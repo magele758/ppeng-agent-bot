@@ -2,6 +2,7 @@
  * Playwright browser backend. Fail-soft with a structured error — never fake success.
  */
 
+import { fenceExternalContent } from '../safety/external-content.js';
 import type { RunContext, ToolExecutionResult } from '../types.js';
 import type { BrowserAction } from './browser-tools.js';
 
@@ -166,7 +167,11 @@ export async function playwrightBrowserAction(
         const title = await page.title();
         return {
           ok: true,
-          content: snapshotFromHtml(html, page.url(), title)
+          content: fenceExternalContent({
+            source: 'browser',
+            label: page.url(),
+            body: snapshotFromHtml(html, page.url(), title)
+          })
         };
       }
       case 'click': {

@@ -710,6 +710,25 @@ export {
   evolutionStartHttpResult
 } from '../evolution/surface.js';
 export type { EvolutionScheduleDecision, EvolutionScheduleReason } from '../evolution/surface.js';
+export {
+  EXTERNAL_FENCE_SYSTEM_SENTENCE,
+  fenceExternalContent,
+  isExternalFence
+} from '../safety/external-content.js';
+export type { ExternalSource } from '../safety/external-content.js';
+export {
+  EgressNotApprovedError,
+  egressNeedsApproval,
+  isMcpMutationTool,
+  isMcpReadOnlyTool,
+  modelTriedToSelfApprove,
+  requireHumanEgressApproval,
+  stripModelSelfApproval
+} from '../safety/egress.js';
+export { parseMcpHttpConfig, parseMcpHttpEndpoints } from '../mcp/mcp-http-config.js';
+export type { McpHttpConfigParse, McpHttpEndpoint, McpHttpTransport } from '../mcp/mcp-http-config.js';
+export { McpHttpSession, isLegacySseEndpointError, redactSecrets } from '../mcp/mcp-http.js';
+export type { McpHttpSessionOptions } from '../mcp/mcp-http.js';
 export { ExtensionRegistry, createExtensionRegistry } from '../extensions/extension-registry.js';
 export type {
   ExtensionPhase,

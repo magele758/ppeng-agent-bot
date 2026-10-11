@@ -89,7 +89,8 @@ export class McpStdioSession {
     return (r.tools ?? []).map((t) => ({
       name: t.name,
       description: t.description,
-      inputSchema: t.inputSchema as Record<string, unknown> | undefined
+      inputSchema: t.inputSchema as Record<string, unknown> | undefined,
+      readOnlyHint: typeof t.annotations?.readOnlyHint === 'boolean' ? t.annotations.readOnlyHint : undefined
     }));
   }
 

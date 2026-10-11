@@ -384,6 +384,24 @@ test('mcp: URLs or stdio configured → enabled; none → off; broken stdio → 
   const bad = pick({ RAW_AGENT_MCP_STDIO: 'not json' });
   assert.equal(bad.enabled, false);
   assert.ok(bad.warnings.some((w) => w.code === 'mcp_stdio_invalid'));
+  const json = pick({
+    RAW_AGENT_MCP_HTTP: JSON.stringify([{ url: 'http://j/mcp' }]),
+    RAW_AGENT_MCP_URLS: 'http://j/mcp,http://k/mcp'
+  });
+  assert.equal(json.params.http, 2);
+  const badHttp = pick({ RAW_AGENT_MCP_HTTP: '{' });
+  assert.equal(badHttp.enabled, false);
+  assert.ok(badHttp.warnings.some((w) => w.code === 'mcp_http_invalid'));
+  const live = byId(
+    resolveEffectiveConfig({
+      env: { RAW_AGENT_MCP_URLS: 'http://a/mcp' },
+      runtime: { mcpHttpConnected: 1 }
+    }),
+    'capability.mcp'
+  );
+  assert.equal(live.reasonCode, 'mcp_connected');
+  assert.equal(live.params.connected, 1);
+  assert.equal(live.params.http, 1);
 });
 
 test('vision: VL model with endpoint → hybrid router on; model only → warning, off; none → off', () => {

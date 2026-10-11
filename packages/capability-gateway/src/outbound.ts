@@ -2,6 +2,7 @@ import { env } from 'node:process';
 import { deliverToChannel } from './channels.js';
 import { recoverOutboundLedger, sendLedgered, type DeliveryRow } from './delivery-ledger.js';
 import { sendFeishuTextMessage } from './feishu-api.js';
+import { appendOutboundDraft } from './outbound-drafts.js';
 import type { ChannelSpec } from './types.js';
 
 export async function deliverChannelText(opts: {
@@ -9,16 +10,30 @@ export async function deliverChannelText(opts: {
   channel: ChannelSpec;
   text: string;
   event?: string;
+  /** Only ledger replay of an already-attempting row passes `approved`. */
+  approval?: 'approved';
 }): Promise<void> {
+  if (opts.approval !== 'approved') {
+    await appendOutboundDraft(opts.gatewayDir, {
+      channelId: opts.channel.id,
+      text: opts.text,
+      event: opts.event ?? 'gateway.im.reply'
+    });
+    return;
+  }
   await sendLedgered({
     gatewayDir: opts.gatewayDir,
     target: { type: 'channel', channelId: opts.channel.id },
     text: opts.text,
     send: async (text) => {
-      const result = await deliverToChannel(opts.channel, {
-        text,
-        event: opts.event ?? 'gateway.im.reply'
-      });
+      const result = await deliverToChannel(
+        opts.channel,
+        {
+          text,
+          event: opts.event ?? 'gateway.im.reply'
+        },
+        { approval: 'approved' }
+      );
       if (!result.ok) throw new Error(result.text || 'delivery failed');
     }
   });
@@ -30,7 +45,7 @@ async function resendRow(row: DeliveryRow, text: string, channels: ChannelSpec[]
     case 'channel': {
       const channel = channels.find((item) => item.id === target.channelId);
       if (!channel) throw new Error(`missing channel ${target.channelId}`);
-      const result = await deliverToChannel(channel, { text, event: 'gateway.im.reply' });
+      const result = await deliverToChannel(channel, { text, event: 'gateway.im.reply' }, { approval: 'approved' });
       if (!result.ok) throw new Error(result.text || 'delivery failed');
       return;
     }

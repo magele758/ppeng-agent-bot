@@ -72,7 +72,11 @@ test('绑定 Bot 的普通文本仍在固定对话里跑一轮 [AC:bot-forever-c
   assert.equal(sessionId, 'sess_alice');
   assert.deepEqual(runtime.commands, [{ sessionId: 'sess_alice', text: 'hello' }]);
   assert.equal(runtime.calls.created.length, 0);
-  assert.deepEqual(runtime.calls.sent, [{ sessionId: 'sess_alice', text: 'hello' }]);
+  assert.equal(runtime.calls.sent.length, 1);
+  assert.equal(runtime.calls.sent[0].sessionId, 'sess_alice');
+  assert.match(runtime.calls.sent[0].text, /«external source=im /);
+  assert.match(runtime.calls.sent[0].text, /hello/);
+  assert.match(runtime.calls.sent[0].text, /«end external»/);
   assert.deepEqual(runtime.calls.ran, ['sess_alice']);
   assert.equal(replies.length, 1);
 });
@@ -88,6 +92,7 @@ test('未绑定 Bot 的 /new 不会走 Bot 命令 [AC:bot-forever-chat#AC-6]', a
   assert.equal(response.status, 200);
   assert.deepEqual(runtime.commands, []);
   assert.equal(runtime.calls.created.length, 1);
-  assert.equal(runtime.calls.created[0].message, '/new');
+  assert.match(runtime.calls.created[0].message, /«external source=im /);
+  assert.match(runtime.calls.created[0].message, /\/new/);
   assert.equal(runtime.calls.ran.length, 1);
 });

@@ -9,7 +9,8 @@ import {
   runAgentTurnAndReply,
   tryBotChatCommand
 } from './im-handlers.js';
-import { deliverChannelText, recoverGatewayOutbound } from './outbound.js';
+import { appendOutboundDraft } from './outbound-drafts.js';
+import { recoverGatewayOutbound } from './outbound.js';
 import { resolveImOutbound } from './silent-reply.js';
 import { readGatewaySettings } from './gateway-settings.js';
 import { readGatewayState } from './state.js';
@@ -339,7 +340,11 @@ export async function handleGatewayHttp(
       }
       if (channel.type === 'webhook' || channel.type === 'http_post') {
         try {
-          await deliverChannelText({ gatewayDir, channel, text: decision.text });
+          await appendOutboundDraft(gatewayDir, {
+            channelId: channel.id,
+            text: decision.text,
+            event: 'gateway.im.reply'
+          });
         } catch (e) {
           json(response, 502, {
             error: e instanceof Error ? e.message : String(e),

@@ -1,4 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { fenceExternalContent } from '../safety/external-content.js';
 import { dirname, join } from 'node:path';
 import { NotFoundError, ValidationError } from '../errors.js';
 import { createId, nowIso } from '../id.js';
@@ -204,7 +205,9 @@ export class AttachmentIngestService {
       encoding: resolved?.encoding,
       imageAssetId,
       artifactHandle,
-      emitText: emitText || undefined,
+      emitText: emitText
+        ? fenceExternalContent({ source: 'attachment', label: file.fileName || 'file', body: emitText })
+        : undefined,
       createdAt: nowIso()
     };
     this.ctx.store.createAttachment(attachment);

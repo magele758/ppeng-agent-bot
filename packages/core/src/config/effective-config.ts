@@ -15,6 +15,7 @@
  * 只有「显式强制了某个云档，却缺依赖」才算硬错误（`missingForced`）。
  */
 
+import { parseMcpHttpConfig } from '../mcp/mcp-http-config.js';
 import type {
   AssetStorageProvider,
   DeploymentMode,
@@ -74,6 +75,8 @@ export interface EffectiveConfigInput {
     /** 启动探测/运行期失败后回退本地的存储项。 */
     storageFallbacks?: Partial<Record<StorageFeature, ConfigNote>>;
     domainsMounted?: string[];
+    /** Live HTTP MCP sessions that finished connect(). */
+    mcpHttpConnected?: number;
   };
 }
 
@@ -516,20 +519,29 @@ function countMcpStdio(env: NodeJS.ProcessEnv): number {
 
 function resolveMcp(input: EffectiveConfigInput): EffectiveItem {
   const env = input.env;
-  const urls = (env.RAW_AGENT_MCP_URLS ?? env.RAW_AGENT_MCP_URL ?? '')
-    .split(/[,;\s]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const httpConfig = parseMcpHttpConfig(env);
+  const httpCount = httpConfig.endpoints.length;
   const stdioRaw = val(env, 'RAW_AGENT_MCP_STDIO');
   const stdioCount = countMcpStdio(env);
   const warnings: ConfigNote[] = [];
   if (stdioRaw && stdioCount === 0) {
     warnings.push(note('mcp_stdio_invalid', 'RAW_AGENT_MCP_STDIO is set but has no valid {command} entries.'));
   }
-  const count = urls.length + stdioCount;
+  if (httpConfig.invalidJson) {
+    warnings.push(note('mcp_http_invalid', 'RAW_AGENT_MCP_HTTP is set but is not a JSON array of url entries.'));
+  }
+  const connected = input.runtime?.mcpHttpConnected ?? 0;
+  const count = httpCount + stdioCount;
+  if (connected > 0) {
+    return item('capability.mcp', 'capability', true, 'mcp', 'auto-detected', 'mcp_connected',
+      'HTTP MCP servers are connected.', {
+        params: { connected, http: httpCount, stdio: stdioCount },
+        warnings
+      });
+  }
   if (count > 0) {
     return item('capability.mcp', 'capability', true, 'mcp', 'auto-detected', 'mcp_configured',
-      'MCP servers are configured.', { params: { http: urls.length, stdio: stdioCount }, warnings });
+      'MCP servers are configured.', { params: { http: httpCount, stdio: stdioCount }, warnings });
   }
   return item('capability.mcp', 'capability', false, 'off', 'local-fallback',
     warnings.length ? 'partial_config' : 'not_configured', 'No MCP servers configured.', { warnings });

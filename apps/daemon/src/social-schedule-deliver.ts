@@ -26,13 +26,13 @@ export async function makeSocialPostDeliver(repoRoot: string): Promise<SocialPos
     if (!ch) {
       return { ok: false, detail: `gateway channel id not found: ${id}` };
     }
-    const main = await deliverToChannel(ch, { text: body, summary: body });
+    const main = await deliverToChannel(ch, { text: body, summary: body }, { approval: 'approved' });
     if (!main.ok) {
       return { ok: false, detail: main.text };
     }
     const fc = firstComment?.trim();
     if (fc) {
-      const c2 = await deliverToChannel(ch, { text: fc, summary: fc });
+      const c2 = await deliverToChannel(ch, { text: fc, summary: fc }, { approval: 'approved' });
       if (!c2.ok) {
         return { ok: false, detail: `main post ok but first_comment failed: ${c2.text}` };
       }

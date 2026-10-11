@@ -154,3 +154,115 @@ describe('McpManager – destroy', () => {
     assert.deepStrictEqual(mgr.stdioSessions, []);
   });
 });
+
+function jsonRpc(id, result, extraHeaders = {}) {
+  return new Response(JSON.stringify({ jsonrpc: '2.0', id, result }), {
+    status: 200,
+    headers: { 'content-type': 'application/json', ...extraHeaders }
+  });
+}
+
+function installMcpFetch(toolCalls) {
+  const original = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async (_url, init) => {
+    calls += 1;
+    const method = String(init?.method ?? 'GET').toUpperCase();
+    if (method === 'GET') return new Response('Method Not Allowed', { status: 405 });
+    const msg = JSON.parse(String(init?.body ?? '{}'));
+    if (msg.method === 'initialize') {
+      return jsonRpc(msg.id, {
+        protocolVersion: '2025-11-25',
+        capabilities: {},
+        serverInfo: { name: 'mock', version: '0' }
+      });
+    }
+    if (msg.method === 'notifications/initialized') return new Response(null, { status: 202 });
+    if (msg.method === 'tools/list') {
+      return jsonRpc(msg.id, {
+        tools: [
+          { name: 'whoami', inputSchema: { type: 'object' }, annotations: { readOnlyHint: true } },
+          { name: 'say', inputSchema: { type: 'object' } },
+          { name: 'custom_unknown', inputSchema: { type: 'object' } }
+        ]
+      });
+    }
+    if (msg.method === 'tools/call') {
+      toolCalls.push(msg.params);
+      return jsonRpc(msg.id, { content: [{ type: 'text', text: 'body-from-server' }] });
+    }
+    if (msg.method === 'resources/read') {
+      return jsonRpc(msg.id, { contents: [{ uri: msg.params?.uri, text: 'resource-body', mimeType: 'text/plain' }] });
+    }
+    return new Response('unexpected', { status: 500 });
+  };
+  return {
+    calls: () => calls,
+    restore: () => {
+      globalThis.fetch = original;
+    }
+  };
+}
+
+describe('McpManager – HTTP session', () => {
+  it('does not connect while HTTP tools stay collapsed', async () => {
+    const toolCalls = [];
+    const installed = installMcpFetch(toolCalls);
+    try {
+      const deps = makeDeps({ RAW_AGENT_MCP_URLS: 'http://127.0.0.1:9/mcp' });
+      const mgr = new McpManager(deps);
+      await mgr.ensureLoaded('s');
+      assert.equal(installed.calls(), 0);
+      assert.equal(mgr.httpConnectedCount(), 0);
+      const invoke = deps.tools.find((tool) => tool.name === 'mcp_invoke');
+      assert.equal(invoke.needsApproval(), true);
+      const denied = await invoke.execute({}, { server: 9, tool: 'say' });
+      assert.equal(denied.ok, false);
+      assert.equal(String(denied.content).includes('«external'), false);
+      await mgr.warmHttp();
+      assert.ok(installed.calls() > 0);
+      assert.equal(mgr.httpConnectedCount(), 1);
+      await mgr.destroy();
+    } finally {
+      installed.restore();
+    }
+  });
+
+  it('fences tool and resource results and strips self-approval only on mutations', async () => {
+    const toolCalls = [];
+    const installed = installMcpFetch(toolCalls);
+    try {
+      const deps = makeDeps({
+        RAW_AGENT_MCP_URLS: 'http://127.0.0.1:9/mcp',
+        RAW_AGENT_MCP_EXPAND_HTTP: '1'
+      });
+      const mgr = new McpManager(deps);
+      await mgr.ensureLoaded('s');
+      const say = deps.tools.find((tool) => tool.name === 'mcp_h0_say');
+      const who = deps.tools.find((tool) => tool.name === 'mcp_h0_whoami');
+      const unknown = deps.tools.find((tool) => tool.name === 'mcp_h0_custom_unknown');
+      assert.equal(say.needsApproval(), true);
+      assert.equal(who.needsApproval(), true);
+      const said = await say.execute({}, { text: 'hi', approval: 'approved', approved: true });
+      const identified = await who.execute({}, { approval: 'approved' });
+      const custom = await unknown.execute({}, { approval: 'approved', approved: true });
+      assert.match(said.content, /«external source=mcp label=say»/);
+      assert.match(said.content, /body-from-server/);
+      assert.match(identified.content, /«end external»/);
+      const sayArgs = toolCalls.find((call) => call.name === 'say').arguments;
+      assert.equal(sayArgs.text, 'hi');
+      assert.equal('approval' in sayArgs, false);
+      assert.equal('approved' in sayArgs, false);
+      assert.equal(toolCalls.find((call) => call.name === 'whoami').arguments.approval, 'approved');
+      assert.equal(toolCalls.find((call) => call.name === 'custom_unknown').arguments.approved, true);
+      assert.equal(custom.ok, true);
+      const read = deps.tools.find((tool) => tool.name === 'mcp_read_resource');
+      const resource = await read.execute({}, { server: 0, uri: 'room://1' });
+      assert.match(resource.content, /«external source=mcp label=room:\/\/1»/);
+      assert.match(resource.content, /resource-body/);
+      await mgr.destroy();
+    } finally {
+      installed.restore();
+    }
+  });
+});

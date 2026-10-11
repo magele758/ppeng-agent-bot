@@ -381,6 +381,9 @@ function maybeAutoStartEvolution(): void {
 
 server.listen(port, host, () => {
   log.info(`listening on http://${host}:${port}`);
+  void runtime.warmMcp().catch((error) => {
+    log.warn('MCP HTTP warm connect failed', errorMessage(error));
+  });
   maybeAutoStartSelfHeal();
   maybeAutoStartEvolution();
 });
