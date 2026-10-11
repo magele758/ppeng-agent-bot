@@ -28,6 +28,7 @@
     "audit:upstream": "npm audit --registry=https://registry.npmjs.org",
     "test:e2e": "node scripts/e2e-run.mjs",
     "test:e2e:install": "playwright install --with-deps chromium",
+    "test:pagelens": "node scripts/pagelens-smoke.mjs",
     "test:examples": "node scripts/run-core-examples.mjs",
     "ai:tools": "bash scripts/ai-cli/check-tools.sh",
     "ai:claude": "bash scripts/ai-cli/run-claude-fix.sh",
