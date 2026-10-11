@@ -37,7 +37,7 @@
 | [`MUTATION_TESTING.md`](MUTATION_TESTING.md) | 关键模块变异测试门禁：变异算子、内存注入、分数棘轮、CI（只观察）与存活变异体处理 |
 | [`ROADMAP.md`](ROADMAP.md) | 长期路线（P0–P4）；与实现以代码为准 |
 | [`CAPABILITY_DISCOVERY_PLAN.md`](CAPABILITY_DISCOVERY_PLAN.md) | 自主探针 / Capability Discovery（含 Tailscale 设备池）开发计划（Draft） |
-| [`BOT_CAPABILITY_PLAN.md`](BOT_CAPABILITY_PLAN.md) | Bot 名册 + canonical 对话（Phase A；对照 Hermes/Grok Bot） |
+| [`BOT_CAPABILITY_PLAN.md`](BOT_CAPABILITY_PLAN.md) | Bot 名册 + canonical 对话；`/new` 压缩、`/stop`、`/model` |
 | [`EMBEDDING_SDK.md`](EMBEDDING_SDK.md) | `@ppeng/agent-core` 作为可嵌入 SDK：稳定 API 面、embed env 最小契约、examples 验收 |
 | [`AGENT_LOOP_LAYERING_PLAN.md`](AGENT_LOOP_LAYERING_PLAN.md) | Agent Loop 分层重构计划（L0–L6；保留 step/steer/fold；其他项目可从任意层接入） |
 | [`AGENTS.md`](../AGENTS.md)（前端 i18n） | Lab 用户可见文案：`useI18n` / zh+en 同 key / `localStorage['lab.locale']`，禁止语言 env |
@@ -124,7 +124,7 @@
 | [`DEPLOYMENT.md`](DEPLOYMENT.md) | Docker / Compose / Helm、发布冒烟 |
 | [`K8S_CLOUD_RUNTIME.md`](K8S_CLOUD_RUNTIME.md) | K8s / 云上运行时规划 |
 | [`HARNESS_EVAL.md`](HARNESS_EVAL.md) | `npm run agent:eval`、fast/nightly cases |
-| [`IM_AGENT_INTEGRATION.md`](IM_AGENT_INTEGRATION.md) | 飞书 / 企微 / Webhook 与 Agent 控制 |
+| [`IM_AGENT_INTEGRATION.md`](IM_AGENT_INTEGRATION.md) | 飞书 / 企微 / Webhook、静默回复、投递账本、例行预检 |
 
 ---
 

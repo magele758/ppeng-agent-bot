@@ -1,0 +1,21 @@
+id: subagent-delegation
+title: 委派子任务的上下文隔离、权限收敛与重启未知态
+status: implemented
+requirement: |
+  When a bot (or any agent) spawns a subagent/delegate task: the child must start without the parent's transcript (summary back only, which you likely already do — keep it), and the child must NOT be given tools that write memory, send outbound IM, create cron/routines, or ask the user to clarify. If the process restarts, an in-flight subagent must be marked unknown, not replayed as success (side effects may have happened). Add heartbeat/timeouts only if a hook already exists; do not build a new supervisor. Acceptance-first, user pre-authorized, tests first. Open a non-draft PR. Do not merge. Do not edit gateway, compression, or approval expiry.
+criteria:
+  - id: AC-1
+    given: 一个 Bot 或普通 Agent 的对话里已经有先前的往来
+    when: 它把一件任务委派给子任务
+    then: 子任务从这份委派说明开始，看不到父对话的历史；子任务结束后，父对话只收到结果摘要，看不到子任务的中间过程
+  - id: AC-2
+    given: 父 Agent（包括 Bot）自己可以写记忆、向外发消息、创建定时任务、向用户追问
+    when: 它委派一个子任务
+    then: 子任务拿不到这些能力，即使父方明确要求把它们交给子任务也不行；读记忆和做手头工作的其它工具仍然可用
+  - id: AC-3
+    given: 一个子任务还在执行，进程随即重启
+    when: 进程重新起来
+    then: 这个子任务被标成未知，而不是成功完成；系统不会再跑一遍并把它记成成功。已经结束的子任务，以及仍在进行的普通对话，不会被改成未知
+notes: |
+  负责人已预先批准本需求，按验收优先直接实现。
+  现有运行时没有子任务心跳或空闲/单工具超时钩子，因此不新增监督器，也不加心跳或超时。

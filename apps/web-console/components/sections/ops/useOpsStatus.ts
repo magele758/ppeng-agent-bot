@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
+import { evolutionEntryVisible } from '@/lib/evolution-surface';
 import type { SelfHealRunLike } from '@/lib/ops-health';
 
 export interface EvolutionSnapshot {
@@ -63,15 +64,17 @@ export function useOpsStatus(opts: { pollMs?: number; withRuns?: boolean } = {})
               .then((r) => ((r as { runs?: SelfHealRunLike[] }).runs ?? []) as SelfHealRunLike[])
               .catch(() => null)
           : Promise.resolve(null),
-        api('/api/evolution/overview')
-          .then((r) => {
-            const o = r as { activeWorktrees?: unknown[]; counts?: Record<string, number> };
-            return {
-              activeWorktrees: Array.isArray(o.activeWorktrees) ? o.activeWorktrees.length : 0,
-              counts: o.counts ?? {}
-            } satisfies EvolutionSnapshot;
-          })
-          .catch(() => null)
+        evolutionEntryVisible()
+          ? api('/api/evolution/overview')
+              .then((r) => {
+                const o = r as { activeWorktrees?: unknown[]; counts?: Record<string, number> };
+                return {
+                  activeWorktrees: Array.isArray(o.activeWorktrees) ? o.activeWorktrees.length : 0,
+                  counts: o.counts ?? {}
+                } satisfies EvolutionSnapshot;
+              })
+              .catch(() => null)
+          : Promise.resolve(null)
       ]);
       if (!alive.current) return;
       setStatus((prev) => ({

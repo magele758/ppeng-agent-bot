@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { approvalInboxStatusText } from '@/lib/approval-inbox';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { sortAgentsById } from '@/lib/sort-utils';
@@ -48,38 +49,47 @@ export function InboxView() {
           <EmptyState title={t('tasks.inbox.approvalsEmptyTitle')} description={t('tasks.inbox.approvalsEmptyDesc')} />
         ) : (
           <div id="listApprovals" className={styles.list}>
-            {approvals.map((a) => (
-              <div key={a.id} className={`list-item ${styles.row}`}>
-                <div className={styles.rowMain}>
-                  <strong>{a.toolName}</strong>
+            {approvals.map((a) => {
+              const expiryNote = approvalInboxStatusText(a, t);
+              const expired = Boolean(a.expireReason);
+              return (
+                <div key={a.id} className={`list-item ${styles.row}`}>
+                  <div className={styles.rowMain}>
+                    <strong>{a.toolName}</strong>
+                  </div>
+                  <div className={styles.rowMeta}>
+                    <span>{t('tasks.inbox.reason', { reason: a.reason || t('tasks.inbox.noReason') })}</span>
+                    <span>{t('tasks.inbox.session', { id: a.sessionId })}</span>
+                    {expiryNote ? <span>{expiryNote}</span> : null}
+                  </div>
+                  <div className={styles.actions}>
+                    {expired ? null : (
+                      <>
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm"
+                          aria-label={t('tasks.inbox.approveAria', { tool: a.toolName })}
+                          onClick={() => decide(a.id, 'approve')}
+                        >
+                          {t('tasks.inbox.approve')}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          aria-label={t('tasks.inbox.rejectAria', { tool: a.toolName })}
+                          onClick={() => decide(a.id, 'reject')}
+                        >
+                          {t('tasks.inbox.reject')}
+                        </button>
+                      </>
+                    )}
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => void openSession(a.sessionId, { focusChat: true })}>
+                      {t('tasks.openSession')}
+                    </button>
+                  </div>
                 </div>
-                <div className={styles.rowMeta}>
-                  <span>{t('tasks.inbox.reason', { reason: a.reason || t('tasks.inbox.noReason') })}</span>
-                  <span>{t('tasks.inbox.session', { id: a.sessionId })}</span>
-                </div>
-                <div className={styles.actions}>
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm"
-                    aria-label={t('tasks.inbox.approveAria', { tool: a.toolName })}
-                    onClick={() => decide(a.id, 'approve')}
-                  >
-                    {t('tasks.inbox.approve')}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    aria-label={t('tasks.inbox.rejectAria', { tool: a.toolName })}
-                    onClick={() => decide(a.id, 'reject')}
-                  >
-                    {t('tasks.inbox.reject')}
-                  </button>
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => void openSession(a.sessionId, { focusChat: true })}>
-                    {t('tasks.openSession')}
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </SettingsGroup>

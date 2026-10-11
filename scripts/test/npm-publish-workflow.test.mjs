@@ -21,7 +21,7 @@ import {
   stripEmptyNpmAuth,
   withoutNpmTokens,
 } from '../publish-npm-lib.mjs';
-import { PUBLIC_PACKAGES } from '../npm-artifacts.mjs';
+import { PUBLIC_PACKAGES, PUBLIC_PACK_FILES } from '../npm-artifacts.mjs';
 
 const workflowPath = new URL('../../.github/workflows/publish-npm.yml', import.meta.url);
 const workflowText = readFileSync(workflowPath, 'utf8');
@@ -74,6 +74,9 @@ test('手动运行和 npm-v 正式 Release 才发布 [AC:npm-auto-publish#AC-3]'
 
 test('只允许两个已公开的包 [AC:npm-auto-publish#AC-4]', () => {
   assert.deepEqual(PUBLIC_PACKAGES, ['api-types', 'agent-loop']);
+  assert.ok(PUBLIC_PACK_FILES.includes('SKILL.md'));
+  const loopPkg = JSON.parse(readFileSync(new URL('../../packages/agent-loop/package.json', import.meta.url), 'utf8'));
+  assert.ok(loopPkg.files.includes('SKILL.md'));
   assert.deepEqual(PUBLIC_NPM_NAMES, ['@mage-ai-lab/api-types', '@mage-ai-lab/agent-loop']);
   assert.deepEqual(
     assertPublishablePackage({ name: '@mage-ai-lab/agent-loop', version: '0.1.2' }),

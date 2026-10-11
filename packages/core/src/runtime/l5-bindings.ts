@@ -3,6 +3,10 @@
  */
 
 import type { ApprovalPolicy } from '../approval/approval-policy.js';
+import {
+  armUnattendedApprovalExpiry,
+  expireDueUnattendedApprovals
+} from '../approval/unattended-approval.js';
 import type { FileApprovalPolicy } from '../approval/policy-loader.js';
 import type { ExtensionRegistry } from '../extensions/extension-registry.js';
 import type { Logger } from '../logger.js';
@@ -313,6 +317,11 @@ export function toolLoopDepsFrom(rt: L5Bindable): ToolLoopDeps {
       return r.systemMessage ? { systemMessage: r.systemMessage } : undefined;
     },
     settingsStore: rt.store,
+    armUnattendedApproval: (approval) => {
+      armUnattendedApprovalExpiry(approval, () => {
+        expireDueUnattendedApprovals(rt.store);
+      });
+    },
     onArtifactCreated: (manifest) => {
       try {
         rt.store.createArtifactIndex({

@@ -41,3 +41,15 @@ export {
   slugifyBotName,
   updateBot
 } from './bot-facade.js';
+export {
+  applyBotChatCommand,
+  canonicalBotIdFromSession,
+  parseBotChatCommand,
+  resolveBotModelArg
+} from './bot-chat-commands.js';
+export type {
+  BotChatCommandCode,
+  BotChatCommandHost,
+  BotChatCommandResult,
+  ParsedBotChatCommand
+} from './bot-chat-commands.js';

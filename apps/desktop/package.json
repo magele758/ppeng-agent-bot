@@ -12,7 +12,6 @@
     "pack": "npm run build && electron-builder --dir",
     "dist": "node ../../scripts/build-desktop.mjs",
     "dist:mac:arm64": "node ../../scripts/build-desktop.mjs --platform mac --arch arm64",
-    "dist:mac:x64": "node ../../scripts/build-desktop.mjs --platform mac --arch x64",
     "dist:win:x64": "node ../../scripts/build-desktop.mjs --platform win --arch x64",
     "dist:win:arm64": "node ../../scripts/build-desktop.mjs --platform win --arch arm64",
     "dist:linux:x64": "node ../../scripts/build-desktop.mjs --platform linux --arch x64",

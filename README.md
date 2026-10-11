@@ -63,7 +63,7 @@ SDK presets are `mini / normal / full / max`. Browser and extension hosts must u
 | `apps/daemon` | HTTP API, scheduler, static stub for `/`; **use Next for UI** |
 | `apps/cli` | `chat`, `send`, tasks, approvals, **self-heal**, daemon restart ack |
 | `apps/web-console` | Agent Lab (Next.js) |
-| `apps/desktop` | **Desktop Client** (Electron; macOS / Windows / Linux × x64 / arm64) |
+| `apps/desktop` | **Desktop Client** (Electron; macOS arm64, Windows and Linux × x64 / arm64) |
 
 ---
 
@@ -98,7 +98,7 @@ npm run build:desktop
 # Output: apps/desktop/release/RawAgent-<version>-<os>-<arch>.{dmg,exe,AppImage}
 ```
 
-CI builds all six artifacts (mac/win/linux × x64/arm64) daily at 17:00 UTC (01:00 Beijing), via Actions → **Desktop artifacts**, a `desktop-v*` tag (no GitHub Release), or a `v*` tag. See [`doc/CI.md`](doc/CI.md) and [`apps/desktop/README.md`](apps/desktop/README.md).
+CI builds five artifacts (macOS arm64, plus Windows and Linux × x64/arm64) daily at 17:00 UTC (01:00 Beijing), via Actions → **Desktop artifacts**, a `desktop-v*` tag (no GitHub Release), or a `v*` tag. Intel Mac (darwin x64) is not built. See [`doc/CI.md`](doc/CI.md) and [`apps/desktop/README.md`](apps/desktop/README.md).
 
 ---
 

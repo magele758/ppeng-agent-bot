@@ -31,6 +31,7 @@ import { tryCreateDynToolStore } from '../dyn-tools/store.js';
 import { isPtcSession } from '../ptc/mode.js';
 import { readSkillProposalSettings } from '../skill-proposals/settings.js';
 import { SKILL_PROPOSE_TOOL_NAME } from '../skill-proposals/tool.js';
+import { stripSubagentDeniedTools } from '../runtime/subagent-policy.js';
 import {
   isCanonicalBotChatSession,
   MESSAGE_AGENT_TOOL_NAME
@@ -141,7 +142,7 @@ export function filterToolsForSession(input: {
   if (!isCanonicalBotChatSession(input.session)) {
     tools = tools.filter((t) => t.name !== MESSAGE_AGENT_TOOL_NAME);
   }
-  return { allowExternalAiTools, tools };
+  return { allowExternalAiTools, tools: stripSubagentDeniedTools(input.session, tools) };
 }
 
 export function resolveTurnTools(input: {
@@ -177,9 +178,12 @@ export function resolveTurnTools(input: {
     names.add(tool.name);
   }
   const merged = extras.length > 0 ? [...filtered.tools, ...extras] : filtered.tools;
-  const turnTools = isCanonicalBotChatSession(input.session)
-    ? merged
-    : merged.filter((t) => t.name !== MESSAGE_AGENT_TOOL_NAME);
+  const turnTools = stripSubagentDeniedTools(
+    input.session,
+    isCanonicalBotChatSession(input.session)
+      ? merged
+      : merged.filter((t) => t.name !== MESSAGE_AGENT_TOOL_NAME)
+  );
   const profile = runProfileFromSession(input.session);
   const bindPatch = sealTaskRunModePatch(input.session.metadata, profile.mode);
   const workspaceSeal = sealWorkspaceBindingPatch(

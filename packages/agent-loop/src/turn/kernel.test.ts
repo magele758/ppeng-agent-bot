@@ -385,12 +385,18 @@ describe('runSessionKernel wiring', () => {
     ).toBe(false);
   });
 
-  it('clamps fold budget when the host does not override applyFoldBudget', async () => {
+  it('does not count-slice history that still fits the token budget', async () => {
+    let seen = 0;
     const { host, session } = createHarness({
       host: {
         loopConfig: { maxVisibleMessages: 3, foldBudgetClamp: true },
         runTurnWithRetries: async (input) => {
-          expect(input.messages.length).toBeLessThanOrEqual(3);
+          seen = input.messages.length;
+          const text = input.messages.flatMap((m) =>
+            m.parts.filter((p) => p.type === 'text').map((p) => p.text)
+          );
+          expect(text).toContain('hi');
+          expect(text).toContain('pad-0');
           return textResult('ok');
         },
       },
@@ -401,6 +407,65 @@ describe('runSessionKernel wiring', () => {
       ]);
     }
     await runSessionKernel(host, session.id);
+    expect(seen).toBeGreaterThan(3);
+  });
+
+  it('keeps the latest user when summary does not shrink an over-budget fold', async () => {
+    let roles: string[] = [];
+    let sawQuestion = false;
+    const { host, session } = createHarness({
+      host: {
+        env: { RAW_AGENT_COMPACT_TOKEN_THRESHOLD: '80' },
+        autoCompact: async () => ({}),
+        loopConfig: { maxVisibleMessages: 3, foldBudgetClamp: true },
+        runTurnWithRetries: async (input) => {
+          roles = input.messages.map((m) => m.role);
+          sawQuestion = input.messages.some(
+            (m) => m.role === 'user' && m.parts.some((p) => p.type === 'text' && p.text === 'hi')
+          );
+          const open = new Set<string>();
+          for (const message of input.messages) {
+            const calls: string[] = [];
+            const results: string[] = [];
+            for (const part of message.parts) {
+              if (part.type === 'tool_call') calls.push(part.toolCallId);
+              if (part.type === 'tool_result') results.push(part.toolCallId);
+            }
+            for (const id of results) expect(open.has(id)).toBe(true);
+            for (const id of calls) open.add(id);
+            for (const id of results) open.delete(id);
+          }
+          return textResult('ok');
+        },
+      },
+    });
+    for (let w = 0; w < 12; w += 1) {
+      host.store.appendMessage(session.id, 'assistant', [
+        { type: 'tool_call', toolCallId: `c${w}a`, name: 'navigate_tab', input: {} },
+        { type: 'tool_call', toolCallId: `c${w}b`, name: 'get_page_info', input: {} },
+      ]);
+      host.store.appendMessage(session.id, 'tool', [
+        {
+          type: 'tool_result',
+          toolCallId: `c${w}a`,
+          name: 'navigate_tab',
+          ok: true,
+          content: 'x'.repeat(500),
+        },
+      ]);
+      host.store.appendMessage(session.id, 'tool', [
+        {
+          type: 'tool_result',
+          toolCallId: `c${w}b`,
+          name: 'get_page_info',
+          ok: true,
+          content: 'x'.repeat(500),
+        },
+      ]);
+    }
+    await runSessionKernel(host, session.id);
+    expect(sawQuestion).toBe(true);
+    expect(roles[0]).not.toBe('tool');
   });
 
   it('delivers latch + hooks + onEvent for turn_prepared / ended', async () => {

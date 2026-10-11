@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Build one desktop artifact (mac/win/linux × x64/arm64).
+ * Build one desktop artifact (macOS arm64, or win/linux × x64/arm64).
+ * Intel Mac (darwin x64 / mac-x64) is not a target.
  *
  *   node scripts/build-desktop.mjs
  *   node scripts/build-desktop.mjs --platform linux --arch x64

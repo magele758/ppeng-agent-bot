@@ -10,8 +10,15 @@ export interface LoopConfig {
   maxContextTokens?: number;
   /** Call host.autoCompact at the start of every turn. Default true. */
   compactEveryTurn?: boolean;
-  /** Clamp the fold when the host does not supply applyFoldBudget. Default true. */
+  /**
+   * Fit the fold when the host does not supply applyFoldBudget. Default true.
+   * Under the token budget this does not tail-slice to maxVisibleMessages.
+   */
   foldBudgetClamp?: boolean;
+  /**
+   * Legacy visible-message count. Not a hard tail slice: under the token
+   * budget it must not drop the latest user message.
+   */
   maxVisibleMessages?: number;
   /** Consult shouldLatchBeforeTools / decideHitlLatch. Default true. */
   hitlLatch?: boolean;

@@ -16,6 +16,8 @@ import {
   createProviderConfigFromEnv,
   validateProviderConfig,
   createCoreStorageContext,
+  considerEvolutionSchedule,
+  EVOLUTION_DISABLED_CODE,
   type CoreStorageContext,
 } from '@ppeng/agent-core';
 import { availableDomainIds, loadDomainBundles } from './domain-loader.js';
@@ -370,9 +372,17 @@ function maybeAutoStartSelfHeal(): void {
   }
 }
 
+function maybeAutoStartEvolution(): void {
+  const decision = considerEvolutionSchedule({ reason: 'boot' });
+  if (!decision.started) {
+    log.info(`${EVOLUTION_DISABLED_CODE}: evolution will not auto-start`);
+  }
+}
+
 server.listen(port, host, () => {
   log.info(`listening on http://${host}:${port}`);
   maybeAutoStartSelfHeal();
+  maybeAutoStartEvolution();
 });
 
 // `setInterval` does not wait for an async callback: a scheduler tick that is

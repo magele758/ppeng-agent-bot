@@ -348,7 +348,9 @@ export interface TurnKernelHost {
   autoClaimTask?(session: SessionRecord): Promise<void>;
 
   /**
-   * Post-fold history budget. Omit and the kernel clamps to maxVisibleMessages.
+   * Post-fold history budget. Omit and the kernel keeps the fold while it is
+   * under the token budget; over budget it pins the system prompt and latest
+   * user message and cuts on a closed tool wave.
    */
   applyFoldBudget?(session: SessionRecord, folded: SessionMessage[]): SessionMessage[];
 

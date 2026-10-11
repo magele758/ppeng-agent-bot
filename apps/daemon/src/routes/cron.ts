@@ -38,7 +38,8 @@ export function cronRoutes(runtime: RawAgentRuntime): RouteSpec[] {
           cron: typeof body.cron === 'string' ? body.cron : '',
           sessionId: typeof body.sessionId === 'string' ? body.sessionId : undefined,
           botId: typeof body.botId === 'string' ? body.botId : undefined,
-          enabled: typeof body.enabled === 'boolean' ? body.enabled : undefined
+          enabled: typeof body.enabled === 'boolean' ? body.enabled : undefined,
+          ...('precheck' in body ? { precheck: body.precheck } : {})
         });
         json(response, 201, { job });
       }
@@ -60,6 +61,7 @@ export function cronRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         if (typeof body.prompt === 'string') patch.prompt = body.prompt;
         if (typeof body.cron === 'string') patch.cron = body.cron;
         if (typeof body.enabled === 'boolean') patch.enabled = body.enabled;
+        if ('precheck' in body) patch.precheck = body.precheck;
         json(response, 200, { job: runtime.updateCronJob(requireParam('id'), patch) });
       }
     },

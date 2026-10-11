@@ -60,7 +60,7 @@ test('same stored session: after_text_assistant collapses more than keep_recent'
   assert.equal(keep.stats.collapsed, 0, 'single recent result stays verbatim under keep_recent=3');
   assert.equal(after.stats.collapsed, 1);
   assert.ok(after.stats.charsSaved > 0);
-  assert.match(after.modelView.find((m) => m.parts.some((p) => p.type === 'tool_result')).parts[0].content, /output dropped/);
+  assert.match(after.modelView.find((m) => m.parts.some((p) => p.type === 'tool_result')).parts[0].content, /omitted to save space/);
   assert.equal(
     keep.modelView.find((m) => m.parts.some((p) => p.type === 'tool_result')).parts[0].content,
     longDump

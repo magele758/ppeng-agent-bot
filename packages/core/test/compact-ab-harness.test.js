@@ -102,7 +102,7 @@ test('silent seed: after_text drops the fact, keep_recent keeps it', () => {
   const toolResults = live.messages.flatMap((m) => m.parts.filter((p) => p.type === 'tool_result'));
   assert.equal(toolResults.length, 3);
   for (const part of toolResults) {
-    assert.match(part.content, /output dropped from context/);
+    assert.match(part.content, /earlier tool output was omitted to save space/);
     assert.equal(part.content.includes(FACT), false);
   }
 });
@@ -243,6 +243,6 @@ test('runtime follow-up sees stubbed dump under after_text, verbatim under keep_
   const keepView = await capturedDump('keep_recent');
   const afterView = await capturedDump('after_text_assistant');
   assert.match(keepView, /rel_liveview01/);
-  assert.match(afterView, /output dropped from context/);
+  assert.match(afterView, /earlier tool output was omitted to save space/);
   assert.equal(afterView.includes(liveToken), false);
 });

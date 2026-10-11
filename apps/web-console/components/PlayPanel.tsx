@@ -129,6 +129,8 @@ function sessionStatusKey(status: string): MessageKey | null {
       return 'play.sessionStatus.waitingApproval';
     case 'failed':
       return 'play.sessionStatus.failed';
+    case 'unknown':
+      return 'play.sessionStatus.unknown';
     default:
       return null;
   }

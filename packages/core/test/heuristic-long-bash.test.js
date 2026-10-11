@@ -144,7 +144,7 @@ test('heuristic session: after_text model view stubs consumed long bash', async 
   assert.equal(after.stats.collapsed, 1);
   assert.match(
     after.modelView.flatMap((m) => m.parts).find((p) => p.type === 'tool_result').content,
-    /output dropped/
+    /omitted to save space/
   );
   assert.match(
     keep.modelView.flatMap((m) => m.parts).find((p) => p.type === 'tool_result').content,

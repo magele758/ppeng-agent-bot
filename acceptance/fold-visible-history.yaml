@@ -1,0 +1,35 @@
+id: fold-visible-history
+title: 折叠历史保留用户问题
+status: implemented
+notes: user pre-authorized
+requirement: |
+  Under the token budget, do NOT hard-slice history to MAX_VISIBLE_MESSAGES (24).
+  Count cap must not drop the latest user message.
+  Always keep the original system prompt and the latest user message.
+  When a cut is required, cut only on a closed tool wave (assistant tool_calls plus
+  matching tool results). Never leave a leading orphan tool message whose assistant
+  tool_calls was dropped.
+  If a prefix must be dropped because the token budget is exceeded, use the existing
+  autoCompact summary path; if summary fails, fall back to pin-user + closed-wave,
+  never the old blind slice.
+criteria:
+  - id: AC-1
+    given: 对话仍在 token 预算内，历史里有系统提示、用户问题，以及超过 24 条工具回合消息
+    when: 这些历史被打包给模型
+    then: 用户的原问题仍在，条数上限不会把它整段丢掉
+  - id: AC-2
+    given: 对话仍在 token 预算内，工具回合超过 24 条，且其中有一次助手同时发出多条工具调用
+    when: 这些历史被打包给模型
+    then: 开头不会出现失去对应助手工具调用的工具结果
+  - id: AC-3
+    given: 必须裁掉更早的一段历史
+    when: 执行裁切
+    then: 最初的系统提示和最新一条用户消息都还在，并且只在已经闭合的工具回合边界上裁切
+  - id: AC-4
+    given: token 预算已经不够，需要丢掉更早的前缀
+    when: 能为这段前缀生成摘要
+    then: 用摘要换掉前缀，最初的系统提示和最新用户消息仍留在对话里
+  - id: AC-5
+    given: token 预算已经不够，且摘要生成失败
+    when: 历史被打包给模型
+    then: 仍保留最新用户消息和完整的工具回合，不会退回到从尾部盲目切片

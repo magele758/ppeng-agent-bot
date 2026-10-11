@@ -9,6 +9,7 @@
  * The actual session execution stays on the runtime (`runSession`) — this
  * service only decides *which* sessions to wake.
  */
+import { stampSessionWake } from '../approval/unattended-approval.js';
 import type { SqliteStateStore } from '../storage.js';
 import type { SessionRecord } from '../types.js';
 
@@ -77,6 +78,7 @@ export class AutonomousScheduler {
           .listTasks({ status: 'pending' })
           .some((task) => !task.ownerAgentId && task.blockedBy.length === 0);
       if (shouldRun) {
+        stampSessionWake(store, session.id, { kind: 'unattended', source: 'scheduler' });
         await runSession(session.id);
       }
     }

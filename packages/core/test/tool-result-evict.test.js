@@ -69,7 +69,7 @@ test('after_text does not evict across a tool-call-only assistant turn', () => {
   ];
   const any = microCompactMessages(input, AFTER_ANY);
   const text = microCompactMessages(input, AFTER_TEXT);
-  assert.match(any.messages[0].parts[0].content, /output dropped/);
+  assert.match(any.messages[0].parts[0].content, /omitted to save space/);
   assert.equal(text.messages[0].parts[0].content, input[0].parts[0].content);
   assert.equal(text.messages[2].parts[0].content, input[2].parts[0].content);
 });

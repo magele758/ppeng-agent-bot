@@ -50,6 +50,7 @@ import {
 import { claimAndApplyInbox } from '../session/apply-claimed-inbox.js';
 import { decideRewindTail, latestCheckpoint } from '../session/checkpoint.js';
 import { clampFoldToVisible } from '../session/fold-budget.js';
+import { resolveHistoryTokenBudget } from '../session/session-budget.js';
 import { estimateUsageCostUsd, mergeCostUsd } from '../model/token-cost.js';
 import { mergeUsage, splitCumulativePromptTokens } from '../model/usage.js';
 import {
@@ -413,7 +414,15 @@ export async function runSessionKernel(
       applyFoldBudget: (sess, foldedMsgs) => {
         if (host.applyFoldBudget) return host.applyFoldBudget(sess, foldedMsgs);
         if (!loopConfig.foldBudgetClamp) return foldedMsgs;
-        return clampFoldToVisible(foldedMsgs, loopConfig.maxVisibleMessages);
+        const tokenBudget = resolveHistoryTokenBudget(
+          'RAW_AGENT_COMPACT_TOKEN_THRESHOLD',
+          { maxContextTokens: loopConfig.maxContextTokens ?? host.maxContextTokens },
+          env
+        );
+        return clampFoldToVisible(foldedMsgs, {
+          maxVisible: loopConfig.maxVisibleMessages,
+          tokenBudget,
+        });
       },
       readWorkingLogTail:
         skipMemory || !host.readWorkingLogAppendix

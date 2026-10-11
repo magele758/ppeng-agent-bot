@@ -7,7 +7,9 @@ description: Embeddable agent loop core SDK (@ppeng/agent-loop / @mage-ai-lab/ag
 
 `@ppeng/agent-loop`（公开发布名 `@mage-ai-lab/agent-loop`）是无外部服务端依赖的可嵌入 Agent 循环内核，提供**单轮 Turn 推进、模型适配器调用、流式退化守卫（Watchdog）、故障自愈与人工审批（HITL）、以及会话步进转向（Steering）**。
 
-源码目录：[`packages/agent-loop`](file:///Users/penglei/developer/self-test-grounding/ppeng-agent-core/packages/agent-loop)
+Bot 模式不在这个包里（它在 daemon / RawAgentRuntime 上）。
+
+源码目录：`packages/agent-loop`。外部项目读 `node_modules/@mage-ai-lab/agent-loop/SKILL.md`（与本文件相同）。
 
 ---
 
@@ -34,59 +36,79 @@ SDK 提供 4 个组装档位（高档位包含所有低档位模块）：
 
 ## 2. 嵌入使用范式（Consumer Usage）
 
-### 2.1 组装式调用（`createAssembledLoop`）
+### 2.1 组装式调用（`createAssembledLoop` + `createHandle`）
 
-```ts
-import { createAssembledLoop } from '@ppeng/agent-loop/assembly';
-import { OpenAiChatAdapter } from '@ppeng/agent-loop/model';
+会话入口是 `createAssembledLoop({ preset })`，再 `createHandle(sessionId)`。`createHandle` 只在 `full` / `max` 上提供。不要把 `createAgentLoop` 当作会话入口（它是这两个档位内部用来造句柄的工厂）。
 
-// 1. 根据需求选择档位组装
+```ts quickstart
+import { createAssembledLoop, OpenAiChatAdapter } from '@mage-ai-lab/agent-loop';
+import { createDefaultMemoryStore, DEFAULT_EMBED_AGENT } from '@mage-ai-lab/agent-loop/mini';
+
+const apiKey = process.env.OPENAI_API_KEY;
+if (!apiKey) throw new Error('Set OPENAI_API_KEY');
+
+const { store, surface } = createDefaultMemoryStore({ agent: DEFAULT_EMBED_AGENT });
+const session = surface.createSession({
+  title: 'weather',
+  mode: 'chat',
+  agentId: DEFAULT_EMBED_AGENT.id,
+});
+surface.appendMessage(session.id, 'user', [
+  { type: 'text', text: 'What is the weather in Shanghai?' },
+]);
+
 const loop = await createAssembledLoop({
-  preset: 'normal', // 'mini' | 'normal' | 'full' | 'max'
+  preset: 'full',
   io: {
+    store,
     model: new OpenAiChatAdapter({
-      apiKey: process.env.OPENAI_API_KEY!,
-      model: 'gpt-4o'
+      apiKey,
+      baseUrl: process.env.OPENAI_BASE_URL ?? 'https://api.openai.com/v1',
+      model: process.env.OPENAI_MODEL ?? 'gpt-4o',
+      useJsonMode: false,
     }),
     tools: [
       {
         name: 'fetch_weather',
         description: 'Query weather for a city',
-        inputSchema: { type: 'object', properties: { city: { type: 'string' } } },
-        execute: async (_ctx, args) => ({ ok: true, content: `${args.city}: Sunny, 22°C` })
-      }
-    ]
-  }
+        inputSchema: {
+          type: 'object',
+          properties: { city: { type: 'string' } },
+          required: ['city'],
+        },
+        approvalMode: 'never',
+        sideEffectLevel: 'none',
+        execute: async (_ctx, args) => ({
+          ok: true,
+          content: `${String(args.city)}: Sunny, 22°C`,
+        }),
+      },
+    ],
+  },
 });
 
-// 2. 创建并运行会话句柄（L4）
-const handle = loop.createAgentLoop('session-101');
-
-// 3. 异步迭代驱动，支持事件监控与中途转向（Mid-run steering）
-for await (const event of handle) {
-  if (event.type === 'model_done') {
-    // 可选：在模型产出后动态注入修正指令
-    // await handle.steer('注意：优先输出摄氏度');
-  }
-}
-
-// 4. 获取折叠后的完整结构化消息
-const messages = await handle.fold();
+if (!loop.createHandle) throw new Error('createHandle requires preset full or max');
+const handle = loop.createHandle(session.id);
+await handle.run();
+console.log(await handle.fold());
 ```
+
+同一句柄也可以 `for await (const event of handle)`。`event.type === 'model_done'` 之后可以 `handle.steer(...)`。
 
 ### 2.2 浏览器 / 扩展轻量级嵌入（`createMiniAssembledLoop`）
 
 ```ts
-import { createMiniAssembledLoop } from '@ppeng/agent-loop/mini';
+import { createMiniAssembledLoop } from '@mage-ai-lab/agent-loop/mini';
 
+// customWebWorkerModelAdapter / inBrowserTool 由宿主提供，不是本包导出。
 const miniLoop = createMiniAssembledLoop({
   io: {
     model: customWebWorkerModelAdapter,
-    tools: [inBrowserTool]
-  }
+    tools: [inBrowserTool],
+  },
 });
 
-const runInfo = await miniLoop.runSession('session-web-1');
+const sessionRecord = await miniLoop.run('session-web-1');
 ```
 
 ### 2.3 可选宿主钩子
@@ -110,15 +132,24 @@ Jev 不是 SDK 模块：未配置入口时宿主不调用它，SDK 接入参数�
 
 观测也在宿主侧。内核只调用 `emitTrace`。`packages/core` 把这些事件镜像到 Langfuse（Lab「更多 → Langfuse」；没保存入口不会上报），并把真正发出的 Jev HTTP 记成 `jev_call`，在 Langfuse 里是当前轮下面的 `jev.<切入点>`。没发出 HTTP 的切入点不会出现。不要为了 Langfuse 或 Jev 在 mini 里静态 import Node。
 
-### 2.4 L4 句柄控制契约（`AgentLoopHandle`）
-- `loop.step()`：执行单个细粒度步骤（单步调试或受控推演）。
-- `loop.run()`：连续循环运行直到会话挂起（waiting_approval / ended / error）。
-- `for await (const event of loop)`：流式消费生命周期事件（`turn_prepared` -> `model_done` -> `tool_executed` -> `ended`）。
-- `loop.steer(message, options)`：向正在运行或即将运行的轮次注入用户修正指令。返回状态：`started`（已新建轮次）、`steered`（已合并到下一轮）、`rejected`（已结束被拒）。
-- `loop.abort()`：软中断当前轮次。
-- `loop.fold()`：获取经过投影和折叠处理后的结构化消息历史。
+### 2.4 审批记录上的可选过期字段
 
-### 2.5 模型适配器、重试与流重置（`@ppeng/agent-loop/model`、`streaming`）
+`ApprovalRecord`（`src/types.ts`）可带 `expiresAt` / `expireReason` / `wakeSource`。这三个字段只描述产品层的无人值守审批：cron、Bot routine、调度等唤醒会写入截止时间；人坐在 Lab 对话里提起的审批不写。到点后由产品层把审批拒绝并记上 `expireReason`，且不执行该工具。循环内核创建审批时只透传字段，不解释超时、也不因为超时改控制流。
+
+### 2.5 L4 句柄控制契约（`AgentLoopHandle`）
+- `handle.step()`：执行单个细粒度步骤（单步调试或受控推演）。
+- `handle.run()`：连续循环运行直到会话挂起（waiting_approval / ended / error）。
+- `for await (const event of handle)`：流式消费生命周期事件（`turn_prepared` -> `model_done` -> `tools_done` -> `ended`）。
+- `handle.steer(message, options)`：向正在运行或即将运行的轮次注入用户修正指令。返回 `started`（已入队下一轮）、`steered`（已并入当前可转向轮次）、`not_submitted`（空文本、无会话或会话已结束等原因被拒）。daemon 的 HTTP 投影才把 `not_submitted` 写成 `rejected`。
+- `handle.abort()`：软中断当前轮次。
+- `handle.fold()`：获取经过投影和折叠处理后的结构化消息历史。
+- 可见历史：折叠结果在 token 预算内时，不会按 `MAX_VISIBLE_MESSAGES`（24）从尾部硬切，条数上限也不会丢掉最新用户消息。需要裁切时保留最初的系统提示和最新用户消息，并且只在闭合的工具回合（助手 `tool_calls` 加上对应工具结果）边界下刀。超过 token 预算时仍走 `autoCompact` 摘要；摘要失败则退回上述钉住规则，不再盲目切片。
+
+### 2.5 会话状态 `unknown`
+
+`SessionStatus` 包含 `unknown`。委派子会话（`mode: 'subagent'`）在进程退出时若仍是 `running`，宿主启动时把它写成 `unknown`：外部副作用是否已经发生无法判断，所以这是终态，不能再跑一遍并记成成功。`decideSteerAdmission` 把 `unknown` 与 `completed` / `failed` 一样视为已结束。SDK 不另建子任务监督器；心跳或超时只接已有钩子，当前没有这类钩子。
+
+### 2.6 模型适配器、重试与流重置（`@ppeng/agent-loop/model`、`streaming`）
 
 - **唯一实现**：OpenAI Chat / Responses（`OpenAICompatibleAdapter`，`httpKind`）与 Anthropic（`AnthropicMessagesAdapter`）只在本包实现。`packages/core/src/model/model-adapters.ts` 只是薄 shim（继承并默认 `env: process.env`），**不要**在 core 里再复制一份解析逻辑。
 - **失败要响亮**：非 2xx 抛 `UpstreamHttpError`（`status`、`retryAfterMs`、`requestId`）；流内 `error` 事件、`response.failed`、无终止事件的 EOF、连接重置抛 `UpstreamStreamError`。不要把半截流当成正常结束返回。
@@ -126,7 +157,7 @@ Jev 不是 SDK 模块：未配置入口时宿主不调用它，SDK 接入参数�
 - **`stream_reset` 契约**：同一轮重新开始出流（重试、或宿主切到 fallback 模型）前，内核先发 `{ type: 'stream_reset', reason: 'retry' | 'fallback' }`。消费者必须丢弃**上一个 `done` 之后**累积的增量文本 / 推理 / 工具参数，再接收新流，否则会出现半截答案 + 完整答案的重复。宿主自己做 fallback 时用 `createStreamResetTracker(onStream)`：把增量交给 `tracker.onChunk(chunk)`，换下一个模型前调 `tracker.resetIfDirty('fallback')`（上一次尝试没出过字就不发）。core 的 `l5-bindings.ts` 中 `fallbackStream().forAttempt(i)` 就是这样接的。
 - **取消**：`ModelTurnInput.signal` 一路传到 `fetch`；宿主（如 daemon SSE）在客户端断开时 abort，即可同时放弃上游请求。
 
-### 2.6 上游回放测试工具（`src/testing/upstream-replay.ts`）
+### 2.7 上游回放测试工具（`src/testing/upstream-replay.ts`）
 
 - 用随机端口的 `node:http` 服务器按 JSON fixture 回放真实上游的 SSE / JSON 响应，驱动**真实**适配器（不 mock fetch）。fixture 字段：`provider`（`openai-chat|openai-responses|anthropic`）、`mode`（`stream|json`）、`responses[]`（`status`、`headers`、`events[]`（`event`/`data`/`raw`）、`split`（`event|whole|{bytes}`，用于切断 JSON / UTF-8）、`delayMs`、`end`（`end|destroy|hang`））、`abortAfterMs`（轮次超时，模拟上游卡死）、`expect`（文本、推理、工具调用、`stopReason`、`usage`、`requestId`、错误正则与字段、命中次数、请求体等）。
 - fixture 在 `src/testing/upstream-fixtures/*.json`；vitest 回放全部 fixture，`packages/core/test/upstream-replay.test.js` 再经 core shim 回放一遍并核对错误分类。新增上游异常时**先加 fixture 复现**，再改适配器。
@@ -139,7 +170,7 @@ Jev 不是 SDK 模块：未配置入口时宿主不调用它，SDK 接入参数�
 当修改 `packages/agent-loop` 时，遵循以下 7 步标准开发流程：
 
 1. **实现功能**：在子目录（`turn/`、`session/`、`model/`、`streaming/`、`recovery/` 等）中实现纯逻辑。
-2. **注册模块元数据**：若新增了模块，必须在 [`src/assembly/presets.ts`](file:///Users/penglei/developer/self-test-grounding/ppeng-agent-core/packages/agent-loop/src/assembly/presets.ts) 的 `LOOP_MODULES` 中登记最低档位与 Node 依赖标志：
+2. **注册模块元数据**：若新增了模块，必须在 `packages/agent-loop/src/assembly/presets.ts` 的 `LOOP_MODULES` 中登记最低档位与 Node 依赖标志：
    ```ts
    { id: 'my-feature', minPreset: 'normal', nodeOnly: false, load: 'static' }
    ```

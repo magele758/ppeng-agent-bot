@@ -8,6 +8,9 @@ export {
   ensureCronStore,
   getCronJob,
   listCronJobs,
+  parseRoutinePrecheck,
   updateCronJob
 } from './cron-facade.js';
 export type { CreateCronJobInput, ListCronJobsFilter, UpdateCronJobInput } from './cron-facade.js';
+export { evaluateRoutinePrecheck, parseWakeGate, readStoredPrecheck } from './routine-precheck.js';
+export type { PrecheckResult, RoutinePrecheck } from './routine-precheck.js';

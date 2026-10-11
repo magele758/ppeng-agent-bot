@@ -9,6 +9,7 @@ import { rewriteScope } from './publish-npm-lib.mjs';
 import { resolveBin, sanitizeScriptEnv } from './spawn-utils.mjs';
 
 export const PUBLIC_PACKAGES = ['api-types', 'agent-loop'];
+export const PUBLIC_PACK_FILES = ['package.json', 'dist', 'README.md', 'LICENSE', 'SKILL.md'];
 
 export function runArtifactCommand(command, args, cwd, env = process.env) {
   const result = spawnSync(resolveBin(command), args, {
@@ -37,7 +38,7 @@ export function packPublicArtifacts(repoRoot, staging, env = process.env) {
     const src = join(repoRoot, 'packages', name);
     const dest = join(staging, name);
     mkdirSync(dest, { recursive: true });
-    for (const file of ['package.json', 'dist', 'README.md', 'LICENSE']) {
+    for (const file of PUBLIC_PACK_FILES) {
       if (existsSync(join(src, file))) cpSync(join(src, file), join(dest, file), { recursive: true });
     }
     rewriteTree(dest);
@@ -101,6 +102,13 @@ assert.ok(store.foldMessages(session.id).some(m => m.parts.some(p => p.type === 
 console.log('public exports + mini session passed');
 `);
   runArtifactCommand(process.execPath, [testFile], consumer, env);
+  const packagedSkill = readFileSync(join(loopRoot, 'SKILL.md'), 'utf8');
+  if (!packagedSkill.includes('loop.createHandle(session.id)')) {
+    throw new Error('published @mage-ai-lab/agent-loop is missing the createHandle quickstart');
+  }
+  if (/createAgentLoop\s*\(/.test(packagedSkill)) {
+    throw new Error('published SKILL.md still calls createAgentLoop');
+  }
   const pkg = JSON.parse(readFileSync(join(loopRoot, 'package.json'), 'utf8'));
   const imports = Object.keys(pkg.exports).map((sub, i) => `import type * as Entry${i} from '@mage-ai-lab/agent-loop${sub === '.' ? '' : sub.slice(1)}';`).join('\n');
   writeFileSync(join(consumer, 'types.mts'), imports);

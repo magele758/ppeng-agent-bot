@@ -197,14 +197,15 @@ docker pull ghcr.io/<owner>/<repo>/web:nightly
 | 冒烟失败（main / 定时 / PR） | build 红，`push` 跳过 |
 | gate 失败、取消或跳过 | `push` 跳过 |
 
-## 桌面产物（mac / Windows / Linux × x64 / arm64）
+## 桌面产物（macOS arm64 / Windows / Linux × x64 / arm64）
 
-[`.github/workflows/desktop.yml`](../.github/workflows/desktop.yml) 打 **6 套** Electron 安装包。每套在对应 arch 的 runner 上编译 Next standalone 和 `server-bundle`，避免交叉编译 `sharp` / `@next/swc`。
+[`.github/workflows/desktop.yml`](../.github/workflows/desktop.yml) 打 **5 套** Electron 安装包。每套在对应 arch 的 runner 上编译 Next standalone 和 `server-bundle`，避免交叉编译 `sharp` / `@next/swc`。
+
+**不要加回 Intel Mac（darwin x64 / `mac-x64`）。** 用户太少，原先在 `macos-14` 上用 Node x64（Rosetta）打包也很慢。不要加 `macos-13`，也不要把 `macos-latest` 当成 x86 Mac runner。Apple Silicon 保留：`mac-arm64` 跑在 `macos-14`。Linux 与 Windows 的 x64 / arm64 保留。
 
 | 产物 id | Runner | 文件 |
 |---------|--------|------|
 | `mac-arm64` | `macos-14` | `RawAgent-<ver>-mac-arm64.dmg` |
-| `mac-x64` | `macos-14` + Node x64（Rosetta） | `RawAgent-<ver>-mac-x64.dmg` |
 | `win-x64` | `windows-latest` | `RawAgent-<ver>-win-x64.exe` |
 | `win-arm64` | `windows-11-arm` | `RawAgent-<ver>-win-arm64.exe` |
 | `linux-x64` | `ubuntu-latest` | `RawAgent-<ver>-linux-x64.AppImage` |
@@ -212,7 +213,7 @@ docker pull ghcr.io/<owner>/<repo>/web:nightly
 
 | 项 | 说明 |
 |----|------|
-| 触发 | 每天 17:00 UTC（北京时间 01:00）打齐 6 套；Actions → **Desktop artifacts** → Run workflow（可只打一套）；推送 `desktop-v*`（agent 可用，不发版；`desktop-v0.1.0-mac-arm64` 只打一套）；推送 `v*` 打齐并挂到 GitHub Release。定时仅在默认分支生效 |
+| 触发 | 每天 17:00 UTC（北京时间 01:00）打齐 5 套；Actions → **Desktop artifacts** → Run workflow（可只打一套）；推送 `desktop-v*`（agent 可用，不发版；`desktop-v0.1.0-mac-arm64` 只打一套）；推送 `v*` 打齐并挂到 GitHub Release。定时仅在默认分支生效 |
 | 不含 | Docker nightly、Evolution、真模型、Apple 公证（CI 不签名，仅 ad-hoc） |
 | Mac 打开 | 未公证时系统会报「已损坏」。M 系列用 `mac-arm64` DMG，先 `xattr -cr` 再打开，见 [`apps/desktop/README.md`](../apps/desktop/README.md) |
 | 本地 | `npm run build:desktop`（当前机器）；或 `--platform mac\|win\|linux --arch x64\|arm64` |

@@ -106,7 +106,7 @@ export const ops = {
     levelWarn: 'Needs attention',
     levelFail: 'Problem detected',
     levelChecking: 'Checking…',
-    allGood: 'The service is reachable and ready; self-heal and Evolution report no problems.',
+    allGood: 'The service is reachable and ready, and self-heal reports no problems.',
     reasonUnreachable: 'Cannot reach the daemon. Make sure it is running.',
     reasonNotReady: 'The service is not ready: the state directory or database is not readable/writable.',
     reasonDoctorFail: 'Diagnostics found {n} failing check(s); see "Diagnostics" below.',
@@ -208,6 +208,8 @@ export const ops = {
     colTool: 'Tool',
     merged: 'merged',
     detailClose: 'Close details',
-    detailFailed: 'Failed to load: {message}'
+    detailFailed: 'Failed to load: {message}',
+    hiddenTitle: 'Evolution is hidden',
+    hiddenBody: 'Evolution is turned off in the product and will not run on its own. This address only shows this note.'
   }
 };

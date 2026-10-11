@@ -1,0 +1,31 @@
+id: unattended-approval-expiry
+title: 无人值守审批超时拒绝
+status: implemented
+requirement: |
+  For approvals raised by a bot routine, cron, or other unattended wake (not a human sitting in the Lab chat): if nobody answers within 10 minutes, expire the approval as DENY, do not run the tool. Human-present chat approvals keep current behavior. Record the expire reason on the approval. No new env vars; 10 minutes can be a named constant. Surface the state in existing approval inbox if cheap, with i18n zh+en.
+notes: user pre-authorized start（用户明确要求立即开始，未等待逐条确认；标准仍以用户视角书写，PR 中供负责人事后复核）
+criteria:
+  - id: AC-1
+    given: 一次定时任务在没有人坐在 Lab 对话里时唤醒了 Agent，并提起一条需要人确认才会执行的操作
+    when: 过了 10 分钟仍然没有人批准或拒绝
+    then: 该审批被拒绝，这次操作没有执行，审批上记着因为无人应答而过期；之后再点批准也不会执行这次操作
+  - id: AC-2
+    given: 一次 Bot 例行任务在没有人坐在 Lab 对话里时唤醒了 Agent，并提起一条需要人确认才会执行的操作
+    when: 过了 10 分钟仍然没有人批准或拒绝
+    then: 该审批被拒绝，这次操作没有执行，审批上记着因为无人应答而过期
+  - id: AC-3
+    given: 一次其他无人值守唤醒（例如调度或代理之间的消息）提起了需要人确认才会执行的操作
+    when: 过了 10 分钟仍然没有人批准或拒绝
+    then: 该审批被拒绝，这次操作没有执行，审批上记着因为无人应答而过期
+  - id: AC-4
+    given: 无人值守唤醒提起的审批还在等待
+    when: 有人在 10 分钟内批准或拒绝
+    then: 以这个人的决定为准，到点后不会再被改写成超时拒绝
+  - id: AC-5
+    given: 有人正坐在 Lab 对话里，Agent 提起了需要确认才会执行的操作
+    when: 超过 10 分钟仍然没有人处理
+    then: 审批仍然等待，这次操作不会因为超时被自动拒绝，也不会被自动执行
+  - id: AC-6
+    given: 一条无人值守审批已经因为超时被拒绝
+    when: 打开现有的审批收件箱
+    then: 能看到它已因无人应答被拒绝且操作未执行，中文和英文都有这段说明

@@ -228,7 +228,7 @@ npm run build:desktop
 
 ### CI/CD
 
-`.github/workflows/desktop.yml` 打 6 套（mac/win/linux × x64/arm64）。手动 Run workflow 或推送 `v*` tag。详见 `doc/CI.md`。
+`.github/workflows/desktop.yml` 打 5 套（macOS arm64，以及 Windows / Linux × x64/arm64）。不打 Intel Mac（darwin x64）。手动 Run workflow 或推送 `v*` tag。详见 `doc/CI.md`。
 
 ### 发布
 

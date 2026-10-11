@@ -89,7 +89,7 @@ test('resolved after_text policy stubs consumed results in the model view', () =
   ];
   const { messages: out, stats } = microCompactMessages(messages, cfg);
   assert.equal(stats.collapsed, 1);
-  assert.match(out[0].parts[0].content, /output dropped/);
+  assert.match(out[0].parts[0].content, /omitted to save space/);
 
   store.db.close();
   rmSync(dir, { recursive: true, force: true });

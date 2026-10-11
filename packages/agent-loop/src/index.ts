@@ -203,6 +203,7 @@ export type { DecideTurnRecoveryInput, RecoveryAction, TurnRecoveryState } from 
 export { runSessionKernel } from './turn/kernel.js';
 export type { AgentLoopLatch, TurnKernelOptions } from './turn/kernel.js';
 export { clampFoldToVisible, MAX_VISIBLE_MESSAGES } from './session/fold-budget.js';
+export type { ClampFoldOptions } from './session/fold-budget.js';
 
 
 // L2: Model — adapters

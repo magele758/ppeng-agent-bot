@@ -169,6 +169,29 @@ function openBotFromBody(
   return { sessionId: opened.sessionId };
 }
 
+function plainCommandText(body: Record<string, unknown>): string | undefined {
+  if (imageAssetIdsFromBody(body).length > 0 || attachmentIdsFromBody(body).length > 0) return undefined;
+  const message = typeof body.message === 'string' ? body.message.trim() : '';
+  return message || undefined;
+}
+
+async function replyBotChatCommand(
+  runtime: RawAgentRuntime,
+  sessionId: string,
+  text: string,
+  response: ServerResponse
+): Promise<boolean> {
+  const command = await runtime.handleBotChatCommand(sessionId, text);
+  if (!command) return false;
+  json(response, 200, {
+    command,
+    session: runtime.getSession(sessionId),
+    latestAssistant: command.reply,
+    messages: runtime.getSessionMessages(sessionId)
+  });
+  return true;
+}
+
 function hasUserContent(body: Record<string, unknown>): boolean {
   const message = typeof body.message === 'string' && body.message.trim();
   return (
@@ -343,6 +366,10 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         }
         const openedBot = openBotFromBody(runtime, body, auth);
         if (openedBot) {
+          const commandText = plainCommandText(body);
+          if (commandText && (await replyBotChatCommand(runtime, openedBot.sessionId, commandText, response))) {
+            return;
+          }
           const hasContent = hasUserContent(body);
           if (hasContent) {
             sendBodyContentToSession(runtime, openedBot.sessionId, body);
@@ -653,6 +680,8 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         if (!message && imgIds.length === 0 && attIds.length === 0) {
           throw new ValidationError('Missing message, imageAssetIds, or attachmentIds');
         }
+        const commandText = plainCommandText(body);
+        if (commandText && (await replyBotChatCommand(runtime, id, commandText, response))) return;
         maybeMergeOptionalGroupsFromBody(runtime, id, body);
         runtime.sendUserMessage(id, message || (imgIds.length ? '(image)' : '(attachment)'), {
           imageAssetIds: imgIds,
@@ -694,6 +723,8 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         const msg = typeof body.message === 'string' ? body.message.trim() : '';
         const imgIds = imageAssetIdsFromBody(body);
         const attIds = attachmentIdsFromBody(body);
+        const commandText = plainCommandText(body);
+        if (commandText && (await replyBotChatCommand(runtime, id, commandText, response))) return;
         maybeMergeOptionalGroupsFromBody(runtime, id, body);
         if (msg || imgIds.length > 0 || attIds.length > 0) {
           runtime.sendUserMessage(id, msg || (imgIds.length ? '(image)' : '(attachment)'), {
@@ -899,11 +930,14 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         let session;
         const openedBot = openBotFromBody(runtime, body, auth);
         const sendOpts = { imageAssetIds: imgIds, attachmentIds: attIds };
+        const commandText = plainCommandText(body);
         if (openedBot) {
+          if (commandText && (await replyBotChatCommand(runtime, openedBot.sessionId, commandText, response))) return;
           maybeMergeOptionalGroupsFromBody(runtime, openedBot.sessionId, body);
           session = runtime.sendUserMessage(openedBot.sessionId, message || '(attachment)', sendOpts);
         } else if (sessionId) {
           guardSession(runtime, sessionId, auth);
+          if (commandText && (await replyBotChatCommand(runtime, sessionId, commandText, response))) return;
           maybeMergeOptionalGroupsFromBody(runtime, sessionId, body);
           session = runtime.sendUserMessage(sessionId, message || '(attachment)', sendOpts);
         } else {
@@ -942,11 +976,14 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         let session;
         const openedBot = openBotFromBody(runtime, body, auth);
         const sendOpts = { imageAssetIds: imgIds, attachmentIds: attIds };
+        const commandText = plainCommandText(body);
         if (openedBot) {
+          if (commandText && (await replyBotChatCommand(runtime, openedBot.sessionId, commandText, response))) return;
           maybeMergeOptionalGroupsFromBody(runtime, openedBot.sessionId, body);
           session = runtime.sendUserMessage(openedBot.sessionId, message || '(attachment)', sendOpts);
         } else if (sessionId) {
           guardSession(runtime, sessionId, auth);
+          if (commandText && (await replyBotChatCommand(runtime, sessionId, commandText, response))) return;
           maybeMergeOptionalGroupsFromBody(runtime, sessionId, body);
           session = runtime.sendUserMessage(sessionId, message || '(attachment)', sendOpts);
         } else {

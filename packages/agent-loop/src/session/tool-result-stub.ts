@@ -1,12 +1,13 @@
 /**
  * Addressable micro-compact stubs.
  *
- * The prefix is stable so existing tests / A/B harnesses that match
- * `[previous: used <tool>` or `output dropped from context` keep working.
+ * The line names the tool and says its earlier output was omitted to save
+ * space. It must not say the user context was dropped or that the conversation
+ * was compressed — models repeat that wording to the user.
  * The suffix is the index: message id + part (and seq when the WAL has one).
  */
 
-export const TOOL_RESULT_STUB_MARK = 'output dropped from context';
+export const TOOL_RESULT_STUB_MARK = 'earlier tool output was omitted to save space';
 
 export interface ToolResultStubAddr {
   messageId: string;
@@ -17,7 +18,7 @@ export interface ToolResultStubAddr {
 /** Parsed pointer; aliases {@link ToolResultStubAddr}. */
 export type ToolResultStubRef = ToolResultStubAddr;
 
-const STUB_PREFIX = /\[previous: used \S+(?: \(failed\))? — output dropped from context\]/;
+const STUB_PREFIX = /\[previous: used \S+(?: \(failed\))? — earlier tool output was omitted to save space\]/;
 
 export function formatToolResultStub(name: string, ok: boolean, addr?: ToolResultStubAddr): string {
   const head = `[previous: used ${name}${ok ? '' : ' (failed)'} — ${TOOL_RESULT_STUB_MARK}]`;

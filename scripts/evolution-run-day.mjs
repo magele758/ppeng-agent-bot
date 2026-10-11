@@ -29,6 +29,7 @@ import { spawn } from 'node:child_process';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { config as loadDotenv } from 'dotenv';
+import { EVOLUTION_DISABLED_CODE, considerEvolutionSchedule } from '../packages/core/src/evolution/surface.ts';
 import {
   enrichEnv,
   posixShell,
@@ -985,6 +986,11 @@ function appendRunEvent(event) {
 }
 
 async function main() {
+  const decision = considerEvolutionSchedule({ reason: 'cli' });
+  if (!decision.started) {
+    console.error(`${EVOLUTION_DISABLED_CODE}: Evolution is hidden and will not run.`);
+    return;
+  }
   const logLines = [];
   const runId = `run-${Date.now()}`;
   const trace = (msg) => {

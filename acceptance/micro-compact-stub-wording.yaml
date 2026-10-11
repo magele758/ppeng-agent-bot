@@ -1,0 +1,30 @@
+id: micro-compact-stub-wording
+title: 微压缩占位只说明工具输出被省略
+status: implemented
+notes: user pre-authorized
+requirement: |
+  In packages/agent-loop only, change the micro-compact tool-result stub
+  (formatToolResultStub / microCompactMessages, session/tool-result-stub.ts and
+  session/micro-compact.ts) so the placeholder does NOT say the user context or
+  "output dropped from context" in a way the model tells the user the conversation
+  was compressed. The stub should say the earlier tool output was omitted to save
+  space, and keep tool name / ids if those are already there. Do not change
+  fold-budget.ts, kernel.ts, or prepare-view.ts (another worker owns the 24-message
+  slice).
+criteria:
+  - id: AC-1
+    given: 送进模型的内容里，一条较早的长工具输出被收成一行占位
+    when: 阅读这行占位
+    then: 占位说明更早的工具输出是为了省空间而省略，并且仍然带有工具名
+  - id: AC-2
+    given: 同一行占位
+    when: 阅读这行占位
+    then: 占位不说用户上下文被丢掉，也不包含 “output dropped from context”，不会让模型据此告诉用户整段对话被压缩
+  - id: AC-3
+    given: 占位本来就带有消息标识、分段序号，以及有序号时的序列号
+    when: 生成这行占位
+    then: 这些标识仍然留在占位里
+  - id: AC-4
+    given: 被收成占位的是一次失败的工具输出
+    when: 阅读这行占位
+    then: 占位仍标明这次失败，并说明更早的工具输出是为了省空间而省略

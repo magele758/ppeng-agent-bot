@@ -881,6 +881,21 @@ export const MIGRATIONS: Migration[] = [
         CREATE INDEX IF NOT EXISTS idx_resource_owners_user ON resource_owners(kind, user_id);
       `);
     }
+  },
+  {
+    version: 24,
+    description: 'approvals.expires_at / expire_reason / wake_source for unattended fail-safe deny',
+    up: (db) => {
+      if (!hasColumn(db, 'approvals', 'expires_at')) {
+        db.exec(`ALTER TABLE approvals ADD COLUMN expires_at TEXT`);
+      }
+      if (!hasColumn(db, 'approvals', 'expire_reason')) {
+        db.exec(`ALTER TABLE approvals ADD COLUMN expire_reason TEXT`);
+      }
+      if (!hasColumn(db, 'approvals', 'wake_source')) {
+        db.exec(`ALTER TABLE approvals ADD COLUMN wake_source TEXT`);
+      }
+    }
   }
 ];
 

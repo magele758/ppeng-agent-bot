@@ -14,6 +14,10 @@ is_truthy() {
 }
 
 run_payload() {
+  # shellcheck disable=SC1091
+  source "$ROOT/scripts/evolution/refuse-if-hidden.sh"
+  evolution_refuse_if_hidden "$ROOT"
+
   [[ -f .env ]] && set -a && source .env && set +a
 
   export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH"

@@ -1,5 +1,6 @@
 'use client';
 
+import { botComposerStatusText, planBotComposerSend } from '@/lib/bot-chat-commands';
 import { parseBotModelOverride, resolveLoadedComposerModelRef } from '@/lib/bot-model';
 import { api } from '@/lib/api';
 import { getSpeechRecognitionCtor, type SpeechRecognitionLike } from '@/lib/speech-dictation';
@@ -1219,6 +1220,47 @@ export function usePlayChat(deps: PlayChatDeps) {
     const text = playInput.trim();
     const imageAssetIds = [...pendingImageAssetIds];
     const attachmentIds = [...pendingAttachmentIds];
+    const commandBotId = playSurface === 'bot' ? botIdRef.current : '';
+    if (
+      planBotComposerSend({
+        botSelected: Boolean(commandBotId),
+        text,
+        hasAttachments: imageAssetIds.length > 0 || attachmentIds.length > 0
+      }) === 'command'
+    ) {
+      stopSpeechDictation();
+      setPlaySending(true);
+      try {
+        let sid = selectedSessionRef.current;
+        if (!sid) {
+          sid = (await openBotSession(commandBotId)).sessionId;
+        }
+        const data = (await api(`/api/sessions/${sid}/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text, autoRun: false })
+        })) as {
+          command?: {
+            code?: string;
+            ok?: boolean;
+            arg?: string;
+            modelOverride?: { modelId?: string } | null;
+          };
+        };
+        acknowledgeLocalSendCommitted();
+        clearComposerOnly();
+        clearStreamingShell();
+        const status = botComposerStatusText(t, data.command);
+        setPlayStatus({ text: status.text, ok: !status.err, err: status.err });
+        sessionListStickTopRef.current = true;
+        await tick({ includePlayPanel: true });
+      } catch (err) {
+        setPlayStatus({ text: err instanceof Error ? err.message : String(err), err: true });
+      } finally {
+        setPlaySending(false);
+      }
+      return;
+    }
     if (workspaceAvailability.blocked) {
       setPlayStatus({
         text: workspaceAvailability.reason || t('play.composer.workspaceBlocked'),

@@ -87,7 +87,7 @@ test('Q1: stub keeps tool_call pairing and names the tool; it does not keep the 
   assert.equal(view.calls[0].input.path, path);
   assert.equal(view.results[0].toolCallId, 'c1');
   assert.match(view.results[0].content, /\[previous: used read_file/);
-  assert.match(view.results[0].content, /output dropped from context/);
+  assert.match(view.results[0].content, /earlier tool output was omitted to save space/);
   assert.equal(view.results[0].content.includes('LEDGER_HASH=9c2e1b'), false);
   assert.equal(input[2].parts[0].content, body, 'stored transcript stays intact');
 });
@@ -157,7 +157,7 @@ test('Q3: after_text keeps the listing during a tool-only streak; after_any drop
   const any = flattenView(microCompactMessages(input, AFTER_ANY).messages);
   const text = flattenView(microCompactMessages(input, AFTER_TEXT).messages);
 
-  assert.match(any.results[0].content, /output dropped/);
+  assert.match(any.results[0].content, /omitted to save space/);
   assert.equal(any.results[0].content.includes(filename), false);
   assert.equal(text.results[0].content, listing);
 });

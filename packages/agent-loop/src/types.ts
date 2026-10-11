@@ -42,7 +42,7 @@ export type {
 // ============================================================================
 
 export type SessionMode = 'chat' | 'task' | 'subagent' | 'teammate';
-export type SessionStatus = 'idle' | 'running' | 'waiting_approval' | 'completed' | 'failed';
+export type SessionStatus = 'idle' | 'running' | 'waiting_approval' | 'completed' | 'failed' | 'unknown';
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'cancelled';
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
 export type WorkspaceMode = 'git-worktree' | 'directory-copy';
@@ -139,6 +139,17 @@ export interface ApprovalRecord {
   idempotencyKey?: string;
   createdAt: string;
   updatedAt: string;
+  /**
+   * Set only when this approval was raised by an unattended wake (cron, bot
+   * routine, scheduler). Absent for a human sitting in Lab chat. Product code
+   * denies the approval at this instant if nobody has answered; the loop does
+   * not interpret it.
+   */
+  expiresAt?: string;
+  /** Present after an unattended approval was denied because nobody answered. */
+  expireReason?: string;
+  /** Wake that raised this approval (`cron`, `routine`, `mailbox`, …). */
+  wakeSource?: string;
 }
 
 export interface SessionMemoryEntry {

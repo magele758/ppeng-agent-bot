@@ -1,0 +1,34 @@
+id: bot-forever-chat
+title: Bot 永久主会话命令
+status: implemented
+notes: |
+  负责人在下达本实现任务时已预先批准本规格（user pre-authorized）。
+  标准按用户可观察行为书写，不含实现方案。
+requirement: |
+  Implement bot forever-chat commands only. Current bots already have a canonical session (RawAgentRuntime createBot/openBot). Gap: in that canonical bot chat, `/new` must NOT open a new session; it compacts the same session (like Hermes desktop Bot Mode). Also support `/stop` (abort current turn) and `/model` (switch that bot's model) as channel/composer commands that hit the bot's canonical session. Wire this for Lab chat when a bot is selected AND for gateway inbound text if a botId is bound. Do not rewrite the gateway security code from PR #76 beyond a small command hook.
+  Config via existing bot settings / Lab, no new RAW_AGENT_* env.
+criteria:
+  - id: AC-1
+    given: 某个 Bot 的固定对话里已经有若干来回
+    when: 在这条对话里发送 `/new`
+    then: 不会新开一条对话；较早内容被压缩进同一条对话的摘要，会话仍是原来那一条
+  - id: AC-2
+    given: 这个 Bot 的固定对话正在生成回复
+    when: 发送 `/stop`
+    then: 当前回合停止，对话仍是原来那一条，不会新开对话
+  - id: AC-3
+    given: 已配置可选模型，这个 Bot 正在用其中的固定对话
+    when: 在该对话里发送 `/model` 并指定一个已配置模型，或指定一个不存在/重名的模型，或发送 `/model default`
+    then: 已配置且唯一的模型会成为这个 Bot 之后的模型；不存在或重名的名字被拒绝且原模型不变；`/model default` 改回跟随默认
+  - id: AC-4
+    given: Lab 里选中了某个 Bot
+    when: 在输入框发送 `/new`、`/stop` 或 `/model`
+    then: 命令作用在这个 Bot 的固定对话上，而不是新开一条普通会话；带附件或未选中 Bot 时这些文字仍按普通消息发送
+  - id: AC-5
+    given: 网关入站已绑定某个 Bot
+    when: 收到文本 `/new`、`/stop` 或 `/model`
+    then: 命令作用在该 Bot 的固定对话上，不另开即时通讯会话，也不把命令交给模型；同一条对话里的普通文本仍会继续跑一轮
+  - id: AC-6
+    given: 没有选中 Bot 的普通对话，或未绑定 Bot 的网关入站
+    when: 发送 `/new`
+    then: 不会压缩某个 Bot 的固定对话，也不会被当成 Bot 命令吞掉

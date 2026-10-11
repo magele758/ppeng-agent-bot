@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cronFromTime, describeCron, parseCronUserPrompt, parseTimeValue } from './cron.ts';
+import { cronFromTime, describeCron, parseCronUserPrompt, parseTimeValue, routinePrecheckPayload } from './cron.ts';
+import { play as zhPlay } from './i18n/messages/zh/play.ts';
+import { play as enPlay } from './i18n/messages/en/play.ts';
 
 test('cronFromTime presets', () => {
   assert.equal(cronFromTime({ hour: 9, minute: 30, preset: 'daily' }), '30 9 * * *');
@@ -19,6 +21,23 @@ test('parseCronUserPrompt', () => {
   const parsed = parseCronUserPrompt('[cron:晨报] 总结昨日进展');
   assert.deepEqual(parsed, { name: '晨报', body: '总结昨日进展' });
   assert.equal(parseCronUserPrompt('普通消息'), null);
+});
+
+test('静默确认有中英文且不是静默标记本身 [AC:bot-gateway-delivery#AC-2]', () => {
+  assert.equal(zhPlay.imSilentAck, '收到，没有更多要补充的。');
+  assert.equal(enPlay.imSilentAck, 'Got it. Nothing more to add.');
+  assert.notEqual(zhPlay.imSilentAck, enPlay.imSilentAck);
+  assert.doesNotMatch(zhPlay.imSilentAck, /SILENT|NO_REPLY/);
+  assert.doesNotMatch(enPlay.imSilentAck, /SILENT|NO_REPLY/);
+});
+
+test('routinePrecheckPayload omits an empty precheck', () => {
+  assert.equal(routinePrecheckPayload('none', 'printf hi'), undefined);
+  assert.equal(routinePrecheckPayload('script', '  '), undefined);
+  assert.deepEqual(routinePrecheckPayload('predicate', ' {"wakeAgent":false} '), {
+    kind: 'predicate',
+    source: '{"wakeAgent":false}'
+  });
 });
 
 test('parseTimeValue', () => {

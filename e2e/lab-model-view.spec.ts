@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 const LONG_BASH_PROMPT = '跑一段长 bash dump';
 const FOLLOWUP_PROMPT = 'hello 再看一眼';
 const STORED_MARKER = 'MODEL_VIEW_BASH_MARKER-';
-const STUB_TEXT = 'output dropped from context';
+const STUB_TEXT = 'earlier tool output was omitted to save space';
 
 test.describe('Lab 模型所见', () => {
   test.afterEach(async ({ request }) => {

@@ -40,7 +40,8 @@ test.describe('Ops console', () => {
     await expect(page.getByTestId('ops-card-service')).toContainText('后台服务');
     await expect(page.getByTestId('ops-card-service')).toContainText('运行正常');
     await expect(page.getByTestId('ops-card-selfheal')).toContainText(/空闲 · 没有进行中的修复|运行中 · \d+ 个修复任务/);
-    await expect(page.getByTestId('ops-card-evolution')).toContainText(/空闲 · 没有进行中的 worktree|运行中 · \d+ 个 worktree/);
+    await expect(page.getByTestId('ops-card-evolution')).toHaveCount(0);
+    await expect(page.locator('a[href="/evolution"]')).toHaveCount(0);
   });
 
   test('one-click diagnostics lists failures and warnings first and folds passes [AC:ops-console#AC-2]', async ({ page }) => {
@@ -205,55 +206,39 @@ test.describe('Ops console', () => {
     await expect(card.getByTestId('effective-capability.webSearch')).toHaveCount(0);
   });
 
-  test('Evolution page follows the interface language [AC:ops-console#AC-8]', async ({ page }) => {
+  test('direct Evolution URL shows a short hidden note in the active language [AC:ops-console#AC-8]', async ({ page }) => {
     await page.goto('/evolution');
-    await expect(page.getByRole('heading', { name: 'Evolution 观测' })).toBeVisible();
-    const title = (text: string) => page.locator('.ev-section-title').filter({ hasText: text });
-    await expect(title('进行中的 Worktree')).toBeVisible();
-    await expect(title('历史结果')).toBeVisible();
-    await expect(page.getByRole('link', { name: /返回控制台/ })).toBeVisible();
+    const hidden = page.getByTestId('evolution-hidden');
+    await expect(hidden).toBeVisible();
+    await expect(hidden.getByRole('heading')).toHaveText('Evolution 已隐藏');
+    await expect(hidden).toContainText('不会自动运行');
+    await expect(page.getByText('进行中的 Worktree')).toHaveCount(0);
+    await expect(page.getByText('历史结果')).toHaveCount(0);
 
     await page.evaluate(() => window.localStorage.setItem('lab.locale', 'en'));
     await page.reload();
-    await expect(page.getByRole('heading', { name: 'Evolution', exact: true })).toBeVisible();
-    await expect(title('Active worktrees')).toBeVisible();
-    await expect(title('History')).toBeVisible();
-    await expect(page.getByRole('link', { name: /Back to console/ })).toBeVisible();
-    await expect(title('进行中的 Worktree')).toHaveCount(0);
+    await expect(hidden.getByRole('heading')).toHaveText('Evolution is hidden');
+    await expect(hidden).toContainText('will not run on its own');
+    await expect(page.getByText('Active worktrees')).toHaveCount(0);
+    await expect(page.getByText('History')).toHaveCount(0);
   });
 
-  test('Evolution history filters by status and keyword [AC:ops-console#AC-9]', async ({ page }) => {
-    const row = (type: string, name: string, title: string, tool: string | null) => ({
-      type, name, status: type, sourceTitle: title, sourceUrl: '', experimentBranch: `exp/evolution-${name}`,
-      dateUtc: '2026-09-07T10:00:00Z', merged: type === 'success', detectedTool: tool
-    });
-    await page.route('**/api/evolution/results', (route) =>
+  test('top bar and health page do not show Evolution even when a run looks active [AC:ops-console#AC-9]', async ({ page }) => {
+    await page.route('**/api/evolution/overview', (route) =>
       route.fulfill({
         json: {
-          results: [
-            row('success', 'retry', 'Add retry', 'cursor'),
-            row('failure', 'build', 'Faster build', 'claude'),
-            row('skip', 'docs', 'Docs tweak', null)
-          ]
+          activeWorktrees: [{ path: '/tmp/.evolution-worktrees/exp', branch: 'exp/evolution-demo', head: 'abc', isEvolution: true }],
+          counts: { success: 1, failure: 0, skip: 0 },
+          latestRunLog: 'running',
+          inboxHint: 'today.md'
         }
       })
     );
-    await page.goto('/evolution');
-    const rows = page.locator('.ev-table tbody tr');
-    await expect(rows).toHaveCount(3);
-
-    await page.getByRole('button', { name: /^失败/ }).click();
-    await expect(rows).toHaveCount(1);
-    await expect(rows.first()).toContainText('Faster build');
-
-    await page.getByRole('button', { name: /^全部/ }).click();
-    await page.getByPlaceholder('搜索标题 / 分支 / 工具').fill('cursor');
-    await expect(rows).toHaveCount(1);
-    await expect(rows.first()).toContainText('Add retry');
-
-    await page.getByPlaceholder('搜索标题 / 分支 / 工具').fill('nothing-matches');
-    await expect(page.getByTestId('ev-no-match')).toHaveText('没有匹配的结果。');
-    await page.getByPlaceholder('搜索标题 / 分支 / 工具').fill('');
-    await expect(rows).toHaveCount(3);
+    await page.goto('/#/ops/health');
+    await expect(page.getByTestId('ops-card-service')).toBeVisible();
+    await expect(page.getByTestId('evolution-status-chip')).toHaveCount(0);
+    await expect(page.getByText(/Evolution 运行中/)).toHaveCount(0);
+    await expect(page.getByTestId('ops-card-evolution')).toHaveCount(0);
+    await expect(page.locator('a[href="/evolution"]')).toHaveCount(0);
   });
 });

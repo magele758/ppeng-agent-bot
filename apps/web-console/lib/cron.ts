@@ -39,6 +39,16 @@ export function cronFromTime(opts: {
   return `${minute} ${hour} * * *`;
 }
 
+export function routinePrecheckPayload(
+  kind: 'none' | 'script' | 'predicate',
+  source: string
+): { kind: 'script' | 'predicate'; source: string } | undefined {
+  if (kind === 'none') return undefined;
+  const trimmed = source.trim();
+  if (!trimmed) return undefined;
+  return { kind, source: trimmed };
+}
+
 export function parseTimeValue(value: string): { hour: number; minute: number } {
   const m = value.trim().match(/^(\d{1,2}):(\d{2})$/);
   if (!m) return { hour: 9, minute: 0 };

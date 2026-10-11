@@ -1,3 +1,4 @@
+import { TOOL_RESULT_STUB_MARK } from './tool-result-stub';
 import type { ChatMessage, MessagePart } from './types';
 
 export function msgPartsToText(parts: MessagePart[] | undefined): string {
@@ -49,7 +50,7 @@ export function userPreviewText(text: string, imageAssetIds: string[]): string {
 }
 
 export function isToolResultStub(content: string): boolean {
-  return content.includes('output dropped from context');
+  return content.includes(TOOL_RESULT_STUB_MARK);
 }
 
 export function isToolResultTrimmed(content: string): boolean {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
+import { evolutionEntryVisible } from '@/lib/evolution-surface';
 import { useI18n, type MessageKey } from '@/lib/i18n';
 import { attentionItems, type EffectiveConfigPayload } from '@/lib/effective-config';
 import {
@@ -138,6 +139,7 @@ export function HealthView() {
   const level = verdict.level;
 
   const heal = status.selfHealActive?.length ?? 0;
+  const showEvolution = evolutionEntryVisible();
   const evo = status.evolution?.activeWorktrees ?? 0;
   const healBad = (status.selfHealRuns ?? []).some((r) => selfHealTone(r.status) === 'bad') && heal === 0;
 
@@ -237,31 +239,33 @@ export function HealthView() {
           {status.selfHealRuns ? <SelfHealRuns runs={status.selfHealRuns} /> : null}
         </StatusCard>
 
-        <StatusCard
-          testId="ops-card-evolution"
-          title={t('ops.health.evolutionTitle')}
-          tone={status.evolution == null ? 'idle' : evo > 0 ? 'run' : 'idle'}
-          headline={
-            status.evolution == null
-              ? t('ops.health.evolutionUnavailable')
-              : activityState(evo) === 'running'
-                ? t('ops.health.evolutionRunning', { n: evo })
-                : t('ops.health.evolutionIdle')
-          }
-        >
-          {status.evolution ? (
-            <div className="muted small">
-              {t('ops.health.evolutionCounts', {
-                success: status.evolution.counts.success ?? 0,
-                failure: status.evolution.counts.failure ?? 0,
-                skip: status.evolution.counts.skip ?? 0
-              })}
-            </div>
-          ) : null}
-          <a className="btn btn-ghost btn-sm ops-card__link" href="/evolution">
-            {t('ops.health.evolutionOpen')}
-          </a>
-        </StatusCard>
+        {showEvolution ? (
+          <StatusCard
+            testId="ops-card-evolution"
+            title={t('ops.health.evolutionTitle')}
+            tone={status.evolution == null ? 'idle' : evo > 0 ? 'run' : 'idle'}
+            headline={
+              status.evolution == null
+                ? t('ops.health.evolutionUnavailable')
+                : activityState(evo) === 'running'
+                  ? t('ops.health.evolutionRunning', { n: evo })
+                  : t('ops.health.evolutionIdle')
+            }
+          >
+            {status.evolution ? (
+              <div className="muted small">
+                {t('ops.health.evolutionCounts', {
+                  success: status.evolution.counts.success ?? 0,
+                  failure: status.evolution.counts.failure ?? 0,
+                  skip: status.evolution.counts.skip ?? 0
+                })}
+              </div>
+            ) : null}
+            <a className="btn btn-ghost btn-sm ops-card__link" href="/evolution">
+              {t('ops.health.evolutionOpen')}
+            </a>
+          </StatusCard>
+        ) : null}
       </div>
 
       <DoctorCard onReport={onDoctor} />

@@ -14,6 +14,12 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+# The running app does not install this crontab. If a host still calls it,
+# the product switch no-ops before learn / run-day / daemon reload.
+# shellcheck disable=SC1091
+source "$ROOT/scripts/evolution/refuse-if-hidden.sh"
+evolution_refuse_if_hidden "$ROOT"
+
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:$PATH"
 [[ -f .env ]] && set -a && source .env && set +a
 

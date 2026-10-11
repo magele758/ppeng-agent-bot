@@ -58,6 +58,7 @@ import {
   parseSecretRefs,
   runWithSecretRefs
 } from '../secrets/secret-vault.js';
+import { stripSubagentDeniedTools } from './subagent-policy.js';
 
 type ToolCallPart = Extract<MessagePart, { type: 'tool_call' }>;
 
@@ -112,6 +113,8 @@ export interface ToolLoopDeps {
   };
   settingsStore?: IngestionSettingsStore;
   onArtifactCreated?: (manifest: PagedArtifactManifest) => void;
+  /** Arm the unattended-wake deny timer when a deadline was stored. */
+  armUnattendedApproval?: (approval: ApprovalRecord) => void;
 }
 
 function toolsForTurn(deps: ToolLoopDeps, turnTools?: ToolContract<any>[]): ToolContract<Record<string, unknown>>[] {
@@ -135,7 +138,11 @@ function hostFromDeps(deps: ToolLoopDeps): ToolLoopHost {
       deps.store.appendMessage(sessionId, role, parts);
     },
     listApprovals: (filter) => deps.store.listApprovals(filter),
-    createApproval: (input) => deps.store.createApproval(input),
+    createApproval: (input) => {
+      const approval = deps.store.createApproval(input);
+      deps.armUnattendedApproval?.(approval);
+      return approval;
+    },
     deleteApproval: (id) => deps.store.deleteApproval(id),
     getTask: (taskId) => deps.store.getTask(taskId),
     updateTask: (taskId, patch) => {
@@ -352,7 +359,8 @@ export async function executeToolCalls(
   sessionId: string,
   turnTools?: ToolContract<any>[]
 ): Promise<ToolExecResult[]> {
-  const execDeps = turnTools ? { ...deps, tools: turnTools } : deps;
+  const visible = stripSubagentDeniedTools(context.session, turnTools ?? deps.tools);
+  const execDeps = { ...deps, tools: visible };
   const vault = getBoundSecretVault();
   const secretValues = vault ? vault.resolveNamed(parseSecretRefs(context.session.metadata)) : {};
   const tx = createCompensationTx();

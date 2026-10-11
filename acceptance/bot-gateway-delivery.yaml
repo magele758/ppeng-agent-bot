@@ -1,0 +1,44 @@
+id: bot-gateway-delivery
+title: IM 静默回复、至少一次投递与例行预检
+status: implemented
+requirement: |
+  Implement three bot/gateway behaviors:
+  1. Outbound: if the assistant reply is exactly or clearly marked [SILENT] or NO_REPLY, do not deliver to IM. If the turn was a direct human message (not cron/webhook), replace a lone silent marker with a short acknowledgement so the human is not left with no reply. i18n zh+en for that acknowledgement.
+  2. Delivery ledger: persist outbound IM deliveries; on restart, redelivery may happen and the resent text must be prefixed so the user can see it may be a duplicate (Hermes uses a recovered-reply prefix). At-least-once, not exactly-once.
+  3. Cron/routine precheck: a bot routine may set a precheck (script or predicate) that runs BEFORE the model. If it returns wakeAgent false, do not start a model turn and do not spend a model call. No new env vars; store the precheck on the existing routine/bot config (Lab/KV).
+  Acceptance-first, user pre-authorized, tests first. Open a non-draft PR. Do not merge. Do not change slash-command routing, compression thresholds, or approval timeouts.
+notes: |
+  user pre-authorized start（用户明确要求立即开始，未等待逐条确认；标准仍以用户视角书写，PR 中供负责人事后复核）
+criteria:
+  - id: AC-1
+    given: 助手准备发到即时通讯的回复正好是 [SILENT] 或 NO_REPLY，或整段回复清楚只是这个静默标记（允许大小写、空白、引号或简单包裹）
+    when: 网关把这条回复外发到即时通讯
+    then: 对方收不到静默标记本身
+  - id: AC-2
+    given: 这一轮是人直接发来的消息，不是定时任务，也不是 webhook
+    when: 助手的整段回复只是一个静默标记
+    then: 对方会收到一句简短确认，而不是没有任何回复；这句确认有中文和英文两种说法
+  - id: AC-3
+    given: 这一轮来自定时任务或 webhook
+    when: 助手的整段回复只是一个静默标记
+    then: 即时通讯什么都不收到，也不会收到那句给人看的确认
+  - id: AC-4
+    given: 回复正文里只是提到静默标记，整段并不是标记
+    when: 网关外发
+    then: 原文照常送到即时通讯
+  - id: AC-5
+    given: 一条即时通讯回复已经记在投递账本里，但发送过程中网关重启，平台可能已经收到也可能没有
+    when: 网关恢复
+    then: 这条内容会再发一次，并且重发文本带有可辨认前缀，表明这可能是重复的；已经确认送达的不会再发。这是至少一次，允许重复
+  - id: AC-6
+    given: 某个 Bot 的例行任务配置了预检（脚本或谓词），预检结果明确为不唤醒（wakeAgent 为 false）
+    when: 该任务到达触发时间
+    then: 不会开始模型回合，也不会产生模型调用
+  - id: AC-7
+    given: 例行任务的预检结果是唤醒，或没有配置预检，或预检没有明确返回不唤醒
+    when: 任务到达触发时间
+    then: 仍会开始模型回合
+  - id: AC-8
+    given: 用户在 Lab 里为例行任务保存预检
+    when: 保存后重新读取该任务
+    then: 预检仍在该任务配置里，下次触发按它执行；不需要新增环境变量，也不需要为此重启

@@ -19,6 +19,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { config as loadDotenv } from 'dotenv';
+import { EVOLUTION_DISABLED_CODE, considerEvolutionSchedule } from '../packages/core/src/evolution/surface.ts';
 import { parseLocalSourceFile, scanDirRecursive } from './evolution/local-source-parse.mjs';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
@@ -153,6 +154,11 @@ function scanArchiveDir(archiveDir) {
 }
 
 async function main() {
+  const decision = considerEvolutionSchedule({ reason: 'cli' });
+  if (!decision.started) {
+    console.error(`${EVOLUTION_DISABLED_CODE}: Evolution is hidden and will not run.`);
+    return;
+  }
   const { fetchFeedItems } = await import(pathToFileURL(join(repoRoot, 'packages/capability-gateway/dist/feed.js')).href);
   const { readGatewayState, writeGatewayState } = await import(
     pathToFileURL(join(repoRoot, 'packages/capability-gateway/dist/state.js')).href

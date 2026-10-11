@@ -176,7 +176,7 @@ export function miscRoutes(runtime: RawAgentRuntime, opts: MiscOptions): RouteSp
         if (pending) guardSession(runtime, pending.sessionId, auth);
         const approval = await runtime.approve(id, decision);
         const session = runtime.getSession(approval.sessionId);
-        if (decision === 'approved' && session?.status === 'idle') {
+        if (approval.status === 'approved' && session?.status === 'idle') {
           await runtime.runSession(session.id);
         }
         json(response, 200, {

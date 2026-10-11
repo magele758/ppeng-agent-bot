@@ -108,6 +108,7 @@ export interface MicroCompactStats {
   charsSaved: number;
 }
 
+/** Stale tool output stand-in: tool name and ids stay; the line only says the output was omitted to save space. */
 export function toolResultPlaceholder(name: string, ok: boolean, addr?: ToolResultStubAddr): string {
   return formatToolResultStub(name, ok, addr);
 }

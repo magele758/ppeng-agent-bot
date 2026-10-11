@@ -36,13 +36,18 @@ export class ApprovalStore {
       args: input.args,
       idempotencyKey: input.idempotencyKey,
       createdAt: nowIso(),
-      updatedAt: nowIso()
+      updatedAt: nowIso(),
+      ...(input.expiresAt ? { expiresAt: input.expiresAt } : {}),
+      ...(input.wakeSource ? { wakeSource: input.wakeSource } : {})
     };
 
     this.db
       .prepare(`
-        INSERT INTO approvals (id, session_id, tool_name, status, reason, args_json, idempotency_key, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO approvals (
+          id, session_id, tool_name, status, reason, args_json, idempotency_key,
+          created_at, updated_at, expires_at, wake_source
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
       .run(
         approval.id,
@@ -53,7 +58,9 @@ export class ApprovalStore {
         serializeJson(approval.args),
         approval.idempotencyKey ?? null,
         approval.createdAt,
-        approval.updatedAt
+        approval.updatedAt,
+        approval.expiresAt ?? null,
+        approval.wakeSource ?? null
       );
 
     return approval;
@@ -77,15 +84,38 @@ export class ApprovalStore {
     if (!approval) {
       throw new NotFoundError('Approval', id);
     }
+    if (approval.status !== 'pending') return approval;
 
-    const next: ApprovalRecord = {
-      ...approval,
-      status,
-      updatedAt: nowIso()
-    };
+    const updatedAt = nowIso();
+    const result = this.db
+      .prepare(`UPDATE approvals SET status = ?, updated_at = ? WHERE id = ? AND status = 'pending'`)
+      .run(status, updatedAt, id);
+    if (Number(result.changes) === 0) {
+      return this.getApproval(id) ?? approval;
+    }
+    return { ...approval, status, updatedAt };
+  }
 
-    this.db.prepare(`UPDATE approvals SET status = ?, updated_at = ? WHERE id = ?`).run(next.status, next.updatedAt, next.id);
-    return next;
+  /**
+   * Deny a still-pending unattended approval. A human decision that landed
+   * first (status no longer pending, or no deadline) is left unchanged.
+   */
+  markApprovalExpired(id: string, expireReason: string): ApprovalRecord | undefined {
+    const approval = this.getApproval(id);
+    if (!approval) return undefined;
+    if (approval.status !== 'pending' || !approval.expiresAt) return approval;
+    const updatedAt = nowIso();
+    const result = this.db
+      .prepare(
+        `UPDATE approvals
+         SET status = 'rejected', expire_reason = ?, updated_at = ?
+         WHERE id = ? AND status = 'pending' AND expires_at IS NOT NULL`
+      )
+      .run(expireReason, updatedAt, id);
+    if (Number(result.changes) === 0) {
+      return this.getApproval(id) ?? approval;
+    }
+    return { ...approval, status: 'rejected', expireReason, updatedAt };
   }
 
   deleteApproval(id: string): void {
@@ -93,6 +123,9 @@ export class ApprovalStore {
   }
 
   private mapApprovalRow(row: Record<string, unknown>): ApprovalRecord {
+    const expiresAt = optionalString(row.expires_at);
+    const expireReason = optionalString(row.expire_reason);
+    const wakeSource = optionalString(row.wake_source);
     return {
       id: String(row.id),
       sessionId: String(row.session_id),
@@ -102,7 +135,10 @@ export class ApprovalStore {
       args: parseJson<Record<string, unknown>>(String(row.args_json)),
       idempotencyKey: optionalString((row as { idempotency_key?: unknown }).idempotency_key),
       createdAt: String(row.created_at),
-      updatedAt: String(row.updated_at)
+      updatedAt: String(row.updated_at),
+      ...(expiresAt ? { expiresAt } : {}),
+      ...(expireReason ? { expireReason } : {}),
+      ...(wakeSource ? { wakeSource } : {})
     };
   }
 }

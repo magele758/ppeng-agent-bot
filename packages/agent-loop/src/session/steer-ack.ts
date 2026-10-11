@@ -38,7 +38,7 @@ export interface HttpSteerAck {
   item?: InboxItem;
 }
 
-const ENDED: ReadonlySet<SessionStatus> = new Set(['completed', 'failed']);
+const ENDED: ReadonlySet<SessionStatus> = new Set(['completed', 'failed', 'unknown']);
 
 export function isSessionEndedStatus(status: SessionStatus | undefined): boolean {
   return status !== undefined && ENDED.has(status);

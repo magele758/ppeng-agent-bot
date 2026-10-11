@@ -14,6 +14,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+# shellcheck disable=SC1091
+source "$ROOT/scripts/evolution/refuse-if-hidden.sh"
+evolution_refuse_if_hidden "$ROOT"
+
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 [[ -f .env ]] && set -a && source .env && set +a
 

@@ -36,6 +36,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config as loadDotenv } from 'dotenv';
+import { EVOLUTION_DISABLED_CODE, considerEvolutionSchedule } from '../packages/core/src/evolution/surface.ts';
 import { EVOLUTION_CONCURRENCY_HARD_CAP, maxEvolutionConcurrencyFromEnv } from './evolution/agent-prompts.mjs';
 import { listCursorModels } from './evolution/cursor-models.mjs';
 import { getEvolutionInboxPendingCount } from './evolution/inbox-loader.mjs';
@@ -328,6 +329,11 @@ async function preflightCursorModels(opts) {
 
 async function main() {
   const opts = parseArgs(expandPresetArgv(process.argv));
+  const decision = considerEvolutionSchedule({ reason: 'cli' });
+  if (!decision.started) {
+    console.error(`${EVOLUTION_DISABLED_CODE}: Evolution is hidden and will not run.`);
+    return;
+  }
   const env  = buildEnv(opts);
   await preflightCursorModels(opts);
 

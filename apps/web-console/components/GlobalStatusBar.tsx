@@ -1,5 +1,6 @@
 'use client';
 
+import { evolutionChipVisible } from '@/lib/evolution-surface';
 import { useI18n, type MessageKey } from '@/lib/i18n';
 import { formatHash } from '@/lib/nav';
 import { overallHealth, type HealthLevel } from '@/lib/ops-health';
@@ -11,7 +12,7 @@ const LEVEL_KEY: Record<HealthLevel, MessageKey> = {
   fail: 'ops.status.fail'
 };
 
-/** One quiet health chip; self-heal / Evolution only show up while they are actually running. */
+/** One quiet health chip. Self-heal shows only while it is running. Evolution stays hidden. */
 export function GlobalStatusBar() {
   const { t } = useI18n();
   const { status } = useOpsStatus();
@@ -22,7 +23,7 @@ export function GlobalStatusBar() {
     configWarnings: 0
   }).level;
   const heal = status.selfHealActive?.length ?? 0;
-  const evo = status.evolution?.activeWorktrees ?? 0;
+  const showEvolution = evolutionChipVisible(status.evolution?.activeWorktrees ?? 0);
   const href = formatHash({ section: 'ops', sub: 'health' });
 
   return (
@@ -40,9 +41,9 @@ export function GlobalStatusBar() {
           {t('ops.status.healRunning', { n: heal })}
         </a>
       ) : null}
-      {evo > 0 ? (
-        <a href={href} className="global-status__chip global-status__link is-run">
-          {t('ops.status.evoRunning', { n: evo })}
+      {showEvolution ? (
+        <a href={href} className="global-status__chip global-status__link is-run" data-testid="evolution-status-chip">
+          {t('ops.status.evoRunning', { n: status.evolution?.activeWorktrees ?? 0 })}
         </a>
       ) : null}
     </div>

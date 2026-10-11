@@ -1,6 +1,6 @@
 # Raw Agent Desktop
 
-Electron desktop client for Raw Agent (macOS, Windows, Linux; x64 and arm64).
+Electron desktop client for Raw Agent (Apple Silicon macOS, Windows, Linux). Intel Mac (darwin x64) is not packed.
 
 ![Raw Agent Desktop](assets/screenshots/main-window.png)
 
@@ -27,11 +27,11 @@ Output: `apps/desktop/release/RawAgent-<version>-<os>-<arch>.{dmg,exe,AppImage}`
 
 | OS | x64 | arm64 |
 |----|-----|-------|
-| macOS | DMG | DMG |
+| macOS | not built (Intel / darwin x64) | DMG |
 | Windows | NSIS exe | NSIS exe |
 | Linux | AppImage | AppImage |
 
-CI: daily at 17:00 UTC (01:00 Beijing), `desktop-v*` tag (agent; no Release), or [`.github/workflows/desktop.yml`](../../.github/workflows/desktop.yml) (see [`doc/CI.md`](../../doc/CI.md)).
+Do not add a darwin-x64 / `mac-x64` CI target back without a new product decision. CI: daily at 17:00 UTC (01:00 Beijing), `desktop-v*` tag (agent; no Release), or [`.github/workflows/desktop.yml`](../../.github/workflows/desktop.yml) (see [`doc/CI.md`](../../doc/CI.md)).
 
 ## Development
 

@@ -117,6 +117,10 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# shellcheck disable=SC1091
+source "$ROOT/scripts/evolution/refuse-if-hidden.sh"
+evolution_refuse_if_hidden "$ROOT"
+
 npm run evolution -- \
   "${PIPELINE_BUILD_FLAG[@]}" \
   --learn \

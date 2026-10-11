@@ -108,16 +108,18 @@ describe('prepareTurnInput', () => {
       },
       autoCompact: async () => undefined,
       claimNextStep: () => [],
-      applyFoldBudget: (_s, msgs) => clampFoldToVisible(msgs, 8),
+      applyFoldBudget: (_s, msgs) => clampFoldToVisible(msgs, { maxVisible: 8, tokenBudget: 20 }),
       prepareView: async (_s, msgs) => {
         viewed = msgs.length;
         return msgs;
       },
       buildAppendix: () => '',
     });
-    expect(viewed).toBe(8);
-    expect(packed.messages).toHaveLength(8);
+    expect(viewed).toBe(packed.messages.length);
+    expect(viewed).toBeLessThan(folded.length);
     expect(packed.foldSeqs).toHaveLength(30);
+    const latestUser = [...packed.messages].reverse().find((m) => m.role === 'user');
+    expect(latestUser?.parts.some((p) => p.type === 'text' && p.text === 'm28')).toBe(true);
   });
 
   it('falls back to working-log tail on the view copy when appendix is empty', async () => {

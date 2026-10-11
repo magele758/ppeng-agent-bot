@@ -92,6 +92,85 @@ export function selectClosedPrefixRange(
   return null;
 }
 
+function resultBeforeCall(slice: SessionMessage[]): boolean {
+  const open = new Set<string>();
+  for (const message of slice) {
+    for (const part of message.parts) {
+      if (part.type === 'tool_call') open.add(part.toolCallId);
+      else if (part.type === 'tool_result' && !open.has(part.toolCallId)) return true;
+    }
+  }
+  return false;
+}
+
+function isClosedSummaryCut(messages: SessionMessage[], start: number, end: number): boolean {
+  if (end <= start) return false;
+  const slice = messages.slice(start, end);
+  if (isToolWaveOpen(slice) || resultBeforeCall(slice)) return false;
+  const next = messages[end];
+  if (next?.role === 'tool') return false;
+  return true;
+}
+
+/**
+ * Closed range that may be replaced by a summary. The leading system prompt
+ * and the latest user message stay verbatim; the recent tail stays too.
+ */
+function selectCompactableClosedRange(
+  folded: SessionMessage[],
+  keepRecent = COMPACT_KEEP_RECENT
+): { startSeq: number; endSeq: number; older: SessionMessage[] } | null {
+  const withSeq = folded.filter((m): m is SessionMessage & { seq: number } => typeof m.seq === 'number');
+  if (withSeq.length < 2) return null;
+
+  let leading = 0;
+  while (leading < withSeq.length && withSeq[leading]!.role === 'system') leading += 1;
+  let latestUser = -1;
+  for (let i = withSeq.length - 1; i >= 0; i -= 1) {
+    if (withSeq[i]!.role === 'user') {
+      latestUser = i;
+      break;
+    }
+  }
+
+  const keep = Math.min(keepRecent, Math.max(1, withSeq.length - 1));
+  const tailStart = withSeq.length - keep;
+  const protectedIdx = new Set<number>();
+  for (let i = 0; i < leading; i += 1) protectedIdx.add(i);
+  if (latestUser >= 0) protectedIdx.add(latestUser);
+
+  const eligible: number[] = [];
+  for (let i = 0; i < tailStart; i += 1) {
+    if (!protectedIdx.has(i)) eligible.push(i);
+  }
+  if (eligible.length === 0) return null;
+
+  const runs: Array<{ start: number; end: number }> = [];
+  let runStart = eligible[0]!;
+  let prev = eligible[0]!;
+  for (let k = 1; k < eligible.length; k += 1) {
+    const idx = eligible[k]!;
+    if (idx !== prev + 1) {
+      runs.push({ start: runStart, end: prev + 1 });
+      runStart = idx;
+    }
+    prev = idx;
+  }
+  runs.push({ start: runStart, end: prev + 1 });
+
+  for (const run of runs) {
+    for (let end = run.end; end > run.start; end -= 1) {
+      if (!isClosedSummaryCut(withSeq, run.start, end)) continue;
+      const older = withSeq.slice(run.start, end);
+      const first = older[0];
+      const last = older[older.length - 1];
+      if (!first || !last) continue;
+      return { startSeq: first.seq, endSeq: last.seq, older };
+    }
+  }
+  return null;
+}
+
 export function findPrunableToolResult(
   folded: SessionMessage[]
 ): (SessionMessage & { seq: number }) | undefined {
@@ -137,7 +216,12 @@ export async function runAutoCompact(input: RunAutoCompactInput): Promise<AutoCo
     return { didCompact: false, pruned: false };
   }
 
-  const range = selectClosedPrefixRange(folded, input.keepRecent ?? COMPACT_KEEP_RECENT);
+  const keepRecent = input.keepRecent ?? COMPACT_KEEP_RECENT;
+  // Prefer a closed range that leaves the leading system prompt and the latest
+  // user message in place. When that would leave nothing to summarize (short
+  // chats), keep the original prefix replace so callers still compact.
+  const range =
+    selectCompactableClosedRange(folded, keepRecent) ?? selectClosedPrefixRange(folded, keepRecent);
   if (range && range.older.length > 0) {
     const summary = await input.summarize(range.older);
     const capped = input.capSummary ? input.capSummary(summary) : summary;

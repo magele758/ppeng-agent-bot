@@ -1,6 +1,6 @@
 {
   "name": "@ppeng/agent-loop",
-  "version": "0.1.2",
+  "version": "0.1.4",
   "description": "Embeddable agent loop core: turn kernel, model adapters, streaming watchdogs, loop guards, session state, and tool execution.",
   "type": "module",
   "engines": {
@@ -8,10 +8,11 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "SKILL.md"
   ],
   "dependencies": {
-    "@ppeng/api-types": "0.1.2",
+    "@ppeng/api-types": "0.1.4",
     "jsonrepair": "^3.12.0"
   },
   "main": "./dist/index.js",
@@ -83,7 +84,7 @@
     }
   },
   "scripts": {
-    "build": "tsc -b",
+    "build": "node scripts/sync-skill.mjs && tsc -b",
     "clean": "rm -rf dist tsconfig.tsbuildinfo",
     "test": "npx --no-install vitest run",
     "test:watch": "npx --no-install vitest",

@@ -405,7 +405,8 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
     ['GET /api/evolution/results', AUTHENTICATED],
     ['GET /api/evolution/result', AUTHENTICATED],
     ['GET /api/evolution/reports', AUTHENTICATED],
-    ['GET /api/evolution/report/:id', AUTHENTICATED]
+    ['GET /api/evolution/report/:id', AUTHENTICATED],
+    ['POST /api/evolution/start', ADMIN]
   ];
 
   const table = new Map<string, RouteAccess>();

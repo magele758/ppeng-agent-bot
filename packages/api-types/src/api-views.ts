@@ -21,7 +21,7 @@ export type ApiSessionSummary = {
   id: string;
   title: string;
   mode: 'chat' | 'task' | 'subagent' | 'teammate';
-  status: 'idle' | 'running' | 'waiting_approval' | 'completed' | 'failed';
+  status: 'idle' | 'running' | 'waiting_approval' | 'completed' | 'failed' | 'unknown';
   agentId: string;
   createdAt?: string;
   updatedAt?: string;
@@ -79,6 +79,12 @@ export type ApiApprovalItem = {
   reason: string;
   args: Record<string, unknown>;
   createdAt: string;
+  /** Set when an unattended wake must be answered before this instant. */
+  expiresAt?: string;
+  /** Set when the approval was denied because nobody answered in time. */
+  expireReason?: string;
+  /** Unattended wake that raised this approval (`cron`, `routine`, …). */
+  wakeSource?: string;
 };
 
 /** Subset of MailRecord for mail rendering. */

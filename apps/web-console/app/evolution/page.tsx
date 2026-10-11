@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { evolutionEntryVisible } from '@/lib/evolution-surface';
 import { EVOLUTION_TYPES, filterEvolutionResults, type EvolutionResultType } from '@/lib/evolution-results';
 import { useI18n, type MessageKey } from '@/lib/i18n';
 import { renderMarkdown } from '@/lib/markdown';
@@ -50,7 +51,17 @@ function shortBranch(branch: string) {
   return branch.replace('exp/evolution-', '').slice(0, 40);
 }
 
-export default function EvolutionPage() {
+function EvolutionHidden() {
+  const { t } = useI18n();
+  return (
+    <main className="ev-page" data-testid="evolution-hidden">
+      <h1>{t('ops.evolution.hiddenTitle')}</h1>
+      <p>{t('ops.evolution.hiddenBody')}</p>
+    </main>
+  );
+}
+
+function EvolutionConsole() {
   const { t } = useI18n();
   const [typeFilter, setTypeFilter] = useState<EvolutionResultType | null>(null);
   const [query, setQuery] = useState('');
@@ -290,4 +301,9 @@ export default function EvolutionPage() {
       ) : null}
     </div>
   );
+}
+
+export default function EvolutionPage() {
+  if (!evolutionEntryVisible()) return <EvolutionHidden />;
+  return <EvolutionConsole />;
 }

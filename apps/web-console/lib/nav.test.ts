@@ -12,6 +12,13 @@ test('一级导航恰好为六项 [AC:console-navigation#AC-1]', () => {
   assert.deepEqual([...SECTION_IDS], ['chat', 'agents', 'tasks', 'knowledge', 'ops', 'settings']);
 });
 
+test('导航没有 Evolution 入口 [AC:ops-console#AC-9]', () => {
+  assert.equal((SECTION_IDS as readonly string[]).includes('evolution'), false);
+  for (const subs of Object.values(SUB_PAGES)) {
+    assert.equal((subs as readonly string[]).includes('evolution'), false);
+  }
+});
+
 test('hash 可解析为 section 与子页，往返一致 [AC:console-navigation#AC-2]', () => {
   assert.deepEqual(parseHash('#/ops/health'), { section: 'ops', sub: 'health' });
   assert.equal(formatHash({ section: 'ops', sub: 'health' }), '#/ops/health');

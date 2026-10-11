@@ -28,7 +28,9 @@ const TRANSITIONS: Record<SessionStatus, Partial<Record<SessionLifecycleEvent, S
     fail: 'failed'
   },
   completed: {},
-  failed: {}
+  failed: {},
+  /** Written on process restart for a child that was still running. Terminal. */
+  unknown: {}
 };
 
 export const SESSION_STATUSES: readonly SessionStatus[] = [
@@ -36,7 +38,8 @@ export const SESSION_STATUSES: readonly SessionStatus[] = [
   'running',
   'waiting_approval',
   'completed',
-  'failed'
+  'failed',
+  'unknown'
 ];
 
 export const SESSION_EVENTS: readonly SessionLifecycleEvent[] = [

@@ -59,7 +59,7 @@ function stubServices(overrides = {}) {
 
 test('placeholder keeps prefix and adds a stable message/part address', () => {
   const text = toolResultPlaceholder('bash', true, { messageId: 'msg_abc', partIndex: 0, seq: 4 });
-  assert.match(text, /^\[previous: used bash — output dropped from context\]/);
+  assert.match(text, /^\[previous: used bash — earlier tool output was omitted to save space\]/);
   assert.match(text, /\bmsg=msg_abc\b/);
   assert.match(text, /\bpart=0\b/);
   assert.match(text, /\bseq=4\b/);
@@ -68,7 +68,7 @@ test('placeholder keeps prefix and adds a stable message/part address', () => {
 
 test('failed placeholder still matches old assertions and parses', () => {
   const text = toolResultPlaceholder('grep', false, { messageId: 't9', partIndex: 1 });
-  assert.match(text, /\[previous: used grep \(failed\) — output dropped from context\]/);
+  assert.match(text, /\[previous: used grep \(failed\) — earlier tool output was omitted to save space\]/);
   assert.equal(parseToolResultStubRef(text)?.messageId, 't9');
   assert.equal(parseToolResultStubRef(text)?.partIndex, 1);
 });
@@ -88,7 +88,7 @@ test('collapsed model view drops full text; retrieve returns the same stored pay
   assert.equal(stats.collapsed, 1);
   const stub = modelView[0].parts[0].content;
   assert.match(stub, /\[previous: used bash/);
-  assert.match(stub, /output dropped from context/);
+  assert.match(stub, /earlier tool output was omitted to save space/);
   assert.equal(stub.includes(SECRET), false, 'model view must not keep the stored payload');
   assert.ok(stored[0].parts[0].content.includes(SECRET), 'stored transcript stays intact');
 

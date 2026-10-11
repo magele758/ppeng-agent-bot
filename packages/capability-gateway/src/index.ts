@@ -19,6 +19,16 @@ export {
   shouldRunDailyLearn
 } from './learn.js';
 export { runAgentTurnAndReply } from './im-handlers.js';
+export { isSilentMarker, resolveImOutbound, SILENT_ACK } from './silent-reply.js';
+export type { ImOutboundDecision, ImTurnOrigin } from './silent-reply.js';
+export {
+  RECOVERED_REPLY_PREFIX,
+  beginOutboundAttempt,
+  finishOutbound,
+  recoverOutboundLedger,
+  sendLedgered
+} from './delivery-ledger.js';
+export { deliverChannelText, recoverGatewayOutbound } from './outbound.js';
 export { readGatewayState, writeGatewayState } from './state.js';
 export type { ChannelSpec, GatewayEnvOptions, GatewayFileConfig, LearnConfig, ParsedFeedItem } from './types.js';
 export {

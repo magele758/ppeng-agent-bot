@@ -11,8 +11,24 @@ import { memoryBackendFromEnv } from '../memory/memory-backend.js';
 import { isMemoryContextAppendixText } from '../memory/memory-gate.js';
 import type { ExtensionRegistry } from '../extensions/extension-registry.js';
 import type { ModelAdapter, RunContext, SessionMessage, SessionRecord } from '../types.js';
-import { runAutoCompact } from '../session/auto-compact.js';
-import { resolveHistoryTokenBudget } from '../session/session-budget.js';
+import {
+  COMPACT_KEEP_RECENT,
+  findPrunableToolResult,
+  runAutoCompact,
+  selectClosedPrefixRange
+} from '../session/auto-compact.js';
+import {
+  BOT_HYGIENE_KEEP_RECENT,
+  botCompactInstruction,
+  botCompactTokenThresholds,
+  isCanonicalBotChat,
+  pruneLargeToolOutputs,
+  selectBotCompactTier,
+  type BotCompactTier
+} from '../session/bot-compact-policy.js';
+import { resolveHistoryTokenBudget, resolveMaxContextTokens } from '../session/session-budget.js';
+import { isToolWaveOpen } from '../session/surface-invariants.js';
+import { estimateMessageTokens } from '../model/token-estimate.js';
 import {
   appendWorkingLogEntry,
   workingLogEnabled,
@@ -157,10 +173,6 @@ export async function autoCompactSession(
   context: RunContext,
   opts?: { force?: boolean }
 ): Promise<{ replaced?: { startSeq: number; endSeq: number } }> {
-  const tokenThreshold = resolveHistoryTokenBudget(
-    'RAW_AGENT_COMPACT_TOKEN_THRESHOLD',
-    host.turnShapeBySession.get(context.session.id) ?? {}
-  );
   const preCompact = await runLifecycleHook(process.env, {
     phase: 'pre_compact',
     sessionId: context.session.id,
@@ -197,6 +209,15 @@ export async function autoCompactSession(
     ]);
   }
 
+  const session = host.store.getSession(context.session.id) ?? context.session;
+  if (isCanonicalBotChat(session)) {
+    return compactCanonicalBot(host, context, opts);
+  }
+
+  const tokenThreshold = resolveHistoryTokenBudget(
+    'RAW_AGENT_COMPACT_TOKEN_THRESHOLD',
+    host.turnShapeBySession.get(context.session.id) ?? {}
+  );
   const result = await runAutoCompact({
     store: host.store,
     session: host.store.getSession(context.session.id) ?? context.session,
@@ -254,4 +275,143 @@ export async function autoCompactSession(
     });
   }
   return { replaced: result.replaced };
+}
+
+/**
+ * Canonical bot chats only. 50% of the model window is a structured summary;
+ * 85% is a shorter hygiene pass. Both cut on a closed tool wave, prune large
+ * old tool outputs before the summary call, and soft-archive the original span.
+ */
+async function compactCanonicalBot(
+  host: CompactHost,
+  context: RunContext,
+  opts?: { force?: boolean }
+): Promise<{ replaced?: { startSeq: number; endSeq: number } }> {
+  const session = host.store.getSession(context.session.id) ?? context.session;
+  const folded = host.store.foldMessages(session.id);
+  if (isToolWaveOpen(folded)) {
+    void host.emitTrace(session.id, {
+      kind: 'compact_skipped',
+      payload: { reason: 'open_tool_wave', tier: 'bot' }
+    });
+    return {};
+  }
+
+  const viewed = await host.prepareMessagesForModel(session, folded);
+  const estimated = estimateMessageTokens(viewed);
+  const thresholds = botCompactTokenThresholds(resolveMaxContextTokens(process.env));
+  const tier = selectBotCompactTier(estimated, thresholds, opts?.force === true);
+  if (!tier) return {};
+
+  const keepRecent = tier === 'hygiene' ? BOT_HYGIENE_KEEP_RECENT : COMPACT_KEEP_RECENT;
+  const range = selectClosedPrefixRange(folded, keepRecent);
+  if (!range || range.older.length === 0) {
+    return pruneOneLargeToolResult(host, session.id, folded);
+  }
+
+  const prior = session.summary?.trim() ?? '';
+  const instruction = botCompactInstruction(tier, prior);
+  const pruned = pruneLargeToolOutputs(range.older);
+  const adapter = host.resolveModelAdapter?.(session) ?? host.modelAdapter;
+  let summary: string;
+  try {
+    summary = await adapter.summarizeMessages({
+      agent: context.agent,
+      messages: [...pruned, instructionMessage(session.id, instruction)],
+      reason: `bot ${tier} compact session ${session.id}`
+    });
+  } catch (error) {
+    persistBotCompactLong(host, context, range.older);
+    throw error;
+  }
+
+  const trimmed = summary.trim();
+  if (!trimmed) {
+    persistBotCompactLong(host, context, range.older);
+    void host.emitTrace(session.id, {
+      kind: 'compact_skipped',
+      payload: { reason: 'empty_summary', tier }
+    });
+    return {};
+  }
+
+  const capped = capRollingSummaryText(
+    trimmed,
+    compactSummaryMaxChars(process.env, thresholds.structuredTokens)
+  );
+  persistBotCompactLong(host, context, range.older, adapter.name === 'heuristic' ? undefined : capped);
+  host.store.appendReplacement(session.id, {
+    startSeq: range.startSeq,
+    endSeq: range.endSeq,
+    role: 'system',
+    parts: [textPart(capped)],
+    key: 'compact-summary'
+  });
+  host.store.updateSession(session.id, { summary: capped });
+  await archiveMessages(host.stateDir, session.id, range.older);
+  noteCompact(host, session.id, { startSeq: range.startSeq, endSeq: range.endSeq }, tier);
+  return { replaced: { startSeq: range.startSeq, endSeq: range.endSeq } };
+}
+
+function instructionMessage(sessionId: string, text: string): SessionMessage {
+  return {
+    id: 'bot-compact-instruction',
+    sessionId,
+    role: 'user',
+    parts: [textPart(text)],
+    createdAt: new Date(0).toISOString()
+  };
+}
+
+function noteCompact(
+  host: CompactHost,
+  sessionId: string,
+  replaced: { startSeq: number; endSeq: number },
+  tier: BotCompactTier
+): void {
+  if (workingLogEnabled(process.env)) {
+    appendWorkingLogEntry(workingLogPath(host.stateDir, sessionId), {
+      kind: 'compact_anchor',
+      content: `Compacted seq ${replaced.startSeq}-${replaced.endSeq} into a replace summary.`
+    });
+  }
+  void host.emitTrace(sessionId, {
+    kind: 'compact',
+    payload: { replaced, pruned: false, didCompact: true, tier }
+  });
+}
+
+/** Closed-wave fallback when no prefix can be summarized: shorten one old tool output. */
+async function pruneOneLargeToolResult(
+  host: CompactHost,
+  sessionId: string,
+  folded: SessionMessage[]
+): Promise<{ replaced?: { startSeq: number; endSeq: number } }> {
+  const prunable = findPrunableToolResult(folded);
+  const resultPart = prunable?.parts.find((part) => part.type === 'tool_result');
+  if (!prunable || !resultPart || resultPart.type !== 'tool_result') {
+    void host.emitTrace(sessionId, {
+      kind: 'compact_skipped',
+      payload: { reason: 'no_closed_range', tier: 'bot' }
+    });
+    return {};
+  }
+  const pruned = pruneLargeToolOutputs([prunable])[0] ?? prunable;
+  host.store.appendReplacement(sessionId, {
+    startSeq: prunable.seq,
+    endSeq: prunable.seq,
+    role: prunable.role,
+    parts: pruned.parts
+  });
+  await archiveMessages(host.stateDir, sessionId, [prunable]);
+  void host.emitTrace(sessionId, {
+    kind: 'compact',
+    payload: {
+      replaced: { startSeq: prunable.seq, endSeq: prunable.seq },
+      pruned: true,
+      didCompact: false,
+      tier: 'bot'
+    }
+  });
+  return { replaced: { startSeq: prunable.seq, endSeq: prunable.seq } };
 }

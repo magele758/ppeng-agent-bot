@@ -11,6 +11,7 @@ import {
   type PermissionMode
 } from '../approval/permission-mode.js';
 import { LEGACY_BOT_BYPASS_META } from '../bots/legacy-bypass.js';
+import { APPROVAL_WAKE_KEY, disarmUnattendedApprovalExpiry } from '../approval/unattended-approval.js';
 import { NotFoundError, ValidationError } from '../errors.js';
 import { textSummaryFromParts } from '../model/model-adapters.js';
 import { decideSteerAdmission, type SteerAck } from '../session/steer-ack.js';
@@ -302,6 +303,9 @@ export function sendUserMessage(
     throw new ValidationError('Message or imageAssetIds required');
   }
   host.store.appendMessage(session.id, 'user', userMessageParts(text || '(image)', ids, host.store));
+  mergeSessionMetadata(host.store, session.id, {
+    [APPROVAL_WAKE_KEY]: { kind: 'human', source: 'lab-chat' }
+  });
   void host.runImageRetention(session.id);
   return host.store.getSession(session.id) as SessionRecord;
 }
@@ -386,7 +390,14 @@ export async function approve(
     emitTrace?: (sessionId: string, event: { kind: string; payload?: Record<string, unknown> }) => void;
   }
 ): Promise<ApprovalRecord> {
+  const existing = store.getApproval(approvalId);
+  if (!existing) {
+    throw new NotFoundError('Approval', approvalId);
+  }
+  if (existing.status !== 'pending') return existing;
   const approval = store.updateApproval(approvalId, decision);
+  if (approval.status !== decision) return approval;
+  disarmUnattendedApprovalExpiry(approval.id);
   if (decision === 'approved' && approval.toolName === DYN_TOOL_PROMOTE_APPROVAL) {
     const name = typeof approval.args?.name === 'string' ? approval.args.name : '';
     const target = approval.args?.targetScope;

@@ -1,6 +1,6 @@
 /** Browser-side parser for micro-compact stubs. Keep in sync with core `session/tool-result-stub.ts`. */
 
-export const TOOL_RESULT_STUB_MARK = 'output dropped from context';
+export const TOOL_RESULT_STUB_MARK = 'earlier tool output was omitted to save space';
 
 export interface ToolResultStubRef {
   messageId: string;
@@ -8,7 +8,7 @@ export interface ToolResultStubRef {
   seq?: number;
 }
 
-const STUB_PREFIX = /\[previous: used \S+(?: \(failed\))? — output dropped from context\]/;
+const STUB_PREFIX = /\[previous: used \S+(?: \(failed\))? — earlier tool output was omitted to save space\]/;
 
 export function isToolResultStub(text: string): boolean {
   return typeof text === 'string' && STUB_PREFIX.test(text) && text.includes(TOOL_RESULT_STUB_MARK);

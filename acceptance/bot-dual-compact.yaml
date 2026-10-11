@@ -1,0 +1,41 @@
+id: bot-dual-compact
+title: 规范 Bot 会话的双阈值压缩
+status: implemented
+requirement: |
+  Repo /workspace (magele758/ppeng-agent-core). Pull latest origin/main. Read AGENTS.md and /cursor/stores/self/docs/personal-assistant-agents-vs-chat-agents.md section 3.2 and the 6.2 bullet on dual safety-net compression.
+
+  For canonical bot sessions only, implement two compression thresholds as a fraction of the model context window (default window 131072): at 50% run structured compact (goal, constraints, progress, decisions, files, next steps; incremental if a summary already exists); at 85% run a hygiene compact. Both must cut only on closed tool waves (tool_call stays paired with tool_result). Prune large old tool outputs before summarizing. Soft-archive the replaced transcript (existing archive jsonl path is fine) and keep it searchable if a session search already exists; do not invent a new vector DB. Do not change non-bot sessions. Do not add RAW_AGENT_* env; ratios can be constants or existing daemon_control/bot settings. There is an open PR #87 that changes SDK clampFoldToVisible; do not depend on it; implement the bot policy in the product compact path (packages/core compact host) so bot sessions compact earlier than the ~109k default.
+
+  Acceptance-first, user pre-authorized. Tests first. Open a non-draft PR. Do not merge. Do not edit gateway silence, approvals, or slash commands. Final reply: PR link and the exact trigger rules.
+criteria:
+  - id: AC-1
+    given: 一条规范 Bot 主会话，模型上下文窗口按默认大小计算
+    when: 会话内容达到窗口的一半，且每个工具调用都已有结果
+    then: 会话被压成结构化摘要，涵盖目标、约束、进展、决策、涉及文件和后续步骤；同样大小的普通聊天不会被压缩
+  - id: AC-2
+    given: 规范 Bot 主会话里已经有一份压缩摘要
+    when: 内容再次达到窗口的一半并压缩
+    then: 新摘要在上一份摘要上增量更新，而不是把整段历史从头再总结一遍
+  - id: AC-3
+    given: 规范 Bot 主会话的内容达到窗口的 85%
+    when: 压缩运行
+    then: 执行卫生压缩，留下的近期原文比一半窗口时的结构化压缩更少
+  - id: AC-4
+    given: 规范 Bot 主会话里工具调用和结果不成对，或一对调用正好卡在切分边界上
+    when: 内容已超过压缩门槛
+    then: 未完成的工具调用不会被切断；已配对的调用和结果不会被拆开
+  - id: AC-5
+    given: 规范 Bot 主会话里有一条很旧的大段工具输出
+    when: 压缩运行
+    then: 生成摘要前这段输出被缩短；被替换的原始对话仍保留，现有会话搜索仍能找到压缩摘要
+  - id: AC-6
+    given: 普通聊天，或只带 Bot 身份但不是规范主会话的聊天
+    when: 内容介于窗口一半和原先的默认压缩点之间，或普通聊天超过原先的默认压缩点
+    then: 不会提前压缩；普通聊天超过原先默认压缩点时仍按原来的方式压缩
+  - id: AC-7
+    given: 规范 Bot 主会话的内容还不到窗口的一半
+    when: 没有因上下文溢出而强制压缩
+    then: 不会压缩
+owner: user
+notes: |
+  用户已预先批准本需求，规格与实现放在同一个 PR。比例是常量，不新增 RAW_AGENT_* 开关。

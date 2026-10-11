@@ -10,6 +10,7 @@ import { dirname } from 'node:path';
 import './silence-sqlite-warning.js';
 import { DatabaseSync } from 'node:sqlite';
 import { applyMigrations, getCurrentSchemaVersion, LATEST_SCHEMA_VERSION } from './stores/migrations/index.js';
+import { readApprovalWake, unattendedApprovalDeadline } from './approval/unattended-approval.js';
 import { SessionMemoryBridge } from './memory/session-memory-bridge.js';
 import type { AgentMemoryStore } from './memory/store.js';
 import { OrchestratorStore } from './orchestrator/store.js';
@@ -664,7 +665,13 @@ export class SqliteStateStore {
   createApproval(
     input: Omit<ApprovalRecord, 'id' | 'status' | 'createdAt' | 'updatedAt'> & { idempotencyKey?: string }
   ): ApprovalRecord {
-    const r = this.approvals.createApproval(input);
+    const session = this.getSession(input.sessionId);
+    const deadline = unattendedApprovalDeadline(readApprovalWake(session?.metadata));
+    const r = this.approvals.createApproval({
+      ...input,
+      expiresAt: input.expiresAt ?? deadline.expiresAt,
+      wakeSource: input.wakeSource ?? deadline.wakeSource
+    });
     this.bumpVersion();
     return r;
   }
@@ -679,6 +686,12 @@ export class SqliteStateStore {
 
   updateApproval(id: string, status: ApprovalStatus): ApprovalRecord {
     const r = this.approvals.updateApproval(id, status);
+    this.bumpVersion();
+    return r;
+  }
+
+  markApprovalExpired(id: string, expireReason: string): ApprovalRecord | undefined {
+    const r = this.approvals.markApprovalExpired(id, expireReason);
     this.bumpVersion();
     return r;
   }

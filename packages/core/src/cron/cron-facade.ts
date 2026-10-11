@@ -4,6 +4,7 @@ import type { SessionFacadeHost } from '../runtime/session-facade.js';
 import type { CronJobRecord } from './cron-store.js';
 import { CronJobStore } from './cron-store.js';
 import { nextCronRunAt, parseCron5 } from './cron-next.js';
+import type { RoutinePrecheck } from './routine-precheck.js';
 
 export interface CreateCronJobInput {
   name: string;
@@ -12,6 +13,8 @@ export interface CreateCronJobInput {
   sessionId?: string;
   botId?: string;
   enabled?: boolean;
+  /** Script or predicate run before the model. Persisted on the routine. */
+  precheck?: unknown;
 }
 
 export interface UpdateCronJobInput {
@@ -19,6 +22,8 @@ export interface UpdateCronJobInput {
   prompt?: string;
   cron?: string;
   enabled?: boolean;
+  /** `null` clears a saved precheck. */
+  precheck?: unknown;
 }
 
 export interface ListCronJobsFilter {
@@ -51,6 +56,26 @@ function normalizeCron(raw: string): string {
   const cron = raw.trim();
   parseCron5(cron);
   return cron;
+}
+
+const MAX_PRECHECK_SOURCE = 4000;
+
+export function parseRoutinePrecheck(raw: unknown): RoutinePrecheck {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new ValidationError('precheck must be an object');
+  }
+  const kind = (raw as { kind?: unknown }).kind;
+  const source = (raw as { source?: unknown }).source;
+  if (kind !== 'script' && kind !== 'predicate') {
+    throw new ValidationError('precheck.kind must be script or predicate');
+  }
+  if (typeof source !== 'string' || !source.trim()) {
+    throw new ValidationError('precheck.source is required');
+  }
+  if (source.length > MAX_PRECHECK_SOURCE) {
+    throw new ValidationError('precheck.source must be ≤ 4000 characters');
+  }
+  return { kind, source: source.trim() };
 }
 
 export function ensureCronStore(host: CronFacadeHost): CronJobStore {
@@ -94,6 +119,10 @@ export function createCronJob(host: CronFacadeHost, input: CreateCronJobInput): 
     botId = session.metadata.botId;
   }
 
+  const metadata: Record<string, unknown> = {};
+  if (botId) metadata.botId = botId;
+  if (input.precheck != null) metadata.precheck = parseRoutinePrecheck(input.precheck);
+
   return ensureCronStore(host).create({
     sessionId,
     agentId,
@@ -103,7 +132,7 @@ export function createCronJob(host: CronFacadeHost, input: CreateCronJobInput): 
     scheduleValue: cron,
     enabled: input.enabled !== false,
     nextRunAt: nextCronRunAt(cron).toISOString(),
-    metadata: botId ? { botId } : {}
+    metadata
   });
 }
 
@@ -117,6 +146,12 @@ export function updateCronJob(
   if (patch.name !== undefined) next.name = normalizeName(patch.name);
   if (patch.prompt !== undefined) next.prompt = normalizePrompt(patch.prompt);
   if (patch.enabled !== undefined) next.enabled = patch.enabled;
+  if (patch.precheck !== undefined) {
+    const metadata = { ...(current.metadata ?? {}) };
+    if (patch.precheck === null) delete metadata.precheck;
+    else metadata.precheck = parseRoutinePrecheck(patch.precheck);
+    next.metadata = metadata;
+  }
   if (patch.cron !== undefined) {
     const cron = normalizeCron(patch.cron);
     next.scheduleKind = 'cron5';

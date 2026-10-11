@@ -106,7 +106,7 @@ export const ops = {
     levelWarn: '需要关注',
     levelFail: '存在异常',
     levelChecking: '检测中…',
-    allGood: '服务可达且已就绪，自愈与 Evolution 没有异常。',
+    allGood: '服务可达且已就绪，自愈没有异常。',
     reasonUnreachable: '无法连接后台服务（daemon），请确认它正在运行。',
     reasonNotReady: '服务还没有就绪：存储目录或数据库不可读写。',
     reasonDoctorFail: '一键诊断发现 {n} 项失败，见下方「诊断」。',
@@ -208,6 +208,8 @@ export const ops = {
     colTool: '工具',
     merged: '已合并',
     detailClose: '关闭详情',
-    detailFailed: '加载失败：{message}'
+    detailFailed: '加载失败：{message}',
+    hiddenTitle: 'Evolution 已隐藏',
+    hiddenBody: 'Evolution 已从产品里关掉，不会自动运行。直接打开这个地址只会看到这段说明。'
   }
 };

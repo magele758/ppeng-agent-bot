@@ -8,6 +8,7 @@ import {
   describeCron,
   formatTimeValue,
   parseTimeValue,
+  routinePrecheckPayload,
   type CronJobInfo,
   type CronPreset
 } from '@/lib/cron';
@@ -21,6 +22,17 @@ const WEEKDAYS: Array<{ value: number; labelKey: MessageKey }> = [
   { value: 6, labelKey: 'play.cronPanel.sat' },
   { value: 0, labelKey: 'play.cronPanel.sun' }
 ];
+
+function precheckSummary(job: CronJobInfo, t: (key: MessageKey) => string): string | null {
+  const raw = job.metadata?.precheck;
+  if (!raw || typeof raw !== 'object') return null;
+  const kind = (raw as { kind?: unknown }).kind;
+  const source = typeof (raw as { source?: unknown }).source === 'string' ? (raw as { source: string }).source : '';
+  if (kind !== 'script' && kind !== 'predicate') return null;
+  const label = kind === 'script' ? t('play.cronPanel.precheckScript') : t('play.cronPanel.precheckPredicate');
+  const preview = source.length > 80 ? `${source.slice(0, 80)}…` : source;
+  return preview ? `${label}: ${preview}` : label;
+}
 
 function formatWhen(iso?: string): string {
   if (!iso) return '—';
@@ -45,6 +57,8 @@ export function BotCronPanel({
   const [time, setTime] = useState('09:00');
   const [weekday, setWeekday] = useState(1);
   const [cronDraft, setCronDraft] = useState('0 9 * * *');
+  const [precheckKind, setPrecheckKind] = useState<'none' | 'script' | 'predicate'>('none');
+  const [precheckSource, setPrecheckSource] = useState('');
   const { t } = useI18n();
 
   const generatedCron = useMemo(() => {
@@ -83,6 +97,7 @@ export function BotCronPanel({
     setBusy(true);
     setErr(null);
     try {
+      const precheck = routinePrecheckPayload(precheckKind, precheckSource);
       await api('/api/cron/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -90,11 +105,14 @@ export function BotCronPanel({
           botId,
           name: name.trim(),
           prompt: prompt.trim(),
-          cron: generatedCron
+          cron: generatedCron,
+          ...(precheck ? { precheck } : {})
         })
       });
       setName('');
       setPrompt('');
+      setPrecheckKind('none');
+      setPrecheckSource('');
       await load();
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -248,6 +266,32 @@ export function BotCronPanel({
             spellCheck={false}
           />
         </label>
+        <label className="field field--stack">
+          <span>{t('play.cronPanel.precheck')}</span>
+          <select
+            className="input-compact"
+            value={precheckKind}
+            onChange={(e) => setPrecheckKind(e.target.value as 'none' | 'script' | 'predicate')}
+          >
+            <option value="none">{t('play.cronPanel.precheckNone')}</option>
+            <option value="script">{t('play.cronPanel.precheckScript')}</option>
+            <option value="predicate">{t('play.cronPanel.precheckPredicate')}</option>
+          </select>
+        </label>
+        {precheckKind !== 'none' ? (
+          <label className="field field--stack">
+            <span>{precheckKind === 'script' ? t('play.cronPanel.precheckScript') : t('play.cronPanel.precheckPredicate')}</span>
+            <textarea
+              className="input-compact bot-cron-form__prompt"
+              required
+              rows={2}
+              placeholder={t('play.cronPanel.precheckPh')}
+              value={precheckSource}
+              onChange={(e) => setPrecheckSource(e.target.value)}
+            />
+          </label>
+        ) : null}
+        {precheckKind !== 'none' ? <p className="bot-cron-form__preview">{t('play.cronPanel.precheckHint')}</p> : null}
         <p className="bot-cron-form__preview">{describeCron(generatedCron)}</p>
         <button type="submit" className="btn btn-primary btn-sm" disabled={busy}>
           {t('play.cronPanel.add')}
@@ -260,7 +304,9 @@ export function BotCronPanel({
         {!jobs.length ? (
           <div className="empty-hint">{t('play.cronPanel.empty')}</div>
         ) : (
-          jobs.map((job) => (
+          jobs.map((job) => {
+            const summary = precheckSummary(job, t);
+            return (
             <article key={job.id} className={`activity-card${job.enabled ? '' : ' is-off'}`}>
               <div className="bot-cron-card__head">
                 <strong>{job.name}</strong>
@@ -269,6 +315,7 @@ export function BotCronPanel({
                 </span>
               </div>
               <p className="bot-cron-card__prompt">{job.prompt}</p>
+              {summary ? <p className="bot-cron-card__meta">{summary}</p> : null}
               <p className="bot-cron-card__meta">
                 {t('play.cronPanel.next', { when: formatWhen(job.nextRunAt) })}
                 {job.lastRunAt ? t('play.cronPanel.last', { when: formatWhen(job.lastRunAt) }) : ''}
@@ -292,7 +339,8 @@ export function BotCronPanel({
                 </button>
               </div>
             </article>
-          ))
+            );
+          })
         )}
       </div>
     </div>

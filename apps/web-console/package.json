@@ -9,7 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@ppeng/api-types": "0.1.2",
+    "@ppeng/api-types": "0.1.4",
     "dompurify": "^3.4.0",
     "marked": "^15.0.6",
     "next": "^15.5.15",

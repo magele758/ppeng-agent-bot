@@ -12,6 +12,7 @@ import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config as loadDotenv } from 'dotenv';
+import { EVOLUTION_DISABLED_CODE, considerEvolutionSchedule } from '../packages/core/src/evolution/surface.ts';
 import { createReleaseRunId, imageTagForRelease, loadReleaseConfig } from './release/config.mjs';
 import { gitSync, currentGitSha } from './release/git-sync.mjs';
 import {
@@ -75,7 +76,11 @@ async function cmdStart(args) {
   report.candidate.git_sha = sync.sha || currentGitSha(repoRoot);
   saveReport(repoRoot, report);
 
-  if (!cfg.skipEvolution) {
+  const evolutionDecision = considerEvolutionSchedule({ reason: 'cli' });
+  if (!cfg.skipEvolution && !evolutionDecision.started) {
+    appendReportEvent(report, 'evolution', { code: EVOLUTION_DISABLED_CODE, skipped: true });
+    console.error(`${EVOLUTION_DISABLED_CODE}: Evolution is hidden and will not run.`);
+  } else if (!cfg.skipEvolution) {
     setPhase(report, 'learn');
     saveReport(repoRoot, report);
     const evArgs = cfg.evolutionArgs.split(/\s+/).filter(Boolean);

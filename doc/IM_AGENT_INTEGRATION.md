@@ -42,6 +42,41 @@
 
 扩展方式：新增 `ChannelType` / `GatewayProvidersConfig` 与对应 handler，或在外部用桥接服务调用 Gateway 的 `POST .../agents/:agentId/invoke`（见 [`types.ts`](../packages/capability-gateway/src/types.ts) 中 `agentRoutes`）。
 
+## 出站静默、投递账本、例行预检
+
+### `[SILENT]` / `NO_REPLY`
+
+整段回复若只是静默标记，网关不把标记发到 IM。会话里仍保留模型原文。顺带提到标记的普通句子照常发送。判定忽略大小写和空白，并允许外面套一层引号、反引号、星号或代码围栏。
+
+标记：`[SILENT]`、`SILENT`、`NO_REPLY`、`NO REPLY`、`[NO_REPLY]`、`[NO REPLY]`、`[静默]`、`静默`、`[沉默]`、`沉默`。
+
+- **人直接发来的消息**（飞书事件、企微 bridge）：不发标记，改发短确认。用户原文里有汉字时是「收到，没有更多要补充的。」，否则是「Got it. Nothing more to add.」（Lab 文案键 `play.imSilentAck`）。
+- **渠道 webhook**：什么都不发，也不发这句确认。标成 cron 来源时同样丢弃；定时任务本身不把模型回复推到 IM。
+
+### 投递账本（至少一次）
+
+飞书回复，以及企微 / 渠道的 IM 出站，在真正发送前写入 `{stateDir}/gateway/delivery-ledger.json`。网关进程启动时重放尚未确认送达的记录。已确认送达的不再发。这是至少一次，允许重复，不是恰好一次。同一条最多再试 8 次，超过则放弃。
+
+发送过程中重启，或发送失败后再次投递时，正文前加上下面前缀，再空一行接原文：
+
+```text
+♻️ Recovered reply — the gateway restarted during delivery, so this may be a duplicate:
+```
+
+### Bot 例行预检
+
+Bot 定时任务可带 `precheck`，经 `POST` / `PATCH /api/cron/jobs` 或 Lab 定时任务面板写在该任务上（`metadata.precheck`）。不新增环境变量，保存后下次触发即生效，不必重启。到点后、把提示写入会话并调用模型之前执行。结果明确为不唤醒时，不开始模型回合，也不产生模型调用，并顺延下次时间。
+
+```json
+{ "kind": "predicate", "source": "{\"wakeAgent\":false}" }
+{ "kind": "predicate", "source": "file:/path/to/flag" }
+{ "kind": "script", "source": "printf '%s\\n' '{\"wakeAgent\":false}'" }
+```
+
+- 只有 JSON 里的 `wakeAgent` **就是布尔 `false`** 才跳过。脚本看标准输出最后一行非空内容。`0`、字符串 `"false"`、纯文本、脚本失败都仍然唤醒。
+- `file:` 谓词：路径上的普通文件存在且非空才唤醒；没有文件或空文件则不唤醒。
+- 脚本在宿主机执行（只剥离注入类环境变量，不进 OS 沙箱），超时 15 秒。`precheck: null` 清除预检。
+
 ## 控制 Agent 的其它入口（非 IM）
 
 - **Web 控制台**：Next.js 经 `middleware` 代理到 daemon 的 `/api/sessions/*` 等。

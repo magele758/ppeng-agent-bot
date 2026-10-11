@@ -6,6 +6,7 @@
  * Takes a DatabaseSync instance via constructor injection.
  */
 import type { DatabaseSync } from 'node:sqlite';
+import { wakeFromSchedulerReason, withApprovalWake } from '../approval/unattended-approval.js';
 import { createId, nowIso } from '../id.js';
 import { serializeJson, parseJson } from './storage-helpers.js';
 import type { AgentSpec, WorkspaceRecord } from '../types.js';
@@ -80,6 +81,20 @@ export class MiscStore {
     this.db
       .prepare(`INSERT INTO scheduler_wake (id, session_id, reason, created_at) VALUES (?, ?, ?, ?)`)
       .run(createId('wake'), sessionId, reason, nowIso());
+    this.stampUnattendedWake(sessionId, reason);
+  }
+
+  /** The queued wake is not a person sitting in Lab chat. */
+  private stampUnattendedWake(sessionId: string, reason: string): void {
+    const row = this.db
+      .prepare(`SELECT metadata_json FROM sessions WHERE id = ?`)
+      .get(sessionId) as { metadata_json?: string } | undefined;
+    if (!row) return;
+    const metadata = parseJson<Record<string, unknown>>(String(row.metadata_json ?? '')) ?? {};
+    const next = withApprovalWake(metadata, wakeFromSchedulerReason(reason));
+    this.db
+      .prepare(`UPDATE sessions SET metadata_json = ?, updated_at = ? WHERE id = ?`)
+      .run(serializeJson(next), nowIso(), sessionId);
   }
 
   /** Returns distinct session ids in FIFO order (by first enqueue time per id in this batch). */

@@ -658,7 +658,7 @@ export {
   nextCronRunAt,
   parseCron5
 } from '../cron/index.js';
-export type { CronJobRecord, CronScheduleKind, CreateCronJobInput, UpdateCronJobInput, ListCronJobsFilter } from '../cron/index.js';
+export type { CronJobRecord, CronScheduleKind, CreateCronJobInput, UpdateCronJobInput, ListCronJobsFilter, RoutinePrecheck } from '../cron/index.js';
 
 // --- Plugins / doctor / extensions ---
 export {
@@ -702,6 +702,14 @@ export {
 export type { BrowserErrorCode, BrowserErrorShape } from '../tools/browser-backend.js';
 export { runDoctor, formatDoctorReport } from '../doctor/doctor.js';
 export type { DoctorSeverity, DoctorCheck, DoctorReport, DoctorOptions } from '../doctor/doctor.js';
+export {
+  EVOLUTION_DISABLED_CODE,
+  EVOLUTION_SURFACE_ENABLED,
+  considerEvolutionSchedule,
+  evolutionDisabledBody,
+  evolutionStartHttpResult
+} from '../evolution/surface.js';
+export type { EvolutionScheduleDecision, EvolutionScheduleReason } from '../evolution/surface.js';
 export { ExtensionRegistry, createExtensionRegistry } from '../extensions/extension-registry.js';
 export type {
   ExtensionPhase,

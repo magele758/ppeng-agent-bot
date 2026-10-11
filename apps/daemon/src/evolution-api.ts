@@ -3,6 +3,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join, normalize } from 'node:path';
 import { promisify } from 'node:util';
+import { evolutionStartHttpResult } from '@ppeng/agent-core';
 import type { RouteSpec } from './routing.js';
 
 const execFileAsync = promisify(execFile);
@@ -128,6 +129,14 @@ export function evolutionRoutes(repoRoot: string): RouteSpec[] {
       method: 'GET',
       pattern: '/api/evolution/report/:id',
       handler: ({ response, requireParam }) => handleReleaseReport(response, repoRoot, requireParam('id'))
+    },
+    {
+      method: 'POST',
+      pattern: '/api/evolution/start',
+      handler: ({ response }) => {
+        const result = evolutionStartHttpResult();
+        json(response, result.status, result.body);
+      }
     }
   ];
 }
