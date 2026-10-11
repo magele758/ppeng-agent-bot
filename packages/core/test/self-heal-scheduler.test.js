@@ -4,7 +4,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SqliteStateStore } from '../dist/storage.js';
-import { SelfHealScheduler } from '../dist/self-heal/self-heal-scheduler.js';
+import { normalizeSelfHealPolicy } from '../dist/self-heal/self-heal-policy.js';
+import { SelfHealScheduler, taskStatusForSelfHealRun } from '../dist/self-heal/self-heal-scheduler.js';
 
 // ── Helpers ──
 
@@ -719,6 +720,145 @@ test('processRuns skips a run whose previous advance is still awaiting', async (
     const after = store.getSelfHealRun(run.id);
     assert.equal(after.status, 'running_tests');
     assert.equal(after.fixIteration, 1);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ── task status mirrors run status ──
+
+test('taskStatusForSelfHealRun maps every run phase to a task status', () => {
+  const expected = {
+    pending: 'in_progress',
+    running_tests: 'in_progress',
+    fixing: 'in_progress',
+    tests_passed: 'in_progress',
+    merging: 'in_progress',
+    restart_pending: 'in_progress',
+    completed: 'completed',
+    failed: 'failed',
+    blocked: 'failed',
+    stopped: 'cancelled',
+  };
+  for (const [run, task] of Object.entries(expected)) {
+    assert.equal(taskStatusForSelfHealRun(run), task, run);
+  }
+});
+
+test('a run that fails during processRuns marks its task failed', async () => {
+  const { store, dir } = makeStore();
+  try {
+    const { task, session } = seedTaskSession(store);
+    store.updateTask(task.id, { status: 'in_progress' });
+    const sched = makeScheduler(store, {
+      runSession: async () => {
+        throw new Error('model down');
+      },
+    });
+    const run = sched.startRun();
+    store.updateSelfHealRun(run.id, { status: 'fixing', taskId: task.id, sessionId: session.id });
+    await sched.processRuns();
+    assert.equal(store.getSelfHealRun(run.id).status, 'failed');
+    assert.equal(store.getTask(task.id).status, 'failed');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a blocked run no longer leaves its task in_progress', async () => {
+  const { store, dir } = makeStore();
+  try {
+    const { task, session } = seedTaskSession(store);
+    store.updateTask(task.id, { status: 'in_progress' });
+    store.updateSession(session.id, { status: 'waiting_approval' });
+    const sched = makeScheduler(store);
+    const run = sched.startRun();
+    store.updateSelfHealRun(run.id, { status: 'fixing', taskId: task.id, sessionId: session.id });
+    await sched.processRuns();
+    assert.equal(store.getSelfHealRun(run.id).status, 'blocked');
+    assert.equal(store.getTask(task.id).status, 'failed');
+    // resuming puts the task back to work
+    sched.resumeRun(run.id);
+    assert.equal(store.getTask(task.id).status, 'in_progress');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('completed run marks its task completed; stopRun cancels it', async () => {
+  const { store, dir } = makeStore();
+  try {
+    const a = seedTaskSession(store);
+    store.updateTask(a.task.id, { status: 'in_progress' });
+    const sched = makeScheduler(store);
+    const done = sched.startRun({ autoMerge: false });
+    store.updateSelfHealRun(done.id, { status: 'tests_passed', taskId: a.task.id, sessionId: a.session.id });
+    await sched.processRuns();
+    assert.equal(store.getSelfHealRun(done.id).status, 'completed');
+    assert.equal(store.getTask(a.task.id).status, 'completed');
+
+    const b = seedTaskSession(store);
+    store.updateTask(b.task.id, { status: 'in_progress' });
+    const stopped = sched.startRun();
+    store.updateSelfHealRun(stopped.id, { status: 'running_tests', taskId: b.task.id, sessionId: b.session.id });
+    sched.stopRun(stopped.id);
+    assert.equal(store.getTask(b.task.id).status, 'cancelled');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('restart ack completes the run and its task', () => {
+  const { store, dir } = makeStore();
+  try {
+    const { task, session } = seedTaskSession(store);
+    store.updateTask(task.id, { status: 'in_progress' });
+    const sched = makeScheduler(store);
+    const run = sched.startRun();
+    store.updateSelfHealRun(run.id, { status: 'restart_pending', taskId: task.id, sessionId: session.id });
+    store.setDaemonControl('restart_request', { requestedAt: new Date().toISOString(), reason: 't', runId: run.id });
+    sched.acknowledgeDaemonRestart();
+    assert.equal(store.getTask(task.id).status, 'completed');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('first processRuns reconciles tasks stranded in_progress by already-ended runs', async () => {
+  const { store, dir } = makeStore();
+  try {
+    const sched = makeScheduler(store);
+    const mk = (status) => {
+      const { task, session } = seedTaskSession(store);
+      store.updateTask(task.id, { status: 'in_progress' });
+      const run = store.createSelfHealRun({ policy: normalizeSelfHealPolicy({}) });
+      store.updateSelfHealRun(run.id, { status, taskId: task.id, sessionId: session.id });
+      return task.id;
+    };
+    const failed = mk('failed');
+    const blocked = mk('blocked');
+    const completed = mk('completed');
+    const stopped = mk('stopped');
+    await sched.processRuns();
+    assert.equal(store.getTask(failed).status, 'failed');
+    assert.equal(store.getTask(blocked).status, 'failed');
+    assert.equal(store.getTask(completed).status, 'completed');
+    assert.equal(store.getTask(stopped).status, 'cancelled');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a user-cancelled task is not overwritten by a later terminal run status', async () => {
+  const { store, dir } = makeStore();
+  try {
+    const { task, session } = seedTaskSession(store);
+    store.updateTask(task.id, { status: 'cancelled' });
+    const sched = makeScheduler(store);
+    const run = sched.startRun({ autoMerge: false });
+    store.updateSelfHealRun(run.id, { status: 'tests_passed', taskId: task.id, sessionId: session.id });
+    await sched.processRuns();
+    assert.equal(store.getTask(task.id).status, 'cancelled');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

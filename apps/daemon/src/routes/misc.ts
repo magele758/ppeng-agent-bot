@@ -8,11 +8,14 @@ import {
   loadOptionalToolGroupsFromEnv,
   optionalToolGroupsFeatureEnabled,
   stampOwnerMetadata,
+  type ApprovalRecord,
   type RawAgentRuntime
 } from '@ppeng/agent-core';
 import type { RouteSpec } from '../routing.js';
 import { etagFromState, json, sendIfNotModified } from '../http-utils.js';
 import { guardSession } from '../session-guard.js';
+
+const APPROVAL_STATUSES: ReadonlyArray<ApprovalRecord['status']> = ['pending', 'approved', 'rejected'];
 
 interface MiscOptions {
   pkgName: string;
@@ -149,9 +152,13 @@ export function miscRoutes(runtime: RawAgentRuntime, opts: MiscOptions): RouteSp
     {
       method: 'GET',
       pattern: '/api/approvals',
-      handler: ({ request, response, auth }) => {
+      handler: ({ request, response, auth, url }) => {
         if (sendIfNotModified(request, response, etagFromState(runtime.getStateVersion()))) return;
-        const approvals = runtime.listApprovals().filter((item) => {
+        const status = url.searchParams.get('status');
+        if (status !== null && !APPROVAL_STATUSES.includes(status as ApprovalRecord['status'])) {
+          throw new ValidationError(`Invalid status: ${status}`);
+        }
+        const approvals = runtime.listApprovals(status ? (status as ApprovalRecord['status']) : undefined).filter((item) => {
           if (!auth.isolate) return true;
           const session = runtime.getSession(item.sessionId);
           return Boolean(session && canAccessSession(session, auth));

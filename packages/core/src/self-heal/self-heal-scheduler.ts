@@ -28,6 +28,8 @@ import type {
   SelfHealEventRecord,
   SelfHealPolicy,
   SelfHealRunRecord,
+  SelfHealStatus,
+  TaskStatus,
 } from '../types.js';
 
 function textPart(text: string): MessagePart {
@@ -39,6 +41,35 @@ function formatAgeSince(iso: string): string {
   if (ms < 60_000) return `${Math.floor(ms / 1000)}s`;
   if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}m`;
   return `${(ms / 3_600_000).toFixed(1)}h`;
+}
+
+const TERMINAL_TASK_STATUSES: ReadonlySet<TaskStatus> = new Set(['completed', 'failed', 'cancelled']);
+
+/**
+ * Task status that mirrors a run's phase. `blocked` runs have left the active
+ * set (the scheduler no longer advances them), so their task is not "in progress".
+ */
+export function taskStatusForSelfHealRun(status: SelfHealStatus): TaskStatus {
+  switch (status) {
+    case 'completed':
+      return 'completed';
+    case 'failed':
+    case 'blocked':
+      return 'failed';
+    case 'stopped':
+      return 'cancelled';
+    case 'pending':
+    case 'running_tests':
+    case 'fixing':
+    case 'tests_passed':
+    case 'merging':
+    case 'restart_pending':
+      return 'in_progress';
+    default: {
+      const unreachable: never = status;
+      return unreachable;
+    }
+  }
 }
 
 export interface SelfHealContext {
@@ -76,6 +107,7 @@ export class SelfHealScheduler {
    * guard every tick re-spawned `npm run test:unit` for the same run.
    */
   private readonly inFlight = new Set<string>();
+  private terminalTasksReconciled = false;
   /** Terminal states from which a run cannot be resumed. */
   private static readonly TERMINAL_STATES: ReadonlySet<string> = new Set(['completed', 'failed']);
 
@@ -95,7 +127,9 @@ export class SelfHealScheduler {
   }
 
   stopRun(id: string): SelfHealRunRecord {
-    return this.ctx.store.updateSelfHealRun(id, { stopped: true, status: 'stopped' });
+    const run = this.ctx.store.updateSelfHealRun(id, { stopped: true, status: 'stopped' });
+    this.syncTaskStatus(run);
+    return run;
   }
 
   resumeRun(id: string): SelfHealRunRecord {
@@ -106,15 +140,19 @@ export class SelfHealScheduler {
     if (SelfHealScheduler.TERMINAL_STATES.has(run.status)) {
       throw new Error(`Cannot resume run in terminal state: ${run.status}`);
     }
+    let resumed: SelfHealRunRecord;
     if (run.status === 'stopped') {
-      return this.ctx.store.updateSelfHealRun(id, { stopped: false, status: 'running_tests', blockReason: undefined });
+      resumed = this.ctx.store.updateSelfHealRun(id, { stopped: false, status: 'running_tests', blockReason: undefined });
+    } else {
+      const nextStatus = run.status === 'fixing' ? 'fixing' : run.status === 'merging' ? 'merging' : 'running_tests';
+      resumed = this.ctx.store.updateSelfHealRun(id, {
+        stopped: false,
+        status: run.status === 'blocked' ? 'running_tests' : nextStatus,
+        blockReason: undefined,
+      });
     }
-    const nextStatus = run.status === 'fixing' ? 'fixing' : run.status === 'merging' ? 'merging' : 'running_tests';
-    return this.ctx.store.updateSelfHealRun(id, {
-      stopped: false,
-      status: run.status === 'blocked' ? 'running_tests' : nextStatus,
-      blockReason: undefined,
-    });
+    this.syncTaskStatus(resumed);
+    return resumed;
   }
 
   getRun(id: string): SelfHealRunRecord | undefined {
@@ -144,7 +182,9 @@ export class SelfHealScheduler {
     if (runId) {
       const run = this.ctx.store.getSelfHealRun(runId);
       if (run?.status === 'restart_pending') {
-        this.ctx.store.updateSelfHealRun(runId, { restartAckAt: new Date().toISOString(), status: 'completed' });
+        this.syncTaskStatus(
+          this.ctx.store.updateSelfHealRun(runId, { restartAckAt: new Date().toISOString(), status: 'completed' }),
+        );
         this.ctx.store.appendSelfHealEvent({ runId, kind: 'restart_acked', payload: {} });
       }
     }
@@ -157,16 +197,44 @@ export class SelfHealScheduler {
     return this.inFlight.size > 0;
   }
 
+  /**
+   * Terminal runs never advance again, so any task still `in_progress` for one
+   * (left by earlier versions, or by a crash between run and task updates) is stale.
+   */
+  private reconcileTerminalRunTasks(): void {
+    for (const run of this.ctx.store.listSelfHealRuns({ limit: 200 })) {
+      if (!SelfHealScheduler.TERMINAL_STATES.has(run.status) && run.status !== 'blocked' && run.status !== 'stopped') {
+        continue;
+      }
+      this.syncTaskStatus(run);
+    }
+  }
+
+  private syncTaskStatus(run: SelfHealRunRecord | undefined): void {
+    if (!run?.taskId) return;
+    const task = this.ctx.store.getTask(run.taskId);
+    if (!task) return;
+    const next = taskStatusForSelfHealRun(run.status);
+    if (task.status === next) return;
+    if (TERMINAL_TASK_STATUSES.has(task.status) && TERMINAL_TASK_STATUSES.has(next)) return;
+    this.ctx.store.updateTask(task.id, { status: next });
+  }
+
   async processRuns(): Promise<void> {
+    if (!this.terminalTasksReconciled) {
+      this.terminalTasksReconciled = true;
+      this.reconcileTerminalRunTasks();
+    }
     const active = this.ctx.store.listActiveSelfHealRuns();
     for (const run of active) {
       if (this.inFlight.has(run.id)) continue;
       this.inFlight.add(run.id);
       try {
         await this.advanceRun(run);
+        this.syncTaskStatus(this.ctx.store.getSelfHealRun(run.id));
       } catch (error) {
         const message = errorMessage(error);
-        this.ctx.store.updateSelfHealRun(run.id, { status: 'failed', blockReason: message });
+        this.syncTaskStatus(this.ctx.store.updateSelfHealRun(run.id, { status: 'failed', blockReason: message }));
         this.ctx.store.appendSelfHealEvent({ runId: run.id, kind: 'error', payload: { message } });
         this.logRun(run.id, `fatal: ${message}`);
       } finally {

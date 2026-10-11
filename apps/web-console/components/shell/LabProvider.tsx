@@ -12,6 +12,7 @@ import {
   type ReactNode
 } from 'react';
 import { api } from '@/lib/api';
+import { pendingApprovals } from '@/lib/approvals';
 import {
   DEFAULT_LOCATION,
   formatHash,
@@ -222,7 +223,7 @@ export function LabProvider({ children }: { children: ReactNode }) {
       api('/api/sessions').catch(() => ({ sessions: undefined })),
       api('/api/tasks').catch(() => ({ tasks: [] as TaskSummary[] })),
       api('/api/social-post-schedules').catch(() => ({ items: [] as SocialPostScheduleItem[] })),
-      api('/api/approvals').catch(() => ({ approvals: [] as ApprovalItem[] })),
+      api('/api/approvals?status=pending').catch(() => ({ approvals: [] as ApprovalItem[] })),
       api('/api/agents').catch(() => ({ agents: undefined })),
       api('/api/workspaces').catch(() => ({ workspaces: [] as WorkspaceRow[] })),
       api('/api/background-jobs').catch(() => ({ jobs: [] as JobRow[] })),
@@ -240,7 +241,7 @@ export function LabProvider({ children }: { children: ReactNode }) {
     if (botsFetched) setBots(botsFetched);
     setTasks((tasksRes as { tasks?: TaskSummary[] }).tasks ?? []);
     setSocialSchedules((socialRes as { items?: SocialPostScheduleItem[] }).items ?? []);
-    setApprovals((appr as { approvals?: ApprovalItem[] }).approvals ?? []);
+    setApprovals(pendingApprovals((appr as { approvals?: ApprovalItem[] }).approvals));
     setJobs((jobsRes as { jobs?: JobRow[] }).jobs ?? []);
     setWorkspaces((ws as { workspaces?: WorkspaceRow[] }).workspaces ?? []);
     setSwarmRuns((swarmRes as { runs?: SwarmRunRow[] }).runs ?? []);

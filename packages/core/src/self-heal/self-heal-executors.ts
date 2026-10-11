@@ -128,19 +128,56 @@ function spawnCapture(
 }
 
 const DEFAULT_TEST_TIMEOUT_MS = 3_600_000;
+const DEFAULT_PREBUILD_TIMEOUT_MS = 900_000;
+const PREBUILD_SCRIPT = path.join('scripts', 'build-workspace.mjs');
+const PREBUILD_FAILURE_TAIL_CHARS = 4_000;
+/** Scripts whose own definition already compiles the workspace packages first. */
+const SCRIPTS_THAT_BUILD_FIRST: ReadonlySet<string> = new Set(['build', 'ci']);
+
+/**
+ * A fresh git worktree / directory copy has no `dist/` (gitignored), yet tests import
+ * `../dist/*.js` of the workspace packages; they must be compiled before the tests run.
+ */
+export function selfHealScriptNeedsPrebuild(script: string): boolean {
+  return !SCRIPTS_THAT_BUILD_FIRST.has(script);
+}
+
+/** Compiles the workspace packages in `cwd` (tsc -b). No-op when the repo has no build script. */
+export async function buildSelfHealWorkspace(
+  cwd: string,
+  options?: { timeoutMs?: number; signal?: AbortSignal }
+): Promise<{ ok: boolean; skipped: boolean; output: string }> {
+  if (!existsSync(path.join(cwd, PREBUILD_SCRIPT))) return { ok: true, skipped: true, output: '' };
+  const { code, output } = await spawnCapture(process.execPath, [PREBUILD_SCRIPT], cwd, {
+    timeoutMs: options?.timeoutMs ?? DEFAULT_PREBUILD_TIMEOUT_MS,
+    signal: options?.signal
+  });
+  return { ok: code === 0, skipped: false, output };
+}
 
 export async function runSelfHealNpmTest(
   cwd: string,
   policy: SelfHealPolicy,
-  options?: { timeoutMs?: number; signal?: AbortSignal }
+  options?: { timeoutMs?: number; signal?: AbortSignal; prebuildTimeoutMs?: number }
 ): Promise<{ ok: boolean; output: string }> {
   const script = npmScriptForSelfHealPolicy(policy);
   const timeoutMs = options?.timeoutMs ?? DEFAULT_TEST_TIMEOUT_MS;
+
+  let buildNote = '';
+  if (selfHealScriptNeedsPrebuild(script)) {
+    const build = await buildSelfHealWorkspace(cwd, { timeoutMs: options?.prebuildTimeoutMs, signal: options?.signal });
+    if (!build.ok) {
+      // tsc still emits JS on type errors, so run the tests anyway and surface the compile errors with the result.
+      buildNote = `[self-heal] workspace build failed (tail):\n${build.output.slice(-PREBUILD_FAILURE_TAIL_CHARS)}\n\n`;
+    }
+  }
+
   const { code, output } = await spawnCapture(resolveNpmBin(), ['run', script], cwd, {
     timeoutMs,
     signal: options?.signal
   });
-  return { ok: code === 0, output };
+  const ok = code === 0;
+  return { ok, output: ok ? output : `${buildNote}${output}` };
 }
 
 export async function gitResolveBranch(cwd: string): Promise<string | undefined> {

@@ -84,6 +84,24 @@ test.describe('Tasks section', () => {
     await expect(list.locator('.list-item')).toHaveCount(0);
   });
 
+  test('inbox hides already-resolved approvals and does not count them [AC:console-tasks#AC-4]', async ({ page }) => {
+    const base = { toolName: 'ask_user', sessionId: 'sess-abc', reason: 'r', args: {}, createdAt: '2026-01-01T00:00:00Z' };
+    await mockOverview(page, {
+      approvals: {
+        approvals: [
+          { ...base, id: 'apr-rejected', status: 'rejected' },
+          { ...base, id: 'apr-approved', status: 'approved' },
+          { ...base, id: 'apr-expired', status: 'expired' }
+        ]
+      }
+    });
+    await page.goto('/#/tasks/inbox');
+    await expect(page.locator('#section-tasks-inbox').getByText('没有待处理的审批')).toBeVisible();
+    await expect(page.locator('#listApprovals')).toHaveCount(0);
+    await expect(page.getByRole('tab', { name: /审批与收件箱/ })).not.toContainText('3');
+    await expect(page.getByRole('tab', { name: /审批与收件箱/ })).not.toContainText('1');
+  });
+
   test('inbox shows an empty state without approvals [AC:console-tasks#AC-5]', async ({ page }) => {
     await mockOverview(page);
     await page.goto('/#/tasks/inbox');
