@@ -1,6 +1,10 @@
-import { EVOLUTION_SURFACE_ENABLED } from '../../../packages/core/src/evolution/surface.ts';
-
-export { EVOLUTION_SURFACE_ENABLED };
+/**
+ * Keep equal to `EVOLUTION_SURFACE_ENABLED` in
+ * `packages/core/src/evolution/surface.ts`.
+ * The Lab image does not COPY `packages/core` (see deploy/docker/Dockerfile.web),
+ * so this boolean lives here. A unit test asserts the two values match.
+ */
+export const EVOLUTION_SURFACE_ENABLED = false;
 
 /** Top-bar chip. Hidden while the product switch is off, even if a worktree is active. */
 export function evolutionChipVisible(activeWorktrees: number): boolean {
