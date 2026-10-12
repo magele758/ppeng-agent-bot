@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { McpHttpSession, isLegacySseEndpointError } from '../dist/mcp/mcp-http.js';
+import { collectHeaderSecrets, McpHttpSession, isLegacySseEndpointError, redactSecrets } from '../dist/mcp/mcp-http.js';
 import { parseMcpHttpConfig, parseMcpHttpEndpoints } from '../dist/mcp/mcp-http-config.js';
 
 const INIT_RESULT = {
@@ -271,7 +271,23 @@ test('explicit streamable-http does not fall back on 405, and 403 never falls ba
   }
 });
 
-test('successful tool, resource, and metadata redact bearer values including short tokens', async () => {
+test('credential collection ignores ordinary headers and short secrets', () => {
+  const report = collectHeaderSecrets(
+    {
+      url: 'http://mcp.test/mcp',
+      headers: { 'X-Trace': '1', Authorization: 'Bearer id', 'X-Api-Key': 'supersecretvalue' }
+    },
+    {}
+  );
+  assert.equal(report.shortCredentialCount, 1);
+  assert.deepEqual(report.secrets, ['supersecretvalue']);
+  assert.equal(
+    redactSecrets('lookup_v1 identity id 1 supersecretvalue', report.secrets),
+    'lookup_v1 identity id 1 [REDACTED]'
+  );
+});
+
+test('short bearer values are not full-text redacted', async () => {
   const token = 'xy';
   const calls = [];
   const fetchImpl = async (url, init) => {
@@ -307,17 +323,101 @@ test('successful tool, resource, and metadata redact bearer values including sho
   );
   try {
     const tools = await session.listTools();
-    assert.equal(JSON.stringify(tools).includes(token), false);
-    assert.match(tools[0].description, /\[REDACTED\]/);
+    assert.equal(tools[0].name, 'whoami');
+    assert.match(tools[0].description, /secret xy/);
     const called = await session.callTool('whoami', {});
     assert.equal(called.isError, true);
-    assert.equal(called.content.includes(token), false);
-    assert.match(called.content, /\[REDACTED\]/);
+    assert.match(called.content, /echo xy/);
     const listed = await session.listResources();
-    assert.equal(JSON.stringify(listed).includes(token), false);
+    assert.equal(listed[0].name, token);
+    assert.match(listed[0].description, /d xy/);
     const resource = await session.readResource('room://1');
-    assert.equal(resource.text.includes(token), false);
-    assert.match(resource.text, /body \[REDACTED\]/);
+    assert.match(resource.text, /body xy/);
+    assert.equal(resource.mimeType, 'text/plain');
+  } finally {
+    await session.close();
+  }
+});
+
+test('redaction keeps tool names, URIs, and schema identifiers and redacts mimeType', async () => {
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    const call = record(calls, url, init);
+    if (call.method === 'GET') return new Response('Method Not Allowed', { status: 405 });
+    const msg = JSON.parse(call.bodyText);
+    if (msg.method === 'initialize') return jsonRpc(msg.id, INIT_RESULT);
+    if (msg.method === 'notifications/initialized') return new Response(null, { status: 202 });
+    if (msg.method === 'tools/list') {
+      return jsonRpc(msg.id, {
+        tools: [
+          {
+            name: 'lookup_v1',
+            description: 'trace 1 token supersecretvalue',
+            inputSchema: {
+              type: 'object',
+              required: ['id'],
+              properties: { id: { type: 'string', description: 'supersecretvalue' } }
+            }
+          },
+          { name: 'identity', description: 'id', inputSchema: { type: 'object' } }
+        ]
+      });
+    }
+    if (msg.method === 'tools/call') {
+      calls.push({ name: msg.params?.name });
+      return jsonRpc(msg.id, { content: [{ type: 'text', text: 'ok supersecretvalue' }] });
+    }
+    if (msg.method === 'resources/list') {
+      return jsonRpc(msg.id, {
+        resources: [
+          {
+            uri: 'room://lookup_v1',
+            name: 'identity',
+            mimeType: 'text/supersecretvalue',
+            description: 'd supersecretvalue'
+          }
+        ]
+      });
+    }
+    if (msg.method === 'resources/read') {
+      return jsonRpc(msg.id, {
+        contents: [{ uri: 'room://lookup_v1', text: 'body', mimeType: 'application/supersecretvalue' }]
+      });
+    }
+    return new Response('unexpected', { status: 500 });
+  };
+  const session = new McpHttpSession(
+    0,
+    {
+      url: 'http://127.0.0.1:9/mcp',
+      headers: { 'X-Trace': '1', Authorization: 'Bearer id', 'X-Api-Key': 'supersecretvalue' }
+    },
+    { fetch: fetchImpl, timeoutMs: 2000 }
+  );
+  try {
+    const tools = await session.listTools();
+    assert.equal(tools[0].name, 'lookup_v1');
+    assert.equal(tools[1].name, 'identity');
+    assert.match(tools[0].description, /trace 1/);
+    assert.match(tools[0].description, /\[REDACTED\]/);
+    assert.equal(tools[0].description.includes('supersecretvalue'), false);
+    assert.equal(tools[1].description, 'id');
+    assert.equal(tools[0].inputSchema.type, 'object');
+    assert.deepEqual(tools[0].inputSchema.required, ['id']);
+    assert.equal(tools[0].inputSchema.properties.id.type, 'string');
+    assert.match(tools[0].inputSchema.properties.id.description, /\[REDACTED\]/);
+    const called = await session.callTool('lookup_v1', {});
+    assert.match(called.content, /\[REDACTED\]/);
+    assert.equal(called.content.includes('supersecretvalue'), false);
+    assert.equal(calls.find((entry) => entry.name === 'lookup_v1')?.name, 'lookup_v1');
+    const listed = await session.listResources();
+    assert.equal(listed[0].uri, 'room://lookup_v1');
+    assert.equal(listed[0].name, 'identity');
+    assert.equal(listed[0].mimeType.includes('supersecretvalue'), false);
+    assert.match(listed[0].mimeType, /\[REDACTED\]/);
+    const resource = await session.readResource('room://lookup_v1');
+    assert.match(resource.mimeType, /\[REDACTED\]/);
+    assert.equal(resource.mimeType.includes('supersecretvalue'), false);
   } finally {
     await session.close();
   }

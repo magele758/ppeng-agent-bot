@@ -1,11 +1,16 @@
 import type { ToolContract } from '../types.js';
-import { annotateUntrustedField, fenceExternalContent, sanitizeDescriptiveFields } from '../safety/external-content.js';
+import {
+  annotateUntrustedField,
+  fenceExternalContent,
+  sanitizeDescriptiveFields,
+  sanitizeMimeType
+} from '../safety/external-content.js';
 import { mcpCallArgs } from '../safety/egress.js';
 import { appendTraceEvent } from '../stores/trace.js';
 import { envBool } from '../env.js';
 import { parseMcpHttpEndpoints, type McpHttpEndpoint } from './mcp-http-config.js';
-import { McpHttpSession } from './mcp-http.js';
-import type { McpToolInfo } from './mcp-jsonrpc.js';
+import { collectHeaderSecrets, McpHttpSession } from './mcp-http.js';
+import type { McpResourceInfo, McpToolInfo } from './mcp-jsonrpc.js';
 import { McpStdioSession, parseMcpStdioConfigs, sanitizeMcpToolSuffix } from './mcp-stdio.js';
 import { minifyMcpToolInputSchema, parseMcpSchemaMinifyLevel } from './mcp-schema-minify.js';
 
@@ -18,6 +23,19 @@ export interface McpManagerDeps {
 
 function fenceMcp(label: string, body: string): string {
   return fenceExternalContent({ source: 'mcp', label, body });
+}
+
+function presentResourceList(listed: McpResourceInfo[]): string {
+  const safe = listed.map((resource) => ({
+    ...resource,
+    mimeType: resource.mimeType ? sanitizeMimeType(resource.mimeType) : undefined
+  }));
+  return fenceMcp('resources', JSON.stringify(safe, null, 2));
+}
+
+function presentResourceBody(mimeType: string | undefined, text: string): string {
+  const mime = sanitizeMimeType(mimeType);
+  return mime ? `${mime}\n\n${text}` : text;
 }
 
 function presentMcpTool(
@@ -108,6 +126,7 @@ export class McpManager {
     }
 
     try {
+      this.warnShortCredentials(endpoints);
       this.httpSessions = endpoints.map(
         (endpoint, index) =>
           new McpHttpSession(index, endpoint, {
@@ -126,6 +145,18 @@ export class McpManager {
       this.registerResourceTools();
     } finally {
       this.mcpExpansionDone = true;
+    }
+  }
+
+  private warnShortCredentials(endpoints: McpHttpEndpoint[]): void {
+    const env = this.deps.env as NodeJS.ProcessEnv;
+    for (const endpoint of endpoints) {
+      const { shortCredentialCount } = collectHeaderSecrets(endpoint, env);
+      if (shortCredentialCount > 0) {
+        this.deps.log.warn(
+          `MCP HTTP ${endpoint.url} has ${shortCredentialCount} credential(s) shorter than 8 characters; full-text redaction skipped`
+        );
+      }
     }
   }
 
@@ -281,7 +312,7 @@ export class McpManager {
             if (!session) return { ok: false, content: 'Invalid URL index' };
             try {
               const listed = await session.listResources();
-              return { ok: true, content: fenceMcp('resources', JSON.stringify(listed, null, 2)) };
+              return { ok: true, content: presentResourceList(listed) };
             } catch (error) {
               const message = error instanceof Error ? error.message : String(error);
               return { ok: false, content: fenceMcp('resources', message) };
@@ -291,7 +322,7 @@ export class McpManager {
           if (!stdio) return { ok: false, content: 'Stdio server not connected' };
           try {
             const listed = await stdio.listResources();
-            return { ok: true, content: fenceMcp('resources', JSON.stringify(listed, null, 2)) };
+            return { ok: true, content: presentResourceList(listed) };
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             return { ok: false, content: fenceMcp('resources', message) };
@@ -320,8 +351,7 @@ export class McpManager {
             if (!session) return { ok: false, content: 'Invalid URL index' };
             try {
               const resource = await session.readResource(args.uri);
-              const text = resource.mimeType ? `${resource.mimeType}\n\n${resource.text}` : resource.text;
-              return { ok: true, content: fenceMcp(args.uri, text) };
+              return { ok: true, content: fenceMcp(args.uri, presentResourceBody(resource.mimeType, resource.text)) };
             } catch (error) {
               const message = error instanceof Error ? error.message : String(error);
               return { ok: false, content: fenceMcp(args.uri, message) };
@@ -331,8 +361,7 @@ export class McpManager {
           if (!stdio) return { ok: false, content: 'Stdio server not connected' };
           try {
             const resource = await stdio.readResource(args.uri);
-            const text = resource.mimeType ? `${resource.mimeType}\n\n${resource.text}` : resource.text;
-            return { ok: true, content: fenceMcp(args.uri, text) };
+            return { ok: true, content: fenceMcp(args.uri, presentResourceBody(resource.mimeType, resource.text)) };
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             return { ok: false, content: fenceMcp(args.uri, message) };

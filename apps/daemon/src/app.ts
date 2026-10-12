@@ -83,7 +83,7 @@ export function buildDaemonRouter(deps: DaemonAppDeps): Router {
     .addAll(gatewaySettingsRoutes(runtime))
     .addAll(tasksRoutes(runtime))
     .addAll(socialRoutes(runtime, repoRoot))
-    .addAll(outboundDraftRoutes(runtime, repoRoot))
+    .addAll(outboundDraftRoutes(runtime, repoRoot, env))
     .addAll(selfHealRoutes(runtime))
     .addAll(mailboxRoutes(runtime))
     .addAll(orchestrationRoutes(runtime))

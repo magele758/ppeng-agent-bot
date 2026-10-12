@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import {
+  applyHumanReleaseHeader,
   copyProxyResponseHeaders,
   daemonProxyErrorMessage,
   LAB_PROXY_HEADER,
@@ -35,6 +36,7 @@ export async function middleware(request: NextRequest) {
   const targetUrl = `${daemonBase()}${request.nextUrl.pathname}${request.nextUrl.search}`;
   const headers = sanitizeProxyHeaders(request.headers);
   appendDaemonBearerIfConfigured(headers);
+  applyHumanReleaseHeader(request.headers, headers, process.env);
   appendLabForwarding(request, headers);
 
   const init: RequestInit & { duplex?: 'half' } = {

@@ -2,6 +2,30 @@
 
 export const LAB_PROXY_HEADER = 'x-ppeng-lab';
 
+/** Keep in sync with `apps/daemon/src/human-release.ts`. */
+export const HUMAN_RELEASE_HEADER = 'x-ppeng-human-release';
+
+export function humanReleaseSecret(env: NodeJS.ProcessEnv): string {
+  return String(env.RAW_AGENT_HUMAN_RELEASE_SECRET ?? '').trim();
+}
+
+/** Browser fetches from the Lab page set this. A bare curl does not. */
+export function requestLooksLikeLabPage(headers: Headers): boolean {
+  return headers.get('sec-fetch-site') === 'same-origin';
+}
+
+/**
+ * Attach the human release secret on the daemon hop. The browser never sees it.
+ * Only same-origin Lab page fetches qualify, so a model shell curling the Lab
+ * port does not receive the header unless it forges `Sec-Fetch-Site`.
+ */
+export function applyHumanReleaseHeader(requestHeaders: Headers, outbound: Headers, env: NodeJS.ProcessEnv): void {
+  const secret = humanReleaseSecret(env);
+  if (!secret || !requestLooksLikeLabPage(requestHeaders)) return;
+  if (outbound.get(HUMAN_RELEASE_HEADER)?.trim()) return;
+  outbound.set(HUMAN_RELEASE_HEADER, secret);
+}
+
 const HOP_BY_HOP = [
   'connection',
   'content-length',

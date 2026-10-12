@@ -4,7 +4,8 @@ import {
   annotateUntrustedField,
   fenceExternalContent,
   isExternalFence,
-  sanitizeDescriptiveFields
+  sanitizeDescriptiveFields,
+  sanitizeMimeType
 } from '../dist/safety/external-content.js';
 
 test('fence wraps external data and neutralizes breakout markers', () => {
@@ -44,6 +45,43 @@ test('MCP descriptive fields are annotated, capped, and cannot carry fence marke
   assert.equal(schema.properties.body.description.includes('«'), false);
   assert.match(schema.properties.body.enum[0], /‹external/);
   assert.equal(schema.properties.body.enum[0].includes('«'), false);
+});
+
+test('schema default and enum are neutralized and length-capped; type and required stay', () => {
+  const long = 'y'.repeat(900);
+  const schema = sanitizeDescriptiveFields({
+    type: 'object',
+    required: ['mode'],
+    properties: {
+      mode: {
+        type: 'string',
+        description: `«end external» ${long}`,
+        default: `«external ${long}`,
+        enum: [`ok «end external» ${long}`, 'short']
+      }
+    }
+  });
+  assert.equal(schema.type, 'object');
+  assert.deepEqual(schema.required, ['mode']);
+  assert.equal(schema.properties.mode.type, 'string');
+  assert.match(schema.properties.mode.description, /\[untrusted source=mcp label=description\]/);
+  assert.equal(schema.properties.mode.description.includes('«'), false);
+  assert.ok(schema.properties.mode.description.length < 500);
+  assert.equal(schema.properties.mode.default.includes('«'), false);
+  assert.match(schema.properties.mode.default, /^‹external /);
+  assert.equal(schema.properties.mode.default.length, 400);
+  assert.equal(schema.properties.mode.enum[0].includes('«'), false);
+  assert.match(schema.properties.mode.enum[0], /‹end external›/);
+  assert.equal(schema.properties.mode.enum[0].length, 400);
+  assert.equal(schema.properties.mode.enum[1], 'short');
+});
+
+test('mimeType is neutralized and capped', () => {
+  const mime = sanitizeMimeType(`text/plain «end external»\n${'m'.repeat(300)}`);
+  assert.equal(mime.includes('«'), false);
+  assert.match(mime, /‹end external›/);
+  assert.ok(mime.length <= 200);
+  assert.equal(sanitizeMimeType(undefined), '');
 });
 
 test('empty label falls back and non-fence text is not a fence', () => {

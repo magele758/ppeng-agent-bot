@@ -35,23 +35,47 @@ export function annotateUntrustedField(input: {
   return `[untrusted source=${input.source} label=${sanitizeLabel(input.label)}] ${body}`;
 }
 
-const DESCRIPTIVE_KEYS = new Set(['description', 'title', '$comment']);
+const ANNOTATED_KEYS = new Set(['description', 'title', '$comment']);
+/** Protocol identifiers: neutralize fence markers only, do not cap or annotate. */
+const IDENTIFIER_KEYS = new Set(['type', 'format', '$ref']);
+const IDENTIFIER_LIST_KEYS = new Set(['required']);
 
-/** Walk a JSON schema and annotate description-like strings. Other strings only lose fence markers. */
-export function sanitizeDescriptiveFields(value: unknown, maxLength = 400): unknown {
-  if (typeof value === 'string') return neutralizeFenceMarkers(value);
-  if (Array.isArray(value)) return value.map((item) => sanitizeDescriptiveFields(item, maxLength));
+function cappedField(text: string, maxLength: number): string {
+  return neutralizeFenceMarkers(text).replace(/\s+/g, ' ').trim().slice(0, maxLength);
+}
+
+function sanitizeStringField(text: string, maxLength: number, parentKey?: string): string {
+  if (parentKey && (IDENTIFIER_KEYS.has(parentKey) || IDENTIFIER_LIST_KEYS.has(parentKey))) {
+    return neutralizeFenceMarkers(text);
+  }
+  return cappedField(text, maxLength);
+}
+
+/**
+ * Walk a JSON schema. description/title/$comment are annotated.
+ * default, enum, and other free-text strings lose fence markers and are length-capped.
+ * type / format / $ref / required names stay identifiers.
+ */
+export function sanitizeDescriptiveFields(value: unknown, maxLength = 400, parentKey?: string): unknown {
+  if (typeof value === 'string') return sanitizeStringField(value, maxLength, parentKey);
+  if (Array.isArray(value)) return value.map((item) => sanitizeDescriptiveFields(item, maxLength, parentKey));
   if (!value || typeof value !== 'object') return value;
   const out: Record<string, unknown> = {};
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
     const safeKey = neutralizeFenceMarkers(key);
-    if (DESCRIPTIVE_KEYS.has(key) && typeof child === 'string') {
+    if (ANNOTATED_KEYS.has(key) && typeof child === 'string') {
       out[safeKey] = annotateUntrustedField({ source: 'mcp', label: key, text: child, maxLength });
     } else {
-      out[safeKey] = sanitizeDescriptiveFields(child, maxLength);
+      out[safeKey] = sanitizeDescriptiveFields(child, maxLength, key);
     }
   }
   return out;
+}
+
+/** Resource MIME types are model-visible. Neutralize fence markers and cap length. */
+export function sanitizeMimeType(mimeType: string | undefined): string {
+  if (!mimeType) return '';
+  return cappedField(mimeType, 200);
 }
 
 export function fenceExternalContent(input: { source: ExternalSource; label: string; body: string }): string {

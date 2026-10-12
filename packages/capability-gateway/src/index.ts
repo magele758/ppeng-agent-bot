@@ -28,7 +28,12 @@ export {
   recoverOutboundLedger,
   sendLedgered
 } from './delivery-ledger.js';
-export { deliverChannelText, recoverGatewayOutbound, releaseOutboundDraft } from './outbound.js';
+export {
+  deliverChannelText,
+  reconcileSendingDrafts,
+  recoverGatewayOutbound,
+  releaseOutboundDraft
+} from './outbound.js';
 export {
   appendOutboundDraft,
   readOutboundDrafts,

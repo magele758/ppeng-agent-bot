@@ -237,6 +237,26 @@ describe('sanitizeSpawnEnv', () => {
     });
   });
 
+  describe('operator credentials', () => {
+    it('strips the daemon operator token even through overrides and allowlist', () => {
+      const env = sanitizeSpawnEnv({
+        base: {
+          PATH: '/usr/bin',
+          RAW_AGENT_AUTH_TOKEN: 'operator-token',
+          RAW_AGENT_HUMAN_RELEASE_SECRET: 'human-secret'
+        },
+        overrides: {
+          RAW_AGENT_AUTH_TOKEN: 'override-token',
+          RAW_AGENT_HUMAN_RELEASE_SECRET: 'override-secret'
+        },
+        allowlist: ['RAW_AGENT_AUTH_TOKEN', 'RAW_AGENT_HUMAN_RELEASE_SECRET']
+      });
+      assert.equal(env.PATH, '/usr/bin');
+      assert.equal(env.RAW_AGENT_AUTH_TOKEN, undefined);
+      assert.equal(env.RAW_AGENT_HUMAN_RELEASE_SECRET, undefined);
+    });
+  });
+
   describe('returns a copy', () => {
     it('does not mutate the base object', () => {
       const base = { PATH: '/usr/bin', LD_PRELOAD: '/evil.so' };

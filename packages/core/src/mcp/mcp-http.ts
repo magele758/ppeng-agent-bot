@@ -15,12 +15,21 @@ export interface McpHttpSessionOptions {
   onTransportFallback?: (info: { url: string; status: number }) => void;
 }
 
-interface ResolvedHeaders {
-  headers: Record<string, string>;
+/** Shorter credential values are not full-text replaced; they corrupt identifiers like `identity`. */
+export const MIN_CREDENTIAL_LENGTH = 8;
+
+/** Header names that carry credentials. Ordinary headers such as `X-Trace` are not secrets. */
+const CREDENTIAL_HEADER_NAME = /authorization|token|secret|key|cookie|auth/i;
+
+const PROTOCOL_STRING_KEYS = new Set(['type', 'format', '$ref']);
+const PROTOCOL_ARRAY_KEYS = new Set(['required']);
+
+export interface HeaderSecretReport {
   secrets: string[];
+  shortCredentialCount: number;
 }
 
-function resolveHeaders(endpoint: McpHttpEndpoint, env: NodeJS.ProcessEnv): ResolvedHeaders {
+function buildHeaders(endpoint: McpHttpEndpoint, env: NodeJS.ProcessEnv): Record<string, string> {
   const headers: Record<string, string> = {};
   for (const [key, value] of Object.entries(endpoint.headers ?? {})) {
     if (value) headers[key] = value;
@@ -30,20 +39,64 @@ function resolveHeaders(endpoint: McpHttpEndpoint, env: NodeJS.ProcessEnv): Reso
     const token = env[endpoint.bearerEnv]?.trim();
     if (token) headers.Authorization = `Bearer ${token}`;
   }
-  const secrets: string[] = [];
-  for (const value of Object.values(headers)) {
-    secrets.push(value);
-    const match = /^Bearer\s+(\S+)/i.exec(value);
-    if (match?.[1]) secrets.push(match[1]);
+  return headers;
+}
+
+function rememberCredential(value: string, report: HeaderSecretReport): void {
+  const trimmed = value.trim();
+  if (!trimmed) return;
+  if (trimmed.length < MIN_CREDENTIAL_LENGTH) {
+    report.shortCredentialCount += 1;
+    return;
   }
-  return { headers, secrets };
+  report.secrets.push(trimmed);
+}
+
+function rememberHeaderValue(value: string, report: HeaderSecretReport): void {
+  const bearer = /^Bearer\s+(\S+)/i.exec(value.trim());
+  if (bearer?.[1]) {
+    rememberCredential(bearer[1], report);
+    return;
+  }
+  rememberCredential(value, report);
+}
+
+/**
+ * Secrets worth full-text redacting. Only credential headers and bearerEnv.
+ * Values shorter than 8 characters are counted so startup can warn, and are omitted.
+ */
+export function collectHeaderSecrets(endpoint: McpHttpEndpoint, env: NodeJS.ProcessEnv): HeaderSecretReport {
+  const report: HeaderSecretReport = { secrets: [], shortCredentialCount: 0 };
+  for (const [name, value] of Object.entries(buildHeaders(endpoint, env))) {
+    if (!value || !CREDENTIAL_HEADER_NAME.test(name)) continue;
+    rememberHeaderValue(value, report);
+  }
+  report.secrets = [...new Set(report.secrets)].sort((a, b) => b.length - a.length);
+  return report;
 }
 
 export function redactSecrets(text: string, secrets: string[]): string {
-  const unique = [...new Set(secrets.filter((secret) => secret.length > 0))].sort((a, b) => b.length - a.length);
+  const unique = [...new Set(secrets.filter((secret) => secret.length >= MIN_CREDENTIAL_LENGTH))].sort(
+    (a, b) => b.length - a.length
+  );
   let out = text;
   for (const secret of unique) {
     out = out.split(secret).join('[REDACTED]');
+  }
+  return out;
+}
+
+/** Redact credential text in schema values. Keys, type, format, $ref, and required names stay. */
+export function redactProtocolTree(value: unknown, secrets: string[], parentKey?: string): unknown {
+  if (typeof value === 'string') {
+    if (parentKey && (PROTOCOL_STRING_KEYS.has(parentKey) || PROTOCOL_ARRAY_KEYS.has(parentKey))) return value;
+    return redactSecrets(value, secrets);
+  }
+  if (Array.isArray(value)) return value.map((item) => redactProtocolTree(item, secrets, parentKey));
+  if (!value || typeof value !== 'object') return value;
+  const out: Record<string, unknown> = {};
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    out[key] = redactProtocolTree(child, secrets, key);
   }
   return out;
 }
@@ -136,14 +189,15 @@ export class McpHttpSession {
     return this.guard(async () => {
       await this.connect();
       const listed = await this.client!.listTools();
-      return (listed.tools ?? []).map((tool) =>
-        this.redactDeep({
-          name: tool.name,
-          description: tool.description,
-          inputSchema: tool.inputSchema as Record<string, unknown> | undefined,
-          readOnlyHint: readOnlyHintOf(tool)
-        })
-      );
+      const secrets = this.secrets();
+      return (listed.tools ?? []).map((tool) => ({
+        name: tool.name,
+        description: tool.description ? redactSecrets(tool.description, secrets) : undefined,
+        inputSchema: tool.inputSchema
+          ? (redactProtocolTree(tool.inputSchema, secrets) as Record<string, unknown>)
+          : undefined,
+        readOnlyHint: readOnlyHintOf(tool)
+      }));
     });
   }
 
@@ -163,14 +217,13 @@ export class McpHttpSession {
       await this.connect();
       try {
         const listed = await this.client!.listResources();
-        return this.redactDeep(
-          (listed.resources ?? []).map((resource) => ({
-            uri: resource.uri,
-            name: resource.name,
-            description: resource.description,
-            mimeType: resource.mimeType
-          }))
-        );
+        const secrets = this.secrets();
+        return (listed.resources ?? []).map((resource) => ({
+          uri: resource.uri,
+          name: resource.name,
+          description: resource.description ? redactSecrets(resource.description, secrets) : undefined,
+          mimeType: resource.mimeType ? redactSecrets(resource.mimeType, secrets) : undefined
+        }));
       } catch {
         return [];
       }
@@ -183,16 +236,17 @@ export class McpHttpSession {
       const listed = await this.client!.readResource({ uri });
       const content = listed.contents?.[0];
       if (!content) return { text: this.redactText(JSON.stringify(listed)) };
+      const mimeType = content.mimeType ? this.redactText(content.mimeType) : undefined;
       if ('text' in content && content.text !== undefined) {
-        return { text: this.redactText(content.text as string), mimeType: content.mimeType };
+        return { text: this.redactText(content.text as string), mimeType };
       }
       if ('blob' in content && typeof content.blob === 'string') {
         return {
           text: this.redactText(`[base64 blob ${content.blob.length} chars]`),
-          mimeType: content.mimeType
+          mimeType
         };
       }
-      return { text: this.redactText(JSON.stringify(this.redactDeep(content))), mimeType: content.mimeType };
+      return { text: this.redactText(JSON.stringify(content)), mimeType };
     });
   }
 
@@ -214,24 +268,11 @@ export class McpHttpSession {
   }
 
   private secrets(): string[] {
-    return resolveHeaders(this.endpoint, this.env()).secrets;
+    return collectHeaderSecrets(this.endpoint, this.env()).secrets;
   }
 
   private redactText(text: string): string {
     return redactSecrets(text, this.secrets());
-  }
-
-  private redactDeep<T>(value: T): T {
-    if (typeof value === 'string') return this.redactText(value) as T;
-    if (Array.isArray(value)) return value.map((item) => this.redactDeep(item)) as T;
-    if (value && typeof value === 'object') {
-      const out: Record<string, unknown> = {};
-      for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
-        out[key] = this.redactDeep(child);
-      }
-      return out as T;
-    }
-    return value;
   }
 
   private redact(error: unknown): Error {
@@ -277,7 +318,7 @@ export class McpHttpSession {
   }
 
   private async connectWith(kind: McpHttpTransport): Promise<void> {
-    const { headers } = resolveHeaders(this.endpoint, this.env());
+    const headers = buildHeaders(this.endpoint, this.env());
     const fetchImpl = fetchWithTimeout(this.options.fetch ?? fetch, this.options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
     const url = new URL(this.endpoint.url);
     const requestInit: RequestInit = { headers };

@@ -1,12 +1,19 @@
 import { env } from 'node:process';
 import { NotFoundError, ValidationError } from '@ppeng/agent-core';
 import { deliverToChannel } from './channels.js';
-import { recoverOutboundLedger, sendLedgered, type DeliveryRow } from './delivery-ledger.js';
+import {
+  abandonDraftDeliveries,
+  closeUnconfirmedDraft,
+  recoverOutboundLedger,
+  sendLedgered,
+  type DeliveryRow
+} from './delivery-ledger.js';
 import { sendFeishuTextMessage } from './feishu-api.js';
 import {
   appendOutboundDraft,
   claimOutboundDraft,
   OutboundDraftError,
+  readOutboundDrafts,
   rejectOutboundDraft,
   settleOutboundDraft,
   type OutboundDraft
@@ -37,11 +44,13 @@ async function sendApprovedChannel(opts: {
   channel: ChannelSpec;
   text: string;
   event?: string;
+  draftId?: string;
 }): Promise<void> {
   await sendLedgered({
     gatewayDir: opts.gatewayDir,
     target: { type: 'channel', channelId: opts.channel.id },
     text: opts.text,
+    draftId: opts.draftId,
     send: async (text) => {
       const result = await deliverToChannel(
         opts.channel,
@@ -76,7 +85,9 @@ export async function releaseOutboundDraft(input: {
 }): Promise<OutboundDraft> {
   if (input.decision === 'reject') {
     try {
-      return await rejectOutboundDraft(input.gatewayDir, input.id);
+      const draft = await rejectOutboundDraft(input.gatewayDir, input.id);
+      await abandonDraftDeliveries(input.gatewayDir, draft.id);
+      return draft;
     } catch (error) {
       rethrowDraft(error);
     }
@@ -95,6 +106,7 @@ export async function releaseOutboundDraft(input: {
         gatewayDir: input.gatewayDir,
         target: { type: 'feishu', receiveId, receiveIdType },
         text: draft.text,
+        draftId: draft.id,
         send: async (out) => {
           const appId = env.RAW_AGENT_FEISHU_APP_ID?.trim();
           const appSecret = env.RAW_AGENT_FEISHU_APP_SECRET?.trim();
@@ -109,7 +121,8 @@ export async function releaseOutboundDraft(input: {
         gatewayDir: input.gatewayDir,
         channel,
         text: draft.text,
-        event: draft.event
+        event: draft.event,
+        draftId: draft.id
       });
     }
     return await settleOutboundDraft(input.gatewayDir, draft.id, { status: 'sent' });
@@ -150,10 +163,45 @@ async function resendRow(row: DeliveryRow, text: string, channels: ChannelSpec[]
   }
 }
 
-/** Replay unconfirmed outbound IM after process start. Failures stay on the ledger. */
+const INTERRUPTED_DRAFT_ERROR = 'interrupted before delivery was confirmed';
+
+async function markDraftSentIfRetryable(gatewayDir: string, draftId: string): Promise<void> {
+  const draft = (await readOutboundDrafts(gatewayDir)).find((item) => item.id === draftId);
+  if (!draft) return;
+  if (draft.status !== 'failed' && draft.status !== 'sending') return;
+  await settleOutboundDraft(gatewayDir, draftId, { status: 'sent' });
+}
+
+/** Crash after claim leaves `sending`. Ledger delivered → sent; otherwise failed and retryable. */
+export async function reconcileSendingDrafts(gatewayDir: string): Promise<number> {
+  const sending = (await readOutboundDrafts(gatewayDir)).filter((draft) => draft.status === 'sending');
+  for (const draft of sending) {
+    const delivered = await closeUnconfirmedDraft(gatewayDir, draft.id);
+    await settleOutboundDraft(
+      gatewayDir,
+      draft.id,
+      delivered ? { status: 'sent' } : { status: 'failed', error: INTERRUPTED_DRAFT_ERROR }
+    );
+  }
+  return sending.length;
+}
+
+async function cancelRejectedDraftReplays(gatewayDir: string): Promise<void> {
+  const rejected = (await readOutboundDrafts(gatewayDir)).filter((draft) => draft.status === 'rejected');
+  for (const draft of rejected) await abandonDraftDeliveries(gatewayDir, draft.id);
+}
+
+async function replayRow(gatewayDir: string, row: DeliveryRow, text: string, channels: ChannelSpec[]): Promise<void> {
+  await resendRow(row, text, channels);
+  if (row.draftId) await markDraftSentIfRetryable(gatewayDir, row.draftId);
+}
+
+/** Replay unconfirmed outbound IM after process start. Rejected drafts are not replayed. */
 export async function recoverGatewayOutbound(input: {
   gatewayDir: string;
   channels: ChannelSpec[];
 }): Promise<number> {
-  return recoverOutboundLedger(input.gatewayDir, (row, text) => resendRow(row, text, input.channels));
+  await reconcileSendingDrafts(input.gatewayDir);
+  await cancelRejectedDraftReplays(input.gatewayDir);
+  return recoverOutboundLedger(input.gatewayDir, (row, text) => replayRow(input.gatewayDir, row, text, input.channels));
 }
