@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { useI18n } from '@/lib/i18n';
+import { loginRequiredEventLocksLab } from '@/lib/api';
 import { authErrorFromSearch, parseAuthMe, type AuthMeResponse, type AuthUser } from '@/lib/auth';
 import { LoginScreen } from './LoginScreen';
 import './auth.css';
@@ -41,7 +42,9 @@ export function AuthGate({
   }, [onUser]);
 
   useEffect(() => {
-    const onRequired = () => {
+    const onRequired = (event: Event) => {
+      const detail = event instanceof CustomEvent ? (event.detail as { loginRequired?: boolean } | undefined) : undefined;
+      if (!loginRequiredEventLocksLab(detail)) return;
       setMe((cur) =>
         cur ? { ...cur, loginRequired: true, user: null } : { loginRequired: true, providers: [], user: null }
       );

@@ -16,14 +16,20 @@ export function InboxView() {
   const [mailFrom, setMailFrom] = useState('');
   const [mailTo, setMailTo] = useState('');
   const [mailBody, setMailBody] = useState('');
+  const [draftLoginHint, setDraftLoginHint] = useState(false);
   const agentsSorted = sortAgentsById(agents);
   const onRefresh = () => void tick();
 
   const decide = (id: string, verdict: 'approve' | 'reject') =>
     void api(`/api/approvals/${id}/${verdict}`, { method: 'POST' }).then(onRefresh);
 
-  const decideDraft = (id: string, verdict: 'approve' | 'reject') =>
-    void api(`/api/outbound-drafts/${id}/${verdict}`, { method: 'POST' }).then(onRefresh, onRefresh);
+  const decideDraft = (id: string, verdict: 'approve' | 'reject') => {
+    setDraftLoginHint(false);
+    void api(`/api/outbound-drafts/${id}/${verdict}`, { method: 'POST' }).then(onRefresh, (error: unknown) => {
+      if (error instanceof Error && error.message === 'human_login_required') setDraftLoginHint(true);
+      onRefresh();
+    });
+  };
 
   const handleSendMail = async () => {
     const body = mailBody.trim();
@@ -98,6 +104,11 @@ export function InboxView() {
       </SettingsGroup>
 
       <SettingsGroup title={t('tasks.inbox.draftsTitle')} description={t('tasks.inbox.draftsDesc')}>
+        {draftLoginHint ? (
+          <p id="outboundDraftLoginHint" className={styles.draftHint} role="alert">
+            {t('tasks.inbox.loginRequiredToSend')}
+          </p>
+        ) : null}
         {outboundDrafts.length === 0 ? (
           <EmptyState title={t('tasks.inbox.draftsEmptyTitle')} description={t('tasks.inbox.draftsEmptyDesc')} />
         ) : (

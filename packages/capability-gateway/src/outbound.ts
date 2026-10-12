@@ -7,7 +7,8 @@ import {
   quarantineUnlinkedDraftRows,
   recoverOutboundLedger,
   sendLedgered,
-  type DeliveryRow
+  type DeliveryRow,
+  type LegacyDraftMatch
 } from './delivery-ledger.js';
 import { sendFeishuTextMessage } from './feishu-api.js';
 import {
@@ -88,6 +89,7 @@ export async function releaseOutboundDraft(input: {
     try {
       const draft = await rejectOutboundDraft(input.gatewayDir, input.id);
       await abandonDraftDeliveries(input.gatewayDir, draft.id);
+      await quarantineLegacyRowsForDraft(input.gatewayDir, draft);
       return draft;
     } catch (error) {
       rethrowDraft(error);
@@ -99,6 +101,7 @@ export async function releaseOutboundDraft(input: {
   } catch (error) {
     rethrowDraft(error);
   }
+  await quarantineLegacyRowsForDraft(input.gatewayDir, draft);
   try {
     if (draft.receiveId && draft.receiveIdType) {
       const receiveId = draft.receiveId;
@@ -192,10 +195,26 @@ async function cancelRejectedDraftReplays(gatewayDir: string): Promise<void> {
   for (const draft of rejected) await abandonDraftDeliveries(gatewayDir, draft.id);
 }
 
-/** Isolate pre-draftId ledger rows whose text is a draft. Does not send them. */
+function legacyMatchFromDraft(draft: OutboundDraft): LegacyDraftMatch {
+  return {
+    text: draft.text,
+    channelId: draft.channelId,
+    ...(draft.receiveId && draft.receiveIdType
+      ? { receiveId: draft.receiveId, receiveIdType: draft.receiveIdType }
+      : {}),
+    createdAt: draft.createdAt
+  };
+}
+
+/** Isolate one draft's pre-draftId rows. Same match as startup. Does not send. */
+export async function quarantineLegacyRowsForDraft(gatewayDir: string, draft: OutboundDraft): Promise<number> {
+  return quarantineUnlinkedDraftRows(gatewayDir, [legacyMatchFromDraft(draft)]);
+}
+
+/** Isolate pre-draftId ledger rows that match a draft's recipient and time window. Does not send. */
 export async function quarantineLegacyDraftLedger(gatewayDir: string): Promise<number> {
-  const texts = (await readOutboundDrafts(gatewayDir)).map((draft) => draft.text);
-  return quarantineUnlinkedDraftRows(gatewayDir, texts);
+  const drafts = await readOutboundDrafts(gatewayDir);
+  return quarantineUnlinkedDraftRows(gatewayDir, drafts.map(legacyMatchFromDraft));
 }
 
 async function replayRow(gatewayDir: string, row: DeliveryRow, text: string, channels: ChannelSpec[]): Promise<void> {

@@ -66,6 +66,7 @@ export const tasks = {
     draftsDesc: 'Digests, webhooks, and model-initiated sends wait here. They go out only after you choose Approve and send.',
     draftsEmptyTitle: 'No outbound drafts',
     draftsEmptyDesc: 'Sends that need a human release are listed here.',
+    loginRequiredToSend: 'Approving an outbound send requires login to be turned on',
     approveSend: 'Approve and send',
     rejectDraft: 'Reject',
     approveSendAria: 'Approve and send {channel}',

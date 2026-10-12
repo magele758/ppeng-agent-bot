@@ -156,20 +156,60 @@ export function finishOutbound(dir: string, id: string, state: 'delivered' | 'fa
 }
 
 /**
- * Drop unfinished rows that predate draftId. They match a draft's text, so
- * reject/reapprove must not replay them. Delivered rows and unrelated IM stay.
- * This does not send.
+ * How close a pre-draftId row must be to the draft's `createdAt` before it is
+ * treated as that draft's send. New sends already carry `draftId`. A later
+ * identical IM on the same channel falls outside this window and is replayed.
  */
-export async function quarantineUnlinkedDraftRows(dir: string, draftTexts: readonly string[]): Promise<number> {
-  const keys = new Set(draftTexts.map(comparableDeliveryText));
-  if (keys.size === 0) return 0;
+export const LEGACY_DRAFT_MATCH_WINDOW_MS = 15 * 60 * 1000;
+
+/** Draft fields used to decide whether an old ledger row is that draft's send. */
+export interface LegacyDraftMatch {
+  text: string;
+  channelId: string;
+  receiveId?: string;
+  receiveIdType?: 'open_id' | 'user_id' | 'union_id' | 'chat_id';
+  createdAt: string;
+}
+
+function sameLegacyRecipient(row: DeliveryRow, draft: LegacyDraftMatch): boolean {
+  const target = row.target;
+  if (draft.receiveId && draft.receiveIdType) {
+    return (
+      target.type === 'feishu' &&
+      target.receiveId === draft.receiveId &&
+      target.receiveIdType === draft.receiveIdType
+    );
+  }
+  return target.type === 'channel' && target.channelId === draft.channelId;
+}
+
+function withinLegacyWindow(rowCreatedAt: string, draftCreatedAt: string): boolean {
+  const rowMs = Date.parse(rowCreatedAt);
+  const draftMs = Date.parse(draftCreatedAt);
+  if (!Number.isFinite(rowMs) || !Number.isFinite(draftMs)) return false;
+  return Math.abs(rowMs - draftMs) <= LEGACY_DRAFT_MATCH_WINDOW_MS;
+}
+
+function matchesLegacyDraft(row: DeliveryRow, draft: LegacyDraftMatch): boolean {
+  if (comparableDeliveryText(row.content) !== comparableDeliveryText(draft.text)) return false;
+  if (!sameLegacyRecipient(row, draft)) return false;
+  return withinLegacyWindow(row.createdAt, draft.createdAt);
+}
+
+/**
+ * Drop unfinished rows that predate draftId only when text, recipient, and
+ * the time window all match a draft. Anything else keeps the at-least-once
+ * replay. Delivered rows and rows that already have draftId stay. This does not send.
+ */
+export async function quarantineUnlinkedDraftRows(dir: string, drafts: readonly LegacyDraftMatch[]): Promise<number> {
+  if (drafts.length === 0) return 0;
   return withLock(dir, async () => {
     const file = readLedger(dir);
     let changed = 0;
     for (const row of file.items) {
       if (row.draftId) continue;
       if (row.state === 'delivered' || row.state === 'abandoned') continue;
-      if (!keys.has(comparableDeliveryText(row.content))) continue;
+      if (!drafts.some((draft) => matchesLegacyDraft(row, draft))) continue;
       row.state = 'abandoned';
       row.updatedAt = nowIso();
       changed += 1;

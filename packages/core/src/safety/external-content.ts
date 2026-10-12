@@ -38,6 +38,11 @@ export function annotateUntrustedField(input: {
 const ANNOTATED_KEYS = new Set(['description', 'title', '$comment']);
 /** Values the model may pass back to the tool. Never rewrite them. */
 const CALLABLE_KEYS = new Set(['default', 'const', 'enum']);
+/**
+ * Maps whose keys are names, not schema keywords. A property literally named
+ * `default` / `const` / `enum` must still have its description sanitized.
+ */
+const SCHEMA_MAP_KEYS = new Set(['properties', 'patternProperties', '$defs', 'definitions']);
 
 function cappedField(text: string, maxLength: number): string {
   return neutralizeFenceMarkers(text).replace(/\s+/g, ' ').trim().slice(0, maxLength);
@@ -76,12 +81,27 @@ function recordCallableSuspicion(value: unknown, maxLength: number, parentKey: s
   suspicious.push(`${parentKey}:${[...reasons].join('+')}`);
 }
 
+function sanitizePropertyMap(
+  map: Record<string, unknown>,
+  maxLength: number,
+  suspicious?: string[]
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [name, schema] of Object.entries(map)) {
+    noteFence(name, suspicious);
+    out[name] = sanitizeDescriptiveFields(schema, maxLength, undefined, suspicious);
+  }
+  return out;
+}
+
 function sanitizeSchemaObject(value: Record<string, unknown>, maxLength: number, suspicious?: string[]): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [key, child] of Object.entries(value)) {
     noteFence(key, suspicious);
     if (ANNOTATED_KEYS.has(key) && typeof child === 'string') {
       out[key] = annotateUntrustedField({ source: 'mcp', label: key, text: child, maxLength });
+    } else if (SCHEMA_MAP_KEYS.has(key) && child && typeof child === 'object' && !Array.isArray(child)) {
+      out[key] = sanitizePropertyMap(child as Record<string, unknown>, maxLength, suspicious);
     } else {
       out[key] = sanitizeDescriptiveFields(child, maxLength, key, suspicious);
     }
@@ -92,8 +112,10 @@ function sanitizeSchemaObject(value: Record<string, unknown>, maxLength: number,
 /**
  * Walk a JSON schema.
  * description / title / $comment are annotated, whitespace-collapsed, and length-capped.
- * default / const / enum are callable values and stay byte-for-byte. A fence marker or
+ * default / const / enum keywords are callable values and stay byte-for-byte. A fence marker or
  * a string longer than `maxLength` is recorded in `suspicious` and the value is not rewritten.
+ * Names under properties, patternProperties, $defs, and definitions are not keywords:
+ * a property named `default` still has its description annotated.
  * Other strings (type, format, $ref, required names, pattern, …) also stay exact; a fence
  * there is recorded the same way instead of being edited.
  */
