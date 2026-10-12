@@ -136,3 +136,8 @@
   font-size: var(--ui-text-sm);
   color: var(--ui-text-muted);
 }
+
+.draftHint {
+  margin: 0 0 var(--ui-space-3);
+  color: var(--ui-text);
+}

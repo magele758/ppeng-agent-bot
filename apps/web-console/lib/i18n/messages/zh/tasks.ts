@@ -66,6 +66,7 @@ export const tasks = {
     draftsDesc: '日报、webhook 和模型主动发起的外发停在这里。只有你点「批准并发送」才会发出。',
     draftsEmptyTitle: '没有待发送的草稿',
     draftsEmptyDesc: '需要你放行的外发会列在这里。',
+    loginRequiredToSend: '批准外发需要先开启登录',
     approveSend: '批准并发送',
     rejectDraft: '拒绝',
     approveSendAria: '批准并发送 {channel}',

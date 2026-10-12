@@ -6,7 +6,7 @@ import {
   readOutboundDrafts,
   releaseOutboundDraft
 } from '@ppeng/agent-capability-gateway';
-import { hasHumanRelease, humanReleaseDeniedBody } from '../human-release.js';
+import { hasHumanRelease, humanReleaseDenied } from '../human-release.js';
 import { json } from '../http-utils.js';
 import type { RouteContext, RouteSpec } from '../routing.js';
 
@@ -14,7 +14,7 @@ import type { RouteContext, RouteSpec } from '../routing.js';
  * Human release path for proactive outbound drafts (digest, webhook, model-initiated).
  * The decision is the URL verb. A request body cannot approve a draft.
  * Approve and reject require a Lab login session ({@link hasHumanRelease}).
- * With login off, both fail closed and the Lab UI asks the operator to enable it.
+ * With login off, both fail closed with 403 `human_login_required` and the inbox asks the operator to enable it.
  */
 export function outboundDraftRoutes(runtime: RawAgentRuntime, repoRoot: string, env: NodeJS.ProcessEnv): RouteSpec[] {
   const gatewayDir = () => join(runtime.stateDir, 'gateway');
@@ -30,7 +30,8 @@ export function outboundDraftRoutes(runtime: RawAgentRuntime, repoRoot: string, 
   };
   const requireHuman = (ctx: RouteContext): boolean => {
     if (hasHumanRelease(ctx.request, env, ctx.auth)) return true;
-    json(ctx.response, 401, humanReleaseDeniedBody(env));
+    const denied = humanReleaseDenied(env);
+    json(ctx.response, denied.status, denied.body);
     return false;
   };
   return [

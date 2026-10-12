@@ -15,6 +15,24 @@ function isCacheableGet(path: string, init?: RequestInit): boolean {
   return path.startsWith('/api/');
 }
 
+/**
+ * A 401 `login_required` replaces the Lab with the login screen.
+ * `loginRequired: false` means login is not configured (draft release uses 403
+ * `human_login_required` for that case). Neither one should lock the workspace.
+ */
+export function loginFailureLocksLab(
+  status: number,
+  body: { error?: unknown; loginRequired?: unknown } | null | undefined
+): boolean {
+  if (status !== 401 || body?.error !== 'login_required') return false;
+  return body.loginRequired !== false;
+}
+
+/** AuthGate ignores a login-required event that explicitly says login is off. */
+export function loginRequiredEventLocksLab(detail: { loginRequired?: boolean } | undefined): boolean {
+  return detail?.loginRequired !== false;
+}
+
 export async function api(path: string, init?: RequestInit): Promise<unknown> {
   const cacheable = isCacheableGet(path, init);
   const cached = cacheable ? etagCache.get(path) : undefined;
@@ -36,8 +54,8 @@ export async function api(path: string, init?: RequestInit): Promise<unknown> {
     data = { _raw: text };
   }
   if (!res.ok) {
-    if (res.status === 401 && data.error === 'login_required' && typeof window !== 'undefined') {
-      window.dispatchEvent(new Event('ppeng-login-required'));
+    if (typeof window !== 'undefined' && loginFailureLocksLab(res.status, data)) {
+      window.dispatchEvent(new CustomEvent('ppeng-login-required', { detail: { loginRequired: true } }));
     }
     throw new Error((data.error as string) ?? `HTTP ${res.status}`);
   }

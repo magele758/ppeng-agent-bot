@@ -27,6 +27,8 @@ test('en and zh leaf key sets are identical', () => {
   assert.ok(zhKeys.includes('play.send'));
   assert.ok(zhKeys.includes('auth.google'));
   assert.ok(zhKeys.includes('more.help'));
+  assert.equal(zh.tasks.inbox.loginRequiredToSend, '批准外发需要先开启登录');
+  assert.ok(en.tasks.inbox.loginRequiredToSend.length > 0);
 });
 
 test('主导航与设置分类在中英文都有文案 [AC:console-navigation#AC-5]', () => {

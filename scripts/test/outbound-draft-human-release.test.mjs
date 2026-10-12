@@ -3,7 +3,8 @@
  * The model shell inherits a sanitized env (same Tier-0 path as bash) and must not
  * be able to POST /api/outbound-drafts/:id/approve. The operator bearer alone is not enough.
  * A forged Sec-Fetch-Site against the Lab port is not enough either: release requires
- * a Lab login session. With login off, approve/reject fail closed.
+ * a Lab login session. With login off, approve/reject return 403 human_login_required
+ * and do not look like a missing Lab session.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -134,6 +135,7 @@ test('model shell with the inherited operator env cannot approve a draft', async
     assert.equal(shell.sawToken, false);
     assert.equal(shell.sawRelease, false);
     assert.equal(shell.status, 401);
+    assert.match(shell.body, /Unauthorized/);
     const still = (await readOutboundDrafts(daemon.gatewayDir)).find((item) => item.id === draft.id);
     assert.equal(still.status, 'pending_approval');
   } finally {
@@ -149,9 +151,9 @@ test('model shell with the inherited operator env cannot approve a draft', async
     method: 'POST',
     headers: { authorization: `Bearer ${token}` }
   });
-  assert.equal(bearerOnly.status, 401);
+  assert.equal(bearerOnly.status, 403);
   const bearerBody = await bearerOnly.json();
-  assert.equal(bearerBody.error, 'login_required');
+  assert.equal(bearerBody.error, 'human_login_required');
   assert.equal(bearerBody.loginRequired, false);
   assert.equal((await readOutboundDrafts(daemon.gatewayDir))[0].status, 'pending_approval');
 
@@ -159,9 +161,9 @@ test('model shell with the inherited operator env cannot approve a draft', async
     method: 'POST',
     headers: { authorization: `Bearer ${token}`, 'x-ppeng-human-release': release }
   });
-  assert.equal(forgedHeader.status, 401);
+  assert.equal(forgedHeader.status, 403);
   const forgedBody = await forgedHeader.json();
-  assert.equal(forgedBody.error, 'login_required');
+  assert.equal(forgedBody.error, 'human_login_required');
   assert.equal(forgedBody.loginRequired, false);
 });
 
@@ -192,8 +194,8 @@ test('with isolation off and no release secret, an unauthenticated shell still c
   process.env.DRAFT_APPROVE_URL = approveUrl;
   try {
     const shell = await modelShellApprove();
-    assert.equal(shell.status, 401);
-    assert.match(shell.body, /login_required/);
+    assert.equal(shell.status, 403);
+    assert.match(shell.body, /human_login_required/);
   } finally {
     if (previous === undefined) delete process.env.DRAFT_APPROVE_URL;
     else process.env.DRAFT_APPROVE_URL = previous;
@@ -350,9 +352,9 @@ test('curl with a forged Sec-Fetch-Site against the Lab port cannot approve a dr
         'Sec-Fetch-Site': 'same-origin',
         'x-ppeng-human-release': release
       });
-      assert.equal(forged.status, 401, forged.body);
+      assert.equal(forged.status, 403, forged.body);
       const body = JSON.parse(forged.body);
-      assert.equal(body.error, 'login_required');
+      assert.equal(body.error, 'human_login_required');
       assert.equal(body.loginRequired, false);
       assert.equal((await readOutboundDrafts(daemon.gatewayDir))[0].status, 'pending_approval');
 
@@ -361,7 +363,8 @@ test('curl with a forged Sec-Fetch-Site against the Lab port cannot approve a dr
         'Sec-Fetch-Site': 'same-origin',
         Cookie: `ppeng_lab_session=${session}`
       });
-      assert.equal(cookied.status, 401, cookied.body);
+      assert.equal(cookied.status, 403, cookied.body);
+      assert.equal(JSON.parse(cookied.body).error, 'human_login_required');
       assert.equal(JSON.parse(cookied.body).loginRequired, false);
       assert.equal((await readOutboundDrafts(daemon.gatewayDir))[0].status, 'pending_approval');
     }
