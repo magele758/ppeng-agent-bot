@@ -36,40 +36,86 @@ export function annotateUntrustedField(input: {
 }
 
 const ANNOTATED_KEYS = new Set(['description', 'title', '$comment']);
-/** Protocol identifiers: neutralize fence markers only, do not cap or annotate. */
-const IDENTIFIER_KEYS = new Set(['type', 'format', '$ref']);
-const IDENTIFIER_LIST_KEYS = new Set(['required']);
+/** Values the model may pass back to the tool. Never rewrite them. */
+const CALLABLE_KEYS = new Set(['default', 'const', 'enum']);
 
 function cappedField(text: string, maxLength: number): string {
   return neutralizeFenceMarkers(text).replace(/\s+/g, ' ').trim().slice(0, maxLength);
 }
 
-function sanitizeStringField(text: string, maxLength: number, parentKey?: string): string {
-  if (parentKey && (IDENTIFIER_KEYS.has(parentKey) || IDENTIFIER_LIST_KEYS.has(parentKey))) {
-    return neutralizeFenceMarkers(text);
-  }
-  return cappedField(text, maxLength);
+function hasFenceMarker(text: string): boolean {
+  return text.includes('«external') || text.includes(FENCE_END);
 }
 
-/**
- * Walk a JSON schema. description/title/$comment are annotated.
- * default, enum, and other free-text strings lose fence markers and are length-capped.
- * type / format / $ref / required names stay identifiers.
- */
-export function sanitizeDescriptiveFields(value: unknown, maxLength = 400, parentKey?: string): unknown {
-  if (typeof value === 'string') return sanitizeStringField(value, maxLength, parentKey);
-  if (Array.isArray(value)) return value.map((item) => sanitizeDescriptiveFields(item, maxLength, parentKey));
-  if (!value || typeof value !== 'object') return value;
-  const out: Record<string, unknown> = {};
+function noteFence(text: string, suspicious?: string[]): void {
+  if (suspicious && hasFenceMarker(text)) suspicious.push('fence');
+}
+
+function walkCallable(value: unknown, maxLength: number, reasons: Set<string>): void {
+  if (typeof value === 'string') {
+    if (hasFenceMarker(value)) reasons.add('fence');
+    if (value.length > maxLength) reasons.add('overlong');
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) walkCallable(item, maxLength, reasons);
+    return;
+  }
+  if (!value || typeof value !== 'object') return;
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
-    const safeKey = neutralizeFenceMarkers(key);
+    if (hasFenceMarker(key)) reasons.add('fence');
+    walkCallable(child, maxLength, reasons);
+  }
+}
+
+function recordCallableSuspicion(value: unknown, maxLength: number, parentKey: string, suspicious?: string[]): void {
+  if (!suspicious) return;
+  const reasons = new Set<string>();
+  walkCallable(value, maxLength, reasons);
+  if (reasons.size === 0) return;
+  suspicious.push(`${parentKey}:${[...reasons].join('+')}`);
+}
+
+function sanitizeSchemaObject(value: Record<string, unknown>, maxLength: number, suspicious?: string[]): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, child] of Object.entries(value)) {
+    noteFence(key, suspicious);
     if (ANNOTATED_KEYS.has(key) && typeof child === 'string') {
-      out[safeKey] = annotateUntrustedField({ source: 'mcp', label: key, text: child, maxLength });
+      out[key] = annotateUntrustedField({ source: 'mcp', label: key, text: child, maxLength });
     } else {
-      out[safeKey] = sanitizeDescriptiveFields(child, maxLength, key);
+      out[key] = sanitizeDescriptiveFields(child, maxLength, key, suspicious);
     }
   }
   return out;
+}
+
+/**
+ * Walk a JSON schema.
+ * description / title / $comment are annotated, whitespace-collapsed, and length-capped.
+ * default / const / enum are callable values and stay byte-for-byte. A fence marker or
+ * a string longer than `maxLength` is recorded in `suspicious` and the value is not rewritten.
+ * Other strings (type, format, $ref, required names, pattern, …) also stay exact; a fence
+ * there is recorded the same way instead of being edited.
+ */
+export function sanitizeDescriptiveFields(
+  value: unknown,
+  maxLength = 400,
+  parentKey?: string,
+  suspicious?: string[]
+): unknown {
+  if (parentKey && CALLABLE_KEYS.has(parentKey)) {
+    recordCallableSuspicion(value, maxLength, parentKey, suspicious);
+    return value;
+  }
+  if (typeof value === 'string') {
+    noteFence(value, suspicious);
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeDescriptiveFields(item, maxLength, parentKey, suspicious));
+  }
+  if (!value || typeof value !== 'object') return value;
+  return sanitizeSchemaObject(value as Record<string, unknown>, maxLength, suspicious);
 }
 
 /** Resource MIME types are model-visible. Neutralize fence markers and cap length. */

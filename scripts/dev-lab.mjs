@@ -4,7 +4,6 @@
  * 端口冲突时在首选端口起向后退避（daemon / web 各 span 个候选）。
  * 用法：npm run dev
  */
-import { randomBytes } from 'node:crypto';
 import dotenv from 'dotenv';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -16,11 +15,6 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 // Repo-root `.env`：与 daemon(dotenv/config)同源，便于 RAW_AGENT_AUTH_TOKEN 同时注入 Next middleware
 dotenv.config({ path: join(root, '.env') });
-
-// Distinct from the operator bearer. Both daemon and Next see it; model shells do not.
-if (!String(process.env.RAW_AGENT_HUMAN_RELEASE_SECRET ?? '').trim()) {
-  process.env.RAW_AGENT_HUMAN_RELEASE_SECRET = randomBytes(24).toString('hex');
-}
 
 const DAEMON_PORT_PREFERRED = Number(process.env.RAW_AGENT_DAEMON_PORT ?? 27070);
 const WEB_PORT_PREFERRED = Number(process.env.RAW_AGENT_WEB_PORT ?? process.env.PORT ?? 23000);

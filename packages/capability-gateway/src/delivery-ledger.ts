@@ -86,6 +86,10 @@ function withRecoveredPrefix(content: string): string {
   return content.startsWith(RECOVERED_REPLY_PREFIX) ? content : `${RECOVERED_REPLY_PREFIX}${content}`;
 }
 
+function comparableDeliveryText(content: string): string {
+  return content.startsWith(RECOVERED_REPLY_PREFIX) ? content.slice(RECOVERED_REPLY_PREFIX.length) : content;
+}
+
 function abandonOpenDraftRows(dir: string, draftId: string): number {
   const file = readLedger(dir);
   let changed = 0;
@@ -151,6 +155,30 @@ export function finishOutbound(dir: string, id: string, state: 'delivered' | 'fa
   writeLedger(dir, file);
 }
 
+/**
+ * Drop unfinished rows that predate draftId. They match a draft's text, so
+ * reject/reapprove must not replay them. Delivered rows and unrelated IM stay.
+ * This does not send.
+ */
+export async function quarantineUnlinkedDraftRows(dir: string, draftTexts: readonly string[]): Promise<number> {
+  const keys = new Set(draftTexts.map(comparableDeliveryText));
+  if (keys.size === 0) return 0;
+  return withLock(dir, async () => {
+    const file = readLedger(dir);
+    let changed = 0;
+    for (const row of file.items) {
+      if (row.draftId) continue;
+      if (row.state === 'delivered' || row.state === 'abandoned') continue;
+      if (!keys.has(comparableDeliveryText(row.content))) continue;
+      row.state = 'abandoned';
+      row.updatedAt = nowIso();
+      changed += 1;
+    }
+    if (changed > 0) writeLedger(dir, file);
+    return changed;
+  });
+}
+
 export async function sendLedgered(opts: {
   gatewayDir: string;
   target: DeliveryTarget;
@@ -159,6 +187,10 @@ export async function sendLedgered(opts: {
   send: (text: string) => Promise<void>;
 }): Promise<void> {
   await withLock(opts.gatewayDir, async () => {
+    if (opts.draftId && draftWasDelivered(opts.gatewayDir, opts.draftId)) {
+      abandonOpenDraftRows(opts.gatewayDir, opts.draftId);
+      return;
+    }
     if (opts.draftId) abandonOpenDraftRows(opts.gatewayDir, opts.draftId);
     const id = beginOutboundAttempt(opts.gatewayDir, opts.target, opts.text, opts.draftId);
     try {

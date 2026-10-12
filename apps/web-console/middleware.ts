@@ -1,12 +1,12 @@
-import type { NextRequest } from 'next/server';
-import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server.js';
+import { NextResponse } from 'next/server.js';
 import {
-  applyHumanReleaseHeader,
   copyProxyResponseHeaders,
   daemonProxyErrorMessage,
   LAB_PROXY_HEADER,
-  sanitizeProxyHeaders
-} from './lib/daemon-proxy';
+  sanitizeProxyHeaders,
+  stripHumanReleaseHeader
+} from './lib/daemon-proxy.ts';
 
 function daemonBase(): string {
   return (process.env.DAEMON_PROXY_TARGET ?? 'http://127.0.0.1:37070').replace(/\/$/, '');
@@ -36,7 +36,7 @@ export async function middleware(request: NextRequest) {
   const targetUrl = `${daemonBase()}${request.nextUrl.pathname}${request.nextUrl.search}`;
   const headers = sanitizeProxyHeaders(request.headers);
   appendDaemonBearerIfConfigured(headers);
-  applyHumanReleaseHeader(request.headers, headers, process.env);
+  stripHumanReleaseHeader(headers);
   appendLabForwarding(request, headers);
 
   const init: RequestInit & { duplex?: 'half' } = {

@@ -4,6 +4,7 @@ import { deliverToChannel } from './channels.js';
 import {
   abandonDraftDeliveries,
   closeUnconfirmedDraft,
+  quarantineUnlinkedDraftRows,
   recoverOutboundLedger,
   sendLedgered,
   type DeliveryRow
@@ -191,6 +192,12 @@ async function cancelRejectedDraftReplays(gatewayDir: string): Promise<void> {
   for (const draft of rejected) await abandonDraftDeliveries(gatewayDir, draft.id);
 }
 
+/** Isolate pre-draftId ledger rows whose text is a draft. Does not send them. */
+export async function quarantineLegacyDraftLedger(gatewayDir: string): Promise<number> {
+  const texts = (await readOutboundDrafts(gatewayDir)).map((draft) => draft.text);
+  return quarantineUnlinkedDraftRows(gatewayDir, texts);
+}
+
 async function replayRow(gatewayDir: string, row: DeliveryRow, text: string, channels: ChannelSpec[]): Promise<void> {
   await resendRow(row, text, channels);
   if (row.draftId) await markDraftSentIfRetryable(gatewayDir, row.draftId);
@@ -203,5 +210,6 @@ export async function recoverGatewayOutbound(input: {
 }): Promise<number> {
   await reconcileSendingDrafts(input.gatewayDir);
   await cancelRejectedDraftReplays(input.gatewayDir);
+  await quarantineLegacyDraftLedger(input.gatewayDir);
   return recoverOutboundLedger(input.gatewayDir, (row, text) => replayRow(input.gatewayDir, row, text, input.channels));
 }

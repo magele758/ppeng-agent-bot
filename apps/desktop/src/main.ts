@@ -220,16 +220,8 @@ function ensureAuthToken(): string {
   });
 }
 
-/** Separate from the operator bearer so a shell that learns the bearer still cannot approve a draft. */
-function ensureHumanReleaseSecret(): string {
-  return ensureEnvKey(getUserEnvPath(), 'RAW_AGENT_HUMAN_RELEASE_SECRET', () => {
-    console.log('[Main] No RAW_AGENT_HUMAN_RELEASE_SECRET found, generating one and saving to user .env');
-    return crypto.randomBytes(24).toString('hex');
-  });
-}
-
 // 启动 Daemon
-async function startDaemon(port: number, authToken: string, humanReleaseSecret: string): Promise<void> {
+async function startDaemon(port: number, authToken: string): Promise<void> {
   const daemonPath = getDaemonEntry();
   const daemonCwd = getDaemonCwd();
   const stateDir = getStateDir();
@@ -249,7 +241,6 @@ async function startDaemon(port: number, authToken: string, humanReleaseSecret: 
     RAW_AGENT_DAEMON_HOST: '127.0.0.1',
     RAW_AGENT_DAEMON_PORT: String(port),
     RAW_AGENT_AUTH_TOKEN: authToken,
-    RAW_AGENT_HUMAN_RELEASE_SECRET: humanReleaseSecret,
     NODE_ENV: 'production'
   });
 
@@ -273,12 +264,7 @@ async function startDaemon(port: number, authToken: string, humanReleaseSecret: 
 }
 
 // 启动 Web Console
-async function startWebConsole(
-  webPort: number,
-  daemonPort: number,
-  authToken: string,
-  humanReleaseSecret: string
-): Promise<void> {
+async function startWebConsole(webPort: number, daemonPort: number, authToken: string): Promise<void> {
   const { entry: webPath, cwd: webCwd } = getWebEntry();
 
   if (!fs.existsSync(webPath)) {
@@ -291,7 +277,6 @@ async function startWebConsole(
     PORT: String(webPort),
     DAEMON_PROXY_TARGET: `http://127.0.0.1:${daemonPort}`,
     RAW_AGENT_AUTH_TOKEN: authToken,
-    RAW_AGENT_HUMAN_RELEASE_SECRET: humanReleaseSecret,
     NODE_ENV: 'production',
     HOSTNAME: '127.0.0.1'
   });
@@ -327,10 +312,9 @@ async function startServices(): Promise<void> {
   currentWebPort = webPort;
 
   const authToken = ensureAuthToken();
-  const humanReleaseSecret = ensureHumanReleaseSecret();
 
-  await startDaemon(daemonPort, authToken, humanReleaseSecret);
-  await startWebConsole(webPort, daemonPort, authToken, humanReleaseSecret);
+  await startDaemon(daemonPort, authToken);
+  await startWebConsole(webPort, daemonPort, authToken);
 }
 
 // 停止所有进程
