@@ -17,7 +17,8 @@ COPY apps/web-console/package.json        apps/web-console/
 
 RUN npm ci --ignore-scripts
 
-# Lab depends on @ppeng/api-types only (not full agent-core)
+# Lab depends on @ppeng/api-types only (not full agent-core).
+# apps/web-console must not import packages/core; this stage does not COPY it.
 COPY tsconfig.json tsconfig.base.json ./
 COPY packages/api-types/ packages/api-types/
 RUN npx tsc -b packages/api-types

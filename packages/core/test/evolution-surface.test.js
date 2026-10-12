@@ -7,9 +7,11 @@ import {
   evolutionStartHttpResult
 } from '../src/evolution/surface.ts';
 import { runScheduler } from '../dist/runtime/scheduler-host.js';
+import { EVOLUTION_SURFACE_ENABLED as labSurfaceEnabled } from '../../../apps/web-console/lib/evolution-surface.ts';
 
 test('Evolution surface switch defaults off and does not launch [AC:ops-console#AC-9]', () => {
   assert.equal(EVOLUTION_SURFACE_ENABLED, false);
+  assert.equal(labSurfaceEnabled, EVOLUTION_SURFACE_ENABLED);
   for (const reason of ['boot', 'timer', 'http', 'cli']) {
     const calls = [];
     const decision = considerEvolutionSchedule({

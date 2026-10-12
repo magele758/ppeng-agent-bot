@@ -5,6 +5,8 @@
  * starts a run (boot, scheduler tick, HTTP, CLI, cron wrapper).
  * Flip this constant to surface it again. Not an environment variable,
  * and there is no settings toggle.
+ * The Lab mirror is `apps/web-console/lib/evolution-surface.ts`; keep both
+ * booleans equal (the web image does not contain this package).
  */
 export const EVOLUTION_SURFACE_ENABLED = false;
 
