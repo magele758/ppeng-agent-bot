@@ -329,6 +329,9 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
     ['POST /api/mailbox', ADMIN],
     ['GET /api/social-post-schedules', ADMIN],
     ['POST /api/social-post-schedules/:taskId/action', ADMIN],
+    ['GET /api/outbound-drafts', ADMIN],
+    ['POST /api/outbound-drafts/:id/approve', ADMIN],
+    ['POST /api/outbound-drafts/:id/reject', ADMIN],
 
     // global settings: everyone reads the public view, admins write
     ['GET /api/ingestion/settings', AUTHENTICATED],

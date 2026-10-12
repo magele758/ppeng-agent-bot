@@ -80,7 +80,8 @@ export function buildEffectiveConfigInput(runtime: RawAgentRuntime, deps: Config
     },
     runtime: {
       storageFallbacks: deps.storageCtx.fallbacks,
-      domainsMounted: deps.domainsMounted
+      domainsMounted: deps.domainsMounted,
+      mcpHttpConnected: runtime.mcpHttpConnectedCount()
     }
   };
 }

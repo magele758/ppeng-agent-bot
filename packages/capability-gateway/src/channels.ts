@@ -1,12 +1,15 @@
 import { env } from 'node:process';
+import { requireHumanEgressApproval } from '@ppeng/agent-core';
 import { sendFeishuTextMessage } from './feishu-api.js';
 import type { ChannelSpec } from './types.js';
 import { buildWeComWebhookUrl, sendWeComGroupBotMarkdown } from './wecom-send.js';
 
 export async function deliverToChannel(
   channel: ChannelSpec,
-  body: Record<string, unknown>
+  body: Record<string, unknown>,
+  opts?: { approval?: string }
 ): Promise<{ ok: boolean; status: number; text: string }> {
+  requireHumanEgressApproval(opts?.approval);
   if (channel.type === 'feishu_bot') {
     const appId = env.RAW_AGENT_FEISHU_APP_ID?.trim();
     const appSecret = env.RAW_AGENT_FEISHU_APP_SECRET?.trim();

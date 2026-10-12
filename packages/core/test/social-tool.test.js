@@ -56,6 +56,33 @@ describe('schedule_social_post tool', () => {
     assert.equal(schedule.approval, 'pending_approval');
   });
 
+  it('ignores a model self-approval and still stores pending_approval', async () => {
+    let createdTaskInput = null;
+    const tools = createBuiltinTools({
+      createTask: async (input) => {
+        createdTaskInput = input;
+        return { id: 'task_self', ...input };
+      }
+    });
+    const tool = tools.find((t) => t.name === 'schedule_social_post');
+    assert.equal(tool.approvalMode, 'auto');
+    assert.equal(tool.needsApproval({}, { approval: 'approved' }), true);
+    const repoRoot = mkdtempSync(join(tmpdir(), 'soc-tool-repo-'));
+    const stateDir = mkdtempSync(join(tmpdir(), 'soc-tool-state-'));
+    const result = await tool.execute(
+      { repoRoot, stateDir, agent: { id: 'agent_1' }, session: { id: 'session_1' } },
+      {
+        body: 'Ship it',
+        channels: ['x'],
+        publish_at: '2026-04-18T12:00:00Z',
+        approval: 'approved'
+      }
+    );
+    assert.equal(result.ok, true);
+    const schedule = createdTaskInput.metadata[SOCIAL_POST_SCHEDULE_METADATA_KEY];
+    assert.equal(schedule.approval, 'pending_approval');
+  });
+
   it('returns error if validation fails', async () => {
     const mockServices = {
       createTask: async () => { throw new Error('Should not be called'); }

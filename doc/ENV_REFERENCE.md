@@ -6,7 +6,7 @@
 > 大多数开关不必设置：配了连接信息（`DATABASE_URL` / `REDIS_URL` / `RAW_AGENT_S3_*` …）会自动启用，没配即本地兜底。
 > 优先级与规则见 [`DEPLOYMENT.md`](DEPLOYMENT.md#配置优先级与本地兜底)；当前实际生效项见 `GET /api/config/effective`。
 
-Generated: 2026-10-01T00:22:53.340Z  ·  Total: 358 (232 runtime + 126 evolution)
+Generated: 2026-10-11T16:40:00.000Z  ·  Total: 360 (234 runtime + 126 evolution)
 
 ## RAW_AGENT_*
 
@@ -81,8 +81,8 @@ Generated: 2026-10-01T00:22:53.340Z  ·  Total: 358 (232 runtime + 126 evolution
 | `RAW_AGENT_FEED_MAX_ATTEMPTS` | `packages/capability-gateway/src/feed.ts` |
 | `RAW_AGENT_FEED_USER_AGENT` | `packages/capability-gateway/src/feed.ts` |
 | `RAW_AGENT_FEISHU_API_BASE` | `packages/capability-gateway/src/feishu-api.ts` |
-| `RAW_AGENT_FEISHU_APP_ID` | `packages/capability-gateway/src/channels.ts`, `packages/capability-gateway/src/im-handlers.ts` |
-| `RAW_AGENT_FEISHU_APP_SECRET` | `packages/capability-gateway/src/channels.ts`, `packages/capability-gateway/src/im-handlers.ts` |
+| `RAW_AGENT_FEISHU_APP_ID` | `packages/capability-gateway/src/channels.ts`, `packages/capability-gateway/src/outbound.ts`, `packages/capability-gateway/test/outbound-delivery.test.js` |
+| `RAW_AGENT_FEISHU_APP_SECRET` | `packages/capability-gateway/src/channels.ts`, `packages/capability-gateway/src/outbound.ts`, `packages/capability-gateway/test/outbound-delivery.test.js` |
 | `RAW_AGENT_GATEWAY_` | `scripts/evolution/worktree.mjs` |
 | `RAW_AGENT_GATEWAY_CONFIG` | `packages/core/src/gateway-config-channels.ts`, `scripts/integration-test.mjs` |
 | `RAW_AGENT_GATEWAY_ENABLED` | `apps/web-console/lib/i18n/messages/en/config.ts`, `apps/web-console/lib/i18n/messages/zh/config.ts`, `packages/capability-gateway/src/config.ts`, `packages/core/src/config/effective-config.ts`, `packages/core/test/effective-config.test.js` |
@@ -119,12 +119,14 @@ Generated: 2026-10-01T00:22:53.340Z  ·  Total: 358 (232 runtime + 126 evolution
 | `RAW_AGENT_MAX_BODY_BYTES` | `apps/daemon/src/server.ts` |
 | `RAW_AGENT_MAX_PARALLEL_TOOLS` | `packages/core/src/runtime-env.ts` |
 | `RAW_AGENT_MAX_TURNS` | `packages/core/src/runtime-env.ts`, `packages/core/src/runtime/session-max-turns.ts` |
-| `RAW_AGENT_MCP_EXPAND_HTTP` | `packages/core/src/mcp/mcp-manager.ts` |
+| `RAW_AGENT_MCP_BEARER` | `packages/core/src/mcp/mcp-http-config.ts`, `packages/core/test/mcp-http.test.js` |
+| `RAW_AGENT_MCP_EXPAND_HTTP` | `packages/core/src/mcp/mcp-manager.ts`, `packages/core/test/mcp-manager.test.js` |
 | `RAW_AGENT_MCP_EXPAND_STDIO` | `packages/core/src/mcp/mcp-manager.ts` |
+| `RAW_AGENT_MCP_HTTP` | `apps/web-console/lib/i18n/messages/en/config.ts`, `apps/web-console/lib/i18n/messages/zh/config.ts`, `packages/core/src/config/effective-config.ts`, `packages/core/src/mcp/mcp-http-config.ts`, `packages/core/src/mcp/mcp-manager.ts`, `packages/core/test/effective-config.test.js` …(+1) |
 | `RAW_AGENT_MCP_SCHEMA_MINIFY` | `packages/core/src/mcp/mcp-schema-minify.ts`, `packages/core/test/mcp-schema-minify.test.js` |
-| `RAW_AGENT_MCP_STDIO` | `apps/web-console/lib/i18n/messages/en/config.ts`, `apps/web-console/lib/i18n/messages/zh/config.ts`, `packages/core/src/config/effective-config.ts`, `packages/core/src/mcp/mcp-manager.ts`, `packages/core/src/mcp/mcp-stdio.ts`, `packages/core/test/effective-config.test.js` …(+1) |
-| `RAW_AGENT_MCP_URL` | `packages/core/src/config/effective-config.ts`, `packages/core/src/mcp/mcp-jsonrpc.ts`, `packages/core/src/mcp/mcp-manager.ts`, `packages/core/test/effective-config.test.js`, `packages/core/test/mcp-jsonrpc.test.js`, `packages/core/test/mcp-manager.test.js` |
-| `RAW_AGENT_MCP_URLS` | `packages/core/src/config/effective-config.ts`, `packages/core/src/mcp/mcp-jsonrpc.ts`, `packages/core/src/mcp/mcp-manager.ts`, `packages/core/test/effective-config.test.js`, `packages/core/test/mcp-jsonrpc.test.js`, `packages/core/test/mcp-manager.test.js` |
+| `RAW_AGENT_MCP_STDIO` | `apps/web-console/lib/i18n/messages/en/config.ts`, `apps/web-console/lib/i18n/messages/zh/config.ts`, `packages/core/src/config/effective-config.ts`, `packages/core/src/mcp/mcp-stdio.ts`, `packages/core/test/effective-config.test.js`, `packages/core/test/mcp-tools.test.js` |
+| `RAW_AGENT_MCP_URL` | `packages/core/src/mcp/mcp-http-config.ts`, `packages/core/src/mcp/mcp-jsonrpc.ts`, `packages/core/test/effective-config.test.js`, `packages/core/test/mcp-http.test.js`, `packages/core/test/mcp-jsonrpc.test.js`, `packages/core/test/mcp-manager.test.js` |
+| `RAW_AGENT_MCP_URLS` | `packages/core/src/mcp/mcp-http-config.ts`, `packages/core/src/mcp/mcp-jsonrpc.ts`, `packages/core/src/mcp/mcp-manager.ts`, `packages/core/test/effective-config.test.js`, `packages/core/test/mcp-http.test.js`, `packages/core/test/mcp-jsonrpc.test.js` …(+1) |
 | `RAW_AGENT_MEMORY_BACKEND` | `packages/core/src/memory/memory-backend.ts`, `packages/core/src/memory/memory-recall.ts`, `packages/core/src/runtime-env.ts`, `packages/core/test/agent-memory-bridge.test.js`, `packages/core/test/bot-memory-namespace.test.js` |
 | `RAW_AGENT_MICRO_COMPACT` | `apps/web-console/lib/i18n/messages/en/more.ts`, `apps/web-console/lib/i18n/messages/zh/more.ts`, `packages/agent-loop/src/session/micro-compact.ts`, `packages/core/test/micro-compact.test.js` |
 | `RAW_AGENT_MICRO_COMPACT_HARD_MAX_CHARS` | `packages/agent-loop/src/session/micro-compact.ts` |

@@ -1,11 +1,12 @@
-import type { RawAgentRuntime } from '@ppeng/agent-core';
-import { decryptFeishuEncryptPayload } from './feishu-crypto.js';
-import { sendFeishuTextMessage } from './feishu-api.js';
 import { env } from 'node:process';
+import { fenceExternalContent, type RawAgentRuntime } from '@ppeng/agent-core';
+import { decryptFeishuEncryptPayload } from './feishu-crypto.js';
 import type { ChannelSpec, FeishuProviderSpec, WeComProviderSpec } from './types.js';
 import { readGatewayState, writeGatewayState, type GatewayPersistedState } from './state.js';
 import type { GatewaySettings } from './gateway-settings.js';
 import { sendLedgered } from './delivery-ledger.js';
+import { sendFeishuTextMessage } from './feishu-api.js';
+import { appendOutboundDraft } from './outbound-drafts.js';
 import { deliverChannelText } from './outbound.js';
 import { resolveImOutbound, type ImTurnOrigin, type SilentAckLocale } from './silent-reply.js';
 import {
@@ -15,6 +16,10 @@ import {
   scheduleGatewayTurn,
   verifyFeishuSignature
 } from './inbound-guard.js';
+
+function fenceImInbound(text: string, label: string): string {
+  return fenceExternalContent({ source: 'im', label, body: text });
+}
 
 function parseJsonContent(raw: string): { text?: string } {
   try {
@@ -172,7 +177,7 @@ export async function runAgentTurnAndReply(input: {
       await input.reply(command.reply);
       return { sessionId, outboundText: command.reply };
     }
-    input.runtime.sendUserMessage(sessionId, input.userText);
+    input.runtime.sendUserMessage(sessionId, fenceImInbound(input.userText, input.sessionKey));
     await input.runtime.runSession(sessionId);
     return finishImReply(input, sessionId);
   }
@@ -181,12 +186,13 @@ export async function runAgentTurnAndReply(input: {
   const map = { ...(input.state.channelSessions ?? {}) };
   let sessionId = sticky ? map[input.sessionKey]?.sessionId : undefined;
 
+  const fenced = fenceImInbound(input.userText, input.sessionKey);
   if (sessionId) {
-    input.runtime.sendUserMessage(sessionId, input.userText);
+    input.runtime.sendUserMessage(sessionId, fenced);
   } else {
     const session = input.runtime.createChatSession({
       title: `IM ${input.sessionKey.slice(0, 40)}`,
-      message: input.userText,
+      message: fenced,
       agentId: input.agentId,
       background: false
     });
@@ -326,12 +332,12 @@ export async function handleFeishuEventRequest(input: {
   const replyChannel = input.spec.replyChannelId
     ? input.channels.find((c) => c.id === input.spec.replyChannelId)
     : undefined;
-
   const appId = env.RAW_AGENT_FEISHU_APP_ID?.trim();
   const appSecret = env.RAW_AGENT_FEISHU_APP_SECRET?.trim();
 
   const reply = async (text: string) => {
-    if (replyChannel?.type === 'feishu_bot' && appId && appSecret) {
+    if (!replyChannel) return;
+    if (replyChannel.type === 'feishu_bot' && appId && appSecret) {
       await sendLedgered({
         gatewayDir: input.gatewayDir,
         target: {
@@ -352,9 +358,23 @@ export async function handleFeishuEventRequest(input: {
       });
       return;
     }
-    if (replyChannel) {
-      await deliverChannelText({ gatewayDir: input.gatewayDir, channel: replyChannel, text });
+    if (replyChannel.type === 'feishu_bot') {
+      await appendOutboundDraft(input.gatewayDir, {
+        channelId: replyChannel.id,
+        text,
+        event: 'gateway.im.reply',
+        receiveId: inbound.receiveId,
+        receiveIdType: inbound.receiveIdType
+      });
+      return;
     }
+    await deliverChannelText({
+      gatewayDir: input.gatewayDir,
+      channel: replyChannel,
+      text,
+      event: 'gateway.im.reply',
+      approval: 'approved'
+    });
   };
 
   scheduleGatewayTurn(botId ? `bot:${botId}` : inbound.sessionKey, async () => {
@@ -412,9 +432,14 @@ export async function handleWeComBridgeRequest(input: {
     : undefined;
 
   const reply = async (out: string) => {
-    if (replyChannel) {
-      await deliverChannelText({ gatewayDir: input.gatewayDir, channel: replyChannel, text: out });
-    }
+    if (!replyChannel) return;
+    await deliverChannelText({
+      gatewayDir: input.gatewayDir,
+      channel: replyChannel,
+      text: out,
+      event: 'gateway.im.reply',
+      approval: 'approved'
+    });
   };
 
   await runAgentTurnAndReply({

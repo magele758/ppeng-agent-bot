@@ -28,7 +28,18 @@ export {
   recoverOutboundLedger,
   sendLedgered
 } from './delivery-ledger.js';
-export { deliverChannelText, recoverGatewayOutbound } from './outbound.js';
+export {
+  deliverChannelText,
+  reconcileSendingDrafts,
+  recoverGatewayOutbound,
+  releaseOutboundDraft
+} from './outbound.js';
+export {
+  appendOutboundDraft,
+  readOutboundDrafts,
+  type OutboundDraft,
+  type OutboundDraftStatus
+} from './outbound-drafts.js';
 export { readGatewayState, writeGatewayState } from './state.js';
 export type { ChannelSpec, GatewayEnvOptions, GatewayFileConfig, LearnConfig, ParsedFeedItem } from './types.js';
 export {

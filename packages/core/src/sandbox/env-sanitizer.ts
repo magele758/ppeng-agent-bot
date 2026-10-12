@@ -71,6 +71,19 @@ const CREDENTIAL_PREFIXES = [
   'AZURE_CLIENT_SECRET',
 ];
 
+/**
+ * Daemon operator credentials. Tool children must not inherit them.
+ * In-process clients read `process.env` directly. Next and the desktop shell
+ * are sibling processes started by dev-lab / e2e / Electron, not by bash.
+ * Nothing in the tool spawn path needs this token; overrides and allowlists
+ * cannot put it back.
+ */
+const OPERATOR_CHILD_DENY = ['RAW_AGENT_AUTH_TOKEN', 'RAW_AGENT_HUMAN_RELEASE_SECRET'] as const;
+
+function stripOperatorChildEnv(env: NodeJS.ProcessEnv): void {
+  for (const key of OPERATOR_CHILD_DENY) delete env[key];
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -148,6 +161,7 @@ export function sanitizeSpawnEnv(options?: SanitizeEnvOptions): NodeJS.ProcessEn
     base[k] = v;
   }
 
+  stripOperatorChildEnv(base);
   return base;
 }
 

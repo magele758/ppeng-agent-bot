@@ -1232,6 +1232,15 @@ export class RawAgentRuntime {
     return () => signal.removeEventListener('abort', cancel);
   }
 
+  /** Open configured HTTP MCP sessions. Safe to call before the first turn; does not throw. */
+  warmMcp(): Promise<void> {
+    return this.mcpManager.warmHttp();
+  }
+
+  mcpHttpConnectedCount(): number {
+    return this.mcpManager.httpConnectedCount();
+  }
+
   /** Gracefully shut down all in-flight work, MCP sessions, and release SQLite. */
   async destroy(): Promise<void> {
     await destroyRuntime({

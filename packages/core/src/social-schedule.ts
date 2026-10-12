@@ -57,6 +57,11 @@ export interface SocialPostScheduleV1 {
   publishAt: string;
   approval: SocialPostApprovalState;
   /**
+   * Who set `approval`. Only the operator action writes `human`.
+   * Model metadata writes are forced to `model` and cannot dispatch.
+   */
+  approvalProvenance?: 'human' | 'model';
+  /**
    * Aggregate + per-channel dispatch outcome.
    *
    * `state` summarises the channels map. The map is keyed by the same labels
@@ -300,6 +305,26 @@ function ensureDispatchChannels(schedule: SocialPostScheduleV1): SocialPostSched
   return {
     ...schedule,
     dispatch: { ...schedule.dispatch, channels: map }
+  };
+}
+
+/**
+ * Model `task_update` metadata must not install or keep `approval: "approved"`.
+ * Operator `applyAction` writes the task store directly and does not pass through here.
+ */
+export function protectModelSocialScheduleMetadata(
+  metadata: Record<string, unknown>
+): Record<string, unknown> {
+  if (!Object.prototype.hasOwnProperty.call(metadata, SOCIAL_POST_SCHEDULE_METADATA_KEY)) return metadata;
+  const raw = metadata[SOCIAL_POST_SCHEDULE_METADATA_KEY];
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return metadata;
+  return {
+    ...metadata,
+    [SOCIAL_POST_SCHEDULE_METADATA_KEY]: {
+      ...(raw as Record<string, unknown>),
+      approval: 'pending_approval',
+      approvalProvenance: 'model'
+    }
   };
 }
 

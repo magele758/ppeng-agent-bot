@@ -5,6 +5,7 @@
  * 本地对已运行中的环境：export PLAYWRIGHT_BASE_URL=http://127.0.0.1:33815 并确保 Next 的 DAEMON_PROXY_TARGET 指向 daemon。
  *
  * 脚本自管启动时：会为 daemon 与 Next 注入同一随机 RAW_AGENT_AUTH_TOKEN，Next middleware 代为附加 Bearer；
+ * 另注入独立的 RAW_AGENT_HUMAN_RELEASE_SECRET，middleware 只在浏览器同源请求上转给草稿批准/拒绝。
  * Playwright 可通过 PLAYWRIGHT_AUTH_PROBE_DAEMON_ORIGIN 断言「直连 daemon 401 / 经 Lab 200」。
  *
  * 子进程生命周期（进程组、失败/信号时清理、日志排空）见 ./e2e-lifecycle.mjs；
@@ -110,6 +111,7 @@ async function main(registry) {
   const daemonBase = `http://127.0.0.1:${daemonPort}`;
   const webBase = `http://127.0.0.1:${webPort}`;
   const e2eBearer = randomBytes(24).toString('hex');
+  const e2eHumanRelease = randomBytes(24).toString('hex');
 
   registry.spawnService('daemon', process.execPath, ['apps/daemon/dist/server.js'], {
     cwd: repoRoot,
@@ -120,7 +122,8 @@ async function main(registry) {
       RAW_AGENT_STATE_DIR: stateDir,
       RAW_AGENT_E2E_ISOLATE: '1',
       RAW_AGENT_SELF_HEAL_AUTO_START: '0',
-      RAW_AGENT_AUTH_TOKEN: e2eBearer
+      RAW_AGENT_AUTH_TOKEN: e2eBearer,
+      RAW_AGENT_HUMAN_RELEASE_SECRET: e2eHumanRelease
     }
   });
   registry.spawnService('next', process.execPath, [nextBin, 'start', '-p', String(webPort), '-H', '127.0.0.1'], {
@@ -128,7 +131,8 @@ async function main(registry) {
     env: {
       ...envForEphemeralDaemon(),
       DAEMON_PROXY_TARGET: daemonBase,
-      RAW_AGENT_AUTH_TOKEN: e2eBearer
+      RAW_AGENT_AUTH_TOKEN: e2eBearer,
+      RAW_AGENT_HUMAN_RELEASE_SECRET: e2eHumanRelease
     }
   });
 

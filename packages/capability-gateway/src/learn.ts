@@ -1,8 +1,8 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { RawAgentRuntime } from '@ppeng/agent-core';
-import { deliverToChannel } from './channels.js';
 import { fetchFeedItems } from './feed.js';
+import { appendOutboundDraft } from './outbound-drafts.js';
 import type { ChannelSpec, LearnConfig } from './types.js';
 import { readGatewayState, writeGatewayState, type GatewayPersistedState } from './state.js';
 
@@ -113,15 +113,11 @@ export async function runLearnCycle(input: {
 
   for (const ch of input.channels) {
     try {
-      const r = await deliverToChannel(ch, {
-        event: 'gateway.daily_learn',
-        date: today,
-        newItems: newForDigest,
-        summary: text
+      await appendOutboundDraft(input.gatewayStateDir, {
+        channelId: ch.id,
+        text,
+        event: 'gateway.daily_learn'
       });
-      if (r.ok) {
-        pushed.push(ch.id);
-      }
     } catch {
       /* channel optional */
     }

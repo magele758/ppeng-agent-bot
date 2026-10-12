@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { copyProxyResponseHeaders, daemonProxyErrorMessage, LAB_PROXY_HEADER, sanitizeProxyHeaders } from './daemon-proxy.ts';
+import {
+  applyHumanReleaseHeader,
+  copyProxyResponseHeaders,
+  daemonProxyErrorMessage,
+  HUMAN_RELEASE_HEADER,
+  LAB_PROXY_HEADER,
+  sanitizeProxyHeaders
+} from './daemon-proxy.ts';
 
 test('sanitizeProxyHeaders drops hop-by-hop and keeps content-type', () => {
   const src = new Headers({
@@ -32,6 +39,29 @@ test('copyProxyResponseHeaders keeps set-cookie list', () => {
 
 test('LAB_PROXY_HEADER is the daemon isolation marker', () => {
   assert.equal(LAB_PROXY_HEADER, 'x-ppeng-lab');
+});
+
+test('human release header is attached only for same-origin Lab page fetches', () => {
+  const env = { RAW_AGENT_HUMAN_RELEASE_SECRET: 'release-secret', RAW_AGENT_AUTH_TOKEN: 'operator-token' };
+  const browser = new Headers({ 'sec-fetch-site': 'same-origin' });
+  const outbound = new Headers();
+  applyHumanReleaseHeader(browser, outbound, env);
+  assert.equal(outbound.get(HUMAN_RELEASE_HEADER), 'release-secret');
+  assert.equal(outbound.get('authorization'), null);
+
+  const curl = new Headers();
+  const bare = new Headers();
+  applyHumanReleaseHeader(curl, bare, env);
+  assert.equal(bare.get(HUMAN_RELEASE_HEADER), null);
+
+  const spoofed = new Headers({ 'sec-fetch-site': 'cross-site' });
+  const cross = new Headers();
+  applyHumanReleaseHeader(spoofed, cross, env);
+  assert.equal(cross.get(HUMAN_RELEASE_HEADER), null);
+
+  const noSecret = new Headers();
+  applyHumanReleaseHeader(browser, noSecret, { RAW_AGENT_AUTH_TOKEN: 'operator-token' });
+  assert.equal(noSecret.get(HUMAN_RELEASE_HEADER), null);
 });
 
 test('daemonProxyErrorMessage includes cause', () => {

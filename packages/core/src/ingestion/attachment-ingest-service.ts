@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { NotFoundError, ValidationError } from '../errors.js';
 import { createId, nowIso } from '../id.js';
 import { ingestImageAsset } from '../image-assets.js';
+import { fenceExternalContent } from '../safety/external-content.js';
 import type { Logger } from '../logger.js';
 import type { SqliteStateStore } from '../storage.js';
 import type { ImageAssetRecord } from '../types.js';
@@ -43,6 +44,15 @@ export interface AttachmentIngestCtx {
   store: SqliteStateStore;
   stateDir: string;
   log: Logger;
+}
+
+function fenceAttachmentEmit(fileName: string | undefined, text: string): string | undefined {
+  if (!text) return undefined;
+  return fenceExternalContent({
+    source: 'attachment',
+    label: fileName || 'file',
+    body: text
+  });
 }
 
 function stripDataUrl(b64: string): string {
@@ -204,7 +214,7 @@ export class AttachmentIngestService {
       encoding: resolved?.encoding,
       imageAssetId,
       artifactHandle,
-      emitText: emitText || undefined,
+      emitText: fenceAttachmentEmit(file.fileName, emitText),
       createdAt: nowIso()
     };
     this.ctx.store.createAttachment(attachment);

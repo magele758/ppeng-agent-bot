@@ -2,6 +2,7 @@
  * Playwright browser backend. Fail-soft with a structured error — never fake success.
  */
 
+import { fenceExternalContent } from '../safety/external-content.js';
 import type { RunContext, ToolExecutionResult } from '../types.js';
 import type { BrowserAction } from './browser-tools.js';
 
@@ -142,6 +143,14 @@ function snapshotFromHtml(html: string, url: string, title: string): string {
   return [`url: ${url}`, `title: ${title}`, 'controls:', ...links, ...buttons, 'text:', text].join('\n');
 }
 
+export function formatBrowserNavigateResult(url: string, title: string): string {
+  return fenceExternalContent({
+    source: 'browser',
+    label: 'navigate',
+    body: JSON.stringify({ ok: true, action: 'navigate', url, title })
+  });
+}
+
 export async function playwrightBrowserAction(
   context: RunContext,
   action: BrowserAction
@@ -158,7 +167,7 @@ export async function playwrightBrowserAction(
         await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
         return {
           ok: true,
-          content: JSON.stringify({ ok: true, action: 'navigate', url: page.url(), title: await page.title() }, null, 2)
+          content: formatBrowserNavigateResult(page.url(), await page.title())
         };
       }
       case 'snapshot': {
@@ -166,7 +175,11 @@ export async function playwrightBrowserAction(
         const title = await page.title();
         return {
           ok: true,
-          content: snapshotFromHtml(html, page.url(), title)
+          content: fenceExternalContent({
+            source: 'browser',
+            label: page.url(),
+            body: snapshotFromHtml(html, page.url(), title)
+          })
         };
       }
       case 'click': {

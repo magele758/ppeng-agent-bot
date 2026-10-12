@@ -9,7 +9,8 @@ import {
   runAgentTurnAndReply,
   tryBotChatCommand
 } from './im-handlers.js';
-import { deliverChannelText, recoverGatewayOutbound } from './outbound.js';
+import { appendOutboundDraft } from './outbound-drafts.js';
+import { reconcileSendingDrafts, recoverGatewayOutbound } from './outbound.js';
 import { resolveImOutbound } from './silent-reply.js';
 import { readGatewaySettings } from './gateway-settings.js';
 import { readGatewayState } from './state.js';
@@ -339,7 +340,11 @@ export async function handleGatewayHttp(
       }
       if (channel.type === 'webhook' || channel.type === 'http_post') {
         try {
-          await deliverChannelText({ gatewayDir, channel, text: decision.text });
+          await appendOutboundDraft(gatewayDir, {
+            channelId: channel.id,
+            text: decision.text,
+            event: 'gateway.im.reply'
+          });
         } catch (e) {
           json(response, 502, {
             error: e instanceof Error ? e.message : String(e),
@@ -481,12 +486,17 @@ export async function createGatewayContext(
   stateDir: string
 ): Promise<GatewayHandleContext | null> {
   const env = parseGatewayEnv(repoRoot);
+  const gatewayDir = `${stateDir}/gateway`;
   if (!env.enabled) {
+    // Drafts are held even when the gateway listener is off. Unstick `sending`
+    // left by a crash without replaying the ledger (that send path stays gated
+    // on the listener being enabled).
+    await reconcileSendingDrafts(gatewayDir);
     return null;
   }
   const fileConfig = (await loadGatewayFileConfig(env.configPath!)) ?? {};
   await recoverGatewayOutbound({
-    gatewayDir: `${stateDir}/gateway`,
+    gatewayDir,
     channels: fileConfig.channels ?? []
   });
   return { runtime, repoRoot, stateDir, env, fileConfigRef: { current: fileConfig } };

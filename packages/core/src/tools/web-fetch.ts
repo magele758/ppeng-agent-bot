@@ -1,4 +1,5 @@
 import { isIPv4, isIPv6 } from 'node:net';
+import { fenceExternalContent } from '../safety/external-content.js';
 import { WEB_SEARCH_NOT_CONFIGURED } from './web-settings.js';
 
 function isPrivateIp(hostname: string): boolean {
@@ -188,7 +189,14 @@ export async function fetchUrlText(options: WebFetchOptions): Promise<{ ok: bool
     });
     const ct = res.headers.get('content-type') ?? '';
     if (!res.ok) {
-      return { ok: false, content: `HTTP ${res.status} ${res.statusText}` };
+      return {
+        ok: false,
+        content: fenceExternalContent({
+          source: 'web_fetch',
+          label: options.url,
+          body: `HTTP ${res.status} ${res.statusText}`
+        })
+      };
     }
     const buf = await readLimitedBody(res.body, maxBytes);
     const text = decodeBody(buf, ct);
@@ -198,7 +206,14 @@ export async function fetchUrlText(options: WebFetchOptions): Promise<{ ok: bool
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    return { ok: false, content: `fetch failed: ${msg}` };
+    return {
+      ok: false,
+      content: fenceExternalContent({
+        source: 'web_fetch',
+        label: options.url,
+        body: `fetch failed: ${msg}`
+      })
+    };
   } finally {
     clearTimeout(timer);
   }

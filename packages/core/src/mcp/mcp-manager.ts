@@ -1,8 +1,18 @@
 import type { ToolContract } from '../types.js';
-import { McpStdioSession, parseMcpStdioConfigs, sanitizeMcpToolSuffix } from './mcp-stdio.js';
-import { minifyMcpToolInputSchema, parseMcpSchemaMinifyLevel } from './mcp-schema-minify.js';
+import {
+  annotateUntrustedField,
+  fenceExternalContent,
+  sanitizeDescriptiveFields,
+  sanitizeMimeType
+} from '../safety/external-content.js';
+import { mcpCallArgs } from '../safety/egress.js';
 import { appendTraceEvent } from '../stores/trace.js';
 import { envBool } from '../env.js';
+import { parseMcpHttpEndpoints, type McpHttpEndpoint } from './mcp-http-config.js';
+import { collectHeaderSecrets, McpHttpSession } from './mcp-http.js';
+import type { McpResourceInfo, McpToolInfo } from './mcp-jsonrpc.js';
+import { McpStdioSession, parseMcpStdioConfigs, sanitizeMcpToolSuffix } from './mcp-stdio.js';
+import { minifyMcpToolInputSchema, parseMcpSchemaMinifyLevel } from './mcp-schema-minify.js';
 
 export interface McpManagerDeps {
   stateDir: string;
@@ -11,18 +21,45 @@ export interface McpManagerDeps {
   log: { warn: (msg: string) => void };
 }
 
+function fenceMcp(label: string, body: string): string {
+  return fenceExternalContent({ source: 'mcp', label, body });
+}
+
+function presentResourceList(listed: McpResourceInfo[]): string {
+  const safe = listed.map((resource) => ({
+    ...resource,
+    mimeType: resource.mimeType ? sanitizeMimeType(resource.mimeType) : undefined
+  }));
+  return fenceMcp('resources', JSON.stringify(safe, null, 2));
+}
+
+function presentResourceBody(mimeType: string | undefined, text: string): string {
+  const mime = sanitizeMimeType(mimeType);
+  return mime ? `${mime}\n\n${text}` : text;
+}
+
+function presentMcpTool(
+  tool: McpToolInfo,
+  fallback: string,
+  prepare: (schema?: Record<string, unknown>) => Record<string, unknown>
+): { description: string; inputSchema: Record<string, unknown> } {
+  const raw = tool.description && tool.description.trim() ? tool.description : fallback;
+  const schema = sanitizeDescriptiveFields(tool.inputSchema ?? { type: 'object' });
+  return {
+    description: annotateUntrustedField({ source: 'mcp', label: tool.name || 'tool', text: raw }),
+    inputSchema: prepare(schema as Record<string, unknown>)
+  };
+}
+
 export class McpManager {
-  private mcpUrls: string[];
+  private httpSessions: McpHttpSession[] = [];
+  private httpConnectPromise?: Promise<void>;
   private mcpToolsPromise?: Promise<void>;
   private mcpExpansionDone = false;
   private readonly mcpStdioSessions: McpStdioSession[] = [];
   private readonly mcpSchemaMinifyLevel: number;
 
   constructor(private readonly deps: McpManagerDeps) {
-    this.mcpUrls = (deps.env['RAW_AGENT_MCP_URLS'] ?? deps.env['RAW_AGENT_MCP_URL'] ?? '')
-      .split(/[,;\s]+/)
-      .map((s) => s.trim())
-      .filter(Boolean);
     this.mcpSchemaMinifyLevel = parseMcpSchemaMinifyLevel(deps.env as NodeJS.ProcessEnv);
   }
 
@@ -35,52 +72,101 @@ export class McpManager {
     return this.mcpStdioSessions;
   }
 
+  httpConnectedCount(): number {
+    return this.httpSessions.filter((session) => session.isConnected).length;
+  }
+
   async ensureLoaded(sessionId: string): Promise<void> {
     if (this.mcpExpansionDone) return;
-
     if (!this.mcpToolsPromise) {
       this.mcpToolsPromise = this.performMcpExpansion(sessionId);
     }
     await this.mcpToolsPromise;
   }
 
-  /** One-shot MCP expansion: connects servers, registers tools, then marks done. */
-  private async performMcpExpansion(sessionId: string): Promise<void> {
-    const urls = [...this.mcpUrls];
-    const stdioConfigs = parseMcpStdioConfigs(this.deps.env as NodeJS.ProcessEnv);
-    const expandStdio = envBool(this.deps.env as NodeJS.ProcessEnv, 'RAW_AGENT_MCP_EXPAND_STDIO', true);
-    const expandHttp = envBool(this.deps.env as NodeJS.ProcessEnv, 'RAW_AGENT_MCP_EXPAND_HTTP', false);
+  /**
+   * Connect HTTP sessions after tools are registered.
+   * `ensureLoaded` connects only when HTTP tools are expanded, so a bare URL
+   * does not open the network. Boot and the settings card call this.
+   */
+  async warmHttp(): Promise<void> {
+    await this.ensureLoaded('mcp-warm');
+    await this.connectHttp();
+  }
 
-    if (urls.length === 0 && stdioConfigs.length === 0) {
+  private connectHttp(): Promise<void> {
+    if (this.httpSessions.length === 0) return Promise.resolve();
+    if (!this.httpConnectPromise) {
+      this.httpConnectPromise = this.connectHttpOnce();
+    }
+    return this.httpConnectPromise;
+  }
+
+  private async connectHttpOnce(): Promise<void> {
+    for (const session of this.httpSessions) {
+      try {
+        await session.connect();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.deps.log.warn(`MCP HTTP server ${session.index} connect failed: ${message}`);
+      }
+    }
+  }
+
+  private async performMcpExpansion(sessionId: string): Promise<void> {
+    const env = this.deps.env as NodeJS.ProcessEnv;
+    const endpoints = parseMcpHttpEndpoints(env);
+    const stdioConfigs = parseMcpStdioConfigs(env);
+    const expandStdio = envBool(env, 'RAW_AGENT_MCP_EXPAND_STDIO', true);
+    const expandHttp = envBool(env, 'RAW_AGENT_MCP_EXPAND_HTTP', false);
+
+    if (endpoints.length === 0 && stdioConfigs.length === 0) {
       this.mcpExpansionDone = true;
       return;
     }
 
     try {
-      const mod = await import('./mcp-jsonrpc.js');
-      const { mcpCallTool, mcpListResources, mcpReadResource } = mod;
-
-      this.expandHttpMcpTools(urls, expandHttp, mod.mcpListTools, mcpCallTool);
+      this.warnShortCredentials(endpoints);
+      this.httpSessions = endpoints.map(
+        (endpoint, index) =>
+          new McpHttpSession(index, endpoint, {
+            env,
+            onTransportFallback: (info) => {
+              this.deps.log.warn(
+                `MCP HTTP server ${index} fell back from streamable-http to SSE after HTTP ${info.status} (${info.url})`
+              );
+            }
+          })
+      );
+      this.registerHttpTools(endpoints);
+      if (expandHttp) await this.connectHttp();
+      if (expandHttp) await this.expandListedHttpTools();
       await this.connectStdioMcpServers(stdioConfigs, expandStdio, sessionId);
-      this.registerResourceTools(urls, mcpListResources, mcpReadResource);
+      this.registerResourceTools();
     } finally {
       this.mcpExpansionDone = true;
     }
   }
 
-  /** Register generic mcp_invoke + optionally expand individual HTTP server tools. */
-  private async expandHttpMcpTools(
-    urls: string[],
-    expandHttp: boolean,
-    mcpListTools: (url: string) => Promise<{ name: string; description?: string; inputSchema?: Record<string, unknown> }[]>,
-    mcpCallTool: (url: string, tool: string, args: Record<string, unknown>) => Promise<{ isError?: boolean; content: string }>
-  ): Promise<void> {
-    if (urls.length === 0 || this.deps.tools.some((t) => t.name === 'mcp_invoke')) return;
+  private warnShortCredentials(endpoints: McpHttpEndpoint[]): void {
+    const env = this.deps.env as NodeJS.ProcessEnv;
+    for (const endpoint of endpoints) {
+      const { shortCredentialCount } = collectHeaderSecrets(endpoint, env);
+      if (shortCredentialCount > 0) {
+        this.deps.log.warn(
+          `MCP HTTP ${endpoint.url} has ${shortCredentialCount} credential(s) shorter than 8 characters; full-text redaction skipped`
+        );
+      }
+    }
+  }
 
-    const httpUrls = [...urls];
+  private registerHttpTools(endpoints: McpHttpEndpoint[]): void {
+    if (endpoints.length === 0 || this.deps.tools.some((tool) => tool.name === 'mcp_invoke')) return;
+    const sessions = this.httpSessions;
     this.deps.tools.push({
       name: 'mcp_invoke',
-      description: 'Invoke a tool on an HTTP JSON-RPC MCP server. server is 0-based index into RAW_AGENT_MCP_URLS list.',
+      description:
+        'Invoke a tool on an HTTP MCP server. server is the 0-based index into RAW_AGENT_MCP_HTTP, then legacy RAW_AGENT_MCP_URLS.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -93,47 +179,62 @@ export class McpManager {
       approvalMode: 'auto',
       sideEffectLevel: 'system',
       needsApproval: () => true,
-      async execute(_ctx, args: { server: number; tool: string; arguments?: Record<string, unknown> }) {
-        const url = httpUrls[Math.floor(args.server)];
-        if (!url) return { ok: false, content: `Invalid MCP server index ${args.server}` };
-        const out = await mcpCallTool(url, args.tool, args.arguments ?? {});
-        return { ok: !out.isError, content: out.content };
+      execute: async (_ctx, args: { server: number; tool: string; arguments?: Record<string, unknown> }) => {
+        const index = Math.floor(args.server);
+        const session = sessions[index];
+        if (!session) return { ok: false, content: `Invalid MCP server index ${args.server}` };
+        const callArgs = mcpCallArgs(args.arguments ?? {});
+        try {
+          const out = await session.callTool(args.tool, callArgs);
+          return { ok: !out.isError, content: fenceMcp(args.tool, out.content) };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return { ok: false, content: fenceMcp(args.tool, message) };
+        }
       }
     } as ToolContract<{ server: number; tool: string; arguments?: Record<string, unknown> }>);
+  }
 
-    if (!expandHttp) return;
-
-    for (let hi = 0; hi < httpUrls.length; hi++) {
-      const baseUrl = httpUrls[hi];
-      if (!baseUrl) continue;
-      let listed: { name: string; description?: string; inputSchema?: Record<string, unknown> }[] = [];
+  private async expandListedHttpTools(): Promise<void> {
+    for (const session of this.httpSessions) {
+      let listed: McpToolInfo[] = [];
       try {
-        listed = await mcpListTools(baseUrl);
-      } catch (err) {
-        this.deps.log.warn(`Failed to list tools from ${baseUrl}: ${err instanceof Error ? err.message : err}`);
+        listed = await session.listTools();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.deps.log.warn(`Failed to list tools from MCP HTTP server ${session.index}: ${message}`);
+        continue;
       }
-      for (const t of listed) {
-        const name = `mcp_h${hi}_${sanitizeMcpToolSuffix(t.name)}`;
-        if (this.deps.tools.some((x) => x.name === name)) continue;
-        const toolName = t.name;
-        const bu = baseUrl;
+      const hi = session.index;
+      for (const tool of listed) {
+        const name = `mcp_h${hi}_${sanitizeMcpToolSuffix(tool.name)}`;
+        if (this.deps.tools.some((existing) => existing.name === name)) continue;
+        const toolName = tool.name;
+        const presented = presentMcpTool(tool, `MCP HTTP server ${hi} tool ${toolName}`, (schema) =>
+          this.prepareMcpInputSchema(schema)
+        );
         this.deps.tools.push({
           name,
-          description: t.description ?? `MCP HTTP server ${hi} tool ${toolName}`,
-          inputSchema: this.prepareMcpInputSchema(t.inputSchema as Record<string, unknown> | undefined),
+          description: presented.description,
+          inputSchema: presented.inputSchema,
           approvalMode: 'auto',
           sideEffectLevel: 'system',
           needsApproval: () => true,
-          async execute(_ctx, args) {
-            const out = await mcpCallTool(bu, toolName, args as Record<string, unknown>);
-            return { ok: !out.isError, content: out.content };
+          execute: async (_ctx, args) => {
+            const callArgs = mcpCallArgs((args ?? {}) as Record<string, unknown>);
+            try {
+              const out = await session.callTool(toolName, callArgs);
+              return { ok: !out.isError, content: fenceMcp(toolName, out.content) };
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error);
+              return { ok: false, content: fenceMcp(toolName, message) };
+            }
           }
         });
       }
     }
   }
 
-  /** Connect stdio MCP servers and optionally expand their tools. */
   private async connectStdioMcpServers(
     stdioConfigs: ReturnType<typeof parseMcpStdioConfigs>,
     expandStdio: boolean,
@@ -148,47 +249,53 @@ export class McpManager {
         this.mcpStdioSessions.push(session);
         if (!expandStdio) continue;
         const listed = await session.listTools();
-        for (const t of listed) {
-          const name = `mcp_s${si}_${sanitizeMcpToolSuffix(t.name)}`;
-          if (this.deps.tools.some((x) => x.name === name)) continue;
-          const toolName = t.name;
+        for (const tool of listed) {
+          const name = `mcp_s${si}_${sanitizeMcpToolSuffix(tool.name)}`;
+          if (this.deps.tools.some((existing) => existing.name === name)) continue;
+          const toolName = tool.name;
+          const presented = presentMcpTool(tool, `MCP stdio server ${si} tool ${toolName}`, (schema) =>
+            this.prepareMcpInputSchema(schema)
+          );
           this.deps.tools.push({
             name,
-            description: t.description ?? `MCP stdio server ${si} tool ${toolName}`,
-            inputSchema: this.prepareMcpInputSchema(t.inputSchema as Record<string, unknown> | undefined),
+            description: presented.description,
+            inputSchema: presented.inputSchema,
             approvalMode: 'auto',
             sideEffectLevel: 'system',
             needsApproval: () => true,
-            async execute(_ctx, args) {
-              const out = await session.callTool(toolName, args as Record<string, unknown>);
-              return { ok: !out.isError, content: out.content };
+            execute: async (_ctx, args) => {
+              const callArgs = mcpCallArgs((args ?? {}) as Record<string, unknown>);
+              try {
+                const out = await session.callTool(toolName, callArgs);
+                return { ok: !out.isError, content: fenceMcp(toolName, out.content) };
+              } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                return { ok: false, content: fenceMcp(toolName, message) };
+              }
             }
           });
         }
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
         void appendTraceEvent(this.deps.stateDir, sessionId, {
           kind: 'model_error',
-          payload: { mcpStdio: si, message: msg }
+          payload: { mcpStdio: si, message }
         });
       }
     }
   }
 
-  /** Register mcp_list_resources and mcp_read_resource tools for all connected servers. */
-  private registerResourceTools(
-    urls: string[],
-    mcpListResources: (url: string) => Promise<unknown>,
-    mcpReadResource: (url: string, uri: string) => Promise<{ mimeType?: string; text: string }>
-  ): void {
-    const totalServers = urls.length + this.mcpStdioSessions.length;
+  private registerResourceTools(): void {
+    const httpSessions = this.httpSessions;
+    const totalServers = httpSessions.length + this.mcpStdioSessions.length;
     if (totalServers === 0) return;
     const mgr = this;
 
-    if (!this.deps.tools.some((t) => t.name === 'mcp_list_resources')) {
+    if (!this.deps.tools.some((tool) => tool.name === 'mcp_list_resources')) {
       this.deps.tools.push({
         name: 'mcp_list_resources',
-        description: 'List MCP resources. server index: 0..N-1 where HTTP URLs (RAW_AGENT_MCP_URLS) come first, then stdio servers (RAW_AGENT_MCP_STDIO order).',
+        description:
+          'List MCP resources. server index: 0..N-1 where HTTP endpoints (RAW_AGENT_MCP_HTTP, then RAW_AGENT_MCP_URLS) come first, then stdio servers.',
         inputSchema: {
           type: 'object',
           properties: { server: { type: 'number' } },
@@ -197,28 +304,34 @@ export class McpManager {
         approvalMode: 'auto',
         sideEffectLevel: 'system',
         needsApproval: () => false,
-        async execute(_ctx, args: { server: number }) {
-          const idx = Math.floor(args.server);
-          if (idx < 0 || idx >= totalServers) return { ok: false, content: `Invalid server ${args.server}` };
-          if (idx < urls.length) {
-            const u = urls[idx];
-            if (!u) return { ok: false, content: 'Invalid URL index' };
+        execute: async (_ctx, args: { server: number }) => {
+          const index = Math.floor(args.server);
+          if (index < 0 || index >= totalServers) return { ok: false, content: `Invalid server ${args.server}` };
+          if (index < httpSessions.length) {
+            const session = httpSessions[index];
+            if (!session) return { ok: false, content: 'Invalid URL index' };
             try {
-              const r = await mcpListResources(u);
-              return { ok: true, content: JSON.stringify(r, null, 2) };
-            } catch (e) {
-              return { ok: false, content: e instanceof Error ? e.message : String(e) };
+              const listed = await session.listResources();
+              return { ok: true, content: presentResourceList(listed) };
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error);
+              return { ok: false, content: fenceMcp('resources', message) };
             }
           }
-          const s = mgr.mcpStdioSessions[idx - urls.length];
-          if (!s) return { ok: false, content: 'Stdio server not connected' };
-          const r = await s.listResources();
-          return { ok: true, content: JSON.stringify(r, null, 2) };
+          const stdio = mgr.mcpStdioSessions[index - httpSessions.length];
+          if (!stdio) return { ok: false, content: 'Stdio server not connected' };
+          try {
+            const listed = await stdio.listResources();
+            return { ok: true, content: presentResourceList(listed) };
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            return { ok: false, content: fenceMcp('resources', message) };
+          }
         }
       } as ToolContract<{ server: number }>);
     }
 
-    if (!this.deps.tools.some((t) => t.name === 'mcp_read_resource')) {
+    if (!this.deps.tools.some((tool) => tool.name === 'mcp_read_resource')) {
       this.deps.tools.push({
         name: 'mcp_read_resource',
         description: 'Read one MCP resource by URI (same server indexing as mcp_list_resources).',
@@ -230,31 +343,50 @@ export class McpManager {
         approvalMode: 'auto',
         sideEffectLevel: 'system',
         needsApproval: () => true,
-        async execute(_ctx, args: { server: number; uri: string }) {
-          const idx = Math.floor(args.server);
-          if (idx < 0 || idx >= totalServers) return { ok: false, content: `Invalid server ${args.server}` };
-          if (idx < urls.length) {
-            const u = urls[idx];
-            if (!u) return { ok: false, content: 'Invalid URL index' };
+        execute: async (_ctx, args: { server: number; uri: string }) => {
+          const index = Math.floor(args.server);
+          if (index < 0 || index >= totalServers) return { ok: false, content: `Invalid server ${args.server}` };
+          if (index < httpSessions.length) {
+            const session = httpSessions[index];
+            if (!session) return { ok: false, content: 'Invalid URL index' };
             try {
-              const r = await mcpReadResource(u, args.uri);
-              return { ok: true, content: r.mimeType ? `${r.mimeType}\n\n${r.text}` : r.text };
-            } catch (e) {
-              return { ok: false, content: e instanceof Error ? e.message : String(e) };
+              const resource = await session.readResource(args.uri);
+              return { ok: true, content: fenceMcp(args.uri, presentResourceBody(resource.mimeType, resource.text)) };
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error);
+              return { ok: false, content: fenceMcp(args.uri, message) };
             }
           }
-          const s = mgr.mcpStdioSessions[idx - urls.length];
-          if (!s) return { ok: false, content: 'Stdio server not connected' };
-          const r = await s.readResource(args.uri);
-          return { ok: true, content: r.mimeType ? `${r.mimeType}\n\n${r.text}` : r.text };
+          const stdio = mgr.mcpStdioSessions[index - httpSessions.length];
+          if (!stdio) return { ok: false, content: 'Stdio server not connected' };
+          try {
+            const resource = await stdio.readResource(args.uri);
+            return { ok: true, content: fenceMcp(args.uri, presentResourceBody(resource.mimeType, resource.text)) };
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            return { ok: false, content: fenceMcp(args.uri, message) };
+          }
         }
       } as ToolContract<{ server: number; uri: string }>);
     }
   }
 
   async destroy(): Promise<void> {
+    for (const session of this.httpSessions) {
+      try {
+        await session.close();
+      } catch {
+        /* best effort */
+      }
+    }
+    this.httpSessions = [];
+    this.httpConnectPromise = undefined;
     for (const session of this.mcpStdioSessions) {
-      try { await session.close(); } catch { /* best effort */ }
+      try {
+        await session.close();
+      } catch {
+        /* best effort */
+      }
     }
     this.mcpStdioSessions.length = 0;
   }

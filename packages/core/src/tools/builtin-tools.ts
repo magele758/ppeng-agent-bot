@@ -20,6 +20,8 @@ import { runWorkspaceGrep } from './grep-workspace.js';
 import { readFileLineRange, shouldStreamReadFile } from './read-file-range.js';
 import { lspSendRequest, parseLspConfigFromEnv } from './lsp-client.js';
 import { fetchUrlText, webSearchFromEnv } from './web-fetch.js';
+import { fenceExternalContent } from '../safety/external-content.js';
+import { egressNeedsApproval } from '../safety/egress.js';
 import { resolveWebSearchTemplate, WEB_SEARCH_NOT_CONFIGURED, type WebSettingsReadStore } from './web-settings.js';
 import {
   HARNESS_ARTIFACT_DIR,
@@ -476,7 +478,11 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
           String(process.env.RAW_AGENT_WEB_FETCH_ALLOW_PRIVATE ?? '').toLowerCase()
         )
       });
-      return { ok: r.ok, content: r.content };
+      if (!r.ok) return { ok: false, content: r.content };
+      return {
+        ok: true,
+        content: fenceExternalContent({ source: 'web_fetch', label: args.url, body: r.content })
+      };
     }
   };
 
@@ -501,7 +507,11 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
         return { ok: false, content: WEB_SEARCH_NOT_CONFIGURED };
       }
       const r = await webSearchFromEnv(process.env, { query: args.query, templateUrl: template });
-      return { ok: r.ok, content: r.content };
+      if (!r.ok) return { ok: false, content: r.content };
+      return {
+        ok: true,
+        content: fenceExternalContent({ source: 'web_fetch', label: args.query, body: r.content })
+      };
     }
   };
 
@@ -1042,15 +1052,16 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
       },
       required: ['body', 'channels', 'publish_at']
     },
-    approvalMode: 'never',
+    approvalMode: 'auto',
     sideEffectLevel: 'none',
+    needsApproval: (_context, args) => egressNeedsApproval('schedule_social_post', args),
     async execute(context, args) {
       const gatewayChannelIds = loadGatewayChannelIdsSync(context.repoRoot);
       const built = buildSocialPostSchedule({
         body: args.body,
         channels: args.channels,
         publishAt: args.publish_at,
-        approval: args.approval,
+        approval: 'pending_approval',
         firstComment: args.first_comment,
         followUpHint: args.follow_up_hint,
         idempotencyKey: args.idempotency_key,

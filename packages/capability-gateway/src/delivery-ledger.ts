@@ -32,6 +32,8 @@ export interface DeliveryRow {
   attempts: number;
   createdAt: string;
   updatedAt: string;
+  /** Set when the row belongs to an outbound draft, so reject/reapprove can cancel it. */
+  draftId?: string;
 }
 
 interface LedgerFile {
@@ -84,8 +86,45 @@ function withRecoveredPrefix(content: string): string {
   return content.startsWith(RECOVERED_REPLY_PREFIX) ? content : `${RECOVERED_REPLY_PREFIX}${content}`;
 }
 
+function abandonOpenDraftRows(dir: string, draftId: string): number {
+  const file = readLedger(dir);
+  let changed = 0;
+  for (const row of file.items) {
+    if (row.draftId !== draftId) continue;
+    if (row.state === 'delivered' || row.state === 'abandoned') continue;
+    row.state = 'abandoned';
+    row.updatedAt = nowIso();
+    changed += 1;
+  }
+  if (changed > 0) writeLedger(dir, file);
+  return changed;
+}
+
+/** True when a draft's ledger row was confirmed delivered. */
+export function draftWasDelivered(dir: string, draftId: string): boolean {
+  return readLedger(dir).items.some((row) => row.draftId === draftId && row.state === 'delivered');
+}
+
+/** Drop retryable rows for a draft. Delivered rows stay so they are not sent again. */
+export async function abandonDraftDeliveries(dir: string, draftId: string): Promise<number> {
+  return withLock(dir, async () => abandonOpenDraftRows(dir, draftId));
+}
+
+/**
+ * Decide a crash reconcile under the ledger lock.
+ * An in-flight `sendLedgered` holds the same lock, so this sees the row only
+ * after that send has finished. Returns whether delivery was confirmed.
+ */
+export async function closeUnconfirmedDraft(dir: string, draftId: string): Promise<boolean> {
+  return withLock(dir, async () => {
+    const delivered = draftWasDelivered(dir, draftId);
+    if (!delivered) abandonOpenDraftRows(dir, draftId);
+    return delivered;
+  });
+}
+
 /** Persist an in-flight send. A crash after this returns is a duplicate-risk redelivery. */
-export function beginOutboundAttempt(dir: string, target: DeliveryTarget, text: string): string {
+export function beginOutboundAttempt(dir: string, target: DeliveryTarget, text: string, draftId?: string): string {
   const file = readLedger(dir);
   const ts = nowIso();
   const row: DeliveryRow = {
@@ -95,7 +134,8 @@ export function beginOutboundAttempt(dir: string, target: DeliveryTarget, text: 
     state: 'attempting',
     attempts: 1,
     createdAt: ts,
-    updatedAt: ts
+    updatedAt: ts,
+    ...(draftId ? { draftId } : {})
   };
   file.items.push(row);
   writeLedger(dir, file);
@@ -115,10 +155,12 @@ export async function sendLedgered(opts: {
   gatewayDir: string;
   target: DeliveryTarget;
   text: string;
+  draftId?: string;
   send: (text: string) => Promise<void>;
 }): Promise<void> {
   await withLock(opts.gatewayDir, async () => {
-    const id = beginOutboundAttempt(opts.gatewayDir, opts.target, opts.text);
+    if (opts.draftId) abandonOpenDraftRows(opts.gatewayDir, opts.draftId);
+    const id = beginOutboundAttempt(opts.gatewayDir, opts.target, opts.text, opts.draftId);
     try {
       await opts.send(opts.text);
       finishOutbound(opts.gatewayDir, id, 'delivered');

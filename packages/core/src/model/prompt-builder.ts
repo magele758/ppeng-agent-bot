@@ -39,6 +39,7 @@ import {
   requestedSkillNames,
   runProfileFromSession
 } from '../runtime/run-profile.js';
+import { EXTERNAL_FENCE_SYSTEM_SENTENCE } from '../safety/external-content.js';
 import { textSummaryFromParts } from './model-adapters.js';
 import type {
   AgentSpec,
@@ -56,7 +57,7 @@ const { HARNESS_ARTIFACT_DIR, HARNESS_ARTIFACT_FILES } = await import('../types.
  * Bump when `buildStablePrefix` (or any helper that feeds it) changes wording.
  * See `./AGENTS.md`.
  */
-export const STABLE_SYSTEM_VERSION = 'v4';
+export const STABLE_SYSTEM_VERSION = 'v5';
 
 /** Appended when `RAW_AGENT_AGENTIC_SAFETY_APPENDIX` is set; English to match the rest of the stable prefix. */
 export const RUNTIME_AGENTIC_SAFETY_APPENDIX = `Runtime safety appendix (policy text only; does not replace model-level safety training):
@@ -374,6 +375,7 @@ export class PromptBuilder {
       workspaceLines,
       `Conversation mode: ${ctx.session.mode}`,
       'You are running in a raw agent loop. Respond normally when no tools are needed.',
+      EXTERNAL_FENCE_SYSTEM_SENTENCE,
       'For multi-step work, call TodoWrite before broad execution and keep exactly one item in progress.',
       'Load skills from repo `skills/` and `~/.agents/**/SKILL.md` only when relevant with load_skill(name).',
       'Use persistent tasks for long-lived work and teammates only for clearly separable work.',

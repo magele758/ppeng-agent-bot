@@ -12,7 +12,7 @@ import styles from './tasks.module.css';
 /** 待审批工具调用、站内邮件与工作区 */
 export function InboxView() {
   const { t } = useI18n();
-  const { approvals, workspaces, agents, mailAll, tick, navigate, openSession } = useLab();
+  const { approvals, outboundDrafts, workspaces, agents, mailAll, tick, navigate, openSession } = useLab();
   const [mailFrom, setMailFrom] = useState('');
   const [mailTo, setMailTo] = useState('');
   const [mailBody, setMailBody] = useState('');
@@ -21,6 +21,9 @@ export function InboxView() {
 
   const decide = (id: string, verdict: 'approve' | 'reject') =>
     void api(`/api/approvals/${id}/${verdict}`, { method: 'POST' }).then(onRefresh);
+
+  const decideDraft = (id: string, verdict: 'approve' | 'reject') =>
+    void api(`/api/outbound-drafts/${id}/${verdict}`, { method: 'POST' }).then(onRefresh, onRefresh);
 
   const handleSendMail = async () => {
     const body = mailBody.trim();
@@ -90,6 +93,52 @@ export function InboxView() {
                 </div>
               );
             })}
+          </div>
+        )}
+      </SettingsGroup>
+
+      <SettingsGroup title={t('tasks.inbox.draftsTitle')} description={t('tasks.inbox.draftsDesc')}>
+        {outboundDrafts.length === 0 ? (
+          <EmptyState title={t('tasks.inbox.draftsEmptyTitle')} description={t('tasks.inbox.draftsEmptyDesc')} />
+        ) : (
+          <div id="listOutboundDrafts" className={styles.list}>
+            {outboundDrafts.map((draft) => (
+              <div key={draft.id} className={`list-item ${styles.row}`} data-draft-id={draft.id}>
+                <div className={styles.rowMain}>
+                  <strong>{draft.channelId}</strong>
+                  <span className={styles.status}>{draft.status}</span>
+                </div>
+                <div className={styles.rowMeta}>
+                  <span>{t('tasks.inbox.draftChannel', { channel: draft.channelId })}</span>
+                  {draft.event ? <span>{t('tasks.inbox.draftEvent', { event: draft.event })}</span> : null}
+                  {draft.receiveId ? <span>{t('tasks.inbox.draftRecipient', { id: draft.receiveId })}</span> : null}
+                  {draft.error ? <span>{draft.error}</span> : null}
+                </div>
+                <div>{draft.text.slice(0, 280)}</div>
+                <div className={styles.actions}>
+                  {draft.status === 'sending' ? null : (
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        aria-label={t('tasks.inbox.approveSendAria', { channel: draft.channelId })}
+                        onClick={() => decideDraft(draft.id, 'approve')}
+                      >
+                        {t('tasks.inbox.approveSend')}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        aria-label={t('tasks.inbox.rejectDraftAria', { channel: draft.channelId })}
+                        onClick={() => decideDraft(draft.id, 'reject')}
+                      >
+                        {t('tasks.inbox.rejectDraft')}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </SettingsGroup>

@@ -86,7 +86,7 @@ export class SocialScheduleService {
     }
 
     const approval = action === 'approve' ? 'approved' : 'rejected';
-    const nextSchedule: SocialPostScheduleV1 = { ...schedule, approval };
+    const nextSchedule: SocialPostScheduleV1 = { ...schedule, approval, approvalProvenance: 'human' };
     return this.store.updateTask(taskId, {
       metadata: {
         ...(task.metadata as Record<string, unknown>),
@@ -110,7 +110,9 @@ export class SocialScheduleService {
     if (task.status === 'cancelled') throw new ValidationError('Task is cancelled');
     const schedule = readSocialPostSchedule(task.metadata as Record<string, unknown> | undefined);
     if (!schedule) throw new ValidationError('Task is not a social post schedule');
-    if (schedule.approval !== 'approved') throw new ValidationError('Schedule must be approved before run_now');
+    if (schedule.approval !== 'approved' || schedule.approvalProvenance !== 'human') {
+      throw new ValidationError('Schedule must be approved by a human before run_now');
+    }
     if (schedule.dispatch.state === 'succeeded') return task;
 
     const { schedule: nextSchedule, ok } = await runSocialPostScheduleDelivery(schedule, deliver);
