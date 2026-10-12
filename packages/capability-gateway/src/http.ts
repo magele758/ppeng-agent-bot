@@ -10,7 +10,7 @@ import {
   tryBotChatCommand
 } from './im-handlers.js';
 import { appendOutboundDraft } from './outbound-drafts.js';
-import { reconcileSendingDrafts, recoverGatewayOutbound } from './outbound.js';
+import { quarantineLegacyDraftLedger, reconcileSendingDrafts, recoverGatewayOutbound } from './outbound.js';
 import { resolveImOutbound } from './silent-reply.js';
 import { readGatewaySettings } from './gateway-settings.js';
 import { readGatewayState } from './state.js';
@@ -492,6 +492,7 @@ export async function createGatewayContext(
     // left by a crash without replaying the ledger (that send path stays gated
     // on the listener being enabled).
     await reconcileSendingDrafts(gatewayDir);
+    await quarantineLegacyDraftLedger(gatewayDir);
     return null;
   }
   const fileConfig = (await loadGatewayFileConfig(env.configPath!)) ?? {};

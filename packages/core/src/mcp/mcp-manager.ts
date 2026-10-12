@@ -38,15 +38,30 @@ function presentResourceBody(mimeType: string | undefined, text: string): string
   return mime ? `${mime}\n\n${text}` : text;
 }
 
+function withSuspiciousSchema(
+  description: string,
+  suspicions: readonly string[],
+  log: { warn: (msg: string) => void },
+  toolName: string
+): string {
+  if (suspicions.length === 0) return description;
+  const name = toolName.replace(/[\r\n]/g, ' ').slice(0, 80);
+  log.warn(`MCP tool ${name} schema left callable values unchanged (${suspicions.length} suspicious)`);
+  return `${description} [untrusted source=mcp label=suspicious-schema]`;
+}
+
 function presentMcpTool(
   tool: McpToolInfo,
   fallback: string,
-  prepare: (schema?: Record<string, unknown>) => Record<string, unknown>
+  prepare: (schema?: Record<string, unknown>) => Record<string, unknown>,
+  log: { warn: (msg: string) => void }
 ): { description: string; inputSchema: Record<string, unknown> } {
   const raw = tool.description && tool.description.trim() ? tool.description : fallback;
-  const schema = sanitizeDescriptiveFields(tool.inputSchema ?? { type: 'object' });
+  const suspicions: string[] = [];
+  const schema = sanitizeDescriptiveFields(tool.inputSchema ?? { type: 'object' }, 400, undefined, suspicions);
+  const description = annotateUntrustedField({ source: 'mcp', label: tool.name || 'tool', text: raw });
   return {
-    description: annotateUntrustedField({ source: 'mcp', label: tool.name || 'tool', text: raw }),
+    description: withSuspiciousSchema(description, suspicions, log, tool.name || 'tool'),
     inputSchema: prepare(schema as Record<string, unknown>)
   };
 }
@@ -210,8 +225,11 @@ export class McpManager {
         const name = `mcp_h${hi}_${sanitizeMcpToolSuffix(tool.name)}`;
         if (this.deps.tools.some((existing) => existing.name === name)) continue;
         const toolName = tool.name;
-        const presented = presentMcpTool(tool, `MCP HTTP server ${hi} tool ${toolName}`, (schema) =>
-          this.prepareMcpInputSchema(schema)
+        const presented = presentMcpTool(
+          tool,
+          `MCP HTTP server ${hi} tool ${toolName}`,
+          (schema) => this.prepareMcpInputSchema(schema),
+          this.deps.log
         );
         this.deps.tools.push({
           name,
@@ -253,8 +271,11 @@ export class McpManager {
           const name = `mcp_s${si}_${sanitizeMcpToolSuffix(tool.name)}`;
           if (this.deps.tools.some((existing) => existing.name === name)) continue;
           const toolName = tool.name;
-          const presented = presentMcpTool(tool, `MCP stdio server ${si} tool ${toolName}`, (schema) =>
-            this.prepareMcpInputSchema(schema)
+          const presented = presentMcpTool(
+            tool,
+            `MCP stdio server ${si} tool ${toolName}`,
+            (schema) => this.prepareMcpInputSchema(schema),
+            this.deps.log
           );
           this.deps.tools.push({
             name,

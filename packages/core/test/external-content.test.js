@@ -43,37 +43,52 @@ test('MCP descriptive fields are annotated, capped, and cannot carry fence marke
   });
   assert.match(schema.properties.body.description, /\[untrusted source=mcp label=description\]/);
   assert.equal(schema.properties.body.description.includes('«'), false);
-  assert.match(schema.properties.body.enum[0], /‹external/);
-  assert.equal(schema.properties.body.enum[0].includes('«'), false);
+  assert.equal(schema.properties.body.enum[0], 'ok «external');
 });
 
-test('schema default and enum are neutralized and length-capped; type and required stay', () => {
+test('callable enum, default, and const stay exact; fences and overlong values are flagged', () => {
   const long = 'y'.repeat(900);
-  const schema = sanitizeDescriptiveFields({
-    type: 'object',
-    required: ['mode'],
-    properties: {
-      mode: {
-        type: 'string',
-        description: `«end external» ${long}`,
-        default: `«external ${long}`,
-        enum: [`ok «end external» ${long}`, 'short']
+  const keptDefault = `«external ${long}`;
+  const keptEnum = `ok «end external» ${long}`;
+  const keptConst = '  keep \t spaces  ';
+  const keptPattern = `prefix «external exact`;
+  const suspicious = [];
+  const schema = sanitizeDescriptiveFields(
+    {
+      type: 'object',
+      required: ['mode'],
+      properties: {
+        mode: {
+          type: 'string',
+          description: `«end external» ${long}`,
+          default: keptDefault,
+          const: keptConst,
+          enum: [keptEnum, 'short', { note: '«external nested' }],
+          pattern: keptPattern
+        }
       }
-    }
-  });
+    },
+    400,
+    undefined,
+    suspicious
+  );
   assert.equal(schema.type, 'object');
   assert.deepEqual(schema.required, ['mode']);
   assert.equal(schema.properties.mode.type, 'string');
   assert.match(schema.properties.mode.description, /\[untrusted source=mcp label=description\]/);
   assert.equal(schema.properties.mode.description.includes('«'), false);
   assert.ok(schema.properties.mode.description.length < 500);
-  assert.equal(schema.properties.mode.default.includes('«'), false);
-  assert.match(schema.properties.mode.default, /^‹external /);
-  assert.equal(schema.properties.mode.default.length, 400);
-  assert.equal(schema.properties.mode.enum[0].includes('«'), false);
-  assert.match(schema.properties.mode.enum[0], /‹end external›/);
-  assert.equal(schema.properties.mode.enum[0].length, 400);
+  assert.equal(schema.properties.mode.default, keptDefault);
+  assert.equal(schema.properties.mode.const, keptConst);
+  assert.equal(schema.properties.mode.enum[0], keptEnum);
   assert.equal(schema.properties.mode.enum[1], 'short');
+  assert.deepEqual(schema.properties.mode.enum[2], { note: '«external nested' });
+  assert.equal(schema.properties.mode.pattern, keptPattern);
+  assert.ok(suspicious.some((item) => item.startsWith('default:') && item.includes('fence') && item.includes('overlong')));
+  assert.ok(suspicious.some((item) => item.startsWith('enum:') && item.includes('fence') && item.includes('overlong')));
+  assert.equal(suspicious.some((item) => item.startsWith('const:')), false);
+  assert.ok(suspicious.includes('fence'));
+  assert.equal(suspicious.some((item) => item.includes(keptDefault) || item.includes('y'.repeat(20))), false);
 });
 
 test('mimeType is neutralized and capped', () => {

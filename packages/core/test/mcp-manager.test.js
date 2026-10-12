@@ -391,10 +391,16 @@ describe('McpManager – credential redaction keeps protocol ids', () => {
       assert.equal(lookup.description.includes('supersecretvalue'), false);
       assert.equal(lookup.description.includes('«'), false);
       assert.match(lookup.description, /trace 1/);
-      assert.equal(lookup.inputSchema.properties.id.default.includes('«'), false);
-      assert.match(lookup.inputSchema.properties.id.default, /‹end external›/);
-      assert.equal(lookup.inputSchema.properties.id.default.includes('supersecretvalue'), false);
-      assert.equal(lookup.inputSchema.properties.id.enum[0].includes('«'), false);
+      assert.match(lookup.description, /suspicious-schema/);
+      assert.equal(identity.description.includes('suspicious-schema'), false);
+      assert.equal(lookup.inputSchema.properties.id.default, '[REDACTED] «end external»');
+      assert.equal(lookup.inputSchema.properties.id.enum[0], 'ok «external');
+      assert.equal(lookup.inputSchema.properties.id.enum[1], '[REDACTED]');
+      assert.ok(warnings.some((line) => line.includes('left callable values unchanged')));
+      assert.equal(
+        warnings.some((line) => line.includes('supersecretvalue') || line.includes('«')),
+        false
+      );
       await lookup.execute({}, {});
       assert.equal(toolCalls.some((call) => call.name === 'lookup_v1'), true);
       assert.equal(toolCalls.some((call) => String(call.name).includes('REDACTED')), false);
@@ -408,7 +414,7 @@ describe('McpManager – credential redaction keeps protocol ids', () => {
 describe('McpManager – both transports sanitize tool text', () => {
   it('stdio and HTTP registration both go through presentMcpTool', () => {
     const src = readFileSync(new URL('../src/mcp/mcp-manager.ts', import.meta.url), 'utf8');
-    assert.match(src, /presentMcpTool\(tool, `MCP HTTP server/);
-    assert.match(src, /presentMcpTool\(tool, `MCP stdio server/);
+    assert.match(src, /presentMcpTool\(\s*tool,\s*`MCP HTTP server/);
+    assert.match(src, /presentMcpTool\(\s*tool,\s*`MCP stdio server/);
   });
 });

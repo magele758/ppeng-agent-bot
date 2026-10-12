@@ -1,33 +1,25 @@
 import type { IncomingMessage } from 'node:http';
-import { oauthPublicConfig, tokensEqual, type RequestAuth } from '@ppeng/agent-core';
+import { oauthPublicConfig, type RequestAuth } from '@ppeng/agent-core';
 
 /**
- * Human proof for draft approve/reject. Keep the header name in sync with
- * `apps/web-console/lib/daemon-proxy.ts`.
+ * Draft approve/reject requires a Lab login session (`ppeng_lab_session`).
  *
- * A Lab login session is enough. Otherwise the request must carry
- * `RAW_AGENT_HUMAN_RELEASE_SECRET` in `x-ppeng-human-release`. The daemon
- * bearer is not that secret: model shells never inherit either value, and
- * bearer-only calls fail even when auth isolation is off. When Lab login is
- * on, a session cookie is required and the header cannot bypass it.
- * If neither a session nor a release secret is configured, the route fails closed.
+ * The cookie is HttpOnly and stays in the browser. The Next proxy does not
+ * inject a release secret, and `Sec-Fetch-Site` is ignored because a local
+ * client can forge it. `x-ppeng-human-release` is not a credential.
+ * When OAuth is not configured, the route fails closed (`login_required`,
+ * `loginRequired: false`) so the Lab UI can tell the operator to turn login on.
+ * A session cookie is not accepted in that mode.
  */
-export const HUMAN_RELEASE_HEADER = 'x-ppeng-human-release';
-
-export function humanReleaseSecret(env: NodeJS.ProcessEnv): string {
-  return String(env.RAW_AGENT_HUMAN_RELEASE_SECRET ?? '').trim();
+export function hasHumanRelease(_request: IncomingMessage, env: NodeJS.ProcessEnv, auth: RequestAuth): boolean {
+  return oauthPublicConfig(env).loginRequired && Boolean(auth.user);
 }
 
-function headerValue(request: IncomingMessage): string {
-  const header = request.headers[HUMAN_RELEASE_HEADER];
-  const raw = Array.isArray(header) ? header[0] : header;
-  return String(raw ?? '');
-}
-
-export function hasHumanRelease(request: IncomingMessage, env: NodeJS.ProcessEnv, auth: RequestAuth): boolean {
-  if (auth.user) return true;
-  if (oauthPublicConfig(env).loginRequired) return false;
-  const secret = humanReleaseSecret(env);
-  if (!secret) return false;
-  return tokensEqual(headerValue(request), secret);
+export function humanReleaseDeniedBody(env: NodeJS.ProcessEnv): {
+  error: 'login_required';
+  loginRequired: boolean;
+  providers: readonly string[];
+} {
+  const cfg = oauthPublicConfig(env);
+  return { error: 'login_required', loginRequired: cfg.loginRequired, providers: cfg.providers };
 }
