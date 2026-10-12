@@ -696,6 +696,7 @@ export type { WebSettings, WebSettingsPatch, WebSettingsReadStore, WebSettingsSt
 export {
   BROWSER_INSTALL_HINT,
   formatBrowserError,
+  formatBrowserNavigateResult,
   playwrightBrowserAction,
   probePlaywrightBackend
 } from '../tools/browser-backend.js';
@@ -712,8 +713,12 @@ export {
 export type { EvolutionScheduleDecision, EvolutionScheduleReason } from '../evolution/surface.js';
 export {
   EXTERNAL_FENCE_SYSTEM_SENTENCE,
+  EXTERNAL_FIELD_MAX,
+  annotateUntrustedField,
   fenceExternalContent,
-  isExternalFence
+  isExternalFence,
+  neutralizeFenceMarkers,
+  sanitizeDescriptiveFields
 } from '../safety/external-content.js';
 export type { ExternalSource } from '../safety/external-content.js';
 export {
@@ -721,6 +726,7 @@ export {
   egressNeedsApproval,
   isMcpMutationTool,
   isMcpReadOnlyTool,
+  mcpCallArgs,
   modelTriedToSelfApprove,
   requireHumanEgressApproval,
   stripModelSelfApproval

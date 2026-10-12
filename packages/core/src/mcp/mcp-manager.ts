@@ -1,6 +1,6 @@
 import type { ToolContract } from '../types.js';
-import { fenceExternalContent } from '../safety/external-content.js';
-import { isMcpMutationTool, stripModelSelfApproval } from '../safety/egress.js';
+import { annotateUntrustedField, fenceExternalContent, sanitizeDescriptiveFields } from '../safety/external-content.js';
+import { mcpCallArgs } from '../safety/egress.js';
 import { appendTraceEvent } from '../stores/trace.js';
 import { envBool } from '../env.js';
 import { parseMcpHttpEndpoints, type McpHttpEndpoint } from './mcp-http-config.js';
@@ -20,19 +20,22 @@ function fenceMcp(label: string, body: string): string {
   return fenceExternalContent({ source: 'mcp', label, body });
 }
 
-function mutationArgs(
-  toolName: string,
-  args: Record<string, unknown>,
-  readOnlyHint?: boolean
-): Record<string, unknown> {
-  if (!isMcpMutationTool(toolName, readOnlyHint)) return args;
-  return stripModelSelfApproval(args);
+function presentMcpTool(
+  tool: McpToolInfo,
+  fallback: string,
+  prepare: (schema?: Record<string, unknown>) => Record<string, unknown>
+): { description: string; inputSchema: Record<string, unknown> } {
+  const raw = tool.description && tool.description.trim() ? tool.description : fallback;
+  const schema = sanitizeDescriptiveFields(tool.inputSchema ?? { type: 'object' });
+  return {
+    description: annotateUntrustedField({ source: 'mcp', label: tool.name || 'tool', text: raw }),
+    inputSchema: prepare(schema as Record<string, unknown>)
+  };
 }
 
 export class McpManager {
   private httpSessions: McpHttpSession[] = [];
   private httpConnectPromise?: Promise<void>;
-  private readonly httpToolReadOnly = new Map<string, boolean | undefined>();
   private mcpToolsPromise?: Promise<void>;
   private mcpExpansionDone = false;
   private readonly mcpStdioSessions: McpStdioSession[] = [];
@@ -106,7 +109,15 @@ export class McpManager {
 
     try {
       this.httpSessions = endpoints.map(
-        (endpoint, index) => new McpHttpSession(index, endpoint, { env })
+        (endpoint, index) =>
+          new McpHttpSession(index, endpoint, {
+            env,
+            onTransportFallback: (info) => {
+              this.deps.log.warn(
+                `MCP HTTP server ${index} fell back from streamable-http to SSE after HTTP ${info.status} (${info.url})`
+              );
+            }
+          })
       );
       this.registerHttpTools(endpoints);
       if (expandHttp) await this.connectHttp();
@@ -121,7 +132,6 @@ export class McpManager {
   private registerHttpTools(endpoints: McpHttpEndpoint[]): void {
     if (endpoints.length === 0 || this.deps.tools.some((tool) => tool.name === 'mcp_invoke')) return;
     const sessions = this.httpSessions;
-    const hints = this.httpToolReadOnly;
     this.deps.tools.push({
       name: 'mcp_invoke',
       description:
@@ -142,8 +152,7 @@ export class McpManager {
         const index = Math.floor(args.server);
         const session = sessions[index];
         if (!session) return { ok: false, content: `Invalid MCP server index ${args.server}` };
-        const raw = args.arguments ?? {};
-        const callArgs = mutationArgs(args.tool, raw, hints.get(`${index}:${args.tool}`));
+        const callArgs = mcpCallArgs(args.arguments ?? {});
         try {
           const out = await session.callTool(args.tool, callArgs);
           return { ok: !out.isError, content: fenceMcp(args.tool, out.content) };
@@ -167,20 +176,21 @@ export class McpManager {
       }
       const hi = session.index;
       for (const tool of listed) {
-        this.httpToolReadOnly.set(`${hi}:${tool.name}`, tool.readOnlyHint);
         const name = `mcp_h${hi}_${sanitizeMcpToolSuffix(tool.name)}`;
         if (this.deps.tools.some((existing) => existing.name === name)) continue;
         const toolName = tool.name;
-        const readOnlyHint = tool.readOnlyHint;
+        const presented = presentMcpTool(tool, `MCP HTTP server ${hi} tool ${toolName}`, (schema) =>
+          this.prepareMcpInputSchema(schema)
+        );
         this.deps.tools.push({
           name,
-          description: tool.description ?? `MCP HTTP server ${hi} tool ${toolName}`,
-          inputSchema: this.prepareMcpInputSchema(tool.inputSchema),
+          description: presented.description,
+          inputSchema: presented.inputSchema,
           approvalMode: 'auto',
           sideEffectLevel: 'system',
           needsApproval: () => true,
           execute: async (_ctx, args) => {
-            const callArgs = mutationArgs(toolName, (args ?? {}) as Record<string, unknown>, readOnlyHint);
+            const callArgs = mcpCallArgs((args ?? {}) as Record<string, unknown>);
             try {
               const out = await session.callTool(toolName, callArgs);
               return { ok: !out.isError, content: fenceMcp(toolName, out.content) };
@@ -212,16 +222,18 @@ export class McpManager {
           const name = `mcp_s${si}_${sanitizeMcpToolSuffix(tool.name)}`;
           if (this.deps.tools.some((existing) => existing.name === name)) continue;
           const toolName = tool.name;
-          const readOnlyHint = tool.readOnlyHint;
+          const presented = presentMcpTool(tool, `MCP stdio server ${si} tool ${toolName}`, (schema) =>
+            this.prepareMcpInputSchema(schema)
+          );
           this.deps.tools.push({
             name,
-            description: tool.description ?? `MCP stdio server ${si} tool ${toolName}`,
-            inputSchema: this.prepareMcpInputSchema(tool.inputSchema),
+            description: presented.description,
+            inputSchema: presented.inputSchema,
             approvalMode: 'auto',
             sideEffectLevel: 'system',
             needsApproval: () => true,
             execute: async (_ctx, args) => {
-              const callArgs = mutationArgs(toolName, (args ?? {}) as Record<string, unknown>, readOnlyHint);
+              const callArgs = mcpCallArgs((args ?? {}) as Record<string, unknown>);
               try {
                 const out = await session.callTool(toolName, callArgs);
                 return { ok: !out.isError, content: fenceMcp(toolName, out.content) };
@@ -269,15 +281,21 @@ export class McpManager {
             if (!session) return { ok: false, content: 'Invalid URL index' };
             try {
               const listed = await session.listResources();
-              return { ok: true, content: JSON.stringify(listed, null, 2) };
+              return { ok: true, content: fenceMcp('resources', JSON.stringify(listed, null, 2)) };
             } catch (error) {
-              return { ok: false, content: error instanceof Error ? error.message : String(error) };
+              const message = error instanceof Error ? error.message : String(error);
+              return { ok: false, content: fenceMcp('resources', message) };
             }
           }
           const stdio = mgr.mcpStdioSessions[index - httpSessions.length];
           if (!stdio) return { ok: false, content: 'Stdio server not connected' };
-          const listed = await stdio.listResources();
-          return { ok: true, content: JSON.stringify(listed, null, 2) };
+          try {
+            const listed = await stdio.listResources();
+            return { ok: true, content: fenceMcp('resources', JSON.stringify(listed, null, 2)) };
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            return { ok: false, content: fenceMcp('resources', message) };
+          }
         }
       } as ToolContract<{ server: number }>);
     }

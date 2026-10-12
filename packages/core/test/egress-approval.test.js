@@ -5,6 +5,7 @@ import {
   isMcpMutationTool,
   isMcpReadOnlyTool,
   modelTriedToSelfApprove,
+  mcpCallArgs,
   requireHumanEgressApproval,
   stripModelSelfApproval
 } from '../dist/safety/egress.js';
@@ -22,6 +23,14 @@ test('MCP reads stay reads and only named writes are mutations', () => {
   assert.equal(isMcpMutationTool('say', true), false);
   assert.equal(isMcpMutationTool('whoami'), false);
   assert.equal(isMcpMutationTool('custom_unknown'), false);
+});
+
+test('MCP calls drop self-approval even when the server marks the tool read-only', () => {
+  const readOnly = mcpCallArgs({ approval: 'approved', approved: true, q: 'hi' });
+  assert.deepEqual(readOnly, { q: 'hi' });
+  const unknown = mcpCallArgs({ approval: 'approved', approved: true, keep: 1 });
+  assert.deepEqual(unknown, { keep: 1 });
+  assert.deepEqual(mcpCallArgs({ approval: 'pending_approval' }), { approval: 'pending_approval' });
 });
 
 test('model self-approval is visible and stripped only from the copy', () => {

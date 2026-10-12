@@ -40,6 +40,7 @@ const LIST_SCROLL_IDS = [
   'listTasks',
   'listSocialSchedules',
   'listApprovals',
+  'listOutboundDrafts',
   'listJobs',
   'listWorkspaces',
   'listMailAll'
@@ -74,6 +75,18 @@ export interface WorkspaceRow {
   mode?: string;
 }
 
+export interface OutboundDraftItem {
+  id: string;
+  channelId: string;
+  text: string;
+  event?: string;
+  status: string;
+  receiveId?: string;
+  receiveIdType?: string;
+  error?: string;
+  createdAt: string;
+}
+
 export interface ServerMeta {
   name: string;
   version: string;
@@ -100,6 +113,7 @@ export interface LabContextValue {
   tasks: TaskSummary[];
   socialSchedules: SocialPostScheduleItem[];
   approvals: ApprovalItem[];
+  outboundDrafts: OutboundDraftItem[];
   jobs: JobRow[];
   workspaces: WorkspaceRow[];
   mailAll: MailItem[];
@@ -144,6 +158,7 @@ export function LabProvider({ children }: { children: ReactNode }) {
   const [tasks, setTasks] = useState<TaskSummary[]>([]);
   const [socialSchedules, setSocialSchedules] = useState<SocialPostScheduleItem[]>([]);
   const [approvals, setApprovals] = useState<ApprovalItem[]>([]);
+  const [outboundDrafts, setOutboundDrafts] = useState<OutboundDraftItem[]>([]);
   const [jobs, setJobs] = useState<JobRow[]>([]);
   const [workspaces, setWorkspaces] = useState<WorkspaceRow[]>([]);
   const [mailAll, setMailAll] = useState<MailItem[]>([]);
@@ -219,11 +234,12 @@ export function LabProvider({ children }: { children: ReactNode }) {
   const loadOverview = useCallback(async () => {
     const listScroll = scrollSnapshot(LIST_SCROLL_IDS);
     const sidNow = selectedSessionRef.current;
-    const [sess, tasksRes, socialRes, appr, ag, ws, jobsRes, swarmRes, orchRes, botsRes] = await Promise.all([
+    const [sess, tasksRes, socialRes, appr, draftRes, ag, ws, jobsRes, swarmRes, orchRes, botsRes] = await Promise.all([
       api('/api/sessions').catch(() => ({ sessions: undefined })),
       api('/api/tasks').catch(() => ({ tasks: [] as TaskSummary[] })),
       api('/api/social-post-schedules').catch(() => ({ items: [] as SocialPostScheduleItem[] })),
       api('/api/approvals?status=pending').catch(() => ({ approvals: [] as ApprovalItem[] })),
+      api('/api/outbound-drafts').catch(() => ({ drafts: [] as OutboundDraftItem[] })),
       api('/api/agents').catch(() => ({ agents: undefined })),
       api('/api/workspaces').catch(() => ({ workspaces: [] as WorkspaceRow[] })),
       api('/api/background-jobs').catch(() => ({ jobs: [] as JobRow[] })),
@@ -242,6 +258,7 @@ export function LabProvider({ children }: { children: ReactNode }) {
     setTasks((tasksRes as { tasks?: TaskSummary[] }).tasks ?? []);
     setSocialSchedules((socialRes as { items?: SocialPostScheduleItem[] }).items ?? []);
     setApprovals(pendingApprovals((appr as { approvals?: ApprovalItem[] }).approvals));
+    setOutboundDrafts((draftRes as { drafts?: OutboundDraftItem[] }).drafts ?? []);
     setJobs((jobsRes as { jobs?: JobRow[] }).jobs ?? []);
     setWorkspaces((ws as { workspaces?: WorkspaceRow[] }).workspaces ?? []);
     setSwarmRuns((swarmRes as { runs?: SwarmRunRow[] }).runs ?? []);
@@ -312,6 +329,7 @@ export function LabProvider({ children }: { children: ReactNode }) {
       tasks,
       socialSchedules,
       approvals,
+      outboundDrafts,
       jobs,
       workspaces,
       mailAll,
@@ -342,6 +360,7 @@ export function LabProvider({ children }: { children: ReactNode }) {
       tasks,
       socialSchedules,
       approvals,
+      outboundDrafts,
       jobs,
       workspaces,
       mailAll,

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { handleGatewayHttp } from '../dist/http.js';
@@ -65,12 +65,10 @@ test('人直接发来的静默回复换成简短确认，不把标记发出去 [
     });
     await drainGatewayTurns();
     assert.equal(res.status, 200);
-    assert.equal(fetched.length, 0);
-    const drafts = JSON.parse(readFileSync(join(ctx.stateDir, 'gateway', 'outbound-drafts.json'), 'utf8'));
-    assert.equal(drafts.items.length, 1);
-    assert.equal(drafts.items[0].status, 'pending_approval');
-    assert.match(drafts.items[0].text, new RegExp(ZH_ACK));
-    assert.doesNotMatch(drafts.items[0].text, /\[SILENT\]|NO_REPLY/);
+    assert.equal(fetched.length, 1);
+    assert.match(fetched[0].body, new RegExp(ZH_ACK));
+    assert.doesNotMatch(fetched[0].body, /\[SILENT\]|NO_REPLY/);
+    assert.equal(existsSync(join(ctx.stateDir, 'gateway', 'outbound-drafts.json')), false);
   } finally {
     globalThis.fetch = original;
   }

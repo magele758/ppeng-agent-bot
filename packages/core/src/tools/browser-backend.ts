@@ -143,6 +143,14 @@ function snapshotFromHtml(html: string, url: string, title: string): string {
   return [`url: ${url}`, `title: ${title}`, 'controls:', ...links, ...buttons, 'text:', text].join('\n');
 }
 
+export function formatBrowserNavigateResult(url: string, title: string): string {
+  return fenceExternalContent({
+    source: 'browser',
+    label: 'navigate',
+    body: JSON.stringify({ ok: true, action: 'navigate', url, title })
+  });
+}
+
 export async function playwrightBrowserAction(
   context: RunContext,
   action: BrowserAction
@@ -159,7 +167,7 @@ export async function playwrightBrowserAction(
         await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
         return {
           ok: true,
-          content: JSON.stringify({ ok: true, action: 'navigate', url: page.url(), title: await page.title() }, null, 2)
+          content: formatBrowserNavigateResult(page.url(), await page.title())
         };
       }
       case 'snapshot': {

@@ -16,6 +16,7 @@ import {
   type BackgroundJobRecord,
   type RunContext
 } from '../types.js';
+import { protectModelSocialScheduleMetadata } from '../social-schedule.js';
 import type { SqliteStateStore } from '../storage.js';
 
 export interface ToolServicesHost {
@@ -80,7 +81,8 @@ export function createToolServices(host: ToolServicesHost): RuntimeToolServices 
       const mergedPatch = { ...patch };
       if (patch.metadata) {
         const existing = host.store.getTask(taskId);
-        mergedPatch.metadata = { ...(existing?.metadata ?? {}), ...patch.metadata };
+        const incoming = protectModelSocialScheduleMetadata(patch.metadata);
+        mergedPatch.metadata = { ...(existing?.metadata ?? {}), ...incoming };
       }
       const task = host.store.updateTask(taskId, mergedPatch);
       if (patch.status === 'completed') {

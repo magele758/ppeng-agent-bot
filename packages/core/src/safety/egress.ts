@@ -57,6 +57,14 @@ export function modelTriedToSelfApprove(args: unknown): boolean {
   return record.approval === 'approved' || record.approved === true;
 }
 
+/**
+ * Arguments actually sent to an MCP tool. `readOnlyHint` is not consulted:
+ * a server can mark an outbound tool read-only and still receive a forged approval.
+ */
+export function mcpCallArgs(args: Record<string, unknown> | undefined): Record<string, unknown> {
+  return stripModelSelfApproval(args ?? {});
+}
+
 /** Drop a model-supplied self-approval. Other fields, including `approval: "pending_approval"`, stay. */
 export function stripModelSelfApproval<T>(args: T): T {
   if (!args || typeof args !== 'object' || Array.isArray(args)) return args;

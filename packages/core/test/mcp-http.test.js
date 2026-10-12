@@ -83,11 +83,13 @@ test('parseMcpHttpConfig merges JSON and legacy URLs and aligns bearers on comma
   assert.equal(parseMcpHttpEndpoints({ RAW_AGENT_MCP_HTTP: '{', RAW_AGENT_MCP_URL: 'http://z/mcp' })[0].url, 'http://z/mcp');
 });
 
-test('legacy SSE detection ignores 401 and 406', () => {
+test('legacy SSE detection uses only 404 and 405', () => {
   assert.equal(isLegacySseEndpointError({ code: 405, message: 'no' }), true);
-  assert.equal(isLegacySseEndpointError(new Error('Method Not Allowed')), true);
-  assert.equal(isLegacySseEndpointError(new Error('Unexpected content type: text/event-stream')), true);
+  assert.equal(isLegacySseEndpointError({ code: 404, message: 'missing' }), true);
+  assert.equal(isLegacySseEndpointError(new Error('Method Not Allowed')), false);
+  assert.equal(isLegacySseEndpointError(new Error('Unexpected content type: text/event-stream')), false);
   assert.equal(isLegacySseEndpointError({ code: 401, message: 'text/event-stream' }), false);
+  assert.equal(isLegacySseEndpointError({ code: 403, message: 'method not allowed text/event-stream' }), false);
   assert.equal(isLegacySseEndpointError({ code: 406, message: 'Method Not Allowed' }), false);
   assert.equal(isLegacySseEndpointError(new Error('connect ECONNREFUSED')), false);
 });
@@ -224,18 +226,99 @@ test('POST 405 falls back to the legacy SSE transport', { timeout: 8000 }, async
     if (msg.method === 'notifications/initialized') return new Response(null, { status: 202 });
     return new Response('unexpected', { status: 500 });
   };
+  const fallbacks = [];
   const session = new McpHttpSession(
     0,
     { url: 'http://127.0.0.1:9/mcp' },
-    { fetch: fetchImpl, timeoutMs: 2000 }
+    {
+      fetch: fetchImpl,
+      timeoutMs: 2000,
+      onTransportFallback: (info) => fallbacks.push(info)
+    }
   );
   try {
     await session.connect();
     assert.equal(session.isConnected, true);
+    assert.deepEqual(fallbacks, [{ url: 'http://127.0.0.1:9/mcp', status: 405 }]);
     assert.ok(calls.some((call) => call.method === 'POST' && call.url.endsWith('/mcp')));
     assert.ok(calls.some((call) => call.method === 'GET'));
   } finally {
     await session.close();
     closeStream();
+  }
+});
+
+test('explicit streamable-http does not fall back on 405, and 403 never falls back', async () => {
+  for (const [transport, status] of [
+    ['streamable-http', 405],
+    [undefined, 403]
+  ]) {
+    const fallbacks = [];
+    const fetchImpl = async (_url, init) => {
+      const method = String(init?.method ?? 'GET').toUpperCase();
+      if (method === 'GET') return new Response('no', { status: 405 });
+      return new Response('method not allowed text/event-stream', { status });
+    };
+    const session = new McpHttpSession(
+      0,
+      { url: 'http://127.0.0.1:9/mcp', ...(transport ? { transport } : {}) },
+      { fetch: fetchImpl, timeoutMs: 2000, onTransportFallback: (info) => fallbacks.push(info) }
+    );
+    await assert.rejects(() => session.connect());
+    assert.equal(session.isConnected, false);
+    assert.deepEqual(fallbacks, [], `${transport ?? 'omitted'} ${status}`);
+    await session.close();
+  }
+});
+
+test('successful tool, resource, and metadata redact bearer values including short tokens', async () => {
+  const token = 'xy';
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    const call = record(calls, url, init);
+    if (call.method === 'GET') return new Response('Method Not Allowed', { status: 405 });
+    const msg = JSON.parse(call.bodyText);
+    if (msg.method === 'initialize') return jsonRpc(msg.id, INIT_RESULT);
+    if (msg.method === 'notifications/initialized') return new Response(null, { status: 202 });
+    if (msg.method === 'tools/list') {
+      return jsonRpc(msg.id, {
+        tools: [{ name: 'whoami', description: `secret ${token}`, inputSchema: { type: 'object', description: token } }]
+      });
+    }
+    if (msg.method === 'tools/call') {
+      return jsonRpc(msg.id, {
+        isError: true,
+        content: [{ type: 'text', text: `echo ${token}` }],
+        _meta: { note: token }
+      });
+    }
+    if (msg.method === 'resources/list') {
+      return jsonRpc(msg.id, { resources: [{ uri: 'room://1', name: token, description: `d ${token}` }] });
+    }
+    if (msg.method === 'resources/read') {
+      return jsonRpc(msg.id, { contents: [{ uri: 'room://1', text: `body ${token}`, mimeType: 'text/plain' }] });
+    }
+    return new Response('unexpected', { status: 500 });
+  };
+  const session = new McpHttpSession(
+    0,
+    { url: 'http://127.0.0.1:9/mcp', headers: { Authorization: `Bearer ${token}` } },
+    { fetch: fetchImpl, timeoutMs: 2000 }
+  );
+  try {
+    const tools = await session.listTools();
+    assert.equal(JSON.stringify(tools).includes(token), false);
+    assert.match(tools[0].description, /\[REDACTED\]/);
+    const called = await session.callTool('whoami', {});
+    assert.equal(called.isError, true);
+    assert.equal(called.content.includes(token), false);
+    assert.match(called.content, /\[REDACTED\]/);
+    const listed = await session.listResources();
+    assert.equal(JSON.stringify(listed).includes(token), false);
+    const resource = await session.readResource('room://1');
+    assert.equal(resource.text.includes(token), false);
+    assert.match(resource.text, /body \[REDACTED\]/);
+  } finally {
+    await session.close();
   }
 });

@@ -11,6 +11,8 @@ export interface McpHttpSessionOptions {
   env?: NodeJS.ProcessEnv;
   fetch?: FetchLike;
   timeoutMs?: number;
+  /** Fired when an unpinned Streamable HTTP connect falls back to legacy SSE. */
+  onTransportFallback?: (info: { url: string; status: number }) => void;
 }
 
 interface ResolvedHeaders {
@@ -38,7 +40,7 @@ function resolveHeaders(endpoint: McpHttpEndpoint, env: NodeJS.ProcessEnv): Reso
 }
 
 export function redactSecrets(text: string, secrets: string[]): string {
-  const unique = [...new Set(secrets.filter((secret) => secret.length >= 4))].sort((a, b) => b.length - a.length);
+  const unique = [...new Set(secrets.filter((secret) => secret.length > 0))].sort((a, b) => b.length - a.length);
   let out = text;
   for (const secret of unique) {
     out = out.split(secret).join('[REDACTED]');
@@ -53,19 +55,17 @@ function errorCode(error: unknown): number | undefined {
 }
 
 /**
- * Old SSE endpoints fail Streamable HTTP with POST 405 / method-not-allowed /
- * `text/event-stream`. 401 and 406 are not that signal — do not fall back.
+ * Fallback is status-code only. 404/405 mean the URL does not speak Streamable HTTP.
+ * 401/403/406 and message text (including "method not allowed") never qualify.
  * A GET 405 on the Streamable HTTP listener is swallowed by the SDK and is not an error.
+ * Explicit `transport: "streamable-http"` does not use this signal.
  */
+const LEGACY_SSE_FALLBACK_STATUS = new Set([404, 405]);
+
 export function isLegacySseEndpointError(error: unknown): boolean {
   const code = errorCode(error);
-  if (code === 401 || code === 406) return false;
-  const message = error instanceof Error ? error.message : String(error ?? '');
-  if (/\b401\b/.test(message) || /\b406\b/.test(message)) return false;
-  if (code === 405) return true;
-  if (/method not allowed/i.test(message)) return true;
-  if (/text\/event-stream/i.test(message)) return true;
-  return false;
+  if (code === undefined) return false;
+  return LEGACY_SSE_FALLBACK_STATUS.has(code);
 }
 
 function fetchWithTimeout(base: FetchLike, timeoutMs: number): FetchLike {
@@ -97,8 +97,9 @@ function readOnlyHintOf(tool: { annotations?: { readOnlyHint?: boolean } }): boo
 
 /**
  * One MCP client over the official SDK Streamable HTTP transport.
- * `transport: "sse"` uses the legacy SSE transport. Any other value tries
- * Streamable HTTP first and falls back to SSE only for an old SSE endpoint.
+ * `transport: "sse"` uses the legacy SSE transport.
+ * `transport: "streamable-http"` never falls back.
+ * An omitted transport tries Streamable HTTP and falls back to SSE only on HTTP 404/405.
  * Session id is sent only after the server returns `mcp-session-id`.
  */
 export class McpHttpSession {
@@ -135,12 +136,14 @@ export class McpHttpSession {
     return this.guard(async () => {
       await this.connect();
       const listed = await this.client!.listTools();
-      return (listed.tools ?? []).map((tool) => ({
-        name: tool.name,
-        description: tool.description,
-        inputSchema: tool.inputSchema as Record<string, unknown> | undefined,
-        readOnlyHint: readOnlyHintOf(tool)
-      }));
+      return (listed.tools ?? []).map((tool) =>
+        this.redactDeep({
+          name: tool.name,
+          description: tool.description,
+          inputSchema: tool.inputSchema as Record<string, unknown> | undefined,
+          readOnlyHint: readOnlyHintOf(tool)
+        })
+      );
     });
   }
 
@@ -151,7 +154,7 @@ export class McpHttpSession {
       const { text, isError } = toolResultToText(
         result as { content?: Array<{ type: string; text?: string }>; isError?: boolean }
       );
-      return { content: text, isError };
+      return { content: this.redactText(text), isError };
     });
   }
 
@@ -160,12 +163,14 @@ export class McpHttpSession {
       await this.connect();
       try {
         const listed = await this.client!.listResources();
-        return (listed.resources ?? []).map((resource) => ({
-          uri: resource.uri,
-          name: resource.name,
-          description: resource.description,
-          mimeType: resource.mimeType
-        }));
+        return this.redactDeep(
+          (listed.resources ?? []).map((resource) => ({
+            uri: resource.uri,
+            name: resource.name,
+            description: resource.description,
+            mimeType: resource.mimeType
+          }))
+        );
       } catch {
         return [];
       }
@@ -177,14 +182,17 @@ export class McpHttpSession {
       await this.connect();
       const listed = await this.client!.readResource({ uri });
       const content = listed.contents?.[0];
-      if (!content) return { text: JSON.stringify(listed) };
+      if (!content) return { text: this.redactText(JSON.stringify(listed)) };
       if ('text' in content && content.text !== undefined) {
-        return { text: content.text as string, mimeType: content.mimeType };
+        return { text: this.redactText(content.text as string), mimeType: content.mimeType };
       }
       if ('blob' in content && typeof content.blob === 'string') {
-        return { text: `[base64 blob ${content.blob.length} chars]`, mimeType: content.mimeType };
+        return {
+          text: this.redactText(`[base64 blob ${content.blob.length} chars]`),
+          mimeType: content.mimeType
+        };
       }
-      return { text: JSON.stringify(content), mimeType: content.mimeType };
+      return { text: this.redactText(JSON.stringify(this.redactDeep(content))), mimeType: content.mimeType };
     });
   }
 
@@ -205,9 +213,29 @@ export class McpHttpSession {
     return this.options.env ?? process.env;
   }
 
+  private secrets(): string[] {
+    return resolveHeaders(this.endpoint, this.env()).secrets;
+  }
+
+  private redactText(text: string): string {
+    return redactSecrets(text, this.secrets());
+  }
+
+  private redactDeep<T>(value: T): T {
+    if (typeof value === 'string') return this.redactText(value) as T;
+    if (Array.isArray(value)) return value.map((item) => this.redactDeep(item)) as T;
+    if (value && typeof value === 'object') {
+      const out: Record<string, unknown> = {};
+      for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+        out[key] = this.redactDeep(child);
+      }
+      return out as T;
+    }
+    return value;
+  }
+
   private redact(error: unknown): Error {
-    const { secrets } = resolveHeaders(this.endpoint, this.env());
-    const message = redactSecrets(error instanceof Error ? error.message : String(error), secrets);
+    const message = this.redactText(error instanceof Error ? error.message : String(error));
     const wrapped = new Error(message);
     wrapped.name = error instanceof Error ? error.name : 'Error';
     const code = errorCode(error);
@@ -236,7 +264,10 @@ export class McpHttpSession {
     try {
       await this.connectWith('streamable-http');
     } catch (error) {
-      if (!isLegacySseEndpointError(error)) throw this.redact(error);
+      const pinned = this.endpoint.transport === 'streamable-http';
+      if (pinned || !isLegacySseEndpointError(error)) throw this.redact(error);
+      const status = errorCode(error) ?? 0;
+      this.options.onTransportFallback?.({ url: this.endpoint.url, status });
       try {
         await this.connectWith('sse');
       } catch (sseError) {
