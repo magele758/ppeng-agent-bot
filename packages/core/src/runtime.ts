@@ -149,7 +149,7 @@ import {
   runScheduler as runSchedulerFn,
   tickCronJobs as tickCronJobsFn
 } from './runtime/scheduler-host.js';
-import { cancelSession as cancelSessionFn, destroyRuntime } from './runtime/session-control.js';
+import { cancelAllSessions as cancelAllSessionsFn, cancelSession as cancelSessionFn, destroyRuntime } from './runtime/session-control.js';
 import { ensureWorkspaceRoot as ensureWorkspaceRootFn } from './runtime/spawn-host.js';
 import { createRuntimeCollaborators } from './runtime/collaborators.js';
 import {
@@ -473,14 +473,27 @@ export class RawAgentRuntime {
     return tickCronJobsFn(schedulerFrom(this.l5()));
   }
 
-  /** Abort in-flight model/tool work for a session (best-effort). Closes any open tool wave. */
-  cancelSession(sessionId: string): void {
-    cancelSessionFn({
+  private sessionControlHost() {
+    return {
       store: this.store,
       sessionAbortControllers: this.sessionAbortControllers,
       backgroundJobAborts: this.backgroundJobAborts,
-      emitTrace: (id, event) => this.emitTrace(id, event)
-    }, sessionId);
+      emitTrace: (id: string, event: Omit<TraceEvent, 'ts' | 'sessionId'>) => this.emitTrace(id, event)
+    };
+  }
+
+  /** Abort in-flight model/tool work for a session (best-effort). Closes any open tool wave. */
+  cancelSession(sessionId: string): void {
+    cancelSessionFn(this.sessionControlHost(), sessionId);
+  }
+
+  /**
+   * Abort every live session and every background job.
+   * When `allowedSessionIds` is set, only those sessions (and their jobs) stop.
+   * Does not close the database or tear down MCP.
+   */
+  cancelAllSessions(allowedSessionIds?: ReadonlySet<string>): { sessionIds: string[] } {
+    return cancelAllSessionsFn(this.sessionControlHost(), allowedSessionIds);
   }
 
   listAgents(): AgentSpec[] {

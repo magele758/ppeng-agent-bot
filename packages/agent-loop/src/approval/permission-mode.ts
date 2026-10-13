@@ -27,6 +27,7 @@ const READ_ONLY_TOOLS = new Set([
   'web_search',
   'vision_analyze',
   'memory_get',
+  'memory_search',
   'memory_list',
   'retrieve_tool_result',
   'list_team',

@@ -203,6 +203,7 @@ function bodyRefCases(f) {
 /** Self-filtered writes that need a request shaped around A's data. */
 function selfFilteredWriteCases(f) {
   return {
+    'POST /api/sessions/cancel-all': {},
     'POST /api/sessions/bulk-delete': { ids: [f.session] },
     'POST /api/memory/preview': { query: 'secret memory', userId: 'user_a' },
     'POST /api/memory/dream-now': { userId: 'user_a', messagesText: 'B wants A memory' },

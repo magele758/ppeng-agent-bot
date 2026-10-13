@@ -42,6 +42,44 @@ export function cancelSession(host: SessionControlHost, sessionId: string): void
   void host.emitTrace(sessionId, { kind: 'cancel', payload: {} });
 }
 
+/**
+ * Abort every live session run and every background job.
+ * Pass `allowedSessionIds` to stop only those sessions (and their jobs).
+ * Does not close the store or tear down MCP.
+ */
+export function cancelAllSessions(
+  host: SessionControlHost,
+  allowedSessionIds?: ReadonlySet<string>
+): { sessionIds: string[] } {
+  const restricted = allowedSessionIds !== undefined;
+  const sessionIds = [...host.sessionAbortControllers.keys()].filter((id) => {
+    const controller = host.sessionAbortControllers.get(id);
+    if (!controller || controller.signal.aborted) return false;
+    return !restricted || allowedSessionIds.has(id);
+  });
+  for (const sessionId of sessionIds) {
+    cancelSession(host, sessionId);
+  }
+  for (const [jobId, controller] of [...host.backgroundJobAborts.entries()]) {
+    if (restricted) {
+      let sessionId: string | undefined;
+      try {
+        sessionId = host.store.getBackgroundJob(jobId)?.sessionId;
+      } catch {
+        sessionId = undefined;
+      }
+      if (!sessionId || !allowedSessionIds.has(sessionId)) continue;
+    }
+    try {
+      controller.abort();
+    } catch {
+      /* best effort */
+    }
+    host.backgroundJobAborts.delete(jobId);
+  }
+  return { sessionIds };
+}
+
 export async function destroyRuntime(input: {
   sessionAbortControllers: Map<string, AbortController>;
   backgroundJobAborts: Map<string, AbortController>;

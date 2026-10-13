@@ -1,7 +1,9 @@
 import type { ToolContract } from '../types.js';
 import { resolveBotMemoryAgentId, type BotMemoryLookup } from '../memory/bot-memory-scope.js';
 import { evaluateMemoryWrite } from '../memory/memory-gate.js';
-import type { MemoryScope } from '../memory/types.js';
+import { hybridOrderMemories } from '../memory/memory-recall.js';
+import { lexicalOverlapScore } from '../memory/memory-semantic-merge.js';
+import type { AgentMemory, MemoryScope } from '../memory/types.js';
 import type { MemoryToolServices } from './runtime-tool-services.js';
 
 const SESSION_SCOPES = new Set(['scratch', 'long']);
@@ -35,6 +37,7 @@ export interface ExtendedMemoryToolServices extends MemoryToolServices {
     tenantId?: string;
     agentId?: string;
     agentUnscoped?: boolean;
+    query?: string;
     limit?: number;
   }) => Promise<unknown[]>;
   prefetchAgentMemory?: (input: {
@@ -46,6 +49,26 @@ export interface ExtendedMemoryToolServices extends MemoryToolServices {
     agentId?: string;
   }) => Promise<unknown[]>;
   botLookup?: BotMemoryLookup;
+}
+
+const FENCE_OPEN = '«external ';
+const FENCE_CLOSE = '«end external»';
+const SEARCH_EXCERPT_CHARS = 180;
+const DEFAULT_SEARCH_LIMIT = 5;
+const MAX_SEARCH_LIMIT = 20;
+
+interface MemorySearchItem {
+  id: string;
+  scope: MemoryToolScope;
+  key: string;
+  value: string;
+  updatedAt: string;
+  importance: number;
+}
+
+interface FenceSpan {
+  start: number;
+  end: number;
 }
 
 function resolveIds(context: { session: { id: string; metadata: Record<string, unknown> } }): {
@@ -61,6 +84,131 @@ function resolveIds(context: { session: { id: string; metadata: Record<string, u
       ? context.session.metadata.tenantId
       : process.env.RAW_AGENT_DEFAULT_TENANT_ID?.trim() || undefined;
   return { userId, tenantId };
+}
+
+function fenceSpans(text: string): FenceSpan[] {
+  const spans: FenceSpan[] = [];
+  let from = 0;
+  while (from < text.length) {
+    const start = text.indexOf(FENCE_OPEN, from);
+    if (start < 0) break;
+    const close = text.indexOf(FENCE_CLOSE, start + FENCE_OPEN.length);
+    if (close < 0) break;
+    const end = close + FENCE_CLOSE.length;
+    spans.push({ start, end });
+    from = end;
+  }
+  return spans;
+}
+
+/** Copy the original open/close markers. Shorten only the interior when the fence itself exceeds the budget. */
+function shrinkClosedFence(fence: string, maxChars: number): string {
+  const headerEnd = fence.indexOf('»');
+  const closeAt = fence.lastIndexOf(FENCE_CLOSE);
+  if (headerEnd < 0 || closeAt < headerEnd) return fence;
+  const header = fence.slice(0, headerEnd + 1);
+  const footer = fence.slice(closeAt);
+  const interior = fence.slice(headerEnd + 1, closeAt);
+  if (header.length + footer.length + 1 >= maxChars) return `${header}\n…\n${footer}`;
+  if (fence.length <= maxChars) return fence;
+  const budget = maxChars - header.length - footer.length;
+  const body = interior.length <= budget ? interior : `${interior.slice(0, Math.max(0, budget - 1))}…`;
+  return `${header}${body}${footer}`;
+}
+
+/**
+ * Short excerpt that never opens an external-content fence without its original closer.
+ * A fence that already fits is copied byte-for-byte.
+ */
+export function excerptPreservingFences(value: string, maxChars = SEARCH_EXCERPT_CHARS): string {
+  if (value.length <= maxChars) return value;
+  const spans = fenceSpans(value);
+  if (spans.length === 0) {
+    const open = value.indexOf(FENCE_OPEN);
+    if (open >= 0 && open < maxChars) {
+      const head = value.slice(0, open).replace(/\s+$/, '');
+      return head ? `${head}…` : `${FENCE_OPEN}unknown»\n…\n${FENCE_CLOSE}`;
+    }
+    return `${value.slice(0, maxChars)}…`;
+  }
+
+  let out = '';
+  let cursor = 0;
+  for (const span of spans) {
+    if (cursor > span.start) continue;
+    const room = maxChars - out.length;
+    if (room <= 0) break;
+    const gap = value.slice(cursor, span.start);
+    if (gap.length > room) {
+      out += gap.slice(0, room);
+      break;
+    }
+    out += gap;
+    const fence = value.slice(span.start, span.end);
+    const fenceRoom = maxChars - out.length;
+    if (fence.length <= fenceRoom) {
+      out += fence;
+      cursor = span.end;
+      continue;
+    }
+    if (out.length === 0) return shrinkClosedFence(fence, maxChars);
+    break;
+  }
+  if (out.length < value.length && !out.endsWith('…') && !out.endsWith(FENCE_CLOSE)) out += '…';
+  return out;
+}
+
+function resolveSearchLimit(raw: unknown): number {
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) return DEFAULT_SEARCH_LIMIT;
+  return Math.min(MAX_SEARCH_LIMIT, Math.max(1, Math.floor(raw)));
+}
+
+function toolScopeOf(raw: unknown, fallback: MemoryToolScope): MemoryToolScope {
+  if (raw === 'scratch' || raw === 'long' || raw === 'user' || raw === 'team' || raw === 'project') return raw;
+  if (raw === 'session.scratch') return 'scratch';
+  if (raw === 'session.long') return 'long';
+  if (raw === 'user.memory') return 'user';
+  if (raw === 'team.memory') return 'team';
+  if (raw === 'project.memory') return 'project';
+  return fallback;
+}
+
+function readSearchItem(row: unknown, fallback: MemoryToolScope): MemorySearchItem | undefined {
+  if (!row || typeof row !== 'object') return undefined;
+  const record = row as Record<string, unknown>;
+  if (typeof record.key !== 'string' || !record.key) return undefined;
+  if (typeof record.value !== 'string') return undefined;
+  const scope = toolScopeOf(record.scope, fallback);
+  const updatedAt = typeof record.updatedAt === 'string' ? record.updatedAt : '1970-01-01T00:00:00.000Z';
+  return {
+    id: typeof record.id === 'string' && record.id ? record.id : `${scope}:${record.key}`,
+    scope,
+    key: record.key,
+    value: record.value,
+    updatedAt,
+    importance: typeof record.importance === 'number' ? record.importance : 0.5
+  };
+}
+
+function agentScopeOf(scope: MemoryToolScope): MemoryScope {
+  const mapped = AGENT_SCOPE_MAP[scope];
+  if (!mapped) throw new Error(`Unknown scope ${scope}`);
+  return mapped;
+}
+
+function toAgentMemory(item: MemorySearchItem): AgentMemory {
+  return {
+    id: item.id,
+    scope: agentScopeOf(item.scope),
+    namespace: 'default',
+    key: item.key,
+    value: item.value,
+    importance: item.importance,
+    confidence: 'medium',
+    accessCount: 0,
+    createdAt: item.updatedAt,
+    updatedAt: item.updatedAt
+  };
 }
 
 export function createMemoryTools(services: ExtendedMemoryToolServices): ToolContract<any>[] {
@@ -261,5 +409,84 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
     }
   };
 
-  return [memorySetTool, memoryGetTool, memoryDeleteTool, handoffStateTool, memoryPrefetchTool];
+  const memorySearchTool: ToolContract<{ query: string; scope?: MemoryToolScope; limit?: number }> = {
+    name: 'memory_search',
+    description:
+      'Search memories and return the top matching keys with short excerpts. scope: scratch|long|user|team|project; omit to search every scope visible to this session. Does not dump the memory store. Excerpts keep existing «external …» «end external» fences intact.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'What to look for in memory keys and values' },
+        scope: { type: 'string', enum: ['scratch', 'long', 'user', 'team', 'project'] },
+        limit: { type: 'number', description: 'Maximum hits to return (default 5, max 20)' }
+      },
+      required: ['query']
+    },
+    approvalMode: 'never',
+    sideEffectLevel: 'none',
+    ptc: { kind: 'read' },
+    async execute(context, args) {
+      const query = typeof args.query === 'string' ? args.query.trim() : '';
+      if (!query) return { ok: false, content: 'query is required' };
+      const requested = args.scope;
+      if (requested !== undefined && !AGENT_SCOPE_MAP[requested]) {
+        return { ok: false, content: `Unknown scope ${requested}` };
+      }
+      if (requested && !SESSION_SCOPES.has(requested) && !services.listAgentMemory) {
+        return { ok: false, content: 'Multi-layer memory backend not available.' };
+      }
+      const limit = resolveSearchLimit(args.limit);
+      const scopes: MemoryToolScope[] = requested
+        ? [requested]
+        : ['scratch', 'long', 'user', 'team', 'project'];
+      const items: MemorySearchItem[] = [];
+      const seen = new Set<string>();
+      const pushRows = (rows: unknown[], scope: MemoryToolScope) => {
+        for (const row of rows) {
+          const item = readSearchItem(row, scope);
+          if (!item || seen.has(item.id)) continue;
+          seen.add(item.id);
+          items.push(item);
+        }
+      };
+      for (const scope of scopes) {
+        if (SESSION_SCOPES.has(scope)) {
+          const rows = await services.listSessionMemory(context.session.id, scope as 'scratch' | 'long');
+          pushRows(rows, scope);
+          continue;
+        }
+        if (!services.listAgentMemory) continue;
+        const ids = resolveIds(context);
+        const botAgentId = resolveBotMemoryAgentId(context.session, services.botLookup);
+        const rows = await services.listAgentMemory({
+          scope: agentScopeOf(scope),
+          sessionId: context.session.id,
+          userId: ids.userId,
+          tenantId: ids.tenantId,
+          query,
+          limit: Math.max(limit * 4, 24),
+          ...(botAgentId ? { agentId: botAgentId } : { agentUnscoped: true })
+        });
+        pushRows(rows, scope);
+      }
+      const matched = items.filter((item) => lexicalOverlapScore(`${item.key} ${item.value}`, query) > 0);
+      const byId = new Map(matched.map((item) => [item.id, item]));
+      const ranked = hybridOrderMemories(
+        matched.map(toAgentMemory),
+        query,
+        {}
+      );
+      const matches = ranked.slice(0, limit).map((item) => {
+        const row = byId.get(item.id)!;
+        return {
+          scope: row.scope,
+          key: row.key,
+          excerpt: excerptPreservingFences(row.value)
+        };
+      });
+      return { ok: true, content: JSON.stringify({ matches }, null, 2) };
+    }
+  };
+
+  return [memorySetTool, memoryGetTool, memorySearchTool, memoryDeleteTool, handoffStateTool, memoryPrefetchTool];
 }
