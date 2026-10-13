@@ -20,17 +20,28 @@ import {
   settleOutboundDraft,
   type OutboundDraft
 } from './outbound-drafts.js';
-import type { ChannelSpec } from './types.js';
+import type { ChannelSpec, ChannelType } from './types.js';
+
+/**
+ * Slack, Telegram, and email held here always become drafts.
+ * `approval: 'approved'` does not send. A human releases the draft, which calls deliverToChannel.
+ * No model tool approves or sends these channels.
+ */
+const HUMAN_RELEASE_CHANNEL_TYPES = new Set<ChannelType>(['slack', 'telegram', 'email']);
 
 export async function deliverChannelText(opts: {
   gatewayDir: string;
   channel: ChannelSpec;
   text: string;
   event?: string;
-  /** Only a human draft release passes `approved`. Model replies omit it and stay a draft. */
+  /**
+   * Model replies omit `approved` and stay drafts, including Feishu and WeCom.
+   * Slack, Telegram, and email stay drafts even when `approved` is passed.
+   * Other channels still send when a caller passes `approved`.
+   */
   approval?: 'approved';
 }): Promise<void> {
-  if (opts.approval !== 'approved') {
+  if (opts.approval !== 'approved' || HUMAN_RELEASE_CHANNEL_TYPES.has(opts.channel.type)) {
     await appendOutboundDraft(opts.gatewayDir, {
       channelId: opts.channel.id,
       text: opts.text,

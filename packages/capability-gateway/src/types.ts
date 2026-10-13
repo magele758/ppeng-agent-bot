@@ -1,18 +1,46 @@
-export type ChannelType = 'webhook' | 'http_post' | 'feishu_bot' | 'wecom_group_bot';
+export type ChannelType =
+  | 'webhook'
+  | 'http_post'
+  | 'feishu_bot'
+  | 'wecom_group_bot'
+  | 'slack'
+  | 'telegram'
+  | 'email';
 
 export interface ChannelSpec {
   id: string;
   type: ChannelType;
-  /** Full URL for webhook or HTTP POST body delivery */
+  /**
+   * Webhook / email_http: POST URL.
+   * Slack: `chat.postMessage` URL, or a conversation id when it is not http(s).
+   * Telegram: Bot API origin, or a chat id when it is not http(s).
+   * Feishu: receive id. WeCom: webhook URL.
+   */
   url: string;
-  /** Extra headers (e.g. Authorization) */
+  /**
+   * Extra headers. Slack / Telegram may carry the bot token here
+   * (`Authorization: Bearer …` or `Bearer env:VAR` / `env:VAR`).
+   * The token value is read at send time and is not written to logs.
+   */
   headers?: Record<string, string>;
-  /** For slack-compatible: use { "text": "..." } wrapping */
+  /** For slack-compatible webhooks: use { "text": "..." } wrapping */
   payloadMode?: 'json_text' | 'raw_json';
   /** Lark / Feishu group bot: use chat_id from receive_id_v2 when sending */
   feishuReceiveIdType?: 'open_id' | 'user_id' | 'union_id' | 'chat_id';
   /** WeCom group bot key (path segment) if url is base only */
   wecomKey?: string;
+  /**
+   * Env var name whose value is the Slack or Telegram bot token.
+   * Configuration stores the name only. Used when `headers` does not carry a token.
+   */
+  tokenEnv?: string;
+  /**
+   * Slack conversation id, Telegram chat id, or email recipient.
+   * Required for Slack / Telegram when `url` is an http(s) endpoint.
+   */
+  target?: string;
+  /** Subject field on the email_http JSON body. */
+  subject?: string;
 }
 
 /** Feishu / Lark event subscription (inbound). */
