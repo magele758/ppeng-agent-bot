@@ -112,6 +112,8 @@ import {
 } from '../turn/prepare-view.js';
 import type { TurnKernelHost } from '../turn/host.js';
 import { autoCompactSession } from './compact-host.js';
+import { applyNormalSessionRequestBudget } from './normal-request-guard.js';
+import { resolveMaxContextTokens } from '../session/session-budget.js';
 import { autoClaimTask, ingestMailbox, unblockDependentTasks } from './scheduler-host.js';
 import { handleTurnCompletion, injectEvolvingCoachBeforeRecovery } from './session-complete.js';
 import { resolveSkillLoad, resolveSkillSearch } from './skill-load.js';
@@ -429,6 +431,51 @@ function runTurnViaFallbackChain(
   });
 }
 
+type ModelTurnCall = TurnKernelHost['runTurnWithRetries'];
+
+/**
+ * Ordinary chats are capped here, after micro-compact has already shaped
+ * `messages` and the kernel has attached the system prompt and tool schemas.
+ * Canonical bot chats are left untouched.
+ */
+function fitProductModelRequest(
+  rt: L5Bindable,
+  input: Parameters<ModelTurnCall>[0]
+): Promise<Parameters<ModelTurnCall>[0]> {
+  const session = input.sessionId ? rt.store.getSession(input.sessionId) : undefined;
+  const adapter = session
+    ? resolveSessionModelAdapter(rt.store, session, process.env, rt.modelAdapter)
+    : rt.modelAdapter;
+  return applyNormalSessionRequestBudget(input, {
+    session,
+    store: rt.store,
+    stateDir: rt.stateDir,
+    maxContextTokens: resolveMaxContextTokens(process.env),
+    emitTrace: (event) => {
+      if (!input.sessionId) return;
+      rt.emitTrace(input.sessionId, {
+        kind: event.kind,
+        payload: event.payload
+      });
+    },
+    summarize: (messages) =>
+      adapter.summarizeMessages({
+        agent: input.agent,
+        messages,
+        reason: `compact session ${input.sessionId ?? session?.id ?? ''}`
+      })
+  });
+}
+
+function runTurnWithNormalRequestBudget(
+  rt: L5Bindable,
+  input: Parameters<ModelTurnCall>[0],
+  onStream: Parameters<ModelTurnCall>[1],
+  deliver: ModelTurnCall
+): Promise<ModelTurnResult> {
+  return fitProductModelRequest(rt, input).then((fitted) => deliver(fitted, onStream));
+}
+
 /**
  * A fallback candidate re-streams the whole turn. Before it starts, tell the client
  * to drop what the failed candidate already streamed (`stream_reset`), the same
@@ -525,31 +572,32 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
       await touchImageAccess(rt.store, assetId);
       return imageBufferToDataUrl(rt.store, rt.stateDir, assetId);
     },
-    runTurnWithRetries: (input, onStream) => {
-      const session = input.sessionId ? rt.store.getSession(input.sessionId) : undefined;
-      const route = resolveModelRoute({
-        store: rt.store,
-        session,
-        env: process.env,
-        fallbackAdapter: rt.modelAdapter
-      });
-      const chained = runTurnViaFallbackChain(rt, input, onStream, route.primary, route.primaryRef ?? null);
-      if (chained) return chained;
-      const candidates = route.candidates.map((adapter, i) => ({
-        adapter,
-        label: i === 0 ? 'primary' : `fallback-${i}`
-      }));
-      if (candidates.length <= 1) {
-        const adapter = route.primary ?? (session
-          ? resolveSessionModelAdapter(rt.store, session, process.env, rt.modelAdapter)
-          : rt.modelAdapter);
-        return toolLoopRunTurn(adapter, input, onStream);
-      }
-      const stream = fallbackStream(onStream);
-      return withProviderFallback(candidates, (adapter, index) =>
-        toolLoopRunTurn(adapter, input, stream.forAttempt(index))
-      );
-    },
+    runTurnWithRetries: (input, onStream) =>
+      runTurnWithNormalRequestBudget(rt, input, onStream, (fitted, stream) => {
+        const session = fitted.sessionId ? rt.store.getSession(fitted.sessionId) : undefined;
+        const route = resolveModelRoute({
+          store: rt.store,
+          session,
+          env: process.env,
+          fallbackAdapter: rt.modelAdapter
+        });
+        const chained = runTurnViaFallbackChain(rt, fitted, stream, route.primary, route.primaryRef ?? null);
+        if (chained) return chained;
+        const candidates = route.candidates.map((adapter, i) => ({
+          adapter,
+          label: i === 0 ? 'primary' : `fallback-${i}`
+        }));
+        if (candidates.length <= 1) {
+          const adapter = route.primary ?? (session
+            ? resolveSessionModelAdapter(rt.store, session, process.env, rt.modelAdapter)
+            : rt.modelAdapter);
+          return toolLoopRunTurn(adapter, fitted, stream);
+        }
+        const reset = fallbackStream(stream);
+        return withProviderFallback(candidates, (adapter, index) =>
+          toolLoopRunTurn(adapter, fitted, reset.forAttempt(index))
+        );
+      }),
     waitSteeringChildrenIdle: (sessionId) => waitSteeringChildrenIdle(sessionId),
 
     ensureMcpLoaded: (sessionId) => rt.mcpManager.ensureLoaded(sessionId),
@@ -888,8 +936,6 @@ function adaptFilePolicyForLoop(
 export function l5ToAssembledIo(rt: L5Bindable): AssembledLoopIo {
   const host = bindTurnKernelHost(rt);
   const toolDeps = toolLoopDepsFrom(rt);
-  // Only override the loop's own model call when a chain is active, so lean presets
-  // (mini) keep their single-call behavior with an empty chain.
   const chainActive =
     planModelFallback({ store: rt.store, primary: rt.modelAdapter, env: process.env }) !== undefined;
   const chainRunTurn: TurnKernelHost['runTurnWithRetries'] = (input, onStream) => {
@@ -927,7 +973,11 @@ export function l5ToAssembledIo(rt: L5Bindable): AssembledLoopIo {
     resolveFilePolicy: async () => adaptFilePolicyForLoop(await rt.mergedFilePolicy()),
     resolveImageDataUrl: host.resolveImageDataUrl,
     resolveModelAdapter: host.resolveModelAdapter,
+    // Only override the loop's own model call when a chain is active, so lean
+    // presets (mini) keep their single-call behavior with an empty chain.
+    // The 20% request cap is fitModelRequest, which the kernel runs first.
     ...(chainActive ? { runTurnWithRetries: chainRunTurn } : {}),
+    fitModelRequest: (input) => fitProductModelRequest(rt, input),
     resolveTurnTools: host.resolveTurnTools,
     resolveRunProfile: host.resolveRunProfile,
     evaluateGoalGate: host.evaluateGoalGate,

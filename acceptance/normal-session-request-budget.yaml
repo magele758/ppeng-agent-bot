@@ -1,0 +1,44 @@
+id: normal-session-request-budget
+title: 普通会话请求不超过窗口的 20%
+status: implemented
+requirement: |
+  User decided: normal sessions must keep the final model request at or below 20% of the model context window. Bot canonical sessions stay on the existing 50% / 85% compression. Do not change bot thresholds.
+
+  Implement for normal (non-canonical-bot) sessions:
+  - Measure the request that will actually be sent: system + tool schemas + messages, divided by the resolved context window (default 131072). Cap is 20% (about 26214 tokens when the window is 131072).
+  - Apply after micro-compact, before the adapter call. Under the cap: send as-is.
+  - Over the cap: drop older closed tool waves first (tool_call stays paired with tool_result). Keep the leading system prompt and the latest user message (memory appendix on that message stays).
+  - If still over, summarize the dropped prefix with the existing compact path. If summary fails, do not fall back to a blind 24-slice.
+  - If the pinned pieces alone exceed 20%, stop dropping, send the turn, and record a trace that it is over budget. Never delete the latest user question to hit the number.
+  - No new RAW_AGENT_* env. A constant or existing daemon_control/Lab setting defaulting to 0.2 is fine. Do not add a visible settings toggle unless one already exists for compact.
+criteria:
+  - id: AC-1
+    given: 一条普通会话，微压缩之后实际要发给模型的内容（系统提示、工具定义和消息）不超过该模型上下文窗口的 20%
+    when: 这一轮发给模型
+    then: 内容原样送出，最新一条用户问题还在
+  - id: AC-2
+    given: 一条普通会话，实际请求超过窗口的 20%，多出来的是更早且已经闭合的工具回合
+    when: 这一轮发给模型
+    then: 更早的闭合工具回合被拿掉，每次工具调用仍和自己的结果在一起；开头的系统提示和最新一条用户消息还在，贴在这条用户消息上的记忆附录也还在；送出的请求不超过窗口的 20%
+  - id: AC-3
+    given: 一条普通会话，拿掉更早的闭合工具回合后仍然超过窗口的 20%，但开头的系统提示、工具定义和最新一条用户消息本身放得进 20%
+    when: 这一轮发给模型
+    then: 被拿掉的更早前缀被收成一份摘要，最新一条用户问题还在，送出的请求不超过窗口的 20%
+  - id: AC-4
+    given: 一条普通会话，需要为被拿掉的前缀做摘要，但摘要做不出来
+    when: 这一轮发给模型
+    then: 最新一条用户问题仍在，开头的系统提示仍在，历史没有被收成最后 24 条
+  - id: AC-5
+    given: 一条普通会话，开头的系统提示、工具定义和最新一条用户消息加在一起已经超过窗口的 20%
+    when: 这一轮发给模型
+    then: 不再为了达标继续删，最新一条用户问题仍被送出，并留下一条记录说明这次请求超过预算
+  - id: AC-6
+    given: 一条规范 Bot 主会话，请求已经超过窗口的 20%，但还没到原先一半窗口的压缩点
+    when: 这一轮发给模型
+    then: 不会按 20% 去削这条会话；Bot 仍只在窗口的 50% 和 85% 压缩
+  - id: AC-7
+    given: 没有为这个比例新增环境变量，模型窗口用默认大小，或窗口被配成别的大小
+    when: 计算普通会话的请求上限
+    then: 默认窗口 131072 时上限约为 26214；其它窗口的上限仍是该窗口的 20%
+owner: user
+notes: user decided 20% for normal sessions

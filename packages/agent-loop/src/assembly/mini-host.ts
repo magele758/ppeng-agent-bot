@@ -56,6 +56,7 @@ export function applyIoOverrides(host: TurnKernelHost, io: AssembledLoopIo): voi
   if (io.executeToolCalls) host.executeToolCalls = io.executeToolCalls;
   if (io.processToolResults) host.processToolResults = io.processToolResults;
   if (io.runTurnWithRetries) host.runTurnWithRetries = io.runTurnWithRetries;
+  if (io.fitModelRequest) host.fitModelRequest = io.fitModelRequest;
   if (io.autoCompact) host.autoCompact = io.autoCompact;
   if (io.prepareMessagesForModel) host.prepareMessagesForModel = io.prepareMessagesForModel;
   if (io.readWorkingLogAppendix) host.readWorkingLogAppendix = io.readWorkingLogAppendix;
