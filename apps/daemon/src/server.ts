@@ -20,7 +20,7 @@ import {
   EVOLUTION_DISABLED_CODE,
   type CoreStorageContext,
 } from '@ppeng/agent-core';
-import { availableDomainIds, loadDomainBundles } from './domain-loader.js';
+import { availableDomainIds, describeDomainConnectors, loadDomainBundles } from './domain-loader.js';
 import { json } from './http-utils.js';
 import {
   clientKeyFromRequest,
@@ -178,6 +178,7 @@ const runtime = new RawAgentRuntime({
   cloudSkillsLoader: storageCtx.cloudSkillsLoader,
   tieredAssetStorage: storageCtx.tieredAssets,
 });
+runtime.connectors.setDomains(describeDomainConnectors(domains));
 
 const loopOn = writeLoopSettings(runtime.store, {
   kernelVariant: 'agent-loop',

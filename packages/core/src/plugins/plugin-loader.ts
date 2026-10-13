@@ -3,9 +3,32 @@
  * A plugin is a directory with plugin.json + optional agents/tools/skills/hooks.
  */
 
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
+import { join, resolve, sep } from 'node:path';
 import type { AgentSpec, SkillSpec, ToolContract } from '../types.js';
+
+export type PluginAuthKind = 'none' | 'bearer' | 'oauth' | 'header';
+
+/** Names only. A plugin manifest must not carry the secret value. */
+export interface PluginAuthSpec {
+  kind?: PluginAuthKind;
+  /** Env var that holds the secret, e.g. `ACME_TOKEN`. */
+  secretEnv?: string;
+  /** HTTP header name when `kind` is `header`. */
+  headerName?: string;
+}
+
+export interface PluginToolSpec {
+  name?: string;
+  description?: string;
+  inputSchema?: Record<string, unknown>;
+}
+
+export interface PluginToolDecl {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+}
 
 export interface PluginManifest {
   id: string;
@@ -15,6 +38,15 @@ export interface PluginManifest {
   /** Relative paths under the plugin root */
   agents?: string[];
   skills?: string[];
+  /** Relative markdown path. Shown to the model only after this connector is granted. */
+  instructions?: string;
+  /** Per-connector auth. The secret value stays in the named env var. */
+  auth?: PluginAuthSpec;
+  /**
+   * Declarative tools: inline specs or JSON paths. `tools/*.json` is loaded too.
+   * They are recorded on `toolDecls` and stay out of `tools` until granted.
+   */
+  tools?: Array<string | PluginToolSpec>;
   /** Optional hook script paths keyed by phase */
   hooks?: Partial<
     Record<
@@ -29,8 +61,17 @@ export interface LoadedPlugin {
   manifest: PluginManifest;
   agents: AgentSpec[];
   skills: SkillSpec[];
-  /** Tool factories are rare; most plugins ship skills/agents only */
+  /**
+   * Tools exposed to the model. Always empty here — the connector registry
+   * adds `toolDecls` only after the plugin is granted.
+   */
   tools: ToolContract<any>[];
+  toolDecls: PluginToolDecl[];
+  /** Markdown from `manifest.instructions`, or empty when missing. */
+  instructionText: string;
+  authKind: PluginAuthKind;
+  secretEnv?: string;
+  headerName?: string;
   hookEnv: Record<string, string>;
 }
 
@@ -92,6 +133,119 @@ function loadSkillMd(path: string, pluginId: string): SkillSpec | undefined {
   }
 }
 
+const AUTH_KINDS = new Set<PluginAuthKind>(['none', 'bearer', 'oauth', 'header']);
+const ENV_NAME_RE = /^[A-Z][A-Z0-9_]{0,63}$/;
+const HEADER_NAME_RE = /^[A-Za-z0-9-]{1,64}$/;
+const TOOL_NAME_RE = /^[A-Za-z][A-Za-z0-9_]{0,64}$/;
+
+function cleanEnvName(name: unknown): string | undefined {
+  if (typeof name !== 'string') return undefined;
+  const trimmed = name.trim();
+  return ENV_NAME_RE.test(trimmed) ? trimmed : undefined;
+}
+
+function cleanHeaderName(name: unknown): string | undefined {
+  if (typeof name !== 'string') return undefined;
+  const trimmed = name.trim();
+  return HEADER_NAME_RE.test(trimmed) ? trimmed : undefined;
+}
+
+function parseAuth(raw: PluginAuthSpec | undefined): {
+  authKind: PluginAuthKind;
+  secretEnv?: string;
+  headerName?: string;
+} {
+  const kind = raw?.kind;
+  const authKind = kind && AUTH_KINDS.has(kind) ? kind : 'none';
+  const secretEnv = cleanEnvName(raw?.secretEnv);
+  const headerName = cleanHeaderName(raw?.headerName);
+  return {
+    authKind,
+    ...(secretEnv ? { secretEnv } : {}),
+    ...(headerName ? { headerName } : {})
+  };
+}
+
+/** Reject paths that leave the plugin root, including via symlink. */
+function resolveInside(root: string, rel: string): string | undefined {
+  if (!rel || rel.includes('\0')) return undefined;
+  const rootAbs = resolve(root);
+  const abs = resolve(rootAbs, rel);
+  if (abs !== rootAbs && !abs.startsWith(rootAbs + sep)) return undefined;
+  if (!existsSync(abs)) return undefined;
+  try {
+    const realRoot = realpathSync(rootAbs);
+    const realAbs = realpathSync(abs);
+    if (realAbs !== realRoot && !realAbs.startsWith(realRoot + sep)) return undefined;
+    return realAbs;
+  } catch {
+    return undefined;
+  }
+}
+
+function readInstructions(root: string, rel: string | undefined): string {
+  if (!rel?.trim()) return '';
+  const abs = resolveInside(root, rel.trim());
+  if (!abs) return '';
+  try {
+    return readFileSync(abs, 'utf8').trim();
+  } catch {
+    return '';
+  }
+}
+
+function toolDeclFromUnknown(raw: unknown): PluginToolDecl | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const rec = raw as Record<string, unknown>;
+  const name = typeof rec.name === 'string' ? rec.name.trim() : '';
+  if (!TOOL_NAME_RE.test(name)) return undefined;
+  const description =
+    typeof rec.description === 'string' && rec.description.trim() ? rec.description.trim() : name;
+  const inputSchema =
+    rec.inputSchema && typeof rec.inputSchema === 'object' && !Array.isArray(rec.inputSchema)
+      ? (rec.inputSchema as Record<string, unknown>)
+      : { type: 'object', properties: {} };
+  return { name, description, inputSchema };
+}
+
+function readToolFile(root: string, rel: string): PluginToolDecl | undefined {
+  const abs = resolveInside(root, rel);
+  if (!abs) return undefined;
+  try {
+    return toolDeclFromUnknown(JSON.parse(readFileSync(abs, 'utf8')) as unknown);
+  } catch {
+    return undefined;
+  }
+}
+
+function loadToolDecls(root: string, manifest: PluginManifest): PluginToolDecl[] {
+  const decls: PluginToolDecl[] = [];
+  const seen = new Set<string>();
+  const push = (decl: PluginToolDecl | undefined) => {
+    if (!decl || seen.has(decl.name)) return;
+    seen.add(decl.name);
+    decls.push(decl);
+  };
+  for (const entry of manifest.tools ?? []) {
+    if (typeof entry === 'string') push(readToolFile(root, entry));
+    else push(toolDeclFromUnknown(entry));
+  }
+  const toolsDir = join(root, 'tools');
+  if (existsSync(toolsDir)) {
+    let names: string[] = [];
+    try {
+      names = readdirSync(toolsDir);
+    } catch {
+      names = [];
+    }
+    for (const name of names) {
+      if (!name.endsWith('.json')) continue;
+      push(readToolFile(root, join('tools', name)));
+    }
+  }
+  return decls;
+}
+
 export function loadPluginFromDir(root: string): LoadedPlugin | undefined {
   const manifestPath = join(root, 'plugin.json');
   const alt = join(root, '.ppeng-plugin', 'plugin.json');
@@ -150,7 +304,20 @@ export function loadPluginFromDir(root: string): LoadedPlugin | undefined {
     }
   }
 
-  return { root, manifest, agents, skills, tools: [], hookEnv };
+  const auth = parseAuth(manifest.auth);
+  return {
+    root,
+    manifest,
+    agents,
+    skills,
+    tools: [],
+    toolDecls: loadToolDecls(root, manifest),
+    instructionText: readInstructions(root, manifest.instructions),
+    authKind: auth.authKind,
+    ...(auth.secretEnv ? { secretEnv: auth.secretEnv } : {}),
+    ...(auth.headerName ? { headerName: auth.headerName } : {}),
+    hookEnv
+  };
 }
 
 /**

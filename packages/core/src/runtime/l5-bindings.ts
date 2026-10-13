@@ -134,6 +134,8 @@ export interface L5Bindable {
   repoRoot: string;
   stateDir: string;
   tools: ToolContract<any>[];
+  /** Refresh granted plugin tools onto `tools` before a turn. Domain mounts stay put. */
+  syncConnectorTools?(): void;
   modelAdapter: ModelAdapter;
   promptBuilder: PromptBuilder;
   mcpManager: { ensureLoaded(sessionId: string): Promise<void> };
@@ -448,6 +450,7 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
     repoRoot: rt.repoRoot,
     stateDir: rt.stateDir,
     tools: rt.tools,
+    ...(rt.syncConnectorTools ? { syncConnectorTools: () => rt.syncConnectorTools!() } : {}),
     modelAdapter: rt.modelAdapter,
     resolveModelAdapter: (session) =>
       resolveSessionModelAdapter(rt.store, session, process.env, rt.modelAdapter),
@@ -567,6 +570,7 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
       return defaultWorkspaceRoots(isolated, rt.repoRoot);
     },
     resolveTurnTools: async ({ session, agent, messages, systemPromptChars }) => {
+      rt.syncConnectorTools?.();
       const query = lastUserQueryFromMessages(messages);
       const dynHydrated = hydrateTurnDynTools({
         store: rt.store,

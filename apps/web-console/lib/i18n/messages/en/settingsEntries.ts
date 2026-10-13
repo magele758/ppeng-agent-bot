@@ -270,6 +270,15 @@ export const settingsEntries = {
     probe: 'Probe Tailscale now',
     probeDone: 'Probe finished: found {count}, source {source}'
   },
+  connectors: {
+    title: 'Connector grants',
+    keywords: 'connector grant plugin domain secret authorization',
+    desc: 'Each connector is granted on its own. Usage notes reach the model only after a grant. This list shows the name and whether it is granted.',
+    empty: 'No connectors to grant.',
+    granted: 'Granted',
+    notGranted: 'Not granted',
+    loadFailed: 'Could not load connectors'
+  },
   langfuse: {
     title: 'Langfuse tracing',
     keywords: 'tracing trace langfuse observability monitoring logs call chain usage cost troubleshooting',

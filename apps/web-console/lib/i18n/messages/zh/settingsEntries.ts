@@ -268,6 +268,15 @@ export const settingsEntries = {
     probe: '立即探测 Tailscale',
     probeDone: '探测完成：发现 {count} 个，来源 {source}'
   },
+  connectors: {
+    title: '连接器授权',
+    keywords: '连接器 connector 授权 grant 插件 领域 密钥',
+    desc: '每个连接器单独授权后，使用说明才会交给模型。这里只显示名称和是否已授权。',
+    empty: '当前没有可授权的连接器。',
+    granted: '已授权',
+    notGranted: '未授权',
+    loadFailed: '无法读取连接器'
+  },
   langfuse: {
     title: 'Langfuse 追踪',
     keywords: '追踪 trace langfuse 可观测 observability 监控 日志 调用链 用量 费用 排查',
