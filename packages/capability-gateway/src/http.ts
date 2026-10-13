@@ -338,7 +338,13 @@ export async function handleGatewayHttp(
         json(response, 200, { ok: true, sessionId: result.sessionId, reply: null });
         return true;
       }
-      if (channel.type === 'webhook' || channel.type === 'http_post') {
+      if (
+        channel.type === 'webhook' ||
+        channel.type === 'http_post' ||
+        channel.type === 'slack' ||
+        channel.type === 'telegram' ||
+        channel.type === 'email'
+      ) {
         try {
           await appendOutboundDraft(gatewayDir, {
             channelId: channel.id,
