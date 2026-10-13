@@ -13,7 +13,7 @@ import {
 } from '../memory/memory-gate.js';
 import { resolveBotMemoryAgentId } from '../memory/bot-memory-scope.js';
 import { memoryBackendFromEnv, sessionScopeToAgent } from '../memory/memory-backend.js';
-import { recallProgressive } from '../memory/memory-recall.js';
+import { recallProgressive, recallProgressiveAsync, type RecallContext, type RecallDiagnostic } from '../memory/memory-recall.js';
 import { resolveMemorySettings } from '../memory/memory-settings.js';
 import { decodePtcStoredValue, encodePersistedPtcValue, isPtcAppendixEligible } from '../memory/ptc-meta.js';
 import type { AgentMemoryStore } from '../memory/store.js';
@@ -21,6 +21,7 @@ import type { AgentMemory } from '../memory/types.js';
 import type { SessionMessage, SessionRecord } from '../types.js';
 import { applyJevMemorySelect } from '../jev/apply.js';
 import { workingLogPath } from './working-log.js';
+import { runProfileFromSession } from '../runtime/run-profile.js';
 
 export {
   compileContextPack,
@@ -62,9 +63,12 @@ export interface CompileTurnAppendixInput {
     getBot?(id: string): { id?: string; agentId: string } | undefined;
     listBots?(opts?: { includeHidden?: boolean }): Array<{ id: string; agentId: string }>;
     getSession?(id: string): SessionRecord | undefined;
+    updateSession?(id: string, patch: Partial<SessionRecord>): SessionRecord;
   };
   stateDir?: string;
   sources?: RecallSources;
+  embedQuery?: (text: string) => Promise<number[] | null>;
+  onDiagnostic?: (diagnostic: RecallDiagnostic) => void;
 }
 
 function packFromSources(sources: RecallSources, query: string): CompiledContextPack {
@@ -124,58 +128,60 @@ function legacySessionRows(
   return rows;
 }
 
-function buildSources(input: CompileTurnAppendixInput): RecallSources | null {
-  try {
-    const settings = resolveMemorySettings(input.store);
-    if (!settings.compilerEnabled) return null;
+function recallInput(input: CompileTurnAppendixInput): RecallContext | RecallSources | null {
+  if (runProfileFromSession(input.session).persistentMemory === 'off') return null;
+  const settings = resolveMemorySettings(input.store);
+  if (!settings.compilerEnabled) return null;
 
-    if (input.sources) return input.sources;
+  if (input.sources) return input.sources;
 
-    const am = input.store && typeof input.store.agentMemory === 'function' ? input.store.agentMemory() : undefined;
-    if (!am) {
-      const listed = (input.store?.listSessionMemory?.(input.session.id) ?? []).filter((m) => {
-        if (m.metadata?.source === 'dyn-tool' || m.metadata?.namespace === 'dyn-tools') {
-          return m.metadata?.pin === true;
-        }
-        return isPtcAppendixEligible(m);
-      });
-      const working =
-        listed.length === 0
-          ? ''
-          : [
-              '## 相关工作记忆',
-              '',
-              ...listed
-                .slice(0, 20)
-                .map((m) => `- ${m.key}: ${decodePtcStoredValue(String(m.value ?? '')).value}`)
-            ].join('\n');
-      return { userProfile: '', core: '', working, workingFile: '' };
-    }
-
-    const userId =
-      typeof input.session.metadata?.userId === 'string'
-        ? input.session.metadata.userId
-        : process.env.RAW_AGENT_DEFAULT_USER_ID?.trim() || undefined;
-    const tenantId =
-      typeof input.session.metadata?.tenantId === 'string'
-        ? input.session.metadata.tenantId
-        : process.env.RAW_AGENT_DEFAULT_TENANT_ID?.trim() || undefined;
-
-    return recallProgressive({
-      store: am,
-      query: input.query,
-      userId,
-      tenantId,
-      sessionId: input.session.id,
-      sessionRows: legacySessionRows(input.store, input.session.id),
-      agentId: resolveBotMemoryAgentId(input.session, input.store),
-      workingLogPath: input.stateDir ? workingLogPath(input.stateDir, input.session.id) : undefined,
-      stateDir: input.stateDir,
-      embeddings: (id) => am.getEmbedding(id)
+  const am = input.store && typeof input.store.agentMemory === 'function' ? input.store.agentMemory() : undefined;
+  if (!am) {
+    const listed = (input.store?.listSessionMemory?.(input.session.id) ?? []).filter((m) => {
+      if (m.metadata?.source === 'dyn-tool' || m.metadata?.namespace === 'dyn-tools') {
+        return m.metadata?.pin === true;
+      }
+      return isPtcAppendixEligible(m);
     });
-  } catch {
-    return null;
+    const working =
+      listed.length === 0
+        ? ''
+        : [
+            '## 相关工作记忆',
+            '',
+            ...listed
+              .slice(0, 20)
+              .map((m) => `- ${m.key}: ${decodePtcStoredValue(String(m.value ?? '')).value}`)
+          ].join('\n');
+    return { userProfile: '', core: '', working, workingFile: '' };
   }
+
+  const userId =
+    typeof input.session.metadata?.userId === 'string'
+      ? input.session.metadata.userId
+      : process.env.RAW_AGENT_DEFAULT_USER_ID?.trim() || undefined;
+  const tenantId =
+    typeof input.session.metadata?.tenantId === 'string'
+      ? input.session.metadata.tenantId
+      : process.env.RAW_AGENT_DEFAULT_TENANT_ID?.trim() || undefined;
+
+  return {
+    store: am,
+    query: input.query,
+    userId,
+    tenantId,
+    sessionId: input.session.id,
+    sessionRows: legacySessionRows(input.store, input.session.id),
+    agentId: resolveBotMemoryAgentId(input.session, input.store),
+    workingLogPath: input.stateDir ? workingLogPath(input.stateDir, input.session.id) : undefined,
+    stateDir: input.stateDir,
+    embeddings: (id) => am.getEmbedding(id)
+  };
+}
+
+function buildSources(input: CompileTurnAppendixInput): RecallSources | null {
+  const source = recallInput(input);
+  return source && 'store' in source ? recallProgressive(source) : source;
 }
 
 export function compileTurnAppendix(input: CompileTurnAppendixInput): string {
@@ -188,39 +194,42 @@ export function compileTurnAppendix(input: CompileTurnAppendixInput): string {
   }
 }
 
-/** Turn path: same as compileTurnAppendix, then optional Jev memorySelect on slots. */
-export async function compileTurnAppendixAsync(input: CompileTurnAppendixInput): Promise<string> {
+/** Shared real-turn and preview pipeline: identity, settings, embeddings, logs and Jev. */
+export async function previewContextPackAsync(input: CompileTurnAppendixInput): Promise<CompiledContextPack & { diagnostics: RecallDiagnostic[] }> {
+  const diagnostics: RecallDiagnostic[] = [];
+  const onDiagnostic = (diagnostic: RecallDiagnostic) => {
+    diagnostics.push(diagnostic);
+    try { input.onDiagnostic?.(diagnostic); } catch { /* observers cannot interrupt recall */ }
+  };
+  let pack = compileContextPack({ userProfile: '', core: '', working: '', workingFile: '' }, input.query);
   try {
-    const sources = buildSources(input);
-    if (!sources) return '';
-    const pack = await maybeFilterPackByJev(
-      input.store,
-      input.query,
-      packFromSources(sources, input.query)
-    );
-    return formatCompiledContextPack(pack);
+    const source = recallInput(input);
+    if (source) {
+      const sources = 'store' in source
+        ? await recallProgressiveAsync({ ...source, settings: resolveMemorySettings(input.store), embedQuery: input.embedQuery, onDiagnostic })
+        : source;
+      pack = await maybeFilterPackByJev(input.store, input.query, packFromSources(sources, input.query));
+    }
   } catch {
-    return '';
+    onDiagnostic({ code: 'recall_unavailable', mode: 'empty', reason: 'Memory recall unavailable; continuing without a memory appendix.' });
   }
+  return { ...pack, diagnostics };
 }
 
-export function previewContextPack(input: CompileTurnAppendixInput): CompiledContextPack {
-  if (input.sources) return compileContextPack(input.sources, input.query);
-  const am = input.store && typeof input.store.agentMemory === 'function' ? input.store.agentMemory() : undefined;
-  if (!am) {
-    return compileContextPack({ userProfile: '', core: '', working: '', workingFile: '' }, input.query);
+export async function compileTurnAppendixAsync(input: CompileTurnAppendixInput): Promise<string> {
+  const pack = await previewContextPackAsync(input);
+  // Store only bounded, sanitized diagnostics; never persist upstream errors or credentials.
+  const current = input.store?.getSession?.(input.session.id)?.metadata ?? input.session.metadata;
+  if (!pack.diagnostics.length && !current.memoryRecallDiagnostics) return formatCompiledContextPack(pack);
+  const metadata = { ...current, memoryRecallDiagnostics: pack.diagnostics };
+  input.session.metadata = metadata;
+  if (JSON.stringify(current.memoryRecallDiagnostics) !== JSON.stringify(pack.diagnostics)) {
+    try { input.store?.updateSession?.(input.session.id, { metadata }); } catch { /* best-effort observation */ }
   }
-  const userId =
-    typeof input.session.metadata?.userId === 'string' ? input.session.metadata.userId : undefined;
-  const sources = recallProgressive({
-    store: am,
-    query: input.query,
-    userId,
-    sessionId: input.session.id,
-    agentId: resolveBotMemoryAgentId(input.session, input.store),
-    workingLogPath: input.stateDir ? workingLogPath(input.stateDir, input.session.id) : undefined,
-    stateDir: input.stateDir,
-    embeddings: (id) => am.getEmbedding(id)
-  });
-  return compileContextPack(sources, input.query);
+  return formatCompiledContextPack(pack);
+}
+
+/** Legacy synchronous API uses the same identity/settings inputs, without network retrieval. */
+export function previewContextPack(input: CompileTurnAppendixInput): CompiledContextPack {
+  return compileContextPack(buildSources(input) ?? { userProfile: '', core: '', working: '', workingFile: '' }, input.query);
 }

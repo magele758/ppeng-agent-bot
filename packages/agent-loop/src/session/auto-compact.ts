@@ -8,6 +8,7 @@
  * returning early.
  */
 
+import { formatToolResultStub } from './tool-result-stub.js';
 import { estimateMessageTokens } from '../model/token-estimate.js';
 import {
   SurfaceInvariantError,
@@ -116,7 +117,7 @@ function isClosedSummaryCut(messages: SessionMessage[], start: number, end: numb
  * Closed range that may be replaced by a summary. The leading system prompt
  * and the latest user message stay verbatim; the recent tail stays too.
  */
-function selectCompactableClosedRange(
+export function selectCompactableClosedRange(
   folded: SessionMessage[],
   keepRecent = COMPACT_KEEP_RECENT
 ): { startSeq: number; endSeq: number; older: SessionMessage[] } | null {
@@ -198,6 +199,7 @@ export interface RunAutoCompactInput {
   force?: boolean;
   /** Throw on open tool wave instead of no-op. */
   strict?: boolean;
+  /** Limit the updated rolling summary; the returned text replaces session.summary. */
   capSummary?: (text: string) => string;
   keepRecent?: number;
 }
@@ -217,14 +219,19 @@ export async function runAutoCompact(input: RunAutoCompactInput): Promise<AutoCo
   }
 
   const keepRecent = input.keepRecent ?? COMPACT_KEEP_RECENT;
-  // Prefer a closed range that leaves the leading system prompt and the latest
-  // user message in place. When that would leave nothing to summarize (short
-  // chats), keep the original prefix replace so callers still compact.
-  const range =
-    selectCompactableClosedRange(folded, keepRecent) ?? selectClosedPrefixRange(folded, keepRecent);
+  // No fallback may consume the latest user question or the leading instructions.
+  const range = selectCompactableClosedRange(folded, keepRecent);
   if (range && range.older.length > 0) {
-    const summary = await input.summarize(range.older);
+    const prior = input.session.summary?.trim();
+    const summaryInput = prior ? [{
+      id: 'compact-prior-summary', sessionId: input.session.id, role: 'system' as const,
+      parts: [{ type: 'text' as const, text: `Update this existing summary with the following history. Preserve still-valid constraints and unresolved work, replace superseded decisions, and do not repeat the previous summary verbatim.\n${prior}` }],
+      createdAt: new Date(0).toISOString()
+    }, ...range.older] : range.older;
+    const summary = await input.summarize(summaryInput);
+    if (!summary.trim()) return { didCompact: false, pruned: false, skippedReason: 'empty_summary' };
     const capped = input.capSummary ? input.capSummary(summary) : summary;
+    if (!capped.trim()) return { didCompact: false, pruned: false, skippedReason: 'empty_summary' };
     input.store.appendReplacement(input.session.id, {
       startSeq: range.startSeq,
       endSeq: range.endSeq,
@@ -232,8 +239,7 @@ export async function runAutoCompact(input: RunAutoCompactInput): Promise<AutoCo
       parts: [{ type: 'text', text: capped }],
       key: 'compact-summary'
     });
-    const merged = input.session.summary ? `${input.session.summary}\n\n${capped}` : capped;
-    input.store.updateSession(input.session.id, { summary: merged });
+    input.store.updateSession(input.session.id, { summary: capped });
     if (input.archive) {
       await input.archive(range.older);
     }
@@ -253,7 +259,7 @@ export async function runAutoCompact(input: RunAutoCompactInput): Promise<AutoCo
   if (!resultPart || resultPart.type !== 'tool_result') {
     return { didCompact: false, pruned: false, skippedReason: 'no_closed_range' };
   }
-  const prunedContent = `${resultPart.content.slice(0, PRUNE_KEEP_CHARS)}\n…[pruned ${resultPart.content.length - PRUNE_KEEP_CHARS} chars]`;
+  const prunedContent = `${resultPart.content.slice(0, PRUNE_KEEP_CHARS)}\n…[pruned ${resultPart.content.length - PRUNE_KEEP_CHARS} chars]\n${formatToolResultStub(resultPart.name, resultPart.ok, { messageId: prunable.id, seq: prunable.seq, partIndex: prunable.parts.indexOf(resultPart) })}`;
   input.store.appendReplacement(input.session.id, {
     startSeq: prunable.seq,
     endSeq: prunable.seq,

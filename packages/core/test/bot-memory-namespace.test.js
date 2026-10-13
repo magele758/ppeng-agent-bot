@@ -245,6 +245,7 @@ test('bot compact writes session.long before the lossy replace; plain chats do n
   });
   store.appendMessage(session.id, 'user', [{ type: 'text', text: '支付回滚顺序写进清单' }]);
   store.appendMessage(session.id, 'assistant', [{ type: 'text', text: '已记下回滚顺序' }]);
+  store.appendMessage(session.id, 'user', [{ type: 'text', text: '继续按清单处理当前任务' }]);
 
   let sawNoteBeforeReplace = false;
   const origReplace = store.appendReplacement.bind(store);
@@ -286,6 +287,7 @@ test('bot compact writes session.long before the lossy replace; plain chats do n
   });
   store.appendMessage(plain.id, 'user', [{ type: 'text', text: '普通会话也压缩' }]);
   store.appendMessage(plain.id, 'assistant', [{ type: 'text', text: '好的' }]);
+  store.appendMessage(plain.id, 'user', [{ type: 'text', text: '继续' }]);
   let plainSummaries = 0;
   const plainAdapter = {
     name: 'scripted',
@@ -323,6 +325,7 @@ test('session.long write failure does not abort compact', async () => {
   });
   store.appendMessage(session.id, 'user', [{ type: 'text', text: '支付回滚顺序写进清单' }]);
   store.appendMessage(session.id, 'assistant', [{ type: 'text', text: '已记下回滚顺序' }]);
+  store.appendMessage(session.id, 'user', [{ type: 'text', text: '继续按清单处理当前任务' }]);
 
   const am = store.agentMemory();
   const orig = am.set.bind(am);
@@ -729,10 +732,8 @@ test('compact note is a short, idempotent conclusion without appendix text or fu
       return 'SUM2';
     }
   };
-  await assert.rejects(
-    autoCompactSession(compactHost(store, dir, flaky), runContext(dir, store.getSession(retry.id)), { force: true }),
-    /upstream down/
-  );
+  const failed = await autoCompactSession(compactHost(store, dir, flaky), runContext(dir, store.getSession(retry.id)), { force: true });
+  assert.equal(failed.replaced, undefined);
   const retryNotes = () =>
     store.agentMemory().search({ sessionId: retry.id, scope: 'session.long', limit: 50 }).filter((r) => String(r.key).startsWith('compact:'));
   assert.equal(retryNotes().length, 1);
@@ -804,7 +805,8 @@ test('compact note falls back to the heuristic cut without a usable summary', as
   ]) {
     const session = seedBotChat(store);
     const result = await autoCompactSession(compactHost(store, dir, adapter), runContext(dir, store.getSession(session.id)), { force: true });
-    assert.ok(result.replaced, label);
+    if (label === 'blank summary') assert.equal(result.replaced, undefined, label);
+    else assert.ok(result.replaced, label);
     const notes = compactNotes(store, session.id);
     assert.equal(notes.length, 1, label);
     assert.ok(notes[0].value.startsWith('压缩前结论'), label);
@@ -823,10 +825,8 @@ test('failed summary keeps a heuristic note, and a same-range retry replaces it 
     if (calls === 1) throw new Error('summary timeout');
     return '重试后的真实摘要';
   });
-  await assert.rejects(
-    autoCompactSession(compactHost(store, dir, adapter), runContext(dir, store.getSession(session.id)), { force: true }),
-    /summary timeout/
-  );
+  const failed = await autoCompactSession(compactHost(store, dir, adapter), runContext(dir, store.getSession(session.id)), { force: true });
+  assert.equal(failed.replaced, undefined);
   const afterFail = compactNotes(store, session.id);
   assert.equal(afterFail.length, 1);
   assert.ok(afterFail[0].value.startsWith('压缩前结论'));
@@ -1119,6 +1119,7 @@ async function compactBotChat(store, dir) {
   });
   store.appendMessage(session.id, 'user', [{ type: 'text', text: '支付回滚顺序写进清单' }]);
   store.appendMessage(session.id, 'assistant', [{ type: 'text', text: '已记下回滚顺序' }]);
+  store.appendMessage(session.id, 'user', [{ type: 'text', text: '继续按清单处理当前任务' }]);
   const adapter = scriptedAdapter(() => '## 摘要\n支付回滚顺序已定稿：先切流再回滚库。');
   const result = await autoCompactSession(compactHost(store, dir, adapter), runContext(dir, store.getSession(session.id)), { force: true });
   assert.ok(result.replaced);

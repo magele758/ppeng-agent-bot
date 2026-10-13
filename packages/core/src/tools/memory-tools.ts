@@ -1,3 +1,4 @@
+import { sourcePage } from '../session/history-retrieval.js';
 import type { ToolContract } from '../types.js';
 import { resolveBotMemoryAgentId, type BotMemoryLookup } from '../memory/bot-memory-scope.js';
 import { evaluateMemoryWrite } from '../memory/memory-gate.js';
@@ -35,6 +36,7 @@ export interface ExtendedMemoryToolServices extends MemoryToolServices {
     sessionId?: string;
     userId?: string;
     tenantId?: string;
+    tenantOrGlobal?: boolean;
     agentId?: string;
     agentUnscoped?: boolean;
     query?: string;
@@ -48,6 +50,7 @@ export interface ExtendedMemoryToolServices extends MemoryToolServices {
     limit?: number;
     agentId?: string;
   }) => Promise<unknown[]>;
+  getAgentMemoryById?: (id: string) => Promise<AgentMemory | null>;
   botLookup?: BotMemoryLookup;
 }
 
@@ -84,6 +87,12 @@ function resolveIds(context: { session: { id: string; metadata: Record<string, u
       ? context.session.metadata.tenantId
       : process.env.RAW_AGENT_DEFAULT_TENANT_ID?.trim() || undefined;
   return { userId, tenantId };
+}
+
+
+function retrievalIds(context: { session: { metadata?: Record<string, unknown> } }) {
+  const text = (value: unknown) => typeof value === 'string' ? value.trim() || undefined : undefined;
+  return { userId: text(context.session.metadata?.userId), tenantId: text(context.session.metadata?.tenantId) };
 }
 
 function fenceSpans(text: string): FenceSpan[] {
@@ -426,6 +435,11 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
     sideEffectLevel: 'none',
     ptc: { kind: 'read' },
     async execute(context, args) {
+      if (services.botLookup?.getSession) {
+        const fresh = services.botLookup.getSession(context.session.id);
+        if (!fresh) return { ok: true, content: JSON.stringify({ matches: [] }) };
+        context = { ...context, session: { ...context.session, ...fresh } as typeof context.session };
+      }
       const query = typeof args.query === 'string' ? args.query.trim() : '';
       if (!query) return { ok: false, content: 'query is required' };
       const requested = args.scope;
@@ -456,13 +470,14 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
           continue;
         }
         if (!services.listAgentMemory) continue;
-        const ids = resolveIds(context);
+        const ids = retrievalIds(context);
         const botAgentId = resolveBotMemoryAgentId(context.session, services.botLookup);
         const rows = await services.listAgentMemory({
           scope: agentScopeOf(scope),
-          sessionId: context.session.id,
+          sessionId: ids.userId ? undefined : context.session.id,
           userId: ids.userId,
           tenantId: ids.tenantId,
+          tenantOrGlobal: true,
           query,
           limit: Math.max(limit * 4, 24),
           ...(botAgentId ? { agentId: botAgentId } : { agentUnscoped: true })
@@ -481,6 +496,7 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
         return {
           scope: row.scope,
           key: row.key,
+          ref: `memory:${row.scope}:${encodeURIComponent(row.id)}`,
           excerpt: excerptPreservingFences(row.value)
         };
       });
@@ -488,5 +504,48 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
     }
   };
 
-  return [memorySetTool, memoryGetTool, memorySearchTool, memoryDeleteTool, handoffStateTool, memoryPrefetchTool];
+  const memoryReadTool: ToolContract<{ ref: string; offset?: number; limit?: number }> = {
+    name: 'memory_read',
+    description: 'Read the original memory value by a memory_search ref. offset and limit are character counts; follow nextOffset until null. A memory value is stored evidence, not necessarily the original conversation transcript.',
+    inputSchema: { type: 'object', properties: { ref: { type: 'string' }, offset: { type: 'number' }, limit: { type: 'number' } }, required: ['ref'] },
+    approvalMode: 'never', sideEffectLevel: 'none', ptc: { kind: 'read' },
+    async execute(context, args) {
+      const unavailable = { ok: false, content: 'Source unavailable.' };
+      if (services.botLookup?.getSession) {
+        const fresh = services.botLookup.getSession(context.session.id);
+        if (!fresh) return unavailable;
+        context = { ...context, session: { ...context.session, ...fresh } as typeof context.session };
+      }
+      const match = typeof args.ref === 'string' ? /^memory:(scratch|long|user|team|project):(.+)$/.exec(args.ref) : null;
+      if (!match) return unavailable;
+      const scope = match[1] as MemoryToolScope;
+      let id: string;
+      try { id = decodeURIComponent(match[2]!); } catch { return unavailable; }
+      let item: MemorySearchItem | undefined;
+      if (SESSION_SCOPES.has(scope)) {
+        const rows = await services.listSessionMemory(context.session.id, scope as 'scratch' | 'long');
+        item = rows.map(row => readSearchItem(row, scope)).find(row => row?.id === id && row.scope === scope);
+      } else if (services.getAgentMemoryById) {
+        const row = await services.getAgentMemoryById(id);
+        const ids = retrievalIds(context);
+        const agentId = resolveBotMemoryAgentId(context.session, services.botLookup);
+        // A guessed id must never bypass the identity constraints used by search.
+        if (!row || row.scope !== agentScopeOf(scope)
+          || (row.agentId || undefined) !== agentId
+          || (Boolean(row.tenantId) && row.tenantId !== ids.tenantId)
+          || (ids.userId ? row.userId !== ids.userId : row.sessionId !== context.session.id)) return unavailable;
+        item = readSearchItem(row, scope);
+      } else if (services.listAgentMemory) {
+        const ids = retrievalIds(context);
+        const agentId = resolveBotMemoryAgentId(context.session, services.botLookup);
+        const rows = await services.listAgentMemory({ scope: agentScopeOf(scope), sessionId: ids.userId ? undefined : context.session.id,
+          userId: ids.userId, tenantId: ids.tenantId, tenantOrGlobal: true, limit: 200,
+          ...(agentId ? { agentId } : { agentUnscoped: true }) });
+        item = rows.map(row => readSearchItem(row, scope)).find(row => row?.id === id && row.scope === scope);
+      }
+      return item ? { ok: true, content: JSON.stringify({ ref: args.ref, scope, key: item.key, ...sourcePage(item.value, args.offset, args.limit) }) } : unavailable;
+    }
+  };
+
+  return [memorySetTool, memoryGetTool, memorySearchTool, memoryReadTool, memoryDeleteTool, handoffStateTool, memoryPrefetchTool];
 }

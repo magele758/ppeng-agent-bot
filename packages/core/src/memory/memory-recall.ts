@@ -27,6 +27,12 @@ export interface RecallSources {
   workingFile: string;
 }
 
+export interface RecallDiagnostic {
+  code: 'embedding_unavailable' | 'stored_embeddings_unavailable' | 'recall_unavailable';
+  mode: 'lexical' | 'empty';
+  reason: string;
+}
+
 export interface RecallContext {
   store: AgentMemoryStore;
   query: string;
@@ -131,6 +137,9 @@ export function recallProgressive(ctx: RecallContext): RecallSources {
 
   const botAgentId = ctx.agentId?.trim() || undefined;
   const userMemoryAgent = botAgentId ? { agentId: botAgentId } : { agentUnscoped: true as const };
+  // Legacy user-wide memories have no tenant. A concrete foreign tenant never
+  // participates, including when the current session has no tenant metadata.
+  const allowedTenant = (memory: AgentMemory) => !memory.tenantId || memory.tenantId === ctx.tenantId;
 
   let core = '';
   if (ctx.userId) {
@@ -139,12 +148,13 @@ export function recallProgressive(ctx: RecallContext): RecallSources {
         scope: 'user.memory',
         userId: ctx.userId,
         tenantId: ctx.tenantId,
-        query: query || undefined,
+        tenantOrGlobal: true,
+        query: ctx.queryEmbedding?.length ? undefined : query || undefined,
         limit: 24,
         orderBy: 'importance',
         ...userMemoryAgent
       })
-      .filter((m) => m.namespace === 'semantic' || ['fact', 'preference', 'entity', 'concept'].includes(m.namespace));
+      .filter((m) => allowedTenant(m) && (m.namespace === 'semantic' || ['fact', 'preference', 'entity', 'concept'].includes(m.namespace)));
     const ranked = hybridOrderMemories(semantic, query, ctx);
     const items = ranked.map((m) => ({
       category: categoryOf(m),
@@ -169,10 +179,11 @@ export function recallProgressive(ctx: RecallContext): RecallSources {
         scope: 'user.memory',
         userId: ctx.userId,
         tenantId: ctx.tenantId,
-        query: query || undefined,
+        tenantOrGlobal: true,
+        query: ctx.queryEmbedding?.length ? undefined : query || undefined,
         limit: 20,
         ...userMemoryAgent
-      }).filter((m) => m.namespace === 'episodic' || m.source === 'curator' || m.source === 'dream')
+      }).filter((m) => allowedTenant(m) && (m.namespace === 'episodic' || m.source === 'curator' || m.source === 'dream'))
     );
   }
 
@@ -211,7 +222,7 @@ export function recallProgressive(ctx: RecallContext): RecallSources {
     query,
     workingLogPath: ctx.workingLogPath,
     stateDir: ctx.stateDir,
-    userId: botAgentId ? undefined : ctx.userId
+    userId: botAgentId || ctx.tenantId ? undefined : ctx.userId
   });
 
   return { userProfile, core, working, workingFile };
@@ -224,6 +235,7 @@ export async function recallProgressiveAsync(
   ctx: RecallContext & {
     settings?: MemorySettings;
     embedQuery?: (text: string) => Promise<number[] | null>;
+    onDiagnostic?: (diagnostic: RecallDiagnostic) => void;
   }
 ): Promise<RecallSources> {
   let queryEmbedding = ctx.queryEmbedding ?? null;
@@ -236,6 +248,9 @@ export async function recallProgressiveAsync(
     } catch {
       queryEmbedding = null;
     }
+    if (!queryEmbedding?.length) {
+      ctx.onDiagnostic?.({ code: 'embedding_unavailable', mode: 'lexical', reason: 'Query embedding service unavailable; using lexical recall.' });
+    }
   }
   let embeddings = ctx.embeddings;
   if (!embeddings && queryEmbedding && typeof ctx.store.listEmbeddings === 'function') {
@@ -243,9 +258,16 @@ export async function recallProgressiveAsync(
       embeddings = ctx.store.listEmbeddings();
     } catch {
       embeddings = undefined;
+      ctx.onDiagnostic?.({ code: 'stored_embeddings_unavailable', mode: 'lexical', reason: 'Stored embeddings unavailable; using lexical recall.' });
     }
   }
-  return recallProgressive({ ...ctx, queryEmbedding, embeddings });
+  try {
+    return recallProgressive({ ...ctx, queryEmbedding, embeddings });
+  } catch (error) {
+    if (!queryEmbedding?.length) throw error;
+    ctx.onDiagnostic?.({ code: 'stored_embeddings_unavailable', mode: 'lexical', reason: 'Hybrid retrieval unavailable; using lexical recall.' });
+    return recallProgressive({ ...ctx, queryEmbedding: null, embeddings: undefined });
+  }
 }
 
 export function grepWorkingFile(input: {

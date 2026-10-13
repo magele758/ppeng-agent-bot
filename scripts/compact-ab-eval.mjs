@@ -11,6 +11,7 @@
  * COMPACT_AB_CASES=silent
  * COMPACT_AB_OUT_DIR=/path  (writes compact-ab-report.json + .txt)
  */
+import { compactRecallPassed } from './agent-eval/context-reliability.mjs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -153,6 +154,7 @@ async function main() {
     };
     console.log(formatCompactAbReport(report));
     await writeReport(report);
+    process.exitCode = 2; // Skipped is not a passing semantic evaluation.
     return;
   }
 
@@ -203,7 +205,7 @@ async function main() {
   console.log(formatCompactAbReport(report));
   await writeReport(report);
 
-  if (report.summary.failed > 0) {
+  if (!compactRecallPassed(report)) {
     process.exit(1);
   }
 }

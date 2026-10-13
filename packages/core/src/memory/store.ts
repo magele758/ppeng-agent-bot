@@ -427,7 +427,10 @@ export class AgentMemoryStore {
       conditions.push('user_id = ?');
       values.push(filter.userId);
     }
-    if (filter.tenantId !== undefined) {
+    if (filter.tenantOrGlobal) {
+      conditions.push('(tenant_id IS NULL OR tenant_id = ?)');
+      values.push(filter.tenantId ?? null);
+    } else if (filter.tenantId !== undefined) {
       conditions.push('tenant_id = ?');
       values.push(filter.tenantId);
     }
@@ -477,7 +480,10 @@ export class AgentMemoryStore {
       conditions.push('am.user_id = ?');
       values.push(filter.userId);
     }
-    if (filter.tenantId !== undefined) {
+    if (filter.tenantOrGlobal) {
+      conditions.push('(am.tenant_id IS NULL OR am.tenant_id = ?)');
+      values.push(filter.tenantId ?? null);
+    } else if (filter.tenantId !== undefined) {
       conditions.push('am.tenant_id = ?');
       values.push(filter.tenantId);
     }

@@ -139,7 +139,20 @@ export function assertNoOpenToolWaveForCompact(folded: SessionMessage[]): void {
 /** Hide / replace ops shadow the inclusive seq range they name. */
 export function shadowedSeqs(nodes: SurfaceNode[]): Set<number> {
   const hidden = new Set<number>();
+  // compact-summary is a rolling snapshot. A successful newer replacement
+  // retires its predecessor even when the replaced range does not contain it.
+  // Keep this in the fold algebra so SQLite and embedded stores agree, and
+  // hiding the newest summary never resurrects an obsolete one.
+  let latestSummarySeq = -1;
   for (const node of nodes) {
+    if (node.surfaceOp === 'replace' && node.key === 'compact-summary') {
+      latestSummarySeq = Math.max(latestSummarySeq, node.seq);
+    }
+  }
+  for (const node of nodes) {
+    if (node.surfaceOp === 'replace' && node.key === 'compact-summary' && node.seq !== latestSummarySeq) {
+      hidden.add(node.seq);
+    }
     if (node.surfaceOp === 'replace' || node.surfaceOp === 'hide') {
       if (
         typeof node.replacesStart === 'number' &&

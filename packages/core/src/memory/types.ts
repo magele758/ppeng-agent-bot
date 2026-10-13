@@ -29,6 +29,8 @@ export interface AgentMemory {
 }
 
 export interface MemoryFilter {
+  /** Restrict to the selected tenant plus legacy global rows; missing tenant means global only. */
+  tenantOrGlobal?: boolean;
   scope?: MemoryScope;
   namespace?: string;
   userId?: string;

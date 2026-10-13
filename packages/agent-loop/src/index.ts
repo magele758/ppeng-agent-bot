@@ -615,6 +615,7 @@ export type {
 } from './session/event-log-settings.js';
 export {
   runAutoCompact,
+  selectCompactableClosedRange,
   isContextOverflowError,
   findPrunableToolResult,
   COMPACT_KEEP_RECENT,

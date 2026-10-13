@@ -166,3 +166,10 @@ describe('explainToolUnderMode', () => {
     expect(explainToolUnderMode('acceptEdits', 'bash').decision).toBe('defer_to_policy');
   });
 });
+
+it('allows history evidence recovery in read-only planning [AC:context-reliability#AC-5]', () => {
+  for (const name of ['history_search', 'history_read', 'memory_read']) {
+    expect(isReadOnlyTool(name)).toBe(true);
+    expect(applyPermissionModeGate('plan', name, 'never')).toEqual({ action: 'proceed' });
+  }
+});

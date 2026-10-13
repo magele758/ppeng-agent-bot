@@ -1,4 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
+import { captureTaskContext, taskContextTodos } from '../session/task-context.js';
 import { createId, nowIso } from '../id.js';
 import { serializeJson, parseJson, optionalString, boolToInt, intToBool } from './storage-helpers.js';
 import type { MessageRole, SessionMessage, SessionRecord, SessionStatus } from '../types.js';
@@ -226,7 +227,13 @@ export class SessionStore {
       key: opts?.key,
       expectedWriterRunId: opts?.expectedWriterRunId
     });
-    return this.surfaceToMessage(node);
+    const message = this.surfaceToMessage(node);
+    const session = this.getSession(sessionId);
+    if (session) {
+      const metadata = captureTaskContext(session, message);
+      if (metadata) this.updateSession(sessionId, { metadata, todo: taskContextTodos(metadata) });
+    }
+    return message;
   }
 
   appendReplacement(sessionId: string, input: AppendReplacementInput): SessionMessage {

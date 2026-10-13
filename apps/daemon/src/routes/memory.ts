@@ -2,8 +2,7 @@ import { AuthorizationError, NotFoundError, ValidationError } from '@ppeng/agent
 import { AgentMemoryStore } from '@ppeng/agent-core';
 import type { MemoryFilter, MemoryScope, MemorySettingsPatch } from '@ppeng/agent-core';
 import {
-  compileContextPack,
-  resolveBotMemoryAgentId,
+  previewContextPackAsync,
   dreamNowForUser,
   formatCompiledContextPack,
   hasPersistedMemorySettings,
@@ -11,7 +10,6 @@ import {
   parseMemoryEmbeddingMode,
   parseMinTaskTools,
   readMemorySettings,
-  recallProgressiveAsync,
   writeMemorySettings
 } from '@ppeng/agent-core';
 import type { RawAgentRuntime, RequestAuth } from '@ppeng/agent-core';
@@ -134,32 +132,17 @@ export function memoryRoutes(runtime: RawAgentRuntime): RouteSpec[] {
           todo: [],
           summary: ''
         };
-        const userId =
-          effectiveUserId(auth, requestedUserId) ??
-          (typeof session.metadata?.userId === 'string' ? session.metadata.userId : undefined);
-        if (userId && session.metadata) {
-          session.metadata = { ...session.metadata, userId };
+        // Existing session ownership is authoritative; request fields cannot redirect recall.
+        // For a sessionless preview, authenticated identity supplies both user and tenant.
+        if (!runtime.store.getSession(sessionId) && auth.isolate && auth.user) {
+          session.metadata = { ...session.metadata, userId: auth.user.id, tenantId: auth.user.tenantId };
         }
-        const settings = readMemorySettings(runtime.store);
-        const am = getStore(runtime);
-        const tenantId =
-          body.tenantId != null
-            ? String(body.tenantId)
-            : typeof session.metadata?.tenantId === 'string'
-              ? session.metadata.tenantId
-              : undefined;
-        const sources = await recallProgressiveAsync({
-          store: am,
+        const pack = await previewContextPackAsync({
+          store: runtime.store,
+          session,
           query,
-          userId,
-          tenantId,
-          sessionId: session.id,
-          agentId: resolveBotMemoryAgentId(session, runtime.store),
-          stateDir: runtime.stateDir,
-          settings,
-          embeddings: (id) => am.getEmbedding(id)
+          stateDir: runtime.stateDir
         });
-        const pack = compileContextPack(sources, query);
         json(response, 200, {
           pack,
           appendix: formatCompiledContextPack(pack)
