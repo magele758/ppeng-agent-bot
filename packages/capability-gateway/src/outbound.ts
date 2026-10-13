@@ -27,7 +27,7 @@ export async function deliverChannelText(opts: {
   channel: ChannelSpec;
   text: string;
   event?: string;
-  /** Conversational replies and a human draft release pass `approved`. Anything else is held as a draft. */
+  /** Only a human draft release passes `approved`. Model replies omit it and stay a draft. */
   approval?: 'approved';
 }): Promise<void> {
   if (opts.approval !== 'approved') {

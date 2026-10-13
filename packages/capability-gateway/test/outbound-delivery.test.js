@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { handleGatewayHttp } from '../dist/http.js';
@@ -18,7 +18,7 @@ import {
   recoverOutboundLedger,
   sendLedgered
 } from '../dist/delivery-ledger.js';
-import { recoverGatewayOutbound } from '../dist/outbound.js';
+import { recoverGatewayOutbound, releaseOutboundDraft } from '../dist/outbound.js';
 import { call, fakeRuntime, feishuMessageEvent, makeCtx } from './gateway-harness.mjs';
 
 const ZH_ACK = '收到，没有更多要补充的。';
@@ -65,10 +65,32 @@ test('人直接发来的静默回复换成简短确认，不把标记发出去 [
     });
     await drainGatewayTurns();
     assert.equal(res.status, 200);
+    assert.equal(fetched.length, 0);
+    const drafts = JSON.parse(readFileSync(join(ctx.stateDir, 'gateway', 'outbound-drafts.json'), 'utf8'));
+    assert.equal(drafts.items.length, 1);
+    assert.equal(drafts.items[0].status, 'pending_approval');
+    assert.equal(drafts.items[0].text, ZH_ACK);
+    assert.doesNotMatch(drafts.items[0].text, /\[SILENT\]|NO_REPLY/);
+    const channels = [{ id: 'out', type: 'http_post', url: 'http://im.test/hook', payloadMode: 'json_text' }];
+    const sent = await releaseOutboundDraft({
+      gatewayDir: join(ctx.stateDir, 'gateway'),
+      id: drafts.items[0].id,
+      decision: 'approve',
+      channels
+    });
+    assert.equal(sent.status, 'sent');
     assert.equal(fetched.length, 1);
     assert.match(fetched[0].body, new RegExp(ZH_ACK));
     assert.doesNotMatch(fetched[0].body, /\[SILENT\]|NO_REPLY/);
-    assert.equal(existsSync(join(ctx.stateDir, 'gateway', 'outbound-drafts.json')), false);
+    await assert.rejects(() =>
+      releaseOutboundDraft({
+        gatewayDir: join(ctx.stateDir, 'gateway'),
+        id: drafts.items[0].id,
+        decision: 'approve',
+        channels
+      })
+    );
+    assert.equal(fetched.length, 1);
   } finally {
     globalThis.fetch = original;
   }
