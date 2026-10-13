@@ -41,6 +41,7 @@ const ASSEMBLED = [
   'browser_snapshot',
   'browser_click',
   'browser_type',
+  'browser_screenshot',
   'computer_screenshot',
   'computer_click',
   'computer_type',
@@ -89,6 +90,7 @@ test('8-mode tool visibility', () => {
   assert.ok(!fast.includes('spawn_subagent'));
   assert.ok(!fast.includes('ptc_exec'));
   assert.ok(!fast.includes('browser_navigate'));
+  assert.ok(!fast.includes('browser_screenshot'));
   assert.ok(!fast.includes('computer_screenshot'));
   assert.ok(FAST_MODE_TOOL_ALLOWLIST.every((n) => ASSEMBLED.includes(n) ? fast.includes(n) : true));
 
@@ -120,6 +122,7 @@ test('8-mode tool visibility', () => {
   assert.ok(computer.includes('computer_click'));
   assert.ok(!computer.includes('ptc_exec'));
   assert.ok(!computer.includes('browser_navigate'));
+  assert.ok(!computer.includes('browser_screenshot'));
 
   const dw = names('dynamic_workflow');
   assert.ok(dw.includes('ptc_exec'));

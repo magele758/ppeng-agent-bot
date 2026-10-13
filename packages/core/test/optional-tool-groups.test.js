@@ -38,6 +38,7 @@ test('optionalToolNamesFromGroups covers configured tools', () => {
   assert.ok(s.has('bash'));
   assert.ok(s.has('web_fetch'));
   assert.ok(s.has('browser_navigate'));
+  assert.ok(s.has('browser_screenshot'));
   assert.ok(s.has('cron_create'));
 });
 

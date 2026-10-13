@@ -6,7 +6,7 @@
 > 大多数开关不必设置：配了连接信息（`DATABASE_URL` / `REDIS_URL` / `RAW_AGENT_S3_*` …）会自动启用，没配即本地兜底。
 > 优先级与规则见 [`DEPLOYMENT.md`](DEPLOYMENT.md#配置优先级与本地兜底)；当前实际生效项见 `GET /api/config/effective`。
 
-Generated: 2026-10-11T16:40:00.000Z  ·  Total: 360 (234 runtime + 126 evolution)
+Generated: 2026-10-11T16:40:00.000Z  ·  Total: 361 (235 runtime + 126 evolution)
 
 ## RAW_AGENT_*
 
@@ -25,6 +25,7 @@ Generated: 2026-10-11T16:40:00.000Z  ·  Total: 360 (234 runtime + 126 evolution
 | `RAW_AGENT_AUTH_TOKEN` | `apps/daemon/src/auth.ts`, `apps/desktop/src/main.ts`, `apps/web-console/middleware.ts`, `packages/core/src/sandbox/result-redaction.ts`, `packages/core/test/embed-loop-no-daemon.test.js`, `packages/core/test/embed-loop-pure-l4.test.js` …(+8) |
 | `RAW_AGENT_BASE_URL` | `apps/daemon/src/server.ts`, `packages/agent-loop/src/model/model-adapters.ts`, `packages/agent-loop/src/model/remote-env.ts`, `packages/core/src/config/effective-config.ts`, `packages/core/src/doctor/doctor.ts`, `packages/core/src/evolving/embedding.ts` …(+13) |
 | `RAW_AGENT_BASH_TIMEOUT_MS` | `packages/core/src/tools/builtin-tools.ts` |
+| `RAW_AGENT_BROWSER_PROFILE_DIR` | `packages/core/src/tools/browser-backend.ts`, `packages/core/test/browser-backend.test.js` |
 | `RAW_AGENT_BROWSER_TOOLS` | `packages/core/src/config/effective-config.ts`, `packages/core/src/doctor/doctor.ts`, `packages/core/src/tools/browser-settings.ts`, `packages/core/src/tools/browser-tools.ts`, `packages/core/src/tools/optional-tool-groups.ts`, `packages/core/test/browser-tools.test.js` …(+1) |
 | `RAW_AGENT_CASE_CAPACITY` | `packages/core/src/evolving/case-governance.ts`, `packages/core/test/case-governance.test.js` |
 | `RAW_AGENT_CASE_GOVERNANCE` | `packages/core/src/evolving/case-governance.ts`, `packages/core/test/case-governance.test.js` |

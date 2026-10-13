@@ -21,6 +21,8 @@ coverage/
 packages/*/coverage/
 *.tsbuildinfo
 .agent-state/
+# Playwright persistent profiles (cookies / local storage). Never commit.
+browser-profiles/
 .evolution-worktrees/
 .evolution/
 .cursor/
