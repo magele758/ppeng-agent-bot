@@ -146,6 +146,7 @@ export class McpManager {
         (endpoint, index) =>
           new McpHttpSession(index, endpoint, {
             env,
+            stateDir: this.deps.stateDir,
             onTransportFallback: (info) => {
               this.deps.log.warn(
                 `MCP HTTP server ${index} fell back from streamable-http to SSE after HTTP ${info.status} (${info.url})`

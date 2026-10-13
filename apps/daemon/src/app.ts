@@ -30,6 +30,7 @@ import { jevRoutes } from './routes/jev.js';
 import { langfuseRoutes } from './routes/langfuse.js';
 import { loopRoutes } from './routes/loop.js';
 import { mailboxRoutes } from './routes/mailbox.js';
+import { mcpOAuthRoutes } from './routes/mcp-oauth.js';
 import { memoryRoutes } from './routes/memory.js';
 import { miscRoutes } from './routes/misc.js';
 import { modelFallbackRoutes } from './routes/model-fallback.js';
@@ -100,6 +101,7 @@ export function buildDaemonRouter(deps: DaemonAppDeps): Router {
     .addAll(modelProviderRoutes(runtime))
     .addAll(modelFallbackRoutes(runtime))
     .addAll(secretsRoutes(runtime))
+    .addAll(mcpOAuthRoutes(runtime))
     .addAll(skillEvalRoutes(runtime))
     .addAll(skillSettingsRoutes(runtime))
     .addAll(skillProposalRoutes(runtime))
