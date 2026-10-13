@@ -44,6 +44,7 @@ test('每个设置条目都有标题、关键词与说明 [AC:settings-categorie
     'skills',
     'dynTools',
     'discovery',
+    'connectors',
     'langfuse',
     'jev',
     'eventLog'

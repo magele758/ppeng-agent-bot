@@ -686,7 +686,30 @@ export {
   mergePlugins,
   pluginDirsFromEnv
 } from '../plugins/plugin-loader.js';
-export type { PluginManifest, LoadedPlugin } from '../plugins/plugin-loader.js';
+export type { PluginManifest, LoadedPlugin, PluginAuthSpec, PluginToolDecl, PluginAuthKind } from '../plugins/plugin-loader.js';
+export {
+  CONNECTOR_GRANTS_KEY,
+  ConnectorRegistry,
+  createConnectorRegistry,
+  listConnectors,
+  grantConnector,
+  revokeConnector,
+  instructionsForGranted,
+  shouldInjectDiscovery,
+  mergeGrantedConnectorTools,
+  pluginConnectorId,
+  discoveryConnectorId,
+  domainConnectorId
+} from '../connectors/registry.js';
+export type {
+  ConnectorRecord,
+  ConnectorPublic,
+  ConnectorSource,
+  ConnectorAuthKind,
+  DomainConnectorSource,
+  ConnectorGrantStore,
+  ConnectorRegistryDeps
+} from '../connectors/registry.js';
 export * from '../ingestion/index.js';
 export * from '../artifact/index.js';
 export { createArtifactTools } from '../tools/artifact-tools.js';

@@ -106,6 +106,24 @@ export function loadDomainBundles(env: NodeJS.ProcessEnv): LoadedDomains {
   };
 }
 
+/**
+ * Rows for the connector registry. Does not mount or unmount bundles —
+ * `loadDomainBundles` remains the only mount path.
+ */
+export function describeDomainConnectors(loaded: LoadedDomains): Array<{
+  id: string;
+  title: string;
+  instructions: string;
+}> {
+  const out: Array<{ id: string; title: string; instructions: string }> = [];
+  for (const id of loaded.ids) {
+    const bundle = REGISTRY[id];
+    if (!bundle) continue;
+    out.push({ id: bundle.id, title: bundle.label, instructions: '' });
+  }
+  return out;
+}
+
 /** Available bundle ids — useful for UI hints / `--help` output. */
 export function availableDomainIds(): string[] {
   return [...KNOWN_DOMAINS];
