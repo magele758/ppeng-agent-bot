@@ -164,6 +164,7 @@ export function createToolServices(host: ToolServicesHost): RuntimeToolServices 
         tenantId: input.tenantId,
         agentId: input.agentId,
         agentUnscoped: input.agentUnscoped,
+        query: input.query,
         limit: input.limit ?? 40
       }),
     prefetchAgentMemory: async (input) => {

@@ -118,6 +118,7 @@ export const PLANNER_READONLY_TOOLS: readonly string[] = [
   'task_get',
   'task_list',
   'memory_get',
+  'memory_search',
   'memory_prefetch',
   'retrieve_tool_result',
   'read_artifact_page',

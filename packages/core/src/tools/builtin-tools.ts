@@ -155,6 +155,7 @@ export interface RuntimeToolServices {
     tenantId?: string;
     agentId?: string;
     agentUnscoped?: boolean;
+    query?: string;
     limit?: number;
   }) => Promise<unknown[]>;
   prefetchAgentMemory?: (input: {
