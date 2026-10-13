@@ -212,7 +212,8 @@ function sendBodyContentToSession(
   maybeMergeOptionalGroupsFromBody(runtime, sessionId, body);
   runtime.sendUserMessage(sessionId, message || (imgIds.length ? '(image)' : '(attachment)'), {
     imageAssetIds: imgIds,
-    attachmentIds: attIds
+    attachmentIds: attIds,
+    autoRun: body.autoRun !== false
   });
 }
 
@@ -291,7 +292,7 @@ async function streamRun(
   };
   response.on('close', onClose);
   try {
-    await runtime.runSession(sessionId, {
+    await runtime.runHumanSession(sessionId, {
       onModelStreamChunk: (chunk: ModelStreamChunk) => sseSend(response, 'model', chunk),
       steerDrainPolicy: readLoopSettings(runtime.store).steerDrainPolicy,
       signal: clientGone.signal
@@ -370,7 +371,7 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
             background: body.background !== false,
             metadata: sessionMetadataFromBody(runtime, body, auth)
           });
-          if (body.autoRun !== false) await runtime.runSession(result.session.id);
+          if (body.autoRun !== false) await runtime.runHumanSession(result.session.id);
           json(response, 201, {
             session: runtime.getSession(result.session.id),
             task: runtime.getTask(result.task.id),
@@ -388,7 +389,7 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
           if (hasContent) {
             sendBodyContentToSession(runtime, openedBot.sessionId, body);
           }
-          if (body.autoRun !== false && hasContent) await runtime.runSession(openedBot.sessionId);
+          if (body.autoRun !== false && hasContent) await runtime.runHumanSession(openedBot.sessionId);
           json(response, 201, {
             session: runtime.getSession(openedBot.sessionId),
             latestAssistant: runtime.getLatestAssistantText(openedBot.sessionId)
@@ -408,7 +409,7 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
           (typeof body.message === 'string' && body.message.trim()) ||
           imageAssetIdsFromBody(body).length > 0 ||
           attachmentIdsFromBody(body).length > 0;
-        if (body.autoRun !== false && hasContent) await runtime.runSession(session.id);
+        if (body.autoRun !== false && hasContent) await runtime.runHumanSession(session.id);
         json(response, 201, {
           session: runtime.getSession(session.id),
           latestAssistant: runtime.getLatestAssistantText(session.id)
@@ -518,16 +519,30 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
     {
       method: 'GET',
       pattern: '/api/sessions/:id',
-      handler: ({ requireParam, response }) => {
+      handler: ({ requireParam, response, url }) => {
         const id = requireParam('id');
         const session = runtime.getSession(id);
         if (!session) throw new NotFoundError('Session');
         const task = session.taskId ? runtime.getTask(session.taskId) : undefined;
+        const includeMessages = url.searchParams.get('includeMessages') !== 'false';
+        const bounded = url.searchParams.has('messageLimit');
+        let page;
+        try {
+          page = includeMessages && bounded ? runtime.store.listHistory(id, {
+            limit: Number(url.searchParams.get('messageLimit')),
+            beforeSeq: url.searchParams.has('beforeSeq') ? Number(url.searchParams.get('beforeSeq')) : undefined
+          }) : undefined;
+        } catch (error) { json(response, 400, {error: error instanceof Error ? error.message : String(error)}); return; }
+        const messages = !includeMessages ? [] : page?.messages ?? runtime.getSessionMessages(id);
+        const latestAssistant = page || !includeMessages
+          ? [...messages].reverse().find(message => message.role === 'assistant')?.parts.filter(part => part.type === 'text').map(part => part.text).join('')
+          : runtime.getLatestAssistantText(id);
         json(response, 200, {
           session,
           task,
-          messages: runtime.getSessionMessages(session.id),
-          latestAssistant: runtime.getLatestAssistantText(session.id),
+          messages,
+          latestAssistant,
+          ...(page ? {hasMore: page.hasMore, nextCursor: page.nextCursor} : {}),
           inbox: runtime.store.listUnclaimedInbox(session.id)
         });
       }
@@ -699,9 +714,10 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         maybeMergeOptionalGroupsFromBody(runtime, id, body);
         runtime.sendUserMessage(id, message || (imgIds.length ? '(image)' : '(attachment)'), {
           imageAssetIds: imgIds,
-          attachmentIds: attIds
+          attachmentIds: attIds,
+    autoRun: body.autoRun !== false
         });
-        if (body.autoRun !== false) await runtime.runSession(id);
+        if (body.autoRun !== false) await runtime.runHumanSession(id);
         json(response, 200, {
           session: runtime.getSession(id),
           latestAssistant: runtime.getLatestAssistantText(id),
@@ -716,7 +732,7 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
       pattern: '/api/sessions/:id/run',
       handler: async ({ requireParam, response }) => {
         const id = requireParam('id');
-        const session = await runtime.runSession(id, {
+        const session = await runtime.runHumanSession(id, {
           steerDrainPolicy: readLoopSettings(runtime.store).steerDrainPolicy
         });
         json(response, 200, {
@@ -743,7 +759,8 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         if (msg || imgIds.length > 0 || attIds.length > 0) {
           runtime.sendUserMessage(id, msg || (imgIds.length ? '(image)' : '(attachment)'), {
             imageAssetIds: imgIds,
-            attachmentIds: attIds
+            attachmentIds: attIds,
+    autoRun: body.autoRun !== false
           });
         }
         await streamRun(runtime, response, id);
@@ -879,9 +896,9 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         const payload = { surfaceId, name, context, ...(dataModel ? { dataModel } : {}) };
         // Plain-text framing the agent already understands; no schema gymnastics.
         const message = `[a2ui:action ${name}] ${JSON.stringify(payload)}`;
-        runtime.sendUserMessage(id, message);
+        runtime.sendUserMessage(id, message, { autoRun: body.autoRun !== false });
         if (body.autoRun !== false) {
-          await runtime.runSession(id);
+          await runtime.runHumanSession(id);
         }
         json(response, 200, {
           session: runtime.getSession(id),
@@ -943,7 +960,7 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         }
         let session;
         const openedBot = openBotFromBody(runtime, body, auth);
-        const sendOpts = { imageAssetIds: imgIds, attachmentIds: attIds };
+        const sendOpts = { autoRun: true, imageAssetIds: imgIds, attachmentIds: attIds };
         const commandText = plainCommandText(body);
         if (openedBot) {
           if (commandText && (await replyBotChatCommand(runtime, openedBot.sessionId, commandText, response))) return;
@@ -965,7 +982,7 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
             metadata: sessionMetadataFromBody(runtime, body, auth)
           });
         }
-        await runtime.runSession(session.id);
+        await runtime.runHumanSession(session.id);
         json(response, 200, {
           session: runtime.getSession(session.id),
           latestAssistant: runtime.getLatestAssistantText(session.id),
@@ -989,7 +1006,7 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         }
         let session;
         const openedBot = openBotFromBody(runtime, body, auth);
-        const sendOpts = { imageAssetIds: imgIds, attachmentIds: attIds };
+        const sendOpts = { autoRun: true, imageAssetIds: imgIds, attachmentIds: attIds };
         const commandText = plainCommandText(body);
         if (openedBot) {
           if (commandText && (await replyBotChatCommand(runtime, openedBot.sessionId, commandText, response))) return;

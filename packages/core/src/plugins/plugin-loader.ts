@@ -1,3 +1,4 @@
+import type { SoftwareExecutor } from '../connectors/software-execution.js';
 /**
  * Minimal plugin package contract (Claude/pi-inspired).
  * A plugin is a directory with plugin.json + optional agents/tools/skills/hooks.
@@ -19,12 +20,14 @@ export interface PluginAuthSpec {
 }
 
 export interface PluginToolSpec {
+  executor?: SoftwareExecutor;
   name?: string;
   description?: string;
   inputSchema?: Record<string, unknown>;
 }
 
 export interface PluginToolDecl {
+  executor?: SoftwareExecutor;
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
@@ -205,7 +208,7 @@ function toolDeclFromUnknown(raw: unknown): PluginToolDecl | undefined {
     rec.inputSchema && typeof rec.inputSchema === 'object' && !Array.isArray(rec.inputSchema)
       ? (rec.inputSchema as Record<string, unknown>)
       : { type: 'object', properties: {} };
-  return { name, description, inputSchema };
+  return { name, description, inputSchema, ...(rec.executor ? {executor: rec.executor as SoftwareExecutor} : {}) };
 }
 
 function readToolFile(root: string, rel: string): PluginToolDecl | undefined {

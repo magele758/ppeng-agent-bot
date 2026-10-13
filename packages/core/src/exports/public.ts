@@ -792,3 +792,13 @@ export { readLcuSettings, writeLcuSettings, LCU_SETTINGS_KEY } from '../computer
 export { LcuComputerUseProvider, defaultLcuCommand } from '../computer-use/lcu-provider.js';
 export type { LcuSettings } from '../computer-use/settings.js';
 export type { LcuClient, LcuDeps } from '../computer-use/lcu-provider.js';
+
+export * from '../session/history/types.js';
+export * from '../session/history/tools.js';
+export * from '../session/history/window.js';
+export { RoutineRunStore, drainRoutineRuns, materializeRoutineOccurrences, cancelRoutineRun, retryRoutineRun, routineSettings, nextZonedCronRunAt, normalizeRoutineTimezone } from '../cron/index.js';
+export type { RoutineRun, RoutineRunStatus, RoutineRuntimeHost } from '../cron/index.js';
+
+export { parseOpenApiSpec } from '../discovery/adapters/openapi.js';
+
+export * from '../rooms/index.js';

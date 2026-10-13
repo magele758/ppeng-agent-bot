@@ -1,3 +1,6 @@
+import { BotRoomService } from './rooms/index.js';
+import { recoverBotWork, tickBotWork, createBotManagementTools, expireOverdueBotWork, isBotWorkSessionBlocked, type BotWorkHost } from './bots/bot-work.js';
+import { createHistoryTools } from './session/history/tools.js';
 /**
  * L5 runtime host façade: MCP / mailbox / approvals / scheduler / public API.
  * The session turn loop lives in `turn/kernel.ts` (`runSessionKernel`).
@@ -96,7 +99,9 @@ import type { AssetStorage, EventBufferRepository } from './storage/interfaces.j
 import { defaultTenantIdFromEnv, defaultUserIdFromEnv } from './storage/provider-config.js';
 import { AgentLoopHandle, type AgentLoopLatch } from './runtime/agent-loop.js';
 import type { EnqueueSteerOptions } from './session/step-inbox.js';
-import type { SteerAck } from './session/steer-ack.js';
+import { decideSteerAdmission, type SteerAck } from './session/steer-ack.js';
+import { resolveSteerInterruptPolicy } from './session/steer-interrupt.js';
+import { requestHumanRun, requestSteerContinuation, dropHumanSteerContinuation, withHumanContinuationAdmission, createHumanContinuationObserver, drainHumanContinuations, blockHumanContinuations, releaseHumanModelInput } from './session/human-continuation.js';
 import { type SteerDrainPolicy } from './session/steer-drain.js';
 import { runSessionKernel as runSessionKernelPpeng } from './turn/kernel.js';
 import {
@@ -228,6 +233,7 @@ export class RawAgentRuntime {
   readonly promptBuilder: PromptBuilder;
   tools: ToolContract<any>[];
   readonly connectors: ConnectorRegistry;
+  readonly rooms: BotRoomService;
   private loadedPlugins: LoadedPlugin[] = [];
   private connectorToolNames = new Set<string>();
   readonly secretVault: SecretVault;
@@ -291,6 +297,7 @@ export class RawAgentRuntime {
         }
       : undefined;
     this.store = new SqliteStateStore(join(this.stateDir, 'runtime.sqlite'));
+    recoverBotWork(this.store);
     const interruptedSubagents = markInterruptedSubagentsUnknown(this.store);
     if (interruptedSubagents.length > 0) {
       this.log.warn('in-flight subagents marked unknown after restart', {
@@ -387,9 +394,13 @@ export class RawAgentRuntime {
       log: this.log
     });
     const toolsWithoutPtc = [
-      ...baseTools,
+      ...baseTools.filter(tool => tool.name !== 'history_search' && tool.name !== 'history_read'),
       ...optionalExtras,
       messageAgentTool,
+      ...createHistoryTools(this.store),
+      ...createBotManagementTools({ store: this.store, runSession: (id) => this.runSession(id),
+        isSessionRunning: (id) => this.runningSessions.has(id), cancelSession: (id) => this.cancelSession(id),
+        hasUnconfirmedEffects: (id, since) => this.hasUnconfirmedEffects(id, since), log: this.log }),
       ...(options.extraTools ?? [])
     ];
     const ptcExec = createPtcExecTool({
@@ -468,6 +479,17 @@ export class RawAgentRuntime {
       })
     );
     this.mcpManager = new McpManager({ stateDir: this.stateDir, tools: this.tools, env: process.env, log: this.log });
+    this.connectors.setMcpInvoker(async (name, args, ctx) => {
+      await this.mcpManager.ensureLoaded(ctx.session.id);
+      const tool = this.tools.find((candidate) => candidate.name === name && (name === 'mcp_invoke' || name.startsWith('mcp_')));
+      if (!tool) return { ok: false, content: 'MCP tool is unavailable: ' + name };
+      return tool.execute(ctx, args);
+    });
+    this.rooms = new BotRoomService({ store: this.store,
+      createChatSession: (input) => this.createChatSession(input),
+      runSession: (id, options) => this.runSession(id, options), cancelSession: (id) => this.cancelSession(id),
+      isSessionRunning: (id) => this.runningSessions.has(id),
+      hasUnconfirmedEffects: (id, since) => this.hasUnconfirmedEffects(id, since) });
     this.computerUse = new LcuComputerUseProvider({
       clientFactory: options.computerUseClientFactory,
       enabled: () => readLcuSettings(this.store).enabled,
@@ -496,7 +518,16 @@ export class RawAgentRuntime {
   }
 
   /** Abort in-flight model/tool work for a session (best-effort). Closes any open tool wave. */
+  isSessionRunning(sessionId: string): boolean {
+    return this.runningSessions.has(sessionId);
+  }
+
+  hasUnconfirmedEffects(sessionId: string, startedAt: string): boolean {
+    return this.connectors.software.unconfirmedForSession(sessionId, startedAt).length > 0;
+  }
+
   cancelSession(sessionId: string): void {
+    blockHumanContinuations(this.store, sessionId);
     cancelSessionFn(this.sessionControlHost(), sessionId);
   }
 
@@ -886,24 +917,38 @@ export class RawAgentRuntime {
   sendUserMessage(
     sessionId: string,
     message: string,
-    options?: { imageAssetIds?: string[]; attachmentIds?: string[] }
+    options?: { imageAssetIds?: string[]; attachmentIds?: string[]; autoRun?: boolean }
   ): SessionRecord {
     const extra = this.attachmentIngest.expandForMessage(sessionId, options?.attachmentIds);
     const imageAssetIds = [...(options?.imageAssetIds ?? []), ...extra.imageAssetIds];
     const text = [message, ...extra.textParts].filter((s) => String(s).trim()).join('\n\n');
     const body = text || (imageAssetIds.length > 0 ? '(attachment)' : message);
-    return sendUserMessageFn(sessionFacadeFrom(this.l5()), sessionId, body, {
-      imageAssetIds
-    });
+    const append = () => {
+      const session = sendUserMessageFn(sessionFacadeFrom(this.l5()), sessionId, body, { imageAssetIds });
+      if (options?.autoRun) requestHumanRun(this.store, sessionId);
+      return session;
+    };
+    return options?.autoRun ? withHumanContinuationAdmission(this.store, sessionId, append) : append();
   }
 
   enqueueSteer(sessionId: string, text: string, opts?: EnqueueSteerOptions): SteerAck {
-    const ack = enqueueSteerFn(this.store, sessionId, text, opts);
+    const admit = () => {
+      const ack = enqueueSteerFn(this.store, sessionId, text, opts);
+      if (ack.status !== 'not_submitted' && opts?.steerMode !== 'subagent') requestSteerContinuation(this.store, sessionId, ack.item);
+      return ack;
+    };
+    const session = this.store.getSession(sessionId);
+    const policy = resolveSteerInterruptPolicy({ option: opts?.interruptPolicy, sessionMetadata: session?.metadata, store: this.store });
+    const decision = decideSteerAdmission({ session, text, interruptPolicy: policy });
+    const ack = opts?.steerMode === 'subagent' || !decision.admit
+      ? admit()
+      : withHumanContinuationAdmission(this.store, sessionId, admit);
     if (ack.status !== 'not_submitted' && opts?.steerMode === 'subagent') {
       this.startSteeringSubagent(sessionId, text, opts.subagentRole, ack.item.id);
       // SubAgent is a parallel child — do not also drain the same text as a parent steer.
       this.store.removeUnclaimedInbox(sessionId, ack.item.id);
     }
+    if (ack.status !== 'not_submitted' && opts?.steerMode !== 'subagent') this.scheduleHumanContinuations();
     return ack;
   }
 
@@ -912,11 +957,14 @@ export class RawAgentRuntime {
     if (!next) throw new ValidationError('Missing steer text');
     const item = this.store.updateUnclaimedInbox(sessionId, itemId, next);
     if (!item) throw new NotFoundError('Steer', itemId);
+    requestSteerContinuation(this.store, sessionId, item);
     return item;
   }
 
   dropSteerItem(sessionId: string, itemId: string): boolean {
-    return this.store.removeUnclaimedInbox(sessionId, itemId);
+    const removed = this.store.removeUnclaimedInbox(sessionId, itemId);
+    if (removed) dropHumanSteerContinuation(this.store, sessionId, itemId);
+    return removed;
   }
 
   /** Spawn a queued inbox item as a steering subagent and drop it from the parent inbox. */
@@ -925,6 +973,7 @@ export class RawAgentRuntime {
     if (!item) throw new NotFoundError('Steer', itemId);
     const spawned = this.startSteeringSubagent(sessionId, item.text, role, item.id);
     this.store.removeUnclaimedInbox(sessionId, itemId);
+    dropHumanSteerContinuation(this.store, sessionId, itemId);
     return { spawned: true as const, childSessionId: spawned?.sessionId, item };
   }
 
@@ -1059,6 +1108,13 @@ export class RawAgentRuntime {
   }
 
   async approve(approvalId: string, decision: 'approved' | 'rejected'): Promise<ApprovalRecord> {
+    const approval = this.store.getApproval(approvalId);
+    if (decision === 'approved' && approval) {
+      const expired = expireOverdueBotWork(this.botWorkRuntimeHost(), approval.sessionId);
+      if (expired || isBotWorkSessionBlocked(this.store, approval.sessionId)) {
+        throw new ValidationError('Delegated task stopped; verify its effects before retrying');
+      }
+    }
     return approveDecision(this.store, approvalId, decision, {
       emitTrace: (sessionId, event) => {
         this.emitTrace(sessionId, event as Omit<TraceEvent, 'ts' | 'sessionId'>);
@@ -1072,7 +1128,16 @@ export class RawAgentRuntime {
   }
 
   async runScheduler(): Promise<void> {
+    await tickBotWork(this.botWorkRuntimeHost());
+    void this.rooms.tick().catch((error) => this.log.warn('Room scheduler failed', { error: String(error) }));
     await runSchedulerFn(schedulerFrom(this.l5()));
+    await this.drainHumanContinuations();
+  }
+
+  private botWorkRuntimeHost(): BotWorkHost {
+    return { store: this.store, runSession: (id: string) => this.runSession(id),
+      isSessionRunning: (id) => this.runningSessions.has(id), cancelSession: (id) => this.cancelSession(id),
+      hasUnconfirmedEffects: (id, since) => this.hasUnconfirmedEffects(id, since), log: this.log };
   }
 
   runResearchTask(taskId: string) {
@@ -1173,6 +1238,22 @@ export class RawAgentRuntime {
     return ensureWorkspaceRootFn(spawnFrom(this.l5()), session, task);
   }
 
+  /** Explicit human run request; subsystem runs keep their own original result promise. */
+  runHumanSession(sessionId: string, options?: Parameters<RawAgentRuntime['runSession']>[1]): Promise<SessionRecord> {
+    requestHumanRun(this.store, sessionId);
+    return this.runSession(sessionId, options);
+  }
+
+  private drainHumanContinuations(): Promise<void> {
+    return drainHumanContinuations({ store: this.store, runSession: (id) => this.runSession(id),
+      isSessionRunning: (id) => this.runningSessions.has(id),
+      hasUnconfirmedEffects: (id) => this.hasUnconfirmedEffects(id, '1970-01-01T00:00:00.000Z'), log: this.log });
+  }
+
+  private scheduleHumanContinuations(): void {
+    setImmediate(() => { if (!this.store.db.isOpen) return; void this.drainHumanContinuations().catch(error => this.log.warn('Human continuation scheduler failed', { error: String(error) })); });
+  }
+
   async runSession(
     sessionId: string,
     options?: {
@@ -1188,7 +1269,20 @@ export class RawAgentRuntime {
       signal?: AbortSignal;
     }
   ): Promise<SessionRecord> {
+    expireOverdueBotWork(this.botWorkRuntimeHost(), sessionId);
+    if (isBotWorkSessionBlocked(this.store, sessionId)) {
+      const stopped = this.store.getSession(sessionId);
+      if (!stopped) throw new NotFoundError('Session', sessionId);
+      return stopped;
+    }
     const parked = this.store.getSession(sessionId);
+    if (typeof parked?.metadata?.roomId === 'string') {
+      this.rooms.prepareSession(sessionId);
+    }
+    if (typeof parked?.metadata?.roomId === 'string' && !options?.onEvent) {
+      const budgetHook = this.rooms.budgetHookForSession(sessionId);
+      if (budgetHook) options = { ...options, onEvent: budgetHook };
+    }
     if (parked?.mode === 'subagent' && parked.status === 'unknown') {
       return parked;
     }
@@ -1197,6 +1291,9 @@ export class RawAgentRuntime {
     if (existing && options?.latch) {
       await existing.catch(() => undefined);
     }
+    const observeHuman = createHumanContinuationObserver(this.store, sessionId);
+    const callerEvent = options?.onEvent;
+    options = { ...options, onEvent: async event => { await observeHuman(event); await callerEvent?.(event); } };
     const { signal: callerSignal, ...runOptions } = options ?? {};
     expireDueUnattendedApprovals(this.store);
 
@@ -1248,7 +1345,7 @@ export class RawAgentRuntime {
           ? runSessionKernelPpeng(coreHost, sessionId, ppengOptions)
           : createAssembledLoop({
               preset: assemblyPreset,
-              io: l5ToAssembledIo(this.l5()),
+              io: l5ToAssembledIo(this.l5(), sessionId),
               hooks,
               config: coreHost.loopConfig
             }).then((assembled) => assembled.run(sessionId, agentLoopOptions)));
@@ -1271,6 +1368,8 @@ export class RawAgentRuntime {
       .finally(() => {
       unlinkCallerSignal();
       this.runningSessions.delete(sessionId);
+      releaseHumanModelInput(this.store, sessionId);
+      this.scheduleHumanContinuations();
     });
     this.runningSessions.set(sessionId, promise);
     return promise;
@@ -1339,6 +1438,9 @@ export class RawAgentRuntime {
       stateDir: this.stateDir,
       tools: this.tools,
       syncConnectorTools: () => this.syncConnectorTools(),
+      filterSoftwareTools: (tools, session) => this.connectors.software.filterForSession(tools, session),
+      hasUnconfirmedEffects: (id, since) => this.hasUnconfirmedEffects(id, since),
+      isSessionRunning: (id) => this.runningSessions.has(id),
       modelAdapter: this.modelAdapter,
       promptBuilder: this.promptBuilder,
       mcpManager: this.mcpManager,

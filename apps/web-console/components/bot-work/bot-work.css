@@ -1,0 +1,70 @@
+[data-testid="bot-team-work"],
+[data-testid="bot-rooms"],
+[data-testid="bot-history"],
+[data-testid="bot-memory"],
+[data-testid="bot-connections"] {
+  margin-block: 1rem;
+  min-width: 0;
+}
+[data-testid^="bot-"] form {
+  display: grid;
+  gap: 0.65rem;
+}
+[data-testid="bot-team-work"] label,
+[data-testid="bot-rooms"] label,
+[data-testid="bot-history"] label,
+[data-testid="bot-connections"] label {
+  display: grid;
+  gap: 0.3rem;
+}
+[data-testid="bot-team-work"] input,
+[data-testid="bot-team-work"] select,
+[data-testid="bot-team-work"] textarea,
+[data-testid="bot-rooms"] input,
+[data-testid="bot-rooms"] select,
+[data-testid="bot-rooms"] textarea,
+[data-testid="bot-history"] input,
+[data-testid="bot-connections"] input,
+[data-testid="bot-connections"] textarea,
+[data-testid="bot-memory"] textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.55rem;
+  border: 1px solid var(--border, #7c859344);
+  border-radius: 0.45rem;
+  background: var(--panel-bg, transparent);
+  color: inherit;
+  font: inherit;
+}
+[data-testid="bot-team-work"] button,
+[data-testid="bot-rooms"] button,
+[data-testid="bot-history"] button,
+[data-testid="bot-connections"] button,
+[data-testid="bot-memory"] button {
+  padding: 0.45rem 0.7rem;
+  margin: 0.25rem 0.4rem 0.25rem 0;
+  border: 1px solid var(--border, #7c859366);
+  border-radius: 0.45rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+[data-testid="bot-team-work"] button:disabled,
+[data-testid="bot-rooms"] button:disabled,
+[data-testid="bot-history"] button:disabled,
+[data-testid="bot-connections"] button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+[data-testid="bot-team-work"] article,
+[data-testid="bot-rooms"] article,
+[data-testid="bot-history"] article,
+[data-testid="bot-connections"] article,
+[data-testid="bot-memory"] article {
+  border-top: 1px solid var(--border, #7c859333);
+  padding: 0.75rem 0;
+  overflow-wrap: anywhere;
+}
+[data-testid="bot-rooms"] select[multiple] {
+  min-height: 5rem;
+}

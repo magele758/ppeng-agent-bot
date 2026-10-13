@@ -1,3 +1,4 @@
+import { setBotDefinitionOwner, resolveBotPrincipal } from '@ppeng/agent-core';
 /**
  * Named Bot roster + canonical session.
  * GET/POST /api/bots, GET/PATCH /api/bots/:id (both carry policy `warnings`), POST /api/bots/:id/open
@@ -43,6 +44,7 @@ export function botsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         });
         if (auth.user) {
           runtime.mergeSessionMetadata(bot.canonicalSessionId, stampOwnerMetadata({}, auth));
+          setBotDefinitionOwner(runtime.store,bot.id,resolveBotPrincipal(runtime.store,{userId:auth.user.id,tenantId:auth.user.tenantId}));
         }
         json(response, 201, { bot });
       }

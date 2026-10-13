@@ -1,3 +1,7 @@
+import { ensureSoftwareInvocationSchema } from '../../connectors/software-execution.js';
+import { ensureBotWorkSchema } from '../../bots/bot-work.js';
+import { ensureBotRoomSchema } from '../../rooms/index.js';
+import { ensureRoutineSchema } from '../../cron/routine-runtime.js';
 /**
  * Versioned schema migrations for the runtime SQLite database.
  *
@@ -895,6 +899,48 @@ export const MIGRATIONS: Migration[] = [
       if (!hasColumn(db, 'approvals', 'wake_source')) {
         db.exec(`ALTER TABLE approvals ADD COLUMN wake_source TEXT`);
       }
+    }
+  }
+  ,{
+    version: 25,
+    description: 'Reliable Bot work, Rooms, Routine runs, history index and memory source references',
+    up: (db) => {
+      ensureBotWorkSchema({db});
+      ensureBotRoomSchema({db});
+      ensureRoutineSchema({db});
+      ensureSoftwareInvocationSchema({db});
+      // Preserve proven legacy ownership before its private canonical can be deleted.
+      // Ownerless history remains installation data, never assigned to a login user.
+      if (hasColumn(db, 'sessions', 'metadata_json')) db.exec(`INSERT INTO bot_definition_owners(bot_id,principal)
+        SELECT bots.id,json_array(CASE WHEN json_type(s.metadata_json,'$.tenantId')='text' THEN trim(json_extract(s.metadata_json,'$.tenantId')) ELSE '' END,trim(json_extract(s.metadata_json,'$.userId')))
+        FROM bots JOIN sessions s ON s.id=bots.canonical_session_id
+        WHERE json_type(s.metadata_json,'$.userId')='text' AND trim(json_extract(s.metadata_json,'$.userId'))<>''
+        ON CONFLICT(bot_id) DO NOTHING`);
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS agent_memory_sources(memory_id TEXT PRIMARY KEY, refs_json TEXT NOT NULL);
+        CREATE TRIGGER IF NOT EXISTS agent_memory_source_delete AFTER DELETE ON agent_memory BEGIN
+          DELETE FROM agent_memory_sources WHERE memory_id=old.id;
+        END;
+        CREATE INDEX IF NOT EXISTS idx_history_session_time ON session_messages(session_id,created_at,seq);
+      `);
+      try {
+        db.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS session_history_fts USING fts5(message_id UNINDEXED, session_id UNINDEXED, text, tokenize='trigram');`);
+      } catch (error) {
+        if (!isOptionalFtsError(error) && !String(error).includes('no such tokenizer')) throw error;
+        return;
+      }
+      db.exec(`
+        INSERT INTO session_history_fts(message_id,session_id,text)
+          SELECT id,session_id,parts_json FROM session_messages
+          WHERE (surface_op IS NULL OR surface_op='append') AND NOT EXISTS(SELECT 1 FROM session_history_fts WHERE message_id=session_messages.id);
+        CREATE TRIGGER IF NOT EXISTS session_history_insert AFTER INSERT ON session_messages
+          WHEN new.surface_op IS NULL OR new.surface_op='append' BEGIN
+            INSERT INTO session_history_fts(message_id,session_id,text) VALUES(new.id,new.session_id,new.parts_json);
+          END;
+        CREATE TRIGGER IF NOT EXISTS session_history_delete AFTER DELETE ON session_messages BEGIN
+          DELETE FROM session_history_fts WHERE message_id=old.id;
+        END;
+      `);
     }
   }
 ];

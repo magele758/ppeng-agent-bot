@@ -505,7 +505,7 @@ export const play = {
     add: 'Add scheduled job',
     empty: 'No scheduled jobs yet',
     next: 'Next {when}',
-    last: ' · last {when}',
+    last: ' · last triggered {when}',
     pause: 'Pause',
     enable: 'Enable',
     remove: 'Delete',

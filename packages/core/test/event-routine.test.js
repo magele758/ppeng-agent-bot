@@ -199,8 +199,9 @@ test('good signature wakes and the user message fences the event', async () => {
     claimDelivery: claimInboundEvent
   });
   assert.equal(result.outcomes[0]?.status, 'woke');
-  assert.deepEqual(runs, [session.id]);
-  const text = userText(store, session.id);
+  assert.equal(runs.length,1);
+  assert.notEqual(runs[0],session.id);
+  const text = runs.map(id=>userText(store,id)).join('\n');
   const fenceAt = text.indexOf('«external source=event label=github/push»');
   const fenceEnd = text.indexOf('«end external»');
   assert.ok(fenceAt > 0);
@@ -231,8 +232,10 @@ test('the same delivery id is a duplicate the second time', async () => {
   const second = await acceptEventRoutine(host, input);
   assert.equal(first.outcomes[0]?.status, 'woke');
   assert.equal(second.outcomes[0]?.status, 'duplicate');
-  assert.deepEqual(runs, [session.id]);
-  assert.equal(store.listMessages(session.id).filter((message) => message.role === 'user').length, 1);
+  assert.equal(runs.length,1);
+  assert.notEqual(runs[0],session.id);
+  assert.equal(store.listMessages(runs[0]).filter((message) => message.role === 'user').length, 1);
+  assert.equal(store.listMessages(session.id).filter((message) => message.role === 'user').length, 0);
   store.db.close();
 });
 
@@ -306,8 +309,8 @@ test('slack and email wake on a good signature and stay quiet when the timestamp
   assert.equal(slackOk.outcomes[0]?.status, 'woke');
   assert.equal(slackStale.outcomes[0]?.status, 'rejected');
   assert.equal(emailOk.outcomes[0]?.status, 'woke');
-  assert.deepEqual(runs, [session.id, session.id]);
-  const text = userText(store, session.id);
+  assert.equal(runs.length,2);assert.ok(runs.every(id=>id!==session.id));assert.notEqual(runs[0],runs[1]);
+  const text = runs.map(id=>userText(store,id)).join('\n');
   assert.match(text, /«external source=event label=slack\/message»/);
   assert.match(text, /«external source=event label=email\/received»/);
   store.db.close();
@@ -398,8 +401,9 @@ test('gateway ingress verifies GitHub without the bearer token and does not doub
   });
   assert.equal(ok.status, 200);
   assert.equal(ok.json.wakeAgent, true);
-  assert.deepEqual(runs, [session.id]);
-  assert.match(userText(store, session.id), /«external source=event label=github\/push»/);
+  assert.equal(runs.length,1);
+  assert.notEqual(runs[0],session.id);
+  assert.match(userText(store, runs[0]), /«external source=event label=github\/push»/);
 
   const again = await gatewayCall(ctx, {
     path: '/routines/github',
@@ -412,6 +416,32 @@ test('gateway ingress verifies GitHub without the bearer token and does not doub
   });
   assert.equal(again.status, 200);
   assert.equal(again.json.duplicate, true);
-  assert.deepEqual(runs, [session.id]);
+  assert.equal(runs.length,1);
+  assert.notEqual(runs[0],session.id);
   store.db.close();
+});
+
+test('gateway capacity rejection is retryable and the same delivery succeeds without duplicating accepted work [AC:bot-routine-lifecycle#AC-3]',async()=>{
+ const {RoutineRunStore,cancelRoutineRun}=await import('../dist/cron/routine-runtime.js');const {updateBotWorkSettings}=await import('../dist/bots/bot-work.js');
+ const {store,host,runs,session}=tempHost();updateBotWorkSettings(store,{perBot:1,perPrincipal:1});
+ const blockerJob=createCronJob(host,{sessionId:session.id,name:'accepted first',prompt:'must remain accepted',intervalMs:60000});const ledger=new RoutineRunStore(store);const blocker=ledger.enqueue(blockerJob,new Date().toISOString());
+ const event=addJob(host,session,{event:'github/push',prompt:'process once'});
+ host.runSession=async(id)=>{runs.push(id);store.appendMessage(id,'assistant',[{type:'text',text:'event completed'}]);return store.getSession(id)};
+ const ctx={runtime:{store,runSession:(id)=>host.runSession(id)},repoRoot:host.stateDir,stateDir:host.stateDir,env:{enabled:true,pathPrefix:'/gateway/v1',learnEnabled:false,learnDailyHourUtc:6,authToken:'gateway-token'},fileConfigRef:{current:{}}};
+ const body={note:'retry after backpressure'},text=JSON.stringify(body);const request={path:'/routines/github',body,headers:{'x-github-event':'push','x-github-delivery':'gw-capacity-retry','x-hub-signature-256':githubSig(text)}};
+ const full=await gatewayCall(ctx,request);assert.equal(full.status,429);assert.equal(full.json.retryable,true);assert.equal(full.json.outcomes[0].status,'queue_full');assert.equal(ledger.get(blocker.id).status,'queued');assert.equal(ledger.get(blocker.id).job.prompt,'must remain accepted');assert.deepEqual(runs,[]);assert.equal(ledger.list(event.id).length,0);
+ await cancelRoutineRun(host,blocker.id);
+ const accepted=await gatewayCall(ctx,request);await new Promise(r=>setImmediate(r));assert.equal(accepted.status,200);assert.equal(accepted.json.duplicate,false);assert.equal(accepted.json.wakeAgent,true);assert.equal(runs.length,1);assert.equal(ledger.list(event.id)[0].status,'completed');
+ const repeated=await gatewayCall(ctx,request);assert.equal(repeated.status,200);assert.equal(repeated.json.duplicate,true);assert.equal(runs.length,1);assert.equal(ledger.list(event.id).length,1);store.db.close();
+});
+
+test('non-SQLite event hosts retain signature, precheck, dedupe and idle wake compatibility',async()=>{
+ const {CronJobStore}=await import('../dist/cron/cron-store.js');const dir=mkdtempSync(join(tmpdir(),'event-legacy-'));const cronStore=new CronJobStore(dir);const sessions=new Map([['legacy',{id:'legacy',status:'idle'}]]);let calls=0;const messages=[];
+ const host={stateDir:dir,cronStore,setCronStore(){},log:{warn(){}},store:{getSession:id=>sessions.get(id),appendMessage:(...args)=>messages.push(args)},runSession:async()=>{calls++}};
+ const base={sessionId:'legacy',agentId:'general',name:'legacy',prompt:'handle',scheduleKind:'event',scheduleValue:'github/push',metadata:{secretEnv:SECRET_ENV}};
+ const job=cronStore.create(base);const raw='{"legacy":"private"}';const claimed=new Set();let delivery=0;const input=()=>({provider:'github',rawBody:raw,headers:{'x-github-event':'push','x-github-delivery':String(delivery),'x-hub-signature-256':githubSig(raw)},env:{[SECRET_ENV]:SECRET},claimDelivery(key){if(claimed.has(key))return false;claimed.add(key);return true}});
+ assert.equal((await acceptEventRoutine(host,input())).outcomes[0].status,'woke');await new Promise(r=>setImmediate(r));assert.equal(calls,1);assert.equal(messages.length,1);assert.equal((await acceptEventRoutine(host,input())).outcomes[0].status,'duplicate');
+ delivery++;sessions.set('legacy',{id:'legacy',status:'waiting_approval'});assert.equal((await acceptEventRoutine(host,input())).outcomes[0].status,'not_idle');assert.equal(calls,1);
+ cronStore.update(job.id,{metadata:{...job.metadata,precheck:{kind:'script',source:'node -e \'const fs=require("node:fs");if(!fs.readFileSync(process.env.PPENG_EVENT_FILE,"utf8").includes("private"))process.exit(1);console.log(JSON.stringify({wakeAgent:false}))\''}}});delivery++;assert.equal((await acceptEventRoutine(host,input())).outcomes[0].status,'skipped');
+ cronStore.update(job.id,{metadata:job.metadata});sessions.delete('legacy');delivery++;assert.equal((await acceptEventRoutine(host,input())).outcomes[0].status,'missing_session');assert.equal(cronStore.get(job.id).enabled,false);
 });

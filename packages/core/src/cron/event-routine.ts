@@ -14,6 +14,9 @@ import type { Logger } from '../logger.js';
 import { fenceExternalContent } from '../safety/external-content.js';
 import type { MessagePart, SessionRecord } from '../types.js';
 import { textPart } from '../runtime/session-facade.js';
+import { BotQueueCapacityError } from '../bots/bot-work.js';
+import { RoutineRunStore, drainRoutineRuns, repairRoutineOwnerSession } from './routine-runtime.js';
+import type { SqliteStateStore } from '../storage.js';
 import { startIdleSessionRun } from '../runtime/scheduler-host.js';
 import { CronJobStore, markCronJobRan, type CronJobRecord } from './cron-store.js';
 import { evaluateRoutinePrecheck, readStoredPrecheck } from './routine-precheck.js';
@@ -45,6 +48,9 @@ export interface EventRoutineHost {
   log: Logger;
   store: EventRoutineStore;
   runSession(sessionId: string): Promise<unknown>;
+  isSessionRunning?(sessionId:string):boolean;
+  hasUnconfirmedEffects?(sessionId:string,startedAt:string):boolean;
+  cancelSession?(sessionId:string):unknown;
   cronStore?: CronJobStore;
   setCronStore?(store: CronJobStore): void;
 }
@@ -63,7 +69,7 @@ export interface AcceptEventRoutineInput {
 
 export interface EventJobOutcome {
   jobId: string;
-  status: 'rejected' | 'duplicate' | 'skipped' | 'woke' | 'not_idle' | 'missing_session';
+  status: 'rejected' | 'duplicate' | 'skipped' | 'woke' | 'not_idle' | 'missing_session' | 'queue_full' | 'queued';
   reason?: 'bad_signature' | 'no_delivery';
   sessionId?: string;
 }
@@ -282,105 +288,56 @@ function errorText(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-/**
- * Verify the signature, drop replays, and run the existing precheck.
- * A bad signature, a replayed delivery id, or `wakeAgent: false` does not call the model.
- */
-export async function acceptEventRoutine(
-  host: EventRoutineHost,
-  input: AcceptEventRoutineInput
-): Promise<AcceptEventRoutineResult> {
-  let parsed = input.body;
-  if (parsed === undefined) {
-    try {
-      parsed = input.rawBody ? (JSON.parse(input.rawBody) as unknown) : {};
-    } catch {
-      return { outcomes: [], error: 'invalid_json' };
-    }
-  }
-  const scheduleValue = resolveScheduleValue(input.provider, input.headers, parsed);
-  if (!scheduleValue) return { outcomes: [], error: 'invalid_event' };
-
-  const env = input.env ?? process.env;
-  const nowMs = input.nowMs ?? Date.now();
-  const store = cronStoreOf(host);
-  const jobs = store
-    .list({ enabled: true })
-    .filter((job) => job.scheduleKind === 'event' && job.scheduleValue === scheduleValue);
-  if (jobs.length === 0) return { scheduleValue, outcomes: [] };
-
-  let eventDir: string | undefined;
-  let eventFile: string | undefined;
-  const ensureEventFile = (): string => {
-    if (eventFile) return eventFile;
-    eventDir = mkdtempSync(join(tmpdir(), 'ppeng-event-'));
-    eventFile = join(eventDir, 'event.json');
-    writeFileSync(eventFile, input.rawBody, { encoding: 'utf8', mode: 0o600 });
-    return eventFile;
-  };
-
-  const outcomes: EventJobOutcome[] = [];
-  try {
-    for (const job of jobs) {
-      const secret = secretFromEnv(job.metadata?.secretEnv, env);
-      if (!secret.value || !signatureOk(input.provider, input.rawBody, secret.value, input.headers, nowMs)) {
-        outcomes.push({ jobId: job.id, status: 'rejected', reason: 'bad_signature' });
-        continue;
-      }
-      const deliveryId = deliveryIdOf(input.provider, input.headers, parsed);
-      if (!deliveryId) {
-        outcomes.push({ jobId: job.id, status: 'rejected', reason: 'no_delivery' });
-        continue;
-      }
-      if (!input.claimDelivery(`event-routine:${job.id}:${deliveryId}`)) {
-        outcomes.push({ jobId: job.id, status: 'duplicate' });
-        continue;
-      }
-
-      const precheck = readStoredPrecheck(job.metadata);
-      let wakeAgent = true;
-      if (precheck) {
-        try {
-          const gate = await evaluateRoutinePrecheck(precheck, {
-            cwd: host.stateDir,
-            env:
-              precheck.kind === 'script'
-                ? { [EVENT_PRECHECK_FILE_ENV]: ensureEventFile() }
-                : undefined,
-            denyEnv: secret.name ? [secret.name] : undefined
-          });
-          wakeAgent = gate.wakeAgent;
-        } catch (err) {
-          host.log.warn('event precheck failed open', { jobId: job.id, error: errorText(err) });
-          wakeAgent = true;
-        }
-      }
-      if (!wakeAgent) {
-        markCronJobRan(store, job);
-        host.log.info('event precheck skipped model turn', { jobId: job.id, name: job.name });
-        outcomes.push({ jobId: job.id, status: 'skipped' });
-        continue;
-      }
-
-      const session = host.store.getSession(job.sessionId);
-      if (!session) {
-        store.update(job.id, { enabled: false });
-        outcomes.push({ jobId: job.id, status: 'missing_session' });
-        continue;
-      }
-      host.store.appendMessage(job.sessionId, 'user', [
-        textPart(eventUserText(job, scheduleValue, deliveryId, input.rawBody))
-      ]);
-      markCronJobRan(store, job);
-      const started = startIdleSessionRun(host, session, `event:${job.id}`);
-      outcomes.push(
-        started
-          ? { jobId: job.id, status: 'woke', sessionId: session.id }
-          : { jobId: job.id, status: 'not_idle', sessionId: session.id }
-      );
-    }
-  } finally {
-    if (eventDir) rmSync(eventDir, { recursive: true, force: true });
-  }
-  return { scheduleValue, outcomes };
+function verifyRoutineDelivery(job:CronJobRecord,input:AcceptEventRoutineInput,env:NodeJS.ProcessEnv,nowMs:number):{deliveryId:string;secretName?:string}|EventJobOutcome {
+ const secret=secretFromEnv(job.metadata.secretEnv,env);
+ if(!secret.value||!signatureOk(input.provider,input.rawBody,secret.value,input.headers,nowMs))return {jobId:job.id,status:'rejected',reason:'bad_signature'};
+ const deliveryId=deliveryIdOf(input.provider,input.headers,input.body);
+ if(!deliveryId)return {jobId:job.id,status:'rejected',reason:'no_delivery'};
+ return {deliveryId,secretName:secret.name};
+}
+async function acceptDurableRoutineEvent(host:EventRoutineHost,config:CronJobStore,job:CronJobRecord,input:AcceptEventRoutineInput,scheduleValue:string,deliveryId:string,nowMs:number):Promise<EventJobOutcome>{
+ const runtimeHost={...host,store:host.store as SqliteStateStore};
+ const session=host.store.getSession(job.sessionId)??repairRoutineOwnerSession(runtimeHost,job);
+ if(!session){config.update(job.id,{enabled:false});return {jobId:job.id,status:'missing_session'};}
+ const runs=new RoutineRunStore(runtimeHost.store),key=`event:${job.id}:${deliveryId}`;
+ if(runs.findByKey(key))return {jobId:job.id,status:'duplicate'};
+ let run;
+ try{run=runs.enqueue(job,new Date(nowMs).toISOString(),{key,prompt:eventUserText(job,scheduleValue,deliveryId,input.rawBody),eventBody:input.rawBody});}
+ catch(error){if(error instanceof BotQueueCapacityError){config.update(job.id,{metadata:{...job.metadata,queueBlockedReason:error.message}});return {jobId:job.id,status:'queue_full'};}throw error;}
+ if(!input.claimDelivery(`event-routine:${job.id}:${deliveryId}`)){runs.update(run.id,{status:'unknown',error:'External dedupe receipt exists without a local occurrence; verify effects before retry'});return {jobId:job.id,status:'duplicate'};}
+ markCronJobRan(config,job,nowMs);config.update(job.id,{metadata:{...job.metadata,queueBlockedReason:undefined}});
+ await drainRoutineRuns(runtimeHost);const saved=runs.get(run.id)!;
+ return {jobId:job.id,status:saved.status==='skipped'?'skipped':saved.sessionId?'woke':'queued',...(saved.sessionId?{sessionId:saved.sessionId}:{})};
+}
+async function legacyEventPrecheck(host:EventRoutineHost,job:CronJobRecord,rawBody:string,secretName?:string):Promise<boolean>{
+ const precheck=readStoredPrecheck(job.metadata);if(!precheck)return true;
+ let directory:string|undefined;let env:NodeJS.ProcessEnv|undefined;
+ try{
+  if(precheck.kind==='script'){directory=mkdtempSync(join(tmpdir(),'ppeng-event-'));const path=join(directory,'event.json');writeFileSync(path,rawBody,{encoding:'utf8',mode:0o600});env={[EVENT_PRECHECK_FILE_ENV]:path};}
+  const result=await evaluateRoutinePrecheck(precheck,{cwd:host.stateDir,...(env?{env}:{}),...(secretName?{denyEnv:[secretName]}:{})});return result.wakeAgent;
+ }finally{if(directory)rmSync(directory,{recursive:true,force:true});}
+}
+async function acceptLegacyRoutineEvent(host:EventRoutineHost,config:CronJobStore,job:CronJobRecord,input:AcceptEventRoutineInput,scheduleValue:string,deliveryId:string,secretName?:string):Promise<EventJobOutcome>{
+ if(!input.claimDelivery(`event-routine:${job.id}:${deliveryId}`))return {jobId:job.id,status:'duplicate'};
+ if(!await legacyEventPrecheck(host,job,input.rawBody,secretName)){markCronJobRan(config,job);return {jobId:job.id,status:'skipped'};}
+ const session=host.store.getSession(job.sessionId);
+ if(!session){config.update(job.id,{enabled:false});return {jobId:job.id,status:'missing_session'};}
+ host.store.appendMessage(job.sessionId,'user',[textPart(eventUserText(job,scheduleValue,deliveryId,input.rawBody))]);markCronJobRan(config,job);
+ const started=startIdleSessionRun(host,session,`event:${job.id}`);return {jobId:job.id,status:started?'woke':'not_idle',sessionId:session.id};
+}
+/** Validated events are durably admitted before claiming external dedupe; compatibility stores keep their old wake contract. */
+export async function acceptEventRoutine(host:EventRoutineHost,input:AcceptEventRoutineInput):Promise<AcceptEventRoutineResult>{
+ let parsed=input.body;
+ if(parsed===undefined){try{parsed=input.rawBody?JSON.parse(input.rawBody):{};}catch{return {outcomes:[],error:'invalid_json'};}}
+ const scheduleValue=resolveScheduleValue(input.provider,input.headers,parsed);if(!scheduleValue)return {outcomes:[],error:'invalid_event'};
+ const config=cronStoreOf(host),env=input.env??process.env,nowMs=input.nowMs??Date.now();
+ const jobs=config.list({enabled:true}).filter(job=>job.scheduleKind==='event'&&job.scheduleValue===scheduleValue);const outcomes:EventJobOutcome[]=[];
+ const verifiedInput={...input,body:parsed};
+ for(const job of jobs){
+  const verified=verifyRoutineDelivery(job,verifiedInput,env,nowMs);
+  if('jobId' in verified){outcomes.push(verified);continue;}
+  const outcome='db' in host.store&&'createSession' in host.store?await acceptDurableRoutineEvent(host,config,job,verifiedInput,scheduleValue,verified.deliveryId,nowMs):await acceptLegacyRoutineEvent(host,config,job,verifiedInput,scheduleValue,verified.deliveryId,verified.secretName);
+  outcomes.push(outcome);
+ }
+ return {scheduleValue,outcomes};
 }

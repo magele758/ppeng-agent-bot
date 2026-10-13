@@ -1,15 +1,22 @@
 import { NotFoundError, ValidationError } from '../errors.js';
+import { resolveBotPrincipal, principalFromSession } from '../bots/bot-identity.js';
 import { openBot } from '../bots/bot-facade.js';
 import type { SessionFacadeHost } from '../runtime/session-facade.js';
 import type { CronJobRecord } from './cron-store.js';
 import { CronJobStore } from './cron-store.js';
-import { nextCronRunAt, parseCron5 } from './cron-next.js';
+import { nextZonedCronRunAt, normalizeRoutineTimezone, parseCron5 } from './cron-next.js';
 import { parseEventScheduleValue } from './event-routine.js';
 import type { RoutinePrecheck } from './routine-precheck.js';
 
 export interface CreateCronJobInput {
   name: string;
   prompt: string;
+  onceAt?: string;
+  intervalMs?: number;
+  timezone?: string;
+  missedPolicy?: 'coalesce' | 'skip' | 'catch_up';
+  userId?: string;
+  tenantId?: string;
   /** 5-field cron. Omit when `event` is set. */
   cron?: string;
   /**
@@ -29,6 +36,12 @@ export interface CreateCronJobInput {
 export interface UpdateCronJobInput {
   name?: string;
   prompt?: string;
+  onceAt?: string;
+  intervalMs?: number;
+  event?: string;
+  secretEnv?: string;
+  timezone?: string;
+  missedPolicy?: 'coalesce' | 'skip' | 'catch_up';
   cron?: string;
   enabled?: boolean;
   /** `null` clears a saved precheck. */
@@ -114,105 +127,73 @@ export function getCronJob(host: CronFacadeHost, id: string): CronJobRecord {
   return job;
 }
 
-export function createCronJob(host: CronFacadeHost, input: CreateCronJobInput): CronJobRecord {
-  const name = normalizeName(input.name);
-  const prompt = normalizePrompt(input.prompt);
-  let sessionId = input.sessionId?.trim() || undefined;
-  let agentId = 'general';
-  let botId = input.botId?.trim() || undefined;
-
-  if (botId) {
-    const opened = openBot(host, botId);
-    sessionId = opened.sessionId;
-    agentId = opened.bot.agentId;
-  }
-  if (!sessionId) throw new ValidationError('sessionId or botId is required');
-
-  const session = host.store.getSession(sessionId);
-  if (!session) throw new NotFoundError('Session', sessionId);
-  agentId = session.agentId;
-  if (!botId && typeof session.metadata?.botId === 'string') {
-    botId = session.metadata.botId;
-  }
-
-  const metadata: Record<string, unknown> = {};
-  if (botId) metadata.botId = botId;
-  if (input.precheck != null) metadata.precheck = parseRoutinePrecheck(input.precheck);
-
-  const eventRaw = input.event?.trim() ?? '';
-  const cronRaw = input.cron?.trim() ?? '';
-  if (eventRaw && cronRaw) throw new ValidationError('pass either cron or event, not both');
-  if (eventRaw) {
-    const scheduleValue = parseEventScheduleValue(eventRaw);
-    if (!scheduleValue) {
-      throw new ValidationError('event must look like github/push, slack/message, or email/received');
-    }
-    const secretRaw = input.secretEnv?.trim() ?? '';
-    if (!secretRaw) throw new ValidationError('secretEnv is required for event routines');
-    metadata.prompt = prompt;
-    metadata.secretEnv = normalizeSecretEnv(secretRaw);
-    return ensureCronStore(host).create({
-      sessionId,
-      agentId,
-      name,
-      prompt,
-      scheduleKind: 'event',
-      scheduleValue,
-      enabled: input.enabled !== false,
-      metadata
-    });
-  }
-  if (!cronRaw) throw new ValidationError('cron or event is required');
-  const cron = normalizeCron(cronRaw);
-
-  return ensureCronStore(host).create({
-    sessionId,
-    agentId,
-    name,
-    prompt,
-    scheduleKind: 'cron5',
-    scheduleValue: cron,
-    enabled: input.enabled !== false,
-    nextRunAt: nextCronRunAt(cron).toISOString(),
-    metadata
-  });
+function resolveCronBinding(host:CronFacadeHost,input:CreateCronJobInput) {
+ let sessionId=input.sessionId?.trim();let botId=input.botId?.trim();
+ if(botId)sessionId=openBot(host,botId,resolveBotPrincipal(host.store,input)).sessionId;
+ if(!sessionId)throw new ValidationError('sessionId or botId is required');
+ const session=host.store.getSession(sessionId);if(!session)throw new NotFoundError('Session',sessionId);
+ if(!botId&&typeof session.metadata.botId==='string')botId=session.metadata.botId;
+ return {session,botId};
 }
-
-export function updateCronJob(
-  host: CronFacadeHost,
-  id: string,
-  patch: UpdateCronJobInput
-): CronJobRecord {
-  const current = getCronJob(host, id);
-  const next: Partial<CronJobRecord> = {};
-  if (patch.name !== undefined) next.name = normalizeName(patch.name);
-  if (patch.prompt !== undefined) next.prompt = normalizePrompt(patch.prompt);
-  if (patch.enabled !== undefined) next.enabled = patch.enabled;
-  if (patch.precheck !== undefined || (patch.prompt !== undefined && current.scheduleKind === 'event')) {
-    const metadata = { ...(current.metadata ?? {}) };
-    if (patch.precheck !== undefined) {
-      if (patch.precheck === null) delete metadata.precheck;
-      else metadata.precheck = parseRoutinePrecheck(patch.precheck);
-    }
-    if (patch.prompt !== undefined && current.scheduleKind === 'event') {
-      metadata.prompt = next.prompt;
-    }
-    next.metadata = metadata;
-  }
-  if (patch.cron !== undefined) {
-    const cron = normalizeCron(patch.cron);
-    next.scheduleKind = 'cron5';
-    next.scheduleValue = cron;
-    next.nextRunAt = nextCronRunAt(cron).toISOString();
-  } else if (patch.enabled === true && current.scheduleKind === 'cron5') {
-    const due = current.nextRunAt ? Date.parse(current.nextRunAt) : NaN;
-    if (!Number.isFinite(due) || due <= Date.now()) {
-      next.nextRunAt = nextCronRunAt(current.scheduleValue).toISOString();
-    }
-  }
-  const updated = ensureCronStore(host).update(id, next);
-  if (!updated) throw new NotFoundError('CronJob', id);
-  return updated;
+function normalizeMissedPolicy(value:string|undefined):NonNullable<CronJobRecord['missedPolicy']>{
+ const policy=value??'coalesce';if(!['coalesce','skip','catch_up'].includes(policy))throw new ValidationError('invalid missedPolicy');return policy as NonNullable<CronJobRecord['missedPolicy']>;
+}
+function intervalSchedule(value:number):Pick<CronJobRecord,'scheduleKind'|'scheduleValue'|'nextRunAt'>{
+ if(!Number.isInteger(value)||value<1000)throw new ValidationError('intervalMs must be >= 1000');
+ return {scheduleKind:'every_ms',scheduleValue:String(value),nextRunAt:new Date(Date.now()+value).toISOString()};
+}
+function onceSchedule(value:string):Pick<CronJobRecord,'scheduleKind'|'scheduleValue'|'nextRunAt'>{
+ const instant=Date.parse(value);if(!Number.isFinite(instant))throw new ValidationError('invalid onceAt');const at=new Date(instant).toISOString();return {scheduleKind:'once_at',scheduleValue:at,nextRunAt:at};
+}
+function eventSchedule(value:string):Pick<CronJobRecord,'scheduleKind'|'scheduleValue'|'nextRunAt'>{
+ const event=parseEventScheduleValue(value);if(!event)throw new ValidationError('invalid event');return {scheduleKind:'event',scheduleValue:event,nextRunAt:undefined};
+}
+function normalizeSchedule(input:Pick<CreateCronJobInput,'cron'|'event'|'onceAt'|'intervalMs'>,timezone:string):Pick<CronJobRecord,'scheduleKind'|'scheduleValue'|'nextRunAt'>{
+ const selectors=[input.cron,input.event,input.onceAt,input.intervalMs].filter(value=>value!==undefined&&value!=='');
+ if(selectors.length!==1)throw new ValidationError('choose exactly one schedule');
+ if(input.onceAt!==undefined)return onceSchedule(input.onceAt);
+ if(input.intervalMs!==undefined)return intervalSchedule(input.intervalMs);
+ if(input.event!==undefined)return eventSchedule(input.event);
+ const cron=normalizeCron(input.cron!);return {scheduleKind:'cron5',scheduleValue:cron,nextRunAt:nextZonedCronRunAt(cron,timezone).toISOString()};
+}
+export function createCronJob(host:CronFacadeHost,input:CreateCronJobInput):CronJobRecord {
+ const name=normalizeName(input.name),prompt=normalizePrompt(input.prompt);
+ const {session,botId}=resolveCronBinding(host,input);const timezone=normalizeRoutineTimezone(input.timezone);
+ const schedule=normalizeSchedule(input,timezone);
+ const metadata:Record<string,unknown>={principal:principalFromSession(host.store,session)};
+ if(botId)metadata.botId=botId;
+ if(input.precheck!=null)metadata.precheck=parseRoutinePrecheck(input.precheck);
+ if(schedule.scheduleKind==='event'){if(!input.secretEnv)throw new ValidationError('secretEnv required for event');metadata.secretEnv=normalizeSecretEnv(input.secretEnv);metadata.prompt=prompt;}
+ return ensureCronStore(host).create({name,prompt,sessionId:session.id,agentId:session.agentId,timezone,missedPolicy:normalizeMissedPolicy(input.missedPolicy),ruleVersion:1,metadata,enabled:input.enabled!==false,...schedule});
+}
+function schedulePatch(current:CronJobRecord,patch:UpdateCronJobInput):Partial<CronJobRecord>{
+ const next:Partial<CronJobRecord>={};
+ if(patch.timezone!==undefined)next.timezone=normalizeRoutineTimezone(patch.timezone);
+ if(patch.missedPolicy!==undefined)next.missedPolicy=normalizeMissedPolicy(patch.missedPolicy);
+ const selectors=[patch.cron,patch.onceAt,patch.intervalMs,patch.event].filter(value=>value!==undefined);
+ if(selectors.length>1)throw new ValidationError('choose exactly one schedule');
+ if(selectors.length)Object.assign(next,normalizeSchedule(patch,next.timezone??current.timezone??'UTC'));
+ if(selectors.length||patch.timezone!==undefined){next.ruleVersion=(current.ruleVersion??1)+1;next.metadata={...current.metadata,catchUpPlan:undefined};}
+ if(!selectors.length&&(patch.enabled===true||patch.timezone!==undefined)&&current.scheduleKind==='cron5'){
+  const due=Date.parse(current.nextRunAt??'');if(patch.timezone!==undefined||!Number.isFinite(due)||due<=Date.now())next.nextRunAt=nextZonedCronRunAt(current.scheduleValue,next.timezone??current.timezone??'UTC').toISOString();
+ }
+ return next;
+}
+function contentPatch(current:CronJobRecord,patch:UpdateCronJobInput,next:Partial<CronJobRecord>):void {
+ if(patch.name!==undefined)next.name=normalizeName(patch.name);
+ if(patch.prompt!==undefined)next.prompt=normalizePrompt(patch.prompt);
+ if(patch.enabled!==undefined)next.enabled=patch.enabled;
+ const metadata={...(next.metadata??current.metadata)};
+ if(patch.secretEnv!==undefined)metadata.secretEnv=normalizeSecretEnv(patch.secretEnv);
+ if(patch.precheck!==undefined){if(patch.precheck===null)delete metadata.precheck;else metadata.precheck=parseRoutinePrecheck(patch.precheck);}
+ if((next.scheduleKind??current.scheduleKind)==='event'){
+  if(typeof metadata.secretEnv!=='string')throw new ValidationError('secretEnv required for event');metadata.prompt=next.prompt??current.prompt;
+ }
+ next.metadata=metadata;
+}
+export function updateCronJob(host:CronFacadeHost,id:string,patch:UpdateCronJobInput):CronJobRecord {
+ const current=getCronJob(host,id);const next=schedulePatch(current,patch);contentPatch(current,patch,next);
+ const updated=ensureCronStore(host).update(id,next);if(!updated)throw new NotFoundError('CronJob',id);return updated;
 }
 
 export function deleteCronJob(host: CronFacadeHost, id: string): void {

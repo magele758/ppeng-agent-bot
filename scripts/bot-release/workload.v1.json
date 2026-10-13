@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "seed": 20261013,
+  "referenceHardware": { "cpu": 4, "memoryGiB": 8, "disk": "SSD" },
+  "dataset": { "botsIncludingSuper": 50, "activeBots": 10, "maxHistoryPerBot": 100000, "historyMessages": 1000000 },
+  "read": { "clients": 20, "requestsPerSecond": 40, "warmupSeconds": 300, "measurementSeconds": 900, "mix": { "page": 0.5, "search": 0.3, "status": 0.2 } },
+  "write": { "topLevelPerSecond": 2, "mix": { "human": 0.4, "routine": 0.2, "dispatch": 0.2, "room": 0.2 }, "maxDownstreamBots": 3 },
+  "payloadBytes": { "input": 1024, "output": 2048, "toolResult": 8192, "artifact": 1048576, "artifactFraction": 0.01 },
+  "controlledLatencyMs": { "modelTurn": 100, "modelMaxTurns": 3, "softwareRead": 50, "softwareWrite": 100, "approval": 5000 },
+  "burst": { "everySeconds": 3600, "durationSeconds": 60, "topLevelPerSecond": 20, "hotspotFraction": 0.5 },
+  "soak": { "warmupSeconds": 1800, "measurementSeconds": 86400, "drainSeconds": 120, "rssSampleSeconds": 10, "rssWindowSeconds": 1800, "maxRssRatio": 1.2 },
+  "thresholdsMs": { "pageP95": 500, "statusP95": 500, "searchP95": 1000, "receiveP95": 500, "firstScreenP95": 2000 },
+  "faults": { "ciSequences": 1000, "candidateSequences": 10000, "consecutiveCandidatePasses": 3 },
+  "memory": { "turns": 200, "compactions": 12, "facts": 100, "liveTrialsPerModel": 3, "criticalRecall": 1, "otherRecall": 0.95 }
+}

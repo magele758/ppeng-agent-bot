@@ -1,3 +1,5 @@
+import { SoftwareExecution } from './software-execution.js';
+import type { RunContext, ToolExecutionResult } from '../types.js';
 /**
  * Per-connector grant registry.
  *
@@ -338,7 +340,27 @@ export function mergeGrantedConnectorTools<T extends { name: string }>(
 export class ConnectorRegistry {
   private domains: readonly DomainConnectorSource[] | undefined;
 
-  constructor(private readonly deps: ConnectorRegistryDeps) {}
+  readonly software: SoftwareExecution;
+  constructor(private readonly deps: ConnectorRegistryDeps) { this.software = new SoftwareExecution(deps.store); }
+  bindSoftware(principal: string, botId: string, connectorId: string, input: unknown) {
+    return this.software.bind(principal, botId, connectorId, this.softwareBindingInput(connectorId, input));
+  }
+  softwareBindingInput(connectorId: string, input: unknown): Record<string, unknown> {
+    const body = input && typeof input === 'object' ? input as Record<string, unknown> : {};
+    if (Array.isArray(body.tools)) return body;
+    const plugin = this.deps.getPlugins().find(p => pluginConnectorId(p.manifest.id) === connectorId);
+    const card = this.capabilities().find(c => discoveryConnectorId(c.id) === connectorId && c.trust === 'bound');
+    const tools = plugin?.toolDecls ?? card?.metadata?.draftTools;
+    if (!Array.isArray(tools)) throw new ValidationError('No executable declarations; provide tools or import OpenAPI');
+    const executableTools = tools.map((tool: PluginToolDecl) => {
+      const executor = tool.executor;
+      if (plugin?.authKind === 'oauth') throw new ValidationError('OAuth plugin executors are unsupported');
+      if (!executor || executor.kind !== 'http' || executor.auth || !plugin || plugin.authKind === 'none') return tool;
+      return { ...tool, executor: { ...executor, auth: plugin.authKind === 'bearer' ? {kind:'bearer' as const} : {kind:'header' as const, name:plugin.headerName ?? 'X-API-Key'} } };
+    });
+    return { ...(plugin?.secretEnv ? {secretEnv:plugin.secretEnv}:{}), ...body, tools: executableTools };
+  }
+  setMcpInvoker(fn: (name: string, args: Record<string, unknown>, ctx: RunContext) => Promise<ToolExecutionResult>): void {this.software.setMcpInvoker(fn);}
 
   /** Display-only domain rows. Does not mount or unmount domain tools. */
   setDomains(domains: readonly DomainConnectorSource[]): void {
@@ -420,7 +442,9 @@ export class ConnectorRegistry {
         tools.push(toolFromDecl(decl, id, secrets));
       }
     }
-    return tools;
+    const bound = this.software.tools();
+    const overrides = new Map(bound.map(t => [t.name, t]));
+    return [...tools.filter(t => !overrides.has(t.name)), ...bound];
   }
 
   private injectable(env: NodeJS.ProcessEnv): ConnectorRecord[] {

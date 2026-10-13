@@ -1,4 +1,5 @@
-import { ConflictError, NotFoundError, ValidationError } from '../errors.js';
+import { resolveBotPrincipal, principalFromSession, sameBotPrincipal, setBotDefinitionOwner, botDefinitionOwner } from './bot-identity.js';
+import { AuthorizationError, ConflictError, NotFoundError, ValidationError } from '../errors.js';
 import { createId, nowIso } from '../id.js';
 import type { SessionFacadeHost } from '../runtime/session-facade.js';
 import { createChatSession, ensureAgent } from '../runtime/session-facade.js';
@@ -154,8 +155,7 @@ function createCanonicalSession(
       ...(inheritedTools ? { allowedTools: inheritedTools } : {}),
       ...(inheritedSkills ? { allowedSkills: inheritedSkills } : {}),
       ...(inheritedModel ? { [BOT_MODEL_OVERRIDE_META]: inheritedModel } : {}),
-      ...(owner?.userId ? { userId: owner.userId } : {}),
-      ...(owner?.tenantId ? { tenantId: owner.tenantId } : {})
+      ...resolveBotPrincipal(host.store, owner)
     }
   });
 }
@@ -189,14 +189,16 @@ export function getBot(store: SqliteStateStore, id: string): BotRecord {
   return bot;
 }
 
-export function createBot(host: SessionFacadeHost, input: CreateBotInput): BotRecord {
+export function createBot(host: SessionFacadeHost, input: CreateBotInput, options?: { builtin?: boolean }): BotRecord {
   const name = normalizeName(input.name);
   const title = normalizeTitle(input.title, name);
   const description = normalizeDescription(input.description);
   if (host.store.getBotByName(name)) {
     throw new ConflictError(`Bot name already exists: ${name}`);
   }
-  if (host.store.countBots({ includeHidden: true }) >= BOT_ROSTER_CAP) {
+  const builtinId = host.store.getDaemonControl<string>('bot.superBotId');
+  const ordinaryCount = host.store.countBots({ includeHidden: true }) - (builtinId && host.store.getBot(builtinId) ? 1 : 0);
+  if (!options?.builtin && ordinaryCount >= BOT_ROSTER_CAP) {
     throw new ValidationError(`Bot roster cap reached (${BOT_ROSTER_CAP})`);
   }
 
@@ -210,7 +212,7 @@ export function createBot(host: SessionFacadeHost, input: CreateBotInput): BotRe
   ensureAgent(host.store, botAgentSpec(draft));
   const session = createCanonicalSession(host, draft);
   const now = nowIso();
-  return host.store.createBot({
+  const created = host.store.createBot({
     id,
     name,
     title,
@@ -221,6 +223,8 @@ export function createBot(host: SessionFacadeHost, input: CreateBotInput): BotRe
     createdAt: now,
     updatedAt: now
   });
+  setBotDefinitionOwner(host.store,id,resolveBotPrincipal(host.store));
+  return created;
 }
 
 export function updateBot(
@@ -307,32 +311,33 @@ export function openBot(
 ): OpenBotResult {
   const bot = getBot(host.store, id);
   refreshBotAgent(host, bot);
-  const userId = opts?.userId?.trim();
-  if (userId) {
-    const mine = host.store.listSessions().find(
-      (session) =>
-        session.metadata?.botId === bot.id &&
-        session.metadata?.[CANONICAL_BOT_CHAT_META] === true &&
-        session.metadata?.userId === userId
-    );
-    if (mine) {
-      ensureBotPermissionMode(host, mine.id);
-      ensureBotSessionCut(host, mine.id);
-      return { bot, sessionId: mine.id, createdSession: false };
-    }
-    const session = createCanonicalSession(host, bot, { userId, tenantId: opts?.tenantId });
-    return { bot, sessionId: session.id, createdSession: true };
-  }
+  const principal = resolveBotPrincipal(host.store, opts);
+  const installation = resolveBotPrincipal(host.store);
   const existing = host.store.getSession(bot.canonicalSessionId);
-  if (existing) {
-    ensureBotPermissionMode(host, existing.id);
-    ensureBotSessionCut(host, existing.id);
-    return { bot, sessionId: existing.id, createdSession: false };
+  // Legacy ownerless history belongs only to this installation.
+  if (existing && !existing.metadata?.userId) {
+    host.store.updateSession(existing.id, { metadata: { ...existing.metadata, ...installation } });
+    setBotDefinitionOwner(host.store,bot.id,installation);
   }
-  const session = createCanonicalSession(host, bot);
-  const updated = host.store.updateBot(bot.id, { canonicalSessionId: session.id });
-  refreshBotAgent(host, updated);
-  return { bot: updated, sessionId: session.id, createdSession: true };
+  const canonical = host.store.getSession(bot.canonicalSessionId);
+  const owner = canonical ? principalFromSession(host.store, canonical) : botDefinitionOwner(host.store,bot.id);
+  if(!canonical&&!owner&&!sameBotPrincipal(principal,installation))throw new AuthorizationError('Bot ownership is unknown for this principal');
+  if(owner && !sameBotPrincipal(owner,installation) && !sameBotPrincipal(owner,principal))throw new AuthorizationError('Bot belongs to another principal');
+  if(canonical && canonical.agentId !== bot.id) throw new ValidationError('Invalid Bot canonical binding');
+  if (canonical && !sameBotPrincipal(principalFromSession(host.store, canonical), installation) &&
+      !sameBotPrincipal(principalFromSession(host.store, canonical), principal)) {
+    throw new AuthorizationError('Bot belongs to another principal');
+  }
+  const mine = host.store.listSessions().find(session =>
+    session.metadata?.botId === bot.id && session.metadata?.[CANONICAL_BOT_CHAT_META] === true &&
+    sameBotPrincipal(principalFromSession(host.store, session), principal));
+  if (mine && (canonical || !sameBotPrincipal(principal, installation))) {
+    ensureBotPermissionMode(host, mine.id); ensureBotSessionCut(host, mine.id);
+    return { bot, sessionId: mine.id, createdSession: false };
+  }
+  const session = createCanonicalSession(host, bot, principal);
+  if (sameBotPrincipal(principal, installation) || (owner && sameBotPrincipal(owner, principal))) host.store.updateBot(bot.id, { canonicalSessionId: session.id });
+  return { bot: host.store.getBot(bot.id)!, sessionId: session.id, createdSession: true };
 }
 
 export function resolveBotIdFromBody(body: Record<string, unknown>): string | undefined {

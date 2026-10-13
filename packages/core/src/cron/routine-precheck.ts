@@ -18,6 +18,7 @@ export interface RoutinePrecheck {
 
 export interface PrecheckResult {
   wakeAgent: boolean;
+  reason?: string;
 }
 
 /** Last non-empty line. `false` only when `wakeAgent` is the boolean false. */
@@ -82,6 +83,7 @@ async function runPrecheckScript(
         }
       : {})
   });
+  if(result.code!==0)throw new Error(`Precheck exited ${result.code??result.signal??'unknown'}`);
   return (result.stdout ?? '').slice(0, MAX_STDOUT);
 }
 
@@ -106,8 +108,8 @@ export async function evaluateRoutinePrecheck(
         denyEnv: opts?.denyEnv
       });
       return { wakeAgent: parseWakeGate(stdout) };
-    } catch {
-      return { wakeAgent: true };
+    } catch (error) {
+      return { wakeAgent: true, reason:error instanceof Error?error.message:String(error) };
     }
   }
   const neverKind: never = precheck.kind;

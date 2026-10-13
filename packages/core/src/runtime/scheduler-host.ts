@@ -3,8 +3,8 @@
  */
 
 import { stampSessionWake, wakeFromSchedulerReason, expireDueUnattendedApprovals } from '../approval/unattended-approval.js';
-import { CronJobStore, markCronJobRan } from '../cron/cron-store.js';
-import { evaluateRoutinePrecheck, readStoredPrecheck } from '../cron/routine-precheck.js';
+import { RoutineRunStore, drainRoutineRuns, materializeRoutineOccurrences, repairRoutineOwnerSession } from '../cron/routine-runtime.js';
+import { CronJobStore } from '../cron/cron-store.js';
 import { considerEvolutionSchedule, type EvolutionScheduleReason } from '../evolution/surface.js';
 import type { Logger } from '../logger.js';
 import type { AutonomousScheduler } from '../services/autonomous-scheduler.js';
@@ -24,6 +24,9 @@ export interface SchedulerTickHost {
   orchestrationEngine: { tick(): Promise<unknown> };
   autonomousScheduler: AutonomousScheduler;
   runSession(sessionId: string): Promise<SessionRecord>;
+  cancelSession?(sessionId: string): unknown;
+  isSessionRunning?(sessionId: string): boolean;
+  hasUnconfirmedEffects?(sessionId: string, startedAt: string): boolean;
   /**
    * Optional injector. The product tick does not set this, so a timer never
    * spawns Evolution. While the surface switch is off, even an injector is ignored.
@@ -83,38 +86,16 @@ export async function tickCronJobs(host: SchedulerTickHost): Promise<number> {
   const due = cronStore.dueJobs();
   let n = 0;
   for (const job of due) {
-    const session = host.store.getSession(job.sessionId);
+    const session = host.store.getSession(job.sessionId) ?? repairRoutineOwnerSession(host,job);
     if (!session) {
       cronStore.update(job.id, { enabled: false });
+      new RoutineRunStore(host.store).enqueue(job, job.nextRunAt ?? new Date().toISOString(), {status:'failed',error:'Owning conversation is missing'});
       continue;
     }
-    const precheck = readStoredPrecheck(job.metadata);
-    if (precheck) {
-      let wakeAgent = true;
-      try {
-        const gate = await evaluateRoutinePrecheck(precheck, { cwd: host.stateDir });
-        wakeAgent = gate.wakeAgent;
-      } catch (err) {
-        host.log.warn('cron precheck failed open', {
-          jobId: job.id,
-          error: err instanceof Error ? err.message : String(err)
-        });
-      }
-      if (!wakeAgent) {
-        markCronJobRan(cronStore, job);
-        host.log.info('cron precheck skipped model turn', { jobId: job.id, name: job.name });
-        n += 1;
-        continue;
-      }
-    }
-    host.store.appendMessage(job.sessionId, 'user', [
-      textPart(`[cron:${job.name}] ${job.prompt}`)
-    ]);
-    markCronJobRan(cronStore, job);
-    const boundToBot = typeof job.metadata?.botId === 'string' && job.metadata.botId.trim().length > 0;
-    startIdleSessionRun(host, session, `${boundToBot ? 'routine' : 'cron'}:${job.id}`);
-    n += 1;
+    const occurrences = materializeRoutineOccurrences(host, cronStore, job);
+    n += occurrences.length;
   }
+  await drainRoutineRuns(host);
   return n;
 }
 

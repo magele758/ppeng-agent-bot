@@ -536,6 +536,18 @@ export class SqliteStateStore {
     return this.sessions.listMessages(sessionId);
   }
 
+  listHistory(sessionId: string, options?: import('./session/history/types.js').HistoryOptions) {
+    return this.sessions.listHistory(sessionId, options);
+  }
+
+  readHistory(sessionId: string, seq: number, before?: number, after?: number) {
+    return this.sessions.readHistory(sessionId, seq, before, after);
+  }
+
+  readHistoryById(sessionId: string, messageId: string) {
+    return this.sessions.readHistoryById(sessionId, messageId);
+  }
+
   enqueueSteer(sessionId: string, text: string, opts?: EnqueueSteerOptions): InboxItem {
     const r = this.inbox.enqueue(sessionId, text, opts);
     this.bumpVersion();

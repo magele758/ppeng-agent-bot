@@ -1,3 +1,7 @@
+import { resolveBotWindowBudget } from '../session/history/window.js';
+import { noteHumanModelInput } from '../session/human-continuation.js';
+import { isCanonicalBotChat } from '../session/bot-compact-policy.js';
+import { estimateMessageTokens } from '../model/token-estimate.js';
 /**
  * L5 host adapters: session/scheduler/spawn/compact/kernel bindings for RawAgentRuntime.
  */
@@ -72,7 +76,6 @@ import {
   filePolicyRequiresBashApproval,
   filePolicyRequiresPathApproval
 } from '../approval/policy-loader.js';
-import { maybeArchiveToolResult } from '../artifact/archive-tool-result.js';
 import { lifecycleBlocks, runLifecycleHook } from '../hooks/lifecycle-hooks.js';
 import { maybeExportOtelSpan } from '../otel.js';
 import { redactToolContent } from '../sandbox/result-redaction.js';
@@ -138,6 +141,7 @@ export interface L5Bindable {
   tools: ToolContract<any>[];
   /** Refresh granted plugin tools onto `tools` before a turn. Domain mounts stay put. */
   syncConnectorTools?(): void;
+  filterSoftwareTools?(tools: ToolContract<any>[], session: SessionRecord): ToolContract<any>[];
   modelAdapter: ModelAdapter;
   promptBuilder: PromptBuilder;
   mcpManager: { ensureLoaded(sessionId: string): Promise<void> };
@@ -166,6 +170,8 @@ export interface L5Bindable {
   mergedFilePolicy(): Promise<FileApprovalPolicy | undefined>;
   runSession(sessionId: string): Promise<SessionRecord>;
   cancelSession(sessionId: string): void;
+  isSessionRunning?(sessionId: string): boolean;
+  hasUnconfirmedEffects?(sessionId: string, startedAt: string): boolean;
   hooks?: KernelHookRegistry;
 }
 
@@ -243,7 +249,10 @@ export function schedulerFrom(rt: L5Bindable): SchedulerTickHost {
     teamDagExecutor: rt.teamDagExecutor,
     orchestrationEngine: rt.orchestrationEngine,
     autonomousScheduler: rt.autonomousScheduler,
-    runSession: (sid) => rt.runSession(sid)
+    runSession: (sid) => rt.runSession(sid),
+    isSessionRunning: (sid) => rt.isSessionRunning?.(sid) ?? false,
+    hasUnconfirmedEffects: (sid, since) => rt.hasUnconfirmedEffects?.(sid, since) ?? false,
+    cancelSession: (sid) => rt.cancelSession(sid)
   };
 }
 
@@ -261,6 +270,49 @@ export function spawnFrom(rt: L5Bindable): SpawnHost {
   };
 }
 
+const activeContextAdapters = new WeakMap<object, Map<string, ModelAdapter>>();
+function activeAdapters(rt: L5Bindable): Map<string, ModelAdapter> {
+  let map = activeContextAdapters.get(rt);
+  if (!map) { map = new Map(); activeContextAdapters.set(rt, map); }
+  return map;
+}
+
+/** Repack against the actual candidate, including smaller fallback windows. */
+async function invokeContextModel(
+  rt: L5Bindable, adapter: ModelAdapter,
+  input: Parameters<TurnKernelHost['runTurnWithRetries']>[0],
+  onStream: Parameters<TurnKernelHost['runTurnWithRetries']>[1],
+  retries?: { maxRetries: number }
+): Promise<ModelTurnResult> {
+  const session = input.sessionId ? rt.store.getSession(input.sessionId) : undefined;
+  if (!session || !isCanonicalBotChat(session)) {
+    if (input.sessionId) noteHumanModelInput(rt.store, input.sessionId, input.messages);
+    return toolLoopRunTurn(adapter, input, onStream, retries);
+  }
+  activeAdapters(rt).set(session.id, adapter);
+  try {
+    const shape = {systemPromptChars: input.systemPrompt.length, toolSchemaTokens: Math.ceil(JSON.stringify(input.tools.map(tool=>({name:tool.name,description:tool.description,inputSchema:tool.inputSchema}))).length/4)};
+    const budget = resolveBotWindowBudget(rt.store, adapter, shape);
+    let messages = input.messages;
+    if (estimateMessageTokens(messages) >= budget.structuredTokens) {
+      const host = compactFrom(rt);
+      const result = await autoCompactSession(host, {session, agent:input.agent, repoRoot:rt.repoRoot, stateDir:rt.stateDir}, {force:true});
+      if (result.replaced) {
+        const prepared = await host.prepareMessagesForModel(session, rt.store.foldMessages(session.id));
+        // Preserve turn-local user memory/image parts when the original message survived.
+        const oldById = new Map(messages.filter(message=>message.role==='user').map(message=>[message.id,message]));
+        messages = prepared.map(message => oldById.get(message.id) ?? message);
+      }
+    }
+    if (estimateMessageTokens(messages) > budget.historyTokens) {
+      throw new Error(`Context length exceeded: actual model window ${budget.contextTokens}, available history ${budget.historyTokens}. Closed tool waves cannot be truncated.`);
+    }
+    rt.emitTrace(session.id,{kind:'compact_skipped',payload:{reason:'context_budget',...budget,adapter:adapter.name}});
+    noteHumanModelInput(rt.store, session.id, messages);
+    return await toolLoopRunTurn(adapter, {...input,messages}, onStream, retries);
+  } finally { activeAdapters(rt).delete(session.id); }
+}
+
 export function compactFrom(rt: L5Bindable): CompactHost {
   return {
     store: rt.store,
@@ -268,6 +320,7 @@ export function compactFrom(rt: L5Bindable): CompactHost {
     modelAdapter: rt.modelAdapter,
     resolveModelAdapter: (session) =>
       resolveSessionModelAdapter(rt.store, session, process.env, rt.modelAdapter),
+    resolveContextAdapter: (session) => activeAdapters(rt).get(session.id) ?? resolveSessionModelAdapter(rt.store, session, process.env, rt.modelAdapter),
     extensionRegistry: rt.extensionRegistry,
     turnShapeBySession: rt.turnShapeBySession,
     emitTrace: (sessionId, event) => rt.emitTrace(sessionId, event),
@@ -427,7 +480,7 @@ function runTurnViaFallbackChain(
     },
     // Retries stack on top of the chain: the primary keeps one, each backup gets none.
     invoke: (adapter, index) =>
-      toolLoopRunTurn(adapter, input, stream.forAttempt(index), { maxRetries: index === 0 ? 1 : 0 })
+      invokeContextModel(rt, adapter, input, stream.forAttempt(index), { maxRetries: index === 0 ? 1 : 0 })
   });
 }
 
@@ -464,6 +517,9 @@ function fitProductModelRequest(
         messages,
         reason: `compact session ${input.sessionId ?? session?.id ?? ''}`
       })
+  }).then(fitted => {
+    if (fitted.sessionId) noteHumanModelInput(rt.store, fitted.sessionId, fitted.messages);
+    return fitted;
   });
 }
 
@@ -591,11 +647,11 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
           const adapter = route.primary ?? (session
             ? resolveSessionModelAdapter(rt.store, session, process.env, rt.modelAdapter)
             : rt.modelAdapter);
-          return toolLoopRunTurn(adapter, fitted, stream);
+          return invokeContextModel(rt, adapter, fitted, stream);
         }
         const reset = fallbackStream(stream);
         return withProviderFallback(candidates, (adapter, index) =>
-          toolLoopRunTurn(adapter, fitted, reset.forAttempt(index))
+          invokeContextModel(rt, adapter, fitted, reset.forAttempt(index))
         );
       }),
     waitSteeringChildrenIdle: (sessionId) => waitSteeringChildrenIdle(sessionId),
@@ -620,6 +676,11 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
     resolveTurnTools: async ({ session, agent, messages, systemPromptChars }) => {
       rt.syncConnectorTools?.();
       const query = lastUserQueryFromMessages(messages);
+      const routineEnabled = (rt.store.getDaemonControl<{dialogToolsEnabled?:boolean}>('routine.settings')?.dialogToolsEnabled ?? true);
+      const botSession = isCanonicalBotChat(session);
+      const selectedSession = botSession && routineEnabled ? {...session,metadata:{...session.metadata,enabledOptionalToolGroups:[...new Set([...(Array.isArray(session.metadata?.enabledOptionalToolGroups) ? session.metadata.enabledOptionalToolGroups.map(String) : []),'cron'])]}} : session;
+      let catalogTools = rt.filterSoftwareTools?.(rt.tools, session) ?? rt.tools;
+      if (botSession && !routineEnabled) catalogTools = catalogTools.filter(tool=>!['cron_create','cron_list','cron_delete'].includes(tool.name));
       const dynHydrated = hydrateTurnDynTools({
         store: rt.store,
         session,
@@ -628,14 +689,14 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
           getAuthorizedTools: (ctx) =>
             filterToolsForSession({
               env: process.env,
-              tools: rt.tools,
+              tools: catalogTools,
               agent: ctx.agent,
               session: ctx.session,
               settingsStore: rt.store
             }).tools,
           previewAuthorizedTools: filterToolsForSession({
             env: process.env,
-            tools: rt.tools,
+            tools: catalogTools,
             agent,
             session,
             settingsStore: rt.store
@@ -647,9 +708,9 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
       });
       const selected = selectTurnTools({
         env: process.env,
-        tools: rt.tools,
+        tools: catalogTools,
         agent,
-        session,
+        session: selectedSession,
         sessionId: session.id,
         systemPromptChars,
         settingsStore: rt.store,
@@ -933,20 +994,11 @@ function adaptFilePolicyForLoop(
 }
 
 /** Product I/O for `createAssembledLoop`. Does not copy A's tool-loop / EventLog / compact. */
-export function l5ToAssembledIo(rt: L5Bindable): AssembledLoopIo {
+export function l5ToAssembledIo(rt: L5Bindable, sessionId?: string): AssembledLoopIo {
   const host = bindTurnKernelHost(rt);
   const toolDeps = toolLoopDepsFrom(rt);
   const chainActive =
     planModelFallback({ store: rt.store, primary: rt.modelAdapter, env: process.env }) !== undefined;
-  const chainRunTurn: TurnKernelHost['runTurnWithRetries'] = (input, onStream) => {
-    const session = input.sessionId ? rt.store.getSession(input.sessionId) : undefined;
-    const adapter = session
-      ? resolveSessionModelAdapter(rt.store, session, process.env, rt.modelAdapter)
-      : rt.modelAdapter;
-    return (
-      runTurnViaFallbackChain(rt, input, onStream, adapter) ?? toolLoopRunTurn(adapter, input, onStream)
-    );
-  };
   return {
     model: rt.modelAdapter,
     tools: rt.tools,
@@ -973,10 +1025,7 @@ export function l5ToAssembledIo(rt: L5Bindable): AssembledLoopIo {
     resolveFilePolicy: async () => adaptFilePolicyForLoop(await rt.mergedFilePolicy()),
     resolveImageDataUrl: host.resolveImageDataUrl,
     resolveModelAdapter: host.resolveModelAdapter,
-    // Only override the loop's own model call when a chain is active, so lean
-    // presets (mini) keep their single-call behavior with an empty chain.
-    // The 20% request cap is fitModelRequest, which the kernel runs first.
-    ...(chainActive ? { runTurnWithRetries: chainRunTurn } : {}),
+    ...(chainActive || (sessionId && isCanonicalBotChat(rt.store.getSession(sessionId) ?? {})) ? {runTurnWithRetries: host.runTurnWithRetries} : {}),
     fitModelRequest: (input) => fitProductModelRequest(rt, input),
     resolveTurnTools: host.resolveTurnTools,
     resolveRunProfile: host.resolveRunProfile,
@@ -1043,15 +1092,10 @@ export function l5ToAssembledIo(rt: L5Bindable): AssembledLoopIo {
         }
       : undefined,
     redactSecrets: (content) => redactToolContent(content, process.env),
-    archiveToolResult: ({ sessionId, toolName, content }) =>
-      maybeArchiveToolResult({
-        stateDir: rt.stateDir,
-        sessionId,
-        toolName,
-        content,
-        settingsStore: rt.store,
-        onCreated: toolDeps.onArtifactCreated
-      }),
+    // Product execution archives the complete, redacted result before any
+    // preview truncation, and returns its real artifact handle to the model.
+    executeToolCalls: host.executeToolCalls,
+    processToolResults: host.processToolResults,
     resolveWorkspacePath: (context, rel) => resolveWorkspacePath(context, rel),
     getImageAsset: (id) => rt.store.getImageAsset(id),
     runToolLifecycleHook: async (input) => {

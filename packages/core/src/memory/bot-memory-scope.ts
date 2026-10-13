@@ -22,7 +22,7 @@ export interface BotMemoryLookup {
 const INHERITING_MODES = new Set(['subagent', 'teammate']);
 const MAX_PARENT_HOPS = 6;
 
-function resolveOwnBotAgentId(session: BotMemorySession, lookup?: BotMemoryLookup): string | undefined {
+function resolvePrivateBotAgentId(session: BotMemorySession, lookup?: BotMemoryLookup): string | undefined {
   const metaBotId =
     typeof session.metadata?.botId === 'string' ? session.metadata.botId.trim() : '';
   const sessionAgent = typeof session.agentId === 'string' ? session.agentId.trim() : '';
@@ -41,6 +41,12 @@ function resolveOwnBotAgentId(session: BotMemorySession, lookup?: BotMemoryLooku
   const listed = lookup.listBots?.({ includeHidden: true }) ?? [];
   const match = listed.find((bot) => bot.id === sessionAgent || bot.agentId === sessionAgent);
   return match?.agentId?.trim() || undefined;
+}
+
+function resolveOwnBotAgentId(session: BotMemorySession, lookup?: BotMemoryLookup): string | undefined {
+  const bot = resolvePrivateBotAgentId(session, lookup);
+  const roomId = typeof session.metadata?.roomId === 'string' ? session.metadata.roomId.trim() : '';
+  return roomId && bot ? `room:${roomId}:${bot}` : bot;
 }
 
 function parentSessionIdOf(session: BotMemorySession): string {

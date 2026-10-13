@@ -78,3 +78,14 @@ test('event routines stay out of dueJobs even when nextRunAt is past', () => {
   assert.equal(store.dueJobs().some((j) => j.id === job.id), false);
   assert.equal(JSON.stringify(store.list()).includes('super-secret-value'), false);
 });
+
+test('dialog tools cover schedule variants and enforce live disable and owner isolation',async()=>{
+ const {createCronTools}=await import('../dist/cron/cron-store.js');const {SqliteStateStore}=await import('../dist/storage.js');const dir=mkdtempSync(join(tmpdir(),'cron-tools-'));const sqlite=new SqliteStateStore(join(dir,'state.db'));const jobs=new CronJobStore(dir);let enabled=true;
+ const alice=sqlite.createSession({title:'tool fixture',mode:'chat',agentId:'general',metadata:{userId:'alice'}}),bob=sqlite.createSession({title:'tool fixture',mode:'chat',agentId:'general',metadata:{userId:'bob'}});
+ const [create,list,remove]=createCronTools(()=>jobs,{store:sqlite,isEnabled:()=>enabled});const context={session:alice,agent:{id:'general'}};let first;
+ for(const schedule of [{every_ms:1000},{once_at:'2030-01-01T00:00:00Z'},{cron:'0 9 * * *',timezone:'UTC'},{event:'github/push',secretEnv:'TOOL_EVENT_SECRET'}]){const output=await create.execute(context,{name:'tool',prompt:'read',...schedule});assert.equal(output.ok,true);first??=JSON.parse(output.content).id;}
+ assert.equal(JSON.parse((await list.execute(context,{})).content).length,4);assert.equal(JSON.parse((await list.execute({session:bob,agent:{id:'general'}},{session_only:false})).content).length,0);
+ assert.equal((await remove.execute({session:bob,agent:{id:'general'}},{id:first})).ok,false);assert.ok(jobs.get(first));assert.equal((await remove.execute(context,{id:first})).ok,true);assert.equal((await remove.execute(context,{id:first})).ok,false);
+ for(const args of [{},{once_at:'bad'},{event:'bad',secretEnv:'ENV'},{event:'github/push',secretEnv:'bad env'},{every_ms:1000,cron:'* * * * *'}])await assert.rejects(()=>create.execute(context,{name:'bad',prompt:'bad',...args}));assert.equal((await create.execute(context,{name:'bad',prompt:'bad',every_ms:1})).ok,false);
+ enabled=false;for(const [tool,args] of [[create,{name:'new',prompt:'new',every_ms:1000}],[list,{}],[remove,{id:first}]])assert.equal((await tool.execute(context,args)).ok,false);sqlite.db.close();
+});

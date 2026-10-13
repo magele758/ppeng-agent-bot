@@ -2,7 +2,8 @@
  * Optional extra tools (browser / cron / discovery / tailscale) assembled at runtime start.
  */
 
-import { CronJobStore, createCronTools, cronToolsFeatureEnabled } from '../cron/cron-store.js';
+import { routineSettings } from '../cron/routine-runtime.js';
+import { CronJobStore, createCronTools } from '../cron/cron-store.js';
 import { CapabilityRegistry } from '../discovery/registry.js';
 import type { SqliteStateStore } from '../storage.js';
 import { createTailscaleTools } from '../tools/tailscale-tools.js';
@@ -31,9 +32,7 @@ export function assembleOptionalTools(input: {
       })
     );
   }
-  if (cronToolsFeatureEnabled(input.env)) {
-    optionalExtras.push(...createCronTools(() => input.getCronStore()));
-  }
+  optionalExtras.push(...createCronTools(() => input.getCronStore(), {store:input.store,isEnabled:()=>routineSettings(input.store).dialogToolsEnabled}));
   {
     const getRegistry = () => new CapabilityRegistry(input.store.capabilities());
     optionalExtras.push(

@@ -502,7 +502,7 @@ export const play = {
     add: '添加定时任务',
     empty: '还没有定时任务',
     next: '下次 {when}',
-    last: ' · 上次 {when}',
+    last: ' · 上次触发 {when}',
     pause: '暂停',
     enable: '启用',
     remove: '删除',

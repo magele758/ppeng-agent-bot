@@ -12,7 +12,7 @@ import {
   type ResourceOwnerStore,
   type TeamPlan
 } from '@ppeng/agent-core';
-import { OWNER_KIND } from './owners.js';
+import { botDefinitionRef, OWNER_KIND } from './owners.js';
 
 function sessionOwner(runtime: RawAgentRuntime, sessionId: string): { found: boolean; ownerId?: string } {
   const session = runtime.getSession(sessionId);
@@ -33,12 +33,12 @@ export function visibleCronJobs(
   return jobs.filter((job) => sessionVisible(runtime, job.sessionId, auth));
 }
 
-/** Bots without an owner are a shared roster: everyone may list and open them. */
+/** Installation definitions form a shared roster; private history remains session-owned. */
 export function visibleBots(runtime: RawAgentRuntime, bots: BotRecord[], auth: RequestAuth): BotRecord[] {
   if (!auth.isolate) return bots;
   return bots.filter((bot) => {
-    const owner = sessionOwner(runtime, bot.canonicalSessionId);
-    return owner.found && (owner.ownerId === undefined || ownerVisibleTo(owner.ownerId, auth));
+    const definition = botDefinitionRef(runtime, bot.id);
+    return definition.found && (definition.unowned === 'allow' || ownerVisibleTo(definition.ownerId, auth));
   });
 }
 

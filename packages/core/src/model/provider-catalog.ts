@@ -34,6 +34,8 @@ export interface CatalogModel {
   ownedBy?: string;
   enabled: boolean;
   capabilities?: ModelCapability[];
+  /** Configured actual input/output context window for this model. */
+  contextWindow?: number;
 }
 
 export interface ModelRef {
@@ -88,6 +90,8 @@ export interface PublicCatalogModel {
   ownedBy?: string;
   enabled: boolean;
   capabilities?: ModelCapability[];
+  /** Configured actual input/output context window for this model. */
+  contextWindow?: number;
 }
 
 export interface PublicModelProvider {
@@ -287,6 +291,7 @@ export function publicProvider(p: ModelProvider, source: PublicModelProvider['so
       id: m.id,
       ownedBy: m.ownedBy,
       enabled: m.enabled,
+      contextWindow: m.contextWindow,
       capabilities: m.capabilities
     })),
     scannedAt: p.scannedAt,
@@ -323,6 +328,7 @@ function normalizeModels(raw: unknown): CatalogModel[] {
       id,
       ownedBy: typeof o.ownedBy === 'string' && o.ownedBy.trim() ? o.ownedBy.trim() : undefined,
       enabled: o.enabled !== false,
+      ...(Number.isSafeInteger(o.contextWindow) && Number(o.contextWindow) >= 1024 ? { contextWindow: Number(o.contextWindow) } : {}),
       ...(caps && caps.length > 0 ? { capabilities: caps } : {})
     });
   }
@@ -516,6 +522,7 @@ export function mergeScannedModels(existing: CatalogModel[], scanned: Array<{ id
     out.push({
       id,
       ownedBy: s.ownedBy ?? prev?.ownedBy,
+      contextWindow: prev?.contextWindow,
       enabled: prev ? prev.enabled : true
     });
   }
@@ -582,7 +589,7 @@ export function findProvider(
   return undefined;
 }
 
-export function createAdapterFromProvider(provider: ModelProvider, modelId: string): ModelAdapter {
+function createUnannotatedAdapter(provider: ModelProvider, modelId: string): ModelAdapter {
   const model = modelId.trim() || provider.models.find((m) => m.enabled)?.id || provider.models[0]?.id || '';
   switch (provider.kind) {
     case 'heuristic':
@@ -607,6 +614,14 @@ export function createAdapterFromProvider(provider: ModelProvider, modelId: stri
       return new HeuristicModelAdapter();
     }
   }
+}
+
+export function createAdapterFromProvider(provider: ModelProvider, modelId: string): ModelAdapter {
+  const adapter = createUnannotatedAdapter(provider, modelId);
+  const configured = provider.models.find(model => model.id === modelId)?.contextWindow;
+  const contextWindow = configured ?? (provider.kind === 'heuristic' ? 131072 : undefined);
+  if (contextWindow) Object.assign(adapter, { contextWindow });
+  return adapter;
 }
 
 export function createModelAdapterFromEnvOrHeuristic(env: NodeJS.ProcessEnv = process.env): ModelAdapter {
@@ -666,7 +681,10 @@ function maybeWrapVl(
     httpKind: vlHttpRaw ? normalizeOpenAiHttpKind(vlHttpRaw) : provider.httpKind
   });
   const scope: 'last_user' | 'any' = env.RAW_AGENT_VL_ROUTE_SCOPE === 'last_user' ? 'last_user' : 'any';
-  return new HybridModelRouterAdapter(textAdapter, vlAdapter, scope);
+  const hybrid = new HybridModelRouterAdapter(textAdapter, vlAdapter, scope);
+  const configured = (textAdapter as ModelAdapter & { contextWindow?: number }).contextWindow;
+  if (configured) Object.assign(hybrid, { contextWindow: configured });
+  return hybrid;
 }
 
 export function pickerOptions(

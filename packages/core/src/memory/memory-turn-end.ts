@@ -1,3 +1,5 @@
+import { principalFromSession } from '../bots/bot-identity.js';
+import type { SqliteStateStore } from '../storage.js';
 /**
  * Turn-end auto-write: dialogue extract + curator (+ dreamer after accept).
  * Fire-and-forget, fail-soft.
@@ -62,11 +64,13 @@ export function scheduleMemoryTurnEnd(input: {
   try {
     const settings = resolveMemorySettings(input.settingsStore);
     const userText = lastUserTextFromMessages(input.messages);
-    const userId = resolveSessionUserId(input.session);
+    const botAgentId = resolveBotMemoryAgentId(input.session, input.botLookup);
+    const identityStore = input.botLookup as SqliteStateStore | undefined;
+    const principal = botAgentId && identityStore?.setDaemonControl ? principalFromSession(identityStore, input.session) : undefined;
+    const userId = principal?.userId ?? resolveSessionUserId(input.session);
     const toolsUsed = collectToolsUsed(input.messages);
     const tenantId =
       typeof input.session.metadata?.tenantId === 'string' ? input.session.metadata.tenantId : undefined;
-    const botAgentId = resolveBotMemoryAgentId(input.session, input.botLookup);
 
     if (settings.dialogueExtract && userId && shouldAttemptDialogueExtract(userText)) {
       void extractDialogueFacts({
@@ -84,6 +88,7 @@ export function scheduleMemoryTurnEnd(input: {
               content: fact.content,
               importance: fact.importance,
               source: 'dialogue_extract',
+              sourceRefs: input.messages.filter(message => message.role === 'user').slice(-1).map(message => ({sessionId: input.session.id, messageId: message.id, seq: message.seq})),
               agentId: botAgentId
             });
           }

@@ -53,3 +53,6 @@ export type {
   BotChatCommandResult,
   ParsedBotChatCommand
 } from './bot-chat-commands.js';
+
+export * from './bot-identity.js';
+export * from './bot-work.js';

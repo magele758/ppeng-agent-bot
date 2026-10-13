@@ -387,6 +387,7 @@ export function ModelProvidersCard({ onCatalogChange, heading }: ModelProvidersC
                                 <span className="status-pill status-pill--ok">{t('settings.model.list.defaultBadge')}</span>
                               ) : null}
                             </label>
+                            <label>{t('botWork.fallbackWindow')}<input type="number" min={1024} defaultValue={m.contextWindow??''} disabled={busy||!isUi} onBlur={e=>{const contextWindow=Number(e.target.value);if(contextWindow>=1024&&contextWindow!==m.contextWindow)void run(async()=>{apply(await patchProvider(p.id,{models:p.models.map(model=>model.id===m.id?{...model,contextWindow}:model)}));});}}/></label>
                             <button
                               type="button"
                               className="btn btn-ghost btn-sm"

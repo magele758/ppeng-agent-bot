@@ -1,6 +1,11 @@
 'use client';
+import '../../bot-work/bot-work.css';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { api } from '@/lib/api';
+import { BotLimits } from '../../bot-work/BotLimits';
+import { BotTeamWork } from '../../bot-work/BotTeamWork';
+import { BotRooms } from '../../bot-work/BotRooms';
 import { filterBots } from '@/lib/agents-view';
 import { visibleBotRoster } from '@/lib/bots';
 import { useI18n } from '@/lib/i18n';
@@ -20,13 +25,16 @@ export function BotsView() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ text: string; err: boolean } | null>(null);
 
+  useEffect(() => { let active=true; void api('/api/bot-work/default').then(data=>{if(active)lab.upsertBot((data as {bot:BotInfo}).bot);}).catch(e=>setNotice({text:String(e),err:true}));return()=>{active=false;}; }, []);
+
   const roster = useMemo(() => visibleBotRoster(lab.bots), [lab.bots]);
   const visible = useMemo(() => filterBots(roster, query), [roster, query]);
   const selected = roster.find((b) => b.id === selectedId) ?? null;
 
   const openChat = async (bot: BotInfo) => {
     try {
-      await lab.openSession(bot.canonicalSessionId, { focusChat: true });
+      const opened=await api(`/api/bots/${encodeURIComponent(bot.id)}/open`,{method:'POST'}) as {session:{id:string}};
+      await lab.openSession(opened.session.id, { focusChat: true });
     } catch (e) {
       setNotice({ text: t('agents.bots.openChatFailed', { error: e instanceof Error ? e.message : String(e) }), err: true });
     }
@@ -67,6 +75,11 @@ export function BotsView() {
 
   return (
     <div className="ag-block" id="botsView">
+      {!query.trim() && <>
+      <BotLimits />
+      <BotTeamWork bots={lab.bots} onOpen={bot=>void openChat(bot)} />
+      <BotRooms bots={roster} />
+      </>}
       <div className="ag-toolbar">
         <div className="ag-toolbar__grow">
           <SearchBox

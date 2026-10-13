@@ -1,3 +1,6 @@
+import { botRoomsRoutes } from './routes/bot-rooms.js';
+import { botWorkRoutes } from './routes/bot-work.js';
+import { botHistoryRoutes } from './routes/bot-history.js';
 import { computerUseRoutes } from './routes/computer-use.js';
 import { connectorRoutes } from './routes/connectors.js';
 /**
@@ -79,6 +82,9 @@ export function buildDaemonRouter(deps: DaemonAppDeps): Router {
     .addAll(miscRoutes(runtime, { pkgName: deps.pkgName, pkgVersion: deps.pkgVersion }))
     .addAll(sessionsRoutes(runtime))
     .addAll(botsRoutes(runtime))
+    .addAll(botWorkRoutes(runtime))
+    .addAll(botRoomsRoutes(runtime))
+    .addAll(botHistoryRoutes(runtime))
     .addAll(cronRoutes(runtime))
     .addAll(configRoutes(runtime, { ...deps.config, env, repoRoot }))
     .addAll(loopRoutes(runtime))

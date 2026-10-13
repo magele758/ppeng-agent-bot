@@ -1,0 +1,27 @@
+id: bot-software-execution
+title: Bot 软件连接与可靠执行
+status: approved
+requirement: |
+  一个bot是可以持续一直对话的，他的记忆和历史会话管理，现在是否能满足，定时任务，以及跟其他bot的通信的模式，组群会话的能力是否能支持，以及调用各种其他软件的能力
+notes: 用户已授权完整开发计划实施，范围为受支持的 HTTP/OpenAPI 与 MCP 执行器。
+criteria:
+  - id: AC-1
+    given: Bot 已获准使用软件连接
+    when: 调用已绑定的受支持软件操作
+    then: 真实执行并返回结果，不把声明当成成功
+  - id: AC-2
+    given: 已导入受支持的软件接口
+    when: Bot 调用带参数的操作
+    then: 参数与凭据正确传递，未支持的接口明确拒绝
+  - id: AC-3
+    given: 不同 Bot 使用不同软件连接
+    when: 选择连接或撤销授权
+    then: 各自凭据隔离，撤销后调用拒绝，显示实际连接状态
+  - id: AC-4
+    given: 操作超时、取消或返回异常
+    when: Bot 查询结果
+    then: 返回真实失败并保护凭据，遵循地址与结果限额
+  - id: AC-5
+    given: 写操作结果未确认或进程中断
+    when: 再次查询或重复请求
+    then: 保留未知状态，不盲目重做，提供核对记录

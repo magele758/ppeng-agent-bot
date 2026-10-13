@@ -34,6 +34,7 @@ function tmpStore() {
 }
 
 function compactHost(store, dir, adapter) {
+  adapter.contextWindow = resolveMaxContextTokens(process.env);
   return {
     store,
     stateDir: dir,

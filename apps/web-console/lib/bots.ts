@@ -70,7 +70,7 @@ export function filterSessionsByPlaySurface<
     const botId = typeof s.metadata?.botId === 'string' ? s.metadata.botId : '';
     return Boolean(botId && botIds.has(botId) && s.metadata?.canonicalBotChat === true);
   };
-  return sessions.filter((s) => (surface === 'bot' ? isBotSession(s) : !isBotSession(s)));
+  return sessions.filter((s) => !s.metadata?.roomId && (surface === 'bot' ? isBotSession(s) : !isBotSession(s)));
 }
 
 export function visibleBotRoster(bots: readonly BotInfo[]): BotInfo[] {

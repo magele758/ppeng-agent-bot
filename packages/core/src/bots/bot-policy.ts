@@ -6,7 +6,7 @@
  */
 
 import { ValidationError } from '../errors.js';
-import { MESSAGE_AGENT_TOOL_NAME } from '../tools/message-agent.js';
+import { MESSAGE_AGENT_TOOL_NAME } from './bot-tool-names.js';
 import { hasLegacyBypassFlag } from './legacy-bypass.js';
 
 const MCP_FIXED_TOOL_NAMES = new Set(['mcp_invoke', 'mcp_list_resources', 'mcp_read_resource']);

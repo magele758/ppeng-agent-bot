@@ -1,3 +1,4 @@
+import { filterRoomTools } from '../rooms/tool-policy.js';
 /**
  * Per-turn tool allowlist: external-AI gate, agent/session whitelist, optional groups.
  */
@@ -145,7 +146,7 @@ export function filterToolsForSession(input: {
   if (!isCanonicalBotChatSession(input.session)) {
     tools = tools.filter((t) => t.name !== MESSAGE_AGENT_TOOL_NAME);
   }
-  return { allowExternalAiTools, tools: stripSubagentDeniedTools(input.session, tools) };
+  return { allowExternalAiTools, tools: filterRoomTools(input.session, stripSubagentDeniedTools(input.session, tools)) };
 }
 
 export function resolveTurnTools(input: {
@@ -181,12 +182,12 @@ export function resolveTurnTools(input: {
     names.add(tool.name);
   }
   const merged = extras.length > 0 ? [...filtered.tools, ...extras] : filtered.tools;
-  const turnTools = stripSubagentDeniedTools(
+  const turnTools = filterRoomTools(input.session, stripSubagentDeniedTools(
     input.session,
     isCanonicalBotChatSession(input.session)
       ? merged
       : merged.filter((t) => t.name !== MESSAGE_AGENT_TOOL_NAME)
-  );
+  ));
   const profile = runProfileFromSession(input.session);
   const bindPatch = sealTaskRunModePatch(input.session.metadata, profile.mode);
   const workspaceSeal = sealWorkspaceBindingPatch(

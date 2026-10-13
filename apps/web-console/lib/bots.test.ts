@@ -68,3 +68,9 @@ test('parseOpenBotResponse accepts session object or sessionId', () => {
   assert.equal(parseOpenBotResponse({ bot, sessionId: 'sess_alt' }).sessionId, 'sess_alt');
   assert.throws(() => parseOpenBotResponse({ bot }), /缺少 bot 或 session/);
 });
+
+test('Room execution sessions stay out of both private chat lists', () => {
+ const sessions = [{id:'private'}, {id:'room',metadata:{roomId:'room-1'}}];
+ assert.deepEqual(filterSessionsByPlaySurface(sessions,[bot],'chat').map(s=>s.id), ['private']);
+ assert.deepEqual(filterSessionsByPlaySurface(sessions,[bot],'bot'), []);
+});

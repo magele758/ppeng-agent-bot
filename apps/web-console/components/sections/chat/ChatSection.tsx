@@ -113,6 +113,25 @@ export function ChatSection({ active }: { active: boolean }) {
     tick
   });
 
+  const defaultBotLoading = useRef(false);
+  useEffect(() => {
+    if (playSurface !== 'bot' || chat.botId || selectedSessionId || defaultBotLoading.current) return;
+    defaultBotLoading.current = true;
+    let cancelled = false;
+    void (async () => {
+      try {
+        let saved = ''; try { saved = localStorage.getItem('lab.selectedBot') ?? ''; } catch {}
+        if (saved) {
+          try { await api(`/api/bots/${encodeURIComponent(saved)}`); if (!cancelled) await chat.selectBot(saved); return; } catch {}
+        }
+        const data = await api('/api/bot-work/default') as {bot:BotInfo};
+        if (!cancelled) { upsertBot(data.bot); await chat.selectBot(data.bot.id); }
+      } catch(e) { if (!cancelled) chat.setPlayStatus({text:String(e),err:true}); }
+      finally {defaultBotLoading.current=false;}
+    })();
+    return () => {cancelled=true;};
+  }, [playSurface, selectedSessionId]);
+
   // Bot 表面锁定 bot.agentId；否则跟随会话 / 默认 Agent
   useEffect(() => {
     if (playSurface === 'bot' && chat.botId) {

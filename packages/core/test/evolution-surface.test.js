@@ -6,6 +6,10 @@ import {
   considerEvolutionSchedule,
   evolutionStartHttpResult
 } from '../src/evolution/surface.ts';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { SqliteStateStore } from '../dist/storage.js';
 import { runScheduler } from '../dist/runtime/scheduler-host.js';
 import { EVOLUTION_SURFACE_ENABLED as labSurfaceEnabled } from '../../../apps/web-console/lib/evolution-surface.ts';
 
@@ -29,13 +33,11 @@ test('Evolution surface switch defaults off and does not launch [AC:ops-console#
 
 test('scheduler tick does not start Evolution [AC:ops-console#AC-9]', async () => {
   const calls = [];
+  const stateDir=mkdtempSync(join(tmpdir(),'evolution-surface-'));
+  const store=new SqliteStateStore(join(stateDir,'state.db'));
   const host = {
-    store: {
-      listApprovals() {
-        return [];
-      }
-    },
-    stateDir: '/tmp',
+    store,
+    stateDir,
     log: { warn() {}, info() {} },
     cronStore: { dueJobs: () => [] },
     setCronStore() {},
@@ -50,4 +52,5 @@ test('scheduler tick does not start Evolution [AC:ops-console#AC-9]', async () =
   };
   await runScheduler(host);
   assert.deepEqual(calls, []);
+  store.db.close();
 });

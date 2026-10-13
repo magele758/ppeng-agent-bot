@@ -80,3 +80,16 @@ test('createCronJob stores an event routine without a next run', () => {
   );
   store.db.close();
 });
+
+test('schedule and content updates preserve explicit policies and invalidate old catch-up plans',()=>{
+ const {store,host}=tempHost();const session=store.createSession({title:'tool fixture',mode:'chat',agentId:'general',metadata:{userId:'alice'}});let job=createCronJob(host,{sessionId:session.id,name:'update',prompt:'read',intervalMs:1000});
+ host.cronStore.update(job.id,{metadata:{...job.metadata,catchUpPlan:{scheduledAts:['old']}}});
+ job=updateCronJob(host,job.id,{onceAt:'2030-01-01T00:00:00Z',name:' once ',prompt:' act ',timezone:'Asia/Shanghai',missedPolicy:'skip',precheck:{kind:'predicate',source:'{"wakeAgent":false}'}});assert.equal(job.scheduleKind,'once_at');assert.equal(job.name,'once');assert.equal(job.prompt,'act');assert.equal(job.missedPolicy,'skip');assert.equal(job.metadata.catchUpPlan,undefined);
+ job=updateCronJob(host,job.id,{intervalMs:60000,precheck:null});assert.equal(job.scheduleKind,'every_ms');assert.equal(job.metadata.precheck,undefined);
+ assert.throws(()=>updateCronJob(host,job.id,{event:'github/push'}),/secretEnv/);
+ job=updateCronJob(host,job.id,{event:'github/push',secretEnv:'UPDATE_EVENT_SECRET',prompt:'event prompt'});assert.equal(job.metadata.prompt,'event prompt');
+ job=updateCronJob(host,job.id,{cron:'0 9 * * *',enabled:false});host.cronStore.update(job.id,{nextRunAt:'2020-01-01T00:00:00Z'});job=updateCronJob(host,job.id,{enabled:true});assert.ok(Date.parse(job.nextRunAt)>Date.now());
+ const version=job.ruleVersion;job=updateCronJob(host,job.id,{timezone:'UTC'});assert.equal(job.ruleVersion,version+1);
+ for(const patch of [{cron:'0 9 * * *',intervalMs:1000},{onceAt:'invalid'},{intervalMs:999},{event:'bad'},{timezone:'bad zone'},{missedPolicy:'bad'},{name:''},{prompt:''},{secretEnv:'bad env'}])assert.throws(()=>updateCronJob(host,job.id,patch));
+ for(const input of [{onceAt:'invalid'},{intervalMs:0},{event:'bad',secretEnv:'ENV'},{cron:'0 9 * * *',missedPolicy:'bad'}])assert.throws(()=>createCronJob(host,{sessionId:session.id,name:'bad',prompt:'bad',...input}));store.db.close();
+});

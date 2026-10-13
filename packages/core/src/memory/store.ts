@@ -156,6 +156,7 @@ export class AgentMemoryStore {
    */
   private ftsAvailable: boolean | null = null;
   private embeddingTableReady: boolean | null = null;
+  private sourceTableReady = false;
 
   constructor(
     private readonly db: DatabaseSync,
@@ -175,6 +176,33 @@ export class AgentMemoryStore {
       }
     }
     return this.ftsAvailable;
+  }
+
+  private ensureSources(): void {
+    if (this.sourceTableReady) return;
+    this.db.prepare('SELECT memory_id FROM agent_memory_sources LIMIT 0').all();
+    this.sourceTableReady = true;
+  }
+
+  private withSources(row: Record<string, unknown>): AgentMemory {
+    const memory = mapMemoryRow(row);
+    this.ensureSources();
+    const source = this.db.prepare('SELECT refs_json FROM agent_memory_sources WHERE memory_id = ?').get(memory.id) as { refs_json: string } | undefined;
+    if (source) {
+      memory.sourceRefs = JSON.parse(source.refs_json);
+      memory.sourceMessageIds = memory.sourceRefs!.map(ref => ref.messageId);
+      const seqs = memory.sourceRefs!.flatMap(ref => ref.seq === undefined ? [] : [ref.seq]);
+      if (seqs.length) { memory.sourceSeqStart = Math.min(...seqs); memory.sourceSeqEnd = Math.max(...seqs); }
+    }
+    return memory;
+  }
+
+  private saveSources(id: string, refs: AgentMemory['sourceRefs']): void {
+    if (refs === undefined) return;
+    this.ensureSources();
+    const valid = refs.filter(ref => ref && typeof ref.sessionId === 'string' && typeof ref.messageId === 'string');
+    const normalized = valid.length > 200 ? [valid[0]!, ...valid.slice(-199)] : valid;
+    this.db.prepare('INSERT INTO agent_memory_sources(memory_id,refs_json) VALUES (?,?) ON CONFLICT(memory_id) DO UPDATE SET refs_json=excluded.refs_json').run(id, JSON.stringify(normalized));
   }
 
   // ── Memory CRUD ──
@@ -215,6 +243,7 @@ export class AgentMemoryStore {
           existing.id
         );
       this.deleteEmbedding(existing.id);
+      this.saveSources(existing.id, memory.sourceRefs);
       return this.getEntryById(existing.id)!;
     }
 
@@ -246,6 +275,7 @@ export class AgentMemoryStore {
         now
       );
 
+    this.saveSources(id, memory.sourceRefs);
     this.enforceLimit(memory.scope, memory.userId, memory.tenantId, memory.sessionId, agentId);
     return this.getEntryById(id)!;
   }
@@ -282,17 +312,19 @@ export class AgentMemoryStore {
       .prepare(`UPDATE agent_memory SET access_count = access_count + 1, last_access_at = ? WHERE id = ?`)
       .run(now, String(row.id));
 
-    return mapMemoryRow({ ...row, access_count: Number(row.access_count ?? 0) + 1, last_access_at: now });
+    return this.withSources({ ...row, access_count: Number(row.access_count ?? 0) + 1, last_access_at: now });
   }
 
   getEntryById(id: string): AgentMemory | null {
     const row = this.db.prepare(`SELECT * FROM agent_memory WHERE id = ?`).get(id) as
       | Record<string, unknown>
       | undefined;
-    return row ? mapMemoryRow(row) : null;
+    return row ? this.withSources(row) : null;
   }
 
   delete(id: string): void {
+    this.ensureSources();
+    this.db.prepare('DELETE FROM agent_memory_sources WHERE memory_id = ?').run(id);
     this.deleteEmbedding(id);
     this.db.prepare(`DELETE FROM agent_memory WHERE id = ?`).run(id);
   }
@@ -461,7 +493,7 @@ export class AgentMemoryStore {
       .prepare(`SELECT * FROM agent_memory ${where} ORDER BY ${orderBy} LIMIT ?`)
       .all(...values, limit) as Array<Record<string, unknown>>;
 
-    return rows.map(mapMemoryRow);
+    return rows.map(row => this.withSources(row));
   }
 
   private ftsSearch(filter: MemoryFilter): AgentMemory[] {
@@ -505,7 +537,7 @@ export class AgentMemoryStore {
          LIMIT ?`
       )
       .all(...values, limit) as Array<Record<string, unknown>>;
-    return rows.map(mapMemoryRow);
+    return rows.map(row => this.withSources(row));
   }
 
   /** Delete expired entries; returns count deleted. */

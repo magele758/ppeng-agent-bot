@@ -211,7 +211,20 @@ function selfFilteredWriteCases(f) {
     'POST /api/bots': { name: 'B Bot' },
     'POST /api/research/tasks': { query: 'B' },
     'POST /api/orchestration/runs': { title: 'B' },
-    'POST /api/cloud-folders': { name: 'B-folder' }
+    'POST /api/cloud-folders': { name: 'B-folder' },
+    'POST /api/bot-work/tasks': { targetBotId: 'missing-private-target', input: 'B-request' },
+    'POST /api/bot-work/tasks/:id/cancel': {},
+    'POST /api/bot-work/bots/:id/control': {paused: true},
+    'POST /api/bot-work/tasks/:id/retry': {},
+    'POST /api/cron/runs/:id/retry': {},
+    'POST /api/cron/runs/:id/cancel': {},
+    'POST /api/bot-rooms': { title: 'B-room', botIds: ['missing-private-target'] },
+    'PATCH /api/bot-rooms/:id': { title: 'B-change' },
+    'POST /api/bot-rooms/:id/members': { botId: 'missing-private-target' },
+    'DELETE /api/bot-rooms/:id/members/:botId': {},
+    'POST /api/bot-rooms/:id/messages': { text: 'B-request' },
+    'POST /api/bot-rooms/:id/stop': {},
+    'POST /api/bot-rooms/:id/resume': {}
   };
 }
 
@@ -380,4 +393,30 @@ test('tenant admins manage roles only inside their own tenant [AC:lab-auth-and-r
   assert.equal((await d.call('C', 'PUT', '/api/tenants/other/members/user_b', { role: 'owner' })).status, 403);
   assert.equal((await d.call('C', 'PUT', '/api/tenants/default/members/user_b', { role: 'admin' })).status, 200);
   assert.equal((await d.call('B', 'GET', '/api/secrets')).status, 200, 'promoted member');
+});
+
+
+test('Bot work and Room writes reject another principal over real HTTP', async t => {
+  const d = await bootDaemon(labEnv({ RAW_AGENT_AUTH_TOKEN: DAEMON_TOKEN }));
+  t.after(() => d.close());
+  const bot = await d.call('A', 'POST', '/api/bots', {name:'Owner-only Bot'});
+  assert.equal(bot.status,201);
+  const room = await d.call('A','POST','/api/bot-rooms',{title:'A private room',botIds:[bot.data.bot.id]});
+  assert.equal(room.status,201);
+  const rid=room.data.room.id;
+  for (const [method,path,body] of [
+    ['POST','/api/bot-work/tasks',{targetBotId:bot.data.bot.id,input:'forbidden'}],
+    ['GET',`/api/bot-rooms/${rid}`],
+    ['PATCH',`/api/bot-rooms/${rid}`,{title:'B replacement'}],
+    ['POST',`/api/bot-rooms/${rid}/members`,{botId:bot.data.bot.id}],
+    ['POST',`/api/bot-rooms/${rid}/messages`,{text:'B injection'}],
+    ['POST',`/api/bot-rooms/${rid}/stop`,{}]
+  ]) {
+    const response=await d.call('B',method,path,body);
+    assert.ok([403,404].includes(response.status),`${method} ${path}: ${response.status}`);
+  }
+  const preserved=await d.call('A','GET',`/api/bot-rooms/${rid}`);
+  assert.equal(preserved.data.room.title,'A private room');
+  assert.equal(preserved.data.room.status,'active');
+  assert.equal((await d.call('A','GET',`/api/bot-rooms/${rid}/messages`)).data.messages.length,0);
 });

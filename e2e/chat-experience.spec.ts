@@ -70,6 +70,11 @@ test.describe('Chat experience', () => {
     page
   }) => {
     await page.goto('/');
+    await page.getByRole("button", { name: "新增" }).click();
+    await page.getByRole("menuitem", { name: /新建会话/ }).click();
+    await page.locator(".composer-config-summary").click();
+    await page.locator("#composerConfigPanel").getByLabel("Agent", { exact: true }).selectOption("");
+    await page.locator(".composer-config-summary").click();
     await sendAndWait(page, LONG_BASH_PROMPT);
 
     const folds = page.locator('#playMessages .chat-tool-fold');
