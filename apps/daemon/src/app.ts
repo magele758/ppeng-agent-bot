@@ -1,4 +1,5 @@
 import { computerUseRoutes } from './routes/computer-use.js';
+import { connectorRoutes } from './routes/connectors.js';
 /**
  * Daemon HTTP application: route registry + auth pipeline, without listening
  * or background timers, so tests can drive the real registry in-process.
@@ -30,6 +31,7 @@ import { jevRoutes } from './routes/jev.js';
 import { langfuseRoutes } from './routes/langfuse.js';
 import { loopRoutes } from './routes/loop.js';
 import { mailboxRoutes } from './routes/mailbox.js';
+import { mcpOAuthRoutes } from './routes/mcp-oauth.js';
 import { memoryRoutes } from './routes/memory.js';
 import { miscRoutes } from './routes/misc.js';
 import { modelFallbackRoutes } from './routes/model-fallback.js';
@@ -97,9 +99,11 @@ export function buildDaemonRouter(deps: DaemonAppDeps): Router {
     .addAll(teamsDagRoutes(runtime))
     .addAll(capabilitiesRoutes(runtime))
     .addAll(computerUseRoutes(runtime))
+    .addAll(connectorRoutes(runtime))
     .addAll(modelProviderRoutes(runtime))
     .addAll(modelFallbackRoutes(runtime))
     .addAll(secretsRoutes(runtime))
+    .addAll(mcpOAuthRoutes(runtime))
     .addAll(skillEvalRoutes(runtime))
     .addAll(skillSettingsRoutes(runtime))
     .addAll(skillProposalRoutes(runtime))

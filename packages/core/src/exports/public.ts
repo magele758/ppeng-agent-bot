@@ -656,9 +656,28 @@ export {
   cronToolsFeatureEnabled,
   markCronJobRan,
   nextCronRunAt,
-  parseCron5
+  parseCron5,
+  EVENT_PRECHECK_FILE_ENV,
+  EVENT_SIGNATURE_WINDOW_MS,
+  acceptEventRoutine,
+  parseEventScheduleValue,
+  verifyEmailSignature,
+  verifyGithubSignature,
+  verifySlackSignature
 } from '../cron/index.js';
-export type { CronJobRecord, CronScheduleKind, CreateCronJobInput, UpdateCronJobInput, ListCronJobsFilter, RoutinePrecheck } from '../cron/index.js';
+export type {
+  CronJobRecord,
+  CronScheduleKind,
+  CreateCronJobInput,
+  UpdateCronJobInput,
+  ListCronJobsFilter,
+  RoutinePrecheck,
+  AcceptEventRoutineInput,
+  AcceptEventRoutineResult,
+  EventJobOutcome,
+  EventProvider,
+  EventRoutineHost
+} from '../cron/index.js';
 
 // --- Plugins / doctor / extensions ---
 export {
@@ -667,7 +686,30 @@ export {
   mergePlugins,
   pluginDirsFromEnv
 } from '../plugins/plugin-loader.js';
-export type { PluginManifest, LoadedPlugin } from '../plugins/plugin-loader.js';
+export type { PluginManifest, LoadedPlugin, PluginAuthSpec, PluginToolDecl, PluginAuthKind } from '../plugins/plugin-loader.js';
+export {
+  CONNECTOR_GRANTS_KEY,
+  ConnectorRegistry,
+  createConnectorRegistry,
+  listConnectors,
+  grantConnector,
+  revokeConnector,
+  instructionsForGranted,
+  shouldInjectDiscovery,
+  mergeGrantedConnectorTools,
+  pluginConnectorId,
+  discoveryConnectorId,
+  domainConnectorId
+} from '../connectors/registry.js';
+export type {
+  ConnectorRecord,
+  ConnectorPublic,
+  ConnectorSource,
+  ConnectorAuthKind,
+  DomainConnectorSource,
+  ConnectorGrantStore,
+  ConnectorRegistryDeps
+} from '../connectors/registry.js';
 export * from '../ingestion/index.js';
 export * from '../artifact/index.js';
 export { createArtifactTools } from '../tools/artifact-tools.js';
@@ -735,6 +777,8 @@ export { parseMcpHttpConfig, parseMcpHttpEndpoints } from '../mcp/mcp-http-confi
 export type { McpHttpConfigParse, McpHttpEndpoint, McpHttpTransport } from '../mcp/mcp-http-config.js';
 export { McpHttpSession, isLegacySseEndpointError, redactSecrets } from '../mcp/mcp-http.js';
 export type { McpHttpSessionOptions } from '../mcp/mcp-http.js';
+export { finishMcpHttpOAuth } from '../mcp/mcp-oauth.js';
+export type { McpOAuthFinishInput, McpOAuthFinishResult } from '../mcp/mcp-oauth.js';
 export { ExtensionRegistry, createExtensionRegistry } from '../extensions/extension-registry.js';
 export type {
   ExtensionPhase,

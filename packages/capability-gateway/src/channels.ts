@@ -1,5 +1,9 @@
 import { env } from 'node:process';
 import { requireHumanEgressApproval } from '@ppeng/agent-core';
+import { sendEmailHttp } from './channels/email.js';
+import { channelMessageText } from './channels/outbound-body.js';
+import { sendSlackChatMessage } from './channels/slack.js';
+import { sendTelegramMessage } from './channels/telegram.js';
 import { sendFeishuTextMessage } from './feishu-api.js';
 import type { ChannelSpec } from './types.js';
 import { buildWeComWebhookUrl, sendWeComGroupBotMarkdown } from './wecom-send.js';
@@ -50,6 +54,13 @@ export async function deliverToChannel(
     } catch (e) {
       return { ok: false, status: 0, text: e instanceof Error ? e.message : String(e) };
     }
+  }
+
+  if (channel.type === 'slack' || channel.type === 'telegram' || channel.type === 'email') {
+    const text = channelMessageText(body);
+    if (channel.type === 'slack') return sendSlackChatMessage(channel, text);
+    if (channel.type === 'telegram') return sendTelegramMessage(channel, text);
+    return sendEmailHttp(channel, text);
   }
 
   const headers: Record<string, string> = {

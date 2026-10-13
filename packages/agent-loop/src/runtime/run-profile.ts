@@ -71,7 +71,8 @@ export const BROWSER_TOOLS: readonly string[] = [
   'browser_navigate',
   'browser_snapshot',
   'browser_click',
-  'browser_type'
+  'browser_type',
+  'browser_screenshot'
 ];
 
 /** Assembly names only — computer-use tools are implemented elsewhere. */
@@ -118,6 +119,7 @@ export const PLANNER_READONLY_TOOLS: readonly string[] = [
   'task_get',
   'task_list',
   'memory_get',
+  'memory_search',
   'memory_prefetch',
   'retrieve_tool_result',
   'read_artifact_page',

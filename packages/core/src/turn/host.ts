@@ -93,6 +93,8 @@ export interface TurnKernelHost {
   repoRoot: string;
   stateDir: string;
   tools: ToolContract<any>[];
+  /** Drop or add granted plugin connector tools before this turn's tool list is sealed. */
+  syncConnectorTools?(): void;
   modelAdapter: ModelAdapter;
   /** Per-session adapter (Lab provider catalog). Falls back to `modelAdapter`. */
   resolveModelAdapter?(session: SessionRecord): ModelAdapter;

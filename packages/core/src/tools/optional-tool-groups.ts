@@ -75,8 +75,14 @@ const DEFAULT_OPTIONAL_GROUPS: OptionalToolGroupDef[] = [
     items: [
       {
         id: 'browser-core',
-        title: 'browser_navigate / snapshot / click / type',
-        toolNames: ['browser_navigate', 'browser_snapshot', 'browser_click', 'browser_type']
+        title: 'browser_navigate / snapshot / screenshot / click / type',
+        toolNames: [
+          'browser_navigate',
+          'browser_snapshot',
+          'browser_screenshot',
+          'browser_click',
+          'browser_type'
+        ]
       }
     ]
   },

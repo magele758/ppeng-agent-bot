@@ -320,6 +320,20 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
       }
     },
 
+    // POST /api/sessions/cancel-all — must be registered before /:id
+    {
+      method: 'POST',
+      pattern: '/api/sessions/cancel-all',
+      handler: ({ response, auth }) => {
+        const allowed =
+          auth.isolate && auth.user
+            ? new Set(listedSessions(runtime, auth).map((session) => session.id))
+            : undefined;
+        const { sessionIds } = runtime.cancelAllSessions(allowed);
+        json(response, 200, { ok: true, sessionIds });
+      }
+    },
+
     // POST /api/sessions/bulk-delete — must be registered before /:id
     {
       method: 'POST',

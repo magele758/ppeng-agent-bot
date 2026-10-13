@@ -1,6 +1,6 @@
 import { envBool } from '../env.js';
 import type { ToolContract, RunContext, ToolExecutionResult } from '../types.js';
-import { playwrightBrowserAction } from './browser-backend.js';
+import { playwrightBrowserAction, type BrowserBackendDeps } from './browser-backend.js';
 
 /**
  * Optional browser tools (Playwright via npx). Gated by optional tool group `browser`
@@ -18,6 +18,7 @@ export interface BrowserToolServices {
 export type BrowserAction =
   | { kind: 'navigate'; url: string }
   | { kind: 'snapshot' }
+  | { kind: 'screenshot' }
   | { kind: 'click'; selector: string }
   | { kind: 'type'; selector: string; text: string };
 
@@ -52,6 +53,19 @@ export function createBrowserTools(services: BrowserToolServices): ToolContract<
     ptc: { kind: 'read' },
     async execute(context) {
       return services.runBrowserAction(context, { kind: 'snapshot' });
+    }
+  };
+
+  const screenshot: ToolContract<Record<string, never>> = {
+    name: 'browser_screenshot',
+    description:
+      'Capture a PNG of the current page, store it as a session image asset, and return only the asset id (no base64).',
+    inputSchema: { type: 'object', properties: {} },
+    approvalMode: 'never',
+    sideEffectLevel: 'none',
+    ptc: { kind: 'read' },
+    async execute(context) {
+      return services.runBrowserAction(context, { kind: 'screenshot' });
     }
   };
 
@@ -94,13 +108,14 @@ export function createBrowserTools(services: BrowserToolServices): ToolContract<
     }
   };
 
-  return [navigate, snapshot, click, typeTool];
+  return [navigate, snapshot, screenshot, click, typeTool];
 }
 
 /** Playwright backend; fail-soft with a structured error when Chromium is missing. */
 export async function defaultBrowserAction(
   context: RunContext,
-  action: BrowserAction
+  action: BrowserAction,
+  deps?: BrowserBackendDeps
 ): Promise<ToolExecutionResult> {
-  return playwrightBrowserAction(context, action);
+  return playwrightBrowserAction(context, action, deps);
 }

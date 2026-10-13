@@ -55,3 +55,28 @@ test('createCronJob rejects bad cron', () => {
   );
   store.db.close();
 });
+
+test('createCronJob stores an event routine without a next run', () => {
+  const { store, host } = tempHost();
+  const bot = createBot(host, { name: 'PushBot' });
+  const job = createCronJob(host, {
+    botId: bot.id,
+    name: 'on push',
+    prompt: '总结推送',
+    event: 'github/push',
+    secretEnv: 'GH_WEBHOOK_SECRET',
+    precheck: { kind: 'predicate', source: '{"wakeAgent":false}' }
+  });
+  assert.equal(job.scheduleKind, 'event');
+  assert.equal(job.scheduleValue, 'github/push');
+  assert.equal(job.nextRunAt, undefined);
+  assert.equal(job.metadata.secretEnv, 'GH_WEBHOOK_SECRET');
+  assert.equal(job.metadata.prompt, '总结推送');
+  assert.deepEqual(job.metadata.precheck, { kind: 'predicate', source: '{"wakeAgent":false}' });
+  assert.equal(host.cronStore.dueJobs().some((item) => item.id === job.id), false);
+  assert.throws(
+    () => createCronJob(host, { botId: bot.id, name: 'x', prompt: 'y', event: 'github/push', cron: '0 9 * * *', secretEnv: 'GH_WEBHOOK_SECRET' }),
+    ValidationError
+  );
+  store.db.close();
+});

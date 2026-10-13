@@ -90,6 +90,8 @@ import type { ArtifactIndexRecord } from './stores/artifact-store.js';
 import { WorkspaceManager } from './workspaces.js';
 import { McpManager } from './mcp/mcp-manager.js';
 import { discoverPlugins, mergePlugins, pluginDirsFromEnv } from './plugins/plugin-loader.js';
+import type { LoadedPlugin } from './plugins/plugin-loader.js';
+import { ConnectorRegistry, mergeGrantedConnectorTools } from './connectors/registry.js';
 import type { AssetStorage, EventBufferRepository } from './storage/interfaces.js';
 import { defaultTenantIdFromEnv, defaultUserIdFromEnv } from './storage/provider-config.js';
 import { AgentLoopHandle, type AgentLoopLatch } from './runtime/agent-loop.js';
@@ -149,7 +151,7 @@ import {
   runScheduler as runSchedulerFn,
   tickCronJobs as tickCronJobsFn
 } from './runtime/scheduler-host.js';
-import { cancelSession as cancelSessionFn, destroyRuntime } from './runtime/session-control.js';
+import { cancelAllSessions as cancelAllSessionsFn, cancelSession as cancelSessionFn, destroyRuntime } from './runtime/session-control.js';
 import { ensureWorkspaceRoot as ensureWorkspaceRootFn } from './runtime/spawn-host.js';
 import { createRuntimeCollaborators } from './runtime/collaborators.js';
 import {
@@ -225,6 +227,9 @@ export class RawAgentRuntime {
   readonly selfHeal: SelfHealScheduler;
   readonly promptBuilder: PromptBuilder;
   tools: ToolContract<any>[];
+  readonly connectors: ConnectorRegistry;
+  private loadedPlugins: LoadedPlugin[] = [];
+  private connectorToolNames = new Set<string>();
   readonly secretVault: SecretVault;
   /** Product-facing kernel event registry. `runSession` always fans out here. */
   readonly hooks: KernelHookRegistry;
@@ -301,11 +306,16 @@ export class RawAgentRuntime {
     this.envApprovalPolicy = runtimeEnv.approvalPolicy;
     this.extensionRegistry = createExtensionRegistry(options.extensions);
 
-    const discoveredPlugins = discoverPlugins(pluginDirsFromEnv(process.env));
-    const mergedPlugins = mergePlugins(discoveredPlugins);
+    this.loadedPlugins = discoverPlugins(pluginDirsFromEnv(process.env));
+    const mergedPlugins = mergePlugins(this.loadedPlugins);
     for (const [k, v] of Object.entries(mergedPlugins.hookEnv)) {
       if (!process.env[k]?.trim()) process.env[k] = v;
     }
+    this.connectors = new ConnectorRegistry({
+      store: this.store,
+      getPlugins: () => this.loadedPlugins,
+      getCapabilities: () => this.store.capabilities().list({ limit: 500 })
+    });
 
     this.promptBuilder = new PromptBuilder({
       store: this.store,
@@ -313,7 +323,10 @@ export class RawAgentRuntime {
       stateDir: this.stateDir,
       extraSkills: [...(options.extraSkills ?? []), ...mergedPlugins.skills],
       cloudSkillsLoader: options.cloudSkillsLoader,
-      runtimeInstructions: (sessionId) => this.computerUse?.instructionsForSession(sessionId) ?? '',
+      runtimeInstructions: (sessionId) =>
+        [this.computerUse?.instructionsForSession(sessionId) ?? '', this.connectors.instructionsForGranted(process.env)]
+          .filter(Boolean)
+          .join('\n\n'),
     });
 
     const collab = createRuntimeCollaborators({
@@ -473,14 +486,27 @@ export class RawAgentRuntime {
     return tickCronJobsFn(schedulerFrom(this.l5()));
   }
 
-  /** Abort in-flight model/tool work for a session (best-effort). Closes any open tool wave. */
-  cancelSession(sessionId: string): void {
-    cancelSessionFn({
+  private sessionControlHost() {
+    return {
       store: this.store,
       sessionAbortControllers: this.sessionAbortControllers,
       backgroundJobAborts: this.backgroundJobAborts,
-      emitTrace: (id, event) => this.emitTrace(id, event)
-    }, sessionId);
+      emitTrace: (id: string, event: Omit<TraceEvent, 'ts' | 'sessionId'>) => this.emitTrace(id, event)
+    };
+  }
+
+  /** Abort in-flight model/tool work for a session (best-effort). Closes any open tool wave. */
+  cancelSession(sessionId: string): void {
+    cancelSessionFn(this.sessionControlHost(), sessionId);
+  }
+
+  /**
+   * Abort every live session and every background job.
+   * When `allowedSessionIds` is set, only those sessions (and their jobs) stop.
+   * Does not close the database or tear down MCP.
+   */
+  cancelAllSessions(allowedSessionIds?: ReadonlySet<string>): { sessionIds: string[] } {
+    return cancelAllSessionsFn(this.sessionControlHost(), allowedSessionIds);
   }
 
   listAgents(): AgentSpec[] {
@@ -1297,12 +1323,22 @@ export class RawAgentRuntime {
     return this.filePolicyCache;
   }
 
+  /** Put granted plugin tools on the shared catalog. Domain tools stay mounted. */
+  syncConnectorTools(): void {
+    this.connectorToolNames = mergeGrantedConnectorTools(
+      this.tools,
+      this.connectors.toolsForGranted(process.env),
+      this.connectorToolNames
+    );
+  }
+
   private l5(): L5Bindable {
     return {
       store: this.store,
       repoRoot: this.repoRoot,
       stateDir: this.stateDir,
       tools: this.tools,
+      syncConnectorTools: () => this.syncConnectorTools(),
       modelAdapter: this.modelAdapter,
       promptBuilder: this.promptBuilder,
       mcpManager: this.mcpManager,

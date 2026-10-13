@@ -132,6 +132,7 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
 
     // sessions
     ['GET /api/sessions', selfFiltered('session')],
+    ['POST /api/sessions/cancel-all', selfFiltered('session')],
     ['POST /api/sessions/bulk-delete', selfFiltered('session')],
     ['POST /api/sessions', owner('bot', sessionCreateRefs)],
     ['GET /api/sessions/team-overview', selfFiltered('session')],
@@ -342,6 +343,9 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
     ['PATCH /api/web/settings', ADMIN],
     ['GET /api/computer-use/settings', AUTHENTICATED],
     ['PATCH /api/computer-use/settings', ADMIN],
+    ['GET /api/connectors', AUTHENTICATED],
+    ['POST /api/connectors/:id/grant', ADMIN],
+    ['POST /api/connectors/:id/revoke', ADMIN],
     ['GET /api/capabilities/settings', AUTHENTICATED],
     ['PATCH /api/capabilities/settings', ADMIN],
     ['GET /api/capabilities/cbom', AUTHENTICATED],
@@ -379,6 +383,8 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
     ['GET /api/sandbox/settings', AUTHENTICATED],
     ['PATCH /api/sandbox/settings', ADMIN],
     ['GET /api/secrets', ADMIN],
+    // MCP client OAuth loopback. Daemon bearer still applies via checkAuth.
+    ['GET /api/mcp/oauth/callback', ADMIN],
     ['PUT /api/secrets/:name', ADMIN],
     ['DELETE /api/secrets/:name', ADMIN],
     ['GET /api/skills/settings', AUTHENTICATED],

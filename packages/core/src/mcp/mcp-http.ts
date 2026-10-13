@@ -4,6 +4,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import type { FetchLike } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { McpHttpEndpoint, McpHttpTransport } from './mcp-http-config.js';
 import type { McpResourceInfo, McpToolInfo } from './mcp-jsonrpc.js';
+import { MCP_OAUTH_AUTHORIZATION_PREFIX, McpOAuthClientProvider } from './mcp-oauth.js';
 
 const DEFAULT_TIMEOUT_MS = 20_000;
 
@@ -13,6 +14,8 @@ export interface McpHttpSessionOptions {
   timeoutMs?: number;
   /** Fired when an unpinned Streamable HTTP connect falls back to legacy SSE. */
   onTransportFallback?: (info: { url: string; status: number }) => void;
+  /** OAuth tokens, client registration, and the PKCE verifier are stored here. */
+  stateDir?: string;
 }
 
 /** Shorter credential values are not full-text replaced; they corrupt identifiers like `identity`. */
@@ -161,6 +164,7 @@ export class McpHttpSession {
   private transport: { close(): Promise<void> } | undefined;
   private connected = false;
   private connectPromise: Promise<void> | undefined;
+  private oauthProvider: McpOAuthClientProvider | undefined;
 
   constructor(
     index: number,
@@ -268,7 +272,9 @@ export class McpHttpSession {
   }
 
   private secrets(): string[] {
-    return collectHeaderSecrets(this.endpoint, this.env()).secrets;
+    const headerSecrets = collectHeaderSecrets(this.endpoint, this.env()).secrets;
+    const oauthSecrets = this.oauthProvider?.credentialSecrets() ?? [];
+    return [...new Set([...headerSecrets, ...oauthSecrets])].sort((a, b) => b.length - a.length);
   }
 
   private redactText(text: string): string {
@@ -276,7 +282,11 @@ export class McpHttpSession {
   }
 
   private redact(error: unknown): Error {
-    const message = this.redactText(error instanceof Error ? error.message : String(error));
+    let message = this.redactText(error instanceof Error ? error.message : String(error));
+    const authorizationUrl = this.oauthProvider?.displayedAuthorizationUrl();
+    if (authorizationUrl && !message.includes(authorizationUrl)) {
+      message = `${message}\n${MCP_OAUTH_AUTHORIZATION_PREFIX}${authorizationUrl}`;
+    }
     const wrapped = new Error(message);
     wrapped.name = error instanceof Error ? error.name : 'Error';
     const code = errorCode(error);
@@ -293,6 +303,7 @@ export class McpHttpSession {
   }
 
   private async doConnect(): Promise<void> {
+    this.oauthProvider?.clearDisplayedAuthorizationUrl();
     const mode: McpHttpTransport = this.endpoint.transport === 'sse' ? 'sse' : 'streamable-http';
     if (mode === 'sse') {
       try {
@@ -317,15 +328,36 @@ export class McpHttpSession {
     }
   }
 
+  private async ensureOAuth(): Promise<McpOAuthClientProvider> {
+    if (!this.oauthProvider) {
+      const stateDir = this.options.stateDir?.trim();
+      if (!stateDir) throw new Error('MCP OAuth requires a state directory');
+      this.oauthProvider = new McpOAuthClientProvider({
+        endpoint: this.endpoint,
+        stateDir,
+        env: this.env()
+      });
+    }
+    await this.oauthProvider.prepare();
+    return this.oauthProvider;
+  }
+
   private async connectWith(kind: McpHttpTransport): Promise<void> {
     const headers = buildHeaders(this.endpoint, this.env());
+    const provider = this.endpoint.oauth ? await this.ensureOAuth() : undefined;
+    if (provider) {
+      for (const key of Object.keys(headers)) {
+        if (key.toLowerCase() === 'authorization') delete headers[key];
+      }
+    }
     const fetchImpl = fetchWithTimeout(this.options.fetch ?? fetch, this.options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
     const url = new URL(this.endpoint.url);
     const requestInit: RequestInit = { headers };
+    const auth = provider ? { authProvider: provider } : {};
     const transport =
       kind === 'sse'
-        ? new SSEClientTransport(url, { requestInit, fetch: fetchImpl })
-        : new StreamableHTTPClientTransport(url, { requestInit, fetch: fetchImpl });
+        ? new SSEClientTransport(url, { requestInit, fetch: fetchImpl, ...auth })
+        : new StreamableHTTPClientTransport(url, { requestInit, fetch: fetchImpl, ...auth });
     const client = new Client({ name: 'raw-agent', version: '0.1.0' });
     try {
       await client.connect(transport);

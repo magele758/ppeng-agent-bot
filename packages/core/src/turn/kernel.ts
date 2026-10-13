@@ -146,6 +146,7 @@ async function hydrateResolveTurnTools(
   dynHydrated: ReturnType<typeof hydrateTurnDynTools>;
   selectedTools: ReturnType<typeof resolveTurnTools>;
 }> {
+  host.syncConnectorTools?.();
   const dynHydrated = hydrateTurnDynTools({
     store: host.store,
     session,
