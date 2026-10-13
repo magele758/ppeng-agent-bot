@@ -1,6 +1,7 @@
 import type { Messages } from '../types.ts';
 
 export const settingsEntries = {
+  computerUse: {"title": "Local computer use (LCU)", "desc": "Let agents use local desktop apps. Requires LCU and ChatGPT; you decide app access.", "keywords": "LCU desktop computer use screenshot TextEdit", "enabled": "Enable local computer use", "hint": "Disabling hides desktop tools. Conversations have independent approvals; desktop turns are queued. Browser and audio are not enabled."},
   common: {
     saved: 'Saved, takes effect immediately',
     save: 'Save',

@@ -1,4 +1,5 @@
 export const settingsEntries = {
+  computerUse: {"title": "本机桌面操作（LCU）", "desc": "让 Agent 使用本机桌面应用。需要已安装 LCU 和 ChatGPT，应用授权由你决定。", "keywords": "LCU 桌面 电脑操作 截图 TextEdit", "enabled": "启用本机桌面操作", "hint": "关闭后不再暴露桌面工具。每个对话独立授权，同一桌面按回合排队；浏览器和音频未启用。"},
   common: {
     saved: '已保存，立即生效',
     save: '保存',

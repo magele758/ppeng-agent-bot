@@ -85,6 +85,9 @@ export function filterToolsForSession(input: {
     ? input.tools
     : input.tools.filter((t) => !t.isExternal);
   let tools = applyAllowlists(externallyGated, allowlistsFor(input.agent, input.session));
+  if ((input.settingsStore?.getDaemonControl?.('computer_use_settings') as { enabled?: boolean } | undefined)?.enabled !== true) {
+    tools = tools.filter(tool => !tool.name.startsWith('lcu_'));
+  }
 
   const assembled = tools;
 
