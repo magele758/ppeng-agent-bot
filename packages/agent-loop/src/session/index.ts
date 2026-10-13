@@ -138,6 +138,7 @@ export {
 } from './compensation.js';
 export {
   runAutoCompact,
+  selectCompactableClosedRange,
   isContextOverflowError,
   findPrunableToolResult,
   COMPACT_KEEP_RECENT,

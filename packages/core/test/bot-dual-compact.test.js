@@ -404,7 +404,7 @@ test('non-canonical chats keep the old compact point [AC:bot-dual-compact#AC-6]'
   store.db.close();
 });
 
-test('overflow force still compacts a short canonical bot with the structured template', async () => {
+test('overflow force preserves the latest user in a short canonical bot [AC:context-reliability#AC-4]', async () => {
   const { dir, store } = tmpStore();
   const session = createSession(store, 'canonical');
   store.appendMessage(session.id, 'user', [{ type: 'text', text: 'remember the ledger' }]);
@@ -420,9 +420,9 @@ test('overflow force still compacts a short canonical bot with the structured te
     runContext(dir, store.getSession(session.id)),
     { force: true }
   );
-  assert.ok(result.replaced);
-  assert.match(foldText(store, session.id), /Goal: ledger/);
-  assert.match(archiveText(dir, session.id), /remember the ledger/);
+  assert.equal(result.replaced, undefined);
+  assert.equal(model.calls.length, 0);
+  assert.match(foldText(store, session.id), /remember the ledger/);
   store.db.close();
 });
 
@@ -454,3 +454,24 @@ function seedTurnsOnto(store, sessionId, target) {
     store.appendMessage(sessionId, message.role, message.parts);
   }
 }
+
+test('failed compression preserves the task and reports its reason in both modes [AC:context-reliability#AC-12]', async () => {
+  for (const kind of ['canonical', 'ordinary']) {
+    const { dir, store } = tmpStore();
+    try {
+      const session = createSession(store, kind);
+      for (let i = 0; i < 30; i++) {
+        store.appendMessage(session.id, i % 2 ? 'assistant' : 'user', [{ type: 'text', text: `history ${i}` }]);
+      }
+      store.appendMessage(session.id, 'user', [{ type: 'text', text: 'LATEST: staging only' }]);
+      const before = store.foldMessages(session.id);
+      const events = [];
+      const model = scripted(() => { throw new Error('summary service down'); });
+      const host = compactHost(store, dir, model.adapter);
+      host.emitTrace = (_session, event) => events.push(event);
+      await autoCompactSession(host, runContext(dir, store.getSession(session.id)), { force: true });
+      assert.deepEqual(store.foldMessages(session.id), before);
+      assert.ok(events.some(event => event.kind === 'compact_skipped' && event.payload.reason === 'summary_failed'));
+    } finally { store.db.close(); }
+  }
+});

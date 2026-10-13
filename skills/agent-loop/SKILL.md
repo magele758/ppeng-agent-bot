@@ -189,3 +189,13 @@ Jev 不是 SDK 模块：未配置入口时宿主不调用它，SDK 接入参数�
 ### Multimodal tool observations
 
 `ToolExecutionResult.images?: ImagePart[]` carries host-ingested image asset references (not raw base64). `executeSingleTool` preserves them. `processToolResults` writes every paired tool result before appending one explicitly labeled tool-observation image message, so parallel tool waves stay valid for model providers. The host supplies image ingestion and `resolveImageDataUrl`; the portable loop imports no desktop runtime. Test: `src/runtime/tool-loop.test.ts` multimodal observations. `BROWSER_TOOLS` includes `browser_screenshot` with navigate / snapshot / click / type. Plan mode treats it as read-only, like `browser_snapshot`. The host ingests the PNG into the image-asset store; the loop only sees `assetId`.
+
+### Context reliability: protected compaction and rolling summary
+
+`selectCompactableClosedRange(messages, keepRecent?)` selects a closed range while preserving leading system messages and the latest user message. `runAutoCompact` uses this selector without falling back to a prefix that consumes protected content. If no range is available it may shorten a closed tool result, or report `no_closed_range`. Empty summary output returns `empty_summary` without replacing history. Summary callback failures still throw for compatibility; product hosts must catch them and trace `summary_failed` while keeping original history.
+
+A prior `session.summary` is supplied to the summary callback as a synthetic system message without a WAL sequence. Callbacks update that prior summary; `capSummary` limits the updated result, and the final text replaces `session.summary` once (it is no longer concatenated again). Archive callbacks still receive only the original selected messages. Product hosts may append bounded source navigation, and should inject the resulting summary into the model request only once.
+
+`history_search`, `history_read`, and `memory_read` are classified as read-only evidence tools and included in planner/fast profiles. They bypass automatic result re-archiving so paginated evidence references remain usable. Authorization remains the product tool host's responsibility.
+
+- `compact-summary` 是保留的滚动摘要 replacement key：`foldSurface` 只显示最新成功 replacement 的摘要，即使新压缩范围未包含旧摘要；原文与旧摘要仍保留在审计 WAL。隐藏最新摘要不会复活旧摘要。其他 key 的可见性语义不变。

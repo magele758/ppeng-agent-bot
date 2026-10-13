@@ -1,0 +1,3526 @@
+[
+  {
+    "id": "constraint-normal",
+    "category": "constraint",
+    "critical": true,
+    "turns": [
+      "切换到任务 Atlas；目标：准备发布计划；约束：仅限 staging-eu 环境；不得部署生产。仅回复收到。",
+      "Continue Atlas. Return only the permitted deployment environment."
+    ],
+    "expected": {
+      "exact": "staging-eu",
+      "state": {}
+    },
+    "contextSeed": {
+      "mode": "normal",
+      "compact": true,
+      "history": [
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 1. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 2. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 3. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 4. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 5. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 6. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 7. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 8. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 9. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 10. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 11. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 12. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 13. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 14. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 15. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 16. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 17. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 18. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 19. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 20. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 21. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 22. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 23. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 24. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 25. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 26. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 27. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 28. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 29. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 30. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 31. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 32. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 33. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 34. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 35. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 36. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 37. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 38. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 39. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 40. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 41. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 42. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 43. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 44. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 45. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 46. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 47. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 48. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 49. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 50. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 51. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 52. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 53. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 54. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 55. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 56. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 57. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 58. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 59. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 60. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 61. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 62. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 63. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 64. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        }
+      ]
+    },
+    "script": [
+      {
+        "text": "收到。"
+      },
+      {
+        "text": "staging-eu"
+      }
+    ]
+  },
+  {
+    "id": "constraint-bot",
+    "category": "constraint",
+    "critical": true,
+    "turns": [
+      "切换到任务 Atlas；目标：准备发布计划；约束：仅限 staging-eu 环境；不得部署生产。仅回复收到。",
+      "Continue Atlas. Return only the permitted deployment environment."
+    ],
+    "expected": {
+      "exact": "staging-eu",
+      "state": {}
+    },
+    "contextSeed": {
+      "mode": "bot",
+      "compact": true,
+      "history": [
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 1. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 2. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 3. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 4. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 5. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 6. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 7. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 8. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 9. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 10. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 11. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 12. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 13. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 14. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 15. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 16. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 17. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 18. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 19. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 20. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 21. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 22. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 23. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 24. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 25. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 26. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 27. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 28. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 29. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 30. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 31. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 32. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 33. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 34. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 35. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 36. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 37. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 38. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 39. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 40. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 41. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 42. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 43. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 44. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 45. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 46. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 47. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 48. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 49. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 50. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 51. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 52. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 53. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 54. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 55. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 56. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 57. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 58. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 59. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 60. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 61. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 62. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 63. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 64. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        }
+      ]
+    },
+    "script": [
+      {
+        "text": "收到。"
+      },
+      {
+        "text": "staging-eu"
+      }
+    ]
+  },
+  {
+    "id": "correction-normal",
+    "category": "correction",
+    "critical": true,
+    "turns": [
+      "切换到任务 Atlas；目标：准备发布计划；约束：负责人为 Iris。仅回复收到。",
+      "把“负责人为 Iris”改为“负责人为 Noura”。仅回复收到。",
+      "Continue Atlas. Return only the current release owner."
+    ],
+    "expected": {
+      "exact": "Noura",
+      "state": {}
+    },
+    "contextSeed": {
+      "mode": "normal",
+      "compact": true,
+      "history": [
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 1. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 2. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 3. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 4. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 5. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 6. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 7. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 8. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 9. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 10. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 11. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 12. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 13. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 14. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 15. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 16. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 17. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 18. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 19. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 20. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 21. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 22. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 23. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 24. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 25. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 26. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 27. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 28. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 29. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 30. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 31. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 32. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 33. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 34. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 35. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 36. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 37. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 38. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 39. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 40. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 41. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 42. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 43. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 44. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 45. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 46. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 47. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 48. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 49. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 50. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 51. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 52. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 53. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 54. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 55. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 56. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 57. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 58. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 59. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 60. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 61. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 62. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 63. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 64. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        }
+      ]
+    },
+    "script": [
+      {
+        "text": "收到。"
+      },
+      {
+        "text": "收到。"
+      },
+      {
+        "text": "Noura"
+      }
+    ]
+  },
+  {
+    "id": "correction-bot",
+    "category": "correction",
+    "critical": true,
+    "turns": [
+      "切换到任务 Atlas；目标：准备发布计划；约束：负责人为 Iris。仅回复收到。",
+      "把“负责人为 Iris”改为“负责人为 Noura”。仅回复收到。",
+      "Continue Atlas. Return only the current release owner."
+    ],
+    "expected": {
+      "exact": "Noura",
+      "state": {}
+    },
+    "contextSeed": {
+      "mode": "bot",
+      "compact": true,
+      "history": [
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 1. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 2. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 3. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 4. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 5. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 6. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 7. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 8. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 9. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 10. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 11. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 12. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 13. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 14. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 15. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 16. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 17. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 18. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 19. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 20. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 21. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 22. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 23. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 24. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 25. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 26. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 27. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 28. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 29. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 30. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 31. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 32. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 33. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 34. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 35. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 36. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 37. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 38. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 39. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 40. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 41. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 42. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 43. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 44. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 45. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 46. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 47. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 48. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 49. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 50. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 51. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 52. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 53. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 54. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 55. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 56. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 57. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 58. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 59. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 60. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 61. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 62. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 63. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 64. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        }
+      ]
+    },
+    "script": [
+      {
+        "text": "收到。"
+      },
+      {
+        "text": "收到。"
+      },
+      {
+        "text": "Noura"
+      }
+    ]
+  },
+  {
+    "id": "task-switch-normal",
+    "category": "task-switch",
+    "critical": true,
+    "turns": [
+      "切换到任务 Atlas；目标：准备发布；约束：预算为 73；约束：仅限 sandbox。仅回复收到。",
+      "切换到任务 Birch；目标：整理文档；约束：预算为 19；约束：只读文档。仅回复收到。",
+      "切回任务 Atlas。仅回复收到。",
+      "Continue the active task. Return only its budget as a number."
+    ],
+    "expected": {
+      "exact": "73",
+      "state": {}
+    },
+    "contextSeed": {
+      "mode": "normal",
+      "compact": true,
+      "history": [
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 1. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 2. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 3. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 4. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 5. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 6. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 7. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 8. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 9. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 10. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 11. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 12. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 13. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 14. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 15. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 16. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 17. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 18. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 19. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 20. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 21. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 22. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 23. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 24. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 25. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 26. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 27. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 28. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 29. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 30. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 31. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 32. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 33. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 34. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 35. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 36. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 37. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 38. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 39. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 40. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 41. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 42. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 43. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 44. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 45. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 46. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 47. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 48. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 49. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 50. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 51. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 52. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 53. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 54. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 55. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 56. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 57. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 58. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 59. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 60. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 61. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 62. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 63. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 64. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        }
+      ]
+    },
+    "script": [
+      {
+        "text": "收到。"
+      },
+      {
+        "text": "收到。"
+      },
+      {
+        "text": "收到。"
+      },
+      {
+        "text": "73"
+      }
+    ]
+  },
+  {
+    "id": "task-switch-bot",
+    "category": "task-switch",
+    "critical": true,
+    "turns": [
+      "切换到任务 Atlas；目标：准备发布；约束：预算为 73；约束：仅限 sandbox。仅回复收到。",
+      "切换到任务 Birch；目标：整理文档；约束：预算为 19；约束：只读文档。仅回复收到。",
+      "切回任务 Atlas。仅回复收到。",
+      "Continue the active task. Return only its budget as a number."
+    ],
+    "expected": {
+      "exact": "73",
+      "state": {}
+    },
+    "contextSeed": {
+      "mode": "bot",
+      "compact": true,
+      "history": [
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 1. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 2. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 3. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 4. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 5. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 6. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 7. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 8. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 9. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 10. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 11. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 12. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 13. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 14. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 15. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 16. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 17. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 18. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 19. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 20. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 21. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 22. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 23. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 24. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 25. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 26. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 27. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 28. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 29. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 30. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 31. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 32. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 33. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 34. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 35. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 36. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 37. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 38. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 39. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 40. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 41. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 42. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 43. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 44. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 45. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 46. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 47. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 48. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 49. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 50. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 51. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 52. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 53. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 54. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 55. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 56. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 57. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 58. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 59. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 60. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 61. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 62. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 63. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 64. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        }
+      ]
+    },
+    "script": [
+      {
+        "text": "收到。"
+      },
+      {
+        "text": "收到。"
+      },
+      {
+        "text": "收到。"
+      },
+      {
+        "text": "73"
+      }
+    ]
+  },
+  {
+    "id": "post-compact-normal",
+    "category": "post-compact",
+    "critical": true,
+    "turns": [
+      "Inspection of archive:release-17 found the exact rollback identifier RLB-Q739. Keep the source available; this identifier is not a recommendation.",
+      "What exact rollback identifier did the inspection find? Return only the identifier. Read the source if the summary is insufficient."
+    ],
+    "expected": {
+      "exact": "RLB-Q739",
+      "state": {}
+    },
+    "contextSeed": {
+      "mode": "normal",
+      "compact": true,
+      "history": [
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 1. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 2. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 3. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 4. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 5. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 6. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 7. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 8. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 9. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 10. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 11. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 12. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 13. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 14. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 15. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 16. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 17. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 18. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 19. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 20. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 21. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 22. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 23. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 24. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 25. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 26. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 27. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 28. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 29. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 30. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 31. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 32. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 33. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 34. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 35. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 36. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 37. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 38. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 39. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 40. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 41. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 42. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 43. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 44. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 45. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 46. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 47. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 48. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 49. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 50. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 51. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 52. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 53. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 54. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 55. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 56. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 57. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 58. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 59. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 60. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 61. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 62. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 63. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 64. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        }
+      ]
+    },
+    "script": [
+      {
+        "text": "收到。"
+      },
+      {
+        "text": "RLB-Q739"
+      }
+    ]
+  },
+  {
+    "id": "post-compact-bot",
+    "category": "post-compact",
+    "critical": true,
+    "turns": [
+      "Inspection of archive:release-17 found the exact rollback identifier RLB-Q739. Keep the source available; this identifier is not a recommendation.",
+      "What exact rollback identifier did the inspection find? Return only the identifier. Read the source if the summary is insufficient."
+    ],
+    "expected": {
+      "exact": "RLB-Q739",
+      "state": {}
+    },
+    "contextSeed": {
+      "mode": "bot",
+      "compact": true,
+      "history": [
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 1. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 2. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 3. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 4. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 5. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 6. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 7. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 8. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 9. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 10. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 11. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 12. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 13. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 14. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 15. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 16. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 17. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 18. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 19. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 20. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 21. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 22. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 23. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 24. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 25. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 26. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 27. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 28. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 29. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 30. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 31. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 32. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 33. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 34. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 35. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 36. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 37. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 38. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 39. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 40. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 41. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 42. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 43. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 44. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 45. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 46. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 47. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 48. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 49. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 50. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 51. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 52. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 53. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 54. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 55. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 56. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 57. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 58. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 59. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 60. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 61. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 62. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 63. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 64. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        }
+      ]
+    },
+    "script": [
+      {
+        "text": "收到。"
+      },
+      {
+        "text": "RLB-Q739"
+      }
+    ]
+  },
+  {
+    "id": "cross-session-normal",
+    "category": "cross-session",
+    "critical": true,
+    "turns": [
+      "Prepare to locate an earlier deployment decision.",
+      "Search earlier conversations for lighthouse-october. Read the matching original source and return only its approved rollback identifier."
+    ],
+    "expected": {
+      "exact": "RB-X928",
+      "state": {},
+      "requiredTools": [
+        "history_search",
+        "history_read"
+      ]
+    },
+    "contextSeed": {
+      "mode": "normal",
+      "compact": true,
+      "previous": "Deployment decision lighthouse-october: the approved rollback identifier is RB-X928. The rejected alternative was RB-X927.",
+      "history": [
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 1. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 2. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 3. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 4. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 5. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 6. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 7. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 8. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 9. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 10. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 11. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 12. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 13. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 14. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 15. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 16. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 17. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 18. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 19. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 20. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 21. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 22. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 23. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 24. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 25. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 26. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 27. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 28. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 29. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 30. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 31. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 32. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 33. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 34. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 35. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 36. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 37. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 38. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 39. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 40. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 41. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 42. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 43. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 44. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 45. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 46. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 47. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 48. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 49. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 50. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 51. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 52. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 53. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 54. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 55. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 56. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 57. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 58. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 59. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 60. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 61. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 62. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 63. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 64. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        }
+      ]
+    },
+    "script": [
+      {
+        "text": "收到。"
+      },
+      {
+        "tool": "history_search",
+        "input": {
+          "query": "lighthouse-october"
+        }
+      },
+      {
+        "tool": "history_read",
+        "refFromLastSearch": true
+      },
+      {
+        "text": "RB-X928"
+      }
+    ]
+  },
+  {
+    "id": "cross-session-bot",
+    "category": "cross-session",
+    "critical": true,
+    "turns": [
+      "Prepare to locate an earlier deployment decision.",
+      "Search earlier conversations for lighthouse-october. Read the matching original source and return only its approved rollback identifier."
+    ],
+    "expected": {
+      "exact": "RB-X928",
+      "state": {},
+      "requiredTools": [
+        "history_search",
+        "history_read"
+      ]
+    },
+    "contextSeed": {
+      "mode": "bot",
+      "compact": true,
+      "previous": "Deployment decision lighthouse-october: the approved rollback identifier is RB-X928. The rejected alternative was RB-X927.",
+      "history": [
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 1. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 2. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 3. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 4. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 5. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 6. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 7. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 8. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 9. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 10. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 11. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 12. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 13. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 14. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 15. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 16. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 17. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 18. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 19. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 20. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 21. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 22. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 23. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 24. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 25. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 26. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 27. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 28. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 29. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 30. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 31. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 32. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 33. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 34. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 35. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 36. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 37. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 38. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 39. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 40. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 41. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 42. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 43. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 44. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 45. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 46. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 47. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 48. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 49. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 50. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 51. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 52. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 53. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 54. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 55. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 56. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 57. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 58. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 59. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 60. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 61. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 62. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "user",
+          "text": "Unrelated completed checkpoint 63. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        },
+        {
+          "role": "assistant",
+          "text": "Unrelated completed checkpoint 64. No changes to the active task or its constraints.",
+          "paddingRepeats": 48
+        }
+      ]
+    },
+    "script": [
+      {
+        "text": "收到。"
+      },
+      {
+        "tool": "history_search",
+        "input": {
+          "query": "lighthouse-october"
+        }
+      },
+      {
+        "tool": "history_read",
+        "refFromLastSearch": true
+      },
+      {
+        "text": "RB-X928"
+      }
+    ]
+  }
+]

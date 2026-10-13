@@ -193,6 +193,7 @@ export {
   compileTurnAppendixAsync,
   formatCompiledContextPack,
   lastUserQueryFromMessages,
-  previewContextPack
+  previewContextPack,
+  previewContextPackAsync
 } from './context-compiler.js';
 export type { CompileTurnAppendixInput } from './context-compiler.js';

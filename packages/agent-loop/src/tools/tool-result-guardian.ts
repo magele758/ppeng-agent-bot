@@ -40,6 +40,9 @@ export const DEFAULT_SKIP_TOOLS = new Set([
   'read_artifact_page',
   'search_artifact_content',
   'retrieve_tool_result',
+  'history_search',
+  'history_read',
+  'memory_read',
 ]);
 
 export const DEFAULT_ARCHIVE_THRESHOLD = 1800;

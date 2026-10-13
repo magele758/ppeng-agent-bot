@@ -41,11 +41,19 @@ try {
       } }
   ];
   let scriptIndex = 0, usageComplete = true, tokens = 0;
+  let previousSessionId;
   let adapter;
   if (simulation) {
-    adapter = { name: 'scripted-verification-only', async runTurn() {
+    adapter = { name: 'scripted-verification-only', async runTurn(input) {
       const entry = task.script?.[scriptIndex++];
       if (!entry) throw new Error('simulation script exhausted');
+      if (entry.refFromLastSearch) {
+        const result = input.messages.flatMap(m => m.parts).findLast(p => p.type === 'tool_result');
+        const parsed = JSON.parse(typeof result?.content === 'string' ? result.content : 'null');
+        const match = parsed?.matches?.find(row => row.sessionId === previousSessionId) ?? parsed?.matches?.[0];
+        if (!match?.ref) throw new Error('simulation search produced no source reference');
+        entry.input = { ref: match.ref };
+      }
       return {
         stopReason: entry.tool ? 'tool_use' : 'end', usage: { inputTokens: 100, outputTokens: 20, totalTokens: 120 },
         assistantParts: entry.tool
@@ -112,15 +120,39 @@ try {
   if (adapter.completeText) measured.completeText = async input => { usageComplete = false; return adapter.completeText(input); };
   const general = core.builtinAgents.find(a => a.id === 'general');
   const runtime = new core.RawAgentRuntime({ repoRoot, stateDir, modelAdapter: measured,
-    agents: [{ ...general, allowedTools: tools.map(t => t.name) }], tools });
+    agents: [{ ...general, allowedTools: task.contextSeed ? ['history_search', 'history_read', 'retrieve_tool_result'] : tools.map(t => t.name) }],
+    ...(task.contextSeed ? {} : { tools }) });
   outcome.savedSettings = {};
   for (const [key, value] of Object.entries(variant.daemonControl ?? {})) {
     runtime.store.setDaemonControl(key, value);
     outcome.savedSettings[key] = runtime.store.getDaemonControl(key);
   }
+  const identity = task.contextSeed ? { userId: 'context-eval-user', tenantId: 'context-eval-tenant',
+    ...(task.contextSeed.mode === 'bot' ? { canonicalBotChat: true, botId: 'context-eval-bot' } : {}) } : {};
+  if (task.contextSeed?.previous) {
+    const previous = runtime.createChatSession({ title: 'Previous deployment decision', message: task.contextSeed.previous,
+      agentId: 'general', metadata: identity });
+    previousSessionId = previous.id;
+    runtime.store.appendMessage(previous.id, 'assistant', [{ type: 'text', text: 'Decision recorded.' }]);
+  }
   const session = runtime.createChatSession({ title: `quality-${task.id}`, message: task.turns[0], agentId: 'general',
-    metadata: { allowedSkillNames: [] } });
+    metadata: { allowedSkillNames: [], ...identity } });
   for (let i = 0; i < task.turns.length; i++) {
+    if (task.contextSeed && i === task.turns.length - 1) {
+      outcome.contextEvidence = { seededMessages: 0, compactRounds: [] };
+      for (let round = 0; round < 2; round++) {
+        for (const row of task.contextSeed.history) {
+          runtime.store.appendMessage(session.id, row.role, [{ type: 'text', text: row.text + ' Archived diagnostic line; routine check succeeded.'.repeat(row.paddingRepeats ?? 0) }]);
+          outcome.contextEvidence.seededMessages++;
+        }
+        if (task.contextSeed.compact) {
+          // Product's existing forced-compaction entry, not a synthetic summary replacement.
+          const compact = await runtime.compactCanonicalSession(session.id);
+          outcome.contextEvidence.compactRounds.push(compact);
+          if (!compact.replaced) throw new Error('context fixture did not compact; semantic evaluation invalid');
+        }
+      }
+    }
     if (i) runtime.sendUserMessage(session.id, task.turns[i]);
     await runtime.runSession(session.id, { onModelStreamChunk: () => {} });
   }
@@ -139,6 +171,17 @@ try {
     toolCallId: part.toolCallId, name: part.name, input: part.input,
     ok: results.get(part.toolCallId)?.ok === true
   }));
+  if (task.contextSeed?.previous) {
+    outcome.contextEvidence.historySourceVerified = parts.filter(p => p.type === 'tool_call' && p.name === 'history_read').some(call => {
+      const result = results.get(call.toolCallId);
+      if (result?.ok !== true) return false;
+      try {
+        const source = JSON.parse(result.content);
+        return source.sessionId === previousSessionId && typeof source.text === 'string' && source.text.includes(task.expected.exact);
+      } catch { return false; }
+    });
+    if (!outcome.contextEvidence.historySourceVerified) outcome.error = 'cross-session answer lacks a successful read of the original evidence';
+  }
   outcome.tokens = usageComplete ? tokens : null;
   outcome.transcript = transcript;
 } catch (error) {

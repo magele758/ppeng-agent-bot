@@ -5,6 +5,7 @@
  */
 
 import { envBool, envInt } from '../env.js';
+import { buildTaskContext } from '../session/task-context.js';
 import { resolveDiscoveryEnabled } from '../discovery/settings.js';
 import {
   builtinSkills,
@@ -452,7 +453,7 @@ export class PromptBuilder {
       : '';
 
     const summaryMaxChars = compactSummaryMaxChars(process.env);
-    const summaryLine = ctx.session.summary
+    const summaryLine = ctx.session.summary && !messages.some(message => message.key === 'compact-summary')
       ? `Compressed summary:\n${capRollingSummaryText(ctx.session.summary, summaryMaxChars)}`
       : '';
 
@@ -475,7 +476,7 @@ export class PromptBuilder {
           })
         : '';
     const dynToolsBlock = buildDynToolsPromptBlock(resolveDynToolsEnabled(this.deps.store));
-    return [taskLine, `Todos: ${todoLine}`, cognitiveLine, summaryLine, ptcBlock, replayBlock, dynToolsBlock, skillBlock]
+    return [taskLine, buildTaskContext(ctx.session, ctx.task), `Todos: ${todoLine}`, cognitiveLine, summaryLine, ptcBlock, replayBlock, dynToolsBlock, skillBlock]
       .filter(Boolean)
       .join('\n\n');
   }

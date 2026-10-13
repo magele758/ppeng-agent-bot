@@ -1,3 +1,5 @@
+import { createHistoryTools } from './history-tools.js';
+import type { HistoryStore } from '../session/history-retrieval.js';
 import { spawn } from 'node:child_process';
 import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -153,6 +155,7 @@ export interface RuntimeToolServices {
     sessionId?: string;
     userId?: string;
     tenantId?: string;
+    tenantOrGlobal?: boolean;
     agentId?: string;
     agentUnscoped?: boolean;
     query?: string;
@@ -166,6 +169,7 @@ export interface RuntimeToolServices {
     limit?: number;
     agentId?: string;
   }) => Promise<unknown[]>;
+  getAgentMemoryById?: (id: string) => Promise<import('../memory/types.js').AgentMemory | null>;
   botLookup?: BotMemoryLookup;
   visionAnalyze: (input: {
     sessionId: string;
@@ -173,6 +177,7 @@ export interface RuntimeToolServices {
     prompt: string;
     signal?: AbortSignal;
   }) => Promise<string>;
+  historyStore?: HistoryStore;
   /** Current-session transcript only. Used by retrieve_tool_result. */
   listSessionMessages?: (sessionId: string) => SessionMessage[];
   compactContext?: (context: RunContext, opts?: { force?: boolean }) => Promise<string>;
@@ -1587,6 +1592,7 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
     spillToolResultTool,
     retrieveToolResultTool,
     ...memoryTools,
+    ...createHistoryTools(services),
     ...createPlanTools(),
     ...createInteractionTools(),
     writeFileTool,

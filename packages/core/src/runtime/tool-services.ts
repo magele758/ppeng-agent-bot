@@ -162,6 +162,7 @@ export function createToolServices(host: ToolServicesHost): RuntimeToolServices 
         sessionId: input.sessionId,
         userId: input.userId,
         tenantId: input.tenantId,
+        tenantOrGlobal: input.tenantOrGlobal,
         agentId: input.agentId,
         agentUnscoped: input.agentUnscoped,
         query: input.query,
@@ -199,7 +200,9 @@ export function createToolServices(host: ToolServicesHost): RuntimeToolServices 
       }
       return out.slice(0, limit);
     },
+    getAgentMemoryById: async (id) => host.store.agentMemory().getEntryById(id),
     botLookup: host.store,
+    historyStore: host.store,
     listSessionMessages: (sessionId) => host.store.listMessages(sessionId),
     compactContext: host.compactContext
       ? (context, opts) => host.compactContext!(context, opts)

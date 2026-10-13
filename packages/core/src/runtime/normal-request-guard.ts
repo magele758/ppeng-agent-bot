@@ -15,9 +15,11 @@ import {
 } from '../session/normal-request-budget.js';
 import type { SessionMessage } from '../types.js';
 import { archiveMessages } from './compact-host.js';
+import { contextSourceNavigation, continuationSummaryInstruction } from '../session/context-sources.js';
+import { estimateTokensFromText } from '../model/token-estimate.js';
 
 export interface NormalRequestBudgetTrace {
-  kind: 'request_over_budget' | 'compact_skipped';
+  kind: 'request_over_budget' | 'compact_skipped' | 'compact';
   payload?: Record<string, unknown>;
 }
 
@@ -70,6 +72,7 @@ function summaryMessage(sessionId: string, text: string): SessionMessage {
     id: createId('msg'),
     sessionId,
     role: 'system',
+    key: 'compact-summary',
     parts: [{ type: 'text', text }],
     createdAt: nowIso()
   };
@@ -90,7 +93,7 @@ async function persistSummary(
   const store = deps.store;
   if (!session || !store) return;
   const seqs = prefix
-    .map((message) => message.seq)
+    .flatMap((message) => message.replaces ? [message.replaces.startSeq, message.replaces.endSeq] : [message.seq])
     .filter((seq): seq is number => typeof seq === 'number');
   if (seqs.length === 0) return;
   const startSeq = Math.min(...seqs);
@@ -102,9 +105,9 @@ async function persistSummary(
     parts: [{ type: 'text', text: summary }],
     key: 'compact-summary'
   });
-  const merged = session.summary ? `${session.summary}\n\n${summary}` : summary;
-  store.updateSession(session.id, { summary: merged });
+  store.updateSession(session.id, { summary });
   if (deps.stateDir) await archiveMessages(deps.stateDir, session.id, prefix);
+  deps.emitTrace?.({ kind: 'compact', payload: { replaced: { startSeq, endSeq }, didCompact: true, reason: 'request_budget' } });
 }
 
 function withMessages<T extends GuardedModelRequest>(input: T, messages: SessionMessage[]): T {
@@ -132,19 +135,25 @@ export async function applyNormalSessionRequestBudget<T extends GuardedModelRequ
 
   if (!fit.summarizePrefix || !fit.summaryKept) {
     if (fit.requestTokens > fit.capTokens) deps.emitTrace?.(overBudgetTrace(fit, 'unresolved'));
-    return withMessages(input, fit.messages);
+    const removed = input.messages.filter(message => !fit.messages.includes(message));
+    return withMessages(input, addSourceNavigation(input, fit.messages, removed, fit.capTokens));
   }
 
   try {
     if (!deps.summarize) throw new Error('summary unavailable');
-    const raw = await deps.summarize(fit.summarizePrefix);
+    const instruction = summaryMessage(deps.session?.id ?? input.sessionId ?? '', continuationSummaryInstruction(deps.session?.summary));
+    const raw = await deps.summarize([...fit.summarizePrefix, instruction]);
     const keptTokens = estimateNormalRequestTokens({
       systemPrompt: input.systemPrompt,
       tools: input.tools,
       messages: fit.summaryKept
     });
     const room = fit.capTokens - keptTokens;
-    const text = capSummaryToTokens(raw, room - 4);
+    if (!raw.trim()) throw new Error('empty summary');
+    const source = contextSourceNavigation(fit.summarizePrefix);
+    const sourceTokens = source ? estimateTokensFromText(source) + 2 : 0;
+    const summary = capSummaryToTokens(raw, room - sourceTokens - 4);
+    const text = summary && source ? `${summary}\n\n${source}` : capSummaryToTokens(raw, room - 4);
     if (!text) throw new Error('empty summary');
     const sessionId = deps.session?.id ?? input.sessionId ?? input.messages[0]?.sessionId ?? '';
     const messages = insertSummary(fit.summaryKept, summaryMessage(sessionId, text));
@@ -179,6 +188,18 @@ export async function applyNormalSessionRequestBudget<T extends GuardedModelRequ
       }
     });
     if (fit.requestTokens > fit.capTokens) deps.emitTrace?.(overBudgetTrace(fit, 'summary_failed'));
-    return withMessages(input, fit.messages);
+    const removed = input.messages.filter(message => !fit.messages.includes(message));
+    return withMessages(input, addSourceNavigation(input, fit.messages, removed, fit.capTokens));
   }
+}
+
+/** Navigation consumes the same request budget; never displace protected content for it. */
+function addSourceNavigation(
+  input: GuardedModelRequest, kept: SessionMessage[], removed: SessionMessage[], cap: number
+): SessionMessage[] {
+  const text = contextSourceNavigation(removed);
+  if (!text) return kept;
+  const source = { ...summaryMessage(input.sessionId ?? removed[0]?.sessionId ?? '', text), key: 'context-history-sources' };
+  const candidate = insertSummary(kept, source);
+  return estimateNormalRequestTokens({ ...input, messages: candidate }) <= cap ? candidate : kept;
 }

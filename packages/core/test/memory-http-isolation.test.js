@@ -10,9 +10,43 @@ import { join } from 'node:path';
 import { RawAgentRuntime } from '../dist/runtime.js';
 import { saveSemanticFact } from '../dist/memory/memory-writer.js';
 import { memoryRoutes } from '../../../apps/daemon/dist/routes/memory.js';
+import { compileTurnAppendixAsync } from '../dist/session/context-compiler.js';
+import { writeMemorySettings } from '../dist/memory/memory-settings.js';
+import { PromptBuilder } from '../dist/model/prompt-builder.js';
 
 const ANON = { isolate: false, labProxy: false, user: null };
 const asUser = (id) => ({ isolate: true, labProxy: true, user: { id, tenantId: 'default' } });
+
+test('fast profile preview respects the same persistent memory policy as the actual prompt [AC:context-reliability#AC-9]', async () => {
+  const runtime = makeRuntime();
+  const session = runtime.store.createSession({ title: 'fast', mode: 'chat', agentId: 'general', metadata: { userId: 'u1', taskRunMode: 'fast' } });
+  runtime.store.agentMemory().set({ scope: 'session.long', namespace: 'default', sessionId: session.id, key: 'deploy', value: 'deploy hidden in fast mode' });
+  const builder = new PromptBuilder({ store: runtime.store, repoRoot: runtime.repoRoot, stateDir: runtime.stateDir });
+  const actual = await builder.buildMemoryAppendixAsync({ session }, { query: 'deploy', stateDir: runtime.stateDir });
+  const preview = await call(runtime, 'POST', '/api/memory/preview', { auth: ANON, body: { sessionId: session.id, query: 'deploy' } });
+  assert.equal(actual, '');
+  assert.equal(preview.payload.appendix, actual);
+  assert.equal(preview.payload.pack.sections.length, 0);
+});
+
+test('HTTP preview matches real recall and ignores ownership overrides on an existing session [AC:context-reliability#AC-9] [AC:context-reliability#AC-8]', async () => {
+  const runtime = makeRuntime();
+  const session = runtime.store.createSession({ title: 'owned', mode: 'chat', agentId: 'general', metadata: { userId: 'u1', tenantId: 't1' } });
+  const am = runtime.store.agentMemory();
+  for (const [userId, tenantId, value] of [['u1', 't1', 'deploy own evidence'], ['u1', 't2', 'deploy FOREIGN_TENANT'], ['u2', 't1', 'deploy FOREIGN_USER']]) {
+    am.set({ scope: 'user.memory', namespace: 'semantic', key: `deploy-${userId}-${tenantId}`, value, userId, tenantId });
+  }
+  const input = { store: runtime.store, session, query: 'deploy', stateDir: runtime.stateDir };
+  const actual = await compileTurnAppendixAsync(input);
+  const preview = await call(runtime, 'POST', '/api/memory/preview', { auth: ANON, body: { sessionId: session.id, userId: 'u2', tenantId: 't2', query: 'deploy' } });
+  assert.equal(preview.payload.appendix, actual);
+  assert.match(actual, /own evidence/);
+  assert.doesNotMatch(actual, /FOREIGN_/);
+  writeMemorySettings(runtime.store, { compilerEnabled: false });
+  const disabled = await call(runtime, 'POST', '/api/memory/preview', { auth: ANON, body: { sessionId: session.id, query: 'deploy' } });
+  assert.equal(disabled.payload.appendix, '');
+  assert.equal(await compileTurnAppendixAsync(input), '');
+});
 
 function makeRuntime() {
   return new RawAgentRuntime({

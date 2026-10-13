@@ -115,7 +115,7 @@ function latestUserIndex(messages: readonly SessionMessage[]): number {
 }
 
 function pinnedMessages(messages: readonly SessionMessage[]): SessionMessage[] {
-  const leading = messages.slice(0, leadingSystemCount(messages));
+  const leading = messages.slice(0, leadingSystemCount(messages)).filter(message => message.key !== 'compact-summary');
   const userIdx = latestUserIndex(messages);
   if (userIdx < 0) return leading.slice();
   return [...leading, messages[userIdx]!];
@@ -198,12 +198,15 @@ function prefixBeforeLatestUser(messages: readonly SessionMessage[]): {
 } {
   const leading = leadingSystemCount(messages);
   const userIdx = latestUserIndex(messages);
+  const systems = messages.slice(0, leading);
+  const rolling = systems.filter(message => message.key === 'compact-summary');
+  const protectedSystems = systems.filter(message => message.key !== 'compact-summary');
   if (userIdx < 0) {
-    return { prefix: messages.slice(leading), kept: messages.slice(0, leading) };
+    return { prefix: [...rolling, ...messages.slice(leading)], kept: protectedSystems };
   }
   return {
-    prefix: messages.slice(leading, userIdx),
-    kept: [...messages.slice(0, leading), ...messages.slice(userIdx)]
+    prefix: [...rolling, ...messages.slice(leading, userIdx)],
+    kept: [...protectedSystems, ...messages.slice(userIdx)]
   };
 }
 

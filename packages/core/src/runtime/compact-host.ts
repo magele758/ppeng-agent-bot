@@ -15,7 +15,7 @@ import {
   COMPACT_KEEP_RECENT,
   findPrunableToolResult,
   runAutoCompact,
-  selectClosedPrefixRange
+  selectCompactableClosedRange
 } from '../session/auto-compact.js';
 import {
   BOT_HYGIENE_KEEP_RECENT,
@@ -41,6 +41,7 @@ import {
   compactSummaryMaxChars
 } from '../turn/prepare-view.js';
 import { textPart } from './session-facade.js';
+import { boundedSourceSummary, continuationSummaryInstruction } from '../session/context-sources.js';
 
 const log = createLogger('compact-host');
 
@@ -218,7 +219,7 @@ export async function autoCompactSession(
     'RAW_AGENT_COMPACT_TOKEN_THRESHOLD',
     host.turnShapeBySession.get(context.session.id) ?? {}
   );
-  const result = await runAutoCompact({
+  const result: Awaited<ReturnType<typeof runAutoCompact>> = await runAutoCompact({
     store: host.store,
     session: host.store.getSession(context.session.id) ?? context.session,
     agent: context.agent,
@@ -230,7 +231,7 @@ export async function autoCompactSession(
       try {
         summary = await adapter.summarizeMessages({
           agent: context.agent,
-          messages: older,
+          messages: [...older, instructionMessage(context.session.id, continuationSummaryInstruction())],
           reason: `compact session ${context.session.id}`
         });
       } catch (e) {
@@ -239,21 +240,21 @@ export async function autoCompactSession(
       }
       // Runs before runAutoCompact appends the replacement, with no await in between.
       persistBotCompactLong(host, context, older, adapter.name === 'heuristic' ? undefined : summary);
-      return summary;
+      if (!summary.trim()) return summary;
+      return boundedSourceSummary(summary, older, compactSummaryMaxChars(process.env, tokenThreshold)).text;
     },
     archive: (older) => archiveMessages(host.stateDir, context.session.id, older),
     prepareView: (msgs) => host.prepareMessagesForModel(context.session, msgs),
     capSummary: (text) => {
       const maxSummaryChars = compactSummaryMaxChars(process.env, tokenThreshold);
-      const merged = context.session.summary ? `${context.session.summary}\n\n${text}` : text;
-      return capRollingSummaryText(merged, maxSummaryChars);
+      return capRollingSummaryText(text, maxSummaryChars);
     }
-  });
+  }).catch(() => ({ didCompact: false, pruned: false, skippedReason: 'summary_failed' }));
 
-  if (result.skippedReason === 'open_tool_wave') {
+  if (result.skippedReason) {
     void host.emitTrace(context.session.id, {
       kind: 'compact_skipped',
-      payload: { reason: 'open_tool_wave' }
+      payload: { reason: result.skippedReason }
     });
     return {};
   }
@@ -304,7 +305,7 @@ async function compactCanonicalBot(
   if (!tier) return {};
 
   const keepRecent = tier === 'hygiene' ? BOT_HYGIENE_KEEP_RECENT : COMPACT_KEEP_RECENT;
-  const range = selectClosedPrefixRange(folded, keepRecent);
+  const range = selectCompactableClosedRange(folded, keepRecent);
   if (!range || range.older.length === 0) {
     return pruneOneLargeToolResult(host, session.id, folded);
   }
@@ -322,7 +323,8 @@ async function compactCanonicalBot(
     });
   } catch (error) {
     persistBotCompactLong(host, context, range.older);
-    throw error;
+    void host.emitTrace(session.id, { kind: 'compact_skipped', payload: { reason: 'summary_failed', tier, message: error instanceof Error ? error.message : String(error) } });
+    return {};
   }
 
   const trimmed = summary.trim();
@@ -335,16 +337,18 @@ async function compactCanonicalBot(
     return {};
   }
 
-  const capped = capRollingSummaryText(
-    trimmed,
-    compactSummaryMaxChars(process.env, thresholds.structuredTokens)
-  );
+  const bounded = boundedSourceSummary(trimmed, range.older, compactSummaryMaxChars(process.env, thresholds.structuredTokens));
+  const capped = bounded.summary;
+  if (!capped.trim()) {
+    void host.emitTrace(session.id, { kind: 'compact_skipped', payload: { reason: 'empty_summary', tier } });
+    return {};
+  }
   persistBotCompactLong(host, context, range.older, adapter.name === 'heuristic' ? undefined : capped);
   host.store.appendReplacement(session.id, {
     startSeq: range.startSeq,
     endSeq: range.endSeq,
     role: 'system',
-    parts: [textPart(capped)],
+    parts: [textPart(bounded.text)],
     key: 'compact-summary'
   });
   host.store.updateSession(session.id, { summary: capped });
