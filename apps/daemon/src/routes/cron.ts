@@ -32,10 +32,14 @@ export function cronRoutes(runtime: RawAgentRuntime): RouteSpec[] {
       pattern: '/api/cron/jobs',
       handler: async ({ readBody, response }) => {
         const body = (await readBody()) as Record<string, unknown>;
+        const cron = typeof body.cron === 'string' ? body.cron : undefined;
+        const event = typeof body.event === 'string' ? body.event : undefined;
         const job = runtime.createCronJob({
           name: typeof body.name === 'string' ? body.name : '',
           prompt: typeof body.prompt === 'string' ? body.prompt : '',
-          cron: typeof body.cron === 'string' ? body.cron : '',
+          ...(cron !== undefined ? { cron } : {}),
+          ...(event !== undefined ? { event } : {}),
+          ...(typeof body.secretEnv === 'string' ? { secretEnv: body.secretEnv } : {}),
           sessionId: typeof body.sessionId === 'string' ? body.sessionId : undefined,
           botId: typeof body.botId === 'string' ? body.botId : undefined,
           enabled: typeof body.enabled === 'boolean' ? body.enabled : undefined,

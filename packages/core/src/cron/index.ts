@@ -14,3 +14,22 @@ export {
 export type { CreateCronJobInput, ListCronJobsFilter, UpdateCronJobInput } from './cron-facade.js';
 export { evaluateRoutinePrecheck, parseWakeGate, readStoredPrecheck } from './routine-precheck.js';
 export type { PrecheckResult, RoutinePrecheck } from './routine-precheck.js';
+export {
+  EVENT_PRECHECK_FILE_ENV,
+  EVENT_SIGNATURE_WINDOW_MS,
+  acceptEventRoutine,
+  headerValue,
+  parseEventScheduleValue,
+  verifyEmailSignature,
+  verifyGithubSignature,
+  verifySlackSignature
+} from './event-routine.js';
+export type {
+  AcceptEventRoutineInput,
+  AcceptEventRoutineResult,
+  EventJobOutcome,
+  EventProvider,
+  EventRoutineHeaders,
+  EventRoutineHost,
+  EventRoutineStore
+} from './event-routine.js';

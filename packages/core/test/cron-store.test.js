@@ -52,3 +52,29 @@ test('cron5 dueJobs and mark advance nextRunAt', () => {
   assert.equal(Date.parse(updated.nextRunAt), expected.getTime());
   assert.equal(store.dueJobs().some((j) => j.id === job.id), false);
 });
+
+test('event routines stay out of dueJobs even when nextRunAt is past', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'cron-event-'));
+  const store = new CronJobStore(dir);
+  const job = store.create({
+    sessionId: 's1',
+    agentId: 'general',
+    name: 'on push',
+    prompt: 'summarize',
+    scheduleKind: 'event',
+    scheduleValue: 'github/push',
+    nextRunAt: new Date(Date.now() - 60_000).toISOString(),
+    metadata: {
+      prompt: 'summarize',
+      secretEnv: 'GH_WEBHOOK_SECRET',
+      precheck: { kind: 'predicate', source: '{"wakeAgent":false}' }
+    }
+  });
+  assert.equal(store.dueJobs().some((j) => j.id === job.id), false);
+  const updated = markCronJobRan(store, job);
+  assert.ok(updated?.lastRunAt);
+  assert.equal(updated?.nextRunAt, undefined);
+  assert.equal(updated?.enabled, true);
+  assert.equal(store.dueJobs().some((j) => j.id === job.id), false);
+  assert.equal(JSON.stringify(store.list()).includes('super-secret-value'), false);
+});

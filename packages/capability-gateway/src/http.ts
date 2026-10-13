@@ -9,6 +9,7 @@ import {
   runAgentTurnAndReply,
   tryBotChatCommand
 } from './im-handlers.js';
+import { handleEventIngress } from './event-ingress.js';
 import { appendOutboundDraft } from './outbound-drafts.js';
 import { quarantineLegacyDraftLedger, reconcileSendingDrafts, recoverGatewayOutbound } from './outbound.js';
 import { resolveImOutbound } from './silent-reply.js';
@@ -112,13 +113,22 @@ export async function handleGatewayHttp(
   const isPlatformPath =
     (parts[0] === 'providers' && parts[1] === 'feishu' && parts[2] === 'events') ||
     (parts[0] === 'providers' && parts[1] === 'wecom' && parts[2] === 'bridge');
+  const isEventIngress =
+    request.method === 'POST' &&
+    parts[0] === 'routines' &&
+    (parts[1] === 'github' || parts[1] === 'slack' || parts[1] === 'email') &&
+    parts.length === 2;
 
-  if (!isPlatformPath && !checkAuth(request, ctx)) {
+  if (!isPlatformPath && !isEventIngress && !checkAuth(request, ctx)) {
     json(response, 401, { error: 'Unauthorized' });
     return true;
   }
 
   try {
+    if (await handleEventIngress(request, response, ctx, parts, readBodyLimit)) {
+      return true;
+    }
+
     if (request.method === 'POST' && parts[0] === 'providers' && parts[1] === 'feishu' && parts[2] === 'events') {
       const spec = fc.providers?.feishu;
       if (!spec?.enabled) {
