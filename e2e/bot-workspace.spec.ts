@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type APIRequestContext } from "@playwright/test";
 
 test("team work, history, rooms and software have real product entry points [AC:default-super-bot#AC-3] [AC:bot-history-memory#AC-1] [AC:bot-rooms#AC-1] [AC:bot-software-execution#AC-3]", async ({
   page,
@@ -334,11 +334,24 @@ test('due one-time work reaches a completed run and its result is inspectable [A
  const {runs}=await(await request.get(`/api/cron/jobs/${job.id}/runs`)).json();expect(runs[0].sessionId).not.toBe(bot.canonicalSessionId);expect(runs[0].result).toBeTruthy();
 });
 
+// Dedicated review fixtures are reused only by the same test across repeat-each runs.
+// Bot deletion is not an API operation and hidden Bots still count toward the roster cap.
+async function ensureReviewBot(request: APIRequestContext, name: string): Promise<{ id: string; name: string }> {
+  const roster = await request.get('/api/bots');
+  expect(roster.ok()).toBeTruthy();
+  const { bots } = await roster.json();
+  const existing = bots.find((bot: { name: string }) => bot.name === name);
+  if (existing) return existing;
+  const created = await request.post('/api/bots', { data: { name } });
+  expect(created.status(), await created.text()).toBe(201);
+  return (await created.json()).bot;
+}
+
 for (const routing of ['host', 'text-mention'] as const) {
   test(`Room routes ${routing} without selecting the mention list [AC:bot-rooms#AC-2]`, async ({ page, request }) => {
     const suffix = Date.now();
-    const { bot: host } = await (await request.post('/api/bots', { data: { name: `Host ${routing} ${suffix}` } })).json();
-    const { bot: member } = await (await request.post('/api/bots', { data: { name: `Member ${routing} ${suffix}` } })).json();
+    const host = await ensureReviewBot(request, `E2E Review Host ${routing}`);
+    const member = await ensureReviewBot(request, `E2E Review Member ${routing}`);
     const { room } = await (await request.post('/api/bot-rooms', { data: { title: `Routing ${routing} ${suffix}`, botIds: [host.id, member.id], hostBotId: host.id } })).json();
     await page.goto('/#/agents/bots');
     const panel = page.getByTestId('bot-rooms');
@@ -355,8 +368,8 @@ for (const routing of ['host', 'text-mention'] as const) {
 }
 
 test('editing a routine can remove its existing precheck [AC:bot-routine-lifecycle#AC-4]', async ({ page, request }) => {
-  const { bot } = await (await request.post('/api/bots', { data: { name: `Clear precheck ${Date.now()}` } })).json();
-  const { job } = await (await request.post('/api/cron/jobs', { data: { botId: bot.id, name: 'Clear existing precheck', prompt: 'Reply ready.', onceAt: new Date(Date.now() + 86400000).toISOString(), timezone: 'UTC', missedPolicy: 'coalesce', precheck: { kind: 'predicate', source: '{"wakeAgent":false}' } } })).json();
+  const bot = await ensureReviewBot(request, 'E2E Review Clear Precheck');
+  const { job } = await (await request.post('/api/cron/jobs', { data: { botId: bot.id, name: `Clear existing precheck ${Date.now()}`, prompt: 'Reply ready.', onceAt: new Date(Date.now() + 86400000).toISOString(), timezone: 'UTC', missedPolicy: 'coalesce', precheck: { kind: 'predicate', source: '{"wakeAgent":false}' } } })).json();
   await page.goto('/#/agents/bots');
   await page.getByTestId(`bot-card-${bot.id}`).click();
   await page.getByTestId('bot-detail').getByRole('button', { name: '展开或收起：定时任务' }).click();
@@ -377,8 +390,8 @@ test('editing a routine can remove its existing precheck [AC:bot-routine-lifecyc
 });
 
 test('Room polling preserves access to messages across a missed page [AC:bot-rooms#AC-6]', async ({ page, request }) => {
-  const { bot } = await (await request.post('/api/bots', { data: { name: `Room gap ${Date.now()}` } })).json();
-  const { room } = await (await request.post('/api/bot-rooms', { data: { title: `Gap ${bot.id}`, botIds: [bot.id] } })).json();
+  const bot = await ensureReviewBot(request, 'E2E Review Room Gap');
+  const { room } = await (await request.post('/api/bot-rooms', { data: { title: `Gap ${bot.id} ${Date.now()}`, botIds: [bot.id] } })).json();
   await request.post(`/api/bot-rooms/${room.id}/messages`, { data: { text: 'Room gap initial', mentions: [] } });
   await page.goto('/#/agents/bots');
   const panel = page.getByTestId('bot-rooms');
@@ -402,8 +415,8 @@ test('Room polling preserves access to messages across a missed page [AC:bot-roo
 test('switching Rooms clears the previous room draft, mentions and attachments [AC:bot-rooms#AC-3]', async ({ page, request }) => {
   const rooms = [];
   for (const suffix of ['A', 'B']) {
-    const { bot } = await (await request.post('/api/bots', { data: { name: `Scope ${suffix} ${Date.now()}` } })).json();
-    const { room } = await (await request.post('/api/bot-rooms', { data: { title: `Scope ${bot.id}`, botIds: [bot.id] } })).json();
+    const bot = await ensureReviewBot(request, `E2E Review Scope ${suffix}`);
+    const { room } = await (await request.post('/api/bot-rooms', { data: { title: `Scope ${bot.id} ${Date.now()}`, botIds: [bot.id] } })).json();
     rooms.push({ bot, room });
   }
   await page.goto('/#/agents/bots');
