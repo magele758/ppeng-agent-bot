@@ -71,7 +71,8 @@ export const BROWSER_TOOLS: readonly string[] = [
   'browser_navigate',
   'browser_snapshot',
   'browser_click',
-  'browser_type'
+  'browser_type',
+  'browser_screenshot'
 ];
 
 /** Assembly names only — computer-use tools are implemented elsewhere. */

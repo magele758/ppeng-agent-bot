@@ -38,6 +38,7 @@ const READ_ONLY_TOOLS = new Set([
   'task_get',
   'lsp_request',
   'browser_snapshot',
+  'browser_screenshot',
   'cron_list'
 ]);
 

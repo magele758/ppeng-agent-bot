@@ -1,9 +1,18 @@
 /**
  * Playwright browser backend. Fail-soft with a structured error — never fake success.
+ *
+ * Each session keeps a persistent Chromium profile so cookies survive the next launch.
+ * Profiles live under stateDir/browser-profiles (or RAW_AGENT_BROWSER_PROFILE_DIR).
+ * Do not log that directory: it holds cookies and local storage.
  */
 
+import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir, homedir } from 'node:os';
+import { join, resolve, sep } from 'node:path';
 import { fenceExternalContent } from '../safety/external-content.js';
-import type { RunContext, ToolExecutionResult } from '../types.js';
+import type { SqliteStateStore } from '../storage.js';
+import type { ImagePart, RunContext, ToolExecutionResult } from '../types.js';
+import { ingestImageAsset } from '../image-assets.js';
 import type { BrowserAction } from './browser-tools.js';
 
 export const BROWSER_INSTALL_HINT =
@@ -24,11 +33,15 @@ export interface BrowserErrorShape {
 
 type PlaywrightModule = {
   chromium: {
-    launch: (opts?: { headless?: boolean }) => Promise<PlaywrightBrowser>;
+    launchPersistentContext: (
+      userDataDir: string,
+      opts?: { headless?: boolean }
+    ) => Promise<PlaywrightContext>;
   };
 };
 
-type PlaywrightBrowser = {
+type PlaywrightContext = {
+  pages: () => PlaywrightPage[];
   newPage: () => Promise<PlaywrightPage>;
   close: () => Promise<void>;
 };
@@ -44,11 +57,18 @@ type PlaywrightPage = {
     count: () => Promise<number>;
   };
   evaluate: (fn: () => unknown) => Promise<unknown>;
+  screenshot?: (opts?: { type?: 'png' | 'jpeg' }) => Promise<Buffer | Uint8Array>;
 };
 
-type SessionSlot = { browser: PlaywrightBrowser; page: PlaywrightPage };
+type SessionSlot = { context: PlaywrightContext; page: PlaywrightPage };
 
 const sessions = new Map<string, SessionSlot>();
+
+export interface BrowserBackendDeps {
+  env?: NodeJS.ProcessEnv;
+  /** Persist PNG bytes as a session image asset. Return the asset id only. */
+  ingestScreenshot?: (png: Buffer, context: RunContext) => Promise<{ id: string }>;
+}
 
 export function formatBrowserError(code: BrowserErrorCode, message: string, action: BrowserAction): string {
   const body: BrowserErrorShape = {
@@ -65,13 +85,15 @@ export async function probePlaywrightBackend(): Promise<{
   detail: string;
   hint?: string;
 }> {
+  let dir: string | undefined;
   try {
     const pw = await loadPlaywright();
     if (!pw) {
       return { ok: false, detail: 'playwright 模块未安装', hint: BROWSER_INSTALL_HINT };
     }
-    const browser = await pw.chromium.launch({ headless: true });
-    await browser.close();
+    dir = await mkdtemp(join(tmpdir(), 'ppeng-browser-probe-'));
+    const context = await pw.chromium.launchPersistentContext(dir, { headless: true });
+    await context.close();
     return { ok: true, detail: 'Playwright Chromium 可用' };
   } catch (e) {
     return {
@@ -79,6 +101,14 @@ export async function probePlaywrightBackend(): Promise<{
       detail: e instanceof Error ? e.message : String(e),
       hint: BROWSER_INSTALL_HINT
     };
+  } finally {
+    if (dir) {
+      try {
+        await rm(dir, { recursive: true, force: true });
+      } catch {
+        /* probe dir only; never log its contents */
+      }
+    }
   }
 }
 
@@ -89,6 +119,12 @@ let playwrightLoaderOverride: PlaywrightLoader | undefined;
 /** Test-only: force missing / fake Playwright without touching env. */
 export function setPlaywrightLoaderForTests(loader?: PlaywrightLoader): void {
   playwrightLoaderOverride = loader;
+}
+
+/** Test-only: drop in-memory pages so the next call launches again. */
+export async function closeAllBrowserSessionsForTests(): Promise<void> {
+  const ids = [...sessions.keys()];
+  for (const id of ids) await closeBrowserSession(id);
 }
 
 async function loadPlaywright(): Promise<PlaywrightModule | null> {
@@ -104,7 +140,57 @@ async function loadPlaywright(): Promise<PlaywrightModule | null> {
   }
 }
 
-async function ensurePage(sessionId: string): Promise<SessionSlot> {
+function profileSegment(sessionId: string): string {
+  const cleaned = sessionId.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 128);
+  if (!cleaned || cleaned === '.' || cleaned === '..') return 'session';
+  return cleaned;
+}
+
+function isWithin(root: string, target: string): boolean {
+  const base = resolve(root);
+  const abs = resolve(target);
+  if (abs === base) return true;
+  const prefix = base.endsWith(sep) ? base : base + sep;
+  return abs.startsWith(prefix);
+}
+
+/** Host Chrome/Chromium user-data dirs. Never launch against these. */
+function isHostBrowserUserDataDir(dir: string): boolean {
+  const abs = resolve(dir);
+  const home = homedir();
+  const markers = [
+    join(home, 'Library', 'Application Support', 'Google', 'Chrome'),
+    join(home, 'Library', 'Application Support', 'Google', 'Chrome Canary'),
+    join(home, 'Library', 'Application Support', 'Chromium'),
+    join(home, '.config', 'google-chrome'),
+    join(home, '.config', 'chromium'),
+    join(home, 'AppData', 'Local', 'Google', 'Chrome', 'User Data')
+  ];
+  return markers.some((marker) => {
+    const root = resolve(marker);
+    return abs === root || abs.startsWith(root.endsWith(sep) ? root : root + sep);
+  });
+}
+
+/**
+ * Persistent profile directory for one session.
+ * Default: `<stateDir>/browser-profiles/<sessionId>`.
+ * `RAW_AGENT_BROWSER_PROFILE_DIR` replaces the root, not the session segment.
+ */
+export function browserProfileDir(
+  stateDir: string,
+  sessionId: string,
+  env: NodeJS.ProcessEnv = process.env
+): string {
+  const override = env.RAW_AGENT_BROWSER_PROFILE_DIR?.trim();
+  const root = override ? resolve(override) : resolve(stateDir, 'browser-profiles');
+  const dir = join(root, profileSegment(sessionId));
+  if (!isWithin(root, dir)) return join(root, 'session');
+  return dir;
+}
+
+async function ensurePage(context: RunContext, env: NodeJS.ProcessEnv): Promise<SessionSlot> {
+  const sessionId = context.session.id;
   const existing = sessions.get(sessionId);
   if (existing) return existing;
   const pw = await loadPlaywright();
@@ -113,13 +199,29 @@ async function ensurePage(sessionId: string): Promise<SessionSlot> {
     err.name = 'browser_not_installed';
     throw err;
   }
+  const userDataDir = browserProfileDir(context.stateDir, sessionId, env);
+  if (isHostBrowserUserDataDir(userDataDir)) {
+    const err = new Error('refusing to open the host Chrome/Chromium profile');
+    err.name = 'browser_launch_failed';
+    throw err;
+  }
+  let browser: PlaywrightContext | undefined;
   try {
-    const browser = await pw.chromium.launch({ headless: true });
-    const page = await browser.newPage();
-    const slot = { browser, page };
+    await mkdir(userDataDir, { recursive: true });
+    browser = await pw.chromium.launchPersistentContext(userDataDir, { headless: true });
+    const open = typeof browser.pages === 'function' ? browser.pages() : [];
+    const page = open[0] ?? (await browser.newPage());
+    const slot = { context: browser, page };
     sessions.set(sessionId, slot);
     return slot;
   } catch (e) {
+    if (browser) {
+      try {
+        await browser.close();
+      } catch {
+        /* ignore */
+      }
+    }
     const err = new Error(e instanceof Error ? e.message : String(e));
     err.name = 'browser_launch_failed';
     throw err;
@@ -151,12 +253,71 @@ export function formatBrowserNavigateResult(url: string, title: string): string 
   });
 }
 
+function pngBytes(raw: unknown): Buffer {
+  if (Buffer.isBuffer(raw)) return raw;
+  if (raw instanceof Uint8Array) return Buffer.from(raw);
+  throw new Error('screenshot did not return png bytes');
+}
+
+function validAssetId(id: string | undefined): string | undefined {
+  const trimmed = id?.trim() ?? '';
+  if (!trimmed || trimmed.length > 128) return undefined;
+  if (!/^[\w.-]+$/.test(trimmed)) return undefined;
+  return trimmed;
+}
+
+/** Store screenshot bytes with the session image assets. Callers return only the id. */
+export async function ingestBrowserScreenshotPng(
+  store: SqliteStateStore,
+  stateDir: string,
+  sessionId: string,
+  png: Buffer
+): Promise<{ id: string }> {
+  const asset = await ingestImageAsset(store, stateDir, {
+    sessionId,
+    buffer: Buffer.from(png),
+    mimeType: 'image/png',
+    sourceType: 'upload'
+  });
+  return { id: asset.id };
+}
+
+async function runScreenshot(
+  context: RunContext,
+  action: BrowserAction,
+  page: PlaywrightPage,
+  deps: BrowserBackendDeps | undefined
+): Promise<ToolExecutionResult> {
+  if (!deps?.ingestScreenshot) {
+    return { ok: false, content: formatBrowserError('browser_action_failed', '截图入库未配置', action) };
+  }
+  if (typeof page.screenshot !== 'function') {
+    return { ok: false, content: formatBrowserError('browser_action_failed', '当前页面不支持截图', action) };
+  }
+  const png = pngBytes(await page.screenshot({ type: 'png' }));
+  if (png.length === 0) {
+    return { ok: false, content: formatBrowserError('browser_action_failed', '截图为空', action) };
+  }
+  const asset = await deps.ingestScreenshot(png, context);
+  const assetId = validAssetId(asset?.id);
+  if (!assetId) {
+    return { ok: false, content: formatBrowserError('browser_action_failed', '截图资产 id 无效', action) };
+  }
+  const image: ImagePart = { type: 'image', assetId, mimeType: 'image/png', alt: 'browser screenshot' };
+  return {
+    ok: true,
+    content: JSON.stringify({ ok: true, action: 'screenshot', assetId, mimeType: 'image/png' }),
+    images: [image]
+  };
+}
+
 export async function playwrightBrowserAction(
   context: RunContext,
-  action: BrowserAction
+  action: BrowserAction,
+  deps?: BrowserBackendDeps
 ): Promise<ToolExecutionResult> {
   try {
-    const slot = await ensurePage(context.session.id);
+    const slot = await ensurePage(context, deps?.env ?? process.env);
     const page = slot.page;
     switch (action.kind) {
       case 'navigate': {
@@ -182,6 +343,8 @@ export async function playwrightBrowserAction(
           })
         };
       }
+      case 'screenshot':
+        return await runScreenshot(context, action, page, deps);
       case 'click': {
         const loc = page.locator(action.selector);
         if ((await loc.count()) === 0) {
@@ -218,7 +381,7 @@ export async function playwrightBrowserAction(
         content: formatBrowserError('browser_not_installed', '未安装 Playwright 或浏览器二进制。' + message, action)
       };
     }
-    if (name === 'browser_launch_failed' || /Executable doesn't exist|browserType.launch/i.test(message)) {
+    if (name === 'browser_launch_failed' || /Executable doesn't exist|browserType\.launch/i.test(message)) {
       return {
         ok: false,
         content: formatBrowserError('browser_launch_failed', message, action)
@@ -233,7 +396,7 @@ export async function closeBrowserSession(sessionId: string): Promise<void> {
   if (!slot) return;
   sessions.delete(sessionId);
   try {
-    await slot.browser.close();
+    await slot.context.close();
   } catch {
     /* ignore */
   }
