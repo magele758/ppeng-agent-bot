@@ -380,6 +380,8 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
     ['GET /api/sandbox/settings', AUTHENTICATED],
     ['PATCH /api/sandbox/settings', ADMIN],
     ['GET /api/secrets', ADMIN],
+    // MCP client OAuth loopback. Daemon bearer still applies via checkAuth.
+    ['GET /api/mcp/oauth/callback', ADMIN],
     ['PUT /api/secrets/:name', ADMIN],
     ['DELETE /api/secrets/:name', ADMIN],
     ['GET /api/skills/settings', AUTHENTICATED],

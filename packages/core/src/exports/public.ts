@@ -754,6 +754,8 @@ export { parseMcpHttpConfig, parseMcpHttpEndpoints } from '../mcp/mcp-http-confi
 export type { McpHttpConfigParse, McpHttpEndpoint, McpHttpTransport } from '../mcp/mcp-http-config.js';
 export { McpHttpSession, isLegacySseEndpointError, redactSecrets } from '../mcp/mcp-http.js';
 export type { McpHttpSessionOptions } from '../mcp/mcp-http.js';
+export { finishMcpHttpOAuth } from '../mcp/mcp-oauth.js';
+export type { McpOAuthFinishInput, McpOAuthFinishResult } from '../mcp/mcp-oauth.js';
 export { ExtensionRegistry, createExtensionRegistry } from '../extensions/extension-registry.js';
 export type {
   ExtensionPhase,
