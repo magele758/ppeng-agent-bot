@@ -743,3 +743,8 @@ export type {
   ExtensionHandlerFn,
   ExtensionSpec
 } from '../extensions/extension-registry.js';
+
+export { readLcuSettings, writeLcuSettings, LCU_SETTINGS_KEY } from '../computer-use/settings.js';
+export { LcuComputerUseProvider, defaultLcuCommand } from '../computer-use/lcu-provider.js';
+export type { LcuSettings } from '../computer-use/settings.js';
+export type { LcuClient, LcuDeps } from '../computer-use/lcu-provider.js';

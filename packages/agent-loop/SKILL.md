@@ -184,3 +184,7 @@ Jev 不是 SDK 模块：未配置入口时宿主不调用它，SDK 接入参数�
    npm run test    # vitest 测试
    ```
 7. **同步更新 Skill**：**核心指令——任何对 API 导出、档位或核心契约的改动，必须同步更新本文件（`skills/agent-loop/SKILL.md`）与 `references/`**。
+
+### Multimodal tool observations
+
+`ToolExecutionResult.images?: ImagePart[]` carries host-ingested image asset references (not raw base64). `executeSingleTool` preserves them. `processToolResults` writes every paired tool result before appending one explicitly labeled tool-observation image message, so parallel tool waves stay valid for model providers. The host supplies image ingestion and `resolveImageDataUrl`; the portable loop imports no desktop runtime. Test: `src/runtime/tool-loop.test.ts` multimodal observations.

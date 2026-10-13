@@ -245,6 +245,7 @@ function buildSkillCatalogBlock(
 }
 
 export interface PromptBuilderDeps {
+  runtimeInstructions?: (sessionId: string) => string;
   store: SqliteStateStore;
   repoRoot: string;
   /** When set, approved user skills under `<stateDir>/skills` are merged in. */
@@ -511,7 +512,7 @@ export class PromptBuilder {
   async buildSystemPrompt(ctx: PromptContext, messages: SessionMessage[]): Promise<string> {
     const stablePrefix = this.buildStablePrefix(ctx);
     const dynamicContext = await this.buildDynamicContext(ctx, messages);
-    return [stablePrefix, dynamicContext].filter(Boolean).join('\n\n---\n\n');
+    return [stablePrefix, dynamicContext, this.deps.runtimeInstructions?.(ctx.session.id)].filter(Boolean).join('\n\n---\n\n');
   }
 
   async allSkills(): Promise<SkillSpec[]> {

@@ -4,6 +4,10 @@
  */
 
 import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { LcuComputerUseProvider, type LcuDeps } from './computer-use/lcu-provider.js';
+import { createLcuApprovalHandler } from './computer-use/approval.js';
+import { readLcuSettings } from './computer-use/settings.js';
 import { createLogger } from './logger.js';
 import { NotFoundError, ValidationError } from './errors.js';
 import type { AgentSandbox } from './sandbox/agent-sandbox-types.js';
@@ -175,6 +179,8 @@ import {
 import type { CronJobRecord } from './cron/cron-store.js';
 
 export interface RuntimeOptions {
+  /** Optional native transport seam for embedders and isolated protocol tests. */
+  computerUseClientFactory?: LcuDeps['clientFactory'];
   repoRoot: string;
   stateDir: string;
   modelAdapter?: ModelAdapter;
@@ -250,6 +256,7 @@ export class RawAgentRuntime {
   >();
   private readonly envApprovalPolicy: ApprovalPolicy | undefined;
   private readonly mcpManager: McpManager;
+  readonly computerUse: LcuComputerUseProvider;
   private filePolicyCache: FileApprovalPolicy | undefined | null = null;
   private readonly socialSchedule: SocialScheduleService;
   private readonly autonomousScheduler: AutonomousScheduler;
@@ -306,6 +313,7 @@ export class RawAgentRuntime {
       stateDir: this.stateDir,
       extraSkills: [...(options.extraSkills ?? []), ...mergedPlugins.skills],
       cloudSkillsLoader: options.cloudSkillsLoader,
+      runtimeInstructions: (sessionId) => this.computerUse?.instructionsForSession(sessionId) ?? '',
     });
 
     const collab = createRuntimeCollaborators({
@@ -447,6 +455,17 @@ export class RawAgentRuntime {
       })
     );
     this.mcpManager = new McpManager({ stateDir: this.stateDir, tools: this.tools, env: process.env, log: this.log });
+    this.computerUse = new LcuComputerUseProvider({
+      clientFactory: options.computerUseClientFactory,
+      enabled: () => readLcuSettings(this.store).enabled,
+      command: () => readLcuSettings(this.store).command,
+      saveImage: async (sessionId, image) => {
+        if (!image.data || !image.mimeType) throw new Error('LCU returned an incomplete image');
+        const asset = await this.ingestImageBase64(sessionId, { dataBase64: image.data, mimeType: image.mimeType });
+        return { type: 'image', assetId: asset.id, mimeType: asset.mimeType, alt: 'LCU desktop observation' };
+      },
+      requestApproval: createLcuApprovalHandler(this.store),
+    });
   }
 
   /** Tick due cron jobs: append prompt to owning session and enqueue a run. */
@@ -1192,14 +1211,25 @@ export class RawAgentRuntime {
         emit: (event) => this.emitTrace(sessionId, event)
       },
       () =>
-        (kernelVariant === 'ppeng'
+        (async () => {
+          try {
+            await this.computerUse.beginTurn(sessionId, randomUUID());
+            for (const tool of this.computerUse.tools()) {
+              const index = this.tools.findIndex(item => item.name === tool.name);
+              if (index >= 0) this.tools[index] = tool; else this.tools.push(tool);
+            }
+            return await (kernelVariant === 'ppeng'
           ? runSessionKernelPpeng(coreHost, sessionId, ppengOptions)
           : createAssembledLoop({
               preset: assemblyPreset,
               io: l5ToAssembledIo(this.l5()),
               hooks,
               config: coreHost.loopConfig
-            }).then((assembled) => assembled.run(sessionId, agentLoopOptions)))
+            }).then((assembled) => assembled.run(sessionId, agentLoopOptions)));
+          } finally {
+            await this.computerUse.endTurn(sessionId, this.sessionAbortControllers.get(sessionId)?.signal.aborted ? 'Interrupt' : 'Stop');
+          }
+        })()
     )
       .catch((err: unknown) => {
         if (err instanceof NotFoundError) throw err;
@@ -1243,6 +1273,7 @@ export class RawAgentRuntime {
 
   /** Gracefully shut down all in-flight work, MCP sessions, and release SQLite. */
   async destroy(): Promise<void> {
+    await this.computerUse.close();
     await destroyRuntime({
       sessionAbortControllers: this.sessionAbortControllers,
       backgroundJobAborts: this.backgroundJobAborts,

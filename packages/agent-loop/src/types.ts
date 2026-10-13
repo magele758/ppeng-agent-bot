@@ -244,6 +244,8 @@ export interface RunContext {
 export interface ToolExecutionResult {
   ok: boolean;
   content: string;
+  /** Host-ingested screenshots, forwarded to the model after the full tool-result wave. */
+  images?: ImagePart[];
   artifacts?: TaskArtifact[];
   metadata?: Record<string, unknown>;
 }

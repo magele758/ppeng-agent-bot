@@ -237,3 +237,16 @@ describe('filterValidToolCalls', () => {
     expect(first.parts[0]).toMatchObject({ type: 'tool_result', ok: false });
   });
 });
+
+describe('multimodal tool observations', () => {
+  it('keeps screenshots after every paired tool result [AC:lcu-computer-use#AC-3]', async () => {
+    const h = host();
+    const image = { type: 'image' as const, assetId: 'screenshot', mimeType: 'image/png' };
+    const r = await executeSingleTool(h, [tool('desktop', async () => ({ ok: true, content: 'observed', images: [image] }))], call('desktop', {}, 'image-call'), ctx, false, 's1');
+    expect(r.images).toEqual([image]);
+    const { processToolResults } = await import('./tool-loop.js');
+    processToolResults(h, [r, { toolCallId: 'other-call', name: 'other', ok: true, content: 'done' }], [], ctx.session, undefined, 's1');
+    expect(h.appended.map((m: any) => m.role)).toEqual(['tool','tool','user']);
+    expect((h.appended[2] as any).parts).toContainEqual(image);
+  });
+});

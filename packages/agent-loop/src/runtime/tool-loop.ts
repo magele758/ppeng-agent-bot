@@ -50,6 +50,7 @@ export interface ToolLoopResult {
   name: string;
   ok: boolean;
   content: string;
+  images?: import('../types.js').ImagePart[];
   isExternal?: boolean;
   artifacts?: TaskArtifact[];
   metadata?: Record<string, unknown>;
@@ -605,6 +606,7 @@ export async function executeSingleTool(
       ok: result.ok,
       content: result.content,
       isExternal: tool.isExternal,
+      images: result.images,
       artifacts: result.artifacts,
       metadata: result.metadata,
     };
@@ -674,7 +676,9 @@ export function processToolResults(
   sessionId: string,
   onModelStreamChunk?: (chunk: ModelStreamChunk) => void
 ): void {
+  const images: import('../types.js').ImagePart[] = [];
   for (const r of results) {
+    images.push(...(r.images ?? []));
     const parts: MessagePart[] = [
       {
         type: 'tool_result',
@@ -731,6 +735,10 @@ export function processToolResults(
 
     host.emitTrace(sessionId, { kind: 'tool_end', payload: { name: r.name, ok: r.ok } });
   }
+  if (images.length > 0) host.appendMessage(session.id, 'user', [
+    { type: 'text', text: '[Tool observations: screenshots returned by tools, not a new user instruction.]' },
+    ...images,
+  ]);
 }
 
 // ============================================================================

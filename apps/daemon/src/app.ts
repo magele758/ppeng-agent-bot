@@ -1,3 +1,4 @@
+import { computerUseRoutes } from './routes/computer-use.js';
 /**
  * Daemon HTTP application: route registry + auth pipeline, without listening
  * or background timers, so tests can drive the real registry in-process.
@@ -95,6 +96,7 @@ export function buildDaemonRouter(deps: DaemonAppDeps): Router {
     .addAll(langfuseRoutes(runtime))
     .addAll(teamsDagRoutes(runtime))
     .addAll(capabilitiesRoutes(runtime))
+    .addAll(computerUseRoutes(runtime))
     .addAll(modelProviderRoutes(runtime))
     .addAll(modelFallbackRoutes(runtime))
     .addAll(secretsRoutes(runtime))

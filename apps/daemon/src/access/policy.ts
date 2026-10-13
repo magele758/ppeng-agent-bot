@@ -340,6 +340,8 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
     ['PATCH /api/browser/settings', ADMIN],
     ['GET /api/web/settings', AUTHENTICATED],
     ['PATCH /api/web/settings', ADMIN],
+    ['GET /api/computer-use/settings', AUTHENTICATED],
+    ['PATCH /api/computer-use/settings', ADMIN],
     ['GET /api/capabilities/settings', AUTHENTICATED],
     ['PATCH /api/capabilities/settings', ADMIN],
     ['GET /api/capabilities/cbom', AUTHENTICATED],
