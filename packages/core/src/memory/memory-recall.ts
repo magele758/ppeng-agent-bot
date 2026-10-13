@@ -131,7 +131,7 @@ function categoryOf(item: AgentMemory): string {
 export function recallProgressive(ctx: RecallContext): RecallSources {
   const query = (ctx.query || '').trim();
   let userProfile = '';
-  if (ctx.userId) {
+  if (ctx.userId && !ctx.agentId?.startsWith('room:')) {
     userProfile = renderUserProfile(ctx.store.getUserProfile(ctx.userId));
   }
 

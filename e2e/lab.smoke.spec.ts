@@ -12,7 +12,7 @@ test.describe('Agent Lab console', () => {
     await expect(nav.getByRole('link', { name: '对话' })).toHaveAttribute('aria-current', 'page');
   });
 
-  test('chat and bot surfaces coexist', async ({ page }) => {
+  test('chat and bot surfaces coexist with the default coordinator [AC:default-super-bot#AC-1]', async ({ page, request }) => {
     await page.goto('/');
     await expect(page.locator('#playSurfaceChat')).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('#botSelect')).toHaveCount(0);
@@ -22,7 +22,9 @@ test.describe('Agent Lab console', () => {
     await expect(page.locator('#playSurfaceBot')).toHaveAttribute('aria-selected', 'true');
     const botSelect = page.locator('#botSelect');
     await expect(botSelect).toBeVisible();
-    await expect(botSelect).toHaveValue('');
+    // Authorized default-Super behavior replaces the former empty selection.
+    const { bot: defaultBot } = await (await request.get('/api/bot-work/default')).json();
+    await expect(botSelect).toHaveValue(defaultBot.id);
     await expect(botSelect.locator('option').first()).toHaveText('选择 Bot');
     await expect(page.locator('.chat-composer-dock').getByRole('button', { name: '新建 Bot' })).toHaveCount(0);
     await page.locator('#playSurfaceChat').click();

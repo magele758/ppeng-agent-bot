@@ -1,3 +1,5 @@
+import { BotQueueCapacityError, enqueueBotMessage } from '../bots/bot-work.js';
+import { botDefinitionOwner, principalFromSession } from '../bots/bot-identity.js';
 /**
  * Canonical Bot Chat only: deliver a composed message into another bot's
  * canonical session and, when that session is idle, wake it with the same
@@ -8,12 +10,12 @@ import { findSimilarToolName } from '@ppeng/agent-loop/recovery';
 import type { BotRecord } from '../bots/types.js';
 import { CANONICAL_BOT_CHAT_META } from '../bots/types.js';
 import type { Logger } from '../logger.js';
-import { startIdleSessionRun } from '../runtime/scheduler-host.js';
-import { getPermissionMode, mergeSessionMetadata, textPart } from '../runtime/session-facade.js';
+import { getPermissionMode } from '../runtime/session-facade.js';
 import type { SqliteStateStore } from '../storage.js';
 import type { RunContext, SessionRecord, ToolContract, ToolExecutionResult } from '../types.js';
 
-export const MESSAGE_AGENT_TOOL_NAME = 'message_agent';
+import { MESSAGE_AGENT_TOOL_NAME } from '../bots/bot-tool-names.js';
+export { MESSAGE_AGENT_TOOL_NAME } from '../bots/bot-tool-names.js';
 export const MESSAGE_MAX_CHARS = 4000;
 export const RELAY_HOP_META = 'relayHop';
 /** Id of the relayed user message that `relayHop` belongs to; the hop is stale once any later user message lands. */
@@ -85,11 +87,6 @@ export function wantsWake(raw: unknown): boolean {
   return !(typeof raw === 'string' && WAKE_OFF_STRINGS.has(raw.trim().toLowerCase()));
 }
 
-/** Ended chats a human message would simply re-run (`runSession` has no status gate). */
-function isReviveableStatus(status: SessionRecord['status']): boolean {
-  return status === 'failed' || status === 'completed';
-}
-
 export function formatBotMessage(sender: { name: string; id: string }, body: string): string {
   return `Message from ${sender.name} / ${sender.id}: ${body}`;
 }
@@ -127,38 +124,6 @@ function senderBot(store: SqliteStateStore, session: SessionRecord): BotRecord |
   return bot;
 }
 
-function ownerField(session: { metadata?: Record<string, unknown> | null }, key: 'userId' | 'tenantId'): string {
-  const raw = session.metadata?.[key];
-  return typeof raw === 'string' ? raw.trim() : '';
-}
-
-/** A destination owned by someone else must never receive this sender's message. */
-export function crossesOwner(sender: SessionRecord, destination: SessionRecord): boolean {
-  for (const key of ['userId', 'tenantId'] as const) {
-    const dest = ownerField(destination, key);
-    if (dest && dest !== ownerField(sender, key)) return true;
-  }
-  return false;
-}
-
-export function resolveDeliverySession(
-  store: SqliteStateStore,
-  target: BotRecord,
-  senderUserId: string | undefined
-): SessionRecord | undefined {
-  const userId = senderUserId?.trim();
-  if (userId) {
-    const mine = store.listSessions().find(
-      (session) =>
-        session.metadata?.botId === target.id &&
-        isCanonicalBotChatSession(session) &&
-        session.metadata?.userId === userId
-    );
-    if (mine) return mine;
-  }
-  return store.getSession(target.canonicalSessionId);
-}
-
 function resolveRosterBot(roster: BotRecord[], raw: string): BotRecord | undefined {
   const want = raw.trim().replace(/^@+/, '');
   if (!want) return undefined;
@@ -177,6 +142,8 @@ export function createMessageAgentTool(host: MessageAgentHost): ToolContract<{
   target?: string;
   message?: string;
   wake?: boolean;
+  idempotencyKey?: string;
+  replyTo?: string;
 }> {
   return {
     name: MESSAGE_AGENT_TOOL_NAME,
@@ -192,7 +159,7 @@ export function createMessageAgentTool(host: MessageAgentHost): ToolContract<{
       'Set wake=false for a note that needs no action: it is stored but the bot is NOT woken and sees it on its next run. ' +
       'wake is the only switch (default true); wording such as "FYI" in the message does not change it. ' +
       'A bot whose last run failed or ended is restarted by a waking message. ' +
-      'If the bot is busy (running) or waiting for human approval the message is not written and you get a structured error; do not retry in a loop. ' +
+      'Busy or waiting-approval bots durably accept queued messages and process them when ready. ' +
       `The message body is at most ${MESSAGE_MAX_CHARS} characters.`,
     inputSchema: {
       type: 'object',
@@ -205,6 +172,8 @@ export function createMessageAgentTool(host: MessageAgentHost): ToolContract<{
           type: 'string',
           description: `What you want that bot to know or do (max ${MESSAGE_MAX_CHARS} characters). Do not include a "Message from" prefix.`
         },
+        idempotencyKey: { type: 'string', description: 'Stable key for safe retries of this exact message.' },
+        replyTo: { type: 'string', description: 'Original message id when replying.' },
         wake: {
           type: 'boolean',
           description:
@@ -231,7 +200,7 @@ export function createMessageAgentTool(host: MessageAgentHost): ToolContract<{
 async function deliverMessageAgent(
   host: MessageAgentHost,
   context: RunContext,
-  args: { target?: string; message?: string; wake?: unknown }
+  args: { target?: string; message?: string; wake?: unknown; idempotencyKey?: string; replyTo?: string }
 ): Promise<ToolExecutionResult> {
   const live = host.store.getSession(context.session.id) ?? context.session;
   if (!isCanonicalBotChatSession(live)) {
@@ -256,7 +225,15 @@ async function deliverMessageAgent(
     });
   }
 
-  const roster = host.store.listBots().filter((bot) => bot.id !== sender.id);
+  const principal = principalFromSession(host.store, live);
+  const installation = principalFromSession(host.store, {metadata:{}});
+  const roster = host.store.listBots({ includeHidden: true }).filter(bot => {
+    if(bot.id===sender.id)return false;
+    const canonical=host.store.getSession(bot.canonicalSessionId);
+    const owner=canonical?principalFromSession(host.store,canonical):botDefinitionOwner(host.store,bot.id);
+    if(!owner)return false;
+    return (owner.userId===principal.userId&&(owner.tenantId??'')===(principal.tenantId??'')) || owner.userId===installation.userId;
+  });
   const names = rosterNames(roster);
   const targetRaw = typeof args.target === 'string' ? args.target : '';
   const messageRaw = typeof args.message === 'string' ? args.message : '';
@@ -303,6 +280,8 @@ async function deliverMessageAgent(
         roster: names
       });
     }
+    const foreign=resolveRosterBot(host.store.listBots({includeHidden:true}),targetRaw);
+    if(foreign)return toolJson(false,{error:'Target is not authorized for this principal',error_code:'TARGET_OWNER_MISMATCH'});
     return toolJson(false, {
       error: `No roster bot matches target '${targetRaw.trim()}'.`,
       error_code: 'UNKNOWN_TARGET',
@@ -311,93 +290,17 @@ async function deliverMessageAgent(
     });
   }
 
-  const senderUserId = ownerField(live, 'userId') || undefined;
-  const destination = resolveDeliverySession(host.store, target, senderUserId);
-  if (!destination || !isCanonicalBotChatSession(destination) || destination.agentId !== target.id) {
-    return toolJson(false, {
-      error: `Canonical session for bot '${target.name}' is missing. Message was not sent.`,
-      error_code: 'TARGET_SESSION_MISSING',
-      targetId: target.id
-    });
+  const skip = !wantsWake(args.wake) ? 'wake_false' : isSilenceToken(body) ? 'silent' : null;
+  try {
+    const previous = host.store.getSession(target.canonicalSessionId)?.status;
+    const accepted = enqueueBotMessage(host, { principal, senderBotId: sender.id, targetBotId: target.id,
+      message: body, wake: !skip, relayHop: hop + 1, idempotencyKey: args.idempotencyKey, replyTo: args.replyTo });
+    return toolJson(true, { ...accepted, delivered: !accepted.queued, targetId: target.id, targetName: target.name,
+      ...(accepted.startedRun && (previous === 'failed' || previous === 'completed') ? { revivedFrom: previous } : {}),
+      relayHop: hop + 1, woke: accepted.startedRun, ...(skip ? { skippedRun: skip } : {}),
+      note: accepted.queued ? 'Accepted durably and queued until the recipient can execute.' : `Delivered and ${accepted.startedRun ? 'woke it' : 'did NOT wake it'}${previous === 'failed' || previous === 'completed' ? ` (previous run had ${previous})` : ''}. Its reply is NOT returned to this call; use tracked delegation for results.` });
+  } catch (error) {
+    if(error instanceof BotQueueCapacityError)return toolJson(false,{accepted:false,retryable:true,error_code:error.code,error:error.message,usage:error.usage,limits:error.limits});
+    return toolJson(false, { error: error instanceof Error ? error.message : String(error), error_code: error instanceof Error && /principal|belongs/i.test(error.message) ? 'TARGET_OWNER_MISMATCH' : 'DELIVERY_FAILED', targetId: target.id });
   }
-  if (destination.id === live.id) {
-    return toolJson(false, {
-      error: "You can't message yourself. Pick another bot from the roster.",
-      error_code: 'SELF_TARGET',
-      did_you_mean: null,
-      roster: names
-    });
-  }
-  if (crossesOwner(live, destination)) {
-    return toolJson(false, {
-      error: `Bot '${target.name}' has no Bot Chat for your user. Message was not sent.`,
-      error_code: 'TARGET_OWNER_MISMATCH',
-      targetId: target.id
-    });
-  }
-
-  // Everything below is synchronous: no other tool call can interleave between the status
-  // check, the write, and the wake.
-  const fresh = host.store.getSession(destination.id) ?? destination;
-  if (fresh.status === 'running' || host.isSessionRunning?.(fresh.id)) {
-    return toolJson(false, {
-      error: `Bot '${target.name}' is busy (session running). The message was not written.`,
-      error_code: 'TARGET_BUSY',
-      targetId: target.id,
-      targetName: target.name,
-      sessionId: fresh.id
-    });
-  }
-  if (fresh.status !== 'idle' && !isReviveableStatus(fresh.status)) {
-    const pendingApprovalIds =
-      fresh.status === 'waiting_approval'
-        ? host.store
-            .listApprovals({ status: 'pending' })
-            .filter((approval) => approval.sessionId === fresh.id)
-            .map((approval) => approval.id)
-        : [];
-    return toolJson(false, {
-      error:
-        fresh.status === 'waiting_approval'
-          ? `Bot '${target.name}' is waiting for human approval, so the message was not written. A person must approve or reject its pending tool call(s) in Lab (approvals page) before it can receive messages; do not retry in a loop.`
-          : `Bot '${target.name}' is not idle (status ${fresh.status}). The message was not written.`,
-      error_code: 'TARGET_NOT_IDLE',
-      targetId: target.id,
-      targetName: target.name,
-      sessionId: fresh.id,
-      status: fresh.status,
-      ...(pendingApprovalIds.length ? { approvalIds: pendingApprovalIds } : {})
-    });
-  }
-
-  const nextHop = hop + 1;
-  const written = host.store.appendMessage(fresh.id, 'user', [textPart(formatBotMessage(sender, body))]);
-  mergeSessionMetadata(host.store, fresh.id, {
-    [RELAY_HOP_META]: nextHop,
-    [RELAY_HOP_MESSAGE_META]: written.id
-  });
-
-  const skip: 'silent' | 'wake_false' | null = !wantsWake(args.wake)
-    ? 'wake_false'
-    : isSilenceToken(body)
-      ? 'silent'
-      : null;
-  const revivedFrom = !skip && fresh.status !== 'idle' ? fresh.status : undefined;
-  const wakeTarget = revivedFrom ? host.store.updateSession(fresh.id, { status: 'idle' }) : fresh;
-  const startedRun = skip ? false : startIdleSessionRun(host, wakeTarget, `message_agent:${sender.id}`);
-  const note = startedRun
-    ? `Delivered to ${target.name} and woke it${revivedFrom ? ` (its previous run had ${revivedFrom}; it was restarted)` : ''}. It works in its own chat with its own permissions; its reply is NOT returned to this call.`
-    : `Delivered to ${target.name} but did NOT wake it (${skip ?? 'not started'}); it sees the message on its next run. No reply is returned to this call.`;
-  return toolJson(true, {
-    delivered: true,
-    targetId: target.id,
-    targetName: target.name,
-    sessionId: fresh.id,
-    relayHop: nextHop,
-    startedRun,
-    woke: startedRun,
-    ...(skip ? { skippedRun: skip } : {}),
-    ...(revivedFrom ? { revivedFrom } : {}),
-    note
-  });
 }

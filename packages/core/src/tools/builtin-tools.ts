@@ -36,7 +36,8 @@ import {
   type SessionMessage,
   type TaskRecord,
   type TodoItem,
-  type ToolContract
+  type ToolContract,
+  type ToolExecutionResult
 } from '../types.js';
 import { retrieveStoredToolResult, resolveToolResultLookup } from '../session/tool-result-retrieve.js';
 import { createArtifactTools } from './artifact-tools.js';
@@ -205,11 +206,11 @@ function workEvidenceDiffCap(): number {
   return Math.min(n, 2_000_000);
 }
 
-function shellOutput(
+function shellExecution(
   command: string,
   cwd: string,
   options?: { timeoutMs?: number; signal?: AbortSignal; sessionId?: string; workspace?: string | string[] }
-): Promise<string> {
+): Promise<ToolExecutionResult> {
   const sandbox = getAgentSandbox();
   return sandbox
     .execute({
@@ -221,11 +222,12 @@ function shellOutput(
       sessionId: options?.sessionId
     })
     .then((result) => {
-    if (options?.signal?.aborted) return '(command aborted)';
+    if (options?.signal?.aborted) return {ok:false, content:'(command aborted)', metadata:{exitCode:result.code, signal:result.signal}};
     const combined = [result.stdout.trim(), result.stderr.trim()].filter(Boolean).join('\n');
-    const raw = combined || `(command exited with ${result.code ?? 0} and no output)`;
+    const raw = combined || `(command exited with ${result.code ?? result.signal ?? 'unknown'} and no output)`;
     // P0 return-path redaction: injected/host secret values must not flow back to the model.
-    return redactToolContent(raw, process.env);
+    const ok = result.code === 0 && result.signal === null;
+    return {ok, content:redactToolContent(ok ? raw : `${raw}\n[exit_code=${result.code ?? 'unknown'}; signal=${result.signal ?? 'none'}]`, process.env), metadata:{exitCode:result.code, signal:result.signal}};
   });
 }
 
@@ -708,15 +710,12 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
           : Number.isFinite(envDefault) && envDefault > 0
             ? envDefault
             : 120_000;
-      return {
-        ok: true,
-        content: await shellOutput(args.command, primaryWorkspacePath(context), {
+      return shellExecution(args.command, primaryWorkspacePath(context), {
           timeoutMs,
           signal: context.abortSignal,
           sessionId: context.session.id,
           workspace: sandboxWorkspaceRoots(context)
-        })
-      };
+        });
     }
   };
 

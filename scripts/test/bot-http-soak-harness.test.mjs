@@ -1,0 +1,14 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtempSync,rmSync,readFileSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {runHttpSoak} from '../bot-release/http-soak.mjs';
+test('real HTTP soak fixture preserves planned burst counts, input evidence and refusal of 24h acceptance [AC:bot-release-readiness#AC-3]',{timeout:90000},async()=>{
+ const directory=mkdtempSync(join(tmpdir(),'http-soak-test-'));
+ try{const report=await runHttpSoak({smoke:true,smokeSeconds:8,out:join(directory,'report.json')});assert.equal(report.fixturePassed,true,JSON.stringify(report.errors));assert.equal(report.fullProtocol,false);assert.equal(report.referenceHardwareMatched,false);assert.equal(report.counts.offeredReads,320);assert.equal(report.counts.offeredWrites,34);assert.equal(report.counts.hotWrites,10);assert.equal(report.readCount,320);assert.equal(report.activeBotIds.length,10);assert.ok(report.approvalSamples.count>0);assert.ok(report.approvalSamples.minDelayMs>=5000);assert.equal(report.scheduling.passed,true);assert.equal(report.daemonExit.code,0);assert.deepEqual(report.metrics.duplicateSoftwareKeys,[]);assert.match(report.releaseAcceptance,/NOT ACCEPTED/);assert.equal(JSON.parse(readFileSync(join(directory,'report.json'))).status,'completed');}finally{rmSync(directory,{recursive:true,force:true});}
+});
+for(const fixtureFault of ['startup','mid-run-signal','shutdown-hang'])test('HTTP soak fails closed for '+fixtureFault+' [AC:bot-release-readiness#AC-3]',{timeout:90000},async()=>{
+ const directory=mkdtempSync(join(tmpdir(),'http-soak-failure-'));
+ try{const report=await runHttpSoak({smoke:true,smokeSeconds:8,fixtureFault,out:join(directory,'report.json')});assert.equal(report.fixturePassed,false);assert.equal(report.fullProtocol,false);assert.match(report.releaseAcceptance,/NOT ACCEPTED/);assert.ok(report.daemonExit);assert.ok(report.errors.length>0||report.daemonExit.code!==0);if(fixtureFault==='mid-run-signal')assert.ok(report.errors.some(row=>row.phase==='signal'));if(fixtureFault==='shutdown-hang')assert.equal(report.daemonExit.signal,'SIGKILL');assert.equal(JSON.parse(readFileSync(join(directory,'report.json'))).status,'failed');}finally{rmSync(directory,{recursive:true,force:true});}
+});

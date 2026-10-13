@@ -37,7 +37,7 @@ export const MODEL_PROVIDER_PRESETS: ModelProviderPreset[] = [
   { id: 'custom', label: '自定义', kind: 'openai-compatible', baseUrl: '' }
 ];
 
-export type PublicCatalogModel = { id: string; ownedBy?: string; enabled: boolean };
+export type PublicCatalogModel = { contextWindow?:number; id: string; ownedBy?: string; enabled: boolean };
 
 export type PublicModelProvider = {
   id: string;

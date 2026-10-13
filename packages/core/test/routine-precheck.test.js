@@ -68,7 +68,8 @@ test('谓词与脚本返回 wakeAgent false 时不开始模型回合 [AC:bot-gat
   due(host, predJob);
   await tickCronJobs(host);
   assert.deepEqual(runs, []);
-  assert.equal(store.listMessages(sessionId).length, before);
+  assert.equal(store.listMessages(sessionId).filter(m=>m.role==='user').length, before);
+  assert.ok(store.listMessages(sessionId).every(m=>m.role==='assistant'));
 
   const file = join(dir, 'empty.txt');
   writeFileSync(file, '');
@@ -93,7 +94,8 @@ test('谓词与脚本返回 wakeAgent false 时不开始模型回合 [AC:bot-gat
   due(host, scriptJob);
   await tickCronJobs(host);
   assert.deepEqual(runs, []);
-  assert.equal(store.listMessages(sessionId).length, before);
+  assert.equal(store.listMessages(sessionId).filter(m=>m.role==='user').length, before);
+  assert.ok(store.listMessages(sessionId).every(m=>m.role==='assistant'));
   store.db.close();
 });
 
@@ -141,7 +143,9 @@ test('预检要求唤醒、没有预检、或没有明确拒绝时仍开始模�
   await tickCronJobs(host);
 
   assert.equal(runs.length, 4);
-  assert.ok(store.listMessages(bot.canonicalSessionId).some((m) => m.role === 'user' && JSON.stringify(m).includes('直接跑')));
+  assert.ok(runs.every(id=>id!==bot.canonicalSessionId));
+  assert.ok(store.listMessages(runs[0]).some((m) => m.role === 'user' && JSON.stringify(m).includes('直接跑')));
+  assert.ok(!store.listMessages(bot.canonicalSessionId).some(m=>m.role==='user'));
   store.db.close();
 });
 

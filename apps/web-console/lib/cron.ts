@@ -6,8 +6,10 @@ export type CronJobInfo = {
   agentId: string;
   name: string;
   prompt: string;
-  scheduleKind: 'every_ms' | 'cron5' | 'once_at';
+  scheduleKind: 'every_ms' | 'cron5' | 'once_at' | 'event';
   scheduleValue: string;
+  timezone?:string;
+  missedPolicy?:'coalesce'|'skip'|'catch_up';
   enabled: boolean;
   lastRunAt?: string;
   nextRunAt?: string;

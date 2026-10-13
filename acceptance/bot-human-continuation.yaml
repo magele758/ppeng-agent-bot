@@ -1,0 +1,31 @@
+id: bot-human-continuation
+title: Bot忙时接收与连续对话
+status: implemented
+requirement: |
+  补齐既定G01/G07持续对话中的忙时接收，承接用户已授权完整实施。
+notes: 用户明确要求继续补齐；父agent确认真实HTTP末轮缺口，授权实现。
+criteria:
+  - id: AC-1
+    given: Bot正在生成当前回合最后的回复
+    when: 用户发送明确要求运行的新消息
+    then: 新消息被持久接收，并在当前回合完成后进入模型输入
+  - id: AC-2
+    given: Bot正在执行工具
+    when: 接收的新消息已进入后续模型轮
+    then: 不为同一输入再自动开启重复回合或重复执行工具
+  - id: AC-3
+    given: Lab中Bot正在生成最后的回复
+    when: 用户发送排队或下一步模式的追问
+    then: 追问在当前回合完成后继续执行，重启后仍可恢复已排队追问
+  - id: AC-4
+    given: 当前回合正在运行
+    when: 新消息仅保存且未请求运行
+    then: 消息被保存，不因当前回合结束而自动执行
+  - id: AC-5
+    given: 对话等待审批、被取消或结果需人工核对
+    when: 有尚未读取的追问
+    then: 不自动绕过审批、取消或核对要求继续执行
+  - id: AC-6
+    given: Bot正在完成委派任务或例行任务
+    when: 新的人类追问开始执行
+    then: 原任务结果先被保存，追问回复不会被误记为原任务结果

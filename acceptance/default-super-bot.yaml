@@ -1,0 +1,52 @@
+id: default-super-bot
+title: 默认 Super Bot 的状态查看、派工与结果汇总
+status: approved
+requirement: |
+  我觉得有几个关键点，你补充分析一下：一个bot是可以持续一直对话的，他的记忆和历史会话管理，现在是否能满足，定时任务，以及跟其他bot的通信的模式，组群会话的能力是否能支持，以及调用各种其他软件的能力，这几个点先补充一下，然后bot模式可以先默认加一个super bot，作为老大，他可以管理以及和任意的bot通信，分多个agent去完成这个分析
+owner: user
+notes: |
+  用户已选择首版管理范围：查看状态、分派任务、联系任意 Bot、汇总结果（建议首版）。
+  本规格只承接默认 Super Bot 的首版行为；群会话和其它专项改进尚未纳入实施范围。
+  任意 Bot 指当前用户有权访问的 Bot；自己隐藏的 Bot 仍可作为明确指定的联系对象。
+  用户明确授权按计划实施；批准不代表已实现。
+criteria:
+  - id: AC-1
+    given: 用户尚未选择过 Bot
+    when: 首次进入 Bot 模式
+    then: 默认选中 Super Bot，并能在它自己的固定对话中开始交流
+  - id: AC-2
+    given: Super Bot 已有对话历史且用户已修改过它的设置
+    when: 重启、升级或再次打开 Bot 模式
+    then: 仍使用原来的 Super Bot，保留历史和设置，不重复创建或覆盖用户已保存的 Bot 选择
+  - id: AC-3
+    given: 用户有多个 Bot，部分正在工作或等待审批
+    when: 用户请 Super Bot 查看团队进度
+    then: Super Bot 能列出用户有权访问的 Bot、各自当前状态及关联任务
+  - id: AC-4
+    given: 用户明确指定一个有权访问的 Bot，包括自己已隐藏的 Bot
+    when: 用户请 Super Bot 联系它
+    then: 消息被交给指定 Bot，保留发送者身份，并能获知是已接收还是等待处理
+  - id: AC-5
+    given: 用户要求 Super Bot 把工作分给多个 Bot
+    when: Super Bot 分派工作
+    then: 每项委派都有明确负责人和可追踪状态，后续回报能对应到原来的委派
+  - id: AC-6
+    given: 被分派工作的 Bot 正在运行或等待审批
+    when: Super Bot 向它派工
+    then: 工作被保存为待处理，待它可执行时继续处理，不因重复通知而重复创建同一项委派
+  - id: AC-7
+    given: Super Bot 正在运行或等待审批
+    when: 其他 Bot 回报某项委派的结果
+    then: 回报被保存，Super Bot 可继续处理时能接收并关联该委派，不丢失回报
+  - id: AC-8
+    given: 委派中既有已完成工作，也有未完成或失败的工作
+    when: 用户请 Super Bot 汇总
+    then: 汇总分别说明成果、未完成事项和失败原因，不把已派发当成已完成
+  - id: AC-9
+    given: Super Bot 已派出工作且部分结果已返回
+    when: 运行进程重启后用户查询进度
+    then: 已保存的委派和结果仍可查询，无法确认完成的工作被明确标为待确认，不冒报成功或自动重复已完成的工作
+  - id: AC-10
+    given: 某个 Bot 的工作需要用户批准
+    when: Super Bot 给它派工或接收回报
+    then: 该 Bot 仍遵循自己的权限设置，Super Bot 不会代替用户批准操作

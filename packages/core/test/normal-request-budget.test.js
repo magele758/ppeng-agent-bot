@@ -365,6 +365,9 @@ test('parallel tool calls in one wave stay paired [AC:normal-session-request-bud
 class RecordingAdapter {
   constructor(summarize) {
     this.name = 'recording';
+    // This fixture models the 131072-token window used by the canonical Bot
+    // criterion; production adapters without a known window use a safe fallback.
+    this.contextWindow = 131072;
     this.inputs = [];
     this.summarize = summarize;
   }

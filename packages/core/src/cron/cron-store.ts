@@ -1,9 +1,12 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { createId, nowIso } from '../id.js';
 import { envBool } from '../env.js';
 import type { ToolContract } from '../types.js';
-import { nextCronRunAt } from './cron-next.js';
+import { principalFromSession } from '../bots/bot-identity.js';
+import type { SqliteStateStore } from '../storage.js';
+import { ValidationError } from '../errors.js';
+import { nextCronRunAt, nextZonedCronRunAt, normalizeRoutineTimezone } from './cron-next.js';
 
 /**
  * First-class agent cron (SQLite-backed file store under stateDir).
@@ -29,6 +32,9 @@ export interface CronJobRecord {
   nextRunAt?: string;
   createdAt: string;
   updatedAt: string;
+  timezone?: string;
+  missedPolicy?: 'coalesce' | 'skip' | 'catch_up';
+  ruleVersion?: number;
   metadata: Record<string, unknown>;
 }
 
@@ -51,14 +57,16 @@ export class CronJobStore {
   private readAll(): CronJobRecord[] {
     try {
       const raw = JSON.parse(readFileSync(this.filePath, 'utf8')) as CronJobRecord[];
-      return Array.isArray(raw) ? raw : [];
+      return Array.isArray(raw) ? raw.map(job=>({...job,timezone:job.timezone??Intl.DateTimeFormat().resolvedOptions().timeZone,missedPolicy:job.missedPolicy??'coalesce',ruleVersion:job.ruleVersion??1})) : [];
     } catch {
       return [];
     }
   }
 
   private writeAll(jobs: CronJobRecord[]): void {
-    writeFileSync(this.filePath, `${JSON.stringify(jobs, null, 2)}\n`, 'utf8');
+    const temporary = `${this.filePath}.${process.pid}.${createId('write')}.tmp`;
+    writeFileSync(temporary, `${JSON.stringify(jobs, null, 2)}\n`, 'utf8');
+    renameSync(temporary, this.filePath);
   }
 
   list(filter?: { sessionId?: string; enabled?: boolean; botId?: string }): CronJobRecord[] {
@@ -145,13 +153,17 @@ export class CronJobStore {
   }
 }
 
-export function createCronTools(getStore: () => CronJobStore): ToolContract<any>[] {
+export function createCronTools(getStore: () => CronJobStore, opts?: {store?:SqliteStateStore;isEnabled?:()=>boolean}): ToolContract<any>[] {
   const createTool: ToolContract<{
     name: string;
     prompt: string;
     every_ms?: number;
     once_at?: string;
     cron?: string;
+    timezone?: string;
+    missedPolicy?: 'coalesce'|'skip'|'catch_up';
+    event?: string;
+    secretEnv?: string;
   }> = {
     name: 'cron_create',
     description:
@@ -163,7 +175,11 @@ export function createCronTools(getStore: () => CronJobStore): ToolContract<any>
         prompt: { type: 'string' },
         every_ms: { type: 'number' },
         once_at: { type: 'string' },
-        cron: { type: 'string', description: '5-field cron expression (stored; tick support is best-effort)' }
+        cron: { type: 'string', description: '5-field cron expression' },
+        timezone:{type:'string',description:'IANA timezone, e.g. Asia/Shanghai'},
+        missedPolicy:{type:'string',enum:['coalesce','skip','catch_up']},
+        event:{type:'string',description:'github/push, slack/message, email/received'},
+        secretEnv:{type:'string',description:'Environment variable name holding event signature secret'}
       },
       required: ['name', 'prompt']
     },
@@ -171,21 +187,28 @@ export function createCronTools(getStore: () => CronJobStore): ToolContract<any>
     sideEffectLevel: 'workspace',
     needsApproval: () => true,
     async execute(context, args) {
+      if(opts?.isEnabled && !opts.isEnabled())return {ok:false,content:'Routine dialog tools are disabled in Lab settings'};
+      const timezone=normalizeRoutineTimezone(args.timezone);
+      if([args.every_ms,args.once_at,args.cron,args.event].filter(v=>v!==undefined).length!==1)throw new ValidationError('choose exactly one schedule');
       let scheduleKind: CronJobRecord['scheduleKind'] = 'every_ms';
       let scheduleValue = '3600000';
       let nextRunAt: string | undefined;
-      if (args.every_ms != null && Number(args.every_ms) > 0) {
+      if (args.every_ms != null && Number.isInteger(args.every_ms) && Number(args.every_ms) >= 1000) {
         scheduleKind = 'every_ms';
         scheduleValue = String(Math.floor(Number(args.every_ms)));
         nextRunAt = new Date(Date.now() + Number(scheduleValue)).toISOString();
       } else if (args.once_at) {
         scheduleKind = 'once_at';
-        scheduleValue = args.once_at;
-        nextRunAt = args.once_at;
+        if(!Number.isFinite(Date.parse(args.once_at)))throw new ValidationError('invalid once_at');
+        scheduleValue = new Date(args.once_at).toISOString();
+        nextRunAt = scheduleValue;
       } else if (args.cron) {
         scheduleKind = 'cron5';
         scheduleValue = args.cron;
-        nextRunAt = nextCronRunAt(args.cron).toISOString();
+        nextRunAt = nextZonedCronRunAt(args.cron,timezone).toISOString();
+      } else if (args.event) {
+        if(!/^(github|slack|email)\/[a-z][a-z0-9_-]{0,64}$/.test(args.event)||!args.secretEnv||!/^[A-Za-z_][A-Za-z0-9_]*$/.test(args.secretEnv))throw new ValidationError('valid event and secretEnv required');
+        scheduleKind='event';scheduleValue=args.event;
       } else {
         return { ok: false, content: 'Provide every_ms, once_at, or cron' };
       }
@@ -197,7 +220,12 @@ export function createCronTools(getStore: () => CronJobStore): ToolContract<any>
         scheduleKind,
         scheduleValue,
         nextRunAt,
+        timezone,
+        missedPolicy:args.missedPolicy??'coalesce',
+        ruleVersion:1,
         metadata: {
+          ...(opts?.store?{principal:principalFromSession(opts.store,context.session)}:{}),
+          ...(args.secretEnv?{secretEnv:args.secretEnv,prompt:args.prompt}:{}),
           ...(typeof context.session.metadata?.botId === 'string'
             ? { botId: context.session.metadata.botId }
             : {})
@@ -217,10 +245,12 @@ export function createCronTools(getStore: () => CronJobStore): ToolContract<any>
     approvalMode: 'never',
     sideEffectLevel: 'none',
     async execute(context, args) {
+      if(opts?.isEnabled && !opts.isEnabled())return {ok:false,content:'Routine dialog tools are disabled in Lab settings'};
       const jobs = getStore().list(
         args.session_only === false ? undefined : { sessionId: context.session.id }
       );
-      return { ok: true, content: JSON.stringify(jobs, null, 2) };
+      const owned=opts?.store?jobs.filter(j=>{const parent=opts.store!.getSession(j.sessionId);return parent?.metadata?.userId===context.session.metadata?.userId&&parent?.metadata?.tenantId===context.session.metadata?.tenantId}):jobs;
+      return { ok: true, content: JSON.stringify(owned, null, 2) };
     }
   };
 
@@ -235,7 +265,10 @@ export function createCronTools(getStore: () => CronJobStore): ToolContract<any>
     approvalMode: 'auto',
     sideEffectLevel: 'workspace',
     needsApproval: () => true,
-    async execute(_context, args) {
+    async execute(context, args) {
+      if(opts?.isEnabled && !opts.isEnabled())return {ok:false,content:'Routine dialog tools are disabled in Lab settings'};
+      const job=getStore().get(args.id);
+      if(opts?.store&&job){const parent=opts.store.getSession(job.sessionId);if(parent?.metadata?.userId!==context.session.metadata?.userId||parent?.metadata?.tenantId!==context.session.metadata?.tenantId)return {ok:false,content:'Routine not found'};}
       const ok = getStore().remove(args.id);
       return { ok, content: ok ? `Removed ${args.id}` : 'Job not found' };
     }
@@ -256,7 +289,7 @@ export function markCronJobRan(store: CronJobStore, job: CronJobRecord, now = Da
       return store.update(job.id, { lastRunAt, nextRunAt });
     }
     case 'cron5': {
-      const nextRunAt = nextCronRunAt(job.scheduleValue, new Date(now)).toISOString();
+      const nextRunAt = (job.timezone ? nextZonedCronRunAt(job.scheduleValue, job.timezone, new Date(now)) : nextCronRunAt(job.scheduleValue, new Date(now))).toISOString();
       return store.update(job.id, { lastRunAt, nextRunAt });
     }
     case 'event':

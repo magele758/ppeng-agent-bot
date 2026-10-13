@@ -24,6 +24,7 @@ export interface GatedWriteInput {
   sessionId?: string;
   importance?: number;
   source?: string;
+  sourceRefs?: AgentMemory['sourceRefs'];
   kind?: MemoryWriteKind;
   taskContent?: string;
   toolsUsed?: string[];
@@ -66,6 +67,7 @@ export function gatedMemorySet(store: AgentMemoryStore, input: GatedWriteInput):
     agentId: input.agentId?.trim() || undefined,
     importance: input.importance ?? 0.5,
     source: input.source ?? 'gated',
+    sourceRefs: input.sourceRefs,
     confidence: 'medium'
   });
   return { ok: true, reason: gate.reason, entry };
@@ -81,6 +83,7 @@ export function saveSemanticFact(
     content: string;
     importance?: number;
     source?: string;
+  sourceRefs?: AgentMemory['sourceRefs'];
     /** When set, merge and insert stay inside this bot namespace. */
     agentId?: string;
   }
@@ -146,6 +149,7 @@ export function saveSemanticFact(
       agentId: existing.agentId ?? agentId,
       importance: Math.max(existing.importance, input.importance ?? 0.7),
       source: input.source ?? existing.source ?? 'semantic_merge',
+      sourceRefs: [...(existing.sourceRefs ?? []), ...(input.sourceRefs ?? [])],
       confidence: existing.confidence
     });
     return { id: updated.id, merged: true };
@@ -163,6 +167,7 @@ export function saveSemanticFact(
     agentId,
     importance: input.importance ?? 0.7,
     source: input.source ?? 'dialogue_extract',
+    sourceRefs: input.sourceRefs,
     confidence: 'medium'
   });
   return { id: created.id, merged: false };

@@ -251,6 +251,19 @@ export function memoryRoutes(runtime: RawAgentRuntime): RouteSpec[] {
           throw new ValidationError('Missing required fields: scope, key, value');
         }
         const store = getStore(runtime);
+        const sourceRefs = Array.isArray(body.sourceRefs) ? body.sourceRefs.slice(0, 200).map(raw => {
+          if (!raw || typeof raw !== 'object') throw new ValidationError('Invalid memory source reference');
+          const ref = raw as {sessionId?:unknown;messageId?:unknown;seq?:unknown};
+          if (typeof ref.sessionId !== 'string' || typeof ref.messageId !== 'string') throw new ValidationError('Memory source requires session and message');
+          guardSession(runtime, ref.sessionId, auth);
+          const seq = ref.seq;
+          if (seq !== undefined && (typeof seq !== 'number' || !Number.isSafeInteger(seq) || seq < 1)) throw new ValidationError('Memory source sequence must be a positive integer');
+          const message = ref.seq === undefined
+            ? (() => { const found = runtime.getSessionMessages(ref.sessionId).find(message => message.id === ref.messageId); return found?.seq === undefined ? undefined : runtime.store.readHistory(ref.sessionId, found.seq, 0, 0)?.message; })()
+            : runtime.store.readHistory(ref.sessionId, seq as number, 0, 0)?.message;
+          if (!message || message.id !== ref.messageId) throw new ValidationError('Memory source message not found');
+          return {sessionId: ref.sessionId, messageId: message.id, seq: message.seq};
+        }) : undefined;
         const entry = store.set({
           scope: String(body.scope) as MemoryScope,
           namespace: String(body.namespace ?? 'default'),
@@ -261,6 +274,7 @@ export function memoryRoutes(runtime: RawAgentRuntime): RouteSpec[] {
           agentId: body.agentId != null && String(body.agentId).trim() ? String(body.agentId).trim() : undefined,
           importance: body.importance != null ? Number(body.importance) : 0.5,
           source: body.source != null ? String(body.source) : undefined,
+          sourceRefs,
           confidence: (body.confidence as 'low' | 'medium' | 'high' | undefined) ?? 'medium',
           expiresAt: body.expiresAt != null ? String(body.expiresAt) : undefined
         });

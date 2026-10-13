@@ -53,10 +53,12 @@ function httpResult(result: AcceptEventRoutineResult): { status: number; body: u
       ? { status: 400, body: { error: 'Missing delivery id' } }
       : { status: 401, body: { error: 'bad_signature' } };
   }
+  const queueFull = result.outcomes.some((item) => item.status === 'queue_full');
   return {
-    status: 200,
+    status: queueFull ? 429 : 200,
     body: {
-      ok: true,
+      ok: !queueFull,
+      ...(queueFull ? { error: 'queue_full', retryable: true } : {}),
       duplicate: result.outcomes.every((item) => item.status === 'duplicate'),
       wakeAgent: result.outcomes.some((item) => item.status === 'woke' || item.status === 'not_idle'),
       outcomes: result.outcomes.map((item) => ({
@@ -98,7 +100,10 @@ export async function handleEventIngress(
     stateDir: ctx.stateDir,
     log,
     store: ctx.runtime.store,
-    runSession: (sessionId) => ctx.runtime.runSession(sessionId)
+    runSession: (sessionId) => ctx.runtime.runSession(sessionId),
+    isSessionRunning: (sessionId) => ctx.runtime.isSessionRunning?.(sessionId) ?? false,
+    hasUnconfirmedEffects: (sessionId, startedAt) => ctx.runtime.hasUnconfirmedEffects?.(sessionId, startedAt) ?? false,
+    cancelSession: (sessionId) => ctx.runtime.cancelSession?.(sessionId)
   };
   const result = await acceptEventRoutine(host, {
     provider,

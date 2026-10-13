@@ -108,3 +108,59 @@ export function nextCronRunAt(expr: string, from: Date = new Date()): Date {
   }
   throw new ValidationError('cron does not match any time in the next year');
 }
+
+/** Validate once at ingress; schedules never depend on the daemon's local timezone. */
+export function normalizeRoutineTimezone(raw?: string): string {
+  const timezone = raw?.trim() || 'UTC';
+  try { new Intl.DateTimeFormat('en-US', { timeZone: timezone }).format(0); }
+  catch { throw new ValidationError('timezone must be an IANA timezone'); }
+  return timezone;
+}
+
+function zonedParts(date: Date, formatter: Intl.DateTimeFormat): Record<string, number> {
+  return Object.fromEntries(formatter.formatToParts(date).filter(p => p.type !== 'literal').map(p => [p.type, Number(p.value)]));
+}
+/** First occurrence of a wall-clock minute wins during a DST rollback. Missing minutes skip. */
+export function nextZonedCronRunAt(expr: string, timezone: string, from: Date = new Date()): Date {
+  const cron = parseCron5(expr);
+  const zone = normalizeRoutineTimezone(timezone);
+  const formatter = new Intl.DateTimeFormat('en-US', { timeZone: zone, year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', hourCycle: 'h23' });
+  const start = Math.floor(from.getTime() / 60000) * 60000 + 60000;
+  for (let i = 0; i < MAX_SCAN_MINUTES; i++) {
+    const instant = new Date(start + i * 60000);
+    const p = zonedParts(instant, formatter);
+    if (!fieldMatches(cron.minute,p.minute!) || !fieldMatches(cron.hour,p.hour!) || !fieldMatches(cron.month,p.month!)) continue;
+    const domOk = fieldMatches(cron.dom,p.day!);
+    const dowOk = fieldMatches(cron.dow,new Date(Date.UTC(p.year!,p.month!-1,p.day!)).getUTCDay());
+    if (!(cron.dom != null && cron.dow != null ? domOk || dowOk : domOk && dowOk)) continue;
+    const localInstant = Date.UTC(p.year!,p.month!-1,p.day!,p.hour!,p.minute!);
+    const prior = new Date(instant.getTime()-180*60000);
+    const priorParts = zonedParts(prior,formatter);
+    const currentOffset = localInstant-instant.getTime();
+    const priorOffset = Date.UTC(priorParts.year!,priorParts.month!-1,priorParts.day!,priorParts.hour!,priorParts.minute!)-prior.getTime();
+    const rollback = priorOffset-currentOffset;
+    const duplicate = rollback>0 && formatter.format(new Date(instant.getTime()-rollback))===formatter.format(instant);
+    if (!duplicate) return instant;
+  }
+  throw new ValidationError('cron does not match any time in the next year');
+}
+
+/** Report matching nonexistent local minutes at forward timezone transitions. */
+export function skippedZonedCronMinutes(expr:string,timezone:string,from:Date,to:Date):Array<{scheduledAt:string;wallTime:string}> {
+ const cron=parseCron5(expr);const formatter=new Intl.DateTimeFormat('en-US',{timeZone:normalizeRoutineTimezone(timezone),year:'numeric',month:'numeric',day:'numeric',hour:'numeric',minute:'numeric',hourCycle:'h23'});
+ const local=(ms:number)=>{const p=zonedParts(new Date(ms),formatter);return Date.UTC(p.year!,p.month!-1,p.day!,p.hour!,p.minute!)};
+ const offset=(ms:number)=>local(ms)-Math.floor(ms/60000)*60000;
+ const result:Array<{scheduledAt:string;wallTime:string}>=[];const end=to.getTime();
+ let previous=Math.max(from.getTime(),end-366*86400000);previous=Math.floor(previous/60000)*60000;
+ let previousOffset=offset(previous);
+ while(previous<end){const next=Math.min(previous+6*3600000,end);const nextOffset=offset(next);
+  if(nextOffset>previousOffset){let low=previous,high=Math.floor(next/60000)*60000;while(high-low>60000){const mid=Math.floor((low+high)/120000)*60000;if(offset(mid)===previousOffset)low=mid;else high=mid;}
+   const before=local(high-60000);const after=local(high);
+   for(let missing=before+60000;missing<after;missing+=60000){const d=new Date(missing);const dom=fieldMatches(cron.dom,d.getUTCDate()),dow=fieldMatches(cron.dow,d.getUTCDay());
+    if(fieldMatches(cron.minute,d.getUTCMinutes())&&fieldMatches(cron.hour,d.getUTCHours())&&fieldMatches(cron.month,d.getUTCMonth()+1)&&(cron.dom!=null&&cron.dow!=null?dom||dow:dom&&dow))result.push({scheduledAt:new Date(high).toISOString(),wallTime:d.toISOString().slice(0,16)});
+   }
+  }
+  previous=next;previousOffset=nextOffset;
+ }
+ return result;
+}

@@ -1,4 +1,4 @@
-import { sessionOwnerId, type RawAgentRuntime, type ResourceOwnerStore } from '@ppeng/agent-core';
+import { botDefinitionOwner, resolveBotPrincipal, sameBotPrincipal, sessionOwnerId, type RawAgentRuntime, type ResourceOwnerStore } from '@ppeng/agent-core';
 import type { RouteContext } from '../routing.js';
 import type { OwnerRef } from './types.js';
 
@@ -36,9 +36,30 @@ export function registryRef(
   return exists ? owned(owners.ownerOf(kind, id)) : MISSING;
 }
 
+/** Bot definition access is independent of any private canonical session. */
+export function botDefinitionRef(runtime: RawAgentRuntime, id: string | undefined): OwnerRef {
+  const bot = id ? runtime.store.getBot(id) : undefined;
+  if (!bot) return MISSING;
+  const definitionOwner = botDefinitionOwner(runtime.store, bot.id);
+  if (definitionOwner) {
+    return sameBotPrincipal(definitionOwner, resolveBotPrincipal(runtime.store))
+      ? {found: true, ownerId: undefined, unowned: 'allow'}
+      : owned(definitionOwner.userId);
+  }
+  // Legacy rows with intact owner evidence can be inspected and migrated. Missing
+  // evidence fails closed: a deleted private session never turns a definition public.
+  const session = runtime.getSession(bot.canonicalSessionId);
+  if (!session) return {found: true, ownerId: undefined, unowned: 'deny'};
+  const ownerId = sessionOwnerId(session);
+  const installation = resolveBotPrincipal(runtime.store);
+  if (!ownerId || (ownerId === installation.userId && !session.metadata?.tenantId)) {
+    return {found: true, ownerId: undefined, unowned: 'allow'};
+  }
+  return owned(ownerId);
+}
+
 export function botRef(lookups: OwnerLookups, id: string | undefined): OwnerRef {
-  const bot = id ? lookups.runtime.store.getBot(id) : undefined;
-  return bot ? sessionRef(lookups, bot.canonicalSessionId) : MISSING;
+  return botDefinitionRef(lookups.runtime, id);
 }
 
 export function cronJobRef(lookups: OwnerLookups, id: string): OwnerRef {

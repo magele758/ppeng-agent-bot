@@ -1,3 +1,4 @@
+import { resolveBotWindowBudget } from '../session/history/window.js';
 /**
  * Auto-compact + transcript archive, extracted from RawAgentRuntime.
  */
@@ -139,6 +140,7 @@ function persistBotCompactLong(
       agentId,
       importance: 0.55,
       source: 'compact',
+      sourceRefs: older.map(message => ({sessionId: context.session.id, messageId: message.id, seq: message.seq})),
       confidence: 'medium'
     });
   } catch (e) {
@@ -151,6 +153,8 @@ export interface CompactHost {
   stateDir: string;
   modelAdapter: ModelAdapter;
   resolveModelAdapter?(session: SessionRecord): ModelAdapter;
+  /** Actual adapter selected for this attempt (including a fallback). */
+  resolveContextAdapter?(session: SessionRecord): ModelAdapter;
   extensionRegistry: ExtensionRegistry;
   turnShapeBySession: Map<string, { systemPromptChars: number; toolCount: number }>;
   emitTrace(sessionId: string, event: Omit<TraceEvent, 'ts' | 'sessionId'>): void;
@@ -300,7 +304,8 @@ async function compactCanonicalBot(
 
   const viewed = await host.prepareMessagesForModel(session, folded);
   const estimated = estimateMessageTokens(viewed);
-  const thresholds = botCompactTokenThresholds(resolveMaxContextTokens(process.env));
+  const actualAdapter = host.resolveContextAdapter?.(session) ?? host.resolveModelAdapter?.(session) ?? host.modelAdapter;
+  const thresholds = resolveBotWindowBudget(host.store, actualAdapter, host.turnShapeBySession.get(session.id));
   const tier = selectBotCompactTier(estimated, thresholds, opts?.force === true);
   if (!tier) return {};
 
@@ -313,7 +318,7 @@ async function compactCanonicalBot(
   const prior = session.summary?.trim() ?? '';
   const instruction = botCompactInstruction(tier, prior);
   const pruned = pruneLargeToolOutputs(range.older);
-  const adapter = host.resolveModelAdapter?.(session) ?? host.modelAdapter;
+  const adapter = actualAdapter;
   let summary: string;
   try {
     summary = await adapter.summarizeMessages({

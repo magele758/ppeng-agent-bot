@@ -1,3 +1,5 @@
+import { principalFromSession } from '../bots/bot-identity.js';
+import type { SqliteStateStore } from '../storage.js';
 /**
  * Product recall / SQLite memory I/O around A's compile + format.
  */
@@ -49,6 +51,7 @@ export interface CompileTurnAppendixInput {
   query: string;
   store?: {
     agentMemory?(): AgentMemoryStore;
+    setDaemonControl?(key: string, value: unknown): void;
     getDaemonControl?(key: string): unknown;
     listSessionMemory?(sessionId: string): Array<{
       id?: string;
@@ -156,10 +159,12 @@ function recallInput(input: CompileTurnAppendixInput): RecallContext | RecallSou
     return { userProfile: '', core: '', working, workingFile: '' };
   }
 
-  const userId =
+  const identityStore = input.store as SqliteStateStore;
+  const principal = resolveBotMemoryAgentId(input.session, input.store) && typeof input.store?.setDaemonControl === 'function' ? principalFromSession(identityStore, input.session) : undefined;
+  const userId = principal?.userId ?? (
     typeof input.session.metadata?.userId === 'string'
       ? input.session.metadata.userId
-      : process.env.RAW_AGENT_DEFAULT_USER_ID?.trim() || undefined;
+      : process.env.RAW_AGENT_DEFAULT_USER_ID?.trim() || undefined);
   const tenantId =
     typeof input.session.metadata?.tenantId === 'string'
       ? input.session.metadata.tenantId

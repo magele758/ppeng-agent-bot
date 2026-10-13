@@ -719,6 +719,7 @@ export function PlayPanel({
                 {t('play.bot')}
               </button>
             </div>
+            {botSurface&&<a className="chat-empty__link" href={formatHash({section:'agents',sub:'bots'})}>{t('play.settings.manageBots')}</a>}
             <div className="create-menu" ref={createMenuRef}>
               <button
                 type="button"
@@ -1041,6 +1042,7 @@ export function PlayPanel({
                           <span className="muted">{t('play.chrome.storedFull')}</span>
                         </div>
                       ) : null}
+                      {botSurface&&chat.historyCursor!=null&&<button className="btn btn-ghost btn-sm" disabled={chat.historyLoading} onClick={()=>void chat.loadOlderHistory()}>{t('botWork.older')}</button>}
                       {renderPlayMessages()}
                       {feedHasTurns && !statsLive ? <ChatStopReasonFooter outcome={chrome?.outcome} /> : null}
                     </SurfaceContextProvider>

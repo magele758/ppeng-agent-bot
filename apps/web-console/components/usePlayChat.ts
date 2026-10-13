@@ -2,6 +2,7 @@
 
 import { botComposerStatusText, planBotComposerSend } from '@/lib/bot-chat-commands';
 import { parseBotModelOverride, resolveLoadedComposerModelRef } from '@/lib/bot-model';
+import { mergeHistoryWindow } from '@/lib/history-window';
 import { api } from '@/lib/api';
 import { getSpeechRecognitionCtor, type SpeechRecognitionLike } from '@/lib/speech-dictation';
 import { renderMarkdown } from '@/lib/markdown';
@@ -190,7 +191,12 @@ export function usePlayChat(deps: PlayChatDeps) {
   } = deps;
   const { t } = useI18n();
 
+  const [historyCursor,setHistoryCursor]=useState<number|null>(null);
+  const [historyLoading,setHistoryLoading]=useState(false);
+  const historySessionRef=useRef('');
   const [sessionMessages, setSessionMessages] = useState<ChatMessage[]>([]);
+  const historyMessagesRef=useRef<ChatMessage[]>([]);
+  historyMessagesRef.current=sessionMessages;
   const [playTitle, setPlayTitle] = useState(t('play.empty.selectOrCreateSession'));
   const [playMeta, setPlayMeta] = useState('');
   const [sessionChrome, setSessionChrome] = useState<SessionChromeMeta | null>(null);
@@ -669,6 +675,7 @@ export function usePlayChat(deps: PlayChatDeps) {
   const refreshPlayPanel = useCallback(async () => {
     const sid = selectedSessionRef.current;
     if (!sid) {
+      historySessionRef.current='';setHistoryCursor(null);
       setPlayTitle(t('play.empty.selectOrCreateSession'));
       setPlayMeta('');
       setSessionChrome(null);
@@ -685,8 +692,9 @@ export function usePlayChat(deps: PlayChatDeps) {
       loadedPinRef.current = { sid: '', pinned: false };
       return;
     }
+    const botHistory=Boolean(botIdRef.current);
     try {
-      const data = (await api(`/api/sessions/${sid}`)) as {
+      const data = (await api(`/api/sessions/${sid}${botHistory?'?messageLimit=50':''}`)) as {
         session: {
           title: string;
           mode: string;
@@ -697,8 +705,10 @@ export function usePlayChat(deps: PlayChatDeps) {
           metadata?: Record<string, unknown>;
         };
         messages: ChatMessage[];
+        hasMore?:boolean;nextCursor?:number|null;
         inbox?: SteerInboxItem[];
       };
+      if(selectedSessionRef.current!==sid)return;
       const chrome = parseSessionChrome(data.session.metadata, data.session.status, {
         createdAt: data.session.createdAt,
         updatedAt: data.session.updatedAt
@@ -733,7 +743,11 @@ export function usePlayChat(deps: PlayChatDeps) {
       setGoalDraft(chrome.goalCondition ?? '');
       setAutonomyDraft(permissionToAutonomy(chrome.permissionMode));
       setBotModelOverride(parseBotModelOverride(data.session.metadata));
-      setSessionMessages(data.messages ?? []);
+      const sameHistory=historySessionRef.current===sid;
+      historySessionRef.current=sid;
+      const merged=mergeHistoryWindow(historyMessagesRef.current as Array<ChatMessage&{id:string;seq?:number}>,(data.messages??[]) as Array<ChatMessage&{id:string;seq?:number}>,botHistory&&sameHistory);
+      setSessionMessages(merged.messages);
+      setHistoryCursor(prev=>!merged.reset&&botHistory?prev:data.hasMore?data.nextCursor??null:null);
       setSteerInbox(mapSteerInboxItems(data.inbox));
       const eg = data.session.metadata?.enabledOptionalToolGroups;
       setEnabledOptionalGroupIds(Array.isArray(eg) ? eg.map(String) : []);
@@ -752,8 +766,10 @@ export function usePlayChat(deps: PlayChatDeps) {
       );
       loadedPinRef.current = { sid, pinned: nextPin !== null };
       try {
+        if (showModelView) {
         const view = (await api(`/api/sessions/${sid}/model-view`)) as SessionModelViewPayload;
         setModelViewPayload(view);
+        } else setModelViewPayload(null);
       } catch {
         setModelViewPayload(null);
       }
@@ -788,7 +804,7 @@ export function usePlayChat(deps: PlayChatDeps) {
       setSessionFileArtifacts([]);
       setSteerInbox([]);
     }
-  }, [playSurface, selectedSessionRef, t]);
+  }, [playSurface, selectedSessionRef, showModelView, t]);
 
   useEffect(() => {
     const live = playSending || Boolean(streamOverlay) || waitTyping;
@@ -798,7 +814,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     let cancelled = false;
     const pullChrome = async () => {
       try {
-        const data = (await api(`/api/sessions/${sid}`)) as {
+        const data = (await api(`/api/sessions/${sid}?includeMessages=false`)) as {
           session: {
             status: string;
             createdAt?: string;
@@ -982,12 +998,22 @@ export function usePlayChat(deps: PlayChatDeps) {
     [orchestrationEngine, playSending, waitTyping, selectedSessionRef, taskMode, skillScope]
   );
 
+  const toggleModelView=async(show:boolean)=>{setShowModelView(show);if(!show)return;const sid=selectedSessionRef.current;if(!sid)return;try{const data=await api(`/api/sessions/${sid}/model-view`) as SessionModelViewPayload;if(selectedSessionRef.current===sid)setModelViewPayload(data);}catch(error){setPlayStatus({text:String(error),err:true});}};
+
+  const loadOlderHistory = async () => {
+    const sid=selectedSessionRef.current;if(!sid||historyCursor==null||historyLoading)return;
+    setHistoryLoading(true);const element=playMessagesRef.current;const height=element?.scrollHeight??0;const top=element?.scrollTop??0;
+    try {const data=await api(`/api/sessions/${sid}/history?limit=50&beforeSeq=${historyCursor}`) as {messages:ChatMessage[];hasMore:boolean;nextCursor:number|null};if(selectedSessionRef.current!==sid)return;setSessionMessages(prev=>Array.from(new Map([...data.messages,...prev].map(m=>[(m as ChatMessage & {id:string}).id,m])).values()));setHistoryCursor(data.hasMore?data.nextCursor:null);requestAnimationFrame(()=>{if(element)element.scrollTop=top+element.scrollHeight-height;});}
+    catch(error){setPlayStatus({text:String(error),err:true});}finally{setHistoryLoading(false);}
+  };
+
   const applyBotSelection = useCallback((bot: BotInfo | null) => {
     if (!bot) {
       botIdRef.current = '';
       setBotId('');
       return;
     }
+    try { localStorage.setItem('lab.selectedBot', bot.id); } catch {}
     botIdRef.current = bot.id;
     setBotId(bot.id);
     setAgentId(bot.agentId);
@@ -1548,6 +1574,7 @@ export function usePlayChat(deps: PlayChatDeps) {
   ]);
 
   return {
+    historyCursor,historyLoading,loadOlderHistory,
     // State
     sessionMessages,
     playTitle,
@@ -1611,7 +1638,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     useStream,
     setUseStream,
     showModelView,
-    setShowModelView,
+    setShowModelView:toggleModelView,
     modelViewPayload,
     showJumpToLatest,
     displayMessages:

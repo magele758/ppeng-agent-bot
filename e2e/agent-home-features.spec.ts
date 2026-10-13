@@ -16,11 +16,13 @@ async function mockGet(page: Page, path: string, body: unknown) {
 const NOW = new Date().toISOString();
 
 const BOTS = [
+  {id:'super-bot',name:'Super Bot',title:'Super Bot',agentId:'super-bot',canonicalSessionId:'sess-bot-super',hidden:false},
   { id: 'deskbot', name: 'DeskBot', title: '桌面助手', agentId: 'deskbot', canonicalSessionId: 'sess-bot-desk', hidden: false },
   { id: 'bot-xiaoba', name: '小八', title: '小八', agentId: 'bot-xiaoba', canonicalSessionId: 'sess-bot-xiaoba', hidden: false }
 ];
 
 const SESSIONS = [
+  {id:'sess-bot-super',title:'Bot Chat · Super Bot',mode:'chat',status:'idle',agentId:'super-bot',metadata:{botId:'super-bot',canonicalBotChat:true},updatedAt:NOW},
   { id: 'sess-chat-1', title: 'Deploy review', mode: 'chat', status: 'idle', agentId: 'general', metadata: {}, updatedAt: NOW },
   { id: 'sess-chat-2', title: 'Weekly notes', mode: 'chat', status: 'idle', agentId: 'general', metadata: {}, updatedAt: NOW },
   { id: 'sess-bot-desk', title: 'Bot Chat · DeskBot', mode: 'chat', status: 'idle', agentId: 'deskbot', metadata: { botId: 'deskbot', canonicalBotChat: true }, updatedAt: NOW },
@@ -30,6 +32,8 @@ const SESSIONS = [
 async function mockHome(page: Page, extra: Record<string, unknown> = {}) {
   const data: Record<string, unknown> = {
     bots: { bots: BOTS },
+    'bot-work/default':{bot:BOTS[0],session:SESSIONS[0],sessionId:SESSIONS[0].id},
+    'sessions/sess-bot-super':{session:SESSIONS[0],messages:[]},
     sessions: { sessions: SESSIONS },
     tasks: { tasks: [] },
     approvals: { approvals: [] },
@@ -38,6 +42,7 @@ async function mockHome(page: Page, extra: Record<string, unknown> = {}) {
     ...extra
   };
   for (const [path, body] of Object.entries(data)) await mockGet(page, path, body);
+  await page.route('**/api/bots/super-bot/open',route=>route.fulfill(json({bot:BOTS[0],session:SESSIONS[0],sessionId:SESSIONS[0].id})));
 }
 
 const ROUTES: Array<{ hash: string; nav: string; section: string }> = [
@@ -82,12 +87,12 @@ test.describe('Chat and Bot mode', () => {
 
     await page.locator('#playSurfaceBot').click();
     await expect(page.locator('#playSurfaceBot')).toHaveAttribute('aria-selected', 'true');
-    await expect(list.locator('.list-item')).toHaveCount(2);
+    await expect(list.locator('.list-item')).toHaveCount(3);
     await expect(list).toContainText('Bot Chat · DeskBot');
     await expect(list).toContainText('Bot Chat · 小八');
     await expect(list).not.toContainText('Deploy review');
     const options = page.locator('#botSelect option');
-    await expect(options).toHaveText(['选择 Bot', 'DeskBot', '小八']);
+    await expect(options).toHaveText(['选择 Bot', 'Super Bot', 'DeskBot', '小八']);
 
     await page.locator('#playSurfaceChat').click();
     await expect(page.locator('#playSurfaceChat')).toHaveAttribute('aria-selected', 'true');

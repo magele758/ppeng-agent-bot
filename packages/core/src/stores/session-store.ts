@@ -1,3 +1,4 @@
+import type { HistoryOptions, HistoryPage, HistoryContext } from '../session/history/types.js';
 import { DatabaseSync } from 'node:sqlite';
 import { captureTaskContext, taskContextTodos } from '../session/task-context.js';
 import { createId, nowIso } from '../id.js';
@@ -47,6 +48,7 @@ export interface AppendReplacementInput {
  */
 export class SessionStore {
   private readonly writerBindings = new Map<string, string>();
+  private historyFts: boolean | undefined;
 
   constructor(private readonly db: DatabaseSync) {}
 
@@ -299,7 +301,62 @@ export class SessionStore {
    * seqs; hide rows themselves never appear.
    */
   foldMessages(sessionId: string): SessionMessage[] {
-    return foldSurface(this.listSurfaceNodes(sessionId));
+    // A read savepoint gives metadata and payload queries one snapshot, including
+    // when called inside a writer's existing transaction. No cross-call cache.
+    const savepoint = createId('fold');
+    this.db.exec(`SAVEPOINT "${savepoint}"`);
+    try {
+      const rows = this.db.prepare(`SELECT id, session_id, seq, surface_op, replaces_start, replaces_end
+        FROM session_messages WHERE session_id = ? ORDER BY seq ASC, created_at ASC, id ASC`).all(sessionId) as Array<Record<string, unknown>>;
+      // Reuse original coercion and invariant validation without reading raw text.
+      const metadata = rows.map(row => this.mapSurfaceRow({...row, parts_json: '[]', role: 'system', created_at: ''}));
+      assertSeqStrictlyIncreasing(metadata);
+      if (rows.some(row => typeof row.seq !== 'number' || !Number.isSafeInteger(row.seq))) return foldSurface(this.listSurfaceNodes(sessionId));
+      const intervals = this.foldShadowIntervals(metadata);
+      if (!intervals) return foldSurface(this.listSurfaceNodes(sessionId));
+      return this.readVisibleFoldRows(sessionId, intervals).map(row => this.surfaceToMessage(this.mapSurfaceRow(row)));
+    } finally {
+      this.db.exec(`RELEASE "${savepoint}"`);
+    }
+  }
+
+  private foldShadowIntervals(nodes: SurfaceNode[]): Array<[number, number]> | undefined {
+    const ranges: Array<[number, number]> = [];
+    for (const node of nodes) {
+      if (node.surfaceOp !== 'replace' && node.surfaceOp !== 'hide') continue;
+      const start = node.replacesStart, end = node.replacesEnd;
+      if (!Number.isInteger(start) || !Number.isInteger(end)) continue;
+      // Preserve legacy Set-based behavior for unusual values outside safe integers.
+      if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end)) return undefined;
+      if (start! <= end!) ranges.push([start!, end!]);
+    }
+    ranges.sort((a, b) => a[0] - b[0]);
+    const merged: Array<[number, number]> = [];
+    for (const [start, end] of ranges) {
+      const previous = merged[merged.length - 1];
+      if (previous && start <= previous[1] + 1) previous[1] = Math.max(previous[1], end);
+      else merged.push([start, end]);
+    }
+    return merged;
+  }
+
+  private readVisibleFoldRows(sessionId: string, intervals: Array<[number, number]>): Array<Record<string, unknown>> {
+    const rows: Array<Record<string, unknown>> = [];
+    let lower: number | undefined;
+    for (const [upper, end] of intervals) {
+      for (const row of this.readFoldInterval(sessionId, lower, upper)) rows.push(row);
+      lower = end;
+    }
+    for (const row of this.readFoldInterval(sessionId, lower)) rows.push(row);
+    return rows;
+  }
+
+  private readFoldInterval(sessionId: string, lower?: number, upper?: number): Array<Record<string, unknown>> {
+    const where = ["session_id = ?", "(surface_op IS NULL OR surface_op != 'hide')"];
+    const args: Array<string | number> = [sessionId];
+    if (lower !== undefined) { where.push('seq > ?'); args.push(lower); }
+    if (upper !== undefined) { where.push('seq < ?'); args.push(upper); }
+    return this.db.prepare(`SELECT * FROM session_messages WHERE ${where.join(' AND ')} ORDER BY seq ASC, created_at ASC, id ASC`).all(...args) as Array<Record<string, unknown>>;
   }
 
   /**
@@ -317,6 +374,68 @@ export class SessionStore {
       .all(sessionId) as Array<Record<string, unknown>>;
 
     return rows.map((row) => this.surfaceToMessage(this.mapSurfaceRow(row)));
+  }
+
+  /** Raw append history: replacements never destroy the source rows. Bound by an indexed sequence cursor. */
+  listHistory(sessionId: string, opts: HistoryOptions = {}): HistoryPage {
+    const limit = Math.min(200, Math.max(1, Math.floor(opts.limit ?? 50)));
+    if (!Number.isFinite(limit)) throw new Error('Invalid history limit');
+    let source = 'session_messages';
+    const where = ["session_messages.session_id = ?", "(surface_op IS NULL OR surface_op = 'append')"];
+    const args: (string | number)[] = [sessionId];
+    if (opts.beforeSeq !== undefined) {
+      if (!Number.isSafeInteger(opts.beforeSeq) || opts.beforeSeq < 1) throw new Error('Invalid history cursor');
+      where.push('session_messages.seq < ?'); args.push(opts.beforeSeq);
+    }
+    for (const [value, operator] of [[opts.from, '>='], [opts.to, '<=']] as const) {
+      if (value !== undefined) {
+        const stamp = new Date(value);
+        if (!Number.isFinite(stamp.getTime())) throw new Error('Invalid history time');
+        where.push(`session_messages.created_at ${operator} ?`); args.push(stamp.toISOString());
+      }
+    }
+    if (opts.query?.trim()) {
+      where.push("EXISTS (SELECT 1 FROM json_each(parts_json) AS part WHERE (json_extract(part.value, '$.text') LIKE ? ESCAPE '\\' OR json_extract(part.value, '$.content') LIKE ? ESCAPE '\\'))");
+      const pattern = '%' + opts.query.trim().replace(/[\\%_]/g, '\\$&') + '%'; args.push(pattern, pattern);
+      if (this.historyFts === undefined) {
+        try { this.db.prepare('SELECT 1 FROM session_history_fts LIMIT 0').all(); this.historyFts = true; } catch { this.historyFts = false; }
+      }
+      // The FTS corpus stores JSON, so only characters preserved verbatim in JSON
+      // are eligible for literal MATCH. Exact extracted-part matching stays authoritative.
+      const query = opts.query.trim();
+      const literalCandidate = query.length >= 3 && /^[\x20-\x7e]+$/.test(query) && !/["\\]/.test(query);
+      if (this.historyFts && literalCandidate) {
+        // DISTINCT protects stable pages even if a legacy FTS table has duplicate rows.
+        // CROSS JOIN starts from selective trigram candidates, then looks up message ids.
+        source = '(SELECT DISTINCT message_id FROM session_history_fts WHERE session_history_fts MATCH ?) AS candidate CROSS JOIN session_messages ON session_messages.id = candidate.message_id';
+        args.unshift('"' + query + '"');
+      } else if (this.historyFts && query.length >= 3 && !/[\\%_"\x00-\x1f]/.test(opts.query)) {
+        where.push('id IN (SELECT message_id FROM session_history_fts WHERE text LIKE ?)'); args.push(pattern);
+      }
+
+    }
+    const rows = this.db.prepare(`SELECT session_messages.* FROM ${source} WHERE ${where.join(' AND ')} ORDER BY session_messages.seq DESC LIMIT ?`).all(...args, limit + 1) as Array<Record<string, unknown>>;
+    const hasMore = rows.length > limit;
+    const messages = rows.slice(0, limit).reverse().map(row => this.surfaceToMessage(this.mapSurfaceRow(row)));
+    return { messages, hasMore, nextCursor: hasMore ? messages[0]?.seq ?? null : null };
+  }
+
+  readHistory(sessionId: string, seq: number, before = 5, after = 5): HistoryContext | undefined {
+    if (!Number.isSafeInteger(seq) || seq < 1) throw new Error('Invalid history sequence');
+    const raw = "(surface_op IS NULL OR surface_op = 'append')";
+    const row = this.db.prepare(`SELECT * FROM session_messages WHERE session_id = ? AND seq = ? AND ${raw}`).get(sessionId, seq) as Record<string, unknown> | undefined;
+    if (!row) return undefined;
+    const bound = (n: number) => Number.isFinite(n) ? Math.min(50, Math.max(0, Math.floor(n))) : 5;
+    const older = this.db.prepare(`SELECT * FROM session_messages WHERE session_id = ? AND seq < ? AND ${raw} ORDER BY seq DESC LIMIT ?`).all(sessionId, seq, bound(before)) as Array<Record<string, unknown>>;
+    const newer = this.db.prepare(`SELECT * FROM session_messages WHERE session_id = ? AND seq > ? AND ${raw} ORDER BY seq ASC LIMIT ?`).all(sessionId, seq, bound(after)) as Array<Record<string, unknown>>;
+    const map = (r: Record<string, unknown>) => this.surfaceToMessage(this.mapSurfaceRow(r));
+    return { message: map(row), messages: [...older.reverse(), row, ...newer].map(map) };
+  }
+
+  /** Resolve an original source ref with one indexed id lookup, never hydrate the whole WAL. */
+  readHistoryById(sessionId: string, messageId: string): SessionMessage | undefined {
+    const row = this.db.prepare("SELECT * FROM session_messages WHERE id = ? AND session_id = ? AND (surface_op IS NULL OR surface_op = 'append')").get(messageId, sessionId) as Record<string, unknown> | undefined;
+    return row ? this.surfaceToMessage(this.mapSurfaceRow(row)) : undefined;
   }
 
   listSurfaceNodes(sessionId: string): SurfaceNode[] {

@@ -1,0 +1,15 @@
+id: bot-identity-continuity
+title: Bot可靠工作与身份连续性
+status: approved
+requirement: |
+  分多个agent补齐所有缺失直到评估完成
+notes: 用户明确授权按已审阅开发计划实施，无需重复确认。
+criteria:
+  - id: AC-1
+    given: 同一用户再次打开Bot
+    when: 跨入口使用
+    then: 复用自己的对话且不进入其他用户的上下文
+  - id: AC-2
+    given: 未开启登录的安装
+    when: 重新启动
+    then: 本地身份保持不变

@@ -7,7 +7,13 @@ export type MemoryScope =
 
 export type MemoryConfidence = 'low' | 'medium' | 'high';
 
+export interface MemorySourceRef { sessionId: string; messageId: string; seq?: number }
+
 export interface AgentMemory {
+  sourceRefs?: MemorySourceRef[];
+  sourceMessageIds?: string[];
+  sourceSeqStart?: number;
+  sourceSeqEnd?: number;
   id: string;
   scope: MemoryScope;
   namespace: string;

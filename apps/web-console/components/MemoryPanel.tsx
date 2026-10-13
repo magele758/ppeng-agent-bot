@@ -24,6 +24,7 @@ export type MemoryEntryRow = {
   tenantId?: string;
   sessionId?: string;
   agentId?: string;
+  sourceRefs?: Array<{sessionId:string;messageId:string;seq?:number}>;
 };
 
 type CuratorMode = 'inline' | 'observe_only' | 'off';
@@ -60,7 +61,7 @@ const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
 export function MemoryPanel() {
   const { t } = useI18n();
-  const { selectedSessionId } = useLab();
+  const { selectedSessionId, openSession } = useLab();
   const [scope, setScope] = useState<MemoryScopeId>('user.memory');
   const [rows, setRows] = useState<MemoryEntryRow[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -284,6 +285,7 @@ export function MemoryPanel() {
                 ) : (
                   <>
                     <div className={styles.value}>{String(r.value)}</div>
+                    {r.sourceRefs?.length ? <details><summary>{t('botWork.source')}</summary>{r.sourceRefs.map(source=><button key={source.messageId} type="button" onClick={()=>void openSession(source.sessionId,{focusChat:true})}>{source.messageId}{source.seq!=null?` #${source.seq}`:''}</button>)}</details> : null}
                     <div className={styles.actions}>
                       {confirmingId === r.id ? (
                         <>

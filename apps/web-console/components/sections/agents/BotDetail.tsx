@@ -7,6 +7,10 @@ import { readBotSettings, type BotSettingsSnapshot } from '@/lib/bot-policy';
 import type { BotPermissionMode } from '@/lib/bot-permission';
 import { catalogToPickerOptions, type ModelProvidersResponse, type ModelRef } from '@/lib/model-providers';
 import type { BotInfo } from '@/lib/types';
+import { BotRuntimeControl } from '../../bot-work/BotLimits';
+import { BotMemory } from '../../bot-work/BotMemory';
+import { BotHistory } from '../../bot-work/BotHistory';
+import { BotConnections } from '../../bot-work/BotConnections';
 import { BotCronPanel } from '../../BotCronPanel';
 import { BotModelSetting } from '../../BotModelSetting';
 import { BotPolicySettings } from '../../BotPolicySettings';
@@ -21,13 +25,16 @@ const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
 export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
   const { t } = useI18n();
+  const [sessionId,setSessionId]=useState(bot.canonicalSessionId);
   const [settings, setSettings] = useState<BotSettingsSnapshot | null>(null);
   const [catalog, setCatalog] = useState<ModelProvidersResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const data = (await api(`/api/sessions/${encodeURIComponent(bot.canonicalSessionId)}`)) as {
+      const opened=await api(`/api/bots/${encodeURIComponent(bot.id)}/open`,{method:'POST'}) as {session:{id:string}};
+      setSessionId(opened.session.id);
+      const data = (await api(`/api/sessions/${encodeURIComponent(opened.session.id)}?includeMessages=false`)) as {
         session?: { metadata?: Record<string, unknown> };
       };
       setSettings(readBotSettings(data.session?.metadata));
@@ -71,7 +78,7 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
 
   const savePermission = useCallback(
     async (mode: BotPermissionMode, opts?: { confirmBypass?: boolean }) => {
-      await api(`/api/sessions/${encodeURIComponent(bot.canonicalSessionId)}`, {
+      await api(`/api/sessions/${encodeURIComponent(sessionId)}`, {
         method: 'PATCH',
         headers: JSON_HEADERS,
         body: JSON.stringify({
@@ -81,7 +88,7 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
       });
       await load();
     },
-    [bot.canonicalSessionId, load]
+    [sessionId, load]
   );
 
   const saveModel = useCallback(
@@ -115,6 +122,10 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
         </p>
       ) : null}
       {!settings && !error ? <p className="ag-panel__lead">{t('agents.bots.loadingSettings')}</p> : null}
+      <BotRuntimeControl botId={bot.id}/>
+      <BotHistory sessionId={sessionId} />
+      <BotMemory botId={bot.id} sessionId={sessionId}/>
+      <BotConnections botId={bot.id} />
       {settings ? (
         <>
           <BotPolicySettings
