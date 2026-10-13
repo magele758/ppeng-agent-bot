@@ -192,6 +192,24 @@ describe('runSessionKernel wiring', () => {
     expect(goalTurns).toBe(2);
   });
 
+  it('fits the model request before the adapter call', async () => {
+    let seen = '';
+    const { host, session } = createHarness({
+      host: {
+        fitModelRequest: async (input) => ({
+          ...input,
+          systemPrompt: `${input.systemPrompt}\nFITTED`,
+        }),
+        runTurnWithRetries: async (input) => {
+          seen = input.systemPrompt;
+          return textResult('ok');
+        },
+      },
+    });
+    await runSessionKernel(host, session.id);
+    expect(seen).toContain('FITTED');
+  });
+
   it('does not silently drop resolveTurnTools tools', async () => {
     let names: string[] = [];
     const extra: ToolContract = {

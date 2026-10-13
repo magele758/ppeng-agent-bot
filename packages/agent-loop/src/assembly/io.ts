@@ -76,6 +76,7 @@ export interface AssembledLoopIo {
   executeToolCalls?: TurnKernelHost['executeToolCalls'];
   processToolResults?: TurnKernelHost['processToolResults'];
   runTurnWithRetries?: TurnKernelHost['runTurnWithRetries'];
+  fitModelRequest?: TurnKernelHost['fitModelRequest'];
   autoCompact?: TurnKernelHost['autoCompact'];
   prepareMessagesForModel?: TurnKernelHost['prepareMessagesForModel'];
   readWorkingLogAppendix?: TurnKernelHost['readWorkingLogAppendix'];

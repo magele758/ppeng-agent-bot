@@ -270,6 +270,17 @@ export interface TurnKernelHost {
   ): Promise<ModelTurnResult>;
 
   /**
+   * Last adjustment of the request that will be sent, after micro-compact and
+   * after system prompt + tool schemas exist. Omit and the kernel sends the
+   * turn unchanged. Must not be used to drop the latest user message.
+   */
+  fitModelRequest?(
+    input: ModelTurnInput & { signal?: AbortSignal }
+  ):
+    | (ModelTurnInput & { signal?: AbortSignal })
+    | Promise<ModelTurnInput & { signal?: AbortSignal }>;
+
+  /**
    * Execute tool calls in parallel with optional approval gating.
    * Return results in the same order as validToolCalls.
    */

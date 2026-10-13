@@ -50,6 +50,8 @@ export type TraceEventKind =
   | 'working_log_append'
   /** Optional post-fold history budget dropped seqs (never silent) */
   | 'fold_budget_drop'
+  /** Ordinary-session request still exceeds 20% of the context window */
+  | 'request_over_budget'
   /** Capability Registry: card registered / upserted */
   | 'capability_register'
   /** Capability Registry: trust or binding state change */

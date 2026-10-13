@@ -466,6 +466,11 @@ export async function runSessionKernel(
     return { allowExternalAiTools, selectedTools, resolvedTools, turnTools, turnProfile };
   };
 
+  const runModelTurn: TurnKernelHost['runTurnWithRetries'] = async (turnInput, onStream) => {
+    const fitted = host.fitModelRequest ? await host.fitModelRequest(turnInput) : turnInput;
+    return host.runTurnWithRetries(fitted, onStream);
+  };
+
   const maybeChooseRecovery = async (
     situation: string,
     options: ReadonlyArray<{ id: string; label: string }>,
@@ -678,7 +683,7 @@ export async function runSessionKernel(
 
       let turnResult: ModelTurnResult;
       try {
-        turnResult = await host.runTurnWithRetries(turnInput, options?.onModelStreamChunk);
+        turnResult = await runModelTurn(turnInput, options?.onModelStreamChunk);
       } catch (error) {
         if (error instanceof RepetitionLoopAbortError) {
           void host.emitTrace(sid, {
@@ -706,7 +711,7 @@ export async function runSessionKernel(
             );
           }
           try {
-            turnResult = await host.runTurnWithRetries(turnInput, options?.onModelStreamChunk);
+            turnResult = await runModelTurn(turnInput, options?.onModelStreamChunk);
           } catch (retryError) {
             const reason =
               retryError instanceof RepetitionLoopAbortError ? retryError.reason : error.reason;
@@ -754,7 +759,7 @@ export async function runSessionKernel(
                     }),
               };
           turnInput = { ...turnInput, messages: packedRetry.messages };
-          turnResult = await host.runTurnWithRetries(turnInput, options?.onModelStreamChunk);
+          turnResult = await runModelTurn(turnInput, options?.onModelStreamChunk);
         } else if (signal.aborted) {
           closeWaveIfOpen();
           await rollbackOpenStep('abort');
