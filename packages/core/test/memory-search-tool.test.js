@@ -123,3 +123,60 @@ test('memory_search keeps external-content fences intact', async () => {
   assert.equal(excerpt.includes(tail), false);
   assert.equal(longResult.content.includes(sibling), false);
 });
+
+test('memory_search maps stored scope aliases and skips rows that are not memories', async () => {
+  const services = {
+    async upsertSessionMemory() {},
+    async deleteSessionMemory() {
+      return false;
+    },
+    async listSessionMemory(_sessionId, scope) {
+      if (scope === 'scratch') {
+        return [
+          { scope: 'session.scratch', key: 'alias-scratch', value: 'zephyralias scratch' },
+          { scope: 'scratch', key: 'plain-scratch', value: 'zephyralias plain scratch' },
+          null,
+          { key: '', value: 'zephyralias empty' },
+          { key: 'not-text', value: 1 }
+        ];
+      }
+      if (scope === 'long') {
+        return [{ scope: 'session.long', key: 'alias-long', value: 'zephyralias long' }];
+      }
+      return [];
+    },
+    async listAgentMemory(query) {
+      if (query.scope === 'user.memory') {
+        return [
+          { scope: 'user.memory', key: 'alias-user', value: 'zephyralias user' },
+          { scope: 'user', key: 'plain-user', value: 'zephyralias plain user' },
+          { scope: 'nope', key: 'fallback-user', value: 'zephyralias fallback' }
+        ];
+      }
+      if (query.scope === 'team.memory') {
+        return [{ scope: 'team.memory', key: 'alias-team', value: 'zephyralias team' }];
+      }
+      if (query.scope === 'project.memory') {
+        return [{ scope: 'project.memory', key: 'alias-project', value: 'zephyralias project', importance: 0.2 }];
+      }
+      return [];
+    }
+  };
+  const search = createMemoryTools(services).find((tool) => tool.name === 'memory_search');
+  const result = await search.execute(ctx('sess-alias'), { query: 'zephyralias', limit: 20 });
+  assert.equal(result.ok, true);
+  const matches = JSON.parse(result.content).matches;
+  assert.deepEqual(
+    matches.map((match) => `${match.scope}:${match.key}`).sort(),
+    [
+      'long:alias-long',
+      'project:alias-project',
+      'scratch:alias-scratch',
+      'scratch:plain-scratch',
+      'team:alias-team',
+      'user:alias-user',
+      'user:fallback-user',
+      'user:plain-user'
+    ]
+  );
+});

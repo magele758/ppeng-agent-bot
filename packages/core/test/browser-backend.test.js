@@ -11,6 +11,7 @@ import {
   formatBrowserError,
   ingestBrowserScreenshotPng,
   playwrightBrowserAction,
+  probePlaywrightBackend,
   setPlaywrightLoaderForTests
 } from '../dist/tools/browser-backend.js';
 
@@ -112,6 +113,50 @@ describe('browser backend error shape', () => {
       await closeBrowserSession('s-launch-fail');
       rmSync(stateDir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('playwright probe', () => {
+  it('reports a missing Playwright module without launching', async () => {
+    setPlaywrightLoaderForTests(async () => null);
+    const result = await probePlaywrightBackend();
+    assert.equal(result.ok, false);
+    assert.match(result.detail, /未安装/);
+    assert.match(result.hint, /playwright install/);
+  });
+
+  it('launches a temporary context and removes the probe directory', async () => {
+    let launched;
+    setPlaywrightLoaderForTests(async () => ({
+      chromium: {
+        launchPersistentContext: async (dir, options) => {
+          launched = { dir, options };
+          assert.equal(existsSync(dir), true);
+          return { close: async () => {} };
+        }
+      }
+    }));
+    const result = await probePlaywrightBackend();
+    assert.equal(result.ok, true);
+    assert.match(result.detail, /可用/);
+    assert.equal(launched.options.headless, true);
+    assert.equal(existsSync(launched.dir), false);
+  });
+
+  it('returns the launch error and still removes the probe directory', async () => {
+    let dir;
+    setPlaywrightLoaderForTests(async () => ({
+      chromium: {
+        launchPersistentContext: async (probeDir) => {
+          dir = probeDir;
+          throw 'browser missing';
+        }
+      }
+    }));
+    const result = await probePlaywrightBackend();
+    assert.equal(result.ok, false);
+    assert.equal(result.detail, 'browser missing');
+    assert.equal(existsSync(dir), false);
   });
 });
 
