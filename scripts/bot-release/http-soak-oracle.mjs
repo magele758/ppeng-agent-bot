@@ -14,3 +14,7 @@ export function hasControlledSoftwareResult(messages,operation,sessionId){
  const id='controlled_'+operation+':'+sessionId;
  return messages.some(message=>message.parts.some(part=>part.type==='tool_result'&&part.name==='http_benchmark_software'&&part.toolCallId===id&&part.ok===true));
 }
+/** Retire only a decision actually emitted after a seen successful result; a raw call count is not completion. */
+export function pendingControlledOperations(operations,{completed,explicitDecision}){
+ return [...new Set(operations)].filter(operation=>!completed(operation)&&explicitDecision(operation)?.finished!==1);
+}

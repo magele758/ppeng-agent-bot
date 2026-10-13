@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {BoundedHistogram,RssWindows,queueGrowth} from '../bot-release/http-soak-stats.mjs';
 import {expectedWorkload} from '../bot-release/http-soak-schedule.mjs';
-import {isFreshCompletedOutput,pendingHumanInputs,hasControlledSoftwareResult} from '../bot-release/http-soak-oracle.mjs';
+import {isFreshCompletedOutput,pendingHumanInputs,hasControlledSoftwareResult,pendingControlledOperations} from '../bot-release/http-soak-oracle.mjs';
 test('24h immutable offered protocol retains hourly burst and exact 50 percent hotspot',()=>{
  const result=expectedWorkload({warmupSeconds:1800,measurementSeconds:86400,burstEverySeconds:3600,burstDurationSeconds:60});assert.equal(result.readWarmup,72000);assert.equal(result.readMeasurement,3456000);assert.equal(result.measurement,197640);assert.equal(result.burst,27600);assert.equal(result.hot,13800);assert.deepEqual(result.kinds,{human:79056,routine:39528,dispatch:39528,room:39528});
 });
@@ -28,4 +28,8 @@ test('input observer sees multiple real human sources without treating quotation
 test('successful archived software result uses actual invocation identity and rejects quoted or failed results',()=>{
  const part={type:'tool_result',name:'http_benchmark_software',toolCallId:'controlled_http_op_3:sid',ok:true,content:'[Tool result archived — context protected]\nHandle: artifact_123\nPreview: ...'};
  assert.equal(hasControlledSoftwareResult([{role:'tool',parts:[part]}],'http_op_3','sid'),true);assert.equal(hasControlledSoftwareResult([{role:'tool',parts:[{...part,ok:false}]}],'http_op_3','sid'),false);assert.equal(hasControlledSoftwareResult([{role:'tool',parts:[{...part,toolCallId:'controlled_http_op_30:sid',content:'Quoted http_op_3:sid'}]}],'http_op_3','sid'),false);assert.equal(hasControlledSoftwareResult([{role:'assistant',parts:[{type:'text',text:'http_op_3:sid'}]}],'http_op_3','sid'),false);
+});
+
+test('explicitly emitted decisions retire before later input drops their typed result without inventing a new confirmation',()=>{
+ const decisions=new Map([['old',{finished:1}],['awaiting',{finished:0}]]);const options={completed:operation=>operation==='terminal',explicitDecision:operation=>decisions.get(operation)};assert.deepEqual(pendingControlledOperations(['old','awaiting','new','unknown','old','terminal'],options),['awaiting','new','unknown']);assert.equal(decisions.get('awaiting').finished,0);assert.equal(decisions.has('new'),false);
 });

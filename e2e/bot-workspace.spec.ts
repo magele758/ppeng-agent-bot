@@ -362,8 +362,8 @@ test('editing a routine can remove its existing precheck [AC:bot-routine-lifecyc
   await page.getByTestId('bot-detail').getByRole('button', { name: '展开或收起：定时任务' }).click();
   const panel = page.locator('.bot-cron-panel');
   await panel.locator('article').filter({ hasText: job.name }).getByRole('button', { name: '修改', exact: true }).click();
-  await expect(panel.getByLabel('预检', { exact: true })).toHaveValue('predicate');
-  await panel.getByLabel('预检', { exact: true }).selectOption('none');
+  await expect(panel.getByRole('combobox', { name: '预检', exact: true })).toHaveValue('predicate');
+  await panel.getByRole('combobox', { name: '预检', exact: true }).selectOption('none');
   await panel.locator('button[type=submit]').click();
   await expect.poll(async () => {
     const { jobs } = await (await request.get(`/api/cron/jobs?botId=${bot.id}`)).json();
@@ -373,7 +373,7 @@ test('editing a routine can remove its existing precheck [AC:bot-routine-lifecyc
   await page.getByTestId(`bot-card-${bot.id}`).click();
   await page.getByTestId('bot-detail').getByRole('button', { name: '展开或收起：定时任务' }).click();
   await panel.locator('article').filter({ hasText: job.name }).getByRole('button', { name: '修改', exact: true }).click();
-  await expect(panel.getByLabel('预检', { exact: true })).toHaveValue('none');
+  await expect(panel.getByRole('combobox', { name: '预检', exact: true })).toHaveValue('none');
 });
 
 test('Room polling preserves access to messages across a missed page [AC:bot-rooms#AC-6]', async ({ page, request }) => {

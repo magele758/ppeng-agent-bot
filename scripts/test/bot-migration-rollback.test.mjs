@@ -15,9 +15,10 @@ import { createCronJob, listCronJobs } from '../../packages/core/dist/cron/cron-
 import { RoutineRunStore } from '../../packages/core/dist/cron/routine-runtime.js';
 import { sanitizeSpawnEnv } from '../../packages/core/dist/sandbox/env-sanitizer.js';
 import { loadSqlDump } from '../migration-fixtures/sql-dump.mjs';
+import { preparePinnedCheckout } from '../migration-fixtures/pinned-checkout.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const REF = '96d55dc';
+const REF = '96d55dc449c776ae4627c570d3fa561cfdd70893';
 const fixtureSql = readFileSync(new URL('../migration-fixtures/snapshots/v24.sql', import.meta.url), 'utf8');
 const ids = JSON.parse(fixtureSql.split('\n').find(line => line.startsWith('-- seed ids: ')).slice('-- seed ids: '.length));
 function run(command, args, cwd = ROOT) {
@@ -44,10 +45,9 @@ function stoppedSnapshot(source,target) {
 test('real v24 ownerless Bot/cron upgrade is idempotent and rollback restores a stopped snapshot [AC:schema-upgrade-safety#AC-1] [AC:schema-upgrade-safety#AC-2]', {timeout:180000}, async()=>{
  const temporary=mkdtempSync(join(tmpdir(),'bot-migration-rollback-'));
  const checkout=join(temporary,'old');const stateDir=join(temporary,'state');const dbFile=join(stateDir,'runtime.sqlite');
- let worktreeAdded=false;
  try {
-  const sha=run('git',['rev-parse',REF]);assert.match(fixtureSql,new RegExp(sha));
-  run('git',['worktree','add','--detach',checkout,sha]);worktreeAdded=true;linkDependencies(checkout);
+  assert.match(fixtureSql,new RegExp(REF));
+  const {sha}=preparePinnedCheckout({sourceRoot:ROOT,checkout,sha:REF});assert.equal(sha,REF);linkDependencies(checkout);
   run(process.execPath,[join(ROOT,'node_modules/typescript/bin/tsc'),'-b','packages/core'],checkout);
   const oldModule=await import(pathToFileURL(join(checkout,'packages/core/dist/storage.js')).href);
   mkdirSync(stateDir,{recursive:true});const raw=new DatabaseSync(dbFile);loadSqlDump(raw,fixtureSql);
@@ -88,7 +88,6 @@ test('real v24 ownerless Bot/cron upgrade is idempotent and rollback restores a 
   const preserved=new SqliteStateStore(join(postDir,'runtime.sqlite'));assert.equal(new RoutineRunStore(preserved).get(occurrence.id).status,'queued');assert.ok(preserved.listMessages(other.sessionId).some(message=>JSON.stringify(message).includes('post-upgrade write')));preserved.db.close();
   assert.notEqual(beforeManifest.database,postManifest.database);assert.notEqual(beforeManifest.cron,postManifest.cron);
  } finally {
-  if(worktreeAdded)run('git',['worktree','remove','--force',checkout]);
   if(existsSync(temporary))rmSync(temporary,{recursive:true,force:true});
  }
 });

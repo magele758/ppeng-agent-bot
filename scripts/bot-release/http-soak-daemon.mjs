@@ -3,7 +3,7 @@ import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
 import {join} from 'node:path';
 import {createServer} from 'node:http';
 import {boot} from '../test/helpers/bot-http-fixture.mjs';
-import {isFreshCompletedOutput,pendingHumanInputs,hasControlledSoftwareResult} from './http-soak-oracle.mjs';
+import {isFreshCompletedOutput,pendingHumanInputs,hasControlledSoftwareResult,pendingControlledOperations} from './http-soak-oracle.mjs';
 import {controlledOperation} from './http-controlled-operation.mjs';
 const workload=JSON.parse(readFileSync(new URL('./workload.v1.json',import.meta.url),'utf8'));
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -43,7 +43,7 @@ const modelAdapter={name:'http-soak-controlled',contextWindow:131072,async runTu
  db.prepare('INSERT INTO load_inputs(executionId,turn,capturedAt,pendingUsers) VALUES(?,?,?,?)').run(executionKey,changed?.n??0,Date.now(),JSON.stringify(observed));
  // A result notification is an acknowledgement only. Referenced original operations do not authorize software again.
  if(context.durableKind==='result'){notificationRuns++;await sleep(workload.controlledLatencyMs.modelTurn);return {stopReason:'end',assistantParts:[{type:'text',text:'Acknowledged durable result notification'.padEnd(workload.payloadBytes.output,'o')}]};}
- const priorSeen=db.prepare('SELECT operation FROM load_user_seen WHERE sessionId=? AND executionId=?').all(input.sessionId,executionKey).map(row=>row.operation).filter(operation=>hasControlledSoftwareResult(input.messages,operation,input.sessionId));const candidates=[...new Set([...(context.operation?[context.operation]:[]),...humanTargets,...priorSeen])].filter(operation=>!db.prepare('SELECT 1 FROM load_completed WHERE operation=? AND sessionId=?').get(operation,input.sessionId));
+ const priorSeen=db.prepare('SELECT operation FROM load_user_seen WHERE sessionId=? AND executionId=?').all(input.sessionId,executionKey).map(row=>row.operation).filter(operation=>hasControlledSoftwareResult(input.messages,operation,input.sessionId));const candidates=pendingControlledOperations([...(context.operation?[context.operation]:[]),...humanTargets,...priorSeen],{completed:operation=>db.prepare('SELECT 1 FROM load_completed WHERE operation=? AND sessionId=?').get(operation,input.sessionId),explicitDecision:operation=>db.prepare('SELECT finished FROM load_model_decisions WHERE operation=? AND sessionId=?').get(operation,input.sessionId)});
  for(const operation of candidates)db.prepare('INSERT OR IGNORE INTO load_starts(operation,sessionId,startedAt,cycle) VALUES(?,?,?,?)').run(operation,input.sessionId,Date.now(),cycles);
  await sleep(workload.controlledLatencyMs.modelTurn);
  const successfulResult=operation=>hasControlledSoftwareResult(input.messages,operation,input.sessionId);const missing=candidates.filter(operation=>!successfulResult(operation)),readyOperations=candidates.filter(successfulResult);
