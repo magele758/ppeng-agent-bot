@@ -10,7 +10,7 @@ import { nextCronRunAt } from './cron-next.js';
  * Scheduler tick is driven by daemon; tools create/list/remove jobs.
  */
 
-export type CronScheduleKind = 'every_ms' | 'cron5' | 'once_at';
+export type CronScheduleKind = 'every_ms' | 'cron5' | 'once_at' | 'event';
 
 export interface CronJobRecord {
   id: string;
@@ -19,7 +19,10 @@ export interface CronJobRecord {
   name: string;
   prompt: string;
   scheduleKind: CronScheduleKind;
-  /** every_ms: interval; cron5: 5-field expression; once_at: ISO timestamp */
+  /**
+   * every_ms: interval; cron5: 5-field expression; once_at: ISO timestamp;
+   * event: `provider/name` such as `github/push`, `slack/message`, `email/received`.
+   */
   scheduleValue: string;
   enabled: boolean;
   lastRunAt?: string;
@@ -112,10 +115,11 @@ export class CronJobStore {
 
   /**
    * Jobs whose nextRunAt is due (or missing nextRunAt with every_ms elapsed).
-   * Simple tick helper for daemon scheduler.
+   * Event routines are not time-driven and never appear here, even with nextRunAt set.
    */
   dueJobs(now = Date.now()): CronJobRecord[] {
     return this.list({ enabled: true }).filter((j) => {
+      if (j.scheduleKind === 'event') return false;
       if (j.nextRunAt) {
         return Date.parse(j.nextRunAt) <= now;
       }
@@ -240,20 +244,27 @@ export function createCronTools(getStore: () => CronJobStore): ToolContract<any>
   return [createTool, listTool, removeTool];
 }
 
-/** Advance nextRunAt after a successful fire. */
+/** Advance nextRunAt after a successful fire. Event routines only record lastRunAt. */
 export function markCronJobRan(store: CronJobStore, job: CronJobRecord, now = Date.now()): CronJobRecord | undefined {
   const lastRunAt = new Date(now).toISOString();
-  if (job.scheduleKind === 'once_at') {
-    return store.update(job.id, { lastRunAt, enabled: false, nextRunAt: undefined });
+  switch (job.scheduleKind) {
+    case 'once_at':
+      return store.update(job.id, { lastRunAt, enabled: false, nextRunAt: undefined });
+    case 'every_ms': {
+      const ms = Number(job.scheduleValue);
+      const nextRunAt = Number.isFinite(ms) && ms > 0 ? new Date(now + ms).toISOString() : undefined;
+      return store.update(job.id, { lastRunAt, nextRunAt });
+    }
+    case 'cron5': {
+      const nextRunAt = nextCronRunAt(job.scheduleValue, new Date(now)).toISOString();
+      return store.update(job.id, { lastRunAt, nextRunAt });
+    }
+    case 'event':
+      return store.update(job.id, { lastRunAt, nextRunAt: undefined });
+    default: {
+      const neverKind: never = job.scheduleKind;
+      void neverKind;
+      return store.update(job.id, { lastRunAt });
+    }
   }
-  if (job.scheduleKind === 'every_ms') {
-    const ms = Number(job.scheduleValue);
-    const nextRunAt = Number.isFinite(ms) && ms > 0 ? new Date(now + ms).toISOString() : undefined;
-    return store.update(job.id, { lastRunAt, nextRunAt });
-  }
-  if (job.scheduleKind === 'cron5') {
-    const nextRunAt = nextCronRunAt(job.scheduleValue, new Date(now)).toISOString();
-    return store.update(job.id, { lastRunAt, nextRunAt });
-  }
-  return store.update(job.id, { lastRunAt });
 }

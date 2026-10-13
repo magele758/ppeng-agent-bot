@@ -62,18 +62,36 @@ function filePredicateWakes(source: string, cwd: string): boolean | undefined {
   }
 }
 
-async function runPrecheckScript(command: string, cwd: string): Promise<string> {
+async function runPrecheckScript(
+  command: string,
+  cwd: string,
+  spawn?: { env?: NodeJS.ProcessEnv; denyEnv?: string[] }
+): Promise<string> {
   const sandbox = new SandboxManager('direct');
+  const overrides = spawn?.env && Object.keys(spawn.env).length > 0 ? spawn.env : undefined;
+  const extraDenylist = spawn?.denyEnv?.filter(Boolean);
   const result = await sandbox.execute(command, cwd, {
     timeoutMs: PRECHECK_TIMEOUT_MS,
-    allowNetwork: true
+    allowNetwork: true,
+    ...(overrides || extraDenylist?.length
+      ? {
+          envOptions: {
+            ...(overrides ? { overrides } : {}),
+            ...(extraDenylist?.length ? { extraDenylist } : {})
+          }
+        }
+      : {})
   });
   return (result.stdout ?? '').slice(0, MAX_STDOUT);
 }
 
+/**
+ * `env` is given to script children only (for example a path to the event file).
+ * It is not spliced into the command string. `parseWakeGate` is unchanged.
+ */
 export async function evaluateRoutinePrecheck(
   precheck: RoutinePrecheck,
-  opts?: { cwd?: string }
+  opts?: { cwd?: string; env?: NodeJS.ProcessEnv; denyEnv?: string[] }
 ): Promise<PrecheckResult> {
   const cwd = opts?.cwd ?? process.cwd();
   if (precheck.kind === 'predicate') {
@@ -83,7 +101,10 @@ export async function evaluateRoutinePrecheck(
   }
   if (precheck.kind === 'script') {
     try {
-      const stdout = await runPrecheckScript(precheck.source, cwd);
+      const stdout = await runPrecheckScript(precheck.source, cwd, {
+        env: opts?.env,
+        denyEnv: opts?.denyEnv
+      });
       return { wakeAgent: parseWakeGate(stdout) };
     } catch {
       return { wakeAgent: true };

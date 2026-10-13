@@ -656,9 +656,28 @@ export {
   cronToolsFeatureEnabled,
   markCronJobRan,
   nextCronRunAt,
-  parseCron5
+  parseCron5,
+  EVENT_PRECHECK_FILE_ENV,
+  EVENT_SIGNATURE_WINDOW_MS,
+  acceptEventRoutine,
+  parseEventScheduleValue,
+  verifyEmailSignature,
+  verifyGithubSignature,
+  verifySlackSignature
 } from '../cron/index.js';
-export type { CronJobRecord, CronScheduleKind, CreateCronJobInput, UpdateCronJobInput, ListCronJobsFilter, RoutinePrecheck } from '../cron/index.js';
+export type {
+  CronJobRecord,
+  CronScheduleKind,
+  CreateCronJobInput,
+  UpdateCronJobInput,
+  ListCronJobsFilter,
+  RoutinePrecheck,
+  AcceptEventRoutineInput,
+  AcceptEventRoutineResult,
+  EventJobOutcome,
+  EventProvider,
+  EventRoutineHost
+} from '../cron/index.js';
 
 // --- Plugins / doctor / extensions ---
 export {
