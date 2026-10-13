@@ -1,11 +1,8 @@
-import { env } from 'node:process';
 import { fenceExternalContent, type RawAgentRuntime } from '@ppeng/agent-core';
 import { decryptFeishuEncryptPayload } from './feishu-crypto.js';
 import type { ChannelSpec, FeishuProviderSpec, WeComProviderSpec } from './types.js';
 import { readGatewayState, writeGatewayState, type GatewayPersistedState } from './state.js';
 import type { GatewaySettings } from './gateway-settings.js';
-import { sendLedgered } from './delivery-ledger.js';
-import { sendFeishuTextMessage } from './feishu-api.js';
 import { appendOutboundDraft } from './outbound-drafts.js';
 import { deliverChannelText } from './outbound.js';
 import { resolveImOutbound, type ImTurnOrigin, type SilentAckLocale } from './silent-reply.js';
@@ -332,32 +329,10 @@ export async function handleFeishuEventRequest(input: {
   const replyChannel = input.spec.replyChannelId
     ? input.channels.find((c) => c.id === input.spec.replyChannelId)
     : undefined;
-  const appId = env.RAW_AGENT_FEISHU_APP_ID?.trim();
-  const appSecret = env.RAW_AGENT_FEISHU_APP_SECRET?.trim();
 
+  // Model text stays a draft. A person releases it through releaseOutboundDraft.
   const reply = async (text: string) => {
     if (!replyChannel) return;
-    if (replyChannel.type === 'feishu_bot' && appId && appSecret) {
-      await sendLedgered({
-        gatewayDir: input.gatewayDir,
-        target: {
-          type: 'feishu',
-          receiveId: inbound.receiveId,
-          receiveIdType: inbound.receiveIdType
-        },
-        text,
-        send: async (out) => {
-          await sendFeishuTextMessage({
-            appId,
-            appSecret,
-            receiveId: inbound.receiveId,
-            receiveIdType: inbound.receiveIdType,
-            text: out
-          });
-        }
-      });
-      return;
-    }
     if (replyChannel.type === 'feishu_bot') {
       await appendOutboundDraft(input.gatewayDir, {
         channelId: replyChannel.id,
@@ -372,8 +347,7 @@ export async function handleFeishuEventRequest(input: {
       gatewayDir: input.gatewayDir,
       channel: replyChannel,
       text,
-      event: 'gateway.im.reply',
-      approval: 'approved'
+      event: 'gateway.im.reply'
     });
   };
 
@@ -431,14 +405,14 @@ export async function handleWeComBridgeRequest(input: {
     ? input.channels.find((c) => c.id === input.spec.replyChannelId)
     : undefined;
 
+  // Model text stays a draft. A person releases it through releaseOutboundDraft.
   const reply = async (out: string) => {
     if (!replyChannel) return;
     await deliverChannelText({
       gatewayDir: input.gatewayDir,
       channel: replyChannel,
       text: out,
-      event: 'gateway.im.reply',
-      approval: 'approved'
+      event: 'gateway.im.reply'
     });
   };
 
