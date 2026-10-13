@@ -7,6 +7,7 @@ import { SqliteStateStore } from '../dist/storage.js';
 import { RawAgentRuntime } from '../dist/runtime.js';
 import { expireDueUnattendedApprovals, UNATTENDED_APPROVAL_TTL_MS } from '../dist/approval/unattended-approval.js';
 import { RoutineRunStore } from '../dist/cron/routine-runtime.js';
+import { buildTaskContext } from '../dist/session/task-context.js';
 import { requestHumanRun, requestSteerContinuation } from '../dist/session/human-continuation.js';
 import { createBot, openBot } from '../dist/bots/bot-facade.js';
 import { resolveBotPrincipal, enqueueBotMessage, tickBotWork, dispatchBotTask, listBotTasks, ensureSuperBot, recoverBotWork, botWorkStatus, claimBotSession, releaseBotSession, cancelBotTask, updateBotWorkSettings, retryBotTask, botTaskPage, botQueueUsage, checkBotWorkCapacity } from '../dist/bots/bot-work.js';
@@ -267,4 +268,21 @@ test('real public approve and run reject an overdue paused task while fresh huma
  await assert.rejects(()=>rt.approve(approval.id,'approved'),/deadline|cancelled|retired|verif|parked/i);await rt.runSession(approval.sessionId);assert.equal(effects,0);assert.equal(listBotTasks(rt.store,principal).find(item=>item.id===task.id).status,'unknown');
  const fresh=rt.store.appendMessage(approval.sessionId,'user',[{type:'text',text:'Please answer this fresh human request'}]);requestHumanRun(rt.store,approval.sessionId);await rt.runSession(approval.sessionId);assert.equal(effects,0);assert.ok(rt.store.foldMessages(approval.sessionId).some(message=>message.id===fresh.id));assert.ok(rt.store.foldMessages(approval.sessionId).some(message=>message.role==='assistant'&&message.parts.some(part=>part.type==='text'&&part.text==='Fresh human request answered')));
  }finally{await rt.destroy();}
+});
+
+
+test('retired Bot task sources no longer pin active goals or unfinished todos while fresh sources survive',async()=>{
+ const {store,host}=setup();const principal=resolveBotPrincipal(store),sender=createBot(host,{name:'Pinned sender'}),worker=createBot(host,{name:'Pinned worker'}),sid=worker.canonicalSessionId;
+ const retained=store.appendMessage(sid,'user',[{type:'text',text:'Constraint: retain the unrelated workspace rule'}]);host.runSession=()=>new Promise(()=>{});
+ const task=dispatchBotTask(host,{principal,requesterBotId:sender.id,targetBotId:worker.id,input:'\nGoal: retired delegated goal\nTodo: retired delegated pending'});await tickBotWork(host);
+ const source=store.db.prepare('SELECT message_ref FROM bot_work_messages WHERE task_id=?').get(task.id).message_ref;
+ assert.match(buildTaskContext(store.getSession(sid)),/retired delegated goal/,'claim preserves requirements captured from its appended source');
+ store.updateSession(sid,{todo:[{content:'retired delegated pending',status:'pending',activeForm:'retired delegated pending'},{content:'completed historical item',status:'completed',activeForm:'completed historical item'},{content:'independent pending',status:'pending',activeForm:'independent pending'}]});
+ const fresh=store.appendMessage(sid,'user',[{type:'text',text:'Goal: fresh accepted goal\nTodo: fresh accepted pending'}]);requestHumanRun(store,sid);
+ assert.match(buildTaskContext(store.getSession(sid)),/retired delegated goal/);recoverBotWork(store);
+ const session=store.getSession(sid),prompt=buildTaskContext(session),facts=Object.values(session.metadata.taskContext.tasks).flat();
+ assert.doesNotMatch(prompt,/retired delegated goal|retired delegated pending/);assert.match(prompt,/fresh accepted goal/);assert.match(prompt,/retain the unrelated workspace rule/);
+ assert.ok(facts.filter(fact=>fact.sourceMessageId===source).every(fact=>fact.status==='superseded'));assert.ok(facts.some(fact=>fact.sourceMessageId===fresh.id&&fact.status==='active'));assert.ok(facts.some(fact=>fact.sourceMessageId===retained.id&&fact.status==='active'));
+ assert.ok(!session.todo.some(todo=>todo.content==='retired delegated pending'));assert.ok(session.todo.some(todo=>todo.content==='independent pending'));assert.ok(session.todo.some(todo=>todo.status==='completed'));assert.ok(!Object.values(session.metadata.taskContext.todos).flat().some(todo=>todo.content==='retired delegated pending'&&todo.status!=='completed'));
+ assert.equal(listBotTasks(store,principal).find(item=>item.id===task.id).status,'unknown');assert.throws(()=>retryBotTask(host,principal,task.id),/verification/);
 });

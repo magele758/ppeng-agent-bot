@@ -306,7 +306,7 @@ export class SessionStore {
     const savepoint = createId('fold');
     this.db.exec(`SAVEPOINT "${savepoint}"`);
     try {
-      const rows = this.db.prepare(`SELECT id, session_id, seq, surface_op, replaces_start, replaces_end
+      const rows = this.db.prepare(`SELECT id, session_id, seq, surface_op, replaces_start, replaces_end, key
         FROM session_messages WHERE session_id = ? ORDER BY seq ASC, created_at ASC, id ASC`).all(sessionId) as Array<Record<string, unknown>>;
       // Reuse original coercion and invariant validation without reading raw text.
       const metadata = rows.map(row => this.mapSurfaceRow({...row, parts_json: '[]', role: 'system', created_at: ''}));
@@ -322,7 +322,9 @@ export class SessionStore {
 
   private foldShadowIntervals(nodes: SurfaceNode[]): Array<[number, number]> | undefined {
     const ranges: Array<[number, number]> = [];
+    const latestSummary = nodes.filter(node => node.surfaceOp === 'replace' && node.key === 'compact-summary').at(-1)?.seq;
     for (const node of nodes) {
+      if (node.surfaceOp === 'replace' && node.key === 'compact-summary' && node.seq !== latestSummary) ranges.push([node.seq, node.seq]);
       if (node.surfaceOp !== 'replace' && node.surfaceOp !== 'hide') continue;
       const start = node.replacesStart, end = node.replacesEnd;
       if (!Number.isInteger(start) || !Number.isInteger(end)) continue;

@@ -3,6 +3,18 @@ import {SqliteStateStore} from '../dist/storage.js';import {SessionStore} from '
 function fixture(){const dir=mkdtempSync(join(tmpdir(),'fold-visible-')),path=join(dir,'db'),store=new SqliteStateStore(path),history=new SessionStore(store.db);return{store,history,path,close(){store.db.close();rmSync(dir,{recursive:true,force:true});}};}
 const session=f=>f.store.createSession({title:'fold',mode:'chat',agentId:'bot'});
 const original=(f,id)=>foldSurface(f.store.listSurfaceNodes(id));
+test('latest compact summary shadows obsolete summaries even after the newest is hidden [AC:bot-history-memory#AC-3]',()=>{
+ const f=fixture();try{
+  const a=session(f);for(let i=1;i<=4;i++)raw(f,a.id,i);
+  raw(f,a.id,5,'replace',1,1,'old summary','compact-summary');
+  raw(f,a.id,6,'replace',2,2,'new summary','compact-summary');
+  assert.deepEqual(f.history.foldMessages(a.id),original(f,a.id));
+  assert.equal(f.history.foldMessages(a.id).filter(message=>message.key==='compact-summary').length,1);
+  raw(f,a.id,7,'hide',6,6);
+  assert.deepEqual(f.history.foldMessages(a.id),original(f,a.id));
+  assert.equal(f.history.foldMessages(a.id).some(message=>message.key==='compact-summary'),false);
+ }finally{f.close();}
+});
 function raw(f,id,seq,op='append',start=null,end=null,text='raw',key=null){f.store.db.prepare('INSERT INTO session_messages(id,session_id,role,parts_json,created_at,seq,surface_op,replaces_start,replaces_end,key) VALUES(?,?,?,?,?,?,?,?,?,?)').run('raw-'+id+'-'+String(seq),id,'user',JSON.stringify([{type:'text',text}]),'2026-10-13T00:00:00Z',seq,op,start,end,key);}
 test('model fold does not hydrate shadowed tool payloads and matches legacy output field for field [AC:bot-history-memory#AC-3]',()=>{const f=fixture();try{const a=session(f),b=session(f);for(let i=1;i<=24;i++)raw(f,a.id,i,'append',null,null,'shadow-original-'+i+'x'.repeat(8192));raw(f,a.id,25,'replace',1,12,'first summary');raw(f,a.id,26,'replace',8,25,'second summary');raw(f,a.id,27,'hide',26,26,'hidden replace');raw(f,a.id,28,'replace',15,20,'visible summary','summary-key');raw(f,a.id,29,'append',null,null,'new visible');raw(f,b.id,1,'append',null,null,'other session');const wanted=original(f,a.id);const mapping=f.history.mapSurfaceRow.bind(f.history);f.history.mapSurfaceRow=row=>{assert.equal(String(row.parts_json).includes('shadow-original-'),false,'shadowed original payload was hydrated');return mapping(row);};assert.deepEqual(f.history.foldMessages(a.id),wanted);assert.deepEqual(f.history.foldMessages(b.id),original(f,b.id));}finally{f.close();}});
 test('nested overlapping reversed invalid and unknown operations retain exact fold semantics [AC:bot-history-memory#AC-3]',()=>{const f=fixture();try{for(const ranges of [[[1,3],[2,4]],[[1,2],[3,4]],[[5,2],[1,1]],[[1.5,3],[2,2]],[['bad',4],[3,null]],[[null,null],[null,null]]]){const a=session(f);for(let i=1;i<=5;i++)raw(f,a.id,i,i===3?null:'unrecognized',null,null,'message '+i);raw(f,a.id,6,'replace',...ranges[0],'summary one');raw(f,a.id,7,'hide',...ranges[1],'hidden');raw(f,a.id,8,'replace',6,7,'summary two');assert.deepEqual(f.history.foldMessages(a.id),original(f,a.id));}}finally{f.close();}});

@@ -1,5 +1,6 @@
 import { stampSessionWake } from '../approval/unattended-approval.js';
 import { parseRunOutcome } from '../session/run-outcome.js';
+import { retireTaskContextSources } from '../session/task-context.js';
 import { closeOpenToolWave } from '../session/tool-wave-close.js';
 import { createId, nowIso } from '../id.js';
 import { AppError, ValidationError } from '../errors.js';
@@ -310,7 +311,7 @@ function claimPendingMessage(host:BotWorkHost,session:SessionRecord,row:Record<s
     const sender=host.store.getBot(String(row.sender_bot));
     const written=host.store.appendMessage(session.id,'user',[{type:'text',text:`Message from ${sender?.name??row.sender_bot} / ${row.sender_bot}: ${row.body}`}]);
     row.message_ref=written.id;row.updated_at=nowIso();
-    host.store.updateSession(session.id,{metadata:{...session.metadata,relayHop:Number(row.hop),relayHopMessageId:written.id,botWorkTaskId:taskId,outcome:undefined,botWorkStartBarrier:undefined}});
+    host.store.updateSession(session.id,{metadata:{...host.store.getSession(session.id)!.metadata,relayHop:Number(row.hop),relayHopMessageId:written.id,botWorkTaskId:taskId,outcome:undefined,botWorkStartBarrier:undefined}});
     host.store.db.prepare("UPDATE bot_work_messages SET status=?,message_ref=?,attempt=attempt+1,updated_at=? WHERE id=? AND status='pending'").run(row.wake?'processing':'processed',written.id,nowIso(),String(row.id));
     if(taskId)host.store.db.prepare("UPDATE bot_work_tasks SET status='running',attempt=attempt+1,updated_at=? WHERE id=? AND status='queued'").run(nowIso(),taskId);
     if(row.wake)stampSessionWake(host.store,session.id,{kind:'unattended',source:taskId?'delegation':'bot-message'});
@@ -371,12 +372,13 @@ function retireBotExecution(store:SqliteStateStore,sessionId:string,entries:Reco
  closeOpenToolWave(store,sessionId,'interrupted');
  const messages=store.foldMessages(sessionId),protectedIds=pendingHumanSources(store,sessionId,messages);
  const anchors=entries.map(row=>(store.db.prepare('SELECT seq FROM session_messages WHERE session_id=? AND id=?').get(sessionId,String(row.message_ref)) as {seq:number}|undefined)?.seq).filter((seq):seq is number=>seq!==undefined);
- const first=anchors.length?Math.min(...anchors):Infinity;let start:number|undefined,end:number|undefined;
+ const first=anchors.length?Math.min(...anchors):Infinity,retiredIds=new Set<string>();let start:number|undefined,end:number|undefined;
  const flush=()=>{if(start!==undefined&&end!==undefined)store.hideRange(sessionId,start,end);start=undefined;end=undefined;};
- for(const message of messages){const seq=Number(message.seq);if(seq<first)continue;if(protectedIds.has(message.id)){flush();continue;}if(end!==undefined&&seq!==end+1)flush();start??=seq;end=seq;}flush();
+ for(const message of messages){const seq=Number(message.seq);if(seq<first)continue;if(protectedIds.has(message.id)){flush();continue;}retiredIds.add(message.id);if(end!==undefined&&seq!==end+1)flush();start??=seq;end=seq;}flush();
  const lastUser=store.foldMessages(sessionId).filter(message=>message.role==='user'&&!protectedIds.has(message.id)).at(-1)?.id??null;
  store.appendMessage(sessionId,'system',[{type:'text',text:`[recovery:unknown] ${reason}. Previous execution of messages ${entries.map(row=>row.id).join(', ')} and tasks ${entries.filter(row=>row.kind==='task').map(row=>row.task_id).join(', ')||'(none)'} is retired. Any effects are UNCONFIRMED. Do not resume or repeat those actions without explicit verification. Process only fresh accepted input. Original traces remain searchable.`}],{key:`recovery:${entries[0]!.id}`});
- store.updateSession(sessionId,{status:'idle',metadata:{...session.metadata,outcome:{kind:'idle',reason:'end'},botRecoveryUnknown:entries.map(row=>row.id),botWorkStartBarrier:{lastUserId:lastUser,reason}}});
+ const retiredContext=retireTaskContextSources(session,retiredIds);
+ store.updateSession(sessionId,{status:'idle',todo:retiredContext.todo,metadata:{...retiredContext.metadata,outcome:{kind:'idle',reason:'end'},botRecoveryUnknown:entries.map(row=>row.id),botWorkStartBarrier:{lastUserId:lastUser,reason}}});
 }
 /** A parked old execution needs fresh input or an explicitly verified task retry. */
 export function isBotWorkSessionBlocked(store:SqliteStateStore,sessionId:string):boolean {

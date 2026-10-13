@@ -131,3 +131,25 @@ export function taskContextTodos(metadata: Record<string, unknown>): SessionReco
   const state = metadata.taskContext as TaskContext;
   return normalizeTodos(state.todos?.[state.active]);
 }
+
+
+/** Retire only requirements traced to execution inputs that recovery has hidden.
+ * Todo items have no source id; remove unfinished items only on an exact match
+ * to a retired fact in their own scope. Unattributed work remains untouched.
+ */
+export function retireTaskContextSources(session: SessionRecord, sourceMessageIds: ReadonlySet<string>): Pick<SessionRecord, 'metadata' | 'todo'> {
+  const state = read(session); align(state, session);
+  const retiredByScope = new Map<string, Set<string>>();
+  for (const [scope, facts] of Object.entries(state.tasks)) {
+    const texts = new Set<string>();
+    for (const fact of facts) {
+      if (fact.status !== 'active' || !sourceMessageIds.has(fact.sourceMessageId)) continue;
+      fact.status = 'superseded'; texts.add(fact.text);
+    }
+    retiredByScope.set(scope, texts);
+    state.todos![scope] = (state.todos![scope] ?? []).filter(todo => todo.status === 'completed' || !texts.has(todo.content));
+  }
+  const activeTexts = retiredByScope.get(state.active) ?? new Set<string>();
+  return { metadata: { ...session.metadata, taskContext: state },
+    todo: session.todo.filter(todo => todo.status === 'completed' || !activeTexts.has(todo.content)) };
+}
