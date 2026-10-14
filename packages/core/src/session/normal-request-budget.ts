@@ -69,6 +69,11 @@ export function estimateNormalRequestTokens(
   return system + estimateToolSchemaTokens(input.tools) + estimateMessageTokens(input.messages);
 }
 
+/** System prompt, tool schemas, leading system messages, and the latest user message. */
+export function estimatePinnedRequestTokens(input: NormalRequestMeasureInput): number {
+  return estimateNormalRequestTokens({ ...input, messages: pinnedMessages(input.messages) });
+}
+
 /** Shrink summary text until its own token estimate fits `maxTokens`. */
 export function capSummaryToTokens(summary: string, maxTokens: number): string {
   const trimmed = summary.trim();

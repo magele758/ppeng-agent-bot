@@ -463,7 +463,6 @@ const HEAVY_SHAPE = { systemPromptChars: 8000, toolCount: 40 };
 test('an unmarked model window compacts at half of the default window [AC:bot-window-compact#AC-1]', async () => {
   const { structuredTokens, hygieneTokens } = thresholds();
   const { dir, store } = tmpStore();
-  store.setDaemonControl('bot.contextSettings', { fallbackContextTokens: 32768 });
   const below = seedTurns(store, 'canonical', 40_000);
   const belowTokens = estimateMessageTokens(store.foldMessages(below.id));
   assert.ok(belowTokens > 16_384);

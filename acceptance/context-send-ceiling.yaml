@@ -1,0 +1,38 @@
+id: context-send-ceiling
+title: 压缩先于发送上限，任务事实有上限，已保存的 32768 生效
+status: implemented
+requirement: |
+  Fix:
+  6. A canonical bot turn must not fail with context-length exceeded before the 50% compact tier can run, on the default 131072 window and on a small window. Compact first, then apply the send ceiling. Do not delete the latest user message. Do not change the 20% normal-session cap or the 50/85 ratios.
+  7. Task facts injected into the system prompt need a hard size cap so they cannot by themselves blow the normal-session 20% pin set and force the whole history to be sent. Keep the latest user message.
+  8. A saved fallback context window of exactly 32768 must be honored if the user saved it. Do not treat 32768 as an unsaved placeholder anymore (the old placeholder bug). Default when unset stays resolveMaxContextTokens (131072).
+  No new RAW_AGENT_* feature flags. Acceptance-first, user asked to fix now, tests first.
+criteria:
+  - id: AC-1
+    given: 一条规范 Bot 主会话，模型窗口是默认的 131072，系统提示和工具开销把还能发送的历史上限压到了窗口一半以下，当前历史多于这个上限、但还不到窗口的一半
+    when: 这一轮发给模型
+    then: 不会在一半窗口的压缩跑起来之前报上下文超长；先压缩，再按发送上限检查；最新一条用户消息还在
+  - id: AC-2
+    given: 一条规范 Bot 主会话，模型窗口比默认的 131072 小，系统提示和工具开销同样把发送上限压到窗口一半以下，当前历史多于这个上限、但还不到一半
+    when: 这一轮发给模型
+    then: 不会在一半窗口的压缩跑起来之前报上下文超长；先压缩，再按发送上限检查；最新一条用户消息还在
+  - id: AC-3
+    given: 一条普通会话，写进系统提示的任务事实本身已经超过该窗口的 20%，同时还有更早的历史和一条最新用户消息
+    when: 这一轮发给模型
+    then: 任务事实被限制在硬上限内，不能单靠自己撑破 20% 的钉住部分从而把整段历史都送出去；更早的历史不会整段照送；最新一条用户消息还在
+  - id: AC-4
+    given: 用户把回退上下文窗口保存成恰好 32768，当前模型没有另外标明窗口
+    when: 确定规范 Bot 会话使用的窗口
+    then: 采用 32768，不再把它当成没保存过的旧占位丢掉
+  - id: AC-5
+    given: 用户没有保存回退上下文窗口，当前模型也没有标明窗口
+    when: 确定窗口
+    then: 仍是默认的 131072
+  - id: AC-6
+    given: 上述发送顺序、任务事实上限和回退窗口已经生效
+    when: 查看普通会话请求上限和规范 Bot 的压缩档
+    then: 普通会话仍是窗口的 20%，规范 Bot 仍是窗口的 50% 和 85%
+owner: user
+notes: |
+  用户要求现在就修，本规格按已批准写入，不另等确认。不新增 RAW_AGENT_* 开关。
+  不改普通会话 20% 上限，不改 Bot 50% / 85% 比例。

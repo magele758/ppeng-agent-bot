@@ -295,7 +295,9 @@ async function invokeContextModel(
     const budget = resolveBotWindowBudget(rt.store, adapter, shape);
     let messages = input.messages;
     let compacted = false;
-    if (estimateMessageTokens(messages) >= budget.structuredTokens) {
+    const estimated = estimateMessageTokens(messages);
+    // Overhead can put the send ceiling under the 50% tier. Compact first, then apply it.
+    if (estimated >= budget.structuredTokens || estimated > budget.historyTokens) {
       const host = compactFrom(rt);
       const result = await autoCompactSession(host, {session, agent:input.agent, repoRoot:rt.repoRoot, stateDir:rt.stateDir}, {force:true});
       if (result.replaced) {

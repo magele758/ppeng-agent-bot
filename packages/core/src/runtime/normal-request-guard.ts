@@ -5,6 +5,7 @@
 
 import { createId, nowIso } from '../id.js';
 import { isCanonicalBotChat } from '../session/bot-compact-policy.js';
+import { capSystemPromptForTaskFacts } from '../session/task-context.js';
 import {
   NORMAL_SESSION_REQUEST_RATIO,
   capSummaryToTokens,
@@ -121,31 +122,38 @@ export async function applyNormalSessionRequestBudget<T extends GuardedModelRequ
 ): Promise<T> {
   if (deps.session && isCanonicalBotChat(deps.session)) return input;
 
-  const fit = fitNormalSessionRequest({
+  const systemPrompt = capSystemPromptForTaskFacts({
     systemPrompt: input.systemPrompt,
     tools: input.tools,
     messages: input.messages,
     maxContextTokens: deps.maxContextTokens
   });
+  const prepared = systemPrompt === input.systemPrompt ? input : { ...input, systemPrompt };
+  const fit = fitNormalSessionRequest({
+    systemPrompt: prepared.systemPrompt,
+    tools: prepared.tools,
+    messages: prepared.messages,
+    maxContextTokens: deps.maxContextTokens
+  });
 
   if (fit.pinnedOverBudget) {
     deps.emitTrace?.(overBudgetTrace(fit, 'pinned'));
-    return withMessages(input, fit.messages);
+    return withMessages(prepared, fit.messages);
   }
 
   if (!fit.summarizePrefix || !fit.summaryKept) {
     if (fit.requestTokens > fit.capTokens) deps.emitTrace?.(overBudgetTrace(fit, 'unresolved'));
-    const removed = input.messages.filter(message => !fit.messages.includes(message));
-    return withMessages(input, addSourceNavigation(input, fit.messages, removed, fit.capTokens));
+    const removed = prepared.messages.filter(message => !fit.messages.includes(message));
+    return withMessages(prepared, addSourceNavigation(prepared, fit.messages, removed, fit.capTokens));
   }
 
   try {
     if (!deps.summarize) throw new Error('summary unavailable');
-    const instruction = summaryMessage(deps.session?.id ?? input.sessionId ?? '', continuationSummaryInstruction(deps.session?.summary));
+    const instruction = summaryMessage(deps.session?.id ?? prepared.sessionId ?? '', continuationSummaryInstruction(deps.session?.summary));
     const raw = await deps.summarize([...fit.summarizePrefix, instruction]);
     const keptTokens = estimateNormalRequestTokens({
-      systemPrompt: input.systemPrompt,
-      tools: input.tools,
+      systemPrompt: prepared.systemPrompt,
+      tools: prepared.tools,
       messages: fit.summaryKept
     });
     const room = fit.capTokens - keptTokens;
@@ -155,11 +163,11 @@ export async function applyNormalSessionRequestBudget<T extends GuardedModelRequ
     const summary = capSummaryToTokens(raw, room - sourceTokens - 4);
     const text = summary && source ? `${summary}\n\n${source}` : capSummaryToTokens(raw, room - 4);
     if (!text) throw new Error('empty summary');
-    const sessionId = deps.session?.id ?? input.sessionId ?? input.messages[0]?.sessionId ?? '';
+    const sessionId = deps.session?.id ?? prepared.sessionId ?? prepared.messages[0]?.sessionId ?? '';
     const messages = insertSummary(fit.summaryKept, summaryMessage(sessionId, text));
     const sentTokens = estimateNormalRequestTokens({
-      systemPrompt: input.systemPrompt,
-      tools: input.tools,
+      systemPrompt: prepared.systemPrompt,
+      tools: prepared.tools,
       messages
     });
     try {
@@ -178,7 +186,7 @@ export async function applyNormalSessionRequestBudget<T extends GuardedModelRequ
         overBudgetTrace({ ...fit, requestTokens: sentTokens }, 'summary_still_over')
       );
     }
-    return withMessages(input, messages);
+    return withMessages(prepared, messages);
   } catch (error) {
     deps.emitTrace?.({
       kind: 'compact_skipped',
@@ -188,8 +196,8 @@ export async function applyNormalSessionRequestBudget<T extends GuardedModelRequ
       }
     });
     if (fit.requestTokens > fit.capTokens) deps.emitTrace?.(overBudgetTrace(fit, 'summary_failed'));
-    const removed = input.messages.filter(message => !fit.messages.includes(message));
-    return withMessages(input, addSourceNavigation(input, fit.messages, removed, fit.capTokens));
+    const removed = prepared.messages.filter(message => !fit.messages.includes(message));
+    return withMessages(prepared, addSourceNavigation(prepared, fit.messages, removed, fit.capTokens));
   }
 }
 

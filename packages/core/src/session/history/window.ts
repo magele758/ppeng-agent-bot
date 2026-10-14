@@ -4,12 +4,6 @@ import { resolveMaxContextTokens } from '../session-budget.js';
 
 export const BOT_CONTEXT_SETTINGS_KEY = 'bot.contextSettings';
 
-/**
- * Hardcoded stand-in introduced when bot windows were split from the model
- * window. It is not a context size, and it must not replace an omitted adapter.
- */
-const LEGACY_BOT_CONTEXT_FALLBACK = 32_768;
-
 export interface BotContextSettings {
   fallbackContextTokens: number;
 }
@@ -31,11 +25,10 @@ function savedFallback(store: ContextSettingsStore): number | undefined {
   if (typeof tokens !== 'number' || !Number.isSafeInteger(tokens) || tokens < 1024 || tokens > 10_000_000) {
     return undefined;
   }
-  if (tokens === LEGACY_BOT_CONTEXT_FALLBACK) return undefined;
   return tokens;
 }
 
-/** Operator-saved window, otherwise the real model default (131072). Never 32768. */
+/** Operator-saved window, including 32768. Unset stays the model default (131072). */
 export function readBotContextSettings(store: ContextSettingsStore): BotContextSettings {
   return { fallbackContextTokens: savedFallback(store) ?? resolveMaxContextTokens() };
 }
