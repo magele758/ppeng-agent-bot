@@ -845,6 +845,46 @@ describe('runSessionKernel wiring', () => {
     expect(executed).toEqual(['yes']);
   });
 
+  it('ID 复用连续两轮只执行一次', async () => {
+    const waves: Array<Array<{ id: string; n: unknown }>> = [];
+    let turns = 0;
+    const { host, session } = createHarness({
+      model: () => {
+        turns += 1;
+        if (turns <= 2) {
+          return {
+            stopReason: 'tool_use',
+            assistantParts: [
+              {
+                type: 'tool_call',
+                toolCallId: 'heuristic_read_dir',
+                name: 'echo',
+                input: { n: turns },
+              },
+            ],
+          };
+        }
+        return textResult('done');
+      },
+      host: {
+        executeToolCalls: async (calls) => {
+          waves.push(calls.map((call) => ({ id: call.toolCallId, n: call.input.n })));
+          return calls.map((call) => ({
+            toolCallId: call.toolCallId,
+            name: call.name,
+            ok: true,
+            content: 'ran',
+          }));
+        },
+      },
+    });
+    await runSessionKernel(host, session.id);
+    expect(waves).toEqual([
+      [{ id: 'heuristic_read_dir', n: 1 }],
+      [{ id: 'heuristic_read_dir', n: 2 }],
+    ]);
+  });
+
   it('does not execute a tool the approval gate already closed', async () => {
     const executed: string[] = [];
     let live: TurnKernelStore | undefined;

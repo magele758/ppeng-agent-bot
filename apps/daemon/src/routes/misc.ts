@@ -17,6 +17,17 @@ import { guardSession } from '../session-guard.js';
 
 const APPROVAL_STATUSES: ReadonlyArray<ApprovalRecord['status']> = ['pending', 'approved', 'rejected'];
 
+/** Resume when an approval is granted, or when a rejection settles the wave. */
+export function shouldResumeAfterApproval(
+  approvalStatus: ApprovalRecord['status'],
+  sessionStatus: string | undefined,
+  pendingLeft: boolean
+): boolean {
+  if (sessionStatus !== 'idle') return false;
+  if (approvalStatus === 'approved') return true;
+  return approvalStatus === 'rejected' && !pendingLeft;
+}
+
 interface MiscOptions {
   pkgName: string;
   pkgVersion: string;
@@ -176,7 +187,10 @@ export function miscRoutes(runtime: RawAgentRuntime, opts: MiscOptions): RouteSp
         if (pending) guardSession(runtime, pending.sessionId, auth);
         const approval = await runtime.approve(id, decision);
         const session = runtime.getSession(approval.sessionId);
-        if (approval.status === 'approved' && session?.status === 'idle') {
+        const pendingLeft = runtime
+          .listApprovals('pending')
+          .some((item) => item.sessionId === approval.sessionId);
+        if (session && shouldResumeAfterApproval(approval.status, session.status, pendingLeft)) {
           await runtime.runSession(session.id);
         }
         json(response, 200, {

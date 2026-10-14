@@ -31,7 +31,7 @@ SDK 提供 4 个组装档位（高档位包含所有低档位模块）：
 - **类型单一切实来源（SSOT）**：循环层的类型以 `src/types.ts` 为唯一真源，上层（如 `packages/core`）只做 re-export，禁止重复声明导致类型分叉。
 - **Watchdog 守卫正交性**：轮内复读（repetition）与思考空转（reasoning-spin）Watchdog 统一包裹在 `runtime/tool-loop.ts` 的 `runTurnWithRetries` 外层，**严禁将 Watchdog 逻辑塞进各具体的 ModelAdapter 中**。
   - `runTurnWithRetries(host, adapter, input, onStream, opts?)` 的可选 `opts.maxRetries` 只能**下调**（取 `min(RAW_AGENT_MODEL_MAX_RETRIES, opts.maxRetries)`，可为 0）；产品层的模型备选链用它限制备选前的叠加重试，不传则行为不变。
-- **审批按调用逐项**：同一波里每个需要审批的工具各建一条审批，全部批准后才执行。被拒绝的调用写入失败的 `tool_result`，恢复时和后续普通轮次都不再执行。审批门通过 `closedByGate` 标出本波已关闭的调用，普通轮次据此跳过，不再为这一步重读整段会话；宿主没填这个标记时仍按折叠结果过滤。同一波只查一次审批表。实际需要审批的调用都会带幂等 key，包括 `permissionMode=ask` 下 `approvalMode` 为 `never` 的非只读工具。权限模式拒绝其中一个时，同波其余调用也各写一条未执行结果。
+- **审批按调用逐项**：同一波里每个需要审批的工具各建一条审批，全部批准后才执行。被拒绝的调用写入失败的 `tool_result`，恢复时和后续普通轮次都不再执行。审批门通过 `closedByGate` 标出本波已关闭的调用，普通轮次据此跳过，不再为这一步重读整段会话；宿主没填这个标记时，只按未匹配 ID 过滤当前这一波，已经有结果的历史调用不会再执行。同一波只查一次审批表。实际需要审批的调用都会带幂等 key，包括 `permissionMode=ask` 下 `approvalMode` 为 `never` 的非只读工具。权限模式拒绝其中一个时，同波其余调用也各写一条未执行结果。
 - **补偿回滚写进结果**：`ToolLoopHost.compensate` 返回已回滚的 `toolCallId` 后，这些调用的结果改为 `ok: false`，并说明变更已撤销。只回滚磁盘、仍留下成功结果，会让下一轮按「文件已写入」继续改。
 
 ---

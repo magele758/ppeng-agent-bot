@@ -101,7 +101,8 @@ export function decideInterruptResume(input: {
 
 /**
  * Calls the approval gate already closed are skipped in memory.
- * A host that did not report falls back to folding the transcript.
+ * A host that did not report keeps the current wave, filtered by still-unmatched ids.
+ * Reused ids (heuristic_read_dir) must not replay an earlier call that already has a result.
  */
 export interface ToolCallClosure {
   reported: boolean;
@@ -113,28 +114,34 @@ export function selectExecutableToolCalls<T extends { toolCallId: string }>(
   closure: ToolCallClosure | undefined,
   foldUnmatched: () => readonly T[]
 ): T[] {
-  if (!closure?.reported) return [...foldUnmatched()];
+  if (!closure?.reported) {
+    const open = new Set(foldUnmatched().map((call) => call.toolCallId));
+    return calls.filter((call) => open.has(call.toolCallId));
+  }
   if (closure.ids.length === 0) return [...calls];
   const closed = new Set(closure.ids);
   return calls.filter((call) => !closed.has(call.toolCallId));
 }
 
-/** Reconstruct unmatched tool_call parts from a fold view, optionally filtered. */
+/**
+ * Latest unmatched tool_call per id. An id that was closed and then reused
+ * contributes only the call that reopened it.
+ */
 export function unmatchedToolCallsFromFold(
   folded: Array<{ parts: MessagePart[] }>,
   allowIds?: string[]
 ): ToolCallPart[] {
   const open = new Set(unmatchedToolCallIds(folded));
   const allow = allowIds ? new Set(allowIds) : open;
-  const out: ToolCallPart[] = [];
+  const latest = new Map<string, ToolCallPart>();
   for (const message of folded) {
     for (const part of message.parts) {
       if (part.type === 'tool_call' && open.has(part.toolCallId) && allow.has(part.toolCallId)) {
-        out.push(part);
+        latest.set(part.toolCallId, part);
       }
     }
   }
-  return out;
+  return [...latest.values()];
 }
 
 function asStringArray(raw: unknown): string[] {
