@@ -1,0 +1,21 @@
+id: software-egress-reserved-tools
+title: 软件出站地址与内置工具名
+status: implemented
+requirement: |
+  Fix two issues only:
+  1. Software HTTP egress must block 100.64.0.0/10 (and otherwise match the repo's existing isPrivateOrReservedIp, including cloud metadata such as 100.100.100.200). Read-only calls must not be a way around that block.
+  2. A bot/software connection must not shadow builtin tools for other sessions. Expand the reserved names so at least grep_files, browser_screenshot, history_search, history_read, memory_read, message_agent, and cron_* cannot be taken. Binding a reserved name is rejected.
+notes: 负责人在本次要求中明确现在就修，标准随实现一起落地。不新增环境变量。
+criteria:
+  - id: AC-1
+    given: 没有放行私网访问
+    when: 软件连接用只读方法访问 100.64.0.0/10 中的地址，包括云元数据 100.100.100.200，以及这个地址的 IPv6 映射写法
+    then: 请求被拒绝，并且不会真正发出
+  - id: AC-2
+    given: 产品已经把回环、链路本地元数据、运营商级 NAT 等地址视为私网或保留地址
+    when: 软件连接直接访问这些地址，或域名解析到这些地址，包括只读方法
+    then: 同样被拒绝；100.64.0.0/10 之外的公网地址不会被这条规则拒绝
+  - id: AC-3
+    given: 其他会话仍要使用内置工具
+    when: 某个 Bot 的软件连接使用 grep_files、browser_screenshot、history_search、history_read、memory_read、message_agent，或以 cron_ 开头的名字，或者库里已经有同名连接
+    then: 新的绑定被拒绝，其他会话仍然看得到这些内置工具，别人的软件连接也不会把其他内置工具从会话里拿走
