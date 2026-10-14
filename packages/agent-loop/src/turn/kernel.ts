@@ -164,11 +164,15 @@ export async function runSessionKernel(
     .map((a) => a.id);
   const resumeDecision = decideInterruptResume({ session, pendingApprovalIds });
   if (resumeDecision.action === 'yield_waiting') {
+    const parked =
+      session.status === 'waiting_approval'
+        ? session
+        : host.store.updateSession(sessionId, { status: 'waiting_approval' });
     await options?.latch?.emit({
       type: 'waiting_approval',
       approvalIds: resumeDecision.interrupt.approvalIds,
     });
-    return session;
+    return parked;
   }
   let resumeFromInterrupt: RunInterruptState | undefined =
     resumeDecision.action === 'resume_tools' ? resumeDecision.interrupt : undefined;
@@ -531,25 +535,56 @@ export async function runSessionKernel(
         if (remaining.length > 0) {
           const folded = host.store.foldMessages(sid);
           const picked = await pickTurnTools(context.session, folded, 0, false);
-          const results = await host.executeToolCalls(
-            remaining,
-            context,
-            picked.allowExternalAiTools,
-            sessionId,
-            picked.resolvedTools
-          );
-          host.processToolResults(results, remaining, context.session, undefined, sessionId, options?.onModelStreamChunk);
-          for (const r of results) {
-            host.recordToolUse?.({ name: r.name, sessionId: sid, turn, ok: r.ok });
+          const gate =
+            (await host.checkToolApprovals?.(remaining, context, refreshedSession, {
+              filePolicy,
+              turnTools: picked.resolvedTools,
+            })) ?? 'proceed';
+          if (gate === 'waiting') {
+            const approvalIds = host.store
+              .listApprovals({ status: 'pending' })
+              .filter((approval) => approval.sessionId === sid)
+              .map((approval) => approval.id);
+            const nextInterrupt = createWaitingApprovalInterrupt({
+              toolCallIds: remaining.map((call) => call.toolCallId),
+              approvalIds,
+              writerRunId,
+              executedToolCallIds: interrupt.executedToolCallIds,
+            });
+            const current = host.store.getSession(sid) as SessionRecord;
+            return host.store.updateSession(sid, {
+              status: 'waiting_approval',
+              metadata: mergeInterruptMetadata(current.metadata ?? {}, nextInterrupt),
+            });
           }
-          await emitStep({
-            type: 'tools_done',
-            results: results.map((r) => ({ ok: r.ok, content: r.content, name: r.name })),
-          });
+          if (gate !== 'skip') {
+            const executable = unmatchedToolCallsFromFold(
+              host.store.foldMessages(sid),
+              interrupt.toolCallIds.filter((id) => !interrupt.executedToolCallIds.includes(id))
+            );
+            if (executable.length > 0) {
+              const results = await host.executeToolCalls(
+                executable,
+                context,
+                picked.allowExternalAiTools,
+                sessionId,
+                picked.resolvedTools
+              );
+              host.processToolResults(results, executable, context.session, undefined, sessionId, options?.onModelStreamChunk);
+              for (const r of results) {
+                host.recordToolUse?.({ name: r.name, sessionId: sid, turn, ok: r.ok });
+              }
+              await emitStep({
+                type: 'tools_done',
+                results: results.map((r) => ({ ok: r.ok, content: r.content, name: r.name })),
+              });
+            }
+          }
         }
 
+        const afterResume = host.store.getSession(sid);
         host.store.updateSession(sid, {
-          metadata: mergeInterruptMetadata(context.session.metadata ?? {}, null),
+          metadata: mergeInterruptMetadata(afterResume?.metadata ?? {}, null),
         });
         continue;
       }

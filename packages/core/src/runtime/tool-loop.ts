@@ -188,9 +188,7 @@ function hostFromDeps(deps: ToolLoopDeps): ToolLoopHost {
         onCreated: deps.onArtifactCreated
       }),
     redactSecrets: (content) => redactToolContent(content, process.env),
-    compensate: async (items) => {
-      await compensateCompletedLifo(items);
-    }
+    compensate: (items) => compensateCompletedLifo(items)
   };
 }
 

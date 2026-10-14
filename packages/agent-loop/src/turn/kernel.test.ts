@@ -147,7 +147,7 @@ function createHarness(opts?: {
     ...opts?.host,
   };
 
-  return { host, store, session, surface, spec, calls, echo };
+  return { host, store, session, surface, spec, calls, echo, approvals };
 }
 
 describe('runSessionKernel wiring', () => {
@@ -749,6 +749,123 @@ describe('runSessionKernel wiring', () => {
     await runSessionKernel(host, session.id);
     expect(seen.allow).toBe(true);
     expect(seen.names).toEqual(['dyn_echo']);
+  });
+
+  it('does not execute a tool the approval gate already closed', async () => {
+    const executed: string[] = [];
+    let live: TurnKernelStore | undefined;
+    const { host, session, store } = createHarness({
+      model: () => textResult('after'),
+      host: {
+        checkToolApprovals: (calls, _ctx, current) => {
+          live?.appendMessage(
+            current.id,
+            'tool',
+            calls.map((call) => ({
+              type: 'tool_result' as const,
+              toolCallId: call.toolCallId,
+              name: call.name,
+              ok: false,
+              content: 'Approval was rejected.',
+            }))
+          );
+          return 'proceed';
+        },
+        executeToolCalls: async (calls) => {
+          executed.push(...calls.map((call) => call.toolCallId));
+          return calls.map((call) => ({
+            toolCallId: call.toolCallId,
+            name: call.name,
+            ok: true,
+            content: 'ran',
+          }));
+        },
+      },
+    });
+    live = store;
+    host.store.appendMessage(session.id, 'assistant', [
+      { type: 'tool_call', toolCallId: 'rejected-1', name: 'echo', input: {} },
+    ]);
+    host.store.updateSession(session.id, {
+      metadata: {
+        interrupt: createWaitingApprovalInterrupt({
+          toolCallIds: ['rejected-1'],
+          approvalIds: ['ap-rejected'],
+        }),
+      },
+    });
+    await runSessionKernel(host, session.id);
+    expect(executed).toEqual([]);
+    const folded = store.foldMessages(session.id);
+    expect(
+      folded.some((message) =>
+        message.parts.some(
+          (part) => part.type === 'tool_result' && part.content === 'Approval was rejected.'
+        )
+      )
+    ).toBe(true);
+    expect(store.getSession(session.id)?.metadata?.interrupt).toBeUndefined();
+  });
+
+  it('keeps metadata written while resumed tools run', async () => {
+    let live: TurnKernelStore | undefined;
+    const { host, session, store } = createHarness({
+      model: () => textResult('after'),
+      host: {
+        executeToolCalls: async (calls, _ctx, _allow, sessionId) => {
+          const current = live?.getSession(sessionId);
+          live?.updateSession(sessionId, {
+            metadata: { ...(current?.metadata ?? {}), dynToolsUsed: ['dyn_echo'] },
+          });
+          return calls.map((call) => ({
+            toolCallId: call.toolCallId,
+            name: call.name,
+            ok: true,
+            content: 'ok',
+          }));
+        },
+      },
+    });
+    live = store;
+    host.store.appendMessage(session.id, 'assistant', [
+      { type: 'tool_call', toolCallId: 'resume-meta', name: 'echo', input: {} },
+    ]);
+    host.store.updateSession(session.id, {
+      metadata: {
+        interrupt: createWaitingApprovalInterrupt({
+          toolCallIds: ['resume-meta'],
+          approvalIds: [],
+        }),
+      },
+    });
+    await runSessionKernel(host, session.id);
+    const metadata = store.getSession(session.id)?.metadata ?? {};
+    expect(metadata.dynToolsUsed).toEqual(['dyn_echo']);
+    expect(metadata.interrupt).toBeUndefined();
+  });
+
+  it('returns to waiting_approval while a sibling approval is still pending', async () => {
+    const { host, session, approvals, calls } = createHarness();
+    approvals.push({
+      id: 'ap-2',
+      sessionId: session.id,
+      toolName: 'bash',
+      status: 'pending',
+      args: {},
+      createdAt: '',
+    });
+    host.store.updateSession(session.id, {
+      status: 'idle',
+      metadata: {
+        interrupt: createWaitingApprovalInterrupt({
+          toolCallIds: ['c1'],
+          approvalIds: ['ap-2'],
+        }),
+      },
+    });
+    const out = await runSessionKernel(host, session.id);
+    expect(out.status).toBe('waiting_approval');
+    expect(calls.execute).toBe(0);
   });
 
   it('rewinds uncommitted tail on finishFailed', async () => {

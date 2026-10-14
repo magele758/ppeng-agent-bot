@@ -258,12 +258,16 @@ export async function runSessionKernel(
     .map((a) => a.id);
   const resumeDecision = decideInterruptResume({ session, pendingApprovalIds });
   if (resumeDecision.action === 'yield_waiting') {
+    const parked =
+      session.status === 'waiting_approval'
+        ? session
+        : host.store.updateSession(sessionId, { status: 'waiting_approval' });
     await options?.latch?.emit({
       type: 'waiting_approval',
       approvalIds: resumeDecision.interrupt.approvalIds,
       interrupt: resumeDecision.interrupt
     });
-    return session;
+    return parked;
   }
   let resumeFromInterrupt: RunInterruptState | undefined =
     resumeDecision.action === 'resume_tools' ? resumeDecision.interrupt : undefined;
@@ -478,19 +482,51 @@ export async function runSessionKernel(
             0
           );
           emitDynHydrateTrace(host, sid, dynHydrated);
-          const results = await host.executeToolCalls(
+          const gate = await host.checkToolApprovals(
             remaining,
             context,
-            allowExt,
-            sid,
+            filePolicy,
+            context.session,
             selectedTools.turnTools
           );
-          host.processToolResults(results, remaining, session, task, sid, options?.onModelStreamChunk);
-          recordDynToolUses(host, sid, turn, results, dynHydrated.names);
-          await emitStep({
-            type: 'tools_done',
-            results: results.map((r) => ({ ok: r.ok, content: r.content, name: r.name }))
-          });
+          if (gate === 'waiting') {
+            const approvalIds = host.store
+              .listApprovals({ status: 'pending' })
+              .filter((approval) => approval.sessionId === sid)
+              .map((approval) => approval.id);
+            const nextInterrupt = createWaitingApprovalInterrupt({
+              toolCallIds: remaining.map((call) => call.toolCallId),
+              approvalIds,
+              writerRunId,
+              executedToolCallIds: interrupt.executedToolCallIds
+            });
+            const current = host.store.getSession(sid) as SessionRecord;
+            return host.store.updateSession(sid, {
+              status: 'waiting_approval',
+              metadata: mergeInterruptMetadata(current.metadata ?? {}, nextInterrupt)
+            });
+          }
+          if (gate !== 'skip') {
+            const executable = unmatchedToolCallsFromFold(
+              host.store.foldMessages(sid),
+              interrupt.toolCallIds.filter((id) => !interrupt.executedToolCallIds.includes(id))
+            );
+            if (executable.length > 0) {
+              const results = await host.executeToolCalls(
+                executable,
+                context,
+                allowExt,
+                sid,
+                selectedTools.turnTools
+              );
+              host.processToolResults(results, executable, session, task, sid, options?.onModelStreamChunk);
+              recordDynToolUses(host, sid, turn, results, dynHydrated.names);
+              await emitStep({
+                type: 'tools_done',
+                results: results.map((r) => ({ ok: r.ok, content: r.content, name: r.name }))
+              });
+            }
+          }
         }
         const after = host.store.getSession(sid);
         host.store.updateSession(sid, {

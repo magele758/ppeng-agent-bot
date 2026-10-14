@@ -79,9 +79,7 @@ function buildToolLoopHost(
             durationMs: String(durationMs),
           })
       : undefined,
-    compensate: async (items) => {
-      await compensateCompletedLifo(items);
-    },
+    compensate: (items) => compensateCompletedLifo(items),
   };
 }
 
