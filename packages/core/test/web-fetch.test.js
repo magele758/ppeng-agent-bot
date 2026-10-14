@@ -177,3 +177,97 @@ test('fetchUrlText allows 172.32.x.x (above private range)', async () => {
   assert.equal(result.ok, false);
   assert.ok(!result.content.includes('private'));
 });
+
+function pinned(request, resolveHost = async () => ['93.184.216.34']) {
+  return { resolveHost, request, allowPrivateHosts: false };
+}
+
+test('fetchUrlText blocks CGNAT, mapped IPv6, and decimal loopback without connecting', async () => {
+  let calls = 0;
+  const request = async () => {
+    calls += 1;
+    return new Response('no');
+  };
+  for (const url of [
+    'http://100.64.0.1/',
+    'http://100.127.255.255/',
+    'http://[::ffff:7f00:1]/',
+    'http://[::ffff:127.0.0.1]/',
+    'http://[::ffff:169.254.169.254]/',
+    'http://2130706433/',
+    'http://0x7f000001/'
+  ]) {
+    const result = await fetchUrlText({ url, ...pinned(request) });
+    assert.equal(result.ok, false, url);
+    assert.match(result.content, /private/, url);
+  }
+  assert.equal(calls, 0);
+});
+
+test('fetchUrlText refuses a name that resolves to loopback or metadata', async () => {
+  let calls = 0;
+  const request = async () => {
+    calls += 1;
+    return new Response('secret');
+  };
+  for (const address of ['127.0.0.1', '::1', '169.254.169.254', '10.1.2.3', '100.64.1.1']) {
+    const result = await fetchUrlText({
+      url: 'https://public.example/page',
+      ...pinned(request, async () => [address])
+    });
+    assert.equal(result.ok, false, address);
+    assert.match(result.content, /private/, address);
+  }
+  const mixed = await fetchUrlText({
+    url: 'https://public.example/page',
+    ...pinned(request, async () => ['93.184.216.34', '127.0.0.1'])
+  });
+  assert.equal(mixed.ok, false);
+  assert.match(mixed.content, /private/);
+  assert.equal(calls, 0);
+});
+
+test('fetchUrlText pins the approved address and rechecks each redirect', async () => {
+  const seen = [];
+  const result = await fetchUrlText({
+    url: 'https://public.example/start',
+    ...pinned(async (url, address) => {
+      seen.push(`${url.hostname}@${address}`);
+      if (url.pathname === '/start') {
+        return new Response(null, { status: 302, headers: { location: 'https://cdn.example/next' } });
+      }
+      return new Response('pinned-body', { status: 200, headers: { 'content-type': 'text/plain' } });
+    }, async (hostname) => (hostname === 'cdn.example' ? ['203.0.113.10'] : ['93.184.216.34']))
+  });
+  assert.equal(result.ok, true);
+  assert.match(result.content, /pinned-body/);
+  assert.deepEqual(seen, ['public.example@93.184.216.34', 'cdn.example@203.0.113.10']);
+});
+
+test('fetchUrlText does not follow a redirect into a private address', async () => {
+  let calls = 0;
+  const result = await fetchUrlText({
+    url: 'https://public.example/start',
+    ...pinned(async () => {
+      calls += 1;
+      return new Response(null, { status: 302, headers: { location: 'http://169.254.169.254/latest/meta-data' } });
+    })
+  });
+  assert.equal(calls, 1);
+  assert.equal(result.ok, false);
+  assert.match(result.content, /private/);
+});
+
+test('fetchUrlText stops a redirect loop', async () => {
+  let calls = 0;
+  const result = await fetchUrlText({
+    url: 'http://203.0.113.10/start',
+    timeoutMs: 1000,
+    request: async () => {
+      calls += 1;
+      return new Response(null, { status: 302, headers: { location: 'http://203.0.113.10/again' } });
+    }
+  });
+  assert.equal(result.ok, false);
+  assert.ok(calls >= 2 && calls <= 6);
+});

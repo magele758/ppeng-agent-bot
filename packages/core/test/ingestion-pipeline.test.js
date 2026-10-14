@@ -8,6 +8,7 @@ import {
   classify,
   decode,
   decodeTextBytes,
+  defaultDownload,
   defaultIngestionSettings,
   emit,
   extractOoxmlText,
@@ -349,5 +350,58 @@ describe('fetchPayload / route / AttachmentIngestService', () => {
     assert.match(emitText, /«end external»\s*$/);
     sqlite.db.close();
     rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe('defaultDownload private network policy', () => {
+  const offline = { allowPrivateHosts: false };
+
+  it('refuses literal private URLs and DNS loopback before download', async () => {
+    let calls = 0;
+    const request = async () => {
+      calls += 1;
+      return new Response('secret', { status: 200, headers: { 'content-type': 'text/plain' } });
+    };
+    const literal = await defaultDownload('http://169.254.169.254/latest/meta-data', 1000, 1000, { ...offline, request });
+    assert.equal(literal.ok, false);
+    assert.match(literal.error ?? '', /private/);
+    const rebound = await defaultDownload('https://files.example/a.txt', 1000, 1000, {
+      ...offline,
+      request,
+      resolveHost: async () => ['127.0.0.1']
+    });
+    assert.equal(rebound.ok, false);
+    assert.match(rebound.error ?? '', /private/);
+    assert.equal(calls, 0);
+  });
+
+  it('does not follow a redirect onto a private address', async () => {
+    let calls = 0;
+    const redirected = await defaultDownload('https://files.example/a.txt', 1000, 1000, {
+      ...offline,
+      resolveHost: async () => ['93.184.216.34'],
+      request: async () => {
+        calls += 1;
+        return new Response(null, { status: 302, headers: { location: 'http://10.0.0.5/secret' } });
+      }
+    });
+    assert.equal(calls, 1);
+    assert.equal(redirected.ok, false);
+    assert.match(redirected.error ?? '', /private/);
+  });
+
+  it('pins a public download to the approved address', async () => {
+    const seen = [];
+    const saved = await defaultDownload('https://files.example/a.txt', 1000, 1000, {
+      ...offline,
+      resolveHost: async () => ['93.184.216.34'],
+      request: async (_url, address) => {
+        seen.push(address);
+        return new Response('hello-file', { status: 200, headers: { 'content-type': 'text/plain' } });
+      }
+    });
+    assert.equal(saved.ok, true);
+    assert.equal(saved.buffer?.toString(), 'hello-file');
+    assert.deepEqual(seen, ['93.184.216.34']);
   });
 });

@@ -42,7 +42,7 @@ export interface SandboxExecOptions {
   timeoutMs?: number;
   /** Abort signal. */
   signal?: AbortSignal;
-  /** Allow network access (default: true). */
+  /** Network stays closed unless the caller passes true. */
   allowNetwork?: boolean;
   /** Remote workspace / Durable Object name when the provider is session-aware. */
   sessionId?: string;
@@ -168,6 +168,11 @@ function buildSeatbeltProfile(workspace: string | string[], home: string, allowN
   return lines.join('\n') + '\n';
 }
 
+/** Network is permitted only when the caller asks for it. */
+export function explicitNetworkAllowed(allowNetwork: boolean | undefined): boolean {
+  return allowNetwork === true;
+}
+
 /** Visible for testing. */
 export { buildSeatbeltProfile };
 
@@ -203,7 +208,7 @@ export class MacOSSandboxProvider implements SandboxProvider {
     const profile = buildSeatbeltProfile(
       options.workspace,
       home,
-      options.allowNetwork !== false,
+      explicitNetworkAllowed(options.allowNetwork),
     );
 
     // Write profile to a temp file (sandbox-exec requires a file path)
@@ -271,7 +276,7 @@ export class LinuxBwrapProvider implements SandboxProvider {
       ...SENSITIVE_HOME_DIRS.map((d) => join(home, d)).filter((p) => existsSync(p)).flatMap((p) => ['--tmpfs', p]),
     ];
 
-    if (options.allowNetwork === false) {
+    if (!explicitNetworkAllowed(options.allowNetwork)) {
       args.push('--unshare-net');
     }
 
@@ -338,6 +343,9 @@ export class SandboxManager {
    * Builtin hardline commands are refused before provider selection, so
    * direct, OS, and container/computer backends all miss the spawn.
    * Then applies Tier 0 env sanitization and delegates to the provider.
+   * Tool children lose credential env names unless the caller sets
+   * `envOptions.stripCredentials` to false. Network is off unless
+   * `allowNetwork` is true (seatbelt / bwrap). Direct mode has no network namespace.
    */
   async execute(
     command: string,
@@ -356,14 +364,17 @@ export class SandboxManager {
       return { stdout: '', stderr: refused.stderr, code: refused.code, signal: null, tier: 0 };
     }
     this.refreshProvider();
-    const env = sanitizeSpawnEnv(options?.envOptions);
+    const env = sanitizeSpawnEnv({
+      ...options?.envOptions,
+      stripCredentials: options?.envOptions?.stripCredentials ?? true,
+    });
     return this.provider.execute(command, {
       cwd,
       workspace: options?.workspace ?? cwd,
       env,
       timeoutMs: options?.timeoutMs,
       signal: options?.signal,
-      allowNetwork: options?.allowNetwork,
+      allowNetwork: explicitNetworkAllowed(options?.allowNetwork),
       sessionId: options?.sessionId,
     });
   }

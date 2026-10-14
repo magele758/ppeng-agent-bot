@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { nowIso } from '../id.js';
-import { fetchUrlText, webSearchFromEnv } from '../tools/web-fetch.js';
+import { fetchUrlText, webFetchAllowsPrivate, webSearchFromEnv } from '../tools/web-fetch.js';
 import { ResearchStore } from './store.js';
 import type { ClaimConfidence, ResearchSource, ResearchTask, SourceKind, TrustLevel } from './types.js';
 
@@ -217,7 +217,13 @@ export class ResearchPipeline {
     this.deps.store.updateTaskStatus(taskId, 'extracting');
     const fetchFn =
       this.deps.fetchText ??
-      ((url: string) => fetchUrlText({ url, maxBytes: 120_000, timeoutMs: 20_000 }));
+      ((url: string) =>
+        fetchUrlText({
+          url,
+          maxBytes: 120_000,
+          timeoutMs: 20_000,
+          allowPrivateHosts: webFetchAllowsPrivate(env)
+        }));
 
     const evidenceRows: Array<{ id: string; quote: string; sourceTitle: string }> = [];
     for (const src of sources.slice(0, MAX_FETCH)) {

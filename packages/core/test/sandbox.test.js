@@ -191,6 +191,46 @@ describe('sanitizeSpawnEnv', () => {
       assert.equal(env.GOOGLE_APPLICATION_CREDENTIALS, undefined);
     });
 
+    it('strips RAW_AGENT key, token, and secret names when enabled', () => {
+      const env = sanitizeSpawnEnv({
+        base: {
+          RAW_AGENT_API_KEY: 'sk-leak',
+          RAW_AGENT_VL_API_KEY: 'vl-leak',
+          RAW_AGENT_EMBEDDING_API_KEY: 'embed-leak',
+          RAW_AGENT_S3_ACCESS_KEY: 's3-leak',
+          RAW_AGENT_S3_SECRET_KEY: 's3-secret',
+          RAW_AGENT_GATEWAY_TOKEN: 'gw-leak',
+          RAW_AGENT_FEISHU_APP_SECRET: 'feishu-leak',
+          RAW_AGENT_OAUTH_GOOGLE_CLIENT_SECRET: 'oauth-leak',
+          RAW_AGENT_MCP_BEARER: 'bearer-leak',
+          RAW_AGENT_MODEL_NAME: 'kept-model',
+          RAW_AGENT_BASE_URL: 'https://api.example/v1',
+          RAW_AGENT_MODEL_CONTEXT_TOKENS: '131072',
+          RAW_AGENT_TOKEN_BUDGET: '0',
+          RAW_AGENT_TOKEN_PRICE_JSON: '{}',
+          RAW_AGENT_WEB_FETCH_ALLOW_PRIVATE: '0',
+          PATH: '/usr/bin'
+        },
+        stripCredentials: true
+      });
+      assert.equal(env.RAW_AGENT_API_KEY, undefined);
+      assert.equal(env.RAW_AGENT_VL_API_KEY, undefined);
+      assert.equal(env.RAW_AGENT_EMBEDDING_API_KEY, undefined);
+      assert.equal(env.RAW_AGENT_S3_ACCESS_KEY, undefined);
+      assert.equal(env.RAW_AGENT_S3_SECRET_KEY, undefined);
+      assert.equal(env.RAW_AGENT_GATEWAY_TOKEN, undefined);
+      assert.equal(env.RAW_AGENT_FEISHU_APP_SECRET, undefined);
+      assert.equal(env.RAW_AGENT_OAUTH_GOOGLE_CLIENT_SECRET, undefined);
+      assert.equal(env.RAW_AGENT_MCP_BEARER, undefined);
+      assert.equal(env.RAW_AGENT_MODEL_NAME, 'kept-model');
+      assert.equal(env.RAW_AGENT_BASE_URL, 'https://api.example/v1');
+      assert.equal(env.RAW_AGENT_MODEL_CONTEXT_TOKENS, '131072');
+      assert.equal(env.RAW_AGENT_TOKEN_BUDGET, '0');
+      assert.equal(env.RAW_AGENT_TOKEN_PRICE_JSON, '{}');
+      assert.equal(env.RAW_AGENT_WEB_FETCH_ALLOW_PRIVATE, '0');
+      assert.equal(env.PATH, '/usr/bin');
+    });
+
     it('strips credential prefix matches when enabled', () => {
       const env = sanitizeSpawnEnv({
         base: {
