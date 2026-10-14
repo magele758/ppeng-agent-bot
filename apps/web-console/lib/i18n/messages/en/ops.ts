@@ -111,6 +111,7 @@ export const ops = {
     reasonNotReady: 'The service is not ready: the state directory or database is not readable/writable.',
     reasonDoctorFail: 'Diagnostics found {n} failing check(s); see "Diagnostics" below.',
     reasonDoctorWarn: 'Diagnostics raised {n} warning(s); see "Diagnostics" below.',
+    reasonSelfHealBad: '{n} recent self-heal run(s) failed or were blocked. See Self-heal below.',
     reasonConfigWarn: '{n} effective-config item(s) need attention; see "Effective configuration" below.',
     updatedAt: 'Updated {time}',
     refresh: 'Refresh',
@@ -126,6 +127,7 @@ export const ops = {
 
     selfHealTitle: 'Self-heal',
     selfHealIdle: 'Idle · no repair in progress',
+    selfHealRecentBad: '{n} recent repair(s) failed or were blocked.',
     selfHealRunning: 'Running · {n} repair job(s)',
     selfHealRecent: 'Recent runs',
     selfHealNoRuns: 'No self-heal runs yet',

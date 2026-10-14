@@ -31,7 +31,21 @@ import {
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const RUNNERS = ['unit', 'vitest', 'e2e'];
-const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', '.next', 'coverage', 'test-results', 'playwright-report', 'out', 'release']);
+const SKIP_DIRS = new Set([
+  'node_modules',
+  '.git',
+  'dist',
+  '.next',
+  'coverage',
+  'test-results',
+  'playwright-report',
+  'out',
+  'release',
+  // Generated worktrees live inside the checkout and copy tagged tests.
+  // They are not part of any runner's file set, so scanning them fails the gate.
+  '.agent-state',
+  '.evolution-worktrees'
+]);
 const SOURCE_EXT_RE = /\.(?:[cm]?[jt]sx?)$/;
 const TESTISH_RE = /(?:\.(?:test|spec)\.[cm]?[jt]sx?$)|(?:(?:^|\/)(?:test|tests|e2e|__tests__)\/)/;
 

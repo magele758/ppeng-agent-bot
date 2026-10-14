@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -86,6 +86,21 @@ test('groupFailuresByFile groups by relative file, drops parent suites, counts u
     { file: 'a.test.mjs', tests: [{ name: 'a.test.mjs', message: '' }] },
     { file: 'b.test.mjs', tests: [{ name: 'leaf', message: 'boom' }] }
   ]);
+});
+
+test('groupFailuresByFile keeps the file name when the reporter realpath differs from the temp root', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'retry-root-'));
+  try {
+    writeFileSync(join(dir, 'flaky.test.mjs'), '');
+    const reported = join(realpathSync(dir), 'flaky.test.mjs');
+    const { files } = groupFailuresByFile(
+      [{ file: reported, name: 'flips', failureType: 'testCodeFailure', message: 'first run' }],
+      dir
+    );
+    assert.deepEqual(files.map((g) => g.file), ['flaky.test.mjs']);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('retryPlan only retries attributable, bounded failures', () => {

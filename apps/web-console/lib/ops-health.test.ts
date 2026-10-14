@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   activityState,
+  countSelfHealBad,
   filterSessions,
   overallHealth,
   selfHealTone,
@@ -24,6 +25,32 @@ test('overallHealth rolls signals up into ok / warn / fail [AC:ops-console#AC-1]
   assert.equal(overallHealth({ ...base, doctor: doctor(1, 1) }).level, 'fail');
   assert.equal(overallHealth({ ...base, ready: false }).level, 'fail');
   assert.deepEqual(overallHealth({ ...base, reachable: false }), { level: 'fail', reasons: ['unreachable'] });
+});
+
+test('failed or blocked self-heal runs make the overall verdict need attention [AC:ops-console#AC-10]', () => {
+  const base = { reachable: true, ready: true, doctor: null, configWarnings: 0, selfHealBad: 0 };
+  assert.deepEqual(overallHealth(base), { level: 'ok', reasons: [] });
+  assert.deepEqual(overallHealth({ ...base, selfHealBad: 2 }), {
+    level: 'warn',
+    reasons: ['selfHealBad']
+  });
+  assert.deepEqual(overallHealth({ ...base, selfHealBad: 1, ready: false }).reasons, [
+    'notReady',
+    'selfHealBad'
+  ]);
+  assert.equal(overallHealth({ ...base, selfHealBad: 1, doctor: doctor(0, 1) }).level, 'fail');
+  assert.equal(countSelfHealBad(null), 0);
+  assert.equal(countSelfHealBad([]), 0);
+  assert.equal(
+    countSelfHealBad([
+      { id: 'a', status: 'completed' },
+      { id: 'b', status: 'failed' },
+      { id: 'c', status: 'blocked' },
+      { id: 'd', status: 'stopped' },
+      { id: 'e', status: 'fixing' }
+    ]),
+    2
+  );
 });
 
 test('activityState and selfHealTone use plain words [AC:ops-console#AC-1]', () => {

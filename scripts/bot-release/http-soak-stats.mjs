@@ -7,7 +7,8 @@ export class BoundedHistogram {
  summary(){return {count:this.count,p95Ms:this.count?this.quantile(.95):null,maxMs:this.max,meanMs:this.count?this.sum/this.count:null};}
 }
 export function processTreeRss(rootPid){
- const rows=[];for(const name of readdirSync('/proc')){if(!/^\d+$/.test(name))continue;try{const text=readFileSync(`/proc/${name}/status`,'utf8'),parent=Number(text.match(/^PPid:\s+(\d+)/m)?.[1]),rss=Number(text.match(/^VmRSS:\s+(\d+)/m)?.[1]??0)*1024;rows.push({pid:Number(name),parent,rss});}catch{}}
+ let names;try{names=readdirSync('/proc');}catch(error){if(error&&error.code==='ENOENT')return {processes:[],rssBytes:0,rootPresent:false,unavailable:true};throw error;}
+ const rows=[];for(const name of names){if(!/^\d+$/.test(name))continue;try{const text=readFileSync(`/proc/${name}/status`,'utf8'),parent=Number(text.match(/^PPid:\s+(\d+)/m)?.[1]),rss=Number(text.match(/^VmRSS:\s+(\d+)/m)?.[1]??0)*1024;rows.push({pid:Number(name),parent,rss});}catch{}}
  const selected=new Set([rootPid]);let changed=true;while(changed){changed=false;for(const row of rows)if(selected.has(row.parent)&&!selected.has(row.pid)){selected.add(row.pid);changed=true;}}
  const processes=rows.filter(row=>selected.has(row.pid));return {processes,rssBytes:processes.reduce((sum,row)=>sum+row.rss,0),rootPresent:processes.some(row=>row.pid===rootPid)};
 }

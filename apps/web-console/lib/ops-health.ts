@@ -26,9 +26,17 @@ export interface HealthInputs {
   doctor: DoctorReportLike | null;
   /** Effective-config items that carry warnings */
   configWarnings: number;
+  /** Failed or blocked runs in the recent self-heal history. Omitted means none known. */
+  selfHealBad?: number;
 }
 
-export type HealthReason = 'unreachable' | 'notReady' | 'doctorFail' | 'doctorWarn' | 'configWarn';
+export type HealthReason =
+  | 'unreachable'
+  | 'notReady'
+  | 'doctorFail'
+  | 'doctorWarn'
+  | 'selfHealBad'
+  | 'configWarn';
 
 export interface OverallHealth {
   level: HealthLevel;
@@ -42,6 +50,7 @@ export function overallHealth(input: HealthInputs): OverallHealth {
   if (input.ready === false) reasons.push('notReady');
   if (input.doctor && input.doctor.summary.fail > 0) reasons.push('doctorFail');
   if (input.doctor && input.doctor.summary.warn > 0) reasons.push('doctorWarn');
+  if ((input.selfHealBad ?? 0) > 0) reasons.push('selfHealBad');
   if (input.configWarnings > 0) reasons.push('configWarn');
   const level: HealthLevel =
     reasons.includes('notReady') || reasons.includes('doctorFail')
@@ -115,4 +124,14 @@ export function selfHealTone(status: string): SelfHealTone {
 /** Plain-language state for a count of running jobs. */
 export function activityState(count: number): 'idle' | 'running' {
   return count > 0 ? 'running' : 'idle';
+}
+
+/** How many recent runs failed or blocked. Unknown history counts as none. */
+export function countSelfHealBad(runs: SelfHealRunLike[] | null | undefined): number {
+  if (!runs) return 0;
+  let n = 0;
+  for (const run of runs) {
+    if (selfHealTone(run.status) === 'bad') n += 1;
+  }
+  return n;
 }
