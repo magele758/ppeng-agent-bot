@@ -294,10 +294,12 @@ async function invokeContextModel(
     const shape = {systemPromptChars: input.systemPrompt.length, toolSchemaTokens: Math.ceil(JSON.stringify(input.tools.map(tool=>({name:tool.name,description:tool.description,inputSchema:tool.inputSchema}))).length/4)};
     const budget = resolveBotWindowBudget(rt.store, adapter, shape);
     let messages = input.messages;
+    let compacted = false;
     if (estimateMessageTokens(messages) >= budget.structuredTokens) {
       const host = compactFrom(rt);
       const result = await autoCompactSession(host, {session, agent:input.agent, repoRoot:rt.repoRoot, stateDir:rt.stateDir}, {force:true});
       if (result.replaced) {
+        compacted = true;
         const prepared = await host.prepareMessagesForModel(session, rt.store.foldMessages(session.id));
         // Preserve turn-local user memory/image parts when the original message survived.
         const oldById = new Map(messages.filter(message=>message.role==='user').map(message=>[message.id,message]));
@@ -307,7 +309,9 @@ async function invokeContextModel(
     if (estimateMessageTokens(messages) > budget.historyTokens) {
       throw new Error(`Context length exceeded: actual model window ${budget.contextTokens}, available history ${budget.historyTokens}. Closed tool waves cannot be truncated.`);
     }
-    rt.emitTrace(session.id,{kind:'compact_skipped',payload:{reason:'context_budget',...budget,adapter:adapter.name}});
+    if (!compacted) {
+      rt.emitTrace(session.id,{kind:'compact_skipped',payload:{reason:'context_budget',...budget,adapter:adapter.name}});
+    }
     noteHumanModelInput(rt.store, session.id, messages);
     return await toolLoopRunTurn(adapter, {...input,messages}, onStream, retries);
   } finally { activeAdapters(rt).delete(session.id); }

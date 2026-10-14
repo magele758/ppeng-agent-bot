@@ -5,7 +5,7 @@ import { api, json, useAction, Feedback } from "./shared";
 export function BotLimits() {
   const { t } = useI18n();
   const action = useAction();
-  const [context, setContext] = useState(32768);
+  const [context, setContext] = useState(131072);
   const [perBot, setPerBot] = useState(1000);
   const [perPrincipal, setPerPrincipal] = useState(10000);
   useEffect(() => {
