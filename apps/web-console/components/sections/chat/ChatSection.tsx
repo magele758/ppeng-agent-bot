@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { filterSessionsByQuery } from '@ppeng/api-types';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
+import { createDefaultBotLoadGuard, startDefaultBotLoadEffect } from '@/lib/bot-console-selection';
 import {
   botForCanonicalSession,
   filterSessionsByPlaySurface,
@@ -113,24 +114,43 @@ export function ChatSection({ active }: { active: boolean }) {
     tick
   });
 
-  const defaultBotLoading = useRef(false);
+  const defaultBotGuardRef = useRef<ReturnType<typeof createDefaultBotLoadGuard> | null>(null);
+  if (defaultBotGuardRef.current === null) defaultBotGuardRef.current = createDefaultBotLoadGuard();
+  const defaultBotGuard = defaultBotGuardRef.current;
   useEffect(() => {
-    if (playSurface !== 'bot' || chat.botId || selectedSessionId || defaultBotLoading.current) return;
-    defaultBotLoading.current = true;
-    let cancelled = false;
-    void (async () => {
-      try {
-        let saved = ''; try { saved = localStorage.getItem('lab.selectedBot') ?? ''; } catch {}
-        if (saved) {
-          try { await api(`/api/bots/${encodeURIComponent(saved)}`); if (!cancelled) await chat.selectBot(saved); return; } catch {}
+    return startDefaultBotLoadEffect(
+      defaultBotGuard,
+      { playSurface, botId: chat.botId, selectedSessionId },
+      async (isCancelled) => {
+        try {
+          let saved = '';
+          try {
+            saved = localStorage.getItem('lab.selectedBot') ?? '';
+          } catch {
+            /* private mode */
+          }
+          if (saved) {
+            try {
+              await api(`/api/bots/${encodeURIComponent(saved)}`);
+              if (isCancelled()) return;
+              await chat.selectBot(saved);
+              return;
+            } catch {
+              if (isCancelled()) return;
+            }
+          }
+          if (isCancelled()) return;
+          const data = (await api('/api/bot-work/default')) as { bot: BotInfo };
+          if (isCancelled()) return;
+          upsertBot(data.bot);
+          await chat.selectBot(data.bot.id);
+        } catch (e) {
+          if (!isCancelled()) chat.setPlayStatus({ text: String(e), err: true });
         }
-        const data = await api('/api/bot-work/default') as {bot:BotInfo};
-        if (!cancelled) { upsertBot(data.bot); await chat.selectBot(data.bot.id); }
-      } catch(e) { if (!cancelled) chat.setPlayStatus({text:String(e),err:true}); }
-      finally {defaultBotLoading.current=false;}
-    })();
-    return () => {cancelled=true;};
-  }, [playSurface, selectedSessionId]);
+      }
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chat callbacks are unstable; rerunning cancels the load that selects the bot.
+  }, [defaultBotGuard, playSurface, selectedSessionId]);
 
   // Bot 表面锁定 bot.agentId；否则跟随会话 / 默认 Agent
   useEffect(() => {

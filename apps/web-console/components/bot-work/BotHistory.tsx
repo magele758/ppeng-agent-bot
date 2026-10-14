@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createGenerationGuard, rowsForSession } from "@/lib/bot-console-selection";
 import { useI18n } from "@/lib/i18n";
 import { api, useAction, Feedback, Result, MessageContent } from "./shared";
 type Message = {
@@ -17,28 +18,49 @@ type Page = {
 export function BotHistory({ sessionId }: { sessionId: string }) {
   const { t } = useI18n();
   const action = useAction();
+  const generations = useRef(createGenerationGuard());
+  const sessionRef = useRef(sessionId);
+  sessionRef.current = sessionId;
   const [query, setQuery] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [rows, setRows] = useState<Message[]>([]);
+  const [loadedSessionId, setLoadedSessionId] = useState(sessionId);
   const [cursor, setCursor] = useState<number | null>(null);
   const [context, setContext] = useState<Message[]>([]);
-  const load = async (older = false) => {
+  const visibleRows = rowsForSession(sessionId, loadedSessionId, rows);
+  const visibleContext = rowsForSession(sessionId, loadedSessionId, context);
+  const showingSession = sessionId === loadedSessionId;
+  const load = async (older = false, signal?: AbortSignal) => {
+    const generation = generations.current.begin();
     const params = new URLSearchParams({ limit: "50", query });
     if (older && cursor != null) params.set("beforeSeq", String(cursor));
     if (from) params.set("from", new Date(from).toISOString());
     if (to) params.set("to", new Date(to).toISOString());
-    const data = (await api(
-      `/api/sessions/${encodeURIComponent(sessionId)}/history?${params}`,
-    )) as Page;
-    setRows((prev) => (older ? [...data.messages, ...prev] : data.messages));
-    setCursor(data.hasMore ? data.nextCursor : null);
-    setContext([]);
+    try {
+      const data = (await api(
+        `/api/sessions/${encodeURIComponent(sessionId)}/history?${params}`,
+        { signal },
+      )) as Page;
+      if (signal?.aborted || !generations.current.isCurrent(generation)) return;
+      setLoadedSessionId(sessionId);
+      setRows((prev) => (older ? [...data.messages, ...prev] : data.messages));
+      setCursor(data.hasMore ? data.nextCursor : null);
+      setContext([]);
+    } catch (error) {
+      if (signal?.aborted || !generations.current.isCurrent(generation)) return;
+      throw error;
+    }
   };
   useEffect(() => {
-    setRows([]);
+    const ac = new AbortController();
     setCursor(null);
-    void action.run(() => load());
+    setContext([]);
+    void action.run(() => load(false, ac.signal));
+    return () => {
+      generations.current.invalidate();
+      ac.abort();
+    };
   }, [sessionId]);
   return (
     <section data-testid="bot-history" className="ag-panel">
@@ -78,10 +100,10 @@ export function BotHistory({ sessionId }: { sessionId: string }) {
         </button>
       </form>
       <Feedback {...action} />
-      {!rows.length && !action.busy && (
+      {!visibleRows.length && !action.busy && (
         <p data-testid="bot-history-empty">{t("botWork.empty")}</p>
       )}
-      {cursor != null && (
+      {showingSession && cursor != null && (
         <button
           disabled={action.busy}
           onClick={() => void action.run(() => load(true))}
@@ -90,7 +112,7 @@ export function BotHistory({ sessionId }: { sessionId: string }) {
         </button>
       )}
       <div style={{ maxHeight: 440, overflow: "auto" }}>
-        {rows.map((m) => (
+        {visibleRows.map((m) => (
           <article key={m.id}>
             <small>
               {m.role} · {m.createdAt} · #{m.seq}
@@ -98,23 +120,25 @@ export function BotHistory({ sessionId }: { sessionId: string }) {
             <MessageContent parts={m.parts} />
             <button
               disabled={action.busy}
-              onClick={() =>
+              onClick={() => {
+                const requestedSessionId = sessionId;
                 void action.run(async () => {
                   const data = (await api(
-                    `/api/sessions/${encodeURIComponent(sessionId)}/history/${m.seq}`,
+                    `/api/sessions/${encodeURIComponent(requestedSessionId)}/history/${m.seq}`,
                   )) as { messages: Message[] };
+                  if (sessionRef.current !== requestedSessionId) return;
                   setContext(data.messages);
-                })
-              }
+                });
+              }}
             >
               {t("botWork.context")}
             </button>
           </article>
         ))}
       </div>
-      {context.length > 0 && (
+      {visibleContext.length > 0 && (
         <aside aria-label={t("botWork.context")}>
-          {context.map((m) => (
+          {visibleContext.map((m) => (
             <article key={m.id}>
               <small>
                 #{m.seq} {m.role}

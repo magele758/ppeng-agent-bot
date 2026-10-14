@@ -1,8 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
+import {
+  createGenerationGuard,
+  loadSelectedBotDetail,
+  selectionForBot,
+  type BotDetailLoadResult
+} from '@/lib/bot-console-selection';
 import { readBotSettings, type BotSettingsSnapshot } from '@/lib/bot-policy';
 import type { BotPermissionMode } from '@/lib/bot-permission';
 import { catalogToPickerOptions, type ModelProvidersResponse, type ModelRef } from '@/lib/model-providers';
@@ -25,29 +31,94 @@ const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
 export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
   const { t } = useI18n();
-  const [sessionId,setSessionId]=useState(bot.canonicalSessionId);
+  const generations = useRef(createGenerationGuard());
+  const [activeBotId, setActiveBotId] = useState(bot.id);
+  const [sessionId, setSessionId] = useState(() => selectionForBot(bot).sessionId);
   const [settings, setSettings] = useState<BotSettingsSnapshot | null>(null);
   const [catalog, setCatalog] = useState<ModelProvidersResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  if (activeBotId !== bot.id) {
+    setActiveBotId(bot.id);
+    setSessionId(selectionForBot(bot).sessionId);
+    setSettings(null);
+    setError(null);
+  }
 
-  const load = useCallback(async () => {
-    try {
-      const opened=await api(`/api/bots/${encodeURIComponent(bot.id)}/open`,{method:'POST'}) as {session:{id:string}};
-      setSessionId(opened.session.id);
-      const data = (await api(`/api/sessions/${encodeURIComponent(opened.session.id)}?includeMessages=false`)) as {
-        session?: { metadata?: Record<string, unknown> };
-      };
-      setSettings(readBotSettings(data.session?.metadata));
-      setError(null);
-    } catch (e) {
-      setError(t('agents.bots.settingsFailed', { error: e instanceof Error ? e.message : String(e) }));
-    }
-  }, [bot.canonicalSessionId, t]);
+  const botIdRef = useRef(bot.id);
+  botIdRef.current = bot.id;
+  const tRef = useRef(t);
+  tRef.current = t;
+
+  const applyLoadResult = useCallback(
+    (generation: number, result: BotDetailLoadResult<BotSettingsSnapshot>) => {
+      if (!generations.current.isCurrent(generation)) return;
+      switch (result.status) {
+        case 'stale':
+          return;
+        case 'error': {
+          const reason = result.error;
+          setError(
+            tRef.current('agents.bots.settingsFailed', {
+              error: reason instanceof Error ? reason.message : String(reason)
+            })
+          );
+          return;
+        }
+        case 'ready':
+          setSessionId(result.sessionId);
+          setSettings(result.settings);
+          setError(null);
+          return;
+        default: {
+          const unreachable: never = result;
+          return unreachable;
+        }
+      }
+    },
+    []
+  );
+
+  const load = useCallback(
+    async (signal?: AbortSignal) => {
+      const botId = bot.id;
+      if (botIdRef.current !== botId) return;
+      const generation = generations.current.begin();
+      const result = await loadSelectedBotDetail({
+        botId: bot.id,
+        generation,
+        isCurrent: (gen) => generations.current.isCurrent(gen),
+        openSession: async (botId) => {
+          const opened = (await api(`/api/bots/${encodeURIComponent(botId)}/open`, {
+            method: 'POST',
+            signal
+          })) as { session: { id: string } };
+          return opened.session.id;
+        },
+        readSettings: async (openedSessionId) => {
+          const data = (await api(
+            `/api/sessions/${encodeURIComponent(openedSessionId)}?includeMessages=false`,
+            { signal }
+          )) as { session?: { metadata?: Record<string, unknown> } };
+          return readBotSettings(data.session?.metadata);
+        }
+      });
+      if (botIdRef.current !== botId) return;
+      applyLoadResult(generation, result);
+    },
+    [applyLoadResult, bot.id]
+  );
 
   useEffect(() => {
+    setSessionId(selectionForBot(bot).sessionId);
     setSettings(null);
-    void load();
-  }, [load]);
+    setError(null);
+    const ac = new AbortController();
+    void load(ac.signal);
+    return () => {
+      generations.current.invalidate();
+      ac.abort();
+    };
+  }, [bot.id, bot.canonicalSessionId, load]);
 
   useEffect(() => {
     let cancelled = false;
