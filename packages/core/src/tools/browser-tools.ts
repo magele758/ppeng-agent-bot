@@ -1,6 +1,6 @@
 import { envBool } from '../env.js';
 import type { ToolContract, RunContext, ToolExecutionResult } from '../types.js';
-import { playwrightBrowserAction, type BrowserBackendDeps } from './browser-backend.js';
+import { playwrightBrowserAction, refuseBrowserNavigate, type BrowserBackendDeps } from './browser-backend.js';
 
 /**
  * Optional browser tools (Playwright via npx). Gated by optional tool group `browser`
@@ -30,7 +30,7 @@ export function createBrowserTools(services: BrowserToolServices): ToolContract<
   const navigate: ToolContract<{ url: string }> = {
     name: 'browser_navigate',
     description:
-      'Navigate the browser session to a URL (Lab「更多 → 浏览器」或 RAW_AGENT_BROWSER_TOOLS；需本机 Playwright Chromium)。',
+      'Navigate the browser session to a URL (Lab「更多 → 浏览器」或 RAW_AGENT_BROWSER_TOOLS；需本机 Playwright Chromium)。拒绝 file://；默认拒绝私网、回环、链路本地和运营商级 NAT 地址。',
     inputSchema: {
       type: 'object',
       properties: { url: { type: 'string' } },
@@ -40,6 +40,8 @@ export function createBrowserTools(services: BrowserToolServices): ToolContract<
     sideEffectLevel: 'system',
     needsApproval: () => true,
     async execute(context, args) {
+      const refused = await refuseBrowserNavigate(String(args.url ?? ''), { env: process.env });
+      if (refused) return refused;
       return services.runBrowserAction(context, { kind: 'navigate', url: args.url });
     }
   };

@@ -36,6 +36,19 @@ test('SSRF blocks private hosts', () => {
   assert.equal(isPrivateOrReservedIp('8.8.8.8'), false);
 });
 
+test('isPrivateOrReservedIp understands URL-canonical IPv4-mapped addresses', () => {
+  assert.equal(isPrivateOrReservedIp('::ffff:7f00:1'), true);
+  assert.equal(isPrivateOrReservedIp('[::ffff:7f00:1]'), true);
+  assert.equal(isPrivateOrReservedIp('::ffff:a00:1'), true);
+  assert.equal(isPrivateOrReservedIp('::ffff:c0a8:101'), true);
+  assert.equal(isPrivateOrReservedIp('::ffff:ac10:1'), true);
+  assert.equal(isPrivateOrReservedIp('::ffff:a9fe:a9fe'), true);
+  assert.equal(isPrivateOrReservedIp('::ffff:6440:1'), true);
+  assert.equal(isPrivateOrReservedIp('::ffff:127.0.0.1'), true);
+  assert.equal(isPrivateOrReservedIp('::ffff:808:808'), false);
+  assert.equal(isPrivateOrReservedIp('::ffff:8.8.8.8'), false);
+});
+
 test('runGoalVerify files_exist', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'goal-verify-'));
   try {

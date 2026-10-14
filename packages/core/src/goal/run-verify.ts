@@ -36,6 +36,17 @@ export function isBlockedVerifyHost(hostname: string): boolean {
   return isPrivateOrReservedIp(host);
 }
 
+/** WHATWG URLs rewrite IPv4-mapped hosts to hex, e.g. 127.0.0.1 → ::ffff:7f00:1. */
+function ipv4FromMappedHex(tail: string): string | undefined {
+  const parts = tail.split(':');
+  if (parts.length !== 2 || parts.some((part) => !/^[0-9a-f]{1,4}$/.test(part))) return undefined;
+  const hi = Number.parseInt(parts[0] ?? '', 16);
+  const lo = Number.parseInt(parts[1] ?? '', 16);
+  if (!Number.isFinite(hi) || !Number.isFinite(lo)) return undefined;
+  const value = ((hi << 16) | lo) >>> 0;
+  return [(value >>> 24) & 255, (value >>> 16) & 255, (value >>> 8) & 255, value & 255].join('.');
+}
+
 export function isPrivateOrReservedIp(hostname: string): boolean {
   const stripped = hostname.startsWith('[') && hostname.endsWith(']') ? hostname.slice(1, -1) : hostname;
   if (isIPv4(stripped)) {
@@ -54,7 +65,10 @@ export function isPrivateOrReservedIp(hostname: string): boolean {
     const h = stripped.toLowerCase();
     if (h === '::1' || h.startsWith('fc') || h.startsWith('fd') || h.startsWith('fe80:')) return true;
     if (h.startsWith('::ffff:')) {
-      return isPrivateOrReservedIp(h.slice('::ffff:'.length));
+      const tail = h.slice('::ffff:'.length);
+      const dotted = isIPv4(tail) ? tail : ipv4FromMappedHex(tail);
+      if (!dotted) return false;
+      return isPrivateOrReservedIp(dotted);
     }
   }
   return false;

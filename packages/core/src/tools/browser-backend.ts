@@ -6,9 +6,12 @@
  * Do not log that directory: it holds cookies and local storage.
  */
 
+import { lookup } from 'node:dns/promises';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { isIP } from 'node:net';
 import { tmpdir, homedir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
+import { isPrivateOrReservedIp } from '../goal/run-verify.js';
 import { fenceExternalContent } from '../safety/external-content.js';
 import type { SqliteStateStore } from '../storage.js';
 import type { ImagePart, RunContext, ToolExecutionResult } from '../types.js';
@@ -46,6 +49,18 @@ type PlaywrightContext = {
   close: () => Promise<void>;
 };
 
+type PlaywrightRequest = {
+  url: () => string;
+  isNavigationRequest?: () => boolean;
+  resourceType?: () => string;
+};
+
+type PlaywrightRoute = {
+  request: () => PlaywrightRequest;
+  abort: (errorCode?: string) => Promise<void>;
+  continue: () => Promise<void>;
+};
+
 type PlaywrightPage = {
   goto: (url: string, opts?: { waitUntil?: string; timeout?: number }) => Promise<unknown>;
   url: () => string;
@@ -58,16 +73,24 @@ type PlaywrightPage = {
   };
   evaluate: (fn: () => unknown) => Promise<unknown>;
   screenshot?: (opts?: { type?: 'png' | 'jpeg' }) => Promise<Buffer | Uint8Array>;
+  route?: (pattern: string, handler: (route: PlaywrightRoute) => Promise<unknown>) => Promise<unknown>;
 };
 
 type SessionSlot = { context: PlaywrightContext; page: PlaywrightPage };
 
 const sessions = new Map<string, SessionSlot>();
 
+export interface BrowserNavigationPolicyOptions {
+  env?: NodeJS.ProcessEnv;
+  /** Every resolved address. One private address denies navigation. Default is system DNS. */
+  resolveHost?: (hostname: string) => Promise<readonly string[]>;
+}
+
 export interface BrowserBackendDeps {
   env?: NodeJS.ProcessEnv;
   /** Persist PNG bytes as a session image asset. Return the asset id only. */
   ingestScreenshot?: (png: Buffer, context: RunContext) => Promise<{ id: string }>;
+  resolveHost?: BrowserNavigationPolicyOptions['resolveHost'];
 }
 
 export function formatBrowserError(code: BrowserErrorCode, message: string, action: BrowserAction): string {
@@ -311,26 +334,144 @@ async function runScreenshot(
   };
 }
 
+const PRIVATE_NAVIGATION = '拒绝私网、回环、链路本地或运营商级 NAT 地址';
+
+function privateNetworkAllowed(env: NodeJS.ProcessEnv | undefined): boolean {
+  return ['1', 'true', 'yes'].includes(String(env?.RAW_AGENT_WEB_FETCH_ALLOW_PRIVATE ?? '').toLowerCase());
+}
+
+async function defaultResolveHost(hostname: string): Promise<readonly string[]> {
+  const records = await lookup(hostname, { all: true });
+  return records.map((record) => record.address);
+}
+
+function navigationPolicy(deps?: BrowserBackendDeps): BrowserNavigationPolicyOptions {
+  const resolve = deps?.resolveHost ?? defaultResolveHost;
+  const cache = new Map<string, readonly string[]>();
+  return {
+    env: deps?.env ?? process.env,
+    resolveHost: async (hostname) => {
+      const hit = cache.get(hostname);
+      if (hit) return hit;
+      const found = await resolve(hostname);
+      cache.set(hostname, found);
+      return found;
+    }
+  };
+}
+
+/** Undefined when navigation may open this URL. file:// is never allowed. */
+export async function browserNavigationBlockReason(
+  rawUrl: string,
+  options?: BrowserNavigationPolicyOptions
+): Promise<string | undefined> {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return 'URL 无效';
+  }
+  if (parsed.protocol === 'file:') return '拒绝 file:// 地址';
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '仅允许 http(s) 导航';
+  if (privateNetworkAllowed(options?.env)) return undefined;
+  const host = parsed.hostname.replace(/^\[|\]$/g, '');
+  if (!host) return PRIVATE_NAVIGATION;
+  if (isIP(host)) return isPrivateOrReservedIp(host) ? PRIVATE_NAVIGATION : undefined;
+  let addresses: readonly string[];
+  try {
+    addresses = await (options?.resolveHost ?? defaultResolveHost)(host);
+  } catch {
+    return '域名解析失败，拒绝导航';
+  }
+  if (addresses.length === 0) return '域名解析失败，拒绝导航';
+  if (addresses.some((address) => isPrivateOrReservedIp(address))) return PRIVATE_NAVIGATION;
+  return undefined;
+}
+
+export async function refuseBrowserNavigate(
+  rawUrl: string,
+  options?: BrowserNavigationPolicyOptions
+): Promise<ToolExecutionResult | undefined> {
+  const url = String(rawUrl ?? '').trim();
+  const action: BrowserAction = { kind: 'navigate', url };
+  if (!url) return { ok: false, content: formatBrowserError('browser_action_failed', 'url 必填', action) };
+  const reason = await browserNavigationBlockReason(url, options);
+  if (!reason) return undefined;
+  return { ok: false, content: formatBrowserError('browser_action_failed', reason, action) };
+}
+
+function isDocumentNavigation(request: PlaywrightRequest): boolean {
+  if (typeof request.isNavigationRequest === 'function' && request.isNavigationRequest()) return true;
+  if (typeof request.resourceType === 'function' && request.resourceType() === 'document') return true;
+  if (typeof request.isNavigationRequest === 'function' || typeof request.resourceType === 'function') return false;
+  return true;
+}
+
+async function completeBrowserNavigate(
+  page: PlaywrightPage,
+  action: Extract<BrowserAction, { kind: 'navigate' }>,
+  policy: BrowserNavigationPolicyOptions
+): Promise<ToolExecutionResult> {
+  const url = action.url.trim();
+  let documentBlocked: string | undefined;
+  if (typeof page.route === 'function') {
+    await page.route('**/*', async (route) => {
+      const request = route.request();
+      let reason: string | undefined;
+      try {
+        reason = await browserNavigationBlockReason(request.url(), policy);
+      } catch {
+        reason = PRIVATE_NAVIGATION;
+      }
+      if (reason) {
+        if (isDocumentNavigation(request)) documentBlocked = reason;
+        await route.abort('blockedbyclient');
+        return;
+      }
+      await route.continue();
+    });
+  }
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+  } catch (error) {
+    if (documentBlocked) {
+      return { ok: false, content: formatBrowserError('browser_action_failed', documentBlocked, action) };
+    }
+    throw error;
+  }
+  if (documentBlocked) {
+    return { ok: false, content: formatBrowserError('browser_action_failed', documentBlocked, action) };
+  }
+  const landed = page.url();
+  const landedReason = await browserNavigationBlockReason(landed, policy);
+  if (landedReason) {
+    return { ok: false, content: formatBrowserError('browser_action_failed', landedReason, action) };
+  }
+  return { ok: true, content: formatBrowserNavigateResult(landed, await page.title()) };
+}
+
+async function runBrowserNavigate(
+  context: RunContext,
+  action: Extract<BrowserAction, { kind: 'navigate' }>,
+  deps?: BrowserBackendDeps
+): Promise<ToolExecutionResult> {
+  const policy = navigationPolicy(deps);
+  const refused = await refuseBrowserNavigate(action.url, policy);
+  if (refused) return refused;
+  const slot = await ensurePage(context, deps?.env ?? process.env);
+  return completeBrowserNavigate(slot.page, { kind: 'navigate', url: action.url.trim() }, policy);
+}
+
 export async function playwrightBrowserAction(
   context: RunContext,
   action: BrowserAction,
   deps?: BrowserBackendDeps
 ): Promise<ToolExecutionResult> {
   try {
+    if (action.kind === 'navigate') return await runBrowserNavigate(context, action, deps);
     const slot = await ensurePage(context, deps?.env ?? process.env);
     const page = slot.page;
     switch (action.kind) {
-      case 'navigate': {
-        const url = String(action.url ?? '').trim();
-        if (!url) {
-          return { ok: false, content: formatBrowserError('browser_action_failed', 'url 必填', action) };
-        }
-        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
-        return {
-          ok: true,
-          content: formatBrowserNavigateResult(page.url(), await page.title())
-        };
-      }
       case 'snapshot': {
         const html = await page.content();
         const title = await page.title();

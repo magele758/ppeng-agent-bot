@@ -1,0 +1,29 @@
+id: browser-navigate-private-network
+title: 浏览器导航拒绝私网和本地文件
+status: implemented
+requirement: |
+  Fix: browser navigation must reject private, loopback, link-local, and CGNAT addresses (use the repo's isPrivateOrReservedIp) and must reject file:// URLs. Do not add a new env flag; the existing private-network allow switch may stay if it already exists, but the default remains deny. Acceptance-first, user asked to fix now, tests first.
+notes: |
+  负责人在本次要求中明确现在就修，标准随实现一起落地。不新增环境变量。已有的私网放行开关默认关闭；打开时只放行私网地址，file:// 仍然拒绝。
+criteria:
+  - id: AC-1
+    given: 没有打开放行私网的开关
+    when: 浏览器要打开回环、私网、链路本地或运营商级 NAT 地址，包括映射写法，或从公网地址被转到这类地址
+    then: 导航被拒绝，该地址对应的页面不会打开
+    notes: 同一套保留地址判断也会拒绝未指定地址（0.0.0.0）。
+  - id: AC-2
+    given: 浏览器可以导航
+    when: 要打开的地址是 file://，包括大写协议，或页面被转到 file://
+    then: 导航被拒绝，本地文件不会被打开
+  - id: AC-3
+    given: 没有打开放行私网的开关
+    when: 要打开的域名解析到回环、私网、链路本地或运营商级 NAT 地址，包括解析结果里混有公网地址
+    then: 导航被拒绝，页面不会打开
+  - id: AC-4
+    given: 目标是公网的 http 或 https 地址
+    when: 浏览器打开该地址，或打开解析到公网地址的域名
+    then: 导航会继续
+  - id: AC-5
+    given: 已有的私网放行开关处于打开
+    when: 浏览器要打开私网地址，或要打开 file://
+    then: 私网地址可以打开，file:// 仍然被拒绝
