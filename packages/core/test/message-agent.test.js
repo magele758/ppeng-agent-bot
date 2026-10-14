@@ -646,7 +646,7 @@ test('hidden own bots remain explicitly addressable [AC:default-super-bot#AC-4]'
  const result=await call(tool,dir,store,alpha,{target:'Ghost',message:'psst',wake:false});assert.equal(result.ok,true);assert.equal(userText(store,ghost.canonicalSessionId).length,1);store.db.close();
 });
 
-test('cross-user delivery is refused; same-user and ownerless sessions are fine [AC:bots#AC-2]', async () => {
+test('cross-user delivery is refused; an ownerless bot does not spawn a personal chat [AC:bots#AC-2] [AC:unowned-legacy-bot#AC-2]', async () => {
   const { dir, store } = tempStore();
   const host = facadeHost(store);
   const alpha = createBot(host, { name: 'Alpha' });
@@ -673,11 +673,14 @@ test('cross-user delivery is refused; same-user and ownerless sessions are fine 
 
   setOwner(beta.canonicalSessionId, { userId: undefined, tenantId: undefined });
   setOwner(alpha.canonicalSessionId, { userId: 'user_a', tenantId: undefined });
+  const before = store.listSessions().map((item) => item.id).sort();
   const legacy = await call(tool, dir, store, alpha, { target: 'Beta', message: 'legacy ok' });
-  assert.equal(legacy.ok, true);
-  const mine=store.listSessions().find(x=>x.metadata?.botId===beta.id&&x.metadata?.userId==='user_a');
-  assert.deepEqual(runs,[mine.id]);
-  assert.notEqual(mine.id,beta.canonicalSessionId);
+  assert.equal(legacy.ok, false);
+  assert.equal(JSON.parse(legacy.content).error_code, 'TARGET_OWNER_MISMATCH');
+  assert.deepEqual(runs, []);
+  assert.deepEqual(store.listSessions().map((item) => item.id).sort(), before);
+  assert.equal(userText(store, beta.canonicalSessionId).length, 0);
+  assert.equal(store.getSession(beta.canonicalSessionId).metadata.userId, undefined);
   store.db.close();
 });
 
