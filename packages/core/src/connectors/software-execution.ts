@@ -2,13 +2,14 @@ import type { DatabaseSync } from 'node:sqlite';
 import { canonicalJson } from '../discovery/cbom.js';
 import { randomUUID, createHash } from 'node:crypto';
 import { lookup } from 'node:dns/promises';
-import { isIP } from 'node:net';
+import { isIP, isIPv4 } from 'node:net';
 import type { RunContext, ToolContract, ToolExecutionResult } from '../types.js';
 import type { ConnectorGrantStore } from './registry.js';
 import { ValidationError } from '../errors.js';
 import { SecretVault } from '../secrets/secret-vault.js';
 import { assertWritableEnvName } from '../secrets/reserved-env-names.js';
-import { collectReservedDynToolNames } from '../dyn-tools/names.js';
+import { collectReservedDynToolNames, isReservedDynToolName } from '../dyn-tools/names.js';
+import { isPrivateOrReservedIp } from '../goal/run-verify.js';
 import { fenceExternalContent } from '../safety/external-content.js';
 import { requestApprovedAddress } from './http-request.js';
 
@@ -127,11 +128,38 @@ export function softwarePrincipal(ctx: RunContext): string {
   return JSON.stringify([String(ctx.session.metadata?.tenantId ?? ''), String(ctx.session.metadata?.userId ?? 'installation')]);
 }
 const connectionKey = (principal:string,botId:string,id:string) => JSON.stringify([principal,botId,id]);
-function privateAddress(ip:string):boolean {
-  const s=ip.toLowerCase();
-  if (s.includes(':')) return s==='::'||s==='::1'||s.startsWith('fc')||s.startsWith('fd')||s.startsWith('fe80:')||s.startsWith('::ffff:');
-  const [a=0,b=0]=s.split('.').map(Number);
-  return a===0||a===10||a===127||a===169&&b===254||a===172&&b>=16&&b<=31||a===192&&b===168||a>=224;
+const SOFTWARE_CONNECTION_TOOL = Symbol.for('ppeng.softwareConnectionTool');
+
+function markSoftwareConnectionTool<T extends object>(tool: T): T {
+  Object.defineProperty(tool, SOFTWARE_CONNECTION_TOOL, { value: true });
+  return tool;
+}
+
+function isSoftwareConnectionTool(tool: object): boolean {
+  return (tool as { [SOFTWARE_CONNECTION_TOOL]?: true })[SOFTWARE_CONNECTION_TOOL] === true;
+}
+
+/** URL canonicalizes IPv4-mapped addresses to hex, so judge the embedded IPv4. */
+function embeddedIpv4(ip: string): string | undefined {
+  const bare = ip.replace(/^\[|\]$/g, '').toLowerCase();
+  if (!bare.startsWith('::ffff:')) return undefined;
+  const rest = bare.slice('::ffff:'.length);
+  if (isIPv4(rest)) return rest;
+  const parts = rest.split(':');
+  if (parts.length !== 2 || parts.some((part) => !/^[0-9a-f]{1,4}$/.test(part))) return undefined;
+  const hi = Number.parseInt(parts[0] ?? '', 16);
+  const lo = Number.parseInt(parts[1] ?? '', 16);
+  const value = ((hi << 16) | lo) >>> 0;
+  return [(value >>> 24) & 255, (value >>> 16) & 255, (value >>> 8) & 255, value & 255].join('.');
+}
+
+function privateAddress(ip: string): boolean {
+  const embedded = embeddedIpv4(ip);
+  if (isPrivateOrReservedIp(embedded ?? ip)) return true;
+  const s = ip.replace(/^\[|\]$/g, '').toLowerCase();
+  if (s.includes(':')) return s === '::';
+  const first = Number(s.split('.')[0]);
+  return Number.isFinite(first) && first >= 224;
 }
 function redact(text: string, secret?: string): string {
   if (!secret) return text;
@@ -259,7 +287,7 @@ export class SoftwareExecution {
   }
   private validateToolName(tool: SoftwareTool, seen: Set<string>): void {
     const reserved = collectReservedDynToolNames();
-    if (!/^[A-Za-z][A-Za-z0-9_]{0,64}$/.test(tool.name) || seen.has(tool.name) || reserved.has(tool.name) || /^(mcp_|lcu_)/.test(tool.name)) throw new ValidationError('Invalid or duplicate tool name');
+    if (!/^[A-Za-z][A-Za-z0-9_]{0,64}$/.test(tool.name) || seen.has(tool.name) || isReservedDynToolName(tool.name, reserved) || /^(mcp_|lcu_)/.test(tool.name)) throw new ValidationError('Invalid or duplicate tool name');
     seen.add(tool.name);
   }
   private validateToolCollisions(principal: string, botId: string, connectorId: string, tool: SoftwareTool): void {
@@ -305,12 +333,13 @@ export class SoftwareExecution {
     const principal=this.principal({userId:session.metadata?.userId as string|undefined,tenantId:session.metadata?.tenantId as string|undefined});
     const all=new Set(Object.values(this.connections()).flatMap(c=>c.tools.map(t=>t.name)));
     const allowed=new Set(this.list(principal,String(session.metadata?.botId??'')).flatMap(c=>c.tools.map(t=>t.name)));
-    return tools.filter(t=>!all.has(t.name)||allowed.has(t.name));
+    // Drop only the foreign software executor. A builtin that shares the name stays.
+    return tools.filter(t=>!all.has(t.name)||allowed.has(t.name)||!isSoftwareConnectionTool(t));
   }
   tools():ToolContract[] {
     const names=new Map<string,SoftwareTool>();const writes=new Set<string>();
     for(const c of Object.values(this.connections())) for(const t of c.tools) {if(!names.has(t.name))names.set(t.name,t);if(writeTool(t))writes.add(t.name);}
-    return [...names.values()].map(t=>({name:t.name,description:t.description,inputSchema:t.inputSchema,approvalMode:'auto',sideEffectLevel:writes.has(t.name)?'system':'none',needsApproval:()=>writes.has(t.name),execute:(ctx,args)=>this.execute(ctx,t.name,args as Record<string,unknown>)}));
+    return [...names.values()].map(t=>markSoftwareConnectionTool({name:t.name,description:t.description,inputSchema:t.inputSchema,approvalMode:'auto',sideEffectLevel:writes.has(t.name)?'system':'none',needsApproval:()=>writes.has(t.name),execute:(ctx,args)=>this.execute(ctx,t.name,args as Record<string,unknown>)}));
   }
   private secret(c:SoftwareConnection):string|undefined {const name=c.secretEnv??c.credRef?.replace(/^vault:/,'');if(!name)return undefined;assertSoftwareCredentialName(name);return this.env[name]??new SecretVault(this.store).resolveNamed([name])[name];}
   async probe(principal:string,botId:string,id:string):Promise<SoftwareConnection> {

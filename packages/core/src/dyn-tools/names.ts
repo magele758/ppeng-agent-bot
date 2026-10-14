@@ -15,7 +15,13 @@ const EXTRA_RESERVED = new Set<string>([
   'search_skills',
   'tool_search',
   'load_capability_tool',
-  'args'
+  'args',
+  'grep_files',
+  'browser_screenshot',
+  'history_search',
+  'history_read',
+  'memory_read',
+  'message_agent'
 ]);
 
 export function collectReservedDynToolNames(processTools?: Array<{ name: string }>): Set<string> {
@@ -29,6 +35,7 @@ export function collectReservedDynToolNames(processTools?: Array<{ name: string 
 }
 
 export function isReservedDynToolName(name: string, reserved: Iterable<string>): boolean {
+  if (name.startsWith('cron_')) return true;
   if (isPtcReservedIdentifier(name)) return true;
   if (PTC_NAMESPACE_BLOCKED_NAMES.has(name)) return true;
   for (const item of reserved) {
