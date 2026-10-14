@@ -1,0 +1,19 @@
+id: bot-console-selection
+title: 切换 Bot 时显示当前会话，开发态仍能载入默认 Bot
+status: implemented
+requirement: |
+  Switching bots must reset the displayed session/history to the newly selected bot. A late /open response for a previous bot must not overwrite the current selection (generation or abort).
+  In next dev Strict Mode, default-bot loading must not get stuck cancelled: the loading guard must reset on cleanup so the second effect run still loads.
+criteria:
+  - id: AC-1
+    given: 用户正在查看一只 Bot 的会话和历史
+    when: 改选另一只 Bot，而这只新 Bot 的打开请求还没返回
+    then: 详情里显示的会话和历史立刻换成新选中的这只 Bot，不再停留在上一只
+  - id: AC-2
+    given: 用户先选了 Bot A 又很快改选 Bot B
+    when: Bot A 的打开结果在 B 已经选中之后才返回
+    then: 界面仍保持 B 的会话和设置，A 的迟到结果不会盖住当前选择
+  - id: AC-3
+    given: 对话页处于 Bot 模式，还没有选中 Bot，也没有选中会话
+    when: 默认 Bot 的加载被取消后立刻再跑一次（开发模式会这样跑两遍）
+    then: 第二次仍会继续加载并选中默认 Bot，不会因为第一次被取消而永远停住
