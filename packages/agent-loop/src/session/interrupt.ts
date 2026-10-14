@@ -99,6 +99,26 @@ export function decideInterruptResume(input: {
   return { action: 'none' };
 }
 
+/**
+ * Calls the approval gate already closed are skipped in memory.
+ * A host that did not report falls back to folding the transcript.
+ */
+export interface ToolCallClosure {
+  reported: boolean;
+  ids: readonly string[];
+}
+
+export function selectExecutableToolCalls<T extends { toolCallId: string }>(
+  calls: readonly T[],
+  closure: ToolCallClosure | undefined,
+  foldUnmatched: () => readonly T[]
+): T[] {
+  if (!closure?.reported) return [...foldUnmatched()];
+  if (closure.ids.length === 0) return [...calls];
+  const closed = new Set(closure.ids);
+  return calls.filter((call) => !closed.has(call.toolCallId));
+}
+
 /** Reconstruct unmatched tool_call parts from a fold view, optionally filtered. */
 export function unmatchedToolCallsFromFold(
   folded: Array<{ parts: MessagePart[] }>,

@@ -78,6 +78,7 @@ import {
   decideInterruptResume,
   mergeInterruptMetadata,
   unmatchedToolCallsFromFold,
+  selectExecutableToolCalls,
   type RunInterruptState
 } from '../session/interrupt.js';
 import {
@@ -482,12 +483,14 @@ export async function runSessionKernel(
             0
           );
           emitDynHydrateTrace(host, sid, dynHydrated);
+          const closedByGate = { reported: false, ids: [] as string[] };
           const gate = await host.checkToolApprovals(
             remaining,
             context,
             filePolicy,
             context.session,
-            selectedTools.turnTools
+            selectedTools.turnTools,
+            closedByGate
           );
           if (gate === 'waiting') {
             const approvalIds = host.store
@@ -507,9 +510,11 @@ export async function runSessionKernel(
             });
           }
           if (gate !== 'skip') {
-            const executable = unmatchedToolCallsFromFold(
-              host.store.foldMessages(sid),
-              interrupt.toolCallIds.filter((id) => !interrupt.executedToolCallIds.includes(id))
+            const executable = selectExecutableToolCalls(remaining, closedByGate, () =>
+              unmatchedToolCallsFromFold(
+                host.store.foldMessages(sid),
+                interrupt.toolCallIds.filter((id) => !interrupt.executedToolCallIds.includes(id))
+              )
             );
             if (executable.length > 0) {
               const results = await host.executeToolCalls(
@@ -1224,12 +1229,14 @@ export async function runSessionKernel(
         turnTools
       );
 
+      const closedByGate = { reported: false, ids: [] as string[] };
       const approvalResult = await host.checkToolApprovals(
         validToolCalls,
         context,
         filePolicy,
         session,
-        turnTools
+        turnTools,
+        closedByGate
       );
       if (approvalResult === 'waiting') {
         if (validToolCalls.some((c) => c.name === 'ask_user')) {
@@ -1286,9 +1293,11 @@ export async function runSessionKernel(
         continue;
       }
 
-      const executable = unmatchedToolCallsFromFold(
-        host.store.foldMessages(sid),
-        validToolCalls.map((call) => call.toolCallId)
+      const executable = selectExecutableToolCalls(validToolCalls, closedByGate, () =>
+        unmatchedToolCallsFromFold(
+          host.store.foldMessages(sid),
+          validToolCalls.map((call) => call.toolCallId)
+        )
       );
       if (executable.length === 0) {
         continue;

@@ -805,6 +805,46 @@ describe('runSessionKernel wiring', () => {
     expect(results).toHaveLength(1);
   });
 
+  it('skips calls the approval gate reports closed without folding them back open', async () => {
+    const executed: string[] = [];
+    let turns = 0;
+    const { host, session } = createHarness({
+      model: () => {
+        turns += 1;
+        if (turns === 1) {
+          return {
+            stopReason: 'tool_use',
+            assistantParts: [
+              { type: 'tool_call', toolCallId: 'nope', name: 'echo', input: { n: 1 } },
+              { type: 'tool_call', toolCallId: 'yes', name: 'echo', input: { n: 2 } },
+            ],
+          };
+        }
+        return textResult('done');
+      },
+      host: {
+        checkToolApprovals: (_calls, _ctx, _session, extras) => {
+          if (extras?.closedByGate) {
+            extras.closedByGate.reported = true;
+            extras.closedByGate.ids.push('nope');
+          }
+          return 'proceed';
+        },
+        executeToolCalls: async (calls) => {
+          executed.push(...calls.map((call) => call.toolCallId));
+          return calls.map((call) => ({
+            toolCallId: call.toolCallId,
+            name: call.name,
+            ok: true,
+            content: 'ran',
+          }));
+        },
+      },
+    });
+    await runSessionKernel(host, session.id);
+    expect(executed).toEqual(['yes']);
+  });
+
   it('does not execute a tool the approval gate already closed', async () => {
     const executed: string[] = [];
     let live: TurnKernelStore | undefined;

@@ -45,6 +45,7 @@ import {
   decideInterruptResume,
   mergeInterruptMetadata,
   unmatchedToolCallsFromFold,
+  selectExecutableToolCalls,
   type RunInterruptState,
 } from '../session/interrupt.js';
 import { claimAndApplyInbox } from '../session/apply-claimed-inbox.js';
@@ -535,10 +536,12 @@ export async function runSessionKernel(
         if (remaining.length > 0) {
           const folded = host.store.foldMessages(sid);
           const picked = await pickTurnTools(context.session, folded, 0, false);
+          const closedByGate = { reported: false, ids: [] as string[] };
           const gate =
             (await host.checkToolApprovals?.(remaining, context, refreshedSession, {
               filePolicy,
               turnTools: picked.resolvedTools,
+              closedByGate,
             })) ?? 'proceed';
           if (gate === 'waiting') {
             const approvalIds = host.store
@@ -558,9 +561,11 @@ export async function runSessionKernel(
             });
           }
           if (gate !== 'skip') {
-            const executable = unmatchedToolCallsFromFold(
-              host.store.foldMessages(sid),
-              interrupt.toolCallIds.filter((id) => !interrupt.executedToolCallIds.includes(id))
+            const executable = selectExecutableToolCalls(remaining, closedByGate, () =>
+              unmatchedToolCallsFromFold(
+                host.store.foldMessages(sid),
+                interrupt.toolCallIds.filter((id) => !interrupt.executedToolCallIds.includes(id))
+              )
             );
             if (executable.length > 0) {
               const results = await host.executeToolCalls(
@@ -1245,10 +1250,12 @@ export async function runSessionKernel(
         return finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'abort');
       }
 
+      const closedByGate = { reported: false, ids: [] as string[] };
       const approvalResult =
         (await host.checkToolApprovals?.(toolCalls, context, session, {
           filePolicy,
           turnTools: resolvedTools,
+          closedByGate,
         })) ?? 'proceed';
       const hostLatch = loopConfig.hitlLatch
         ? await host.shouldLatchBeforeTools?.({ session, toolCalls })
@@ -1328,9 +1335,11 @@ export async function runSessionKernel(
         }
       }
 
-      const executable = unmatchedToolCallsFromFold(
-        host.store.foldMessages(sid),
-        toolCalls.map((call) => call.toolCallId)
+      const executable = selectExecutableToolCalls(toolCalls, closedByGate, () =>
+        unmatchedToolCallsFromFold(
+          host.store.foldMessages(sid),
+          toolCalls.map((call) => call.toolCallId)
+        )
       );
       if (executable.length === 0) {
         continue;

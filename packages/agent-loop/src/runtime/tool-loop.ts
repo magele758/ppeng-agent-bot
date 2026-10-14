@@ -276,6 +276,12 @@ export function filterValidToolCalls(
 // Approval check
 // ============================================================================
 
+/** Filled by the gate so a later turn can skip closed calls without folding. */
+export interface ApprovalClosureReport {
+  reported: boolean;
+  ids: string[];
+}
+
 export function checkToolApprovals(
   host: ToolLoopHost,
   tools: ToolContract<Record<string, unknown>>[],
@@ -283,8 +289,10 @@ export function checkToolApprovals(
   context: RunContext,
   filePolicy: FileApprovalPolicy | undefined,
   session: SessionRecord,
-  envApprovalPolicy: ApprovalPolicy | undefined
+  envApprovalPolicy: ApprovalPolicy | undefined,
+  closure?: ApprovalClosureReport
 ): 'waiting' | 'skip' | 'proceed' {
+  if (closure) closure.reported = true;
   const policy = envApprovalPolicy ?? contextHasApprovalPolicy(context);
   const sid = session.id;
   const permissionMode = resolvePermissionMode(session.metadata, host.env);
@@ -351,13 +359,19 @@ export function checkToolApprovals(
   }
 
   let waiting = false;
+  let sessionApprovals: Map<string, ApprovalRecord> | undefined;
+  const approvalFor = (idemKey: string): ApprovalRecord | undefined => {
+    sessionApprovals ??= approvalIndexForSession(host, sid);
+    return sessionApprovals.get(idemKey);
+  };
   for (const tc of validToolCalls) {
     const tool = findToolByName(tools, tc.name);
     if (!tool || !needsApproval(tool, tc)) continue;
     const idemKey = stableJsonHash(tool.name, tc.input);
-    const existing = findApprovalForCall(host, sid, idemKey);
+    const existing = approvalFor(idemKey);
     if (existing?.status === 'approved') continue;
     if (existing?.status === 'rejected') {
+      closure?.ids.push(tc.toolCallId);
       appendApprovalToolResult(
         host,
         sid,
@@ -405,21 +419,24 @@ function appendApprovalToolResult(
   ]);
 }
 
-/** Rejected wins over a stale pending or approved row with the same idempotency key. */
-function findApprovalForCall(
+const APPROVAL_RANK: Record<ApprovalRecord['status'], number> = {
+  approved: 0,
+  pending: 1,
+  rejected: 2,
+};
+
+/** One scan per wave. Rejected wins over a stale pending or approved row with the same key. */
+function approvalIndexForSession(
   host: ToolLoopHost,
-  sessionId: string,
-  idemKey: string | undefined
-): ApprovalRecord | undefined {
-  if (!idemKey) return undefined;
-  const statuses = ['rejected', 'pending', 'approved'] as const;
-  for (const status of statuses) {
-    const hit = host
-      .listApprovals({ status })
-      .find((approval) => approval.sessionId === sessionId && approval.idempotencyKey === idemKey);
-    if (hit) return hit;
+  sessionId: string
+): Map<string, ApprovalRecord> {
+  const index = new Map<string, ApprovalRecord>();
+  for (const row of host.listApprovals()) {
+    if (row.sessionId !== sessionId || !row.idempotencyKey) continue;
+    const prev = index.get(row.idempotencyKey);
+    if (!prev || APPROVAL_RANK[row.status] >= APPROVAL_RANK[prev.status]) index.set(row.idempotencyKey, row);
   }
-  return undefined;
+  return index;
 }
 
 // ============================================================================

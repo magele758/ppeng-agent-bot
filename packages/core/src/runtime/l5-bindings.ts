@@ -929,14 +929,15 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
     stepTx: createRuntimeStepTx(rt),
     filterValidToolCalls: (toolCalls, allowExternalAiTools, sessionId, turnTools) =>
       toolLoopFilterValid(toolLoopDepsFrom(rt), toolCalls, allowExternalAiTools, sessionId, turnTools),
-    checkToolApprovals: async (validToolCalls, context, filePolicy, session, turnTools) => {
+    checkToolApprovals: async (validToolCalls, context, filePolicy, session, turnTools, closure) => {
       const decision = toolLoopCheckApprovals(
         toolLoopDepsFrom(rt),
         validToolCalls,
         context,
         filePolicy,
         session,
-        turnTools
+        turnTools,
+        closure
       );
       if (decision !== 'proceed') return decision;
       return applyJevToolGate(rt.store, session.id, validToolCalls);
@@ -1074,7 +1075,8 @@ export function l5ToAssembledIo(rt: L5Bindable, sessionId?: string): AssembledLo
         extras?.filePolicy,
         session,
         extras?.turnTools,
-        rt.envApprovalPolicy
+        rt.envApprovalPolicy,
+        extras?.closedByGate
       );
       if (decision !== 'proceed') return decision;
       return applyJevToolGate(rt.store, session.id, toolCalls);

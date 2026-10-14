@@ -128,7 +128,8 @@ export {
   decideInterruptResume,
   parseRunInterrupt,
   mergeInterruptMetadata,
-  unmatchedToolCallsFromFold
+  unmatchedToolCallsFromFold,
+  selectExecutableToolCalls
 } from './interrupt.js';
 export type { RunInterruptState } from './interrupt.js';
 export { assertWriterClaim, WriterClaimError } from './writer-claim.js';

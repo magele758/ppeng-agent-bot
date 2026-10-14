@@ -205,6 +205,11 @@ export type HitlLatchDecision = 'proceed' | 'waiting' | 'steer';
 export interface CheckToolApprovalsExtras {
   filePolicy?: FileApprovalPolicy;
   turnTools?: ToolContract<any>[];
+  /**
+   * The default gate sets `reported` and lists calls it already closed.
+   * The kernel then skips those calls without folding the transcript.
+   */
+  closedByGate?: { reported: boolean; ids: string[] };
 }
 
 export interface ResolveTurnToolsResult {

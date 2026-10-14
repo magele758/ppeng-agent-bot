@@ -308,9 +308,12 @@ describe('checkToolApprovals', () => {
       status: 'pending' | 'approved' | 'rejected';
       idempotencyKey?: string;
     }> = [];
+    let lists = 0;
     const h = host({
-      listApprovals: (filter) =>
-        approvals.filter((approval) => !filter?.status || approval.status === filter.status) as never,
+      listApprovals: (filter) => {
+        lists += 1;
+        return approvals.filter((approval) => !filter?.status || approval.status === filter.status) as never;
+      },
       createApproval: (input) => {
         const row = {
           id: `ap-${approvals.length + 1}`,
@@ -325,10 +328,17 @@ describe('checkToolApprovals', () => {
     });
     const calls = [call('bash', { command: 'ls' }, 'c1'), call('write_file', { path: 'a.txt' }, 'c2')];
     const tools = [always('bash'), always('write_file')];
-    checkToolApprovals(h, tools, calls, ctx, undefined, session, undefined);
+    const opened = { reported: false, ids: [] as string[] };
+    checkToolApprovals(h, tools, calls, ctx, undefined, session, undefined, opened);
+    expect(lists).toBe(1);
+    expect(opened).toEqual({ reported: true, ids: [] });
     approvals[0]!.status = 'approved';
     approvals[1]!.status = 'rejected';
-    expect(checkToolApprovals(h, tools, calls, ctx, undefined, session, undefined)).toBe('proceed');
+    const closed = { reported: false, ids: [] as string[] };
+    lists = 0;
+    expect(checkToolApprovals(h, tools, calls, ctx, undefined, session, undefined, closed)).toBe('proceed');
+    expect(lists).toBe(1);
+    expect(closed).toEqual({ reported: true, ids: ['c2'] });
     expect(approvals).toHaveLength(2);
     const parts = h.appended.flatMap((entry) => (entry as { parts: Array<{ toolCallId?: string; ok?: boolean; content?: string }> }).parts);
     expect(parts).toEqual([
@@ -373,7 +383,9 @@ describe('checkToolApprovals', () => {
     expect(approvals[0]?.idempotencyKey).toBeTruthy();
 
     approvals[0]!.status = 'approved';
-    expect(checkToolApprovals(h, [spill], calls, ctx, undefined, ask, undefined)).toBe('proceed');
+    const closed = { reported: false, ids: [] as string[] };
+    expect(checkToolApprovals(h, [spill], calls, ctx, undefined, ask, undefined, closed)).toBe('proceed');
+    expect(closed).toEqual({ reported: true, ids: [] });
     expect(approvals).toHaveLength(1);
     expect(h.appended).toHaveLength(0);
   });
