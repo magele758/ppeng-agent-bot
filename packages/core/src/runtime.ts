@@ -11,6 +11,8 @@ import { randomUUID } from 'node:crypto';
 import { LcuComputerUseProvider, type LcuDeps } from './computer-use/lcu-provider.js';
 import { createLcuApprovalHandler } from './computer-use/approval.js';
 import { readLcuSettings } from './computer-use/settings.js';
+import { createAppControlTools } from './app-control/tools.js';
+import { readAppControlSettings } from './app-control/settings.js';
 import { createLogger } from './logger.js';
 import { NotFoundError, ValidationError } from './errors.js';
 import type { AgentSandbox } from './sandbox/agent-sandbox-types.js';
@@ -501,6 +503,10 @@ export class RawAgentRuntime {
       },
       requestApproval: createLcuApprovalHandler(this.store),
     });
+    this.tools.push(...createAppControlTools({
+      enabled: () => readAppControlSettings(this.store).enabled,
+      approvals: this.store
+    }));
   }
 
   /** Tick due cron jobs: append prompt to owning session and enqueue a run. */

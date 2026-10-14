@@ -1,5 +1,6 @@
 export const settingsEntries = {
   computerUse: {"title": "本机桌面操作（LCU）", "desc": "让 Agent 使用本机桌面应用。需要已安装 LCU 和 ChatGPT，应用授权由你决定。", "keywords": "LCU 桌面 电脑操作 截图 TextEdit", "enabled": "启用本机桌面操作", "hint": "关闭后不再暴露桌面工具。每个对话独立授权，同一桌面按回合排队；浏览器和音频未启用。"},
+  appControl: {"title": "macOS 应用控制", "desc": "让 Agent 激活本机应用、向当前应用输入文字，或发送少量按键。仅 macOS。", "keywords": "macOS 应用控制 Apple Events 自动化 按键", "enabled": "启用 macOS 应用控制", "hint": "默认关闭。打开后只能激活应用、输入文字，或发送回车、Tab、Esc、方向键、拷贝和粘贴。每次动作仍需在 Lab 批准。首次使用时 macOS 可能弹出权限询问，这个开关不会预先授权。其它系统会提示不可用。"},
   common: {
     saved: '已保存，立即生效',
     save: '保存',
