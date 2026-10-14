@@ -3,6 +3,7 @@
  */
 
 import type { MessagePart, SessionMessage } from '../types.js';
+import { stableJsonHash } from '../runtime/helpers.js';
 import { askJev, choiceOf, noulOf } from './client.js';
 import { applyJevContextSelect as applyJevContextSelectPoint } from './points/context-select.js';
 import { applyJevMemorySelect as applyJevMemorySelectPoint } from './points/memory-select.js';
@@ -22,6 +23,13 @@ const ROUTE_ACT_AT = 0.75;
 
 type ToolCall = { toolCallId: string; name: string; input: Record<string, unknown> };
 
+export interface JevSettledApproval {
+  sessionId: string;
+  status: string;
+  toolName: string;
+  args: Record<string, unknown>;
+}
+
 export interface JevToolStore extends JevSettingsStore {
   appendMessage(sessionId: string, role: 'tool', parts: MessagePart[]): unknown;
   createApproval(input: {
@@ -30,6 +38,37 @@ export interface JevToolStore extends JevSettingsStore {
     reason: string;
     args: Record<string, unknown>;
   }): unknown;
+  getApproval?(id: string): JevSettledApproval | undefined;
+}
+
+export interface JevToolGateOptions {
+  /** Approvals already decided for this resumed wave. */
+  settledApprovalIds?: readonly string[];
+  /** Calls the normal gate already closed, so a rejected review does not write a second result. */
+  alreadyClosedIds?: readonly string[];
+  markClosed?(ids: string[]): void;
+}
+
+export type SettledToolGateDecision = 'create' | 'proceed' | 'waiting' | 'reject';
+
+/** Resume path: an ask for a call that already has a decision must not open another approval. */
+export function settledToolGateDecision(
+  call: ToolCall,
+  sessionId: string,
+  settled: readonly JevSettledApproval[]
+): SettledToolGateDecision {
+  const wanted = stableJsonHash(call.name, call.input);
+  const match = settled.find(
+    (row) =>
+      row.sessionId === sessionId &&
+      row.toolName === call.name &&
+      stableJsonHash(row.toolName, row.args) === wanted
+  );
+  if (!match) return 'create';
+  if (match.status === 'approved') return 'proceed';
+  if (match.status === 'rejected') return 'reject';
+  if (match.status === 'pending') return 'waiting';
+  return 'create';
 }
 
 export function selectGoalJudge(
@@ -55,10 +94,33 @@ export function selectGoalJudge(
   };
 }
 
+function rejectSettledReview(
+  store: JevToolStore,
+  sessionId: string,
+  call: ToolCall,
+  options: JevToolGateOptions | undefined
+): 'proceed' {
+  const closed = new Set(options?.alreadyClosedIds ?? []);
+  if (!closed.has(call.toolCallId)) {
+    store.appendMessage(sessionId, 'tool', [
+      {
+        type: 'tool_result',
+        toolCallId: call.toolCallId,
+        name: call.name,
+        ok: false,
+        content: `Review of ${call.name} was already rejected.`
+      }
+    ]);
+    options?.markClosed?.([call.toolCallId]);
+  }
+  return 'proceed';
+}
+
 export async function applyJevToolGate(
   store: JevToolStore,
   sessionId: string,
-  calls: ToolCall[]
+  calls: ToolCall[],
+  options?: JevToolGateOptions
 ): Promise<'proceed' | 'skip' | 'waiting'> {
   const chain = resolveJevChain(store);
   if (!chainHas(chain, 'toolGate')) return 'proceed';
@@ -98,13 +160,30 @@ export async function applyJevToolGate(
   }
   if (picked.choice === 'ask') {
     const call = risky[0]!;
-    store.createApproval({
-      sessionId,
-      toolName: call.name,
-      reason: `Jev asked for review before ${call.name}`,
-      args: call.input
-    });
-    return 'waiting';
+    const settled = (options?.settledApprovalIds ?? [])
+      .map((id) => store.getApproval?.(id))
+      .filter((row): row is JevSettledApproval => row != null);
+    const decision = settledToolGateDecision(call, sessionId, settled);
+    switch (decision) {
+      case 'proceed':
+        return 'proceed';
+      case 'waiting':
+        return 'waiting';
+      case 'reject':
+        return rejectSettledReview(store, sessionId, call, options);
+      case 'create':
+        store.createApproval({
+          sessionId,
+          toolName: call.name,
+          reason: `Jev asked for review before ${call.name}`,
+          args: call.input
+        });
+        return 'waiting';
+      default: {
+        const unreachable: never = decision;
+        return unreachable;
+      }
+    }
   }
   return 'proceed';
 }

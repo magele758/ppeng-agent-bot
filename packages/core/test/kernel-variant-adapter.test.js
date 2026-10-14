@@ -51,7 +51,10 @@ test('adapter forwards A optional ports (claim/fold/HITL/dyn/goal/stepTx/task)',
     autoCompact: async () => ({}),
     handleTurnCompletion: async (s) => s,
     processToolResults() {},
-    checkToolApprovals: () => 'proceed',
+    checkToolApprovals: (...args) => {
+      seen.push(`settled:${(args[6] ?? []).join(',')}`);
+      return 'proceed';
+    },
     filterValidToolCalls: (c) => c,
     autoClaimTask: async () => {
       seen.push('autoClaimTask');
@@ -103,6 +106,12 @@ test('adapter forwards A optional ports (claim/fold/HITL/dyn/goal/stepTx/task)',
   assert.equal(typeof loop.resolveRunProfile, 'function');
   assert.equal(loop.hooks, core.hooks);
   loop.resolveRunProfile({ id: 's1' });
+  loop.checkToolApprovals(
+    [],
+    {},
+    { id: 's1' },
+    { settledApprovalIds: ['ap-1'], closedByGate: { reported: false, ids: [] } }
+  );
 
   return Promise.resolve()
     .then(() => loop.autoClaimTask({ id: 's1' }))
@@ -122,6 +131,7 @@ test('adapter forwards A optional ports (claim/fold/HITL/dyn/goal/stepTx/task)',
       assert.ok(seen.includes('ws:s1:task-1'));
       assert.ok(seen.includes('appendix:q:/state'));
       assert.ok(seen.includes('profile:s1'));
+      assert.ok(seen.includes('settled:ap-1'));
     });
 });
 

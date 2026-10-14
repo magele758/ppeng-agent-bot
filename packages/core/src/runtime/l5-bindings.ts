@@ -553,6 +553,26 @@ function fallbackStream(onStream: Parameters<TurnKernelHost['runTurnWithRetries'
   };
 }
 
+function jevToolGateForCalls(
+  store: Parameters<typeof applyJevToolGate>[0],
+  sessionId: string,
+  calls: Parameters<typeof applyJevToolGate>[2],
+  closure: { reported: boolean; ids: string[] } | undefined,
+  settledApprovalIds?: readonly string[]
+) {
+  return applyJevToolGate(store, sessionId, calls, {
+    settledApprovalIds,
+    alreadyClosedIds: closure?.ids,
+    markClosed(ids) {
+      if (!closure) return;
+      closure.reported = true;
+      for (const id of ids) {
+        if (!closure.ids.includes(id)) closure.ids.push(id);
+      }
+    }
+  });
+}
+
 export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
   return {
     store: rt.store,
@@ -929,7 +949,15 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
     stepTx: createRuntimeStepTx(rt),
     filterValidToolCalls: (toolCalls, allowExternalAiTools, sessionId, turnTools) =>
       toolLoopFilterValid(toolLoopDepsFrom(rt), toolCalls, allowExternalAiTools, sessionId, turnTools),
-    checkToolApprovals: async (validToolCalls, context, filePolicy, session, turnTools, closure) => {
+    checkToolApprovals: async (
+      validToolCalls,
+      context,
+      filePolicy,
+      session,
+      turnTools,
+      closure,
+      settledApprovalIds
+    ) => {
       const decision = toolLoopCheckApprovals(
         toolLoopDepsFrom(rt),
         validToolCalls,
@@ -940,7 +968,7 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
         closure
       );
       if (decision !== 'proceed') return decision;
-      return applyJevToolGate(rt.store, session.id, validToolCalls);
+      return jevToolGateForCalls(rt.store, session.id, validToolCalls, closure, settledApprovalIds);
     },
     executeToolCalls: (validToolCalls, context, allowExternalAiTools, sessionId, turnTools) =>
       toolLoopExecuteCalls(
@@ -1079,7 +1107,13 @@ export function l5ToAssembledIo(rt: L5Bindable, sessionId?: string): AssembledLo
         extras?.closedByGate
       );
       if (decision !== 'proceed') return decision;
-      return applyJevToolGate(rt.store, session.id, toolCalls);
+      return jevToolGateForCalls(
+        rt.store,
+        session.id,
+        toolCalls,
+        extras?.closedByGate,
+        extras?.settledApprovalIds
+      );
     },
     stepTx: host.stepTx,
     vault: {

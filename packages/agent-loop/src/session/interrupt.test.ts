@@ -42,6 +42,29 @@ describe('reused tool-call ids', () => {
     expect(selectExecutableToolCalls(wave, { reported: false, ids: [] }, () => historical)).toEqual(wave);
   });
 
+  it('orders reused ids by last occurrence: a(history), b, a', () => {
+    const folded = [
+      {
+        parts: [{ type: 'tool_call' as const, toolCallId: 'a', name: 'echo', input: { n: 1 } }],
+      },
+      {
+        parts: [
+          { type: 'tool_result' as const, toolCallId: 'a', name: 'echo', ok: true, content: 'old' },
+        ],
+      },
+      {
+        parts: [{ type: 'tool_call' as const, toolCallId: 'b', name: 'echo', input: { n: 2 } }],
+      },
+      {
+        parts: [{ type: 'tool_call' as const, toolCallId: 'a', name: 'echo', input: { n: 3 } }],
+      },
+    ];
+    expect(unmatchedToolCallsFromFold(folded)).toEqual([
+      { type: 'tool_call', toolCallId: 'b', name: 'echo', input: { n: 2 } },
+      { type: 'tool_call', toolCallId: 'a', name: 'echo', input: { n: 3 } },
+    ]);
+  });
+
   it('does not fold when the gate reports no closures', () => {
     let foldedCalls = 0;
     const wave = [{ toolCallId: 'heuristic_read_dir' }];

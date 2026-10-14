@@ -283,7 +283,8 @@ export async function continueResumedToolWave(input: {
     input.filePolicy,
     input.context.session,
     selectedTools.turnTools,
-    closedByGate
+    closedByGate,
+    input.interrupt.approvalIds
   );
   if (gate === 'waiting') {
     const approvalIds = input.host.store
