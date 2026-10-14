@@ -53,6 +53,7 @@ export async function defaultDownload(
       maxRedirects: deps?.maxRedirects
     });
     if (!res.ok) {
+      await res.body?.cancel().catch(() => undefined);
       return { ok: false, status: res.status, error: `下载失败 HTTP ${res.status}` };
     }
     const ct = res.headers.get('content-type')?.split(';')[0]?.trim();

@@ -41,23 +41,26 @@ function runCmd(
   });
 }
 
+/**
+ * Only negative globs. A positive glob would whitelist the whole search.
+ * Dotfiles need --hidden so .env.example, .env.sample, and .env.template can match.
+ * Excluding every dotted env name would hide those templates. Excluding the
+ * credentials basename would skip a credentials directory. The JS filter drops
+ * real secret files and keeps the rest. VCS directories stay excluded.
+ */
 const RG_SECRET_EXCLUDES = [
+  '--glob',
+  '!**/.git/**',
+  '--glob',
+  '!**/.svn/**',
+  '--glob',
+  '!**/.hg/**',
   '--glob',
   '!**/.env',
   '--glob',
-  '!**/.env.*',
-  '--glob',
   '!**/id_rsa',
   '--glob',
-  '!**/id_rsa.*',
-  '--glob',
-  '!**/credentials',
-  '--glob',
-  '!**/credentials.*',
-  '--glob',
-  '!**/*.credentials',
-  '--glob',
-  '!**/credentials/**'
+  '!**/id_rsa.*'
 ];
 
 function grepLinePath(line: string): string | undefined {
@@ -92,6 +95,7 @@ export async function runWorkspaceGrep(options: GrepOptions): Promise<{ ok: bool
   const rgArgs = [
     '--line-number',
     '--no-heading',
+    '--hidden',
     '--max-count',
     String(limit),
     ...(contextLines > 0 ? ['-C', String(contextLines)] : []),

@@ -4,6 +4,7 @@ import {
   authUserFromId,
   hashToken,
   LAB_PROXY_HEADER,
+  oauthNonLocalNeedsPublicOrigin,
   oauthPublicConfig,
   oauthPublicOrigin,
   readSessionToken,
@@ -39,6 +40,14 @@ export function requestPublicOrigin(request: IncomingMessage, env: NodeJS.Proces
 
 export function requestSecure(request: IncomingMessage, env: NodeJS.ProcessEnv): boolean {
   return requestPublicOrigin(request, env).startsWith('https://');
+}
+
+/** True when this request is non-local and RAW_AGENT_OAUTH_PUBLIC_ORIGIN is unset. */
+export function oauthOriginBlocked(request: IncomingMessage, env: NodeJS.ProcessEnv): boolean {
+  return oauthNonLocalNeedsPublicOrigin(env, [
+    headerValue(request, 'host'),
+    headerValue(request, 'x-forwarded-host')
+  ]);
 }
 
 function sessionUser(params: {

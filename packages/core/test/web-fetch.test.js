@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
 import { fetchPinnedPublic, isBlockedFetchAddress } from '../dist/net/public-fetch.js';
+import { fetchImageFromUrl } from '../dist/image-assets.js';
+import { defaultDownload } from '../dist/ingestion/ports.js';
 import {
   decodeFetchedBodyAsText,
   extractArxivPaperIdFromUrl,
@@ -433,4 +436,47 @@ test('DNS lookup stops on abort and on its own deadline', async () => {
   assert.equal(result.ok, false);
   assert.match(result.content, /timed out/);
   assert.ok(Date.now() - started < 2000);
+});
+
+test('caller timeout ends a body that stalls after response headers', async () => {
+  const server = createServer((req, res) => {
+    res.writeHead(200, { 'content-type': 'text/plain' });
+    res.write('partial');
+    req.on('close', () => {
+      res.destroy();
+    });
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  const port = typeof address === 'object' && address ? address.port : 0;
+  const url = `http://127.0.0.1:${port}/stall`;
+  const deps = { allowPrivateHosts: true };
+  const hung = Symbol('hung');
+  const within = (work) => Promise.race([
+    work,
+    new Promise((resolve) => setTimeout(() => resolve(hung), 2500))
+  ]);
+  try {
+    const text = await within(fetchUrlText({ url, timeoutMs: 400, maxBytes: 1024, ...deps }));
+    assert.notEqual(text, hung);
+    assert.equal(text.ok, false);
+    assert.match(text.content, /abort/i);
+    assert.equal(text.content.includes('partial'), false);
+
+    const image = await within(fetchImageFromUrl(url, 1024, 400, undefined, deps).then(
+      () => 'completed',
+      (err) => err
+    ));
+    assert.notEqual(image, hung);
+    assert.ok(image instanceof Error);
+    assert.match(image.message, /abort/i);
+
+    const download = await within(defaultDownload(url, 1024, 400, deps));
+    assert.notEqual(download, hung);
+    assert.equal(download.ok, false);
+    assert.match(download.error ?? '', /abort/i);
+  } finally {
+    server.closeAllConnections?.();
+    await new Promise((resolve) => server.close(() => resolve()));
+  }
 });

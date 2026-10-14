@@ -18,6 +18,8 @@ import {
   createCoreStorageContext,
   considerEvolutionSchedule,
   EVOLUTION_DISABLED_CODE,
+  oauthStartupNeedsPublicOrigin,
+  OAUTH_PUBLIC_ORIGIN_STARTUP_WARNING,
   type CoreStorageContext,
 } from '@ppeng/agent-core';
 import { availableDomainIds, describeDomainConnectors, loadDomainBundles } from './domain-loader.js';
@@ -380,8 +382,14 @@ function maybeAutoStartEvolution(): void {
   }
 }
 
+function warnUnsetOauthPublicOrigin(): void {
+  if (!oauthStartupNeedsPublicOrigin(env)) return;
+  log.warn(OAUTH_PUBLIC_ORIGIN_STARTUP_WARNING);
+}
+
 server.listen(port, host, () => {
   log.info(`listening on http://${host}:${port}`);
+  warnUnsetOauthPublicOrigin();
   void runtime.warmMcp().catch((error) => {
     log.warn('MCP HTTP warm connect failed', errorMessage(error));
   });

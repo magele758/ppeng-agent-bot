@@ -16,10 +16,15 @@ export type {
 } from './types.js';
 
 export {
+  OAUTH_PUBLIC_ORIGIN_REQUIRED,
+  OAUTH_PUBLIC_ORIGIN_STARTUP_WARNING,
+  isPublicHttpHost,
+  oauthNonLocalNeedsPublicOrigin,
   oauthProvider,
   oauthProvidersFromEnv,
   oauthPublicConfig,
-  oauthPublicOrigin
+  oauthPublicOrigin,
+  oauthStartupNeedsPublicOrigin
 } from './oauth-config.js';
 
 export {

@@ -102,8 +102,10 @@ function rememberPersistedClaim(claims: Record<string, number>, key: string, now
  * Atomically claim an inbound event id. Returns false when it was already claimed
  * (platform retry / replay). Synchronous so concurrent deliveries cannot both win.
  * Pass `persistDir` (the gateway directory) to record the claim next to the
- * delivery ledger. Those claims do not expire with the in-memory 6h window and
- * survive process restart. `resetInboundDedupe` clears only the memory map.
+ * delivery ledger. Those claims do not expire with the in-memory 6h window,
+ * survive process restart, and are not copied into the memory map (that map
+ * would otherwise grow without the 6h TTL). `resetInboundDedupe` clears only
+ * the memory map.
  */
 export function claimInboundEvent(key: string, now = Date.now(), persistDir?: string): boolean {
   if (persistDir) {
@@ -111,7 +113,6 @@ export function claimInboundEvent(key: string, now = Date.now(), persistDir?: st
     if (Object.prototype.hasOwnProperty.call(claims, key)) return false;
     rememberPersistedClaim(claims, key, now);
     writePersistedClaims(persistDir, claims);
-    seen.set(key, now);
     return true;
   }
   const at = seen.get(key);

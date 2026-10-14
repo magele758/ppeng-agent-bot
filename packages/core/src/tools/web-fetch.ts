@@ -86,6 +86,7 @@ async function tryFetchArxivApiText(
         }
       });
       if (!res.ok) {
+        await res.body?.cancel().catch(() => undefined);
         continue;
       }
       const xml = await res.text();
@@ -158,6 +159,7 @@ export async function fetchUrlText(options: WebFetchOptions): Promise<{ ok: bool
     });
     const ct = res.headers.get('content-type') ?? '';
     if (!res.ok) {
+      await res.body?.cancel().catch(() => undefined);
       return {
         ok: false,
         content: fenceExternalContent({
@@ -210,6 +212,7 @@ async function readLimitedBody(
       total += value.byteLength;
       if (total > maxBytes) {
         chunks.push(value.subarray(0, Math.max(0, value.byteLength - (total - maxBytes))));
+        await reader.cancel().catch(() => undefined);
         break;
       }
       chunks.push(value);

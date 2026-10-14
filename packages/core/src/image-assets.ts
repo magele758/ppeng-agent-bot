@@ -134,6 +134,7 @@ export async function fetchImageFromUrl(
       maxRedirects: deps?.maxRedirects
     });
     if (!res.ok) {
+      await res.body?.cancel().catch(() => undefined);
       throw new Error(`Fetch image failed ${res.status}`);
     }
     const ct = res.headers.get('content-type')?.split(';')[0]?.trim() ?? 'application/octet-stream';

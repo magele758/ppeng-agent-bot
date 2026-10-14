@@ -114,6 +114,17 @@ test('Feishu retry after memory reset does not run the agent again', async () =>
   assert.equal(runtime.calls.ran.length, 1);
 });
 
+test('persisted Feishu claim does not pin the in-memory map', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'feishu-dedupe-mem-'));
+  const key = 'feishu:event:ev_persist_only';
+  const now = Date.now();
+  resetInboundDedupe();
+  assert.equal(claimInboundEvent(key, now, dir), true);
+  assert.equal(claimInboundEvent(key, now), true);
+  assert.equal(claimInboundEvent(key, now, dir), false);
+  resetInboundDedupe();
+});
+
 test('same Feishu event_id stays claimed after the in-memory map is cleared', () => {
   const dir = mkdtempSync(join(tmpdir(), 'feishu-dedupe-'));
   const key = 'feishu:event:ev_restart';

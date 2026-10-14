@@ -9,6 +9,8 @@ import {
   exchangeAuthorizationCode,
   fetchOAuthProfile,
   hashToken,
+  OAUTH_PUBLIC_ORIGIN_REQUIRED,
+  createLogger,
   oauthCallbackPath,
   oauthProvider,
   oauthPublicConfig,
@@ -26,7 +28,9 @@ import {
 } from '@ppeng/agent-core';
 import type { RouteSpec } from '../routing.js';
 import { json } from '../http-utils.js';
-import { requestPublicOrigin, requestSecure } from '../user-auth.js';
+import { oauthOriginBlocked, requestPublicOrigin, requestSecure } from '../user-auth.js';
+
+const oauthLog = createLogger('oauth');
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -52,9 +56,14 @@ function startRoute(
     pattern: `/api/auth/${provider}/start`,
     handler: ({ request, response }) => {
       const cfg = oauthProvider(env, provider);
-      const origin = requestPublicOrigin(request, env);
-      if (!cfg || !origin) {
+      if (!cfg) {
         json(response, 404, { error: 'OAuth provider is not configured' });
+        return;
+      }
+      const origin = requestPublicOrigin(request, env);
+      if (!origin || oauthOriginBlocked(request, env)) {
+        oauthLog.warn(OAUTH_PUBLIC_ORIGIN_REQUIRED);
+        json(response, 400, { error: OAUTH_PUBLIC_ORIGIN_REQUIRED });
         return;
       }
       const state = randomUrlToken(24);

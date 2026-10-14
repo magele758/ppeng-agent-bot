@@ -11,8 +11,11 @@ import {
   canAccessSession,
   filterSessionsByAuth,
   hashToken,
+  OAUTH_PUBLIC_ORIGIN_REQUIRED,
+  oauthNonLocalNeedsPublicOrigin,
   oauthPublicConfig,
   oauthPublicOrigin,
+  oauthStartupNeedsPublicOrigin,
   stampOwnerMetadata,
   upsertUserFromOAuth
 } from '../dist/auth/index.js';
@@ -223,11 +226,20 @@ test('OAuth start ignores forged Host and X-Forwarded-Host when public origin is
     'x-forwarded-host': 'evil.example',
     'x-forwarded-proto': 'https'
   };
+  assert.equal(oauthStartupNeedsPublicOrigin(oauthEnv()), true);
+  assert.equal(oauthStartupNeedsPublicOrigin({
+    ...oauthEnv(),
+    RAW_AGENT_OAUTH_PUBLIC_ORIGIN: 'https://lab.example'
+  }), false);
+  assert.equal(oauthNonLocalNeedsPublicOrigin(oauthEnv(), ['evil.example', '127.0.0.1:27070']), true);
+  assert.equal(oauthNonLocalNeedsPublicOrigin({}, ['127.0.0.1:27070', 'localhost:23000']), false);
   assert.equal(requestPublicOrigin({ headers: forged }, {}), '');
   assert.equal(requestSecure({ headers: forged }, {}), false);
   const started = startGoogle(oauthEnv(), forged);
-  assert.equal(started.status, 404);
+  assert.equal(started.status, 400);
   assert.equal(started.location, undefined);
+  assert.match(started.body, /RAW_AGENT_OAUTH_PUBLIC_ORIGIN/);
+  assert.match(started.body, new RegExp(OAUTH_PUBLIC_ORIGIN_REQUIRED.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.doesNotMatch(started.body, /evil\.example/);
 
   const loopbackHeaders = {
@@ -237,11 +249,25 @@ test('OAuth start ignores forged Host and X-Forwarded-Host when public origin is
   };
   assert.equal(requestPublicOrigin({ headers: loopbackHeaders }, {}), 'http://127.0.0.1:27070');
   assert.equal(requestSecure({ headers: loopbackHeaders }, {}), false);
-  const local = startGoogle(oauthEnv(), loopbackHeaders);
+  const proxied = startGoogle(oauthEnv(), loopbackHeaders);
+  assert.equal(proxied.status, 400);
+  assert.equal(proxied.location, undefined);
+  assert.match(proxied.body, /RAW_AGENT_OAUTH_PUBLIC_ORIGIN/);
+  assert.doesNotMatch(proxied.body, /evil\.example/);
+
+  const local = startGoogle(oauthEnv(), { host: '127.0.0.1:27070' });
   assert.equal(local.status, 302);
   assert.match(local.location, /^https:\/\/accounts\.google\.com\//);
   assert.match(local.location, /redirect_uri=http%3A%2F%2F127\.0\.0\.1%3A27070%2Fapi%2Fauth%2Fgoogle%2Fcallback/);
-  assert.doesNotMatch(local.location, /evil\.example/);
+
+  const localLab = startGoogle(oauthEnv(), {
+    host: '127.0.0.1:27070',
+    'x-forwarded-host': '127.0.0.1:23000',
+    'x-forwarded-proto': 'http'
+  });
+  assert.equal(localLab.status, 302);
+  assert.match(localLab.location, /redirect_uri=http%3A%2F%2F127\.0\.0\.1%3A27070%2Fapi%2Fauth%2Fgoogle%2Fcallback/);
+  assert.doesNotMatch(localLab.location, /23000/);
 
   const configured = {
     ...oauthEnv(),
