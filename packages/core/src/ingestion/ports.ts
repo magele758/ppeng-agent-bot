@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { fetchPinnedPublic, webFetchAllowsPrivate, type PublicFetchDeps } from '../net/public-fetch.js';
 import type { ImageAssetRecord } from '../types.js';
 import type { IngestionSettings } from './settings.js';
 import { DEFAULT_DOWNLOAD_MAX_BYTES, defaultIngestionSettings } from './settings.js';
@@ -35,11 +36,22 @@ export interface IngestionPorts {
   >;
 }
 
-export async function defaultDownload(url: string, maxBytes: number, timeoutMs = 30_000): Promise<DownloadResult> {
+export async function defaultDownload(
+  url: string,
+  maxBytes: number,
+  timeoutMs = 30_000,
+  deps?: PublicFetchDeps
+): Promise<DownloadResult> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { signal: ctrl.signal });
+    const res = await fetchPinnedPublic(url, {
+      signal: ctrl.signal,
+      allowPrivateHosts: deps?.allowPrivateHosts ?? webFetchAllowsPrivate(),
+      resolveHost: deps?.resolveHost,
+      request: deps?.request,
+      maxRedirects: deps?.maxRedirects
+    });
     if (!res.ok) {
       return { ok: false, status: res.status, error: `下载失败 HTTP ${res.status}` };
     }

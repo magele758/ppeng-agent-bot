@@ -1,6 +1,7 @@
 import { createLogger } from '../logger.js';
 import type { AgentSandbox, AgentSandboxExecRequest, AgentSandboxExecResult } from './agent-sandbox-types.js';
 import { commandHardlineSandboxResult } from './command-hardline.js';
+import { explicitNetworkAllowed } from './os-sandbox.js';
 
 const log = createLogger('sandbox-remote-vm');
 
@@ -55,7 +56,7 @@ export class RemoteVmAgentSandbox implements AgentSandbox {
           cwd: req.cwd,
           workspace: req.workspace,
           timeoutMs: req.timeoutMs,
-          allowNetwork: req.allowNetwork !== false,
+          allowNetwork: explicitNetworkAllowed(req.allowNetwork),
           sessionId: req.sessionId
         }),
         signal: controller.signal

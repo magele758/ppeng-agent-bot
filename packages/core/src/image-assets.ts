@@ -5,6 +5,7 @@ import type { ImageAssetRecord, ImageRetentionTier, SessionRecord } from './type
 import { createId, nowIso } from './id.js';
 import type { SqliteStateStore } from './storage.js';
 import { envInt } from './env.js';
+import { fetchPinnedPublic, webFetchAllowsPrivate, type PublicFetchDeps } from './net/public-fetch.js';
 
 const ALLOWED_IMAGE_MIMES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 
@@ -112,12 +113,26 @@ export async function fetchImageFromUrl(
   url: string,
   maxBytes: number,
   timeoutMs: number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  deps?: PublicFetchDeps
 ): Promise<{ buffer: Buffer; mimeType: string }> {
+  if (signal?.aborted) {
+    throw signal.reason instanceof Error
+      ? signal.reason
+      : Object.assign(new Error('The operation was aborted'), { name: 'AbortError' });
+  }
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  const onAbort = () => ctrl.abort();
+  signal?.addEventListener('abort', onAbort, { once: true });
   try {
-    const res = await fetch(url, { signal: signal ?? ctrl.signal });
+    const res = await fetchPinnedPublic(url, {
+      signal: ctrl.signal,
+      allowPrivateHosts: deps?.allowPrivateHosts ?? webFetchAllowsPrivate(),
+      resolveHost: deps?.resolveHost,
+      request: deps?.request,
+      maxRedirects: deps?.maxRedirects
+    });
     if (!res.ok) {
       throw new Error(`Fetch image failed ${res.status}`);
     }
@@ -139,6 +154,7 @@ export async function fetchImageFromUrl(
     return { buffer: buf, mimeType: mime };
   } finally {
     clearTimeout(timer);
+    signal?.removeEventListener('abort', onAbort);
   }
 }
 

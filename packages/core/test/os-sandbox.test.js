@@ -11,6 +11,7 @@ import {
   SandboxManager,
   createSandboxFromEnv,
   buildSeatbeltProfile,
+  explicitNetworkAllowed,
 } from '../dist/sandbox/os-sandbox.js';
 
 // ---------------------------------------------------------------------------
@@ -41,6 +42,14 @@ describe('buildSeatbeltProfile', () => {
   it('does NOT add network deny when allowNetwork=true', () => {
     const profile = buildSeatbeltProfile('/ws', '/home/u', true);
     assert.ok(!profile.includes('(deny network*)'));
+  });
+
+  it('allows network only when the caller passes true', () => {
+    assert.equal(explicitNetworkAllowed(undefined), false);
+    assert.equal(explicitNetworkAllowed(false), false);
+    assert.equal(explicitNetworkAllowed(true), true);
+    assert.ok(buildSeatbeltProfile('/ws', '/home/u', explicitNetworkAllowed(undefined)).includes('(deny network*)'));
+    assert.ok(!buildSeatbeltProfile('/ws', '/home/u', explicitNetworkAllowed(true)).includes('(deny network*)'));
   });
 
   it('allows a union of workspace roots', () => {
@@ -318,6 +327,37 @@ describe('SandboxManager.execute', () => {
     } else if (process.platform === 'darwin') {
       assert.equal(result.tier, 0, 'macOS should fall back to direct when sandbox-exec is unusable');
     }
+  });
+
+  it('strips tool-child credentials and keeps non-secret settings', async () => {
+    const mgr = new SandboxManager('direct');
+    const result = await mgr.execute(
+      'printf %s "$RAW_AGENT_API_KEY|$GITHUB_TOKEN|$RAW_AGENT_MODEL_NAME|$RAW_AGENT_MODEL_CONTEXT_TOKENS|$RAW_AGENT_TOKEN_BUDGET"',
+      tmpdir(),
+      {
+        envOptions: {
+          base: {
+            PATH: process.env.PATH ?? '/usr/bin',
+            RAW_AGENT_API_KEY: 'sk-leak',
+            GITHUB_TOKEN: 'ghp-leak',
+            RAW_AGENT_MODEL_NAME: 'kept-model',
+            RAW_AGENT_MODEL_CONTEXT_TOKENS: '131072',
+            RAW_AGENT_TOKEN_BUDGET: 'budget'
+          }
+        }
+      }
+    );
+    assert.equal(result.code, 0, result.stderr);
+    assert.equal(result.stdout, '||kept-model|131072|budget');
+  });
+
+  it('denies outbound network unless allowNetwork is true', async () => {
+    const mgr = new SandboxManager('auto');
+    if (mgr.activeTier === 0) return;
+    const curl = await mgr.execute('command -v curl', tmpdir(), { allowNetwork: true });
+    if (curl.code !== 0) return;
+    const denied = await mgr.execute('curl -s --connect-timeout 2 http://example.com', tmpdir());
+    assert.notEqual(denied.code, 0);
   });
 
   it('applies env sanitization (Tier 0) regardless of provider', async () => {

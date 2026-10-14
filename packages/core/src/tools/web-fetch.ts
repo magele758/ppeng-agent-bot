@@ -1,56 +1,18 @@
-import { isIPv4, isIPv6 } from 'node:net';
+import {
+  fetchPinnedPublic,
+  PrivateNetworkDenied,
+  webFetchAllowsPrivate,
+  type PublicFetchDeps
+} from '../net/public-fetch.js';
 import { fenceExternalContent } from '../safety/external-content.js';
 import { WEB_SEARCH_NOT_CONFIGURED } from './web-settings.js';
 
-function isPrivateIp(hostname: string): boolean {
-  if (hostname === 'localhost' || hostname === '0.0.0.0') {
-    return true;
-  }
-  // Strip IPv6 brackets (URL.hostname keeps them, e.g. "[::1]")
-  const stripped = hostname.startsWith('[') && hostname.endsWith(']')
-    ? hostname.slice(1, -1)
-    : hostname;
-  if (isIPv4(stripped)) {
-    const parts = stripped.split('.').map((p) => Number(p));
-    if (parts.length !== 4 || parts.some((n) => !Number.isFinite(n))) {
-      return true;
-    }
-    const a = parts[0]!;
-    const b = parts[1]!;
-    if (a === 10) {
-      return true;
-    }
-    if (a === 127) {
-      return true;
-    }
-    if (a === 0) {
-      return true;
-    }
-    if (a === 172 && b >= 16 && b <= 31) {
-      return true;
-    }
-    if (a === 192 && b === 168) {
-      return true;
-    }
-    if (a === 169 && b === 254) {
-      return true;
-    }
-    return false;
-  }
-  if (isIPv6(stripped)) {
-    const h = stripped.toLowerCase();
-    if (h === '::1' || h.startsWith('fc') || h.startsWith('fd') || h.startsWith('fe80:')) {
-      return true;
-    }
-  }
-  return false;
-}
+export { webFetchAllowsPrivate };
 
-export interface WebFetchOptions {
+export interface WebFetchOptions extends PublicFetchDeps {
   url: string;
   maxBytes?: number;
   timeoutMs?: number;
-  allowPrivateHosts?: boolean;
 }
 
 const DEFAULT_MAX = 2_000_000;
@@ -107,15 +69,17 @@ function parseArxivAtomEntry(xml: string): { title: string; summary: string; aut
 /**
  * Fetch paper title + abstract from arXiv Atom export API (fixed host; does not follow user-controlled redirects).
  */
-async function tryFetchArxivApiText(arxivId: string, signal: AbortSignal): Promise<string | null> {
+async function tryFetchArxivApiText(
+  arxivId: string,
+  init: PublicFetchDeps & { signal: AbortSignal }
+): Promise<string | null> {
   const bases = ['https://export.arxiv.org/api/query', 'http://export.arxiv.org/api/query'];
   for (const base of bases) {
     const apiUrl = `${base}?id_list=${encodeURIComponent(arxivId)}`;
     try {
-      const res = await fetch(apiUrl, {
+      const res = await fetchPinnedPublic(apiUrl, {
+        ...init,
         method: 'GET',
-        redirect: 'follow',
-        signal,
         headers: {
           'user-agent': 'raw-agent-web_fetch/1.0 (arxiv export api)',
           accept: 'application/atom+xml,text/xml;q=0.9,*/*;q=0.8'
@@ -148,7 +112,9 @@ const DEFAULT_FETCH_HEADERS = {
 } as const;
 
 /**
- * Fetch http(s) URL as text with size cap and basic SSRF guard (blocks private IPs when allowPrivateHosts is false).
+ * Fetch http(s) URL as text with size cap.
+ * Private, CGNAT, and mapped addresses are refused unless allowPrivateHosts is set.
+ * DNS answers and every redirect hop use the same check, and the socket stays on the approved address.
  */
 export async function fetchUrlText(options: WebFetchOptions): Promise<{ ok: boolean; content: string }> {
   const maxBytes = options.maxBytes ?? DEFAULT_MAX;
@@ -162,17 +128,21 @@ export async function fetchUrlText(options: WebFetchOptions): Promise<{ ok: bool
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     return { ok: false, content: 'Only http(s) URLs are allowed' };
   }
-  const host = parsed.hostname;
-  if (!options.allowPrivateHosts && isPrivateIp(host)) {
-    return { ok: false, content: 'Refused: private/local host (set RAW_AGENT_WEB_FETCH_ALLOW_PRIVATE=1 to allow)' };
-  }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const transport = {
+    allowPrivateHosts: options.allowPrivateHosts === true,
+    resolveHost: options.resolveHost,
+    request: options.request,
+    maxRedirects: options.maxRedirects,
+    dnsTimeoutMs: options.dnsTimeoutMs,
+    signal: controller.signal
+  };
   try {
     const arxivId = extractArxivPaperIdFromUrl(options.url);
     if (arxivId) {
-      const apiText = await tryFetchArxivApiText(arxivId, controller.signal);
+      const apiText = await tryFetchArxivApiText(arxivId, transport);
       if (apiText) {
         return {
           ok: true,
@@ -181,10 +151,9 @@ export async function fetchUrlText(options: WebFetchOptions): Promise<{ ok: bool
       }
     }
 
-    const res = await fetch(options.url, {
+    const res = await fetchPinnedPublic(options.url, {
+      ...transport,
       method: 'GET',
-      redirect: 'follow',
-      signal: controller.signal,
       headers: { ...DEFAULT_FETCH_HEADERS }
     });
     const ct = res.headers.get('content-type') ?? '';
@@ -205,6 +174,9 @@ export async function fetchUrlText(options: WebFetchOptions): Promise<{ ok: bool
       content: `Content-Type: ${ct}\n\n${text}`
     };
   } catch (e) {
+    if (e instanceof PrivateNetworkDenied) {
+      return { ok: false, content: e.message };
+    }
     const msg = e instanceof Error ? e.message : String(e);
     return {
       ok: false,
@@ -400,6 +372,6 @@ export async function webSearchFromEnv(
     url,
     maxBytes: options.maxBytes,
     timeoutMs: options.timeoutMs,
-    allowPrivateHosts: ['1', 'true', 'yes'].includes(String(env.RAW_AGENT_WEB_FETCH_ALLOW_PRIVATE ?? '').toLowerCase())
+    allowPrivateHosts: webFetchAllowsPrivate(env)
   });
 }

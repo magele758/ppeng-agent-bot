@@ -10,6 +10,7 @@ import {
   imageBufferToDataUrl,
   touchImageAccess,
   readImageBuffer,
+  fetchImageFromUrl,
 } from '../dist/image-assets.js';
 import { SqliteStateStore } from '../dist/storage.js';
 
@@ -438,8 +439,88 @@ describe('touchImageAccess', () => {
   });
 });
 
-// ── fetchImageFromUrl / pickKeyframesViaModel / mergeContactSheet ────────
-// Skipped: fetchImageFromUrl requires a real HTTP server.
+describe('fetchImageFromUrl private network policy', () => {
+  const offline = { allowPrivateHosts: false };
+
+  it('refuses metadata, loopback, and DNS rebinding before download', async () => {
+    let calls = 0;
+    const request = async () => {
+      calls += 1;
+      return new Response(MINIMAL_PNG, { status: 200, headers: { 'content-type': 'image/png' } });
+    };
+    await assert.rejects(
+      () => fetchImageFromUrl('http://169.254.169.254/latest/meta-data', 1000, 1000, undefined, { ...offline, request }),
+      /private/
+    );
+    await assert.rejects(
+      () => fetchImageFromUrl('http://127.0.0.1/secret.png', 1000, 1000, undefined, { ...offline, request }),
+      /private/
+    );
+    await assert.rejects(
+      () => fetchImageFromUrl('https://cdn.example/a.png', 1000, 1000, undefined, {
+        ...offline,
+        request,
+        resolveHost: async () => ['127.0.0.1']
+      }),
+      /private/
+    );
+    assert.equal(calls, 0);
+  });
+
+  it('does not follow a redirect onto a private address', async () => {
+    let calls = 0;
+    await assert.rejects(
+      () => fetchImageFromUrl('https://cdn.example/a.png', 1000, 1000, undefined, {
+        ...offline,
+        resolveHost: async () => ['93.184.216.34'],
+        request: async () => {
+          calls += 1;
+          return new Response(null, { status: 302, headers: { location: 'http://169.254.169.254/x' } });
+        }
+      }),
+      /private/
+    );
+    assert.equal(calls, 1);
+  });
+
+  it('returns immediately when the caller signal is already aborted', async () => {
+    const ac = new AbortController();
+    ac.abort();
+    let calls = 0;
+    const started = Date.now();
+    await assert.rejects(
+      () => fetchImageFromUrl('https://cdn.example/a.png', 1000, 30_000, ac.signal, {
+        ...offline,
+        resolveHost: async () => {
+          calls += 1;
+          return ['93.184.216.34'];
+        },
+        request: async () => {
+          calls += 1;
+          return new Response(MINIMAL_PNG, { status: 200, headers: { 'content-type': 'image/png' } });
+        }
+      }),
+      (err) => err instanceof Error && (err.name === 'AbortError' || /abort/i.test(err.message))
+    );
+    assert.equal(calls, 0);
+    assert.ok(Date.now() - started < 500);
+  });
+
+  it('pins a public image download to the approved address', async () => {
+    const seen = [];
+    const image = await fetchImageFromUrl('https://cdn.example/a.png', 1_000_000, 1000, undefined, {
+      ...offline,
+      resolveHost: async () => ['93.184.216.34'],
+      request: async (_url, address) => {
+        seen.push(address);
+        return new Response(MINIMAL_PNG, { status: 200, headers: { 'content-type': 'image/png' } });
+      }
+    });
+    assert.deepEqual(seen, ['93.184.216.34']);
+    assert.equal(image.mimeType, 'image/png');
+    assert.ok(image.buffer.length > 0);
+  });
+});
+
 // pickKeyframesViaModel requires a live LLM endpoint.
 // mergeContactSheet is unexported (private) and requires the sharp library.
-// Testing these would need heavy mocking or external infrastructure.

@@ -21,7 +21,7 @@ import { isVaultMetadataDirName } from './markdown-vault-noise.js';
 import { runWorkspaceGrep } from './grep-workspace.js';
 import { readFileLineRange, shouldStreamReadFile } from './read-file-range.js';
 import { lspSendRequest, parseLspConfigFromEnv } from './lsp-client.js';
-import { fetchUrlText, webSearchFromEnv } from './web-fetch.js';
+import { fetchUrlText, webFetchAllowsPrivate, webSearchFromEnv } from './web-fetch.js';
 import { fenceExternalContent } from '../safety/external-content.js';
 import { egressNeedsApproval } from '../safety/egress.js';
 import { resolveWebSearchTemplate, WEB_SEARCH_NOT_CONFIGURED, type WebSettingsReadStore } from './web-settings.js';
@@ -219,7 +219,8 @@ function shellExecution(
       workspace: options?.workspace ?? cwd,
       timeoutMs: options?.timeoutMs,
       signal: options?.signal,
-      sessionId: options?.sessionId
+      sessionId: options?.sessionId,
+      allowNetwork: true
     })
     .then((result) => {
     if (options?.signal?.aborted) return {ok:false, content:'(command aborted)', metadata:{exitCode:result.code, signal:result.signal}};
@@ -482,9 +483,7 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
       const r = await fetchUrlText({
         url: args.url,
         maxBytes: Number.isFinite(maxBytes) && maxBytes > 0 ? maxBytes : undefined,
-        allowPrivateHosts: ['1', 'true', 'yes'].includes(
-          String(process.env.RAW_AGENT_WEB_FETCH_ALLOW_PRIVATE ?? '').toLowerCase()
-        )
+        allowPrivateHosts: webFetchAllowsPrivate()
       });
       if (!r.ok) return { ok: false, content: r.content };
       return {
@@ -758,7 +757,7 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
       const workspace = sandboxWorkspaceRoots(context);
 
       const execEvidence = async (command: string, timeoutMs: number) =>
-        sandbox.execute({ command, cwd, workspace, timeoutMs, signal, sessionId });
+        sandbox.execute({ command, cwd, workspace, timeoutMs, signal, sessionId, allowNetwork: true });
 
       const inside = await execEvidence('git rev-parse --is-inside-work-tree', 15_000);
       const gitAvailable = inside.code === 0 && inside.stdout.trim() === 'true';

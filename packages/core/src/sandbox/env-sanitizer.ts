@@ -72,6 +72,28 @@ const CREDENTIAL_PREFIXES = [
 ];
 
 /**
+ * RAW_AGENT_* secret names. Numeric budgets such as MODEL_CONTEXT_TOKENS,
+ * TOKEN_BUDGET, and TOKEN_PRICE_JSON do not match these suffixes.
+ *
+ * These names are not on the allowlist. bash / bg_run / work_evidence children
+ * must not inherit them: a `printenv` would put the value into the session.
+ * Model, VL, embedding, Feishu, OAuth, and daemon auth read `process.env` in
+ * the host process. Self-heal uses `enrichSpawnEnv`, which does not turn
+ * credential stripping on. GitHub/npm tokens in the exact credential list stay
+ * stripped too; `gh` and `git` use on-disk helpers, not these variables.
+ */
+const RAW_AGENT_CREDENTIAL_SUFFIX =
+  /_(?:API_KEY|ACCESS_KEY|SECRET_KEY|CLIENT_SECRET|APP_SECRET|SECRET|PASSWORD|CREDENTIAL|CREDENTIALS|TOKEN|BEARER)$/;
+
+function isCredentialName(key: string): boolean {
+  if (CREDENTIAL_EXACT.has(key)) return true;
+  for (const prefix of CREDENTIAL_PREFIXES) {
+    if (key.startsWith(prefix)) return true;
+  }
+  return key.startsWith('RAW_AGENT_') && RAW_AGENT_CREDENTIAL_SUFFIX.test(key);
+}
+
+/**
  * Daemon operator credentials. Tool children must not inherit them.
  * In-process clients read `process.env` directly. Next and the desktop shell
  * are sibling processes started by dev-lab / e2e / Electron, not by bash.
@@ -136,18 +158,9 @@ export function sanitizeSpawnEnv(options?: SanitizeEnvOptions): NodeJS.ProcessEn
       continue;
     }
 
-    // Credential stripping (opt-in)
-    if (stripCredentials) {
-      if (CREDENTIAL_EXACT.has(key)) {
-        delete base[key];
-        continue;
-      }
-      for (const prefix of CREDENTIAL_PREFIXES) {
-        if (key.startsWith(prefix)) {
-          delete base[key];
-          break;
-        }
-      }
+    // Credential stripping (opt-in). SandboxManager turns this on for tool children.
+    if (stripCredentials && isCredentialName(key)) {
+      delete base[key];
     }
   }
 

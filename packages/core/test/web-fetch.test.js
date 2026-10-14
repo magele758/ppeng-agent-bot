@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { fetchPinnedPublic, isBlockedFetchAddress } from '../dist/net/public-fetch.js';
 import {
   decodeFetchedBodyAsText,
   extractArxivPaperIdFromUrl,
@@ -176,4 +177,206 @@ test('fetchUrlText allows 172.32.x.x (above private range)', async () => {
   const result = await fetchUrlText({ url: 'http://172.32.0.1:19999/', timeoutMs: 500 });
   assert.equal(result.ok, false);
   assert.ok(!result.content.includes('private'));
+});
+
+function pinned(request, resolveHost = async () => ['93.184.216.34']) {
+  return { resolveHost, request, allowPrivateHosts: false };
+}
+
+test('fetchUrlText blocks CGNAT, mapped IPv6, and decimal loopback without connecting', async () => {
+  let calls = 0;
+  const request = async () => {
+    calls += 1;
+    return new Response('no');
+  };
+  for (const url of [
+    'http://100.64.0.1/',
+    'http://100.127.255.255/',
+    'http://[::ffff:7f00:1]/',
+    'http://[::ffff:127.0.0.1]/',
+    'http://[::ffff:169.254.169.254]/',
+    'http://2130706433/',
+    'http://0x7f000001/'
+  ]) {
+    const result = await fetchUrlText({ url, ...pinned(request) });
+    assert.equal(result.ok, false, url);
+    assert.match(result.content, /private/, url);
+  }
+  assert.equal(calls, 0);
+});
+
+test('fetchUrlText refuses a name that resolves to loopback or metadata', async () => {
+  let calls = 0;
+  const request = async () => {
+    calls += 1;
+    return new Response('secret');
+  };
+  for (const address of ['127.0.0.1', '::1', '169.254.169.254', '10.1.2.3', '100.64.1.1']) {
+    const result = await fetchUrlText({
+      url: 'https://public.example/page',
+      ...pinned(request, async () => [address])
+    });
+    assert.equal(result.ok, false, address);
+    assert.match(result.content, /private/, address);
+  }
+  const mixed = await fetchUrlText({
+    url: 'https://public.example/page',
+    ...pinned(request, async () => ['93.184.216.34', '127.0.0.1'])
+  });
+  assert.equal(mixed.ok, false);
+  assert.match(mixed.content, /private/);
+  assert.equal(calls, 0);
+});
+
+test('fetchUrlText pins the approved address and rechecks each redirect', async () => {
+  const seen = [];
+  const result = await fetchUrlText({
+    url: 'https://public.example/start',
+    ...pinned(async (url, address) => {
+      seen.push(`${url.hostname}@${address}`);
+      if (url.pathname === '/start') {
+        return new Response(null, { status: 302, headers: { location: 'https://cdn.example/next' } });
+      }
+      return new Response('pinned-body', { status: 200, headers: { 'content-type': 'text/plain' } });
+    }, async (hostname) => (hostname === 'cdn.example' ? ['203.0.113.10'] : ['93.184.216.34']))
+  });
+  assert.equal(result.ok, true);
+  assert.match(result.content, /pinned-body/);
+  assert.deepEqual(seen, ['public.example@93.184.216.34', 'cdn.example@203.0.113.10']);
+});
+
+test('fetchUrlText does not follow a redirect into a private address', async () => {
+  let calls = 0;
+  const result = await fetchUrlText({
+    url: 'https://public.example/start',
+    ...pinned(async () => {
+      calls += 1;
+      return new Response(null, { status: 302, headers: { location: 'http://169.254.169.254/latest/meta-data' } });
+    })
+  });
+  assert.equal(calls, 1);
+  assert.equal(result.ok, false);
+  assert.match(result.content, /private/);
+});
+
+test('fetchUrlText stops a redirect loop', async () => {
+  let calls = 0;
+  const result = await fetchUrlText({
+    url: 'http://203.0.113.10/start',
+    timeoutMs: 1000,
+    request: async () => {
+      calls += 1;
+      return new Response(null, { status: 302, headers: { location: 'http://203.0.113.10/again' } });
+    }
+  });
+  assert.equal(result.ok, false);
+  assert.ok(calls >= 2 && calls <= 6);
+});
+
+test('isBlockedFetchAddress rejects NAT64 and IPv4-compatible embeds plus benchmarking space', () => {
+  for (const address of [
+    '64:ff9b::7f00:1',
+    '64:ff9b::127.0.0.1',
+    '64:ff9b::a9fe:a9fe',
+    '64:ff9b::c612:1',
+    '::7f00:1',
+    '::127.0.0.1',
+    '::a00:1',
+    '198.18.0.1',
+    '198.19.255.255'
+  ]) {
+    assert.equal(isBlockedFetchAddress(address), true, address);
+  }
+  for (const address of ['64:ff9b::808:808', '::808:808', '198.17.0.1', '198.20.0.1', '8.8.8.8']) {
+    assert.equal(isBlockedFetchAddress(address), false, address);
+  }
+});
+
+test('fetchUrlText blocks NAT64, IPv4-compatible, and 198.18/15 before connect', async () => {
+  let calls = 0;
+  const request = async () => {
+    calls += 1;
+    return new Response('no');
+  };
+  for (const url of [
+    'http://[64:ff9b::7f00:1]/',
+    'http://[64:ff9b::127.0.0.1]/',
+    'http://[::7f00:1]/',
+    'http://[::10.0.0.1]/',
+    'http://198.18.0.1/',
+    'http://198.19.255.255/'
+  ]) {
+    const result = await fetchUrlText({ url, ...pinned(request) });
+    assert.equal(result.ok, false, url);
+    assert.match(result.content, /private/, url);
+  }
+  const nat64Name = await fetchUrlText({
+    url: 'https://nat64.example/a',
+    ...pinned(request, async () => ['64:ff9b::7f00:1'])
+  });
+  assert.equal(nat64Name.ok, false);
+  assert.match(nat64Name.content, /private/);
+  assert.equal(calls, 0);
+});
+
+test('fetchUrlText pins a public NAT64 address and fails over to the next approved address', async () => {
+  const seen = [];
+  const result = await fetchUrlText({
+    url: 'https://dual.example/a',
+    ...pinned(async (_url, address) => {
+      seen.push(address);
+      if (address === '64:ff9b::808:808') throw new Error('connect ECONNREFUSED');
+      if (address === '203.0.113.10') {
+        return new Response('second', { status: 200, headers: { 'content-type': 'text/plain' } });
+      }
+      return new Response('unexpected', { status: 500 });
+    }, async () => ['64:ff9b::808:808', '203.0.113.10'])
+  });
+  assert.equal(result.ok, true);
+  assert.match(result.content, /second/);
+  assert.deepEqual(seen, ['64:ff9b::808:808', '203.0.113.10']);
+});
+
+test('fetchUrlText does not try another address after an HTTP response', async () => {
+  const seen = [];
+  const result = await fetchUrlText({
+    url: 'https://dual.example/a',
+    ...pinned(async (_url, address) => {
+      seen.push(address);
+      return new Response('first', { status: 503, headers: { 'content-type': 'text/plain' } });
+    }, async () => ['203.0.113.10', '203.0.113.11'])
+  });
+  assert.equal(result.ok, false);
+  assert.deepEqual(seen, ['203.0.113.10']);
+});
+
+test('DNS lookup stops on abort and on its own deadline', async () => {
+  const ac = new AbortController();
+  ac.abort();
+  let calls = 0;
+  await assert.rejects(
+    () => fetchPinnedPublic('https://slow.example/a', {
+      signal: ac.signal,
+      resolveHost: async () => {
+        calls += 1;
+        return ['93.184.216.34'];
+      },
+      request: async () => new Response('no')
+    }),
+    (err) => err instanceof Error && (err.name === 'AbortError' || /abort/i.test(err.message))
+  );
+  assert.equal(calls, 0);
+
+  const started = Date.now();
+  const result = await fetchUrlText({
+    url: 'https://slow.example/a',
+    timeoutMs: 5000,
+    dnsTimeoutMs: 40,
+    allowPrivateHosts: false,
+    resolveHost: () => new Promise(() => {}),
+    request: async () => new Response('no')
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.content, /timed out/);
+  assert.ok(Date.now() - started < 2000);
 });
