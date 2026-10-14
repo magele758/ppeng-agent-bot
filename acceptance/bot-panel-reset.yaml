@@ -1,0 +1,32 @@
+id: bot-panel-reset
+title: 切换 Bot 时重置记忆、暂停开关和软件连接
+status: implemented
+requirement: |
+  #117 already resets session/history on bot switch. Memory panel, pause switch, and software-connection rows still keep the previous bot. Reset those when the selected bot id changes, and ignore late responses from the previous bot.
+notes: |
+  负责人要求现在修好，并先写测试。标准按该要求批准后在同一变更里实现。
+criteria:
+  - id: AC-1
+    given: 用户正在查看一只 Bot 的记忆，列表里有条目，并且打开了编辑或来源内容
+    when: 改选另一只 Bot，而这只新 Bot 的记忆还没返回
+    then: 记忆列表、编辑框和来源内容立刻不再显示上一只 Bot 的内容，因此不能删除或保存上一只的记忆
+  - id: AC-2
+    given: 用户先看 Bot A 的记忆，又很快改选 Bot B
+    when: Bot A 的记忆结果或失败在 B 已经选中之后才返回，或者上一只的刷新在切换之后才结束
+    then: 记忆列表仍只属于 B；A 的条目和失败都不会出现在 B 上，这次过期刷新也不会取消 B 正在进行的加载
+  - id: AC-3
+    given: 用户看到一只 Bot 的暂停开关和停用开关是打开的
+    when: 改选另一只 Bot，而这只新 Bot 的运行状态还没返回
+    then: 两个开关都不再保持打开，而且此时的操作不会把上一只 Bot 的暂停或停用写到当前 Bot
+  - id: AC-4
+    given: 用户先看 Bot A 的暂停状态，又很快改选 Bot B
+    when: Bot A 的运行状态在 B 已经选中之后才返回，随后用户在 B 的状态返回后拨动暂停开关
+    then: A 的迟到状态不会改动 B 的开关；拨动只作用于 B，并沿用 B 自己的停用状态
+  - id: AC-5
+    given: 用户正在查看一只 Bot 的软件连接行和调用记录
+    when: 改选另一只 Bot，而这只新 Bot 的连接还没返回
+    then: 连接行和调用记录立刻不再显示上一只 Bot 的内容
+  - id: AC-6
+    given: 用户先看 Bot A 的软件连接和调用记录，又很快改选 Bot B
+    when: Bot A 的连接或调用记录在 B 已经选中之后才返回，或者上一只的刷新在切换之后才结束
+    then: 这些行不会出现在 B 的面板上，过期的刷新也不会取消 B 正在进行的加载

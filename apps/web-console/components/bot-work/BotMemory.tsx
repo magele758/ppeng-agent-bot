@@ -1,7 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
+import { ownedByBot, shownRows } from "@/lib/bot-panel-reset";
 import { useI18n } from "@/lib/i18n";
 import { api, json, useAction, Feedback, Result } from "./shared";
+import { useBotPanelRead } from "./use-bot-panel-read";
 type Entry = {
   id: string;
   scope: string;
@@ -23,44 +25,69 @@ export function BotMemory({
 }) {
   const { t } = useI18n();
   const action = useAction();
+  const panel = useBotPanelRead(botId);
+  const [loadedBotId, setLoadedBotId] = useState("");
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [draftBotId, setDraftBotId] = useState("");
   const [editing, setEditing] = useState<Entry | null>(null);
+  const [contextBotId, setContextBotId] = useState("");
   const [context, setContext] = useState<unknown>(null);
-  const load = async () => {
-    const data = (await api(
-      `/api/memory?agentId=${encodeURIComponent(botId)}&limit=200`,
-    )) as { entries: Entry[] };
+  const visibleEntries = shownRows(botId, loadedBotId, entries);
+  const visibleDraft = ownedByBot(botId, draftBotId, editing);
+  const visibleContext = ownedByBot(botId, contextBotId, context);
+  const reload = async (requestedBotId: string, signal?: AbortSignal) => {
+    const data = await panel.read(
+      requestedBotId,
+      () =>
+        api(
+          `/api/memory?agentId=${encodeURIComponent(requestedBotId)}&limit=200`,
+          { signal },
+        ) as Promise<{ entries: Entry[] }>,
+      signal,
+    );
+    if (!data) return;
+    setLoadedBotId(requestedBotId);
     setEntries(data.entries);
   };
   useEffect(() => {
-    void action.run(load);
+    const ac = new AbortController();
+    void action.run(() => reload(botId, ac.signal));
+    return () => ac.abort();
   }, [botId, sessionId]);
   return (
     <section className="ag-panel" data-testid="bot-memory">
       <h3>{t("memory.title")}</h3>
       <p>{t("botWork.memoryHistoryHint")}</p>
-      <button disabled={action.busy} onClick={() => void action.run(load)}>
+      <button disabled={action.busy} onClick={() => void action.run(() => reload(botId))}>
         {t("botWork.refresh")}
       </button>
       <Feedback {...action} />
-      {!entries.length && !action.busy && <p>{t("botWork.empty")}</p>}
-      {entries.map((entry) => (
+      {botId === loadedBotId && !visibleEntries.length && !action.busy && <p>{t("botWork.empty")}</p>}
+      {visibleEntries.map((entry) => (
         <article key={entry.id}>
           <strong>{entry.key}</strong>
           <p>{entry.value}</p>
-          <button disabled={action.busy} onClick={() => setEditing(entry)}>
+          <button
+            disabled={action.busy}
+            onClick={() => {
+              setDraftBotId(botId);
+              setEditing(entry);
+            }}
+          >
             {t("botWork.edit")}
           </button>
           <button
             disabled={action.busy}
-            onClick={() =>
+            onClick={() => {
+              const requestedBotId = botId;
               void action.run(async () => {
                 await api(`/api/memory/${encodeURIComponent(entry.id)}`, {
                   method: "DELETE",
                 });
-                await load();
-              })
-            }
+                if (panel.selected() !== requestedBotId) return;
+                await reload(requestedBotId);
+              });
+            }}
           >
             {t("botWork.remove")}
           </button>
@@ -68,37 +95,45 @@ export function BotMemory({
             <button
               key={source.messageId}
               disabled={action.busy || source.seq == null}
-              onClick={() =>
-                void action.run(async () =>
-                  setContext(
-                    await api(
+              onClick={() => {
+                const requestedBotId = botId;
+                void action.run(async () => {
+                  const data = await panel.read(requestedBotId, () =>
+                    api(
                       `/api/sessions/${encodeURIComponent(source.sessionId)}/history/${source.seq}`,
                     ),
-                  ),
-                )
-              }
+                  );
+                  if (!data) return;
+                  setContextBotId(requestedBotId);
+                  setContext(data);
+                });
+              }}
             >
               {t("botWork.source")} #{source.seq ?? source.messageId}
             </button>
           ))}
         </article>
       ))}
-      {editing && (
+      {visibleDraft && (
         <form
           onSubmit={(e) => {
             e.preventDefault();
+            const requestedBotId = botId;
+            const draft = visibleDraft;
+            if (panel.selected() !== requestedBotId) return;
             void action.run(async () => {
-              await api("/api/memory", json(editing));
+              await api("/api/memory", json(draft));
+              if (panel.selected() !== requestedBotId) return;
               setEditing(null);
-              await load();
+              await reload(requestedBotId);
             });
           }}
         >
           <textarea
             required
             aria-label={t("memory.valueLabel")}
-            value={editing.value}
-            onChange={(e) => setEditing({ ...editing, value: e.target.value })}
+            value={visibleDraft.value}
+            onChange={(e) => setEditing({ ...visibleDraft, value: e.target.value })}
           />
           <button disabled={action.busy}>{t("botWork.save")}</button>
           <button type="button" onClick={() => setEditing(null)}>
@@ -106,7 +141,7 @@ export function BotMemory({
           </button>
         </form>
       )}
-      <Result value={context} />
+      <Result value={visibleContext} />
     </section>
   );
 }
