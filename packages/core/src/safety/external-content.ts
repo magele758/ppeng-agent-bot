@@ -1,4 +1,4 @@
-export type ExternalSource = 'web_fetch' | 'browser' | 'mcp' | 'attachment' | 'im' | 'event';
+export type ExternalSource = 'web_fetch' | 'browser' | 'mcp' | 'http' | 'attachment' | 'im' | 'event';
 
 /** Fixed sentence in the stable system prefix. Bump STABLE_SYSTEM_VERSION when this wording changes. */
 export const EXTERNAL_FENCE_SYSTEM_SENTENCE =

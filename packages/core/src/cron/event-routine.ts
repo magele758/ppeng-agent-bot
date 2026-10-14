@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Logger } from '../logger.js';
 import { fenceExternalContent } from '../safety/external-content.js';
+import { assertCredentialEnvName } from '../secrets/credential-env.js';
 import type { MessagePart, SessionRecord } from '../types.js';
 import { textPart } from '../runtime/session-facade.js';
 import { BotQueueCapacityError } from '../bots/bot-work.js';
@@ -233,7 +234,12 @@ function deliveryIdOf(provider: EventProvider, headers: EventRoutineHeaders, bod
 }
 
 function secretFromEnv(name: unknown, env: NodeJS.ProcessEnv): { name?: string; value?: string } {
-  if (typeof name !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) return {};
+  if (typeof name !== 'string') return {};
+  try {
+    assertCredentialEnvName(name);
+  } catch {
+    return {};
+  }
   const value = env[name];
   if (typeof value !== 'string' || value.length === 0) return { name };
   return { name, value };

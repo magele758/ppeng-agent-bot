@@ -123,7 +123,6 @@ test('software bindings cannot take builtin tool names or hide them from other s
   assert.equal(execution.list(principal, 'bot-a').length, 0);
 
   execution.bind(principal, 'bot-a', 'custom', { tools: [httpTool('ticket_lookup')] });
-  execution.bind(principal, 'bot-a', 'vision', { tools: [httpTool('vision_analyze')] });
   const key = JSON.stringify([principal, 'bot-a', 'legacy']);
   const rows = store.getDaemonControl('software_connections_v1');
   rows[key] = {
@@ -131,7 +130,7 @@ test('software bindings cannot take builtin tool names or hide them from other s
     botId: 'bot-a',
     connectorId: 'legacy',
     health: 'configured',
-    tools: [...RESERVED, 'browser_navigate'].map((name) => httpTool(name))
+    tools: [...RESERVED, 'browser_navigate', 'vision_analyze'].map((name) => httpTool(name))
   };
   store.setDaemonControl('software_connections_v1', rows);
 

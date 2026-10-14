@@ -6,6 +6,7 @@ import type { ToolContract } from '../types.js';
 import { principalFromSession } from '../bots/bot-identity.js';
 import type { SqliteStateStore } from '../storage.js';
 import { ValidationError } from '../errors.js';
+import { assertCredentialEnvName } from '../secrets/credential-env.js';
 import { nextCronRunAt, nextZonedCronRunAt, normalizeRoutineTimezone } from './cron-next.js';
 
 /**
@@ -207,7 +208,8 @@ export function createCronTools(getStore: () => CronJobStore, opts?: {store?:Sql
         scheduleValue = args.cron;
         nextRunAt = nextZonedCronRunAt(args.cron,timezone).toISOString();
       } else if (args.event) {
-        if(!/^(github|slack|email)\/[a-z][a-z0-9_-]{0,64}$/.test(args.event)||!args.secretEnv||!/^[A-Za-z_][A-Za-z0-9_]*$/.test(args.secretEnv))throw new ValidationError('valid event and secretEnv required');
+        if(!/^(github|slack|email)\/[a-z][a-z0-9_-]{0,64}$/.test(args.event))throw new ValidationError('valid event and secretEnv required');
+        assertCredentialEnvName(String(args.secretEnv ?? ''));
         scheduleKind='event';scheduleValue=args.event;
       } else {
         return { ok: false, content: 'Provide every_ms, once_at, or cron' };

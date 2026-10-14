@@ -7,18 +7,14 @@ import type { RunContext, ToolContract, ToolExecutionResult } from '../types.js'
 import type { ConnectorGrantStore } from './registry.js';
 import { ValidationError } from '../errors.js';
 import { SecretVault } from '../secrets/secret-vault.js';
-import { assertWritableEnvName } from '../secrets/reserved-env-names.js';
+import { assertCredentialEnvName } from '../secrets/credential-env.js';
 import { collectReservedDynToolNames, isReservedDynToolName } from '../dyn-tools/names.js';
 import { isPrivateOrReservedIp } from '../goal/run-verify.js';
 import { fenceExternalContent } from '../safety/external-content.js';
 import { requestApprovedAddress } from './http-request.js';
 
-// Keep aligned with sandbox/env-sanitizer OPERATOR_CHILD_DENY: operator secrets
-// must never be selected by a Bot as software credentials, including old bindings.
-const OPERATOR_CREDENTIAL_DENY = new Set(['RAW_AGENT_AUTH_TOKEN', 'RAW_AGENT_HUMAN_RELEASE_SECRET']);
 function assertSoftwareCredentialName(name: string): void {
-  assertWritableEnvName(name);
-  if (OPERATOR_CREDENTIAL_DENY.has(name)) throw new ValidationError('Operator credential cannot be used for software execution');
+  assertCredentialEnvName(name);
 }
 
 export interface HttpExecutor {
@@ -92,6 +88,26 @@ class InvocationLedger {
     const rows=this.store.getDaemonControl<Invocation[]>(INVOCATIONS)??[];
     const index=rows.findIndex(r=>r.id===row.id);if(index<0)rows.push(row);else rows[index]=row;
     this.store.setDaemonControl(INVOCATIONS,rows);
+  }
+  /** Insert a new claim. A concurrent duplicate fingerprint returns the row already stored. */
+  insertFresh(row:Invocation):Invocation|undefined {
+    if(!this.db) {
+      const rows=this.store.getDaemonControl<Invocation[]>(INVOCATIONS)??[];
+      const existing=rows.find(r=>r.fingerprint===row.fingerprint&&r.id!==row.id);
+      if(existing) return existing;
+      this.put(row);
+      return undefined;
+    }
+    try {
+      this.put(row);
+      return undefined;
+    } catch (error) {
+      const message=error instanceof Error ? error.message : String(error);
+      if (!message.includes('UNIQUE constraint failed: software_invocations.fingerprint')) throw error;
+      const existing=this.fingerprint(row.fingerprint);
+      if (!existing) throw error;
+      return existing;
+    }
   }
   get(id:string):Invocation|undefined {
     return this.db?this.decode(this.db.prepare('SELECT payload,seq FROM software_invocations WHERE id=?').get(id)):(this.store.getDaemonControl<Invocation[]>(INVOCATIONS)??[]).find(r=>r.id===id);
@@ -168,7 +184,10 @@ function redact(text: string, secret?: string): string {
   for (const variant of [...variants].sort((a,b)=>b.length-a.length)) text=text.split(variant).join('[REDACTED]');
   return text;
 }
-function writeTool(tool:SoftwareTool):boolean {return tool.executor.kind==='mcp' ? true : !['GET','HEAD','OPTIONS'].includes(tool.executor.method??'GET');}
+function writeTool(tool:SoftwareTool):boolean {
+  if (tool.executor.kind==='mcp') return tool.executor.readOnly !== true;
+  return !['GET','HEAD','OPTIONS'].includes(tool.executor.method??'GET');
+}
 interface ExecutionBinding {principal: string; botId: string; connection: SoftwareConnection; tool: SoftwareTool; secret?: string}
 interface PreparedHttpRequest {url: URL; headers: Record<string, string>; body?: string; signal: AbortSignal}
 function executionSignal(ctx: RunContext, timeoutMs: number): AbortSignal {
@@ -333,8 +352,13 @@ export class SoftwareExecution {
     const principal=this.principal({userId:session.metadata?.userId as string|undefined,tenantId:session.metadata?.tenantId as string|undefined});
     const all=new Set(Object.values(this.connections()).flatMap(c=>c.tools.map(t=>t.name)));
     const allowed=new Set(this.list(principal,String(session.metadata?.botId??'')).flatMap(c=>c.tools.map(t=>t.name)));
-    // Drop only the foreign software executor. A builtin that shares the name stays.
-    return tools.filter(t=>!all.has(t.name)||allowed.has(t.name)||!isSoftwareConnectionTool(t));
+    const catalogBuiltins=new Set(tools.filter(t=>!isSoftwareConnectionTool(t)).map(t=>t.name));
+    // A connection may not replace a builtin that is already in this catalog.
+    return tools.filter(t=>{
+      if(!isSoftwareConnectionTool(t)) return true;
+      if(catalogBuiltins.has(t.name)) return false;
+      return !all.has(t.name)||allowed.has(t.name);
+    });
   }
   tools():ToolContract[] {
     const names=new Map<string,SoftwareTool>();const writes=new Set<string>();
@@ -382,15 +406,16 @@ export class SoftwareExecution {
     if (prior.requestHash !== requestHash) return {ok: false, content: 'Idempotency key was already used with different arguments'};
     return prior.result ?? {ok: false, content: `Invocation ${prior.id} is ${prior.state}; verify before retrying`};
   }
-  private newInvocation(ctx: RunContext, binding: ExecutionBinding, requestHash: string, fingerprint: string): Invocation {
+  private newInvocation(ctx: RunContext, binding: ExecutionBinding, requestHash: string, fingerprint: string): { row: Invocation; owned: boolean } {
     const taskId = ctx.task?.id ?? ctx.session.metadata?.botWorkTaskId ?? ctx.session.metadata?.routineRunId;
     const row: Invocation = {id: randomUUID(), sessionId: ctx.session.id, principal: binding.principal, botId: binding.botId,
       connectorId: binding.connection.connectorId, toolName: binding.tool.name, fingerprint, requestHash,
       state: 'running', write: writeTool(binding.tool), startedAt: new Date().toISOString()};
     const trackedTask = ctx.task?.id || ctx.session.metadata?.botWorkTaskId || ctx.session.metadata?.routineRunId;
     if (trackedTask) row.taskId = String(taskId);
-    this.ledger.put(row);
-    return row;
+    const existing=this.ledger.insertFresh(row);
+    if(existing) return {row:existing, owned:false};
+    return {row, owned:true};
   }
   private assertCurrentConnection(binding: ExecutionBinding): void {
     const current = this.connections()[connectionKey(binding.principal, binding.botId, binding.connection.connectorId)];
@@ -457,7 +482,7 @@ export class SoftwareExecution {
     const request = prepareHttpRequest(ctx, executor, args, row.write, binding.secret, key);
     const response = await this.fetchHttpResponse(binding, executor, request, dispatch);
     const body = await readHttpResponse(response, executor.maxBytes ?? 2000000);
-    return {ok: response.ok, content: fenceExternalContent({source: 'mcp', label: binding.tool.name, body}), metadata: {status: response.status, invocationId: row.id}};
+    return {ok: response.ok, content: fenceExternalContent({source: 'http', label: binding.tool.name, body}), metadata: {status: response.status, invocationId: row.id}};
   }
   async execute(ctx: RunContext, name: string, args: Record<string, unknown>): Promise<ToolExecutionResult> {
     let binding: ExecutionBinding | undefined;
@@ -471,7 +496,12 @@ export class SoftwareExecution {
     const {requestHash, fingerprint} = invocationIdentity(binding, args, key);
     const prior = this.existingInvocation(requestHash, fingerprint);
     if (prior) return prior;
-    const row = this.newInvocation(ctx, binding, requestHash, fingerprint);
+    const claimed = this.newInvocation(ctx, binding, requestHash, fingerprint);
+    if (!claimed.owned) {
+      if (claimed.row.requestHash !== requestHash) return {ok: false, content: 'Idempotency key was already used with different arguments'};
+      return claimed.row.result ?? {ok: false, content: `Invocation ${claimed.row.id} is ${claimed.row.state}; verify before retrying`};
+    }
+    const row = claimed.row;
     let dispatched = false;
     const dispatch = () => {dispatched = true;};
     try {
