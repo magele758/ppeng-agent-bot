@@ -146,21 +146,25 @@ export function verifySlackSignature(input: {
 }
 
 /**
- * `X-Ppeng-Signature: sha256=<hex>` is HMAC-SHA256(secret, `{timestamp}.{rawBody}`).
- * `X-Ppeng-Timestamp` is unix seconds and must be within 5 minutes. The timestamp
- * is inside the MAC so a captured signature cannot be reused with a fresh time.
+ * `X-Ppeng-Signature: sha256=<hex>` is HMAC-SHA256(secret, `${timestamp}.${deliveryId}.${rawBody}`).
+ * `X-Ppeng-Timestamp` is unix seconds. The delivery id (`X-Ppeng-Delivery`, or the
+ * equivalent id on the message) is inside the MAC, and a timestamp more than 5
+ * minutes from now is rejected. A captured signature cannot be replayed with
+ * another delivery id or a fresh time.
  */
 export function verifyEmailSignature(input: {
   rawBody: string;
   secret: string;
-  timestamp: string | undefined;
   signature: string | undefined;
+  deliveryId?: string;
+  timestamp?: string;
   nowMs?: number;
 }): boolean {
   if (!input.secret || !input.signature) return false;
+  const deliveryId = clampDeliveryId(input.deliveryId);
   const timestamp = freshTimestamp(input.timestamp, input.nowMs ?? Date.now());
-  if (!timestamp) return false;
-  const expected = `sha256=${hmacHex(input.secret, `${timestamp}.${input.rawBody}`)}`;
+  if (!deliveryId || !timestamp) return false;
+  const expected = `sha256=${hmacHex(input.secret, `${timestamp}.${deliveryId}.${input.rawBody}`)}`;
   return signaturesMatch(expected, input.signature);
 }
 
@@ -240,7 +244,8 @@ function signatureOk(
   rawBody: string,
   secret: string,
   headers: EventRoutineHeaders,
-  nowMs: number
+  nowMs: number,
+  deliveryId?: string
 ): boolean {
   if (provider === 'github') {
     return verifyGithubSignature({
@@ -264,6 +269,7 @@ function signatureOk(
   return verifyEmailSignature({
     rawBody,
     secret,
+    deliveryId,
     timestamp: headerValue(headers, 'x-ppeng-timestamp'),
     signature: headerValue(headers, 'x-ppeng-signature'),
     nowMs
@@ -304,8 +310,8 @@ function errorText(err: unknown): string {
 
 function verifyRoutineDelivery(job:CronJobRecord,input:AcceptEventRoutineInput,env:NodeJS.ProcessEnv,nowMs:number):{deliveryId:string;secretName?:string}|EventJobOutcome {
  const secret=secretFromEnv(job.metadata.secretEnv,env);
- if(!secret.value||!signatureOk(input.provider,input.rawBody,secret.value,input.headers,nowMs))return {jobId:job.id,status:'rejected',reason:'bad_signature'};
  const deliveryId=deliveryIdOf(input.provider,input.headers,input.body);
+ if(!secret.value||!signatureOk(input.provider,input.rawBody,secret.value,input.headers,nowMs,deliveryId))return {jobId:job.id,status:'rejected',reason:'bad_signature'};
  if(!deliveryId)return {jobId:job.id,status:'rejected',reason:'no_delivery'};
  return {deliveryId,secretName:secret.name};
 }

@@ -47,8 +47,8 @@ function slackSig(raw, timestamp = NOW_SEC, secret = SECRET) {
   return `v0=${hmac(secret, `v0:${timestamp}:${raw}`)}`;
 }
 
-function emailSig(raw, timestamp = NOW_SEC, secret = SECRET) {
-  return `sha256=${hmac(secret, `${timestamp}.${raw}`)}`;
+function emailSig(raw, deliveryId, timestamp = NOW_SEC, secret = SECRET) {
+  return `sha256=${hmac(secret, `${timestamp}.${deliveryId}.${raw}`)}`;
 }
 
 function tempHost() {
@@ -141,12 +141,18 @@ test('signature helpers accept a matching HMAC and reject a bad or stale one', (
   const email = {
     rawBody: raw,
     secret: SECRET,
+    deliveryId: 'email-sig',
     timestamp: NOW_SEC,
-    signature: emailSig(raw),
+    signature: emailSig(raw, 'email-sig'),
     nowMs: NOW
   };
   assert.equal(verifyEmailSignature(email), true);
   assert.equal(verifyEmailSignature({ ...email, signature: `sha256=${hmac(SECRET, raw)}` }), false);
+  assert.equal(verifyEmailSignature({ ...email, signature: `sha256=${hmac(SECRET, `${NOW_SEC}.${raw}`)}` }), false);
+  assert.equal(verifyEmailSignature({ ...email, signature: emailSig(raw, 'email-other') }), false);
+  assert.equal(verifyEmailSignature({ ...email, deliveryId: 'email-other' }), false);
+  assert.equal(verifyEmailSignature({ ...email, deliveryId: undefined }), false);
+  assert.equal(verifyEmailSignature({ ...email, signature: githubSig(raw, 'email-sig', NOW_SEC) }), true);
   assert.equal(verifyEmailSignature({ ...email, signature: githubSig(raw, 'delivery-sig', NOW_SEC) }), false);
   assert.equal(verifyEmailSignature({ ...email, timestamp: String(Number(NOW_SEC) - 301), nowMs: NOW }), false);
 });
@@ -281,7 +287,7 @@ function routineRowCount(store) {
   return store.db.prepare('SELECT COUNT(*) AS n FROM bot_routine_runs').get().n;
 }
 
-test('换掉 GitHub 投递号并复用原签名时不会再次入队 [AC:github-webhook-replay#AC-1] [AC:github-webhook-replay#AC-3]', async () => {
+test('换掉 GitHub 投递号并复用原签名时不会再次入队 [AC:github-webhook-replay#AC-1] [AC:github-webhook-replay#AC-3] [AC:email-webhook-replay#AC-6]', async () => {
   const { store, host, runs, session } = tempHost();
   addJob(host, session, { event: 'github/push' });
   const raw = JSON.stringify({ note: 'replay-body' });
@@ -438,7 +444,7 @@ test('slack and email wake on a good signature and stay quiet when the timestamp
     rawBody: emailBody,
     headers: {
       'x-ppeng-timestamp': NOW_SEC,
-      'x-ppeng-signature': emailSig(emailBody),
+      'x-ppeng-signature': emailSig(emailBody, 'email-1'),
       'x-ppeng-delivery': 'email-1'
     },
     nowMs: NOW,
@@ -451,7 +457,7 @@ test('slack and email wake on a good signature and stay quiet when the timestamp
     rawBody: emailStaleBody,
     headers: {
       'x-ppeng-timestamp': emailStaleTs,
-      'x-ppeng-signature': emailSig(emailStaleBody, emailStaleTs),
+      'x-ppeng-signature': emailSig(emailStaleBody, 'email-stale', emailStaleTs),
       'x-ppeng-delivery': 'email-stale'
     },
     nowMs: NOW,
@@ -465,6 +471,145 @@ test('slack and email wake on a good signature and stay quiet when the timestamp
   const text = runs.map(id=>userText(store,id)).join('\n');
   assert.match(text, /«external source=event label=slack\/message»/);
   assert.match(text, /«external source=event label=email\/received»/);
+  store.db.close();
+});
+
+test('5 分钟内换邮件投递号并复用原签名时不会再跑一轮 [AC:email-webhook-replay#AC-1] [AC:email-webhook-replay#AC-2]', async () => {
+  const { store, host, runs, session } = tempHost();
+  addJob(host, session, { event: 'email/received' });
+  const raw = JSON.stringify({ subject: 'invoice', deliveryId: 'email-original' });
+  const deliveryA = 'email-original';
+  const signature = emailSig(raw, deliveryA, NOW_SEC);
+  const headers = {
+    'x-ppeng-timestamp': NOW_SEC,
+    'x-ppeng-signature': signature,
+    'x-ppeng-delivery': deliveryA
+  };
+  const withinWindow = NOW + 4 * 60 * 1000;
+  const first = await acceptEventRoutine(host, {
+    provider: 'email',
+    rawBody: raw,
+    headers,
+    nowMs: NOW,
+    claimDelivery: claimInboundEvent
+  });
+  const replay = await acceptEventRoutine(host, {
+    provider: 'email',
+    rawBody: raw,
+    headers: { ...headers, 'x-ppeng-delivery': 'email-swapped' },
+    nowMs: withinWindow,
+    claimDelivery: claimInboundEvent
+  });
+  const edge = await acceptEventRoutine(host, {
+    provider: 'email',
+    rawBody: raw,
+    headers: { ...headers, 'x-ppeng-delivery': 'email-swapped-edge' },
+    nowMs: NOW + EVENT_SIGNATURE_WINDOW_MS,
+    claimDelivery: claimInboundEvent
+  });
+  const freshDelivery = 'email-fresh';
+  const second = await acceptEventRoutine(host, {
+    provider: 'email',
+    rawBody: raw,
+    headers: {
+      'x-ppeng-timestamp': NOW_SEC,
+      'x-ppeng-signature': emailSig(raw, freshDelivery, NOW_SEC),
+      'x-ppeng-delivery': freshDelivery
+    },
+    nowMs: withinWindow,
+    claimDelivery: claimInboundEvent
+  });
+  assert.equal(first.outcomes[0]?.status, 'woke');
+  assert.equal(replay.outcomes[0]?.status, 'rejected');
+  assert.equal(replay.outcomes[0]?.reason, 'bad_signature');
+  assert.equal(edge.outcomes[0]?.status, 'rejected');
+  assert.equal(edge.outcomes[0]?.reason, 'bad_signature');
+  assert.equal(second.outcomes[0]?.status, 'woke');
+  assert.equal(runs.length, 2);
+  assert.equal(routineRowCount(store), 2);
+  store.db.close();
+});
+
+test('签名没覆盖投递号的邮件不会跑 [AC:email-webhook-replay#AC-3]', async () => {
+  const { store, host, runs, session } = tempHost();
+  addJob(host, session, { event: 'email/received' });
+  const raw = JSON.stringify({ subject: 'invoice', deliveryId: 'email-uncovered' });
+  const uncovered = await acceptEventRoutine(host, {
+    provider: 'email',
+    rawBody: raw,
+    headers: {
+      'x-ppeng-timestamp': NOW_SEC,
+      'x-ppeng-signature': `sha256=${hmac(SECRET, `${NOW_SEC}.${raw}`)}`,
+      'x-ppeng-delivery': 'email-uncovered'
+    },
+    nowMs: NOW + 60 * 1000,
+    claimDelivery: claimInboundEvent
+  });
+  assert.equal(uncovered.outcomes[0]?.status, 'rejected');
+  assert.equal(uncovered.outcomes[0]?.reason, 'bad_signature');
+  assert.deepEqual(runs, []);
+  assert.equal(routineRowCount(store), 0);
+  store.db.close();
+});
+
+test('正文里的投递号换一个再投递时不会再跑一轮 [AC:email-webhook-replay#AC-4]', async () => {
+  const { store, host, runs, session } = tempHost();
+  addJob(host, session, { event: 'email/received' });
+  const deliveryA = 'email-from-body';
+  const raw = JSON.stringify({ subject: 'invoice', deliveryId: deliveryA });
+  const signature = emailSig(raw, deliveryA, NOW_SEC);
+  const first = await acceptEventRoutine(host, {
+    provider: 'email',
+    rawBody: raw,
+    headers: {
+      'x-ppeng-timestamp': NOW_SEC,
+      'x-ppeng-signature': signature
+    },
+    nowMs: NOW,
+    claimDelivery: claimInboundEvent
+  });
+  const replay = await acceptEventRoutine(host, {
+    provider: 'email',
+    rawBody: raw,
+    headers: {
+      'x-ppeng-timestamp': NOW_SEC,
+      'x-ppeng-signature': signature,
+      'x-ppeng-delivery': 'email-header-swapped'
+    },
+    nowMs: NOW + 4 * 60 * 1000,
+    claimDelivery: claimInboundEvent
+  });
+  assert.equal(first.outcomes[0]?.status, 'woke');
+  assert.equal(replay.outcomes[0]?.status, 'rejected');
+  assert.equal(replay.outcomes[0]?.reason, 'bad_signature');
+  assert.equal(runs.length, 1);
+  assert.equal(routineRowCount(store), 1);
+  store.db.close();
+});
+
+test('Slack 仍按原来的签名在 5 分钟内执行一次 [AC:email-webhook-replay#AC-5]', async () => {
+  const { store, host, runs, session } = tempHost();
+  addJob(host, session, { event: 'slack/message' });
+  const raw = JSON.stringify({ type: 'event_callback', event_id: 'Ev-slack-keep', event: { type: 'message', text: 'hi' } });
+  const woke = await acceptEventRoutine(host, {
+    provider: 'slack',
+    rawBody: raw,
+    headers: {
+      'x-slack-request-timestamp': NOW_SEC,
+      'x-slack-signature': slackSig(raw)
+    },
+    nowMs: NOW + 4 * 60 * 1000,
+    claimDelivery: claimInboundEvent
+  });
+  assert.equal(woke.outcomes[0]?.status, 'woke');
+  assert.equal(runs.length, 1);
+  assert.equal(verifySlackSignature({
+    rawBody: raw,
+    secret: SECRET,
+    timestamp: NOW_SEC,
+    signature: `v0=${hmac(SECRET, `v0:${NOW_SEC}:${raw}`)}`,
+    nowMs: NOW
+  }), true);
   store.db.close();
 });
 

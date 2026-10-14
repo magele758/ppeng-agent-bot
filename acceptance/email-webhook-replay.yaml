@@ -1,0 +1,32 @@
+id: email-webhook-replay
+title: 邮件事件不能靠换投递号重放
+status: implemented
+requirement: |
+  Fix: email webhook HMAC must cover X-Ppeng-Delivery (or equivalent delivery id) the same way GitHub now covers delivery id. Replaying within 5 minutes with the same signature and a new delivery id must not wake a second routine. Do not weaken Slack or the GitHub format from #114. No new env vars. Acceptance-first, user asked to fix now, tests first. Open a PR and merge when the relevant checks are green. Do not publish npm. Do not edit browser, cron secretEnv, compact, or the web console.
+notes: |
+  user pre-authorized start（用户明确要求现在修，未等待逐条确认；标准仍以用户视角书写，PR 中供负责人事后复核）
+criteria:
+  - id: AC-1
+    given: 一条邮件事件在 5 分钟内刚刚成功触发了例行任务
+    when: 同一份签名被拿来再投递一次，只是换了一个新的投递号
+    then: 不会再排入第二次例行任务，模型也不会再跑一遍
+  - id: AC-2
+    given: 一条 5 分钟以内的邮件事件，签名和这次投递对得上
+    when: 它第一次到达
+    then: 例行任务会排入并执行一次
+  - id: AC-3
+    given: 一条 5 分钟以内的邮件事件，签名没有覆盖这次投递号
+    when: 它到达
+    then: 被拒绝，不会排入例行任务，也不会跑模型
+  - id: AC-4
+    given: 一条邮件没有单独给出投递号，投递号写在正文里，并在 5 分钟内成功触发了例行任务
+    when: 同一份签名再投递一次，并带上另一个投递号
+    then: 不会再排入第二次例行任务，模型也不会再跑一遍
+  - id: AC-5
+    given: 一条 5 分钟以内、签名仍按 Slack 现有方式计算的 Slack 事件
+    when: 它第一次到达
+    then: 例行任务会执行一次
+  - id: AC-6
+    given: 一条 GitHub 事件的签名仍按现在的方式覆盖时间、投递号和正文
+    when: 同一份签名被拿来再投递一次，只是换了一个新的投递号
+    then: 仍然被拒绝，不会再执行
