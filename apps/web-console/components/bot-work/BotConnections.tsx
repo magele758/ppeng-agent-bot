@@ -1,7 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
+import { ownedByBot, shownRows } from "@/lib/bot-panel-reset";
 import { useI18n } from "@/lib/i18n";
 import { api, json, useAction, Feedback, Result, Status } from "./shared";
+import { useBotPanelRead } from "./use-bot-panel-read";
 type Invocation = {
   id: string;
   toolName: string;
@@ -18,25 +20,40 @@ type Connection = {
 export function BotConnections({ botId }: { botId: string }) {
   const { t } = useI18n();
   const action = useAction();
+  const panel = useBotPanelRead(botId);
+  const [loadedBotId, setLoadedBotId] = useState("");
   const [connections, setConnections] = useState<Connection[]>([]);
   const [connectorId, setId] = useState("");
   const [spec, setSpec] = useState("");
   const [secretEnv, setSecret] = useState("");
   const [invocations, setInvocations] = useState<Invocation[]>([]);
-  const [cursor,setCursor]=useState<number|null>(null);
+  const [invocationBotId, setInvocationBotId] = useState("");
+  const [cursor, setCursor] = useState<number | null>(null);
   const [selectedConnector, setSelectedConnector] = useState("");
   const [note, setNote] = useState("");
   const [unsupported, setUnsupported] = useState<unknown[]>([]);
+  const [unsupportedBotId, setUnsupportedBotId] = useState("");
   const [tools, setTools] = useState("");
-  const base = `/api/bots/${encodeURIComponent(botId)}/connections`;
-  const load = async () => {
-    const data = (await api(base)) as { connections: Connection[] };
+  const visibleConnections = shownRows(botId, loadedBotId, connections);
+  const visibleInvocations = shownRows(botId, invocationBotId, invocations);
+  const visibleUnsupported = ownedByBot(botId, unsupportedBotId, unsupported);
+  const connectionPath = (requestedBotId: string, suffix = "") =>
+    `/api/bots/${encodeURIComponent(requestedBotId)}/connections${suffix}`;
+  const load = async (requestedBotId: string, signal?: AbortSignal) => {
+    const data = await panel.read(
+      requestedBotId,
+      () =>
+        api(connectionPath(requestedBotId), { signal }) as Promise<{ connections: Connection[] }>,
+      signal,
+    );
+    if (!data) return;
+    setLoadedBotId(requestedBotId);
     setConnections(data.connections);
   };
   useEffect(() => {
-    setConnections([]);
-    setInvocations([]);
-    void action.run(load);
+    const ac = new AbortController();
+    void action.run(() => load(botId, ac.signal));
+    return () => ac.abort();
   }, [botId]);
   return (
     <section className="ag-panel" data-testid="bot-connections">
@@ -45,17 +62,25 @@ export function BotConnections({ botId }: { botId: string }) {
       <form
         onSubmit={(e) => {
           e.preventDefault();
+          const requestedBotId = botId;
           void action.run(async () => {
-            const result = (await api(
-              `${base}/import`,
-              json({
-                connectorId,
-                spec: JSON.parse(spec),
-                ...(secretEnv ? { secretEnv } : {}),
-              }),
-            )) as { unsupported?: unknown[] };
+            const parsed = JSON.parse(spec);
+            const result = await panel.read(
+              requestedBotId,
+              () =>
+                api(
+                  connectionPath(requestedBotId, "/import"),
+                  json({
+                    connectorId,
+                    spec: parsed,
+                    ...(secretEnv ? { secretEnv } : {}),
+                  }),
+                ) as Promise<{ unsupported?: unknown[] }>,
+            );
+            if (!result) return;
+            setUnsupportedBotId(requestedBotId);
             setUnsupported(result.unsupported ?? []);
-            await load();
+            await load(requestedBotId);
           });
         }}
       >
@@ -90,18 +115,22 @@ export function BotConnections({ botId }: { botId: string }) {
         <form
           onSubmit={(e) => {
             e.preventDefault();
+            const requestedBotId = botId;
             void action.run(async () => {
-              await api(
-                `${base}/${encodeURIComponent(connectorId)}`,
-                json(
-                  {
-                    ...(secretEnv ? { secretEnv } : {}),
-                    ...(tools.trim() ? { tools: JSON.parse(tools) } : {}),
-                  },
-                  "PUT",
+              const saved = await panel.read(requestedBotId, () =>
+                api(
+                  connectionPath(requestedBotId, `/${encodeURIComponent(connectorId)}`),
+                  json(
+                    {
+                      ...(secretEnv ? { secretEnv } : {}),
+                      ...(tools.trim() ? { tools: JSON.parse(tools) } : {}),
+                    },
+                    "PUT",
+                  ),
                 ),
               );
-              await load();
+              if (!saved) return;
+              await load(requestedBotId);
             });
           }}
         >
@@ -118,8 +147,8 @@ export function BotConnections({ botId }: { botId: string }) {
         </form>
       </details>
       <Feedback {...action} />
-      {!connections.length && !action.busy && <p>{t("botWork.empty")}</p>}
-      {connections.map((c) => (
+      {botId === loadedBotId && !visibleConnections.length && !action.busy && <p>{t("botWork.empty")}</p>}
+      {visibleConnections.map((c) => (
         <article key={c.connectorId}>
           <h4>{c.connectorId}</h4>
           <p>
@@ -134,51 +163,95 @@ export function BotConnections({ botId }: { botId: string }) {
           </ul>
           <button
             disabled={action.busy}
-            onClick={() =>
+            onClick={() => {
+              const requestedBotId = botId;
               void action.run(async () => {
-                await api(
-                  `${base}/${encodeURIComponent(c.connectorId)}/probe`,
-                  { method: "POST" },
+                const probed = await panel.read(requestedBotId, () =>
+                  api(connectionPath(requestedBotId, `/${encodeURIComponent(c.connectorId)}/probe`), {
+                    method: "POST",
+                  }),
                 );
-                await load();
-              })
-            }
+                if (!probed) return;
+                await load(requestedBotId);
+              });
+            }}
           >
             {t("botWork.probe")}
           </button>
           <button
             disabled={action.busy}
-            onClick={() =>
+            onClick={() => {
+              const requestedBotId = botId;
               void action.run(async () => {
-                await api(`${base}/${encodeURIComponent(c.connectorId)}`, {
-                  method: "DELETE",
-                });
-                await load();
-              })
-            }
+                const removed = await panel.read(requestedBotId, () =>
+                  api(connectionPath(requestedBotId, `/${encodeURIComponent(c.connectorId)}`), {
+                    method: "DELETE",
+                  }),
+                );
+                if (!removed) return;
+                await load(requestedBotId);
+              });
+            }}
           >
             {t("botWork.revoke")}
           </button>
           <button
             disabled={action.busy}
-            onClick={() =>
+            onClick={() => {
+              const requestedBotId = botId;
+              const connector = c.connectorId;
               void action.run(async () => {
-                const data = (await api(
-                  `${base}/${encodeURIComponent(c.connectorId)}/invocations`,
-                )) as { invocations: Invocation[];hasMore?:boolean;nextCursor?:number|null };
-                setCursor(data.hasMore?data.nextCursor??null:null);
-                setSelectedConnector(c.connectorId);
+                const data = await panel.read(
+                  requestedBotId,
+                  () =>
+                    api(connectionPath(requestedBotId, `/${encodeURIComponent(connector)}/invocations`)) as Promise<{
+                      invocations: Invocation[];
+                      hasMore?: boolean;
+                      nextCursor?: number | null;
+                    }>,
+                );
+                if (!data) return;
+                setInvocationBotId(requestedBotId);
+                setCursor(data.hasMore ? (data.nextCursor ?? null) : null);
+                setSelectedConnector(connector);
                 setInvocations(data.invocations);
-              })
-            }
+              });
+            }}
           >
             {t("botWork.invocations")}
           </button>
         </article>
       ))}
-      <Result value={unsupported.length ? unsupported : null} />
-      {cursor!=null&&<button disabled={action.busy} onClick={()=>void action.run(async()=>{const data=await api(`${base}/${encodeURIComponent(selectedConnector)}/invocations?limit=100&beforeSeq=${cursor}`) as {invocations:Invocation[];hasMore:boolean;nextCursor:number|null};setInvocations(prev=>[...prev,...data.invocations]);setCursor(data.hasMore?data.nextCursor:null);})}>{t('botWork.older')}</button>}
-      {invocations.map((inv) => (
+      <Result value={visibleUnsupported && visibleUnsupported.length ? visibleUnsupported : null} />
+      {botId === invocationBotId && cursor != null && (
+        <button
+          disabled={action.busy}
+          onClick={() => {
+            const requestedBotId = botId;
+            const before = cursor;
+            const connector = selectedConnector;
+            void action.run(async () => {
+              const data = await panel.read(
+                requestedBotId,
+                () =>
+                  api(
+                    connectionPath(
+                      requestedBotId,
+                      `/${encodeURIComponent(connector)}/invocations?limit=100&beforeSeq=${before}`,
+                    ),
+                  ) as Promise<{ invocations: Invocation[]; hasMore: boolean; nextCursor: number | null }>,
+              );
+              if (!data) return;
+              setInvocationBotId(requestedBotId);
+              setInvocations((prev) => [...prev, ...data.invocations]);
+              setCursor(data.hasMore ? data.nextCursor : null);
+            });
+          }}
+        >
+          {t("botWork.older")}
+        </button>
+      )}
+      {visibleInvocations.map((inv) => (
         <article key={inv.id}>
           <strong>{inv.toolName}</strong>
           <Status value={inv.state} />
@@ -197,20 +270,27 @@ export function BotConnections({ botId }: { botId: string }) {
                 <button
                   key={state}
                   disabled={action.busy || !note.trim()}
-                  onClick={() =>
+                  onClick={() => {
+                    const requestedBotId = botId;
+                    const connector = selectedConnector;
                     void action.run(async () => {
-                      const data = (await api(
-                        `${base}/${encodeURIComponent(selectedConnector)}/invocations/${inv.id}/resolve`,
-                        json({ state, note }),
-                      )) as { invocation: Invocation };
-                      setInvocations((prev) =>
-                        prev.map((row) =>
-                          row.id === inv.id ? data.invocation : row,
-                        ),
+                      const data = await panel.read(
+                        requestedBotId,
+                        () =>
+                          api(
+                            connectionPath(
+                              requestedBotId,
+                              `/${encodeURIComponent(connector)}/invocations/${inv.id}/resolve`,
+                            ),
+                            json({ state, note }),
+                          ) as Promise<{ invocation: Invocation }>,
                       );
+                      if (!data) return;
+                      setInvocationBotId(requestedBotId);
+                      setInvocations((prev) => prev.map((row) => (row.id === inv.id ? data.invocation : row)));
                       setNote("");
-                    })
-                  }
+                    });
+                  }}
                 >
                   {state === "completed"
                     ? t("botWork.confirmedSuccess")

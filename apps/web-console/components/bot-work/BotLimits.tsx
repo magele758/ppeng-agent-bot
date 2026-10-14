@@ -1,7 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
+import { pauseChange, shownPause, type PauseControl } from "@/lib/bot-panel-reset";
 import { useI18n } from "@/lib/i18n";
 import { api, json, useAction, Feedback } from "./shared";
+import { useBotPanelRead } from "./use-bot-panel-read";
 export function BotLimits() {
   const { t } = useI18n();
   const action = useAction();
@@ -79,37 +81,56 @@ export function BotLimits() {
 export function BotRuntimeControl({ botId }: { botId: string }) {
   const { t } = useI18n();
   const action = useAction();
-  const [control, setControl] = useState({ paused: false, disabled: false });
-  const path = `/api/bot-work/bots/${encodeURIComponent(botId)}/control`;
+  const panel = useBotPanelRead(botId);
+  const [loadedBotId, setLoadedBotId] = useState("");
+  const [control, setControl] = useState<PauseControl>({ paused: false, disabled: false });
+  const visible = shownPause(botId, loadedBotId, control);
+  const loaded = botId === loadedBotId;
+  const apply = async (requestedBotId: string, next: PauseControl | null, signal?: AbortSignal) => {
+    const data = await panel.read(
+      requestedBotId,
+      () =>
+        api(
+          `/api/bot-work/bots/${encodeURIComponent(requestedBotId)}/control`,
+          next ? json(next) : { signal },
+        ) as Promise<{ control: PauseControl }>,
+      signal,
+    );
+    if (!data) return;
+    setLoadedBotId(requestedBotId);
+    setControl(data.control);
+  };
   useEffect(() => {
-    void action.run(async () => {
-      const data = (await api(path)) as { control: typeof control };
-      setControl(data.control);
-    });
+    const ac = new AbortController();
+    void action.run(() => apply(botId, null, ac.signal));
+    return () => ac.abort();
   }, [botId]);
-  const save = (next: typeof control) =>
-    void action.run(async () => {
-      const data = (await api(path, json(next))) as { control: typeof control };
-      setControl(data.control);
-    });
+  const save = (patch: { botId: string; control: PauseControl } | null) => {
+    if (!patch) return;
+    void action.run(() => apply(patch.botId, patch.control));
+  };
   return (
     <div>
       <Feedback {...action} />
       <label>
         <input
           type="checkbox"
-          disabled={action.busy}
-          checked={control.paused}
-          onChange={(e) => save({ ...control, paused: e.target.checked })}
+          disabled={action.busy || !loaded}
+          checked={visible.paused}
+          onChange={(e) =>
+            save(pauseChange({ selectedBotId: botId, loadedBotId, control, paused: e.target.checked }))
+          }
         />
         {t("botWork.pauseBackground")}
       </label>
       <label>
         <input
           type="checkbox"
-          disabled={action.busy}
-          checked={control.disabled}
-          onChange={(e) => save({ ...control, disabled: e.target.checked })}
+          disabled={action.busy || !loaded}
+          checked={visible.disabled}
+          onChange={(e) =>
+            save(pauseChange({ selectedBotId: botId, loadedBotId, control, disabled: e.target.checked }))
+          }
         />
         {t("botWork.disableBot")}
       </label>
