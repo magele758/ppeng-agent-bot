@@ -1,0 +1,42 @@
+id: macos-app-control
+title: macOS 应用控制（外层宿主）
+status: implemented
+requirement: |
+  User decision: macOS “App A wants to control App B” (Apple Events / Automation TCC, the Grok Bot → Cursor dialog) should live in the OUTER host and be injected as tools. Do NOT put osascript, Accessibility, or Apple Events inside packages/agent-loop. The loop may only see tool names and results. Existing LCU (lcu_js / lcu_js_reset, requires a local lcu binary and signed ChatGPT app) stays as-is.
+
+  Add a sibling outer-layer capability in packages/core (computer-use or a small app-control module):
+
+  - Default OFF. Persist in daemon_control KV (same style as computer_use_settings). Lab settings toggle, i18n zh+en. No new RAW_AGENT_* env.
+  - Model-visible tools are narrow and fixed, not arbitrary AppleScript. Suggested: activate a named app, type text into the front app, send a keystroke (small allowlist: return, tab, escape, arrows, cmd-c/v). The host fills a fixed osascript template. Reject any tool argument that looks like raw script, do shell script, or a URL scheme.
+  - macOS only. On Linux/Windows the tool returns a clear unavailable error and does not spawn.
+  - First use will cause the normal macOS TCC dialog; do not try to pre-grant or bypass it. Lab approval still required before the host runs the osascript (same spirit as LCU: approve this action, not a permanent silent grant).
+  - Spawn via sanitizeSpawnEnv with a minimal env. No network.
+  - agent-loop: at most add the tool names to an allowlist constant if that is the existing pattern for host-implemented tools (see how lcu_js is named). Do not import node or osascript from the SDK. If you touch SKILL.md, one sentence: app control is a host tool, not in the portable loop.
+notes: |
+  负责人要求现在就做。本规格按已批准处理，不先停在 draft 等再次确认。
+  现有 LCU 桌面能力保持不变。
+criteria:
+  - id: AC-1
+    given: 应用控制默认关闭
+    when: 用户在 Lab 设置里打开它，之后再关闭
+    then: 开关被记住并立即生效；打开时助手能看到激活应用、输入文字和发送按键这三个动作，关闭后这些动作不再出现
+  - id: AC-2
+    given: 应用控制已打开
+    when: 助手提交的参数像一段脚本、包含 do shell script，或像一个 URL scheme
+    then: 该动作被拒绝，系统不会因此去控制任何应用
+  - id: AC-3
+    given: 当前电脑不是 macOS
+    when: 助手尝试激活应用、输入文字或发送按键
+    then: 用户看到明确的不可用说明，并且没有启动任何控制命令
+  - id: AC-4
+    given: 应用控制已打开，且这个具体动作还没有在 Lab 里被批准
+    when: 助手尝试执行它；用户只批准了另一个不同的动作
+    then: 未批准的动作不会控制应用；批准只覆盖被批准的那一个动作，不会变成永久的静默授权
+  - id: AC-5
+    given: 应用控制已打开
+    when: 助手发送的按键不在回车、Tab、Esc、方向键、拷贝和粘贴这个小范围内
+    then: 该按键被拒绝，系统不会去按任何键
+  - id: AC-6
+    given: 运行环境里有密钥或网络代理
+    when: 用户批准了一次允许的应用控制动作并执行
+    then: 实际启动的进程只带最小环境，不继承这些密钥和代理

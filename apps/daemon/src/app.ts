@@ -2,6 +2,7 @@ import { botRoomsRoutes } from './routes/bot-rooms.js';
 import { botWorkRoutes } from './routes/bot-work.js';
 import { botHistoryRoutes } from './routes/bot-history.js';
 import { computerUseRoutes } from './routes/computer-use.js';
+import { appControlRoutes } from './routes/app-control.js';
 import { connectorRoutes } from './routes/connectors.js';
 /**
  * Daemon HTTP application: route registry + auth pipeline, without listening
@@ -105,6 +106,7 @@ export function buildDaemonRouter(deps: DaemonAppDeps): Router {
     .addAll(teamsDagRoutes(runtime))
     .addAll(capabilitiesRoutes(runtime))
     .addAll(computerUseRoutes(runtime))
+    .addAll(appControlRoutes(runtime))
     .addAll(connectorRoutes(runtime))
     .addAll(modelProviderRoutes(runtime))
     .addAll(modelFallbackRoutes(runtime))

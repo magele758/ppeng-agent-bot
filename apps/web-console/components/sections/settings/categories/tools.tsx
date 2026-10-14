@@ -1,3 +1,4 @@
+import { AppControlSettingsCard } from '../../../AppControlSettingsCard';
 import { ComputerUseSettingsCard } from '../../../ComputerUseSettingsCard';
 import { ConnectorsSettingsCard } from '../../../ConnectorsSettingsCard';
 import { DiscoverySettingsCard } from '../../../DiscoverySettingsCard';
@@ -7,6 +8,7 @@ import type { SettingsEntry } from '../registry';
 
 export const toolsEntries: SettingsEntry[] = [
   { id: 'computerUse', category: 'tools', titleKey: 'settingsEntries.computerUse.title', keywordsKey: 'settingsEntries.computerUse.keywords', render: () => <ComputerUseSettingsCard /> },
+  { id: 'appControl', category: 'tools', titleKey: 'settingsEntries.appControl.title', keywordsKey: 'settingsEntries.appControl.keywords', render: () => <AppControlSettingsCard /> },
   { id: 'connectors', category: 'tools', titleKey: 'settingsEntries.connectors.title', keywordsKey: 'settingsEntries.connectors.keywords', render: () => <ConnectorsSettingsCard /> },
   {
     id: 'skills',

@@ -31,6 +31,7 @@ import { readDynToolSettings } from '../dyn-tools/settings.js';
 import { tryCreateDynToolStore } from '../dyn-tools/store.js';
 import { isPtcSession } from '../ptc/mode.js';
 import { readSkillProposalSettings } from '../skill-proposals/settings.js';
+import { APP_CONTROL_TOOL_NAMES, readAppControlSettings } from '../app-control/settings.js';
 import { SKILL_PROPOSE_TOOL_NAME } from '../skill-proposals/tool.js';
 import { stripSubagentDeniedTools } from '../runtime/subagent-policy.js';
 import {
@@ -88,6 +89,10 @@ export function filterToolsForSession(input: {
   let tools = applyAllowlists(externallyGated, allowlistsFor(input.agent, input.session));
   if ((input.settingsStore?.getDaemonControl?.('computer_use_settings') as { enabled?: boolean } | undefined)?.enabled !== true) {
     tools = tools.filter(tool => !tool.name.startsWith('lcu_'));
+  }
+  if (!readAppControlSettings(input.settingsStore).enabled) {
+    const hidden = new Set<string>(APP_CONTROL_TOOL_NAMES);
+    tools = tools.filter((tool) => !hidden.has(tool.name));
   }
 
   const assembled = tools;

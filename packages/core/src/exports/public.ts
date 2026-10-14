@@ -792,6 +792,14 @@ export { readLcuSettings, writeLcuSettings, LCU_SETTINGS_KEY } from '../computer
 export { LcuComputerUseProvider, defaultLcuCommand } from '../computer-use/lcu-provider.js';
 export type { LcuSettings } from '../computer-use/settings.js';
 export type { LcuClient, LcuDeps } from '../computer-use/lcu-provider.js';
+export {
+  readAppControlSettings,
+  writeAppControlSettings,
+  APP_CONTROL_SETTINGS_KEY,
+  APP_CONTROL_TOOL_NAMES
+} from '../app-control/settings.js';
+export type { AppControlSettings, AppControlToolName } from '../app-control/settings.js';
+export { createAppControlTools } from '../app-control/tools.js';
 
 export * from '../session/history/types.js';
 export * from '../session/history/tools.js';
