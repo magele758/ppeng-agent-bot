@@ -118,7 +118,7 @@ export function feishuMessageEvent({ token = 'tok', eventId, text = 'hi', openId
   };
 }
 
-export function feishuSign(rawBody, encryptKey, { timestamp = '1700000000', nonce = 'n1' } = {}) {
+export function feishuSign(rawBody, encryptKey, { timestamp = String(Math.floor(Date.now() / 1000)), nonce = 'n1' } = {}) {
   const signature = createHash('sha256').update(timestamp + nonce + encryptKey + rawBody).digest('hex');
   return {
     'X-Lark-Request-Timestamp': timestamp,

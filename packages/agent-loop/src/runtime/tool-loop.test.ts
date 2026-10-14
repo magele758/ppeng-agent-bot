@@ -171,6 +171,16 @@ describe('executeSingleTool', () => {
     expect(phases).toEqual(['pre_tool_use', 'post_tool_use', 'pre_tool_use']);
   });
 
+  it('redacts non-shell tool output', async () => {
+    const h = host({
+      redactSecrets: (s) => s.replace(/sk-\w+/g, '[redacted]'),
+    });
+    const read = tool('read_file', async () => ({ ok: true, content: 'file sk-abc123 tail' }));
+    const r = await executeSingleTool(h, [read], call('read_file', { path: 'a.txt' }), ctx, false, 's1');
+    expect(r.content).toBe('file [redacted] tail');
+    expect(r.content).not.toContain('sk-abc123');
+  });
+
   it('redacts shell-like output and prefers archived content over truncation', async () => {
     const h = host({
       env: { TOOL_RESULT_MAX_CHARS: '10' },

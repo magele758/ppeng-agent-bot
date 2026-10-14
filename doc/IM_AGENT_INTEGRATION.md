@@ -14,8 +14,8 @@
 
 配置走持久化设置（`daemon_control` KV `gateway_im_settings`），`GET/PATCH /api/gateway/settings`（管理员），保存即生效、无需重启；值覆盖 `gateway.config.json` 中同名字段；读取只返回 `*Set` 布尔，不回显密钥。
 
-- **飞书验签**：消息事件必须带正确的 `verificationToken`（`header.token`）；配置 `encryptKey` 时另校验 `X-Lark-Signature`（sha256(timestamp+nonce+encryptKey+body)）。两者都未配置时消息事件一律 403（URL 验证握手仍可用）。
-- **去重 + 立即 ack**：按 `event_id`（缺省用 `message_id`）去重（内存，6h）；校验通过后立即返回 200，Agent 在后台按会话串行执行。
+- **飞书验签**：消息事件必须带正确的 `verificationToken`（`header.token`）；配置 `encryptKey` 时另校验 `X-Lark-Signature`（sha256(timestamp+nonce+encryptKey+body)）。时间戳偏离当前时间超过 5 分钟直接 403。两者都未配置时消息事件一律 403（URL 验证握手仍可用）。
+- **去重 + 立即 ack**：按 `event_id`（缺省用 `message_id`）去重，写入 gateway 目录的 `inbound-dedupe.json`（与出站 delivery ledger 同目录）；进程重启后同一事件仍拒绝。校验通过后立即返回 200，Agent 在后台按会话串行执行。
 - **sender 白名单**：`feishu.allowedSenders`（open_id/user_id/union_id/chat_id）、`wecom.allowedSenders`（userKey）、`webhook.allowedSenders`（通用渠道 senderId，缺发送者也拒绝）；空列表 = 不限制。
 - **企微 bridge**：必须配置 `bridgeSecret`（未配置一律 403）。
 - **Bot 路由**：`feishu.botId` / `wecom.botId` 让 IM 消息落进该 Bot 的 canonical 会话；`POST /chat`、`/channels/:id/webhook` 的 body 也可带 `botId`。

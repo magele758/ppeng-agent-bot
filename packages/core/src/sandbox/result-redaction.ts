@@ -1,6 +1,6 @@
 /**
  * Tool-result redaction: strip sensitive env *values* from content flowing
- * back to the model (stdout/stderr of bash / bg_* / etc.).
+ * back to the model. Every tool result is scrubbed, not only shell output.
  *
  * Aligns with ai-agent-node `redactExecutionServerEnv` — this is not an access
  * control (the user already knows their own secrets), but a return-path

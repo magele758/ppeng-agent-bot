@@ -18,6 +18,7 @@ import { createExternalAiTools } from './external-ai-tools.js';
 import { bashCommandNeedsApproval } from './bash-command-policy.js';
 import { globWorkspaceFiles } from './glob-files.js';
 import { isVaultMetadataDirName } from './markdown-vault-noise.js';
+import { SENSITIVE_READ_REFUSAL, sensitiveReadRefusal } from '../workspace/sensitive-read.js';
 import { runWorkspaceGrep } from './grep-workspace.js';
 import { readFileLineRange, shouldStreamReadFile } from './read-file-range.js';
 import { lspSendRequest, parseLspConfigFromEnv } from './lsp-client.js';
@@ -315,6 +316,9 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
           : [{ alias: 'repo', path: primaryWorkspacePath(context), primary: true }];
         const blocks: string[] = [];
         for (const root of roots) {
+          if (sensitiveReadRefusal(root.path)) {
+            return { ok: false, content: SENSITIVE_READ_REFUSAL };
+          }
           const entries = await readdir(root.path, { withFileTypes: true });
           const lines = entries
             .filter((entry) => !isVaultMetadataDirName(entry.name))
@@ -328,6 +332,9 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
       }
 
       const target = repoPath(context, args.path);
+      if (sensitiveReadRefusal(target)) {
+        return { ok: false, content: SENSITIVE_READ_REFUSAL };
+      }
       const targetStat = await stat(target);
       const limit = typeof args.limit === 'number' && args.limit > 0 ? args.limit : undefined;
       const offsetLine = typeof args.offset_line === 'number' && args.offset_line >= 0 ? args.offset_line : 0;

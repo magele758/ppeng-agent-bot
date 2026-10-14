@@ -33,6 +33,7 @@ SDK 提供 4 个组装档位（高档位包含所有低档位模块）：
   - `runTurnWithRetries(host, adapter, input, onStream, opts?)` 的可选 `opts.maxRetries` 只能**下调**（取 `min(RAW_AGENT_MODEL_MAX_RETRIES, opts.maxRetries)`，可为 0）；产品层的模型备选链用它限制备选前的叠加重试，不传则行为不变。
 - **审批按调用逐项**：同一波里每个需要审批的工具各建一条审批，全部批准后才执行。被拒绝的调用写入失败的 `tool_result`，恢复时和后续普通轮次都不再执行。审批门通过 `closedByGate` 标出本波已关闭的调用，普通轮次据此跳过，不再为这一步重读整段会话；宿主没填这个标记时，只按未匹配 ID 过滤当前这一波，已经有结果的历史调用不会再执行。同一 ID 多次未闭合时按最后一次出现排序：历史 `a`、然后 `b`、再复用 `a`，结果是 `b` 和最新的 `a`。恢复波次时内核把已经定过的审批 id 放进 `settledApprovalIds`，宿主若再次询问（例如 Jev toolGate 返回 ask）必须沿用这些结果，不能另建审批。同一波只查一次审批表。实际需要审批的调用都会带幂等 key，包括 `permissionMode=ask` 下 `approvalMode` 为 `never` 的非只读工具。权限模式拒绝其中一个时，同波其余调用也各写一条未执行结果。
 - **补偿回滚写进结果**：`ToolLoopHost.compensate` 返回已回滚的 `toolCallId` 后，这些调用的结果改为 `ok: false`，并说明变更已撤销。只回滚磁盘、仍留下成功结果，会让下一轮按「文件已写入」继续改。
+- **工具结果脱敏**：宿主提供 `redactSecrets` 时，每个工具结果（含抛错信息）在归档或截断前都会经过它，不限 shell。
 
 ---
 

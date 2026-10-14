@@ -142,7 +142,7 @@ export interface ToolLoopHost {
     content: string;
   }): string;
 
-  /** Scrub secrets from shell-like tool output before archiving/truncating. */
+  /** Scrub secrets from every tool result before archiving or truncating. */
   redactSecrets?(content: string): string;
 
   /**
@@ -227,12 +227,9 @@ function partitionForParallel<T>(items: T[], maxParallel: number): T[][] {
   return chunks;
 }
 
-const SHELL_LIKE_TOOLS: Record<string, true> = {
-  bash: true,
-  bg_run: true,
-  bg_check: true,
-  work_evidence: true,
-};
+function scrubToolContent(host: ToolLoopHost, content: string): string {
+  return host.redactSecrets ? host.redactSecrets(content) : content;
+}
 
 // ============================================================================
 // Filter
@@ -622,9 +619,7 @@ export async function executeSingleTool(
     }
 
     const maxChars = envToolResultMaxChars(host.env);
-    const scrubbed = SHELL_LIKE_TOOLS[tool.name] && host.redactSecrets
-      ? host.redactSecrets(result.content)
-      : result.content;
+    const scrubbed = scrubToolContent(host, result.content);
     const archived = host.archiveToolResult
       ? host.archiveToolResult({ sessionId, toolName: tool.name, content: scrubbed })
       : scrubbed;
@@ -670,7 +665,7 @@ export async function executeSingleTool(
     if (completed) {
       completed.push({ tool, toolCallId: toolCall.toolCallId, args: (execInput ?? {}) as Record<string, unknown>, snapshot, context });
     }
-    const content = error instanceof Error ? error.message : String(error);
+    const content = scrubToolContent(host, error instanceof Error ? error.message : String(error));
     exportSpan(false);
     if (host.runLifecycleHook) {
       await host.runLifecycleHook({ phase: 'post_tool_use', tool: tool.name, sessionId, input: execInput, ok: false, content });

@@ -1,3 +1,4 @@
+import { isIPv4 } from 'node:net';
 import type { OAuthProviderConfig, OAuthProviderId, OAuthPublicConfig } from './types.js';
 
 function pair(
@@ -43,12 +44,33 @@ export function oauthPublicConfig(env: NodeJS.ProcessEnv = process.env): OAuthPu
   return { loginRequired: providers.length > 0, providers };
 }
 
+function isLoopbackHostname(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\[+|\]+$/g, '');
+  if (host === 'localhost' || host === '::1') return true;
+  if (!isIPv4(host)) return false;
+  return Number(host.split('.')[0]) === 127;
+}
+
+/** Unconfigured origins may only be loopback http. Client-supplied hosts are not trusted. */
+function loopbackHttpOrigin(fallbackHost: string | undefined): string {
+  const raw = (fallbackHost ?? '').trim();
+  if (!raw) return '';
+  let url: URL;
+  try {
+    url = raw.includes('://') ? new URL(raw) : new URL(`http://${raw}`);
+  } catch {
+    return '';
+  }
+  if (url.username || url.password) return '';
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return '';
+  if (!isLoopbackHostname(url.hostname)) return '';
+  return `http://${url.host}`;
+}
+
 export function oauthPublicOrigin(env: NodeJS.ProcessEnv, fallbackHost?: string): string {
   const explicit = String(env.RAW_AGENT_OAUTH_PUBLIC_ORIGIN ?? '')
     .trim()
     .replace(/\/$/, '');
   if (explicit) return explicit;
-  const host = (fallbackHost ?? '').trim();
-  if (!host) return '';
-  return host.includes('://') ? host.replace(/\/$/, '') : `http://${host}`;
+  return loopbackHttpOrigin(fallbackHost);
 }

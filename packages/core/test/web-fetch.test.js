@@ -350,6 +350,60 @@ test('fetchUrlText does not try another address after an HTTP response', async (
   assert.deepEqual(seen, ['203.0.113.10']);
 });
 
+test('a silent approved address is abandoned and the next pinned address is used', async () => {
+  const seen = [];
+  const ac = new AbortController();
+  const response = await fetchPinnedPublic('https://dual.example/a', {
+    signal: ac.signal,
+    connectTimeoutMs: 40,
+    resolveHost: async () => ['203.0.113.10', '203.0.113.11'],
+    request: (_url, address, options) => {
+      seen.push(address);
+      if (address === '203.0.113.10') {
+        return new Promise((_resolve, reject) => {
+          const fail = () => {
+            const err = new Error('The operation was aborted');
+            err.name = 'AbortError';
+            reject(err);
+          };
+          if (options.signal.aborted) fail();
+          else options.signal.addEventListener('abort', fail, { once: true });
+        });
+      }
+      return Promise.resolve(new Response('second', { status: 200, headers: { 'content-type': 'text/plain' } }));
+    }
+  });
+  assert.equal(await response.text(), 'second');
+  assert.deepEqual(seen, ['203.0.113.10', '203.0.113.11']);
+});
+
+test('caller abort does not try the next approved address', async () => {
+  const seen = [];
+  const ac = new AbortController();
+  await assert.rejects(
+    () => fetchPinnedPublic('https://dual.example/a', {
+      signal: ac.signal,
+      connectTimeoutMs: 2000,
+      resolveHost: async () => ['203.0.113.10', '203.0.113.11'],
+      request: (_url, address, options) => {
+        seen.push(address);
+        ac.abort();
+        return new Promise((_resolve, reject) => {
+          const fail = () => {
+            const err = new Error('The operation was aborted');
+            err.name = 'AbortError';
+            reject(err);
+          };
+          if (options.signal.aborted) fail();
+          else options.signal.addEventListener('abort', fail, { once: true });
+        });
+      }
+    }),
+    (err) => err instanceof Error && (err.name === 'AbortError' || /abort/i.test(err.message))
+  );
+  assert.deepEqual(seen, ['203.0.113.10']);
+});
+
 test('DNS lookup stops on abort and on its own deadline', async () => {
   const ac = new AbortController();
   ac.abort();

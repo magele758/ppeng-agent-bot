@@ -30,12 +30,11 @@ export function isAuthPublicPath(pathname: string): boolean {
 }
 
 export function requestPublicOrigin(request: IncomingMessage, env: NodeJS.ProcessEnv): string {
-  const forwardedHost = headerValue(request, 'x-forwarded-host');
-  const forwardedProto = headerValue(request, 'x-forwarded-proto');
-  const host = forwardedHost || headerValue(request, 'host') || '';
-  const proto = forwardedProto || (host.startsWith('localhost') || host.startsWith('127.0.0.1') ? 'http' : 'https');
-  const fallback = host.includes('://') ? host : host ? `${proto}://${host}` : '';
-  return oauthPublicOrigin(env, fallback);
+  const explicit = oauthPublicOrigin(env);
+  if (explicit) return explicit;
+  // Ignore X-Forwarded-Host / X-Forwarded-Proto. Only a loopback Host is usable
+  // until RAW_AGENT_OAUTH_PUBLIC_ORIGIN is set.
+  return oauthPublicOrigin(env, headerValue(request, 'host'));
 }
 
 export function requestSecure(request: IncomingMessage, env: NodeJS.ProcessEnv): boolean {

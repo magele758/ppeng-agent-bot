@@ -13,6 +13,7 @@ export const PRIVATE_HOST_REFUSAL =
 
 const MAX_REDIRECTS = 5;
 const DEFAULT_DNS_TIMEOUT_MS = 10_000;
+const DEFAULT_CONNECT_TIMEOUT_MS = 10_000;
 
 export class PrivateNetworkDenied extends Error {
   readonly code = 'private_network';
@@ -34,6 +35,12 @@ export interface PublicFetchDeps {
   maxRedirects?: number;
   /** DNS deadline. The caller abort signal also cancels lookup. Default 10s. */
   dnsTimeoutMs?: number;
+  /**
+   * Per-address connect deadline. A silent address is abandoned so the next
+   * approved address can be tried. The caller abort signal still stops failover.
+   * Default 10s. Not an environment switch.
+   */
+  connectTimeoutMs?: number;
 }
 
 export interface PublicFetchInit extends PublicFetchDeps {
@@ -200,9 +207,38 @@ async function approvedPublicAddresses(
   return addresses;
 }
 
+function connectTimeoutMs(init: PublicFetchInit): number {
+  return init.connectTimeoutMs && init.connectTimeoutMs > 0 ? init.connectTimeoutMs : DEFAULT_CONNECT_TIMEOUT_MS;
+}
+
+/**
+ * Per-address deadline. A plain `AbortSignal.timeout` is unref'd, so a silent
+ * socket would never expire when this fetch is the only pending work.
+ */
+function connectDeadline(parent: AbortSignal, ms: number): { signal: AbortSignal; done: () => void } {
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    const error = new Error('connect timed out');
+    error.name = 'AbortError';
+    controller.abort(error);
+  }, ms);
+  const onParent = () => controller.abort(parent.reason);
+  if (parent.aborted) controller.abort(parent.reason);
+  else parent.addEventListener('abort', onParent, { once: true });
+  return {
+    signal: controller.signal,
+    done() {
+      clearTimeout(timer);
+      parent.removeEventListener('abort', onParent);
+    }
+  };
+}
+
 /**
  * GET/HEAD with manual redirects. Every hop is rechecked.
- * Each attempt is pinned to one approved address. A connection failure tries the next approved address.
+ * Each attempt is pinned to one approved address and has its own connect deadline.
+ * A connection failure or a silent address tries the next approved address.
+ * An abort from the caller does not.
  */
 export async function fetchPinnedPublic(rawUrl: string, init: PublicFetchInit): Promise<Response> {
   let current: URL;
@@ -218,18 +254,22 @@ export async function fetchPinnedPublic(rawUrl: string, init: PublicFetchInit): 
     const addresses = await approvedPublicAddresses(current, init, init.signal);
     let response: Response | undefined;
     let lastError: unknown;
+    const connectMs = connectTimeoutMs(init);
     for (const address of addresses) {
       if (init.signal.aborted) throw abortError(init.signal);
+      const attempt = connectDeadline(init.signal, connectMs);
       try {
         response = await request(current, address, {
           method: init.method ?? 'GET',
           headers: init.headers ?? {},
-          signal: init.signal
+          signal: attempt.signal
         });
         break;
       } catch (err) {
-        if (isAbortError(err, init.signal)) throw err;
+        if (init.signal.aborted) throw isAbortError(err, init.signal) ? err : abortError(init.signal);
         lastError = err;
+      } finally {
+        attempt.done();
       }
     }
     if (!response) {
