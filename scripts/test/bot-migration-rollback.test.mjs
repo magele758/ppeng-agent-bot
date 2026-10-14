@@ -63,9 +63,12 @@ test('real v24 ownerless Bot/cron upgrade is idempotent and rollback restores a 
   const current=new SqliteStateStore(dbFile);const currentHost=host(current,stateDir);
   assert.equal(getCurrentSchemaVersion(current.db),LATEST_SCHEMA_VERSION);assert.equal(LATEST_SCHEMA_VERSION,25);
   assert.equal(current.getBot(ids.bots.planner.id).hidden,true);assert.deepEqual(current.listMessages(ids.bots.researcher.sessionId),originalMessages);
-  const installation=openBot(currentHost,ids.bots.researcher.id);assert.equal(installation.sessionId,ids.bots.researcher.sessionId);assert.match(current.getSession(installation.sessionId).metadata.userId,/^installation:/);
-  const other=openBot(currentHost,ids.bots.researcher.id,{userId:'new-login',tenantId:'new-tenant'});assert.notEqual(other.sessionId,installation.sessionId);assert.equal(current.listMessages(other.sessionId).length,0);
+  const installation=openBot(currentHost,ids.bots.researcher.id);assert.equal(installation.sessionId,ids.bots.researcher.sessionId);assert.equal(current.getSession(installation.sessionId).metadata.userId,undefined);
+  assert.throws(()=>openBot(currentHost,ids.bots.researcher.id,{userId:'new-login',tenantId:'new-tenant'}));
+  assert.deepEqual(current.listMessages(installation.sessionId),originalMessages);
+  assert.equal(current.listSessions().some(session=>session.metadata?.userId==='new-login'),false);
   assert.equal(current.agentMemory().search({scope:'user.memory',userId:'new-login',agentId:ids.bots.researcher.agentId,limit:50}).length,0);
+  const other={sessionId:current.createSession({title:'post-upgrade',mode:'chat',agentId:ids.bots.researcher.agentId}).id};
   const oldCron=listCronJobs(currentHost,{botId:ids.bots.researcher.id});assert.equal(oldCron.length,1);assert.equal(oldCron[0].id,'legacy-cron');assert.equal(oldCron[0].prompt,legacyJob.prompt);assert.ok(oldCron[0].timezone);
   assert.equal(readFileSync(join(stateDir,'transcripts/legacy.txt'),'utf8'),'original private history archive\n');
   const job=createCronJob(currentHost,{sessionId:other.sessionId,name:'new interval',prompt:'new data that must be archived',intervalMs:60000,timezone:'Asia/Shanghai'});

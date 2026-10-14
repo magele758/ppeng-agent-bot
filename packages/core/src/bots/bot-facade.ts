@@ -179,6 +179,12 @@ function ensureBotSessionCut(host: SessionFacadeHost, sessionId: string): void {
   });
 }
 
+/** A blank user id is unowned. It is not the installer principal. */
+function recordedCanonicalUserId(session: { metadata?: Record<string, unknown> } | undefined): string | undefined {
+  const raw = session?.metadata?.userId;
+  return typeof raw === 'string' && raw.trim() ? raw.trim() : undefined;
+}
+
 export function listBots(store: SqliteStateStore, opts?: ListBotsOptions): BotRecord[] {
   return store.listBots(opts);
 }
@@ -314,10 +320,16 @@ export function openBot(
   const principal = resolveBotPrincipal(host.store, opts);
   const installation = resolveBotPrincipal(host.store);
   const existing = host.store.getSession(bot.canonicalSessionId);
-  // Legacy ownerless history belongs only to this installation.
-  if (existing && !existing.metadata?.userId) {
-    host.store.updateSession(existing.id, { metadata: { ...existing.metadata, ...installation } });
-    setBotDefinitionOwner(host.store,bot.id,installation);
+  // Ownerless legacy chats stay unowned until an explicit claim. Opening one must
+  // not adopt the installer principal or clone its allowlist into another login's chat.
+  if (existing && !recordedCanonicalUserId(existing)) {
+    if (existing.agentId !== bot.id) throw new ValidationError('Invalid Bot canonical binding');
+    if (!sameBotPrincipal(principal, installation)) {
+      throw new AuthorizationError('Bot ownership is unknown for this principal');
+    }
+    ensureBotPermissionMode(host, existing.id);
+    ensureBotSessionCut(host, existing.id);
+    return { bot, sessionId: existing.id, createdSession: false };
   }
   const canonical = host.store.getSession(bot.canonicalSessionId);
   const owner = canonical ? principalFromSession(host.store, canonical) : botDefinitionOwner(host.store,bot.id);

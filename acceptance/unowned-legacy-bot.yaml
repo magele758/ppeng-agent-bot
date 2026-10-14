@@ -1,0 +1,25 @@
+id: unowned-legacy-bot
+title: 无主旧 Bot 不被打开时认领
+status: implemented
+notes: |
+  负责人在下达本实现任务时已预先批准本规格（user asked to fix now）。
+  不新增环境变量。已有主人的 Bot 保持原行为。
+requirement: |
+  Fix: the first openBot on a canonical session that has no userId must not rewrite that bot into the installer principal in a way that lets any logged-in user open their own forever-chat with that bot's tool allowlist. Keep existing owned bots unchanged. Prefer: unowned legacy bots stay unowned until an explicit claim, and another user cannot spawn a personal canonical chat from that allowlist. No new env vars.
+criteria:
+  - id: AC-1
+    given: 一只旧 Bot 的固定对话还没有登录用户归属，并限制了可用工具，里面已有历史
+    when: 安装环境第一次打开这只 Bot，并再次打开
+    then: 仍是原来那条固定对话，历史和工具限制都在；它没有被改成安装者名下，再次打开也不会被认领
+  - id: AC-2
+    given: 这只旧 Bot 仍没有主人
+    when: 另一个已登录用户打开它，想得到自己的固定对话
+    then: 开不出属于自己的固定对话，也拿不到这份工具白名单；原来的对话仍没有主人，历史不变
+  - id: AC-3
+    given: 一只 Bot 的固定对话已经属于安装者，并限制了可用工具
+    when: 一个已登录用户打开自己的固定对话
+    then: 能打开属于自己的那条，工具限制与原来一致；安装者那条固定对话仍属于安装者
+  - id: AC-4
+    given: 一只 Bot 的固定对话已经属于某个登录用户
+    when: 该用户再次打开，以及另一个登录用户尝试打开
+    then: 原用户仍进入自己原来的固定对话；另一个用户被拒绝，开不出新的固定对话，原主人不变
