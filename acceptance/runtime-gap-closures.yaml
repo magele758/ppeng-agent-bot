@@ -1,0 +1,38 @@
+id: runtime-gap-closures
+title: 事件密钥、内置工具名、发布脚本环境、只读 MCP、HTTP 来源与幂等并发
+status: implemented
+requirement: |
+  Fix all of these:
+  3. Event/routine secretEnv must reject operator tokens the same way software connections reject RAW_AGENT_AUTH_TOKEN and RAW_AGENT_HUMAN_RELEASE_SECRET.
+  4. Reserved builtin tool names must include the remaining builtins that can still be shadowed, at least vision_analyze, plus any other builtin name that filterForSession would hide. Do not allow a connection to remove another session's builtin.
+  5. scripts/bot-release/http-soak.mjs and history-benchmark.mjs git/ps spawns must use sanitizeSpawnEnv (or an explicit minimal env), matching soak.mjs.
+  10. Honor McpExecutor.readOnly: read-only MCP calls must not be stuck in the write/unknown retry ban.
+  11. HTTP tool results must not be fenced as source mcp.
+  12. Concurrent duplicate idempotency keys must return the existing invocation, not throw a unique-constraint error.
+  No new env vars. Acceptance-first, user asked to fix now, tests first. One PR. Merge when relevant checks are green. Do not publish npm. Do not edit email HMAC, browser navigation, bot compact thresholds, or web-console bot panels.
+notes: 负责人在本次要求中明确现在就修，标准随实现一起落地。不新增环境变量。
+criteria:
+  - id: AC-1
+    given: 可以给 Bot 新建或修改一条由外部事件唤醒的定时任务
+    when: 把签名密钥选成 RAW_AGENT_AUTH_TOKEN、RAW_AGENT_HUMAN_RELEASE_SECRET，或软件连接同样会拒绝的执行环境保留名
+    then: 新建和修改都被拒绝；已经写进旧任务的这类名字也不会被拿来校验签名
+  - id: AC-2
+    given: 其他会话仍然需要使用内置工具
+    when: 某个软件连接使用 vision_analyze，或其它仍可能挡住内置工具的内置名字，包括库里已经存在的同名连接
+    then: 新的绑定被拒绝，其他会话仍然看得到这些内置工具
+  - id: AC-3
+    given: 发布用的 HTTP 长时浸泡和历史基准要询问版本库与进程列表
+    when: 这两个脚本启动对应的子进程
+    then: 子进程不继承宿主环境里的密钥和注入变量
+  - id: AC-4
+    given: 软件连接里的 MCP 工具被标明只读
+    when: 这次调用失败，或用另一把幂等键再试一次
+    then: 不会被当成尚未确认的写操作而禁止重试；没有标明只读的 MCP 仍然不能在未确认时重试
+  - id: AC-5
+    given: 软件连接通过 HTTP 取回外部结果
+    when: 结果交给模型
+    then: 外部内容标记的来源不是 mcp
+  - id: AC-6
+    given: 一次软件调用已经用某把幂等键记下
+    when: 另一路同时再用同一把键记录
+    then: 返回已经存在的那次调用，而不是报唯一约束错误

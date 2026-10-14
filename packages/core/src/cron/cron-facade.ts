@@ -7,6 +7,7 @@ import { CronJobStore } from './cron-store.js';
 import { nextZonedCronRunAt, normalizeRoutineTimezone, parseCron5 } from './cron-next.js';
 import { parseEventScheduleValue } from './event-routine.js';
 import type { RoutinePrecheck } from './routine-precheck.js';
+import { assertCredentialEnvName } from '../secrets/credential-env.js';
 
 export interface CreateCronJobInput {
   name: string;
@@ -82,9 +83,7 @@ function normalizeCron(raw: string): string {
 
 function normalizeSecretEnv(raw: string): string {
   const name = raw.trim();
-  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) || name.length > 128) {
-    throw new ValidationError('secretEnv must be an environment variable name');
-  }
+  assertCredentialEnvName(name);
   return name;
 }
 
