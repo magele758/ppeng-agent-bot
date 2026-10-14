@@ -30,8 +30,17 @@ function hmac(secret, payload) {
   return createHmac('sha256', secret).update(payload, 'utf8').digest('hex');
 }
 
-function githubSig(raw, secret = SECRET) {
-  return `sha256=${hmac(secret, raw)}`;
+function githubSig(raw, deliveryId, timestamp = NOW_SEC, secret = SECRET) {
+  return `sha256=${hmac(secret, `${timestamp}.${deliveryId}.${raw}`)}`;
+}
+
+function githubHeaders(raw, deliveryId, timestamp = String(Math.floor(Date.now() / 1000)), secret = SECRET) {
+  return {
+    'x-github-event': 'push',
+    'x-github-delivery': deliveryId,
+    'x-github-timestamp': timestamp,
+    'x-hub-signature-256': githubSig(raw, deliveryId, timestamp, secret)
+  };
 }
 
 function slackSig(raw, timestamp = NOW_SEC, secret = SECRET) {
@@ -93,10 +102,22 @@ function addJob(host, session, patch) {
 
 test('signature helpers accept a matching HMAC and reject a bad or stale one', () => {
   const raw = '{"ref":"refs/heads/main"}';
-  assert.equal(verifyGithubSignature({ rawBody: raw, secret: SECRET, signature: githubSig(raw) }), true);
-  assert.equal(verifyGithubSignature({ rawBody: raw, secret: SECRET, signature: 'sha256=deadbeef' }), false);
-  assert.equal(verifyGithubSignature({ rawBody: raw, secret: SECRET, signature: githubSig(raw, 'other') }), false);
-  assert.equal(verifyGithubSignature({ rawBody: raw, secret: '', signature: githubSig(raw, '') }), false);
+  const github = {
+    rawBody: raw,
+    secret: SECRET,
+    deliveryId: 'delivery-sig',
+    timestamp: NOW_SEC,
+    signature: githubSig(raw, 'delivery-sig', NOW_SEC),
+    nowMs: NOW
+  };
+  assert.equal(verifyGithubSignature(github), true);
+  assert.equal(verifyGithubSignature({ ...github, signature: 'sha256=deadbeef' }), false);
+  assert.equal(verifyGithubSignature({ ...github, signature: githubSig(raw, 'delivery-sig', NOW_SEC, 'other') }), false);
+  assert.equal(verifyGithubSignature({ ...github, secret: '', signature: githubSig(raw, 'delivery-sig', NOW_SEC, '') }), false);
+  assert.equal(verifyGithubSignature({ ...github, signature: `sha256=${hmac(SECRET, raw)}` }), false);
+  assert.equal(verifyGithubSignature({ ...github, deliveryId: 'delivery-other' }), false);
+  assert.equal(verifyGithubSignature({ ...github, nowMs: NOW + EVENT_SIGNATURE_WINDOW_MS }), true);
+  assert.equal(verifyGithubSignature({ ...github, nowMs: NOW + EVENT_SIGNATURE_WINDOW_MS + 1 }), false);
   assert.doesNotThrow(() => verifyGithubSignature({ rawBody: raw, secret: SECRET, signature: 'nope' }));
 
   const slack = {
@@ -125,7 +146,8 @@ test('signature helpers accept a matching HMAC and reject a bad or stale one', (
     nowMs: NOW
   };
   assert.equal(verifyEmailSignature(email), true);
-  assert.equal(verifyEmailSignature({ ...email, signature: githubSig(raw) }), false);
+  assert.equal(verifyEmailSignature({ ...email, signature: `sha256=${hmac(SECRET, raw)}` }), false);
+  assert.equal(verifyEmailSignature({ ...email, signature: githubSig(raw, 'delivery-sig', NOW_SEC) }), false);
   assert.equal(verifyEmailSignature({ ...email, timestamp: String(Number(NOW_SEC) - 301), nowMs: NOW }), false);
 });
 
@@ -148,8 +170,7 @@ test('bad signature does not call runSession', async () => {
     provider: 'github',
     rawBody: raw,
     headers: {
-      'x-github-event': 'push',
-      'x-github-delivery': 'delivery-bad-sig',
+      ...githubHeaders(raw, 'delivery-bad-sig'),
       'x-hub-signature-256': 'sha256=deadbeef'
     },
     claimDelivery: claimInboundEvent
@@ -171,11 +192,7 @@ test('good signature with wakeAgent false does not call runSession', async () =>
   const result = await acceptEventRoutine(host, {
     provider: 'github',
     rawBody: raw,
-    headers: {
-      'x-github-event': 'push',
-      'x-github-delivery': 'delivery-quiet',
-      'x-hub-signature-256': githubSig(raw)
-    },
+    headers: githubHeaders(raw, 'delivery-quiet'),
     claimDelivery: claimInboundEvent
   });
   assert.equal(result.outcomes[0]?.status, 'skipped');
@@ -191,11 +208,7 @@ test('good signature wakes and the user message fences the event', async () => {
   const result = await acceptEventRoutine(host, {
     provider: 'github',
     rawBody: raw,
-    headers: {
-      'x-github-event': 'push',
-      'x-github-delivery': 'delivery-wake',
-      'x-hub-signature-256': githubSig(raw)
-    },
+    headers: githubHeaders(raw, 'delivery-wake'),
     claimDelivery: claimInboundEvent
   });
   assert.equal(result.outcomes[0]?.status, 'woke');
@@ -221,11 +234,7 @@ test('the same delivery id is a duplicate the second time', async () => {
   const input = {
     provider: 'github',
     rawBody: raw,
-    headers: {
-      'x-github-event': 'push',
-      'x-github-delivery': 'delivery-dup',
-      'x-hub-signature-256': githubSig(raw)
-    },
+    headers: githubHeaders(raw, 'delivery-dup'),
     claimDelivery: claimInboundEvent
   };
   const first = await acceptEventRoutine(host, input);
@@ -254,11 +263,7 @@ test('script precheck reads the event file and the JSON is not spliced into the 
   const result = await acceptEventRoutine(host, {
     provider: 'github',
     rawBody: raw,
-    headers: {
-      'x-github-event': 'push',
-      'x-github-delivery': 'delivery-script',
-      'x-hub-signature-256': githubSig(raw)
-    },
+    headers: githubHeaders(raw, 'delivery-script'),
     claimDelivery: claimInboundEvent
   });
   assert.equal(result.outcomes[0]?.status, 'skipped');
@@ -268,7 +273,140 @@ test('script precheck reads the event file and the JSON is not spliced into the 
   store.db.close();
 });
 
-test('slack and email wake on a good signature and stay quiet when the timestamp is stale', async () => {
+function routineRowCount(store) {
+  const table = store.db
+    .prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table' AND name = 'bot_routine_runs'")
+    .get();
+  if (!table.n) return 0;
+  return store.db.prepare('SELECT COUNT(*) AS n FROM bot_routine_runs').get().n;
+}
+
+test('换掉 GitHub 投递号并复用原签名时不会再次入队 [AC:github-webhook-replay#AC-1] [AC:github-webhook-replay#AC-3]', async () => {
+  const { store, host, runs, session } = tempHost();
+  addJob(host, session, { event: 'github/push' });
+  const raw = JSON.stringify({ note: 'replay-body' });
+  const deliveryA = 'delivery-original';
+  const signature = githubSig(raw, deliveryA, NOW_SEC);
+  const headers = {
+    'x-github-event': 'push',
+    'x-github-delivery': deliveryA,
+    'x-github-timestamp': NOW_SEC,
+    'x-hub-signature-256': signature
+  };
+  const first = await acceptEventRoutine(host, {
+    provider: 'github',
+    rawBody: raw,
+    headers,
+    nowMs: NOW,
+    claimDelivery: claimInboundEvent
+  });
+  const replay = await acceptEventRoutine(host, {
+    provider: 'github',
+    rawBody: raw,
+    headers: { ...headers, 'x-github-delivery': 'delivery-swapped' },
+    nowMs: NOW,
+    claimDelivery: claimInboundEvent
+  });
+  const refreshed = await acceptEventRoutine(host, {
+    provider: 'github',
+    rawBody: raw,
+    headers: {
+      ...headers,
+      'x-github-delivery': 'delivery-swapped-fresh-time',
+      'x-github-timestamp': String(Number(NOW_SEC) + 1)
+    },
+    nowMs: NOW + 1000,
+    claimDelivery: claimInboundEvent
+  });
+  const bodyOnly = await acceptEventRoutine(host, {
+    provider: 'github',
+    rawBody: raw,
+    headers: {
+      'x-github-event': 'push',
+      'x-github-delivery': 'delivery-body-only',
+      'x-github-timestamp': NOW_SEC,
+      'x-hub-signature-256': `sha256=${hmac(SECRET, raw)}`
+    },
+    nowMs: NOW,
+    claimDelivery: claimInboundEvent
+  });
+  assert.equal(first.outcomes[0]?.status, 'woke');
+  assert.equal(replay.outcomes[0]?.status, 'rejected');
+  assert.equal(replay.outcomes[0]?.reason, 'bad_signature');
+  assert.equal(refreshed.outcomes[0]?.status, 'rejected');
+  assert.equal(bodyOnly.outcomes[0]?.status, 'rejected');
+  assert.equal(runs.length, 1);
+  assert.equal(routineRowCount(store), 1);
+  store.db.close();
+});
+
+test('超过几分钟的 GitHub 投递不会入队 [AC:github-webhook-replay#AC-2]', async () => {
+  const { store, host, runs, session } = tempHost();
+  addJob(host, session, { event: 'github/push' });
+  const freshRaw = JSON.stringify({ note: 'fresh-body' });
+  const fresh = await acceptEventRoutine(host, {
+    provider: 'github',
+    rawBody: freshRaw,
+    headers: {
+      'x-github-event': 'push',
+      'x-github-delivery': 'delivery-fresh',
+      'x-github-timestamp': NOW_SEC,
+      'x-hub-signature-256': githubSig(freshRaw, 'delivery-fresh', NOW_SEC)
+    },
+    nowMs: NOW,
+    claimDelivery: claimInboundEvent
+  });
+  const staleRaw = JSON.stringify({ note: 'stale-body' });
+  const staleTs = String(Number(NOW_SEC) - 301);
+  const stale = await acceptEventRoutine(host, {
+    provider: 'github',
+    rawBody: staleRaw,
+    headers: {
+      'x-github-event': 'push',
+      'x-github-delivery': 'delivery-stale',
+      'x-github-timestamp': staleTs,
+      'x-hub-signature-256': githubSig(staleRaw, 'delivery-stale', staleTs)
+    },
+    nowMs: NOW,
+    claimDelivery: claimInboundEvent
+  });
+  const edgeRaw = JSON.stringify({ note: 'edge-body' });
+  const edge = await acceptEventRoutine(host, {
+    provider: 'github',
+    rawBody: edgeRaw,
+    headers: {
+      'x-github-event': 'push',
+      'x-github-delivery': 'delivery-edge',
+      'x-github-timestamp': NOW_SEC,
+      'x-hub-signature-256': githubSig(edgeRaw, 'delivery-edge', NOW_SEC)
+    },
+    nowMs: NOW + EVENT_SIGNATURE_WINDOW_MS,
+    claimDelivery: claimInboundEvent
+  });
+  const pastRaw = JSON.stringify({ note: 'past-window' });
+  const past = await acceptEventRoutine(host, {
+    provider: 'github',
+    rawBody: pastRaw,
+    headers: {
+      'x-github-event': 'push',
+      'x-github-delivery': 'delivery-past',
+      'x-github-timestamp': NOW_SEC,
+      'x-hub-signature-256': githubSig(pastRaw, 'delivery-past', NOW_SEC)
+    },
+    nowMs: NOW + EVENT_SIGNATURE_WINDOW_MS + 1,
+    claimDelivery: claimInboundEvent
+  });
+  assert.equal(fresh.outcomes[0]?.status, 'woke');
+  assert.equal(stale.outcomes[0]?.status, 'rejected');
+  assert.equal(stale.outcomes[0]?.reason, 'bad_signature');
+  assert.equal(edge.outcomes[0]?.status, 'woke');
+  assert.equal(past.outcomes[0]?.status, 'rejected');
+  assert.equal(runs.length, 2);
+  assert.equal(routineRowCount(store), 2);
+  store.db.close();
+});
+
+test('slack and email wake on a good signature and stay quiet when the timestamp is stale [AC:github-webhook-replay#AC-4]', async () => {
   const { store, host, runs, session } = tempHost();
   addJob(host, session, { event: 'slack/message', name: 'slack' });
   addJob(host, session, { event: 'email/received', name: 'email' });
@@ -306,9 +444,23 @@ test('slack and email wake on a good signature and stay quiet when the timestamp
     nowMs: NOW,
     claimDelivery: claimInboundEvent
   });
+  const emailStaleBody = JSON.stringify({ subject: 'old-invoice', deliveryId: 'email-stale' });
+  const emailStaleTs = String(Number(NOW_SEC) - 301);
+  const emailStale = await acceptEventRoutine(host, {
+    provider: 'email',
+    rawBody: emailStaleBody,
+    headers: {
+      'x-ppeng-timestamp': emailStaleTs,
+      'x-ppeng-signature': emailSig(emailStaleBody, emailStaleTs),
+      'x-ppeng-delivery': 'email-stale'
+    },
+    nowMs: NOW,
+    claimDelivery: claimInboundEvent
+  });
   assert.equal(slackOk.outcomes[0]?.status, 'woke');
   assert.equal(slackStale.outcomes[0]?.status, 'rejected');
   assert.equal(emailOk.outcomes[0]?.status, 'woke');
+  assert.equal(emailStale.outcomes[0]?.status, 'rejected');
   assert.equal(runs.length,2);assert.ok(runs.every(id=>id!==session.id));assert.notEqual(runs[0],runs[1]);
   const text = runs.map(id=>userText(store,id)).join('\n');
   assert.match(text, /«external source=event label=slack\/message»/);
@@ -380,8 +532,7 @@ test('gateway ingress verifies GitHub without the bearer token and does not doub
     path: '/routines/github',
     body: raw,
     headers: {
-      'x-github-event': 'push',
-      'x-github-delivery': 'gw-bad',
+      ...githubHeaders(rawText, 'gw-bad'),
       'x-hub-signature-256': 'sha256=nope'
     }
   });
@@ -393,11 +544,7 @@ test('gateway ingress verifies GitHub without the bearer token and does not doub
   const ok = await gatewayCall(ctx, {
     path: '/routines/github',
     body: raw,
-    headers: {
-      'x-github-event': 'push',
-      'x-github-delivery': 'gw-ok',
-      'x-hub-signature-256': githubSig(rawText)
-    }
+    headers: githubHeaders(rawText, 'gw-ok')
   });
   assert.equal(ok.status, 200);
   assert.equal(ok.json.wakeAgent, true);
@@ -408,11 +555,7 @@ test('gateway ingress verifies GitHub without the bearer token and does not doub
   const again = await gatewayCall(ctx, {
     path: '/routines/github',
     body: raw,
-    headers: {
-      'x-github-event': 'push',
-      'x-github-delivery': 'gw-ok',
-      'x-hub-signature-256': githubSig(rawText)
-    }
+    headers: githubHeaders(rawText, 'gw-ok')
   });
   assert.equal(again.status, 200);
   assert.equal(again.json.duplicate, true);
@@ -428,7 +571,7 @@ test('gateway capacity rejection is retryable and the same delivery succeeds wit
  const event=addJob(host,session,{event:'github/push',prompt:'process once'});
  host.runSession=async(id)=>{runs.push(id);store.appendMessage(id,'assistant',[{type:'text',text:'event completed'}]);return store.getSession(id)};
  const ctx={runtime:{store,runSession:(id)=>host.runSession(id)},repoRoot:host.stateDir,stateDir:host.stateDir,env:{enabled:true,pathPrefix:'/gateway/v1',learnEnabled:false,learnDailyHourUtc:6,authToken:'gateway-token'},fileConfigRef:{current:{}}};
- const body={note:'retry after backpressure'},text=JSON.stringify(body);const request={path:'/routines/github',body,headers:{'x-github-event':'push','x-github-delivery':'gw-capacity-retry','x-hub-signature-256':githubSig(text)}};
+ const body={note:'retry after backpressure'},text=JSON.stringify(body);const request={path:'/routines/github',body,headers:githubHeaders(text,'gw-capacity-retry')};
  const full=await gatewayCall(ctx,request);assert.equal(full.status,429);assert.equal(full.json.retryable,true);assert.equal(full.json.outcomes[0].status,'queue_full');assert.equal(ledger.get(blocker.id).status,'queued');assert.equal(ledger.get(blocker.id).job.prompt,'must remain accepted');assert.deepEqual(runs,[]);assert.equal(ledger.list(event.id).length,0);
  await cancelRoutineRun(host,blocker.id);
  const accepted=await gatewayCall(ctx,request);await new Promise(r=>setImmediate(r));assert.equal(accepted.status,200);assert.equal(accepted.json.duplicate,false);assert.equal(accepted.json.wakeAgent,true);assert.equal(runs.length,1);assert.equal(ledger.list(event.id)[0].status,'completed');
@@ -439,7 +582,7 @@ test('non-SQLite event hosts retain signature, precheck, dedupe and idle wake co
  const {CronJobStore}=await import('../dist/cron/cron-store.js');const dir=mkdtempSync(join(tmpdir(),'event-legacy-'));const cronStore=new CronJobStore(dir);const sessions=new Map([['legacy',{id:'legacy',status:'idle'}]]);let calls=0;const messages=[];
  const host={stateDir:dir,cronStore,setCronStore(){},log:{warn(){}},store:{getSession:id=>sessions.get(id),appendMessage:(...args)=>messages.push(args)},runSession:async()=>{calls++}};
  const base={sessionId:'legacy',agentId:'general',name:'legacy',prompt:'handle',scheduleKind:'event',scheduleValue:'github/push',metadata:{secretEnv:SECRET_ENV}};
- const job=cronStore.create(base);const raw='{"legacy":"private"}';const claimed=new Set();let delivery=0;const input=()=>({provider:'github',rawBody:raw,headers:{'x-github-event':'push','x-github-delivery':String(delivery),'x-hub-signature-256':githubSig(raw)},env:{[SECRET_ENV]:SECRET},claimDelivery(key){if(claimed.has(key))return false;claimed.add(key);return true}});
+ const job=cronStore.create(base);const raw='{"legacy":"private"}';const claimed=new Set();let delivery=0;const input=()=>({provider:'github',rawBody:raw,headers:githubHeaders(raw,String(delivery)),env:{[SECRET_ENV]:SECRET},claimDelivery(key){if(claimed.has(key))return false;claimed.add(key);return true}});
  assert.equal((await acceptEventRoutine(host,input())).outcomes[0].status,'woke');await new Promise(r=>setImmediate(r));assert.equal(calls,1);assert.equal(messages.length,1);assert.equal((await acceptEventRoutine(host,input())).outcomes[0].status,'duplicate');
  delivery++;sessions.set('legacy',{id:'legacy',status:'waiting_approval'});assert.equal((await acceptEventRoutine(host,input())).outcomes[0].status,'not_idle');assert.equal(calls,1);
  cronStore.update(job.id,{metadata:{...job.metadata,precheck:{kind:'script',source:'node -e \'const fs=require("node:fs");if(!fs.readFileSync(process.env.PPENG_EVENT_FILE,"utf8").includes("private"))process.exit(1);console.log(JSON.stringify({wakeAgent:false}))\''}}});delivery++;assert.equal((await acceptEventRoutine(host,input())).outcomes[0].status,'skipped');
