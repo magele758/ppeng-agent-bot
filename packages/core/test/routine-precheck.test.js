@@ -8,6 +8,7 @@ import { createBot } from '../dist/bots/index.js';
 import { CronJobStore } from '../dist/cron/cron-store.js';
 import { createCronJob, listCronJobs, updateCronJob } from '../dist/cron/cron-facade.js';
 import { evaluateRoutinePrecheck } from '../dist/cron/routine-precheck.js';
+import { RoutineRunStore } from '../dist/cron/routine-runtime.js';
 import { tickCronJobs } from '../dist/runtime/scheduler-host.js';
 
 function tempHost() {
@@ -189,5 +190,127 @@ test('预检保存在例行任务上，重新读取后下次触发仍生效 [AC:
   const cleared = updateCronJob(host, job.id, { precheck: null });
   assert.equal(cleared.metadata.precheck, undefined);
   assert.equal(process.env.RAW_AGENT_ROUTINE_PRECHECK, undefined);
+  store.db.close();
+});
+
+test('预检失败、非零退出或抛错时不开始模型回合 [AC:routine-precheck-fail-closed#AC-1]', async () => {
+  const claimedWake = await evaluateRoutinePrecheck(
+    { kind: 'script', source: `printf '%s\\n' '{"wakeAgent":true}'; exit 4` },
+    { cwd: tmpdir() }
+  );
+  assert.equal(claimedWake.wakeAgent, false);
+
+  const crashed = await evaluateRoutinePrecheck(
+    { kind: 'script', source: 'exit 7' },
+    { cwd: tmpdir() }
+  );
+  assert.equal(crashed.wakeAgent, false);
+
+  const thrown = await evaluateRoutinePrecheck(
+    { kind: 'script', source: 'printf hi' },
+    { cwd: join(tmpdir(), `missing-precheck-cwd-${Date.now()}`) }
+  );
+  assert.equal(thrown.wakeAgent, false);
+
+  const timedOut = await evaluateRoutinePrecheck(
+    { kind: 'script', source: 'sleep 30' },
+    { cwd: tmpdir() }
+  );
+  assert.equal(timedOut.wakeAgent, false);
+
+  const { store, host, runs } = tempHost();
+  const bot = createBot(host, { name: 'Fail closed' });
+  const job = createCronJob(host, {
+    botId: bot.id,
+    name: '失败预检',
+    prompt: '不要跑模型',
+    cron: '0 9 * * *',
+    precheck: { kind: 'script', source: 'exit 9' }
+  });
+  due(host, job);
+  await tickCronJobs(host);
+  assert.deepEqual(runs, []);
+  assert.equal(new RoutineRunStore(store).list(job.id)[0].status, 'skipped');
+  store.db.close();
+});
+
+test('预检输出不唤醒时，即使退出码非零也不开始模型回合 [AC:routine-precheck-fail-closed#AC-2]', async () => {
+  const gate = await evaluateRoutinePrecheck(
+    { kind: 'script', source: `printf '%s\\n' 'noise' '{"wakeAgent":false}'; exit 3` },
+    { cwd: tmpdir() }
+  );
+  assert.equal(gate.wakeAgent, false);
+
+  const { store, host, runs } = tempHost();
+  const bot = createBot(host, { name: 'Suppress' });
+  const job = createCronJob(host, {
+    botId: bot.id,
+    name: '非零仍不唤醒',
+    prompt: '不要跑模型',
+    cron: '0 9 * * *',
+    precheck: { kind: 'script', source: `printf '%s\\n' '{"wakeAgent":false}'; exit 3` }
+  });
+  due(host, job);
+  await tickCronJobs(host);
+  assert.deepEqual(runs, []);
+  assert.equal(new RoutineRunStore(store).list(job.id)[0].status, 'skipped');
+  store.db.close();
+});
+
+test('预检脚本看不到守护进程环境，也不能访问公网 [AC:routine-precheck-fail-closed#AC-3]', async () => {
+  const secret = `precheck-secret-${Date.now()}`;
+  const names = ['RAW_AGENT_API_KEY', 'RAW_AGENT_AUTH_TOKEN', 'GITHUB_TOKEN'];
+  const previous = new Map(names.map((name) => [name, process.env[name]]));
+  for (const name of names) process.env[name] = secret;
+  const dir = mkdtempSync(join(tmpdir(), 'precheck-env-'));
+  const file = join(dir, 'event.json');
+  writeFileSync(file, 'visible-event');
+  writeFileSync(join(dir, 'probe.mjs'), `import fs from 'node:fs';
+import net from 'node:net';
+const secret = ${JSON.stringify(secret)};
+const leak = Object.entries(process.env).some(([k,v]) => k === 'RAW_AGENT_API_KEY' || k === 'RAW_AGENT_AUTH_TOKEN' || k === 'GITHUB_TOKEN' || String(v).includes(secret));
+let fileOk = false;
+try { fileOk = fs.readFileSync(process.env.PPENG_EVENT_FILE, 'utf8').includes('visible-event'); } catch {}
+const s = net.connect({ host: '1.1.1.1', port: 443 });
+const finish = (wake) => { console.log(JSON.stringify({ wakeAgent: wake })); process.exit(0); };
+s.on('connect', () => { s.end(); finish(true); });
+s.on('error', () => finish(leak || !fileOk));
+s.setTimeout(800, () => { s.destroy(); finish(leak || !fileOk); });
+`);
+  try {
+    const result = await evaluateRoutinePrecheck(
+      { kind: 'script', source: 'node probe.mjs' },
+      { cwd: dir, env: { PPENG_EVENT_FILE: file }, denyEnv: ['RAW_AGENT_API_KEY'] }
+    );
+    assert.equal(result.reason, undefined);
+    assert.equal(result.wakeAgent, false);
+  } finally {
+    for (const [name, value] of previous) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
+});
+
+test('预检正常结束且没有明确拒绝时仍开始模型回合 [AC:routine-precheck-fail-closed#AC-4]', async () => {
+  const gate = await evaluateRoutinePrecheck(
+    { kind: 'script', source: `printf '%s\\n' hello` },
+    { cwd: tmpdir() }
+  );
+  assert.equal(gate.wakeAgent, true);
+
+  const { store, host, runs } = tempHost();
+  const bot = createBot(host, { name: 'Still wake' });
+  const job = createCronJob(host, {
+    botId: bot.id,
+    name: '纯文本仍唤醒',
+    prompt: '要跑',
+    cron: '0 9 * * *',
+    precheck: { kind: 'script', source: `printf '%s\\n' hello` }
+  });
+  due(host, job);
+  await tickCronJobs(host);
+  assert.equal(runs.length, 1);
+  assert.equal(new RoutineRunStore(store).list(job.id)[0].status === 'skipped', false);
   store.db.close();
 });

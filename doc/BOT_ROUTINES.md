@@ -18,7 +18,7 @@ Each occurrence has its own working chat, inherits the Bot identity, model and a
 
  `GET /api/cron/runs/:id` includes status, scheduled time, missed count, attempts, result and working session reference. Main chat receives only a summary and a link after it becomes idle. `lastRunAt` means trigger time, not successful completion.
 
-A precheck returning false records `skipped` without a model call. A precheck error preserves the existing fail-open behavior and records a diagnostic. Empty model output or denied/expired approval is a failure, not success. Unattended approval expires after the existing ten-minute deadline. Explicit approval resumes the same working session through the shared continuation guard; approving is not treated as completed work. Only the finished continuation's result can complete the occurrence.
+A precheck returning false, or a precheck that exits non-zero, throws, times out, or otherwise fails, records `skipped` without a model call. Stdout `{"wakeAgent":false}` does not wake even when the process exits non-zero. The script does not inherit the daemon environment and has no general network access. Empty model output or denied/expired approval is a failure, not success. Unattended approval expires after the existing ten-minute deadline. Explicit approval resumes the same working session through the shared continuation guard; approving is not treated as completed work. Only the finished continuation's result can complete the occurrence.
 
 ## Recovery and control
 

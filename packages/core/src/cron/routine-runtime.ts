@@ -178,9 +178,8 @@ async function evaluateRunPrecheck(host:RoutineRuntimeHost,run:RoutineRun):Promi
 }
 async function precheckAllowsRun(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):Promise<boolean>{
  if(run.precheckChecked)return true;const gate=await evaluateRunPrecheck(host,run);
- runs.update(run.id,{precheckChecked:true,...(gate.reason?{error:`Precheck failed open: ${gate.reason}`}:{})});
- if(gate.wakeAgent)return true;
- const skipped=runs.update(run.id,{status:'skipped',error:'Precheck requested no model turn',finishedAt:nowIso()});summarize(host,runs,skipped);return false;
+ if(gate.wakeAgent){runs.update(run.id,{precheckChecked:true});return true;}
+ const skipped=runs.update(run.id,{precheckChecked:true,status:'skipped',error:gate.reason?`Precheck failed; model not started: ${gate.reason}`:'Precheck requested no model turn',finishedAt:nowIso()});summarize(host,runs,skipped);return false;
 }
 function routineParent(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):SessionRecord|undefined {
  const parent=host.store.getSession(run.mainSessionId)??repairRoutineOwnerSession(host,run.job);
