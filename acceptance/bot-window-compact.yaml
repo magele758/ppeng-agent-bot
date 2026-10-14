@@ -1,0 +1,25 @@
+id: bot-window-compact
+title: 规范 Bot 按真实模型窗口的一半和 85% 压缩
+status: implemented
+requirement: |
+  Fix only issue 1: canonical bot sessions must compact at 50% and 85% of the real model context window again (default 131072 via resolveMaxContextTokens), not a squeezed history budget and not the 32768 fallback when the adapter omits contextWindow. Hygiene must remain reachable on the default window. Do not change the normal-session 20% cap. Do not emit compact_skipped on a turn that just compacted successfully if that false trace is in the same bot compact path. Update tests that locked the wrong 32768 behavior. No new RAW_AGENT_* env. Acceptance-first: user asked to fix it now; acceptance yaml approved with that note; failing tagged tests first.
+criteria:
+  - id: AC-1
+    given: 一条规范 Bot 主会话，当前模型没有标明上下文窗口
+    when: 会话内容还不到默认模型窗口的一半，或刚好达到这一半
+    then: 不到一半时不压缩；达到一半时做结构化压缩。不会按 32768 窗口提前压缩
+  - id: AC-2
+    given: 一条规范 Bot 主会话，系统提示和工具已经占掉一部分预算，模型窗口是真实窗口或未标明时的默认窗口
+    when: 会话内容达到该窗口的 85%
+    then: 执行卫生压缩。提示、工具和预留不会把这一档压到窗口的 85% 以下，默认窗口上这一档仍然能够触发
+  - id: AC-3
+    given: 规范 Bot 主会话这一轮刚刚压缩成功
+    when: 同一轮继续发给模型
+    then: 不会再记一条压缩被跳过
+  - id: AC-4
+    given: 普通聊天会话
+    when: 按请求上限检查
+    then: 上限仍是模型窗口的 20%
+owner: user
+notes: |
+  用户要求现在就修，本规格按已批准写入，不另等确认。不新增 RAW_AGENT_* 开关。普通会话的 20% 上限保持不变。

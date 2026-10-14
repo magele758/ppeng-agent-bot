@@ -30,11 +30,22 @@ test('stable cursor pages concurrent history without repeats [AC:bot-history-mem
  s.db.close();
 });
 test('actual model windows reserve system/tool overhead [AC:bot-history-memory#AC-3]',()=>{
- const store={getDaemonControl:()=>({fallbackContextTokens:32768})};
- assert.equal(resolveBotWindowBudget(store,{contextWindow:64000},{systemPromptChars:4000,toolCount:10}).contextTokens,64000);
- const small=resolveBotWindowBudget(store,{contextWindow:8000},{systemPromptChars:4000,toolCount:10});
- assert.ok(small.structuredTokens < 4000); assert.ok(small.hygieneTokens < 6800);
- assert.equal(resolveBotWindowBudget(store,{},{}).contextTokens,32768);
+ const legacy={getDaemonControl:()=>({fallbackContextTokens:32768})};
+ const named=resolveBotWindowBudget(legacy,{contextWindow:64000},{systemPromptChars:4000,toolCount:10});
+ assert.equal(named.contextTokens,64000);
+ assert.equal(named.structuredTokens,32000);
+ assert.equal(named.hygieneTokens,54400);
+ const small=resolveBotWindowBudget(legacy,{contextWindow:8000},{systemPromptChars:4000,toolCount:10});
+ assert.equal(small.structuredTokens,4000);
+ assert.equal(small.hygieneTokens,6800);
+ assert.ok(small.historyTokens < small.structuredTokens);
+ const omitted=resolveBotWindowBudget(legacy,{},{});
+ assert.equal(omitted.contextTokens,131072);
+ assert.equal(omitted.structuredTokens,65536);
+ assert.equal(omitted.hygieneTokens,111411);
+ assert.ok(omitted.historyTokens >= omitted.hygieneTokens);
+ const custom={getDaemonControl:()=>({fallbackContextTokens:90000})};
+ assert.equal(resolveBotWindowBudget(custom,{},{}).contextTokens,90000);
 });
 test('model history tools only operate current session [AC:bot-history-memory#AC-1]',async()=>{
  const s=fresh(); const a=s.createSession({title:'a',mode:'chat',agentId:'a'}),b=s.createSession({title:'b',mode:'chat',agentId:'b'});

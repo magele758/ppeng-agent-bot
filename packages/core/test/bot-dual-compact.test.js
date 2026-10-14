@@ -14,6 +14,7 @@ import { estimateMessageTokens } from '../dist/model/token-estimate.js';
 import { resolveHistoryTokenBudget, resolveMaxContextTokens } from '../dist/session/session-budget.js';
 import { filterSessionsByQuery } from '../dist/session-query.js';
 import { unmatchedToolCallIds } from '../dist/session/surface-invariants.js';
+import { normalRequestCapTokens, NORMAL_SESSION_REQUEST_RATIO } from '../dist/session/normal-request-budget.js';
 
 const STRUCTURED_SECTIONS = ['Goal', 'Constraints', 'Progress', 'Decisions', 'Files', 'Next steps'];
 
@@ -33,14 +34,15 @@ function tmpStore() {
   return { dir, store: new SqliteStateStore(join(dir, 'state.db')) };
 }
 
-function compactHost(store, dir, adapter) {
-  adapter.contextWindow = resolveMaxContextTokens(process.env);
+function compactHost(store, dir, adapter, options = {}) {
+  if (options.omitWindow) delete adapter.contextWindow;
+  else adapter.contextWindow = options.window ?? resolveMaxContextTokens(process.env);
   return {
     store,
     stateDir: dir,
     modelAdapter: adapter,
     extensionRegistry: createExtensionRegistry(),
-    turnShapeBySession: new Map(),
+    turnShapeBySession: options.turnShapeBySession ?? new Map(),
     emitTrace() {},
     prepareMessagesForModel: async (_session, messages) => messages
   };
@@ -455,6 +457,133 @@ function seedTurnsOnto(store, sessionId, target) {
     store.appendMessage(sessionId, message.role, message.parts);
   }
 }
+
+const HEAVY_SHAPE = { systemPromptChars: 8000, toolCount: 40 };
+
+test('an unmarked model window compacts at half of the default window [AC:bot-window-compact#AC-1]', async () => {
+  const { structuredTokens, hygieneTokens } = thresholds();
+  const { dir, store } = tmpStore();
+  store.setDaemonControl('bot.contextSettings', { fallbackContextTokens: 32768 });
+  const below = seedTurns(store, 'canonical', 40_000);
+  const belowTokens = estimateMessageTokens(store.foldMessages(below.id));
+  assert.ok(belowTokens > 16_384);
+  assert.ok(belowTokens < structuredTokens);
+  const belowModel = scripted(() => 'SHOULD_NOT_RUN');
+  const belowResult = await autoCompactSession(
+    compactHost(store, dir, belowModel.adapter, { omitWindow: true }),
+    runContext(dir, store.getSession(below.id))
+  );
+  assert.equal(belowResult.replaced, undefined);
+  assert.equal(belowModel.calls.length, 0);
+
+  const half = seedTurns(store, 'canonical', structuredTokens);
+  const halfTokens = estimateMessageTokens(store.foldMessages(half.id));
+  assert.ok(halfTokens >= structuredTokens && halfTokens < hygieneTokens);
+  const halfModel = scripted(() =>
+    ['Goal: ship', 'Constraints: none', 'Progress: started', 'Decisions: sqlite', 'Files: a.ts', 'Next steps: test'].join('\n')
+  );
+  const halfResult = await autoCompactSession(
+    compactHost(store, dir, halfModel.adapter, { omitWindow: true }),
+    runContext(dir, store.getSession(half.id))
+  );
+  assert.ok(halfResult.replaced);
+  const asked = messageText(halfModel.calls[0].messages);
+  assert.match(asked, /Structured compaction/);
+  assert.equal(/hygiene/i.test(asked), false);
+  store.db.close();
+});
+
+test('hygiene stays at 85% of the real window when the prompt and tools are large [AC:bot-window-compact#AC-2]', async () => {
+  const { hygieneTokens } = thresholds();
+  const { dir, store } = tmpStore();
+  const band = seedTurns(store, 'canonical', 108_000);
+  const atHygiene = seedTurns(store, 'canonical', hygieneTokens);
+  const bandTokens = estimateMessageTokens(store.foldMessages(band.id));
+  const hygieneLevel = estimateMessageTokens(store.foldMessages(atHygiene.id));
+  assert.ok(bandTokens > 106_272 && bandTokens < hygieneTokens);
+  assert.ok(hygieneLevel >= hygieneTokens);
+  const shape = new Map([
+    [band.id, HEAVY_SHAPE],
+    [atHygiene.id, HEAVY_SHAPE]
+  ]);
+  const bandModel = scripted(() =>
+    ['Goal: ship', 'Constraints: none', 'Progress: started', 'Decisions: sqlite', 'Files: a.ts', 'Next steps: test'].join('\n')
+  );
+  const bandResult = await autoCompactSession(
+    compactHost(store, dir, bandModel.adapter, { window: 131072, turnShapeBySession: shape }),
+    runContext(dir, store.getSession(band.id))
+  );
+  assert.ok(bandResult.replaced);
+  const bandAsked = messageText(bandModel.calls[0].messages);
+  assert.match(bandAsked, /Structured compaction/);
+  assert.equal(/hygiene/i.test(bandAsked), false);
+
+  const hygieneModel = scripted(() => 'hygiene-summary');
+  const hygieneResult = await autoCompactSession(
+    compactHost(store, dir, hygieneModel.adapter, { omitWindow: true, turnShapeBySession: shape }),
+    runContext(dir, store.getSession(atHygiene.id))
+  );
+  assert.ok(hygieneResult.replaced);
+  assert.match(messageText(hygieneModel.calls[0].messages), /hygiene/i);
+  store.db.close();
+});
+
+test('a turn that just compacted does not also record compact skipped [AC:bot-window-compact#AC-3]', async () => {
+  const { RawAgentRuntime } = await import('../dist/runtime.js');
+  const { bindTurnKernelHost } = await import('../dist/runtime/l5-bindings.js');
+  let summaries = 0;
+  const adapter = {
+    name: 'window-test',
+    contextWindow: 8192,
+    async runTurn() {
+      return { assistantParts: [{ type: 'text', text: 'done' }], stopReason: 'end' };
+    },
+    async summarizeMessages() {
+      summaries += 1;
+      return 'Goal: keep going\nConstraints: preserve deadline\nNext steps: unfinished';
+    }
+  };
+  const rt = new RawAgentRuntime({
+    repoRoot: mkdtempSync(join(tmpdir(), 'window-repo-')),
+    stateDir: mkdtempSync(join(tmpdir(), 'window-state-')),
+    modelAdapter: adapter
+  });
+  try {
+    const bot = rt.createBot({ name: 'Window bot' });
+    const session = rt.getSession(rt.openBot(bot.id).sessionId);
+    for (let n = 0; n < 40; n++) {
+      rt.store.appendMessage(session.id, n % 2 ? 'assistant' : 'user', [{ type: 'text', text: 'x'.repeat(700) }]);
+    }
+    const host = bindTurnKernelHost(rt.l5());
+    await host.runTurnWithRetries({
+      sessionId: session.id,
+      agent: rt.store.getAgent(bot.agentId),
+      systemPrompt: 's'.repeat(1000),
+      messages: rt.store.foldMessages(session.id),
+      tools: []
+    });
+    let events = [];
+    for (let i = 0; i < 20; i++) {
+      events = await rt.listTraceEvents(session.id);
+      if (events.length > 0) break;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    assert.ok(summaries >= 1);
+    assert.ok(events.some((event) => event.kind === 'compact'));
+    assert.equal(
+      events.some((event) => event.kind === 'compact_skipped' && event.payload?.reason === 'context_budget'),
+      false
+    );
+  } finally {
+    rt.store.db.close();
+  }
+});
+
+test('ordinary chats stay capped at 20% of the window [AC:bot-window-compact#AC-4]', () => {
+  assert.equal(NORMAL_SESSION_REQUEST_RATIO, 0.2);
+  assert.equal(normalRequestCapTokens(131072), 26214);
+  assert.equal(normalRequestCapTokens(resolveMaxContextTokens(process.env)), Math.floor(131072 * 0.2));
+});
 
 test('failed compression preserves the task and reports its reason in both modes [AC:context-reliability#AC-12]', async () => {
   for (const kind of ['canonical', 'ordinary']) {
