@@ -219,7 +219,8 @@ function shellExecution(
       workspace: options?.workspace ?? cwd,
       timeoutMs: options?.timeoutMs,
       signal: options?.signal,
-      sessionId: options?.sessionId
+      sessionId: options?.sessionId,
+      allowNetwork: true
     })
     .then((result) => {
     if (options?.signal?.aborted) return {ok:false, content:'(command aborted)', metadata:{exitCode:result.code, signal:result.signal}};
@@ -756,7 +757,7 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
       const workspace = sandboxWorkspaceRoots(context);
 
       const execEvidence = async (command: string, timeoutMs: number) =>
-        sandbox.execute({ command, cwd, workspace, timeoutMs, signal, sessionId });
+        sandbox.execute({ command, cwd, workspace, timeoutMs, signal, sessionId, allowNetwork: true });
 
       const inside = await execEvidence('git rev-parse --is-inside-work-tree', 15_000);
       const gitAvailable = inside.code === 0 && inside.stdout.trim() === 'true';

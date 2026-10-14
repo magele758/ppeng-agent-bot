@@ -74,6 +74,13 @@ const CREDENTIAL_PREFIXES = [
 /**
  * RAW_AGENT_* secret names. Numeric budgets such as MODEL_CONTEXT_TOKENS,
  * TOKEN_BUDGET, and TOKEN_PRICE_JSON do not match these suffixes.
+ *
+ * These names are not on the allowlist. bash / bg_run / work_evidence children
+ * must not inherit them: a `printenv` would put the value into the session.
+ * Model, VL, embedding, Feishu, OAuth, and daemon auth read `process.env` in
+ * the host process. Self-heal uses `enrichSpawnEnv`, which does not turn
+ * credential stripping on. GitHub/npm tokens in the exact credential list stay
+ * stripped too; `gh` and `git` use on-disk helpers, not these variables.
  */
 const RAW_AGENT_CREDENTIAL_SUFFIX =
   /_(?:API_KEY|ACCESS_KEY|SECRET_KEY|CLIENT_SECRET|APP_SECRET|SECRET|PASSWORD|CREDENTIAL|CREDENTIALS|TOKEN|BEARER)$/;

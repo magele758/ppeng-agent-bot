@@ -345,7 +345,8 @@ export class SandboxManager {
    * Then applies Tier 0 env sanitization and delegates to the provider.
    * Tool children lose credential env names unless the caller sets
    * `envOptions.stripCredentials` to false. Network is off unless
-   * `allowNetwork` is true (seatbelt / bwrap). Direct mode has no network namespace.
+   * `allowNetwork` is true (seatbelt / bwrap). bash, bg_run, and work_evidence
+   * pass true so curl, npm, git fetch, and gh keep working. Direct mode has no network namespace.
    */
   async execute(
     command: string,

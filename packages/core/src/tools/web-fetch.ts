@@ -136,6 +136,7 @@ export async function fetchUrlText(options: WebFetchOptions): Promise<{ ok: bool
     resolveHost: options.resolveHost,
     request: options.request,
     maxRedirects: options.maxRedirects,
+    dnsTimeoutMs: options.dnsTimeoutMs,
     signal: controller.signal
   };
   try {

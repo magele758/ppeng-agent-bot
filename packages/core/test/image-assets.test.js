@@ -483,6 +483,29 @@ describe('fetchImageFromUrl private network policy', () => {
     assert.equal(calls, 1);
   });
 
+  it('returns immediately when the caller signal is already aborted', async () => {
+    const ac = new AbortController();
+    ac.abort();
+    let calls = 0;
+    const started = Date.now();
+    await assert.rejects(
+      () => fetchImageFromUrl('https://cdn.example/a.png', 1000, 30_000, ac.signal, {
+        ...offline,
+        resolveHost: async () => {
+          calls += 1;
+          return ['93.184.216.34'];
+        },
+        request: async () => {
+          calls += 1;
+          return new Response(MINIMAL_PNG, { status: 200, headers: { 'content-type': 'image/png' } });
+        }
+      }),
+      (err) => err instanceof Error && (err.name === 'AbortError' || /abort/i.test(err.message))
+    );
+    assert.equal(calls, 0);
+    assert.ok(Date.now() - started < 500);
+  });
+
   it('pins a public image download to the approved address', async () => {
     const seen = [];
     const image = await fetchImageFromUrl('https://cdn.example/a.png', 1_000_000, 1000, undefined, {

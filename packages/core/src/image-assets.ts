@@ -116,6 +116,11 @@ export async function fetchImageFromUrl(
   signal?: AbortSignal,
   deps?: PublicFetchDeps
 ): Promise<{ buffer: Buffer; mimeType: string }> {
+  if (signal?.aborted) {
+    throw signal.reason instanceof Error
+      ? signal.reason
+      : Object.assign(new Error('The operation was aborted'), { name: 'AbortError' });
+  }
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   const onAbort = () => ctrl.abort();

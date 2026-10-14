@@ -203,6 +203,9 @@ Spawn 一律 `sanitizeSpawnEnv()`（Tier 0）；无 shell 拼接，prompt 只作
 
 - 注入：`LD_PRELOAD`、`LD_LIBRARY_PATH`、`DYLD_INSERT_LIBRARIES`、`NODE_OPTIONS`、`PYTHONPATH` / `PYTHONSTARTUP`、`JAVA_TOOL_OPTIONS`、`BASH_ENV`、`ENV`、`IFS`、`PROMPT_COMMAND`、`BASH_FUNC_*` …
 - 可选 `stripCredentials: true`：再剥 `AWS_SECRET_*`、`GITHUB_TOKEN`、`NPM_TOKEN` 等
+- `SandboxManager` 对工具子进程默认打开这项。匹配 `RAW_AGENT_` 且以 `_API_KEY` / `_TOKEN` / `_SECRET` / `_PASSWORD` / `_BEARER` 等结尾的名字会去掉，包括 `RAW_AGENT_API_KEY`、`RAW_AGENT_AUTH_TOKEN`、`RAW_AGENT_FEISHU_APP_SECRET`
+
+这些 `RAW_AGENT_*` 密钥**没有**代码白名单。模型、VL、embedding、飞书、OAuth、daemon 鉴权都在宿主进程读 `process.env`，不经过 bash。自愈子进程走 `enrichSpawnEnv`，默认不剥凭证。把密钥加回 bash 环境会让 `printenv` 进会话。`RAW_AGENT_BASE_URL`、`RAW_AGENT_MODEL_NAME`、`*_TOKENS`、`TOKEN_BUDGET`、`TOKEN_PRICE_JSON` 不是密钥，会留下。`GH_TOKEN` / `NPM_TOKEN` / `GITHUB_TOKEN` 仍按原精确名单剥掉；`gh` / `git` 用磁盘上的凭证助手，不靠这些环境变量。
 
 Tier 0 **不**限制文件系统/网络——那是 Tier 1。
 
@@ -217,9 +220,10 @@ Tier 0 **不**限制文件系统/网络——那是 Tier 1。
 | `direct` | 仅 Tier 0 |
 | `container` | 预留 Tier 2（当前同 Direct） |
 
-**macOS seatbelt**：deny `~/.ssh`、`~/.aws`、`~/.gnupg`、`~/.kube`、`~/.docker` 读写；显式 allow workspace；可选 `allowNetwork=false`。  
-**Linux bwrap**：namespace 隔离同类敏感路径。  
-不可用 → **fail-open 降级 Tier 0**（不阻塞本地开发）。
+**macOS seatbelt**：deny `~/.ssh`、`~/.aws`、`~/.gnupg`、`~/.kube`、`~/.docker` 读写；显式 allow workspace。未传 `allowNetwork: true` 时 `(deny network*)`。  
+**Linux bwrap**：namespace 隔离同类敏感路径；未传 `allowNetwork: true` 时 `--unshare-net`。  
+`bash`、`bg_run`、`work_evidence` 显式传 `allowNetwork: true`，auto 模式下 `curl`、`npm install`、`git fetch`、`gh` 保持能联网。其它调用点不传就是断网。remote_vm 与 microservice 同样只有显式 `true` 才在请求体里放行。  
+不可用 → **fail-open 降级 Tier 0**（不阻塞本地开发；Direct 没有网络命名空间，命令仍能出网）。
 
 ### 6.3 Result redaction（回流脱敏）
 

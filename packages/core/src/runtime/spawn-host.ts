@@ -401,7 +401,8 @@ export async function startBackgroundJob(
       cwd,
       workspace,
       signal: ac.signal,
-      sessionId
+      sessionId,
+      allowNetwork: true
     })
     .then((result) => {
       host.backgroundJobAborts.delete(job.id);
