@@ -210,6 +210,11 @@ export interface CheckToolApprovalsExtras {
    * The kernel then skips those calls without folding the transcript.
    */
   closedByGate?: { reported: boolean; ids: string[] };
+  /**
+   * Approvals already decided for a resumed wave. A host that asks again
+   * (for example Jev toolGate) must follow these instead of creating new ones.
+   */
+  settledApprovalIds?: readonly string[];
 }
 
 export interface ResolveTurnToolsResult {

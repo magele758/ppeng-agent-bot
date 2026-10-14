@@ -885,6 +885,48 @@ describe('runSessionKernel wiring', () => {
     ]);
   });
 
+  it('恢复波次时把已定审批交给审批门，不再另建审批', async () => {
+    const executed: string[] = [];
+    let settled: readonly string[] | undefined;
+    let created = 0;
+    const { host, session } = createHarness({
+      model: () => textResult('after'),
+      host: {
+        checkToolApprovals: (_calls, _ctx, _session, extras) => {
+          settled = extras?.settledApprovalIds;
+          if (settled?.includes('ap-approved')) return 'proceed';
+          created += 1;
+          return 'waiting';
+        },
+        executeToolCalls: async (calls) => {
+          executed.push(...calls.map((call) => call.toolCallId));
+          return calls.map((call) => ({
+            toolCallId: call.toolCallId,
+            name: call.name,
+            ok: true,
+            content: 'ran',
+          }));
+        },
+      },
+    });
+    host.store.appendMessage(session.id, 'assistant', [
+      { type: 'tool_call', toolCallId: 'bash-1', name: 'echo', input: { cmd: 'ls' } },
+    ]);
+    host.store.updateSession(session.id, {
+      status: 'idle',
+      metadata: {
+        interrupt: createWaitingApprovalInterrupt({
+          toolCallIds: ['bash-1'],
+          approvalIds: ['ap-approved'],
+        }),
+      },
+    });
+    await runSessionKernel(host, session.id);
+    expect(settled).toEqual(['ap-approved']);
+    expect(created).toBe(0);
+    expect(executed).toEqual(['bash-1']);
+  });
+
   it('does not execute a tool the approval gate already closed', async () => {
     const executed: string[] = [];
     let live: TurnKernelStore | undefined;

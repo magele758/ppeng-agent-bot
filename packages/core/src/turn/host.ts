@@ -135,7 +135,8 @@ export interface TurnKernelHost {
     filePolicy: FileApprovalPolicy | undefined,
     session: SessionRecord,
     turnTools?: ToolContract<any>[],
-    closedByGate?: { reported: boolean; ids: string[] }
+    closedByGate?: { reported: boolean; ids: string[] },
+    settledApprovalIds?: readonly string[]
   ): 'waiting' | 'skip' | 'proceed' | Promise<'waiting' | 'skip' | 'proceed'>;
   executeToolCalls(
     validToolCalls: ToolCallPart[],

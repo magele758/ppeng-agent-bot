@@ -190,6 +190,7 @@ async function continueResumedToolWave(input: {
       filePolicy: input.filePolicy,
       turnTools: picked.resolvedTools,
       closedByGate,
+      settledApprovalIds: input.interrupt.approvalIds,
     }
   );
   if (gate === 'waiting') {

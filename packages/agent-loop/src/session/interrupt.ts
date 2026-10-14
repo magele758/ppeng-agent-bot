@@ -124,8 +124,9 @@ export function selectExecutableToolCalls<T extends { toolCallId: string }>(
 }
 
 /**
- * Latest unmatched tool_call per id. An id that was closed and then reused
- * contributes only the call that reopened it.
+ * Latest unmatched tool_call per id, in last-occurrence order.
+ * An id that was closed and then reused contributes only the call that reopened it.
+ * `a` (history), `b`, `a` again yields `b` then the latest `a`.
  */
 export function unmatchedToolCallsFromFold(
   folded: Array<{ parts: MessagePart[] }>,
@@ -137,6 +138,7 @@ export function unmatchedToolCallsFromFold(
   for (const message of folded) {
     for (const part of message.parts) {
       if (part.type === 'tool_call' && open.has(part.toolCallId) && allow.has(part.toolCallId)) {
+        latest.delete(part.toolCallId);
         latest.set(part.toolCallId, part);
       }
     }
