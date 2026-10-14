@@ -33,6 +33,13 @@ jobs:
       - name: TypeScript build
         run: npm run build
 
+      # Ubuntu 24.04 AppArmor blocks the user+net namespace the routine precheck uses to drop network.
+      - name: Allow precheck network namespaces
+        run: |
+          if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+
       # 失败文件单独重跑一次：重跑通过 = flaky（step 通过但告警 + summary + artifact），两次都挂 = 失败。
       - name: Unit tests
         run: node scripts/ci/retry-failed-tests.mjs --script test:unit --label unit --report "$RUNNER_TEMP/flaky-tests/unit.json"
@@ -123,6 +130,13 @@ jobs:
 
       - name: TypeScript build (workspace packages)
         run: node scripts/build-workspace.mjs
+
+      # Ubuntu 24.04 AppArmor blocks the user+net namespace the routine precheck uses to drop network.
+      - name: Allow precheck network namespaces
+        run: |
+          if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
 
       - name: Prepare acceptance results dir
         run: mkdir -p "${{ runner.temp }}/acceptance-results"

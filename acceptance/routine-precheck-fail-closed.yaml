@@ -1,0 +1,24 @@
+id: routine-precheck-fail-closed
+title: 例行预检失败不唤醒模型
+status: implemented
+requirement: |
+  Fix: if a bot routine precheck throws, exits non-zero, or otherwise fails, do NOT wake the model (wakeAgent false). A stdout {"wakeAgent":false} must still suppress the model even if the process exits non-zero — or if you treat non-zero as failure, failure means do not wake, never wake. The precheck subprocess must not inherit the daemon environment (use sanitizeSpawnEnv or an explicit minimal env) and must not get general network access unless the existing design already required it for a documented reason; default is no network. No new RAW_AGENT_* env. Acceptance-first, user asked to fix now, tests first. Open a PR and merge if relevant checks are green. Do not publish npm. Do not edit compact thresholds, software private-IP checks, GitHub webhook verification, or the web console.
+notes: |
+  负责人要求现在就修（预先授权实现，不等逐条确认）。标准按用户能观察到的行为书写，供事后复核。
+criteria:
+  - id: AC-1
+    given: 某个 Bot 的例行任务配置了预检脚本
+    when: 预检抛错、退出码非零、超时或其它失败
+    then: 不唤醒模型，也不开始模型回合
+  - id: AC-2
+    given: 预检脚本的标准输出明确表示不唤醒
+    when: 该进程退出码非零
+    then: 仍然不唤醒模型，不开始模型回合
+  - id: AC-3
+    given: 守护进程环境里有密钥或其它配置，机器也能访问公网
+    when: 例行预检脚本运行
+    then: 脚本看不到守护进程的环境，也不能访问公网
+  - id: AC-4
+    given: 预检脚本正常结束，且没有明确表示不唤醒
+    when: 例行任务到达触发时间
+    then: 仍会开始模型回合
