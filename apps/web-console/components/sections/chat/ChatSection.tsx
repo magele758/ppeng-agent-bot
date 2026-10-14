@@ -1,9 +1,10 @@
 'use client';
 
 import './chat.css';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { filterSessionsByQuery } from '@ppeng/api-types';
 import { api } from '@/lib/api';
+import { pickDefaultAgentId } from '@/lib/default-agent';
 import { useI18n } from '@/lib/i18n';
 import { createDefaultBotLoadGuard, startDefaultBotLoadEffect } from '@/lib/bot-console-selection';
 import {
@@ -17,12 +18,6 @@ import type { AgentInfo, BotInfo, SessionSummary } from '@/lib/types';
 import { PlayPanel } from '../../PlayPanel';
 import { usePlayChat } from '../../usePlayChat';
 import { useLab } from '../../shell/LabProvider';
-
-function pickDefaultAgentId(aList: { id: string }[]): string {
-  if (aList.some((a) => a.id === 'general')) return 'general';
-  if (aList.some((a) => a.id === 'main')) return 'main';
-  return aList[0]?.id ?? '';
-}
 
 /**
  * 对话页。常驻挂载（隐藏时仍保持流式连接与草稿），
@@ -152,8 +147,10 @@ export function ChatSection({ active }: { active: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chat callbacks are unstable; rerunning cancels the load that selects the bot.
   }, [defaultBotGuard, playSurface, selectedSessionId]);
 
-  // Bot 表面锁定 bot.agentId；否则跟随会话 / 默认 Agent
-  useEffect(() => {
+  // Bot 表面锁定 bot.agentId；否则跟随会话 / 默认 Agent。
+  // 必须在绘制前写上：目录按 id 排序，第一项是没有 bash 的 capability-prober，
+  // 绘制后的 effect 会给「发送」留出一帧空 agentId，新会话就会落到它上面。
+  useLayoutEffect(() => {
     if (playSurface === 'bot' && chat.botId) {
       const bot = bots.find((b) => b.id === chat.botId);
       if (bot) chat.setAgentId(bot.agentId);
@@ -165,7 +162,10 @@ export function ChatSection({ active }: { active: boolean }) {
       chat.setAgentId(sess.agentId);
       return;
     }
-    chat.setAgentId((prev: string) => (prev && agents.some((a) => a.id === prev) ? prev : pickDefaultAgentId(agents)));
+    chat.setAgentId((prev: string) => {
+      if (prev && (agents.length === 0 || agents.some((a) => a.id === prev))) return prev;
+      return pickDefaultAgentId(agents);
+    });
   }, [agents, bots, chat.botId, playSurface]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const deleteSessions = async (ids: string[]) => {
