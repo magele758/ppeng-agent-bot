@@ -210,7 +210,8 @@ test('shared capacity preserves cron checkpoint and rejected event retry does no
  assert.equal(materializeRoutineOccurrences(host,host.cronStore,due).length,0);assert.equal(host.cronStore.get(job.id).nextRunAt,checkpoint);assert.match(host.cronStore.get(job.id).metadata.queueBlockedReason,/capacity/i);assert.equal(runs.get(blocker.id).status,'queued');
  const event=createCronJob(host,{sessionId:session.id,name:'event',prompt:'handle event',event:'github/push',secretEnv:'BOT_CAPACITY_EVENT_SECRET'});
  const raw=JSON.stringify({text:'retryable event'}),secret='fixture-event-secret';let claims=0;
- const input={provider:'github',rawBody:raw,headers:{'x-github-event':'push','x-github-delivery':'capacity-retry','x-hub-signature-256':`sha256=${createHmac('sha256',secret).update(raw).digest('hex')}`},env:{BOT_CAPACITY_EVENT_SECRET:secret},claimDelivery(){claims++;return true}};
+ const delivery='capacity-retry',timestamp=String(Math.floor(Date.now()/1000));
+ const input={provider:'github',rawBody:raw,headers:{'x-github-event':'push','x-github-delivery':delivery,'x-github-timestamp':timestamp,'x-hub-signature-256':`sha256=${createHmac('sha256',secret).update(`${timestamp}.${delivery}.${raw}`).digest('hex')}`},env:{BOT_CAPACITY_EVENT_SECRET:secret},claimDelivery(){claims++;return true}};
  const blocked=await acceptEventRoutine(host,input);assert.equal(blocked.outcomes[0].status,'queue_full');assert.equal(claims,0);assert.equal(runs.list(event.id).length,0);
  await cancelRoutineRun(host,blocker.id);const retried=await acceptEventRoutine(host,input);await new Promise(r=>setImmediate(r));assert.equal(retried.outcomes[0].status,'woke');assert.equal(claims,1);assert.equal(runs.list(event.id).length,1);
  const duplicate=await acceptEventRoutine(host,input);assert.equal(duplicate.outcomes[0].status,'duplicate');assert.equal(claims,1);

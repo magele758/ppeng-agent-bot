@@ -24,7 +24,7 @@ import { evaluateRoutinePrecheck, readStoredPrecheck } from './routine-precheck.
 /** Child env var. The value is a file path, never the event JSON. */
 export const EVENT_PRECHECK_FILE_ENV = 'PPENG_EVENT_FILE';
 
-/** Slack and email reject timestamps further than this from now. */
+/** Slack, email, and GitHub reject timestamps further than this from now. */
 export const EVENT_SIGNATURE_WINDOW_MS = 5 * 60 * 1000;
 
 const SUMMARY_MAX = 12_000;
@@ -97,14 +97,25 @@ function hmacHex(secret: string, payload: string): string {
   return createHmac('sha256', secret).update(payload, 'utf8').digest('hex');
 }
 
-/** `X-Hub-Signature-256` is `sha256=` + HMAC-SHA256(secret, rawBody). */
+/**
+ * `X-Hub-Signature-256` is `sha256=` + HMAC-SHA256(secret, `${timestamp}.${deliveryId}.${rawBody}`).
+ * `X-Github-Timestamp` is unix seconds. `X-Github-Delivery` is the delivery id.
+ * Both are inside the MAC, and a timestamp more than 5 minutes from now is rejected.
+ * A captured body signature cannot be replayed with another delivery id or a fresh time.
+ */
 export function verifyGithubSignature(input: {
   rawBody: string;
   secret: string;
   signature: string | undefined;
+  deliveryId?: string;
+  timestamp?: string;
+  nowMs?: number;
 }): boolean {
   if (!input.secret || !input.signature) return false;
-  const expected = `sha256=${hmacHex(input.secret, input.rawBody)}`;
+  const deliveryId = clampDeliveryId(input.deliveryId);
+  const timestamp = freshTimestamp(input.timestamp, input.nowMs ?? Date.now());
+  if (!deliveryId || !timestamp) return false;
+  const expected = `sha256=${hmacHex(input.secret, `${timestamp}.${deliveryId}.${input.rawBody}`)}`;
   return signaturesMatch(expected, input.signature);
 }
 
@@ -235,7 +246,10 @@ function signatureOk(
     return verifyGithubSignature({
       rawBody,
       secret,
-      signature: headerValue(headers, 'x-hub-signature-256')
+      signature: headerValue(headers, 'x-hub-signature-256'),
+      deliveryId: headerValue(headers, 'x-github-delivery'),
+      timestamp: headerValue(headers, 'x-github-timestamp'),
+      nowMs
     });
   }
   if (provider === 'slack') {
