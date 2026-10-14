@@ -54,4 +54,50 @@ test.describe('Lab 模型所见', () => {
     await expect(storedFold.locator('.chat-tool-io__block--out')).toContainText(STORED_MARKER);
     await expect(page.locator('.model-view-banner')).toHaveCount(0);
   });
+
+  test('目录刚返回时发送，新会话用通用助手而不是按 id 排在最前的探针', async ({ page }) => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route('**/api/agents', async (route) => {
+      if (route.request().method() !== 'GET') {
+        await route.continue();
+        return;
+      }
+      await held;
+      await route.continue();
+    });
+    const agentIds: Array<string | undefined> = [];
+    page.on('request', (req) => {
+      if (!req.url().includes('/api/chat/stream')) return;
+      const body = req.postDataJSON() as { agentId?: string };
+      agentIds.push(body.agentId);
+    });
+
+    await page.goto('/');
+    await expect(page.locator('#panel-play')).toBeVisible();
+    await page.getByLabel('消息内容').fill(LONG_BASH_PROMPT);
+    await page.locator('.composer-config-summary').click();
+    const agentSelect = page.locator('#agentSelect');
+    await expect(agentSelect).toBeVisible();
+    await page.evaluate(() => {
+      const select = document.getElementById('agentSelect');
+      if (!select) return;
+      const obs = new MutationObserver(() => {
+        obs.disconnect();
+        document.getElementById('btnSend')?.click();
+      });
+      obs.observe(select, { childList: true, subtree: true });
+    });
+    release();
+
+    const resultFold = page.locator('#playMessages .chat-tool-fold--result').first();
+    await expect(resultFold).toBeVisible({ timeout: 60_000 });
+    if (!(await resultFold.evaluate((el) => el instanceof HTMLDetailsElement && el.open))) {
+      await resultFold.locator(':scope > summary').click();
+    }
+    await expect(resultFold.locator('.chat-tool-io__block--out')).toContainText(STORED_MARKER);
+    expect(agentIds[0]).toBe('general');
+  });
 });

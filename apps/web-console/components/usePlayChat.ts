@@ -2,6 +2,7 @@
 
 import { botComposerStatusText, planBotComposerSend } from '@/lib/bot-chat-commands';
 import { parseBotModelOverride, resolveLoadedComposerModelRef } from '@/lib/bot-model';
+import { resolveComposerAgentId } from '@/lib/default-agent';
 import { mergeHistoryWindow } from '@/lib/history-window';
 import { api } from '@/lib/api';
 import { getSpeechRecognitionCtor, type SpeechRecognitionLike } from '@/lib/speech-dictation';
@@ -225,7 +226,7 @@ export function usePlayChat(deps: PlayChatDeps) {
   const [workspaceAvailability, setWorkspaceAvailability] = useState<WorkspaceAvailability>(
     emptyWorkspaceAvailability
   );
-  const [agentId, setAgentId] = useState('');
+  const [agentId, setAgentId] = useState('general');
   const [botId, setBotId] = useState('');
   const botIdRef = useRef('');
   const [botModelOverride, setBotModelOverride] = useState<ModelRef | null>(null);
@@ -1223,7 +1224,7 @@ export function usePlayChat(deps: PlayChatDeps) {
       body: JSON.stringify({
         mode,
         title: mode === 'task' ? t('play.status.newTask') : t('play.status.newSession'),
-        agentId: agentId || agents[0]?.id,
+        agentId: resolveComposerAgentId(agentId, agents),
         autoRun: false,
         background: false,
         ...optionalGroupsBody(optionalToolGroupsFeature, enabledOptionalGroupIds),
@@ -1417,7 +1418,7 @@ export function usePlayChat(deps: PlayChatDeps) {
           await readSseFetch('/api/chat/stream', {
             message: text || '(attachment)',
             title: (text || t('play.attachment')).slice(0, 60),
-            agentId: agentId || agents[0]?.id,
+            agentId: resolveComposerAgentId(agentId, agents),
             imageAssetIds,
             attachmentIds,
             ...optionalGroupsBody(optionalToolGroupsFeature, enabledOptionalGroupIds),
@@ -1435,7 +1436,7 @@ export function usePlayChat(deps: PlayChatDeps) {
             body: JSON.stringify({
               message: text || '(attachment)',
               title: (text || t('play.attachment')).slice(0, 60),
-              agentId: agentId || agents[0]?.id,
+              agentId: resolveComposerAgentId(agentId, agents),
               imageAssetIds,
               attachmentIds,
               ...optionalGroupsBody(optionalToolGroupsFeature, enabledOptionalGroupIds),
@@ -1462,7 +1463,7 @@ export function usePlayChat(deps: PlayChatDeps) {
             message: text || '(attachment)',
             imageAssetIds,
             attachmentIds,
-            agentId: agentId || agents[0]?.id,
+            agentId: resolveComposerAgentId(agentId, agents),
             autoRun: true,
             background: true,
             ...optionalGroupsBody(optionalToolGroupsFeature, enabledOptionalGroupIds),
