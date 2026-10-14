@@ -111,6 +111,7 @@ export const ops = {
     reasonNotReady: '服务还没有就绪：存储目录或数据库不可读写。',
     reasonDoctorFail: '一键诊断发现 {n} 项失败，见下方「诊断」。',
     reasonDoctorWarn: '一键诊断有 {n} 项警告，见下方「诊断」。',
+    reasonSelfHealBad: '最近的自愈运行有 {n} 次失败或阻塞，见下方「自愈」。',
     reasonConfigWarn: '有效配置里有 {n} 项需要注意，见下方「有效配置」。',
     updatedAt: '更新于 {time}',
     refresh: '刷新',
@@ -126,6 +127,7 @@ export const ops = {
 
     selfHealTitle: '自愈',
     selfHealIdle: '空闲 · 没有进行中的修复',
+    selfHealRecentBad: '最近 {n} 次修复失败或阻塞。',
     selfHealRunning: '运行中 · {n} 个修复任务',
     selfHealRecent: '最近运行',
     selfHealNoRuns: '还没有自愈运行记录',

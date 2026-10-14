@@ -79,9 +79,7 @@ function buildToolLoopHost(
             durationMs: String(durationMs),
           })
       : undefined,
-    compensate: async (items) => {
-      await compensateCompletedLifo(items);
-    },
+    compensate: (items) => compensateCompletedLifo(items),
   };
 }
 
@@ -115,7 +113,8 @@ export function createNormalAssembledLoop(input: CreateAssembledLoopInput = {}):
         context,
         extras?.filePolicy ?? io.filePolicy,
         session,
-        io.envApprovalPolicy
+        io.envApprovalPolicy,
+        extras?.closedByGate
       );
   }
 

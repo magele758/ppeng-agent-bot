@@ -1,4 +1,5 @@
 // Pure helpers for retry-failed-tests.mjs (unit-tested in scripts/test/flaky-retry-lib.test.mjs).
+import fs from 'node:fs';
 import path from 'node:path';
 
 /** More failing files than this looks like a real breakage, not noise: skip the retry. */
@@ -52,6 +53,22 @@ export function parseFailureLines(text) {
 }
 
 /**
+ * Node reports an absolute real path. On macOS `os.tmpdir()` is under `/var`, which is a symlink
+ * to `/private/var`, so a plain `path.relative` walks out to the filesystem root and the isolated
+ * retry cannot find the file. Realpath both sides, then fall back for synthetic paths in tests.
+ */
+export function failureFileRelativeToRoot(file, root) {
+  if (!path.isAbsolute(file)) return file;
+  try {
+    const rel = path.relative(fs.realpathSync(root), fs.realpathSync(file));
+    if (rel && !rel.startsWith('..') && !path.isAbsolute(rel)) return rel;
+  } catch {
+    /* path does not exist (unit fixtures) or was removed before grouping */
+  }
+  return path.relative(root, file);
+}
+
+/**
  * Group failure events by test file (relative to root). Parent suites that only failed because a
  * subtest failed are dropped from the test names; events without a file are counted as unattributed.
  */
@@ -63,7 +80,7 @@ export function groupFailuresByFile(events, root) {
       unattributed += 1;
       continue;
     }
-    const file = path.isAbsolute(ev.file) ? path.relative(root, ev.file) : ev.file;
+    const file = failureFileRelativeToRoot(ev.file, root);
     if (!byFile.has(file)) byFile.set(file, { file, tests: [] });
     const group = byFile.get(file);
     if (ev.failureType !== 'subtestsFailed' && !group.tests.some((t) => t.name === ev.name)) {

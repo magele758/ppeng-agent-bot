@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  checkToolApprovals,
   DEFAULT_TOOL_RESULT_MAX_CHARS,
   envToolResultMaxChars,
   executeSingleTool,
@@ -9,7 +10,7 @@ import {
   type CompletedWaveItem,
   type ToolLoopHost,
 } from './tool-loop.js';
-import type { RunContext, ToolCallPart, ToolContract } from '../types.js';
+import type { RunContext, SessionRecord, ToolCallPart, ToolContract } from '../types.js';
 
 const ctx = { session: { id: 's1', metadata: {} } } as unknown as RunContext;
 
@@ -216,6 +217,29 @@ describe('executeToolCalls', () => {
     expect(items.map((i) => i.toolCallId)).toEqual(['tc-a', 'tc-b', 'tc-c', 'tc-d']);
   });
 
+  it('marks a rolled-back success as a failure', async () => {
+    const h = host({
+      compensate: async (items) => ({
+        compensated: items.filter((item) => item.tool.name === 'write_file').map((item) => item.toolCallId),
+      }),
+    });
+    const results = await executeToolCalls(
+      h,
+      [
+        tool('write_file', async () => ({ ok: true, content: 'wrote' })),
+        tool('bash', async () => ({ ok: false, content: 'boom' })),
+      ],
+      [call('write_file', { path: 'a.txt' }), call('bash', { command: 'false' })],
+      ctx,
+      false,
+      's1',
+      4
+    );
+    expect(results[0]).toMatchObject({ ok: false });
+    expect(results[0]?.content).toContain('Rolled back');
+    expect(results[1]?.ok).toBe(false);
+  });
+
   it('does not compensate when every result is ok', async () => {
     const compensate = vi.fn(async () => undefined);
     const h = host({ compensate });
@@ -235,6 +259,159 @@ describe('filterValidToolCalls', () => {
     const first = h.appended[0] as { role: string; parts: Array<{ type: string; ok?: boolean }> };
     expect(first.role).toBe('tool');
     expect(first.parts[0]).toMatchObject({ type: 'tool_result', ok: false });
+  });
+});
+
+describe('checkToolApprovals', () => {
+  const session = { id: 's1', metadata: {} } as unknown as SessionRecord;
+  const always = (name: string) =>
+    tool(name, async () => ({ ok: true, content: '' }), { approvalMode: 'always' });
+
+  it('creates one pending approval per call and does not proceed when only one is approved', () => {
+    const approvals: Array<{
+      id: string;
+      sessionId: string;
+      toolName: string;
+      status: 'pending' | 'approved' | 'rejected';
+      idempotencyKey?: string;
+    }> = [];
+    const h = host({
+      listApprovals: (filter) =>
+        approvals.filter((approval) => !filter?.status || approval.status === filter.status) as never,
+      createApproval: (input) => {
+        const row = {
+          id: `ap-${approvals.length + 1}`,
+          sessionId: input.sessionId,
+          toolName: input.toolName,
+          status: 'pending' as const,
+          idempotencyKey: input.idempotencyKey,
+        };
+        approvals.push(row);
+        return row as never;
+      },
+    });
+    const calls = [call('bash', { command: 'ls' }, 'c1'), call('write_file', { path: 'a.txt' }, 'c2')];
+    const tools = [always('bash'), always('write_file')];
+    expect(checkToolApprovals(h, tools, calls, ctx, undefined, session, undefined)).toBe('waiting');
+    expect(approvals.map((approval) => approval.toolName)).toEqual(['bash', 'write_file']);
+
+    approvals[0]!.status = 'approved';
+    expect(checkToolApprovals(h, tools, calls, ctx, undefined, session, undefined)).toBe('waiting');
+    expect(approvals).toHaveLength(2);
+  });
+
+  it('records a rejection and proceeds only for calls that are already approved', () => {
+    const approvals: Array<{
+      id: string;
+      sessionId: string;
+      toolName: string;
+      status: 'pending' | 'approved' | 'rejected';
+      idempotencyKey?: string;
+    }> = [];
+    let lists = 0;
+    const h = host({
+      listApprovals: (filter) => {
+        lists += 1;
+        return approvals.filter((approval) => !filter?.status || approval.status === filter.status) as never;
+      },
+      createApproval: (input) => {
+        const row = {
+          id: `ap-${approvals.length + 1}`,
+          sessionId: input.sessionId,
+          toolName: input.toolName,
+          status: 'pending' as const,
+          idempotencyKey: input.idempotencyKey,
+        };
+        approvals.push(row);
+        return row as never;
+      },
+    });
+    const calls = [call('bash', { command: 'ls' }, 'c1'), call('write_file', { path: 'a.txt' }, 'c2')];
+    const tools = [always('bash'), always('write_file')];
+    const opened = { reported: false, ids: [] as string[] };
+    checkToolApprovals(h, tools, calls, ctx, undefined, session, undefined, opened);
+    expect(lists).toBe(1);
+    expect(opened).toEqual({ reported: true, ids: [] });
+    approvals[0]!.status = 'approved';
+    approvals[1]!.status = 'rejected';
+    const closed = { reported: false, ids: [] as string[] };
+    lists = 0;
+    expect(checkToolApprovals(h, tools, calls, ctx, undefined, session, undefined, closed)).toBe('proceed');
+    expect(lists).toBe(1);
+    expect(closed).toEqual({ reported: true, ids: ['c2'] });
+    expect(approvals).toHaveLength(2);
+    const parts = h.appended.flatMap((entry) => (entry as { parts: Array<{ toolCallId?: string; ok?: boolean; content?: string }> }).parts);
+    expect(parts).toEqual([
+      expect.objectContaining({
+        toolCallId: 'c2',
+        ok: false,
+        content: 'Approval for write_file was rejected.',
+      }),
+    ]);
+  });
+
+  it('reuses the approval key for ask-mode tools whose approvalMode is never', () => {
+    const approvals: Array<{
+      id: string;
+      sessionId: string;
+      toolName: string;
+      status: 'pending' | 'approved' | 'rejected';
+      idempotencyKey?: string;
+    }> = [];
+    const h = host({
+      listApprovals: (filter) =>
+        approvals.filter((approval) => !filter?.status || approval.status === filter.status) as never,
+      createApproval: (input) => {
+        const row = {
+          id: `ap-${approvals.length + 1}`,
+          sessionId: input.sessionId,
+          toolName: input.toolName,
+          status: 'pending' as const,
+          idempotencyKey: input.idempotencyKey,
+        };
+        approvals.push(row);
+        return row as never;
+      },
+    });
+    const ask = { id: 's1', metadata: { permissionMode: 'ask' } } as unknown as SessionRecord;
+    const spill = tool('spill_tool_result', async () => ({ ok: true, content: 'spilled' }), {
+      approvalMode: 'never',
+    });
+    const calls = [call('spill_tool_result', { uri: 'tool-result://1' }, 'spill-1')];
+    expect(checkToolApprovals(h, [spill], calls, ctx, undefined, ask, undefined)).toBe('waiting');
+    expect(approvals).toHaveLength(1);
+    expect(approvals[0]?.idempotencyKey).toBeTruthy();
+
+    approvals[0]!.status = 'approved';
+    const closed = { reported: false, ids: [] as string[] };
+    expect(checkToolApprovals(h, [spill], calls, ctx, undefined, ask, undefined, closed)).toBe('proceed');
+    expect(closed).toEqual({ reported: true, ids: [] });
+    expect(approvals).toHaveLength(1);
+    expect(h.appended).toHaveLength(0);
+  });
+
+  it('writes a result for every call when plan mode blocks one of them', () => {
+    const h = host();
+    const plan = { id: 's1', metadata: { permissionMode: 'plan' } } as unknown as SessionRecord;
+    const tools = [
+      tool('read_file', async () => ({ ok: true, content: 'file' }), { approvalMode: 'never' }),
+      tool('bash', async () => ({ ok: true, content: 'ran' }), { approvalMode: 'always' }),
+    ];
+    const decision = checkToolApprovals(
+      h,
+      tools,
+      [call('read_file', { path: 'a.txt' }, 'read-1'), call('bash', { command: 'rm -rf /' }, 'bash-1')],
+      ctx,
+      undefined,
+      plan,
+      undefined
+    );
+    expect(decision).toBe('skip');
+    const parts = h.appended.flatMap(
+      (entry) => (entry as { parts: Array<{ toolCallId?: string; content?: string }> }).parts
+    );
+    expect(parts.map((part) => part.toolCallId).sort()).toEqual(['bash-1', 'read-1']);
+    expect(parts.find((part) => part.toolCallId === 'read-1')?.content).not.toContain('tool_result_missing');
   });
 });
 

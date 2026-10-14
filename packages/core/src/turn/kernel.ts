@@ -78,6 +78,7 @@ import {
   decideInterruptResume,
   mergeInterruptMetadata,
   unmatchedToolCallsFromFold,
+  selectExecutableToolCalls,
   type RunInterruptState
 } from '../session/interrupt.js';
 import {
@@ -114,7 +115,7 @@ import type {
   SessionRecord,
   TokenUsage
 } from '../types.js';
-import type { TurnKernelHost } from './host.js';
+import type { ToolCallPart, TurnKernelHost } from './host.js';
 import { buildSkillProposeReminder } from '../skill-proposals/reminder.js';
 import {
   defaultWorkspaceRoots,
@@ -238,6 +239,100 @@ function emitDynHydrateTrace(
   });
 }
 
+/** Put a yielded session back into waiting_approval when a decision had cleared it. */
+export function sessionParkedForApproval<T extends { id: string; status: string }>(
+  store: { updateSession(id: string, patch: { status: 'waiting_approval' }): T },
+  session: T
+): T {
+  if (session.status === 'waiting_approval') return session;
+  return store.updateSession(session.id, { status: 'waiting_approval' });
+}
+
+/**
+ * Re-check approvals for a resumed tool wave. Returns the parked session when
+ * the wave is still waiting; otherwise executes whatever the gate left open.
+ */
+export async function continueResumedToolWave(input: {
+  host: TurnKernelHost;
+  agent: AgentSpec;
+  sessionId: string;
+  turn: number;
+  remaining: ToolCallPart[];
+  context: RunContext;
+  filePolicy: Awaited<ReturnType<TurnKernelHost['mergedFilePolicy']>>;
+  allowExternalAiTools: boolean;
+  interrupt: RunInterruptState;
+  writerRunId: string;
+  session: SessionRecord;
+  onModelStreamChunk?: (chunk: ModelStreamChunk) => void;
+  emitStep: (ev: AgentStepEvent) => Promise<void>;
+}): Promise<SessionRecord | undefined> {
+  const { dynHydrated, selectedTools } = await hydrateResolveTurnTools(
+    input.host,
+    input.context.session,
+    input.agent,
+    input.sessionId,
+    queryForDynHydrate(input.host.store.foldMessages(input.sessionId)),
+    0
+  );
+  emitDynHydrateTrace(input.host, input.sessionId, dynHydrated);
+  const closedByGate = { reported: false, ids: [] as string[] };
+  const gate = await input.host.checkToolApprovals(
+    input.remaining,
+    input.context,
+    input.filePolicy,
+    input.context.session,
+    selectedTools.turnTools,
+    closedByGate
+  );
+  if (gate === 'waiting') {
+    const approvalIds = input.host.store
+      .listApprovals({ status: 'pending' })
+      .filter((approval) => approval.sessionId === input.sessionId)
+      .map((approval) => approval.id);
+    const nextInterrupt = createWaitingApprovalInterrupt({
+      toolCallIds: input.remaining.map((call) => call.toolCallId),
+      approvalIds,
+      writerRunId: input.writerRunId,
+      executedToolCallIds: input.interrupt.executedToolCallIds
+    });
+    const current = input.host.store.getSession(input.sessionId) as SessionRecord;
+    return input.host.store.updateSession(input.sessionId, {
+      status: 'waiting_approval',
+      metadata: mergeInterruptMetadata(current.metadata ?? {}, nextInterrupt)
+    });
+  }
+  if (gate === 'skip') return undefined;
+  const allowIds = input.interrupt.toolCallIds.filter(
+    (id) => !input.interrupt.executedToolCallIds.includes(id)
+  );
+  const executable = selectExecutableToolCalls(input.remaining, closedByGate, () =>
+    unmatchedToolCallsFromFold(input.host.store.foldMessages(input.sessionId), allowIds)
+  );
+  if (executable.length === 0) return undefined;
+  const results = await input.host.executeToolCalls(
+    executable,
+    input.context,
+    input.allowExternalAiTools,
+    input.sessionId,
+    selectedTools.turnTools
+  );
+  input.host.processToolResults(
+    results,
+    executable,
+    input.session,
+    input.context.task,
+    input.sessionId,
+    input.onModelStreamChunk
+  );
+  recordDynToolUses(input.host, input.sessionId, input.turn, results, dynHydrated.names);
+  await input.emitStep({
+    type: 'tools_done',
+    results: results.map((result) => ({ ok: result.ok, content: result.content, name: result.name }))
+  });
+  return undefined;
+}
+
 export async function runSessionKernel(
   host: TurnKernelHost,
   sessionId: string,
@@ -258,12 +353,13 @@ export async function runSessionKernel(
     .map((a) => a.id);
   const resumeDecision = decideInterruptResume({ session, pendingApprovalIds });
   if (resumeDecision.action === 'yield_waiting') {
+    const parked = sessionParkedForApproval(host.store, session);
     await options?.latch?.emit({
       type: 'waiting_approval',
       approvalIds: resumeDecision.interrupt.approvalIds,
       interrupt: resumeDecision.interrupt
     });
-    return session;
+    return parked;
   }
   let resumeFromInterrupt: RunInterruptState | undefined =
     resumeDecision.action === 'resume_tools' ? resumeDecision.interrupt : undefined;
@@ -469,28 +565,22 @@ export async function runSessionKernel(
         const sessionOptIn = context.session.metadata?.allowExternalAiTools === true;
         const allowExt = envBool(process.env, 'RAW_AGENT_EXTERNAL_AI_TOOLS', false) && sessionOptIn;
         if (remaining.length > 0) {
-          const { dynHydrated, selectedTools } = await hydrateResolveTurnTools(
+          const parked = await continueResumedToolWave({
             host,
-            context.session,
             agent,
-            sid,
-            queryForDynHydrate(host.store.foldMessages(sid)),
-            0
-          );
-          emitDynHydrateTrace(host, sid, dynHydrated);
-          const results = await host.executeToolCalls(
+            sessionId: sid,
+            turn,
             remaining,
             context,
-            allowExt,
-            sid,
-            selectedTools.turnTools
-          );
-          host.processToolResults(results, remaining, session, task, sid, options?.onModelStreamChunk);
-          recordDynToolUses(host, sid, turn, results, dynHydrated.names);
-          await emitStep({
-            type: 'tools_done',
-            results: results.map((r) => ({ ok: r.ok, content: r.content, name: r.name }))
+            filePolicy,
+            allowExternalAiTools: allowExt,
+            interrupt,
+            writerRunId,
+            session,
+            onModelStreamChunk: options?.onModelStreamChunk,
+            emitStep
           });
+          if (parked) return parked;
         }
         const after = host.store.getSession(sid);
         host.store.updateSession(sid, {
@@ -1188,12 +1278,14 @@ export async function runSessionKernel(
         turnTools
       );
 
+      const closedByGate = { reported: false, ids: [] as string[] };
       const approvalResult = await host.checkToolApprovals(
         validToolCalls,
         context,
         filePolicy,
         session,
-        turnTools
+        turnTools,
+        closedByGate
       );
       if (approvalResult === 'waiting') {
         if (validToolCalls.some((c) => c.name === 'ask_user')) {
@@ -1250,14 +1342,24 @@ export async function runSessionKernel(
         continue;
       }
 
+      const executable = selectExecutableToolCalls(validToolCalls, closedByGate, () =>
+        unmatchedToolCallsFromFold(
+          host.store.foldMessages(sid),
+          validToolCalls.map((call) => call.toolCallId)
+        )
+      );
+      if (executable.length === 0) {
+        continue;
+      }
+
       const results = await host.executeToolCalls(
-        validToolCalls,
+        executable,
         context,
         allowExternalAiTools,
         sid,
         turnTools
       );
-      host.processToolResults(results, validToolCalls, session, task, sid, options?.onModelStreamChunk);
+      host.processToolResults(results, executable, session, task, sid, options?.onModelStreamChunk);
       recordDynToolUses(host, sid, turn, results, dynHydrated.names);
       await emitStep({
         type: 'tools_done',

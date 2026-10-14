@@ -3,7 +3,7 @@
 import { evolutionChipVisible } from '@/lib/evolution-surface';
 import { useI18n, type MessageKey } from '@/lib/i18n';
 import { formatHash } from '@/lib/nav';
-import { overallHealth, type HealthLevel } from '@/lib/ops-health';
+import { countSelfHealBad, overallHealth, type HealthLevel } from '@/lib/ops-health';
 import { useOpsStatus } from './sections/ops/useOpsStatus';
 
 const LEVEL_KEY: Record<HealthLevel, MessageKey> = {
@@ -12,15 +12,16 @@ const LEVEL_KEY: Record<HealthLevel, MessageKey> = {
   fail: 'ops.status.fail'
 };
 
-/** One quiet health chip. Self-heal shows only while it is running. Evolution stays hidden. */
+/** One quiet health chip. Recent self-heal failures lower it; a running job gets its own chip. Evolution stays hidden. */
 export function GlobalStatusBar() {
   const { t } = useI18n();
-  const { status } = useOpsStatus();
+  const { status } = useOpsStatus({ withRuns: true });
   const level = overallHealth({
     reachable: status.reachable,
     ready: status.ready,
     doctor: null,
-    configWarnings: 0
+    configWarnings: 0,
+    selfHealBad: countSelfHealBad(status.selfHealRuns)
   }).level;
   const heal = status.selfHealActive?.length ?? 0;
   const showEvolution = evolutionChipVisible(status.evolution?.activeWorktrees ?? 0);

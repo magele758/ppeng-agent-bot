@@ -45,6 +45,7 @@ import {
   decideInterruptResume,
   mergeInterruptMetadata,
   unmatchedToolCallsFromFold,
+  selectExecutableToolCalls,
   type RunInterruptState,
 } from '../session/interrupt.js';
 import { claimAndApplyInbox } from '../session/apply-claimed-inbox.js';
@@ -85,7 +86,12 @@ import type {
   SessionRecord,
   TokenUsage,
 } from '../types.js';
-import type { AgentStepEvent, KernelStepInfo, TurnKernelHost } from './host.js';
+import type {
+  AgentStepEvent,
+  CheckToolApprovalsExtras,
+  KernelStepInfo,
+  TurnKernelHost,
+} from './host.js';
 
 // ============================================================================
 // Latch interface — minimal subset for the kernel
@@ -143,6 +149,104 @@ function isLastAnswerTurn(turn: number, maxTurns: number, force: boolean): boole
   return force && Number.isFinite(maxTurns) && turn === maxTurns - 1;
 }
 
+type KernelToolCall = Extract<MessagePart, { type: 'tool_call' }>;
+
+function sessionParkedForApproval<T extends { id: string; status: string }>(
+  store: { updateSession(id: string, patch: { status: 'waiting_approval' }): T },
+  session: T
+): T {
+  if (session.status === 'waiting_approval') return session;
+  return store.updateSession(session.id, { status: 'waiting_approval' });
+}
+
+async function continueResumedToolWave(input: {
+  host: TurnKernelHost;
+  sid: string;
+  turn: number;
+  sessionId: string;
+  remaining: KernelToolCall[];
+  context: RunContext;
+  refreshedSession: SessionRecord;
+  filePolicy: CheckToolApprovalsExtras['filePolicy'];
+  interrupt: RunInterruptState;
+  writerRunId: string;
+  pickTurnTools: (
+    sess: SessionRecord,
+    messages: SessionMessage[],
+    systemPromptChars: number,
+    emptyTools: boolean
+  ) => Promise<{ allowExternalAiTools: boolean; resolvedTools: TurnKernelHost['tools'] }>;
+  emitStep: (ev: AgentStepEvent) => Promise<void>;
+  onModelStreamChunk?: (chunk: ModelStreamChunk) => void;
+}): Promise<SessionRecord | undefined> {
+  const folded = input.host.store.foldMessages(input.sid);
+  const picked = await input.pickTurnTools(input.context.session, folded, 0, false);
+  const closedByGate = { reported: false, ids: [] as string[] };
+  const gate = await input.host.checkToolApprovals?.(
+    input.remaining,
+    input.context,
+    input.refreshedSession,
+    {
+      filePolicy: input.filePolicy,
+      turnTools: picked.resolvedTools,
+      closedByGate,
+    }
+  );
+  if (gate === 'waiting') {
+    const approvalIds = input.host.store
+      .listApprovals({ status: 'pending' })
+      .filter((approval) => approval.sessionId === input.sid)
+      .map((approval) => approval.id);
+    const nextInterrupt = createWaitingApprovalInterrupt({
+      toolCallIds: input.remaining.map((call) => call.toolCallId),
+      approvalIds,
+      writerRunId: input.writerRunId,
+      executedToolCallIds: input.interrupt.executedToolCallIds,
+    });
+    const current = input.host.store.getSession(input.sid) as SessionRecord;
+    return input.host.store.updateSession(input.sid, {
+      status: 'waiting_approval',
+      metadata: mergeInterruptMetadata(current.metadata ?? {}, nextInterrupt),
+    });
+  }
+  if (gate === 'skip') return undefined;
+  const allowIds = input.interrupt.toolCallIds.filter(
+    (id) => !input.interrupt.executedToolCallIds.includes(id)
+  );
+  const executable = selectExecutableToolCalls(input.remaining, closedByGate, () =>
+    unmatchedToolCallsFromFold(input.host.store.foldMessages(input.sid), allowIds)
+  );
+  if (executable.length === 0) return undefined;
+  const results = await input.host.executeToolCalls(
+    executable,
+    input.context,
+    picked.allowExternalAiTools,
+    input.sessionId,
+    picked.resolvedTools
+  );
+  input.host.processToolResults(
+    results,
+    executable,
+    input.context.session,
+    undefined,
+    input.sessionId,
+    input.onModelStreamChunk
+  );
+  results.forEach((result) => {
+    input.host.recordToolUse?.({
+      name: result.name,
+      sessionId: input.sid,
+      turn: input.turn,
+      ok: result.ok,
+    });
+  });
+  await input.emitStep({
+    type: 'tools_done',
+    results: results.map((result) => ({ ok: result.ok, content: result.content, name: result.name })),
+  });
+  return undefined;
+}
+
 // ============================================================================
 // Main kernel
 // ============================================================================
@@ -164,11 +268,12 @@ export async function runSessionKernel(
     .map((a) => a.id);
   const resumeDecision = decideInterruptResume({ session, pendingApprovalIds });
   if (resumeDecision.action === 'yield_waiting') {
+    const parked = sessionParkedForApproval(host.store, session);
     await options?.latch?.emit({
       type: 'waiting_approval',
       approvalIds: resumeDecision.interrupt.approvalIds,
     });
-    return session;
+    return parked;
   }
   let resumeFromInterrupt: RunInterruptState | undefined =
     resumeDecision.action === 'resume_tools' ? resumeDecision.interrupt : undefined;
@@ -529,27 +634,27 @@ export async function runSessionKernel(
         );
 
         if (remaining.length > 0) {
-          const folded = host.store.foldMessages(sid);
-          const picked = await pickTurnTools(context.session, folded, 0, false);
-          const results = await host.executeToolCalls(
+          const parked = await continueResumedToolWave({
+            host,
+            sid,
+            turn,
+            sessionId,
             remaining,
             context,
-            picked.allowExternalAiTools,
-            sessionId,
-            picked.resolvedTools
-          );
-          host.processToolResults(results, remaining, context.session, undefined, sessionId, options?.onModelStreamChunk);
-          for (const r of results) {
-            host.recordToolUse?.({ name: r.name, sessionId: sid, turn, ok: r.ok });
-          }
-          await emitStep({
-            type: 'tools_done',
-            results: results.map((r) => ({ ok: r.ok, content: r.content, name: r.name })),
+            refreshedSession,
+            filePolicy,
+            interrupt,
+            writerRunId,
+            pickTurnTools,
+            emitStep,
+            onModelStreamChunk: options?.onModelStreamChunk,
           });
+          if (parked) return parked;
         }
 
+        const afterResume = host.store.getSession(sid);
         host.store.updateSession(sid, {
-          metadata: mergeInterruptMetadata(context.session.metadata ?? {}, null),
+          metadata: mergeInterruptMetadata(afterResume?.metadata ?? {}, null),
         });
         continue;
       }
@@ -1210,10 +1315,12 @@ export async function runSessionKernel(
         return finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'abort');
       }
 
+      const closedByGate = { reported: false, ids: [] as string[] };
       const approvalResult =
         (await host.checkToolApprovals?.(toolCalls, context, session, {
           filePolicy,
           turnTools: resolvedTools,
+          closedByGate,
         })) ?? 'proceed';
       const hostLatch = loopConfig.hitlLatch
         ? await host.shouldLatchBeforeTools?.({ session, toolCalls })
@@ -1293,16 +1400,26 @@ export async function runSessionKernel(
         }
       }
 
+      const executable = selectExecutableToolCalls(toolCalls, closedByGate, () =>
+        unmatchedToolCallsFromFold(
+          host.store.foldMessages(sid),
+          toolCalls.map((call) => call.toolCallId)
+        )
+      );
+      if (executable.length === 0) {
+        continue;
+      }
+
       const toolsStep = stepInfo(turn, 'tools_done');
       await host.stepTx?.beginStep?.(toolsStep);
       const results = await host.executeToolCalls(
-        toolCalls,
+        executable,
         context,
         allowExternalAiTools,
         sid,
         resolvedTools
       );
-      host.processToolResults(results, toolCalls, context.session, undefined, sid, options?.onModelStreamChunk);
+      host.processToolResults(results, executable, context.session, undefined, sid, options?.onModelStreamChunk);
       for (const r of results) {
         host.recordToolUse?.({ name: r.name, sessionId: sid, turn, ok: r.ok });
       }

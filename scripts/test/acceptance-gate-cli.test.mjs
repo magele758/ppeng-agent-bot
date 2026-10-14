@@ -100,6 +100,21 @@ test('CLI cannot evaluate: missing / empty / non-JUnit results and bad args exit
   }
 });
 
+test('CLI ignores acceptance tags copied into self-heal and evolution worktrees [AC:acceptance-gate#AC-8]', () => {
+  const root = fixtureRepo({
+    '.agent-state/workspaces/self-heal-x/apps/web-console/lib/ops-health.test.ts': `test('stale ${tag('AC-1')}', () => {});\n`,
+    '.evolution-worktrees/old/e2e/ops.spec.ts': `test('stale e2e ${tag('AC-1')}', () => {});\n`,
+  });
+  try {
+    const r = runGate(root);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.doesNotMatch(r.stdout, /\.agent-state/);
+    assert.doesNotMatch(r.stdout, /\.evolution-worktrees/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('CLI fails when tags live in a file no test runner executes [AC:acceptance-gate#AC-6]', () => {
   const root = fixtureRepo({ 'other/test/forgotten.test.mjs': `test('x ${tag('AC-1')}', () => {});\n` });
   try {

@@ -145,8 +145,12 @@ export interface ToolLoopHost {
   /** Scrub secrets from shell-like tool output before archiving/truncating. */
   redactSecrets?(content: string): string;
 
-  /** Wave-level LIFO compensation: called when any result in the wave is !ok. */
-  compensate?(items: CompletedWaveItem[]): Promise<void>;
+  /**
+   * Wave-level LIFO compensation: called when any result in the wave is !ok.
+   * Return the tool-call ids whose side effects were undone so the wave
+   * results can stop claiming those calls succeeded.
+   */
+  compensate?(items: CompletedWaveItem[]): Promise<{ compensated: string[] } | void>;
 
   /**
    * Per-tool span/metric export, invoked inside `executeSingleTool` right after
@@ -272,6 +276,12 @@ export function filterValidToolCalls(
 // Approval check
 // ============================================================================
 
+/** Filled by the gate so a later turn can skip closed calls without folding. */
+export interface ApprovalClosureReport {
+  reported: boolean;
+  ids: string[];
+}
+
 export function checkToolApprovals(
   host: ToolLoopHost,
   tools: ToolContract<Record<string, unknown>>[],
@@ -279,8 +289,10 @@ export function checkToolApprovals(
   context: RunContext,
   filePolicy: FileApprovalPolicy | undefined,
   session: SessionRecord,
-  envApprovalPolicy: ApprovalPolicy | undefined
+  envApprovalPolicy: ApprovalPolicy | undefined,
+  closure?: ApprovalClosureReport
 ): 'waiting' | 'skip' | 'proceed' {
+  if (closure) closure.reported = true;
   const policy = envApprovalPolicy ?? contextHasApprovalPolicy(context);
   const sid = session.id;
   const permissionMode = resolvePermissionMode(session.metadata, host.env);
@@ -311,76 +323,120 @@ export function checkToolApprovals(
     return tool.approvalMode === 'auto' && tool.needsApproval?.(context, toolCall.input) === true;
   };
 
+  const denied: Array<{ tc: ToolCallPart; detail: string; code: string }> = [];
   for (const tc of validToolCalls) {
     const tool = findToolByName(tools, tc.name);
     if (!tool) continue;
     const modeGate = applyPermissionModeGate(permissionMode, tool.name, tool.approvalMode);
     if (modeGate?.action === 'deny') {
-      const detail = `${modeGate.reason}\nremediation: ${modeGate.remediation}`;
-      host.appendMessage(sid, 'tool', [
-        {
-          type: 'tool_result',
-          toolCallId: tc.toolCallId,
-          name: tc.name,
-          ok: false,
-          content: detail,
-          problem: toolInfraProblem(tc.name, tc.toolCallId, modeGate.code, detail, {
-            title: 'Blocked by permission mode',
-            status: 403,
-          }),
-        },
-      ]);
-      return 'skip';
+      denied.push({
+        tc,
+        detail: `${modeGate.reason}\nremediation: ${modeGate.remediation}`,
+        code: modeGate.code,
+      });
     }
   }
-
-  const pendingApproval = validToolCalls.find((tc) => {
-    const t = findToolByName(tools, tc.name);
-    return t ? needsApproval(t, tc) : false;
-  });
-
-  if (!pendingApproval) return 'proceed';
-
-  const tool = findToolByName(tools, pendingApproval.name);
-  if (!tool) {
-    host.appendMessage(sid, 'tool', [
-      {
-        type: 'tool_result',
-        toolCallId: pendingApproval.toolCallId,
-        name: pendingApproval.name,
-        ok: false,
-        content: `Unknown tool ${pendingApproval.name}`,
-        problem: toolInfraProblem(
-          pendingApproval.name,
-          pendingApproval.toolCallId,
-          'UNKNOWN_TOOL',
-          `No tool definition matches name ${pendingApproval.name}.`,
-          { title: 'Unknown tool', status: 404 }
-        ),
-      },
-    ]);
+  if (denied.length > 0) {
+    const deniedIds = new Set(denied.map((item) => item.tc.toolCallId));
+    for (const item of denied) {
+      appendApprovalToolResult(host, sid, item.tc, item.detail, {
+        title: 'Blocked by permission mode',
+        code: item.code,
+        status: 403,
+      });
+    }
+    for (const tc of validToolCalls) {
+      if (deniedIds.has(tc.toolCallId)) continue;
+      appendApprovalToolResult(
+        host,
+        sid,
+        tc,
+        'Not executed: another tool in the same wave was blocked by permission mode.',
+        { title: 'Not executed', code: 'WAVE_BLOCKED', status: 403 }
+      );
+    }
     return 'skip';
   }
 
-  const idemKey =
-    tool.approvalMode !== 'never' ? stableJsonHash(tool.name, pendingApproval.input) : undefined;
-  const existingApproved = idemKey
-    ? host
-        .listApprovals({ status: 'approved' })
-        .find((a) => a.sessionId === sid && a.idempotencyKey === idemKey)
-    : undefined;
-
-  if (!existingApproved) {
+  let waiting = false;
+  let sessionApprovals: Map<string, ApprovalRecord> | undefined;
+  const approvalFor = (idemKey: string): ApprovalRecord | undefined => {
+    sessionApprovals ??= approvalIndexForSession(host, sid);
+    return sessionApprovals.get(idemKey);
+  };
+  for (const tc of validToolCalls) {
+    const tool = findToolByName(tools, tc.name);
+    if (!tool || !needsApproval(tool, tc)) continue;
+    const idemKey = stableJsonHash(tool.name, tc.input);
+    const existing = approvalFor(idemKey);
+    if (existing?.status === 'approved') continue;
+    if (existing?.status === 'rejected') {
+      closure?.ids.push(tc.toolCallId);
+      appendApprovalToolResult(
+        host,
+        sid,
+        tc,
+        `Approval for ${tool.name} was rejected.`,
+        { title: 'Approval rejected', code: 'APPROVAL_REJECTED', status: 403 }
+      );
+      continue;
+    }
+    if (existing?.status === 'pending') {
+      waiting = true;
+      continue;
+    }
     host.createApproval({
       sessionId: sid,
       toolName: tool.name,
       reason: `Approval required for ${tool.name} (permissionMode=${permissionMode})`,
-      args: pendingApproval.input,
+      args: tc.input,
       idempotencyKey: idemKey,
     });
-    return 'waiting';
+    waiting = true;
   }
-  return 'proceed';
+  return waiting ? 'waiting' : 'proceed';
+}
+
+function appendApprovalToolResult(
+  host: ToolLoopHost,
+  sessionId: string,
+  tc: ToolCallPart,
+  content: string,
+  problem: { title: string; code: string; status: number }
+): void {
+  host.appendMessage(sessionId, 'tool', [
+    {
+      type: 'tool_result',
+      toolCallId: tc.toolCallId,
+      name: tc.name,
+      ok: false,
+      content,
+      problem: toolInfraProblem(tc.name, tc.toolCallId, problem.code, content, {
+        title: problem.title,
+        status: problem.status,
+      }),
+    },
+  ]);
+}
+
+const APPROVAL_RANK: Record<ApprovalRecord['status'], number> = {
+  approved: 0,
+  pending: 1,
+  rejected: 2,
+};
+
+/** One scan per wave. Rejected wins over a stale pending or approved row with the same key. */
+function approvalIndexForSession(
+  host: ToolLoopHost,
+  sessionId: string
+): Map<string, ApprovalRecord> {
+  const index = new Map<string, ApprovalRecord>();
+  for (const row of host.listApprovals()) {
+    if (row.sessionId !== sessionId || !row.idempotencyKey) continue;
+    const prev = index.get(row.idempotencyKey);
+    if (!prev || APPROVAL_RANK[row.status] >= APPROVAL_RANK[prev.status]) index.set(row.idempotencyKey, row);
+  }
+  return index;
 }
 
 // ============================================================================
@@ -657,7 +713,13 @@ export async function executeToolCalls(
   }
 
   if ((results.some((r) => !r.ok) || context.abortSignal?.aborted) && host.compensate) {
-    await host.compensate(completed);
+    const report = await host.compensate(completed);
+    const rolledBack = new Set(report?.compensated ?? []);
+    for (const result of results) {
+      if (!result.ok || !rolledBack.has(result.toolCallId)) continue;
+      result.ok = false;
+      result.content = `${result.content}\n\nRolled back: a later tool in this wave failed, so this change was undone.`;
+    }
   }
 
   return results;

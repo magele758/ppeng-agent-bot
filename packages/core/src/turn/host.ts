@@ -134,7 +134,8 @@ export interface TurnKernelHost {
     context: RunContext,
     filePolicy: FileApprovalPolicy | undefined,
     session: SessionRecord,
-    turnTools?: ToolContract<any>[]
+    turnTools?: ToolContract<any>[],
+    closedByGate?: { reported: boolean; ids: string[] }
   ): 'waiting' | 'skip' | 'proceed' | Promise<'waiting' | 'skip' | 'proceed'>;
   executeToolCalls(
     validToolCalls: ToolCallPart[],

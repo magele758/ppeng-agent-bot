@@ -188,9 +188,7 @@ function hostFromDeps(deps: ToolLoopDeps): ToolLoopHost {
         onCreated: deps.onArtifactCreated
       }),
     redactSecrets: (content) => redactToolContent(content, process.env),
-    compensate: async (items) => {
-      await compensateCompletedLifo(items);
-    }
+    compensate: (items) => compensateCompletedLifo(items)
   };
 }
 
@@ -296,8 +294,10 @@ export function checkToolApprovals(
   context: RunContext,
   filePolicy: FileApprovalPolicy | undefined,
   session: SessionRecord,
-  turnTools?: ToolContract<any>[]
+  turnTools?: ToolContract<any>[],
+  closure?: { reported: boolean; ids: string[] }
 ): 'waiting' | 'skip' | 'proceed' {
+  if (closure) closure.reported = true;
   if (refuseHardlineToolCalls(deps, validToolCalls, session)) return 'skip';
   return checkToolApprovalsA(
     hostFromDeps(deps),
@@ -306,7 +306,8 @@ export function checkToolApprovals(
     context,
     adaptFilePolicy(filePolicy),
     session,
-    deps.envApprovalPolicy
+    deps.envApprovalPolicy,
+    closure
   );
 }
 
@@ -318,8 +319,10 @@ export function checkToolApprovalsForLoop(
   filePolicy: LoopFilePolicy | undefined,
   session: SessionRecord,
   turnTools: ToolContract<any>[] | undefined,
-  envApprovalPolicy: ToolLoopDeps['envApprovalPolicy']
+  envApprovalPolicy: ToolLoopDeps['envApprovalPolicy'],
+  closure?: { reported: boolean; ids: string[] }
 ): 'waiting' | 'skip' | 'proceed' {
+  if (closure) closure.reported = true;
   if (refuseHardlineToolCalls(deps, validToolCalls, session)) return 'skip';
   return checkToolApprovalsA(
     hostFromDeps(deps),
@@ -328,7 +331,8 @@ export function checkToolApprovalsForLoop(
     context,
     filePolicy,
     session,
-    envApprovalPolicy
+    envApprovalPolicy,
+    closure
   );
 }
 

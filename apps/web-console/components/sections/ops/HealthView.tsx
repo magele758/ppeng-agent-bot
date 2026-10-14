@@ -6,6 +6,7 @@ import { useI18n, type MessageKey } from '@/lib/i18n';
 import { attentionItems, type EffectiveConfigPayload } from '@/lib/effective-config';
 import {
   activityState,
+  countSelfHealBad,
   overallHealth,
   selfHealTone,
   type DoctorReportLike,
@@ -39,7 +40,7 @@ const SELF_HEAL_STATUS_KEY: Record<string, MessageKey> = {
 
 function reasonText(
   reason: HealthReason,
-  counts: { doctorFail: number; doctorWarn: number; configWarn: number },
+  counts: { doctorFail: number; doctorWarn: number; configWarn: number; selfHealBad: number },
   t: (key: MessageKey, vars?: Record<string, string | number>) => string
 ): string {
   switch (reason) {
@@ -51,6 +52,8 @@ function reasonText(
       return t('ops.health.reasonDoctorFail', { n: counts.doctorFail });
     case 'doctorWarn':
       return t('ops.health.reasonDoctorWarn', { n: counts.doctorWarn });
+    case 'selfHealBad':
+      return t('ops.health.reasonSelfHealBad', { n: counts.selfHealBad });
     case 'configWarn':
       return t('ops.health.reasonConfigWarn', { n: counts.configWarn });
     default: {
@@ -130,26 +133,29 @@ export function HealthView() {
   const onDoctor = useCallback((report: DoctorReportLike | null) => setDoctor(report), []);
 
   const configWarnings = config ? attentionItems(config.items).length : 0;
+  const selfHealBad = countSelfHealBad(status.selfHealRuns);
   const verdict = overallHealth({
     reachable: status.reachable,
     ready: status.ready,
     doctor,
-    configWarnings
+    configWarnings,
+    selfHealBad
   });
   const level = verdict.level;
 
   const heal = status.selfHealActive?.length ?? 0;
   const showEvolution = evolutionEntryVisible();
   const evo = status.evolution?.activeWorktrees ?? 0;
-  const healBad = (status.selfHealRuns ?? []).some((r) => selfHealTone(r.status) === 'bad') && heal === 0;
+  const healBad = selfHealBad > 0 && heal === 0;
 
   const counts = useMemo(
     () => ({
       doctorFail: doctor?.summary.fail ?? 0,
       doctorWarn: doctor?.summary.warn ?? 0,
-      configWarn: configWarnings
+      configWarn: configWarnings,
+      selfHealBad
     }),
-    [doctor, configWarnings]
+    [doctor, configWarnings, selfHealBad]
   );
 
   const serviceHeadline = !status.loaded
@@ -236,6 +242,9 @@ export function HealthView() {
                 : t('ops.health.selfHealIdle')
           }
         >
+          {selfHealBad > 0 ? (
+            <div className="ops-run__note">{t('ops.health.selfHealRecentBad', { n: selfHealBad })}</div>
+          ) : null}
           {status.selfHealRuns ? <SelfHealRuns runs={status.selfHealRuns} /> : null}
         </StatusCard>
 

@@ -81,7 +81,8 @@ export function adaptCoreHostToAgentLoop(core: CoreHost): LoopHost {
         context,
         extras?.filePolicy as Parameters<CoreHost['checkToolApprovals']>[2],
         session,
-        extras?.turnTools
+        extras?.turnTools,
+        extras?.closedByGate
       ),
 
     resolveImageDataUrl: core.resolveImageDataUrl

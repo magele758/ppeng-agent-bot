@@ -189,12 +189,18 @@ test.describe('Self-heal consistency', () => {
     await expect(filters.getByTestId('status-filter-completed')).toContainText('1');
   });
 
-  test('a finished-but-failed history with nothing running reads as idle, not running [AC:ops-console#AC-1]', async ({ page }) => {
+  test('a finished-but-failed history stays idle and the banner does not say all clear [AC:ops-console#AC-1] [AC:ops-console#AC-10]', async ({ page }) => {
     await mockHome(page, { 'self-heal/runs': { runs: runs.slice(1, 3) } });
     await page.goto('/#/ops/health');
     const card = page.getByTestId('ops-card-selfheal');
     await expect(card).toContainText('空闲 · 没有进行中的修复');
     await expect(card).not.toContainText('运行中');
+    await expect(card).toContainText('最近 2 次修复失败或阻塞。');
+    const overall = page.getByTestId('ops-overall');
+    await expect(overall).toHaveAttribute('data-level', 'warn');
+    await expect(overall).toContainText('需要关注');
+    await expect(overall).not.toContainText('一切正常');
+    await expect(page.locator('.global-status__chip').first()).toContainText('需要关注');
   });
 });
 

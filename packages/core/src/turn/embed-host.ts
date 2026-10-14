@@ -295,8 +295,8 @@ export function createEmbedTurnHost(
     filterValidToolCalls(toolCalls: ToolCallPart[], allowExternalAiTools, sessionId, turnTools) {
       return filterValidToolCalls(toolLoopDeps, toolCalls, allowExternalAiTools, sessionId, turnTools);
     },
-    checkToolApprovals(validToolCalls, context, filePolicy, session, turnTools) {
-      return checkToolApprovals(toolLoopDeps, validToolCalls, context, filePolicy, session, turnTools);
+    checkToolApprovals(validToolCalls, context, filePolicy, session, turnTools, closure) {
+      return checkToolApprovals(toolLoopDeps, validToolCalls, context, filePolicy, session, turnTools, closure);
     },
     executeToolCalls(validToolCalls, context, allowExternalAiTools, sessionId, turnTools) {
       return executeToolCalls(

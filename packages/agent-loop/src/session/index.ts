@@ -69,8 +69,10 @@ export {
   parseRunInterrupt,
   mergeInterruptMetadata,
   unmatchedToolCallsFromFold,
+  selectExecutableToolCalls,
   INTERRUPT_METADATA_KEY
 } from './interrupt.js';
+export type { ToolCallClosure } from './interrupt.js';
 export type { RunInterruptState, InterruptResumeAction } from './interrupt.js';
 
 export {
