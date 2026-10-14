@@ -1328,16 +1328,24 @@ export async function runSessionKernel(
         }
       }
 
+      const executable = unmatchedToolCallsFromFold(
+        host.store.foldMessages(sid),
+        toolCalls.map((call) => call.toolCallId)
+      );
+      if (executable.length === 0) {
+        continue;
+      }
+
       const toolsStep = stepInfo(turn, 'tools_done');
       await host.stepTx?.beginStep?.(toolsStep);
       const results = await host.executeToolCalls(
-        toolCalls,
+        executable,
         context,
         allowExternalAiTools,
         sid,
         resolvedTools
       );
-      host.processToolResults(results, toolCalls, context.session, undefined, sid, options?.onModelStreamChunk);
+      host.processToolResults(results, executable, context.session, undefined, sid, options?.onModelStreamChunk);
       for (const r of results) {
         host.recordToolUse?.({ name: r.name, sessionId: sid, turn, ok: r.ok });
       }

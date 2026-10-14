@@ -340,6 +340,44 @@ describe('checkToolApprovals', () => {
     ]);
   });
 
+  it('reuses the approval key for ask-mode tools whose approvalMode is never', () => {
+    const approvals: Array<{
+      id: string;
+      sessionId: string;
+      toolName: string;
+      status: 'pending' | 'approved' | 'rejected';
+      idempotencyKey?: string;
+    }> = [];
+    const h = host({
+      listApprovals: (filter) =>
+        approvals.filter((approval) => !filter?.status || approval.status === filter.status) as never,
+      createApproval: (input) => {
+        const row = {
+          id: `ap-${approvals.length + 1}`,
+          sessionId: input.sessionId,
+          toolName: input.toolName,
+          status: 'pending' as const,
+          idempotencyKey: input.idempotencyKey,
+        };
+        approvals.push(row);
+        return row as never;
+      },
+    });
+    const ask = { id: 's1', metadata: { permissionMode: 'ask' } } as unknown as SessionRecord;
+    const spill = tool('spill_tool_result', async () => ({ ok: true, content: 'spilled' }), {
+      approvalMode: 'never',
+    });
+    const calls = [call('spill_tool_result', { uri: 'tool-result://1' }, 'spill-1')];
+    expect(checkToolApprovals(h, [spill], calls, ctx, undefined, ask, undefined)).toBe('waiting');
+    expect(approvals).toHaveLength(1);
+    expect(approvals[0]?.idempotencyKey).toBeTruthy();
+
+    approvals[0]!.status = 'approved';
+    expect(checkToolApprovals(h, [spill], calls, ctx, undefined, ask, undefined)).toBe('proceed');
+    expect(approvals).toHaveLength(1);
+    expect(h.appended).toHaveLength(0);
+  });
+
   it('writes a result for every call when plan mode blocks one of them', () => {
     const h = host();
     const plan = { id: 's1', metadata: { permissionMode: 'plan' } } as unknown as SessionRecord;

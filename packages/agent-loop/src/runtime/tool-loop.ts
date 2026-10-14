@@ -354,7 +354,7 @@ export function checkToolApprovals(
   for (const tc of validToolCalls) {
     const tool = findToolByName(tools, tc.name);
     if (!tool || !needsApproval(tool, tc)) continue;
-    const idemKey = tool.approvalMode !== 'never' ? stableJsonHash(tool.name, tc.input) : undefined;
+    const idemKey = stableJsonHash(tool.name, tc.input);
     const existing = findApprovalForCall(host, sid, idemKey);
     if (existing?.status === 'approved') continue;
     if (existing?.status === 'rejected') {

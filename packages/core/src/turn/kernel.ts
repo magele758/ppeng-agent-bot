@@ -1286,14 +1286,22 @@ export async function runSessionKernel(
         continue;
       }
 
+      const executable = unmatchedToolCallsFromFold(
+        host.store.foldMessages(sid),
+        validToolCalls.map((call) => call.toolCallId)
+      );
+      if (executable.length === 0) {
+        continue;
+      }
+
       const results = await host.executeToolCalls(
-        validToolCalls,
+        executable,
         context,
         allowExternalAiTools,
         sid,
         turnTools
       );
-      host.processToolResults(results, validToolCalls, session, task, sid, options?.onModelStreamChunk);
+      host.processToolResults(results, executable, session, task, sid, options?.onModelStreamChunk);
       recordDynToolUses(host, sid, turn, results, dynHydrated.names);
       await emitStep({
         type: 'tools_done',

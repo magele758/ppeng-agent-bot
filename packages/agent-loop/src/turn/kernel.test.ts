@@ -751,6 +751,60 @@ describe('runSessionKernel wiring', () => {
     expect(seen.names).toEqual(['dyn_echo']);
   });
 
+  it('does not execute a repeated call the approval gate already closed on a normal turn', async () => {
+    const executed: string[] = [];
+    let live: TurnKernelStore | undefined;
+    let turns = 0;
+    const { host, session, store } = createHarness({
+      model: () => {
+        turns += 1;
+        if (turns === 1) {
+          return {
+            stopReason: 'tool_use',
+            assistantParts: [
+              { type: 'tool_call', toolCallId: 'nope', name: 'echo', input: { n: 1 } },
+              { type: 'tool_call', toolCallId: 'yes', name: 'echo', input: { n: 2 } },
+            ],
+          };
+        }
+        return textResult('done');
+      },
+      host: {
+        checkToolApprovals: (calls, _ctx, current) => {
+          const rejected = calls.filter((call) => call.toolCallId === 'nope');
+          live?.appendMessage(
+            current.id,
+            'tool',
+            rejected.map((call) => ({
+              type: 'tool_result' as const,
+              toolCallId: call.toolCallId,
+              name: call.name,
+              ok: false,
+              content: 'Approval was rejected.',
+            }))
+          );
+          return 'proceed';
+        },
+        executeToolCalls: async (calls) => {
+          executed.push(...calls.map((call) => call.toolCallId));
+          return calls.map((call) => ({
+            toolCallId: call.toolCallId,
+            name: call.name,
+            ok: true,
+            content: 'ran',
+          }));
+        },
+      },
+    });
+    live = store;
+    await runSessionKernel(host, session.id);
+    expect(executed).toEqual(['yes']);
+    const results = store.foldMessages(session.id).flatMap((message) =>
+      message.parts.filter((part) => part.type === 'tool_result' && part.toolCallId === 'nope')
+    );
+    expect(results).toHaveLength(1);
+  });
+
   it('does not execute a tool the approval gate already closed', async () => {
     const executed: string[] = [];
     let live: TurnKernelStore | undefined;
