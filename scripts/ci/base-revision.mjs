@@ -7,12 +7,19 @@ export function git(root, args) {
   return result.stdout.trimEnd();
 }
 
-export function baseRevision(root) {
+export function baseRevision(root, env = process.env) {
   // Fixture roots without a Git repository have no historical obligations.
   try { git(root, ['rev-parse', '--show-toplevel']); } catch { return null; }
-  const base = git(root, ['merge-base', 'HEAD', 'origin/main']);
+  // workflow_call retains the caller's event, including the full push range.
+  const eventBase = env.GITHUB_EVENT_NAME === 'push' ? env.CI_PUSH_BEFORE
+    : env.GITHUB_EVENT_NAME === 'pull_request' ? env.CI_PR_BASE_SHA : null;
+  if (eventBase && !/^0+$/.test(eventBase)) {
+    try { return git(root, ['rev-parse', '--verify', '--end-of-options', `${eventBase}^{commit}`]); } catch { /* Use the fallback when unavailable. */ }
+  }
+  let base;
+  try { base = git(root, ['merge-base', 'HEAD', 'origin/main']); } catch { /* Fall back to the parent. */ }
   // On main itself, compare with its parent so a same-commit relaxation is visible.
-  return base === git(root, ['rev-parse', 'HEAD']) ? git(root, ['rev-parse', 'HEAD^']) : base;
+  return !base || base === git(root, ['rev-parse', 'HEAD']) ? git(root, ['rev-parse', 'HEAD^']) : base;
 }
 
 export function compareAcceptance(base, current) {

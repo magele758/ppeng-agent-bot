@@ -23,6 +23,11 @@ on:
 permissions:
   contents: read
 
+# workflow_call inherits the caller's event; share its base with all gate scripts.
+env:
+  CI_PUSH_BEFORE: ${{ github.event.before }}
+  CI_PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+
 jobs:
   tests:
     name: Build, unit tests, HTTP regression, E2E
@@ -264,8 +269,7 @@ jobs:
       - name: Resolve comparison base
         id: base
         run: |
-          base=$(git merge-base HEAD origin/main)
-          if [ "$base" = "$(git rev-parse HEAD)" ]; then base=$(git rev-parse HEAD^); fi
+          base=$(node --input-type=module -e 'import { baseRevision } from "./scripts/ci/base-revision.mjs"; console.log(baseRevision(process.cwd()));')
           echo "ref=$base" >> "$GITHUB_OUTPUT"
       - name: Detect RAW_AGENT_API_KEY
         id: check

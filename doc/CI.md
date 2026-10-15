@@ -40,6 +40,8 @@ regression / integration 不重试（单 daemon 有状态流程，重跑会掩�
 
 Main release gate 对 mutation、真模型 smoke 和 compaction A/B 保持阻断；缺密钥的可选模型检查可跳过，实际失败或取消会阻断。Harness 暂为非阻断诊断：仍等待并在日志和 step summary 报告真实结果，独立 Harness 工作流继续保留失败状态和证据，不伪装成质量通过。starter 仅有 12 个案例，少于要求的 30 个；在具备符合要求的实验前，将它作为 Main 阻断项会导致有密钥时永久失败。质量阈值不降低、不复制案例凑数；待合格实验就绪后再恢复 Main 的阻断规则与对应测试。
 
+必需的 mutation Job 若被跳过，会有意使 Main release gate 失败（fail-closed）。
+
 验收门禁对比 Git 基线，拒绝已批准标准降级、退休或删除。CRAP 同样读取基线版本的债务记录，拒绝候选版本放宽基线；新增扫描的 web-console 既有债务仅从基线源码推导，零覆盖率债务不享受任何宽限。CI checkout 获取完整历史；本地需要 origin/main。
 
 ### 门禁健康报告
