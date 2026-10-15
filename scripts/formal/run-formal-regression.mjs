@@ -4,9 +4,11 @@
  * Does NOT run TLC. Passing is not a formal proof.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { checkTla } from './tla-sanity.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -48,6 +50,13 @@ const tlaDir = join(ROOT, 'specs/formal/tla');
 const tla = readdirSync(tlaDir).filter((n) => n.endsWith('.tla'));
 if (tla.length < 3) fail(`expected >=3 TLA drafts, got ${tla.length}`);
 
+for (const file of tla) {
+  const cfg = join(tlaDir, file.replace(/\.tla$/, '.cfg'));
+  if (!existsSync(cfg)) fail('missing cfg: ' + cfg);
+  const errors = checkTla(file.slice(0, -4), readFileSync(join(tlaDir, file), 'utf8'), readFileSync(cfg, 'utf8'));
+  if (errors.length) fail(errors.join('; '));
+  console.log('  ✓ structural sanity ' + file);
+}
 const start = Date.now();
 const res = spawnSync(
   process.execPath,

@@ -395,7 +395,7 @@ test('results: skipped/todo or never-run tagged tests do not count [AC:acceptanc
 
 test('results: a retried test that eventually passed counts as passed [AC:acceptance-gate#AC-2]', () => {
   const title = `flaky ${tag('demo', 'AC-1')}`;
-  assert.deepEqual(dedupeResults([result(title, 'failed'), result(title, 'passed')]).map((r) => r.outcome), ['passed']);
+  assert.deepEqual(dedupeResults([result(title, 'failed'), result(title, 'passed')]).map((r) => r.outcome), ['failed']);
   assert.deepEqual(dedupeResults([result(title, 'skipped'), result(title, 'failed')]).map((r) => r.outcome), ['failed']);
   assert.deepEqual(dedupeResults([result(title, 'failed'), result(title, 'skipped')]).map((r) => r.outcome), ['failed']);
   assert.equal(dedupeResults([result(title, 'passed', 'a.xml'), result(title, 'failed', 'b.xml')]).length, 2, 'different runs stay separate');

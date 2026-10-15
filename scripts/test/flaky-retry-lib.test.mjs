@@ -42,7 +42,7 @@ test('the real test:unit script is a node --test command the retry wrapper can d
   const pkg = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'));
   const { flags, patterns } = splitNodeTestCommand(pkg.scripts['test:unit']);
   assert.ok(flags.includes('--test'));
-  assert.ok(patterns.includes('scripts/test/*.test.mjs'));
+  assert.ok(patterns.includes('"scripts/**/*.test.mjs"'));
 });
 
 test('buildShellCommand quotes injected values but keeps globs unquoted for sh', () => {
@@ -202,10 +202,10 @@ test('flips', () => {
 const STABLE = `import test from 'node:test';\ntest('ok', () => {});\n`;
 const BROKEN = `import test from 'node:test';\ntest('always', () => { throw new Error('nope'); });\n`;
 
-test('CLI: a file that passes on isolated retry is reported flaky and the step passes', () => {
+test('CLI: a file that passes on isolated retry is reported flaky and the step fails', () => {
   const r = runCli({ 'flaky.test.mjs': FLAKY, 'stable.test.mjs': STABLE }, 'node --test *.test.mjs');
-  assert.equal(r.status, 0, r.stdout);
-  assert.equal(r.report.pass, true);
+  assert.equal(r.status, 1, r.stdout);
+  assert.equal(r.report.pass, false);
   assert.equal(r.report.retried, true);
   assert.deepEqual(r.report.flaky.map((g) => g.file), ['flaky.test.mjs']);
   assert.deepEqual(r.report.failed, []);
@@ -213,15 +213,15 @@ test('CLI: a file that passes on isolated retry is reported flaky and the step p
   assert.match(r.summary, /### Flaky tests \(unit\)/);
 });
 
-test('CLI --junit: the retry gets its own JUnit file and the acceptance gate counts the flaky test as passed', () => {
+test('CLI --junit: the retry gets its own JUnit file and the acceptance gate retains the initial failure', () => {
   const r = runCli({ 'flaky.test.mjs': FLAKY, 'stable.test.mjs': STABLE }, 'node --test *.test.mjs', { junit: true });
-  assert.equal(r.status, 0, r.stdout);
+  assert.equal(r.status, 1, r.stdout);
   assert.deepEqual(Object.keys(r.junit), ['unit.retry-1.xml', 'unit.xml']);
   const results = Object.entries(r.junit).flatMap(([f, xml]) => parseJUnit(xml).map((c) => ({ ...c, source: `results/${f}` })));
   const flips = results.filter((c) => c.name === 'flips');
   assert.deepEqual(flips.map((c) => c.outcome).sort(), ['failed', 'passed']);
   const merged = dedupeResults(results);
-  assert.deepEqual(merged.filter((c) => c.name === 'flips').map((c) => c.outcome), ['passed']);
+  assert.deepEqual(merged.filter((c) => c.name === 'flips').map((c) => c.outcome), ['failed']);
   assert.deepEqual(merged.filter((c) => c.name === 'ok').map((c) => c.outcome), ['passed']);
 });
 

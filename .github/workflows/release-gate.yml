@@ -7,6 +7,17 @@ name: Release gate
 
 on:
   workflow_call:
+    secrets:
+      RAW_AGENT_API_KEY:
+        required: false
+      RAW_AGENT_BASE_URL:
+        required: false
+      RAW_AGENT_MODEL_NAME:
+        required: false
+      RAW_AGENT_ANTHROPIC_URL:
+        required: false
+      HARNESS_EVAL_API_KEY:
+        required: false
   workflow_dispatch:
 
 permissions:
@@ -20,6 +31,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -40,7 +53,7 @@ jobs:
             sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           fi
 
-      # 失败文件单独重跑一次：重跑通过 = flaky（step 通过但告警 + summary + artifact），两次都挂 = 失败。
+      # Retry recovery remains visible and fails unless explicitly allowlisted.
       - name: Unit tests
         run: node scripts/ci/retry-failed-tests.mjs --script test:unit --label unit --report "$RUNNER_TEMP/flaky-tests/unit.json"
 
@@ -115,6 +128,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -201,6 +216,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -233,21 +250,107 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  secrets-gate:
+    name: Check remote-smoke secrets
+    runs-on: ubuntu-latest
+    outputs:
+      has-key: ${{ steps.check.outputs.has-key }}
+      has-harness-key: ${{ steps.check.outputs.has-harness-key }}
+      base-ref: ${{ steps.base.outputs.ref }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Resolve comparison base
+        id: base
+        run: |
+          base=$(git merge-base HEAD origin/main)
+          if [ "$base" = "$(git rev-parse HEAD)" ]; then base=$(git rev-parse HEAD^); fi
+          echo "ref=$base" >> "$GITHUB_OUTPUT"
+      - name: Detect RAW_AGENT_API_KEY
+        id: check
+        env:
+          RAW_AGENT_API_KEY: ${{ secrets.RAW_AGENT_API_KEY }}
+          HARNESS_EVAL_API_KEY: ${{ secrets.HARNESS_EVAL_API_KEY }}
+        run: |
+          if [ -n "$RAW_AGENT_API_KEY" ]; then
+            echo "has-key=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-key=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -n "$HARNESS_EVAL_API_KEY" ]; then echo "has-harness-key=true" >> "$GITHUB_OUTPUT"; else echo "has-harness-key=false" >> "$GITHUB_OUTPUT"; fi
+
+  # 使用你在 GitHub 配置的 Secrets 调用真实第三方 API（见 docs/CI.md）
+  remote-model-smoke:
+    name: Remote model smoke (optional)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [tests, secrets-gate]
+    # 至少提供 API Key；OpenAI 兼容还需 BASE_URL + MODEL_NAME（可在 Secrets 中一并配置）
+    if: ${{ github.event.repository.fork == false && needs.secrets-gate.outputs.has-key == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - name: Remote smoke (OpenAI-compatible)
+        if: ${{ vars.RAW_AGENT_CI_PROVIDER != 'anthropic-compatible' }}
+        run: npm run test:remote
+        env:
+          RAW_AGENT_MODEL_PROVIDER: openai-compatible
+          RAW_AGENT_API_KEY: ${{ secrets.RAW_AGENT_API_KEY }}
+          RAW_AGENT_BASE_URL: ${{ secrets.RAW_AGENT_BASE_URL }}
+          RAW_AGENT_MODEL_NAME: ${{ secrets.RAW_AGENT_MODEL_NAME }}
+          RAW_AGENT_USE_JSON_MODE: ${{ vars.RAW_AGENT_USE_JSON_MODE }}
+
+      - name: Remote smoke (Anthropic-compatible)
+        if: ${{ vars.RAW_AGENT_CI_PROVIDER == 'anthropic-compatible' }}
+        run: npm run test:remote
+        env:
+          RAW_AGENT_MODEL_PROVIDER: anthropic-compatible
+          RAW_AGENT_API_KEY: ${{ secrets.RAW_AGENT_API_KEY }}
+          RAW_AGENT_ANTHROPIC_URL: ${{ secrets.RAW_AGENT_ANTHROPIC_URL }}
+          RAW_AGENT_BASE_URL: ${{ secrets.RAW_AGENT_BASE_URL }}
+          RAW_AGENT_MODEL_NAME: ${{ secrets.RAW_AGENT_MODEL_NAME }}
+
+
+  mutation:
+    uses: ./.github/workflows/mutation.yml
+
+  harness:
+    needs: [tests, secrets-gate]
+    if: ${{ github.event.repository.fork == false && needs.secrets-gate.outputs.has-harness-key == 'true' }}
+    uses: ./.github/workflows/harness-quality.yml
+    with:
+      baseline_ref: ${{ needs.secrets-gate.outputs.base-ref }}
+      experiment: scripts/agent-eval/experiments/starter.json
+    secrets: inherit
+
+  compact-ab:
+    needs: [tests, secrets-gate]
+    if: ${{ github.event.repository.fork == false && needs.secrets-gate.outputs.has-key == 'true' }}
+    uses: ./.github/workflows/compact-ab.yml
+    secrets: inherit
+
   gate:
     name: Main release gate
     if: always()
-    needs: [tests, crap, acceptance]
+    needs: [tests, crap, acceptance, mutation, secrets-gate, remote-model-smoke, harness, compact-ab]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: All gate jobs must succeed
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: All required and participating optional jobs must succeed
         env:
-          TESTS: ${{ needs.tests.result }}
-          CRAP: ${{ needs.crap.result }}
-          ACCEPTANCE: ${{ needs.acceptance.result }}
-        run: |
-          echo "tests=${TESTS} crap=${CRAP} acceptance=${ACCEPTANCE}" | tee -a "$GITHUB_STEP_SUMMARY"
-          if [ "$TESTS" != "success" ] || [ "$CRAP" != "success" ] || [ "$ACCEPTANCE" != "success" ]; then
-            echo "::error::Release gate failed (tests=${TESTS}, crap=${CRAP}, acceptance=${ACCEPTANCE})"
-            exit 1
-          fi
+          RESULTS: ${{ toJSON(needs) }}
+        run: node scripts/ci/release-results.mjs "$RESULTS"

@@ -45,11 +45,11 @@ test('npm and Docker publication require a successful release gate, including fo
 
 test('release gate retains deterministic test layers and does not tolerate failures', () => {
   const doc = workflow('release-gate');
-  assert.deepEqual(needs(doc.jobs.gate).sort(), ['acceptance', 'crap', 'tests']);
+  assert.deepEqual(needs(doc.jobs.gate).sort(), ['acceptance', 'compact-ab', 'crap', 'harness', 'mutation', 'remote-model-smoke', 'secrets-gate', 'tests']);
   assert.equal(doc.jobs.gate.if, 'always()');
   for (const job of Object.values(doc.jobs)) {
     assert.notEqual(job['continue-on-error'], true);
-    for (const step of job.steps) assert.notEqual(step['continue-on-error'], true);
+    for (const step of job.steps ?? []) assert.notEqual(step['continue-on-error'], true);
   }
   const runs = doc.jobs.tests.steps.map((step) => step.run).filter(Boolean);
   for (const script of ['build', 'test:formal', 'test:package', 'agent:eval:verify', 'test:regression', 'test:integration']) {
@@ -113,11 +113,9 @@ test('empirical quality workflow uses a frozen baseline and preserves evidence w
 test('actual gate summary script accepts only success/success/success; failure, cancelled, skipped, unknown fail closed', {
   skip: process.platform === 'win32' ? 'Release gate shell runs on Ubuntu; bash contract tested on Unix' : false
 }, () => {
-  const step = workflow('release-gate').jobs.gate.steps.find((s) => s.env?.TESTS && s.env?.CRAP);
+  const step = workflow('release-gate').jobs.gate.steps.find((s) => s.env?.RESULTS);
   assert.ok(step?.run);
-  assert.equal(step.env.TESTS, '${{ needs.tests.result }}');
-  assert.equal(step.env.CRAP, '${{ needs.crap.result }}');
-  assert.equal(step.env.ACCEPTANCE, '${{ needs.acceptance.result }}');
+  assert.equal(step.env.RESULTS, '${{ toJSON(needs) }}');
   const dir = mkdtempSync(join(tmpdir(), 'release-gate-contract-'));
   const states = ['success', 'failure', 'cancelled', 'skipped', ''];
   try {
@@ -126,7 +124,7 @@ test('actual gate summary script accepts only success/success/success; failure, 
         for (const acceptance of states) {
           const child = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', step.run], {
             env: sanitizeScriptEnv({
-              ...process.env, TESTS: tests, CRAP: crap, ACCEPTANCE: acceptance, GITHUB_STEP_SUMMARY: join(dir, 'summary.md')
+              ...process.env, RESULTS: JSON.stringify({ tests: {result: tests}, crap: {result: crap}, acceptance: {result: acceptance}, mutation: {result: 'success'}, 'secrets-gate': {result: 'success'} }), GITHUB_STEP_SUMMARY: join(dir, 'summary.md')
             }),
             encoding: 'utf8', timeout: 5_000
           });

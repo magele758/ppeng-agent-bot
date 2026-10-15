@@ -5,8 +5,9 @@
  * statically that every criterion of an approved/implemented spec is referenced by a test, and,
  * when JUnit results are supplied, that at least one referencing test passed and none failed.
  *
- * Everything here is pure (no fs / process) so the rules are unit-testable.
+ * Rules are unit-testable; the checked-in flaky exception list is shared with the retry runner.
  */
+import { isKnownFlaky } from '../ci/known-flaky.mjs';
 import { parseDocument } from 'yaml';
 
 export const STATUSES = ['draft', 'approved', 'implemented', 'retired'];
@@ -328,7 +329,7 @@ function finishCase(node) {
 
 /**
  * Collapses repeated executions of the same test (CI retries, the same suite run twice) into one
- * outcome: passed if any run passed, else failed if any failed, else skipped. `unit.retry-1.xml`
+ * outcome: failed if any run failed, else passed if any passed, else skipped. `unit.retry-1.xml`
  * (written by scripts/ci/retry-failed-tests.mjs) counts as another run of `unit.xml`.
  */
 export function dedupeResults(results) {
@@ -336,11 +337,21 @@ export function dedupeResults(results) {
   for (const r of results) {
     const source = (r.source ?? '').replace(/\.retry-\d+(?=\.xml$)/, '');
     const key = `${source}\u0000${r.classname ?? ''}\u0000${r.title}`;
-    const prev = byKey.get(key);
-    if (!prev) byKey.set(key, { ...r });
-    else if (r.outcome === 'passed' || (r.outcome === 'failed' && prev.outcome === 'skipped')) prev.outcome = r.outcome;
+    if (!byKey.has(key)) byKey.set(key, []);
+    byKey.get(key).push(r);
   }
-  return [...byKey.values()];
+  return [...byKey.values()].map(runs => {
+    const failed = runs.some(r => r.outcome === 'failed');
+    const passed = runs.some(r => r.outcome === 'passed');
+    const retries = runs.filter(r => /\.retry-\d+\.xml$/.test(r.source ?? ''));
+    const recovered = failed && retries.length > 0 && retries.every(r => r.outcome === 'passed');
+    return {
+      ...runs[0],
+      outcome: failed ? 'failed' : passed ? 'passed' : 'skipped',
+      ...(failed && passed ? { mixedResults: true } : {}),
+      ...(recovered ? { retryRecovered: true } : {})
+    };
+  });
 }
 
 function criterionKey(featureId, criterionId) {
@@ -427,6 +438,12 @@ export function evaluateAcceptance({ specs, specErrors = [], specWarnings = [], 
   const deduped = resultsMode ? dedupeResults(results) : [];
   if (resultsMode) {
     for (const r of deduped) {
+      if (r.mixedResults) {
+        const matches = staticTests.filter(t => t.title === r.name || t.title === r.title);
+        const allowed = r.retryRecovered && matches.length === 1 && isKnownFlaky(matches[0].file, r.name);
+        warnings.push('Failed then passed on retry' + (allowed ? ' (known flaky exception)' : ' (not a clean pass)') + ': ' + r.title);
+        if (allowed) r.outcome = 'passed';
+      }
       for (const tag of extractTags(r.title)) {
         // Rejected tags are reported once; results only add ones the static scan could not see (dynamic titles).
         const sink = rejectedTags.has(tag.raw) ? [] : errors;

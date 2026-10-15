@@ -29,6 +29,8 @@ import {
   scanTestSource,
 } from './acceptance-lib.mjs';
 
+import { baseRevision, git, compareAcceptance } from '../ci/base-revision.mjs';
+
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const RUNNERS = ['unit', 'vitest', 'e2e'];
 const SKIP_DIRS = new Set([
@@ -213,6 +215,15 @@ function main() {
     args.results.push(dir);
   }
   const { specs, specErrors, specWarnings } = loadSpecs(args.root);
+  const base = baseRevision(args.root);
+  if (base) {
+    const baseSpecs = git(args.root, ['ls-tree', '-r', '--name-only', base, '--', 'acceptance']).split('\n').filter(f => f.endsWith('.yaml')).map(file => {
+      const parsed = parseSpec(git(args.root, ['show', base + ':' + file]), path.basename(file));
+      if (parsed.errors.length) throw new Error(parsed.errors.join('\n'));
+      return parsed.spec;
+    });
+    specErrors.push(...compareAcceptance(baseSpecs, specs));
+  }
   const { staticTests, orphanFiles, runnableCount } = scanTests(args.root);
   const results = args.results.length ? loadResults(args.results, args.root) : null;
   const report = evaluateAcceptance({ specs, specErrors, specWarnings, staticTests, orphanFiles, results });

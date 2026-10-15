@@ -182,7 +182,9 @@ export function miscRoutes(runtime: RawAgentRuntime, opts: MiscOptions): RouteSp
       pattern: '/api/approvals/:id/:decision',
       handler: async ({ requireParam, response, auth }) => {
         const id = requireParam('id');
-        const decision = requireParam('decision') === 'reject' ? 'rejected' : 'approved';
+        const action = requireParam('decision');
+        if (action !== 'approve' && action !== 'reject') throw new ValidationError('Invalid approval decision');
+        const decision = action === 'approve' ? 'approved' : 'rejected';
         const pending = runtime.listApprovals().find((item) => item.id === id);
         if (pending) guardSession(runtime, pending.sessionId, auth);
         const approval = await runtime.approve(id, decision);

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Run a `node --test` npm script; when it fails, re-run each failing test FILE once in its own
- * process. Files that pass on retry are flaky: the step still passes, but emits ::warning
+ * process. Files that pass on retry are flaky: unlisted failures fail the step, which emits ::warning
  * annotations, a step-summary section and a JSON report. A file that fails twice fails the step.
  *
  * Usage: node scripts/ci/retry-failed-tests.mjs [--script test:unit] [--label unit] [--report <file.json>]
@@ -97,6 +97,7 @@ function main() {
   }
 
   const report = buildReport({ label: args.label, script: args.script, firstExitCode, plan, flaky, failed });
+  if (!report.pass && flaky.length) console.log('::error::Unlisted retry recovery is not a clean pass');
   for (const line of renderAnnotations({ flaky, failed: plan.retry ? failed : [] }, args.label)) console.log(line);
   const summary = renderSummary({ flaky, failed: plan.retry ? failed : [] }, args.label);
   if (summary && process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary}\n`);

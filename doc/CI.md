@@ -6,7 +6,7 @@
 
 | Job | 内容 | 是否需要密钥 |
 |-----|------|----------------|
-| **Release gate**（[`release-gate.yml`](../.github/workflows/release-gate.yml)） | 两个并行 Job + 验收 + 汇总：① `npm ci` → `build` → `test:unit` → `test:formal` → `agent:eval:fast -- --exit-on-fail` → `test:regression` → `test:integration` → `test:e2e`（启发式模型）；② 工具链预检后带覆盖率跑 `test:unit` 与 SDK vitest → [CRAP 门禁](CRAP_GATE.md)；③ **Acceptance criteria gate**：收集 ①② 的 JUnit 结果，证明每条已批准验收标准都有通过的测试（[验收门禁](ACCEPTANCE_GATE.md)）；④ **Main release gate** 汇总，仅全部成功才通过 | 否 |
+| **Release gate**（[`release-gate.yml`](../.github/workflows/release-gate.yml)） | 两个并行 Job + 验收 + 汇总：① `npm ci` → `build` → `test:unit` → `test:formal` → `agent:eval:fast -- --exit-on-fail` → `test:regression` → `test:integration` → `test:e2e`（启发式模型）；② 工具链预检后带覆盖率跑 `test:unit` 与 SDK vitest → [CRAP 门禁](CRAP_GATE.md)；③ **Acceptance criteria gate**：收集 ①② 的 JUnit 结果，证明每条已批准验收标准都有通过的测试（[验收门禁](ACCEPTANCE_GATE.md)）；④ **Main release gate** 汇总上述检查、mutation 及参与运行的可选模型检查，仅成功或明确允许的跳过才通过 | 否 |
 | **remote-model-smoke** | `npm run test:remote`：真实调用你配置的第三方 API，跑一轮简单对话 | 是（可选） |
 
 远程冒烟 **仅在你配置了 `RAW_AGENT_API_KEY` 时才会执行**，未配置时整 Job 跳过，不影响通过。真模型压缩 A/B 不在这条流水线里，见下方「压缩 A/B」。
@@ -28,13 +28,17 @@
 gate 里的 `test:unit`（两个 Job 各跑一次，含覆盖率那次）经 [`scripts/ci/retry-failed-tests.mjs`](../scripts/ci/retry-failed-tests.mjs) 执行：
 
 - 首轮失败时，把**失败的测试文件**各自单独用 `node --test <file>` 重跑**一次**；
-- 重跑通过 = **flaky**：step 仍通过，但出 `::warning title=Flaky test (...)`（挂在对应文件上）、step summary 写「Flaky tests」表格，并上传 artifact `flaky-tests-unit` / `flaky-tests-unit-coverage`（JSON，保留 30 天，无 flaky 时也上传空列表，供健康报告统计）；
+- 重跑通过 = **flaky**：默认判红；仅 `scripts/ci/known-flaky.json` 中精确匹配文件、测试标题且附理由的条目可豁免。仍出 `::warning title=Flaky test (...)`（挂在对应文件上）、step summary 写「Flaky tests」表格，并上传 artifact `flaky-tests-unit` / `flaky-tests-unit-coverage`（JSON，保留 30 天，无 flaky 时也上传空列表，供健康报告统计）；
 - 重跑仍失败 = 真失败，gate 红；
 - 不重试的情况（直接判红）：失败无法归到具体文件（如 runner 崩溃），或失败文件超过 10 个（更像真回归）。
 
 regression / integration 不重试（单 daemon 有状态流程，重跑会掩盖真问题）。E2E 由 [`playwright.config.ts`](../playwright.config.ts) 在 CI 上 `retries: 1` + `failOnFlakyTests`：重试只用于留 trace 与区分 flaky，**flaky 用例仍判红**。
 
-flaky 告警不是豁免：出现后应尽快修或隔离，否则下一次就可能连挂两次卡住发布。
+验收结果同样保留首轮失败，重试恢复不会记作干净通过；已登记例外仍显示告警，持续失败绝不豁免。
+
+Main release gate 同时汇总 mutation、真模型 smoke、Harness 和 compaction A/B。缺密钥的可选模型检查可跳过，实际失败或取消会阻断。Harness 沿用既有实验配置和严格质量门槛；starter 仅有 12 个案例，少于默认要求的 30 个，因此不能作为通过质量门槛的证据。
+
+验收门禁对比 Git 基线，拒绝已批准标准降级、退休或删除。CRAP 同样读取基线版本的债务记录，拒绝候选版本放宽基线；新增扫描的 web-console 既有债务仅从基线源码推导，零覆盖率债务不享受任何宽限。CI checkout 获取完整历史；本地需要 origin/main。
 
 ### 门禁健康报告
 

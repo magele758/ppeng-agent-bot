@@ -1,11 +1,12 @@
-# 变异测试门禁（见 doc/MUTATION_TESTING.md）。独立 workflow，目前只观察：不属于 release-gate.yml，
-# 也不是必需检查；分数跌破基线只会让本 workflow 变红。
+# 变异测试门禁（见 doc/MUTATION_TESTING.md）。可独立运行，也由 release-gate.yml 调用；
+# 分片失败或分数跌破基线都会阻断 Main release gate。
 # 每周全量跑一次；PR 只在关键模块源码 / 测试 / 门禁脚本变化时触发。
 # command-hardline 变异体最多，按变异体序号交错切 3 片并行；gate job 合并各片报告后按基线判定。
 
 name: Mutation
 
 on:
+  workflow_call:
   schedule:
     - cron: '23 3 * * 1'
   workflow_dispatch:
@@ -33,7 +34,7 @@ on:
       - .github/workflows/mutation.yml
 
 concurrency:
-  group: mutation-${{ github.ref }}
+  group: mutation-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -100,6 +101,11 @@ jobs:
         with:
           pattern: mutation-*
           path: coverage/mutation-shards
+
+      - name: Require successful shards
+        env:
+          SHARDS: ${{ needs.mutate.result }}
+        run: test "$SHARDS" = success
 
       - name: Merge shard reports and check the baseline
         run: node scripts/mutation/run-mutation.mjs --merge coverage/mutation-shards --out coverage/mutation

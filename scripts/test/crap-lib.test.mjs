@@ -188,7 +188,7 @@ test('gate fails on new functions over threshold, passes baselined debt', () => 
 });
 
 test('gate fails when baselined debt grows beyond tolerance, and reports improvements', () => {
-  const baseline = buildBaseline([row('a.ts::old', 100), row('a.ts::gone', 50)]);
+  const baseline = buildBaseline([row('a.ts::old', 100, { coverage: 0.1 }), row('a.ts::gone', 50)]);
   assert.equal(allowedCrap(100), 106);
   assert.equal(evaluateGate([row('a.ts::old', 105.9)], baseline).pass, true, 'noise within tolerance');
 
