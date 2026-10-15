@@ -51,14 +51,16 @@ export function createCronRunTools(getStore: () => CronJobStore, opts?: CronTool
       const ledger = new RoutineRunStore(opts!.store!);
       if (args.run_id) {
         const run = ledger.get(args.run_id);
-        const live = run ? getStore().get(run.job.id) : undefined;
-        if (!run || !live || !owns(opts,context,live)) return {ok:false,content:'Run not found'};
+        if (!run) return {ok:false,content:'Run not found'};
+        // Prefer live job; after cronStore.remove keep history readable via snapshot + live session.
+        const authJob = getStore().get(run.job.id) ?? run.job;
+        if (!owns(opts,context,authJob)) return {ok:false,content:'Run not found'};
         return {ok:true,content:JSON.stringify(publicRun(run))};
       }
-      const job = getStore().get(args.id!);
-      if (!job || !owns(opts,context,job)) return {ok:false,content:'Routine not found'};
       const page = ledger.page(args.id!,{before:args.before,limit:args.limit});
-      // Ownership already proven via live store job; do not re-check embedded run.job snapshots.
+      const authJob = getStore().get(args.id!) ?? page.runs[0]?.job;
+      if (!authJob || !owns(opts,context,authJob)) return {ok:false,content:'Routine not found'};
+      // Auth via live job when present; ownership is session-based (no principal fallback).
       return {ok:true,content:JSON.stringify({...page,runs:page.runs.map(publicRun)})};
     },
   };
