@@ -5,7 +5,8 @@ export const settings = {
     behavior: 'Agent behavior',
     safety: 'Safety & sandbox',
     tools: 'Tools & skills',
-    integrations: 'Integrations & observability'
+    integrations: 'Integrations & observability',
+    ops: 'Ops'
   },
   categoriesLabel: 'Settings categories',
   searchPlaceholder: 'Search settings (e.g. model, API key, Feishu, theme)',

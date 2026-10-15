@@ -97,7 +97,7 @@ export const ops = {
     fail: '存在异常',
     healRunning: '自愈运行中 · {n}',
     evoRunning: 'Evolution 运行中 · {n}',
-    open: '打开「运维 → 系统健康」'
+    open: '打开「设置 → 运维 · 系统健康」'
   },
 
   health: {

@@ -191,7 +191,7 @@ test("default Super Bot is selected and a saved alternative survives reload [AC:
     })
   ).json();
   await page.goto("/");
-  await page.locator("#playSurfaceBot").click();
+  await page.locator("#nav-bot").click();
   await expect(page.locator("#botSelect")).toHaveValue(superBot.id);
   await page.locator("#botSelect").selectOption(bot.id);
   await expect(page.locator("#botSelect")).toHaveValue(bot.id);

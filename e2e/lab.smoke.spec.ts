@@ -8,18 +8,19 @@ test.describe('Agent Lab console', () => {
     await expect(page.locator('#panel-play')).toBeVisible();
     await expect(page.getByRole('button', { name: '工作台' })).toHaveCount(0);
     const nav = page.getByRole('navigation', { name: '一级导航' });
-    await expect(nav.getByRole('link')).toHaveText(['对话', 'Bots 与 Agents', '任务', '知识与记忆', '运维', '设置']);
+    await expect(nav.getByRole('link')).toHaveText(['Bot', '对话', 'Bots 与 Agents', '任务', '知识与记忆', '设置']);
     await expect(nav.getByRole('link', { name: '对话' })).toHaveAttribute('aria-current', 'page');
+    await expect(nav.getByRole('link', { name: '运维' })).toHaveCount(0);
   });
 
   test('chat and bot surfaces coexist with the default coordinator [AC:default-super-bot#AC-1]', async ({ page, request }) => {
     await page.goto('/');
-    await expect(page.locator('#playSurfaceChat')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('#nav-chat')).toHaveAttribute('aria-current', 'page');
     await expect(page.locator('#botSelect')).toHaveCount(0);
     await expect(page.getByRole('button', { name: '新增' })).toBeVisible();
 
-    await page.locator('#playSurfaceBot').click();
-    await expect(page.locator('#playSurfaceBot')).toHaveAttribute('aria-selected', 'true');
+    await page.locator('#nav-bot').click();
+    await expect(page.locator('#nav-bot')).toHaveAttribute('aria-current', 'page');
     const botSelect = page.locator('#botSelect');
     await expect(botSelect).toBeVisible();
     // Authorized default-Super behavior replaces the former empty selection.
@@ -27,7 +28,7 @@ test.describe('Agent Lab console', () => {
     await expect(botSelect).toHaveValue(defaultBot.id);
     await expect(botSelect.locator('option').first()).toHaveText('选择 Bot');
     await expect(page.locator('.chat-composer-dock').getByRole('button', { name: '新建 Bot' })).toHaveCount(0);
-    await page.locator('#playSurfaceChat').click();
+    await page.locator('#nav-chat').click();
     await expect(page.locator('#botSelect')).toHaveCount(0);
 
     // 创建 Bot 的入口只在 Bots 页（对话页不再内嵌创建表单）
@@ -59,7 +60,8 @@ test.describe('Agent Lab console', () => {
 
   test('ops tab shows session trajectory workspace', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('link', { name: '运维' }).click();
+    await page.getByRole('link', { name: '设置' }).click();
+    await page.locator('#settings-cat-ops').click();
     await expect(page.locator('#panel-ops').getByRole('heading', { name: '会话' })).toBeVisible();
     await expect(page.locator('#panel-ops').getByRole('heading', { name: 'Trajectory' })).toBeVisible();
     await expect(page.locator('#listSessions')).toBeVisible();
@@ -68,8 +70,9 @@ test.describe('Agent Lab console', () => {
 
   test('switching sections updates the URL and survives reload [AC:console-navigation#AC-2]', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('link', { name: '运维' }).click();
-    await expect(page).toHaveURL(/#\/ops\/trajectory$/);
+    await page.getByRole('link', { name: '设置' }).click();
+    await page.locator('#settings-cat-ops').click();
+    await expect(page).toHaveURL(/#\/settings\/ops\/trajectory$/);
     await expect(page.locator('#panel-ops')).toBeVisible();
 
     await page.getByRole('link', { name: 'Bots 与 Agents' }).click();
@@ -81,6 +84,21 @@ test.describe('Agent Lab console', () => {
     await page.reload();
     await expect(page.locator('#panel-teams')).toBeVisible();
     await expect(page.getByRole('link', { name: 'Bots 与 Agents' })).toHaveAttribute('aria-current', 'page');
+  });
+
+  test('rail collapse hides labels and the choice survives reload', async ({ page }) => {
+    await page.goto('/');
+    const rail = page.getByRole('complementary', { name: '主导航' });
+    await rail.getByRole('button', { name: '收起导航' }).click();
+    await expect(rail).toHaveClass(/is-collapsed/);
+    await rail.getByRole('link', { name: '知识与记忆' }).click();
+    await expect(page).toHaveURL(/#\/knowledge/);
+    await page.reload();
+    const again = page.getByRole('complementary', { name: '主导航' });
+    await expect(again).toHaveClass(/is-collapsed/);
+    await again.getByRole('button', { name: '展开导航' }).click();
+    await expect(again).not.toHaveClass(/is-collapsed/);
+    await expect(again.getByRole('link', { name: '知识与记忆' })).toBeVisible();
   });
 
   test('draft in chat survives visiting another section [AC:console-navigation#AC-4]', async ({ page }) => {

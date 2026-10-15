@@ -7,7 +7,7 @@ import { Section, SubTabs, type SubTabItem } from '../ui';
 import { useSectionNav } from '../shell/useSectionNav';
 
 export interface SectionFrameProps {
-  section: Exclude<SectionId, 'chat' | 'settings'>;
+  section: Exclude<SectionId, 'chat' | 'settings' | 'bot'>;
   active: boolean;
   /** 可选：覆盖某个子页的徽标 */
   badges?: Partial<Record<string, number>>;
@@ -16,7 +16,7 @@ export interface SectionFrameProps {
   renderSub: (sub: string) => ReactNode;
 }
 
-/** 非对话 section 的统一外框：页头 + 子页签 + 当前子页。DOM id：`section-<id>` / `section-<id>-<sub>` */
+/** 带子页签的 section 外框。对话与 Bot 走 Play 面板，设置自有布局。 */
 export function SectionFrame({ section, active, badges, actions, renderSub }: SectionFrameProps) {
   const { t } = useI18n();
   const { sub, select, subs } = useSectionNav(section);

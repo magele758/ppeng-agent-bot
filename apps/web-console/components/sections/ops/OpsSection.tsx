@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { useI18n } from '@/lib/i18n';
 import { OpsPanel } from '../../OpsPanel';
 import { useLab } from '../../shell/LabProvider';
-import { SectionFrame } from '../SectionFrame';
+import { SubTabs } from '../../ui';
 import { HealthView } from './HealthView';
 import './ops.css';
 
@@ -58,21 +59,33 @@ function TrajectoryView() {
   );
 }
 
-export function OpsSection({ active }: { active: boolean }) {
+/** 设置 → 运维。子页签仍是会话轨迹 / 系统健康。 */
+export function OpsWorkspace({
+  pane,
+  onSelectPane
+}: {
+  pane: string | null;
+  onSelectPane: (pane: string) => void;
+}) {
+  const { t } = useI18n();
+  const sub = pane === 'health' ? 'health' : 'trajectory';
   return (
-    <SectionFrame
-      section="ops"
-      active={active}
-      renderSub={(sub) => {
-        switch (sub) {
-          case 'trajectory':
-            return <TrajectoryView />;
-          case 'health':
-            return <HealthView />;
-          default:
-            return null;
-        }
-      }}
-    />
+    <div className="ops-workspace" id="section-ops">
+      <h2 className="ops-workspace__title">{t('shell.nav.ops')}</h2>
+      <p className="muted small">{t('shell.desc.ops')}</p>
+      <SubTabs
+        items={[
+          { id: 'trajectory', label: t('shell.sub.ops.trajectory') },
+          { id: 'health', label: t('shell.sub.ops.health') }
+        ]}
+        active={sub}
+        onSelect={onSelectPane}
+        ariaLabel={t('shell.nav.subPages')}
+        idPrefix="section-ops"
+      />
+      <div id={`section-ops-${sub}`}>
+        {sub === 'health' ? <HealthView /> : <TrajectoryView />}
+      </div>
+    </div>
   );
 }

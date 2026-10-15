@@ -1,4 +1,13 @@
 /* 运维区（WS4）：健康总览、轨迹摘要、有效配置。只用 --ui-* 令牌。 */
+.ops-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-3);
+}
+.ops-workspace__title {
+  margin: 0;
+  font-size: var(--ui-text-lg);
+}
 .ops-dot {
   display: inline-block;
   width: 8px;

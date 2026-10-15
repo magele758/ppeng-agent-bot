@@ -94,10 +94,10 @@ const setVal = (el, v) => {
 };
 const badge = (el) => { const m = (el?.innerText || '').trim().match(/(\\d+)\\s*$/); return m ? Number(m[1]) : 0; };
 const surface = async (which) => {
-  await go('#/chat', '#panel-play');
-  const btn = q(which === 'bot' ? '#playSurfaceBot' : '#playSurfaceChat');
-  if (btn.getAttribute('aria-selected') !== 'true') btn.click();
-  await until(() => btn.getAttribute('aria-selected') === 'true', 3000);
+  const hash = which === 'bot' ? '#/bot' : '#/chat';
+  const nav = which === 'bot' ? '#nav-bot' : '#nav-chat';
+  await go(hash, '#panel-play');
+  await until(() => q(nav)?.getAttribute('aria-current') === 'page', 3000);
   await w(400);
 };
 const railTitles = () => qa('#sessionListMini .list-item').map((e) => (q('.session-item__title', e) || e).innerText.trim());
@@ -118,11 +118,11 @@ const CHECKS = [
 await go('#/chat', '#panel-play');
 const links = qa('nav a');
 const ids = links.map((a) => a.id).join(',');
-const want = 'nav-chat,nav-agents,nav-tasks,nav-knowledge,nav-ops,nav-settings';
+const want = 'nav-bot,nav-chat,nav-agents,nav-tasks,nav-knowledge,nav-settings';
 const hrefs = links.map((a) => a.getAttribute('href')).join(',');
 const cur = links.filter((a) => a.getAttribute('aria-current') === 'page').map((a) => a.id);
 if (ids !== want) return bad('nav ids=' + ids);
-if (hrefs !== '#/chat,#/agents,#/tasks,#/knowledge,#/ops,#/settings') return bad('hrefs=' + hrefs);
+if (hrefs !== '#/bot,#/chat,#/agents,#/tasks,#/knowledge,#/settings') return bad('hrefs=' + hrefs);
 if (cur.join() !== 'nav-chat') return bad('aria-current=' + cur.join());
 return ok('6 links, current=nav-chat');`
   },
@@ -131,10 +131,10 @@ return ok('6 links, current=nav-chat');`
     title: '哈希路由：8 个页面各落到对应区块并高亮导航',
     code: `
 const routes = [
-  ['#/chat', 'nav-chat', '#panel-play'], ['#/agents', 'nav-agents', '#section-agents'],
+  ['#/bot', 'nav-bot', '#panel-play'], ['#/chat', 'nav-chat', '#panel-play'], ['#/agents', 'nav-agents', '#section-agents'],
   ['#/tasks', 'nav-tasks', '#section-tasks-queue'], ['#/tasks/inbox', 'nav-tasks', '#section-tasks-inbox'],
-  ['#/knowledge', 'nav-knowledge', '#section-knowledge'], ['#/ops', 'nav-ops', '#section-ops-trajectory'],
-  ['#/ops/health', 'nav-ops', '#section-ops-health'], ['#/settings', 'nav-settings', '#section-settings']
+  ['#/knowledge', 'nav-knowledge', '#section-knowledge'], ['#/ops', 'nav-settings', '#section-ops-trajectory'],
+  ['#/ops/health', 'nav-settings', '#section-ops-health'], ['#/settings', 'nav-settings', '#section-settings']
 ];
 const fails = [];
 for (const [hash, nav, sel] of routes) {
