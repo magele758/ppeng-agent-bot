@@ -49,6 +49,10 @@ function attachmentIdsFromBody(body: Record<string, unknown>): string[] {
   return body.attachmentIds.map(String).filter(Boolean);
 }
 
+function replyToFromBody(body: Record<string, unknown>): string | undefined {
+  return typeof body.replyTo === 'string' ? body.replyTo : undefined;
+}
+
 function sessionMetadataFromBody(
   runtime: RawAgentRuntime,
   body: Record<string, unknown>,
@@ -959,7 +963,10 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         const payload = { surfaceId, name, context, ...(dataModel ? { dataModel } : {}) };
         // Plain-text framing the agent already understands; no schema gymnastics.
         const message = `[a2ui:action ${name}] ${JSON.stringify(payload)}`;
-        runtime.sendUserMessage(id, message, { replyTo: typeof body.replyTo === 'string' ? body.replyTo : undefined, autoRun: body.autoRun !== false });
+        runtime.sendUserMessage(id, message, {
+          replyTo: replyToFromBody(body),
+          autoRun: body.autoRun !== false
+        });
         if (body.autoRun !== false) {
           await runtime.runHumanSession(id);
         }
