@@ -340,18 +340,24 @@ flowchart TD
 - **上下文**：仍依赖现有 `autoCompact` + `session.summary`；结构化 Markdown 作为跨压缩/子会话 handoff 的补充。
 - **环境**：`RAW_AGENT_MAX_TURNS` 可提高单轮 `runSession` 的 turn 上限（长 sprint）。
 
-## 7. 内置工具（37 个，另可选 3 个 external-ai）
+## 7. 内置工具（基础挂载 51 个，另有条件挂载工具）
 
-清单以源码为准：`packages/core/src/tools/builtin-tools.ts` 中 `createBuiltinTools`；可用 `node scripts/doc-sync-tools.mjs` 打印当前列表。
+清单以源码为准：`packages/core/src/tools/builtin-tools.ts` 中 `createBuiltinTools` 及其导入的工具工厂。下表共 51 个（包含提供 `historyStore` 时的 2 个历史工具，不含下述条件挂载工具）。`node scripts/doc-sync-tools.mjs` 仅扫描该文件内的名称字面量，会漏掉导入的工具并包含部分可选工具，不能用其输出作为挂载总数。
 
-| 类别 | 工具名（节选） |
+| 类别 | 工具名 |
 |------|----------------|
 | 文件/搜索 | `read_file`, `grep_files`, `glob_files`, `write_file`, `edit_file`, `bash`, `workspace_list` |
 | 网络/视觉 | `web_fetch`, `web_search`, `vision_analyze` |
-| 记忆 | `memory_set`, `memory_get`, `memory_delete`, `handoff_state`（对话回路经 `AgentMemoryStore`） |
-| 任务/协作 | `task_*`, `spawn_subagent`, `spawn_teammate`, `list_team`, `send_message`, `read_inbox` |
+| 记忆 | `memory_set`, `memory_get`, `memory_search`, `memory_read`, `memory_delete`, `handoff_state`, `memory_prefetch`（对话回路经 `AgentMemoryStore`） |
+| 任务/协作 | `task_create`, `task_get`, `task_update`, `task_list`, `spawn_subagent`, `spawn_teammate`, `list_team`, `send_message`, `read_inbox` |
+| 历史 | `history_search`, `history_read` |
+| 计划 | `submit_plan`, `request_confirmation`, `confirm_plan`, `start_step`, `complete_step`, `fail_step` |
+| 用户交互 | `ask_user`, `save_user_info`, `collect_credentials` |
+| 产物 | `read_artifact_page`, `search_artifact_content` |
 | Harness | `harness_write_spec`, `record_summary`, `TodoWrite`, `work_evidence` |
-| 其他 | `load_skill`, `bg_run`, `bg_check`, `lsp_request`, `notebook_edit`, `spill_tool_result`, `retrieve_tool_result`, `schedule_social_post`, `a2ui_render`, `a2ui_delete_surface` |
+| 其他 | `search_skills`, `load_skill`, `bg_run`, `bg_check`, `lsp_request`, `spill_tool_result`, `retrieve_tool_result`, `schedule_social_post` |
+
+提供 `compactContext` 服务时额外挂载 `compact_context`（runtime 提供该服务时总数为 52）；未提供 `historyStore` 时不挂载上述 2 个历史工具。设 `RAW_AGENT_NOTEBOOK_TOOLS=1` 时额外挂载 `notebook_edit`；设 `RAW_AGENT_A2UI_ENABLED=1` 时额外挂载 `a2ui_render`, `a2ui_delete_surface`。
 
 设 `RAW_AGENT_EXTERNAL_AI_TOOLS=1` 时额外挂载：`claude_code`, `codex_exec`, `cursor_agent`。
 

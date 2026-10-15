@@ -26,7 +26,7 @@ Agent Lab / CLI → daemon HTTP / SSE
                        ↓
           RawAgentRuntime（产品宿主，packages/core）
                        ↓  注入 model / tools / storage / hooks
-          createAssembledLoop（packages/agent-loop，默认 max）
+          createAssembledLoop（packages/agent-loop，默认 mini）
                        ↓
           turn kernel → 组装上下文 → 模型 → 工具 → 下一轮
 ```
@@ -99,7 +99,7 @@ npm run agent:eval:fast -- --exit-on-fail
 3. **改完怎么验**：逻辑改动跑 `npm run test:unit`；全量 TS 编译用 `npm run build`。界面/E2E 见 [`doc/TESTING.md`](doc/TESTING.md)、必要时 `npm run test:e2e`。
 4. **配置与密钥**：支持的功能优先使用 Lab UI 与持久化 settings API，避免新增功能开关 env。必要的连接、进程引导或 CI 回退配置参考 [`.env.example`](.env.example)；**切勿提交 `.env`**。env 修改需重启进程；界面设置的生效范围以各 API 为准。
 5. **Evolution**：`npm run evolution -- --help` 查看参数（`--learn`、`--agent`、`--review`、`--until-empty`、`--research`、`--test-agent` 等）。一键 drain + 展示站：`npm run evolution:drain-showcase -- --help`。`run-day` 默认只处理 inbox **「今日新条目」** 分段（下文 Evolution 一节）。
-6. **子进程 / 沙箱**：新增 `spawn` 须走 `sanitizeSpawnEnv()` 与现有沙箱封装（`packages/core/src/sandbox.ts`、`SandboxManager`），勿在完整父进程环境下裸调 `spawn`。
+6. **子进程 / 沙箱**：新增 `spawn` 须走 `sanitizeSpawnEnv()` 与现有沙箱封装（`packages/core/src/sandbox/env-sanitizer.ts`、`packages/core/src/sandbox/os-sandbox.ts`、`SandboxManager`），勿在完整父进程环境下裸调 `spawn`。
 7. **Skills**：仓库内 `skills/**/SKILL.md`；可与 `~/.agents/**/SKILL.md` 合并（见 `AGENTS.md`）。
 8. **循环 SDK 改动**：契约变化须同步 [`skills/agent-loop/SKILL.md`](skills/agent-loop/SKILL.md)，并执行 `npm run test --workspace=@ppeng/agent-loop` 与 `npm run build --workspace=@ppeng/agent-loop`；根目录 `test:unit` 不能代替 SDK 的 Vitest 测试。
 

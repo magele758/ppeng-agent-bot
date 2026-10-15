@@ -13,7 +13,7 @@
  *   --model <name>           cursor agent 模型（默认 composer-2-fast）
  *   --review <cli>           review agent：cursor | codex | none（默认 none）
  *   --review-model <name>    review 模型（仅 cursor review，默认与 --model 相同）
- *   --concurrency <n>        并发 worktree 数（默认 3；上限默认 32，可用 EVOLUTION_CONCURRENCY_MAX 覆盖，硬顶 200）
+ *   --concurrency <n>        并发 worktree 数（省略时沿用 EVOLUTION_CONCURRENCY，否则取上限；上限默认 32，可用 EVOLUTION_CONCURRENCY_MAX 覆盖，硬顶 200）
  *   --items <n>              最多处理 inbox 条目数（不设 = 全部）
  *   --merge                  测试通过后自动合并到目标分支
  *   --target-branch <b>      合并目标分支（默认 main）
@@ -60,7 +60,7 @@ Usage: npm run evolution -- [options]
   --model <name>           cursor agent 模型 (默认 composer-2-fast)
   --review <cli>           review agent: cursor | codex | none  (默认 none)
   --review-model <name>    review 模型，仅 cursor review 时 (默认同 --model)
-  --concurrency <n>        并发数 (默认 3；未设 env 时上限 32，可用 EVOLUTION_CONCURRENCY_MAX 覆盖，硬顶 200)
+  --concurrency <n>        并发数 (省略时沿用 EVOLUTION_CONCURRENCY，否则取上限；上限默认 32，可用 EVOLUTION_CONCURRENCY_MAX 覆盖，硬顶 200)
   --items <n>              最多处理 inbox 条目数
   --merge                  自动合并到目标分支
   --target-branch <b>      合并目标分支 (默认 main)
@@ -346,7 +346,7 @@ async function main() {
     opts.research === 'none' ? 'none' : opts.research === 'cursor' ? 'cursor' : opts.research === 'generic' ? 'generic' : opts.agent === 'cursor' ? 'cursor(默认)' : '(.env/省略)';
   const testAgentLabel = opts.testAgent === 'none' ? 'none' : opts.testAgent === 'gemini' ? 'gemini' : '(沿用.env)';
   console.log(
-    `[evolution] 配置: agent=${opts.agent}${modelLabel} review=${reviewLabel} research=${researchLabel} test-agent=${testAgentLabel} concurrency=${opts.concurrency ?? 3}${opts.merge ? ' auto-merge' : ''}${opts.untilEmpty ? ' until-empty' : ''}`
+    `[evolution] 配置: agent=${opts.agent}${modelLabel} review=${reviewLabel} research=${researchLabel} test-agent=${testAgentLabel} concurrency=${Math.min(EVOLUTION_CONCURRENCY_CLI_MAX, Math.max(1, Number(env.EVOLUTION_CONCURRENCY ?? EVOLUTION_CONCURRENCY_CLI_MAX) || EVOLUTION_CONCURRENCY_CLI_MAX))}${opts.merge ? ' auto-merge' : ''}${opts.untilEmpty ? ' until-empty' : ''}`
   );
 
   // ── 1. optional build ────────────────────────────────────────────────────
