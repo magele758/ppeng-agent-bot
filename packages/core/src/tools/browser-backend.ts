@@ -54,6 +54,8 @@ type PlaywrightRequest = {
   url: () => string;
   method?: () => string;
   headers?: () => Record<string, string>;
+  /** Includes Cookie. `headers()` omits it. */
+  allHeaders?: () => Promise<Record<string, string>>;
   postData?: () => string | null;
   isNavigationRequest?: () => boolean;
   resourceType?: () => string;
@@ -421,6 +423,8 @@ function isDocumentNavigation(request: PlaywrightRequest): boolean {
 
 const BROWSER_PIN_BODY_MAX = 2_000_000;
 const SKIP_BROWSER_HEADER = new Set(['host', 'content-length', 'connection', 'transfer-encoding']);
+/** Wrong after the body is decoded. Chromium splits one set-cookie value on newlines. */
+const DROP_PINNED_RESPONSE_HEADER = new Set(['content-encoding', 'content-length', 'transfer-encoding']);
 
 function browserForwardHeaders(headers: Record<string, string> | undefined): Record<string, string> {
   const out: Record<string, string> = {};
@@ -432,11 +436,31 @@ function browserForwardHeaders(headers: Record<string, string> | undefined): Rec
 
 function browserFulfillHeaders(res: Response): Record<string, string> {
   const headers: Record<string, string> = {};
-  const type = res.headers.get('content-type');
-  const location = res.headers.get('location');
-  if (type) headers['content-type'] = type;
-  if (location) headers.location = location;
+  const cookies = res.headers.getSetCookie();
+  if (cookies.length > 0) headers['set-cookie'] = cookies.join('\n');
+  res.headers.forEach((value, key) => {
+    if (key === 'set-cookie' || DROP_PINNED_RESPONSE_HEADER.has(key)) return;
+    headers[key] = value;
+  });
   return headers;
+}
+
+async function readPinnedBrowserBody(res: Response): Promise<Buffer | undefined> {
+  const body = res.body;
+  if (!body) return Buffer.alloc(0);
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) return Buffer.concat(chunks);
+    total += value.byteLength;
+    if (total > BROWSER_PIN_BODY_MAX) {
+      await reader.cancel();
+      return undefined;
+    }
+    chunks.push(value);
+  }
 }
 
 async function fulfillPinnedBrowserRoute(
@@ -451,7 +475,7 @@ async function fulfillPinnedBrowserRoute(
     const res = await fetchPinnedPublic(req.url(), {
       signal: ctrl.signal,
       method: req.method?.() || 'GET',
-      headers: browserForwardHeaders(req.headers?.()),
+      headers: browserForwardHeaders(await req.allHeaders?.()),
       body: req.postData?.() || undefined,
       allowPrivateHosts: false,
       resolveHost: policy.resolveHost,
@@ -459,8 +483,8 @@ async function fulfillPinnedBrowserRoute(
       followRedirects: false,
       connectTimeoutMs: policy.connectTimeoutMs
     });
-    const buf = Buffer.from(await res.arrayBuffer());
-    if (buf.length > BROWSER_PIN_BODY_MAX) {
+    const buf = await readPinnedBrowserBody(res);
+    if (!buf) {
       await route.abort('blockedbyclient');
       return;
     }
