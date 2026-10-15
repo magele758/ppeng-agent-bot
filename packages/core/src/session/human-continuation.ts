@@ -12,7 +12,7 @@ interface ContinuationState { pending:HumanRequest[]; blockedReason?:string; }
 const key=(id:string)=>PREFIX+id;
 function state(store:SqliteStateStore,id:string):ContinuationState{return store.getDaemonControl<ContinuationState>(key(id))??{pending:[]};}
 function transaction<T>(store:SqliteStateStore,execute:()=>T):T {
- const own=!store.db.isTransaction;if(own)store.db.exec('BEGIN IMMEDIATE');
+ const own=!store.db.inTransaction;if(own)store.db.exec('BEGIN IMMEDIATE');
  try{const result=execute();if(own)store.db.exec('COMMIT');return result;}
  catch(error){if(own)store.db.exec('ROLLBACK');throw error;}
 }
