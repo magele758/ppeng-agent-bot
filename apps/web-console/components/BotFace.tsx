@@ -2,18 +2,28 @@
 
 import { useEffect, useId, useRef } from 'react';
 import {
+  HAPPY_BEAT_MS,
   botFaceColor,
   botFaceIndex,
+  botFaceShape,
   createBlinkClock,
   damp,
   ellipsisScale,
   expressionForMood,
+  happyBeat,
+  hoverDelight,
+  mouthKindForGesture,
+  mouthPath,
   nextIdleLook,
   resolveEyePose,
+  resolveFaceGesture,
+  sleepyBreath,
   speakingMouth,
   stepBlinkClock,
   toolScan,
+  turnFinishHappyUntil,
   type BotFaceColor,
+  type BotFaceShape,
   type LivingFaceMood
 } from '@/lib/bot-face';
 import './bot-face.css';
@@ -29,20 +39,58 @@ export interface BotFaceProps {
   mood?: LivingFaceMood;
 }
 
-type Paint = { top: string; body: string; ink: string; edge: string };
-
-const PAINT: Record<BotFaceColor | 'empty', Paint> = {
-  blue: { top: '#5B93F5', body: '#2563EB', ink: '#0B1B33', edge: '#1D4ED8' },
-  white: { top: '#FFFFFF', body: '#F4F6F8', ink: '#1C1F26', edge: '#C5CBD3' },
-  orange: { top: '#F6B04A', body: '#EA580C', ink: '#2A1204', edge: '#C2410C' },
-  red: { top: '#F07178', body: '#DC2626', ink: '#2A0A0C', edge: '#B91C1C' },
-  purple: { top: '#B49AF8', body: '#7C3AED', ink: '#1A1030', edge: '#6D28D9' },
-  empty: { top: '#F8F9FB', body: '#E6E8EE', ink: '#667085', edge: '#C5CAD3' }
+type Paint = {
+  top: string;
+  body: string;
+  ink: string;
+  edge: string;
+  blush: string;
+  blushOpacity: number;
 };
 
-const EYE_L = { cx: 22, cy: 31 };
-const EYE_R = { cx: 42, cy: 31 };
-const DOTS = [20, 32, 44] as const;
+const PAINT: Record<BotFaceColor | 'empty', Paint> = {
+  blue: { top: '#93C5FD', body: '#3B82F6', ink: '#0B1B33', edge: '#1D4ED8', blush: '#FF8FAB', blushOpacity: 0.5 },
+  white: { top: '#FFFFFF', body: '#F7F8FA', ink: '#2A3140', edge: '#C5CBD3', blush: '#F9A8D4', blushOpacity: 0.9 },
+  orange: { top: '#FDBA74', body: '#F97316', ink: '#3A1604', edge: '#C2410C', blush: '#FFE4E6', blushOpacity: 0.62 },
+  red: { top: '#FCA5A5', body: '#EF4444', ink: '#3F0A0A', edge: '#B91C1C', blush: '#FFE4E6', blushOpacity: 0.55 },
+  purple: { top: '#DDD6FE', body: '#8B5CF6', ink: '#1E1033', edge: '#6D28D9', blush: '#FF8FAB', blushOpacity: 0.42 },
+  mint: { top: '#99F6E4', body: '#14B8A6', ink: '#042F2E', edge: '#0F766E', blush: '#FF8FAB', blushOpacity: 0.48 },
+  pink: { top: '#FBCFE8', body: '#F472B6', ink: '#4A1230', edge: '#DB2777', blush: '#FFF1F2', blushOpacity: 0.75 },
+  yellow: { top: '#FDE68A', body: '#F5C14A', ink: '#3A2A08', edge: '#D97706', blush: '#FB7185', blushOpacity: 0.42 },
+  empty: { top: '#F8F9FB', body: '#E6E8EE', ink: '#667085', edge: '#C5CAD3', blush: '#F9A8D4', blushOpacity: 0.5 }
+};
+
+const BEAN = 'M32 13C50 11 61 22 61 32C61 46 50 53 32 53C14 53 3 46 3 32C3 22 14 11 32 13Z';
+
+const DOTS = [22, 32, 42] as const;
+
+type FaceLayout = {
+  left: number;
+  right: number;
+  eyeY: number;
+  mouthY: number;
+  cheekY: number;
+  cheekL: number;
+  cheekR: number;
+};
+
+function layoutFor(shape: BotFaceShape | null): FaceLayout {
+  switch (shape) {
+    case 'tall':
+      return { left: 26, right: 38, eyeY: 28, mouthY: 44, cheekY: 36, cheekL: 23, cheekR: 41 };
+    case 'bean':
+      return { left: 22, right: 42, eyeY: 30, mouthY: 41, cheekY: 36, cheekL: 17, cheekR: 47 };
+    case 'circle':
+      return { left: 24, right: 40, eyeY: 30, mouthY: 43, cheekY: 37, cheekL: 18, cheekR: 46 };
+    case 'squircle':
+    case null:
+      return { left: 24, right: 40, eyeY: 30, mouthY: 43, cheekY: 37, cheekL: 18, cheekR: 46 };
+    default: {
+      const unreachable: never = shape;
+      return unreachable;
+    }
+  }
+}
 
 type PointerSample = { x: number; y: number; atMs: number };
 
@@ -76,29 +124,68 @@ function subscribeFace(fn: (now: number) => void): () => void {
   };
 }
 
-function eyeShape(cx: number, cy: number, open: number): string {
-  return `translate(${cx} ${cy}) scale(1 ${open.toFixed(3)}) translate(${-cx} ${-cy})`;
+function eyeShape(cx: number, cy: number, open: number, drop: number): string {
+  return `translate(${cx} ${cy + drop}) scale(1 ${open.toFixed(3)}) translate(${-cx} ${-cy})`;
 }
 
-function Eye({ cx, cy, ink, squint }: { cx: number; cy: number; ink: string; squint: boolean }) {
-  const width = squint ? 14 : 13;
-  const height = squint ? 9 : 22;
+function Eye({ cx, cy, ink }: { cx: number; cy: number; ink: string }) {
   return (
     <g data-eye="" data-cx={cx} data-cy={cy}>
-      <rect x={cx - width / 2} y={cy - height / 2} width={width} height={height} rx={width / 2} fill={ink} />
+      <circle cx={cx} cy={cy} r="5.6" fill={ink} />
+      <circle cx={cx - 1.6} cy={cy - 1.9} r="1.65" fill="#fff" opacity="0.92" />
     </g>
   );
 }
 
-/** Original rounded face. Same trimmed name keeps the same color. */
+function Silhouette({
+  shape,
+  fill,
+  edge,
+  dashed
+}: {
+  shape: BotFaceShape | 'empty';
+  fill?: string;
+  edge?: string;
+  dashed?: boolean;
+}) {
+  const stroke = edge ?? 'none';
+  const dash = dashed ? '3 2.4' : undefined;
+  switch (shape) {
+    case 'empty':
+    case 'squircle':
+      return (
+        <rect x="5" y="8" width="54" height="48" rx="22" fill={fill} stroke={stroke} strokeWidth="1.35" strokeDasharray={dash} />
+      );
+    case 'circle':
+      return <circle cx="32" cy="32" r="26" fill={fill} stroke={stroke} strokeWidth="1.35" strokeDasharray={dash} />;
+    case 'tall':
+      return (
+        <rect x="16" y="3" width="32" height="58" rx="16" fill={fill} stroke={stroke} strokeWidth="1.35" strokeDasharray={dash} />
+      );
+    case 'bean':
+      return <path d={BEAN} fill={fill} stroke={stroke} strokeWidth="1.35" strokeDasharray={dash} />;
+    default: {
+      const unreachable: never = shape;
+      return unreachable;
+    }
+  }
+}
+
+/** Original living face. The trimmed name keeps the same color and silhouette. */
 export function BotFace({ name, label, testId, size = 'sm', className, mood = 'idle' }: BotFaceProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const moodRef = useRef(mood);
+  const hoverAtRef = useRef<number | null>(null);
+  const happyUntilRef = useRef<number | null>(null);
+  const prevMoodRef = useRef(mood);
   moodRef.current = mood;
   const reactId = useId().replace(/:/g, '');
   const color = botFaceColor(name);
+  const shape = botFaceShape(name);
   const index = botFaceIndex(name);
   const paint = color ? PAINT[color] : PAINT.empty;
+  const drawnShape: BotFaceShape | 'empty' = shape ?? 'empty';
+  const layout = layoutFor(shape);
   const expression = expressionForMood(mood);
   const clipId = `bot-face-${reactId}`;
   const fillId = `bot-face-fill-${reactId}`;
@@ -107,11 +194,15 @@ export function BotFace({ name, label, testId, size = 'sm', className, mood = 'i
     .join(' ');
 
   useEffect(() => {
+    const until = turnFinishHappyUntil(prevMoodRef.current, mood, performance.now());
+    prevMoodRef.current = mood;
+    if (until !== null) happyUntilRef.current = until;
+  }, [mood]);
+
+  useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return;
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
-    if (motion.matches) return;
-
     let blink = createBlinkClock(performance.now(), Math.random());
     let idle = nextIdleLook(performance.now(), Math.random(), Math.random());
     let shownX = 0;
@@ -121,12 +212,24 @@ export function BotFace({ name, label, testId, size = 'sm', className, mood = 'i
     return subscribeFace((now) => {
       const root = svgRef.current;
       if (!root || document.hidden) return;
+      const reduced = motion.matches;
       const dt = Math.min(48, now - last);
       last = now;
-      const current = expressionForMood(moodRef.current);
-      const blinkStep = stepBlinkClock(blink, now, Math.random());
+      const hovering = hoverAtRef.current !== null;
+      const pointerAge = pointerSample ? now - pointerSample.atMs : null;
+      const gesture = resolveFaceGesture({
+        mood: moodRef.current,
+        hovering,
+        pointerAgeMs: pointerAge,
+        nowMs: now,
+        happyUntilMs: happyUntilRef.current
+      });
+      root.setAttribute('data-face-gesture', gesture);
+      const blinkStep = reduced
+        ? { clock: blink, open: 1 }
+        : stepBlinkClock(blink, now, Math.random());
       blink = blinkStep.clock;
-      if (now >= idle.untilMs) idle = nextIdleLook(now, Math.random(), Math.random());
+      if (!reduced && now >= idle.untilMs) idle = nextIdleLook(now, Math.random(), Math.random());
       const rect = root.getBoundingClientRect();
       const pose = resolveEyePose({
         mood: moodRef.current,
@@ -135,31 +238,45 @@ export function BotFace({ name, label, testId, size = 'sm', className, mood = 'i
         faceCenter: { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 },
         idle
       });
-      shownX = damp(shownX, pose.lookX, dt);
-      shownY = damp(shownY, pose.lookY, dt);
-      const scan = current === 'scan' ? toolScan((now % 1400) / 1400) : 0;
-      const look = root.querySelector('[data-look]');
-      look?.setAttribute('transform', `translate(${((shownX + scan) * 6.2).toFixed(2)} ${(shownY * 4.2).toFixed(2)})`);
-      const openness = current === 'ellipsis' || current === 'scan' ? 1 : blinkStep.open;
+      const targetY = gesture === 'sleepy' ? 0.5 : pose.lookY;
+      shownX = damp(shownX, gesture === 'sleepy' ? 0 : pose.lookX, dt);
+      shownY = damp(shownY, targetY, dt);
+      const scan = !reduced && gesture === 'scan' ? toolScan((now % 1400) / 1400) : 0;
+      let bob = 0;
+      if (!reduced && gesture === 'hover' && hoverAtRef.current !== null) {
+        bob = hoverDelight(now - hoverAtRef.current).dy;
+      } else if (!reduced && gesture === 'happy' && happyUntilRef.current !== null) {
+        bob = happyBeat(now - (happyUntilRef.current - HAPPY_BEAT_MS)).dy;
+      } else if (!reduced && gesture === 'sleepy') {
+        bob = sleepyBreath((now % 2800) / 2800);
+      }
+      root.querySelector('[data-bob]')?.setAttribute('transform', `translate(0 ${bob.toFixed(2)})`);
+      root
+        .querySelector('[data-look]')
+        ?.setAttribute('transform', `translate(${((shownX + scan) * 5.2).toFixed(2)} ${(shownY * 3.4).toFixed(2)})`);
+      const openness =
+        gesture === 'ellipsis' || gesture === 'scan' ? 1 : gesture === 'sleepy' ? 0.42 * blinkStep.open : blinkStep.open;
+      const drop = gesture === 'sleepy' ? 1.6 : 0;
       for (const eye of root.querySelectorAll('[data-eye]')) {
         const cx = Number(eye.getAttribute('data-cx'));
         const cy = Number(eye.getAttribute('data-cy'));
-        eye.setAttribute('transform', eyeShape(cx, cy, openness));
+        eye.setAttribute('transform', eyeShape(cx, cy, openness, drop));
       }
       const mouth = root.querySelector('[data-mouth]');
       if (mouth) {
-        const amount = speakingMouth((now % 520) / 520);
-        mouth.setAttribute('ry', (1.15 + amount * 3.3).toFixed(2));
+        const y = Number(mouth.getAttribute('data-y'));
+        const amount = gesture === 'talk' && !reduced ? speakingMouth((now % 520) / 520) : gesture === 'talk' ? 0.45 : 0;
+        mouth.setAttribute('d', mouthPath(mouthKindForGesture(gesture), y, amount));
       }
       const dotPhase = (now % 900) / 900;
       for (const dot of root.querySelectorAll('[data-dot]')) {
         const cx = Number(dot.getAttribute('data-cx'));
         const cy = Number(dot.getAttribute('data-cy'));
-        const scale = ellipsisScale(Number(dot.getAttribute('data-i')), dotPhase);
+        const scale = reduced ? 1 : ellipsisScale(Number(dot.getAttribute('data-i')), dotPhase);
         dot.setAttribute('transform', `translate(${cx} ${cy}) scale(${scale.toFixed(3)}) translate(${-cx} ${-cy})`);
       }
       const sweep = root.querySelector('[data-sweep]');
-      if (sweep) {
+      if (sweep && !reduced) {
         const glow = 0.28 + 0.72 * (0.5 + 0.5 * Math.sin((now % 1400) / 1400 * Math.PI * 2));
         sweep.setAttribute('opacity', glow.toFixed(3));
       }
@@ -174,11 +291,18 @@ export function BotFace({ name, label, testId, size = 'sm', className, mood = 'i
       data-testid={testId}
       data-bot-face={index === null ? 'empty' : String(index)}
       data-bot-color={color ?? 'empty'}
+      data-bot-shape={shape ?? 'empty'}
       data-face-mood={mood}
       data-face-expression={expression}
       role={label ? 'img' : 'presentation'}
       aria-label={label}
       aria-hidden={label ? undefined : true}
+      onPointerEnter={() => {
+        hoverAtRef.current = performance.now();
+      }}
+      onPointerLeave={() => {
+        hoverAtRef.current = null;
+      }}
     >
       <defs>
         <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
@@ -186,47 +310,71 @@ export function BotFace({ name, label, testId, size = 'sm', className, mood = 'i
           <stop offset="1" stopColor={paint.body} />
         </linearGradient>
         <clipPath id={clipId}>
-          <rect x="3" y="5" width="58" height="54" rx="20" />
+          <Silhouette shape={drawnShape} />
         </clipPath>
       </defs>
-      <rect
-        x="3"
-        y="5"
-        width="58"
-        height="54"
-        rx="20"
-        fill={`url(#${fillId})`}
-        stroke={paint.edge}
-        strokeWidth="1.25"
-        strokeDasharray={color ? undefined : '3 2.4'}
-      />
-      <g clipPath={`url(#${clipId})`}>
-        <ellipse cx="24" cy="14" rx="16" ry="7" fill="#fff" opacity={color === 'white' ? 0.28 : 0.22} />
-        <g data-look="">
-          {expression === 'ellipsis' ? (
-            DOTS.map((cx, i) => (
-              <circle key={cx} data-dot="" data-i={i} data-cx={cx} data-cy="32" cx={cx} cy="32" r="3.6" fill={paint.ink} />
-            ))
-          ) : (
-            <>
-              <Eye cx={EYE_L.cx} cy={EYE_L.cy} ink={paint.ink} squint={expression === 'scan'} />
-              <Eye cx={EYE_R.cx} cy={EYE_R.cy} ink={paint.ink} squint={expression === 'scan'} />
-            </>
-          )}
-          {expression === 'talk' ? (
-            <ellipse data-mouth="" cx="32" cy="48" rx="6" ry="2.2" fill={paint.ink} />
-          ) : null}
-          {expression === 'scan' ? (
+      <g data-bob="">
+        <Silhouette shape={drawnShape} fill={`url(#${fillId})`} edge={paint.edge} dashed={!color} />
+        <g clipPath={`url(#${clipId})`}>
+          <ellipse cx="26" cy="16" rx="14" ry="6" fill="#fff" opacity={color === 'white' ? 0.45 : 0.28} />
+          <ellipse
+            cx={layout.cheekL}
+            cy={layout.cheekY}
+            rx="4.4"
+            ry="2.6"
+            fill={paint.blush}
+            opacity={paint.blushOpacity}
+          />
+          <ellipse
+            cx={layout.cheekR}
+            cy={layout.cheekY}
+            rx="4.4"
+            ry="2.6"
+            fill={paint.blush}
+            opacity={paint.blushOpacity}
+          />
+          <g data-look="">
+            {expression === 'ellipsis' ? (
+              DOTS.map((cx, i) => (
+                <circle
+                  key={cx}
+                  data-dot=""
+                  data-i={i}
+                  data-cx={cx}
+                  data-cy={layout.eyeY}
+                  cx={cx}
+                  cy={layout.eyeY}
+                  r="3.5"
+                  fill={paint.ink}
+                />
+              ))
+            ) : (
+              <>
+                <Eye cx={layout.left} cy={layout.eyeY} ink={paint.ink} />
+                <Eye cx={layout.right} cy={layout.eyeY} ink={paint.ink} />
+              </>
+            )}
             <path
-              data-sweep=""
-              d="M20 49c4-3.4 8-4.8 12-4.8s8 1.4 12 4.8"
+              data-mouth=""
+              data-y={layout.mouthY}
+              d={mouthPath('rest', layout.mouthY)}
               fill="none"
               stroke={paint.ink}
-              strokeWidth="1.8"
+              strokeWidth="1.7"
               strokeLinecap="round"
-              opacity="0.45"
             />
-          ) : null}
+            {expression === 'scan' ? (
+              <path
+                data-sweep=""
+                d={`M${layout.left - 2} ${layout.mouthY + 6}c4-3 8-4 12-4s8 1 12 4`}
+                fill="none"
+                stroke={paint.ink}
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                opacity="0.45"
+              />
+            ) : null}
+          </g>
         </g>
       </g>
     </svg>
