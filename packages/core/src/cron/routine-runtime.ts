@@ -67,7 +67,7 @@ export class RoutineRunStore {
  enqueue(job:CronJobRecord,scheduledAt:string,opts?:{status?:RoutineRunStatus;missedCount?:number;error?:string;key?:string;prompt?:string;precheckChecked?:boolean;eventBody?:string}):RoutineRun {
   const key=opts?.key??`${job.id}:${job.ruleVersion??1}:${job.timezone??'UTC'}:${scheduledAt}`;
   const now=nowIso();const run:RoutineRun={id:createId('routine_run'),routineId:job.id,scheduledAt,timezone:job.timezone??'UTC',status:opts?.status??'queued',mainSessionId:job.sessionId,attempt:1,missedCount:opts?.missedCount??0,createdAt:now,updatedAt:now,precheckChecked:opts?.precheckChecked??false,job:{...job,prompt:opts?.prompt??job.prompt},...(opts?.error?{error:opts.error}:{})};
-  const ownTransaction=!this.store.db.inTransaction;if(ownTransaction)this.store.db.exec('BEGIN IMMEDIATE');
+  const ownTransaction=!this.store.db.isTransaction;if(ownTransaction)this.store.db.exec('BEGIN IMMEDIATE');
   try {
    const existing=this.findByKey(key);if(existing){if(ownTransaction)this.store.db.exec('COMMIT');return existing;}
    if(run.status==='queued'){const parent=this.store.getSession(job.sessionId);const principal=job.metadata.principal as {userId:string;tenantId?:string}|undefined;
@@ -90,7 +90,7 @@ function summarize(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):
  if(parent.status==='running'||parent.status==='waiting_approval'||host.isSessionRunning?.(parent.id))return;
  const description=run.result||run.error||run.status;
  // Insert the summary and notification marker atomically. No user instruction or private run transcript.
- const ownTransaction=!host.store.db.inTransaction;if(ownTransaction)host.store.db.exec('BEGIN IMMEDIATE');
+ const ownTransaction=!host.store.db.isTransaction;if(ownTransaction)host.store.db.exec('BEGIN IMMEDIATE');
  try { const fresh=runs.get(run.id);if(fresh?.notificationSent){if(ownTransaction)host.store.db.exec('COMMIT');return;}
  const summary=host.store.appendMessage(run.mainSessionId,'assistant',[textPart(`[routine:${run.job.name}] ${run.status}\n${description.slice(0,2000)}\nRun: ${run.id}${run.sessionId?` · /api/sessions/${run.sessionId}`:''}`)]);
  if(run.sessionId)host.store.db.prepare('INSERT INTO bot_routine_summary_links(message_id,main_session_id,working_session_id,run_id) VALUES(?,?,?,?)').run(summary.id,run.mainSessionId,run.sessionId,run.id);

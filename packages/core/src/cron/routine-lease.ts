@@ -19,7 +19,7 @@ export class RoutineLease {
   ) {}
 
   static acquire(store: Pick<SqliteStateStore, 'db'>, runId: string, now = Date.now(), duration = ROUTINE_LEASE_MS): RoutineLease | undefined {
-    const ownTransaction = !store.db.inTransaction;
+    const ownTransaction = !store.db.isTransaction;
     if (ownTransaction) store.db.exec('BEGIN IMMEDIATE');
     try {
       const token = randomUUID();
@@ -45,7 +45,7 @@ export class RoutineLease {
 
   /** Fence state changes in the same write transaction as the ownership check. */
   whileOwned<T>(action: () => T): T | undefined {
-    const ownTransaction = !this.store.db.inTransaction;
+    const ownTransaction = !this.store.db.isTransaction;
     if (ownTransaction) this.store.db.exec('BEGIN IMMEDIATE');
     try {
       const result = this.owns() ? action() : undefined;
