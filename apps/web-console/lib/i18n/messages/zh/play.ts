@@ -5,6 +5,8 @@ export const play = {
   chat: '对话',
   bot: 'Bot',
   selectBot: '选择 Bot',
+  botPickerCurrent: '当前 Bot：{name}',
+  botPickerList: 'Bot 列表',
   newBot: '新建 Bot',
   newSession: '新建会话',
   messageContent: '消息内容',
