@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import type { AgentInfo, ApprovalItem, BotInfo, SessionSummary } from '@/lib/types';
 import { visibleBotRoster, type PlaySurface } from '@/lib/bots';
 import { collectActivityTools, collectArtifacts } from '@/lib/activity-tools';
@@ -275,7 +275,7 @@ export function PlayPanel({
 
   const compositionActiveRef = useRef(false);
   const compositionJustEndedRef = useRef(false);
-  const compositionGuardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const compositionGuardTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     return () => {
@@ -308,15 +308,16 @@ export function PlayPanel({
     }, COMPOSITION_ENTER_GUARD_MS);
   };
 
-  const onComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+  const onComposerKeyDown = (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+    const native = event.nativeEvent;
     const decision = decideComposerEnter({
       key: event.key,
       shiftKey: event.shiftKey,
-      isComposing: event.isComposing || event.nativeEvent.isComposing,
+      isComposing: native.isComposing,
       keyCode:
-        event.keyCode === IME_COMPOSITION_KEY_CODE || event.nativeEvent.keyCode === IME_COMPOSITION_KEY_CODE
+        event.keyCode === IME_COMPOSITION_KEY_CODE || native.keyCode === IME_COMPOSITION_KEY_CODE
           ? IME_COMPOSITION_KEY_CODE
-          : event.nativeEvent.keyCode,
+          : native.keyCode,
       compositionActive: compositionActiveRef.current,
       compositionJustEnded: compositionJustEndedRef.current,
     });
