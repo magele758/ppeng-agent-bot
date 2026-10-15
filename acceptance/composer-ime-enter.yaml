@@ -1,0 +1,22 @@
+id: composer-ime-enter
+title: 输入法确认回车不发送
+status: implemented
+requirement: |
+  While the user is composing Chinese with an IME, pressing Enter to confirm a candidate (including an English word picked from the IME) sends the unfinished message. Enter during composition must NOT send.
+  After composition has fully ended, Enter sends as today. Shift+Enter inserts a newline and does not send, if the composer is a textarea or can be one. If it is a single-line input, keep it single-line but still do not send during IME.
+  Do not clear the draft on a swallowed Enter.
+notes: |
+  负责人要求现在修好。标准按该要求在同一变更里实现。
+criteria:
+  - id: AC-1
+    given: 用户正在对话输入框里用输入法组词，候选还没确认（包括从候选里选一个英文词）
+    when: 按下 Enter 确认候选
+    then: 未写完的消息不会发出，输入框里的草稿仍在
+  - id: AC-2
+    given: 输入法组词已经完全结束，草稿仍留在输入框里
+    when: 用户再按 Enter
+    then: 消息按平时一样发送
+  - id: AC-3
+    given: 输入框可以换行
+    when: 用户按 Shift+Enter
+    then: 插入换行，消息不会发送

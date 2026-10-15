@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import type { AgentInfo, ApprovalItem, BotInfo, SessionSummary } from '@/lib/types';
 import { visibleBotRoster, type PlaySurface } from '@/lib/bots';
 import { collectActivityTools, collectArtifacts } from '@/lib/activity-tools';
@@ -28,6 +28,7 @@ import { ActivityPanel } from './ActivityPanel';
 import { ArtifactRail } from './ArtifactRail';
 import { BotCronPanel } from './BotCronPanel';
 import { composerModelLocked } from '@/lib/bot-model';
+import { COMPOSITION_ENTER_GUARD_MS, IME_COMPOSITION_KEY_CODE, decideComposerEnter } from '@/lib/composer-enter';
 import { ApprovalBanner } from './ApprovalBanner';
 import { GoalStatusCard } from './GoalStatusCard';
 import { TrajectoryPanel } from './TrajectoryPanel';
@@ -271,6 +272,58 @@ export function PlayPanel({
       : chat.steerInterruptPolicy === 'queue'
         ? t('play.composer.runningQueue')
         : t('play.composer.runningSteer');
+
+  const compositionActiveRef = useRef(false);
+  const compositionJustEndedRef = useRef(false);
+  const compositionGuardTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (compositionGuardTimerRef.current != null) {
+        window.clearTimeout(compositionGuardTimerRef.current);
+      }
+    };
+  }, []);
+
+  const clearCompositionGuard = () => {
+    if (compositionGuardTimerRef.current != null) {
+      window.clearTimeout(compositionGuardTimerRef.current);
+      compositionGuardTimerRef.current = null;
+    }
+  };
+
+  const onComposerCompositionStart = () => {
+    compositionActiveRef.current = true;
+    compositionJustEndedRef.current = false;
+    clearCompositionGuard();
+  };
+
+  const onComposerCompositionEnd = () => {
+    compositionActiveRef.current = false;
+    compositionJustEndedRef.current = true;
+    clearCompositionGuard();
+    compositionGuardTimerRef.current = window.setTimeout(() => {
+      compositionJustEndedRef.current = false;
+      compositionGuardTimerRef.current = null;
+    }, COMPOSITION_ENTER_GUARD_MS);
+  };
+
+  const onComposerKeyDown = (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+    const native = event.nativeEvent;
+    const decision = decideComposerEnter({
+      key: event.key,
+      shiftKey: event.shiftKey,
+      isComposing: native.isComposing,
+      keyCode:
+        event.keyCode === IME_COMPOSITION_KEY_CODE || native.keyCode === IME_COMPOSITION_KEY_CODE
+          ? IME_COMPOSITION_KEY_CODE
+          : native.keyCode,
+      compositionActive: compositionActiveRef.current,
+      compositionJustEnded: compositionJustEndedRef.current,
+    });
+    if (decision.preventDefault) event.preventDefault();
+    if (decision.send) void chat.sendPlayMessage();
+  };
 
   const applyExecPreset = (preset: ExecPreset) => {
     const support = agentSelectValue;
@@ -1098,12 +1151,9 @@ export function PlayPanel({
                     autoComplete="off"
                     value={chat.playInput}
                     onChange={(e) => chat.setPlayInput(e.target.value)}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          void chat.sendPlayMessage();
-                        }
-                    }}
+                    onCompositionStart={onComposerCompositionStart}
+                    onCompositionEnd={onComposerCompositionEnd}
+                    onKeyDown={onComposerKeyDown}
                   />
                   {chat.speechDictationAvailable ? (
                     <button
