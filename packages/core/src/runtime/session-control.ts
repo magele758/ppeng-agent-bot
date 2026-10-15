@@ -32,9 +32,10 @@ function releaseParkedApproval(host: SessionControlHost, session: SessionRecord)
     host.store.updateApproval(approval.id, 'rejected');
   }
   const metadata = session.metadata ? session.metadata : {};
+  const outcome = runOutcomeFromEnd({ reason: 'abort', sessionStatus: 'failed' });
   host.store.updateSession(session.id, {
     status: parkedCancelStatus(session),
-    metadata: mergeInterruptMetadata(metadata, null)
+    metadata: mergeInterruptMetadata(mergeOutcomeMetadata(metadata, outcome), null)
   });
   return true;
 }

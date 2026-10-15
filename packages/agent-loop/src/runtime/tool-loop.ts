@@ -445,16 +445,23 @@ function approvalMatches(row: ApprovalRecord, sessionId: string, idemKey: string
   return row.sessionId === sessionId && row.idempotencyKey === idemKey;
 }
 
-function hasApprovalStatus(
+/** Per call and per tool+input. A reused id with different args must not inherit an earlier approval. */
+function hookAskKey(toolCall: ToolCallPart): string {
+  return `${toolCall.toolCallId}:${stableJsonHash(toolCall.name, toolCall.input)}`;
+}
+
+/** Newest row wins, so a later approval is not hidden by an older rejection of the same call. */
+function latestMatchingApproval(
   host: ToolLoopHost,
   sessionId: string,
-  idemKey: string,
-  status: 'approved' | 'rejected'
-): boolean {
-  for (const row of host.listApprovals({ status })) {
-    if (approvalMatches(row, sessionId, idemKey)) return true;
+  idemKey: string
+): ApprovalRecord | undefined {
+  let latest: ApprovalRecord | undefined;
+  for (const row of host.listApprovals()) {
+    if (!approvalMatches(row, sessionId, idemKey)) continue;
+    if (!latest || row.createdAt >= latest.createdAt) latest = row;
   }
-  return false;
+  return latest;
 }
 
 function userRejectedToolResult(toolCall: ToolCallPart, toolName: string): ToolLoopResult {
@@ -478,7 +485,7 @@ function holdForHookAsk(
   sessionId: string,
   message: string | undefined
 ): ToolLoopResult {
-  const idemKey = stableJsonHash(tool.name, toolCall.input);
+  const idemKey = hookAskKey(toolCall);
   host.createApproval({
     sessionId,
     toolName: tool.name,
@@ -503,11 +510,10 @@ function resolvePreToolAsk(
   sessionId: string,
   message: string | undefined
 ): ToolLoopResult | undefined {
-  const idemKey = stableJsonHash(tool.name, toolCall.input);
-  if (hasApprovalStatus(host, sessionId, idemKey, 'rejected')) {
-    return userRejectedToolResult(toolCall, tool.name);
-  }
-  if (hasApprovalStatus(host, sessionId, idemKey, 'approved')) return undefined;
+  const idemKey = hookAskKey(toolCall);
+  const latest = latestMatchingApproval(host, sessionId, idemKey);
+  if (latest && latest.status === 'rejected') return userRejectedToolResult(toolCall, tool.name);
+  if (latest && latest.status === 'approved') return undefined;
   return holdForHookAsk(host, tool, toolCall, sessionId, message);
 }
 
