@@ -57,6 +57,7 @@ export const settings = {
     stepSave: 'Choose a default model',
     providerGroup: 'Provider',
     customProvider: 'Custom',
+    presetSiliconflow: 'SiliconFlow',
     apiKey: 'API Key',
     apiKeyPlaceholder: 'Paste your API key',
     apiKeyHint: 'The key is stored on this machine\'s daemon only and is shown masked afterwards. Local services (e.g. Ollama) can keep the placeholder value.',

@@ -13,6 +13,7 @@ import type { ImageAssetRecord, SessionMessage, SessionRecord } from '../types.j
 import { annotateRetiredToolParts, messagesMayNeedRetiredAnnotation } from '../dyn-tools/annotate-retired.js';
 import { readDynToolSettings } from '../dyn-tools/settings.js';
 import { tryCreateDynToolStore } from '../dyn-tools/store.js';
+import { microCompactMessages } from '@ppeng/agent-loop/session';
 import {
   applyOptionalFoldBudget as applyOptionalFoldBudgetA,
   capRollingSummaryText,
@@ -75,7 +76,11 @@ export function applyOptionalFoldBudget(
   session: SessionRecord,
   folded: SessionMessage[]
 ): SessionMessage[] {
-  return applyOptionalFoldBudgetA(session, folded, {
+  const compacted = microCompactMessages(
+    folded,
+    resolveMicroCompactConfig({ store: host.store, env: process.env })
+  ).messages;
+  return applyOptionalFoldBudgetA(session, compacted, {
     maxVisibleMessages: MAX_VISIBLE_MESSAGES,
     selectEpisodic: (msgs, sess) => selectEpisodicForHost(host, sess, msgs),
     emitTrace: (sessionId, event) => host.emitTrace(sessionId, event)
@@ -104,6 +109,7 @@ function selectEpisodicForHost(
       phase: result.cognitivePhase,
       confidence: result.cognitiveConfidence
     });
+    capSessionMap(host.promptBuilder.lastCognitivePhaseBySession);
     return result.selected;
   }
   return selectEpisodicMessages(folded, tokenBudget, {

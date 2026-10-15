@@ -116,6 +116,17 @@ export class SessionStore {
     return rows.map((row) => this.mapSessionRow(row));
   }
 
+  listIdleBackgroundSessions(modes: readonly string[]): SessionRecord[] {
+    if (modes.length === 0) return [];
+    const placeholders = modes.map(() => '?').join(',');
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM sessions WHERE background = 1 AND status = 'idle' AND mode IN (${placeholders}) ORDER BY updated_at DESC`
+      )
+      .all(...modes) as Array<Record<string, unknown>>;
+    return rows.map((row) => this.mapSessionRow(row));
+  }
+
   getSession(id: string): SessionRecord | undefined {
     const row = this.db.prepare(`SELECT * FROM sessions WHERE id = ?`).get(id) as Record<string, unknown> | undefined;
     return row ? this.mapSessionRow(row) : undefined;
@@ -378,6 +389,19 @@ export class SessionStore {
    * Full WAL for audit / UI (append + replace rows). Hide ops are not content.
    * The model path must not use this as input.
    */
+  hasAssistantOrToolMessage(sessionId: string): boolean {
+    const row = this.db
+      .prepare(
+        `SELECT 1 AS hit FROM session_messages
+         WHERE session_id = ?
+           AND role IN ('assistant', 'tool')
+           AND (surface_op IS NULL OR surface_op != 'hide')
+         LIMIT 1`
+      )
+      .get(sessionId);
+    return Boolean(row);
+  }
+
   listMessages(sessionId: string): SessionMessage[] {
     const rows = this.db
       .prepare(

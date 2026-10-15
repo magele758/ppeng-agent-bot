@@ -55,6 +55,8 @@ export interface ToolLoopResult {
   artifacts?: TaskArtifact[];
   metadata?: Record<string, unknown>;
   problem?: HttpProblemDetails;
+  /** Set when a hook asked for approval. The kernel parks instead of persisting this row. */
+  hold?: 'approval';
 }
 
 
@@ -167,6 +169,9 @@ export interface ToolLoopHost {
 
   /** Reject `{ raw }` / `{ _nonObject }` tool args. Default true. */
   gateDirtyInput?: boolean;
+
+  /** Tool-call ids that already have a persisted tool_result. Skip writing them again. */
+  pairedToolCallIds?(sessionId: string): ReadonlySet<string>;
 }
 
 // ============================================================================
@@ -436,6 +441,76 @@ function approvalIndexForSession(
   return index;
 }
 
+function approvalMatches(row: ApprovalRecord, sessionId: string, idemKey: string): boolean {
+  return row.sessionId === sessionId && row.idempotencyKey === idemKey;
+}
+
+function hasApprovalStatus(
+  host: ToolLoopHost,
+  sessionId: string,
+  idemKey: string,
+  status: 'approved' | 'rejected'
+): boolean {
+  for (const row of host.listApprovals({ status })) {
+    if (approvalMatches(row, sessionId, idemKey)) return true;
+  }
+  return false;
+}
+
+function userRejectedToolResult(toolCall: ToolCallPart, toolName: string): ToolLoopResult {
+  const content = '用户拒绝';
+  return {
+    toolCallId: toolCall.toolCallId,
+    name: toolName,
+    ok: false,
+    content,
+    problem: toolInfraProblem(toolName, toolCall.toolCallId, 'APPROVAL_REJECTED', content, {
+      title: 'Approval rejected',
+      status: 403,
+    }),
+  };
+}
+
+function holdForHookAsk(
+  host: ToolLoopHost,
+  tool: ToolContract<Record<string, unknown>>,
+  toolCall: ToolCallPart,
+  sessionId: string,
+  message: string | undefined
+): ToolLoopResult {
+  const idemKey = stableJsonHash(tool.name, toolCall.input);
+  host.createApproval({
+    sessionId,
+    toolName: tool.name,
+    reason: message ?? `Hook asked for approval on ${tool.name}`,
+    args: toolCall.input,
+    idempotencyKey: idemKey,
+  });
+  return {
+    toolCallId: toolCall.toolCallId,
+    name: tool.name,
+    ok: false,
+    content: '',
+    hold: 'approval',
+  };
+}
+
+/** A rejected ask must settle as one tool_result. Creating another approval parks the wave again. */
+function resolvePreToolAsk(
+  host: ToolLoopHost,
+  tool: ToolContract<Record<string, unknown>>,
+  toolCall: ToolCallPart,
+  sessionId: string,
+  message: string | undefined
+): ToolLoopResult | undefined {
+  const idemKey = stableJsonHash(tool.name, toolCall.input);
+  if (hasApprovalStatus(host, sessionId, idemKey, 'rejected')) {
+    return userRejectedToolResult(toolCall, tool.name);
+  }
+  if (hasApprovalStatus(host, sessionId, idemKey, 'approved')) return undefined;
+  return holdForHookAsk(host, tool, toolCall, sessionId, message);
+}
+
 // ============================================================================
 // Single-tool execution
 // ============================================================================
@@ -558,32 +633,8 @@ export async function executeSingleTool(
   }
 
   if (pre.permissionDecision === 'ask') {
-    const idemKey = stableJsonHash(tool.name, toolCall.input);
-    const existingApproved = host
-      .listApprovals({ status: 'approved' })
-      .find((a) => a.sessionId === sessionId && a.idempotencyKey === idemKey);
-    if (!existingApproved) {
-      host.createApproval({
-        sessionId,
-        toolName: tool.name,
-        reason: pre.message ?? `Hook asked for approval on ${tool.name}`,
-        args: toolCall.input,
-        idempotencyKey: idemKey,
-      });
-      return {
-        toolCallId: toolCall.toolCallId,
-        name: tool.name,
-        ok: false,
-        content: 'waiting for approval (hook permissionDecision=ask)',
-        problem: toolInfraProblem(
-          tool.name,
-          toolCall.toolCallId,
-          'HOOK_ASK_APPROVAL',
-          'Hook requested human approval',
-          { title: 'Approval required by hook', status: 403 }
-        ),
-      };
-    }
+    const asked = resolvePreToolAsk(host, tool, toolCall, sessionId, pre.message);
+    if (asked) return asked;
   }
 
   const execInput = pre.input !== undefined ? pre.input : toolCall.input;
@@ -684,6 +735,78 @@ export async function executeSingleTool(
   }
 }
 
+function resultCountsAsWaveFailure(result: ToolLoopResult): boolean {
+  return !result.ok && result.hold !== 'approval';
+}
+
+/** A hook hold is not a failed write, so it must not roll the rest of the wave back. */
+export function waveNeedsCompensation(results: readonly ToolLoopResult[], aborted: boolean): boolean {
+  if (aborted) return true;
+  return results.some(resultCountsAsWaveFailure);
+}
+
+export function toolWaveHeldForApproval(results: readonly { hold?: string }[]): boolean {
+  return results.some((result) => result.hold === 'approval');
+}
+
+export function resultsToPersist(results: readonly ToolLoopResult[]): ToolLoopResult[] {
+  return results.filter((result) => result.hold !== 'approval');
+}
+
+export function skipPersistedToolResult(
+  result: { toolCallId: string },
+  paired: ReadonlySet<string> | undefined
+): boolean {
+  if (!paired) return false;
+  return paired.has(result.toolCallId);
+}
+
+function reopenToolCallId(open: Set<string>, paired: Set<string>, id: string): void {
+  open.add(id);
+  paired.delete(id);
+}
+
+function closeToolCallId(open: Set<string>, paired: Set<string>, id: string): void {
+  if (!open.has(id)) return;
+  open.delete(id);
+  paired.add(id);
+}
+
+function applyToolPairEvent(
+  open: Set<string>,
+  paired: Set<string>,
+  part: { type?: string; toolCallId?: string }
+): void {
+  const id = part.toolCallId;
+  if (!id) return;
+  if (part.type === 'tool_call') {
+    reopenToolCallId(open, paired, id);
+    return;
+  }
+  if (part.type !== 'tool_result') return;
+  closeToolCallId(open, paired, id);
+}
+
+/**
+ * Ids whose latest tool_call already has a later tool_result.
+ * A reused id (heuristic_read_dir) is open again until a result follows that latest call.
+ */
+export function pairedToolCallIdsFromMessages(
+  messages: readonly { parts: readonly { type?: string; toolCallId?: string }[] }[]
+): Set<string> {
+  const open = new Set<string>();
+  const paired = new Set<string>();
+  for (const message of messages) {
+    for (const part of message.parts) applyToolPairEvent(open, paired, part);
+  }
+  return paired;
+}
+
+function toolResultIdsAlreadyPaired(host: ToolLoopHost, sessionId: string): ReadonlySet<string> | undefined {
+  if (!host.pairedToolCallIds) return undefined;
+  return host.pairedToolCallIds(sessionId);
+}
+
 // ============================================================================
 // Wave execution with compensation
 // ============================================================================
@@ -707,7 +830,7 @@ export async function executeToolCalls(
     results.push(...chunkResults);
   }
 
-  if ((results.some((r) => !r.ok) || context.abortSignal?.aborted) && host.compensate) {
+  if (waveNeedsCompensation(results, context.abortSignal?.aborted === true) && host.compensate) {
     const report = await host.compensate(completed);
     const rolledBack = new Set(report?.compensated ?? []);
     for (const result of results) {
@@ -734,7 +857,9 @@ export function processToolResults(
   onModelStreamChunk?: (chunk: ModelStreamChunk) => void
 ): void {
   const images: import('../types.js').ImagePart[] = [];
+  const paired = toolResultIdsAlreadyPaired(host, sessionId);
   for (const r of results) {
+    if (skipPersistedToolResult(r, paired)) continue;
     images.push(...(r.images ?? []));
     const parts: MessagePart[] = [
       {

@@ -24,9 +24,9 @@ export const more = {
     'Only changes the tool_result view sent to the model; stored transcript stays intact. Use this to keep long tool results from filling the window.',
 
 
-  loopTaskMode: 'Default TaskMode',
+  loopTaskMode: 'Default task mode',
   loopSkillScope: 'Default skill scope',
-  loopSkillScopeAria: 'Default skill_scope',
+  loopSkillScopeAria: 'Default skill scope',
   loopInboxCap: 'Inbox overflow cap',
   loopInboxCapTip:
     'Empty or 0 = never drop. A positive integer folds the oldest unclaimed inbox items into one system summary when over cap.',

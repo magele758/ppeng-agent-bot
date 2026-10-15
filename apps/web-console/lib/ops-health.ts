@@ -28,6 +28,12 @@ export interface HealthInputs {
   configWarnings: number;
   /** Failed or blocked runs in the recent self-heal history. Omitted means none known. */
   selfHealBad?: number;
+  /** Status loaded, but the self-heal active list could not be read. */
+  selfHealUnread?: boolean;
+  /** The user ran diagnostics and that request failed. Omitted before a run. */
+  doctorLoadFailed?: boolean;
+  /** The effective-config request failed. Omitted before a request. */
+  configLoadFailed?: boolean;
 }
 
 export type HealthReason =
@@ -35,7 +41,10 @@ export type HealthReason =
   | 'notReady'
   | 'doctorFail'
   | 'doctorWarn'
+  | 'doctorLoadFailed'
   | 'selfHealBad'
+  | 'selfHealUnread'
+  | 'configLoadFailed'
   | 'configWarn';
 
 export interface OverallHealth {
@@ -50,7 +59,10 @@ export function overallHealth(input: HealthInputs): OverallHealth {
   if (input.ready === false) reasons.push('notReady');
   if (input.doctor && input.doctor.summary.fail > 0) reasons.push('doctorFail');
   if (input.doctor && input.doctor.summary.warn > 0) reasons.push('doctorWarn');
+  if (input.doctorLoadFailed) reasons.push('doctorLoadFailed');
   if ((input.selfHealBad ?? 0) > 0) reasons.push('selfHealBad');
+  if (input.selfHealUnread) reasons.push('selfHealUnread');
+  if (input.configLoadFailed) reasons.push('configLoadFailed');
   if (input.configWarnings > 0) reasons.push('configWarn');
   const level: HealthLevel =
     reasons.includes('notReady') || reasons.includes('doctorFail')
@@ -124,6 +136,19 @@ export function selfHealTone(status: string): SelfHealTone {
 /** Plain-language state for a count of running jobs. */
 export function activityState(count: number): 'idle' | 'running' {
   return count > 0 ? 'running' : 'idle';
+}
+
+/** True while a status poll is already running, so a second caller should wait. */
+export function shouldSkipOpsPoll(inFlight: boolean): boolean {
+  return inFlight;
+}
+
+/**
+ * A caller that needs self-heal history must run again after a poll that did not load it.
+ * Returns whether that follow-up is required.
+ */
+export function opsPollNeedsRerun(capturedRuns: boolean, requestedRuns: boolean): boolean {
+  return requestedRuns && !capturedRuns;
 }
 
 /** How many recent runs failed or blocked. Unknown history counts as none. */

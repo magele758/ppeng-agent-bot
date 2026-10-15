@@ -406,6 +406,7 @@ test('scheduler dequeue wakes sessions enqueued on task create', async () => {
   assert.ok(task);
 
   await runtime.runScheduler();
+  await runtime.autonomousScheduler.whenIdle();
   const s = runtime.getSession(bg.id);
   assert.equal(s?.status, 'completed');
   assert.equal(runtime.getLatestAssistantText(bg.id), 'woke');

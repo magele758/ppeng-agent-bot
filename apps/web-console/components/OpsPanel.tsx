@@ -43,6 +43,8 @@ export interface OpsPanelProps {
   selectedSessionId: string | null;
   onSelectSession: (id: string) => void;
   traceRows: { kind: string; ts: string; payload?: unknown }[];
+  traceError: boolean;
+  traceLoaded: boolean;
 }
 
 function Stat({ label, value, tone }: { label: string; value: string; tone?: 'err' }) {
@@ -59,7 +61,9 @@ export function OpsPanel({
   sessions,
   selectedSessionId,
   onSelectSession,
-  traceRows
+  traceRows,
+  traceError,
+  traceLoaded
 }: OpsPanelProps) {
   const { t } = useI18n();
   const [filter, setFilter] = useState('');
@@ -88,24 +92,38 @@ export function OpsPanel({
     if (!selectedSessionId) {
       return <EmptyState title={t('ops.emptyPickSession')} />;
     }
+    if (traceError && turns.length === 0) {
+      return <p role="alert">{t('ops.traceLoadFailed')}</p>;
+    }
+    if (!traceLoaded) {
+      return <p className="muted">{t('ops.traceLoading')}</p>;
+    }
     if (!turns.length) {
       return <EmptyState title={t('ops.emptyTraj')} />;
     }
     if (!visibleTurns.length) {
       const onlyErrorsEmpty = errorsOnly && kindQuery.trim() === '';
       return (
-        <EmptyState
-          title={onlyErrorsEmpty ? t('ops.trace.noErrorTurns') : t('ops.trace.noMatchEvents')}
-          description={onlyErrorsEmpty ? t('ops.trace.noErrorTurnsHint') : t('ops.trace.noMatchEventsHint')}
-          action={
-            <button type="button" className="btn btn-ghost btn-sm" onClick={clearTraceFilters}>
-              {t('ops.trace.clearFilters')}
-            </button>
-          }
-        />
+        <>
+          {traceError ? <p role="alert">{t('ops.traceLoadFailed')}</p> : null}
+          <EmptyState
+            title={onlyErrorsEmpty ? t('ops.trace.noErrorTurns') : t('ops.trace.noMatchEvents')}
+            description={onlyErrorsEmpty ? t('ops.trace.noErrorTurnsHint') : t('ops.trace.noMatchEventsHint')}
+            action={
+              <button type="button" className="btn btn-ghost btn-sm" onClick={clearTraceFilters}>
+                {t('ops.trace.clearFilters')}
+              </button>
+            }
+          />
+        </>
       );
     }
-    return <TraceTurnList groups={visibleTurns} bulk={bulk} />;
+    return (
+      <>
+        {traceError ? <p role="alert">{t('ops.traceLoadFailed')}</p> : null}
+        <TraceTurnList groups={visibleTurns} bulk={bulk} />
+      </>
+    );
   };
 
   return (

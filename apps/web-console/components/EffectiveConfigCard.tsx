@@ -20,10 +20,13 @@ import { getMessage } from '@/lib/i18n/t';
 import type { MessageKey } from '@/lib/i18n/messages/types';
 
 export function EffectiveConfigCard({
-  onLoaded
+  onLoaded,
+  onLoadFailed
 }: {
   /** Lets a parent (the health overview) fold config warnings into its verdict. */
   onLoaded?: (payload: EffectiveConfigPayload) => void;
+  /** True after a failed load, false after a successful one. Not called before the request. */
+  onLoadFailed?: (failed: boolean) => void;
 }) {
   const { t, messages } = useI18n();
   const [data, setData] = useState<EffectiveConfigPayload | null>(null);
@@ -38,12 +41,14 @@ export function EffectiveConfigCard({
       const payload = (await api('/api/config/effective')) as EffectiveConfigPayload;
       setData(payload);
       onLoaded?.(payload);
+      onLoadFailed?.(false);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
+      onLoadFailed?.(true);
     } finally {
       setBusy(false);
     }
-  }, [onLoaded]);
+  }, [onLoaded, onLoadFailed]);
 
   useEffect(() => {
     void load();
@@ -94,7 +99,7 @@ export function EffectiveConfigCard({
         <div className="card-head">
           <h3>{t('config.title')}</h3>
         </div>
-        <div className="empty-hint">{err ? `${t('config.loadFailed')}: ${err}` : t('config.loading')}</div>
+        <div className="empty-hint" role={err ? 'alert' : undefined}>{err ? `${t('config.loadFailed')}: ${err}` : t('config.loading')}</div>
       </div>
     );
   }
@@ -156,7 +161,7 @@ export function EffectiveConfigCard({
           <p className="muted ops-cfg__howto">{t('config.howToChange')}</p>
         </div>
       ) : null}
-      {err ? <div className="ops-cfg__error">{err}</div> : null}
+      {err ? <div className="ops-cfg__error" role="alert">{err}</div> : null}
     </div>
   );
 }

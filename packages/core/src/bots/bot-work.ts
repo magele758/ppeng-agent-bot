@@ -1,5 +1,6 @@
 import { stampSessionWake } from '../approval/unattended-approval.js';
 import { parseRunOutcome } from '../session/run-outcome.js';
+import { assistantTextsFromFold } from '../session/visible-assistant.js';
 import { retireTaskContextSources } from '../session/task-context.js';
 import { closeOpenToolWave } from '../session/tool-wave-close.js';
 import { createId, nowIso } from '../id.js';
@@ -192,8 +193,7 @@ export function dispatchBotTask(host:BotWorkHost,input:{principal:BotPrincipal;r
  return task;
 }
 function lastAssistant(store:SqliteStateStore,sessionId:string,afterId:string):string {
- const messages=store.listMessages(sessionId);const anchor=messages.findIndex(m=>m.id===afterId);
- return messages.slice(anchor+1).filter(m=>m.role==='assistant'&&!m.hidden).map(m=>m.parts.filter(p=>p.type==='text').map(p=>p.type==='text'?p.text:'').join('')).filter(Boolean).join('\n').slice(-12000);
+ return assistantTextsFromFold(store, sessionId, afterId).join('\n').slice(-12000);
 }
 export function hasPendingSessionWake(store:SqliteStateStore,sessionId:string):boolean { return !!store.db.prepare('SELECT 1 FROM scheduler_wake WHERE session_id=? LIMIT 1').get(sessionId); }
 /** True means the approved continuation is in flight; never treats approval itself as completion. */

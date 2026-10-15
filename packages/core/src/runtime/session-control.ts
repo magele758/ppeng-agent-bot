@@ -3,16 +3,40 @@
  */
 
 import type { McpManager } from '../mcp/mcp-manager.js';
+import { mergeInterruptMetadata } from '../session/interrupt.js';
 import { mergeOutcomeMetadata, runOutcomeFromEnd } from '../session/run-outcome.js';
 import { closeOpenToolWave } from '../session/tool-wave-close.js';
 import type { SqliteStateStore } from '../storage.js';
 import type { TraceEvent } from '../stores/trace.js';
+import type { SessionRecord } from '../types.js';
 
 export interface SessionControlHost {
   store: SqliteStateStore;
   sessionAbortControllers: Map<string, AbortController>;
   backgroundJobAborts: Map<string, AbortController>;
   emitTrace(sessionId: string, event: Omit<TraceEvent, 'ts' | 'sessionId'>): void;
+}
+
+const AUTONOMOUS_BACKGROUND_MODES: ReadonlySet<SessionRecord['mode']> = new Set(['task', 'teammate']);
+
+/** Idle would let the next autonomous sweep start the task the user just stopped. */
+function parkedCancelStatus(session: SessionRecord): 'failed' | 'idle' {
+  if (session.background && AUTONOMOUS_BACKGROUND_MODES.has(session.mode)) return 'failed';
+  return 'idle';
+}
+
+function releaseParkedApproval(host: SessionControlHost, session: SessionRecord): boolean {
+  if (session.status !== 'waiting_approval') return false;
+  for (const approval of host.store.listApprovals({ status: 'pending' })) {
+    if (approval.sessionId !== session.id) continue;
+    host.store.updateApproval(approval.id, 'rejected');
+  }
+  const metadata = session.metadata ? session.metadata : {};
+  host.store.updateSession(session.id, {
+    status: parkedCancelStatus(session),
+    metadata: mergeInterruptMetadata(metadata, null)
+  });
+  return true;
 }
 
 export function cancelSession(host: SessionControlHost, sessionId: string): void {
@@ -22,7 +46,7 @@ export function cancelSession(host: SessionControlHost, sessionId: string): void
     /* fold/append must not block abort */
   }
   const session = host.store.getSession(sessionId);
-  if (session) {
+  if (session && !releaseParkedApproval(host, session)) {
     const outcome = runOutcomeFromEnd({ reason: 'abort', sessionStatus: 'failed' });
     host.store.updateSession(sessionId, {
       metadata: mergeOutcomeMetadata(session.metadata ?? {}, outcome)

@@ -17,6 +17,8 @@ export const tasks = {
   },
   filterLabel: '按状态筛选',
   clearFilters: '清除筛选',
+  loadFailed: '列表没有加载成功。已有内容会保留，请稍后重试。',
+  actionFailed: '操作没有完成：{error}',
   openSession: '查看会话',
   queue: {
     tasksTitle: '任务队列',

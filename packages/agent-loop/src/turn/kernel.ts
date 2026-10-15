@@ -51,6 +51,8 @@ import {
 import { claimAndApplyInbox } from '../session/apply-claimed-inbox.js';
 import { decideRewindTail, latestCheckpoint } from '../session/checkpoint.js';
 import { clampFoldToVisible } from '../session/fold-budget.js';
+import { DEFAULT_MICRO_COMPACT_CONFIG, microCompactMessages } from '../session/micro-compact.js';
+import { resultsToPersist, toolWaveHeldForApproval } from '../runtime/tool-loop.js';
 import { resolveHistoryTokenBudget } from '../session/session-budget.js';
 import { estimateUsageCostUsd, mergeCostUsd } from '../model/token-cost.js';
 import { mergeUsage, splitCumulativePromptTokens } from '../model/usage.js';
@@ -159,6 +161,30 @@ function sessionParkedForApproval<T extends { id: string; status: string }>(
   return store.updateSession(session.id, { status: 'waiting_approval' });
 }
 
+function parkResumedApproval(
+  host: TurnKernelHost,
+  sid: string,
+  remaining: readonly { toolCallId: string }[],
+  writerRunId: string,
+  interrupt: RunInterruptState
+): SessionRecord {
+  const approvalIds = host.store
+    .listApprovals({ status: 'pending' })
+    .filter((approval) => approval.sessionId === sid)
+    .map((approval) => approval.id);
+  const nextInterrupt = createWaitingApprovalInterrupt({
+    toolCallIds: remaining.map((call) => call.toolCallId),
+    approvalIds,
+    writerRunId,
+    executedToolCallIds: interrupt.executedToolCallIds,
+  });
+  const current = host.store.getSession(sid) as SessionRecord;
+  return host.store.updateSession(sid, {
+    status: 'waiting_approval',
+    metadata: mergeInterruptMetadata(current.metadata ?? {}, nextInterrupt),
+  });
+}
+
 async function continueResumedToolWave(input: {
   host: TurnKernelHost;
   sid: string;
@@ -194,21 +220,7 @@ async function continueResumedToolWave(input: {
     }
   );
   if (gate === 'waiting') {
-    const approvalIds = input.host.store
-      .listApprovals({ status: 'pending' })
-      .filter((approval) => approval.sessionId === input.sid)
-      .map((approval) => approval.id);
-    const nextInterrupt = createWaitingApprovalInterrupt({
-      toolCallIds: input.remaining.map((call) => call.toolCallId),
-      approvalIds,
-      writerRunId: input.writerRunId,
-      executedToolCallIds: input.interrupt.executedToolCallIds,
-    });
-    const current = input.host.store.getSession(input.sid) as SessionRecord;
-    return input.host.store.updateSession(input.sid, {
-      status: 'waiting_approval',
-      metadata: mergeInterruptMetadata(current.metadata ?? {}, nextInterrupt),
-    });
+    return parkResumedApproval(input.host, input.sid, input.remaining, input.writerRunId, input.interrupt);
   }
   if (gate === 'skip') return undefined;
   const allowIds = input.interrupt.toolCallIds.filter(
@@ -226,13 +238,16 @@ async function continueResumedToolWave(input: {
     picked.resolvedTools
   );
   input.host.processToolResults(
-    results,
+    resultsToPersist(results),
     executable,
     input.context.session,
     undefined,
     input.sessionId,
     input.onModelStreamChunk
   );
+  if (toolWaveHeldForApproval(results)) {
+    return parkResumedApproval(input.host, input.sid, input.remaining, input.writerRunId, input.interrupt);
+  }
   results.forEach((result) => {
     input.host.recordToolUse?.({
       name: result.name,
@@ -251,6 +266,10 @@ async function continueResumedToolWave(input: {
 // ============================================================================
 // Main kernel
 // ============================================================================
+
+function sessionForTurn(host: TurnKernelHost, sessionId: string, fallback: SessionRecord): SessionRecord {
+  return host.store.getSession(sessionId) ?? fallback;
+}
 
 export async function runSessionKernel(
   host: TurnKernelHost,
@@ -520,12 +539,13 @@ export async function runSessionKernel(
       applyFoldBudget: (sess, foldedMsgs) => {
         if (host.applyFoldBudget) return host.applyFoldBudget(sess, foldedMsgs);
         if (!loopConfig.foldBudgetClamp) return foldedMsgs;
+        const compacted = microCompactMessages(foldedMsgs, DEFAULT_MICRO_COMPACT_CONFIG).messages;
         const tokenBudget = resolveHistoryTokenBudget(
           'RAW_AGENT_COMPACT_TOKEN_THRESHOLD',
           { maxContextTokens: loopConfig.maxContextTokens ?? host.maxContextTokens },
           env
         );
-        return clampFoldToVisible(foldedMsgs, {
+        return clampFoldToVisible(compacted, {
           maxVisible: loopConfig.maxVisibleMessages,
           tokenBudget,
         });
@@ -1265,7 +1285,7 @@ export async function runSessionKernel(
         }
 
         const goal = await host.evaluateGoalGate?.({
-          session,
+          session: sessionForTurn(host, sid, session),
           agent,
           signal,
           workspaceRoot: workspaceRoot ?? host.repoRoot,
@@ -1318,7 +1338,7 @@ export async function runSessionKernel(
 
       const closedByGate = { reported: false, ids: [] as string[] };
       const approvalResult =
-        (await host.checkToolApprovals?.(toolCalls, context, session, {
+        (await host.checkToolApprovals?.(toolCalls, context, sessionForTurn(host, sid, session), {
           filePolicy,
           turnTools: resolvedTools,
           closedByGate,
@@ -1420,7 +1440,17 @@ export async function runSessionKernel(
         sid,
         resolvedTools
       );
-      host.processToolResults(results, executable, context.session, undefined, sid, options?.onModelStreamChunk);
+      host.processToolResults(
+        resultsToPersist(results),
+        executable,
+        context.session,
+        undefined,
+        sid,
+        options?.onModelStreamChunk
+      );
+      if (toolWaveHeldForApproval(results)) {
+        return parkForApproval();
+      }
       for (const r of results) {
         host.recordToolUse?.({ name: r.name, sessionId: sid, turn, ok: r.ok });
       }

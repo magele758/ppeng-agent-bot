@@ -945,18 +945,23 @@ export function usePlayChat(deps: PlayChatDeps) {
       const sid = selectedSessionRef.current;
       if (!sid) return;
       const cond = condition.trim();
-      await api(`/api/sessions/${sid}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(
-          cond
-            ? { goalCondition: cond, goalEnabled: true }
-            : { goalCondition: '', goalEnabled: false }
-        )
-      });
-      await refreshPlayPanel();
+      try {
+        await api(`/api/sessions/${sid}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(
+            cond
+              ? { goalCondition: cond, goalEnabled: true }
+              : { goalCondition: '', goalEnabled: false }
+          )
+        });
+        await refreshPlayPanel();
+      } catch (e) {
+        setPlayStatus({ text: e instanceof Error ? e.message : String(e), err: true });
+        await refreshPlayPanel();
+      }
     },
-    [selectedSessionRef, refreshPlayPanel]
+    [refreshPlayPanel, selectedSessionRef]
   );
 
   const persistPendingStrategy = useCallback(
@@ -977,39 +982,53 @@ export function usePlayChat(deps: PlayChatDeps) {
 
   const saveAutonomy = useCallback(
     async (level: AutonomyLevel) => {
+      const previous = autonomyDraft;
       setAutonomyDraft(level);
       const sid = selectedSessionRef.current;
       if (!sid) return;
-      await api(`/api/sessions/${sid}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          permissionMode: autonomyToPermission(level),
-          ...(level === 'autonomous' ? { confirmBypass: true } : {})
-        })
-      });
-      await refreshPlayPanel();
+      try {
+        await api(`/api/sessions/${sid}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            permissionMode: autonomyToPermission(level),
+            ...(level === 'autonomous' ? { confirmBypass: true } : {})
+          })
+        });
+        await refreshPlayPanel();
+      } catch (e) {
+        setAutonomyDraft(previous);
+        setPlayStatus({ text: e instanceof Error ? e.message : String(e), err: true });
+        await refreshPlayPanel();
+      }
     },
-    [selectedSessionRef, refreshPlayPanel]
+    [autonomyDraft, refreshPlayPanel, selectedSessionRef]
   );
 
   const saveTaskMode = useCallback(
     async (next: LabTaskMode) => {
+      const previousMode = taskMode;
+      const previousEngine = orchestrationEngine;
       setTaskMode(next);
-      if (next === 'dynamic_workflow') setOrchestrationEngine('ptc');
-      else setOrchestrationEngine('legacy');
+      const nextEngine = next === 'dynamic_workflow' ? 'ptc' : 'legacy';
+      setOrchestrationEngine(nextEngine);
       const sid = selectedSessionRef.current;
       if (!sid) return;
-      await api(`/api/sessions/${encodeURIComponent(sid)}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(
-          orchestrationBody(next, next === 'dynamic_workflow' ? 'ptc' : 'legacy', skillScope)
-        )
-      });
-      await refreshPlayPanel();
+      try {
+        await api(`/api/sessions/${encodeURIComponent(sid)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(orchestrationBody(next, nextEngine, skillScope))
+        });
+        await refreshPlayPanel();
+      } catch (e) {
+        setTaskMode(previousMode);
+        setOrchestrationEngine(previousEngine);
+        setPlayStatus({ text: e instanceof Error ? e.message : String(e), err: true });
+        await refreshPlayPanel();
+      }
     },
-    [refreshPlayPanel, selectedSessionRef, skillScope]
+    [orchestrationEngine, refreshPlayPanel, selectedSessionRef, skillScope, taskMode]
   );
 
   const saveWorkspaceBinding = useCallback(
@@ -1034,42 +1053,56 @@ export function usePlayChat(deps: PlayChatDeps) {
 
   const saveSkillScope = useCallback(
     async (next: LabSkillScope) => {
+      const previous = skillScope;
       setSkillScope(next);
       const sid = selectedSessionRef.current;
       if (!sid) return;
-      await api(`/api/sessions/${encodeURIComponent(sid)}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ skillScope: next })
-      });
+      try {
+        await api(`/api/sessions/${encodeURIComponent(sid)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ skillScope: next })
+        });
+      } catch (e) {
+        setSkillScope(previous);
+        setPlayStatus({ text: e instanceof Error ? e.message : String(e), err: true });
+        await refreshPlayPanel();
+      }
     },
-    [selectedSessionRef]
+    [refreshPlayPanel, selectedSessionRef, skillScope]
   );
 
   const saveOrchestrationEngine = useCallback(
     async (engine: OrchestrationEngine) => {
+      const previousEngine = orchestrationEngine;
+      const previousMode = taskMode;
       setOrchestrationEngine(engine);
+      const nextMode = engine === 'ptc' ? 'dynamic_workflow' : taskMode;
       if (engine === 'ptc') setTaskMode('dynamic_workflow');
       const sid = selectedSessionRef.current;
       if (!sid) return;
-      await api(`/api/sessions/${encodeURIComponent(sid)}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(
-          orchestrationBody(
-            engine === 'ptc' ? 'dynamic_workflow' : taskMode,
-            engine,
-            skillScope
-          )
-        )
-      });
-      await refreshPlayPanel();
+      try {
+        await api(`/api/sessions/${encodeURIComponent(sid)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(orchestrationBody(nextMode, engine, skillScope))
+        });
+        await refreshPlayPanel();
+      } catch (e) {
+        setOrchestrationEngine(previousEngine);
+        setTaskMode(previousMode);
+        setPlayStatus({ text: e instanceof Error ? e.message : String(e), err: true });
+        await refreshPlayPanel();
+      }
     },
-    [refreshPlayPanel, selectedSessionRef, taskMode, skillScope]
+    [orchestrationEngine, refreshPlayPanel, selectedSessionRef, skillScope, taskMode]
   );
 
   const setExecutionMode = useCallback(
     async (nextAgentId: string, nextMode: 'chat' | 'task' = 'chat') => {
+      const previousAgent = agentId;
+      const previousMode = mode;
+      const previousEngine = orchestrationEngine;
       setAgentId(nextAgentId);
       setMode(nextMode);
       const nextEngine = nextMode === 'task' ? orchestrationEngine : 'legacy';
@@ -1087,12 +1120,16 @@ export function usePlayChat(deps: PlayChatDeps) {
             }),
           });
           setPlayMeta((prev) => `${nextMode} · ${prev.split(' · ')[1] || 'idle'} · agent=${nextAgentId}`);
-        } catch {
-          /* ignore non-blocking */
+        } catch (e) {
+          setAgentId(previousAgent);
+          setMode(previousMode);
+          setOrchestrationEngine(previousEngine);
+          setPlayStatus({ text: e instanceof Error ? e.message : String(e), err: true });
+          await refreshPlayPanel();
         }
       }
     },
-    [orchestrationEngine, playSending, waitTyping, selectedSessionRef, taskMode, skillScope]
+    [agentId, mode, orchestrationEngine, playSending, refreshPlayPanel, selectedSessionRef, skillScope, taskMode, waitTyping]
   );
 
   const toggleModelView=async(show:boolean)=>{setShowModelView(show);if(!show)return;const sid=selectedSessionRef.current;if(!sid)return;try{const data=await api(`/api/sessions/${sid}/model-view`) as SessionModelViewPayload;if(selectedSessionRef.current===sid)setModelViewPayload(data);}catch(error){setPlayStatus({text:String(error),err:true});}};

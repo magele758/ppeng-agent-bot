@@ -5,7 +5,10 @@ import {
   envToolResultMaxChars,
   executeSingleTool,
   executeToolCalls,
+  resultsToPersist,
   filterValidToolCalls,
+  pairedToolCallIdsFromMessages,
+  processToolResults,
   truncateToolContent,
   type CompletedWaveItem,
   type ToolLoopHost,
@@ -422,6 +425,137 @@ describe('checkToolApprovals', () => {
     );
     expect(parts.map((part) => part.toolCallId).sort()).toEqual(['bash-1', 'read-1']);
     expect(parts.find((part) => part.toolCallId === 'read-1')?.content).not.toContain('tool_result_missing');
+  });
+});
+
+describe('pre_tool_use ask', () => {
+  it('holds for approval instead of writing a failure result', async () => {
+    const h = host({
+      runLifecycleHook: async () => ({ permissionDecision: 'ask', message: 'please confirm' }),
+    });
+    const echo = tool('echo', async () => ({ ok: true, content: 'ran' }));
+    const result = await executeSingleTool(h, [echo], call('echo', { a: 1 }), ctx, false, 's1');
+    expect(result.hold).toBe('approval');
+    expect(result.content).not.toContain('waiting for approval');
+    expect(result.ok).toBe(false);
+    expect(h.appended).toEqual([]);
+    const held = await executeToolCalls(h, [echo], [call('echo', { a: 1 }, 'hold-1')], ctx, false, 's1', 1);
+    const compensate = vi.fn(async () => undefined);
+    const withCompensate = host({
+      compensate,
+      runLifecycleHook: async (input) => (input.tool === 'echo' ? { permissionDecision: 'ask' } : {}),
+    });
+    const wave = await executeToolCalls(
+      withCompensate,
+      [echo, tool('write_file', async () => ({ ok: true, content: 'wrote' }))],
+      [call('echo', { a: 1 }, 'ask-1'), call('write_file', { path: 'a' }, 'write-1')],
+      ctx,
+      false,
+      's1',
+      2
+    );
+    expect(wave.find((item) => item.toolCallId === 'ask-1')?.hold).toBe('approval');
+    expect(wave.find((item) => item.toolCallId === 'write-1')?.ok).toBe(true);
+    expect(compensate).not.toHaveBeenCalled();
+    expect(held[0]?.hold).toBe('approval');
+  });
+
+  it('writes one user-rejected result on resume and does not open another approval', async () => {
+    const approvals: Array<{ id: string; status: string; sessionId: string; idempotencyKey?: string }> = [];
+    let created = 0;
+    let ran = 0;
+    const h = host({
+      runLifecycleHook: async () => ({ permissionDecision: 'ask', message: 'please confirm' }),
+      listApprovals: (filter) =>
+        approvals.filter((row) => !filter?.status || row.status === filter.status) as never,
+      createApproval: (input) => {
+        created += 1;
+        const row = { id: `ap-${created}`, status: 'pending', createdAt: '', updatedAt: '', ...input };
+        approvals.push(row);
+        return row as never;
+      },
+    });
+    const echo = tool('echo', async () => {
+      ran += 1;
+      return { ok: true, content: 'ran' };
+    });
+    const toolCall = call('echo', { a: 1 }, 'ask-1');
+    const first = await executeSingleTool(h, [echo], toolCall, ctx, false, 's1');
+    expect(first.hold).toBe('approval');
+    expect(created).toBe(1);
+    expect(ran).toBe(0);
+    approvals[0]!.status = 'rejected';
+    const resumed = await executeToolCalls(h, [echo], [toolCall], ctx, false, 's1', 1);
+    expect(created).toBe(1);
+    expect(ran).toBe(0);
+    expect(resumed).toHaveLength(1);
+    expect(resumed[0]?.hold).toBeUndefined();
+    expect(resumed[0]?.ok).toBe(false);
+    expect(resumed[0]?.content).toBe('用户拒绝');
+    processToolResults(h, resultsToPersist(resumed), [toolCall], ctx.session, undefined, 's1');
+    expect(h.appended).toHaveLength(1);
+    const part = (h.appended[0] as { parts: Array<{ type?: string; content?: string; ok?: boolean }> }).parts[0];
+    expect(part?.type).toBe('tool_result');
+    expect(part?.content).toBe('用户拒绝');
+    expect(part?.ok).toBe(false);
+    approvals[0]!.status = 'approved';
+    const allowed = await executeSingleTool(h, [echo], toolCall, ctx, false, 's1');
+    expect(allowed.ok).toBe(true);
+    expect(allowed.content).toBe('ran');
+    expect(created).toBe(1);
+    expect(ran).toBe(1);
+  });
+});
+
+describe('already paired tool results', () => {
+  it('does not append a second result for the same tool call id', () => {
+    const h = host({
+      pairedToolCallIds: () => new Set(['done-1']),
+    });
+    processToolResults(
+      h,
+      [
+        { toolCallId: 'done-1', name: 'echo', ok: false, content: 'late' },
+        { toolCallId: 'open-1', name: 'echo', ok: true, content: 'fresh' },
+      ],
+      [],
+      ctx.session,
+      undefined,
+      's1'
+    );
+    const ids = h.appended.flatMap(
+      (entry) => (entry as { parts: Array<{ toolCallId?: string }> }).parts.map((part) => part.toolCallId)
+    );
+    expect(ids).toEqual(['open-1']);
+  });
+
+  it('treats a reused id as open until a result follows its latest call', () => {
+    const reopened = [
+      { parts: [{ type: 'tool_call', toolCallId: 'heuristic_read_dir' }] },
+      { parts: [{ type: 'tool_result', toolCallId: 'heuristic_read_dir' }] },
+      { parts: [{ type: 'tool_call', toolCallId: 'heuristic_read_dir' }] },
+    ];
+    expect([...pairedToolCallIdsFromMessages(reopened)]).toEqual([]);
+    expect([...pairedToolCallIdsFromMessages(reopened.slice(0, 2))]).toEqual(['heuristic_read_dir']);
+    const closedAgain = [
+      ...reopened,
+      { parts: [{ type: 'tool_result', toolCallId: 'heuristic_read_dir' }] },
+    ];
+    expect(pairedToolCallIdsFromMessages(closedAgain).has('heuristic_read_dir')).toBe(true);
+
+    const h = host({
+      pairedToolCallIds: () => pairedToolCallIdsFromMessages(reopened),
+    });
+    processToolResults(
+      h,
+      [{ toolCallId: 'heuristic_read_dir', name: 'echo', ok: true, content: 'new' }],
+      [],
+      ctx.session,
+      undefined,
+      's1'
+    );
+    expect(h.appended).toHaveLength(1);
+    expect((h.appended[0] as { parts: Array<{ content?: string }> }).parts[0]?.content).toBe('new');
   });
 });
 

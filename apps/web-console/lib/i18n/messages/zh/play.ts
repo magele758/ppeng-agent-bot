@@ -315,6 +315,7 @@ export const play = {
     tip: '工具装配档（HOW）。自动=全工具；极速=少工具快答；规划 / 团队 / 研究 / 浏览器 / 电脑 / 动态工作流各自打开对应能力。会话绑定后不可改。',
     bound: '会话已绑定运行模式（write-once）',
     how: 'HOW：工具装配档',
+    label: '任务模式',
     auto: '自动（全工具）',
     fast: '极速',
     planner: '规划',
@@ -561,7 +562,15 @@ export const play = {
   },
 
   goalCard: {
-    softGate: ' · 软闸 fail-open'
+    title: '目标',
+    softGate: ' · 软闸 fail-open',
+    loadFailed: '目标状态没有加载成功',
+    verify: ' · 校验 {kind}',
+    statusDeriving: '整理中',
+    statusActive: '进行中',
+    statusWaiting: '等待你',
+    statusAchieved: '已达成',
+    statusUnmet: '未达成并结束'
   },
 
   cronPanel: {

@@ -35,7 +35,13 @@ function CheckRow({ check }: { check: DoctorCheckLike }) {
 }
 
 /** One-click read-only diagnostics: failures and warnings first, passes folded away. */
-export function DoctorCard({ onReport }: { onReport?: (report: DoctorReportLike | null) => void }) {
+export function DoctorCard({
+  onReport,
+  onLoadFailed
+}: {
+  onReport?: (report: DoctorReportLike | null) => void;
+  onLoadFailed?: (failed: boolean) => void;
+}) {
   const { t, locale } = useI18n();
   const [report, setReport] = useState<DoctorReportLike | null>(null);
   const [busy, setBusy] = useState(false);
@@ -48,12 +54,14 @@ export function DoctorCard({ onReport }: { onReport?: (report: DoctorReportLike 
       const next = (await api('/api/doctor')) as DoctorReportLike;
       setReport(next);
       onReport?.(next);
+      onLoadFailed?.(false);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
+      onLoadFailed?.(true);
     } finally {
       setBusy(false);
     }
-  }, [onReport]);
+  }, [onLoadFailed, onReport]);
 
   const split = useMemo(() => (report ? splitDoctorChecks(report.checks) : null), [report]);
   const checkedAt = report ? new Date(report.checkedAt).toLocaleTimeString(locale) : '';

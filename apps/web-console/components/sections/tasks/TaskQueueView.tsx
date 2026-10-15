@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useI18n, type MessageKey } from '@/lib/i18n';
 import { EmptyState, SettingsGroup } from '../../ui';
 import { useLab } from '../../shell/LabProvider';
+import { ListFallback } from './ListFallback';
 import { StatusFilterBar } from './StatusFilterBar';
 import { TASK_STATUSES, countByStatus, filterByStatusAndQuery, type StatusFilter } from './task-filters';
 import styles from './tasks.module.css';
@@ -12,7 +13,7 @@ type TaskStatusId = (typeof TASK_STATUSES)[number];
 
 export function TaskQueueView() {
   const { t } = useI18n();
-  const { tasks, socialSchedules, jobs, openSession } = useLab();
+  const { tasks, socialSchedules, jobs, listState, openSession } = useLab();
   const [status, setStatus] = useState<StatusFilter<TaskStatusId>>('all');
   const [query, setQuery] = useState('');
 
@@ -30,9 +31,11 @@ export function TaskQueueView() {
   return (
     <>
       <SettingsGroup title={t('tasks.queue.tasksTitle')} description={t('tasks.queue.tasksDesc')}>
-        {tasks.length === 0 ? (
-          <EmptyState title={t('tasks.queue.emptyTitle')} description={t('tasks.queue.emptyDesc')} />
-        ) : (
+        <ListFallback
+          error={listState.tasks.error}
+          count={tasks.length}
+          empty={<EmptyState title={t('tasks.queue.emptyTitle')} description={t('tasks.queue.emptyDesc')} />}
+        >
           <>
             <div className={styles.toolbar}>
               <input
@@ -94,13 +97,15 @@ export function TaskQueueView() {
               </div>
             )}
           </>
-        )}
+        </ListFallback>
       </SettingsGroup>
 
       <SettingsGroup title={t('tasks.queue.schedulesTitle')} description={t('tasks.queue.schedulesDesc')} collapsible>
-        {socialSchedules.length === 0 ? (
-          <EmptyState title={t('tasks.queue.schedulesEmptyTitle')} description={t('tasks.queue.schedulesEmptyDesc')} />
-        ) : (
+        <ListFallback
+          error={listState.socialSchedules.error}
+          count={socialSchedules.length}
+          empty={<EmptyState title={t('tasks.queue.schedulesEmptyTitle')} description={t('tasks.queue.schedulesEmptyDesc')} />}
+        >
           <div id="listSchedules" className={styles.list}>
             {socialSchedules.map((s) => (
               <div key={s.taskId} className={`list-item ${styles.row}`}>
@@ -115,13 +120,15 @@ export function TaskQueueView() {
               </div>
             ))}
           </div>
-        )}
+        </ListFallback>
       </SettingsGroup>
 
       <SettingsGroup title={t('tasks.queue.jobsTitle')} description={t('tasks.queue.jobsDesc')} collapsible>
-        {jobs.length === 0 ? (
-          <EmptyState title={t('tasks.queue.jobsEmptyTitle')} description={t('tasks.queue.jobsEmptyDesc')} />
-        ) : (
+        <ListFallback
+          error={listState.jobs.error}
+          count={jobs.length}
+          empty={<EmptyState title={t('tasks.queue.jobsEmptyTitle')} description={t('tasks.queue.jobsEmptyDesc')} />}
+        >
           <div id="listJobs" className={styles.list}>
             {jobs.map((j, i) => (
               <div key={`job-${i}-${j.command ?? ''}`} className={`list-item ${styles.row}`}>
@@ -132,7 +139,7 @@ export function TaskQueueView() {
               </div>
             ))}
           </div>
-        )}
+        </ListFallback>
       </SettingsGroup>
     </>
   );

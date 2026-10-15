@@ -57,6 +57,7 @@ export const settings = {
     stepSave: '选择默认模型',
     providerGroup: '服务商',
     customProvider: '自定义',
+    presetSiliconflow: '硅基流动',
     apiKey: 'API Key',
     apiKeyPlaceholder: '粘贴你的 API Key',
     apiKeyHint: 'Key 只保存在本机 daemon，之后只显示脱敏结果，不会再回显。本地服务（如 Ollama）可保持默认占位值。',

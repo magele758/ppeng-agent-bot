@@ -24,7 +24,7 @@ export const MODEL_PROVIDER_PRESETS: ModelProviderPreset[] = [
   { id: 'openai', label: 'OpenAI', kind: 'openai-compatible', baseUrl: 'https://api.openai.com/v1' },
   { id: 'deepseek', label: 'DeepSeek', kind: 'openai-compatible', baseUrl: 'https://api.deepseek.com/v1' },
   { id: 'openrouter', label: 'OpenRouter', kind: 'openai-compatible', baseUrl: 'https://openrouter.ai/api/v1' },
-  { id: 'siliconflow', label: 'SiliconFlow 硅基流动', kind: 'openai-compatible', baseUrl: 'https://api.siliconflow.cn/v1' },
+  { id: 'siliconflow', label: 'SiliconFlow', kind: 'openai-compatible', baseUrl: 'https://api.siliconflow.cn/v1' },
   { id: 'moonshot', label: 'Moonshot', kind: 'openai-compatible', baseUrl: 'https://api.moonshot.cn/v1' },
   {
     id: 'ollama',
@@ -34,7 +34,7 @@ export const MODEL_PROVIDER_PRESETS: ModelProviderPreset[] = [
     apiKeyHint: 'ollama'
   },
   { id: 'anthropic', label: 'Anthropic', kind: 'anthropic-compatible', baseUrl: 'https://api.anthropic.com' },
-  { id: 'custom', label: '自定义', kind: 'openai-compatible', baseUrl: '' }
+  { id: 'custom', label: 'Custom', kind: 'openai-compatible', baseUrl: '' }
 ];
 
 export type PublicCatalogModel = { contextWindow?:number; id: string; ownedBy?: string; enabled: boolean };

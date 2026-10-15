@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useI18n, type MessageKey } from '@/lib/i18n';
 import { EmptyState, SettingsGroup } from './ui';
+import { ListFallback } from './sections/tasks/ListFallback';
 import { StatusFilterBar } from './sections/tasks/StatusFilterBar';
 import { RUN_STATUSES, countByStatus, filterByStatusAndQuery, type StatusFilter } from './sections/tasks/task-filters';
 import styles from './sections/tasks/tasks.module.css';
@@ -16,7 +17,7 @@ export type OrchestrationRunRow = {
 
 type RunStatusId = (typeof RUN_STATUSES)[number];
 
-export function OrchestrationPanel({ runs }: { runs: OrchestrationRunRow[] }) {
+export function OrchestrationPanel({ runs, loadError = false }: { runs: OrchestrationRunRow[]; loadError?: boolean }) {
   const { t } = useI18n();
   const [status, setStatus] = useState<StatusFilter<RunStatusId>>('all');
   const [query, setQuery] = useState('');
@@ -32,9 +33,11 @@ export function OrchestrationPanel({ runs }: { runs: OrchestrationRunRow[] }) {
 
   return (
     <SettingsGroup title={t('tasks.runs.title')} description={t('tasks.runs.desc')}>
-      {runs.length === 0 ? (
-        <EmptyState title={t('tasks.runs.emptyTitle')} description={t('tasks.runs.emptyDesc')} />
-      ) : (
+      <ListFallback
+        error={loadError}
+        count={runs.length}
+        empty={<EmptyState title={t('tasks.runs.emptyTitle')} description={t('tasks.runs.emptyDesc')} />}
+      >
         <>
           <div className={styles.toolbar}>
             <input
@@ -91,7 +94,7 @@ export function OrchestrationPanel({ runs }: { runs: OrchestrationRunRow[] }) {
             </div>
           )}
         </>
-      )}
+      </ListFallback>
     </SettingsGroup>
   );
 }

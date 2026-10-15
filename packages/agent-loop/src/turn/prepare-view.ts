@@ -17,7 +17,7 @@ export { MAX_VISIBLE_MESSAGES };
 
 export const SESSION_CACHE_MAX = 512;
 
-export function capSessionMap(map: Map<string, unknown>, max = SESSION_CACHE_MAX): void {
+export function capSessionMap<V>(map: Map<string, V>, max = SESSION_CACHE_MAX): void {
   if (map.size <= max) return;
   for (const key of map.keys()) {
     map.delete(key);

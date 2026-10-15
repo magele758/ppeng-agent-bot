@@ -157,6 +157,15 @@ const STDIO_SECRET_NAME =
 /** Protocol fields. Their text is not descriptive copy, so a matching secret stays. */
 const SCHEMA_OPAQUE_KEY = new Set(['enum', 'required', '$ref']);
 
+/** Object keys here are schema names, not keywords. A property may be named `enum`. */
+const SCHEMA_PROPERTY_MAP = new Set([
+  'properties',
+  'patternProperties',
+  '$defs',
+  'definitions',
+  'dependentSchemas'
+]);
+
 function stdioSecretValues(env?: Record<string, string>): string[] {
   if (!env) return [];
   const values: string[] = [];
@@ -172,22 +181,50 @@ export function redactStdioFailure(message: string, env?: Record<string, string>
   return redactSecrets(message, stdioSecretValues(env));
 }
 
-function redactSchemaNode(node: unknown, secrets: string[]): unknown {
+function redactSchemaNode(node: unknown, secrets: string[], keysAreNames = false): unknown {
   if (Array.isArray(node)) return node.map((item) => redactSchemaNode(item, secrets));
-  if (node && typeof node === 'object') return redactSchemaFields(node as Record<string, unknown>, secrets);
+  if (node && typeof node === 'object') {
+    return redactSchemaFields(node as Record<string, unknown>, secrets, keysAreNames);
+  }
   return node;
 }
 
-function redactSchemaFields(node: Record<string, unknown>, secrets: string[]): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(node)) out[key] = schemaField(key, value, secrets);
+function defineSchemaField(out: Record<string, unknown>, key: string, value: unknown): void {
+  Object.defineProperty(out, key, { value, enumerable: true, writable: true, configurable: true });
+}
+
+function redactSchemaFields(
+  node: Record<string, unknown>,
+  secrets: string[],
+  keysAreNames: boolean
+): Record<string, unknown> {
+  const out = Object.create(null) as Record<string, unknown>;
+  for (const [key, value] of Object.entries(node)) {
+    defineSchemaField(out, key, schemaField(key, value, secrets, keysAreNames));
+  }
   return out;
 }
 
-function schemaField(key: string, value: unknown, secrets: string[]): unknown {
-  if (SCHEMA_OPAQUE_KEY.has(key)) return value;
-  if (key === 'description' && typeof value === 'string') return redactSecrets(value, secrets);
-  return redactSchemaNode(value, secrets);
+function opaqueSchemaKeyword(key: string, keysAreNames: boolean): boolean {
+  if (keysAreNames) return false;
+  return SCHEMA_OPAQUE_KEY.has(key);
+}
+
+function descriptionText(key: string, value: unknown, secrets: string[], keysAreNames: boolean): string | undefined {
+  if (keysAreNames || key !== 'description' || typeof value !== 'string') return undefined;
+  return redactSecrets(value, secrets);
+}
+
+function propertyNamesFollow(key: string, keysAreNames: boolean): boolean {
+  if (keysAreNames) return false;
+  return SCHEMA_PROPERTY_MAP.has(key);
+}
+
+function schemaField(key: string, value: unknown, secrets: string[], keysAreNames: boolean): unknown {
+  if (opaqueSchemaKeyword(key, keysAreNames)) return value;
+  const text = descriptionText(key, value, secrets, keysAreNames);
+  if (text !== undefined) return text;
+  return redactSchemaNode(value, secrets, propertyNamesFollow(key, keysAreNames));
 }
 
 /** Description text only. Property names, required, enum, and $ref stay as protocol fields. */

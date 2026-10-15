@@ -22,9 +22,9 @@ export const more = {
   compactGroupTip: '只改送给模型的 tool_result 视图，落库原文不变。用来控制长工具结果占窗口。',
 
 
-  loopTaskMode: '默认 TaskMode',
+  loopTaskMode: '默认任务模式',
   loopSkillScope: '默认技能域',
-  loopSkillScopeAria: '默认 skill_scope',
+  loopSkillScopeAria: '默认技能域',
   loopInboxCap: 'Inbox overflow 上限',
   loopInboxCapTip: '留空或 0=不丢。填正整数后，未认领 inbox 超限会把最旧的合成一条 system 摘要。',
   loopInboxUnlimited: '无限（默认）',

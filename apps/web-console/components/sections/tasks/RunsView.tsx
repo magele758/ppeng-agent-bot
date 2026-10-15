@@ -4,18 +4,21 @@ import { useI18n } from '@/lib/i18n';
 import { OrchestrationPanel } from '../../OrchestrationPanel';
 import { EmptyState, SettingsGroup } from '../../ui';
 import { useLab } from '../../shell/LabProvider';
+import { ListFallback } from './ListFallback';
 import styles from './tasks.module.css';
 
 export function RunsView() {
   const { t } = useI18n();
-  const { orchestrationRuns, swarmRuns } = useLab();
+  const { orchestrationRuns, swarmRuns, listState } = useLab();
   return (
     <>
-      <OrchestrationPanel runs={orchestrationRuns} />
+      <OrchestrationPanel runs={orchestrationRuns} loadError={listState.orchestrationRuns.error} />
       <SettingsGroup title={t('tasks.runs.swarmTitle')} description={t('tasks.runs.swarmDesc')} collapsible>
-        {swarmRuns.length === 0 ? (
-          <EmptyState title={t('tasks.runs.swarmEmptyTitle')} description={t('tasks.runs.swarmEmptyDesc')} />
-        ) : (
+        <ListFallback
+          error={listState.swarmRuns.error}
+          count={swarmRuns.length}
+          empty={<EmptyState title={t('tasks.runs.swarmEmptyTitle')} description={t('tasks.runs.swarmEmptyDesc')} />}
+        >
           <div id="listSwarmRuns" className={styles.list}>
             {swarmRuns.map((r) => (
               <div key={r.id} className={`list-item ${styles.row}`}>
@@ -30,7 +33,7 @@ export function RunsView() {
               </div>
             ))}
           </div>
-        )}
+        </ListFallback>
       </SettingsGroup>
     </>
   );

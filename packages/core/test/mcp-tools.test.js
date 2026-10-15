@@ -254,4 +254,89 @@ describe('redactStdioTool', () => {
     assert.equal(out.name, 'deploy');
     assert.equal(out.readOnlyHint, false);
   });
+
+  it('redacts descriptions of parameters named enum, required, or $ref', () => {
+    const secret = 'supersecretvalue';
+    const schema = JSON.parse(
+      JSON.stringify({
+        type: 'object',
+        description: `top ${secret}`,
+        required: ['production'],
+        $ref: `ref-${secret}`,
+        enum: ['production', secret],
+        properties: {
+          enum: { type: 'string', description: `mode ${secret}`, enum: ['production', secret] },
+          required: { description: `need ${secret}` },
+          $ref: { description: `link ${secret}`, $ref: `#/${secret}` }
+        }
+      })
+    );
+    const out = redactStdioTool(
+      { name: 'deploy', description: 'plain', inputSchema: schema, readOnlyHint: false },
+      { MCP_TOKEN: secret }
+    );
+    const props = out.inputSchema.properties;
+    assert.equal(props.enum.description.includes(secret), false);
+    assert.match(props.enum.description, /\[REDACTED\]/);
+    assert.deepEqual(props.enum.enum, ['production', secret]);
+    assert.equal(props.required.description.includes(secret), false);
+    assert.match(props.required.description, /\[REDACTED\]/);
+    assert.equal(props.$ref.description.includes(secret), false);
+    assert.equal(props.$ref.$ref, `#/${secret}`);
+    assert.deepEqual(out.inputSchema.enum, ['production', secret]);
+    assert.deepEqual(out.inputSchema.required, ['production']);
+    assert.equal(out.inputSchema.$ref, `ref-${secret}`);
+    assert.equal(out.inputSchema.description.includes(secret), false);
+    assert.equal(schema.properties.enum.description, `mode ${secret}`);
+  });
+
+  it('keeps a parameter named __proto__ and redacts its description', () => {
+    const secret = 'supersecretvalue';
+    const schema = JSON.parse(
+      `{"type":"object","properties":{"__proto__":{"type":"string","description":"tok ${secret}"}}}`
+    );
+    const out = redactStdioTool(
+      { name: 'deploy', description: 'plain', inputSchema: schema, readOnlyHint: false },
+      { MCP_TOKEN: secret }
+    );
+    const prop = out.inputSchema.properties.__proto__;
+    assert.equal(Object.hasOwn(out.inputSchema.properties, '__proto__'), true);
+    assert.equal(prop.type, 'string');
+    assert.equal(prop.description.includes(secret), false);
+    assert.match(prop.description, /\[REDACTED\]/);
+    assert.equal(schema.properties.__proto__.description, `tok ${secret}`);
+  });
+
+  it('redacts description under a parameter named properties', () => {
+    const secret = 'supersecretvalue';
+    const schema = {
+      type: 'object',
+      properties: {
+        properties: {
+          description: `nested ${secret}`,
+          enum: ['production', secret],
+          properties: { inner: { description: `inner ${secret}` } }
+        },
+        patternProperties: { description: `pat ${secret}` },
+        $defs: { description: `defs ${secret}` },
+        definitions: { description: `def ${secret}` },
+        dependentSchemas: { description: `dep ${secret}` }
+      }
+    };
+    const out = redactStdioTool(
+      { name: 'deploy', description: 'plain', inputSchema: schema, readOnlyHint: false },
+      { MCP_TOKEN: secret }
+    );
+    const named = out.inputSchema.properties;
+    assert.equal(named.properties.description.includes(secret), false);
+    assert.match(named.properties.description, /\[REDACTED\]/);
+    assert.deepEqual(named.properties.enum, ['production', secret]);
+    assert.equal(named.properties.properties.inner.description.includes(secret), false);
+    assert.match(named.properties.properties.inner.description, /\[REDACTED\]/);
+    assert.equal(named.patternProperties.description.includes(secret), false);
+    assert.equal(named.$defs.description.includes(secret), false);
+    assert.equal(named.definitions.description.includes(secret), false);
+    assert.equal(named.dependentSchemas.description.includes(secret), false);
+    assert.equal(schema.properties.properties.description, `nested ${secret}`);
+  });
 });

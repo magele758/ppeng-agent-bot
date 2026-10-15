@@ -76,7 +76,8 @@ export function createRuntimeCollaborators(input: {
     store: input.store,
     runSession: (sid) => input.runSession(sid),
     isSelfHealControlled: (session) =>
-      (session.metadata as { selfHealControlled?: boolean }).selfHealControlled === true
+      (session.metadata as { selfHealControlled?: boolean }).selfHealControlled === true,
+    log: input.log
   });
   const swarmExecutor = new SwarmExecutor({
     store: input.store.swarm(),
