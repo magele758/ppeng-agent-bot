@@ -33,6 +33,7 @@ import { COMPOSITION_ENTER_GUARD_MS, IME_COMPOSITION_KEY_CODE, decideComposerEnt
 import { ApprovalBanner } from './ApprovalBanner';
 import { GoalStatusCard } from './GoalStatusCard';
 import { TrajectoryPanel } from './TrajectoryPanel';
+import { ContextStackPanel } from './ContextStackPanel';
 import { groupAgentsByDomain, sortAgentsById } from '@/lib/sort-utils';
 import { groupSessionsByDate } from '@/lib/session-groups';
 import { WorkspacePicker } from './WorkspacePicker';
@@ -266,7 +267,7 @@ export function PlayPanel({
   const configBtnRef = useRef<HTMLButtonElement>(null);
   const configPanelRef = useRef<HTMLDivElement>(null);
   const prevSteerCountRef = useRef(0);
-  const [railTab, setRailTab] = useState<'activity' | 'artifacts' | 'cron' | 'trajectory'>('activity');
+  const [railTab, setRailTab] = useState<'activity' | 'context' | 'artifacts' | 'cron' | 'trajectory'>('activity');
   const flatAgents = sortAgentsById(agents);
   const supportAgents = useMemo(() => supportAgentsOf(flatAgents), [flatAgents]);
   const supportByDomain = useMemo(() => groupAgentsByDomain(supportAgents), [supportAgents]);
@@ -1473,6 +1474,15 @@ export function PlayPanel({
             <button
               type="button"
               role="tab"
+              className={`play-rail__tab${railTab === 'context' ? ' active' : ''}`}
+              aria-selected={railTab === 'context'}
+              onClick={() => setRailTab('context')}
+            >
+              {t('play.rail.context')}
+            </button>
+            <button
+              type="button"
+              role="tab"
               className={`play-rail__tab${railTab === 'artifacts' ? ' active' : ''}`}
               aria-selected={railTab === 'artifacts'}
               onClick={() => setRailTab('artifacts')}
@@ -1503,6 +1513,12 @@ export function PlayPanel({
           <div className="play-rail__body">
             {railTab === 'activity' ? (
               <ActivityPanel items={activityItems} />
+            ) : railTab === 'context' ? (
+              <ContextStackPanel
+                sessionId={selectedSessionId}
+                running={chatRunning}
+                messageCount={chat.sessionMessages.length}
+              />
             ) : railTab === 'artifacts' ? (
               <ArtifactRail items={artifacts} />
             ) : railTab === 'trajectory' ? (

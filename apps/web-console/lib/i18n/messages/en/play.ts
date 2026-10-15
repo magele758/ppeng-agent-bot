@@ -333,8 +333,47 @@ export const play = {
   rail: {
     aria: 'Side rail',
     activity: 'Activity',
+    context: 'Context',
     artifacts: 'Artifacts',
     trajectory: 'Trajectory'
+  },
+
+  contextStack: {
+    hint: 'Prepared view for the next model call: system prompt, folded messages, compaction stubs, memory appendix, and working log. This does not write a new summary.',
+    refresh: 'Refresh',
+    loading: 'Reading model context…',
+    pickSession: 'Choose a session first',
+    loadFailed: 'Could not read context: {message}',
+    empty: 'This request has no context blocks to show.',
+    barAria: 'Model context composition',
+    legend: 'Legend',
+    budgetNormal: 'about {request} / {cap} tokens ({ratio}% of the {window} window)',
+    budgetBot: 'messages about {messages} tokens · 50% line {structured} · 85% line {hygiene} · history room {history}',
+    pinnedOver: 'Pinned content is already over the cap, so the next call still sends it whole.',
+    wouldSummarize: 'Over the ordinary 20% cap. Blocks marked “will summarize” are replaced by one summary on the real send; this view still shows the original text.',
+    wouldCompact: 'This bot chat is at a compaction line. The next send compacts first; this view still shows the current text.',
+    pinned: 'Pinned',
+    dispositionKeep: 'Sent',
+    dispositionSummarize: 'Will summarize',
+    dispositionDropped: 'Left out',
+    blockMeta: '{tokens} tokens · {share}% · {chars} chars',
+    kinds: {
+      system: 'System prompt',
+      systemMessage: 'System message',
+      tools: 'Tool schemas',
+      summary: 'Summary',
+      memory: 'Memory appendix',
+      workingLog: 'Working log',
+      user: 'User',
+      assistant: 'Assistant',
+      reasoning: 'Reasoning',
+      toolCall: 'Tool call',
+      toolResult: 'Tool result',
+      toolStub: 'Compaction stub',
+      image: 'Image',
+      surface: 'Surface',
+      historySources: 'History sources'
+    }
   },
 
   settings: {

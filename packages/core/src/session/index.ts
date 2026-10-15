@@ -61,6 +61,20 @@ export type {
 export { buildSessionModelView } from './model-view.js';
 export type { SessionModelView } from './model-view.js';
 export {
+  assembleContextStack,
+  describeContextBudget,
+  previewSessionContextStack
+} from './context-stack.js';
+export type {
+  ContextAppendixView,
+  ContextBlockDisposition,
+  ContextBlockKind,
+  ContextStackBlock,
+  ContextStackBudget,
+  ContextStackPayload,
+  ContextStackPreviewHost
+} from './context-stack.js';
+export {
   retrieveSessionToolResult,
   retrieveStoredToolResult,
   resolveToolResultLookup,

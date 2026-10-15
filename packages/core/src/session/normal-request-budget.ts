@@ -119,6 +119,10 @@ function latestUserIndex(messages: readonly SessionMessage[]): number {
   return -1;
 }
 
+export function pinnedRequestMessages(messages: readonly SessionMessage[]): SessionMessage[] {
+  return pinnedMessages(messages);
+}
+
 function pinnedMessages(messages: readonly SessionMessage[]): SessionMessage[] {
   const leading = messages.slice(0, leadingSystemCount(messages)).filter(message => message.key !== 'compact-summary');
   const userIdx = latestUserIndex(messages);

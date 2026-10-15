@@ -520,6 +520,16 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
       }
     },
 
+    // GET /api/sessions/:id/context-stack — read-only prepared model context
+    {
+      method: 'GET',
+      pattern: '/api/sessions/:id/context-stack',
+      handler: async ({ requireParam, response }) => {
+        const id = requireParam('id');
+        json(response, 200, await runtime.previewContextStack(id));
+      }
+    },
+
     // GET /api/sessions/:id/tool-results/:messageId — stored tool_result (not the model-view stub)
     {
       method: 'GET',
