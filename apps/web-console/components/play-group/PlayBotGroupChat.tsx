@@ -5,6 +5,7 @@ import type { BotInfo } from '@/lib/types';
 import { api } from '@/lib/api';
 import { mergeHistoryWindow } from '@/lib/history-window';
 import { useI18n, type MessageKey } from '@/lib/i18n';
+import { renderMarkdown } from '@/lib/markdown';
 import {
   BOT_GROUPS_CHANGED_EVENT,
   addGroupMember,
@@ -12,6 +13,7 @@ import {
   removeGroupMember,
   type GroupMemberCode
 } from '@/lib/bot-group';
+import { BotFace } from '../BotFace';
 import './play-group.css';
 
 type Room = {
@@ -31,7 +33,15 @@ type RoomMessage = {
   sender: { type: 'user' | 'bot'; id: string; name: string };
 };
 
-type RoomTurn = { id: string; status: string };
+type RoomTurn = { id: string; status: string; botIds?: string[]; cursor?: number };
+
+function liveSpeakerId(turns: readonly RoomTurn[]): string {
+  const live = turns.find((turn) => turn.status === 'running' || turn.status === 'queued' || turn.status === 'waiting_approval');
+  if (!live?.botIds?.length) return '';
+  const cursor = live.cursor ?? 0;
+  const index = cursor >= 0 && cursor < live.botIds.length ? cursor : 0;
+  return live.botIds[index] ?? '';
+}
 
 function issueKey(code: GroupMemberCode): MessageKey {
   switch (code) {
@@ -56,6 +66,53 @@ function jsonBody(body: unknown, method = 'POST'): RequestInit {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body)
   };
+}
+
+function GroupTurn({
+  message,
+  name,
+  mood,
+  attachmentLabel
+}: {
+  message: RoomMessage;
+  name: string;
+  mood: 'idle' | 'speaking';
+  attachmentLabel?: string;
+}) {
+  const kind = message.sender.type;
+  switch (kind) {
+    case 'user':
+    case 'bot':
+      break;
+    default: {
+      const exhaustive: never = kind;
+      return exhaustive;
+    }
+  }
+  const user = kind === 'user';
+  return (
+    <article className={`chat-turn play-group-turn${user ? ' chat-turn--user' : ' chat-turn--assistant play-group-turn--bot'}`}>
+      {kind === 'bot' ? (
+        <BotFace
+          name={name}
+          mood={mood}
+          size="sm"
+          className="play-group-turn__face"
+          testId={`play-group-face-${message.id}`}
+        />
+      ) : null}
+      <div className="chat-turn__content">
+        <div className="chat-turn__label">{name}</div>
+        <div className="chat-bubble">
+          <div
+            className="chat-bubble__body chat-bubble__md"
+            dangerouslySetInnerHTML={{ __html: renderMarkdown(message.text) }}
+          />
+        </div>
+        {attachmentLabel ? <p className="play-group-hint">{attachmentLabel}</p> : null}
+      </div>
+    </article>
+  );
 }
 
 function senderName(message: RoomMessage, bots: readonly BotInfo[], me: string): string {
@@ -283,15 +340,22 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
             <div className="chat-feed__track">
               {loadError ? <p className="play-group-error">{t('play.group.loadFailed')}</p> : null}
               {!loadError && messages.length === 0 ? <p className="play-group-hint">{t('play.group.noMessages')}</p> : null}
-              {messages.map((message) => (
-                <article key={message.id} className="play-group-msg">
-                  <p className="play-group-msg__who">{senderName(message, bots, t('play.me'))}</p>
-                  <p className="play-group-msg__text">{message.text}</p>
-                  {message.attachmentIds && message.attachmentIds.length > 0 ? (
-                    <p className="play-group-hint">{t('play.group.attachmentCount', { count: message.attachmentIds.length })}</p>
-                  ) : null}
-                </article>
-              ))}
+              {messages.map((message) => {
+                const name = senderName(message, bots, t('play.me'));
+                const liveId = liveSpeakerId(turns);
+                const lastFromLive = [...messages].reverse().find((item) => item.sender.type === 'bot' && item.sender.id === liveId);
+                const mood = message.sender.type === 'bot' && message.id === lastFromLive?.id ? 'speaking' : 'idle';
+                const count = message.attachmentIds?.length ?? 0;
+                return (
+                  <GroupTurn
+                    key={message.id}
+                    message={message}
+                    name={name}
+                    mood={mood}
+                    attachmentLabel={count > 0 ? t('play.group.attachmentCount', { count }) : undefined}
+                  />
+                );
+              })}
               {speaking ? <p className="play-group-hint">{t('play.group.membersSpeaking')}</p> : null}
               {cursor != null ? (
                 <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => void loadRoom(true)}>

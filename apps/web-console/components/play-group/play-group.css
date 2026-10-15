@@ -84,20 +84,18 @@
   font-size: var(--ui-text-xs);
 }
 
-.play-group-msg {
-  margin: 0 0 14px;
+.play-group-turn {
+  align-items: flex-start;
 }
 
-.play-group-msg__who {
-  margin: 0 0 2px;
-  font-size: var(--ui-text-xs);
-  color: var(--ui-text-muted);
+.play-group-turn .chat-turn__label {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.75rem;
 }
 
-.play-group-msg__text {
-  margin: 0;
-  white-space: pre-wrap;
-  line-height: 1.5;
+.play-group-turn--bot .play-group-turn__face {
+  margin-top: 18px;
 }
 
 .play-group-composer {
