@@ -360,7 +360,10 @@ export const play = {
     steerTag: '⚡ Live steer',
     steerTagTitle: 'Guidance inserted while the agent was running',
     cronTag: 'Cron · {name}',
-    cronTagTitle: 'Triggered by a Bot cron job'
+    cronTagTitle: 'Triggered by a Bot cron job',
+    toolObservation: 'Screenshots returned by tools, not a new user instruction.',
+    toolShotAlt: 'Tool screenshot',
+    enlargeImage: 'Enlarge screenshot'
   },
 
 
