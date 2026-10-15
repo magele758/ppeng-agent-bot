@@ -9,6 +9,7 @@ import { getSpeechRecognitionCtor, type SpeechRecognitionLike } from '@/lib/spee
 import { renderMarkdown } from '@/lib/markdown';
 import { rollbackToCheckpoint, streamCheckpoint, type StreamSegment } from '@/lib/stream-segments';
 import { feedSseBuffer } from '@/lib/sse';
+import { liveSessionFollowRequest, type LiveStreamArm } from '@/lib/live-stream-attach';
 import { userPreviewText } from '@/lib/chat-utils';
 import { playSendAckToneIfEnabled } from '@/lib/send-ack-feedback';
 import {
@@ -252,6 +253,11 @@ export function usePlayChat(deps: PlayChatDeps) {
   const [queryExecMode, setQueryExecMode] = useState<QueryExecMode>('steering');
 
   const playMessagesRef = useRef<HTMLDivElement>(null);
+  const liveFollowRef = useRef<{
+    sessionId: string;
+    controller: AbortController;
+    ready: Promise<void>;
+  } | null>(null);
   const playInputRef = useRef<HTMLTextAreaElement>(null);
   const playInputLiveRef = useRef('');
   const speechRecRef = useRef<SpeechRecognitionLike | null>(null);
@@ -349,6 +355,8 @@ export function usePlayChat(deps: PlayChatDeps) {
   useEffect(() => {
     playStickToBottomRef.current = true;
     setShowJumpToLatest(false);
+    const follow = liveFollowRef.current;
+    if (follow && follow.sessionId !== selectedSessionId) follow.controller.abort();
   }, [selectedSessionId]);
 
   useEffect(() => {
@@ -1072,15 +1080,28 @@ export function usePlayChat(deps: PlayChatDeps) {
    */
   const RECONNECT_DELAYS_MS = [1000, 3000, 10000];
 
-  const readSseFetch = async (url: string, body: unknown, onSession?: (id: string) => void) => {
+  const readSseFetch = async (
+    url: string,
+    body: unknown,
+    onSession?: (id: string) => void,
+    opts?: { onReady?: () => void; signal?: AbortSignal; extraAttempts?: number }
+  ) => {
+    const throwIfAborted = () => {
+      if (opts?.signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError');
+    };
+    const isAbort = (err: unknown) =>
+      opts?.signal?.aborted || (err instanceof Error && err.name === 'AbortError');
     let res: Response | undefined;
     let lastErr: unknown;
-    for (let attempt = 0; attempt <= RECONNECT_DELAYS_MS.length; attempt++) {
+    const extraAttempts = opts?.extraAttempts ?? RECONNECT_DELAYS_MS.length;
+    for (let attempt = 0; attempt <= extraAttempts; attempt++) {
+      throwIfAborted();
       try {
         res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
+          signal: opts?.signal
         });
         if (res.ok) break;
         // 4xx client errors (except 408/425 which are transient) are terminal:
@@ -1093,10 +1114,11 @@ export function usePlayChat(deps: PlayChatDeps) {
         }
         lastErr = new Error(`SSE handshake HTTP ${res.status}`);
       } catch (err) {
+        if (isAbort(err)) throw err;
         lastErr = err;
       }
-      if (attempt < RECONNECT_DELAYS_MS.length) {
-        await new Promise((r) => setTimeout(r, RECONNECT_DELAYS_MS[attempt]));
+      if (attempt < extraAttempts) {
+        await new Promise((r) => setTimeout(r, RECONNECT_DELAYS_MS[Math.min(attempt, RECONNECT_DELAYS_MS.length - 1)]));
       }
     }
     if (!res || !res.ok) {
@@ -1130,6 +1152,9 @@ export function usePlayChat(deps: PlayChatDeps) {
           envelope?: Record<string, unknown>;
           session?: { id: string };
         };
+        if (event === 'ready') {
+          opts?.onReady?.();
+        }
         if (event === 'error') {
           const raw = typeof p.message === 'string' && p.message.trim() ? p.message.trim() : 'stream error';
           throw new PlayStreamError(t('play.status.runFailed', { error: raw }));
@@ -1206,6 +1231,53 @@ export function usePlayChat(deps: PlayChatDeps) {
         }
       });
     }
+  };
+
+  /**
+   * Listen for the run that an ask_user approve/reject is about to start.
+   * `ready` resolves once the server is subscribed, before that run begins.
+   */
+  const armLiveSessionStream = (sessionId: string): LiveStreamArm => {
+    const current = liveFollowRef.current;
+    if (current?.sessionId === sessionId && !current.controller.signal.aborted) {
+      return {
+        ready: current.ready,
+        cancel: () => current.controller.abort()
+      };
+    }
+    current?.controller.abort();
+    const controller = new AbortController();
+    let resolveReady: () => void = () => undefined;
+    const ready = new Promise<void>((resolve) => {
+      const finish = () => resolve();
+      resolveReady = finish;
+      setTimeout(finish, 4000);
+    });
+    const follow = { sessionId, controller, ready };
+    liveFollowRef.current = follow;
+    setStreamOverlay({ segments: [] });
+    const { url, body } = liveSessionFollowRequest(sessionId);
+    void (async () => {
+      try {
+        await readSseFetch(url, body, undefined, {
+          signal: controller.signal,
+          extraAttempts: 0,
+          onReady: () => resolveReady()
+        });
+      } catch (error) {
+        const aborted = controller.signal.aborted || (error instanceof Error && error.name === 'AbortError');
+        if (!aborted) {
+          setPlayStatus({ text: error instanceof Error ? error.message : String(error), err: true });
+        }
+      } finally {
+        resolveReady();
+        if (liveFollowRef.current?.controller !== controller) return;
+        liveFollowRef.current = null;
+        clearStreamingShell();
+        if (!controller.signal.aborted) await tick({ includePlayPanel: true });
+      }
+    })();
+    return { ready, cancel: () => controller.abort() };
   };
 
   const ensurePlaySessionForImages = async (): Promise<string> => {
@@ -1665,6 +1737,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     refreshPlayPanel,
     requestScrollPlayToBottom,
     sendPlayMessage,
+    armLiveSessionStream,
     handleFileUpload,
     handleUrlFetch,
     setPlayTitle,

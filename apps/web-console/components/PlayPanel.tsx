@@ -70,6 +70,7 @@ export interface PlayPanelProps {
   onCancelSession: () => void;
   onOpenTrace: () => void;
   onApprovalsChanged: () => void;
+  onAttachStream?: (sessionId: string) => { ready: Promise<void>; cancel: () => void };
   chat: ReturnType<typeof usePlayChat>;
   sessionFilter?: string;
   onSessionFilterChange?: (value: string) => void;
@@ -240,6 +241,7 @@ export function PlayPanel({
   onCancelSession,
   onOpenTrace,
   onApprovalsChanged,
+  onAttachStream,
   chat,
   sessionFilter = '',
   onSessionFilterChange,
@@ -1067,7 +1069,11 @@ export function PlayPanel({
               </div>
             </header>
 
-            <ApprovalBanner approvals={sessionApprovals} onDone={onApprovalsChanged} />
+            <ApprovalBanner
+              approvals={sessionApprovals}
+              onDone={onApprovalsChanged}
+              onAttachStream={onAttachStream}
+            />
             <GoalStatusCard sessionId={selectedSessionId} />
 
             <div className="chat-panel-body">

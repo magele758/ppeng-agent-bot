@@ -299,6 +299,7 @@ export function ChatSection({ active }: { active: boolean }) {
       }
       onOpenTrace={() => navigate('ops', 'trajectory')}
       onApprovalsChanged={() => void tick({ includePlayPanel: true })}
+      onAttachStream={(sessionId) => chat.armLiveSessionStream(sessionId)}
       chat={chat}
       sessionFilter={sessionSidebarFilter}
       onSessionFilterChange={setSessionSidebarFilter}
