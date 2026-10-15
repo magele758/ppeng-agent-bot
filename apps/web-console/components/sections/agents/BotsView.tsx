@@ -10,6 +10,7 @@ import { filterBots } from '@/lib/agents-view';
 import { visibleBotRoster } from '@/lib/bots';
 import { useI18n } from '@/lib/i18n';
 import type { BotInfo } from '@/lib/types';
+import { BotFace } from '../../BotFace';
 import { EmptyState } from '../../ui';
 import { useLab } from '../../shell/LabProvider';
 import { BotCreateForm } from './BotCreateForm';
@@ -62,6 +63,7 @@ export function BotsView() {
   if (roster.length === 0 && !creating) {
     return (
       <EmptyState
+        icon={<BotFace name="" label={t('agents.bots.faceEmpty')} testId="bot-empty-face" size="lg" />}
         title={t('agents.bots.emptyTitle')}
         description={t('agents.bots.emptyDesc')}
         action={
@@ -120,7 +122,10 @@ export function BotsView() {
                   setNotice(null);
                 }}
               >
-                <span className="ag-card__title">{b.name}</span>
+                <span className="ag-card__identity">
+                  <BotFace name={b.name} testId={`bot-face-${b.id}`} />
+                  <span className="ag-card__title">{b.name}</span>
+                </span>
                 {b.title && b.title !== b.name ? <span className="ag-card__sub">{b.title}</span> : null}
                 {b.description ? <p className="ag-card__desc">{b.description}</p> : null}
                 <span className="ag-chips">

@@ -92,10 +92,23 @@
   box-shadow: var(--ui-shadow-sm);
 }
 
+.ag-card__identity,
+.ag-panel__identity {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  min-width: 0;
+}
+
+.ag-panel__identity {
+  align-items: flex-start;
+}
+
 .ag-card__title {
   font-size: var(--ui-text-lg);
   font-weight: 600;
   overflow-wrap: anywhere;
+  min-width: 0;
 }
 
 .ag-card__sub {

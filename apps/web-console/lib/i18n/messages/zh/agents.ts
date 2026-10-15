@@ -49,6 +49,8 @@ export const agents = {
     created: '已创建 Bot「{name}」',
     createFailed: '创建失败：{error}',
     detailTitle: 'Bot 设置',
+    faceLabel: '{name} 的机器人头像',
+    faceEmpty: '机器人头像',
     openChat: '打开对话',
     openChatFailed: '无法打开对话：{error}',
     sectionSchedule: '定时任务',
