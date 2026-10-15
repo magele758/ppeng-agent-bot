@@ -60,8 +60,8 @@ test.describe('Agent Lab console', () => {
   test('ops tab shows session trajectory workspace', async ({ page }) => {
     await page.goto('/');
     await page.getByRole('link', { name: '运维' }).click();
-    await expect(page.locator('#panel-ops').getByRole('heading', { name: '会话' })).toBeVisible();
-    await expect(page.locator('#panel-ops').getByRole('heading', { name: 'Trajectory' })).toBeVisible();
+    await expect(page.locator('#panel-ops').getByRole('heading', { name: '会话', exact: true })).toBeVisible();
+    await expect(page.locator('#panel-ops').getByRole('heading', { name: '会话轨迹', exact: true })).toBeVisible();
     await expect(page.locator('#listSessions')).toBeVisible();
     await expect(page.locator('#traceTimeline')).toBeVisible();
   });
