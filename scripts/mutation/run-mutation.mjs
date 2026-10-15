@@ -165,10 +165,16 @@ function tail(text, max = 4000) {
   return text.length > max ? text.slice(-max) : text;
 }
 
+function failureExcerpt(res) {
+  const highlights = res.highlights?.trim();
+  return highlights ? `${highlights}\n---\n${res.output}` : res.output;
+}
+
 function runChild(nodeArgs, env, timeoutMs) {
   return new Promise((resolve) => {
     const started = Date.now();
     let output = '';
+    let highlights = '';
     let timedOut = false;
     const child = spawn(process.execPath, ['--import', LOADER, ...nodeArgs], {
       cwd: ROOT,
@@ -178,7 +184,11 @@ function runChild(nodeArgs, env, timeoutMs) {
     });
     active.add(child);
     const collect = (chunk) => {
-      output = tail(output + chunk);
+      const text = String(chunk);
+      output = tail(output + text);
+      for (const line of text.split('\n')) {
+        if (/not ok |AssertionError|ERR_TEST|took \d+(\.\d+)?ms/.test(line)) highlights = tail(highlights + line + '\n', 2000);
+      }
     };
     child.stdout.on('data', collect);
     child.stderr.on('data', collect);
@@ -189,7 +199,7 @@ function runChild(nodeArgs, env, timeoutMs) {
     const done = (result) => {
       clearTimeout(timer);
       active.delete(child);
-      resolve({ ...result, timedOut, ms: Date.now() - started, output });
+      resolve({ ...result, timedOut, ms: Date.now() - started, output, highlights });
     };
     child.on('error', (err) => done({ spawnError: err.message }));
     child.on('close', (code, signal) => done({ code, signal }));
@@ -259,7 +269,7 @@ async function cleanRun(id, mod, target, concurrency) {
     if (i === 0) env.NODE_V8_COVERAGE = covDir;
     const res = await runTests(mod.testFiles, env, { timeoutMs: CLEAN_RUN_TIMEOUT_MS, bail: false });
     if (classifyRun(res) !== 'survived') {
-      throw new FatalError(`[${id}] clean test run failed (copy ${i + 1}/${concurrency}):\n${res.output}`);
+      throw new FatalError(`[${id}] clean test run failed (copy ${i + 1}/${concurrency}):\n${failureExcerpt(res)}`);
     }
     if (!fs.existsSync(hit)) throw new FatalError(`[${id}] ${mod.testFiles.join(', ')} never import ${target.rel}`);
     slowest = Math.max(slowest, res.ms);
