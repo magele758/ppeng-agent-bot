@@ -1331,6 +1331,55 @@ test('search filters and ordering apply to both the FTS and LIKE paths', () => {
   store.db.close();
 });
 
+test('memory set persists source refs on insert and replaces them on update', () => {
+  const { store } = tmpStore();
+  const am = store.agentMemory();
+  const created = am.set({
+    scope: 'user.memory',
+    namespace: 'fact',
+    key: 'k',
+    value: 'v',
+    userId: 'u1',
+    sourceRefs: [{ sessionId: 's', messageId: 'm1', seq: 3 }]
+  });
+  assert.equal(created.sourceRefs[0].messageId, 'm1');
+  assert.equal(created.sourceSeqStart, 3);
+  assert.equal(created.sourceSeqEnd, 3);
+  const updated = am.set({
+    scope: 'user.memory',
+    namespace: 'fact',
+    key: 'k',
+    value: 'v2',
+    userId: 'u1',
+    sourceRefs: [{ sessionId: 's', messageId: 'm2', seq: 9 }]
+  });
+  assert.equal(updated.id, created.id);
+  assert.equal(updated.sourceRefs[0].messageId, 'm2');
+  assert.equal(updated.sourceSeqStart, 9);
+  const kept = am.set({
+    scope: 'user.memory',
+    namespace: 'fact',
+    key: 'k',
+    value: 'v3',
+    userId: 'u1'
+  });
+  assert.equal(kept.sourceRefs[0].messageId, 'm2');
+  store.db.close();
+});
+
+test('FTS tenantOrGlobal returns that tenant plus global rows and not other tenants', () => {
+  const { store } = tmpStore();
+  const am = store.agentMemory();
+  row(am, { key: 'global', value: 'kiwi fruit alpha' });
+  row(am, { key: 'mine', value: 'kiwi fruit beta', tenantId: 't1' });
+  row(am, { key: 'other', value: 'kiwi fruit gamma', tenantId: 't2' });
+  assert.deepEqual(
+    am.search({ query: 'fruit kiwi', tenantOrGlobal: true, tenantId: 't1' }).map((m) => m.key).sort(),
+    ['global', 'mine']
+  );
+  store.db.close();
+});
+
 test('a fresh store searches through FTS: word order does not matter', () => {
   const { store } = tmpStore();
   const am = store.agentMemory();
@@ -1393,6 +1442,38 @@ test('bot namespace: children follow metadata.parentSessionId and the nearest re
   const lookup = sessionLookup(sessions);
   assert.equal(resolveBotMemoryAgentId(sessions.child, lookup), 'bot-root');
   assert.equal(resolveBotMemoryAgentId(sessions.a, lookup), 'y');
+});
+
+test('bot namespace: a room id is part of the private agent id only when a bot resolves', () => {
+  const lookup = { getBot: (id) => (id === 'b1' ? { id: 'b1', agentId: 'agent-x' } : undefined) };
+  assert.equal(
+    resolveBotMemoryAgentId({ agentId: 'b1', metadata: { botId: 'b1', roomId: ' room-1 ' } }, lookup),
+    'room:room-1:agent-x'
+  );
+  assert.equal(resolveBotMemoryAgentId({ metadata: { roomId: 'room-1' } }, lookup), undefined);
+  assert.equal(
+    resolveBotMemoryAgentId({ agentId: 'b1', metadata: { botId: 'b1', roomId: 12 } }, lookup),
+    'agent-x'
+  );
+});
+
+test('bot namespace: a parent cycle stops at the visited node', () => {
+  const sessions = {
+    a: { id: 'a', mode: 'subagent', parentSessionId: 'b', metadata: {} },
+    b: { id: 'b', mode: 'subagent', parentSessionId: 'c', metadata: {} },
+    c: { id: 'c', mode: 'subagent', parentSessionId: 'd', metadata: { botId: 'bot-c' } },
+    d: { id: 'd', mode: 'subagent', parentSessionId: 'e', metadata: {} },
+    e: { id: 'e', mode: 'subagent', parentSessionId: 'b', metadata: { botId: 'bot-e' } }
+  };
+  const bots = {
+    'bot-c': { id: 'bot-c', agentId: 'agent-c' },
+    'bot-e': { id: 'bot-e', agentId: 'agent-e' }
+  };
+  const lookup = {
+    getSession: (id) => sessions[id],
+    getBot: (id) => bots[id]
+  };
+  assert.equal(resolveBotMemoryAgentId(sessions.a, lookup), 'agent-e');
 });
 
 test('bot namespace: parent chains stop after six hops', () => {
