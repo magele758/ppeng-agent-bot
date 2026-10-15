@@ -50,7 +50,9 @@ export async function defaultDownload(
       allowPrivateHosts: deps?.allowPrivateHosts ?? webFetchAllowsPrivate(),
       resolveHost: deps?.resolveHost,
       request: deps?.request,
-      maxRedirects: deps?.maxRedirects
+      maxRedirects: deps?.maxRedirects,
+      dnsTimeoutMs: deps?.dnsTimeoutMs,
+      connectTimeoutMs: deps?.connectTimeoutMs
     });
     if (!res.ok) {
       await res.body?.cancel().catch(() => undefined);

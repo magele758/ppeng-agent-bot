@@ -1,6 +1,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import type { McpResourceInfo, McpToolInfo } from './mcp-jsonrpc.js';
+import { redactSecrets } from './mcp-redact.js';
 
 export interface StdioMcpConfig {
   command: string;
@@ -142,6 +143,11 @@ export class McpStdioSession {
     this.client = undefined;
     this.transport = undefined;
   }
+}
+
+/** Stdio failures and tool text can echo child env. Strip those values before trace or the model. */
+export function redactStdioFailure(message: string, env?: Record<string, string>): string {
+  return redactSecrets(message, Object.values(env ?? {}));
 }
 
 export function sanitizeMcpToolSuffix(name: string): string {

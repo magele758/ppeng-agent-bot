@@ -334,6 +334,7 @@ async function runNavigate(sessionId, url, options = {}) {
   const launches = [];
   const aborts = [];
   const continued = [];
+  const fulfilled = [];
   let routeHandler;
   const page = {
     goto: async (target) => {
@@ -345,6 +346,9 @@ async function runNavigate(sessionId, url, options = {}) {
         await routeHandler({
           request: () => ({
             url: () => request.url,
+            method: () => request.method ?? 'GET',
+            headers: () => request.headers ?? {},
+            postData: () => request.postData ?? null,
             isNavigationRequest: () => request.document !== false,
             resourceType: () => (request.document === false ? 'script' : 'document')
           }),
@@ -354,7 +358,19 @@ async function runNavigate(sessionId, url, options = {}) {
           },
           continue: async () => {
             continued.push(request.url);
-          }
+          },
+          ...(options.fulfill
+            ? {
+                fulfill: async (response) => {
+                  fulfilled.push({
+                    url: request.url,
+                    status: response?.status,
+                    headers: response?.headers,
+                    body: response?.body
+                  });
+                }
+              }
+            : {})
         });
         if (aborted && request.document !== false) throw new Error('net::ERR_BLOCKED_BY_CLIENT');
       }
@@ -379,9 +395,11 @@ async function runNavigate(sessionId, url, options = {}) {
   try {
     const result = await playwrightBrowserAction(sessionCtx(sessionId, stateDir), { kind: 'navigate', url }, {
       env: options.env ?? {},
-      resolveHost: options.resolveHost
+      resolveHost: options.resolveHost,
+      request: options.request,
+      connectTimeoutMs: options.connectTimeoutMs
     });
-    return { result, gotos, launches, aborts, continued };
+    return { result, gotos, launches, aborts, continued, fulfilled };
   } finally {
     await closeBrowserSession(sessionId);
     rmSync(stateDir, { recursive: true, force: true });
@@ -612,5 +630,76 @@ describe('browser navigation network policy', () => {
     assert.deepEqual(sub.aborts, ['http://169.254.169.254/latest/meta-data']);
     assert.equal(sub.continued.length, 0);
     assert.match(sub.result.content, /label=navigate/);
+  });
+
+  it('pins navigation to the approved address and fails over when the first address cannot connect', async () => {
+    const seen = [];
+    const started = Date.now();
+    const hang = (options) => new Promise((_resolve, reject) => {
+      const fail = () => {
+        const err = new Error('The operation was aborted');
+        err.name = 'AbortError';
+        reject(err);
+      };
+      if (options.signal.aborted) fail();
+      else options.signal.addEventListener('abort', fail, { once: true });
+    });
+    const pinned = await runNavigate('nav-pin-failover', 'https://example.com/page', {
+      env: {},
+      fulfill: true,
+      connectTimeoutMs: 40,
+      resolveHost: async () => ['203.0.113.10', '203.0.113.11'],
+      follow: [{
+        url: 'https://example.com/page',
+        document: true,
+        method: 'POST',
+        headers: { Host: 'evil.test', 'X-Trace': '1', 'Content-Length': '7' },
+        postData: 'payload'
+      }],
+      request: async (_url, address, options) => {
+        seen.push({ address, method: options.method, body: options.body, trace: options.headers['X-Trace'], host: options.headers.Host });
+        if (address === '203.0.113.10') return hang(options);
+        return new Response('page', { status: 200, headers: { 'content-type': 'text/html' } });
+      }
+    });
+    assert.equal(pinned.result.ok, true);
+    assert.equal(pinned.continued.length, 0);
+    assert.deepEqual(seen.map((item) => item.address), ['203.0.113.10', '203.0.113.11']);
+    assert.equal(seen[0].method, 'POST');
+    assert.equal(seen[0].body, 'payload');
+    assert.equal(seen[0].trace, '1');
+    assert.equal(seen[0].host, undefined);
+    assert.equal(pinned.fulfilled.length, 1);
+    assert.equal(pinned.fulfilled[0].status, 200);
+    assert.equal(pinned.fulfilled[0].headers['content-type'], 'text/html');
+    assert.ok(Date.now() - started < 2500);
+
+    const redirected = await runNavigate('nav-pin-redirect', 'https://example.com/start', {
+      env: {},
+      fulfill: true,
+      connectTimeoutMs: 40,
+      resolveHost: async () => ['203.0.113.10'],
+      follow: [{ url: 'https://example.com/start', document: true }],
+      request: async () => new Response(null, { status: 302, headers: { location: 'http://169.254.169.254/latest' } })
+    });
+    assert.equal(redirected.fulfilled.length, 1);
+    assert.equal(redirected.fulfilled[0].status, 302);
+    assert.equal(redirected.fulfilled[0].headers.location, 'http://169.254.169.254/latest');
+    assert.equal(redirected.continued.length, 0);
+
+    const failed = await runNavigate('nav-pin-fail', 'https://example.com/page', {
+      env: {},
+      fulfill: true,
+      connectTimeoutMs: 40,
+      resolveHost: async () => ['203.0.113.10'],
+      follow: [{ url: 'https://example.com/page', document: true }],
+      request: async () => {
+        throw new Error('secret-stack 203.0.113.10');
+      }
+    });
+    assert.equal(failed.result.ok, false);
+    assert.match(JSON.parse(failed.result.content).message, /导航连接失败/);
+    assert.equal(failed.result.content.includes('secret-stack'), false);
+    assert.deepEqual(failed.aborts, ['https://example.com/page']);
   });
 });

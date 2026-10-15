@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { fenceExternalContent, type RawAgentRuntime } from '@ppeng/agent-core';
 import { decryptFeishuEncryptPayload } from './feishu-crypto.js';
 import type { ChannelSpec, FeishuProviderSpec, WeComProviderSpec } from './types.js';
@@ -8,6 +9,7 @@ import { deliverChannelText } from './outbound.js';
 import { resolveImOutbound, type ImTurnOrigin, type SilentAckLocale } from './silent-reply.js';
 import {
   claimInboundEvent,
+  inboundTimestampFresh,
   isSenderAllowed,
   safeEqual,
   scheduleGatewayTurn,
@@ -369,6 +371,40 @@ export async function handleFeishuEventRequest(input: {
   return { kind: 'empty', status: 200 };
 }
 
+function wecomConfiguredSecret(settings: GatewaySettings, spec: WeComProviderSpec): string {
+  return (settings.wecom.bridgeSecret ?? spec.bridgeSecret)?.trim() ?? '';
+}
+
+function wecomSecretRejected(input: {
+  headers?: Record<string, string | string[] | undefined>;
+  spec: WeComProviderSpec;
+  settings: GatewaySettings;
+}): { status: number; body: Record<string, unknown> } | undefined {
+  const secret = wecomConfiguredSecret(input.settings, input.spec);
+  if (!secret) return { status: 403, body: { error: 'WeCom bridge secret is not configured' } };
+  if (!safeEqual(headerValue(input.headers, 'x-wecom-bridge-secret') ?? '', secret)) {
+    return { status: 403, body: { error: 'Invalid secret' } };
+  }
+  return undefined;
+}
+
+function wecomTimestampRejected(headers: Record<string, string | string[] | undefined> | undefined): boolean {
+  return !inboundTimestampFresh(headerValue(headers, 'x-wecom-bridge-timestamp') ?? '', Date.now());
+}
+
+function wecomEventKey(
+  userKey: string,
+  text: string,
+  body: Record<string, unknown>,
+  headers: Record<string, string | string[] | undefined> | undefined
+): string {
+  const msgId = String(body.msgId ?? body.msg_id ?? '').trim();
+  if (msgId) return `wecom:msg:${msgId}`;
+  const timestamp = headerValue(headers, 'x-wecom-bridge-timestamp') ?? '';
+  const digest = createHash('sha256').update(`${userKey}\n${timestamp}\n${text}`).digest('hex');
+  return `wecom:body:${digest}`;
+}
+
 export async function handleWeComBridgeRequest(input: {
   body: Record<string, unknown>;
   headers?: Record<string, string | string[] | undefined>;
@@ -378,13 +414,10 @@ export async function handleWeComBridgeRequest(input: {
   gatewayDir: string;
   channels: ChannelSpec[];
 }): Promise<{ status: number; body: Record<string, unknown> }> {
-  const secret = (input.settings.wecom.bridgeSecret ?? input.spec.bridgeSecret)?.trim();
-  if (!secret) {
-    return { status: 403, body: { error: 'WeCom bridge secret is not configured' } };
-  }
-  const got = String(input.body.secret ?? headerValue(input.headers, 'x-wecom-bridge-secret') ?? '');
-  if (!safeEqual(got, secret)) {
-    return { status: 403, body: { error: 'Invalid secret' } };
+  const rejected = wecomSecretRejected(input);
+  if (rejected) return rejected;
+  if (wecomTimestampRejected(input.headers)) {
+    return { status: 403, body: { error: 'Stale or missing timestamp' } };
   }
 
   const userKey = String(input.body.userKey ?? input.body.user_id ?? '').trim();
@@ -394,6 +427,9 @@ export async function handleWeComBridgeRequest(input: {
   }
   if (!isSenderAllowed(input.settings.wecom.allowedSenders, [userKey])) {
     return { status: 403, body: { error: 'sender_not_allowed' } };
+  }
+  if (!claimInboundEvent(wecomEventKey(userKey, text, input.body, input.headers), Date.now(), input.gatewayDir)) {
+    return { status: 200, body: { ok: true, duplicate: true } };
   }
 
   const agentId = input.spec.defaultAgentId ?? 'main';

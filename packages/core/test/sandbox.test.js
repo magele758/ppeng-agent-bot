@@ -138,13 +138,35 @@ describe('sanitizeSpawnEnv', () => {
       assert.equal(env.CUSTOM_VAR, 'hello');
     });
 
-    it('overrides can re-add stripped vars (intentional)', () => {
+    it('overrides cannot put injection vars or stripped credentials back', () => {
       const env = sanitizeSpawnEnv({
-        base: { NODE_OPTIONS: '--evil' },
-        overrides: { NODE_OPTIONS: '--max-old-space-size=4096' },
+        base: { PATH: '/usr/bin' },
+        overrides: {
+          NODE_OPTIONS: '--max-old-space-size=4096',
+          LD_PRELOAD: '/tmp/x.so',
+          'BASH_FUNC_echo%%': '() { echo; }',
+          PATH: '/custom/bin',
+          CUSTOM_VAR: 'hello',
+          CUSTOM_DENIED: 'no',
+          AWS_SECRET_ACCESS_KEY: 'from-override'
+        },
+        stripCredentials: true,
+        extraDenylist: ['CUSTOM_DENIED'],
+        allowlist: ['NODE_OPTIONS']
       });
-      // Override wins — caller explicitly passes it
-      assert.equal(env.NODE_OPTIONS, '--max-old-space-size=4096');
+      assert.equal(env.NODE_OPTIONS, undefined);
+      assert.equal(env.LD_PRELOAD, undefined);
+      assert.equal(env['BASH_FUNC_echo%%'], undefined);
+      assert.equal(env.AWS_SECRET_ACCESS_KEY, undefined);
+      assert.equal(env.CUSTOM_DENIED, undefined);
+      assert.equal(env.PATH, '/custom/bin');
+      assert.equal(env.CUSTOM_VAR, 'hello');
+      const kept = sanitizeSpawnEnv({
+        base: { PATH: '/usr/bin' },
+        overrides: { AWS_SECRET_ACCESS_KEY: 'from-override', OK: '2' }
+      });
+      assert.equal(kept.AWS_SECRET_ACCESS_KEY, 'from-override');
+      assert.equal(kept.OK, '2');
     });
 
     it('does not include overrides with undefined values', () => {

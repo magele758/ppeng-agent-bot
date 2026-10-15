@@ -11,7 +11,7 @@ import { envBool } from '../env.js';
 import { parseMcpHttpEndpoints, type McpHttpEndpoint } from './mcp-http-config.js';
 import { collectHeaderSecrets, McpHttpSession } from './mcp-http.js';
 import type { McpResourceInfo, McpToolInfo } from './mcp-jsonrpc.js';
-import { McpStdioSession, parseMcpStdioConfigs, sanitizeMcpToolSuffix } from './mcp-stdio.js';
+import { McpStdioSession, parseMcpStdioConfigs, redactStdioFailure, sanitizeMcpToolSuffix } from './mcp-stdio.js';
 import { minifyMcpToolInputSchema, parseMcpSchemaMinifyLevel } from './mcp-schema-minify.js';
 
 export interface McpManagerDeps {
@@ -273,7 +273,10 @@ export class McpManager {
           if (this.deps.tools.some((existing) => existing.name === name)) continue;
           const toolName = tool.name;
           const presented = presentMcpTool(
-            tool,
+            {
+              ...tool,
+              description: tool.description ? redactStdioFailure(tool.description, cfg.env) : tool.description
+            },
             `MCP stdio server ${si} tool ${toolName}`,
             (schema) => this.prepareMcpInputSchema(schema),
             this.deps.log
@@ -289,16 +292,16 @@ export class McpManager {
               const callArgs = mcpCallArgs((args ?? {}) as Record<string, unknown>);
               try {
                 const out = await session.callTool(toolName, callArgs);
-                return { ok: !out.isError, content: fenceMcp(toolName, out.content) };
+                return { ok: !out.isError, content: fenceMcp(toolName, redactStdioFailure(out.content, cfg.env)) };
               } catch (error) {
-                const message = error instanceof Error ? error.message : String(error);
+                const message = redactStdioFailure(error instanceof Error ? error.message : String(error), cfg.env);
                 return { ok: false, content: fenceMcp(toolName, message) };
               }
             }
           });
         }
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = redactStdioFailure(error instanceof Error ? error.message : String(error), cfg.env);
         void appendTraceEvent(this.deps.stateDir, sessionId, {
           kind: 'model_error',
           payload: { mcpStdio: si, message }

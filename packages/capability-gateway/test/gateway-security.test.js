@@ -133,15 +133,23 @@ function wecomCtx(spec = { enabled: true }) {
   const ctx = makeCtx({ runtime, fileConfig: { providers: { wecom: spec } } });
   return { runtime, ctx };
 }
-const wecomPost = (ctx, body) => call(handleGatewayHttp, ctx, { path: '/providers/wecom/bridge', body });
+const wecomPost = (ctx, body, headers) =>
+  call(handleGatewayHttp, ctx, { path: '/providers/wecom/bridge', body, headers });
+
+function wecomAuth(secret, timestamp = Math.floor(Date.now() / 1000)) {
+  return {
+    'x-wecom-bridge-secret': secret,
+    'x-wecom-bridge-timestamp': String(timestamp)
+  };
+}
 
 test('企微白名单：非白名单 403，白名单正常 [AC:gateway-im-security#AC-8]', async () => {
   const { runtime, ctx } = wecomCtx({ enabled: true, bridgeSecret: 's3' });
   writeGatewaySettings(runtime.store, { wecom: { allowedSenders: ['alice'] } });
-  const denied = await wecomPost(ctx, { secret: 's3', userKey: 'mallory', text: 'hi' });
+  const denied = await wecomPost(ctx, { userKey: 'mallory', text: 'hi' }, wecomAuth('s3'));
   assert.equal(denied.status, 403);
   assert.equal(runtime.calls.ran.length, 0);
-  const ok = await wecomPost(ctx, { secret: 's3', userKey: 'alice', text: 'hi' });
+  const ok = await wecomPost(ctx, { userKey: 'alice', text: 'hi' }, wecomAuth('s3'));
   assert.equal(ok.status, 200);
   assert.equal(runtime.calls.ran.length, 1);
 });
@@ -175,12 +183,41 @@ test('企微未配置 secret 时一律拒绝 [AC:gateway-im-security#AC-10]', as
 
 test('企微 secret 错误 403，正确则处理 [AC:gateway-im-security#AC-11]', async () => {
   const { runtime, ctx } = wecomCtx({ enabled: true, bridgeSecret: 's3' });
-  const bad = await wecomPost(ctx, { secret: 'nope', userKey: 'alice', text: 'hi' });
+  const bad = await wecomPost(ctx, { userKey: 'alice', text: 'hi' }, wecomAuth('nope'));
   assert.equal(bad.status, 403);
   assert.equal(runtime.calls.ran.length, 0);
-  const ok = await wecomPost(ctx, { secret: 's3', userKey: 'alice', text: 'hi' });
+  const ok = await wecomPost(ctx, { userKey: 'alice', text: 'hi' }, wecomAuth('s3'));
   assert.equal(ok.status, 200);
   assert.equal(runtime.calls.ran.length, 1);
+});
+
+test('企微密钥只认请求头，过期时间戳和重放不再跑 Agent', async () => {
+  const { runtime, ctx } = wecomCtx({ enabled: true, bridgeSecret: 's3' });
+  const now = Math.floor(Date.now() / 1000);
+  const bodySecret = await wecomPost(ctx, { secret: 's3', userKey: 'alice', text: 'hi' }, {
+    'x-wecom-bridge-timestamp': String(now)
+  });
+  assert.equal(bodySecret.status, 403);
+  const stale = await wecomPost(ctx, { userKey: 'alice', text: 'hi' }, wecomAuth('s3', now - 301));
+  const future = await wecomPost(ctx, { userKey: 'alice', text: 'hi' }, wecomAuth('s3', now + 301));
+  assert.equal(stale.status, 403);
+  assert.equal(future.status, 403);
+  assert.equal(runtime.calls.ran.length, 0);
+
+  const first = await wecomPost(ctx, { userKey: 'alice', text: 'hi', msgId: 'm1' }, wecomAuth('s3', now));
+  const again = await wecomPost(ctx, { userKey: 'alice', text: 'other', msgId: 'm1' }, wecomAuth('s3', now));
+  assert.equal(first.status, 200);
+  assert.equal(first.json.ok, true);
+  assert.equal(again.json.duplicate, true);
+
+  const plain = await wecomPost(ctx, { userKey: 'bob', text: 'same' }, wecomAuth('s3', now));
+  const replay = await wecomPost(ctx, { userKey: 'bob', text: 'same' }, wecomAuth('s3', now));
+  const other = await wecomPost(ctx, { userKey: 'bob', text: 'different' }, wecomAuth('s3', now));
+  assert.equal(plain.status, 200);
+  assert.equal(replay.json.duplicate, true);
+  assert.equal(other.status, 200);
+  assert.equal(other.json.duplicate, undefined);
+  assert.equal(runtime.calls.ran.length, 3);
 });
 
 test('设置保存后无需重启立即生效，读取不回显明文 [AC:gateway-im-security#AC-12]', async () => {
@@ -230,5 +267,62 @@ test('网关 /chat 带 botId：存在则落 canonical 会话，不存在 404 [AC
   const missing = await call(handleGatewayHttp, ctx, { path: '/chat', body: { message: 'yo', botId: 'ghost' } });
   assert.equal(missing.status, 404);
   assert.equal(runtime.calls.created.length, 0);
+  assert.equal(runtime.calls.ran.length, 1);
+});
+
+test('网关 token 和路由密钥按常量时间比较', async () => {
+  const runtime = fakeRuntime();
+  const ctx = makeCtx({ runtime, authToken: 'gateway-secret' });
+  const missing = await call(handleGatewayHttp, ctx, { method: 'GET', path: '/health' });
+  const wrong = await call(handleGatewayHttp, ctx, {
+    method: 'GET',
+    path: '/health',
+    headers: { 'x-gateway-token': 'gateway-secret-extra' }
+  });
+  const short = await call(handleGatewayHttp, ctx, {
+    method: 'GET',
+    path: '/health',
+    headers: { authorization: 'Bearer gateway' }
+  });
+  assert.equal(missing.status, 401);
+  assert.equal(wrong.status, 401);
+  assert.equal(short.status, 401);
+  const header = await call(handleGatewayHttp, ctx, {
+    method: 'GET',
+    path: '/health',
+    headers: { 'x-gateway-token': 'gateway-secret' }
+  });
+  const bearer = await call(handleGatewayHttp, ctx, {
+    method: 'GET',
+    path: '/health',
+    headers: { authorization: 'Bearer gateway-secret' }
+  });
+  assert.equal(header.status, 200);
+  assert.equal(bearer.status, 200);
+
+  const routed = makeCtx({
+    runtime,
+    authToken: 'gateway-secret',
+    fileConfig: { agentRoutes: [{ agentId: 'main', routeKey: 'route-secret' }] }
+  });
+  const auth = { 'x-gateway-token': 'gateway-secret' };
+  const noKey = await call(handleGatewayHttp, routed, {
+    path: '/agents/main/invoke',
+    headers: auth,
+    body: { message: 'hi' }
+  });
+  const badKey = await call(handleGatewayHttp, routed, {
+    path: '/agents/main/invoke',
+    headers: { ...auth, 'x-agent-route-key': 'route-secret-x' },
+    body: { message: 'hi' }
+  });
+  const ok = await call(handleGatewayHttp, routed, {
+    path: '/agents/main/invoke',
+    headers: { ...auth, 'x-agent-route-key': 'route-secret' },
+    body: { message: 'hi' }
+  });
+  assert.equal(noKey.status, 401);
+  assert.equal(badKey.status, 401);
+  assert.equal(ok.status, 200);
   assert.equal(runtime.calls.ran.length, 1);
 });

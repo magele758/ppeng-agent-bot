@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseMcpStdioConfigs, sanitizeMcpToolSuffix } from '../dist/mcp/mcp-stdio.js';
+import { parseMcpStdioConfigs, redactStdioFailure, sanitizeMcpToolSuffix } from '../dist/mcp/mcp-stdio.js';
 
 // ---------------------------------------------------------------------------
 // parseMcpStdioConfigs
@@ -174,5 +174,16 @@ describe('sanitizeMcpToolSuffix', () => {
 
   it('preserves mixed valid/invalid characters', () => {
     assert.equal(sanitizeMcpToolSuffix('get:user.info'), 'get_user_info');
+  });
+});
+
+describe('redactStdioFailure', () => {
+  it('strips child env values, including percent-encoded copies', () => {
+    const secret = 'stdio/secret';
+    const encoded = encodeURIComponent(secret);
+    const out = redactStdioFailure(`failed ${secret} and ${encoded}`, { MCP_TOKEN: secret, SHORT: 'abc' });
+    assert.equal(out.includes(secret), false);
+    assert.equal(out.includes(encoded), false);
+    assert.match(out, /\[REDACTED\]/);
   });
 });

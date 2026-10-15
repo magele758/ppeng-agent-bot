@@ -106,6 +106,18 @@ function stripOperatorChildEnv(env: NodeJS.ProcessEnv): void {
   for (const key of OPERATOR_CHILD_DENY) delete env[key];
 }
 
+function blockedOverride(key: string): boolean {
+  return INJECTION_VARS.has(key) || key.startsWith('BASH_FUNC_');
+}
+
+/** Injection vars stay stripped even when a caller passes them as overrides. */
+function overrideKept(key: string, options: SanitizeEnvOptions | undefined, stripCredentials: boolean): boolean {
+  if (blockedOverride(key)) return false;
+  if (options?.extraDenylist?.includes(key)) return false;
+  if (stripCredentials && isCredentialName(key)) return false;
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -164,10 +176,10 @@ export function sanitizeSpawnEnv(options?: SanitizeEnvOptions): NodeJS.ProcessEn
     }
   }
 
-  // Merge overrides last — these are intentional additions by the caller.
+  // Overrides are intentional, but cannot put injection vars or stripped credentials back.
   if (options?.overrides) {
     for (const [k, v] of Object.entries(options.overrides)) {
-      if (v !== undefined) base[k] = v;
+      if (v !== undefined && overrideKept(k, options, stripCredentials)) base[k] = v;
     }
   }
   for (const [k, v] of Object.entries(secretOverrides)) {

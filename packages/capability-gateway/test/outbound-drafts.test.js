@@ -242,7 +242,11 @@ test('a WeCom bridge model reply is drafted and posts once after approve', async
     });
     const res = await call(handleGatewayHttp, ctx, {
       path: '/providers/wecom/bridge',
-      body: { secret: 's3', userKey: 'alice', text: '你好' }
+      headers: {
+        'x-wecom-bridge-secret': 's3',
+        'x-wecom-bridge-timestamp': String(Math.floor(Date.now() / 1000))
+      },
+      body: { userKey: 'alice', text: '你好' }
     });
     assert.equal(res.status, 200);
     assert.equal(fetched.length, 0);

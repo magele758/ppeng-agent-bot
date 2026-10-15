@@ -287,6 +287,19 @@ test('credential collection ignores ordinary headers and short secrets', () => {
   );
 });
 
+test('redactSecrets replaces percent-encoded and JSON-escaped forms', () => {
+  const secret = 'sek"ret/x';
+  const encoded = encodeURIComponent(secret);
+  const json = JSON.stringify(secret).slice(1, -1);
+  const text = `raw ${secret} enc ${encoded} low ${encoded.toLowerCase()} json ${json}`;
+  const out = redactSecrets(text, [secret, 'short']);
+  assert.equal(out.includes(secret), false);
+  assert.equal(out.includes(encoded), false);
+  assert.equal(out.includes(encoded.toLowerCase()), false);
+  assert.equal(out.includes(json), false);
+  assert.match(out, /\[REDACTED\]/);
+});
+
 test('short bearer values are not full-text redacted', async () => {
   const token = 'xy';
   const calls = [];
