@@ -385,6 +385,13 @@ export class RawAgentRuntime {
       options.tools ?? createBuiltinTools(toolServices)
     );
     const optionalExtras = assembleOptionalTools({
+      routineHost: {
+        store:this.store, stateDir:this.stateDir, log:this.log,
+        runSession:(id)=>this.runSession(id),
+        isSessionRunning:(id)=>this.isSessionRunning(id),
+        hasUnconfirmedEffects:(id,startedAt)=>this.connectors.software.unconfirmedForSession(id,startedAt).length>0,
+        cancelSession:(id)=>this.cancelSession(id),
+      },
       env: process.env,
       store: this.store,
       stateDir: this.stateDir,

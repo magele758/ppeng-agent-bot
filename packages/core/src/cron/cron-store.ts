@@ -1,3 +1,5 @@
+import { createCronRunTools, type CronToolOptions } from './cron-run-tools.js';
+import { normalizeCiConclusions, parseEventScheduleValue } from './event-routine.js';
 import { normalizeExpiresAt, routineExpired } from './routine-deadline.js';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
@@ -5,7 +7,6 @@ import { createId, nowIso } from '../id.js';
 import { envBool } from '../env.js';
 import type { ToolContract } from '../types.js';
 import { principalFromSession } from '../bots/bot-identity.js';
-import type { SqliteStateStore } from '../storage.js';
 import { ValidationError } from '../errors.js';
 import { assertCredentialEnvName } from '../secrets/credential-env.js';
 import { nextCronRunAt, nextZonedCronRunAt, normalizeRoutineTimezone } from './cron-next.js';
@@ -156,7 +157,7 @@ export class CronJobStore {
   }
 }
 
-export function createCronTools(getStore: () => CronJobStore, opts?: {store?:SqliteStateStore;isEnabled?:()=>boolean}): ToolContract<any>[] {
+export function createCronTools(getStore: () => CronJobStore, opts?: CronToolOptions): ToolContract<any>[] {
   const createTool: ToolContract<{
     name: string;
     prompt: string;
@@ -168,6 +169,7 @@ export function createCronTools(getStore: () => CronJobStore, opts?: {store?:Sql
     missedPolicy?: 'coalesce'|'skip'|'catch_up';
     event?: string;
     secretEnv?: string;
+    conclusions?: string[];
   }> = {
     name: 'cron_create',
     description:
@@ -183,8 +185,9 @@ export function createCronTools(getStore: () => CronJobStore, opts?: {store?:Sql
         cron: { type: 'string', description: '5-field cron expression' },
         timezone:{type:'string',description:'IANA timezone, e.g. Asia/Shanghai'},
         missedPolicy:{type:'string',enum:['coalesce','skip','catch_up']},
-        event:{type:'string',description:'github/push, slack/message, email/received'},
-        secretEnv:{type:'string',description:'Environment variable name holding event signature secret'}
+        event:{type:'string',description:'github/push, slack/message, email/received, webhook/generic, ci/status'},
+        secretEnv:{type:'string',description:'Lab Secret Vault credential reference (legacy environment reference also supported)'},
+        conclusions:{type:'array',items:{type:'string'},description:'CI completion conclusions; empty accepts all'}
       },
       required: ['name', 'prompt']
     },
@@ -212,9 +215,9 @@ export function createCronTools(getStore: () => CronJobStore, opts?: {store?:Sql
         scheduleValue = args.cron;
         nextRunAt = nextZonedCronRunAt(args.cron,timezone).toISOString();
       } else if (args.event) {
-        if(!/^(github|slack|email)\/[a-z][a-z0-9_-]{0,64}$/.test(args.event))throw new ValidationError('valid event and secretEnv required');
+        if(!parseEventScheduleValue(args.event))throw new ValidationError('valid event and secretEnv required');
         assertCredentialEnvName(String(args.secretEnv ?? ''));
-        scheduleKind='event';scheduleValue=args.event;
+        scheduleKind='event';scheduleValue=parseEventScheduleValue(args.event)!;
       } else {
         return { ok: false, content: 'Provide every_ms >= 60000, once_at, or cron' };
       }
@@ -231,6 +234,7 @@ export function createCronTools(getStore: () => CronJobStore, opts?: {store?:Sql
         missedPolicy:args.missedPolicy??'coalesce',
         ruleVersion:1,
         metadata: {
+          ...(args.conclusions!==undefined?{conclusions:normalizeCiConclusions(args.conclusions)}:{}),
           ...(opts?.store?{principal:principalFromSession(opts.store,context.session)}:{}),
           ...(args.secretEnv?{secretEnv:args.secretEnv,prompt:args.prompt}:{}),
           ...(typeof context.session.metadata?.botId === 'string'
@@ -281,7 +285,7 @@ export function createCronTools(getStore: () => CronJobStore, opts?: {store?:Sql
     }
   };
 
-  return [createTool, listTool, removeTool];
+  return [createTool, listTool, removeTool, ...createCronRunTools(getStore,opts)];
 }
 
 /** Advance nextRunAt after a successful fire. Event routines only record lastRunAt. */

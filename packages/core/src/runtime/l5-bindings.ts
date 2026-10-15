@@ -706,7 +706,7 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
       const botSession = isCanonicalBotChat(session);
       const selectedSession = botSession && routineEnabled ? {...session,metadata:{...session.metadata,enabledOptionalToolGroups:[...new Set([...(Array.isArray(session.metadata?.enabledOptionalToolGroups) ? session.metadata.enabledOptionalToolGroups.map(String) : []),'cron'])]}} : session;
       let catalogTools = rt.filterSoftwareTools?.(rt.tools, session) ?? rt.tools;
-      if (botSession && !routineEnabled) catalogTools = catalogTools.filter(tool=>!['cron_create','cron_list','cron_delete'].includes(tool.name));
+      if (botSession && !routineEnabled) catalogTools = catalogTools.filter(tool=>!['cron_create','cron_list','cron_remove','cron_delete','cron_run_now','cron_runs'].includes(tool.name));
       const dynHydrated = hydrateTurnDynTools({
         store: rt.store,
         session,

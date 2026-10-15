@@ -18,6 +18,7 @@ const DENIED = [
   'send_message',
   'message_agent',
   'cron_create',
+  'cron_run_now',
   'ask_user'
 ];
 

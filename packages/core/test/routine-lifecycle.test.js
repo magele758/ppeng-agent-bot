@@ -301,3 +301,30 @@ test('expired disabled cron is removed on restart without catching up [AC:bot-ro
  host.cronStore.update(job.id,{enabled:false,expiresAt:new Date(Date.now()-1).toISOString(),nextRunAt:new Date(Date.now()-600000).toISOString()});host.cronStore=undefined;
  await tickCronJobs(host);assert.equal(host.cronStore.get(job.id),undefined);assert.equal(new RoutineRunStore(store).list(job.id).length,0);store.db.close();
 });
+
+test('dialog run_now queues serial work through approval and runs queries enforce ownership [AC:bot-routine-lifecycle#AC-10]',async()=>{
+ const {createCronTools}=await import('../dist/cron/cron-store.js');
+ const {store,session,host}=fixture();let enabled=true;
+ host.runSession=async id=>{store.updateSession(id,{status:'waiting_approval'});return store.getSession(id)};
+ const job=createCronJob(host,{sessionId:session.id,name:'manual',prompt:'read',intervalMs:60000});
+ const tools=createCronTools(()=>host.cronStore,{store,isEnabled:()=>enabled,runtimeHost:host});
+ const now=tools.find(t=>t.name==='cron_run_now'),query=tools.find(t=>t.name==='cron_runs');assert.ok(now);assert.ok(query);assert.equal(now.needsApproval(),true);
+ const ctx={session,agent:{id:'general'}};
+ const first=JSON.parse((await now.execute(ctx,{id:job.id})).content);await new Promise(r=>setImmediate(r));
+ const second=JSON.parse((await now.execute(ctx,{id:job.id})).content);
+ assert.equal(new RoutineRunStore(store).get(first.id).status,'waiting_approval');assert.equal(second.status,'queued');
+ assert.equal(host.cronStore.get(job.id).nextRunAt,job.nextRunAt);
+ const ledger=new RoutineRunStore(store);for(let n=0;n<3;n++)ledger.enqueue(job,new Date(n).toISOString(),{status:'completed'});
+ const page=JSON.parse((await query.execute(ctx,{id:job.id,limit:1})).content);assert.ok(page.nextCursor);assert.ok(page.runs.some(r=>r.id===first.id));
+ const older=JSON.parse((await query.execute(ctx,{id:job.id,limit:1,before:page.nextCursor})).content);assert.ok(older.runs.some(r=>r.status==='completed'&&!page.runs.some(p=>p.id===r.id)));
+ ledger.update(first.id,{eventBody:'private event'});
+ const detail=JSON.parse((await query.execute(ctx,{run_id:first.id})).content);assert.equal(detail.id,first.id);assert.equal(detail.eventBody,undefined);
+ const bob=store.createSession({title:'other',mode:'chat',agentId:'general',metadata:{userId:'bob'}});
+ for(const [tool,args] of [[now,{id:job.id}],[query,{id:job.id}],[query,{run_id:first.id}]])assert.equal((await tool.execute({session:bob,agent:{id:'general'}},args)).ok,false);
+ assert.equal((await query.execute(ctx,{id:job.id,before:-1})).ok,false);
+ host.cronStore.update(job.id,{enabled:false});assert.equal((await now.execute(ctx,{id:job.id})).ok,false);
+ host.cronStore.remove(job.id);assert.equal((await query.execute(ctx,{run_id:first.id})).ok,true);
+ assert.equal((await query.execute(ctx,{id:job.id,before:1})).ok,true);
+ enabled=false;assert.equal((await now.execute(ctx,{id:job.id})).ok,false);assert.equal((await query.execute(ctx,{id:job.id})).ok,false);
+ store.db.close();
+});

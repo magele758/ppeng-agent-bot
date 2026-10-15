@@ -1,7 +1,8 @@
 "use client";
 import { useCallback, useState } from "react";
+import { routineStatusPresentation } from "@/lib/routine-status";
 import { api } from "@/lib/api";
-import { useI18n, type MessageKey } from "@/lib/i18n";
+import { useI18n } from "@/lib/i18n";
 export const json = (value: unknown, method = "POST"): RequestInit => ({
   method,
   headers: { "Content-Type": "application/json" },
@@ -43,31 +44,8 @@ export { api };
 
 export function Status({ value }: { value: string }) {
   const { t } = useI18n();
-  const known = [
-    "queued",
-    "running",
-    "waiting_approval",
-    "completed",
-    "failed",
-    "cancelled",
-    "unknown",
-    "skipped",
-    "silent",
-    "idle",
-    "active",
-    "paused",
-    "configured",
-    "ready",
-    "degraded",
-    "unavailable",
-  ];
-  return (
-    <span>
-      {known.includes(value)
-        ? t(`botWork.states.${value}` as MessageKey)
-        : value}
-    </span>
-  );
+  const presentation = routineStatusPresentation(value);
+  return <span className={`routine-status routine-status--${presentation.status}`} style={presentation.style}>{t(presentation.key)}</span>;
 }
 
 export function MessageContent({ parts }: { parts: unknown[] }) {
