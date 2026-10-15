@@ -305,7 +305,7 @@ body,
 .session-chrome__chip.is-warn { border-color: color-mix(in srgb, #c9a227 55%, var(--color-border-strong)); }
 
 .approval-banner {
-  margin: 0 12px 8px;
+  margin: 8px 0 14px;
   padding: 10px 12px;
   border: 1px solid color-mix(in srgb, #c9a227 50%, var(--color-border-strong));
   background: color-mix(in srgb, #c9a227 10%, var(--color-surface-strong));
