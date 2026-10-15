@@ -26,7 +26,7 @@ Agent Lab / CLI → daemon HTTP / SSE
                        ↓
           RawAgentRuntime (product host, packages/core)
                        ↓  injected model / tools / storage / hooks
-          createAssembledLoop (packages/agent-loop, default: max)
+          createAssembledLoop (packages/agent-loop, default: mini)
                        ↓
           turn kernel → prepare context → model → tools → next turn
 ```
@@ -111,7 +111,7 @@ If you are an **automated coding agent** (Cursor, Codex, Claude Code, etc.) work
 3. **After edits**: `npm run test:unit` for logic; `npm run build` for TypeScript across packages. UI/E2E → `doc/TESTING.md`, `npm run test:e2e` when relevant.
 4. **Secrets & config**: prefer Lab UI and persisted settings APIs for supported options; avoid adding feature-switch env vars. Use [`.env.example`](.env.example) for necessary connection/bootstrap or CI fallback configuration; **never commit `.env`**. Env changes require process restart; consult each settings API for its effective scope.
 5. **Evolution**: `npm run evolution -- --help` for flags (`--learn`, `--agent`, `--review`, `--until-empty`, `--research`, `--test-agent`, …). Optional full drain + showcase: `npm run evolution:drain-showcase -- --help`. Inbox processing defaults to the **「今日新条目」** section (see README Evolution section below).
-6. **Spawning / sandbox**: new subprocess code must use `sanitizeSpawnEnv()` and existing sandbox helpers (`packages/core/src/sandbox.ts`, `SandboxManager`) — not raw `spawn` with full parent env.
+6. **Spawning / sandbox**: new subprocess code must use `sanitizeSpawnEnv()` and existing sandbox helpers (`packages/core/src/sandbox/env-sanitizer.ts`, `packages/core/src/sandbox/os-sandbox.ts`, `SandboxManager`) — not raw `spawn` with full parent env.
 7. **Skills**: `skills/**/SKILL.md`; optional merge with `~/.agents/**/SKILL.md` (details in `AGENTS.md`).
 8. **Loop SDK changes**: update [`skills/agent-loop/SKILL.md`](skills/agent-loop/SKILL.md) alongside SDK contracts, and run both `npm run test --workspace=@ppeng/agent-loop` and `npm run build --workspace=@ppeng/agent-loop`. Root `test:unit` does not replace the SDK's Vitest suite.
 
