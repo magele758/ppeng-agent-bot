@@ -709,19 +709,45 @@ export function skipPersistedToolResult(
   return paired.has(result.toolCallId);
 }
 
-function rememberToolResultId(ids: Set<string>, part: { type?: string; toolCallId?: string }): void {
-  if (part.type !== 'tool_result' || !part.toolCallId) return;
-  ids.add(part.toolCallId);
+function reopenToolCallId(open: Set<string>, paired: Set<string>, id: string): void {
+  open.add(id);
+  paired.delete(id);
 }
 
+function closeToolCallId(open: Set<string>, paired: Set<string>, id: string): void {
+  if (!open.has(id)) return;
+  open.delete(id);
+  paired.add(id);
+}
+
+function applyToolPairEvent(
+  open: Set<string>,
+  paired: Set<string>,
+  part: { type?: string; toolCallId?: string }
+): void {
+  const id = part.toolCallId;
+  if (!id) return;
+  if (part.type === 'tool_call') {
+    reopenToolCallId(open, paired, id);
+    return;
+  }
+  if (part.type !== 'tool_result') return;
+  closeToolCallId(open, paired, id);
+}
+
+/**
+ * Ids whose latest tool_call already has a later tool_result.
+ * A reused id (heuristic_read_dir) is open again until a result follows that latest call.
+ */
 export function pairedToolCallIdsFromMessages(
   messages: readonly { parts: readonly { type?: string; toolCallId?: string }[] }[]
 ): Set<string> {
-  const ids = new Set<string>();
+  const open = new Set<string>();
+  const paired = new Set<string>();
   for (const message of messages) {
-    for (const part of message.parts) rememberToolResultId(ids, part);
+    for (const part of message.parts) applyToolPairEvent(open, paired, part);
   }
-  return ids;
+  return paired;
 }
 
 function toolResultIdsAlreadyPaired(host: ToolLoopHost, sessionId: string): ReadonlySet<string> | undefined {

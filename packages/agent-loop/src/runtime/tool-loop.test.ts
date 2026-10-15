@@ -6,6 +6,7 @@ import {
   executeSingleTool,
   executeToolCalls,
   filterValidToolCalls,
+  pairedToolCallIdsFromMessages,
   processToolResults,
   truncateToolContent,
   type CompletedWaveItem,
@@ -479,6 +480,35 @@ describe('already paired tool results', () => {
       (entry) => (entry as { parts: Array<{ toolCallId?: string }> }).parts.map((part) => part.toolCallId)
     );
     expect(ids).toEqual(['open-1']);
+  });
+
+  it('treats a reused id as open until a result follows its latest call', () => {
+    const reopened = [
+      { parts: [{ type: 'tool_call', toolCallId: 'heuristic_read_dir' }] },
+      { parts: [{ type: 'tool_result', toolCallId: 'heuristic_read_dir' }] },
+      { parts: [{ type: 'tool_call', toolCallId: 'heuristic_read_dir' }] },
+    ];
+    expect([...pairedToolCallIdsFromMessages(reopened)]).toEqual([]);
+    expect([...pairedToolCallIdsFromMessages(reopened.slice(0, 2))]).toEqual(['heuristic_read_dir']);
+    const closedAgain = [
+      ...reopened,
+      { parts: [{ type: 'tool_result', toolCallId: 'heuristic_read_dir' }] },
+    ];
+    expect(pairedToolCallIdsFromMessages(closedAgain).has('heuristic_read_dir')).toBe(true);
+
+    const h = host({
+      pairedToolCallIds: () => pairedToolCallIdsFromMessages(reopened),
+    });
+    processToolResults(
+      h,
+      [{ toolCallId: 'heuristic_read_dir', name: 'echo', ok: true, content: 'new' }],
+      [],
+      ctx.session,
+      undefined,
+      's1'
+    );
+    expect(h.appended).toHaveLength(1);
+    expect((h.appended[0] as { parts: Array<{ content?: string }> }).parts[0]?.content).toBe('new');
   });
 });
 

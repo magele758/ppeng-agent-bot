@@ -306,4 +306,37 @@ describe('redactStdioTool', () => {
     assert.match(prop.description, /\[REDACTED\]/);
     assert.equal(schema.properties.__proto__.description, `tok ${secret}`);
   });
+
+  it('redacts description under a parameter named properties', () => {
+    const secret = 'supersecretvalue';
+    const schema = {
+      type: 'object',
+      properties: {
+        properties: {
+          description: `nested ${secret}`,
+          enum: ['production', secret],
+          properties: { inner: { description: `inner ${secret}` } }
+        },
+        patternProperties: { description: `pat ${secret}` },
+        $defs: { description: `defs ${secret}` },
+        definitions: { description: `def ${secret}` },
+        dependentSchemas: { description: `dep ${secret}` }
+      }
+    };
+    const out = redactStdioTool(
+      { name: 'deploy', description: 'plain', inputSchema: schema, readOnlyHint: false },
+      { MCP_TOKEN: secret }
+    );
+    const named = out.inputSchema.properties;
+    assert.equal(named.properties.description.includes(secret), false);
+    assert.match(named.properties.description, /\[REDACTED\]/);
+    assert.deepEqual(named.properties.enum, ['production', secret]);
+    assert.equal(named.properties.properties.inner.description.includes(secret), false);
+    assert.match(named.properties.properties.inner.description, /\[REDACTED\]/);
+    assert.equal(named.patternProperties.description.includes(secret), false);
+    assert.equal(named.$defs.description.includes(secret), false);
+    assert.equal(named.definitions.description.includes(secret), false);
+    assert.equal(named.dependentSchemas.description.includes(secret), false);
+    assert.equal(schema.properties.properties.description, `nested ${secret}`);
+  });
 });

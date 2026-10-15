@@ -215,11 +215,16 @@ function descriptionText(key: string, value: unknown, secrets: string[], keysAre
   return redactSecrets(value, secrets);
 }
 
+function propertyNamesFollow(key: string, keysAreNames: boolean): boolean {
+  if (keysAreNames) return false;
+  return SCHEMA_PROPERTY_MAP.has(key);
+}
+
 function schemaField(key: string, value: unknown, secrets: string[], keysAreNames: boolean): unknown {
   if (opaqueSchemaKeyword(key, keysAreNames)) return value;
   const text = descriptionText(key, value, secrets, keysAreNames);
   if (text !== undefined) return text;
-  return redactSchemaNode(value, secrets, SCHEMA_PROPERTY_MAP.has(key));
+  return redactSchemaNode(value, secrets, propertyNamesFollow(key, keysAreNames));
 }
 
 /** Description text only. Property names, required, enum, and $ref stay as protocol fields. */

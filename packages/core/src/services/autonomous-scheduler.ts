@@ -19,6 +19,31 @@ interface AutonomousSchedulerCtx {
   runSession: (sessionId: string) => Promise<unknown>;
   /** Sessions controlled by self-heal must NOT be auto-run by this scheduler. */
   isSelfHealControlled?: (session: SessionRecord) => boolean;
+  log?: { warn(message: string, fields?: Record<string, unknown>): void };
+}
+
+function sessionRunError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
+/** A run that dies before the kernel settles must not stay idle or running forever. */
+function markOpenSessionFailed(store: SqliteStateStore, sessionId: string): void {
+  const session = store.getSession(sessionId);
+  if (!session) return;
+  if (session.status !== 'idle' && session.status !== 'running') return;
+  store.updateSession(sessionId, { status: 'failed' });
+}
+
+function warnAutonomousRunFailed(ctx: AutonomousSchedulerCtx, sessionId: string, error: unknown): void {
+  const log = ctx.log;
+  if (!log) return;
+  log.warn('autonomous session run failed', { sessionId, error: sessionRunError(error) });
+}
+
+function noteAutonomousRunFailed(ctx: AutonomousSchedulerCtx, sessionId: string, error: unknown): void {
+  markOpenSessionFailed(ctx.store, sessionId);
+  warnAutonomousRunFailed(ctx, sessionId, error);
 }
 
 const AUTONOMOUS_MODES: Set<SessionRecord['mode']> = new Set(['task', 'teammate']);
@@ -61,6 +86,9 @@ export class AutonomousScheduler {
     this.running.add(sessionId);
     const job = Promise.resolve()
       .then(() => this.ctx.runSession(sessionId))
+      .catch((error: unknown) => {
+        noteAutonomousRunFailed(this.ctx, sessionId, error);
+      })
       .finally(() => {
         this.running.delete(sessionId);
         this.inflight.delete(job);
