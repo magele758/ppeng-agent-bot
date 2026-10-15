@@ -69,7 +69,7 @@ Commands:
   task create <title> [description]
   task ls
   task show <taskId>
-  approve <approvalId> [approve|reject]
+  approve <approvalId> <approve|reject>
   agent ls
   workspace ls
   scheduler run
@@ -376,7 +376,8 @@ async function main(): Promise<void> {
 
   if (command === 'approve') {
     const approvalId = subcommand;
-    const action = rest[0] === 'reject' ? 'reject' : 'approve';
+    const action = rest[0];
+    if (action !== 'approve' && action !== 'reject') throw new Error('Expected explicit approve or reject decision');
     if (!approvalId) {
       throw new Error('Missing approval id');
     }

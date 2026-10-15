@@ -3,6 +3,17 @@
 name: Harness quality comparison
 
 on:
+  workflow_call:
+    inputs:
+      baseline_ref:
+        type: string
+        required: true
+      experiment:
+        type: string
+        default: scripts/agent-eval/experiments/starter.json
+    secrets:
+      HARNESS_EVAL_API_KEY:
+        required: false
   workflow_dispatch:
     inputs:
       baseline_ref:

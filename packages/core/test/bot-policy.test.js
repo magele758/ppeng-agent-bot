@@ -442,6 +442,33 @@ test('allowedTools warnings name missing required tools; empty and complete list
   ]);
 });
 
+test('a canonical bot chat is a foreground session and is not rewritten once it is cut', () => {
+  const store = tempStore();
+  const host = facadeHost(store);
+  const bot = createBot(host, { name: 'Foreground' });
+  const session = store.getSession(bot.canonicalSessionId);
+  assert.equal(session.background, false);
+  assert.equal(session.metadata.sessionCut, true);
+  const updates = [];
+  const original = store.updateSession.bind(store);
+  store.updateSession = (id, patch) => {
+    updates.push({ id, patch });
+    return original(id, patch);
+  };
+  const again = openBot(host, bot.id);
+  assert.equal(again.createdSession, false);
+  assert.equal(again.sessionId, session.id);
+  assert.deepEqual(updates, []);
+  store.db.close();
+});
+
+test('botPolicyWarnings emits a warning for legacy bypass permission', () => {
+  assert.deepEqual(
+    botPolicyWarnings({ permissionMode: 'bypass', legacyBotBypass: true }),
+    [{ code: 'legacy_bypass_permission' }]
+  );
+});
+
 test('botPolicyWarnings is recomputed from stored session metadata, not from the last save', () => {
   const store = tempStore();
   const host = facadeHost(store);

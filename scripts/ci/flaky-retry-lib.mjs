@@ -1,5 +1,6 @@
 // Pure helpers for retry-failed-tests.mjs (unit-tested in scripts/test/flaky-retry-lib.test.mjs).
 import fs from 'node:fs';
+import { isKnownFlaky, knownFlaky } from './known-flaky.mjs';
 import path from 'node:path';
 
 /** More failing files than this looks like a real breakage, not noise: skip the retry. */
@@ -156,7 +157,7 @@ export function renderSummary({ flaky, failed }, label) {
   const out = [];
   if (flaky.length) {
     out.push(`### Flaky tests (${label})`, '');
-    out.push('Failed on the first run, passed when the file was re-run alone. The step passes; please fix or quarantine.', '');
+    out.push('Failed on the first run, passed when the file was re-run alone. Unlisted retry recoveries fail the step; checked-in exceptions remain visibly flaky.', '');
     out.push('| File | Tests |', '|---|---|');
     for (const g of flaky) out.push(`| \`${mdCell(g.file)}\` | ${mdCell(testNames(g))} |`);
     out.push('');
@@ -170,7 +171,7 @@ export function renderSummary({ flaky, failed }, label) {
   return out.join('\n');
 }
 
-export function buildReport({ label, script, firstExitCode, plan, flaky, failed }) {
+export function buildReport({ label, script, firstExitCode, plan, flaky, failed, allowlist = knownFlaky }) {
   return {
     schema: 1,
     label,
@@ -178,7 +179,7 @@ export function buildReport({ label, script, firstExitCode, plan, flaky, failed 
     firstExitCode,
     retried: plan.retry,
     noRetryReason: plan.reason,
-    pass: plan.pass || (plan.retry && failed.length === 0),
+    pass: plan.pass || (plan.retry && failed.length === 0 && flaky.every(g => g.tests.length > 0 && g.tests.every(t => isKnownFlaky(g.file, t.name, allowlist)))),
     flaky,
     failed
   };

@@ -1,9 +1,23 @@
-# 真模型压缩 A/B：仅手动触发，不跟 push / PR。
+# 真模型压缩 A/B：支持手动触发；release gate 有密钥时调用。
 # Actions → Compact A/B → Run workflow
 
 name: Compact A/B
 
 on:
+  workflow_call:
+    inputs:
+      cases:
+        type: string
+        default: silent
+    secrets:
+      RAW_AGENT_API_KEY:
+        required: false
+      RAW_AGENT_BASE_URL:
+        required: false
+      RAW_AGENT_MODEL_NAME:
+        required: false
+      RAW_AGENT_ANTHROPIC_URL:
+        required: false
   workflow_dispatch:
     inputs:
       cases:

@@ -655,21 +655,28 @@ test('cross-user delivery is refused; an ownerless bot does not spawn a personal
     store.updateSession(sessionId, { metadata: { ...store.getSession(sessionId).metadata, ...meta } });
   const { tool, runs } = harness(store);
 
+  const assertFilteredOut = (result) => {
+    const payload = JSON.parse(result.content);
+    assert.equal(payload.error_code, 'TARGET_OWNER_MISMATCH');
+    assert.equal(payload.error, 'Target is not authorized for this principal');
+    assert.equal('targetId' in payload, false);
+  };
+
   setOwner(alpha.canonicalSessionId, { userId: 'user_a' });
   setOwner(beta.canonicalSessionId, { userId: 'user_b' });
   const crossed = await call(tool, dir, store, alpha, { target: 'Beta', message: 'leak?' });
-  assert.equal(JSON.parse(crossed.content).error_code, 'TARGET_OWNER_MISMATCH');
+  assertFilteredOut(crossed);
   assert.equal(userText(store, beta.canonicalSessionId).length, 0);
 
   setOwner(alpha.canonicalSessionId, { userId: undefined });
   const anon = await call(tool, dir, store, alpha, { target: 'Beta', message: 'anon?' });
-  assert.equal(JSON.parse(anon.content).error_code, 'TARGET_OWNER_MISMATCH');
+  assertFilteredOut(anon);
   assert.deepEqual(runs, []);
 
   setOwner(alpha.canonicalSessionId, { userId: 'user_a', tenantId: 't1' });
   setOwner(beta.canonicalSessionId, { userId: 'user_a', tenantId: 't2' });
   const tenant = await call(tool, dir, store, alpha, { target: 'Beta', message: 'tenant?' });
-  assert.equal(JSON.parse(tenant.content).error_code, 'TARGET_OWNER_MISMATCH');
+  assertFilteredOut(tenant);
 
   setOwner(beta.canonicalSessionId, { userId: undefined, tenantId: undefined });
   setOwner(alpha.canonicalSessionId, { userId: 'user_a', tenantId: undefined });
@@ -1009,6 +1016,10 @@ test('did_you_mean falls back from names to ids and strips leading @', async () 
   const researcher = createBot(host, { name: 'Researcher' });
   const atTypo = await failure(call(tool, dir, store, alpha, { target: '@@@@@@Reseacher', message: 'hi' }));
   assert.equal(atTypo.did_you_mean, researcher.name);
+
+  const none = await failure(call(tool, dir, store, alpha, { target: 'zzzz-qqqq-not-a-bot', message: 'hi' }));
+  assert.equal(none.error_code, 'UNKNOWN_TARGET');
+  assert.equal(none.did_you_mean, null);
   store.db.close();
 });
 
@@ -1085,4 +1096,93 @@ test('refusals report ok:false for no-bot, plan mode, unknown target and owner m
 
   assert.equal(userText(store, beta.canonicalSessionId).length, 0);
   store.db.close();
+});
+
+test('message_agent catches early store failures as structured errors', async () => {
+  const { dir, store } = tempStore();
+  try {
+    const alpha = createBot(facadeHost(store), { name: 'Alpha' });
+    const broken = Object.create(store);
+    const { tool } = harness(broken);
+    for (const thrown of [new Error('read failed'), 'raw read failure']) {
+      broken.getSession = () => { throw thrown; };
+      const result = await failure(call(tool, dir, store, alpha, { target: 'Beta', message: 'hi' }));
+      assert.equal(result.error_code, 'DELIVERY_FAILED');
+      assert.equal(result.error, thrown instanceof Error ? thrown.message : thrown);
+    }
+  } finally { store.db.close(); }
+});
+
+test('an exact bot id wins over another bot whose name is that id', async () => {
+  const { dir, store } = tempStore();
+  const host = facadeHost(store);
+  const sender = createBot(host, { name: 'Sender' });
+  const byId = createBot(host, { name: 'Hello World' });
+  const byName = createBot(host, { name: 'hello-world' });
+  assert.equal(byId.id, 'hello-world');
+  assert.notEqual(byName.id, byId.id);
+  const { tool } = harness(store);
+  const result = await call(tool, dir, store, sender, { target: 'hello-world', message: 'to the id', wake: false });
+  assert.equal(result.ok, true);
+  assert.equal(JSON.parse(result.content).targetId, byId.id);
+  assert.equal(userText(store, byId.canonicalSessionId).length, 1);
+  assert.equal(userText(store, byName.canonicalSessionId).length, 0);
+  store.db.close();
+});
+
+test('an exact bot name wins over a case-insensitive id of a different bot', async () => {
+  const { dir, store } = tempStore();
+  const host = facadeHost(store);
+  const sender = createBot(host, { name: 'Sender' });
+  const ciId = createBot(host, { name: 'foo' });
+  store.db.prepare('UPDATE bots SET name = ? WHERE id = ?').run('keeper', ciId.id);
+  const exactName = createBot(host, { name: 'Foo' });
+  assert.equal(ciId.id, 'foo');
+  assert.notEqual(exactName.id, ciId.id);
+  const { tool } = harness(store);
+  const result = await call(tool, dir, store, sender, { target: 'Foo', message: 'to the name', wake: false });
+  assert.equal(result.ok, true);
+  assert.equal(JSON.parse(result.content).targetId, exactName.id);
+  assert.equal(userText(store, exactName.canonicalSessionId).length, 1);
+  assert.equal(userText(store, ciId.canonicalSessionId).length, 0);
+  store.db.close();
+});
+
+test('a hidden bot owned by someone else is an owner mismatch, not an unknown target', async () => {
+  const { dir, store } = tempStore();
+  const host = facadeHost(store);
+  const alpha = createBot(host, { name: 'Alpha' });
+  const ghost = createBot(host, { name: 'Ghost' });
+  updateBot(host, ghost.id, { hidden: true });
+  const ghostSession = store.getSession(ghost.canonicalSessionId);
+  store.updateSession(ghost.canonicalSessionId, {
+    metadata: { ...ghostSession.metadata, userId: 'user_b' }
+  });
+  const { tool } = harness(store);
+  const payload = await failure(call(tool, dir, store, alpha, { target: 'Ghost', message: 'psst' }));
+  assert.equal(payload.error_code, 'TARGET_OWNER_MISMATCH');
+  assert.equal(payload.error, 'Target is not authorized for this principal');
+  assert.equal('targetId' in payload, false);
+  store.db.close();
+});
+
+test('message_agent reports queue capacity and retains already accepted work', async () => {
+  const { dir, store } = tempStore();
+  try {
+    const host = facadeHost(store);
+    const alpha = createBot(host, { name: 'Alpha' });
+    const beta = createBot(host, { name: 'Beta' });
+    store.setDaemonControl('bot.workSettings', { perBot: 1, perPrincipal: 1 });
+    const { tool, active } = harness(store);
+    active.add(beta.canonicalSessionId);
+    const first = await call(tool, dir, store, alpha, { target: 'Beta', message: 'first' });
+    assert.equal(first.ok, true);
+    const overflow = await failure(call(tool, dir, store, alpha, { target: 'Beta', message: 'overflow' }));
+    assert.equal(overflow.error_code, 'QUEUE_FULL');
+    assert.equal(overflow.accepted, false);
+    assert.equal(overflow.retryable, true);
+    assert.match(overflow.error, /Pending work capacity reached/);
+    assert.deepEqual(overflow.limits, { perBot: 1, perPrincipal: 1 });
+    assert.deepEqual(overflow.usage, { total: 1, byBot: { [beta.id]: 1 } });
+  } finally { store.db.close(); }
 });

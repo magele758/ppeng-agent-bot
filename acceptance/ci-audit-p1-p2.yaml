@@ -1,0 +1,47 @@
+id: ci-audit-p1-p2
+title: CI audit P1/P2 release gate hardening
+status: implemented
+requirement: |
+  Remaining CI P1/P2 items from the earlier ppeng-agent-core audit: retry-pass must not be silently green; acceptance status downgrade/removal must fail the gate; CRAP baseline relaxations and apps/web-console must be covered; only an explicit approve counts as approval; trustProxy=false ignores X-Forwarded-For (test); recursive test:unit discovery; no slack for zero-coverage CRAP entries; TLA sanity check in test:formal; mutation/real-model smoke/Harness/compaction A/B failures feed the Main release gate (missing secrets may skip); pinned bot-release evidence items.
+notes: "Approved under lei's standing instruction; final acceptance by lei pending."
+criteria:
+  - id: AC-1
+    given: A test fails initially and passes when retried in isolation.
+    when: CI evaluates unit-test and acceptance results.
+    then: The retry recovery is reported explicitly and fails the gate unless that exact test is on the checked-in known-flaky list; an exception is never reported as a clean pass, and a persistent failure still fails.
+  - id: AC-2
+    given: The base revision contains approved or implemented acceptance criteria.
+    when: A candidate downgrades their status, retires or deletes their specification, or removes a criterion together with its test tag.
+    then: The acceptance gate fails and identifies the protection removed relative to the base revision.
+  - id: AC-3
+    given: A candidate contains code changes or edits to the CRAP baseline.
+    when: The CRAP gate evaluates the candidate against the base revision.
+    then: Baseline relaxations cannot hide regressions, and web-console production code is included in the assessment; any initial accommodation is limited to code already present in the base revision.
+  - id: AC-4
+    given: An approval is pending.
+    when: A user submits an approval decision through HTTP or CLI.
+    then: Only an explicit approve decision grants approval; reject, missing, malformed, and unknown decisions never grant approval.
+  - id: AC-5
+    given: Proxy trust is disabled and requests originate from the same remote address.
+    when: The requests supply different or spoofed X-Forwarded-For headers.
+    then: They share the same rate-limit identity and cannot bypass the limit by changing the forwarded address.
+  - id: AC-6
+    given: A unit test is added in a nested directory within an existing unit-test suite.
+    when: The standard unit-test command runs.
+    then: The nested test executes alongside existing unit tests, and its failure makes the command fail.
+  - id: AC-7
+    given: An existing CRAP baseline entry has zero coverage.
+    when: Its risk score increases even slightly.
+    then: The CRAP gate fails without applying percentage or absolute slack to that entry.
+  - id: AC-8
+    given: A formal specification has a missing or mismatched module header, missing footer, or an undefined specification referenced by its configuration.
+    when: Formal regression checks run without TLC.
+    then: The malformed specification fails a cheap structural sanity check; valid checked-in specifications pass without claiming formal verification.
+  - id: AC-9
+    given: Mutation, real-model smoke, Harness, and compaction A/B checks participate in a release evaluation.
+    when: The Main release gate aggregates their results.
+    then: Failures in mutation or real-model smoke fail the release gate; optional model checks may skip for unavailable credentials. Compaction A/B outcomes remain explicitly reported but do not block Main because live-model evidence is non-deterministic. Harness outcomes remain explicitly reported but do not block Main until a qualifying experiment meets the unchanged quality requirements.
+  - id: AC-10
+    given: Release readiness requires build, unit, integration, browser, faults, migration-rollback, performance, soak, live-model, live-software, acceptance, and crap evidence.
+    when: Any required evidence item is removed from a candidate manifest or from the required-evidence contract.
+    then: The missing manifest item blocks readiness, and removal from the contract fails a regression check that independently pins all twelve required items.

@@ -302,7 +302,8 @@ export function scoreFunctions(file, functions, coveredLines) {
 }
 
 /** Small absolute slack absorbs coverage noise from timing-dependent paths. */
-export function allowedCrap(baselineCrap) {
+export function allowedCrap(baselineCrap, coverage) {
+  if (coverage === 0) return baselineCrap;
   return baselineCrap * 1.05 + 1;
 }
 
@@ -320,7 +321,7 @@ export function evaluateGate(rows, baseline, threshold = DEFAULT_THRESHOLD) {
     if (row.crap <= threshold) continue;
     const prior = baselineEntries[row.key];
     if (!prior) newViolations.push(row);
-    else if (row.crap > allowedCrap(prior.crap)) regressions.push({ ...row, baselineCrap: prior.crap });
+    else if (row.crap > allowedCrap(prior.crap, prior.coverage)) regressions.push({ ...row, baselineCrap: prior.crap, baselineCoverage: prior.coverage });
   }
   for (const [key, prior] of Object.entries(baselineEntries)) {
     const row = current.get(key);

@@ -1029,3 +1029,30 @@ test('classifyModelError: 504 and 529 are decided by status, not by body words',
   assert.deepEqual(pick(classifyModelError(httpError(504, 'engine is currently overloaded'))), ['server_error', 504]);
   assert.deepEqual(pick(classifyModelError(httpError(529, 'boom'))), ['overloaded', 529]);
 });
+
+
+test('classifyModelError: missing AbortSignal global does not throw on ordinary errors', () => {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'AbortSignal');
+  try {
+    Object.defineProperty(globalThis, 'AbortSignal', { configurable: true, value: undefined });
+    assert.deepEqual(classifyModelError(new Error('plain failure')), { category: 'unknown', upstreamRetryable: false });
+  } finally {
+    Object.defineProperty(globalThis, 'AbortSignal', descriptor);
+  }
+});
+
+test('classifyModelError: nullish errors return before invoking text classifiers', (t) => {
+  // Empty input has no text to classify. Observe the fast path without changing regex results.
+  const exec = t.mock.method(RegExp.prototype, 'exec');
+  try {
+    for (const input of [null, undefined]) {
+      const before = exec.mock.callCount();
+      const result = classifyModelError(input);
+      const after = exec.mock.callCount();
+      assert.deepEqual(result, { category: 'unknown', upstreamRetryable: false });
+      assert.equal(after, before, 'nullish input must bypass regex classification');
+    }
+  } finally {
+    exec.mock.restore();
+  }
+});

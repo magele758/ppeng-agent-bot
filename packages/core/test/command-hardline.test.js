@@ -1574,15 +1574,18 @@ describe('command hardline review fixes', () => {
     });
 
     it('stays fast on huge inputs and doubling variables', () => {
+      // CPU milliseconds, best of 3. A slow CI core measures ~150ms for the
+      // 100k positional list; the budget only has to reject a seconds-scale blowup.
+      const fastEnough = budgetMs(1000);
       const loop = timed(`for d in ${items(256)}; do rm -rf "$d"; done`);
       assert.equal(loop.result, null);
-      assert.ok(loop.ms < budgetMs(200), `took ${loop.ms.toFixed(0)}ms`);
+      assert.ok(loop.ms < fastEnough, `took ${loop.ms.toFixed(0)}ms`);
       const big = timed(`f() { rm -rf "$1"; }; ${Array.from({ length: 20_000 }, () => 'f ./b').join('; ')}`);
       assert.equal(big.result, null);
-      assert.ok(big.ms < budgetMs(200), `took ${big.ms.toFixed(0)}ms`);
+      assert.ok(big.ms < fastEnough, `took ${big.ms.toFixed(0)}ms`);
       const longPositional = timed(`f() { rm -rf "$@"; }; f ${'a '.repeat(100_000)}`);
       assert.equal(longPositional.result, null);
-      assert.ok(longPositional.ms < budgetMs(200), `took ${longPositional.ms.toFixed(0)}ms`);
+      assert.ok(longPositional.ms < fastEnough, `took ${longPositional.ms.toFixed(0)}ms`);
     });
   });
 
@@ -2119,4 +2122,17 @@ describe('command hardline before approval', () => {
     assert.equal(decision, 'proceed');
     assert.equal(messages.length, 0);
   });
+});
+
+it('hardline propagates unexpected scanner defects instead of treating them as resource exhaustion', () => {
+  const defect = new Error('scanner defect');
+  // Inject a scanner failure after the public trim guard has succeeded.
+  const command = new Proxy(new String('echo safe'), {
+    get(target, key) {
+      if (key === 'trim') return () => 'echo safe';
+      if (key === 'length') throw defect;
+      return Reflect.get(target, key);
+    }
+  });
+  assert.throws(() => matchCommandHardline(command), (error) => error === defect);
 });
