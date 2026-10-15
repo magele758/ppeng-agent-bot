@@ -322,6 +322,6 @@ export function materializeRoutineOccurrences(host:RoutineRuntimeHost,config:Cro
 /** Single-instance cleanup keeps configuration while already admitted work is pending. */
 function removeExpiredRoutines(host:RoutineRuntimeHost):void {
  const config=new CronJobStore(host.stateDir),runs=new RoutineRunStore(host.store);
- const busy=new Set(runs.pending().filter(run=>['queued','running','waiting_approval'].includes(run.status)||activeFor(host.store).has(run.id)).map(run=>run.routineId));
+ const busy=new Set(runs.pending().map(run=>run.routineId));
  for(const job of config.list())if(routineExpired(job)&&!busy.has(job.id))config.remove(job.id);
 }

@@ -269,6 +269,23 @@ test('deadline stops admission and deletes only after in-flight completion [AC:b
  assert.deepEqual(materializeRoutineOccurrences(host,host.cronStore,expired),[]);await tickCronJobs(host);assert.ok(host.cronStore.get(job.id));assert.equal(runs.list(job.id).length,1);
  resolve();await new Promise(r=>setImmediate(r));await tickCronJobs(host);assert.equal(host.cronStore.get(job.id),undefined);assert.equal(runs.get(run.id).status,'completed');store.db.close();
 });
+test('expired routine retains unknown work until confirmed retry completes [AC:bot-routine-lifecycle#AC-6]',async()=>{
+ const {store,session,host}=fixture();
+ try{
+  const job=createCronJob(host,{sessionId:session.id,name:'expired unknown',prompt:'check',intervalMs:60000,expiresAt:new Date(Date.now()+3600000).toISOString()});
+  const runs=new RoutineRunStore(store);const run=runs.enqueue(job,new Date().toISOString());
+  runs.update(run.id,{status:'unknown',notificationSent:true});
+  host.cronStore.update(job.id,{expiresAt:new Date(Date.now()-1).toISOString(),nextRunAt:new Date(Date.now()-60000).toISOString()});
+  for(let i=0;i<2;i++){
+   await tickCronJobs(host);
+   assert.ok(host.cronStore.get(job.id));assert.equal(runs.get(run.id).status,'unknown');assert.equal(runs.list(job.id).length,1);
+  }
+  assert.throws(()=>retryRoutineRun(host,run.id),/confirmUnknown/);
+  assert.equal(retryRoutineRun(host,run.id,{confirmUnknown:true}).status,'queued');
+  await tickCronJobs(host);await new Promise(r=>setImmediate(r));await tickCronJobs(host);
+  assert.equal(runs.get(run.id).status,'completed');assert.equal(host.cronStore.get(job.id),undefined);assert.equal(runs.list(job.id).length,1);
+ }finally{store.db.close();}
+});
 test('model silence suppresses main-chat notification [AC:bot-routine-lifecycle#AC-7]',async()=>{
  for(const text of ['[NO_UPDATE]','  [NO_UPDATE] no changes  ','ordinary report','prefix [NO_UPDATE]']){
  const {store,session,host}=fixture();host.runSession=async id=>{store.appendMessage(id,'assistant',[{type:'text',text}]);};
