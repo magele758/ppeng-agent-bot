@@ -222,6 +222,7 @@ test("assign work through Super Bot and inspect the persisted result [AC:default
       )?.status;
     })
     .toBe("completed");
+  await panel.locator("summary").click();
   await panel.getByRole("button", { name: "刷新", exact: true }).click();
   await panel
     .locator("article")

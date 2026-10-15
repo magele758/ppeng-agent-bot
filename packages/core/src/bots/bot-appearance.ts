@@ -38,3 +38,22 @@ export function normalizeBotFaceShape(raw: unknown): BotFaceShape | null {
 export function normalizeBotFaceColor(raw: unknown): BotFaceColor | null {
   return requireChoice('faceColor', raw, BOT_FACE_COLORS);
 }
+
+/** Fields present on a create/patch body. Absent keys are left unset. */
+export function readFaceInput(body: Record<string, unknown>): { faceShape?: unknown; faceColor?: unknown } {
+  return {
+    ...('faceShape' in body ? { faceShape: body.faceShape } : {}),
+    ...('faceColor' in body ? { faceColor: body.faceColor } : {})
+  };
+}
+
+/** Normalized face columns for an update. Omitted keys stay unchanged. */
+export function faceUpdatePatch(patch: { faceShape?: unknown; faceColor?: unknown }): {
+  faceShape?: BotFaceShape | null;
+  faceColor?: BotFaceColor | null;
+} {
+  return {
+    ...(patch.faceShape !== undefined ? { faceShape: normalizeBotFaceShape(patch.faceShape) } : {}),
+    ...(patch.faceColor !== undefined ? { faceColor: normalizeBotFaceColor(patch.faceColor) } : {})
+  };
+}

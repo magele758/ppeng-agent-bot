@@ -9,9 +9,11 @@ import {
   BOT_ROSTER_CAP,
   canonicalBotChatTitle,
   createBot,
+  faceUpdatePatch,
   getBot,
   listBots,
   openBot,
+  readFaceInput,
   slugifyBotName,
   updateBot
 } from '../dist/bots/index.js';
@@ -167,6 +169,17 @@ test('openBot: missing session is recreated', () => {
   assert.ok(session);
   assert.equal(getBot(store, bot.id).canonicalSessionId, opened.sessionId);
   store.db.close();
+});
+
+test('face input keeps only present fields and rejects an unknown choice', () => {
+  assert.deepEqual(readFaceInput({ name: 'A' }), {});
+  assert.deepEqual(readFaceInput({ faceShape: 'bean', faceColor: null }), { faceShape: 'bean', faceColor: null });
+  assert.deepEqual(faceUpdatePatch({}), {});
+  assert.deepEqual(faceUpdatePatch({ faceShape: 'circle', faceColor: 'mint' }), {
+    faceShape: 'circle',
+    faceColor: 'mint'
+  });
+  assert.throws(() => faceUpdatePatch({ faceColor: 'gold' }), ValidationError);
 });
 
 test('createBot stores a face choice and update can clear it', () => {
