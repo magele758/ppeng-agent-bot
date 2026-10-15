@@ -10,12 +10,13 @@ export class BoundedHistogram {
  * Full soaks use nearest-rank p95 against the published millisecond SLO.
  * A smoke window has about 34 receive samples, so that rank is the second-slowest
  * sample. Two runner stalls then fail a series whose median and mean still meet
- * the same SLO. Smoke applies those thresholds to the median and the mean.
+ * the same SLO. Smoke keeps those two checks and also requires nearest-rank p90
+ * at the same SLO: the slowest few samples may miss it, a longer tail may not.
  */
 export function latencyWithinThreshold(histogram, thresholdMs, mode) {
  if (!histogram || histogram.count < 1 || !Number.isFinite(thresholdMs)) return false;
  if (mode === 'strict') return histogram.quantile(0.95) <= thresholdMs;
- if (mode === 'smoke') return histogram.quantile(0.5) <= thresholdMs && histogram.sum / histogram.count <= thresholdMs;
+ if (mode === 'smoke') return histogram.quantile(0.5) <= thresholdMs && histogram.sum / histogram.count <= thresholdMs && histogram.quantile(0.9) <= thresholdMs;
  throw new Error(`Unknown latency mode: ${mode}`);
 }
 export function processTreeRss(rootPid){

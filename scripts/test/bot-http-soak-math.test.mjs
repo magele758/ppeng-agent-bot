@@ -24,6 +24,10 @@ test('smoke latency gate keeps the published SLO on the median and mean',()=>{
  assert.equal(latencyWithinThreshold(new BoundedHistogram(),500,'smoke'),false);
  assert.throws(()=>latencyWithinThreshold(fast,500,'other'),/Unknown latency mode/);
 });
+test('smoke latency gate rejects thirty fast receives plus four multi-second receives',()=>{
+ const tail=new BoundedHistogram();for(let i=0;i<30;i++)tail.add(100);for(let i=0;i<4;i++)tail.add(3000);
+ assert.equal(tail.quantile(.5)<=500,true);assert.equal(tail.sum/tail.count<=500,true);assert.equal(latencyWithinThreshold(tail,500,'smoke'),false);
+});
 test('bounded histograms keep constant storage and conservatively reject overflow latency',()=>{
  const h=new BoundedHistogram();for(let i=0;i<100000;i++)h.add(i%100);assert.equal(h.bins.length,10002);assert.equal(h.count,100000);assert.equal(h.quantile(.95),94);const overflow=new BoundedHistogram();for(let i=0;i<100;i++)overflow.add(20000+i);assert.equal(overflow.quantile(.95),20099);
 });
