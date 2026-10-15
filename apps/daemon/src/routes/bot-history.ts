@@ -7,7 +7,7 @@ export function botHistoryRoutes(runtime: RawAgentRuntime): RouteSpec[] {
  return wrapSessionIdRoutes(runtime,[
  {method:'GET',pattern:'/api/sessions/:id/history',handler:({requireParam,url,response})=>{
   const value=(key:string)=>url.searchParams.has(key)?Number(url.searchParams.get(key)):undefined;
-  try { json(response,200,runtime.store.listHistory(requireParam('id'),{limit:value('limit'),beforeSeq:value('beforeSeq'),query:url.searchParams.get('query')??undefined,from:url.searchParams.get('from')??undefined,to:url.searchParams.get('to')??undefined})); }
+  try { json(response,200,runtime.store.listHistory(requireParam('id'),{limit:value('limit'),beforeSeq:value('beforeSeq'),query:url.searchParams.get('query')??undefined,from:url.searchParams.get('from')??undefined,to:url.searchParams.get('to')??undefined,role:url.searchParams.get('role')??undefined})); }
   catch(error){json(response,400,{error:error instanceof Error?error.message:String(error)});}
  }},
  {method:'GET',pattern:'/api/sessions/:id/history/:seq',handler:({requireParam,url,response})=>{

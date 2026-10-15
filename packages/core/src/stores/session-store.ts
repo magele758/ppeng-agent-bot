@@ -38,6 +38,19 @@ export interface AppendReplacementInput {
   expectedWriterRunId?: string;
 }
 
+function historyRole(value: string | undefined): MessageRole | undefined {
+  if (value === undefined || value === '') return undefined;
+  switch (value) {
+    case 'system':
+    case 'user':
+    case 'assistant':
+    case 'tool':
+      return value;
+    default:
+      throw new Error('Invalid history role');
+  }
+}
+
 /**
  * Domain store for session + message persistence.
  * Shares the same DatabaseSync instance with SqliteStateStore.
@@ -388,6 +401,11 @@ export class SessionStore {
     if (opts.beforeSeq !== undefined) {
       if (!Number.isSafeInteger(opts.beforeSeq) || opts.beforeSeq < 1) throw new Error('Invalid history cursor');
       where.push('session_messages.seq < ?'); args.push(opts.beforeSeq);
+    }
+    const role = historyRole(opts.role);
+    if (role) {
+      where.push('session_messages.role = ?');
+      args.push(role);
     }
     for (const [value, operator] of [[opts.from, '>='], [opts.to, '<=']] as const) {
       if (value !== undefined) {
