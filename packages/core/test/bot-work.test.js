@@ -10,6 +10,7 @@ import { RoutineRunStore } from '../dist/cron/routine-runtime.js';
 import { buildTaskContext } from '../dist/session/task-context.js';
 import { requestHumanRun, requestSteerContinuation } from '../dist/session/human-continuation.js';
 import { createBot, openBot } from '../dist/bots/bot-facade.js';
+import { cancelSession } from '../dist/runtime/session-control.js';
 import { resolveBotPrincipal, enqueueBotMessage, tickBotWork, dispatchBotTask, listBotTasks, ensureSuperBot, recoverBotWork, botWorkStatus, claimBotSession, releaseBotSession, cancelBotTask, updateBotWorkSettings, retryBotTask, botTaskPage, botQueueUsage, checkBotWorkCapacity } from '../dist/bots/bot-work.js';
 
 function setup() {
@@ -97,6 +98,46 @@ test('restart closes unconfirmed tool wave and drains new input in same canonica
  const reopened=new SqliteStateStore(store.dbPath);recoverBotWork(reopened);assert.equal(reopened.getSession(canonical).status,'idle');assert.equal(reopened.getBot(b.id).canonicalSessionId,canonical);assert.ok(!reopened.foldMessages(canonical).some(m=>m.parts.some(p=>p.type==='tool_call')));assert.ok(reopened.listMessages(canonical).some(m=>m.parts.some(p=>p.type==='tool_call'&&p.toolCallId==='unfinished')));
  const recoveryHost={...host,store:reopened,runSession:async id=>{const folded=reopened.foldMessages(id);assert.ok(!folded.some(m=>m.parts.some(p=>p.type==='tool_call')));reopened.appendMessage(id,'assistant',[{type:'text',text:'safe read complete'}]);}};
  await tickBotWork(recoveryHost);assert.equal(listBotTasks(reopened,principal).find(t=>t.id===task.id).status,'unknown');assert.ok(reopened.foldMessages(canonical).some(m=>JSON.stringify(m.parts).includes('new safe read')));
+});
+test('cancelling work parked on approval shows cancelled', async () => {
+  const {store, host} = setup();
+  const principal = resolveBotPrincipal(store);
+  const a = createBot(host, {name: 'A'});
+  const b = createBot(host, {name: 'B'});
+  host.runSession = async (id) => {
+    store.createApproval({sessionId: id, toolName: 'bash', reason: 'ask', args: {command: 'true'}});
+    const session = store.getSession(id);
+    store.updateSession(id, {
+      status: 'waiting_approval',
+      metadata: {
+        ...session.metadata,
+        interrupt: {
+          kind: 'waiting_approval',
+          toolCallIds: ['c1'],
+          approvalIds: ['a1'],
+          executedToolCallIds: [],
+          stepCursor: 'tools'
+        },
+        outcome: {kind: 'waiting_approval', reason: 'waiting_approval'}
+      }
+    });
+  };
+  const task = dispatchBotTask(host, {principal, requesterBotId: a.id, targetBotId: b.id, input: 'parked approval'});
+  await tickBotWork(host);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(listBotTasks(store, principal).find((item) => item.id === task.id).status, 'waiting_approval');
+  cancelSession({
+    store,
+    sessionAbortControllers: new Map(),
+    backgroundJobAborts: new Map(),
+    emitTrace() {}
+  }, b.canonicalSessionId);
+  const session = store.getSession(b.canonicalSessionId);
+  assert.equal(session.metadata.interrupt, undefined);
+  assert.equal(session.metadata.outcome.kind, 'aborted');
+  await tickBotWork(host);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(listBotTasks(store, principal).find((item) => item.id === task.id).status, 'cancelled');
 });
 test('aborted task with partial output never reports completed',async()=>{
  const {store,host}=setup();const principal=resolveBotPrincipal(store),a=createBot(host,{name:'A'}),b=createBot(host,{name:'B'});

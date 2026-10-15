@@ -505,6 +505,54 @@ describe('pre_tool_use ask', () => {
     expect(created).toBe(1);
     expect(ran).toBe(1);
   });
+
+  it('asks again for the same tool and input on a new call, then runs after approval', async () => {
+    const approvals: Array<{
+      id: string;
+      status: string;
+      sessionId: string;
+      idempotencyKey?: string;
+      createdAt: string;
+    }> = [];
+    let created = 0;
+    let ran = 0;
+    const h = host({
+      runLifecycleHook: async () => ({ permissionDecision: 'ask', message: 'please confirm' }),
+      listApprovals: () => approvals as never,
+      createApproval: (input) => {
+        created += 1;
+        const row = {
+          id: `ap-${created}`,
+          status: 'pending',
+          createdAt: `2020-01-0${created}T00:00:00.000Z`,
+          updatedAt: '',
+          ...input,
+        };
+        approvals.push(row);
+        return row as never;
+      },
+    });
+    const echo = tool('echo', async () => {
+      ran += 1;
+      return { ok: true, content: 'ran' };
+    });
+    const first = await executeSingleTool(h, [echo], call('echo', { a: 1 }, 'ask-1'), ctx, false, 's1');
+    expect(first.hold).toBe('approval');
+    expect(approvals[0]?.idempotencyKey).toBe('ask-1');
+    approvals[0]!.status = 'rejected';
+    const again = await executeSingleTool(h, [echo], call('echo', { a: 1 }, 'ask-2'), ctx, false, 's1');
+    expect(again.hold).toBe('approval');
+    expect(again.content).not.toBe('用户拒绝');
+    expect(created).toBe(2);
+    expect(approvals[1]?.idempotencyKey).toBe('ask-2');
+    expect(ran).toBe(0);
+    approvals[1]!.status = 'approved';
+    const allowed = await executeSingleTool(h, [echo], call('echo', { a: 1 }, 'ask-2'), ctx, false, 's1');
+    expect(allowed.ok).toBe(true);
+    expect(allowed.content).toBe('ran');
+    expect(created).toBe(2);
+    expect(ran).toBe(1);
+  });
 });
 
 describe('already paired tool results', () => {
