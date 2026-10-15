@@ -89,6 +89,9 @@ test('real worker process exit recovers unstarted work and quarantines interrupt
  execFileSync(process.execPath,['--input-type=module','-e',source],{env:sanitizeSpawnEnv(),timeout:10000});
  const interrupted=runs.get(queued.id);assert.equal(interrupted.status,'running');assert.notEqual(interrupted.ownerPid,process.pid);
  let replay=0;host.runSession=async()=>{replay++};await drainRoutineRuns(host);
+ assert.equal(runs.get(queued.id).status,'running'); // An unexpired remote lease remains authoritative.
+ store.db.prepare('UPDATE bot_routine_leases SET expires_at=0 WHERE run_id=?').run(queued.id);
+ await drainRoutineRuns(host);
  assert.equal(runs.get(queued.id).status,'unknown');assert.equal(replay,0);
  const waiting=runs.enqueue(job,new Date(Date.now()+1).toISOString());await drainRoutineRuns(host);assert.equal(runs.get(waiting.id).status,'queued');
  await cancelRoutineRun(host,queued.id);host.runSession=async(id)=>{store.appendMessage(id,'assistant',[{type:'text',text:'safe result'}]);return store.getSession(id)};

@@ -32,7 +32,8 @@ export const SNAPSHOT_REVISIONS = [
   { version: 22, ref: '67ced21', note: 'legacy bot memory backfilled, before resource_owners (v23)' },
   { version: 23, ref: '57ecc35', note: 'resource_owners, before approvals expiry columns (v24)' },
   { version: 24, ref: '96d55dc', note: 'unattended approval expiry, before reliable Bot/history schemas (v25)' },
-  { version: 25, ref: 'eaf1f44', note: 'reliable Bot work schemas, before saved face shape and color (v26)' }
+  { version: 25, ref: 'eaf1f44', note: 'reliable Bot work schemas, before saved face shape and color (v26)' },
+  { version: 26, ref: '16bcceb', note: 'saved face shape and color, before routine leases and summary links (v27)' }
 ];
 
 function run(cmd, args, cwd) {

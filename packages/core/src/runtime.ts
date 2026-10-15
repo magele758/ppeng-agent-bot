@@ -952,14 +952,14 @@ export class RawAgentRuntime {
   sendUserMessage(
     sessionId: string,
     message: string,
-    options?: { imageAssetIds?: string[]; attachmentIds?: string[]; autoRun?: boolean }
+    options?: { imageAssetIds?: string[]; attachmentIds?: string[]; autoRun?: boolean; replyTo?: string }
   ): SessionRecord {
     const extra = this.attachmentIngest.expandForMessage(sessionId, options?.attachmentIds);
     const imageAssetIds = [...(options?.imageAssetIds ?? []), ...extra.imageAssetIds];
     const text = [message, ...extra.textParts].filter((s) => String(s).trim()).join('\n\n');
     const body = text || (imageAssetIds.length > 0 ? '(attachment)' : message);
     const append = () => {
-      const session = sendUserMessageFn(sessionFacadeFrom(this.l5()), sessionId, body, { imageAssetIds });
+      const session = sendUserMessageFn(sessionFacadeFrom(this.l5()), sessionId, body, { imageAssetIds, replyTo: options?.replyTo });
       if (options?.autoRun) requestHumanRun(this.store, sessionId);
       return session;
     };

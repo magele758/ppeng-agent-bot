@@ -1,4 +1,6 @@
 /** Durable occurrence ledger. Configuration and individual execution have independent lifecycles. */
+import { ensureRoutineSummarySchema } from './routine-continuation.js';
+import { RoutineLease, ensureRoutineLeaseSchema } from './routine-lease.js';
 import { routineExpired } from './routine-deadline.js';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -25,7 +27,7 @@ export interface RoutineRun {
  id:string; routineId:string; scheduledAt:string; timezone:string; status:RoutineRunStatus;
  approvalIds?:string[];resumeStartedAt?:string; attempts?:RoutineAttempt[]; sessionId?:string; mainSessionId:string; attempt:number; result?:string; error?:string;
  precheckChecked?:boolean; missedCount:number; createdAt:string; updatedAt:string; startedAt?:string; finishedAt?:string; ownerPid?:number;
- eventBody?:string; notificationSent?:boolean; requiresEffectVerification?:boolean; job:CronJobRecord;
+ summaryMessageId?:string; eventBody?:string; notificationSent?:boolean; requiresEffectVerification?:boolean; job:CronJobRecord;
 }
 export interface RoutineRuntimeHost {
  store:SqliteStateStore; stateDir:string; log:Pick<Logger,'warn'|'info'>;
@@ -37,6 +39,8 @@ export interface RoutineRuntimeHost {
 const active = new WeakMap<SqliteStateStore,Set<string>>();
 function activeFor(store:SqliteStateStore):Set<string> { let set=active.get(store); if(!set){set=new Set();active.set(store,set)}return set; }
 export function ensureRoutineSchema(store:Pick<SqliteStateStore,'db'>):void {
+ ensureRoutineLeaseSchema(store);
+ ensureRoutineSummarySchema(store);
  store.db.exec(`CREATE TABLE IF NOT EXISTS bot_routine_runs(id TEXT PRIMARY KEY,routine_id TEXT NOT NULL,occurrence_key TEXT NOT NULL UNIQUE,status TEXT NOT NULL,payload TEXT NOT NULL,notified INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS idx_bot_routine_runs ON bot_routine_runs(routine_id,status); CREATE INDEX IF NOT EXISTS idx_bot_routine_status ON bot_routine_runs(status)`);
  const columns=store.db.prepare('PRAGMA table_info(bot_routine_runs)').all();
  if(!columns.some(c=>c.name==='notified')){store.db.exec("ALTER TABLE bot_routine_runs ADD COLUMN notified INTEGER NOT NULL DEFAULT 0; UPDATE bot_routine_runs SET notified=1 WHERE json_extract(payload,'$.notificationSent')=1");}
@@ -86,11 +90,12 @@ function summarize(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):
  if(parent.status==='running'||parent.status==='waiting_approval'||host.isSessionRunning?.(parent.id))return;
  const description=run.result||run.error||run.status;
  // Insert the summary and notification marker atomically. No user instruction or private run transcript.
- host.store.db.exec('BEGIN IMMEDIATE');
- try { const fresh=runs.get(run.id);if(fresh?.notificationSent){host.store.db.exec('COMMIT');return;}
- host.store.appendMessage(run.mainSessionId,'assistant',[textPart(`[routine:${run.job.name}] ${run.status}\n${description.slice(0,2000)}\nRun: ${run.id}${run.sessionId?` · /api/sessions/${run.sessionId}`:''}`)]);
- runs.update(run.id,{notificationSent:true});host.store.db.exec('COMMIT');
- }catch(error){host.store.db.exec('ROLLBACK');throw error;}
+ const ownTransaction=!host.store.db.isTransaction;if(ownTransaction)host.store.db.exec('BEGIN IMMEDIATE');
+ try { const fresh=runs.get(run.id);if(fresh?.notificationSent){if(ownTransaction)host.store.db.exec('COMMIT');return;}
+ const summary=host.store.appendMessage(run.mainSessionId,'assistant',[textPart(`[routine:${run.job.name}] ${run.status}\n${description.slice(0,2000)}\nRun: ${run.id}${run.sessionId?` · /api/sessions/${run.sessionId}`:''}`)]);
+ if(run.sessionId)host.store.db.prepare('INSERT INTO bot_routine_summary_links(message_id,main_session_id,working_session_id,run_id) VALUES(?,?,?,?)').run(summary.id,run.mainSessionId,run.sessionId,run.id);
+ runs.update(run.id,{notificationSent:true,summaryMessageId:summary.id});if(ownTransaction)host.store.db.exec('COMMIT');
+ }catch(error){if(ownTransaction)host.store.db.exec('ROLLBACK');throw error;}
 }
 function resultText(host:RoutineRuntimeHost,id:string):string {return assistantTextsFromFold(host.store,id).at(-1)?.trim().slice(0,16000)??'';}
 function unknownEffects(host:RoutineRuntimeHost,run:RoutineRun):boolean {
@@ -135,39 +140,45 @@ function failRoutineExecution(host:RoutineRuntimeHost,runs:RoutineRunStore,id:st
  const reason=error instanceof Error?error.message:String(error);
  const failed=runs.update(id,{status:unconfirmed?'unknown':'failed',error:unconfirmed?'External effects are unconfirmed; verify before retry':reason,finishedAt:nowIso()});summarize(host,runs,failed);
 }
-function launchRoutineSession(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun,sessionId:string):void {
+function launchRoutineSession(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun,sessionId:string,lease:RoutineLease):void {
  const executing=activeFor(host.store);executing.add(run.id);
- try{void Promise.resolve(host.runSession(sessionId)).then(()=>finish(host,runs,run.id,sessionId)).catch(error=>failRoutineExecution(host,runs,run.id,sessionId,error)).finally(()=>{executing.delete(run.id);removeExpiredRoutines(host);});}
- catch(error){executing.delete(run.id);failRoutineExecution(host,runs,run.id,sessionId,error);}
+ const stop=lease.heartbeat(()=>{host.cancelSession?.(sessionId);});
+ const cleanup=()=>{stop();lease.release();executing.delete(run.id);removeExpiredRoutines(host);};
+ try{void Promise.resolve(host.runSession(sessionId)).then(()=>{lease.whileOwned(()=>finish(host,runs,run.id,sessionId));}).catch(error=>{lease.whileOwned(()=>failRoutineExecution(host,runs,run.id,sessionId,error));}).finally(cleanup);}
+ catch(error){try{lease.whileOwned(()=>failRoutineExecution(host,runs,run.id,sessionId,error));}finally{cleanup();}}
 }
 function recoverInterruptedRoutine(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):void {
- if(run.ownerPid&&run.ownerPid!==process.pid){try{process.kill(run.ownerPid,0);return;}catch{/* previous worker is gone */}}
  const interrupted=runs.update(run.id,{status:'unknown',error:'Process interrupted while executing; verify effects before retry',finishedAt:nowIso()});summarize(host,runs,interrupted);
 }
 function approvalsForRun(host:RoutineRuntimeHost,run:RoutineRun):ApprovalRecord[]{
  return host.store.listApprovals().filter(approval=>approval.sessionId===run.sessionId&&(!run.approvalIds?.length||run.approvalIds.includes(approval.id)));
 }
-function resumeRoutineAfterDecision(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun,executing:Set<string>):void {
+function resumeRoutineAfterDecision(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun,executing:Set<string>,lease:RoutineLease):boolean {
  const session=run.sessionId?host.store.getSession(run.sessionId):undefined;
- if(!session){const missing=runs.update(run.id,{status:'unknown',error:'Working context disappeared during approval; verify effects before retry',finishedAt:nowIso()});summarize(host,runs,missing);return;}
- if(session.status==='running'){
-  if(host.isSessionRunning?.(session.id)===false){const interrupted=runs.update(run.id,{status:'unknown',error:'Approval continuation was interrupted; verify effects before retry',finishedAt:nowIso()});summarize(host,runs,interrupted);}return;
- }
- const approvals=approvalsForRun(host,run);if(approvals.some(approval=>approval.status==='pending'))return;
+ if(!session){const missing=runs.update(run.id,{status:'unknown',error:'Working context disappeared during approval; verify effects before retry',finishedAt:nowIso()});summarize(host,runs,missing);return false;}
+ if(session.status==='running'){recoverInterruptedRoutine(host,runs,run);return false;}
+ const approvals=approvalsForRun(host,run);if(approvals.some(approval=>approval.status==='pending'))return false;
  const approved=approvals.some(approval=>approval.status==='approved')&&!approvals.some(approval=>approval.status==='rejected');
- const outcome=parseRunOutcome(session?.metadata?.outcome);
- if(approved&&session?.status==='idle'&&(!outcome||outcome.kind==='waiting_approval')){
-  const bridge={...host,runSession:(id:string)=>{runs.update(run.id,{status:'running',ownerPid:process.pid,resumeStartedAt:nowIso(),approvalIds:undefined});executing.add(run.id);return host.runSession(id);}};
-  if(resumeApprovedBotSession(bridge,session.id,run.startedAt??run.createdAt,()=>{try{finish(host,runs,run.id,session.id);}finally{executing.delete(run.id);}}))return;
+ const outcome=parseRunOutcome(session.metadata?.outcome);
+ if(approved&&session.status==='idle'&&(!outcome||outcome.kind==='waiting_approval')){
+  let stop:()=>void=()=>{};let launched=false;
+  const bridge={...host,runSession:(id:string)=>{launched=true;runs.update(run.id,{status:'running',ownerPid:process.pid,resumeStartedAt:nowIso(),approvalIds:undefined});executing.add(run.id);stop=lease.heartbeat(()=>{host.cancelSession?.(id);});return host.runSession(id);}};
+  if(resumeApprovedBotSession(bridge,session.id,run.startedAt??run.createdAt,()=>{try{lease.whileOwned(()=>finish(host,runs,run.id,session.id));}finally{stop();lease.release();executing.delete(run.id);}}))return launched;
  }
- if(session?.status!=='waiting_approval')finish(host,runs,run.id);
+ if(session.status!=='waiting_approval')finish(host,runs,run.id);
+ return false;
 }
 function recoverRoutineRuns(host:RoutineRuntimeHost,runs:RoutineRunStore,executing:Set<string>):void {
- for(const run of runs.pending()){
-  if(executing.has(run.id))continue;
-  if(run.status==='running')recoverInterruptedRoutine(host,runs,run);
-  else if(run.status==='waiting_approval')resumeRoutineAfterDecision(host,runs,run,executing);
-  else if(run.status!=='queued')summarize(host,runs,run);
+ for(const candidate of runs.pending()){
+  if(executing.has(candidate.id)||candidate.status==='queued')continue;
+  const lease=RoutineLease.acquire(host.store,candidate.id);if(!lease)continue;
+  let handedOff=false;
+  try{
+   const run=runs.get(candidate.id);if(!run)continue;
+   if(run.status==='running')lease.whileOwned(()=>{const fresh=runs.get(run.id);if(fresh?.status==='running')recoverInterruptedRoutine(host,runs,fresh);});
+   else if(run.status==='waiting_approval')handedOff=resumeRoutineAfterDecision(host,runs,run,executing,lease);
+   else if(run.status!=='queued')summarize(host,runs,run);
+  }finally{if(!handedOff)lease.release();}
  }
 }
 async function evaluateRunPrecheck(host:RoutineRuntimeHost,run:RoutineRun):Promise<{wakeAgent:boolean;reason?:string}>{
@@ -179,10 +190,13 @@ async function evaluateRunPrecheck(host:RoutineRuntimeHost,run:RoutineRun):Promi
   return await evaluateRoutinePrecheck(precheck,{cwd:host.stateDir,...(env?{env}:{}),...(typeof secret==='string'?{denyEnv:[secret]}:{})});
  }finally{if(directory)rmSync(directory,{recursive:true,force:true});}
 }
-async function precheckAllowsRun(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):Promise<boolean>{
+async function precheckAllowsRun(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun,lease:RoutineLease):Promise<boolean>{
  if(run.precheckChecked)return true;const gate=await evaluateRunPrecheck(host,run);
- if(gate.wakeAgent){runs.update(run.id,{precheckChecked:true});return true;}
- const skipped=runs.update(run.id,{precheckChecked:true,status:'skipped',error:gate.reason?`Precheck failed; model not started: ${gate.reason}`:'Precheck requested no model turn',finishedAt:nowIso()});summarize(host,runs,skipped);return false;
+ return lease.whileOwned(()=>{
+  if(runs.get(run.id)?.status!=='queued')return false;
+  if(gate.wakeAgent){runs.update(run.id,{precheckChecked:true});return true;}
+  const skipped=runs.update(run.id,{precheckChecked:true,status:'skipped',error:gate.reason?`Precheck failed; model not started: ${gate.reason}`:'Precheck requested no model turn',finishedAt:nowIso()});summarize(host,runs,skipped);return false;
+ })??false;
 }
 function routineParent(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):SessionRecord|undefined {
  const parent=host.store.getSession(run.mainSessionId)??repairRoutineOwnerSession(host,run.job);
@@ -197,9 +211,10 @@ function routineParent(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineR
 function routineWorkMetadata(host:RoutineRuntimeHost,parent:SessionRecord,run:RoutineRun):Record<string,unknown>{
  return {...principalFromSession(host.store,parent),...inheritBotAllowlists(parent.metadata),...inheritModelOverride(parent.metadata),permissionMode:childPermissionMode(parent.metadata)??'ask',maxTurns:parent.metadata?.maxTurns??32,...(typeof parent.metadata?.botId==='string'?{botId:parent.metadata.botId}:{}),...(typeof parent.metadata?.workspaceId==='string'?{workspaceId:parent.metadata.workspaceId}:{}),canonicalBotChat:false,routineRunId:run.id,routineId:run.routineId,routineParentSessionId:parent.id};
 }
-function claimRoutineSession(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun,parent:SessionRecord):SessionRecord|undefined {
+function claimRoutineSession(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun,parent:SessionRecord,lease:RoutineLease):SessionRecord|undefined {
  host.store.db.exec('BEGIN IMMEDIATE');
  try{
+  if(!lease.renew()){host.store.db.exec('ROLLBACK');return undefined;}
   const session=host.store.createSession({title:`Routine: ${run.job.name}`,mode:'chat',agentId:parent.agentId,background:false,metadata:routineWorkMetadata(host,parent,run)});
   if(!runs.claim(run.id,session.id)){host.store.db.exec('ROLLBACK');return undefined;}
   host.store.appendMessage(session.id,'user',[textPart(`[cron:${run.job.name}] ${run.job.prompt}\nWhen there is nothing new to report, reply only '[NO_UPDATE]'.`)]);stampSessionWake(host.store,session.id,{kind:'unattended',source:'routine'});host.store.db.exec('COMMIT');return session;
@@ -211,10 +226,17 @@ function busyRoutines(runs:RoutineRunStore,all:RoutineRun[],executing:Set<string
 }
 async function dispatchRoutineQueue(host:RoutineRuntimeHost,runs:RoutineRunStore,executing:Set<string>):Promise<void>{
  const all=runs.pending(),busy=busyRoutines(runs,all,executing);
- for(const run of all.filter(item=>item.status==='queued')){
-  if(busy.has(run.routineId))continue;const parent=routineParent(host,runs,run);if(!parent)continue;
-  if(!await precheckAllowsRun(host,runs,run))continue;const session=claimRoutineSession(host,runs,run,parent);if(!session)continue;
-  busy.add(run.routineId);launchRoutineSession(host,runs,run,session.id);
+ for(const candidate of all.filter(item=>item.status==='queued')){
+  if(busy.has(candidate.routineId))continue;
+  const lease=RoutineLease.acquire(host.store,candidate.id);if(!lease)continue;
+  let handedOff=false;const stop=lease.heartbeat(()=>{});
+  try{
+   const run=runs.get(candidate.id);if(!run||run.status!=='queued')continue;
+   const parent=routineParent(host,runs,run);if(!parent)continue;
+   if(!await precheckAllowsRun(host,runs,run,lease))continue;
+   const session=claimRoutineSession(host,runs,run,parent,lease);if(!session)continue;
+   busy.add(run.routineId);handedOff=true;launchRoutineSession(host,runs,run,session.id,lease);
+  }finally{stop();if(!handedOff)lease.release();}
  }
 }
 export async function drainRoutineRuns(host:RoutineRuntimeHost):Promise<void>{
@@ -232,7 +254,7 @@ export function retryRoutineRun(host:RoutineRuntimeHost,id:string,opts?:{confirm
  if(run.sessionId&&host.hasUnconfirmedEffects?.(run.sessionId,run.startedAt??run.createdAt)&&['failed','cancelled'].includes(run.status))run=runs.update(id,{status:'unknown',error:'External effects are unconfirmed; verify before retry',notificationSent:false});
  if((run.status==='unknown'||run.requiresEffectVerification)&&!opts?.confirmUnknown)throw new ValidationError('Verify previously performed effects and confirmUnknown before retry');
  if(!['failed','cancelled','unknown'].includes(run.status)||activeFor(host.store).has(id))throw new ValidationError('Only stopped failed, cancelled or unknown runs can be retried');
- host.store.db.exec('BEGIN IMMEDIATE');try{const parent=host.store.getSession(run.mainSessionId);if(parent)checkBotWorkCapacity(host.store,principalFromSession(host.store,parent),String(run.job.metadata.botId??run.job.agentId));const queued=runs.update(id,{status:'queued',attempt:run.attempt+1,sessionId:undefined,error:undefined,result:undefined,finishedAt:undefined,notificationSent:false,requiresEffectVerification:false});host.store.db.exec('COMMIT');return queued;}catch(error){host.store.db.exec('ROLLBACK');throw error;}
+ host.store.db.exec('BEGIN IMMEDIATE');try{if(host.store.db.prepare('SELECT 1 FROM bot_routine_leases WHERE run_id=? AND expires_at>?').get(id,Date.now()))throw new ValidationError('Routine worker still holds an active lease');const parent=host.store.getSession(run.mainSessionId);if(parent)checkBotWorkCapacity(host.store,principalFromSession(host.store,parent),String(run.job.metadata.botId??run.job.agentId));const queued=runs.update(id,{status:'queued',attempt:run.attempt+1,sessionId:undefined,summaryMessageId:undefined,error:undefined,result:undefined,finishedAt:undefined,notificationSent:false,requiresEffectVerification:false});host.store.db.exec('COMMIT');return queued;}catch(error){host.store.db.exec('ROLLBACK');throw error;}
 }
 export function routineSettings(store:SqliteStateStore,patch?:{dialogToolsEnabled?:boolean}):{dialogToolsEnabled:boolean}{
  const prior=store.getDaemonControl<{dialogToolsEnabled?:boolean}>('routine.settings');

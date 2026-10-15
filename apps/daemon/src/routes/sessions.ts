@@ -49,6 +49,10 @@ function attachmentIdsFromBody(body: Record<string, unknown>): string[] {
   return body.attachmentIds.map(String).filter(Boolean);
 }
 
+function replyToFromBody(body: Record<string, unknown>): string | undefined {
+  return typeof body.replyTo === 'string' ? body.replyTo : undefined;
+}
+
 function sessionMetadataFromBody(
   runtime: RawAgentRuntime,
   body: Record<string, unknown>,
@@ -213,6 +217,7 @@ function sendBodyContentToSession(
   const attIds = attachmentIdsFromBody(body);
   maybeMergeOptionalGroupsFromBody(runtime, sessionId, body);
   runtime.sendUserMessage(sessionId, message || (imgIds.length ? '(image)' : '(attachment)'), {
+    replyTo: typeof body.replyTo === 'string' ? body.replyTo : undefined,
     imageAssetIds: imgIds,
     attachmentIds: attIds,
     autoRun: body.autoRun !== false
@@ -768,6 +773,7 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         if (commandText && (await replyBotChatCommand(runtime, id, commandText, response))) return;
         maybeMergeOptionalGroupsFromBody(runtime, id, body);
         runtime.sendUserMessage(id, message || (imgIds.length ? '(image)' : '(attachment)'), {
+          replyTo: typeof body.replyTo === 'string' ? body.replyTo : undefined,
           imageAssetIds: imgIds,
           attachmentIds: attIds,
     autoRun: body.autoRun !== false
@@ -818,6 +824,7 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         maybeMergeOptionalGroupsFromBody(runtime, id, body);
         if (msg || imgIds.length > 0 || attIds.length > 0) {
           runtime.sendUserMessage(id, msg || (imgIds.length ? '(image)' : '(attachment)'), {
+            replyTo: typeof body.replyTo === 'string' ? body.replyTo : undefined,
             imageAssetIds: imgIds,
             attachmentIds: attIds,
     autoRun: body.autoRun !== false
@@ -956,7 +963,10 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         const payload = { surfaceId, name, context, ...(dataModel ? { dataModel } : {}) };
         // Plain-text framing the agent already understands; no schema gymnastics.
         const message = `[a2ui:action ${name}] ${JSON.stringify(payload)}`;
-        runtime.sendUserMessage(id, message, { autoRun: body.autoRun !== false });
+        runtime.sendUserMessage(id, message, {
+          replyTo: replyToFromBody(body),
+          autoRun: body.autoRun !== false
+        });
         if (body.autoRun !== false) {
           await runtime.runHumanSession(id);
         }
@@ -1037,7 +1047,8 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         }
         let session;
         const openedBot = openBotFromBody(runtime, body, auth);
-        const sendOpts = { autoRun: true, imageAssetIds: imgIds, attachmentIds: attIds };
+        const sendOpts = { autoRun: true, replyTo: typeof body.replyTo === 'string' ? body.replyTo : undefined,
+          imageAssetIds: imgIds, attachmentIds: attIds };
         const commandText = plainCommandText(body);
         if (openedBot) {
           if (commandText && (await replyBotChatCommand(runtime, openedBot.sessionId, commandText, response))) return;
@@ -1083,7 +1094,8 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         }
         let session;
         const openedBot = openBotFromBody(runtime, body, auth);
-        const sendOpts = { autoRun: true, imageAssetIds: imgIds, attachmentIds: attIds };
+        const sendOpts = { autoRun: true, replyTo: typeof body.replyTo === 'string' ? body.replyTo : undefined,
+          imageAssetIds: imgIds, attachmentIds: attIds };
         const commandText = plainCommandText(body);
         if (openedBot) {
           if (commandText && (await replyBotChatCommand(runtime, openedBot.sessionId, commandText, response))) return;
