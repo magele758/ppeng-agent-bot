@@ -1,0 +1,133 @@
+.play-main.chat-panel[hidden] {
+  display: none !important;
+}
+
+.play-group-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 8px 8px;
+}
+
+.play-group-create {
+  align-self: flex-start;
+}
+
+.play-group-form,
+.play-group-members {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.play-group-form label,
+.play-group-add {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-text-muted);
+}
+
+.play-group-picker {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 160px;
+  overflow: auto;
+}
+
+.play-group-picker label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  color: var(--ui-text);
+  padding: 2px 0;
+}
+
+.play-group-form__actions,
+.play-group-add {
+  flex-direction: row;
+  align-items: center;
+}
+
+.play-group-badge {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 0 6px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-text-muted);
+}
+
+.play-group-members {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--color-border-strong);
+}
+
+.play-group-member-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.play-group-member {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px 2px 8px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  font-size: var(--ui-text-xs);
+}
+
+.play-group-msg {
+  margin: 0 0 14px;
+}
+
+.play-group-msg__who {
+  margin: 0 0 2px;
+  font-size: var(--ui-text-xs);
+  color: var(--ui-text-muted);
+}
+
+.play-group-msg__text {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+.play-group-composer {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  padding: 10px 14px 14px;
+  border-top: 1px solid var(--color-border-strong);
+  flex-shrink: 0;
+}
+
+.play-group-composer textarea {
+  flex: 1;
+  min-height: 44px;
+  max-height: 160px;
+  resize: vertical;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control, 8px);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.play-group-hint,
+.play-group-error {
+  margin: 0;
+  font-size: var(--ui-text-xs);
+}
+
+.play-group-error {
+  color: var(--ui-danger, #c2410c);
+}
