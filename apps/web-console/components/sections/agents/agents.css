@@ -440,6 +440,10 @@
   box-sizing: border-box;
 }
 
+#bot-permissions {
+  scroll-margin-top: var(--ui-space-3);
+}
+
 .ag-panel .composer-config-group .bot-policy-tools {
   min-height: 140px;
 }

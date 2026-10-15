@@ -13,6 +13,7 @@ import { readBotSettings, type BotSettingsSnapshot } from '@/lib/bot-policy';
 import type { BotPermissionMode } from '@/lib/bot-permission';
 import { catalogToPickerOptions, type ModelProvidersResponse, type ModelRef } from '@/lib/model-providers';
 import type { BotInfo } from '@/lib/types';
+import { BOT_PERMISSIONS_SECTION_ID, readBotPermissionsTarget } from '@/lib/bot-chat-header';
 import { BotRuntimeControl } from '../../bot-work/BotLimits';
 import { BotMemory } from '../../bot-work/BotMemory';
 import { BotHistory } from '../../bot-work/BotHistory';
@@ -122,6 +123,13 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
   }, [bot.id, bot.canonicalSessionId, load]);
 
   useEffect(() => {
+    if (!settings) return;
+    const target = readBotPermissionsTarget(window.location.hash);
+    if (!target || target.botId !== bot.id) return;
+    document.getElementById(BOT_PERMISSIONS_SECTION_ID)?.scrollIntoView({ block: 'start' });
+  }, [settings, bot.id]);
+
+  useEffect(() => {
     let cancelled = false;
     void api('/api/model-providers')
       .then((data) => {
@@ -208,16 +216,18 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
       <BotConnections botId={bot.id} />
       {settings ? (
         <>
-          <BotPolicySettings
-            botId={bot.id}
-            maxTurns={settings.maxTurns}
-            permissionMode={settings.permissionMode}
-            onSavePermission={savePermission}
-            allowedTools={settings.allowedTools}
-            allowedSkills={settings.allowedSkills}
-            allowlistsCollapsed
-            onSave={patchBot}
-          />
+          <div id={BOT_PERMISSIONS_SECTION_ID} data-testid="bot-permissions">
+            <BotPolicySettings
+              botId={bot.id}
+              maxTurns={settings.maxTurns}
+              permissionMode={settings.permissionMode}
+              onSavePermission={savePermission}
+              allowedTools={settings.allowedTools}
+              allowedSkills={settings.allowedSkills}
+              allowlistsCollapsed
+              onSave={patchBot}
+            />
+          </div>
           <BotModelSetting
             botId={bot.id}
             pinned={settings.modelOverride}
