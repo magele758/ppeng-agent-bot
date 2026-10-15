@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
+import { isBotFaceColor, isBotFaceShape, type BotFaceColor, type BotFaceShape } from '@/lib/bot-face';
 import { useI18n } from '@/lib/i18n';
 import {
   createGenerationGuard,
@@ -22,6 +23,8 @@ import { BotCronPanel } from '../../BotCronPanel';
 import { BotModelSetting } from '../../BotModelSetting';
 import { BotPolicySettings } from '../../BotPolicySettings';
 import { BotFace } from '../../BotFace';
+import { BotFaceChoice } from '../../BotFaceChoice';
+import { useLab } from '../../shell/LabProvider';
 import { SettingsGroup } from '../../ui';
 
 interface BotDetailProps {
@@ -33,6 +36,9 @@ const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
 export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
   const { t } = useI18n();
+  const { upsertBot } = useLab();
+  const [shape, setShape] = useState<BotFaceShape | null>(isBotFaceShape(bot.faceShape) ? bot.faceShape : null);
+  const [color, setColor] = useState<BotFaceColor | null>(isBotFaceColor(bot.faceColor) ? bot.faceColor : null);
   const generations = useRef(createGenerationGuard());
   const [activeBotId, setActiveBotId] = useState(bot.id);
   const [sessionId, setSessionId] = useState(() => selectionForBot(bot).sessionId);
@@ -44,6 +50,8 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
     setSessionId(selectionForBot(bot).sessionId);
     setSettings(null);
     setError(null);
+    setShape(isBotFaceShape(bot.faceShape) ? bot.faceShape : null);
+    setColor(isBotFaceColor(bot.faceColor) ? bot.faceColor : null);
   }
 
   const botIdRef = useRef(bot.id);
@@ -111,6 +119,11 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
   );
 
   useEffect(() => {
+    setShape(isBotFaceShape(bot.faceShape) ? bot.faceShape : null);
+    setColor(isBotFaceColor(bot.faceColor) ? bot.faceColor : null);
+  }, [bot.id, bot.faceColor, bot.faceShape]);
+
+  useEffect(() => {
     setSessionId(selectionForBot(bot).sessionId);
     setSettings(null);
     setError(null);
@@ -149,11 +162,27 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
         method: 'PATCH',
         headers: JSON_HEADERS,
         body: JSON.stringify(patch)
-      })) as { warnings?: unknown };
+      })) as { bot?: BotInfo; warnings?: unknown };
+      if (result.bot) upsertBot(result.bot);
       await load();
       return result;
     },
-    [bot.id, load]
+    [bot.id, load, upsertBot]
+  );
+
+  const saveFace = useCallback(
+    async (patch: { faceShape?: BotFaceShape; faceColor?: BotFaceColor }) => {
+      setError(null);
+      try {
+        await patchBot(patch);
+      } catch (err) {
+        setError(
+          t('agents.bots.faceSaveFailed', { error: err instanceof Error ? err.message : String(err) })
+        );
+        throw err;
+      }
+    },
+    [patchBot, t]
   );
 
   const savePermission = useCallback(
@@ -184,6 +213,8 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
         <div className="ag-panel__identity">
           <BotFace
             name={bot.name}
+            shape={shape}
+            color={color}
             label={t('agents.bots.faceLabel', { name: bot.name })}
             testId="bot-detail-face"
             size="md"
@@ -203,6 +234,21 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
         <span className="chip chip-muted">{t('agents.bots.agentChip', { agent: bot.agentId })}</span>
       </div>
       {bot.description ? <p className="ag-panel__lead">{bot.description}</p> : null}
+      <BotFaceChoice
+        name={bot.name}
+        shape={shape}
+        color={color}
+        onShape={(next) => {
+          const previous = shape;
+          setShape(next);
+          void saveFace({ faceShape: next }).catch(() => setShape(previous));
+        }}
+        onColor={(next) => {
+          const previous = color;
+          setColor(next);
+          void saveFace({ faceColor: next }).catch(() => setColor(previous));
+        }}
+      />
 
       {error ? (
         <p className="ag-status ag-status--err" role="alert">

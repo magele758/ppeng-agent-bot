@@ -29,6 +29,15 @@ export {
   parseModelOverrideInput,
   readBotModelOverride
 } from './bot-model.js';
+export {
+  BOT_FACE_COLORS,
+  BOT_FACE_SHAPES,
+  normalizeBotFaceColor,
+  normalizeBotFaceShape,
+  readBotFaceColor,
+  readBotFaceShape
+} from './bot-appearance.js';
+export type { BotFaceColor, BotFaceShape } from './bot-appearance.js';
 export { BotStore } from './bot-store.js';
 export {
   botInstructions,

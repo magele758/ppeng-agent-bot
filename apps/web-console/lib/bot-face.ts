@@ -20,6 +20,41 @@ export const BOT_FACE_SHAPES = ['squircle', 'circle', 'tall', 'bean'] as const;
 
 export type BotFaceShape = (typeof BOT_FACE_SHAPES)[number];
 
+/** Body color for the choice swatches. The living face uses a softer gradient of the same hue. */
+export const BOT_FACE_SWATCH: Record<BotFaceColor, string> = {
+  blue: '#3B6EF5',
+  white: '#F7F8FC',
+  orange: '#F97316',
+  red: '#EF4444',
+  purple: '#8B5CF6',
+  mint: '#2DD4BF',
+  pink: '#F472B6',
+  yellow: '#F5C14A'
+};
+
+export function isBotFaceShape(value: unknown): value is BotFaceShape {
+  return typeof value === 'string' && (BOT_FACE_SHAPES as readonly string[]).includes(value);
+}
+
+export function isBotFaceColor(value: unknown): value is BotFaceColor {
+  return typeof value === 'string' && (BOT_FACE_COLORS as readonly string[]).includes(value);
+}
+
+/**
+ * A saved choice wins. Anything else, including a blank save, keeps the name hash.
+ * A blank name with no save is the empty face.
+ */
+export function resolveBotFaceAppearance(input: {
+  name?: string | null;
+  savedShape?: unknown;
+  savedColor?: unknown;
+}): { shape: BotFaceShape | null; color: BotFaceColor | null } {
+  return {
+    shape: isBotFaceShape(input.savedShape) ? input.savedShape : botFaceShape(input.name),
+    color: isBotFaceColor(input.savedColor) ? input.savedColor : botFaceColor(input.name)
+  };
+}
+
 export const LIVING_FACE_MOODS = ['idle', 'thinking', 'speaking', 'tool'] as const;
 
 export type LivingFaceMood = (typeof LIVING_FACE_MOODS)[number];
@@ -304,7 +339,7 @@ export function hoverDelight(elapsedMs: number): { dy: number; smile: number } {
   if (elapsedMs < 0) return { dy: 0, smile: 0 };
   if (elapsedMs >= HOVER_HOP_MS) return { dy: 0, smile: 1 };
   const p = elapsedMs / HOVER_HOP_MS;
-  return { dy: -Math.sin(p * Math.PI) * 3.4, smile: 1 };
+  return { dy: -Math.sin(p * Math.PI) * 1.1, smile: 1 };
 }
 
 /** Two softening hops after a turn ends. `dy` is up when negative. */
@@ -312,7 +347,7 @@ export function happyBeat(elapsedMs: number): { dy: number; smile: number } {
   if (elapsedMs < 0 || elapsedMs > HAPPY_BEAT_MS) return { dy: 0, smile: 0 };
   const p = elapsedMs / HAPPY_BEAT_MS;
   const hop = Math.sin(p * Math.PI * 2) * (1 - p);
-  return { dy: -4.2 * hop, smile: 1 };
+  return { dy: -1.2 * hop, smile: 1 };
 }
 
 /** Slow vertical breath while sleepy. */

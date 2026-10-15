@@ -3,8 +3,10 @@
 import { useState, type FormEvent } from 'react';
 import { api } from '@/lib/api';
 import { botNameIssue } from '@/lib/agents-view';
+import type { BotFaceColor, BotFaceShape } from '@/lib/bot-face';
 import { useI18n } from '@/lib/i18n';
 import type { BotInfo } from '@/lib/types';
+import { BotFaceChoice } from '../../BotFaceChoice';
 import { Disclosure } from './Disclosure';
 
 interface BotCreateFormProps {
@@ -17,6 +19,8 @@ export function BotCreateForm({ onCreated, onCancel }: BotCreateFormProps) {
   const [name, setName] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [shape, setShape] = useState<BotFaceShape | null>(null);
+  const [color, setColor] = useState<BotFaceColor | null>(null);
   const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,9 +35,13 @@ export function BotCreateForm({ onCreated, onCancel }: BotCreateFormProps) {
     setBusy(true);
     setError(null);
     try {
-      const body: { name: string; title?: string; description?: string } = { name: name.trim() };
+      const body: { name: string; title?: string; description?: string; faceShape?: BotFaceShape; faceColor?: BotFaceColor } = {
+        name: name.trim()
+      };
       if (title.trim()) body.title = title.trim();
       if (description.trim()) body.description = description.trim();
+      if (shape) body.faceShape = shape;
+      if (color) body.faceColor = color;
       const data = (await api('/api/bots', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -69,6 +77,7 @@ export function BotCreateForm({ onCreated, onCancel }: BotCreateFormProps) {
         />
         {showNameError ? <span className="ag-field__error" role="alert">{t('agents.bots.nameRequired')}</span> : null}
       </label>
+      <BotFaceChoice name={name} shape={shape} color={color} onShape={setShape} onColor={setColor} disabled={busy} />
       <Disclosure label={t('agents.common.advanced')}>
         <label className="ag-field">
           <span className="ag-field__label">{t('agents.bots.titleLabel')}</span>

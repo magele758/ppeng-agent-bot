@@ -12,6 +12,7 @@ import {
   type ReactNode
 } from 'react';
 import { api } from '@/lib/api';
+import { BotFaceCatalog } from '../BotFaceCatalog';
 import { pendingApprovals } from '@/lib/approvals';
 import { type PlaySurface } from '@/lib/bots';
 import {
@@ -448,5 +449,9 @@ export function LabProvider({ children }: { children: ReactNode }) {
     ]
   );
 
-  return <LabContext.Provider value={value}>{children}</LabContext.Provider>;
+  return (
+    <LabContext.Provider value={value}>
+      <BotFaceCatalog bots={bots}>{children}</BotFaceCatalog>
+    </LabContext.Provider>
+  );
 }

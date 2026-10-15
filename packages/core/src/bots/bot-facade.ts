@@ -8,6 +8,7 @@ import type { AgentSpec, SessionRecord } from '../types.js';
 import type { SqliteStateStore } from '../storage.js';
 import { normalizeAllowedSkillNames, readAllowedSkillNames } from '../skills/skill-allowlist.js';
 import { normalizeAllowedToolNames, readPositiveAllowedTools } from './bot-policy.js';
+import { normalizeBotFaceColor, normalizeBotFaceShape } from './bot-appearance.js';
 import {
   BOT_MODEL_OVERRIDE_META,
   normalizeBotModelOverride,
@@ -196,6 +197,8 @@ export function getBot(store: SqliteStateStore, id: string): BotRecord {
 }
 
 export function createBot(host: SessionFacadeHost, input: CreateBotInput, options?: { builtin?: boolean }): BotRecord {
+  const faceShape = normalizeBotFaceShape(input.faceShape);
+  const faceColor = normalizeBotFaceColor(input.faceColor);
   const name = normalizeName(input.name);
   const title = normalizeTitle(input.title, name);
   const description = normalizeDescription(input.description);
@@ -226,6 +229,8 @@ export function createBot(host: SessionFacadeHost, input: CreateBotInput, option
     agentId: id,
     canonicalSessionId: session.id,
     hidden: false,
+    faceShape,
+    faceColor,
     createdAt: now,
     updatedAt: now
   });
@@ -271,6 +276,8 @@ export function updateBot(
     }
     modelOverride = normalizeBotModelOverride(patch.modelOverride, opts.modelOptions);
   }
+  const faceShape = patch.faceShape !== undefined ? normalizeBotFaceShape(patch.faceShape) : undefined;
+  const faceColor = patch.faceColor !== undefined ? normalizeBotFaceColor(patch.faceColor) : undefined;
   const name = patch.name !== undefined ? normalizeName(patch.name) : current.name;
   if (name !== current.name) {
     const taken = host.store.getBotByName(name);
@@ -283,7 +290,9 @@ export function updateBot(
     name,
     title,
     description,
-    hidden: patch.hidden
+    hidden: patch.hidden,
+    ...(faceShape !== undefined ? { faceShape } : {}),
+    ...(faceColor !== undefined ? { faceColor } : {})
   });
   if (name !== current.name || title !== current.title) {
     for (const session of listBotChats(host.store, next)) {

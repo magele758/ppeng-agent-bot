@@ -942,6 +942,19 @@ export const MIGRATIONS: Migration[] = [
         END;
       `);
     }
+  },
+  {
+    version: 26,
+    description: 'bots.face_shape and bots.face_color for a saved living-face choice',
+    up: (db) => {
+      if (!hasTable(db, 'bots')) return;
+      if (!hasColumn(db, 'bots', 'face_shape')) {
+        db.exec(`ALTER TABLE bots ADD COLUMN face_shape TEXT`);
+      }
+      if (!hasColumn(db, 'bots', 'face_color')) {
+        db.exec(`ALTER TABLE bots ADD COLUMN face_color TEXT`);
+      }
+    }
   }
 ];
 

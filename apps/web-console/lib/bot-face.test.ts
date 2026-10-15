@@ -14,6 +14,9 @@ import {
   botFaceColor,
   botFaceIndex,
   botFaceShape,
+  isBotFaceColor,
+  isBotFaceShape,
+  resolveBotFaceAppearance,
   damp,
   ellipsisScale,
   happyBeat,
@@ -96,6 +99,37 @@ test('名字映射到稳定且彼此不同的脸颜色和轮廓', () => {
   assert.equal(botFaceShape(''), null);
   assert.equal(botFaceColor(null), null);
   assert.equal(botFaceShape(undefined), null);
+});
+
+test('保存的脸型和颜色覆盖名字，没保存则沿用名字', () => {
+  assert.equal(isBotFaceShape('squircle'), true);
+  assert.equal(isBotFaceShape('star'), false);
+  assert.equal(isBotFaceColor('yellow'), true);
+  assert.equal(isBotFaceColor('gold'), false);
+  assert.deepEqual(resolveBotFaceAppearance({ name: 'DeskBot' }), { shape: 'tall', color: 'white' });
+  assert.deepEqual(resolveBotFaceAppearance({ name: '  DeskBot  ', savedShape: null, savedColor: null }), {
+    shape: 'tall',
+    color: 'white'
+  });
+  assert.deepEqual(resolveBotFaceAppearance({ name: 'DeskBot', savedShape: 'circle', savedColor: 'blue' }), {
+    shape: 'circle',
+    color: 'blue'
+  });
+  assert.deepEqual(resolveBotFaceAppearance({ name: 'DeskBot', savedShape: 'bean' }), { shape: 'bean', color: 'white' });
+  assert.deepEqual(resolveBotFaceAppearance({ name: 'DeskBot', savedColor: 'mint' }), { shape: 'tall', color: 'mint' });
+  assert.deepEqual(resolveBotFaceAppearance({ name: 'DeskBot', savedShape: 'nope', savedColor: '' }), {
+    shape: 'tall',
+    color: 'white'
+  });
+  assert.deepEqual(resolveBotFaceAppearance({ name: '' }), { shape: null, color: null });
+  assert.deepEqual(resolveBotFaceAppearance({ name: '', savedShape: 'circle', savedColor: 'red' }), {
+    shape: 'circle',
+    color: 'red'
+  });
+  assert.deepEqual(resolveBotFaceAppearance({ name: 'Super Bot' }), {
+    shape: botFaceShape('Super Bot'),
+    color: botFaceColor('Super Bot')
+  });
 });
 
 test('对话状态按最新片段切换', () => {
@@ -256,7 +290,8 @@ test('悬停、犯困和说完后的高兴各自接在空闲脸上', () => {
   assert.equal(hoverDelight(-1).smile, 0);
   assert.ok(Math.abs(hoverDelight(0).dy) < 1e-12);
   assert.equal(hoverDelight(0).smile, 1);
-  assert.ok(hoverDelight(HOVER_HOP_MS / 2).dy < -3);
+  assert.ok(hoverDelight(HOVER_HOP_MS / 2).dy < -0.9);
+  assert.ok(hoverDelight(HOVER_HOP_MS / 2).dy > -1.3);
   assert.equal(hoverDelight(HOVER_HOP_MS).dy, 0);
   assert.equal(hoverDelight(HOVER_HOP_MS).smile, 1);
 

@@ -51,6 +51,26 @@ export const agents = {
     detailTitle: 'Bot 设置',
     faceLabel: '{name} 的机器人头像',
     faceEmpty: '机器人头像',
+    faceShapeLabel: '脸型',
+    faceColorLabel: '颜色',
+    faceHint: '不选就按名字决定。保存后，选择器、会话和群里都用这张脸。',
+    faceSaveFailed: '没能保存外观：{error}',
+    faceShape: {
+      squircle: '方圆',
+      circle: '圆形',
+      tall: '长条',
+      bean: '豆形'
+    },
+    faceColor: {
+      blue: '蓝',
+      white: '白',
+      orange: '橙',
+      red: '红',
+      purple: '紫',
+      mint: '薄荷',
+      pink: '粉',
+      yellow: '黄'
+    },
     openChat: '打开对话',
     openChatFailed: '无法打开对话：{error}',
     sectionSchedule: '定时任务',
