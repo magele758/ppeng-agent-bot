@@ -1,3 +1,5 @@
+import type { BotFaceColor, BotFaceShape } from './bot-appearance.js';
+
 export interface BotRecord {
   id: string;
   name: string;
@@ -6,6 +8,10 @@ export interface BotRecord {
   agentId: string;
   canonicalSessionId: string;
   hidden: boolean;
+  /** Saved silhouette. Null keeps the name-based shape. */
+  faceShape: BotFaceShape | null;
+  /** Saved swatch. Null keeps the name-based color. */
+  faceColor: BotFaceColor | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -14,6 +20,10 @@ export interface CreateBotInput {
   name: string;
   title?: string;
   description?: string;
+  /** Omitted or null keeps the name-based shape. */
+  faceShape?: unknown;
+  /** Omitted or null keeps the name-based color. */
+  faceColor?: unknown;
 }
 
 export interface UpdateBotInput {
@@ -29,6 +39,10 @@ export interface UpdateBotInput {
   allowedSkills?: unknown;
   /** `null` clears (follow global default). Otherwise { providerId, modelId } from the picker list. */
   modelOverride?: unknown;
+  /** `null` clears the saved shape. Omitted leaves it unchanged. */
+  faceShape?: unknown;
+  /** `null` clears the saved color. Omitted leaves it unchanged. */
+  faceColor?: unknown;
 }
 
 export interface ListBotsOptions {

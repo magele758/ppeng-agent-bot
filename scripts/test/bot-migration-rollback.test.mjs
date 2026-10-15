@@ -61,7 +61,7 @@ test('real v24 ownerless Bot/cron upgrade is idempotent and rollback restores a 
   const beforeDir=join(temporary,'before-upgrade');const beforeManifest=stoppedSnapshot(stateDir,beforeDir);
 
   const current=new SqliteStateStore(dbFile);const currentHost=host(current,stateDir);
-  assert.equal(getCurrentSchemaVersion(current.db),LATEST_SCHEMA_VERSION);assert.equal(LATEST_SCHEMA_VERSION,25);
+  assert.equal(getCurrentSchemaVersion(current.db),LATEST_SCHEMA_VERSION);assert.equal(LATEST_SCHEMA_VERSION,26);
   assert.equal(current.getBot(ids.bots.planner.id).hidden,true);assert.deepEqual(current.listMessages(ids.bots.researcher.sessionId),originalMessages);
   const installation=openBot(currentHost,ids.bots.researcher.id);assert.equal(installation.sessionId,ids.bots.researcher.sessionId);assert.equal(current.getSession(installation.sessionId).metadata.userId,undefined);
   assert.throws(()=>openBot(currentHost,ids.bots.researcher.id,{userId:'new-login',tenantId:'new-tenant'}));
@@ -79,9 +79,9 @@ test('real v24 ownerless Bot/cron upgrade is idempotent and rollback restores a 
   for(const [table,count]of Object.entries(counts))assert.equal(reopened.db.prepare(`SELECT count(*) AS n FROM ${table}`).get().n,count);
   assert.equal(new RoutineRunStore(reopened).get(occurrence.id).status,'queued');assert.equal(reopened.db.prepare('PRAGMA integrity_check').get().integrity_check,'ok');assert.deepEqual(reopened.db.prepare('PRAGMA foreign_key_check').all(),[]);reopened.db.close();
 
-  // The actual pinned old implementation refuses v25. It cannot silently downgrade the candidate.
+  // The pinned v24 binary refuses any newer schema. It cannot silently downgrade the candidate.
   const incompatibleHash=hash(dbFile);
-  assert.throws(()=>new oldModule.SqliteStateStore(dbFile),/schema v25 is newer than supported v24.*No automatic downgrade is safe/);
+  assert.throws(()=>new oldModule.SqliteStateStore(dbFile),new RegExp(`schema v${LATEST_SCHEMA_VERSION} is newer than supported v24.*No automatic downgrade is safe`));
   assert.equal(hash(dbFile),incompatibleHash);
   const postDir=join(temporary,'post-upgrade-archive');const postManifest=stoppedSnapshot(stateDir,postDir);
   const recoveryDir=join(temporary,'restored-v24');cpSync(beforeDir,recoveryDir,{recursive:true});

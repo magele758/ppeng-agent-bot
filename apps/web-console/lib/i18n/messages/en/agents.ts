@@ -51,6 +51,26 @@ export const agents = {
     detailTitle: 'Bot settings',
     faceLabel: 'Robot avatar for {name}',
     faceEmpty: 'Robot avatar',
+    faceShapeLabel: 'Shape',
+    faceColorLabel: 'Color',
+    faceHint: 'Leave these unset to follow the name. After you save, the picker, sessions and groups use this face.',
+    faceSaveFailed: 'Could not save the look: {error}',
+    faceShape: {
+      squircle: 'Squircle',
+      circle: 'Circle',
+      tall: 'Tall',
+      bean: 'Bean'
+    },
+    faceColor: {
+      blue: 'Blue',
+      white: 'White',
+      orange: 'Orange',
+      red: 'Red',
+      purple: 'Purple',
+      mint: 'Mint',
+      pink: 'Pink',
+      yellow: 'Yellow'
+    },
     openChat: 'Open chat',
     openChatFailed: 'Could not open chat: {error}',
     sectionSchedule: 'Scheduled jobs',

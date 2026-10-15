@@ -45,6 +45,10 @@ export type ApiBotInfo = {
   agentId: string;
   canonicalSessionId: string;
   hidden: boolean;
+  /** Saved silhouette. Absent or null keeps the name-based shape. */
+  faceShape?: 'squircle' | 'circle' | 'tall' | 'bean' | null;
+  /** Saved swatch. Absent or null keeps the name-based color. */
+  faceColor?: 'blue' | 'white' | 'orange' | 'red' | 'purple' | 'mint' | 'pink' | 'yellow' | null;
   createdAt: string;
   updatedAt: string;
 };

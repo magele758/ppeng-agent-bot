@@ -2,6 +2,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { NotFoundError } from '../errors.js';
 import { nowIso } from '../id.js';
 import { boolToInt, intToBool } from '../stores/storage-helpers.js';
+import { readBotFaceColor, readBotFaceShape } from './bot-appearance.js';
 import type { BotRecord, ListBotsOptions, UpdateBotInput } from './types.js';
 
 export class BotStore {
@@ -13,8 +14,8 @@ export class BotStore {
         `
         INSERT INTO bots (
           id, name, title, description, agent_id, canonical_session_id,
-          hidden, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          hidden, face_shape, face_color, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
       )
       .run(
@@ -25,6 +26,8 @@ export class BotStore {
         bot.agentId,
         bot.canonicalSessionId,
         boolToInt(bot.hidden),
+        bot.faceShape ?? null,
+        bot.faceColor ?? null,
         bot.createdAt,
         bot.updatedAt
       );
@@ -77,6 +80,8 @@ export class BotStore {
       title: patch.title !== undefined ? patch.title : current.title,
       description: patch.description !== undefined ? patch.description : current.description,
       hidden: patch.hidden !== undefined ? patch.hidden : current.hidden,
+      faceShape: patch.faceShape !== undefined ? readBotFaceShape(patch.faceShape) : current.faceShape,
+      faceColor: patch.faceColor !== undefined ? readBotFaceColor(patch.faceColor) : current.faceColor,
       canonicalSessionId: patch.canonicalSessionId ?? current.canonicalSessionId,
       updatedAt: nowIso()
     };
@@ -85,7 +90,7 @@ export class BotStore {
         `
         UPDATE bots SET
           name = ?, title = ?, description = ?, canonical_session_id = ?,
-          hidden = ?, updated_at = ?
+          hidden = ?, face_shape = ?, face_color = ?, updated_at = ?
         WHERE id = ?
       `
       )
@@ -95,6 +100,8 @@ export class BotStore {
         next.description,
         next.canonicalSessionId,
         boolToInt(next.hidden),
+        next.faceShape,
+        next.faceColor,
         next.updatedAt,
         id
       );
@@ -110,6 +117,8 @@ export class BotStore {
       agentId: String(row.agent_id),
       canonicalSessionId: String(row.canonical_session_id),
       hidden: intToBool(row.hidden),
+      faceShape: readBotFaceShape(row.face_shape),
+      faceColor: readBotFaceColor(row.face_color),
       createdAt: String(row.created_at),
       updatedAt: String(row.updated_at)
     };

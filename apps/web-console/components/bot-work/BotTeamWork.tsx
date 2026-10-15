@@ -81,33 +81,55 @@ export function BotTeamWork({
       clearInterval(timer);
     };
   }, [paged]);
+  const unresolvedTasks = tasks.filter((task) => unresolved(task));
+  const historyTasks = tasks.filter((task) => !unresolved(task));
+  const taskArticle = (task: Task) => (
+        <article key={task.id}>
+          <p>
+            {bots.find((b) => b.id === task.targetBotId)?.name ??
+              task.targetBotId}
+            : {task.input}
+          </p>
+          <p>
+            <Status value={task.status} />
+          </p>
+          <button
+            disabled={action.busy}
+            onClick={() =>
+              void action.run(async () => {
+                const data = (await api(`/api/bot-work/tasks/${task.id}`)) as {
+                  task: Task;
+                };
+                setSelected(data.task);setConfirmUnknown(false);
+              })
+            }
+          >
+            {t("botWork.details")}
+          </button>
+          {["queued", "running", "waiting_approval"].includes(task.status) && (
+            <button
+              disabled={action.busy}
+              onClick={() =>
+                void action.run(async () => {
+                  await api(`/api/bot-work/tasks/${task.id}/cancel`, {
+                    method: "POST",
+                  });
+                  await load();
+                })
+              }
+            >
+              {t("botWork.cancel")}
+            </button>
+          )}
+        </article>
+      );
   return (
     <section className="ag-panel" data-testid="bot-team-work">
       <h3>{t("botWork.team")}</h3>
-      <button disabled={action.busy} onClick={() => void action.run(load)}>
-        {t("botWork.refresh")}
-      </button>
-      <button
-        disabled={action.busy}
-        onClick={() =>
-          void action.run(async () => {
-            const result = (await api("/api/bot-work/default")) as {
-              bot: BotInfo;
-            };
-            onOpen(result.bot);
-          })
-        }
-      >
-        {t("botWork.defaultBot")}
-      </button>
+      <p className="bot-work-dispatch-lead" data-testid="bot-team-work-lead">
+        {t("botWork.dispatchLead")}
+      </p>
       <Feedback {...action} />
-      <ul>
-        {statuses.map((s) => (
-          <li role="presentation" key={s.bot.id}>
-            {s.bot.name} · <Status value={s.status} /> · {s.pending}
-          </li>
-        ))}
-      </ul>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -150,52 +172,42 @@ export function BotTeamWork({
         </label>
         <button disabled={action.busy}>{t("botWork.assign")}</button>
       </form>
-      {!tasks.length && !action.busy && <p>{t("botWork.empty")}</p>}
-      {[true, false].map(active => <div key={String(active)}><h4>{t(active ? "botWork.unresolved" : "botWork.taskHistory")}</h4>{tasks.filter(task => unresolved(task) === active).map((task) => (
-        <article key={task.id}>
-          <p>
-            {bots.find((b) => b.id === task.targetBotId)?.name ??
-              task.targetBotId}
-            : {task.input}
-          </p>
-          <p>
-            <Status value={task.status} />
-          </p>
-          <button
-            disabled={action.busy}
-            onClick={() =>
-              void action.run(async () => {
-                const data = (await api(`/api/bot-work/tasks/${task.id}`)) as {
-                  task: Task;
-                };
-                setSelected(data.task);setConfirmUnknown(false);
-              })
-            }
-          >
-            {t("botWork.details")}
-          </button>
-          {["queued", "running", "waiting_approval"].includes(task.status) && (
-            <button
-              disabled={action.busy}
-              onClick={() =>
-                void action.run(async () => {
-                  await api(`/api/bot-work/tasks/${task.id}/cancel`, {
-                    method: "POST",
-                  });
-                  await load();
-                })
-              }
-            >
-              {t("botWork.cancel")}
-            </button>
-          )}
-        </article>
-      ))}</div>)}
+      <h4>{t("botWork.unresolved")}</h4>
+      {unresolvedTasks.length ? unresolvedTasks.map(taskArticle) : !action.busy ? <p>{t("botWork.empty")}</p> : null}
+      <h4>{t("botWork.taskHistory")}</h4>
+      {historyTasks.length ? historyTasks.map(taskArticle) : <p>{t("botWork.empty")}</p>}
       {cursor && <button disabled={action.busy} onClick={() => void action.run(async () => {
         const page = await api(`/api/bot-work/tasks?limit=50&cursor=${encodeURIComponent(cursor)}`) as Page;
         setTasks(await mergeRetainedHistory(page, true));
         setCursor(page.nextCursor ?? null);setPaged(true);
       })}>{t("botWork.older")}</button>}
+      <details className="bot-work-more">
+        <summary>{t("botWork.more")}</summary>
+        <button disabled={action.busy} onClick={() => void action.run(load)}>
+          {t("botWork.refresh")}
+        </button>
+        <button
+          disabled={action.busy}
+          onClick={() =>
+            void action.run(async () => {
+              const result = (await api("/api/bot-work/default")) as {
+                bot: BotInfo;
+              };
+              onOpen(result.bot);
+            })
+          }
+        >
+          {t("botWork.defaultBot")}
+        </button>
+        <h4>{t("botWork.roster")}</h4>
+        <ul>
+          {statuses.map((s) => (
+            <li role="presentation" key={s.bot.id}>
+              {s.bot.name} · <Status value={s.status} /> · {s.pending}
+            </li>
+          ))}
+        </ul>
+      </details>
       {selected && (
         <aside>
           <h4>{t("botWork.result")}</h4>

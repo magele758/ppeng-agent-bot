@@ -8,6 +8,7 @@ import { setBotDefinitionOwner, resolveBotPrincipal } from '@ppeng/agent-core';
 
 import {
   readBotModelOverride,
+  readFaceInput,
   stampOwnerMetadata,
   type RawAgentRuntime,
   type UpdateBotInput
@@ -40,7 +41,8 @@ export function botsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         const bot = runtime.createBot({
           name: typeof body.name === 'string' ? body.name : '',
           title: typeof body.title === 'string' ? body.title : undefined,
-          description: typeof body.description === 'string' ? body.description : undefined
+          description: typeof body.description === 'string' ? body.description : undefined,
+          ...readFaceInput(body)
         });
         if (auth.user) {
           runtime.mergeSessionMetadata(bot.canonicalSessionId, stampOwnerMetadata({}, auth));
@@ -72,6 +74,7 @@ export function botsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         if ('allowedTools' in body) patch.allowedTools = body.allowedTools;
         if ('allowedSkills' in body) patch.allowedSkills = body.allowedSkills;
         if ('modelOverride' in body) patch.modelOverride = body.modelOverride;
+        Object.assign(patch, readFaceInput(body));
         const skillCatalog = 'allowedSkills' in body ? await runtime.listSkills() : undefined;
         const bot = runtime.updateBot(id, patch, { skillCatalog });
         const saved = runtime.getSession(bot.canonicalSessionId);

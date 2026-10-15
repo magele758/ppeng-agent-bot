@@ -68,3 +68,14 @@
 [data-testid="bot-rooms"] select[multiple] {
   min-height: 5rem;
 }
+.bot-work-dispatch-lead {
+  margin: 0.15rem 0 0.75rem;
+  color: var(--ui-text-muted, #5c6570);
+}
+.bot-work-more {
+  margin-top: 0.75rem;
+}
+.bot-work-more summary {
+  cursor: pointer;
+  font-weight: 600;
+}

@@ -9,9 +9,11 @@ import {
   BOT_ROSTER_CAP,
   canonicalBotChatTitle,
   createBot,
+  faceUpdatePatch,
   getBot,
   listBots,
   openBot,
+  readFaceInput,
   slugifyBotName,
   updateBot
 } from '../dist/bots/index.js';
@@ -166,6 +168,38 @@ test('openBot: missing session is recreated', () => {
   const session = store.getSession(opened.sessionId);
   assert.ok(session);
   assert.equal(getBot(store, bot.id).canonicalSessionId, opened.sessionId);
+  store.db.close();
+});
+
+test('face input keeps only present fields and rejects an unknown choice', () => {
+  assert.deepEqual(readFaceInput({ name: 'A' }), {});
+  assert.deepEqual(readFaceInput({ faceShape: 'bean', faceColor: null }), { faceShape: 'bean', faceColor: null });
+  assert.deepEqual(faceUpdatePatch({}), {});
+  assert.deepEqual(faceUpdatePatch({ faceShape: 'circle', faceColor: 'mint' }), {
+    faceShape: 'circle',
+    faceColor: 'mint'
+  });
+  assert.throws(() => faceUpdatePatch({ faceColor: 'gold' }), ValidationError);
+});
+
+test('createBot stores a face choice and update can clear it', () => {
+  const store = tempStore();
+  const h = host(store);
+  const bot = createBot(h, { name: 'DeskBot', faceShape: 'circle', faceColor: 'blue' });
+  assert.equal(bot.faceShape, 'circle');
+  assert.equal(bot.faceColor, 'blue');
+  assert.equal(getBot(store, bot.id).faceShape, 'circle');
+  const renamed = updateBot(h, bot.id, { title: 'Still blue' });
+  assert.equal(renamed.faceShape, 'circle');
+  assert.equal(renamed.faceColor, 'blue');
+  const cleared = updateBot(h, bot.id, { faceShape: null, faceColor: null });
+  assert.equal(cleared.faceShape, null);
+  assert.equal(cleared.faceColor, null);
+  const plain = createBot(h, { name: 'Plain' });
+  assert.equal(plain.faceShape, null);
+  assert.equal(plain.faceColor, null);
+  assert.throws(() => createBot(h, { name: 'Nope', faceShape: 'star' }), ValidationError);
+  assert.throws(() => updateBot(h, bot.id, { faceColor: 'gold' }), ValidationError);
   store.db.close();
 });
 
