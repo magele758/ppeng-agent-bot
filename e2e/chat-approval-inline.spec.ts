@@ -68,13 +68,13 @@ test('pending approval sits in the transcript beside the waiting tool [AC:chat-a
   await expect(banner).toHaveAttribute('aria-label', '待审批');
   await expect(banner.getByText(ASK_REASON, { exact: true })).toHaveCount(1);
 
-  const order = await feed.evaluate(() => {
-    const tool = document.querySelector('.chat-tool-fold__name');
-    const block = document.querySelector('.approval-banner');
-    if (!tool || !block) return 'missing';
-    return (tool.compareDocumentPosition(block) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0 ? 'after' : 'before';
-  });
-  expect(order).toBe('after');
+  const toolName = feed.locator('.chat-tool-fold__name', { hasText: 'ask_user' });
+  await expect(toolName).toBeVisible();
+  const toolBox = await toolName.boundingBox();
+  const bannerBox = await banner.boundingBox();
+  expect(toolBox).toBeTruthy();
+  expect(bannerBox).toBeTruthy();
+  expect(bannerBox!.y).toBeGreaterThan(toolBox!.y);
 
   const replyBox = banner.locator('textarea.ask-user-reply');
   await expect(replyBox).toBeVisible();
