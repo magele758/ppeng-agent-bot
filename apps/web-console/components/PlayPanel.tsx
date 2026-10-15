@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import type { AgentInfo, ApprovalItem, BotInfo, SessionSummary } from '@/lib/types';
 import { visibleBotRoster, type PlaySurface } from '@/lib/bots';
 import { collectActivityTools, collectArtifacts } from '@/lib/activity-tools';
@@ -28,6 +28,7 @@ import { ActivityPanel } from './ActivityPanel';
 import { ArtifactRail } from './ArtifactRail';
 import { BotCronPanel } from './BotCronPanel';
 import { composerModelLocked } from '@/lib/bot-model';
+import { COMPOSITION_ENTER_GUARD_MS, IME_COMPOSITION_KEY_CODE, decideComposerEnter } from '@/lib/composer-enter';
 import { ApprovalBanner } from './ApprovalBanner';
 import { GoalStatusCard } from './GoalStatusCard';
 import { TrajectoryPanel } from './TrajectoryPanel';
@@ -35,9 +36,12 @@ import { groupAgentsByDomain, sortAgentsById } from '@/lib/sort-utils';
 import { groupSessionsByDate } from '@/lib/session-groups';
 import { WorkspacePicker } from './WorkspacePicker';
 import { catalogToPickerOptions } from '@/lib/model-providers';
-import { BotFace } from './BotFace';
+import { resolveLivingFaceMood } from '@/lib/bot-face';
+import { ComposerBotPicker } from './ComposerBotPicker';
 import { ComposerModelPicker } from './ComposerModelPicker';
 import { SessionSettingsPanel, type ExecPreset } from './sections/chat/SessionSettingsPanel';
+import { PlayBotGroupChat } from './play-group/PlayBotGroupChat';
+import { PlayBotGroupList } from './play-group/PlayBotGroupList';
 
 function isCoreExecAgent(id: string): boolean {
   return id === 'general' || id === 'main';
@@ -68,6 +72,7 @@ export interface PlayPanelProps {
   onCancelSession: () => void;
   onOpenTrace: () => void;
   onApprovalsChanged: () => void;
+  onAttachStream?: (sessionId: string) => { ready: Promise<void>; cancel: () => void };
   chat: ReturnType<typeof usePlayChat>;
   sessionFilter?: string;
   onSessionFilterChange?: (value: string) => void;
@@ -238,6 +243,7 @@ export function PlayPanel({
   onCancelSession,
   onOpenTrace,
   onApprovalsChanged,
+  onAttachStream,
   chat,
   sessionFilter = '',
   onSessionFilterChange,
@@ -253,6 +259,8 @@ export function PlayPanel({
   const [selectMode, setSelectMode] = useState(false);
   const [checkedIds, setCheckedIds] = useState<string[]>([]);
   const [deleting, setDeleting] = useState(false);
+  const [openGroupId, setOpenGroupId] = useState<string | null>(null);
+  const [groupCount, setGroupCount] = useState(0);
   const createMenuRef = useRef<HTMLDivElement>(null);
   const configBtnRef = useRef<HTMLButtonElement>(null);
   const configPanelRef = useRef<HTMLDivElement>(null);
@@ -264,13 +272,67 @@ export function PlayPanel({
   const execPreset = execPresetOf(chat.agentId, chat.mode);
   const agentSelectValue = isCoreExecAgent(chat.agentId) || !chat.agentId ? '' : chat.agentId;
   const chatRunning = chat.playSending || Boolean(chat.streamOverlay) || chat.waitTyping;
-  const steerDisabled = chatRunning && chat.steerInterruptPolicy === 'disabled';
-  const runningPlaceholder =
-    chat.steerInterruptPolicy === 'disabled'
+  const immediateSteer = chat.immediateSteer;
+  const steerDisabled = chatRunning && !immediateSteer && chat.steerInterruptPolicy === 'disabled';
+  const runningPlaceholder = immediateSteer
+    ? t('play.composer.runningSteer')
+    : chat.steerInterruptPolicy === 'disabled'
       ? t('play.composer.runningDisabled')
       : chat.steerInterruptPolicy === 'queue'
         ? t('play.composer.runningQueue')
         : t('play.composer.runningSteer');
+
+  const compositionActiveRef = useRef(false);
+  const compositionJustEndedRef = useRef(false);
+  const compositionGuardTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (compositionGuardTimerRef.current != null) {
+        window.clearTimeout(compositionGuardTimerRef.current);
+      }
+    };
+  }, []);
+
+  const clearCompositionGuard = () => {
+    if (compositionGuardTimerRef.current != null) {
+      window.clearTimeout(compositionGuardTimerRef.current);
+      compositionGuardTimerRef.current = null;
+    }
+  };
+
+  const onComposerCompositionStart = () => {
+    compositionActiveRef.current = true;
+    compositionJustEndedRef.current = false;
+    clearCompositionGuard();
+  };
+
+  const onComposerCompositionEnd = () => {
+    compositionActiveRef.current = false;
+    compositionJustEndedRef.current = true;
+    clearCompositionGuard();
+    compositionGuardTimerRef.current = window.setTimeout(() => {
+      compositionJustEndedRef.current = false;
+      compositionGuardTimerRef.current = null;
+    }, COMPOSITION_ENTER_GUARD_MS);
+  };
+
+  const onComposerKeyDown = (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+    const native = event.nativeEvent;
+    const decision = decideComposerEnter({
+      key: event.key,
+      shiftKey: event.shiftKey,
+      isComposing: native.isComposing,
+      keyCode:
+        event.keyCode === IME_COMPOSITION_KEY_CODE || native.keyCode === IME_COMPOSITION_KEY_CODE
+          ? IME_COMPOSITION_KEY_CODE
+          : native.keyCode,
+      compositionActive: compositionActiveRef.current,
+      compositionJustEnded: compositionJustEndedRef.current,
+    });
+    if (decision.preventDefault) event.preventDefault();
+    if (decision.send) void chat.sendPlayMessage();
+  };
 
   const applyExecPreset = (preset: ExecPreset) => {
     const support = agentSelectValue;
@@ -358,6 +420,12 @@ export function PlayPanel({
       return next.length === prev.length ? prev : next;
     });
   }, [visibleIds]);
+
+  useEffect(() => {
+    if (botSurface) return;
+    setOpenGroupId(null);
+    setGroupCount(0);
+  }, [botSurface]);
 
   const toggleChecked = (id: string, on: boolean) => {
     setCheckedIds((prev) => {
@@ -825,9 +893,18 @@ export function PlayPanel({
           ) : null}
           </div>
           <div className="list-scroll play-sidebar__list" id="sessionListMini">
-            {!sessions.length ? (
+            {botSurface ? (
+              <PlayBotGroupList
+                bots={botRoster}
+                selectedId={openGroupId}
+                filter={sessionFilter}
+                onOpen={setOpenGroupId}
+                onCount={setGroupCount}
+              />
+            ) : null}
+            {!sessions.length && (!botSurface || groupCount === 0) ? (
               <div className="empty-hint">{botSurface ? t('play.sidebar.noBots') : t('play.sidebar.noSessions')}</div>
-            ) : (
+            ) : sessions.length ? (
               sessionGroups.map((group) => (
                 <section key={group.bucket} className="session-date-group">
                   <h3 className="session-date-group__label">{sessionGroupDisplay(group.bucket, group.label, t)}</h3>
@@ -836,10 +913,11 @@ export function PlayPanel({
                       const title = s.title || t('play.unnamed');
                       const checked = checkedVisible.includes(s.id);
                       const statusKey = sessionStatusKey(s.status);
+                      const sessionRowSelected = !openGroupId && selectedSessionId === s.id;
                       return (
                         <div
                           key={s.id}
-                          className={`list-item list-item--session${selectedSessionId === s.id ? ' selected' : ''}${checked ? ' is-checked' : ''}`}
+                          className={`list-item list-item--session${sessionRowSelected ? ' selected' : ''}${checked ? ' is-checked' : ''}`}
                           role="button"
                           tabIndex={0}
                           onClick={() => {
@@ -847,12 +925,16 @@ export function PlayPanel({
                               toggleChecked(s.id, !checked);
                               return;
                             }
+                            setOpenGroupId(null);
                             onSelectSession(s.id);
                           }}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
                               if (selectMode) toggleChecked(s.id, !checked);
-                              else onSelectSession(s.id);
+                              else {
+                                setOpenGroupId(null);
+                                onSelectSession(s.id);
+                              }
                             }
                           }}
                         >
@@ -901,12 +983,13 @@ export function PlayPanel({
                   </div>
                 </section>
               ))
-            )}
+            ) : null}
           </div>
         </aside>
 
         <div className="play-main-col">
-          <div className="play-main chat-panel">
+          {botSurface && openGroupId ? <PlayBotGroupChat key={openGroupId} roomId={openGroupId} bots={botRoster} /> : null}
+          <div className="play-main chat-panel" hidden={botSurface && openGroupId != null}>
             <header className="chat-panel-header">
               <div className="chat-panel-header__text">
                 <h2 className="chat-panel-title" id="playTitle">
@@ -1013,7 +1096,11 @@ export function PlayPanel({
               </div>
             </header>
 
-            <ApprovalBanner approvals={sessionApprovals} onDone={onApprovalsChanged} />
+            <ApprovalBanner
+              approvals={sessionApprovals}
+              onDone={onApprovalsChanged}
+              onAttachStream={onAttachStream}
+            />
             <GoalStatusCard sessionId={selectedSessionId} />
 
             <div className="chat-panel-body">
@@ -1098,12 +1185,9 @@ export function PlayPanel({
                     autoComplete="off"
                     value={chat.playInput}
                     onChange={(e) => chat.setPlayInput(e.target.value)}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          void chat.sendPlayMessage();
-                        }
-                    }}
+                    onCompositionStart={onComposerCompositionStart}
+                    onCompositionEnd={onComposerCompositionEnd}
+                    onKeyDown={onComposerKeyDown}
                   />
                   {chat.speechDictationAvailable ? (
                     <button
@@ -1147,9 +1231,9 @@ export function PlayPanel({
                         : chatRunning
                           ? steerDisabled
                             ? t('play.composer.interruptDisabled')
-                            : chat.steerInterruptPolicy === 'queue'
-                              ? t('play.composer.queueHint')
-                              : t('play.composer.steerHint')
+                            : immediateSteer || chat.steerInterruptPolicy !== 'queue'
+                              ? t('play.composer.steerHint')
+                              : t('play.composer.queueHint')
                           : t('play.send')
                     }
                     disabled={
@@ -1210,43 +1294,21 @@ export function PlayPanel({
                       </span>
                     </button>
                     {botSurface ? (
-                      <div className="composer-bot-picker">
-                        <BotFace
-                          name={selectedBot?.name || chat.botId}
-                          label={
-                            selectedBot?.name || chat.botId
-                              ? t('agents.bots.faceLabel', { name: selectedBot?.name || chat.botId })
-                              : t('agents.bots.faceEmpty')
-                          }
-                          testId="bot-picker-face"
-                        />
-                        <span className="composer-bot-picker__name" aria-hidden="true">
-                          {selectedBot?.name ?? (chat.botId || t('play.selectBot'))}
-                        </span>
-                        <span className="composer-bot-picker__chevron" aria-hidden="true">
-                          ▾
-                        </span>
-                        <label className="sr-only" htmlFor="botSelect">
-                          {t('play.bot')}
-                        </label>
-                        <select
-                          id="botSelect"
-                          className="composer-bot-select"
-                          aria-label={t('play.bot')}
-                          value={chat.botId}
-                          onChange={(e) => void chat.selectBot(e.target.value)}
-                        >
-                          <option value="">{t('play.selectBot')}</option>
-                          {chat.botId && !botRoster.some((b) => b.id === chat.botId) ? (
-                            <option value={chat.botId}>{selectedBot?.name ?? chat.botId}</option>
-                          ) : null}
-                          {botRoster.map((b) => (
-                            <option key={b.id} value={b.id}>
-                              {b.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                      <ComposerBotPicker
+                        bots={botRoster.map((b) => ({ id: b.id, name: b.name }))}
+                        value={chat.botId}
+                        selectedName={selectedBot?.name ?? ''}
+                        orphan={
+                          chat.botId && !botRoster.some((b) => b.id === chat.botId)
+                            ? { id: chat.botId, name: selectedBot?.name ?? chat.botId }
+                            : null
+                        }
+                        mood={resolveLivingFaceMood({
+                          live: chat.playSending || Boolean(chat.streamOverlay) || chat.waitTyping,
+                          segments: chat.streamOverlay?.segments
+                        })}
+                        onSelect={(id) => void chat.selectBot(id)}
+                      />
                     ) : null}
                     <div className="chat-composer-dock__pickers">
                     <ComposerModelPicker
@@ -1278,9 +1340,9 @@ export function PlayPanel({
                         : chatRunning
                           ? steerDisabled
                             ? t('play.composer.statusDisabled')
-                            : chat.steerInterruptPolicy === 'queue'
-                              ? t('play.composer.statusQueue')
-                              : t('play.composer.statusSteer')
+                            : immediateSteer || chat.steerInterruptPolicy !== 'queue'
+                              ? t('play.composer.statusSteer')
+                              : t('play.composer.statusQueue')
                           : '')}
                   </p>
                 </div>

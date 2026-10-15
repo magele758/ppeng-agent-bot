@@ -143,7 +143,7 @@ Jev 不是 SDK 模块：未配置入口时宿主不调用它，SDK 接入参数�
 - `handle.step()`：执行单个细粒度步骤（单步调试或受控推演）。
 - `handle.run()`：连续循环运行直到会话挂起（waiting_approval / ended / error）。
 - `for await (const event of handle)`：流式消费生命周期事件（`turn_prepared` -> `model_done` -> `tools_done` -> `ended`）。
-- `handle.steer(message, options)`：向正在运行或即将运行的轮次注入用户修正指令。返回 `started`（已入队下一轮）、`steered`（已并入当前可转向轮次）、`not_submitted`（空文本、无会话或会话已结束等原因被拒）。daemon 的 HTTP 投影才把 `not_submitted` 写成 `rejected`。
+- `handle.steer(message, options)`：向正在运行或即将运行的轮次注入用户修正指令。返回 `started`（已入队下一轮）、`steered`（已并入当前可转向轮次）、`not_submitted`（空文本、无会话或会话已结束等原因被拒）。daemon 的 HTTP 投影才把 `not_submitted` 写成 `rejected`。规范 Bot 对话（`mode: chat` 且 `canonicalBotChat`）在回合运行中一律按 `steered` 落入下一枪（`next-step`），即使循环策略是排队或关闭、调用方写了 `next-run` 也不再等到整轮结束；这不是工具审批。普通会话仍遵守 queue / steer / disabled。`steerMode: subagent` 不改落点。
 - `handle.abort()`：软中断当前轮次。
 - `handle.fold()`：获取经过投影和折叠处理后的结构化消息历史。
 - 可见历史：折叠结果在 token 预算内时，不会按 `MAX_VISIBLE_MESSAGES`（24）从尾部硬切，条数上限也不会丢掉最新用户消息。需要裁切时保留最初的系统提示和最新用户消息，并且只在闭合的工具回合（助手 `tool_calls` 加上对应工具结果）边界下刀。超过 token 预算时仍走 `autoCompact` 摘要；摘要失败则退回上述钉住规则，不再盲目切片。

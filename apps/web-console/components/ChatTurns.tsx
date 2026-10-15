@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { StreamSegment } from '@/lib/stream-segments';
 import { formatStreamToolArgs } from '@/lib/stream-segments';
 import type { ChatMessage, MessagePart } from '@/lib/types';
@@ -27,6 +27,12 @@ import {
   toolIoPartKey,
   type ToolCallPart
 } from '@/lib/tool-io';
+import {
+  chatImageRef,
+  chatImageSrc,
+  isToolObservationCaption,
+  type ChatImageRef
+} from '@/lib/chat-images';
 
 function buildModClass(
  _role: string,
@@ -220,6 +226,51 @@ function ToolResultFold({
   );
 }
 
+function ChatImageThumb({ sessionId, image }: { sessionId: string; image: ChatImageRef }) {
+  const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const src = chatImageSrc(sessionId, image.assetId);
+  const alt = image.alt?.trim() || t('play.turns.toolShotAlt');
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (open) {
+      if (!dialog.open) dialog.showModal();
+      return;
+    }
+    if (dialog.open) dialog.close();
+  }, [open]);
+
+  return (
+    <>
+      <button
+        type="button"
+        className="chat-image-thumb"
+        aria-label={t('play.turns.enlargeImage')}
+        onClick={() => setOpen(true)}
+      >
+        <img src={src} alt={alt} />
+      </button>
+      <dialog
+        ref={dialogRef}
+        className="chat-image-lightbox"
+        aria-label={alt}
+        onClose={() => setOpen(false)}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) setOpen(false);
+        }}
+      >
+        <img src={src} alt={alt} />
+        <button type="button" className="chat-image-lightbox__close" onClick={() => setOpen(false)}>
+          {t('common.close')}
+        </button>
+      </dialog>
+    </>
+  );
+}
+
 function SurfaceUpdateBlock({
   p,
   sessionId,
@@ -280,17 +331,18 @@ function StructuredBubble({
   toolCallsById?: ReadonlyMap<string, ToolCallPart>;
   resolvedCallIds?: ReadonlySet<string>;
 }) {
+  const { t } = useI18n();
   const usePre = role === 'tool' || role === 'system';
   const nodes: ReactNode[] = [];
   const textBuf: string[] = [];
   const flush = () => {
-    const t = textBuf.join('\n').trim();
+    const joined = textBuf.join('\n').trim();
     textBuf.length = 0;
-    if (!t) return;
+    if (!joined) return;
     if (usePre) {
       nodes.push(
         <pre key={nodes.length} className="chat-bubble__pre">
-          {t}
+          {joined}
         </pre>
       );
     } else {
@@ -298,7 +350,7 @@ function StructuredBubble({
         <div
           key={nodes.length}
           className="chat-bubble__body chat-bubble__md"
-          dangerouslySetInnerHTML={{ __html: renderMarkdown(t) }}
+          dangerouslySetInnerHTML={{ __html: renderMarkdown(joined) }}
         />
       );
     }
@@ -308,7 +360,16 @@ function StructuredBubble({
     const p = partsList[pi]!;
     if (p.type === 'text') {
       const line = p.text ?? '';
-      if (line) textBuf.push(line);
+      if (isToolObservationCaption(line)) {
+        flush();
+        nodes.push(
+          <p key={nodes.length} className="chat-tool-observation">
+            {t('play.turns.toolObservation')}
+          </p>
+        );
+      } else if (line) {
+        textBuf.push(line);
+      }
     } else if (p.type === 'reasoning') {
       flush();
       const t = (p.text ?? '').trim();
@@ -316,7 +377,24 @@ function StructuredBubble({
         nodes.push(<ReasoningFold key={nodes.length} text={t} />);
       }
     } else if (p.type === 'image') {
-      textBuf.push(`[image ${p.assetId ?? ''}${p.mimeType ? ` ${p.mimeType}` : ''}]`);
+      flush();
+      const refs: ChatImageRef[] = [];
+      let cursor = pi;
+      while (cursor < partsList.length && partsList[cursor]?.type === 'image') {
+        const ref = chatImageRef(partsList[cursor]!);
+        if (ref) refs.push(ref);
+        cursor += 1;
+      }
+      pi = cursor - 1;
+      if (refs.length > 0) {
+        nodes.push(
+          <div key={nodes.length} className="chat-image-thumbs">
+            {refs.map((image, index) => (
+              <ChatImageThumb key={`${image.assetId}-${index}`} sessionId={sessionId} image={image} />
+            ))}
+          </div>
+        );
+      }
     } else if (p.type === 'tool_call') {
       if (resolvedCallIds?.has(p.toolCallId)) continue;
       flush();

@@ -1,0 +1,19 @@
+id: play-bot-group
+title: Bot 会话列表里的多 Bot 群聊
+status: implemented
+requirement: |
+  为什么不能把多个 Bot 拉进一个群聊？希望这个能力就在 Bot 会话列表里，能直接看见、直接用。
+  从这条列表可以新建群聊，并加入一个以上已有的 Bot。群聊出现在同一列表里，和单个 Bot 的会话区分开。
+  打开后是一份共享记录。用户发出的消息进入这份记录，成员 Bot 参与其中。之后还可以加入或移出 Bot。
+  单个 Bot 的会话保持原样，不要把每个 Bot 会话都变成群。
+criteria:
+  - id: AC-1
+    given: 用户已有多个 Bot
+    when: 在 Bot 会话列表里用少于两个 Bot，或把同一个 Bot 重复加入来建群
+    then: 群不会被创建，成员保持至少两个且互不重复
+  - id: AC-2
+    given: 群里已经有至少两个 Bot
+    when: 再加入一个已在群里的 Bot，或移出后会少于两个
+    then: 成员名单不出现重复，也不会少到只剩一个
+notes: |
+  群的共享记录与发言仍走已有 Bot Room，不另建消息库。本规格只锁成员规则；侧栏入口复用该 Room。

@@ -199,6 +199,7 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
     ['POST /api/sessions/:id/a2ui/action', session],
     ['POST /api/sessions/:id/images/ingest-base64', session],
     ['POST /api/sessions/:id/images/fetch-url', session],
+    ['GET /api/sessions/:id/images/:assetId', session],
     ['POST /api/sessions/:id/attachments/ingest-base64', session],
     ['POST /api/sessions/:id/attachments/fetch-url', session],
     ['GET /api/sessions/:id/attachments', session],

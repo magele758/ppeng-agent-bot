@@ -14,7 +14,7 @@ import { LEGACY_BOT_BYPASS_META } from '../bots/legacy-bypass.js';
 import { APPROVAL_WAKE_KEY, disarmUnattendedApprovalExpiry } from '../approval/unattended-approval.js';
 import { NotFoundError, ValidationError } from '../errors.js';
 import { textSummaryFromParts } from '../model/model-adapters.js';
-import { decideSteerAdmission, type SteerAck } from '../session/steer-ack.js';
+import { decideSteerAdmission, sessionSteersImmediately, type SteerAck } from '../session/steer-ack.js';
 import { resolveSteerDrainPolicy, resolveSteerInboxTarget } from '../session/steer-drain.js';
 import { resolveSteerInterruptPolicy } from '../session/steer-interrupt.js';
 import type { EnqueueSteerOptions } from '../session/step-inbox.js';
@@ -362,9 +362,14 @@ export function enqueueSteer(
     sessionMetadata: session?.metadata,
     store
   });
+  const immediate =
+    session?.status === 'running' &&
+    sessionSteersImmediately(session) &&
+    opts?.steerMode !== 'subagent';
   const target = resolveSteerInboxTarget({
+    immediate,
     explicitTarget: opts?.target,
-    interruptPolicy: policy,
+    interruptPolicy: immediate ? 'steer' : policy,
     drainPolicy,
     sessionStatus: session?.status
   });

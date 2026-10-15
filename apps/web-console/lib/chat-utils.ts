@@ -1,5 +1,5 @@
-import { TOOL_RESULT_STUB_MARK } from './tool-result-stub';
-import type { ChatMessage, MessagePart } from './types';
+import { TOOL_RESULT_STUB_MARK } from './tool-result-stub.ts';
+import type { ChatMessage, MessagePart } from './types.ts';
 
 export function msgPartsToText(parts: MessagePart[] | undefined): string {
   if (!parts) return '';
@@ -7,7 +7,8 @@ export function msgPartsToText(parts: MessagePart[] | undefined): string {
     .map((p) => {
       if (p.type === 'text') return p.text ?? '';
       if (p.type === 'reasoning') return p.text ?? '';
-      if (p.type === 'image') return `[image ${p.assetId}${p.mimeType ? ` ${p.mimeType}` : ''}]`;
+      // Thumbnails render from the image part; never surface the asset id as text.
+      if (p.type === 'image') return '';
       if (p.type === 'tool_call') return `[${p.name}] ${JSON.stringify(p.input ?? {})}`;
       if (p.type === 'tool_result') return `[result ${p.name}] ${p.content ?? ''}`;
       if (p.type === 'surface_update') return `[a2ui surface ${p.surfaceId}]`;
@@ -30,7 +31,8 @@ export function messageHasStructuredParts(parts: MessagePart[] | undefined): boo
         p.type === 'tool_call' ||
         p.type === 'tool_result' ||
         p.type === 'reasoning' ||
-        p.type === 'surface_update'
+        p.type === 'surface_update' ||
+        p.type === 'image'
     )
   );
 }

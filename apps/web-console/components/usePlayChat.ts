@@ -9,6 +9,7 @@ import { getSpeechRecognitionCtor, type SpeechRecognitionLike } from '@/lib/spee
 import { renderMarkdown } from '@/lib/markdown';
 import { rollbackToCheckpoint, streamCheckpoint, type StreamSegment } from '@/lib/stream-segments';
 import { feedSseBuffer } from '@/lib/sse';
+import { liveSessionFollowRequest, type LiveStreamArm } from '@/lib/live-stream-attach';
 import { userPreviewText } from '@/lib/chat-utils';
 import { playSendAckToneIfEnabled } from '@/lib/send-ack-feedback';
 import {
@@ -51,6 +52,7 @@ import {
   type SteerInboxItem,
   type SteerInterruptPolicy
 } from '@/lib/query-queue';
+import { decideRunningTurnSend, isCanonicalBotChatMetadata } from '@/lib/running-turn-send';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 /** Stream already persisted the user turn; do not put the draft back in the composer. */
@@ -116,6 +118,20 @@ function optionalGroupsBody(feature: boolean, ids: string[]): { enabledOptionalT
 function modelRefBody(ref: ModelRef | null): { modelRef?: ModelRef } {
   if (!ref) return {};
   return { modelRef: ref };
+}
+
+function messageId(message: ChatMessage): string {
+  const id = (message as ChatMessage & { id?: unknown }).id;
+  return typeof id === 'string' ? id : '';
+}
+
+function messageUserText(message: ChatMessage): string {
+  const parts = message.parts ?? [];
+  const lines: string[] = [];
+  for (const part of parts) {
+    if (part.type === 'text' && typeof part.text === 'string' && part.text.trim()) lines.push(part.text);
+  }
+  return lines.join('\n');
 }
 
 function orchestrationBody(
@@ -247,11 +263,23 @@ export function usePlayChat(deps: PlayChatDeps) {
   const [modelViewPayload, setModelViewPayload] = useState<SessionModelViewPayload | null>(null);
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const [steerInterruptPolicy, setSteerInterruptPolicyState] = useState<SteerInterruptPolicy>('queue');
+  const [immediateSteer, setImmediateSteer] = useState(false);
+  const immediateSteerRef = useRef(false);
+  const canonicalBotChatRef = useRef(false);
+  const canonicalBotChatKnownRef = useRef(false);
+  const canonicalForSessionRef = useRef<string | null>(null);
+  const pendingSteerTextRef = useRef<string | null>(null);
+  const pendingSteerKnownIdsRef = useRef<Set<string>>(new Set());
   const [steerInbox, setSteerInbox] = useState<SteerInboxItem[]>([]);
   const [steerPolicyBusy, setSteerPolicyBusy] = useState(false);
   const [queryExecMode, setQueryExecMode] = useState<QueryExecMode>('steering');
 
   const playMessagesRef = useRef<HTMLDivElement>(null);
+  const liveFollowRef = useRef<{
+    sessionId: string;
+    controller: AbortController;
+    ready: Promise<void>;
+  } | null>(null);
   const playInputRef = useRef<HTMLTextAreaElement>(null);
   const playInputLiveRef = useRef('');
   const speechRecRef = useRef<SpeechRecognitionLike | null>(null);
@@ -280,8 +308,36 @@ export function usePlayChat(deps: PlayChatDeps) {
     setPendingAttachmentIds([]);
   };
 
+  const composerIsCanonicalBot = () => {
+    const sid = selectedSessionRef.current;
+    if (canonicalBotChatKnownRef.current && canonicalForSessionRef.current === sid) {
+      return canonicalBotChatRef.current;
+    }
+    return playSurface === 'bot' && Boolean(botIdRef.current) && Boolean(sid);
+  };
+
+  const publishImmediateSteer = () => {
+    const steer = decideRunningTurnSend({ canonicalBotChat: composerIsCanonicalBot() }) === 'steer';
+    immediateSteerRef.current = steer;
+    setImmediateSteer(steer);
+  };
+
+  const rememberCanonicalBotChat = (sid: string | null, session?: { mode?: string; metadata?: Record<string, unknown> | null }) => {
+    if (!sid || !session) {
+      canonicalBotChatKnownRef.current = false;
+      canonicalBotChatRef.current = false;
+      canonicalForSessionRef.current = null;
+      publishImmediateSteer();
+      return;
+    }
+    canonicalBotChatKnownRef.current = true;
+    canonicalForSessionRef.current = sid;
+    canonicalBotChatRef.current = isCanonicalBotChatMetadata(session);
+    publishImmediateSteer();
+  };
+
   const clearStreamingShell = () => {
-    setOptimisticUser(null);
+    if (!pendingSteerTextRef.current) setOptimisticUser(null);
     setStreamOverlay(null);
     setWaitTyping(false);
   };
@@ -349,6 +405,8 @@ export function usePlayChat(deps: PlayChatDeps) {
   useEffect(() => {
     playStickToBottomRef.current = true;
     setShowJumpToLatest(false);
+    const follow = liveFollowRef.current;
+    if (follow && follow.sessionId !== selectedSessionId) follow.controller.abort();
   }, [selectedSessionId]);
 
   useEffect(() => {
@@ -677,6 +735,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     const sid = selectedSessionRef.current;
     if (!sid) {
       historySessionRef.current='';setHistoryCursor(null);
+      rememberCanonicalBotChat(null);
       setPlayTitle(t('play.empty.selectOrCreateSession'));
       setPlayMeta('');
       setSessionChrome(null);
@@ -710,6 +769,7 @@ export function usePlayChat(deps: PlayChatDeps) {
         inbox?: SteerInboxItem[];
       };
       if(selectedSessionRef.current!==sid)return;
+      rememberCanonicalBotChat(sid, data.session);
       const chrome = parseSessionChrome(data.session.metadata, data.session.status, {
         createdAt: data.session.createdAt,
         updatedAt: data.session.updatedAt
@@ -789,6 +849,7 @@ export function usePlayChat(deps: PlayChatDeps) {
         setSessionFileArtifacts([]);
       }
     } catch {
+      rememberCanonicalBotChat(null);
       setPlayTitle(t('play.status.loadFailed'));
       setPlayMeta('');
       setSessionChrome(null);
@@ -843,6 +904,41 @@ export function usePlayChat(deps: PlayChatDeps) {
       clearInterval(timer);
     };
   }, [playSending, streamOverlay, waitTyping, selectedSessionId, selectedSessionRef]);
+
+  useEffect(() => {
+    publishImmediateSteer();
+  }, [playSurface, botId, selectedSessionId]);
+
+  useEffect(() => {
+    const wanted = pendingSteerTextRef.current;
+    if (!wanted || !optimisticUser) return;
+    const sid = selectedSessionRef.current;
+    if (!sid) return;
+    let cancelled = false;
+    const look = async () => {
+      try {
+        const data = (await api(`/api/sessions/${sid}?messageLimit=40`)) as { messages?: ChatMessage[] };
+        if (cancelled || pendingSteerTextRef.current !== wanted) return;
+        const known = pendingSteerKnownIdsRef.current;
+        const landed = (data.messages ?? []).some((message) => {
+          const id = messageId(message);
+          return message.role === 'user' && id && !known.has(id) && messageUserText(message).includes(wanted);
+        });
+        if (!landed) return;
+        pendingSteerTextRef.current = null;
+        setOptimisticUser(null);
+        await refreshPlayPanel();
+      } catch {
+        /* steer landing is best-effort */
+      }
+    };
+    void look();
+    const timer = setInterval(() => void look(), 1000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [optimisticUser, selectedSessionId, refreshPlayPanel, selectedSessionRef]);
 
   const saveGoalCondition = useCallback(
     async (condition: string) => {
@@ -1109,15 +1205,28 @@ export function usePlayChat(deps: PlayChatDeps) {
    */
   const RECONNECT_DELAYS_MS = [1000, 3000, 10000];
 
-  const readSseFetch = async (url: string, body: unknown, onSession?: (id: string) => void) => {
+  const readSseFetch = async (
+    url: string,
+    body: unknown,
+    onSession?: (id: string) => void,
+    opts?: { onReady?: () => void; signal?: AbortSignal; extraAttempts?: number }
+  ) => {
+    const throwIfAborted = () => {
+      if (opts?.signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError');
+    };
+    const isAbort = (err: unknown) =>
+      opts?.signal?.aborted || (err instanceof Error && err.name === 'AbortError');
     let res: Response | undefined;
     let lastErr: unknown;
-    for (let attempt = 0; attempt <= RECONNECT_DELAYS_MS.length; attempt++) {
+    const extraAttempts = opts?.extraAttempts ?? RECONNECT_DELAYS_MS.length;
+    for (let attempt = 0; attempt <= extraAttempts; attempt++) {
+      throwIfAborted();
       try {
         res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
+          signal: opts?.signal
         });
         if (res.ok) break;
         // 4xx client errors (except 408/425 which are transient) are terminal:
@@ -1130,10 +1239,11 @@ export function usePlayChat(deps: PlayChatDeps) {
         }
         lastErr = new Error(`SSE handshake HTTP ${res.status}`);
       } catch (err) {
+        if (isAbort(err)) throw err;
         lastErr = err;
       }
-      if (attempt < RECONNECT_DELAYS_MS.length) {
-        await new Promise((r) => setTimeout(r, RECONNECT_DELAYS_MS[attempt]));
+      if (attempt < extraAttempts) {
+        await new Promise((r) => setTimeout(r, RECONNECT_DELAYS_MS[Math.min(attempt, RECONNECT_DELAYS_MS.length - 1)]));
       }
     }
     if (!res || !res.ok) {
@@ -1167,6 +1277,9 @@ export function usePlayChat(deps: PlayChatDeps) {
           envelope?: Record<string, unknown>;
           session?: { id: string };
         };
+        if (event === 'ready') {
+          opts?.onReady?.();
+        }
         if (event === 'error') {
           const raw = typeof p.message === 'string' && p.message.trim() ? p.message.trim() : 'stream error';
           throw new PlayStreamError(t('play.status.runFailed', { error: raw }));
@@ -1243,6 +1356,53 @@ export function usePlayChat(deps: PlayChatDeps) {
         }
       });
     }
+  };
+
+  /**
+   * Listen for the run that an ask_user approve/reject is about to start.
+   * `ready` resolves once the server is subscribed, before that run begins.
+   */
+  const armLiveSessionStream = (sessionId: string): LiveStreamArm => {
+    const current = liveFollowRef.current;
+    if (current?.sessionId === sessionId && !current.controller.signal.aborted) {
+      return {
+        ready: current.ready,
+        cancel: () => current.controller.abort()
+      };
+    }
+    current?.controller.abort();
+    const controller = new AbortController();
+    let resolveReady: () => void = () => undefined;
+    const ready = new Promise<void>((resolve) => {
+      const finish = () => resolve();
+      resolveReady = finish;
+      setTimeout(finish, 4000);
+    });
+    const follow = { sessionId, controller, ready };
+    liveFollowRef.current = follow;
+    setStreamOverlay({ segments: [] });
+    const { url, body } = liveSessionFollowRequest(sessionId);
+    void (async () => {
+      try {
+        await readSseFetch(url, body, undefined, {
+          signal: controller.signal,
+          extraAttempts: 0,
+          onReady: () => resolveReady()
+        });
+      } catch (error) {
+        const aborted = controller.signal.aborted || (error instanceof Error && error.name === 'AbortError');
+        if (!aborted) {
+          setPlayStatus({ text: error instanceof Error ? error.message : String(error), err: true });
+        }
+      } finally {
+        resolveReady();
+        if (liveFollowRef.current?.controller !== controller) return;
+        liveFollowRef.current = null;
+        clearStreamingShell();
+        if (!controller.signal.aborted) await tick({ includePlayPanel: true });
+      }
+    })();
+    return { ready, cancel: () => controller.abort() };
   };
 
   const ensurePlaySessionForImages = async (): Promise<string> => {
@@ -1335,18 +1495,34 @@ export function usePlayChat(deps: PlayChatDeps) {
     const running = playSending || Boolean(streamOverlay) || waitTyping;
     if (running) {
       if (!text || !selectedSessionId) return;
-      if (steerInterruptPolicy === 'disabled') {
+      const immediate =
+        decideRunningTurnSend({ canonicalBotChat: composerIsCanonicalBot() }) === 'steer';
+      if (!immediate && steerInterruptPolicy === 'disabled') {
         setPlayStatus({ text: t('play.status.steerDisabled'), err: true });
         return;
       }
       stopSpeechDictation();
+      if (immediate) {
+        pendingSteerKnownIdsRef.current = new Set(
+          historyMessagesRef.current.map((message) => messageId(message)).filter(Boolean)
+        );
+        pendingSteerTextRef.current = text;
+        acknowledgeLocalSendCommitted();
+        requestScrollPlayToBottom();
+        setOptimisticUser(userPreviewText(text, []));
+        clearComposerOnly();
+      }
       try {
-        const target = steerInterruptPolicy === 'queue' ? 'next-run' : 'next-step';
+        const target = immediate || steerInterruptPolicy !== 'queue' ? 'next-step' : 'next-run';
         const execMode = queryExecModeRef.current;
         const data = (await api(`/api/sessions/${selectedSessionId}/steer`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, target, ...steerBodyFromQueryMode(execMode) }),
+          body: JSON.stringify(
+            immediate
+              ? { text, target: 'next-step' }
+              : { text, target, ...steerBodyFromQueryMode(execMode) }
+          ),
         })) as { ok?: boolean; status?: string; reason?: string; item?: SteerInboxItem };
         acknowledgeLocalSendCommitted();
         clearComposerOnly();
@@ -1357,6 +1533,11 @@ export function usePlayChat(deps: PlayChatDeps) {
           ]);
         }
         if (data.status === 'rejected' || data.status === 'not_submitted') {
+          if (immediate) {
+            pendingSteerTextRef.current = null;
+            setOptimisticUser(null);
+            setPlayInput(text);
+          }
           const why =
             data.reason === 'session_ended'
               ? t('play.status.sessionEnded')
@@ -1366,9 +1547,9 @@ export function usePlayChat(deps: PlayChatDeps) {
                   ? t('play.status.steerDisabled')
                   : data.reason || t('play.status.notAccepted');
           setPlayStatus({ text: t('play.status.notAcceptedWhy', { why }), err: true });
-        } else if (execMode === 'subagent') {
+        } else if (!immediate && execMode === 'subagent') {
           setPlayStatus({ text: t('play.status.queuedSubagent'), ok: true });
-        } else if (data.status === 'queued') {
+        } else if (!immediate && data.status === 'queued') {
           setPlayStatus({
             text: steerInterruptPolicy === 'queue' ? t('play.status.queuedEnd') : t('play.status.queuedNext'),
             ok: true
@@ -1377,6 +1558,11 @@ export function usePlayChat(deps: PlayChatDeps) {
           setPlayStatus({ text: t('play.status.steered'), ok: true });
         }
       } catch (err) {
+        if (immediate) {
+          pendingSteerTextRef.current = null;
+          setOptimisticUser(null);
+          setPlayInput(text);
+        }
         setPlayStatus({ text: err instanceof Error ? err.message : String(err), err: true });
       }
       return;
@@ -1686,6 +1872,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     enabledOptionalGroupIds,
     toggleOptionalGroup,
     steerInterruptPolicy,
+    immediateSteer,
     saveSteerInterruptPolicy,
     steerInbox,
     steerPolicyBusy,
@@ -1702,6 +1889,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     refreshPlayPanel,
     requestScrollPlayToBottom,
     sendPlayMessage,
+    armLiveSessionStream,
     handleFileUpload,
     handleUrlFetch,
     setPlayTitle,

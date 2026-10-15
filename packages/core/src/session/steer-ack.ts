@@ -2,7 +2,8 @@ export {
   decideSteerAdmission,
   steerAckToHttp,
   isSessionEndedStatus,
-  isCompactInFlight
+  isCompactInFlight,
+  sessionSteersImmediately
 } from '@ppeng/agent-loop/session';
 export type {
   SteerAck,

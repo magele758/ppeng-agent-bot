@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
   AppError,
@@ -36,6 +37,7 @@ import { steerHttpFromCoreAck } from '../steer-ack.js';
 import { readLoopSettings } from '../loop-settings.js';
 import { assertWorkspaceBindingRefs } from './workspace.js';
 import { guardSession, listedSessions, wrapSessionIdRoutes } from '../session-guard.js';
+import { resolveSessionImagePath } from '../session-image.js';
 
 function imageAssetIdsFromBody(body: Record<string, unknown>): string[] {
   if (!Array.isArray(body.imageAssetIds)) return [];
@@ -305,6 +307,49 @@ async function streamRun(
     sseSend(response, 'error', { message: error instanceof Error ? error.message : String(error) });
   }
   response.end();
+}
+
+const FOLLOW_RUN_WAIT_MS = 20_000;
+
+/**
+ * Watch a session run that someone else starts (approval resume). Subscribing
+ * does not start a run, and hanging up does not cancel it.
+ */
+async function followSessionStream(
+  runtime: RawAgentRuntime,
+  response: ServerResponse<IncomingMessage>,
+  sessionId: string
+) {
+  sseInit(response);
+  const detach = runtime.subscribeModelStream(sessionId, (chunk: ModelStreamChunk) => {
+    sseSend(response, 'model', chunk);
+  });
+  sseSend(response, 'ready', { ok: true });
+  const clientGone = new AbortController();
+  const onClose = () => {
+    if (!response.writableEnded) clientGone.abort();
+  };
+  response.on('close', onClose);
+  try {
+    await runtime.waitForSessionRun(sessionId, {
+      signal: clientGone.signal,
+      timeoutMs: FOLLOW_RUN_WAIT_MS
+    });
+    if (!clientGone.signal.aborted) {
+      sseSend(response, 'result', {
+        session: runtime.getSession(sessionId),
+        latestAssistant: runtime.getLatestAssistantText(sessionId)
+      });
+    }
+  } catch (error) {
+    if (!clientGone.signal.aborted) {
+      sseSend(response, 'error', { message: error instanceof Error ? error.message : String(error) });
+    }
+  } finally {
+    detach();
+    response.removeListener('close', onClose);
+    if (!response.writableEnded) response.end();
+  }
 }
 
 export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
@@ -750,6 +795,11 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
       handler: async ({ requireParam, readBody, response }) => {
         const id = requireParam('id');
         const body = (await readBody()) as Record<string, unknown>;
+        if (body.follow === true) {
+          if (!runtime.getSession(id)) throw new NotFoundError('Session', id);
+          await followSessionStream(runtime, response, id);
+          return;
+        }
         const msg = typeof body.message === 'string' ? body.message.trim() : '';
         const imgIds = imageAssetIdsFromBody(body);
         const attIds = attachmentIdsFromBody(body);
@@ -942,6 +992,23 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         } catch (error) {
           throw error instanceof AppError ? error : new ValidationError(errorMessage(error));
         }
+      }
+    },
+
+    // GET /api/sessions/:id/images/:assetId — inline bytes for chat thumbnails
+    {
+      method: 'GET',
+      pattern: '/api/sessions/:id/images/:assetId',
+      handler: ({ requireParam, response }) => {
+        const id = requireParam('id');
+        const assetId = requireParam('assetId');
+        const file = resolveSessionImagePath(runtime.stateDir, runtime.store.getImageAsset(assetId), id);
+        if (!file) throw new NotFoundError('Image', assetId);
+        response.statusCode = 200;
+        response.setHeader('content-type', file.mimeType);
+        response.setHeader('content-disposition', 'inline');
+        response.setHeader('cache-control', 'private, max-age=3600');
+        response.end(readFileSync(file.absPath));
       }
     },
 
