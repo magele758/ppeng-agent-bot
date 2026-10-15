@@ -733,3 +733,72 @@ test('non-SQLite event hosts retain signature, precheck, dedupe and idle wake co
  cronStore.update(job.id,{metadata:{...job.metadata,precheck:{kind:'script',source:'node -e \'const fs=require("node:fs");if(!fs.readFileSync(process.env.PPENG_EVENT_FILE,"utf8").includes("private"))process.exit(1);console.log(JSON.stringify({wakeAgent:false}))\''}}});delivery++;assert.equal((await acceptEventRoutine(host,input())).outcomes[0].status,'skipped');
  cronStore.update(job.id,{metadata:job.metadata});sessions.delete('legacy');delivery++;assert.equal((await acceptEventRoutine(host,input())).outcomes[0].status,'missing_session');assert.equal(cronStore.get(job.id).enabled,false);
 });
+
+test('generic JSON webhook validates per-routine vault HMAC, freshness and durable replay [AC:bot-routine-lifecycle#AC-9]', async () => {
+  const { SecretVault } = await import('../dist/secrets/secret-vault.js');
+  const { RoutineRunStore } = await import('../dist/cron/routine-runtime.js');
+  const { store, host, session } = tempHost();
+  const secretEnv = 'ROUTINE_VAULT_SECRET';
+  new SecretVault(store).set(secretEnv, SECRET);
+  const job = createCronJob(host, {sessionId:session.id,name:'generic',prompt:'read',event:'webhook/generic',secretEnv});
+  const other = createCronJob(host, {sessionId:session.id,name:'other',prompt:'read',event:'webhook/generic',secretEnv:'OTHER_VAULT_SECRET'});
+  new SecretVault(store).set('OTHER_VAULT_SECRET', 'other-secret');
+  const rawBody = '[null,42,{"text":"any JSON"}]';
+  const send = (id, timestamp=NOW_SEC, signature=emailSig(rawBody,id,timestamp)) => acceptEventRoutine(host,{provider:'webhook',rawBody,headers:{'x-ppeng-delivery':id,'x-ppeng-timestamp':timestamp,'x-ppeng-signature':signature},nowMs:NOW,env:{},claimDelivery:()=>true});
+  assert.equal((await send('bad',NOW_SEC,'sha256=bad')).outcomes[0].status,'rejected');
+  assert.equal((await send('stale',String(Number(NOW_SEC)-301))).outcomes[0].status,'rejected');
+  assert.equal((await send('future',String(Number(NOW_SEC)+301))).outcomes[0].status,'rejected');
+  const accepted = await send('valid');
+  assert.equal(accepted.outcomes.find(x=>x.jobId===job.id).status,'woke');
+  assert.equal(accepted.outcomes.find(x=>x.jobId===other.id).status,'rejected');
+  assert.equal((await send('valid')).outcomes[0].status,'duplicate');
+  assert.equal((await send('changed',NOW_SEC,emailSig(rawBody,'valid'))).outcomes[0].status,'rejected');
+  assert.equal(new RoutineRunStore(store).list(job.id).length,1);
+  await new Promise(r=>setImmediate(r));store.db.close();
+});
+
+test('CI only accepts completed check/workflow/status events matching conclusions [AC:bot-routine-lifecycle#AC-9]', async () => {
+  const { store, host, session } = tempHost();
+  const job=createCronJob(host,{sessionId:session.id,name:'ci',prompt:'review',event:'ci/status',secretEnv:SECRET_ENV,conclusions:['failure']});
+  let index=0;
+  for(const event of ['check_run','workflow_run','status']){
+    for(const conclusion of ['success','failure','pending']){
+      const body=event==='status'?{state:conclusion}:{action:conclusion==='pending'?'in_progress':'completed',[event]:{status:conclusion==='pending'?'in_progress':'completed',conclusion}};
+      const rawBody=JSON.stringify(body);
+      const result=await acceptEventRoutine(host,{provider:'github',rawBody,headers:{...githubHeaders(rawBody,`ci-${index++}`,NOW_SEC),'x-github-event':event},nowMs:NOW,claimDelivery:()=>true});
+      assert.equal(result.outcomes.some(x=>x.jobId===job.id&&x.status==='woke'),conclusion==='failure');
+      await new Promise(r=>setImmediate(r));
+    }
+  }
+  store.db.close();
+});
+
+test('daemon gateway delivers signed generic and CI routines without bearer auth [AC:bot-routine-lifecycle#AC-9]',async()=>{
+ const {SecretVault}=await import('../dist/secrets/secret-vault.js');
+ const {store,host,session}=tempHost();new SecretVault(store).set('HTTP_ROUTINE_SECRET',SECRET);
+ createCronJob(host,{sessionId:session.id,name:'generic HTTP',prompt:'inspect',event:'webhook/generic',secretEnv:'HTTP_ROUTINE_SECRET'});
+ createCronJob(host,{sessionId:session.id,name:'CI HTTP',prompt:'inspect',event:'ci/status',secretEnv:'HTTP_ROUTINE_SECRET',conclusions:['success']});
+ const ctx={runtime:{store,runSession:id=>host.runSession(id)},repoRoot:host.stateDir,stateDir:host.stateDir,env:{enabled:true,pathPrefix:'/gateway/v1',learnEnabled:false,learnDailyHourUtc:6,authToken:'gateway-token'},fileConfigRef:{current:{}}};
+ const body=[1,null,'payload'],raw=JSON.stringify(body),timestamp=String(Math.floor(Date.now()/1000));
+ const request={path:'/routines/webhook',body,headers:{'x-ppeng-delivery':'generic-http','x-ppeng-timestamp':timestamp,'x-ppeng-signature':emailSig(raw,'generic-http',timestamp)}};
+ assert.equal((await gatewayCall(ctx,{...request,headers:{...request.headers,'x-ppeng-signature':'sha256=bad'}})).status,401);
+ assert.equal((await gatewayCall(ctx,request)).json.wakeAgent,true);
+ assert.equal((await gatewayCall(ctx,request)).json.duplicate,true);
+ const ci={action:'completed',check_run:{status:'completed',conclusion:'success'}};
+ assert.equal((await gatewayCall(ctx,{path:'/routines/ci',body:ci,headers:{...githubHeaders(JSON.stringify(ci),'ci-http'),'x-github-event':'check_run'}})).json.wakeAgent,true);
+ await new Promise(r=>setImmediate(r));store.db.close();
+});
+
+test('generic accepts scalar/null JSON and exact freshness boundary but rejects timestamp substitution [AC:bot-routine-lifecycle#AC-9]',async()=>{
+ const {store,host,session}=tempHost();
+ createCronJob(host,{sessionId:session.id,name:'any JSON',prompt:'inspect',event:'webhook/generic',secretEnv:SECRET_ENV});
+ let n=0;
+ for(const rawBody of ['null','42','"text"','true','{}']){
+  const id=`scalar-${n++}`,timestamp=String(Number(NOW_SEC)-300);
+  const input={provider:'webhook',rawBody,nowMs:NOW,headers:{'x-ppeng-delivery':id,'x-ppeng-timestamp':timestamp,'x-ppeng-signature':emailSig(rawBody,id,timestamp)},claimDelivery:()=>true};
+  assert.equal((await acceptEventRoutine(host,{...input,headers:{...input.headers,'x-ppeng-timestamp':NOW_SEC}})).outcomes[0].status,'rejected');
+  assert.equal((await acceptEventRoutine(host,input)).outcomes[0].status,'woke');await new Promise(r=>setImmediate(r));
+ }
+ for(const rawBody of ['', 'not json'])assert.equal((await acceptEventRoutine(host,{provider:'webhook',rawBody,headers:{},claimDelivery:()=>true})).error,'invalid_json');
+ store.db.close();
+});

@@ -1,3 +1,6 @@
+import { createId } from '../id.js';
+import { routineExpired } from './routine-deadline.js';
+import { RoutineRunStore, drainRoutineRuns, type RoutineRuntimeHost, type RoutineRun } from './routine-runtime.js';
 import { normalizeExpiresAt } from './routine-deadline.js';
 import { NotFoundError, ValidationError } from '../errors.js';
 import { resolveBotPrincipal, principalFromSession } from '../bots/bot-identity.js';
@@ -6,7 +9,7 @@ import type { SessionFacadeHost } from '../runtime/session-facade.js';
 import type { CronJobRecord } from './cron-store.js';
 import { CronJobStore } from './cron-store.js';
 import { nextZonedCronRunAt, normalizeRoutineTimezone, parseCron5 } from './cron-next.js';
-import { parseEventScheduleValue } from './event-routine.js';
+import { normalizeCiConclusions, parseEventScheduleValue } from './event-routine.js';
 import type { RoutinePrecheck } from './routine-precheck.js';
 import { assertCredentialEnvName } from '../secrets/credential-env.js';
 
@@ -27,8 +30,10 @@ export interface CreateCronJobInput {
    * Event routines are not time-polled.
    */
   event?: string;
-  /** Environment variable name that holds the webhook secret. Never the secret itself. */
+  /** Lab Secret Vault credential name, with legacy environment fallback. Never the secret itself. */
   secretEnv?: string;
+  /** Empty array accepts every completed CI conclusion. */
+  conclusions?: string[];
   sessionId?: string;
   botId?: string;
   enabled?: boolean;
@@ -44,6 +49,8 @@ export interface UpdateCronJobInput {
   intervalMs?: number;
   event?: string;
   secretEnv?: string;
+  /** Empty array accepts every completed CI conclusion. */
+  conclusions?: string[];
   timezone?: string;
   missedPolicy?: 'coalesce' | 'skip' | 'catch_up';
   cron?: string;
@@ -164,6 +171,7 @@ export function createCronJob(host:CronFacadeHost,input:CreateCronJobInput):Cron
  const schedule=normalizeSchedule(input,timezone);
  const metadata:Record<string,unknown>={principal:principalFromSession(host.store,session)};
  if(botId)metadata.botId=botId;
+ if(input.conclusions!==undefined)metadata.conclusions=normalizeCiConclusions(input.conclusions);
  if(input.precheck!=null)metadata.precheck=parseRoutinePrecheck(input.precheck);
  if(schedule.scheduleKind==='event'){if(!input.secretEnv)throw new ValidationError('secretEnv required for event');metadata.secretEnv=normalizeSecretEnv(input.secretEnv);metadata.prompt=prompt;}
  return ensureCronStore(host).create({expiresAt:normalizeExpiresAt(input.expiresAt,schedule.scheduleKind),name,prompt,sessionId:session.id,agentId:session.agentId,timezone,missedPolicy:normalizeMissedPolicy(input.missedPolicy),ruleVersion:1,metadata,enabled:input.enabled!==false,...schedule});
@@ -186,6 +194,7 @@ function contentPatch(current:CronJobRecord,patch:UpdateCronJobInput,next:Partia
  if(patch.prompt!==undefined)next.prompt=normalizePrompt(patch.prompt);
  if(patch.enabled!==undefined)next.enabled=patch.enabled;
  const metadata={...(next.metadata??current.metadata)};
+ if(patch.conclusions!==undefined)metadata.conclusions=normalizeCiConclusions(patch.conclusions);
  if(patch.secretEnv!==undefined)metadata.secretEnv=normalizeSecretEnv(patch.secretEnv);
  if(patch.precheck!==undefined){if(patch.precheck===null)delete metadata.precheck;else metadata.precheck=parseRoutinePrecheck(patch.precheck);}
  if((next.scheduleKind??current.scheduleKind)==='event'){
@@ -203,4 +212,13 @@ export function updateCronJob(host:CronFacadeHost,id:string,patch:UpdateCronJobI
 export function deleteCronJob(host: CronFacadeHost, id: string): void {
   getCronJob(host, id);
   ensureCronStore(host).remove(id);
+}
+
+/** Manual admission uses the normal serial worker and does not advance future triggers. */
+export async function runCronJobNow(host: RoutineRuntimeHost, job: CronJobRecord): Promise<RoutineRun> {
+  if (!job.enabled || routineExpired(job)) throw new ValidationError('Routine is paused or expired');
+  const runs = new RoutineRunStore(host.store);
+  const run = runs.enqueue(job, new Date().toISOString(), {key:createId('manual')});
+  await drainRoutineRuns(host);
+  return runs.get(run.id)!;
 }

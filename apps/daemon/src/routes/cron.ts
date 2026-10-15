@@ -56,6 +56,7 @@ export function cronRoutes(runtime: RawAgentRuntime): RouteSpec[] {
           prompt: typeof body.prompt === 'string' ? body.prompt : '',
           ...(cron !== undefined ? { cron } : {}),
           ...(event !== undefined ? { event } : {}),
+          ...('conclusions' in body ? { conclusions: body.conclusions as string[] } : {}),
           ...(typeof body.secretEnv === 'string' ? { secretEnv: body.secretEnv } : {}),
           sessionId: typeof body.sessionId === 'string' ? body.sessionId : undefined,
           botId: typeof body.botId === 'string' ? body.botId : undefined,
@@ -86,6 +87,7 @@ export function cronRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         if (typeof body.onceAt === 'string') patch.onceAt=body.onceAt;
         if (typeof body.intervalMs === 'number') patch.intervalMs=body.intervalMs;
         if (typeof body.event === 'string') patch.event=body.event;
+        if ('conclusions' in body) patch.conclusions=body.conclusions as string[];
         if (typeof body.secretEnv === 'string') patch.secretEnv=body.secretEnv;
         if (typeof body.timezone === 'string') patch.timezone=body.timezone;
         if (typeof body.missedPolicy === 'string') patch.missedPolicy=body.missedPolicy as 'coalesce'|'skip'|'catch_up';

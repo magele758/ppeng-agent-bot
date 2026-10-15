@@ -17,6 +17,7 @@ export const SUBAGENT_DENIED_TOOLS = [
   'send_message',
   'message_agent',
   'cron_create',
+  'cron_run_now',
   'ask_user'
 ] as const;
 
