@@ -5,6 +5,8 @@ import {
   BLINK_SPAN_MS,
   BOT_FACE_COLORS,
   BOT_FACE_COUNT,
+  BOT_FACE_PICKER_COLORS,
+  BOT_FACE_PICKER_SHAPES,
   BOT_FACE_SHAPES,
   HAPPY_BEAT_MS,
   HOVER_HOP_MS,
@@ -67,13 +69,23 @@ test('没有名字时使用占位脸 [AC:bot-robot-faces#AC-4]', () => {
 
 test('名字映射到稳定且彼此不同的脸颜色和轮廓', () => {
   assert.ok(BOT_FACE_COLORS.length > 3);
-  assert.deepEqual(BOT_FACE_SHAPES, ['squircle', 'circle', 'tall', 'bean']);
-  assert.equal(botFaceColor('DeskBot'), 'white');
-  assert.equal(botFaceShape('DeskBot'), 'tall');
-  assert.equal(botFaceColor('Super Bot'), 'yellow');
-  assert.equal(botFaceShape('Super Bot'), 'bean');
-  assert.equal(botFaceColor('小八'), 'pink');
-  assert.equal(botFaceShape('小八'), 'circle');
+  assert.deepEqual(BOT_FACE_PICKER_SHAPES, [
+    'circle',
+    'cloud',
+    'squircle',
+    'star',
+    'clover',
+    'heart',
+    'flower',
+    'teardrop',
+    'bean',
+    'triangle',
+    'house',
+    'splat',
+    'hexagon'
+  ]);
+  assert.equal(BOT_FACE_PICKER_COLORS.length, 11);
+  assert.equal(isBotFaceShape('tall'), true);
   assert.equal(botFaceColor('  DeskBot  '), botFaceColor('DeskBot'));
   assert.equal(botFaceShape('  DeskBot  '), botFaceShape('DeskBot'));
   assert.notEqual(botFaceColor('DeskBot'), botFaceColor('Super Bot'));
@@ -93,8 +105,14 @@ test('名字映射到稳定且彼此不同的脸颜色和轮廓', () => {
     if (color) seenColors.add(color);
     if (shape) seenShapes.add(shape);
   }
-  assert.equal(seenShapes.size, BOT_FACE_SHAPES.length);
+  assert.ok(seenShapes.size > 3);
   assert.ok(seenColors.size > 3);
+  const reachable = new Set<string>();
+  for (let i = 0; i < 500; i += 1) {
+    const shape = botFaceShape(`shape-${i}`);
+    if (shape) reachable.add(shape);
+  }
+  assert.deepEqual([...reachable].sort(), [...BOT_FACE_PICKER_SHAPES].sort());
   assert.equal(botFaceColor(''), null);
   assert.equal(botFaceShape(''), null);
   assert.equal(botFaceColor(null), null);
@@ -103,23 +121,33 @@ test('名字映射到稳定且彼此不同的脸颜色和轮廓', () => {
 
 test('保存的脸型和颜色覆盖名字，没保存则沿用名字', () => {
   assert.equal(isBotFaceShape('squircle'), true);
-  assert.equal(isBotFaceShape('star'), false);
+  assert.equal(isBotFaceShape('star'), true);
+  assert.equal(isBotFaceShape('spark'), false);
   assert.equal(isBotFaceColor('yellow'), true);
   assert.equal(isBotFaceColor('gold'), false);
-  assert.deepEqual(resolveBotFaceAppearance({ name: 'DeskBot' }), { shape: 'tall', color: 'white' });
+  assert.deepEqual(resolveBotFaceAppearance({ name: 'DeskBot' }), {
+    shape: botFaceShape('DeskBot'),
+    color: botFaceColor('DeskBot')
+  });
   assert.deepEqual(resolveBotFaceAppearance({ name: '  DeskBot  ', savedShape: null, savedColor: null }), {
-    shape: 'tall',
-    color: 'white'
+    shape: botFaceShape('DeskBot'),
+    color: botFaceColor('DeskBot')
   });
-  assert.deepEqual(resolveBotFaceAppearance({ name: 'DeskBot', savedShape: 'circle', savedColor: 'blue' }), {
-    shape: 'circle',
-    color: 'blue'
+  assert.deepEqual(resolveBotFaceAppearance({ name: 'DeskBot', savedShape: 'teardrop', savedColor: 'black' }), {
+    shape: 'teardrop',
+    color: 'black'
   });
-  assert.deepEqual(resolveBotFaceAppearance({ name: 'DeskBot', savedShape: 'bean' }), { shape: 'bean', color: 'white' });
-  assert.deepEqual(resolveBotFaceAppearance({ name: 'DeskBot', savedColor: 'mint' }), { shape: 'tall', color: 'mint' });
+  assert.deepEqual(resolveBotFaceAppearance({ name: 'DeskBot', savedShape: 'bean' }), {
+    shape: 'bean',
+    color: botFaceColor('DeskBot')
+  });
+  assert.deepEqual(resolveBotFaceAppearance({ name: 'DeskBot', savedColor: 'mint' }), {
+    shape: botFaceShape('DeskBot'),
+    color: 'mint'
+  });
   assert.deepEqual(resolveBotFaceAppearance({ name: 'DeskBot', savedShape: 'nope', savedColor: '' }), {
-    shape: 'tall',
-    color: 'white'
+    shape: botFaceShape('DeskBot'),
+    color: botFaceColor('DeskBot')
   });
   assert.deepEqual(resolveBotFaceAppearance({ name: '' }), { shape: null, color: null });
   assert.deepEqual(resolveBotFaceAppearance({ name: '', savedShape: 'circle', savedColor: 'red' }), {
@@ -155,7 +183,7 @@ test('对话状态按最新片段切换', () => {
   assert.equal(expressionForMood('idle'), 'rest');
   assert.equal(expressionForMood('thinking'), 'ellipsis');
   assert.equal(expressionForMood('speaking'), 'talk');
-  assert.equal(expressionForMood('tool'), 'scan');
+  assert.equal(expressionForMood('tool'), 'surprised');
 });
 
 test('眨眼从张开到闭合再张开，并可以连眨一次', () => {
@@ -248,7 +276,7 @@ test('视线跟随指针，空闲时环视，思考和工具各自改表情', ()
     faceCenter: { x: 0, y: 0 },
     idle: { x: 0.5, y: 0.5 }
   });
-  assert.deepEqual(tool, { lookX: 0, lookY: 0, expression: 'scan' });
+  assert.deepEqual(tool, { lookX: 0, lookY: 0, expression: 'surprised' });
 
   assert.equal(toolScan(0), -0.72);
   assert.equal(toolScan(0.25), 0);
@@ -280,7 +308,7 @@ test('悬停、犯困和说完后的高兴各自接在空闲脸上', () => {
   assert.equal(resolveFaceGesture({ ...base, happyUntilMs: 5400, hovering: true }), 'happy');
   assert.equal(resolveFaceGesture({ ...base, mood: 'thinking', hovering: true }), 'ellipsis');
   assert.equal(resolveFaceGesture({ ...base, mood: 'speaking' }), 'talk');
-  assert.equal(resolveFaceGesture({ ...base, mood: 'tool', hovering: true }), 'scan');
+  assert.equal(resolveFaceGesture({ ...base, mood: 'tool', hovering: true }), 'surprised');
 
   assert.equal(turnFinishHappyUntil('idle', 'idle', 1000), null);
   assert.equal(turnFinishHappyUntil('speaking', 'thinking', 1000), null);
@@ -300,6 +328,7 @@ test('悬停、犯困和说完后的高兴各自接在空闲脸上', () => {
   assert.ok(happyBeat(HAPPY_BEAT_MS / 4).dy < 0);
   assert.deepEqual(happyBeat(HAPPY_BEAT_MS + 1), { dy: 0, smile: 0 });
   assert.equal(mouthPath('sleepy', 43), 'M29 44 H35');
-  assert.match(mouthPath('smile', 43), /^M26 /);
+  assert.match(mouthPath('smile', 43), /^M29 /);
+  assert.match(mouthPath('oh', 40), /^M29 /);
   assert.match(mouthPath('open', 43, 1), /Q32 /);
 });

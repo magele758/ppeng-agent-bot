@@ -485,6 +485,7 @@
 
 .bot-face-choice__preview {
   display: flex;
+  justify-content: center;
 }
 
 .bot-face-choice__group {
@@ -493,42 +494,49 @@
   gap: var(--ui-space-2);
 }
 
-.bot-face-choice__row {
+.bot-face-choice__shapes {
+  display: grid;
+  grid-template-columns: repeat(5, 40px);
+  justify-content: center;
+  gap: 8px 10px;
+}
+
+.bot-face-choice__colors {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--ui-space-2);
-  align-items: center;
+  justify-content: center;
+  gap: 10px 12px;
+  max-width: 280px;
+  margin: 0 auto;
 }
 
 .bot-face-choice__shape,
 .bot-face-choice__color {
-  border: 1px solid var(--ui-border);
-  background: var(--ui-surface);
+  border: 2px solid transparent;
+  background: transparent;
   color: var(--ui-text);
   cursor: pointer;
+  padding: 0;
 }
 
 .bot-face-choice__shape {
   display: inline-flex;
   align-items: center;
-  gap: var(--ui-space-2);
-  padding: var(--ui-space-1) var(--ui-space-2);
-  border-radius: var(--ui-radius-md);
-  font: inherit;
-  font-size: var(--ui-text-sm);
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
 }
 
 .bot-face-choice__color {
   width: 28px;
   height: 28px;
-  padding: 0;
   border-radius: 999px;
 }
 
 .bot-face-choice__shape[aria-pressed='true'],
 .bot-face-choice__color[aria-pressed='true'] {
-  border-color: var(--ui-text);
-  box-shadow: var(--ui-shadow-sm);
+  border-color: #c5c8d0;
 }
 
 .bot-face-choice__shape:focus-visible,

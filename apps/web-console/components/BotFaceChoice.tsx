@@ -1,9 +1,9 @@
 'use client';
 
-import { useId } from 'react';
+import { useId, type ReactNode } from 'react';
 import {
-  BOT_FACE_COLORS,
-  BOT_FACE_SHAPES,
+  BOT_FACE_PICKER_COLORS,
+  BOT_FACE_PICKER_SHAPES,
   BOT_FACE_SWATCH,
   resolveBotFaceAppearance,
   type BotFaceColor,
@@ -18,7 +18,8 @@ export function BotFaceChoice({
   color,
   onShape,
   onColor,
-  disabled
+  disabled,
+  children
 }: {
   name: string;
   shape: BotFaceShape | null;
@@ -26,48 +27,52 @@ export function BotFaceChoice({
   onShape: (shape: BotFaceShape) => void;
   onColor: (color: BotFaceColor) => void;
   disabled?: boolean;
+  children?: ReactNode;
 }) {
   const { t } = useI18n();
   const shapeLabelId = useId();
   const colorLabelId = useId();
   const shown = resolveBotFaceAppearance({ name, savedShape: shape, savedColor: color });
+  const previewShape = shown.shape ?? 'teardrop';
+  const previewColor = shown.color ?? 'red';
   return (
     <fieldset className="bot-face-choice" disabled={disabled}>
       <div className="bot-face-choice__preview">
         <BotFace
           name={name}
-          shape={shape}
-          color={color}
+          shape={previewShape}
+          color={previewColor}
           size="lg"
           testId="bot-face-choice-preview"
           label={t('agents.bots.faceLabel', { name: name.trim() || t('agents.bots.faceEmpty') })}
         />
       </div>
+      {children}
       <div className="bot-face-choice__group">
-        <span className="ag-field__label" id={shapeLabelId}>
+        <span className="sr-only" id={shapeLabelId}>
           {t('agents.bots.faceShapeLabel')}
         </span>
-        <div className="bot-face-choice__row" role="group" aria-labelledby={shapeLabelId}>
-          {BOT_FACE_SHAPES.map((id) => (
+        <div className="bot-face-choice__shapes" role="group" aria-labelledby={shapeLabelId}>
+          {BOT_FACE_PICKER_SHAPES.map((id) => (
             <button
               key={id}
               type="button"
               className="bot-face-choice__shape"
               aria-pressed={shown.shape === id}
+              aria-label={t(`agents.bots.faceShape.${id}`)}
               onClick={() => onShape(id)}
             >
-              <BotFace name={name} shape={id} color={shown.color} />
-              <span>{t(`agents.bots.faceShape.${id}`)}</span>
+              <BotFace name="" shape={id} color={previewColor} />
             </button>
           ))}
         </div>
       </div>
       <div className="bot-face-choice__group">
-        <span className="ag-field__label" id={colorLabelId}>
+        <span className="sr-only" id={colorLabelId}>
           {t('agents.bots.faceColorLabel')}
         </span>
-        <div className="bot-face-choice__row" role="group" aria-labelledby={colorLabelId}>
-          {BOT_FACE_COLORS.map((id) => (
+        <div className="bot-face-choice__colors" role="group" aria-labelledby={colorLabelId}>
+          {BOT_FACE_PICKER_COLORS.map((id) => (
             <button
               key={id}
               type="button"

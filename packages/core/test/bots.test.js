@@ -198,7 +198,10 @@ test('createBot stores a face choice and update can clear it', () => {
   const plain = createBot(h, { name: 'Plain' });
   assert.equal(plain.faceShape, null);
   assert.equal(plain.faceColor, null);
-  assert.throws(() => createBot(h, { name: 'Nope', faceShape: 'star' }), ValidationError);
+  assert.throws(() => createBot(h, { name: 'Nope', faceShape: 'spark' }), ValidationError);
+  const drop = createBot(h, { name: 'Drop', faceShape: 'teardrop', faceColor: 'black' });
+  assert.equal(drop.faceShape, 'teardrop');
+  assert.equal(drop.faceColor, 'black');
   assert.throws(() => updateBot(h, bot.id, { faceColor: 'gold' }), ValidationError);
   store.db.close();
 });

@@ -15,6 +15,11 @@
   height: 56px;
 }
 
+.bot-face-choice__preview .bot-face {
+  width: 88px;
+  height: 88px;
+}
+
 .bot-face--empty {
   opacity: 0.92;
 }

@@ -1,11 +1,40 @@
 import { ValidationError } from '../errors.js';
 
 /** Stored face choices. Blank means the client keeps the name-based look. */
-export const BOT_FACE_SHAPES = ['squircle', 'circle', 'tall', 'bean'] as const;
+export const BOT_FACE_SHAPES = [
+  'circle',
+  'cloud',
+  'squircle',
+  'star',
+  'clover',
+  'heart',
+  'flower',
+  'teardrop',
+  'bean',
+  'triangle',
+  'house',
+  'splat',
+  'hexagon',
+  'tall'
+] as const;
 
 export type BotFaceShape = (typeof BOT_FACE_SHAPES)[number];
 
-export const BOT_FACE_COLORS = ['blue', 'white', 'orange', 'red', 'purple', 'mint', 'pink', 'yellow'] as const;
+export const BOT_FACE_COLORS = [
+  'black',
+  'brown',
+  'red',
+  'orange',
+  'yellow',
+  'green',
+  'teal',
+  'blue',
+  'purple',
+  'pink',
+  'gray',
+  'white',
+  'mint'
+] as const;
 
 export type BotFaceColor = (typeof BOT_FACE_COLORS)[number];
 
