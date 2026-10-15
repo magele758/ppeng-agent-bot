@@ -18,6 +18,16 @@ test('raw history survives replacements, time filters and exact context [AC:bot-
  assert.equal(s.listHistory(c.id,{query:'summary'}).messages.length,0);
  s.db.close();
 });
+test('history role filter keeps the latest user rows [AC:bot-session-row#AC-1]', () => {
+ const s=fresh(); const c=s.createSession({title:'bot',mode:'chat',agentId:'a'});
+ s.appendMessage(c.id,'assistant',[{type:'text',text:'answer'}]);
+ const user=s.appendMessage(c.id,'user',[{type:'text',text:'question'}]);
+ s.appendMessage(c.id,'assistant',[{type:'text',text:'later'}]);
+ const page=s.listHistory(c.id,{role:'user',limit:4});
+ assert.deepEqual(page.messages.map(m=>m.id),[user.id]);
+ assert.throws(()=>s.listHistory(c.id,{role:'nope'}),/Invalid history role/);
+ s.db.close();
+});
 test('stable cursor pages concurrent history without repeats [AC:bot-history-memory#AC-2]', () => {
  const s=fresh(); const c=s.createSession({title:'bot',mode:'chat',agentId:'a'});
  for(let n=0;n<123;n++) s.appendMessage(c.id,'user',[{type:'text',text:String(n)}]);

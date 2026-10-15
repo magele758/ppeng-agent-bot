@@ -12,9 +12,13 @@ const FACE_INDEXES = [0, 1, 2, 3, 4, 5, 6, 7] as const;
 
 export type BotFaceIndex = (typeof FACE_INDEXES)[number];
 
-export const BOT_FACE_COLORS = ['blue', 'white', 'orange', 'red', 'purple'] as const;
+export const BOT_FACE_COLORS = ['blue', 'white', 'orange', 'red', 'purple', 'mint', 'pink', 'yellow'] as const;
 
 export type BotFaceColor = (typeof BOT_FACE_COLORS)[number];
+
+export const BOT_FACE_SHAPES = ['squircle', 'circle', 'tall', 'bean'] as const;
+
+export type BotFaceShape = (typeof BOT_FACE_SHAPES)[number];
 
 export const LIVING_FACE_MOODS = ['idle', 'thinking', 'speaking', 'tool'] as const;
 
@@ -41,20 +45,37 @@ export function botFaceIndex(name: string | null | undefined): BotFaceIndex | nu
   return FACE_INDEXES[(hash >>> 0) % BOT_FACE_COUNT]!;
 }
 
-/** Stable swatch for a trimmed name. Independent of the legacy face index. */
-export function botFaceColor(name: string | null | undefined): BotFaceColor | null {
-  if (typeof name !== 'string') return null;
-  const key = name.trim();
-  if (!key) return null;
+function nameHash(key: string): number {
   let hash = 2166136261;
   for (let i = 0; i < key.length; i += 1) {
     hash ^= key.charCodeAt(i);
     hash = Math.imul(hash, 16777619);
   }
-  hash >>>= 0;
-  hash = Math.imul(hash ^ (hash >>> 13), 0x5bd1e995);
-  hash >>>= 0;
-  return BOT_FACE_COLORS[hash % BOT_FACE_COLORS.length]!;
+  return hash >>> 0;
+}
+
+function namedKey(name: string | null | undefined): string | null {
+  if (typeof name !== 'string') return null;
+  const key = name.trim();
+  return key ? key : null;
+}
+
+/** Stable swatch for a trimmed name. Independent of the legacy face index. */
+export function botFaceColor(name: string | null | undefined): BotFaceColor | null {
+  const key = namedKey(name);
+  if (!key) return null;
+  const hash = nameHash(key);
+  const mixed = Math.imul(hash ^ (hash >>> 13), 0x5bd1e995) >>> 0;
+  return BOT_FACE_COLORS[mixed % BOT_FACE_COLORS.length]!;
+}
+
+/** Stable silhouette for a trimmed name. Independent of the color mix. */
+export function botFaceShape(name: string | null | undefined): BotFaceShape | null {
+  const key = namedKey(name);
+  if (!key) return null;
+  const hash = nameHash(key);
+  const mixed = Math.imul(hash ^ (hash >>> 19), 0x85ebca6b) >>> 0;
+  return BOT_FACE_SHAPES[mixed % BOT_FACE_SHAPES.length]!;
 }
 
 export type FaceSegment = { kind: string };
@@ -238,6 +259,105 @@ export function speakingMouth(phase: number): number {
 export function ellipsisScale(index: number, phase: number): number {
   const wave = Math.sin((wrap01(phase) + index * 0.18) * Math.PI * 2);
   return 0.55 + 0.45 * ((wave + 1) / 2);
+}
+
+export const SLEEPY_AFTER_MS = 4200;
+export const HAPPY_BEAT_MS = 880;
+export const HOVER_HOP_MS = 420;
+
+export type FaceGesture = 'rest' | 'sleepy' | 'hover' | 'happy' | 'ellipsis' | 'talk' | 'scan';
+
+export type MouthKind = 'rest' | 'smile' | 'sleepy' | 'open';
+
+/**
+ * Decorative motion layered on an idle face.
+ * A live turn keeps its expression. After it returns to idle, a short happy
+ * beat wins, then hover, then a sleepy face once the pointer has been gone.
+ */
+export function resolveFaceGesture(input: {
+  mood: LivingFaceMood;
+  hovering: boolean;
+  pointerAgeMs: number | null;
+  nowMs: number;
+  happyUntilMs: number | null;
+}): FaceGesture {
+  const base = expressionForMood(input.mood);
+  if (base === 'ellipsis' || base === 'talk' || base === 'scan') return base;
+  if (input.happyUntilMs !== null && input.nowMs < input.happyUntilMs) return 'happy';
+  if (input.hovering) return 'hover';
+  if (input.pointerAgeMs !== null && input.pointerAgeMs > SLEEPY_AFTER_MS) return 'sleepy';
+  return 'rest';
+}
+
+/** When a live turn becomes idle, the face celebrates until this timestamp. */
+export function turnFinishHappyUntil(
+  prev: LivingFaceMood,
+  next: LivingFaceMood,
+  nowMs: number
+): number | null {
+  if (prev !== 'idle' && next === 'idle') return nowMs + HAPPY_BEAT_MS;
+  return null;
+}
+
+/** One small hop when the pointer arrives, then a held smile. */
+export function hoverDelight(elapsedMs: number): { dy: number; smile: number } {
+  if (elapsedMs < 0) return { dy: 0, smile: 0 };
+  if (elapsedMs >= HOVER_HOP_MS) return { dy: 0, smile: 1 };
+  const p = elapsedMs / HOVER_HOP_MS;
+  return { dy: -Math.sin(p * Math.PI) * 3.4, smile: 1 };
+}
+
+/** Two softening hops after a turn ends. `dy` is up when negative. */
+export function happyBeat(elapsedMs: number): { dy: number; smile: number } {
+  if (elapsedMs < 0 || elapsedMs > HAPPY_BEAT_MS) return { dy: 0, smile: 0 };
+  const p = elapsedMs / HAPPY_BEAT_MS;
+  const hop = Math.sin(p * Math.PI * 2) * (1 - p);
+  return { dy: -4.2 * hop, smile: 1 };
+}
+
+/** Slow vertical breath while sleepy. */
+export function sleepyBreath(phase: number): number {
+  return Math.sin(wrap01(phase) * Math.PI * 2) * 0.8;
+}
+
+/** Mouth outline in the 64 viewBox. `openAmount` is 0…1 while speaking. */
+export function mouthPath(kind: MouthKind, y: number, openAmount = 0): string {
+  switch (kind) {
+    case 'rest':
+      return `M28 ${y} Q32 ${y + 2.6} 36 ${y}`;
+    case 'smile':
+      return `M26 ${y - 1} Q32 ${y + 5} 38 ${y - 1}`;
+    case 'sleepy':
+      return `M29 ${y + 1} H35`;
+    case 'open': {
+      const drop = 2.4 + clamp01(openAmount) * 4;
+      return `M27 ${y} Q32 ${y + drop} 37 ${y}`;
+    }
+    default: {
+      const unreachable: never = kind;
+      return unreachable;
+    }
+  }
+}
+
+export function mouthKindForGesture(gesture: FaceGesture): MouthKind {
+  switch (gesture) {
+    case 'rest':
+    case 'ellipsis':
+    case 'scan':
+      return 'rest';
+    case 'hover':
+    case 'happy':
+      return 'smile';
+    case 'sleepy':
+      return 'sleepy';
+    case 'talk':
+      return 'open';
+    default: {
+      const unreachable: never = gesture;
+      return unreachable;
+    }
+  }
 }
 
 export function damp(current: number, target: number, dtMs: number): number {

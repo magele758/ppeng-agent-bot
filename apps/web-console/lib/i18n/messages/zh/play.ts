@@ -71,7 +71,8 @@ export const play = {
     deleteConfirmOne: '删除会话「{title}」？此操作不可撤销。',
     deleteConfirmMany: '删除选中的 {count} 个会话？此操作不可撤销。',
     deleteFailed: '删除失败：{detail}',
-    checkboxAria: '选中会话 {title}'
+    checkboxAria: '选中会话 {title}',
+    noQuestion: '还没提问'
   },
 
   group: {

@@ -71,7 +71,8 @@ export const play = {
     deleteConfirmOne: 'Delete session “{title}”? This cannot be undone.',
     deleteConfirmMany: 'Delete {count} selected sessions? This cannot be undone.',
     deleteFailed: 'Could not delete: {detail}',
-    checkboxAria: 'Select session {title}'
+    checkboxAria: 'Select session {title}',
+    noQuestion: 'No question yet'
   },
 
   group: {
