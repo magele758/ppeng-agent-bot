@@ -12,24 +12,66 @@ const FACE_INDEXES = [0, 1, 2, 3, 4, 5, 6, 7] as const;
 
 export type BotFaceIndex = (typeof FACE_INDEXES)[number];
 
-export const BOT_FACE_COLORS = ['blue', 'white', 'orange', 'red', 'purple', 'mint', 'pink', 'yellow'] as const;
+/** Colors offered in the picker. Order matches the swatch row. */
+export const BOT_FACE_PICKER_COLORS = [
+  'black',
+  'brown',
+  'red',
+  'orange',
+  'yellow',
+  'green',
+  'teal',
+  'blue',
+  'purple',
+  'pink',
+  'gray'
+] as const;
+
+/** Older saves still render. They are not offered for new choices. */
+export const BOT_FACE_LEGACY_COLORS = ['white', 'mint'] as const;
+
+export const BOT_FACE_COLORS = [...BOT_FACE_PICKER_COLORS, ...BOT_FACE_LEGACY_COLORS] as const;
 
 export type BotFaceColor = (typeof BOT_FACE_COLORS)[number];
 
-export const BOT_FACE_SHAPES = ['squircle', 'circle', 'tall', 'bean'] as const;
+/** Silhouettes in the create/edit grid, left to right, top to bottom. */
+export const BOT_FACE_PICKER_SHAPES = [
+  'circle',
+  'cloud',
+  'squircle',
+  'star',
+  'clover',
+  'heart',
+  'flower',
+  'teardrop',
+  'bean',
+  'triangle',
+  'house',
+  'splat',
+  'hexagon'
+] as const;
+
+export const BOT_FACE_LEGACY_SHAPES = ['tall'] as const;
+
+export const BOT_FACE_SHAPES = [...BOT_FACE_PICKER_SHAPES, ...BOT_FACE_LEGACY_SHAPES] as const;
 
 export type BotFaceShape = (typeof BOT_FACE_SHAPES)[number];
 
-/** Body color for the choice swatches. The living face uses a softer gradient of the same hue. */
+/** Flat body color. The resting face is a solid silhouette, not a gradient sticker. */
 export const BOT_FACE_SWATCH: Record<BotFaceColor, string> = {
-  blue: '#3B6EF5',
-  white: '#F7F8FC',
-  orange: '#F97316',
-  red: '#EF4444',
-  purple: '#8B5CF6',
-  mint: '#2DD4BF',
-  pink: '#F472B6',
-  yellow: '#F5C14A'
+  black: '#1C1C1E',
+  brown: '#8D5A3B',
+  red: '#F43F3F',
+  orange: '#FF7A1A',
+  yellow: '#FFB000',
+  green: '#3CB44A',
+  teal: '#1AAE9F',
+  blue: '#2F6BFF',
+  purple: '#7C4DFF',
+  pink: '#FF4F93',
+  gray: '#8E8E93',
+  white: '#F4F5F7',
+  mint: '#2DD4BF'
 };
 
 export function isBotFaceShape(value: unknown): value is BotFaceShape {
@@ -59,7 +101,7 @@ export const LIVING_FACE_MOODS = ['idle', 'thinking', 'speaking', 'tool'] as con
 
 export type LivingFaceMood = (typeof LIVING_FACE_MOODS)[number];
 
-export type LivingFaceExpression = 'rest' | 'ellipsis' | 'talk' | 'scan';
+export type LivingFaceExpression = 'rest' | 'ellipsis' | 'talk' | 'surprised';
 
 /** Blank names use the empty-state placeholder instead of a named face. */
 export function botFaceIndex(name: string | null | undefined): BotFaceIndex | null {
@@ -101,7 +143,7 @@ export function botFaceColor(name: string | null | undefined): BotFaceColor | nu
   if (!key) return null;
   const hash = nameHash(key);
   const mixed = Math.imul(hash ^ (hash >>> 13), 0x5bd1e995) >>> 0;
-  return BOT_FACE_COLORS[mixed % BOT_FACE_COLORS.length]!;
+  return BOT_FACE_PICKER_COLORS[mixed % BOT_FACE_PICKER_COLORS.length]!;
 }
 
 /** Stable silhouette for a trimmed name. Independent of the color mix. */
@@ -110,7 +152,7 @@ export function botFaceShape(name: string | null | undefined): BotFaceShape | nu
   if (!key) return null;
   const hash = nameHash(key);
   const mixed = Math.imul(hash ^ (hash >>> 19), 0x85ebca6b) >>> 0;
-  return BOT_FACE_SHAPES[mixed % BOT_FACE_SHAPES.length]!;
+  return BOT_FACE_PICKER_SHAPES[mixed % BOT_FACE_PICKER_SHAPES.length]!;
 }
 
 export type FaceSegment = { kind: string };
@@ -144,7 +186,7 @@ export function expressionForMood(mood: LivingFaceMood): LivingFaceExpression {
     case 'speaking':
       return 'talk';
     case 'tool':
-      return 'scan';
+      return 'surprised';
     default: {
       const unreachable: never = mood;
       return unreachable;
@@ -300,9 +342,9 @@ export const SLEEPY_AFTER_MS = 4200;
 export const HAPPY_BEAT_MS = 880;
 export const HOVER_HOP_MS = 420;
 
-export type FaceGesture = 'rest' | 'sleepy' | 'hover' | 'happy' | 'ellipsis' | 'talk' | 'scan';
+export type FaceGesture = 'rest' | 'sleepy' | 'hover' | 'happy' | 'ellipsis' | 'talk' | 'surprised';
 
-export type MouthKind = 'rest' | 'smile' | 'sleepy' | 'open';
+export type MouthKind = 'rest' | 'smile' | 'sleepy' | 'open' | 'oh';
 
 /**
  * Decorative motion layered on an idle face.
@@ -317,7 +359,7 @@ export function resolveFaceGesture(input: {
   happyUntilMs: number | null;
 }): FaceGesture {
   const base = expressionForMood(input.mood);
-  if (base === 'ellipsis' || base === 'talk' || base === 'scan') return base;
+  if (base === 'ellipsis' || base === 'talk' || base === 'surprised') return base;
   if (input.happyUntilMs !== null && input.nowMs < input.happyUntilMs) return 'happy';
   if (input.hovering) return 'hover';
   if (input.pointerAgeMs !== null && input.pointerAgeMs > SLEEPY_AFTER_MS) return 'sleepy';
@@ -361,7 +403,9 @@ export function mouthPath(kind: MouthKind, y: number, openAmount = 0): string {
     case 'rest':
       return `M28 ${y} Q32 ${y + 2.6} 36 ${y}`;
     case 'smile':
-      return `M26 ${y - 1} Q32 ${y + 5} 38 ${y - 1}`;
+      return `M29 ${y} Q32 ${y + 2.2} 35 ${y}`;
+    case 'oh':
+      return `M${29} ${y - 2.2} a3 3.2 0 1 0 6 0 a3 3.2 0 1 0 -6 0`;
     case 'sleepy':
       return `M29 ${y + 1} H35`;
     case 'open': {
@@ -379,7 +423,6 @@ export function mouthKindForGesture(gesture: FaceGesture): MouthKind {
   switch (gesture) {
     case 'rest':
     case 'ellipsis':
-    case 'scan':
       return 'rest';
     case 'hover':
     case 'happy':
@@ -388,6 +431,8 @@ export function mouthKindForGesture(gesture: FaceGesture): MouthKind {
       return 'sleepy';
     case 'talk':
       return 'open';
+    case 'surprised':
+      return 'oh';
     default: {
       const unreachable: never = gesture;
       return unreachable;

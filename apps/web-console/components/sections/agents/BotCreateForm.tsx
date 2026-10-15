@@ -61,23 +61,24 @@ export function BotCreateForm({ onCreated, onCancel }: BotCreateFormProps) {
         <h3 className="ag-panel__title">{t('agents.bots.createTitle')}</h3>
         <p className="ag-panel__lead">{t('agents.bots.createDesc')}</p>
       </div>
-      <label className="ag-field">
-        <span className="ag-field__label">{t('agents.bots.nameLabel')}</span>
-        <input
-          className="ag-input"
-          value={name}
-          autoFocus
-          placeholder={t('agents.bots.namePh')}
-          aria-invalid={showNameError}
-          aria-required="true"
-          onChange={(e) => {
-            setName(e.target.value);
-            setTouched(true);
-          }}
-        />
-        {showNameError ? <span className="ag-field__error" role="alert">{t('agents.bots.nameRequired')}</span> : null}
-      </label>
-      <BotFaceChoice name={name} shape={shape} color={color} onShape={setShape} onColor={setColor} disabled={busy} />
+      <BotFaceChoice name={name} shape={shape} color={color} onShape={setShape} onColor={setColor} disabled={busy}>
+        <label className="ag-field">
+          <span className="sr-only">{t('agents.bots.nameLabel')}</span>
+          <input
+            className="ag-input"
+            value={name}
+            autoFocus
+            placeholder={t('agents.bots.namePh')}
+            aria-invalid={showNameError}
+            aria-required="true"
+            onChange={(e) => {
+              setName(e.target.value);
+              setTouched(true);
+            }}
+          />
+          {showNameError ? <span className="ag-field__error" role="alert">{t('agents.bots.nameRequired')}</span> : null}
+        </label>
+      </BotFaceChoice>
       <Disclosure label={t('agents.common.advanced')}>
         <label className="ag-field">
           <span className="ag-field__label">{t('agents.bots.titleLabel')}</span>

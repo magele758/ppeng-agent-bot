@@ -46,9 +46,38 @@ export type ApiBotInfo = {
   canonicalSessionId: string;
   hidden: boolean;
   /** Saved silhouette. Absent or null keeps the name-based shape. */
-  faceShape?: 'squircle' | 'circle' | 'tall' | 'bean' | null;
+  faceShape?:
+    | 'circle'
+    | 'cloud'
+    | 'squircle'
+    | 'star'
+    | 'clover'
+    | 'heart'
+    | 'flower'
+    | 'teardrop'
+    | 'bean'
+    | 'triangle'
+    | 'house'
+    | 'splat'
+    | 'hexagon'
+    | 'tall'
+    | null;
   /** Saved swatch. Absent or null keeps the name-based color. */
-  faceColor?: 'blue' | 'white' | 'orange' | 'red' | 'purple' | 'mint' | 'pink' | 'yellow' | null;
+  faceColor?:
+    | 'black'
+    | 'brown'
+    | 'red'
+    | 'orange'
+    | 'yellow'
+    | 'green'
+    | 'teal'
+    | 'blue'
+    | 'purple'
+    | 'pink'
+    | 'gray'
+    | 'white'
+    | 'mint'
+    | null;
   createdAt: string;
   updatedAt: string;
 };
