@@ -260,14 +260,24 @@ test('OAuth start ignores forged Host and X-Forwarded-Host when public origin is
   assert.match(local.location, /^https:\/\/accounts\.google\.com\//);
   assert.match(local.location, /redirect_uri=http%3A%2F%2F127\.0\.0\.1%3A27070%2Fapi%2Fauth%2Fgoogle%2Fcallback/);
 
-  const localLab = startGoogle(oauthEnv(), {
+  const labHeaders = {
     host: '127.0.0.1:27070',
     'x-forwarded-host': '127.0.0.1:23000',
-    'x-forwarded-proto': 'http'
-  });
+    'x-forwarded-proto': 'https'
+  };
+  assert.equal(requestPublicOrigin({ headers: labHeaders }, {}), 'http://127.0.0.1:23000');
+  assert.equal(requestSecure({ headers: labHeaders }, {}), false);
+  const localLab = startGoogle(oauthEnv(), labHeaders);
   assert.equal(localLab.status, 302);
-  assert.match(localLab.location, /redirect_uri=http%3A%2F%2F127\.0\.0\.1%3A27070%2Fapi%2Fauth%2Fgoogle%2Fcallback/);
-  assert.doesNotMatch(localLab.location, /23000/);
+  assert.match(localLab.location, /redirect_uri=http%3A%2F%2F127\.0\.0\.1%3A23000%2Fapi%2Fauth%2Fgoogle%2Fcallback/);
+  assert.doesNotMatch(localLab.location, /27070/);
+
+  const localLabHost = startGoogle(oauthEnv(), {
+    host: '127.0.0.1:27070',
+    'x-forwarded-host': 'localhost:23000'
+  });
+  assert.equal(localLabHost.status, 302);
+  assert.match(localLabHost.location, /redirect_uri=http%3A%2F%2Flocalhost%3A23000%2Fapi%2Fauth%2Fgoogle%2Fcallback/);
 
   const configured = {
     ...oauthEnv(),

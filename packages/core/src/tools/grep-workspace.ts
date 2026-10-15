@@ -63,23 +63,64 @@ const RG_SECRET_EXCLUDES = [
   '!**/id_rsa.*'
 ];
 
-function grepLinePath(line: string): string | undefined {
-  const numbered = /^(.*?):\d+:/.exec(line) ?? /^(.*?)-\d+-/.exec(line);
-  const path = numbered?.[1]?.trim();
-  return path || undefined;
-}
-
-function sensitiveGrepLine(line: string, cwd: string): boolean {
-  const rel = grepLinePath(line);
-  if (!rel) return false;
-  if (pathHasSensitiveSecretName(rel)) return true;
-  const abs = isAbsolute(rel) ? rel : resolve(cwd, rel);
+function sensitiveGrepPath(filePath: string, cwd: string): boolean {
+  if (pathHasSensitiveSecretName(filePath)) return true;
+  const abs = isAbsolute(filePath) ? filePath : resolve(cwd, filePath);
   return pathHasSensitiveSecretName(abs) || isBlockedPath(abs);
 }
 
-function withoutSensitiveMatches(content: string, cwd: string): string {
+interface RgByteText {
+  text?: string;
+  bytes?: string;
+}
+
+function rgText(value: RgByteText | undefined): string {
+  if (!value) return '';
+  if (typeof value.text === 'string') return value.text;
+  if (typeof value.bytes === 'string') return Buffer.from(value.bytes, 'base64').toString('utf8');
+  return '';
+}
+
+/** Render rg --json and drop every record whose path is a secret file. */
+function renderRgJson(stdout: string, cwd: string): string {
+  const kept: string[] = [];
+  for (const raw of stdout.split('\n')) {
+    if (!raw) continue;
+    let event: { type?: string; data?: { path?: RgByteText; lines?: RgByteText; line_number?: number } };
+    try {
+      event = JSON.parse(raw) as typeof event;
+    } catch {
+      continue;
+    }
+    if (event.type !== 'match' && event.type !== 'context') continue;
+    const filePath = rgText(event.data?.path);
+    if (!filePath || sensitiveGrepPath(filePath, cwd)) continue;
+    const text = rgText(event.data?.lines).replace(/\n$/, '');
+    const lineNo = event.data?.line_number;
+    const sep = event.type === 'context' ? '-' : ':';
+    kept.push(lineNo ? `${filePath}${sep}${lineNo}${sep}${text}` : `${filePath}${sep}${text}`);
+  }
+  return kept.join('\n').trim() || '(no matches)';
+}
+
+/**
+ * grep(1) has no structured path. A line is dropped when any `path:line:` or
+ * `path-line-` prefix is itself a secret file, so context text like
+ * `credentials-2-secret:12:34` cannot hide the real path.
+ */
+function fallbackLineSensitive(line: string, cwd: string): boolean {
+  const marks = /:\d+:|-\d+-/g;
+  let match: RegExpExecArray | null;
+  while ((match = marks.exec(line))) {
+    const candidate = line.slice(0, match.index);
+    if (candidate && sensitiveGrepPath(candidate, cwd)) return true;
+  }
+  return false;
+}
+
+function withoutSensitiveGrepLines(content: string, cwd: string): string {
   if (!content || content === '(no matches)') return content || '(no matches)';
-  const kept = content.split('\n').filter((line) => line.length === 0 || !sensitiveGrepLine(line, cwd));
+  const kept = content.split('\n').filter((line) => line.length === 0 || !fallbackLineSensitive(line, cwd));
   const text = kept.join('\n').trim();
   return text || '(no matches)';
 }
@@ -87,14 +128,13 @@ function withoutSensitiveMatches(content: string, cwd: string): string {
 /** Run ripgrep if available, else recursive grep. Sensitive filenames and blocked paths are not returned. */
 export async function runWorkspaceGrep(options: GrepOptions): Promise<{ ok: boolean; content: string }> {
   const { cwd, pattern, glob, maxMatches, contextLines = 0 } = options;
-  if (sensitiveReadRefusal(cwd) || (glob && globTargetsSensitiveSecret(glob))) {
+  if (sensitiveReadRefusal(cwd, undefined, 'directory') || (glob && globTargetsSensitiveSecret(glob))) {
     return { ok: false, content: SENSITIVE_READ_REFUSAL };
   }
   const limit = Math.min(Math.max(maxMatches, 1), 500);
 
   const rgArgs = [
-    '--line-number',
-    '--no-heading',
+    '--json',
     '--hidden',
     '--max-count',
     String(limit),
@@ -108,7 +148,7 @@ export async function runWorkspaceGrep(options: GrepOptions): Promise<{ ok: bool
   const rg = await runCmd('rg', rgArgs, cwd);
   if (rg.code !== -1) {
     if (rg.code === 0 || rg.stdout.trim()) {
-      return { ok: true, content: withoutSensitiveMatches(rg.stdout.trim(), cwd) || '(no matches)' };
+      return { ok: true, content: renderRgJson(rg.stdout, cwd) };
     }
     if (rg.code === 1) {
       return { ok: true, content: '(no matches)' };
@@ -121,7 +161,7 @@ export async function runWorkspaceGrep(options: GrepOptions): Promise<{ ok: bool
     return { ok: false, content: 'Neither rg nor grep is available in PATH.' };
   }
   if (g.code === 0 || g.stdout.trim()) {
-    return { ok: true, content: withoutSensitiveMatches(g.stdout.trim(), cwd) || '(no matches)' };
+    return { ok: true, content: withoutSensitiveGrepLines(g.stdout.trim(), cwd) };
   }
   if (g.code === 1) {
     return { ok: true, content: '(no matches)' };

@@ -36,7 +36,7 @@
 已实现（migration v7+ / v20）：
 
 - `users` / `tenants` / `memberships` 表
-- Google / GitHub OAuth（`RAW_AGENT_OAUTH_*`），Lab 登录后会话按 `metadata.userId` 隔离。未设置 `RAW_AGENT_OAUTH_PUBLIC_ORIGIN` 时只接受本机 loopback 登录；公网或反代（非本机 `Host` / `X-Forwarded-Host`）会在启动日志和 `/api/auth/*/start` 报错，要求把该变量设成浏览器打开的 https 源。这两个头不再当作回调来源。
+- Google / GitHub OAuth（`RAW_AGENT_OAUTH_*`），Lab 登录后会话按 `metadata.userId` 隔离。未设置 `RAW_AGENT_OAUTH_PUBLIC_ORIGIN` 时只接受本机 loopback。Lab 反代带来的 loopback `X-Forwarded-Host`（浏览器打开的地址，含端口）用作回调，避免落到 daemon 端口；非本机 `Host` / `X-Forwarded-Host` 会在启动日志和 `/api/auth/*/start` 报错，要求把该变量设成浏览器打开的 https 源。
 - `agent_memory` 五层 + FTS5（降级 LIKE）
 - 对话工具 `memory_set`/`memory_get` 写入 `agent_memory`（`session.scratch`/`session.long`）
 

@@ -77,7 +77,7 @@ export function oauthPublicOrigin(env: NodeJS.ProcessEnv, fallbackHost?: string)
 
 /** Login error when OAuth is configured but the browser is not on loopback. */
 export const OAUTH_PUBLIC_ORIGIN_REQUIRED =
-  'Set RAW_AGENT_OAUTH_PUBLIC_ORIGIN to the public https origin. Host and X-Forwarded-Host are not used as the redirect origin, so non-local sign-in fails until it is set.';
+  'Set RAW_AGENT_OAUTH_PUBLIC_ORIGIN to the public https origin. A non-loopback Host or X-Forwarded-Host is not used as the redirect origin, so non-local sign-in fails until it is set.';
 
 /** Startup log when a provider is configured and the public origin is still unset. */
 export const OAUTH_PUBLIC_ORIGIN_STARTUP_WARNING =
@@ -98,7 +98,7 @@ export function isPublicHttpHost(value: string | undefined): boolean {
 
 /**
  * Unset public origin plus a non-loopback Host or X-Forwarded-Host.
- * The forwarded host only detects a non-local browser; it is never the redirect origin.
+ * A loopback X-Forwarded-Host may be the Lab callback origin. A public one is not.
  */
 export function oauthNonLocalNeedsPublicOrigin(
   env: NodeJS.ProcessEnv,

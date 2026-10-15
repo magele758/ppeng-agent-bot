@@ -64,7 +64,22 @@ export function globTargetsSensitiveSecret(glob: string): boolean {
   return parts.slice(0, -1).some((part) => globParentBlocks(part));
 }
 
-export function sensitiveReadRefusal(absPath: string, home = homedir()): string | undefined {
-  if (isBlockedPath(absPath, home) || pathHasSensitiveSecretName(absPath)) return SENSITIVE_READ_REFUSAL;
+/** A directory named credentials is code. The exact basename blocks files only. */
+function directoryHasSensitiveSecretName(filePath: string): boolean {
+  const parts = filePath.split(/[/\\]/).filter((part) => part.length > 0);
+  if (parts.length === 0) return false;
+  const base = parts[parts.length - 1] ?? '';
+  if (base.toLowerCase() !== 'credentials' && isSensitiveSecretBasename(base)) return true;
+  return parts.slice(0, -1).some((part) => parentSegmentBlocks(part));
+}
+
+export function sensitiveReadRefusal(
+  absPath: string,
+  home = homedir(),
+  kind: 'file' | 'directory' = 'file'
+): string | undefined {
+  if (isBlockedPath(absPath, home)) return SENSITIVE_READ_REFUSAL;
+  const named = kind === 'directory' ? directoryHasSensitiveSecretName(absPath) : pathHasSensitiveSecretName(absPath);
+  if (named) return SENSITIVE_READ_REFUSAL;
   return undefined;
 }

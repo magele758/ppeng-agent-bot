@@ -4,6 +4,7 @@ import {
   authUserFromId,
   hashToken,
   LAB_PROXY_HEADER,
+  isPublicHttpHost,
   oauthNonLocalNeedsPublicOrigin,
   oauthPublicConfig,
   oauthPublicOrigin,
@@ -33,8 +34,14 @@ export function isAuthPublicPath(pathname: string): boolean {
 export function requestPublicOrigin(request: IncomingMessage, env: NodeJS.ProcessEnv): string {
   const explicit = oauthPublicOrigin(env);
   if (explicit) return explicit;
-  // Ignore X-Forwarded-Host / X-Forwarded-Proto. Only a loopback Host is usable
-  // until RAW_AGENT_OAUTH_PUBLIC_ORIGIN is set.
+  // Lab's proxy replaces Host with the daemon. A loopback X-Forwarded-Host is the
+  // browser origin (including its port). Non-loopback values are not a callback origin.
+  const forwarded = headerValue(request, 'x-forwarded-host');
+  if (forwarded && !isPublicHttpHost(forwarded)) {
+    const first = forwarded.split(',')[0]?.trim();
+    const origin = oauthPublicOrigin(env, first);
+    if (origin) return origin;
+  }
   return oauthPublicOrigin(env, headerValue(request, 'host'));
 }
 
