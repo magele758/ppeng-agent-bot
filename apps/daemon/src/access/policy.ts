@@ -175,6 +175,7 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
     ['GET /api/sessions/team-overview', selfFiltered('session')],
     ['GET /api/sessions/:id/team', session],
     ['GET /api/sessions/:id/model-view', session],
+    ['GET /api/sessions/:id/context-stack', session],
     ['GET /api/sessions/:id/history', session],
     ['GET /api/sessions/:id/history/:seq', session],
     ['GET /api/bot-context-settings', AUTHENTICATED],

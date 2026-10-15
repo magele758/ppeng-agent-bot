@@ -334,8 +334,47 @@ export const play = {
   rail: {
     aria: '右侧栏',
     activity: '活动',
+    context: '上下文',
     artifacts: '工件',
     trajectory: '轨迹'
+  },
+
+  contextStack: {
+    hint: '下一次发给模型的准备结果。含系统提示、折叠后的消息、压缩占位、记忆附录和工作日志。这里不新写摘要。',
+    refresh: '刷新',
+    loading: '正在读取模型上下文…',
+    pickSession: '先选择一个会话',
+    loadFailed: '读取上下文失败：{message}',
+    empty: '这次请求没有可显示的上下文块。',
+    barAria: '模型上下文构成',
+    legend: '图例',
+    budgetNormal: '约 {request} / {cap} token（窗口 {window} 的 {ratio}%）',
+    budgetBot: '消息约 {messages} token · 50% 线 {structured} · 85% 线 {hygiene} · 历史可发 {history}',
+    pinnedOver: '钉住的内容已经超过上限，下一轮仍会整段送出。',
+    wouldSummarize: '超过普通会话 20% 上限。标成「将摘要」的块在真正发送时会被换成一条摘要；这里仍是原文。',
+    wouldCompact: '已到这条 Bot 会话的压缩线。下一轮发送前会压缩；这里仍是当前原文。',
+    pinned: '钉住',
+    dispositionKeep: '会发送',
+    dispositionSummarize: '将摘要',
+    dispositionDropped: '已排除',
+    blockMeta: '{tokens} token · {share}% · {chars} 字',
+    kinds: {
+      system: '系统提示',
+      systemMessage: '系统消息',
+      tools: '工具定义',
+      summary: '摘要',
+      memory: '记忆附录',
+      workingLog: '工作日志',
+      user: '用户',
+      assistant: '助手',
+      reasoning: '推理',
+      toolCall: '工具调用',
+      toolResult: '工具结果',
+      toolStub: '压缩占位',
+      image: '图片',
+      surface: '界面',
+      historySources: '历史来源'
+    }
   },
 
   settings: {

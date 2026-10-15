@@ -19,6 +19,7 @@ import type { AgentSandbox } from './sandbox/agent-sandbox-types.js';
 import { SelfHealScheduler } from './self-heal/self-heal-scheduler.js';
 import { attachServedByToTrace } from './model/fallback-chain.js';
 import { PromptBuilder } from './model/prompt-builder.js';
+import { previewSessionContextStack } from './session/context-stack.js';
 import type { ApprovalPolicy } from './approval/approval-policy.js';
 import { expireDueUnattendedApprovals } from './approval/unattended-approval.js';
 import {
@@ -613,6 +614,24 @@ export class RawAgentRuntime {
 
   getSessionMessages(sessionId: string): SessionMessage[] {
     return this.store.listMessages(sessionId);
+  }
+
+  /** Read-only prepared model context. Does not compact, claim inbox, or persist a summary. */
+  previewContextStack(sessionId: string) {
+    return previewSessionContextStack(
+      {
+        store: this.store,
+        repoRoot: this.repoRoot,
+        stateDir: this.stateDir,
+        tools: this.tools,
+        promptBuilder: this.promptBuilder,
+        modelAdapter: this.modelAdapter,
+        turnShapeBySession: this.turnShapeBySession,
+        syncConnectorTools: () => this.syncConnectorTools(),
+        env: process.env
+      },
+      sessionId
+    );
   }
 
   /** Shallow-merge keys into session.metadata (daemon PATCH / UI toggles). */
