@@ -445,9 +445,9 @@ function approvalMatches(row: ApprovalRecord, sessionId: string, idemKey: string
   return row.sessionId === sessionId && row.idempotencyKey === idemKey;
 }
 
-/** Hook asks are per call. A hash of tool+input would reject every later call with the same arguments. */
+/** Per call and per tool+input. A reused id with different args must not inherit an earlier approval. */
 function hookAskKey(toolCall: ToolCallPart): string {
-  return toolCall.toolCallId;
+  return `${toolCall.toolCallId}:${stableJsonHash(toolCall.name, toolCall.input)}`;
 }
 
 /** Newest row wins, so a later approval is not hidden by an older rejection of the same call. */
