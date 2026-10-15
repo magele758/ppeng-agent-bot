@@ -132,6 +132,56 @@ test('prepared context payload keeps full text in order [AC:play-context-stack#A
   assert.equal(loggedPayload.blocks.find((block) => block.kind === 'user').text, 'follow-up');
 });
 
+test('each message part kind keeps its own text [AC:play-context-stack#AC-3]', () => {
+  const message = msg('mix', 'assistant', [
+    { type: 'reasoning', text: 'thinking about the dump' },
+    { type: 'text', text: 'assistant says hello' },
+    { type: 'image', mimeType: 'image/png', assetId: 'asset-1', alt: 'a chart', sourceUrl: 'https://example.test/chart.png' },
+    { type: 'tool_call', toolCallId: 'c1', name: 'bash', input: { command: 'echo hi' } },
+    {
+      type: 'surface_update',
+      surfaceId: 'surf-1',
+      catalogId: 'catalog-1',
+      messages: [{ type: 'update' }]
+    }
+  ]);
+  const system = msg('sysm', 'system', [{ type: 'text', text: 'a system note' }], { key: 'note' });
+  const toolRole = msg('toolmsg', 'tool', [{ type: 'text', text: 'tool role text' }]);
+  const sources = msg('src', 'system', [{ type: 'text', text: 'history lives at /tmp/log' }], {
+    key: 'context-history-sources'
+  });
+  const bareImage = msg('img2', 'user', [{ type: 'image', mimeType: 'image/jpeg', assetId: 'asset-2' }]);
+  const payload = assembleContextStack({
+    sessionId: 's',
+    systemPrompt: '',
+    tools: [],
+    messages: [system, message, toolRole, sources, bareImage],
+    budget: budgetShape(),
+    dispositionById: { mix: 'keep', sysm: 'keep', toolmsg: 'keep', src: 'keep', img2: 'keep' },
+    pinnedIds: new Set()
+  });
+  const byKind = Object.fromEntries(payload.blocks.map((block) => [block.kind + ':' + block.id, block]));
+  assert.equal(payload.blocks.find((block) => block.kind === 'reasoning').text, 'thinking about the dump');
+  assert.equal(payload.blocks.find((block) => block.kind === 'assistant').text, 'assistant says hello');
+  const image = payload.blocks.find((block) => block.kind === 'image' && block.text.includes('asset-1'));
+  assert.match(image.text, /a chart/);
+  assert.match(image.text, /https:\/\/example.test\/chart.png/);
+  assert.equal(image.tokens, 1200);
+  const bare = payload.blocks.find((block) => block.kind === 'image' && block.text.includes('asset-2'));
+  assert.equal(bare.text.includes('http'), false);
+  const call = payload.blocks.find((block) => block.kind === 'tool-call');
+  assert.match(call.text, /echo hi/);
+  assert.equal(call.label, 'bash');
+  const surface = payload.blocks.find((block) => block.kind === 'surface');
+  assert.match(surface.text, /surf-1/);
+  assert.equal(payload.blocks.find((block) => block.kind === 'system-message').text, 'a system note');
+  assert.equal(payload.blocks.find((block) => block.id.startsWith('toolmsg')).text, 'tool role text');
+  assert.equal(payload.blocks.find((block) => block.kind === 'history-sources').text, 'history lives at /tmp/log');
+  assert.equal(payload.blocks.some((block) => block.kind === 'system'), false);
+  assert.equal(payload.blocks.some((block) => block.kind === 'tools'), false);
+  void byKind;
+});
+
 test('ordinary 20% cap marks summarize or drop; bot 50/85 keeps the text [AC:play-context-stack#AC-4]', () => {
   const oldHuge = msg('old', 'user', [{ type: 'text', text: 'H'.repeat(60000) }]);
   const latest = msg('latest', 'user', [{ type: 'text', text: 'latest line' }]);

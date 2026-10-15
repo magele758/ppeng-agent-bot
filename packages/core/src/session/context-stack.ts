@@ -182,6 +182,52 @@ function toolSchemaText(tools: readonly CountedToolSchema[]): string {
   }
 }
 
+function partBase(
+  message: SessionMessage,
+  index: number,
+  disposition: ContextBlockDisposition,
+  pinned: boolean
+) {
+  return {
+    id: `${message.id}:${index}`,
+    disposition,
+    pinned,
+    messageId: message.id,
+    seq: message.seq
+  };
+}
+
+function textBlock(
+  message: SessionMessage,
+  part: Extract<MessagePart, { type: 'text' }>,
+  index: number,
+  disposition: ContextBlockDisposition,
+  pinned: boolean
+): ContextStackBlock {
+  return block({
+    ...partBase(message, index, disposition, pinned),
+    kind: textKind(message.role),
+    label: message.role === 'system' ? message.key ?? '' : '',
+    text: part.text,
+    tokens: estimateTokensFromText(part.text)
+  });
+}
+
+function imageLines(part: Extract<MessagePart, { type: 'image' }>): string[] {
+  const lines = [`[image] ${part.mimeType}`, part.assetId];
+  if (part.alt) lines.push(part.alt);
+  if (part.sourceUrl) lines.push(part.sourceUrl);
+  return lines;
+}
+
+function prettyJson(value: unknown): string {
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
 function partBlock(
   message: SessionMessage,
   part: MessagePart,
@@ -189,22 +235,10 @@ function partBlock(
   disposition: ContextBlockDisposition,
   pinned: boolean
 ): ContextStackBlock {
-  const base = {
-    id: `${message.id}:${index}`,
-    disposition,
-    pinned,
-    messageId: message.id,
-    seq: message.seq
-  };
+  const base = partBase(message, index, disposition, pinned);
   switch (part.type) {
     case 'text':
-      return block({
-        ...base,
-        kind: textKind(message.role),
-        label: message.role === 'system' ? message.key ?? '' : '',
-        text: part.text,
-        tokens: estimateTokensFromText(part.text)
-      });
+      return textBlock(message, part, index, disposition, pinned);
     case 'reasoning':
       return block({
         ...base,
@@ -213,34 +247,22 @@ function partBlock(
         text: part.text,
         tokens: estimateTokensFromText(part.text)
       });
-    case 'image': {
-      const lines = [`[image] ${part.mimeType}`, part.assetId];
-      if (part.alt) lines.push(part.alt);
-      if (part.sourceUrl) lines.push(part.sourceUrl);
+    case 'image':
       return block({
         ...base,
         kind: 'image',
         label: part.mimeType,
-        text: lines.join('\n'),
+        text: imageLines(part).join('\n'),
         tokens: IMAGE_PART_TOKEN_ESTIMATE
       });
-    }
-    case 'tool_call': {
-      const raw = JSON.stringify(part.input ?? {});
-      let pretty = raw;
-      try {
-        pretty = JSON.stringify(part.input ?? {}, null, 2);
-      } catch {
-        pretty = raw;
-      }
+    case 'tool_call':
       return block({
         ...base,
         kind: 'tool-call',
         label: part.name,
-        text: `${part.name}\n${pretty}`,
-        tokens: estimateTokensFromText(raw)
+        text: `${part.name}\n${prettyJson(part.input ?? {})}`,
+        tokens: estimateTokensFromText(JSON.stringify(part.input ?? {}))
       });
-    }
     case 'tool_result':
       return block({
         ...base,
@@ -249,20 +271,14 @@ function partBlock(
         text: part.content,
         tokens: estimateTokensFromText(part.content)
       });
-    case 'surface_update': {
-      const text = JSON.stringify(
-        { surfaceId: part.surfaceId, catalogId: part.catalogId, messages: part.messages },
-        null,
-        2
-      );
+    case 'surface_update':
       return block({
         ...base,
         kind: 'surface',
         label: part.surfaceId,
-        text,
-        tokens: estimateTokensFromText(text)
+        text: prettyJson({ surfaceId: part.surfaceId, catalogId: part.catalogId, messages: part.messages }),
+        tokens: estimateTokensFromText(prettyJson({ surfaceId: part.surfaceId, catalogId: part.catalogId, messages: part.messages }))
       });
-    }
     default: {
       const unreachable: never = part;
       return unreachable;
