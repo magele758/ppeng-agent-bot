@@ -1,9 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { evolutionEntryVisible } from '@/lib/evolution-surface';
-import type { SelfHealRunLike } from '@/lib/ops-health';
+import { opsPollNeedsRerun, shouldSkipOpsPoll, type SelfHealRunLike } from '@/lib/ops-health';
 
 export interface EvolutionSnapshot {
   activeWorktrees: number;
@@ -33,6 +33,35 @@ const INITIAL: OpsStatus = {
   updatedAt: null
 };
 
+interface StatusSub {
+  withRuns: boolean;
+  onStatus: (status: OpsStatus) => void;
+  onBusy: (busy: boolean) => void;
+}
+
+const subs = new Set<StatusSub>();
+let shared: OpsStatus = { ...INITIAL };
+let timer: ReturnType<typeof setInterval> | null = null;
+let armedMs = 0;
+let flight: Promise<void> | null = null;
+let flightIncludesRuns = false;
+let pendingFollowUp = false;
+
+function anyWantsRuns(): boolean {
+  for (const sub of subs) {
+    if (sub.withRuns) return true;
+  }
+  return false;
+}
+
+function publish(status: OpsStatus, busy: boolean): void {
+  shared = status;
+  for (const sub of subs) {
+    sub.onStatus(status);
+    sub.onBusy(busy);
+  }
+}
+
 async function probeReadiness(): Promise<boolean | null> {
   try {
     const res = await fetch('/api/readiness');
@@ -43,63 +72,102 @@ async function probeReadiness(): Promise<boolean | null> {
   }
 }
 
-/** Polls the cheap status endpoints. `withRuns` also loads the recent self-heal run history. */
+async function readStatus(withRuns: boolean): Promise<OpsStatus> {
+  const [healthRes, ready, heal, runs, evo] = await Promise.all([
+    fetch('/api/health').then((r) => r.ok).catch(() => false),
+    probeReadiness(),
+    api('/api/self-heal/status')
+      .then((r) => ((r as { active?: SelfHealRunLike[] }).active ?? []) as SelfHealRunLike[])
+      .catch(() => null),
+    withRuns
+      ? api('/api/self-heal/runs?limit=5')
+          .then((r) => ((r as { runs?: SelfHealRunLike[] }).runs ?? []) as SelfHealRunLike[])
+          .catch(() => null)
+      : Promise.resolve(null),
+    evolutionEntryVisible()
+      ? api('/api/evolution/overview')
+          .then((r) => {
+            const o = r as { activeWorktrees?: unknown[]; counts?: Record<string, number> };
+            return {
+              activeWorktrees: Array.isArray(o.activeWorktrees) ? o.activeWorktrees.length : 0,
+              counts: o.counts ?? {}
+            } satisfies EvolutionSnapshot;
+          })
+          .catch(() => null)
+      : Promise.resolve(null)
+  ]);
+  return {
+    loaded: true,
+    reachable: healthRes,
+    ready: healthRes ? ready : null,
+    selfHealActive: heal,
+    selfHealRuns: withRuns ? runs : shared.selfHealRuns,
+    evolution: evo,
+    updatedAt: Date.now()
+  };
+}
+
+function beginPoll(force: boolean): void {
+  const requestedRuns = anyWantsRuns();
+  if (shouldSkipOpsPoll(flight !== null)) {
+    if (force || opsPollNeedsRerun(flightIncludesRuns, requestedRuns)) pendingFollowUp = true;
+    return;
+  }
+  flightIncludesRuns = requestedRuns;
+  for (const sub of subs) sub.onBusy(true);
+  const capturedRuns = requestedRuns;
+  flight = readStatus(capturedRuns)
+    .then((next) => {
+      shared = next;
+    })
+    .finally(() => {
+      flight = null;
+      flightIncludesRuns = false;
+      const follow = pendingFollowUp;
+      pendingFollowUp = false;
+      publish(shared, false);
+      if (follow && subs.size > 0) beginPoll(false);
+    });
+}
+
+function armTimer(ms: number): void {
+  if (timer && ms >= armedMs) return;
+  if (timer) clearInterval(timer);
+  armedMs = ms;
+  timer = setInterval(() => {
+    if (subs.size > 0) beginPoll(false);
+  }, ms);
+}
+
+function disarmTimer(): void {
+  if (subs.size > 0 || !timer) return;
+  clearInterval(timer);
+  timer = null;
+  armedMs = 0;
+}
+
+/** Polls the cheap status endpoints. Callers share one in-flight request. */
 export function useOpsStatus(opts: { pollMs?: number; withRuns?: boolean } = {}) {
   const { pollMs = 15_000, withRuns = false } = opts;
-  const [status, setStatus] = useState<OpsStatus>(INITIAL);
-  const [busy, setBusy] = useState(false);
-  const alive = useRef(true);
+  const [status, setStatus] = useState<OpsStatus>(shared);
+  const [busy, setBusy] = useState(flight !== null);
 
-  const load = useCallback(async () => {
-    setBusy(true);
-    try {
-      const [healthRes, ready, heal, runs, evo] = await Promise.all([
-        fetch('/api/health').then((r) => r.ok).catch(() => false),
-        probeReadiness(),
-        api('/api/self-heal/status')
-          .then((r) => ((r as { active?: SelfHealRunLike[] }).active ?? []) as SelfHealRunLike[])
-          .catch(() => null),
-        withRuns
-          ? api('/api/self-heal/runs?limit=5')
-              .then((r) => ((r as { runs?: SelfHealRunLike[] }).runs ?? []) as SelfHealRunLike[])
-              .catch(() => null)
-          : Promise.resolve(null),
-        evolutionEntryVisible()
-          ? api('/api/evolution/overview')
-              .then((r) => {
-                const o = r as { activeWorktrees?: unknown[]; counts?: Record<string, number> };
-                return {
-                  activeWorktrees: Array.isArray(o.activeWorktrees) ? o.activeWorktrees.length : 0,
-                  counts: o.counts ?? {}
-                } satisfies EvolutionSnapshot;
-              })
-              .catch(() => null)
-          : Promise.resolve(null)
-      ]);
-      if (!alive.current) return;
-      setStatus((prev) => ({
-        loaded: true,
-        reachable: healthRes,
-        ready: healthRes ? ready : null,
-        selfHealActive: heal,
-        selfHealRuns: withRuns ? runs : prev.selfHealRuns,
-        evolution: evo,
-        updatedAt: Date.now()
-      }));
-    } finally {
-      if (alive.current) setBusy(false);
-    }
-  }, [withRuns]);
+  const reload = useCallback(() => {
+    beginPoll(true);
+  }, []);
 
   useEffect(() => {
-    alive.current = true;
-    void load();
-    const timer = setInterval(() => void load(), pollMs);
+    const sub: StatusSub = { withRuns, onStatus: setStatus, onBusy: setBusy };
+    subs.add(sub);
+    setStatus(shared);
+    setBusy(flight !== null);
+    beginPoll(false);
+    armTimer(pollMs);
     return () => {
-      alive.current = false;
-      clearInterval(timer);
+      subs.delete(sub);
+      disarmTimer();
     };
-  }, [load, pollMs]);
+  }, [pollMs, withRuns]);
 
-  return { status, busy, reload: load };
+  return { status, busy, reload };
 }

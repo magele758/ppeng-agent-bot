@@ -55,6 +55,8 @@ export interface ToolLoopResult {
   artifacts?: TaskArtifact[];
   metadata?: Record<string, unknown>;
   problem?: HttpProblemDetails;
+  /** Set when a hook asked for approval. The kernel parks instead of persisting this row. */
+  hold?: 'approval';
 }
 
 
@@ -167,6 +169,9 @@ export interface ToolLoopHost {
 
   /** Reject `{ raw }` / `{ _nonObject }` tool args. Default true. */
   gateDirtyInput?: boolean;
+
+  /** Tool-call ids that already have a persisted tool_result. Skip writing them again. */
+  pairedToolCallIds?(sessionId: string): ReadonlySet<string>;
 }
 
 // ============================================================================
@@ -574,14 +579,8 @@ export async function executeSingleTool(
         toolCallId: toolCall.toolCallId,
         name: tool.name,
         ok: false,
-        content: 'waiting for approval (hook permissionDecision=ask)',
-        problem: toolInfraProblem(
-          tool.name,
-          toolCall.toolCallId,
-          'HOOK_ASK_APPROVAL',
-          'Hook requested human approval',
-          { title: 'Approval required by hook', status: 403 }
-        ),
+        content: '',
+        hold: 'approval',
       };
     }
   }
@@ -684,6 +683,52 @@ export async function executeSingleTool(
   }
 }
 
+function resultCountsAsWaveFailure(result: ToolLoopResult): boolean {
+  return !result.ok && result.hold !== 'approval';
+}
+
+/** A hook hold is not a failed write, so it must not roll the rest of the wave back. */
+export function waveNeedsCompensation(results: readonly ToolLoopResult[], aborted: boolean): boolean {
+  if (aborted) return true;
+  return results.some(resultCountsAsWaveFailure);
+}
+
+export function toolWaveHeldForApproval(results: readonly { hold?: string }[]): boolean {
+  return results.some((result) => result.hold === 'approval');
+}
+
+export function resultsToPersist(results: readonly ToolLoopResult[]): ToolLoopResult[] {
+  return results.filter((result) => result.hold !== 'approval');
+}
+
+export function skipPersistedToolResult(
+  result: { toolCallId: string },
+  paired: ReadonlySet<string> | undefined
+): boolean {
+  if (!paired) return false;
+  return paired.has(result.toolCallId);
+}
+
+function rememberToolResultId(ids: Set<string>, part: { type?: string; toolCallId?: string }): void {
+  if (part.type !== 'tool_result' || !part.toolCallId) return;
+  ids.add(part.toolCallId);
+}
+
+export function pairedToolCallIdsFromMessages(
+  messages: readonly { parts: readonly { type?: string; toolCallId?: string }[] }[]
+): Set<string> {
+  const ids = new Set<string>();
+  for (const message of messages) {
+    for (const part of message.parts) rememberToolResultId(ids, part);
+  }
+  return ids;
+}
+
+function toolResultIdsAlreadyPaired(host: ToolLoopHost, sessionId: string): ReadonlySet<string> | undefined {
+  if (!host.pairedToolCallIds) return undefined;
+  return host.pairedToolCallIds(sessionId);
+}
+
 // ============================================================================
 // Wave execution with compensation
 // ============================================================================
@@ -707,7 +752,7 @@ export async function executeToolCalls(
     results.push(...chunkResults);
   }
 
-  if ((results.some((r) => !r.ok) || context.abortSignal?.aborted) && host.compensate) {
+  if (waveNeedsCompensation(results, context.abortSignal?.aborted === true) && host.compensate) {
     const report = await host.compensate(completed);
     const rolledBack = new Set(report?.compensated ?? []);
     for (const result of results) {
@@ -734,7 +779,9 @@ export function processToolResults(
   onModelStreamChunk?: (chunk: ModelStreamChunk) => void
 ): void {
   const images: import('../types.js').ImagePart[] = [];
+  const paired = toolResultIdsAlreadyPaired(host, sessionId);
   for (const r of results) {
+    if (skipPersistedToolResult(r, paired)) continue;
     images.push(...(r.images ?? []));
     const parts: MessagePart[] = [
       {

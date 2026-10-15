@@ -12,6 +12,7 @@ import { appendWorkingLogEntry, readWorkingLogTail, workingLogPath } from '../se
 import type { AgentSpec, ModelAdapter, ModelTurnResult, ToolContract } from '../types.js';
 import type { TurnKernelHost, TurnKernelStore } from './host.js';
 import { createKernelHookRegistry } from './hooks.js';
+import { createGoalGateFromMetadata } from '../goal/goal-gate.js';
 import { runSessionKernel } from './kernel.js';
 import { WORKING_LOG_APPENDIX_HEAD } from './prepare-turn-input.js';
 
@@ -1119,5 +1120,132 @@ describe('runSessionKernel wiring', () => {
     expect(outcomes.some((o) => o.outcome === 'partial' && o.reason === 'max_turns_exhausted')).toBe(
       true
     );
+  });
+
+  it('feeds the refreshed session into the goal gate so turns accumulate', async () => {
+    const turns: number[] = [];
+    const { host, session, store } = createHarness({
+      model: () => textResult('still working'),
+      host: {
+        maxTurnsPerRun: 2,
+        evaluateGoalGate: async ({ session: live }) => {
+          const gate = createGoalGateFromMetadata(live.metadata, {
+            RAW_AGENT_GOAL_GATE: '1',
+            RAW_AGENT_GOAL_MAX_TURNS: '8',
+          });
+          if (!gate) throw new Error('goal gate missing');
+          await gate.evaluate({
+            snapshot: 'work',
+            judge: async () => JSON.stringify({ met: false, reason: 'not yet' }),
+          });
+          host.mergeSessionMetadata!(live.id, gate.metadataPatch());
+          turns.push(gate.getTurnsUsed());
+          return { met: false, reason: 'not yet' };
+        },
+      },
+    });
+    store.updateSession(session.id, { metadata: { goalCondition: 'ship the fix' } });
+    await runSessionKernel(host, session.id);
+    expect(turns).toEqual([1, 2]);
+    const ledger = store.getSession(session.id)?.metadata?.goalLedger;
+    expect(Array.isArray(ledger) && ledger.length).toBe(2);
+  });
+
+  it('re-reads permission mode before the next tool wave', async () => {
+    const modes: unknown[] = [];
+    let executes = 0;
+    const { host, session, store } = createHarness({
+      model: () => {
+        executes += 1;
+        return executes < 3 ? toolResult('echo', `c-${executes}`) : textResult('done');
+      },
+      host: {
+        maxTurnsPerRun: 3,
+        checkToolApprovals: (_calls, _ctx, current) => {
+          modes.push(current.metadata?.permissionMode ?? 'auto');
+          return current.metadata?.permissionMode === 'plan' ? 'skip' : 'proceed';
+        },
+        executeToolCalls: async (calls) => {
+          const current = store.getSession(session.id);
+          store.updateSession(session.id, {
+            metadata: { ...(current?.metadata ?? {}), permissionMode: 'plan' },
+          });
+          return calls.map((call) => ({
+            toolCallId: call.toolCallId,
+            name: call.name,
+            ok: true,
+            content: 'ok',
+          }));
+        },
+      },
+    });
+    await runSessionKernel(host, session.id);
+    expect(modes[0]).toBe('auto');
+    expect(modes[1]).toBe('plan');
+    expect(executes).toBe(3);
+  });
+
+  it('parks the session when a tool wave is held for approval', async () => {
+    const persisted: string[] = [];
+    const { host, session, store } = createHarness({
+      model: () => toolResult('echo', 'call-1'),
+      host: {
+        executeToolCalls: async (calls) =>
+          calls.map((call) => ({
+            toolCallId: call.toolCallId,
+            name: call.name,
+            ok: false,
+            content: '',
+            hold: 'approval' as const,
+          })),
+        processToolResults: (results) => {
+          persisted.push(...results.map((result) => result.toolCallId));
+        },
+      },
+    });
+    const out = await runSessionKernel(host, session.id);
+    expect(out.status).toBe('waiting_approval');
+    expect(persisted).toEqual([]);
+    expect(store.foldMessages(session.id).some((message) => message.role === 'tool')).toBe(false);
+  });
+
+  it('parks again when a resumed tool wave is held for approval', async () => {
+    const { host, session, store, approvals } = createHarness({
+      host: {
+        executeToolCalls: async (calls) =>
+          calls.map((call) => ({
+            toolCallId: call.toolCallId,
+            name: call.name,
+            ok: false,
+            content: '',
+            hold: 'approval' as const,
+          })),
+        processToolResults: (results) => {
+          if (results.length > 0) throw new Error('held result must not be persisted');
+        },
+      },
+    });
+    store.appendMessage(session.id, 'assistant', [
+      { type: 'tool_call', toolCallId: 'call-1', name: 'echo', input: {} },
+    ]);
+    approvals.push({
+      id: 'ap-approved',
+      sessionId: session.id,
+      toolName: 'echo',
+      status: 'approved',
+      args: {},
+      createdAt: new Date().toISOString(),
+    });
+    store.updateSession(session.id, {
+      status: 'idle',
+      metadata: {
+        interrupt: createWaitingApprovalInterrupt({
+          toolCallIds: ['call-1'],
+          approvalIds: ['ap-approved'],
+        }),
+      },
+    });
+    const out = await runSessionKernel(host, session.id);
+    expect(out.status).toBe('waiting_approval');
   });
 });

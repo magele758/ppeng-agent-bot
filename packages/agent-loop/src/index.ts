@@ -314,9 +314,14 @@ export {
   executeToolCalls,
   executeSingleTool,
   filterValidToolCalls,
+  pairedToolCallIdsFromMessages,
   processToolResults,
+  resultsToPersist,
   retryDelayMs,
   runTurnWithRetries,
+  skipPersistedToolResult,
+  toolWaveHeldForApproval,
+  waveNeedsCompensation,
   MAX_RETRY_AFTER_MS,
 } from './runtime/tool-loop.js';
 export type {

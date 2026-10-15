@@ -17,6 +17,8 @@ export const tasks = {
   },
   filterLabel: 'Filter by status',
   clearFilters: 'Clear filters',
+  loadFailed: 'The list did not load. Existing items stay; try again shortly.',
+  actionFailed: 'That action did not finish: {error}',
   openSession: 'View session',
   queue: {
     tasksTitle: 'Task queue',

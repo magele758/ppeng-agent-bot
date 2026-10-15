@@ -4,8 +4,10 @@ import {
   activityState,
   countSelfHealBad,
   filterSessions,
+  opsPollNeedsRerun,
   overallHealth,
   selfHealTone,
+  shouldSkipOpsPoll,
   splitDoctorChecks,
   type DoctorReportLike
 } from './ops-health.ts';
@@ -51,6 +53,32 @@ test('failed or blocked self-heal runs make the overall verdict need attention [
     ]),
     2
   );
+});
+
+test('a failed doctor or config load, or an unreadable self-heal status, needs attention', () => {
+  const base = { reachable: true, ready: true, doctor: null, configWarnings: 0 };
+  assert.deepEqual(overallHealth(base), { level: 'ok', reasons: [] });
+  assert.deepEqual(overallHealth({ ...base, selfHealUnread: true }), {
+    level: 'warn',
+    reasons: ['selfHealUnread']
+  });
+  assert.deepEqual(overallHealth({ ...base, doctorLoadFailed: true }), {
+    level: 'warn',
+    reasons: ['doctorLoadFailed']
+  });
+  assert.deepEqual(overallHealth({ ...base, configLoadFailed: true }), {
+    level: 'warn',
+    reasons: ['configLoadFailed']
+  });
+  assert.equal(overallHealth({ ...base, doctorLoadFailed: true, ready: false }).level, 'fail');
+});
+
+test('ops status polls share one in-flight request and rerun when history was missing', () => {
+  assert.equal(shouldSkipOpsPoll(false), false);
+  assert.equal(shouldSkipOpsPoll(true), true);
+  assert.equal(opsPollNeedsRerun(false, true), true);
+  assert.equal(opsPollNeedsRerun(true, true), false);
+  assert.equal(opsPollNeedsRerun(false, false), false);
 });
 
 test('activityState and selfHealTone use plain words [AC:ops-console#AC-1]', () => {

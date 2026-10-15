@@ -99,20 +99,41 @@ export async function tickCronJobs(host: SchedulerTickHost): Promise<number> {
   return n;
 }
 
+function schedulerStepError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
+function detachSchedulerStep(host: SchedulerTickHost, name: string, fn: () => Promise<unknown>): void {
+  void Promise.resolve()
+    .then(fn)
+    .catch((error: unknown) => {
+      host.log.warn(`${name} tick failed`, { error: schedulerStepError(error) });
+    });
+}
+
+async function runSchedulerStep(host: SchedulerTickHost, name: string, fn: () => Promise<unknown>): Promise<void> {
+  try {
+    await fn();
+  } catch (error) {
+    host.log.warn(`${name} tick failed`, { error: schedulerStepError(error) });
+  }
+}
+
 export async function runScheduler(host: SchedulerTickHost): Promise<void> {
   expireDueUnattendedApprovals(host.store);
   considerEvolutionSchedule({
     reason: 'timer',
     launch: host.launchEvolution
   });
-  await host.selfHeal.processRuns();
-  await host.swarmExecutor.tick();
+  detachSchedulerStep(host, 'self-heal', () => host.selfHeal.processRuns());
+  await runSchedulerStep(host, 'swarm', () => host.swarmExecutor.tick());
   if (host.teamDagExecutor) {
-    await host.teamDagExecutor.tick();
+    await runSchedulerStep(host, 'team-dag', () => host.teamDagExecutor!.tick());
   }
-  await host.orchestrationEngine.tick();
-  await tickCronJobs(host);
-  await host.autonomousScheduler.tick();
+  await runSchedulerStep(host, 'orchestration', () => host.orchestrationEngine.tick());
+  await runSchedulerStep(host, 'cron', () => tickCronJobs(host));
+  await runSchedulerStep(host, 'autonomous', () => host.autonomousScheduler.tick());
 }
 
 export async function ingestMailbox(store: SqliteStateStore, session: SessionRecord): Promise<void> {
@@ -179,5 +200,5 @@ export function sessionTeammateFinished(store: SqliteStateStore, sessionId: stri
   if (!session) return false;
   if (session.status === 'completed') return true;
   if (session.status !== 'idle') return false;
-  return store.listMessages(sessionId).some((m) => m.role === 'assistant' || m.role === 'tool');
+  return store.hasAssistantOrToolMessage(sessionId);
 }

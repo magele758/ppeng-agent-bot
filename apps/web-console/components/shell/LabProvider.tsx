@@ -22,6 +22,7 @@ import {
   type SectionId
 } from '@/lib/nav';
 import type { ModelProvidersResponse } from '@/lib/model-providers';
+import { fetchList, idleLabListState, settleList, type LabListKey, type LabListState, type ListFetch } from '@/lib/list-load';
 import type {
   AgentInfo,
   ApprovalItem,
@@ -119,6 +120,8 @@ export interface LabContextValue {
   mailAll: MailItem[];
   swarmRuns: SwarmRunRow[];
   orchestrationRuns: OrchestrationRunRow[];
+  /** Per-list load result. `error` means the last fetch failed; rows are the last success. */
+  listState: LabListState;
   serverMeta: ServerMeta | null;
 
   autoRefresh: boolean;
@@ -164,6 +167,7 @@ export function LabProvider({ children }: { children: ReactNode }) {
   const [mailAll, setMailAll] = useState<MailItem[]>([]);
   const [swarmRuns, setSwarmRuns] = useState<SwarmRunRow[]>([]);
   const [orchestrationRuns, setOrchestrationRuns] = useState<OrchestrationRunRow[]>([]);
+  const [listState, setListState] = useState<LabListState>(idleLabListState);
   const [serverMeta, setServerMeta] = useState<ServerMeta | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [modelSetupOpen, setModelSetupOpen] = useState(false);
@@ -171,6 +175,30 @@ export function LabProvider({ children }: { children: ReactNode }) {
   const sessionListStickTopRef = useRef(false);
   const selectedSessionRef = useRef<string | null>(null);
   const sessionsRef = useRef<SessionSummary[]>([]);
+  const listStateRef = useRef(listState);
+  const listsRef = useRef({
+    tasks,
+    socialSchedules,
+    approvals,
+    outboundDrafts,
+    jobs,
+    workspaces,
+    mailAll,
+    swarmRuns,
+    orchestrationRuns
+  });
+  listStateRef.current = listState;
+  listsRef.current = {
+    tasks,
+    socialSchedules,
+    approvals,
+    outboundDrafts,
+    jobs,
+    workspaces,
+    mailAll,
+    swarmRuns,
+    orchestrationRuns
+  };
   const chatBridgeRef = useRef<ChatBridge | null>(null);
   const tickTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -212,12 +240,87 @@ export function LabProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const loadMailAll = useCallback(async () => {
-    try {
-      const r = (await api('/api/mailbox/all?limit=200')) as { mail?: MailItem[] };
-      setMailAll(r.mail ?? []);
-    } catch {
-      setMailAll([]);
+  const loadOverview = useCallback(async () => {
+    const listScroll = scrollSnapshot(LIST_SCROLL_IDS);
+    const sidNow = selectedSessionRef.current;
+    const [sess, tasksRes, socialRes, appr, draftRes, ag, ws, jobsRes, swarmRes, orchRes, botsRes, mailRes] =
+      await Promise.all([
+      api('/api/sessions').catch(() => ({ sessions: undefined })),
+      fetchList(async () => {
+        const r = (await api('/api/tasks')) as { tasks?: TaskSummary[] };
+        return r.tasks ?? [];
+      }),
+      fetchList(async () => {
+        const r = (await api('/api/social-post-schedules')) as { items?: SocialPostScheduleItem[] };
+        return r.items ?? [];
+      }),
+      fetchList(async () => {
+        const r = (await api('/api/approvals?status=pending')) as { approvals?: ApprovalItem[] };
+        return pendingApprovals(r.approvals);
+      }),
+      fetchList(async () => {
+        const r = (await api('/api/outbound-drafts')) as { drafts?: OutboundDraftItem[] };
+        return r.drafts ?? [];
+      }),
+      api('/api/agents').catch(() => ({ agents: undefined })),
+      fetchList(async () => {
+        const r = (await api('/api/workspaces')) as { workspaces?: WorkspaceRow[] };
+        return r.workspaces ?? [];
+      }),
+      fetchList(async () => {
+        const r = (await api('/api/background-jobs')) as { jobs?: JobRow[] };
+        return r.jobs ?? [];
+      }),
+      fetchList(async () => {
+        const r = (await api('/api/swarm/runs')) as { runs?: SwarmRunRow[] };
+        return r.runs ?? [];
+      }),
+      fetchList(async () => {
+        const r = (await api('/api/orchestration/runs')) as { runs?: OrchestrationRunRow[] };
+        return r.runs ?? [];
+      }),
+      api('/api/bots').catch(() => ({ bots: undefined })),
+      fetchList(async () => {
+        const r = (await api('/api/mailbox/all?limit=200')) as { mail?: MailItem[] };
+        return r.mail ?? [];
+      })
+    ]);
+    const sessFetched = (sess as { sessions?: SessionSummary[] }).sessions;
+    const agFetched = (ag as { agents?: AgentInfo[] }).agents;
+    const botsFetched = (botsRes as { bots?: BotInfo[] }).bots;
+    // 拉取失败（undefined）时保留现有列表，避免瞬时错误清空会话/Agent
+    const sList = sessFetched ?? sessionsRef.current;
+    if (sessFetched) setSessions(sessFetched);
+    if (agFetched) setAgents(agFetched);
+    if (botsFetched) setBots(botsFetched);
+    const snap = listsRef.current;
+    const nextState: LabListState = { ...listStateRef.current };
+    const keep = <T,>(key: LabListKey, current: T[], fetched: ListFetch<T>, commit: (items: T[]) => void) => {
+      const settled = settleList(current, nextState[key], fetched);
+      nextState[key] = settled.state;
+      if (fetched.ok) commit(settled.items);
+    };
+    keep('tasks', snap.tasks, tasksRes, setTasks);
+    keep('socialSchedules', snap.socialSchedules, socialRes, setSocialSchedules);
+    keep('approvals', snap.approvals, appr, setApprovals);
+    keep('outboundDrafts', snap.outboundDrafts, draftRes, setOutboundDrafts);
+    keep('workspaces', snap.workspaces, ws, setWorkspaces);
+    keep('jobs', snap.jobs, jobsRes, setJobs);
+    keep('swarmRuns', snap.swarmRuns, swarmRes, setSwarmRuns);
+    keep('orchestrationRuns', snap.orchestrationRuns, orchRes, setOrchestrationRuns);
+    keep('mail', snap.mailAll, mailRes, setMailAll);
+    listStateRef.current = nextState;
+    setListState(nextState);
+
+    applyScrollSnapshot(listScroll);
+    if (sessionListStickTopRef.current) {
+      if (sidNow && sList[0]?.id === sidNow) {
+        for (const id of ['listSessions', 'sessionListMini'] as const) {
+          const el = document.getElementById(id);
+          if (el) el.scrollTop = 0;
+        }
+      }
+      sessionListStickTopRef.current = false;
     }
   }, []);
 
@@ -230,52 +333,6 @@ export function LabProvider({ children }: { children: ReactNode }) {
       return next;
     });
   }, []);
-
-  const loadOverview = useCallback(async () => {
-    const listScroll = scrollSnapshot(LIST_SCROLL_IDS);
-    const sidNow = selectedSessionRef.current;
-    const [sess, tasksRes, socialRes, appr, draftRes, ag, ws, jobsRes, swarmRes, orchRes, botsRes] = await Promise.all([
-      api('/api/sessions').catch(() => ({ sessions: undefined })),
-      api('/api/tasks').catch(() => ({ tasks: [] as TaskSummary[] })),
-      api('/api/social-post-schedules').catch(() => ({ items: [] as SocialPostScheduleItem[] })),
-      api('/api/approvals?status=pending').catch(() => ({ approvals: [] as ApprovalItem[] })),
-      api('/api/outbound-drafts').catch(() => ({ drafts: [] as OutboundDraftItem[] })),
-      api('/api/agents').catch(() => ({ agents: undefined })),
-      api('/api/workspaces').catch(() => ({ workspaces: [] as WorkspaceRow[] })),
-      api('/api/background-jobs').catch(() => ({ jobs: [] as JobRow[] })),
-      api('/api/swarm/runs').catch(() => ({ runs: [] as SwarmRunRow[] })),
-      api('/api/orchestration/runs').catch(() => ({ runs: [] as OrchestrationRunRow[] })),
-      api('/api/bots').catch(() => ({ bots: undefined }))
-    ]);
-    const sessFetched = (sess as { sessions?: SessionSummary[] }).sessions;
-    const agFetched = (ag as { agents?: AgentInfo[] }).agents;
-    const botsFetched = (botsRes as { bots?: BotInfo[] }).bots;
-    // 拉取失败（undefined）时保留现有列表，避免瞬时错误清空会话/Agent
-    const sList = sessFetched ?? sessionsRef.current;
-    if (sessFetched) setSessions(sessFetched);
-    if (agFetched) setAgents(agFetched);
-    if (botsFetched) setBots(botsFetched);
-    setTasks((tasksRes as { tasks?: TaskSummary[] }).tasks ?? []);
-    setSocialSchedules((socialRes as { items?: SocialPostScheduleItem[] }).items ?? []);
-    setApprovals(pendingApprovals((appr as { approvals?: ApprovalItem[] }).approvals));
-    setOutboundDrafts((draftRes as { drafts?: OutboundDraftItem[] }).drafts ?? []);
-    setJobs((jobsRes as { jobs?: JobRow[] }).jobs ?? []);
-    setWorkspaces((ws as { workspaces?: WorkspaceRow[] }).workspaces ?? []);
-    setSwarmRuns((swarmRes as { runs?: SwarmRunRow[] }).runs ?? []);
-    setOrchestrationRuns((orchRes as { runs?: OrchestrationRunRow[] }).runs ?? []);
-    await loadMailAll();
-
-    applyScrollSnapshot(listScroll);
-    if (sessionListStickTopRef.current) {
-      if (sidNow && sList[0]?.id === sidNow) {
-        for (const id of ['listSessions', 'sessionListMini'] as const) {
-          const el = document.getElementById(id);
-          if (el) el.scrollTop = 0;
-        }
-      }
-      sessionListStickTopRef.current = false;
-    }
-  }, [loadMailAll]);
 
   const tick = useCallback(
     async (opts?: { includePlayPanel?: boolean }) => {
@@ -335,6 +392,7 @@ export function LabProvider({ children }: { children: ReactNode }) {
       mailAll,
       swarmRuns,
       orchestrationRuns,
+      listState,
       serverMeta,
       autoRefresh,
       setAutoRefresh,
@@ -366,6 +424,7 @@ export function LabProvider({ children }: { children: ReactNode }) {
       mailAll,
       swarmRuns,
       orchestrationRuns,
+      listState,
       serverMeta,
       autoRefresh,
       tick,

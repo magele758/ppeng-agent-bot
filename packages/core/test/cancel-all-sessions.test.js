@@ -4,7 +4,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SqliteStateStore } from '../dist/storage.js';
-import { cancelAllSessions } from '../dist/runtime/session-control.js';
+import { cancelAllSessions, cancelSession } from '../dist/runtime/session-control.js';
 import { RawAgentRuntime } from '../dist/runtime.js';
 
 function openStore() {
@@ -146,5 +146,47 @@ test('runtime cancelAllSessions aborts two in-flight runs and still reads sessio
     assert.equal(runtime.getSession(second.id)?.title, 'run-two');
   } finally {
     await runtime.destroy();
+  }
+});
+
+test('cancelSession releases a parked approval and leaves other statuses abort-only', () => {
+  const store = openStore();
+  try {
+    const parked = session(store, 'parked');
+    store.updateSession(parked.id, {
+      status: 'waiting_approval',
+      metadata: {
+        interrupt: {
+          kind: 'waiting_approval',
+          toolCallIds: ['c1'],
+          approvalIds: ['a1'],
+          executedToolCallIds: [],
+          stepCursor: 'tools'
+        }
+      }
+    });
+    const approval = store.createApproval({
+      sessionId: parked.id,
+      toolName: 'bash',
+      reason: 'ask',
+      args: { command: 'true' }
+    });
+    const running = session(store, 'running');
+    store.updateSession(running.id, { status: 'running' });
+    const host = {
+      store,
+      sessionAbortControllers: new Map(),
+      backgroundJobAborts: new Map(),
+      emitTrace() {}
+    };
+    cancelSession(host, parked.id);
+    cancelSession(host, running.id);
+    assert.equal(store.getSession(parked.id)?.status, 'idle');
+    assert.equal(store.getSession(parked.id)?.metadata?.interrupt, undefined);
+    assert.equal(store.getApproval(approval.id)?.status, 'rejected');
+    assert.equal(store.getSession(running.id)?.status, 'running');
+    assert.equal(store.getSession(running.id)?.metadata?.outcome?.kind, 'aborted');
+  } finally {
+    store.db.close();
   }
 });

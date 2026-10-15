@@ -36,7 +36,22 @@ export interface SwarmExecutorDeps {
 }
 
 export class SwarmExecutor {
+  private readonly launching = new Set<string>();
+
   constructor(private readonly deps: SwarmExecutorDeps) {}
+
+  private launchTeammate(sessionId: string): void {
+    if (this.launching.has(sessionId)) return;
+    this.launching.add(sessionId);
+    void Promise.resolve()
+      .then(() => this.deps.runSession(sessionId))
+      .catch(() => {
+        this.deps.enqueueSchedulerWake(sessionId, 'swarm.task');
+      })
+      .finally(() => {
+        this.launching.delete(sessionId);
+      });
+  }
 
   async tick(nowMs: number = Date.now()): Promise<void> {
     for (const run of this.deps.store.getTimedOutRuns(nowMs)) {
@@ -181,12 +196,7 @@ export class SwarmExecutor {
       artifacts
     });
 
-    // Prefer immediate run; also enqueue wake for autonomous scheduler recovery
-    try {
-      await this.deps.runSession(session.id);
-    } catch {
-      this.deps.enqueueSchedulerWake(session.id, 'swarm.task');
-    }
+    this.launchTeammate(session.id);
   }
 
   private advanceInProgressTask(run: SwarmRun, task: SwarmTask, sessions: SessionRecord[]): void {

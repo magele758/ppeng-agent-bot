@@ -77,12 +77,12 @@ export function TaskModePicker({
   return (
     <>
       <label className="session-settings__field">
-        <FieldLabel tip={t('play.taskMode.tip')}>TaskMode</FieldLabel>
+        <FieldLabel tip={t('play.taskMode.tip')}>{t('play.taskMode.label')}</FieldLabel>
         <select
           value={mode}
           disabled={locked}
           title={bound ? t('play.taskMode.bound') : t('play.taskMode.how')}
-          aria-label="TaskMode"
+          aria-label={t('play.taskMode.label')}
           onChange={(e) => onModeChange(e.target.value as LabTaskMode)}
         >
           {TASK_MODE_OPTIONS.map((opt) => (
@@ -99,7 +99,7 @@ export function TaskModePicker({
             value={skillScope}
             disabled={disabled}
             title={t('play.skillScope.what')}
-            aria-label="skill_scope"
+            aria-label={t('play.skillScope.label')}
             onChange={(e) => onSkillScopeChange(e.target.value as LabSkillScope)}
           >
             {SKILL_SCOPE_OPTIONS.map((opt) => (

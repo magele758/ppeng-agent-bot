@@ -445,6 +445,10 @@ export class SqliteStateStore {
     return this.sessions.listSessions();
   }
 
+  listIdleBackgroundSessions(modes: readonly string[]): SessionRecord[] {
+    return this.sessions.listIdleBackgroundSessions(modes);
+  }
+
   getSession(id: string): SessionRecord | undefined {
     return this.sessions.getSession(id);
   }
@@ -534,6 +538,10 @@ export class SqliteStateStore {
 
   listMessages(sessionId: string): SessionMessage[] {
     return this.sessions.listMessages(sessionId);
+  }
+
+  hasAssistantOrToolMessage(sessionId: string): boolean {
+    return this.sessions.hasAssistantOrToolMessage(sessionId);
   }
 
   listHistory(sessionId: string, options?: import('./session/history/types.js').HistoryOptions) {

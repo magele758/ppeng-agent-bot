@@ -276,6 +276,7 @@ export const play = {
     tip: 'Tool pack (HOW). Auto = all tools; Fast = fewer tools; planner / teams / research / browser / computer / dynamic workflow each unlock matching capabilities. Bound after the session starts.',
     bound: 'Run mode is bound on this session (write-once)',
     how: 'HOW: tool pack',
+    label: 'Task mode',
     auto: 'Auto (all tools)',
     fast: 'Fast',
     planner: 'Planner',
@@ -481,7 +482,15 @@ export const play = {
   },
 
   goalCard: {
-    softGate: ' · soft gate fail-open'
+    title: 'Goal',
+    softGate: ' · soft gate fail-open',
+    loadFailed: 'Could not load the goal',
+    verify: ' · verify {kind}',
+    statusDeriving: 'Deriving',
+    statusActive: 'Active',
+    statusWaiting: 'Waiting for you',
+    statusAchieved: 'Achieved',
+    statusUnmet: 'Closed unmet'
   },
 
   cronPanel: {

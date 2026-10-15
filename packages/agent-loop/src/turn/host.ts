@@ -142,6 +142,8 @@ export interface ToolExecResult {
   ok: boolean;
   content: string;
   metadata?: Record<string, unknown>;
+  /** Hook asked for approval. The kernel parks and does not persist this row. */
+  hold?: 'approval';
 }
 
 // ============================================================================

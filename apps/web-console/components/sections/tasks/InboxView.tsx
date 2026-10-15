@@ -7,46 +7,63 @@ import { useI18n } from '@/lib/i18n';
 import { sortAgentsById } from '@/lib/sort-utils';
 import { EmptyState, SettingsGroup } from '../../ui';
 import { useLab } from '../../shell/LabProvider';
+import { ListFallback } from './ListFallback';
 import styles from './tasks.module.css';
 
 /** 待审批工具调用、站内邮件与工作区 */
 export function InboxView() {
   const { t } = useI18n();
-  const { approvals, outboundDrafts, workspaces, agents, mailAll, tick, navigate, openSession } = useLab();
+  const { approvals, outboundDrafts, workspaces, agents, mailAll, listState, tick, navigate, openSession } = useLab();
   const [mailFrom, setMailFrom] = useState('');
   const [mailTo, setMailTo] = useState('');
   const [mailBody, setMailBody] = useState('');
   const [draftLoginHint, setDraftLoginHint] = useState(false);
+  const [approvalError, setApprovalError] = useState<string | null>(null);
+  const [draftError, setDraftError] = useState<string | null>(null);
+  const [mailError, setMailError] = useState<string | null>(null);
   const agentsSorted = sortAgentsById(agents);
   const onRefresh = () => void tick();
 
-  const decide = (id: string, verdict: 'approve' | 'reject') =>
-    void api(`/api/approvals/${id}/${verdict}`, { method: 'POST' }).then(onRefresh);
+  const decide = (id: string, verdict: 'approve' | 'reject') => {
+    setApprovalError(null);
+    void api(`/api/approvals/${id}/${verdict}`, { method: 'POST' }).then(onRefresh, (error: unknown) => {
+      setApprovalError(error instanceof Error ? error.message : String(error));
+    });
+  };
 
   const decideDraft = (id: string, verdict: 'approve' | 'reject') => {
     setDraftLoginHint(false);
+    setDraftError(null);
     void api(`/api/outbound-drafts/${id}/${verdict}`, { method: 'POST' }).then(onRefresh, (error: unknown) => {
-      if (error instanceof Error && error.message === 'human_login_required') setDraftLoginHint(true);
-      onRefresh();
+      if (error instanceof Error && error.message === 'human_login_required') {
+        setDraftLoginHint(true);
+        return;
+      }
+      setDraftError(error instanceof Error ? error.message : String(error));
     });
   };
 
   const handleSendMail = async () => {
     const body = mailBody.trim();
     if (!body) return;
-    await api('/api/mailbox', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        fromAgentId: mailFrom || agentsSorted[0]?.id,
-        toAgentId: mailTo || agentsSorted[0]?.id,
-        content: body
-      })
-    });
-    await api('/api/scheduler/run', { method: 'POST' });
-    setMailBody('');
-    onRefresh();
-    navigate('agents', 'teams');
+    setMailError(null);
+    try {
+      await api('/api/mailbox', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fromAgentId: mailFrom || agentsSorted[0]?.id,
+          toAgentId: mailTo || agentsSorted[0]?.id,
+          content: body
+        })
+      });
+      await api('/api/scheduler/run', { method: 'POST' });
+      setMailBody('');
+      onRefresh();
+      navigate('agents', 'teams');
+    } catch (error) {
+      setMailError(error instanceof Error ? error.message : String(error));
+    }
   };
 
   const recentMail = mailAll.slice(-5).reverse();
@@ -54,9 +71,12 @@ export function InboxView() {
   return (
     <>
       <SettingsGroup title={t('tasks.inbox.approvalsTitle')} description={t('tasks.inbox.approvalsDesc')}>
-        {approvals.length === 0 ? (
-          <EmptyState title={t('tasks.inbox.approvalsEmptyTitle')} description={t('tasks.inbox.approvalsEmptyDesc')} />
-        ) : (
+        {approvalError ? <p role="alert">{t('tasks.actionFailed', { error: approvalError })}</p> : null}
+        <ListFallback
+          error={listState.approvals.error}
+          count={approvals.length}
+          empty={<EmptyState title={t('tasks.inbox.approvalsEmptyTitle')} description={t('tasks.inbox.approvalsEmptyDesc')} />}
+        >
           <div id="listApprovals" className={styles.list}>
             {approvals.map((a) => {
               const expiryNote = approvalInboxStatusText(a, t);
@@ -100,7 +120,7 @@ export function InboxView() {
               );
             })}
           </div>
-        )}
+        </ListFallback>
       </SettingsGroup>
 
       <SettingsGroup title={t('tasks.inbox.draftsTitle')} description={t('tasks.inbox.draftsDesc')}>
@@ -109,9 +129,12 @@ export function InboxView() {
             {t('tasks.inbox.loginRequiredToSend')}
           </p>
         ) : null}
-        {outboundDrafts.length === 0 ? (
-          <EmptyState title={t('tasks.inbox.draftsEmptyTitle')} description={t('tasks.inbox.draftsEmptyDesc')} />
-        ) : (
+        {draftError ? <p role="alert">{t('tasks.actionFailed', { error: draftError })}</p> : null}
+        <ListFallback
+          error={listState.outboundDrafts.error}
+          count={outboundDrafts.length}
+          empty={<EmptyState title={t('tasks.inbox.draftsEmptyTitle')} description={t('tasks.inbox.draftsEmptyDesc')} />}
+        >
           <div id="listOutboundDrafts" className={styles.list}>
             {outboundDrafts.map((draft) => (
               <div key={draft.id} className={`list-item ${styles.row}`} data-draft-id={draft.id}>
@@ -151,7 +174,7 @@ export function InboxView() {
               </div>
             ))}
           </div>
-        )}
+        </ListFallback>
       </SettingsGroup>
 
       <SettingsGroup title={t('tasks.inbox.mailTitle')} description={t('tasks.inbox.mailDesc')} collapsible defaultOpen={false}>
@@ -203,8 +226,10 @@ export function InboxView() {
               </button>
             </div>
             <h3 className={styles.field}>{t('tasks.inbox.recentMail')}</h3>
+            {mailError ? <p role="alert">{t('tasks.actionFailed', { error: mailError })}</p> : null}
+            {listState.mail.error ? <p role="alert">{t('tasks.loadFailed')}</p> : null}
             {recentMail.length === 0 ? (
-              <p className="muted">{t('tasks.inbox.recentMailEmpty')}</p>
+              listState.mail.error ? null : <p className="muted">{t('tasks.inbox.recentMailEmpty')}</p>
             ) : (
               <div className={styles.list}>
                 {recentMail.map((m, i) => (
@@ -225,9 +250,11 @@ export function InboxView() {
       </SettingsGroup>
 
       <SettingsGroup title={t('tasks.inbox.workspacesTitle')} description={t('tasks.inbox.workspacesDesc')} collapsible defaultOpen={false}>
-        {workspaces.length === 0 ? (
-          <EmptyState title={t('tasks.inbox.workspacesEmptyTitle')} description={t('tasks.inbox.workspacesEmptyDesc')} />
-        ) : (
+        <ListFallback
+          error={listState.workspaces.error}
+          count={workspaces.length}
+          empty={<EmptyState title={t('tasks.inbox.workspacesEmptyTitle')} description={t('tasks.inbox.workspacesEmptyDesc')} />}
+        >
           <div id="listWorkspaces" className={styles.list}>
             {workspaces.map((w, i) => (
               <div key={`ws-${i}-${w.name}`} className={`list-item ${styles.row}`}>
@@ -238,7 +265,7 @@ export function InboxView() {
               </div>
             ))}
           </div>
-        )}
+        </ListFallback>
       </SettingsGroup>
     </>
   );

@@ -47,6 +47,7 @@ import {
   executeSingleTool as executeSingleToolA,
   executeToolCalls as executeToolCallsA,
   filterValidToolCalls as filterValidToolCallsA,
+  pairedToolCallIdsFromMessages,
   processToolResults as processToolResultsA,
   runTurnWithRetries as runTurnWithRetriesA,
   type FileApprovalPolicy as LoopFilePolicy,
@@ -88,6 +89,7 @@ export interface ToolLoopStore {
   deleteApproval: (id: string) => void;
   getTask: (taskId: string) => TaskRecord | undefined;
   updateTask: (taskId: string, patch: { artifacts: TaskArtifact[] }) => unknown;
+  foldMessages?(sessionId: string): Array<{ parts: MessagePart[] }>;
 }
 
 export interface ToolLoopDeps {
@@ -188,8 +190,17 @@ function hostFromDeps(deps: ToolLoopDeps): ToolLoopHost {
         onCreated: deps.onArtifactCreated
       }),
     redactSecrets: (content) => redactToolContent(content, process.env),
-    compensate: (items) => compensateCompletedLifo(items)
+    compensate: (items) => compensateCompletedLifo(items),
+    pairedToolCallIds: (sessionId) => pairedToolCallIdsFromMessages(foldMessagesOf(deps.store, sessionId))
   };
+}
+
+function foldMessagesOf(
+  store: ToolLoopStore,
+  sessionId: string
+): Array<{ parts: MessagePart[] }> {
+  if (!store.foldMessages) return [];
+  return store.foldMessages(sessionId);
 }
 
 function envHost(): ToolLoopHost {

@@ -11,6 +11,7 @@ import { childPermissionMode, inheritBotAllowlists, inheritModelOverride } from 
 import { textPart } from '../runtime/session-facade.js';
 import { stampSessionWake } from '../approval/unattended-approval.js';
 import { parseRunOutcome } from '../session/run-outcome.js';
+import { assistantTextsFromFold } from '../session/visible-assistant.js';
 import { BotQueueCapacityError, checkBotWorkCapacity, botWorkControl, resumeApprovedBotSession } from '../bots/bot-work.js';
 import { openBot } from '../bots/bot-facade.js';
 import { principalFromSession } from '../bots/bot-identity.js';
@@ -89,7 +90,7 @@ function summarize(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):
  runs.update(run.id,{notificationSent:true});host.store.db.exec('COMMIT');
  }catch(error){host.store.db.exec('ROLLBACK');throw error;}
 }
-function resultText(host:RoutineRuntimeHost,id:string):string {return host.store.listMessages(id).filter(m=>m.role==='assistant').map(m=>m.parts.filter(p=>p.type==='text').map(p=>p.type==='text'?p.text:'').join('')).filter(Boolean).at(-1)?.slice(0,16000)??'';}
+function resultText(host:RoutineRuntimeHost,id:string):string {return assistantTextsFromFold(host.store,id).at(-1)?.slice(0,16000)??'';}
 function unknownEffects(host:RoutineRuntimeHost,run:RoutineRun):boolean {
  return !!run.sessionId&&host.hasUnconfirmedEffects?.(run.sessionId,run.startedAt??run.createdAt)===true;
 }

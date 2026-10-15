@@ -54,6 +54,12 @@ function reasonText(
       return t('ops.health.reasonDoctorWarn', { n: counts.doctorWarn });
     case 'selfHealBad':
       return t('ops.health.reasonSelfHealBad', { n: counts.selfHealBad });
+    case 'selfHealUnread':
+      return t('ops.health.reasonSelfHealUnread');
+    case 'doctorLoadFailed':
+      return t('ops.health.reasonDoctorLoadFailed');
+    case 'configLoadFailed':
+      return t('ops.health.reasonConfigLoadFailed');
     case 'configWarn':
       return t('ops.health.reasonConfigWarn', { n: counts.configWarn });
     default: {
@@ -128,18 +134,26 @@ export function HealthView() {
   const { status, busy, reload } = useOpsStatus({ withRuns: true });
   const [doctor, setDoctor] = useState<DoctorReportLike | null>(null);
   const [config, setConfig] = useState<EffectiveConfigPayload | null>(null);
+  const [doctorLoadFailed, setDoctorLoadFailed] = useState(false);
+  const [configLoadFailed, setConfigLoadFailed] = useState(false);
 
   const onConfig = useCallback((payload: EffectiveConfigPayload) => setConfig(payload), []);
   const onDoctor = useCallback((report: DoctorReportLike | null) => setDoctor(report), []);
+  const onDoctorFailed = useCallback((failed: boolean) => setDoctorLoadFailed(failed), []);
+  const onConfigFailed = useCallback((failed: boolean) => setConfigLoadFailed(failed), []);
 
   const configWarnings = config ? attentionItems(config.items).length : 0;
   const selfHealBad = countSelfHealBad(status.selfHealRuns);
+  const selfHealUnread = status.loaded && status.selfHealActive === null;
   const verdict = overallHealth({
     reachable: status.reachable,
     ready: status.ready,
     doctor,
     configWarnings,
-    selfHealBad
+    selfHealBad,
+    selfHealUnread,
+    doctorLoadFailed,
+    configLoadFailed
   });
   const level = verdict.level;
 
@@ -277,8 +291,8 @@ export function HealthView() {
         ) : null}
       </div>
 
-      <DoctorCard onReport={onDoctor} />
-      <EffectiveConfigCard onLoaded={onConfig} />
+      <DoctorCard onReport={onDoctor} onLoadFailed={onDoctorFailed} />
+      <EffectiveConfigCard onLoaded={onConfig} onLoadFailed={onConfigFailed} />
     </div>
   );
 }

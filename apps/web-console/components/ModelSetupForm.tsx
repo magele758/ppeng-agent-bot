@@ -21,6 +21,12 @@ import './sections/settings/settings.css';
 
 const KIND_IDS: ModelProviderKind[] = ['openai-compatible', 'anthropic-compatible'];
 
+function presetLabel(id: string, fallback: string, t: I18nContextValue['t']): string {
+  if (id === 'custom') return t('settings.model.customProvider');
+  if (id === 'siliconflow') return t('settings.model.presetSiliconflow');
+  return fallback;
+}
+
 function kindLabel(id: ModelProviderKind, t: I18nContextValue['t']): string {
   switch (id) {
     case 'openai-compatible':
@@ -154,7 +160,7 @@ export function ModelSetupForm({ onSaved, onCancel }: ModelSetupFormProps) {
         method: 'POST',
         headers: JSON_HEADERS,
         body: JSON.stringify({
-          name: name.trim() || suggestedName || preset.label,
+          name: name.trim() || suggestedName || presetLabel(preset.id, preset.label, t),
           kind,
           baseUrl: baseUrl.trim(),
           apiKey: apiKey.trim(),
@@ -226,7 +232,7 @@ export function ModelSetupForm({ onSaved, onCancel }: ModelSetupFormProps) {
               disabled={saving}
               onClick={() => choosePreset(p.id)}
             >
-              {p.id === 'custom' ? t('settings.model.customProvider') : p.label}
+              {presetLabel(p.id, p.label, t)}
             </button>
           ))}
         </div>

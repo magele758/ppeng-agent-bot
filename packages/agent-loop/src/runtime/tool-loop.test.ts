@@ -6,6 +6,7 @@ import {
   executeSingleTool,
   executeToolCalls,
   filterValidToolCalls,
+  processToolResults,
   truncateToolContent,
   type CompletedWaveItem,
   type ToolLoopHost,
@@ -422,6 +423,62 @@ describe('checkToolApprovals', () => {
     );
     expect(parts.map((part) => part.toolCallId).sort()).toEqual(['bash-1', 'read-1']);
     expect(parts.find((part) => part.toolCallId === 'read-1')?.content).not.toContain('tool_result_missing');
+  });
+});
+
+describe('pre_tool_use ask', () => {
+  it('holds for approval instead of writing a failure result', async () => {
+    const h = host({
+      runLifecycleHook: async () => ({ permissionDecision: 'ask', message: 'please confirm' }),
+    });
+    const echo = tool('echo', async () => ({ ok: true, content: 'ran' }));
+    const result = await executeSingleTool(h, [echo], call('echo', { a: 1 }), ctx, false, 's1');
+    expect(result.hold).toBe('approval');
+    expect(result.content).not.toContain('waiting for approval');
+    expect(result.ok).toBe(false);
+    expect(h.appended).toEqual([]);
+    const held = await executeToolCalls(h, [echo], [call('echo', { a: 1 }, 'hold-1')], ctx, false, 's1', 1);
+    const compensate = vi.fn(async () => undefined);
+    const withCompensate = host({
+      compensate,
+      runLifecycleHook: async (input) => (input.tool === 'echo' ? { permissionDecision: 'ask' } : {}),
+    });
+    const wave = await executeToolCalls(
+      withCompensate,
+      [echo, tool('write_file', async () => ({ ok: true, content: 'wrote' }))],
+      [call('echo', { a: 1 }, 'ask-1'), call('write_file', { path: 'a' }, 'write-1')],
+      ctx,
+      false,
+      's1',
+      2
+    );
+    expect(wave.find((item) => item.toolCallId === 'ask-1')?.hold).toBe('approval');
+    expect(wave.find((item) => item.toolCallId === 'write-1')?.ok).toBe(true);
+    expect(compensate).not.toHaveBeenCalled();
+    expect(held[0]?.hold).toBe('approval');
+  });
+});
+
+describe('already paired tool results', () => {
+  it('does not append a second result for the same tool call id', () => {
+    const h = host({
+      pairedToolCallIds: () => new Set(['done-1']),
+    });
+    processToolResults(
+      h,
+      [
+        { toolCallId: 'done-1', name: 'echo', ok: false, content: 'late' },
+        { toolCallId: 'open-1', name: 'echo', ok: true, content: 'fresh' },
+      ],
+      [],
+      ctx.session,
+      undefined,
+      's1'
+    );
+    const ids = h.appended.flatMap(
+      (entry) => (entry as { parts: Array<{ toolCallId?: string }> }).parts.map((part) => part.toolCallId)
+    );
+    expect(ids).toEqual(['open-1']);
   });
 });
 
