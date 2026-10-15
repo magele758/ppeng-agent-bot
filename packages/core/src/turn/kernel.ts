@@ -46,12 +46,7 @@ import {
   type GoalGate
 } from '../goal/index.js';
 import { estimateUsageCostUsd, llmPromptDebugEnabled, mergeCostUsd, mergeUsage, splitCumulativePromptTokens } from '@ppeng/agent-loop';
-import {
-  workingLogEnabled,
-  workingLogPath,
-  workingLogTailChars,
-  readWorkingLogTail
-} from '../session/working-log.js';
+import { readWorkingLogAppendix } from '../session/working-log.js';
 import { applyClaimedInbox, prepareTurnInput } from './prepare-turn-input.js';
 import {
   createTurnRecoveryState,
@@ -616,17 +611,7 @@ export async function runSessionKernel(
           const withReminder = (text: string) =>
             reminder ? [text.trim(), reminder].filter(Boolean).join('\n\n') : text;
           if (compiled.trim()) return withReminder(compiled);
-          const workingLogTail = workingLogEnabled(process.env)
-            ? readWorkingLogTail(
-                workingLogPath(host.stateDir, sid),
-                workingLogTailChars(process.env)
-              )
-            : '';
-          return withReminder(
-            workingLogTail.trim()
-              ? `[working log — durable trail across compaction; full transcripts at the referenced paths]\n${workingLogTail.trim()}`
-              : ''
-          );
+          return withReminder(readWorkingLogAppendix(host.stateDir, sid, process.env));
         },
         applyFoldBudget: (sess, foldedMsgs) => host.applyOptionalFoldBudget(sess, foldedMsgs)
       });
