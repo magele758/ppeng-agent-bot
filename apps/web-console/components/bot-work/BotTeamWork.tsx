@@ -174,6 +174,13 @@ export function BotTeamWork({
       </form>
       <h4>{t("botWork.unresolved")}</h4>
       {unresolvedTasks.length ? unresolvedTasks.map(taskArticle) : !action.busy ? <p>{t("botWork.empty")}</p> : null}
+      <h4>{t("botWork.taskHistory")}</h4>
+      {historyTasks.length ? historyTasks.map(taskArticle) : <p>{t("botWork.empty")}</p>}
+      {cursor && <button disabled={action.busy} onClick={() => void action.run(async () => {
+        const page = await api(`/api/bot-work/tasks?limit=50&cursor=${encodeURIComponent(cursor)}`) as Page;
+        setTasks(await mergeRetainedHistory(page, true));
+        setCursor(page.nextCursor ?? null);setPaged(true);
+      })}>{t("botWork.older")}</button>}
       <details className="bot-work-more">
         <summary>{t("botWork.more")}</summary>
         <button disabled={action.busy} onClick={() => void action.run(load)}>
@@ -200,13 +207,6 @@ export function BotTeamWork({
             </li>
           ))}
         </ul>
-        <h4>{t("botWork.taskHistory")}</h4>
-        {historyTasks.length ? historyTasks.map(taskArticle) : <p>{t("botWork.empty")}</p>}
-        {cursor && <button disabled={action.busy} onClick={() => void action.run(async () => {
-          const page = await api(`/api/bot-work/tasks?limit=50&cursor=${encodeURIComponent(cursor)}`) as Page;
-          setTasks(await mergeRetainedHistory(page, true));
-          setCursor(page.nextCursor ?? null);setPaged(true);
-        })}>{t("botWork.older")}</button>}
       </details>
       {selected && (
         <aside>
