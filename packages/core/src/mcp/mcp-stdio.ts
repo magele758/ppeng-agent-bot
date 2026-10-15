@@ -152,7 +152,10 @@ export class McpStdioSession {
 
 /** Credential-shaped names only. Ordinary values such as NODE_ENV=production stay intact. */
 const STDIO_SECRET_NAME =
-  /(^|_)(TOKEN|SECRET|PASSWORD|PASSWD|API_KEY|ACCESS_KEY|CREDENTIAL|CREDENTIALS|COOKIE|BEARER)($|_)/i;
+  /(^|_)(TOKEN|SECRET|PASSWORD|PASSWD|API_KEY|ACCESS_KEY|CREDENTIAL|CREDENTIALS|COOKIE|BEARER|AUTHORIZATION|AUTHTOKEN)($|_)/i;
+
+/** Protocol fields. Their text is not descriptive copy, so a matching secret stays. */
+const SCHEMA_OPAQUE_KEY = new Set(['enum', 'required', '$ref']);
 
 function stdioSecretValues(env?: Record<string, string>): string[] {
   if (!env) return [];
@@ -169,10 +172,32 @@ export function redactStdioFailure(message: string, env?: Record<string, string>
   return redactSecrets(message, stdioSecretValues(env));
 }
 
-/** Description text only. Schema names, required, and enum values are protocol fields. */
+function redactSchemaNode(node: unknown, secrets: string[]): unknown {
+  if (Array.isArray(node)) return node.map((item) => redactSchemaNode(item, secrets));
+  if (node && typeof node === 'object') return redactSchemaFields(node as Record<string, unknown>, secrets);
+  return node;
+}
+
+function redactSchemaFields(node: Record<string, unknown>, secrets: string[]): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(node)) out[key] = schemaField(key, value, secrets);
+  return out;
+}
+
+function schemaField(key: string, value: unknown, secrets: string[]): unknown {
+  if (SCHEMA_OPAQUE_KEY.has(key)) return value;
+  if (key === 'description' && typeof value === 'string') return redactSecrets(value, secrets);
+  return redactSchemaNode(value, secrets);
+}
+
+/** Description text only. Property names, required, enum, and $ref stay as protocol fields. */
 export function redactStdioTool(tool: McpToolInfo, env?: Record<string, string>): McpToolInfo {
-  const description = tool.description ? redactStdioFailure(tool.description, env) : tool.description;
-  return { ...tool, description };
+  const secrets = stdioSecretValues(env);
+  const description = tool.description ? redactSecrets(tool.description, secrets) : tool.description;
+  const inputSchema = tool.inputSchema
+    ? (redactSchemaNode(tool.inputSchema, secrets) as Record<string, unknown>)
+    : tool.inputSchema;
+  return { ...tool, description, inputSchema };
 }
 
 export function sanitizeMcpToolSuffix(name: string): string {

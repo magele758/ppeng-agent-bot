@@ -187,16 +187,38 @@ describe('redactStdioFailure', () => {
     assert.match(out, /\[REDACTED\]/);
     assert.equal(redactStdioFailure('env is production', { NODE_ENV: 'production', PATH: '/usr/bin', MONKEY: 'monkeysecret' }), 'env is production');
   });
+
+  it('redacts AUTHORIZATION and NPM_CONFIG_AUTHTOKEN values', () => {
+    const auth = 'bearer-authorization-value';
+    const npm = 'npm-authtoken-value';
+    const out = redactStdioFailure(`${auth} and ${npm} in production`, {
+      AUTHORIZATION: auth,
+      NPM_CONFIG_AUTHTOKEN: npm,
+      NODE_ENV: 'production'
+    });
+    assert.equal(out.includes(auth), false);
+    assert.equal(out.includes(npm), false);
+    assert.match(out, /\[REDACTED\]/);
+    assert.match(out, /production/);
+  });
 });
 
 describe('redactStdioTool', () => {
-  it('redacts description text only and leaves schema protocol fields intact', () => {
+  it('redacts description text in the schema and keeps enum values such as production', () => {
     const secret = 'supersecretvalue';
     const schema = {
       type: 'object',
+      description: `top ${secret}`,
       required: ['production'],
+      $ref: `ref-${secret}`,
       properties: {
-        production: { type: 'string', enum: ['production', secret], description: `use ${secret}` }
+        production: {
+          type: 'string',
+          enum: ['production', secret],
+          description: `use ${secret} in production`,
+          $ref: '#/production'
+        },
+        [secret]: { type: 'string', description: 'plain label' }
       }
     };
     const tool = {
@@ -212,11 +234,23 @@ describe('redactStdioTool', () => {
       PATH: '/usr/bin',
       MONKEY: 'monkeysecret'
     });
+    const input = out.inputSchema;
     assert.equal(out.description.includes(secret), false);
     assert.match(out.description, /\[REDACTED\]/);
     assert.match(out.description, /production/);
-    assert.deepEqual(out.inputSchema, schema);
-    assert.equal(JSON.stringify(out.inputSchema).includes(secret), true);
+    assert.equal(input.description.includes(secret), false);
+    assert.match(input.description, /\[REDACTED\]/);
+    assert.equal(input.properties.production.description.includes(secret), false);
+    assert.match(input.properties.production.description, /production/);
+    assert.deepEqual(input.properties.production.enum, ['production', secret]);
+    assert.deepEqual(input.required, ['production']);
+    assert.equal(input.$ref, `ref-${secret}`);
+    assert.equal(input.properties.production.$ref, '#/production');
+    assert.equal(Object.prototype.hasOwnProperty.call(input.properties, 'production'), true);
+    assert.equal(input.properties[secret].description, 'plain label');
+    assert.equal(input.properties[secret].type, 'string');
+    assert.equal(schema.description, `top ${secret}`);
+    assert.equal(schema.properties.production.description, `use ${secret} in production`);
     assert.equal(out.name, 'deploy');
     assert.equal(out.readOnlyHint, false);
   });
