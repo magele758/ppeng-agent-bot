@@ -99,7 +99,7 @@ test('restart closes unconfirmed tool wave and drains new input in same canonica
  const recoveryHost={...host,store:reopened,runSession:async id=>{const folded=reopened.foldMessages(id);assert.ok(!folded.some(m=>m.parts.some(p=>p.type==='tool_call')));reopened.appendMessage(id,'assistant',[{type:'text',text:'safe read complete'}]);}};
  await tickBotWork(recoveryHost);assert.equal(listBotTasks(reopened,principal).find(t=>t.id===task.id).status,'unknown');assert.ok(reopened.foldMessages(canonical).some(m=>JSON.stringify(m.parts).includes('new safe read')));
 });
-test('cancelling work parked on approval shows cancelled', async () => {
+test('cancelling work parked on approval shows cancelled [AC:pr152-approval-followups#AC-3]', async () => {
   const {store, host} = setup();
   const principal = resolveBotPrincipal(store);
   const a = createBot(host, {name: 'A'});
@@ -126,12 +126,15 @@ test('cancelling work parked on approval shows cancelled', async () => {
   await tickBotWork(host);
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(listBotTasks(store, principal).find((item) => item.id === task.id).status, 'waiting_approval');
+  const pendingApproval = store.listApprovals({status: 'pending'}).find(item => item.sessionId === b.canonicalSessionId);
+  assert.ok(pendingApproval);
   cancelSession({
     store,
     sessionAbortControllers: new Map(),
     backgroundJobAborts: new Map(),
     emitTrace() {}
   }, b.canonicalSessionId);
+  assert.equal(store.listApprovals().find(item => item.id === pendingApproval.id).status, 'rejected');
   const session = store.getSession(b.canonicalSessionId);
   assert.equal(session.metadata.interrupt, undefined);
   assert.equal(session.metadata.outcome.kind, 'aborted');

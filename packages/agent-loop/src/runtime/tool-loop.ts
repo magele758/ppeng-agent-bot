@@ -421,13 +421,7 @@ function appendApprovalToolResult(
   ]);
 }
 
-const APPROVAL_RANK: Record<ApprovalRecord['status'], number> = {
-  approved: 0,
-  pending: 1,
-  rejected: 2,
-};
-
-/** One scan per wave. Rejected wins over a stale pending or approved row with the same key. */
+/** One scan per wave. The newest record for each key wins. */
 function approvalIndexForSession(
   host: ToolLoopHost,
   sessionId: string
@@ -436,13 +430,11 @@ function approvalIndexForSession(
   for (const row of host.listApprovals()) {
     if (row.sessionId !== sessionId || !row.idempotencyKey) continue;
     const prev = index.get(row.idempotencyKey);
-    if (!prev || APPROVAL_RANK[row.status] >= APPROVAL_RANK[prev.status]) index.set(row.idempotencyKey, row);
+    // ISO 8601 timestamps in the same UTC format sort chronologically via lexicographic >=.
+    // On equal timestamps, the last listed record wins, matching the hook-ask path.
+    if (!prev || row.createdAt >= prev.createdAt) index.set(row.idempotencyKey, row);
   }
   return index;
-}
-
-function approvalMatches(row: ApprovalRecord, sessionId: string, idemKey: string): boolean {
-  return row.sessionId === sessionId && row.idempotencyKey === idemKey;
 }
 
 /** Per call and per tool+input. A reused id with different args must not inherit an earlier approval. */
@@ -450,18 +442,13 @@ function hookAskKey(toolCall: ToolCallPart): string {
   return `${toolCall.toolCallId}:${stableJsonHash(toolCall.name, toolCall.input)}`;
 }
 
-/** Newest row wins, so a later approval is not hidden by an older rejection of the same call. */
-function latestMatchingApproval(
-  host: ToolLoopHost,
-  sessionId: string,
-  idemKey: string
-): ApprovalRecord | undefined {
-  let latest: ApprovalRecord | undefined;
-  for (const row of host.listApprovals()) {
-    if (!approvalMatches(row, sessionId, idemKey)) continue;
-    if (!latest || row.createdAt >= latest.createdAt) latest = row;
-  }
-  return latest;
+/** Lazy, wave-local lookup shared by all hook asks, including sequential chunks. */
+function createApprovalLookup(host: ToolLoopHost, sessionId: string): (key: string) => ApprovalRecord | undefined {
+  let sessionApprovals: Map<string, ApprovalRecord> | undefined;
+  return (key) => {
+    sessionApprovals ??= approvalIndexForSession(host, sessionId);
+    return sessionApprovals.get(key);
+  };
 }
 
 function userRejectedToolResult(toolCall: ToolCallPart, toolName: string): ToolLoopResult {
@@ -508,10 +495,11 @@ function resolvePreToolAsk(
   tool: ToolContract<Record<string, unknown>>,
   toolCall: ToolCallPart,
   sessionId: string,
-  message: string | undefined
+  message: string | undefined,
+  approvalFor: (key: string) => ApprovalRecord | undefined
 ): ToolLoopResult | undefined {
   const idemKey = hookAskKey(toolCall);
-  const latest = latestMatchingApproval(host, sessionId, idemKey);
+  const latest = approvalFor(idemKey);
   if (latest && latest.status === 'rejected') return userRejectedToolResult(toolCall, tool.name);
   if (latest && latest.status === 'approved') return undefined;
   return holdForHookAsk(host, tool, toolCall, sessionId, message);
@@ -529,6 +517,20 @@ export async function executeSingleTool(
   allowExternalAiTools: boolean,
   sessionId: string,
   completed?: CompletedWaveItem[]
+): Promise<ToolLoopResult> {
+  return executeSingleToolWithApprovals(host, tools, toolCall, context, allowExternalAiTools, sessionId,
+    completed, createApprovalLookup(host, sessionId));
+}
+
+async function executeSingleToolWithApprovals(
+  host: ToolLoopHost,
+  tools: ToolContract<Record<string, unknown>>[],
+  toolCall: ToolCallPart,
+  context: RunContext,
+  allowExternalAiTools: boolean,
+  sessionId: string,
+  completed: CompletedWaveItem[] | undefined,
+  approvalFor: (key: string) => ApprovalRecord | undefined
 ): Promise<ToolLoopResult> {
   const tool = findToolByName(tools, toolCall.name);
   if (!tool) {
@@ -639,7 +641,7 @@ export async function executeSingleTool(
   }
 
   if (pre.permissionDecision === 'ask') {
-    const asked = resolvePreToolAsk(host, tool, toolCall, sessionId, pre.message);
+    const asked = resolvePreToolAsk(host, tool, toolCall, sessionId, pre.message, approvalFor);
     if (asked) return asked;
   }
 
@@ -828,10 +830,11 @@ export async function executeToolCalls(
 ): Promise<ToolLoopResult[]> {
   const completed: CompletedWaveItem[] = [];
   const results: ToolLoopResult[] = [];
+  const approvalFor = createApprovalLookup(host, sessionId);
 
   for (const chunk of partitionForParallel(validToolCalls, maxParallelToolCalls)) {
     const chunkResults = await Promise.all(
-      chunk.map((tc) => executeSingleTool(host, tools, tc, context, allowExternalAiTools, sessionId, completed))
+      chunk.map((tc) => executeSingleToolWithApprovals(host, tools, tc, context, allowExternalAiTools, sessionId, completed, approvalFor))
     );
     results.push(...chunkResults);
   }

@@ -1,0 +1,25 @@
+id: pr152-approval-followups
+title: Consistent approval decisions and cancelled parked work
+status: implemented
+owner: lei
+notes: Criteria approved under the owner's standing instruction without per-item confirmation; final acceptance by lei pending.
+requirement: |
+  Implement these 4 small follow-ups in this repo worktree. Do not commit or push, no env-var flags, do not deploy or restart anything.
+  Make the permissionMode approval path use latest-record-wins consistently with the hook path (createdAt ordering), preserving existing test expectations where they encode intended behavior; add a test where a later approval after a rejection is honored.
+  Cache latestMatchingApproval once per wave the way sessionApprovals is.
+  Assert that cancelling a parked session also rejects the pending approval record.
+  Add a comment noting that the createdAt >= string compare relies on ISO 8601 lexicographic ordering.
+  Run the packages/agent-loop tests and build, plus packages/core bot-work test. Report per item.
+criteria:
+  - id: AC-1
+    given: A guarded action has multiple approval decisions
+    when: The action is checked again
+    then: The most recently created decision is honored, including approval after rejection, regardless of the order decisions are returned
+  - id: AC-2
+    given: Multiple actions in one wave ask for approval
+    when: The wave runs and then a later wave resumes after decisions change
+    then: Each wave reads approvals once and the later wave honors the updated decisions
+  - id: AC-3
+    given: Bot work is parked with a pending approval
+    when: Its session is cancelled
+    then: The pending approval is rejected and the work becomes cancelled

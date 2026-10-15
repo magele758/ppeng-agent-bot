@@ -13,7 +13,7 @@ import {
   type CompletedWaveItem,
   type ToolLoopHost,
 } from './tool-loop.js';
-import type { RunContext, SessionRecord, ToolCallPart, ToolContract } from '../types.js';
+import type { ApprovalRecord, RunContext, SessionRecord, ToolCallPart, ToolContract } from '../types.js';
 
 const ctx = { session: { id: 's1', metadata: {} } } as unknown as RunContext;
 
@@ -280,6 +280,32 @@ describe('checkToolApprovals', () => {
   const always = (name: string) =>
     tool(name, async () => ({ ok: true, content: '' }), { approvalMode: 'always' });
 
+  it('honors the newest permission decision regardless of row order [AC:pr152-approval-followups#AC-1]', () => {
+    const session = { id: 's1', metadata: { permissionMode: 'ask' } } as unknown as SessionRecord;
+    const approvals: ApprovalRecord[] = [];
+    const h = host({
+      listApprovals: () => approvals,
+      createApproval: (input) => {
+        const row = { ...input, id: 'old', status: 'rejected' as const, createdAt: '2026-10-15T01:00:00.000Z', updatedAt: '2026-10-15T01:00:00.000Z' };
+        approvals.push(row);
+        return row;
+      },
+    });
+    const calls = [call('bash', { command: 'ls' }, 'c1')];
+    const tools = [always('bash')];
+    checkToolApprovals(h, tools, calls, ctx, undefined, session, undefined);
+    const old = approvals[0]!;
+    const newer = { ...old, id: 'new', status: 'approved' as const, createdAt: '2026-10-15T02:00:00.000Z' };
+    for (const rows of [[old, newer], [newer, old]]) {
+      approvals.splice(0, approvals.length, ...rows);
+      expect(checkToolApprovals(h, tools, calls, ctx, undefined, session, undefined)).toBe('proceed');
+      expect(h.appended).toEqual([]);
+    }
+    approvals.push({ ...old, id: 'newest', createdAt: '2026-10-15T03:00:00.000Z' });
+    checkToolApprovals(h, tools, calls, ctx, undefined, session, undefined);
+    expect(h.appended).toHaveLength(1);
+  });
+
   it('creates one pending approval per call and does not proceed when only one is approved', () => {
     const approvals: Array<{
       id: string;
@@ -429,6 +455,32 @@ describe('checkToolApprovals', () => {
 });
 
 describe('pre_tool_use ask', () => {
+  it('reads approvals once across wave chunks and refreshes on resume [AC:pr152-approval-followups#AC-2]', async () => {
+    const approvals: ApprovalRecord[] = [];
+    const listApprovals = vi.fn(() => approvals);
+    const execute = vi.fn(async () => ({ ok: true, content: 'ran' }));
+    const h = host({
+      listApprovals,
+      runLifecycleHook: async () => ({ permissionDecision: 'ask' }),
+      createApproval: (input) => {
+        const row = { ...input, id: String(approvals.length), status: 'pending' as const, createdAt: '2026-10-15T01:00:00.000Z', updatedAt: '2026-10-15T01:00:00.000Z' };
+        approvals.push(row);
+        return row;
+      },
+    });
+    const tools = [tool('echo', execute)];
+    const calls = [call('echo', {}, 'one'), call('echo', {}, 'two'), call('echo', {}, 'three')];
+    const held = await executeToolCalls(h, tools, calls, ctx, false, 's1', 2);
+    expect(held.every(result => result.hold === 'approval')).toBe(true);
+    expect(listApprovals).toHaveBeenCalledTimes(1);
+    expect(execute).not.toHaveBeenCalled();
+    approvals.forEach(row => { row.status = 'approved'; });
+    const resumed = await executeToolCalls(h, tools, calls, ctx, false, 's1', 2);
+    expect(resumed.every(result => result.ok)).toBe(true);
+    expect(listApprovals).toHaveBeenCalledTimes(2);
+    expect(execute).toHaveBeenCalledTimes(3);
+  });
+
   it('holds for approval instead of writing a failure result', async () => {
     const h = host({
       runLifecycleHook: async () => ({ permissionDecision: 'ask', message: 'please confirm' }),
