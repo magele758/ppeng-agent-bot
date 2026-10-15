@@ -49,6 +49,8 @@ export const agents = {
     created: 'Created Bot "{name}"',
     createFailed: 'Could not create: {error}',
     detailTitle: 'Bot settings',
+    faceLabel: 'Robot avatar for {name}',
+    faceEmpty: 'Robot avatar',
     openChat: 'Open chat',
     openChatFailed: 'Could not open chat: {error}',
     sectionSchedule: 'Scheduled jobs',

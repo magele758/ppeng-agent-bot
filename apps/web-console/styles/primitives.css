@@ -133,6 +133,11 @@
   text-align: center;
 }
 
+.ui-empty__icon {
+  display: flex;
+  color: var(--ui-text);
+}
+
 .ui-empty__title {
   font-size: var(--ui-text-lg);
   font-weight: 600;
