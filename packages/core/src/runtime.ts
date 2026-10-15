@@ -250,6 +250,9 @@ export class RawAgentRuntime {
   private readonly sessionAbortControllers = new Map<string, AbortController>();
   /** Tracks sessions currently in runSession() to prevent concurrent runs on the same session. */
   private readonly runningSessions = new Map<string, Promise<SessionRecord>>();
+  /** Late subscribers (Lab follow after ask_user) receive chunks from the in-flight run. */
+  private readonly modelStreamListeners = new Map<string, Set<(chunk: ModelStreamChunk) => void>>();
+  private readonly sessionRunWaiters = new Map<string, Set<(run: Promise<SessionRecord>) => void>>();
   /**
    * Last turn's system-prompt size and tool count per session, used to derive the
    * history token budget. Populated after the first turn assembles its prompt;
@@ -1244,6 +1247,108 @@ export class RawAgentRuntime {
     return ensureWorkspaceRootFn(spawnFrom(this.l5()), session, task);
   }
 
+  /** Subscribe to model chunks for a session. Safe to call before the run starts. */
+  subscribeModelStream(sessionId: string, listener: (chunk: ModelStreamChunk) => void): () => void {
+    const set = this.modelStreamListeners.get(sessionId) ?? new Set<(chunk: ModelStreamChunk) => void>();
+    set.add(listener);
+    this.modelStreamListeners.set(sessionId, set);
+    return () => {
+      set.delete(listener);
+      if (set.size === 0) this.modelStreamListeners.delete(sessionId);
+    };
+  }
+
+  /**
+   * Settle when the in-flight run ends, or when the next run starts and then ends.
+   * Does not start a run. Aborting `signal` stops waiting and leaves the run going.
+   */
+  waitForSessionRun(
+    sessionId: string,
+    opts?: { signal?: AbortSignal; timeoutMs?: number }
+  ): Promise<SessionRecord | undefined> {
+    const watch = (run: Promise<SessionRecord>) => this.observeSessionRun(run, opts?.signal);
+    const existing = this.runningSessions.get(sessionId);
+    if (existing) return watch(existing);
+    const timeoutMs = opts?.timeoutMs ?? 20_000;
+    return new Promise((resolve) => {
+      let settled = false;
+      const set = this.sessionRunWaiters.get(sessionId) ?? new Set<(run: Promise<SessionRecord>) => void>();
+      this.sessionRunWaiters.set(sessionId, set);
+      const stopWaiting = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        opts?.signal?.removeEventListener('abort', onAbort);
+        set.delete(onStart);
+        if (set.size === 0) this.sessionRunWaiters.delete(sessionId);
+      };
+      const onStart = (run: Promise<SessionRecord>) => {
+        stopWaiting();
+        void watch(run).then(resolve);
+      };
+      const onAbort = () => {
+        stopWaiting();
+        resolve(undefined);
+      };
+      const timer = setTimeout(() => {
+        stopWaiting();
+        resolve(undefined);
+      }, timeoutMs);
+      set.add(onStart);
+      if (opts?.signal?.aborted) {
+        onAbort();
+        return;
+      }
+      opts?.signal?.addEventListener('abort', onAbort, { once: true });
+      const again = this.runningSessions.get(sessionId);
+      if (again) onStart(again);
+    });
+  }
+
+  private observeSessionRun(
+    run: Promise<SessionRecord>,
+    signal?: AbortSignal
+  ): Promise<SessionRecord | undefined> {
+    if (signal?.aborted) return Promise.resolve(undefined);
+    return new Promise((resolve) => {
+      const onAbort = () => resolve(undefined);
+      signal?.addEventListener('abort', onAbort, { once: true });
+      run.then(
+        (record) => {
+          signal?.removeEventListener('abort', onAbort);
+          resolve(signal?.aborted ? undefined : record);
+        },
+        () => {
+          signal?.removeEventListener('abort', onAbort);
+          resolve(undefined);
+        }
+      );
+    });
+  }
+
+  private notifySessionRunStarted(sessionId: string, run: Promise<SessionRecord>): void {
+    const waiters = this.sessionRunWaiters.get(sessionId);
+    if (!waiters || waiters.size === 0) return;
+    for (const waiter of [...waiters]) waiter(run);
+  }
+
+  private deliverModelStreamChunk(
+    sessionId: string,
+    chunk: ModelStreamChunk,
+    direct?: (chunk: ModelStreamChunk) => void
+  ): void {
+    direct?.(chunk);
+    const listeners = this.modelStreamListeners.get(sessionId);
+    if (!listeners) return;
+    for (const listener of [...listeners]) {
+      try {
+        listener(chunk);
+      } catch (error) {
+        this.log.warn('model stream listener failed', { sessionId, error: String(error) });
+      }
+    }
+  }
+
   /** Explicit human run request; subsystem runs keep their own original result promise. */
   runHumanSession(sessionId: string, options?: Parameters<RawAgentRuntime['runSession']>[1]): Promise<SessionRecord> {
     requestHumanRun(this.store, sessionId);
@@ -1293,13 +1398,27 @@ export class RawAgentRuntime {
       return parked;
     }
     const existing = this.runningSessions.get(sessionId);
-    if (existing && !options?.latch) return existing;
+    if (existing && !options?.latch) {
+      const late = options?.onModelStreamChunk;
+      if (late) {
+        const detach = this.subscribeModelStream(sessionId, late);
+        void existing.finally(() => detach());
+      }
+      return existing;
+    }
     if (existing && options?.latch) {
       await existing.catch(() => undefined);
     }
     const observeHuman = createHumanContinuationObserver(this.store, sessionId);
     const callerEvent = options?.onEvent;
     options = { ...options, onEvent: async event => { await observeHuman(event); await callerEvent?.(event); } };
+    const directChunk = options?.onModelStreamChunk;
+    if (directChunk || (this.modelStreamListeners.get(sessionId)?.size ?? 0) > 0) {
+      options = {
+        ...options,
+        onModelStreamChunk: (chunk) => this.deliverModelStreamChunk(sessionId, chunk, directChunk)
+      };
+    }
     const { signal: callerSignal, ...runOptions } = options ?? {};
     expireDueUnattendedApprovals(this.store);
 
@@ -1378,6 +1497,7 @@ export class RawAgentRuntime {
       this.scheduleHumanContinuations();
     });
     this.runningSessions.set(sessionId, promise);
+    this.notifySessionRunStarted(sessionId, promise);
     return promise;
   }
 
