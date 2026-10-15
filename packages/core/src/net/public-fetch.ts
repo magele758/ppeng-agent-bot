@@ -13,6 +13,7 @@ export const PRIVATE_HOST_REFUSAL =
 
 const MAX_REDIRECTS = 5;
 const DEFAULT_DNS_TIMEOUT_MS = 10_000;
+const DEFAULT_CONNECT_TIMEOUT_MS = 10_000;
 
 export class PrivateNetworkDenied extends Error {
   readonly code = 'private_network';
@@ -34,6 +35,13 @@ export interface PublicFetchDeps {
   maxRedirects?: number;
   /** DNS deadline. The caller abort signal also cancels lookup. Default 10s. */
   dnsTimeoutMs?: number;
+  /**
+   * Per-address connect deadline. A silent address is abandoned so the next
+   * approved address can be tried. The caller abort signal still stops failover.
+   * After response headers this deadline is cleared, but the caller abort stays
+   * armed until the body is read or cancelled. Default 10s. Not an environment switch.
+   */
+  connectTimeoutMs?: number;
 }
 
 export interface PublicFetchInit extends PublicFetchDeps {
@@ -200,9 +208,117 @@ async function approvedPublicAddresses(
   return addresses;
 }
 
+function connectTimeoutMs(init: PublicFetchInit): number {
+  return init.connectTimeoutMs && init.connectTimeoutMs > 0 ? init.connectTimeoutMs : DEFAULT_CONNECT_TIMEOUT_MS;
+}
+
+interface ConnectAttempt {
+  signal: AbortSignal;
+  /** Headers arrived. Drop only the connect timer; caller abort stays linked. */
+  clearConnectTimer(): void;
+  /** Connection failed, the body was cancelled, or the body finished. */
+  dispose(): void;
+}
+
+/**
+ * Per-address deadline. A plain `AbortSignal.timeout` is unref'd, so a silent
+ * socket would never expire when this fetch is the only pending work.
+ * `clearConnectTimer` must not detach the caller abort: body reads still need it.
+ */
+function connectDeadline(parent: AbortSignal, ms: number): ConnectAttempt {
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    const error = new Error('connect timed out');
+    error.name = 'AbortError';
+    controller.abort(error);
+  }, ms);
+  const onParent = () => controller.abort(parent.reason);
+  if (parent.aborted) controller.abort(parent.reason);
+  else parent.addEventListener('abort', onParent, { once: true });
+  let disposed = false;
+  return {
+    signal: controller.signal,
+    clearConnectTimer() {
+      clearTimeout(timer);
+    },
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      clearTimeout(timer);
+      parent.removeEventListener('abort', onParent);
+    }
+  };
+}
+
+/**
+ * Keep `parent` wired to the socket until the body ends, errors, or is cancelled.
+ * Clearing that link when the headers arrive leaves a stalled body unread forever.
+ */
+function retainCallerAbort(response: Response, parent: AbortSignal, dispose: () => void): Response {
+  const body = response.body;
+  if (!body) {
+    dispose();
+    return response;
+  }
+  const reader = body.getReader();
+  let released = false;
+  const release = () => {
+    if (released) return;
+    released = true;
+    parent.removeEventListener('abort', onAbort);
+    dispose();
+  };
+  const onAbort = () => {
+    void reader.cancel(abortError(parent)).catch(() => undefined);
+  };
+  if (parent.aborted) onAbort();
+  else parent.addEventListener('abort', onAbort);
+  const wrapped = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      if (parent.aborted) {
+        const reason = abortError(parent);
+        release();
+        await reader.cancel(reason).catch(() => undefined);
+        controller.error(reason);
+        return;
+      }
+      try {
+        const { done, value } = await reader.read();
+        if (parent.aborted) {
+          const reason = abortError(parent);
+          release();
+          controller.error(reason);
+          return;
+        }
+        if (done) {
+          release();
+          controller.close();
+          return;
+        }
+        controller.enqueue(value);
+      } catch (error) {
+        release();
+        controller.error(error instanceof Error ? error : new Error(String(error)));
+      }
+    },
+    cancel(reason) {
+      release();
+      return reader.cancel(reason);
+    }
+  });
+  return new Response(wrapped, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers
+  });
+}
+
 /**
  * GET/HEAD with manual redirects. Every hop is rechecked.
- * Each attempt is pinned to one approved address. A connection failure tries the next approved address.
+ * Each attempt is pinned to one approved address and has its own connect deadline.
+ * A connection failure or a silent address tries the next approved address.
+ * An abort from the caller does not. After headers, that abort stays armed until
+ * the body is read or cancelled; only the connect timer is cleared.
  */
 export async function fetchPinnedPublic(rawUrl: string, init: PublicFetchInit): Promise<Response> {
   let current: URL;
@@ -218,27 +334,40 @@ export async function fetchPinnedPublic(rawUrl: string, init: PublicFetchInit): 
     const addresses = await approvedPublicAddresses(current, init, init.signal);
     let response: Response | undefined;
     let lastError: unknown;
+    let attempt: ConnectAttempt | undefined;
+    const connectMs = connectTimeoutMs(init);
     for (const address of addresses) {
       if (init.signal.aborted) throw abortError(init.signal);
+      const currentAttempt = connectDeadline(init.signal, connectMs);
       try {
         response = await request(current, address, {
           method: init.method ?? 'GET',
           headers: init.headers ?? {},
-          signal: init.signal
+          signal: currentAttempt.signal
         });
+        currentAttempt.clearConnectTimer();
+        attempt = currentAttempt;
         break;
       } catch (err) {
-        if (isAbortError(err, init.signal)) throw err;
+        currentAttempt.dispose();
+        if (init.signal.aborted) throw isAbortError(err, init.signal) ? err : abortError(init.signal);
         lastError = err;
       }
     }
-    if (!response) {
+    if (!response || !attempt) {
       throw lastError instanceof Error ? lastError : new Error('connect failed');
     }
+    if (init.signal.aborted) {
+      await response.body?.cancel().catch(() => undefined);
+      attempt.dispose();
+      throw abortError(init.signal);
+    }
     const redirect = response.status >= 300 && response.status < 400;
-    if (!redirect) return response;
+    const settled = attempt;
+    if (!redirect) return retainCallerAbort(response, init.signal, () => settled.dispose());
     const location = response.headers.get('location');
     await response.body?.cancel().catch(() => undefined);
+    attempt.dispose();
     if (!location || hop === max) throw new Error('Redirect limit exceeded');
     current = new URL(location, current);
   }

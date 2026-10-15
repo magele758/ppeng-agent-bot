@@ -23,6 +23,9 @@ function appendDaemonBearerIfConfigured(headers: Headers): void {
 
 function appendLabForwarding(request: NextRequest, headers: Headers): void {
   headers.set(LAB_PROXY_HEADER, '1');
+  // fetch() to the daemon replaces Host. Forward the browser host so a loopback
+  // Lab keeps its own port as the OAuth callback. The daemon accepts this only
+  // when it is loopback; a public host is rejected unless public origin is set.
   headers.set('x-forwarded-host', request.nextUrl.host);
   headers.set('x-forwarded-proto', request.nextUrl.protocol.replace(/:$/, '') || 'http');
 }

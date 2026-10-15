@@ -11,10 +11,17 @@ import {
   canAccessSession,
   filterSessionsByAuth,
   hashToken,
+  OAUTH_PUBLIC_ORIGIN_REQUIRED,
+  oauthNonLocalNeedsPublicOrigin,
   oauthPublicConfig,
+  oauthPublicOrigin,
+  oauthStartupNeedsPublicOrigin,
   stampOwnerMetadata,
   upsertUserFromOAuth
 } from '../dist/auth/index.js';
+import { RawAgentRuntime } from '../dist/runtime.js';
+import { authRoutes } from '../../../apps/daemon/dist/routes/auth.js';
+import { requestPublicOrigin, requestSecure } from '../../../apps/daemon/dist/user-auth.js';
 
 function tempStore() {
   const dir = mkdtempSync(join(tmpdir(), 'oauth-'));
@@ -142,4 +149,144 @@ test('filterSessionsByAuth hides other owners when isolating', () => {
   assert.equal(canAccessSession(sessions[1], auth), false);
   assert.equal(canAccessSession(sessions[0], ANONYMOUS_AUTH), true);
   assert.deepEqual(stampOwnerMetadata({ title: 'x' }, auth).userId, 'u1');
+});
+
+test('oauthPublicOrigin trusts only the configured origin, else loopback', () => {
+  assert.equal(
+    oauthPublicOrigin(
+      { RAW_AGENT_OAUTH_PUBLIC_ORIGIN: 'https://lab.example/' },
+      'https://evil.example'
+    ),
+    'https://lab.example'
+  );
+  assert.equal(oauthPublicOrigin({}, '127.0.0.1:27070'), 'http://127.0.0.1:27070');
+  assert.equal(oauthPublicOrigin({}, 'http://localhost:23000/ignored'), 'http://localhost:23000');
+  assert.equal(oauthPublicOrigin({}, '[::1]:37070'), 'http://[::1]:37070');
+  assert.equal(oauthPublicOrigin({}, 'evil.example'), '');
+  assert.equal(oauthPublicOrigin({}, 'https://evil.example'), '');
+  assert.equal(oauthPublicOrigin({}, 'localhost.evil.com'), '');
+  assert.equal(oauthPublicOrigin({}, 'https://user:pass@127.0.0.1'), '');
+});
+
+function oauthEnv() {
+  return {
+    RAW_AGENT_OAUTH_GOOGLE_CLIENT_ID: 'id',
+    RAW_AGENT_OAUTH_GOOGLE_CLIENT_SECRET: 'secret'
+  };
+}
+
+function startGoogle(env, headers) {
+  const dir = mkdtempSync(join(tmpdir(), 'oauth-origin-'));
+  const runtime = new RawAgentRuntime({
+    repoRoot: dir,
+    stateDir: dir,
+    modelAdapter: {
+      name: 'noop',
+      async runTurn() {
+        return { stopReason: 'end', assistantParts: [] };
+      },
+      async summarizeMessages() {
+        return '';
+      }
+    }
+  });
+  const spec = authRoutes({ runtime, authStore: new AuthStore(runtime.store.db), env }).find(
+    (route) => route.method === 'GET' && route.pattern === '/api/auth/google/start'
+  );
+  assert.ok(spec);
+  let location;
+  let body = '';
+  const response = {
+    statusCode: 200,
+    setHeader(name, value) {
+      if (String(name).toLowerCase() === 'location') location = value;
+    },
+    appendHeader() {},
+    end(text) {
+      if (text) body += text;
+    }
+  };
+  spec.handler({
+    request: { headers, url: '/api/auth/google/start' },
+    response,
+    url: new URL('http://127.0.0.1/api/auth/google/start'),
+    parts: ['api', 'auth', 'google', 'start'],
+    params: {},
+    requireParam: () => '',
+    readBody: async () => ({}),
+    auth: ANONYMOUS_AUTH
+  });
+  runtime.store.db.close();
+  return { status: response.statusCode, location, body };
+}
+
+test('OAuth start ignores forged Host and X-Forwarded-Host when public origin is unset', () => {
+  const forged = {
+    host: 'evil.example',
+    'x-forwarded-host': 'evil.example',
+    'x-forwarded-proto': 'https'
+  };
+  assert.equal(oauthStartupNeedsPublicOrigin(oauthEnv()), true);
+  assert.equal(oauthStartupNeedsPublicOrigin({
+    ...oauthEnv(),
+    RAW_AGENT_OAUTH_PUBLIC_ORIGIN: 'https://lab.example'
+  }), false);
+  assert.equal(oauthNonLocalNeedsPublicOrigin(oauthEnv(), ['evil.example', '127.0.0.1:27070']), true);
+  assert.equal(oauthNonLocalNeedsPublicOrigin({}, ['127.0.0.1:27070', 'localhost:23000']), false);
+  assert.equal(requestPublicOrigin({ headers: forged }, {}), '');
+  assert.equal(requestSecure({ headers: forged }, {}), false);
+  const started = startGoogle(oauthEnv(), forged);
+  assert.equal(started.status, 400);
+  assert.equal(started.location, undefined);
+  assert.match(started.body, /RAW_AGENT_OAUTH_PUBLIC_ORIGIN/);
+  assert.match(started.body, new RegExp(OAUTH_PUBLIC_ORIGIN_REQUIRED.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.doesNotMatch(started.body, /evil\.example/);
+
+  const loopbackHeaders = {
+    host: '127.0.0.1:27070',
+    'x-forwarded-host': 'evil.example',
+    'x-forwarded-proto': 'https'
+  };
+  assert.equal(requestPublicOrigin({ headers: loopbackHeaders }, {}), 'http://127.0.0.1:27070');
+  assert.equal(requestSecure({ headers: loopbackHeaders }, {}), false);
+  const proxied = startGoogle(oauthEnv(), loopbackHeaders);
+  assert.equal(proxied.status, 400);
+  assert.equal(proxied.location, undefined);
+  assert.match(proxied.body, /RAW_AGENT_OAUTH_PUBLIC_ORIGIN/);
+  assert.doesNotMatch(proxied.body, /evil\.example/);
+
+  const local = startGoogle(oauthEnv(), { host: '127.0.0.1:27070' });
+  assert.equal(local.status, 302);
+  assert.match(local.location, /^https:\/\/accounts\.google\.com\//);
+  assert.match(local.location, /redirect_uri=http%3A%2F%2F127\.0\.0\.1%3A27070%2Fapi%2Fauth%2Fgoogle%2Fcallback/);
+
+  const labHeaders = {
+    host: '127.0.0.1:27070',
+    'x-forwarded-host': '127.0.0.1:23000',
+    'x-forwarded-proto': 'https'
+  };
+  assert.equal(requestPublicOrigin({ headers: labHeaders }, {}), 'http://127.0.0.1:23000');
+  assert.equal(requestSecure({ headers: labHeaders }, {}), false);
+  const localLab = startGoogle(oauthEnv(), labHeaders);
+  assert.equal(localLab.status, 302);
+  assert.match(localLab.location, /redirect_uri=http%3A%2F%2F127\.0\.0\.1%3A23000%2Fapi%2Fauth%2Fgoogle%2Fcallback/);
+  assert.doesNotMatch(localLab.location, /27070/);
+
+  const localLabHost = startGoogle(oauthEnv(), {
+    host: '127.0.0.1:27070',
+    'x-forwarded-host': 'localhost:23000'
+  });
+  assert.equal(localLabHost.status, 302);
+  assert.match(localLabHost.location, /redirect_uri=http%3A%2F%2Flocalhost%3A23000%2Fapi%2Fauth%2Fgoogle%2Fcallback/);
+
+  const configured = {
+    ...oauthEnv(),
+    RAW_AGENT_OAUTH_PUBLIC_ORIGIN: 'https://lab.example'
+  };
+  assert.equal(requestPublicOrigin({ headers: forged }, configured), 'https://lab.example');
+  assert.equal(requestSecure({ headers: forged }, configured), true);
+  const remote = startGoogle(configured, forged);
+  assert.equal(remote.status, 302);
+  assert.match(remote.location, /redirect_uri=https%3A%2F%2Flab\.example%2Fapi%2Fauth%2Fgoogle%2Fcallback/);
+  assert.doesNotMatch(remote.location, /evil\.example/);
 });

@@ -66,7 +66,7 @@ export interface AssembledLoopIo {
   // 审批与安全策略
   envApprovalPolicy?: ApprovalPolicy;                      // 工具审批策略（auto / strict / manual）
   filePolicy?: FileApprovalPolicy;                         // 文件写入/修改审批策略
-  redactSecrets?: (content: string) => string;             // 敏感信息脱敏过滤器
+  redactSecrets?: (content: string) => string;             // 每个工具结果在归档前都经过它
 
   // 存储与资源解析
   archiveToolResult?: (input: { sessionId: string; toolName: string; content: string }) => string;

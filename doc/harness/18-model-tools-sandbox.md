@@ -237,15 +237,14 @@ Tier 0 **不**限制文件系统/网络——那是 Tier 1。
 4. 长值优先匹配，避免子串互伤
 
 目的：`printenv` / 误 dump **不会**把密钥原样写进会话库、trace、下一轮 prompt。  
-不是访问控制（用户本机仍有密钥），是 **return-path containment**。
+不是访问控制（用户本机仍有密钥），是 **return-path containment**。每个工具结果在归档前都走 `redactSecrets`（产品宿主接到 `redactToolContent`），不限 shell。`read_file` / `grep_files` 对 `isBlockedPath` 以及文件名 `.env`、`id_rsa`、`credentials` 直接拒绝，不把正文放进结果。
 
 链路：
 
 ```
-bash/bg_* execute
-  → SandboxManager (Tier0 env + 可选 Tier1)
-  → truncate
-  → redactEnvValues / redactToolContent
+tool execute
+  → redactToolContent
+  → archive / truncate
   → persist + 回灌模型
 ```
 

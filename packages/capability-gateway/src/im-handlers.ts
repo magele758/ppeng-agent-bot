@@ -320,7 +320,7 @@ export async function handleFeishuEventRequest(input: {
   }
 
   const eventKey = feishuEventKey(unwrapped, inbound);
-  if (eventKey && !claimInboundEvent(eventKey)) {
+  if (eventKey && !claimInboundEvent(eventKey, Date.now(), input.gatewayDir)) {
     return { kind: 'empty', status: 200 };
   }
 

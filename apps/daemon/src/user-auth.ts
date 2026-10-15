@@ -4,6 +4,8 @@ import {
   authUserFromId,
   hashToken,
   LAB_PROXY_HEADER,
+  isPublicHttpHost,
+  oauthNonLocalNeedsPublicOrigin,
   oauthPublicConfig,
   oauthPublicOrigin,
   readSessionToken,
@@ -30,16 +32,29 @@ export function isAuthPublicPath(pathname: string): boolean {
 }
 
 export function requestPublicOrigin(request: IncomingMessage, env: NodeJS.ProcessEnv): string {
-  const forwardedHost = headerValue(request, 'x-forwarded-host');
-  const forwardedProto = headerValue(request, 'x-forwarded-proto');
-  const host = forwardedHost || headerValue(request, 'host') || '';
-  const proto = forwardedProto || (host.startsWith('localhost') || host.startsWith('127.0.0.1') ? 'http' : 'https');
-  const fallback = host.includes('://') ? host : host ? `${proto}://${host}` : '';
-  return oauthPublicOrigin(env, fallback);
+  const explicit = oauthPublicOrigin(env);
+  if (explicit) return explicit;
+  // Lab's proxy replaces Host with the daemon. A loopback X-Forwarded-Host is the
+  // browser origin (including its port). Non-loopback values are not a callback origin.
+  const forwarded = headerValue(request, 'x-forwarded-host');
+  if (forwarded && !isPublicHttpHost(forwarded)) {
+    const first = forwarded.split(',')[0]?.trim();
+    const origin = oauthPublicOrigin(env, first);
+    if (origin) return origin;
+  }
+  return oauthPublicOrigin(env, headerValue(request, 'host'));
 }
 
 export function requestSecure(request: IncomingMessage, env: NodeJS.ProcessEnv): boolean {
   return requestPublicOrigin(request, env).startsWith('https://');
+}
+
+/** True when this request is non-local and RAW_AGENT_OAUTH_PUBLIC_ORIGIN is unset. */
+export function oauthOriginBlocked(request: IncomingMessage, env: NodeJS.ProcessEnv): boolean {
+  return oauthNonLocalNeedsPublicOrigin(env, [
+    headerValue(request, 'host'),
+    headerValue(request, 'x-forwarded-host')
+  ]);
 }
 
 function sessionUser(params: {

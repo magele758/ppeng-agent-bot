@@ -1,4 +1,6 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 /** Constant-time string comparison (length-independent via hashing). */
 export function safeEqual(a: string, b: string): boolean {
@@ -7,9 +9,20 @@ export function safeEqual(a: string, b: string): boolean {
   return timingSafeEqual(ha, hb);
 }
 
+/** Feishu `X-Lark-Request-Timestamp` older or newer than this is rejected. */
+export const FEISHU_SIGNATURE_WINDOW_MS = 5 * 60 * 1000;
+
+function feishuTimestampFresh(timestamp: string, nowMs: number): boolean {
+  if (!/^\d{1,16}$/.test(timestamp)) return false;
+  const seconds = Number(timestamp);
+  if (!Number.isFinite(seconds)) return false;
+  return Math.abs(nowMs - seconds * 1000) <= FEISHU_SIGNATURE_WINDOW_MS;
+}
+
 /**
  * Feishu request signature: sha256(timestamp + nonce + encryptKey + rawBody), hex.
  * Sent in X-Lark-Request-Timestamp / X-Lark-Request-Nonce / X-Lark-Signature.
+ * A timestamp more than 5 minutes from `nowMs` is rejected.
  */
 export function verifyFeishuSignature(input: {
   rawBody: string;
@@ -17,8 +30,10 @@ export function verifyFeishuSignature(input: {
   timestamp?: string;
   nonce?: string;
   signature?: string;
+  nowMs?: number;
 }): boolean {
   if (!input.timestamp || !input.nonce || !input.signature) return false;
+  if (!feishuTimestampFresh(input.timestamp, input.nowMs ?? Date.now())) return false;
   const expected = createHash('sha256')
     .update(input.timestamp + input.nonce + input.encryptKey + input.rawBody, 'utf8')
     .digest('hex');
@@ -35,13 +50,71 @@ const DEDUPE_TTL_MS = 6 * 60 * 60 * 1000;
 const DEDUPE_MAX = 10_000;
 const seen = new Map<string, number>();
 
+/** Beside `delivery-ledger.json` in the gateway directory. Restart does not forget claims. */
+const INBOUND_DEDUPE_FILE = 'inbound-dedupe.json';
+
+interface InboundDedupeFile {
+  version: 1;
+  claims: Record<string, number>;
+}
+
+function dedupePath(dir: string): string {
+  return join(dir, INBOUND_DEDUPE_FILE);
+}
+
+function readPersistedClaims(dir: string): Record<string, number> {
+  try {
+    const raw = JSON.parse(readFileSync(dedupePath(dir), 'utf8')) as InboundDedupeFile;
+    if (!raw || raw.version !== 1 || !raw.claims || typeof raw.claims !== 'object' || Array.isArray(raw.claims)) {
+      return {};
+    }
+    const claims: Record<string, number> = {};
+    for (const [key, at] of Object.entries(raw.claims)) {
+      if (typeof at === 'number' && Number.isFinite(at)) claims[key] = at;
+    }
+    return claims;
+  } catch {
+    return {};
+  }
+}
+
+function writePersistedClaims(dir: string, claims: Record<string, number>): void {
+  mkdirSync(dir, { recursive: true });
+  const path = dedupePath(dir);
+  const tmp = `${path}.${process.pid}.tmp`;
+  writeFileSync(tmp, `${JSON.stringify({ version: 1, claims } satisfies InboundDedupeFile, null, 2)}\n`, 'utf8');
+  renameSync(tmp, path);
+}
+
+function rememberPersistedClaim(claims: Record<string, number>, key: string, now: number): void {
+  claims[key] = now;
+  const keys = Object.keys(claims);
+  if (keys.length <= DEDUPE_MAX) return;
+  keys.sort((a, b) => (claims[a] ?? 0) - (claims[b] ?? 0));
+  for (const old of keys) {
+    if (Object.keys(claims).length <= DEDUPE_MAX) break;
+    if (old === key) continue;
+    delete claims[old];
+  }
+}
+
 /**
  * Atomically claim an inbound event id. Returns false when it was already claimed
  * (platform retry / replay). Synchronous so concurrent deliveries cannot both win.
- * In-memory: a daemon restart forgets claims, which only matters for retries that
- * straddle the restart.
+ * Pass `persistDir` (the gateway directory) to record the claim next to the
+ * delivery ledger. Those claims do not expire with the in-memory 6h window,
+ * survive process restart, and are not copied into the memory map (that map
+ * would otherwise grow without the 6h TTL). `resetInboundDedupe` clears only
+ * the memory map.
  */
-export function claimInboundEvent(key: string, now = Date.now()): boolean {
+export function claimInboundEvent(key: string, now = Date.now(), persistDir?: string): boolean {
+  if (persistDir) {
+    const claims = readPersistedClaims(persistDir);
+    if (Object.prototype.hasOwnProperty.call(claims, key)) return false;
+    rememberPersistedClaim(claims, key, now);
+    writePersistedClaims(persistDir, claims);
+    return true;
+  }
   const at = seen.get(key);
   if (at !== undefined && now - at < DEDUPE_TTL_MS) return false;
   seen.delete(key);
