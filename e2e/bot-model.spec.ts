@@ -50,7 +50,8 @@ test.describe('Bot model setting', () => {
     const composerModelSelect = async () => {
       await page.getByTestId('bot-detail').getByRole('button', { name: '打开对话' }).click();
       await expect(page.locator('#playModelSelect')).toBeVisible();
-      await expect(page).toHaveURL(/#\/chat/);
+      await expect(page).toHaveURL(/#\/bot/);
+      await expect(page.locator('#nav-bot')).toHaveAttribute('aria-current', 'page');
       return page.locator('#playModelSelect');
     };
 
