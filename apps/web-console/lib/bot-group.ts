@@ -43,6 +43,31 @@ export function groupSpeakBudget(memberCount: number): number {
   return Math.min(20, memberCount);
 }
 
+export type MentionQuery = { start: number; query: string };
+
+/** The @ being typed at the caret, if it starts a mention and is not already finished. */
+export function activeMentionQuery(value: string, caret: number): MentionQuery | null {
+  if (!Number.isInteger(caret) || caret < 0 || caret > value.length) return null;
+  const upto = value.slice(0, caret);
+  const match = upto.match(/(^|\s)@([^\s@,，:：;；!?！？]*)$/u);
+  if (!match || match.index == null) return null;
+  return { start: match.index + match[1].length, query: match[2] };
+}
+
+export function filterMentionMembers<T extends { name: string }>(members: readonly T[], query: string): T[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [...members];
+  return members.filter((member) => member.name.toLowerCase().includes(q));
+}
+
+export function insertMention(value: string, start: number, caret: number, name: string): { value: string; caret: number } {
+  const insertion = `@${name} `;
+  return {
+    value: value.slice(0, start) + insertion + value.slice(caret),
+    caret: start + insertion.length
+  };
+}
+
 export function groupMatchesQuery(
   room: { title: string; botIds: readonly string[] },
   query: string,

@@ -8,8 +8,11 @@ import { useI18n, type MessageKey } from '@/lib/i18n';
 import { renderMarkdown } from '@/lib/markdown';
 import {
   BOT_GROUPS_CHANGED_EVENT,
+  activeMentionQuery,
   addGroupMember,
+  filterMentionMembers,
   groupSpeakBudget,
+  insertMention,
   removeGroupMember,
   type GroupMemberCode
 } from '@/lib/bot-group';
@@ -131,6 +134,10 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
   const [turns, setTurns] = useState<RoomTurn[]>([]);
   const [cursor, setCursor] = useState<number | null>(null);
   const [text, setText] = useState('');
+  const [caret, setCaret] = useState(0);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const [mentionDismissed, setMentionDismissed] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [addId, setAddId] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -206,6 +213,29 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
   const known = new Set(bots.map((bot) => bot.id));
   const speaking = turns.some((turn) => turn.status === 'queued' || turn.status === 'running' || turn.status === 'waiting_approval');
   const available = bots.filter((bot) => room && !room.botIds.includes(bot.id));
+  const mentionMembers = (room?.botIds ?? []).map((id) => ({ id, name: nameOf(id) }));
+  const mention = activeMentionQuery(text, caret);
+  const mentionOptions = mention ? filterMentionMembers(mentionMembers, mention.query) : [];
+  const mentionKey = mention ? `${mention.start}:${mention.query}` : '';
+  const mentionOpen = Boolean(mention && mentionKey !== mentionDismissed && room?.status === 'active' && !busy);
+  const activeMention = mentionOptions[Math.min(mentionIndex, Math.max(mentionOptions.length - 1, 0))];
+
+  const syncCaret = (el: HTMLTextAreaElement) => setCaret(el.selectionStart ?? el.value.length);
+
+  const chooseMention = (name: string) => {
+    if (!mention) return;
+    const next = insertMention(text, mention.start, caret, name);
+    setText(next.value);
+    setCaret(next.caret);
+    setMentionIndex(0);
+    setMentionDismissed(`${mention.start}:${name}`);
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(next.caret, next.caret);
+    });
+  };
 
   const ensureBudget = async (next: Room) => {
     const needed = groupSpeakBudget(next.botIds.length);
@@ -275,7 +305,6 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
         `/api/bot-rooms/${room.id}/messages`,
         jsonBody({
           text: submitted,
-          mentions: room.botIds,
           idempotencyKey: crypto.randomUUID()
         })
       )) as { message?: RoomMessage };
@@ -372,14 +401,74 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
             void send();
           }}
         >
+          {mentionOpen ? (
+            <ul id="play-group-mentions" className="play-group-mentions" role="listbox" aria-label={t('play.group.mentionList')}>
+              {mentionOptions.length === 0 ? (
+                <li className="play-group-mentions__empty">{t('play.group.mentionEmpty')}</li>
+              ) : (
+                mentionOptions.map((option, index) => {
+                  const selected = option.id === activeMention?.id;
+                  return (
+                    <li key={option.id} id={`play-group-mention-${option.id}`} role="option" aria-selected={selected}>
+                      <button
+                        type="button"
+                        className={`play-group-mentions__option${selected ? ' is-active' : ''}`}
+                        data-testid="play-group-mention"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onMouseEnter={() => setMentionIndex(index)}
+                        onClick={() => chooseMention(option.name)}
+                      >
+                        <BotFace name={option.name} size="sm" />
+                        <span>{option.name}</span>
+                      </button>
+                    </li>
+                  );
+                })
+              )}
+            </ul>
+          ) : null}
           <textarea
+            ref={textareaRef}
             value={text}
             placeholder={t('play.group.placeholder')}
             aria-label={t('play.group.placeholder')}
+            aria-autocomplete="list"
+            aria-controls="play-group-mentions"
+            aria-expanded={mentionOpen}
+            aria-activedescendant={mentionOpen && activeMention ? `play-group-mention-${activeMention.id}` : undefined}
             disabled={!room || room.status !== 'active' || busy}
-            onChange={(event) => setText(event.target.value)}
+            onChange={(event) => {
+              setText(event.target.value);
+              syncCaret(event.currentTarget);
+            }}
+            onClick={(event) => syncCaret(event.currentTarget)}
+            onKeyUp={(event) => {
+              if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Enter' || event.key === 'Escape') return;
+              syncCaret(event.currentTarget);
+            }}
             onKeyDown={(event) => {
-              if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
+              const ime = event.nativeEvent.isComposing || event.keyCode === 229;
+              if (mentionOpen && event.key === 'ArrowDown' && mentionOptions.length) {
+                event.preventDefault();
+                setMentionIndex((index) => (index + 1) % mentionOptions.length);
+                return;
+              }
+              if (mentionOpen && event.key === 'ArrowUp' && mentionOptions.length) {
+                event.preventDefault();
+                setMentionIndex((index) => (index - 1 + mentionOptions.length) % mentionOptions.length);
+                return;
+              }
+              if (mentionOpen && event.key === 'Escape') {
+                event.preventDefault();
+                setMentionDismissed(mentionKey);
+                return;
+              }
+              if (event.key !== 'Enter' || event.shiftKey || ime) return;
+              if (mentionOpen && activeMention) {
+                event.preventDefault();
+                chooseMention(activeMention.name);
+                return;
+              }
               event.preventDefault();
               event.currentTarget.form?.requestSubmit();
             }}

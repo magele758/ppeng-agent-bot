@@ -35,7 +35,7 @@ test('create and reopen a durable room with its members [AC:bot-rooms#AC-1]', ()
   assert.equal(reopened.list(f.principal).length, 1);
 });
 
-test('explicit mentions are deterministic and default host handles unmentioned text [AC:bot-rooms#AC-2] [AC:bot-rooms#AC-3]', async () => {
+test('mentions wake only named members and a message without @ wakes every member [AC:bot-rooms#AC-2] [AC:bot-rooms#AC-3]', async () => {
   const f = fixture();
   f.store.appendMessage(f.a.canonicalSessionId, 'user', [{ type: 'text', text: 'PRIVATE_SECRET' }]);
   const room = f.rooms.create(f.principal, { title: 'Team', botIds: [f.a.id, f.b.id], hostBotId: f.a.id });
@@ -49,9 +49,21 @@ test('explicit mentions are deterministic and default host handles unmentioned t
   for (const id of f.runs) assert.ok(!JSON.stringify(f.store.listMessages(id)).includes('PRIVATE_SECRET'));
   assert.equal(f.store.listMessages(f.a.canonicalSessionId).length, 1);
   const defaultTurn = f.rooms.send(f.principal, room.id, { text: 'ordinary question' }).turn;
-  assert.deepEqual(defaultTurn.botIds, [f.a.id]);
-  assert.deepEqual(f.rooms.send(f.principal,room.id,{text:'email owner@example.com'}).turn.botIds,[f.a.id]);
+  assert.deepEqual(defaultTurn.botIds, [f.a.id, f.b.id]);
+  assert.deepEqual(f.rooms.send(f.principal,room.id,{text:'email owner@example.com'}).turn.botIds,[f.a.id, f.b.id]);
   assert.deepEqual(f.rooms.send(f.principal,room.id,{text:'@NoSuchMember do work'}).turn.botIds,[]);
+  assert.deepEqual(f.rooms.send(f.principal,room.id,{text:`only @${f.b.name}`}).turn.botIds,[f.b.id]);
+  assert.deepEqual(f.rooms.send(f.principal,room.id,{text:`@${f.a.name} @Stranger`}).turn.botIds,[f.a.id]);
+});
+
+test('a spaced display name is one mention and does not add outsiders [AC:bot-rooms#AC-2]', () => {
+  const f = fixture();
+  const superBot = createBot(f.facade, { name: 'Super Bot' });
+  f.store.updateSession(superBot.canonicalSessionId, { metadata: { ...f.store.getSession(superBot.canonicalSessionId).metadata, ...f.principal } });
+  const room = f.rooms.create(f.principal, { title: 'Names', botIds: [f.a.id, superBot.id], hostBotId: f.a.id });
+  assert.deepEqual(f.rooms.send(f.principal, room.id, { text: 'hi @Super Bot now' }).turn.botIds, [superBot.id]);
+  assert.deepEqual(f.rooms.send(f.principal, room.id, { text: '@Super Bot @Nope' }).turn.botIds, [superBot.id]);
+  assert.deepEqual(f.rooms.send(f.principal, room.id, { text: 'all of you' }).turn.botIds, [f.a.id, superBot.id]);
 });
 
 test('budget, pause, stop, leave and resume constrain actual scheduling [AC:bot-rooms#AC-4]', async () => {

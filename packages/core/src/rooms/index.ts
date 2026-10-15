@@ -199,12 +199,28 @@ export class BotRoomService {
       for (const id of ids) if (!room.botIds.includes(id)) throw new ValidationError('Mentioned Bot is not a Room member');
       return ids;
     }
-    const names = room.botIds.map(id => this.store.getBot(id)!).filter(Boolean);
-    const tokens = [...text.matchAll(/(?:^|\s)@([^\s@,，:：;；!?！？]+)/gu)];
-    const hits = tokens.map(match => names.find(bot => bot.id === match[1] || bot.name === match[1])?.id).filter((id): id is string => Boolean(id));
-    const ids = [...new Set(hits)];
-    // Unknown explicit mentions never silently invoke the host.
-    return !ids.length && !tokens.length && room.hostBotId ? [room.hostBotId] : ids;
+    const members = room.botIds.map(id => this.store.getBot(id)).filter((bot): bot is NonNullable<typeof bot> => Boolean(bot));
+    const ids: string[] = [];
+    let sawMention = false;
+    for (let i = 0; i < text.length; i += 1) {
+      if (text[i] !== '@' || (i > 0 && !/\s/u.test(text[i - 1] ?? ''))) continue;
+      sawMention = true;
+      const rest = text.slice(i + 1);
+      let best: (typeof members)[number] | undefined;
+      let bestLen = 0;
+      for (const bot of members) {
+        for (const token of [bot.name, bot.id]) {
+          if (!token || !rest.startsWith(token) || token.length <= bestLen) continue;
+          best = bot;
+          bestLen = token.length;
+        }
+      }
+      if (!best) continue;
+      if (!ids.includes(best.id)) ids.push(best.id);
+      i += bestLen;
+    }
+    // No @ means every current member. An @ that names nobody stays empty and does not pull in non-members.
+    return sawMention ? ids : room.botIds.slice();
   }
   send(principal: BotPrincipal, id: string, input: BotRoomMessageInput): { message: BotRoomMessage; turn: BotRoomTurn } {
     const room = this.get(principal, id);
