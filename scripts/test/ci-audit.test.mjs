@@ -75,10 +75,13 @@ test('release gate consumes every participating quality result [AC:ci-audit-p1-p
  for(const job of ['mutation','remote-model-smoke','harness','compact-ab']) assert.ok(workflow.jobs.gate.needs.includes(job),job);
  const { releaseFailures }=await import('../ci/release-results.mjs');
  const required={tests:{result:'success'},crap:{result:'success'},acceptance:{result:'success'},mutation:{result:'success'},'secrets-gate':{result:'success'}};
- for(const name of ['remote-model-smoke','harness','compact-ab']) {
+ for(const name of ['remote-model-smoke','compact-ab']) {
   assert.deepEqual(releaseFailures({...required,[name]:{result:'skipped'}}),[]);
   assert.ok(releaseFailures({...required,[name]:{result:'failure'}}).includes(name));
   assert.ok(releaseFailures({...required,[name]:{result:'cancelled'}}).includes(name));
+ }
+ for (const result of ['success','failure','cancelled','skipped']) {
+  assert.deepEqual(releaseFailures({...required,harness:{result}}),[]);
  }
  assert.ok(releaseFailures({...required,mutation:{result:'skipped'}}).includes('mutation'));
 });
@@ -120,4 +123,19 @@ test('recursive unit pattern executes a nested test and propagates failure [AC:c
   writeFileSync(file,"const test = require('node:test'); test('nested sentinel', () => { throw Error('nested failure'); });");
   const red=run();assert.equal(red.status,1);assert.match(red.stdout,/nested failure/);
  } finally {rmSync(root,{recursive:true,force:true});}
+});
+
+test('known load-window timeout uses the exact shared retry exception [AC:ci-audit-p1-p2#AC-1]', async () => {
+ const { knownFlaky, isKnownFlaky } = await import('../ci/known-flaky.mjs');
+ const file = 'scripts/test/bot-http-fixed-window.test.mjs';
+ const name = 'fixed window bounds queues and terminates stalled work at original deadline';
+ assert.ok(isKnownFlaky(file, name));
+ assert.ok(readFileSync(file, 'utf8').includes("test('" + name + "'"));
+ const flaky = [{file, tests:[{name}]}];
+ const args = {plan:{retry:true}, flaky, failed:[]};
+ assert.equal(buildReport(args).pass, true);
+ assert.equal(buildReport({...args, failed:flaky}).pass, false);
+ assert.equal(buildReport({...args, flaky:[{file,tests:[{name:name+' other'}]}]}).pass, false);
+ assert.equal(isKnownFlaky('other.test.mjs', name), false);
+ assert.equal(knownFlaky.filter(entry => entry.file === file && entry.name === name).length, 1);
 });

@@ -124,16 +124,18 @@ test('actual gate summary script accepts only success/success/success; failure, 
         for (const acceptance of states) {
           const child = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', step.run], {
             env: sanitizeScriptEnv({
-              ...process.env, RESULTS: JSON.stringify({ tests: {result: tests}, crap: {result: crap}, acceptance: {result: acceptance}, mutation: {result: 'success'}, 'secrets-gate': {result: 'success'} }), GITHUB_STEP_SUMMARY: join(dir, 'summary.md')
+              ...process.env, RESULTS: JSON.stringify({ tests: {result: tests}, crap: {result: crap}, acceptance: {result: acceptance}, mutation: {result: 'success'}, 'secrets-gate': {result: 'success'}, harness: {result: 'failure'} }), GITHUB_STEP_SUMMARY: join(dir, 'summary.md')
             }),
             encoding: 'utf8', timeout: 5_000
           });
           assert.equal(child.error, undefined);
+          assert.match(child.stdout, /Harness \(non-blocking\): failure/);
           assert.equal(child.status, tests === 'success' && crap === 'success' && acceptance === 'success' ? 0 : 1,
             `tests=${tests} crap=${crap} acceptance=${acceptance}: ${child.stderr}`);
         }
       }
     }
+    assert.match(readFileSync(join(dir, 'summary.md'), 'utf8'), /Harness \(non-blocking\): failure/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
