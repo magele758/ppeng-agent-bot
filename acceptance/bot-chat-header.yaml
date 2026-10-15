@@ -1,0 +1,22 @@
+id: bot-chat-header
+title: Bot 对话头部只显示名字、活脸和权限入口
+status: implemented
+notes: |
+  负责人要求本轮直接实现并合并，验收标准按该说明视为已批准。
+requirement: |
+  Bot 对话头部不要「Bot Chat」前缀，标题只显示这只 Bot 的名字。普通非 Bot 会话保持原来的标题。
+  头部要有进入这只 Bot 权限设置的入口，打开已有的权限 / 工具审批 / 允许名单，不另做一套权限。
+  头部名字旁边显示与选择器、列表、详情相同的会动的脸。
+criteria:
+  - id: AC-1
+    given: 打开一只 Bot 的对话，会话标题带有「Bot Chat · 名字」
+    when: 用户看对话头部的标题
+    then: 标题只有这只 Bot 的名字
+  - id: AC-2
+    given: 打开的是普通会话，不是 Bot 对话
+    when: 用户看对话头部的标题
+    then: 标题仍是这条会话原来的标题
+  - id: AC-3
+    given: 打开一只 Bot 的对话
+    when: 用户从对话头部进入权限
+    then: 打开的是这只 Bot 已有的权限设置，而不是另一套权限

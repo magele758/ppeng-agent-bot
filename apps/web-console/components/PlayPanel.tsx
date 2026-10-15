@@ -39,6 +39,8 @@ import { groupSessionsByDate } from '@/lib/session-groups';
 import { WorkspacePicker } from './WorkspacePicker';
 import { catalogToPickerOptions } from '@/lib/model-providers';
 import { resolveLivingFaceMood } from '@/lib/bot-face';
+import { botChatHeaderTitle, botNameFromCanonicalTitle, botPermissionsHref } from '@/lib/bot-chat-header';
+import { BotFace } from './BotFace';
 import { ComposerBotPicker } from './ComposerBotPicker';
 import { ComposerModelPicker } from './ComposerModelPicker';
 import { SessionSettingsPanel, type ExecPreset } from './sections/chat/SessionSettingsPanel';
@@ -394,6 +396,20 @@ export function PlayPanel({
   );
   const botLocked = playSurface === 'bot' && Boolean(chat.botId);
   const botSurface = playSurface === 'bot';
+  const headerBotChat = botSurface && Boolean(selectedSessionId);
+  const headerBotName = headerBotChat
+    ? selectedBot?.name?.trim() || botNameFromCanonicalTitle(chat.playTitle)
+    : '';
+  const headerTitle = botChatHeaderTitle({
+    botChat: headerBotChat,
+    botName: headerBotName,
+    sessionTitle: chat.playTitle
+  });
+  const headerBotId = headerBotChat ? chat.botId || selectedBot?.id || '' : '';
+  const headerFaceMood = resolveLivingFaceMood({
+    live: chat.playSending || Boolean(chat.streamOverlay) || chat.waitTyping,
+    segments: chat.streamOverlay?.segments
+  });
 
   const selectedSession = useMemo(
     () => sessions.find((s) => s.id === selectedSessionId) ?? null,
@@ -992,11 +1008,32 @@ export function PlayPanel({
         <div className="play-main-col">
           {botSurface && openGroupId ? <PlayBotGroupChat key={openGroupId} roomId={openGroupId} bots={botRoster} /> : null}
           <div className="play-main chat-panel" hidden={botSurface && openGroupId != null}>
-            <header className="chat-panel-header">
+            <header className={`chat-panel-header${headerBotName ? ' chat-panel-header--bot' : ''}`}>
               <div className="chat-panel-header__text">
-                <h2 className="chat-panel-title" id="playTitle">
-                  {chat.playTitle}
-                </h2>
+                <div className="chat-panel-header__title-row">
+                  {headerBotName ? (
+                    <BotFace
+                      name={headerBotName}
+                      mood={headerFaceMood}
+                      size="md"
+                      testId="chat-header-face"
+                      className="chat-panel-header__face"
+                    />
+                  ) : null}
+                  <h2 className="chat-panel-title" id="playTitle">
+                    {headerTitle}
+                  </h2>
+                  {headerBotId ? (
+                    <a
+                      className="chat-panel-header__permissions"
+                      href={botPermissionsHref(headerBotId)}
+                      data-testid="chat-header-permissions"
+                      aria-label={t('play.header.permissionsAria', { name: headerBotName || headerTitle })}
+                    >
+                      {t('play.header.permissions')}
+                    </a>
+                  ) : null}
+                </div>
                 {selectedSessionId ? (
                   <div className="session-chrome" id="playMeta">
                     {chrome?.status || selectedSession?.status ? (

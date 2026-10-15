@@ -283,6 +283,44 @@ body,
   }
 }
 
+.chat-panel-header--bot {
+  height: auto;
+  max-height: none;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.chat-panel-header__title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.chat-panel-header--bot .chat-panel-title {
+  flex: 1 1 auto;
+}
+.chat-panel-header__permissions {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-xs);
+  background: var(--color-surface-strong);
+  color: var(--color-text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+}
+.chat-panel-header__permissions:hover {
+  border-color: var(--accent);
+}
+.chat-panel-header__permissions:focus-visible {
+  outline: 2px solid var(--color-text-primary);
+  outline-offset: 1px;
+}
+
 .session-chrome {
   display: flex;
   flex-wrap: wrap;

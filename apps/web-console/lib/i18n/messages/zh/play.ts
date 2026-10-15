@@ -400,7 +400,9 @@ export const play = {
   header: {
     more: '更多',
     run: '重新运行会话',
-    runHint: '不发送新消息，直接让会话再跑一轮'
+    runHint: '不发送新消息，直接让会话再跑一轮',
+    permissions: '权限',
+    permissionsAria: '打开 {name} 的权限设置'
   },
 
   role: {
