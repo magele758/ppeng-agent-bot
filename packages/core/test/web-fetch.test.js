@@ -407,6 +407,57 @@ test('caller abort does not try the next approved address', async () => {
   assert.deepEqual(seen, ['203.0.113.10']);
 });
 
+test('fetchUrlText, fetchImageFromUrl, and defaultDownload fall back when the first address cannot connect', async () => {
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const seen = { text: [], image: [], download: [] };
+  const hang = (options) => new Promise((_resolve, reject) => {
+    const fail = () => {
+      const err = new Error('The operation was aborted');
+      err.name = 'AbortError';
+      reject(err);
+    };
+    if (options.signal.aborted) fail();
+    else options.signal.addEventListener('abort', fail, { once: true });
+  });
+  const requestFor = (bucket, body, contentType) => async (_url, address, options) => {
+    bucket.push(address);
+    if (address === '203.0.113.10') return hang(options);
+    return new Response(body, { status: 200, headers: { 'content-type': contentType } });
+  };
+  const resolveHost = async () => ['203.0.113.10', '203.0.113.11'];
+  const started = Date.now();
+  const text = await fetchUrlText({
+    url: 'https://dual.example/a',
+    timeoutMs: 3000,
+    connectTimeoutMs: 40,
+    allowPrivateHosts: false,
+    resolveHost,
+    request: requestFor(seen.text, 'second', 'text/plain')
+  });
+  const image = await fetchImageFromUrl('https://dual.example/a.png', 1024, 3000, undefined, {
+    allowPrivateHosts: false,
+    connectTimeoutMs: 40,
+    resolveHost,
+    request: requestFor(seen.image, png, 'image/png')
+  });
+  const download = await defaultDownload('https://dual.example/a.bin', 1024, 3000, {
+    allowPrivateHosts: false,
+    connectTimeoutMs: 40,
+    resolveHost,
+    request: requestFor(seen.download, 'file', 'application/octet-stream')
+  });
+  assert.equal(text.ok, true);
+  assert.match(text.content, /second/);
+  assert.equal(image.mimeType, 'image/png');
+  assert.ok(image.buffer.subarray(0, 8).equals(png));
+  assert.equal(download.ok, true);
+  assert.equal(download.buffer.toString(), 'file');
+  assert.deepEqual(seen.text, ['203.0.113.10', '203.0.113.11']);
+  assert.deepEqual(seen.image, ['203.0.113.10', '203.0.113.11']);
+  assert.deepEqual(seen.download, ['203.0.113.10', '203.0.113.11']);
+  assert.ok(Date.now() - started < 2500);
+});
+
 test('DNS lookup stops on abort and on its own deadline', async () => {
   const ac = new AbortController();
   ac.abort();

@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { nowIso } from '../id.js';
+import { fenceExternalContent } from '../safety/external-content.js';
 import { fetchUrlText, webFetchAllowsPrivate, webSearchFromEnv } from '../tools/web-fetch.js';
 import { ResearchStore } from './store.js';
 import type { ClaimConfidence, ResearchSource, ResearchTask, SourceKind, TrustLevel } from './types.js';
@@ -83,6 +84,14 @@ function clipQuote(text: string, max = 1200): string {
   return t.length <= max ? t : `${t.slice(0, max)}…`;
 }
 
+function researchSourceLabel(url: string | undefined, title: string): string {
+  return url || title;
+}
+
+function fenceResearchQuote(quote: string, label: string): string {
+  return fenceExternalContent({ source: 'web_fetch', label, body: clipQuote(quote, 500) });
+}
+
 function synthesizeClaims(
   query: string,
   evidences: Array<{ id: string; quote: string; sourceTitle: string }>
@@ -101,7 +110,7 @@ function synthesizeClaims(
   const lead = evidences[0]!;
   return [
     {
-      text: `Based on ${evidences.length} source(s), key context for "${query}": ${clipQuote(lead.quote, 280)}`,
+      text: `Based on ${evidences.length} source(s), key context for "${query}": ${lead.quote}`,
       confidence: evidences.length >= 3 ? 'high' : evidences.length === 2 ? 'medium' : 'low',
       evidenceIds: ids.slice(0, 3)
     },
@@ -135,7 +144,7 @@ async function writeReport(
     ...sources.map((s) => `- [${s.title}](${s.url ?? ''}) (${s.kind}, ${s.trustLevel})`),
     '',
     '## Evidence',
-    ...evidences.map((e, i) => `${i + 1}. ${clipQuote(e.quote, 500)}`),
+    ...evidences.map((e, i) => `${i + 1}. ${e.quote}`),
     '',
     '## Claims',
     ...claims.map((c) => `- (${c.confidence}) ${c.text}`),
@@ -240,14 +249,15 @@ export class ResearchPipeline {
         }
       }
       if (!quote.trim()) quote = `Title-only hit: ${src.title}`;
+      const fenced = fenceResearchQuote(quote, researchSourceLabel(src.url, src.title));
       const ev = this.deps.store.addEvidence({
         taskId,
         sourceId: src.id,
-        quote,
+        quote: fenced,
         location: src.url,
         relevance: src.trustLevel === 'primary' ? 0.9 : 0.7
       });
-      evidenceRows.push({ id: ev.id, quote, sourceTitle: src.title });
+      evidenceRows.push({ id: ev.id, quote: fenced, sourceTitle: src.title });
     }
 
     this.deps.store.updateTaskStatus(taskId, 'synthesizing');

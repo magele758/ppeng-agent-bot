@@ -4,7 +4,10 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import type { FetchLike } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { McpHttpEndpoint, McpHttpTransport } from './mcp-http-config.js';
 import type { McpResourceInfo, McpToolInfo } from './mcp-jsonrpc.js';
+import { redactSecrets } from './mcp-redact.js';
 import { MCP_OAUTH_AUTHORIZATION_PREFIX, McpOAuthClientProvider } from './mcp-oauth.js';
+
+export { redactSecrets } from './mcp-redact.js';
 
 const DEFAULT_TIMEOUT_MS = 20_000;
 
@@ -76,17 +79,6 @@ export function collectHeaderSecrets(endpoint: McpHttpEndpoint, env: NodeJS.Proc
   }
   report.secrets = [...new Set(report.secrets)].sort((a, b) => b.length - a.length);
   return report;
-}
-
-export function redactSecrets(text: string, secrets: string[]): string {
-  const unique = [...new Set(secrets.filter((secret) => secret.length >= MIN_CREDENTIAL_LENGTH))].sort(
-    (a, b) => b.length - a.length
-  );
-  let out = text;
-  for (const secret of unique) {
-    out = out.split(secret).join('[REDACTED]');
-  }
-  return out;
 }
 
 /** Redact credential text in schema values. Keys, type, format, $ref, and required names stay. */

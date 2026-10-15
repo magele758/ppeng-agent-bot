@@ -17,13 +17,13 @@
 - **飞书验签**：消息事件必须带正确的 `verificationToken`（`header.token`）；配置 `encryptKey` 时另校验 `X-Lark-Signature`（sha256(timestamp+nonce+encryptKey+body)）。时间戳偏离当前时间超过 5 分钟直接 403。两者都未配置时消息事件一律 403（URL 验证握手仍可用）。
 - **去重 + 立即 ack**：按 `event_id`（缺省用 `message_id`）去重，写入 gateway 目录的 `inbound-dedupe.json`（与出站 delivery ledger 同目录）；进程重启后同一事件仍拒绝。校验通过后立即返回 200，Agent 在后台按会话串行执行。
 - **sender 白名单**：`feishu.allowedSenders`（open_id/user_id/union_id/chat_id）、`wecom.allowedSenders`（userKey）、`webhook.allowedSenders`（通用渠道 senderId，缺发送者也拒绝）；空列表 = 不限制。
-- **企微 bridge**：必须配置 `bridgeSecret`（未配置一律 403）。
+- **企微 bridge**：必须配置 `bridgeSecret`（未配置一律 403）。密钥只认请求头 `x-wecom-bridge-secret`，JSON body 里的 `secret` 不参与校验。请求头 `x-wecom-bridge-timestamp` 为 Unix 秒，偏离当前时间超过 5 分钟则 403。有 `msgId` 或 `msg_id` 时按它去重，否则按 userKey、时间戳和正文的摘要去重。重复投递返回 200 且 `duplicate: true`，不再跑 Agent。
 - **Bot 路由**：`feishu.botId` / `wecom.botId` 让 IM 消息落进该 Bot 的 canonical 会话；`POST /chat`、`/channels/:id/webhook` 的 body 也可带 `botId`。
 
 ### 企业微信（WeCom）— 部分
 
 - **出站群机器人**：`type: "wecom_group_bot"`，[`wecom-send.ts`](../packages/capability-gateway/src/wecom-send.ts) 向企业微信 webhook 发送 markdown。
-- **入站**：`POST {gatewayPrefix}/providers/wecom/bridge`（必须配置 `bridgeSecret`），见 [`http.ts`](../packages/capability-gateway/src/http.ts)。用于**自建桥**将外部系统转发的消息 POST 进来再跑 Agent；**不是**完整的企业微信应用回调协议栈。
+- **入站**：`POST {gatewayPrefix}/providers/wecom/bridge`。请求头带 `x-wecom-bridge-secret` 和 `x-wecom-bridge-timestamp`（必须配置 `bridgeSecret`），见 [`http.ts`](../packages/capability-gateway/src/http.ts)。用于**自建桥**将外部系统转发的消息 POST 进来再跑 Agent；**不是**完整的企业微信应用回调协议栈。
 - **配置**：`providers.wecom` 见 `gateway.config.example.json`。
 
 ### 通用 Webhook（含 Slack Incoming 等）

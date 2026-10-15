@@ -9,10 +9,11 @@ export function safeEqual(a: string, b: string): boolean {
   return timingSafeEqual(ha, hb);
 }
 
-/** Feishu `X-Lark-Request-Timestamp` older or newer than this is rejected. */
+/** Feishu and WeCom timestamps older or newer than this are rejected. */
 export const FEISHU_SIGNATURE_WINDOW_MS = 5 * 60 * 1000;
 
-function feishuTimestampFresh(timestamp: string, nowMs: number): boolean {
+/** Unix seconds within the 5-minute window. Shared by Feishu signatures and the WeCom bridge. */
+export function inboundTimestampFresh(timestamp: string, nowMs: number): boolean {
   if (!/^\d{1,16}$/.test(timestamp)) return false;
   const seconds = Number(timestamp);
   if (!Number.isFinite(seconds)) return false;
@@ -33,7 +34,7 @@ export function verifyFeishuSignature(input: {
   nowMs?: number;
 }): boolean {
   if (!input.timestamp || !input.nonce || !input.signature) return false;
-  if (!feishuTimestampFresh(input.timestamp, input.nowMs ?? Date.now())) return false;
+  if (!inboundTimestampFresh(input.timestamp, input.nowMs ?? Date.now())) return false;
   const expected = createHash('sha256')
     .update(input.timestamp + input.nonce + input.encryptKey + input.rawBody, 'utf8')
     .digest('hex');

@@ -12,6 +12,7 @@ import { isIP } from 'node:net';
 import { tmpdir, homedir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { isPrivateOrReservedIp } from '../goal/run-verify.js';
+import { fetchPinnedPublic, PrivateNetworkDenied, type PublicFetchDeps } from '../net/public-fetch.js';
 import { fenceExternalContent } from '../safety/external-content.js';
 import type { SqliteStateStore } from '../storage.js';
 import type { ImagePart, RunContext, ToolExecutionResult } from '../types.js';
@@ -51,6 +52,9 @@ type PlaywrightContext = {
 
 type PlaywrightRequest = {
   url: () => string;
+  method?: () => string;
+  headers?: () => Record<string, string>;
+  postData?: () => string | null;
   isNavigationRequest?: () => boolean;
   resourceType?: () => string;
 };
@@ -59,6 +63,7 @@ type PlaywrightRoute = {
   request: () => PlaywrightRequest;
   abort: (errorCode?: string) => Promise<void>;
   continue: () => Promise<void>;
+  fulfill?: (response: { status?: number; headers?: Record<string, string>; body?: Buffer }) => Promise<void>;
 };
 
 type PlaywrightPage = {
@@ -84,6 +89,8 @@ export interface BrowserNavigationPolicyOptions {
   env?: NodeJS.ProcessEnv;
   /** Every resolved address. One private address denies navigation. Default is system DNS. */
   resolveHost?: (hostname: string) => Promise<readonly string[]>;
+  /** Per-address connect deadline for the pinned navigation fetch. Default 10s. */
+  connectTimeoutMs?: number;
 }
 
 export interface BrowserBackendDeps {
@@ -91,6 +98,10 @@ export interface BrowserBackendDeps {
   /** Persist PNG bytes as a session image asset. Return the asset id only. */
   ingestScreenshot?: (png: Buffer, context: RunContext) => Promise<{ id: string }>;
   resolveHost?: BrowserNavigationPolicyOptions['resolveHost'];
+  /** Pinned transport. Default connects to the approved address. */
+  request?: PublicFetchDeps['request'];
+  /** Per-address connect deadline for pinned navigation. Default 10s. */
+  connectTimeoutMs?: number;
 }
 
 export function formatBrowserError(code: BrowserErrorCode, message: string, action: BrowserAction): string {
@@ -350,6 +361,7 @@ function navigationPolicy(deps?: BrowserBackendDeps): BrowserNavigationPolicyOpt
   const cache = new Map<string, readonly string[]>();
   return {
     env: deps?.env ?? process.env,
+    connectTimeoutMs: deps?.connectTimeoutMs,
     resolveHost: async (hostname) => {
       const hit = cache.get(hostname);
       if (hit) return hit;
@@ -407,29 +419,117 @@ function isDocumentNavigation(request: PlaywrightRequest): boolean {
   return true;
 }
 
+const BROWSER_PIN_BODY_MAX = 2_000_000;
+const SKIP_BROWSER_HEADER = new Set(['host', 'content-length', 'connection', 'transfer-encoding']);
+
+function browserForwardHeaders(headers: Record<string, string> | undefined): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(headers ?? {})) {
+    if (value && !SKIP_BROWSER_HEADER.has(key.toLowerCase())) out[key] = value;
+  }
+  return out;
+}
+
+function browserFulfillHeaders(res: Response): Record<string, string> {
+  const headers: Record<string, string> = {};
+  const type = res.headers.get('content-type');
+  const location = res.headers.get('location');
+  if (type) headers['content-type'] = type;
+  if (location) headers.location = location;
+  return headers;
+}
+
+async function fulfillPinnedBrowserRoute(
+  route: PlaywrightRoute,
+  policy: BrowserNavigationPolicyOptions,
+  request: PublicFetchDeps['request'] | undefined
+): Promise<void> {
+  const req = route.request();
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 30_000);
+  try {
+    const res = await fetchPinnedPublic(req.url(), {
+      signal: ctrl.signal,
+      method: req.method?.() || 'GET',
+      headers: browserForwardHeaders(req.headers?.()),
+      body: req.postData?.() || undefined,
+      allowPrivateHosts: false,
+      resolveHost: policy.resolveHost,
+      request,
+      followRedirects: false,
+      connectTimeoutMs: policy.connectTimeoutMs
+    });
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length > BROWSER_PIN_BODY_MAX) {
+      await route.abort('blockedbyclient');
+      return;
+    }
+    await route.fulfill?.({ status: res.status, headers: browserFulfillHeaders(res), body: buf });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function blockBrowserRoute(
+  route: PlaywrightRoute,
+  policy: BrowserNavigationPolicyOptions,
+  onDocumentBlock: (reason: string) => void
+): Promise<boolean> {
+  const req = route.request();
+  let reason: string | undefined;
+  try {
+    reason = await browserNavigationBlockReason(req.url(), policy);
+  } catch {
+    reason = PRIVATE_NAVIGATION;
+  }
+  if (!reason) return false;
+  if (isDocumentNavigation(req)) onDocumentBlock(reason);
+  await route.abort('blockedbyclient');
+  return true;
+}
+
+async function abortPinnedBrowserRoute(
+  route: PlaywrightRoute,
+  error: unknown,
+  onDocumentBlock: (reason: string) => void
+): Promise<void> {
+  const message = error instanceof PrivateNetworkDenied ? error.message : '导航连接失败';
+  if (isDocumentNavigation(route.request())) onDocumentBlock(message);
+  await route.abort('blockedbyclient');
+}
+
+async function settleBrowserRoute(
+  route: PlaywrightRoute,
+  policy: BrowserNavigationPolicyOptions,
+  request: PublicFetchDeps['request'] | undefined,
+  onDocumentBlock: (reason: string) => void
+): Promise<void> {
+  if (await blockBrowserRoute(route, policy, onDocumentBlock)) return;
+  if (privateNetworkAllowed(policy.env) || !route.fulfill) {
+    await route.continue();
+    return;
+  }
+  try {
+    await fulfillPinnedBrowserRoute(route, policy, request);
+  } catch (error) {
+    await abortPinnedBrowserRoute(route, error, onDocumentBlock);
+  }
+}
+
 async function completeBrowserNavigate(
   page: PlaywrightPage,
   action: Extract<BrowserAction, { kind: 'navigate' }>,
-  policy: BrowserNavigationPolicyOptions
+  policy: BrowserNavigationPolicyOptions,
+  request?: PublicFetchDeps['request']
 ): Promise<ToolExecutionResult> {
   const url = action.url.trim();
   let documentBlocked: string | undefined;
   if (typeof page.route === 'function') {
-    await page.route('**/*', async (route) => {
-      const request = route.request();
-      let reason: string | undefined;
-      try {
-        reason = await browserNavigationBlockReason(request.url(), policy);
-      } catch {
-        reason = PRIVATE_NAVIGATION;
-      }
-      if (reason) {
-        if (isDocumentNavigation(request)) documentBlocked = reason;
-        await route.abort('blockedbyclient');
-        return;
-      }
-      await route.continue();
-    });
+    await page.route('**/*', (route) =>
+      settleBrowserRoute(route, policy, request, (reason) => {
+        documentBlocked = reason;
+      })
+    );
   }
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
@@ -459,7 +559,7 @@ async function runBrowserNavigate(
   const refused = await refuseBrowserNavigate(action.url, policy);
   if (refused) return refused;
   const slot = await ensurePage(context, deps?.env ?? process.env);
-  return completeBrowserNavigate(slot.page, { kind: 'navigate', url: action.url.trim() }, policy);
+  return completeBrowserNavigate(slot.page, { kind: 'navigate', url: action.url.trim() }, policy, deps?.request);
 }
 
 export async function playwrightBrowserAction(

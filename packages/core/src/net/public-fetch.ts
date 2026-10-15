@@ -47,6 +47,9 @@ export interface PublicFetchDeps {
 export interface PublicFetchInit extends PublicFetchDeps {
   method?: string;
   headers?: Record<string, string>;
+  body?: string;
+  /** When false, a 3xx response is returned instead of followed. Default follows. */
+  followRedirects?: boolean;
   signal: AbortSignal;
 }
 
@@ -313,6 +316,10 @@ function retainCallerAbort(response: Response, parent: AbortSignal, dispose: () 
   });
 }
 
+function shouldFollowRedirect(response: Response, followRedirects: boolean | undefined): boolean {
+  return response.status >= 300 && response.status < 400 && followRedirects !== false;
+}
+
 /**
  * GET/HEAD with manual redirects. Every hop is rechecked.
  * Each attempt is pinned to one approved address and has its own connect deadline.
@@ -343,6 +350,7 @@ export async function fetchPinnedPublic(rawUrl: string, init: PublicFetchInit): 
         response = await request(current, address, {
           method: init.method ?? 'GET',
           headers: init.headers ?? {},
+          body: init.body,
           signal: currentAttempt.signal
         });
         currentAttempt.clearConnectTimer();
@@ -362,7 +370,7 @@ export async function fetchPinnedPublic(rawUrl: string, init: PublicFetchInit): 
       attempt.dispose();
       throw abortError(init.signal);
     }
-    const redirect = response.status >= 300 && response.status < 400;
+    const redirect = shouldFollowRedirect(response, init.followRedirects);
     const settled = attempt;
     if (!redirect) return retainCallerAbort(response, init.signal, () => settled.dispose());
     const location = response.headers.get('location');

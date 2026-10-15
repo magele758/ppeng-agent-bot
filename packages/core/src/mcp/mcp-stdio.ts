@@ -1,6 +1,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import type { McpResourceInfo, McpToolInfo } from './mcp-jsonrpc.js';
+import { redactSecrets } from './mcp-redact.js';
 
 export interface StdioMcpConfig {
   command: string;
@@ -86,19 +87,24 @@ export class McpStdioSession {
   async listTools(): Promise<McpToolInfo[]> {
     await this.connect();
     const r = await this.client!.listTools();
-    return (r.tools ?? []).map((t) => ({
-      name: t.name,
-      description: t.description,
-      inputSchema: t.inputSchema as Record<string, unknown> | undefined,
-      readOnlyHint: typeof t.annotations?.readOnlyHint === 'boolean' ? t.annotations.readOnlyHint : undefined
-    }));
+    return (r.tools ?? []).map((t) =>
+      redactStdioTool(
+        {
+          name: t.name,
+          description: t.description,
+          inputSchema: t.inputSchema as Record<string, unknown> | undefined,
+          readOnlyHint: typeof t.annotations?.readOnlyHint === 'boolean' ? t.annotations.readOnlyHint : undefined
+        },
+        this.config.env
+      )
+    );
   }
 
   async callTool(name: string, args: Record<string, unknown>): Promise<{ content: string; isError?: boolean }> {
     await this.connect();
     const result = await this.client!.callTool({ name, arguments: args });
     const { text, isError } = toolResultToText(result as { content?: Array<{ type: string; text?: string }>; isError?: boolean });
-    return { content: text, isError };
+    return { content: redactStdioFailure(text, this.config.env), isError };
   }
 
   async listResources(): Promise<McpResourceInfo[]> {
@@ -142,6 +148,19 @@ export class McpStdioSession {
     this.client = undefined;
     this.transport = undefined;
   }
+}
+
+/** Stdio failures and tool text can echo child env. Strip those values before trace or the model. */
+export function redactStdioFailure(message: string, env?: Record<string, string>): string {
+  return redactSecrets(message, Object.values(env ?? {}));
+}
+
+function redactStdioTool(tool: McpToolInfo, env?: Record<string, string>): McpToolInfo {
+  const description = tool.description ? redactStdioFailure(tool.description, env) : tool.description;
+  const inputSchema = tool.inputSchema
+    ? (JSON.parse(redactStdioFailure(JSON.stringify(tool.inputSchema), env)) as Record<string, unknown>)
+    : undefined;
+  return { name: tool.name, description, inputSchema, readOnlyHint: tool.readOnlyHint };
 }
 
 export function sanitizeMcpToolSuffix(name: string): string {

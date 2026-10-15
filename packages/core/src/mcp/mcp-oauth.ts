@@ -20,6 +20,7 @@ import type {
 import type { FetchLike } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { AppError, ValidationError } from '../errors.js';
 import type { McpHttpEndpoint } from './mcp-http-config.js';
+import { redactSecrets } from './mcp-redact.js';
 
 /** Matches `MIN_CREDENTIAL_LENGTH` in mcp-http.ts. Kept local to avoid an import cycle. */
 const MIN_SECRET_LENGTH = 8;
@@ -96,12 +97,7 @@ function safeEqual(left: string, right: string): boolean {
 }
 
 function redactCredentialText(text: string, secrets: string[]): string {
-  const unique = [...new Set(secrets.filter((secret) => secret.length >= MIN_SECRET_LENGTH))].sort(
-    (a, b) => b.length - a.length
-  );
-  let out = text;
-  for (const secret of unique) out = out.split(secret).join('[REDACTED]');
-  return out;
+  return redactSecrets(text, secrets);
 }
 
 function optionalString(value: unknown): string | undefined {

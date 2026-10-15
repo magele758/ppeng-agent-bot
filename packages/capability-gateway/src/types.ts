@@ -61,7 +61,11 @@ export interface FeishuProviderSpec {
 /** WeCom: outbound group bot + optional simple bridge inbound. */
 export interface WeComProviderSpec {
   enabled?: boolean;
-  /** Shared secret for POST /wecom/bridge (required; Lab settings override) */
+  /**
+   * Shared secret for POST /wecom/bridge (required; Lab settings override).
+   * Clients send it in `x-wecom-bridge-secret`. A JSON `secret` field is ignored.
+   * `x-wecom-bridge-timestamp` is Unix seconds and must be within 5 minutes.
+   */
   bridgeSecret?: string;
   defaultAgentId?: string;
   botId?: string;

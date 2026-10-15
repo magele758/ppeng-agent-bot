@@ -14,6 +14,7 @@ import { appendOutboundDraft } from './outbound-drafts.js';
 import { quarantineLegacyDraftLedger, reconcileSendingDrafts, recoverGatewayOutbound } from './outbound.js';
 import { resolveImOutbound } from './silent-reply.js';
 import { readGatewaySettings } from './gateway-settings.js';
+import { safeEqual } from './inbound-guard.js';
 import { readGatewayState } from './state.js';
 import type { GatewayEnvOptions, GatewayFileConfig } from './types.js';
 
@@ -73,12 +74,12 @@ function checkAuth(request: IncomingMessage, ctx: GatewayHandleContext): boolean
     return ctx.authorize ? ctx.authorize(request) : true;
   }
   const h = request.headers['x-gateway-token'];
-  if (typeof h === 'string' && h === token) {
+  if (typeof h === 'string' && safeEqual(h, token)) {
     return true;
   }
   const auth = request.headers.authorization;
   if (typeof auth === 'string' && auth.startsWith('Bearer ')) {
-    return auth.slice(7) === token;
+    return safeEqual(auth.slice(7), token);
   }
   return false;
 }
@@ -191,7 +192,7 @@ export async function handleGatewayHttp(
       }
       if (route.routeKey) {
         const got = request.headers['x-agent-route-key'];
-        if (typeof got !== 'string' || got !== route.routeKey) {
+        if (typeof got !== 'string' || !safeEqual(got, route.routeKey)) {
           json(response, 401, { error: 'Invalid X-Agent-Route-Key' });
           return true;
         }
