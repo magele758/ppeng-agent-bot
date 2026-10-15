@@ -1,5 +1,5 @@
 import type { SessionMessage } from '../../types.js';
-export interface HistoryOptions { limit?: number; beforeSeq?: number; query?: string; from?: string; to?: string }
+export interface HistoryOptions { limit?: number; beforeSeq?: number; query?: string; from?: string; to?: string; role?: string }
 export interface HistoryPage { messages: SessionMessage[]; nextCursor: number | null; hasMore: boolean }
 export interface HistoryContext { message: SessionMessage; messages: SessionMessage[] }
 export interface HistoryStore {

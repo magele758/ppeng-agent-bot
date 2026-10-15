@@ -34,6 +34,18 @@ async function mockHome(page: Page, extra: Record<string, unknown> = {}) {
     bots: { bots: BOTS },
     'bot-work/default':{bot:BOTS[0],session:SESSIONS[0],sessionId:SESSIONS[0].id},
     'sessions/sess-bot-super':{session:SESSIONS[0],messages:[]},
+    'sessions/sess-bot-super/history': { messages: [] },
+    'sessions/sess-bot-desk/history': {
+      messages: [
+        { role: 'user', parts: [{ type: 'text', text: '更早的问题' }] },
+        { role: 'assistant', parts: [{ type: 'text', text: '好' }] },
+        { role: 'user', parts: [{ type: 'text', text: '桌面现在怎么样\n请把今天的安排、未读消息、明天的会议和还没做完的事都看一下' }] }
+      ]
+    },
+    'sessions/sess-bot-xiaoba/history': {
+      messages: [{ role: 'assistant', parts: [{ type: 'text', text: '先这样' }] }]
+    },
+    'bot-rooms': { rooms: [{ id: 'room-1', title: '晨会', botIds: ['deskbot', 'bot-xiaoba'], status: 'idle' }] },
     sessions: { sessions: SESSIONS },
     tasks: { tasks: [] },
     approvals: { approvals: [] },
@@ -79,18 +91,51 @@ test.describe('Agent Home routes', () => {
 });
 
 test.describe('Chat and Bot mode', () => {
-  test('switching to Bot mode lists the bot roster with their fixed chats, chat mode hides them [AC:bots#AC-1]', async ({ page }) => {
+  test('switching to Bot mode lists the bot roster with their fixed chats, chat mode hides them [AC:bots#AC-1] [AC:bot-session-row#AC-3] [AC:bot-session-row#AC-4] [AC:bot-session-row#AC-5]', async ({ page }) => {
     await mockHome(page);
     await page.goto('/#/chat');
     const list = page.locator('#sessionListMini');
     await expect(list).toContainText('Deploy review');
     await expect(list).not.toContainText('Bot Chat');
+    await expect(list.locator('.list-item--bot-chat')).toHaveCount(0);
 
     await page.locator('#nav-bot').click();
     await expect(page.locator('#nav-bot')).toHaveAttribute('aria-current', 'page');
-    await expect(list.locator('.list-item')).toHaveCount(3);
-    await expect(list).toContainText('Bot Chat · DeskBot');
-    await expect(list).toContainText('Bot Chat · 小八');
+    await expect(list.locator('.list-item--bot-chat')).toHaveCount(3);
+    await expect(list.locator('.list-item--group')).toHaveCount(1);
+    await expect(list.locator('.list-item--group')).toContainText('群聊');
+    await expect(list.locator('.list-item--group').locator('[data-bot-face-slot]')).toHaveCount(0);
+    const desk = list.locator('.list-item--bot-chat', { hasText: 'DeskBot' });
+    await expect(desk.locator('.session-item__question-text')).toHaveText(
+      '桌面现在怎么样 请把今天的安排、未读消息、明天的会议和还没做完的事都看一下'
+    );
+    await expect(desk.locator('.session-item__agent')).toHaveCount(0);
+    await expect(desk.locator('.session-item__delete')).toHaveText('删除');
+    await expect(desk).not.toContainText('Bot Chat');
+    await expect(desk.locator('.session-item__question')).toHaveCSS('white-space', 'nowrap');
+    await expect(desk.locator('.session-item__question')).toHaveCSS('overflow-x', 'hidden');
+    const questionBox = await desk.locator('.session-item__question').boundingBox();
+    const textBox = await desk.locator('.session-item__question-text').boundingBox();
+    expect(questionBox && textBox && textBox.width > questionBox.width).toBe(true);
+    expect(textBox && textBox.height < 24).toBe(true);
+    await desk.hover();
+    const motion = await desk.locator('.session-item__question-text').evaluate((el) => {
+      const style = getComputedStyle(el);
+      return { name: style.animationName, reduced: window.matchMedia('(prefers-reduced-motion: reduce)').matches };
+    });
+    if (motion.reduced) {
+      await expect(desk.locator('.session-item__question')).toHaveCSS('overflow-x', 'auto');
+    } else {
+      expect(motion.name).toBe('session-question-marquee');
+      await page.waitForTimeout(2000);
+      const shifted = await desk.locator('.session-item__question-text').evaluate((el) => getComputedStyle(el).transform);
+      expect(shifted).not.toBe('none');
+    }
+    await expect(list.locator('[data-bot-face-slot] > *')).toHaveCount(3);
+    await expect(list.locator('.list-item--bot-chat', { hasText: '小八' })).toContainText('还没提问');
+    await expect(list.locator('.list-item--bot-chat', { hasText: '小八' })).not.toContainText('bot-xiaoba');
+    await expect(list.locator('.list-item--bot-chat', { hasText: 'Super Bot' })).not.toContainText('super-bot');
+    await expect(list).not.toContainText('Bot Chat');
     await expect(list).not.toContainText('Deploy review');
     const options = page.locator('#botSelect option');
     await expect(options).toHaveText(['选择 Bot', 'Super Bot', 'DeskBot', '小八']);

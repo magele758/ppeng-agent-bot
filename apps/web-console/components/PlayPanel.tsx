@@ -44,6 +44,8 @@ import { ComposerModelPicker } from './ComposerModelPicker';
 import { SessionSettingsPanel, type ExecPreset } from './sections/chat/SessionSettingsPanel';
 import { PlayBotGroupChat } from './play-group/PlayBotGroupChat';
 import { PlayBotGroupList } from './play-group/PlayBotGroupList';
+import { SessionListRow } from './SessionListRow';
+import { useBotSessionQuestions } from './useBotSessionQuestions';
 
 function isCoreExecAgent(id: string): boolean {
   return id === 'general' || id === 'main';
@@ -263,6 +265,13 @@ export function PlayPanel({
   const [deleting, setDeleting] = useState(false);
   const [openGroupId, setOpenGroupId] = useState<string | null>(null);
   const [groupCount, setGroupCount] = useState(0);
+  const botQuestions = useBotSessionQuestions({
+    sessions,
+    bots,
+    selectedSessionId,
+    selectedMessages: chat.sessionMessages,
+    pendingQuestion: chat.optimisticUser
+  });
   const createMenuRef = useRef<HTMLDivElement>(null);
   const configBtnRef = useRef<HTMLButtonElement>(null);
   const configPanelRef = useRef<HTMLDivElement>(null);
@@ -938,74 +947,39 @@ export function PlayPanel({
                   <h3 className="session-date-group__label">{sessionGroupDisplay(group.bucket, group.label, t)}</h3>
                   <div className="session-date-group__items">
                     {group.sessions.map((s) => {
-                      const title = s.title || t('play.unnamed');
                       const checked = checkedVisible.includes(s.id);
                       const statusKey = sessionStatusKey(s.status);
-                      const sessionRowSelected = !openGroupId && selectedSessionId === s.id;
                       return (
-                        <div
+                        <SessionListRow
                           key={s.id}
-                          className={`list-item list-item--session${sessionRowSelected ? ' selected' : ''}${checked ? ' is-checked' : ''}`}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => {
-                            if (selectMode) {
-                              toggleChecked(s.id, !checked);
-                              return;
-                            }
+                          session={s}
+                          bots={bots}
+                          question={botQuestions.get(s.id) ?? ''}
+                          selected={!openGroupId && selectedSessionId === s.id}
+                          checked={checked}
+                          selectMode={selectMode}
+                          deleting={deleting}
+                          status={
+                            statusKey ? (
+                              <span className={`session-item__status session-item__status--${s.status}`}>
+                                <span className={statusDotClass(s.status)} aria-hidden="true" />
+                                {t(statusKey)}
+                              </span>
+                            ) : null
+                          }
+                          onOpen={() => {
                             setOpenGroupId(null);
                             onSelectSession(s.id);
                           }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              if (selectMode) toggleChecked(s.id, !checked);
-                              else {
-                                setOpenGroupId(null);
-                                onSelectSession(s.id);
-                              }
-                            }
-                          }}
-                        >
-                          {selectMode ? (
-                            <input
-                              type="checkbox"
-                              className="session-item__check"
-                              checked={checked}
-                              disabled={deleting}
-                              aria-label={t('play.sidebar.checkboxAria', { title })}
-                              onClick={(e) => e.stopPropagation()}
-                              onChange={(e) => toggleChecked(s.id, e.target.checked)}
-                            />
-                          ) : null}
-                          <div className="session-item__body">
-                            <div className="session-item__title">{title}</div>
-                            <div className="session-item__meta">
-                              {statusKey ? (
-                                <span className={`session-item__status session-item__status--${s.status}`}>
-                                  <span className={statusDotClass(s.status)} aria-hidden="true" />
-                                  {t(statusKey)}
-                                </span>
-                              ) : null}
-                              {s.agentId && !isCoreExecAgent(s.agentId) ? (
-                                <span className="session-item__agent">{s.agentId}</span>
-                              ) : null}
-                            </div>
-                          </div>
-                          {onDeleteSessions && !selectMode ? (
-                            <button
-                              type="button"
-                              className="btn btn-ghost btn-sm session-item__delete"
-                              disabled={deleting}
-                              aria-label={t('play.sidebar.deleteOneAria', { title })}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void confirmDelete([s.id], t('play.sidebar.deleteConfirmOne', { title }));
-                              }}
-                            >
-                              {t('play.sidebar.deleteOne')}
-                            </button>
-                          ) : null}
-                        </div>
+                          onToggleChecked={(next) => toggleChecked(s.id, next)}
+                          onDelete={
+                            onDeleteSessions
+                              ? (title) => {
+                                  void confirmDelete([s.id], t('play.sidebar.deleteConfirmOne', { title }));
+                                }
+                              : undefined
+                          }
+                        />
                       );
                     })}
                   </div>
