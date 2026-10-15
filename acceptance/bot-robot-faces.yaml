@@ -1,0 +1,27 @@
+id: bot-robot-faces
+title: Bot 显示稳定的机器人头像
+status: implemented
+notes: |
+  负责人在提出需求时明确要求现在就实现，验收标准按该说明视为已批准。
+  Coucou 源码是 MIT，但 LICENSE-ASSETS.md 排除了角色形象、应用图标、design/ 与 docs/media/，因此不复制其图像，改用原创简笔机器人脸。
+requirement: |
+  User wants each bot in bot mode to show a small robot icon, inspired by https://github.com/Louis-CFM/coucou. FIRST check that repo's license.
+  License result: coucou source is MIT, but character art, app icon, design/, and docs/media/ are excluded in LICENSE-ASSETS.md. Do NOT copy their PNGs, vectors, or Mochi drawing. Implement original simple robot-face SVGs. Assign deterministically from the bot name (stable hash, same name → same face). Show on bot cards, detail, and the chat bot picker.
+  Empty state too if there is a bot avatar slot. All new user-visible strings via i18n zh+en.
+criteria:
+  - id: AC-1
+    given: 列表里有若干 Bot
+    when: 用户查看 Bot 卡片
+    then: 每张卡片都有一个小机器人头像，同一个名字始终是同一张脸
+  - id: AC-2
+    given: 用户打开某个 Bot 的详情
+    when: 详情显示出来
+    then: 详情上的机器人头像与这只 Bot 在卡片上的头像相同
+  - id: AC-3
+    given: 对话页处于 Bot 模式
+    when: 用户查看聊天里的 Bot 选择器
+    then: 选择器显示当前 Bot 的机器人头像；改选另一只名字不同的 Bot 后，头像换成那只 Bot 的脸
+  - id: AC-4
+    given: 还没有任何 Bot
+    when: Bot 列表的空状态出现
+    then: 空状态的头像位置显示一个机器人图标

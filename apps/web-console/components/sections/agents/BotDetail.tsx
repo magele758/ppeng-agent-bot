@@ -20,6 +20,7 @@ import { BotConnections } from '../../bot-work/BotConnections';
 import { BotCronPanel } from '../../BotCronPanel';
 import { BotModelSetting } from '../../BotModelSetting';
 import { BotPolicySettings } from '../../BotPolicySettings';
+import { BotFace } from '../../BotFace';
 import { SettingsGroup } from '../../ui';
 
 interface BotDetailProps {
@@ -172,9 +173,17 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
   return (
     <section className="ag-panel" aria-label={t('agents.bots.detailTitle')} id="botDetail" data-testid="bot-detail">
       <div className="ag-panel__head">
-        <div>
-          <h3 className="ag-panel__title">{bot.name}</h3>
-          {bot.title && bot.title !== bot.name ? <p className="ag-panel__lead">{bot.title}</p> : null}
+        <div className="ag-panel__identity">
+          <BotFace
+            name={bot.name}
+            label={t('agents.bots.faceLabel', { name: bot.name })}
+            testId="bot-detail-face"
+            size="md"
+          />
+          <div>
+            <h3 className="ag-panel__title">{bot.name}</h3>
+            {bot.title && bot.title !== bot.name ? <p className="ag-panel__lead">{bot.title}</p> : null}
+          </div>
         </div>
         <div className="ag-panel__actions">
           <button type="button" className="btn btn-primary btn-sm" onClick={() => onOpenChat(bot)}>

@@ -35,6 +35,7 @@ import { groupAgentsByDomain, sortAgentsById } from '@/lib/sort-utils';
 import { groupSessionsByDate } from '@/lib/session-groups';
 import { WorkspacePicker } from './WorkspacePicker';
 import { catalogToPickerOptions } from '@/lib/model-providers';
+import { BotFace } from './BotFace';
 import { ComposerModelPicker } from './ComposerModelPicker';
 import { SessionSettingsPanel, type ExecPreset } from './sections/chat/SessionSettingsPanel';
 
@@ -1209,14 +1210,29 @@ export function PlayPanel({
                       </span>
                     </button>
                     {botSurface ? (
-                      <>
+                      <div className="composer-bot-picker">
+                        <BotFace
+                          name={selectedBot?.name || chat.botId}
+                          label={
+                            selectedBot?.name || chat.botId
+                              ? t('agents.bots.faceLabel', { name: selectedBot?.name || chat.botId })
+                              : t('agents.bots.faceEmpty')
+                          }
+                          testId="bot-picker-face"
+                        />
+                        <span className="composer-bot-picker__name" aria-hidden="true">
+                          {selectedBot?.name ?? (chat.botId || t('play.selectBot'))}
+                        </span>
+                        <span className="composer-bot-picker__chevron" aria-hidden="true">
+                          ▾
+                        </span>
                         <label className="sr-only" htmlFor="botSelect">
-                          Bot
+                          {t('play.bot')}
                         </label>
                         <select
                           id="botSelect"
                           className="composer-bot-select"
-                          aria-label="Bot"
+                          aria-label={t('play.bot')}
                           value={chat.botId}
                           onChange={(e) => void chat.selectBot(e.target.value)}
                         >
@@ -1230,7 +1246,7 @@ export function PlayPanel({
                             </option>
                           ))}
                         </select>
-                      </>
+                      </div>
                     ) : null}
                     <div className="chat-composer-dock__pickers">
                     <ComposerModelPicker
