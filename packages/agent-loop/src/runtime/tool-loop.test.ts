@@ -115,6 +115,32 @@ describe('executeSingleTool', () => {
     expect(allowed.isExternal).toBe(true);
   });
 
+  it.each([undefined, 'schema changed'])('rejects a capability pin mismatch before hooks or execution (reason: %s)', async (reason) => {
+    const execute = vi.fn(async () => ({ ok: true, content: 'unexpected' }));
+    const runLifecycleHook = vi.fn(async () => ({}));
+    const checkCapabilityPin = vi.fn(() => ({ ok: false, reason, expected: 'old', actual: 'new' }));
+    const h = host({ checkCapabilityPin, runLifecycleHook });
+    const t = tool('pinned', execute);
+    const result = await executeSingleTool(h, [t], call('pinned', {}), ctx, false, 's1');
+    expect(checkCapabilityPin).toHaveBeenCalledWith('pinned', t.inputSchema);
+    expect(result).toMatchObject({ ok: false, problem: { code: 'SCHEMA_PIN_MISMATCH', status: 409 } });
+    expect(JSON.parse(result.content)).toEqual({
+      error: 'schema_pin_mismatch', reason: reason ?? 'CBOM schema pin failed', expected: 'old', actual: 'new',
+    });
+    expect(h.traces).toEqual(['capability_pin_fail']);
+    expect(runLifecycleHook).not.toHaveBeenCalled();
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('executes a tool after a successful capability pin check', async () => {
+    const execute = vi.fn(async () => ({ ok: true, content: 'done' }));
+    const h = host({ checkCapabilityPin: () => ({ ok: true }) });
+    const result = await executeSingleTool(h, [tool('pinned', execute)], call('pinned', {}), ctx, false, 's1');
+    expect(result).toMatchObject({ ok: true, content: 'done' });
+    expect(execute).toHaveBeenCalledOnce();
+    expect(h.traces).toEqual(['tool_start']);
+  });
+
   it('truncates using the env threshold and exports a span on success and on throw', async () => {
     const spans: Array<{ toolName: string; ok: boolean }> = [];
     const h = host({
@@ -172,6 +198,25 @@ describe('executeSingleTool', () => {
     expect(r2.ok).toBe(false);
     expect(r2.problem?.code).toBe('PRE_TOOL_USE_BLOCKED');
     expect(phases).toEqual(['pre_tool_use', 'post_tool_use', 'pre_tool_use']);
+  });
+
+  it.each([false, true])('captures rewritten input for compensation and tolerates snapshot failure (throws: %s)', async (throws) => {
+    const snapshot = { previous: 'value' };
+    const captureSnapshot = vi.fn(async () => {
+      if (throws) throw new Error('snapshot unavailable');
+      return snapshot;
+    });
+    const execute = vi.fn(async () => ({ ok: true, content: 'done' }));
+    const completed: CompletedWaveItem[] = [];
+    const h = host({ runLifecycleHook: async () => ({ input: { rewritten: true } }) });
+    const t = tool('write', execute, { captureSnapshot });
+    const result = await executeSingleTool(h, [t], call('write', {}), ctx, false, 's1', completed);
+    expect(result.ok).toBe(true);
+    expect(captureSnapshot).toHaveBeenCalledWith(ctx, { rewritten: true });
+    expect(execute).toHaveBeenCalledWith(ctx, { rewritten: true });
+    expect(completed).toEqual([{
+      tool: t, toolCallId: 'tc-write', args: { rewritten: true }, snapshot: throws ? undefined : snapshot, context: ctx,
+    }]);
   });
 
   it('redacts non-shell tool output', async () => {

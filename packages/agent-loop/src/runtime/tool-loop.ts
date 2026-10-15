@@ -522,6 +522,65 @@ export async function executeSingleTool(
     completed, createApprovalLookup(host, sessionId));
 }
 
+function checkToolCapabilityPin(
+  host: ToolLoopHost,
+  tool: ToolContract<Record<string, unknown>>,
+  toolCall: ToolCallPart,
+  sessionId: string
+): ToolLoopResult | undefined {
+  if (host.checkCapabilityPin) {
+    const pin = host.checkCapabilityPin(tool.name, tool.inputSchema ?? {});
+    if (!pin.ok) {
+      host.emitTrace(sessionId, {
+        kind: 'capability_pin_fail',
+        payload: { tool: tool.name, reason: pin.reason, expected: pin.expected, actual: pin.actual },
+      });
+      return {
+        toolCallId: toolCall.toolCallId,
+        name: tool.name,
+        ok: false,
+        content: JSON.stringify({
+          error: 'schema_pin_mismatch',
+          reason: pin.reason ?? 'CBOM schema pin failed',
+          expected: pin.expected,
+          actual: pin.actual,
+        }),
+        problem: toolInfraProblem(
+          tool.name,
+          toolCall.toolCallId,
+          'SCHEMA_PIN_MISMATCH',
+          pin.reason ?? 'CBOM schema pin failed',
+          { title: 'Schema pin mismatch', status: 409 }
+        ),
+      };
+    }
+  }
+
+  return undefined;
+}
+
+function prepareToolResultContent(host: ToolLoopHost, sessionId: string, toolName: string, content: string): string {
+  const maxChars = envToolResultMaxChars(host.env);
+  const scrubbed = scrubToolContent(host, content);
+  const archived = host.archiveToolResult
+    ? host.archiveToolResult({ sessionId, toolName, content: scrubbed })
+    : scrubbed;
+  return archived === scrubbed ? truncateToolContent(scrubbed, maxChars) : archived;
+}
+
+async function captureToolSnapshot(
+  tool: ToolContract<Record<string, unknown>>,
+  context: RunContext,
+  input: unknown
+): Promise<unknown> {
+  if (!tool.captureSnapshot) return undefined;
+  try {
+    return await tool.captureSnapshot(context, input as Record<string, unknown>);
+  } catch {
+    return undefined;
+  }
+}
+
 async function executeSingleToolWithApprovals(
   host: ToolLoopHost,
   tools: ToolContract<Record<string, unknown>>[],
@@ -584,33 +643,8 @@ async function executeSingleToolWithApprovals(
     };
   }
 
-  if (host.checkCapabilityPin) {
-    const pin = host.checkCapabilityPin(tool.name, tool.inputSchema ?? {});
-    if (!pin.ok) {
-      host.emitTrace(sessionId, {
-        kind: 'capability_pin_fail',
-        payload: { tool: tool.name, reason: pin.reason, expected: pin.expected, actual: pin.actual },
-      });
-      return {
-        toolCallId: toolCall.toolCallId,
-        name: tool.name,
-        ok: false,
-        content: JSON.stringify({
-          error: 'schema_pin_mismatch',
-          reason: pin.reason ?? 'CBOM schema pin failed',
-          expected: pin.expected,
-          actual: pin.actual,
-        }),
-        problem: toolInfraProblem(
-          tool.name,
-          toolCall.toolCallId,
-          'SCHEMA_PIN_MISMATCH',
-          pin.reason ?? 'CBOM schema pin failed',
-          { title: 'Schema pin mismatch', status: 409 }
-        ),
-      };
-    }
-  }
+  const pinFailure = checkToolCapabilityPin(host, tool, toolCall, sessionId);
+  if (pinFailure) return pinFailure;
 
   host.emitTrace(sessionId, { kind: 'tool_start', payload: { name: tool.name } });
 
@@ -646,14 +680,7 @@ async function executeSingleToolWithApprovals(
   }
 
   const execInput = pre.input !== undefined ? pre.input : toolCall.input;
-  let snapshot: unknown;
-  if (tool.captureSnapshot) {
-    try {
-      snapshot = await tool.captureSnapshot(context, execInput as Record<string, unknown>);
-    } catch {
-      snapshot = undefined;
-    }
-  }
+  const snapshot = await captureToolSnapshot(tool, context, execInput);
 
   const startedAt = Date.now();
   const exportSpan = (ok: boolean) => {
@@ -677,13 +704,7 @@ async function executeSingleToolWithApprovals(
       completed.push({ tool, toolCallId: toolCall.toolCallId, args: (execInput ?? {}) as Record<string, unknown>, snapshot, context });
     }
 
-    const maxChars = envToolResultMaxChars(host.env);
-    const scrubbed = scrubToolContent(host, result.content);
-    const archived = host.archiveToolResult
-      ? host.archiveToolResult({ sessionId, toolName: tool.name, content: scrubbed })
-      : scrubbed;
-
-    result = { ...result, content: archived === scrubbed ? truncateToolContent(scrubbed, maxChars) : archived };
+    result = { ...result, content: prepareToolResultContent(host, sessionId, tool.name, result.content) };
     exportSpan(result.ok);
 
     if (host.runLifecycleHook) {
