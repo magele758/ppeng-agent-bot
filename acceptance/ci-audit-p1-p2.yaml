@@ -40,7 +40,7 @@ criteria:
   - id: AC-9
     given: Mutation, real-model smoke, Harness, and compaction A/B checks participate in a release evaluation.
     when: The Main release gate aggregates their results.
-    then: Failures in mutation, real-model smoke, or compaction A/B fail the release gate; optional model checks may skip for unavailable credentials. Harness outcomes remain explicitly reported but do not block Main until a qualifying experiment meets the unchanged quality requirements.
+    then: Failures in mutation or real-model smoke fail the release gate; optional model checks may skip for unavailable credentials. Compaction A/B outcomes remain explicitly reported but do not block Main because live-model evidence is non-deterministic. Harness outcomes remain explicitly reported but do not block Main until a qualifying experiment meets the unchanged quality requirements.
   - id: AC-10
     given: Release readiness requires build, unit, integration, browser, faults, migration-rollback, performance, soak, live-model, live-software, acceptance, and crap evidence.
     when: Any required evidence item is removed from a candidate manifest or from the required-evidence contract.

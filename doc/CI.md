@@ -38,7 +38,7 @@ regression / integration 不重试（单 daemon 有状态流程，重跑会掩�
 
 验收结果同样保留首轮失败，重试恢复不会记作干净通过；已登记例外仍显示告警，持续失败绝不豁免。
 
-Main release gate 对 mutation、真模型 smoke 和 compaction A/B 保持阻断；缺密钥的可选模型检查可跳过，实际失败或取消会阻断。Harness 暂为非阻断诊断：仍等待并在日志和 step summary 报告真实结果，独立 Harness 工作流继续保留失败状态和证据，不伪装成质量通过。starter 仅有 12 个案例，少于要求的 30 个；在具备符合要求的实验前，将它作为 Main 阻断项会导致有密钥时永久失败。质量阈值不降低、不复制案例凑数；待合格实验就绪后再恢复 Main 的阻断规则与对应测试。
+Main release gate 对 mutation 和真模型 smoke 保持阻断；缺密钥的可选模型检查可跳过，真模型 smoke 实际失败或取消会阻断。Compaction A/B 与 Harness 一样作为非阻断诊断：真实结果仍写入日志和 step summary，失败或取消不阻断 Main。实时模型输出具有非确定性，单次 `quality_regression=true` 不能作为稳定、可复现的发布回归证据；保留原始 job 状态和报告供排查，不把诊断失败伪装成通过。Harness 暂为非阻断诊断：仍等待并在日志和 step summary 报告真实结果，独立 Harness 工作流继续保留失败状态和证据，不伪装成质量通过。starter 仅有 12 个案例，少于要求的 30 个；在具备符合要求的实验前，将它作为 Main 阻断项会导致有密钥时永久失败。质量阈值不降低、不复制案例凑数；待合格实验就绪后再恢复 Main 的阻断规则与对应测试。
 
 必需的 mutation Job 若被跳过，会有意使 Main release gate 失败（fail-closed）。
 

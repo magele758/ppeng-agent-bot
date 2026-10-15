@@ -2120,3 +2120,16 @@ describe('command hardline before approval', () => {
     assert.equal(messages.length, 0);
   });
 });
+
+it('hardline propagates unexpected scanner defects instead of treating them as resource exhaustion', () => {
+  const defect = new Error('scanner defect');
+  // Inject a scanner failure after the public trim guard has succeeded.
+  const command = new Proxy(new String('echo safe'), {
+    get(target, key) {
+      if (key === 'trim') return () => 'echo safe';
+      if (key === 'length') throw defect;
+      return Reflect.get(target, key);
+    }
+  });
+  assert.throws(() => matchCommandHardline(command), (error) => error === defect);
+});

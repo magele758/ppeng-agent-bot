@@ -1086,3 +1086,39 @@ test('refusals report ok:false for no-bot, plan mode, unknown target and owner m
   assert.equal(userText(store, beta.canonicalSessionId).length, 0);
   store.db.close();
 });
+
+test('message_agent catches early store failures as structured errors', async () => {
+  const { dir, store } = tempStore();
+  try {
+    const alpha = createBot(facadeHost(store), { name: 'Alpha' });
+    const broken = Object.create(store);
+    const { tool } = harness(broken);
+    for (const thrown of [new Error('read failed'), 'raw read failure']) {
+      broken.getSession = () => { throw thrown; };
+      const result = await failure(call(tool, dir, store, alpha, { target: 'Beta', message: 'hi' }));
+      assert.equal(result.error_code, 'DELIVERY_FAILED');
+      assert.equal(result.error, thrown instanceof Error ? thrown.message : thrown);
+    }
+  } finally { store.db.close(); }
+});
+
+test('message_agent reports queue capacity and retains already accepted work', async () => {
+  const { dir, store } = tempStore();
+  try {
+    const host = facadeHost(store);
+    const alpha = createBot(host, { name: 'Alpha' });
+    const beta = createBot(host, { name: 'Beta' });
+    store.setDaemonControl('bot.workSettings', { perBot: 1, perPrincipal: 1 });
+    const { tool, active } = harness(store);
+    active.add(beta.canonicalSessionId);
+    const first = await call(tool, dir, store, alpha, { target: 'Beta', message: 'first' });
+    assert.equal(first.ok, true);
+    const overflow = await failure(call(tool, dir, store, alpha, { target: 'Beta', message: 'overflow' }));
+    assert.equal(overflow.error_code, 'QUEUE_FULL');
+    assert.equal(overflow.accepted, false);
+    assert.equal(overflow.retryable, true);
+    assert.match(overflow.error, /Pending work capacity reached/);
+    assert.deepEqual(overflow.limits, { perBot: 1, perPrincipal: 1 });
+    assert.deepEqual(overflow.usage, { total: 1, byBot: { [beta.id]: 1 } });
+  } finally { store.db.close(); }
+});

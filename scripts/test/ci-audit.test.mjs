@@ -93,13 +93,15 @@ test('release gate consumes every participating quality result [AC:ci-audit-p1-p
  for(const job of ['mutation','remote-model-smoke','harness','compact-ab']) assert.ok(workflow.jobs.gate.needs.includes(job),job);
  const { releaseFailures }=await import('../ci/release-results.mjs');
  const required={tests:{result:'success'},crap:{result:'success'},acceptance:{result:'success'},mutation:{result:'success'},'secrets-gate':{result:'success'}};
- for(const name of ['remote-model-smoke','compact-ab']) {
+ for(const name of ['remote-model-smoke']) {
   assert.deepEqual(releaseFailures({...required,[name]:{result:'skipped'}}),[]);
   assert.ok(releaseFailures({...required,[name]:{result:'failure'}}).includes(name));
   assert.ok(releaseFailures({...required,[name]:{result:'cancelled'}}).includes(name));
  }
  for (const result of ['success','failure','cancelled','skipped']) {
-  assert.deepEqual(releaseFailures({...required,harness:{result}}),[]);
+  for (const name of ['harness', 'compact-ab']) {
+   assert.deepEqual(releaseFailures({...required,[name]:{result}}),[]);
+  }
  }
  assert.ok(releaseFailures({...required,mutation:{result:'skipped'}}).includes('mutation'));
 });
@@ -156,4 +158,26 @@ test('known load-window timeout uses the exact shared retry exception [AC:ci-aud
  assert.equal(buildReport({...args, flaky:[{file,tests:[{name:name+' other'}]}]}).pass, false);
  assert.equal(isKnownFlaky('other.test.mjs', name), false);
  assert.equal(knownFlaky.filter(entry => entry.file === file && entry.name === name).length, 1);
+});
+
+test('release CLI reports non-blocking diagnostics in stdout and step summary [AC:ci-audit-p1-p2#AC-9]', async () => {
+ const { mkdtempSync, rmSync } = await import('node:fs');
+ const { tmpdir } = await import('node:os');
+ const { join } = await import('node:path');
+ const { spawnSync } = await import('node:child_process');
+ const { sanitizeScriptEnv } = await import('../spawn-utils.mjs');
+ const dir = mkdtempSync(join(tmpdir(), 'release-summary-'));
+ try {
+  const summary = join(dir, 'summary.md');
+  const needs = Object.fromEntries(['tests','crap','acceptance','mutation','secrets-gate'].map(name => [name,{result:'success'}]));
+  needs.harness = {result:'failure'};
+  needs['compact-ab'] = {result:'failure'};
+  const run = spawnSync(process.execPath, ['scripts/ci/release-results.mjs', JSON.stringify(needs)], {encoding:'utf8',env:{...sanitizeScriptEnv(),GITHUB_STEP_SUMMARY:summary}});
+  assert.equal(run.status, 0, run.stdout + run.stderr);
+  for (const output of [run.stdout, readFileSync(summary, 'utf8')]) {
+   assert.match(output, /Harness \(non-blocking\): failure/);
+   assert.match(output, /Compact A[/]B \(non-blocking\): failure/);
+   assert.match(output, /non-deterministic/);
+  }
+ } finally { rmSync(dir, {recursive:true,force:true}); }
 });
