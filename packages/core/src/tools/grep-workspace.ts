@@ -81,25 +81,43 @@ function rgText(value: RgByteText | undefined): string {
   return '';
 }
 
+interface RgEvent {
+  type?: string;
+  data?: { path?: RgByteText; lines?: RgByteText; line_number?: number };
+}
+
+function parseRgEvent(raw: string): RgEvent | undefined {
+  try {
+    return JSON.parse(raw) as RgEvent;
+  } catch {
+    return undefined;
+  }
+}
+
+function formatRgHit(filePath: string, kind: string, lineNo: number | undefined, text: string): string {
+  const sep = kind === 'context' ? '-' : ':';
+  const body = text.replace(/\n$/, '');
+  if (!lineNo) return `${filePath}${sep}${body}`;
+  return `${filePath}${sep}${lineNo}${sep}${body}`;
+}
+
+function rgHitLine(event: RgEvent, cwd: string): string {
+  if (event.type !== 'match' && event.type !== 'context') return '';
+  const filePath = rgText(event.data?.path);
+  if (!filePath || sensitiveGrepPath(filePath, cwd)) return '';
+  return formatRgHit(filePath, event.type, event.data?.line_number, rgText(event.data?.lines));
+}
+
+function rgLine(raw: string, cwd: string): string {
+  if (!raw) return '';
+  const event = parseRgEvent(raw);
+  if (!event) return '';
+  return rgHitLine(event, cwd);
+}
+
 /** Render rg --json and drop every record whose path is a secret file. */
 function renderRgJson(stdout: string, cwd: string): string {
-  const kept: string[] = [];
-  for (const raw of stdout.split('\n')) {
-    if (!raw) continue;
-    let event: { type?: string; data?: { path?: RgByteText; lines?: RgByteText; line_number?: number } };
-    try {
-      event = JSON.parse(raw) as typeof event;
-    } catch {
-      continue;
-    }
-    if (event.type !== 'match' && event.type !== 'context') continue;
-    const filePath = rgText(event.data?.path);
-    if (!filePath || sensitiveGrepPath(filePath, cwd)) continue;
-    const text = rgText(event.data?.lines).replace(/\n$/, '');
-    const lineNo = event.data?.line_number;
-    const sep = event.type === 'context' ? '-' : ':';
-    kept.push(lineNo ? `${filePath}${sep}${lineNo}${sep}${text}` : `${filePath}${sep}${text}`);
-  }
+  const kept = stdout.split('\n').map((raw) => rgLine(raw, cwd)).filter((line) => line.length > 0);
   return kept.join('\n').trim() || '(no matches)';
 }
 

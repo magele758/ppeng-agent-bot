@@ -237,6 +237,18 @@ function repoPath(context: RunContext, path: string): string {
   return resolveWorkspacePath(context, path);
 }
 
+/** Directories named credentials stay readable. A file with that exact name does not. */
+async function readableStat(
+  target: string
+): Promise<{ ok: true; stat: Awaited<ReturnType<typeof stat>> } | { ok: false; content: string }> {
+  if (sensitiveReadRefusal(target, undefined, 'directory')) {
+    return { ok: false, content: SENSITIVE_READ_REFUSAL };
+  }
+  const targetStat = await stat(target);
+  if (targetStat.isDirectory() || !sensitiveReadRefusal(target)) return { ok: true, stat: targetStat };
+  return { ok: false, content: SENSITIVE_READ_REFUSAL };
+}
+
 function externalAiToolsEnabled(): boolean {
   const v = process.env.RAW_AGENT_EXTERNAL_AI_TOOLS?.trim().toLowerCase();
   return v === '1' || v === 'true' || v === 'yes';
@@ -332,27 +344,13 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
       }
 
       const target = repoPath(context, args.path);
-      const fileRefusal = sensitiveReadRefusal(target);
-      const credentialsDirCandidate =
-        fileRefusal === SENSITIVE_READ_REFUSAL &&
-        sensitiveReadRefusal(target, undefined, 'directory') === undefined;
-      if (fileRefusal && !credentialsDirCandidate) {
-        return { ok: false, content: SENSITIVE_READ_REFUSAL };
-      }
-      let targetStat;
-      try {
-        targetStat = await stat(target);
-      } catch (error) {
-        if (fileRefusal) return { ok: false, content: SENSITIVE_READ_REFUSAL };
-        throw error;
-      }
+      const readable = await readableStat(target);
+      if (!readable.ok) return { ok: false, content: SENSITIVE_READ_REFUSAL };
+      const targetStat = readable.stat;
       const limit = typeof args.limit === 'number' && args.limit > 0 ? args.limit : undefined;
       const offsetLine = typeof args.offset_line === 'number' && args.offset_line >= 0 ? args.offset_line : 0;
 
       if (targetStat.isDirectory()) {
-        if (sensitiveReadRefusal(target, undefined, 'directory')) {
-          return { ok: false, content: SENSITIVE_READ_REFUSAL };
-        }
         const entries = await readdir(target, { withFileTypes: true });
         const lines = entries
           .filter((entry) => !isVaultMetadataDirName(entry.name))
@@ -364,7 +362,6 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
           content: sliced.join('\n') || '(empty directory)'
         };
       }
-      if (fileRefusal) return { ok: false, content: SENSITIVE_READ_REFUSAL };
 
       const useWindow = offsetLine > 0 || (limit !== undefined && (await shouldStreamReadFile(target)));
       if (useWindow && limit !== undefined) {
