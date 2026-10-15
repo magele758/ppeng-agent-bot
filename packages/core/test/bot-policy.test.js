@@ -442,6 +442,13 @@ test('allowedTools warnings name missing required tools; empty and complete list
   ]);
 });
 
+test('botPolicyWarnings emits a warning for legacy bypass permission', () => {
+  assert.deepEqual(
+    botPolicyWarnings({ permissionMode: 'bypass', legacyBotBypass: true }),
+    [{ code: 'legacy_bypass_permission' }]
+  );
+});
+
 test('botPolicyWarnings is recomputed from stored session metadata, not from the last save', () => {
   const store = tempStore();
   const host = facadeHost(store);
