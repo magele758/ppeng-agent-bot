@@ -811,32 +811,10 @@ export function PlayPanel({
   };
 
   return (
-    <section className={`panel ${active ? 'active' : ''}`} id="panel-play" role="tabpanel">
+    <section className={`panel ${active ? 'active' : ''}`} id="panel-play">
       <div className="play-layout play-layout--rail">
         <aside className="play-sidebar">
           <div className="play-sidebar__head">
-            <div className="play-surface-switch" role="tablist" aria-label={t('play.sidebar.modeAria')}>
-              <button
-                type="button"
-                role="tab"
-                id="playSurfaceChat"
-                className={playSurface === 'chat' ? 'is-active' : ''}
-                aria-selected={playSurface === 'chat'}
-                onClick={() => onPlaySurfaceChange('chat')}
-              >
-                {t('play.chat')}
-              </button>
-              <button
-                type="button"
-                role="tab"
-                id="playSurfaceBot"
-                className={playSurface === 'bot' ? 'is-active' : ''}
-                aria-selected={playSurface === 'bot'}
-                onClick={() => onPlaySurfaceChange('bot')}
-              >
-                {t('play.bot')}
-              </button>
-            </div>
             {botSurface&&<a className="chat-empty__link" href={formatHash({section:'agents',sub:'bots'})}>{t('play.settings.manageBots')}</a>}
             <div className="create-menu" ref={createMenuRef}>
               <button

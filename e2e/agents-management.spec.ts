@@ -182,8 +182,8 @@ test.describe('Bots page', () => {
     await openBotsPage(page);
     await page.getByTestId(`bot-card-${bot.id}`).click();
     await page.getByTestId('bot-detail').getByRole('button', { name: '打开对话' }).click();
-    await expect(page).toHaveURL(/#\/chat$/);
-    await expect(page.locator('#playSurfaceBot')).toHaveAttribute('aria-selected', 'true');
+    await expect(page).toHaveURL(/#\/bot$/);
+    await expect(page.locator('#nav-bot')).toHaveAttribute('aria-current', 'page');
     await expect(page.getByPlaceholder(`发消息给 ${bot.name}…`)).toBeVisible();
   });
 });

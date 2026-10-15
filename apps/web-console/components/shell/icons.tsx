@@ -14,6 +14,13 @@ const common = {
 
 export function SectionIcon({ id }: { id: SectionId }) {
   switch (id) {
+    case 'bot':
+      return (
+        <svg {...common}>
+          <rect x="6" y="8" width="12" height="10" rx="3" />
+          <path d="M12 4v4M9 13h.01M15 13h.01M9 4h6" />
+        </svg>
+      );
     case 'chat':
       return (
         <svg {...common}>
@@ -37,12 +44,6 @@ export function SectionIcon({ id }: { id: SectionId }) {
       return (
         <svg {...common}>
           <path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2V5ZM8 7h7" />
-        </svg>
-      );
-    case 'ops':
-      return (
-        <svg {...common}>
-          <path d="M3 12h4l3-8 4 16 3-8h4" />
         </svg>
       );
     case 'settings':

@@ -25,7 +25,7 @@ export function GlobalStatusBar() {
   }).level;
   const heal = status.selfHealActive?.length ?? 0;
   const showEvolution = evolutionChipVisible(status.evolution?.activeWorktrees ?? 0);
-  const href = formatHash({ section: 'ops', sub: 'health' });
+  const href = formatHash({ section: 'settings', sub: 'ops', pane: 'health' });
 
   return (
     <div className="global-status" role="group" aria-label={t('ops.status.aria')}>

@@ -131,7 +131,7 @@ function EvolutionConsole() {
 
   return (
     <div className="ev-page">
-      <a href="/#/ops/health" className="ev-back">
+      <a href="/#/settings/ops/health" className="ev-back">
         ← {t('ops.evolution.back')}
       </a>
 

@@ -410,7 +410,7 @@ body,
 }
 .stop-menu__item:hover { background: color-mix(in srgb, var(--color-text-primary) 8%, transparent); }
 
-.create-menu { position: relative; }
+.create-menu { position: relative; margin-left: auto; }
 .create-menu__pop {
   position: absolute;
   right: 0;

@@ -8,12 +8,13 @@ import { AdvancedToggle, EmptyState, Section, useAdvancedMode } from '../../ui';
 import { useLab } from '../../shell/LabProvider';
 import { useSectionNav } from '../../shell/useSectionNav';
 import { ModelOnboardingBanner } from '../../ModelOnboardingBanner';
+import { OpsWorkspace } from '../ops/OpsSection';
 import { SETTINGS_ENTRIES, type SettingsCategoryId } from './registry';
 import './settings.css';
 
 export function SettingsSection({ active }: { active: boolean }) {
   const { t } = useI18n();
-  const { selectedSessionId } = useLab();
+  const { selectedSessionId, location, navigate } = useLab();
   const { sub, select } = useSectionNav('settings');
   const [advanced] = useAdvancedMode();
   const [query, setQuery] = useState('');
@@ -51,6 +52,7 @@ export function SettingsSection({ active }: { active: boolean }) {
 
   const searching = query.trim().length > 0;
   const category = (sub ?? SUB_PAGES.settings[0]) as SettingsCategoryId;
+  const showOps = !searching && category === 'ops';
 
   const visible = useMemo(() => {
     const matched = filterSettingsEntries(searchable, query, advanced);
@@ -118,6 +120,7 @@ export function SettingsSection({ active }: { active: boolean }) {
                 aria-current={!searching && id === category ? 'page' : undefined}
                 onClick={() => {
                   setQuery('');
+                  if (id === 'ops' && category === 'ops') return;
                   select(id);
                 }}
               >
@@ -126,7 +129,12 @@ export function SettingsSection({ active }: { active: boolean }) {
             ))}
           </nav>
           <div className="settings-entries" id={`section-settings-${searching ? 'search' : category}`}>
-            {visible.length === 0 ? (
+            {showOps ? (
+              <OpsWorkspace
+                pane={location.pane}
+                onSelectPane={(pane) => navigate('settings', 'ops', pane)}
+              />
+            ) : visible.length === 0 ? (
               <EmptyState
                 title={searching ? t('settings.noResultsTitle') : t('settings.emptyCategoryTitle')}
                 description={searching ? t('settings.noResultsDesc', { query: query.trim() }) : t('settings.emptyCategoryDesc')}

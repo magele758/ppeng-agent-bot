@@ -116,7 +116,7 @@ test.describe('Chat experience', () => {
 
   test('the Bot view points to Bots & Agents for managing bots [AC:chat-experience#AC-6]', async ({ page }) => {
     await page.goto('/');
-    await page.locator('#playSurfaceBot').click();
+    await page.locator('#nav-bot').click();
     const manage = page.locator('#panel-play').getByRole('link', { name: /在「Bots 与 Agents」中管理/ });
     await expect(manage.first()).toBeVisible();
     await manage.first().click();
