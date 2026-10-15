@@ -21,3 +21,9 @@ test("one-time schedule uses the selected zone and detects DST gaps [AC:bot-rout
 });
 
 test('editing preserves wall time in the schedule zone',()=>{assert.equal(zonedInstantToLocal('2026-10-13T01:00:00.000Z','Asia/Shanghai'),'2026-10-13T09:00');});
+
+test('routine deadline edits round-trip in the selected timezone [AC:bot-routine-lifecycle#AC-6]',()=>{
+ const iso='2030-10-15T01:30:00.000Z';
+ assert.equal(zonedInstantToLocal(iso,'Asia/Shanghai'),'2030-10-15T09:30');
+ assert.equal(zonedLocalToIso(zonedInstantToLocal(iso,'Asia/Shanghai'),'Asia/Shanghai'),iso);
+});

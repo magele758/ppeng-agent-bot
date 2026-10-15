@@ -13,6 +13,7 @@ export type CronJobInfo = {
   enabled: boolean;
   lastRunAt?: string;
   nextRunAt?: string;
+  expiresAt?: string;
   createdAt: string;
   updatedAt: string;
   metadata: Record<string, unknown>;

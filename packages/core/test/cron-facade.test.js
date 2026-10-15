@@ -82,7 +82,7 @@ test('createCronJob stores an event routine without a next run', () => {
 });
 
 test('schedule and content updates preserve explicit policies and invalidate old catch-up plans',()=>{
- const {store,host}=tempHost();const session=store.createSession({title:'tool fixture',mode:'chat',agentId:'general',metadata:{userId:'alice'}});let job=createCronJob(host,{sessionId:session.id,name:'update',prompt:'read',intervalMs:1000});
+ const {store,host}=tempHost();const session=store.createSession({title:'tool fixture',mode:'chat',agentId:'general',metadata:{userId:'alice'}});let job=createCronJob(host,{sessionId:session.id,name:'update',prompt:'read',intervalMs:60000});
  host.cronStore.update(job.id,{metadata:{...job.metadata,catchUpPlan:{scheduledAts:['old']}}});
  job=updateCronJob(host,job.id,{onceAt:'2030-01-01T00:00:00Z',name:' once ',prompt:' act ',timezone:'Asia/Shanghai',missedPolicy:'skip',precheck:{kind:'predicate',source:'{"wakeAgent":false}'}});assert.equal(job.scheduleKind,'once_at');assert.equal(job.name,'once');assert.equal(job.prompt,'act');assert.equal(job.missedPolicy,'skip');assert.equal(job.metadata.catchUpPlan,undefined);
  job=updateCronJob(host,job.id,{intervalMs:60000,precheck:null});assert.equal(job.scheduleKind,'every_ms');assert.equal(job.metadata.precheck,undefined);
@@ -90,6 +90,17 @@ test('schedule and content updates preserve explicit policies and invalidate old
  job=updateCronJob(host,job.id,{event:'github/push',secretEnv:'UPDATE_EVENT_SECRET',prompt:'event prompt'});assert.equal(job.metadata.prompt,'event prompt');
  job=updateCronJob(host,job.id,{cron:'0 9 * * *',enabled:false});host.cronStore.update(job.id,{nextRunAt:'2020-01-01T00:00:00Z'});job=updateCronJob(host,job.id,{enabled:true});assert.ok(Date.parse(job.nextRunAt)>Date.now());
  const version=job.ruleVersion;job=updateCronJob(host,job.id,{timezone:'UTC'});assert.equal(job.ruleVersion,version+1);
- for(const patch of [{cron:'0 9 * * *',intervalMs:1000},{onceAt:'invalid'},{intervalMs:999},{event:'bad'},{timezone:'bad zone'},{missedPolicy:'bad'},{name:''},{prompt:''},{secretEnv:'bad env'}])assert.throws(()=>updateCronJob(host,job.id,patch));
+ for(const patch of [{cron:'0 9 * * *',intervalMs:60000},{onceAt:'invalid'},{intervalMs:999},{event:'bad'},{timezone:'bad zone'},{missedPolicy:'bad'},{name:''},{prompt:''},{secretEnv:'bad env'}])assert.throws(()=>updateCronJob(host,job.id,patch));
  for(const input of [{onceAt:'invalid'},{intervalMs:0},{event:'bad',secretEnv:'ENV'},{cron:'0 9 * * *',missedPolicy:'bad'}])assert.throws(()=>createCronJob(host,{sessionId:session.id,name:'bad',prompt:'bad',...input}));store.db.close();
+});
+
+test('future recurring deadlines and one-minute minimum [AC:bot-routine-lifecycle#AC-8]',()=>{
+ const {store,host}=tempHost();const bot=createBot(host,{name:'deadline'});
+ const input={botId:bot.id,name:'r',prompt:'check',intervalMs:60000};
+ for(const intervalMs of [0,1000,59999,60000.5])assert.throws(()=>createCronJob(host,{...input,intervalMs}),/intervalMs/);
+ for(const expiresAt of ['bad','2000-01-01T00:00:00Z'])assert.throws(()=>createCronJob(host,{...input,expiresAt}),/expiresAt/);
+ const expiresAt=new Date(Date.now()+3600000).toISOString();const job=createCronJob(host,{...input,expiresAt});assert.equal(job.expiresAt,expiresAt);
+ assert.throws(()=>updateCronJob(host,job.id,{expiresAt:'bad'}),/expiresAt/);
+ assert.throws(()=>updateCronJob(host,job.id,{intervalMs:59999}),/intervalMs/);
+ assert.equal(updateCronJob(host,job.id,{expiresAt:null}).expiresAt,undefined);store.db.close();
 });

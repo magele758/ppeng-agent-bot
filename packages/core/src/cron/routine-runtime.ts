@@ -1,4 +1,5 @@
 /** Durable occurrence ledger. Configuration and individual execution have independent lifecycles. */
+import { routineExpired } from './routine-deadline.js';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -18,7 +19,7 @@ import { principalFromSession } from '../bots/bot-identity.js';
 import { CronJobStore, type CronJobRecord } from './cron-store.js';
 import { evaluateRoutinePrecheck, readStoredPrecheck } from './routine-precheck.js';
 import { nextZonedCronRunAt, skippedZonedCronMinutes } from './cron-next.js';
-export type RoutineRunStatus = 'queued'|'running'|'waiting_approval'|'completed'|'failed'|'cancelled'|'unknown'|'skipped';
+export type RoutineRunStatus = 'queued'|'running'|'waiting_approval'|'completed'|'failed'|'cancelled'|'unknown'|'skipped'|'silent';
 export interface RoutineAttempt { number:number;sessionId:string;startedAt:string;finishedAt?:string;status:RoutineRunStatus;result?:string;error?:string }
 export interface RoutineRun {
  id:string; routineId:string; scheduledAt:string; timezone:string; status:RoutineRunStatus;
@@ -78,6 +79,7 @@ export class RoutineRunStore {
 }
 function summarize(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):void {
  if(run.notificationSent)return;
+ if(run.status==='silent'){runs.update(run.id,{notificationSent:true});return;}
  const parent=host.store.getSession(run.mainSessionId)??repairRoutineOwnerSession(host,run.job);
  if(parent&&parent.id!==run.mainSessionId){runs.update(run.id,{mainSessionId:parent.id});run.mainSessionId=parent.id;}
  if(!parent){runs.update(run.id,{notificationSent:true});return;}
@@ -90,7 +92,7 @@ function summarize(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):
  runs.update(run.id,{notificationSent:true});host.store.db.exec('COMMIT');
  }catch(error){host.store.db.exec('ROLLBACK');throw error;}
 }
-function resultText(host:RoutineRuntimeHost,id:string):string {return assistantTextsFromFold(host.store,id).at(-1)?.slice(0,16000)??'';}
+function resultText(host:RoutineRuntimeHost,id:string):string {return assistantTextsFromFold(host.store,id).at(-1)?.trim().slice(0,16000)??'';}
 function unknownEffects(host:RoutineRuntimeHost,run:RoutineRun):boolean {
  return !!run.sessionId&&host.hasUnconfirmedEffects?.(run.sessionId,run.startedAt??run.createdAt)===true;
 }
@@ -114,7 +116,7 @@ function completionResult(host:RoutineRuntimeHost,run:RoutineRun,session:Session
  const denied=approvals.some(approval=>approval.status==='rejected');const outcome=parseRunOutcome(session?.metadata?.outcome);
  const stopped=outcome?.kind==='aborted'||outcome?.kind==='failed'||(outcome?.kind==='idle'&&outcome.reason!=='end');
  const failed=stopped||!session||!['idle','completed'].includes(session.status)||denied||!result.trim();
- return failed?{status:'failed',result,error:completionError(session,denied,result)}:{status:'completed',result};
+ return failed?{status:'failed',result,error:completionError(session,denied,result)}:{status:result.trim().startsWith('[NO_UPDATE]')?'silent':'completed',result};
 }
 function finish(host:RoutineRuntimeHost,runs:RoutineRunStore,id:string,expectedSessionId?:string):void {
  const run=runs.get(id);if(!run||(expectedSessionId&&run.sessionId!==expectedSessionId))return;
@@ -135,7 +137,7 @@ function failRoutineExecution(host:RoutineRuntimeHost,runs:RoutineRunStore,id:st
 }
 function launchRoutineSession(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun,sessionId:string):void {
  const executing=activeFor(host.store);executing.add(run.id);
- try{void Promise.resolve(host.runSession(sessionId)).then(()=>finish(host,runs,run.id,sessionId)).catch(error=>failRoutineExecution(host,runs,run.id,sessionId,error)).finally(()=>executing.delete(run.id));}
+ try{void Promise.resolve(host.runSession(sessionId)).then(()=>finish(host,runs,run.id,sessionId)).catch(error=>failRoutineExecution(host,runs,run.id,sessionId,error)).finally(()=>{executing.delete(run.id);removeExpiredRoutines(host);});}
  catch(error){executing.delete(run.id);failRoutineExecution(host,runs,run.id,sessionId,error);}
 }
 function recoverInterruptedRoutine(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):void {
@@ -200,7 +202,7 @@ function claimRoutineSession(host:RoutineRuntimeHost,runs:RoutineRunStore,run:Ro
  try{
   const session=host.store.createSession({title:`Routine: ${run.job.name}`,mode:'chat',agentId:parent.agentId,background:false,metadata:routineWorkMetadata(host,parent,run)});
   if(!runs.claim(run.id,session.id)){host.store.db.exec('ROLLBACK');return undefined;}
-  host.store.appendMessage(session.id,'user',[textPart(`[cron:${run.job.name}] ${run.job.prompt}`)]);stampSessionWake(host.store,session.id,{kind:'unattended',source:'routine'});host.store.db.exec('COMMIT');return session;
+  host.store.appendMessage(session.id,'user',[textPart(`[cron:${run.job.name}] ${run.job.prompt}\nWhen there is nothing new to report, reply only '[NO_UPDATE]'.`)]);stampSessionWake(host.store,session.id,{kind:'unattended',source:'routine'});host.store.db.exec('COMMIT');return session;
  }catch(error){host.store.db.exec('ROLLBACK');throw error;}
 }
 function busyRoutines(runs:RoutineRunStore,all:RoutineRun[],executing:Set<string>):Set<string>{
@@ -216,12 +218,12 @@ async function dispatchRoutineQueue(host:RoutineRuntimeHost,runs:RoutineRunStore
  }
 }
 export async function drainRoutineRuns(host:RoutineRuntimeHost):Promise<void>{
- const runs=new RoutineRunStore(host.store),executing=activeFor(host.store);recoverRoutineRuns(host,runs,executing);await dispatchRoutineQueue(host,runs,executing);
+ const runs=new RoutineRunStore(host.store),executing=activeFor(host.store);recoverRoutineRuns(host,runs,executing);await dispatchRoutineQueue(host,runs,executing);removeExpiredRoutines(host);
 }
 
 export async function cancelRoutineRun(host:RoutineRuntimeHost,id:string):Promise<RoutineRun>{
  const runs=new RoutineRunStore(host.store);const run=runs.get(id);if(!run)throw new NotFoundError('RoutineRun',id);
- if(['completed','failed','skipped','cancelled'].includes(run.status))return run;
+ if(['completed','failed','skipped','silent','cancelled'].includes(run.status))return run;
  if(run.sessionId){host.cancelSession?.(run.sessionId);for(const approval of host.store.listApprovals({status:'pending'}).filter(a=>a.sessionId===run.sessionId))host.store.updateApproval(approval.id,'rejected');const session=host.store.getSession(run.sessionId);if(session?.status==='waiting_approval')host.store.updateSession(session.id,{status:'failed'});}
  const cancelled=runs.update(id,{status:'cancelled',requiresEffectVerification:run.status==='unknown'||run.requiresEffectVerification===true,error:'Cancelled by user; already performed effects are not undone',finishedAt:nowIso()});summarize(host,runs,cancelled);return cancelled;
 }
@@ -309,9 +311,17 @@ function checkpointRoutinePlan(config:CronJobStore,job:CronJobRecord,schedule:Mi
 }
 /** Persist receipts before advancing configuration; partial catch-up and replay share one checkpoint. */
 export function materializeRoutineOccurrences(host:RoutineRuntimeHost,config:CronJobStore,job:CronJobRecord,now=Date.now()):RoutineRun[] {
+ if(routineExpired(job,now))return [];
  const runs=new RoutineRunStore(host.store);rememberRoutinePrincipal(host,config,job);recordSkippedLocalTimes(runs,job,now);
  const due=scheduleDue(job);if(!Number.isFinite(due)||due>now)return [];
  const schedule=missedSchedule(job,due,now),plan=catchUpPlan(runs,job,schedule);
  if(plan)job.metadata={...job.metadata,catchUpPlan:plan};
  const admitted=admitRoutinePlan(host,runs,job,schedule,plan,now);checkpointRoutinePlan(config,job,schedule,plan,admitted.created,admitted.blocked);return admitted.created;
+}
+
+/** Single-instance cleanup keeps configuration while already admitted work is pending. */
+function removeExpiredRoutines(host:RoutineRuntimeHost):void {
+ const config=new CronJobStore(host.stateDir),runs=new RoutineRunStore(host.store);
+ const busy=new Set(runs.pending().map(run=>run.routineId));
+ for(const job of config.list())if(routineExpired(job)&&!busy.has(job.id))config.remove(job.id);
 }

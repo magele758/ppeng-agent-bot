@@ -73,3 +73,13 @@ test('PATCH /api/cron/jobs/:id 写入名称、提示、时刻、开关和预检 
   const untouched = await call(rt, 'PATCH', '/api/cron/jobs/:id', { id: created.id }, {});
   assert.equal(untouched.body.job.name, 'evening');
 });
+
+test('POST/PATCH preserve, clear, and validate recurring deadlines [AC:bot-routine-lifecycle#AC-6] [AC:bot-routine-lifecycle#AC-8]',async()=>{
+ const rt=makeRuntime();const session=rt.createChatSession({title:'deadline',message:'seed',background:false});const expiresAt=new Date(Date.now()+3600000).toISOString();
+ const created=await call(rt,'POST','/api/cron/jobs',{}, {sessionId:session.id,name:'r',prompt:'check',intervalMs:60000,expiresAt});assert.equal(created.body.job.expiresAt,expiresAt);const id=created.body.job.id;
+ const later=new Date(Date.now()+7200000).toISOString();assert.equal((await call(rt,'PATCH','/api/cron/jobs/:id',{id},{expiresAt:later})).body.job.expiresAt,later);
+ for(const expiresAt of ['bad','2000-01-01T00:00:00Z',123])await assert.rejects(()=>call(rt,'PATCH','/api/cron/jobs/:id',{id},{expiresAt}),/expiresAt/);
+ await assert.rejects(()=>call(rt,'PATCH','/api/cron/jobs/:id',{id},{intervalMs:59999}),/intervalMs/);
+ assert.equal((await call(rt,'PATCH','/api/cron/jobs/:id',{id},{expiresAt:null})).body.job.expiresAt,undefined);
+ rt.store.db.close();
+});
