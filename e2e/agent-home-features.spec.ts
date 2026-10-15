@@ -46,13 +46,14 @@ async function mockHome(page: Page, extra: Record<string, unknown> = {}) {
 }
 
 const ROUTES: Array<{ hash: string; nav: string; section: string }> = [
+  { hash: '#/bot', nav: 'nav-bot', section: '#panel-play' },
   { hash: '#/chat', nav: 'nav-chat', section: '#panel-play' },
   { hash: '#/agents', nav: 'nav-agents', section: '#section-agents' },
   { hash: '#/tasks', nav: 'nav-tasks', section: '#section-tasks-queue' },
   { hash: '#/tasks/inbox', nav: 'nav-tasks', section: '#section-tasks-inbox' },
   { hash: '#/knowledge', nav: 'nav-knowledge', section: '#section-knowledge' },
-  { hash: '#/ops', nav: 'nav-ops', section: '#section-ops-trajectory' },
-  { hash: '#/ops/health', nav: 'nav-ops', section: '#section-ops-health' },
+  { hash: '#/ops', nav: 'nav-settings', section: '#section-ops-trajectory' },
+  { hash: '#/ops/health', nav: 'nav-settings', section: '#section-ops-health' },
   { hash: '#/settings', nav: 'nav-settings', section: '#section-settings' }
 ];
 
@@ -85,8 +86,8 @@ test.describe('Chat and Bot mode', () => {
     await expect(list).toContainText('Deploy review');
     await expect(list).not.toContainText('Bot Chat');
 
-    await page.locator('#playSurfaceBot').click();
-    await expect(page.locator('#playSurfaceBot')).toHaveAttribute('aria-selected', 'true');
+    await page.locator('#nav-bot').click();
+    await expect(page.locator('#nav-bot')).toHaveAttribute('aria-current', 'page');
     await expect(list.locator('.list-item')).toHaveCount(3);
     await expect(list).toContainText('Bot Chat · DeskBot');
     await expect(list).toContainText('Bot Chat · 小八');
@@ -94,8 +95,8 @@ test.describe('Chat and Bot mode', () => {
     const options = page.locator('#botSelect option');
     await expect(options).toHaveText(['选择 Bot', 'Super Bot', 'DeskBot', '小八']);
 
-    await page.locator('#playSurfaceChat').click();
-    await expect(page.locator('#playSurfaceChat')).toHaveAttribute('aria-selected', 'true');
+    await page.locator('#nav-chat').click();
+    await expect(page.locator('#nav-chat')).toHaveAttribute('aria-current', 'page');
     await expect(list).toContainText('Weekly notes');
     await expect(page.locator('#botSelect')).toHaveCount(0);
   });
@@ -209,18 +210,18 @@ test.describe('Settings language and theme', () => {
     await mockHome(page);
     await page.goto('/#/settings');
     const nav = page.getByRole('navigation', { name: '一级导航' });
-    await expect(nav.getByRole('link')).toHaveText(['对话', 'Bots 与 Agents', '任务', '知识与记忆', '运维', '设置']);
+    await expect(nav.getByRole('link')).toHaveText(['Bot', '对话', 'Bots 与 Agents', '任务', '知识与记忆', '设置']);
 
     await page.getByTestId('language-toggle').first().getByRole('button', { name: 'English' }).click();
     await expect(page.locator('html')).toHaveAttribute('lang', /^en/);
-    await expect(page.getByRole('navigation', { name: /primary|navigation/i }).getByRole('link').first()).toHaveText('Chat');
+    await expect(page.getByRole('navigation', { name: /primary|navigation/i }).getByRole('link').nth(1)).toHaveText('Chat');
 
     await page.reload();
     await expect(page.locator('html')).toHaveAttribute('lang', /^en/);
 
     await page.getByTestId('language-toggle').first().getByRole('button', { name: '中文' }).click();
     await expect(page.locator('html')).toHaveAttribute('lang', /^zh/);
-    await expect(nav.getByRole('link').first()).toHaveText('对话');
+    await expect(nav.getByRole('link').nth(1)).toHaveText('对话');
   });
 
   test('theme choice applies data-theme and survives reload', async ({ page }) => {

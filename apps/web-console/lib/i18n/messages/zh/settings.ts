@@ -5,7 +5,8 @@ export const settings = {
     behavior: 'Agent 行为',
     safety: '安全与沙箱',
     tools: '工具与技能',
-    integrations: '集成与可观测'
+    integrations: '集成与可观测',
+    ops: '运维'
   },
   categoriesLabel: '设置分类',
   searchPlaceholder: '搜索设置（如：模型、API Key、飞书、主题）',

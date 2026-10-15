@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { api } from '@/lib/api';
+import { approvalShownLines } from '@/lib/approval-feed';
 import { attachBeforeAskUserDecision, type LiveStreamArm } from '@/lib/live-stream-attach';
 import { useI18n } from '@/lib/i18n';
 import type { ApprovalItem } from '@/lib/types';
@@ -56,10 +57,7 @@ function ApprovalItemRow({
   const { t } = useI18n();
   const [reply, setReply] = useState('');
   const isAsk = a.toolName === 'ask_user';
-  const question =
-    (typeof a.args?.question === 'string' && a.args.question) ||
-    a.reason ||
-    t('play.approval.needInfo');
+  const shown = approvalShownLines(a, t('play.approval.needInfo'));
 
   const postDecision = async (decision: 'approve' | 'reject') => {
     if (decision === 'approve' && isAsk) {
@@ -93,10 +91,10 @@ function ApprovalItemRow({
     <div className="approval-banner__item">
       <div className="approval-banner__row">
         <strong>{a.toolName}</strong>
-        {a.reason ? <span className="muted small">{a.reason}</span> : null}
+        {shown.reason ? <span className="muted small">{shown.reason}</span> : null}
       </div>
       {isAsk ? (
-        <p className="approval-banner__q">{question}</p>
+        shown.question ? <p className="approval-banner__q">{shown.question}</p> : null
       ) : (
         <pre className="approval-banner__args">{argsPreview(a.args)}</pre>
       )}

@@ -16,13 +16,99 @@
   overflow-y: auto;
 }
 
+.lab-rail__top {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-1);
+}
+
 .lab-rail__brand {
   display: flex;
   align-items: center;
   gap: var(--ui-space-2);
+  flex: 1;
+  min-width: 0;
   padding: var(--ui-space-1) var(--ui-space-2);
   font-weight: 600;
   font-size: var(--ui-text-md);
+}
+
+.lab-rail__brand-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.lab-rail__toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-md);
+  background: transparent;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+}
+
+.lab-rail__toggle:hover {
+  color: var(--ui-text);
+  background: var(--ui-surface);
+}
+
+.lab-rail__toggle:focus-visible {
+  outline: var(--ui-focus);
+  outline-offset: -2px;
+}
+
+.lab-rail.is-collapsed {
+  width: var(--ui-rail-width-collapsed);
+  flex-basis: var(--ui-rail-width-collapsed);
+}
+
+.lab-rail.is-collapsed .lab-rail__top,
+.lab-rail.is-collapsed .lab-rail__brand {
+  flex-direction: column;
+  padding-inline: 0;
+}
+
+.lab-rail.is-collapsed .lab-rail__brand-name,
+.lab-rail.is-collapsed .lab-rail__label,
+.lab-rail.is-collapsed .account-menu__name {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.lab-rail.is-collapsed .lab-rail__link,
+.lab-rail.is-collapsed .lab-rail__foot {
+  justify-content: center;
+}
+
+.lab-rail.is-collapsed .lab-rail__link {
+  position: relative;
+  padding-inline: var(--ui-space-2);
+}
+
+.lab-rail.is-collapsed .lab-rail__badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 14px;
+  padding: 0 3px;
+}
+
+.lab-rail.is-collapsed .lab-rail__foot .btn,
+.lab-rail.is-collapsed .account-menu .btn {
+  justify-content: center;
+  padding-inline: 6px;
 }
 
 .lab-rail__nav {
@@ -96,6 +182,12 @@
   border-top: 1px solid var(--ui-border);
 }
 
+.lab-rail__tool {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+}
+
 .lab-main {
   flex: 1;
   min-width: 0;
@@ -150,9 +242,11 @@
   .app.lab-shell {
     flex-direction: column-reverse;
   }
-  .lab-rail {
+  .lab-rail,
+  .lab-rail.is-collapsed {
     width: auto;
     flex: 0 0 auto;
+    flex-basis: auto;
     flex-direction: row;
     align-items: center;
     padding: var(--ui-space-1) var(--ui-space-2);
@@ -164,6 +258,9 @@
   .lab-rail__brand,
   .lab-rail__foot {
     display: none;
+  }
+  .lab-rail__top {
+    flex: 0 0 auto;
   }
   .lab-rail__nav {
     flex-direction: row;

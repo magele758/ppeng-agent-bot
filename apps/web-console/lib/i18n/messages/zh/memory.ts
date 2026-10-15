@@ -56,7 +56,7 @@ export const memory = {
   embeddingModeAuto: '自动（配了 embedding 上游就启用）',
   embeddingModeOn: '开启（可复用对话 key）',
   embeddingModeOff: '关闭',
-  embeddingHint: '自动：配置了专用 embedding 上游就启用，否则只用关键词检索；开启：复用对话 key；关闭：始终关键词检索。实际生效状态见「运维 → 健康」。',
+  embeddingHint: '自动：配置了专用 embedding 上游就启用，否则只用关键词检索；开启：复用对话 key；关闭：始终关键词检索。实际生效状态见「设置 → 运维」。',
   recentObs: '最近观测（gate / curator）',
   emptyObs: '暂无观测',
   previewTitle: '上下文预览',

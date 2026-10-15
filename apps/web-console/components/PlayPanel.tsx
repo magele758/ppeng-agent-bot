@@ -20,6 +20,7 @@ import { api } from '@/lib/api';
 import { formatHash } from '@/lib/nav';
 import { useI18n, type MessageKey } from '@/lib/i18n';
 import { messageHasStructuredParts, msgPartsToText, normalizedRole } from '@/lib/chat-utils';
+import { anchorApprovals } from '@/lib/approval-feed';
 import { indexResolvedToolCallIds, indexToolCalls } from '@/lib/tool-io';
 import { ChatTurnFromMessage, ChatTurnPlain, ChatTurnStreaming } from './ChatTurns';
 import { SurfaceContextProvider } from './a2ui/SurfaceContext';
@@ -660,23 +661,40 @@ export function PlayPanel({
     const toolSource = chat.sessionMessages.length ? chat.sessionMessages : feedMessages;
     const toolCallsById = indexToolCalls(toolSource);
     const resolvedCallIds = indexResolvedToolCallIds(toolSource);
+    const approvalAnchors = anchorApprovals(
+      feedMessages,
+      sessionApprovals,
+      resolvedCallIds,
+      (chat.streamOverlay?.segments ?? []).flatMap((seg) =>
+        seg.kind === 'tool' ? [{ name: seg.name, toolCallId: seg.toolCallId, args: seg.args }] : []
+      )
+    );
     if (selectedSessionId && chat.sessionMessages.length === 0 && !chat.optimisticUser && !chat.streamOverlay && !chat.waitTyping) {
       return (
-        <div className="chat-empty">
-          <h3 className="chat-empty__title">{t('play.empty.noMessages')}</h3>
-          <p className="chat-empty__hint">
-            {chat.needsModelSetup ? t('play.empty.startAfterSetup') : t('play.empty.startChat')}
-          </p>
-          {chat.needsModelSetup ? (
-            <button
-              type="button"
-              className="btn btn-primary btn-sm chat-empty__cta"
-              onClick={onOpenModelSetup}
-            >
-              {t('play.empty.setupCta')}
-            </button>
+        <>
+          <div className="chat-empty">
+            <h3 className="chat-empty__title">{t('play.empty.noMessages')}</h3>
+            <p className="chat-empty__hint">
+              {chat.needsModelSetup ? t('play.empty.startAfterSetup') : t('play.empty.startChat')}
+            </p>
+            {chat.needsModelSetup ? (
+              <button
+                type="button"
+                className="btn btn-primary btn-sm chat-empty__cta"
+                onClick={onOpenModelSetup}
+              >
+                {t('play.empty.setupCta')}
+              </button>
+            ) : null}
+          </div>
+          {sessionApprovals.length ? (
+            <ApprovalBanner
+              approvals={sessionApprovals}
+              onDone={onApprovalsChanged}
+              onAttachStream={onAttachStream}
+            />
           ) : null}
-        </div>
+        </>
       );
     }
 
@@ -727,6 +745,17 @@ export function PlayPanel({
           );
         }
       }
+      const pendingHere = approvalAnchors.afterMessage.get(mi);
+      if (pendingHere?.length) {
+        nodes.push(
+          <ApprovalBanner
+            key={`apr-${mi}`}
+            approvals={pendingHere}
+            onDone={onApprovalsChanged}
+            onAttachStream={onAttachStream}
+          />
+        );
+      }
       const turnIdx = endIndexToTurn.get(mi);
       if (turnIdx == null) continue;
       if (deferLastTurnStats && turnIdx === turnSlices.length - 1) continue;
@@ -747,6 +776,16 @@ export function PlayPanel({
           resolvedCallIds={resolvedCallIds}
         />
       );
+      if (approvalAnchors.afterStream.length) {
+        nodes.push(
+          <ApprovalBanner
+            key="apr-stream"
+            approvals={approvalAnchors.afterStream}
+            onDone={onApprovalsChanged}
+            onAttachStream={onAttachStream}
+          />
+        );
+      }
     }
     if (chat.waitTyping) {
       nodes.push(<ChatTurnPlain key="wait" role="assistant" text="…" extraClass="chat-turn--typing" />);
@@ -758,36 +797,24 @@ export function PlayPanel({
         nodes.push(<ChatFeedStatsFooter key={`turn-stats-live-${liveIdx}`} line={line} turnIndex={liveIdx} />);
       }
     }
+    if (approvalAnchors.trailing.length) {
+      nodes.push(
+        <ApprovalBanner
+          key="apr-trail"
+          approvals={approvalAnchors.trailing}
+          onDone={onApprovalsChanged}
+          onAttachStream={onAttachStream}
+        />
+      );
+    }
     return <>{nodes}</>;
   };
 
   return (
-    <section className={`panel ${active ? 'active' : ''}`} id="panel-play" role="tabpanel">
+    <section className={`panel ${active ? 'active' : ''}`} id="panel-play">
       <div className="play-layout play-layout--rail">
         <aside className="play-sidebar">
           <div className="play-sidebar__head">
-            <div className="play-surface-switch" role="tablist" aria-label={t('play.sidebar.modeAria')}>
-              <button
-                type="button"
-                role="tab"
-                id="playSurfaceChat"
-                className={playSurface === 'chat' ? 'is-active' : ''}
-                aria-selected={playSurface === 'chat'}
-                onClick={() => onPlaySurfaceChange('chat')}
-              >
-                {t('play.chat')}
-              </button>
-              <button
-                type="button"
-                role="tab"
-                id="playSurfaceBot"
-                className={playSurface === 'bot' ? 'is-active' : ''}
-                aria-selected={playSurface === 'bot'}
-                onClick={() => onPlaySurfaceChange('bot')}
-              >
-                {t('play.bot')}
-              </button>
-            </div>
             {botSurface&&<a className="chat-empty__link" href={formatHash({section:'agents',sub:'bots'})}>{t('play.settings.manageBots')}</a>}
             <div className="create-menu" ref={createMenuRef}>
               <button
@@ -1096,11 +1123,6 @@ export function PlayPanel({
               </div>
             </header>
 
-            <ApprovalBanner
-              approvals={sessionApprovals}
-              onDone={onApprovalsChanged}
-              onAttachStream={onAttachStream}
-            />
             <GoalStatusCard sessionId={selectedSessionId} />
 
             <div className="chat-panel-body">

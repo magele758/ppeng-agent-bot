@@ -15,7 +15,7 @@ function localeEndonym(locale: Locale): string {
   }
 }
 
-export function LanguageToggle() {
+export function LanguageToggle({ compact = false }: { compact?: boolean }) {
   const { locale, setLocale, t } = useI18n();
 
   return (
@@ -34,9 +34,11 @@ export function LanguageToggle() {
             type="button"
             className={pressed ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-ghost'}
             aria-pressed={pressed}
+            aria-label={localeEndonym(code)}
+            title={localeEndonym(code)}
             onClick={() => setLocale(code)}
           >
-            {localeEndonym(code)}
+            {compact ? (code === 'zh' ? '中' : 'EN') : localeEndonym(code)}
           </button>
         );
       })}

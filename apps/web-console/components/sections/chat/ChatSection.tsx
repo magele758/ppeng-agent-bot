@@ -10,7 +10,6 @@ import { createDefaultBotLoadGuard, startDefaultBotLoadEffect } from '@/lib/bot-
 import {
   botForCanonicalSession,
   filterSessionsByPlaySurface,
-  readStoredPlaySurface,
   writeStoredPlaySurface,
   type PlaySurface
 } from '@/lib/bots';
@@ -38,13 +37,14 @@ export function ChatSection({ active }: { active: boolean }) {
     upsertBot,
     tick,
     loadOverview,
+    location,
     navigate,
     setModelSetupOpen,
     registerChatBridge
   } = lab;
 
   const [sessionSidebarFilter, setSessionSidebarFilter] = useState('');
-  const [playSurface, setPlaySurfaceState] = useState<PlaySurface>(() => readStoredPlaySurface());
+  const [playSurface, setPlaySurfaceState] = useState<PlaySurface>('chat');
   const lastChatSessionRef = useRef<string | null>(null);
   const lastBotSessionRef = useRef<string | null>(null);
   const playSurfaceRef = useRef<PlaySurface>(playSurface);
@@ -198,9 +198,10 @@ export function ChatSection({ active }: { active: boolean }) {
   };
 
   const selectSession = useCallback(
-    async (id: string) => {
+    async (id: string): Promise<PlaySurface> => {
       setSelectedSessionId(id);
       const match = botForCanonicalSession(botsRef.current, id, sessionsRef.current);
+      const surface: PlaySurface = match ? 'bot' : 'chat';
       if (match) {
         lastBotSessionRef.current = id;
         setPlaySurface('bot');
@@ -215,11 +216,12 @@ export function ChatSection({ active }: { active: boolean }) {
       await loadOverview();
       await chat.refreshPlayPanel();
       chat.requestScrollPlayToBottom();
+      return surface;
     },
     [chat, loadOverview, setPlaySurface, setSelectedSessionId]
   );
 
-  const switchPlaySurface = (next: PlaySurface) => {
+  const applySurface = (next: PlaySurface) => {
     if (next === playSurfaceRef.current) return;
     setPlaySurface(next);
     if (next === 'chat') {
@@ -252,6 +254,20 @@ export function ChatSection({ active }: { active: boolean }) {
     void loadOverview().then(() => chat.refreshPlayPanel());
   };
 
+  const applySurfaceRef = useRef(applySurface);
+  applySurfaceRef.current = applySurface;
+
+  useEffect(() => {
+    if (location.section === 'chat' || location.section === 'bot') {
+      applySurfaceRef.current(location.section);
+    }
+  }, [location.section]);
+
+  const onPlaySurfaceChange = (next: PlaySurface) => {
+    if (location.section !== next) navigate(next);
+    applySurface(next);
+  };
+
   const bridgeRef = useRef({
     refreshPlayPanel: chat.refreshPlayPanel,
     selectSession,
@@ -278,7 +294,7 @@ export function ChatSection({ active }: { active: boolean }) {
       agents={agents}
       bots={bots}
       playSurface={playSurface}
-      onPlaySurfaceChange={switchPlaySurface}
+      onPlaySurfaceChange={onPlaySurfaceChange}
       approvals={approvals}
       selectedSessionId={selectedSessionId}
       onSelectSession={(id) => void selectSession(id)}
@@ -297,7 +313,7 @@ export function ChatSection({ active }: { active: boolean }) {
       onCancelSession={() =>
         void api(`/api/sessions/${selectedSessionId}/cancel`, { method: 'POST' }).then(() => tick())
       }
-      onOpenTrace={() => navigate('ops', 'trajectory')}
+      onOpenTrace={() => navigate('settings', 'ops', 'trajectory')}
       onApprovalsChanged={() => void tick({ includePlayPanel: true })}
       onAttachStream={(sessionId) => chat.armLiveSessionStream(sessionId)}
       chat={chat}

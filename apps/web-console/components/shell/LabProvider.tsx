@@ -13,8 +13,10 @@ import {
 } from 'react';
 import { api } from '@/lib/api';
 import { pendingApprovals } from '@/lib/approvals';
+import { type PlaySurface } from '@/lib/bots';
 import {
   DEFAULT_LOCATION,
+  canonicalOpsHash,
   formatHash,
   parseHash,
   sameLocation,
@@ -97,14 +99,14 @@ export interface ServerMeta {
 /** 由 Chat section 注册，供其他 section 通过 `openSession` 复用对话侧选择逻辑 */
 export interface ChatBridge {
   refreshPlayPanel: () => Promise<void>;
-  selectSession: (id: string) => Promise<void>;
+  selectSession: (id: string) => Promise<PlaySurface>;
   applyModelCatalog: (data: ModelProvidersResponse) => void;
 }
 
 export interface LabContextValue {
   location: NavLocation;
-  /** 导航；不传 sub 时取该 section 默认子页 */
-  navigate: (section: SectionId, sub?: string | null) => void;
+  /** 导航；不传 sub 时取该 section 默认子页。pane 仅用于设置里的运维。 */
+  navigate: (section: SectionId, sub?: string | null, pane?: string | null) => void;
 
   sessions: SessionSummary[];
   agents: AgentInfo[];
@@ -208,17 +210,24 @@ export function LabProvider({ children }: { children: ReactNode }) {
 
   // hash ⇄ location：挂载后读取（SSR 首屏固定为对话，避免 hydration 不一致）
   useEffect(() => {
-    const sync = () => setLocation((prev) => {
-      const next = parseHash(window.location.hash);
-      return sameLocation(prev, next) ? prev : next;
-    });
+    const sync = () => {
+      const raw = window.location.hash;
+      const redirected = canonicalOpsHash(raw);
+      if (redirected) {
+        const qIndex = raw.indexOf('?');
+        const q = qIndex >= 0 ? raw.slice(qIndex) : '';
+        window.history.replaceState(null, '', `${redirected}${q}`);
+      }
+      const next = parseHash(redirected ?? raw);
+      setLocation((prev) => (sameLocation(prev, next) ? prev : next));
+    };
     sync();
     window.addEventListener('hashchange', sync);
     return () => window.removeEventListener('hashchange', sync);
   }, []);
 
-  const navigate = useCallback((section: SectionId, sub?: string | null) => {
-    const next = parseHash(formatHash({ section, sub: sub ?? null }));
+  const navigate = useCallback((section: SectionId, sub?: string | null, pane?: string | null) => {
+    const next = parseHash(formatHash({ section, sub: sub ?? null, pane: pane ?? null }));
     const hash = formatHash(next);
     if (window.location.hash !== hash) window.location.hash = hash;
     setLocation((prev) => (sameLocation(prev, next) ? prev : next));
@@ -367,9 +376,10 @@ export function LabProvider({ children }: { children: ReactNode }) {
   const openSession = useCallback(
     async (id: string, opts?: { focusChat?: boolean }) => {
       const bridge = chatBridgeRef.current;
-      if (bridge) await bridge.selectSession(id);
+      let surface: PlaySurface = 'chat';
+      if (bridge) surface = await bridge.selectSession(id);
       else setSelectedSessionId(id);
-      if (opts?.focusChat) navigate('chat');
+      if (opts?.focusChat) navigate(surface);
     },
     [navigate, setSelectedSessionId]
   );

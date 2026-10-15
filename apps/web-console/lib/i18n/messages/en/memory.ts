@@ -56,7 +56,7 @@ export const memory = {
   embeddingModeAuto: 'Auto (on when an embedding upstream is configured)',
   embeddingModeOn: 'On (may reuse the chat key)',
   embeddingModeOff: 'Off',
-  embeddingHint: 'Auto: on when a dedicated embedding upstream is configured, otherwise keyword search only. On: reuse the chat key. Off: always keyword search. See Ops → Health for the effective state.',
+  embeddingHint: 'Auto: on when a dedicated embedding upstream is configured, otherwise keyword search only. On: reuse the chat key. Off: always keyword search. See Settings → Ops for the effective state.',
   recentObs: 'Recent observations (gate / curator)',
   emptyObs: 'No observations yet',
   previewTitle: 'Context preview',

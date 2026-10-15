@@ -99,7 +99,7 @@ export const ops = {
     fail: 'Problem detected',
     healRunning: 'Self-heal running · {n}',
     evoRunning: 'Evolution running · {n}',
-    open: 'Open Ops → System health'
+    open: 'Open Settings → Ops · System health'
   },
 
   health: {

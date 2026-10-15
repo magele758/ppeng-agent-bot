@@ -32,11 +32,17 @@ test('en and zh leaf key sets are identical', () => {
 });
 
 test('主导航与设置分类在中英文都有文案 [AC:console-navigation#AC-5]', () => {
-  const sections = ['chat', 'agents', 'tasks', 'knowledge', 'ops', 'settings'] as const;
+  const sections = ['bot', 'chat', 'agents', 'tasks', 'knowledge', 'settings'] as const;
   for (const id of sections) {
     assert.ok(zh.shell.nav[id].length > 0);
     assert.ok(en.shell.nav[id].length > 0);
-    assert.notEqual(zh.shell.nav[id], en.shell.nav[id]);
+    if (id !== 'bot') assert.notEqual(zh.shell.nav[id], en.shell.nav[id]);
   }
+  assert.equal(zh.shell.nav.ops, '运维');
+  assert.equal(en.shell.nav.ops, 'Ops');
+  assert.notEqual(zh.shell.nav.collapse, en.shell.nav.collapse);
+  assert.notEqual(zh.shell.nav.expand, en.shell.nav.expand);
+  assert.equal(zh.settings.categories.ops, '运维');
+  assert.equal(en.settings.categories.ops, 'Ops');
   assert.deepEqual(Object.keys(zh.settings.categories), Object.keys(en.settings.categories));
 });
