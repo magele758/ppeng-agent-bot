@@ -82,3 +82,42 @@ test('approval continuation is leased once across instances [AC:bot-routine-life
  await Promise.all([drainRoutineRuns({...h,runSession:execute}),drainRoutineRuns({...host(b),runSession:execute})]);
  assert.equal(calls,1);assert.equal(runs.get(run.id).status,'running');done();await new Promise(r=>setImmediate(r));assert.equal(runs.get(run.id).status,'completed');a.db.close();b.db.close();
 });
+
+async function stalledHeartbeat(t,heartbeatFirst){
+  const {a,b,h,runs,run}=fixture();let done,cancelled=0;
+  t.mock.timers.enable({apis:['setInterval','Date']});
+  const runtime={...h,cancelSession(){cancelled++;},runSession:async id=>{await new Promise(r=>done=r);a.appendMessage(id,'assistant',[{type:'text',text:'healthy result'}]);}};
+  await drainRoutineRuns(runtime);
+  // Advance wall time without delivering timers, as with a blocked event loop.
+  t.mock.timers.setTime(Date.now()+120_000);
+  await drainRoutineRuns(runtime);
+  assert.equal(runs.get(run.id).status,'running');
+  if(heartbeatFirst)t.mock.timers.tick(20_000);
+  done();await new Promise(r=>setImmediate(r));
+  assert.equal(cancelled,0);
+  await drainRoutineRuns(runtime);
+  assert.equal(runs.get(run.id).status,'completed');
+  assert.equal(a.listMessages(run.mainSessionId).length,1);
+  a.db.close();b.db.close();
+}
+test('stalled heartbeat without a competing owner completes normally before heartbeat [AC:bot-routine-lifecycle#AC-12]',t=>stalledHeartbeat(t,false));
+test('stalled heartbeat without a competing owner completes normally after heartbeat [AC:bot-routine-lifecycle#AC-12]',t=>stalledHeartbeat(t,true));
+
+test('transient SQLite busy on heartbeat retries without cancelling ownership [AC:bot-routine-lifecycle#AC-12]',async t=>{
+ const {a,b,run}=fixture();let cancelled=0;
+ t.mock.timers.enable({apis:['setInterval']});
+ const lease=RoutineLease.acquire(a,run.id),stop=lease.heartbeat(()=>cancelled++);
+ a.db.exec('PRAGMA busy_timeout=0');
+ b.db.exec('BEGIN IMMEDIATE');
+ try{t.mock.timers.tick(20_000);assert.equal(cancelled,0);}finally{b.db.exec('ROLLBACK');}
+ try{
+  a.db.prepare('UPDATE bot_routine_leases SET expires_at=0 WHERE run_id=?').run(run.id);
+  t.mock.timers.tick(20_000);
+  assert.equal(cancelled,0);assert.equal(lease.owns(),true);
+  a.db.prepare('UPDATE bot_routine_leases SET expires_at=0 WHERE run_id=?').run(run.id);
+  const successor=RoutineLease.acquire(b,run.id);assert.ok(successor);
+  t.mock.timers.tick(20_000);assert.equal(cancelled,1);
+  assert.equal(lease.whileOwned(()=>assert.fail('lost owner must be fenced')),undefined);
+  lease.release();assert.equal(successor.owns(),true);successor.release();
+ }finally{stop();a.db.close();b.db.close();}
+});

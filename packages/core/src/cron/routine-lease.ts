@@ -3,6 +3,13 @@ import type { SqliteStateStore } from '../storage.js';
 
 const PROCESS_OWNER = randomUUID();
 export const ROUTINE_LEASE_MS = 60_000;
+function isTransientLockError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const { code, errcode } = error as { code?: string; errcode?: number };
+  // node:sqlite uses ERR_SQLITE_ERROR with SQLite's numeric (possibly extended) code.
+  return (typeof errcode === 'number' && [5, 6].includes(errcode & 0xff))
+    || code === 'SQLITE_BUSY' || code === 'SQLITE_LOCKED';
+}
 export function ensureRoutineLeaseSchema(store: Pick<SqliteStateStore, 'db'>): void {
   store.db.exec(`CREATE TABLE IF NOT EXISTS bot_routine_leases (
     run_id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, token TEXT NOT NULL, expires_at INTEGER NOT NULL
@@ -39,8 +46,10 @@ export class RoutineLease {
   }
 
   renew(now = Date.now()): boolean {
-    return !!this.store.db.prepare('UPDATE bot_routine_leases SET expires_at=? WHERE run_id=? AND token=? AND expires_at>?')
-      .run(now + this.duration, this.runId, this.token, now).changes;
+    // Expiry permits takeover; only a replaced/deleted token proves ownership lost.
+    // A delayed heartbeat can renew atomically unless another owner got here first.
+    return !!this.store.db.prepare('UPDATE bot_routine_leases SET expires_at=? WHERE run_id=? AND token=?')
+      .run(now + this.duration, this.runId, this.token).changes;
   }
 
   /** Fence state changes in the same write transaction as the ownership check. */
@@ -48,7 +57,7 @@ export class RoutineLease {
     const ownTransaction = !this.store.db.isTransaction;
     if (ownTransaction) this.store.db.exec('BEGIN IMMEDIATE');
     try {
-      const result = this.owns() ? action() : undefined;
+      const result = this.renew() ? action() : undefined;
       if (ownTransaction) this.store.db.exec('COMMIT');
       return result;
     } catch (error) {
@@ -63,7 +72,11 @@ export class RoutineLease {
 
   heartbeat(onLost: () => void): () => void {
     const timer = setInterval(() => {
-      try { if (this.renew()) return; } catch { /* An unrenewable lease must not authorize completion. */ }
+      try { if (this.renew()) return; } catch (error) {
+        // Contention is not evidence of takeover. Keep retrying; completion still
+        // renews and fences against the token under the same write transaction.
+        if (isTransientLockError(error)) return;
+      }
       clearInterval(timer);
       onLost();
     }, Math.floor(this.duration / 3));

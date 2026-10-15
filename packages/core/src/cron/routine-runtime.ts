@@ -214,7 +214,7 @@ function routineWorkMetadata(host:RoutineRuntimeHost,parent:SessionRecord,run:Ro
 function claimRoutineSession(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun,parent:SessionRecord,lease:RoutineLease):SessionRecord|undefined {
  host.store.db.exec('BEGIN IMMEDIATE');
  try{
-  if(!lease.owns()){host.store.db.exec('ROLLBACK');return undefined;}
+  if(!lease.renew()){host.store.db.exec('ROLLBACK');return undefined;}
   const session=host.store.createSession({title:`Routine: ${run.job.name}`,mode:'chat',agentId:parent.agentId,background:false,metadata:routineWorkMetadata(host,parent,run)});
   if(!runs.claim(run.id,session.id)){host.store.db.exec('ROLLBACK');return undefined;}
   host.store.appendMessage(session.id,'user',[textPart(`[cron:${run.job.name}] ${run.job.prompt}\nWhen there is nothing new to report, reply only '[NO_UPDATE]'.`)]);stampSessionWake(host.store,session.id,{kind:'unattended',source:'routine'});host.store.db.exec('COMMIT');return session;
