@@ -360,7 +360,10 @@ export const play = {
     steerTag: '⚡ 实时插话引导',
     steerTagTitle: '在智能体运行期间动态插入的引导词',
     cronTag: '定时 · {name}',
-    cronTagTitle: 'Bot 定时任务触发'
+    cronTagTitle: 'Bot 定时任务触发',
+    toolObservation: '工具返回的截图，不是新的用户指令。',
+    toolShotAlt: '工具截图',
+    enlargeImage: '放大查看截图'
   },
 
 

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
   AppError,
@@ -36,6 +37,7 @@ import { steerHttpFromCoreAck } from '../steer-ack.js';
 import { readLoopSettings } from '../loop-settings.js';
 import { assertWorkspaceBindingRefs } from './workspace.js';
 import { guardSession, listedSessions, wrapSessionIdRoutes } from '../session-guard.js';
+import { resolveSessionImagePath } from '../session-image.js';
 
 function imageAssetIdsFromBody(body: Record<string, unknown>): string[] {
   if (!Array.isArray(body.imageAssetIds)) return [];
@@ -942,6 +944,23 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         } catch (error) {
           throw error instanceof AppError ? error : new ValidationError(errorMessage(error));
         }
+      }
+    },
+
+    // GET /api/sessions/:id/images/:assetId — inline bytes for chat thumbnails
+    {
+      method: 'GET',
+      pattern: '/api/sessions/:id/images/:assetId',
+      handler: ({ requireParam, response }) => {
+        const id = requireParam('id');
+        const assetId = requireParam('assetId');
+        const file = resolveSessionImagePath(runtime.stateDir, runtime.store.getImageAsset(assetId), id);
+        if (!file) throw new NotFoundError('Image', assetId);
+        response.statusCode = 200;
+        response.setHeader('content-type', file.mimeType);
+        response.setHeader('content-disposition', 'inline');
+        response.setHeader('cache-control', 'private, max-age=3600');
+        response.end(readFileSync(file.absPath));
       }
     },
 

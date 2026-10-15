@@ -1,0 +1,20 @@
+id: tool-observation-thumbnails
+title: 工具观察截图缩略图
+status: implemented
+requirement: |
+  Lab 对话里，用户角色、内容是工具观察的回合（气泡 class chat-bubble）被渲染成原始文本：
+  “[Tool observations: screenshots returned by tools, not a new user instruction.] [image img_… image/jpeg]”。
+  希望这些截图显示成小缩略图，不要打印看不懂的资产 id 字符串。保留简短说明；如果说明是用户能看见的写死英文，放到中英文 i18n。
+criteria:
+  - id: AC-1
+    given: 对话里有一条用户角色的工具观察消息，里面带有工具返回的截图
+    when: 在 Lab 对话里查看这条消息
+    then: 每张截图显示为小缩略图，气泡里不再出现形如 [image img_… mime] 的资产编号原文
+  - id: AC-2
+    given: 同一条工具观察消息
+    when: 查看缩略图旁的说明
+    then: 仍有一句简短说明，中文界面和英文界面各自显示对应语言
+  - id: AC-3
+    given: 一条没有截图的普通用户消息
+    when: 在对话里查看
+    then: 仍按原来的文字显示，不会被当成工具观察
