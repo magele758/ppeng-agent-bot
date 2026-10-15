@@ -40,6 +40,8 @@ import { resolveLivingFaceMood } from '@/lib/bot-face';
 import { ComposerBotPicker } from './ComposerBotPicker';
 import { ComposerModelPicker } from './ComposerModelPicker';
 import { SessionSettingsPanel, type ExecPreset } from './sections/chat/SessionSettingsPanel';
+import { PlayBotGroupChat } from './play-group/PlayBotGroupChat';
+import { PlayBotGroupList } from './play-group/PlayBotGroupList';
 
 function isCoreExecAgent(id: string): boolean {
   return id === 'general' || id === 'main';
@@ -257,6 +259,8 @@ export function PlayPanel({
   const [selectMode, setSelectMode] = useState(false);
   const [checkedIds, setCheckedIds] = useState<string[]>([]);
   const [deleting, setDeleting] = useState(false);
+  const [openGroupId, setOpenGroupId] = useState<string | null>(null);
+  const [groupCount, setGroupCount] = useState(0);
   const createMenuRef = useRef<HTMLDivElement>(null);
   const configBtnRef = useRef<HTMLButtonElement>(null);
   const configPanelRef = useRef<HTMLDivElement>(null);
@@ -414,6 +418,12 @@ export function PlayPanel({
       return next.length === prev.length ? prev : next;
     });
   }, [visibleIds]);
+
+  useEffect(() => {
+    if (botSurface) return;
+    setOpenGroupId(null);
+    setGroupCount(0);
+  }, [botSurface]);
 
   const toggleChecked = (id: string, on: boolean) => {
     setCheckedIds((prev) => {
@@ -881,9 +891,18 @@ export function PlayPanel({
           ) : null}
           </div>
           <div className="list-scroll play-sidebar__list" id="sessionListMini">
-            {!sessions.length ? (
+            {botSurface ? (
+              <PlayBotGroupList
+                bots={botRoster}
+                selectedId={openGroupId}
+                filter={sessionFilter}
+                onOpen={setOpenGroupId}
+                onCount={setGroupCount}
+              />
+            ) : null}
+            {!sessions.length && (!botSurface || groupCount === 0) ? (
               <div className="empty-hint">{botSurface ? t('play.sidebar.noBots') : t('play.sidebar.noSessions')}</div>
-            ) : (
+            ) : sessions.length ? (
               sessionGroups.map((group) => (
                 <section key={group.bucket} className="session-date-group">
                   <h3 className="session-date-group__label">{sessionGroupDisplay(group.bucket, group.label, t)}</h3>
@@ -892,10 +911,11 @@ export function PlayPanel({
                       const title = s.title || t('play.unnamed');
                       const checked = checkedVisible.includes(s.id);
                       const statusKey = sessionStatusKey(s.status);
+                      const sessionRowSelected = !openGroupId && selectedSessionId === s.id;
                       return (
                         <div
                           key={s.id}
-                          className={`list-item list-item--session${selectedSessionId === s.id ? ' selected' : ''}${checked ? ' is-checked' : ''}`}
+                          className={`list-item list-item--session${sessionRowSelected ? ' selected' : ''}${checked ? ' is-checked' : ''}`}
                           role="button"
                           tabIndex={0}
                           onClick={() => {
@@ -903,12 +923,16 @@ export function PlayPanel({
                               toggleChecked(s.id, !checked);
                               return;
                             }
+                            setOpenGroupId(null);
                             onSelectSession(s.id);
                           }}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
                               if (selectMode) toggleChecked(s.id, !checked);
-                              else onSelectSession(s.id);
+                              else {
+                                setOpenGroupId(null);
+                                onSelectSession(s.id);
+                              }
                             }
                           }}
                         >
@@ -957,12 +981,13 @@ export function PlayPanel({
                   </div>
                 </section>
               ))
-            )}
+            ) : null}
           </div>
         </aside>
 
         <div className="play-main-col">
-          <div className="play-main chat-panel">
+          {botSurface && openGroupId ? <PlayBotGroupChat key={openGroupId} roomId={openGroupId} bots={botRoster} /> : null}
+          <div className="play-main chat-panel" hidden={botSurface && openGroupId != null}>
             <header className="chat-panel-header">
               <div className="chat-panel-header__text">
                 <h2 className="chat-panel-title" id="playTitle">
