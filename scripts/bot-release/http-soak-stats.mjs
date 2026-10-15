@@ -6,6 +6,18 @@ export class BoundedHistogram {
  quantile(q){let count=0;for(let i=0;i<this.bins.length;i++){count+=this.bins[i];if(count>=Math.ceil(this.count*q))return i===10001?this.max:i;}return null;}
  summary(){return {count:this.count,p95Ms:this.count?this.quantile(.95):null,maxMs:this.max,meanMs:this.count?this.sum/this.count:null};}
 }
+/**
+ * Full soaks use nearest-rank p95 against the published millisecond SLO.
+ * A smoke window has about 34 receive samples, so that rank is the second-slowest
+ * sample. Two runner stalls then fail a series whose median and mean still meet
+ * the same SLO. Smoke applies those thresholds to the median and the mean.
+ */
+export function latencyWithinThreshold(histogram, thresholdMs, mode) {
+ if (!histogram || histogram.count < 1 || !Number.isFinite(thresholdMs)) return false;
+ if (mode === 'strict') return histogram.quantile(0.95) <= thresholdMs;
+ if (mode === 'smoke') return histogram.quantile(0.5) <= thresholdMs && histogram.sum / histogram.count <= thresholdMs;
+ throw new Error(`Unknown latency mode: ${mode}`);
+}
 export function processTreeRss(rootPid){
  let names;try{names=readdirSync('/proc');}catch(error){if(error&&error.code==='ENOENT')return {processes:[],rssBytes:0,rootPresent:false,unavailable:true};throw error;}
  const rows=[];for(const name of names){if(!/^\d+$/.test(name))continue;try{const text=readFileSync(`/proc/${name}/status`,'utf8'),parent=Number(text.match(/^PPid:\s+(\d+)/m)?.[1]),rss=Number(text.match(/^VmRSS:\s+(\d+)/m)?.[1]??0)*1024;rows.push({pid:Number(name),parent,rss});}catch{}}

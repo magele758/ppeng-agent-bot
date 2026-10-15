@@ -1,10 +1,28 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {BoundedHistogram,RssWindows,queueGrowth} from '../bot-release/http-soak-stats.mjs';
+import {BoundedHistogram,latencyWithinThreshold,RssWindows,queueGrowth} from '../bot-release/http-soak-stats.mjs';
 import {expectedWorkload} from '../bot-release/http-soak-schedule.mjs';
 import {isFreshCompletedOutput,pendingHumanInputs,hasControlledSoftwareResult,pendingControlledOperations} from '../bot-release/http-soak-oracle.mjs';
 test('24h immutable offered protocol retains hourly burst and exact 50 percent hotspot',()=>{
  const result=expectedWorkload({warmupSeconds:1800,measurementSeconds:86400,burstEverySeconds:3600,burstDurationSeconds:60});assert.equal(result.readWarmup,72000);assert.equal(result.readMeasurement,3456000);assert.equal(result.measurement,197640);assert.equal(result.burst,27600);assert.equal(result.hot,13800);assert.deepEqual(result.kinds,{human:79056,routine:39528,dispatch:39528,room:39528});
+});
+test('smoke latency gate keeps the published SLO on the median and mean',()=>{
+ const stalled=new BoundedHistogram();for(let i=0;i<32;i++)stalled.add(150);stalled.add(747);stalled.add(1020);
+ assert.equal(latencyWithinThreshold(stalled,500,'strict'),false);
+ assert.equal(latencyWithinThreshold(stalled,500,'smoke'),true);
+ const barely=new BoundedHistogram();for(let i=0;i<32;i++)barely.add(144);barely.add(502);barely.add(514);
+ assert.equal(latencyWithinThreshold(barely,500,'strict'),false);
+ assert.equal(latencyWithinThreshold(barely,500,'smoke'),true);
+ const slow=new BoundedHistogram();for(let i=0;i<34;i++)slow.add(600);
+ assert.equal(latencyWithinThreshold(slow,500,'smoke'),false);
+ assert.equal(latencyWithinThreshold(slow,500,'strict'),false);
+ const heavyTail=new BoundedHistogram();for(let i=0;i<18;i++)heavyTail.add(10);for(let i=0;i<16;i++)heavyTail.add(2000);
+ assert.equal(latencyWithinThreshold(heavyTail,500,'smoke'),false);
+ const fast=new BoundedHistogram();for(let i=0;i<34;i++)fast.add(80);
+ assert.equal(latencyWithinThreshold(fast,500,'strict'),true);
+ assert.equal(latencyWithinThreshold(fast,500,'smoke'),true);
+ assert.equal(latencyWithinThreshold(new BoundedHistogram(),500,'smoke'),false);
+ assert.throws(()=>latencyWithinThreshold(fast,500,'other'),/Unknown latency mode/);
 });
 test('bounded histograms keep constant storage and conservatively reject overflow latency',()=>{
  const h=new BoundedHistogram();for(let i=0;i<100000;i++)h.add(i%100);assert.equal(h.bins.length,10002);assert.equal(h.count,100000);assert.equal(h.quantile(.95),94);const overflow=new BoundedHistogram();for(let i=0;i<100;i++)overflow.add(20000+i);assert.equal(overflow.quantile(.95),20099);
