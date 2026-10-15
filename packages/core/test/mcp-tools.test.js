@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseMcpStdioConfigs, redactStdioFailure, sanitizeMcpToolSuffix } from '../dist/mcp/mcp-stdio.js';
+import { parseMcpStdioConfigs, redactStdioFailure, redactStdioTool, sanitizeMcpToolSuffix } from '../dist/mcp/mcp-stdio.js';
 
 // ---------------------------------------------------------------------------
 // parseMcpStdioConfigs
@@ -185,5 +185,39 @@ describe('redactStdioFailure', () => {
     assert.equal(out.includes(secret), false);
     assert.equal(out.includes(encoded), false);
     assert.match(out, /\[REDACTED\]/);
+    assert.equal(redactStdioFailure('env is production', { NODE_ENV: 'production', PATH: '/usr/bin', MONKEY: 'monkeysecret' }), 'env is production');
+  });
+});
+
+describe('redactStdioTool', () => {
+  it('redacts description text only and leaves schema protocol fields intact', () => {
+    const secret = 'supersecretvalue';
+    const schema = {
+      type: 'object',
+      required: ['production'],
+      properties: {
+        production: { type: 'string', enum: ['production', secret], description: `use ${secret}` }
+      }
+    };
+    const tool = {
+      name: 'deploy',
+      description: `token ${secret} in production`,
+      inputSchema: schema,
+      readOnlyHint: false
+    };
+    const out = redactStdioTool(tool, {
+      NODE_ENV: 'production',
+      MCP_TOKEN: secret,
+      SHORT: 'abc',
+      PATH: '/usr/bin',
+      MONKEY: 'monkeysecret'
+    });
+    assert.equal(out.description.includes(secret), false);
+    assert.match(out.description, /\[REDACTED\]/);
+    assert.match(out.description, /production/);
+    assert.deepEqual(out.inputSchema, schema);
+    assert.equal(JSON.stringify(out.inputSchema).includes(secret), true);
+    assert.equal(out.name, 'deploy');
+    assert.equal(out.readOnlyHint, false);
   });
 });

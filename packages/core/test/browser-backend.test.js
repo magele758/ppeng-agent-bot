@@ -347,7 +347,17 @@ async function runNavigate(sessionId, url, options = {}) {
           request: () => ({
             url: () => request.url,
             method: () => request.method ?? 'GET',
-            headers: () => request.headers ?? {},
+            headers: () => {
+              const copy = { ...(request.headers ?? {}) };
+              delete copy.cookie;
+              delete copy.Cookie;
+              return copy;
+            },
+            allHeaders: async () => {
+              const out = {};
+              for (const [key, value] of Object.entries(request.headers ?? {})) out[key.toLowerCase()] = value;
+              return out;
+            },
             postData: () => request.postData ?? null,
             isNavigationRequest: () => request.document !== false,
             resourceType: () => (request.document === false ? 'script' : 'document')
@@ -653,11 +663,18 @@ describe('browser navigation network policy', () => {
         url: 'https://example.com/page',
         document: true,
         method: 'POST',
-        headers: { Host: 'evil.test', 'X-Trace': '1', 'Content-Length': '7' },
+        headers: { Host: 'evil.test', 'X-Trace': '1', 'Content-Length': '7', Cookie: 'sid=secret' },
         postData: 'payload'
       }],
       request: async (_url, address, options) => {
-        seen.push({ address, method: options.method, body: options.body, trace: options.headers['X-Trace'], host: options.headers.Host });
+        seen.push({
+          address,
+          method: options.method,
+          body: options.body,
+          trace: options.headers['x-trace'],
+          host: options.headers.host,
+          cookie: options.headers.cookie
+        });
         if (address === '203.0.113.10') return hang(options);
         return new Response('page', { status: 200, headers: { 'content-type': 'text/html' } });
       }
@@ -669,6 +686,7 @@ describe('browser navigation network policy', () => {
     assert.equal(seen[0].body, 'payload');
     assert.equal(seen[0].trace, '1');
     assert.equal(seen[0].host, undefined);
+    assert.equal(seen[0].cookie, 'sid=secret');
     assert.equal(pinned.fulfilled.length, 1);
     assert.equal(pinned.fulfilled[0].status, 200);
     assert.equal(pinned.fulfilled[0].headers['content-type'], 'text/html');
@@ -701,5 +719,69 @@ describe('browser navigation network policy', () => {
     assert.match(JSON.parse(failed.result.content).message, /导航连接失败/);
     assert.equal(failed.result.content.includes('secret-stack'), false);
     assert.deepEqual(failed.aborts, ['https://example.com/page']);
+  });
+
+  it('forwards upstream response headers and every Set-Cookie', async () => {
+    const headers = new Headers();
+    headers.set('content-type', 'text/html; charset=utf-8');
+    headers.set('location', 'https://cdn.example/next');
+    headers.set('access-control-allow-origin', 'https://app.example');
+    headers.set('access-control-allow-credentials', 'true');
+    headers.set('content-security-policy', "default-src 'none'");
+    headers.append('set-cookie', 'a=1; Path=/');
+    headers.append('set-cookie', 'b=2; HttpOnly');
+    headers.set('content-encoding', 'gzip');
+    headers.set('content-length', '99999');
+    headers.set('transfer-encoding', 'chunked');
+    const pinned = await runNavigate('nav-pin-headers', 'https://example.com/page', {
+      env: {},
+      fulfill: true,
+      resolveHost: async () => ['203.0.113.10'],
+      follow: [{ url: 'https://example.com/page', document: true }],
+      request: async () => new Response('<html></html>', { status: 200, headers })
+    });
+    assert.equal(pinned.result.ok, true);
+    assert.equal(pinned.fulfilled.length, 1);
+    const got = pinned.fulfilled[0].headers;
+    assert.equal(got['content-type'], 'text/html; charset=utf-8');
+    assert.equal(got.location, 'https://cdn.example/next');
+    assert.equal(got['access-control-allow-origin'], 'https://app.example');
+    assert.equal(got['access-control-allow-credentials'], 'true');
+    assert.equal(got['content-security-policy'], "default-src 'none'");
+    assert.equal(got['set-cookie'], 'a=1; Path=/\nb=2; HttpOnly');
+    assert.equal(got['content-encoding'], undefined);
+    assert.equal(got['content-length'], undefined);
+    assert.equal(got['transfer-encoding'], undefined);
+  });
+
+  it('cancels a pinned response body as soon as it exceeds 2MB', async () => {
+    let pulls = 0;
+    let cancelled = false;
+    const stream = new ReadableStream({
+      pull(controller) {
+        pulls += 1;
+        if (pulls > 8) {
+          controller.close();
+          return;
+        }
+        controller.enqueue(new Uint8Array(1_000_000));
+      },
+      cancel() {
+        cancelled = true;
+      }
+    });
+    const pinned = await runNavigate('nav-pin-body-cap', 'https://example.com/page', {
+      env: {},
+      fulfill: true,
+      resolveHost: async () => ['203.0.113.10'],
+      follow: [{ url: 'https://example.com/page', document: true }],
+      request: async () => new Response(stream, { status: 200, headers: { 'content-type': 'application/octet-stream' } })
+    });
+    assert.equal(pinned.result.ok, false);
+    assert.equal(pinned.fulfilled.length, 0);
+    assert.deepEqual(pinned.aborts, ['https://example.com/page']);
+    assert.equal(cancelled, true);
+    assert.ok(pulls < 8);
+    assert.match(JSON.parse(pinned.result.content).message, /ERR_BLOCKED_BY_CLIENT/);
   });
 });

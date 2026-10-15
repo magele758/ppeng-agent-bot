@@ -150,17 +150,29 @@ export class McpStdioSession {
   }
 }
 
-/** Stdio failures and tool text can echo child env. Strip those values before trace or the model. */
-export function redactStdioFailure(message: string, env?: Record<string, string>): string {
-  return redactSecrets(message, Object.values(env ?? {}));
+/** Credential-shaped names only. Ordinary values such as NODE_ENV=production stay intact. */
+const STDIO_SECRET_NAME =
+  /(^|_)(TOKEN|SECRET|PASSWORD|PASSWD|API_KEY|ACCESS_KEY|CREDENTIAL|CREDENTIALS|COOKIE|BEARER)($|_)/i;
+
+function stdioSecretValues(env?: Record<string, string>): string[] {
+  if (!env) return [];
+  const values: string[] = [];
+  for (const [name, value] of Object.entries(env)) {
+    if (!STDIO_SECRET_NAME.test(name) || value.length < 8) continue;
+    values.push(value);
+  }
+  return values;
 }
 
-function redactStdioTool(tool: McpToolInfo, env?: Record<string, string>): McpToolInfo {
+/** Stdio failures and tool text can echo child env. Strip credential values before trace or the model. */
+export function redactStdioFailure(message: string, env?: Record<string, string>): string {
+  return redactSecrets(message, stdioSecretValues(env));
+}
+
+/** Description text only. Schema names, required, and enum values are protocol fields. */
+export function redactStdioTool(tool: McpToolInfo, env?: Record<string, string>): McpToolInfo {
   const description = tool.description ? redactStdioFailure(tool.description, env) : tool.description;
-  const inputSchema = tool.inputSchema
-    ? (JSON.parse(redactStdioFailure(JSON.stringify(tool.inputSchema), env)) as Record<string, unknown>)
-    : undefined;
-  return { name: tool.name, description, inputSchema, readOnlyHint: tool.readOnlyHint };
+  return { ...tool, description };
 }
 
 export function sanitizeMcpToolSuffix(name: string): string {
