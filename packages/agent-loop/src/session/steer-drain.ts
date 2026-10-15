@@ -82,7 +82,10 @@ export function resolveSteerInboxTarget(input: {
   interruptPolicy: SteerInterruptPolicy;
   drainPolicy?: SteerDrainPolicy;
   sessionStatus?: string;
+  /** Canonical bot chat: land on the next shot, even if the caller asked for next-run. */
+  immediate?: boolean;
 }): InboxTarget {
+  if (input.immediate) return 'next-step';
   if (input.explicitTarget) return input.explicitTarget;
   if (input.drainPolicy === 'tool_launch') return 'next-step';
   if (input.interruptPolicy === 'queue' && input.sessionStatus === 'running') return 'next-run';

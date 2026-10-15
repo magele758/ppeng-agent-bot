@@ -272,9 +272,11 @@ export function PlayPanel({
   const execPreset = execPresetOf(chat.agentId, chat.mode);
   const agentSelectValue = isCoreExecAgent(chat.agentId) || !chat.agentId ? '' : chat.agentId;
   const chatRunning = chat.playSending || Boolean(chat.streamOverlay) || chat.waitTyping;
-  const steerDisabled = chatRunning && chat.steerInterruptPolicy === 'disabled';
-  const runningPlaceholder =
-    chat.steerInterruptPolicy === 'disabled'
+  const immediateSteer = chat.immediateSteer;
+  const steerDisabled = chatRunning && !immediateSteer && chat.steerInterruptPolicy === 'disabled';
+  const runningPlaceholder = immediateSteer
+    ? t('play.composer.runningSteer')
+    : chat.steerInterruptPolicy === 'disabled'
       ? t('play.composer.runningDisabled')
       : chat.steerInterruptPolicy === 'queue'
         ? t('play.composer.runningQueue')
@@ -1229,9 +1231,9 @@ export function PlayPanel({
                         : chatRunning
                           ? steerDisabled
                             ? t('play.composer.interruptDisabled')
-                            : chat.steerInterruptPolicy === 'queue'
-                              ? t('play.composer.queueHint')
-                              : t('play.composer.steerHint')
+                            : immediateSteer || chat.steerInterruptPolicy !== 'queue'
+                              ? t('play.composer.steerHint')
+                              : t('play.composer.queueHint')
                           : t('play.send')
                     }
                     disabled={
@@ -1338,9 +1340,9 @@ export function PlayPanel({
                         : chatRunning
                           ? steerDisabled
                             ? t('play.composer.statusDisabled')
-                            : chat.steerInterruptPolicy === 'queue'
-                              ? t('play.composer.statusQueue')
-                              : t('play.composer.statusSteer')
+                            : immediateSteer || chat.steerInterruptPolicy !== 'queue'
+                              ? t('play.composer.statusSteer')
+                              : t('play.composer.statusQueue')
                           : '')}
                   </p>
                 </div>

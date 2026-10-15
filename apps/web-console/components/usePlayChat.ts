@@ -52,6 +52,7 @@ import {
   type SteerInboxItem,
   type SteerInterruptPolicy
 } from '@/lib/query-queue';
+import { decideRunningTurnSend, isCanonicalBotChatMetadata } from '@/lib/running-turn-send';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 /** Stream already persisted the user turn; do not put the draft back in the composer. */
@@ -117,6 +118,20 @@ function optionalGroupsBody(feature: boolean, ids: string[]): { enabledOptionalT
 function modelRefBody(ref: ModelRef | null): { modelRef?: ModelRef } {
   if (!ref) return {};
   return { modelRef: ref };
+}
+
+function messageId(message: ChatMessage): string {
+  const id = (message as ChatMessage & { id?: unknown }).id;
+  return typeof id === 'string' ? id : '';
+}
+
+function messageUserText(message: ChatMessage): string {
+  const parts = message.parts ?? [];
+  const lines: string[] = [];
+  for (const part of parts) {
+    if (part.type === 'text' && typeof part.text === 'string' && part.text.trim()) lines.push(part.text);
+  }
+  return lines.join('\n');
 }
 
 function orchestrationBody(
@@ -248,6 +263,13 @@ export function usePlayChat(deps: PlayChatDeps) {
   const [modelViewPayload, setModelViewPayload] = useState<SessionModelViewPayload | null>(null);
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const [steerInterruptPolicy, setSteerInterruptPolicyState] = useState<SteerInterruptPolicy>('queue');
+  const [immediateSteer, setImmediateSteer] = useState(false);
+  const immediateSteerRef = useRef(false);
+  const canonicalBotChatRef = useRef(false);
+  const canonicalBotChatKnownRef = useRef(false);
+  const canonicalForSessionRef = useRef<string | null>(null);
+  const pendingSteerTextRef = useRef<string | null>(null);
+  const pendingSteerKnownIdsRef = useRef<Set<string>>(new Set());
   const [steerInbox, setSteerInbox] = useState<SteerInboxItem[]>([]);
   const [steerPolicyBusy, setSteerPolicyBusy] = useState(false);
   const [queryExecMode, setQueryExecMode] = useState<QueryExecMode>('steering');
@@ -286,8 +308,36 @@ export function usePlayChat(deps: PlayChatDeps) {
     setPendingAttachmentIds([]);
   };
 
+  const composerIsCanonicalBot = () => {
+    const sid = selectedSessionRef.current;
+    if (canonicalBotChatKnownRef.current && canonicalForSessionRef.current === sid) {
+      return canonicalBotChatRef.current;
+    }
+    return playSurface === 'bot' && Boolean(botIdRef.current) && Boolean(sid);
+  };
+
+  const publishImmediateSteer = () => {
+    const steer = decideRunningTurnSend({ canonicalBotChat: composerIsCanonicalBot() }) === 'steer';
+    immediateSteerRef.current = steer;
+    setImmediateSteer(steer);
+  };
+
+  const rememberCanonicalBotChat = (sid: string | null, session?: { mode?: string; metadata?: Record<string, unknown> | null }) => {
+    if (!sid || !session) {
+      canonicalBotChatKnownRef.current = false;
+      canonicalBotChatRef.current = false;
+      canonicalForSessionRef.current = null;
+      publishImmediateSteer();
+      return;
+    }
+    canonicalBotChatKnownRef.current = true;
+    canonicalForSessionRef.current = sid;
+    canonicalBotChatRef.current = isCanonicalBotChatMetadata(session);
+    publishImmediateSteer();
+  };
+
   const clearStreamingShell = () => {
-    setOptimisticUser(null);
+    if (!pendingSteerTextRef.current) setOptimisticUser(null);
     setStreamOverlay(null);
     setWaitTyping(false);
   };
@@ -685,6 +735,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     const sid = selectedSessionRef.current;
     if (!sid) {
       historySessionRef.current='';setHistoryCursor(null);
+      rememberCanonicalBotChat(null);
       setPlayTitle(t('play.empty.selectOrCreateSession'));
       setPlayMeta('');
       setSessionChrome(null);
@@ -718,6 +769,7 @@ export function usePlayChat(deps: PlayChatDeps) {
         inbox?: SteerInboxItem[];
       };
       if(selectedSessionRef.current!==sid)return;
+      rememberCanonicalBotChat(sid, data.session);
       const chrome = parseSessionChrome(data.session.metadata, data.session.status, {
         createdAt: data.session.createdAt,
         updatedAt: data.session.updatedAt
@@ -797,6 +849,7 @@ export function usePlayChat(deps: PlayChatDeps) {
         setSessionFileArtifacts([]);
       }
     } catch {
+      rememberCanonicalBotChat(null);
       setPlayTitle(t('play.status.loadFailed'));
       setPlayMeta('');
       setSessionChrome(null);
@@ -851,6 +904,41 @@ export function usePlayChat(deps: PlayChatDeps) {
       clearInterval(timer);
     };
   }, [playSending, streamOverlay, waitTyping, selectedSessionId, selectedSessionRef]);
+
+  useEffect(() => {
+    publishImmediateSteer();
+  }, [playSurface, botId, selectedSessionId]);
+
+  useEffect(() => {
+    const wanted = pendingSteerTextRef.current;
+    if (!wanted || !optimisticUser) return;
+    const sid = selectedSessionRef.current;
+    if (!sid) return;
+    let cancelled = false;
+    const look = async () => {
+      try {
+        const data = (await api(`/api/sessions/${sid}?messageLimit=40`)) as { messages?: ChatMessage[] };
+        if (cancelled || pendingSteerTextRef.current !== wanted) return;
+        const known = pendingSteerKnownIdsRef.current;
+        const landed = (data.messages ?? []).some((message) => {
+          const id = messageId(message);
+          return message.role === 'user' && id && !known.has(id) && messageUserText(message).includes(wanted);
+        });
+        if (!landed) return;
+        pendingSteerTextRef.current = null;
+        setOptimisticUser(null);
+        await refreshPlayPanel();
+      } catch {
+        /* steer landing is best-effort */
+      }
+    };
+    void look();
+    const timer = setInterval(() => void look(), 1000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [optimisticUser, selectedSessionId, refreshPlayPanel, selectedSessionRef]);
 
   const saveGoalCondition = useCallback(
     async (condition: string) => {
@@ -1370,18 +1458,34 @@ export function usePlayChat(deps: PlayChatDeps) {
     const running = playSending || Boolean(streamOverlay) || waitTyping;
     if (running) {
       if (!text || !selectedSessionId) return;
-      if (steerInterruptPolicy === 'disabled') {
+      const immediate =
+        decideRunningTurnSend({ canonicalBotChat: composerIsCanonicalBot() }) === 'steer';
+      if (!immediate && steerInterruptPolicy === 'disabled') {
         setPlayStatus({ text: t('play.status.steerDisabled'), err: true });
         return;
       }
       stopSpeechDictation();
+      if (immediate) {
+        pendingSteerKnownIdsRef.current = new Set(
+          historyMessagesRef.current.map((message) => messageId(message)).filter(Boolean)
+        );
+        pendingSteerTextRef.current = text;
+        acknowledgeLocalSendCommitted();
+        requestScrollPlayToBottom();
+        setOptimisticUser(userPreviewText(text, []));
+        clearComposerOnly();
+      }
       try {
-        const target = steerInterruptPolicy === 'queue' ? 'next-run' : 'next-step';
+        const target = immediate || steerInterruptPolicy !== 'queue' ? 'next-step' : 'next-run';
         const execMode = queryExecModeRef.current;
         const data = (await api(`/api/sessions/${selectedSessionId}/steer`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, target, ...steerBodyFromQueryMode(execMode) }),
+          body: JSON.stringify(
+            immediate
+              ? { text, target: 'next-step' }
+              : { text, target, ...steerBodyFromQueryMode(execMode) }
+          ),
         })) as { ok?: boolean; status?: string; reason?: string; item?: SteerInboxItem };
         acknowledgeLocalSendCommitted();
         clearComposerOnly();
@@ -1392,6 +1496,11 @@ export function usePlayChat(deps: PlayChatDeps) {
           ]);
         }
         if (data.status === 'rejected' || data.status === 'not_submitted') {
+          if (immediate) {
+            pendingSteerTextRef.current = null;
+            setOptimisticUser(null);
+            setPlayInput(text);
+          }
           const why =
             data.reason === 'session_ended'
               ? t('play.status.sessionEnded')
@@ -1401,9 +1510,9 @@ export function usePlayChat(deps: PlayChatDeps) {
                   ? t('play.status.steerDisabled')
                   : data.reason || t('play.status.notAccepted');
           setPlayStatus({ text: t('play.status.notAcceptedWhy', { why }), err: true });
-        } else if (execMode === 'subagent') {
+        } else if (!immediate && execMode === 'subagent') {
           setPlayStatus({ text: t('play.status.queuedSubagent'), ok: true });
-        } else if (data.status === 'queued') {
+        } else if (!immediate && data.status === 'queued') {
           setPlayStatus({
             text: steerInterruptPolicy === 'queue' ? t('play.status.queuedEnd') : t('play.status.queuedNext'),
             ok: true
@@ -1412,6 +1521,11 @@ export function usePlayChat(deps: PlayChatDeps) {
           setPlayStatus({ text: t('play.status.steered'), ok: true });
         }
       } catch (err) {
+        if (immediate) {
+          pendingSteerTextRef.current = null;
+          setOptimisticUser(null);
+          setPlayInput(text);
+        }
         setPlayStatus({ text: err instanceof Error ? err.message : String(err), err: true });
       }
       return;
@@ -1721,6 +1835,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     enabledOptionalGroupIds,
     toggleOptionalGroup,
     steerInterruptPolicy,
+    immediateSteer,
     saveSteerInterruptPolicy,
     steerInbox,
     steerPolicyBusy,
