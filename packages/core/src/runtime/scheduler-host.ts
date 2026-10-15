@@ -104,11 +104,17 @@ function schedulerStepError(error: unknown): string {
   return String(error);
 }
 
+function warnSchedulerStep(host: SchedulerTickHost, name: string, error: unknown): void {
+  const log = host.log;
+  if (!log) return;
+  log.warn(`${name} tick failed`, { error: schedulerStepError(error) });
+}
+
 function detachSchedulerStep(host: SchedulerTickHost, name: string, fn: () => Promise<unknown>): void {
   void Promise.resolve()
     .then(fn)
     .catch((error: unknown) => {
-      host.log.warn(`${name} tick failed`, { error: schedulerStepError(error) });
+      warnSchedulerStep(host, name, error);
     });
 }
 
@@ -116,7 +122,7 @@ async function runSchedulerStep(host: SchedulerTickHost, name: string, fn: () =>
   try {
     await fn();
   } catch (error) {
-    host.log.warn(`${name} tick failed`, { error: schedulerStepError(error) });
+    warnSchedulerStep(host, name, error);
   }
 }
 

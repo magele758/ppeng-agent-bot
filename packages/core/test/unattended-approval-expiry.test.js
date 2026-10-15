@@ -137,24 +137,28 @@ describe('unattended approval expiry', { concurrency: false }, () => {
   });
 
   test('a scheduler sweep denies a due unattended approval after restart [AC:unattended-approval-expiry#AC-1]', () => {
-    withFakeClock(() => {
+    return withFakeClock(() => {
       const store = tempStore();
       try {
         const { sessionId, approval } = parkUnattended(store, { kind: 'unattended', source: 'cron' });
         mock.timers.tick(TEN_MINUTES_MS);
         const task = runScheduler({
           store,
+          log: { warn() {} },
+          cronStore: { dueJobs: () => [] },
+          setCronStore() {},
           selfHeal: {
             processRuns: async () => {
               throw new Error('stop-after-expiry');
             }
-          }
+          },
+          swarmExecutor: { tick: async () => {} },
+          orchestrationEngine: { tick: async () => {} },
+          autonomousScheduler: { tick: async () => {} },
+          async runSession() {}
         });
         assertDeniedWithoutRunning(store, sessionId, approval.id);
-        task.catch((err) => {
-          const message = err instanceof Error ? err.message : String(err);
-          if (!message.includes('stop-after-expiry')) throw err;
-        });
+        return task;
       } finally {
         store.db.close();
       }
