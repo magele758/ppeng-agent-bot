@@ -955,6 +955,11 @@ export const MIGRATIONS: Migration[] = [
         db.exec(`ALTER TABLE bots ADD COLUMN face_color TEXT`);
       }
     }
+  },
+  {
+    version: 27,
+    description: 'routine occurrence leases and summary continuation links',
+    up: (db) => { ensureRoutineSchema({db}); }
   }
 ];
 

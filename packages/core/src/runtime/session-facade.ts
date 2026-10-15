@@ -10,6 +10,7 @@ import {
   shiftPermissionMode,
   type PermissionMode
 } from '../approval/permission-mode.js';
+import { routineReplyContext } from '../cron/routine-continuation.js';
 import { LEGACY_BOT_BYPASS_META } from '../bots/legacy-bypass.js';
 import { APPROVAL_WAKE_KEY, disarmUnattendedApprovalExpiry } from '../approval/unattended-approval.js';
 import { NotFoundError, ValidationError } from '../errors.js';
@@ -290,7 +291,7 @@ export function sendUserMessage(
   host: SessionFacadeHost,
   sessionId: string,
   message: string,
-  options?: { imageAssetIds?: string[] }
+  options?: { imageAssetIds?: string[]; replyTo?: string }
 ): SessionRecord {
   const session = host.store.getSession(sessionId);
   if (!session) {
@@ -302,7 +303,10 @@ export function sendUserMessage(
   if (!text && ids.length === 0) {
     throw new ValidationError('Message or imageAssetIds required');
   }
-  host.store.appendMessage(session.id, 'user', userMessageParts(text || '(image)', ids, host.store));
+  const context = routineReplyContext(host.store, session, options?.replyTo);
+  const parts = userMessageParts(text || '(image)', ids, host.store);
+  if (context) parts.unshift(textPart(context));
+  host.store.appendMessage(session.id, 'user', parts);
   mergeSessionMetadata(host.store, session.id, {
     [APPROVAL_WAKE_KEY]: { kind: 'human', source: 'lab-chat' }
   });
