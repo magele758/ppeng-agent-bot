@@ -34,7 +34,7 @@ export function compareBaselines(base, current) {
   if ((current?.threshold ?? 30) > (base?.threshold ?? 30)) errors.push('CRAP baseline threshold relaxed');
   for (const [key, entry] of Object.entries(current?.functions ?? {})) {
     const prior = base?.functions?.[key];
-    if (!prior || entry.crap > prior.crap || (prior.coverage === 0 && entry.coverage !== 0)) errors.push(`CRAP baseline relaxed: ${key}`);
+    if (!prior || entry.crap > prior.crap) errors.push(`CRAP baseline relaxed: ${key}`);
   }
   return errors;
 }

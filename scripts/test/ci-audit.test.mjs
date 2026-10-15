@@ -45,6 +45,24 @@ test('baseline relaxations fail and web-console is scanned [AC:ci-audit-p1-p2#AC
  assert.match(readFileSync('scripts/crap/crap-gate.mjs','utf8'),/'apps\/web-console'/);
 });
 
+test('baseline coverage improvements from zero pass without a CRAP increase [AC:ci-audit-p1-p2#AC-3]',async()=>{
+ const { compareBaselines }=await import('../ci/base-revision.mjs');
+ const base={threshold:30,functions:{a:{crap:100,coverage:0}}};
+ for(const crap of [90,100]) {
+  assert.deepEqual(compareBaselines(base,{...base,functions:{a:{crap,coverage:50}}}),[]);
+ }
+});
+
+test('baseline CRAP increases fail regardless of coverage [AC:ci-audit-p1-p2#AC-3] [AC:ci-audit-p1-p2#AC-7]',async()=>{
+ const { compareBaselines }=await import('../ci/base-revision.mjs');
+ for(const priorCoverage of [0,50]) {
+  const base={threshold:30,functions:{a:{crap:100,coverage:priorCoverage}}};
+  for(const coverage of [0,50,100]) {
+   assert.deepEqual(compareBaselines(base,{...base,functions:{a:{crap:100.01,coverage}}}),['CRAP baseline relaxed: a']);
+  }
+ }
+});
+
 test('formal structure and cfg references are checked [AC:ci-audit-p1-p2#AC-8]',async()=>{
  const { checkTla }=await import('../formal/tla-sanity.mjs');
  const good='---- MODULE Demo ----\nInit == TRUE\nNext == TRUE\nSpec == Init /\\ Next\n====';
