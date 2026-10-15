@@ -1,3 +1,4 @@
+import { normalizeExpiresAt, routineExpired } from './routine-deadline.js';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { createId, nowIso } from '../id.js';
@@ -29,6 +30,7 @@ export interface CronJobRecord {
    */
   scheduleValue: string;
   enabled: boolean;
+  expiresAt?: string;
   lastRunAt?: string;
   nextRunAt?: string;
   createdAt: string;
@@ -128,7 +130,7 @@ export class CronJobStore {
    */
   dueJobs(now = Date.now()): CronJobRecord[] {
     return this.list({ enabled: true }).filter((j) => {
-      if (j.scheduleKind === 'event') return false;
+      if (j.scheduleKind === 'event' || routineExpired(j, now)) return false;
       if (j.nextRunAt) {
         return Date.parse(j.nextRunAt) <= now;
       }
@@ -160,6 +162,7 @@ export function createCronTools(getStore: () => CronJobStore, opts?: {store?:Sql
     prompt: string;
     every_ms?: number;
     once_at?: string;
+    expiresAt?: string;
     cron?: string;
     timezone?: string;
     missedPolicy?: 'coalesce'|'skip'|'catch_up';
@@ -174,7 +177,8 @@ export function createCronTools(getStore: () => CronJobStore, opts?: {store?:Sql
       properties: {
         name: { type: 'string' },
         prompt: { type: 'string' },
-        every_ms: { type: 'number' },
+        every_ms: { type: 'number', minimum: 60000 },
+        expiresAt: { type: 'string', description: 'Optional future ISO deadline for cron/every_ms; automatically removes routine after existing runs finish' },
         once_at: { type: 'string' },
         cron: { type: 'string', description: '5-field cron expression' },
         timezone:{type:'string',description:'IANA timezone, e.g. Asia/Shanghai'},
@@ -194,7 +198,7 @@ export function createCronTools(getStore: () => CronJobStore, opts?: {store?:Sql
       let scheduleKind: CronJobRecord['scheduleKind'] = 'every_ms';
       let scheduleValue = '3600000';
       let nextRunAt: string | undefined;
-      if (args.every_ms != null && Number.isInteger(args.every_ms) && Number(args.every_ms) >= 1000) {
+      if (args.every_ms != null && Number.isInteger(args.every_ms) && Number(args.every_ms) >= 60000) {
         scheduleKind = 'every_ms';
         scheduleValue = String(Math.floor(Number(args.every_ms)));
         nextRunAt = new Date(Date.now() + Number(scheduleValue)).toISOString();
@@ -212,7 +216,7 @@ export function createCronTools(getStore: () => CronJobStore, opts?: {store?:Sql
         assertCredentialEnvName(String(args.secretEnv ?? ''));
         scheduleKind='event';scheduleValue=args.event;
       } else {
-        return { ok: false, content: 'Provide every_ms, once_at, or cron' };
+        return { ok: false, content: 'Provide every_ms >= 60000, once_at, or cron' };
       }
       const job = getStore().create({
         sessionId: context.session.id,
@@ -222,6 +226,7 @@ export function createCronTools(getStore: () => CronJobStore, opts?: {store?:Sql
         scheduleKind,
         scheduleValue,
         nextRunAt,
+        expiresAt: normalizeExpiresAt(args.expiresAt, scheduleKind),
         timezone,
         missedPolicy:args.missedPolicy??'coalesce',
         ruleVersion:1,

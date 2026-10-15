@@ -1,9 +1,10 @@
 id: bot-routine-lifecycle
 title: Bot 可靠例行任务
-status: implemented
+status: approved
 requirement: |
   完整补齐前述 gap，按 Bot 模式多 Agent 协作开发计划实施。
 notes: |
+  final acceptance by lei pending
   用户已授权完整实施，承接开发计划 G09–G12，不重复索取相同授权。
 criteria:
   - id: AC-1
@@ -26,3 +27,15 @@ criteria:
     given: 后台任务正常完成、失败或预检跳过
     when: 用户检查私人对话和任务运行
     then: 原始任务在独立工作上下文执行，主对话只收到结果摘要及原结果引用，跳过不会显示为成功
+  - id: AC-6
+    given: 用户创建或修改周期任务并设置未来的截止时间
+    when: 到达截止时间
+    then: 不再产生新运行，已产生的运行结束后自动删除任务配置并保留运行历史
+  - id: AC-7
+    given: 例行任务完成模型执行
+    when: 最终输出去除首尾空白后以 '[NO_UPDATE]' 开头
+    then: 运行显示静默状态且主对话不收到摘要，普通输出仍正常通知
+  - id: AC-8
+    given: 用户通过界面、接口或对话安排间隔任务
+    when: 设置小于一分钟的间隔或非未来的截止时间
+    then: 保存被拒绝，一分钟及以上间隔和未来截止时间可保存

@@ -4,7 +4,7 @@
  * Persistence is stateDir/cron/jobs.json. Tick always runs (no RAW_AGENT_* switch).
  */
 
-import { RoutineRunStore, cancelRoutineRun, retryRoutineRun, drainRoutineRuns, routineSettings, type RoutineRun, type RequestAuth, type RawAgentRuntime, type UpdateCronJobInput } from '@ppeng/agent-core';
+import { ValidationError, RoutineRunStore, cancelRoutineRun, retryRoutineRun, drainRoutineRuns, routineSettings, type RoutineRun, type RequestAuth, type RawAgentRuntime, type UpdateCronJobInput } from '@ppeng/agent-core';
 import type { RouteSpec } from '../routing.js';
 import { json } from '../http-utils.js';
 import { visibleCronJobs, sessionVisible } from '../access/visibility.js';
@@ -42,10 +42,12 @@ export function cronRoutes(runtime: RawAgentRuntime): RouteSpec[] {
       pattern: '/api/cron/jobs',
       handler: async ({ readBody, response, auth }) => {
         const body = (await readBody()) as Record<string, unknown>;
+        if ('expiresAt' in body && body.expiresAt !== null && typeof body.expiresAt !== 'string') throw new ValidationError('expiresAt must be an ISO timestamp or null');
         const cron = typeof body.cron === 'string' ? body.cron : undefined;
         const event = typeof body.event === 'string' ? body.event : undefined;
         const job = runtime.createCronJob({
           ...(auth.user ? {userId:auth.user.id,tenantId:auth.user.tenantId}:{}),
+          ...('expiresAt' in body ? {expiresAt:body.expiresAt as string|null}:{}),
           ...(typeof body.onceAt === 'string' ? {onceAt:body.onceAt}:{}),
           ...(typeof body.intervalMs === 'number' ? {intervalMs:body.intervalMs}:{}),
           ...(typeof body.timezone === 'string' ? {timezone:body.timezone}:{}),
@@ -75,7 +77,9 @@ export function cronRoutes(runtime: RawAgentRuntime): RouteSpec[] {
       pattern: '/api/cron/jobs/:id',
       handler: async ({ requireParam, readBody, response }) => {
         const body = (await readBody()) as Record<string, unknown>;
+        if ('expiresAt' in body && body.expiresAt !== null && typeof body.expiresAt !== 'string') throw new ValidationError('expiresAt must be an ISO timestamp or null');
         const patch: UpdateCronJobInput = {};
+        if ('expiresAt' in body) patch.expiresAt=body.expiresAt as string|null;
         if (typeof body.name === 'string') patch.name = body.name;
         if (typeof body.prompt === 'string') patch.prompt = body.prompt;
         if (typeof body.cron === 'string') patch.cron = body.cron;

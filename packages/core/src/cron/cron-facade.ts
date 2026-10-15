@@ -1,3 +1,4 @@
+import { normalizeExpiresAt } from './routine-deadline.js';
 import { NotFoundError, ValidationError } from '../errors.js';
 import { resolveBotPrincipal, principalFromSession } from '../bots/bot-identity.js';
 import { openBot } from '../bots/bot-facade.js';
@@ -13,6 +14,7 @@ export interface CreateCronJobInput {
   name: string;
   prompt: string;
   onceAt?: string;
+  expiresAt?: string | null;
   intervalMs?: number;
   timezone?: string;
   missedPolicy?: 'coalesce' | 'skip' | 'catch_up';
@@ -38,6 +40,7 @@ export interface UpdateCronJobInput {
   name?: string;
   prompt?: string;
   onceAt?: string;
+  expiresAt?: string | null;
   intervalMs?: number;
   event?: string;
   secretEnv?: string;
@@ -138,7 +141,7 @@ function normalizeMissedPolicy(value:string|undefined):NonNullable<CronJobRecord
  const policy=value??'coalesce';if(!['coalesce','skip','catch_up'].includes(policy))throw new ValidationError('invalid missedPolicy');return policy as NonNullable<CronJobRecord['missedPolicy']>;
 }
 function intervalSchedule(value:number):Pick<CronJobRecord,'scheduleKind'|'scheduleValue'|'nextRunAt'>{
- if(!Number.isInteger(value)||value<1000)throw new ValidationError('intervalMs must be >= 1000');
+ if(!Number.isInteger(value)||value<60000)throw new ValidationError('intervalMs must be >= 60000');
  return {scheduleKind:'every_ms',scheduleValue:String(value),nextRunAt:new Date(Date.now()+value).toISOString()};
 }
 function onceSchedule(value:string):Pick<CronJobRecord,'scheduleKind'|'scheduleValue'|'nextRunAt'>{
@@ -163,7 +166,7 @@ export function createCronJob(host:CronFacadeHost,input:CreateCronJobInput):Cron
  if(botId)metadata.botId=botId;
  if(input.precheck!=null)metadata.precheck=parseRoutinePrecheck(input.precheck);
  if(schedule.scheduleKind==='event'){if(!input.secretEnv)throw new ValidationError('secretEnv required for event');metadata.secretEnv=normalizeSecretEnv(input.secretEnv);metadata.prompt=prompt;}
- return ensureCronStore(host).create({name,prompt,sessionId:session.id,agentId:session.agentId,timezone,missedPolicy:normalizeMissedPolicy(input.missedPolicy),ruleVersion:1,metadata,enabled:input.enabled!==false,...schedule});
+ return ensureCronStore(host).create({expiresAt:normalizeExpiresAt(input.expiresAt,schedule.scheduleKind),name,prompt,sessionId:session.id,agentId:session.agentId,timezone,missedPolicy:normalizeMissedPolicy(input.missedPolicy),ruleVersion:1,metadata,enabled:input.enabled!==false,...schedule});
 }
 function schedulePatch(current:CronJobRecord,patch:UpdateCronJobInput):Partial<CronJobRecord>{
  const next:Partial<CronJobRecord>={};
@@ -192,6 +195,8 @@ function contentPatch(current:CronJobRecord,patch:UpdateCronJobInput,next:Partia
 }
 export function updateCronJob(host:CronFacadeHost,id:string,patch:UpdateCronJobInput):CronJobRecord {
  const current=getCronJob(host,id);const next=schedulePatch(current,patch);contentPatch(current,patch,next);
+ if(patch.expiresAt!==undefined)next.expiresAt=normalizeExpiresAt(patch.expiresAt,next.scheduleKind??current.scheduleKind);
+ else if(next.scheduleKind&&!['cron5','every_ms'].includes(next.scheduleKind))next.expiresAt=undefined;
  const updated=ensureCronStore(host).update(id,next);if(!updated)throw new NotFoundError('CronJob',id);return updated;
 }
 

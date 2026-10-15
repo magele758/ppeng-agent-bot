@@ -52,6 +52,7 @@ export function Status({ value }: { value: string }) {
     "cancelled",
     "unknown",
     "skipped",
+    "silent",
     "idle",
     "active",
     "paused",

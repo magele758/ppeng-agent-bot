@@ -260,3 +260,27 @@ test('cancelling a recovered unknown occurrence preserves effect verification be
  const reopened=new SqliteStateStore(path);let calls=0;const restored={...host,store:reopened,runSession:async()=>{calls++;}};const ledger=new RoutineRunStore(reopened);await drainRoutineRuns(restored);assert.equal(ledger.get(run.id).status,'unknown');assert.throws(()=>retryRoutineRun(restored,run.id),/confirmUnknown/);
  const cancelled=await cancelRoutineRun(restored,run.id);assert.equal(cancelled.status,'cancelled');assert.throws(()=>retryRoutineRun(restored,run.id),/confirmUnknown/);assert.equal(ledger.get(run.id).status,'cancelled');assert.equal(calls,0);const queued=retryRoutineRun(restored,run.id,{confirmUnknown:true});assert.equal(queued.status,'queued');assert.equal(queued.attempt,2);assert.equal(queued.requiresEffectVerification,false);reopened.db.close();
 });
+
+test('deadline stops admission and deletes only after in-flight completion [AC:bot-routine-lifecycle#AC-6]',async()=>{
+ const {store,session,host}=fixture();let resolve;host.runSession=async id=>{await new Promise(r=>{resolve=r});store.appendMessage(id,'assistant',[{type:'text',text:'done'}]);};
+ const job=createCronJob(host,{sessionId:session.id,name:'expiry',prompt:'check',intervalMs:60000,expiresAt:new Date(Date.now()+3600000).toISOString()});
+ const runs=new RoutineRunStore(store);const run=runs.enqueue(job,new Date().toISOString());await drainRoutineRuns(host);
+ const expired=host.cronStore.update(job.id,{expiresAt:new Date(Date.now()-1).toISOString(),nextRunAt:new Date(Date.now()-60000).toISOString()});
+ assert.deepEqual(materializeRoutineOccurrences(host,host.cronStore,expired),[]);await tickCronJobs(host);assert.ok(host.cronStore.get(job.id));assert.equal(runs.list(job.id).length,1);
+ resolve();await new Promise(r=>setImmediate(r));await tickCronJobs(host);assert.equal(host.cronStore.get(job.id),undefined);assert.equal(runs.get(run.id).status,'completed');store.db.close();
+});
+test('model silence suppresses main-chat notification [AC:bot-routine-lifecycle#AC-7]',async()=>{
+ for(const text of ['[NO_UPDATE]','  [NO_UPDATE] no changes  ','ordinary report','prefix [NO_UPDATE]']){
+ const {store,session,host}=fixture();host.runSession=async id=>{store.appendMessage(id,'assistant',[{type:'text',text}]);};
+ const job=createCronJob(host,{sessionId:session.id,name:'silent',prompt:'check',intervalMs:60000});const runs=new RoutineRunStore(store);const run=runs.enqueue(job,new Date().toISOString());
+ await drainRoutineRuns(host);await new Promise(r=>setImmediate(r));await drainRoutineRuns(host);
+ const silent=text.trim().startsWith('[NO_UPDATE]');assert.equal(runs.get(run.id).status,silent?'silent':'completed');assert.equal(store.listMessages(session.id).length,silent?0:1);
+ assert.ok(store.listMessages(runs.get(run.id).sessionId).some(m=>m.role==='user'&&JSON.stringify(m).includes('[NO_UPDATE]')));store.db.close();
+ }
+});
+
+test('expired disabled cron is removed on restart without catching up [AC:bot-routine-lifecycle#AC-6]',async()=>{
+ const {store,session,host}=fixture();const job=createCronJob(host,{sessionId:session.id,name:'expired',prompt:'check',cron:'* * * * *',expiresAt:new Date(Date.now()+3600000).toISOString(),missedPolicy:'catch_up'});
+ host.cronStore.update(job.id,{enabled:false,expiresAt:new Date(Date.now()-1).toISOString(),nextRunAt:new Date(Date.now()-600000).toISOString()});host.cronStore=undefined;
+ await tickCronJobs(host);assert.equal(host.cronStore.get(job.id),undefined);assert.equal(new RoutineRunStore(store).list(job.id).length,0);store.db.close();
+});
