@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { api } from '@/lib/api';
+import { attachBeforeAskUserDecision, type LiveStreamArm } from '@/lib/live-stream-attach';
 import { useI18n } from '@/lib/i18n';
 import type { ApprovalItem } from '@/lib/types';
 
@@ -15,10 +16,12 @@ function argsPreview(args: unknown): string {
 
 export function ApprovalBanner({
   approvals,
-  onDone
+  onDone,
+  onAttachStream
 }: {
   approvals: ApprovalItem[];
   onDone: () => void;
+  onAttachStream?: (sessionId: string) => LiveStreamArm;
 }) {
   const { t } = useI18n();
   if (!approvals.length) return null;
@@ -27,13 +30,29 @@ export function ApprovalBanner({
     <div className="approval-banner" role="region" aria-label={t('play.approval.aria')}>
       <div className="approval-banner__title">{t('play.approval.title')}</div>
       {approvals.map((a) => (
-        <ApprovalItemRow key={a.id} approval={a} onDone={onDone} />
+        <ApprovalItemRow
+          key={a.id}
+          approval={a}
+          otherPendingCount={approvals.filter((item) => item.id !== a.id && item.sessionId === a.sessionId).length}
+          onDone={onDone}
+          onAttachStream={onAttachStream}
+        />
       ))}
     </div>
   );
 }
 
-function ApprovalItemRow({ approval: a, onDone }: { approval: ApprovalItem; onDone: () => void }) {
+function ApprovalItemRow({
+  approval: a,
+  otherPendingCount,
+  onDone,
+  onAttachStream
+}: {
+  approval: ApprovalItem;
+  otherPendingCount: number;
+  onDone: () => void;
+  onAttachStream?: (sessionId: string) => LiveStreamArm;
+}) {
   const { t } = useI18n();
   const [reply, setReply] = useState('');
   const isAsk = a.toolName === 'ask_user';
@@ -42,8 +61,8 @@ function ApprovalItemRow({ approval: a, onDone }: { approval: ApprovalItem; onDo
     a.reason ||
     t('play.approval.needInfo');
 
-  const approve = async () => {
-    if (isAsk) {
+  const postDecision = async (decision: 'approve' | 'reject') => {
+    if (decision === 'approve' && isAsk) {
       if (!reply.trim() || !a.sessionId) return;
       await api(`/api/sessions/${encodeURIComponent(a.sessionId)}/ask-user/reply`, {
         method: 'POST',
@@ -51,7 +70,22 @@ function ApprovalItemRow({ approval: a, onDone }: { approval: ApprovalItem; onDo
         body: JSON.stringify({ reply: reply.trim() })
       });
     }
-    await api(`/api/approvals/${a.id}/approve`, { method: 'POST' });
+    const path = decision === 'approve' ? 'approve' : 'reject';
+    const send = () =>
+      api(`/api/approvals/${a.id}/${path}`, { method: 'POST' }).then(() => undefined);
+    if (!onAttachStream) {
+      await send();
+      onDone();
+      return;
+    }
+    await attachBeforeAskUserDecision({
+      toolName: a.toolName,
+      decision,
+      otherPendingCount,
+      sessionId: a.sessionId,
+      arm: onAttachStream,
+      postDecision: send
+    });
     onDone();
   };
 
@@ -80,16 +114,14 @@ function ApprovalItemRow({ approval: a, onDone }: { approval: ApprovalItem; onDo
           type="button"
           className="btn btn-primary btn-sm"
           disabled={isAsk && !reply.trim()}
-          onClick={() => void approve()}
+          onClick={() => void postDecision('approve').catch(() => undefined)}
         >
           {isAsk ? t('play.approval.replyContinue') : t('play.approval.approveContinue')}
         </button>
         <button
           type="button"
           className="btn btn-ghost btn-sm"
-          onClick={() =>
-            void api(`/api/approvals/${a.id}/reject`, { method: 'POST' }).then(() => onDone())
-          }
+          onClick={() => void postDecision('reject').catch(() => undefined)}
         >
           {t('play.approval.reject')}
         </button>

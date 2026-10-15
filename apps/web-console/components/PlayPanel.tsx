@@ -36,7 +36,8 @@ import { groupAgentsByDomain, sortAgentsById } from '@/lib/sort-utils';
 import { groupSessionsByDate } from '@/lib/session-groups';
 import { WorkspacePicker } from './WorkspacePicker';
 import { catalogToPickerOptions } from '@/lib/model-providers';
-import { BotFace } from './BotFace';
+import { resolveLivingFaceMood } from '@/lib/bot-face';
+import { ComposerBotPicker } from './ComposerBotPicker';
 import { ComposerModelPicker } from './ComposerModelPicker';
 import { SessionSettingsPanel, type ExecPreset } from './sections/chat/SessionSettingsPanel';
 import { PlayBotGroupChat } from './play-group/PlayBotGroupChat';
@@ -71,6 +72,7 @@ export interface PlayPanelProps {
   onCancelSession: () => void;
   onOpenTrace: () => void;
   onApprovalsChanged: () => void;
+  onAttachStream?: (sessionId: string) => { ready: Promise<void>; cancel: () => void };
   chat: ReturnType<typeof usePlayChat>;
   sessionFilter?: string;
   onSessionFilterChange?: (value: string) => void;
@@ -241,6 +243,7 @@ export function PlayPanel({
   onCancelSession,
   onOpenTrace,
   onApprovalsChanged,
+  onAttachStream,
   chat,
   sessionFilter = '',
   onSessionFilterChange,
@@ -1091,7 +1094,11 @@ export function PlayPanel({
               </div>
             </header>
 
-            <ApprovalBanner approvals={sessionApprovals} onDone={onApprovalsChanged} />
+            <ApprovalBanner
+              approvals={sessionApprovals}
+              onDone={onApprovalsChanged}
+              onAttachStream={onAttachStream}
+            />
             <GoalStatusCard sessionId={selectedSessionId} />
 
             <div className="chat-panel-body">
@@ -1285,43 +1292,21 @@ export function PlayPanel({
                       </span>
                     </button>
                     {botSurface ? (
-                      <div className="composer-bot-picker">
-                        <BotFace
-                          name={selectedBot?.name || chat.botId}
-                          label={
-                            selectedBot?.name || chat.botId
-                              ? t('agents.bots.faceLabel', { name: selectedBot?.name || chat.botId })
-                              : t('agents.bots.faceEmpty')
-                          }
-                          testId="bot-picker-face"
-                        />
-                        <span className="composer-bot-picker__name" aria-hidden="true">
-                          {selectedBot?.name ?? (chat.botId || t('play.selectBot'))}
-                        </span>
-                        <span className="composer-bot-picker__chevron" aria-hidden="true">
-                          ▾
-                        </span>
-                        <label className="sr-only" htmlFor="botSelect">
-                          {t('play.bot')}
-                        </label>
-                        <select
-                          id="botSelect"
-                          className="composer-bot-select"
-                          aria-label={t('play.bot')}
-                          value={chat.botId}
-                          onChange={(e) => void chat.selectBot(e.target.value)}
-                        >
-                          <option value="">{t('play.selectBot')}</option>
-                          {chat.botId && !botRoster.some((b) => b.id === chat.botId) ? (
-                            <option value={chat.botId}>{selectedBot?.name ?? chat.botId}</option>
-                          ) : null}
-                          {botRoster.map((b) => (
-                            <option key={b.id} value={b.id}>
-                              {b.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                      <ComposerBotPicker
+                        bots={botRoster.map((b) => ({ id: b.id, name: b.name }))}
+                        value={chat.botId}
+                        selectedName={selectedBot?.name ?? ''}
+                        orphan={
+                          chat.botId && !botRoster.some((b) => b.id === chat.botId)
+                            ? { id: chat.botId, name: selectedBot?.name ?? chat.botId }
+                            : null
+                        }
+                        mood={resolveLivingFaceMood({
+                          live: chat.playSending || Boolean(chat.streamOverlay) || chat.waitTyping,
+                          segments: chat.streamOverlay?.segments
+                        })}
+                        onSelect={(id) => void chat.selectBot(id)}
+                      />
                     ) : null}
                     <div className="chat-composer-dock__pickers">
                     <ComposerModelPicker

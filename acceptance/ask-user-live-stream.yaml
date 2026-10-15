@@ -1,0 +1,15 @@
+id: ask-user-live-stream
+title: 回答追问后继续看到生成内容
+status: implemented
+requirement: |
+  Bug: after the user answers an ask_user approval (回复并继续), the backend keeps streaming output, but the Lab chat frontend does not continue updating. The user can see the run still producing on the backend.
+  After approve/deny of ask_user, the UI must attach again to the live output stream (or must never have detached) so new assistant tokens and tool events show up without a manual refresh.
+criteria:
+  - id: AC-1
+    given: 助手在对话里提出问题并等待用户回复，用户作答后后端会继续生成
+    when: 用户填写回复并点击「回复并继续」
+    then: 对话区继续显示后续助手输出和工具过程，不必手动刷新页面
+  - id: AC-2
+    given: 助手在对话里提出问题并等待用户回复，且没有其他待处理的审批
+    when: 用户拒绝这次提问
+    then: 对话区继续显示拒绝之后的后续输出，不必手动刷新页面

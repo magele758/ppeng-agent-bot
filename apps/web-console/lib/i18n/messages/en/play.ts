@@ -5,6 +5,8 @@ export const play = {
   chat: 'Chat',
   bot: 'Bot',
   selectBot: 'Select Bot',
+  botPickerCurrent: 'Current bot: {name}',
+  botPickerList: 'Bot list',
   newBot: 'New Bot',
   newSession: 'New session',
   messageContent: 'Message',
