@@ -85,7 +85,7 @@ export {
 } from './compact-settings.js';
 export type { CompactSettings, CompactSettingsPatch, CompactSettingsStore } from './compact-settings.js';
 export { resolveHistoryTokenBudget } from './session-budget.js';
-export { decideSteerAdmission, steerAckToHttp } from './steer-ack.js';
+export { decideSteerAdmission, steerAckToHttp, sessionSteersImmediately } from './steer-ack.js';
 export type { SteerAck, SteerAckStatus, HttpSteerAck } from './steer-ack.js';
 export {
   DEFAULT_STEER_INTERRUPT_POLICY,

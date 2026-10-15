@@ -5,7 +5,7 @@
 
 import type { AgentLoopHost } from '../runtime/agent-loop.js';
 import { mergeOutcomeMetadata, runOutcomeFromEnd } from '../session/run-outcome.js';
-import { decideSteerAdmission } from '../session/steer-ack.js';
+import { decideSteerAdmission, sessionSteersImmediately } from '../session/steer-ack.js';
 import { resolveSteerDrainPolicy, resolveSteerInboxTarget } from '../session/steer-drain.js';
 import { resolveSteerInterruptPolicy } from '../session/steer-interrupt.js';
 import { closeOpenToolWave } from '../session/tool-wave-close.js';
@@ -69,9 +69,14 @@ export function createTurnKernelLoopHost(input: TurnKernelLoopHostInput): AgentL
         sessionMetadata: session?.metadata,
         store: policyStore
       });
+      const immediate =
+        session?.status === 'running' &&
+        sessionSteersImmediately(session) &&
+        opts?.steerMode !== 'subagent';
       const target = resolveSteerInboxTarget({
+        immediate,
         explicitTarget: opts?.target,
-        interruptPolicy: policy,
+        interruptPolicy: immediate ? 'steer' : policy,
         drainPolicy,
         sessionStatus: session?.status
       });

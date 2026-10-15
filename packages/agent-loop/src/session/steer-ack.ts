@@ -44,6 +44,17 @@ export function isSessionEndedStatus(status: SessionStatus | undefined): boolean
   return status !== undefined && ENDED.has(status);
 }
 
+/**
+ * Canonical bot chat (`mode: chat` + `canonicalBotChat`).
+ * Subagent / task sessions keep ordinary steer admission even if the flag is copied.
+ */
+export function sessionSteersImmediately(session?: {
+  mode?: string;
+  metadata?: Record<string, unknown> | null;
+} | null): boolean {
+  return session?.mode === 'chat' && session.metadata?.canonicalBotChat === true;
+}
+
 export function isCompactInFlight(session: SessionRecord | undefined | null): boolean {
   if (!session) return false;
   return session.metadata?.compactInFlight === true;
@@ -69,7 +80,10 @@ export function decideSteerAdmission(input: {
     return { admit: false, reason: 'session_ended' };
   }
   if (input.session.status === 'running') {
-    const policy = parseSteerInterruptPolicy(input.interruptPolicy) ?? DEFAULT_STEER_INTERRUPT_POLICY;
+    // Canonical bot chats steer on the next shot. Queue / disabled still apply to ordinary sessions.
+    const policy = sessionSteersImmediately(input.session)
+      ? 'steer'
+      : (parseSteerInterruptPolicy(input.interruptPolicy) ?? DEFAULT_STEER_INTERRUPT_POLICY);
     if (policy === 'disabled') {
       return { admit: false, reason: 'steer_disabled' };
     }

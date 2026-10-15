@@ -8,7 +8,7 @@
 
 import type { SessionMessage, SessionRecord } from '../types.js';
 import type { EnqueueSteerOptions, InboxItem } from '../session/step-inbox.js';
-import { decideSteerAdmission, type SteerAck } from '../session/steer-ack.js';
+import { decideSteerAdmission, sessionSteersImmediately, type SteerAck } from '../session/steer-ack.js';
 import { closeOpenToolWave, type ToolWaveCloseStore } from '../session/tool-wave-close.js';
 import type { TurnKernelHost, AgentStepEvent } from '../turn/host.js';
 import type { AgentLoopLatch as KernelLatch } from '../turn/kernel.js';
@@ -341,8 +341,16 @@ export function createAgentLoopFromKernelHost(
       if (!decision.admit) {
         return { status: 'not_submitted', reason: decision.reason };
       }
+      const immediate =
+        session?.status === 'running' &&
+        sessionSteersImmediately(session) &&
+        opts?.steerMode !== 'subagent';
       const store = host.store as SteerCapableStore;
-      const item = store.enqueueSteer?.(sessionId, text, opts);
+      const item = store.enqueueSteer?.(
+        sessionId,
+        text,
+        immediate ? { ...opts, target: 'next-step' } : opts
+      );
       if (!item) {
         return { status: 'not_submitted', reason: 'no_session' };
       }
