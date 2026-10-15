@@ -273,10 +273,7 @@ export class McpManager {
           if (this.deps.tools.some((existing) => existing.name === name)) continue;
           const toolName = tool.name;
           const presented = presentMcpTool(
-            {
-              ...tool,
-              description: tool.description ? redactStdioFailure(tool.description, cfg.env) : tool.description
-            },
+            tool,
             `MCP stdio server ${si} tool ${toolName}`,
             (schema) => this.prepareMcpInputSchema(schema),
             this.deps.log
