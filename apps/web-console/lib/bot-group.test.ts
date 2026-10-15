@@ -1,10 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  activeMentionQuery,
   addGroupMember,
+  filterMentionMembers,
   groupMatchesQuery,
   groupMemberIds,
   groupSpeakBudget,
+  insertMention,
   removeGroupMember
 } from './bot-group.ts';
 
@@ -62,6 +65,24 @@ test('speak budget covers every member up to the room cap', () => {
   assert.equal(groupSpeakBudget(8), 8);
   assert.equal(groupSpeakBudget(50), 20);
   assert.equal(groupSpeakBudget(1), 2);
+});
+
+test('typing @ opens a member query and choosing one inserts @name', () => {
+  const members = [{ name: 'Super Bot' }, { name: '小八' }, { name: 'DeskBot' }];
+  assert.equal(activeMentionQuery('hello', 5), null);
+  assert.deepEqual(activeMentionQuery('hi @', 4), { start: 3, query: '' });
+  assert.deepEqual(activeMentionQuery('hi @小', 5), { start: 3, query: '小' });
+  assert.equal(activeMentionQuery('mail owner@example.com', 20), null);
+  assert.equal(activeMentionQuery('hi @小八 ', 7), null);
+  assert.deepEqual(
+    filterMentionMembers(members, '小').map((member) => member.name),
+    ['小八']
+  );
+  assert.deepEqual(
+    filterMentionMembers(members, '').map((member) => member.name),
+    ['Super Bot', '小八', 'DeskBot']
+  );
+  assert.deepEqual(insertMention('hi @小', 3, 5, '小八'), { value: 'hi @小八 ', caret: 7 });
 });
 
 test('sidebar filter matches a group title or member without treating it as one bot', () => {

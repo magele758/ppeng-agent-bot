@@ -99,12 +99,54 @@
 }
 
 .play-group-composer {
+  position: relative;
   display: flex;
   gap: 8px;
   align-items: flex-end;
   padding: 10px 14px 14px;
   border-top: 1px solid var(--color-border-strong);
   flex-shrink: 0;
+}
+
+.play-group-mentions {
+  position: absolute;
+  left: 14px;
+  right: 72px;
+  bottom: calc(100% - 6px);
+  z-index: 5;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 220px;
+  overflow: auto;
+  background: var(--color-surface-base, #fff);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 8px;
+}
+
+.play-group-mentions__option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  padding: 4px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.play-group-mentions__option.is-active,
+.play-group-mentions__option:hover {
+  background: var(--color-surface-strong, rgba(0, 0, 0, 0.06));
+}
+
+.play-group-mentions__empty {
+  padding: 6px 8px;
+  color: var(--ui-text-muted);
+  font-size: var(--ui-text-xs);
 }
 
 .play-group-composer textarea {

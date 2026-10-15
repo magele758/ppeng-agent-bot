@@ -347,7 +347,7 @@ async function ensureReviewBot(request: APIRequestContext, name: string): Promis
   return (await created.json()).bot;
 }
 
-for (const routing of ['host', 'text-mention'] as const) {
+for (const routing of ['everyone', 'text-mention'] as const) {
   test(`Room routes ${routing} without selecting the mention list [AC:bot-rooms#AC-2]`, async ({ page, request }) => {
     const suffix = Date.now();
     const host = await ensureReviewBot(request, `E2E Review Host ${routing}`);
@@ -356,14 +356,19 @@ for (const routing of ['host', 'text-mention'] as const) {
     await page.goto('/#/agents/bots');
     const panel = page.getByTestId('bot-rooms');
     await panel.getByRole('button', { name: room.title, exact: true }).click();
-    const target = routing === 'host' ? host : member;
-    await panel.getByLabel('群消息', { exact: true }).fill(routing === 'host' ? 'Reply ready.' : `@${member.id} Reply ready.`);
+    await panel.getByLabel('群消息', { exact: true }).fill(routing === 'everyone' ? 'Reply ready.' : `@${member.id} Reply ready.`);
     const sent = page.waitForRequest(req => req.method() === 'POST' && req.url().endsWith(`/api/bot-rooms/${room.id}/messages`));
     await panel.getByRole('button', { name: '发送', exact: true }).click();
     expect((await sent).postDataJSON()).not.toHaveProperty('mentions');
-    await expect(panel.getByRole('log').getByText(target.name, { exact: true })).toBeVisible({ timeout: 30000 });
+    const log = panel.getByRole('log');
+    if (routing === 'everyone') {
+      await expect(log.getByText(host.name, { exact: true })).toBeVisible({ timeout: 30000 });
+      await expect(log.getByText(member.name, { exact: true })).toBeVisible();
+    } else {
+      await expect(log.getByText(member.name, { exact: true })).toBeVisible({ timeout: 30000 });
+    }
     const { turns } = await (await request.get(`/api/bot-rooms/${room.id}/turns`)).json();
-    expect(turns[0].botIds).toEqual([target.id]);
+    expect(turns[0].botIds).toEqual(routing === 'everyone' ? [host.id, member.id] : [member.id]);
   });
 }
 
