@@ -441,6 +441,76 @@ function approvalIndexForSession(
   return index;
 }
 
+function approvalMatches(row: ApprovalRecord, sessionId: string, idemKey: string): boolean {
+  return row.sessionId === sessionId && row.idempotencyKey === idemKey;
+}
+
+function hasApprovalStatus(
+  host: ToolLoopHost,
+  sessionId: string,
+  idemKey: string,
+  status: 'approved' | 'rejected'
+): boolean {
+  for (const row of host.listApprovals({ status })) {
+    if (approvalMatches(row, sessionId, idemKey)) return true;
+  }
+  return false;
+}
+
+function userRejectedToolResult(toolCall: ToolCallPart, toolName: string): ToolLoopResult {
+  const content = '用户拒绝';
+  return {
+    toolCallId: toolCall.toolCallId,
+    name: toolName,
+    ok: false,
+    content,
+    problem: toolInfraProblem(toolName, toolCall.toolCallId, 'APPROVAL_REJECTED', content, {
+      title: 'Approval rejected',
+      status: 403,
+    }),
+  };
+}
+
+function holdForHookAsk(
+  host: ToolLoopHost,
+  tool: ToolContract<Record<string, unknown>>,
+  toolCall: ToolCallPart,
+  sessionId: string,
+  message: string | undefined
+): ToolLoopResult {
+  const idemKey = stableJsonHash(tool.name, toolCall.input);
+  host.createApproval({
+    sessionId,
+    toolName: tool.name,
+    reason: message ?? `Hook asked for approval on ${tool.name}`,
+    args: toolCall.input,
+    idempotencyKey: idemKey,
+  });
+  return {
+    toolCallId: toolCall.toolCallId,
+    name: tool.name,
+    ok: false,
+    content: '',
+    hold: 'approval',
+  };
+}
+
+/** A rejected ask must settle as one tool_result. Creating another approval parks the wave again. */
+function resolvePreToolAsk(
+  host: ToolLoopHost,
+  tool: ToolContract<Record<string, unknown>>,
+  toolCall: ToolCallPart,
+  sessionId: string,
+  message: string | undefined
+): ToolLoopResult | undefined {
+  const idemKey = stableJsonHash(tool.name, toolCall.input);
+  if (hasApprovalStatus(host, sessionId, idemKey, 'rejected')) {
+    return userRejectedToolResult(toolCall, tool.name);
+  }
+  if (hasApprovalStatus(host, sessionId, idemKey, 'approved')) return undefined;
+  return holdForHookAsk(host, tool, toolCall, sessionId, message);
+}
+
 // ============================================================================
 // Single-tool execution
 // ============================================================================
@@ -563,26 +633,8 @@ export async function executeSingleTool(
   }
 
   if (pre.permissionDecision === 'ask') {
-    const idemKey = stableJsonHash(tool.name, toolCall.input);
-    const existingApproved = host
-      .listApprovals({ status: 'approved' })
-      .find((a) => a.sessionId === sessionId && a.idempotencyKey === idemKey);
-    if (!existingApproved) {
-      host.createApproval({
-        sessionId,
-        toolName: tool.name,
-        reason: pre.message ?? `Hook asked for approval on ${tool.name}`,
-        args: toolCall.input,
-        idempotencyKey: idemKey,
-      });
-      return {
-        toolCallId: toolCall.toolCallId,
-        name: tool.name,
-        ok: false,
-        content: '',
-        hold: 'approval',
-      };
-    }
+    const asked = resolvePreToolAsk(host, tool, toolCall, sessionId, pre.message);
+    if (asked) return asked;
   }
 
   const execInput = pre.input !== undefined ? pre.input : toolCall.input;

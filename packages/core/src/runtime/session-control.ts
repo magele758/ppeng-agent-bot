@@ -17,6 +17,14 @@ export interface SessionControlHost {
   emitTrace(sessionId: string, event: Omit<TraceEvent, 'ts' | 'sessionId'>): void;
 }
 
+const AUTONOMOUS_BACKGROUND_MODES: ReadonlySet<SessionRecord['mode']> = new Set(['task', 'teammate']);
+
+/** Idle would let the next autonomous sweep start the task the user just stopped. */
+function parkedCancelStatus(session: SessionRecord): 'failed' | 'idle' {
+  if (session.background && AUTONOMOUS_BACKGROUND_MODES.has(session.mode)) return 'failed';
+  return 'idle';
+}
+
 function releaseParkedApproval(host: SessionControlHost, session: SessionRecord): boolean {
   if (session.status !== 'waiting_approval') return false;
   for (const approval of host.store.listApprovals({ status: 'pending' })) {
@@ -25,7 +33,7 @@ function releaseParkedApproval(host: SessionControlHost, session: SessionRecord)
   }
   const metadata = session.metadata ? session.metadata : {};
   host.store.updateSession(session.id, {
-    status: 'idle',
+    status: parkedCancelStatus(session),
     metadata: mergeInterruptMetadata(metadata, null)
   });
   return true;

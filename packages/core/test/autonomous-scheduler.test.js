@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SqliteStateStore } from '../dist/storage.js';
 import { AutonomousScheduler } from '../dist/services/autonomous-scheduler.js';
+import { cancelSession } from '../dist/runtime/session-control.js';
 
 function openStore() {
   const dir = mkdtempSync(join(tmpdir(), 'auto-sched-'));
@@ -61,6 +62,44 @@ test('a rejected autonomous run does not reject unhandled and clears running', a
     assert.equal(calls.length, 6);
   } finally {
     process.off('unhandledRejection', onRejection);
+    store.db.close();
+  }
+});
+
+test('a cancelled background task waiting for approval is not started on the next tick', async () => {
+  const store = openStore();
+  try {
+    const session = backgroundTask(store, 'parked-task');
+    store.updateSession(session.id, { status: 'waiting_approval' });
+    const approval = store.createApproval({
+      sessionId: session.id,
+      toolName: 'bash',
+      reason: 'ask',
+      args: { command: 'true' }
+    });
+    store.enqueueSchedulerWake(session.id, 'before-cancel');
+    cancelSession(
+      {
+        store,
+        sessionAbortControllers: new Map(),
+        backgroundJobAborts: new Map(),
+        emitTrace() {}
+      },
+      session.id
+    );
+    assert.equal(store.getSession(session.id).status, 'failed');
+    assert.equal(store.getApproval(approval.id).status, 'rejected');
+    const calls = [];
+    const scheduler = new AutonomousScheduler({
+      store,
+      async runSession(sessionId) {
+        calls.push(sessionId);
+      }
+    });
+    await scheduler.tick();
+    await scheduler.whenIdle();
+    assert.deepEqual(calls, []);
+  } finally {
     store.db.close();
   }
 });
