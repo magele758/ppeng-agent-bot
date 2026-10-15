@@ -3,6 +3,7 @@ import '../../bot-work/bot-work.css';
 
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
+import { readBotPermissionsTarget } from '@/lib/bot-chat-header';
 import { BotLimits } from '../../bot-work/BotLimits';
 import { BotTeamWork } from '../../bot-work/BotTeamWork';
 import { BotRooms } from '../../bot-work/BotRooms';
@@ -27,6 +28,19 @@ export function BotsView() {
   const [notice, setNotice] = useState<{ text: string; err: boolean } | null>(null);
 
   useEffect(() => { let active=true; void api('/api/bot-work/default').then(data=>{if(active)lab.upsertBot((data as {bot:BotInfo}).bot);}).catch(e=>setNotice({text:String(e),err:true}));return()=>{active=false;}; }, []);
+
+  useEffect(() => {
+    const apply = () => {
+      const target = readBotPermissionsTarget(window.location.hash);
+      if (!target) return;
+      setCreating(false);
+      setQuery('');
+      setSelectedId(target.botId);
+    };
+    apply();
+    window.addEventListener('hashchange', apply);
+    return () => window.removeEventListener('hashchange', apply);
+  }, []);
 
   const roster = useMemo(() => visibleBotRoster(lab.bots), [lab.bots]);
   const visible = useMemo(() => filterBots(roster, query), [roster, query]);

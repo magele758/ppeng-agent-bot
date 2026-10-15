@@ -400,7 +400,9 @@ export const play = {
   header: {
     more: 'More',
     run: 'Re-run session',
-    runHint: 'Run another turn without sending a new message'
+    runHint: 'Run another turn without sending a new message',
+    permissions: 'Permissions',
+    permissionsAria: 'Open permission settings for {name}'
   },
 
   role: {
