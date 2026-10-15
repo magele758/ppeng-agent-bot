@@ -126,7 +126,7 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
     if (!settings) return;
     const target = readBotPermissionsTarget(window.location.hash);
     if (!target || target.botId !== bot.id) return;
-    document.getElementById(BOT_PERMISSIONS_SECTION_ID)?.scrollIntoView({ block: 'nearest' });
+    document.getElementById(BOT_PERMISSIONS_SECTION_ID)?.scrollIntoView({ block: 'start' });
   }, [settings, bot.id]);
 
   useEffect(() => {
