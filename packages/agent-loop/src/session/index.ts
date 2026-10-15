@@ -82,7 +82,13 @@ export {
 } from './steer-interrupt.js';
 export type { SteerInterruptPolicy } from './steer-interrupt.js';
 
-export { decideSteerAdmission, steerAckToHttp, isSessionEndedStatus, isCompactInFlight } from './steer-ack.js';
+export {
+  decideSteerAdmission,
+  steerAckToHttp,
+  isSessionEndedStatus,
+  isCompactInFlight,
+  sessionSteersImmediately
+} from './steer-ack.js';
 export type { SteerAck, SteerAckStatus, HttpSteerAck, HttpSteerAckStatus, NotSubmittedReason } from './steer-ack.js';
 
 export {

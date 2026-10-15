@@ -130,6 +130,37 @@ describe('L4 steer() uses decideSteerAdmission', () => {
   });
 });
 
+describe('kernel host enqueueSteer', () => {
+  it('puts a running canonical bot on the next shot and leaves ordinary sessions queued [AC:bot-immediate-steer#AC-1] [AC:bot-immediate-steer#AC-2] [AC:bot-immediate-steer#AC-3]', () => {
+    const surface = createMemorySurfaceStore();
+    const session = surface.createSession({ title: 'bot', mode: 'chat', agentId: 'bot' });
+    surface.updateSession(session.id, { status: 'running', metadata: { canonicalBotChat: true } });
+    const host = createAgentLoopFromKernelHost({ store: surface }, async () => undefined);
+
+    const steered = host.enqueueSteer(session.id, 'mid', { target: 'next-run' });
+    expect(steered.status).toBe('steered');
+    if (steered.status !== 'steered') return;
+    expect(steered.item.target).toBe('next-step');
+
+    const child = host.enqueueSteer(session.id, 'child', { target: 'next-run', steerMode: 'subagent' });
+    expect(child.status).toBe('steered');
+    if (child.status !== 'steered') return;
+    expect(child.item.target).toBe('next-run');
+
+    surface.updateSession(session.id, { status: 'running', metadata: {} });
+    const queued = host.enqueueSteer(session.id, 'later', { target: 'next-run' });
+    expect(queued.status).toBe('started');
+    if (queued.status !== 'started') return;
+    expect(queued.item.target).toBe('next-run');
+
+    expect(host.enqueueSteer(session.id, 'no', { interruptPolicy: 'disabled' })).toEqual({
+      status: 'not_submitted',
+      reason: 'steer_disabled'
+    });
+    expect(host.enqueueSteer(session.id, '   ')).toEqual({ status: 'not_submitted', reason: 'empty' });
+  });
+});
+
 describe('L4 abort closes the open tool wave first', () => {
   it('abort() closes unmatched tool_calls then aborts the round controller', async () => {
     const surface = createMemorySurfaceStore();
