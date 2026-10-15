@@ -25,7 +25,7 @@ function json(res: ServerResponse, status: number, body: unknown): void {
 function eventProvider(parts: string[]): EventProvider | undefined {
   if (parts.length !== 2 || parts[0] !== 'routines') return undefined;
   const name = parts[1];
-  if (name === 'github' || name === 'slack' || name === 'email') return name;
+  if (name === 'github' || name === 'slack' || name === 'email' || name === 'webhook' || name === 'ci') return name;
   return undefined;
 }
 
@@ -72,7 +72,7 @@ function httpResult(result: AcceptEventRoutineResult): { status: number; body: u
 }
 
 /**
- * `POST {prefix}/routines/github|slack|email`.
+ * `POST {prefix}/routines/github|slack|email|webhook|ci`.
  * Returns false when the path is not an event routine so the caller keeps routing.
  * Signature failure and delivery replay do not start a model turn.
  */
@@ -90,7 +90,7 @@ export async function handleEventIngress(
   const rawBody = await readRawBody(request, readBodyLimit);
   let body: unknown;
   try {
-    body = rawBody ? (JSON.parse(rawBody) as unknown) : {};
+    body = JSON.parse(rawBody) as unknown;
   } catch {
     json(response, 400, { error: 'Invalid JSON' });
     return true;
@@ -110,7 +110,7 @@ export async function handleEventIngress(
     rawBody,
     headers: request.headers,
     body,
-    claimDelivery: claimInboundEvent
+    claimDelivery: (key) => claimInboundEvent(key, Date.now(), `${ctx.stateDir}/gateway`)
   });
   const out = httpResult(result);
   json(response, out.status, out.body);

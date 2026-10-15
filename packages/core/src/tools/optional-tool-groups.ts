@@ -89,12 +89,12 @@ const DEFAULT_OPTIONAL_GROUPS: OptionalToolGroupDef[] = [
   {
     id: 'cron',
     title: 'Scheduled jobs',
-    description: 'First-class agent cron (cron_create / cron_list / cron_remove)',
+    description: 'First-class agent cron (cron_create / cron_list / cron_remove / cron_run_now / cron_runs)',
     items: [
       {
         id: 'cron-core',
-        title: 'cron_create / cron_list / cron_remove',
-        toolNames: ['cron_create', 'cron_list', 'cron_remove']
+        title: 'cron_create / cron_list / cron_remove / cron_run_now / cron_runs',
+        toolNames: ['cron_create', 'cron_list', 'cron_remove', 'cron_run_now', 'cron_runs']
       }
     ]
   },

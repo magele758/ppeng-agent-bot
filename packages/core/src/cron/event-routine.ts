@@ -6,10 +6,12 @@
  * in `PPENG_EVENT_FILE` and the stored command is not rewritten.
  */
 
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { SecretVault, type SecretVaultStore } from '../secrets/secret-vault.js';
+import { ValidationError } from '../errors.js';
 import type { Logger } from '../logger.js';
 import { fenceExternalContent } from '../safety/external-content.js';
 import { assertCredentialEnvName } from '../secrets/credential-env.js';
@@ -29,9 +31,9 @@ export const EVENT_PRECHECK_FILE_ENV = 'PPENG_EVENT_FILE';
 export const EVENT_SIGNATURE_WINDOW_MS = 5 * 60 * 1000;
 
 const SUMMARY_MAX = 12_000;
-const EVENT_SCHEDULE = /^(github|slack|email)\/[a-z][a-z0-9_-]{0,64}$/;
+const EVENT_SCHEDULE = /^(?:(github|slack|email)\/[a-z][a-z0-9_-]{0,64}|webhook\/generic|ci\/status)$/;
 
-export type EventProvider = 'github' | 'slack' | 'email';
+export type EventProvider = 'github' | 'slack' | 'email' | 'webhook' | 'ci';
 
 export interface EventRoutineHeaders {
   [name: string]: string | string[] | undefined;
@@ -88,9 +90,8 @@ export function parseEventScheduleValue(raw: string): string | undefined {
 
 function signaturesMatch(expected: string, provided: string | undefined): boolean {
   if (!provided) return false;
-  const left = Buffer.from(expected.toLowerCase(), 'utf8');
-  const right = Buffer.from(provided.trim().toLowerCase(), 'utf8');
-  if (left.length !== right.length) return false;
+  const left = createHash('sha256').update(expected.toLowerCase()).digest();
+  const right = createHash('sha256').update(provided.trim().toLowerCase()).digest();
   return timingSafeEqual(left, right);
 }
 
@@ -192,11 +193,31 @@ function eventName(raw: string | undefined): string | undefined {
   return /^[a-z][a-z0-9_-]{0,64}$/.test(name) ? name : undefined;
 }
 
+
+const CI_CONCLUSIONS = new Set(['success', 'failure', 'error', 'neutral', 'cancelled', 'skipped', 'timed_out', 'action_required', 'stale', 'startup_failure']);
+export function normalizeCiConclusions(value: unknown): string[] {
+  if (!Array.isArray(value) || value.some(item => typeof item !== 'string' || !CI_CONCLUSIONS.has(item))) {
+    throw new ValidationError('conclusions must be an array of CI completion conclusions');
+  }
+  return [...new Set(value as string[])];
+}
+function ciConclusion(headers: EventRoutineHeaders, body: unknown): string | undefined {
+  const event = headerValue(headers, 'x-github-event');
+  const rec = asRecord(body);
+  if (event === 'status') return ['success', 'failure', 'error'].includes(String(rec?.state)) ? String(rec?.state) : undefined;
+  if (event !== 'check_run' && event !== 'workflow_run') return undefined;
+  const run = asRecord(rec?.[event]);
+  if (rec?.action !== 'completed' || run?.status !== 'completed') return undefined;
+  return typeof run.conclusion === 'string' && CI_CONCLUSIONS.has(run.conclusion) ? run.conclusion : undefined;
+}
+
 function resolveScheduleValue(
   provider: EventProvider,
   headers: EventRoutineHeaders,
   body: unknown
 ): string | undefined {
+  if (provider === 'webhook') return 'webhook/generic';
+  if (provider === 'ci') return ciConclusion(headers, body) ? 'ci/status' : undefined;
   if (provider === 'github') {
     const name = eventName(headerValue(headers, 'x-github-event'));
     return name ? parseEventScheduleValue(`github/${name}`) : undefined;
@@ -221,7 +242,7 @@ function clampDeliveryId(raw: string | undefined): string | undefined {
 }
 
 function deliveryIdOf(provider: EventProvider, headers: EventRoutineHeaders, body: unknown): string | undefined {
-  if (provider === 'github') return clampDeliveryId(headerValue(headers, 'x-github-delivery'));
+  if (provider === 'github' || provider === 'ci') return clampDeliveryId(headerValue(headers, 'x-github-delivery'));
   if (provider === 'slack') {
     const rec = asRecord(body);
     return clampDeliveryId(typeof rec?.event_id === 'string' ? rec.event_id : undefined);
@@ -233,14 +254,15 @@ function deliveryIdOf(provider: EventProvider, headers: EventRoutineHeaders, bod
   );
 }
 
-function secretFromEnv(name: unknown, env: NodeJS.ProcessEnv): { name?: string; value?: string } {
+function resolveRoutineSecret(name: unknown, env: NodeJS.ProcessEnv, store: EventRoutineStore): { name?: string; value?: string } {
   if (typeof name !== 'string') return {};
   try {
     assertCredentialEnvName(name);
   } catch {
     return {};
   }
-  const value = env[name];
+  const vault = 'getDaemonControl' in store && 'setDaemonControl' in store ? new SecretVault(store as EventRoutineStore & SecretVaultStore) : undefined;
+  const value = vault?.get(name) ?? env[name];
   if (typeof value !== 'string' || value.length === 0) return { name };
   return { name, value };
 }
@@ -253,7 +275,7 @@ function signatureOk(
   nowMs: number,
   deliveryId?: string
 ): boolean {
-  if (provider === 'github') {
+  if (provider === 'github' || provider === 'ci') {
     return verifyGithubSignature({
       rawBody,
       secret,
@@ -314,8 +336,8 @@ function errorText(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-function verifyRoutineDelivery(job:CronJobRecord,input:AcceptEventRoutineInput,env:NodeJS.ProcessEnv,nowMs:number):{deliveryId:string;secretName?:string}|EventJobOutcome {
- const secret=secretFromEnv(job.metadata.secretEnv,env);
+function verifyRoutineDelivery(job:CronJobRecord,input:AcceptEventRoutineInput,env:NodeJS.ProcessEnv,nowMs:number,store:EventRoutineStore):{deliveryId:string;secretName?:string}|EventJobOutcome {
+ const secret=resolveRoutineSecret(job.metadata.secretEnv,env,store);
  const deliveryId=deliveryIdOf(input.provider,input.headers,input.body);
  if(!secret.value||!signatureOk(input.provider,input.rawBody,secret.value,input.headers,nowMs,deliveryId))return {jobId:job.id,status:'rejected',reason:'bad_signature'};
  if(!deliveryId)return {jobId:job.id,status:'rejected',reason:'no_delivery'};
@@ -354,15 +376,16 @@ async function acceptLegacyRoutineEvent(host:EventRoutineHost,config:CronJobStor
 /** Validated events are durably admitted before claiming external dedupe; compatibility stores keep their old wake contract. */
 export async function acceptEventRoutine(host:EventRoutineHost,input:AcceptEventRoutineInput):Promise<AcceptEventRoutineResult>{
  let parsed=input.body;
- if(parsed===undefined){try{parsed=input.rawBody?JSON.parse(input.rawBody):{};}catch{return {outcomes:[],error:'invalid_json'};}}
+ if(parsed===undefined){try{parsed=JSON.parse(input.rawBody);}catch{return {outcomes:[],error:'invalid_json'};}}
  const scheduleValue=resolveScheduleValue(input.provider,input.headers,parsed);if(!scheduleValue)return {outcomes:[],error:'invalid_event'};
  const config=cronStoreOf(host),env=input.env??process.env,nowMs=input.nowMs??Date.now();
- const jobs=config.list({enabled:true}).filter(job=>job.scheduleKind==='event'&&job.scheduleValue===scheduleValue);const outcomes:EventJobOutcome[]=[];
+ const conclusion = input.provider==='github'||input.provider==='ci' ? ciConclusion(input.headers,parsed) : undefined;
+ const jobs=config.list({enabled:true}).filter(job=>job.scheduleKind==='event' && (job.scheduleValue===scheduleValue || (job.scheduleValue==='ci/status' && conclusion!==undefined)) && (job.scheduleValue!=='ci/status' || !Array.isArray(job.metadata.conclusions) || !job.metadata.conclusions.length || job.metadata.conclusions.includes(conclusion)));const outcomes:EventJobOutcome[]=[];
  const verifiedInput={...input,body:parsed};
  for(const job of jobs){
-  const verified=verifyRoutineDelivery(job,verifiedInput,env,nowMs);
+  const verified=verifyRoutineDelivery(job,verifiedInput,env,nowMs,host.store);
   if('jobId' in verified){outcomes.push(verified);continue;}
-  const outcome='db' in host.store&&'createSession' in host.store?await acceptDurableRoutineEvent(host,config,job,verifiedInput,scheduleValue,verified.deliveryId,nowMs):await acceptLegacyRoutineEvent(host,config,job,verifiedInput,scheduleValue,verified.deliveryId,verified.secretName);
+  const outcome='db' in host.store&&'createSession' in host.store?await acceptDurableRoutineEvent(host,config,job,verifiedInput,job.scheduleValue,verified.deliveryId,nowMs):await acceptLegacyRoutineEvent(host,config,job,verifiedInput,job.scheduleValue,verified.deliveryId,verified.secretName);
   outcomes.push(outcome);
  }
  return {scheduleValue,outcomes};

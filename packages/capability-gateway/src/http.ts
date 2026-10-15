@@ -117,7 +117,7 @@ export async function handleGatewayHttp(
   const isEventIngress =
     request.method === 'POST' &&
     parts[0] === 'routines' &&
-    (parts[1] === 'github' || parts[1] === 'slack' || parts[1] === 'email') &&
+    (parts[1] === 'github' || parts[1] === 'slack' || parts[1] === 'email' || parts[1] === 'webhook' || parts[1] === 'ci') &&
     parts.length === 2;
 
   if (!isPlatformPath && !isEventIngress && !checkAuth(request, ctx)) {
