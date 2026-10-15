@@ -130,6 +130,62 @@ test('a failing scheduler step does not skip the later steps', async () => {
   store.db.close();
 });
 
+test('later scheduler steps start before self-heal finishes, and the tick waits for it', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'audit-sched-join-'));
+  const store = new SqliteStateStore(join(dir, 'state.db'));
+  let releaseHeal = () => {};
+  const heal = new Promise((resolve) => {
+    releaseHeal = resolve;
+  });
+  const order = [];
+  const host = {
+    store,
+    stateDir: dir,
+    log: { warn() {} },
+    cronStore: { dueJobs: () => [] },
+    setCronStore() {},
+    selfHeal: {
+      processRuns() {
+        order.push('heal-start');
+        return heal;
+      }
+    },
+    swarmExecutor: {
+      async tick() {
+        order.push('swarm');
+      }
+    },
+    orchestrationEngine: {
+      async tick() {
+        order.push('orchestration');
+      }
+    },
+    autonomousScheduler: {
+      async tick() {
+        order.push('autonomous');
+      }
+    },
+    async runSession() {}
+  };
+  try {
+    let settled = false;
+    const task = runScheduler(host).finally(() => {
+      settled = true;
+    });
+    const deadline = Date.now() + 2000;
+    while (!order.includes('autonomous') && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.deepEqual(order, ['heal-start', 'swarm', 'orchestration', 'autonomous']);
+    assert.equal(settled, false);
+    releaseHeal();
+    await task;
+    assert.equal(settled, true);
+  } finally {
+    store.db.close();
+  }
+});
+
 test('fold budget stubs an old tool result before episodic selection', () => {
   const previousBudget = process.env.RAW_AGENT_EPISODIC_TOKEN_BUDGET;
   const previousCognitive = process.env.RAW_AGENT_COGNITIVE_STATE_SELECTION;

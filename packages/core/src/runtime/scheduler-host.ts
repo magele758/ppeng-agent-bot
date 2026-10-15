@@ -110,14 +110,6 @@ function warnSchedulerStep(host: SchedulerTickHost, name: string, error: unknown
   log.warn(`${name} tick failed`, { error: schedulerStepError(error) });
 }
 
-function detachSchedulerStep(host: SchedulerTickHost, name: string, fn: () => Promise<unknown>): void {
-  void Promise.resolve()
-    .then(fn)
-    .catch((error: unknown) => {
-      warnSchedulerStep(host, name, error);
-    });
-}
-
 async function runSchedulerStep(host: SchedulerTickHost, name: string, fn: () => Promise<unknown>): Promise<void> {
   try {
     await fn();
@@ -132,7 +124,12 @@ export async function runScheduler(host: SchedulerTickHost): Promise<void> {
     reason: 'timer',
     launch: host.launchEvolution
   });
-  detachSchedulerStep(host, 'self-heal', () => host.selfHeal.processRuns());
+  // Start self-heal first so a long npm test does not block the other steps,
+  // then join it before returning. The daemon refuses to overlap ticks, and
+  // returning early would start the same work again 1.5s later.
+  const selfHeal = host.selfHeal.processRuns().catch((error: unknown) => {
+    warnSchedulerStep(host, 'self-heal', error);
+  });
   await runSchedulerStep(host, 'swarm', () => host.swarmExecutor.tick());
   if (host.teamDagExecutor) {
     await runSchedulerStep(host, 'team-dag', () => host.teamDagExecutor!.tick());
@@ -140,6 +137,7 @@ export async function runScheduler(host: SchedulerTickHost): Promise<void> {
   await runSchedulerStep(host, 'orchestration', () => host.orchestrationEngine.tick());
   await runSchedulerStep(host, 'cron', () => tickCronJobs(host));
   await runSchedulerStep(host, 'autonomous', () => host.autonomousScheduler.tick());
+  await selfHeal;
 }
 
 export async function ingestMailbox(store: SqliteStateStore, session: SessionRecord): Promise<void> {
