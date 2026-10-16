@@ -161,9 +161,9 @@ function approvalsForRun(host:RoutineRuntimeHost,run:RoutineRun):ApprovalRecord[
 /**
  * Outcome of an attempt to continue a waiting_approval routine run.
  * `handled` — a continuation was started (the lease covers it).
- * `busy`    — the run is owned elsewhere or still legitimately in flight; the caller must NOT
- *             run the session itself, that would duplicate the continuation.
- * `not-routine` — no waiting_approval routine run owns this session.
+ * `busy`    — the run is owned elsewhere, already `running`, or still legitimately in flight;
+ *             the caller must NOT run the session itself, that would duplicate the continuation.
+ * `not-routine` — no waiting_approval or running routine run owns this session.
  */
 export type RoutineContinuation = 'handled'|'busy'|'not-routine';
 function resumeRoutineAfterDecision(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun,executing:Set<string>,lease:RoutineLease):RoutineContinuation {
@@ -286,10 +286,11 @@ export async function drainRoutineRuns(host:RoutineRuntimeHost):Promise<void>{
  * `handled` — this process started the leased continuation, or finished the run
  *   (rejection, quarantine, or a session that already left `running`). The caller
  *   must not call `runSession` again.
- * `busy` — a peer holds the lease, or other approvals are still pending. The caller
- *   must not call `runSession`; that would duplicate or unleash the continuation.
- * `not-routine` — no waiting_approval routine run owns this session. The caller may
- *   run the session itself.
+ * `busy` — a peer holds the lease, other approvals are still pending, or this
+ *   session's routine run is already `running` (resumed elsewhere, holding the
+ *   lease, or executing locally). The caller must not call `runSession`.
+ * `not-routine` — no waiting_approval or running routine run owns this session.
+ *   The caller may run the session itself.
  */
 export function resumeApprovalContinuation(
   host: RoutineRuntimeHost,
@@ -297,10 +298,11 @@ export function resumeApprovalContinuation(
 ): RoutineContinuation {
   const runs = new RoutineRunStore(host.store);
   const executing = activeFor(host.store);
-  const candidate = runs.pending().find(
-    r => r.status === 'waiting_approval' && r.sessionId === sessionId
-  );
-  if (!candidate) return 'not-routine';
+  const owned = runs.pending().filter(r => r.sessionId === sessionId);
+  const candidate = owned.find(r => r.status === 'waiting_approval');
+  // An in-flight resume already owns this session. `not-routine` would let the
+  // approval route start a second, unleased runSession.
+  if (!candidate) return owned.some(r => r.status === 'running') ? 'busy' : 'not-routine';
   const lease = RoutineLease.acquire(host.store, candidate.id);
   if (!lease) return 'busy';
   let outcome: RoutineContinuation = 'busy';

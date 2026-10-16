@@ -49,13 +49,10 @@ function sameOwner(focus: SessionRecord, session: SessionRecord): boolean {
   const su = textMeta(session.metadata, 'userId');
   const ft = textMeta(focus.metadata, 'tenantId');
   const st = textMeta(session.metadata, 'tenantId');
-  // Both sides have an explicit userId: require exact match.
-  // If either side has no userId (legacy/single-user), fall back to tenantId match.
-  // Two sessions both missing userId AND tenantId are treated as same-owner (single-user local mode).
-  if (fu && su) return fu === su && ft === st;
-  if (ft && st) return ft === st;
-  // ponytail: both unowned = same-owner in local mode; hiddenFromOwner guards multi-user with real userIds
-  return !fu && !su && !ft && !st;
+  // A userId on either side must match on both. Tenant equality is only the
+  // fallback when neither side has a userId (both empty = single-user local mode).
+  if (fu || su) return fu === su && ft === st;
+  return ft === st;
 }
 
 function clip(value: string): string {

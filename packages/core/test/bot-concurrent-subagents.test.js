@@ -435,6 +435,40 @@ test('subagent-help: sibling with different userId is dropped [AC:bot-concurrent
   }
 });
 
+test('subagent-help same-owner: userId on either side must match, tenant only when neither has a user', async () => {
+  const runtime = runtimeWith({
+    name: 'idle',
+    async runTurn() { return { stopReason: 'end', assistantParts: [{ type: 'text', text: 'ok' }] }; },
+    async summarizeMessages() { return ''; }
+  });
+  try {
+    const bot = runtime.createBot({ name: 'OwnerMatch' });
+    const parent = runtime.getSession(runtime.openBot(bot.id).sessionId);
+    const make = (title, extra) => runtime.store.createSession({
+      title,
+      mode: 'subagent',
+      agentId: parent.agentId,
+      parentSessionId: parent.id,
+      metadata: { parentSessionId: parent.id, botId: parent.metadata.botId, ...extra }
+    });
+    const askerUser = make('asker-user', { userId: 'A', tenantId: 'T' });
+    const askerTenant = make('asker-tenant', { tenantId: 'T' });
+    const sibTenant = make('sib-tenant', { tenantId: 'T' });
+    const sibUserB = make('sib-user-b', { userId: 'B', tenantId: 'T' });
+    const { subagentHelpTargets } = await import('../dist/runtime/subagent-help.js');
+    const ids = (session) => subagentHelpTargets(runtime.store, runtime.store.getSession(session.id), 'siblings').map((row) => row.id);
+    const fromUser = ids(askerUser);
+    assert.equal(fromUser.includes(sibTenant.id), false, '{userId:A,tenantId:T} vs {tenantId:T} is not the same owner');
+    assert.equal(fromUser.includes(sibUserB.id), false, 'different users never match');
+    const fromTenant = ids(askerTenant);
+    assert.equal(fromTenant.includes(sibTenant.id), true, 'both without userId and the same tenant match');
+    assert.equal(fromTenant.includes(askerUser.id), false, '{tenantId:T} vs {userId:A,tenantId:T} is not the same owner');
+    assert.equal(fromTenant.includes(sibUserB.id), false, 'different users never match');
+  } finally {
+    await runtime.destroy();
+  }
+});
+
 test('subagent-recall: tenant-only session cannot retrieve another user\'s user.memory [AC:bot-concurrent-subagents#AC-3]', async () => {
   const { store } = memoryStore();
   try {
