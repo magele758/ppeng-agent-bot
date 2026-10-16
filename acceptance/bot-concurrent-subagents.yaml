@@ -1,0 +1,25 @@
+id: bot-concurrent-subagents
+title: Bot 并发工作时派生子代理，并允许子代理复用记忆与互助
+status: implemented
+requirement: |
+  When bot mode is doing several things at once, does it fork sub-agents by itself? If it does not, make concurrent bot work fork a sub-agent per extra piece of work (the parent bot stays the coordinator). One in-flight turn does not need a fork. Two or more concurrent pieces of work do.
+  A sub-agent’s context search and memory search must be able to reuse the parent bot’s memory and the global bot memory, and the sub-agent must be able to ask the parent (and sibling sub-agents of the same bot) for help. That is the 「通信互助」. Do not give sub-agents new rights to send external IM, schedule cron, or overwrite the parent’s memory. Search and a help message back to the parent/siblings only. Keep the existing subagent privilege limits.
+criteria:
+  - id: AC-1
+    given: 一个 Bot 正在处理一件工作，没有别的工作同时进来
+    when: 这一轮还在进行
+    then: 不会额外派生子代理，仍由这个 Bot 自己处理
+  - id: AC-2
+    given: 同一个 Bot 同时有两件或更多工作
+    when: 这些工作被接进来
+    then: 除了 Bot 自己留下的那一件，多出来的每一件都由一个子代理处理，原来的 Bot 对话仍是协调者
+  - id: AC-3
+    given: 一个 Bot 的子代理，父会话里有笔记，这个 Bot 还有跨会话的全局记忆，另一个 Bot 和共享记忆池里是别的内容
+    when: 子代理搜索上下文或记忆
+    then: 能找到父 Bot 的笔记和这个 Bot 的全局记忆，找不到另一个 Bot 的私有记忆，也找不到共享记忆池
+  - id: AC-4
+    given: 一个 Bot 的子代理，父 Bot 和同 Bot 的兄弟子代理都在
+    when: 它求助，或试图对外发消息、建定时任务、改写父 Bot 的记忆
+    then: 求助只送到父 Bot 和同 Bot 的兄弟子代理；对外发消息、定时任务和改写父记忆仍然不可用
+notes: |
+  负责人在本次任务里要求直接实现并合并。子代理开场仍然看不到父对话原文；父会话笔记和 Bot 全局记忆只在搜索和上下文召回里复用。

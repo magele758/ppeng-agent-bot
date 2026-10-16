@@ -1,5 +1,7 @@
 import { BotRoomService } from './rooms/index.js';
 import { recoverBotWork, tickBotWork, createBotManagementTools, expireOverdueBotWork, isBotWorkSessionBlocked, type BotWorkHost } from './bots/bot-work.js';
+import { applyConcurrentBotForks, clearActiveWorkPiece } from './bots/concurrent-fork.js';
+import { createSubagentHelpTool } from './runtime/subagent-help.js';
 import { createHistoryTools } from './session/history/tools.js';
 /**
  * L5 runtime host façade: MCP / mailbox / approvals / scheduler / public API.
@@ -411,6 +413,7 @@ export class RawAgentRuntime {
       ...optionalExtras,
       messageAgentTool,
       ...createHistoryTools(this.store),
+      createSubagentHelpTool(this.store),
       ...createBotManagementTools({ store: this.store, runSession: (id) => this.runSession(id),
         isSessionRunning: (id) => this.runningSessions.has(id), cancelSession: (id) => this.cancelSession(id),
         hasUnconfirmedEffects: (id, since) => this.hasUnconfirmedEffects(id, since), log: this.log }),
@@ -1375,6 +1378,23 @@ export class RawAgentRuntime {
     }
   }
 
+  private forkConcurrentBotWork(session: SessionRecord | undefined, inFlight: boolean): void {
+    if (!session || session.mode !== 'chat' || session.metadata?.canonicalBotChat !== true) return;
+    try {
+      applyConcurrentBotForks(
+        {
+          store: this.store,
+          runSession: (id) => this.runSession(id),
+          log: this.log
+        },
+        session.id,
+        inFlight
+      );
+    } catch (error) {
+      this.log.warn('Concurrent bot fork failed', { sessionId: session.id, error: String(error) });
+    }
+  }
+
   /** Explicit human run request; subsystem runs keep their own original result promise. */
   runHumanSession(sessionId: string, options?: Parameters<RawAgentRuntime['runSession']>[1]): Promise<SessionRecord> {
     requestHumanRun(this.store, sessionId);
@@ -1425,6 +1445,7 @@ export class RawAgentRuntime {
     }
     const existing = this.runningSessions.get(sessionId);
     if (existing && !options?.latch) {
+      this.forkConcurrentBotWork(parked, true);
       const late = options?.onModelStreamChunk;
       if (late) {
         const detach = this.subscribeModelStream(sessionId, late);
@@ -1435,6 +1456,7 @@ export class RawAgentRuntime {
     if (existing && options?.latch) {
       await existing.catch(() => undefined);
     }
+    this.forkConcurrentBotWork(parked, false);
     const observeHuman = createHumanContinuationObserver(this.store, sessionId);
     const callerEvent = options?.onEvent;
     options = { ...options, onEvent: async event => { await observeHuman(event); await callerEvent?.(event); } };
@@ -1519,6 +1541,7 @@ export class RawAgentRuntime {
       .finally(() => {
       unlinkCallerSignal();
       this.runningSessions.delete(sessionId);
+      clearActiveWorkPiece(sessionId);
       releaseHumanModelInput(this.store, sessionId);
       this.scheduleHumanContinuations();
     });

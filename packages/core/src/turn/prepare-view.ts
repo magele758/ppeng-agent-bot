@@ -14,6 +14,7 @@ import { annotateRetiredToolParts, messagesMayNeedRetiredAnnotation } from '../d
 import { readDynToolSettings } from '../dyn-tools/settings.js';
 import { tryCreateDynToolStore } from '../dyn-tools/store.js';
 import { microCompactMessages } from '@ppeng/agent-loop/session';
+import { coordinatorViewOf } from '../bots/concurrent-fork.js';
 import {
   applyOptionalFoldBudget as applyOptionalFoldBudgetA,
   capRollingSummaryText,
@@ -56,7 +57,7 @@ export async function prepareMessagesForModel(
   const dynSettings = readDynToolSettings(host.store);
   const mayNeedRetired =
     dynSettings.enabled || messagesMayNeedRetiredAnnotation(messages, session);
-  return prepareRichView(session, messages, {
+  return prepareRichView(session, coordinatorViewOf(session, messages), {
     getImageAsset: (id) => host.store.getImageAsset(id),
     annotateRetired: (msgs, sess) => {
       if (!mayNeedRetired) return msgs;

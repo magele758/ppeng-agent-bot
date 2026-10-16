@@ -34,6 +34,7 @@ import { readSkillProposalSettings } from '../skill-proposals/settings.js';
 import { APP_CONTROL_TOOL_NAMES, readAppControlSettings } from '../app-control/settings.js';
 import { SKILL_PROPOSE_TOOL_NAME } from '../skill-proposals/tool.js';
 import { stripSubagentDeniedTools } from '../runtime/subagent-policy.js';
+import { ASK_BOT_HELP_TOOL } from '../runtime/subagent-help.js';
 import {
   isCanonicalBotChatSession,
   MESSAGE_AGENT_TOOL_NAME
@@ -151,7 +152,21 @@ export function filterToolsForSession(input: {
   if (!isCanonicalBotChatSession(input.session)) {
     tools = tools.filter((t) => t.name !== MESSAGE_AGENT_TOOL_NAME);
   }
+  tools = withSubagentHelp(input.session, tools, input.tools);
   return { allowExternalAiTools, tools: filterRoomTools(input.session, stripSubagentDeniedTools(input.session, tools)) };
+}
+
+function withSubagentHelp<T extends { name: string }>(
+  session: { mode?: string },
+  tools: T[],
+  catalog: readonly T[]
+): T[] {
+  if (session.mode === 'subagent') {
+    if (tools.some((tool) => tool.name === ASK_BOT_HELP_TOOL)) return tools;
+    const tool = catalog.find((item) => item.name === ASK_BOT_HELP_TOOL);
+    return tool ? [...tools, tool] : tools;
+  }
+  return tools.filter((tool) => tool.name !== ASK_BOT_HELP_TOOL);
 }
 
 export function resolveTurnTools(input: {

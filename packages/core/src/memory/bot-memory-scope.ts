@@ -100,6 +100,37 @@ function resolveNode(
  * userId / tenantId a bot-derived child session should carry so its user-level
  * memory resolves without RAW_AGENT_DEFAULT_USER_ID. Ordinary parents return {}.
  */
+export interface SubagentMemoryAccess {
+  parentSessionId?: string;
+  /** Durable namespace of this bot, shared across its sessions. */
+  botAgentId: string;
+}
+
+/**
+ * Bot sub-agents may read the spawning session and that bot's durable memory.
+ * Ordinary sub-agents stay on their own session. This does not grant writes.
+ */
+export function resolveSubagentMemoryAccess(
+  session: BotMemorySession,
+  lookup?: BotMemoryLookup
+): SubagentMemoryAccess | undefined {
+  if (session.mode !== 'subagent') return undefined;
+  const botAgentId = resolveBotMemoryAgentId(session, lookup);
+  if (!botAgentId) return undefined;
+  const parentSessionId = parentSessionIdOf(session);
+  if (!parentSessionId || parentSessionId === session.id) return { botAgentId };
+  return { botAgentId, parentSessionId };
+}
+
+/** Sessions whose scratch/long a bot sub-agent may search: itself and its parent. */
+export function subagentMemorySessionIds(session: BotMemorySession, lookup?: BotMemoryLookup): string[] {
+  const ids: string[] = [];
+  if (session.id) ids.push(session.id);
+  const parentSessionId = resolveSubagentMemoryAccess(session, lookup)?.parentSessionId;
+  if (parentSessionId && !ids.includes(parentSessionId)) ids.push(parentSessionId);
+  return ids;
+}
+
 export function inheritBotIdentityMetadata(
   parent: BotMemorySession,
   lookup?: BotMemoryLookup

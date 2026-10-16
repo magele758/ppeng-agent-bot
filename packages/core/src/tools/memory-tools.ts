@@ -1,6 +1,10 @@
 import { sourcePage } from '../session/history-retrieval.js';
 import type { ToolContract } from '../types.js';
-import { resolveBotMemoryAgentId, type BotMemoryLookup } from '../memory/bot-memory-scope.js';
+import {
+  resolveBotMemoryAgentId,
+  subagentMemorySessionIds,
+  type BotMemoryLookup
+} from '../memory/bot-memory-scope.js';
 import { evaluateMemoryWrite } from '../memory/memory-gate.js';
 import { hybridOrderMemories } from '../memory/memory-recall.js';
 import { lexicalOverlapScore } from '../memory/memory-semantic-merge.js';
@@ -463,10 +467,13 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
           items.push(item);
         }
       };
+      const sessionIds = subagentMemorySessionIds(context.session, services.botLookup);
       for (const scope of scopes) {
         if (SESSION_SCOPES.has(scope)) {
-          const rows = await services.listSessionMemory(context.session.id, scope as 'scratch' | 'long');
-          pushRows(rows, scope);
+          for (const sessionId of sessionIds) {
+            const rows = await services.listSessionMemory(sessionId, scope as 'scratch' | 'long');
+            pushRows(rows, scope);
+          }
           continue;
         }
         if (!services.listAgentMemory) continue;
@@ -523,8 +530,11 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
       try { id = decodeURIComponent(match[2]!); } catch { return unavailable; }
       let item: MemorySearchItem | undefined;
       if (SESSION_SCOPES.has(scope)) {
-        const rows = await services.listSessionMemory(context.session.id, scope as 'scratch' | 'long');
-        item = rows.map(row => readSearchItem(row, scope)).find(row => row?.id === id && row.scope === scope);
+        for (const sessionId of subagentMemorySessionIds(context.session, services.botLookup)) {
+          const rows = await services.listSessionMemory(sessionId, scope as 'scratch' | 'long');
+          item = rows.map(row => readSearchItem(row, scope)).find(row => row?.id === id && row.scope === scope);
+          if (item) break;
+        }
       } else if (services.getAgentMemoryById) {
         const row = await services.getAgentMemoryById(id);
         const ids = retrievalIds(context);
