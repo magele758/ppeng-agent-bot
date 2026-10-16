@@ -60,10 +60,12 @@ export function subagentHelpTargets(
       if (candidate.id === session.id || candidate.mode !== 'subagent') continue;
       if (parentIdOf(candidate) !== parentId) continue;
       if (resolveBotMemoryAgentId(candidate, store) !== botAgentId) continue;
-      // ponytail: same-owner guard — mirror sameOwner logic from bot-activity
+      // same-owner guard — mirror sameOwner in bot-activity.ts
       const cu = typeof candidate.metadata?.userId === 'string' ? candidate.metadata.userId.trim() : '';
       const ct = typeof candidate.metadata?.tenantId === 'string' ? candidate.metadata.tenantId.trim() : '';
-      if (su && cu ? (su !== cu || st !== ct) : (st && ct ? st !== ct : (su || cu || st || ct))) continue;
+      // A userId on either side must match on both. Tenant equality is only the
+      // fallback when neither side has a userId (both empty = single-user local mode).
+      if (su || cu ? su !== cu || st !== ct : st !== ct) continue;
       targets.push(candidate);
     }
   }

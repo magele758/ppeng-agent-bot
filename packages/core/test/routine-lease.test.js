@@ -147,6 +147,20 @@ test('active approval-path lease on peer protects running session from quarantin
  a.db.close();b.db.close();
 });
 
+test('running routine with a peer lease is busy and does not start a session [AC:bot-routine-lifecycle#AC-12]', async () => {
+ const {resumeApprovalContinuation}=await import('../dist/cron/routine-runtime.js');
+ const {a,b,h,runs,run}=fixture();
+ const session=a.createSession({title:'work',mode:'chat',agentId:'general',background:false,metadata:{userId:'alice'}});
+ assert.equal(runs.claim(run.id,session.id).status,'running');
+ const peer=RoutineLease.acquire(b,run.id);
+ assert.ok(peer,'peer must hold the lease');
+ let calls=0;
+ const outcome=resumeApprovalContinuation({...h,runSession:async()=>{calls++;}},session.id);
+ assert.equal(outcome,'busy');
+ assert.equal(calls,0,'runSession must not be called');
+ peer.release();a.db.close();b.db.close();
+});
+
 // P1 regression: whileOwned must not clobber a cancel with 'unknown'.
 test('cancel committed before fence wins; unknown is not written over cancel [AC:bot-routine-lifecycle#AC-12]',async()=>{
  const {a,b,h,runs,run}=await stuckWaitingApproval();

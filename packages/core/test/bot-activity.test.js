@@ -291,6 +291,99 @@ test('sameOwner: two sessions with distinct userIds are not same-owner [AC:bot-a
   assert.equal(items.some((item) => item.title === 'UserB digest'), false, 'user B routine must not appear in user A rail');
 });
 
+test('sameOwner: a userId on either side must match; tenant-only is not the same owner [AC:bot-activity-rail#AC-3]', () => {
+  const focus = session({ id: 'focus-user', metadata: { userId: 'A', tenantId: 'T' } });
+  const tenantOnly = session({ id: 'main-tenant', metadata: { userId: undefined, tenantId: 'T' } });
+  const run = routine({
+    id: 'run-mixed',
+    mainSessionId: tenantOnly.id,
+    job: {
+      id: 'job-mixed',
+      sessionId: tenantOnly.id,
+      agentId: 'ada',
+      name: 'Tenant only digest',
+      prompt: 'hidden',
+      scheduleKind: 'cron5',
+      scheduleValue: '0 * * * *',
+      enabled: true,
+      createdAt: '2026-10-16T10:00:00.000Z',
+      updatedAt: '2026-10-16T10:00:00.000Z',
+      metadata: { botId: 'ada' }
+    }
+  });
+  const items = assembleBotActivity({
+    focus,
+    sessions: [focus, tenantOnly],
+    jobs: [],
+    routines: [run],
+    botNames: new Map([['ada', 'Ada']]),
+    now: NOW
+  });
+  assert.equal(items.some((item) => item.title === 'Tenant only digest'), false, '{userId:A,tenantId:T} vs {tenantId:T} is not the same owner');
+});
+
+test('sameOwner: sessions with no userId and the same tenant match [AC:bot-activity-rail#AC-3]', () => {
+  const focus = session({ id: 'focus-tenant', metadata: { userId: undefined, tenantId: 'T' } });
+  const main = session({ id: 'main-tenant', metadata: { userId: undefined, tenantId: 'T' } });
+  const run = routine({
+    id: 'run-tenant',
+    mainSessionId: main.id,
+    job: {
+      id: 'job-tenant',
+      sessionId: main.id,
+      agentId: 'ada',
+      name: 'Shared tenant digest',
+      prompt: 'hidden',
+      scheduleKind: 'cron5',
+      scheduleValue: '0 * * * *',
+      enabled: true,
+      createdAt: '2026-10-16T10:00:00.000Z',
+      updatedAt: '2026-10-16T10:00:00.000Z',
+      metadata: { botId: 'ada' }
+    }
+  });
+  const items = assembleBotActivity({
+    focus,
+    sessions: [focus, main],
+    jobs: [],
+    routines: [run],
+    botNames: new Map([['ada', 'Ada']]),
+    now: NOW
+  });
+  assert.equal(items.some((item) => item.title === 'Shared tenant digest' && item.status === 'running'), true);
+});
+
+test('sameOwner: different users never match even in the same tenant [AC:bot-activity-rail#AC-3]', () => {
+  const focus = session({ id: 'focus-a', metadata: { userId: 'A', tenantId: 'T' } });
+  const other = session({ id: 'main-b', metadata: { userId: 'B', tenantId: 'T' } });
+  const run = routine({
+    id: 'run-other-user',
+    mainSessionId: other.id,
+    job: {
+      id: 'job-other-user',
+      sessionId: other.id,
+      agentId: 'ada',
+      name: 'Other user digest',
+      prompt: 'hidden',
+      scheduleKind: 'cron5',
+      scheduleValue: '0 * * * *',
+      enabled: true,
+      createdAt: '2026-10-16T10:00:00.000Z',
+      updatedAt: '2026-10-16T10:00:00.000Z',
+      metadata: { botId: 'ada' }
+    }
+  });
+  const items = assembleBotActivity({
+    focus,
+    sessions: [focus, other],
+    jobs: [],
+    routines: [run],
+    botNames: new Map([['ada', 'Ada']]),
+    now: NOW
+  });
+  assert.equal(items.some((item) => item.title === 'Other user digest'), false, 'different users never match');
+});
+
 test('sameOwner: two unowned sessions (local mode) are same-owner [AC:bot-activity-rail#AC-4]', () => {
   // Single-user local mode: both sessions have no userId — rail shows all activity.
   const focus = {
