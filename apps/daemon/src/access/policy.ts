@@ -174,6 +174,7 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
     ['POST /api/sessions', owner('bot', sessionCreateRefs)],
     ['GET /api/sessions/team-overview', selfFiltered('session')],
     ['GET /api/sessions/:id/team', session],
+    ['GET /api/sessions/:id/activity', session],
     ['GET /api/sessions/:id/model-view', session],
     ['GET /api/sessions/:id/context-stack', session],
     ['GET /api/sessions/:id/context-snapshots', session],

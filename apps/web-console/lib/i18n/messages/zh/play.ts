@@ -628,7 +628,17 @@ export const play = {
     error: '失败',
     done: '完成',
     args: '参数',
-    result: '结果'
+    result: '结果',
+    workAria: '这个 Bot 正在做的事',
+    workTitle: '正在进行',
+    workEmpty: '现在没有在进行的工作',
+    workLoading: '正在读取活动…',
+    workRefresh: '刷新',
+    workLoadFailed: '活动列表加载失败',
+    workRunning: '进行中',
+    workWaiting: '等待',
+    workDone: '已完成',
+    workStarted: '开始于 {time}'
   },
 
   stored: {

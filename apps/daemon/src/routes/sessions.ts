@@ -18,6 +18,7 @@ import {
   parseTaskMode,
   parseWorkspaceBinding,
   ConflictError,
+  listSessionBotActivity,
   ptcMetadataPatchFromInput,
   resolveBotIdFromBody,
   retrieveSessionToolResult,
@@ -501,6 +502,19 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
           directChildren: direct,
           descendants
         });
+      }
+    },
+
+    // GET /api/sessions/:id/activity — in-flight routines and background work
+    {
+      method: 'GET',
+      pattern: '/api/sessions/:id/activity',
+      handler: ({ requireParam, response }) => {
+        const id = requireParam('id');
+        const session = runtime.getSession(id);
+        if (!session) throw new NotFoundError('Session', id);
+        response.setHeader('cache-control', 'no-store');
+        json(response, 200, { items: listSessionBotActivity(runtime.store, session) });
       }
     },
 

@@ -702,7 +702,21 @@ body,
   border: 1px solid var(--color-border-strong);
 }
 .activity-card__phase--running { border-color: #3d9a6a; color: #3d9a6a; }
+.activity-card__phase--waiting { border-color: #b8860b; color: #b8860b; }
+.activity-card__phase--done { border-color: var(--color-border-strong); color: var(--muted); }
 .activity-card__phase--error { border-color: #c44; color: #c44; }
+.activity-panel__actions { display: flex; align-items: center; gap: 6px; }
+.bot-activity { margin-bottom: 12px; }
+.bot-activity__row { cursor: default; }
+.bot-activity__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 8px 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.bot-activity__bot, .bot-activity__time { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .activity-card__name { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .activity-card__pre {
   margin: 0;

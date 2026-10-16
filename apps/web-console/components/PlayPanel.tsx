@@ -1523,7 +1523,11 @@ export function PlayPanel({
           </div>
           <div className="play-rail__body">
             {railTab === 'activity' ? (
-              <ActivityPanel items={activityItems} />
+              <ActivityPanel
+                items={activityItems}
+                botSessionId={selectedSessionId}
+                showBotWork={botSurface}
+              />
             ) : railTab === 'context' ? (
               <ContextStackPanel
                 sessionId={selectedSessionId}

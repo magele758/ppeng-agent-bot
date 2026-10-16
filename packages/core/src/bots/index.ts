@@ -67,3 +67,14 @@ export type {
 
 export * from './bot-identity.js';
 export * from './bot-work.js';
+export {
+  assembleBotActivity,
+  botActivityStatus,
+  listSessionBotActivity
+} from './bot-activity.js';
+export type {
+  AssembleBotActivityInput,
+  BotActivityItem,
+  BotActivityKind,
+  BotActivityStatus
+} from './bot-activity.js';

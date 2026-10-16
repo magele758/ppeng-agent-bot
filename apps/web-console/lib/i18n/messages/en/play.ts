@@ -631,7 +631,17 @@ export const play = {
     error: 'Failed',
     done: 'Done',
     args: 'Args',
-    result: 'Result'
+    result: 'Result',
+    workAria: 'What this bot is doing',
+    workTitle: 'In progress',
+    workEmpty: 'Nothing is running',
+    workLoading: 'Loading activity…',
+    workRefresh: 'Refresh',
+    workLoadFailed: 'Could not load activity',
+    workRunning: 'Running',
+    workWaiting: 'Waiting',
+    workDone: 'Done',
+    workStarted: 'Started {time}'
   },
 
   stored: {
