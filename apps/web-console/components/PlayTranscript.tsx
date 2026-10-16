@@ -93,7 +93,13 @@ function OlderButton({ chat }: { chat: Chat }) {
   if (chat.historyCursor == null) return null;
   return (
     <div className="chat-feed__older">
-      <button type="button" className="btn btn-ghost btn-sm" disabled={chat.historyLoading} onClick={() => void chat.loadOlderHistory('scroll')}>
+      <button
+        type="button"
+        className="btn btn-ghost btn-sm"
+        data-testid="feed-load-older"
+        disabled={chat.historyLoading}
+        onClick={() => void chat.loadOlderHistory('scroll')}
+      >
         {t('botWork.older')}
       </button>
     </div>

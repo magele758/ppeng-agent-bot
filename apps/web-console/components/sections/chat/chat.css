@@ -8,10 +8,16 @@
   width: 100%;
 }
 
+/* Stay on-screen while the windowed track is scrolled to the tail. */
 .chat-feed__older {
   display: flex;
   justify-content: center;
+  position: sticky;
+  top: 0;
+  z-index: 2;
   margin: 0 0 8px;
+  padding: 4px 0;
+  background: var(--ui-bg);
 }
 
 /* —— 输入区 dock：附件 / 会话设置 / 模型 / 工作区 同一行 —— */

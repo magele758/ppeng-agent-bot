@@ -301,10 +301,8 @@ test("Bot chat opens a bounded history page and loads older messages [AC:bot-his
       .getByText("Paged conversational item 0", { exact: true }),
   ).toHaveCount(0);
   const older = page.waitForResponse((res) => res.url().includes("beforeSeq="));
-  await page
-    .locator("#playMessages")
-    .getByRole("button", { name: "加载更早记录", exact: true })
-    .click();
+  // Sticky older control stays clickable while the windowed feed is stuck to the tail.
+  await page.locator("#playMessages").getByTestId("feed-load-older").click();
   await older;
   await expect
     .poll(async () => {
