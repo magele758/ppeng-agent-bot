@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import { test, after } from 'node:test';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -7,7 +7,9 @@ import { handleGatewayHttp } from '../dist/http.js';
 import { drainGatewayTurns } from '../dist/inbound-guard.js';
 import { appendOutboundDraft, readOutboundDrafts } from '../dist/outbound-drafts.js';
 import { releaseOutboundDraft } from '../dist/outbound.js';
-import { call, fakeRuntime, feishuMessageEvent, makeCtx } from './gateway-harness.mjs';
+import { call, cleanupGatewayTemps, fakeRuntime, feishuMessageEvent, makeCtx } from './gateway-harness.mjs';
+
+after(() => cleanupGatewayTemps());
 
 test('concurrent draft appends keep every item', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'gw-draft-race-'));

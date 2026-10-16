@@ -1,5 +1,5 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { closeSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /** Constant-time string comparison (length-independent via hashing). */
@@ -82,9 +82,53 @@ function readPersistedClaims(dir: string): Record<string, number> {
 function writePersistedClaims(dir: string, claims: Record<string, number>): void {
   mkdirSync(dir, { recursive: true });
   const path = dedupePath(dir);
-  const tmp = `${path}.${process.pid}.tmp`;
+  const tmp = `${path}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`;
   writeFileSync(tmp, `${JSON.stringify({ version: 1, claims } satisfies InboundDedupeFile, null, 2)}\n`, 'utf8');
   renameSync(tmp, path);
+}
+
+/** Exclusive claim of one persisted dedupe file so concurrent deliveries cannot both win. */
+function withPersistedClaimLock<T>(dir: string, fn: () => T): T {
+  mkdirSync(dir, { recursive: true });
+  const lockPath = `${dedupePath(dir)}.lock`;
+  const started = Date.now();
+  let fd: number | undefined;
+  while (fd === undefined) {
+    try {
+      fd = openSync(lockPath, 'wx');
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== 'EEXIST') throw error;
+      let stale = false;
+      try {
+        const lockedAt = Number(readFileSync(lockPath, 'utf8'));
+        stale = !Number.isFinite(lockedAt) || Date.now() - lockedAt > 10_000;
+      } catch (readError) {
+        if ((readError as NodeJS.ErrnoException).code === 'ENOENT') continue;
+      }
+      if (stale) {
+        try {
+          unlinkSync(lockPath);
+        } catch {
+          /* another claimant removed or replaced the stale lock */
+        }
+        continue;
+      }
+      if (Date.now() - started > 5_000) throw new Error(`Inbound dedupe lock timed out: ${lockPath}`);
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
+    }
+  }
+  try {
+    writeFileSync(fd, String(Date.now()));
+    return fn();
+  } finally {
+    closeSync(fd);
+    try {
+      unlinkSync(lockPath);
+    } catch {
+      /* lock already released */
+    }
+  }
 }
 
 function rememberPersistedClaim(claims: Record<string, number>, key: string, now: number): void {
@@ -101,7 +145,8 @@ function rememberPersistedClaim(claims: Record<string, number>, key: string, now
 
 /**
  * Atomically claim an inbound event id. Returns false when it was already claimed
- * (platform retry / replay). Synchronous so concurrent deliveries cannot both win.
+ * (platform retry / replay). The persisted path holds an exclusive file lock so
+ * concurrent deliveries cannot both win.
  * Pass `persistDir` (the gateway directory) to record the claim next to the
  * delivery ledger. Those claims do not expire with the in-memory 6h window,
  * survive process restart, and are not copied into the memory map (that map
@@ -110,11 +155,13 @@ function rememberPersistedClaim(claims: Record<string, number>, key: string, now
  */
 export function claimInboundEvent(key: string, now = Date.now(), persistDir?: string): boolean {
   if (persistDir) {
-    const claims = readPersistedClaims(persistDir);
-    if (Object.prototype.hasOwnProperty.call(claims, key)) return false;
-    rememberPersistedClaim(claims, key, now);
-    writePersistedClaims(persistDir, claims);
-    return true;
+    return withPersistedClaimLock(persistDir, () => {
+      const claims = readPersistedClaims(persistDir);
+      if (Object.prototype.hasOwnProperty.call(claims, key)) return false;
+      rememberPersistedClaim(claims, key, now);
+      writePersistedClaims(persistDir, claims);
+      return true;
+    });
   }
   const at = seen.get(key);
   if (at !== undefined && now - at < DEDUPE_TTL_MS) return false;

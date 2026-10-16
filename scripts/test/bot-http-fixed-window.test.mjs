@@ -3,9 +3,13 @@ import assert from 'node:assert/strict';
 import {runFixedHttpWindow} from '../bot-release/http-fixed-window.mjs';
 
 test('fixed window bounds queues and terminates stalled work at original deadline',async()=>{
- let active=0,max=0;const signals=[];const started=Date.now();
+ let active=0,max=0;const signals=[];
  const phase=await runFixedHttpWindow({name:'warmup',seconds:.12,streams:[{name:'read',rate:100,clients:2,maxPendingPerClient:1,run:({signal})=>{active++;max=Math.max(max,active);signals.push(signal);return new Promise(()=>{});}}]});
- const counts=phase.streams.read;assert.ok(Date.now()-started<400);assert.equal(max,2);assert.equal(counts.planned,12);assert.equal(counts.started,2);assert.equal(counts.timedOut,2);assert.equal(counts.expiredQueued,2);assert.equal(counts.queueRejected,8);assert.equal(counts.planned,counts.completed+counts.failed+counts.timedOut+counts.expiredQueued+counts.queueRejected+counts.missedSchedule);assert.equal(phase.protocolPassed,false);assert.ok(signals.every(s=>s.aborted));
+ const counts=phase.streams.read;
+ // Bound the fixture clock, not Date.now(). CI delay before the window starts must not fail a window that closed on its own deadline.
+ assert.ok(phase.observedElapsedSeconds*1000<400,`window elapsed ${phase.observedElapsedSeconds}s`);
+ assert.ok(phase.deadlineOvershootMs<400);
+ assert.equal(max,2);assert.equal(counts.planned,12);assert.equal(counts.started,2);assert.equal(counts.timedOut,2);assert.equal(counts.expiredQueued,2);assert.equal(counts.queueRejected,8);assert.equal(counts.planned,counts.completed+counts.failed+counts.timedOut+counts.expiredQueued+counts.queueRejected+counts.missedSchedule);assert.equal(phase.protocolPassed,false);assert.ok(signals.every(s=>s.aborted));
 });
 test('fast work retains fixed planned counts without allowing late completions',async()=>{
  const phase=await runFixedHttpWindow({name:'measurement',seconds:.1,streams:[{name:'read',rate:100,clients:20,maxPendingPerClient:1,run:async()=>true},{name:'write',rate:20,clients:10,maxPendingPerClient:1,run:async()=>true}]});

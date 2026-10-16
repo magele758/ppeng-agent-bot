@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { createId, nowIso } from '../id.js';
 import type { TeamMailboxMessage } from './types.js';
@@ -49,10 +49,12 @@ export class TeamFileMailbox {
       taskId: input.taskId,
       createdAt: nowIso()
     };
-    this.maybeRotateAudit();
-    appendJsonLine(this.auditFile, message);
-    appendJsonLine(this.inboxFile(message.to), message);
-    return message;
+    return withMailboxLock(this.inboxDir, () => {
+      this.maybeRotateAudit();
+      appendJsonLine(this.auditFile, message);
+      appendJsonLine(this.inboxFile(message.to), message);
+      return message;
+    });
   }
 
   peekInbox(agentName: string): TeamMailboxMessage[] {
@@ -61,9 +63,11 @@ export class TeamFileMailbox {
 
   readInbox(agentName: string): TeamMailboxMessage[] {
     const file = this.inboxFile(sanitizeMailboxAgent(agentName));
-    const items = readJsonl(file);
-    writeFileSync(file, '', 'utf8');
-    return items;
+    return withMailboxLock(this.inboxDir, () => {
+      const items = readJsonl(file);
+      writeFileSync(file, '', 'utf8');
+      return items;
+    });
   }
 
   listRecent(limit = 50): TeamMailboxMessage[] {
@@ -99,6 +103,34 @@ function ensureFile(filePath: string): void {
 function appendJsonLine(filePath: string, payload: unknown): void {
   ensureFile(filePath);
   appendFileSync(filePath, `${JSON.stringify(payload)}\n`, 'utf8');
+}
+
+/** Serialize mailbox writers that share one plan directory under parallel load. */
+function withMailboxLock<T>(inboxDir: string, fn: () => T): T {
+  mkdirSync(inboxDir, { recursive: true });
+  const lockPath = join(inboxDir, '.mailbox.lock');
+  const started = Date.now();
+  let fd: number | undefined;
+  while (fd === undefined) {
+    try {
+      fd = openSync(lockPath, 'wx');
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== 'EEXIST') throw error;
+      if (Date.now() - started > 5_000) throw new Error(`Team mailbox lock timed out: ${lockPath}`);
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
+    }
+  }
+  try {
+    return fn();
+  } finally {
+    closeSync(fd);
+    try {
+      unlinkSync(lockPath);
+    } catch {
+      /* lock already released */
+    }
+  }
 }
 
 function readJsonl(filePath: string): TeamMailboxMessage[] {

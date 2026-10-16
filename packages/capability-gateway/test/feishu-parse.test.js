@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { test } from 'node:test';
+import { test, after } from 'node:test';
 import { handleGatewayHttp } from '../dist/http.js';
 import {
   claimInboundEvent,
@@ -19,8 +19,11 @@ import {
   feishuEncrypt,
   feishuMessageEvent,
   feishuSign,
+  cleanupGatewayTemps,
   makeCtx
 } from './gateway-harness.mjs';
+
+after(() => cleanupGatewayTemps());
 
 test('feishu url_verification', () => {
   const r = feishuUrlVerificationResponse({ type: 'url_verification', challenge: 'abc' });
@@ -116,21 +119,42 @@ test('Feishu retry after memory reset does not run the agent again', async () =>
 
 test('persisted Feishu claim does not pin the in-memory map', () => {
   const dir = mkdtempSync(join(tmpdir(), 'feishu-dedupe-mem-'));
-  const key = 'feishu:event:ev_persist_only';
-  const now = Date.now();
-  resetInboundDedupe();
-  assert.equal(claimInboundEvent(key, now, dir), true);
-  assert.equal(claimInboundEvent(key, now), true);
-  assert.equal(claimInboundEvent(key, now, dir), false);
-  resetInboundDedupe();
+  try {
+    const key = 'feishu:event:ev_persist_only';
+    const now = Date.now();
+    resetInboundDedupe();
+    assert.equal(claimInboundEvent(key, now, dir), true);
+    assert.equal(claimInboundEvent(key, now), true);
+    assert.equal(claimInboundEvent(key, now, dir), false);
+    resetInboundDedupe();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('same Feishu event_id stays claimed after the in-memory map is cleared', () => {
   const dir = mkdtempSync(join(tmpdir(), 'feishu-dedupe-'));
-  const key = 'feishu:event:ev_restart';
-  const now = Date.now();
-  assert.equal(claimInboundEvent(key, now, dir), true);
-  resetInboundDedupe();
-  assert.equal(claimInboundEvent(key, now + 7 * 60 * 60 * 1000, dir), false);
-  assert.equal(claimInboundEvent('feishu:event:ev_other', now, dir), true);
+  try {
+    const key = 'feishu:event:ev_restart';
+    const now = Date.now();
+    assert.equal(claimInboundEvent(key, now, dir), true);
+    resetInboundDedupe();
+    assert.equal(claimInboundEvent(key, now + 7 * 60 * 60 * 1000, dir), false);
+    assert.equal(claimInboundEvent('feishu:event:ev_other', now, dir), true);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('concurrent persisted claims of one event id admit exactly one winner', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'feishu-dedupe-race-'));
+  try {
+    const key = 'feishu:event:ev_race';
+    const now = Date.now();
+    const results = Array.from({ length: 12 }, () => claimInboundEvent(key, now, dir));
+    assert.equal(results.filter(Boolean).length, 1);
+    assert.equal(claimInboundEvent(key, now, dir), false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

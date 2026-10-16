@@ -30,3 +30,34 @@ test('mailbox 文件追加 jsonl', () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('parallel mailbox sends keep every line', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'team-mbox-race-'));
+  try {
+    const plan = join(dir, 'plan-a');
+    const n = 24;
+    await Promise.all(
+      Array.from({ length: n }, (_, i) =>
+        Promise.resolve().then(() =>
+          new TeamFileMailbox(plan).send({
+            planId: 'plan-a',
+            type: 'task',
+            from: 'team-coordinator',
+            to: 'worker-1',
+            content: `race-${i}`,
+            taskId: `t${i}`
+          })
+        )
+      )
+    );
+    const box = new TeamFileMailbox(plan);
+    const inbox = box.peekInbox('worker-1');
+    assert.equal(inbox.length, n);
+    assert.equal(new Set(inbox.map((item) => item.content)).size, n);
+    assert.equal(box.listRecent(n).length, n);
+    assert.equal(box.readInbox('worker-1').length, n);
+    assert.equal(box.peekInbox('worker-1').length, 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
