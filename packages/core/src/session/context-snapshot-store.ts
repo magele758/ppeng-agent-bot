@@ -8,6 +8,12 @@ import {
   type ContextSnapshotBlock
 } from './context-snapshots.js';
 
+/** Snapshots kept per session; RAW_AGENT_CONTEXT_SNAPSHOT_LIMIT (1-10000, read at startup) overrides. */
+const CONTEXT_SNAPSHOT_LIMIT = (() => {
+  const v = Number(process.env['RAW_AGENT_CONTEXT_SNAPSHOT_LIMIT']);
+  return Number.isFinite(v) && v >= 1 && v <= 10_000 ? Math.floor(v) : 50;
+})();
+
 interface SnapshotRow {
   id: string;
   session_id: string;
@@ -60,6 +66,19 @@ export class ContextSnapshotStore {
            VALUES (?, ?, ?, ?, ?)`
         )
         .run(row.id, row.session_id, row.turn_index, row.created_at, row.blocks_json);
+      // Prune oldest rows beyond CONTEXT_SNAPSHOT_LIMIT within the same transaction
+      this.db
+        .prepare(
+          `DELETE FROM context_stack_snapshots
+           WHERE session_id = ?
+             AND id NOT IN (
+               SELECT id FROM context_stack_snapshots
+               WHERE session_id = ?
+               ORDER BY turn_index DESC, created_at DESC, id DESC
+               LIMIT ?
+             )`
+        )
+        .run(sessionId, sessionId, CONTEXT_SNAPSHOT_LIMIT);
       this.db.exec('COMMIT');
       return { snapshot: toSnapshot(row), created: true };
     } catch (error) {
