@@ -26,6 +26,7 @@ import { ChatTurnFromMessage, ChatTurnPlain, ChatTurnStreaming } from './ChatTur
 import { SurfaceContextProvider } from './a2ui/SurfaceContext';
 import type { usePlayChat } from './usePlayChat';
 import { ActivityPanel } from './ActivityPanel';
+import { BotActivityList } from './BotActivityList';
 import { ArtifactRail } from './ArtifactRail';
 import { BotCronPanel } from './BotCronPanel';
 import { composerModelLocked } from '@/lib/bot-model';
@@ -1523,7 +1524,10 @@ export function PlayPanel({
           </div>
           <div className="play-rail__body">
             {railTab === 'activity' ? (
-              <ActivityPanel items={activityItems} />
+              <>
+                {botSurface && selectedSessionId ? <BotActivityList sessionId={selectedSessionId} /> : null}
+                <ActivityPanel items={activityItems} />
+              </>
             ) : railTab === 'context' ? (
               <ContextStackPanel
                 sessionId={selectedSessionId}
