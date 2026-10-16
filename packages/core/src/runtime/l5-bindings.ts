@@ -493,6 +493,57 @@ function runTurnViaFallbackChain(
 
 type ModelTurnCall = TurnKernelHost['runTurnWithRetries'];
 
+type PreparedSnapshotInput = Parameters<typeof recordPreparedContextSnapshot>[1];
+const pendingPreparedSnapshots = new WeakMap<L5Bindable['store'], PreparedSnapshotInput[]>();
+
+function recordQuietly(store: L5Bindable['store'], input: PreparedSnapshotInput): void {
+  try {
+    recordPreparedContextSnapshot(store, input);
+  } catch {
+    /* Replay history must not change the turn or write a summary. */
+  }
+}
+
+/**
+ * Write queued replay snapshots now, in prepare order. Readers call this first
+ * so a listed history always includes every prepare that already happened.
+ */
+export function flushPreparedContextSnapshots(store: L5Bindable['store'], sessionId?: string): void {
+  const queue = pendingPreparedSnapshots.get(store);
+  if (!queue?.length) return;
+  const keep: PreparedSnapshotInput[] = [];
+  for (const item of queue.splice(0)) {
+    if (sessionId !== undefined && item.session.id !== sessionId) keep.push(item);
+    else if (store.db.isOpen) recordQuietly(store, item);
+  }
+  queue.push(...keep);
+}
+
+/**
+ * Building and storing a prepared-view snapshot copies the whole context
+ * (token estimates, block text, JSON). Doing that inline on every prepared
+ * model request made back-to-back bot turns one long synchronous burst that
+ * starved HTTP handlers. Snapshots are replay-only, so record them on the next
+ * macrotask instead; the request itself is unchanged.
+ */
+function drainOnePreparedSnapshot(store: L5Bindable['store']): void {
+  const queue = pendingPreparedSnapshots.get(store);
+  const next = queue?.shift();
+  if (next && store.db.isOpen) recordQuietly(store, next);
+  // One snapshot per macrotask keeps each write short between HTTP handlers.
+  if (queue?.length) setImmediate(() => drainOnePreparedSnapshot(store));
+}
+
+export function queuePreparedContextSnapshot(store: L5Bindable['store'], input: PreparedSnapshotInput): void {
+  let queue = pendingPreparedSnapshots.get(store);
+  if (!queue) {
+    queue = [];
+    pendingPreparedSnapshots.set(store, queue);
+  }
+  queue.push(input);
+  if (queue.length === 1) setImmediate(() => drainOnePreparedSnapshot(store));
+}
+
 /**
  * Ordinary chats are capped here, after micro-compact has already shaped
  * `messages` and the kernel has attached the system prompt and tool schemas.
@@ -507,22 +558,18 @@ function fitProductModelRequest(
     ? resolveSessionModelAdapter(rt.store, session, process.env, rt.modelAdapter)
     : rt.modelAdapter;
   if (session) {
-    try {
-      recordPreparedContextSnapshot(rt.store, {
-        session,
-        systemPrompt: input.systemPrompt,
-        tools: input.tools.map((tool) => ({
-          name: tool.name,
-          description: tool.description,
-          inputSchema: tool.inputSchema
-        })),
-        messages: input.messages,
-        adapter,
-        env: process.env
-      });
-    } catch {
-      /* Replay history must not change the turn or write a summary. */
-    }
+    queuePreparedContextSnapshot(rt.store, {
+      session,
+      systemPrompt: input.systemPrompt,
+      tools: input.tools.map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+        inputSchema: tool.inputSchema
+      })),
+      messages: [...input.messages],
+      adapter,
+      env: process.env
+    });
   }
   return applyNormalSessionRequestBudget(input, {
     session,

@@ -165,7 +165,7 @@ import {
 import { cancelAllSessions as cancelAllSessionsFn, cancelSession as cancelSessionFn, destroyRuntime } from './runtime/session-control.js';
 import { ensureWorkspaceRoot as ensureWorkspaceRootFn } from './runtime/spawn-host.js';
 import { createRuntimeCollaborators } from './runtime/collaborators.js';
-import {
+import { flushPreparedContextSnapshots,
   bindTurnKernelHost,
   compactFrom,
   createRuntimeToolServices,
@@ -631,6 +631,7 @@ export class RawAgentRuntime {
   listContextSnapshots(sessionId: string): ContextSnapshot[] {
     const session = this.store.getSession(sessionId);
     if (!session) throw new NotFoundError('Session', sessionId);
+    flushPreparedContextSnapshots(this.store, sessionId);
     return this.store.listContextSnapshots(sessionId);
   }
 
