@@ -27,14 +27,15 @@ import {
 } from '../packages/core/dist/session/compact-settings.js';
 import { microCompactMessages } from '../packages/core/dist/session/micro-compact.js';
 import {
-  answerRecallsToken,
   applyCompactAbSeedToStore,
   buildCompactAbSeed,
+  followUpToolCalls,
   formatCompactAbReport,
   parseCaseList,
   parsePolicyList,
   previewCompactAbView,
   redactAnswerPreview,
+  scoreRecall,
   seedToolName,
   summarizeCompactAbRuns,
   summarizeSeedTools
@@ -117,7 +118,8 @@ async function runOne(runtime, policy, caseId) {
 
   row.collapsed = live.stats.collapsed;
   row.charsSaved = live.stats.charsSaved;
-  row.recalled = answerRecallsToken(answer, seed.token);
+  row.followUpTools = followUpToolCalls(runtime.store.foldMessages(session.id), seed.followUp);
+  row.recalled = scoreRecall({ answer, token: seed.token, followUpTools: row.followUpTools });
   row.answerPreview = redactAnswerPreview(answer);
   row.usage = usageFromSession(rec);
   if (typeof rec?.metadata?.usageCostUsd === 'number') {

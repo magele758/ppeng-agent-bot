@@ -88,6 +88,8 @@ export interface CompactAbRunRow {
   error?: string;
   toolName?: string;
   stdoutSummary?: string;
+  /** Tools called by the model during the follow-up turn (after seed follow-up user message). */
+  followUpTools?: string[];
 }
 
 export interface CompactAbSummary {
@@ -290,8 +292,9 @@ export function firstUserPrompt(): string {
 export function followUpPrompt(): string {
   return [
     'What tarball filename appeared in the directory listing?',
-    'Reply with only the filename.',
-    'Do not use tools.'
+    'Do not re-run any commands.',
+    'If the earlier output is no longer in view, recover it from this session\'s history.',
+    'Reply with only the filename.'
   ].join(' ');
 }
 
@@ -446,6 +449,56 @@ export function previewCompactAbView(
   };
 }
 
+/** Tool names that indicate the model re-ran a command instead of recalling from context.
+ * bash/exec: shell-policy.ts treats both; bg_run/work_evidence: builtin-tools.ts. */
+const COMMAND_TOOL_NAMES = new Set(['bash', 'exec', 'bg_run', 'work_evidence']);
+
+/**
+ * Extract tool names called after the follow-up user message. Pure; no I/O.
+ * Ignores any tool calls that belong to the seeded turns before the follow-up.
+ */
+export function followUpToolCalls(messages: SessionMessage[], followUpText: string): string[] {
+  let followUpIdx = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]!;
+    if (m.role === 'user') {
+      const text = m.parts.filter((p) => p.type === 'text').map((p) => (p as {text:string}).text).join('');
+      if (text === followUpText) { followUpIdx = i; break; }
+    }
+  }
+  if (followUpIdx < 0) return [];
+  const tools: string[] = [];
+  for (let i = followUpIdx + 1; i < messages.length; i++) {
+    const m = messages[i]!;
+    if (m.role === 'assistant') {
+      for (const p of m.parts) {
+        if (p.type === 'tool_call' && (p as {name?:string}).name) {
+          tools.push((p as {name:string}).name);
+        }
+      }
+    }
+  }
+  return tools;
+}
+
+/** True when the model called a shell/command tool — counts as a recall MISS, not an error. */
+export function isCommandReexecution(tools: string[]): boolean {
+  return tools.some((t) => COMMAND_TOOL_NAMES.has(t));
+}
+
+/**
+ * Score a follow-up turn. Re-executing a command is always recalled=false regardless of
+ * whether the answer happens to contain the token (the model cheated by re-running).
+ */
+export function scoreRecall(opts: {
+  answer: string;
+  token: string;
+  followUpTools: string[];
+}): boolean {
+  if (isCommandReexecution(opts.followUpTools)) return false;
+  return answerRecallsToken(opts.answer, opts.token);
+}
+
 export function answerRecallsToken(answer: string, token: string): boolean {
   const needle = token.trim();
   if (!needle) return false;
@@ -519,8 +572,9 @@ export function formatCompactAbReport(report: CompactAbReport): string {
       : '';
     const err = row.error ? ` error=${row.error}` : '';
     const tool = row.toolName ? ` tool=${row.toolName}` : '';
+    const followUp = row.followUpTools?.length ? ` follow_up_tools=${row.followUpTools.join(',')}` : '';
     lines.push(
-      `  ${row.policy}/${row.caseId}:${tool} recalled=${row.recalled} in_view=${row.expectedTokenInView} collapsed=${row.collapsed} chars_saved=${row.charsSaved} view_tok=${row.viewTokens} base_tok=${row.baselineTokens}${usage} ${row.elapsedMs}ms${err}`
+      `  ${row.policy}/${row.caseId}:${tool} recalled=${row.recalled} in_view=${row.expectedTokenInView} collapsed=${row.collapsed} chars_saved=${row.charsSaved} view_tok=${row.viewTokens} base_tok=${row.baselineTokens}${usage}${followUp} ${row.elapsedMs}ms${err}`
     );
     if (row.stdoutSummary) lines.push(`    stdout: ${row.stdoutSummary}`);
     if (row.answerPreview) lines.push(`    answer: ${row.answerPreview}`);

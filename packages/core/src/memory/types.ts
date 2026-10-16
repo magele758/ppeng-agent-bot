@@ -39,7 +39,8 @@ export interface MemoryFilter {
   tenantOrGlobal?: boolean;
   scope?: MemoryScope;
   namespace?: string;
-  userId?: string;
+  /** Explicit null means user_id IS NULL (ownerless rows); undefined means no user_id condition. */
+  userId?: string | null;
   tenantId?: string;
   sessionId?: string;
   /** Exact key match (session delete / lookup). */
