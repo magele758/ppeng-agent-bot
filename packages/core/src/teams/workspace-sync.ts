@@ -1,5 +1,5 @@
 import { cp, mkdir, readdir } from 'node:fs/promises';
-import { closeSync, existsSync, mkdirSync, openSync, unlinkSync } from 'node:fs';
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { basename, join, relative, resolve } from 'node:path';
 import type { WorkspaceManager } from '../workspaces.js';
 import type { WorkspaceMode, WorkspaceRecord } from '../types.js';
@@ -27,9 +27,9 @@ function shouldCopy(source: string, destinationName: string): boolean {
   return ![...SKIP_DIR_NAMES].some((name) => normalized.includes(`/${name}/`) || normalized.endsWith(`/${name}`));
 }
 
-export async function copyWorkspaceSnapshot(from: string, to: string): Promise<void> {
+export async function copyWorkspaceSnapshot(from: string, to: string, lock?: SnapshotLockOptions): Promise<void> {
   await mkdir(to, { recursive: true });
-  await withSnapshotLock(to, () => copyWorkspaceEntries(from, to));
+  await withSnapshotLock(to, () => copyWorkspaceEntries(from, to), lock);
 }
 
 async function copyWorkspaceEntries(from: string, to: string): Promise<void> {
@@ -70,34 +70,116 @@ export async function createTeamWorkerWorkspace(input: {
   return { rootPath: input.destRoot, mode: 'directory-copy' };
 }
 
-export async function syncWorkerResultToPlan(workerRoot: string, integrationDir: string): Promise<void> {
+export async function syncWorkerResultToPlan(
+  workerRoot: string,
+  integrationDir: string,
+  lock?: SnapshotLockOptions
+): Promise<void> {
   await mkdir(integrationDir, { recursive: true });
-  await copyWorkspaceSnapshot(workerRoot, integrationDir);
+  await copyWorkspaceSnapshot(workerRoot, integrationDir, lock);
 }
 
-async function withSnapshotLock<T>(dir: string, fn: () => Promise<T>): Promise<T> {
+const SNAPSHOT_LOCK_STALE_MS = 10_000;
+const SNAPSHOT_LOCK_WAIT_MS = 1_000;
+
+export interface SnapshotLockOptions {
+  staleMs?: number;
+  waitMs?: number;
+  now?: () => number;
+}
+
+async function withSnapshotLock<T>(dir: string, fn: () => Promise<T>, options: SnapshotLockOptions = {}): Promise<T> {
   mkdirSync(dir, { recursive: true });
   const lockPath = join(dir, '.snapshot.lock');
-  const started = Date.now();
-  let fd: number | undefined;
-  while (fd === undefined) {
-    try {
-      fd = openSync(lockPath, 'wx');
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code;
-      if (code !== 'EEXIST') throw error;
-      if (Date.now() - started > 15_000) throw new Error(`Team workspace snapshot lock timed out: ${lockPath}`);
-      await new Promise((resolve) => setTimeout(resolve, 5));
-    }
-  }
+  const token = `${process.pid}:${Date.now()}`;
+  const fd = await acquireSnapshotLock(lockPath, token, options);
   try {
     return await fn();
   } finally {
-    closeSync(fd);
-    try {
-      unlinkSync(lockPath);
-    } catch {
-      /* lock already released */
+    releaseSnapshotLock(lockPath, fd, token);
+  }
+}
+
+async function acquireSnapshotLock(lockPath: string, token: string, options: SnapshotLockOptions): Promise<number> {
+  const now = options.now ?? Date.now;
+  const started = now();
+  const waitMs = options.waitMs ?? SNAPSHOT_LOCK_WAIT_MS;
+  for (;;) {
+    const fd = tryCreateSnapshotLock(lockPath, token);
+    if (fd !== undefined) return fd;
+    if (snapshotLockStale(lockPath, options.staleMs ?? SNAPSHOT_LOCK_STALE_MS, now())) {
+      reclaimSnapshotLock(lockPath);
+      continue;
     }
+    if (now() - started > waitMs) {
+      throw new Error(`Team workspace snapshot lock timed out: ${lockPath}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
+
+function tryCreateSnapshotLock(lockPath: string, token: string): number | undefined {
+  try {
+    const fd = openSync(lockPath, 'wx');
+    writeFileSync(fd, token);
+    return fd;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') return undefined;
+    throw error;
+  }
+}
+
+/**
+ * Missing file is free. A recorded pid that is gone, or an mtime older than
+ * `staleMs`, is a crash leftover. A brand-new empty file is live: the holder
+ * is between create and writing its token.
+ */
+function snapshotLockStale(lockPath: string, staleMs: number, now: number): boolean {
+  let body: string;
+  try {
+    body = readFileSync(lockPath, 'utf8');
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'ENOENT';
+  }
+  const age = snapshotLockAge(lockPath, now);
+  if (age > staleMs) return true;
+  return body.length > 0 && snapshotOwnerDead(body);
+}
+
+function snapshotLockAge(lockPath: string, now: number): number {
+  try {
+    return now - statSync(lockPath).mtimeMs;
+  } catch {
+    return Number.POSITIVE_INFINITY;
+  }
+}
+
+/** Our own pid is a live holder, not a crash leftover. */
+function snapshotOwnerDead(body: string): boolean {
+  const pid = Number(body.split(':')[0]);
+  if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) return false;
+  try {
+    process.kill(pid, 0);
+    return false;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'ESRCH';
+  }
+}
+
+function reclaimSnapshotLock(lockPath: string): void {
+  try {
+    unlinkSync(lockPath);
+  } catch {
+    /* another copier reclaimed or replaced it */
+  }
+}
+
+function releaseSnapshotLock(lockPath: string, fd: number, token: string): void {
+  closeSync(fd);
+  try {
+    if (readFileSync(lockPath, 'utf8') !== token) return;
+    unlinkSync(lockPath);
+  } catch {
+    /* lock already released or replaced */
   }
 }

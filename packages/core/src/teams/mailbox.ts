@@ -1,4 +1,4 @@
-import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { createId, nowIso } from '../id.js';
 import type { TeamMailboxMessage } from './types.js';
@@ -30,10 +30,12 @@ export interface SendTeamMailboxInput {
 export class TeamFileMailbox {
   private readonly inboxDir: string;
   private readonly auditFile: string;
+  private readonly lockOptions: MailboxLockOptions;
 
-  constructor(planDir: string) {
+  constructor(planDir: string, lockOptions: MailboxLockOptions = {}) {
     this.inboxDir = teamMailboxDir(planDir);
     this.auditFile = join(this.inboxDir, 'audit.jsonl');
+    this.lockOptions = lockOptions;
     mkdirSync(this.inboxDir, { recursive: true });
     ensureFile(this.auditFile);
   }
@@ -54,7 +56,7 @@ export class TeamFileMailbox {
       appendJsonLine(this.auditFile, message);
       appendJsonLine(this.inboxFile(message.to), message);
       return message;
-    });
+    }, this.lockOptions);
   }
 
   peekInbox(agentName: string): TeamMailboxMessage[] {
@@ -67,7 +69,7 @@ export class TeamFileMailbox {
       const items = readJsonl(file);
       writeFileSync(file, '', 'utf8');
       return items;
-    });
+    }, this.lockOptions);
   }
 
   listRecent(limit = 50): TeamMailboxMessage[] {
@@ -105,31 +107,117 @@ function appendJsonLine(filePath: string, payload: unknown): void {
   appendFileSync(filePath, `${JSON.stringify(payload)}\n`, 'utf8');
 }
 
+const MAILBOX_LOCK_STALE_MS = 10_000;
+const MAILBOX_LOCK_WAIT_MS = 1_000;
+
+export interface MailboxLockOptions {
+  staleMs?: number;
+  waitMs?: number;
+  now?: () => number;
+}
+
 /** Serialize mailbox writers that share one plan directory under parallel load. */
-function withMailboxLock<T>(inboxDir: string, fn: () => T): T {
+function withMailboxLock<T>(inboxDir: string, fn: () => T, options: MailboxLockOptions = {}): T {
   mkdirSync(inboxDir, { recursive: true });
   const lockPath = join(inboxDir, '.mailbox.lock');
-  const started = Date.now();
-  let fd: number | undefined;
-  while (fd === undefined) {
-    try {
-      fd = openSync(lockPath, 'wx');
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code;
-      if (code !== 'EEXIST') throw error;
-      if (Date.now() - started > 5_000) throw new Error(`Team mailbox lock timed out: ${lockPath}`);
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
-    }
-  }
+  const token = `${process.pid}:${Date.now()}`;
+  const fd = acquireMailboxLock(lockPath, token, options);
   try {
     return fn();
   } finally {
-    closeSync(fd);
-    try {
-      unlinkSync(lockPath);
-    } catch {
-      /* lock already released */
+    releaseOwnedLock(lockPath, fd, token);
+  }
+}
+
+function acquireMailboxLock(lockPath: string, token: string, options: MailboxLockOptions): number {
+  const now = options.now ?? Date.now;
+  const started = now();
+  const waitMs = options.waitMs ?? MAILBOX_LOCK_WAIT_MS;
+  for (;;) {
+    const fd = tryCreateOwnedLock(lockPath, token);
+    if (fd !== undefined) return fd;
+    if (mailboxLockStale(lockPath, options.staleMs ?? MAILBOX_LOCK_STALE_MS, now())) {
+      reclaimLockFile(lockPath);
+      continue;
     }
+    if (now() - started > waitMs) throw new Error(`Team mailbox lock timed out: ${lockPath}`);
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
+  }
+}
+
+/**
+ * Missing file is free. A recorded pid that is gone, or an mtime older than
+ * `staleMs`, is a crash leftover. A brand-new file with no pid yet is live:
+ * the holder is between create and writing its token.
+ */
+function mailboxLockStale(lockPath: string, staleMs: number, now: number): boolean {
+  const body = readLockBody(lockPath);
+  if (body === undefined) return true;
+  const age = lockMtimeAge(lockPath, now);
+  if (age > staleMs) return true;
+  return body.length > 0 && lockOwnerDead(body);
+}
+
+/** undefined when the lock vanished between the failed create and this read. */
+function readLockBody(lockPath: string): string | undefined {
+  try {
+    return readFileSync(lockPath, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    return '';
+  }
+}
+
+function lockMtimeAge(lockPath: string, now: number): number {
+  try {
+    return now - statSync(lockPath).mtimeMs;
+  } catch {
+    return Number.POSITIVE_INFINITY;
+  }
+}
+
+/**
+ * `pid:…` whose pid no longer exists. Our own pid is never dead: a fresh lock
+ * is written with it and must not be reclaimed before its mtime goes stale.
+ * Unparseable content is not treated as dead.
+ */
+function lockOwnerDead(body: string): boolean {
+  const pid = Number(body.split(':')[0]);
+  if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) return false;
+  try {
+    process.kill(pid, 0);
+    return false;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'ESRCH';
+  }
+}
+
+function tryCreateOwnedLock(lockPath: string, token: string): number | undefined {
+  try {
+    const fd = openSync(lockPath, 'wx');
+    writeFileSync(fd, token);
+    return fd;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') return undefined;
+    throw error;
+  }
+}
+
+function reclaimLockFile(lockPath: string): void {
+  try {
+    unlinkSync(lockPath);
+  } catch {
+    /* another writer reclaimed or replaced it */
+  }
+}
+
+function releaseOwnedLock(lockPath: string, fd: number, token: string): void {
+  closeSync(fd);
+  try {
+    if (readFileSync(lockPath, 'utf8') !== token) return;
+    unlinkSync(lockPath);
+  } catch {
+    /* lock already released or replaced */
   }
 }
 

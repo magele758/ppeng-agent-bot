@@ -1,5 +1,5 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { closeSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+import { closeSync, mkdirSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /** Constant-time string comparison (length-independent via hashing). */
@@ -87,47 +87,95 @@ function writePersistedClaims(dir: string, claims: Record<string, number>): void
   renameSync(tmp, path);
 }
 
-/** Exclusive claim of one persisted dedupe file so concurrent deliveries cannot both win. */
-function withPersistedClaimLock<T>(dir: string, fn: () => T): T {
+/** A lock whose body is empty or not ours is not stale; age is the file mtime. */
+const CLAIM_LOCK_STALE_MS = 10_000;
+const CLAIM_LOCK_WAIT_MS = 5_000;
+
+export interface PersistedClaimLockOptions {
+  /** How long a live lock may be held before another process may reclaim it. */
+  staleMs?: number;
+  /** How long to wait for a fresh lock before giving up. */
+  waitMs?: number;
+  now?: () => number;
+  /** Test seam: runs after the lock is held and before the claim body. */
+  onAcquired?: (lockPath: string, token: string) => void;
+}
+
+/**
+ * Exclusive claim of one persisted dedupe file so concurrent deliveries cannot both win.
+ * Returns false when the lock cannot be acquired before the wait expires — the caller
+ * must treat that as "do not claim", not as an error.
+ */
+function withPersistedClaimLock<T>(dir: string, fn: () => T, options: PersistedClaimLockOptions = {}): T | false {
   mkdirSync(dir, { recursive: true });
   const lockPath = `${dedupePath(dir)}.lock`;
-  const started = Date.now();
-  let fd: number | undefined;
-  while (fd === undefined) {
-    try {
-      fd = openSync(lockPath, 'wx');
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code;
-      if (code !== 'EEXIST') throw error;
-      let stale = false;
-      try {
-        const lockedAt = Number(readFileSync(lockPath, 'utf8'));
-        stale = !Number.isFinite(lockedAt) || Date.now() - lockedAt > 10_000;
-      } catch (readError) {
-        if ((readError as NodeJS.ErrnoException).code === 'ENOENT') continue;
-      }
-      if (stale) {
-        try {
-          unlinkSync(lockPath);
-        } catch {
-          /* another claimant removed or replaced the stale lock */
-        }
-        continue;
-      }
-      if (Date.now() - started > 5_000) throw new Error(`Inbound dedupe lock timed out: ${lockPath}`);
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
-    }
-  }
+  const token = randomBytes(8).toString('hex');
+  const fd = acquireClaimLock(lockPath, token, options);
+  if (fd === undefined) return false;
   try {
-    writeFileSync(fd, String(Date.now()));
+    options.onAcquired?.(lockPath, token);
     return fn();
   } finally {
-    closeSync(fd);
-    try {
-      unlinkSync(lockPath);
-    } catch {
-      /* lock already released */
+    releaseClaimLock(lockPath, fd, token);
+  }
+}
+
+function acquireClaimLock(lockPath: string, token: string, options: PersistedClaimLockOptions): number | undefined {
+  const now = options.now ?? Date.now;
+  const started = now();
+  const waitMs = options.waitMs ?? CLAIM_LOCK_WAIT_MS;
+  for (;;) {
+    const fd = tryAcquireClaimLock(lockPath, token);
+    if (fd !== undefined) return fd;
+    if (claimLockStale(lockPath, options.staleMs ?? CLAIM_LOCK_STALE_MS, now())) {
+      reclaimStaleClaimLock(lockPath);
+      continue;
     }
+    if (now() - started > waitMs) return undefined;
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
+  }
+}
+
+/** `wx` create. undefined means the lock is held; other open errors propagate. */
+function tryAcquireClaimLock(lockPath: string, token: string): number | undefined {
+  try {
+    const fd = openSync(lockPath, 'wx');
+    writeFileSync(fd, token);
+    return fd;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') return undefined;
+    throw error;
+  }
+}
+
+/**
+ * Empty or unparseable content is a holder that has not finished writing.
+ * Only an mtime older than `staleMs` (or a missing file, which is free) is stale.
+ */
+function claimLockStale(lockPath: string, staleMs: number, now: number): boolean {
+  try {
+    return now - statSync(lockPath).mtimeMs > staleMs;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'ENOENT';
+  }
+}
+
+function reclaimStaleClaimLock(lockPath: string): void {
+  try {
+    unlinkSync(lockPath);
+  } catch {
+    /* another claimant removed or replaced the stale lock */
+  }
+}
+
+/** Unlink only while the file still names us, so a stolen lock is left for its new owner. */
+function releaseClaimLock(lockPath: string, fd: number, token: string): void {
+  closeSync(fd);
+  try {
+    if (readFileSync(lockPath, 'utf8') !== token) return;
+    unlinkSync(lockPath);
+  } catch {
+    /* lock already released or replaced */
   }
 }
 
@@ -153,15 +201,21 @@ function rememberPersistedClaim(claims: Record<string, number>, key: string, now
  * would otherwise grow without the 6h TTL). `resetInboundDedupe` clears only
  * the memory map.
  */
-export function claimInboundEvent(key: string, now = Date.now(), persistDir?: string): boolean {
+export function claimInboundEvent(
+  key: string,
+  now = Date.now(),
+  persistDir?: string,
+  lock?: PersistedClaimLockOptions
+): boolean {
   if (persistDir) {
-    return withPersistedClaimLock(persistDir, () => {
+    const claimed = withPersistedClaimLock(persistDir, () => {
       const claims = readPersistedClaims(persistDir);
       if (Object.prototype.hasOwnProperty.call(claims, key)) return false;
       rememberPersistedClaim(claims, key, now);
       writePersistedClaims(persistDir, claims);
       return true;
-    });
+    }, lock);
+    return claimed === true;
   }
   const at = seen.get(key);
   if (at !== undefined && now - at < DEDUPE_TTL_MS) return false;
