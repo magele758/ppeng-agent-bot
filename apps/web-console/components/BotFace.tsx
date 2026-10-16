@@ -266,38 +266,7 @@ export function BotFace({
   const saved = useSavedFace(name);
   const avatar = shapeProp === undefined && colorProp === undefined ? saved.avatar : null;
   const avatarImage = avatar !== null && /^https?:\/\//i.test(avatar);
-  if (avatar) {
-    const classes = ['bot-face', 'bot-face--avatar', size !== 'sm' ? `bot-face--${size}` : '', className]
-      .filter(Boolean)
-      .join(' ');
-    return avatarImage ? (
-      <img className={classes} src={avatar} alt={label ?? ''} data-testid={testId} data-bot-avatar="image" />
-    ) : (
-      <span className={classes} role={label ? 'img' : 'presentation'} aria-label={label} aria-hidden={label ? undefined : true} data-testid={testId} data-bot-avatar="emoji">
-        {avatar}
-      </span>
-    );
-  }
-  const appearance = resolveBotFaceAppearance({
-    name,
-    savedShape: shapeProp !== undefined ? shapeProp : saved.shape,
-    savedColor: colorProp !== undefined ? colorProp : saved.color
-  });
-  const color = appearance.color;
-  const shape = appearance.shape;
-  const index = botFaceIndex(name);
-  const eyes = eyeInk(color);
-  const drawnShape: BotFaceShape | 'empty' = shape ?? (color ? 'circle' : 'empty');
-  const layout = layoutFor(shape);
-  const expression = expressionForMood(mood);
-  const surprised = expression === 'surprised';
-  const eyeW = surprised ? 8.2 : layout.eyeW;
-  const eyeH = surprised ? 8.2 : layout.eyeH;
-  const initialMouth: MouthKind = expression === 'talk' ? 'open' : expression === 'surprised' ? 'oh' : 'rest';
-  const clipId = `bot-face-${reactId}`;
-  const classes = ['bot-face', size !== 'sm' ? `bot-face--${size}` : '', color ? '' : 'bot-face--empty', className]
-    .filter(Boolean)
-    .join(' ');
+  const showAvatar = Boolean(avatar);
 
   useEffect(() => {
     const until = turnFinishHappyUntil(prevMoodRef.current, mood, performance.now());
@@ -306,8 +275,7 @@ export function BotFace({
   }, [mood]);
 
   useEffect(() => {
-    const svg = svgRef.current;
-    if (!svg) return;
+    if (showAvatar) return;
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
     let blink = createBlinkClock(performance.now(), Math.random());
     let idle = nextIdleLook(performance.now(), Math.random(), Math.random());
@@ -388,7 +356,40 @@ export function BotFace({
         dot.setAttribute('transform', `translate(${cx} ${cy}) scale(${scale.toFixed(3)}) translate(${-cx} ${-cy})`);
       }
     });
-  }, []);
+  }, [showAvatar]);
+
+  if (avatar) {
+    const classes = ['bot-face', 'bot-face--avatar', size !== 'sm' ? `bot-face--${size}` : '', className]
+      .filter(Boolean)
+      .join(' ');
+    return avatarImage ? (
+      <img className={classes} src={avatar} alt={label ?? ''} data-testid={testId} data-bot-avatar="image" />
+    ) : (
+      <span className={classes} role={label ? 'img' : 'presentation'} aria-label={label} aria-hidden={label ? undefined : true} data-testid={testId} data-bot-avatar="emoji">
+        {avatar}
+      </span>
+    );
+  }
+  const appearance = resolveBotFaceAppearance({
+    name,
+    savedShape: shapeProp !== undefined ? shapeProp : saved.shape,
+    savedColor: colorProp !== undefined ? colorProp : saved.color
+  });
+  const color = appearance.color;
+  const shape = appearance.shape;
+  const index = botFaceIndex(name);
+  const eyes = eyeInk(color);
+  const drawnShape: BotFaceShape | 'empty' = shape ?? (color ? 'circle' : 'empty');
+  const layout = layoutFor(shape);
+  const expression = expressionForMood(mood);
+  const surprised = expression === 'surprised';
+  const eyeW = surprised ? 8.2 : layout.eyeW;
+  const eyeH = surprised ? 8.2 : layout.eyeH;
+  const initialMouth: MouthKind = expression === 'talk' ? 'open' : expression === 'surprised' ? 'oh' : 'rest';
+  const clipId = `bot-face-${reactId}`;
+  const classes = ['bot-face', size !== 'sm' ? `bot-face--${size}` : '', color ? '' : 'bot-face--empty', className]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <svg
