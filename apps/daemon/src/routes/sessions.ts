@@ -612,7 +612,7 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         const bounded = url.searchParams.has('messageLimit');
         let page;
         try {
-          page = includeMessages && bounded ? runtime.store.listHistory(id, {
+          page = includeMessages && bounded ? runtime.store.listVisibleMessagesPage(id, {
             limit: Number(url.searchParams.get('messageLimit')),
             beforeSeq: url.searchParams.has('beforeSeq') ? Number(url.searchParams.get('beforeSeq')) : undefined
           }) : undefined;

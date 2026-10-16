@@ -555,6 +555,10 @@ export class SqliteStateStore {
     return this.sessions.listMessages(sessionId);
   }
 
+  listVisibleMessagesPage(sessionId: string, opts?: { limit?: number; beforeSeq?: number }) {
+    return this.sessions.listVisibleMessagesPage(sessionId, opts);
+  }
+
   hasAssistantOrToolMessage(sessionId: string): boolean {
     return this.sessions.hasAssistantOrToolMessage(sessionId);
   }

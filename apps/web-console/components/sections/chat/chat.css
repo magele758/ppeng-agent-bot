@@ -1,5 +1,25 @@
 /* 对话页（WS1）覆盖样式：只用 --ui-* token；选择器带父级以压过 legacy-vanilla/globals。 */
 
+.chat-feed__spacer {
+  width: 100%;
+}
+
+.chat-feed__row {
+  width: 100%;
+}
+
+/* Stay on-screen while the windowed track is scrolled to the tail. */
+.chat-feed__older {
+  display: flex;
+  justify-content: center;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 0 0 8px;
+  padding: 4px 0;
+  background: var(--ui-bg);
+}
+
 /* —— 输入区 dock：附件 / 会话设置 / 模型 / 工作区 同一行 —— */
 .chat-composer-outer .chat-composer-dock {
   flex-wrap: wrap;

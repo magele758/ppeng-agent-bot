@@ -29,7 +29,7 @@ test('pending approval sits in the transcript beside the waiting tool [AC:chat-a
       body: JSON.stringify({ sessions: [session] })
     });
   });
-  await page.route(`**/api/sessions/${sessionId}`, (route) => {
+  await page.route(new RegExp(`/api/sessions/${sessionId}(?:\\?|$)`), (route) => {
     void route.fulfill({
       status: 200,
       contentType: 'application/json',

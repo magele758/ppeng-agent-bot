@@ -1,3 +1,16 @@
+/** Prepend an older page. Ids already loaded keep the loaded copy, so a cursor overlap cannot duplicate a row. */
+export function prependHistoryPage<T extends { id: string }>(loaded: T[], older: T[]): T[] {
+  const loadedIds = new Set(loaded.map((message) => message.id));
+  const head: T[] = [];
+  const seen = new Set<string>();
+  for (const message of older) {
+    if (loadedIds.has(message.id) || seen.has(message.id)) continue;
+    seen.add(message.id);
+    head.push(message);
+  }
+  return [...head, ...loaded];
+}
+
 export function mergeHistoryWindow<T extends {id:string;seq?:number}>(previous:T[],incoming:T[],sameSession:boolean):{messages:T[];reset:boolean} {
  if(!sameSession||!previous.length)return {messages:incoming,reset:true};
  const ids=new Set(previous.map(message=>message.id));

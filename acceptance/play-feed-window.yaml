@@ -1,0 +1,40 @@
+id: play-feed-window
+title: 对话记录按页加载并窗口渲染
+status: implemented
+requirement: |
+  The Play chat feed (div#playMessages, class chat-feed) gets very long. The user asked
+  whether loading is optimized or whether every open fetches the whole transcript, and
+  told us to design the strategy properly.
+  1. Opening a session or refreshing it loads the newest page only (a bounded page, on
+     the order of a few dozen messages), not the whole history.
+  2. Scrolling up loads the previous page and keeps the scroll position (do not jump).
+     The user can reach older messages this way.
+  3. The DOM does not mount every loaded message at once. Window the rendered rows
+     (virtual list or an equivalent window). Streaming output still appends at the
+     bottom and follows the tail while the user is already at the bottom.
+  4. A turn that is streaming must not refetch the entire history to show new tokens.
+  5. Preserve scroll position when a background refresh replaces messages (same rule
+     the session list already follows).
+  Do not change what is stored, and do not change the model prepare / context-stack path.
+  This is only how the Lab loads and paints the transcript.
+criteria:
+  - id: AC-1
+    given: 一个已经很长的会话
+    when: 打开这个会话，或刷新它
+    then: 对话区只加载最新的一小页消息（几十条），不会一次取回整段历史
+  - id: AC-2
+    given: 当前已加载的内容之前还有更早的消息
+    when: 向上滚动
+    then: 加载上一页，阅读位置不跳动，可以继续看到更早的消息；相邻两页不重复、也不漏掉消息
+  - id: AC-3
+    given: 已经加载了很多条消息
+    when: 查看对话区，并且人正停在底部
+    then: 页面不会同时挂上每一条已加载消息；新的流式输出追加在末尾，并跟着最新内容
+  - id: AC-4
+    given: 一轮回复正在逐字出现
+    when: 新的文字到达
+    then: 不重新拉取整段历史
+  - id: AC-5
+    given: 人已经离开对话底部
+    when: 后台刷新替换了已显示的消息
+    then: 滚动位置保持不变

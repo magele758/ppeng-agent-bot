@@ -416,6 +416,38 @@ export class SessionStore {
     return rows.map((row) => this.surfaceToMessage(this.mapSurfaceRow(row)));
   }
 
+  /**
+   * One page of {@link listMessages} (the Lab transcript), newest first when
+   * `beforeSeq` is omitted. `beforeSeq` is exclusive, so the next page starts
+   * on the message immediately before this page. Callers that need the whole
+   * transcript keep using {@link listMessages}.
+   */
+  listVisibleMessagesPage(sessionId: string, opts: { limit?: number; beforeSeq?: number } = {}): HistoryPage {
+    const limit = Math.min(200, Math.max(1, Math.floor(opts.limit ?? 40)));
+    if (!Number.isFinite(limit)) throw new Error('Invalid history limit');
+    const where = ['session_id = ?', "(surface_op IS NULL OR surface_op != 'hide')"];
+    const args: Array<string | number> = [sessionId];
+    if (opts.beforeSeq !== undefined) {
+      if (!Number.isSafeInteger(opts.beforeSeq) || opts.beforeSeq < 1) throw new Error('Invalid history cursor');
+      where.push('seq < ?');
+      args.push(opts.beforeSeq);
+    }
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM session_messages
+         WHERE ${where.join(' AND ')}
+         ORDER BY seq DESC, created_at DESC, id DESC
+         LIMIT ?`
+      )
+      .all(...args, limit + 1) as Array<Record<string, unknown>>;
+    const hasMore = rows.length > limit;
+    const messages = rows
+      .slice(0, limit)
+      .reverse()
+      .map((row) => this.surfaceToMessage(this.mapSurfaceRow(row)));
+    return { messages, hasMore, nextCursor: hasMore ? messages[0]?.seq ?? null : null };
+  }
+
   /** Raw append history: replacements never destroy the source rows. Bound by an indexed sequence cursor. */
   listHistory(sessionId: string, opts: HistoryOptions = {}): HistoryPage {
     const limit = Math.min(200, Math.max(1, Math.floor(opts.limit ?? 50)));
