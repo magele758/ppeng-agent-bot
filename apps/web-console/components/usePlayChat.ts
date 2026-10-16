@@ -3,8 +3,17 @@
 import { botComposerStatusText, planBotComposerSend } from '@/lib/bot-chat-commands';
 import { parseBotModelOverride, resolveLoadedComposerModelRef } from '@/lib/bot-model';
 import { resolveComposerAgentId } from '@/lib/default-agent';
-import { planFeedScroll, readFeedAnchor, sessionFeedSearch, type FeedScrollIntent } from '@/lib/feed-window';
-import { mergeHistoryWindow, prependHistoryPage } from '@/lib/history-window';
+import {
+  canRequestOlderPage,
+  nextTranscriptWindow,
+  pageEpochCurrent,
+  planFeedScroll,
+  readFeedAnchor,
+  sessionFeedSearch,
+  showLatestWhenStuck,
+  type FeedScrollIntent
+} from '@/lib/feed-window';
+import { prependHistoryPage } from '@/lib/history-window';
 import { api } from '@/lib/api';
 import { getSpeechRecognitionCtor, type SpeechRecognitionLike } from '@/lib/speech-dictation';
 import { renderMarkdown } from '@/lib/markdown';
@@ -210,6 +219,8 @@ export function usePlayChat(deps: PlayChatDeps) {
   const { t } = useI18n();
 
   const [historyCursor,setHistoryCursor]=useState<number|null>(null);
+  const historyCursorRef = useRef<number | null>(null);
+  historyCursorRef.current = historyCursor;
   const [historyLoading,setHistoryLoading]=useState(false);
   const historySessionRef=useRef('');
   const historyLoadingRef = useRef(false);
@@ -776,7 +787,7 @@ export function usePlayChat(deps: PlayChatDeps) {
         hasMore?:boolean;nextCursor?:number|null;
         inbox?: SteerInboxItem[];
       };
-      if (selectedSessionRef.current !== sid || feedEpochRef.current !== epoch) return;
+      if (!pageEpochCurrent(selectedSessionRef.current, sid, feedEpochRef.current, epoch)) return;
       feedEpochRef.current = epoch + 1;
       rememberCanonicalBotChat(sid, data.session);
       const chrome = parseSessionChrome(data.session.metadata, data.session.status, {
@@ -816,23 +827,22 @@ export function usePlayChat(deps: PlayChatDeps) {
       const switching = historySessionRef.current !== sid;
       if (switching) historyAutoBlockedRef.current = false;
       const incoming = (data.messages ?? []) as Array<ChatMessage & { id: string; seq?: number }>;
-      const merged = mergeHistoryWindow(
-        historyMessagesRef.current as Array<ChatMessage & { id: string; seq?: number }>,
+      const planned = nextTranscriptWindow({
+        sameSession: !switching,
+        previous: historyMessagesRef.current as Array<ChatMessage & { id: string; seq?: number }>,
         incoming,
-        !switching
-      );
+        hasMore: data.hasMore === true,
+        nextCursor: data.nextCursor ?? null,
+        previousCursor: historyCursorRef.current,
+        stick: playStickToBottomRef.current,
+        anchor: readFeedAnchor(playMessagesRef.current)
+      });
       historySessionRef.current = sid;
-      if (merged.reset) playStickToBottomRef.current = true;
-      const planned = planFeedScroll(
-        merged.reset || playStickToBottomRef.current ? 'bottom' : 'pin',
-        playStickToBottomRef.current,
-        readFeedAnchor(playMessagesRef.current)
-      );
       playStickToBottomRef.current = planned.stick;
-      if (planned.stick) setShowJumpToLatest(false);
+      showLatestWhenStuck(planned.stick, setShowJumpToLatest);
       feedScrollIntentRef.current = planned.intent;
-      setSessionMessages(merged.messages);
-      setHistoryCursor((prev) => (!merged.reset ? prev : data.hasMore ? data.nextCursor ?? null : null));
+      setSessionMessages(planned.messages);
+      setHistoryCursor(planned.cursor);
       setFeedRevision((revision) => revision + 1);
       setSteerInbox(mapSteerInboxItems(data.inbox));
       const eg = data.session.metadata?.enabledOptionalToolGroups;
@@ -1163,22 +1173,28 @@ export function usePlayChat(deps: PlayChatDeps) {
 
   const loadOlderHistory = async (reason: 'scroll' | 'auto' = 'scroll') => {
     const sid = selectedSessionRef.current;
-    if (!sid || historyCursor == null || historyLoadingRef.current) return;
-    if (reason === 'auto' && historyAutoBlockedRef.current) return;
+    const cursor = historyCursorRef.current;
+    if (!canRequestOlderPage({
+      sessionId: sid,
+      cursor,
+      loading: historyLoadingRef.current,
+      reason,
+      blocked: historyAutoBlockedRef.current
+    })) return;
     const epoch = feedEpochRef.current;
     historyLoadingRef.current = true;
     setHistoryLoading(true);
     try {
-      const data = (await api(`/api/sessions/${sid}?${sessionFeedSearch(historyCursor)}`)) as {
+      const data = (await api(`/api/sessions/${sid}?${sessionFeedSearch(cursor)}`)) as {
         messages: ChatMessage[];
         hasMore: boolean;
         nextCursor: number | null;
       };
-      if (selectedSessionRef.current !== sid || feedEpochRef.current !== epoch) return;
+      if (!pageEpochCurrent(selectedSessionRef.current, sid!, epoch, feedEpochRef.current)) return;
       const older = (data.messages ?? []) as Array<ChatMessage & { id: string }>;
       const planned = planFeedScroll('prepend', playStickToBottomRef.current, readFeedAnchor(playMessagesRef.current));
       playStickToBottomRef.current = planned.stick;
-      if (planned.stick) setShowJumpToLatest(false);
+      showLatestWhenStuck(planned.stick, setShowJumpToLatest);
       feedScrollIntentRef.current = planned.intent;
       setSessionMessages((prev) => prependHistoryPage(prev as Array<ChatMessage & { id: string }>, older));
       setHistoryCursor(data.hasMore ? data.nextCursor : null);

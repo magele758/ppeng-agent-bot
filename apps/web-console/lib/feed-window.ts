@@ -1,3 +1,5 @@
+import { mergeHistoryWindow } from './history-window.ts';
+
 /** How many transcript rows the Lab asks for per page. A few dozen, not the whole session. */
 export const PLAY_FEED_PAGE_SIZE = 40;
 
@@ -147,6 +149,57 @@ export function historyWindow(options: {
 }
 
 /** Keep a row inside the mounted window so scroll restoration can see it. */
+export function feedRange(
+  history: Array<{ key: string }>,
+  scrollTop: number,
+  viewport: number,
+  prefix: number[],
+  stickToBottom: boolean,
+  intent: FeedScrollIntent | null
+): FeedRange {
+  const focusKey = intent && intent.kind !== 'bottom' ? intent.key : undefined;
+  const focusIndex = focusKey ? history.findIndex((slot) => slot.key === focusKey) : -1;
+  const range = historyWindow({
+    count: history.length,
+    scrollTop,
+    viewport,
+    prefix,
+    stickToBottom,
+    fallbackRows: FEED_FALLBACK_ROWS
+  });
+  if (focusIndex < 0) return range;
+  return rangeIncluding(range, focusIndex, history.length, prefix);
+}
+
+export function rememberRowHeight(input: {
+  heights: Map<string, number>;
+  history: Array<{ key: string }>;
+  prefix: number[];
+  key: string;
+  height: number;
+  scrollTop: number;
+  stick: boolean;
+  pending: boolean;
+}): { changed: boolean; shift: number } {
+  const previous = input.heights.get(input.key) ?? FEED_ROW_ESTIMATE_PX;
+  if (Math.abs(previous - input.height) < 1) {
+    input.heights.set(input.key, input.height);
+    return { changed: false, shift: 0 };
+  }
+  const index = input.history.findIndex((slot) => slot.key === input.key);
+  const shift = heightScrollShift({
+    index,
+    previous,
+    next: input.height,
+    rowTop: input.prefix[index] ?? 0,
+    scrollTop: input.scrollTop,
+    stick: input.stick,
+    pending: input.pending
+  });
+  input.heights.set(input.key, input.height);
+  return { changed: true, shift };
+}
+
 export function rangeIncluding(range: FeedRange, index: number, count: number, prefix: number[]): FeedRange {
   if (index < 0 || index >= count || (index >= range.start && index < range.end)) return range;
   const span = Math.max(range.end - range.start, 8);
@@ -173,6 +226,110 @@ export function scrollTopAfterPrepend(top: number, previousHeight: number, nextH
 /** Move scrollTop so a row that sits at `currentOffset` returns to `targetOffset`. */
 export function scrollTopToAnchor(currentScrollTop: number, currentOffset: number, targetOffset: number): number {
   return currentScrollTop + (currentOffset - targetOffset);
+}
+
+export function nextTranscriptWindow<T extends { id: string; seq?: number }>(input: {
+  sameSession: boolean;
+  previous: T[];
+  incoming: T[];
+  hasMore: boolean;
+  nextCursor: number | null;
+  previousCursor: number | null;
+  stick: boolean;
+  anchor: { key?: string; offset?: number; top: number; height: number };
+}): { messages: T[]; cursor: number | null; stick: boolean; intent: FeedScrollIntent } {
+  const merged = mergeHistoryWindow(input.previous, input.incoming, input.sameSession);
+  const followTail = merged.reset || input.stick;
+  const planned = planFeedScroll(followTail ? 'bottom' : 'pin', followTail, input.anchor);
+  const cursor = merged.reset ? (input.hasMore ? input.nextCursor : null) : input.previousCursor;
+  return { messages: merged.messages, cursor, stick: planned.stick, intent: planned.intent };
+}
+
+export function canRequestOlderPage(input: {
+  sessionId: string | null;
+  cursor: number | null;
+  loading: boolean;
+  reason: 'scroll' | 'auto';
+  blocked: boolean;
+}): boolean {
+  if (!input.sessionId || input.cursor == null || input.loading) return false;
+  if (input.reason === 'auto' && input.blocked) return false;
+  return true;
+}
+
+export function showLatestWhenStuck(stick: boolean, show: (value: boolean) => void): void {
+  if (stick) show(false);
+}
+
+export function pageEpochCurrent(currentSession: string | null, sessionId: string, epochNow: number, epochThen: number): boolean {
+  return currentSession === sessionId && epochNow === epochThen;
+}
+
+export interface ScrollTarget {
+  scrollHeight: number;
+  clientHeight: number;
+  scrollTop: number;
+  querySelector: (selector: string) => { getBoundingClientRect: () => { top: number } } | null;
+  getBoundingClientRect: () => { top: number };
+}
+
+/** Align the scroller to a pending intent. Returns the next intent (kept while row heights settle). */
+export function resolveFeedScroll(el: ScrollTarget, pending: FeedScrollIntent | null, tries: number): {
+  intent: FeedScrollIntent | null;
+  tries: number;
+  scrollTop: number | null;
+} {
+  if (!pending) return { intent: null, tries, scrollTop: null };
+  if (pending.kind === 'bottom') {
+    return { intent: null, tries: 0, scrollTop: Math.max(0, el.scrollHeight - el.clientHeight) };
+  }
+  const nextTries = tries + 1;
+  const node = pending.key != null ? el.querySelector(`[data-feed-key="${cssEscape(pending.key)}"]`) : null;
+  if (node && pending.offset != null) {
+    const current = node.getBoundingClientRect().top - el.getBoundingClientRect().top;
+    const done = Math.abs(current - pending.offset) <= 1 || nextTries > 4;
+    return {
+      intent: done ? null : pending,
+      tries: done ? 0 : nextTries,
+      scrollTop: preservedScrollTop(scrollTopToAnchor(el.scrollTop, current, pending.offset), el.scrollHeight, el.clientHeight)
+    };
+  }
+  if (pending.kind === 'prepend') {
+    return {
+      intent: null,
+      tries: 0,
+      scrollTop: preservedScrollTop(scrollTopAfterPrepend(pending.top, pending.height, el.scrollHeight), el.scrollHeight, el.clientHeight)
+    };
+  }
+  return {
+    intent: null,
+    tries: 0,
+    scrollTop: preservedScrollTop(pending.top, el.scrollHeight, el.clientHeight)
+  };
+}
+
+export function heightScrollShift(input: {
+  index: number;
+  previous: number;
+  next: number;
+  rowTop: number;
+  scrollTop: number;
+  stick: boolean;
+  pending: boolean;
+}): number {
+  if (input.pending || input.stick || input.index < 0) return 0;
+  const rowBottom = input.rowTop + input.previous;
+  if (rowBottom > input.scrollTop + 1) return 0;
+  return input.next - input.previous;
+}
+
+export function shouldAutoLoadOlder(hasOlder: boolean, loading: boolean, scrollHeight: number, clientHeight: number): boolean {
+  return hasOlder && !loading && scrollHeight <= clientHeight + 1;
+}
+
+function cssEscape(value: string): string {
+  if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') return CSS.escape(value);
+  return value.replace(/["\\]/g, '\\$&');
 }
 
 export function planFeedScroll(

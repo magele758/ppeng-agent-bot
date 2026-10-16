@@ -300,15 +300,20 @@ test("Bot chat opens a bounded history page and loads older messages [AC:bot-his
       .locator("#playMessages")
       .getByText("Paged conversational item 0", { exact: true }),
   ).toHaveCount(0);
+  const older = page.waitForResponse((res) => res.url().includes("beforeSeq="));
   await page
     .locator("#playMessages")
     .getByRole("button", { name: "加载更早记录", exact: true })
     .click();
-  await expect(
-    page
-      .locator("#playMessages")
-      .getByText("Paged conversational item 0", { exact: true }),
-  ).toBeVisible();
+  await older;
+  await expect
+    .poll(async () => {
+      await page.locator("#playMessages").evaluate((el) => {
+        el.scrollTop = 0;
+      });
+      return page.locator("#playMessages").getByText("Paged conversational item 0", { exact: true }).count();
+    })
+    .toBeGreaterThan(0);
   expect(modelViewRequests).toHaveLength(0);
 });
 

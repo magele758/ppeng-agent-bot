@@ -13,19 +13,12 @@ import {
 import {
   buildTurnFeedStats,
   formatTurnFeedStatsLine,
-  sliceConversationTurns,
   type TurnFeedTraceEvent
 } from '@/lib/turn-feed-stats';
 import { api } from '@/lib/api';
 import { formatHash } from '@/lib/nav';
 import { useI18n, type MessageKey } from '@/lib/i18n';
-import { messageHasStructuredParts, msgPartsToText, normalizedRole } from '@/lib/chat-utils';
-import { buildFeedSlots, type FeedSlot } from '@/lib/feed-window';
-import { anchorApprovals } from '@/lib/approval-feed';
-import { indexResolvedToolCallIds, indexToolCalls } from '@/lib/tool-io';
-import { ChatFeedWindow } from './ChatFeedWindow';
-import { ChatTurnFromMessage, ChatTurnPlain, ChatTurnStreaming } from './ChatTurns';
-import { SurfaceContextProvider } from './a2ui/SurfaceContext';
+import { PlayTranscript } from './PlayTranscript';
 import type { usePlayChat } from './usePlayChat';
 import { ActivityPanel } from './ActivityPanel';
 import { ArtifactRail } from './ArtifactRail';
@@ -646,194 +639,6 @@ export function PlayPanel({
     el.style.height = `${el.scrollHeight}px`;
   }, [chat.playInput, chat.playInputRef]);
 
-  const noTranscriptYet =
-    !chat.optimisticUser && chat.sessionMessages.length === 0 && !chat.streamOverlay && !chat.waitTyping;
-  const feedMessages = chat.displayMessages;
-  const toolSource = chat.sessionMessages.length ? chat.sessionMessages : feedMessages;
-  const toolCallsById = indexToolCalls(toolSource);
-  const resolvedCallIds = indexResolvedToolCallIds(toolSource);
-  const approvalAnchors = anchorApprovals(
-    feedMessages,
-    sessionApprovals,
-    resolvedCallIds,
-    (chat.streamOverlay?.segments ?? []).flatMap((seg) =>
-      seg.kind === 'tool' ? [{ name: seg.name, toolCallId: seg.toolCallId, args: seg.args }] : []
-    )
-  );
-  const sid = selectedSessionId ?? '';
-  const modelView = chat.showModelView;
-  const turnSlices = sliceConversationTurns(feedMessages as Array<{ role?: string; createdAt?: unknown }>);
-  const deferLastTurnStats = Boolean(chat.streamOverlay || chat.waitTyping) && !chat.optimisticUser;
-  const feedSlots = noTranscriptYet
-    ? []
-    : buildFeedSlots({
-        messages: feedMessages.map((message) => ({ id: (message as { id?: string }).id })),
-        turns: turnSlices.map((slice, turnIndex) => ({
-          endIndex: slice.endIndex,
-          turnIndex,
-          stats: Boolean(turnFeedStatLines[turnIndex]),
-          live: deferLastTurnStats && turnIndex === turnSlices.length - 1
-        })),
-        approvalIndexes: [...approvalAnchors.afterMessage.keys()],
-        optimistic: Boolean(chat.optimisticUser),
-        stream: Boolean(chat.streamOverlay),
-        streamApproval: approvalAnchors.afterStream.length > 0,
-        typing: chat.waitTyping,
-        trail: approvalAnchors.trailing.length > 0
-      });
-  const renderFeedSlot = (slot: FeedSlot): ReactNode => {
-    switch (slot.kind) {
-      case 'message': {
-        const mi = slot.messageIndex ?? 0;
-        const m = feedMessages[mi];
-        if (!m) return null;
-        if (messageHasStructuredParts(m.parts)) {
-          return (
-            <ChatTurnFromMessage
-              m={m}
-              sessionId={sid}
-              msgIndex={mi}
-              modelView={modelView}
-              toolCallsById={toolCallsById}
-              resolvedCallIds={resolvedCallIds}
-            />
-          );
-        }
-        const role = normalizedRole(m);
-        const plain = msgPartsToText(m.parts);
-        if (role === 'tool' || role === 'system') return <ChatTurnPlain role={role} text={plain} />;
-        return (
-          <ChatTurnFromMessage
-            m={m}
-            sessionId={sid}
-            msgIndex={mi}
-            modelView={modelView}
-            toolCallsById={toolCallsById}
-            resolvedCallIds={resolvedCallIds}
-          />
-        );
-      }
-      case 'approval': {
-        const pending =
-          slot.messageIndex == null ? approvalAnchors.afterStream : approvalAnchors.afterMessage.get(slot.messageIndex);
-        if (!pending?.length) return null;
-        return <ApprovalBanner approvals={pending} onDone={onApprovalsChanged} onAttachStream={onAttachStream} />;
-      }
-      case 'stats': {
-        if (slot.turnIndex == null) return null;
-        const line = turnFeedStatLines[slot.turnIndex] ?? null;
-        if (!line) return null;
-        return <ChatFeedStatsFooter line={line} turnIndex={slot.turnIndex} />;
-      }
-      case 'optimistic':
-        return <ChatTurnPlain role="user" text={chat.optimisticUser ?? ''} />;
-      case 'stream':
-        return (
-          <ChatTurnStreaming
-            segments={chat.streamOverlay?.segments ?? []}
-            sessionId={sid}
-            resolvedCallIds={resolvedCallIds}
-          />
-        );
-      case 'typing':
-        return <ChatTurnPlain role="assistant" text="…" extraClass="chat-turn--typing" />;
-      case 'trail':
-        return (
-          <ApprovalBanner
-            approvals={approvalAnchors.trailing}
-            onDone={onApprovalsChanged}
-            onAttachStream={onAttachStream}
-          />
-        );
-      default: {
-        const unreachable: never = slot.kind;
-        return unreachable;
-      }
-    }
-  };
-  let feedEmpty: ReactNode = null;
-  if (noTranscriptYet && !selectedSessionId) {
-    feedEmpty = chat.needsModelSetup ? (
-      <div className="chat-empty chat-empty--setup">
-        <h3 className="chat-empty__title">{t('play.empty.setupTitle')}</h3>
-        <p className="chat-empty__hint">{t('play.empty.setupHint')}</p>
-        <button type="button" className="btn btn-primary btn-sm chat-empty__cta" onClick={onOpenModelSetup}>
-          {t('play.empty.setupCta')}
-        </button>
-        <button type="button" className="btn btn-ghost btn-sm chat-empty__cta" onClick={onNewSession}>
-          {t('play.empty.setupLater')}
-        </button>
-      </div>
-    ) : (
-      <div className="chat-empty">
-        <h3 className="chat-empty__title">{botSurface ? t('play.empty.selectOrCreateBot') : t('play.empty.selectOrCreateSession')}</h3>
-        <p className="chat-empty__hint">{botSurface ? t('play.empty.hintBot') : t('play.empty.hintSession')}</p>
-        {botSurface ? (
-          <a className="btn btn-primary btn-sm chat-empty__cta" href={formatHash({ section: 'agents', sub: 'bots' })}>
-            {t('play.newBot')}
-          </a>
-        ) : (
-          <button type="button" className="btn btn-primary btn-sm chat-empty__cta" onClick={onNewSession}>
-            {t('play.newSession')}
-          </button>
-        )}
-        {botSurface ? (
-          <a className="chat-empty__link" href={formatHash({ section: 'agents', sub: 'bots' })}>
-            {t('play.settings.manageBots')}
-          </a>
-        ) : null}
-      </div>
-    );
-  } else if (noTranscriptYet) {
-    feedEmpty = (
-      <>
-        <div className="chat-empty">
-          <h3 className="chat-empty__title">{t('play.empty.noMessages')}</h3>
-          <p className="chat-empty__hint">
-            {chat.needsModelSetup ? t('play.empty.startAfterSetup') : t('play.empty.startChat')}
-          </p>
-          {chat.needsModelSetup ? (
-            <button type="button" className="btn btn-primary btn-sm chat-empty__cta" onClick={onOpenModelSetup}>
-              {t('play.empty.setupCta')}
-            </button>
-          ) : null}
-        </div>
-        {sessionApprovals.length ? (
-          <ApprovalBanner approvals={sessionApprovals} onDone={onApprovalsChanged} onAttachStream={onAttachStream} />
-        ) : null}
-      </>
-    );
-  }
-  const feedHeader = (
-    <>
-      {chat.showModelView ? (
-        <div className="model-view-banner" role="status">
-          {t('play.chrome.modelViewBanner', { policy: chat.modelViewPayload?.policy ?? '—' })}
-          {chat.modelViewPayload
-            ? t('play.chrome.modelViewStats', {
-                collapsed: chat.modelViewPayload.stats.collapsed,
-                saved: chat.modelViewPayload.stats.charsSaved
-              })
-            : ''}
-          <span className="muted">{t('play.chrome.storedFull')}</span>
-        </div>
-      ) : null}
-      {chat.historyCursor != null ? (
-        <div className="chat-feed__older">
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            disabled={chat.historyLoading}
-            onClick={() => void chat.loadOlderHistory('scroll')}
-          >
-            {chat.historyLoading ? t('play.chrome.loadingOlder') : t('play.chrome.loadOlder')}
-          </button>
-        </div>
-      ) : null}
-      {feedEmpty}
-    </>
-  );
-
 
   return (
     <section className={`panel ${active ? 'active' : ''}`} id="panel-play">
@@ -1138,22 +943,18 @@ export function PlayPanel({
 
             <div className="chat-panel-body">
               <div className="chat-feed-shell">
-                <SurfaceContextProvider messages={chat.displayMessages}>
-                  <ChatFeedWindow
-                    scrollerRef={chat.playMessagesRef}
-                    slots={feedSlots}
-                    renderSlot={renderFeedSlot}
-                    stickToBottomRef={chat.playStickToBottomRef}
-                    scrollIntentRef={chat.feedScrollIntentRef}
-                    revision={chat.feedRevision}
-                    hasOlder={chat.historyCursor != null}
-                    olderLoading={chat.historyLoading}
-                    onStickScroll={chat.handlePlayMessagesScroll}
-                    onRequestOlder={(reason) => void chat.loadOlderHistory(reason)}
-                    header={feedHeader}
-                    footer={feedHasTurns && !statsLive ? <ChatStopReasonFooter outcome={chrome?.outcome} /> : null}
-                  />
-                </SurfaceContextProvider>
+                <PlayTranscript
+                  chat={chat}
+                  selectedSessionId={selectedSessionId}
+                  sessionApprovals={sessionApprovals}
+                  turnFeedStatLines={turnFeedStatLines}
+                  botSurface={botSurface}
+                  footer={feedHasTurns && !statsLive ? <ChatStopReasonFooter outcome={chrome?.outcome} /> : null}
+                  onOpenModelSetup={onOpenModelSetup}
+                  onNewSession={onNewSession}
+                  onApprovalsChanged={onApprovalsChanged}
+                  onAttachStream={onAttachStream}
+                />
                 {chat.showJumpToLatest ? (
                   <button
                     type="button"

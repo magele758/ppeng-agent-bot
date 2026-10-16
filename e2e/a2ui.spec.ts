@@ -107,7 +107,7 @@ test.describe('A2UI', () => {
         })
       });
     });
-    await page.route(`**/api/sessions/${sessionId}`, (route) => {
+    await page.route(new RegExp(`/api/sessions/${sessionId}(?:\\?|$)`), (route) => {
       void route.fulfill({
         status: 200,
         contentType: 'application/json',

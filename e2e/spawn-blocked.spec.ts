@@ -19,7 +19,7 @@ test.describe('Blocked teammate result', () => {
     await page.route('**/api/sessions', (route) => {
       void route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ sessions: [session] }) });
     });
-    await page.route(`**/api/sessions/${sessionId}`, (route) => {
+    await page.route(new RegExp(`/api/sessions/${sessionId}(?:\\?|$)`), (route) => {
       void route.fulfill({
         status: 200,
         contentType: 'application/json',

@@ -14,12 +14,12 @@ import {
   FEED_NEAR_TOP_PX,
   FEED_OVERSCAN_PX,
   FEED_ROW_ESTIMATE_PX,
+  feedRange,
   historyWindow,
   prefixHeights,
-  preservedScrollTop,
-  rangeIncluding,
-  scrollTopAfterPrepend,
-  scrollTopToAnchor,
+  rememberRowHeight,
+  resolveFeedScroll,
+  shouldAutoLoadOlder,
   splitPinnedSuffix,
   type FeedRange,
   type FeedScrollIntent,
@@ -102,83 +102,38 @@ export function ChatFeedWindow({
   prefixRef.current = prefix;
   void heightsVersion;
 
-  const intent = scrollIntentRef.current;
-  const focusKey = intent && intent.kind !== 'bottom' ? intent.key : undefined;
-  const focusIndex = focusKey ? history.findIndex((slot) => slot.key === focusKey) : -1;
-  let range = historyWindow({
-    count: history.length,
-    scrollTop,
-    viewport,
-    prefix,
-    overscanPx: FEED_OVERSCAN_PX,
-    stickToBottom: stickToBottomRef.current,
-    fallbackRows: FEED_FALLBACK_ROWS
-  });
-  if (focusIndex >= 0) range = rangeIncluding(range, focusIndex, history.length, prefix);
+  const range = feedRange(history, scrollTop, viewport, prefix, stickToBottomRef.current, scrollIntentRef.current);
 
   const onHeight = useCallback((key: string, height: number) => {
-    const previous = heightsRef.current.get(key) ?? FEED_ROW_ESTIMATE_PX;
-    if (Math.abs(previous - height) < 1) {
-      heightsRef.current.set(key, height);
-      return;
-    }
-    const index = historyRef.current.findIndex((slot) => slot.key === key);
+    const row = rememberRowHeight({
+      heights: heightsRef.current,
+      history: historyRef.current,
+      prefix: prefixRef.current,
+      key,
+      height,
+      scrollTop: scrollerRef.current?.scrollTop ?? 0,
+      stick: stickToBottomRef.current,
+      pending: scrollIntentRef.current != null
+    });
     const el = scrollerRef.current;
-    if (!scrollIntentRef.current && el && index >= 0 && !stickToBottomRef.current) {
-      const rowBottom = (prefixRef.current[index] ?? 0) + previous;
-      if (rowBottom <= el.scrollTop + 1) el.scrollTop += height - previous;
-    }
-    heightsRef.current.set(key, height);
-    setHeightsVersion((version) => version + 1);
-  }, [scrollerRef, stickToBottomRef]);
+    if (el) el.scrollTop += row.shift;
+    if (row.changed) setHeightsVersion((version) => version + 1);
+  }, [scrollerRef, stickToBottomRef, scrollIntentRef]);
 
   useLayoutEffect(() => {
     const el = scrollerRef.current;
     if (!el) return;
-    const pending = scrollIntentRef.current;
-    if (pending) {
+    const applied = resolveFeedScroll(el, scrollIntentRef.current, intentTriesRef.current);
+    scrollIntentRef.current = applied.intent;
+    intentTriesRef.current = applied.tries;
+    if (applied.scrollTop != null) {
       applyingScrollRef.current = true;
-      if (pending.kind === 'bottom') {
-        scrollIntentRef.current = null;
-        intentTriesRef.current = 0;
-        el.scrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
-      } else {
-        intentTriesRef.current += 1;
-        const node =
-          pending.key != null
-            ? el.querySelector<HTMLElement>(`[data-feed-key="${cssEscape(pending.key)}"]`)
-            : null;
-        if (node && pending.offset != null) {
-          const current = node.getBoundingClientRect().top - el.getBoundingClientRect().top;
-          if (Math.abs(current - pending.offset) <= 1 || intentTriesRef.current > 4) {
-            scrollIntentRef.current = null;
-            intentTriesRef.current = 0;
-          }
-          el.scrollTop = preservedScrollTop(
-            scrollTopToAnchor(el.scrollTop, current, pending.offset),
-            el.scrollHeight,
-            el.clientHeight
-          );
-        } else if (pending.kind === 'prepend') {
-          scrollIntentRef.current = null;
-          intentTriesRef.current = 0;
-          el.scrollTop = preservedScrollTop(
-            scrollTopAfterPrepend(pending.top, pending.height, el.scrollHeight),
-            el.scrollHeight,
-            el.clientHeight
-          );
-        } else {
-          scrollIntentRef.current = null;
-          intentTriesRef.current = 0;
-          el.scrollTop = preservedScrollTop(pending.top, el.scrollHeight, el.clientHeight);
-        }
-      }
+      el.scrollTop = applied.scrollTop;
       applyingScrollRef.current = false;
-      setScrollTop(el.scrollTop);
+      setScrollTop(applied.scrollTop);
     }
     if (el.clientHeight !== viewport) setViewport(el.clientHeight);
-    const unread = el.scrollHeight <= el.clientHeight + 1;
-    if (hasOlder && !olderLoading && unread) onRequestOlderRef.current('auto');
+    if (shouldAutoLoadOlder(hasOlder, olderLoading, el.scrollHeight, el.clientHeight)) onRequestOlderRef.current('auto');
   }, [hasOlder, heightsVersion, olderLoading, revision, scrollerRef, scrollIntentRef, slots.length, viewport]);
 
   const onScroll = (event: UIEvent<HTMLDivElement>) => {
@@ -234,7 +189,3 @@ export function ChatFeedWindow({
   );
 }
 
-function cssEscape(value: string): string {
-  if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') return CSS.escape(value);
-  return value.replace(/["\\]/g, '\\$&');
-}

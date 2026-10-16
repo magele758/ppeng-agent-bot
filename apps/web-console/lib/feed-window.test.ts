@@ -3,16 +3,23 @@ import assert from 'node:assert/strict';
 import { prependHistoryPage } from './history-window.ts';
 import {
   FEED_ROW_ESTIMATE_PX,
+  canRequestOlderPage,
+  feedRange,
   historyWindow,
+  nextTranscriptWindow,
   planFeedScroll,
   prefixHeights,
   preservedScrollTop,
+  rangeIncluding,
+  resolveFeedScroll,
   scrollTopAfterPrepend,
   scrollTopToAnchor,
   sessionFeedSearch,
   splitPinnedSuffix,
   streamEventNeedsTranscriptRefetch,
-  buildFeedSlots
+  buildFeedSlots,
+  heightScrollShift,
+  shouldAutoLoadOlder
 } from './feed-window.ts';
 
 const page = (from: number, to: number) =>
@@ -80,6 +87,53 @@ test('loaded rows stay windowed and the tail stays mounted while following the b
   const split = splitPinnedSuffix(slots);
   assert.equal(split.history.length, 80);
   assert.deepEqual(split.pinned.map((slot) => slot.kind), ['stream']);
+});
+
+test('scroll intent keeps an anchor row and a short page can auto-load [AC:play-feed-window#AC-2] [AC:play-feed-window#AC-5]', () => {
+  const anchor = { top: 12, height: 400, key: 'm:1', offset: 20 };
+  const el = {
+    scrollHeight: 900,
+    clientHeight: 200,
+    scrollTop: 0,
+    getBoundingClientRect: () => ({ top: 0 }),
+    querySelector: () => ({ getBoundingClientRect: () => ({ top: 80 }) })
+  };
+  const moved = resolveFeedScroll(el, { kind: 'prepend', top: 0, height: 400, key: 'm:1', offset: 20 }, 0);
+  assert.equal(moved.scrollTop, 60);
+  assert.equal(moved.intent?.kind, 'prepend');
+  el.scrollTop = 60;
+  el.querySelector = () => ({ getBoundingClientRect: () => ({ top: 20 }) });
+  assert.equal(resolveFeedScroll(el, moved.intent, moved.tries).intent, null);
+  const bottom = resolveFeedScroll({ ...el, scrollHeight: 500 }, { kind: 'bottom' }, 0);
+  assert.equal(bottom.scrollTop, 300);
+  const pinned = resolveFeedScroll({ ...el, querySelector: () => null }, { kind: 'pin', top: 40 }, 0);
+  assert.equal(pinned.scrollTop, 40);
+  const planned = nextTranscriptWindow({
+    sameSession: true,
+    previous: page(1, 40),
+    incoming: page(20, 50),
+    hasMore: true,
+    nextCursor: 20,
+    previousCursor: 1,
+    stick: false,
+    anchor
+  });
+  assert.equal(planned.cursor, 1);
+  assert.equal(planned.stick, false);
+  assert.equal(canRequestOlderPage({ sessionId: 's', cursor: 1, loading: false, reason: 'scroll', blocked: false }), true);
+  assert.equal(canRequestOlderPage({ sessionId: null, cursor: 1, loading: false, reason: 'scroll', blocked: false }), false);
+  assert.equal(canRequestOlderPage({ sessionId: 's', cursor: 1, loading: false, reason: 'auto', blocked: true }), false);
+  assert.equal(resolveFeedScroll(el, null, 0).scrollTop, null);
+  const fallback = resolveFeedScroll({ ...el, scrollTop: 4, querySelector: () => null }, { kind: 'prepend', top: 4, height: 10 }, 0);
+  assert.equal(fallback.intent, null);
+  assert.equal(typeof fallback.scrollTop, 'number');
+  assert.equal(heightScrollShift({ index: 0, previous: 10, next: 30, rowTop: 0, scrollTop: 40, stick: false, pending: false }), 20);
+  assert.equal(shouldAutoLoadOlder(true, false, 100, 200), true);
+  const prefix = prefixHeights(10, () => 10);
+  const widened = rangeIncluding({ start: 0, end: 2, padTop: 0, padBottom: 80 }, 8, 10, prefix);
+  assert.ok(widened.start <= 8 && widened.end > 8);
+  const ranged = feedRange([{ key: 'a' }, { key: 'b' }], 0, 0, prefixHeights(2, () => 10), true, { kind: 'pin', top: 0, key: 'b', offset: 0 });
+  assert.equal(ranged.end, 2);
 });
 
 test('a refresh keeps the scroll offset unless the reader is already on the tail [AC:play-feed-window#AC-5]', () => {
