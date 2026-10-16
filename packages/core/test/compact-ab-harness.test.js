@@ -10,14 +10,18 @@ import {
   applyCompactAbSeedToStore,
   buildCompactAbSeed,
   compactAbPolicyConfig,
+  followUpToolCalls,
   formatCompactAbReport,
+  isCommandReexecution,
   parseCaseList,
   parsePolicyList,
   previewCompactAbView,
+  scoreRecall,
   seedMessages,
   summarizeCompactAbRuns
 } from '../dist/session/compact-ab-harness.js';
-import { microCompactMessages } from '../dist/session/micro-compact.js';
+import { microCompactMessages, parseToolResultStubRef } from '../dist/session/micro-compact.js';
+import { createBuiltinTools } from '../dist/tools/builtin-tools.js';
 
 const FACT = 'ppeng-gateway-rel_deadbeef00.tgz';
 
@@ -203,6 +207,49 @@ test('answerRecallsToken and report lists tool / stdout / recall / tokens', () =
   assert.match(text, /chars_saved=0/);
 });
 
+test('followUpPrompt forbids re-running commands but permits history recovery', () => {
+  const seed = buildCompactAbSeed({ token: FACT, caseId: 'silent' });
+  const prompt = seed.followUp;
+  // must NOT say "Do not use tools" (that blocked retrieve_tool_result too)
+  assert.equal(prompt.includes('Do not use tools'), false);
+  // must forbid re-running commands
+  assert.match(prompt, /[Dd]o not re.?run|not re-run/i);
+  // must permit history / transcript recovery
+  assert.match(prompt, /history|transcript|session/i);
+  // must still ask for the filename and only the filename
+  assert.match(prompt, /tarball|filename/i);
+  assert.match(prompt, /[Rr]eply with only/i);
+});
+
+test('formatCompactAbReport includes follow_up_tools when present', () => {
+  const text = formatCompactAbReport({
+    generatedAt: '2026-09-02T00:00:00.000Z',
+    adapter: 'test',
+    model: 'm',
+    runs: [
+      {
+        policy: 'after_text_assistant',
+        caseId: 'silent',
+        token: FACT,
+        recalled: true,
+        expectedTokenInView: false,
+        collapsed: 3,
+        charsSaved: 700,
+        viewTokens: 80,
+        baselineTokens: 200,
+        elapsedMs: 12,
+        answerPreview: FACT,
+        toolName: 'bash',
+        stdoutSummary: 'ls: 18-line listing (1200ch)',
+        followUpTools: ['retrieve_tool_result']
+      }
+    ],
+    summary: summarizeCompactAbRuns([])
+  });
+  assert.match(text, /follow_up_tools=retrieve_tool_result/);
+});
+
+
 test('runtime follow-up sees stubbed dump under after_text, verbatim under keep_recent', async () => {
   const liveToken = 'ppeng-gateway-rel_liveview01.tgz';
   const seed = buildCompactAbSeed({ token: liveToken, caseId: 'silent', minChars: 2400 });
@@ -245,4 +292,107 @@ test('runtime follow-up sees stubbed dump under after_text, verbatim under keep_
   assert.match(keepView, /rel_liveview01/);
   assert.match(afterView, /earlier tool output was omitted to save space/);
   assert.equal(afterView.includes(liveToken), false);
+});
+
+test('command re-execution is recalled=false; qualityRegression=true when keep_recent recalled', () => {
+  const tok = 'ppeng-gateway-rel_reexec01.tgz';
+  // Any command tool => scoreRecall returns false regardless of answer content
+  for (const tool of ['bash', 'exec', 'bg_run', 'work_evidence']) {
+    const result = scoreRecall({ answer: tok, token: tok, followUpTools: [tool] });
+    assert.equal(result, false, `expected false for tool=${tool}`);
+  }
+  // Non-command tool with correct answer => recalled=true
+  assert.equal(scoreRecall({ answer: tok, token: tok, followUpTools: ['retrieve_tool_result'] }), true);
+  assert.equal(scoreRecall({ answer: tok, token: tok, followUpTools: [] }), true);
+
+  // qualityRegression=true when keep_recent recalled but after_text re-executed
+  const summary = summarizeCompactAbRuns([
+    { policy: 'keep_recent', caseId: 'silent', token: tok, recalled: true, expectedTokenInView: true, collapsed: 0, charsSaved: 0, viewTokens: 100, baselineTokens: 100, elapsedMs: 1, answerPreview: tok },
+    { policy: 'after_text_assistant', caseId: 'silent', token: tok, recalled: false, expectedTokenInView: false, collapsed: 3, charsSaved: 500, viewTokens: 50, baselineTokens: 100, elapsedMs: 1, answerPreview: '' }
+  ]);
+  assert.equal(summary.qualityRegression, true);
+  assert.equal(summary.recalled, 1);
+});
+
+test('retrieve_tool_result / non-command follow-up with correct answer is recalled=true', () => {
+  const tok = 'ppeng-gateway-rel_recall02.tgz';
+  assert.equal(scoreRecall({ answer: tok, token: tok, followUpTools: ['retrieve_tool_result'] }), true);
+  assert.equal(scoreRecall({ answer: tok, token: tok, followUpTools: ['history_read'] }), true);
+  assert.equal(scoreRecall({ answer: tok, token: tok, followUpTools: [] }), true);
+  // wrong answer => false even with non-command tools
+  assert.equal(scoreRecall({ answer: 'nope', token: tok, followUpTools: ['retrieve_tool_result'] }), false);
+  // isCommandReexecution helpers
+  assert.equal(isCommandReexecution(['retrieve_tool_result']), false);
+  assert.equal(isCommandReexecution(['bash']), true);
+  assert.equal(isCommandReexecution([]), false);
+});
+
+test('followUpToolCalls ignores seeded tool calls before the follow-up message', () => {
+  const seed = buildCompactAbSeed({ token: FACT, caseId: 'silent' });
+  const msgs = seedMessages(seed);
+  // seed has bash tool_calls; none are after the follow-up user message
+  const before = followUpToolCalls(msgs, seed.followUp);
+  assert.deepEqual(before, [], 'seeded bash calls must not appear');
+
+  // append an assistant tool_call after the follow-up message
+  const extra = [
+    ...msgs,
+    {
+      id: 'a_extra',
+      sessionId: 'compact-ab',
+      role: 'assistant',
+      parts: [{ type: 'tool_call', toolCallId: 'tc_x', name: 'retrieve_tool_result', input: {} }],
+      createdAt: '2026-09-02T00:00:00.000Z'
+    }
+  ];
+  const after = followUpToolCalls(extra, seed.followUp);
+  assert.deepEqual(after, ['retrieve_tool_result']);
+});
+
+
+test('after_text_assistant stub carries msg=/part= and retrieve_tool_result recovers ls output', async () => {
+  const seed = buildCompactAbSeed({ token: FACT, caseId: 'silent', minChars: 2400 });
+
+  // Seed a runtime store with real messages so IDs are assigned by the store
+  const runtime = new RawAgentRuntime({
+    repoRoot: mkdtempSync(join(tmpdir(), 'cab-ret-repo-')),
+    stateDir: mkdtempSync(join(tmpdir(), 'cab-ret-state-')),
+    modelAdapter: {
+      name: 'stub',
+      async runTurn() {
+        return { stopReason: 'end', assistantParts: [{ type: 'text', text: 'ok' }] };
+      },
+      async summarizeMessages() { return 'summary'; }
+    }
+  });
+  const session = runtime.createChatSession({ title: 'ret-test', agentId: 'general', message: seed.firstUser });
+  applyCompactAbSeedToStore(runtime.store, session.id, seed);
+
+  // Compact the stored messages (uses store-assigned IDs) to get stubs with real msg= values
+  const stored = runtime.store.foldMessages(session.id);
+  const live = microCompactMessages(stored, compactAbPolicyConfig('after_text_assistant'));
+  const stubParts = live.messages.flatMap((m) => m.parts.filter((p) => p.type === 'tool_result'));
+  assert.equal(stubParts.length, 3, 'all three tool_results must be present as stubs');
+
+  // Parse msg=/part= from the actual stub text using parseToolResultStubRef
+  const lsStub = stubParts[0];
+  assert.ok(lsStub, 'first stub must exist');
+  const ref = parseToolResultStubRef(lsStub.content);
+  assert.ok(ref, `parseToolResultStubRef failed on: ${lsStub.content.slice(0, 80)}`);
+  assert.ok(ref.messageId, 'stub must carry msg=');
+  assert.equal(lsStub.content.includes(FACT), false, 'stub must not expose the token');
+
+  // Call retrieve_tool_result with the parsed address — must recover ls output containing the token
+  const tools = createBuiltinTools({
+    listSessionMessages: (sid) => runtime.store.foldMessages(sid)
+  });
+  const retrieveTool = tools.find((t) => t.name === 'retrieve_tool_result');
+  assert.ok(retrieveTool, 'retrieve_tool_result must be registered');
+
+  const ctx = { repoRoot: process.cwd(), stateDir: process.cwd(), agent: { id: 'general' }, session: { id: session.id } };
+  const byId = await retrieveTool.execute(ctx, { message_id: ref.messageId });
+  assert.equal(byId.ok, true, `retrieve by id failed: ${byId.content}`);
+  assert.match(byId.content, new RegExp(FACT), 'recovered content must contain the token');
+
+  await runtime.destroy();
 });

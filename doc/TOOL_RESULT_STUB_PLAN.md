@@ -136,6 +136,8 @@ Chat Completions **做不到**「模型开始吐字的同时挖掉本轮 KV」�
 
 占位已带 `msg=`/`part=`/`seq=`。重调应优先 `retrieve_tool_result`，而不是再跑一遍有副作用的命令。`SessionLoopGuard` 仍兜底同工具连打。
 
+compact-ab 评测的后续追问（`followUpPrompt`）禁止重跑命令，允许通过本会话历史恢复输出；若模型在后续轮调了 `bash`/`exec`/`bg_run`/`work_evidence` 等命令工具则计为 recalled=false（召回失败，非错误），见 `packages/core/src/session/compact-ab-harness.ts` 的 `scoreRecall`。
+
 ---
 
 ## 5. 明确不做（本轮）
