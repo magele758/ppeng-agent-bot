@@ -134,6 +134,8 @@ export const play = {
     modelViewStats: ' · collapsed={collapsed} · saved {saved} chars',
     storedFull: ' · stored copy is still full text',
     jumpLatest: 'Jump to latest',
+    loadOlder: 'Load older messages',
+    loadingOlder: 'Loading older messages…',
     needsModel: 'No model of your own yet. Add a provider in the workbench and enable a model.'
   },
 

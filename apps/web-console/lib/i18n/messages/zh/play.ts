@@ -134,6 +134,8 @@ export const play = {
     modelViewStats: ' · collapsed={collapsed} · 省 {saved} 字',
     storedFull: ' · 落库仍是全文',
     jumpLatest: '回到最新消息',
+    loadOlder: '加载更早的消息',
+    loadingOlder: '正在加载更早的消息…',
     needsModel: '尚未配置自己的模型。请在工作台添加服务商并勾选模型。'
   },
 
