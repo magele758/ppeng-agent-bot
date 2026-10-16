@@ -75,9 +75,10 @@ function layoutFor(shape: BotFaceShape | null): FaceLayout {
       return { left: 27, right: 37, eyeY: 32, eyeW: 5, eyeH: 13, mouthY: 46, markY: 16 };
     case 'bean':
       return { left: 24, right: 40, eyeY: 33, eyeW: 5, eyeH: 11, mouthY: 42, markY: 18 };
+    case 'flower':
+      return { left: 26.5, right: 37.5, eyeY: 32, eyeW: 5.2, eyeH: 12, mouthY: 44, markY: 14 };
     case 'cloud':
     case 'clover':
-    case 'flower':
     case 'splat':
     case 'hexagon':
     case 'circle':
@@ -186,12 +187,12 @@ function Silhouette({ shape, fill, dashed }: { shape: BotFaceShape | 'empty'; fi
     case 'flower':
       return (
         <g fill={fill} stroke={stroke} strokeWidth="1.2" strokeDasharray={dash}>
-          <circle cx="32" cy="14" r="11" />
-          <circle cx="49" cy="26" r="11" />
-          <circle cx="42" cy="46" r="11" />
-          <circle cx="22" cy="46" r="11" />
-          <circle cx="15" cy="26" r="11" />
-          <circle cx="32" cy="32" r="9" />
+          <circle cx="32" cy="20" r="15" />
+          <circle cx="43.41" cy="28.29" r="15" />
+          <circle cx="39.05" cy="41.71" r="15" />
+          <circle cx="24.95" cy="41.71" r="15" />
+          <circle cx="20.59" cy="28.29" r="15" />
+          <circle cx="32" cy="32" r="14" />
         </g>
       );
     case 'teardrop':
