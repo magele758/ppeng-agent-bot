@@ -5,8 +5,16 @@ import { api } from '@/lib/api';
 import {
   contextStackLegend,
   formatContextShare,
-  stackContextSegments
+  stackContextSegments,
+  type ContextStackSegment
 } from '@/lib/context-stack-bar';
+import {
+  buildContextReplayFrames,
+  replayFrameIndex,
+  selectContextReplayFrame,
+  type ReplayFrame,
+  type ReplaySnapshot
+} from '@/lib/context-stack-replay';
 import { useI18n, type MessageKey } from '@/lib/i18n';
 
 interface ContextStackBlock {
@@ -41,6 +49,8 @@ interface ContextStackPayload {
   blocks: ContextStackBlock[];
   budget: ContextStackBudget;
 }
+
+type TFn = ReturnType<typeof useI18n>['t'];
 
 function kindKey(kind: string): MessageKey | null {
   switch (kind) {
@@ -79,6 +89,297 @@ function kindKey(kind: string): MessageKey | null {
   }
 }
 
+function settledError(reason: unknown): string {
+  if (reason instanceof Error) return reason.message;
+  return String(reason);
+}
+
+function readStack(result: PromiseSettledResult<unknown>): { data: ContextStackPayload | null; err: string | null } {
+  if (result.status === 'rejected') return { data: null, err: settledError(result.reason) };
+  return { data: result.value as ContextStackPayload, err: null };
+}
+
+function readSnapshots(result: PromiseSettledResult<unknown>): { snapshots: ReplaySnapshot[]; err: string | null } {
+  if (result.status === 'rejected') return { snapshots: [], err: settledError(result.reason) };
+  const history = result.value as { snapshots?: ReplaySnapshot[] };
+  if (!Array.isArray(history.snapshots)) return { snapshots: [], err: null };
+  return { snapshots: history.snapshots, err: null };
+}
+
+function matchingBody(data: ContextStackPayload | null, sessionId: string | null): ContextStackPayload | null {
+  if (!data || data.sessionId !== sessionId) return null;
+  return data;
+}
+
+function formatReplayTime(iso: string | null, locale: string): string {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  const tag = locale === 'zh' ? 'zh-CN' : 'en';
+  return new Intl.DateTimeFormat(tag, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date);
+}
+
+function replayPositionLabel(frame: ReplayFrame, locale: string, t: TFn): string {
+  if (frame.live) return t('play.contextStack.replayLive');
+  return t('play.contextStack.replayAt', {
+    turn: String(frame.turn ?? ''),
+    time: formatReplayTime(frame.createdAt, locale)
+  });
+}
+
+function frameIdAt(frames: readonly ReplayFrame[], index: number): string {
+  const frame = selectContextReplayFrame(frames, index);
+  if (!frame) return 'live';
+  return frame.id;
+}
+
+function labelForKind(kind: string, t: TFn): string {
+  const key = kindKey(kind);
+  if (!key) return kind;
+  return t(key);
+}
+
+function MissingSession({ sessionId, t }: { sessionId: string | null; t: TFn }) {
+  if (sessionId) return null;
+  return <p className="empty-hint">{t('play.contextStack.pickSession')}</p>;
+}
+
+function LoadError({ err, t }: { err: string | null; t: TFn }) {
+  if (!err) return null;
+  return <p className="empty-hint">{t('play.contextStack.loadFailed', { message: err })}</p>;
+}
+
+function ReplayError({ err, t }: { err: string | null; t: TFn }) {
+  if (!err) return null;
+  return <p className="empty-hint">{t('play.contextStack.replayLoadFailed', { message: err })}</p>;
+}
+
+function LoadingLine({ show, t }: { show: boolean; t: TFn }) {
+  if (!show) return null;
+  return <p className="empty-hint">{t('play.contextStack.loading')}</p>;
+}
+
+function ReplayBar({
+  frames,
+  index,
+  frame,
+  locale,
+  onSelect,
+  t
+}: {
+  frames: readonly ReplayFrame[];
+  index: number;
+  frame: ReplayFrame;
+  locale: string;
+  onSelect: (id: string) => void;
+  t: TFn;
+}) {
+  const label = replayPositionLabel(frame, locale, t);
+  return (
+    <>
+      <HistoryHint live={frame.live} t={t} />
+      <div className="context-stack__replay">
+        <button type="button" className="btn btn-ghost btn-sm" onClick={() => onSelect(frameIdAt(frames, index - 1))} disabled={index <= 0}>
+          {t('play.contextStack.replayEarlier')}
+        </button>
+        <input
+          className="context-stack__scrub"
+          type="range"
+          min={0}
+          max={Math.max(0, frames.length - 1)}
+          step={1}
+          value={index}
+          disabled={frames.length <= 1}
+          aria-label={t('play.contextStack.replayScrub')}
+          aria-valuetext={label}
+          onChange={(event) => onSelect(frameIdAt(frames, Number(event.target.value)))}
+        />
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          onClick={() => onSelect(frameIdAt(frames, index + 1))}
+          disabled={index >= frames.length - 1}
+        >
+          {t('play.contextStack.replayLater')}
+        </button>
+      </div>
+      <p className="context-stack__replay-label">{label}</p>
+    </>
+  );
+}
+
+function HistoryHint({ live, t }: { live: boolean; t: TFn }) {
+  if (live) return null;
+  return <p className="context-stack__hint">{t('play.contextStack.replayHint')}</p>;
+}
+
+function num(value: number | null): string {
+  return String(value ?? 0);
+}
+
+function BudgetLine({ budget, t }: { budget: ContextStackBudget; t: TFn }) {
+  if (budget.mode === 'canonical-bot') {
+    return (
+      <p className="context-stack__budget">
+        {t('play.contextStack.budgetBot', {
+          messages: num(budget.messageTokens),
+          structured: num(budget.structuredTokens),
+          hygiene: num(budget.hygieneTokens),
+          history: num(budget.historyTokens)
+        })}
+      </p>
+    );
+  }
+  return (
+    <p className="context-stack__budget">
+      {t('play.contextStack.budgetNormal', {
+        request: num(budget.requestTokens),
+        cap: num(budget.capTokens),
+        window: num(budget.windowTokens),
+        ratio: String(Math.round((budget.ratio ?? 0.2) * 100))
+      })}
+    </p>
+  );
+}
+
+function BudgetFlag({ show, text }: { show: boolean; text: string }) {
+  if (!show) return null;
+  return <p className="context-stack__note">{text}</p>;
+}
+
+function LiveBudget({ live, budget, t }: { live: boolean; budget: ContextStackBudget; t: TFn }) {
+  if (!live) return null;
+  return (
+    <>
+      <BudgetLine budget={budget} t={t} />
+      <BudgetFlag show={budget.pinnedOverBudget} text={t('play.contextStack.pinnedOver')} />
+      <BudgetFlag show={budget.wouldSummarize} text={t('play.contextStack.wouldSummarize')} />
+      <BudgetFlag show={budget.wouldCompact} text={t('play.contextStack.wouldCompact')} />
+    </>
+  );
+}
+
+function StackBar({ segments, t }: { segments: readonly ContextStackSegment[]; t: TFn }) {
+  if (segments.length === 0) return null;
+  return (
+    <div className="context-stack__bar" role="img" aria-label={t('play.contextStack.barAria')}>
+      {segments.map((segment) => (
+        <span
+          key={segment.id}
+          className={`context-stack__seg context-stack__seg--${segment.disposition}`}
+          style={{ flexGrow: segment.share, backgroundColor: segment.color }}
+          title={`${labelForKind(segment.kind, t)} · ${formatContextShare(segment.share)}%`}
+        />
+      ))}
+    </div>
+  );
+}
+
+function StackLegend({ segments, t }: { segments: readonly ContextStackSegment[]; t: TFn }) {
+  const legend = contextStackLegend(segments);
+  if (legend.length === 0) return null;
+  return (
+    <ul className="context-stack__legend" aria-label={t('play.contextStack.legend')}>
+      {legend.map((item) => (
+        <li key={item.kind}>
+          <span className="context-stack__swatch" style={{ background: item.color }} />
+          <span>{labelForKind(item.kind, t)}</span>
+          <span className="context-stack__share">{formatContextShare(item.share)}%</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function segmentFor(segments: readonly ContextStackSegment[], id: string): ContextStackSegment | undefined {
+  return segments.find((entry) => entry.id === id);
+}
+
+function OptionalText({ text, className }: { text: string; className: string }) {
+  if (!text) return null;
+  return <span className={className}>{text}</span>;
+}
+
+function DispositionFlag({ disposition, t }: { disposition: ContextStackBlock['disposition']; t: TFn }) {
+  if (disposition === 'keep') return null;
+  const text = disposition === 'summarize'
+    ? t('play.contextStack.dispositionSummarize')
+    : t('play.contextStack.dispositionDropped');
+  return <span className="context-stack__flag">{text}</span>;
+}
+
+function ContextBlockRow({
+  item,
+  segment,
+  t
+}: {
+  item: ContextStackBlock;
+  segment: ContextStackSegment | undefined;
+  t: TFn;
+}) {
+  return (
+    <li className={`context-stack__block context-stack__block--${item.disposition}`} data-kind={item.kind}>
+      <div className="context-stack__block-head">
+        <span className="context-stack__swatch" style={{ background: segment?.color }} />
+        <span className="context-stack__kind">{labelForKind(item.kind, t)}</span>
+        <OptionalText text={item.label} className="context-stack__label" />
+        <OptionalText text={item.pinned ? t('play.contextStack.pinned') : ''} className="context-stack__flag" />
+        <DispositionFlag disposition={item.disposition} t={t} />
+        <span className="context-stack__meta">
+          {t('play.contextStack.blockMeta', {
+            tokens: String(item.tokens),
+            share: formatContextShare(segment?.share ?? 0),
+            chars: String(item.chars)
+          })}
+        </span>
+      </div>
+      <pre className="context-stack__text">{item.text}</pre>
+    </li>
+  );
+}
+
+function BlockList({ blocks, segments, t }: { blocks: readonly ContextStackBlock[]; segments: readonly ContextStackSegment[]; t: TFn }) {
+  if (blocks.length === 0) return <p className="empty-hint">{t('play.contextStack.empty')}</p>;
+  return (
+    <ol className="context-stack__list">
+      {blocks.map((item) => (
+        <ContextBlockRow key={item.id} item={item} segment={segmentFor(segments, item.id)} t={t} />
+      ))}
+    </ol>
+  );
+}
+
+function ContextStackBody({
+  body,
+  snapshots,
+  selectedId,
+  locale,
+  onSelect,
+  t
+}: {
+  body: ContextStackPayload;
+  snapshots: readonly ReplaySnapshot[];
+  selectedId: string;
+  locale: string;
+  onSelect: (id: string) => void;
+  t: TFn;
+}) {
+  const frames = buildContextReplayFrames(snapshots, body.blocks);
+  const index = replayFrameIndex(frames, selectedId);
+  const frame = selectContextReplayFrame(frames, index);
+  if (!frame) return null;
+  const stacked = stackContextSegments(frame.blocks);
+  return (
+    <>
+      <ReplayBar frames={frames} index={index} frame={frame} locale={locale} onSelect={onSelect} t={t} />
+      <LiveBudget live={frame.live} budget={body.budget} t={t} />
+      <StackBar segments={stacked.segments} t={t} />
+      <StackLegend segments={stacked.segments} t={t} />
+      <BlockList blocks={frame.blocks} segments={stacked.segments} t={t} />
+    </>
+  );
+}
+
 export function ContextStackPanel({
   sessionId,
   running,
@@ -88,10 +389,13 @@ export function ContextStackPanel({
   running: boolean;
   messageCount: number;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [data, setData] = useState<ContextStackPayload | null>(null);
+  const [snapshots, setSnapshots] = useState<ReplaySnapshot[]>([]);
   const [err, setErr] = useState<string | null>(null);
+  const [replayErr, setReplayErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [selectedId, setSelectedId] = useState('live');
   const request = useRef(0);
 
   const load = useCallback(async () => {
@@ -99,132 +403,62 @@ export function ContextStackPanel({
     const ticket = ++request.current;
     if (!sid) {
       setData(null);
+      setSnapshots([]);
       setErr(null);
+      setReplayErr(null);
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
-      const body = (await api(`/api/sessions/${encodeURIComponent(sid)}/context-stack`)) as ContextStackPayload;
+      const [stackResult, historyResult] = await Promise.allSettled([
+        api(`/api/sessions/${encodeURIComponent(sid)}/context-stack`),
+        api(`/api/sessions/${encodeURIComponent(sid)}/context-snapshots`)
+      ]);
       if (request.current !== ticket) return;
-      setData(body);
-      setErr(null);
-    } catch (error) {
-      if (request.current !== ticket) return;
-      setErr(error instanceof Error ? error.message : String(error));
+      const stack = readStack(stackResult);
+      setData(stack.data);
+      setErr(stack.err);
+      const history = readSnapshots(historyResult);
+      setSnapshots(history.snapshots);
+      setReplayErr(history.err);
     } finally {
       if (request.current === ticket) setLoading(false);
     }
   }, [sessionId]);
 
   useEffect(() => {
+    setSelectedId('live');
+  }, [sessionId]);
+
+  useEffect(() => {
     void load();
   }, [load, running, messageCount]);
 
-  const labelFor = (kind: string) => {
-    const key = kindKey(kind);
-    return key ? t(key) : kind;
-  };
-
-  const body = data && data.sessionId === sessionId ? data : null;
-  const stacked = body ? stackContextSegments(body.blocks) : null;
-  const legend = stacked ? contextStackLegend(stacked.segments) : [];
+  const body = matchingBody(data, sessionId);
+  const showLoading = Boolean(sessionId) && loading && !body;
 
   return (
     <div className="context-stack">
       <div className="context-stack__head">
         <p className="context-stack__hint">{t('play.contextStack.hint')}</p>
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm"
-          onClick={() => void load()}
-          disabled={!sessionId || loading}
-        >
+        <button type="button" className="btn btn-ghost btn-sm" onClick={() => void load()} disabled={!sessionId || loading}>
           {t('play.contextStack.refresh')}
         </button>
       </div>
-      {!sessionId ? <p className="empty-hint">{t('play.contextStack.pickSession')}</p> : null}
-      {err ? <p className="empty-hint">{t('play.contextStack.loadFailed', { message: err })}</p> : null}
-      {sessionId && loading && !body ? <p className="empty-hint">{t('play.contextStack.loading')}</p> : null}
-      {body && stacked ? (
-        <>
-          <p className="context-stack__budget">
-            {body.budget.mode === 'canonical-bot'
-              ? t('play.contextStack.budgetBot', {
-                  messages: String(body.budget.messageTokens),
-                  structured: String(body.budget.structuredTokens ?? 0),
-                  hygiene: String(body.budget.hygieneTokens ?? 0),
-                  history: String(body.budget.historyTokens ?? 0)
-                })
-              : t('play.contextStack.budgetNormal', {
-                  request: String(body.budget.requestTokens),
-                  cap: String(body.budget.capTokens),
-                  window: String(body.budget.windowTokens),
-                  ratio: String(Math.round((body.budget.ratio ?? 0.2) * 100))
-                })}
-          </p>
-          {body.budget.pinnedOverBudget ? <p className="context-stack__note">{t('play.contextStack.pinnedOver')}</p> : null}
-          {body.budget.wouldSummarize ? <p className="context-stack__note">{t('play.contextStack.wouldSummarize')}</p> : null}
-          {body.budget.wouldCompact ? <p className="context-stack__note">{t('play.contextStack.wouldCompact')}</p> : null}
-          {body.blocks.length === 0 ? <p className="empty-hint">{t('play.contextStack.empty')}</p> : null}
-          {body.blocks.length > 0 ? (
-            <div
-              className="context-stack__bar"
-              role="img"
-              aria-label={t('play.contextStack.barAria')}
-            >
-              {stacked.segments.map((segment) => (
-                <span
-                  key={segment.id}
-                  className={`context-stack__seg context-stack__seg--${segment.disposition}`}
-                  style={{ flexGrow: segment.share, backgroundColor: segment.color }}
-                  title={`${labelFor(segment.kind)} · ${formatContextShare(segment.share)}%`}
-                />
-              ))}
-            </div>
-          ) : null}
-          {legend.length > 0 ? (
-            <ul className="context-stack__legend" aria-label={t('play.contextStack.legend')}>
-              {legend.map((item) => (
-                <li key={item.kind}>
-                  <span className="context-stack__swatch" style={{ background: item.color }} />
-                  <span>{labelFor(item.kind)}</span>
-                  <span className="context-stack__share">{formatContextShare(item.share)}%</span>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          <ol className="context-stack__list">
-            {body.blocks.map((item) => {
-              const segment = stacked.segments.find((entry) => entry.id === item.id);
-              return (
-                <li key={item.id} className={`context-stack__block context-stack__block--${item.disposition}`} data-kind={item.kind}>
-                  <div className="context-stack__block-head">
-                    <span className="context-stack__swatch" style={{ background: segment?.color }} />
-                    <span className="context-stack__kind">{labelFor(item.kind)}</span>
-                    {item.label ? <span className="context-stack__label">{item.label}</span> : null}
-                    {item.pinned ? <span className="context-stack__flag">{t('play.contextStack.pinned')}</span> : null}
-                    {item.disposition !== 'keep' ? (
-                      <span className="context-stack__flag">
-                        {item.disposition === 'summarize'
-                          ? t('play.contextStack.dispositionSummarize')
-                          : t('play.contextStack.dispositionDropped')}
-                      </span>
-                    ) : null}
-                    <span className="context-stack__meta">
-                      {t('play.contextStack.blockMeta', {
-                        tokens: String(item.tokens),
-                        share: formatContextShare(segment?.share ?? 0),
-                        chars: String(item.chars)
-                      })}
-                    </span>
-                  </div>
-                  <pre className="context-stack__text">{item.text}</pre>
-                </li>
-              );
-            })}
-          </ol>
-        </>
+      <MissingSession sessionId={sessionId} t={t} />
+      <LoadError err={err} t={t} />
+      <ReplayError err={replayErr} t={t} />
+      <LoadingLine show={showLoading} t={t} />
+      {body ? (
+        <ContextStackBody
+          body={body}
+          snapshots={snapshots}
+          selectedId={selectedId}
+          locale={locale}
+          onSelect={setSelectedId}
+          t={t}
+        />
       ) : null}
     </div>
   );

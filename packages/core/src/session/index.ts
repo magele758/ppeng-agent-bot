@@ -65,6 +65,14 @@ export {
   describeContextBudget,
   previewSessionContextStack
 } from './context-stack.js';
+export {
+  orderContextSnapshots,
+  parseContextSnapshotBlocks,
+  preparedContextSnapshotBlocks,
+  recordPreparedContextSnapshot,
+  selectContextSnapshot
+} from './context-snapshots.js';
+export type { ContextSnapshot, ContextSnapshotBlock } from './context-snapshots.js';
 export type {
   ContextAppendixView,
   ContextBlockDisposition,

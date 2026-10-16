@@ -117,6 +117,7 @@ import type { TurnKernelHost } from '../turn/host.js';
 import { autoCompactSession } from './compact-host.js';
 import { applyNormalSessionRequestBudget } from './normal-request-guard.js';
 import { resolveMaxContextTokens } from '../session/session-budget.js';
+import { recordPreparedContextSnapshot } from '../session/context-snapshots.js';
 import { autoClaimTask, ingestMailbox, unblockDependentTasks } from './scheduler-host.js';
 import { handleTurnCompletion, injectEvolvingCoachBeforeRecovery } from './session-complete.js';
 import { resolveSkillLoad, resolveSkillSearch } from './skill-load.js';
@@ -505,6 +506,24 @@ function fitProductModelRequest(
   const adapter = session
     ? resolveSessionModelAdapter(rt.store, session, process.env, rt.modelAdapter)
     : rt.modelAdapter;
+  if (session) {
+    try {
+      recordPreparedContextSnapshot(rt.store, {
+        session,
+        systemPrompt: input.systemPrompt,
+        tools: input.tools.map((tool) => ({
+          name: tool.name,
+          description: tool.description,
+          inputSchema: tool.inputSchema
+        })),
+        messages: input.messages,
+        adapter,
+        env: process.env
+      });
+    } catch {
+      /* Replay history must not change the turn or write a summary. */
+    }
+  }
   return applyNormalSessionRequestBudget(input, {
     session,
     store: rt.store,

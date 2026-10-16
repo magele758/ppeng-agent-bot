@@ -30,6 +30,8 @@ import { BackgroundJobStore } from './stores/background-job-store.js';
 import { MiscStore } from './stores/misc-store.js';
 import { SessionStore } from './stores/session-store.js';
 import type { CreateSessionInput } from './stores/session-store.js';
+import { ContextSnapshotStore } from './session/context-snapshot-store.js';
+import type { ContextSnapshot, ContextSnapshotBlock } from './session/context-snapshots.js';
 import { StepInboxStore, type EnqueueSteerOptions, type InboxItem } from './session/step-inbox.js';
 import { ImageAssetStore } from './stores/image-asset-store.js';
 import { AttachmentStore } from './stores/attachment-store.js';
@@ -104,6 +106,7 @@ export class SqliteStateStore {
   private readonly artifacts: ArtifactStore;
   private readonly agentCases: AgentCaseStore;
   private readonly bots: BotStore;
+  private readonly contextSnapshots: ContextSnapshotStore;
 
   constructor(dbPath: string) {
     this.dbPath = dbPath;
@@ -126,6 +129,7 @@ export class SqliteStateStore {
     this.artifacts = new ArtifactStore(this.db);
     this.agentCases = new AgentCaseStore(this.db);
     this.bots = new BotStore(this.db);
+    this.contextSnapshots = new ContextSnapshotStore(this.db);
     try {
       this.initialize();
     } catch (error) {
@@ -466,6 +470,17 @@ export class SqliteStateStore {
     const ok = this.sessions.deleteSession(sessionId);
     if (ok) this.bumpVersion();
     return ok;
+  }
+
+  /** Copy of one prepared model view. Identical to the latest row is a no-op. */
+  appendContextSnapshot(sessionId: string, blocks: readonly ContextSnapshotBlock[]): ContextSnapshot {
+    const saved = this.contextSnapshots.append(sessionId, blocks);
+    if (saved.created) this.bumpVersion();
+    return saved.snapshot;
+  }
+
+  listContextSnapshots(sessionId: string): ContextSnapshot[] {
+    return this.contextSnapshots.list(sessionId);
   }
 
   claimWriter(sessionId: string, runId: string): void {

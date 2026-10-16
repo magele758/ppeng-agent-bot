@@ -361,6 +361,13 @@ export const play = {
     dispositionSummarize: '将摘要',
     dispositionDropped: '已排除',
     blockMeta: '{tokens} token · {share}% · {chars} 字',
+    replayEarlier: '上一刻',
+    replayLater: '下一刻',
+    replayScrub: '上下文时间',
+    replayLive: '当前 · 最新',
+    replayAt: '第 {turn} 次 · {time}',
+    replayHint: '这是当时准备好的上下文，只读，不会改会话。',
+    replayLoadFailed: '回放记录读取失败：{message}',
     kinds: {
       system: '系统提示',
       systemMessage: '系统消息',

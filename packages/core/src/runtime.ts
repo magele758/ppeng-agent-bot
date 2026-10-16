@@ -20,6 +20,7 @@ import { SelfHealScheduler } from './self-heal/self-heal-scheduler.js';
 import { attachServedByToTrace } from './model/fallback-chain.js';
 import { PromptBuilder } from './model/prompt-builder.js';
 import { previewSessionContextStack } from './session/context-stack.js';
+import type { ContextSnapshot } from './session/context-snapshots.js';
 import type { ApprovalPolicy } from './approval/approval-policy.js';
 import { expireDueUnattendedApprovals } from './approval/unattended-approval.js';
 import {
@@ -621,6 +622,13 @@ export class RawAgentRuntime {
 
   getSessionMessages(sessionId: string): SessionMessage[] {
     return this.store.listMessages(sessionId);
+  }
+
+  /** Stored prepared views, oldest first. Read-only. */
+  listContextSnapshots(sessionId: string): ContextSnapshot[] {
+    const session = this.store.getSession(sessionId);
+    if (!session) throw new NotFoundError('Session', sessionId);
+    return this.store.listContextSnapshots(sessionId);
   }
 
   /** Read-only prepared model context. Does not compact, claim inbox, or persist a summary. */
