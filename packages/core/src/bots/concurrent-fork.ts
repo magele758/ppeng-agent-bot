@@ -26,6 +26,7 @@ export interface ConcurrentForkRef {
 }
 
 export const CONCURRENT_FORKS_KEY = 'concurrentBotForks';
+export const COORDINATOR_NOTE_PREFIX = '【协调】';
 
 const activeWorkPiece = new Map<string, string>();
 
@@ -131,7 +132,7 @@ function writeForks(store: SqliteStateStore, sessionId: string, forks: Concurren
 }
 
 export function coordinatorNote(childSessionId: string, excerpt: string): string {
-  return `【协调】这段并发工作已交给子代理 ${childSessionId}。你是协调者，不要亲自重做。\n任务摘录：${excerpt.slice(0, 240)}`;
+  return `${COORDINATOR_NOTE_PREFIX}这段并发工作已交给子代理 ${childSessionId}。你是协调者，不要亲自重做。\n任务摘录：${excerpt.slice(0, 240)}`;
 }
 
 export function coordinatorViewOf(session: SessionRecord, messages: SessionMessage[]): SessionMessage[] {

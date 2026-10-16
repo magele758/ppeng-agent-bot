@@ -156,7 +156,7 @@ function approvalsForRun(host:RoutineRuntimeHost,run:RoutineRun):ApprovalRecord[
 function resumeRoutineAfterDecision(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun,executing:Set<string>,lease:RoutineLease):boolean {
  const session=run.sessionId?host.store.getSession(run.sessionId):undefined;
  if(!session){const missing=runs.update(run.id,{status:'unknown',error:'Working context disappeared during approval; verify effects before retry',finishedAt:nowIso()});summarize(host,runs,missing);return false;}
- if(session.status==='running'){recoverInterruptedRoutine(host,runs,run);return false;}
+ if(session.status==='running')return false;
  const approvals=approvalsForRun(host,run);if(approvals.some(approval=>approval.status==='pending'))return false;
  const approved=approvals.some(approval=>approval.status==='approved')&&!approvals.some(approval=>approval.status==='rejected');
  const outcome=parseRunOutcome(session.metadata?.outcome);
