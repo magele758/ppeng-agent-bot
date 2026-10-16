@@ -9,6 +9,7 @@ import {
   recordPreparedContextSnapshot,
   selectContextSnapshot
 } from '../dist/session/context-snapshots.js';
+import { flushPreparedContextSnapshots, queuePreparedContextSnapshot } from '../dist/runtime/l5-bindings.js';
 
 function block(id, text) {
   return {
@@ -148,6 +149,69 @@ test('recording a prepared view does not compact or rewrite the summary [AC:play
     const picked = selectContextSnapshot(listed, 0);
     assert.equal(picked.blocks[0].text, 'EARLIER-TEXT');
     assert.ok(selectContextSnapshot(listed, 1).blocks.some((item) => item.text.includes('HELLO-SNAPSHOT')));
+    store.db.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('dedupe uses cached fingerprint, survives a fresh store and returns stored blocks [hot-path]', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'context-snapshots-dedupe-'));
+  try {
+    const path = join(dir, 'state.sqlite');
+    const store = new SqliteStateStore(path);
+    const session = store.createSession({ title: 'dedupe', mode: 'chat', agentId: 'general', summary: '' });
+    const input = (text) => ({
+      session,
+      systemPrompt: 'SYS',
+      tools: [],
+      messages: [{ id: 'u1', sessionId: session.id, role: 'user', parts: [{ type: 'text', text }], createdAt: new Date().toISOString() }],
+      adapter: { name: 'heuristic' },
+      env: {}
+    });
+    const first = recordPreparedContextSnapshot(store, input('A'));
+    const again = recordPreparedContextSnapshot(store, input('A'));
+    assert.equal(again.id, first.id);
+    assert.deepEqual(again.blocks, first.blocks);
+    const second = recordPreparedContextSnapshot(store, input('B'));
+    assert.notEqual(second.id, first.id);
+    assert.equal(second.turn, first.turn + 1);
+    store.db.close();
+    const reopened = new SqliteStateStore(path);
+    const same = recordPreparedContextSnapshot(reopened, input('B'));
+    assert.equal(same.id, second.id);
+    assert.equal(reopened.listContextSnapshots(session.id).length, 2);
+    reopened.db.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('queued prepares are written later, in order, and flushed before listing [hot-path]', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'context-snapshots-queue-'));
+  try {
+    const store = new SqliteStateStore(join(dir, 'state.sqlite'));
+    const session = store.createSession({ title: 'queue', mode: 'chat', agentId: 'general', summary: '' });
+    const input = (text) => ({
+      session,
+      systemPrompt: 'SYS',
+      tools: [],
+      messages: [{ id: 'u1', sessionId: session.id, role: 'user', parts: [{ type: 'text', text }], createdAt: new Date().toISOString() }],
+      adapter: { name: 'heuristic' },
+      env: {}
+    });
+    queuePreparedContextSnapshot(store, input('ONE'));
+    queuePreparedContextSnapshot(store, input('TWO'));
+    assert.equal(store.listContextSnapshots(session.id).length, 0, 'nothing written inline');
+    flushPreparedContextSnapshots(store, session.id);
+    const flushed = store.listContextSnapshots(session.id);
+    assert.equal(flushed.length, 2);
+    assert.ok(flushed[0].blocks.some((b) => b.text.includes('ONE')));
+    assert.ok(flushed[1].blocks.some((b) => b.text.includes('TWO')));
+    queuePreparedContextSnapshot(store, input('THREE'));
+    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(store.listContextSnapshots(session.id).length, 3);
     store.db.close();
   } finally {
     rmSync(dir, { recursive: true, force: true });
