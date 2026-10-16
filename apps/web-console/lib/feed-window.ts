@@ -324,6 +324,9 @@ export function heightScrollShift(input: {
 }
 
 export function shouldAutoLoadOlder(hasOlder: boolean, loading: boolean, scrollHeight: number, clientHeight: number): boolean {
+  // clientHeight 0 means the scroller has not laid out yet; treating that as
+  // "short content" would auto-fetch every older page on open and clear the cursor.
+  if (clientHeight <= 0) return false;
   return hasOlder && !loading && scrollHeight <= clientHeight + 1;
 }
 

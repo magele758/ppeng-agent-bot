@@ -129,6 +129,8 @@ test('scroll intent keeps an anchor row and a short page can auto-load [AC:play-
   assert.equal(typeof fallback.scrollTop, 'number');
   assert.equal(heightScrollShift({ index: 0, previous: 10, next: 30, rowTop: 0, scrollTop: 40, stick: false, pending: false }), 20);
   assert.equal(shouldAutoLoadOlder(true, false, 100, 200), true);
+  assert.equal(shouldAutoLoadOlder(true, false, 0, 0), false);
+  assert.equal(shouldAutoLoadOlder(true, false, 50, 0), false);
   const prefix = prefixHeights(10, () => 10);
   const widened = rangeIncluding({ start: 0, end: 2, padTop: 0, padBottom: 80 }, 8, 10, prefix);
   assert.ok(widened.start <= 8 && widened.end > 8);
