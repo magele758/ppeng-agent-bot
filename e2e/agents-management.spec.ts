@@ -106,8 +106,9 @@ test.describe('Bots page', () => {
     await page.getByRole('button', { name: '新建 Bot', exact: true }).first().click();
     const again = page.getByRole('form', { name: '新建 Bot' });
     await again.getByRole('textbox', { name: '名称', exact: true }).fill(name);
-    await again.getByRole('button', { name: '创建 Bot' }).click();
-    await expect(again.getByRole('alert')).toContainText('already exists');
+    // A taken name is refused before submit, so the create button never runs.
+    await expect(again.getByRole('button', { name: '创建 Bot' })).toBeDisabled();
+    await expect(again.getByRole('alert')).toContainText('已经有同名的 Bot');
 
     const list = (await (await request.get('/api/bots')).json()) as { bots: { name: string }[] };
     expect(list.bots.filter((b) => b.name === name)).toHaveLength(1);

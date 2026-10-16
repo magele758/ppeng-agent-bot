@@ -672,6 +672,7 @@ export function PlayPanel({
                   <a
                     role="menuitem"
                     className="create-menu__item"
+                    aria-label={t('play.newBot')}
                     href={formatHash({ section: 'agents', sub: 'bots' })}
                     onClick={() => setCreateMenuOpen(false)}
                   >
@@ -682,6 +683,7 @@ export function PlayPanel({
                     role="menuitem"
                     className="create-menu__item"
                     data-testid="play-create-group"
+                    aria-label={t('agents.bots.newGroup')}
                     href={formatHash({ section: 'agents', sub: 'bots' })}
                     onClick={() => setCreateMenuOpen(false)}
                   >
