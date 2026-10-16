@@ -13,7 +13,7 @@ import {
   MEMORY_CONTEXT_APPENDIX_PREFIX,
   isMemoryContextAppendixText
 } from '../memory/memory-gate.js';
-import { resolveBotMemoryAgentId } from '../memory/bot-memory-scope.js';
+import { resolveBotMemoryAgentId, resolveSubagentMemoryAccess } from '../memory/bot-memory-scope.js';
 import { memoryBackendFromEnv, sessionScopeToAgent } from '../memory/memory-backend.js';
 import { recallProgressive, recallProgressiveAsync, type RecallContext, type RecallDiagnostic } from '../memory/memory-recall.js';
 import { resolveMemorySettings } from '../memory/memory-settings.js';
@@ -131,6 +131,21 @@ function legacySessionRows(
   return rows;
 }
 
+function legacyRowsForSession(
+  store: CompileTurnAppendixInput['store'],
+  sessionIds: string[]
+): AgentMemory[] | undefined {
+  const rows: AgentMemory[] = [];
+  let found = false;
+  for (const sessionId of sessionIds) {
+    const part = legacySessionRows(store, sessionId);
+    if (!part) continue;
+    found = true;
+    rows.push(...part);
+  }
+  return found ? rows : undefined;
+}
+
 function recallInput(input: CompileTurnAppendixInput): RecallContext | RecallSources | null {
   if (runProfileFromSession(input.session).persistentMemory === 'off') return null;
   const settings = resolveMemorySettings(input.store);
@@ -170,13 +185,16 @@ function recallInput(input: CompileTurnAppendixInput): RecallContext | RecallSou
       ? input.session.metadata.tenantId
       : process.env.RAW_AGENT_DEFAULT_TENANT_ID?.trim() || undefined;
 
+  const parentSessionId = resolveSubagentMemoryAccess(input.session, input.store)?.parentSessionId;
+  const sessionIds = parentSessionId ? [input.session.id, parentSessionId] : [input.session.id];
   return {
     store: am,
     query: input.query,
     userId,
     tenantId,
     sessionId: input.session.id,
-    sessionRows: legacySessionRows(input.store, input.session.id),
+    sessionRows: legacyRowsForSession(input.store, sessionIds),
+    alsoSessionIds: parentSessionId ? [parentSessionId] : undefined,
     agentId: resolveBotMemoryAgentId(input.session, input.store),
     workingLogPath: input.stateDir ? workingLogPath(input.stateDir, input.session.id) : undefined,
     stateDir: input.stateDir,

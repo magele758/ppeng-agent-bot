@@ -12,7 +12,12 @@ import { createMemoryTools } from '../dist/tools/memory-tools.js';
 import { autoCompactSession } from '../dist/runtime/compact-host.js';
 import { createExtensionRegistry } from '../dist/extensions/extension-registry.js';
 import { createToolServices } from '../dist/runtime/tool-services.js';
-import { inheritBotIdentityMetadata, resolveBotMemoryAgentId } from '../dist/memory/bot-memory-scope.js';
+import {
+  inheritBotIdentityMetadata,
+  resolveBotMemoryAgentId,
+  resolveSubagentMemoryAccess,
+  subagentMemorySessionIds
+} from '../dist/memory/bot-memory-scope.js';
 import { AgentMemoryStore } from '../dist/memory/store.js';
 import { dreamNowForUser } from '../dist/memory/memory-dreamer.js';
 import { shortCompactConclusion, shortCompactSummaryConclusion } from '../dist/runtime/compact-host.js';
@@ -1492,4 +1497,72 @@ test('inheritBotIdentityMetadata returns an empty object for ordinary parents', 
     inheritBotIdentityMetadata({ metadata: { botId: 'b1', userId: ' u1 ', tenantId: ' ' } }),
     { userId: 'u1' }
   );
+});
+
+test('bot sub-agents may read parent session + bot namespace; others do not', () => {
+  const sessions = {
+    parent: { id: 'parent', mode: 'chat', agentId: 'bot-a', metadata: { botId: 'bot-a' } },
+    child: {
+      id: 'child',
+      mode: 'subagent',
+      agentId: 'reviewer',
+      parentSessionId: 'parent',
+      metadata: { botId: 'bot-a', parentSessionId: 'parent' }
+    },
+    orphan: {
+      id: 'orphan',
+      mode: 'subagent',
+      agentId: 'reviewer',
+      metadata: { botId: 'bot-a' }
+    },
+    selfParent: {
+      id: 'self',
+      mode: 'subagent',
+      agentId: 'reviewer',
+      parentSessionId: 'self',
+      metadata: { botId: 'bot-a' }
+    },
+    plainChild: {
+      id: 'plain-child',
+      mode: 'subagent',
+      agentId: 'reviewer',
+      parentSessionId: 'plain',
+      metadata: { parentSessionId: 'plain' }
+    },
+    plain: { id: 'plain', mode: 'chat', agentId: 'general', metadata: {} },
+    mate: {
+      id: 'mate',
+      mode: 'teammate',
+      agentId: 'helper',
+      parentSessionId: 'parent',
+      metadata: { botId: 'bot-a', parentSessionId: 'parent' }
+    },
+    chat: { id: 'chat', mode: 'chat', agentId: 'bot-a', metadata: { botId: 'bot-a' } }
+  };
+  const lookup = sessionLookup(sessions, { 'bot-a': { id: 'bot-a', agentId: 'bot-a' } });
+
+  assert.deepEqual(resolveSubagentMemoryAccess(sessions.child, lookup), {
+    botAgentId: 'bot-a',
+    parentSessionId: 'parent'
+  });
+  assert.deepEqual(resolveSubagentMemoryAccess(sessions.orphan, lookup), { botAgentId: 'bot-a' });
+  assert.deepEqual(resolveSubagentMemoryAccess(sessions.selfParent, lookup), { botAgentId: 'bot-a' });
+  assert.equal(resolveSubagentMemoryAccess(sessions.plainChild, lookup), undefined);
+  assert.equal(resolveSubagentMemoryAccess(sessions.mate, lookup), undefined);
+  assert.equal(resolveSubagentMemoryAccess(sessions.chat, lookup), undefined);
+
+  assert.deepEqual(subagentMemorySessionIds(sessions.child, lookup), ['child', 'parent']);
+  assert.deepEqual(subagentMemorySessionIds(sessions.orphan, lookup), ['orphan']);
+  assert.deepEqual(subagentMemorySessionIds(sessions.selfParent, lookup), ['self']);
+  assert.deepEqual(subagentMemorySessionIds(sessions.plainChild, lookup), ['plain-child']);
+  assert.deepEqual(subagentMemorySessionIds(sessions.mate, lookup), ['mate']);
+  assert.deepEqual(subagentMemorySessionIds(sessions.chat, lookup), ['chat']);
+  assert.deepEqual(
+    subagentMemorySessionIds(
+      { mode: 'subagent', parentSessionId: 'parent', metadata: { botId: 'bot-a' } },
+      lookup
+    ),
+    ['parent']
+  );
+  assert.deepEqual(subagentMemorySessionIds({ mode: 'chat', metadata: { botId: 'bot-a' } }, lookup), []);
 });

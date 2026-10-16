@@ -50,6 +50,8 @@ export interface RecallContext {
    * memory lives in the legacy session_memory table (RAW_AGENT_MEMORY_BACKEND=session).
    */
   sessionRows?: AgentMemory[];
+  /** Parent session scratch/long a bot sub-agent may reuse alongside its own. */
+  alsoSessionIds?: string[];
   workingLogPath?: string;
   stateDir?: string;
   /** Query vector; omit → lexical / FTS only. */
@@ -168,10 +170,15 @@ export function recallProgressive(ctx: RecallContext): RecallSources {
   if (ctx.sessionRows) {
     workingRows.push(...ctx.sessionRows);
   } else if (ctx.sessionId) {
-    workingRows.push(
-      ...ctx.store.search({ sessionId: ctx.sessionId, scope: 'session.scratch', limit: 40 }),
-      ...ctx.store.search({ sessionId: ctx.sessionId, scope: 'session.long', limit: 40 })
+    const sessionIds = [ctx.sessionId, ...(ctx.alsoSessionIds ?? [])].filter(
+      (id, index, all): id is string => Boolean(id) && all.indexOf(id) === index
     );
+    for (const sessionId of sessionIds) {
+      workingRows.push(
+        ...ctx.store.search({ sessionId, scope: 'session.scratch', limit: 40 }),
+        ...ctx.store.search({ sessionId, scope: 'session.long', limit: 40 })
+      );
+    }
   }
   if (ctx.userId) {
     workingRows.push(

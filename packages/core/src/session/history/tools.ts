@@ -1,5 +1,6 @@
 import type { SessionMessage, ToolContract } from '../../types.js';
-import { resolveBotMemoryAgentId } from '../../memory/bot-memory-scope.js';
+import { resolveBotMemoryAgentId, resolveSubagentMemoryAccess } from '../../memory/bot-memory-scope.js';
+import { collectSubagentMemoryHits } from '../../memory/subagent-recall.js';
 import { createHistoryTools as createVisibleHistoryTools } from '../../tools/history-tools.js';
 import { historyReference, sourcePage, type HistoryStore as VisibleHistoryStore } from '../history-retrieval.js';
 import type { HistoryOptions, HistoryStore } from './types.js';
@@ -70,11 +71,18 @@ export function createHistoryTools(store: ScopedHistoryStore): ToolContract[] {
  );
  return [{
   name: 'history_search',
-  description: 'Search retained original history. Signed-in ordinary chats search sessions visible to the current identity and namespace; anonymous, Bot, Room and their child sessions search only THIS session. Returns stable seq/id/ref sources for history_read.',
+  description: 'Search retained original history. Signed-in ordinary chats search sessions visible to the current identity and namespace; anonymous, Bot, Room and their child sessions search only THIS session. A bot sub-agent also receives that bot\'s parent notes and global memory. Returns stable seq/id/ref sources for history_read.',
   inputSchema: { type: 'object', properties: { query: { type: 'string' }, session_id: { type: 'string' }, from: { type: 'string' }, to: { type: 'string' }, beforeSeq: { type: 'integer' }, limit: { type: 'integer' } } },
   approvalMode: 'never', sideEffectLevel: 'none', ptc: { kind: 'read' },
   async execute(ctx, args) {
-   try { return !scoped(ctx.session) && search ? await search.execute(ctx, args) : searchOwnSource(store, ctx.session.id, args as HistoryOptions & { session_id?: string }); }
+   try {
+    const result = !scoped(ctx.session) && search ? await search.execute(ctx, args) : searchOwnSource(store, ctx.session.id, args as HistoryOptions & { session_id?: string });
+    if (!result.ok || !resolveSubagentMemoryAccess(ctx.session, store)) return result;
+    const parsed = JSON.parse(result.content) as Record<string, unknown>;
+    const query = typeof (args as { query?: unknown }).query === 'string' ? (args as { query: string }).query : '';
+    parsed.memories = collectSubagentMemoryHits(store, ctx.session, query);
+    return { ok: true, content: JSON.stringify(parsed) };
+   }
    catch (error) { return { ok: false, content: error instanceof Error ? error.message : String(error) }; }
   }
  }, {

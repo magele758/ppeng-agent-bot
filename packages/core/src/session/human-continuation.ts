@@ -156,6 +156,12 @@ function dispatchContinuation(host:HumanContinuationHost,id:string,executing:Set
  try{restorePendingSources(host.store,id);void Promise.resolve(host.runSession(id)).then(()=>settleContinuation(host,id,before)).catch(failed).finally(()=>executing.delete(id));}
  catch(error){executing.delete(id);failed(error);}
 }
+/** Human work still waiting on this chat. Steers are corrections, not extra pieces. */
+export function listPendingHumanWork(store: SqliteStateStore, sessionId: string): Array<{ id: string; seq: number }> {
+  return state(store, sessionId).pending
+    .filter((request) => request.kind !== 'steer')
+    .map((request) => ({ id: request.id, seq: request.seq }));
+}
 /** Dispatch only: slow model/tool work never blocks the scheduler or another chat. */
 export async function drainHumanContinuations(host:HumanContinuationHost):Promise<void> {
  const executing=activeFor(host.store);
