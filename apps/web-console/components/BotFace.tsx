@@ -264,6 +264,20 @@ export function BotFace({
   moodRef.current = mood;
   const reactId = useId().replace(/:/g, '');
   const saved = useSavedFace(name);
+  const avatar = shapeProp === undefined && colorProp === undefined ? saved.avatar : null;
+  const avatarImage = avatar !== null && /^https?:\/\//i.test(avatar);
+  if (avatar) {
+    const classes = ['bot-face', 'bot-face--avatar', size !== 'sm' ? `bot-face--${size}` : '', className]
+      .filter(Boolean)
+      .join(' ');
+    return avatarImage ? (
+      <img className={classes} src={avatar} alt={label ?? ''} data-testid={testId} data-bot-avatar="image" />
+    ) : (
+      <span className={classes} role={label ? 'img' : 'presentation'} aria-label={label} aria-hidden={label ? undefined : true} data-testid={testId} data-bot-avatar="emoji">
+        {avatar}
+      </span>
+    );
+  }
   const appearance = resolveBotFaceAppearance({
     name,
     savedShape: shapeProp !== undefined ? shapeProp : saved.shape,

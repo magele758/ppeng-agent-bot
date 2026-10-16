@@ -15,6 +15,7 @@ import { BotFace } from '../../BotFace';
 import { EmptyState } from '../../ui';
 import { useLab } from '../../shell/LabProvider';
 import { BotCreateForm } from './BotCreateForm';
+import { BotGroupCreateForm } from './BotGroupCreateForm';
 import { BotDetail } from './BotDetail';
 import { NoMatch } from './NoMatch';
 import { SearchBox } from './SearchBox';
@@ -24,6 +25,7 @@ export function BotsView() {
   const lab = useLab();
   const [query, setQuery] = useState('');
   const [creating, setCreating] = useState(false);
+  const [creatingGroup, setCreatingGroup] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ text: string; err: boolean } | null>(null);
 
@@ -34,6 +36,7 @@ export function BotsView() {
       const target = readBotPermissionsTarget(window.location.hash);
       if (!target) return;
       setCreating(false);
+      setCreatingGroup(false);
       setQuery('');
       setSelectedId(target.botId);
     };
@@ -59,22 +62,40 @@ export function BotsView() {
     lab.upsertBot(bot);
     setSelectedId(bot.id);
     setCreating(false);
+    setCreatingGroup(false);
     setQuery('');
     setNotice({ text: t('agents.bots.created', { name: bot.name }), err: false });
   };
 
   const startCreate = () => {
     setCreating(true);
+    setCreatingGroup(false);
     setNotice(null);
   };
 
+  const startGroup = () => {
+    setCreatingGroup(true);
+    setCreating(false);
+    setNotice(null);
+  };
+
+  const paneOpen = creating || creatingGroup;
   const rightPane = creating ? (
-    <BotCreateForm onCreated={created} onCancel={() => setCreating(false)} />
+    <BotCreateForm existingNames={roster.map((bot) => bot.name)} onCreated={created} onCancel={() => setCreating(false)} />
+  ) : creatingGroup ? (
+    <BotGroupCreateForm
+      bots={roster}
+      onCreated={(title) => {
+        setCreatingGroup(false);
+        setNotice({ text: t('agents.bots.groupCreated', { name: title }), err: false });
+      }}
+      onCancel={() => setCreatingGroup(false)}
+    />
   ) : selected ? (
     <BotDetail key={selected.id} bot={selected} onOpenChat={(b) => void openChat(b)} />
   ) : null;
 
-  if (roster.length === 0 && !creating) {
+  if (roster.length === 0 && !paneOpen) {
     return (
       <EmptyState
         icon={<BotFace name="" label={t('agents.bots.faceEmpty')} testId="bot-empty-face" size="lg" />}
@@ -106,8 +127,11 @@ export function BotsView() {
           />
         </div>
         <span className="ag-toolbar__meta">{t('agents.common.count', { count: visible.length })}</span>
-        <button type="button" className="btn btn-primary btn-sm" onClick={startCreate} disabled={creating}>
+        <button type="button" className="btn btn-primary btn-sm" data-testid="bot-create-open" onClick={startCreate} disabled={creating}>
           {t('agents.bots.newBot')}
+        </button>
+        <button type="button" className="btn btn-sm" data-testid="bot-group-open" onClick={startGroup} disabled={creatingGroup}>
+          {t('agents.bots.newGroup')}
         </button>
       </div>
       {notice ? (
@@ -127,12 +151,13 @@ export function BotsView() {
                 key={b.id}
                 type="button"
                 role="listitem"
-                className={`ag-card${b.id === selectedId && !creating ? ' is-selected' : ''}`}
-                aria-pressed={b.id === selectedId && !creating}
+                className={`ag-card${b.id === selectedId && !paneOpen ? ' is-selected' : ''}`}
+                aria-pressed={b.id === selectedId && !paneOpen}
                 data-testid={`bot-card-${b.id}`}
                 onClick={() => {
                   setSelectedId(b.id);
                   setCreating(false);
+                  setCreatingGroup(false);
                   setNotice(null);
                 }}
               >

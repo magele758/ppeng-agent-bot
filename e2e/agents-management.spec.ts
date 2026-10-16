@@ -69,7 +69,7 @@ test.describe('Bots page', () => {
     await openBotsPage(page);
     await expect(page.getByText('还没有 Bot')).toBeVisible();
     await expect(page.getByText('Bot 是长期存在的专属对话入口', { exact: false })).toBeVisible();
-    const cta = page.locator('#section-agents-bots').getByRole('button', { name: '新建 Bot' });
+    const cta = page.locator('#section-agents-bots').getByRole('button', { name: '新建 Bot', exact: true });
     await expect(cta).toBeVisible();
     await cta.click();
     await expect(page.getByRole('form', { name: '新建 Bot' })).toBeVisible();
@@ -81,7 +81,7 @@ test.describe('Bots page', () => {
   }) => {
     const name = uniq('Create');
     await openBotsPage(page);
-    await page.getByRole('button', { name: '新建 Bot' }).first().click();
+    await page.getByRole('button', { name: '新建 Bot', exact: true }).first().click();
     const form = page.getByRole('form', { name: '新建 Bot' });
     await expect(form).toBeVisible();
 
@@ -89,6 +89,7 @@ test.describe('Bots page', () => {
     await expect(submit).toBeDisabled();
     await expect(form.getByLabel('显示标题')).toHaveCount(0);
     await expect(form.getByLabel('描述')).toHaveCount(0);
+    await expect(form.getByRole('group', { name: '图标' })).toBeVisible();
     await form.getByRole('button', { name: '高级选项' }).click();
     await expect(form.getByLabel('显示标题')).toBeVisible();
     await expect(form.getByLabel('描述')).toBeVisible();
@@ -102,7 +103,7 @@ test.describe('Bots page', () => {
     await expect(page.getByTestId('bot-detail').getByRole('heading', { name })).toBeVisible();
     await expect(page.getByText(`已创建 Bot「${name}」`)).toBeVisible();
 
-    await page.getByRole('button', { name: '新建 Bot' }).first().click();
+    await page.getByRole('button', { name: '新建 Bot', exact: true }).first().click();
     const again = page.getByRole('form', { name: '新建 Bot' });
     await again.getByRole('textbox', { name: '名称', exact: true }).fill(name);
     await again.getByRole('button', { name: '创建 Bot' }).click();

@@ -3,9 +3,9 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { isBotFaceColor, isBotFaceShape, type BotFaceColor, type BotFaceShape } from '@/lib/bot-face';
 
-export type SavedFace = { shape: BotFaceShape | null; color: BotFaceColor | null };
+export type SavedFace = { shape: BotFaceShape | null; color: BotFaceColor | null; avatar: string | null };
 
-const EMPTY: SavedFace = { shape: null, color: null };
+const EMPTY: SavedFace = { shape: null, color: null, avatar: null };
 
 const CatalogContext = createContext<ReadonlyMap<string, SavedFace>>(new Map());
 
@@ -13,7 +13,7 @@ export function BotFaceCatalog({
   bots,
   children
 }: {
-  bots: readonly { name: string; faceShape?: string | null; faceColor?: string | null }[];
+  bots: readonly { name: string; faceShape?: string | null; faceColor?: string | null; avatar?: string | null }[];
   children: ReactNode;
 }) {
   const map = useMemo(() => {
@@ -23,7 +23,8 @@ export function BotFaceCatalog({
       if (!key) continue;
       const shape = isBotFaceShape(bot.faceShape) ? bot.faceShape : null;
       const color = isBotFaceColor(bot.faceColor) ? bot.faceColor : null;
-      if (shape || color) next.set(key, { shape, color });
+      const avatar = typeof bot.avatar === 'string' && bot.avatar.trim() ? bot.avatar.trim() : null;
+      if (shape || color || avatar) next.set(key, { shape, color, avatar });
     }
     return next;
   }, [bots]);

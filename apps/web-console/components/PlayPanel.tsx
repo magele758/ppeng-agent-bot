@@ -678,6 +678,16 @@ export function PlayPanel({
                     {t('play.bot')}
                     <span className="muted small">{t('play.newBot')}</span>
                   </a>
+                  <a
+                    role="menuitem"
+                    className="create-menu__item"
+                    data-testid="play-create-group"
+                    href={formatHash({ section: 'agents', sub: 'bots' })}
+                    onClick={() => setCreateMenuOpen(false)}
+                  >
+                    {t('agents.bots.groupTitle')}
+                    <span className="muted small">{t('agents.bots.newGroup')}</span>
+                  </a>
                 </div>
               ) : null}
             </div>
