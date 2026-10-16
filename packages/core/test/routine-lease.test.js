@@ -83,6 +83,125 @@ test('approval continuation is leased once across instances [AC:bot-routine-life
  assert.equal(calls,1);assert.equal(runs.get(run.id).status,'running');done();await new Promise(r=>setImmediate(r));assert.equal(runs.get(run.id).status,'completed');a.db.close();b.db.close();
 });
 
+async function stuckWaitingApproval(){
+ const {a,b,h,runs,run}=fixture();
+ await drainRoutineRuns({...h,runSession:async id=>{
+  a.createApproval({sessionId:id,toolName:'bash',reason:'gated',args:{command:'true'}});
+  a.updateSession(id,{status:'waiting_approval',metadata:{...a.getSession(id).metadata,outcome:{kind:'waiting_approval'}}});
+ }});
+ await new Promise(r=>setImmediate(r));
+ assert.equal(runs.get(run.id).status,'waiting_approval');
+ a.updateSession(runs.get(run.id).sessionId,{status:'running'});
+ a.db.prepare('UPDATE bot_routine_leases SET expires_at=0 WHERE run_id=?').run(run.id);
+ return {a,b,h,runs,run};
+}
+test('crashed waiting_approval run with a stuck running session becomes unknown [AC:bot-routine-lifecycle#AC-12]',async()=>{
+ const {a,b,h,runs,run}=await stuckWaitingApproval();
+ let calls=0;
+ await drainRoutineRuns({...h,isSessionRunning:()=>false,runSession:async()=>{calls++;}});
+ assert.equal(runs.get(run.id).status,'unknown');assert.equal(calls,0);a.db.close();b.db.close();
+});
+test('live waiting_approval session that is still running stays waiting [AC:bot-routine-lifecycle#AC-12]',async()=>{
+ const {a,b,h,runs,run}=await stuckWaitingApproval();
+ const sessionId=runs.get(run.id).sessionId;let calls=0;
+ await drainRoutineRuns({...h,isSessionRunning:id=>id===sessionId,runSession:async()=>{calls++;}});
+ assert.equal(runs.get(run.id).status,'waiting_approval');assert.equal(calls,0);a.db.close();b.db.close();
+});
+test('crashed waiting_approval with undefined isSessionRunning recovers to unknown [AC:bot-routine-lifecycle#AC-12]',async()=>{
+ const {a,b,h,runs,run}=await stuckWaitingApproval();
+ let calls=0;
+ await drainRoutineRuns({...h,isSessionRunning:undefined,runSession:async()=>{calls++;}});
+ assert.equal(runs.get(run.id).status,'unknown');assert.equal(calls,0);a.db.close();b.db.close();
+});
+
+// P0 regression: a peer must not quarantine a run whose approval continuation holds an active lease.
+test('active approval-path lease on peer protects running session from quarantine [AC:bot-routine-lifecycle#AC-12]',async()=>{
+ // This test exercises the REAL approve path via resumeApprovalContinuation (not a hand-planted row).
+ // resumeApprovalContinuation acquires the lease; instance B drains concurrently and must skip.
+ const {resumeApprovalContinuation}=await import('../dist/cron/routine-runtime.js');
+ const {a,b,h,host,runs,run}=await stuckWaitingApproval();
+ // The enqueued object has no sessionId; the claimed run does.
+ const sessionId=runs.get(run.id).sessionId;
+ // Simulate what the HTTP approve route does: flip session to idle with an approved approval.
+ a.updateApproval(a.listApprovals().find(x=>x.sessionId===sessionId).id,'approved');
+ a.updateSession(sessionId,{status:'idle',metadata:{...a.getSession(sessionId).metadata,outcome:{kind:'waiting_approval'}}});
+ let continuationStarted=false,continuationDone;
+ const continuationHost={...h,runSession:async id=>{
+  continuationStarted=true;
+  await new Promise(r=>{continuationDone=r;});
+  a.appendMessage(id,'assistant',[{type:'text',text:'approved result'}]);
+  a.updateSession(id,{metadata:{...a.getSession(id).metadata,outcome:{kind:'idle',reason:'end'}}});
+ }};
+ // Start the continuation via the real approve path (acquires the lease).
+ const started=resumeApprovalContinuation(continuationHost,sessionId);
+ assert.equal(started,'handled','resumeApprovalContinuation must return handled when a matching run exists');
+ assert.ok(continuationStarted,'runSession must have been called synchronously in bridge');
+ // Now drain from B while the continuation holds the lease — it must not quarantine.
+ let calls=0;
+ await drainRoutineRuns({store:b,stateDir:h.stateDir,log:{warn(){},info(){}},isSessionRunning:()=>false,runSession:async()=>{calls++;}});
+ assert.equal(runs.get(run.id).status,'running','peer drain must not quarantine while lease is held');
+ assert.equal(calls,0,'peer must not re-run the session');
+ // After the continuation finishes the run should complete.
+ continuationDone();await new Promise(r=>setImmediate(r));
+ assert.equal(runs.get(run.id).status,'completed');
+ a.db.close();b.db.close();
+});
+
+// P1 regression: whileOwned must not clobber a cancel with 'unknown'.
+test('cancel committed before fence wins; unknown is not written over cancel [AC:bot-routine-lifecycle#AC-12]',async()=>{
+ const {a,b,h,runs,run}=await stuckWaitingApproval();
+ // Cancel the run (no lease needed).
+ const {cancelRoutineRun}=await import('../dist/cron/routine-runtime.js');
+ await cancelRoutineRun({...h,cancelSession(){}},run.id);
+ assert.equal(runs.get(run.id).status,'cancelled');
+ // Drain that finds session.status==='running' and no live lease:
+ // it should not write 'unknown' because the run is already cancelled.
+ await drainRoutineRuns({store:b,stateDir:h.stateDir,log:{warn(){},info(){}},isSessionRunning:()=>false,runSession:async()=>{}});
+ assert.equal(runs.get(run.id).status,'cancelled','cancel must survive fence re-read');
+ a.db.close();b.db.close();
+});
+
+// P1 regression: two real drains share one DB; both try to recover; only one should write.
+test('two drains sharing one DB race approval recovery; only one quarantines [AC:bot-routine-lifecycle#AC-12]',async()=>{
+ const {a,b,h,runs,run}=await stuckWaitingApproval();
+ // Count the quarantine UPDATE on BOTH connections. hB opens its own DatabaseSync, so a
+ // counter on `a` alone stays 0 when B wins acquire, and stays 1 when both write.
+ // The write must also be the fenced CAS: inside whileOwned's BEGIN, and still predicated
+ // on status IN ('waiting_approval','running'). Dropping whileOwned or the CAS fails below.
+ let attempts=0,fenced=0,bare=0,applied=0,uncas=0;
+ function instrument(db){
+  const origExec=db.exec.bind(db),origPrepare=db.prepare.bind(db);let depth=0;
+  db.exec=function(sql){
+   const result=origExec(sql);
+   if(/^\s*BEGIN\b/i.test(sql))depth++;
+   else if(/^\s*(COMMIT|ROLLBACK)\b/i.test(sql))depth=Math.max(0,depth-1);
+   return result;
+  };
+  db.prepare=function(sql){
+   const stmt=origPrepare(sql);
+   if(!/UPDATE\s+bot_routine_runs/i.test(sql)||!/status='unknown'/.test(sql))return stmt;
+   const origRun=stmt.run.bind(stmt);
+   const cas=/status\s+IN\s*\(\s*'waiting_approval'\s*,\s*'running'\s*\)/i.test(sql);
+   stmt.run=function(...args){
+    attempts++;if(depth>0)fenced++;else bare++;if(!cas)uncas++;
+    const result=origRun(...args);if(result.changes)applied++;return result;
+   };
+   return stmt;
+  };
+ }
+ instrument(a.db);instrument(b.db);
+ const hA={...h,isSessionRunning:()=>false,runSession:async()=>{}};
+ const hB={store:b,stateDir:h.stateDir,log:{warn(){},info(){}},isSessionRunning:()=>false,runSession:async()=>{}};
+ await Promise.all([drainRoutineRuns(hA),drainRoutineRuns(hB)]);
+ assert.equal(runs.get(run.id).status,'unknown');
+ assert.equal(attempts,1,'exactly one quarantine UPDATE across both connections');
+ assert.equal(applied,1,'that UPDATE must change a row');
+ assert.equal(fenced,1,'quarantine must run inside whileOwned');
+ assert.equal(bare,0,'an unfenced unknown write means whileOwned was removed');
+ assert.equal(uncas,0,'the unknown write must keep the status CAS predicate');
+ a.db.close();b.db.close();
+});
+
 async function stalledHeartbeat(t,heartbeatFirst){
   const {a,b,h,runs,run}=fixture();let done,cancelled=0;
   t.mock.timers.enable({apis:['setInterval','Date']});
