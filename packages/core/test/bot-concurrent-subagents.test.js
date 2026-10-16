@@ -388,3 +388,126 @@ test('sub-agent help reaches parent and siblings only and cannot send IM, cron, 
     await runtime.destroy();
   }
 });
+
+// ── isolation guards ──────────────────────────────────────────────────────────
+
+test('subagent-help: sibling with different userId is dropped [AC:bot-concurrent-subagents#AC-4]', async () => {
+  const runtime = runtimeWith({
+    name: 'idle',
+    async runTurn() { return { stopReason: 'end', assistantParts: [{ type: 'text', text: 'ok' }] }; },
+    async summarizeMessages() { return ''; }
+  });
+  try {
+    const bot = runtime.createBot({ name: 'FamilyIsolation' });
+    const parent = runtime.getSession(runtime.openBot(bot.id).sessionId);
+    // child belongs to userA (same as parent)
+    const child = runtime.store.createSession({
+      title: 'child-a',
+      mode: 'subagent',
+      agentId: parent.agentId,
+      parentSessionId: parent.id,
+      metadata: { parentSessionId: parent.id, botId: parent.metadata.botId, userId: 'userA', tenantId: undefined }
+    });
+    // sameUserSibling belongs to userA — must be included
+    const sameUserSibling = runtime.store.createSession({
+      title: 'sibling-same',
+      mode: 'subagent',
+      agentId: parent.agentId,
+      parentSessionId: parent.id,
+      metadata: { parentSessionId: parent.id, botId: parent.metadata.botId, userId: 'userA', tenantId: undefined }
+    });
+    // otherUserSibling belongs to userB — must be excluded
+    const otherUserSibling = runtime.store.createSession({
+      title: 'sibling-other',
+      mode: 'subagent',
+      agentId: parent.agentId,
+      parentSessionId: parent.id,
+      metadata: { parentSessionId: parent.id, botId: parent.metadata.botId, userId: 'userB', tenantId: undefined }
+    });
+    const { subagentHelpTargets } = await import('../dist/runtime/subagent-help.js');
+    const targets = subagentHelpTargets(runtime.store, runtime.store.getSession(child.id), 'siblings');
+    const ids = targets.map((s) => s.id);
+    assert.equal(ids.includes(sameUserSibling.id), true, 'same-user sibling must be included');
+    assert.equal(ids.includes(otherUserSibling.id), false, 'different-user sibling must be dropped');
+    assert.equal(ids.includes(child.id), false, 'self must not appear');
+  } finally {
+    await runtime.destroy();
+  }
+});
+
+test('subagent-recall: tenant-only session cannot retrieve another user\'s user.memory [AC:bot-concurrent-subagents#AC-3]', async () => {
+  const { store } = memoryStore();
+  try {
+    // Store a fact owned by userX under bot-a
+    const am = store.agentMemory();
+    am.set({
+      scope: 'user.memory',
+      namespace: 'semantic',
+      key: 'fact:userX-secret',
+      value: 'userX 的秘密记忆',
+      userId: 'userX',
+      tenantId: 'tenant1',
+      agentId: 'bot-a',
+      importance: 0.9,
+      confidence: 'high',
+      source: 'user_provided'
+    });
+    // A tenant-only session (no userId) should NOT find userX's row
+    const parent = store.createSession({
+      title: 'parent-tenant',
+      mode: 'chat',
+      agentId: 'bot-a',
+      metadata: { botId: 'bot-a', canonicalBotChat: true, tenantId: 'tenant1' }
+    });
+    const child = store.createSession({
+      title: 'child-tenant',
+      mode: 'subagent',
+      agentId: 'reviewer',
+      parentSessionId: parent.id,
+      metadata: { parentSessionId: parent.id, botId: 'bot-a', tenantId: 'tenant1' }
+    });
+    const { collectSubagentMemoryHits } = await import('../dist/memory/subagent-recall.js');
+    const hits = collectSubagentMemoryHits(store, store.getSession(child.id), 'userX');
+    assert.equal(hits.some((h) => h.excerpt.includes('userX 的秘密记忆')), false,
+      'tenant-only session must not get userX rows');
+  } finally {
+    store.db.close();
+  }
+});
+
+test('subagent-recall: ownerless legacy session still retrieves user_id IS NULL bot memory [AC:bot-concurrent-subagents#AC-3]', async () => {
+  const { store } = memoryStore();
+  try {
+    // Store a fact with no userId (legacy ownerless row)
+    const am = store.agentMemory();
+    am.set({
+      scope: 'user.memory',
+      namespace: 'semantic',
+      key: 'fact:legacy',
+      value: '无主旧记忆',
+      agentId: 'bot-a',
+      importance: 0.9,
+      confidence: 'high',
+      source: 'user_provided'
+    });
+    const parent = store.createSession({
+      title: 'parent-legacy',
+      mode: 'chat',
+      agentId: 'bot-a',
+      metadata: { botId: 'bot-a', canonicalBotChat: true }
+    });
+    const child = store.createSession({
+      title: 'child-legacy',
+      mode: 'subagent',
+      agentId: 'reviewer',
+      parentSessionId: parent.id,
+      metadata: { parentSessionId: parent.id, botId: 'bot-a' }
+    });
+    const { collectSubagentMemoryHits } = await import('../dist/memory/subagent-recall.js');
+    const hits = collectSubagentMemoryHits(store, store.getSession(child.id), '无主');
+    assert.equal(hits.some((h) => h.excerpt.includes('无主旧记忆')), true,
+      'ownerless session must still find user_id IS NULL bot memory');
+  } finally {
+    store.db.close();
+  }
+});

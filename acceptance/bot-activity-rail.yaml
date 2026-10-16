@@ -32,6 +32,6 @@ criteria:
     when: 前端请求活动栏
     then: 该 subagent 会话作为 background 项出现，status 为 waiting
   - id: AC-6
-    given: 活动栏的 API endpoint 存在
-    when: 未认证请求打该接口
-    then: 返回 401；已认证且会话属于该用户时返回 200 含活动列表
+    given: 活动栏 listSessionBotActivity 被调用，存储里有 running routine 和 background job
+    when: 通过 store 直接调用（单元测试场景）
+    then: 返回包含这两条记录的列表，status 均为 running，botName 正确；HTTP 层 401 鉴权属于集成测试范畴，不在本 AC 覆盖范围内

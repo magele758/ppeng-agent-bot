@@ -22,7 +22,7 @@ interface MemoryListStore extends BotMemoryLookup {
     search(filter: {
       scope: 'user.memory';
       agentId: string;
-      userId?: string;
+      userId?: string | null;
       tenantId?: string;
       tenantOrGlobal?: boolean;
       limit?: number;
@@ -80,16 +80,20 @@ export function collectSubagentMemoryHits(
   const userId = typeof session.metadata?.userId === 'string' ? session.metadata.userId.trim() : '';
   const tenantId = typeof session.metadata?.tenantId === 'string' ? session.metadata.tenantId.trim() : '';
   const memory = store.agentMemory?.();
-  // ponytail: skip user.memory search when userId is empty — an unscoped search could return
-  // rows from other users' bot namespaces if the backing store uses only agentId as partition key.
-  if (memory && (userId || tenantId)) {
-    for (const row of memory.search({
-      scope: 'user.memory',
-      agentId: access.botAgentId,
-      ...(userId ? { userId } : {}),
-      ...(tenantId ? { tenantId, tenantOrGlobal: true } : {}),
-      limit: 40
-    })) {
+  // ponytail: always search bot memory, but use a scoped filter so an ownerless session
+  // (no userId, no tenantId) only matches user_id IS NULL rows — not other users' memory.
+  // A session with userId searches by userId; a session with only tenantId searches by tenantId.
+  // Both cases cannot widen to another user's rows.
+  if (memory) {
+    // ponytail: always search, but never let the filter widen to other users' rows.
+    // userId present → exact match; tenant-only → userId IS NULL + tenantId;
+    // ownerless legacy session → userId IS NULL (no tenantId condition).
+    const rows = userId
+      ? memory.search({ scope: 'user.memory', agentId: access.botAgentId, limit: 40, userId, ...(tenantId ? { tenantId, tenantOrGlobal: true as const } : {}) })
+      : tenantId
+        ? memory.search({ scope: 'user.memory', agentId: access.botAgentId, limit: 40, userId: null, tenantId })
+        : memory.search({ scope: 'user.memory', agentId: access.botAgentId, limit: 40, userId: null });
+    for (const row of rows) {
       push(hit('global', row, needle));
     }
   }

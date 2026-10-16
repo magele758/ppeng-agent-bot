@@ -68,12 +68,23 @@ test('bot activity status maps to running, waiting, or done [AC:bot-activity-rai
   }
 });
 
-test('assemble lists in-flight routines and background work for this bot [AC:bot-activity-rail#AC-1] [AC:bot-activity-rail#AC-2] [AC:bot-activity-rail#AC-3] [AC:bot-activity-rail#AC-5]', () => {
+test('assemble lists in-flight routines and background work for this bot [AC:bot-activity-rail#AC-1] [AC:bot-activity-rail#AC-2] [AC:bot-activity-rail#AC-3]', () => {
   const focus = session({});
   const worker = session({
     id: 'worker',
     title: 'Routine: Morning digest',
     metadata: { routineRunId: 'run-live', canonicalBotChat: false }
+  });
+  // subagent child of focus — tagged AC-5
+  const subagentChild = session({
+    id: 'sub',
+    title: 'Sub-agent: review',
+    mode: 'subagent',
+    status: 'waiting_approval',
+    parentSessionId: 'focus',
+    background: true,
+    createdAt: '2026-10-16T11:30:00.000Z',
+    metadata: { canonicalBotChat: false }
   });
   const teammate = session({
     id: 'mate',
@@ -97,7 +108,7 @@ test('assemble lists in-flight routines and background work for this bot [AC:bot
   });
   const items = assembleBotActivity({
     focus,
-    sessions: [focus, worker, teammate, idle, stranger],
+    sessions: [focus, worker, subagentChild, teammate, idle, stranger],
     jobs: [
       {
         id: 'bg-1',
@@ -151,8 +162,12 @@ test('assemble lists in-flight routines and background work for this bot [AC:bot
     now: NOW
   });
 
+  // AC-5: a subagent with parentSessionId === focus.id appears as a background waiting item
+  assert.equal(items.some((item) => item.id === 'session:sub' && item.status === 'waiting'), true,
+    'subagent child must appear as background waiting [AC:bot-activity-rail#AC-5]');
+
   assert.deepEqual(
-    items.map((item) => [item.kind, item.status, item.title, item.botName]),
+    items.filter((item) => item.id !== 'session:sub').map((item) => [item.kind, item.status, item.title, item.botName]),
     [
       ['background', 'running', 'npm test', 'Ada'],
       ['routine', 'running', 'Morning digest', 'Ada'],
@@ -336,4 +351,28 @@ test('sameOwner: two unowned sessions (local mode) are same-owner [AC:bot-activi
     now: NOW,
   });
   assert.equal(items.some((item) => item.title === 'Local digest' && item.status === 'running'), true, 'local mode routine must appear');
+});
+
+test('subagent child with parentSessionId appears as background waiting in the activity rail [AC:bot-activity-rail#AC-5]', () => {
+  const focus = session({});
+  const subagentChild = session({
+    id: 'sub-ac5',
+    title: 'Sub-agent: classify',
+    mode: 'subagent',
+    status: 'waiting_approval',
+    parentSessionId: 'focus',
+    background: true,
+    createdAt: '2026-10-16T11:30:00.000Z',
+    metadata: { canonicalBotChat: false }
+  });
+  const items = assembleBotActivity({
+    focus,
+    sessions: [focus, subagentChild],
+    jobs: [],
+    routines: [],
+    botNames: new Map([['ada', 'Ada']]),
+    now: NOW
+  });
+  assert.equal(items.some((item) => item.id === 'session:sub-ac5' && item.kind === 'background' && item.status === 'waiting'), true,
+    'subagent child must appear as background waiting');
 });
