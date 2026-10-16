@@ -25,15 +25,77 @@ function statusLabel(
   }
 }
 
+function startedLocale(locale: string): string {
+  if (locale === 'zh') return 'zh-CN';
+  return 'en';
+}
+
 function formatStarted(iso: string, locale: string): string {
   const at = Date.parse(iso);
   if (!Number.isFinite(at)) return iso;
-  return new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en', {
+  return new Intl.DateTimeFormat(startedLocale(locale), {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit'
   }).format(at);
+}
+
+function BotActivityRow({
+  item,
+  label,
+  started
+}: {
+  item: BotActivityItem;
+  label: string;
+  started: string;
+}) {
+  return (
+    <article
+      className={`activity-card activity-card--${item.status}`}
+      role="listitem"
+      aria-label={`${label} ${item.title}`}
+    >
+      <div className="activity-card__summary bot-activity__row">
+        <span className={`activity-card__phase activity-card__phase--${item.status}`}>{label}</span>
+        <span className="activity-card__name" title={item.title}>{item.title}</span>
+      </div>
+      <div className="bot-activity__meta">
+        <span className="bot-activity__bot">{item.botName}</span>
+        <time className="bot-activity__time" dateTime={item.startedAt}>{started}</time>
+      </div>
+    </article>
+  );
+}
+
+function BotActivityBody({
+  items,
+  loaded,
+  error,
+  t,
+  locale
+}: {
+  items: BotActivityItem[];
+  loaded: boolean;
+  error: boolean;
+  t: (key: 'play.activity.workLoadFailed' | 'play.activity.workLoading' | 'play.activity.workEmpty' | 'play.activity.workStarted' | 'play.activity.workRunning' | 'play.activity.workWaiting' | 'play.activity.workDone', vars?: Record<string, string | number>) => string;
+  locale: string;
+}) {
+  if (error) return <div className="empty-hint" role="alert">{t('play.activity.workLoadFailed')}</div>;
+  if (!loaded) return <div className="empty-hint">{t('play.activity.workLoading')}</div>;
+  if (!items.length) return <div className="empty-hint">{t('play.activity.workEmpty')}</div>;
+  return (
+    <>
+      {items.map((item) => (
+        <BotActivityRow
+          key={item.id}
+          item={item}
+          label={statusLabel(item.status, t)}
+          started={t('play.activity.workStarted', { time: formatStarted(item.startedAt, locale) })}
+        />
+      ))}
+    </>
+  );
 }
 
 /**
@@ -98,34 +160,7 @@ export function BotActivityList({ sessionId }: { sessionId: string }) {
         </div>
       </div>
       <div className="activity-panel__list" role="list">
-        {error ? <div className="empty-hint" role="alert">{t('play.activity.workLoadFailed')}</div> : null}
-        {!loaded && !error ? <div className="empty-hint">{t('play.activity.workLoading')}</div> : null}
-        {loaded && !error && items.length === 0 ? (
-          <div className="empty-hint">{t('play.activity.workEmpty')}</div>
-        ) : null}
-        {items.map((item) => {
-          const label = statusLabel(item.status, t);
-          const started = formatStarted(item.startedAt, locale);
-          return (
-            <article
-              key={item.id}
-              className={`activity-card activity-card--${item.status}`}
-              role="listitem"
-              aria-label={`${label} ${item.title}`}
-            >
-              <div className="activity-card__summary bot-activity__row">
-                <span className={`activity-card__phase activity-card__phase--${item.status}`}>{label}</span>
-                <span className="activity-card__name" title={item.title}>{item.title}</span>
-              </div>
-              <div className="bot-activity__meta">
-                <span className="bot-activity__bot">{item.botName}</span>
-                <time className="bot-activity__time" dateTime={item.startedAt}>
-                  {t('play.activity.workStarted', { time: started })}
-                </time>
-              </div>
-            </article>
-          );
-        })}
+        <BotActivityBody items={items} loaded={loaded} error={error} t={t} locale={locale} />
       </div>
     </div>
   );

@@ -45,10 +45,8 @@ function textMeta(metadata: Record<string, unknown> | undefined, key: string): s
 }
 
 function sameOwner(focus: SessionRecord, session: SessionRecord): boolean {
-  return (
-    textMeta(focus.metadata, 'userId') === textMeta(session.metadata, 'userId') &&
-    textMeta(focus.metadata, 'tenantId') === textMeta(session.metadata, 'tenantId')
-  );
+  return textMeta(focus.metadata, 'userId') === textMeta(session.metadata, 'userId')
+    && textMeta(focus.metadata, 'tenantId') === textMeta(session.metadata, 'tenantId');
 }
 
 function clip(value: string): string {
@@ -69,6 +67,11 @@ function isRecent(iso: string | undefined, now: number): boolean {
   if (!Number.isFinite(at)) return false;
   const age = now - at;
   return age <= DONE_WINDOW_MS && age >= -60_000;
+}
+
+function keepRow(status: BotActivityStatus, stamp: string | undefined, now: number): boolean {
+  if (status !== 'done') return true;
+  return isRecent(stamp, now);
 }
 
 function rank(status: BotActivityStatus): number {
@@ -95,41 +98,127 @@ export interface AssembleBotActivityInput {
   now?: number;
 }
 
-/** Pure projection. In-flight rows stay; finished rows stay for a short window. */
-export function assembleBotActivity(input: AssembleBotActivityInput): BotActivityItem[] {
-  const now = input.now ?? Date.now();
-  const focusBot = textMeta(input.focus.metadata, 'botId');
+function indexSessions(sessions: readonly SessionRecord[], focus: SessionRecord): Map<string, SessionRecord> {
   const byId = new Map<string, SessionRecord>();
-  for (const session of input.sessions) byId.set(session.id, session);
-  byId.set(input.focus.id, input.focus);
+  for (const session of sessions) byId.set(session.id, session);
+  byId.set(focus.id, focus);
+  return byId;
+}
 
-  const routineSessionIds = new Set<string>();
-  const items: BotActivityItem[] = [];
+function routineTied(run: RoutineRun, focus: SessionRecord, byId: Map<string, SessionRecord>): boolean {
+  if (run.mainSessionId === focus.id || run.job.sessionId === focus.id) return true;
+  const main = byId.get(run.mainSessionId);
+  const focusBot = textMeta(focus.metadata, 'botId');
+  const jobBot = textMeta(run.job.metadata, 'botId');
+  if (!focusBot || jobBot !== focusBot || !main) return false;
+  return sameOwner(focus, main);
+}
 
+function hiddenFromOwner(run: RoutineRun, focus: SessionRecord, byId: Map<string, SessionRecord>): boolean {
+  const main = byId.get(run.mainSessionId);
+  if (!main || run.mainSessionId === focus.id) return false;
+  return !sameOwner(focus, main);
+}
+
+function routineItem(
+  run: RoutineRun,
+  focus: SessionRecord,
+  byId: Map<string, SessionRecord>,
+  names: ReadonlyMap<string, string>,
+  now: number
+): BotActivityItem | undefined {
+  if (!routineTied(run, focus, byId) || hiddenFromOwner(run, focus, byId)) return undefined;
+  const status = botActivityStatus(run.status);
+  const stamp = run.finishedAt || run.updatedAt;
+  if (!keepRow(status, stamp, now)) return undefined;
+  const botId = textMeta(run.job.metadata, 'botId') || textMeta(focus.metadata, 'botId');
+  const title = run.job.name || run.job.prompt || run.id;
+  return {
+    id: `routine:${run.id}`,
+    kind: 'routine',
+    title: clip(title),
+    status,
+    botId,
+    botName: botLabel(botId, names, focus.agentId),
+    startedAt: run.startedAt || run.createdAt
+  };
+}
+
+function isRelatedSession(session: SessionRecord, focus: SessionRecord): boolean {
+  if (session.parentSessionId === focus.id) return true;
+  const focusBot = textMeta(focus.metadata, 'botId');
+  const botId = textMeta(session.metadata, 'botId');
+  if (!focusBot || botId !== focusBot || !sameOwner(focus, session)) return false;
+  if (session.metadata.canonicalBotChat === true) return false;
+  return session.background || session.mode === 'teammate' || session.mode === 'subagent';
+}
+
+function sessionItem(
+  session: SessionRecord,
+  focus: SessionRecord,
+  names: ReadonlyMap<string, string>,
+  now: number
+): BotActivityItem | undefined {
+  if (textMeta(session.metadata, 'routineRunId')) return undefined;
+  if (session.status === 'idle') return undefined;
+  const status = botActivityStatus(session.status);
+  if (!keepRow(status, session.updatedAt, now)) return undefined;
+  const botId = textMeta(session.metadata, 'botId') || textMeta(focus.metadata, 'botId');
+  return {
+    id: `session:${session.id}`,
+    kind: 'background',
+    title: clip(session.title || session.id),
+    status,
+    botId,
+    botName: botLabel(botId, names, session.agentId),
+    startedAt: session.createdAt
+  };
+}
+
+function jobItem(
+  job: BackgroundJobRecord,
+  focus: SessionRecord,
+  byId: Map<string, SessionRecord>,
+  names: ReadonlyMap<string, string>,
+  now: number
+): BotActivityItem | undefined {
+  const status = botActivityStatus(job.status);
+  if (!keepRow(status, job.updatedAt, now)) return undefined;
+  const session = byId.get(job.sessionId);
+  const botId = textMeta(session?.metadata, 'botId') || textMeta(focus.metadata, 'botId');
+  const fallback = session?.agentId ?? focus.agentId;
+  return {
+    id: `job:${job.id}`,
+    kind: 'background',
+    title: clip(job.command || job.id),
+    status,
+    botId,
+    botName: botLabel(botId, names, fallback),
+    startedAt: job.createdAt
+  };
+}
+
+function collectRoutines(
+  items: BotActivityItem[],
+  routineSessionIds: Set<string>,
+  input: AssembleBotActivityInput,
+  byId: Map<string, SessionRecord>,
+  now: number
+): void {
   for (const run of input.routines) {
-    const main = byId.get(run.mainSessionId);
-    const jobBot = textMeta(run.job.metadata, 'botId');
-    const sameBot =
-      Boolean(focusBot) && jobBot === focusBot && Boolean(main) && sameOwner(input.focus, main!);
-    const tied =
-      run.mainSessionId === input.focus.id || run.job.sessionId === input.focus.id || sameBot;
-    if (!tied) continue;
-    if (main && run.mainSessionId !== input.focus.id && !sameOwner(input.focus, main)) continue;
-    const status = botActivityStatus(run.status);
-    if (status === 'done' && !isRecent(run.finishedAt || run.updatedAt, now)) continue;
+    const item = routineItem(run, input.focus, byId, input.botNames, now);
+    if (!item) continue;
+    items.push(item);
     if (run.sessionId) routineSessionIds.add(run.sessionId);
-    const botId = jobBot || focusBot;
-    items.push({
-      id: `routine:${run.id}`,
-      kind: 'routine',
-      title: clip(run.job.name || run.job.prompt || run.id),
-      status,
-      botId,
-      botName: botLabel(botId, input.botNames, input.focus.agentId),
-      startedAt: run.startedAt || run.createdAt
-    });
   }
+}
 
+function collectSessions(
+  items: BotActivityItem[],
+  routineSessionIds: Set<string>,
+  input: AssembleBotActivityInput,
+  now: number
+): Set<string> {
   const relatedIds = new Set<string>([input.focus.id]);
   for (const session of input.sessions) {
     if (session.id === input.focus.id) continue;
@@ -137,57 +226,79 @@ export function assembleBotActivity(input: AssembleBotActivityInput): BotActivit
       relatedIds.add(session.id);
       continue;
     }
-    const child = session.parentSessionId === input.focus.id;
-    const botId = textMeta(session.metadata, 'botId');
-    const sibling =
-      Boolean(focusBot) &&
-      botId === focusBot &&
-      sameOwner(input.focus, session) &&
-      session.metadata.canonicalBotChat !== true &&
-      (session.background || session.mode === 'teammate' || session.mode === 'subagent');
-    if (!child && !sibling) continue;
+    if (!isRelatedSession(session, input.focus)) continue;
     relatedIds.add(session.id);
-    if (textMeta(session.metadata, 'routineRunId')) continue;
-    if (session.status === 'idle') continue;
-    const status = botActivityStatus(session.status);
-    if (status === 'done' && !isRecent(session.updatedAt, now)) continue;
-    const rowBot = botId || focusBot;
-    items.push({
-      id: `session:${session.id}`,
-      kind: 'background',
-      title: clip(session.title || session.id),
-      status,
-      botId: rowBot,
-      botName: botLabel(rowBot, input.botNames, session.agentId),
-      startedAt: session.createdAt
-    });
+    const item = sessionItem(session, input.focus, input.botNames, now);
+    if (!item) continue;
+    items.push(item);
   }
+  return relatedIds;
+}
 
+function collectJobs(
+  items: BotActivityItem[],
+  relatedIds: Set<string>,
+  input: AssembleBotActivityInput,
+  byId: Map<string, SessionRecord>,
+  now: number
+): void {
   for (const job of input.jobs) {
     if (!relatedIds.has(job.sessionId)) continue;
-    const status = botActivityStatus(job.status);
-    if (status === 'done' && !isRecent(job.updatedAt, now)) continue;
-    const session = byId.get(job.sessionId);
-    const botId = (session ? textMeta(session.metadata, 'botId') : '') || focusBot;
-    items.push({
-      id: `job:${job.id}`,
-      kind: 'background',
-      title: clip(job.command || job.id),
-      status,
-      botId,
-      botName: botLabel(botId, input.botNames, session?.agentId ?? input.focus.agentId),
-      startedAt: job.createdAt
-    });
+    const item = jobItem(job, input.focus, byId, input.botNames, now);
+    if (!item) continue;
+    items.push(item);
   }
+}
 
+function capAndSort(items: BotActivityItem[]): BotActivityItem[] {
   const active = items.filter((item) => item.status !== 'done');
   const done = items
     .filter((item) => item.status === 'done')
     .sort((a, b) => b.startedAt.localeCompare(a.startedAt) || a.id.localeCompare(b.id))
     .slice(0, DONE_CAP);
-  return [...active, ...done].sort(
-    (a, b) => rank(a.status) - rank(b.status) || b.startedAt.localeCompare(a.startedAt) || a.id.localeCompare(b.id)
-  );
+  return [...active, ...done].sort((a, b) => compareItems(a, b));
+}
+
+function compareItems(a: BotActivityItem, b: BotActivityItem): number {
+  const byStatus = rank(a.status) - rank(b.status);
+  if (byStatus !== 0) return byStatus;
+  const byTime = b.startedAt.localeCompare(a.startedAt);
+  if (byTime !== 0) return byTime;
+  return a.id.localeCompare(b.id);
+}
+
+/** Pure projection. In-flight rows stay; finished rows stay for a short window. */
+export function assembleBotActivity(input: AssembleBotActivityInput): BotActivityItem[] {
+  const now = input.now ?? Date.now();
+  const byId = indexSessions(input.sessions, input.focus);
+  const routineSessionIds = new Set<string>();
+  const items: BotActivityItem[] = [];
+  collectRoutines(items, routineSessionIds, input, byId, now);
+  const relatedIds = collectSessions(items, routineSessionIds, input, now);
+  collectJobs(items, relatedIds, input, byId, now);
+  return capAndSort(items);
+}
+
+function parseRun(payload: string): RoutineRun | undefined {
+  try {
+    const run = JSON.parse(payload) as RoutineRun;
+    if (!run?.id || !run.job) return undefined;
+    return run;
+  } catch {
+    return undefined;
+  }
+}
+
+function parseRuns(rows: Array<{ payload: string }>): RoutineRun[] {
+  const seen = new Set<string>();
+  const runs: RoutineRun[] = [];
+  for (const row of rows) {
+    const run = parseRun(String(row.payload));
+    if (!run || seen.has(run.id)) continue;
+    seen.add(run.id);
+    runs.push(run);
+  }
+  return runs;
 }
 
 function loadRoutines(store: SqliteStateStore): RoutineRun[] {
@@ -205,19 +316,7 @@ function loadRoutines(store: SqliteStateStore): RoutineRun[] {
       "SELECT payload FROM bot_routine_runs WHERE status NOT IN ('queued','running','waiting_approval','unknown') ORDER BY rowid DESC LIMIT 200"
     )
     .all() as Array<{ payload: string }>;
-  const seen = new Set<string>();
-  const runs: RoutineRun[] = [];
-  for (const row of [...active, ...recent]) {
-    try {
-      const run = JSON.parse(String(row.payload)) as RoutineRun;
-      if (!run?.id || !run.job || seen.has(run.id)) continue;
-      seen.add(run.id);
-      runs.push(run);
-    } catch {
-      /* Skip a corrupt payload; the ledger row stays untouched. */
-    }
-  }
-  return runs;
+  return parseRuns([...active, ...recent]);
 }
 
 /** Read-only snapshot for one open session. */

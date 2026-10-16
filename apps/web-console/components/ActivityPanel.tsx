@@ -2,6 +2,7 @@
 
 import type { ActivityToolItem } from '@/lib/activity-tools';
 import { useI18n } from '@/lib/i18n';
+import { BotActivityList } from './BotActivityList';
 
 function phaseLabel(
   phase: ActivityToolItem['phase'],
@@ -23,16 +24,26 @@ function phaseLabel(
   }
 }
 
+function BotWorkSlot({ show, sessionId }: { show?: boolean; sessionId?: string | null }) {
+  if (!show || !sessionId) return null;
+  return <BotActivityList sessionId={sessionId} />;
+}
+
 export function ActivityPanel({
   items,
-  emptyHint
+  emptyHint,
+  botSessionId,
+  showBotWork
 }: {
   items: ActivityToolItem[];
   emptyHint?: string;
+  botSessionId?: string | null;
+  showBotWork?: boolean;
 }) {
   const { t } = useI18n();
   return (
     <div className="activity-panel" aria-label={t('play.activity.aria')}>
+      <BotWorkSlot show={showBotWork} sessionId={botSessionId} />
       <div className="activity-panel__head">
         <h3 className="activity-panel__title">{t('play.rail.activity')}</h3>
         <span className="badge">{items.length}</span>
