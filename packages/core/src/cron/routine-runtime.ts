@@ -157,9 +157,13 @@ function resumeRoutineAfterDecision(host:RoutineRuntimeHost,runs:RoutineRunStore
  const session=run.sessionId?host.store.getSession(run.sessionId):undefined;
  if(!session){const missing=runs.update(run.id,{status:'unknown',error:'Working context disappeared during approval; verify effects before retry',finishedAt:nowIso()});summarize(host,runs,missing);return false;}
  if(session.status==='running'){
-  if(host.isSessionRunning?.(session.id))return false;
-  // ponytail: mirror line 181 — lease.whileOwned fences late completion by a lost owner
-  lease.whileOwned(()=>recoverInterruptedRoutine(host,runs,run));return false;
+  // P0: local isSessionRunning is not cross-instance evidence. An approve/resume path acquires a
+  // heartbeat lease so peers see an owner. Exclude our own drain lease from the liveness check —
+  // we just acquired it and it is not evidence of a live continuation elsewhere.
+  if(host.isSessionRunning?.(session.id)||lease.hasOtherActive())return false;
+  // ponytail: mirror line 181 — lease.whileOwned fences against a concurrently restored owner;
+  // P1: re-read run status so we never clobber a concurrent cancel with 'unknown'
+  lease.whileOwned(()=>{const fresh=runs.get(run.id);if(fresh?.status==='waiting_approval'||(fresh?.status==='running'&&!lease.hasOtherActive()))recoverInterruptedRoutine(host,runs,fresh??run);});return false;
  }
  const approvals=approvalsForRun(host,run);if(approvals.some(approval=>approval.status==='pending'))return false;
  const approved=approvals.some(approval=>approval.status==='approved')&&!approvals.some(approval=>approval.status==='rejected');

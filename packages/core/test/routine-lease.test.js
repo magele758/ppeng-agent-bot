@@ -114,6 +114,52 @@ test('crashed waiting_approval with undefined isSessionRunning recovers to unkno
  assert.equal(runs.get(run.id).status,'unknown');assert.equal(calls,0);a.db.close();b.db.close();
 });
 
+// P0 regression: a peer must not quarantine a run whose approval continuation holds an active lease.
+test('active approval-path lease on peer protects running session from quarantine [AC:bot-routine-lifecycle#AC-12]',async()=>{
+ // Simulate what the approve HTTP path does: session is running, no local isSessionRunning,
+ // but the continuation holds a live lease (acquired by the approve/resume bridge).
+ const {a,b,h,runs,run}=await stuckWaitingApproval();
+ // Manually insert a live lease as the approve path would.
+ const lease=RoutineLease.acquire(a,run.id);
+ assert.ok(lease,'lease must be acquirable after park released it');
+ let calls=0;
+ // Drain from b — isSessionRunning is false on this host (different instance).
+ await drainRoutineRuns({store:b,stateDir:h.stateDir,log:{warn(){},info(){}},isSessionRunning:()=>false,runSession:async()=>{calls++;}});
+ assert.equal(runs.get(run.id).status,'waiting_approval','peer must not clobber live lease');
+ assert.equal(calls,0);
+ lease.release();
+ // After the lease expires a drain CAN recover it.
+ a.db.prepare('UPDATE bot_routine_leases SET expires_at=0 WHERE run_id=?').run(run.id);
+ await drainRoutineRuns({store:b,stateDir:h.stateDir,log:{warn(){},info(){}},isSessionRunning:()=>false,runSession:async()=>{calls++;}});
+ assert.equal(runs.get(run.id).status,'unknown','expired lease must allow recovery');
+ a.db.close();b.db.close();
+});
+
+// P1 regression: whileOwned must not clobber a cancel with 'unknown'.
+test('cancel committed before fence wins; unknown is not written over cancel [AC:bot-routine-lifecycle#AC-12]',async()=>{
+ const {a,b,h,runs,run}=await stuckWaitingApproval();
+ // Cancel the run (no lease needed).
+ const {cancelRoutineRun}=await import('../dist/cron/routine-runtime.js');
+ await cancelRoutineRun({...h,cancelSession(){}},run.id);
+ assert.equal(runs.get(run.id).status,'cancelled');
+ // Drain that finds session.status==='running' and no live lease:
+ // it should not write 'unknown' because the run is already cancelled.
+ await drainRoutineRuns({store:b,stateDir:h.stateDir,log:{warn(){},info(){}},isSessionRunning:()=>false,runSession:async()=>{}});
+ assert.equal(runs.get(run.id).status,'cancelled','cancel must survive fence re-read');
+ a.db.close();b.db.close();
+});
+
+// P1 regression: two real drains share one DB; both try to recover; only one should write.
+test('two drains sharing one DB race approval recovery; only one quarantines [AC:bot-routine-lifecycle#AC-12]',async()=>{
+ const {a,b,h,runs,run}=await stuckWaitingApproval();
+ // No live lease — both drains want to recover.
+ const hA={...h,isSessionRunning:()=>false,runSession:async()=>{}};
+ const hB={store:b,stateDir:h.stateDir,log:{warn(){},info(){}},isSessionRunning:()=>false,runSession:async()=>{}};
+ await Promise.all([drainRoutineRuns(hA),drainRoutineRuns(hB)]);
+ assert.equal(runs.get(run.id).status,'unknown');
+ a.db.close();b.db.close();
+});
+
 async function stalledHeartbeat(t,heartbeatFirst){
   const {a,b,h,runs,run}=fixture();let done,cancelled=0;
   t.mock.timers.enable({apis:['setInterval','Date']});
