@@ -107,6 +107,12 @@ test('live waiting_approval session that is still running stays waiting [AC:bot-
  await drainRoutineRuns({...h,isSessionRunning:id=>id===sessionId,runSession:async()=>{calls++;}});
  assert.equal(runs.get(run.id).status,'waiting_approval');assert.equal(calls,0);a.db.close();b.db.close();
 });
+test('crashed waiting_approval with undefined isSessionRunning recovers to unknown [AC:bot-routine-lifecycle#AC-12]',async()=>{
+ const {a,b,h,runs,run}=await stuckWaitingApproval();
+ let calls=0;
+ await drainRoutineRuns({...h,isSessionRunning:undefined,runSession:async()=>{calls++;}});
+ assert.equal(runs.get(run.id).status,'unknown');assert.equal(calls,0);a.db.close();b.db.close();
+});
 
 async function stalledHeartbeat(t,heartbeatFirst){
   const {a,b,h,runs,run}=fixture();let done,cancelled=0;

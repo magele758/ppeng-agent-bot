@@ -158,7 +158,8 @@ function resumeRoutineAfterDecision(host:RoutineRuntimeHost,runs:RoutineRunStore
  if(!session){const missing=runs.update(run.id,{status:'unknown',error:'Working context disappeared during approval; verify effects before retry',finishedAt:nowIso()});summarize(host,runs,missing);return false;}
  if(session.status==='running'){
   if(host.isSessionRunning?.(session.id))return false;
-  recoverInterruptedRoutine(host,runs,run);return false;
+  // ponytail: mirror line 181 — lease.whileOwned fences late completion by a lost owner
+  lease.whileOwned(()=>recoverInterruptedRoutine(host,runs,run));return false;
  }
  const approvals=approvalsForRun(host,run);if(approvals.some(approval=>approval.status==='pending'))return false;
  const approved=approvals.some(approval=>approval.status==='approved')&&!approvals.some(approval=>approval.status==='rejected');
