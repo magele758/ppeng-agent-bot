@@ -83,6 +83,31 @@ test('approval continuation is leased once across instances [AC:bot-routine-life
  assert.equal(calls,1);assert.equal(runs.get(run.id).status,'running');done();await new Promise(r=>setImmediate(r));assert.equal(runs.get(run.id).status,'completed');a.db.close();b.db.close();
 });
 
+async function stuckWaitingApproval(){
+ const {a,b,h,runs,run}=fixture();
+ await drainRoutineRuns({...h,runSession:async id=>{
+  a.createApproval({sessionId:id,toolName:'bash',reason:'gated',args:{command:'true'}});
+  a.updateSession(id,{status:'waiting_approval',metadata:{...a.getSession(id).metadata,outcome:{kind:'waiting_approval'}}});
+ }});
+ await new Promise(r=>setImmediate(r));
+ assert.equal(runs.get(run.id).status,'waiting_approval');
+ a.updateSession(runs.get(run.id).sessionId,{status:'running'});
+ a.db.prepare('UPDATE bot_routine_leases SET expires_at=0 WHERE run_id=?').run(run.id);
+ return {a,b,h,runs,run};
+}
+test('crashed waiting_approval run with a stuck running session becomes unknown [AC:bot-routine-lifecycle#AC-12]',async()=>{
+ const {a,b,h,runs,run}=await stuckWaitingApproval();
+ let calls=0;
+ await drainRoutineRuns({...h,isSessionRunning:()=>false,runSession:async()=>{calls++;}});
+ assert.equal(runs.get(run.id).status,'unknown');assert.equal(calls,0);a.db.close();b.db.close();
+});
+test('live waiting_approval session that is still running stays waiting [AC:bot-routine-lifecycle#AC-12]',async()=>{
+ const {a,b,h,runs,run}=await stuckWaitingApproval();
+ const sessionId=runs.get(run.id).sessionId;let calls=0;
+ await drainRoutineRuns({...h,isSessionRunning:id=>id===sessionId,runSession:async()=>{calls++;}});
+ assert.equal(runs.get(run.id).status,'waiting_approval');assert.equal(calls,0);a.db.close();b.db.close();
+});
+
 async function stalledHeartbeat(t,heartbeatFirst){
   const {a,b,h,runs,run}=fixture();let done,cancelled=0;
   t.mock.timers.enable({apis:['setInterval','Date']});
