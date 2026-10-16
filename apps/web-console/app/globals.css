@@ -572,6 +572,21 @@ body,
   font-size: 11px;
   line-height: 1.45;
 }
+.context-stack__replay {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.context-stack__scrub {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--color-text-primary);
+}
+.context-stack__replay-label {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+}
 .traj-panel { display: flex; flex-direction: column; gap: 6px; }
 .traj-turn { border: 1px solid var(--color-border-strong); border-radius: var(--radius-xs); }
 .traj-turn--back { border-color: color-mix(in srgb, #c44 40%, var(--color-border-strong)); }

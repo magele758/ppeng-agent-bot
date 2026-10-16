@@ -199,7 +199,8 @@ export class SessionStore {
         'attachments',
         'artifacts',
         'goal_records',
-        'agent_cases'
+        'agent_cases',
+        'context_stack_snapshots'
       ]) {
         run(`DELETE FROM ${table} WHERE session_id = ?`, sessionId);
       }

@@ -960,6 +960,23 @@ export const MIGRATIONS: Migration[] = [
     version: 27,
     description: 'routine occurrence leases and summary continuation links',
     up: (db) => { ensureRoutineSchema({db}); }
+  },
+  {
+    version: 28,
+    description: 'context_stack_snapshots for Play context replay',
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS context_stack_snapshots (
+          id TEXT PRIMARY KEY,
+          session_id TEXT NOT NULL,
+          turn_index INTEGER NOT NULL,
+          created_at TEXT NOT NULL,
+          blocks_json TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_context_stack_snapshots_session
+          ON context_stack_snapshots(session_id, turn_index, created_at);
+      `);
+    }
   }
 ];
 

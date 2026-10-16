@@ -7,6 +7,12 @@ import {
   formatContextShare,
   stackContextSegments
 } from '@/lib/context-stack-bar';
+import {
+  buildContextReplayFrames,
+  replayFrameIndex,
+  selectContextReplayFrame,
+  type ReplaySnapshot
+} from '@/lib/context-stack-replay';
 import { useI18n, type MessageKey } from '@/lib/i18n';
 
 interface ContextStackBlock {
@@ -88,10 +94,13 @@ export function ContextStackPanel({
   running: boolean;
   messageCount: number;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [data, setData] = useState<ContextStackPayload | null>(null);
+  const [snapshots, setSnapshots] = useState<ReplaySnapshot[]>([]);
   const [err, setErr] = useState<string | null>(null);
+  const [replayErr, setReplayErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [selectedId, setSelectedId] = useState('live');
   const request = useRef(0);
 
   const load = useCallback(async () => {
@@ -99,22 +108,43 @@ export function ContextStackPanel({
     const ticket = ++request.current;
     if (!sid) {
       setData(null);
+      setSnapshots([]);
       setErr(null);
+      setReplayErr(null);
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
-      const body = (await api(`/api/sessions/${encodeURIComponent(sid)}/context-stack`)) as ContextStackPayload;
+      const [stackResult, historyResult] = await Promise.allSettled([
+        api(`/api/sessions/${encodeURIComponent(sid)}/context-stack`),
+        api(`/api/sessions/${encodeURIComponent(sid)}/context-snapshots`)
+      ]);
       if (request.current !== ticket) return;
-      setData(body);
-      setErr(null);
-    } catch (error) {
-      if (request.current !== ticket) return;
-      setErr(error instanceof Error ? error.message : String(error));
+      if (stackResult.status === 'rejected') {
+        const reason = stackResult.reason;
+        setErr(reason instanceof Error ? reason.message : String(reason));
+        setData(null);
+      } else {
+        setData(stackResult.value as ContextStackPayload);
+        setErr(null);
+      }
+      if (historyResult.status === 'rejected') {
+        const reason = historyResult.reason;
+        setSnapshots([]);
+        setReplayErr(reason instanceof Error ? reason.message : String(reason));
+      } else {
+        const history = historyResult.value as { snapshots?: ReplaySnapshot[] };
+        setSnapshots(Array.isArray(history.snapshots) ? history.snapshots : []);
+        setReplayErr(null);
+      }
     } finally {
       if (request.current === ticket) setLoading(false);
     }
+  }, [sessionId]);
+
+  useEffect(() => {
+    setSelectedId('live');
   }, [sessionId]);
 
   useEffect(() => {
@@ -127,13 +157,41 @@ export function ContextStackPanel({
   };
 
   const body = data && data.sessionId === sessionId ? data : null;
-  const stacked = body ? stackContextSegments(body.blocks) : null;
+  const frames = body ? buildContextReplayFrames(snapshots, body.blocks) : [];
+  const frameIndex = replayFrameIndex(frames, selectedId);
+  const frame = selectContextReplayFrame(frames, frameIndex) ?? null;
+  const shownBlocks = frame?.blocks ?? [];
+  const stacked = frame ? stackContextSegments(shownBlocks) : null;
   const legend = stacked ? contextStackLegend(stacked.segments) : [];
+  const replayTime = (iso: string) => {
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return iso;
+    return new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date);
+  };
+  const positionLabel = !frame
+    ? ''
+    : frame.live
+      ? t('play.contextStack.replayLive')
+      : t('play.contextStack.replayAt', {
+          turn: String(frame.turn ?? ''),
+          time: frame.createdAt ? replayTime(frame.createdAt) : ''
+        });
+  const chooseFrame = (index: number) => {
+    const next = selectContextReplayFrame(frames, index);
+    if (next) setSelectedId(next.id);
+  };
 
   return (
     <div className="context-stack">
       <div className="context-stack__head">
-        <p className="context-stack__hint">{t('play.contextStack.hint')}</p>
+        <p className="context-stack__hint">
+          {frame && !frame.live ? t('play.contextStack.replayHint') : t('play.contextStack.hint')}
+        </p>
         <button
           type="button"
           className="btn btn-ghost btn-sm"
@@ -145,29 +203,65 @@ export function ContextStackPanel({
       </div>
       {!sessionId ? <p className="empty-hint">{t('play.contextStack.pickSession')}</p> : null}
       {err ? <p className="empty-hint">{t('play.contextStack.loadFailed', { message: err })}</p> : null}
+      {replayErr ? <p className="empty-hint">{t('play.contextStack.replayLoadFailed', { message: replayErr })}</p> : null}
       {sessionId && loading && !body ? <p className="empty-hint">{t('play.contextStack.loading')}</p> : null}
-      {body && stacked ? (
+      {body && stacked && frame ? (
         <>
-          <p className="context-stack__budget">
-            {body.budget.mode === 'canonical-bot'
-              ? t('play.contextStack.budgetBot', {
-                  messages: String(body.budget.messageTokens),
-                  structured: String(body.budget.structuredTokens ?? 0),
-                  hygiene: String(body.budget.hygieneTokens ?? 0),
-                  history: String(body.budget.historyTokens ?? 0)
-                })
-              : t('play.contextStack.budgetNormal', {
-                  request: String(body.budget.requestTokens),
-                  cap: String(body.budget.capTokens),
-                  window: String(body.budget.windowTokens),
-                  ratio: String(Math.round((body.budget.ratio ?? 0.2) * 100))
-                })}
-          </p>
-          {body.budget.pinnedOverBudget ? <p className="context-stack__note">{t('play.contextStack.pinnedOver')}</p> : null}
-          {body.budget.wouldSummarize ? <p className="context-stack__note">{t('play.contextStack.wouldSummarize')}</p> : null}
-          {body.budget.wouldCompact ? <p className="context-stack__note">{t('play.contextStack.wouldCompact')}</p> : null}
-          {body.blocks.length === 0 ? <p className="empty-hint">{t('play.contextStack.empty')}</p> : null}
-          {body.blocks.length > 0 ? (
+          <div className="context-stack__replay">
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => chooseFrame(frameIndex - 1)}
+              disabled={frameIndex <= 0}
+            >
+              {t('play.contextStack.replayEarlier')}
+            </button>
+            <input
+              className="context-stack__scrub"
+              type="range"
+              min={0}
+              max={Math.max(0, frames.length - 1)}
+              step={1}
+              value={frameIndex}
+              disabled={frames.length <= 1}
+              aria-label={t('play.contextStack.replayScrub')}
+              aria-valuetext={positionLabel}
+              onChange={(event) => chooseFrame(Number(event.target.value))}
+            />
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => chooseFrame(frameIndex + 1)}
+              disabled={frameIndex >= frames.length - 1}
+            >
+              {t('play.contextStack.replayLater')}
+            </button>
+          </div>
+          <p className="context-stack__replay-label">{positionLabel}</p>
+          {frame.live ? (
+            <>
+              <p className="context-stack__budget">
+                {body.budget.mode === 'canonical-bot'
+                  ? t('play.contextStack.budgetBot', {
+                      messages: String(body.budget.messageTokens),
+                      structured: String(body.budget.structuredTokens ?? 0),
+                      hygiene: String(body.budget.hygieneTokens ?? 0),
+                      history: String(body.budget.historyTokens ?? 0)
+                    })
+                  : t('play.contextStack.budgetNormal', {
+                      request: String(body.budget.requestTokens),
+                      cap: String(body.budget.capTokens),
+                      window: String(body.budget.windowTokens),
+                      ratio: String(Math.round((body.budget.ratio ?? 0.2) * 100))
+                    })}
+              </p>
+              {body.budget.pinnedOverBudget ? <p className="context-stack__note">{t('play.contextStack.pinnedOver')}</p> : null}
+              {body.budget.wouldSummarize ? <p className="context-stack__note">{t('play.contextStack.wouldSummarize')}</p> : null}
+              {body.budget.wouldCompact ? <p className="context-stack__note">{t('play.contextStack.wouldCompact')}</p> : null}
+            </>
+          ) : null}
+          {shownBlocks.length === 0 ? <p className="empty-hint">{t('play.contextStack.empty')}</p> : null}
+          {shownBlocks.length > 0 ? (
             <div
               className="context-stack__bar"
               role="img"
@@ -195,7 +289,7 @@ export function ContextStackPanel({
             </ul>
           ) : null}
           <ol className="context-stack__list">
-            {body.blocks.map((item) => {
+            {shownBlocks.map((item) => {
               const segment = stacked.segments.find((entry) => entry.id === item.id);
               return (
                 <li key={item.id} className={`context-stack__block context-stack__block--${item.disposition}`} data-kind={item.kind}>

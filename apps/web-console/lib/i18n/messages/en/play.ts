@@ -361,6 +361,13 @@ export const play = {
     dispositionSummarize: 'Will summarize',
     dispositionDropped: 'Left out',
     blockMeta: '{tokens} tokens · {share}% · {chars} chars',
+    replayEarlier: 'Earlier',
+    replayLater: 'Later',
+    replayScrub: 'Context timeline',
+    replayLive: 'Now · latest',
+    replayAt: 'Turn {turn} · {time}',
+    replayHint: 'Prepared context from that moment. Replay only reads and does not change the session.',
+    replayLoadFailed: 'Could not read replay history: {message}',
     kinds: {
       system: 'System prompt',
       systemMessage: 'System message',

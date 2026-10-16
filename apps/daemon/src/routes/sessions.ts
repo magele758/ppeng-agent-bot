@@ -535,6 +535,16 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
       }
     },
 
+    // GET /api/sessions/:id/context-snapshots — stored prepares; replay does not write
+    {
+      method: 'GET',
+      pattern: '/api/sessions/:id/context-snapshots',
+      handler: ({ requireParam, response }) => {
+        const id = requireParam('id');
+        json(response, 200, { sessionId: id, snapshots: runtime.listContextSnapshots(id) });
+      }
+    },
+
     // GET /api/sessions/:id/tool-results/:messageId — stored tool_result (not the model-view stub)
     {
       method: 'GET',
