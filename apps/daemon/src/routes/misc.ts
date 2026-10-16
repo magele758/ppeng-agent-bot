@@ -194,20 +194,37 @@ export function miscRoutes(runtime: RawAgentRuntime, opts: MiscOptions): RouteSp
           .listApprovals('pending')
           .some((item) => item.sessionId === approval.sessionId);
         if (session && shouldResumeAfterApproval(approval.status, session.status, pendingLeft)) {
-          // Try to resume under the routine lease so any concurrent peer drain's
-          // acquire fails and won't quarantine this still-active continuation (P0).
-          // Fall back to plain runSession when no waiting_approval routine run is found.
+          // Routine runs resume under the routine lease. `handled` and `busy` must not fall
+          // through to a bare runSession (peer owner, other approvals still pending, or a
+          // rejection that finish() already recorded). Only a non-routine session does.
+          let continuation: Promise<unknown> | undefined;
           const routineHost = {
             store: runtime.store,
             stateDir: runtime.stateDir,
-            runSession: (sid: string) => runtime.runSession(sid),
+            runSession: (sid: string) => {
+              let flight: Promise<unknown>;
+              try {
+                flight = Promise.resolve(runtime.runSession(sid));
+              } catch (error) {
+                flight = Promise.reject(error);
+              }
+              // Mark handled so a sync rejection is not unhandled before the await below.
+              flight.then(() => undefined, () => undefined);
+              continuation = flight;
+              return flight;
+            },
             cancelSession: (sid: string) => runtime.cancelSession(sid),
             isSessionRunning: (sid: string) => runtime.isSessionRunning(sid),
             hasUnconfirmedEffects: (sid: string, since: string) => runtime.hasUnconfirmedEffects(sid, since),
             log: { warn: (..._a: unknown[]) => {}, info: (..._a: unknown[]) => {} },
           };
-          if (!resumeApprovalContinuation(routineHost, session.id)) {
+          const outcome = resumeApprovalContinuation(routineHost, session.id);
+          if (outcome === 'not-routine') {
             await runtime.runSession(session.id);
+          } else if (continuation) {
+            // Await the leased continuation so the response snapshot is post-turn and a
+            // continuation failure is still a failed HTTP request.
+            await continuation;
           }
         }
         json(response, 200, {

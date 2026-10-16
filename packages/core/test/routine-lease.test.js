@@ -120,9 +120,10 @@ test('active approval-path lease on peer protects running session from quarantin
  // resumeApprovalContinuation acquires the lease; instance B drains concurrently and must skip.
  const {resumeApprovalContinuation}=await import('../dist/cron/routine-runtime.js');
  const {a,b,h,host,runs,run}=await stuckWaitingApproval();
- // Simulate what the HTTP approve route does: flip session to idle with an approved approval.
- a.updateApproval(a.listApprovals().find(x=>x.sessionId===run.sessionId).id,'approved');
+ // The enqueued object has no sessionId; the claimed run does.
  const sessionId=runs.get(run.id).sessionId;
+ // Simulate what the HTTP approve route does: flip session to idle with an approved approval.
+ a.updateApproval(a.listApprovals().find(x=>x.sessionId===sessionId).id,'approved');
  a.updateSession(sessionId,{status:'idle',metadata:{...a.getSession(sessionId).metadata,outcome:{kind:'waiting_approval'}}});
  let continuationStarted=false,continuationDone;
  const continuationHost={...h,runSession:async id=>{
@@ -133,7 +134,7 @@ test('active approval-path lease on peer protects running session from quarantin
  }};
  // Start the continuation via the real approve path (acquires the lease).
  const started=resumeApprovalContinuation(continuationHost,sessionId);
- assert.ok(started,'resumeApprovalContinuation must return true when a matching run exists');
+ assert.equal(started,'handled','resumeApprovalContinuation must return handled when a matching run exists');
  assert.ok(continuationStarted,'runSession must have been called synchronously in bridge');
  // Now drain from B while the continuation holds the lease — it must not quarantine.
  let calls=0;
@@ -163,19 +164,41 @@ test('cancel committed before fence wins; unknown is not written over cancel [AC
 // P1 regression: two real drains share one DB; both try to recover; only one should write.
 test('two drains sharing one DB race approval recovery; only one quarantines [AC:bot-routine-lifecycle#AC-12]',async()=>{
  const {a,b,h,runs,run}=await stuckWaitingApproval();
- // Count actual DB writes to bot_routine_runs.
- let writes=0;
- const origPrepare=a.db.prepare.bind(a.db);
- a.db.prepare=function(sql){const stmt=origPrepare(sql);if(/UPDATE bot_routine_runs/.test(sql)&&/status='unknown'/.test(sql)){const origRun=stmt.run.bind(stmt);stmt.run=function(...args){writes++;return origRun(...args);};}return stmt;};
- // No live lease — both drains want to recover.
+ // Count the quarantine UPDATE on BOTH connections. hB opens its own DatabaseSync, so a
+ // counter on `a` alone stays 0 when B wins acquire, and stays 1 when both write.
+ // The write must also be the fenced CAS: inside whileOwned's BEGIN, and still predicated
+ // on status IN ('waiting_approval','running'). Dropping whileOwned or the CAS fails below.
+ let attempts=0,fenced=0,bare=0,applied=0,uncas=0;
+ function instrument(db){
+  const origExec=db.exec.bind(db),origPrepare=db.prepare.bind(db);let depth=0;
+  db.exec=function(sql){
+   const result=origExec(sql);
+   if(/^\s*BEGIN\b/i.test(sql))depth++;
+   else if(/^\s*(COMMIT|ROLLBACK)\b/i.test(sql))depth=Math.max(0,depth-1);
+   return result;
+  };
+  db.prepare=function(sql){
+   const stmt=origPrepare(sql);
+   if(!/UPDATE\s+bot_routine_runs/i.test(sql)||!/status='unknown'/.test(sql))return stmt;
+   const origRun=stmt.run.bind(stmt);
+   const cas=/status\s+IN\s*\(\s*'waiting_approval'\s*,\s*'running'\s*\)/i.test(sql);
+   stmt.run=function(...args){
+    attempts++;if(depth>0)fenced++;else bare++;if(!cas)uncas++;
+    const result=origRun(...args);if(result.changes)applied++;return result;
+   };
+   return stmt;
+  };
+ }
+ instrument(a.db);instrument(b.db);
  const hA={...h,isSessionRunning:()=>false,runSession:async()=>{}};
  const hB={store:b,stateDir:h.stateDir,log:{warn(){},info(){}},isSessionRunning:()=>false,runSession:async()=>{}};
  await Promise.all([drainRoutineRuns(hA),drainRoutineRuns(hB)]);
  assert.equal(runs.get(run.id).status,'unknown');
- // The lease acts as a mutual-exclusion token: the drain that wins acquire() is the one that writes.
- // The other loses the acquire() race and never reaches recoverInterruptedRoutine at all, so
- // exactly one DB write must land. Remove whileOwned() or the acquire() guard and this breaks.
- assert.equal(writes,1,'exactly one drain must commit the CAS write');
+ assert.equal(attempts,1,'exactly one quarantine UPDATE across both connections');
+ assert.equal(applied,1,'that UPDATE must change a row');
+ assert.equal(fenced,1,'quarantine must run inside whileOwned');
+ assert.equal(bare,0,'an unfenced unknown write means whileOwned was removed');
+ assert.equal(uncas,0,'the unknown write must keep the status CAS predicate');
  a.db.close();b.db.close();
 });
 
