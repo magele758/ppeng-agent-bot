@@ -54,10 +54,16 @@ export function subagentHelpTargets(
     if (parent && resolveBotMemoryAgentId(parent, store) === botAgentId) targets.push(parent);
   }
   if (audience === 'siblings' || audience === 'both') {
+    const su = typeof session.metadata?.userId === 'string' ? session.metadata.userId.trim() : '';
+    const st = typeof session.metadata?.tenantId === 'string' ? session.metadata.tenantId.trim() : '';
     for (const candidate of store.listSessions()) {
       if (candidate.id === session.id || candidate.mode !== 'subagent') continue;
       if (parentIdOf(candidate) !== parentId) continue;
       if (resolveBotMemoryAgentId(candidate, store) !== botAgentId) continue;
+      // ponytail: same-owner guard — mirror sameOwner logic from bot-activity
+      const cu = typeof candidate.metadata?.userId === 'string' ? candidate.metadata.userId.trim() : '';
+      const ct = typeof candidate.metadata?.tenantId === 'string' ? candidate.metadata.tenantId.trim() : '';
+      if (su && cu ? (su !== cu || st !== ct) : (st && ct ? st !== ct : (su || cu || st || ct))) continue;
       targets.push(candidate);
     }
   }

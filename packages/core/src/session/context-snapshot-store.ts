@@ -38,7 +38,8 @@ export class ContextSnapshotStore {
   append(sessionId: string, blocks: readonly ContextSnapshotBlock[]): { snapshot: ContextSnapshot; created: boolean } {
     const fingerprint = contextSnapshotFingerprint(blocks);
     const blocksJson = JSON.stringify(blocks);
-    this.db.exec('BEGIN');
+    const sp = `ctxsnap_${sessionId.replace(/[^a-z0-9]/gi, '_')}`;
+    this.db.exec(`SAVEPOINT "${sp}"`);
     try {
       const latest = this.db
         .prepare(
@@ -50,7 +51,7 @@ export class ContextSnapshotStore {
         )
         .get(sessionId) as SnapshotRow | undefined;
       if (latest && contextSnapshotFingerprint(parseContextSnapshotBlocks(latest.blocks_json)) === fingerprint) {
-        this.db.exec('COMMIT');
+        this.db.exec(`RELEASE "${sp}"`);
         return { snapshot: toSnapshot(latest), created: false };
       }
       const row: SnapshotRow = {
@@ -79,10 +80,11 @@ export class ContextSnapshotStore {
              )`
         )
         .run(sessionId, sessionId, CONTEXT_SNAPSHOT_LIMIT);
-      this.db.exec('COMMIT');
+      this.db.exec(`RELEASE "${sp}"`);
       return { snapshot: toSnapshot(row), created: true };
     } catch (error) {
-      this.db.exec('ROLLBACK');
+      this.db.exec(`ROLLBACK TO "${sp}"`);
+      this.db.exec(`RELEASE "${sp}"`);
       throw error;
     }
   }
