@@ -58,7 +58,7 @@ function routine(patch) {
   };
 }
 
-test('bot activity status maps to running, waiting, or done', () => {
+test('bot activity status maps to running, waiting, or done [AC:bot-activity-rail#AC-1] [AC:bot-activity-rail#AC-2]', () => {
   assert.equal(botActivityStatus('running'), 'running');
   for (const raw of ['queued', 'waiting_approval', 'unknown', 'pending']) {
     assert.equal(botActivityStatus(raw), 'waiting', raw);
@@ -68,7 +68,7 @@ test('bot activity status maps to running, waiting, or done', () => {
   }
 });
 
-test('assemble lists in-flight routines and background work for this bot', () => {
+test('assemble lists in-flight routines and background work for this bot [AC:bot-activity-rail#AC-1] [AC:bot-activity-rail#AC-2] [AC:bot-activity-rail#AC-3] [AC:bot-activity-rail#AC-5]', () => {
   const focus = session({});
   const worker = session({
     id: 'worker',
@@ -170,7 +170,7 @@ test('assemble lists in-flight routines and background work for this bot', () =>
   assert.equal(items.some((item) => item.title === 'Idle room' || item.title === 'Ancient' || item.title === 'old job' || item.title === 'Other user'), false);
 });
 
-test('listSessionBotActivity reads routine runs and background jobs', () => {
+test('listSessionBotActivity reads routine runs and background jobs [AC:bot-activity-rail#AC-1] [AC:bot-activity-rail#AC-6]', () => {
   const store = new SqliteStateStore(join(mkdtempSync(join(tmpdir(), 'bot-activity-')), 'state.db'));
   const host = {
     store,
@@ -212,4 +212,128 @@ test('listSessionBotActivity reads routine runs and background jobs', () => {
   assert.equal(items.some((item) => item.title === 'Digest' && item.status === 'running' && item.botName === 'Ada'), true);
   assert.equal(items.some((item) => item.title === 'echo hi' && item.status === 'running' && item.botName === 'Ada'), true);
   assert.equal(items.some((item) => item.title.includes('hidden') || item.title === 'Ancient'), false);
+});
+
+test('sameOwner: two sessions with distinct userIds are not same-owner [AC:bot-activity-rail#AC-3]', () => {
+  // A routine tied to user-B's session must NOT appear in user-A's rail.
+  const focusA = {
+    id: 'focus-a',
+    title: 'Bot Chat · Ada',
+    mode: 'chat',
+    status: 'idle',
+    agentId: 'ada',
+    background: false,
+    todo: [],
+    metadata: { botId: 'ada', userId: 'userA', canonicalBotChat: true },
+    createdAt: '2026-10-16T10:00:00.000Z',
+    updatedAt: '2026-10-16T10:00:00.000Z',
+  };
+  const sessionB = {
+    id: 'session-b',
+    title: 'Bot Chat · Ada',
+    mode: 'chat',
+    status: 'idle',
+    agentId: 'ada',
+    background: false,
+    todo: [],
+    metadata: { botId: 'ada', userId: 'userB', canonicalBotChat: true },
+    createdAt: '2026-10-16T10:00:00.000Z',
+    updatedAt: '2026-10-16T10:00:00.000Z',
+  };
+  const runB = {
+    id: 'run-b',
+    routineId: 'job-b',
+    scheduledAt: '2026-10-16T11:00:00.000Z',
+    timezone: 'UTC',
+    status: 'running',
+    mainSessionId: 'session-b',
+    attempt: 1,
+    missedCount: 0,
+    createdAt: '2026-10-16T11:00:00.000Z',
+    updatedAt: '2026-10-16T11:05:00.000Z',
+    startedAt: '2026-10-16T11:01:00.000Z',
+    job: {
+      id: 'job-b',
+      sessionId: 'session-b',
+      agentId: 'ada',
+      name: 'UserB digest',
+      scheduleKind: 'cron5',
+      scheduleValue: '0 * * * *',
+      enabled: true,
+      createdAt: '2026-10-16T10:00:00.000Z',
+      updatedAt: '2026-10-16T10:00:00.000Z',
+      metadata: { botId: 'ada' },
+    },
+  };
+  const items = assembleBotActivity({
+    focus: focusA,
+    sessions: [focusA, sessionB],
+    jobs: [],
+    routines: [runB],
+    botNames: new Map([['ada', 'Ada']]),
+    now: NOW,
+  });
+  assert.equal(items.some((item) => item.title === 'UserB digest'), false, 'user B routine must not appear in user A rail');
+});
+
+test('sameOwner: two unowned sessions (local mode) are same-owner [AC:bot-activity-rail#AC-4]', () => {
+  // Single-user local mode: both sessions have no userId — rail shows all activity.
+  const focus = {
+    id: 'focus-local',
+    title: 'Bot Chat · Ada',
+    mode: 'chat',
+    status: 'idle',
+    agentId: 'ada',
+    background: false,
+    todo: [],
+    metadata: { botId: 'ada', canonicalBotChat: true },
+    createdAt: '2026-10-16T10:00:00.000Z',
+    updatedAt: '2026-10-16T10:00:00.000Z',
+  };
+  const mainSession = {
+    id: 'main-local',
+    title: 'Bot Chat · Ada',
+    mode: 'chat',
+    status: 'idle',
+    agentId: 'ada',
+    background: false,
+    todo: [],
+    metadata: { botId: 'ada', canonicalBotChat: true },
+    createdAt: '2026-10-16T10:00:00.000Z',
+    updatedAt: '2026-10-16T10:00:00.000Z',
+  };
+  const run = {
+    id: 'run-local',
+    routineId: 'job-local',
+    scheduledAt: '2026-10-16T11:00:00.000Z',
+    timezone: 'UTC',
+    status: 'running',
+    mainSessionId: 'main-local',
+    attempt: 1,
+    missedCount: 0,
+    createdAt: '2026-10-16T11:00:00.000Z',
+    updatedAt: '2026-10-16T11:05:00.000Z',
+    startedAt: '2026-10-16T11:01:00.000Z',
+    job: {
+      id: 'job-local',
+      sessionId: 'main-local',
+      agentId: 'ada',
+      name: 'Local digest',
+      scheduleKind: 'cron5',
+      scheduleValue: '0 * * * *',
+      enabled: true,
+      createdAt: '2026-10-16T10:00:00.000Z',
+      updatedAt: '2026-10-16T10:00:00.000Z',
+      metadata: { botId: 'ada' },
+    },
+  };
+  const items = assembleBotActivity({
+    focus,
+    sessions: [focus, mainSession],
+    jobs: [],
+    routines: [run],
+    botNames: new Map([['ada', 'Ada']]),
+    now: NOW,
+  });
+  assert.equal(items.some((item) => item.title === 'Local digest' && item.status === 'running'), true, 'local mode routine must appear');
 });

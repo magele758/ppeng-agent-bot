@@ -1,0 +1,37 @@
+id: bot-activity-rail
+title: Lab activity rail 展示 Bot 在途工作，并按 owner 隔离
+status: approved
+notes: |
+  final acceptance by lei pending.
+  负责人要求本轮直接实现并合并；验收标准按该说明视为已批准。
+  对应 PR #162（Merge 8173295）。
+requirement: |
+  Lab 右侧活动栏（GET /api/sessions/:id/activity）为当前打开的 Bot 会话展示
+  正在运行或最近完成的后台工作（routine 跑批、后台 job、子代理会话）。
+  只展示属于同一个 owner 的工作；其他用户的工作绝不出现在该 Bot 的活动栏里。
+  单用户本地模式（无 userId）下所有工作均可见，不要求登录。
+criteria:
+  - id: AC-1
+    given: 当前打开的 Bot 会话里有一条正在运行的 routine 跑批和一条正在运行的后台 job
+    when: 前端请求 GET /api/sessions/:id/activity
+    then: 活动栏返回这两条记录，status 均为 running，botName 正确
+  - id: AC-2
+    given: 当前 Bot 有一条 30 分钟内已完成的 routine 跑批，以及一条超过 30 分钟的旧完成记录
+    when: 前端请求 GET /api/sessions/:id/activity
+    then: 最近完成的那条出现在结果里；旧的那条不出现
+  - id: AC-3
+    given: 两个不同 userId 的用户各自有一只 Bot，各自有 routine 运行
+    when: 用户 A 请求自己 Bot 会话的活动栏
+    then: 只看到属于用户 A 的那条；用户 B 的 routine 不出现，哪怕 botId 相同
+  - id: AC-4
+    given: 单用户本地模式：所有会话均无 userId，同一只 Bot 有多条 routine 运行
+    when: 前端请求活动栏
+    then: 全部 routine 均出现（不因空 userId 被过滤）
+  - id: AC-5
+    given: 当前 Bot 会话有一条父会话为它的 subagent 会话，状态为 waiting_approval
+    when: 前端请求活动栏
+    then: 该 subagent 会话作为 background 项出现，status 为 waiting
+  - id: AC-6
+    given: 活动栏的 API endpoint 存在
+    when: 未认证请求打该接口
+    then: 返回 401；已认证且会话属于该用户时返回 200 含活动列表

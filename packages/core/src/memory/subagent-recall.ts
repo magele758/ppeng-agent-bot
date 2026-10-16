@@ -80,7 +80,9 @@ export function collectSubagentMemoryHits(
   const userId = typeof session.metadata?.userId === 'string' ? session.metadata.userId.trim() : '';
   const tenantId = typeof session.metadata?.tenantId === 'string' ? session.metadata.tenantId.trim() : '';
   const memory = store.agentMemory?.();
-  if (memory) {
+  // ponytail: skip user.memory search when userId is empty — an unscoped search could return
+  // rows from other users' bot namespaces if the backing store uses only agentId as partition key.
+  if (memory && (userId || tenantId)) {
     for (const row of memory.search({
       scope: 'user.memory',
       agentId: access.botAgentId,
