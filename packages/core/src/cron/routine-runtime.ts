@@ -148,7 +148,12 @@ function launchRoutineSession(host:RoutineRuntimeHost,runs:RoutineRunStore,run:R
  catch(error){try{lease.whileOwned(()=>failRoutineExecution(host,runs,run.id,sessionId,error));}finally{cleanup();}}
 }
 function recoverInterruptedRoutine(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):void {
- const interrupted=runs.update(run.id,{status:'unknown',error:'Process interrupted while executing; verify effects before retry',finishedAt:nowIso()});summarize(host,runs,interrupted);
+ // CAS: only write 'unknown' if the run is still in a recoverable state; a concurrent cancel/finish wins.
+ const patch={status:'unknown' as const,error:'Process interrupted while executing; verify effects before retry',finishedAt:nowIso()};
+ const now=nowIso();const next={...run,...patch,updatedAt:now};
+ if(run.sessionId&&run.attempts?.length)next.attempts=run.attempts.map(a=>a.sessionId===run.sessionId?{...a,status:'unknown' as const,finishedAt:now}:a);
+ const result=host.store.db.prepare("UPDATE bot_routine_runs SET status='unknown',payload=?,notified=0 WHERE id=? AND status IN ('waiting_approval','running')").run(JSON.stringify(next),run.id);
+ if(result.changes)summarize(host,runs,next);
 }
 function approvalsForRun(host:RoutineRuntimeHost,run:RoutineRun):ApprovalRecord[]{
  return host.store.listApprovals().filter(approval=>approval.sessionId===run.sessionId&&(!run.approvalIds?.length||run.approvalIds.includes(approval.id)));
@@ -161,9 +166,12 @@ function resumeRoutineAfterDecision(host:RoutineRuntimeHost,runs:RoutineRunStore
   // heartbeat lease so peers see an owner. Exclude our own drain lease from the liveness check —
   // we just acquired it and it is not evidence of a live continuation elsewhere.
   if(host.isSessionRunning?.(session.id)||lease.hasOtherActive())return false;
-  // ponytail: mirror line 181 — lease.whileOwned fences against a concurrently restored owner;
-  // P1: re-read run status so we never clobber a concurrent cancel with 'unknown'
-  lease.whileOwned(()=>{const fresh=runs.get(run.id);if(fresh?.status==='waiting_approval'||(fresh?.status==='running'&&!lease.hasOtherActive()))recoverInterruptedRoutine(host,runs,fresh??run);});return false;
+  // P1: re-read BOTH run and session inside the fence so we never clobber a concurrent cancel or
+  // a session that already left 'running' while the run stayed 'waiting_approval'.
+  lease.whileOwned(()=>{
+   const fresh=runs.get(run.id);const freshSession=fresh?.sessionId?host.store.getSession(fresh.sessionId):undefined;
+   if(fresh?.status==='waiting_approval'||(fresh?.status==='running'&&!lease.hasOtherActive()&&freshSession?.status!=='running'))recoverInterruptedRoutine(host,runs,fresh??run);
+  });return false;
  }
  const approvals=approvalsForRun(host,run);if(approvals.some(approval=>approval.status==='pending'))return false;
  const approved=approvals.some(approval=>approval.status==='approved')&&!approvals.some(approval=>approval.status==='rejected');
@@ -249,6 +257,41 @@ async function dispatchRoutineQueue(host:RoutineRuntimeHost,runs:RoutineRunStore
 }
 export async function drainRoutineRuns(host:RoutineRuntimeHost):Promise<void>{
  const runs=new RoutineRunStore(host.store),executing=activeFor(host.store);recoverRoutineRuns(host,runs,executing);await dispatchRoutineQueue(host,runs,executing);removeExpiredRoutines(host);
+}
+
+/**
+ * Acquire the routine lease for the waiting_approval run tied to `sessionId`, then
+ * resume the session while holding the lease.  Any concurrent peer drain's acquire
+ * fails on the occupied row, so `hasOtherActive()` returns true and the run is left
+ * alone — solving the P0 quarantine race.
+ *
+ * Returns true when a continuation was started; false when no matching run was found
+ * or the run state was inconsistent (e.g. already cancelled).  The caller should fall
+ * back to a plain `runSession` if this returns false.
+ */
+export function resumeApprovalContinuation(
+  host: RoutineRuntimeHost,
+  sessionId: string
+): boolean {
+  const runs = new RoutineRunStore(host.store);
+  const executing = activeFor(host.store);
+  // Find the waiting_approval run that owns this session.
+  const candidate = runs.pending().find(
+    r => r.status === 'waiting_approval' && r.sessionId === sessionId
+  );
+  if (!candidate) return false;
+  const lease = RoutineLease.acquire(host.store, candidate.id);
+  if (!lease) return false;
+  let handedOff = false;
+  try {
+    const run = runs.get(candidate.id);
+    if (run?.status === 'waiting_approval') {
+      handedOff = resumeRoutineAfterDecision(host, runs, run, executing, lease);
+    }
+  } finally {
+    if (!handedOff) lease.release();
+  }
+  return handedOff;
 }
 
 export async function cancelRoutineRun(host:RoutineRuntimeHost,id:string):Promise<RoutineRun>{

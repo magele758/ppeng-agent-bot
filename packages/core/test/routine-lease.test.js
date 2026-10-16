@@ -116,22 +116,33 @@ test('crashed waiting_approval with undefined isSessionRunning recovers to unkno
 
 // P0 regression: a peer must not quarantine a run whose approval continuation holds an active lease.
 test('active approval-path lease on peer protects running session from quarantine [AC:bot-routine-lifecycle#AC-12]',async()=>{
- // Simulate what the approve HTTP path does: session is running, no local isSessionRunning,
- // but the continuation holds a live lease (acquired by the approve/resume bridge).
- const {a,b,h,runs,run}=await stuckWaitingApproval();
- // Manually insert a live lease as the approve path would.
- const lease=RoutineLease.acquire(a,run.id);
- assert.ok(lease,'lease must be acquirable after park released it');
+ // This test exercises the REAL approve path via resumeApprovalContinuation (not a hand-planted row).
+ // resumeApprovalContinuation acquires the lease; instance B drains concurrently and must skip.
+ const {resumeApprovalContinuation}=await import('../dist/cron/routine-runtime.js');
+ const {a,b,h,host,runs,run}=await stuckWaitingApproval();
+ // Simulate what the HTTP approve route does: flip session to idle with an approved approval.
+ a.updateApproval(a.listApprovals().find(x=>x.sessionId===run.sessionId).id,'approved');
+ const sessionId=runs.get(run.id).sessionId;
+ a.updateSession(sessionId,{status:'idle',metadata:{...a.getSession(sessionId).metadata,outcome:{kind:'waiting_approval'}}});
+ let continuationStarted=false,continuationDone;
+ const continuationHost={...h,runSession:async id=>{
+  continuationStarted=true;
+  await new Promise(r=>{continuationDone=r;});
+  a.appendMessage(id,'assistant',[{type:'text',text:'approved result'}]);
+  a.updateSession(id,{metadata:{...a.getSession(id).metadata,outcome:{kind:'idle',reason:'end'}}});
+ }};
+ // Start the continuation via the real approve path (acquires the lease).
+ const started=resumeApprovalContinuation(continuationHost,sessionId);
+ assert.ok(started,'resumeApprovalContinuation must return true when a matching run exists');
+ assert.ok(continuationStarted,'runSession must have been called synchronously in bridge');
+ // Now drain from B while the continuation holds the lease — it must not quarantine.
  let calls=0;
- // Drain from b — isSessionRunning is false on this host (different instance).
  await drainRoutineRuns({store:b,stateDir:h.stateDir,log:{warn(){},info(){}},isSessionRunning:()=>false,runSession:async()=>{calls++;}});
- assert.equal(runs.get(run.id).status,'waiting_approval','peer must not clobber live lease');
- assert.equal(calls,0);
- lease.release();
- // After the lease expires a drain CAN recover it.
- a.db.prepare('UPDATE bot_routine_leases SET expires_at=0 WHERE run_id=?').run(run.id);
- await drainRoutineRuns({store:b,stateDir:h.stateDir,log:{warn(){},info(){}},isSessionRunning:()=>false,runSession:async()=>{calls++;}});
- assert.equal(runs.get(run.id).status,'unknown','expired lease must allow recovery');
+ assert.equal(runs.get(run.id).status,'running','peer drain must not quarantine while lease is held');
+ assert.equal(calls,0,'peer must not re-run the session');
+ // After the continuation finishes the run should complete.
+ continuationDone();await new Promise(r=>setImmediate(r));
+ assert.equal(runs.get(run.id).status,'completed');
  a.db.close();b.db.close();
 });
 
@@ -152,11 +163,19 @@ test('cancel committed before fence wins; unknown is not written over cancel [AC
 // P1 regression: two real drains share one DB; both try to recover; only one should write.
 test('two drains sharing one DB race approval recovery; only one quarantines [AC:bot-routine-lifecycle#AC-12]',async()=>{
  const {a,b,h,runs,run}=await stuckWaitingApproval();
+ // Count actual DB writes to bot_routine_runs.
+ let writes=0;
+ const origPrepare=a.db.prepare.bind(a.db);
+ a.db.prepare=function(sql){const stmt=origPrepare(sql);if(/UPDATE bot_routine_runs/.test(sql)&&/status='unknown'/.test(sql)){const origRun=stmt.run.bind(stmt);stmt.run=function(...args){writes++;return origRun(...args);};}return stmt;};
  // No live lease — both drains want to recover.
  const hA={...h,isSessionRunning:()=>false,runSession:async()=>{}};
  const hB={store:b,stateDir:h.stateDir,log:{warn(){},info(){}},isSessionRunning:()=>false,runSession:async()=>{}};
  await Promise.all([drainRoutineRuns(hA),drainRoutineRuns(hB)]);
  assert.equal(runs.get(run.id).status,'unknown');
+ // The lease acts as a mutual-exclusion token: the drain that wins acquire() is the one that writes.
+ // The other loses the acquire() race and never reaches recoverInterruptedRoutine at all, so
+ // exactly one DB write must land. Remove whileOwned() or the acquire() guard and this breaks.
+ assert.equal(writes,1,'exactly one drain must commit the CAS write');
  a.db.close();b.db.close();
 });
 

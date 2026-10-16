@@ -8,6 +8,7 @@ import {
   loadOptionalToolGroupsFromEnv,
   optionalToolGroupsFeatureEnabled,
   stampOwnerMetadata,
+  resumeApprovalContinuation,
   type ApprovalRecord,
   type RawAgentRuntime
 } from '@ppeng/agent-core';
@@ -193,7 +194,21 @@ export function miscRoutes(runtime: RawAgentRuntime, opts: MiscOptions): RouteSp
           .listApprovals('pending')
           .some((item) => item.sessionId === approval.sessionId);
         if (session && shouldResumeAfterApproval(approval.status, session.status, pendingLeft)) {
-          await runtime.runSession(session.id);
+          // Try to resume under the routine lease so any concurrent peer drain's
+          // acquire fails and won't quarantine this still-active continuation (P0).
+          // Fall back to plain runSession when no waiting_approval routine run is found.
+          const routineHost = {
+            store: runtime.store,
+            stateDir: runtime.stateDir,
+            runSession: (sid: string) => runtime.runSession(sid),
+            cancelSession: (sid: string) => runtime.cancelSession(sid),
+            isSessionRunning: (sid: string) => runtime.isSessionRunning(sid),
+            hasUnconfirmedEffects: (sid: string, since: string) => runtime.hasUnconfirmedEffects(sid, since),
+            log: { warn: (..._a: unknown[]) => {}, info: (..._a: unknown[]) => {} },
+          };
+          if (!resumeApprovalContinuation(routineHost, session.id)) {
+            await runtime.runSession(session.id);
+          }
         }
         json(response, 200, {
           approval,
