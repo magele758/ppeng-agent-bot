@@ -105,9 +105,12 @@ export function BotCreateForm({ existingNames, onCreated, onCancel }: BotCreateF
           void submit();
         }}
       >
-        <label className="ag-field">
-          <span className="ag-field__label">{t('agents.bots.nameLabel')}</span>
+        <div className="ag-field">
+          <label className="ag-field__label" htmlFor="bot-create-name">
+            {t('agents.bots.nameLabel')}
+          </label>
           <input
+            id="bot-create-name"
             className="ag-input"
             data-testid="bot-create-name"
             value={name}
@@ -116,10 +119,13 @@ export function BotCreateForm({ existingNames, onCreated, onCancel }: BotCreateF
             autoFocus
             placeholder={t('agents.bots.namePh')}
             aria-invalid={nameProblem === 'taken' || undefined}
+            aria-describedby="bot-create-name-hint"
             onChange={(e) => setName(e.target.value)}
           />
-          <span className="ag-field__hint">{t('agents.bots.nameHint')}</span>
-        </label>
+          <span id="bot-create-name-hint" className="ag-field__hint">
+            {t('agents.bots.nameHint')}
+          </span>
+        </div>
 
         <fieldset className="ag-field ag-avatar">
           <legend className="ag-field__label">{t('agents.bots.avatarLabel')}</legend>
@@ -148,9 +154,12 @@ export function BotCreateForm({ existingNames, onCreated, onCancel }: BotCreateF
               </button>
             ))}
           </div>
-          <label className="ag-field">
-            <span className="ag-field__label">{t('agents.bots.avatarUrlLabel')}</span>
+          <div className="ag-field">
+            <label className="ag-field__label" htmlFor="bot-create-avatar-url">
+              {t('agents.bots.avatarUrlLabel')}
+            </label>
             <input
+              id="bot-create-avatar-url"
               className="ag-input"
               data-testid="bot-create-avatar-url"
               type="url"
@@ -161,34 +170,46 @@ export function BotCreateForm({ existingNames, onCreated, onCancel }: BotCreateF
               aria-invalid={avatarProblem === 'invalid' || undefined}
               onChange={(e) => setImageUrl(e.target.value)}
             />
-          </label>
+          </div>
         </fieldset>
 
         <Disclosure label={t('agents.common.advanced')}>
-          <label className="ag-field">
-            <span className="ag-field__label">{t('agents.bots.titleLabel')}</span>
+          <div className="ag-field">
+            <label className="ag-field__label" htmlFor="bot-create-title">
+              {t('agents.bots.titleLabel')}
+            </label>
             <input
+              id="bot-create-title"
               className="ag-input"
               data-testid="bot-create-title"
               value={title}
               maxLength={80}
+              aria-describedby="bot-create-title-hint"
               onChange={(e) => setTitle(e.target.value)}
             />
-            <span className="ag-field__hint">{t('agents.bots.titleHint')}</span>
-          </label>
-          <label className="ag-field">
-            <span className="ag-field__label">{t('agents.bots.descLabel')}</span>
+            <span id="bot-create-title-hint" className="ag-field__hint">
+              {t('agents.bots.titleHint')}
+            </span>
+          </div>
+          <div className="ag-field">
+            <label className="ag-field__label" htmlFor="bot-create-description">
+              {t('agents.bots.descLabel')}
+            </label>
             <textarea
+              id="bot-create-description"
               className="ag-input"
               data-testid="bot-create-description"
               rows={3}
               maxLength={2000}
               value={description}
               placeholder={t('agents.bots.descPh')}
+              aria-describedby="bot-create-description-hint"
               onChange={(e) => setDescription(e.target.value)}
             />
-            <span className="ag-field__hint">{t('agents.bots.descHint')}</span>
-          </label>
+            <span id="bot-create-description-hint" className="ag-field__hint">
+              {t('agents.bots.descHint')}
+            </span>
+          </div>
           <BotFaceChoice
             name={name.trim()}
             shape={face.shape}
