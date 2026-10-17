@@ -35,5 +35,5 @@ export type {
 } from './event-routine.js';
 
 export { RoutineRunStore, ensureRoutineSchema, drainRoutineRuns, materializeRoutineOccurrences, cancelRoutineRun, retryRoutineRun, routineSettings, resumeApprovalContinuation } from './routine-runtime.js';
-export type { RoutineRun, RoutineAttempt, RoutineRunStatus, RoutineRuntimeHost, RoutineContinuation } from './routine-runtime.js';
+export type { RoutineRun, RoutineAttempt, RoutineRunStatus, RoutineRuntimeHost, RoutineContinuation, RoutineRoomDelivery } from './routine-runtime.js';
 export { nextZonedCronRunAt, normalizeRoutineTimezone, skippedZonedCronMinutes } from './cron-next.js';

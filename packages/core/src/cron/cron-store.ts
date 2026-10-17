@@ -8,6 +8,7 @@ import { envBool } from '../env.js';
 import type { ToolContract } from '../types.js';
 import { principalFromSession } from '../bots/bot-identity.js';
 import { ValidationError } from '../errors.js';
+import { assertBotRoomTarget } from '../rooms/index.js';
 import { assertCredentialEnvName } from '../secrets/credential-env.js';
 import { nextCronRunAt, nextZonedCronRunAt, normalizeRoutineTimezone } from './cron-next.js';
 
@@ -170,6 +171,7 @@ export function createCronTools(getStore: () => CronJobStore, opts?: CronToolOpt
     event?: string;
     secretEnv?: string;
     conclusions?: string[];
+    roomId?: string;
   }> = {
     name: 'cron_create',
     description:
@@ -187,7 +189,8 @@ export function createCronTools(getStore: () => CronJobStore, opts?: CronToolOpt
         missedPolicy:{type:'string',enum:['coalesce','skip','catch_up']},
         event:{type:'string',description:'github/push, slack/message, email/received, webhook/generic, ci/status'},
         secretEnv:{type:'string',description:'Lab Secret Vault credential reference (legacy environment reference also supported)'},
-        conclusions:{type:'array',items:{type:'string'},description:'CI completion conclusions; empty accepts all'}
+        conclusions:{type:'array',items:{type:'string'},description:'CI completion conclusions; empty accepts all'},
+        roomId:{type:'string',description:'Optional room that receives a non-empty completed result. The current bot must already be a member.'}
       },
       required: ['name', 'prompt']
     },
@@ -221,6 +224,11 @@ export function createCronTools(getStore: () => CronJobStore, opts?: CronToolOpt
       } else {
         return { ok: false, content: 'Provide every_ms >= 60000, once_at, or cron' };
       }
+      if (typeof args.roomId === 'string' && args.roomId.trim()) {
+        if (!opts?.store) throw new ValidationError('roomId requires routine storage');
+        const botId = context.session.metadata?.botId;
+        assertBotRoomTarget(opts.store, args.roomId.trim(), typeof botId === 'string' ? botId : undefined, principalFromSession(opts.store, context.session));
+      }
       const job = getStore().create({
         sessionId: context.session.id,
         agentId: context.agent.id,
@@ -239,7 +247,8 @@ export function createCronTools(getStore: () => CronJobStore, opts?: CronToolOpt
           ...(args.secretEnv?{secretEnv:args.secretEnv,prompt:args.prompt}:{}),
           ...(typeof context.session.metadata?.botId === 'string'
             ? { botId: context.session.metadata.botId }
-            : {})
+            : {}),
+          ...(typeof args.roomId === 'string' && args.roomId.trim() ? { roomId: args.roomId.trim() } : {})
         }
       });
       return { ok: true, content: JSON.stringify(job, null, 2) };

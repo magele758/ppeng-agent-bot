@@ -2,8 +2,9 @@ import { createId } from '../id.js';
 import { routineExpired } from './routine-deadline.js';
 import { RoutineRunStore, drainRoutineRuns, type RoutineRuntimeHost, type RoutineRun } from './routine-runtime.js';
 import { normalizeExpiresAt } from './routine-deadline.js';
-import { NotFoundError, ValidationError } from '../errors.js';
+import { AuthorizationError, NotFoundError, ValidationError } from '../errors.js';
 import { resolveBotPrincipal, principalFromSession } from '../bots/bot-identity.js';
+import { assertBotRoomTarget } from '../rooms/index.js';
 import { openBot } from '../bots/bot-facade.js';
 import type { SessionFacadeHost } from '../runtime/session-facade.js';
 import type { CronJobRecord } from './cron-store.js';
@@ -36,6 +37,8 @@ export interface CreateCronJobInput {
   conclusions?: string[];
   sessionId?: string;
   botId?: string;
+  /** Group that receives a non-empty completed result. The owning bot must be a member. */
+  roomId?: string;
   enabled?: boolean;
   /** Script or predicate run before the model. Persisted on the routine. */
   precheck?: unknown;
@@ -55,6 +58,8 @@ export interface UpdateCronJobInput {
   missedPolicy?: 'coalesce' | 'skip' | 'catch_up';
   cron?: string;
   enabled?: boolean;
+  /** `null` clears the target room. */
+  roomId?: string | null;
   /** `null` clears a saved precheck. */
   precheck?: unknown;
 }
@@ -136,6 +141,16 @@ export function getCronJob(host: CronFacadeHost, id: string): CronJobRecord {
   return job;
 }
 
+function jobPrincipal(host:CronFacadeHost,job:CronJobRecord):ReturnType<typeof principalFromSession> {
+ const session=host.store.getSession(job.sessionId);
+ if(session)return principalFromSession(host.store,session);
+ const raw=job.metadata.principal;
+ if(raw&&typeof raw==='object'&&!Array.isArray(raw)&&typeof (raw as {userId?:unknown}).userId==='string'&&(raw as {userId:string}).userId.trim()){
+  const tenant=(raw as {tenantId?:unknown}).tenantId;
+  return {userId:(raw as {userId:string}).userId.trim(),...(typeof tenant==='string'&&tenant.trim()?{tenantId:tenant.trim()}:{})};
+ }
+ throw new AuthorizationError();
+}
 function resolveCronBinding(host:CronFacadeHost,input:CreateCronJobInput) {
  let sessionId=input.sessionId?.trim();let botId=input.botId?.trim();
  if(botId)sessionId=openBot(host,botId,resolveBotPrincipal(host.store,input)).sessionId;
@@ -169,8 +184,12 @@ export function createCronJob(host:CronFacadeHost,input:CreateCronJobInput):Cron
  const name=normalizeName(input.name),prompt=normalizePrompt(input.prompt);
  const {session,botId}=resolveCronBinding(host,input);const timezone=normalizeRoutineTimezone(input.timezone);
  const schedule=normalizeSchedule(input,timezone);
- const metadata:Record<string,unknown>={principal:principalFromSession(host.store,session)};
+ const principal=principalFromSession(host.store,session);
+ const roomId=input.roomId?.trim();
+ if(roomId)assertBotRoomTarget(host.store,roomId,botId,principal);
+ const metadata:Record<string,unknown>={principal};
  if(botId)metadata.botId=botId;
+ if(roomId)metadata.roomId=roomId;
  if(input.conclusions!==undefined)metadata.conclusions=normalizeCiConclusions(input.conclusions);
  if(input.precheck!=null)metadata.precheck=parseRoutinePrecheck(input.precheck);
  if(schedule.scheduleKind==='event'){if(!input.secretEnv)throw new ValidationError('secretEnv required for event');metadata.secretEnv=normalizeSecretEnv(input.secretEnv);metadata.prompt=prompt;}
@@ -189,7 +208,7 @@ function schedulePatch(current:CronJobRecord,patch:UpdateCronJobInput):Partial<C
  }
  return next;
 }
-function contentPatch(current:CronJobRecord,patch:UpdateCronJobInput,next:Partial<CronJobRecord>):void {
+function contentPatch(host:CronFacadeHost,current:CronJobRecord,patch:UpdateCronJobInput,next:Partial<CronJobRecord>):void {
  if(patch.name!==undefined)next.name=normalizeName(patch.name);
  if(patch.prompt!==undefined)next.prompt=normalizePrompt(patch.prompt);
  if(patch.enabled!==undefined)next.enabled=patch.enabled;
@@ -197,13 +216,17 @@ function contentPatch(current:CronJobRecord,patch:UpdateCronJobInput,next:Partia
  if(patch.conclusions!==undefined)metadata.conclusions=normalizeCiConclusions(patch.conclusions);
  if(patch.secretEnv!==undefined)metadata.secretEnv=normalizeSecretEnv(patch.secretEnv);
  if(patch.precheck!==undefined){if(patch.precheck===null)delete metadata.precheck;else metadata.precheck=parseRoutinePrecheck(patch.precheck);}
+ if(patch.roomId!==undefined){
+  if(patch.roomId===null)delete metadata.roomId;
+  else {const roomId=patch.roomId.trim();if(!roomId)throw new ValidationError('roomId is required');const botId=typeof metadata.botId==='string'?metadata.botId:undefined;assertBotRoomTarget(host.store,roomId,botId,jobPrincipal(host,current));metadata.roomId=roomId;}
+ }
  if((next.scheduleKind??current.scheduleKind)==='event'){
   if(typeof metadata.secretEnv!=='string')throw new ValidationError('secretEnv required for event');metadata.prompt=next.prompt??current.prompt;
  }
  next.metadata=metadata;
 }
 export function updateCronJob(host:CronFacadeHost,id:string,patch:UpdateCronJobInput):CronJobRecord {
- const current=getCronJob(host,id);const next=schedulePatch(current,patch);contentPatch(current,patch,next);
+ const current=getCronJob(host,id);const next=schedulePatch(current,patch);contentPatch(host,current,patch,next);
  if(patch.expiresAt!==undefined)next.expiresAt=normalizeExpiresAt(patch.expiresAt,next.scheduleKind??current.scheduleKind);
  else if(next.scheduleKind&&!['cron5','every_ms'].includes(next.scheduleKind))next.expiresAt=undefined;
  const updated=ensureCronStore(host).update(id,next);if(!updated)throw new NotFoundError('CronJob',id);return updated;

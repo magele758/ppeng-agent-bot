@@ -21,13 +21,16 @@ import { principalFromSession } from '../bots/bot-identity.js';
 import { CronJobStore, type CronJobRecord } from './cron-store.js';
 import { evaluateRoutinePrecheck, readStoredPrecheck } from './routine-precheck.js';
 import { nextZonedCronRunAt, skippedZonedCronMinutes } from './cron-next.js';
+import { deliverBotRoomMessage } from '../rooms/index.js';
+import type { BotPrincipal } from '../bots/bot-identity.js';
 export type RoutineRunStatus = 'queued'|'running'|'waiting_approval'|'completed'|'failed'|'cancelled'|'unknown'|'skipped'|'silent';
+export interface RoutineRoomDelivery { status:'delivered'|'skipped'; roomId:string; messageId?:string; reason?:string }
 export interface RoutineAttempt { number:number;sessionId:string;startedAt:string;finishedAt?:string;status:RoutineRunStatus;result?:string;error?:string }
 export interface RoutineRun {
  id:string; routineId:string; scheduledAt:string; timezone:string; status:RoutineRunStatus;
  approvalIds?:string[];resumeStartedAt?:string; attempts?:RoutineAttempt[]; sessionId?:string; mainSessionId:string; attempt:number; result?:string; error?:string;
  precheckChecked?:boolean; missedCount:number; createdAt:string; updatedAt:string; startedAt?:string; finishedAt?:string; ownerPid?:number;
- summaryMessageId?:string; eventBody?:string; notificationSent?:boolean; requiresEffectVerification?:boolean; job:CronJobRecord;
+ summaryMessageId?:string; eventBody?:string; notificationSent?:boolean; requiresEffectVerification?:boolean; roomDelivery?:RoutineRoomDelivery; job:CronJobRecord;
 }
 export interface RoutineRuntimeHost {
  store:SqliteStateStore; stateDir:string; log:Pick<Logger,'warn'|'info'>;
@@ -81,12 +84,38 @@ export class RoutineRunStore {
  update(id:string,patch:Partial<RoutineRun>):RoutineRun {const old=this.get(id);if(!old)throw new NotFoundError('RoutineRun',id);const next={...old,...patch,id,updatedAt:nowIso()};if(patch.status&&old.sessionId&&old.attempts?.length&&patch.status!=='queued'){next.attempts=old.attempts.map(a=>a.sessionId===old.sessionId?{...a,status:patch.status!,...(patch.result!==undefined?{result:patch.result}:{}),...(patch.error!==undefined?{error:patch.error}:{}),...(patch.finishedAt?{finishedAt:patch.finishedAt}:{})}:a);}this.store.db.prepare('UPDATE bot_routine_runs SET status=?,payload=?,notified=? WHERE id=?').run(next.status,JSON.stringify(next),next.notificationSent?1:0,id);return next;}
  claim(id:string,sessionId:string):RoutineRun|undefined { const current=this.get(id);if(!current||current.status!=='queued')return undefined;const startedAt=nowIso();const next={...current,status:'running' as const,sessionId,error:current.error?.startsWith('Bot is')?undefined:current.error,ownerPid:process.pid,startedAt,updatedAt:startedAt,attempts:[...(current.attempts??[]),{number:current.attempt,sessionId,startedAt,status:'running' as const}]};const result=this.store.db.prepare("UPDATE bot_routine_runs SET status='running',payload=? WHERE id=? AND status='queued' AND NOT EXISTS (SELECT 1 FROM bot_routine_runs other WHERE other.routine_id=? AND other.id<>? AND other.status IN ('running','waiting_approval','unknown'))").run(JSON.stringify(next),id,current.routineId,id);return result.changes?next:undefined; }
 }
+function routineRoomId(run:RoutineRun):string|undefined {
+ const roomId=run.job.metadata.roomId;return typeof roomId==='string'&&roomId.trim()?roomId.trim():undefined;
+}
+function routinePrincipal(run:RoutineRun):BotPrincipal|undefined {
+ const raw=run.job.metadata.principal;if(!raw||typeof raw!=='object'||Array.isArray(raw))return undefined;
+ const userId=(raw as {userId?:unknown}).userId;if(typeof userId!=='string'||!userId.trim())return undefined;
+ const tenantId=(raw as {tenantId?:unknown}).tenantId;
+ return {userId:userId.trim(),...(typeof tenantId==='string'&&tenantId.trim()?{tenantId:tenantId.trim()}:{})};
+}
+/** Completed text only. Silence, skip, empty, and failure stay out of the room. */
+export function routineRoomPost(run:RoutineRun):string|undefined {
+ if(!routineRoomId(run)||run.status!=='completed')return undefined;
+ const text=run.result?.trim();return text||undefined;
+}
+function refusedRoom(host:RoutineRuntimeHost,run:RoutineRun,roomId:string,reason:string):RoutineRoomDelivery {
+ host.log.warn('routine room delivery skipped',{runId:run.id,roomId,reason});
+ return {status:'skipped',roomId,reason};
+}
+function postRoomResult(host:RoutineRuntimeHost,run:RoutineRun):RoutineRoomDelivery|undefined {
+ const roomId=routineRoomId(run);const text=routineRoomPost(run);if(!roomId||!text)return undefined;
+ const botId=run.job.metadata.botId;const principal=routinePrincipal(run);
+ if(typeof botId!=='string'||!principal)return refusedRoom(host,run,roomId,'not_bot_owned');
+ const delivery=deliverBotRoomMessage(host.store,{roomId,botId,principal,text,idempotencyKey:`routine:${run.id}:${run.attempt}`});
+ if(delivery.delivered)return {status:'delivered',roomId,messageId:delivery.message.id};
+ return refusedRoom(host,run,roomId,delivery.reason);
+}
 function summarize(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):void {
  if(run.notificationSent)return;
  if(run.status==='silent'){runs.update(run.id,{notificationSent:true});return;}
  const parent=host.store.getSession(run.mainSessionId)??repairRoutineOwnerSession(host,run.job);
  if(parent&&parent.id!==run.mainSessionId){runs.update(run.id,{mainSessionId:parent.id});run.mainSessionId=parent.id;}
- if(!parent){runs.update(run.id,{notificationSent:true});return;}
+ if(!parent){const roomDelivery=postRoomResult(host,run);runs.update(run.id,{notificationSent:true,...(roomDelivery?{roomDelivery}:{})});return;}
  if(parent.status==='running'||parent.status==='waiting_approval'||host.isSessionRunning?.(parent.id))return;
  const description=run.result||run.error||run.status;
  // Insert the summary and notification marker atomically. No user instruction or private run transcript.
@@ -94,7 +123,8 @@ function summarize(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):
  try { const fresh=runs.get(run.id);if(fresh?.notificationSent){if(ownTransaction)host.store.db.exec('COMMIT');return;}
  const summary=host.store.appendMessage(run.mainSessionId,'assistant',[textPart(`[routine:${run.job.name}] ${run.status}\n${description.slice(0,2000)}\nRun: ${run.id}${run.sessionId?` · /api/sessions/${run.sessionId}`:''}`)]);
  if(run.sessionId)host.store.db.prepare('INSERT INTO bot_routine_summary_links(message_id,main_session_id,working_session_id,run_id) VALUES(?,?,?,?)').run(summary.id,run.mainSessionId,run.sessionId,run.id);
- runs.update(run.id,{notificationSent:true,summaryMessageId:summary.id});if(ownTransaction)host.store.db.exec('COMMIT');
+ const roomDelivery=postRoomResult(host,fresh??run);
+ runs.update(run.id,{notificationSent:true,summaryMessageId:summary.id,...(roomDelivery?{roomDelivery:roomDelivery}:{})});if(ownTransaction)host.store.db.exec('COMMIT');
  }catch(error){if(ownTransaction)host.store.db.exec('ROLLBACK');throw error;}
 }
 function resultText(host:RoutineRuntimeHost,id:string):string {return assistantTextsFromFold(host.store,id).at(-1)?.trim().slice(0,16000)??'';}
@@ -253,7 +283,8 @@ function claimRoutineSession(host:RoutineRuntimeHost,runs:RoutineRunStore,run:Ro
   if(!lease.renew()){host.store.db.exec('ROLLBACK');return undefined;}
   const session=host.store.createSession({title:`Routine: ${run.job.name}`,mode:'chat',agentId:parent.agentId,background:false,metadata:routineWorkMetadata(host,parent,run)});
   if(!runs.claim(run.id,session.id)){host.store.db.exec('ROLLBACK');return undefined;}
-  host.store.appendMessage(session.id,'user',[textPart(`[cron:${run.job.name}] ${run.job.prompt}\nWhen there is nothing new to report, reply only '[NO_UPDATE]'.`)]);stampSessionWake(host.store,session.id,{kind:'unattended',source:'routine'});host.store.db.exec('COMMIT');return session;
+  const roomNote=routineRoomId(run)?' Your reply is posted to the group, so include only what is worth posting.':'';
+  host.store.appendMessage(session.id,'user',[textPart(`[cron:${run.job.name}] ${run.job.prompt}\nWhen there is nothing new to report, reply only '[NO_UPDATE]'.${roomNote}`)]);stampSessionWake(host.store,session.id,{kind:'unattended',source:'routine'});host.store.db.exec('COMMIT');return session;
  }catch(error){host.store.db.exec('ROLLBACK');throw error;}
 }
 function busyRoutines(runs:RoutineRunStore,all:RoutineRun[],executing:Set<string>):Set<string>{

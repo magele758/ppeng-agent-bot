@@ -476,3 +476,75 @@ export class BotRoomService {
     return this.store.listMessages(sessionId).filter(message=>(message.seq??0)>startSeq&&message.role==='assistant'&&!message.hidden).flatMap(message=>message.parts.filter(part=>part.type==='text').map(part=>part.text)).join('\n\n');
   }
 }
+
+export type BotRoomDelivery =
+  | { delivered: true; message: BotRoomMessage }
+  | { delivered: false; reason: string };
+
+/** Create/update gate. A foreign room is a generic forbidden, not a membership hint. */
+export function assertBotRoomTarget(store: Pick<SqliteStateStore, 'db'>, roomId: string, botId: string | undefined, principal: BotPrincipal): void {
+  if (!botId) throw new ValidationError('roomId requires a bot-owned routine');
+  ensureBotRoomSchema(store);
+  const row = store.db.prepare('SELECT principal_id,data FROM bot_rooms WHERE id=?').get(roomId) as { principal_id: string; data: string } | undefined;
+  if (!row || row.principal_id !== botPrincipalKey(principal)) throw new AuthorizationError();
+  const room = decode<BotRoom>(row);
+  if (!room || !sameBotPrincipal(room.principal, principal)) throw new AuthorizationError();
+  if (!room.botIds.includes(botId)) throw new ValidationError('Bot is not a member of the room');
+}
+
+function roomRefusal(room: BotRoom | undefined, input: { botId: string; principal: BotPrincipal }): string | undefined {
+  if (!room) return 'room_missing';
+  if (!sameBotPrincipal(room.principal, input.principal) || room.principalId !== botPrincipalKey(input.principal)) return 'principal_mismatch';
+  if (room.status !== 'active') return 'room_paused';
+  if (!room.botIds.includes(input.botId)) return 'bot_not_member';
+  return undefined;
+}
+
+function priorRoomMessage(store: Pick<SqliteStateStore, 'db'>, roomId: string, key: string): BotRoomMessage | undefined {
+  return decode<BotRoomMessage>(store.db.prepare('SELECT data FROM bot_room_messages WHERE room_id=? AND idem_key=?').get(roomId, key));
+}
+
+function writeBotRoomRow(store: Pick<SqliteStateStore, 'db'>, message: BotRoomMessage, key: string): void {
+  store.db.prepare('INSERT INTO bot_room_messages(id,room_id,seq,idem_key,data) VALUES(?,?,?,?,?)').run(message.id, message.roomId, message.seq, key, JSON.stringify(message));
+}
+
+function insertBotRoomMessage(store: Pick<SqliteStateStore, 'db'>, roomId: string, bot: { id: string; name: string }, text: string, key: string): BotRoomDelivery {
+  const prior = priorRoomMessage(store, roomId, key);
+  if (prior) return { delivered: true, message: prior };
+  const seq = (store.db.prepare('SELECT COALESCE(MAX(seq),0)+1 AS seq FROM bot_room_messages WHERE room_id=?').get(roomId) as { seq: number }).seq;
+  const message: BotRoomMessage = { id: createId('room_msg'), roomId, seq, sender: { type: 'bot', id: bot.id, name: bot.name }, text: text.slice(0, 8000), attachmentIds: [], createdAt: nowIso() };
+  try { writeBotRoomRow(store, message, key); }
+  catch (error) { return roomInsertResult(store, roomId, key, error); }
+  return { delivered: true, message };
+}
+
+function isConstraintError(error: unknown): boolean {
+  const code = (error as { errcode?: number }).errcode;
+  const name = (error as { code?: string }).code ?? '';
+  return code === 19 || (typeof code === 'number' && code >= 2067 && code < 2256) || name.includes('SQLITE_CONSTRAINT');
+}
+
+function roomInsertResult(store: Pick<SqliteStateStore, 'db'>, roomId: string, key: string, error: unknown): BotRoomDelivery {
+  const again = priorRoomMessage(store, roomId, key);
+  if (again) return { delivered: true, message: again };
+  if (isConstraintError(error)) return { delivered: false, reason: 'conflict' };
+  throw error;
+}
+
+/** Bot posts never start a room turn. Same key returns the existing message. */
+export function deliverBotRoomMessage(
+  store: Pick<SqliteStateStore, 'db' | 'getBot'>,
+  input: { roomId: string; botId: string; principal: BotPrincipal; text: string; idempotencyKey: string }
+): BotRoomDelivery {
+  ensureBotRoomSchema(store);
+  const room = decode<BotRoom>(store.db.prepare('SELECT data FROM bot_rooms WHERE id=?').get(input.roomId));
+  const refused = roomRefusal(room, input);
+  if (refused) return { delivered: false, reason: refused };
+  const bot = store.getBot(input.botId);
+  if (!bot) return { delivered: false, reason: 'bot_missing' };
+  const text = input.text.trim();
+  if (!text) return { delivered: false, reason: 'empty' };
+  const key = input.idempotencyKey.trim();
+  if (!key || key.length > 200) return { delivered: false, reason: 'invalid_key' };
+  return insertBotRoomMessage(store, input.roomId, bot, text, key);
+}
