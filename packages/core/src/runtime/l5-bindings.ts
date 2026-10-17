@@ -554,12 +554,11 @@ export function flushPreparedContextSnapshots(store: L5Bindable['store'], sessio
     }
   }
   queue.push(...keep);
-  // A per-session flush skips other sessions. Those were not attempted, so the
-  // background drain has to be re-armed or they stay queued forever. A full
-  // flush already tried every session; re-arming would only retry a failure
-  // that destroy is about to close over.
-  const pendingOtherSession = sessionId !== undefined && queue.some((item) => item.sessionId !== sessionId);
-  if (pendingOtherSession && store.db.isOpen) schedulePreparedSnapshotDrain(store, queue);
+  // Flush cancels the scheduled drain, so anything still queued (a write that
+  // failed, or another session a per-session flush skipped) has to be re-armed
+  // or it sits in memory until exit. A drain that writes nothing falls back to
+  // the unref'd retry.
+  if (queue.length && store.db.isOpen) schedulePreparedSnapshotDrain(store, queue);
 }
 
 /**

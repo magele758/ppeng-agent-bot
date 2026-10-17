@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SqliteStateStore } from '../dist/storage.js';
 import { RawAgentRuntime } from '../dist/runtime.js';
+import { McpManager } from '../dist/mcp/mcp-manager.js';
+import { destroyRuntime } from '../dist/runtime/session-control.js';
 import {
   orderContextSnapshots,
   preparedContextSnapshotBlocksFor,
@@ -382,6 +384,83 @@ test('destroy writes other sessions when the head item fails [hot-path]', async 
   } finally {
     rmSync(repoRoot, { recursive: true, force: true });
     rmSync(stateDir, { recursive: true, force: true });
+  }
+});
+
+test('a per-session flush that fails still retries that session in the background [hot-path]', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'context-snapshots-own-retry-'));
+  try {
+    const store = new SqliteStateStore(join(dir, 'state.sqlite'));
+    const session = store.createSession({ title: 'own-retry', mode: 'chat', agentId: 'general', summary: '' });
+    const original = store.appendContextSnapshot.bind(store);
+    store.appendContextSnapshot = () => {
+      throw new Error('disk full');
+    };
+    queuePrepared(store, session, 'OWN');
+    flushPreparedContextSnapshots(store, session.id);
+    assert.equal(store.listContextSnapshots(session.id).length, 0, 'failed write stays queued');
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(store.listContextSnapshots(session.id).length, 0, 'retry waits while the write still fails');
+    store.appendContextSnapshot = original;
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    const listed = store.listContextSnapshots(session.id);
+    assert.equal(listed.length, 1);
+    assert.ok(listed[0].blocks.some((b) => b.text.includes('OWN')));
+    store.db.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a snapshot queued during shutdown is flushed before the db closes [hot-path]', async () => {
+  const repoRoot = mkdtempSync(join(tmpdir(), 'context-snapshots-late-queue-repo-'));
+  const stateDir = mkdtempSync(join(tmpdir(), 'context-snapshots-late-queue-state-'));
+  try {
+    const runtime = new RawAgentRuntime({ repoRoot, stateDir, modelAdapter: { name: 'heuristic' } });
+    const session = runtime.store.createSession({ title: 'late', mode: 'chat', agentId: 'general', summary: '' });
+    // A turn preparing a request while MCP is torn down queues after the early flush.
+    const manager = runtime.mcpManager;
+    const original = manager.destroy.bind(manager);
+    manager.destroy = async () => {
+      queuePrepared(runtime.store, session, 'DURING-SHUTDOWN');
+      await original();
+    };
+    await runtime.destroy();
+    const reopened = new SqliteStateStore(runtime.store.dbPath);
+    const listed = reopened.listContextSnapshots(session.id);
+    assert.equal(listed.length, 1);
+    assert.ok(listed[0].blocks.some((b) => b.text.includes('DURING-SHUTDOWN')));
+    reopened.db.close();
+  } finally {
+    rmSync(repoRoot, { recursive: true, force: true });
+    rmSync(stateDir, { recursive: true, force: true });
+  }
+});
+
+test('destroyRuntime runs beforeClose before closing the db [hot-path]', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'context-snapshots-before-close-'));
+  try {
+    const store = new SqliteStateStore(join(dir, 'state.sqlite'));
+    const manager = new McpManager({
+      stateDir: dir,
+      tools: [],
+      env: {},
+      log: { warn: () => {} }
+    });
+    let sawOpen = false;
+    await destroyRuntime({
+      sessionAbortControllers: new Map(),
+      backgroundJobAborts: new Map(),
+      mcpManager: manager,
+      store,
+      beforeClose: () => {
+        sawOpen = store.db.isOpen;
+      }
+    });
+    assert.equal(sawOpen, true, 'beforeClose runs while the db is still open');
+    assert.equal(store.db.isOpen, false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 

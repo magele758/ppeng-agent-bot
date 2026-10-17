@@ -1584,12 +1584,14 @@ export class RawAgentRuntime {
   async destroy(): Promise<void> {
     await this.computerUse.close();
     // Writes still queued must land before the store closes, or replay loses them.
+    // Turns aborted below can queue one more prepare; beforeClose flushes that too.
     flushPreparedContextSnapshots(this.store);
     await destroyRuntime({
       sessionAbortControllers: this.sessionAbortControllers,
       backgroundJobAborts: this.backgroundJobAborts,
       mcpManager: this.mcpManager,
-      store: this.store
+      store: this.store,
+      beforeClose: () => flushPreparedContextSnapshots(this.store)
     });
   }
 
