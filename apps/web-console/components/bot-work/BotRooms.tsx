@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useI18n, type MessageKey } from "@/lib/i18n";
-import { mergeHistoryWindow, prependHistoryPage } from "@/lib/history-window";
+import { applyHistoryPage, historyPollStale, loadEarlierCursorAfterReset, mergeHistoryWindow } from "@/lib/history-window";
 import type { BotInfo } from "@/lib/types";
 import { api, json, useAction, Feedback, Result, Status } from "./shared";
 type Room = {
@@ -59,20 +59,20 @@ export function BotRooms({ bots }: { bots: BotInfo[] }) {
       messagesRef.current = []; setMessages([]); rememberCursor(null); setTurns([]);
     }
     setRoom(r);
+    // Bump epoch so an in-flight poll cannot overwrite this read.
+    historyEpoch.current += 1;
     const base = `/api/bot-rooms/${r.id}`;
-    const beforeSeq = older ? cursorRef.current : null;
-    const epoch = ++historyEpoch.current;
     const [data, status] = (await Promise.all([
       api(
-        `${base}/messages?limit=50${beforeSeq != null ? `&beforeSeq=${beforeSeq}` : ""}`,
+        `${base}/messages?limit=50${older && cursorRef.current != null ? `&beforeSeq=${cursorRef.current}` : ""}`,
       ),
       api(`${base}/turns`),
     ])) as [
       { messages: Message[]; nextCursor: number | null; hasMore: boolean },
       { turns: Turn[] },
     ];
-    if (roomIdRef.current !== r.id || epoch !== historyEpoch.current) return;
-    const nextMessages = older ? prependHistoryPage(messagesRef.current, data.messages) : data.messages;
+    if (roomIdRef.current !== r.id) return;
+    const nextMessages = applyHistoryPage(messagesRef.current, data.messages, older);
     messagesRef.current = nextMessages;
     setMessages(nextMessages);
     rememberCursor(data.hasMore ? data.nextCursor : null);
@@ -92,17 +92,13 @@ export function BotRooms({ bots }: { bots: BotInfo[] }) {
         api(`/api/bot-rooms/${room.id}`),
       ])
         .then(([history, status, current]) => {
-          if (!active || roomIdRef.current !== room.id || epoch !== historyEpoch.current) return;
+          if (historyPollStale(active, roomIdRef.current, room.id, historyEpoch.current, epoch)) return;
           const page = history as { messages: Message[]; hasMore: boolean; nextCursor: number | null };
           const merged = mergeHistoryWindow(messagesRef.current, page.messages, true);
           messagesRef.current = merged.messages;
           setMessages(merged.messages);
-          // A disjoint tail means a page was skipped. The tail cursor only reaches
-          // that page; the next older read has to start at the oldest row still shown.
-          if (merged.reset) {
-            const oldest = merged.messages[0]?.seq;
-            rememberCursor(oldest != null && oldest > 1 ? oldest : page.hasMore ? page.nextCursor : null);
-          }
+          // A disjoint tail skipped a page. The next older read starts at the oldest row still shown.
+          if (merged.reset) rememberCursor(loadEarlierCursorAfterReset(merged.messages, page.hasMore, page.nextCursor));
           setTurns((status as { turns: Turn[] }).turns);
           setRoom(prev=>prev?{...prev,status:(current as {room:Room}).room.status,botIds:(current as {room:Room}).room.botIds}:(current as {room:Room}).room);
         })
