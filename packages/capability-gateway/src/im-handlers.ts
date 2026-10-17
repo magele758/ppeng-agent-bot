@@ -9,6 +9,7 @@ import { deliverChannelText } from './outbound.js';
 import { resolveImOutbound, type ImTurnOrigin, type SilentAckLocale } from './silent-reply.js';
 import {
   claimInboundEvent,
+  InboundClaimTimeoutError,
   inboundTimestampFresh,
   isSenderAllowed,
   safeEqual,
@@ -256,6 +257,38 @@ function feishuEventKey(body: Record<string, unknown>, inbound: FeishuInboundTex
 
 const forbidden = (error: string) => ({ kind: 'json' as const, status: 403, body: { error } });
 
+type FeishuClaimStop =
+  | { kind: 'json'; status: number; body: Record<string, unknown> }
+  | { kind: 'empty'; status: number };
+
+/** Duplicate stays a 200 ack. A lock timeout is 503 so the platform redelivers. */
+async function feishuClaimStop(key: string | undefined, gatewayDir: string): Promise<FeishuClaimStop | undefined> {
+  if (!key) return undefined;
+  const claim = await claimOrBusy(key, gatewayDir);
+  if (claim === 'duplicate') return { kind: 'empty', status: 200 };
+  if (claim === 'busy') return { kind: 'json', status: 503, body: { error: 'Inbound claim lock busy', retryable: true } };
+  return undefined;
+}
+
+async function wecomClaimStop(
+  key: string,
+  gatewayDir: string
+): Promise<{ status: number; body: Record<string, unknown> } | undefined> {
+  const claim = await claimOrBusy(key, gatewayDir);
+  if (claim === 'duplicate') return { status: 200, body: { ok: true, duplicate: true } };
+  if (claim === 'busy') return { status: 503, body: { error: 'Inbound claim lock busy', retryable: true } };
+  return undefined;
+}
+
+async function claimOrBusy(key: string, gatewayDir: string): Promise<'claimed' | 'duplicate' | 'busy'> {
+  try {
+    return await claimInboundEvent(key, Date.now(), gatewayDir);
+  } catch (error) {
+    if (error instanceof InboundClaimTimeoutError) return 'busy';
+    throw error;
+  }
+}
+
 /**
  * Verify, dedupe and acknowledge a Feishu event. The agent turn runs in the
  * background so the platform gets its 200 inside its timeout and a retry
@@ -322,9 +355,8 @@ export async function handleFeishuEventRequest(input: {
   }
 
   const eventKey = feishuEventKey(unwrapped, inbound);
-  if (eventKey && !claimInboundEvent(eventKey, Date.now(), input.gatewayDir)) {
-    return { kind: 'empty', status: 200 };
-  }
+  const stopped = await feishuClaimStop(eventKey, input.gatewayDir);
+  if (stopped) return stopped;
 
   const agentId = input.spec.defaultAgentId ?? 'main';
   const botId = input.settings.feishu.botId ?? input.spec.botId;
@@ -428,9 +460,8 @@ export async function handleWeComBridgeRequest(input: {
   if (!isSenderAllowed(input.settings.wecom.allowedSenders, [userKey])) {
     return { status: 403, body: { error: 'sender_not_allowed' } };
   }
-  if (!claimInboundEvent(wecomEventKey(userKey, text, input.body, input.headers), Date.now(), input.gatewayDir)) {
-    return { status: 200, body: { ok: true, duplicate: true } };
-  }
+  const stopped = await wecomClaimStop(wecomEventKey(userKey, text, input.body, input.headers), input.gatewayDir);
+  if (stopped) return stopped;
 
   const agentId = input.spec.defaultAgentId ?? 'main';
   const botId = input.settings.wecom.botId ?? input.spec.botId;

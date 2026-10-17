@@ -32,7 +32,7 @@ gate 里的 `test:unit`（两个 Job 各跑一次，含覆盖率那次）经 [`s
 - 重跑仍失败 = 真失败，gate 红；
 - 不重试的情况（直接判红）：失败无法归到具体文件（如 runner 崩溃），或失败文件超过 10 个（更像真回归）。
 
-`scripts/test/bot-http-fixed-window.test.mjs` 的 `fixed window bounds queues and terminates stalled work at original deadline` 是已登记的调度敏感超时例外，经上述 unit wrapper 处理，仍报告 flaky。独立 HTTP regression 步骤和脚本没有失败重跑逻辑，因此无需另设豁免通道。
+`scripts/test/bot-http-fixed-window.test.mjs` 的固定窗口断言量的是窗口自己的 `observedElapsedSeconds` / `deadlineOvershootMs`，不再用进程 `Date.now()` 墙钟。调度延迟不再需要 known-flaky 豁免。独立 HTTP regression 步骤和脚本没有失败重跑逻辑，因此无需另设豁免通道。
 
 regression / integration 不重试（单 daemon 有状态流程，重跑会掩盖真问题）。E2E 由 [`playwright.config.ts`](../playwright.config.ts) 在 CI 上 `retries: 1` + `failOnFlakyTests`：重试只用于留 trace 与区分 flaky，**flaky 用例仍判红**。
 

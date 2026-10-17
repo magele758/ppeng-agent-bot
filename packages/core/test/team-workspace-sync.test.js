@@ -50,6 +50,26 @@ test('createTeamWorkerWorkspace falls back to directory-copy', async () => {
   }
 });
 
+test('parallel snapshot copies keep every source file', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'team-parallel-'));
+  try {
+    const sources = [0, 1].map((i) => {
+      const src = join(root, `src-${i}`);
+      mkdirSync(src, { recursive: true });
+      writeFileSync(join(src, `keep-${i}.txt`), `ok-${i}`);
+      return src;
+    });
+    const dest = join(root, 'dest');
+    await Promise.all(sources.map((src) => copyWorkspaceSnapshot(src, dest)));
+    assert.equal(existsSync(join(dest, 'keep-0.txt')), true);
+    assert.equal(existsSync(join(dest, 'keep-1.txt')), true);
+    assert.equal(existsSync(join(dest, '.snapshot.lock')), false);
+    assert.equal(existsSync(join(dest, '.snapshot.lock.db')), true);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('teamTaskWorkspaceDir sanitizes traversal', () => {
   const dir = teamTaskWorkspaceDir('/tmp/state', 'plan1', '../evil');
   assert.equal(dirname(dir), join('/tmp/state', 'teams', 'plan1', 'tasks'));

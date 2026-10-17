@@ -19,7 +19,7 @@ test('real authenticated HTTP load fixture observes fixed read/write mix and ref
   assert.deepEqual(report.readCounts,{warmup:80,measurement:200});assert.deepEqual(report.readMix,{page:100,search:60,status:40});
   assert.deepEqual(report.writeMix,{human:4,routine:2,dispatch:2,room:2});assert.equal(report.clientCount,20);assert.ok(report.maxReadInFlight<=20);
   assert.equal(report.idleSchedulingProbe.observedDistinctSessions,3);assert.equal(report.idleSchedulingProbe.withinTwoCycles,true);
-  assert.ok(report.approvals.length>=2);assert.ok(report.approvals.every(item=>item.approvedAt-Date.parse(item.createdAt)>=5000));
+  assert.ok(report.approvals.length>=2);assert.ok(report.approvals.every(item=>item.approvedAt-Date.parse(item.createdAt)>=5000&&item.waitedMs>=5000));
   assert.equal(report.latency.receive.count,10);assert.equal(report.latency.clientQueue.count,200);assert.equal(report.latency.readSocket.count,200);
   assert.equal(report.browserFirstScreen.status,'unverified');assert.match(report.releaseAcceptance,/NOT ACCEPTED/);
   assert.deepEqual(report.daemon.errors,[]);assert.deepEqual(report.daemon.duplicateSoftwareKeys,[]);assert.ok(report.daemon.notificationRuns>0);assert.ok(report.daemon.modelTurns>0);assert.ok(report.daemon.toolCalls>0);

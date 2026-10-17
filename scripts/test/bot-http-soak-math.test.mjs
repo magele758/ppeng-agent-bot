@@ -28,6 +28,12 @@ test('smoke latency gate rejects thirty fast receives plus four multi-second rec
  const tail=new BoundedHistogram();for(let i=0;i<30;i++)tail.add(100);for(let i=0;i<4;i++)tail.add(3000);
  assert.equal(tail.quantile(.5)<=500,true);assert.equal(tail.sum/tail.count<=500,true);assert.equal(latencyWithinThreshold(tail,500,'smoke'),false);
 });
+test('smoke latency gate tolerates four ~1s receive stalls under CI load but not a tail past 3x the SLO',()=>{
+ const ci=new BoundedHistogram();for(let i=0;i<30;i++)ci.add(150);for(const v of [646,700,950,1085])ci.add(v);
+ assert.equal(latencyWithinThreshold(ci,500,'strict'),false);assert.equal(latencyWithinThreshold(ci,500,'smoke'),true);
+ const edge=new BoundedHistogram();for(let i=0;i<30;i++)edge.add(150);for(let i=0;i<4;i++)edge.add(1501);
+ assert.equal(latencyWithinThreshold(edge,500,'smoke'),false);
+});
 test('bounded histograms keep constant storage and conservatively reject overflow latency',()=>{
  const h=new BoundedHistogram();for(let i=0;i<100000;i++)h.add(i%100);assert.equal(h.bins.length,10002);assert.equal(h.count,100000);assert.equal(h.quantile(.95),94);const overflow=new BoundedHistogram();for(let i=0;i<100;i++)overflow.add(20000+i);assert.equal(overflow.quantile(.95),20099);
 });
