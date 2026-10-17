@@ -503,15 +503,18 @@ interface QueuedPreparedSnapshot {
 }
 
 interface PreparedSnapshotQueue extends Array<QueuedPreparedSnapshot> {
-  /** Set while a drain macrotask is already waiting, so a second one is not armed. */
+  /** Set while a drain macrotask is waiting, so a second one is not armed. */
   scheduled?: NodeJS.Immediate;
+  /** Set while a failed write is waiting to be retried. unref'd. */
+  retry?: NodeJS.Timeout;
 }
 
 const pendingPreparedSnapshots = new WeakMap<L5Bindable['store'], PreparedSnapshotQueue>();
 
 /**
  * Write one queued snapshot. A closed store or a thrown append leaves the item
- * queued so the next flush or drain can retry it; draining stops either way.
+ * queued so the next flush or drain can retry it. Ordering is per session, so
+ * a failure blocks only that session.
  */
 function writeQueuedPreparedSnapshot(store: L5Bindable['store'], item: QueuedPreparedSnapshot): boolean {
   if (!store.db.isOpen) return false;
@@ -523,31 +526,40 @@ function writeQueuedPreparedSnapshot(store: L5Bindable['store'], item: QueuedPre
   }
 }
 
+function cancelPreparedSnapshotSchedule(queue: PreparedSnapshotQueue | undefined): void {
+  if (!queue) return;
+  if (queue.scheduled) clearImmediate(queue.scheduled);
+  if (queue.retry) clearTimeout(queue.retry);
+  delete queue.scheduled;
+  delete queue.retry;
+}
+
 /**
- * Write queued replay snapshots now, in prepare order. Readers call this first
- * so a listed history always includes every prepare that already happened.
- * Stops at the first write that cannot land; that item and the rest stay queued.
+ * Write queued replay snapshots now, in prepare order within each session.
+ * Readers call this first so a listed history always includes every prepare
+ * that already happened. A session whose write fails keeps that item and every
+ * later item of the same session queued; other sessions keep being written.
  */
 export function flushPreparedContextSnapshots(store: L5Bindable['store'], sessionId?: string): void {
   const queue = pendingPreparedSnapshots.get(store);
   if (!queue?.length) return;
-  if (queue.scheduled) {
-    clearImmediate(queue.scheduled);
-    delete queue.scheduled;
-  }
+  cancelPreparedSnapshotSchedule(queue);
+  const blocked = new Set<string>();
   const keep: QueuedPreparedSnapshot[] = [];
-  let stopped = false;
   for (const item of queue.splice(0)) {
-    if (stopped || (sessionId !== undefined && item.sessionId !== sessionId)) {
+    const selected = sessionId === undefined || item.sessionId === sessionId;
+    if (!selected || blocked.has(item.sessionId) || !writeQueuedPreparedSnapshot(store, item)) {
       keep.push(item);
-      continue;
-    }
-    if (!writeQueuedPreparedSnapshot(store, item)) {
-      keep.push(item);
-      stopped = true;
+      if (selected) blocked.add(item.sessionId);
     }
   }
   queue.push(...keep);
+  // A per-session flush skips other sessions. Those were not attempted, so the
+  // background drain has to be re-armed or they stay queued forever. A full
+  // flush already tried every session; re-arming would only retry a failure
+  // that destroy is about to close over.
+  const pendingOtherSession = sessionId !== undefined && queue.some((item) => item.sessionId !== sessionId);
+  if (pendingOtherSession && store.db.isOpen) schedulePreparedSnapshotDrain(store, queue);
 }
 
 /**
@@ -559,23 +571,54 @@ export function flushPreparedContextSnapshots(store: L5Bindable['store'], sessio
  */
 function drainOnePreparedSnapshot(store: L5Bindable['store']): void {
   const queue = pendingPreparedSnapshots.get(store);
-  const next = queue?.[0];
-  // A failed write stays at the head. Retrying the rest would reorder history.
-  if (next && !writeQueuedPreparedSnapshot(store, next)) {
-    delete queue.scheduled;
-    return;
+  if (!queue?.length) return;
+  // One successful write per macrotask. A failed session stays queued, in
+  // order, and is skipped for the rest of this pass so other sessions proceed.
+  const blocked = new Set<string>();
+  let wrote = false;
+  for (let index = 0; index < queue.length && !wrote;) {
+    const next = queue[index];
+    if (!next || blocked.has(next.sessionId)) {
+      index += 1;
+      continue;
+    }
+    if (writeQueuedPreparedSnapshot(store, next)) {
+      queue.splice(index, 1);
+      wrote = true;
+      continue;
+    }
+    blocked.add(next.sessionId);
+    index += 1;
   }
-  queue?.shift();
-  // One snapshot per macrotask keeps each write short between HTTP handlers.
-  if (queue?.length) schedulePreparedSnapshotDrain(store, queue);
+  if (!queue.length || !store.db.isOpen) return;
+  // Healthy items keep the one-per-macrotask pace. Only a leftover failure waits.
+  if (wrote) schedulePreparedSnapshotDrain(store, queue);
+  else schedulePreparedSnapshotRetry(store, queue);
+}
+
+/** True while either the next macrotask or a failure retry is already waiting. */
+function snapshotDrainPending(queue: PreparedSnapshotQueue): boolean {
+  return queue.scheduled !== undefined || queue.retry !== undefined;
 }
 
 function schedulePreparedSnapshotDrain(store: L5Bindable['store'], queue: PreparedSnapshotQueue): void {
-  if (queue.scheduled) return;
+  if (snapshotDrainPending(queue)) return;
   queue.scheduled = setImmediate(() => {
     delete queue.scheduled;
     drainOnePreparedSnapshot(store);
   });
+}
+
+/** Retry after a failed write. unref so a stuck snapshot cannot hold the process open. */
+function schedulePreparedSnapshotRetry(store: L5Bindable['store'], queue: PreparedSnapshotQueue): void {
+  if (snapshotDrainPending(queue) || !store.db.isOpen) return;
+  const timer = setTimeout(() => {
+    delete queue.retry;
+    if (!store.db.isOpen) return;
+    drainOnePreparedSnapshot(store);
+  }, 1000);
+  timer.unref();
+  queue.retry = timer;
 }
 
 export function queuePreparedContextSnapshot(
@@ -589,7 +632,7 @@ export function queuePreparedContextSnapshot(
     pendingPreparedSnapshots.set(store, queue);
   }
   queue.push({ sessionId, blocks });
-  if (queue.length === 1) schedulePreparedSnapshotDrain(store, queue);
+  if (!snapshotDrainPending(queue)) schedulePreparedSnapshotDrain(store, queue);
 }
 
 /**

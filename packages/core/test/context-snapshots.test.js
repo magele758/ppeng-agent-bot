@@ -277,6 +277,114 @@ test('a failed write stays queued and the next flush writes it [hot-path]', () =
   }
 });
 
+test('flushing session A leaves session B queued, and B drains in the background [hot-path]', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'context-snapshots-other-session-'));
+  try {
+    const store = new SqliteStateStore(join(dir, 'state.sqlite'));
+    const sessionA = store.createSession({ title: 'a', mode: 'chat', agentId: 'general', summary: '' });
+    const sessionB = store.createSession({ title: 'b', mode: 'chat', agentId: 'general', summary: '' });
+    queuePrepared(store, sessionA, 'AAA');
+    queuePrepared(store, sessionB, 'BBB');
+    flushPreparedContextSnapshots(store, sessionA.id);
+    assert.equal(store.listContextSnapshots(sessionA.id).length, 1);
+    assert.equal(store.listContextSnapshots(sessionB.id).length, 0, 'B stays queued after A is flushed');
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(store.listContextSnapshots(sessionB.id).length, 1);
+    assert.ok(store.listContextSnapshots(sessionB.id)[0].blocks.some((b) => b.text.includes('BBB')));
+    store.db.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a failing session does not block another session in flush or background drain [hot-path]', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'context-snapshots-isolate-'));
+  try {
+    const store = new SqliteStateStore(join(dir, 'state.sqlite'));
+    const sessionA = store.createSession({ title: 'a', mode: 'chat', agentId: 'general', summary: '' });
+    const sessionB = store.createSession({ title: 'b', mode: 'chat', agentId: 'general', summary: '' });
+    const original = store.appendContextSnapshot.bind(store);
+    store.appendContextSnapshot = (sessionId, blocks) => {
+      if (sessionId === sessionA.id) throw new Error('disk full');
+      return original(sessionId, blocks);
+    };
+    queuePrepared(store, sessionA, 'A1');
+    queuePrepared(store, sessionA, 'A2');
+    queuePrepared(store, sessionB, 'BBB');
+    flushPreparedContextSnapshots(store);
+    assert.equal(store.listContextSnapshots(sessionA.id).length, 0, 'failed A is not dropped');
+    assert.equal(store.listContextSnapshots(sessionB.id).length, 1, 'B is written despite A failing');
+
+    queuePrepared(store, sessionA, 'A3');
+    queuePrepared(store, sessionB, 'BBB-2');
+    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(store.listContextSnapshots(sessionA.id).length, 0);
+    assert.equal(store.listContextSnapshots(sessionB.id).length, 2, 'background drain still writes B');
+
+    store.appendContextSnapshot = original;
+    flushPreparedContextSnapshots(store, sessionA.id);
+    const listed = store.listContextSnapshots(sessionA.id);
+    assert.equal(listed.length, 3);
+    assert.ok(listed[0].blocks.some((b) => b.text.includes('A1')));
+    assert.ok(listed[1].blocks.some((b) => b.text.includes('A2')));
+    assert.ok(listed[2].blocks.some((b) => b.text.includes('A3')));
+    store.db.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a failing session is retried in the background once writes succeed [hot-path]', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'context-snapshots-retry-timer-'));
+  try {
+    const store = new SqliteStateStore(join(dir, 'state.sqlite'));
+    const session = store.createSession({ title: 'retry-timer', mode: 'chat', agentId: 'general', summary: '' });
+    const original = store.appendContextSnapshot.bind(store);
+    store.appendContextSnapshot = () => {
+      throw new Error('disk full');
+    };
+    queuePrepared(store, session, 'LATER');
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(store.listContextSnapshots(session.id).length, 0, 'first drain keeps the failed item');
+    store.appendContextSnapshot = original;
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    const listed = store.listContextSnapshots(session.id);
+    assert.equal(listed.length, 1);
+    assert.ok(listed[0].blocks.some((b) => b.text.includes('LATER')));
+    store.db.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('destroy writes other sessions when the head item fails [hot-path]', async () => {
+  const repoRoot = mkdtempSync(join(tmpdir(), 'context-snapshots-destroy-fail-repo-'));
+  const stateDir = mkdtempSync(join(tmpdir(), 'context-snapshots-destroy-fail-state-'));
+  try {
+    const runtime = new RawAgentRuntime({ repoRoot, stateDir, modelAdapter: { name: 'heuristic' } });
+    const sessionA = runtime.store.createSession({ title: 'a', mode: 'chat', agentId: 'general', summary: '' });
+    const sessionB = runtime.store.createSession({ title: 'b', mode: 'chat', agentId: 'general', summary: '' });
+    const original = runtime.store.appendContextSnapshot.bind(runtime.store);
+    runtime.store.appendContextSnapshot = (sessionId, blocks) => {
+      if (sessionId === sessionA.id) throw new Error('disk full');
+      return original(sessionId, blocks);
+    };
+    queuePrepared(runtime.store, sessionA, 'A-FAIL');
+    queuePrepared(runtime.store, sessionB, 'B-OK');
+    await runtime.destroy();
+    const reopened = new SqliteStateStore(runtime.store.dbPath);
+    assert.equal(reopened.listContextSnapshots(sessionA.id).length, 0, 'failed A is not counted as written');
+    const listed = reopened.listContextSnapshots(sessionB.id);
+    assert.equal(listed.length, 1);
+    assert.ok(listed[0].blocks.some((b) => b.text.includes('B-OK')));
+    reopened.db.close();
+  } finally {
+    rmSync(repoRoot, { recursive: true, force: true });
+    rmSync(stateDir, { recursive: true, force: true });
+  }
+});
+
 test('queued blocks are captured before later edits to the input parts [hot-path]', () => {
   const dir = mkdtempSync(join(tmpdir(), 'context-snapshots-capture-'));
   try {
@@ -294,3 +402,4 @@ test('queued blocks are captured before later edits to the input parts [hot-path
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
