@@ -1,10 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  applyBotsHash,
+  botCardSelected,
+  botCardSubtitle,
   botForCanonicalSession,
+  botsHashIntent,
+  botsPane,
   filterSessionsByPlaySurface,
   parseOpenBotResponse,
   parsePlaySurface,
+  showBotsEmpty,
   visibleBotRoster
 } from './bots.ts';
 
@@ -67,6 +73,48 @@ test('parseOpenBotResponse accepts session object or sessionId', () => {
   assert.equal(parseOpenBotResponse({ bot, session: { id: 'sess_bot' } }).sessionId, 'sess_bot');
   assert.equal(parseOpenBotResponse({ bot, sessionId: 'sess_alt' }).sessionId, 'sess_alt');
   assert.throws(() => parseOpenBotResponse({ bot }), /缺少 bot 或 session/);
+});
+
+test('roster pane prefers create, then group, then a selected bot', () => {
+  assert.equal(botsPane(true, true, true), 'create');
+  assert.equal(botsPane(false, true, true), 'group');
+  assert.equal(botsPane(false, false, true), 'detail');
+  assert.equal(botsPane(false, false, false), 'none');
+  assert.equal(botCardSelected('ada', 'ada', false), true);
+  assert.equal(botCardSelected('ada', 'ada', true), false);
+  assert.equal(botCardSelected('ada', 'bob', false), false);
+  assert.equal(botCardSubtitle('Ada', 'Ada'), null);
+  assert.equal(botCardSubtitle('Ada', ''), null);
+  assert.equal(botCardSubtitle('Ada', undefined), null);
+  assert.equal(botCardSubtitle('Ada', 'Helper'), 'Helper');
+  assert.equal(showBotsEmpty(0, 'none'), true);
+  assert.equal(showBotsEmpty(0, 'detail'), true);
+  assert.equal(showBotsEmpty(0, 'create'), false);
+  assert.equal(showBotsEmpty(0, 'group'), false);
+  assert.equal(showBotsEmpty(2, 'none'), false);
+});
+
+test('a hash opens group create ahead of a permissions deep link', () => {
+  const readGroup = (hash: string) => hash.includes('group');
+  const readPermissions = (hash: string) => (hash.includes('bot=') ? { botId: 'ada' } : null);
+  assert.deepEqual(botsHashIntent('#/group', readGroup, readPermissions), { kind: 'group' });
+  assert.deepEqual(botsHashIntent('#/bot=ada', readGroup, readPermissions), { kind: 'permissions', botId: 'ada' });
+  assert.deepEqual(botsHashIntent('#/chat', readGroup, readPermissions), { kind: 'ignore' });
+  const calls: string[] = [];
+  const set = {
+    setCreating: (value: boolean) => calls.push(`creating:${value}`),
+    setCreatingGroup: (value: boolean) => calls.push(`group:${value}`),
+    setNotice: (value: null) => calls.push(`notice:${value}`),
+    setQuery: (value: string) => calls.push(`query:${value}`),
+    setSelectedId: (value: string) => calls.push(`id:${value}`)
+  };
+  applyBotsHash('#/chat', readGroup, readPermissions, set);
+  assert.deepEqual(calls, []);
+  applyBotsHash('#/group', readGroup, readPermissions, set);
+  assert.deepEqual(calls, ['creating:false', 'notice:null', 'group:true']);
+  calls.length = 0;
+  applyBotsHash('#/bot=ada', readGroup, readPermissions, set);
+  assert.deepEqual(calls, ['creating:false', 'notice:null', 'group:false', 'query:', 'id:ada']);
 });
 
 test('Room execution sessions stay out of both private chat lists', () => {

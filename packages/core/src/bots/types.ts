@@ -12,6 +12,8 @@ export interface BotRecord {
   faceShape: BotFaceShape | null;
   /** Saved swatch. Null keeps the name-based color. */
   faceColor: BotFaceColor | null;
+  /** Optional emoji or image URL drawn instead of the geometric face. Null keeps the face. */
+  avatar: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -24,6 +26,8 @@ export interface CreateBotInput {
   faceShape?: unknown;
   /** Omitted or null keeps the name-based color. */
   faceColor?: unknown;
+  /** Emoji or http(s) image URL. Omitted or blank keeps the geometric face. */
+  avatar?: unknown;
 }
 
 export interface UpdateBotInput {
@@ -43,6 +47,8 @@ export interface UpdateBotInput {
   faceShape?: unknown;
   /** `null` clears the saved color. Omitted leaves it unchanged. */
   faceColor?: unknown;
+  /** `null` or blank clears the emoji / image. Omitted leaves it unchanged. */
+  avatar?: unknown;
 }
 
 export interface ListBotsOptions {

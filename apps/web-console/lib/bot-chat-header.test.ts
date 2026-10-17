@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 import {
   BOT_PERMISSIONS_SECTION_ID,
   botChatHeaderTitle,
+  botGroupCreateHref,
   botNameFromCanonicalTitle,
   botPermissionsHref,
+  readBotGroupCreate,
   readBotPermissionsTarget
 } from './bot-chat-header.ts';
 
@@ -82,4 +84,14 @@ test('权限入口指向这只 Bot 已有的权限设置 [AC:bot-chat-header#AC-
   assert.equal(readBotPermissionsTarget('#/agents/bots?bot=super-bot'), null);
   assert.equal(readBotPermissionsTarget('#/chat?bot=super-bot&focus=permissions'), null);
   assert.equal(readBotPermissionsTarget('#/agents/bots?focus=permissions'), null);
+});
+
+test('群聊入口指向 Bots 页已有的建群表单', () => {
+  const href = botGroupCreateHref();
+  assert.equal(href, '#/agents/bots?create=group');
+  assert.equal(readBotGroupCreate(href), true);
+  assert.equal(readBotGroupCreate('#/agents/bots'), false);
+  assert.equal(readBotGroupCreate('#/agents/bots?create=bot'), false);
+  assert.equal(readBotGroupCreate('#/chat?create=group'), false);
+  assert.equal(readBotPermissionsTarget(href), null);
 });

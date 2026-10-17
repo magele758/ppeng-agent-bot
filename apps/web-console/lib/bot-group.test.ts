@@ -5,8 +5,17 @@ import {
   addGroupMember,
   filterMentionMembers,
   groupMatchesQuery,
+  groupCreateBlock,
+  groupCreateBlockKey,
+  groupCreateDraft,
+  groupCreateError,
+  groupCreateNeedsRoster,
+  groupCreateReady,
+  buildBotGroupCreateBody,
   groupMemberIds,
   groupSpeakBudget,
+  groupTitleOk,
+  toggleGroupMember,
   insertMention,
   removeGroupMember
 } from './bot-group.ts';
@@ -58,6 +67,59 @@ test('rejects removing a member when fewer than two would remain [AC:play-bot-gr
     ok: true,
     members: ['super-bot', 'deskbot']
   });
+});
+
+test('a group title is one to 120 trimmed characters', () => {
+  assert.equal(groupTitleOk('  '), false);
+  assert.equal(groupTitleOk('值班'), true);
+  assert.equal(groupTitleOk('x'.repeat(120)), true);
+  assert.equal(groupTitleOk(` ${'x'.repeat(121)} `), false);
+});
+
+test('toggling membership adds then removes an id', () => {
+  assert.deepEqual(toggleGroupMember([], 'ada'), ['ada']);
+  assert.deepEqual(toggleGroupMember(['ada', 'bob'], 'bob'), ['ada']);
+  assert.deepEqual(toggleGroupMember(['ada'], 'bob'), ['ada', 'bob']);
+});
+
+test('group create body hosts the first member and stops on a bad title or roster', () => {
+  const known = new Set(['ada', 'bob', 'cy']);
+  assert.equal(groupCreateNeedsRoster(1), true);
+  assert.equal(groupCreateNeedsRoster(2), false);
+  assert.equal(buildBotGroupCreateBody('  ', ['ada', 'bob'], known), null);
+  assert.equal(buildBotGroupCreateBody('值班', ['ada'], known), null);
+  assert.deepEqual(buildBotGroupCreateBody(' 值班 ', ['ada', 'bob', 'cy'], known), {
+    title: '值班',
+    botIds: ['ada', 'bob', 'cy'],
+    hostBotId: 'ada',
+    maxBotTurns: 3
+  });
+  assert.equal(groupCreateReady('值班', ['ada', 'bob'], known), true);
+  assert.equal(groupCreateReady('值班', ['ada'], known), false);
+  assert.equal(groupCreateBlock(false, true), 'title');
+  assert.equal(groupCreateBlock(true, false), 'members');
+  assert.equal(groupCreateBlock(true, true), null);
+  assert.equal(groupCreateBlockKey('title', true), 'play.group.titleInvalid');
+  assert.equal(groupCreateBlockKey('members', true), 'agents.bots.groupNeedTwo');
+  assert.equal(groupCreateBlockKey(null, false), 'agents.bots.groupNeedTwo');
+  assert.equal(groupCreateBlockKey(null, true), null);
+  const short = groupCreateDraft('值班', ['ada'], known);
+  assert.equal(short.ready, false);
+  assert.equal(short.body, null);
+  assert.equal(short.warnMembers, true);
+  assert.equal(short.blockKey, 'agents.bots.groupNeedTwo');
+  const blank = groupCreateDraft('  ', [], known);
+  assert.equal(blank.block, 'title');
+  assert.equal(blank.warnMembers, false);
+  assert.equal(blank.blockKey, 'play.group.titleInvalid');
+  const titled = groupCreateDraft('  ', ['ada', 'bob'], known);
+  assert.equal(titled.block, 'title');
+  assert.equal(titled.blockKey, 'play.group.titleInvalid');
+  const ready = groupCreateDraft('值班', ['ada', 'bob'], known);
+  assert.equal(ready.blockKey, null);
+  assert.equal(ready.body?.hostBotId, 'ada');
+  assert.equal(groupCreateError(new Error('nope'), (message) => `failed:${message}`), 'failed:nope');
+  assert.equal(groupCreateError('down', (message) => `failed:${message}`), 'failed:down');
 });
 
 test('speak budget covers every member up to the room cap', () => {
