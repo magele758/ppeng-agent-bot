@@ -17,6 +17,10 @@ import {
   verifySlackSignature
 } from '../dist/cron/event-routine.js';
 import { claimInboundEvent } from '../../capability-gateway/dist/inbound-guard.js';
+
+async function claimDelivery(key) {
+  return (await claimInboundEvent(key)) === 'claimed';
+}
 import { handleGatewayHttp } from '../../capability-gateway/dist/http.js';
 
 const SECRET = 'event-secret-do-not-log';
@@ -179,7 +183,7 @@ test('bad signature does not call runSession', async () => {
       ...githubHeaders(raw, 'delivery-bad-sig'),
       'x-hub-signature-256': 'sha256=deadbeef'
     },
-    claimDelivery: claimInboundEvent
+    claimDelivery
   });
   assert.equal(result.outcomes[0]?.status, 'rejected');
   assert.equal(result.outcomes[0]?.reason, 'bad_signature');
@@ -199,7 +203,7 @@ test('good signature with wakeAgent false does not call runSession', async () =>
     provider: 'github',
     rawBody: raw,
     headers: githubHeaders(raw, 'delivery-quiet'),
-    claimDelivery: claimInboundEvent
+    claimDelivery
   });
   assert.equal(result.outcomes[0]?.status, 'skipped');
   assert.deepEqual(runs, []);
@@ -215,7 +219,7 @@ test('good signature wakes and the user message fences the event', async () => {
     provider: 'github',
     rawBody: raw,
     headers: githubHeaders(raw, 'delivery-wake'),
-    claimDelivery: claimInboundEvent
+    claimDelivery
   });
   assert.equal(result.outcomes[0]?.status, 'woke');
   assert.equal(runs.length,1);
@@ -241,7 +245,7 @@ test('the same delivery id is a duplicate the second time', async () => {
     provider: 'github',
     rawBody: raw,
     headers: githubHeaders(raw, 'delivery-dup'),
-    claimDelivery: claimInboundEvent
+    claimDelivery
   };
   const first = await acceptEventRoutine(host, input);
   const second = await acceptEventRoutine(host, input);
@@ -270,7 +274,7 @@ test('script precheck reads the event file and the JSON is not spliced into the 
     provider: 'github',
     rawBody: raw,
     headers: githubHeaders(raw, 'delivery-script'),
-    claimDelivery: claimInboundEvent
+    claimDelivery
   });
   assert.equal(result.outcomes[0]?.status, 'skipped');
   assert.deepEqual(runs, []);
@@ -304,14 +308,14 @@ test('换掉 GitHub 投递号并复用原签名时不会再次入队 [AC:github-
     rawBody: raw,
     headers,
     nowMs: NOW,
-    claimDelivery: claimInboundEvent
+    claimDelivery
   });
   const replay = await acceptEventRoutine(host, {
     provider: 'github',
     rawBody: raw,
     headers: { ...headers, 'x-github-delivery': 'delivery-swapped' },
     nowMs: NOW,
-    claimDelivery: claimInboundEvent
+    claimDelivery
   });
   const refreshed = await acceptEventRoutine(host, {
     provider: 'github',
@@ -322,7 +326,7 @@ test('换掉 GitHub 投递号并复用原签名时不会再次入队 [AC:github-
       'x-github-timestamp': String(Number(NOW_SEC) + 1)
     },
     nowMs: NOW + 1000,
-    claimDelivery: claimInboundEvent
+    claimDelivery
   });
   const bodyOnly = await acceptEventRoutine(host, {
     provider: 'github',
@@ -334,7 +338,7 @@ test('换掉 GitHub 投递号并复用原签名时不会再次入队 [AC:github-
       'x-hub-signature-256': `sha256=${hmac(SECRET, raw)}`
     },
     nowMs: NOW,
-    claimDelivery: claimInboundEvent
+    claimDelivery
   });
   assert.equal(first.outcomes[0]?.status, 'woke');
   assert.equal(replay.outcomes[0]?.status, 'rejected');
@@ -360,7 +364,7 @@ test('超过几分钟的 GitHub 投递不会入队 [AC:github-webhook-replay#AC-
       'x-hub-signature-256': githubSig(freshRaw, 'delivery-fresh', NOW_SEC)
     },
     nowMs: NOW,
-    claimDelivery: claimInboundEvent
+    claimDelivery
   });
   const staleRaw = JSON.stringify({ note: 'stale-body' });
   const staleTs = String(Number(NOW_SEC) - 301);
@@ -374,7 +378,7 @@ test('超过几分钟的 GitHub 投递不会入队 [AC:github-webhook-replay#AC-
       'x-hub-signature-256': githubSig(staleRaw, 'delivery-stale', staleTs)
     },
     nowMs: NOW,
-    claimDelivery: claimInboundEvent
+    claimDelivery
   });
   const edgeRaw = JSON.stringify({ note: 'edge-body' });
   const edge = await acceptEventRoutine(host, {
@@ -387,7 +391,7 @@ test('超过几分钟的 GitHub 投递不会入队 [AC:github-webhook-replay#AC-
       'x-hub-signature-256': githubSig(edgeRaw, 'delivery-edge', NOW_SEC)
     },
     nowMs: NOW + EVENT_SIGNATURE_WINDOW_MS,
-    claimDelivery: claimInboundEvent
+    claimDelivery
   });
   const pastRaw = JSON.stringify({ note: 'past-window' });
   const past = await acceptEventRoutine(host, {
@@ -400,7 +404,7 @@ test('超过几分钟的 GitHub 投递不会入队 [AC:github-webhook-replay#AC-
       'x-hub-signature-256': githubSig(pastRaw, 'delivery-past', NOW_SEC)
     },
     nowMs: NOW + EVENT_SIGNATURE_WINDOW_MS + 1,
-    claimDelivery: claimInboundEvent
+    claimDelivery
   });
   assert.equal(fresh.outcomes[0]?.status, 'woke');
   assert.equal(stale.outcomes[0]?.status, 'rejected');
@@ -425,7 +429,7 @@ test('slack and email wake on a good signature and stay quiet when the timestamp
       'x-slack-signature': slackSig(slackBody)
     },
     nowMs: NOW,
-    claimDelivery: claimInboundEvent
+    claimDelivery
   });
   const staleBody = JSON.stringify({ type: 'event_callback', event_id: 'Ev-slack-stale', event: { type: 'message', text: 'old' } });
   const slackStale = await acceptEventRoutine(host, {
@@ -436,7 +440,7 @@ test('slack and email wake on a good signature and stay quiet when the timestamp
       'x-slack-signature': slackSig(staleBody, String(Number(NOW_SEC) - 301))
     },
     nowMs: NOW,
-    claimDelivery: claimInboundEvent
+    claimDelivery
   });
   const emailBody = JSON.stringify({ subject: 'invoice', deliveryId: 'email-1' });
   const emailOk = await acceptEventRoutine(host, {
@@ -448,7 +452,7 @@ test('slack and email wake on a good signature and stay quiet when the timestamp
       'x-ppeng-delivery': 'email-1'
     },
     nowMs: NOW,
-    claimDelivery: claimInboundEvent
+    claimDelivery
   });
   const emailStaleBody = JSON.stringify({ subject: 'old-invoice', deliveryId: 'email-stale' });
   const emailStaleTs = String(Number(NOW_SEC) - 301);
@@ -461,7 +465,7 @@ test('slack and email wake on a good signature and stay quiet when the timestamp
       'x-ppeng-delivery': 'email-stale'
     },
     nowMs: NOW,
-    claimDelivery: claimInboundEvent
+    claimDelivery
   });
   assert.equal(slackOk.outcomes[0]?.status, 'woke');
   assert.equal(slackStale.outcomes[0]?.status, 'rejected');
@@ -491,21 +495,21 @@ test('5 分钟内换邮件投递号并复用原签名时不会再跑一轮 [AC:e
     rawBody: raw,
     headers,
     nowMs: NOW,
-    claimDelivery: claimInboundEvent
+    claimDelivery
   });
   const replay = await acceptEventRoutine(host, {
     provider: 'email',
     rawBody: raw,
     headers: { ...headers, 'x-ppeng-delivery': 'email-swapped' },
     nowMs: withinWindow,
-    claimDelivery: claimInboundEvent
+    claimDelivery
   });
   const edge = await acceptEventRoutine(host, {
     provider: 'email',
     rawBody: raw,
     headers: { ...headers, 'x-ppeng-delivery': 'email-swapped-edge' },
     nowMs: NOW + EVENT_SIGNATURE_WINDOW_MS,
-    claimDelivery: claimInboundEvent
+    claimDelivery
   });
   const freshDelivery = 'email-fresh';
   const second = await acceptEventRoutine(host, {
@@ -517,7 +521,7 @@ test('5 分钟内换邮件投递号并复用原签名时不会再跑一轮 [AC:e
       'x-ppeng-delivery': freshDelivery
     },
     nowMs: withinWindow,
-    claimDelivery: claimInboundEvent
+    claimDelivery
   });
   assert.equal(first.outcomes[0]?.status, 'woke');
   assert.equal(replay.outcomes[0]?.status, 'rejected');
@@ -543,7 +547,7 @@ test('签名没覆盖投递号的邮件不会跑 [AC:email-webhook-replay#AC-3]'
       'x-ppeng-delivery': 'email-uncovered'
     },
     nowMs: NOW + 60 * 1000,
-    claimDelivery: claimInboundEvent
+    claimDelivery
   });
   assert.equal(uncovered.outcomes[0]?.status, 'rejected');
   assert.equal(uncovered.outcomes[0]?.reason, 'bad_signature');
@@ -566,7 +570,7 @@ test('正文里的投递号换一个再投递时不会再跑一轮 [AC:email-web
       'x-ppeng-signature': signature
     },
     nowMs: NOW,
-    claimDelivery: claimInboundEvent
+    claimDelivery
   });
   const replay = await acceptEventRoutine(host, {
     provider: 'email',
@@ -577,7 +581,7 @@ test('正文里的投递号换一个再投递时不会再跑一轮 [AC:email-web
       'x-ppeng-delivery': 'email-header-swapped'
     },
     nowMs: NOW + 4 * 60 * 1000,
-    claimDelivery: claimInboundEvent
+    claimDelivery
   });
   assert.equal(first.outcomes[0]?.status, 'woke');
   assert.equal(replay.outcomes[0]?.status, 'rejected');
@@ -599,7 +603,7 @@ test('Slack 仍按原来的签名在 5 分钟内执行一次 [AC:email-webhook-r
       'x-slack-signature': slackSig(raw)
     },
     nowMs: NOW + 4 * 60 * 1000,
-    claimDelivery: claimInboundEvent
+    claimDelivery
   });
   assert.equal(woke.outcomes[0]?.status, 'woke');
   assert.equal(runs.length, 1);

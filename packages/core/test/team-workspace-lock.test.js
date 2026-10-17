@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { copyWorkspaceSnapshot, syncWorkerResultToPlan } from '../dist/teams/workspace-sync.js';
+import { copyWorkspaceSnapshot, snapshotLockWaitMs, syncWorkerResultToPlan } from '../dist/teams/workspace-sync.js';
+import { SNAPSHOT_LOCK_HEARTBEAT_MS, startSnapshotLockHeartbeat } from '../dist/teams/snapshot-lock.js';
 
 const fast = { staleMs: 40, waitMs: 30 };
 
@@ -25,7 +26,7 @@ test('a stale snapshot lock is reclaimed and the copy completes', async () => {
     mkdirSync(dest, { recursive: true });
     writeFileSync(join(src, 'kept.txt'), 'yes');
     const lock = join(dest, '.snapshot.lock');
-    writeFileSync(lock, `${process.pid}:held`);
+    writeFileSync(lock, 'not-a-pid');
     ageLock(lock, 60_000);
     await copyWorkspaceSnapshot(src, dest, fast);
     assert.equal(readFileSync(join(dest, 'kept.txt'), 'utf8'), 'yes');

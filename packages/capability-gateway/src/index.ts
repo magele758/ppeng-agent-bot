@@ -57,4 +57,4 @@ export type {
   GatewaySettingsStore,
   GatewaySettingsView
 } from './gateway-settings.js';
-export { drainGatewayTurns } from './inbound-guard.js';
+export { drainGatewayTurns, claimInboundEvent, InboundClaimTimeoutError } from './inbound-guard.js';

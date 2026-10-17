@@ -1,6 +1,7 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { closeSync, mkdirSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 
 /** Constant-time string comparison (length-independent via hashing). */
 export function safeEqual(a: string, b: string): boolean {
@@ -89,7 +90,24 @@ function writePersistedClaims(dir: string, claims: Record<string, number>): void
 
 /** A lock whose body is empty or not ours is not stale; age is the file mtime. */
 const CLAIM_LOCK_STALE_MS = 10_000;
+/** How long to wait for a fresh lock before giving up. */
 const CLAIM_LOCK_WAIT_MS = 5_000;
+const CLAIM_WAIT_SLICES_MS = [5, 10, 20, 40, 80] as const;
+
+/** Thrown when the persisted-claim lock stays busy past the wait. Not a duplicate. */
+export class InboundClaimTimeoutError extends Error {
+  readonly code = 'INBOUND_CLAIM_TIMEOUT';
+  readonly retryable = true;
+
+  constructor(lockPath: string) {
+    super(`Inbound claim lock timed out: ${lockPath}`);
+    this.name = 'InboundClaimTimeoutError';
+  }
+}
+
+export function isInboundClaimTimeout(error: unknown): error is InboundClaimTimeoutError {
+  return error instanceof InboundClaimTimeoutError;
+}
 
 export interface PersistedClaimLockOptions {
   /** How long a live lock may be held before another process may reclaim it. */
@@ -99,19 +117,19 @@ export interface PersistedClaimLockOptions {
   now?: () => number;
   /** Test seam: runs after the lock is held and before the claim body. */
   onAcquired?: (lockPath: string, token: string) => void;
+  /** How many lock-timeouts to retry before throwing. Default 3. */
+  attempts?: number;
 }
 
 /**
  * Exclusive claim of one persisted dedupe file so concurrent deliveries cannot both win.
- * Returns false when the lock cannot be acquired before the wait expires — the caller
- * must treat that as "do not claim", not as an error.
+ * Throws InboundClaimTimeoutError when the lock stays busy — that is not a duplicate.
  */
-function withPersistedClaimLock<T>(dir: string, fn: () => T, options: PersistedClaimLockOptions = {}): T | false {
+async function withPersistedClaimLock<T>(dir: string, fn: () => T, options: PersistedClaimLockOptions = {}): Promise<T> {
   mkdirSync(dir, { recursive: true });
   const lockPath = `${dedupePath(dir)}.lock`;
   const token = randomBytes(8).toString('hex');
-  const fd = acquireClaimLock(lockPath, token, options);
-  if (fd === undefined) return false;
+  const fd = await acquireClaimLock(lockPath, token, options);
   try {
     options.onAcquired?.(lockPath, token);
     return fn();
@@ -120,10 +138,11 @@ function withPersistedClaimLock<T>(dir: string, fn: () => T, options: PersistedC
   }
 }
 
-function acquireClaimLock(lockPath: string, token: string, options: PersistedClaimLockOptions): number | undefined {
+async function acquireClaimLock(lockPath: string, token: string, options: PersistedClaimLockOptions): Promise<number> {
   const now = options.now ?? Date.now;
   const started = now();
   const waitMs = options.waitMs ?? CLAIM_LOCK_WAIT_MS;
+  let step = 0;
   for (;;) {
     const fd = tryAcquireClaimLock(lockPath, token);
     if (fd !== undefined) return fd;
@@ -131,9 +150,16 @@ function acquireClaimLock(lockPath: string, token: string, options: PersistedCla
       reclaimStaleClaimLock(lockPath);
       continue;
     }
-    if (now() - started > waitMs) return undefined;
-    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
+    if (now() - started > waitMs) throw new InboundClaimTimeoutError(lockPath);
+    step = await pauseForClaim(step, waitMs - (now() - started));
   }
+}
+
+/** Bounded async pause. Returns the next backoff step. Never uses Atomics.wait. */
+async function pauseForClaim(step: number, remainingMs: number): Promise<number> {
+  const slice = CLAIM_WAIT_SLICES_MS[Math.min(step, CLAIM_WAIT_SLICES_MS.length - 1)] ?? CLAIM_WAIT_SLICES_MS[0];
+  if (remainingMs > 0) await delay(Math.min(slice, remainingMs));
+  return step + 1;
 }
 
 /** `wx` create. undefined means the lock is held; other open errors propagate. */
@@ -191,43 +217,79 @@ function rememberPersistedClaim(claims: Record<string, number>, key: string, now
   }
 }
 
+export type InboundClaimResult = 'claimed' | 'duplicate';
+
+const INBOUND_CLAIM_ATTEMPTS = 3;
+
 /**
- * Atomically claim an inbound event id. Returns false when it was already claimed
- * (platform retry / replay). The persisted path holds an exclusive file lock so
- * concurrent deliveries cannot both win.
+ * Atomically claim an inbound event id.
+ * `'claimed'` is the first win; `'duplicate'` is a platform retry / replay.
+ * A lock that stays busy throws InboundClaimTimeoutError after a few attempts —
+ * that is not a duplicate and must not be acknowledged as one.
  * Pass `persistDir` (the gateway directory) to record the claim next to the
  * delivery ledger. Those claims do not expire with the in-memory 6h window,
  * survive process restart, and are not copied into the memory map (that map
  * would otherwise grow without the 6h TTL). `resetInboundDedupe` clears only
  * the memory map.
  */
-export function claimInboundEvent(
+export async function claimInboundEvent(
   key: string,
   now = Date.now(),
   persistDir?: string,
   lock?: PersistedClaimLockOptions
-): boolean {
-  if (persistDir) {
-    const claimed = withPersistedClaimLock(persistDir, () => {
-      const claims = readPersistedClaims(persistDir);
-      if (Object.prototype.hasOwnProperty.call(claims, key)) return false;
-      rememberPersistedClaim(claims, key, now);
-      writePersistedClaims(persistDir, claims);
-      return true;
-    }, lock);
-    return claimed === true;
-  }
-  const at = seen.get(key);
-  if (at !== undefined && now - at < DEDUPE_TTL_MS) return false;
-  seen.delete(key);
-  seen.set(key, now);
-  if (seen.size > DEDUPE_MAX) {
-    for (const [k, t] of seen) {
-      if (seen.size <= DEDUPE_MAX && now - t < DEDUPE_TTL_MS) break;
-      seen.delete(k);
+): Promise<InboundClaimResult> {
+  if (!persistDir) return claimInMemory(key, now);
+  return claimPersistedWithRetry(key, now, persistDir, lock);
+}
+
+async function claimPersistedWithRetry(
+  key: string,
+  now: number,
+  persistDir: string,
+  lock?: PersistedClaimLockOptions
+): Promise<InboundClaimResult> {
+  let last: unknown;
+  for (let attempt = 0; attempt < (lock?.attempts ?? INBOUND_CLAIM_ATTEMPTS); attempt += 1) {
+    try {
+      return await claimPersistedOnce(key, now, persistDir, lock);
+    } catch (error) {
+      if (!isInboundClaimTimeout(error)) throw error;
+      last = error;
     }
   }
-  return true;
+  throw last;
+}
+
+async function claimPersistedOnce(
+  key: string,
+  now: number,
+  persistDir: string,
+  lock?: PersistedClaimLockOptions
+): Promise<InboundClaimResult> {
+  return withPersistedClaimLock(persistDir, () => {
+    const claims = readPersistedClaims(persistDir);
+    if (Object.prototype.hasOwnProperty.call(claims, key)) return 'duplicate';
+    rememberPersistedClaim(claims, key, now);
+    writePersistedClaims(persistDir, claims);
+    return 'claimed';
+  }, lock);
+}
+
+function claimInMemory(key: string, now: number): InboundClaimResult {
+  const at = seen.get(key);
+  if (at !== undefined && now - at < DEDUPE_TTL_MS) return 'duplicate';
+  seen.delete(key);
+  seen.set(key, now);
+  trimInMemoryClaims(now);
+  return 'claimed';
+}
+
+function trimInMemoryClaims(now: number): void {
+  if (seen.size <= DEDUPE_MAX) return;
+  for (const [k, t] of seen) {
+    if (seen.size <= DEDUPE_MAX && now - t < DEDUPE_TTL_MS) break;
+    seen.delete(k);
+  }
 }
 
 export function resetInboundDedupe(): void {

@@ -117,43 +117,43 @@ test('Feishu retry after memory reset does not run the agent again', async () =>
   assert.equal(runtime.calls.ran.length, 1);
 });
 
-test('persisted Feishu claim does not pin the in-memory map', () => {
+test('persisted Feishu claim does not pin the in-memory map', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'feishu-dedupe-mem-'));
   try {
     const key = 'feishu:event:ev_persist_only';
     const now = Date.now();
     resetInboundDedupe();
-    assert.equal(claimInboundEvent(key, now, dir), true);
-    assert.equal(claimInboundEvent(key, now), true);
-    assert.equal(claimInboundEvent(key, now, dir), false);
+    assert.equal(await claimInboundEvent(key, now, dir), 'claimed');
+    assert.equal(await claimInboundEvent(key, now), 'claimed');
+    assert.equal(await claimInboundEvent(key, now, dir), 'duplicate');
     resetInboundDedupe();
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test('same Feishu event_id stays claimed after the in-memory map is cleared', () => {
+test('same Feishu event_id stays claimed after the in-memory map is cleared', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'feishu-dedupe-'));
   try {
     const key = 'feishu:event:ev_restart';
     const now = Date.now();
-    assert.equal(claimInboundEvent(key, now, dir), true);
+    assert.equal(await claimInboundEvent(key, now, dir), 'claimed');
     resetInboundDedupe();
-    assert.equal(claimInboundEvent(key, now + 7 * 60 * 60 * 1000, dir), false);
-    assert.equal(claimInboundEvent('feishu:event:ev_other', now, dir), true);
+    assert.equal(await claimInboundEvent(key, now + 7 * 60 * 60 * 1000, dir), 'duplicate');
+    assert.equal(await claimInboundEvent('feishu:event:ev_other', now, dir), 'claimed');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test('concurrent persisted claims of one event id admit exactly one winner', () => {
+test('concurrent persisted claims of one event id admit exactly one winner', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'feishu-dedupe-race-'));
   try {
     const key = 'feishu:event:ev_race';
     const now = Date.now();
-    const results = Array.from({ length: 12 }, () => claimInboundEvent(key, now, dir));
-    assert.equal(results.filter(Boolean).length, 1);
-    assert.equal(claimInboundEvent(key, now, dir), false);
+    const results = await Promise.all(Array.from({ length: 12 }, () => claimInboundEvent(key, now, dir)));
+    assert.equal(results.filter((item) => item === 'claimed').length, 1);
+    assert.equal(await claimInboundEvent(key, now, dir), 'duplicate');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

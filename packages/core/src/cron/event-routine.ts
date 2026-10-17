@@ -66,8 +66,8 @@ export interface AcceptEventRoutineInput {
   body?: unknown;
   nowMs?: number;
   env?: NodeJS.ProcessEnv;
-  /** `claimInboundEvent` from the gateway. False means this delivery was already claimed. */
-  claimDelivery: (key: string) => boolean;
+  /** `claimInboundEvent` from the gateway. False means this delivery was already claimed. A throw is a retryable lock timeout, not a duplicate. */
+  claimDelivery: (key: string) => boolean | Promise<boolean>;
 }
 
 export interface EventJobOutcome {
