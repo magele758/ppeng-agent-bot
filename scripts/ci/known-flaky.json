@@ -1,7 +1,1 @@
-[
-  {
-    "file": "scripts/test/bot-http-fixed-window.test.mjs",
-    "name": "fixed window bounds queues and terminates stalled work at original deadline",
-    "reason": "Pre-existing HTTP performance load-window timeout flake under concurrent CI load: the 120 ms window and 400 ms wall-clock bound are scheduling-sensitive. Allow only isolated retry recovery; persistent failure still blocks."
-  }
-]
+[]
