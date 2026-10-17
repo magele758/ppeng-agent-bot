@@ -372,7 +372,8 @@ for (const routing of ['everyone', 'text-mention'] as const) {
       await expect(log.getByText(member.name, { exact: true })).toBeVisible({ timeout: 30000 });
     }
     const { turns } = await (await request.get(`/api/bot-rooms/${room.id}/turns`)).json();
-    expect(turns[0].botIds).toEqual(routing === 'everyone' ? [host.id, member.id] : [member.id]);
+    expect(turns[0].botIds).toEqual(routing === 'everyone' ? [host.id, member.id] : [member.id, host.id]);
+    if (routing === 'text-mention') expect(turns[0].mentionedBotIds).toEqual([member.id]);
   });
 }
 
