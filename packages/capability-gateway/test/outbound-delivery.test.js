@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import { test, after } from 'node:test';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -19,7 +19,9 @@ import {
   sendLedgered
 } from '../dist/delivery-ledger.js';
 import { recoverGatewayOutbound, releaseOutboundDraft } from '../dist/outbound.js';
-import { call, fakeRuntime, feishuMessageEvent, makeCtx } from './gateway-harness.mjs';
+import { call, cleanupGatewayTemps, fakeRuntime, feishuMessageEvent, makeCtx } from './gateway-harness.mjs';
+
+after(() => cleanupGatewayTemps());
 
 const ZH_ACK = '收到，没有更多要补充的。';
 const EN_ACK = 'Got it. Nothing more to add.';

@@ -2,6 +2,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import { dirname, join } from 'node:path';
 import { createId, nowIso } from '../id.js';
 import type { TeamMailboxMessage } from './types.js';
+import { withFdLock } from './fd-lock.js';
 
 const AUDIT_MAX_BYTES = 1024 * 1024;
 
@@ -30,15 +31,17 @@ export interface SendTeamMailboxInput {
 export class TeamFileMailbox {
   private readonly inboxDir: string;
   private readonly auditFile: string;
+  private readonly lockOptions: MailboxLockOptions;
 
-  constructor(planDir: string) {
+  constructor(planDir: string, lockOptions: MailboxLockOptions = {}) {
     this.inboxDir = teamMailboxDir(planDir);
     this.auditFile = join(this.inboxDir, 'audit.jsonl');
+    this.lockOptions = lockOptions;
     mkdirSync(this.inboxDir, { recursive: true });
     ensureFile(this.auditFile);
   }
 
-  send(input: SendTeamMailboxInput): TeamMailboxMessage {
+  send(input: SendTeamMailboxInput): Promise<TeamMailboxMessage> {
     const message: TeamMailboxMessage = {
       id: createId('tmail'),
       planId: input.planId,
@@ -49,21 +52,25 @@ export class TeamFileMailbox {
       taskId: input.taskId,
       createdAt: nowIso()
     };
-    this.maybeRotateAudit();
-    appendJsonLine(this.auditFile, message);
-    appendJsonLine(this.inboxFile(message.to), message);
-    return message;
+    return withMailboxLock(this.inboxDir, () => {
+      this.maybeRotateAudit();
+      appendJsonLine(this.auditFile, message);
+      appendJsonLine(this.inboxFile(message.to), message);
+      return message;
+    }, this.lockOptions);
   }
 
   peekInbox(agentName: string): TeamMailboxMessage[] {
     return readJsonl(this.inboxFile(sanitizeMailboxAgent(agentName)));
   }
 
-  readInbox(agentName: string): TeamMailboxMessage[] {
+  readInbox(agentName: string): Promise<TeamMailboxMessage[]> {
     const file = this.inboxFile(sanitizeMailboxAgent(agentName));
-    const items = readJsonl(file);
-    writeFileSync(file, '', 'utf8');
-    return items;
+    return withMailboxLock(this.inboxDir, () => {
+      const items = readJsonl(file);
+      writeFileSync(file, '', 'utf8');
+      return items;
+    }, this.lockOptions);
   }
 
   listRecent(limit = 50): TeamMailboxMessage[] {
@@ -99,6 +106,31 @@ function ensureFile(filePath: string): void {
 function appendJsonLine(filePath: string, payload: unknown): void {
   ensureFile(filePath);
   appendFileSync(filePath, `${JSON.stringify(payload)}\n`, 'utf8');
+}
+
+const MAILBOX_LOCK_WAIT_MS = 1_000;
+
+export interface MailboxLockOptions {
+  /**
+   * @deprecated Ignored. The lock is an SQLite exclusive transaction on the
+   * database fd, released by the kernel on close or process death. There is
+   * no mtime staleness.
+   */
+  staleMs?: number;
+  waitMs?: number;
+  now?: () => number;
+}
+
+/** Serialize mailbox writers that share one plan directory under parallel load. */
+export async function withMailboxLock<T>(inboxDir: string, fn: () => T | Promise<T>, options: MailboxLockOptions = {}): Promise<T> {
+  mkdirSync(inboxDir, { recursive: true });
+  const legacy = join(inboxDir, '.mailbox.lock');
+  const dbPath = join(inboxDir, '.mailbox.lock.db');
+  return withFdLock(dbPath, fn, {
+    waitMs: options.waitMs ?? MAILBOX_LOCK_WAIT_MS,
+    now: options.now,
+    timeout: `Team mailbox lock timed out: ${legacy}`
+  });
 }
 
 function readJsonl(filePath: string): TeamMailboxMessage[] {

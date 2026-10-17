@@ -422,7 +422,7 @@ export class TeamDagExecutor {
     }
     task.sessionId = session.id;
     task.status = 'running';
-    this.postMail(plan, {
+    await this.postMail(plan, {
       from: 'team-coordinator',
       to: session.agentId || `worker-${task.id}`,
       type: 'task',
@@ -433,7 +433,7 @@ export class TeamDagExecutor {
     this.deps.enqueueSchedulerWake(session.id, 'teams.dag.task');
   }
 
-  private postMail(
+  private async postMail(
     plan: TeamPlan,
     input: {
       from: string;
@@ -443,9 +443,9 @@ export class TeamDagExecutor {
       sessionId?: string;
       taskId?: string;
     }
-  ): void {
+  ): Promise<void> {
     try {
-      const msg = mailboxFor(plan, this.deps.stateDir).send({
+      const msg = await mailboxFor(plan, this.deps.stateDir).send({
         planId: plan.id,
         type: input.type,
         from: input.from,

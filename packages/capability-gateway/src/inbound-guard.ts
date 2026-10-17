@@ -1,6 +1,7 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { withFdLock } from '@ppeng/agent-core';
 
 /** Constant-time string comparison (length-independent via hashing). */
 export function safeEqual(a: string, b: string): boolean {
@@ -82,9 +83,61 @@ function readPersistedClaims(dir: string): Record<string, number> {
 function writePersistedClaims(dir: string, claims: Record<string, number>): void {
   mkdirSync(dir, { recursive: true });
   const path = dedupePath(dir);
-  const tmp = `${path}.${process.pid}.tmp`;
+  const tmp = `${path}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`;
   writeFileSync(tmp, `${JSON.stringify({ version: 1, claims } satisfies InboundDedupeFile, null, 2)}\n`, 'utf8');
   renameSync(tmp, path);
+}
+
+/** How long to wait for a fresh lock before giving up. */
+const CLAIM_LOCK_WAIT_MS = 5_000;
+
+/** Thrown when the persisted-claim lock stays busy past the wait. Not a duplicate. */
+export class InboundClaimTimeoutError extends Error {
+  readonly code = 'INBOUND_CLAIM_TIMEOUT';
+  readonly retryable = true;
+
+  constructor(lockPath: string) {
+    super(`Inbound claim lock timed out: ${lockPath}`);
+    this.name = 'InboundClaimTimeoutError';
+  }
+}
+
+export function isInboundClaimTimeout(error: unknown): error is InboundClaimTimeoutError {
+  return error instanceof InboundClaimTimeoutError;
+}
+
+export interface PersistedClaimLockOptions {
+  /**
+   * @deprecated Ignored. The claim lock is an SQLite exclusive transaction on
+   * the database fd. The kernel releases it on close or process death, so
+   * there is no mtime reclaim.
+   */
+  staleMs?: number;
+  /** How long to wait for a fresh lock before giving up. */
+  waitMs?: number;
+  now?: () => number;
+  /** Test seam: runs after the lock is held and before the claim body. `token` is unused. */
+  onAcquired?: (lockPath: string, token: string) => void;
+  /** How many lock-timeouts to retry before throwing. Default 3. */
+  attempts?: number;
+}
+
+/**
+ * Exclusive claim of one persisted dedupe file so concurrent deliveries cannot both win.
+ * Throws InboundClaimTimeoutError when the lock stays busy — that is not a duplicate.
+ */
+async function withPersistedClaimLock<T>(dir: string, fn: () => T, options: PersistedClaimLockOptions = {}): Promise<T> {
+  mkdirSync(dir, { recursive: true });
+  const legacy = `${dedupePath(dir)}.lock`;
+  const dbPath = `${legacy}.db`;
+  return withFdLock(dbPath, () => {
+    options.onAcquired?.(dbPath, '');
+    return fn();
+  }, {
+    waitMs: options.waitMs ?? CLAIM_LOCK_WAIT_MS,
+    now: options.now,
+    timeout: new InboundClaimTimeoutError(legacy)
+  });
 }
 
 function rememberPersistedClaim(claims: Record<string, number>, key: string, now: number): void {
@@ -99,34 +152,79 @@ function rememberPersistedClaim(claims: Record<string, number>, key: string, now
   }
 }
 
+export type InboundClaimResult = 'claimed' | 'duplicate';
+
+const INBOUND_CLAIM_ATTEMPTS = 3;
+
 /**
- * Atomically claim an inbound event id. Returns false when it was already claimed
- * (platform retry / replay). Synchronous so concurrent deliveries cannot both win.
+ * Atomically claim an inbound event id.
+ * `'claimed'` is the first win; `'duplicate'` is a platform retry / replay.
+ * A lock that stays busy throws InboundClaimTimeoutError after a few attempts —
+ * that is not a duplicate and must not be acknowledged as one.
  * Pass `persistDir` (the gateway directory) to record the claim next to the
  * delivery ledger. Those claims do not expire with the in-memory 6h window,
  * survive process restart, and are not copied into the memory map (that map
  * would otherwise grow without the 6h TTL). `resetInboundDedupe` clears only
  * the memory map.
  */
-export function claimInboundEvent(key: string, now = Date.now(), persistDir?: string): boolean {
-  if (persistDir) {
-    const claims = readPersistedClaims(persistDir);
-    if (Object.prototype.hasOwnProperty.call(claims, key)) return false;
-    rememberPersistedClaim(claims, key, now);
-    writePersistedClaims(persistDir, claims);
-    return true;
-  }
-  const at = seen.get(key);
-  if (at !== undefined && now - at < DEDUPE_TTL_MS) return false;
-  seen.delete(key);
-  seen.set(key, now);
-  if (seen.size > DEDUPE_MAX) {
-    for (const [k, t] of seen) {
-      if (seen.size <= DEDUPE_MAX && now - t < DEDUPE_TTL_MS) break;
-      seen.delete(k);
+export async function claimInboundEvent(
+  key: string,
+  now = Date.now(),
+  persistDir?: string,
+  lock?: PersistedClaimLockOptions
+): Promise<InboundClaimResult> {
+  if (!persistDir) return claimInMemory(key, now);
+  return claimPersistedWithRetry(key, now, persistDir, lock);
+}
+
+async function claimPersistedWithRetry(
+  key: string,
+  now: number,
+  persistDir: string,
+  lock?: PersistedClaimLockOptions
+): Promise<InboundClaimResult> {
+  let last: unknown;
+  for (let attempt = 0; attempt < (lock?.attempts ?? INBOUND_CLAIM_ATTEMPTS); attempt += 1) {
+    try {
+      return await claimPersistedOnce(key, now, persistDir, lock);
+    } catch (error) {
+      if (!isInboundClaimTimeout(error)) throw error;
+      last = error;
     }
   }
-  return true;
+  throw last;
+}
+
+async function claimPersistedOnce(
+  key: string,
+  now: number,
+  persistDir: string,
+  lock?: PersistedClaimLockOptions
+): Promise<InboundClaimResult> {
+  return withPersistedClaimLock(persistDir, () => {
+    const claims = readPersistedClaims(persistDir);
+    if (Object.prototype.hasOwnProperty.call(claims, key)) return 'duplicate';
+    rememberPersistedClaim(claims, key, now);
+    writePersistedClaims(persistDir, claims);
+    return 'claimed';
+  }, lock);
+}
+
+function claimInMemory(key: string, now: number): InboundClaimResult {
+  const at = seen.get(key);
+  if (at !== undefined && now - at < DEDUPE_TTL_MS) return 'duplicate';
+  seen.delete(key);
+  seen.set(key, now);
+  trimInMemoryClaims(now);
+  return 'claimed';
+}
+
+function trimInMemoryClaims(now: number): void {
+  if (seen.size <= DEDUPE_MAX) return;
+  for (const [k, t] of seen) {
+    if (seen.size <= DEDUPE_MAX && now - t < DEDUPE_TTL_MS) break;
+    seen.delete(k);
+  }
 }
 
 export function resetInboundDedupe(): void {
