@@ -35,12 +35,13 @@ test('create and reopen a durable room with its members [AC:bot-rooms#AC-1]', ()
   assert.equal(reopened.list(f.principal).length, 1);
 });
 
-test('mentions wake only named members and a message without @ wakes every member [AC:bot-rooms#AC-2] [AC:bot-rooms#AC-3]', async () => {
+test('mentioned members speak first and everyone else still gets a restrained turn [AC:bot-rooms#AC-2] [AC:bot-rooms#AC-3]', async () => {
   const f = fixture();
   f.store.appendMessage(f.a.canonicalSessionId, 'user', [{ type: 'text', text: 'PRIVATE_SECRET' }]);
   const room = f.rooms.create(f.principal, { title: 'Team', botIds: [f.a.id, f.b.id], hostBotId: f.a.id });
   const sent = f.rooms.send(f.principal, room.id, { text: `Hello @${f.b.name} @${f.a.name}` });
   assert.deepEqual(sent.turn.botIds, [f.b.id, f.a.id]);
+  assert.deepEqual(sent.turn.mentionedBotIds, [f.b.id, f.a.id]);
   await f.rooms.tick();
   assert.equal(f.rooms.turns(f.principal, room.id)[0].status, 'completed');
   const messages = f.rooms.messages(f.principal, room.id).messages;
@@ -50,10 +51,19 @@ test('mentions wake only named members and a message without @ wakes every membe
   assert.equal(f.store.listMessages(f.a.canonicalSessionId).length, 1);
   const defaultTurn = f.rooms.send(f.principal, room.id, { text: 'ordinary question' }).turn;
   assert.deepEqual(defaultTurn.botIds, [f.a.id, f.b.id]);
-  assert.deepEqual(f.rooms.send(f.principal,room.id,{text:'email owner@example.com'}).turn.botIds,[f.a.id, f.b.id]);
-  assert.deepEqual(f.rooms.send(f.principal,room.id,{text:'@NoSuchMember do work'}).turn.botIds,[]);
-  assert.deepEqual(f.rooms.send(f.principal,room.id,{text:`only @${f.b.name}`}).turn.botIds,[f.b.id]);
-  assert.deepEqual(f.rooms.send(f.principal,room.id,{text:`@${f.a.name} @Stranger`}).turn.botIds,[f.a.id]);
+  assert.equal(defaultTurn.mentionedBotIds, undefined);
+  const email = f.rooms.send(f.principal,room.id,{text:'email owner@example.com'}).turn;
+  assert.deepEqual(email.botIds,[f.a.id, f.b.id]);
+  assert.equal(email.mentionedBotIds, undefined);
+  const unknown = f.rooms.send(f.principal,room.id,{text:'@NoSuchMember do work'}).turn;
+  assert.deepEqual(unknown.botIds,[f.a.id, f.b.id]);
+  assert.deepEqual(unknown.mentionedBotIds, []);
+  const onlyBeta = f.rooms.send(f.principal,room.id,{text:`only @${f.b.name}`}).turn;
+  assert.deepEqual(onlyBeta.botIds,[f.b.id, f.a.id]);
+  assert.deepEqual(onlyBeta.mentionedBotIds,[f.b.id]);
+  const stranger = f.rooms.send(f.principal,room.id,{text:`@${f.a.name} @Stranger`}).turn;
+  assert.deepEqual(stranger.botIds,[f.a.id, f.b.id]);
+  assert.deepEqual(stranger.mentionedBotIds,[f.a.id]);
 });
 
 test('a spaced display name is one mention and does not add outsiders [AC:bot-rooms#AC-2]', () => {
@@ -61,9 +71,15 @@ test('a spaced display name is one mention and does not add outsiders [AC:bot-ro
   const superBot = createBot(f.facade, { name: 'Super Bot' });
   f.store.updateSession(superBot.canonicalSessionId, { metadata: { ...f.store.getSession(superBot.canonicalSessionId).metadata, ...f.principal } });
   const room = f.rooms.create(f.principal, { title: 'Names', botIds: [f.a.id, superBot.id], hostBotId: f.a.id });
-  assert.deepEqual(f.rooms.send(f.principal, room.id, { text: 'hi @Super Bot now' }).turn.botIds, [superBot.id]);
-  assert.deepEqual(f.rooms.send(f.principal, room.id, { text: '@Super Bot @Nope' }).turn.botIds, [superBot.id]);
-  assert.deepEqual(f.rooms.send(f.principal, room.id, { text: 'all of you' }).turn.botIds, [f.a.id, superBot.id]);
+  const spaced = f.rooms.send(f.principal, room.id, { text: 'hi @Super Bot now' }).turn;
+  assert.deepEqual(spaced.botIds, [superBot.id, f.a.id]);
+  assert.deepEqual(spaced.mentionedBotIds, [superBot.id]);
+  const outsider = f.rooms.send(f.principal, room.id, { text: '@Super Bot @Nope' }).turn;
+  assert.deepEqual(outsider.botIds, [superBot.id, f.a.id]);
+  assert.deepEqual(outsider.mentionedBotIds, [superBot.id]);
+  const everyone = f.rooms.send(f.principal, room.id, { text: 'all of you' }).turn;
+  assert.deepEqual(everyone.botIds, [f.a.id, superBot.id]);
+  assert.equal(everyone.mentionedBotIds, undefined);
 });
 
 test('budget, pause, stop, leave and resume constrain actual scheduling [AC:bot-rooms#AC-4]', async () => {
@@ -80,11 +96,12 @@ test('budget, pause, stop, leave and resume constrain actual scheduling [AC:bot-
   f.rooms.removeMember(f.principal, room.id, f.b.id);
   f.rooms.resume(f.principal, room.id);
   await f.rooms.tick();
-  assert.equal(f.runs.length, 1);
+  assert.equal(f.runs.length, 2);
+  assert.equal(f.store.getSession(f.runs[1]).agentId, f.a.id);
   f.rooms.send(f.principal, room.id, { text: 'stop this', mentions: [f.a.id] });
   f.rooms.stop(f.principal, room.id);
   await f.rooms.tick();
-  assert.equal(f.runs.length, 1);
+  assert.equal(f.runs.length, 2);
   assert.equal(f.rooms.turns(f.principal, room.id).at(-1).status, 'cancelled');
 });
 
@@ -262,7 +279,7 @@ test('real approve then scheduler resumes Room tools before collecting a final r
 });
 
 test('Room receive observes shared private-work capacity atomically without dropping accepted input [AC:bot-rooms#AC-5]',()=>{
-  const f=fixture(),room=f.rooms.create(f.principal,{title:'Shared capacity',botIds:[f.a.id,f.b.id]});
+  const f=fixture(),room=f.rooms.create(f.principal,{title:'Shared capacity',botIds:[f.a.id,f.b.id],maxBotTurns:1});
   updateBotWorkSettings(f.store,{perBot:1,perPrincipal:2});
   setBotWorkControl(f.host,f.principal,f.a.id,{paused:true,disabled:false});
   const accepted=enqueueBotMessage(f.host,{principal:f.principal,senderBotId:f.b.id,targetBotId:f.a.id,message:'accepted private input',idempotencyKey:'private'});
@@ -429,6 +446,90 @@ test('a round where every member stays silent still completes [AC:bot-rooms#AC-2
   assert.equal(turn.botTurns, 0);
   assert.deepEqual(turn.silentBotIds, [f.a.id, f.b.id]);
   assert.equal(f.rooms.messages(f.principal, room.id).messages.filter(message => message.sender.type === 'bot').length, 0);
+});
+
+test('Hello @Beta schedules Beta first and tells Alpha to stay quiet unless necessary [AC:bot-rooms#AC-2]', async () => {
+  const f = fixture();
+  const room = f.rooms.create(f.principal, { title: 'Order', botIds: [f.a.id, f.b.id] });
+  const sent = f.rooms.send(f.principal, room.id, { text: `Hello @${f.b.name}` });
+  assert.deepEqual(sent.turn.botIds, [f.b.id, f.a.id]);
+  assert.deepEqual(sent.turn.mentionedBotIds, [f.b.id]);
+  await f.rooms.tick();
+  const beta = userPrompts(f.store, f.runs[0]).at(-1);
+  const alpha = userPrompts(f.store, f.runs[1]).at(-1);
+  assert.equal(f.store.getSession(f.runs[0]).agentId, f.b.id);
+  assert.ok(!beta.includes('not @-mentioned'));
+  assert.ok(alpha.includes('not @-mentioned'));
+  assert.ok(alpha.includes('[SILENT]'));
+});
+
+test('an unmentioned member replying [SILENT] leaves only the mentioned post [AC:bot-rooms#AC-2]', async () => {
+  const f = fixture();
+  const room = f.rooms.create(f.principal, { title: 'Quiet extra', botIds: [f.a.id, f.b.id] });
+  recordingRun(f, async id => {
+    const agentId = f.store.getSession(id).agentId;
+    const text = agentId === f.a.id ? '[SILENT]' : `reply:${agentId}`;
+    f.store.appendMessage(id, 'assistant', [{ type: 'text', text }]);
+    f.store.updateSession(id, { status: 'idle' });
+  });
+  f.rooms.send(f.principal, room.id, { text: `Hello @${f.b.name}` });
+  await f.rooms.tick();
+  const turn = f.rooms.turns(f.principal, room.id)[0];
+  assert.equal(turn.status, 'completed');
+  assert.equal(turn.terminationReason, 'members_completed');
+  assert.deepEqual(turn.silentBotIds, [f.a.id]);
+  const posted = f.rooms.messages(f.principal, room.id).messages.filter(message => message.sender.type === 'bot');
+  assert.deepEqual(posted.map(message => message.sender.id), [f.b.id]);
+});
+
+test('a message without @ schedules every member with no restraint text [AC:bot-rooms#AC-2]', async () => {
+  const f = fixture();
+  const room = f.rooms.create(f.principal, { title: 'Open floor', botIds: [f.a.id, f.b.id] });
+  const sent = f.rooms.send(f.principal, room.id, { text: 'ordinary question' });
+  assert.deepEqual(sent.turn.botIds, [f.a.id, f.b.id]);
+  assert.equal(sent.turn.mentionedBotIds, undefined);
+  await f.rooms.tick();
+  for (const id of f.runs) assert.ok(!userPrompts(f.store, id).at(-1).includes('not @-mentioned'));
+});
+
+test('an @ that matches nobody schedules every member with restraint and adds no outsider [AC:bot-rooms#AC-2]', async () => {
+  const f = fixture();
+  const room = f.rooms.create(f.principal, { title: 'Unknown name', botIds: [f.a.id, f.b.id] });
+  const sent = f.rooms.send(f.principal, room.id, { text: '@NoSuchMember do work' });
+  assert.deepEqual(sent.turn.botIds, [f.a.id, f.b.id]);
+  assert.deepEqual(sent.turn.mentionedBotIds, []);
+  assert.ok(!sent.turn.botIds.includes('NoSuchMember'));
+  await f.rooms.tick();
+  assert.equal(f.runs.length, 2);
+  for (const id of f.runs) assert.ok(userPrompts(f.store, id).at(-1).includes('not @-mentioned'));
+  const none = f.rooms.send(f.principal, room.id, { text: 'explicit empty', mentions: [] });
+  assert.deepEqual(none.turn.botIds, [f.a.id, f.b.id]);
+  assert.deepEqual(none.turn.mentionedBotIds, []);
+});
+
+test('retrying the same explicit mentions returns the same receipt [AC:bot-rooms#AC-2]', () => {
+  const f = fixture();
+  const room = f.rooms.create(f.principal, { title: 'Retry', botIds: [f.a.id, f.b.id] });
+  const first = f.rooms.send(f.principal, room.id, { text: 'hello', mentions: [f.b.id], idempotencyKey: 'same' });
+  assert.deepEqual(first.turn.botIds, [f.b.id, f.a.id]);
+  assert.deepEqual(first.turn.mentionedBotIds, [f.b.id]);
+  const retry = f.rooms.send(f.principal, room.id, { text: 'hello', mentions: [f.b.id], idempotencyKey: 'same' });
+  assert.equal(retry.message.id, first.message.id);
+  assert.equal(retry.turn.id, first.turn.id);
+  assert.throws(() => f.rooms.send(f.principal, room.id, { text: 'hello', mentions: [f.a.id], idempotencyKey: 'same' }), /different Room message/);
+});
+
+test('maxBotTurns of 1 lets the mentioned member post before anyone else [AC:bot-rooms#AC-2]', async () => {
+  const f = fixture();
+  const room = f.rooms.create(f.principal, { title: 'Mention budget', botIds: [f.a.id, f.b.id], maxBotTurns: 1 });
+  f.rooms.send(f.principal, room.id, { text: `Hello @${f.b.name}` });
+  await f.rooms.tick();
+  assert.equal(f.runs.length, 1);
+  assert.equal(f.store.getSession(f.runs[0]).agentId, f.b.id);
+  const turn = f.rooms.turns(f.principal, room.id)[0];
+  assert.equal(turn.status, 'completed');
+  assert.equal(turn.terminationReason, 'budget');
+  assert.deepEqual(f.rooms.messages(f.principal, room.id).messages.filter(message => message.sender.type === 'bot').map(message => message.sender.id), [f.b.id]);
 });
 
 test('deleted approval context becomes unknown without blocking or replaying later queued work [AC:bot-rooms#AC-5]',async()=>{
