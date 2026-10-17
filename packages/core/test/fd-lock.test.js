@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { acquireFdLock, isSqliteLockBusy, withFdLock } from '../dist/teams/fd-lock.js';
@@ -62,12 +62,13 @@ test('blocking the event loop does not let a child take the lock', async () => {
   const child = spawn(process.execPath, ['--input-type=module', '-e', waitForLock(CORE), db], {
     stdio: ['ignore', 'pipe', 'pipe']
   });
+  const output = collectOutput(child);
   try {
     const held = await acquireFdLock(db, { waitMs: 1_000, timeout: 'parent' });
     await waitForLine(child, 'WAITING');
-    const until = Date.now() + 12_000;
-    while (Date.now() < until) { /* longer than the old stale window */ }
-    assert.equal(child.exitCode, null);
+    blockEventLoop(12_000);
+    await yieldEventLoop();
+    assertChildStillWaiting(child, output);
     held.release();
     const result = await waitForExit(child);
     assert.equal(result.status, 0, result.stderr);
@@ -86,18 +87,9 @@ test('concurrent child processes never double-hold mailbox, snapshot, or claim l
     const children = ['mailbox', 'snapshot', 'claim'].flatMap((kind) =>
       Array.from({ length: workers }, (_, index) => spawnWorker(join(dir, kind), kind, index, cycles))
     );
-    const timer = setInterval(() => assertNoOverlap(dir), 2);
-    let results;
-    try {
-      results = await Promise.all(children.map(waitForExit));
-    } finally {
-      clearInterval(timer);
-    }
+    const results = await Promise.all(children.map(waitForExit));
     for (const result of results) assert.equal(result.status, 0, result.stderr + result.stdout);
-    for (const kind of ['mailbox', 'snapshot', 'claim']) {
-      const count = Number(readFileSync(join(dir, kind, 'count'), 'utf8'));
-      assert.equal(count, workers * cycles, kind);
-    }
+    for (const kind of ['mailbox', 'snapshot', 'claim']) assertExclusive(join(dir, kind), workers * cycles);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -121,6 +113,24 @@ test('two async callers in one process are serialized', async () => {
   }
 });
 
+/** Longer than the old mtime stale window, so a time-based reclaim would have fired. */
+function blockEventLoop(ms) {
+  const until = Date.now() + ms;
+  while (Date.now() < until) { /* synchronous: queued child I/O cannot run */ }
+}
+
+/** Drain exit and stdout events that a busy loop left sitting in the queue. */
+async function yieldEventLoop() {
+  for (let i = 0; i < 8; i += 1) {
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+}
+
+function assertChildStillWaiting(child, output) {
+  assert.equal(child.exitCode, null);
+  assert.equal(output.stdout.includes('ACQUIRED'), false, output.stdout);
+}
+
 function holdUntilKilled(modulePath) {
   return `
     import { acquireFdLock } from ${JSON.stringify(modulePath)};
@@ -133,9 +143,9 @@ function holdUntilKilled(modulePath) {
 function waitForLock(modulePath) {
   return `
     import { acquireFdLock } from ${JSON.stringify(modulePath)};
-    console.log('WAITING');
+    process.stdout.write('WAITING\\n');
     const held = await acquireFdLock(process.argv[1], { waitMs: 30_000, timeout: 'child timeout' });
-    console.log('ACQUIRED');
+    process.stdout.write('ACQUIRED\\n');
     held.release();
   `;
 }
@@ -148,34 +158,77 @@ function spawnWorker(dir, kind, index, cycles) {
 }
 
 function workerSource(kind) {
-  const acquire = {
-    mailbox: `import { withMailboxLock } from ${JSON.stringify(MAILBOX)};
-      const run = (fn) => withMailboxLock(process.argv[1], fn, { waitMs: 10_000 });`,
-    snapshot: `import { withSnapshotLock } from ${JSON.stringify(SNAPSHOT)};
-      const run = (fn) => withSnapshotLock(process.argv[1], fn, { waitMs: 10_000 });`,
-    claim: `import { withFdLock } from ${JSON.stringify(CORE)};
-      const run = (fn) => withFdLock(join(process.argv[1], 'claim.lock.db'), fn, { waitMs: 10_000, timeout: 'claim timeout' });`
-  }[kind];
+  const acquire = lockAcquire(kind);
   return `
-    import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+    import { mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs';
     import { join } from 'node:path';
     ${acquire}
     const root = process.argv[1];
-    const marker = join(root, 'marker-' + process.argv[2]);
+    const id = process.argv[2];
+    const ownerFile = join(root, 'owner');
     const countFile = join(root, 'count');
+    const violations = join(root, 'violations');
     mkdirSync(root, { recursive: true });
     for (let i = 0; i < Number(process.argv[3]); i += 1) {
-      await run(() => {
-        writeFileSync(marker, '1');
-        const count = readCount(countFile) + 1;
-        writeFileSync(countFile, String(count));
-        writeFileSync(marker, '0');
-      });
+      await run(() => holdOnce(id, ownerFile, countFile, violations));
+    }
+    ${sectionHelpers()}
+  `;
+}
+
+function lockAcquire(kind) {
+  if (kind === 'mailbox') {
+    return `import { withMailboxLock } from ${JSON.stringify(MAILBOX)};
+      const run = (fn) => withMailboxLock(process.argv[1], fn, { waitMs: 10_000 });`;
+  }
+  if (kind === 'snapshot') {
+    return `import { withSnapshotLock } from ${JSON.stringify(SNAPSHOT)};
+      const run = (fn) => withSnapshotLock(process.argv[1], fn, { waitMs: 10_000 });`;
+  }
+  return `import { withFdLock } from ${JSON.stringify(CORE)};
+    const run = (fn) => withFdLock(join(process.argv[1], 'claim.lock.db'), fn, { waitMs: 10_000, timeout: 'claim timeout' });`;
+}
+
+function sectionHelpers() {
+  return `
+    function holdOnce(id, ownerFile, countFile, violations) {
+      const seen = readText(ownerFile);
+      if (seen !== '') noteViolation(violations, id, 'enter', seen);
+      writeFileSync(ownerFile, id);
+      let spin = 0;
+      for (let n = 0; n < 200; n += 1) spin += n;
+      const still = readText(ownerFile);
+      if (still !== id) noteViolation(violations, id, 'held', still);
+      writeFileSync(countFile, String(readCount(countFile) + 1));
+      writeFileSync(ownerFile, '');
+      if (spin < 0) writeFileSync(ownerFile, 'spin');
+    }
+    function noteViolation(file, id, when, seen) {
+      appendFileSync(file, id + ' ' + when + ' saw ' + JSON.stringify(seen) + '\\n');
+    }
+    function readText(file) {
+      try { return readFileSync(file, 'utf8'); } catch { return ''; }
     }
     function readCount(file) {
-      try { return Number(readFileSync(file, 'utf8')); } catch { return 0; }
+      const text = readText(file);
+      return text === '' ? 0 : Number(text);
     }
   `;
+}
+
+function assertExclusive(dir, expected) {
+  assert.equal(Number(readFileSync(join(dir, 'count'), 'utf8')), expected);
+  assert.equal(readFileSync(join(dir, 'owner'), 'utf8'), '');
+  assert.equal(violationCount(dir), 0);
+}
+
+function violationCount(dir) {
+  try {
+    const text = readFileSync(join(dir, 'violations'), 'utf8').trim();
+    return text === '' ? 0 : text.split('\n').length;
+  } catch {
+    return 0;
+  }
 }
 
 function waitForLine(child, line) {
@@ -183,34 +236,34 @@ function waitForLine(child, line) {
     let stdout = '';
     let stderr = '';
     const timer = setTimeout(() => reject(new Error(`missing ${line}: ${stderr}`)), 5_000);
-    child.stdout.on('data', (chunk) => {
+    const onData = (chunk) => {
       stdout += chunk;
       if (!stdout.includes(line)) return;
-      clearTimeout(timer);
+      cleanup();
       resolve(stdout);
-    });
-    child.stderr.on('data', (chunk) => { stderr += chunk; });
-    child.on('exit', () => {
-      clearTimeout(timer);
+    };
+    const onErr = (chunk) => { stderr += chunk; };
+    const onExit = () => {
+      cleanup();
       reject(new Error(`exited before ${line}: ${stderr}`));
-    });
+    };
+    const cleanup = () => {
+      clearTimeout(timer);
+      child.stdout.off('data', onData);
+      child.stderr.off('data', onErr);
+      child.off('exit', onExit);
+    };
+    child.stdout.on('data', onData);
+    child.stderr.on('data', onErr);
+    child.on('exit', onExit);
   });
 }
 
-function assertNoOverlap(dir) {
-  for (const kind of ['mailbox', 'snapshot', 'claim']) {
-    const kindDir = join(dir, kind);
-    let held = 0;
-    try {
-      for (const name of readdirSync(kindDir)) {
-        if (!name.startsWith('marker-')) continue;
-        if (readFileSync(join(kindDir, name), 'utf8') === '1') held += 1;
-      }
-    } catch {
-      continue;
-    }
-    if (held > 1) throw new Error(`${kind} had ${held} holders`);
-  }
+function collectOutput(child) {
+  const output = { stdout: '', stderr: '' };
+  child.stdout.on('data', (chunk) => { output.stdout += chunk; });
+  child.stderr.on('data', (chunk) => { output.stderr += chunk; });
+  return output;
 }
 
 function waitForExit(child) {
@@ -219,6 +272,10 @@ function waitForExit(child) {
     let stderr = '';
     child.stdout.on('data', (chunk) => { stdout += chunk; });
     child.stderr.on('data', (chunk) => { stderr += chunk; });
+    if (child.exitCode !== null) {
+      resolve({ status: child.exitCode, stdout, stderr });
+      return;
+    }
     child.on('exit', (status) => resolve({ status, stdout, stderr }));
   });
 }
