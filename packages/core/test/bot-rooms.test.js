@@ -331,7 +331,7 @@ test('a later turn of the same bot receives only messages since its last deliver
   assert.ok(!second.some(message => message.text === 'OLD_TOPIC'), 'already delivered history is not repeated');
   assert.ok(!second.some(message => message.text === 'reply:1'), 'own published reply stays in the session as assistant output');
   assert.ok(second.some(message => message.text === 'NEW_TOPIC' && message.sender.name === f.principal.userId && message.sender.type === 'user' && Number.isInteger(message.seq)));
-  assert.match(prompts[1], /New messages since your last turn in this Room/);
+  assert.match(prompts[1], /New messages since your last turn in this Room\. Earlier Room messages were either shown to you earlier in this conversation or explicitly reported as omitted\./);
   assert.match(prompts[0], /Recent Room history \(first turn in this Room context\)/);
 });
 
@@ -443,12 +443,58 @@ test('an oversized delta keeps the newest messages and reports how many were omi
   for (let i = 0; i < 205; i++) f.rooms.send(f.principal, room.id, { text: `BULK_${String(i).padStart(3, '0')}_${'x'.repeat(800)}`, mentions: [] });
   f.rooms.send(f.principal, room.id, { text: 'READ_NOW', mentions: [f.a.id] });
   for (let i = 0; i < 206; i++) await f.rooms.tick();
-  assert.match(prompt, /Recent Room history \(first turn in this Room context\)\. \d+ earlier messages omitted\./);
   const history = historyOf(prompt);
+  const omitted = 206 - history.length;
   assert.ok(history.length <= 200);
+  assert.ok(omitted > 6, 'the char budget drops more than the messages past the 200 window');
+  assert.match(prompt, new RegExp(`Recent Room history \\(first turn in this Room context\\)\\. ${omitted} older unseen Room messages were omitted and are NOT in this conversation\\.`));
   assert.equal(history.at(-1).text, 'READ_NOW');
   assert.ok(!history.some(message => message.text.startsWith('BULK_000')));
   assert.ok(history.some(message => message.sender.name === f.principal.userId));
+});
+
+test('more than 200 unseen messages between two turns report the overflow outside the window [AC:bot-rooms#AC-3]', async () => {
+  const f = fixture();
+  const room = f.rooms.create(f.principal, { title: 'Busy catch-up', botIds: [f.a.id] });
+  const prompts = [];
+  f.host.runSession = async id => { prompts.push(promptTexts(f.store, id).at(-1)); f.store.appendMessage(id, 'assistant', [{ type: 'text', text: `ack:${prompts.length}` }]); };
+  f.rooms.send(f.principal, room.id, { text: 'SEEN_ONCE', mentions: [f.a.id] });
+  await f.rooms.tick();
+  const flood = 230;
+  for (let i = 0; i < flood; i++) f.rooms.send(f.principal, room.id, { text: `FLOOD_${String(i).padStart(3, '0')}`, mentions: [] });
+  f.rooms.send(f.principal, room.id, { text: 'CATCH_UP', mentions: [f.a.id] });
+  for (let i = 0; i < flood + 1; i++) await f.rooms.tick();
+  const second = prompts.at(-1);
+  const history = historyOf(second);
+  const omitted = flood + 1 - history.length;
+  assert.ok(history.length <= 200);
+  assert.equal(omitted, flood + 1 - history.length);
+  assert.ok(omitted > 0 && omitted >= flood + 1 - 200, 'the omitted count includes messages outside the last-200 window');
+  assert.match(second, new RegExp(`${omitted} older unseen Room messages were omitted and are NOT in this conversation`));
+  assert.match(second, /New messages since your last turn in this Room\. Earlier Room messages were either shown to you earlier in this conversation or explicitly reported as omitted\./);
+  assert.equal(history.at(-1).text, 'CATCH_UP');
+  assert.ok(!history.some(message => message.text === 'SEEN_ONCE' || message.text === 'ack:1' || message.text === 'FLOOD_000'));
+  const sessionId = f.store.db.prepare('SELECT session_id FROM bot_room_contexts WHERE room_id=? AND bot_id=?').get(room.id, f.a.id).session_id;
+  const atPrompt = f.store.db.prepare('SELECT seq FROM bot_room_messages WHERE room_id=? AND json_extract(data,\'$.text\')=?').get(room.id, 'CATCH_UP').seq;
+  assert.equal(f.store.getSession(sessionId).metadata.roomDelivery.throughSeq, atPrompt, 'the cursor advances to the newest seq present when the prompt was built, past the skipped overflow');
+  assert.ok(f.store.getSession(sessionId).metadata.roomDelivery.extraSeqs.every(seq => seq > atPrompt), 'only the reply published after the prompt sits past the cursor');
+});
+
+test('messages dropped by the character budget are counted as omitted and not in the conversation [AC:bot-rooms#AC-3]', async () => {
+  const f = fixture();
+  const room = f.rooms.create(f.principal, { title: 'Char budget', botIds: [f.a.id] });
+  let prompt = '';
+  f.host.runSession = async id => { prompt = promptTexts(f.store, id).at(-1); f.store.appendMessage(id, 'assistant', [{ type: 'text', text: 'ack' }]); };
+  const bulky = 'y'.repeat(20000);
+  for (let i = 0; i < 8; i++) f.rooms.send(f.principal, room.id, { text: `HEAVY_${i}_${bulky}`, mentions: [] });
+  f.rooms.send(f.principal, room.id, { text: 'READ_HEAVY', mentions: [f.a.id] });
+  for (let i = 0; i < 9; i++) await f.rooms.tick();
+  const history = historyOf(prompt);
+  assert.ok(history.length < 9 && history.length >= 1, 'the character budget drops older messages inside the window');
+  assert.equal(history.at(-1).text, 'READ_HEAVY');
+  assert.ok(!history.some(message => message.text.startsWith('HEAVY_0_')));
+  const omitted = 9 - history.length;
+  assert.match(prompt, new RegExp(`Recent Room history \\(first turn in this Room context\\)\\. ${omitted} older unseen Room messages were omitted and are NOT in this conversation\\.`));
 });
 
 test('an already delivered unknown turn still warns on the next turn [AC:bot-rooms#AC-3]', async () => {
