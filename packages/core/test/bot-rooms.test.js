@@ -641,6 +641,22 @@ function historyOf(text) {
   const end = json.indexOf('\n');
   return JSON.parse(end < 0 ? json : json.slice(0, end));
 }
+function triggerText(prompt) {
+  const marker = '\nTrigger: ';
+  const start = prompt.indexOf(marker);
+  assert.ok(start >= 0, 'prompt names its trigger');
+  const json = prompt.slice(start + marker.length);
+  const end = json.indexOf('\n');
+  return JSON.parse(end < 0 ? json : json.slice(0, end)).text;
+}
+
+/** History only: a user line with no turn, so gap4 does not schedule restrained speakers for flood text. */
+function insertUserLine(f, room, text) {
+  const seq = f.store.db.prepare('SELECT COALESCE(MAX(seq),0)+1 AS seq FROM bot_room_messages WHERE room_id=?').get(room.id).seq;
+  const message = { id: `room_msg_line_${seq}`, roomId: room.id, seq, sender: { type: 'user', id: f.principal.userId, name: f.principal.userId }, text, attachmentIds: [], createdAt: new Date().toISOString() };
+  f.store.db.prepare('INSERT INTO bot_room_messages(id,room_id,seq,idem_key,data) VALUES(?,?,?,?,?)').run(message.id, room.id, seq, `line-${room.id}-${seq}`, JSON.stringify(message));
+  return message;
+}
 
 test('a [SILENT] reply posts nothing, uses a slot, and does not re-send messages already seen on that turn', async () => {
   const f = fixture();
@@ -750,18 +766,18 @@ test('a user message already seen still schedules its own turn and gets a reply 
   const room = f.rooms.create(f.principal, { title: 'Seen but still answered', botIds: [f.a.id, f.b.id] });
   const prompts = [];
   f.host.runSession = async id => {
-    prompts.push(promptTexts(f.store, id).at(-1));
+    prompts.push({ sessionId: id, text: promptTexts(f.store, id).at(-1) });
     f.store.appendMessage(id, 'assistant', [{ type: 'text', text: `said:${f.store.getSession(id).agentId}` }]);
   };
   f.rooms.send(f.principal, room.id, { text: 'MESSAGE_A', mentions: [f.a.id, f.b.id] });
   f.rooms.send(f.principal, room.id, { text: 'MESSAGE_B', mentions: [f.a.id] });
   await f.rooms.tick();
   assert.equal(prompts.length, 2);
-  assert.ok(historyOf(prompts[0]).some(message => message.text === 'MESSAGE_B' && message.sender.type === 'user'), 'Alpha sees MESSAGE_B while answering MESSAGE_A');
+  assert.ok(historyOf(prompts[0].text).some(message => message.text === 'MESSAGE_B' && message.sender.type === 'user'), 'Alpha sees MESSAGE_B while answering MESSAGE_A');
   const alphaFollowUp = f.rooms.turns(f.principal, room.id).find(turn => turn.messageId !== f.rooms.turns(f.principal, room.id)[0].messageId && turn.botIds.includes(f.a.id));
   assert.equal(alphaFollowUp.status, 'queued', 'MESSAGE_B still gives Alpha its own turn');
   await f.rooms.tick();
-  const followUp = prompts.at(-1);
+  const followUp = prompts.find(entry => f.store.getSession(entry.sessionId).agentId === f.a.id && triggerText(entry.text) === 'MESSAGE_B').text;
   assert.match(followUp, /Trigger:/);
   assert.ok(followUp.includes('MESSAGE_B'), 'the follow-up trigger is MESSAGE_B');
   assert.ok(!historyOf(followUp).some(message => message.text === 'MESSAGE_B'), 'MESSAGE_B was already in the earlier prompt, so it is not repeated as history');
@@ -775,14 +791,14 @@ test('a fresh, new-member, or replaced context session gets the recent window ag
   const f = fixture();
   const room = f.rooms.create(f.principal, { title: 'Fresh window', botIds: [f.a.id] });
   const seen = [];
-  f.host.runSession = async id => { seen.push(promptTexts(f.store, id).at(-1)); f.store.appendMessage(id, 'assistant', [{ type: 'text', text: 'kept' }]); };
+  f.host.runSession = async id => { seen.push({ sessionId: id, text: promptTexts(f.store, id).at(-1) }); f.store.appendMessage(id, 'assistant', [{ type: 'text', text: 'kept' }]); };
   f.rooms.send(f.principal, room.id, { text: 'FIRST_WINDOW' });
   await f.rooms.tick();
   const contextId = f.store.db.prepare('SELECT session_id FROM bot_room_contexts WHERE room_id=? AND bot_id=?').get(room.id, f.a.id).session_id;
   f.store.updateSession(contextId, { status: 'unknown' });
   f.rooms.send(f.principal, room.id, { text: 'AFTER_REPLACE' });
   await f.rooms.tick();
-  const replaced = seen.at(-1);
+  const replaced = seen.at(-1).text;
   assert.match(replaced, /Recent Room history \(first turn in this Room context\)/);
   assert.ok(historyOf(replaced).some(message => message.text === 'FIRST_WINDOW'));
   assert.ok(historyOf(replaced).some(message => message.text === 'kept' && message.sender.name === 'Alpha'));
@@ -791,7 +807,7 @@ test('a fresh, new-member, or replaced context session gets the recent window ag
   f.rooms.addMember(f.principal, room.id, c.id);
   f.rooms.send(f.principal, room.id, { text: 'WELCOME', mentions: [c.id] });
   await f.rooms.tick();
-  const joined = seen.at(-1);
+  const joined = seen.find(entry => f.store.getSession(entry.sessionId).agentId === c.id).text;
   assert.match(joined, /first turn in this Room context/);
   assert.ok(historyOf(joined).some(message => message.text === 'FIRST_WINDOW'));
   assert.ok(historyOf(joined).some(message => message.text === 'WELCOME' && message.sender.type === 'user'));
@@ -802,9 +818,9 @@ test('an oversized delta keeps the newest messages and reports how many were omi
   const room = f.rooms.create(f.principal, { title: 'Capped', botIds: [f.a.id] });
   let prompt = '';
   f.host.runSession = async id => { prompt = promptTexts(f.store, id).at(-1); f.store.appendMessage(id, 'assistant', [{ type: 'text', text: 'ack' }]); };
-  for (let i = 0; i < 205; i++) f.rooms.send(f.principal, room.id, { text: `BULK_${String(i).padStart(3, '0')}_${'x'.repeat(800)}`, mentions: [] });
+  for (let i = 0; i < 205; i++) insertUserLine(f, room, `BULK_${String(i).padStart(3, '0')}_${'x'.repeat(800)}`);
   f.rooms.send(f.principal, room.id, { text: 'READ_NOW', mentions: [f.a.id] });
-  for (let i = 0; i < 206; i++) await f.rooms.tick();
+  await f.rooms.tick();
   const history = historyOf(prompt);
   const omitted = 206 - history.length;
   assert.ok(history.length <= 200);
@@ -823,9 +839,9 @@ test('more than 200 unseen messages between two turns report the overflow outsid
   f.rooms.send(f.principal, room.id, { text: 'SEEN_ONCE', mentions: [f.a.id] });
   await f.rooms.tick();
   const flood = 230;
-  for (let i = 0; i < flood; i++) f.rooms.send(f.principal, room.id, { text: `FLOOD_${String(i).padStart(3, '0')}`, mentions: [] });
+  for (let i = 0; i < flood; i++) insertUserLine(f, room, `FLOOD_${String(i).padStart(3, '0')}`);
   f.rooms.send(f.principal, room.id, { text: 'CATCH_UP', mentions: [f.a.id] });
-  for (let i = 0; i < flood + 1; i++) await f.rooms.tick();
+  await f.rooms.tick();
   const second = prompts.at(-1);
   const history = historyOf(second);
   const omitted = flood + 1 - history.length;
@@ -848,9 +864,9 @@ test('messages dropped by the character budget are counted as omitted and not in
   let prompt = '';
   f.host.runSession = async id => { prompt = promptTexts(f.store, id).at(-1); f.store.appendMessage(id, 'assistant', [{ type: 'text', text: 'ack' }]); };
   const bulky = 'y'.repeat(20000);
-  for (let i = 0; i < 8; i++) f.rooms.send(f.principal, room.id, { text: `HEAVY_${i}_${bulky}`, mentions: [] });
+  for (let i = 0; i < 8; i++) insertUserLine(f, room, `HEAVY_${i}_${bulky}`);
   f.rooms.send(f.principal, room.id, { text: 'READ_HEAVY', mentions: [f.a.id] });
-  for (let i = 0; i < 9; i++) await f.rooms.tick();
+  await f.rooms.tick();
   const history = historyOf(prompt);
   assert.ok(history.length < 9 && history.length >= 1, 'the character budget drops older messages inside the window');
   assert.equal(history.at(-1).text, 'READ_HEAVY');
@@ -887,11 +903,11 @@ test('a newer turn reply is visible to an older turn member that has not built i
   f.store.db.prepare('INSERT INTO bot_room_messages(id,room_id,seq,idem_key,data) VALUES(?,?,?,?,?)').run(reply.id, room.id, seq, 'planted-newer-reply', JSON.stringify(reply));
   const prompts = [];
   f.host.runSession = async id => {
-    prompts.push(promptTexts(f.store, id).at(-1));
+    prompts.push({ sessionId: id, text: promptTexts(f.store, id).at(-1) });
     f.store.appendMessage(id, 'assistant', [{ type: 'text', text: `said:${f.store.getSession(id).agentId}` }]);
   };
   await f.rooms.tick();
-  const alpha = historyOf(prompts[0]);
+  const alpha = historyOf(prompts[0].text);
   assert.ok(alpha.some(message => message.text === 'NEWER_REPLY' && message.sender.id === f.b.id), 'a newer-turn reply already in the room is visible');
   assert.ok(alpha.some(message => message.text === 'NEWER_ASK' && message.sender.type === 'user'), 'a later queued user message is visible too');
   assert.ok(alpha.some(message => message.text === 'OLDER_ASK'));
@@ -900,11 +916,11 @@ test('a newer turn reply is visible to an older turn member that has not built i
   assert.equal(alphaDelivery.throughSeq, seq, 'the cursor covers every message present when the prompt was built');
   const ownReply = f.rooms.messages(f.principal, room.id).messages.find(message => message.sender.id === f.a.id && message.text.startsWith('said:'));
   assert.deepEqual(alphaDelivery.extraSeqs, [ownReply.seq], 'only this bot\'s own reply, published after the prompt, is tracked past the cursor');
-  const laterMember = historyOf(prompts[1]);
+  const laterMember = historyOf(prompts[1].text);
   assert.ok(laterMember.some(message => message.text === 'NEWER_REPLY' && message.sender.id === f.b.id), 'a newer-turn reply is visible to the older turn\'s later member');
   assert.ok(laterMember.some(message => message.sender.id === f.a.id && message.text.startsWith('said:')), 'the earlier member reply is visible to the later member');
   await f.rooms.tick();
-  const betaNext = prompts.at(-1);
+  const betaNext = prompts.find(entry => f.store.getSession(entry.sessionId).agentId === f.b.id && triggerText(entry.text) === 'NEWER_ASK').text;
   assert.match(betaNext, /NEWER_ASK/);
   assert.ok(!historyOf(betaNext).some(message => message.text === 'NEWER_REPLY'), 'already delivered on the previous turn, so not repeated');
   assert.ok(!historyOf(betaNext).some(message => message.sender.id === f.a.id), 'Alpha\'s reply was already in the previous prompt');
