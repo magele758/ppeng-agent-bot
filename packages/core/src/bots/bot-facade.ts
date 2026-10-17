@@ -8,7 +8,7 @@ import type { AgentSpec, SessionRecord } from '../types.js';
 import type { SqliteStateStore } from '../storage.js';
 import { normalizeAllowedSkillNames, readAllowedSkillNames } from '../skills/skill-allowlist.js';
 import { normalizeAllowedToolNames, readPositiveAllowedTools } from './bot-policy.js';
-import { faceUpdatePatch, normalizeBotFaceColor, normalizeBotFaceShape } from './bot-appearance.js';
+import { faceUpdatePatch, normalizeBotAvatar, normalizeBotFaceColor, normalizeBotFaceShape } from './bot-appearance.js';
 import {
   BOT_MODEL_OVERRIDE_META,
   normalizeBotModelOverride,
@@ -199,6 +199,7 @@ export function getBot(store: SqliteStateStore, id: string): BotRecord {
 export function createBot(host: SessionFacadeHost, input: CreateBotInput, options?: { builtin?: boolean }): BotRecord {
   const faceShape = normalizeBotFaceShape(input.faceShape);
   const faceColor = normalizeBotFaceColor(input.faceColor);
+  const avatar = normalizeBotAvatar(input.avatar);
   const name = normalizeName(input.name);
   const title = normalizeTitle(input.title, name);
   const description = normalizeDescription(input.description);
@@ -231,6 +232,7 @@ export function createBot(host: SessionFacadeHost, input: CreateBotInput, option
     hidden: false,
     faceShape,
     faceColor,
+    avatar,
     createdAt: now,
     updatedAt: now
   });

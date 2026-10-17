@@ -83,6 +83,14 @@ describe('bot name validation', () => {
     assert.equal(botNameIssue('   '), 'empty');
     assert.equal(botNameIssue('Daily digest'), null);
   });
+
+  test('a trimmed name that matches an existing bot is taken', () => {
+    const taken = ['Daily digest', 'Ada'];
+    assert.equal(botNameIssue('  daily digest  ', taken), 'taken');
+    assert.equal(botNameIssue('ada', taken), 'taken');
+    assert.equal(botNameIssue('Ada Lovelace', taken), null);
+    assert.equal(botNameIssue('Daily digest'), null);
+  });
 });
 
 describe('bot settings snapshot', () => {
