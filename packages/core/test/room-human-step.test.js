@@ -18,9 +18,10 @@ test('the private note names the room and the room notice carries no step detail
 });
 
 test('handing off drops the room waiting latch so a private decision cannot resume it [AC:bot-rooms#AC-8]', () => {
-  const next = roomMetadataAfterHandOff({ roomId: 'room-1', interrupt: { kind: 'waiting_approval' }, outcome: { kind: 'waiting_approval' }, botId: 'alpha' });
+  const next = roomMetadataAfterHandOff({ roomId: 'room-1', interrupt: { kind: 'waiting_approval' }, outcome: { kind: 'waiting_approval' }, botId: 'alpha', roomDelivery: { throughSeq: 4, extraSeqs: [] } });
   assert.equal(next.roomId, 'room-1');
   assert.equal(next.botId, 'alpha');
+  assert.deepEqual(next.roomDelivery, { throughSeq: 4, extraSeqs: [] });
   assert.equal('interrupt' in next, false);
   assert.equal('outcome' in next, false);
 });

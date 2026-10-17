@@ -15,7 +15,9 @@ import type { SqliteStateStore } from '../storage.js';
 import type { RunContext, SessionRecord, ToolContract, ToolExecutionResult } from '../types.js';
 
 import { MESSAGE_AGENT_TOOL_NAME } from '../bots/bot-tool-names.js';
+import { isSilenceToken } from '../bots/silence.js';
 export { MESSAGE_AGENT_TOOL_NAME } from '../bots/bot-tool-names.js';
+export { isSilenceToken } from '../bots/silence.js';
 export const MESSAGE_MAX_CHARS = 4000;
 export const RELAY_HOP_META = 'relayHop';
 /** Id of the relayed user message that `relayHop` belongs to; the hop is stale once any later user message lands. */
@@ -24,8 +26,6 @@ export const RELAY_HOP_LIMIT = 3;
 /** Room id stamped on a 1:1 that a Room member sent. Absent for ordinary Bot Chat relays. */
 export const SOURCE_ROOM_META = 'sourceRoomId';
 const ROSTER_SAMPLE = 8;
-
-const SILENCE_TOKENS = new Set(['[SILENT]', 'SILENT', 'NO_REPLY', 'NO REPLY']);
 
 export interface MessageAgentHost {
   store: SqliteStateStore;
@@ -70,15 +70,6 @@ export function readRelayHop(metadata: Record<string, unknown> | undefined): num
     return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
   }
   return 0;
-}
-
-/**
- * A body that is only a silence token is the recipient's "nothing more to say" convention: it is
- * persisted but must not chain-wake the other side. This is not a sender intent signal; senders
- * opt out of waking with the explicit `wake:false` argument.
- */
-export function isSilenceToken(body: string): boolean {
-  return SILENCE_TOKENS.has(body.trim().replace(/\s+/g, ' ').toUpperCase());
 }
 
 const WAKE_OFF_STRINGS = new Set(['false', '0', 'no']);

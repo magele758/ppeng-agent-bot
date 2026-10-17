@@ -91,6 +91,7 @@ export function handRoomHumanStepToPrivateChat(host: Pick<BotWorkHost, 'store'>,
     host.store.rewriteMessageParts(input.memberSessionId, message.id, kept);
    }
   }
+  // member.metadata already carries the roomDelivery cursor written before this run. Spread it; do not rebuild metadata from scratch.
   host.store.updateSession(input.memberSessionId, { status: 'idle', metadata: roomMetadataAfterHandOff(member.metadata) });
   const waiting = host.store.getSession(chat.id) ?? fresh!;
   const outcome = runOutcomeFromEnd({ reason: 'waiting_approval', sessionStatus: 'waiting_approval' });

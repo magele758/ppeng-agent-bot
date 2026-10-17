@@ -33,7 +33,7 @@ test.describe('Agent Lab console', () => {
 
     // 创建 Bot 的入口只在 Bots 页（对话页不再内嵌创建表单）
     await page.getByRole('button', { name: '新增' }).click();
-    await page.getByRole('menuitem', { name: /新建 Bot/ }).click();
+    await page.getByRole('menuitem', { name: '新建 Bot', exact: true }).click();
     await expect(page).toHaveURL(/#\/agents\/bots/);
     await expect(page.locator('#section-agents')).toBeVisible();
     await expect(page.locator('#composerBotForm')).toHaveCount(0);

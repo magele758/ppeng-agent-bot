@@ -27,7 +27,12 @@ export function memberNeedsHuman(
   return session.status === 'waiting_approval' && approvals.some((approval) => approval.status === 'pending');
 }
 
-/** Drop the waiting latch so a later private decision cannot resume this Room session. */
+/**
+ * Drop the waiting latch so a later private decision cannot resume this Room session.
+ * Keep roomDelivery: executeMember already advanced the read position, and a hand-off
+ * must not make the member answer those Room messages again. A rolled-back hand-off
+ * never reaches this write, so it cannot undo that position either.
+ */
 export function roomMetadataAfterHandOff(metadata: Record<string, unknown> | undefined): Record<string, unknown> {
   const next = { ...(metadata ?? {}) };
   delete next.interrupt;

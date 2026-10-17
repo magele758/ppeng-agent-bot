@@ -17,6 +17,16 @@ function collectLeafKeys(value: unknown, prefix = ''): string[] {
   return keys.sort();
 }
 
+test('play create menu names for a bot and a group do not overlap', () => {
+  for (const messages of [zh, en]) {
+    const bot = messages.play.newBot;
+    const group = messages.agents.bots.newGroup;
+    assert.notEqual(bot, group);
+    assert.equal(group.includes(bot), false);
+    assert.equal(messages.agents.bots.groupTitle.includes(bot), false);
+  }
+});
+
 test('en and zh leaf key sets are identical', () => {
   const zhKeys = collectLeafKeys(zh);
   const enKeys = collectLeafKeys(en);
