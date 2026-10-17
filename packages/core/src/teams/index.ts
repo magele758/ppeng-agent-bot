@@ -7,3 +7,5 @@ export * from './mailbox.js';
 export * from './gates.js';
 export * from './workspace-sync.js';
 export * from './executor.js';
+export { acquireFdLock, isSqliteLockBusy, withFdLock } from './fd-lock.js';
+export type { FdLockWait, HeldFdLock } from './fd-lock.js';

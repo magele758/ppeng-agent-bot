@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { test, beforeEach } from 'node:test';
+import { test, beforeEach, after } from 'node:test';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -7,9 +7,10 @@ import { handleGatewayHttp } from '../dist/http.js';
 import { drainGatewayTurns, resetInboundDedupe } from '../dist/inbound-guard.js';
 import { runAgentTurnAndReply } from '../dist/im-handlers.js';
 import { writeGatewaySettings } from '../dist/gateway-settings.js';
-import { call, fakeRuntime, feishuMessageEvent, makeCtx } from './gateway-harness.mjs';
+import { call, cleanupGatewayTemps, fakeRuntime, feishuMessageEvent, makeCtx } from './gateway-harness.mjs';
 
 beforeEach(() => resetInboundDedupe());
+after(() => cleanupGatewayTemps());
 
 function withCommands(runtime) {
   const commands = [];

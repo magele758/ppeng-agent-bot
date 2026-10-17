@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { test, beforeEach } from 'node:test';
+import { test, beforeEach, after } from 'node:test';
 import { handleGatewayHttp } from '../dist/http.js';
 import { drainGatewayTurns, resetInboundDedupe } from '../dist/inbound-guard.js';
 import {
@@ -14,10 +14,12 @@ import {
   feishuEncrypt,
   feishuMessageEvent,
   feishuSign,
+  cleanupGatewayTemps,
   makeCtx
 } from './gateway-harness.mjs';
 
 beforeEach(() => resetInboundDedupe());
+after(() => cleanupGatewayTemps());
 
 function feishuCtx({ spec = { enabled: true, verificationToken: 'tok' }, runtimeOpts, channels } = {}) {
   const runtime = fakeRuntime(runtimeOpts);
@@ -218,6 +220,20 @@ test('企微密钥只认请求头，过期时间戳和重放不再跑 Agent', as
   assert.equal(other.status, 200);
   assert.equal(other.json.duplicate, undefined);
   assert.equal(runtime.calls.ran.length, 3);
+});
+
+test('concurrent WeCom replays of one msgId claim a single agent turn', async () => {
+  const { runtime, ctx } = wecomCtx({ enabled: true, bridgeSecret: 's3' });
+  const now = Math.floor(Date.now() / 1000);
+  const posts = await Promise.all(
+    Array.from({ length: 8 }, () =>
+      wecomPost(ctx, { userKey: 'alice', text: 'race', msgId: 'race-1' }, wecomAuth('s3', now))
+    )
+  );
+  await drainGatewayTurns();
+  assert.equal(posts.filter((item) => item.status === 200 && item.json?.ok === true && !item.json?.duplicate).length, 1);
+  assert.equal(posts.filter((item) => item.json?.duplicate === true).length, 7);
+  assert.equal(runtime.calls.ran.length, 1);
 });
 
 test('设置保存后无需重启立即生效，读取不回显明文 [AC:gateway-im-security#AC-12]', async () => {

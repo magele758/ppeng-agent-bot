@@ -11,10 +11,16 @@ import {
   type EventProvider,
   type EventRoutineHost
 } from '@ppeng/agent-core';
-import { claimInboundEvent } from './inbound-guard.js';
+import { claimInboundEvent, InboundClaimTimeoutError } from './inbound-guard.js';
 import type { GatewayHandleContext } from './http.js';
 
 const log = createLogger('event-ingress');
+
+/** True when this process won the claim. A lock timeout throws; it is not a duplicate. */
+async function claimEventDelivery(key: string, gatewayDir: string): Promise<boolean> {
+  const result = await claimInboundEvent(key, Date.now(), gatewayDir);
+  return result === 'claimed';
+}
 
 function json(res: ServerResponse, status: number, body: unknown): void {
   res.statusCode = status;
@@ -105,13 +111,22 @@ export async function handleEventIngress(
     hasUnconfirmedEffects: (sessionId, startedAt) => ctx.runtime.hasUnconfirmedEffects?.(sessionId, startedAt) ?? false,
     cancelSession: (sessionId) => ctx.runtime.cancelSession?.(sessionId)
   };
-  const result = await acceptEventRoutine(host, {
-    provider,
-    rawBody,
-    headers: request.headers,
-    body,
-    claimDelivery: (key) => claimInboundEvent(key, Date.now(), `${ctx.stateDir}/gateway`)
-  });
+  let result: AcceptEventRoutineResult;
+  try {
+    result = await acceptEventRoutine(host, {
+      provider,
+      rawBody,
+      headers: request.headers,
+      body,
+      claimDelivery: (key) => claimEventDelivery(key, `${ctx.stateDir}/gateway`)
+    });
+  } catch (error) {
+    if (error instanceof InboundClaimTimeoutError) {
+      json(response, 503, { error: 'Inbound claim lock busy', retryable: true });
+      return true;
+    }
+    throw error;
+  }
   const out = httpResult(result);
   json(response, out.status, out.body);
   return true;

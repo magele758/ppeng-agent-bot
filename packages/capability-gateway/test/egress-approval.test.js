@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import { test, after } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { deliverToChannel } from '../dist/channels.js';
 import { handleGatewayHttp } from '../dist/http.js';
-import { call, fakeRuntime, makeCtx } from './gateway-harness.mjs';
+import { call, cleanupGatewayTemps, fakeRuntime, makeCtx } from './gateway-harness.mjs';
+
+after(() => cleanupGatewayTemps());
 
 test('deliverToChannel does not fetch until a human approval is passed', async () => {
   let calls = 0;

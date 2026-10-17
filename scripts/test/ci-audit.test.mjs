@@ -145,19 +145,18 @@ test('recursive unit pattern executes a nested test and propagates failure [AC:c
  } finally {rmSync(root,{recursive:true,force:true});}
 });
 
-test('known load-window timeout uses the exact shared retry exception [AC:ci-audit-p1-p2#AC-1]', async () => {
+test('fixed HTTP window no longer needs a known-flaky wall-clock exception [AC:ci-audit-p1-p2#AC-1]', async () => {
  const { knownFlaky, isKnownFlaky } = await import('../ci/known-flaky.mjs');
  const file = 'scripts/test/bot-http-fixed-window.test.mjs';
  const name = 'fixed window bounds queues and terminates stalled work at original deadline';
- assert.ok(isKnownFlaky(file, name));
- assert.ok(readFileSync(file, 'utf8').includes("test('" + name + "'"));
+ const source = readFileSync(file, 'utf8');
+ assert.ok(source.includes("test('" + name + "'"));
+ assert.match(source, /observedElapsedSeconds/);
+ assert.doesNotMatch(source, /Date\.now\(\)-started/);
+ assert.equal(isKnownFlaky(file, name), false);
+ assert.equal(knownFlaky.filter(entry => entry.file === file && entry.name === name).length, 0);
  const flaky = [{file, tests:[{name}]}];
- const args = {plan:{retry:true}, flaky, failed:[]};
- assert.equal(buildReport(args).pass, true);
- assert.equal(buildReport({...args, failed:flaky}).pass, false);
- assert.equal(buildReport({...args, flaky:[{file,tests:[{name:name+' other'}]}]}).pass, false);
- assert.equal(isKnownFlaky('other.test.mjs', name), false);
- assert.equal(knownFlaky.filter(entry => entry.file === file && entry.name === name).length, 1);
+ assert.equal(buildReport({plan:{retry:true}, flaky, failed:[]}).pass, false);
 });
 
 test('release CLI reports non-blocking diagnostics in stdout and step summary [AC:ci-audit-p1-p2#AC-9]', async () => {
