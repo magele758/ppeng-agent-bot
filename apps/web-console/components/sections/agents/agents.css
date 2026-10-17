@@ -248,6 +248,58 @@
   align-items: center;
 }
 
+.ag-avatar {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.ag-avatar__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-2);
+}
+
+.ag-avatar__emoji {
+  min-width: 36px;
+  min-height: 36px;
+  padding: var(--ui-space-1) var(--ui-space-2);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-bg);
+  color: var(--ui-text);
+  font: inherit;
+  font-size: var(--ui-text-sm);
+  cursor: pointer;
+}
+
+.ag-avatar__emoji--mark {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.ag-avatar__emoji.is-selected {
+  border-color: var(--ui-accent, currentColor);
+  outline: var(--ui-focus);
+}
+
+.ag-check-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-1);
+  max-height: 180px;
+  overflow: auto;
+}
+
+.ag-check-list label {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+}
+
 .ag-status {
   margin: 0;
   font-size: var(--ui-text-sm);

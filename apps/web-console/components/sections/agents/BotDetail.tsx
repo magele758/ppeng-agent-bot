@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
-import { isBotFaceColor, isBotFaceShape, type BotFaceColor, type BotFaceShape } from '@/lib/bot-face';
+import { detailFaceProps, isBotFaceColor, isBotFaceShape, type BotFaceColor, type BotFaceShape } from '@/lib/bot-face';
 import { useI18n } from '@/lib/i18n';
 import {
   createGenerationGuard,
@@ -213,8 +213,7 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
         <div className="ag-panel__identity">
           <BotFace
             name={bot.name}
-            shape={shape}
-            color={color}
+            {...detailFaceProps(shape, color)}
             label={t('agents.bots.faceLabel', { name: bot.name })}
             testId="bot-detail-face"
             size="md"

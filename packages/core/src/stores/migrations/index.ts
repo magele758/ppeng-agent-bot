@@ -980,6 +980,16 @@ export const MIGRATIONS: Migration[] = [
   },
   {
     version: 29,
+    description: 'bots.avatar for an optional emoji or image URL',
+    up: (db) => {
+      if (!hasTable(db, 'bots')) return;
+      if (!hasColumn(db, 'bots', 'avatar')) {
+        db.exec(`ALTER TABLE bots ADD COLUMN avatar TEXT`);
+      }
+    }
+  },
+  {
+    version: 30,
     description: 'bot_work_messages.source_room records the Room a 1:1 private message came from',
     up: (db) => {
       ensureBotWorkSchema({ db });

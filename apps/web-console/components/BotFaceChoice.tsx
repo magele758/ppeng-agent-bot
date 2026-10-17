@@ -5,6 +5,7 @@ import {
   BOT_FACE_PICKER_COLORS,
   BOT_FACE_PICKER_SHAPES,
   BOT_FACE_SWATCH,
+  previewFaceChoice,
   resolveBotFaceAppearance,
   type BotFaceColor,
   type BotFaceShape
@@ -33,15 +34,14 @@ export function BotFaceChoice({
   const shapeLabelId = useId();
   const colorLabelId = useId();
   const shown = resolveBotFaceAppearance({ name, savedShape: shape, savedColor: color });
-  const previewShape = shown.shape ?? 'teardrop';
   const previewColor = shown.color ?? 'red';
+  const previewFace = previewFaceChoice(shape, color, shown);
   return (
     <fieldset className="bot-face-choice" disabled={disabled}>
       <div className="bot-face-choice__preview">
         <BotFace
           name={name}
-          shape={previewShape}
-          color={previewColor}
+          {...previewFace}
           size="lg"
           testId="bot-face-choice-preview"
           label={t('agents.bots.faceLabel', { name: name.trim() || t('agents.bots.faceEmpty') })}

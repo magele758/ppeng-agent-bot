@@ -69,6 +69,12 @@ export function agentToolScope(agent: Pick<AgentDetail, 'allowedTools'>): AgentT
   return tools.length === 0 ? { kind: 'all' } : { kind: 'limited', tools: [...tools].sort() };
 }
 
-export function botNameIssue(name: string): 'empty' | null {
-  return name.trim() ? null : 'empty';
+export type BotNameIssue = 'empty' | 'taken';
+
+/** Trimmed name must be non-empty and not already used (case-insensitive). */
+export function botNameIssue(name: string, takenNames?: readonly string[]): BotNameIssue | null {
+  const trimmed = name.trim();
+  if (!trimmed) return 'empty';
+  if (takenNames?.some((existing) => existing.trim().toLowerCase() === trimmed.toLowerCase())) return 'taken';
+  return null;
 }

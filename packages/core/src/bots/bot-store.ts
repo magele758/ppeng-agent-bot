@@ -2,7 +2,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { NotFoundError } from '../errors.js';
 import { nowIso } from '../id.js';
 import { boolToInt, intToBool } from '../stores/storage-helpers.js';
-import { readBotFaceColor, readBotFaceShape } from './bot-appearance.js';
+import { normalizeBotAvatar, readBotFaceColor, readBotFaceShape } from './bot-appearance.js';
 import type { BotRecord, ListBotsOptions, UpdateBotInput } from './types.js';
 
 export class BotStore {
@@ -14,8 +14,8 @@ export class BotStore {
         `
         INSERT INTO bots (
           id, name, title, description, agent_id, canonical_session_id,
-          hidden, face_shape, face_color, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          hidden, face_shape, face_color, avatar, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
       )
       .run(
@@ -28,6 +28,7 @@ export class BotStore {
         boolToInt(bot.hidden),
         bot.faceShape ?? null,
         bot.faceColor ?? null,
+        bot.avatar ?? null,
         bot.createdAt,
         bot.updatedAt
       );
@@ -82,6 +83,7 @@ export class BotStore {
       hidden: patch.hidden !== undefined ? patch.hidden : current.hidden,
       faceShape: patch.faceShape !== undefined ? readBotFaceShape(patch.faceShape) : current.faceShape,
       faceColor: patch.faceColor !== undefined ? readBotFaceColor(patch.faceColor) : current.faceColor,
+      avatar: patch.avatar !== undefined ? normalizeBotAvatar(patch.avatar) : current.avatar,
       canonicalSessionId: patch.canonicalSessionId ?? current.canonicalSessionId,
       updatedAt: nowIso()
     };
@@ -90,7 +92,7 @@ export class BotStore {
         `
         UPDATE bots SET
           name = ?, title = ?, description = ?, canonical_session_id = ?,
-          hidden = ?, face_shape = ?, face_color = ?, updated_at = ?
+          hidden = ?, face_shape = ?, face_color = ?, avatar = ?, updated_at = ?
         WHERE id = ?
       `
       )
@@ -102,6 +104,7 @@ export class BotStore {
         boolToInt(next.hidden),
         next.faceShape,
         next.faceColor,
+        next.avatar,
         next.updatedAt,
         id
       );
@@ -119,6 +122,7 @@ export class BotStore {
       hidden: intToBool(row.hidden),
       faceShape: readBotFaceShape(row.face_shape),
       faceColor: readBotFaceColor(row.face_color),
+      avatar: row.avatar == null || row.avatar === '' ? null : String(row.avatar),
       createdAt: String(row.created_at),
       updatedAt: String(row.updated_at)
     };

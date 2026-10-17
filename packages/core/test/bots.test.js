@@ -61,6 +61,7 @@ test('createBot: agent 1:1 + canonical session [AC:bots#AC-1]', () => {
   assert.equal(bot.agentId, 'researcher');
   assert.equal(bot.name, 'Researcher');
   assert.equal(bot.hidden, false);
+  assert.equal(bot.avatar, null);
 
   const agent = store.getAgent('researcher');
   assert.ok(agent);
@@ -82,6 +83,23 @@ test('createBot: agent 1:1 + canonical session [AC:bots#AC-1]', () => {
   assert.match(agent.instructions, /permissionMode/);
   assert.doesNotMatch(agent.instructions, /full permission|Never ask the user to approve/i);
   assert.equal(store.listMessages(session.id).length, 0);
+  store.db.close();
+});
+
+test('createBot: optional avatar is an emoji or image URL and can be cleared', () => {
+  const store = tempStore();
+  const h = host(store);
+  const marked = createBot(h, { name: 'Emoji', avatar: ' 🤖 ' });
+  assert.equal(marked.avatar, '🤖');
+  assert.equal(getBot(store, marked.id).avatar, '🤖');
+  const pictured = createBot(h, { name: 'Picture', avatar: 'https://cdn.example/bot.png' });
+  assert.equal(pictured.avatar, 'https://cdn.example/bot.png');
+  const cleared = updateBot(h, pictured.id, { avatar: '  ' });
+  assert.equal(cleared.avatar, null);
+  assert.throws(() => createBot(h, { name: 'Bad', avatar: 'ftp://cdn.example/bot.png' }));
+  assert.throws(() => createBot(h, { name: 'Words', avatar: 'not an emoji' }));
+  const omitted = createBot(h, { name: 'Plain' });
+  assert.equal(omitted.avatar, null);
   store.db.close();
 });
 
