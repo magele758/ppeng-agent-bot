@@ -1,18 +1,8 @@
-import { appendFileSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { createId, nowIso } from '../id.js';
 import type { TeamMailboxMessage } from './types.js';
-import {
-  createLockToken,
-  holdLockAcquisition,
-  lockTokenNonce,
-  readStaleLock,
-  reclaimStaleLock,
-  releaseHeldLock,
-  releaseLockAcquisition,
-  writeOwnedLock
-} from './lock-liveness.js';
-import { startAsyncLockWait } from './async-lock-wait.js';
+import { withFdLock } from './fd-lock.js';
 
 const AUDIT_MAX_BYTES = 1024 * 1024;
 
@@ -118,10 +108,14 @@ function appendJsonLine(filePath: string, payload: unknown): void {
   appendFileSync(filePath, `${JSON.stringify(payload)}\n`, 'utf8');
 }
 
-const MAILBOX_LOCK_STALE_MS = 10_000;
 const MAILBOX_LOCK_WAIT_MS = 1_000;
 
 export interface MailboxLockOptions {
+  /**
+   * @deprecated Ignored. The lock is an SQLite exclusive transaction on the
+   * database fd, released by the kernel on close or process death. There is
+   * no mtime staleness.
+   */
   staleMs?: number;
   waitMs?: number;
   now?: () => number;
@@ -130,70 +124,13 @@ export interface MailboxLockOptions {
 /** Serialize mailbox writers that share one plan directory under parallel load. */
 export async function withMailboxLock<T>(inboxDir: string, fn: () => T | Promise<T>, options: MailboxLockOptions = {}): Promise<T> {
   mkdirSync(inboxDir, { recursive: true });
-  const lockPath = join(inboxDir, '.mailbox.lock');
-  const held = await holdMailboxLock(lockPath, options);
-  try {
-    return await fn();
-  } finally {
-    held.release();
-  }
-}
-
-async function holdMailboxLock(lockPath: string, options: MailboxLockOptions): Promise<{ release: () => void }> {
-  const token = createLockToken();
-  const nonce = lockTokenNonce(token);
-  holdLockAcquisition(nonce);
-  try {
-    const fd = await acquireMailboxLock(lockPath, token, options);
-    return { release: () => releaseOwnedLock(lockPath, fd, token, nonce) };
-  } catch (error) {
-    releaseLockAcquisition(nonce);
-    throw error;
-  }
-}
-
-async function acquireMailboxLock(lockPath: string, token: string, options: MailboxLockOptions): Promise<number> {
-  const now = options.now ?? Date.now;
-  const wait = startAsyncLockWait(options.waitMs ?? MAILBOX_LOCK_WAIT_MS, now);
-  const staleMs = options.staleMs ?? MAILBOX_LOCK_STALE_MS;
-  for (;;) {
-    throwIfMailboxWaitExpired(wait, lockPath);
-    const fd = tryCreateOwnedLock(lockPath, token);
-    if (fd !== undefined) return fd;
-    if (reclaimIfStale(lockPath, staleMs, now)) continue;
-    throwIfMailboxWaitExpired(wait, lockPath);
-    await wait.pause();
-  }
-}
-
-function throwIfMailboxWaitExpired(wait: { expired: () => boolean }, lockPath: string): void {
-  if (wait.expired()) throw new Error(`Team mailbox lock timed out: ${lockPath}`);
-}
-
-/** True only when a stale lock was actually removed. A failed rename is not progress. */
-function reclaimIfStale(lockPath: string, staleMs: number, now: () => number): boolean {
-  const stale = readStaleLock(lockPath, staleMs, now());
-  if (!stale) return false;
-  return reclaimStaleLock(lockPath, staleMs, now, stale);
-}
-
-function tryCreateOwnedLock(lockPath: string, token: string): number | undefined {
-  try {
-    const fd = openSync(lockPath, 'wx');
-    writeOwnedLock(fd, token);
-    return fd;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'EEXIST') return undefined;
-    throw error;
-  }
-}
-
-function releaseOwnedLock(lockPath: string, fd: number, token: string, nonce: string): void {
-  try {
-    releaseHeldLock(lockPath, fd, token);
-  } finally {
-    releaseLockAcquisition(nonce);
-  }
+  const legacy = join(inboxDir, '.mailbox.lock');
+  const dbPath = join(inboxDir, '.mailbox.lock.db');
+  return withFdLock(dbPath, fn, {
+    waitMs: options.waitMs ?? MAILBOX_LOCK_WAIT_MS,
+    now: options.now,
+    timeout: `Team mailbox lock timed out: ${legacy}`
+  });
 }
 
 function readJsonl(filePath: string): TeamMailboxMessage[] {

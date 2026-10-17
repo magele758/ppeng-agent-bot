@@ -64,6 +64,7 @@ test('parallel snapshot copies keep every source file', async () => {
     assert.equal(existsSync(join(dest, 'keep-0.txt')), true);
     assert.equal(existsSync(join(dest, 'keep-1.txt')), true);
     assert.equal(existsSync(join(dest, '.snapshot.lock')), false);
+    assert.equal(existsSync(join(dest, '.snapshot.lock.db')), true);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

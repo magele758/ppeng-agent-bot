@@ -23,7 +23,7 @@ export function teamIntegrationDir(stateDir: string, planId: string): string {
 }
 
 const SKIP_DIR_NAMES = new Set(['node_modules', '.agent-state', '.git', 'dist']);
-const SKIP_FILE_NAMES = new Set(['.snapshot.lock']);
+const SKIP_FILE_NAMES = new Set(['.snapshot.lock', '.snapshot.lock.db', '.snapshot.lock.db-journal', '.snapshot.lock.db-wal', '.snapshot.lock.db-shm']);
 
 function shouldCopy(source: string, destinationName: string): boolean {
   const normalized = source.replaceAll('\\', '/');

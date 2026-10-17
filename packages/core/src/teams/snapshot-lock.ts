@@ -1,23 +1,19 @@
-import { mkdirSync, openSync, utimesSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import {
-  createLockToken,
-  holdLockAcquisition,
-  lockTokenNonce,
-  readStaleLock,
-  reclaimStaleLock,
-  releaseHeldLock,
-  releaseLockAcquisition,
-  writeOwnedLock
-} from './lock-liveness.js';
-import { startAsyncLockWait } from './async-lock-wait.js';
+import { withFdLock } from './fd-lock.js';
 
-/** Crash leftover with no live owner. Env override is for tests that need a shorter wait. */
+/**
+ * @deprecated No longer used. Locks do not expire by age; the kernel releases
+ * the SQLite exclusive lock when the holder closes it or the process dies.
+ */
 export const SNAPSHOT_LOCK_STALE_MS = 10_000;
 
 const DEFAULT_SNAPSHOT_LOCK_WAIT_MS = 15_000;
 
-/** How often a holder refreshes mtime so a live lock is not judged by a stale timestamp. */
+/**
+ * @deprecated No longer used. Holders do not refresh an mtime; there is no
+ * heartbeat. Kept so existing imports keep compiling.
+ */
 export const SNAPSHOT_LOCK_HEARTBEAT_MS = 2_500;
 
 function envWaitMs(): number | undefined {
@@ -33,102 +29,32 @@ export function snapshotLockWaitMs(): number {
 }
 
 export interface SnapshotLockOptions {
+  /**
+   * @deprecated Ignored. The lock has no time-based expiry.
+   */
   staleMs?: number;
   waitMs?: number;
   now?: () => number;
-  /** Test seam. Defaults to the production heartbeat. */
+  /**
+   * @deprecated Ignored. There is no heartbeat to start.
+   */
   startHeartbeat?: (lockPath: string) => () => void;
 }
 
 export async function withSnapshotLock<T>(dir: string, fn: () => T | Promise<T>, options: SnapshotLockOptions = {}): Promise<T> {
   mkdirSync(dir, { recursive: true });
-  const lockPath = join(dir, '.snapshot.lock');
-  const held = await holdSnapshotLock(lockPath, options);
-  try {
-    return await fn();
-  } finally {
-    held.release();
-  }
+  const legacy = join(dir, '.snapshot.lock');
+  return withFdLock(join(dir, '.snapshot.lock.db'), fn, {
+    waitMs: options.waitMs ?? snapshotLockWaitMs(),
+    now: options.now,
+    timeout: `Team workspace snapshot lock timed out: ${legacy}`
+  });
 }
 
-async function holdSnapshotLock(lockPath: string, options: SnapshotLockOptions): Promise<{ release: () => void }> {
-  const token = createLockToken();
-  const nonce = lockTokenNonce(token);
-  holdLockAcquisition(nonce);
-  try {
-    const fd = await acquireSnapshotLock(lockPath, token, options);
-    const stopHeartbeat = (options.startHeartbeat ?? startSnapshotLockHeartbeat)(lockPath);
-    return { release: () => releaseHeldSnapshotLock(lockPath, fd, token, nonce, stopHeartbeat) };
-  } catch (error) {
-    releaseLockAcquisition(nonce);
-    throw error;
-  }
+/**
+ * @deprecated No-op. Snapshot locks are kernel-owned and do not touch mtime.
+ * Returns a stopper so existing callers can still clear it.
+ */
+export function startSnapshotLockHeartbeat(_lockPath: string, _everyMs = SNAPSHOT_LOCK_HEARTBEAT_MS): () => void {
+  return () => {};
 }
-
-function releaseHeldSnapshotLock(
-  lockPath: string,
-  fd: number,
-  token: string,
-  nonce: string,
-  stopHeartbeat: () => void
-): void {
-  stopHeartbeat();
-  try {
-    releaseHeldLock(lockPath, fd, token);
-  } finally {
-    releaseLockAcquisition(nonce);
-  }
-}
-
-async function acquireSnapshotLock(lockPath: string, token: string, options: SnapshotLockOptions): Promise<number> {
-  const now = options.now ?? Date.now;
-  const wait = startAsyncLockWait(options.waitMs ?? snapshotLockWaitMs(), now);
-  const staleMs = options.staleMs ?? SNAPSHOT_LOCK_STALE_MS;
-  for (;;) {
-    throwIfSnapshotWaitExpired(wait, lockPath);
-    const fd = tryCreateSnapshotLock(lockPath, token);
-    if (fd !== undefined) return fd;
-    if (reclaimIfStale(lockPath, staleMs, now)) continue;
-    throwIfSnapshotWaitExpired(wait, lockPath);
-    await wait.pause();
-  }
-}
-
-function throwIfSnapshotWaitExpired(wait: { expired: () => boolean }, lockPath: string): void {
-  if (wait.expired()) throw new Error(`Team workspace snapshot lock timed out: ${lockPath}`);
-}
-
-/** True only when a stale lock was actually removed. A failed rename is not progress. */
-function reclaimIfStale(lockPath: string, staleMs: number, now: () => number): boolean {
-  const stale = readStaleLock(lockPath, staleMs, now());
-  if (!stale) return false;
-  return reclaimStaleLock(lockPath, staleMs, now, stale);
-}
-
-function tryCreateSnapshotLock(lockPath: string, token: string): number | undefined {
-  try {
-    const fd = openSync(lockPath, 'wx');
-    writeOwnedLock(fd, token);
-    return fd;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'EEXIST') return undefined;
-    throw error;
-  }
-}
-
-/** Touch mtime while we hold the lock. `unref` so the timer cannot keep the process alive. */
-export function startSnapshotLockHeartbeat(lockPath: string, everyMs = SNAPSHOT_LOCK_HEARTBEAT_MS): () => void {
-  const timer = setInterval(() => touchSnapshotLock(lockPath), everyMs);
-  timer.unref();
-  return () => clearInterval(timer);
-}
-
-function touchSnapshotLock(lockPath: string): void {
-  const now = new Date();
-  try {
-    utimesSync(lockPath, now, now);
-  } catch {
-    /* released between ticks */
-  }
-}
-

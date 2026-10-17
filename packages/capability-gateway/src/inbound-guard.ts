@@ -1,18 +1,7 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { mkdirSync, openSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { setTimeout as delay } from 'node:timers/promises';
-import {
-  claimLockBodyStale,
-  createLockToken,
-  holdLockAcquisition,
-  lockTokenNonce,
-  readStaleLock,
-  reclaimStaleLock,
-  releaseHeldLock,
-  releaseLockAcquisition,
-  writeOwnedLock
-} from '@ppeng/agent-core';
+import { withFdLock } from '@ppeng/agent-core';
 
 /** Constant-time string comparison (length-independent via hashing). */
 export function safeEqual(a: string, b: string): boolean {
@@ -99,14 +88,8 @@ function writePersistedClaims(dir: string, claims: Record<string, number>): void
   renameSync(tmp, path);
 }
 
-/**
- * How long an empty or unparseable lock may sit before another process may
- * reclaim it. A live holder is never reclaimed on age alone.
- */
-const CLAIM_LOCK_STALE_MS = 10_000;
 /** How long to wait for a fresh lock before giving up. */
 const CLAIM_LOCK_WAIT_MS = 5_000;
-const CLAIM_WAIT_SLICES_MS = [5, 10, 20, 40, 80] as const;
 
 /** Thrown when the persisted-claim lock stays busy past the wait. Not a duplicate. */
 export class InboundClaimTimeoutError extends Error {
@@ -125,14 +108,15 @@ export function isInboundClaimTimeout(error: unknown): error is InboundClaimTime
 
 export interface PersistedClaimLockOptions {
   /**
-   * How long an empty or unparseable lock may sit before it may be reclaimed.
-   * A holder whose identity is still alive is never reclaimed on age.
+   * @deprecated Ignored. The claim lock is an SQLite exclusive transaction on
+   * the database fd. The kernel releases it on close or process death, so
+   * there is no mtime reclaim.
    */
   staleMs?: number;
   /** How long to wait for a fresh lock before giving up. */
   waitMs?: number;
   now?: () => number;
-  /** Test seam: runs after the lock is held and before the claim body. */
+  /** Test seam: runs after the lock is held and before the claim body. `token` is unused. */
   onAcquired?: (lockPath: string, token: string) => void;
   /** How many lock-timeouts to retry before throwing. Default 3. */
   attempts?: number;
@@ -144,78 +128,16 @@ export interface PersistedClaimLockOptions {
  */
 async function withPersistedClaimLock<T>(dir: string, fn: () => T, options: PersistedClaimLockOptions = {}): Promise<T> {
   mkdirSync(dir, { recursive: true });
-  const lockPath = `${dedupePath(dir)}.lock`;
-  const held = await holdClaimLock(lockPath, options);
-  try {
-    options.onAcquired?.(lockPath, held.token);
+  const legacy = `${dedupePath(dir)}.lock`;
+  const dbPath = `${legacy}.db`;
+  return withFdLock(dbPath, () => {
+    options.onAcquired?.(dbPath, '');
     return fn();
-  } finally {
-    held.release();
-  }
-}
-
-async function holdClaimLock(lockPath: string, options: PersistedClaimLockOptions): Promise<{ token: string; release: () => void }> {
-  const token = createLockToken();
-  const nonce = lockTokenNonce(token);
-  holdLockAcquisition(nonce);
-  try {
-    const fd = await acquireClaimLock(lockPath, token, options);
-    return { token, release: () => releaseClaimLock(lockPath, fd, token, nonce) };
-  } catch (error) {
-    releaseLockAcquisition(nonce);
-    throw error;
-  }
-}
-
-async function acquireClaimLock(lockPath: string, token: string, options: PersistedClaimLockOptions): Promise<number> {
-  const now = options.now ?? Date.now;
-  const started = now();
-  const waitMs = options.waitMs ?? CLAIM_LOCK_WAIT_MS;
-  let step = 0;
-  for (;;) {
-    if (now() - started > waitMs) throw new InboundClaimTimeoutError(lockPath);
-    const fd = tryAcquireClaimLock(lockPath, token);
-    if (fd !== undefined) return fd;
-    if (reclaimStaleClaimLock(lockPath, options.staleMs ?? CLAIM_LOCK_STALE_MS, now)) continue;
-    if (now() - started > waitMs) throw new InboundClaimTimeoutError(lockPath);
-    step = await pauseForClaim(step, waitMs - (now() - started));
-  }
-}
-
-/** Bounded async pause. Returns the next backoff step. Never uses Atomics.wait. */
-async function pauseForClaim(step: number, remainingMs: number): Promise<number> {
-  const slice = CLAIM_WAIT_SLICES_MS[Math.min(step, CLAIM_WAIT_SLICES_MS.length - 1)] ?? CLAIM_WAIT_SLICES_MS[0];
-  if (remainingMs > 0) await delay(Math.min(slice, remainingMs));
-  return step + 1;
-}
-
-/** `wx` create. undefined means the lock is held; other open errors propagate. */
-function tryAcquireClaimLock(lockPath: string, token: string): number | undefined {
-  try {
-    const fd = openSync(lockPath, 'wx');
-    writeOwnedLock(fd, token);
-    return fd;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'EEXIST') return undefined;
-    throw error;
-  }
-}
-
-/**
- * True only when a reclaimable lock was actually removed. A live identity is
- * not reclaimable, and a rename that does not finish is not progress: the
- * caller waits and eventually times out.
- */
-function reclaimStaleClaimLock(lockPath: string, staleMs: number, now: () => number): boolean {
-  const stale = readStaleLock(lockPath, staleMs, now(), claimLockBodyStale);
-  if (!stale) return false;
-  return reclaimStaleLock(lockPath, staleMs, now, stale, claimLockBodyStale);
-}
-
-/** Unlink only while our fd still names the directory entry and our token. */
-function releaseClaimLock(lockPath: string, fd: number, token: string, nonce: string): void {
-  releaseHeldLock(lockPath, fd, token);
-  releaseLockAcquisition(nonce);
+  }, {
+    waitMs: options.waitMs ?? CLAIM_LOCK_WAIT_MS,
+    now: options.now,
+    timeout: new InboundClaimTimeoutError(legacy)
+  });
 }
 
 function rememberPersistedClaim(claims: Record<string, number>, key: string, now: number): void {
