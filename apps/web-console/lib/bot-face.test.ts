@@ -174,12 +174,13 @@ test('保存的脸型和颜色覆盖名字，没保存则沿用名字', () => {
 test('picker preview keeps a saved avatar until a shape or color is chosen', () => {
   const shown = { shape: 'star' as const, color: 'blue' as const };
   assert.deepEqual(previewFaceChoice(null, null, shown), {});
-  assert.deepEqual(previewFaceChoice('circle', null, shown), { shape: 'star' });
-  assert.deepEqual(previewFaceChoice(null, 'red', shown), { color: 'blue' });
+  assert.deepEqual(previewFaceChoice('circle', null, shown), { shape: 'circle' });
+  assert.deepEqual(previewFaceChoice(null, 'red', shown), { color: 'red' });
   assert.deepEqual(previewFaceChoice('circle', 'red', { shape: null, color: null }), {
-    shape: 'teardrop',
+    shape: 'circle',
     color: 'red'
   });
+  assert.deepEqual(previewFaceChoice('star', 'teal', shown), { shape: 'star', color: 'teal' });
 });
 
 test('saved faces index by trimmed name and skip blanks', () => {
@@ -236,8 +237,15 @@ test('drawn face uses a save, then the name, and rounds the eyes when surprised'
   assert.equal(named.mouth, 'open');
   assert.equal(named.mouthOpen, 0.45);
   assert.equal(named.drawnShape, named.shape);
+  assert.deepEqual(named.layout, faceLayout(named.shape));
+  const unsaved = drawnFaceView({ name: 'DeskBot', saved: { shape: null, color: null }, mood: 'idle' });
+  assert.equal(unsaved.shape, botFaceShape('DeskBot'));
+  assert.equal(unsaved.drawnShape, unsaved.shape);
+  assert.deepEqual(unsaved.layout, faceLayout(unsaved.shape));
+  assert.notDeepEqual(unsaved.layout, faceLayout('circle'));
   const blank = drawnFaceView({ name: '', shape: null, color: 'red', saved: { shape: null, color: null }, mood: 'tool' });
   assert.equal(blank.drawnShape, 'circle');
+  assert.deepEqual(blank.layout, faceLayout('circle'));
   assert.equal(blank.eyeW, 8.2);
   assert.equal(blank.mouth, 'oh');
   assert.equal(blank.index, null);

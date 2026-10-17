@@ -103,9 +103,9 @@ export function resolveBotFaceAppearance(input: {
  * A chosen silhouette or swatch is passed through; the other axis stays unset
  * so the name (or a saved choice) still fills it.
  */
-function previewAxis<T extends string>(chosen: T | null, shown: T | null, fallback: T): T | undefined {
+function previewAxis<T extends string>(chosen: T | null): T | undefined {
   if (chosen === null) return undefined;
-  return shown ?? fallback;
+  return chosen;
 }
 
 export function previewFaceChoice(
@@ -114,8 +114,8 @@ export function previewFaceChoice(
   shown: { shape: BotFaceShape | null; color: BotFaceColor | null }
 ): { shape?: BotFaceShape; color?: BotFaceColor } {
   if (shape === null && color === null) return {};
-  const nextShape = previewAxis(shape, shown.shape, 'teardrop');
-  const nextColor = previewAxis(color, shown.color, 'red');
+  const nextShape = previewAxis(shape);
+  const nextColor = previewAxis(color);
   return {
     ...(nextShape !== undefined ? { shape: nextShape } : {}),
     ...(nextColor !== undefined ? { color: nextColor } : {})
@@ -286,8 +286,7 @@ export function drawnFaceView(input: {
   const appearance = resolveDrawnFace(input);
   const expression = expressionForMood(input.mood);
   const mouth = restingMouth(expression);
-  const layoutShape = input.shape !== undefined ? input.shape : input.saved.shape;
-  const layout = faceLayout(layoutShape);
+  const layout = faceLayout(layoutShapeFor(appearance));
   const round = expression === 'surprised';
   return {
     shape: appearance.shape,
@@ -303,6 +302,12 @@ export function drawnFaceView(input: {
     expression,
     layout
   };
+}
+
+/** Eyes and mouth sit on the same silhouette the outline uses. */
+function layoutShapeFor(appearance: { shape: BotFaceShape | null; color: BotFaceColor | null }): BotFaceShape | null {
+  if (appearance.shape) return appearance.shape;
+  return appearance.color ? 'circle' : null;
 }
 
 function drawnSilhouette(shape: BotFaceShape | null, color: BotFaceColor | null): BotFaceShape | 'empty' {
