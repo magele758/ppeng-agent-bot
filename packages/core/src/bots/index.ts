@@ -30,9 +30,11 @@ export {
   readBotModelOverride
 } from './bot-model.js';
 export {
+  BOT_AVATAR_EMOJIS,
   BOT_FACE_COLORS,
   BOT_FACE_SHAPES,
   faceUpdatePatch,
+  normalizeBotAvatar,
   normalizeBotFaceColor,
   normalizeBotFaceShape,
   readBotFaceColor,

@@ -34,7 +34,7 @@ import { groupSessionsByDate } from '@/lib/session-groups';
 import { WorkspacePicker } from './WorkspacePicker';
 import { catalogToPickerOptions } from '@/lib/model-providers';
 import { resolveLivingFaceMood } from '@/lib/bot-face';
-import { botChatHeaderTitle, botNameFromCanonicalTitle, botPermissionsHref } from '@/lib/bot-chat-header';
+import { botChatHeaderTitle, botGroupCreateHref, botNameFromCanonicalTitle, botPermissionsHref } from '@/lib/bot-chat-header';
 import { BotFace } from './BotFace';
 import { ComposerBotPicker } from './ComposerBotPicker';
 import { ComposerModelPicker } from './ComposerModelPicker';
@@ -672,11 +672,30 @@ export function PlayPanel({
                   <a
                     role="menuitem"
                     className="create-menu__item"
+                    aria-label={t('play.newBot')}
                     href={formatHash({ section: 'agents', sub: 'bots' })}
                     onClick={() => setCreateMenuOpen(false)}
                   >
                     {t('play.bot')}
                     <span className="muted small">{t('play.newBot')}</span>
+                  </a>
+                  <a
+                    role="menuitem"
+                    className="create-menu__item"
+                    data-testid="play-create-group"
+                    aria-label={t('agents.bots.newGroup')}
+                    href={botGroupCreateHref()}
+                    onClick={(event) => {
+                      setCreateMenuOpen(false);
+                      const href = botGroupCreateHref();
+                      if (window.location.hash === href) {
+                        event.preventDefault();
+                        window.dispatchEvent(new HashChangeEvent('hashchange'));
+                      }
+                    }}
+                  >
+                    {t('agents.bots.groupTitle')}
+                    <span className="muted small">{t('agents.bots.newGroup')}</span>
                   </a>
                 </div>
               ) : null}
