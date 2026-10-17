@@ -34,7 +34,7 @@ import { groupSessionsByDate } from '@/lib/session-groups';
 import { WorkspacePicker } from './WorkspacePicker';
 import { catalogToPickerOptions } from '@/lib/model-providers';
 import { resolveLivingFaceMood } from '@/lib/bot-face';
-import { botChatHeaderTitle, botNameFromCanonicalTitle, botPermissionsHref } from '@/lib/bot-chat-header';
+import { botChatHeaderTitle, botGroupCreateHref, botNameFromCanonicalTitle, botPermissionsHref } from '@/lib/bot-chat-header';
 import { BotFace } from './BotFace';
 import { ComposerBotPicker } from './ComposerBotPicker';
 import { ComposerModelPicker } from './ComposerModelPicker';
@@ -684,8 +684,15 @@ export function PlayPanel({
                     className="create-menu__item"
                     data-testid="play-create-group"
                     aria-label={t('agents.bots.newGroup')}
-                    href={formatHash({ section: 'agents', sub: 'bots' })}
-                    onClick={() => setCreateMenuOpen(false)}
+                    href={botGroupCreateHref()}
+                    onClick={(event) => {
+                      setCreateMenuOpen(false);
+                      const href = botGroupCreateHref();
+                      if (window.location.hash === href) {
+                        event.preventDefault();
+                        window.dispatchEvent(new HashChangeEvent('hashchange'));
+                      }
+                    }}
                   >
                     {t('agents.bots.groupTitle')}
                     <span className="muted small">{t('agents.bots.newGroup')}</span>

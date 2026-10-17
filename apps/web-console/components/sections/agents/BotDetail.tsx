@@ -213,8 +213,8 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
         <div className="ag-panel__identity">
           <BotFace
             name={bot.name}
-            shape={shape}
-            color={color}
+            {...(shape !== null ? { shape } : {})}
+            {...(color !== null ? { color } : {})}
             label={t('agents.bots.faceLabel', { name: bot.name })}
             testId="bot-detail-face"
             size="md"

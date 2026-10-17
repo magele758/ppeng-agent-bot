@@ -3,7 +3,7 @@ import '../../bot-work/bot-work.css';
 
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
-import { readBotPermissionsTarget } from '@/lib/bot-chat-header';
+import { readBotGroupCreate, readBotPermissionsTarget } from '@/lib/bot-chat-header';
 import { BotLimits } from '../../bot-work/BotLimits';
 import { BotTeamWork } from '../../bot-work/BotTeamWork';
 import { BotRooms } from '../../bot-work/BotRooms';
@@ -33,7 +33,14 @@ export function BotsView() {
 
   useEffect(() => {
     const apply = () => {
-      const target = readBotPermissionsTarget(window.location.hash);
+      const hash = window.location.hash;
+      if (readBotGroupCreate(hash)) {
+        setCreating(false);
+        setCreatingGroup(true);
+        setNotice(null);
+        return;
+      }
+      const target = readBotPermissionsTarget(hash);
       if (!target) return;
       setCreating(false);
       setCreatingGroup(false);

@@ -32,6 +32,20 @@ export function botPermissionsHref(botId: string): string {
   return `#/agents/bots?bot=${encodeURIComponent(botId.trim())}&focus=permissions`;
 }
 
+/** Hash that opens the existing group-creation form on the bots page. */
+export function botGroupCreateHref(): string {
+  return '#/agents/bots?create=group';
+}
+
+/** True when the hash asks the bots page to open the group form. */
+export function readBotGroupCreate(hash: string): boolean {
+  const queryAt = hash.indexOf('?');
+  if (queryAt < 0) return false;
+  const path = hash.slice(0, queryAt).replace(/^#\/?/, '');
+  if (path !== 'agents/bots') return false;
+  return new URLSearchParams(hash.slice(queryAt + 1)).get('create') === 'group';
+}
+
 /** Parse a permissions deep link. Other hashes return null. */
 export function readBotPermissionsTarget(hash: string): { botId: string } | null {
   const queryAt = hash.indexOf('?');

@@ -35,13 +35,15 @@ export function BotFaceChoice({
   const shown = resolveBotFaceAppearance({ name, savedShape: shape, savedColor: color });
   const previewShape = shown.shape ?? 'teardrop';
   const previewColor = shown.color ?? 'red';
+  // Keep a saved emoji or image until a silhouette or swatch is actually chosen.
+  const previewFace =
+    shape === null && color === null ? {} : { ...(shape !== null ? { shape: previewShape } : {}), ...(color !== null ? { color: previewColor } : {}) };
   return (
     <fieldset className="bot-face-choice" disabled={disabled}>
       <div className="bot-face-choice__preview">
         <BotFace
           name={name}
-          shape={previewShape}
-          color={previewColor}
+          {...previewFace}
           size="lg"
           testId="bot-face-choice-preview"
           label={t('agents.bots.faceLabel', { name: name.trim() || t('agents.bots.faceEmpty') })}
