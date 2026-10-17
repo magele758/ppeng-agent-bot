@@ -355,7 +355,7 @@ test('same-turn earlier replies are visible and a bot does not receive its own r
   assert.ok(again.some(message => message.text === 'again'));
 });
 
-test('a user message queued during an earlier turn is delivered on its own turn [AC:bot-rooms#AC-3]', async () => {
+test('a user message queued after the trigger is visible to the later member of that turn [AC:bot-rooms#AC-3]', async () => {
   const f = fixture();
   const room = f.rooms.create(f.principal, { title: 'Queued later', botIds: [f.a.id, f.b.id] });
   const prompts = [];
@@ -370,25 +370,43 @@ test('a user message queued during an earlier turn is delivered on its own turn 
   f.rooms.send(f.principal, room.id, { text: 'MESSAGE_A', mentions: [f.a.id, f.b.id] });
   const running = f.rooms.tick();
   await new Promise(resolve => setImmediate(resolve));
-  f.rooms.send(f.principal, room.id, { text: 'MESSAGE_B', mentions: [f.a.id] });
+  f.rooms.send(f.principal, room.id, { text: 'MESSAGE_B', mentions: [f.b.id] });
   release();
   await new Promise(resolve => setImmediate(resolve));
-  const finishBeta = release;
-  finishBeta();
+  release();
   await running;
   assert.equal(prompts.length, 2);
-  assert.ok(!historyOf(prompts[0]).some(message => message.text === 'MESSAGE_B'), 'a later queued message does not leak into the earlier turn');
-  assert.ok(!historyOf(prompts[1]).some(message => message.text === 'MESSAGE_B'));
+  // Alpha's prompt is built before MESSAGE_B arrives; Beta runs after it was queued, so Beta sees it.
+  assert.ok(!historyOf(prompts[0]).some(message => message.text === 'MESSAGE_B'), 'a message that arrives after the prompt is built is not in that prompt');
+  assert.ok(historyOf(prompts[1]).some(message => message.text === 'MESSAGE_B' && message.sender.name === f.principal.userId && message.sender.type === 'user'), 'a user message queued after the trigger is visible to the later member of the earlier turn');
+  assert.ok(historyOf(prompts[1]).some(message => message.text === 'MESSAGE_A'));
+  assert.ok(historyOf(prompts[1]).some(message => message.text === 'turn-reply:1' && message.sender.id === f.a.id && message.sender.name === 'Alpha'));
+});
+
+test('a user message already seen still schedules its own turn and gets a reply [AC:bot-rooms#AC-3]', async () => {
+  const f = fixture();
+  const room = f.rooms.create(f.principal, { title: 'Seen but still answered', botIds: [f.a.id, f.b.id] });
+  const prompts = [];
   f.host.runSession = async id => {
     prompts.push(promptTexts(f.store, id).at(-1));
-    f.store.appendMessage(id, 'assistant', [{ type: 'text', text: 'turn-reply:b' }]);
+    f.store.appendMessage(id, 'assistant', [{ type: 'text', text: `said:${f.store.getSession(id).agentId}` }]);
   };
+  f.rooms.send(f.principal, room.id, { text: 'MESSAGE_A', mentions: [f.a.id, f.b.id] });
+  f.rooms.send(f.principal, room.id, { text: 'MESSAGE_B', mentions: [f.a.id] });
   await f.rooms.tick();
-  const later = historyOf(prompts.at(-1));
-  assert.ok(later.some(message => message.text === 'MESSAGE_B' && message.sender.name === f.principal.userId && message.sender.type === 'user'));
-  assert.ok(later.some(message => message.text === 'turn-reply:2' && message.sender.id === f.b.id && message.sender.name === 'Beta'), 'the other member reply, queued after the cursor, is still delivered');
-  assert.ok(!later.some(message => message.text === 'turn-reply:1'), 'own reply is already in this session');
-  assert.ok(!later.some(message => message.text === 'MESSAGE_A'), 'the triggering message of the earlier turn was already delivered');
+  assert.equal(prompts.length, 2);
+  assert.ok(historyOf(prompts[0]).some(message => message.text === 'MESSAGE_B' && message.sender.type === 'user'), 'Alpha sees MESSAGE_B while answering MESSAGE_A');
+  const alphaFollowUp = f.rooms.turns(f.principal, room.id).find(turn => turn.messageId !== f.rooms.turns(f.principal, room.id)[0].messageId && turn.botIds.includes(f.a.id));
+  assert.equal(alphaFollowUp.status, 'queued', 'MESSAGE_B still gives Alpha its own turn');
+  await f.rooms.tick();
+  const followUp = prompts.at(-1);
+  assert.match(followUp, /Trigger:/);
+  assert.ok(followUp.includes('MESSAGE_B'), 'the follow-up trigger is MESSAGE_B');
+  assert.ok(!historyOf(followUp).some(message => message.text === 'MESSAGE_B'), 'MESSAGE_B was already in the earlier prompt, so it is not repeated as history');
+  assert.ok(!historyOf(followUp).some(message => message.sender.id === f.a.id), 'own reply is already in this session');
+  assert.ok(historyOf(followUp).some(message => message.sender.id === f.b.id), 'the other member reply is still delivered');
+  assert.equal(f.rooms.messages(f.principal, room.id).messages.filter(message => message.sender.id === f.a.id).at(-1).text, `said:${f.a.id}`, 'Alpha still publishes a reply to MESSAGE_B');
+  assert.equal(f.rooms.turns(f.principal, room.id).every(turn => turn.status === 'completed'), true);
 });
 
 test('a fresh, new-member, or replaced context session gets the recent window again [AC:bot-rooms#AC-3]', async () => {
@@ -451,7 +469,7 @@ test('an already delivered unknown turn still warns on the next turn [AC:bot-roo
   assert.ok(!historyOf(prompt).some(message => message.text === 'RISKY_OLD'), 'the warning does not depend on re-sending delivered messages');
 });
 
-test('a newer turn reply is not visible to an older turn that has not built its prompt yet [AC:bot-rooms#AC-3]', async () => {
+test('a newer turn reply is visible to an older turn member that has not built its prompt yet [AC:bot-rooms#AC-3]', async () => {
   const f = fixture();
   const room = f.rooms.create(f.principal, { title: 'Out of order replies', botIds: [f.a.id, f.b.id] });
   const older = f.rooms.send(f.principal, room.id, { text: 'OLDER_ASK', mentions: [f.a.id, f.b.id] });
@@ -466,16 +484,58 @@ test('a newer turn reply is not visible to an older turn that has not built its 
   };
   await f.rooms.tick();
   const alpha = historyOf(prompts[0]);
-  assert.ok(!alpha.some(message => message.text === 'NEWER_REPLY'), 'a reply to a later instruction does not leak into the older turn');
-  assert.ok(!alpha.some(message => message.text === 'NEWER_ASK'));
+  assert.ok(alpha.some(message => message.text === 'NEWER_REPLY' && message.sender.id === f.b.id), 'a newer-turn reply already in the room is visible');
+  assert.ok(alpha.some(message => message.text === 'NEWER_ASK' && message.sender.type === 'user'), 'a later queued user message is visible too');
   assert.ok(alpha.some(message => message.text === 'OLDER_ASK'));
   const alphaSession = f.store.db.prepare('SELECT session_id FROM bot_room_contexts WHERE room_id=? AND bot_id=?').get(room.id, f.a.id).session_id;
   const alphaDelivery = f.store.getSession(alphaSession).metadata.roomDelivery;
-  assert.ok(!alphaDelivery.extraSeqs.includes(seq), 'the newer reply is not marked delivered on the older turn');
-  assert.ok(alphaDelivery.throughSeq < seq);
+  assert.equal(alphaDelivery.throughSeq, seq, 'the cursor covers every message present when the prompt was built');
+  const ownReply = f.rooms.messages(f.principal, room.id).messages.find(message => message.sender.id === f.a.id && message.text.startsWith('said:'));
+  assert.deepEqual(alphaDelivery.extraSeqs, [ownReply.seq], 'only this bot\'s own reply, published after the prompt, is tracked past the cursor');
+  const laterMember = historyOf(prompts[1]);
+  assert.ok(laterMember.some(message => message.text === 'NEWER_REPLY' && message.sender.id === f.b.id), 'a newer-turn reply is visible to the older turn\'s later member');
+  assert.ok(laterMember.some(message => message.sender.id === f.a.id && message.text.startsWith('said:')), 'the earlier member reply is visible to the later member');
   await f.rooms.tick();
-  const beta = historyOf(prompts.at(-1));
-  assert.ok(beta.some(message => message.text === 'NEWER_REPLY' && message.sender.id === f.b.id), 'the same reply is delivered when its own turn runs');
+  const betaNext = prompts.at(-1);
+  assert.match(betaNext, /NEWER_ASK/);
+  assert.ok(!historyOf(betaNext).some(message => message.text === 'NEWER_REPLY'), 'already delivered on the previous turn, so not repeated');
+  assert.ok(!historyOf(betaNext).some(message => message.sender.id === f.a.id), 'Alpha\'s reply was already in the previous prompt');
   assert.equal(f.rooms.turns(f.principal, room.id).find(turn => turn.id === older.turn.id).status, 'completed');
   assert.equal(f.rooms.turns(f.principal, room.id).find(turn => turn.id === newer.turn.id).status, 'completed');
+});
+
+test('a message that arrives while the bot is running is delivered on its next turn [AC:bot-rooms#AC-3]', async () => {
+  const f = fixture();
+  const room = f.rooms.create(f.principal, { title: 'Arrives while running', botIds: [f.a.id] });
+  const prompts = [];
+  let release;
+  f.host.runSession = id => new Promise(resolve => {
+    prompts.push(promptTexts(f.store, id).at(-1));
+    release = () => {
+      f.store.appendMessage(id, 'assistant', [{ type: 'text', text: 'first-reply' }]);
+      resolve();
+    };
+  });
+  f.rooms.send(f.principal, room.id, { text: 'TRIGGER_ONE' });
+  const running = f.rooms.tick();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(prompts.length, 1, 'the prompt is built before the run returns');
+  f.rooms.send(f.principal, room.id, { text: 'ARRIVED_WHILE_RUNNING' });
+  assert.ok(!historyOf(prompts[0]).some(message => message.text === 'ARRIVED_WHILE_RUNNING'));
+  const sessionId = f.store.db.prepare('SELECT session_id FROM bot_room_contexts WHERE room_id=? AND bot_id=?').get(room.id, f.a.id).session_id;
+  const built = f.store.getSession(sessionId).metadata.roomDelivery;
+  assert.ok(built.throughSeq < f.rooms.messages(f.principal, room.id).messages.at(-1).seq, 'the cursor stops at prompt-build time');
+  release();
+  await running;
+  f.host.runSession = async id => {
+    prompts.push(promptTexts(f.store, id).at(-1));
+    f.store.appendMessage(id, 'assistant', [{ type: 'text', text: 'second-reply' }]);
+  };
+  await f.rooms.tick();
+  const next = historyOf(prompts.at(-1));
+  assert.ok(next.some(message => message.text === 'ARRIVED_WHILE_RUNNING' && message.sender.type === 'user' && message.sender.name === f.principal.userId), 'the late message is delivered on the next turn');
+  assert.ok(!next.some(message => message.text === 'TRIGGER_ONE'), 'the earlier trigger was already delivered');
+  assert.ok(!next.some(message => message.text === 'first-reply'), 'own reply is not fed back');
+  assert.equal(f.rooms.messages(f.principal, room.id).messages.filter(message => message.sender.type === 'bot').at(-1).text, 'second-reply');
+  assert.equal(f.rooms.turns(f.principal, room.id).length, 2);
 });
