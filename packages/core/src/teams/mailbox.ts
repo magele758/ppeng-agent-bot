@@ -1,9 +1,16 @@
-import { appendFileSync, closeSync, existsSync, linkSync, mkdirSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync, type Stats } from 'node:fs';
-import { randomBytes } from 'node:crypto';
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { createId, nowIso } from '../id.js';
 import type { TeamMailboxMessage } from './types.js';
-import { lockOwnerDead } from './lock-liveness.js';
+import {
+  createLockToken,
+  holdLockAcquisition,
+  lockFileStale,
+  lockTokenNonce,
+  reclaimStaleLock,
+  releaseLockAcquisition,
+  releaseLockIfToken
+} from './lock-liveness.js';
 import { startAsyncLockWait } from './async-lock-wait.js';
 
 const AUDIT_MAX_BYTES = 1024 * 1024;
@@ -120,21 +127,28 @@ export interface MailboxLockOptions {
 }
 
 /** Serialize mailbox writers that share one plan directory under parallel load. */
-async function withMailboxLock<T>(inboxDir: string, fn: () => T, options: MailboxLockOptions = {}): Promise<T> {
+export async function withMailboxLock<T>(inboxDir: string, fn: () => T | Promise<T>, options: MailboxLockOptions = {}): Promise<T> {
   mkdirSync(inboxDir, { recursive: true });
   const lockPath = join(inboxDir, '.mailbox.lock');
   const held = await holdMailboxLock(lockPath, options);
   try {
-    return fn();
+    return await fn();
   } finally {
     held.release();
   }
 }
 
 async function holdMailboxLock(lockPath: string, options: MailboxLockOptions): Promise<{ release: () => void }> {
-  const token = `${process.pid}:${Date.now()}`;
-  const fd = await acquireMailboxLock(lockPath, token, options);
-  return { release: () => releaseOwnedLock(lockPath, fd, token) };
+  const token = createLockToken();
+  const nonce = lockTokenNonce(token);
+  holdLockAcquisition(nonce);
+  try {
+    const fd = await acquireMailboxLock(lockPath, token, options);
+    return { release: () => releaseOwnedLock(lockPath, fd, token, nonce) };
+  } catch (error) {
+    releaseLockAcquisition(nonce);
+    throw error;
+  }
 }
 
 async function acquireMailboxLock(lockPath: string, token: string, options: MailboxLockOptions): Promise<number> {
@@ -144,48 +158,12 @@ async function acquireMailboxLock(lockPath: string, token: string, options: Mail
   for (;;) {
     const fd = tryCreateOwnedLock(lockPath, token);
     if (fd !== undefined) return fd;
-    if (mailboxLockStale(lockPath, staleMs, now())) {
-      reclaimStaleMailboxLock(lockPath, staleMs, now);
+    if (lockFileStale(lockPath, staleMs, now())) {
+      reclaimStaleLock(lockPath, staleMs, now);
       continue;
     }
     if (wait.expired()) throw new Error(`Team mailbox lock timed out: ${lockPath}`);
     await wait.pause();
-  }
-}
-
-/**
- * Missing file is free. A live owner pid is never stale, however old the mtime.
- * Mtime staleness applies only when the pid is dead or the token has no pid.
- * A brand-new file with no pid yet is live: the holder is between create and writing its token.
- */
-function mailboxLockStale(lockPath: string, staleMs: number, now: number): boolean {
-  const body = readLockBody(lockPath);
-  if (body === undefined) return true;
-  if (mailboxOwnerAlive(body)) return false;
-  if (body.length === 0) return lockMtimeAge(lockPath, now) > staleMs;
-  return true;
-}
-
-function mailboxOwnerAlive(body: string): boolean {
-  if (body.length === 0) return false;
-  return !lockOwnerDead(body);
-}
-
-/** undefined when the lock vanished between the failed create and this read. */
-function readLockBody(lockPath: string): string | undefined {
-  try {
-    return readFileSync(lockPath, 'utf8');
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
-    return '';
-  }
-}
-
-function lockMtimeAge(lockPath: string, now: number): number {
-  try {
-    return now - statSync(lockPath).mtimeMs;
-  } catch {
-    return Number.POSITIVE_INFINITY;
   }
 }
 
@@ -200,60 +178,10 @@ function tryCreateOwnedLock(lockPath: string, token: string): number | undefined
   }
 }
 
-/**
- * Move the file we judged stale aside, then unlink only if that same inode is
- * still the dead owner. A replacement created at `lockPath` is left alone.
- */
-function reclaimStaleMailboxLock(lockPath: string, staleMs: number, now: () => number): void {
-  let seen: Stats;
-  try {
-    seen = statSync(lockPath);
-  } catch {
-    return;
-  }
-  const parked = `${lockPath}.${process.pid}.${randomBytes(4).toString('hex')}.reclaim`;
-  try {
-    renameSync(lockPath, parked);
-  } catch {
-    return;
-  }
-  if (!sameLockInode(parked, seen) || !mailboxLockStale(parked, staleMs, now())) {
-    restoreParkedLock(parked, lockPath);
-    return;
-  }
-  try {
-    unlinkSync(parked);
-  } catch {
-    /* another writer already removed the parked file */
-  }
-}
-
-function sameLockInode(path: string, seen: Stats): boolean {
-  try {
-    const current = statSync(path);
-    return current.ino === seen.ino && current.dev === seen.dev;
-  } catch {
-    return false;
-  }
-}
-
-function restoreParkedLock(parked: string, lockPath: string): void {
-  try {
-    linkSync(parked, lockPath);
-    unlinkSync(parked);
-  } catch {
-    /* a new owner already created lockPath; leave the parked file */
-  }
-}
-
-function releaseOwnedLock(lockPath: string, fd: number, token: string): void {
+function releaseOwnedLock(lockPath: string, fd: number, token: string, nonce: string): void {
   closeSync(fd);
-  try {
-    if (readFileSync(lockPath, 'utf8') !== token) return;
-    unlinkSync(lockPath);
-  } catch {
-    /* lock already released or replaced */
-  }
+  releaseLockIfToken(lockPath, token);
+  releaseLockAcquisition(nonce);
 }
 
 function readJsonl(filePath: string): TeamMailboxMessage[] {

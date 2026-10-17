@@ -1,7 +1,14 @@
-import { closeSync, linkSync, mkdirSync, openSync, readFileSync, renameSync, statSync, unlinkSync, utimesSync, writeFileSync, type Stats } from 'node:fs';
-import { randomBytes } from 'node:crypto';
+import { closeSync, mkdirSync, openSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { lockOwnerDead } from './lock-liveness.js';
+import {
+  createLockToken,
+  holdLockAcquisition,
+  lockFileStale,
+  lockTokenNonce,
+  reclaimStaleLock,
+  releaseLockAcquisition,
+  releaseLockIfToken
+} from './lock-liveness.js';
 import { startAsyncLockWait } from './async-lock-wait.js';
 
 /** Crash leftover with no live owner. Env override is for tests that need a shorter wait. */
@@ -32,7 +39,7 @@ export interface SnapshotLockOptions {
   startHeartbeat?: (lockPath: string) => () => void;
 }
 
-export async function withSnapshotLock<T>(dir: string, fn: () => Promise<T>, options: SnapshotLockOptions = {}): Promise<T> {
+export async function withSnapshotLock<T>(dir: string, fn: () => T | Promise<T>, options: SnapshotLockOptions = {}): Promise<T> {
   mkdirSync(dir, { recursive: true });
   const lockPath = join(dir, '.snapshot.lock');
   const held = await holdSnapshotLock(lockPath, options);
@@ -44,15 +51,30 @@ export async function withSnapshotLock<T>(dir: string, fn: () => Promise<T>, opt
 }
 
 async function holdSnapshotLock(lockPath: string, options: SnapshotLockOptions): Promise<{ release: () => void }> {
-  const token = `${process.pid}:${Date.now()}`;
-  const fd = await acquireSnapshotLock(lockPath, token, options);
-  const stopHeartbeat = (options.startHeartbeat ?? startSnapshotLockHeartbeat)(lockPath);
-  return { release: () => releaseHeldSnapshotLock(lockPath, fd, token, stopHeartbeat) };
+  const token = createLockToken();
+  const nonce = lockTokenNonce(token);
+  holdLockAcquisition(nonce);
+  try {
+    const fd = await acquireSnapshotLock(lockPath, token, options);
+    const stopHeartbeat = (options.startHeartbeat ?? startSnapshotLockHeartbeat)(lockPath);
+    return { release: () => releaseHeldSnapshotLock(lockPath, fd, token, nonce, stopHeartbeat) };
+  } catch (error) {
+    releaseLockAcquisition(nonce);
+    throw error;
+  }
 }
 
-function releaseHeldSnapshotLock(lockPath: string, fd: number, token: string, stopHeartbeat: () => void): void {
+function releaseHeldSnapshotLock(
+  lockPath: string,
+  fd: number,
+  token: string,
+  nonce: string,
+  stopHeartbeat: () => void
+): void {
   stopHeartbeat();
-  releaseSnapshotLock(lockPath, fd, token);
+  closeSync(fd);
+  releaseLockIfToken(lockPath, token);
+  releaseLockAcquisition(nonce);
 }
 
 async function acquireSnapshotLock(lockPath: string, token: string, options: SnapshotLockOptions): Promise<number> {
@@ -62,8 +84,8 @@ async function acquireSnapshotLock(lockPath: string, token: string, options: Sna
   for (;;) {
     const fd = tryCreateSnapshotLock(lockPath, token);
     if (fd !== undefined) return fd;
-    if (snapshotLockStale(lockPath, staleMs, now())) {
-      reclaimStaleSnapshotLock(lockPath, staleMs, now);
+    if (lockFileStale(lockPath, staleMs, now())) {
+      reclaimStaleLock(lockPath, staleMs, now);
       continue;
     }
     if (wait.expired()) throw new Error(`Team workspace snapshot lock timed out: ${lockPath}`);
@@ -79,88 +101,6 @@ function tryCreateSnapshotLock(lockPath: string, token: string): number | undefi
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'EEXIST') return undefined;
     throw error;
-  }
-}
-
-/**
- * Missing file is free. A live owner pid is never stale, however old the mtime.
- * Mtime staleness applies only when the pid is dead or the token has no pid.
- * A brand-new empty file is live: the holder is between create and writing its token.
- */
-export function snapshotLockStale(lockPath: string, staleMs: number, now: number): boolean {
-  const body = readSnapshotLockBody(lockPath);
-  if (body === undefined) return true;
-  if (snapshotOwnerAlive(body)) return false;
-  if (body.length === 0) return snapshotLockAge(lockPath, now) > staleMs;
-  return true;
-}
-
-/** A recorded live pid is never stale. Empty or unparseable content has no owner. */
-function snapshotOwnerAlive(body: string): boolean {
-  if (body.length === 0) return false;
-  return !lockOwnerDead(body);
-}
-
-function readSnapshotLockBody(lockPath: string): string | undefined {
-  try {
-    return readFileSync(lockPath, 'utf8');
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
-    return '';
-  }
-}
-
-function snapshotLockAge(lockPath: string, now: number): number {
-  try {
-    return now - statSync(lockPath).mtimeMs;
-  } catch {
-    return Number.POSITIVE_INFINITY;
-  }
-}
-
-/**
- * Move the file we judged stale aside, then unlink only if that same inode is
- * still the dead owner. A replacement created at `lockPath` is left alone.
- */
-function reclaimStaleSnapshotLock(lockPath: string, staleMs: number, now: () => number): void {
-  let seen: Stats;
-  try {
-    seen = statSync(lockPath);
-  } catch {
-    return;
-  }
-  const parked = `${lockPath}.${process.pid}.${randomBytes(4).toString('hex')}.reclaim`;
-  try {
-    renameSync(lockPath, parked);
-  } catch {
-    return;
-  }
-  if (!sameSnapshotInode(parked, seen) || !snapshotLockStale(parked, staleMs, now())) {
-    restoreParkedSnapshotLock(parked, lockPath);
-    return;
-  }
-  try {
-    unlinkSync(parked);
-  } catch {
-    /* another copier already removed the parked file */
-  }
-}
-
-function sameSnapshotInode(path: string, seen: Stats): boolean {
-  try {
-    const current = statSync(path);
-    return current.ino === seen.ino && current.dev === seen.dev;
-  } catch {
-    return false;
-  }
-}
-
-function restoreParkedSnapshotLock(parked: string, lockPath: string): void {
-  try {
-    linkSync(parked, lockPath);
-    unlinkSync(parked);
-  } catch {
-    /* a new owner already created lockPath; leave the parked file */
   }
 }
 
@@ -180,12 +120,3 @@ function touchSnapshotLock(lockPath: string): void {
   }
 }
 
-function releaseSnapshotLock(lockPath: string, fd: number, token: string): void {
-  closeSync(fd);
-  try {
-    if (readFileSync(lockPath, 'utf8') !== token) return;
-    unlinkSync(lockPath);
-  } catch {
-    /* lock already released or replaced */
-  }
-}

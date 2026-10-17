@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { TeamFileMailbox } from '../dist/teams/mailbox.js';
+import { TeamFileMailbox, withMailboxLock } from '../dist/teams/mailbox.js';
 
 const fast = { staleMs: 40, waitMs: 30 };
 
@@ -18,6 +18,11 @@ function lockOf(plan) {
 function ageLock(lock, msAgo) {
   const old = new Date(Date.now() - msAgo);
   utimesSync(lock, old, old);
+}
+
+/** v2 body: our pid, a start time this process does not have, and a token we never issued. */
+function reusedOwnPid(tag) {
+  return `${process.pid}:1:deadbeef${tag}:nonce${tag}`;
 }
 
 test('a stale mtime mailbox lock is reclaimed and the send lands', async () => {
@@ -85,20 +90,103 @@ test('a crash leftover mailbox lock does not drop the next send', async () => {
   }
 });
 
-test('an old lock owned by a live pid is not reclaimed', async () => {
-  const plan = planDir('mbox-live-old-');
+test('a fresh old-format mailbox lock with a live pid is not reclaimed', async () => {
+  const plan = planDir('mbox-v1-fresh-');
   try {
     const box = new TeamFileMailbox(plan, fast);
     const lock = lockOf(plan);
     mkdirSync(join(plan, 'runtime', 'mailbox'), { recursive: true });
-    writeFileSync(lock, `${process.pid}:still-alive`);
-    ageLock(lock, 60_000);
+    writeFileSync(lock, `${process.pid}:${Date.now()}`);
     await assert.rejects(
       () => box.send({ planId: 'p', type: 'task', from: 'a', to: 'b', content: 'dropped' }),
       /Team mailbox lock timed out/
     );
-    assert.equal(readFileSync(lock, 'utf8'), `${process.pid}:still-alive`);
     assert.equal(existsSync(join(plan, 'runtime', 'mailbox', 'b.jsonl')), false);
+  } finally {
+    rmSync(plan, { recursive: true, force: true });
+  }
+});
+
+test('an old-format mailbox lock with a live pid is reclaimed once its mtime is stale', async () => {
+  const plan = planDir('mbox-v1-stale-');
+  try {
+    const box = new TeamFileMailbox(plan, fast);
+    const lock = lockOf(plan);
+    mkdirSync(join(plan, 'runtime', 'mailbox'), { recursive: true });
+    writeFileSync(lock, `${process.pid}:${Date.now()}`);
+    ageLock(lock, 60_000);
+    const msg = await box.send({ planId: 'p', type: 'task', from: 'a', to: 'b', content: 'after-v1' });
+    assert.equal(msg.content, 'after-v1');
+    assert.equal(box.peekInbox('b')[0]?.content, 'after-v1');
+    assert.equal(existsSync(lock), false);
+  } finally {
+    rmSync(plan, { recursive: true, force: true });
+  }
+});
+
+test('our pid with a foreign token and an old mtime is a reused pid and is reclaimed', async () => {
+  const plan = planDir('mbox-reuse-');
+  try {
+    const box = new TeamFileMailbox(plan, fast);
+    const lock = lockOf(plan);
+    mkdirSync(join(plan, 'runtime', 'mailbox'), { recursive: true });
+    writeFileSync(lock, reusedOwnPid('mbox'));
+    ageLock(lock, 60_000);
+    const started = Date.now();
+    const msg = await box.send({ planId: 'p', type: 'task', from: 'a', to: 'b', content: 'reused' });
+    assert.ok(Date.now() - started < 500);
+    assert.equal(msg.content, 'reused');
+    assert.equal(box.peekInbox('b')[0]?.content, 'reused');
+  } finally {
+    rmSync(plan, { recursive: true, force: true });
+  }
+});
+
+test('a mailbox lock this process holds is not reclaimed when its mtime is aged', async () => {
+  const plan = planDir('mbox-held-');
+  try {
+    const inbox = join(plan, 'runtime', 'mailbox');
+    const lock = lockOf(plan);
+    let releaseHold;
+    const hold = new Promise((resolve) => {
+      releaseHold = resolve;
+    });
+    const held = withMailboxLock(inbox, async () => {
+      ageLock(lock, 60_000);
+      await hold;
+    }, { staleMs: 40, waitMs: 2_000 });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const send = new TeamFileMailbox(plan, fast).send({ planId: 'p', type: 'task', from: 'a', to: 'c', content: 'blocked' }).then(
+      () => 'stole',
+      () => 'waited'
+    );
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    releaseHold();
+    await held;
+    assert.equal(await send, 'waited');
+  } finally {
+    rmSync(plan, { recursive: true, force: true });
+  }
+});
+
+test('release removes only the body this process wrote', async () => {
+  const plan = planDir('mbox-release-');
+  try {
+    const inbox = join(plan, 'runtime', 'mailbox');
+    const lock = lockOf(plan);
+    const replaced = `${process.pid}:1:foreign:notours`;
+    let releaseHold;
+    const hold = new Promise((resolve) => {
+      releaseHold = resolve;
+    });
+    const held = withMailboxLock(inbox, async () => {
+      writeFileSync(lock, replaced);
+      await hold;
+    }, { staleMs: 40, waitMs: 2_000 });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    releaseHold();
+    await held;
+    assert.equal(readFileSync(lock, 'utf8'), replaced);
   } finally {
     rmSync(plan, { recursive: true, force: true });
   }
