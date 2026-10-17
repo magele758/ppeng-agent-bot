@@ -210,6 +210,10 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
   }, [messages.length, roomId]);
 
   const nameOf = (id: string) => bots.find((bot) => bot.id === id)?.name ?? id;
+  const descriptionOf = (id: string) => {
+    const raw = bots.find((bot) => bot.id === id)?.description;
+    return typeof raw === 'string' ? raw.replace(/\s+/g, ' ').trim() : '';
+  };
   const known = new Set(bots.map((bot) => bot.id));
   const speaking = turns.some((turn) => turn.status === 'queued' || turn.status === 'running' || turn.status === 'waiting_approval');
   const available = bots.filter((bot) => room && !room.botIds.includes(bot.id));
@@ -332,20 +336,30 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
       <div className="play-group-members">
         <div className="play-group-member-row">
           <span className="play-group-badge">{t('play.group.badge')}</span>
-          {room?.botIds.map((id) => (
-            <span key={id} className="play-group-member">
-              {nameOf(id)}
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                disabled={busy || !room || room.botIds.length <= 2}
-                aria-label={t('play.group.removeAria', { name: nameOf(id) })}
-                onClick={() => void removeMember(id)}
-              >
-                {t('play.group.remove')}
-              </button>
-            </span>
-          ))}
+          {room?.botIds.map((id) => {
+            const description = descriptionOf(id);
+            return (
+              <span key={id} className="play-group-member">
+                <span className="play-group-member__identity">
+                  <span>{nameOf(id)}</span>
+                  {description ? (
+                    <span className="play-group-member__desc" title={description}>
+                      {description}
+                    </span>
+                  ) : null}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  disabled={busy || !room || room.botIds.length <= 2}
+                  aria-label={t('play.group.removeAria', { name: nameOf(id) })}
+                  onClick={() => void removeMember(id)}
+                >
+                  {t('play.group.remove')}
+                </button>
+              </span>
+            );
+          })}
         </div>
         <div className="play-group-add">
           <select aria-label={t('play.group.addMember')} value={addId} onChange={(event) => setAddId(event.target.value)}>
