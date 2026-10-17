@@ -69,6 +69,7 @@ export {
   orderContextSnapshots,
   parseContextSnapshotBlocks,
   preparedContextSnapshotBlocks,
+  preparedContextSnapshotBlocksFor,
   recordPreparedContextSnapshot,
   selectContextSnapshot
 } from './context-snapshots.js';
