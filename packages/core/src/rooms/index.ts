@@ -416,9 +416,8 @@ export class BotRoomService {
     }
     return parts;
   }
-  /** Last speaking slot of this round: nobody current remains after the cursor, or the speaking budget is spent. */
+  /** Last scheduled member of this round: nobody still in the Room remains after the cursor. Silence does not spend the speaking budget, so a budget guess must not mark an earlier member as wrap-up. */
   private isWrapUpTurn(room: BotRoom, turn: BotRoomTurn): boolean {
-    if (turn.botTurns + 1 >= turn.maxBotTurns) return true;
     for (let i = turn.cursor + 1; i < turn.botIds.length; i += 1) {
       if (room.botIds.includes(turn.botIds[i]!)) return false;
     }

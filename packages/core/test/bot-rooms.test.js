@@ -348,6 +348,29 @@ test('only the last scheduled member is told this is the wrap-up turn [AC:bot-ro
   assert.ok(beta.includes('wrap-up'));
 });
 
+test('a tight speaking budget does not tell a non-last member to wrap up [AC:bot-rooms#AC-2]', async () => {
+  const f = fixture();
+  const room = f.rooms.create(f.principal, { title: 'Budget wrap', botIds: [f.a.id, f.b.id], maxBotTurns: 1 });
+  f.rooms.send(f.principal, room.id, { text: 'both', mentions: [f.a.id, f.b.id] });
+  await f.rooms.tick();
+  assert.equal(f.runs.length, 1);
+  const first = userPrompts(f.store, f.runs[0]).at(-1);
+  assert.ok(!first.includes('本轮收尾'));
+  assert.ok(!first.includes('wrap-up'));
+});
+
+test('removing a later scheduled member makes the preceding member the wrap-up member [AC:bot-rooms#AC-2]', async () => {
+  const f = fixture();
+  const room = f.rooms.create(f.principal, { title: 'Leave wrap', botIds: [f.a.id, f.b.id] });
+  f.rooms.send(f.principal, room.id, { text: 'both', mentions: [f.a.id, f.b.id] });
+  f.rooms.removeMember(f.principal, room.id, f.b.id);
+  await f.rooms.tick();
+  assert.equal(f.runs.length, 1);
+  const first = userPrompts(f.store, f.runs[0]).at(-1);
+  assert.ok(first.includes('本轮收尾'));
+  assert.ok(first.includes('wrap-up'));
+});
+
 test('silence does not consume the speaking budget [AC:bot-rooms#AC-2]', async () => {
   const f = fixture();
   const room = f.rooms.create(f.principal, { title: 'Budget silence', botIds: [f.a.id, f.b.id], maxBotTurns: 1 });
