@@ -31,3 +31,13 @@ test('invalid rates or duplicate stream names cannot hide failed workload',async
 test('progress callback failure prevents reserved work from escaping cleanup',async()=>{
  let calls=0;await assert.rejects(runFixedHttpWindow({name:'x',seconds:.1,streams:[{name:'read',rate:10,clients:1,run(){calls++;}}],onProgress(){throw new Error('cannot write progress');}}),/cannot write progress/);await new Promise(resolve=>setImmediate(resolve));assert.equal(calls,0);
 });
+
+test('completion grace lets the final admitted slot finish but never admits new work after the deadline',async()=>{
+ const phase=await runFixedHttpWindow({name:'measurement',seconds:.1,completionGraceMs:200,streams:[{name:'read',rate:100,clients:20,maxPendingPerClient:1,run:({index})=>new Promise(resolve=>setTimeout(()=>resolve(true),index===9?60:1))}]});
+ const counts=phase.streams.read;assert.equal(counts.planned,10);assert.equal(counts.completed,10);assert.equal(counts.timedOut,0);assert.equal(phase.protocolPassed,true);assert.ok(phase.admissionElapsedSeconds<phase.observedElapsedSeconds);
+});
+test('work exceeding the completion grace still times out and fails the window',async()=>{
+ const started=performance.now();const phase=await runFixedHttpWindow({name:'measurement',seconds:.05,completionGraceMs:50,streams:[{name:'read',rate:20,clients:1,maxPendingPerClient:1,run:()=>new Promise(()=>{})}]});
+ assert.ok(performance.now()-started<400);assert.equal(phase.streams.read.timedOut,1);assert.equal(phase.streams.read.completed,0);assert.equal(phase.protocolPassed,false);
+ await assert.rejects(runFixedHttpWindow({name:'x',seconds:.1,completionGraceMs:-1,streams:[{name:'read',rate:10,clients:1,run(){}}]}));
+});
