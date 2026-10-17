@@ -364,11 +364,17 @@ export class BotRoomService {
   /** A step that needs a person leaves the Room. The private chat keeps the approval and the pending call; this turn does not wait or fail. */
   private handOffHumanStep(room: BotRoom, turn: BotRoomTurn, botId: string, session: SessionRecord): boolean {
     const bot = this.store.getBot(botId);
+    // Mutate a copy until COMMIT. A failed hand-off must leave the live turn exactly as it was, so the next tick can still find this human step.
+    const next: BotRoomTurn = { ...turn, handedOffBotIds: turn.handedOffBotIds ? [...turn.handedOffBotIds] : undefined };
     const moved = handRoomHumanStepToPrivateChat({ store: this.store }, { roomTitle: room.title, botId, principal: room.principal, memberSessionId: session.id }, () => {
-      if (this.rawRoom(room.id).botIds.includes(botId)) this.append(room.id, { type: 'bot', id: botId, name: bot?.name ?? botId }, ROOM_HUMAN_STEP_NOTICE, [], turn.id, `handoff:${turn.id}:${turn.cursor}`);
-      turn.botTurns++; turn.cursor++; turn.handedOffBotIds = [...(turn.handedOffBotIds ?? []), botId]; delete turn.currentSessionId; delete turn.startSeq; this.saveTurn(turn);
+      if (this.rawRoom(room.id).botIds.includes(botId)) this.append(room.id, { type: 'bot', id: botId, name: bot?.name ?? botId }, ROOM_HUMAN_STEP_NOTICE, [], next.id, `handoff:${next.id}:${next.cursor}`);
+      next.botTurns++; next.cursor++; next.handedOffBotIds = [...(next.handedOffBotIds ?? []), botId]; delete next.currentSessionId; delete next.startSeq; this.saveTurn(next);
     });
-    return Boolean(moved);
+    if (!moved) return false;
+    Object.assign(turn, next);
+    if (!('currentSessionId' in next)) delete turn.currentSessionId;
+    if (!('startSeq' in next)) delete turn.startSeq;
+    return true;
   }
   private sessionFailed(turn: BotRoomTurn, session: SessionRecord): boolean {
     if (session.status !== 'failed' && session.status !== 'unknown') return false;

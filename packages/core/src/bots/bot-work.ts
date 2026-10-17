@@ -75,19 +75,20 @@ export function handRoomHumanStepToPrivateChat(host: Pick<BotWorkHost, 'store'>,
  const apply = () => {
   const fresh = host.store.getSession(chat.id);
   if (!privateChatCanTakeHandOff(fresh)) return false;
-  host.store.db.prepare(`UPDATE approvals SET session_id=?, expires_at=NULL, wake_source=NULL, updated_at=? WHERE session_id=? AND status='pending'`).run(chat.id, nowIso(), input.memberSessionId);
-  const moved = host.store.listApprovals({ status: 'pending' }).filter(approval => approval.sessionId === chat.id);
+  // Only the rows this statement re-points. A leftover pending approval already on the private chat must not enter the new interrupt.
+  const movedIds = (host.store.db.prepare(`UPDATE approvals SET session_id=?, expires_at=NULL, wake_source=NULL, updated_at=? WHERE session_id=? AND status='pending' RETURNING id`).all(chat.id, nowIso(), input.memberSessionId) as { id: string }[]).map(row => row.id);
   host.store.appendMessage(chat.id, 'user', [{ type: 'text', text: privateHandbackText(input.roomTitle) }]);
   if (open.length) {
    const calls: MessagePart[] = open.map(call => ({ type: 'tool_call', toolCallId: call.toolCallId, name: call.name, input: call.input }));
    host.store.appendMessage(chat.id, 'assistant', calls);
-   // Remove the Room copy of the call so a later Room run cannot pair or replay it,
-   // and so the tool name does not remain in that transcript or its search index.
+   // Drop only the unmatched call. A sibling call that already has a result stays, so the next Room turn is not left with a dangling tool_result.
+   // An assistant row that held nothing else is deleted. The store path also refreshes the history search index.
    const handedIds = new Set(open.map(call => call.toolCallId));
    for (const message of host.store.listMessages(input.memberSessionId)) {
     if (message.role !== 'assistant') continue;
     if (!message.parts.some(part => part.type === 'tool_call' && handedIds.has(part.toolCallId))) continue;
-    host.store.db.prepare('DELETE FROM session_messages WHERE id=? AND session_id=?').run(message.id, input.memberSessionId);
+    const kept = message.parts.filter(part => part.type !== 'tool_call' || !handedIds.has(part.toolCallId));
+    host.store.rewriteMessageParts(input.memberSessionId, message.id, kept);
    }
   }
   host.store.updateSession(input.memberSessionId, { status: 'idle', metadata: roomMetadataAfterHandOff(member.metadata) });
@@ -95,7 +96,7 @@ export function handRoomHumanStepToPrivateChat(host: Pick<BotWorkHost, 'store'>,
   const outcome = runOutcomeFromEnd({ reason: 'waiting_approval', sessionStatus: 'waiting_approval' });
   const interrupt = createWaitingApprovalInterrupt({
    toolCallIds: open.map(call => call.toolCallId),
-   approvalIds: moved.map(approval => approval.id)
+   approvalIds: movedIds
   });
   host.store.updateSession(chat.id, {
    status: 'waiting_approval',

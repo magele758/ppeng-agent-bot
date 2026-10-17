@@ -240,6 +240,39 @@ export class SessionStore {
     }
   }
 
+  /**
+   * Drop selected parts from one append row. An empty remainder deletes the row.
+   * The history index has an insert and a delete trigger but no update trigger,
+   * so a rewrite deletes and reinserts the FTS row for the same message id.
+   */
+  rewriteMessageParts(sessionId: string, messageId: string, parts: SessionMessage['parts']): boolean {
+    const row = this.db
+      .prepare(`SELECT id FROM session_messages WHERE id = ? AND session_id = ? AND (surface_op IS NULL OR surface_op = 'append')`)
+      .get(messageId, sessionId) as { id: string } | undefined;
+    if (!row) return false;
+    if (parts.length === 0) {
+      this.db.prepare(`DELETE FROM session_messages WHERE id = ? AND session_id = ?`).run(messageId, sessionId);
+    } else {
+      const json = serializeJson(parts);
+      this.db.prepare(`UPDATE session_messages SET parts_json = ? WHERE id = ? AND session_id = ?`).run(json, messageId, sessionId);
+      this.syncHistoryIndex(messageId, sessionId, json);
+    }
+    this.db.prepare(`UPDATE sessions SET updated_at = ? WHERE id = ?`).run(nowIso(), sessionId);
+    return true;
+  }
+
+  /** Keep session_history_fts aligned with a rewritten parts payload. Missing index is fine. */
+  private syncHistoryIndex(messageId: string, sessionId: string, partsJson: string): void {
+    try {
+      this.db.prepare(`DELETE FROM session_history_fts WHERE message_id = ?`).run(messageId);
+      this.db.prepare(`INSERT INTO session_history_fts(message_id, session_id, text) VALUES(?, ?, ?)`).run(messageId, sessionId, partsJson);
+    } catch (error) {
+      const message = String(error);
+      if (/no such (table|module)/i.test(message)) return;
+      throw error;
+    }
+  }
+
   appendMessage(
     sessionId: string,
     role: MessageRole,
