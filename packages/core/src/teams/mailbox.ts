@@ -5,8 +5,8 @@ import type { TeamMailboxMessage } from './types.js';
 import {
   createLockToken,
   holdLockAcquisition,
-  lockFileStale,
   lockTokenNonce,
+  readStaleLock,
   reclaimStaleLock,
   releaseLockAcquisition,
   releaseLockIfToken
@@ -156,15 +156,24 @@ async function acquireMailboxLock(lockPath: string, token: string, options: Mail
   const wait = startAsyncLockWait(options.waitMs ?? MAILBOX_LOCK_WAIT_MS, now);
   const staleMs = options.staleMs ?? MAILBOX_LOCK_STALE_MS;
   for (;;) {
+    throwIfMailboxWaitExpired(wait, lockPath);
     const fd = tryCreateOwnedLock(lockPath, token);
     if (fd !== undefined) return fd;
-    if (lockFileStale(lockPath, staleMs, now())) {
-      reclaimStaleLock(lockPath, staleMs, now);
-      continue;
-    }
-    if (wait.expired()) throw new Error(`Team mailbox lock timed out: ${lockPath}`);
+    if (reclaimIfStale(lockPath, staleMs, now)) continue;
+    throwIfMailboxWaitExpired(wait, lockPath);
     await wait.pause();
   }
+}
+
+function throwIfMailboxWaitExpired(wait: { expired: () => boolean }, lockPath: string): void {
+  if (wait.expired()) throw new Error(`Team mailbox lock timed out: ${lockPath}`);
+}
+
+/** True only when a stale lock was actually removed. A failed rename is not progress. */
+function reclaimIfStale(lockPath: string, staleMs: number, now: () => number): boolean {
+  const stale = readStaleLock(lockPath, staleMs, now());
+  if (!stale) return false;
+  return reclaimStaleLock(lockPath, staleMs, now, stale);
 }
 
 function tryCreateOwnedLock(lockPath: string, token: string): number | undefined {

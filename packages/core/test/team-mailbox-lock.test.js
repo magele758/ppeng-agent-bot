@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { TeamFileMailbox, withMailboxLock } from '../dist/teams/mailbox.js';
+import { setLockRenameForTests } from '../dist/teams/lock-liveness.js';
 
 const fast = { staleMs: 40, waitMs: 30 };
 
@@ -205,6 +206,31 @@ test('reclaim leaves a live replacement and does not leak a parked lock', async 
     const parked = readdirSync(join(plan, 'runtime', 'mailbox')).filter((name) => name.includes('.reclaim'));
     assert.deepEqual(parked, []);
   } finally {
+    rmSync(plan, { recursive: true, force: true });
+  }
+});
+
+test('a mailbox rename that keeps failing throws the lock timeout', async () => {
+  const plan = planDir('mbox-rename-');
+  try {
+    const box = new TeamFileMailbox(plan, { staleMs: 40, waitMs: 80 });
+    const lock = lockOf(plan);
+    mkdirSync(join(plan, 'runtime', 'mailbox'), { recursive: true });
+    writeFileSync(lock, '999999:crashed');
+    ageLock(lock, 60_000);
+    setLockRenameForTests(() => {
+      throw Object.assign(new Error('busy'), { code: 'EBUSY' });
+    });
+    const started = Date.now();
+    await assert.rejects(
+      () => box.send({ planId: 'p', type: 'task', from: 'a', to: 'b', content: 'no' }),
+      /Team mailbox lock timed out/
+    );
+    assert.ok(Date.now() - started < 2_000);
+    assert.equal(readFileSync(lock, 'utf8'), '999999:crashed');
+    assert.equal(existsSync(join(plan, 'runtime', 'mailbox', 'b.jsonl')), false);
+  } finally {
+    setLockRenameForTests(undefined);
     rmSync(plan, { recursive: true, force: true });
   }
 });

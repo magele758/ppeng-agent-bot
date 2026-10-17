@@ -30,9 +30,21 @@
  * a live in-process hold is never reclaimed even if something ages the mtime.
  * v1 with a dead pid is reclaimable immediately; v1 with a live pid, and an
  * empty body (holder may be between create and write), wait until mtime is stale.
+ *
+ * Staleness is one (ino, dev, mtimeMs, body) tuple. The file is stat'd, read,
+ * then stat'd again; the pair is used only when ino, dev, and mtimeMs are
+ * unchanged. A body swapped in between those stats is "not stale" — the caller
+ * waits and retries, it does not reclaim. Reclaim renames that same inode aside
+ * only after a last stat still matches, then re-checks the parked file. The
+ * remaining window is the instant between that last stat and the rename: a
+ * holder that replaces the inode there can be parked and linked back, and a
+ * holder that reuses the same inode (utimes or an in-place rewrite) can be
+ * removed if the parked re-check still sees the stale snapshot. Both are
+ * bounded by the re-check; neither is closed without an atomic inode lock,
+ * which this module does not take.
  */
 
-import { linkSync, readFileSync, renameSync, statSync, unlinkSync, type Stats } from 'node:fs';
+import { linkSync, readFileSync, renameSync, statSync, unlinkSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 
 /**
@@ -94,6 +106,13 @@ function readProcStartTimeFromProc(pid: number): string {
 
 /** Tests only. Replaces the start-time reader; pass undefined to restore /proc. */
 let readProcStartTimeImpl: (pid: number) => string = readProcStartTimeFromProc;
+
+/** Tests only. Runs between the two stats of one consistent read; pass undefined to restore. */
+let betweenLockStatsForTests: ((lockPath: string) => void) | undefined;
+
+export function setBetweenLockStatsForTests(hook: ((lockPath: string) => void) | undefined): void {
+  betweenLockStatsForTests = hook;
+}
 
 export function setProcStartTimeReaderForTests(reader: ((pid: number) => string) | undefined): void {
   readProcStartTimeImpl = reader ?? readProcStartTimeFromProc;
@@ -238,44 +257,97 @@ export function readLockBody(lockPath: string): string | undefined {
   }
 }
 
-export function lockMtimeAge(lockPath: string, now: number): number {
-  try {
-    return now - statSync(lockPath).mtimeMs;
-  } catch {
-    return Number.POSITIVE_INFINITY;
-  }
-}
-
-export function lockFileStale(lockPath: string, staleMs: number, now: number): boolean {
-  // Age first. A holder may age the mtime after writing the body; reading the
-  // body first would pair a not-yet-held nonce with the aged timestamp.
-  const ageMs = lockMtimeAge(lockPath, now);
-  return lockBodyStale({ body: readLockBody(lockPath), ageMs, staleMs });
+/** Identity of one inode at one mtime. `body === undefined` means the path is absent. */
+export interface LockSnapshot {
+  ino: number;
+  dev: number;
+  mtimeMs: number;
+  body: string | undefined;
 }
 
 /**
- * Move the file aside, then unlink only if that same inode is still stale.
- * A replacement created at `lockPath` is linked back and left alone.
+ * Stat, read, stat again. The body belongs to this inode only when ino, dev,
+ * and mtimeMs did not change. A mismatch, or a vanished path, is not a snapshot.
  */
-export function reclaimStaleLock(lockPath: string, staleMs: number, now: () => number): void {
-  const seen = statOrUndefined(lockPath);
-  if (!seen) return;
-  const parked = parkedLockPath(lockPath);
-  try {
-    renameSync(lockPath, parked);
-  } catch {
-    return;
-  }
-  if (!sameLockInode(parked, seen) || !lockFileStale(parked, staleMs, now())) {
-    restoreParkedLock(parked, lockPath);
-    return;
-  }
-  unlinkQuiet(parked);
+export function readConsistentLock(lockPath: string): LockSnapshot | undefined {
+  const before = statOrUndefined(lockPath);
+  if (!before) return undefined;
+  const body = readLockBody(lockPath);
+  betweenLockStatsForTests?.(lockPath);
+  const after = statOrUndefined(lockPath);
+  if (!after || !sameInodeStamp(before, after)) return undefined;
+  return { ino: after.ino, dev: after.dev, mtimeMs: after.mtimeMs, body };
 }
 
-function statOrUndefined(lockPath: string): Stats | undefined {
+export function lockFileStale(lockPath: string, staleMs: number, now: number): boolean {
+  const snapshot = readConsistentLock(lockPath);
+  if (!snapshot) return false;
+  return snapshotIsStale(snapshot, staleMs, now);
+}
+
+/** The consistent snapshot when the file is stale; undefined when it is not, or the read raced. */
+export function readStaleLock(lockPath: string, staleMs: number, now: number): LockSnapshot | undefined {
+  const snapshot = readConsistentLock(lockPath);
+  if (!snapshot || !snapshotIsStale(snapshot, staleMs, now)) return undefined;
+  return snapshot;
+}
+
+function snapshotIsStale(snapshot: LockSnapshot, staleMs: number, now: number): boolean {
+  return lockBodyStale({ body: snapshot.body, ageMs: now - snapshot.mtimeMs, staleMs });
+}
+
+/**
+ * True when the stale inode was removed. False when the path is absent, the
+ * snapshot raced, the file is not stale, or the rename could not proceed —
+ * the caller must back off, not retry immediately.
+ *
+ * `expected`, when passed, is the snapshot the caller already judged stale.
+ * The rename proceeds only while `lockPath` is still that inode at that mtime.
+ */
+export function reclaimStaleLock(
+  lockPath: string,
+  staleMs: number,
+  now: () => number,
+  expected?: LockSnapshot
+): boolean {
+  const seen = expected ?? readConsistentLock(lockPath);
+  if (!seen || !snapshotIsStale(seen, staleMs, now())) return false;
+  if (!inodeStillAt(lockPath, seen)) return false;
+  const parked = parkedLockPath(lockPath);
+  if (!renameAside(lockPath, parked)) return false;
+  if (!parkedStillStale(parked, seen, staleMs, now())) {
+    restoreParkedLock(parked, lockPath);
+    return false;
+  }
+  unlinkQuiet(parked);
+  return true;
+}
+
+function parkedStillStale(parked: string, seen: LockSnapshot, staleMs: number, now: number): boolean {
+  const again = readConsistentLock(parked);
+  return Boolean(again && sameInodeStamp(again, seen) && snapshotIsStale(again, staleMs, now));
+}
+
+/** Last look before rename. A replaced or retouched inode is not the one we judged. */
+function inodeStillAt(lockPath: string, seen: LockSnapshot): boolean {
+  const current = statOrUndefined(lockPath);
+  return Boolean(current && sameInodeStamp(current, seen));
+}
+
+interface InodeStamp {
+  ino: number;
+  dev: number;
+  mtimeMs: number;
+}
+
+function sameInodeStamp(current: InodeStamp, seen: InodeStamp): boolean {
+  return current.ino === seen.ino && current.dev === seen.dev && current.mtimeMs === seen.mtimeMs;
+}
+
+function statOrUndefined(lockPath: string): InodeStamp | undefined {
   try {
-    return statSync(lockPath);
+    const stats = statSync(lockPath);
+    return { ino: stats.ino, dev: stats.dev, mtimeMs: stats.mtimeMs };
   } catch {
     return undefined;
   }
@@ -285,10 +357,17 @@ function parkedLockPath(lockPath: string): string {
   return `${lockPath}.${process.pid}.${randomBytes(4).toString('hex')}.reclaim`;
 }
 
-function sameLockInode(path: string, seen: Stats): boolean {
+/** Tests only. Replaces the rename used to park a stale lock; pass undefined to restore. */
+let renameAsideImpl: (from: string, to: string) => void = renameSync;
+
+export function setLockRenameForTests(rename: ((from: string, to: string) => void) | undefined): void {
+  renameAsideImpl = rename ?? renameSync;
+}
+
+function renameAside(from: string, to: string): boolean {
   try {
-    const current = statSync(path);
-    return current.ino === seen.ino && current.dev === seen.dev;
+    renameAsideImpl(from, to);
+    return true;
   } catch {
     return false;
   }

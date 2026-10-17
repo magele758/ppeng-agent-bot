@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { copyWorkspaceSnapshot, snapshotLockWaitMs, syncWorkerResultToPlan } from '../dist/teams/workspace-sync.js';
 import { SNAPSHOT_LOCK_HEARTBEAT_MS, startSnapshotLockHeartbeat, withSnapshotLock } from '../dist/teams/snapshot-lock.js';
+import { setLockRenameForTests } from '../dist/teams/lock-liveness.js';
 
 const fast = { staleMs: 40, waitMs: 30 };
 
@@ -196,6 +197,31 @@ test('snapshot release removes only the body this process wrote', async () => {
     await held;
     assert.equal(readFileSync(lock, 'utf8'), replaced);
   } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a snapshot rename that keeps failing throws the lock timeout', async () => {
+  const dir = root('snap-rename-');
+  try {
+    const src = join(dir, 'src');
+    const dest = join(dir, 'dest');
+    mkdirSync(src, { recursive: true });
+    mkdirSync(dest, { recursive: true });
+    writeFileSync(join(src, 'kept.txt'), 'no');
+    const lock = join(dest, '.snapshot.lock');
+    writeFileSync(lock, '999999:crashed');
+    ageLock(lock, 60_000);
+    setLockRenameForTests(() => {
+      throw Object.assign(new Error('busy'), { code: 'EBUSY' });
+    });
+    const started = Date.now();
+    await assert.rejects(() => copyWorkspaceSnapshot(src, dest, { staleMs: 40, waitMs: 80 }), /Team workspace snapshot lock timed out/);
+    assert.ok(Date.now() - started < 2_000);
+    assert.equal(existsSync(join(dest, 'kept.txt')), false);
+    assert.equal(readFileSync(lock, 'utf8'), '999999:crashed');
+  } finally {
+    setLockRenameForTests(undefined);
     rmSync(dir, { recursive: true, force: true });
   }
 });

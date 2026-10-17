@@ -3,8 +3,8 @@ import { join } from 'node:path';
 import {
   createLockToken,
   holdLockAcquisition,
-  lockFileStale,
   lockTokenNonce,
+  readStaleLock,
   reclaimStaleLock,
   releaseLockAcquisition,
   releaseLockIfToken
@@ -82,15 +82,24 @@ async function acquireSnapshotLock(lockPath: string, token: string, options: Sna
   const wait = startAsyncLockWait(options.waitMs ?? snapshotLockWaitMs(), now);
   const staleMs = options.staleMs ?? SNAPSHOT_LOCK_STALE_MS;
   for (;;) {
+    throwIfSnapshotWaitExpired(wait, lockPath);
     const fd = tryCreateSnapshotLock(lockPath, token);
     if (fd !== undefined) return fd;
-    if (lockFileStale(lockPath, staleMs, now())) {
-      reclaimStaleLock(lockPath, staleMs, now);
-      continue;
-    }
-    if (wait.expired()) throw new Error(`Team workspace snapshot lock timed out: ${lockPath}`);
+    if (reclaimIfStale(lockPath, staleMs, now)) continue;
+    throwIfSnapshotWaitExpired(wait, lockPath);
     await wait.pause();
   }
+}
+
+function throwIfSnapshotWaitExpired(wait: { expired: () => boolean }, lockPath: string): void {
+  if (wait.expired()) throw new Error(`Team workspace snapshot lock timed out: ${lockPath}`);
+}
+
+/** True only when a stale lock was actually removed. A failed rename is not progress. */
+function reclaimIfStale(lockPath: string, staleMs: number, now: () => number): boolean {
+  const stale = readStaleLock(lockPath, staleMs, now());
+  if (!stale) return false;
+  return reclaimStaleLock(lockPath, staleMs, now, stale);
 }
 
 function tryCreateSnapshotLock(lockPath: string, token: string): number | undefined {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -13,9 +13,13 @@ import {
   lockIdentityAlive,
   lockTokenNonce,
   parseLockIdentity,
+  readConsistentLock,
   readProcStartTime,
+  reclaimStaleLock,
   releaseLockAcquisition,
   releaseLockIfToken,
+  setBetweenLockStatsForTests,
+  setLockRenameForTests,
   setProcStartTimeReaderForTests
 } from '../dist/teams/lock-liveness.js';
 
@@ -140,6 +144,43 @@ test('a real start-time mismatch is reclaimed while the lock is still fresh', ()
     assert.equal(lockBodyStale({ body, ageMs: 0, staleMs: 10_000 }), true);
   } finally {
     setProcStartTimeReaderForTests(undefined);
+  }
+});
+
+test('a body replaced between the two stats is not judged stale', () => {
+  const root = dir('lock-replaced-');
+  try {
+    const file = join(root, '.lock');
+    writeFileSync(file, '999999:crashed');
+    age(file, 60_000);
+    setBetweenLockStatsForTests(() => {
+      writeFileSync(file, `${process.pid}:${Date.now()}`);
+    });
+    assert.equal(readConsistentLock(file), undefined);
+    assert.equal(lockFileStale(file, 40, Date.now()), false);
+    assert.equal(reclaimStaleLock(file, 40, Date.now), false);
+    assert.match(readFileSync(file, 'utf8'), new RegExp(`^${process.pid}:\\d+$`));
+  } finally {
+    setBetweenLockStatsForTests(undefined);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('a rename that keeps failing does not remove the lock', () => {
+  const root = dir('lock-rename-');
+  try {
+    const file = join(root, '.lock');
+    writeFileSync(file, '999999:crashed');
+    age(file, 60_000);
+    setLockRenameForTests(() => {
+      throw Object.assign(new Error('busy'), { code: 'EBUSY' });
+    });
+    assert.equal(reclaimStaleLock(file, 40, Date.now), false);
+    assert.equal(existsSync(file), true);
+    assert.equal(readConsistentLock(file)?.body, '999999:crashed');
+  } finally {
+    setLockRenameForTests(undefined);
+    rmSync(root, { recursive: true, force: true });
   }
 });
 
