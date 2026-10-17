@@ -288,14 +288,83 @@ test('approving the handed-off step in the private chat does not rerun it in the
     const member=rt.store.listSessions().find(session=>session.metadata?.roomId===room.id);
     assert.equal(member.status,'idle');
     await rt.approve(approval.id,'approved');
-    await rt.runScheduler();
+    await rt.runSession(bot.canonicalSessionId);
     await rt.rooms.tick();
-    assert.equal(executions,0);
+    assert.equal(executions,1);
     const after=rt.rooms.messages(principal,room.id).messages.map(message=>message.text).join('\n');
     assert.equal(after.includes('APPROVED_PROBE_RESULT'),false);
     assert.equal(after.includes('Verified approved work finished'),false);
     assert.equal(rt.rooms.turns(principal,room.id)[0].status,'completed');
+    const privateText=JSON.stringify(rt.store.listMessages(bot.canonicalSessionId));
+    assert.match(privateText,/APPROVED_PROBE_RESULT/);
+    const memberText=JSON.stringify(rt.store.listMessages(member.id));
+    assert.equal(memberText.includes('tool_result'),false);
+    assert.equal(memberText.includes('room_approval_probe'),false);
+    assert.equal(member.status,'idle');
   }finally{rt.destroy();}
+});
+
+test('a busy private chat keeps the step in the room until it is idle, then runs it once there [AC:bot-rooms#AC-8]',async()=>{
+  let executions=0;
+  const rt=new RawAgentRuntime({repoRoot:mkdtempSync(join(tmpdir(),'room-busy-repo-')),stateDir:mkdtempSync(join(tmpdir(),'room-busy-state-')),extraTools:[{name:'room_approval_probe',description:'Approval probe',inputSchema:{type:'object',properties:{}},approvalMode:'always',sideEffectLevel:'workspace',async execute(){executions++;return {ok:true,content:'APPROVED_PROBE_RESULT'};}}],modelAdapter:{name:'room-busy-scripted',async runTurn(input){if(input.messages.some(message=>message.parts.some(part=>part.type==='tool_result'&&part.name==='room_approval_probe')))return {stopReason:'end',assistantParts:[{type:'text',text:'Verified approved work finished'}]};return {stopReason:'tool_use',assistantParts:[{type:'text',text:'Pending work, not complete'},{type:'tool_call',toolCallId:'approval-probe',name:'room_approval_probe',input:{}}]};},async summarizeMessages(){return '';}}});
+  try {
+    const bot=rt.createBot({name:'BusyMember'}),principal=resolveBotPrincipal(rt.store);
+    rt.store.updateSession(bot.canonicalSessionId,{status:'running'});
+    const room=rt.rooms.create(principal,{title:'Busy approval',botIds:[bot.id]});
+    rt.rooms.send(principal,room.id,{text:'Run the approved action'});
+    await rt.rooms.tick();
+    const waiting=rt.rooms.turns(principal,room.id)[0];
+    assert.equal(waiting.status,'waiting_approval');
+    assert.equal(waiting.handedOffBotIds,undefined);
+    assert.equal(rt.store.listApprovals({status:'pending'}).every(approval=>approval.sessionId!==bot.canonicalSessionId),true);
+    assert.equal(JSON.stringify(rt.store.listMessages(bot.canonicalSessionId)).includes('Busy approval'),false);
+    assert.equal(executions,0);
+    await rt.rooms.tick();
+    assert.equal(rt.rooms.turns(principal,room.id)[0].status,'waiting_approval');
+    rt.store.updateSession(bot.canonicalSessionId,{status:'idle'});
+    await rt.rooms.tick();
+    const handed=rt.rooms.turns(principal,room.id)[0];
+    assert.equal(handed.status,'completed');
+    assert.deepEqual(handed.handedOffBotIds,[bot.id]);
+    const approval=rt.store.listApprovals({status:'pending'})[0];
+    assert.equal(approval.sessionId,bot.canonicalSessionId);
+    await rt.approve(approval.id,'approved');
+    await rt.runSession(bot.canonicalSessionId);
+    assert.equal(executions,1);
+    const member=rt.store.listSessions().find(session=>session.metadata?.roomId===room.id);
+    assert.equal(JSON.stringify(rt.store.listMessages(member.id)).includes('tool_result'),false);
+    assert.equal(rt.rooms.messages(principal,room.id).messages.map(message=>message.text).join('\n').includes('APPROVED_PROBE_RESULT'),false);
+  }finally{rt.destroy();}
+});
+
+test('a failed hand-off transaction leaves the approval, the turn and the member unchanged [AC:bot-rooms#AC-8]',async()=>{
+  const f=fixture();
+  const room=f.rooms.create(f.principal,{title:'Atomic',botIds:[f.a.id]});
+  f.host.runSession=async id=>{
+    const session=f.store.getSession(id);
+    f.store.appendMessage(id,'assistant',[{type:'tool_call',toolCallId:'kept',name:'write_file',input:{path:'secret.env'}}]);
+    f.store.createApproval({sessionId:id,toolName:'write_file',reason:'needs a person',args:{path:'secret.env'}});
+    f.store.updateSession(id,{status:'waiting_approval',metadata:{...session.metadata,interrupt:{kind:'waiting_approval',approvalIds:['x']},outcome:{kind:'waiting_approval'}}});
+  };
+  const db=f.store.db,original=db.prepare.bind(db);
+  db.prepare=(sql,...rest)=>{
+    const statement=original(sql,...rest);
+    if(typeof sql==='string'&&sql.includes('INSERT INTO session_messages')&&sql.includes('parts_json')){
+      const run=statement.run.bind(statement);
+      statement.run=(...args)=>{if(args[0]===f.a.canonicalSessionId||args[1]===f.a.canonicalSessionId)throw new Error('private write failed');return run(...args);};
+    }
+    return statement;
+  };
+  f.rooms.send(f.principal,room.id,{text:'needs a person'});
+  await f.rooms.tick();
+  const turn=f.rooms.turns(f.principal,room.id)[0];
+  assert.equal(turn.status,'waiting_approval');
+  const approval=f.store.listApprovals({status:'pending'})[0];
+  const member=f.store.listSessions().find(session=>session.metadata?.roomId===room.id);
+  assert.equal(approval.sessionId,member.id);
+  assert.equal(member.status,'waiting_approval');
+  assert.equal(JSON.stringify(f.store.listMessages(f.a.canonicalSessionId)).includes('Atomic'),false);
+  assert.equal(f.rooms.messages(f.principal,room.id).messages.some(message=>message.sender.type==='bot'),false);
 });
 
 test('Room receive observes shared private-work capacity atomically without dropping accepted input [AC:bot-rooms#AC-5]',()=>{

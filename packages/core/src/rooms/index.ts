@@ -6,6 +6,7 @@ import type { SessionRecord } from '../types.js';
 import type { KernelHookListener } from '@ppeng/agent-loop';
 import { fenceExternalContent } from '../safety/external-content.js';
 import { botWorkControl, hasPendingSessionWake, resumeApprovedBotSession, checkBotQueueCapacity, handRoomHumanStepToPrivateChat } from '../bots/bot-work.js';
+import { ROOM_HUMAN_STEP_NOTICE } from './human-step.js';
 import { stampSessionWake } from '../approval/unattended-approval.js';
 export { filterRoomTools } from './tool-policy.js';
 
@@ -32,6 +33,7 @@ export interface BotRoomHost {
   cancelSession(sessionId: string): void;
   isSessionRunning?(sessionId: string): boolean;
   hasUnconfirmedEffects?(sessionId:string,startedAt:string):boolean;
+  log?: { warn(...args: unknown[]): void };
 }
 type DataRow = { data: string };
 function decode<T>(row: unknown): T | undefined { return row ? JSON.parse((row as DataRow).data) as T : undefined; }
@@ -359,16 +361,14 @@ export class BotRoomService {
     if (turn.terminationReason !== 'tool_budget' && turn.terminationReason !== 'cost_budget') return false;
     turn.status = 'completed'; this.saveTurn(turn); return true;
   }
-  /** A step that needs a person leaves the Room. The private chat keeps the approval; this turn does not wait or fail. */
+  /** A step that needs a person leaves the Room. The private chat keeps the approval and the pending call; this turn does not wait or fail. */
   private handOffHumanStep(room: BotRoom, turn: BotRoomTurn, botId: string, session: SessionRecord): boolean {
-    const handed = handRoomHumanStepToPrivateChat({ store: this.store }, { roomTitle: room.title, botId, principal: room.principal, memberSessionId: session.id });
-    if (!handed) return false;
     const bot = this.store.getBot(botId);
-    this.tx(() => {
-      if (this.rawRoom(room.id).botIds.includes(botId)) this.append(room.id, { type: 'bot', id: botId, name: bot?.name ?? botId }, handed.notice, [], turn.id, `handoff:${turn.id}:${turn.cursor}`);
+    const moved = handRoomHumanStepToPrivateChat({ store: this.store }, { roomTitle: room.title, botId, principal: room.principal, memberSessionId: session.id }, () => {
+      if (this.rawRoom(room.id).botIds.includes(botId)) this.append(room.id, { type: 'bot', id: botId, name: bot?.name ?? botId }, ROOM_HUMAN_STEP_NOTICE, [], turn.id, `handoff:${turn.id}:${turn.cursor}`);
       turn.botTurns++; turn.cursor++; turn.handedOffBotIds = [...(turn.handedOffBotIds ?? []), botId]; delete turn.currentSessionId; delete turn.startSeq; this.saveTurn(turn);
     });
-    return true;
+    return Boolean(moved);
   }
   private sessionFailed(turn: BotRoomTurn, session: SessionRecord): boolean {
     if (session.status !== 'failed' && session.status !== 'unknown') return false;
@@ -382,7 +382,15 @@ export class BotRoomService {
   private async settleWaiting(room: BotRoom, turn: BotRoomTurn): Promise<boolean> {
     const session = turn.currentSessionId && this.store.getSession(turn.currentSessionId);
     if (!session) { this.contextMissing(turn); return false; }
-    if (session.status === 'waiting_approval' || session.status === 'running' || this.host.isSessionRunning?.(session.id)) return false;
+    if (session.status === 'waiting_approval') {
+      const botId = turn.botIds[turn.cursor];
+      if (botId) {
+        try { if (this.handOffHumanStep(room, turn, botId, session)) return true; }
+        catch (error) { this.host.log?.warn?.('Room human-step hand-off rolled back', { roomId: room.id, turnId: turn.id, error: String(error) }); }
+      }
+      return false;
+    }
+    if (session.status === 'running' || this.host.isSessionRunning?.(session.id)) return false;
     const control = botWorkControl(this.store, room.principal, turn.botIds[turn.cursor]!);
     if (control.paused || control.disabled) { turn.terminationReason = control.disabled ? 'bot_disabled' : 'bot_paused'; this.saveTurn(turn); return false; }
     if (hasPendingSessionWake(this.store, session.id)) return false;
@@ -452,7 +460,12 @@ export class BotRoomService {
     if (after.terminationReason === 'tool_budget' || after.terminationReason === 'cost_budget') { turn.terminationReason = after.terminationReason; this.completeBudget(turn); return false; }
     if (this.applyOutcome(turn, current)) return false;
     if (current.status === 'waiting_approval') {
-      if (this.handOffHumanStep(room, turn, botId, current)) return true;
+      try {
+        if (this.handOffHumanStep(room, turn, botId, current)) return true;
+      } catch (error) {
+        // The hand-off transaction rolled back. Leave the turn waiting so a later tick retries it.
+        this.host.log?.warn?.('Room human-step hand-off rolled back', { roomId: room.id, turnId: turn.id, error: String(error) });
+      }
       turn.status = 'waiting_approval'; turn.startCostUsd = typeof current.metadata?.usageCostUsd === 'number' ? current.metadata.usageCostUsd : 0; this.saveTurn(turn); return false;
     }
     if (this.sessionFailed(turn, current)) return false;

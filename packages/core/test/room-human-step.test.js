@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { memberNeedsHuman, privateHandbackText, roomMetadataAfterHandOff, ROOM_HUMAN_STEP_NOTICE } from '../dist/rooms/human-step.js';
+import { privateChatCanTakeHandOff } from '../dist/bots/bot-work.js';
 
 test('only a parked member with a pending approval needs a person [AC:bot-rooms#AC-8]', () => {
   assert.equal(memberNeedsHuman({ status: 'waiting_approval' }, [{ status: 'pending' }]), true);
@@ -22,4 +23,13 @@ test('handing off drops the room waiting latch so a private decision cannot resu
   assert.equal(next.botId, 'alpha');
   assert.equal('interrupt' in next, false);
   assert.equal('outcome' in next, false);
+});
+
+test('a private chat takes a handed step only while it is idle or finished [AC:bot-rooms#AC-8]', () => {
+  assert.equal(privateChatCanTakeHandOff({ status: 'idle' }), true);
+  assert.equal(privateChatCanTakeHandOff({ status: 'completed' }), true);
+  assert.equal(privateChatCanTakeHandOff({ status: 'running' }), false);
+  assert.equal(privateChatCanTakeHandOff({ status: 'waiting_approval' }), false);
+  assert.equal(privateChatCanTakeHandOff({ status: 'failed' }), false);
+  assert.equal(privateChatCanTakeHandOff(undefined), false);
 });

@@ -1,14 +1,14 @@
 import { stampSessionWake, withApprovalWake } from '../approval/unattended-approval.js';
-import { parseRunOutcome } from '../session/run-outcome.js';
+import { mergeOutcomeMetadata, parseRunOutcome, runOutcomeFromEnd } from '../session/run-outcome.js';
 import { assistantTextsFromFold } from '../session/visible-assistant.js';
 import { retireTaskContextSources } from '../session/task-context.js';
 import { closeOpenToolWave } from '../session/tool-wave-close.js';
-import { unmatchedToolCallsFromFold } from '@ppeng/agent-loop/session';
+import { createWaitingApprovalInterrupt, mergeInterruptMetadata, unmatchedToolCallsFromFold } from '@ppeng/agent-loop/session';
 import { createId, nowIso } from '../id.js';
 import { AppError, ValidationError } from '../errors.js';
 import type { SqliteStateStore } from '../storage.js';
 import type { Logger } from '../logger.js';
-import type { SessionRecord, ToolContract } from '../types.js';
+import type { MessagePart, SessionRecord, ToolContract } from '../types.js';
 import type { SessionFacadeHost } from '../runtime/session-facade.js';
 import { createBot, openBot } from './bot-facade.js';
 import { resolveBotPrincipal, principalFromSession, botPrincipalKey, sameBotPrincipal, botDefinitionOwner, type BotPrincipal } from './bot-identity.js';
@@ -50,31 +50,71 @@ export function ensureBotWorkSchema(store: Pick<SqliteStateStore,'db'>): void {
 function facade(host: BotWorkHost): SessionFacadeHost {
  return { store:host.store, runImageRetention:async()=>{}, wakeAllAutonomousSessions(){}, wakeAgentSessions(){} } as SessionFacadeHost;
 }
+/** The private chat can take a handed step only when nothing else is using it. */
+export function privateChatCanTakeHandOff(session: { status?: string } | undefined): boolean {
+ return session?.status === 'idle' || session?.status === 'completed';
+}
 /**
  * A Room member stopped on a step a person must approve, log in, or verify.
- * Move that pending approval onto the bot's private chat and leave the Room session idle,
- * so approving in private cannot resume or replay the Room turn.
+ * Move that pending approval and its unmatched tool call onto the bot's private chat
+ * and leave the Room session idle, so approving in private runs the step there once
+ * and cannot resume or replay the Room turn.
+ *
+ * When the private chat is not idle or completed, nothing is detached: the caller
+ * keeps the Room turn waiting and retries once the private chat is free.
+ * Pass `within` to write the Room notice and turn in the same transaction; a throw rolls all of it back.
  */
-export function handRoomHumanStepToPrivateChat(host: Pick<BotWorkHost, 'store'>, input: { roomTitle: string; botId: string; principal: BotPrincipal; memberSessionId: string }): { privateSessionId: string; notice: string; reason: string } | undefined {
+export function handRoomHumanStepToPrivateChat(host: Pick<BotWorkHost, 'store'>, input: { roomTitle: string; botId: string; principal: BotPrincipal; memberSessionId: string }, within?: () => void): { privateSessionId: string; notice: string; reason: string } | undefined {
  const member = host.store.getSession(input.memberSessionId);
  const pending = host.store.listApprovals({ status: 'pending' }).filter(approval => approval.sessionId === input.memberSessionId);
  if (!member || !memberNeedsHuman(member, pending)) return undefined;
  const chat = openBotWorkContext(host as BotWorkHost, input.botId, input.principal);
- host.store.db.prepare(`UPDATE approvals SET session_id=?, expires_at=NULL, wake_source=NULL, updated_at=? WHERE session_id=? AND status='pending'`).run(chat.id, nowIso(), input.memberSessionId);
- host.store.appendMessage(chat.id, 'user', [{ type: 'text', text: privateHandbackText(input.roomTitle) }]);
- host.store.updateSession(input.memberSessionId, { status: 'idle', metadata: roomMetadataAfterHandOff(member.metadata) });
- closeHandedToolWave(host.store, input.memberSessionId);
  const parked = host.store.getSession(chat.id);
- if (parked && (parked.status === 'idle' || parked.status === 'completed')) {
-  host.store.updateSession(chat.id, { status: 'waiting_approval', metadata: withApprovalWake(parked.metadata, { kind: 'human', source: 'room-handoff' }) });
+ if (!privateChatCanTakeHandOff(parked)) return undefined;
+ const open = unmatchedToolCallsFromFold(host.store.foldMessages(input.memberSessionId));
+ const apply = () => {
+  const fresh = host.store.getSession(chat.id);
+  if (!privateChatCanTakeHandOff(fresh)) return false;
+  host.store.db.prepare(`UPDATE approvals SET session_id=?, expires_at=NULL, wake_source=NULL, updated_at=? WHERE session_id=? AND status='pending'`).run(chat.id, nowIso(), input.memberSessionId);
+  const moved = host.store.listApprovals({ status: 'pending' }).filter(approval => approval.sessionId === chat.id);
+  host.store.appendMessage(chat.id, 'user', [{ type: 'text', text: privateHandbackText(input.roomTitle) }]);
+  if (open.length) {
+   const calls: MessagePart[] = open.map(call => ({ type: 'tool_call', toolCallId: call.toolCallId, name: call.name, input: call.input }));
+   host.store.appendMessage(chat.id, 'assistant', calls);
+   // Remove the Room copy of the call so a later Room run cannot pair or replay it,
+   // and so the tool name does not remain in that transcript or its search index.
+   const handedIds = new Set(open.map(call => call.toolCallId));
+   for (const message of host.store.listMessages(input.memberSessionId)) {
+    if (message.role !== 'assistant') continue;
+    if (!message.parts.some(part => part.type === 'tool_call' && handedIds.has(part.toolCallId))) continue;
+    host.store.db.prepare('DELETE FROM session_messages WHERE id=? AND session_id=?').run(message.id, input.memberSessionId);
+   }
+  }
+  host.store.updateSession(input.memberSessionId, { status: 'idle', metadata: roomMetadataAfterHandOff(member.metadata) });
+  const waiting = host.store.getSession(chat.id) ?? fresh!;
+  const outcome = runOutcomeFromEnd({ reason: 'waiting_approval', sessionStatus: 'waiting_approval' });
+  const interrupt = createWaitingApprovalInterrupt({
+   toolCallIds: open.map(call => call.toolCallId),
+   approvalIds: moved.map(approval => approval.id)
+  });
+  host.store.updateSession(chat.id, {
+   status: 'waiting_approval',
+   metadata: withApprovalWake(mergeInterruptMetadata(mergeOutcomeMetadata(waiting.metadata, outcome), interrupt), { kind: 'human', source: 'room-handoff' })
+  });
+  if (within) within();
+  return true;
+ };
+ // `within` is not a transaction. Only skip BEGIN when one is already open, so a throw rolls the approval move back with the Room turn.
+ if (host.store.db.isTransaction) {
+  if (!apply()) return undefined;
+ } else {
+  host.store.db.exec('BEGIN IMMEDIATE');
+  try {
+   if (!apply()) { host.store.db.exec('ROLLBACK'); return undefined; }
+   host.store.db.exec('COMMIT');
+  } catch (error) { host.store.db.exec('ROLLBACK'); throw error; }
  }
  return { privateSessionId: chat.id, notice: ROOM_HUMAN_STEP_NOTICE, reason: ROOM_HUMAN_STEP_REASON };
-}
-/** Close the Room tool wave without naming the tool or copying its arguments. */
-function closeHandedToolWave(store: SqliteStateStore, sessionId: string): void {
- const open = unmatchedToolCallsFromFold(store.foldMessages(sessionId));
- if (!open.length) return;
- store.appendMessage(sessionId, 'tool', open.map(call => ({ type: 'tool_result' as const, toolCallId: call.toolCallId, name: call.name, ok: false, content: ROOM_HUMAN_STEP_NOTICE })));
 }
 export function openBotWorkContext(host: BotWorkHost, botId: string, principal: BotPrincipal): SessionRecord {
  ensureBotWorkSchema(host.store);
