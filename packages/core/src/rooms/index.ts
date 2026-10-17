@@ -416,8 +416,9 @@ export class BotRoomService {
     }
     return parts;
   }
-  /** Last scheduled member of this round: nobody still in the Room remains after the cursor. Silence does not spend the speaking budget, so a budget guess must not mark an earlier member as wrap-up. */
+  /** This run uses the last speaking-budget slot, or no later scheduled member is still in the Room. */
   private isWrapUpTurn(room: BotRoom, turn: BotRoomTurn): boolean {
+    if (turn.botTurns + 1 >= turn.maxBotTurns) return true;
     for (let i = turn.cursor + 1; i < turn.botIds.length; i += 1) {
       if (room.botIds.includes(turn.botIds[i]!)) return false;
     }
@@ -475,9 +476,10 @@ export class BotRoomService {
   private publish(room:BotRoom,turn:BotRoomTurn,botId:string):void {
     const bot=this.store.getBot(botId)!;
     const output=this.resultText(turn.currentSessionId!,turn.startSeq??0).trim();
-    // An empty reply or a silence token ends only this member's turn. It posts nothing and does not spend the speaking budget.
+    // An empty reply or a silence token ends only this member's turn. It posts nothing, but a clean end still spends one speaking-budget slot.
     if(!output||isSilenceToken(output)){
       this.tx(()=>{
+        turn.botTurns++;
         turn.cursor++;
         if(!turn.silentBotIds)turn.silentBotIds=[];
         if(!turn.silentBotIds.includes(botId))turn.silentBotIds.push(botId);

@@ -311,7 +311,7 @@ test('a member replying [SILENT] posts nothing and the next member still speaks 
   assert.equal(turn.status, 'completed');
   assert.equal(turn.terminationReason, 'members_completed');
   assert.deepEqual(turn.silentBotIds, [f.a.id]);
-  assert.equal(turn.botTurns, 1);
+  assert.equal(turn.botTurns, 2);
   const posted = f.rooms.messages(f.principal, room.id).messages.filter(message => message.sender.type === 'bot');
   assert.deepEqual(posted.map(message => message.sender.id), [f.b.id]);
   assert.ok(!posted.some(message => message.text.includes('[SILENT]')));
@@ -348,15 +348,16 @@ test('only the last scheduled member is told this is the wrap-up turn [AC:bot-ro
   assert.ok(beta.includes('wrap-up'));
 });
 
-test('a tight speaking budget does not tell a non-last member to wrap up [AC:bot-rooms#AC-2]', async () => {
+test('maxBotTurns of 1 gives the wrap-up signal to the only member that runs [AC:bot-rooms#AC-2]', async () => {
   const f = fixture();
   const room = f.rooms.create(f.principal, { title: 'Budget wrap', botIds: [f.a.id, f.b.id], maxBotTurns: 1 });
   f.rooms.send(f.principal, room.id, { text: 'both', mentions: [f.a.id, f.b.id] });
   await f.rooms.tick();
   assert.equal(f.runs.length, 1);
   const first = userPrompts(f.store, f.runs[0]).at(-1);
-  assert.ok(!first.includes('本轮收尾'));
-  assert.ok(!first.includes('wrap-up'));
+  assert.ok(first.includes('本轮收尾'));
+  assert.ok(first.includes('wrap-up'));
+  assert.equal(f.store.getSession(f.runs[0]).agentId, f.a.id);
 });
 
 test('removing a later scheduled member makes the preceding member the wrap-up member [AC:bot-rooms#AC-2]', async () => {
@@ -371,7 +372,7 @@ test('removing a later scheduled member makes the preceding member the wrap-up m
   assert.ok(first.includes('wrap-up'));
 });
 
-test('silence does not consume the speaking budget [AC:bot-rooms#AC-2]', async () => {
+test('a silent member still uses one speaking-budget slot [AC:bot-rooms#AC-2]', async () => {
   const f = fixture();
   const room = f.rooms.create(f.principal, { title: 'Budget silence', botIds: [f.a.id, f.b.id], maxBotTurns: 1 });
   recordingRun(f, async id => {
@@ -383,11 +384,52 @@ test('silence does not consume the speaking budget [AC:bot-rooms#AC-2]', async (
   f.rooms.send(f.principal, room.id, { text: 'both', mentions: [f.a.id, f.b.id] });
   await f.rooms.tick();
   const turn = f.rooms.turns(f.principal, room.id)[0];
-  assert.equal(f.runs.length, 2);
+  assert.equal(f.runs.length, 1);
+  assert.equal(f.store.getSession(f.runs[0]).agentId, f.a.id);
   assert.equal(turn.status, 'completed');
-  assert.equal(turn.terminationReason, 'members_completed');
+  assert.equal(turn.terminationReason, 'budget');
   assert.equal(turn.botTurns, 1);
-  assert.deepEqual(f.rooms.messages(f.principal, room.id).messages.filter(message => message.sender.type === 'bot').map(message => message.sender.id), [f.b.id]);
+  assert.deepEqual(turn.silentBotIds, [f.a.id]);
+  assert.equal(f.rooms.messages(f.principal, room.id).messages.filter(message => message.sender.type === 'bot').length, 0);
+});
+
+test('when the budget covers every member only the last one gets the wrap-up signal [AC:bot-rooms#AC-2]', async () => {
+  const f = fixture();
+  const room = f.rooms.create(f.principal, { title: 'Budget covers all', botIds: [f.a.id, f.b.id], maxBotTurns: 2 });
+  f.rooms.send(f.principal, room.id, { text: 'both', mentions: [f.a.id, f.b.id] });
+  await f.rooms.tick();
+  assert.equal(f.runs.length, 2);
+  const first = userPrompts(f.store, f.runs[0]).at(-1);
+  const last = userPrompts(f.store, f.runs[1]).at(-1);
+  assert.ok(!first.includes('本轮收尾'));
+  assert.ok(!first.includes('wrap-up'));
+  assert.ok(last.includes('本轮收尾'));
+  assert.ok(last.includes('wrap-up'));
+});
+
+test('queue usage counts only budgeted member runs and drops after a silent run [AC:bot-rooms#AC-2]', async () => {
+  const f = fixture();
+  const c = createBot(f.facade, { name: 'Gamma' });
+  f.store.updateSession(c.canonicalSessionId, { metadata: { ...f.store.getSession(c.canonicalSessionId).metadata, ...f.principal } });
+  const room = f.rooms.create(f.principal, { title: 'Capacity silence', botIds: [f.a.id, f.b.id, c.id], maxBotTurns: 2 });
+  f.rooms.send(f.principal, room.id, { text: 'all', mentions: [f.a.id, f.b.id, c.id] });
+  assert.equal(botQueueUsage(f.store, f.principal).total, 2);
+  assert.deepEqual(botQueueUsage(f.store, f.principal).byBot, { [f.a.id]: 1, [f.b.id]: 1 });
+  setBotWorkControl(f.host, f.principal, f.b.id, { paused: true, disabled: false });
+  recordingRun(f, async id => {
+    f.store.appendMessage(id, 'assistant', [{ type: 'text', text: '[SILENT]' }]);
+    f.store.updateSession(id, { status: 'idle' });
+  });
+  await f.rooms.tick();
+  const turn = f.rooms.turns(f.principal, room.id)[0];
+  assert.equal(f.runs.length, 1);
+  assert.equal(f.store.getSession(f.runs[0]).agentId, f.a.id);
+  assert.equal(turn.status, 'queued');
+  assert.equal(turn.terminationReason, 'bot_paused');
+  assert.equal(turn.botTurns, 1);
+  assert.deepEqual(turn.silentBotIds, [f.a.id]);
+  assert.equal(botQueueUsage(f.store, f.principal).total, 1);
+  assert.deepEqual(botQueueUsage(f.store, f.principal).byBot, { [f.b.id]: 1 });
 });
 
 test('a failed or aborted member still fails the round [AC:bot-rooms#AC-2]', async () => {
@@ -426,7 +468,7 @@ test('a round where every member stays silent still completes [AC:bot-rooms#AC-2
   const turn = f.rooms.turns(f.principal, room.id)[0];
   assert.equal(turn.status, 'completed');
   assert.equal(turn.terminationReason, 'members_completed');
-  assert.equal(turn.botTurns, 0);
+  assert.equal(turn.botTurns, 2);
   assert.deepEqual(turn.silentBotIds, [f.a.id, f.b.id]);
   assert.equal(f.rooms.messages(f.principal, room.id).messages.filter(message => message.sender.type === 'bot').length, 0);
 });
