@@ -42,17 +42,20 @@ export async function middleware(request: NextRequest) {
   stripHumanReleaseHeader(headers);
   appendLabForwarding(request, headers);
 
-  const init: RequestInit & { duplex?: 'half' } = {
+  const init: RequestInit = {
     method: request.method,
     headers,
     redirect: 'manual'
   };
 
   if (request.method !== 'GET' && request.method !== 'HEAD') {
-    // Edge/undici requires duplex when forwarding a body; hop-by-hop headers
-    // (especially content-length) on the copied request make POST fetch fail.
-    init.body = request.body;
-    init.duplex = 'half';
+    // Buffer the body instead of streaming request.body: undici fetch turns any
+    // 401 reply to a stream-bodied request into a network error ("expected
+    // non-null body source"), which would mask the daemon's login_required
+    // response as a 502. Hop-by-hop headers (especially content-length) are
+    // already stripped by sanitizeProxyHeaders.
+    const body = await request.arrayBuffer();
+    if (body.byteLength > 0) init.body = body;
   }
 
   try {

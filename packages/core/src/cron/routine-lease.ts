@@ -52,6 +52,16 @@ export class RoutineLease {
       .run(now + this.duration, this.runId, this.token).changes;
   }
 
+  /** True when another owner (different token) holds an unexpired lease — cross-instance liveness signal. */
+  static hasOtherActiveLease(store: Pick<SqliteStateStore, 'db'>, runId: string, ownToken: string, now = Date.now()): boolean {
+    return !!store.db.prepare('SELECT 1 FROM bot_routine_leases WHERE run_id=? AND token<>? AND expires_at>?').get(runId, ownToken, now);
+  }
+
+  /** True when a peer (not this lease) holds an unexpired lease for the same run. */
+  hasOtherActive(now = Date.now()): boolean {
+    return RoutineLease.hasOtherActiveLease(this.store, this.runId, this.token, now);
+  }
+
   /** Fence state changes in the same write transaction as the ownership check. */
   whileOwned<T>(action: () => T): T | undefined {
     const ownTransaction = !this.store.db.isTransaction;

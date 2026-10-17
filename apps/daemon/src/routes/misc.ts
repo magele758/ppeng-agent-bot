@@ -8,6 +8,7 @@ import {
   loadOptionalToolGroupsFromEnv,
   optionalToolGroupsFeatureEnabled,
   stampOwnerMetadata,
+  resumeApprovalContinuation,
   type ApprovalRecord,
   type RawAgentRuntime
 } from '@ppeng/agent-core';
@@ -193,7 +194,38 @@ export function miscRoutes(runtime: RawAgentRuntime, opts: MiscOptions): RouteSp
           .listApprovals('pending')
           .some((item) => item.sessionId === approval.sessionId);
         if (session && shouldResumeAfterApproval(approval.status, session.status, pendingLeft)) {
-          await runtime.runSession(session.id);
+          // Routine runs resume under the routine lease. `handled` and `busy` must not fall
+          // through to a bare runSession (peer owner, other approvals still pending, or a
+          // rejection that finish() already recorded). Only a non-routine session does.
+          let continuation: Promise<unknown> | undefined;
+          const routineHost = {
+            store: runtime.store,
+            stateDir: runtime.stateDir,
+            runSession: (sid: string) => {
+              let flight: Promise<unknown>;
+              try {
+                flight = Promise.resolve(runtime.runSession(sid));
+              } catch (error) {
+                flight = Promise.reject(error);
+              }
+              // Mark handled so a sync rejection is not unhandled before the await below.
+              flight.then(() => undefined, () => undefined);
+              continuation = flight;
+              return flight;
+            },
+            cancelSession: (sid: string) => runtime.cancelSession(sid),
+            isSessionRunning: (sid: string) => runtime.isSessionRunning(sid),
+            hasUnconfirmedEffects: (sid: string, since: string) => runtime.hasUnconfirmedEffects(sid, since),
+            log: { warn: (..._a: unknown[]) => {}, info: (..._a: unknown[]) => {} },
+          };
+          const outcome = resumeApprovalContinuation(routineHost, session.id);
+          if (outcome === 'not-routine') {
+            await runtime.runSession(session.id);
+          } else if (continuation) {
+            // Await the leased continuation so the response snapshot is post-turn and a
+            // continuation failure is still a failed HTTP request.
+            await continuation;
+          }
         }
         json(response, 200, {
           approval,

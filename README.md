@@ -208,6 +208,8 @@ Unified entry: `npm run evolution -- [options]` (run `--help` for all flags).
 
 `npm run evolution:pipeline` (bash one-shot: build→learn→run-day→optional reload) and the low-level `evolution:learn` / `evolution:run-day` scripts are still available. For advanced fine-grained tuning (plan, test-agent, review rounds, etc.) see `scripts/evolution-quality-pipeline.env.example` and `.env.example`.
 
+> **Deprecated (2026-10-16):** the self-evolution pipeline (`evolution:*` scripts, `scripts/evolution*`) is no longer maintained. Do not extend it; it may be removed later. See `scripts/evolution/DEPRECATED.md`.
+
 ---
 
 ## Self-heal

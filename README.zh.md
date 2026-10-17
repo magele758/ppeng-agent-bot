@@ -196,6 +196,8 @@ Daemon API 示例：`GET /api/version`、`GET /api/health`、`GET /api/traces?se
 
 底层仍可直接使用 `npm run evolution:pipeline`（bash 一键：build→learn→run-day→可选重载），或 `npm run evolution:learn` / `npm run evolution:run-day` 单独执行。高级细粒度调参（plan、test-agent、review rounds 等）见 `scripts/evolution-quality-pipeline.env.example` 与 `.env.example`。
 
+> **已停止维护（2026-10-16）：** 自进化流水线（`evolution:*` 脚本、`scripts/evolution*`）不再维护，请勿扩展，后续可能移除。详见 `scripts/evolution/DEPRECATED.md`。
+
 ---
 
 ## 自愈（Self-heal）

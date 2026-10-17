@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# DEPRECATED (2026-10-16): 自进化流水线已停止维护，见 scripts/evolution/DEPRECATED.md
 # 自进化一键编排：委托 evolution-cli.mjs（learn → run-day → 可选 post-merge-reload）
 #
 # 环境变量（见 .env.example「自进化一键管线」）：

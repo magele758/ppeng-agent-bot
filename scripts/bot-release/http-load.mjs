@@ -50,7 +50,7 @@ export async function runHttpLoad({smoke=false,smokeSeconds=10,out='test-results
  }
  async function phase(name,seconds){
   const writeBase=writeSequence;writeSequence+=seconds*workload.write.topLevelPerSecond;
-  const window=await runFixedHttpWindow({name,seconds,signal:stop.signal,onProgress:progress=>writeFileSync(output+'.progress.json',JSON.stringify(progress,null,2)+'\n'),streams:[
+  const window=await runFixedHttpWindow({name,seconds,signal:stop.signal,completionGraceMs:workload.thresholdsMs.searchP95,onProgress:progress=>writeFileSync(output+'.progress.json',JSON.stringify(progress,null,2)+'\n'),streams:[
    {name:'read',rate:workload.read.requestsPerSecond,clients:workload.read.clients,maxPendingPerClient:1,async run({index,plannedMono,enqueuedMono,startedMono,deadlineMono,signal}){
     const type=index%10<5?'page':index%10<8?'search':'status',b=Math.floor(random()*ready.sessions.length),n=1+Math.floor(random()*ready.counts[b]);const path=type==='status'?'/api/bot-work/status':`/api/sessions/${ready.sessions[b]}/history?limit=50`+(type==='search'?'&query='+encodeURIComponent(`http_source_${b}_${n} unique_${b}_${n};`):'');
     inFlight++;maxReadInFlight=Math.max(maxReadInFlight,inFlight);
@@ -61,7 +61,7 @@ export async function runHttpLoad({smoke=false,smokeSeconds=10,out='test-results
    {name:'write',rate:workload.write.topLevelPerSecond,clients:10,maxPendingPerClient:1,run:({index,plannedWall,signal})=>write(writeBase+index,name,plannedWall,signal)}
   ]});
   window.streams.write.operationRange={first:writeBase,last:writeBase+window.streams.write.planned-1};report.phaseWindows[name]=window;if(!window.protocolPassed)report.errors.push({phase:name,message:'Fixed workload window incomplete: missed, rejected, unfinished or failed planned slots',streams:window.streams});
-  await sleep(0);return window.observedElapsedSeconds;
+  await sleep(0);return window.admissionElapsedSeconds;
  }
  try{
   approvalTimer=setInterval(async()=>{if(approvalBusy)return;approvalBusy=true;try{const data=await request('GET','/api/approvals?status=pending',undefined,stop.signal);const required=workload.controlledLatencyMs.approval;for(const item of data.approvals??[]){const createdMs=Date.parse(item.createdAt);if(!Number.isFinite(createdMs))continue;const waited=Date.now()-createdMs;if(waited>=required){await request('POST',`/api/approvals/${item.id}/approve`,{},stop.signal);approvalSamples.push({id:item.id,sessionId:item.sessionId,createdAt:item.createdAt,approvedAt:createdMs+required,observedApprovedAt:Date.now(),waitedMs:waited});}}}catch(error){if(!stop.signal.aborted)report.errors.push({phase:'approval',message:String(error)});}finally{approvalBusy=false;}},250);

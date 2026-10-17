@@ -804,8 +804,8 @@ export { createAppControlTools } from '../app-control/tools.js';
 export * from '../session/history/types.js';
 export * from '../session/history/tools.js';
 export * from '../session/history/window.js';
-export { RoutineRunStore, drainRoutineRuns, materializeRoutineOccurrences, cancelRoutineRun, retryRoutineRun, routineSettings, nextZonedCronRunAt, normalizeRoutineTimezone } from '../cron/index.js';
-export type { RoutineRun, RoutineRunStatus, RoutineRuntimeHost } from '../cron/index.js';
+export { RoutineRunStore, drainRoutineRuns, materializeRoutineOccurrences, cancelRoutineRun, retryRoutineRun, routineSettings, nextZonedCronRunAt, normalizeRoutineTimezone, resumeApprovalContinuation } from '../cron/index.js';
+export type { RoutineRun, RoutineRunStatus, RoutineRuntimeHost, RoutineContinuation } from '../cron/index.js';
 
 export { parseOpenApiSpec } from '../discovery/adapters/openapi.js';
 
