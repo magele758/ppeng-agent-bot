@@ -159,6 +159,21 @@ for (const snapshot of SNAPSHOTS) {
     }
     store.db.close();
   });
+
+  // v29 adds bots.avatar with no DEFAULT clause, so an upgraded row stays NULL.
+  if (v < 29) test(`v${v} -> latest: bots.avatar defaults to NULL [AC:schema-upgrade-safety#AC-1]`, () => {
+    const { store } = restore(snapshot);
+    const { researcher, planner } = ids.bots;
+    const columns = store.db.prepare('PRAGMA table_info(bots)').all();
+    const avatar = columns.find((column) => column.name === 'avatar');
+    assert.ok(avatar, 'bots.avatar exists after upgrade');
+    assert.equal(avatar.dflt_value, null);
+    for (const id of [researcher.id, planner.id]) {
+      assert.equal(store.db.prepare('SELECT avatar FROM bots WHERE id=?').get(id).avatar, null);
+      assert.equal(store.getBot(id).avatar, null);
+    }
+    store.db.close();
+  });
 }
 
 test('v20 -> latest through the runtime: warning is served until the owner picks a tier [AC:bots#AC-6]', () => {
