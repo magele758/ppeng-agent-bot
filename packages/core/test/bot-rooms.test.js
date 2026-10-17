@@ -127,24 +127,49 @@ test('history pages remain stable and attachment refs and principal checks are e
   assert.throws(()=>f.rooms.patch(f.principal,room.id,{maxBotTurns:21}), /budget/);
 });
 
-test('waiting approval preserves later turns and result recovery without rerunning the approved work [AC:bot-rooms#AC-5]', async () => {
+test('a member step that needs a person leaves the room for the private chat and does not fail the turn [AC:bot-rooms#AC-8]', async () => {
   const f=fixture();
-  const room=f.rooms.create(f.principal,{title:'Approval',botIds:[f.a.id]});
+  const room=f.rooms.create(f.principal,{title:'Approval',botIds:[f.a.id,f.b.id]});
   let calls=0;
-  f.host.runSession=async id=>{calls++;f.store.updateSession(id,{status:'waiting_approval'});};
-  f.rooms.send(f.principal,room.id,{text:'needs approval'});
+  f.host.runSession=async id=>{
+    calls++;
+    const session=f.store.getSession(id);
+    if(session.agentId!==f.a.id){f.store.appendMessage(id,'assistant',[{type:'text',text:'beta continues'}]);return;}
+    f.store.createApproval({sessionId:id,toolName:'write_file',reason:'needs a person',args:{path:'secret.env',token:'SECRET_CREDENTIAL'}});
+    f.store.updateSession(id,{status:'waiting_approval',metadata:{...session.metadata,interrupt:{kind:'waiting_approval',approvalIds:['x']},outcome:{kind:'waiting_approval'}}});
+  };
+  f.rooms.send(f.principal,room.id,{text:'needs a person',mentions:[f.a.id,f.b.id]});
   await f.rooms.tick();
-  const blocked=f.rooms.turns(f.principal,room.id)[0];
-  assert.equal(blocked.status,'waiting_approval');
-  f.rooms.send(f.principal,room.id,{text:'later'});
+  const turn=f.rooms.turns(f.principal,room.id)[0];
+  assert.equal(turn.status,'completed');
+  assert.notEqual(turn.status,'failed');
+  assert.deepEqual(turn.handedOffBotIds,[f.a.id]);
+  assert.equal(calls,2);
+  const roomText=f.rooms.messages(f.principal,room.id).messages.map(message=>message.text).join('\n');
+  assert.match(roomText,/私聊/);
+  assert.equal(roomText.includes('SECRET_CREDENTIAL'),false);
+  assert.equal(roomText.includes('write_file'),false);
+  assert.equal(roomText.includes('secret.env'),false);
+  assert.match(roomText,/beta continues/);
+  const pending=f.store.listApprovals({status:'pending'});
+  assert.equal(pending.length,1);
+  assert.equal(pending[0].sessionId,f.a.canonicalSessionId);
+  const privateText=f.store.listMessages(f.a.canonicalSessionId).map(message=>message.parts.map(part=>part.text??'').join('')).join('\n');
+  assert.match(privateText,/Approval/);
+  assert.equal(privateText.includes('SECRET_CREDENTIAL'),false);
+  const member=f.store.listSessions().find(session=>session.metadata?.roomId===room.id&&session.metadata?.botId===f.a.id);
+  assert.equal(member.status,'idle');
+  assert.equal(member.metadata.interrupt,undefined);
+  const memberText=JSON.stringify(f.store.listMessages(member.id));
+  assert.equal(memberText.includes('SECRET_CREDENTIAL'),false);
+  assert.equal(memberText.includes('write_file'),false);
+  assert.equal(memberText.includes('secret.env'),false);
+  f.store.appendMessage(f.a.canonicalSessionId,'assistant',[{type:'text',text:'PRIVATE_APPROVAL_RESULT'}]);
+  f.store.updateSession(f.a.canonicalSessionId,{status:'idle'});
   await f.rooms.tick();
-  assert.equal(calls,1);
-  f.store.appendMessage(blocked.currentSessionId,'assistant',[{type:'text',text:'approved output'}]);
-  f.store.updateSession(blocked.currentSessionId,{status:'idle'});
-  await f.rooms.tick();
-  assert.equal(calls,1);
-  assert.equal(f.rooms.turns(f.principal,room.id)[0].status,'completed');
-  assert.equal(f.rooms.messages(f.principal,room.id).messages.at(-1).text,'approved output');
+  const after=f.rooms.messages(f.principal,room.id).messages.map(message=>message.text).join('\n');
+  assert.equal(after.includes('PRIVATE_APPROVAL_RESULT'),false);
+  assert.equal(calls,2);
 });
 
 test('stopping an in-flight member cancels and fences its late reply [AC:bot-rooms#AC-4]', async () => {
@@ -246,19 +271,30 @@ test('Bot background pause and disable apply to Room work and preserve pending i
   assert.equal(f.runs.length,1);assert.equal(f.rooms.turns(f.principal,room.id)[0].status,'completed');
 });
 
-test('real approve then scheduler resumes Room tools before collecting a final result [AC:bot-rooms#AC-5]',async()=>{
+test('approving the handed-off step in the private chat does not rerun it in the room [AC:bot-rooms#AC-8] [AC:bot-rooms#AC-3]',async()=>{
   let executions=0;
   const rt=new RawAgentRuntime({repoRoot:mkdtempSync(join(tmpdir(),'room-approval-repo-')),stateDir:mkdtempSync(join(tmpdir(),'room-approval-state-')),extraTools:[{name:'room_approval_probe',description:'Approval probe',inputSchema:{type:'object',properties:{}},approvalMode:'always',sideEffectLevel:'workspace',async execute(){executions++;return {ok:true,content:'APPROVED_PROBE_RESULT'};}}],modelAdapter:{name:'room-approval-scripted',async runTurn(input){if(input.messages.some(message=>message.parts.some(part=>part.type==='tool_result'&&part.name==='room_approval_probe')))return {stopReason:'end',assistantParts:[{type:'text',text:'Verified approved work finished'}]};return {stopReason:'tool_use',assistantParts:[{type:'text',text:'Pending work, not complete'},{type:'tool_call',toolCallId:'approval-probe',name:'room_approval_probe',input:{}}]};},async summarizeMessages(){return '';}}});
   try {
     const bot=rt.createBot({name:'ApprovalMember'}),principal=resolveBotPrincipal(rt.store),room=rt.rooms.create(principal,{title:'Actual approval',botIds:[bot.id]});
     rt.rooms.send(principal,room.id,{text:'Run the approved action'});await rt.rooms.tick();
-    assert.equal(rt.rooms.turns(principal,room.id)[0].status,'waiting_approval');assert.equal(executions,0);
-    const approval=rt.store.listApprovals({status:'pending'})[0];assert.ok(approval);
+    const turn=rt.rooms.turns(principal,room.id)[0];
+    assert.equal(turn.status,'completed');assert.deepEqual(turn.handedOffBotIds,[bot.id]);assert.notEqual(turn.status,'failed');assert.equal(executions,0);
+    const roomText=rt.rooms.messages(principal,room.id).messages.map(message=>message.text).join('\n');
+    assert.match(roomText,/私聊/);
+    assert.equal(roomText.includes('room_approval_probe'),false);
+    assert.equal(roomText.includes('Pending work'),false);
+    const approval=rt.store.listApprovals({status:'pending'})[0];
+    assert.ok(approval);assert.equal(approval.sessionId,bot.canonicalSessionId);
+    const member=rt.store.listSessions().find(session=>session.metadata?.roomId===room.id);
+    assert.equal(member.status,'idle');
     await rt.approve(approval.id,'approved');
     await rt.runScheduler();
-    const done=await waitFor(async()=>{await rt.rooms.tick();const turn=rt.rooms.turns(principal,room.id)[0];return turn.status==='completed'?turn:null;});
-    assert.ok(done);assert.equal(executions,1);
-    assert.ok(rt.rooms.messages(principal,room.id).messages.at(-1).text.includes('Verified approved work finished'));
+    await rt.rooms.tick();
+    assert.equal(executions,0);
+    const after=rt.rooms.messages(principal,room.id).messages.map(message=>message.text).join('\n');
+    assert.equal(after.includes('APPROVED_PROBE_RESULT'),false);
+    assert.equal(after.includes('Verified approved work finished'),false);
+    assert.equal(rt.rooms.turns(principal,room.id)[0].status,'completed');
   }finally{rt.destroy();}
 });
 
@@ -290,10 +326,17 @@ test('leaving a queued group preserves capacity accounting for remaining speaker
 
 test('deleted approval context becomes unknown without blocking or replaying later queued work [AC:bot-rooms#AC-5]',async()=>{
   const f=fixture(),room=f.rooms.create(f.principal,{title:'Missing context',botIds:[f.a.id]});let calls=0;
-  f.host.runSession=async id=>{calls++;f.store.createApproval({sessionId:id,toolName:'write_file',args:{},reason:'pending'});f.store.updateSession(id,{status:'waiting_approval'});};
-  f.rooms.send(f.principal,room.id,{text:'UNCONFIRMED_OLD_WORK'});await f.rooms.tick();
-  const old=f.rooms.turns(f.principal,room.id)[0];assert.equal(old.status,'waiting_approval');
-  f.store.deleteSession(old.currentSessionId);
+  let release;
+  f.host.runSession=id=>new Promise(resolve=>{calls++;release=()=>{f.store.appendMessage(id,'assistant',[{type:'text',text:'late'}]);f.store.updateSession(id,{status:'idle'});resolve();};});
+  f.rooms.send(f.principal,room.id,{text:'UNCONFIRMED_OLD_WORK'});
+  const running=f.rooms.tick();
+  await new Promise(resolve=>setImmediate(resolve));
+  const old=f.rooms.turns(f.principal,room.id)[0];assert.equal(old.status,'running');
+  const contextId=old.currentSessionId;
+  release();await running;
+  const done=f.rooms.turns(f.principal,room.id)[0];
+  f.store.db.prepare("UPDATE bot_room_turns SET status='running',data=? WHERE id=?").run(JSON.stringify({...done,status:'running',currentSessionId:contextId}),done.id);
+  f.store.deleteSession(contextId);
   const restarted=new BotRoomService(f.host);
   assert.equal(restarted.turns(f.principal,room.id)[0].status,'unknown');
   f.host.runSession=async id=>{calls++;const text=f.store.listMessages(id).flatMap(message=>message.parts).map(part=>part.text??'').join('');assert.ok(text.includes('UNCONFIRMED effects'));f.store.appendMessage(id,'assistant',[{type:'text',text:'only new work completed'}]);};

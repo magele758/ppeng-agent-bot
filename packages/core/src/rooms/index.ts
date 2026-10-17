@@ -5,7 +5,7 @@ import type { SqliteStateStore } from '../storage.js';
 import type { SessionRecord } from '../types.js';
 import type { KernelHookListener } from '@ppeng/agent-loop';
 import { fenceExternalContent } from '../safety/external-content.js';
-import { botWorkControl, hasPendingSessionWake, resumeApprovedBotSession, checkBotQueueCapacity } from '../bots/bot-work.js';
+import { botWorkControl, hasPendingSessionWake, resumeApprovedBotSession, checkBotQueueCapacity, handRoomHumanStepToPrivateChat } from '../bots/bot-work.js';
 import { stampSessionWake } from '../approval/unattended-approval.js';
 export { filterRoomTools } from './tool-policy.js';
 
@@ -22,7 +22,7 @@ export interface BotRoomMessageInput { text: string; mentions?: string[]; attach
 export type RoomTurnStatus = 'queued' | 'running' | 'waiting_approval' | 'completed' | 'failed' | 'cancelled' | 'unknown';
 export interface BotRoomTurn {
   id: string; roomId: string; messageId: string; status: RoomTurnStatus; botIds: string[];
-  maxBotTurns: number; botTurns: number; toolCalls: number; costUsd: number; costStatus: 'unknown' | 'estimated'; cursor: number; currentSessionId?: string; startSeq?: number; startCostUsd?: number; startedAt?: string; partialResult?: string;
+  maxBotTurns: number; botTurns: number; toolCalls: number; costUsd: number; costStatus: 'unknown' | 'estimated'; cursor: number; currentSessionId?: string; startSeq?: number; startCostUsd?: number; startedAt?: string; partialResult?: string; handedOffBotIds?: string[];
   terminationReason?: string; createdAt: string; updatedAt: string;
 }
 export interface BotRoomHost {
@@ -359,6 +359,17 @@ export class BotRoomService {
     if (turn.terminationReason !== 'tool_budget' && turn.terminationReason !== 'cost_budget') return false;
     turn.status = 'completed'; this.saveTurn(turn); return true;
   }
+  /** A step that needs a person leaves the Room. The private chat keeps the approval; this turn does not wait or fail. */
+  private handOffHumanStep(room: BotRoom, turn: BotRoomTurn, botId: string, session: SessionRecord): boolean {
+    const handed = handRoomHumanStepToPrivateChat({ store: this.store }, { roomTitle: room.title, botId, principal: room.principal, memberSessionId: session.id });
+    if (!handed) return false;
+    const bot = this.store.getBot(botId);
+    this.tx(() => {
+      if (this.rawRoom(room.id).botIds.includes(botId)) this.append(room.id, { type: 'bot', id: botId, name: bot?.name ?? botId }, handed.notice, [], turn.id, `handoff:${turn.id}:${turn.cursor}`);
+      turn.botTurns++; turn.cursor++; turn.handedOffBotIds = [...(turn.handedOffBotIds ?? []), botId]; delete turn.currentSessionId; delete turn.startSeq; this.saveTurn(turn);
+    });
+    return true;
+  }
   private sessionFailed(turn: BotRoomTurn, session: SessionRecord): boolean {
     if (session.status !== 'failed' && session.status !== 'unknown') return false;
     turn.status = session.status; turn.terminationReason = 'member_execution_failed'; this.saveTurn(turn); return true;
@@ -432,6 +443,7 @@ export class BotRoomService {
   private settleMember(room: BotRoom, turn: BotRoomTurn, botId: string, sessionId: string): boolean {
     const after = this.turnById(turn.id);
     if (after.status !== 'running') return false;
+    turn.status = after.status;
     const current = this.store.getSession(sessionId);
     if (!current) { this.contextMissing(turn); return false; }
     if (this.applyUnconfirmedEffects(turn, current)) return false;
@@ -440,6 +452,7 @@ export class BotRoomService {
     if (after.terminationReason === 'tool_budget' || after.terminationReason === 'cost_budget') { turn.terminationReason = after.terminationReason; this.completeBudget(turn); return false; }
     if (this.applyOutcome(turn, current)) return false;
     if (current.status === 'waiting_approval') {
+      if (this.handOffHumanStep(room, turn, botId, current)) return true;
       turn.status = 'waiting_approval'; turn.startCostUsd = typeof current.metadata?.usageCostUsd === 'number' ? current.metadata.usageCostUsd : 0; this.saveTurn(turn); return false;
     }
     if (this.sessionFailed(turn, current)) return false;
