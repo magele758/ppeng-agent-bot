@@ -58,6 +58,32 @@ test('a completed routine posts one bot message and recovery does not duplicate 
   reopened.db.close();
 });
 
+test('a silence token posts nothing and sends no summary [AC:bot-routine-lifecycle#AC-14]', async () => {
+  for (const reply of ['[SILENT]', ' [silent] ']) {
+    const silent = fixture(reply);
+    const job = createCronJob(silent.host, { botId: silent.bot.id, userId: silent.principal.userId, tenantId: silent.principal.tenantId, name: 'quiet-token', prompt: 'check', intervalMs: 60000, roomId: silent.room.id });
+    const run = new RoutineRunStore(silent.store).enqueue(job, new Date().toISOString());
+    const ledger = await finish(silent.host, silent.store);
+    const done = ledger.get(run.id);
+    assert.equal(done.status, 'silent');
+    assert.equal(done.roomDelivery, undefined);
+    assert.equal(silent.rooms.messages(silent.principal, silent.room.id).messages.length, 0);
+    assert.equal(silent.store.listMessages(done.mainSessionId).length, 0);
+    silent.store.db.close();
+  }
+});
+
+test('whitespace output posts nothing and stays failed [AC:bot-routine-lifecycle#AC-14]', async () => {
+  const blank = fixture('   \n\t  ');
+  const job = createCronJob(blank.host, { botId: blank.bot.id, userId: blank.principal.userId, tenantId: blank.principal.tenantId, name: 'spaces', prompt: 'check', intervalMs: 60000, roomId: blank.room.id });
+  const run = new RoutineRunStore(blank.store).enqueue(job, new Date().toISOString());
+  const ledger = await finish(blank.host, blank.store);
+  assert.equal(ledger.get(run.id).status, 'failed');
+  assert.equal(ledger.get(run.id).roomDelivery, undefined);
+  assert.equal(blank.rooms.messages(blank.principal, blank.room.id).messages.length, 0);
+  blank.store.db.close();
+});
+
 test('silence, precheck skip, failure and empty output post nothing [AC:bot-routine-lifecycle#AC-14]', async () => {
   const silent = fixture('[NO_UPDATE]');
   const silentJob = createCronJob(silent.host, { botId: silent.bot.id, userId: silent.principal.userId, tenantId: silent.principal.tenantId, name: 'quiet', prompt: 'check', intervalMs: 60000, roomId: silent.room.id });
@@ -198,6 +224,11 @@ test('deliverBotRoomMessage is idempotent and does not start a room turn [AC:bot
   store.db.prepare('UPDATE bot_rooms SET data=? WHERE id=?').run(JSON.stringify(current), room.id);
   assert.equal(deliverBotRoomMessage(store, { roomId: room.id, botId: 'missing-bot', principal, text: 'no', idempotencyKey: 'k5' }).reason, 'bot_missing');
   assert.equal(deliverBotRoomMessage(store, { roomId: room.id, botId: bot.id, principal, text: '   ', idempotencyKey: 'k6' }).reason, 'empty');
+  const beforeSilent = rooms.messages(principal, room.id).messages.length;
+  const silentPost = deliverBotRoomMessage(store, { roomId: room.id, botId: bot.id, principal, text: ' [SILENT] ', idempotencyKey: 'k-silent' });
+  assert.equal(silentPost.delivered, false);
+  assert.equal(silentPost.reason, 'silent');
+  assert.equal(rooms.messages(principal, room.id).messages.length, beforeSilent);
   assert.equal(deliverBotRoomMessage(store, { roomId: room.id, botId: bot.id, principal, text: 'no', idempotencyKey: '   ' }).reason, 'invalid_key');
   assert.equal(deliverBotRoomMessage(store, { roomId: room.id, botId: bot.id, principal, text: 'no', idempotencyKey: 'k'.repeat(201) }).reason, 'invalid_key');
   const long = deliverBotRoomMessage(store, { roomId: room.id, botId: bot.id, principal, text: 'x'.repeat(9000), idempotencyKey: 'long' });

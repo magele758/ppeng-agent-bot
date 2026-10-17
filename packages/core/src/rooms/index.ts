@@ -564,6 +564,7 @@ export function deliverBotRoomMessage(
   if (!bot) return { delivered: false, reason: 'bot_missing' };
   const text = input.text.trim();
   if (!text) return { delivered: false, reason: 'empty' };
+  if (isSilenceToken(text)) return { delivered: false, reason: 'silent' };
   const key = input.idempotencyKey.trim();
   if (!key || key.length > 200) return { delivered: false, reason: 'invalid_key' };
   return insertBotRoomMessage(store, input.roomId, bot, text, key);

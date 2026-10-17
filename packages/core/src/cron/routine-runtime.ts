@@ -22,6 +22,7 @@ import { CronJobStore, type CronJobRecord } from './cron-store.js';
 import { evaluateRoutinePrecheck, readStoredPrecheck } from './routine-precheck.js';
 import { nextZonedCronRunAt, skippedZonedCronMinutes } from './cron-next.js';
 import { deliverBotRoomMessage } from '../rooms/index.js';
+import { isSilenceToken } from '../bots/silence.js';
 import type { BotPrincipal } from '../bots/bot-identity.js';
 export type RoutineRunStatus = 'queued'|'running'|'waiting_approval'|'completed'|'failed'|'cancelled'|'unknown'|'skipped'|'silent';
 export interface RoutineRoomDelivery { status:'delivered'|'skipped'; roomId:string; messageId?:string; reason?:string }
@@ -140,6 +141,9 @@ function isWaitingForDecision(session:SessionRecord|undefined,approvals:Approval
  const outcome=parseRunOutcome(session?.metadata?.outcome);
  return outcome?.kind==='waiting_approval'&&approvals.some(approval=>approval.status==='pending'||approval.status==='approved');
 }
+function routineQuiet(result:string):boolean {
+ return result.trim().startsWith('[NO_UPDATE]')||isSilenceToken(result);
+}
 function completionError(session:SessionRecord|undefined,denied:boolean,result:string):string {
  if(denied)return 'Approval denied or expired';const outcome=parseRunOutcome(session?.metadata?.outcome);
  if(outcome?.reason)return `Execution stopped: ${outcome.reason}`;
@@ -151,7 +155,7 @@ function completionResult(host:RoutineRuntimeHost,run:RoutineRun,session:Session
  const denied=approvals.some(approval=>approval.status==='rejected');const outcome=parseRunOutcome(session?.metadata?.outcome);
  const stopped=outcome?.kind==='aborted'||outcome?.kind==='failed'||(outcome?.kind==='idle'&&outcome.reason!=='end');
  const failed=stopped||!session||!['idle','completed'].includes(session.status)||denied||!result.trim();
- return failed?{status:'failed',result,error:completionError(session,denied,result)}:{status:result.trim().startsWith('[NO_UPDATE]')?'silent':'completed',result};
+ return failed?{status:'failed',result,error:completionError(session,denied,result)}:{status:routineQuiet(result)?'silent':'completed',result};
 }
 function finish(host:RoutineRuntimeHost,runs:RoutineRunStore,id:string,expectedSessionId?:string):void {
  const run=runs.get(id);if(!run||(expectedSessionId&&run.sessionId!==expectedSessionId))return;
