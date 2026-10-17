@@ -1,7 +1,18 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { closeSync, mkdirSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, openSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
+import {
+  claimLockBodyStale,
+  createLockToken,
+  holdLockAcquisition,
+  lockTokenNonce,
+  readStaleLock,
+  reclaimStaleLock,
+  releaseHeldLock,
+  releaseLockAcquisition,
+  writeOwnedLock
+} from '@ppeng/agent-core';
 
 /** Constant-time string comparison (length-independent via hashing). */
 export function safeEqual(a: string, b: string): boolean {
@@ -88,7 +99,10 @@ function writePersistedClaims(dir: string, claims: Record<string, number>): void
   renameSync(tmp, path);
 }
 
-/** A lock whose body is empty or not ours is not stale; age is the file mtime. */
+/**
+ * How long an empty or unparseable lock may sit before another process may
+ * reclaim it. A live holder is never reclaimed on age alone.
+ */
 const CLAIM_LOCK_STALE_MS = 10_000;
 /** How long to wait for a fresh lock before giving up. */
 const CLAIM_LOCK_WAIT_MS = 5_000;
@@ -110,7 +124,10 @@ export function isInboundClaimTimeout(error: unknown): error is InboundClaimTime
 }
 
 export interface PersistedClaimLockOptions {
-  /** How long a live lock may be held before another process may reclaim it. */
+  /**
+   * How long an empty or unparseable lock may sit before it may be reclaimed.
+   * A holder whose identity is still alive is never reclaimed on age.
+   */
   staleMs?: number;
   /** How long to wait for a fresh lock before giving up. */
   waitMs?: number;
@@ -128,13 +145,25 @@ export interface PersistedClaimLockOptions {
 async function withPersistedClaimLock<T>(dir: string, fn: () => T, options: PersistedClaimLockOptions = {}): Promise<T> {
   mkdirSync(dir, { recursive: true });
   const lockPath = `${dedupePath(dir)}.lock`;
-  const token = randomBytes(8).toString('hex');
-  const fd = await acquireClaimLock(lockPath, token, options);
+  const held = await holdClaimLock(lockPath, options);
   try {
-    options.onAcquired?.(lockPath, token);
+    options.onAcquired?.(lockPath, held.token);
     return fn();
   } finally {
-    releaseClaimLock(lockPath, fd, token);
+    held.release();
+  }
+}
+
+async function holdClaimLock(lockPath: string, options: PersistedClaimLockOptions): Promise<{ token: string; release: () => void }> {
+  const token = createLockToken();
+  const nonce = lockTokenNonce(token);
+  holdLockAcquisition(nonce);
+  try {
+    const fd = await acquireClaimLock(lockPath, token, options);
+    return { token, release: () => releaseClaimLock(lockPath, fd, token, nonce) };
+  } catch (error) {
+    releaseLockAcquisition(nonce);
+    throw error;
   }
 }
 
@@ -147,11 +176,7 @@ async function acquireClaimLock(lockPath: string, token: string, options: Persis
     if (now() - started > waitMs) throw new InboundClaimTimeoutError(lockPath);
     const fd = tryAcquireClaimLock(lockPath, token);
     if (fd !== undefined) return fd;
-    if (claimLockStale(lockPath, options.staleMs ?? CLAIM_LOCK_STALE_MS, now())) {
-      reclaimStaleClaimLock(lockPath);
-      if (now() - started > waitMs) throw new InboundClaimTimeoutError(lockPath);
-      continue;
-    }
+    if (reclaimStaleClaimLock(lockPath, options.staleMs ?? CLAIM_LOCK_STALE_MS, now)) continue;
     if (now() - started > waitMs) throw new InboundClaimTimeoutError(lockPath);
     step = await pauseForClaim(step, waitMs - (now() - started));
   }
@@ -168,7 +193,7 @@ async function pauseForClaim(step: number, remainingMs: number): Promise<number>
 function tryAcquireClaimLock(lockPath: string, token: string): number | undefined {
   try {
     const fd = openSync(lockPath, 'wx');
-    writeFileSync(fd, token);
+    writeOwnedLock(fd, token);
     return fd;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'EEXIST') return undefined;
@@ -177,34 +202,20 @@ function tryAcquireClaimLock(lockPath: string, token: string): number | undefine
 }
 
 /**
- * Empty or unparseable content is a holder that has not finished writing.
- * Only an mtime older than `staleMs` (or a missing file, which is free) is stale.
+ * True only when a reclaimable lock was actually removed. A live identity is
+ * not reclaimable, and a rename that does not finish is not progress: the
+ * caller waits and eventually times out.
  */
-function claimLockStale(lockPath: string, staleMs: number, now: number): boolean {
-  try {
-    return now - statSync(lockPath).mtimeMs > staleMs;
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code === 'ENOENT';
-  }
+function reclaimStaleClaimLock(lockPath: string, staleMs: number, now: () => number): boolean {
+  const stale = readStaleLock(lockPath, staleMs, now(), claimLockBodyStale);
+  if (!stale) return false;
+  return reclaimStaleLock(lockPath, staleMs, now, stale, claimLockBodyStale);
 }
 
-function reclaimStaleClaimLock(lockPath: string): void {
-  try {
-    unlinkSync(lockPath);
-  } catch {
-    /* another claimant removed or replaced the stale lock */
-  }
-}
-
-/** Unlink only while the file still names us, so a stolen lock is left for its new owner. */
-function releaseClaimLock(lockPath: string, fd: number, token: string): void {
-  closeSync(fd);
-  try {
-    if (readFileSync(lockPath, 'utf8') !== token) return;
-    unlinkSync(lockPath);
-  } catch {
-    /* lock already released or replaced */
-  }
+/** Unlink only while our fd still names the directory entry and our token. */
+function releaseClaimLock(lockPath: string, fd: number, token: string, nonce: string): void {
+  releaseHeldLock(lockPath, fd, token);
+  releaseLockAcquisition(nonce);
 }
 
 function rememberPersistedClaim(claims: Record<string, number>, key: string, now: number): void {

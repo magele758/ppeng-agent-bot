@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   LOCK_START_UNKNOWN,
+  claimLockBodyStale,
   createLockToken,
   currentProcessLockToken,
   holdLockAcquisition,
@@ -73,6 +74,19 @@ test('a live foreign pid with matching identity is reclaimable once mtime is sta
   assert.equal(lockIdentityAlive(body), true);
   assert.equal(lockBodyStale({ body, ageMs: 0, staleMs: 40 }), false);
   assert.equal(lockBodyStale({ body, ageMs: 41, staleMs: 40 }), true);
+  assert.equal(claimLockBodyStale({ body, ageMs: 60_000, staleMs: 40 }), false);
+});
+
+test('a claim lock keeps a live identity and reclaims only a dead one', () => {
+  const live = `${process.ppid}:${Date.now()}`;
+  assert.equal(claimLockBodyStale({ body: live, ageMs: 60_000, staleMs: 40 }), false);
+  assert.equal(claimLockBodyStale({ body: '999999:1', ageMs: 0, staleMs: 40 }), true);
+  assert.equal(claimLockBodyStale({ body: 'not-a-pid', ageMs: 0, staleMs: 40 }), false);
+  assert.equal(claimLockBodyStale({ body: 'not-a-pid', ageMs: 41, staleMs: 40 }), true);
+  assert.equal(claimLockBodyStale({ body: '', ageMs: 0, staleMs: 40 }), false);
+  assert.equal(claimLockBodyStale({ body: '', ageMs: 41, staleMs: 40 }), true);
+  const reused = `${process.pid}:1:not-our-token:nonce`;
+  assert.equal(claimLockBodyStale({ body: reused, ageMs: 0, staleMs: 40 }), true);
 });
 
 test('a fresh lock this process holds is not reclaimed even with an old mtime', () => {

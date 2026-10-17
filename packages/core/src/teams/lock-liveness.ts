@@ -44,7 +44,7 @@
  * which this module does not take.
  */
 
-import { linkSync, readFileSync, renameSync, statSync, unlinkSync } from 'node:fs';
+import { closeSync, fstatSync, linkSync, lstatSync, readFileSync, renameSync, statSync, unlinkSync, writeSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 
 /**
@@ -140,14 +140,20 @@ interface V1Identity {
   pid: number;
 }
 
-type LockIdentity = V2Identity | V1Identity | { kind: 'empty' } | { kind: 'unknown' };
+/** A pid that could be parsed, but whose body is neither v1 nor v2. */
+interface UnknownIdentity {
+  kind: 'unknown';
+  pid?: number;
+}
+
+type LockIdentity = V2Identity | V1Identity | UnknownIdentity | { kind: 'empty' };
 
 export function parseLockIdentity(body: string): LockIdentity {
   if (body.length === 0) return { kind: 'empty' };
   const parts = body.split(':');
   const pid = Number(parts[0]);
   if (!Number.isInteger(pid) || pid <= 0) return { kind: 'unknown' };
-  return v2Identity(pid, parts) ?? v1Identity(pid, parts) ?? { kind: 'unknown' };
+  return v2Identity(pid, parts) ?? v1Identity(pid, parts) ?? { kind: 'unknown', pid };
 }
 
 function v2Identity(pid: number, parts: string[]): V2Identity | undefined {
@@ -247,6 +253,36 @@ function identityExpired(identity: LockIdentity, body: string): boolean {
   return false;
 }
 
+/**
+ * Claim-lock rule. Unlike {@link lockBodyStale}, a live identity is never
+ * stale: a paused holder keeps the file, and the waiter times out instead.
+ * Dead pid, own pid with a foreign token, and a real start-time mismatch
+ * are reclaimable immediately. A legacy body is reclaimable when its pid is
+ * dead, or when it has no pid and mtime is older than `staleMs`. An empty
+ * body (creator between open and write) waits for that same mtime.
+ */
+export function claimLockBodyStale(input: LockStaleInput): boolean {
+  if (input.body === undefined) return true;
+  const identity = parseLockIdentity(input.body);
+  if (identity.kind === 'v2') return claimV2Stale(identity, input.body);
+  if (identity.kind === 'v1') return !lockPidAlive(identity.pid);
+  if (identity.kind === 'empty') return input.ageMs > input.staleMs;
+  if (identity.kind === 'unknown') return claimUnknownStale(identity, input);
+  return false;
+}
+
+/** A held acquisition, and any identity that is still alive, is never stale. */
+function claimV2Stale(identity: V2Identity, body: string): boolean {
+  if (lockAcquisitionHeld(identity.nonce)) return false;
+  return !lockIdentityAlive(body);
+}
+
+/** A leftover with no pid waits for mtime. A recorded pid that is dead does not. */
+function claimUnknownStale(identity: UnknownIdentity, input: LockStaleInput): boolean {
+  if (identity.pid === undefined) return input.ageMs > input.staleMs;
+  return !lockPidAlive(identity.pid);
+}
+
 /** undefined when the lock vanished; '' when it exists but cannot be read. */
 export function readLockBody(lockPath: string): string | undefined {
   try {
@@ -279,21 +315,34 @@ export function readConsistentLock(lockPath: string): LockSnapshot | undefined {
   return { ino: after.ino, dev: after.dev, mtimeMs: after.mtimeMs, body };
 }
 
-export function lockFileStale(lockPath: string, staleMs: number, now: number): boolean {
+/** Decides whether one consistent snapshot may be reclaimed. */
+export type LockStaleRule = (input: LockStaleInput) => boolean;
+
+export function lockFileStale(
+  lockPath: string,
+  staleMs: number,
+  now: number,
+  rule: LockStaleRule = lockBodyStale
+): boolean {
   const snapshot = readConsistentLock(lockPath);
   if (!snapshot) return false;
-  return snapshotIsStale(snapshot, staleMs, now);
+  return snapshotIsStale(snapshot, staleMs, now, rule);
 }
 
 /** The consistent snapshot when the file is stale; undefined when it is not, or the read raced. */
-export function readStaleLock(lockPath: string, staleMs: number, now: number): LockSnapshot | undefined {
+export function readStaleLock(
+  lockPath: string,
+  staleMs: number,
+  now: number,
+  rule: LockStaleRule = lockBodyStale
+): LockSnapshot | undefined {
   const snapshot = readConsistentLock(lockPath);
-  if (!snapshot || !snapshotIsStale(snapshot, staleMs, now)) return undefined;
+  if (!snapshot || !snapshotIsStale(snapshot, staleMs, now, rule)) return undefined;
   return snapshot;
 }
 
-function snapshotIsStale(snapshot: LockSnapshot, staleMs: number, now: number): boolean {
-  return lockBodyStale({ body: snapshot.body, ageMs: now - snapshot.mtimeMs, staleMs });
+function snapshotIsStale(snapshot: LockSnapshot, staleMs: number, now: number, rule: LockStaleRule): boolean {
+  return rule({ body: snapshot.body, ageMs: now - snapshot.mtimeMs, staleMs });
 }
 
 /**
@@ -308,14 +357,15 @@ export function reclaimStaleLock(
   lockPath: string,
   staleMs: number,
   now: () => number,
-  expected?: LockSnapshot
+  expected?: LockSnapshot,
+  rule: LockStaleRule = lockBodyStale
 ): boolean {
-  const seen = expected ?? readConsistentLock(lockPath);
-  if (!seen || !snapshotIsStale(seen, staleMs, now())) return false;
+  const seen = expected ?? readStaleLock(lockPath, staleMs, now(), rule);
+  if (!seen) return false;
   if (!inodeStillAt(lockPath, seen)) return false;
   const parked = parkedLockPath(lockPath);
   if (!renameAside(lockPath, parked)) return false;
-  if (!parkedStillStale(parked, seen, staleMs, now())) {
+  if (!parkedStillStale(parked, seen, staleMs, now(), rule)) {
     restoreParkedLock(parked, lockPath);
     return false;
   }
@@ -323,9 +373,15 @@ export function reclaimStaleLock(
   return true;
 }
 
-function parkedStillStale(parked: string, seen: LockSnapshot, staleMs: number, now: number): boolean {
+function parkedStillStale(
+  parked: string,
+  seen: LockSnapshot,
+  staleMs: number,
+  now: number,
+  rule: LockStaleRule
+): boolean {
   const again = readConsistentLock(parked);
-  return Boolean(again && sameInodeStamp(again, seen) && snapshotIsStale(again, staleMs, now));
+  return Boolean(again && sameInodeStamp(again, seen) && snapshotIsStale(again, staleMs, now, rule));
 }
 
 /** Last look before rename. A replaced or retouched inode is not the one we judged. */
@@ -397,5 +453,45 @@ export function releaseLockIfToken(lockPath: string, token: string): void {
     unlinkSync(lockPath);
   } catch {
     /* already released or replaced */
+  }
+}
+
+/**
+ * Release through the fd we opened. A stale holder must not unlink a file a
+ * later owner created at the same path: the held fd's inode has to still be
+ * the directory entry, and that entry's body has to still be our token.
+ * The fd is closed either way.
+ */
+export function releaseHeldLock(lockPath: string, fd: number, token: string): void {
+  try {
+    if (heldLockStillOurs(lockPath, fd, token)) unlinkSync(lockPath);
+  } catch {
+    /* already released or replaced */
+  } finally {
+    closeSync(fd);
+  }
+}
+
+/**
+ * The descriptor is write-only (`wx`), so the body is read by path. That is
+ * safe only after the directory entry is confirmed to be the same inode:
+ * a replacement at this path has a different dev+ino and is never unlinked.
+ */
+function heldLockStillOurs(lockPath: string, fd: number, token: string): boolean {
+  const opened = fstatSync(fd);
+  const linked = lstatSync(lockPath);
+  if (opened.dev !== linked.dev || opened.ino !== linked.ino) return false;
+  return readFileSync(lockPath, 'utf8') === token;
+}
+
+/**
+ * `writeFileSync(fd, ...)` closes the descriptor, which would make the later
+ * inode check fail and leak the lock. `writeSync` leaves it open.
+ */
+export function writeOwnedLock(fd: number, token: string): void {
+  const bytes = Buffer.from(token, 'utf8');
+  let offset = 0;
+  while (offset < bytes.length) {
+    offset += writeSync(fd, bytes, offset, bytes.length - offset);
   }
 }

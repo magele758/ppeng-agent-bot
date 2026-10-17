@@ -1,4 +1,4 @@
-import { closeSync, mkdirSync, openSync, utimesSync, writeFileSync } from 'node:fs';
+import { closeSync, mkdirSync, openSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   createLockToken,
@@ -7,7 +7,8 @@ import {
   readStaleLock,
   reclaimStaleLock,
   releaseLockAcquisition,
-  releaseLockIfToken
+  releaseLockIfToken,
+  writeOwnedLock
 } from './lock-liveness.js';
 import { startAsyncLockWait } from './async-lock-wait.js';
 
@@ -105,7 +106,7 @@ function reclaimIfStale(lockPath: string, staleMs: number, now: () => number): b
 function tryCreateSnapshotLock(lockPath: string, token: string): number | undefined {
   try {
     const fd = openSync(lockPath, 'wx');
-    writeFileSync(fd, token);
+    writeOwnedLock(fd, token);
     return fd;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'EEXIST') return undefined;

@@ -9,7 +9,8 @@ import {
   readStaleLock,
   reclaimStaleLock,
   releaseLockAcquisition,
-  releaseLockIfToken
+  releaseLockIfToken,
+  writeOwnedLock
 } from './lock-liveness.js';
 import { startAsyncLockWait } from './async-lock-wait.js';
 
@@ -179,7 +180,7 @@ function reclaimIfStale(lockPath: string, staleMs: number, now: () => number): b
 function tryCreateOwnedLock(lockPath: string, token: string): number | undefined {
   try {
     const fd = openSync(lockPath, 'wx');
-    writeFileSync(fd, token);
+    writeOwnedLock(fd, token);
     return fd;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'EEXIST') return undefined;

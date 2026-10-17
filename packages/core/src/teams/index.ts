@@ -7,3 +7,16 @@ export * from './mailbox.js';
 export * from './gates.js';
 export * from './workspace-sync.js';
 export * from './executor.js';
+export {
+  claimLockBodyStale,
+  createLockToken,
+  holdLockAcquisition,
+  lockTokenNonce,
+  readProcStartTime,
+  readStaleLock,
+  reclaimStaleLock,
+  releaseHeldLock,
+  releaseLockAcquisition,
+  writeOwnedLock
+} from './lock-liveness.js';
+export type { LockStaleInput, LockSnapshot } from './lock-liveness.js';
