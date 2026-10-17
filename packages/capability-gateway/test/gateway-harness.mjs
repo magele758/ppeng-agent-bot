@@ -1,5 +1,5 @@
 import { createCipheriv, createHash, randomBytes } from 'node:crypto';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
@@ -55,8 +55,11 @@ export function fakeRuntime({ bots = {}, runSession } = {}) {
   return runtime;
 }
 
+const gatewayTempDirs = new Set();
+
 export function makeCtx({ runtime, fileConfig = {}, authToken } = {}) {
   const stateDir = mkdtempSync(join(tmpdir(), 'gw-sec-'));
+  gatewayTempDirs.add(stateDir);
   return {
     runtime,
     repoRoot: stateDir,
@@ -64,6 +67,14 @@ export function makeCtx({ runtime, fileConfig = {}, authToken } = {}) {
     env: { enabled: true, pathPrefix: '/gateway/v1', learnEnabled: false, learnDailyHourUtc: 6, authToken },
     fileConfigRef: { current: fileConfig }
   };
+}
+
+/** Remove every state dir created by makeCtx. Safe to call from after() and afterEach. */
+export function cleanupGatewayTemps() {
+  for (const dir of gatewayTempDirs) {
+    rmSync(dir, { recursive: true, force: true });
+    gatewayTempDirs.delete(dir);
+  }
 }
 
 export async function call(handleGatewayHttp, ctx, { method = 'POST', path, body, rawBody, headers = {} }) {

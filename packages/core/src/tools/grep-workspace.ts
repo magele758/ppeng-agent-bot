@@ -145,44 +145,66 @@ function withoutSensitiveGrepLines(content: string, cwd: string): string {
 
 /** Run ripgrep if available, else recursive grep. Sensitive filenames and blocked paths are not returned. */
 export async function runWorkspaceGrep(options: GrepOptions): Promise<{ ok: boolean; content: string }> {
-  const { cwd, pattern, glob, maxMatches, contextLines = 0 } = options;
-  if (sensitiveReadRefusal(cwd, undefined, 'directory') || (glob && globTargetsSensitiveSecret(glob))) {
-    return { ok: false, content: SENSITIVE_READ_REFUSAL };
-  }
-  const limit = Math.min(Math.max(maxMatches, 1), 500);
+  const refused = refuseSensitiveGrep(options);
+  if (refused) return refused;
+  const rg = await runRipgrep(options);
+  if (rg) return rg;
+  return runGrepFallback(options);
+}
 
-  const rgArgs = [
+function refuseSensitiveGrep(options: GrepOptions): { ok: false; content: string } | undefined {
+  if (sensitiveReadRefusal(options.cwd, undefined, 'directory')) return { ok: false, content: SENSITIVE_READ_REFUSAL };
+  if (options.glob && globTargetsSensitiveSecret(options.glob)) return { ok: false, content: SENSITIVE_READ_REFUSAL };
+  return undefined;
+}
+
+function grepLimit(maxMatches: number): number {
+  return Math.min(Math.max(maxMatches, 1), 500);
+}
+
+async function runRipgrep(options: GrepOptions): Promise<{ ok: boolean; content: string } | undefined> {
+  const rg = await runCmd('rg', ripgrepArgs(options), options.cwd);
+  return ripgrepResult(rg, options.cwd);
+}
+
+function ripgrepArgs(options: GrepOptions): string[] {
+  const limit = grepLimit(options.maxMatches);
+  const context = options.contextLines ?? 0;
+  return [
     '--json',
     '--hidden',
     '--max-count',
     String(limit),
-    ...(contextLines > 0 ? ['-C', String(contextLines)] : []),
+    ...(context > 0 ? ['-C', String(context)] : []),
     ...RG_SECRET_EXCLUDES,
-    ...(glob ? ['--glob', glob] : []),
-    pattern,
+    ...(options.glob ? ['--glob', options.glob] : []),
+    options.pattern,
     '.'
   ];
+}
 
-  const rg = await runCmd('rg', rgArgs, cwd);
-  if (rg.code !== -1) {
-    if (rg.code === 0 || rg.stdout.trim()) {
-      return { ok: true, content: renderRgJson(rg.stdout, cwd) };
-    }
-    if (rg.code === 1) {
-      return { ok: true, content: '(no matches)' };
-    }
-  }
+function ripgrepResult(
+  rg: { code: number | null; stdout: string },
+  cwd: string
+): { ok: boolean; content: string } | undefined {
+  if (rg.code === -1) return undefined;
+  if (rg.code === 0 || rg.stdout.trim()) return { ok: true, content: renderRgJson(rg.stdout, cwd) };
+  if (rg.code === 1) return { ok: true, content: '(no matches)' };
+  return undefined;
+}
 
-  const grepArgs = ['-RIn', '--max-count', String(limit), pattern, '.'];
-  const g = await runCmd('grep', grepArgs, cwd);
-  if (g.code === -1) {
-    return { ok: false, content: 'Neither rg nor grep is available in PATH.' };
-  }
-  if (g.code === 0 || g.stdout.trim()) {
-    return { ok: true, content: withoutSensitiveGrepLines(g.stdout.trim(), cwd) };
-  }
-  if (g.code === 1) {
-    return { ok: true, content: '(no matches)' };
-  }
+async function runGrepFallback(options: GrepOptions): Promise<{ ok: boolean; content: string }> {
+  const limit = grepLimit(options.maxMatches);
+  const g = await runCmd('grep', ['-RIn', '--max-count', String(limit), options.pattern, '.'], options.cwd);
+  return grepFallbackResult(g, options.cwd);
+}
+
+function grepFallbackResult(
+  g: { code: number | null; stdout: string; stderr: string },
+  cwd: string
+): { ok: boolean; content: string } {
+  if (g.code === -1) return { ok: false, content: 'Neither rg nor grep is available in PATH.' };
+  if (g.code === 0 || g.stdout.trim()) return { ok: true, content: withoutSensitiveGrepLines(g.stdout.trim(), cwd) };
+  if (g.code === 1) return { ok: true, content: '(no matches)' };
   return { ok: false, content: g.stderr.trim() || 'grep failed' };
 }
