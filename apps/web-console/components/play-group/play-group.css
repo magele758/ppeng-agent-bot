@@ -82,6 +82,22 @@
   border: 1px solid var(--color-border-strong);
   border-radius: 999px;
   font-size: var(--ui-text-xs);
+  max-width: 100%;
+}
+
+.play-group-member__identity {
+  display: inline-flex;
+  flex-direction: column;
+  min-width: 0;
+  max-width: 16rem;
+}
+
+.play-group-member__desc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 16rem;
+  color: var(--ui-text-muted);
 }
 
 .play-group-turn {
