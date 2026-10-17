@@ -31,3 +31,12 @@ export function isRestrainedMember(turn: { mentionedBotIds?: readonly string[] }
 export function restraintHint(turn: { mentionedBotIds?: readonly string[] }, botId: string): string {
   return isRestrainedMember(turn, botId) ? RESTRAINT_HINT : '';
 }
+
+/**
+ * Members that will actually run this round, in speaking order, capped by the round budget.
+ * Mentioned members come first, so an unmentioned member only appears while budget remains.
+ */
+export function budgetedSpeakers(botIds: readonly string[], maxBotTurns: number): string[] {
+  const limit = Number.isInteger(maxBotTurns) && maxBotTurns > 0 ? maxBotTurns : 0;
+  return botIds.slice(0, limit);
+}

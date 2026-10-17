@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isRestrainedMember, restraintHint, scheduleRoomTurn, RESTRAINT_HINT } from '../src/rooms/scheduling.ts';
+import { budgetedSpeakers, isRestrainedMember, restraintHint, scheduleRoomTurn, RESTRAINT_HINT } from '../src/rooms/scheduling.ts';
 
 const alpha = 'bot_alpha';
 const beta = 'bot_beta';
@@ -60,4 +60,12 @@ test('an empty mentionedBotIds restrains every member [AC:bot-rooms#AC-2]', () =
   assert.equal(isRestrainedMember(unmatched, alpha), true);
   assert.equal(isRestrainedMember(unmatched, beta), true);
   assert.equal(restraintHint(unmatched, gamma), RESTRAINT_HINT);
+});
+
+test('the round budget keeps mentioned members and drops the rest [AC:bot-rooms#AC-2]', () => {
+  const schedule = scheduleRoomTurn(room, [beta, alpha]);
+  assert.deepEqual(budgetedSpeakers(schedule.botIds, 2), [beta, alpha]);
+  assert.deepEqual(budgetedSpeakers(schedule.botIds, 1), [beta]);
+  assert.deepEqual(budgetedSpeakers(schedule.botIds, 8), [beta, alpha, gamma]);
+  assert.deepEqual(budgetedSpeakers(schedule.botIds, 0), []);
 });

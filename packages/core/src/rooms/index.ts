@@ -7,7 +7,7 @@ import type { KernelHookListener } from '@ppeng/agent-loop';
 import { fenceExternalContent } from '../safety/external-content.js';
 import { botWorkControl, hasPendingSessionWake, resumeApprovedBotSession, checkBotQueueCapacity } from '../bots/bot-work.js';
 import { isSilenceToken } from '../bots/silence.js';
-import { restraintHint, scheduleRoomTurn } from './scheduling.js';
+import { budgetedSpeakers, restraintHint, scheduleRoomTurn } from './scheduling.js';
 export { filterRoomTools } from './tool-policy.js';
 
 export interface BotRoom {
@@ -238,7 +238,7 @@ export class BotRoomService {
     return this.tx(() => {
       const existing = this.duplicateReceipt(id, input, text, attachments);
       if (existing) return existing;
-      checkBotQueueCapacity(this.store, principal, schedule.botIds.slice(0, room.maxBotTurns));
+      checkBotQueueCapacity(this.store, principal, budgetedSpeakers(schedule.botIds, room.maxBotTurns));
       const pending = this.store.db.prepare("SELECT COUNT(*) AS count FROM bot_room_turns WHERE room_id=? AND status IN ('queued','running','waiting_approval')").get(id) as { count: number };
       if (pending.count >= 1000) throw new ConflictError('Room queue capacity reached; retry later');
       const turnId = createId('room_turn');
@@ -421,8 +421,9 @@ export class BotRoomService {
     }
     return parts;
   }
-  /** Last scheduled member of this round: nobody still in the Room remains after the cursor. Silence does not spend the speaking budget, so a budget guess must not mark an earlier member as wrap-up. */
+  /** This run uses the last speaking-budget slot, or no later scheduled member is still in the Room. */
   private isWrapUpTurn(room: BotRoom, turn: BotRoomTurn): boolean {
+    if (turn.botTurns + 1 >= turn.maxBotTurns) return true;
     for (let i = turn.cursor + 1; i < turn.botIds.length; i += 1) {
       if (room.botIds.includes(turn.botIds[i]!)) return false;
     }
@@ -480,9 +481,10 @@ export class BotRoomService {
   private publish(room:BotRoom,turn:BotRoomTurn,botId:string):void {
     const bot=this.store.getBot(botId)!;
     const output=this.resultText(turn.currentSessionId!,turn.startSeq??0).trim();
-    // An empty reply or a silence token ends only this member's turn. It posts nothing and does not spend the speaking budget.
+    // An empty reply or a silence token ends only this member's turn. It posts nothing, but a clean end still spends one speaking-budget slot.
     if(!output||isSilenceToken(output)){
       this.tx(()=>{
+        turn.botTurns++;
         turn.cursor++;
         if(!turn.silentBotIds)turn.silentBotIds=[];
         if(!turn.silentBotIds.includes(botId))turn.silentBotIds.push(botId);
