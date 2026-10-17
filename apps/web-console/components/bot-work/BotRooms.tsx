@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useI18n, type MessageKey } from "@/lib/i18n";
-import { mergeHistoryWindow } from "@/lib/history-window";
+import { mergeHistoryWindow, prependHistoryPage } from "@/lib/history-window";
 import type { BotInfo } from "@/lib/types";
 import { api, json, useAction, Feedback, Result, Status } from "./shared";
 type Room = {
@@ -40,8 +40,14 @@ export function BotRooms({ bots }: { bots: BotInfo[] }) {
   const messagesRef = useRef<Message[]>([]);
   const roomIdRef = useRef<string | null>(null);
   const [cursor, setCursor] = useState<number | null>(null);
+  const cursorRef = useRef<number | null>(null);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [newMember, setNewMember] = useState("");
+  const historyEpoch = useRef(0);
+  const rememberCursor = (next: number | null) => {
+    cursorRef.current = next;
+    setCursor(next);
+  };
   const load = async () => {
     const data = (await api("/api/bot-rooms")) as { rooms: Room[] };
     setRooms(data.rooms);
@@ -50,24 +56,26 @@ export function BotRooms({ bots }: { bots: BotInfo[] }) {
     if (roomIdRef.current !== r.id) {
       roomIdRef.current = r.id;
       setText(""); setMentions([]); setAttachments(""); setNewMember("");
-      messagesRef.current = []; setMessages([]); setCursor(null); setTurns([]);
+      messagesRef.current = []; setMessages([]); rememberCursor(null); setTurns([]);
     }
     setRoom(r);
     const base = `/api/bot-rooms/${r.id}`;
+    const beforeSeq = older ? cursorRef.current : null;
+    const epoch = ++historyEpoch.current;
     const [data, status] = (await Promise.all([
       api(
-        `${base}/messages?limit=50${older && cursor ? `&beforeSeq=${cursor}` : ""}`,
+        `${base}/messages?limit=50${beforeSeq != null ? `&beforeSeq=${beforeSeq}` : ""}`,
       ),
       api(`${base}/turns`),
     ])) as [
       { messages: Message[]; nextCursor: number | null; hasMore: boolean },
       { turns: Turn[] },
     ];
-    if (roomIdRef.current !== r.id) return;
-    const nextMessages = older ? [...data.messages, ...messagesRef.current] : data.messages;
+    if (roomIdRef.current !== r.id || epoch !== historyEpoch.current) return;
+    const nextMessages = older ? prependHistoryPage(messagesRef.current, data.messages) : data.messages;
     messagesRef.current = nextMessages;
     setMessages(nextMessages);
-    setCursor(data.hasMore ? data.nextCursor : null);
+    rememberCursor(data.hasMore ? data.nextCursor : null);
     setTurns(status.turns);
   };
   useEffect(() => {
@@ -77,18 +85,24 @@ export function BotRooms({ bots }: { bots: BotInfo[] }) {
     if (!room) return;
     let active = true;
     const timer = setInterval(() => {
+      const epoch = historyEpoch.current;
       void Promise.all([
         api(`/api/bot-rooms/${room.id}/messages?limit=50`),
         api(`/api/bot-rooms/${room.id}/turns`),
         api(`/api/bot-rooms/${room.id}`),
       ])
         .then(([history, status, current]) => {
-          if (!active || roomIdRef.current !== room.id) return;
+          if (!active || roomIdRef.current !== room.id || epoch !== historyEpoch.current) return;
           const page = history as { messages: Message[]; hasMore: boolean; nextCursor: number | null };
           const merged = mergeHistoryWindow(messagesRef.current, page.messages, true);
           messagesRef.current = merged.messages;
           setMessages(merged.messages);
-          if (merged.reset) setCursor(page.hasMore ? page.nextCursor : null);
+          // A disjoint tail means a page was skipped. The tail cursor only reaches
+          // that page; the next older read has to start at the oldest row still shown.
+          if (merged.reset) {
+            const oldest = merged.messages[0]?.seq;
+            rememberCursor(oldest != null && oldest > 1 ? oldest : page.hasMore ? page.nextCursor : null);
+          }
           setTurns((status as { turns: Turn[] }).turns);
           setRoom(prev=>prev?{...prev,status:(current as {room:Room}).room.status,botIds:(current as {room:Room}).room.botIds}:(current as {room:Room}).room);
         })
