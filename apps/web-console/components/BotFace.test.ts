@@ -8,7 +8,7 @@ const body = source.slice(source.indexOf('export function BotFace('));
 test('BotFace runs both effects before the avatar return so hook order stays stable', () => {
   const moodEffect = body.indexOf('turnFinishHappyUntil(');
   const motionEffect = body.indexOf("matchMedia('(prefers-reduced-motion: reduce)')");
-  const avatarReturn = body.indexOf('if (avatar)');
+  const avatarReturn = body.indexOf("standIn?.kind === 'image'");
   assert.ok(moodEffect > 0 && motionEffect > moodEffect, 'both effects exist, mood effect first');
   assert.ok(avatarReturn > motionEffect, 'avatar return stays after every hook');
 });

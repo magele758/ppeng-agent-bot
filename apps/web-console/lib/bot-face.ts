@@ -97,11 +97,261 @@ export function resolveBotFaceAppearance(input: {
   };
 }
 
+/**
+ * Preview props for the face picker.
+ * Nothing chosen yet keeps a saved emoji or image (no shape/color override).
+ * A chosen silhouette or swatch is passed through; the other axis stays unset
+ * so the name (or a saved choice) still fills it.
+ */
+function previewAxis<T extends string>(chosen: T | null, shown: T | null, fallback: T): T | undefined {
+  if (chosen === null) return undefined;
+  return shown ?? fallback;
+}
+
+export function previewFaceChoice(
+  shape: BotFaceShape | null,
+  color: BotFaceColor | null,
+  shown: { shape: BotFaceShape | null; color: BotFaceColor | null }
+): { shape?: BotFaceShape; color?: BotFaceColor } {
+  if (shape === null && color === null) return {};
+  const nextShape = previewAxis(shape, shown.shape, 'teardrop');
+  const nextColor = previewAxis(color, shown.color, 'red');
+  return {
+    ...(nextShape !== undefined ? { shape: nextShape } : {}),
+    ...(nextColor !== undefined ? { color: nextColor } : {})
+  };
+}
+
+export type SavedFaceEntry = {
+  shape: BotFaceShape | null;
+  color: BotFaceColor | null;
+  avatar: string | null;
+};
+
+export type FaceCatalogBot = {
+  name: string;
+  faceShape?: string | null;
+  faceColor?: string | null;
+  avatar?: string | null;
+};
+
+function savedAvatarText(avatar: unknown): string | null {
+  return typeof avatar === 'string' && avatar.trim() ? avatar.trim() : null;
+}
+
+function faceHasSave(face: SavedFaceEntry): boolean {
+  return Boolean(face.shape || face.color || face.avatar);
+}
+
+function savedFaceEntry(bot: FaceCatalogBot): { key: string; face: SavedFaceEntry } | null {
+  const key = bot.name.trim();
+  if (!key) return null;
+  const face = {
+    shape: isBotFaceShape(bot.faceShape) ? bot.faceShape : null,
+    color: isBotFaceColor(bot.faceColor) ? bot.faceColor : null,
+    avatar: savedAvatarText(bot.avatar)
+  };
+  if (!faceHasSave(face)) return null;
+  return { key, face };
+}
+
+/** Index saved faces by trimmed name. Blank names and faces with nothing saved are skipped. */
+export function indexSavedFaces(bots: readonly FaceCatalogBot[]): Map<string, SavedFaceEntry> {
+  const next = new Map<string, SavedFaceEntry>();
+  for (const bot of bots) {
+    const entry = savedFaceEntry(bot);
+    if (entry) next.set(entry.key, entry.face);
+  }
+  return next;
+}
+
+/** An http(s) avatar renders as an image; anything else saved is treated as emoji text. */
+export function isAvatarImageUrl(avatar: string | null): boolean {
+  return avatar !== null && /^https?:\/\//i.test(avatar);
+}
+
+/** Saved avatar shows only when the caller did not pass an explicit shape or color. */
+export function avatarWhenNoFaceOverride(
+  shape: BotFaceShape | null | undefined,
+  color: BotFaceColor | null | undefined,
+  savedAvatar: string | null
+): string | null {
+  return shape === undefined && color === undefined ? savedAvatar : null;
+}
+
+export type BotFaceSize = 'sm' | 'md' | 'lg';
+
+/** Class list shared by the svg face and the avatar stand-in. */
+export function botFaceClassName(input: {
+  size: BotFaceSize;
+  className?: string;
+  avatar?: boolean;
+  empty?: boolean;
+}): string {
+  const sizeClass = input.size !== 'sm' ? `bot-face--${input.size}` : '';
+  const kind = input.avatar ? 'bot-face--avatar' : input.empty ? 'bot-face--empty' : '';
+  return ['bot-face', kind, sizeClass, input.className ?? ''].filter((part) => part.length > 0).join(' ');
+}
+
+export type AvatarStandIn =
+  | { kind: 'image'; className: string; src: string; alt: string }
+  | { kind: 'emoji'; className: string; text: string; label: string | undefined };
+
+/**
+ * How a saved avatar is drawn. Null means "draw the geometric face instead".
+ * An http(s) value is an image; anything else is emoji text.
+ */
+export function avatarStandIn(input: {
+  avatar: string | null;
+  size: BotFaceSize;
+  className?: string;
+  label?: string;
+}): AvatarStandIn | null {
+  if (!input.avatar) return null;
+  const className = botFaceClassName({ size: input.size, className: input.className, avatar: true });
+  if (isAvatarImageUrl(input.avatar)) {
+    return { kind: 'image', className, src: input.avatar, alt: input.label ?? '' };
+  }
+  return { kind: 'emoji', className, text: input.avatar, label: input.label };
+}
+
+/** Light silhouettes need dark eyes. An empty face uses the placeholder gray. */
+export function eyeInkForColor(color: BotFaceColor | null): string {
+  if (color === 'yellow' || color === 'white') return '#1A1A1A';
+  if (!color) return '#667085';
+  return '#FFFFFF';
+}
+
+export type DrawnFaceView = {
+  shape: BotFaceShape | null;
+  color: BotFaceColor | null;
+  drawnShape: BotFaceShape | 'empty';
+  index: BotFaceIndex | null;
+  eyes: string;
+  eyeW: number;
+  eyeH: number;
+  mouth: MouthKind;
+  mouthOpen: number;
+  empty: boolean;
+  expression: LivingFaceExpression;
+  layout: FaceLayout;
+};
+
+export type FaceLayout = {
+  left: number;
+  right: number;
+  eyeY: number;
+  eyeW: number;
+  eyeH: number;
+  mouthY: number;
+  markY: number;
+};
+
+const FACE_LAYOUTS: Record<BotFaceShape, FaceLayout> = {
+  triangle: { left: 27, right: 37, eyeY: 40, eyeW: 4.6, eyeH: 10, mouthY: 48, markY: 28 },
+  house: { left: 26, right: 38, eyeY: 40, eyeW: 4.8, eyeH: 11, mouthY: 50, markY: 22 },
+  teardrop: { left: 26, right: 38, eyeY: 40, eyeW: 5.2, eyeH: 13, mouthY: 50, markY: 22 },
+  heart: { left: 26, right: 38, eyeY: 34, eyeW: 4.8, eyeH: 11, mouthY: 44, markY: 18 },
+  star: { left: 27, right: 37, eyeY: 33, eyeW: 4.2, eyeH: 9, mouthY: 42, markY: 18 },
+  tall: { left: 27, right: 37, eyeY: 32, eyeW: 5, eyeH: 13, mouthY: 46, markY: 16 },
+  bean: { left: 24, right: 40, eyeY: 33, eyeW: 5, eyeH: 11, mouthY: 42, markY: 18 },
+  flower: { left: 26.5, right: 37.5, eyeY: 32, eyeW: 5.2, eyeH: 12, mouthY: 44, markY: 14 },
+  cloud: { left: 26, right: 38, eyeY: 33, eyeW: 5.4, eyeH: 13, mouthY: 46, markY: 16 },
+  clover: { left: 26, right: 38, eyeY: 33, eyeW: 5.4, eyeH: 13, mouthY: 46, markY: 16 },
+  splat: { left: 26, right: 38, eyeY: 33, eyeW: 5.4, eyeH: 13, mouthY: 46, markY: 16 },
+  hexagon: { left: 26, right: 38, eyeY: 33, eyeW: 5.4, eyeH: 13, mouthY: 46, markY: 16 },
+  circle: { left: 26, right: 38, eyeY: 33, eyeW: 5.4, eyeH: 13, mouthY: 46, markY: 16 },
+  squircle: { left: 26, right: 38, eyeY: 33, eyeW: 5.4, eyeH: 13, mouthY: 46, markY: 16 }
+};
+
+const DEFAULT_FACE_LAYOUT = FACE_LAYOUTS.circle;
+
+/** Eye and mouth placement for one silhouette. A blank shape uses the default face. */
+export function faceLayout(shape: BotFaceShape | null): FaceLayout {
+  if (!shape) return DEFAULT_FACE_LAYOUT;
+  return FACE_LAYOUTS[shape];
+}
+
+/**
+ * Everything the resting svg needs besides layout geometry.
+ * A surprised face uses round eyes; talk and surprise open the mouth.
+ */
+export function drawnFaceView(input: {
+  name?: string | null;
+  shape?: BotFaceShape | null;
+  color?: BotFaceColor | null;
+  saved: { shape: BotFaceShape | null; color: BotFaceColor | null };
+  mood: LivingFaceMood;
+}): DrawnFaceView {
+  const appearance = resolveDrawnFace(input);
+  const expression = expressionForMood(input.mood);
+  const mouth = restingMouth(expression);
+  const layoutShape = input.shape !== undefined ? input.shape : input.saved.shape;
+  const layout = faceLayout(layoutShape);
+  const round = expression === 'surprised';
+  return {
+    shape: appearance.shape,
+    color: appearance.color,
+    drawnShape: drawnSilhouette(appearance.shape, appearance.color),
+    index: botFaceIndex(input.name),
+    eyes: eyeInkForColor(appearance.color),
+    eyeW: round ? 8.2 : layout.eyeW,
+    eyeH: round ? 8.2 : layout.eyeH,
+    mouth: mouth.kind,
+    mouthOpen: mouth.open,
+    empty: !appearance.color,
+    expression,
+    layout
+  };
+}
+
+function drawnSilhouette(shape: BotFaceShape | null, color: BotFaceColor | null): BotFaceShape | 'empty' {
+  if (shape) return shape;
+  return color ? 'circle' : 'empty';
+}
+
+function restingMouth(expression: LivingFaceExpression): { kind: MouthKind; open: number } {
+  if (expression === 'talk') return { kind: 'open', open: 0.45 };
+  if (expression === 'surprised') return { kind: 'oh', open: 0 };
+  return { kind: 'rest', open: 0 };
+}
+
+/**
+ * Face the component draws.
+ * An explicit prop wins, including `null` (skip the save, use the name).
+ * An omitted prop falls through to the catalog, then the name hash.
+ */
+export function resolveDrawnFace(input: {
+  name?: string | null;
+  shape?: BotFaceShape | null;
+  color?: BotFaceColor | null;
+  saved: { shape: BotFaceShape | null; color: BotFaceColor | null };
+}): { shape: BotFaceShape | null; color: BotFaceColor | null } {
+  return resolveBotFaceAppearance({
+    name: input.name,
+    savedShape: input.shape !== undefined ? input.shape : input.saved.shape,
+    savedColor: input.color !== undefined ? input.color : input.saved.color
+  });
+}
+
+/** What the detail header passes to BotFace. Null axes are omitted so the save still shows. */
+export function detailFaceProps(
+  shape: BotFaceShape | null,
+  color: BotFaceColor | null
+): { shape?: BotFaceShape; color?: BotFaceColor } {
+  return {
+    ...(shape !== null ? { shape } : {}),
+    ...(color !== null ? { color } : {})
+  };
+}
+
 export const LIVING_FACE_MOODS = ['idle', 'thinking', 'speaking', 'tool'] as const;
 
 export type LivingFaceMood = (typeof LIVING_FACE_MOODS)[number];
 
 export type LivingFaceExpression = 'rest' | 'ellipsis' | 'talk' | 'surprised';
+
+export type MouthKind = 'rest' | 'smile' | 'sleepy' | 'open' | 'oh';
 
 /** Blank names use the empty-state placeholder instead of a named face. */
 export function botFaceIndex(name: string | null | undefined): BotFaceIndex | null {
@@ -343,8 +593,6 @@ export const HAPPY_BEAT_MS = 880;
 export const HOVER_HOP_MS = 420;
 
 export type FaceGesture = 'rest' | 'sleepy' | 'hover' | 'happy' | 'ellipsis' | 'talk' | 'surprised';
-
-export type MouthKind = 'rest' | 'smile' | 'sleepy' | 'open' | 'oh';
 
 /**
  * Decorative motion layered on an idle face.

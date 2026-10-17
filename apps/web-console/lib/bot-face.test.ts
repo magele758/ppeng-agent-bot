@@ -18,7 +18,18 @@ import {
   botFaceShape,
   isBotFaceColor,
   isBotFaceShape,
+  avatarStandIn,
+  avatarWhenNoFaceOverride,
+  botFaceClassName,
+  detailFaceProps,
+  drawnFaceView,
+  eyeInkForColor,
+  faceLayout,
+  indexSavedFaces,
+  isAvatarImageUrl,
+  previewFaceChoice,
   resolveBotFaceAppearance,
+  resolveDrawnFace,
   damp,
   ellipsisScale,
   happyBeat,
@@ -158,6 +169,96 @@ test('保存的脸型和颜色覆盖名字，没保存则沿用名字', () => {
     shape: botFaceShape('Super Bot'),
     color: botFaceColor('Super Bot')
   });
+});
+
+test('picker preview keeps a saved avatar until a shape or color is chosen', () => {
+  const shown = { shape: 'star' as const, color: 'blue' as const };
+  assert.deepEqual(previewFaceChoice(null, null, shown), {});
+  assert.deepEqual(previewFaceChoice('circle', null, shown), { shape: 'star' });
+  assert.deepEqual(previewFaceChoice(null, 'red', shown), { color: 'blue' });
+  assert.deepEqual(previewFaceChoice('circle', 'red', { shape: null, color: null }), {
+    shape: 'teardrop',
+    color: 'red'
+  });
+});
+
+test('saved faces index by trimmed name and skip blanks', () => {
+  const map = indexSavedFaces([
+    { name: '  Ada  ', faceShape: 'bean', faceColor: 'mint', avatar: '  🤖  ' },
+    { name: '   ', faceShape: 'star', faceColor: 'red' },
+    { name: 'NoSave', faceShape: 'spark', faceColor: 'gold', avatar: '  ' },
+    { name: 'Pic', avatar: ' https://cdn.example/a.png ' },
+    { name: 'ShapeOnly', faceShape: 'heart' }
+  ]);
+  assert.deepEqual(map.get('Ada'), { shape: 'bean', color: 'mint', avatar: '🤖' });
+  assert.equal(map.has(''), false);
+  assert.equal(map.has('NoSave'), false);
+  assert.deepEqual(map.get('Pic'), { shape: null, color: null, avatar: 'https://cdn.example/a.png' });
+  assert.deepEqual(map.get('ShapeOnly'), { shape: 'heart', color: null, avatar: null });
+  assert.equal(indexSavedFaces([{ name: 'Num', avatar: 3 as unknown as string }]).size, 0);
+});
+
+test('an avatar stands in only when no face override was passed', () => {
+  assert.equal(avatarWhenNoFaceOverride(undefined, undefined, '🤖'), '🤖');
+  assert.equal(avatarWhenNoFaceOverride(null, undefined, '🤖'), null);
+  assert.equal(avatarWhenNoFaceOverride(undefined, 'red', '🤖'), null);
+  assert.equal(isAvatarImageUrl(null), false);
+  assert.equal(isAvatarImageUrl('🤖'), false);
+  assert.equal(isAvatarImageUrl('https://cdn.example/a.png'), true);
+  assert.equal(isAvatarImageUrl('HTTP://cdn.example/a.png'), true);
+  assert.equal(avatarStandIn({ avatar: null, size: 'sm' }), null);
+  assert.deepEqual(avatarStandIn({ avatar: 'https://cdn.example/a.png', size: 'lg', label: 'Ada' }), {
+    kind: 'image',
+    className: 'bot-face bot-face--avatar bot-face--lg',
+    src: 'https://cdn.example/a.png',
+    alt: 'Ada'
+  });
+  assert.deepEqual(avatarStandIn({ avatar: '🤖', size: 'sm' }), {
+    kind: 'emoji',
+    className: 'bot-face bot-face--avatar',
+    text: '🤖',
+    label: undefined
+  });
+  assert.equal(botFaceClassName({ size: 'md', empty: true, className: 'extra' }), 'bot-face bot-face--empty bot-face--md extra');
+  assert.equal(botFaceClassName({ size: 'sm' }), 'bot-face');
+});
+
+test('drawn face uses a save, then the name, and rounds the eyes when surprised', () => {
+  const saved = { shape: 'bean' as const, color: 'mint' as const };
+  const idle = drawnFaceView({ name: 'DeskBot', saved, mood: 'idle' });
+  assert.equal(idle.shape, 'bean');
+  assert.equal(idle.color, 'mint');
+  assert.equal(idle.mouth, 'rest');
+  assert.equal(idle.mouthOpen, 0);
+  assert.deepEqual(idle.layout, faceLayout('bean'));
+  const named = drawnFaceView({ name: 'DeskBot', shape: null, color: null, saved, mood: 'speaking' });
+  assert.equal(named.shape, botFaceShape('DeskBot'));
+  assert.equal(named.mouth, 'open');
+  assert.equal(named.mouthOpen, 0.45);
+  assert.equal(named.drawnShape, named.shape);
+  const blank = drawnFaceView({ name: '', shape: null, color: 'red', saved: { shape: null, color: null }, mood: 'tool' });
+  assert.equal(blank.drawnShape, 'circle');
+  assert.equal(blank.eyeW, 8.2);
+  assert.equal(blank.mouth, 'oh');
+  assert.equal(blank.index, null);
+  const empty = drawnFaceView({ name: '', saved: { shape: null, color: null }, mood: 'thinking' });
+  assert.equal(empty.drawnShape, 'empty');
+  assert.equal(empty.empty, true);
+  assert.equal(empty.eyes, '#667085');
+  assert.equal(eyeInkForColor('yellow'), '#1A1A1A');
+  assert.equal(eyeInkForColor('white'), '#1A1A1A');
+  assert.equal(eyeInkForColor('blue'), '#FFFFFF');
+  assert.equal(eyeInkForColor(null), '#667085');
+  assert.deepEqual(faceLayout(null), faceLayout('circle'));
+  assert.deepEqual(faceLayout('tall').left, 27);
+  assert.deepEqual(resolveDrawnFace({ name: 'DeskBot', color: 'red', saved }), {
+    shape: 'bean',
+    color: 'red'
+  });
+  assert.deepEqual(detailFaceProps(null, null), {});
+  assert.deepEqual(detailFaceProps('star', null), { shape: 'star' });
+  assert.deepEqual(detailFaceProps(null, 'pink'), { color: 'pink' });
+  for (const shape of BOT_FACE_SHAPES) assert.ok(faceLayout(shape).eyeH > 0);
 });
 
 test('对话状态按最新片段切换', () => {

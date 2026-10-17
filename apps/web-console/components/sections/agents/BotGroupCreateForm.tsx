@@ -2,7 +2,14 @@
 
 import { useState } from 'react';
 import { api } from '@/lib/api';
-import { groupMemberIds, groupSpeakBudget, BOT_GROUPS_CHANGED_EVENT } from '@/lib/bot-group';
+import {
+  BOT_GROUPS_CHANGED_EVENT,
+  groupCreateDraft,
+  groupCreateError,
+  groupCreateNeedsRoster,
+  toggleGroupMember,
+  type BotGroupCreateBody
+} from '@/lib/bot-group';
 import { useI18n } from '@/lib/i18n';
 import type { BotInfo } from '@/lib/types';
 
@@ -20,40 +27,30 @@ export function BotGroupCreateForm({ bots, onCreated, onCancel }: BotGroupCreate
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const trimmed = title.trim();
-  const titleOk = trimmed.length >= 1 && trimmed.length <= 120;
-  const members = groupMemberIds(memberIds, new Set(bots.map((bot) => bot.id)));
-  const ready = titleOk && members.ok;
+  const knownIds = new Set(bots.map((bot) => bot.id));
+  const draft = groupCreateDraft(title, memberIds, knownIds);
 
   const toggle = (id: string) => {
-    setMemberIds((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
+    setMemberIds((current) => toggleGroupMember(current, id));
   };
 
   const submit = async () => {
-    if (!titleOk) {
-      setError(t('play.group.titleInvalid'));
+    if (draft.blockKey) {
+      setError(t(draft.blockKey));
       return;
     }
-    if (!members.ok) {
-      setError(t('agents.bots.groupNeedTwo'));
-      return;
-    }
+    const body = draft.body as BotGroupCreateBody;
     setBusy(true);
     setError(null);
     try {
       await api('/api/bot-rooms', {
         method: 'POST',
-        body: JSON.stringify({
-          title: trimmed,
-          botIds: members.members,
-          hostBotId: members.members[0],
-          maxBotTurns: groupSpeakBudget(members.members.length)
-        })
+        body: JSON.stringify(body)
       });
       window.dispatchEvent(new CustomEvent(BOT_GROUPS_CHANGED_EVENT));
-      onCreated(trimmed);
+      onCreated(body.title);
     } catch (err) {
-      setError(t('agents.bots.groupFailed', { error: err instanceof Error ? err.message : String(err) }));
+      setError(groupCreateError(err, (error) => t('agents.bots.groupFailed', { error })));
     } finally {
       setBusy(false);
     }
@@ -67,8 +64,8 @@ export function BotGroupCreateForm({ bots, onCreated, onCancel }: BotGroupCreate
           <p className="ag-panel__lead">{t('agents.bots.groupDesc')}</p>
         </div>
       </header>
-      {bots.length < 2 ? (
-        <p className="ag-field__hint" data-testid="bot-group-empty">{t('agents.bots.groupEmpty')}</p>
+      {groupCreateNeedsRoster(bots.length) ? (
+        <GroupCreateEmpty onCancel={onCancel} />
       ) : (
         <form
           className="ag-form"
@@ -111,16 +108,14 @@ export function BotGroupCreateForm({ bots, onCreated, onCancel }: BotGroupCreate
               ))}
             </ul>
           </fieldset>
-          {!members.ok && memberIds.length > 0 ? (
-            <p className="ag-field__error" role="alert">{t('agents.bots.groupNeedTwo')}</p>
-          ) : null}
+          <GroupMemberWarning show={draft.warnMembers} />
           {error ? <p className="ag-field__error" role="alert">{error}</p> : null}
           <div className="ag-form__actions">
             <button
               type="submit"
               className="btn btn-primary btn-sm"
               data-testid="bot-group-submit"
-              disabled={busy || !ready}
+              disabled={busy || !draft.ready}
             >
               {busy ? t('agents.bots.groupSubmitting') : t('agents.bots.groupSubmit')}
             </button>
@@ -130,13 +125,26 @@ export function BotGroupCreateForm({ bots, onCreated, onCancel }: BotGroupCreate
           </div>
         </form>
       )}
-      {bots.length < 2 ? (
-        <div className="ag-form__actions">
-          <button type="button" className="btn btn-sm" onClick={onCancel}>
-            {t('agents.bots.cancel')}
-          </button>
-        </div>
-      ) : null}
     </section>
   );
+}
+
+function GroupCreateEmpty({ onCancel }: { onCancel: () => void }) {
+  const { t } = useI18n();
+  return (
+    <>
+      <p className="ag-field__hint" data-testid="bot-group-empty">{t('agents.bots.groupEmpty')}</p>
+      <div className="ag-form__actions">
+        <button type="button" className="btn btn-sm" onClick={onCancel}>
+          {t('agents.bots.cancel')}
+        </button>
+      </div>
+    </>
+  );
+}
+
+function GroupMemberWarning({ show }: { show: boolean }) {
+  const { t } = useI18n();
+  if (!show) return null;
+  return <p className="ag-field__error" role="alert">{t('agents.bots.groupNeedTwo')}</p>;
 }
