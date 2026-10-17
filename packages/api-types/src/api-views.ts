@@ -78,6 +78,8 @@ export type ApiBotInfo = {
     | 'white'
     | 'mint'
     | null;
+  /** Emoji or http(s) image URL. Absent or null keeps the geometric face. */
+  avatar?: string | null;
   createdAt: string;
   updatedAt: string;
 };

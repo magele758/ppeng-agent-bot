@@ -977,6 +977,16 @@ export const MIGRATIONS: Migration[] = [
           ON context_stack_snapshots(session_id, turn_index, created_at);
       `);
     }
+  },
+  {
+    version: 29,
+    description: 'bots.avatar for an optional emoji or image URL',
+    up: (db) => {
+      if (!hasTable(db, 'bots')) return;
+      if (!hasColumn(db, 'bots', 'avatar')) {
+        db.exec(`ALTER TABLE bots ADD COLUMN avatar TEXT`);
+      }
+    }
   }
 ];
 

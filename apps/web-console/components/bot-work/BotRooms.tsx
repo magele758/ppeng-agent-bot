@@ -159,50 +159,53 @@ export function BotRooms({ bots }: { bots: BotInfo[] }) {
             ))}
           </select>
         </label>
-        <label>
-          {t("botWork.host")}
-          <select value={host} onChange={(e) => setHost(e.target.value)}>
-            <option value="">{t("botWork.notSelected")}</option>
-            {bots
-              .filter((b) => members.includes(b.id))
-              .map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-          </select>
-        </label>
-        <label>
-          {t("botWork.budget")}
-          <input
-            type="number"
-            min={1}
-            max={20}
-            value={budget}
-            onChange={(e) => setBudget(Number(e.target.value))}
-          />
-        </label>
-        <label>
-          {t("botWork.maxToolCalls")}
-          <input
-            type="number"
-            min={1}
-            max={10000}
-            value={maxToolCalls}
-            onChange={(e) => setMaxToolCalls(Number(e.target.value))}
-          />
-        </label>
-        <label>
-          {t("botWork.maxCostUsd")}
-          <input
-            type="number"
-            min={0.001}
-            max={1000}
-            step="any"
-            value={maxCostUsd}
-            onChange={(e) => setMaxCostUsd(Number(e.target.value))}
-          />
-        </label>
+        <details>
+          <summary>{t("agents.common.advanced")}</summary>
+          <label>
+            {t("botWork.host")}
+            <select value={host} onChange={(e) => setHost(e.target.value)}>
+              <option value="">{t("botWork.notSelected")}</option>
+              {bots
+                .filter((b) => members.includes(b.id))
+                .map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <label>
+            {t("botWork.budget")}
+            <input
+              type="number"
+              min={1}
+              max={20}
+              value={budget}
+              onChange={(e) => setBudget(Number(e.target.value))}
+            />
+          </label>
+          <label>
+            {t("botWork.maxToolCalls")}
+            <input
+              type="number"
+              min={1}
+              max={10000}
+              value={maxToolCalls}
+              onChange={(e) => setMaxToolCalls(Number(e.target.value))}
+            />
+          </label>
+          <label>
+            {t("botWork.maxCostUsd")}
+            <input
+              type="number"
+              min={0.001}
+              max={1000}
+              step="any"
+              value={maxCostUsd}
+              onChange={(e) => setMaxCostUsd(Number(e.target.value))}
+            />
+          </label>
+        </details>
         <button
           data-testid="room-create"
           disabled={action.busy || !members.length}

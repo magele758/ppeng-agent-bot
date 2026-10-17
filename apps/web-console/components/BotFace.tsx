@@ -4,17 +4,18 @@ import { useEffect, useId, useRef } from 'react';
 import {
   BOT_FACE_SWATCH,
   HAPPY_BEAT_MS,
-  botFaceIndex,
+  avatarStandIn,
+  avatarWhenNoFaceOverride,
+  botFaceClassName,
   createBlinkClock,
   damp,
+  drawnFaceView,
   ellipsisScale,
-  expressionForMood,
   happyBeat,
   hoverDelight,
   mouthKindForGesture,
   mouthPath,
   nextIdleLook,
-  resolveBotFaceAppearance,
   resolveEyePose,
   resolveFaceGesture,
   sleepyBreath,
@@ -48,55 +49,6 @@ export interface BotFaceProps {
 }
 
 const DOTS = [-3.2, 0, 3.2] as const;
-
-type FaceLayout = {
-  left: number;
-  right: number;
-  eyeY: number;
-  eyeW: number;
-  eyeH: number;
-  mouthY: number;
-  markY: number;
-};
-
-function layoutFor(shape: BotFaceShape | null): FaceLayout {
-  switch (shape) {
-    case 'triangle':
-      return { left: 27, right: 37, eyeY: 40, eyeW: 4.6, eyeH: 10, mouthY: 48, markY: 28 };
-    case 'house':
-      return { left: 26, right: 38, eyeY: 40, eyeW: 4.8, eyeH: 11, mouthY: 50, markY: 22 };
-    case 'teardrop':
-      return { left: 26, right: 38, eyeY: 40, eyeW: 5.2, eyeH: 13, mouthY: 50, markY: 22 };
-    case 'heart':
-      return { left: 26, right: 38, eyeY: 34, eyeW: 4.8, eyeH: 11, mouthY: 44, markY: 18 };
-    case 'star':
-      return { left: 27, right: 37, eyeY: 33, eyeW: 4.2, eyeH: 9, mouthY: 42, markY: 18 };
-    case 'tall':
-      return { left: 27, right: 37, eyeY: 32, eyeW: 5, eyeH: 13, mouthY: 46, markY: 16 };
-    case 'bean':
-      return { left: 24, right: 40, eyeY: 33, eyeW: 5, eyeH: 11, mouthY: 42, markY: 18 };
-    case 'flower':
-      return { left: 26.5, right: 37.5, eyeY: 32, eyeW: 5.2, eyeH: 12, mouthY: 44, markY: 14 };
-    case 'cloud':
-    case 'clover':
-    case 'splat':
-    case 'hexagon':
-    case 'circle':
-    case 'squircle':
-    case null:
-      return { left: 26, right: 38, eyeY: 33, eyeW: 5.4, eyeH: 13, mouthY: 46, markY: 16 };
-    default: {
-      const unreachable: never = shape;
-      return unreachable;
-    }
-  }
-}
-
-function eyeInk(color: BotFaceColor | null): string {
-  if (color === 'yellow' || color === 'white') return '#1A1A1A';
-  if (!color) return '#667085';
-  return '#FFFFFF';
-}
 
 type PointerSample = { x: number; y: number; atMs: number };
 
@@ -264,26 +216,9 @@ export function BotFace({
   moodRef.current = mood;
   const reactId = useId().replace(/:/g, '');
   const saved = useSavedFace(name);
-  const appearance = resolveBotFaceAppearance({
-    name,
-    savedShape: shapeProp !== undefined ? shapeProp : saved.shape,
-    savedColor: colorProp !== undefined ? colorProp : saved.color
-  });
-  const color = appearance.color;
-  const shape = appearance.shape;
-  const index = botFaceIndex(name);
-  const eyes = eyeInk(color);
-  const drawnShape: BotFaceShape | 'empty' = shape ?? (color ? 'circle' : 'empty');
-  const layout = layoutFor(shape);
-  const expression = expressionForMood(mood);
-  const surprised = expression === 'surprised';
-  const eyeW = surprised ? 8.2 : layout.eyeW;
-  const eyeH = surprised ? 8.2 : layout.eyeH;
-  const initialMouth: MouthKind = expression === 'talk' ? 'open' : expression === 'surprised' ? 'oh' : 'rest';
-  const clipId = `bot-face-${reactId}`;
-  const classes = ['bot-face', size !== 'sm' ? `bot-face--${size}` : '', color ? '' : 'bot-face--empty', className]
-    .filter(Boolean)
-    .join(' ');
+  const avatar = avatarWhenNoFaceOverride(shapeProp, colorProp, saved.avatar);
+  const standIn = avatarStandIn({ avatar, size, className, label });
+  const showAvatar = standIn !== null;
 
   useEffect(() => {
     const until = turnFinishHappyUntil(prevMoodRef.current, mood, performance.now());
@@ -292,8 +227,7 @@ export function BotFace({
   }, [mood]);
 
   useEffect(() => {
-    const svg = svgRef.current;
-    if (!svg) return;
+    if (showAvatar) return;
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
     let blink = createBlinkClock(performance.now(), Math.random());
     let idle = nextIdleLook(performance.now(), Math.random(), Math.random());
@@ -374,7 +308,22 @@ export function BotFace({
         dot.setAttribute('transform', `translate(${cx} ${cy}) scale(${scale.toFixed(3)}) translate(${-cx} ${-cy})`);
       }
     });
-  }, []);
+  }, [showAvatar]);
+
+  if (standIn?.kind === 'image') {
+    return <img className={standIn.className} src={standIn.src} alt={standIn.alt} data-testid={testId} data-bot-avatar="image" />;
+  }
+  if (standIn?.kind === 'emoji') {
+    return (
+      <span className={standIn.className} role={standIn.label ? 'img' : 'presentation'} aria-label={standIn.label} aria-hidden={standIn.label ? undefined : true} data-testid={testId} data-bot-avatar="emoji">
+        {standIn.text}
+      </span>
+    );
+  }
+  const view = drawnFaceView({ name, shape: shapeProp, color: colorProp, saved, mood });
+  const layout = view.layout;
+  const clipId = `bot-face-${reactId}`;
+  const classes = botFaceClassName({ size, className, empty: view.empty });
 
   return (
     <svg
@@ -382,12 +331,12 @@ export function BotFace({
       className={classes}
       viewBox="0 0 64 64"
       data-testid={testId}
-      data-bot-face={index === null ? 'empty' : String(index)}
-      data-bot-color={color ?? 'empty'}
-      data-bot-shape={shape ?? 'empty'}
-      data-eye-ink={eyes}
+      data-bot-face={view.index === null ? 'empty' : String(view.index)}
+      data-bot-color={view.color ?? 'empty'}
+      data-bot-shape={view.shape ?? 'empty'}
+      data-eye-ink={view.eyes}
       data-face-mood={mood}
-      data-face-expression={expression}
+      data-face-expression={view.expression}
       role={label ? 'img' : 'presentation'}
       aria-label={label}
       aria-hidden={label ? undefined : true}
@@ -400,31 +349,31 @@ export function BotFace({
     >
       <defs>
         <clipPath id={clipId}>
-          <Silhouette shape={drawnShape} />
+          <Silhouette shape={view.drawnShape} />
         </clipPath>
       </defs>
       <g data-bob="">
-        <Silhouette shape={drawnShape} fill={color ? BOT_FACE_SWATCH[color] : '#E6E8EE'} dashed={!color} />
+        <Silhouette shape={view.drawnShape} fill={view.color ? BOT_FACE_SWATCH[view.color] : '#E6E8EE'} dashed={!view.color} />
         <g clipPath={`url(#${clipId})`}>
           <g data-blush="" opacity="0">
             <ellipse cx={layout.left - 7} cy={layout.eyeY + 8} rx="3.4" ry="1.7" fill="#000" />
             <ellipse cx={layout.right + 7} cy={layout.eyeY + 8} rx="3.4" ry="1.7" fill="#000" />
           </g>
           <g data-look="">
-            <Eye cx={layout.left} cy={layout.eyeY} ink={eyes} width={eyeW} height={eyeH} />
-            <Eye cx={layout.right} cy={layout.eyeY} ink={eyes} width={eyeW} height={eyeH} />
+            <Eye cx={layout.left} cy={layout.eyeY} ink={view.eyes} width={view.eyeW} height={view.eyeH} />
+            <Eye cx={layout.right} cy={layout.eyeY} ink={view.eyes} width={view.eyeW} height={view.eyeH} />
             <path
               data-mouth=""
               data-y={layout.mouthY}
-              d={mouthPath(initialMouth, layout.mouthY, initialMouth === 'open' ? 0.45 : 0)}
-              fill={initialMouth === 'open' || initialMouth === 'oh' ? eyes : 'none'}
-              stroke={initialMouth === 'open' || initialMouth === 'oh' ? 'none' : eyes}
+              d={mouthPath(view.mouth, layout.mouthY, view.mouthOpen)}
+              fill={view.mouth === 'open' || view.mouth === 'oh' ? view.eyes : 'none'}
+              stroke={view.mouth === 'open' || view.mouth === 'oh' ? 'none' : view.eyes}
               strokeWidth="1.6"
               strokeLinecap="round"
-              opacity={mouthVisible(initialMouth) ? 1 : 0}
+              opacity={mouthVisible(view.mouth) ? 1 : 0}
             />
           </g>
-          {expression === 'ellipsis'
+          {view.expression === 'ellipsis'
             ? DOTS.map((dx, i) => (
                 <circle
                   key={dx}
@@ -435,7 +384,7 @@ export function BotFace({
                   cx={32 + dx}
                   cy={layout.markY}
                   r="1.35"
-                  fill={eyes}
+                  fill={view.eyes}
                 />
               ))
             : null}
