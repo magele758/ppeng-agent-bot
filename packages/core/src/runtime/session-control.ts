@@ -110,6 +110,8 @@ export async function destroyRuntime(input: {
   backgroundJobAborts: Map<string, AbortController>;
   mcpManager: McpManager;
   store: SqliteStateStore;
+  /** Runs after sessions and MCP are torn down, immediately before the DB closes. */
+  beforeClose?: () => void;
 }): Promise<void> {
   for (const ac of input.sessionAbortControllers.values()) {
     try { ac.abort(); } catch { /* best effort */ }
@@ -122,6 +124,9 @@ export async function destroyRuntime(input: {
   input.backgroundJobAborts.clear();
 
   await input.mcpManager.destroy();
+
+  // A turn can still queue a snapshot while shutting down. Catch it before close.
+  try { input.beforeClose?.(); } catch { /* best effort */ }
 
   try { input.store.db.close(); } catch { /* best effort — may already be closed */ }
 }

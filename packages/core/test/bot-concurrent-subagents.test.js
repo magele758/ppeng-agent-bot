@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SqliteStateStore } from '../dist/storage.js';
 import { RawAgentRuntime } from '../dist/runtime.js';
-import { planConcurrentBotForks, coordinatorViewOf } from '../dist/bots/concurrent-fork.js';
+import { planConcurrentBotForks, coordinatorViewOf, pendingBotWorkPieces } from '../dist/bots/concurrent-fork.js';
 import { compileTurnAppendix } from '../dist/session/context-compiler.js';
 import { createMemoryTools } from '../dist/tools/memory-tools.js';
 import { createHistoryTools } from '../dist/session/history/tools.js';
@@ -544,4 +544,16 @@ test('subagent-recall: ownerless legacy session still retrieves user_id IS NULL 
   } finally {
     store.db.close();
   }
+});
+
+test('pendingBotWorkPieces skips the transcript fold when no human work is waiting [hot-path]', () => {
+  const store = new SqliteStateStore(join(mkdtempSync(join(tmpdir(), 'bot-fork-pieces-')), 'state.db'));
+  const session = store.createSession({ title: 'pieces', mode: 'chat', agentId: 'general', metadata: { canonicalBotChat: true } });
+  store.appendMessage(session.id, 'user', [{ type: 'text', text: 'old ask' }]);
+  let folds = 0;
+  const fold = store.foldMessages.bind(store);
+  store.foldMessages = (id) => { folds += 1; return fold(id); };
+  assert.deepEqual(pendingBotWorkPieces(store, session.id), []);
+  assert.equal(folds, 0);
+  store.db.close();
 });

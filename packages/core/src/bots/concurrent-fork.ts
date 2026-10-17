@@ -86,9 +86,13 @@ function pieceText(message: SessionMessage | undefined): string {
 }
 
 export function pendingBotWorkPieces(store: SqliteStateStore, sessionId: string): WorkPiece[] {
+  const waiting = listPendingHumanWork(store, sessionId);
+  // Nothing waiting means no piece and no fork: skip folding the whole transcript,
+  // which runSession otherwise paid on every start of a canonical bot chat.
+  if (waiting.length === 0) return [];
   const messages = new Map(store.foldMessages(sessionId).map((message) => [message.id, message]));
   const pieces: WorkPiece[] = [];
-  for (const pending of listPendingHumanWork(store, sessionId)) {
+  for (const pending of waiting) {
     const text = pieceText(messages.get(pending.id));
     if (!text) continue;
     pieces.push({ id: pending.id, text });

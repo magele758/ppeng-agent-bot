@@ -4,11 +4,16 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SqliteStateStore } from '../dist/storage.js';
+import { RawAgentRuntime } from '../dist/runtime.js';
+import { McpManager } from '../dist/mcp/mcp-manager.js';
+import { destroyRuntime } from '../dist/runtime/session-control.js';
 import {
   orderContextSnapshots,
+  preparedContextSnapshotBlocksFor,
   recordPreparedContextSnapshot,
   selectContextSnapshot
 } from '../dist/session/context-snapshots.js';
+import { flushPreparedContextSnapshots, queuePreparedContextSnapshot } from '../dist/runtime/l5-bindings.js';
 
 function block(id, text) {
   return {
@@ -21,6 +26,23 @@ function block(id, text) {
     pinned: false,
     disposition: 'keep'
   };
+}
+
+function preparedInput(session, text) {
+  return {
+    session,
+    systemPrompt: 'SYS',
+    tools: [],
+    messages: [{ id: 'u1', sessionId: session.id, role: 'user', parts: [{ type: 'text', text }], createdAt: new Date().toISOString() }],
+    adapter: { name: 'heuristic' },
+    env: {}
+  };
+}
+
+function queuePrepared(store, session, text) {
+  const input = preparedInput(session, text);
+  queuePreparedContextSnapshot(store, session.id, preparedContextSnapshotBlocksFor(store, input));
+  return input;
 }
 
 test('orders snapshots by turn and selects one [AC:play-context-replay#AC-1] [AC:play-context-replay#AC-2]', () => {
@@ -153,3 +175,310 @@ test('recording a prepared view does not compact or rewrite the summary [AC:play
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('dedupe uses cached fingerprint, survives a fresh store and returns stored blocks [hot-path]', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'context-snapshots-dedupe-'));
+  try {
+    const path = join(dir, 'state.sqlite');
+    const store = new SqliteStateStore(path);
+    const session = store.createSession({ title: 'dedupe', mode: 'chat', agentId: 'general', summary: '' });
+    const input = (text) => ({
+      session,
+      systemPrompt: 'SYS',
+      tools: [],
+      messages: [{ id: 'u1', sessionId: session.id, role: 'user', parts: [{ type: 'text', text }], createdAt: new Date().toISOString() }],
+      adapter: { name: 'heuristic' },
+      env: {}
+    });
+    const first = recordPreparedContextSnapshot(store, input('A'));
+    const again = recordPreparedContextSnapshot(store, input('A'));
+    assert.equal(again.id, first.id);
+    assert.deepEqual(again.blocks, first.blocks);
+    const second = recordPreparedContextSnapshot(store, input('B'));
+    assert.notEqual(second.id, first.id);
+    assert.equal(second.turn, first.turn + 1);
+    store.db.close();
+    const reopened = new SqliteStateStore(path);
+    const same = recordPreparedContextSnapshot(reopened, input('B'));
+    assert.equal(same.id, second.id);
+    assert.equal(reopened.listContextSnapshots(session.id).length, 2);
+    reopened.db.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('queued prepares are written later, in order, and flushed before listing [hot-path]', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'context-snapshots-queue-'));
+  try {
+    const store = new SqliteStateStore(join(dir, 'state.sqlite'));
+    const session = store.createSession({ title: 'queue', mode: 'chat', agentId: 'general', summary: '' });
+    queuePrepared(store, session, 'ONE');
+    queuePrepared(store, session, 'TWO');
+    assert.equal(store.listContextSnapshots(session.id).length, 0, 'nothing written inline');
+    flushPreparedContextSnapshots(store, session.id);
+    const flushed = store.listContextSnapshots(session.id);
+    assert.equal(flushed.length, 2);
+    assert.ok(flushed[0].blocks.some((b) => b.text.includes('ONE')));
+    assert.ok(flushed[1].blocks.some((b) => b.text.includes('TWO')));
+    queuePrepared(store, session, 'THREE');
+    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(store.listContextSnapshots(session.id).length, 3);
+    store.db.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('destroy flushes a queued snapshot; queueing after close then flush writes nothing [hot-path]', async () => {
+  const repoRoot = mkdtempSync(join(tmpdir(), 'context-snapshots-destroy-repo-'));
+  const stateDir = mkdtempSync(join(tmpdir(), 'context-snapshots-destroy-state-'));
+  try {
+    const runtime = new RawAgentRuntime({ repoRoot, stateDir, modelAdapter: { name: 'heuristic' } });
+    const session = runtime.store.createSession({ title: 'destroy', mode: 'chat', agentId: 'general', summary: '' });
+    queuePrepared(runtime.store, session, 'BEFORE-CLOSE');
+    assert.equal(runtime.store.listContextSnapshots(session.id).length, 0);
+    await runtime.destroy();
+    const reopened = new SqliteStateStore(runtime.store.dbPath);
+    const listed = reopened.listContextSnapshots(session.id);
+    assert.equal(listed.length, 1);
+    assert.ok(listed[0].blocks.some((b) => b.text.includes('BEFORE-CLOSE')));
+    queuePrepared(reopened, session, 'AFTER-CLOSE');
+    reopened.db.close();
+    assert.doesNotThrow(() => flushPreparedContextSnapshots(reopened, session.id));
+    const again = new SqliteStateStore(runtime.store.dbPath);
+    assert.equal(again.listContextSnapshots(session.id).length, 1);
+    again.db.close();
+  } finally {
+    rmSync(repoRoot, { recursive: true, force: true });
+    rmSync(stateDir, { recursive: true, force: true });
+  }
+});
+
+test('a failed write stays queued and the next flush writes it [hot-path]', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'context-snapshots-retry-'));
+  try {
+    const store = new SqliteStateStore(join(dir, 'state.sqlite'));
+    const session = store.createSession({ title: 'retry', mode: 'chat', agentId: 'general', summary: '' });
+    const original = store.appendContextSnapshot.bind(store);
+    store.appendContextSnapshot = () => {
+      throw new Error('disk full');
+    };
+    queuePrepared(store, session, 'KEPT');
+    flushPreparedContextSnapshots(store, session.id);
+    assert.equal(store.listContextSnapshots(session.id).length, 0, 'failed write is not dropped');
+    store.appendContextSnapshot = original;
+    flushPreparedContextSnapshots(store, session.id);
+    const listed = store.listContextSnapshots(session.id);
+    assert.equal(listed.length, 1);
+    assert.ok(listed[0].blocks.some((b) => b.text.includes('KEPT')));
+    store.db.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('flushing session A leaves session B queued, and B drains in the background [hot-path]', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'context-snapshots-other-session-'));
+  try {
+    const store = new SqliteStateStore(join(dir, 'state.sqlite'));
+    const sessionA = store.createSession({ title: 'a', mode: 'chat', agentId: 'general', summary: '' });
+    const sessionB = store.createSession({ title: 'b', mode: 'chat', agentId: 'general', summary: '' });
+    queuePrepared(store, sessionA, 'AAA');
+    queuePrepared(store, sessionB, 'BBB');
+    flushPreparedContextSnapshots(store, sessionA.id);
+    assert.equal(store.listContextSnapshots(sessionA.id).length, 1);
+    assert.equal(store.listContextSnapshots(sessionB.id).length, 0, 'B stays queued after A is flushed');
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(store.listContextSnapshots(sessionB.id).length, 1);
+    assert.ok(store.listContextSnapshots(sessionB.id)[0].blocks.some((b) => b.text.includes('BBB')));
+    store.db.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a failing session does not block another session in flush or background drain [hot-path]', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'context-snapshots-isolate-'));
+  try {
+    const store = new SqliteStateStore(join(dir, 'state.sqlite'));
+    const sessionA = store.createSession({ title: 'a', mode: 'chat', agentId: 'general', summary: '' });
+    const sessionB = store.createSession({ title: 'b', mode: 'chat', agentId: 'general', summary: '' });
+    const original = store.appendContextSnapshot.bind(store);
+    store.appendContextSnapshot = (sessionId, blocks) => {
+      if (sessionId === sessionA.id) throw new Error('disk full');
+      return original(sessionId, blocks);
+    };
+    queuePrepared(store, sessionA, 'A1');
+    queuePrepared(store, sessionA, 'A2');
+    queuePrepared(store, sessionB, 'BBB');
+    flushPreparedContextSnapshots(store);
+    assert.equal(store.listContextSnapshots(sessionA.id).length, 0, 'failed A is not dropped');
+    assert.equal(store.listContextSnapshots(sessionB.id).length, 1, 'B is written despite A failing');
+
+    queuePrepared(store, sessionA, 'A3');
+    queuePrepared(store, sessionB, 'BBB-2');
+    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(store.listContextSnapshots(sessionA.id).length, 0);
+    assert.equal(store.listContextSnapshots(sessionB.id).length, 2, 'background drain still writes B');
+
+    store.appendContextSnapshot = original;
+    flushPreparedContextSnapshots(store, sessionA.id);
+    const listed = store.listContextSnapshots(sessionA.id);
+    assert.equal(listed.length, 3);
+    assert.ok(listed[0].blocks.some((b) => b.text.includes('A1')));
+    assert.ok(listed[1].blocks.some((b) => b.text.includes('A2')));
+    assert.ok(listed[2].blocks.some((b) => b.text.includes('A3')));
+    store.db.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a failing session is retried in the background once writes succeed [hot-path]', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'context-snapshots-retry-timer-'));
+  try {
+    const store = new SqliteStateStore(join(dir, 'state.sqlite'));
+    const session = store.createSession({ title: 'retry-timer', mode: 'chat', agentId: 'general', summary: '' });
+    const original = store.appendContextSnapshot.bind(store);
+    store.appendContextSnapshot = () => {
+      throw new Error('disk full');
+    };
+    queuePrepared(store, session, 'LATER');
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(store.listContextSnapshots(session.id).length, 0, 'first drain keeps the failed item');
+    store.appendContextSnapshot = original;
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    const listed = store.listContextSnapshots(session.id);
+    assert.equal(listed.length, 1);
+    assert.ok(listed[0].blocks.some((b) => b.text.includes('LATER')));
+    store.db.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('destroy writes other sessions when the head item fails [hot-path]', async () => {
+  const repoRoot = mkdtempSync(join(tmpdir(), 'context-snapshots-destroy-fail-repo-'));
+  const stateDir = mkdtempSync(join(tmpdir(), 'context-snapshots-destroy-fail-state-'));
+  try {
+    const runtime = new RawAgentRuntime({ repoRoot, stateDir, modelAdapter: { name: 'heuristic' } });
+    const sessionA = runtime.store.createSession({ title: 'a', mode: 'chat', agentId: 'general', summary: '' });
+    const sessionB = runtime.store.createSession({ title: 'b', mode: 'chat', agentId: 'general', summary: '' });
+    const original = runtime.store.appendContextSnapshot.bind(runtime.store);
+    runtime.store.appendContextSnapshot = (sessionId, blocks) => {
+      if (sessionId === sessionA.id) throw new Error('disk full');
+      return original(sessionId, blocks);
+    };
+    queuePrepared(runtime.store, sessionA, 'A-FAIL');
+    queuePrepared(runtime.store, sessionB, 'B-OK');
+    await runtime.destroy();
+    const reopened = new SqliteStateStore(runtime.store.dbPath);
+    assert.equal(reopened.listContextSnapshots(sessionA.id).length, 0, 'failed A is not counted as written');
+    const listed = reopened.listContextSnapshots(sessionB.id);
+    assert.equal(listed.length, 1);
+    assert.ok(listed[0].blocks.some((b) => b.text.includes('B-OK')));
+    reopened.db.close();
+  } finally {
+    rmSync(repoRoot, { recursive: true, force: true });
+    rmSync(stateDir, { recursive: true, force: true });
+  }
+});
+
+test('a per-session flush that fails still retries that session in the background [hot-path]', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'context-snapshots-own-retry-'));
+  try {
+    const store = new SqliteStateStore(join(dir, 'state.sqlite'));
+    const session = store.createSession({ title: 'own-retry', mode: 'chat', agentId: 'general', summary: '' });
+    const original = store.appendContextSnapshot.bind(store);
+    store.appendContextSnapshot = () => {
+      throw new Error('disk full');
+    };
+    queuePrepared(store, session, 'OWN');
+    flushPreparedContextSnapshots(store, session.id);
+    assert.equal(store.listContextSnapshots(session.id).length, 0, 'failed write stays queued');
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(store.listContextSnapshots(session.id).length, 0, 'retry waits while the write still fails');
+    store.appendContextSnapshot = original;
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    const listed = store.listContextSnapshots(session.id);
+    assert.equal(listed.length, 1);
+    assert.ok(listed[0].blocks.some((b) => b.text.includes('OWN')));
+    store.db.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a snapshot queued during shutdown is flushed before the db closes [hot-path]', async () => {
+  const repoRoot = mkdtempSync(join(tmpdir(), 'context-snapshots-late-queue-repo-'));
+  const stateDir = mkdtempSync(join(tmpdir(), 'context-snapshots-late-queue-state-'));
+  try {
+    const runtime = new RawAgentRuntime({ repoRoot, stateDir, modelAdapter: { name: 'heuristic' } });
+    const session = runtime.store.createSession({ title: 'late', mode: 'chat', agentId: 'general', summary: '' });
+    // A turn preparing a request while MCP is torn down queues after the early flush.
+    const manager = runtime.mcpManager;
+    const original = manager.destroy.bind(manager);
+    manager.destroy = async () => {
+      queuePrepared(runtime.store, session, 'DURING-SHUTDOWN');
+      await original();
+    };
+    await runtime.destroy();
+    const reopened = new SqliteStateStore(runtime.store.dbPath);
+    const listed = reopened.listContextSnapshots(session.id);
+    assert.equal(listed.length, 1);
+    assert.ok(listed[0].blocks.some((b) => b.text.includes('DURING-SHUTDOWN')));
+    reopened.db.close();
+  } finally {
+    rmSync(repoRoot, { recursive: true, force: true });
+    rmSync(stateDir, { recursive: true, force: true });
+  }
+});
+
+test('destroyRuntime runs beforeClose before closing the db [hot-path]', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'context-snapshots-before-close-'));
+  try {
+    const store = new SqliteStateStore(join(dir, 'state.sqlite'));
+    const manager = new McpManager({
+      stateDir: dir,
+      tools: [],
+      env: {},
+      log: { warn: () => {} }
+    });
+    let sawOpen = false;
+    await destroyRuntime({
+      sessionAbortControllers: new Map(),
+      backgroundJobAborts: new Map(),
+      mcpManager: manager,
+      store,
+      beforeClose: () => {
+        sawOpen = store.db.isOpen;
+      }
+    });
+    assert.equal(sawOpen, true, 'beforeClose runs while the db is still open');
+    assert.equal(store.db.isOpen, false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('queued blocks are captured before later edits to the input parts [hot-path]', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'context-snapshots-capture-'));
+  try {
+    const store = new SqliteStateStore(join(dir, 'state.sqlite'));
+    const session = store.createSession({ title: 'capture', mode: 'chat', agentId: 'general', summary: '' });
+    const input = queuePrepared(store, session, 'SENT');
+    input.messages[0].parts[0].text = 'MUTATED';
+    flushPreparedContextSnapshots(store, session.id);
+    const listed = store.listContextSnapshots(session.id);
+    assert.equal(listed.length, 1);
+    assert.ok(listed[0].blocks.some((b) => b.text.includes('SENT')));
+    assert.equal(listed[0].blocks.some((b) => b.text.includes('MUTATED')), false);
+    store.db.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
