@@ -21,6 +21,8 @@ export const RELAY_HOP_META = 'relayHop';
 /** Id of the relayed user message that `relayHop` belongs to; the hop is stale once any later user message lands. */
 export const RELAY_HOP_MESSAGE_META = 'relayHopMessageId';
 export const RELAY_HOP_LIMIT = 3;
+/** Room id stamped on a 1:1 that a Room member sent. Absent for ordinary Bot Chat relays. */
+export const SOURCE_ROOM_META = 'sourceRoomId';
 const ROSTER_SAMPLE = 8;
 
 const SILENCE_TOKENS = new Set(['[SILENT]', 'SILENT', 'NO_REPLY', 'NO REPLY']);
@@ -87,8 +89,15 @@ export function wantsWake(raw: unknown): boolean {
   return !(typeof raw === 'string' && WAKE_OFF_STRINGS.has(raw.trim().toLowerCase()));
 }
 
-export function formatBotMessage(sender: { name: string; id: string }, body: string): string {
-  return `Message from ${sender.name} / ${sender.id}: ${body}`;
+export function formatBotMessage(sender: { name: string; id: string }, body: string, sourceRoomId?: string): string {
+  const from = sourceRoomId ? ` (from room ${sourceRoomId})` : '';
+  return `Message from ${sender.name} / ${sender.id}${from}: ${body}`;
+}
+
+/** A Room member session is not a canonical Bot Chat, but it may send one 1:1. */
+export function sourceRoomIdOf(session: { metadata?: Record<string, unknown> | null }): string | undefined {
+  const raw = session.metadata?.roomId;
+  return typeof raw === 'string' && raw.trim() ? raw.trim() : undefined;
 }
 
 function toolJson(ok: boolean, payload: Record<string, unknown>): ToolExecutionResult {
@@ -156,6 +165,8 @@ export function createMessageAgentTool(host: MessageAgentHost): ToolContract<{
       'Do not write a "Message from" prefix; the sender name and id are added automatically. ' +
       "Delivery is fire-and-forget into that bot's canonical Bot Chat and wakes it by default; " +
       'this call never returns their reply (they may message you back later). ' +
+      'From a Room turn the same rules apply: the note is marked with the Room id, nothing the recipient says is written back to the Room, ' +
+      'and waking them does not authorize an action that still needs the user. ' +
       'Set wake=false for a note that needs no action: it is stored but the bot is NOT woken and sees it on its next run. ' +
       'wake is the only switch (default true); wording such as "FYI" in the message does not change it. ' +
       'A bot whose last run failed or ended is restarted by a waking message. ' +
@@ -203,9 +214,10 @@ async function deliverMessageAgent(
   args: { target?: string; message?: string; wake?: unknown; idempotencyKey?: string; replyTo?: string }
 ): Promise<ToolExecutionResult> {
   const live = host.store.getSession(context.session.id) ?? context.session;
-  if (!isCanonicalBotChatSession(live)) {
+  const sourceRoomId = sourceRoomIdOf(live);
+  if (!isCanonicalBotChatSession(live) && !sourceRoomId) {
     return toolJson(false, {
-      error: 'message_agent is only available in a canonical Bot Chat session.',
+      error: 'message_agent is only available in a canonical Bot Chat session or a Room member turn.',
       error_code: 'NOT_CANONICAL'
     });
   }
@@ -294,7 +306,8 @@ async function deliverMessageAgent(
   try {
     const previous = host.store.getSession(target.canonicalSessionId)?.status;
     const accepted = enqueueBotMessage(host, { principal, senderBotId: sender.id, targetBotId: target.id,
-      message: body, wake: !skip, relayHop: hop + 1, idempotencyKey: args.idempotencyKey, replyTo: args.replyTo });
+      message: body, wake: !skip, relayHop: hop + 1, idempotencyKey: args.idempotencyKey, replyTo: args.replyTo,
+      ...(sourceRoomId ? { sourceRoomId } : {}) });
     return toolJson(true, { ...accepted, delivered: !accepted.queued, targetId: target.id, targetName: target.name,
       ...(accepted.startedRun && (previous === 'failed' || previous === 'completed') ? { revivedFrom: previous } : {}),
       relayHop: hop + 1, woke: accepted.startedRun, ...(skip ? { skippedRun: skip } : {}),

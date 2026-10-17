@@ -15,7 +15,7 @@ export { resolveBotPrincipal, principalFromSession } from './bot-identity.js';
 export type { BotPrincipal } from './bot-identity.js';
 
 export interface BotWorkHost { store: SqliteStateStore; runSession(id: string): Promise<unknown>; isSessionRunning?(id: string): boolean; cancelSession?(id:string):void; hasUnconfirmedEffects?(sessionId:string,startedAt:string):boolean; log: Logger }
-export interface BotMessageInput { principal: BotPrincipal; senderBotId: string; targetBotId: string; message: string; idempotencyKey?: string; taskId?: string; replyTo?: string; wake?: boolean; relayHop?: number }
+export interface BotMessageInput { principal: BotPrincipal; senderBotId: string; targetBotId: string; message: string; idempotencyKey?: string; taskId?: string; replyTo?: string; wake?: boolean; relayHop?: number; sourceRoomId?: string }
 export interface BotTask { id: string; principal: BotPrincipal; requesterBotId: string; targetBotId: string; input: string; status: string; attempt: number; deadline?: string; result?: string; failureReason?: string; createdAt: string; updatedAt: string }
 const initialized = new WeakSet<object>();
 const activeRuns = new WeakMap<SqliteStateStore, Set<string>>();
@@ -30,7 +30,7 @@ export function ensureBotWorkSchema(store: Pick<SqliteStateStore,'db'>): void {
  CREATE TABLE IF NOT EXISTS bot_definition_owners(bot_id TEXT PRIMARY KEY,principal TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS bot_work_messages (
  seq INTEGER PRIMARY KEY AUTOINCREMENT,id TEXT NOT NULL UNIQUE,principal TEXT NOT NULL,sender_bot TEXT NOT NULL,target_bot TEXT NOT NULL,session_id TEXT NOT NULL,
- body TEXT NOT NULL,kind TEXT NOT NULL DEFAULT 'message',idem TEXT,task_id TEXT,reply_to TEXT,wake INTEGER NOT NULL DEFAULT 1,hop INTEGER NOT NULL DEFAULT 0,status TEXT NOT NULL DEFAULT 'pending',
+ body TEXT NOT NULL,kind TEXT NOT NULL DEFAULT 'message',idem TEXT,task_id TEXT,reply_to TEXT,wake INTEGER NOT NULL DEFAULT 1,hop INTEGER NOT NULL DEFAULT 0,source_room TEXT,status TEXT NOT NULL DEFAULT 'pending',
  message_ref TEXT,attempt INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,
  UNIQUE(principal,sender_bot,idem));
  CREATE INDEX IF NOT EXISTS bot_work_pending ON bot_work_messages(status,seq);
@@ -42,6 +42,7 @@ export function ensureBotWorkSchema(store: Pick<SqliteStateStore,'db'>): void {
  `);
  const columns=store.db.prepare('PRAGMA table_info(bot_work_messages)').all() as {name:string}[];
  if(!columns.some(c=>c.name==='kind'))store.db.exec("ALTER TABLE bot_work_messages ADD COLUMN kind TEXT NOT NULL DEFAULT 'message'");
+ if(!columns.some(c=>c.name==='source_room'))store.db.exec('ALTER TABLE bot_work_messages ADD COLUMN source_room TEXT');
  initialized.add(store);
 }
 function facade(host: BotWorkHost): SessionFacadeHost {
@@ -158,15 +159,17 @@ export function enqueueBotMessage(host:BotWorkHost,input:BotMessageInput):{accep
  openBotWorkContext(host,input.senderBotId,input.principal);
  const target=openBotWorkContext(host,input.targetBotId,input.principal);
  const id=createId('bmsg'),now=nowIso(),key=botPrincipalKey(input.principal);
+ const sourceRoom=typeof input.sourceRoomId==='string'&&input.sourceRoomId.trim()?input.sourceRoomId.trim():null;
  host.store.db.exec('BEGIN IMMEDIATE');
  try {
  const duplicate=input.idempotencyKey?host.store.db.prepare('SELECT id FROM bot_work_messages WHERE principal=? AND sender_bot=? AND idem=?').get(key,input.senderBotId,input.idempotencyKey):undefined;
  if(!duplicate)checkBotWorkCapacity(host.store,input.principal,input.targetBotId);
- host.store.db.prepare(`INSERT INTO bot_work_messages(id,principal,sender_bot,target_bot,session_id,body,idem,task_id,reply_to,wake,hop,created_at,updated_at)
- VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(principal,sender_bot,idem) DO NOTHING`).run(id,key,input.senderBotId,input.targetBotId,target.id,input.message,input.idempotencyKey??null,input.taskId??null,input.replyTo??null,input.wake===false?0:1,input.relayHop??0,now,now);host.store.db.exec('COMMIT');
+ host.store.db.prepare(`INSERT INTO bot_work_messages(id,principal,sender_bot,target_bot,session_id,body,idem,task_id,reply_to,wake,hop,source_room,created_at,updated_at)
+ VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(principal,sender_bot,idem) DO NOTHING`).run(id,key,input.senderBotId,input.targetBotId,target.id,input.message,input.idempotencyKey??null,input.taskId??null,input.replyTo??null,input.wake===false?0:1,input.relayHop??0,sourceRoom,now,now);host.store.db.exec('COMMIT');
  }catch(error){host.store.db.exec('ROLLBACK');throw error;}
  const row=(input.idempotencyKey?host.store.db.prepare('SELECT * FROM bot_work_messages WHERE principal=? AND sender_bot=? AND idem=?').get(key,input.senderBotId,input.idempotencyKey):host.store.db.prepare('SELECT * FROM bot_work_messages WHERE id=?').get(id)) as Record<string,unknown>;
- if(String(row.body)!==input.message || String(row.target_bot)!==input.targetBotId)throw new ValidationError('Idempotency key was already used for different message');
+ const storedRoom=row.source_room==null||row.source_room===''?null:String(row.source_room);
+ if(String(row.body)!==input.message || String(row.target_bot)!==input.targetBotId || storedRoom!==sourceRoom)throw new ValidationError('Idempotency key was already used for different message');
  const started=drainBotSession(host,target.id);
  const fresh=host.store.db.prepare('SELECT status FROM bot_work_messages WHERE id=?').get(String(row.id)) as {status:string};
  return {accepted:true,messageId:String(row.id),sessionId:target.id,queued:fresh.status==='pending',startedRun:started};
@@ -309,9 +312,13 @@ function claimPendingMessage(host:BotWorkHost,session:SessionRecord,row:Record<s
     const fence=claimBotSession(host.store,session.id,owner);
     if(fence===undefined){host.store.db.exec('COMMIT');return undefined;}
     const sender=host.store.getBot(String(row.sender_bot));
-    const written=host.store.appendMessage(session.id,'user',[{type:'text',text:`Message from ${sender?.name??row.sender_bot} / ${row.sender_bot}: ${row.body}`}]);
+    const sourceRoom=typeof row.source_room==='string'&&row.source_room?row.source_room:undefined;
+    const fromRoom=sourceRoom?` (from room ${sourceRoom})`:'';
+    const written=host.store.appendMessage(session.id,'user',[{type:'text',text:`Message from ${sender?.name??row.sender_bot} / ${row.sender_bot}${fromRoom}: ${row.body}`}]);
     row.message_ref=written.id;row.updated_at=nowIso();
-    host.store.updateSession(session.id,{metadata:{...host.store.getSession(session.id)!.metadata,relayHop:Number(row.hop),relayHopMessageId:written.id,botWorkTaskId:taskId,outcome:undefined,botWorkStartBarrier:undefined}});
+    const prior={...(host.store.getSession(session.id)!.metadata??{})};
+    delete prior.sourceRoomId;
+    host.store.updateSession(session.id,{metadata:{...prior,relayHop:Number(row.hop),relayHopMessageId:written.id,botWorkTaskId:taskId,outcome:undefined,botWorkStartBarrier:undefined}});
     host.store.db.prepare("UPDATE bot_work_messages SET status=?,message_ref=?,attempt=attempt+1,updated_at=? WHERE id=? AND status='pending'").run(row.wake?'processing':'processed',written.id,nowIso(),String(row.id));
     if(taskId)host.store.db.prepare("UPDATE bot_work_tasks SET status='running',attempt=attempt+1,updated_at=? WHERE id=? AND status='queued'").run(nowIso(),taskId);
     if(row.wake)stampSessionWake(host.store,session.id,{kind:'unattended',source:taskId?'delegation':'bot-message'});

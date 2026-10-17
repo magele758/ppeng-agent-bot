@@ -184,7 +184,8 @@ test('real Agent runtime executes isolated Room contexts and returns shared repl
     assert.ok(calls.every(input=>!JSON.stringify(input).includes('PRIVATE_MEMORY_NEVER_SHARE')),'private Bot fact must not enter Room model input');
     assert.ok(calls.some(input=>JSON.stringify(input.messages).includes('SHARED_ATTACHMENT_CONTENT')),'shared attachment text reaches actual model input');
     assert.ok(calls.some(input=>input.messages.flatMap(message=>message.parts).some(part=>part.type==='image'&&part.assetId===imageAttachment.imageAsset.id)),'shared image part reaches actual model input');
-    for(const input of calls)for(const name of ['message_agent','bot_delegate','spawn_subagent','spawn_teammate','send_message','task_create'])assert.ok(!input.tools.some(tool=>tool.name===name),`${name} cannot bypass Room scheduling`);
+    for(const input of calls)for(const name of ['bot_delegate','spawn_subagent','spawn_teammate','send_message','task_create'])assert.ok(!input.tools.some(tool=>tool.name===name),`${name} cannot bypass Room scheduling`);
+    assert.ok(calls.some(input=>input.tools.some(tool=>tool.name==='message_agent')),'a Room member may send one bot a private 1:1');
     assert.equal(rt.store.listMessages(bot.canonicalSessionId).length,1);
   } finally {rt.destroy();}
 });
@@ -299,4 +300,160 @@ test('deleted approval context becomes unknown without blocking or replaying lat
   restarted.send(f.principal,room.id,{text:'NEW_SEPARATE_WORK'});await restarted.tick();
   assert.equal(calls,2);assert.equal(restarted.turns(f.principal,room.id)[0].status,'unknown');assert.equal(restarted.turns(f.principal,room.id)[1].status,'completed');
   assert.equal(restarted.turns(f.principal,room.id)[0].terminationReason,'execution_context_missing');
+});
+
+test('a Room member can privately message another bot, with or without waking it, and the note stays out of the Room [AC:bot-rooms#AC-7]', async () => {
+  const privateReply = 'PRIVATE_REPLY_STAYS_OUT';
+  const adapter = { name: 'room-dm', nextWake: true, async summarizeMessages() { return ''; } };
+  const rt = new RawAgentRuntime({
+    repoRoot: mkdtempSync(join(tmpdir(), 'room-dm-repo-')),
+    stateDir: mkdtempSync(join(tmpdir(), 'room-dm-state-')),
+    modelAdapter: adapter
+  });
+  try {
+    const alpha = rt.createBot({ name: 'Alpha' });
+    const beta = rt.createBot({ name: 'Beta' });
+    const principal = resolveBotPrincipal(rt.store);
+    const room = rt.rooms.create(principal, { title: 'Side channel', botIds: [alpha.id, beta.id] });
+    adapter.runTurn = async input => {
+      const latestUser = input.messages.findLast(message => message.role === 'user');
+      const latestIndex = input.messages.lastIndexOf(latestUser);
+      const done = input.messages.slice(latestIndex + 1).some(message => message.parts.some(part => part.type === 'tool_result'));
+      if (done) return { stopReason: 'end', assistantParts: [{ type: 'text', text: 'told them privately' }] };
+      const session = rt.store.getSession(input.sessionId);
+      if (session?.metadata?.roomId !== room.id) return { stopReason: 'end', assistantParts: [{ type: 'text', text: privateReply }] };
+      if (session.metadata.botId !== alpha.id) return { stopReason: 'end', assistantParts: [{ type: 'text', text: 'beta stays in the room' }] };
+      assert.ok(input.tools.some(tool => tool.name === 'message_agent'));
+      const wake = adapter.nextWake;
+      return { stopReason: 'tool_use', assistantParts: [{ type: 'tool_call', toolCallId: 'dm', name: 'message_agent', input: { target: 'Beta', message: `note wake=${wake}`, wake } }] };
+    };
+
+    adapter.nextWake = true;
+    rt.rooms.send(principal, room.id, { text: 'ask beta privately', mentions: [alpha.id] });
+    await rt.rooms.tick();
+    await waitFor(async () => rt.store.listMessages(beta.canonicalSessionId).some(message => message.role === 'assistant') ? true : null);
+    const woken = rt.store.listMessages(beta.canonicalSessionId).filter(message => message.role === 'user').map(message => message.parts.map(part => part.text ?? '').join('')).join('\n');
+    assert.match(woken, new RegExp(`from room ${room.id}`));
+    assert.match(woken, /note wake=true/);
+    const stored = rt.store.db.prepare('SELECT source_room, wake, hop FROM bot_work_messages WHERE sender_bot=?').all(alpha.id);
+    assert.equal(stored.length, 1);
+    assert.equal(stored[0].source_room, room.id);
+    assert.equal(stored[0].wake, 1);
+    assert.equal(stored[0].hop, 1);
+    assert.equal(rt.store.getSession(beta.canonicalSessionId).metadata.approvalWake.kind, 'unattended');
+    const roomText = rt.rooms.messages(principal, room.id).messages.map(message => message.text).join('\n');
+    assert.equal(roomText.includes(privateReply), false);
+    assert.equal(roomText.includes('note wake=true'), false);
+
+    adapter.nextWake = false;
+    rt.rooms.send(principal, room.id, { text: 'leave a note', mentions: [alpha.id] });
+    await rt.rooms.tick();
+    const quietRow = rt.store.db.prepare('SELECT source_room, wake, status FROM bot_work_messages WHERE body=?').get('note wake=false');
+    assert.equal(quietRow.source_room, room.id);
+    assert.equal(quietRow.wake, 0);
+    assert.equal(quietRow.status, 'processed');
+    const betaRuns = rt.store.listMessages(beta.canonicalSessionId).filter(message => message.role === 'assistant');
+    assert.equal(betaRuns.length, 1);
+    assert.equal(rt.rooms.messages(principal, room.id).messages.some(message => message.text.includes('note wake=false')), false);
+
+    adapter.runTurn = async input => {
+      const latestUser = input.messages.findLast(message => message.role === 'user');
+      const done = input.messages.slice(input.messages.lastIndexOf(latestUser) + 1).some(message => message.parts.some(part => part.type === 'tool_result'));
+      if (done) return { stopReason: 'end', assistantParts: [{ type: 'text', text: 'unknown target refused' }] };
+      return { stopReason: 'tool_use', assistantParts: [{ type: 'tool_call', toolCallId: 'miss', name: 'message_agent', input: { target: 'Nobody', message: 'should not land' } }] };
+    };
+    rt.rooms.send(principal, room.id, { text: 'message a stranger', mentions: [alpha.id] });
+    await rt.rooms.tick();
+    const member = rt.store.listSessions().find(session => session.metadata?.roomId === room.id && session.metadata?.botId === alpha.id);
+    const missed = rt.store.listMessages(member.id).flatMap(message => message.parts).filter(part => part.type === 'tool_result').at(-1);
+    assert.equal(JSON.parse(missed.content).error_code, 'UNKNOWN_TARGET');
+    assert.equal(rt.store.db.prepare("SELECT id FROM bot_work_messages WHERE body='should not land'").get(), undefined);
+  } finally { rt.destroy(); }
+});
+
+test('a Room private message still stops at three hops and a full tool budget blocks another one [AC:bot-rooms#AC-7]', async () => {
+  const hops = [];
+  const adapter = {
+    name: 'room-hop',
+    async runTurn(input) {
+      const session = rt.store.getSession(input.sessionId);
+      const done = input.messages.some(message => message.parts.some(part => part.type === 'tool_result' || (part.type === 'text' && String(part.text).includes('Relay hop limit'))));
+      if (session?.metadata?.canonicalBotChat === true) {
+        const hop = session.metadata.relayHop ?? 0;
+        if (done) return { stopReason: 'end', assistantParts: [{ type: 'text', text: 'chain ended' }] };
+        if (hop >= 3) return { stopReason: 'tool_use', assistantParts: [{ type: 'tool_call', toolCallId: 'hop', name: 'message_agent', input: { target: 'Epsilon', message: 'one too many' } }] };
+        const order = ['Alpha', 'Beta', 'Gamma', 'Delta'];
+        const name = rt.store.getBot(session.metadata.botId)?.name;
+        const next = order[order.indexOf(name) + 1];
+        return { stopReason: 'tool_use', assistantParts: [{ type: 'tool_call', toolCallId: 'hop', name: 'message_agent', input: { target: next, message: `forward ${hop}` } }] };
+      }
+      if (done) return { stopReason: 'end', assistantParts: [{ type: 'text', text: 'room done' }] };
+      return { stopReason: 'tool_use', assistantParts: [{ type: 'tool_call', toolCallId: 'hop', name: 'message_agent', input: { target: 'Beta', message: 'from the room' } }] };
+    },
+    async summarizeMessages() { return ''; }
+  };
+  const rt = new RawAgentRuntime({
+    repoRoot: mkdtempSync(join(tmpdir(), 'room-hop-repo-')),
+    stateDir: mkdtempSync(join(tmpdir(), 'room-hop-state-')),
+    modelAdapter: adapter
+  });
+  try {
+    const names = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon'];
+    const bots = names.map(name => rt.createBot({ name }));
+    const principal = resolveBotPrincipal(rt.store);
+    const room = rt.rooms.create(principal, { title: 'Hop room', botIds: [bots[0].id] });
+    rt.rooms.send(principal, room.id, { text: 'start a chain' });
+    await rt.rooms.tick();
+    await waitFor(async () => {
+      const row = rt.store.db.prepare("SELECT hop, status FROM bot_work_messages WHERE target_bot=? ORDER BY seq DESC LIMIT 1").get(bots[3].id);
+      return row && row.status !== 'pending' ? row : null;
+    });
+    const delivered = rt.store.db.prepare('SELECT sender_bot, target_bot, hop, source_room FROM bot_work_messages ORDER BY seq').all();
+    for (const row of delivered) hops.push(row.hop);
+    assert.deepEqual(hops, [1, 2, 3]);
+    assert.equal(delivered[0].source_room, room.id);
+    assert.equal(delivered[1].source_room, null);
+    const epsilon = rt.store.db.prepare('SELECT id FROM bot_work_messages WHERE target_bot=?').get(bots[4].id);
+    assert.equal(epsilon, undefined);
+    const blocked = bots.flatMap(bot => rt.store.listMessages(bot.canonicalSessionId)).flatMap(message => message.parts).find(part => part.type === 'tool_result' && String(part.content).includes('HOP_LIMIT'));
+    assert.equal(JSON.parse(blocked.content).error_code, 'HOP_LIMIT');
+    const roomText = rt.rooms.messages(principal, room.id).messages.map(message => message.text).join('\n');
+    assert.equal(roomText.includes('forward'), false);
+    assert.equal(roomText.includes('chain ended'), false);
+  } finally { rt.destroy(); }
+});
+
+test('a Room turn that has used its tool budget cannot send another private message [AC:bot-rooms#AC-7]', async () => {
+  const adapter = {
+    name: 'room-budget',
+    async runTurn(input) {
+      const over = input.messages.some(message => message.parts.some(part => part.type === 'tool_result'));
+      if (over) return { stopReason: 'end', assistantParts: [{ type: 'text', text: 'should not get another turn' }] };
+      return {
+        stopReason: 'tool_use',
+        assistantParts: [
+          { type: 'tool_call', toolCallId: 'dm1', name: 'message_agent', input: { target: 'Beta', message: 'over budget one', wake: false } },
+          { type: 'tool_call', toolCallId: 'dm2', name: 'message_agent', input: { target: 'Beta', message: 'over budget two', wake: false } }
+        ]
+      };
+    },
+    async summarizeMessages() { return ''; }
+  };
+  const rt = new RawAgentRuntime({
+    repoRoot: mkdtempSync(join(tmpdir(), 'room-budget-repo-')),
+    stateDir: mkdtempSync(join(tmpdir(), 'room-budget-state-')),
+    modelAdapter: adapter
+  });
+  try {
+    const alpha = rt.createBot({ name: 'Alpha' });
+    const beta = rt.createBot({ name: 'Beta' });
+    const principal = resolveBotPrincipal(rt.store);
+    const room = rt.rooms.create(principal, { title: 'Tight budget', botIds: [alpha.id], maxToolCalls: 1 });
+    rt.rooms.send(principal, room.id, { text: 'one tool only' });
+    await rt.rooms.tick();
+    assert.equal(rt.rooms.turns(principal, room.id)[0].terminationReason, 'tool_budget');
+    const bodies = rt.store.db.prepare('SELECT body FROM bot_work_messages').all().map(row => row.body);
+    assert.deepEqual(bodies, []);
+    assert.equal(rt.rooms.messages(principal, room.id).messages.some(message => String(message.text).includes('over budget')), false);
+  } finally { rt.destroy(); }
 });

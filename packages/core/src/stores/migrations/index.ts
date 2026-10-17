@@ -977,6 +977,13 @@ export const MIGRATIONS: Migration[] = [
           ON context_stack_snapshots(session_id, turn_index, created_at);
       `);
     }
+  },
+  {
+    version: 29,
+    description: 'bot_work_messages.source_room records the Room a 1:1 private message came from',
+    up: (db) => {
+      ensureBotWorkSchema({ db });
+    }
   }
 ];
 
