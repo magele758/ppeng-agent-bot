@@ -106,6 +106,38 @@ test('a non-EEXIST open error is rethrown', async () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
+test('a stale lock cannot postpone the wait deadline', async () => {
+  const dir = gatewayDir('claim-lock-deadline-');
+  try {
+    const lock = lockOf(dir);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(lock, 'leftover');
+    const old = new Date(Date.now() - 60_000);
+    utimesSync(lock, old, old);
+    let reads = 0;
+    const base = 10_000;
+    const started = Date.now();
+    await assert.rejects(
+      () => claimInboundEvent('k', 1, dir, {
+        staleMs: 0,
+        waitMs: 10,
+        attempts: 1,
+        now: () => {
+          reads += 1;
+          return reads === 1 ? base : base + 100;
+        }
+      }),
+      (error) => error instanceof InboundClaimTimeoutError
+    );
+    assert.ok(Date.now() - started < 1_000);
+    assert.ok(reads < 20);
+    assert.equal(readFileSync(lock, 'utf8'), 'leftover');
+    assert.equal(existsSync(join(dir, 'inbound-dedupe.json')), false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('a lock timeout is not reported as a duplicate', async () => {
   const dir = gatewayDir('claim-lock-busy-');
   try {

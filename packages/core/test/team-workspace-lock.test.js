@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { copyWorkspaceSnapshot, snapshotLockWaitMs, syncWorkerResultToPlan } from '../dist/teams/workspace-sync.js';
@@ -67,6 +67,44 @@ test('a fresh live snapshot lock is not stolen', async () => {
     await assert.rejects(() => copyWorkspaceSnapshot(src, dest, fast), /Team workspace snapshot lock timed out/);
     assert.equal(existsSync(join(dest, 'kept.txt')), false);
     assert.equal(readFileSync(lock, 'utf8'), `${process.pid}:live`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('reclaiming a dead snapshot lock does not leave a parked file', async () => {
+  const dir = root('snap-parked-');
+  try {
+    const src = join(dir, 'src');
+    const dest = join(dir, 'dest');
+    mkdirSync(src, { recursive: true });
+    mkdirSync(dest, { recursive: true });
+    writeFileSync(join(src, 'kept.txt'), 'yes');
+    const lock = join(dest, '.snapshot.lock');
+    writeFileSync(lock, '999999:crashed');
+    await copyWorkspaceSnapshot(src, dest, fast);
+    assert.equal(existsSync(lock), false);
+    const parked = readdirSync(dest).filter((name) => name.includes('.reclaim'));
+    assert.deepEqual(parked, []);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('an old snapshot lock owned by a live pid is not reclaimed', async () => {
+  const dir = root('snap-live-old-');
+  try {
+    const src = join(dir, 'src');
+    const dest = join(dir, 'dest');
+    mkdirSync(src, { recursive: true });
+    mkdirSync(dest, { recursive: true });
+    writeFileSync(join(src, 'kept.txt'), 'no');
+    const lock = join(dest, '.snapshot.lock');
+    writeFileSync(lock, `${process.pid}:still-alive`);
+    ageLock(lock, 60_000);
+    await assert.rejects(() => copyWorkspaceSnapshot(src, dest, fast), /Team workspace snapshot lock timed out/);
+    assert.equal(readFileSync(lock, 'utf8'), `${process.pid}:still-alive`);
+    assert.equal(existsSync(join(dest, 'kept.txt')), false);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

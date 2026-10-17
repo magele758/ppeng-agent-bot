@@ -422,7 +422,7 @@ export class TeamDagExecutor {
     }
     task.sessionId = session.id;
     task.status = 'running';
-    this.postMail(plan, {
+    await this.postMail(plan, {
       from: 'team-coordinator',
       to: session.agentId || `worker-${task.id}`,
       type: 'task',

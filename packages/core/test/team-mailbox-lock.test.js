@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { TeamFileMailbox } from '../dist/teams/mailbox.js';
@@ -99,6 +99,23 @@ test('an old lock owned by a live pid is not reclaimed', async () => {
     );
     assert.equal(readFileSync(lock, 'utf8'), `${process.pid}:still-alive`);
     assert.equal(existsSync(join(plan, 'runtime', 'mailbox', 'b.jsonl')), false);
+  } finally {
+    rmSync(plan, { recursive: true, force: true });
+  }
+});
+
+test('reclaim leaves a live replacement and does not leak a parked lock', async () => {
+  const plan = planDir('mbox-replaced-');
+  try {
+    const box = new TeamFileMailbox(plan, fast);
+    const lock = lockOf(plan);
+    mkdirSync(join(plan, 'runtime', 'mailbox'), { recursive: true });
+    writeFileSync(lock, '999999:crashed');
+    const msg = await box.send({ planId: 'p', type: 'task', from: 'a', to: 'b', content: 'kept' });
+    assert.equal(msg.content, 'kept');
+    assert.equal(existsSync(lock), false);
+    const parked = readdirSync(join(plan, 'runtime', 'mailbox')).filter((name) => name.includes('.reclaim'));
+    assert.deepEqual(parked, []);
   } finally {
     rmSync(plan, { recursive: true, force: true });
   }

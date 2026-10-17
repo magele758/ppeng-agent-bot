@@ -1,4 +1,5 @@
-import { closeSync, mkdirSync, openSync, readFileSync, statSync, unlinkSync, utimesSync, writeFileSync } from 'node:fs';
+import { closeSync, linkSync, mkdirSync, openSync, readFileSync, renameSync, statSync, unlinkSync, utimesSync, writeFileSync, type Stats } from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { lockOwnerDead } from './lock-liveness.js';
 import { startAsyncLockWait } from './async-lock-wait.js';
@@ -62,7 +63,7 @@ async function acquireSnapshotLock(lockPath: string, token: string, options: Sna
     const fd = tryCreateSnapshotLock(lockPath, token);
     if (fd !== undefined) return fd;
     if (snapshotLockStale(lockPath, staleMs, now())) {
-      reclaimSnapshotLock(lockPath);
+      reclaimStaleSnapshotLock(lockPath, staleMs, now);
       continue;
     }
     if (wait.expired()) throw new Error(`Team workspace snapshot lock timed out: ${lockPath}`);
@@ -117,11 +118,49 @@ function snapshotLockAge(lockPath: string, now: number): number {
   }
 }
 
-function reclaimSnapshotLock(lockPath: string): void {
+/**
+ * Move the file we judged stale aside, then unlink only if that same inode is
+ * still the dead owner. A replacement created at `lockPath` is left alone.
+ */
+function reclaimStaleSnapshotLock(lockPath: string, staleMs: number, now: () => number): void {
+  let seen: Stats;
   try {
-    unlinkSync(lockPath);
+    seen = statSync(lockPath);
   } catch {
-    /* another copier reclaimed or replaced it */
+    return;
+  }
+  const parked = `${lockPath}.${process.pid}.${randomBytes(4).toString('hex')}.reclaim`;
+  try {
+    renameSync(lockPath, parked);
+  } catch {
+    return;
+  }
+  if (!sameSnapshotInode(parked, seen) || !snapshotLockStale(parked, staleMs, now())) {
+    restoreParkedSnapshotLock(parked, lockPath);
+    return;
+  }
+  try {
+    unlinkSync(parked);
+  } catch {
+    /* another copier already removed the parked file */
+  }
+}
+
+function sameSnapshotInode(path: string, seen: Stats): boolean {
+  try {
+    const current = statSync(path);
+    return current.ino === seen.ino && current.dev === seen.dev;
+  } catch {
+    return false;
+  }
+}
+
+function restoreParkedSnapshotLock(parked: string, lockPath: string): void {
+  try {
+    linkSync(parked, lockPath);
+    unlinkSync(parked);
+  } catch {
+    /* a new owner already created lockPath; leave the parked file */
   }
 }
 

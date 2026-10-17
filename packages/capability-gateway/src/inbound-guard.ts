@@ -144,10 +144,12 @@ async function acquireClaimLock(lockPath: string, token: string, options: Persis
   const waitMs = options.waitMs ?? CLAIM_LOCK_WAIT_MS;
   let step = 0;
   for (;;) {
+    if (now() - started > waitMs) throw new InboundClaimTimeoutError(lockPath);
     const fd = tryAcquireClaimLock(lockPath, token);
     if (fd !== undefined) return fd;
     if (claimLockStale(lockPath, options.staleMs ?? CLAIM_LOCK_STALE_MS, now())) {
       reclaimStaleClaimLock(lockPath);
+      if (now() - started > waitMs) throw new InboundClaimTimeoutError(lockPath);
       continue;
     }
     if (now() - started > waitMs) throw new InboundClaimTimeoutError(lockPath);

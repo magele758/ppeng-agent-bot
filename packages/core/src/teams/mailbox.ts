@@ -1,4 +1,5 @@
-import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, closeSync, existsSync, linkSync, mkdirSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync, type Stats } from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { createId, nowIso } from '../id.js';
 import type { TeamMailboxMessage } from './types.js';
@@ -144,7 +145,7 @@ async function acquireMailboxLock(lockPath: string, token: string, options: Mail
     const fd = tryCreateOwnedLock(lockPath, token);
     if (fd !== undefined) return fd;
     if (mailboxLockStale(lockPath, staleMs, now())) {
-      reclaimLockFile(lockPath);
+      reclaimStaleMailboxLock(lockPath, staleMs, now);
       continue;
     }
     if (wait.expired()) throw new Error(`Team mailbox lock timed out: ${lockPath}`);
@@ -199,11 +200,49 @@ function tryCreateOwnedLock(lockPath: string, token: string): number | undefined
   }
 }
 
-function reclaimLockFile(lockPath: string): void {
+/**
+ * Move the file we judged stale aside, then unlink only if that same inode is
+ * still the dead owner. A replacement created at `lockPath` is left alone.
+ */
+function reclaimStaleMailboxLock(lockPath: string, staleMs: number, now: () => number): void {
+  let seen: Stats;
   try {
-    unlinkSync(lockPath);
+    seen = statSync(lockPath);
   } catch {
-    /* another writer reclaimed or replaced it */
+    return;
+  }
+  const parked = `${lockPath}.${process.pid}.${randomBytes(4).toString('hex')}.reclaim`;
+  try {
+    renameSync(lockPath, parked);
+  } catch {
+    return;
+  }
+  if (!sameLockInode(parked, seen) || !mailboxLockStale(parked, staleMs, now())) {
+    restoreParkedLock(parked, lockPath);
+    return;
+  }
+  try {
+    unlinkSync(parked);
+  } catch {
+    /* another writer already removed the parked file */
+  }
+}
+
+function sameLockInode(path: string, seen: Stats): boolean {
+  try {
+    const current = statSync(path);
+    return current.ino === seen.ino && current.dev === seen.dev;
+  } catch {
+    return false;
+  }
+}
+
+function restoreParkedLock(parked: string, lockPath: string): void {
+  try {
+    linkSync(parked, lockPath);
+    unlinkSync(parked);
+  } catch {
+    /* a new owner already created lockPath; leave the parked file */
   }
 }
 
