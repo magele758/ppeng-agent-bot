@@ -165,7 +165,7 @@ import {
 import { cancelAllSessions as cancelAllSessionsFn, cancelSession as cancelSessionFn, destroyRuntime } from './runtime/session-control.js';
 import { ensureWorkspaceRoot as ensureWorkspaceRootFn } from './runtime/spawn-host.js';
 import { createRuntimeCollaborators } from './runtime/collaborators.js';
-import {
+import { flushPreparedContextSnapshots,
   bindTurnKernelHost,
   compactFrom,
   createRuntimeToolServices,
@@ -631,6 +631,7 @@ export class RawAgentRuntime {
   listContextSnapshots(sessionId: string): ContextSnapshot[] {
     const session = this.store.getSession(sessionId);
     if (!session) throw new NotFoundError('Session', sessionId);
+    flushPreparedContextSnapshots(this.store, sessionId);
     return this.store.listContextSnapshots(sessionId);
   }
 
@@ -1582,11 +1583,15 @@ export class RawAgentRuntime {
   /** Gracefully shut down all in-flight work, MCP sessions, and release SQLite. */
   async destroy(): Promise<void> {
     await this.computerUse.close();
+    // Writes still queued must land before the store closes, or replay loses them.
+    // Turns aborted below can queue one more prepare; beforeClose flushes that too.
+    flushPreparedContextSnapshots(this.store);
     await destroyRuntime({
       sessionAbortControllers: this.sessionAbortControllers,
       backgroundJobAborts: this.backgroundJobAborts,
       mcpManager: this.mcpManager,
-      store: this.store
+      store: this.store,
+      beforeClose: () => flushPreparedContextSnapshots(this.store)
     });
   }
 

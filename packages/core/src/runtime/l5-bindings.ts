@@ -117,7 +117,10 @@ import type { TurnKernelHost } from '../turn/host.js';
 import { autoCompactSession } from './compact-host.js';
 import { applyNormalSessionRequestBudget } from './normal-request-guard.js';
 import { resolveMaxContextTokens } from '../session/session-budget.js';
-import { recordPreparedContextSnapshot } from '../session/context-snapshots.js';
+import {
+  preparedContextSnapshotBlocksFor,
+  type ContextSnapshotBlock
+} from '../session/context-snapshots.js';
 import { autoClaimTask, ingestMailbox, unblockDependentTasks } from './scheduler-host.js';
 import { handleTurnCompletion, injectEvolvingCoachBeforeRecovery } from './session-complete.js';
 import { resolveSkillLoad, resolveSkillSearch } from './skill-load.js';
@@ -493,6 +496,144 @@ function runTurnViaFallbackChain(
 
 type ModelTurnCall = TurnKernelHost['runTurnWithRetries'];
 
+/** Blocks are captured at queue time. Only the SQLite write waits. */
+interface QueuedPreparedSnapshot {
+  sessionId: string;
+  blocks: ContextSnapshotBlock[];
+}
+
+interface PreparedSnapshotQueue extends Array<QueuedPreparedSnapshot> {
+  /** Set while a drain macrotask is waiting, so a second one is not armed. */
+  scheduled?: NodeJS.Immediate;
+  /** Set while a failed write is waiting to be retried. unref'd. */
+  retry?: NodeJS.Timeout;
+}
+
+const pendingPreparedSnapshots = new WeakMap<L5Bindable['store'], PreparedSnapshotQueue>();
+
+/**
+ * Write one queued snapshot. A closed store or a thrown append leaves the item
+ * queued so the next flush or drain can retry it. Ordering is per session, so
+ * a failure blocks only that session.
+ */
+function writeQueuedPreparedSnapshot(store: L5Bindable['store'], item: QueuedPreparedSnapshot): boolean {
+  if (!store.db.isOpen) return false;
+  try {
+    store.appendContextSnapshot(item.sessionId, item.blocks);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function cancelPreparedSnapshotSchedule(queue: PreparedSnapshotQueue | undefined): void {
+  if (!queue) return;
+  if (queue.scheduled) clearImmediate(queue.scheduled);
+  if (queue.retry) clearTimeout(queue.retry);
+  delete queue.scheduled;
+  delete queue.retry;
+}
+
+/**
+ * Write queued replay snapshots now, in prepare order within each session.
+ * Readers call this first so a listed history always includes every prepare
+ * that already happened. A session whose write fails keeps that item and every
+ * later item of the same session queued; other sessions keep being written.
+ */
+export function flushPreparedContextSnapshots(store: L5Bindable['store'], sessionId?: string): void {
+  const queue = pendingPreparedSnapshots.get(store);
+  if (!queue?.length) return;
+  cancelPreparedSnapshotSchedule(queue);
+  const blocked = new Set<string>();
+  const keep: QueuedPreparedSnapshot[] = [];
+  for (const item of queue.splice(0)) {
+    const selected = sessionId === undefined || item.sessionId === sessionId;
+    if (!selected || blocked.has(item.sessionId) || !writeQueuedPreparedSnapshot(store, item)) {
+      keep.push(item);
+      if (selected) blocked.add(item.sessionId);
+    }
+  }
+  queue.push(...keep);
+  // Flush cancels the scheduled drain, so anything still queued (a write that
+  // failed, or another session a per-session flush skipped) has to be re-armed
+  // or it sits in memory until exit. A drain that writes nothing falls back to
+  // the unref'd retry.
+  if (queue.length && store.db.isOpen) schedulePreparedSnapshotDrain(store, queue);
+}
+
+/**
+ * Storing a prepared-view snapshot copies the whole context (block text, JSON).
+ * Doing that inline on every prepared model request made back-to-back bot turns
+ * one long synchronous burst that starved HTTP handlers. Blocks are built when
+ * the request is prepared; only the SQLite write waits for the next macrotask.
+ * The request itself is unchanged.
+ */
+function drainOnePreparedSnapshot(store: L5Bindable['store']): void {
+  const queue = pendingPreparedSnapshots.get(store);
+  if (!queue?.length) return;
+  // One successful write per macrotask. A failed session stays queued, in
+  // order, and is skipped for the rest of this pass so other sessions proceed.
+  const blocked = new Set<string>();
+  let wrote = false;
+  for (let index = 0; index < queue.length && !wrote;) {
+    const next = queue[index];
+    if (!next || blocked.has(next.sessionId)) {
+      index += 1;
+      continue;
+    }
+    if (writeQueuedPreparedSnapshot(store, next)) {
+      queue.splice(index, 1);
+      wrote = true;
+      continue;
+    }
+    blocked.add(next.sessionId);
+    index += 1;
+  }
+  if (!queue.length || !store.db.isOpen) return;
+  // Healthy items keep the one-per-macrotask pace. Only a leftover failure waits.
+  if (wrote) schedulePreparedSnapshotDrain(store, queue);
+  else schedulePreparedSnapshotRetry(store, queue);
+}
+
+/** True while either the next macrotask or a failure retry is already waiting. */
+function snapshotDrainPending(queue: PreparedSnapshotQueue): boolean {
+  return queue.scheduled !== undefined || queue.retry !== undefined;
+}
+
+function schedulePreparedSnapshotDrain(store: L5Bindable['store'], queue: PreparedSnapshotQueue): void {
+  if (snapshotDrainPending(queue)) return;
+  queue.scheduled = setImmediate(() => {
+    delete queue.scheduled;
+    drainOnePreparedSnapshot(store);
+  });
+}
+
+/** Retry after a failed write. unref so a stuck snapshot cannot hold the process open. */
+function schedulePreparedSnapshotRetry(store: L5Bindable['store'], queue: PreparedSnapshotQueue): void {
+  if (snapshotDrainPending(queue) || !store.db.isOpen) return;
+  const timer = setTimeout(() => {
+    delete queue.retry;
+    if (!store.db.isOpen) return;
+    drainOnePreparedSnapshot(store);
+  }, 1000);
+  timer.unref();
+  queue.retry = timer;
+}
+
+export function queuePreparedContextSnapshot(
+  store: L5Bindable['store'],
+  sessionId: string,
+  blocks: ContextSnapshotBlock[]
+): void {
+  let queue = pendingPreparedSnapshots.get(store);
+  if (!queue) {
+    queue = [];
+    pendingPreparedSnapshots.set(store, queue);
+  }
+  queue.push({ sessionId, blocks });
+  if (!snapshotDrainPending(queue)) schedulePreparedSnapshotDrain(store, queue);
+}
+
 /**
  * Ordinary chats are capped here, after micro-compact has already shaped
  * `messages` and the kernel has attached the system prompt and tool schemas.
@@ -508,7 +649,7 @@ function fitProductModelRequest(
     : rt.modelAdapter;
   if (session) {
     try {
-      recordPreparedContextSnapshot(rt.store, {
+      const blocks = preparedContextSnapshotBlocksFor(rt.store, {
         session,
         systemPrompt: input.systemPrompt,
         tools: input.tools.map((tool) => ({
@@ -516,10 +657,11 @@ function fitProductModelRequest(
           description: tool.description,
           inputSchema: tool.inputSchema
         })),
-        messages: input.messages,
+        messages: [...input.messages],
         adapter,
         env: process.env
       });
+      queuePreparedContextSnapshot(rt.store, session.id, blocks);
     } catch {
       /* Replay history must not change the turn or write a summary. */
     }
