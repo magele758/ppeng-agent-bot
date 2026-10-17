@@ -193,6 +193,30 @@ test('release removes only the body this process wrote', async () => {
   }
 });
 
+test('a stale mailbox holder releasing does not delete the lock a new holder created', async () => {
+  const plan = planDir('mbox-successor-');
+  try {
+    const inbox = join(plan, 'runtime', 'mailbox');
+    const lock = lockOf(plan);
+    let releaseHold;
+    const hold = new Promise((resolve) => {
+      releaseHold = resolve;
+    });
+    const held = withMailboxLock(inbox, async () => {
+      ageLock(lock, 60_000);
+      rmSync(lock);
+      writeFileSync(lock, reusedOwnPid('next'));
+      await hold;
+    }, { staleMs: 40, waitMs: 2_000 });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    releaseHold();
+    await held;
+    assert.equal(readFileSync(lock, 'utf8'), reusedOwnPid('next'));
+  } finally {
+    rmSync(plan, { recursive: true, force: true });
+  }
+});
+
 test('reclaim leaves a live replacement and does not leak a parked lock', async () => {
   const plan = planDir('mbox-replaced-');
   try {

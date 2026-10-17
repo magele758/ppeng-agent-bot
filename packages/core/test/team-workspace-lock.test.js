@@ -201,6 +201,32 @@ test('snapshot release removes only the body this process wrote', async () => {
   }
 });
 
+test('a stale snapshot holder releasing does not delete the lock a new holder created', async () => {
+  const dir = root('snap-successor-');
+  try {
+    const dest = join(dir, 'dest');
+    mkdirSync(dest, { recursive: true });
+    const lock = join(dest, '.snapshot.lock');
+    const successor = `${process.pid}:1:deadbeefnext:noncenext`;
+    let releaseHold;
+    const hold = new Promise((resolve) => {
+      releaseHold = resolve;
+    });
+    const held = withSnapshotLock(dest, async () => {
+      ageLock(lock, 60_000);
+      rmSync(lock);
+      writeFileSync(lock, successor);
+      await hold;
+    }, { staleMs: 40, waitMs: 2_000, startHeartbeat: () => () => {} });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    releaseHold();
+    await held;
+    assert.equal(readFileSync(lock, 'utf8'), successor);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('a snapshot rename that keeps failing throws the lock timeout', async () => {
   const dir = root('snap-rename-');
   try {

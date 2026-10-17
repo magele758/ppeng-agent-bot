@@ -1,4 +1,4 @@
-import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { createId, nowIso } from '../id.js';
 import type { TeamMailboxMessage } from './types.js';
@@ -8,8 +8,8 @@ import {
   lockTokenNonce,
   readStaleLock,
   reclaimStaleLock,
+  releaseHeldLock,
   releaseLockAcquisition,
-  releaseLockIfToken,
   writeOwnedLock
 } from './lock-liveness.js';
 import { startAsyncLockWait } from './async-lock-wait.js';
@@ -189,9 +189,11 @@ function tryCreateOwnedLock(lockPath: string, token: string): number | undefined
 }
 
 function releaseOwnedLock(lockPath: string, fd: number, token: string, nonce: string): void {
-  closeSync(fd);
-  releaseLockIfToken(lockPath, token);
-  releaseLockAcquisition(nonce);
+  try {
+    releaseHeldLock(lockPath, fd, token);
+  } finally {
+    releaseLockAcquisition(nonce);
+  }
 }
 
 function readJsonl(filePath: string): TeamMailboxMessage[] {

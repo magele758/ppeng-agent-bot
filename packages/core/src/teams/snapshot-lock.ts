@@ -1,4 +1,4 @@
-import { closeSync, mkdirSync, openSync, utimesSync } from 'node:fs';
+import { mkdirSync, openSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   createLockToken,
@@ -6,8 +6,8 @@ import {
   lockTokenNonce,
   readStaleLock,
   reclaimStaleLock,
+  releaseHeldLock,
   releaseLockAcquisition,
-  releaseLockIfToken,
   writeOwnedLock
 } from './lock-liveness.js';
 import { startAsyncLockWait } from './async-lock-wait.js';
@@ -73,9 +73,11 @@ function releaseHeldSnapshotLock(
   stopHeartbeat: () => void
 ): void {
   stopHeartbeat();
-  closeSync(fd);
-  releaseLockIfToken(lockPath, token);
-  releaseLockAcquisition(nonce);
+  try {
+    releaseHeldLock(lockPath, fd, token);
+  } finally {
+    releaseLockAcquisition(nonce);
+  }
 }
 
 async function acquireSnapshotLock(lockPath: string, token: string, options: SnapshotLockOptions): Promise<number> {

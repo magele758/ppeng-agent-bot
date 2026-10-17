@@ -446,16 +446,6 @@ function unlinkQuiet(path: string): void {
   }
 }
 
-/** Release removes the lock only when the body is still exactly our token. */
-export function releaseLockIfToken(lockPath: string, token: string): void {
-  try {
-    if (readFileSync(lockPath, 'utf8') !== token) return;
-    unlinkSync(lockPath);
-  } catch {
-    /* already released or replaced */
-  }
-}
-
 /**
  * Release through the fd we opened. A stale holder must not unlink a file a
  * later owner created at the same path: the held fd's inode has to still be
@@ -484,10 +474,7 @@ function heldLockStillOurs(lockPath: string, fd: number, token: string): boolean
   return readFileSync(lockPath, 'utf8') === token;
 }
 
-/**
- * `writeFileSync(fd, ...)` closes the descriptor, which would make the later
- * inode check fail and leak the lock. `writeSync` leaves it open.
- */
+/** `writeSync` writes the token without reopening the file or closing `fd`. */
 export function writeOwnedLock(fd: number, token: string): void {
   const bytes = Buffer.from(token, 'utf8');
   let offset = 0;

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, openSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -17,8 +17,8 @@ import {
   readConsistentLock,
   readProcStartTime,
   reclaimStaleLock,
+  releaseHeldLock,
   releaseLockAcquisition,
-  releaseLockIfToken,
   setBetweenLockStatsForTests,
   setLockRenameForTests,
   setProcStartTimeReaderForTests
@@ -120,16 +120,18 @@ test('old-format live pid waits for a stale mtime; a dead pid is reclaimable imm
   assert.equal(lockBodyStale({ body: '', ageMs: 41, staleMs: 40 }), true);
 });
 
-test('release unlinks only a body that still equals our token', () => {
+test('release unlinks only while the held fd still names our token', () => {
   const root = dir('lock-release-');
   try {
     const file = join(root, '.lock');
     const ours = createLockToken();
-    writeFileSync(file, `${process.pid}:1:other:nonce`);
-    releaseLockIfToken(file, ours);
-    assert.equal(lockFileStale(file, 40, Date.now()), true);
-    writeFileSync(file, ours);
-    releaseLockIfToken(file, ours);
+    const foreignFd = openSync(file, 'wx');
+    writeFileSync(foreignFd, `${process.pid}:1:other:nonce`);
+    releaseHeldLock(file, foreignFd, ours);
+    assert.equal(existsSync(file), true);
+    const ownFd = openSync(file, 'r+');
+    writeFileSync(ownFd, ours);
+    releaseHeldLock(file, ownFd, ours);
     assert.equal(existsSync(file), false);
   } finally {
     rmSync(root, { recursive: true, force: true });
