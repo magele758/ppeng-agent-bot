@@ -411,12 +411,18 @@ export class BotRoomService {
     if (session.status === 'running' || session.status === 'waiting_approval' || this.host.isSessionRunning?.(session.id)) { turn.status = 'queued'; this.saveTurn(turn); return undefined; }
     return { room: latest, botId, session };
   }
-  /** User messages queued after the trigger stay hidden. Replies of an earlier turn may land past that seq and must still be delivered. */
+  /** User messages queued after the trigger stay hidden. A bot reply past the trigger is visible only when its producing turn was triggered no later than this one; an unresolvable producer stays hidden. */
   private visible(message: BotRoomMessage, trigger: BotRoomMessage, turn: BotRoomTurn): boolean {
     if (message.seq <= trigger.seq || message.turnId === turn.id) return true;
-    return message.sender.type === 'bot' && !!message.turnId && message.turnId !== turn.id && this.turnById(message.turnId).messageId !== message.id;
+    if (message.sender.type !== 'bot' || !message.turnId || message.turnId === turn.id) return false;
+    const producer = this.store.db.prepare('SELECT data FROM bot_room_turns WHERE id=?').get(message.turnId);
+    const producerTurn = decode<BotRoomTurn>(producer);
+    if (!producerTurn || producerTurn.messageId === message.id) return false;
+    const producerMessage = decode<BotRoomMessage>(this.store.db.prepare('SELECT data FROM bot_room_messages WHERE id=?').get(producerTurn.messageId));
+    return !!producerMessage && producerMessage.seq <= trigger.seq;
   }
-  private memberInput(room: BotRoom, turn: BotRoomTurn, session: SessionRecord): Parameters<SqliteStateStore['appendMessage']>[2] {
+  /** Eligible window plus the seqs this prompt delivers. Omitted-by-cap messages still count as delivered. */
+  private historyForTurn(room: BotRoom, turn: BotRoomTurn, session: SessionRecord): { parts: Parameters<SqliteStateStore['appendMessage']>[2]; throughSeq: number; extraSeqs: number[] } {
     const recent = this.messages(room.principal, room.id, { limit: ROOM_HISTORY_CAP }).messages;
     const trigger = recent.find(message => message.id === turn.messageId) ?? decode<BotRoomMessage>(this.store.db.prepare('SELECT data FROM bot_room_messages WHERE id=?').get(turn.messageId))!;
     // Later queued user messages stay out until their own turn. A single max-seq
@@ -440,7 +446,9 @@ export class BotRoomService {
       const image = imageId && this.store.getImageAsset(imageId);
       if (image) parts.push({ type: 'image', assetId: image.id, mimeType: image.mimeType });
     }
-    return parts;
+    const throughSeq = trigger.seq;
+    const extraSeqs = [...(prior?.extraSeqs ?? []).filter(seq => seq > throughSeq), ...unseen.filter(message => message.seq > throughSeq).map(message => message.seq)];
+    return { parts, throughSeq, extraSeqs };
   }
   /** Newest ROOM_HISTORY_CAP messages, then oldest dropped until the text budget fits. */
   private fitHistory(messages: BotRoomMessage[]): { kept: BotRoomMessage[]; omitted: number } {
@@ -449,17 +457,9 @@ export class BotRoomService {
     while (kept.length > 1 && JSON.stringify(kept).length > ROOM_HISTORY_CHARS) { kept = kept.slice(1); omitted++; }
     return { kept, omitted };
   }
-  /** Record delivery when the prompt is appended, before the member run, so a failed run is not replayed into the same session. */
-  private markDelivered(session: SessionRecord, turn: BotRoomTurn, room: BotRoom): SessionRecord {
-    const recent = this.messages(room.principal, room.id, { limit: ROOM_HISTORY_CAP }).messages;
-    const trigger = recent.find(message => message.id === turn.messageId);
-    const throughSeq = trigger?.seq ?? roomDelivery(session.metadata)?.throughSeq ?? 0;
-    const prior = roomDelivery(session.metadata);
-    const eligible = trigger ? recent.filter(message => this.visible(message, trigger, turn)) : recent.filter(message => message.seq <= throughSeq || message.turnId === turn.id);
-    const extraSeqs = eligible.filter(message => message.seq > throughSeq).map(message => message.seq);
-    // Keep seqs delivered earlier that have since fallen outside the last-200 page.
-    const merged = [...(prior?.extraSeqs ?? []).filter(seq => seq > throughSeq), ...extraSeqs];
-    return this.store.updateSession(session.id, { metadata: withRoomDelivery(session.metadata, { throughSeq, extraSeqs: merged }) });
+  /** Record the seqs historyForTurn already chose, before the member run, so a failed run is not replayed into the same session. */
+  private markDelivered(session: SessionRecord, throughSeq: number, extraSeqs: number[]): SessionRecord {
+    return this.store.updateSession(session.id, { metadata: withRoomDelivery(session.metadata, { throughSeq, extraSeqs }) });
   }
   private noteReplyDelivered(sessionId: string, seq: number): void {
     const session = this.store.getSession(sessionId);
@@ -473,8 +473,9 @@ export class BotRoomService {
     turn.startSeq = this.store.listMessages(session.id).at(-1)?.seq ?? 0;
     turn.startCostUsd = typeof session.metadata?.usageCostUsd === 'number' ? session.metadata.usageCostUsd : 0;
     this.saveTurn(turn);
-    this.store.appendMessage(session.id, 'user', this.memberInput(room, turn, session));
-    const delivered = this.markDelivered(session, turn, room);
+    const history = this.historyForTurn(room, turn, session);
+    this.store.appendMessage(session.id, 'user', history.parts);
+    const delivered = this.markDelivered(session, history.throughSeq, history.extraSeqs);
     const metadata = { ...delivered.metadata }; delete metadata.outcome;
     this.store.updateSession(session.id, { status: 'idle', metadata });
     await this.host.runSession(session.id, { onEvent: this.budgetHookForSession(session.id) });

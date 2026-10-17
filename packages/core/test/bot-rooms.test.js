@@ -450,3 +450,32 @@ test('an already delivered unknown turn still warns on the next turn [AC:bot-roo
   assert.ok(prompt.includes(unknown.id));
   assert.ok(!historyOf(prompt).some(message => message.text === 'RISKY_OLD'), 'the warning does not depend on re-sending delivered messages');
 });
+
+test('a newer turn reply is not visible to an older turn that has not built its prompt yet [AC:bot-rooms#AC-3]', async () => {
+  const f = fixture();
+  const room = f.rooms.create(f.principal, { title: 'Out of order replies', botIds: [f.a.id, f.b.id] });
+  const older = f.rooms.send(f.principal, room.id, { text: 'OLDER_ASK', mentions: [f.a.id, f.b.id] });
+  const newer = f.rooms.send(f.principal, room.id, { text: 'NEWER_ASK', mentions: [f.b.id] });
+  const seq = f.store.db.prepare('SELECT COALESCE(MAX(seq),0)+1 AS seq FROM bot_room_messages WHERE room_id=?').get(room.id).seq;
+  const reply = { id: 'room_msg_newer_reply', roomId: room.id, seq, sender: { type: 'bot', id: f.b.id, name: 'Beta' }, text: 'NEWER_REPLY', attachmentIds: [], turnId: newer.turn.id, createdAt: new Date().toISOString() };
+  f.store.db.prepare('INSERT INTO bot_room_messages(id,room_id,seq,idem_key,data) VALUES(?,?,?,?,?)').run(reply.id, room.id, seq, 'planted-newer-reply', JSON.stringify(reply));
+  const prompts = [];
+  f.host.runSession = async id => {
+    prompts.push(promptTexts(f.store, id).at(-1));
+    f.store.appendMessage(id, 'assistant', [{ type: 'text', text: `said:${f.store.getSession(id).agentId}` }]);
+  };
+  await f.rooms.tick();
+  const alpha = historyOf(prompts[0]);
+  assert.ok(!alpha.some(message => message.text === 'NEWER_REPLY'), 'a reply to a later instruction does not leak into the older turn');
+  assert.ok(!alpha.some(message => message.text === 'NEWER_ASK'));
+  assert.ok(alpha.some(message => message.text === 'OLDER_ASK'));
+  const alphaSession = f.store.db.prepare('SELECT session_id FROM bot_room_contexts WHERE room_id=? AND bot_id=?').get(room.id, f.a.id).session_id;
+  const alphaDelivery = f.store.getSession(alphaSession).metadata.roomDelivery;
+  assert.ok(!alphaDelivery.extraSeqs.includes(seq), 'the newer reply is not marked delivered on the older turn');
+  assert.ok(alphaDelivery.throughSeq < seq);
+  await f.rooms.tick();
+  const beta = historyOf(prompts.at(-1));
+  assert.ok(beta.some(message => message.text === 'NEWER_REPLY' && message.sender.id === f.b.id), 'the same reply is delivered when its own turn runs');
+  assert.equal(f.rooms.turns(f.principal, room.id).find(turn => turn.id === older.turn.id).status, 'completed');
+  assert.equal(f.rooms.turns(f.principal, room.id).find(turn => turn.id === newer.turn.id).status, 'completed');
+});
