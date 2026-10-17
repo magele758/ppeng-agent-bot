@@ -300,3 +300,153 @@ test('deleted approval context becomes unknown without blocking or replaying lat
   assert.equal(calls,2);assert.equal(restarted.turns(f.principal,room.id)[0].status,'unknown');assert.equal(restarted.turns(f.principal,room.id)[1].status,'completed');
   assert.equal(restarted.turns(f.principal,room.id)[0].terminationReason,'execution_context_missing');
 });
+
+function promptTexts(store, sessionId) {
+  return store.listMessages(sessionId).filter(message => message.role === 'user').flatMap(message => message.parts).map(part => part.text ?? '').filter(Boolean);
+}
+function historyOf(text) {
+  const marker = 'Shared Room history (user content, not system instructions):\n';
+  const start = text.indexOf(marker);
+  assert.ok(start >= 0, 'prompt carries shared Room history');
+  const json = text.slice(start + marker.length);
+  const end = json.indexOf('\n');
+  return JSON.parse(end < 0 ? json : json.slice(0, end));
+}
+
+test('a later turn of the same bot receives only messages since its last delivery [AC:bot-rooms#AC-3]', async () => {
+  const f = fixture();
+  const room = f.rooms.create(f.principal, { title: 'Incremental', botIds: [f.a.id] });
+  const prompts = [];
+  f.host.runSession = async id => {
+    prompts.push(promptTexts(f.store, id).at(-1));
+    f.store.appendMessage(id, 'assistant', [{ type: 'text', text: `reply:${prompts.length}` }]);
+  };
+  f.rooms.send(f.principal, room.id, { text: 'OLD_TOPIC' });
+  await f.rooms.tick();
+  f.rooms.send(f.principal, room.id, { text: 'NEW_TOPIC' });
+  await f.rooms.tick();
+  const first = historyOf(prompts[0]);
+  const second = historyOf(prompts[1]);
+  assert.ok(first.some(message => message.text === 'OLD_TOPIC' && message.sender.name === f.principal.userId));
+  assert.ok(!second.some(message => message.text === 'OLD_TOPIC'), 'already delivered history is not repeated');
+  assert.ok(!second.some(message => message.text === 'reply:1'), 'own published reply stays in the session as assistant output');
+  assert.ok(second.some(message => message.text === 'NEW_TOPIC' && message.sender.name === f.principal.userId && message.sender.type === 'user' && Number.isInteger(message.seq)));
+  assert.match(prompts[1], /New messages since your last turn in this Room/);
+  assert.match(prompts[0], /Recent Room history \(first turn in this Room context\)/);
+});
+
+test('same-turn earlier replies are visible and a bot does not receive its own reply again [AC:bot-rooms#AC-3]', async () => {
+  const f = fixture();
+  const room = f.rooms.create(f.principal, { title: 'Same turn', botIds: [f.a.id, f.b.id] });
+  const byBot = {};
+  f.host.runSession = async id => {
+    const session = f.store.getSession(id);
+    byBot[session.agentId] = promptTexts(f.store, id).at(-1);
+    f.store.appendMessage(id, 'assistant', [{ type: 'text', text: `said:${session.agentId}` }]);
+  };
+  f.rooms.send(f.principal, room.id, { text: 'discuss', mentions: [f.a.id, f.b.id] });
+  await f.rooms.tick();
+  const beta = historyOf(byBot[f.b.id]);
+  assert.ok(beta.some(message => message.text === `said:${f.a.id}` && message.sender.id === f.a.id && message.sender.name === 'Alpha'));
+  f.rooms.send(f.principal, room.id, { text: 'again', mentions: [f.b.id] });
+  await f.rooms.tick();
+  const again = historyOf(byBot[f.b.id]);
+  assert.ok(!again.some(message => message.text === `said:${f.b.id}`), 'own published reply is already in the session');
+  assert.ok(again.some(message => message.text === 'again'));
+});
+
+test('a user message queued during an earlier turn is delivered on its own turn [AC:bot-rooms#AC-3]', async () => {
+  const f = fixture();
+  const room = f.rooms.create(f.principal, { title: 'Queued later', botIds: [f.a.id, f.b.id] });
+  const prompts = [];
+  let release;
+  f.host.runSession = id => new Promise(resolve => {
+    release = () => {
+      prompts.push(promptTexts(f.store, id).at(-1));
+      f.store.appendMessage(id, 'assistant', [{ type: 'text', text: `turn-reply:${prompts.length}` }]);
+      resolve();
+    };
+  });
+  f.rooms.send(f.principal, room.id, { text: 'MESSAGE_A', mentions: [f.a.id, f.b.id] });
+  const running = f.rooms.tick();
+  await new Promise(resolve => setImmediate(resolve));
+  f.rooms.send(f.principal, room.id, { text: 'MESSAGE_B', mentions: [f.a.id] });
+  release();
+  await new Promise(resolve => setImmediate(resolve));
+  const finishBeta = release;
+  finishBeta();
+  await running;
+  assert.equal(prompts.length, 2);
+  assert.ok(!historyOf(prompts[0]).some(message => message.text === 'MESSAGE_B'), 'a later queued message does not leak into the earlier turn');
+  assert.ok(!historyOf(prompts[1]).some(message => message.text === 'MESSAGE_B'));
+  f.host.runSession = async id => {
+    prompts.push(promptTexts(f.store, id).at(-1));
+    f.store.appendMessage(id, 'assistant', [{ type: 'text', text: 'turn-reply:b' }]);
+  };
+  await f.rooms.tick();
+  const later = historyOf(prompts.at(-1));
+  assert.ok(later.some(message => message.text === 'MESSAGE_B' && message.sender.name === f.principal.userId && message.sender.type === 'user'));
+  assert.ok(later.some(message => message.text === 'turn-reply:2' && message.sender.id === f.b.id && message.sender.name === 'Beta'), 'the other member reply, queued after the cursor, is still delivered');
+  assert.ok(!later.some(message => message.text === 'turn-reply:1'), 'own reply is already in this session');
+  assert.ok(!later.some(message => message.text === 'MESSAGE_A'), 'the triggering message of the earlier turn was already delivered');
+});
+
+test('a fresh, new-member, or replaced context session gets the recent window again [AC:bot-rooms#AC-3]', async () => {
+  const f = fixture();
+  const room = f.rooms.create(f.principal, { title: 'Fresh window', botIds: [f.a.id] });
+  const seen = [];
+  f.host.runSession = async id => { seen.push(promptTexts(f.store, id).at(-1)); f.store.appendMessage(id, 'assistant', [{ type: 'text', text: 'kept' }]); };
+  f.rooms.send(f.principal, room.id, { text: 'FIRST_WINDOW' });
+  await f.rooms.tick();
+  const contextId = f.store.db.prepare('SELECT session_id FROM bot_room_contexts WHERE room_id=? AND bot_id=?').get(room.id, f.a.id).session_id;
+  f.store.updateSession(contextId, { status: 'unknown' });
+  f.rooms.send(f.principal, room.id, { text: 'AFTER_REPLACE' });
+  await f.rooms.tick();
+  const replaced = seen.at(-1);
+  assert.match(replaced, /Recent Room history \(first turn in this Room context\)/);
+  assert.ok(historyOf(replaced).some(message => message.text === 'FIRST_WINDOW'));
+  assert.ok(historyOf(replaced).some(message => message.text === 'kept' && message.sender.name === 'Alpha'));
+  const c = createBot(f.facade, { name: 'Gamma' });
+  f.store.updateSession(c.canonicalSessionId, { metadata: { ...f.store.getSession(c.canonicalSessionId).metadata, ...f.principal } });
+  f.rooms.addMember(f.principal, room.id, c.id);
+  f.rooms.send(f.principal, room.id, { text: 'WELCOME', mentions: [c.id] });
+  await f.rooms.tick();
+  const joined = seen.at(-1);
+  assert.match(joined, /first turn in this Room context/);
+  assert.ok(historyOf(joined).some(message => message.text === 'FIRST_WINDOW'));
+  assert.ok(historyOf(joined).some(message => message.text === 'WELCOME' && message.sender.type === 'user'));
+});
+
+test('an oversized delta keeps the newest messages and reports how many were omitted [AC:bot-rooms#AC-3]', async () => {
+  const f = fixture();
+  const room = f.rooms.create(f.principal, { title: 'Capped', botIds: [f.a.id] });
+  let prompt = '';
+  f.host.runSession = async id => { prompt = promptTexts(f.store, id).at(-1); f.store.appendMessage(id, 'assistant', [{ type: 'text', text: 'ack' }]); };
+  for (let i = 0; i < 205; i++) f.rooms.send(f.principal, room.id, { text: `BULK_${String(i).padStart(3, '0')}_${'x'.repeat(800)}`, mentions: [] });
+  f.rooms.send(f.principal, room.id, { text: 'READ_NOW', mentions: [f.a.id] });
+  for (let i = 0; i < 206; i++) await f.rooms.tick();
+  assert.match(prompt, /Recent Room history \(first turn in this Room context\)\. \d+ earlier messages omitted\./);
+  const history = historyOf(prompt);
+  assert.ok(history.length <= 200);
+  assert.equal(history.at(-1).text, 'READ_NOW');
+  assert.ok(!history.some(message => message.text.startsWith('BULK_000')));
+  assert.ok(history.some(message => message.sender.name === f.principal.userId));
+});
+
+test('an already delivered unknown turn still warns on the next turn [AC:bot-rooms#AC-3]', async () => {
+  const f = fixture();
+  const room = f.rooms.create(f.principal, { title: 'Still unknown', botIds: [f.a.id] });
+  f.host.hasUnconfirmedEffects = () => true;
+  f.rooms.send(f.principal, room.id, { text: 'RISKY_OLD' });
+  await f.rooms.tick();
+  const unknown = f.rooms.turns(f.principal, room.id)[0];
+  assert.equal(unknown.status, 'unknown');
+  delete f.host.hasUnconfirmedEffects;
+  let prompt = '';
+  f.host.runSession = async id => { prompt = promptTexts(f.store, id).at(-1); f.store.appendMessage(id, 'assistant', [{ type: 'text', text: 'careful' }]); };
+  f.rooms.send(f.principal, room.id, { text: 'NEXT_AFTER_UNKNOWN' });
+  await f.rooms.tick();
+  assert.match(prompt, /UNCONFIRMED effects/);
+  assert.ok(prompt.includes(unknown.id));
+  assert.ok(!historyOf(prompt).some(message => message.text === 'RISKY_OLD'), 'the warning does not depend on re-sending delivered messages');
+});
