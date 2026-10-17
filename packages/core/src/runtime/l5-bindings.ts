@@ -117,7 +117,10 @@ import type { TurnKernelHost } from '../turn/host.js';
 import { autoCompactSession } from './compact-host.js';
 import { applyNormalSessionRequestBudget } from './normal-request-guard.js';
 import { resolveMaxContextTokens } from '../session/session-budget.js';
-import { recordPreparedContextSnapshot } from '../session/context-snapshots.js';
+import {
+  preparedContextSnapshotBlocksFor,
+  type ContextSnapshotBlock
+} from '../session/context-snapshots.js';
 import { autoClaimTask, ingestMailbox, unblockDependentTasks } from './scheduler-host.js';
 import { handleTurnCompletion, injectEvolvingCoachBeforeRecovery } from './session-complete.js';
 import { resolveSkillLoad, resolveSkillSearch } from './skill-load.js';
@@ -493,55 +496,100 @@ function runTurnViaFallbackChain(
 
 type ModelTurnCall = TurnKernelHost['runTurnWithRetries'];
 
-type PreparedSnapshotInput = Parameters<typeof recordPreparedContextSnapshot>[1];
-const pendingPreparedSnapshots = new WeakMap<L5Bindable['store'], PreparedSnapshotInput[]>();
+/** Blocks are captured at queue time. Only the SQLite write waits. */
+interface QueuedPreparedSnapshot {
+  sessionId: string;
+  blocks: ContextSnapshotBlock[];
+}
 
-function recordQuietly(store: L5Bindable['store'], input: PreparedSnapshotInput): void {
+interface PreparedSnapshotQueue extends Array<QueuedPreparedSnapshot> {
+  /** Set while a drain macrotask is already waiting, so a second one is not armed. */
+  scheduled?: NodeJS.Immediate;
+}
+
+const pendingPreparedSnapshots = new WeakMap<L5Bindable['store'], PreparedSnapshotQueue>();
+
+/**
+ * Write one queued snapshot. A closed store or a thrown append leaves the item
+ * queued so the next flush or drain can retry it; draining stops either way.
+ */
+function writeQueuedPreparedSnapshot(store: L5Bindable['store'], item: QueuedPreparedSnapshot): boolean {
+  if (!store.db.isOpen) return false;
   try {
-    recordPreparedContextSnapshot(store, input);
+    store.appendContextSnapshot(item.sessionId, item.blocks);
+    return true;
   } catch {
-    /* Replay history must not change the turn or write a summary. */
+    return false;
   }
 }
 
 /**
  * Write queued replay snapshots now, in prepare order. Readers call this first
  * so a listed history always includes every prepare that already happened.
+ * Stops at the first write that cannot land; that item and the rest stay queued.
  */
 export function flushPreparedContextSnapshots(store: L5Bindable['store'], sessionId?: string): void {
   const queue = pendingPreparedSnapshots.get(store);
   if (!queue?.length) return;
-  const keep: PreparedSnapshotInput[] = [];
+  if (queue.scheduled) {
+    clearImmediate(queue.scheduled);
+    delete queue.scheduled;
+  }
+  const keep: QueuedPreparedSnapshot[] = [];
+  let stopped = false;
   for (const item of queue.splice(0)) {
-    if (sessionId !== undefined && item.session.id !== sessionId) keep.push(item);
-    else if (store.db.isOpen) recordQuietly(store, item);
+    if (stopped || (sessionId !== undefined && item.sessionId !== sessionId)) {
+      keep.push(item);
+      continue;
+    }
+    if (!writeQueuedPreparedSnapshot(store, item)) {
+      keep.push(item);
+      stopped = true;
+    }
   }
   queue.push(...keep);
 }
 
 /**
- * Building and storing a prepared-view snapshot copies the whole context
- * (token estimates, block text, JSON). Doing that inline on every prepared
- * model request made back-to-back bot turns one long synchronous burst that
- * starved HTTP handlers. Snapshots are replay-only, so record them on the next
- * macrotask instead; the request itself is unchanged.
+ * Storing a prepared-view snapshot copies the whole context (block text, JSON).
+ * Doing that inline on every prepared model request made back-to-back bot turns
+ * one long synchronous burst that starved HTTP handlers. Blocks are built when
+ * the request is prepared; only the SQLite write waits for the next macrotask.
+ * The request itself is unchanged.
  */
 function drainOnePreparedSnapshot(store: L5Bindable['store']): void {
   const queue = pendingPreparedSnapshots.get(store);
-  const next = queue?.shift();
-  if (next && store.db.isOpen) recordQuietly(store, next);
+  const next = queue?.[0];
+  // A failed write stays at the head. Retrying the rest would reorder history.
+  if (next && !writeQueuedPreparedSnapshot(store, next)) {
+    delete queue.scheduled;
+    return;
+  }
+  queue?.shift();
   // One snapshot per macrotask keeps each write short between HTTP handlers.
-  if (queue?.length) setImmediate(() => drainOnePreparedSnapshot(store));
+  if (queue?.length) schedulePreparedSnapshotDrain(store, queue);
 }
 
-export function queuePreparedContextSnapshot(store: L5Bindable['store'], input: PreparedSnapshotInput): void {
+function schedulePreparedSnapshotDrain(store: L5Bindable['store'], queue: PreparedSnapshotQueue): void {
+  if (queue.scheduled) return;
+  queue.scheduled = setImmediate(() => {
+    delete queue.scheduled;
+    drainOnePreparedSnapshot(store);
+  });
+}
+
+export function queuePreparedContextSnapshot(
+  store: L5Bindable['store'],
+  sessionId: string,
+  blocks: ContextSnapshotBlock[]
+): void {
   let queue = pendingPreparedSnapshots.get(store);
   if (!queue) {
     queue = [];
     pendingPreparedSnapshots.set(store, queue);
   }
-  queue.push(input);
-  if (queue.length === 1) setImmediate(() => drainOnePreparedSnapshot(store));
+  queue.push({ sessionId, blocks });
+  if (queue.length === 1) schedulePreparedSnapshotDrain(store, queue);
 }
 
 /**
@@ -558,18 +606,23 @@ function fitProductModelRequest(
     ? resolveSessionModelAdapter(rt.store, session, process.env, rt.modelAdapter)
     : rt.modelAdapter;
   if (session) {
-    queuePreparedContextSnapshot(rt.store, {
-      session,
-      systemPrompt: input.systemPrompt,
-      tools: input.tools.map((tool) => ({
-        name: tool.name,
-        description: tool.description,
-        inputSchema: tool.inputSchema
-      })),
-      messages: [...input.messages],
-      adapter,
-      env: process.env
-    });
+    try {
+      const blocks = preparedContextSnapshotBlocksFor(rt.store, {
+        session,
+        systemPrompt: input.systemPrompt,
+        tools: input.tools.map((tool) => ({
+          name: tool.name,
+          description: tool.description,
+          inputSchema: tool.inputSchema
+        })),
+        messages: [...input.messages],
+        adapter,
+        env: process.env
+      });
+      queuePreparedContextSnapshot(rt.store, session.id, blocks);
+    } catch {
+      /* Replay history must not change the turn or write a summary. */
+    }
   }
   return applyNormalSessionRequestBudget(input, {
     session,

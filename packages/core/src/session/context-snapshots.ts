@@ -179,22 +179,24 @@ export function preparedContextSnapshotBlocks(input: {
   }));
 }
 
+export type PreparedContextSnapshotInput = {
+  session: Pick<SessionRecord, 'id' | 'metadata'>;
+  systemPrompt: string;
+  tools: readonly CountedToolSchema[];
+  messages: readonly SessionMessage[];
+  adapter?: Partial<ModelAdapter> & { contextWindow?: number };
+  env?: NodeJS.ProcessEnv;
+};
+
 /**
- * Persist the view a turn has already prepared. Identical to the previous
- * snapshot is a no-op. Does not compact or summarize.
+ * Blocks for a view a turn has already prepared. Pure: no append, compact, or
+ * summary write. Callers that defer the SQLite write capture this before the
+ * prepared messages can be edited in place.
  */
-export function recordPreparedContextSnapshot(
+export function preparedContextSnapshotBlocksFor(
   store: ContextSnapshotWriteStore,
-  input: {
-    session: Pick<SessionRecord, 'id' | 'metadata'>;
-    systemPrompt: string;
-    tools: readonly CountedToolSchema[];
-    messages: readonly SessionMessage[];
-    adapter?: Partial<ModelAdapter> & { contextWindow?: number };
-    env?: NodeJS.ProcessEnv;
-  }
-): ContextSnapshot | undefined {
-  if (!store.appendContextSnapshot) return undefined;
+  input: PreparedContextSnapshotInput
+): ContextSnapshotBlock[] {
   const env = input.env ?? process.env;
   const canonical = isCanonicalBotChat(input.session);
   const botWindow = canonical
@@ -211,7 +213,7 @@ export function recordPreparedContextSnapshot(
         env
       )
     : undefined;
-  const blocks = preparedContextSnapshotBlocks({
+  return preparedContextSnapshotBlocks({
     sessionId: input.session.id,
     systemPrompt: input.systemPrompt,
     tools: input.tools,
@@ -220,5 +222,16 @@ export function recordPreparedContextSnapshot(
     maxContextTokens: botWindow?.contextTokens ?? resolveMaxContextTokens(env),
     botWindow
   });
-  return store.appendContextSnapshot(input.session.id, blocks);
+}
+
+/**
+ * Persist the view a turn has already prepared. Identical to the previous
+ * snapshot is a no-op. Does not compact or summarize.
+ */
+export function recordPreparedContextSnapshot(
+  store: ContextSnapshotWriteStore,
+  input: PreparedContextSnapshotInput
+): ContextSnapshot | undefined {
+  if (!store.appendContextSnapshot) return undefined;
+  return store.appendContextSnapshot(input.session.id, preparedContextSnapshotBlocksFor(store, input));
 }

@@ -1583,6 +1583,8 @@ export class RawAgentRuntime {
   /** Gracefully shut down all in-flight work, MCP sessions, and release SQLite. */
   async destroy(): Promise<void> {
     await this.computerUse.close();
+    // Writes still queued must land before the store closes, or replay loses them.
+    flushPreparedContextSnapshots(this.store);
     await destroyRuntime({
       sessionAbortControllers: this.sessionAbortControllers,
       backgroundJobAborts: this.backgroundJobAborts,
