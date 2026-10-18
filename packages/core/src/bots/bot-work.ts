@@ -1,16 +1,18 @@
-import { stampSessionWake } from '../approval/unattended-approval.js';
-import { parseRunOutcome } from '../session/run-outcome.js';
+import { stampSessionWake, withApprovalWake } from '../approval/unattended-approval.js';
+import { mergeOutcomeMetadata, parseRunOutcome, runOutcomeFromEnd } from '../session/run-outcome.js';
 import { assistantTextsFromFold } from '../session/visible-assistant.js';
 import { retireTaskContextSources } from '../session/task-context.js';
 import { closeOpenToolWave } from '../session/tool-wave-close.js';
+import { createWaitingApprovalInterrupt, mergeInterruptMetadata, unmatchedToolCallsFromFold } from '@ppeng/agent-loop/session';
 import { createId, nowIso } from '../id.js';
 import { AppError, ValidationError } from '../errors.js';
 import type { SqliteStateStore } from '../storage.js';
 import type { Logger } from '../logger.js';
-import type { SessionRecord, ToolContract } from '../types.js';
+import type { MessagePart, SessionRecord, ToolContract } from '../types.js';
 import type { SessionFacadeHost } from '../runtime/session-facade.js';
 import { createBot, openBot } from './bot-facade.js';
 import { resolveBotPrincipal, principalFromSession, botPrincipalKey, sameBotPrincipal, botDefinitionOwner, type BotPrincipal } from './bot-identity.js';
+import { ROOM_HUMAN_STEP_NOTICE, ROOM_HUMAN_STEP_REASON, memberNeedsHuman, privateHandbackText, roomMetadataAfterHandOff } from '../rooms/human-step.js';
 export { resolveBotPrincipal, principalFromSession } from './bot-identity.js';
 export type { BotPrincipal } from './bot-identity.js';
 
@@ -47,6 +49,85 @@ export function ensureBotWorkSchema(store: Pick<SqliteStateStore,'db'>): void {
 }
 function facade(host: BotWorkHost): SessionFacadeHost {
  return { store:host.store, runImageRetention:async()=>{}, wakeAllAutonomousSessions(){}, wakeAgentSessions(){} } as SessionFacadeHost;
+}
+/** A leftover approval, or a waiting interrupt, means this chat still owes a person a decision. */
+function privateChatHasPendingApproval(store: SqliteStateStore, sessionId: string): boolean {
+ if (store.listApprovals({ status: 'pending' }).some(approval => approval.sessionId === sessionId)) return true;
+ const session = store.getSession(sessionId);
+ const interrupt = session?.metadata?.interrupt;
+ return !!interrupt && typeof interrupt === 'object' && (interrupt as { kind?: unknown }).kind === 'waiting_approval';
+}
+/** Statuses that are still doing work. A failed, cancelled or unknown chat is free to take the step. */
+const PRIVATE_CHAT_BUSY = new Set(['running', 'waiting_approval']);
+/** The private chat can take a handed step when it is not running and not already waiting on its own approval. */
+export function privateChatCanTakeHandOff(session: { status?: string } | undefined): boolean {
+ return !!session && !PRIVATE_CHAT_BUSY.has(session.status ?? '');
+}
+/**
+ * A Room member stopped on a step a person must approve, log in, or verify.
+ * Move that pending approval and its unmatched tool call onto the bot's private chat
+ * and leave the Room session idle, so approving in private runs the step there once
+ * and cannot resume or replay the Room turn.
+ *
+ * When the private chat is running, already waiting on its own approval, or still
+ * holds any pending approval, nothing is detached and its interrupt is left as-is.
+ * The caller keeps the Room turn waiting and retries once that chat is free.
+ * Pass `within` to write the Room notice and turn in the same transaction; a throw rolls all of it back.
+ */
+export function handRoomHumanStepToPrivateChat(host: Pick<BotWorkHost, 'store'>, input: { roomTitle: string; botId: string; principal: BotPrincipal; memberSessionId: string }, within?: () => void): { privateSessionId: string; notice: string; reason: string } | undefined {
+ const member = host.store.getSession(input.memberSessionId);
+ const pending = host.store.listApprovals({ status: 'pending' }).filter(approval => approval.sessionId === input.memberSessionId);
+ if (!member || !memberNeedsHuman(member, pending)) return undefined;
+ const chat = openBotWorkContext(host as BotWorkHost, input.botId, input.principal);
+ const parked = host.store.getSession(chat.id);
+ if (!privateChatCanTakeHandOff(parked) || privateChatHasPendingApproval(host.store, chat.id)) return undefined;
+ const open = unmatchedToolCallsFromFold(host.store.foldMessages(input.memberSessionId));
+ const apply = () => {
+  const fresh = host.store.getSession(chat.id);
+  // Re-check inside the transaction. A pending approval that landed after the first look must defer, not be overwritten.
+  if (!privateChatCanTakeHandOff(fresh) || privateChatHasPendingApproval(host.store, chat.id)) return false;
+  // Only the rows this statement re-points. A chat that already has a pending approval never reaches here.
+  const movedIds = (host.store.db.prepare(`UPDATE approvals SET session_id=?, expires_at=NULL, wake_source=NULL, updated_at=? WHERE session_id=? AND status='pending' RETURNING id`).all(chat.id, nowIso(), input.memberSessionId) as { id: string }[]).map(row => row.id);
+  host.store.appendMessage(chat.id, 'user', [{ type: 'text', text: privateHandbackText(input.roomTitle) }]);
+  if (open.length) {
+   const calls: MessagePart[] = open.map(call => ({ type: 'tool_call', toolCallId: call.toolCallId, name: call.name, input: call.input }));
+   host.store.appendMessage(chat.id, 'assistant', calls);
+   // Drop only the unmatched call. A sibling call that already has a result stays, so the next Room turn is not left with a dangling tool_result.
+   // An assistant row that held nothing else is deleted. The store path also refreshes the history search index.
+   const handedIds = new Set(open.map(call => call.toolCallId));
+   for (const message of host.store.listMessages(input.memberSessionId)) {
+    if (message.role !== 'assistant') continue;
+    if (!message.parts.some(part => part.type === 'tool_call' && handedIds.has(part.toolCallId))) continue;
+    const kept = message.parts.filter(part => part.type !== 'tool_call' || !handedIds.has(part.toolCallId));
+    host.store.rewriteMessageParts(input.memberSessionId, message.id, kept);
+   }
+  }
+  // member.metadata already carries the roomDelivery cursor written before this run. Spread it; do not rebuild metadata from scratch.
+  host.store.updateSession(input.memberSessionId, { status: 'idle', metadata: roomMetadataAfterHandOff(member.metadata) });
+  const waiting = host.store.getSession(chat.id) ?? fresh!;
+  const outcome = runOutcomeFromEnd({ reason: 'waiting_approval', sessionStatus: 'waiting_approval' });
+  const interrupt = createWaitingApprovalInterrupt({
+   toolCallIds: open.map(call => call.toolCallId),
+   approvalIds: movedIds
+  });
+  host.store.updateSession(chat.id, {
+   status: 'waiting_approval',
+   metadata: withApprovalWake(mergeInterruptMetadata(mergeOutcomeMetadata(waiting.metadata, outcome), interrupt), { kind: 'human', source: 'room-handoff' })
+  });
+  if (within) within();
+  return true;
+ };
+ // `within` is not a transaction. Only skip BEGIN when one is already open, so a throw rolls the approval move back with the Room turn.
+ if (host.store.db.isTransaction) {
+  if (!apply()) return undefined;
+ } else {
+  host.store.db.exec('BEGIN IMMEDIATE');
+  try {
+   if (!apply()) { host.store.db.exec('ROLLBACK'); return undefined; }
+   host.store.db.exec('COMMIT');
+  } catch (error) { host.store.db.exec('ROLLBACK'); throw error; }
+ }
+ return { privateSessionId: chat.id, notice: ROOM_HUMAN_STEP_NOTICE, reason: ROOM_HUMAN_STEP_REASON };
 }
 export function openBotWorkContext(host: BotWorkHost, botId: string, principal: BotPrincipal): SessionRecord {
  ensureBotWorkSchema(host.store);

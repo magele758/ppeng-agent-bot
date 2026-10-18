@@ -504,6 +504,13 @@ export class SqliteStateStore {
     return r;
   }
 
+  /** Keep the remaining parts of one message, or delete the row when none remain. Refreshes the history index. */
+  rewriteMessageParts(sessionId: string, messageId: string, parts: SessionMessage['parts']): boolean {
+    const changed = this.sessions.rewriteMessageParts(sessionId, messageId, parts);
+    if (changed) this.bumpVersion();
+    return changed;
+  }
+
   appendReplacement(
     sessionId: string,
     input: {
