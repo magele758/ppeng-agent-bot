@@ -5,7 +5,8 @@ import type { SqliteStateStore } from '../storage.js';
 import type { SessionRecord } from '../types.js';
 import type { KernelHookListener } from '@ppeng/agent-loop';
 import { fenceExternalContent } from '../safety/external-content.js';
-import { botWorkControl, hasPendingSessionWake, resumeApprovedBotSession, checkBotQueueCapacity } from '../bots/bot-work.js';
+import { botWorkControl, hasPendingSessionWake, resumeApprovedBotSession, checkBotQueueCapacity, handRoomHumanStepToPrivateChat } from '../bots/bot-work.js';
+import { ROOM_HUMAN_STEP_NOTICE } from './human-step.js';
 import { stampSessionWake } from '../approval/unattended-approval.js';
 import { isSilenceToken } from '../bots/silence.js';
 import { budgetedSpeakers, restraintHint, scheduleRoomTurn } from './scheduling.js';
@@ -26,7 +27,7 @@ export interface BotRoomTurn {
   id: string; roomId: string; messageId: string; status: RoomTurnStatus; botIds: string[];
   /** Present only when the triggering message named members. Empty means an @ matched nobody, so everyone is restrained. */
   mentionedBotIds?: string[];
-  maxBotTurns: number; botTurns: number; toolCalls: number; costUsd: number; costStatus: 'unknown' | 'estimated'; cursor: number; currentSessionId?: string; startSeq?: number; startCostUsd?: number; startedAt?: string; partialResult?: string; silentBotIds?: string[];
+  maxBotTurns: number; botTurns: number; toolCalls: number; costUsd: number; costStatus: 'unknown' | 'estimated'; cursor: number; currentSessionId?: string; startSeq?: number; startCostUsd?: number; startedAt?: string; partialResult?: string; silentBotIds?: string[]; handedOffBotIds?: string[];
   terminationReason?: string; createdAt: string; updatedAt: string;
 }
 export interface BotRoomHost {
@@ -36,6 +37,7 @@ export interface BotRoomHost {
   cancelSession(sessionId: string): void;
   isSessionRunning?(sessionId: string): boolean;
   hasUnconfirmedEffects?(sessionId:string,startedAt:string):boolean;
+  log?: { warn(...args: unknown[]): void };
 }
 type DataRow = { data: string };
 function decode<T>(row: unknown): T | undefined { return row ? JSON.parse((row as DataRow).data) as T : undefined; }
@@ -379,6 +381,25 @@ export class BotRoomService {
     if (turn.terminationReason !== 'tool_budget' && turn.terminationReason !== 'cost_budget') return false;
     turn.status = 'completed'; this.saveTurn(turn); return true;
   }
+  /** A step that needs a person leaves the Room. The private chat keeps the approval and the pending call; this turn does not wait or fail. */
+  private handOffHumanStep(room: BotRoom, turn: BotRoomTurn, botId: string, session: SessionRecord): boolean {
+    const bot = this.store.getBot(botId);
+    // Mutate a copy until COMMIT. A failed hand-off must leave the live turn exactly as it was, so the next tick can still find this human step.
+    const next: BotRoomTurn = { ...turn, handedOffBotIds: turn.handedOffBotIds ? [...turn.handedOffBotIds] : undefined };
+    const moved = handRoomHumanStepToPrivateChat({ store: this.store }, { roomTitle: room.title, botId, principal: room.principal, memberSessionId: session.id }, () => {
+      if (this.rawRoom(room.id).botIds.includes(botId)) this.append(room.id, { type: 'bot', id: botId, name: bot?.name ?? botId }, ROOM_HUMAN_STEP_NOTICE, [], next.id, `handoff:${next.id}:${next.cursor}`);
+      next.botTurns++; next.cursor++; next.handedOffBotIds = [...(next.handedOffBotIds ?? []), botId]; delete next.currentSessionId; delete next.startSeq;
+      // Same save as the cursor move. Leaving waiting_approval with no session makes settleWaiting call this turn unknown.
+      next.status = next.cursor < next.botIds.length && next.botTurns < next.maxBotTurns ? 'running' : 'completed';
+      if (next.status === 'completed') next.terminationReason = next.cursor < next.botIds.length ? 'budget' : 'members_completed';
+      this.saveTurn(next);
+    });
+    if (!moved) return false;
+    Object.assign(turn, next);
+    if (!('currentSessionId' in next)) delete turn.currentSessionId;
+    if (!('startSeq' in next)) delete turn.startSeq;
+    return true;
+  }
   private sessionFailed(turn: BotRoomTurn, session: SessionRecord): boolean {
     if (session.status !== 'failed' && session.status !== 'unknown') return false;
     turn.status = session.status; turn.terminationReason = 'member_execution_failed'; this.saveTurn(turn); return true;
@@ -391,7 +412,15 @@ export class BotRoomService {
   private async settleWaiting(room: BotRoom, turn: BotRoomTurn): Promise<boolean> {
     const session = turn.currentSessionId && this.store.getSession(turn.currentSessionId);
     if (!session) { this.contextMissing(turn); return false; }
-    if (session.status === 'waiting_approval' || session.status === 'running' || this.host.isSessionRunning?.(session.id)) return false;
+    if (session.status === 'waiting_approval') {
+      const botId = turn.botIds[turn.cursor];
+      if (botId) {
+        try { if (this.handOffHumanStep(room, turn, botId, session)) return true; }
+        catch (error) { this.host.log?.warn?.('Room human-step hand-off rolled back', { roomId: room.id, turnId: turn.id, error: String(error) }); }
+      }
+      return false;
+    }
+    if (session.status === 'running' || this.host.isSessionRunning?.(session.id)) return false;
     const control = botWorkControl(this.store, room.principal, turn.botIds[turn.cursor]!);
     if (control.paused || control.disabled) { turn.terminationReason = control.disabled ? 'bot_disabled' : 'bot_paused'; this.saveTurn(turn); return false; }
     if (hasPendingSessionWake(this.store, session.id)) return false;
@@ -503,6 +532,7 @@ export class BotRoomService {
   private settleMember(room: BotRoom, turn: BotRoomTurn, botId: string, sessionId: string): boolean {
     const after = this.turnById(turn.id);
     if (after.status !== 'running') return false;
+    turn.status = after.status;
     const current = this.store.getSession(sessionId);
     if (!current) { this.contextMissing(turn); return false; }
     if (this.applyUnconfirmedEffects(turn, current)) return false;
@@ -511,6 +541,12 @@ export class BotRoomService {
     if (after.terminationReason === 'tool_budget' || after.terminationReason === 'cost_budget') { turn.terminationReason = after.terminationReason; this.completeBudget(turn); return false; }
     if (this.applyOutcome(turn, current)) return false;
     if (current.status === 'waiting_approval') {
+      try {
+        if (this.handOffHumanStep(room, turn, botId, current)) return true;
+      } catch (error) {
+        // The hand-off transaction rolled back. Leave the turn waiting so a later tick retries it.
+        this.host.log?.warn?.('Room human-step hand-off rolled back', { roomId: room.id, turnId: turn.id, error: String(error) });
+      }
       turn.status = 'waiting_approval'; turn.startCostUsd = typeof current.metadata?.usageCostUsd === 'number' ? current.metadata.usageCostUsd : 0; this.saveTurn(turn); return false;
     }
     if (this.sessionFailed(turn, current)) return false;
