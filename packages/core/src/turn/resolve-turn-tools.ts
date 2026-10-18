@@ -149,11 +149,16 @@ export function filterToolsForSession(input: {
   if (!readSkillProposalSettings(input.settingsStore).enabled) {
     tools = tools.filter((t) => t.name !== SKILL_PROPOSE_TOOL_NAME);
   }
-  if (!isCanonicalBotChatSession(input.session)) {
+  if (!isCanonicalBotChatSession(input.session) && !isRoomMemberSession(input.session)) {
     tools = tools.filter((t) => t.name !== MESSAGE_AGENT_TOOL_NAME);
   }
   tools = withSubagentHelp(input.session, tools, input.tools);
   return { allowExternalAiTools, tools: filterRoomTools(input.session, stripSubagentDeniedTools(input.session, tools)) };
+}
+
+/** A Room member turn is the only non-canonical session allowed to call message_agent. */
+function isRoomMemberSession(session: { metadata?: Record<string, unknown> | null }): boolean {
+  return typeof session.metadata?.roomId === 'string' && session.metadata.roomId.trim().length > 0;
 }
 
 function withSubagentHelp<T extends { name: string }>(
@@ -204,7 +209,7 @@ export function resolveTurnTools(input: {
   const merged = extras.length > 0 ? [...filtered.tools, ...extras] : filtered.tools;
   const turnTools = filterRoomTools(input.session, stripSubagentDeniedTools(
     input.session,
-    isCanonicalBotChatSession(input.session)
+    isCanonicalBotChatSession(input.session) || isRoomMemberSession(input.session)
       ? merged
       : merged.filter((t) => t.name !== MESSAGE_AGENT_TOOL_NAME)
   ));

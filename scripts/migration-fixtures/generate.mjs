@@ -35,7 +35,8 @@ export const SNAPSHOT_REVISIONS = [
   { version: 25, ref: 'eaf1f44', note: 'reliable Bot work schemas, before saved face shape and color (v26)' },
   { version: 26, ref: '16bcceb', note: 'saved face shape and color, before routine leases and summary links (v27)' },
   { version: 27, ref: 'b9518b3', note: 'routine leases and summary links, before context stack snapshots (v28)' },
-  { version: 28, ref: 'd0caa00', note: 'context stack snapshots, before bots.avatar (v29)' }
+  { version: 28, ref: 'd0caa00', note: 'context stack snapshots, before bots.avatar (v29)' },
+  { version: 29, ref: '1b4d428', note: 'bots.avatar, before bot_work_messages.source_room (v30)' }
 ];
 
 function run(cmd, args, cwd) {
