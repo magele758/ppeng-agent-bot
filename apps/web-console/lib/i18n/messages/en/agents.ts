@@ -36,7 +36,7 @@ export const agents = {
     searchAria: 'Search bots',
     agentChip: 'Agent: {agent}',
     createTitle: 'New Bot',
-    createDesc: 'Give it a name. The icon and the rest are optional and can be changed any time.',
+    createDesc: 'Give your Bot a name and choose a face and color. Leave them unselected to generate its look from the name.',
     nameLabel: 'Name',
     namePh: 'Name your Bot',
     nameHint: 'Shown in the roster and in chat. Must be unique.',

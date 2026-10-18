@@ -22,7 +22,7 @@ type Message = {
   text: string;
   attachmentIds: string[];
 };
-export function BotRooms({ bots }: { bots: BotInfo[] }) {
+export function BotRooms({ bots, selectedRoomId }: { bots: BotInfo[]; selectedRoomId?: string }) {
   const { t } = useI18n();
   const action = useAction();
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -83,8 +83,13 @@ export function BotRooms({ bots }: { bots: BotInfo[] }) {
     setTurns(status.turns);
   };
   useEffect(() => {
-    void action.run(load);
-  }, []);
+    void action.run(async () => {
+      if (selectedRoomId) {
+        const data = await api(`/api/bot-rooms/${encodeURIComponent(selectedRoomId)}`) as { room: Room };
+        await open(data.room);
+      } else await load();
+    });
+  }, [selectedRoomId]);
   useEffect(() => {
     if (!room) return;
     let active = true;
@@ -125,6 +130,7 @@ export function BotRooms({ bots }: { bots: BotInfo[] }) {
     <section className="ag-panel" data-testid="bot-rooms">
       <h3>{t("botWork.rooms")}</h3>
       <Feedback {...action} />
+      {!selectedRoomId && <>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -239,6 +245,7 @@ export function BotRooms({ bots }: { bots: BotInfo[] }) {
         ))}
       </nav>
       {!rooms.length && !action.busy && <p>{t("botWork.empty")}</p>}
+      </>}
       {room && (
         <div>
           <h4 data-testid="room-selected-title">{room.title}</h4>

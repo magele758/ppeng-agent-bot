@@ -1,4 +1,4 @@
-import { setBotDefinitionOwner, resolveBotPrincipal } from '@ppeng/agent-core';
+import { BotFunctionalGroupService, setBotDefinitionOwner, resolveBotPrincipal } from '@ppeng/agent-core';
 /**
  * Named Bot roster + canonical session.
  * GET/POST /api/bots, GET/PATCH /api/bots/:id (both carry policy `warnings`), POST /api/bots/:id/open
@@ -30,7 +30,9 @@ export function botsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         ) {
           return;
         }
-        json(response, 200, { bots: visibleBots(runtime, runtime.listBots({ includeHidden }), auth) });
+        const groups = new BotFunctionalGroupService(runtime.store);
+        const principal = resolveBotPrincipal(runtime.store, auth.user ? { userId: auth.user.id, tenantId: auth.user.tenantId } : undefined);
+        json(response, 200, { bots: visibleBots(runtime, runtime.listBots({ includeHidden }), auth).map(bot => ({ ...bot, functionalGroupId: groups.groupIdForBot(principal, bot.id) })) });
       }
     },
     {

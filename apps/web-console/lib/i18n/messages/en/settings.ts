@@ -49,6 +49,16 @@ export const settings = {
     system: 'Follow system'
   },
   model: {
+    globalDefault: {
+      title: 'Global default model',
+      description: 'Bots, group members, and conversations without their own selection follow this model immediately after saving. Bot-specific and conversation selections take priority; clear them to follow the global default again.',
+      empty: 'No usable model configured',
+      configure: 'Configure models',
+      saved: 'Global default model saved as {model}',
+      saveFailed: 'Could not save the global default. The model may have been disabled or removed. Your saved configuration is unchanged; refresh the list and retry.',
+      follow: 'Follow global default',
+      following: 'Global default · {provider}'
+    },
     desc: 'Pick a provider, paste the API key, test the connection and choose a default model. Takes effect immediately — no .env edit or restart.',
     wizardTitle: 'Add a model provider',
     stepProvider: 'Choose a provider',

@@ -13,6 +13,7 @@ export interface BotMemorySession {
 }
 
 export interface BotMemoryLookup {
+  getDaemonControl?(key: string): unknown;
   getBot?(id: string): { id?: string; agentId: string } | undefined;
   listBots?(opts?: { includeHidden?: boolean }): Array<{ id: string; agentId: string }>;
   getSession?(id: string): BotMemorySession | undefined;

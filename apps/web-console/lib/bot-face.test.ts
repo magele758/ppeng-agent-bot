@@ -229,7 +229,7 @@ test('drawn face uses a save, then the name, and rounds the eyes when surprised'
   const idle = drawnFaceView({ name: 'DeskBot', saved, mood: 'idle' });
   assert.equal(idle.shape, 'bean');
   assert.equal(idle.color, 'mint');
-  assert.equal(idle.mouth, 'rest');
+  assert.equal(idle.mouth, 'smile');
   assert.equal(idle.mouthOpen, 0);
   assert.deepEqual(idle.layout, faceLayout('bean'));
   const named = drawnFaceView({ name: 'DeskBot', shape: null, color: null, saved, mood: 'speaking' });

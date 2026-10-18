@@ -1,6 +1,7 @@
 import type { SessionMessage, ToolContract } from '../../types.js';
 import { resolveBotMemoryAgentId, resolveSubagentMemoryAccess } from '../../memory/bot-memory-scope.js';
 import { collectSubagentMemoryHits } from '../../memory/subagent-recall.js';
+import { sharedMessageVisible } from '../../bots/shared-context-isolation.js';
 import { createHistoryTools as createVisibleHistoryTools } from '../../tools/history-tools.js';
 import { historyReference, sourcePage, type HistoryStore as VisibleHistoryStore } from '../history-retrieval.js';
 import type { HistoryOptions, HistoryStore } from './types.js';
@@ -29,14 +30,14 @@ function readOwnSource(store: HistoryStore, sessionId: string, args: ReadArgs) {
   if (!Number.isSafeInteger(args.seq) || args.seq! < 1) return unavailable();
   message = store.readHistory(sessionId, args.seq!, 0, 0)?.message;
  }
- if (!message) return unavailable();
+ if (!message || !sharedMessageVisible(store, sessionId, message)) return unavailable();
  // Preserve seq-only and explicit original-plus-neighbours requests; ref/part/offset opt into source pages.
  const legacyContext = args.before !== undefined || args.after !== undefined
   || (!args.ref && args.part === undefined && args.offset === undefined);
  if (legacyContext) {
   if (!Number.isSafeInteger(message.seq) || message.seq! < 1) return unavailable();
   const context = store.readHistory(sessionId, message.seq!, args.before, args.after);
-  return context ? { ok: true, content: JSON.stringify(context) } : unavailable();
+  return context ? { ok: true, content: JSON.stringify({ ...context, messages: context.messages.filter(item => sharedMessageVisible(store, sessionId, item)) }) } : unavailable();
  }
  if (!Number.isSafeInteger(part) || part < 0 || !message.parts[part]) return unavailable();
  const text = partText(message.parts[part]!);
@@ -46,7 +47,8 @@ function readOwnSource(store: HistoryStore, sessionId: string, args: ReadArgs) {
 
 function searchOwnSource(store: HistoryStore, sessionId: string, args: HistoryOptions & { session_id?: string }) {
  if (args.session_id !== undefined && args.session_id !== sessionId) return unavailable();
- const page = store.listHistory(sessionId, args);
+ const originalPage = store.listHistory(sessionId, args);
+ const page = { ...originalPage, messages: originalPage.messages.filter(message => sharedMessageVisible(store, sessionId, message)) };
  const query = typeof args.query === 'string' ? args.query.trim().toLocaleLowerCase() : '';
  const matches: Array<Record<string, unknown>> = [];
  for (const message of page.messages) for (let part = 0; part < message.parts.length; part++) {

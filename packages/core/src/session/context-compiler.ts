@@ -1,3 +1,4 @@
+import { sharedMemoryVisible, hasRevokedSharedContext } from '../bots/shared-context-isolation.js';
 import { principalFromSession } from '../bots/bot-identity.js';
 import type { SqliteStateStore } from '../storage.js';
 /**
@@ -111,6 +112,7 @@ function legacySessionRows(
   const now = new Date().toISOString();
   const rows: AgentMemory[] = [];
   for (const entry of store.listSessionMemory(sessionId)) {
+    if (!sharedMemoryVisible(store, entry, sessionId)) continue;
     if (entry.scope !== 'scratch' && entry.scope !== 'long') continue;
     const meta = entry.metadata ?? {};
     rows.push({
@@ -156,6 +158,7 @@ function recallInput(input: CompileTurnAppendixInput): RecallContext | RecallSou
   const am = input.store && typeof input.store.agentMemory === 'function' ? input.store.agentMemory() : undefined;
   if (!am) {
     const listed = (input.store?.listSessionMemory?.(input.session.id) ?? []).filter((m) => {
+      if (!sharedMemoryVisible(input.store ?? {}, m, input.session.id)) return false;
       if (m.metadata?.source === 'dyn-tool' || m.metadata?.namespace === 'dyn-tools') {
         return m.metadata?.pin === true;
       }
@@ -188,7 +191,17 @@ function recallInput(input: CompileTurnAppendixInput): RecallContext | RecallSou
   const parentSessionId = resolveSubagentMemoryAccess(input.session, input.store)?.parentSessionId;
   const sessionIds = parentSessionId ? [input.session.id, parentSessionId] : [input.session.id];
   return {
-    store: am,
+    // Filter the raw persisted rows before recall ranking, excerpts or embeddings
+    // can reuse facts derived from a group whose access has since been revoked.
+    store: new Proxy(am, {
+      get(target, property) {
+        if (property === 'search') return (filter: Parameters<AgentMemoryStore['search']>[0]) =>
+          target.search(filter).filter(row => sharedMemoryVisible(input.store ?? {}, row,
+            filter.scope?.startsWith('session.') ? filter.sessionId : undefined));
+        const value = Reflect.get(target, property);
+        return typeof value === 'function' ? value.bind(target) : value;
+      }
+    }),
     query: input.query,
     userId,
     tenantId,
@@ -196,7 +209,8 @@ function recallInput(input: CompileTurnAppendixInput): RecallContext | RecallSou
     sessionRows: legacyRowsForSession(input.store, sessionIds),
     alsoSessionIds: parentSessionId ? [parentSessionId] : undefined,
     agentId: resolveBotMemoryAgentId(input.session, input.store),
-    workingLogPath: input.stateDir ? workingLogPath(input.stateDir, input.session.id) : undefined,
+    workingLogPath: input.stateDir && !hasRevokedSharedContext(input.store ?? {}, input.session.id)
+      ? workingLogPath(input.stateDir, input.session.id) : undefined,
     stateDir: input.stateDir,
     embeddings: (id) => am.getEmbedding(id)
   };

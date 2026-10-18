@@ -218,6 +218,12 @@ function selfFilteredWriteCases(f) {
     'POST /api/bot-work/tasks/:id/retry': {},
     'POST /api/cron/runs/:id/retry': {},
     'POST /api/cron/runs/:id/cancel': {},
+    'POST /api/bot-functional-groups': { name: 'B group' },
+    'PATCH /api/bot-functional-groups/:id': { name: 'B replacement' },
+    'DELETE /api/bot-functional-groups/:id': {},
+    'PUT /api/bots/:id/functional-group': { groupId: null },
+    'PUT /api/bot-shared-context': { entries: { note: 'B own scope' } },
+    'DELETE /api/bot-rooms/:id': {},
     'POST /api/bot-rooms': { title: 'B-room', botIds: ['missing-private-target'] },
     'PATCH /api/bot-rooms/:id': { title: 'B-change' },
     'POST /api/bot-rooms/:id/members': { botId: 'missing-private-target' },
@@ -419,4 +425,66 @@ test('Bot work and Room writes reject another principal over real HTTP', async t
   assert.equal(preserved.data.room.title,'A private room');
   assert.equal(preserved.data.room.status,'active');
   assert.equal((await d.call('A','GET',`/api/bot-rooms/${rid}/messages`)).data.messages.length,0);
+});
+
+
+test('functional groups and explicit global/group/room facts stay isolated across real HTTP principals [AC:bot-functional-groups#AC-9] [AC:bot-functional-groups#AC-10]', async t => {
+  const d = await bootDaemon(labEnv({ RAW_AGENT_AUTH_TOKEN: DAEMON_TOKEN }));
+  t.after(() => d.close());
+  const bot = await d.call('A','POST','/api/bots',{name:'A scoped Bot'});
+  assert.equal(bot.status,201);
+  const botId=bot.data.bot.id;
+  const group = await d.call('A','POST','/api/bot-functional-groups',{name:'A private function'});
+  assert.equal(group.status,201);
+  const groupId=group.data.group.id;
+  const room=await d.call('A','POST','/api/bot-rooms',{title:'A shared facts room',botIds:[botId]});
+  assert.equal(room.status,201);
+  const roomId=room.data.room.id;
+  assert.equal((await d.call('A','PUT',`/api/bots/${botId}/functional-group`,{groupId})).status,200);
+  const scopes=[
+    ['global','A_GLOBAL_SECRET'],
+    [`group&id=${encodeURIComponent(groupId)}`,'A_GROUP_SECRET'],
+    [`room&id=${encodeURIComponent(roomId)}`,'A_ROOM_SECRET']
+  ];
+  for(const [query,secret] of scopes) {
+    const path=`/api/bot-shared-context?scope=${query}`;
+    const written=await d.call('A','PUT',path,{entries:{fact:secret}});
+    assert.equal(written.status,200,written.text);
+    const otherRead=await d.call('B','GET',path);
+    assert.ok(!otherRead.text.includes(secret),'shared facts never appear for another principal');
+    if(query==='global') {
+      assert.equal(otherRead.status,200);
+      assert.deepEqual(otherRead.data.entries,{});
+      assert.equal((await d.call('B','PUT',path,{entries:{fact:'B_OWN_GLOBAL'}})).status,200);
+    } else {
+      assert.ok([403,404].includes(otherRead.status),otherRead.text);
+      const forbiddenWrite=await d.call('B','PUT',path,{entries:{fact:'B_POISON'}});
+      assert.ok([403,404].includes(forbiddenWrite.status),forbiddenWrite.text);
+    }
+    const preserved=await d.call('A','GET',path);
+    assert.equal(preserved.status,200);
+    assert.deepEqual(preserved.data.entries,{fact:secret});
+  }
+  const ownGroup=await d.call('B','POST','/api/bot-functional-groups',{name:'B function'});
+  assert.equal(ownGroup.status,201);
+  for(const [method,path,body] of [
+    ['PATCH',`/api/bot-functional-groups/${groupId}`,{name:'B takeover'}],
+    ['DELETE',`/api/bot-functional-groups/${groupId}`],
+    ['PUT',`/api/bots/${botId}/functional-group`,{groupId:null}],
+    ['PUT',`/api/bots/${botId}/functional-group`,{groupId:ownGroup.data.group.id}]
+  ]) {
+    const response=await d.call('B',method,path,body);
+    assert.ok([403,404].includes(response.status),`${method} ${path}: ${response.status} ${response.text}`);
+  }
+  const bList=await d.call('B','GET','/api/bot-functional-groups');
+  assert.equal(bList.status,200);
+  assert.ok(!bList.text.includes(groupId));
+  assert.ok(!bList.text.includes('A private function'));
+  const preservedGroups=await d.call('A','GET','/api/bot-functional-groups');
+  assert.equal(preservedGroups.status,200);
+  assert.deepEqual(preservedGroups.data.groups,[{id:groupId,name:'A private function',botIds:[botId]}]);
+  const preservedBot=await d.call('A','GET',`/api/bots/${botId}`);
+  assert.equal(preservedBot.status,200);
+  assert.equal(preservedBot.data.bot.id,botId);
+  assert.equal(preservedBot.data.bot.name,'A scoped Bot');
 });

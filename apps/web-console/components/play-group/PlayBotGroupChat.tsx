@@ -17,7 +17,13 @@ import {
   type GroupMemberCode
 } from '@/lib/bot-group';
 import { BotFace } from '../BotFace';
+import { useBotWorkStates } from '../bot-work/BotWorkState';
+import { MODEL_PROVIDERS_CHANGED_EVENT } from '@/lib/model-providers';
+import type { RoomModelConfiguration } from '@/lib/room-models';
+import { RoomSharedContextEditor } from './RoomSharedContextEditor';
 import './play-group.css';
+import '../bot-work/bot-work.css';
+import { BotRooms } from '../bot-work/BotRooms';
 
 type Room = {
   id: string;
@@ -39,7 +45,7 @@ type RoomMessage = {
 type RoomTurn = { id: string; status: string; botIds?: string[]; mentionedBotIds?: string[]; cursor?: number };
 
 function liveSpeakerId(turns: readonly RoomTurn[]): string {
-  const live = turns.find((turn) => turn.status === 'running' || turn.status === 'queued' || turn.status === 'waiting_approval');
+  const live = turns.find((turn) => turn.status === 'running');
   if (!live?.botIds?.length) return '';
   const cursor = live.cursor ?? 0;
   const index = cursor >= 0 && cursor < live.botIds.length ? cursor : 0;
@@ -129,6 +135,10 @@ function senderName(message: RoomMessage, bots: readonly BotInfo[], me: string):
 
 export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: readonly BotInfo[] }) {
   const { t } = useI18n();
+  const workStates = useBotWorkStates();
+  const [showSettings, setShowSettings] = useState(false);
+  useEffect(() => setShowSettings(false), [roomId]);
+  const [models,setModels] = useState<RoomModelConfiguration|null>(null);
   const [room, setRoom] = useState<Room | null>(null);
   const [messages, setMessages] = useState<RoomMessage[]>([]);
   const [turns, setTurns] = useState<RoomTurn[]>([]);
@@ -170,12 +180,13 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
     ])) as [
       { messages: RoomMessage[]; hasMore: boolean; nextCursor: number | null },
       { turns: RoomTurn[] },
-      { room: Room }
+      { room: Room; models?: RoomModelConfiguration }
     ];
     if (roomIdRef.current !== id) return;
     applyHistory(history, older);
     setTurns(Array.isArray(turnData.turns) ? turnData.turns : []);
     setRoom(current.room);
+    setModels(current.models ?? null);
     setLoadError(false);
   };
 
@@ -183,6 +194,7 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
     messagesRef.current = [];
     setMessages([]);
     setRoom(null);
+    setModels(null);
     setTurns([]);
     setCursor(null);
     setText('');
@@ -196,9 +208,12 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
     };
     refresh();
     const timer = setInterval(() => refresh(false), 2000);
+    const onModelsChanged=()=>refresh(false);
+    window.addEventListener(MODEL_PROVIDERS_CHANGED_EVENT,onModelsChanged);
     return () => {
       active = false;
       clearInterval(timer);
+      window.removeEventListener(MODEL_PROVIDERS_CHANGED_EVENT,onModelsChanged);
     };
     // cursor is read only for the older-page action, not the poll.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -331,15 +346,26 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
       <header className="chat-panel-header">
         <div className="chat-panel-header__text">
           <h2 className="chat-panel-title">{room?.title ?? t('play.group.badge')}</h2>
+          <div className="play-group-model-default" data-testid="room-default-model">
+            <span>{t('play.groupModel.defaultLabel')}: {models
+              ? models.defaultModel ? `${models.defaultModel.providerName} / ${models.defaultModel.modelId}` : t('play.groupModel.unconfigured')
+              : t('common.loading')}</span>
+            <a href="#/settings/models">{t('play.groupModel.settings')}</a>
+          </div>
+          <p className="play-group-model-hint">{t('play.groupModel.priorityHint')}</p>
         </div>
+        <button type="button" className="btn btn-ghost btn-sm" aria-expanded={showSettings} onClick={() => setShowSettings(value => !value)}>{t('play.groupSettings.title')}</button>
       </header>
+      {showSettings && <div className="play-group-settings" data-testid="room-settings"><BotRooms key={roomId} bots={[...bots]} selectedRoomId={roomId} /></div>}
       <div className="play-group-members">
         <div className="play-group-member-row">
           <span className="play-group-badge">{t('play.group.badge')}</span>
           {room?.botIds.map((id) => {
             const description = descriptionOf(id);
+            const memberModel=models?.members.find(member=>member.botId===id);
             return (
               <span key={id} className="play-group-member">
+                <BotFace name={nameOf(id)} mood={workStates[id]>0?'thinking':'idle'} size="sm" testId={`room-member-face-${id}`} />
                 <span className="play-group-member__identity">
                   <span>{nameOf(id)}</span>
                   {description ? (
@@ -347,6 +373,11 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
                       {description}
                     </span>
                   ) : null}
+                  <span className="play-group-member__model" data-testid={`room-member-model-${id}`}>
+                    {models ? memberModel?.model
+                      ? `${t(memberModel.source==='bot'?'play.groupModel.botSource':'play.groupModel.globalSource')} · ${memberModel.model.providerName} / ${memberModel.model.modelId}`
+                      : t('play.groupModel.unconfigured') : t('common.loading')}
+                  </span>
                 </span>
                 <button
                   type="button"
@@ -376,6 +407,7 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
         </div>
         {room && room.botIds.length <= 2 ? <p className="play-group-hint">{t('play.group.keepTwo')}</p> : null}
         {error ? <p className="play-group-error">{error}</p> : null}
+        {room ? <RoomSharedContextEditor roomId={room.id} /> : null}
       </div>
       <div className="chat-panel-body">
         <div className="chat-feed-shell">
@@ -387,7 +419,7 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
                 const name = senderName(message, bots, t('play.me'));
                 const liveId = liveSpeakerId(turns);
                 const lastFromLive = [...messages].reverse().find((item) => item.sender.type === 'bot' && item.sender.id === liveId);
-                const mood = message.sender.type === 'bot' && message.id === lastFromLive?.id ? 'speaking' : 'idle';
+                const mood = message.sender.type === 'bot' && message.id === lastFromLive?.id && workStates[message.sender.id]>0 ? 'speaking' : 'idle';
                 const count = message.attachmentIds?.length ?? 0;
                 return (
                   <GroupTurn

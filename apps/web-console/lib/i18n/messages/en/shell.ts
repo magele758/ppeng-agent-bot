@@ -23,7 +23,7 @@ export const shell = {
   },
   sub: {
     agents: { agents: 'Agents', bots: 'Bots', teams: 'Teams', skills: 'Skills' },
-    tasks: { queue: 'Task queue', runs: 'Runs', inbox: 'Approvals & inbox' },
+    tasks: { bots: 'Bot tasks', queue: 'Task queue', runs: 'Runs', inbox: 'Approvals & inbox' },
     knowledge: { memory: 'Memory', ingestion: 'Ingestion' },
     ops: { trajectory: 'Trajectory', health: 'System health' }
   },

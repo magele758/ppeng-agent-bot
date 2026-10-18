@@ -1,0 +1,32 @@
+import {test,expect} from '@playwright/test';
+
+test('actual shared avatar state survives switching, refresh and partial completion then stops for idle members [AC:bot-working-animation#AC-1] [AC:bot-working-animation#AC-2] [AC:bot-working-animation#AC-3] [AC:bot-working-animation#AC-4]',async({page})=>{
+ const {bots}=await (await page.request.get('/api/bots')).json();expect(bots.length).toBeGreaterThan(1);
+ const [a,b]=bots;let counts:Record<string,number>={};let observed=-1;
+ await page.route('**/api/bot-work/status',r=>{observed=counts[a.id]??0;return r.fulfill({json:{bots:bots.map((bot:{id:string})=>({bot,activeWorkCount:counts[bot.id]??0}))}});});
+ const room={id:'working-state-probe',title:'Working state probe',botIds:[a.id,b.id],hostBotId:a.id,status:'active',maxBotTurns:2};
+ await page.route('**/api/bot-rooms',r=>r.fulfill({json:{rooms:[room]}}));
+ await page.route('**/api/bot-rooms/working-state-probe',r=>r.fulfill({json:{room,models:{defaultModel:null,members:room.botIds.map(botId=>({botId,model:null,source:'unconfigured'}))}}}));
+ await page.route('**/api/bot-rooms/working-state-probe/messages*',r=>r.fulfill({json:{messages:[],hasMore:false,nextCursor:null}}));
+ await page.route('**/api/bot-rooms/working-state-probe/turns',r=>r.fulfill({json:{turns:[]}}));
+ await page.goto('/#/bot');
+ const row=(name:string)=>page.locator('#sessionListMini .list-item--bot-chat').filter({has:page.locator('.session-item__title').getByText(name,{exact:true})});
+ const face=(name:string)=>row(name).locator('[data-face-mood]').first();
+ await expect(face(a.name)).toHaveAttribute('data-face-mood','idle');
+ await row(a.name).click();counts={[a.id]:2};
+ await expect(face(a.name)).toHaveAttribute('data-face-working','true');
+ await expect(page.locator('.chat-panel-header--bot [data-face-mood]')).toHaveAttribute('data-face-working','true');
+ const bob=face(a.name).locator('[data-bob]');
+ const first=await bob.getAttribute('transform');await page.waitForTimeout(420);const second=await bob.getAttribute('transform');expect(second).not.toEqual(first);
+ await page.waitForTimeout(2100);const third=await bob.getAttribute('transform');expect(third).not.toEqual(second);
+ counts={[a.id]:1};await expect.poll(()=>observed).toBe(1);await expect(face(a.name)).toHaveAttribute('data-face-working','true');
+ await row(b.name).click();await expect(face(a.name)).toHaveAttribute('data-face-working','true');
+ await expect(page.locator('.chat-panel-header--bot [data-face-mood]')).toHaveAttribute('data-face-working','false');
+ await page.reload();await expect(face(a.name)).toHaveAttribute('data-face-working','true');
+ await page.getByRole('button',{name:'打开群聊 Working state probe',exact:true}).click();
+ await expect(page.getByTestId(`room-member-face-${a.id}`)).toHaveAttribute('data-face-working','true');
+ await expect(page.getByTestId(`room-member-face-${b.id}`)).toHaveAttribute('data-face-working','false');
+ counts={};await expect(face(a.name)).toHaveAttribute('data-face-working','false');
+ await expect(page.getByTestId(`room-member-face-${a.id}`)).toHaveAttribute('data-face-working','false');
+ const stillA=await bob.getAttribute('transform');await page.waitForTimeout(420);expect(await bob.getAttribute('transform')).toEqual(stillA);
+});

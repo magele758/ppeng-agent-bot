@@ -5,6 +5,8 @@ import type { BotInfo, SessionSummary } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
 import { sessionRowCopy } from '@/lib/session-row';
 import { BotFace } from './BotFace';
+import { botForCanonicalSession } from '@/lib/bots';
+import { useBotWorkMood } from './bot-work/BotWorkState';
 
 function isCoreExecAgent(id: string): boolean {
   return id === 'general' || id === 'main';
@@ -21,7 +23,9 @@ export function SessionListRow({
   status,
   onOpen,
   onToggleChecked,
-  onDelete
+  onDelete,
+  deleteAria,
+  deleteLabel
 }: {
   session: SessionSummary;
   bots: readonly BotInfo[];
@@ -34,6 +38,8 @@ export function SessionListRow({
   onOpen: () => void;
   onToggleChecked: (checked: boolean) => void;
   onDelete?: (title: string) => void;
+  deleteAria?: string;
+  deleteLabel?: string;
 }) {
   const { t } = useI18n();
   const copy = sessionRowCopy({
@@ -43,6 +49,8 @@ export function SessionListRow({
     emptyHint: t('play.sidebar.noQuestion'),
     unnamed: t('play.unnamed')
   });
+  const botId = botForCanonicalSession(bots, session.id, [session])?.id ?? (typeof session.metadata?.botId === 'string' ? session.metadata.botId : '');
+  const mood = useBotWorkMood(botId);
   const title = copy.title;
   const bot = copy.kind === 'bot';
   const faceName = copy.kind === 'bot' ? copy.faceName : '';
@@ -81,7 +89,7 @@ export function SessionListRow({
       ) : null}
       {bot ? (
         <span className="session-item__face" data-bot-face-slot="">
-          <BotFace name={faceName} />
+          <BotFace name={faceName} mood={mood} />
         </span>
       ) : null}
       <div className="session-item__body">
@@ -102,13 +110,13 @@ export function SessionListRow({
           type="button"
           className="btn btn-ghost btn-sm session-item__delete"
           disabled={deleting}
-          aria-label={t('play.sidebar.deleteOneAria', { title })}
+          aria-label={deleteAria ?? t('play.sidebar.deleteOneAria', { title })}
           onClick={(event) => {
             event.stopPropagation();
             onDelete(title);
           }}
         >
-          {t('play.sidebar.deleteOne')}
+          {deleteLabel ?? t('play.sidebar.deleteOne')}
         </button>
       ) : null}
     </div>

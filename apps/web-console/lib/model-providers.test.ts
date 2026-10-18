@@ -8,6 +8,7 @@ import {
   modelSetupState,
   pickDefaultModel,
   groupPickerOptionsByProvider,
+  globalDefaultModelOptions,
   isVerifiedConfiguredProvider,
   baseUrlFromModelsEndpoint,
   matchProviderPresetId,
@@ -29,6 +30,14 @@ const opt = (
   modelId,
   kind: 'openai-compatible',
   source: 'ui'
+});
+
+test('global default offers enabled real models with provider labels only [AC:global-default-model-clarity#AC-1] [AC:global-default-model-clarity#AC-5]', () => {
+  const provider = (id: string, kind: string, hasApiKey = true) => ({ id, name: id, kind, source: 'ui', baseUrl: 'https://example.test/v1', hasApiKey, models: [{ id: 'enabled', enabled: true }, { id: 'off', enabled: false }] });
+  const data = { catalog: { providers: [provider('real', 'openai-compatible'), provider('demo', 'heuristic'), provider('no-key', 'openai-compatible', false)] }, options: [opt('deleted', 'Removed', 'stale')] } as unknown as ModelProvidersResponse;
+  assert.deepEqual(globalDefaultModelOptions(data).map((o) => [o.providerId, o.providerName, o.modelId]), [['real', 'real', 'enabled']]);
+  data.catalog.providers = [provider('demo', 'heuristic')] as PublicModelProvider[];
+  assert.deepEqual(globalDefaultModelOptions(data), []);
 });
 
 test('groupPickerOptionsByProvider keeps provider order and groups models', () => {

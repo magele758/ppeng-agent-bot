@@ -239,10 +239,15 @@ export function planModelFallback(input: {
   };
 
   const catalog = readModelCatalog(input.store);
+  const preferred = resolveSessionPreferredRef(catalog, input.session, env);
   const declaredRef =
     input.primaryRef !== undefined
       ? (input.primaryRef ?? undefined)
-      : resolveSessionPreferredRef(catalog, input.session, env).ref;
+      // This helper receives an already constructed adapter. Without an explicit ref, only the
+      // declared default can identify it: a newly resolved replacement does not prove that the
+      // supplied adapter was constructed from that replacement (it may be the runtime fallback).
+      // Routed callers pass primaryRef explicitly when they really selected another model.
+      : preferred.source === 'default' && catalog.defaultRef ? catalog.defaultRef : preferred.ref;
   const declaredProvider = declaredRef ? findProvider(catalog, declaredRef.providerId, env) : undefined;
   // A ref whose provider is missing/unusable resolves to the runtime fallback adapter, so naming it
   // would mislabel `servedBy` and wrongly dedupe a chain entry against the real primary.

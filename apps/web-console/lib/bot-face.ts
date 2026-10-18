@@ -318,7 +318,7 @@ function drawnSilhouette(shape: BotFaceShape | null, color: BotFaceColor | null)
 function restingMouth(expression: LivingFaceExpression): { kind: MouthKind; open: number } {
   if (expression === 'talk') return { kind: 'open', open: 0.45 };
   if (expression === 'surprised') return { kind: 'oh', open: 0 };
-  return { kind: 'rest', open: 0 };
+  return { kind: expression === 'rest' ? 'smile' : 'rest', open: 0 };
 }
 
 /**

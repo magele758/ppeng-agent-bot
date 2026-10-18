@@ -49,7 +49,7 @@ function parseMetadata(json: string): Record<string, unknown> {
   }
 }
 
-function rawBotLookup(db: DatabaseSync): Required<BotMemoryLookup> {
+function rawBotLookup(db: DatabaseSync): Required<Pick<BotMemoryLookup, 'getBot' | 'listBots' | 'getSession'>> {
   const bots = db.prepare(`SELECT id, agent_id AS agentId FROM bots`).all() as Array<{
     id: string;
     agentId: string;

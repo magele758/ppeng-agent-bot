@@ -75,7 +75,7 @@ test.describe('Bots page', () => {
     await expect(page.getByRole('form', { name: '新建 Bot' })).toBeVisible();
   });
 
-  test('creating a Bot needs only a name; advanced fields are folded; duplicates are refused [AC:agents-management#AC-4]', async ({
+  test('creating a Bot needs only a name; face fields are visible; duplicates are refused [AC:agents-management#AC-4]', async ({
     page,
     request
   }) => {
@@ -87,10 +87,6 @@ test.describe('Bots page', () => {
 
     const submit = form.getByRole('button', { name: '创建 Bot' });
     await expect(submit).toBeDisabled();
-    await expect(form.getByLabel('显示标题')).toHaveCount(0);
-    await expect(form.getByLabel('描述')).toHaveCount(0);
-    await expect(form.getByRole('group', { name: '图标' })).toBeVisible();
-    await form.getByRole('button', { name: '高级选项' }).click();
     await expect(form.getByLabel('显示标题')).toBeVisible();
     await expect(form.getByLabel('描述')).toBeVisible();
 

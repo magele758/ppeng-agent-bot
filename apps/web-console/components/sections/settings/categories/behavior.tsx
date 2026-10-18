@@ -1,10 +1,18 @@
 import { AgentLoopEngineSettingsCard, AgentLoopSettingsCard } from '../../../AgentLoopSettingsCard';
 import { CompactSettingsCard } from '../../../CompactSettingsCard';
 import { GoalSettingsCard, GoalVerifySettingsCard } from '../../../GoalSettingsCard';
+import { BotLimits } from '../../../bot-work/BotLimits';
 import type { SettingsEntry } from '../registry';
 
 /** 常用项在前；专家级（引擎内核、压缩、目标校验）标 advanced，被搜索命中时自动展示 */
 export const behaviorEntries: SettingsEntry[] = [
+  {
+    id: 'botLimits',
+    category: 'behavior',
+    titleKey: 'botWork.globalLimits',
+    keywordsKey: 'botWork.globalLimitsKeywords',
+    render: () => <BotLimits />
+  },
   {
     id: 'agentLoop',
     category: 'behavior',

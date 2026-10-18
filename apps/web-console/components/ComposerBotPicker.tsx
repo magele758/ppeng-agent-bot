@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { useI18n } from '@/lib/i18n';
 import type { LivingFaceMood } from '@/lib/bot-face';
 import { BotFace } from './BotFace';
+import { useBotWorkStates } from './bot-work/BotWorkState';
 
 export type ComposerBotChoice = { id: string; name: string };
 
@@ -26,6 +27,7 @@ export function ComposerBotPicker({
   onSelect
 }: ComposerBotPickerProps) {
   const { t } = useI18n();
+  const workStates = useBotWorkStates();
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -169,7 +171,7 @@ export function ComposerBotPicker({
                   onMouseEnter={() => setActive(index)}
                   onClick={() => choose(option.id)}
                 >
-                  <BotFace name={option.id ? option.name : ''} />
+                  <BotFace name={option.id ? option.name : ''} mood={workStates[option.id] > 0 ? 'thinking' : 'idle'} />
                   <span>{option.name}</span>
                 </button>
               </li>

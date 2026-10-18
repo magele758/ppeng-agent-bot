@@ -543,6 +543,12 @@ export class RawAgentRuntime {
     return this.runningSessions.has(sessionId);
   }
 
+  /** Process-local ownership excludes orphaned durable jobs after a restart. */
+  isBackgroundJobRunning(jobId: string): boolean {
+    const controller = this.backgroundJobAborts.get(jobId);
+    return Boolean(controller && !controller.signal.aborted);
+  }
+
   hasUnconfirmedEffects(sessionId: string, startedAt: string): boolean {
     return this.connectors.software.unconfirmedForSession(sessionId, startedAt).length > 0;
   }

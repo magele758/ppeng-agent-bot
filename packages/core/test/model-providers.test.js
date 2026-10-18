@@ -25,6 +25,7 @@ import {
   readModelCatalog,
   suggestProviderName,
   resolveDefaultModelRef,
+  resolveSessionPreferredRef,
   resolveSessionModelAdapter,
   setCatalogDefaultRef,
   upsertProvider,
@@ -205,7 +206,7 @@ test('resolveSessionModelAdapter uses session modelRef over env fallback', () =>
   rmSync(dir, { recursive: true, force: true });
 });
 
-test('mergeModelRefMetadata stamps default when body omits modelRef', () => {
+test('mergeModelRefMetadata leaves unpinned sessions following global [AC:global-default-model-clarity#AC-2]', () => {
   const { dir, store } = tmpStore();
   writeModelCatalog(store, {
     providers: [],
@@ -213,7 +214,7 @@ test('mergeModelRefMetadata stamps default when body omits modelRef', () => {
     updatedAt: new Date().toISOString()
   });
   const meta = mergeModelRefMetadata(store, {}, {}, {});
-  assert.deepEqual(meta.modelRef, heuristicRef());
+  assert.equal(meta.modelRef, undefined);
   const explicit = mergeModelRefMetadata(
     store,
     {},
@@ -224,6 +225,37 @@ test('mergeModelRefMetadata stamps default when body omits modelRef', () => {
   assert.equal(parseModelRef({ providerId: 'a', modelId: 'b' })?.modelId, 'b');
   store.db.close();
   rmSync(dir, { recursive: true, force: true });
+});
+
+test('global default is hot, persistent, and explicit pins survive until cleared [AC:global-default-model-clarity#AC-2] [AC:global-default-model-clarity#AC-3]', () => {
+  const { dir, store } = tmpStore();
+  try {
+    const p = upsertProvider(store, { name: 'Test', kind: 'openai-compatible', baseUrl: 'http://localhost:9999/v1', apiKey: 'test', models: [{ id: 'one', enabled: true }, { id: 'two', enabled: true }] });
+    const one = { providerId: p.id, modelId: 'one' };
+    const two = { providerId: p.id, modelId: 'two' };
+    const unpinned = { metadata: mergeModelRefMetadata(store, {}, {}, {}) };
+    const pinned = { metadata: mergeModelRefMetadata(store, {}, { modelRef: one }, {}) };
+    setCatalogDefaultRef(store, two, {});
+    assert.deepEqual(resolveSessionPreferredRef(readModelCatalog(store), unpinned, {}).ref, two);
+    assert.deepEqual(resolveSessionPreferredRef(readModelCatalog(store), pinned, {}).ref, one);
+    assert.deepEqual(resolveSessionPreferredRef(readModelCatalog(store), { metadata: { modelOverride: one } }, {}).ref, one);
+    pinned.metadata = mergeModelRefMetadata(store, pinned.metadata, { modelRef: null }, {});
+    assert.deepEqual(resolveSessionPreferredRef(readModelCatalog(store), pinned, {}).ref, two);
+    const restarted = new SqliteStateStore(join(dir, 'state.db'));
+    try { assert.deepEqual(resolveDefaultModelRef(restarted, {}), two); } finally { restarted.db.close(); }
+  } finally { store.db.close(); rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('disabled or deleted default selections fail without replacing saved model [AC:global-default-model-clarity#AC-6]', () => {
+  const { dir, store } = tmpStore();
+  try {
+    const p = upsertProvider(store, { name: 'Test', kind: 'openai-compatible', baseUrl: 'http://localhost:9999/v1', apiKey: 'test', models: [{ id: 'one', enabled: true }, { id: 'off', enabled: false }] });
+    const saved = readModelCatalog(store).defaultRef;
+    for (const modelId of ['off', 'deleted']) {
+      assert.throws(() => setCatalogDefaultRef(store, { providerId: p.id, modelId }, {}), /enabled|available/i);
+      assert.deepEqual(readModelCatalog(store).defaultRef, saved);
+    }
+  } finally { store.db.close(); rmSync(dir, { recursive: true, force: true }); }
 });
 
 test('env fallback provider is listed but keys stay masked', () => {

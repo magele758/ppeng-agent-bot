@@ -4,9 +4,6 @@ import '../../bot-work/bot-work.css';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 import { readBotGroupCreate, readBotPermissionsTarget } from '@/lib/bot-chat-header';
-import { BotLimits } from '../../bot-work/BotLimits';
-import { BotTeamWork } from '../../bot-work/BotTeamWork';
-import { BotRooms } from '../../bot-work/BotRooms';
 import { filterBots } from '@/lib/agents-view';
 import { applyBotsHash, botCardSelected, botCardSubtitle, botsPane, showBotsEmpty, visibleBotRoster } from '@/lib/bots';
 import { useI18n } from '@/lib/i18n';
@@ -74,12 +71,6 @@ export function BotsView() {
     setNotice(null);
   };
 
-  const startGroup = () => {
-    setCreatingGroup(true);
-    setCreating(false);
-    setNotice(null);
-  };
-
   const pane = botsPane(creating, creatingGroup, selected !== null);
   const paneOpen = pane === 'create' || pane === 'group';
   const rightPane = pane === 'none' ? null : (
@@ -98,6 +89,11 @@ export function BotsView() {
     />
   );
 
+  // Creation has its own focused surface; the management list returns on cancel.
+  if (paneOpen) {
+    return <div className="ag-block ag-bot-create-surface" id="botsView">{rightPane}</div>;
+  }
+
   if (showBotsEmpty(roster.length, pane)) {
     return (
       <EmptyState
@@ -115,11 +111,6 @@ export function BotsView() {
 
   return (
     <div className="ag-block" id="botsView">
-      {!query.trim() && <>
-      <BotLimits />
-      <BotTeamWork bots={lab.bots} onOpen={bot=>void openChat(bot)} />
-      <BotRooms bots={roster} />
-      </>}
       <div className="ag-toolbar">
         <div className="ag-toolbar__grow">
           <SearchBox
@@ -132,9 +123,6 @@ export function BotsView() {
         <span className="ag-toolbar__meta">{t('agents.common.count', { count: visible.length })}</span>
         <button type="button" className="btn btn-primary btn-sm" data-testid="bot-create-open" onClick={startCreate} disabled={creating}>
           {t('agents.bots.newBot')}
-        </button>
-        <button type="button" className="btn btn-sm" data-testid="bot-group-open" onClick={startGroup} disabled={creatingGroup}>
-          {t('agents.bots.newGroup')}
         </button>
       </div>
       {notice ? (

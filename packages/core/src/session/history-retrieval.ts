@@ -1,7 +1,9 @@
 import { resolveBotMemoryAgentId, type BotMemoryLookup, type BotMemorySession } from '../memory/bot-memory-scope.js';
 import type { SessionRecord, SessionMessage } from '../types.js';
+import { sharedMessageVisible } from '../bots/shared-context-isolation.js';
 
 export interface HistoryStore extends BotMemoryLookup {
+  getDaemonControl?(key: string): unknown;
   listSessions(): SessionRecord[];
   getSession(id: string): SessionRecord | undefined;
   listSurfaceNodes(id: string): Array<Pick<SessionMessage, 'id' | 'parts' | 'role' | 'createdAt'> & { seq: number; surfaceOp: string }>;
@@ -42,7 +44,7 @@ export function searchHistory(store: HistoryStore, sourceId: string, args: { que
     if (args.session_id && args.session_id !== session.id) continue;
     if (!canReadHistory(source, session, store)) continue;
     for (const message of store.listSurfaceNodes(session.id)) {
-      if (message.surfaceOp !== 'append') continue;
+      if (message.surfaceOp !== 'append' || !sharedMessageVisible(store, session.id, message)) continue;
       for (let part = 0; part < message.parts.length; part++) {
         const text = partText(message.parts[part]!);
         if (!text) continue;
@@ -75,7 +77,7 @@ export function readHistory(store: HistoryStore, sourceId: string, args: {
   const source = store.getSession(sourceId), target = store.getSession(sessionId);
   if (!source || !target || !canReadHistory(source, target, store)) return null;
   const message = store.listSurfaceNodes(sessionId).find(m => m.surfaceOp === 'append' && (messageId ? m.id === messageId : m.seq === args.seq));
-  if (!message || !message.parts[part]) return null;
+  if (!message || !sharedMessageVisible(store, sessionId, message) || !message.parts[part]) return null;
   const text = partText(message.parts[part]!);
   if (text === undefined) return null;
   return { ref: historyReference(sessionId, message.id, part), sessionId, messageId: message.id,

@@ -1,4 +1,6 @@
 import { resolveBotWindowBudget } from '../session/history/window.js';
+import { BotFunctionalGroupService } from '../bots/functional-groups.js';
+import { hasRevokedSharedContext } from '../bots/shared-context-isolation.js';
 import { noteHumanModelInput } from '../session/human-continuation.js';
 import { isCanonicalBotChat } from '../session/bot-compact-policy.js';
 import { estimateMessageTokens } from '../model/token-estimate.js';
@@ -206,20 +208,31 @@ export function fanoutKernelLatch<TEvent>(
   };
 }
 
-export function bindMemoryAppendixPrompt(rt: Pick<L5Bindable, 'promptBuilder' | 'stateDir'>): TurnKernelHost['promptBuilder'] {
+export function bindMemoryAppendixPrompt(rt: Pick<L5Bindable, 'promptBuilder' | 'stateDir'> & Partial<Pick<L5Bindable, 'store'>>): TurnKernelHost['promptBuilder'] {
   const prompt = rt.promptBuilder;
+  const sharedContext = rt.store ? new BotFunctionalGroupService(rt.store) : undefined;
   return {
     get lastCognitivePhaseBySession() {
       return prompt.lastCognitivePhaseBySession;
     },
     getRouting: (sessionId) => prompt.getRouting(sessionId),
     buildStablePrefix: (ctx) => prompt.buildStablePrefix(ctx),
-    buildSystemPrompt: (ctx, messages) => prompt.buildSystemPrompt(ctx, messages),
-    buildMemoryAppendix: (ctx, opts) =>
-      prompt.buildMemoryAppendixAsync(ctx, {
+    buildSystemPrompt: (ctx, messages) => prompt.buildSystemPrompt(
+      rt.store && hasRevokedSharedContext(rt.store,ctx.session.id)
+        ? {...ctx,session:{...ctx.session,summary:undefined,todo:[]}}
+        : ctx, messages),
+    buildMemoryAppendix: async (ctx, opts) => {
+      const memory = await prompt.buildMemoryAppendixAsync(ctx, {
         query: opts?.query,
         stateDir: opts?.stateDir ?? rt.stateDir
-      })
+      });
+      const appendix=memory + (sharedContext?.appendix(ctx.session) ?? '');
+      // A nonempty boundary also prevents either kernel's working-log fallback
+      // from reintroducing unproven summaries of a departed group's context.
+      return appendix || (rt.store && hasRevokedSharedContext(rt.store,ctx.session.id)
+        ? '[sharing-domain-changed] Previous group-derived context is unavailable. Use only currently authorized shared facts and unrevoked sources.'
+        : '');
+    }
   };
 }
 

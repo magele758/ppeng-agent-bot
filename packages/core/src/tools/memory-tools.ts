@@ -1,3 +1,4 @@
+import { sharedMemoryVisible } from '../bots/shared-context-isolation.js';
 import { sourcePage } from '../session/history-retrieval.js';
 import type { ToolContract } from '../types.js';
 import {
@@ -310,7 +311,8 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
     async execute(context, args) {
       const scope = args.scope ?? 'scratch';
       if (SESSION_SCOPES.has(scope)) {
-        const rows = await services.listSessionMemory(context.session.id, scope as 'scratch' | 'long');
+        const rows = (await services.listSessionMemory(context.session.id, scope as 'scratch' | 'long'))
+          .filter(row => sharedMemoryVisible(services.botLookup ?? {}, row, context.session.id));
         return {
           ok: true,
           content: rows.length > 0 ? JSON.stringify(rows, null, 2) : 'No memory entries.'
@@ -325,14 +327,14 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
       }
       const ids = resolveIds(context);
       const botAgentId = resolveBotMemoryAgentId(context.session, services.botLookup);
-      const rows = await services.listAgentMemory({
+      const rows = (await services.listAgentMemory({
         scope: agentScope,
         sessionId: context.session.id,
         userId: ids.userId,
         tenantId: ids.tenantId,
         limit: 40,
         ...(botAgentId ? { agentId: botAgentId } : { agentUnscoped: true })
-      });
+      })).filter(row => sharedMemoryVisible(services.botLookup ?? {}, row));
       return {
         ok: true,
         content: rows.length > 0 ? JSON.stringify(rows, null, 2) : 'No memory entries.'
@@ -400,21 +402,22 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
     ptc: { kind: 'read' },
     async execute(context, args) {
       if (!services.prefetchAgentMemory) {
-        const rows = await services.listSessionMemory(context.session.id);
+        const rows = (await services.listSessionMemory(context.session.id))
+          .filter(row => sharedMemoryVisible(services.botLookup ?? {}, row, context.session.id));
         return {
           ok: true,
           content: rows.length ? JSON.stringify(rows.slice(0, args.limit ?? 20), null, 2) : 'No memory.'
         };
       }
       const ids = resolveIds(context);
-      const rows = await services.prefetchAgentMemory({
+      const rows = (await services.prefetchAgentMemory({
         sessionId: context.session.id,
         userId: ids.userId,
         tenantId: ids.tenantId,
         query: args.query,
         limit: args.limit ?? 20,
         agentId: resolveBotMemoryAgentId(context.session, services.botLookup)
-      });
+      })).filter(row => sharedMemoryVisible(services.botLookup ?? {}, row));
       return {
         ok: true,
         content: rows.length ? JSON.stringify(rows, null, 2) : 'No memory matches.'
@@ -459,8 +462,9 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
         : ['scratch', 'long', 'user', 'team', 'project'];
       const items: MemorySearchItem[] = [];
       const seen = new Set<string>();
-      const pushRows = (rows: unknown[], scope: MemoryToolScope) => {
+      const pushRows = (rows: unknown[], scope: MemoryToolScope, fallbackSessionId?: string) => {
         for (const row of rows) {
+          if (!sharedMemoryVisible(services.botLookup ?? {}, row, fallbackSessionId)) continue;
           const item = readSearchItem(row, scope);
           if (!item || seen.has(item.id)) continue;
           seen.add(item.id);
@@ -472,7 +476,7 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
         if (SESSION_SCOPES.has(scope)) {
           for (const sessionId of sessionIds) {
             const rows = await services.listSessionMemory(sessionId, scope as 'scratch' | 'long');
-            pushRows(rows, scope);
+            pushRows(rows, scope, sessionId);
           }
           continue;
         }
@@ -532,7 +536,7 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
       if (SESSION_SCOPES.has(scope)) {
         for (const sessionId of subagentMemorySessionIds(context.session, services.botLookup)) {
           const rows = await services.listSessionMemory(sessionId, scope as 'scratch' | 'long');
-          item = rows.map(row => readSearchItem(row, scope)).find(row => row?.id === id && row.scope === scope);
+          item = rows.filter(row => sharedMemoryVisible(services.botLookup ?? {}, row, sessionId)).map(row => readSearchItem(row, scope)).find(row => row?.id === id && row.scope === scope);
           if (item) break;
         }
       } else if (services.getAgentMemoryById) {
@@ -540,7 +544,7 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
         const ids = retrievalIds(context);
         const agentId = resolveBotMemoryAgentId(context.session, services.botLookup);
         // A guessed id must never bypass the identity constraints used by search.
-        if (!row || row.scope !== agentScopeOf(scope)
+        if (!row || !sharedMemoryVisible(services.botLookup ?? {}, row) || row.scope !== agentScopeOf(scope)
           || (row.agentId || undefined) !== agentId
           || (Boolean(row.tenantId) && row.tenantId !== ids.tenantId)
           || (ids.userId ? row.userId !== ids.userId : row.sessionId !== context.session.id)) return unavailable;
@@ -551,7 +555,7 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
         const rows = await services.listAgentMemory({ scope: agentScopeOf(scope), sessionId: ids.userId ? undefined : context.session.id,
           userId: ids.userId, tenantId: ids.tenantId, tenantOrGlobal: true, limit: 200,
           ...(agentId ? { agentId } : { agentUnscoped: true }) });
-        item = rows.map(row => readSearchItem(row, scope)).find(row => row?.id === id && row.scope === scope);
+        item = rows.filter(row => sharedMemoryVisible(services.botLookup ?? {}, row)).map(row => readSearchItem(row, scope)).find(row => row?.id === id && row.scope === scope);
       }
       return item ? { ok: true, content: JSON.stringify({ ref: args.ref, scope, key: item.key, ...sourcePage(item.value, args.offset, args.limit) }) } : unavailable;
     }

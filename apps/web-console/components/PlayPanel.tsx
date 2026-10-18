@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import type { AgentInfo, ApprovalItem, BotInfo, SessionSummary } from '@/lib/types';
-import { visibleBotRoster, type PlaySurface } from '@/lib/bots';
+import { botForCanonicalSession, visibleBotRoster, type PlaySurface } from '@/lib/bots';
 import { collectActivityTools, collectArtifacts } from '@/lib/activity-tools';
 import {
   formatCostUsd,
@@ -33,16 +33,22 @@ import { groupAgentsByDomain, sortAgentsById } from '@/lib/sort-utils';
 import { groupSessionsByDate } from '@/lib/session-groups';
 import { WorkspacePicker } from './WorkspacePicker';
 import { catalogToPickerOptions } from '@/lib/model-providers';
-import { resolveLivingFaceMood } from '@/lib/bot-face';
-import { botChatHeaderTitle, botGroupCreateHref, botNameFromCanonicalTitle, botPermissionsHref } from '@/lib/bot-chat-header';
+import { useBotWorkMood } from './bot-work/BotWorkState';
+import { botChatHeaderTitle, botNameFromCanonicalTitle, botPermissionsHref } from '@/lib/bot-chat-header';
 import { BotFace } from './BotFace';
+import { resolveLivingFaceMood } from '@/lib/bot-face';
 import { ComposerBotPicker } from './ComposerBotPicker';
 import { ComposerModelPicker } from './ComposerModelPicker';
 import { SessionSettingsPanel, type ExecPreset } from './sections/chat/SessionSettingsPanel';
 import { PlayBotGroupChat } from './play-group/PlayBotGroupChat';
 import { PlayBotGroupList } from './play-group/PlayBotGroupList';
 import { SessionListRow } from './SessionListRow';
+import { BotFunctionalGroups } from './BotFunctionalGroups';
 import { useBotSessionQuestions } from './useBotSessionQuestions';
+import { BotEntryDialog } from './BotEntryDialog';
+import { BotCreateForm } from './sections/agents/BotCreateForm';
+import { BotGroupCreateForm } from './sections/agents/BotGroupCreateForm';
+import { useLab } from './shell/LabProvider';
 
 function isCoreExecAgent(id: string): boolean {
   return id === 'general' || id === 'main';
@@ -257,6 +263,10 @@ export function PlayPanel({
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const moreMenuRef = useRef<HTMLDivElement>(null);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
+  const [createKind, setCreateKind] = useState<'bot' | 'room' | null>(null);
+  const [functionalCreate, setFunctionalCreate] = useState(0);
+  const [botRemoveError, setBotRemoveError] = useState('');
+  const { upsertBot, setBots, tick } = useLab();
   const [selectMode, setSelectMode] = useState(false);
   const [checkedIds, setCheckedIds] = useState<string[]>([]);
   const [deleting, setDeleting] = useState(false);
@@ -401,10 +411,10 @@ export function PlayPanel({
     sessionTitle: chat.playTitle
   });
   const headerBotId = headerBotChat ? chat.botId || selectedBot?.id || '' : '';
-  const headerFaceMood = resolveLivingFaceMood({
-    live: chat.playSending || Boolean(chat.streamOverlay) || chat.waitTyping,
-    segments: chat.streamOverlay?.segments
-  });
+  const headerWorkMood = useBotWorkMood(headerBotId);
+  const pickerWorkMood = useBotWorkMood(chat.botId);
+  const headerFaceMood = resolveLivingFaceMood({live:headerWorkMood!=='idle',segments:chat.streamOverlay?.segments});
+  const pickerFaceMood = resolveLivingFaceMood({live:pickerWorkMood!=='idle',segments:chat.streamOverlay?.segments});
 
   const selectedSession = useMemo(
     () => sessions.find((s) => s.id === selectedSessionId) ?? null,
@@ -640,13 +650,61 @@ export function PlayPanel({
   }, [chat.playInput, chat.playInputRef]);
 
 
+  const renderSession = (s: SessionSummary) => {
+    if (botSurface && botForCanonicalSession(bots, s.id, sessions)?.hidden) return null;
+    const rowBot = botSurface ? botForCanonicalSession(bots, s.id, sessions) : undefined;
+    const checked = checkedVisible.includes(s.id);
+    const statusKey = sessionStatusKey(s.status);
+    return (
+      <SessionListRow
+        key={s.id}
+        session={s}
+        bots={bots}
+        question={botQuestions.get(s.id) ?? ''}
+        selected={!openGroupId && selectedSessionId === s.id}
+        checked={checked}
+        selectMode={selectMode}
+        deleting={deleting}
+        status={
+          statusKey ? (
+            <span className={`session-item__status session-item__status--${s.status}`}>
+              <span className={statusDotClass(s.status)} aria-hidden="true" />
+              {t(statusKey)}
+            </span>
+          ) : null
+        }
+        onOpen={() => {
+          setOpenGroupId(null);
+          onSelectSession(s.id);
+        }}
+        onToggleChecked={(next) => toggleChecked(s.id, next)}
+        deleteAria={rowBot ? t('play.entry.removeBot', { name: rowBot.name }) : undefined}
+        deleteLabel={rowBot ? t('play.entry.remove') : undefined}
+        onDelete={rowBot ? async () => {
+          if (deleting || !window.confirm(t('play.entry.removeBotConfirm', { name: rowBot.name }))) return;
+          setDeleting(true);
+          setBotRemoveError('');
+          try { await api(`/api/bots/${encodeURIComponent(rowBot.id)}`, { method: 'PATCH', body: JSON.stringify({ hidden: true }) }); setBots(previous => previous.map(bot => bot.id === rowBot.id ? { ...bot, hidden: true } : bot)); }
+          catch (cause) { setBotRemoveError(t('play.entry.removeFailed', { error: cause instanceof Error ? cause.message : String(cause) })); }
+          finally { setDeleting(false); }
+        } : onDeleteSessions ? (title) => { void confirmDelete([s.id], t('play.sidebar.deleteConfirmOne', { title })); } : undefined}
+      />
+    );
+  };
+
   return (
     <section className={`panel ${active ? 'active' : ''}`} id="panel-play">
+      {createKind ? <BotEntryDialog label={createKind === 'bot' ? t('play.newBot') : t('play.group.create')}>
+        {createKind === 'bot' ? <BotCreateForm existingNames={bots.map(bot => bot.name)} onCreated={bot => { upsertBot(bot); setCreateKind(null); void tick({ includePlayPanel: false }); }} onCancel={() => setCreateKind(null)} /> : <BotGroupCreateForm bots={botRoster} onCreated={() => setCreateKind(null)} onCancel={() => setCreateKind(null)} />}
+      </BotEntryDialog> : null}
       <div className="play-layout play-layout--rail">
         <aside className="play-sidebar">
           <div className="play-sidebar__head">
-            {botSurface&&<a className="chat-empty__link" href={formatHash({section:'agents',sub:'bots'})}>{t('play.settings.manageBots')}</a>}
-            <div className="create-menu" ref={createMenuRef}>
+            <div className="create-menu" ref={createMenuRef} onMouseEnter={() => setCreateMenuOpen(true)} onMouseLeave={() => setCreateMenuOpen(false)} onKeyDown={(event) => {
+              if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+              event.preventDefault(); setCreateMenuOpen(true);
+              requestAnimationFrame(() => { const items = Array.from(createMenuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []); const index = items.indexOf(document.activeElement as HTMLElement); const next = event.key === 'End' || event.key === 'ArrowUp' && index < 0 ? items.length - 1 : event.key === 'Home' ? 0 : (index + (event.key === 'ArrowUp' ? -1 : 1) + items.length) % items.length; items[next]?.focus(); });
+            }}>
               <button
                 type="button"
                 id="btnPlayCreate"
@@ -654,53 +712,21 @@ export function PlayPanel({
                 aria-haspopup="menu"
                 aria-expanded={createMenuOpen}
                 aria-controls="playCreateMenu"
-                onClick={() => setCreateMenuOpen((v) => !v)}
+                onClick={() => setCreateMenuOpen(true)}
               >
-                {t('play.add')}
+                {botSurface ? t('play.entry.new') : t('play.add')}
               </button>
               {createMenuOpen ? (
                 <div className="create-menu__pop" id="playCreateMenu" role="menu">
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="create-menu__item"
-                    onClick={openCreateChat}
-                  >
-                    {t('play.chat')}
-                    <span className="muted small">{t('play.newSession')}</span>
-                  </button>
-                  <a
-                    role="menuitem"
-                    className="create-menu__item"
-                    aria-label={t('play.newBot')}
-                    href={formatHash({ section: 'agents', sub: 'bots' })}
-                    onClick={() => setCreateMenuOpen(false)}
-                  >
-                    {t('play.bot')}
-                    <span className="muted small">{t('play.newBot')}</span>
-                  </a>
-                  <a
-                    role="menuitem"
-                    className="create-menu__item"
-                    data-testid="play-create-group"
-                    aria-label={t('agents.bots.newGroup')}
-                    href={botGroupCreateHref()}
-                    onClick={(event) => {
-                      setCreateMenuOpen(false);
-                      const href = botGroupCreateHref();
-                      if (window.location.hash === href) {
-                        event.preventDefault();
-                        window.dispatchEvent(new HashChangeEvent('hashchange'));
-                      }
-                    }}
-                  >
-                    {t('agents.bots.groupTitle')}
-                    <span className="muted small">{t('agents.bots.newGroup')}</span>
-                  </a>
+                  {!botSurface ? <button type="button" role="menuitem" className="create-menu__item" onClick={openCreateChat}>{t('play.newSession')}</button> : null}
+                  <button type="button" role="menuitem" className="create-menu__item" onClick={() => { setCreateMenuOpen(false); setCreateKind('bot'); }}>{t('play.newBot')}</button>
+                  <button type="button" role="menuitem" className="create-menu__item" data-testid="play-create-group" onClick={() => { setCreateMenuOpen(false); setCreateKind('room'); }}>{t('play.group.create')}</button>
+                  {botSurface ? <button type="button" role="menuitem" className="create-menu__item" onClick={() => { setCreateMenuOpen(false); setFunctionalCreate(n => n + 1); }}>{t('play.functionalGroups.create')}</button> : null}
                 </div>
               ) : null}
             </div>
           </div>
+          {botRemoveError ? <p role="alert" className="play-group-error">{botRemoveError}</p> : null}
           <div className="play-sidebar__tools">
           {onSessionFilterChange ? (
             <label className="play-sidebar__search">
@@ -776,51 +802,19 @@ export function PlayPanel({
                 filter={sessionFilter}
                 onOpen={setOpenGroupId}
                 onCount={setGroupCount}
+                onDeleted={(id) => setOpenGroupId((current) => current === id ? null : current)}
               />
             ) : null}
-            {!sessions.length && (!botSurface || groupCount === 0) ? (
+            {botSurface ? (
+              <BotFunctionalGroups bots={botRoster} sessions={sessions} renderSession={renderSession} createRequest={functionalCreate} />
+            ) : !sessions.length ? (
               <div className="empty-hint">{botSurface ? t('play.sidebar.noBots') : t('play.sidebar.noSessions')}</div>
             ) : sessions.length ? (
               sessionGroups.map((group) => (
                 <section key={group.bucket} className="session-date-group">
                   <h3 className="session-date-group__label">{sessionGroupDisplay(group.bucket, group.label, t)}</h3>
                   <div className="session-date-group__items">
-                    {group.sessions.map((s) => {
-                      const checked = checkedVisible.includes(s.id);
-                      const statusKey = sessionStatusKey(s.status);
-                      return (
-                        <SessionListRow
-                          key={s.id}
-                          session={s}
-                          bots={bots}
-                          question={botQuestions.get(s.id) ?? ''}
-                          selected={!openGroupId && selectedSessionId === s.id}
-                          checked={checked}
-                          selectMode={selectMode}
-                          deleting={deleting}
-                          status={
-                            statusKey ? (
-                              <span className={`session-item__status session-item__status--${s.status}`}>
-                                <span className={statusDotClass(s.status)} aria-hidden="true" />
-                                {t(statusKey)}
-                              </span>
-                            ) : null
-                          }
-                          onOpen={() => {
-                            setOpenGroupId(null);
-                            onSelectSession(s.id);
-                          }}
-                          onToggleChecked={(next) => toggleChecked(s.id, next)}
-                          onDelete={
-                            onDeleteSessions
-                              ? (title) => {
-                                  void confirmDelete([s.id], t('play.sidebar.deleteConfirmOne', { title }));
-                                }
-                              : undefined
-                          }
-                        />
-                      );
-                    })}
+                    {group.sessions.map(renderSession)}
                   </div>
                 </section>
               ))
@@ -1141,10 +1135,7 @@ export function PlayPanel({
                             ? { id: chat.botId, name: selectedBot?.name ?? chat.botId }
                             : null
                         }
-                        mood={resolveLivingFaceMood({
-                          live: chat.playSending || Boolean(chat.streamOverlay) || chat.waitTyping,
-                          segments: chat.streamOverlay?.segments
-                        })}
+                        mood={pickerFaceMood}
                         onSelect={(id) => void chat.selectBot(id)}
                       />
                     ) : null}

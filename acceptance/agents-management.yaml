@@ -2,6 +2,8 @@ id: agents-management
 title: Bots / Agents / Teams / Skills 管理页清晰易用
 status: implemented
 owner: ws2-agents
+notes: |
+  Bot 创建字段布局已由用户批准的 bot-face-first-creation AC-1 更新：标题、描述、脸型和颜色直接展示，仍仅名称必填。
 requirement: |
   让创建/管理 bot、agent、team、skill 清晰、容易：卡片/列表总览加搜索，创建流程只要求最少必填字段并把其余放进「高级」，
   空状态要有清晰指引，team 图要易读。
@@ -21,7 +23,7 @@ criteria:
   - id: AC-4
     given: 用户在 Bots 页点击「新建 Bot」
     when: 只填写名称并提交
-    then: 表单默认只要求名称，标题和描述收在折叠的「高级」里；名称为空时不能提交；创建成功后新 Bot 出现在列表中并被选中；同名 Bot 再次创建会显示明确的错误，且不会多出一个 Bot
+    then: 表单仅要求名称，标题、描述、脸型和颜色直接展示且为可选；名称为空时不能提交；创建成功后新 Bot 出现在列表中并被选中；同名 Bot 再次创建会显示明确的错误，且不会多出一个 Bot
   - id: AC-5
     given: 用户已有多个 Bot
     when: 在 Bots 页搜索框输入名称、标题或描述的一部分

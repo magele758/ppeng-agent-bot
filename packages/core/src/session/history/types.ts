@@ -3,6 +3,7 @@ export interface HistoryOptions { limit?: number; beforeSeq?: number; query?: st
 export interface HistoryPage { messages: SessionMessage[]; nextCursor: number | null; hasMore: boolean }
 export interface HistoryContext { message: SessionMessage; messages: SessionMessage[] }
 export interface HistoryStore {
+ getDaemonControl?(key: string): unknown;
  listHistory(sessionId: string, options?: HistoryOptions): HistoryPage;
  readHistory(sessionId: string, seq: number, before?: number, after?: number): HistoryContext | undefined;
  readHistoryById?(sessionId: string, messageId: string): SessionMessage | undefined;

@@ -1,0 +1,15 @@
+id: bot-group-drag-only
+title: Bot 侧栏移组仅保留拖拽入口
+status: implemented
+owner: user
+requirement: |
+  这个显示纯多余，去掉，已经有拖拽进入分组的能力了
+criteria:
+  - id: AC-1
+    given: 用户打开 Bot 聊天页
+    when: 查看各功能分组和未分组中的 Bot 列表
+    then: 不再显示每个 Bot 下方的移组下拉框，也不保留其占位空行，Bot 行仍可打开对话和执行带确认的移除操作
+  - id: AC-2
+    given: Bot 当前属于某个功能分组或未分组
+    when: 用户将其拖到另一功能分组或未分组区域
+    then: 成功后立即更新归属且刷新后保留；保存失败时回到原分组并显示错误，Bot 和原有对话不丢失

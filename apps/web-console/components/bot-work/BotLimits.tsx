@@ -8,6 +8,8 @@ export function BotLimits() {
   const { t } = useI18n();
   const action = useAction();
   const [context, setContext] = useState(131072);
+  const [saved, setSaved] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [perBot, setPerBot] = useState(1000);
   const [perPrincipal, setPerPrincipal] = useState(10000);
   useEffect(() => {
@@ -22,21 +24,26 @@ export function BotLimits() {
       setContext(window.settings.fallbackContextTokens);
       setPerBot(queue.settings.perBot);
       setPerPrincipal(queue.settings.perPrincipal);
+      setLoaded(true);
     });
   }, []);
   return (
-    <details>
-      <summary>{t("botWork.limits")}</summary>
+    <section className="ag-panel" data-testid="bot-global-limits">
+      <h3>{t("botWork.globalLimits")}</h3>
+      <p>{t("botWork.globalLimitsHint")}</p>
       <Feedback {...action} />
+      {saved && !action.busy && !action.error && <p role="status">{t("botWork.limitsSaved")}</p>}
       <form
         onSubmit={(e) => {
           e.preventDefault();
+          setSaved(false);
           void action.run(async () => {
             await api(
               "/api/bot-context-settings",
               json({ fallbackContextTokens: context }, "PATCH"),
             );
             await api("/api/bot-work/settings", json({ perBot, perPrincipal }));
+            setSaved(true);
           });
         }}
       >
@@ -72,9 +79,9 @@ export function BotLimits() {
             onChange={(e) => setPerPrincipal(Number(e.target.value))}
           />
         </label>
-        <button disabled={action.busy}>{t("botWork.save")}</button>
+        <button disabled={action.busy || !loaded}>{t("botWork.save")}</button>
       </form>
-    </details>
+    </section>
   );
 }
 

@@ -49,6 +49,16 @@ export const settings = {
     system: '跟随系统'
   },
   model: {
+    globalDefault: {
+      title: '全局默认模型',
+      description: '未单独指定模型的 Bot、群聊成员和普通对话跟随此默认值，保存后立即生效。Bot 专属模型或对话单独选择优先；清除单独选择后恢复跟随全局。',
+      empty: '尚未配置可用模型',
+      configure: '配置模型',
+      saved: '全局默认模型已保存为 {model}',
+      saveFailed: '保存全局默认模型失败，模型可能已禁用或删除。当前配置未更改，请刷新列表后重试。',
+      follow: '跟随全局默认',
+      following: '全局默认 · {provider}'
+    },
     desc: '选择服务商、填入 API Key、测试连接，选好默认模型即可使用。保存后立即生效，无需改 .env 或重启。',
     wizardTitle: '添加模型服务商',
     stepProvider: '选择服务商',

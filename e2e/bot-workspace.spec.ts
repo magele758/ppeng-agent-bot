@@ -1,4 +1,11 @@
-import { test, expect, type APIRequestContext } from "@playwright/test";
+import { test, expect, type APIRequestContext, type Page } from "@playwright/test";
+
+async function openRoomSettings(page: Page, title: string) {
+  await page.goto('/#/bot');
+  await page.getByRole('button', { name: `打开群聊 ${title}`, exact: true }).click();
+  await page.getByRole('button', { name: '群聊设置', exact: true }).click();
+  return page.getByTestId('bot-rooms');
+}
 
 test("team work, history, rooms and software have real product entry points [AC:default-super-bot#AC-3] [AC:bot-history-memory#AC-1] [AC:bot-rooms#AC-1] [AC:bot-software-execution#AC-3]", async ({
   page,
@@ -9,9 +16,10 @@ test("team work, history, rooms and software have real product entry points [AC:
   });
   expect(response.status()).toBe(201);
   const { bot } = await response.json();
-  await page.goto("/#/agents/bots");
+  await page.goto("/#/tasks/bots");
   await expect(page.getByTestId("bot-team-work")).toBeVisible();
-  await expect(page.getByTestId("bot-rooms")).toBeVisible();
+  await page.goto("/#/agents/bots");
+  await expect(page.getByTestId("bot-rooms")).toHaveCount(0);
   await page.getByTestId(`bot-card-${bot.id}`).click();
   await expect(page.getByTestId("bot-history")).toBeVisible();
   await expect(page.getByTestId("bot-connections")).toBeVisible();
@@ -20,6 +28,9 @@ test("team work, history, rooms and software have real product entry points [AC:
     .fill("missing exact historical phrase");
   await page.getByTestId("bot-history-search").click();
   await expect(page.getByTestId("bot-history-empty")).toBeVisible();
+  await page.goto('/#/bot');
+  await page.locator('#btnPlayCreate').click();
+  await expect(page.getByRole('menuitem', { name: '新建群聊', exact: true })).toBeVisible();
 });
 
 test("create and reopen a room with persistent membership [AC:bot-rooms#AC-1] [AC:bot-rooms#AC-4]", async ({
@@ -31,21 +42,25 @@ test("create and reopen a room with persistent membership [AC:bot-rooms#AC-1] [A
       data: { name: `Room member ${Date.now()}` },
     })
   ).json();
-  await page.goto("/#/agents/bots");
-  const rooms = page.getByTestId("bot-rooms");
-  await rooms.getByTestId("room-title").fill(`Room ${bot.id}`);
-  await rooms.getByTestId("room-members").selectOption([bot.id]);
-  await rooms.getByTestId("room-create").click();
-  await expect(rooms.getByTestId("room-selected-title")).toHaveText(
-    `Room ${bot.id}`,
-  );
-  await rooms.getByTestId("room-stop").click();
-  await expect(rooms.getByTestId("room-status")).toHaveText(/已暂停/);
+  const { bots } = await (await request.get('/api/bots')).json();
+  const other = bots.find((member: { id: string }) => member.id !== bot.id);
+  await page.goto('/#/bot');
+  await page.locator('#btnPlayCreate').click();
+  await page.getByRole('menuitem', { name: '新建群聊', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByTestId('bot-group-name').fill(`Room ${bot.id}`);
+  await dialog.getByTestId(`bot-group-member-${bot.id}`).check();
+  await dialog.getByTestId(`bot-group-member-${other.id}`).check();
+  await dialog.locator('button[type=submit]').click();
+  await page.getByRole('button', { name: `打开群聊 Room ${bot.id}`, exact: true }).click();
+  const rooms = page.getByTestId('bot-rooms');
+  await page.getByText('群聊设置', { exact: true }).click();
+  await rooms.getByTestId('room-stop').click();
+  await expect(rooms.getByTestId('room-status')).toHaveText(/已暂停/);
   await page.reload();
-  await rooms
-    .getByRole("button", { name: `Room ${bot.id}`, exact: true })
-    .click();
-  await expect(rooms.getByTestId("room-status")).toHaveText(/已暂停/);
+  await page.getByRole('button', { name: `打开群聊 Room ${bot.id}`, exact: true }).click();
+  await page.getByText('群聊设置', { exact: true }).click();
+  await expect(rooms.getByTestId('room-status')).toHaveText(/已暂停/);
 });
 
 test("schedule a one-time job and inspect its durable run history [AC:bot-routine-lifecycle#AC-4]", async ({
@@ -206,9 +221,9 @@ test("assign work through Super Bot and inspect the persisted result [AC:default
   const { bot } = await (
     await request.post("/api/bots", { data: { name: `Worker ${Date.now()}` } })
   ).json();
-  await page.goto("/#/agents/bots");
+  await page.goto("/#/tasks/bots");
   const panel = page.getByTestId("bot-team-work");
-  await panel.getByLabel("目标 Bot").selectOption(bot.id);
+  await panel.getByLabel("执行 Bot").selectOption(bot.id);
   await panel.getByLabel("工作内容").fill("Reply with the word ready.");
   await panel.getByRole("button", { name: "分派任务", exact: true }).click();
   await expect(
@@ -253,9 +268,7 @@ test("group reply is shown automatically and stays out of private chat [AC:bot-r
       },
     })
   ).json();
-  await page.goto("/#/agents/bots");
-  const panel = page.getByTestId("bot-rooms");
-  await panel.getByRole("button", { name: room.title, exact: true }).click();
+  const panel = await openRoomSettings(page, room.title);
   await panel
     .getByLabel("群消息", { exact: true })
     .fill("Group-only anchor 93371. Reply ready.");
@@ -357,9 +370,7 @@ for (const routing of ['everyone', 'text-mention'] as const) {
     const host = await ensureReviewBot(request, `E2E Review Host ${routing}`);
     const member = await ensureReviewBot(request, `E2E Review Member ${routing}`);
     const { room } = await (await request.post('/api/bot-rooms', { data: { title: `Routing ${routing} ${suffix}`, botIds: [host.id, member.id], hostBotId: host.id } })).json();
-    await page.goto('/#/agents/bots');
-    const panel = page.getByTestId('bot-rooms');
-    await panel.getByRole('button', { name: room.title, exact: true }).click();
+    const panel = await openRoomSettings(page, room.title);
     await panel.getByLabel('群消息', { exact: true }).fill(routing === 'everyone' ? 'Reply ready.' : `@${member.id} Reply ready.`);
     const sent = page.waitForRequest(req => req.method() === 'POST' && req.url().endsWith(`/api/bot-rooms/${room.id}/messages`));
     await panel.getByRole('button', { name: '发送', exact: true }).click();
@@ -411,9 +422,7 @@ test('Room polling preserves access to messages across a missed page [AC:bot-roo
   // Pause so the burst stays user rows. A speaking member would insert replies and push item 1 past one older page.
   expect((await request.post(`/api/bot-rooms/${room.id}/stop`)).ok()).toBeTruthy();
   await request.post(`/api/bot-rooms/${room.id}/messages`, { data: { text: 'Room gap initial' } });
-  await page.goto('/#/agents/bots');
-  const panel = page.getByTestId('bot-rooms');
-  await panel.getByRole('button', { name: room.title, exact: true }).click();
+  const panel = await openRoomSettings(page, room.title);
   await expect(panel.getByRole('log')).toContainText('Room gap initial');
   let release!: () => void;
   const held = new Promise<void>(resolve => { release = resolve; });
@@ -439,14 +448,13 @@ test('switching Rooms clears the previous room draft, mentions and attachments [
     const { room } = await (await request.post('/api/bot-rooms', { data: { title: `Scope ${bot.id} ${Date.now()}`, botIds: [bot.id] } })).json();
     rooms.push({ bot, room });
   }
-  await page.goto('/#/agents/bots');
-  const panel = page.getByTestId('bot-rooms');
-  await panel.getByRole('button', { name: rooms[0].room.title, exact: true }).click();
+  const panel = await openRoomSettings(page, rooms[0].room.title);
   await panel.getByLabel('群消息', { exact: true }).fill('Draft for room A only');
   await panel.getByLabel('提及成员（可多选）').selectOption([rooms[0].bot.id]);
   // The existing attachment-reference field has a translated accessible name.
   await panel.getByLabel('附件引用（逗号分隔）').fill('room-a-attachment');
-  await panel.getByRole('button', { name: rooms[1].room.title, exact: true }).click();
+  await page.getByRole('button', { name: `打开群聊 ${rooms[1].room.title}`, exact: true }).click();
+  await page.getByRole('button', { name: '群聊设置', exact: true }).click();
   await expect(panel.getByLabel('群消息', { exact: true })).toHaveValue('');
   await expect(panel.getByLabel('提及成员（可多选）')).toHaveValues([]);
   await expect(panel.getByLabel('附件引用（逗号分隔）')).toHaveValue('');

@@ -81,6 +81,16 @@ export type GroupedPickerOptions = {
   options: ModelPickerOption[];
 };
 
+/** Real enabled catalog models eligible for the global default (including bootstrap providers). */
+export function globalDefaultModelOptions(data: ModelProvidersResponse | null | undefined): ModelPickerOption[] {
+  return (data?.catalog.providers ?? []).flatMap((p) => {
+    if (p.kind === 'heuristic' || p.source === 'builtin' || !p.baseUrl.trim() || !p.hasApiKey) return [];
+    return p.models.filter((m) => m.enabled).map((m) => ({
+      providerId: p.id, providerName: p.name, modelId: m.id, kind: p.kind, source: p.source
+    }));
+  });
+}
+
 export function parseManualModelIds(raw: string): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
