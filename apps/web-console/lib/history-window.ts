@@ -22,6 +22,15 @@ export function historyPollStale(
   return !active || currentRoomId !== polledRoomId || epochNow !== epochThen;
 }
 
+/**
+ * An older page fetched before a history reset (poll window reset, or another
+ * open() that bumped the epoch) must not be applied: its messages, cursor, and
+ * turns belong to the window that was replaced.
+ */
+export function olderHistoryPageStale(epochNow: number, epochThen: number): boolean {
+  return epochNow !== epochThen;
+}
+
 /** Older page is prepended (loaded ids win). A tail refresh replaces the window. */
 export function applyHistoryPage<T extends { id: string }>(loaded: T[], page: T[], older: boolean): T[] {
   return older ? prependHistoryPage(loaded, page) : page;
