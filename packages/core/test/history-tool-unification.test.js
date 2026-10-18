@@ -98,5 +98,5 @@ test('anonymous history keeps the current-session indexed messages and default c
 
 test('runtime exposes exactly one history_search and one history_read after upstream integration [AC:bot-history-memory#AC-1]',async()=>{
  const directory=mkdtempSync(join(tmpdir(),'history-catalog-'));const runtime=new RawAgentRuntime({repoRoot:directory,stateDir:join(directory,'state'),modelAdapter:{name:'catalog',async runTurn(){return {stopReason:'end',assistantParts:[{type:'text',text:'ok'}]};},async summarizeMessages(){return '';}}});
- try{for(const name of ['history_search','history_read'])assert.equal(runtime.tools.filter(tool=>tool.name===name).length,1,name);}finally{try{await runtime.destroy();}catch{try{runtime.store?.db?.close();}catch{/* already closed */}}rmSync(directory,{recursive:true,force:true});}
+ try{for(const name of ['history_search','history_read'])assert.equal(runtime.tools.filter(tool=>tool.name===name).length,1,name);}finally{await runtime.destroy();rmSync(directory,{recursive:true,force:true});}
 });

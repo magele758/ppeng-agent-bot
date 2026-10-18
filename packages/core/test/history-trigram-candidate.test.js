@@ -5,7 +5,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {SqliteStateStore} from '../dist/storage.js';
 import {SessionStore} from '../dist/stores/session-store.js';
-function fixture(){const dir=mkdtempSync(join(tmpdir(),'history-trigram-'));const store=new SqliteStateStore(join(dir,'db'));return {store,history:new SessionStore(store.db),close(){try{store.db.close();}catch{/* already closed */}rmSync(dir,{recursive:true,force:true});}};}
+function fixture(){const dir=mkdtempSync(join(tmpdir(),'history-trigram-'));const store=new SqliteStateStore(join(dir,'db'));return {store,history:new SessionStore(store.db),close(){if(store.db.isOpen)store.db.close();rmSync(dir,{recursive:true,force:true});}};}
 function expected(db,sessionId,query,opts={}){const clauses=["session_id=?", "(surface_op IS NULL OR surface_op='append')"],args=[sessionId];if(opts.beforeSeq){clauses.push('seq < ?');args.push(opts.beforeSeq);}if(opts.from){clauses.push('created_at >= ?');args.push(opts.from);}if(opts.to){clauses.push('created_at <= ?');args.push(opts.to);}const pattern='%'+query.trim().replace(/[\\%_]/g,'\\$&')+'%';clauses.push("EXISTS(SELECT 1 FROM json_each(parts_json) part WHERE json_extract(part.value,'$.text') LIKE ? ESCAPE '\\' OR json_extract(part.value,'$.content') LIKE ? ESCAPE '\\')");args.push(pattern,pattern);return db.prepare(`SELECT id FROM session_messages WHERE ${clauses.join(' AND ')} ORDER BY seq DESC LIMIT ?`).all(...args,(opts.limit??50)+1);}
 test('literal history search preserves substring Unicode special characters and part boundaries [AC:bot-history-memory#AC-1]',()=>{
  const f=fixture();try{const a=f.store.createSession({title:'a',mode:'chat',agentId:'bot'}),b=f.store.createSession({title:'b',mode:'chat',agentId:'bot'});
