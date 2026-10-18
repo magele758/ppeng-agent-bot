@@ -1,6 +1,8 @@
 id: chat-experience
 title: 对话页简洁易用
 status: implemented
+notes: |
+  AC-6 的入口位置已按负责人批准的 bot-entry-simplification AC-1、AC-4 同步：移除侧栏重复链接，通过当前 Bot 的权限设置进入其配置。
 requirement: |
   对话页配置太多、输入区拥挤、同一设置在多处重复。目标：输入区默认干净、次要选项收进一个紧凑的「会话设置」面板
   （常用在前，其余放进「高级」），全局设置只在「设置」页出现一次；会话列表清晰；工具调用 / 思考块默认折叠、可读。
@@ -27,5 +29,5 @@ criteria:
     then: 按日期分组，每项显示标题；只有运行中、等待审批、失败的会话才带状态标签；可按关键词筛选
   - id: AC-6
     given: 用户在 Bot 视图下
-    when: 查看空状态或会话设置
-    then: 有一个前往「Bots 与 Agents」管理 Bot 的入口，点击后进入该页面
+    when: 选中 Bot 并点击对话标题旁的权限设置入口
+    then: 进入「Bots 与 Agents」中对应 Bot 的配置；侧栏不再重复显示通用管理链接

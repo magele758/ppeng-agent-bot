@@ -3,8 +3,9 @@
 import type { ReactNode } from 'react';
 import type { BotInfo, SessionSummary } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
-import { sessionRowCopy } from '@/lib/session-row';
+import { sessionRowCopy, sessionWorkBotId } from '@/lib/session-row';
 import { BotFace } from './BotFace';
+import { useBotWorkMood } from './bot-work/BotWorkState';
 
 function isCoreExecAgent(id: string): boolean {
   return id === 'general' || id === 'main';
@@ -21,7 +22,9 @@ export function SessionListRow({
   status,
   onOpen,
   onToggleChecked,
-  onDelete
+  onDelete,
+  deleteAria,
+  deleteLabel
 }: {
   session: SessionSummary;
   bots: readonly BotInfo[];
@@ -34,6 +37,8 @@ export function SessionListRow({
   onOpen: () => void;
   onToggleChecked: (checked: boolean) => void;
   onDelete?: (title: string) => void;
+  deleteAria?: string;
+  deleteLabel?: string;
 }) {
   const { t } = useI18n();
   const copy = sessionRowCopy({
@@ -43,6 +48,8 @@ export function SessionListRow({
     emptyHint: t('play.sidebar.noQuestion'),
     unnamed: t('play.unnamed')
   });
+  const botId = sessionWorkBotId(session, bots);
+  const mood = useBotWorkMood(botId);
   const title = copy.title;
   const bot = copy.kind === 'bot';
   const faceName = copy.kind === 'bot' ? copy.faceName : '';
@@ -81,20 +88,14 @@ export function SessionListRow({
       ) : null}
       {bot ? (
         <span className="session-item__face" data-bot-face-slot="">
-          <BotFace name={faceName} />
+          <BotFace name={faceName} mood={mood} />
         </span>
       ) : null}
       <div className="session-item__body">
         <div className="session-item__title">{title}</div>
         <div className="session-item__meta">
           {status}
-          {bot ? (
-            <div className={`session-item__question${hasQuestion ? ' is-question' : ''}`}>
-              <span className="session-item__question-text">{subtitle}</span>
-            </div>
-          ) : session.agentId && !isCoreExecAgent(session.agentId) ? (
-            <span className="session-item__agent">{session.agentId}</span>
-          ) : null}
+          <SessionRowSubtitle bot={bot} subtitle={subtitle} hasQuestion={hasQuestion} agentId={session.agentId} />
         </div>
       </div>
       {onDelete && !selectMode ? (
@@ -102,15 +103,25 @@ export function SessionListRow({
           type="button"
           className="btn btn-ghost btn-sm session-item__delete"
           disabled={deleting}
-          aria-label={t('play.sidebar.deleteOneAria', { title })}
+          aria-label={deleteAria ?? t('play.sidebar.deleteOneAria', { title })}
           onClick={(event) => {
             event.stopPropagation();
             onDelete(title);
           }}
         >
-          {t('play.sidebar.deleteOne')}
+          {deleteLabel ?? t('play.sidebar.deleteOne')}
         </button>
       ) : null}
     </div>
   );
+}
+
+function SessionRowSubtitle({ bot, subtitle, hasQuestion, agentId }: { bot: boolean; subtitle: string; hasQuestion: boolean; agentId?: string }) {
+  return bot ? (
+    <div className={`session-item__question${hasQuestion ? ' is-question' : ''}`}>
+      <span className="session-item__question-text">{subtitle}</span>
+    </div>
+  ) : agentId && !isCoreExecAgent(agentId) ? (
+    <span className="session-item__agent">{agentId}</span>
+  ) : null;
 }

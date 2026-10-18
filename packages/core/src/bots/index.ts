@@ -43,6 +43,8 @@ export {
 } from './bot-appearance.js';
 export type { BotFaceColor, BotFaceShape } from './bot-appearance.js';
 export { BotStore } from './bot-store.js';
+export { BotFunctionalGroupService } from './functional-groups.js';
+export type { BotFunctionalGroup, BotSharedScope } from './functional-groups.js';
 export {
   botInstructions,
   canonicalBotChatTitle,

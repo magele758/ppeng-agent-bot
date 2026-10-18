@@ -154,6 +154,7 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
     ['GET /api/bot-rooms', selfFiltered('bot-room')],
     ['POST /api/bot-rooms', selfFiltered('bot-room')],
     ['GET /api/bot-rooms/:id', selfFiltered('bot-room')],
+    ['DELETE /api/bot-rooms/:id', selfFiltered('bot-room')],
     ['PATCH /api/bot-rooms/:id', selfFiltered('bot-room')],
     ['POST /api/bot-rooms/:id/members', selfFiltered('bot-room')],
     ['DELETE /api/bot-rooms/:id/members/:botId', selfFiltered('bot-room')],
@@ -271,6 +272,13 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
 
     // bots + cron
     ['GET /api/bots', selfFiltered('bot')],
+    ['GET /api/bot-functional-groups', selfFiltered('bot-functional-group')],
+    ['POST /api/bot-functional-groups', selfFiltered('bot-functional-group')],
+    ['PATCH /api/bot-functional-groups/:id', selfFiltered('bot-functional-group')],
+    ['DELETE /api/bot-functional-groups/:id', selfFiltered('bot-functional-group')],
+    ['PUT /api/bots/:id/functional-group', selfFiltered('bot-functional-group')],
+    ['GET /api/bot-shared-context', selfFiltered('bot-shared-context')],
+    ['PUT /api/bot-shared-context', selfFiltered('bot-shared-context')],
     ['POST /api/bots', selfFiltered('bot')],
     ['GET /api/bots/:id', owner('bot', byParam('id', (id) => botRef(l, id)), 'allow')],
     ['PATCH /api/bots/:id', owner('bot', byParam('id', (id) => botRef(l, id)), 'admin')],

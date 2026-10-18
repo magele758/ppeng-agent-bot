@@ -572,7 +572,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     setModelCatalog(data);
     const pickerOptions = catalogToPickerOptions(data);
     setModelOptions(pickerOptions);
-    setModelRef((cur) => resolvePickerModelRef(pickerOptions, cur, data.catalog?.defaultRef ?? null));
+    setModelRef((cur) => cur ? resolvePickerModelRef(pickerOptions, cur) : null);
   }, []);
 
   useEffect(() => {
@@ -725,8 +725,7 @@ export function usePlayChat(deps: PlayChatDeps) {
   );
 
   const saveModelRef = useCallback(
-    async (next: ModelRef) => {
-      setModelRef(next);
+    async (next: ModelRef | null) => {
       const sid = selectedSessionRef.current;
       try {
         if (sid) {
@@ -736,11 +735,7 @@ export function usePlayChat(deps: PlayChatDeps) {
             body: JSON.stringify({ modelRef: next })
           });
         }
-        await api('/api/model-providers/default', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ defaultRef: next })
-        });
+        setModelRef(next);
       } catch (e) {
         setPlayStatus({ text: e instanceof Error ? e.message : String(e), err: true });
       }

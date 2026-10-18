@@ -1,6 +1,7 @@
 import { resolveBotPrincipal, BotQueueCapacityError, type BotRoomService, type RawAgentRuntime } from '@ppeng/agent-core';
 import type { RouteSpec, RouteContext } from '../routing.js';
 import { json } from '../http-utils.js';
+import { roomModelConfiguration } from './bot-room-models.js';
 
 /** All operations enforce Room principal ownership, including administrator requests. */
 export function botRoomsRoutes(runtime: RawAgentRuntime & { rooms: BotRoomService }): RouteSpec[] {
@@ -11,7 +12,8 @@ export function botRoomsRoutes(runtime: RawAgentRuntime & { rooms: BotRoomServic
   return [
     {method:'GET',pattern:'/api/bot-rooms',handler:ctx=>{json(ctx.response,200,{rooms:rooms.list(principal(ctx))});}},
     {method:'POST',pattern:'/api/bot-rooms',handler:async ctx=>{const input=await body(ctx);const room=rooms.create(principal(ctx),{title:typeof input.title==='string'?input.title:'',botIds:input.botIds as string[],hostBotId:input.hostBotId as string|undefined,maxBotTurns:input.maxBotTurns as number|undefined,maxToolCalls:input.maxToolCalls as number|undefined,maxCostUsd:input.maxCostUsd as number|undefined});json(ctx.response,201,{room});}},
-    {method:'GET',pattern:'/api/bot-rooms/:id',handler:ctx=>{json(ctx.response,200,{room:rooms.get(principal(ctx),ctx.requireParam('id'))});}},
+    {method:'GET',pattern:'/api/bot-rooms/:id',handler:ctx=>{const owner=principal(ctx);const room=rooms.get(owner,ctx.requireParam('id'));json(ctx.response,200,{room,models:roomModelConfiguration(runtime,room,owner)});}},
+    {method:'DELETE',pattern:'/api/bot-rooms/:id',handler:ctx=>{rooms.delete(principal(ctx),ctx.requireParam('id'));json(ctx.response,200,{deleted:true});}},
     {method:'PATCH',pattern:'/api/bot-rooms/:id',handler:async ctx=>{const input=await body(ctx);const room=rooms.patch(principal(ctx),ctx.requireParam('id'),input);json(ctx.response,200,{room});wake();}},
     {method:'POST',pattern:'/api/bot-rooms/:id/members',handler:async ctx=>{const input=await body(ctx);const room=rooms.addMember(principal(ctx),ctx.requireParam('id'),typeof input.botId==='string'?input.botId:'');json(ctx.response,200,{room});}},
     {method:'DELETE',pattern:'/api/bot-rooms/:id/members/:botId',handler:ctx=>{json(ctx.response,200,{room:rooms.removeMember(principal(ctx),ctx.requireParam('id'),ctx.requireParam('botId'))});}},

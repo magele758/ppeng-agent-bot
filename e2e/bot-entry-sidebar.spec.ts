@@ -1,0 +1,136 @@
+import { test, expect } from '@playwright/test';
+
+test.beforeAll(async ({ request }) => {
+ const { bots } = await (await request.get('/api/bots')).json();
+ for (let index = bots.filter((bot: { hidden?: boolean }) => !bot.hidden).length; index < 2; index++) {
+  const response = await request.post('/api/bots', { data: { name: `Entry fixture ${Date.now()} ${index}` } });
+  expect(response.ok()).toBeTruthy();
+ }
+});
+
+test('one accessible New menu opens dedicated creation without losing the current view [AC:bot-entry-simplification#AC-1] [AC:bot-entry-simplification#AC-2]', async ({page}) => {
+ await page.goto('/#/bot');
+ const sidebar=page.locator('#panel-play.active .play-sidebar');
+ await expect(sidebar.locator('.play-sidebar__head a')).toHaveCount(0);
+ await expect(sidebar.getByTestId('play-group-create')).toHaveCount(0);
+ const create=sidebar.locator('#btnPlayCreate'); await expect(create).toHaveText('新建');
+ await create.hover(); await expect(sidebar.getByRole('menu')).toBeVisible();
+ const itemBounds=await sidebar.getByRole('menuitem').first().boundingBox();expect(itemBounds).toBeTruthy();await page.mouse.move(itemBounds!.x+itemBounds!.width/2,itemBounds!.y+itemBounds!.height/2,{steps:20});await expect(sidebar.getByRole('menu')).toBeVisible();
+ await expect(sidebar.getByRole('menuitem')).toHaveCount(3);
+ await sidebar.getByRole('menuitem',{name:'新建 Bot',exact:true}).click();
+ const dialog=page.getByRole('dialog'); await expect(dialog.getByTestId('bot-create')).toBeVisible();
+ await expect(dialog.getByTestId('bot-group-create')).toHaveCount(0);
+ await page.keyboard.press('Escape'); await expect(dialog).toHaveCount(0); await expect(create).toBeFocused(); await expect(page).toHaveURL(/#\/bot$/);
+ await create.focus(); await create.press('ArrowDown'); await expect(sidebar.getByRole('menuitem').first()).toBeFocused();
+ await page.keyboard.press('Escape'); await expect(sidebar.getByRole('menu')).toHaveCount(0);
+ await create.click(); await sidebar.getByRole('menuitem',{name:'新建群聊',exact:true}).click();
+ await expect(dialog.getByTestId('bot-group-create')).toBeVisible(); await dialog.getByRole('button',{name:'取消',exact:true}).click();
+ await create.click(); await sidebar.getByRole('menuitem',{name:'新建功能分组',exact:true}).click();
+ await expect(page.getByRole('dialog').getByRole('textbox')).toBeVisible(); await page.getByRole('dialog').getByRole('button',{name:'取消',exact:true}).click();
+});
+
+test('dedicated room and functional group creation report failures then show saved objects immediately [AC:bot-entry-simplification#AC-3]',async({page})=>{
+ const {bots}=await (await page.request.get('/api/bots')).json(); expect(bots.length).toBeGreaterThan(1);
+ const rooms: any[]=[];const groups: any[]=[];let fail=true;
+ await page.route('**/api/bot-rooms',route=>{
+  if(route.request().method()==='GET')return route.fulfill({json:{rooms}});
+  if(fail)return route.fulfill({status:503,json:{error:'Room unavailable'}});
+  const room={...route.request().postDataJSON(),id:'entry-room',status:'active'};rooms.push(room);return route.fulfill({json:{room}});
+ });
+ await page.route('**/api/bot-functional-groups',route=>{
+  if(route.request().method()==='GET')return route.fulfill({json:{groups}});
+  if(fail)return route.fulfill({status:503,json:{error:'Group unavailable'}});
+  const group={...route.request().postDataJSON(),id:'entry-functional',botIds:[]};groups.push(group);return route.fulfill({json:{group}});
+ });
+ await page.goto('/#/bot');const newMenu=async(name:string)=>{await page.locator('#btnPlayCreate').click();await page.getByRole('menuitem',{name,exact:true}).click();};
+ await newMenu('新建群聊');const dialog=page.getByRole('dialog');
+ await dialog.getByTestId('bot-group-name').fill('Entry room');
+ for(const bot of bots.slice(0,2))await dialog.getByTestId(`bot-group-member-${bot.id}`).check();
+ await dialog.locator('button[type=submit]').click();await expect(dialog.getByRole('alert').filter({hasText:'Room unavailable'})).toBeVisible();expect(rooms).toHaveLength(0);
+ fail=false;await dialog.locator('button[type=submit]').click();await expect(dialog).toHaveCount(0);await expect(page.getByRole('button',{name:'打开群聊 Entry room',exact:true})).toBeVisible();expect(rooms).toHaveLength(1);
+ fail=true;await newMenu('新建功能分组');await dialog.getByRole('textbox').fill('Entry functional');await dialog.locator('button[type=submit]').click();await expect(dialog.getByRole('alert')).toContainText('Group unavailable');expect(groups).toHaveLength(0);
+ fail=false;await dialog.locator('button[type=submit]').click();await expect(dialog).toHaveCount(0);await expect(page.getByTestId('functional-group-entry-functional')).toContainText('Entry functional');expect(groups).toHaveLength(1);
+});
+
+test('Bot removal names its preserved data and failure preserves the Bot [AC:bot-entry-simplification#AC-7]',async({page})=>{
+ const {bots}=await(await page.request.get('/api/bots')).json();const bot=bots.find((b:any)=>!b.hidden);expect(bot).toBeTruthy();let writes=0;let fail=true;let removed=false;
+ await page.route('**/api/bots',route=>route.fulfill({json:{bots:bots.map((b:any)=>b.id===bot.id&&removed?{...b,hidden:true}:b)}}));
+ await page.route(`**/api/bots/${bot.id}`,route=>{writes++;if(!fail)removed=true;return fail?route.fulfill({status:503,json:{error:'Removal unavailable'}}):route.fulfill({json:{bot:{...bot,hidden:true}}});});
+ await page.goto('/#/bot');const remove=page.getByRole('button',{name:`移除 Bot「${bot.name}」`,exact:true});await expect(remove).toBeVisible();
+ page.once('dialog',async d=>{expect(d.message()).toContain(bot.name);expect(d.message()).toContain('不会删除会话');await d.dismiss();});await remove.click();expect(writes).toBe(0);await expect(remove).toBeVisible();
+ page.once('dialog',d=>d.accept());await remove.click();await expect(page.getByRole('alert').filter({hasText:'Removal unavailable'})).toBeVisible();await expect(remove).toBeVisible();
+ fail=false;page.once('dialog',d=>d.accept());await remove.click();await expect(remove).toHaveCount(0);await expect(page.getByLabel(`移动 ${bot.name} 到功能分组`,{exact:true})).toHaveCount(0);expect(writes).toBe(2);
+});
+
+test('functional group deletion confirms retained members and preserves them on cancellation or failure [AC:bot-entry-simplification#AC-7]',async({page})=>{
+ const {bots}=await(await page.request.get('/api/bots')).json();const bot=bots.find((b:any)=>!b.hidden);let exists=true;let fail=true;let writes=0;
+ await page.route('**/api/bot-functional-groups**',route=>{
+  if(route.request().method()==='GET')return route.fulfill({json:{groups:exists?[{id:'remove-probe',name:'Remove probe',botIds:[bot.id]}]:[]}});
+  writes++;if(fail)return route.fulfill({status:503,json:{error:'Group removal unavailable'}});exists=false;return route.fulfill({json:{ok:true}});
+ });
+ await page.goto('/#/bot');const group=page.getByTestId('functional-group-remove-probe');const remove=group.getByRole('button',{name:'删除功能分组',exact:true});await expect(group).toContainText(bot.name);
+ page.once('dialog',async d=>{expect(d.message()).toContain('Remove probe');expect(d.message()).toContain('Bot 将回到未分组');await d.dismiss();});await remove.click();expect(writes).toBe(0);await expect(group).toBeVisible();
+ page.once('dialog',d=>d.accept());await remove.click();await expect(page.getByRole('alert').filter({hasText:'Group removal unavailable'})).toBeVisible();await expect(group).toContainText(bot.name);
+ fail=false;page.once('dialog',d=>d.accept());await remove.click();await expect(group).toHaveCount(0);await expect(page.getByTestId('functional-group-ungrouped')).toContainText(bot.name);expect(writes).toBe(2);
+});
+
+
+test('Bot rows have no move control or footer while chat and confirmed removal remain available [AC:bot-group-drag-only#AC-1]', async ({ page }) => {
+ const { bots } = await (await page.request.get('/api/bots')).json();
+ const bot = bots.find((item: { hidden?: boolean }) => !item.hidden);
+ expect(bot).toBeTruthy();
+ await page.goto('/#/bot');
+ const row = page.locator('#sessionListMini [draggable="true"]').filter({ has: page.getByRole('button', { name: `移除 Bot「${bot.name}」`, exact: true }) });
+ await expect(row).toHaveCount(1);
+ await expect(page.getByRole('combobox', { name: /^移动 .* 到功能分组$/ })).toHaveCount(0);
+ const chatRow = row.locator('.list-item--session');
+ const wrapperBox = await row.boundingBox();
+ const chatBox = await chatRow.boundingBox();
+ expect(wrapperBox).toBeTruthy(); expect(chatBox).toBeTruthy();
+ expect(Math.abs(wrapperBox!.height - chatBox!.height)).toBeLessThanOrEqual(1);
+ await chatRow.click();
+ await expect(page.locator('#playTitle')).toContainText(bot.name);
+ let confirms = 0;
+ page.once('dialog', async dialog => { confirms++; expect(dialog.message()).toContain(bot.name); await dialog.dismiss(); });
+ await row.getByRole('button', { name: `移除 Bot「${bot.name}」`, exact: true }).click();
+ expect(confirms).toBe(1);
+ await expect(row).toBeVisible();
+});
+
+test('drag-only grouping persists successful moves and restores failed moves without losing the conversation [AC:bot-group-drag-only#AC-2]', async ({ page }) => {
+ const { bots } = await (await page.request.get('/api/bots')).json();
+ const bot = bots.find((item: { hidden?: boolean }) => !item.hidden);
+ expect(bot).toBeTruthy();
+ const groups = [{ id: 'drag-source', name: 'Drag source', botIds: [bot.id] }, { id: 'drag-target', name: 'Drag target', botIds: [] as string[] }];
+ let fail = false; let writes = 0;
+ await page.route('**/api/bot-functional-groups', route => route.fulfill({ json: { groups } }));
+ await page.route(`**/api/bots/${bot.id}/functional-group`, async route => {
+  writes++;
+  await new Promise(resolve => setTimeout(resolve, 300));
+  if (fail) return route.fulfill({ status: 503, json: { error: 'Drag save unavailable' } });
+  const groupId = route.request().postDataJSON().groupId;
+  for (const group of groups) group.botIds = group.botIds.filter(id => id !== bot.id);
+  groups.find(group => group.id === groupId)?.botIds.push(bot.id);
+  return route.fulfill({ json: { bot } });
+ });
+ await page.goto('/#/bot');
+ const source = page.getByTestId('functional-group-drag-source');
+ const target = page.getByTestId('functional-group-drag-target');
+ const ungrouped = page.getByTestId('functional-group-ungrouped');
+ const rowIn = (container: typeof source) => container.locator('.list-item--session').filter({ hasText: bot.name });
+ await rowIn(source).dragTo(target.locator('h3'));
+ await expect(rowIn(target)).toBeVisible();
+ await expect.poll(() => groups[1].botIds).toContain(bot.id);
+ await page.reload(); await expect(rowIn(target)).toBeVisible();
+ await rowIn(target).dragTo(ungrouped.locator('h3'));
+ await expect(rowIn(ungrouped)).toBeVisible();
+ await expect.poll(() => groups[1].botIds).toEqual([]);
+ await page.reload(); await expect(rowIn(ungrouped)).toBeVisible();
+ fail = true;
+ await rowIn(ungrouped).dragTo(source.locator('h3'));
+ await expect(page.getByRole('alert').filter({ hasText: 'Drag save unavailable' })).toBeVisible();
+ await expect(rowIn(ungrouped)).toBeVisible(); await expect(rowIn(source)).toHaveCount(0);
+ await rowIn(ungrouped).click(); await expect(page.locator('#playTitle')).toContainText(bot.name);
+ expect((await page.request.get(`/api/sessions/${bot.canonicalSessionId}`)).ok()).toBeTruthy();
+ expect(writes).toBe(3);
+});

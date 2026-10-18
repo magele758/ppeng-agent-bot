@@ -116,3 +116,8 @@ export function sessionRowCopy(input: {
     faceName
   };
 }
+
+/** Resolve activity ownership using the same canonical identity as the row. */
+export function sessionWorkBotId(session: SessionRowSession, bots: readonly BotInfo[]): string {
+  return botForCanonicalSession(bots, session.id, [session])?.id ?? metadataString(session.metadata, 'botId');
+}

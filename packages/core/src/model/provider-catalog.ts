@@ -5,6 +5,7 @@
  */
 
 import { createId, nowIso } from '../id.js';
+import { ValidationError } from '../errors.js';
 import {
   AnthropicCompatibleAdapter,
   HeuristicModelAdapter,
@@ -186,7 +187,7 @@ export function readSessionModelOverride(
 
 function providerUsable(provider: ModelProvider | undefined): provider is ModelProvider {
   if (!provider) return false;
-  return provider.kind === 'heuristic' || (provider.apiKey.trim() !== '' && provider.baseUrl.trim() !== '');
+  return provider.kind === 'heuristic' || Boolean(provider.apiKey?.trim() && provider.baseUrl?.trim());
 }
 
 /**
@@ -245,7 +246,13 @@ export function resolveSessionPreferredRef(
   }
   const fromSession = modelRefFromSession(session);
   if (fromSession) return { ref: fromSession, source: 'session', overrideSkipped };
-  if (catalog.defaultRef) return { ref: catalog.defaultRef, source: 'default', overrideSkipped };
+  if (catalog.defaultRef || catalog.providers.some((p) => providerUsable(p) && p.models.some((m) => m.enabled))) {
+    const ref = availableDefaultRef(catalog, env);
+    // An unavailable default must not promote the heuristic last resort ahead of injected adapters.
+    if (ref.providerId !== HEURISTIC_PROVIDER_ID || resolveModelOverrideRef(catalog, catalog.defaultRef ?? undefined, env)) {
+      return { ref, source: 'default', overrideSkipped };
+    }
+  }
   return { source: 'none', overrideSkipped };
 }
 
@@ -453,8 +460,9 @@ export function upsertProvider(store: ModelProvidersStore, input: Partial<ModelP
     return merged;
   }
   catalog.providers.push(incoming);
-  if (!catalog.defaultRef && incoming.models[0]) {
-    catalog.defaultRef = { providerId: incoming.id, modelId: incoming.models[0]!.id };
+  const firstEnabled = incoming.models.find((m) => m.enabled);
+  if (!catalog.defaultRef && firstEnabled) {
+    catalog.defaultRef = { providerId: incoming.id, modelId: firstEnabled.id };
   }
   writeModelCatalog(store, catalog);
   return incoming;
@@ -505,8 +513,11 @@ export function deleteProvider(store: ModelProvidersStore, id: string): boolean 
   return true;
 }
 
-export function setCatalogDefaultRef(store: ModelProvidersStore, ref: ModelRef | null): ModelProviderCatalog {
+export function setCatalogDefaultRef(store: ModelProvidersStore, ref: ModelRef | null, env: NodeJS.ProcessEnv = process.env): ModelProviderCatalog {
   const catalog = readModelCatalog(store);
+  if (ref && !resolveModelOverrideRef(catalog, ref, env)) {
+    throw new ValidationError('Selected model is no longer available or enabled. Refresh the model list and retry.');
+  }
   return writeModelCatalog(store, { ...catalog, defaultRef: ref });
 }
 
@@ -722,6 +733,14 @@ function asModelRef(ref: { providerId: string; modelId: string } | null | undefi
   return { providerId: ref.providerId, modelId: ref.modelId };
 }
 
+/** Validate saved defaults on every read, including after a model is disabled or removed. */
+function availableDefaultRef(catalog: ModelProviderCatalog, env: NodeJS.ProcessEnv): ModelRef {
+  const saved = resolveModelOverrideRef(catalog, catalog.defaultRef ?? undefined, env);
+  if (saved) return saved;
+  const options = pickerOptions(catalog, env).filter((o) => providerUsable(findProvider(catalog, o.providerId, env)));
+  return asModelRef(options.find((o) => o.kind !== 'heuristic') ?? options[0]);
+}
+
 export function publicCatalogPayload(store: ModelProvidersStore, env: NodeJS.ProcessEnv = process.env) {
   const catalog = readModelCatalog(store);
   const envP = envFallbackProvider(env);
@@ -732,7 +751,7 @@ export function publicCatalogPayload(store: ModelProvidersStore, env: NodeJS.Pro
   if (envP) providers.push(publicProvider(envP, 'env'));
   const options = pickerOptions(catalog, env);
   const persisted = hasPersistedModelCatalog(store);
-  const defaultRef = asModelRef(catalog.defaultRef ?? options[0]);
+  const defaultRef = availableDefaultRef(catalog, env);
   return {
     catalog: {
       providers,
@@ -755,13 +774,7 @@ export function resolveDefaultModelRef(
   env: NodeJS.ProcessEnv = process.env
 ): ModelRef {
   const catalog = readModelCatalog(store);
-  if (catalog.defaultRef) return catalog.defaultRef;
-  const opts = pickerOptions(catalog, env);
-  const firstUi = opts.find((o) => o.source === 'ui');
-  if (firstUi) return { providerId: firstUi.providerId, modelId: firstUi.modelId };
-  const envOpt = opts.find((o) => o.source === 'env');
-  if (envOpt) return { providerId: envOpt.providerId, modelId: envOpt.modelId };
-  return heuristicRef();
+  return availableDefaultRef(catalog, env);
 }
 
 export function mergeModelRefMetadata(
@@ -771,11 +784,16 @@ export function mergeModelRefMetadata(
   env: NodeJS.ProcessEnv = process.env
 ): Record<string, unknown> {
   const extra = { ...(metadata ?? {}) };
+  if (body.modelRef === null) {
+    delete extra.modelRef;
+    return extra;
+  }
   const fromBody =
     parseModelRef(body.modelRef) ??
     (typeof body.providerId === 'string' && typeof body.modelId === 'string'
       ? parseModelRef({ providerId: body.providerId, modelId: body.modelId })
       : parseModelRef(extra.modelRef));
-  extra.modelRef = fromBody ?? resolveDefaultModelRef(store, env);
+  if (fromBody) extra.modelRef = fromBody;
+  else delete extra.modelRef;
   return extra;
 }

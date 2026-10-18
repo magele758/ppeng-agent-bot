@@ -36,7 +36,7 @@ export const agents = {
     searchAria: '搜索 Bot',
     agentChip: 'Agent：{agent}',
     createTitle: '新建 Bot',
-    createDesc: '起一个名字即可。图标和其他选项都可以稍后修改。',
+    createDesc: '起一个名字，选择喜欢的脸型和颜色。不选则按名称自动生成。',
     nameLabel: '名称',
     namePh: '给你的 Bot 起个名字',
     nameHint: '会出现在名单和对话里，不能和已有 Bot 重名。',

@@ -20,6 +20,7 @@ export function BotFaceChoice({
   onShape,
   onColor,
   disabled,
+  showLabels = false,
   children
 }: {
   name: string;
@@ -28,6 +29,7 @@ export function BotFaceChoice({
   onShape: (shape: BotFaceShape) => void;
   onColor: (color: BotFaceColor) => void;
   disabled?: boolean;
+  showLabels?: boolean;
   children?: ReactNode;
 }) {
   const { t } = useI18n();
@@ -49,7 +51,7 @@ export function BotFaceChoice({
       </div>
       {children}
       <div className="bot-face-choice__group">
-        <span className="sr-only" id={shapeLabelId}>
+        <span className={showLabels ? 'ag-field__label' : 'sr-only'} id={shapeLabelId}>
           {t('agents.bots.faceShapeLabel')}
         </span>
         <div className="bot-face-choice__shapes" role="group" aria-labelledby={shapeLabelId}>
@@ -68,7 +70,7 @@ export function BotFaceChoice({
         </div>
       </div>
       <div className="bot-face-choice__group">
-        <span className="sr-only" id={colorLabelId}>
+        <span className={showLabels ? 'ag-field__label' : 'sr-only'} id={colorLabelId}>
           {t('agents.bots.faceColorLabel')}
         </span>
         <div className="bot-face-choice__colors" role="group" aria-labelledby={colorLabelId}>

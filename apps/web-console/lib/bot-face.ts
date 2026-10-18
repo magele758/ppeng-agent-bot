@@ -318,7 +318,7 @@ function drawnSilhouette(shape: BotFaceShape | null, color: BotFaceColor | null)
 function restingMouth(expression: LivingFaceExpression): { kind: MouthKind; open: number } {
   if (expression === 'talk') return { kind: 'open', open: 0.45 };
   if (expression === 'surprised') return { kind: 'oh', open: 0 };
-  return { kind: 'rest', open: 0 };
+  return { kind: expression === 'rest' ? 'smile' : 'rest', open: 0 };
 }
 
 /**
@@ -708,4 +708,15 @@ function clamp01(value: number): number {
 function wrap01(phase: number): number {
   const x = phase % 1;
   return x < 0 ? x + 1 : x;
+}
+
+/** Mouth motion follows the clock even when no stream tokens arrive. */
+export function talkingMouthAmount(gesture: string, reduced: boolean, now: number): number {
+  if (gesture !== 'talk') return 0;
+  return reduced ? 0.45 : speakingMouth((now % 520) / 520);
+}
+
+/** Open mouths are filled; smiles and resting mouths use an outline. */
+export function mouthFilled(kind: MouthKind): boolean {
+  return kind === 'open' || kind === 'oh';
 }

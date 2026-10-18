@@ -31,17 +31,15 @@ test.describe('Agent Lab console', () => {
     await page.locator('#nav-chat').click();
     await expect(page.locator('#botSelect')).toHaveCount(0);
 
-    // 创建 Bot 的入口只在 Bots 页（对话页不再内嵌创建表单）
+    // 统一新建入口在独立弹窗里创建，保留当前对话。
     await page.getByRole('button', { name: '新增' }).click();
     await page.getByRole('menuitem', { name: '新建 Bot', exact: true }).click();
-    await expect(page).toHaveURL(/#\/agents\/bots/);
-    await expect(page.locator('#section-agents')).toBeVisible();
+    await expect(page).toHaveURL(/#\/chat/);
+    await expect(page.getByRole('dialog', { name: '新建 Bot' })).toBeVisible();
     await expect(page.locator('#composerBotForm')).toHaveCount(0);
-    await page.getByRole('button', { name: '新建 Bot' }).first().click();
     const form = page.getByRole('form', { name: '新建 Bot' });
     await expect(form).toBeVisible();
     await expect(form.getByLabel('名称')).toBeVisible();
-    await form.getByRole('button', { name: /高级/ }).click();
     await expect(form.getByLabel('显示标题')).toBeVisible();
     await expect(form.getByLabel('描述')).toBeVisible();
   });

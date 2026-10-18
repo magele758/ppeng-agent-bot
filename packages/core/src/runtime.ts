@@ -254,6 +254,7 @@ export class RawAgentRuntime {
   private readonly sessionAbortControllers = new Map<string, AbortController>();
   /** Tracks sessions currently in runSession() to prevent concurrent runs on the same session. */
   private readonly runningSessions = new Map<string, Promise<SessionRecord>>();
+  private readonly pendingTraceWrites = new Map<string, Set<Promise<void>>>();
   /** Late subscribers (Lab follow after ask_user) receive chunks from the in-flight run. */
   private readonly modelStreamListeners = new Map<string, Set<(chunk: ModelStreamChunk) => void>>();
   private readonly sessionRunWaiters = new Map<string, Set<(run: Promise<SessionRecord>) => void>>();
@@ -543,6 +544,12 @@ export class RawAgentRuntime {
     return this.runningSessions.has(sessionId);
   }
 
+  /** Process-local ownership excludes orphaned durable jobs after a restart. */
+  isBackgroundJobRunning(jobId: string): boolean {
+    const controller = this.backgroundJobAborts.get(jobId);
+    return Boolean(controller && !controller.signal.aborted);
+  }
+
   hasUnconfirmedEffects(sessionId: string, startedAt: string): boolean {
     return this.connectors.software.unconfirmedForSession(sessionId, startedAt).length > 0;
   }
@@ -774,6 +781,9 @@ export class RawAgentRuntime {
   }
 
   async listTraceEvents(sessionId: string, limit?: number): Promise<TraceEvent[]> {
+    // Trace emission remains non-blocking for model/tool execution. Readers must
+    // nevertheless see the writes that were already emitted when they asked.
+    await Promise.all(this.pendingTraceWrites.get(sessionId) ?? []);
     return readSessionTraceEvents(this.stateDir, sessionId, limit ?? 500);
   }
 
@@ -1598,7 +1608,18 @@ export class RawAgentRuntime {
   /** Trace JSONL on disk; optional PG fan-out when `EVENT_BUFFER_PROVIDER=redis_postgres`. */
   private emitTrace(sessionId: string, rawEvent: Omit<TraceEvent, 'ts' | 'sessionId'>): void {
     const event = attachServedByToTrace(sessionId, rawEvent);
-    void appendTraceEvent(this.stateDir, sessionId, event, this.traceCloudOptions);
+    const write = appendTraceEvent(this.stateDir, sessionId, event, this.traceCloudOptions);
+    const pending = this.pendingTraceWrites.get(sessionId) ?? new Set<Promise<void>>();
+    this.pendingTraceWrites.set(sessionId, pending);
+    pending.add(write);
+    const settled = () => {
+      pending.delete(write);
+      if (pending.size === 0) this.pendingTraceWrites.delete(sessionId);
+    };
+    void write.then(settled, (error) => {
+      settled();
+      console.warn('[runtime] trace write failed', error);
+    });
     void mirrorTraceToLangfuse(this.store, sessionId, event);
   }
 

@@ -110,8 +110,8 @@ function maybeMergeOptionalGroupsFromBody(
     }
   }
   const modelRef = parseModelRef(body.modelRef) ?? parseModelRef(body);
-  if (modelRef) {
-    runtime.mergeSessionMetadata(sessionId, { modelRef });
+  if (modelRef || body.modelRef === null) {
+    runtime.mergeSessionMetadata(sessionId, { modelRef: modelRef ?? null });
   }
 }
 
@@ -716,8 +716,8 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
           runtime.mergeSessionMetadata(id, bind.patch);
         }
         const modelRef = parseModelRef(body.modelRef) ?? parseModelRef(body);
-        if (modelRef) {
-          runtime.mergeSessionMetadata(id, { modelRef });
+        if (modelRef || body.modelRef === null) {
+          runtime.mergeSessionMetadata(id, { modelRef: modelRef ?? null });
         }
         const sessionPatch: Partial<Omit<SessionRecord, 'id' | 'createdAt'>> = {};
         if (typeof body.agentId === 'string' && body.agentId.trim()) {

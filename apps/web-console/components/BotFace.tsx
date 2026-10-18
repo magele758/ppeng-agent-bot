@@ -15,11 +15,12 @@ import {
   hoverDelight,
   mouthKindForGesture,
   mouthPath,
+  mouthFilled,
   nextIdleLook,
   resolveEyePose,
   resolveFaceGesture,
   sleepyBreath,
-  speakingMouth,
+  talkingMouthAmount,
   stepBlinkClock,
   turnFinishHappyUntil,
   type BotFaceColor,
@@ -28,6 +29,7 @@ import {
   type MouthKind
 } from '@/lib/bot-face';
 import { useSavedFace } from './BotFaceCatalog';
+import { useI18n } from '@/lib/i18n';
 import './bot-face.css';
 
 export interface BotFaceProps {
@@ -194,9 +196,27 @@ function mouthVisible(kind: MouthKind): boolean {
   return kind !== 'rest';
 }
 
+function updateMouth(root: SVGSVGElement, gesture: ReturnType<typeof resolveFaceGesture>, reduced: boolean, now: number) {
+  const mouth = root.querySelector('[data-mouth]');
+  if (!mouth) return;
+  const y = Number(mouth.getAttribute('data-y'));
+  const kind = mouthKindForGesture(gesture);
+  const amount = talkingMouthAmount(gesture, reduced, now);
+  const ink = root.getAttribute('data-eye-ink') || '#fff';
+  mouth.setAttribute('d', mouthPath(kind, y, amount));
+  mouth.setAttribute('opacity', mouthVisible(kind) ? '1' : '0');
+  if (mouthFilled(kind)) {
+    mouth.setAttribute('fill', ink);
+    mouth.setAttribute('stroke', 'none');
+  } else {
+    mouth.setAttribute('fill', 'none');
+    mouth.setAttribute('stroke', ink);
+  }
+}
+
 /**
- * Original living icon. Resting face is a flat silhouette and two eyes.
- * Happy keeps a small smile; the heavier cute marks stay off the resting face.
+ * Original living icon. Idle faces hold an alert, friendly smile.
+ * Motion and working expressions only run during an active turn.
  */
 export function BotFace({
   name,
@@ -209,6 +229,9 @@ export function BotFace({
   color: colorProp
 }: BotFaceProps) {
   const svgRef = useRef<SVGSVGElement>(null);
+  const { t } = useI18n();
+  const working = mood !== 'idle';
+  const workLabel = t('play.faceMotion.working');
   const moodRef = useRef(mood);
   const hoverAtRef = useRef<number | null>(null);
   const happyUntilRef = useRef<number | null>(null);
@@ -228,6 +251,17 @@ export function BotFace({
 
   useEffect(() => {
     if (showAvatar) return;
+    if (mood === 'idle') {
+      // An active turn may have moved these nodes imperatively. Returning to
+      // idle must reset that pose as well as stop its animation subscription.
+      const root = svgRef.current;
+      root?.setAttribute('data-face-gesture', 'rest');
+      for (const node of root?.querySelectorAll('[data-bob], [data-look], [data-eye]') ?? []) {
+        node.removeAttribute('transform');
+      }
+      root?.querySelector('[data-blush]')?.setAttribute('opacity', '0');
+      return;
+    }
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
     let blink = createBlinkClock(performance.now(), Math.random());
     let idle = nextIdleLook(performance.now(), Math.random(), Math.random());
@@ -262,10 +296,14 @@ export function BotFace({
         faceCenter: { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 },
         idle
       });
-      const targetY = gesture === 'sleepy' ? 0.28 : pose.lookY;
-      shownX = damp(shownX, gesture === 'sleepy' ? 0 : pose.lookX, dt);
-      shownY = damp(shownY, targetY, dt);
-      let bob = 0;
+      // Work motion is driven by elapsed time, independent of streamed tokens.
+      const wave = Math.sin(now * Math.PI * 2 / 1800);
+      const scan = Math.sin(now * Math.PI * 2 / 2400);
+      const lookX = moodRef.current === 'tool' ? scan * 0.5 : pose.lookX + wave * 0.2;
+      const targetY = pose.lookY + scan * 0.12;
+      shownX = reduced ? 0 : damp(shownX, lookX, dt);
+      shownY = reduced ? 0 : damp(shownY, targetY, dt);
+      let bob = reduced ? 0 : wave * 1.25;
       if (!reduced && gesture === 'hover' && hoverAtRef.current !== null) {
         bob = hoverDelight(now - hoverAtRef.current).dy * 0.45;
       } else if (!reduced && gesture === 'happy' && happyUntilRef.current !== null) {
@@ -282,22 +320,7 @@ export function BotFace({
         const cy = Number(eye.getAttribute('data-cy'));
         eye.setAttribute('transform', eyeTransform(cx, cy, openness, drop));
       }
-      const mouth = root.querySelector('[data-mouth]');
-      if (mouth) {
-        const y = Number(mouth.getAttribute('data-y'));
-        const kind = mouthKindForGesture(gesture);
-        const amount = gesture === 'talk' && !reduced ? speakingMouth((now % 520) / 520) : gesture === 'talk' ? 0.45 : 0;
-        const ink = root.getAttribute('data-eye-ink') || '#fff';
-        mouth.setAttribute('d', mouthPath(kind, y, amount));
-        mouth.setAttribute('opacity', mouthVisible(kind) ? '1' : '0');
-        if (kind === 'open' || kind === 'oh') {
-          mouth.setAttribute('fill', ink);
-          mouth.setAttribute('stroke', 'none');
-        } else {
-          mouth.setAttribute('fill', 'none');
-          mouth.setAttribute('stroke', ink);
-        }
-      }
+      updateMouth(root, gesture, reduced, now);
       const blush = root.querySelector('[data-blush]');
       blush?.setAttribute('opacity', gesture === 'happy' || gesture === 'hover' ? '0.16' : '0');
       const dotPhase = (now % 900) / 900;
@@ -308,21 +331,12 @@ export function BotFace({
         dot.setAttribute('transform', `translate(${cx} ${cy}) scale(${scale.toFixed(3)}) translate(${-cx} ${-cy})`);
       }
     });
-  }, [showAvatar]);
+  }, [showAvatar, mood]);
 
-  if (standIn?.kind === 'image') {
-    return <img className={standIn.className} src={standIn.src} alt={standIn.alt} data-testid={testId} data-bot-avatar="image" />;
-  }
-  if (standIn?.kind === 'emoji') {
-    return (
-      <span className={standIn.className} role={standIn.label ? 'img' : 'presentation'} aria-label={standIn.label} aria-hidden={standIn.label ? undefined : true} data-testid={testId} data-bot-avatar="emoji">
-        {standIn.text}
-      </span>
-    );
-  }
+  if (standIn) return <AvatarFace standIn={standIn} working={working} size={size} workLabel={workLabel} mood={mood} testId={testId} />;
   const view = drawnFaceView({ name, shape: shapeProp, color: colorProp, saved, mood });
   const layout = view.layout;
-  const clipId = `bot-face-${reactId}`;
+  const maskId = `bot-face-${reactId}`;
   const classes = botFaceClassName({ size, className, empty: view.empty });
 
   return (
@@ -336,6 +350,7 @@ export function BotFace({
       data-bot-shape={view.shape ?? 'empty'}
       data-eye-ink={view.eyes}
       data-face-mood={mood}
+      data-face-working={working}
       data-face-expression={view.expression}
       role={label ? 'img' : 'presentation'}
       aria-label={label}
@@ -347,14 +362,16 @@ export function BotFace({
         hoverAtRef.current = null;
       }}
     >
+      {working ? <title>{workLabel}</title> : null}
       <defs>
-        <clipPath id={clipId}>
-          <Silhouette shape={view.drawnShape} />
-        </clipPath>
+        {/* A mask supports compound silhouettes (<g>), unlike clipPath. */}
+        <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
+          <Silhouette shape={view.drawnShape} fill="#fff" />
+        </mask>
       </defs>
       <g data-bob="">
         <Silhouette shape={view.drawnShape} fill={view.color ? BOT_FACE_SWATCH[view.color] : '#E6E8EE'} dashed={!view.color} />
-        <g clipPath={`url(#${clipId})`}>
+        <g mask={`url(#${maskId})`}>
           <g data-blush="" opacity="0">
             <ellipse cx={layout.left - 7} cy={layout.eyeY + 8} rx="3.4" ry="1.7" fill="#000" />
             <ellipse cx={layout.right + 7} cy={layout.eyeY + 8} rx="3.4" ry="1.7" fill="#000" />
@@ -366,8 +383,8 @@ export function BotFace({
               data-mouth=""
               data-y={layout.mouthY}
               d={mouthPath(view.mouth, layout.mouthY, view.mouthOpen)}
-              fill={view.mouth === 'open' || view.mouth === 'oh' ? view.eyes : 'none'}
-              stroke={view.mouth === 'open' || view.mouth === 'oh' ? 'none' : view.eyes}
+              fill={mouthFilled(view.mouth) ? view.eyes : 'none'}
+              stroke={mouthFilled(view.mouth) ? 'none' : view.eyes}
               strokeWidth="1.6"
               strokeLinecap="round"
               opacity={mouthVisible(view.mouth) ? 1 : 0}
@@ -390,6 +407,29 @@ export function BotFace({
             : null}
         </g>
       </g>
+      {working ? <text className="bot-face__work-label" x="32" y="62" textAnchor="middle">{workLabel}</text> : null}
     </svg>
+  );
+}
+
+type AvatarStandIn = NonNullable<ReturnType<typeof avatarStandIn>>;
+
+function AvatarContent({ standIn, avatarClass, mood, working, testId }: { standIn: AvatarStandIn; avatarClass: string; mood: LivingFaceMood; working: boolean; testId?: string }) {
+  return standIn.kind === 'image' ? (
+    <img className={avatarClass} src={standIn.src} alt={standIn.alt} data-testid={testId} data-bot-avatar="image" data-face-mood={mood} data-face-working={working} />
+  ) : (
+    <span className={avatarClass} role={standIn.label ? 'img' : 'presentation'} aria-label={standIn.label} aria-hidden={standIn.label ? undefined : true} data-testid={testId} data-bot-avatar="emoji" data-face-mood={mood} data-face-working={working}>
+      {standIn.text}
+    </span>
+  );
+}
+
+function AvatarFace({ standIn, working, size, workLabel, mood, testId }: { standIn: AvatarStandIn; working: boolean; size: 'sm' | 'md' | 'lg'; workLabel: string; mood: LivingFaceMood; testId?: string }) {
+  const avatarClass = `${standIn.className}${working ? ' bot-face--working' : ''}`;
+  return (
+    <span className={botFaceClassName({ size, className: 'bot-face-avatar-shell' })} data-face-working={working} title={working ? workLabel : undefined}>
+      <AvatarContent standIn={standIn} avatarClass={avatarClass} mood={mood} working={working} testId={testId} />
+      {working ? <span className="bot-face__work-label">{workLabel}</span> : null}
+    </span>
   );
 }

@@ -43,3 +43,53 @@
 .bot-face--lg.bot-face--avatar {
   font-size: 30px;
 }
+
+
+.bot-face-avatar-shell {
+  position: relative;
+  overflow: visible;
+}
+
+.bot-face--avatar.bot-face--working {
+  animation: bot-face-working 1.8s ease-in-out infinite;
+  transform-origin: center 70%;
+}
+
+@keyframes bot-face-working {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  25% { transform: translateY(-2px) rotate(0); }
+  50% { transform: translateY(0) rotate(3deg); }
+  75% { transform: translateY(-1px) rotate(0); }
+}
+
+.bot-face__work-label {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bot-face--avatar.bot-face--working {
+    animation: none;
+    transform: none;
+  }
+
+  .bot-face__work-label {
+    display: block;
+    fill: var(--ui-text, #344054);
+    font-size: 10px;
+    font-weight: 600;
+  }
+
+  .bot-face-avatar-shell > .bot-face__work-label {
+    position: absolute;
+    bottom: -4px;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    border-radius: 3px;
+    padding: 1px 2px;
+    background: var(--ui-bg-muted, #f3f4f6);
+    color: var(--ui-text, #344054);
+    font-size: 8px;
+    line-height: 1;
+  }
+}

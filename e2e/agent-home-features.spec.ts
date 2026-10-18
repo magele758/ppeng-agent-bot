@@ -110,7 +110,8 @@ test.describe('Chat and Bot mode', () => {
       '桌面现在怎么样 请把今天的安排、未读消息、明天的会议和还没做完的事都看一下'
     );
     await expect(desk.locator('.session-item__agent')).toHaveCount(0);
-    await expect(desk.locator('.session-item__delete')).toHaveText('删除');
+    await expect(desk.locator('.session-item__delete')).toHaveText('移除');
+    await expect(desk.locator('.session-item__delete')).toHaveAttribute('aria-label', '移除 Bot「DeskBot」');
     await expect(desk).not.toContainText('Bot Chat');
     await expect(desk.locator('.session-item__question')).toHaveCSS('white-space', 'nowrap');
     await expect(desk.locator('.session-item__question')).toHaveCSS('overflow-x', 'hidden');

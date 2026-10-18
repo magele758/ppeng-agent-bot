@@ -104,6 +104,20 @@ export class BotRoomService {
   list(principal: BotPrincipal): BotRoom[] {
     return this.store.db.prepare('SELECT data FROM bot_rooms WHERE principal_id=? ORDER BY rowid').all(botPrincipalKey(principal)).map(row => decode<BotRoom>(row)!);
   }
+  /** Remove only Room state; Bot definitions and private conversations stay intact. */
+  delete(principal: BotPrincipal, id: string): void {
+    this.get(principal, id);
+    // Cancel first: a failed cancellation leaves the Room available for retry.
+    for (const turn of this.activeTurns(id)) {
+      if (turn.currentSessionId) this.host.cancelSession(turn.currentSessionId);
+    }
+    this.tx(() => {
+      for (const table of ['bot_room_messages', 'bot_room_turns', 'bot_room_contexts']) {
+        this.store.db.prepare(`DELETE FROM ${table} WHERE room_id=?`).run(id);
+      }
+      this.store.db.prepare('DELETE FROM bot_rooms WHERE id=?').run(id);
+    });
+  }
   private checkBot(principal: BotPrincipal, id: string): void {
     const bot = this.store.getBot(id);
     if (!bot) throw new NotFoundError('Bot', id);

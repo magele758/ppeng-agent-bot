@@ -17,7 +17,7 @@ export function BotTeamWork({
   onOpen,
 }: {
   bots: BotInfo[];
-  onOpen: (bot: BotInfo) => void;
+  onOpen: (bot: BotInfo) => void | Promise<void>;
 }) {
   const { t } = useI18n();
   const action = useAction();
@@ -193,7 +193,7 @@ export function BotTeamWork({
               const result = (await api("/api/bot-work/default")) as {
                 bot: BotInfo;
               };
-              onOpen(result.bot);
+              await onOpen(result.bot);
             })
           }
         >

@@ -198,8 +198,9 @@ export function modelProviderRoutes(runtime: RawAgentRuntime): RouteSpec[] {
             scanError: null
           });
           const current = readModelCatalog(runtime.store);
-          if (!current.defaultRef && models[0]) {
-            setCatalogDefaultRef(runtime.store, { providerId: id, modelId: models[0].id });
+          const firstEnabled = models.find((m) => m.enabled);
+          if (!current.defaultRef && firstEnabled) {
+            setCatalogDefaultRef(runtime.store, { providerId: id, modelId: firstEnabled.id });
           }
           json(response, 200, {
             ok: true,

@@ -13,6 +13,47 @@
   align-self: flex-start;
 }
 
+.list-item--group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.play-group-delete {
+  flex: 0 0 auto;
+  color: var(--ui-text-muted);
+}
+
+.room-shared-context {
+  font-size: var(--ui-text-xs);
+  max-height: 240px;
+  overflow: auto;
+}
+
+.room-shared-context summary {
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.room-shared-context__fact,
+.room-shared-context__actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.room-shared-context__fact input {
+  min-width: 0;
+  width: 40%;
+  flex: 1;
+  padding: 5px 7px;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control, 8px);
+}
+
 .play-group-form,
 .play-group-members {
   display: flex;
@@ -187,3 +228,21 @@
 .play-group-error {
   color: var(--ui-danger, #c2410c);
 }
+
+.play-main[data-testid="play-group-chat"] > .chat-panel-header {
+  height: auto;
+  max-height: none;
+  padding-block: 10px;
+}
+.play-group-settings { flex: 0 1 auto; max-height: 55vh; overflow: auto; padding: 12px; border-bottom: 1px solid var(--color-border-strong); }
+.play-group-model-default { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; font-size: 12px; color: var(--text-muted); }
+.play-group-model-default span { overflow-wrap: anywhere; }
+.play-group-model-default a { white-space: nowrap; }
+.play-group-model-hint { margin: 4px 0 0; font-size: 11px; color: var(--text-muted); }
+.play-group-member__model { font-size: 10px; color: var(--text-muted); overflow-wrap: anywhere; }
+.play-group-member > .bot-face { flex: 0 0 auto; width: 28px; height: 28px; }
+
+.bot-entry-backdrop { position: fixed; inset: 0; z-index: 1000; background: #0005; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.bot-entry-dialog { width: min(640px, 100%); max-height: 85vh; overflow: auto; background: var(--surface, #fff); border: 1px solid var(--border, #ddd); border-radius: 12px; box-shadow: 0 12px 48px #0003; padding: 16px; }
+
+.create-menu__pop::before { content: ""; position: absolute; left: 0; right: 0; top: -6px; height: 6px; }

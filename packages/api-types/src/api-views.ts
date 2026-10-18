@@ -39,6 +39,8 @@ export type ApiAgentInfo = {
 /** Named persistent Bot + canonical session (Lab roster). */
 export type ApiBotInfo = {
   id: string;
+  /** The caller's functional grouping; null means ungrouped. */
+  functionalGroupId?: string | null;
   name: string;
   title: string;
   description: string;

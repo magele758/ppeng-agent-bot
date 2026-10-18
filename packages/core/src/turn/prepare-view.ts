@@ -15,6 +15,7 @@ import { readDynToolSettings } from '../dyn-tools/settings.js';
 import { tryCreateDynToolStore } from '../dyn-tools/store.js';
 import { microCompactMessages } from '@ppeng/agent-loop/session';
 import { coordinatorViewOf } from '../bots/concurrent-fork.js';
+import { sealSharedExposure, sharedMessageVisible } from '../bots/shared-context-isolation.js';
 import {
   applyOptionalFoldBudget as applyOptionalFoldBudgetA,
   capRollingSummaryText,
@@ -37,6 +38,7 @@ export interface PrepareViewHost {
   store: {
     getImageAsset(id: string): ImageAssetRecord | undefined;
     getDaemonControl?(key: string): unknown;
+    setDaemonControl?(key: string,value: unknown): void;
     agentMemory?(): unknown;
     upsertSessionMemory?(input: unknown): unknown;
     listSessionMemory?(sessionId: string): unknown[];
@@ -57,7 +59,9 @@ export async function prepareMessagesForModel(
   const dynSettings = readDynToolSettings(host.store);
   const mayNeedRetired =
     dynSettings.enabled || messagesMayNeedRetiredAnnotation(messages, session);
-  return prepareRichView(session, coordinatorViewOf(session, messages), {
+  sealSharedExposure(host.store,session.id,messages);
+  const scoped=messages.filter(message=>sharedMessageVisible(host.store,session.id,message));
+  return prepareRichView(session, coordinatorViewOf(session, scoped), {
     getImageAsset: (id) => host.store.getImageAsset(id),
     annotateRetired: (msgs, sess) => {
       if (!mayNeedRetired) return msgs;

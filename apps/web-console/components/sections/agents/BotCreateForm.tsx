@@ -4,19 +4,15 @@ import { useState } from 'react';
 import { api } from '@/lib/api';
 import { botNameIssue } from '@/lib/agents-view';
 import {
-  BOT_AVATAR_EMOJIS,
-  botAvatarIssue,
   botCreateBlock,
   botCreateReady,
   buildBotCreatePayload,
-  nextAvatarEmoji,
   unwrapCreatedBot
 } from '@/lib/bot-avatar';
 import type { BotFaceColor, BotFaceShape } from '@/lib/bot-face';
 import { useI18n } from '@/lib/i18n';
 import type { BotInfo } from '@/lib/types';
 import { BotFaceChoice } from '../../BotFaceChoice';
-import { Disclosure } from './Disclosure';
 
 interface BotCreateFormProps {
   existingNames: readonly string[];
@@ -28,29 +24,24 @@ const EMPTY_FACE: { shape: BotFaceShape | null; color: BotFaceColor | null } = {
 
 function CreateFieldErrors({
   nameProblem,
-  avatarProblem,
   error
 }: {
   nameProblem: string | null;
-  avatarProblem: string | null;
   error: string | null;
 }) {
   const { t } = useI18n();
   return (
     <>
       {nameProblem === 'taken' ? <p className="ag-field__error" role="alert">{t('agents.bots.nameTaken')}</p> : null}
-      {avatarProblem ? <p className="ag-field__error" role="alert">{t('agents.bots.avatarInvalid')}</p> : null}
       {error ? <p className="ag-field__error" role="alert">{error}</p> : null}
     </>
   );
 }
 
-/** Create one Bot by name. Icon is optional; title, description and face are advanced. */
+/** Create a Bot with an immediately visible face preview and optional appearance choices. */
 export function BotCreateForm({ existingNames, onCreated, onCancel }: BotCreateFormProps) {
   const { t } = useI18n();
   const [name, setName] = useState('');
-  const [emoji, setEmoji] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [face, setFace] = useState(EMPTY_FACE);
@@ -58,10 +49,9 @@ export function BotCreateForm({ existingNames, onCreated, onCancel }: BotCreateF
   const [busy, setBusy] = useState(false);
 
   const nameProblem = botNameIssue(name, existingNames);
-  const avatarProblem = botAvatarIssue(emoji, imageUrl);
 
   const submit = async () => {
-    const block = botCreateBlock(nameProblem, avatarProblem);
+    const block = botCreateBlock(nameProblem, null);
     if (block === 'name-empty') {
       setError(t('agents.bots.nameRequired'));
       return;
@@ -70,16 +60,12 @@ export function BotCreateForm({ existingNames, onCreated, onCancel }: BotCreateF
       setError(t('agents.bots.nameTaken'));
       return;
     }
-    if (block === 'avatar') {
-      setError(t('agents.bots.avatarInvalid'));
-      return;
-    }
     setBusy(true);
     setError(null);
     try {
       const bot = (await api('/api/bots', {
         method: 'POST',
-        body: JSON.stringify(buildBotCreatePayload({ name, title, description, emoji, imageUrl, face }))
+        body: JSON.stringify(buildBotCreatePayload({ name, title, description, emoji: '', imageUrl: '', face }))
       })) as { bot?: BotInfo } | BotInfo;
       onCreated(unwrapCreatedBot(bot));
     } catch (err) {
@@ -127,102 +113,55 @@ export function BotCreateForm({ existingNames, onCreated, onCancel }: BotCreateF
           </span>
         </div>
 
-        <fieldset className="ag-field ag-avatar">
-          <legend className="ag-field__label">{t('agents.bots.avatarLabel')}</legend>
-          <span className="ag-field__hint">{t('agents.bots.avatarHint')}</span>
-          <div className="ag-avatar__row" role="radiogroup" aria-label={t('agents.bots.avatarEmojiAria')}>
-            <button
-              type="button"
-              className={`ag-avatar__emoji${emoji ? '' : ' is-selected'}`}
-              aria-pressed={!emoji}
-              disabled={busy}
-              onClick={() => setEmoji('')}
-            >
-              {t('agents.bots.avatarNone')}
-            </button>
-            {BOT_AVATAR_EMOJIS.map((mark) => (
-              <button
-                key={mark}
-                type="button"
-                className={`ag-avatar__emoji ag-avatar__emoji--mark${emoji === mark ? ' is-selected' : ''}`}
-                aria-pressed={emoji === mark}
-                aria-label={mark}
-                disabled={busy}
-                onClick={() => setEmoji(nextAvatarEmoji(emoji, mark))}
-              >
-                {mark}
-              </button>
-            ))}
-          </div>
-          <div className="ag-field">
-            <label className="ag-field__label" htmlFor="bot-create-avatar-url">
-              {t('agents.bots.avatarUrlLabel')}
-            </label>
-            <input
-              id="bot-create-avatar-url"
-              className="ag-input"
-              data-testid="bot-create-avatar-url"
-              type="url"
-              inputMode="url"
-              value={imageUrl}
-              maxLength={500}
-              placeholder={t('agents.bots.avatarUrlPh')}
-              aria-invalid={avatarProblem === 'invalid' || undefined}
-              onChange={(e) => setImageUrl(e.target.value)}
-            />
-          </div>
-        </fieldset>
-
-        <Disclosure label={t('agents.common.advanced')}>
-          <div className="ag-field">
-            <label className="ag-field__label" htmlFor="bot-create-title">
-              {t('agents.bots.titleLabel')}
-            </label>
-            <input
-              id="bot-create-title"
-              className="ag-input"
-              data-testid="bot-create-title"
-              value={title}
-              maxLength={80}
-              aria-describedby="bot-create-title-hint"
-              onChange={(e) => setTitle(e.target.value)}
-            />
-            <span id="bot-create-title-hint" className="ag-field__hint">
-              {t('agents.bots.titleHint')}
-            </span>
-          </div>
-          <div className="ag-field">
-            <label className="ag-field__label" htmlFor="bot-create-description">
-              {t('agents.bots.descLabel')}
-            </label>
-            <textarea
-              id="bot-create-description"
-              className="ag-input"
-              data-testid="bot-create-description"
-              rows={3}
-              maxLength={2000}
-              value={description}
-              placeholder={t('agents.bots.descPh')}
-              aria-describedby="bot-create-description-hint"
-              onChange={(e) => setDescription(e.target.value)}
-            />
-            <span id="bot-create-description-hint" className="ag-field__hint">
-              {t('agents.bots.descHint')}
-            </span>
-          </div>
-          <BotFaceChoice
-            name={name.trim()}
-            shape={face.shape}
-            color={face.color}
-            disabled={busy}
-            onShape={(shape) => setFace((current) => ({ ...current, shape }))}
-            onColor={(color) => setFace((current) => ({ ...current, color }))}
+        <div className="ag-field">
+          <label className="ag-field__label" htmlFor="bot-create-title">
+            {t('agents.bots.titleLabel')}
+          </label>
+          <input
+            id="bot-create-title"
+            className="ag-input"
+            data-testid="bot-create-title"
+            value={title}
+            maxLength={80}
+            aria-describedby="bot-create-title-hint"
+            onChange={(e) => setTitle(e.target.value)}
           />
-        </Disclosure>
+          <span id="bot-create-title-hint" className="ag-field__hint">
+            {t('agents.bots.titleHint')}
+          </span>
+        </div>
+        <div className="ag-field">
+          <label className="ag-field__label" htmlFor="bot-create-description">
+            {t('agents.bots.descLabel')}
+          </label>
+          <textarea
+            id="bot-create-description"
+            className="ag-input"
+            data-testid="bot-create-description"
+            rows={3}
+            maxLength={2000}
+            value={description}
+            placeholder={t('agents.bots.descPh')}
+            aria-describedby="bot-create-description-hint"
+            onChange={(e) => setDescription(e.target.value)}
+          />
+          <span id="bot-create-description-hint" className="ag-field__hint">
+            {t('agents.bots.descHint')}
+          </span>
+        </div>
+        <BotFaceChoice
+          showLabels
+          name={name.trim()}
+          shape={face.shape}
+          color={face.color}
+          disabled={busy}
+          onShape={(shape) => setFace((current) => ({ ...current, shape }))}
+          onColor={(color) => setFace((current) => ({ ...current, color }))}
+        />
 
-        <CreateFieldErrors nameProblem={nameProblem} avatarProblem={avatarProblem} error={error} />
+        <CreateFieldErrors nameProblem={nameProblem} error={error} />
         <div className="ag-form__actions">
-          <button type="submit" className="btn btn-primary btn-sm" data-testid="bot-create-submit" disabled={!botCreateReady(name, nameProblem, avatarProblem, busy)}>
+          <button type="submit" className="btn btn-primary btn-sm" data-testid="bot-create-submit" disabled={!botCreateReady(name, nameProblem, null, busy)}>
             {busy ? t('agents.bots.submitting') : t('agents.bots.submit')}
           </button>
           <button type="button" className="btn btn-sm" onClick={onCancel} disabled={busy}>

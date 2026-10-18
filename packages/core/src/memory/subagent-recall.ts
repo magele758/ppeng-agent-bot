@@ -3,6 +3,7 @@
  * and the bot's durable memory. Does not include another bot or the shared pool.
  */
 
+import { sharedMemoryVisible } from '../bots/shared-context-isolation.js';
 import { resolveSubagentMemoryAccess, type BotMemoryLookup, type BotMemorySession } from './bot-memory-scope.js';
 import { lexicalOverlapScore } from './memory-semantic-merge.js';
 
@@ -73,6 +74,7 @@ export function collectSubagentMemoryHits(
   if (access.parentSessionId && store.listSessionMemory) {
     for (const scope of ['scratch', 'long'] as const) {
       for (const row of store.listSessionMemory(access.parentSessionId, scope)) {
+        if (!sharedMemoryVisible(store, row, access.parentSessionId)) continue;
         push(hit('parent', { ...row, scope }, needle));
       }
     }
@@ -94,6 +96,7 @@ export function collectSubagentMemoryHits(
         ? memory.search({ scope: 'user.memory', agentId: access.botAgentId, limit: 40, userId: null, tenantId })
         : memory.search({ scope: 'user.memory', agentId: access.botAgentId, limit: 40, userId: null });
     for (const row of rows) {
+      if (!sharedMemoryVisible(store, row)) continue;
       push(hit('global', row, needle));
     }
   }

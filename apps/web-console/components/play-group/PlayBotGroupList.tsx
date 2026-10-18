@@ -1,15 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { BotInfo } from '@/lib/types';
 import { api } from '@/lib/api';
-import { useI18n, type MessageKey } from '@/lib/i18n';
+import { useI18n } from '@/lib/i18n';
 import {
   BOT_GROUPS_CHANGED_EVENT,
   groupMatchesQuery,
-  groupMemberIds,
-  groupSpeakBudget,
-  type GroupMemberCode
 } from '@/lib/bot-group';
 import './play-group.css';
 
@@ -20,51 +17,26 @@ type Room = {
   status: string;
 };
 
-function issueKey(code: GroupMemberCode): MessageKey {
-  switch (code) {
-    case 'need_two':
-      return 'play.group.needTwo';
-    case 'duplicate':
-      return 'play.group.duplicate';
-    case 'blank':
-      return 'play.group.blank';
-    case 'unknown':
-      return 'play.group.unknown';
-    default: {
-      const exhaustive: never = code;
-      return exhaustive;
-    }
-  }
-}
-
-function jsonBody(body: unknown, method = 'POST'): RequestInit {
-  return {
-    method,
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body)
-  };
-}
-
 export function PlayBotGroupList({
   bots,
   selectedId,
   filter,
   onOpen,
+  onDeleted,
   onCount
 }: {
   bots: readonly BotInfo[];
   selectedId: string | null;
   filter: string;
   onOpen: (id: string) => void;
+  onDeleted?: (id: string) => void;
   onCount?: (count: number) => void;
 }) {
   const { t } = useI18n();
   const [rooms, setRooms] = useState<Room[]>([]);
-  const [creating, setCreating] = useState(false);
-  const [title, setTitle] = useState('');
-  const [memberIds, setMemberIds] = useState<string[]>([]);
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState('');
+  const roomRevision = useRef(0);
 
   const nameOf = (id: string) => bots.find((bot) => bot.id === id)?.name ?? id;
   const visible = rooms.filter((room) => groupMatchesQuery(room, filter, nameOf));
@@ -76,14 +48,15 @@ export function PlayBotGroupList({
   useEffect(() => {
     let active = true;
     const load = () => {
+      const revision = roomRevision.current;
       void api('/api/bot-rooms')
         .then((data) => {
-          if (!active) return;
+          if (!active || revision !== roomRevision.current) return;
           const list = (data as { rooms?: Room[] }).rooms;
           setRooms(Array.isArray(list) ? list : []);
         })
         .catch(() => {
-          if (active) setRooms([]);
+          // Preserve the last known list on a transient polling failure.
         });
     };
     load();
@@ -97,120 +70,26 @@ export function PlayBotGroupList({
     };
   }, []);
 
-  const toggleMember = (id: string) => {
-    setMemberIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
-    setError('');
-  };
-
-  const createGroup = async () => {
-    const trimmed = title.trim();
-    if (!trimmed || trimmed.length > 120) {
-      setError(t('play.group.titleInvalid'));
-      return;
-    }
-    const known = new Set(bots.map((bot) => bot.id));
-    const members = groupMemberIds(memberIds, known);
-    if (!members.ok) {
-      setError(t(issueKey(members.code)));
-      return;
-    }
-    setBusy(true);
-    setError('');
+  const deleteGroup = async (room: Room) => {
+    if (deletingId || !window.confirm(t('play.group.deleteConfirm', { title: room.title }))) return;
+    setDeletingId(room.id);
+    setDeleteError('');
     try {
-      const data = (await api(
-        '/api/bot-rooms',
-        jsonBody({
-          title: trimmed,
-          botIds: members.members,
-          hostBotId: members.members[0],
-          maxBotTurns: groupSpeakBudget(members.members.length)
-        })
-      )) as { room?: Room };
-      const room = data.room;
-      if (!room?.id) throw new Error('missing room');
-      setRooms((prev) => (prev.some((item) => item.id === room.id) ? prev : [...prev, room]));
-      setTitle('');
-      setMemberIds([]);
-      setCreating(false);
+      await api(`/api/bot-rooms/${encodeURIComponent(room.id)}`, { method: 'DELETE' });
+      roomRevision.current++;
+      setRooms((prev) => prev.filter((item) => item.id !== room.id));
+      onDeleted?.(room.id);
       window.dispatchEvent(new Event(BOT_GROUPS_CHANGED_EVENT));
-      onOpen(room.id);
     } catch {
-      setError(t('play.group.createFailed'));
+      setDeleteError(t('play.group.deleteFailed'));
     } finally {
-      setBusy(false);
+      setDeletingId(null);
     }
   };
 
   return (
     <div className="play-group-block">
-      <button
-        type="button"
-        className="btn btn-ghost btn-sm play-group-create"
-        data-testid="play-group-create"
-        aria-expanded={creating}
-        onClick={() => {
-          setCreating((open) => !open);
-          setError('');
-        }}
-      >
-        {t('play.group.create')}
-      </button>
-      {creating ? (
-        <form
-          className="play-group-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void createGroup();
-          }}
-        >
-          <label>
-            {t('play.group.title')}
-            <input
-              className="input-compact"
-              value={title}
-              maxLength={120}
-              placeholder={t('play.group.titlePlaceholder')}
-              onChange={(event) => setTitle(event.target.value)}
-            />
-          </label>
-          <span>{t('play.group.members')}</span>
-          <p className="play-group-hint">{t('play.group.participateHint')}</p>
-          {bots.length < 2 ? (
-            <p className="play-group-error">{t('play.group.needTwo')}</p>
-          ) : (
-            <ul className="play-group-picker">
-              {bots.map((bot) => (
-                <li key={bot.id}>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={memberIds.includes(bot.id)}
-                      onChange={() => toggleMember(bot.id)}
-                    />
-                    {bot.name}
-                  </label>
-                </li>
-              ))}
-            </ul>
-          )}
-          {error ? <p className="play-group-error">{error}</p> : null}
-          <div className="play-group-form__actions">
-            <button type="submit" className="btn btn-primary btn-sm" disabled={busy || bots.length < 2}>
-              {busy ? t('play.creating') : t('play.group.submit')}
-            </button>
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={() => {
-                setCreating(false);
-                setError('');
-              }}
-            >
-              {t('common.cancel')}
-            </button>
-          </div>
-        </form>
-      ) : null}
+      {deleteError ? <p role="alert" className="play-group-error" data-testid="play-group-delete-error">{deleteError}</p> : null}
       {visible.map((room) => {
         const names = room.botIds.map(nameOf).join('、');
         const selected = selectedId === room.id;
@@ -225,7 +104,10 @@ export function PlayBotGroupList({
             aria-label={t('play.group.openAria', { title: room.title })}
             onClick={() => onOpen(room.id)}
             onKeyDown={(event) => {
-              if (event.key === 'Enter') onOpen(room.id);
+              if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+                event.preventDefault();
+                onOpen(room.id);
+              }
             }}
           >
             <div className="session-item__body">
@@ -235,6 +117,19 @@ export function PlayBotGroupList({
                 <span className="session-item__agent">{names}</span>
               </div>
             </div>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm play-group-delete"
+              data-testid="play-group-delete"
+              aria-label={t('play.group.deleteAria', { title: room.title })}
+              disabled={deletingId !== null}
+              onClick={(event) => {
+                event.stopPropagation();
+                void deleteGroup(room);
+              }}
+            >
+              {deletingId === room.id ? t('play.group.deleting') : t('play.group.deleteLabel')}
+            </button>
           </div>
         );
       })}

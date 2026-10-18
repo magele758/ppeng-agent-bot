@@ -14,7 +14,7 @@ test('a known task finishing after loading older history remains visible [AC:def
     const task = paged ? { ...current, status: 'completed', result: 'Recovered final result' } : current;
     return route.fulfill({ json: { tasks: [task], activeTasks: paged ? [] : [task], historyTasks: paged ? [task] : [], nextCursor: paged ? null : 'older', hasMore: !paged } });
   });
-  await page.goto('/#/agents/bots');
+  await page.goto('/#/tasks/bots');
   const panel = page.getByTestId('bot-team-work');
   await expect(panel.locator('article').filter({ hasText: current.input })).toContainText('执行中');
   await panel.locator('summary').click();

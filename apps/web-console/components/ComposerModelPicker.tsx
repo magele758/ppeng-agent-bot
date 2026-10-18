@@ -16,7 +16,7 @@ export type ComposerModelPickerProps = {
   modelRef: ModelRef | null;
   /** Persisted Lab catalog default (not env / effective fallback). */
   defaultRef?: ModelRef | null;
-  onSelect: (next: ModelRef) => void;
+  onSelect: (next: ModelRef | null) => void;
   onManage: () => void;
   /** Set when a Bot pins its own model: the trigger is locked and shows this text. */
   lockedReason?: string;
@@ -42,7 +42,7 @@ export function ComposerModelPicker({
     () => resolvePickerModelRef(visibleOptions, modelRef, defaultRef),
     [visibleOptions, modelRef, defaultRef]
   );
-  const currentValue = resolvedRef ? encodeModelValue(resolvedRef) : '';
+  const currentValue = modelRef ? encodeModelValue(modelRef) : '';
   const current = visibleOptions.find(
     (o) => o.providerId === resolvedRef?.providerId && o.modelId === resolvedRef?.modelId
   );
@@ -78,12 +78,17 @@ export function ComposerModelPicker({
         onClick={() => setOpen((v) => !v)}
       >
         <span className="composer-model-trigger__provider">
-          {current?.providerName ?? (visibleOptions.length ? t('play.model.pick') : t('play.model.none'))}
+          <ModelProviderLabel current={current} pinned={Boolean(modelRef)} hasOptions={visibleOptions.length > 0} />
         </span>
         {current ? <span className="composer-model-trigger__model">{current.modelId}</span> : null}
       </button>
       {open ? (
         <div className="composer-model-panel" role="listbox" aria-label={t('play.availableModels')}>
+          <button type="button" role="option" aria-selected={!modelRef}
+            className={`composer-model-option${!modelRef ? ' is-selected' : ''}`}
+            onClick={() => { onSelect(null); setOpen(false); }}>
+            {t('settings.model.globalDefault.follow')}
+          </button>
           {!groups.length ? (
             <p className="composer-model-panel__empty">{t('play.model.empty')}</p>
           ) : (
@@ -129,4 +134,10 @@ export function ComposerModelPicker({
       ) : null}
     </div>
   );
+}
+
+function ModelProviderLabel({ current, pinned, hasOptions }: { current?: ModelPickerOption; pinned: boolean; hasOptions: boolean }) {
+  const { t } = useI18n();
+  if (!current) return <>{hasOptions ? t('play.model.pick') : t('play.model.none')}</>;
+  return <>{pinned ? current.providerName : t('settings.model.globalDefault.following', { provider: current.providerName })}</>;
 }

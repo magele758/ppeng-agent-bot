@@ -596,3 +596,8 @@
   outline: var(--ui-focus);
   outline-offset: 2px;
 }
+
+/* Dedicated Bot creation stays readable instead of sharing a column with the roster. */
+.ag-bot-create-surface {
+  max-width: 720px;
+}
