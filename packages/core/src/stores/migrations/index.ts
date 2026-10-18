@@ -987,6 +987,13 @@ export const MIGRATIONS: Migration[] = [
         db.exec(`ALTER TABLE bots ADD COLUMN avatar TEXT`);
       }
     }
+  },
+  {
+    version: 30,
+    description: 'bot_work_messages.source_room records the Room a 1:1 private message came from',
+    up: (db) => {
+      ensureBotWorkSchema({ db });
+    }
   }
 ];
 

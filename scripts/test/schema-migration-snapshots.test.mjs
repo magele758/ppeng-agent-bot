@@ -174,6 +174,18 @@ for (const snapshot of SNAPSHOTS) {
     }
     store.db.close();
   });
+
+  // v30 adds bot_work_messages.source_room with no DEFAULT, so a pre-existing row stays NULL.
+  if (v < 30) test(`v${v} -> latest: bot_work_messages.source_room defaults to NULL [AC:schema-upgrade-safety#AC-1]`, () => {
+    const { store } = restore(snapshot);
+    const columns = store.db.prepare('PRAGMA table_info(bot_work_messages)').all();
+    const sourceRoom = columns.find((column) => column.name === 'source_room');
+    assert.ok(sourceRoom, 'bot_work_messages.source_room exists after upgrade');
+    assert.equal(sourceRoom.dflt_value, null);
+    const rows = store.db.prepare('SELECT source_room FROM bot_work_messages').all();
+    for (const row of rows) assert.equal(row.source_room, null);
+    store.db.close();
+  });
 }
 
 test('v20 -> latest through the runtime: warning is served until the owner picks a tier [AC:bots#AC-6]', () => {
