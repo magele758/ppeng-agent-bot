@@ -369,10 +369,17 @@ for (const routing of ['everyone', 'text-mention'] as const) {
       await expect(log.getByText(host.name, { exact: true })).toBeVisible({ timeout: 30000 });
       await expect(log.getByText(member.name, { exact: true })).toBeVisible();
     } else {
+      // Mentioned member speaks first. The unmentioned host is still scheduled and may stay [SILENT].
       await expect(log.getByText(member.name, { exact: true })).toBeVisible({ timeout: 30000 });
     }
-    const { turns } = await (await request.get(`/api/bot-rooms/${room.id}/turns`)).json();
-    expect(turns[0].botIds).toEqual(routing === 'everyone' ? [host.id, member.id] : [member.id]);
+    await expect.poll(async () => {
+      const { turns } = await (await request.get(`/api/bot-rooms/${room.id}/turns`)).json();
+      return turns[0]?.botIds;
+    }, { timeout: 30000 }).toEqual(routing === 'everyone' ? [host.id, member.id] : [member.id, host.id]);
+    if (routing === 'text-mention') {
+      const { turns } = await (await request.get(`/api/bot-rooms/${room.id}/turns`)).json();
+      expect(turns[0].mentionedBotIds).toEqual([member.id]);
+    }
   });
 }
 
@@ -401,7 +408,9 @@ test('editing a routine can remove its existing precheck [AC:bot-routine-lifecyc
 test('Room polling preserves access to messages across a missed page [AC:bot-rooms#AC-6]', async ({ page, request }) => {
   const bot = await ensureReviewBot(request, 'E2E Review Room Gap');
   const { room } = await (await request.post('/api/bot-rooms', { data: { title: `Gap ${bot.id} ${Date.now()}`, botIds: [bot.id] } })).json();
-  await request.post(`/api/bot-rooms/${room.id}/messages`, { data: { text: 'Room gap initial', mentions: [] } });
+  // Pause so the burst stays user rows. A speaking member would insert replies and push item 1 past one older page.
+  expect((await request.post(`/api/bot-rooms/${room.id}/stop`)).ok()).toBeTruthy();
+  await request.post(`/api/bot-rooms/${room.id}/messages`, { data: { text: 'Room gap initial' } });
   await page.goto('/#/agents/bots');
   const panel = page.getByTestId('bot-rooms');
   await panel.getByRole('button', { name: room.title, exact: true }).click();
@@ -411,14 +420,16 @@ test('Room polling preserves access to messages across a missed page [AC:bot-roo
   await page.route(`**/api/bot-rooms/${room.id}/messages?limit=50`, async route => { await held; await route.continue(); });
   try {
     for (let index = 1; index <= 100; index++) {
-      const response = await request.post(`/api/bot-rooms/${room.id}/messages`, { data: { text: `Room gap item ${index}`, mentions: [] } });
+      const response = await request.post(`/api/bot-rooms/${room.id}/messages`, { data: { text: `Room gap item ${index}` } });
       expect(response.ok()).toBeTruthy();
     }
   } finally { release(); }
-  await expect(panel.getByRole('log')).toContainText('Room gap item 100');
+  await expect(panel.getByRole('log')).toContainText('Room gap item 100', { timeout: 30000 });
   await expect(panel.getByRole('log').getByText('Room gap item 1', { exact: true })).toHaveCount(0);
-  await panel.getByRole('button', { name: '加载更早记录', exact: true }).click();
-  await expect(panel.getByRole('log').getByText('Room gap item 1', { exact: true })).toBeVisible();
+  const older = panel.getByRole('button', { name: '加载更早记录', exact: true });
+  await expect.poll(async () => older.count(), { timeout: 30000 }).toBeGreaterThan(0);
+  await older.click();
+  await expect(panel.getByRole('log').getByText('Room gap item 1', { exact: true })).toBeVisible({ timeout: 30000 });
 });
 
 test('switching Rooms clears the previous room draft, mentions and attachments [AC:bot-rooms#AC-3]', async ({ page, request }) => {

@@ -36,7 +36,7 @@ type RoomMessage = {
   sender: { type: 'user' | 'bot'; id: string; name: string };
 };
 
-type RoomTurn = { id: string; status: string; botIds?: string[]; cursor?: number };
+type RoomTurn = { id: string; status: string; botIds?: string[]; mentionedBotIds?: string[]; cursor?: number };
 
 function liveSpeakerId(turns: readonly RoomTurn[]): string {
   const live = turns.find((turn) => turn.status === 'running' || turn.status === 'queued' || turn.status === 'waiting_approval');
