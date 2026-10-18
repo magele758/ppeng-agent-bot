@@ -11,6 +11,38 @@ export function prependHistoryPage<T extends { id: string }>(loaded: T[], older:
   return [...head, ...loaded];
 }
 
+/** Drop a poll that finished after the room changed or a newer history read started. */
+export function historyPollStale(
+  active: boolean,
+  currentRoomId: string | null,
+  polledRoomId: string,
+  epochNow: number,
+  epochThen: number,
+): boolean {
+  return !active || currentRoomId !== polledRoomId || epochNow !== epochThen;
+}
+
+/** Older page is prepended (loaded ids win). A tail refresh replaces the window. */
+export function applyHistoryPage<T extends { id: string }>(loaded: T[], page: T[], older: boolean): T[] {
+  return older ? prependHistoryPage(loaded, page) : page;
+}
+
+/**
+ * Load-earlier cursor after a disjoint/reset tail merge.
+ * The tail page cursor only reaches the skipped page. When the oldest visible
+ * seq is past the start of history, the next older read starts at that row;
+ * otherwise keep nextCursor while another page exists.
+ */
+export function loadEarlierCursorAfterReset(
+  messages: ReadonlyArray<{ seq?: number }>,
+  hasMore: boolean,
+  nextCursor: number | null,
+): number | null {
+  const oldest = messages[0]?.seq;
+  if (oldest != null && oldest > 1) return oldest;
+  return hasMore ? nextCursor : null;
+}
+
 export function mergeHistoryWindow<T extends {id:string;seq?:number}>(previous:T[],incoming:T[],sameSession:boolean):{messages:T[];reset:boolean} {
  if(!sameSession||!previous.length)return {messages:incoming,reset:true};
  const ids=new Set(previous.map(message=>message.id));
