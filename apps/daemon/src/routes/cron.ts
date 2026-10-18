@@ -60,6 +60,7 @@ export function cronRoutes(runtime: RawAgentRuntime): RouteSpec[] {
           ...(typeof body.secretEnv === 'string' ? { secretEnv: body.secretEnv } : {}),
           sessionId: typeof body.sessionId === 'string' ? body.sessionId : undefined,
           botId: typeof body.botId === 'string' ? body.botId : undefined,
+          ...(typeof body.roomId === 'string' ? { roomId: body.roomId } : {}),
           enabled: typeof body.enabled === 'boolean' ? body.enabled : undefined,
           ...('precheck' in body ? { precheck: body.precheck } : {})
         });
@@ -92,6 +93,8 @@ export function cronRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         if (typeof body.timezone === 'string') patch.timezone=body.timezone;
         if (typeof body.missedPolicy === 'string') patch.missedPolicy=body.missedPolicy as 'coalesce'|'skip'|'catch_up';
         if (typeof body.enabled === 'boolean') patch.enabled = body.enabled;
+        if ('roomId' in body && body.roomId !== null && typeof body.roomId !== 'string') throw new ValidationError('roomId must be a string or null');
+        if ('roomId' in body) patch.roomId = body.roomId as string | null;
         if ('precheck' in body) patch.precheck = body.precheck;
         json(response, 200, { job: runtime.updateCronJob(requireParam('id'), patch) });
       }
