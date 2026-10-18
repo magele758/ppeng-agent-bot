@@ -805,6 +805,23 @@ test('a failed or aborted member still fails the round [AC:bot-rooms#AC-2]', asy
   assert.equal(f.runs.length, 2);
 });
 
+test('a failed room turn allows the next message to complete [AC:bot-chat-image-compatibility#AC-3]', async () => {
+  const f = fixture();
+  const room = f.rooms.create(f.principal, { title: 'Retry', botIds: [f.a.id, f.b.id] });
+  recordingRun(f, async id => { f.store.updateSession(id, { status: 'failed', metadata: { ...f.store.getSession(id).metadata, outcome: { kind: 'failed', reason: 'model_error' } } }); });
+  f.rooms.send(f.principal, room.id, { text: 'first' });
+  await f.rooms.tick();
+  assert.equal(f.rooms.turns(f.principal, room.id).at(-1).status, 'failed');
+  recordingRun(f, async id => {
+    f.store.appendMessage(id, 'assistant', [{ type: 'text', text: 'Recovered' }]);
+    f.store.updateSession(id, { status: 'idle', metadata: { ...f.store.getSession(id).metadata, outcome: { kind: 'idle', reason: 'end' } } });
+  });
+  f.rooms.send(f.principal, room.id, { text: 'try again' });
+  await f.rooms.tick();
+  assert.equal(f.rooms.turns(f.principal, room.id).at(-1).status, 'completed');
+  assert.equal(f.rooms.messages(f.principal, room.id).messages.filter(m => m.sender.type === 'bot').length, 2);
+});
+
 test('a round where every member stays silent still completes [AC:bot-rooms#AC-2]', async () => {
   const f = fixture();
   const room = f.rooms.create(f.principal, { title: 'All quiet', botIds: [f.a.id, f.b.id] });

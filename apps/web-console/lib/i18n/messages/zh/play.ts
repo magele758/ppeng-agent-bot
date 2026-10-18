@@ -1,5 +1,6 @@
 /** Play / Chat 界面文案。不要加 as const。 */
 export const play = {
+  imageUnsupported: '当前模型不支持图片。请选择支持图片的模型，或移除本次图片后发送纯文本。',
   groupSettings: { title: '群聊设置' },
   entry: { new: '新建', remove: '移除', removeBot: '移除 Bot「{name}」', removeBotConfirm: '移除 Bot「{name}」？它将从 Bot 列表隐藏，已有对话、群聊和任务会保留；这不会删除会话。', removeFailed: '移除失败：{error}' },
   groupModel: {
@@ -115,6 +116,7 @@ export const play = {
   },
 
   group: {
+    replyFailed: '群成员本次回复失败，请检查成员模型或稍后重试。你可以继续发送消息。',
     create: '新建群聊',
     title: '群名称',
     titlePlaceholder: '给这个群起个名字',
