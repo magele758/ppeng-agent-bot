@@ -1,0 +1,23 @@
+export const externalAgents = {
+  title: 'External Agent task handoff',
+  keywords: 'external Agent integration handoff delegate HTTP API tasks credentials',
+  description: 'Let authorized external Agents submit tasks, track progress and retrieve results. Each client uses a separate credential and can only read its own tasks.',
+  enabled: 'Enable external task handoff',
+  enabledHint: 'Changes take effect when saved. Disabling rejects all external requests; accepted tasks keep running.',
+  endpoint: 'Submit to {path} with a Bearer credential. Track the returned task ID by appending /task-id to the same path.',
+  executors: 'Available executor IDs: {ids}',
+  clientId: 'Client ID',
+  clientIdHint: 'Use letters, digits, underscores or hyphens. Fixed after saving to identify task ownership; use a distinct ID for each client.',
+  name: 'Name',
+  clientEnabled: 'Allow this client',
+  token: 'Access credential',
+  tokenHint: 'Enter a random credential of at least 32 characters and share it with the external Agent. Saved credentials are never shown. Leave blank to keep, or enter a new value to replace immediately.',
+  allowedAgents: 'Allowed executors',
+  allowedAgentsHint: 'Enter executor IDs separated by commas or spaces. Delegation is limited to this list.',
+  defaultAgent: 'Default executor',
+  defaultAgentHint: 'Must be in the allowed list. Used when a request does not specify an executor.',
+  newClient: 'New client',
+  add: 'Add client',
+  remove: 'Remove this client',
+  empty: 'No clients configured. Add and save a client, then share its credential with the external Agent.'
+};

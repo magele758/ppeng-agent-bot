@@ -256,7 +256,7 @@ test('route access contract: every route is classified, isolated, and A-owned da
   const key = (r) => `${r.method} ${r.pattern}`;
 
   await t.test('registry and policy table match exactly', () => {
-    const kinds = new Set(['public', 'authenticated', 'self-filtered', 'owner', 'admin']);
+    const kinds = new Set(['public', 'authenticated', 'self-filtered', 'owner', 'admin', 'external-agent']);
     for (const r of routes) assert.ok(kinds.has(r.access.kind), `${key(r)} has class ${r.access.kind}`);
     const policy = buildRoutePolicy({ runtime: d.runtime, owners: { ownerOf: () => undefined } });
     const registered = new Set(routes.map(key));

@@ -58,6 +58,8 @@ import { teamsDagRoutes } from './routes/teams-dag.js';
 import { trajectoryRoutes } from './routes/trajectory.js';
 import { workspaceRoutes } from './routes/workspace.js';
 import { requireLabLogin, resolveRequestAuth } from './user-auth.js';
+import { isExternalAgentTaskPath } from './external-agent-settings.js';
+import { externalAgentRoutes } from './routes/external-agents.js';
 
 export interface DaemonAppDeps {
   runtime: RawAgentRuntime;
@@ -94,6 +96,7 @@ export function buildDaemonRouter(deps: DaemonAppDeps): Router {
     .addAll(compactRoutes(runtime))
     .addAll(gatewaySettingsRoutes(runtime))
     .addAll(tasksRoutes(runtime))
+    .addAll(externalAgentRoutes(runtime))
     .addAll(socialRoutes(runtime, repoRoot))
     .addAll(outboundDraftRoutes(runtime, repoRoot, env))
     .addAll(selfHealRoutes(runtime))
@@ -147,6 +150,13 @@ export function createDaemonApp(deps: DaemonAppDeps): DaemonApp {
   const authorize = gatewayAuthorizer(deps.env);
 
   const handleApi = async (request: IncomingMessage, response: ServerResponse<IncomingMessage>, url: URL) => {
+    // Only these exact task paths use independent scoped credentials. Their handlers
+    // require an external credential even when daemon auth / Lab login are disabled.
+    if (isExternalAgentTaskPath(url.pathname)) {
+      if (deps.admit && !deps.admit(request, response, url)) return;
+      if (!(await router.dispatch(request, response, url))) json(response, 404, { error: 'Route not found' });
+      return;
+    }
     if (!checkAuth(request, response, deps.env)) return;
     const auth = resolveRequestAuth({
       request,

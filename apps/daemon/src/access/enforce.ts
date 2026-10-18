@@ -32,6 +32,10 @@ function checkOwnerRef(ref: OwnerRef, access: OwnerAccess, auth: RequestAuth): v
  * server.ts maps to HTTP statuses; resolves silently when the request may proceed.
  */
 export async function enforceRouteAccess(access: RouteAccess, ctx: RouteContext): Promise<void> {
+  if (access.kind === 'external-agent') {
+    access.authenticate(ctx);
+    return;
+  }
   const { auth } = ctx;
   if (access.kind === 'public' || !auth.isolate) return;
   if (!auth.user) throw new UnauthenticatedError();

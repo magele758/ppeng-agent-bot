@@ -1,0 +1,23 @@
+export const externalAgents = {
+  title: '外部 Agent 任务交接',
+  keywords: '外部 Agent 接入 交接 委托 HTTP API 任务 凭证',
+  description: '允许已授权的外部 Agent 提交任务、查询进度和取回结果。每个接入方使用独立凭证，只能查看自己提交的任务。',
+  enabled: '启用外部任务交接',
+  enabledHint: '保存后立即生效。关闭后所有外部接入请求都会被拒绝，已接收的任务继续执行。',
+  endpoint: '提交入口：{path}。使用 Bearer 接入凭证；返回任务编号后，通过同一路径加 /任务编号查询。',
+  executors: '可用的执行者标识：{ids}',
+  clientId: '接入方标识',
+  clientIdHint: '使用字母、数字、下划线或连字符。保存后固定，用于任务归属；不同接入方应使用不同标识。',
+  name: '名称',
+  clientEnabled: '允许此接入方调用',
+  token: '接入凭证',
+  tokenHint: '填写至少 32 个字符的随机凭证，并交给外部 Agent。保存后不再回显；留空保留，填写新值立即替换。',
+  allowedAgents: '允许的执行者',
+  allowedAgentsHint: '填写执行者标识，用逗号或空格分隔。只能委托给这些执行者。',
+  defaultAgent: '默认执行者',
+  defaultAgentHint: '必须在允许列表中；外部调用未指定执行者时使用。',
+  newClient: '新接入方',
+  add: '添加接入方',
+  remove: '移除此接入方',
+  empty: '尚未配置接入方。添加并保存后，将凭证交给外部 Agent。'
+};

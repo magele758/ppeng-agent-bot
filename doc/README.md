@@ -39,6 +39,7 @@
 | [`CAPABILITY_DISCOVERY_PLAN.md`](CAPABILITY_DISCOVERY_PLAN.md) | 自主探针 / Capability Discovery（含 Tailscale 设备池）开发计划（Draft） |
 | [`BOT_CAPABILITY_PLAN.md`](BOT_CAPABILITY_PLAN.md) | Bot 名册 + canonical 对话；`/new` 压缩、`/stop`、`/model` |
 | [`EMBEDDING_SDK.md`](EMBEDDING_SDK.md) | `@ppeng/agent-core` 作为可嵌入 SDK：稳定 API 面、embed env 最小契约、examples 验收 |
+| [`EXTERNAL_AGENT_HANDOFF.md`](EXTERNAL_AGENT_HANDOFF.md) | 外部 Agent 通用任务交接：Lab 接入授权、HTTP 提交与查询、幂等重试、结果和权限范围 |
 | [`AGENT_LOOP_LAYERING_PLAN.md`](AGENT_LOOP_LAYERING_PLAN.md) | Agent Loop 分层重构计划（L0–L6；保留 step/steer/fold；其他项目可从任意层接入） |
 | [`AGENTS.md`](../AGENTS.md)（前端 i18n） | Lab 用户可见文案：`useI18n` / zh+en 同 key / `localStorage['lab.locale']`，禁止语言 env |
 
