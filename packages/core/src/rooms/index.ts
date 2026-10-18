@@ -383,7 +383,11 @@ export class BotRoomService {
     const next: BotRoomTurn = { ...turn, handedOffBotIds: turn.handedOffBotIds ? [...turn.handedOffBotIds] : undefined };
     const moved = handRoomHumanStepToPrivateChat({ store: this.store }, { roomTitle: room.title, botId, principal: room.principal, memberSessionId: session.id }, () => {
       if (this.rawRoom(room.id).botIds.includes(botId)) this.append(room.id, { type: 'bot', id: botId, name: bot?.name ?? botId }, ROOM_HUMAN_STEP_NOTICE, [], next.id, `handoff:${next.id}:${next.cursor}`);
-      next.botTurns++; next.cursor++; next.handedOffBotIds = [...(next.handedOffBotIds ?? []), botId]; delete next.currentSessionId; delete next.startSeq; this.saveTurn(next);
+      next.botTurns++; next.cursor++; next.handedOffBotIds = [...(next.handedOffBotIds ?? []), botId]; delete next.currentSessionId; delete next.startSeq;
+      // Same save as the cursor move. Leaving waiting_approval with no session makes settleWaiting call this turn unknown.
+      next.status = next.cursor < next.botIds.length && next.botTurns < next.maxBotTurns ? 'running' : 'completed';
+      if (next.status === 'completed') next.terminationReason = next.cursor < next.botIds.length ? 'budget' : 'members_completed';
+      this.saveTurn(next);
     });
     if (!moved) return false;
     Object.assign(turn, next);

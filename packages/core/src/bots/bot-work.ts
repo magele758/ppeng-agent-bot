@@ -50,9 +50,18 @@ export function ensureBotWorkSchema(store: Pick<SqliteStateStore,'db'>): void {
 function facade(host: BotWorkHost): SessionFacadeHost {
  return { store:host.store, runImageRetention:async()=>{}, wakeAllAutonomousSessions(){}, wakeAgentSessions(){} } as SessionFacadeHost;
 }
-/** The private chat can take a handed step only when nothing else is using it. */
+/** A leftover approval, or a waiting interrupt, means this chat still owes a person a decision. */
+function privateChatHasPendingApproval(store: SqliteStateStore, sessionId: string): boolean {
+ if (store.listApprovals({ status: 'pending' }).some(approval => approval.sessionId === sessionId)) return true;
+ const session = store.getSession(sessionId);
+ const interrupt = session?.metadata?.interrupt;
+ return !!interrupt && typeof interrupt === 'object' && (interrupt as { kind?: unknown }).kind === 'waiting_approval';
+}
+/** Statuses that are still doing work. A failed, cancelled or unknown chat is free to take the step. */
+const PRIVATE_CHAT_BUSY = new Set(['running', 'waiting_approval']);
+/** The private chat can take a handed step when it is not running and not already waiting on its own approval. */
 export function privateChatCanTakeHandOff(session: { status?: string } | undefined): boolean {
- return session?.status === 'idle' || session?.status === 'completed';
+ return !!session && !PRIVATE_CHAT_BUSY.has(session.status ?? '');
 }
 /**
  * A Room member stopped on a step a person must approve, log in, or verify.
@@ -60,8 +69,9 @@ export function privateChatCanTakeHandOff(session: { status?: string } | undefin
  * and leave the Room session idle, so approving in private runs the step there once
  * and cannot resume or replay the Room turn.
  *
- * When the private chat is not idle or completed, nothing is detached: the caller
- * keeps the Room turn waiting and retries once the private chat is free.
+ * When the private chat is running, already waiting on its own approval, or still
+ * holds any pending approval, nothing is detached and its interrupt is left as-is.
+ * The caller keeps the Room turn waiting and retries once that chat is free.
  * Pass `within` to write the Room notice and turn in the same transaction; a throw rolls all of it back.
  */
 export function handRoomHumanStepToPrivateChat(host: Pick<BotWorkHost, 'store'>, input: { roomTitle: string; botId: string; principal: BotPrincipal; memberSessionId: string }, within?: () => void): { privateSessionId: string; notice: string; reason: string } | undefined {
@@ -70,12 +80,13 @@ export function handRoomHumanStepToPrivateChat(host: Pick<BotWorkHost, 'store'>,
  if (!member || !memberNeedsHuman(member, pending)) return undefined;
  const chat = openBotWorkContext(host as BotWorkHost, input.botId, input.principal);
  const parked = host.store.getSession(chat.id);
- if (!privateChatCanTakeHandOff(parked)) return undefined;
+ if (!privateChatCanTakeHandOff(parked) || privateChatHasPendingApproval(host.store, chat.id)) return undefined;
  const open = unmatchedToolCallsFromFold(host.store.foldMessages(input.memberSessionId));
  const apply = () => {
   const fresh = host.store.getSession(chat.id);
-  if (!privateChatCanTakeHandOff(fresh)) return false;
-  // Only the rows this statement re-points. A leftover pending approval already on the private chat must not enter the new interrupt.
+  // Re-check inside the transaction. A pending approval that landed after the first look must defer, not be overwritten.
+  if (!privateChatCanTakeHandOff(fresh) || privateChatHasPendingApproval(host.store, chat.id)) return false;
+  // Only the rows this statement re-points. A chat that already has a pending approval never reaches here.
   const movedIds = (host.store.db.prepare(`UPDATE approvals SET session_id=?, expires_at=NULL, wake_source=NULL, updated_at=? WHERE session_id=? AND status='pending' RETURNING id`).all(chat.id, nowIso(), input.memberSessionId) as { id: string }[]).map(row => row.id);
   host.store.appendMessage(chat.id, 'user', [{ type: 'text', text: privateHandbackText(input.roomTitle) }]);
   if (open.length) {

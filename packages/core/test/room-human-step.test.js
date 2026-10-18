@@ -26,11 +26,13 @@ test('handing off drops the room waiting latch so a private decision cannot resu
   assert.equal('outcome' in next, false);
 });
 
-test('a private chat takes a handed step only while it is idle or finished [AC:bot-rooms#AC-8]', () => {
+test('a private chat takes a handed step unless it is busy or already waiting [AC:bot-rooms#AC-8]', () => {
   assert.equal(privateChatCanTakeHandOff({ status: 'idle' }), true);
   assert.equal(privateChatCanTakeHandOff({ status: 'completed' }), true);
+  assert.equal(privateChatCanTakeHandOff({ status: 'failed' }), true);
+  assert.equal(privateChatCanTakeHandOff({ status: 'cancelled' }), true);
+  assert.equal(privateChatCanTakeHandOff({ status: 'unknown' }), true);
   assert.equal(privateChatCanTakeHandOff({ status: 'running' }), false);
   assert.equal(privateChatCanTakeHandOff({ status: 'waiting_approval' }), false);
-  assert.equal(privateChatCanTakeHandOff({ status: 'failed' }), false);
   assert.equal(privateChatCanTakeHandOff(undefined), false);
 });
