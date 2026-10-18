@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useI18n, type MessageKey } from "@/lib/i18n";
-import { applyHistoryPage, historyPollStale, loadEarlierCursorAfterReset, mergeHistoryWindow, olderHistoryPageStale } from "@/lib/history-window";
+import { applyHistoryPage, historyPollStale, historyWindowAnchor, loadEarlierCursorAfterReset, mergeHistoryWindow, olderHistoryPageStale } from "@/lib/history-window";
 import type { BotInfo } from "@/lib/types";
 import { api, json, useAction, Feedback, Result, Status } from "./shared";
 type Room = {
@@ -61,8 +61,10 @@ export function BotRooms({ bots }: { bots: BotInfo[] }) {
     setRoom(r);
     // Bump epoch so an in-flight poll cannot overwrite this read.
     historyEpoch.current += 1;
-    // Capture before the await: a reset during the fetch (poll merge, or another open()) makes this page stale.
+    // Capture before the await. open() bumps the epoch; a poll reset replaces the
+    // oldest row without bumping it. Either change makes this page stale.
     const epoch = historyEpoch.current;
+    const anchor = historyWindowAnchor(messagesRef.current);
     const base = `/api/bot-rooms/${r.id}`;
     const [data, status] = (await Promise.all([
       api(
@@ -75,7 +77,7 @@ export function BotRooms({ bots }: { bots: BotInfo[] }) {
     ];
     if (roomIdRef.current !== r.id) return;
     // A stale older page would prepend messages and cursors from the window a reset already replaced.
-    if (older && olderHistoryPageStale(historyEpoch.current, epoch)) return;
+    if (older && olderHistoryPageStale(historyEpoch.current, epoch, historyWindowAnchor(messagesRef.current), anchor)) return;
     const nextMessages = applyHistoryPage(messagesRef.current, data.messages, older);
     messagesRef.current = nextMessages;
     setMessages(nextMessages);

@@ -22,13 +22,24 @@ export function historyPollStale(
   return !active || currentRoomId !== polledRoomId || epochNow !== epochThen;
 }
 
+/** Oldest loaded row. A poll window reset replaces this id without bumping historyEpoch. */
+export function historyWindowAnchor(messages: ReadonlyArray<{ id: string }>): string | null {
+  return messages[0]?.id ?? null;
+}
+
 /**
- * An older page fetched before a history reset (poll window reset, or another
- * open() that bumped the epoch) must not be applied: its messages, cursor, and
- * turns belong to the window that was replaced.
+ * An older page fetched before a history reset must not be applied: its messages,
+ * cursor, and turns belong to the window that was replaced.
+ * open() bumps the epoch; a poll reset (mergeHistoryWindow) does not, so the
+ * oldest loaded id is the other anchor. Either change drops the page.
  */
-export function olderHistoryPageStale(epochNow: number, epochThen: number): boolean {
-  return epochNow !== epochThen;
+export function olderHistoryPageStale(
+  epochNow: number,
+  epochThen: number,
+  anchorNow: string | null = null,
+  anchorThen: string | null = null,
+): boolean {
+  return epochNow !== epochThen || anchorNow !== anchorThen;
 }
 
 /** Older page is prepended (loaded ids win). A tail refresh replaces the window. */
