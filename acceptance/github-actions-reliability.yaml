@@ -1,0 +1,23 @@
+id: github-actions-reliability
+title: GitHub Actions 回归检查稳定性
+status: draft
+requirement: |
+  帮我看看ppeng-agent-core的github仓库是不是还有什么pr没合并？各种Action如果有问题也一起修复一下
+criteria:
+  - id: AC-1
+    given: 助手已拒绝请求，用户随后要求继续
+    when: 自动化回归检查运行该对话
+    then: 检查能可靠确认拒绝保护提示和对应审计记录均存在，不因等待记录写入的时机而偶发失败
+  - id: AC-2
+    given: HTTP 压测冒烟检查在共享 CI 运行环境执行
+    when: 检查正常负载以及启动失败、运行中断和关闭挂起场景
+    then: 正常场景依据原有验收要求判定，异常场景仍判定失败，并保留失败证据，不因测试自身的时序问题误报
+  - id: AC-3
+    given: 必需的自动化检查发现真实回归或仅在重试后通过的未获准测试
+    when: 发布门禁汇总检查结果
+    then: 门禁继续阻止发布，不通过跳过测试、放宽验收要求或扩大重试豁免来隐藏失败
+notes: |
+  排查时没有打开的 PR。近期两次 Docker nightly 失败分别记录拒绝保护回归检查和 HTTP 压测冒烟检查的偶发失败，均在隔离重试后通过，随后由门禁正确阻断发布。修复前继续核对原始失败日志；如发现需要改变上述用户可见行为，应重新确认标准。
+links:
+  - https://github.com/magele758/ppeng-agent-core/actions/runs/39079604566
+  - https://github.com/magele758/ppeng-agent-core/actions/runs/39061871109
