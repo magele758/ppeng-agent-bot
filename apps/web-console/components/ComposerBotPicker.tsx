@@ -167,7 +167,7 @@ export function ComposerBotPicker({
                   role="option"
                   id={`bot-opt-${index}`}
                   aria-selected={selected}
-                  className={`composer-bot-option${index === active ? ' is-active' : ''}${selected ? ' is-selected' : ''}`}
+                  className={botOptionClass(index === active, selected)}
                   onMouseEnter={() => setActive(index)}
                   onClick={() => choose(option.id)}
                 >
@@ -181,4 +181,8 @@ export function ComposerBotPicker({
       ) : null}
     </div>
   );
+}
+
+function botOptionClass(active: boolean, selected: boolean): string {
+  return `composer-bot-option${active ? ' is-active' : ''}${selected ? ' is-selected' : ''}`;
 }

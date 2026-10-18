@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 
-type Fact = { key: string; value: string };
+import { factEditorState, type SharedFact as Fact } from '@/lib/functional-group-view';
 
 /** Only the explicitly entered facts are shared; no private transcript is imported. */
 export function RoomSharedContextEditor({ roomId }: { roomId: string }) {
@@ -33,9 +33,9 @@ export function RoomSharedContextEditor({ roomId }: { roomId: string }) {
   }, [open, path, retry, t]);
 
   const edit = (next: Fact[]) => { setRows(next); setSaved(false); };
-  const valid = rows.every(row => row.key.trim()) && new Set(rows.map(row => row.key.trim())).size === rows.length;
+  const controls = factEditorState(rows, busy, loaded);
   const save = async () => {
-    if (!loaded || !valid || busy) return;
+    if (controls.saveDisabled) return;
     setBusy(true); setError(''); setSaved(false);
     try {
       const entries = Object.fromEntries(rows.map(row => [row.key.trim(), row.value]));
@@ -56,10 +56,16 @@ export function RoomSharedContextEditor({ roomId }: { roomId: string }) {
       </div>)}
       <div className="room-shared-context__actions">
         <button type="button" className="btn btn-ghost btn-sm" data-testid="room-shared-add" disabled={busy} onClick={() => edit([...rows, { key: '', value: '' }])}>{t('play.group.sharedAdd')}</button>
-        <button type="button" className="btn btn-secondary btn-sm" data-testid="room-shared-save" disabled={busy || !valid} onClick={() => void save()}>{t('play.group.sharedSave')}</button>
+        <button type="button" className="btn btn-secondary btn-sm" data-testid="room-shared-save" disabled={controls.saveDisabled} onClick={() => void save()}>{t('play.group.sharedSave')}</button>
       </div>
     </> : null}
-    {error ? <p role="alert" className="play-group-error">{error} {!loaded ? <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => setRetry(value => value + 1)}>{t('play.group.sharedRetry')}</button> : null}</p> : null}
+    <RoomFactError error={error} loaded={loaded} busy={busy} retry={() => setRetry(value => value + 1)} />
     {saved ? <p role="status" className="play-group-hint">{t('play.group.sharedSaved')}</p> : null}
   </details>;
+}
+
+function RoomFactError({ error, loaded, busy, retry }: { error: string; loaded: boolean; busy: boolean; retry: () => void }) {
+  const { t } = useI18n();
+  if (!error) return null;
+  return <p role="alert" className="play-group-error">{error} {!loaded ? <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={retry}>{t('play.group.sharedRetry')}</button> : null}</p>;
 }

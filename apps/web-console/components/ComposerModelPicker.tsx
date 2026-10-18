@@ -78,7 +78,7 @@ export function ComposerModelPicker({
         onClick={() => setOpen((v) => !v)}
       >
         <span className="composer-model-trigger__provider">
-          {current ? (modelRef ? current.providerName : t('settings.model.globalDefault.following', { provider: current.providerName })) : (visibleOptions.length ? t('play.model.pick') : t('play.model.none'))}
+          <ModelProviderLabel current={current} pinned={Boolean(modelRef)} hasOptions={visibleOptions.length > 0} />
         </span>
         {current ? <span className="composer-model-trigger__model">{current.modelId}</span> : null}
       </button>
@@ -134,4 +134,10 @@ export function ComposerModelPicker({
       ) : null}
     </div>
   );
+}
+
+function ModelProviderLabel({ current, pinned, hasOptions }: { current?: ModelPickerOption; pinned: boolean; hasOptions: boolean }) {
+  const { t } = useI18n();
+  if (!current) return <>{hasOptions ? t('play.model.pick') : t('play.model.none')}</>;
+  return <>{pinned ? current.providerName : t('settings.model.globalDefault.following', { provider: current.providerName })}</>;
 }

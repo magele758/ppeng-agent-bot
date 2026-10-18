@@ -3,9 +3,8 @@
 import type { ReactNode } from 'react';
 import type { BotInfo, SessionSummary } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
-import { sessionRowCopy } from '@/lib/session-row';
+import { sessionRowCopy, sessionWorkBotId } from '@/lib/session-row';
 import { BotFace } from './BotFace';
-import { botForCanonicalSession } from '@/lib/bots';
 import { useBotWorkMood } from './bot-work/BotWorkState';
 
 function isCoreExecAgent(id: string): boolean {
@@ -49,7 +48,7 @@ export function SessionListRow({
     emptyHint: t('play.sidebar.noQuestion'),
     unnamed: t('play.unnamed')
   });
-  const botId = botForCanonicalSession(bots, session.id, [session])?.id ?? (typeof session.metadata?.botId === 'string' ? session.metadata.botId : '');
+  const botId = sessionWorkBotId(session, bots);
   const mood = useBotWorkMood(botId);
   const title = copy.title;
   const bot = copy.kind === 'bot';
@@ -96,13 +95,7 @@ export function SessionListRow({
         <div className="session-item__title">{title}</div>
         <div className="session-item__meta">
           {status}
-          {bot ? (
-            <div className={`session-item__question${hasQuestion ? ' is-question' : ''}`}>
-              <span className="session-item__question-text">{subtitle}</span>
-            </div>
-          ) : session.agentId && !isCoreExecAgent(session.agentId) ? (
-            <span className="session-item__agent">{session.agentId}</span>
-          ) : null}
+          <SessionRowSubtitle bot={bot} subtitle={subtitle} hasQuestion={hasQuestion} agentId={session.agentId} />
         </div>
       </div>
       {onDelete && !selectMode ? (
@@ -121,4 +114,14 @@ export function SessionListRow({
       ) : null}
     </div>
   );
+}
+
+function SessionRowSubtitle({ bot, subtitle, hasQuestion, agentId }: { bot: boolean; subtitle: string; hasQuestion: boolean; agentId?: string }) {
+  return bot ? (
+    <div className={`session-item__question${hasQuestion ? ' is-question' : ''}`}>
+      <span className="session-item__question-text">{subtitle}</span>
+    </div>
+  ) : agentId && !isCoreExecAgent(agentId) ? (
+    <span className="session-item__agent">{agentId}</span>
+  ) : null;
 }

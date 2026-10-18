@@ -16,6 +16,7 @@ import {
   type TurnFeedTraceEvent
 } from '@/lib/turn-feed-stats';
 import { api } from '@/lib/api';
+import { nextMenuIndex } from '@/lib/entry-navigation';
 import { formatHash } from '@/lib/nav';
 import { useI18n, type MessageKey } from '@/lib/i18n';
 import { PlayTranscript } from './PlayTranscript';
@@ -650,9 +651,27 @@ export function PlayPanel({
   }, [chat.playInput, chat.playInputRef]);
 
 
+  const removeBot = async (rowBot: BotInfo) => {
+    if (deleting || !window.confirm(t('play.entry.removeBotConfirm', { name: rowBot.name }))) return;
+    setDeleting(true);
+    setBotRemoveError('');
+    try {
+      await api(`/api/bots/${encodeURIComponent(rowBot.id)}`, { method: 'PATCH', body: JSON.stringify({ hidden: true }) });
+      setBots(previous => previous.map(bot => bot.id === rowBot.id ? { ...bot, hidden: true } : bot));
+    } catch (cause) {
+      setBotRemoveError(t('play.entry.removeFailed', { error: cause instanceof Error ? cause.message : String(cause) }));
+    } finally { setDeleting(false); }
+  };
+  const removalProps = (s: SessionSummary, rowBot: BotInfo | undefined) => {
+    if (rowBot) return { deleteAria: t('play.entry.removeBot', { name: rowBot.name }), deleteLabel: t('play.entry.remove'), onDelete: () => { void removeBot(rowBot); } };
+    if (!onDeleteSessions) return {};
+    return { onDelete: (title: string) => { void confirmDelete([s.id], t('play.sidebar.deleteConfirmOne', { title })); } };
+  };
+  const rowBotFor = (s: SessionSummary) => botSurface ? botForCanonicalSession(bots, s.id, sessions) : undefined;
+
   const renderSession = (s: SessionSummary) => {
-    if (botSurface && botForCanonicalSession(bots, s.id, sessions)?.hidden) return null;
-    const rowBot = botSurface ? botForCanonicalSession(bots, s.id, sessions) : undefined;
+    const rowBot = rowBotFor(s);
+    if (rowBot?.hidden) return null;
     const checked = checkedVisible.includes(s.id);
     const statusKey = sessionStatusKey(s.status);
     return (
@@ -678,32 +697,31 @@ export function PlayPanel({
           onSelectSession(s.id);
         }}
         onToggleChecked={(next) => toggleChecked(s.id, next)}
-        deleteAria={rowBot ? t('play.entry.removeBot', { name: rowBot.name }) : undefined}
-        deleteLabel={rowBot ? t('play.entry.remove') : undefined}
-        onDelete={rowBot ? async () => {
-          if (deleting || !window.confirm(t('play.entry.removeBotConfirm', { name: rowBot.name }))) return;
-          setDeleting(true);
-          setBotRemoveError('');
-          try { await api(`/api/bots/${encodeURIComponent(rowBot.id)}`, { method: 'PATCH', body: JSON.stringify({ hidden: true }) }); setBots(previous => previous.map(bot => bot.id === rowBot.id ? { ...bot, hidden: true } : bot)); }
-          catch (cause) { setBotRemoveError(t('play.entry.removeFailed', { error: cause instanceof Error ? cause.message : String(cause) })); }
-          finally { setDeleting(false); }
-        } : onDeleteSessions ? (title) => { void confirmDelete([s.id], t('play.sidebar.deleteConfirmOne', { title })); } : undefined}
+        {...removalProps(s, rowBot)}
       />
     );
   };
 
+  const renderCreateDialog = () => (
+    createKind ? <BotEntryDialog label={createKind === 'bot' ? t('play.newBot') : t('play.group.create')}>
+        {createKind === 'bot' ? <BotCreateForm existingNames={bots.map(bot => bot.name)} onCreated={bot => { upsertBot(bot); setCreateKind(null); void tick({ includePlayPanel: false }); }} onCancel={() => setCreateKind(null)} /> : <BotGroupCreateForm bots={botRoster} onCreated={() => setCreateKind(null)} onCancel={() => setCreateKind(null)} />}
+      </BotEntryDialog> : null
+  );
+
   return (
     <section className={`panel ${active ? 'active' : ''}`} id="panel-play">
-      {createKind ? <BotEntryDialog label={createKind === 'bot' ? t('play.newBot') : t('play.group.create')}>
-        {createKind === 'bot' ? <BotCreateForm existingNames={bots.map(bot => bot.name)} onCreated={bot => { upsertBot(bot); setCreateKind(null); void tick({ includePlayPanel: false }); }} onCancel={() => setCreateKind(null)} /> : <BotGroupCreateForm bots={botRoster} onCreated={() => setCreateKind(null)} onCancel={() => setCreateKind(null)} />}
-      </BotEntryDialog> : null}
+      {renderCreateDialog()}
       <div className="play-layout play-layout--rail">
         <aside className="play-sidebar">
           <div className="play-sidebar__head">
             <div className="create-menu" ref={createMenuRef} onMouseEnter={() => setCreateMenuOpen(true)} onMouseLeave={() => setCreateMenuOpen(false)} onKeyDown={(event) => {
               if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
               event.preventDefault(); setCreateMenuOpen(true);
-              requestAnimationFrame(() => { const items = Array.from(createMenuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []); const index = items.indexOf(document.activeElement as HTMLElement); const next = event.key === 'End' || event.key === 'ArrowUp' && index < 0 ? items.length - 1 : event.key === 'Home' ? 0 : (index + (event.key === 'ArrowUp' ? -1 : 1) + items.length) % items.length; items[next]?.focus(); });
+              requestAnimationFrame(() => {
+                const items = Array.from(createMenuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
+                const next = nextMenuIndex(event.key, items.indexOf(document.activeElement as HTMLElement), items.length);
+                items[next]?.focus();
+              });
             }}>
               <button
                 type="button"

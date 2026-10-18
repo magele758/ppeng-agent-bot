@@ -8,7 +8,7 @@ import { useI18n } from '@/lib/i18n';
 import styles from './BotFunctionalGroups.module.css';
 import { BotEntryDialog } from './BotEntryDialog';
 
-type FunctionalGroup = { id: string; name: string; botIds: string[] };
+import { canMoveBot, factEditorState, functionalGroupRows, functionalGroupPresentation, groupSaveDisabled, functionalGroupSaveRequest, moveBotInGroups, upsertFunctionalGroup, type FunctionalGroup } from '@/lib/functional-group-view';
 const BOT_DRAG = 'application/x-agent-home-bot';
 
 export function BotFunctionalGroups({ bots, sessions, renderSession, createRequest = 0 }: {
@@ -45,15 +45,14 @@ export function BotFunctionalGroups({ bots, sessions, renderSession, createReque
   }));
 
   const save = async () => {
-    if (!editing?.name.trim() || pending) return;
+    if (groupSaveDisabled(editing, pending)) return;
+    if (!editing) return;
     setPending(true);
     setError('');
     try {
-      const { group } = await api(`/api/bot-functional-groups${editing.id ? `/${encodeURIComponent(editing.id)}` : ''}`, {
-        method: editing.id ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: editing.name.trim() })
-      }) as { group: FunctionalGroup };
-      setGroups((previous) => editing.id ? previous.map((g) => g.id === group.id ? group : g) : [...previous, group]);
+      const request = functionalGroupSaveRequest(editing);
+      const { group } = await api(request.path, request.options) as { group: FunctionalGroup };
+      setGroups((previous) => upsertFunctionalGroup(previous, group));
       setEditing(null);
     } catch (cause) { fail(cause); }
     finally { setPending(false); }
@@ -71,13 +70,11 @@ export function BotFunctionalGroups({ bots, sessions, renderSession, createReque
   };
 
   const move = async (botId: string, groupId: string | null) => {
-    if (pending || !bots.some((b) => b.id === botId)) return;
+    if (!canMoveBot(groups, bots, pending, botId, groupId)) return;
     const previous = groups;
-    const currentGroup = groups.find((g) => g.botIds.includes(botId))?.id ?? null;
-    if (currentGroup === groupId) return;
     setPending(true);
     setError('');
-    setGroups(groups.map((g) => ({ ...g, botIds: [...g.botIds.filter((id) => id !== botId), ...(g.id === groupId ? [botId] : [])] })));
+    setGroups(moveBotInGroups(groups, botId, groupId));
     try {
       await api(`/api/bots/${encodeURIComponent(botId)}/functional-group`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ groupId })
@@ -87,21 +84,17 @@ export function BotFunctionalGroups({ bots, sessions, renderSession, createReque
   };
 
   const section = (group: FunctionalGroup | null) => {
-    const groupId = group?.id ?? null;
-    const rows = sessions.filter((session) => {
-      const bot = botForCanonicalSession(bots, session.id, sessions);
-      if (bot?.hidden) return false;
-      const assigned = bot ? groups.find((g) => g.botIds.includes(bot.id))?.id ?? null : null;
-      return assigned === groupId;
-    });
-    return <section key={groupId ?? 'ungrouped'} data-testid={`functional-group-${groupId ?? 'ungrouped'}`}
+    const presentation = functionalGroupPresentation(group, t('play.functionalGroups.ungrouped'));
+    const groupId = presentation.id;
+    const rows = functionalGroupRows(groups, bots, sessions, groupId);
+    return <section key={presentation.key} data-testid={`functional-group-${presentation.key}`}
       className={`${styles.group} ${dragTarget === groupId ? styles.dropTarget : ''}`}
       aria-busy={pending}
       onDragOver={(event) => { if (pending || !event.dataTransfer.types.includes(BOT_DRAG)) return; event.preventDefault(); event.dataTransfer.dropEffect = 'move'; setDragTarget(groupId); }}
       onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragTarget(undefined); }}
       onDrop={(event) => { event.preventDefault(); setDragTarget(undefined); void move(event.dataTransfer.getData(BOT_DRAG), groupId); }}>
       <div className={styles.heading}>
-        <h3>{group?.name ?? t('play.functionalGroups.ungrouped')}</h3>
+        <h3>{presentation.name}</h3>
         <span className={styles.count}>{rows.length}</span>
         {group ? <>
           <button className="btn btn-ghost btn-sm" disabled={pending} aria-label={t('play.functionalGroups.rename')} title={t('play.functionalGroups.rename')}
@@ -127,10 +120,10 @@ export function BotFunctionalGroups({ bots, sessions, renderSession, createReque
       <span>{t('play.functionalGroups.title')}</span>
 
     </div>
-    {error ? <div role="alert" className={styles.error}>{error}{!loaded ? <button className="btn btn-ghost btn-sm" onClick={() => setRetry((n) => n + 1)}>{t('play.functionalGroups.retry')}</button> : null}</div> : null}
+    <GroupLoadError error={error} loaded={loaded} retry={() => setRetry(n => n + 1)} />
     {editing ? <BotEntryDialog label={editing.id ? t('play.functionalGroups.rename') : t('play.functionalGroups.create')}><form className={styles.editor} onSubmit={(event) => { event.preventDefault(); void save(); }}>
       <label>{t('play.functionalGroups.name')}<input required autoFocus value={editing.name} disabled={pending} maxLength={80} onChange={(event) => setEditing({ ...editing, name: event.target.value })} /></label>
-      <button type="submit" className="btn btn-sm" disabled={pending || !editing.name.trim()} aria-label={t('play.functionalGroups.save')}>{t('common.save')}</button>
+      <button type="submit" className="btn btn-sm" disabled={groupSaveDisabled(editing, pending)} aria-label={t('play.functionalGroups.save')}>{t('common.save')}</button>
       <button type="button" className="btn btn-ghost btn-sm" disabled={pending} onClick={() => setEditing(null)}>{t('common.cancel')}</button>
       {error ? <p role="alert">{error}</p> : null}
     </form></BotEntryDialog> : null}
@@ -150,6 +143,7 @@ function SharedFacts({ groups }: { groups: FunctionalGroup[] }) {
   const [retry, setRetry] = useState(0);
   const path = scope === 'global' ? '/api/bot-shared-context?scope=global' : `/api/bot-shared-context?scope=group&id=${encodeURIComponent(scope)}`;
   const ready = loadedPath === path;
+  const controls = factEditorState(rows, busy, ready);
   useEffect(() => { if (scope !== 'global' && !groups.some((g) => g.id === scope)) setScope('global'); }, [groups, scope]);
   useEffect(() => {
     if (!open) return;
@@ -177,13 +171,19 @@ function SharedFacts({ groups }: { groups: FunctionalGroup[] }) {
       <option value="global">{t('play.functionalGroups.global')}</option>{groups.map((g) => <option value={g.id} key={g.id}>{g.name}</option>)}
     </select></label>
     {rows.map((row, index) => <div className={styles.fact} key={index}>
-      <input aria-label={t('play.functionalGroups.factName', { index: index + 1 })} placeholder={t('play.functionalGroups.factNameHint')} value={row.key} disabled={busy || !ready} onChange={(event) => { setSaved(false); setRows(rows.map((r, i) => i === index ? { ...r, key: event.target.value } : r)); }} />
-      <input aria-label={t('play.functionalGroups.factValue', { index: index + 1 })} placeholder={t('play.functionalGroups.factValueHint')} value={row.value} disabled={busy || !ready} onChange={(event) => { setSaved(false); setRows(rows.map((r, i) => i === index ? { ...r, value: event.target.value } : r)); }} />
-      <button className="btn btn-ghost btn-sm" disabled={busy || !ready} aria-label={t('play.functionalGroups.removeFact', { index: index + 1 })} onClick={() => { setSaved(false); setRows(rows.filter((_, i) => i !== index)); }}>×</button>
+      <input aria-label={t('play.functionalGroups.factName', { index: index + 1 })} placeholder={t('play.functionalGroups.factNameHint')} value={row.key} disabled={controls.disabled} onChange={(event) => { setSaved(false); setRows(rows.map((r, i) => i === index ? { ...r, key: event.target.value } : r)); }} />
+      <input aria-label={t('play.functionalGroups.factValue', { index: index + 1 })} placeholder={t('play.functionalGroups.factValueHint')} value={row.value} disabled={controls.disabled} onChange={(event) => { setSaved(false); setRows(rows.map((r, i) => i === index ? { ...r, value: event.target.value } : r)); }} />
+      <button className="btn btn-ghost btn-sm" disabled={controls.disabled} aria-label={t('play.functionalGroups.removeFact', { index: index + 1 })} onClick={() => { setSaved(false); setRows(rows.filter((_, i) => i !== index)); }}>×</button>
     </div>)}
-    <button className="btn btn-ghost btn-sm" disabled={busy || !ready} onClick={() => { setSaved(false); setRows([...rows, { key: '', value: '' }]); }}>{t('play.functionalGroups.addFact')}</button>
-    <button className="btn btn-sm" disabled={busy || !ready || rows.some((r) => !r.key.trim()) || new Set(rows.map((r) => r.key.trim())).size !== rows.length} onClick={() => { void save(); }}>{t('play.functionalGroups.saveShared')}</button>
-    {error ? <p role="alert">{t('play.functionalGroups.failed', { error })}{!ready ? <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => setRetry((n) => n + 1)}>{t('play.functionalGroups.retry')}</button> : null}</p> : null}
+    <button className="btn btn-ghost btn-sm" disabled={controls.disabled} onClick={() => { setSaved(false); setRows([...rows, { key: '', value: '' }]); }}>{t('play.functionalGroups.addFact')}</button>
+    <button className="btn btn-sm" disabled={controls.saveDisabled} onClick={() => { void save(); }}>{t('play.functionalGroups.saveShared')}</button>
+    <GroupLoadError error={error && t('play.functionalGroups.failed', { error })} loaded={ready} busy={busy} retry={() => setRetry(n => n + 1)} />
     {saved ? <p role="status">{t('play.functionalGroups.saved')}</p> : null}
   </details>;
+}
+
+function GroupLoadError({ error, loaded, busy = false, retry }: { error: string; loaded: boolean; busy?: boolean; retry: () => void }) {
+  const { t } = useI18n();
+  if (!error) return null;
+  return <div role="alert" className={styles.error}>{error}{!loaded ? <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={retry}>{t('play.functionalGroups.retry')}</button> : null}</div>;
 }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -429,12 +429,19 @@ test('refusal preservation guard injects reminder on redirect after refusal', as
   assert.equal(capturedMessages[2].parts[0].text, 'Sure, proceed anyway.');
 
   // Verify trace event
-  const tick = (ms) => new Promise((r) => setTimeout(r, ms));
-  await tick(100); // Wait for async trace append
-  const traceFile = join(stateDir, 'traces', session.id, 'events.jsonl');
-  assert.ok(existsSync(traceFile), 'trace file should exist');
-  const traceContent = readFileSync(traceFile, 'utf8');
-  assert.ok(traceContent.includes('refusal_preservation'), 'trace should contain refusal_preservation event');
+  const events = await rt.listTraceEvents(session.id);
+  const guardEvent = events.find((event) => event.kind === 'refusal_preservation');
+  assert.ok(guardEvent, 'trace should contain refusal_preservation event');
+  assert.equal(guardEvent.payload.refusalCount, 1);
+  assert.equal(guardEvent.payload.isRedirectAttempt, true);
+});
+
+test('listTraceEvents waits for emitted events without a timer', async () => {
+  const rt = makeRuntime();
+  const session = rt.createChatSession({});
+  rt.emitTraceEvent(session.id, { kind: 'turn_start', payload: { marker: 'queued-write' } });
+  const events = await rt.listTraceEvents(session.id);
+  assert.ok(events.some((event) => event.kind === 'turn_start' && event.payload.marker === 'queued-write'));
 });
 
 test('refusal preservation guard is silent on benign chat', async () => {

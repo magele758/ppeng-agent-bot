@@ -10,6 +10,7 @@ import {
   groupPickerOptionsByProvider,
   globalDefaultModelOptions,
   type ModelProvidersResponse,
+  type ModelPickerOption,
   type PublicModelProvider
 } from '@/lib/model-providers';
 import { ModelSetupForm } from './ModelSetupForm';
@@ -209,32 +210,7 @@ export function ModelProvidersCard({ onCatalogChange, heading }: ModelProvidersC
         {notice?.kind === 'error' ? <SaveStatus state="error" error={notice.text} /> : null}
         {notice?.kind === 'ok' ? <SaveStatus state="saved" savedLabel={notice.text} /> : null}
 
-        <div className="model-default-row">
-          <div className="field">
-            <label htmlFor="model-default-select">{t('settings.model.globalDefault.title')}</label>
-            <select
-              id="model-default-select"
-              value={defaultRef ? encodeModelValue(defaultRef) : ''}
-              disabled={busy || grouped.length === 0}
-              onChange={(e) => {
-                const ref = decodeModelValue(e.target.value);
-                if (ref) void setDefault(ref.providerId, ref.modelId);
-              }}
-            >
-              {!defaultRef ? <option value="">{t('settings.model.globalDefault.empty')}</option> : null}
-              {grouped.map((g) => (
-                <optgroup key={g.providerId} label={g.providerName}>
-                  {g.options.map((o) => (
-                    <option key={encodeModelValue(o)} value={encodeModelValue(o)}>
-                      {o.modelId}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </div>
-          {defaultLabel ? <span className="muted small">{defaultLabel}</span> : null}
-        </div>
+        <GlobalDefaultModelSelect grouped={grouped} defaultRef={defaultRef} defaultLabel={defaultLabel} busy={busy} setDefault={setDefault} />
         <p className="muted small">{t('settings.model.globalDefault.description')}</p>
         {loadState === 'ready' && !defaultOptions.length ? (
           <div className="empty-hint">
@@ -423,6 +399,39 @@ export function ModelProvidersCard({ onCatalogChange, heading }: ModelProvidersC
           })}
         </div>
       </SettingsGroup>
+    </div>
+  );
+}
+
+/** The global default stays controlled by the saved catalog, including failed saves. */
+function GlobalDefaultModelSelect({ grouped, defaultRef, defaultLabel, busy, setDefault }: { grouped: ReturnType<typeof groupPickerOptionsByProvider>; defaultRef: ModelPickerOption | null; defaultLabel: string | null; busy: boolean; setDefault: (providerId: string, modelId: string) => Promise<void> }) {
+  const { t } = useI18n();
+  return (
+    <div className="model-default-row">
+      <div className="field">
+        <label htmlFor="model-default-select">{t('settings.model.globalDefault.title')}</label>
+        <select
+          id="model-default-select"
+          value={defaultRef ? encodeModelValue(defaultRef) : ''}
+          disabled={busy || grouped.length === 0}
+          onChange={(e) => {
+            const ref = decodeModelValue(e.target.value);
+            if (ref) void setDefault(ref.providerId, ref.modelId);
+          }}
+        >
+          {!defaultRef ? <option value="">{t('settings.model.globalDefault.empty')}</option> : null}
+          {grouped.map((g) => (
+            <optgroup key={g.providerId} label={g.providerName}>
+              {g.options.map((o) => (
+                <option key={encodeModelValue(o)} value={encodeModelValue(o)}>
+                  {o.modelId}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+      </div>
+      {defaultLabel ? <span className="muted small">{defaultLabel}</span> : null}
     </div>
   );
 }

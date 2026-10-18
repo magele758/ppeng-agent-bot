@@ -19,6 +19,7 @@ import {
 import { BotFace } from '../BotFace';
 import { useBotWorkStates } from '../bot-work/BotWorkState';
 import { MODEL_PROVIDERS_CHANGED_EVENT } from '@/lib/model-providers';
+import { groupComposerCommand, runGroupComposerCommand, groupMessageMood, roomComposerDisabled, roomDefaultModelLabel, roomMemberModelLabel, roomHistoryUrl } from '@/lib/group-chat-view';
 import type { RoomModelConfiguration } from '@/lib/room-models';
 import { RoomSharedContextEditor } from './RoomSharedContextEditor';
 import './play-group.css';
@@ -172,7 +173,7 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
 
   const loadRoom = async (older = false) => {
     const id = roomId;
-    const historyUrl = `/api/bot-rooms/${id}/messages?limit=50${older && cursor ? `&beforeSeq=${cursor}` : ''}`;
+    const historyUrl = roomHistoryUrl(id, older, cursor);
     const [history, turnData, current] = (await Promise.all([
       api(historyUrl),
       api(`/api/bot-rooms/${id}/turns`),
@@ -341,15 +342,16 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
     }
   };
 
+  const liveId = liveSpeakerId(turns);
+  const lastFromLive = [...messages].reverse().find((item) => item.sender.type === 'bot' && item.sender.id === liveId);
+
   return (
     <div className="play-main chat-panel" data-testid="play-group-chat">
       <header className="chat-panel-header">
         <div className="chat-panel-header__text">
           <h2 className="chat-panel-title">{room?.title ?? t('play.group.badge')}</h2>
           <div className="play-group-model-default" data-testid="room-default-model">
-            <span>{t('play.groupModel.defaultLabel')}: {models
-              ? models.defaultModel ? `${models.defaultModel.providerName} / ${models.defaultModel.modelId}` : t('play.groupModel.unconfigured')
-              : t('common.loading')}</span>
+            <span>{t('play.groupModel.defaultLabel')}: {roomDefaultModelLabel(models, t)}</span>
             <a href="#/settings/models">{t('play.groupModel.settings')}</a>
           </div>
           <p className="play-group-model-hint">{t('play.groupModel.priorityHint')}</p>
@@ -362,7 +364,6 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
           <span className="play-group-badge">{t('play.group.badge')}</span>
           {room?.botIds.map((id) => {
             const description = descriptionOf(id);
-            const memberModel=models?.members.find(member=>member.botId===id);
             return (
               <span key={id} className="play-group-member">
                 <BotFace name={nameOf(id)} mood={workStates[id]>0?'thinking':'idle'} size="sm" testId={`room-member-face-${id}`} />
@@ -374,9 +375,7 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
                     </span>
                   ) : null}
                   <span className="play-group-member__model" data-testid={`room-member-model-${id}`}>
-                    {models ? memberModel?.model
-                      ? `${t(memberModel.source==='bot'?'play.groupModel.botSource':'play.groupModel.globalSource')} · ${memberModel.model.providerName} / ${memberModel.model.modelId}`
-                      : t('play.groupModel.unconfigured') : t('common.loading')}
+                    {roomMemberModelLabel(models, id, t)}
                   </span>
                 </span>
                 <button
@@ -417,9 +416,7 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
               {!loadError && messages.length === 0 ? <p className="play-group-hint">{t('play.group.noMessages')}</p> : null}
               {messages.map((message) => {
                 const name = senderName(message, bots, t('play.me'));
-                const liveId = liveSpeakerId(turns);
-                const lastFromLive = [...messages].reverse().find((item) => item.sender.type === 'bot' && item.sender.id === liveId);
-                const mood = message.sender.type === 'bot' && message.id === lastFromLive?.id && workStates[message.sender.id]>0 ? 'speaking' : 'idle';
+                const mood = groupMessageMood(message, lastFromLive?.id, workStates);
                 const count = message.attachmentIds?.length ?? 0;
                 return (
                   <GroupTurn
@@ -493,37 +490,23 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
               syncCaret(event.currentTarget);
             }}
             onKeyDown={(event) => {
-              const ime = event.nativeEvent.isComposing || event.keyCode === 229;
-              if (mentionOpen && event.key === 'ArrowDown' && mentionOptions.length) {
-                event.preventDefault();
-                setMentionIndex((index) => (index + 1) % mentionOptions.length);
-                return;
-              }
-              if (mentionOpen && event.key === 'ArrowUp' && mentionOptions.length) {
-                event.preventDefault();
-                setMentionIndex((index) => (index - 1 + mentionOptions.length) % mentionOptions.length);
-                return;
-              }
-              if (mentionOpen && event.key === 'Escape') {
-                event.preventDefault();
-                setMentionDismissed(mentionKey);
-                return;
-              }
-              if (event.key !== 'Enter' || event.shiftKey || ime) return;
-              if (mentionOpen && activeMention) {
-                event.preventDefault();
-                chooseMention(activeMention.name);
-                return;
-              }
+              const command = groupComposerCommand(event.key, event.shiftKey, event.nativeEvent.isComposing || event.keyCode === 229, mentionOpen, mentionOptions.length, !!activeMention);
+              if (command === 'none') return;
               event.preventDefault();
-              event.currentTarget.form?.requestSubmit();
+              runGroupComposerCommand(command, {
+                next: () => setMentionIndex(index => (index + 1) % mentionOptions.length),
+                previous: () => setMentionIndex(index => (index - 1 + mentionOptions.length) % mentionOptions.length),
+                dismiss: () => setMentionDismissed(mentionKey),
+                choose: () => chooseMention(activeMention!.name),
+                send: () => event.currentTarget.form?.requestSubmit()
+              });
             }}
           />
           <button
             type="submit"
             className="btn btn-primary btn-sm"
             data-testid="play-group-send"
-            disabled={busy || !room || room.status !== 'active' || !text.trim()}
+            disabled={roomComposerDisabled(room, busy, text)}
           >
             {busy ? t('play.group.sending') : t('play.group.send')}
           </button>

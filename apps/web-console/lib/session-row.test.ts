@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { displayedQuestion, lastUserQuestion, sessionRowCopy } from './session-row.ts';
+import { displayedQuestion, lastUserQuestion, sessionRowCopy, sessionWorkBotId } from './session-row.ts';
 import type { BotInfo } from './types.ts';
 
 function bot(over: Partial<BotInfo> & Pick<BotInfo, 'id' | 'name'>): BotInfo {
@@ -132,4 +132,11 @@ test('a canonical chat missing from the roster does not fall back to the raw id 
   assert.equal(copy.title, unnamed);
   assert.equal(copy.faceName, '');
   assert.equal(copy.subtitle, emptyHint);
+});
+
+test('work identity prefers canonical roster then metadata and ignores invalid identifiers', () => {
+  assert.equal(sessionWorkBotId({ id: 'sess-bot-super', metadata: { botId: 'wrong' } }, [superBot]), superBot.id);
+  assert.equal(sessionWorkBotId({ id: 'other', metadata: { botId: 'standalone' } }, []), 'standalone');
+  assert.equal(sessionWorkBotId({ id: 'other', metadata: { botId: 42 } }, []), '');
+  assert.equal(sessionWorkBotId({ id: 'other' }, []), '');
 });

@@ -35,6 +35,7 @@ import {
   happyBeat,
   hoverDelight,
   mouthPath,
+  mouthFilled,
   expressionForMood,
   faceGaze,
   nextIdleLook,
@@ -42,6 +43,7 @@ import {
   resolveFaceGesture,
   resolveLivingFaceMood,
   speakingMouth,
+  talkingMouthAmount,
   stepBlinkClock,
   toolScan,
   turnFinishHappyUntil,
@@ -440,4 +442,18 @@ test('悬停、犯困和说完后的高兴各自接在空闲脸上', () => {
   assert.match(mouthPath('smile', 43), /^M29 /);
   assert.match(mouthPath('oh', 40), /^M29 /);
   assert.match(mouthPath('open', 43, 1), /Q32 /);
+});
+
+test('working mouth animates only while speaking and respects reduced motion', () => {
+  assert.equal(talkingMouthAmount('rest', false, 30), 0);
+  assert.equal(talkingMouthAmount('talk', true, 30), 0.45);
+  assert.equal(talkingMouthAmount('talk', false, 30), speakingMouth(30 / 520));
+  assert.notEqual(talkingMouthAmount('talk', false, 30), talkingMouthAmount('talk', false, 150));
+});
+
+test('open mouths use fill and other mouth gestures use strokes', () => {
+  assert.equal(mouthFilled('open'), true);
+  assert.equal(mouthFilled('oh'), true);
+  assert.equal(mouthFilled('rest'), false);
+  assert.equal(mouthFilled('smile'), false);
 });

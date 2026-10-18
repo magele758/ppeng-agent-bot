@@ -709,3 +709,14 @@ function wrap01(phase: number): number {
   const x = phase % 1;
   return x < 0 ? x + 1 : x;
 }
+
+/** Mouth motion follows the clock even when no stream tokens arrive. */
+export function talkingMouthAmount(gesture: string, reduced: boolean, now: number): number {
+  if (gesture !== 'talk') return 0;
+  return reduced ? 0.45 : speakingMouth((now % 520) / 520);
+}
+
+/** Open mouths are filled; smiles and resting mouths use an outline. */
+export function mouthFilled(kind: MouthKind): boolean {
+  return kind === 'open' || kind === 'oh';
+}

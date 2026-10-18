@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, type ReactNode } from 'react';
+import { dialogTabTarget } from '@/lib/entry-navigation';
 
 /** A focused create flow that keeps its underlying conversation mounted. */
 export function BotEntryDialog({ label, children }: { label: string; children: ReactNode }) {
@@ -16,12 +17,12 @@ export function BotEntryDialog({ label, children }: { label: string; children: R
         // The last button is the form's cancel action. A disabled action keeps an in-flight submit open.
         const buttons = panel?.querySelectorAll<HTMLButtonElement>('button[type="button"]');
         buttons?.[buttons.length - 1]?.click();
+        return;
       }
       if (event.key !== 'Tab') return;
-      const items = focusable(); const first = items[0]; const last = items[items.length - 1];
-      if (!first) { event.preventDefault(); return; }
-      if (event.shiftKey && (document.activeElement === first || !panel?.contains(document.activeElement))) { event.preventDefault(); last.focus(); }
-      else if (!event.shiftKey && (document.activeElement === last || !panel?.contains(document.activeElement))) { event.preventDefault(); first.focus(); }
+      const items = focusable();
+      const target = dialogTabTarget(items, document.activeElement as HTMLElement, Boolean(panel?.contains(document.activeElement)), event.shiftKey);
+      if (!items.length || target) { event.preventDefault(); target?.focus(); }
     };
     document.addEventListener('keydown', onKey, true);
     return () => { document.removeEventListener('keydown', onKey, true); (before?.isConnected ? before : document.getElementById('btnPlayCreate'))?.focus(); };

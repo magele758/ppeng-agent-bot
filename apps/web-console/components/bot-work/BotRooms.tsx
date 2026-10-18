@@ -244,7 +244,7 @@ export function BotRooms({ bots, selectedRoomId }: { bots: BotInfo[]; selectedRo
           </button>
         ))}
       </nav>
-      {!rooms.length && !action.busy && <p>{t("botWork.empty")}</p>}
+      <RoomListEmpty empty={rooms.length === 0} busy={action.busy} />
       </>}
       {room && (
         <div>
@@ -466,4 +466,9 @@ export function BotRooms({ bots, selectedRoomId }: { bots: BotInfo[]; selectedRo
       )}
     </section>
   );
+}
+
+function RoomListEmpty({ empty, busy }: { empty: boolean; busy: boolean }) {
+  const { t } = useI18n();
+  return empty && !busy ? <p>{t('botWork.empty')}</p> : null;
 }
