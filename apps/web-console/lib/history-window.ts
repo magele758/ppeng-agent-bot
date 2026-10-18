@@ -30,16 +30,23 @@ export function historyWindowAnchor(messages: ReadonlyArray<{ id: string }>): st
 /**
  * An older page fetched before a history reset must not be applied: its messages,
  * cursor, and turns belong to the window that was replaced.
+ * A tail refresh is not an older page, so it is never dropped here.
  * open() bumps the epoch; a poll reset (mergeHistoryWindow) does not, so the
  * oldest loaded id is the other anchor. Either change drops the page.
  */
 export function olderHistoryPageStale(
+  older: boolean,
   epochNow: number,
   epochThen: number,
   anchorNow: string | null = null,
   anchorThen: string | null = null,
 ): boolean {
-  return epochNow !== epochThen || anchorNow !== anchorThen;
+  return older && (epochNow !== epochThen || anchorNow !== anchorThen);
+}
+
+/** Load-older reads before the cursor. A tail refresh, or a missing cursor, does not. */
+export function historyBeforeQuery(older: boolean, cursor: number | null): string {
+  return older && cursor != null ? `&beforeSeq=${cursor}` : "";
 }
 
 /** Older page is prepended (loaded ids win). A tail refresh replaces the window. */
