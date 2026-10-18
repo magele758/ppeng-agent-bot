@@ -1,4 +1,5 @@
 import { botWork } from './botWork.ts';
+import { externalAgents } from './externalAgents.ts';
 import type { Messages } from '../types.ts';
 import { agents } from './agents.ts';
 import { knowledge } from './knowledge.ts';
@@ -19,6 +20,7 @@ import { skillProposals } from './skillProposals.ts';
 import { teams } from './teams.ts';
 
 export const en = {
+  externalAgents,
   botWork,
   common,
   auth,

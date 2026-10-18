@@ -43,7 +43,13 @@ type RoomMessage = {
   sender: { type: 'user' | 'bot'; id: string; name: string };
 };
 
-type RoomTurn = { id: string; status: string; botIds?: string[]; mentionedBotIds?: string[]; cursor?: number };
+type RoomTurn = { id: string; status: string; botIds?: string[]; mentionedBotIds?: string[]; cursor?: number; terminationReason?: string };
+
+function RoomReplyFailure({ turn }: { turn?: RoomTurn }) {
+  const { t } = useI18n();
+  if (turn?.status !== 'failed') return null;
+  return <p role="alert" className="play-group-error">{t('play.group.replyFailed')}</p>;
+}
 
 function liveSpeakerId(turns: readonly RoomTurn[]): string {
   const live = turns.find((turn) => turn.status === 'running');
@@ -333,7 +339,9 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
         messagesRef.current = next;
         setMessages(next);
       }
-      await loadRoom(false);
+      // Acceptance is durable even when the subsequent read fails. Do not
+      // restore an accepted message into the composer and invite duplicates.
+      await loadRoom(false).catch(() => setLoadError(true));
     } catch {
       setText(submitted);
       setError(t('play.group.sendFailed'));
@@ -406,6 +414,7 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
         </div>
         {room && room.botIds.length <= 2 ? <p className="play-group-hint">{t('play.group.keepTwo')}</p> : null}
         {error ? <p className="play-group-error">{error}</p> : null}
+        <RoomReplyFailure turn={turns.at(-1)} />
         {room ? <RoomSharedContextEditor roomId={room.id} /> : null}
       </div>
       <div className="chat-panel-body">

@@ -18,6 +18,7 @@ import {
 import { normalizeRemoteSecret } from './remote-env.js';
 import { normalizeOpenAiCompatibleBaseUrl } from './list-models.js';
 import { createLogger } from '../logger.js';
+import { withImageCompatibility } from './image-compatibility.js';
 import type { ModelAdapter, SessionRecord } from '../types.js';
 
 const log = createLogger('model-override');
@@ -628,7 +629,7 @@ function createUnannotatedAdapter(provider: ModelProvider, modelId: string): Mod
 }
 
 export function createAdapterFromProvider(provider: ModelProvider, modelId: string): ModelAdapter {
-  const adapter = createUnannotatedAdapter(provider, modelId);
+  const adapter = withImageCompatibility(createUnannotatedAdapter(provider, modelId));
   const configured = provider.models.find(model => model.id === modelId)?.contextWindow;
   const contextWindow = configured ?? (provider.kind === 'heuristic' ? 131072 : undefined);
   if (contextWindow) Object.assign(adapter, { contextWindow });
@@ -637,7 +638,7 @@ export function createAdapterFromProvider(provider: ModelProvider, modelId: stri
 
 export function createModelAdapterFromEnvOrHeuristic(env: NodeJS.ProcessEnv = process.env): ModelAdapter {
   try {
-    return createModelAdapterFromEnv(env);
+    return withImageCompatibility(createModelAdapterFromEnv(env));
   } catch {
     return new HeuristicModelAdapter();
   }
@@ -684,13 +685,13 @@ function maybeWrapVl(
     String(env.RAW_AGENT_VL_USE_JSON_MODE ?? '0').toLowerCase()
   );
   const vlHttpRaw = env.RAW_AGENT_VL_OPENAI_HTTP_KIND?.trim();
-  const vlAdapter = new OpenAICompatibleAdapter({
+  const vlAdapter = withImageCompatibility(new OpenAICompatibleAdapter({
     apiKey: vlKey,
     baseUrl: vlBase,
     model: vlModel,
     useJsonMode: vlUseJson,
     httpKind: vlHttpRaw ? normalizeOpenAiHttpKind(vlHttpRaw) : provider.httpKind
-  });
+  }));
   const scope: 'last_user' | 'any' = env.RAW_AGENT_VL_ROUTE_SCOPE === 'last_user' ? 'last_user' : 'any';
   const hybrid = new HybridModelRouterAdapter(textAdapter, vlAdapter, scope);
   const configured = (textAdapter as ModelAdapter & { contextWindow?: number }).contextWindow;

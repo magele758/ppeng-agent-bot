@@ -7,6 +7,7 @@
  * Classes are documented on {@link RouteAccess}.
  */
 import type { RouteContext } from '../routing.js';
+import { authenticateExternalAgent } from '../external-agent-settings.js';
 import {
   bodyRefs,
   bodyString,
@@ -244,6 +245,10 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
       )
     ],
     ['GET /api/tasks', selfFiltered('task')],
+    ['GET /api/external-agents/settings', ADMIN],
+    ['PATCH /api/external-agents/settings', ADMIN],
+    ['POST /api/external-agent/v1/tasks', { kind: 'external-agent', authenticate: ctx => { authenticateExternalAgent(l.runtime, ctx.request); } }],
+    ['GET /api/external-agent/v1/tasks/:id', { kind: 'external-agent', authenticate: ctx => { authenticateExternalAgent(l.runtime, ctx.request); } }],
     ['POST /api/tasks', selfFiltered('task')],
     ['GET /api/tasks/:id', owner('task', byParam('id', (id) => taskRef(l, id)))],
     ['GET /api/goals/settings', AUTHENTICATED],

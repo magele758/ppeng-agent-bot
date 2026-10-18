@@ -1,6 +1,6 @@
 import {test,expect} from '@playwright/test';
 
-test('actual shared avatar state survives switching, refresh and partial completion then stops for idle members [AC:bot-working-animation#AC-1] [AC:bot-working-animation#AC-2] [AC:bot-working-animation#AC-3] [AC:bot-working-animation#AC-4]',async({page})=>{
+test('actual work switches list idle motion to continuous work and back across refresh [AC:bot-list-idle-motion#AC-2] [AC:bot-working-animation#AC-1] [AC:bot-working-animation#AC-2] [AC:bot-working-animation#AC-3] [AC:bot-working-animation#AC-4]',async({page})=>{
  const {bots}=await (await page.request.get('/api/bots')).json();expect(bots.length).toBeGreaterThan(1);
  const [a,b]=bots;let counts:Record<string,number>={};let observed=-1;
  await page.route('**/api/bot-work/status',r=>{observed=counts[a.id]??0;return r.fulfill({json:{bots:bots.map((bot:{id:string})=>({bot,activeWorkCount:counts[bot.id]??0}))}});});
@@ -13,8 +13,10 @@ test('actual shared avatar state survives switching, refresh and partial complet
  const row=(name:string)=>page.locator('#sessionListMini .list-item--bot-chat').filter({has:page.locator('.session-item__title').getByText(name,{exact:true})});
  const face=(name:string)=>row(name).locator('[data-face-mood]').first();
  await expect(face(a.name)).toHaveAttribute('data-face-mood','idle');
+ await expect(face(a.name).locator('[data-bob]')).toHaveCSS('animation-name','bot-face-idle-body');
  await row(a.name).click();counts={[a.id]:2};
  await expect(face(a.name)).toHaveAttribute('data-face-working','true');
+ await expect(face(a.name).locator('[data-bob]')).toHaveCSS('animation-name','none');
  await expect(page.locator('.chat-panel-header--bot [data-face-mood]')).toHaveAttribute('data-face-working','true');
  const bob=face(a.name).locator('[data-bob]');
  const first=await bob.getAttribute('transform');await page.waitForTimeout(420);const second=await bob.getAttribute('transform');expect(second).not.toEqual(first);
@@ -28,5 +30,8 @@ test('actual shared avatar state survives switching, refresh and partial complet
  await expect(page.getByTestId(`room-member-face-${b.id}`)).toHaveAttribute('data-face-working','false');
  counts={};await expect(face(a.name)).toHaveAttribute('data-face-working','false');
  await expect(page.getByTestId(`room-member-face-${a.id}`)).toHaveAttribute('data-face-working','false');
- const stillA=await bob.getAttribute('transform');await page.waitForTimeout(420);expect(await bob.getAttribute('transform')).toEqual(stillA);
+ await expect(bob).toHaveCSS('animation-name','bot-face-idle-body');
+ const member=page.getByTestId(`room-member-face-${a.id}`).locator('[data-bob]');
+ const stillA=await member.getAttribute('transform');await page.waitForTimeout(420);expect(await member.getAttribute('transform')).toEqual(stillA);
+ await expect(member).toHaveCSS('animation-name','none');
 });

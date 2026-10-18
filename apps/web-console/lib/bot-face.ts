@@ -386,6 +386,11 @@ function nameHash(key: string): number {
   return hash >>> 0;
 }
 
+/** A negative phase starts each list face mid-cycle, without random hydration changes. */
+export function botFaceIdleDelay(name: string): string {
+  return `-${nameHash(name) % 8800}ms`;
+}
+
 function namedKey(name: string | null | undefined): string | null {
   if (typeof name !== 'string') return null;
   const key = name.trim();

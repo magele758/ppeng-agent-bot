@@ -1,0 +1,29 @@
+id: external-agent-task-handoff
+title: 外部 Agent 任务交接
+status: implemented
+requirement: |
+  我想要这个部署的服务可以被任意的agent通信、调用传递任务，比如把grok bot里的bot的任务都交接过来，这个可以做到吗？
+notes: |
+  用户已确认首期实现通用外部 Agent 任务交接，通过公开接入说明提交任务及查询结果。
+  Grok Bot 历史任务迁移后续另行接入。
+criteria:
+  - id: AC-1
+    given: 外部 Agent 已获得授权且能够访问部署服务
+    when: 它按照接入说明提交任务目标、必要上下文和目标执行者
+    then: 服务接收并执行任务，外部 Agent 获得可用于追踪的任务标识
+  - id: AC-2
+    given: 外部 Agent 已提交任务
+    when: 它查询该任务
+    then: 它能看到当前进度及可用结果，任务失败或等待人工处理时能看到相应状态和原因
+  - id: AC-3
+    given: 一个来源任务已被接收
+    when: 外部 Agent 因重试再次提交相同来源和相同任务标识的任务
+    then: 服务返回已有任务而不重复创建或启动任务
+  - id: AC-4
+    given: 外部调用者未获授权或请求访问授权范围之外的任务
+    when: 它尝试提交或查询任务
+    then: 服务拒绝该请求且不泄露受限任务的内容
+  - id: AC-5
+    given: 管理员需要管理外部 Agent 的接入
+    when: 管理员在 Lab 保存接入授权或目标执行者配置
+    then: 后续请求立即遵循新配置且无需重启服务

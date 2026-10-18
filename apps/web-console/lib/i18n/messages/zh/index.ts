@@ -1,4 +1,5 @@
 import { botWork } from './botWork.ts';
+import { externalAgents } from './externalAgents.ts';
 import { agents } from './agents.ts';
 import { knowledge } from './knowledge.ts';
 import { settings } from './settings.ts';
@@ -18,6 +19,7 @@ import { skillProposals } from './skillProposals.ts';
 import { teams } from './teams.ts';
 
 export const zh = {
+  externalAgents,
   botWork,
   common,
   auth,

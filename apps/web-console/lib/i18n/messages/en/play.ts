@@ -1,5 +1,6 @@
 /** Play / Chat copy. Do not add as const. */
 export const play = {
+  imageUnsupported: 'The current model does not support images. Select an image-capable model, or remove the current images and send text only.',
   groupSettings: { title: 'Group chat settings' },
   entry: { new: 'New', remove: 'Remove', removeBot: 'Remove Bot “{name}”', removeBotConfirm: 'Remove Bot “{name}”? It will be hidden from the Bot list. Existing conversations, group chats and tasks are kept; this does not delete conversations.', removeFailed: 'Removal failed: {error}' },
   groupModel: {
@@ -115,6 +116,7 @@ export const play = {
   },
 
   group: {
+    replyFailed: 'A group member could not reply. Check its model or try again later. You can continue sending messages.',
     create: 'New group chat',
     title: 'Group name',
     titlePlaceholder: 'Name this group',

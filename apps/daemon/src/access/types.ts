@@ -33,7 +33,8 @@ export type OwnerRef =
 
 /**
  * Who may reach a route once Lab login isolates users (`auth.isolate`).
- * Single-user / operator requests (`isolate === false`) pass every class.
+ * Single-user / operator requests (`isolate === false`) pass Lab access classes;
+ * external-agent credentials remain mandatory.
  *
  * - `public`: no login (health probes, OAuth handshake).
  * - `authenticated`: any signed-in user; the payload is not per-user data.
@@ -45,9 +46,13 @@ export type OwnerRef =
  *   (shared, e.g. operator-made bots), or `admin`.
  * - `admin`: tenant owner/admin users and operators only (global settings,
  *   secrets, host filesystem, daemon control).
+ * - `external-agent`: requires its own scoped credential on every request,
+ *   including when Lab login is off. Task ownership is filtered by its handler.
  */
 export type RouteAccess =
   | { kind: 'public' }
+  /** Always checked, even in single-user mode; independent of daemon/Lab credentials. */
+  | { kind: 'external-agent'; authenticate: (ctx: RouteContext) => void }
   | { kind: 'authenticated' }
   | { kind: 'self-filtered'; resource: string }
   | {

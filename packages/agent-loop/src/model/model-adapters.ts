@@ -882,7 +882,10 @@ async function buildOpenAiMessages(
   const output: Array<Record<string, unknown>> = [
     {
       role: 'system',
-      content: systemPrompt
+      // Some OpenAI-compatible chat templates accept exactly one leading
+      // system message. Preserve runtime notices at system authority without
+      // sending mid-conversation system roles or mutating the stored history.
+      content: [systemPrompt, ...messages.filter(message => message.role === 'system').map(message => textFromParts(message.parts))].join('\n\n')
     }
   ];
 
@@ -921,10 +924,6 @@ async function buildOpenAiMessages(
     }
 
     if (message.role === 'system') {
-      output.push({
-        role: 'system',
-        content: textFromParts(message.parts)
-      });
       continue;
     }
 

@@ -127,6 +127,8 @@ Jev 不是 SDK 模块：未配置入口时宿主不调用它，SDK 接入参数�
 
 ### Responses 流终止与回归契约
 
+- OpenAI chat-completions 的流式与非流式请求把历史 `system` 提示按原顺序合并到唯一的首条 system 消息，放在主 system prompt 之后；对话主体只保留非 system 消息的原顺序。兼容仅接受开头 system 的网关；不改写持久化历史，也不降低系统提示权限。回归：`src/model/system-prefix.test.ts`。
+
 - `OpenAiResponsesAdapter.runTurnStream` 接受 `response.completed` / `response.done` / `response.incomplete`；不完整响应保留已有文本、`usage`、`finishReason` 与 `truncated`。兼容网关终止帧省略 `output` 时，继续使用累计分片，不能丢掉终止帧的用量与截断信息。
 - `response.failed` / `response.cancelled`（以及终止帧中的对应 status）必须抛错，不能伪装成成功的空回答。重试仍由上层 tool-loop 负责，不在 adapter 内新增重试。
 - 与共享适配器重构合并后，上述处理集中在 SDK 的 Responses 事件 handler / `finishResponsesStream`；core 保持薄 shim。终止帧有实际内容（含兼容字段 `output_text`）时优先采用，否则保留累计分片并合并终止元数据。

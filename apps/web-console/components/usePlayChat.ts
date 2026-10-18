@@ -15,6 +15,7 @@ import {
 } from '@/lib/feed-window';
 import { prependHistoryPage } from '@/lib/history-window';
 import { api } from '@/lib/api';
+import { modelErrorText } from '@/lib/model-errors';
 import { getSpeechRecognitionCtor, type SpeechRecognitionLike } from '@/lib/speech-dictation';
 import { renderMarkdown } from '@/lib/markdown';
 import { rollbackToCheckpoint, streamCheckpoint, type StreamSegment } from '@/lib/stream-segments';
@@ -1345,7 +1346,7 @@ export function usePlayChat(deps: PlayChatDeps) {
         }
         if (event === 'error') {
           const raw = typeof p.message === 'string' && p.message.trim() ? p.message.trim() : 'stream error';
-          throw new PlayStreamError(t('play.status.runFailed', { error: raw }));
+          throw new PlayStreamError(t('play.status.runFailed', { error: modelErrorText(raw, t) }));
         }
         if (event === 'model' && p.type === 'done') {
           turnCheckpoint = streamCheckpoint(segments);
@@ -1771,7 +1772,7 @@ export function usePlayChat(deps: PlayChatDeps) {
       sessionListStickTopRef.current = true;
       await tick({ includePlayPanel: true });
     } catch (e) {
-      setPlayStatus({ text: e instanceof Error ? e.message : String(e), err: true });
+      setPlayStatus({ text: modelErrorText(e instanceof Error ? e.message : String(e), t), err: true });
       const persisted = e instanceof PlayStreamError && e.persisted;
       if (!persisted) {
         setPlayInput(draftSnapshot);
