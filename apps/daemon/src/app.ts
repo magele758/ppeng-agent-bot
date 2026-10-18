@@ -1,3 +1,4 @@
+import { factoryRoutes } from './routes/factory.js';
 import { botRoomsRoutes } from './routes/bot-rooms.js';
 import { botFunctionalGroupRoutes } from './routes/bot-functional-groups.js';
 import { botWorkRoutes } from './routes/bot-work.js';
@@ -89,6 +90,7 @@ export function buildDaemonRouter(deps: DaemonAppDeps): Router {
     .addAll(botFunctionalGroupRoutes(runtime))
     .addAll(botWorkRoutes(runtime))
     .addAll(botRoomsRoutes(runtime))
+    .addAll(factoryRoutes(runtime))
     .addAll(botHistoryRoutes(runtime))
     .addAll(cronRoutes(runtime))
     .addAll(configRoutes(runtime, { ...deps.config, env, repoRoot }))

@@ -1,7 +1,7 @@
 export const SECTION_IDS = ['bot', 'chat', 'agents', 'tasks', 'knowledge', 'settings'] as const;
 export type SectionId = (typeof SECTION_IDS)[number];
 
-export const OPS_PANES = ['trajectory', 'health'] as const;
+export const OPS_PANES = ['trajectory', 'health', 'factory'] as const;
 export type OpsPane = (typeof OPS_PANES)[number];
 export const DEFAULT_OPS_PANE: OpsPane = 'trajectory';
 

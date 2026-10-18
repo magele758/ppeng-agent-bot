@@ -171,3 +171,12 @@
 
 .trace-group__meta { margin-right: var(--ui-space-2); }
 .trace-turn__error { flex: 1 1 100%; font-size: var(--ui-text-xs); color: var(--ui-danger); word-break: break-word; }
+
+.factory-panel fieldset { margin: 1rem 0; padding: 1rem; border: 1px solid var(--border, #ddd); border-radius: 8px; }
+.factory-panel label { display: flex; flex-direction: column; gap: .35rem; margin: .5rem 0; }
+.factory-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: .75rem; }
+.factory-table { overflow-x: auto; margin: 1rem 0; }
+.factory-table table { width: 100%; border-collapse: collapse; }
+.factory-table td, .factory-table th { text-align: left; padding: .6rem; border-bottom: 1px solid var(--border, #ddd); vertical-align: top; }
+.factory-panel pre { max-width: 60vw; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.factory-panel button { margin: .3rem; }

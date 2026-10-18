@@ -7,3 +7,6 @@
  * `@ppeng/agent-core/session` (`SessionSurfaceStore`), not this barrel.
  */
 export * from './exports/public.js';
+
+export { FactoryService } from './factory/service.js';
+export type { FactoryMachine, FactoryTask, FactorySettings, FactoryTransport } from './factory/types.js';
