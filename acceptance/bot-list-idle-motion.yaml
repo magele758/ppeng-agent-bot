@@ -1,0 +1,21 @@
+id: bot-list-idle-motion
+title: Bot 列表待机头像保持活性
+status: implemented
+requirement: |
+  这个列表里的icon，还是保持一定的活性，不要呆着不动，让他活泼点，动作多点
+notes: |
+  仅调整 Bot 列表中的待机表现。已按用户批准同步修订 bot-working-animation 和
+  bot-functional-groups 中适用于列表头像的空闲静止约定，不改变真实工作状态的判定。
+criteria:
+  - id: AC-1
+    given: Bot 没有正在执行的工作，用户未开启减少动态效果
+    when: 用户持续查看 Bot 列表
+    then: 列表头像会间歇出现眨眼、轻晃、探头等多种轻快的小动作，各 Bot 的动作错开播放；无需鼠标悬停即可看到
+  - id: AC-2
+    given: Bot 从待机开始工作，或结束工作回到待机
+    when: 用户查看列表头像
+    then: 工作时使用更连续、更明显的动作，结束后回到间歇待机小动作，待机动画不会使界面显示成工作中
+  - id: AC-3
+    given: 用户开启了系统的减少动态效果
+    when: 用户查看 Bot 列表
+    then: 头像保持静止，工作状态仍可辨认，列表文字和行位置不因动效发生跳动

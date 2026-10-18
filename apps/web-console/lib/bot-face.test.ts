@@ -14,6 +14,7 @@ import {
   POINTER_FRESH_MS,
   blinkOpenness,
   botFaceColor,
+  botFaceIdleDelay,
   botFaceIndex,
   botFaceShape,
   isBotFaceColor,
@@ -49,6 +50,12 @@ import {
   turnFinishHappyUntil,
   type BlinkClock
 } from './bot-face.ts';
+
+test('idle list motion has a stable name-specific phase [AC:bot-list-idle-motion#AC-1]', () => {
+  assert.equal(botFaceIdleDelay('DeskBot'), botFaceIdleDelay('DeskBot'));
+  assert.notEqual(botFaceIdleDelay('DeskBot'), botFaceIdleDelay('Super Bot'));
+  assert.match(botFaceIdleDelay('小八'), /^-\d+ms$/);
+});
 
 test('同一个名字始终对应同一张脸 [AC:bot-robot-faces#AC-1] [AC:bot-robot-faces#AC-2] [AC:bot-robot-faces#AC-3]', () => {
   assert.equal(BOT_FACE_COUNT, 8);

@@ -1,6 +1,7 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
+import { botFaceIdleDelay } from '@/lib/bot-face';
 import type { BotInfo, SessionSummary } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
 import { sessionRowCopy, sessionWorkBotId } from '@/lib/session-row';
@@ -87,7 +88,7 @@ export function SessionListRow({
         />
       ) : null}
       {bot ? (
-        <span className="session-item__face" data-bot-face-slot="">
+        <span className="session-item__face" data-bot-face-slot="" style={{ '--bot-face-idle-delay': botFaceIdleDelay(faceName) } as CSSProperties}>
           <BotFace name={faceName} mood={mood} />
         </span>
       ) : null}
