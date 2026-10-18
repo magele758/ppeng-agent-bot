@@ -1,3 +1,4 @@
+import { factory } from './factory.ts';
 import { botWork } from './botWork.ts';
 import { externalAgents } from './externalAgents.ts';
 import { agents } from './agents.ts';
@@ -19,6 +20,7 @@ import { skillProposals } from './skillProposals.ts';
 import { teams } from './teams.ts';
 
 export const zh = {
+  factory,
   externalAgents,
   botWork,
   common,

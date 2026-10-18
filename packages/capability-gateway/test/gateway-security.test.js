@@ -193,7 +193,10 @@ test('企微 secret 错误 403，正确则处理 [AC:gateway-im-security#AC-11]'
   assert.equal(runtime.calls.ran.length, 1);
 });
 
-test('企微密钥只认请求头，过期时间戳和重放不再跑 Agent', async () => {
+test('企微密钥只认请求头，过期时间戳和重放不再跑 Agent', async (t) => {
+  // Pin both timestamp construction and validation to one clock. A +301s
+  // timestamp becomes valid if the real clock crosses the next second.
+  t.mock.method(Date, 'now', () => 1_800_000_000_999);
   const { runtime, ctx } = wecomCtx({ enabled: true, bridgeSecret: 's3' });
   const now = Math.floor(Date.now() / 1000);
   const bodySecret = await wecomPost(ctx, { secret: 's3', userKey: 'alice', text: 'hi' }, {

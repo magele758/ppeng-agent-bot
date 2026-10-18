@@ -1,3 +1,5 @@
+import { FactoryService } from './factory/service.js';
+import { createFactoryTools } from './factory/tools.js';
 import { BotRoomService } from './rooms/index.js';
 import { recoverBotWork, tickBotWork, createBotManagementTools, expireOverdueBotWork, isBotWorkSessionBlocked, type BotWorkHost } from './bots/bot-work.js';
 import { applyConcurrentBotForks, clearActiveWorkPiece } from './bots/concurrent-fork.js';
@@ -240,6 +242,7 @@ export class RawAgentRuntime {
   tools: ToolContract<any>[];
   readonly connectors: ConnectorRegistry;
   readonly rooms: BotRoomService;
+  readonly factory: FactoryService;
   private loadedPlugins: LoadedPlugin[] = [];
   private connectorToolNames = new Set<string>();
   readonly secretVault: SecretVault;
@@ -508,6 +511,8 @@ export class RawAgentRuntime {
       runSession: (id, options) => this.runSession(id, options), cancelSession: (id) => this.cancelSession(id),
       isSessionRunning: (id) => this.runningSessions.has(id),
       hasUnconfirmedEffects: (id, since) => this.hasUnconfirmedEffects(id, since) });
+    this.factory = new FactoryService({store:this.store,rooms:this.rooms});
+    this.tools.push(...createFactoryTools(this.store,this.rooms,this.factory));
     this.computerUse = new LcuComputerUseProvider({
       clientFactory: options.computerUseClientFactory,
       enabled: () => readLcuSettings(this.store).enabled,
@@ -1185,6 +1190,7 @@ export class RawAgentRuntime {
   }
 
   async runScheduler(): Promise<void> {
+    void this.factory.tick().catch(error => this.log.warn('Factory scheduler failed', {error:String(error)}));
     await tickBotWork(this.botWorkRuntimeHost());
     void this.rooms.tick().catch((error) => this.log.warn('Room scheduler failed', { error: String(error) }));
     await runSchedulerFn(schedulerFrom(this.l5()));
@@ -1592,6 +1598,7 @@ export class RawAgentRuntime {
 
   /** Gracefully shut down all in-flight work, MCP sessions, and release SQLite. */
   async destroy(): Promise<void> {
+    await this.factory.close();
     await this.computerUse.close();
     // Writes still queued must land before the store closes, or replay loses them.
     // Turns aborted below can queue one more prepare; beforeClose flushes that too.

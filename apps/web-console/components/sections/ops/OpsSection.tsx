@@ -6,6 +6,7 @@ import { useI18n } from '@/lib/i18n';
 import { OpsPanel } from '../../OpsPanel';
 import { useLab } from '../../shell/LabProvider';
 import { SubTabs } from '../../ui';
+import { FactoryView } from './FactoryView';
 import { HealthView } from './HealthView';
 import './ops.css';
 
@@ -78,7 +79,7 @@ export function OpsWorkspace({
   onSelectPane: (pane: string) => void;
 }) {
   const { t } = useI18n();
-  const sub = pane === 'health' ? 'health' : 'trajectory';
+  const sub = pane === 'factory' ? 'factory' : pane === 'health' ? 'health' : 'trajectory';
   return (
     <div className="ops-workspace" id="section-ops">
       <h2 className="ops-workspace__title">{t('shell.nav.ops')}</h2>
@@ -86,7 +87,8 @@ export function OpsWorkspace({
       <SubTabs
         items={[
           { id: 'trajectory', label: t('shell.sub.ops.trajectory') },
-          { id: 'health', label: t('shell.sub.ops.health') }
+          { id: 'health', label: t('shell.sub.ops.health') },
+          { id: 'factory', label: t('factory.title') }
         ]}
         active={sub}
         onSelect={onSelectPane}
@@ -94,7 +96,7 @@ export function OpsWorkspace({
         idPrefix="section-ops"
       />
       <div id={`section-ops-${sub}`}>
-        {sub === 'health' ? <HealthView /> : <TrajectoryView />}
+        {sub === 'factory' ? <FactoryView /> : sub === 'health' ? <HealthView /> : <TrajectoryView />}
       </div>
     </div>
   );

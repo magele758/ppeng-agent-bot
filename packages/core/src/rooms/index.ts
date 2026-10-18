@@ -87,6 +87,7 @@ export class BotRoomService {
   }
   private get store() { return this.host.store; }
   private tx<T>(fn: () => T): T {
+    if (this.store.db.isTransaction) return fn();
     this.store.db.exec('BEGIN IMMEDIATE');
     try { const value = fn(); this.store.db.exec('COMMIT'); return value; }
     catch (error) { this.store.db.exec('ROLLBACK'); throw error; }
@@ -278,6 +279,14 @@ export class BotRoomService {
       const turn: BotRoomTurn = { id: turnId, roomId: id, messageId: message.id, status: 'queued', botIds: schedule.botIds, ...(schedule.mentionedBotIds !== undefined ? { mentionedBotIds: schedule.mentionedBotIds } : {}), maxBotTurns: room.maxBotTurns, botTurns: 0, toolCalls: 0, costUsd: 0, costStatus: 'unknown', cursor: 0, createdAt: now, updatedAt: now };
       this.store.db.prepare('INSERT INTO bot_room_turns(id,room_id,status,data) VALUES(?,?,?,?)').run(turn.id, id, turn.status, JSON.stringify(turn));
       return { message, turn };
+    });
+  }
+  /** A built-in command is recorded as human input without running a model round. */
+  sendHandled(principal: BotPrincipal, id: string, input: BotRoomMessageInput) {
+    return this.tx(() => {
+      const result=this.send(principal,id,input);
+      if(result.turn.status==='queued'){result.turn.status='completed';result.turn.terminationReason='handled_command';this.saveTurn(result.turn);}
+      return result;
     });
   }
   stop(principal: BotPrincipal, id: string): BotRoom {

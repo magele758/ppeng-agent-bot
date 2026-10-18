@@ -1,3 +1,4 @@
+import { filterFactoryTools } from '../factory/tool-policy.js';
 import { filterRoomTools } from '../rooms/tool-policy.js';
 /**
  * Per-turn tool allowlist: external-AI gate, agent/session whitelist, optional groups.
@@ -153,7 +154,7 @@ export function filterToolsForSession(input: {
     tools = tools.filter((t) => t.name !== MESSAGE_AGENT_TOOL_NAME);
   }
   tools = withSubagentHelp(input.session, tools, input.tools);
-  return { allowExternalAiTools, tools: filterRoomTools(input.session, stripSubagentDeniedTools(input.session, tools)) };
+  return { allowExternalAiTools, tools: filterFactoryTools(input.session, filterRoomTools(input.session, stripSubagentDeniedTools(input.session, tools)), input.settingsStore) };
 }
 
 /** A Room member turn is the only non-canonical session allowed to call message_agent. */
@@ -207,12 +208,12 @@ export function resolveTurnTools(input: {
     names.add(tool.name);
   }
   const merged = extras.length > 0 ? [...filtered.tools, ...extras] : filtered.tools;
-  const turnTools = filterRoomTools(input.session, stripSubagentDeniedTools(
+  const turnTools = filterFactoryTools(input.session, filterRoomTools(input.session, stripSubagentDeniedTools(
     input.session,
     isCanonicalBotChatSession(input.session) || isRoomMemberSession(input.session)
       ? merged
       : merged.filter((t) => t.name !== MESSAGE_AGENT_TOOL_NAME)
-  ));
+  )), input.settingsStore);
   const profile = runProfileFromSession(input.session);
   const bindPatch = sealTaskRunModePatch(input.session.metadata, profile.mode);
   const workspaceSeal = sealWorkspaceBindingPatch(
