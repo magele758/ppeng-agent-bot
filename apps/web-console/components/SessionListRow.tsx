@@ -1,6 +1,6 @@
 'use client';
 
-import type { CSSProperties, ReactNode } from 'react';
+import { useRef, type CSSProperties, type PointerEvent, type ReactNode } from 'react';
 import { botFaceIdleDelay } from '@/lib/bot-face';
 import type { BotInfo, SessionSummary } from '@/lib/types';
 import { useI18n } from '@/lib/i18n';
@@ -10,6 +10,12 @@ import { useBotWorkMood } from './bot-work/BotWorkState';
 
 function isCoreExecAgent(id: string): boolean {
   return id === 'general' || id === 'main';
+}
+
+function pointerOpensRow(event: PointerEvent<HTMLElement>, selectMode: boolean): boolean {
+  if (selectMode || event.button !== 0) return false;
+  const target = event.target;
+  return !(target instanceof Element && target.closest('button, a, input, textarea, select'));
 }
 
 export function SessionListRow({
@@ -42,6 +48,7 @@ export function SessionListRow({
   deleteLabel?: string;
 }) {
   const { t } = useI18n();
+  const openedByPointer = useRef(false);
   const copy = sessionRowCopy({
     session,
     bots,
@@ -63,9 +70,18 @@ export function SessionListRow({
       role="button"
       tabIndex={0}
       data-session-kind={bot ? 'bot' : 'plain'}
+      onPointerDown={(event) => {
+        if (!pointerOpensRow(event, selectMode)) return;
+        openedByPointer.current = true;
+        onOpen();
+      }}
       onClick={() => {
         if (selectMode) {
           onToggleChecked(!checked);
+          return;
+        }
+        if (openedByPointer.current) {
+          openedByPointer.current = false;
           return;
         }
         onOpen();

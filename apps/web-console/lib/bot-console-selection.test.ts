@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   createDefaultBotLoadGuard,
   createGenerationGuard,
+  defaultBotLoadMaySelect,
   loadSelectedBotDetail,
   rowsForSession,
   selectionForBot,
@@ -113,4 +114,26 @@ test('default bot load runs again after the first pass is cancelled [AC:bot-cons
   assert.deepEqual(selected, ['second']);
   assert.equal(guard.held, false);
   stopSecond?.();
+});
+
+test('a click before the default Bot open starts keeps that chat [AC:bot-face-first-creation#AC-4]', async () => {
+  let selected: string | null = null;
+  const selectionAtStart = selected;
+  const arrived = deferred<void>();
+  let opened = '';
+  const load = (async () => {
+    await arrived.promise;
+    if (!defaultBotLoadMaySelect(selectionAtStart, selected, false)) return;
+    opened = 'super-bot';
+    selected = 'super-session';
+  })();
+
+  selected = 'alpha-session';
+  arrived.resolve();
+  await load;
+  assert.equal(opened, '');
+  assert.equal(selected, 'alpha-session');
+  assert.equal(defaultBotLoadMaySelect(null, null, false), true);
+  assert.equal(defaultBotLoadMaySelect(null, 'alpha-session', false), false);
+  assert.equal(defaultBotLoadMaySelect(null, null, true), false);
 });
