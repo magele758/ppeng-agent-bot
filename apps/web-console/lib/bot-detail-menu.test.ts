@@ -37,3 +37,10 @@ test('记忆值里的 token 原文会被换成占位 [AC:bot-detail-menu#AC-1]',
   assert.equal(presentMemoryValue('note', 'Bearer sk-live-secret-token', hidden).includes('sk-live'), false);
   assert.equal(presentMemoryValue('city', '杭州', hidden), '杭州');
 });
+
+test('nested memory configuration hides named secrets without dropping ordinary fields [AC:bot-detail-menu#AC-1]', () => {
+  const shown = presentMemoryValue('settings', JSON.stringify({ theme: 'dark', auth: { apiKey: 'opaque-private-value', token: 'another-private-value' } }), '[hidden]');
+  assert.ok(shown.includes('dark'));
+  assert.ok(!shown.includes('opaque-private-value'));
+  assert.ok(!shown.includes('another-private-value'));
+});
