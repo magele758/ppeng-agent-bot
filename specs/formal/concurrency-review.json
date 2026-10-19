@@ -103,19 +103,19 @@
       ]
     },
     {
-      "step": "Post-admission checkpoint identity regression: actual RawAgentRuntime and SQLite for both kernels with a deterministic scheduling cut; complements the real-process matrix",
-      "files": [
-        "packages/core/test/approval-admission-race.test.js",
-        "packages/core/src/turn/kernel.ts",
-        "packages/agent-loop/src/turn/kernel.ts"
-      ]
-    },
-    {
       "step": "Reviewed per-command isolation approval integration and exact latest-decision lookup; dedicated security regressions supplement bounded process fixtures",
       "files": [
         "packages/core/src/sandbox/model-isolation.ts",
         "packages/core/src/runtime/spawn-host.ts",
         "packages/core/test/model-sandbox-isolation.test.js"
+      ]
+    },
+    {
+      "step": "Post-admission checkpoint identity regression: actual RawAgentRuntime and SQLite for both kernels with a deterministic scheduling cut; complements the real-process matrix",
+      "files": [
+        "packages/core/test/approval-admission-race.test.js",
+        "packages/core/src/turn/kernel.ts",
+        "packages/agent-loop/src/turn/kernel.ts"
       ]
     }
   ],
@@ -189,9 +189,9 @@
     "packages/core/test/unattended-approval-writer-scope.test.js": "23c17f903361bc53bbb0b7733eb4bf9147b4977c4dc546f800862cf2856b9371",
     "packages/core/src/bots/bot-work.ts": "19a710f12efdd7b9c388c235838a54257a90f5130da3ece7aaf30248289dddd4",
     "packages/core/src/runtime/subagent-policy.ts": "6a08e1262ccd479f772095b0450fd8bda077d09bd43bec67087bc68c7cc9f1d1",
-    "packages/core/test/approval-admission-race.test.js": "7cc7a84f410356079645121a3e060573ef2782d4287be6959924efb195c782cc",
     "packages/core/src/sandbox/model-isolation.ts": "ebbe3a893976214b72de4d4d995a7e4458d1a9275165aeaebf3f0dae1d942129",
     "packages/core/src/runtime/spawn-host.ts": "a087208d90bf31d0b458bbc546f6be51167d0f8e91f96ad32967c76c2d88046d",
-    "packages/core/test/model-sandbox-isolation.test.js": "a079f30070173d361291ae59fa4f70829cf116daed4b7fec6b3593abe7a17d35"
+    "packages/core/test/model-sandbox-isolation.test.js": "a079f30070173d361291ae59fa4f70829cf116daed4b7fec6b3593abe7a17d35",
+    "packages/core/test/approval-admission-race.test.js": "7cc7a84f410356079645121a3e060573ef2782d4287be6959924efb195c782cc"
   }
 }
