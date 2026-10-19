@@ -19,7 +19,10 @@ const DENIED = [
   'message_agent',
   'cron_create',
   'cron_run_now',
-  'ask_user'
+  'ask_user',
+  'factory_settings_save',
+  'factory_patrol_set',
+  'factory_list_repos'
 ];
 
 class ScriptedAdapter {

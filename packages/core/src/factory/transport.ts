@@ -160,22 +160,16 @@ function verifiedReport(value: unknown, development = false): FactoryReport {
 }
 export class SshFactoryTransport implements FactoryTransport {
   private children = new Set<ChildProcess>();
-  private invoke(
-    machine: FactoryMachine,
-    action: string,
-    task?: FactoryTask,
-    extra?: Record<string, unknown>,
+  private spawnRemote(
+    alias: string,
+    program: string,
+    payload: unknown,
+    timeoutMs: number,
+    maxOutput: number,
   ): Promise<unknown> {
-    if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/.test(machine.sshAlias))
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/.test(alias))
       return Promise.reject(new Error("Invalid SSH alias"));
-    if (task?.development?.reviewCarry && Buffer.byteLength(JSON.stringify(task.development.reviewCarry),"utf8") > 262144)
-      return Promise.reject(new Error("Review summary exceeds continuation budget; recovery required"));
     return new Promise((resolve, reject) => {
-      const repo = machine.repositories.find(
-          (r) => r.id === task?.repositoryId,
-        ),
-        logPath = repo?.logs?.find((l) => l.id === task?.logId)?.path;
-      const program = action === "delivery" ? `import base64;exec(base64.b64decode('${Buffer.from(DELIVERY_WORKER).toString("base64")}'))` : task?.development || action === "preflight" ? `source=__import__('base64').b64decode('${Buffer.from(DEVELOPMENT_WORKER).toString("base64")}').decode();globals()['_SOURCE']=source;exec(source)` : bootstrap;
       const child = spawn(
         "ssh",
         [
@@ -191,7 +185,7 @@ export class SshFactoryTransport implements FactoryTransport {
           "-o",
           "ServerAliveCountMax=2",
           "--",
-          machine.sshAlias,
+          alias,
           `python3 -I -c "${program}"`,
         ],
         {
@@ -210,16 +204,13 @@ export class SshFactoryTransport implements FactoryTransport {
         this.children.delete(child);
         err ? reject(err) : resolve(value);
       };
-      const timer = setTimeout(
-        () => {
-          terminateProcessTree(child);
-          end(new Error("SSH response unavailable; verify remote receipt"));
-        },
-        action === "delivery" ? 120000 : action === "preflight" ? 90000 : action === "start" ? Math.max(90000,(task?.timeoutMs ?? 30000) + 15000) : action === "stop" ? 25000 : 15000,
-      );
+      const timer = setTimeout(() => {
+        terminateProcessTree(child);
+        end(new Error("SSH response unavailable; verify remote receipt"));
+      }, timeoutMs);
       child.stdout?.on("data", (part) => {
         output += part.toString();
-        if (output.length > (task?.development || action === "artifact" ? 2097152 : 131072)) {
+        if (output.length > maxOutput) {
           terminateProcessTree(child);
           end(new Error("Remote result exceeds limit"));
         }
@@ -237,10 +228,40 @@ export class SshFactoryTransport implements FactoryTransport {
         }
       });
       child.stdin?.on("error", () => {});
-      const wireTask = task?.development ? {id:task.id,identity:task.identity,repositoryPath:task.repositoryPath,principal:task.principal,machineId:task.machineId,
-        development:{requirement:task.development.requirement,baseline:task.development.baseline,policy:task.development.policy,generation:task.development.generation,round:task.development.round,dependency:task.development.dependency,reviewCarry:task.development.reviewCarry,deliveryInput:task.development.deliveryInput,verifyCurrent:task.development.verifyCurrent}} : task;
-      child.stdin?.end(JSON.stringify({ action, task:wireTask, logPath, ...extra }));
+      child.stdin?.end(JSON.stringify(payload));
     });
+  }
+  /** Fixed Python source only. Caller data stays in the JSON payload, not the shell command. */
+  runFixedPython(alias: string, source: string, payload: unknown): Promise<unknown> {
+    const program = `import base64;exec(base64.b64decode('${Buffer.from(source).toString("base64")}'))`;
+    return this.spawnRemote(alias, program, payload, 20000, 262144);
+  }
+  private invoke(
+    machine: FactoryMachine,
+    action: string,
+    task?: FactoryTask,
+    extra?: Record<string, unknown>,
+  ): Promise<unknown> {
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/.test(machine.sshAlias))
+      return Promise.reject(new Error("Invalid SSH alias"));
+    if (task?.development?.reviewCarry && Buffer.byteLength(JSON.stringify(task.development.reviewCarry),"utf8") > 262144)
+      return Promise.reject(new Error("Review summary exceeds continuation budget; recovery required"));
+    const repo = machine.repositories.find(
+        (r) => r.id === task?.repositoryId,
+      ),
+      logPath = repo?.logs?.find((l) => l.id === task?.logId)?.path;
+    const program = action === "delivery" ? `import base64;exec(base64.b64decode('${Buffer.from(DELIVERY_WORKER).toString("base64")}'))` : task?.development || action === "preflight" ? `source=__import__('base64').b64decode('${Buffer.from(DEVELOPMENT_WORKER).toString("base64")}').decode();globals()['_SOURCE']=source;exec(source)` : bootstrap;
+    const timeoutMs = action === "delivery" ? 120000 : action === "preflight" ? 90000 : action === "start" ? Math.max(90000,(task?.timeoutMs ?? 30000) + 15000) : action === "stop" ? 25000 : 15000;
+    const maxOutput = task?.development || action === "artifact" ? 2097152 : 131072;
+    const wireTask = task?.development ? {id:task.id,identity:task.identity,repositoryPath:task.repositoryPath,principal:task.principal,machineId:task.machineId,
+      development:{requirement:task.development.requirement,baseline:task.development.baseline,policy:task.development.policy,generation:task.development.generation,round:task.development.round,dependency:task.development.dependency,reviewCarry:task.development.reviewCarry,deliveryInput:task.development.deliveryInput,verifyCurrent:task.development.verifyCurrent}} : task;
+    return this.spawnRemote(
+      machine.sshAlias,
+      program,
+      { action, task: wireTask, logPath, ...extra },
+      timeoutMs,
+      maxOutput,
+    );
   }
   async delivery(m:FactoryMachine,request:DeliveryRequest,t?:FactoryTask){
     const result=await this.invoke(m,"delivery",t,request) as any;
