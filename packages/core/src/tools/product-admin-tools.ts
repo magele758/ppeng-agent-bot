@@ -364,6 +364,10 @@ export function createProductAdminTools(host: ProductAdminHost): ToolContract<Re
           if (decision.notice) modelNotice = decision.notice;
           else if (decision.pin) modelPin = decision.pin;
         }
+        const skillCatalog = 'allowedSkills' in args && host.skillNames
+          ? (await host.skillNames()).map((name) => ({ name })) : undefined;
+        if ('allowedSkills' in args && !skillCatalog) throw new ValidationError('allowedSkills requires a skill catalog');
+        return store.transaction(() => {
         const principal = principalOf(store, ctx.session);
         const persona = typeof args.persona === 'string' ? args.persona.trim() : '';
         const bot = createBot(host.facade, {
@@ -394,12 +398,6 @@ export function createProductAdminTools(host: ProductAdminHost): ToolContract<Re
         let next = getBot(store, bot.id);
         if (persona || Object.keys(patch).length > 0) {
           const dyn = tryCreateDynToolStore(store);
-          const skillCatalog = patch.allowedSkills !== undefined && host.skillNames
-            ? (await host.skillNames()).map((name) => ({ name }))
-            : undefined;
-          if (patch.allowedSkills !== undefined && !skillCatalog) {
-            throw new ValidationError('allowedSkills requires a skill catalog');
-          }
           next = updateBot(host.facade, bot.id, patch, {
             toolCatalog: host.toolNames().map((name) => ({ name })),
             dynToolNames: dyn ? dyn.list({ sessionId: bot.canonicalSessionId }).map((record) => record.name) : undefined,
@@ -412,6 +410,7 @@ export function createProductAdminTools(host: ProductAdminHost): ToolContract<Re
         }
         const view = { bot: botView(store, next) };
         return modelNotice ? { ...view, modelNotice } : view;
+        });
       }
     },
     {

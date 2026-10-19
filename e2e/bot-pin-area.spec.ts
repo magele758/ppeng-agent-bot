@@ -79,10 +79,11 @@ test('普通 Bot 拖进置顶区后可见、不重复、刷新仍在且原分组
     await expect(pinByName(page, bot.name)).toHaveCount(1);
     await expect(pinByName(page, bot.name)).toContainText(bot.name);
     await expect(pinByName(page, boss.name)).toHaveCount(1);
-    await expect(groupSection(page, group.id)).toContainText(bot.name);
+    await expect(groupSection(page, group.id).locator(`[data-bot-name="${bot.name}"]`)).toHaveCount(0);
     await expect(groupSection(page, 'ungrouped')).not.toContainText(bot.name);
+    expect(await memberIds(request, group.id)).toContain(bot.id);
 
-    await draggableBot(page, group.id, bot.name).dragTo(pinArea(page));
+    await pinByName(page, bot.name).dragTo(pinArea(page));
     await expect(pinByName(page, bot.name)).toHaveCount(1);
     await expect(pinByName(page, boss.name)).toHaveCount(1);
 
@@ -95,8 +96,9 @@ test('普通 Bot 拖进置顶区后可见、不重复、刷新仍在且原分组
     await expect(page.getByTestId('functional-group-ungrouped')).toBeVisible();
     await expect(pinByName(page, bot.name)).toHaveCount(1);
     await expect(pinByName(page, boss.name)).toHaveCount(1);
-    await expect(groupSection(page, group.id)).toContainText(bot.name);
+    await expect(groupSection(page, group.id).locator(`[data-bot-name="${bot.name}"]`)).toHaveCount(0);
     await expect(groupSection(page, 'ungrouped')).not.toContainText(bot.name);
+    expect(await memberIds(request, group.id)).toContain(bot.id);
     const reloaded = await readPins(page);
     expect(reloaded).toEqual(pinned);
   } finally {
@@ -111,6 +113,8 @@ test('未自定义时置顶区已有 Super Bot [AC:bot-pin-area#AC-3]', async ({
   await expect(pinByName(page, 'Super Bot')).toHaveCount(1);
   await expect(pinByName(page, 'Super Bot')).toContainText('Super Bot');
   await expect(pinByName(page, 'Super Bot')).toHaveAttribute('data-bot-name', 'Super Bot');
+  await expect(groupSection(page, 'ungrouped').locator('[data-bot-name="Super Bot"]')).toHaveCount(0);
+  await expect(pinArea(page)).toHaveCount(1);
   const state = await readPins(page);
   if (state !== null) expect(state).toEqual({ customized: false, ids: [] });
   expect(boss.name).toBe('Super Bot');
@@ -131,7 +135,9 @@ test('拖出置顶区后刷新不回来，原分组保留，Super Bot 也可以�
     await page.reload();
     await expect(pinByName(page, bot.name)).toHaveCount(1);
     await expect(pinByName(page, boss.name)).toHaveCount(1);
-    await expect(groupSection(page, group.id)).toContainText(bot.name);
+    await expect(groupSection(page, group.id).locator(`[data-bot-name="${bot.name}"]`)).toHaveCount(0);
+    await expect(groupSection(page, 'ungrouped').locator('[data-bot-name="Super Bot"]')).toHaveCount(0);
+    expect(await memberIds(request, group.id)).toContain(bot.id);
 
     await pinByName(page, bot.name).dragTo(page.locator('.play-main-col'));
     await expect(pinByName(page, bot.name)).toHaveCount(0);
@@ -305,6 +311,14 @@ async function createRoom(request: APIRequestContext, title: string, botIds: str
   const raw = await res.text();
   expect(res.status(), raw).toBe(201);
   return (JSON.parse(raw) as { room: { id: string; title: string } }).room;
+}
+
+async function memberIds(request: APIRequestContext, groupId: string): Promise<string[]> {
+  const res = await request.get('/api/bot-functional-groups');
+  const raw = await res.text();
+  expect(res.ok(), raw).toBeTruthy();
+  const { groups } = JSON.parse(raw) as { groups: { id: string; botIds: string[] }[] };
+  return groups.find((group) => group.id === groupId)?.botIds ?? [];
 }
 
 async function moveToGroup(request: APIRequestContext, botId: string, groupId: string): Promise<void> {

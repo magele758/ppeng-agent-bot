@@ -46,6 +46,8 @@ import {
   speakingMouth,
   talkingMouthAmount,
   stepBlinkClock,
+  BUSY_BLINK_PACE,
+  busyPose,
   toolScan,
   turnFinishHappyUntil,
   type BlinkClock
@@ -302,6 +304,21 @@ test('对话状态按最新片段切换', () => {
   assert.equal(expressionForMood('thinking'), 'ellipsis');
   assert.equal(expressionForMood('speaking'), 'talk');
   assert.equal(expressionForMood('tool'), 'surprised');
+});
+
+test('干活时眨眼更密，身体连续侧看和点头但幅度不大 [AC:bot-face-readable-shapes#AC-4]', () => {
+  const resting: BlinkClock = { nextAtMs: 0, startedAtMs: null, followAtMs: null };
+  const busy = stepBlinkClock(resting, 1000, 0.9, BUSY_BLINK_PACE);
+  const calm = stepBlinkClock(resting, 1000, 0.9);
+  assert.ok(busy.clock.nextAtMs < calm.clock.nextAtMs);
+  assert.ok(busy.clock.nextAtMs - 1000 < 2100);
+  const samples = [0, 180, 340, 520, 880].map((now) => busyPose(now));
+  const look = samples.map((pose) => pose.lookX);
+  assert.ok(Math.min(...look) < -0.4 && Math.max(...look) > 0.4, `look should sweep both ways: ${look.join(',')}`);
+  const nods = samples.map((pose) => pose.bob);
+  assert.ok(Math.max(...nods) - Math.min(...nods) > 1, `nod should keep moving: ${nods.join(',')}`);
+  assert.ok(samples.every((pose) => Math.abs(pose.bob) < 2.4 && Math.abs(pose.tilt) <= 8));
+  assert.ok(Math.max(...samples.map((pose) => pose.tilt)) - Math.min(...samples.map((pose) => pose.tilt)) > 4);
 });
 
 test('眨眼从张开到闭合再张开，并可以连眨一次', () => {

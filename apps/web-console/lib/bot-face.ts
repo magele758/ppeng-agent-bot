@@ -249,14 +249,14 @@ export type FaceLayout = {
 
 const FACE_LAYOUTS: Record<BotFaceShape, FaceLayout> = {
   triangle: { left: 27, right: 37, eyeY: 40, eyeW: 4.6, eyeH: 10, mouthY: 48, markY: 28 },
-  house: { left: 26, right: 38, eyeY: 40, eyeW: 4.8, eyeH: 11, mouthY: 50, markY: 22 },
+  house: { left: 26, right: 38, eyeY: 36, eyeW: 5, eyeH: 11, mouthY: 48, markY: 20 },
   teardrop: { left: 26, right: 38, eyeY: 40, eyeW: 5.2, eyeH: 13, mouthY: 50, markY: 22 },
   heart: { left: 26, right: 38, eyeY: 34, eyeW: 4.8, eyeH: 11, mouthY: 44, markY: 18 },
-  star: { left: 27, right: 37, eyeY: 33, eyeW: 4.2, eyeH: 9, mouthY: 42, markY: 18 },
+  star: { left: 26, right: 38, eyeY: 32, eyeW: 5.2, eyeH: 12, mouthY: 44, markY: 16 },
   tall: { left: 27, right: 37, eyeY: 32, eyeW: 5, eyeH: 13, mouthY: 46, markY: 16 },
   bean: { left: 24, right: 40, eyeY: 33, eyeW: 5, eyeH: 11, mouthY: 42, markY: 18 },
   flower: { left: 26.5, right: 37.5, eyeY: 32, eyeW: 5.2, eyeH: 12, mouthY: 44, markY: 14 },
-  cloud: { left: 26, right: 38, eyeY: 33, eyeW: 5.4, eyeH: 13, mouthY: 46, markY: 16 },
+  cloud: { left: 27, right: 39, eyeY: 34, eyeW: 5.2, eyeH: 11, mouthY: 45, markY: 18 },
   clover: { left: 26, right: 38, eyeY: 33, eyeW: 5.4, eyeH: 13, mouthY: 46, markY: 16 },
   splat: { left: 26, right: 38, eyeY: 33, eyeW: 5.4, eyeH: 13, mouthY: 46, markY: 16 },
   hexagon: { left: 26, right: 38, eyeY: 33, eyeW: 5.4, eyeH: 13, mouthY: 46, markY: 16 },
@@ -462,6 +462,9 @@ const DOUBLE_BLINK_CHANCE = 0.18;
 const DOUBLE_BLINK_GAP_MS = 150;
 const BLINK_MIN_GAP_MS = 2100;
 const BLINK_GAP_SPAN_MS = 2700;
+
+/** Shorter blink gap while a turn is live, so the face looks occupied. */
+export const BUSY_BLINK_PACE = { minGapMs: 420, gapSpanMs: 560 } as const;
 const CLOSED_OPENNESS = 0.14;
 
 export type BlinkClock = {
@@ -502,7 +505,8 @@ export function blinkOpenness(nowMs: number, startedAtMs: number | null): number
 export function stepBlinkClock(
   clock: BlinkClock,
   nowMs: number,
-  random01: number
+  random01: number,
+  pace?: { minGapMs?: number; gapSpanMs?: number }
 ): { clock: BlinkClock; open: number } {
   let next = clock;
   if (next.startedAtMs !== null && nowMs - next.startedAtMs >= BLINK_SPAN_MS) {
@@ -516,7 +520,9 @@ export function stepBlinkClock(
     const roll = clamp01(random01);
     const double = roll < DOUBLE_BLINK_CHANCE;
     const followAtMs = double ? nowMs + BLINK_SPAN_MS + DOUBLE_BLINK_GAP_MS : null;
-    const gap = BLINK_MIN_GAP_MS + roll * BLINK_GAP_SPAN_MS;
+    const minGap = pace?.minGapMs ?? BLINK_MIN_GAP_MS;
+    const gapSpan = pace?.gapSpanMs ?? BLINK_GAP_SPAN_MS;
+    const gap = minGap + roll * gapSpan;
     next = {
       startedAtMs: nowMs,
       followAtMs,
@@ -573,6 +579,25 @@ export function resolveEyePose(input: {
     return { lookX: gaze.x, lookY: gaze.y, expression };
   }
   return { lookX: input.idle.x, lookY: input.idle.y, expression };
+}
+
+export type BusyPose = { lookX: number; lookY: number; bob: number; tilt: number };
+
+/**
+ * Small continuous motion while a turn is live.
+ * lookX sweeps left and right, bob nods, tilt rocks the body.
+ * Idle faces do not call this.
+ */
+export function busyPose(nowMs: number): BusyPose {
+  const glance = Math.sin((nowMs / 520) * Math.PI * 2);
+  const nod = Math.sin((nowMs / 280) * Math.PI * 2);
+  const sway = Math.sin((nowMs / 880) * Math.PI * 2);
+  return {
+    lookX: glance * 0.9,
+    lookY: nod * 0.42,
+    bob: nod * 1.5,
+    tilt: sway * 7
+  };
 }
 
 /** Horizontal scan used while a tool is running. phase is 0…1. */

@@ -62,8 +62,6 @@ test('切换会话后画面不再绘制上一场进行中的回合 [AC:bot-switc
   assert.equal(detached.detached, true);
   assert.equal(detached.liveSessionId, null);
   assert.equal(streamPaintApplies(detached.generation, 4), false);
-  assert.equal(mayClaimSelectedSession(detached.generation, 4, 'session-b', 'session-a'), false);
-  assert.equal(mayClaimSelectedSession(4, 4, 'session-b', 'session-a'), false);
 
   const slots = buildFeedSlots({
     messages: screen.messages.map((message) => ({ id: message.id })),
@@ -85,10 +83,64 @@ test('切换会话后画面不再绘制上一场进行中的回合 [AC:bot-switc
   );
 });
 
+test('切走后、新会话装上画面前，不再绘制上一场已经写出的文字和后续吐字 [AC:bot-switch-live-turn#AC-4]', () => {
+  const writtenOnA = [
+    { id: 'a-user', role: 'user', text: 'A 的问题' },
+    { id: 'a-assistant', role: 'assistant', text: 'A 正在吐的字' },
+  ];
+  const beforeBLoads = screenLiveTurn({
+    selectedSessionId: 'session-b',
+    loadedSessionId: 'session-a',
+    messages: writtenOnA,
+    liveSessionId: 'session-a',
+    optimisticUser: 'A 正在发送',
+    hasStream: true,
+    waitTyping: true,
+    playSending: true,
+  });
+  assert.deepEqual(beforeBLoads.messages, []);
+  assert.equal(beforeBLoads.bound, false);
+  assert.equal(beforeBLoads.optimisticUser, null);
+  assert.equal(beforeBLoads.hasStream, false);
+  assert.equal(beforeBLoads.waitTyping, false);
+  assert.equal(beforeBLoads.playSending, false);
+
+  const laterTokens = screenLiveTurn({
+    selectedSessionId: 'session-b',
+    loadedSessionId: 'session-a',
+    messages: [...writtenOnA, { id: 'a-more', role: 'assistant', text: 'A 后续 token' }],
+    liveSessionId: 'session-b',
+    optimisticUser: '…',
+    hasStream: true,
+    waitTyping: true,
+    playSending: true,
+  });
+  assert.deepEqual(laterTokens.messages, []);
+  assert.equal(laterTokens.hasStream, false);
+  assert.equal(laterTokens.waitTyping, false);
+  assert.equal(laterTokens.optimisticUser, null);
+
+  const bLoaded = screenLiveTurn({
+    selectedSessionId: 'session-b',
+    loadedSessionId: 'session-b',
+    messages: historyB,
+    liveSessionId: 'session-a',
+    optimisticUser: 'A 正在发送',
+    hasStream: true,
+    waitTyping: true,
+    playSending: true,
+  });
+  assert.equal(bLoaded.bound, true);
+  assert.equal(bLoaded.messages, historyB);
+  assert.equal(bLoaded.hasStream, false);
+  assert.equal(bLoaded.optimisticUser, null);
+});
+
 test('留在当前会话时继续显示这场进行中的回合 [AC:bot-switch-live-turn#AC-3]', () => {
   const historyA = [{ id: 'a-user', role: 'user', text: 'A 的问题' }];
   const screen = screenLiveTurn({
     selectedSessionId: 'session-a',
+    loadedSessionId: 'session-a',
     messages: historyA,
     liveSessionId: 'session-a',
     optimisticUser: 'A 正在发送',
@@ -96,6 +148,7 @@ test('留在当前会话时继续显示这场进行中的回合 [AC:bot-switch-l
     waitTyping: false,
     playSending: true,
   });
+  assert.equal(screen.bound, true);
   assert.equal(screen.messages, historyA);
   assert.equal(screen.optimisticUser, 'A 正在发送');
   assert.equal(screen.hasStream, true);
@@ -104,8 +157,52 @@ test('留在当前会话时继续显示这场进行中的回合 [AC:bot-switch-l
   assert.equal(shouldDetachLiveTurn('session-a', 'session-a'), false);
   assert.equal(detachLiveTurn({ generation: 2, liveSessionId: 'session-a' }, 'session-a').detached, false);
   assert.equal(streamPaintApplies(2, 2), true);
-  assert.equal(mayClaimSelectedSession(2, 2, 'session-a', 'session-a'), true);
-  assert.equal(mayClaimSelectedSession(2, 2, null, 'session-a'), true);
+});
+
+test('late Bot opens cannot replace a newer request or session selection [AC:bot-switch-live-turn#AC-1]', async () => {
+  const {botOpenApplies, visibleStream, liveTurnRunning} = await import('./live-turn-session.ts');
+  let request = 1;
+  let selected: string | null = 'a';
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  const lateOpen = (async () => {
+    await pending;
+    if (botOpenApplies(1, request, 'a', selected, true)) selected = 'old-open-result';
+  })();
+  request = 2;
+  selected = 'b';
+  release();
+  await lateOpen;
+  assert.equal(selected, 'b');
+  assert.equal(botOpenApplies(2, 2, 'b', 'b', true), true);
+  assert.equal(botOpenApplies(2, 2, 'b', 'c', true), false);
+  assert.equal(botOpenApplies(2, 2, 'b', 'b', false), false);
+  assert.equal(visibleStream(false, {segments: []}), null);
+  const overlay = {segments: []};
+  assert.equal(visibleStream(true, overlay), overlay);
+  assert.equal(liveTurnRunning('a', 'b', true, true, true), false);
+  assert.equal(liveTurnRunning('a', 'a', true, false, false), true);
+  assert.equal(liveTurnRunning('a', 'a', false, true, false), true);
+  assert.equal(liveTurnRunning('a', 'a', false, false, true), true);
+  assert.equal(liveTurnRunning('a', 'a', false, false, false), false);
+});
+
+test('returning to A does not let an old steer response clear the new composer [AC:bot-switch-live-turn#AC-1]', async () => {
+  const {steerResponseApplies} = await import('./live-turn-session.ts');
+  assert.equal(steerResponseApplies(1, 3, 'a', 'a'), false);
+  assert.equal(steerResponseApplies(1, 1, 'a', 'b'), false);
+  assert.equal(steerResponseApplies(1, 1, 'a', 'a'), true);
+});
+
+test('selection already changed before generation detaches still refuses old session adoption [AC:bot-switch-live-turn#AC-1]', async () => {
+  const {mayClaimSelectedSession, canFollowSession} = await import('./live-turn-session.ts');
+  assert.equal(mayClaimSelectedSession(2, 2, 'b', 'a'), false);
+  assert.equal(mayClaimSelectedSession(3, 2, 'a', 'a'), false);
+  assert.equal(mayClaimSelectedSession(2, 2, null, 'a'), true);
+  assert.equal(mayClaimSelectedSession(2, 2, 'a', 'a'), true);
+  assert.equal(canFollowSession('b', 'a'), false);
+  assert.equal(canFollowSession('a', 'a'), true);
+  assert.equal(canFollowSession(null, 'a'), true);
 });
 
 test('切走后旧回合不能继续绘制、也不能把选中会话拽回去 [AC:bot-switch-live-turn#AC-1] [AC:bot-switch-live-turn#AC-2]', async () => {

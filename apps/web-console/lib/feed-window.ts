@@ -249,12 +249,14 @@ export function nextTranscriptWindow<T extends { id: string; seq?: number }>(inp
 }
 
 export function canRequestOlderPage(input: {
+  loadedSessionId?: string;
   sessionId: string | null;
   cursor: number | null;
   loading: boolean;
   reason: 'scroll' | 'auto';
   blocked: boolean;
 }): boolean {
+  if (input.loadedSessionId !== undefined && input.loadedSessionId !== input.sessionId) return false;
   if (!input.sessionId || input.cursor == null || input.loading) return false;
   if (input.reason === 'auto' && input.blocked) return false;
   return true;
@@ -264,7 +266,8 @@ export function showLatestWhenStuck(stick: boolean, show: (value: boolean) => vo
   if (stick) show(false);
 }
 
-export function pageEpochCurrent(currentSession: string | null, sessionId: string, epochNow: number, epochThen: number): boolean {
+export function pageEpochCurrent(currentSession: string | null, sessionId: string, epochNow: number, epochThen: number, loadedSessionId = sessionId): boolean {
+  if (loadedSessionId !== sessionId) return false;
   return currentSession === sessionId && epochNow === epochThen;
 }
 

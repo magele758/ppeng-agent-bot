@@ -586,3 +586,18 @@ test('project creation validates roots before persisting and retains the selecte
   assert.equal(created.body.project.roots[0].isPrimary,true);
   fx.store.db.close();
 });
+
+test('invalid creation configuration leaves no partial Bot, agent, or session [AC:bot-create-named-tools#AC-2]', async () => {
+ const fx = fixture({ skillNames: async () => ['Research'] });
+ try {
+  const before = { bots: fx.store.countBots({ includeHidden: true }), sessions: fx.store.listSessions().length, agents: fx.store.listAgents().length };
+  for (const extra of [{ allowedTools: ['missing_tool'] }, { allowedSkills: ['missing_skill'] }, { maxTurns: 999 }]) {
+   const result = await call(fx, 'create_bot', { name: 'Atomic creation', ...extra });
+   assert.equal(result.ok, false);
+   assert.equal(fx.store.getBotByName('Atomic creation'), undefined);
+   assert.deepEqual({ bots: fx.store.countBots({ includeHidden: true }), sessions: fx.store.listSessions().length, agents: fx.store.listAgents().length }, before);
+  }
+  const result = await call(fx, 'create_bot', { name: 'Atomic creation', allowedSkills: ['Research'], allowedTools: ['bot_list'] });
+  assert.equal(result.ok, true, JSON.stringify(result.body));
+ } finally { fx.store.db.close(); }
+});

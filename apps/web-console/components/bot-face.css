@@ -51,15 +51,16 @@
 }
 
 .bot-face--avatar.bot-face--working {
-  animation: bot-face-working 1.8s ease-in-out infinite;
+  animation: bot-face-working 0.85s ease-in-out infinite;
   transform-origin: center 70%;
 }
 
 @keyframes bot-face-working {
-  0%, 100% { transform: translateY(0) rotate(-3deg); }
-  25% { transform: translateY(-2px) rotate(0); }
-  50% { transform: translateY(0) rotate(3deg); }
-  75% { transform: translateY(-1px) rotate(0); }
+  0%, 100% { transform: translate(0, 0) rotate(-6deg); }
+  20% { transform: translate(-1.5px, -2px) rotate(3deg); }
+  40% { transform: translate(1.5px, 0) rotate(-4deg); }
+  60% { transform: translate(-1px, -1px) rotate(6deg); }
+  80% { transform: translate(1px, -2px) rotate(-2deg); }
 }
 
 .bot-face__work-label {

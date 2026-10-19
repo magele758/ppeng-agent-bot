@@ -15,15 +15,16 @@ import {
 } from '@/lib/feed-window';
 import { prependHistoryPage } from '@/lib/history-window';
 import { api } from '@/lib/api';
+import { loadSessionPanelResource, transcriptModelView } from '@/lib/session-panel-resource';
 import { modelErrorText } from '@/lib/model-errors';
 import { getSpeechRecognitionCtor, type SpeechRecognitionLike } from '@/lib/speech-dictation';
 import { renderMarkdown } from '@/lib/markdown';
 import { rollbackToCheckpoint, streamCheckpoint, type StreamSegment } from '@/lib/stream-segments';
 import { feedSseBuffer } from '@/lib/sse';
 import { liveSessionFollowRequest, type LiveStreamArm } from '@/lib/live-stream-attach';
+import { shouldResumeRunningTurn } from '@/lib/run-leave';
 import {
   applyWhen,
-  assertLiveTurn,
   assertSameSession,
   detachLiveTurn,
   generationForArm,
@@ -31,8 +32,8 @@ import {
   liveTurnBelongsToSelection,
   liveTurnIsRunning,
   liveTurnOwnerId,
-  LiveTurnSuperseded,
   mayClaimSelectedSession,
+  canFollowSession,
   ownsLiveTurn,
   releaseArmOwner,
   releaseIfCurrent,
@@ -46,6 +47,11 @@ import {
   shouldTickLiveArm,
   streamOverlayVisible,
   streamPaintApplies,
+  botOpenApplies,
+  visibleStream,
+  liveTurnRunning,
+  steerResponseApplies,
+  UNBOUND_LIVE_TURN,
   streamSessionAllowed,
   tickIfPersisted,
   visibleLiveOverlay,
@@ -243,6 +249,15 @@ export interface PlayChatDeps {
   tick: (opts?: { includePlayPanel?: boolean }) => Promise<void>;
 }
 
+function activeFollowMatches(follow: { sessionId: string; controller: AbortController; ready: Promise<void> } | null,
+  sessionId: string): boolean {
+  return follow?.sessionId === sessionId && !follow.controller.signal.aborted;
+}
+
+function isSessionResult(event: string, payload: { session?: { id?: string } }): payload is { session: { id: string } } {
+  return event === 'result' && Boolean(payload.session?.id);
+}
+
 export function usePlayChat(deps: PlayChatDeps) {
   const {
     selectedSessionId,
@@ -335,6 +350,9 @@ export function usePlayChat(deps: PlayChatDeps) {
   const [queryExecMode, setQueryExecMode] = useState<QueryExecMode>('steering');
 
   const playMessagesRef = useRef<HTMLDivElement>(null);
+  const playSendingLiveRef = useRef(false);
+  playSendingLiveRef.current = playSending;
+  const [chromeSessionId, setChromeSessionId] = useState<string | null>(null);
   const liveFollowRef = useRef<{
     sessionId: string;
     controller: AbortController;
@@ -342,6 +360,7 @@ export function usePlayChat(deps: PlayChatDeps) {
   } | null>(null);
   const liveOwnerRef = useRef<string | null>(null);
   const liveGenRef = useRef(0);
+  const botOpenRequestRef = useRef(0);
   const playInputRef = useRef<HTMLTextAreaElement>(null);
   const playInputLiveRef = useRef('');
   const speechRecRef = useRef<SpeechRecognitionLike | null>(null);
@@ -422,8 +441,17 @@ export function usePlayChat(deps: PlayChatDeps) {
   const liveTurnCurrent = (generation: number) => streamPaintApplies(liveGenRef.current, generation);
 
   const liveTurnOnScreen = (generation: number) =>
-    liveTurnCurrent(generation) &&
-    liveTurnBelongsToSelection(liveOwnerRef.current, selectedSessionRef.current);
+    liveTurnCurrent(generation) && liveTurnBelongsToSelection(liveOwnerRef.current, selectedSessionRef.current);
+
+  const assertSessionClaim = (generation: number, sessionId: string) => {
+    if (!mayClaimSelectedSession(liveGenRef.current, generation, selectedSessionRef.current, sessionId)) {
+      throw new Error('Detached session selection');
+    }
+  };
+
+  const assertLiveTurn = (generation: number) => {
+    if (!liveTurnCurrent(generation)) throw new Error('Detached live turn');
+  };
 
   const finishLiveTurn = (generation: number) => {
     if (!liveTurnCurrent(generation)) return;
@@ -829,6 +857,7 @@ export function usePlayChat(deps: PlayChatDeps) {
   const refreshPlayPanel = useCallback(async () => {
     const sid = selectedSessionRef.current;
     if (!sid) {
+      setChromeSessionId(null);
       historySessionRef.current='';
       historyAutoBlockedRef.current = false;
       setHistoryCursor(null);
@@ -898,6 +927,7 @@ export function usePlayChat(deps: PlayChatDeps) {
           ? 'ptc'
           : 'legacy'
       );
+      setChromeSessionId(sid);
       setSessionChrome(chrome);
       setGoalDraft(chrome.goalCondition ?? '');
       setAutonomyDraft(permissionToAutonomy(chrome.permissionMode));
@@ -939,29 +969,21 @@ export function usePlayChat(deps: PlayChatDeps) {
         })
       );
       loadedPinRef.current = { sid, pinned: nextPin !== null };
-      try {
-        if (showModelView) {
-        const view = (await api(`/api/sessions/${sid}/model-view`)) as SessionModelViewPayload;
-        setModelViewPayload(view);
-        } else setModelViewPayload(null);
-      } catch {
-        setModelViewPayload(null);
-      }
-      try {
-        const arts = (await api(`/api/sessions/${sid}/artifacts`)) as {
-          artifacts?: Array<{ id: string; title?: string; fileName?: string }>;
-        };
-        setSessionFileArtifacts(
-          (arts.artifacts ?? []).map((a) => ({
-            id: a.id,
-            title: a.title || a.fileName,
-            handle: a.id
-          }))
-        );
-      } catch {
-        setSessionFileArtifacts([]);
-      }
+      const panelCurrent = () => pageEpochCurrent(selectedSessionRef.current, sid, feedEpochRef.current, epoch + 1);
+      await loadSessionPanelResource<SessionModelViewPayload | null>(
+        async () => showModelView ? await api(`/api/sessions/${sid}/model-view`) as SessionModelViewPayload : null,
+        panelCurrent, setModelViewPayload, null
+      );
+      await loadSessionPanelResource(
+        async () => {
+          const arts = await api(`/api/sessions/${sid}/artifacts`) as { artifacts?: Array<{ id: string; title?: string; fileName?: string }> };
+          return (arts.artifacts ?? []).map(a => ({ id: a.id, title: a.title || a.fileName, handle: a.id }));
+        },
+        panelCurrent, setSessionFileArtifacts, []
+      );
     } catch {
+      if (!pageEpochCurrent(selectedSessionRef.current, sid, feedEpochRef.current, epoch)) return;
+      setChromeSessionId(null);
       historySessionRef.current = '';
       setHistoryCursor(null);
       rememberCanonicalBotChat(null);
@@ -1258,7 +1280,8 @@ export function usePlayChat(deps: PlayChatDeps) {
       cursor,
       loading: historyLoadingRef.current,
       reason,
-      blocked: historyAutoBlockedRef.current
+      blocked: historyAutoBlockedRef.current,
+      loadedSessionId: historySessionRef.current
     })) return;
     const epoch = feedEpochRef.current;
     historyLoadingRef.current = true;
@@ -1269,8 +1292,8 @@ export function usePlayChat(deps: PlayChatDeps) {
         hasMore: boolean;
         nextCursor: number | null;
       };
-      if (!pageEpochCurrent(selectedSessionRef.current, sid!, epoch, feedEpochRef.current)) return;
-      const older = (data.messages ?? []) as Array<ChatMessage & { id: string }>;
+      if (!pageEpochCurrent(selectedSessionRef.current, sid!, epoch, feedEpochRef.current, historySessionRef.current)) return;
+        const older = (data.messages ?? []) as Array<ChatMessage & { id: string }>;
       const planned = planFeedScroll('prepend', playStickToBottomRef.current, readFeedAnchor(playMessagesRef.current));
       playStickToBottomRef.current = planned.stick;
       showLatestWhenStuck(planned.stick, setShowJumpToLatest);
@@ -1304,24 +1327,19 @@ export function usePlayChat(deps: PlayChatDeps) {
 
   const openBotSession = useCallback(
     async (id: string, adopt?: { liveGen: number }): Promise<{ bot: BotInfo; sessionId: string }> => {
+      const requestId = ++botOpenRequestRef.current;
+      const selectedAtStart = selectedSessionRef.current;
+      const generation = adopt?.liveGen ?? liveGenRef.current;
       const data = (await api(`/api/bots/${encodeURIComponent(id)}/open`, {
         method: 'POST'
       })) as OpenBotResponse;
       const opened = parseOpenBotResponse(data);
-      if (
-        adopt &&
-        !mayClaimSelectedSession(
-          liveGenRef.current,
-          adopt.liveGen,
-          selectedSessionRef.current,
-          opened.sessionId
-        )
-      ) {
-        return opened;
-      }
+      if (!botOpenApplies(requestId, botOpenRequestRef.current, selectedAtStart, selectedSessionRef.current, liveTurnCurrent(generation))) return opened;
       applyBotSelection(opened.bot);
       upsertBot?.(opened.bot);
-      if (adopt) liveOwnerRef.current = opened.sessionId;
+      if (adopt) {
+        liveOwnerRef.current = opened.sessionId;
+      }
       selectedSessionRef.current = opened.sessionId;
       setSelectedSessionId(opened.sessionId);
       return opened;
@@ -1331,6 +1349,13 @@ export function usePlayChat(deps: PlayChatDeps) {
 
   const selectBot = useCallback(
     async (id: string) => {
+      // Invalidate pending opens and stream callbacks as soon as selection is requested.
+      botOpenRequestRef.current += 1;
+      liveGenRef.current += 1;
+      liveOwnerRef.current = null;
+      pendingSteerTextRef.current = null;
+      clearStreamingShell();
+      setPlaySending(false);
       if (!id) {
         applyBotSelection(null);
         return;
@@ -1367,9 +1392,10 @@ export function usePlayChat(deps: PlayChatDeps) {
   const readSseFetch = async (
     url: string,
     body: unknown,
-    onSession?: (id: string) => void,
-    opts?: { onReady?: () => void; signal?: AbortSignal; extraAttempts?: number; liveGen?: number }
+    onSession: ((id: string) => void) | undefined,
+    opts: { onReady?: () => void; signal?: AbortSignal; extraAttempts?: number; liveGen: number }
   ) => {
+    const streamGeneration = opts.liveGen;
     const throwIfAborted = () => {
       if (opts?.signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError');
     };
@@ -1414,16 +1440,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     const nextId = () => `s-${++idCounter}`;
 
     const sync = () => {
-      if (
-        !streamOverlayVisible({
-          liveGen: opts?.liveGen,
-          activeGeneration: liveGenRef.current,
-          liveSessionId: liveOwnerRef.current,
-          selectedSessionId: selectedSessionRef.current,
-        })
-      ) {
-        return;
-      }
+      if (!liveTurnOnScreen(streamGeneration)) return;
       setStreamOverlay({ segments: [...segments] });
     };
 
@@ -1446,6 +1463,7 @@ export function usePlayChat(deps: PlayChatDeps) {
           envelope?: Record<string, unknown>;
           session?: { id: string };
         };
+        if (!liveTurnOnScreen(streamGeneration)) return;
         if (event === 'ready') {
           opts?.onReady?.();
         }
@@ -1517,16 +1535,9 @@ export function usePlayChat(deps: PlayChatDeps) {
           }
           sync();
         }
-        const sid = resultSessionId(event, p.session?.id);
-        if (
-          sid &&
-          streamSessionAllowed({
-            liveGen: opts?.liveGen,
-            activeGeneration: liveGenRef.current,
-            selectedSessionId: selectedSessionRef.current,
-            sessionId: sid,
-          })
-        ) {
+        if (isSessionResult(event, p)) {
+          const sid = p.session.id;
+          assertSessionClaim(streamGeneration, sid);
           liveOwnerRef.current = sid;
           onSession?.(sid);
           selectedSessionRef.current = sid;
@@ -1540,16 +1551,28 @@ export function usePlayChat(deps: PlayChatDeps) {
    * Listen for the run that an ask_user approve/reject is about to start.
    * `ready` resolves once the server is subscribed, before that run begins.
    */
+  const reportFollowError = (error: unknown, controller: AbortController, generation: number) => {
+    if (controller.signal.aborted || !liveTurnOnScreen(generation)) return;
+    if (error instanceof Error && error.name === 'AbortError') return;
+    setPlayStatus({ text: String(error), err: true });
+  };
+
+  const finishFollow = async (controller: AbortController, generation: number, claimedHere: boolean) => {
+    if (liveFollowRef.current?.controller !== controller) return;
+    liveFollowRef.current = null;
+    if (!liveTurnCurrent(generation)) return;
+    clearStreamingShell();
+    if (claimedHere) liveOwnerRef.current = null;
+    if (!controller.signal.aborted) await tick({ includePlayPanel: true });
+  };
+
   const armLiveSessionStream = (sessionId: string): LiveStreamArm => {
-    const selected = selectedSessionRef.current;
-    if (shouldSkipForeignLiveArm(selected, sessionId)) {
-      return { ready: Promise.resolve(), cancel: () => undefined };
-    }
     const current = liveFollowRef.current;
-    if (current?.sessionId === sessionId && !current.controller.signal.aborted) {
+    if (!canFollowSession(selectedSessionRef.current, sessionId)) return { ready: Promise.resolve(), cancel: () => undefined };
+    if (activeFollowMatches(current, sessionId)) {
       return {
-        ready: current.ready,
-        cancel: () => current.controller.abort()
+        ready: current!.ready,
+        cancel: () => current!.controller.abort()
       };
     }
     current?.controller.abort();
@@ -1575,28 +1598,30 @@ export function usePlayChat(deps: PlayChatDeps) {
           liveGen: generation
         });
       } catch (error) {
-        const aborted = controller.signal.aborted || (error instanceof Error && error.name === 'AbortError');
-        if (shouldSurfaceLiveArmError(aborted, liveTurnOnScreen(generation))) {
-          setPlayStatus({ text: error instanceof Error ? error.message : String(error), err: true });
-        }
+        reportFollowError(error, controller, generation);
       } finally {
         resolveReady();
-        if (liveFollowRef.current?.controller !== controller) return;
-        liveFollowRef.current = null;
-        applyWhen(liveTurnCurrent(generation), () => clearStreamingShell());
-        applyWhen(
-          releaseArmOwner(liveTurnCurrent(generation), !alreadyOwner, liveOwnerRef.current === sessionId),
-          () => {
-            liveOwnerRef.current = null;
-          }
-        );
-        if (shouldTickLiveArm(liveTurnCurrent(generation), controller.signal.aborted)) {
-          await tick({ includePlayPanel: true });
-        }
+        await finishFollow(controller, generation, !alreadyOwner);
       }
     })();
     return { ready, cancel: () => controller.abort() };
   };
+
+  const armLiveSessionStreamRef = useRef(armLiveSessionStream);
+  armLiveSessionStreamRef.current = armLiveSessionStream;
+
+  useEffect(() => {
+    const sid = selectedSessionId;
+    if (!sid || chromeSessionId !== sid) return;
+    if (!shouldResumeRunningTurn({ status: sessionChrome?.status, locallySending: playSendingLiveRef.current })) {
+      return;
+    }
+    const armed = armLiveSessionStreamRef.current(sid);
+    return () => {
+      // Stop watching only. Closing this follow socket does not cancel the server run.
+      armed.cancel();
+    };
+  }, [selectedSessionId, chromeSessionId, sessionChrome?.status]);
 
   const ensurePlaySessionForImages = async (): Promise<string> => {
     if (selectedSessionRef.current) return selectedSessionRef.current;
@@ -1633,6 +1658,44 @@ export function usePlayChat(deps: PlayChatDeps) {
     return sid;
   };
 
+  const sendBotCommand = async (commandBotId: string, text: string) => {
+      stopSpeechDictation();
+      const generation = claimLiveTurn(liveTurnOwnerId(selectedSessionRef.current));
+      setPlaySending(true);
+      try {
+        let sid = selectedSessionRef.current;
+        if (!sid) {
+          sid = (await openBotSession(commandBotId, { liveGen: generation })).sessionId;
+          assertLiveTurn(generation);
+        }
+        const data = (await api(`/api/sessions/${sid}/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text, autoRun: false })
+        })) as {
+          command?: {
+            code?: string;
+            ok?: boolean;
+            arg?: string;
+            modelOverride?: { modelId?: string } | null;
+          };
+        };
+        assertLiveTurn(generation);
+        acknowledgeLocalSendCommitted();
+        clearComposerOnly();
+        clearStreamingShell();
+        const status = botComposerStatusText(t, data.command);
+        setPlayStatus({ text: status.text, ok: !status.err, err: status.err });
+        sessionListStickTopRef.current = true;
+        await tick({ includePlayPanel: true });
+      } catch (err) {
+        if (!liveTurnOnScreen(generation)) return;
+        setPlayStatus({ text: String(err), err: true });
+      } finally {
+        finishLiveTurn(generation);
+      }
+  };
+
   const sendPlayMessage = async () => {
     const text = playInput.trim();
     const imageAssetIds = [...pendingImageAssetIds];
@@ -1651,45 +1714,7 @@ export function usePlayChat(deps: PlayChatDeps) {
         hasAttachments
       }) === 'command'
     ) {
-      stopSpeechDictation();
-      const generation = claimLiveTurn(liveTurnOwnerId(selectedSessionRef.current));
-      setPlaySending(true);
-      try {
-        let sid = selectedSessionRef.current;
-        if (!sid) {
-          const opened = await openBotSession(commandBotId, { liveGen: generation });
-          assertLiveTurn(
-            mayClaimSelectedSession(liveGenRef.current, generation, selectedSessionRef.current, opened.sessionId)
-          );
-          sid = opened.sessionId;
-        }
-        const data = (await api(`/api/sessions/${sid}/messages`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text, autoRun: false })
-        })) as {
-          command?: {
-            code?: string;
-            ok?: boolean;
-            arg?: string;
-            modelOverride?: { modelId?: string } | null;
-          };
-        };
-        assertLiveTurn(liveTurnOnScreen(generation));
-        acknowledgeLocalSendCommitted();
-        clearComposerOnly();
-        finishLiveTurn(generation);
-        const status = botComposerStatusText(t, data.command);
-        setPlayStatus({ text: status.text, ok: !status.err, err: status.err });
-        sessionListStickTopRef.current = true;
-        await tick({ includePlayPanel: true });
-      } catch (err) {
-        reportOwnedError(ownsLiveTurn(err, liveTurnOnScreen(generation)), () =>
-          setPlayStatus({ text: err instanceof Error ? err.message : String(err), err: true })
-        );
-      } finally {
-        releaseIfCurrent(liveTurnCurrent(generation), () => setPlaySending(false));
-      }
+      await sendBotCommand(commandBotId, text);
       return;
     }
     if (workspaceAvailability.blocked) {
@@ -1699,15 +1724,11 @@ export function usePlayChat(deps: PlayChatDeps) {
       });
       return;
     }
-    const running = liveTurnIsRunning(
-      liveTurnBelongsToSelection(liveOwnerRef.current, selectedSessionRef.current),
-      playSending,
-      Boolean(streamOverlay),
-      waitTyping
-    );
+    const running = liveTurnRunning(liveOwnerRef.current, selectedSessionRef.current, playSending, Boolean(streamOverlay), waitTyping);
     if (running) {
       if (!submission.hasContent || !selectedSessionId) return;
       const steerSessionId = selectedSessionId;
+      const steerGeneration = liveGenRef.current;
       const delivery = planRunningTurnDelivery({
         canonicalBotChat: composerIsCanonicalBot(),
         interruptPolicy: steerInterruptPolicy
@@ -1737,11 +1758,11 @@ export function usePlayChat(deps: PlayChatDeps) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(
             immediate
-              ? { text: submission.message, target: 'next-step', ...contextFields }
+              ? { text: submission.message, target, ...contextFields }
               : { text: submission.message, target, ...steerBodyFromQueryMode(execMode), ...contextFields }
           ),
         })) as { ok?: boolean; status?: string; reason?: string; item?: SteerInboxItem };
-        assertSameSession(selectedSessionRef.current, steerSessionId);
+        if (!steerResponseApplies(steerGeneration, liveGenRef.current, steerSessionId, selectedSessionRef.current)) return;
         acknowledgeLocalSendCommitted();
         clearComposerOnly();
         if (delivery.revealSettings && execMode !== 'subagent' && data.item?.id) {
@@ -1778,19 +1799,15 @@ export function usePlayChat(deps: PlayChatDeps) {
           setPlayStatus({ text: t('play.status.steered'), ok: true });
         }
       } catch (err) {
-        handleSteerFailure({
-          superseded: err instanceof LiveTurnSuperseded,
-          sameSession: selectedSessionRef.current === steerSessionId,
-          immediate,
-          restore: () => {
-            pendingSteerTextRef.current = null;
-            setOptimisticUser(null);
-            setOptimisticContext([]);
-            setPlayInput(text);
-            setPendingContext(contextSnapshot);
-          },
-          report: () => setPlayStatus({ text: err instanceof Error ? err.message : String(err), err: true }),
-        });
+        if (!steerResponseApplies(steerGeneration, liveGenRef.current, steerSessionId, selectedSessionRef.current)) return;
+        if (immediate) {
+          pendingSteerTextRef.current = null;
+          setOptimisticUser(null);
+          setOptimisticContext([]);
+          setPlayInput(text);
+          setPendingContext(contextSnapshot);
+        }
+        setPlayStatus({ text: err instanceof Error ? err.message : String(err), err: true });
       }
       return;
     }
@@ -1827,12 +1844,9 @@ export function usePlayChat(deps: PlayChatDeps) {
       let sid = selectedSessionId;
       if (!sid && activeBotId) {
         const opened = await openBotSession(activeBotId, { liveGen: generation });
-        assertLiveTurn(
-          mayClaimSelectedSession(liveGenRef.current, generation, selectedSessionRef.current, opened.sessionId)
-        );
         sid = opened.sessionId;
       }
-      assertLiveTurn(liveTurnOnScreen(generation));
+      assertLiveTurn(generation);
       if (sid) {
         if (useStream) {
           beginStreamTurn();
@@ -1868,7 +1882,7 @@ export function usePlayChat(deps: PlayChatDeps) {
             }),
           });
         }
-        assertLiveTurn(liveTurnOnScreen(generation));
+        assertLiveTurn(generation);
         finishLiveTurn(generation);
         setPlayStatus({ text: t('play.status.sent'), ok: true });
       } else if (activeBotId) {
@@ -1888,7 +1902,7 @@ export function usePlayChat(deps: PlayChatDeps) {
             ...modelRefBody(modelRefForSend),
             ...workspaceBindingBody(workspaceBinding),
           }, undefined, { liveGen: generation });
-          assertLiveTurn(liveTurnOnScreen(generation));
+          assertLiveTurn(generation);
           finishLiveTurn(generation);
           setPlayStatus({ text: t('play.status.streamDone'), ok: true });
         } else {
@@ -1910,14 +1924,12 @@ export function usePlayChat(deps: PlayChatDeps) {
             }),
           })) as { session: { id: string } };
           const newSid = data.session.id;
-          assertLiveTurn(mayClaimSelectedSession(liveGenRef.current, generation, selectedSessionRef.current, newSid));
+          assertSessionClaim(generation, newSid);
           liveOwnerRef.current = newSid;
           selectedSessionRef.current = newSid;
           setSelectedSessionId(newSid);
-          assertLiveTurn(liveTurnOnScreen(generation));
           finishLiveTurn(generation);
           await refreshPlayPanel();
-          assertLiveTurn(liveTurnCurrent(generation));
           setPlayStatus({ text: t('play.status.sessionCreated'), ok: true });
         }
       } else {
@@ -1942,17 +1954,15 @@ export function usePlayChat(deps: PlayChatDeps) {
           }),
         })) as { session: { id: string } };
         const newSid = data.session.id;
-        assertLiveTurn(mayClaimSelectedSession(liveGenRef.current, generation, selectedSessionRef.current, newSid));
+        assertSessionClaim(generation, newSid);
         liveOwnerRef.current = newSid;
         selectedSessionRef.current = newSid;
         setSelectedSessionId(newSid);
-        assertLiveTurn(liveTurnOnScreen(generation));
         finishLiveTurn(generation);
         await refreshPlayPanel();
-        assertLiveTurn(liveTurnCurrent(generation));
         setPlayStatus({ text: t('play.status.taskCreated'), ok: true });
       }
-      assertLiveTurn(liveTurnCurrent(generation));
+      assertLiveTurn(generation);
       if (!hadSession && !activeBotId && selectedSessionRef.current) {
         await persistPendingStrategy(selectedSessionRef.current);
       }
@@ -2051,6 +2061,7 @@ export function usePlayChat(deps: PlayChatDeps) {
 
   const screen = screenLiveTurn({
     selectedSessionId,
+    loadedSessionId: historySessionRef.current,
     messages: sessionMessages,
     liveSessionId: liveOwnerRef.current,
     optimisticUser,
@@ -2061,8 +2072,9 @@ export function usePlayChat(deps: PlayChatDeps) {
 
   return {
     historyCursor,historyLoading,loadOlderHistory,
+    transcriptReady: screen.bound,
     // State
-    sessionMessages,
+    sessionMessages: screen.messages,
     playTitle,
     playMeta,
     sessionChrome,
@@ -2089,7 +2101,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     playStatus,
     setPlayStatus,
     optimisticUser: screen.optimisticUser,
-    streamOverlay: visibleLiveOverlay(screen.hasStream, streamOverlay),
+    streamOverlay: visibleStream(screen.hasStream, streamOverlay),
     waitTyping: screen.waitTyping,
     playSending: screen.playSending,
     composerAckFlash,
@@ -2132,7 +2144,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     modelViewPayload,
     showJumpToLatest,
     displayMessages:
-      showModelView && modelViewPayload?.modelView ? modelViewPayload.modelView : sessionMessages,
+      transcriptModelView(screen.bound, showModelView, modelViewPayload?.modelView, screen.messages),
     optionalToolGroupsFeature,
     optionalToolCatalog,
     enabledOptionalGroupIds,

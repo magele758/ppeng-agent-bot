@@ -75,6 +75,7 @@ export function BotGroupCreateForm({ bots, onCreated, onCancel }: BotGroupCreate
             void submit();
           }}
         >
+          <div className="ag-form__scroll">
           <label className="ag-field">
             <span className="ag-field__label">{t('agents.bots.groupNameLabel')}</span>
             <input
@@ -109,6 +110,7 @@ export function BotGroupCreateForm({ bots, onCreated, onCancel }: BotGroupCreate
             </ul>
           </fieldset>
           <GroupMemberWarning show={draft.warnMembers} />
+          </div>
           {error ? <p className="ag-field__error" role="alert">{error}</p> : null}
           <div className="ag-form__actions">
             <button

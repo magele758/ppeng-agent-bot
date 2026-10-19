@@ -40,47 +40,82 @@ export function streamPaintApplies(activeGeneration: number, paintGeneration: nu
 }
 
 /**
- * A live turn may bind `nextSessionId` only while it still owns the screen.
- * A session the user already selected is left alone, even before the generation bumps.
+ * A fetched transcript belongs on screen only for the session it was loaded for.
+ * An empty id means nothing foreign is loaded yet.
  */
-export function mayClaimSelectedSession(
-  activeGeneration: number,
-  paintGeneration: number,
-  selectedSessionId: string | null,
-  nextSessionId: string
+export function transcriptBound(
+  loadedSessionId: string | null | undefined,
+  selectedSessionId: string | null
 ): boolean {
-  if (!streamPaintApplies(activeGeneration, paintGeneration)) return false;
-  return selectedSessionId == null || selectedSessionId === nextSessionId;
+  if (loadedSessionId == null || loadedSessionId === '') return true;
+  return loadedSessionId === selectedSessionId;
 }
 
 /**
  * What the main transcript should draw for the selected session.
- * Saved messages stay as given. Optimistic bubbles, the streaming placeholder,
- * and the waiting 「…」 only stay when they belong to that session.
+ * Messages loaded for another session stay off screen, including text that
+ * already streamed. Optimistic bubbles, the streaming placeholder, and the
+ * waiting 「…」 only stay when this session owns the live turn.
  */
-export function screenLiveTurn<T>(input: {
+export function screenLiveTurn<T extends readonly unknown[]>(input: {
   selectedSessionId: string | null;
-  messages: readonly T[];
+  loadedSessionId?: string | null;
+  messages: T | [];
   liveSessionId: string | null;
   optimisticUser: string | null;
   hasStream: boolean;
   waitTyping: boolean;
   playSending: boolean;
 }): {
-  messages: readonly T[];
+  messages: T | [];
+  bound: boolean;
   optimisticUser: string | null;
   hasStream: boolean;
   waitTyping: boolean;
   playSending: boolean;
 } {
-  const show = liveTurnBelongsToSelection(input.liveSessionId, input.selectedSessionId);
+  const bound = transcriptBound(input.loadedSessionId, input.selectedSessionId);
+  const show = bound && liveTurnBelongsToSelection(input.liveSessionId, input.selectedSessionId);
   return {
-    messages: input.messages,
+    messages: bound ? input.messages : [],
+    bound,
     optimisticUser: show ? input.optimisticUser : null,
     hasStream: show && input.hasStream,
     waitTyping: show && input.waitTyping,
     playSending: show && input.playSending,
   };
+}
+
+/** Apply an async Bot open only while its request, selection and turn still match. */
+export function botOpenApplies(request: number, currentRequest: number, selected: string | null,
+  currentSelected: string | null, currentTurn: boolean): boolean {
+  return request === currentRequest && selected === currentSelected && currentTurn;
+}
+
+export function visibleStream<T>(show: boolean, overlay: T): T | null {
+  return show ? overlay : null;
+}
+
+export function liveTurnRunning(owner: string | null, selected: string | null,
+  sending: boolean, streaming: boolean, waiting: boolean): boolean {
+  return liveTurnBelongsToSelection(owner, selected) && (sending || streaming || waiting);
+}
+
+/** Returning to the same session does not revive a detached steer request. */
+export function steerResponseApplies(generation: number, currentGeneration: number,
+  session: string, currentSession: string | null): boolean {
+  return generation === currentGeneration && session === currentSession;
+}
+
+/** Also check selection before React has detached the previous generation. */
+export function mayClaimSelectedSession(activeGeneration: number, paintGeneration: number,
+  selectedSessionId: string | null, nextSessionId: string): boolean {
+  return streamPaintApplies(activeGeneration, paintGeneration) &&
+    (selectedSessionId == null || selectedSessionId === nextSessionId);
+}
+
+export function canFollowSession(selected: string | null, requested: string): boolean {
+  return selected == null || selected === requested;
 }
 
 /** Thrown when a newer selection owns the screen and this turn must stop quietly. */
