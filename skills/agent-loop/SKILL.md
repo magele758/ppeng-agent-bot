@@ -214,3 +214,6 @@ A prior `session.summary` is supplied to the summary callback as a synthetic sys
 - `compact-summary` 是保留的滚动摘要 replacement key：`foldSurface` 只显示最新成功 replacement 的摘要，即使新压缩范围未包含旧摘要；原文与旧摘要仍保留在审计 WAL。隐藏最新摘要不会复活旧摘要。其他 key 的可见性语义不变。
 
 Quoted inbox items are exempt from lossy overflow summarization: the configured overflow cap applies to summarizable inputs. Their exact pointers must remain pending until the model receives them; never acknowledge a quote through a system summary that omits its source.
+
+Session forks copy WAL nodes with fresh IDs. Memory and SQLite hosts must remap each copied replyTo.messageId to the copied original in the child, keeping excerpt/botId and parent history unchanged. Targets absent from the copied prefix must never trigger cross-session history lookup.
+Product hosts must also preserve history visibility restrictions when forking. A copied prefix does not grant group membership: retain revoked source ranges and conservatively close active/pending group exposure at the copied boundary, without blocking new private child input or changing parent restrictions. A host unable to persist these constraints must reject the fork.

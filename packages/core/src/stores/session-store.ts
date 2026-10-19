@@ -638,6 +638,7 @@ export class SessionStore {
 
   copyWalPrefix(fromId: string, toId: string, endSeq: number): number {
     const nodes = this.listSurfaceNodes(fromId).filter((n) => n.seq <= endSeq);
+    const copiedIds = new Map(nodes.map(node => [node.id, createId('msg')]));
     const insert = this.db.prepare(`
       INSERT INTO session_messages (
         id, session_id, role, parts_json, created_at,
@@ -646,7 +647,7 @@ export class SessionStore {
     `);
     for (const node of nodes) {
       insert.run(
-        createId('msg'),
+        copiedIds.get(node.id)!,
         toId,
         node.role,
         serializeJson(node.parts),
@@ -656,7 +657,7 @@ export class SessionStore {
         node.surfaceOp,
         node.replacesStart ?? null,
         node.replacesEnd ?? null,
-        node.replyTo ? serializeJson(node.replyTo) : null
+        node.replyTo ? serializeJson({ ...node.replyTo, messageId: copiedIds.get(node.replyTo.messageId) ?? node.replyTo.messageId }) : null
       );
     }
     if (nodes.length > 0) {

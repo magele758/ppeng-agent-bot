@@ -461,3 +461,51 @@ for (const kernelVariant of ['ppeng','agent-loop']) test(`${kernelVariant} overf
  const captured=[];const runtime=new RawAgentRuntime({repoRoot:mkdtempSync(join(tmpdir(),'quote-overflow-')),stateDir:mkdtempSync(join(tmpdir(),'quote-overflow-state-')),modelAdapter:{name:'quote-overflow',async runTurn(input){captured.push(input.messages);return {stopReason:'end',assistantParts:[{type:'text',text:'done'}]};}}});
  try{runtime.store.setDaemonControl('loop_settings',{kernelVariant,inboxOverflowCap:2});const s=runtime.createChatSession({title:'quote overflow'});const old=runtime.store.appendMessage(s.id,'assistant',[{type:'text',text:fullReply}],{key:'folded-source'});runtime.store.hideByKey(s.id,'folded-source');const quote={messageId:old.id,excerpt};const item=runtime.store.enqueueSteer(s.id,'quoted oldest',{replyTo:quote});for(const text of ['a','b','c','d'])runtime.store.enqueueSteer(s.id,text);assert.deepEqual(runtime.store.listUnclaimedInbox(s.id).find(i=>i.id===item.id)?.replyTo,quote);await runtime.runSession(s.id);assert.ok(captured.length);assert.match(JSON.stringify(captured),/TAIL_MARKER_94/);const delivered=runtime.store.foldMessages(s.id).find(m=>m.role==='user'&&m.parts.some(part=>part.type==='text'&&part.text==='quoted oldest'));assert.deepEqual(delivered.replyTo,{...quote,excerpt:excerpt.trim()});assert.doesNotMatch(JSON.stringify(delivered),/TAIL_MARKER_94/);}finally{await runtime.destroy();}
 });
+
+for (const kernelVariant of ['ppeng', 'agent-loop']) test(`${kernelVariant} fork resolves quotes within copied child history [AC:bot-reply-quote#AC-1] [AC:bot-reply-quote#AC-5]`, async () => {
+ const captured=[];
+ const runtime=new RawAgentRuntime({repoRoot:mkdtempSync(join(tmpdir(),'quote-fork-')),stateDir:mkdtempSync(join(tmpdir(),'quote-fork-state-')),modelAdapter:{name:'quote-fork',async runTurn(input){captured.push(input.messages);return {stopReason:'end',assistantParts:[{type:'text',text:'done'}]};}}});
+ try {
+  runtime.store.setDaemonControl('loop_settings',{kernelVariant});
+  const parent=runtime.createChatSession({title:'quoted parent'});
+  const original=runtime.store.appendMessage(parent.id,'assistant',[{type:'text',text:fullReply}],{key:'fork-quote-source'});
+  runtime.store.appendMessage(parent.id,'user',[{type:'text',text:'explain original'}],{replyTo:{messageId:original.id,excerpt}});
+  runtime.store.appendMessage(parent.id,'assistant',[{type:'text',text:'finished'}]);
+  const {session:child}=runtime.forkSession(parent.id);
+  const copied=runtime.store.foldMessages(child.id).find(m=>m.key==='fork-quote-source');
+  runtime.store.hideByKey(child.id,'fork-quote-source');
+  runtime.sendUserMessage(child.id,'continue with the quoted original');
+  await runtime.runSession(child.id);
+  assert.ok(captured.length);
+  assert.match(JSON.stringify(captured),/TAIL_MARKER_94/);
+  const user=runtime.store.foldMessages(child.id).find(m=>m.parts.some(p=>p.text==='explain original'));
+  assert.equal(user.replyTo.messageId,copied.id);
+  assert.doesNotMatch(JSON.stringify(user),/TAIL_MARKER_94/);
+  assert.equal(runtime.store.foldMessages(parent.id).find(m=>m.role==='user').replyTo.messageId,original.id);
+ } finally {await runtime.destroy();}
+});
+
+for (const kernelVariant of ['ppeng', 'agent-loop']) for (const exposureKind of ['revoked', 'pending', 'active']) test(`${kernelVariant} fork cannot recover ${exposureKind} shared quote text [AC:bot-functional-groups#AC-9]`, async () => {
+ const captured=[];
+ const runtime=new RawAgentRuntime({repoRoot:mkdtempSync(join(tmpdir(),'quote-fork-scope-')),stateDir:mkdtempSync(join(tmpdir(),'quote-fork-scope-state-')),modelAdapter:{name:'quote-fork-scope',async runTurn(input){captured.push(input.messages);return {stopReason:'end',assistantParts:[{type:'text',text:'done'}]};}}});
+ try {
+  runtime.store.setDaemonControl('loop_settings',{kernelVariant});
+  const parent=runtime.createChatSession({title:'scoped parent'});
+  runtime.store.appendMessage(parent.id,'assistant',[{type:'text',text:'PRIVATE_BEFORE_GROUP_72'}]);
+  const original=runtime.store.appendMessage(parent.id,'assistant',[{type:'text',text:'WITHDRAWN_FORK_SECRET_91'}],{key:'scoped-quote-source'});
+  runtime.store.hideByKey(parent.id,'scoped-quote-source');
+  runtime.store.appendMessage(parent.id,'user',[{type:'text',text:'quoted shared point'}],{replyTo:{messageId:original.id,excerpt:'short quote'}});
+  runtime.store.appendMessage(parent.id,'assistant',[{type:'text',text:'finished'}]);
+  const range={fromSeq:original.seq,toSeq:original.seq,startedAt:'2026-10-19T00:00:00Z',endedAt:'2026-10-19T01:00:00Z',...(exposureKind==='pending'?{pending:true}:{})};
+  const exposure=exposureKind==='active'?{active:{groupId:'group-source',fromSeq:original.seq,startedAt:range.startedAt},revoked:[]}:{revoked:[range]};
+  runtime.store.setDaemonControl('bot.sharedExposure:'+parent.id,exposure);
+  const {session:child}=runtime.forkSession(parent.id);
+  runtime.sendUserMessage(child.id,'fresh private question after fork');
+  await runtime.runSession(child.id);
+  assert.ok(captured.length);
+  assert.doesNotMatch(JSON.stringify(captured),/WITHDRAWN_FORK_SECRET_91/);
+  assert.match(JSON.stringify(captured),/PRIVATE_BEFORE_GROUP_72/);
+  assert.match(JSON.stringify(captured),/fresh private question after fork/);
+  assert.deepEqual(runtime.store.getDaemonControl('bot.sharedExposure:'+parent.id),exposure);
+ } finally {await runtime.destroy();}
+});
