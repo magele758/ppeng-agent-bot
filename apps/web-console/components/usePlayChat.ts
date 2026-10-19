@@ -28,6 +28,7 @@ import {
   botOpenApplies,
   visibleStream,
   liveTurnRunning,
+  steerResponseApplies,
   UNBOUND_LIVE_TURN,
 } from '@/lib/live-turn-session';
 import { userPreviewText } from '@/lib/chat-utils';
@@ -1680,6 +1681,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     if (running) {
       if (!submission.hasContent || !selectedSessionId) return;
       const steerSessionId = selectedSessionId;
+      const steerGeneration = liveGenRef.current;
       const delivery = planRunningTurnDelivery({
         canonicalBotChat: composerIsCanonicalBot(),
         interruptPolicy: steerInterruptPolicy
@@ -1713,7 +1715,7 @@ export function usePlayChat(deps: PlayChatDeps) {
               : { text: submission.message, target, ...steerBodyFromQueryMode(execMode), ...contextFields }
           ),
         })) as { ok?: boolean; status?: string; reason?: string; item?: SteerInboxItem };
-        if (selectedSessionRef.current !== steerSessionId) return;
+        if (!steerResponseApplies(steerGeneration, liveGenRef.current, steerSessionId, selectedSessionRef.current)) return;
         acknowledgeLocalSendCommitted();
         clearComposerOnly();
         if (delivery.revealSettings && execMode !== 'subagent' && data.item?.id) {
@@ -1750,7 +1752,7 @@ export function usePlayChat(deps: PlayChatDeps) {
           setPlayStatus({ text: t('play.status.steered'), ok: true });
         }
       } catch (err) {
-        if (selectedSessionRef.current !== steerSessionId) return;
+        if (!steerResponseApplies(steerGeneration, liveGenRef.current, steerSessionId, selectedSessionRef.current)) return;
         if (immediate) {
           pendingSteerTextRef.current = null;
           setOptimisticUser(null);

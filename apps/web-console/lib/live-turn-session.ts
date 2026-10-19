@@ -83,3 +83,9 @@ export function liveTurnRunning(owner: string | null, selected: string | null,
   sending: boolean, streaming: boolean, waiting: boolean): boolean {
   return liveTurnBelongsToSelection(owner, selected) && (sending || streaming || waiting);
 }
+
+/** Returning to the same session does not revive a detached steer request. */
+export function steerResponseApplies(generation: number, currentGeneration: number,
+  session: string, currentSession: string | null): boolean {
+  return generation === currentGeneration && session === currentSession;
+}

@@ -107,3 +107,10 @@ test('late Bot opens cannot replace a newer request or session selection [AC:bot
   assert.equal(liveTurnRunning('a', 'a', false, false, true), true);
   assert.equal(liveTurnRunning('a', 'a', false, false, false), false);
 });
+
+test('returning to A does not let an old steer response clear the new composer [AC:bot-switch-live-turn#AC-1]', async () => {
+  const {steerResponseApplies} = await import('./live-turn-session.ts');
+  assert.equal(steerResponseApplies(1, 3, 'a', 'a'), false);
+  assert.equal(steerResponseApplies(1, 1, 'a', 'b'), false);
+  assert.equal(steerResponseApplies(1, 1, 'a', 'a'), true);
+});
