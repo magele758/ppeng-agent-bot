@@ -276,3 +276,30 @@ test('an explicit Bot click wins a delayed saved-default lookup [AC:bot-face-fir
   releaseLookup();
  }
 });
+
+test('composer Bot choice wins while its open and the saved-default lookup are both pending [AC:bot-face-first-creation#AC-4]', async ({ page, request }) => {
+ const { bots } = await (await request.get('/api/bots')).json();
+ const [saved, chosen] = bots.filter((bot: { hidden?: boolean }) => !bot.hidden);
+ expect(saved).toBeTruthy(); expect(chosen).toBeTruthy();
+ let releaseLookup!: () => void, seenLookup!: () => void, releaseChosen!: () => void, seenChosen!: () => void;
+ const lookupGate = new Promise<void>(r => { releaseLookup = r; });
+ const lookupSeen = new Promise<void>(r => { seenLookup = r; });
+ const chosenGate = new Promise<void>(r => { releaseChosen = r; });
+ const chosenSeen = new Promise<void>(r => { seenChosen = r; });
+ let savedOpens = 0;
+ page.on('request', req => { if (new URL(req.url()).pathname === `/api/bots/${saved.id}/open`) savedOpens++; });
+ await page.addInitScript(id => localStorage.setItem('lab.selectedBot', id), saved.id);
+ await page.route(`**/api/bots/${saved.id}`, async route => { if (route.request().method() !== 'GET') return route.continue(); seenLookup(); await lookupGate; await route.fulfill({ json: { bot: saved } }); });
+ await page.route(`**/api/bots/${chosen.id}/open`, async route => { seenChosen(); await chosenGate; await route.continue(); });
+ try {
+  await page.goto('/#/bot'); await lookupSeen;
+  await page.locator('.composer-bot-picker__trigger').click();
+  await page.locator('#botSelectMenu').getByRole('option', { name: chosen.name, exact: true }).click();
+  await chosenSeen;
+  const returned = page.waitForResponse(r => new URL(r.url()).pathname === `/api/bots/${saved.id}`);
+  releaseLookup(); await (await returned).finished();
+  await page.evaluate(() => new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r()))));
+  expect(savedOpens).toBe(0);
+  releaseChosen(); await expect(page.locator('#playTitle')).toHaveText(chosen.name);
+ } finally { releaseLookup(); releaseChosen(); }
+});

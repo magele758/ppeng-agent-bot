@@ -2129,6 +2129,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     botModelOverride,
     applyBotSelection,
     selectBot,
+    getBotSelectionVersion: () => botOpenRequestRef.current,
     modelOptions,
     modelRef,
     modelCatalog,

@@ -110,8 +110,9 @@ export function ChatSection({ active }: { active: boolean }) {
       { playSurface, botId: chat.botId, selectedSessionId },
       async (isCancelled) => {
         const selectionAtStart = selectedSessionRef.current;
+        const intentAtStart = chat.getBotSelectionVersion();
         const maySelect = () =>
-          defaultBotLoadMaySelect(selectionAtStart, selectedSessionRef.current, isCancelled());
+          defaultBotLoadMaySelect(selectionAtStart, selectedSessionRef.current, isCancelled() || intentAtStart !== chat.getBotSelectionVersion());
         try {
           let saved = '';
           try {
