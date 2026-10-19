@@ -131,6 +131,7 @@ export function planDirectIsolationHold(
   let wait = false;
   const create: Array<{ toolName: string; args: Record<string, unknown> }> = [];
   for (const call of calls) {
+    if (!['bash', 'bg_run', 'work_evidence'].includes(call.name)) continue;
     if (!call.input || typeof call.input !== 'object' || Array.isArray(call.input)) continue;
     const args = call.input as Record<string, unknown>;
     if (!shellCallNeedsDirectApproval(args.isolation, availability)) continue;
@@ -213,6 +214,10 @@ function latestMatchingApproval(
   const matches = approvals.filter(
     (row) => row.sessionId === sessionId && row.toolName === toolName && canonicalToolArgs(row.args ?? {}) === want
   );
-  matches.sort((a, b) => String(a.createdAt ?? '').localeCompare(String(b.createdAt ?? '')));
+  // Millisecond timestamps cannot order concurrent decisions. Never let an
+  // approved row hide an equally recent refusal or still-pending review.
+  const statusOrder = ['approved', 'rejected', 'pending'];
+  matches.sort((a, b) => String(a.createdAt ?? '').localeCompare(String(b.createdAt ?? '')) ||
+    statusOrder.indexOf(a.status) - statusOrder.indexOf(b.status));
   return matches[matches.length - 1];
 }

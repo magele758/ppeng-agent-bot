@@ -14,6 +14,8 @@ import {
   DIRECT_ISOLATION_REFUSAL,
   OS_UNAVAILABLE_REFUSAL,
   decideShellIsolation,
+  planDirectIsolationHold,
+  approvalGrantsDirectIsolation,
   shellIsolationAvailability
 } from '../dist/sandbox/model-isolation.js';
 
@@ -134,10 +136,12 @@ test('direct isolation does not run until approval, including bypass [AC:model-s
 
     for (const permissionMode of ['auto', 'bypass']) {
       const approvals = [];
+      const armed = [];
       const messages = [];
       const session = { id: 'sess-iso', metadata: { permissionMode } };
       const gateCtx = { ...runCtx, session };
       const deps = {
+        armUnattendedApproval: (approval) => armed.push(approval),
         tools: createBuiltinTools({}),
         store: {
           appendMessage: (sessionId, role, parts) => messages.push({ sessionId, role, parts }),
@@ -172,6 +176,7 @@ test('direct isolation does not run until approval, including bypass [AC:model-s
       );
       assert.equal(decision, 'waiting', permissionMode);
       assert.equal(approvals.length, 1, permissionMode);
+      assert.deepEqual(armed, approvals, `expiry armed in ${permissionMode}`);
       assert.equal(messages.length, 0, permissionMode);
       assert.equal(existsSync(marker), false);
     }
@@ -272,6 +277,20 @@ test('bg_run and work_evidence honor the same isolation choice and direct approv
     assert.equal(calls.length, 1);
     assert.equal(jobs.length, 1);
 
+    const args = { command: 'printf hi', isolation: 'direct' };
+    const rows = [
+      { sessionId: 's', toolName: 'bg_run', status: 'approved', args, createdAt: '2026-10-19T00:00:00.000Z' },
+      { sessionId: 's', toolName: 'bg_run', status: 'rejected', args, createdAt: '2026-10-19T00:00:01.000Z' }
+    ];
+    host.store.listApprovals = (filter) => rows.filter((row) => !filter?.status || row.status === filter.status);
+    await assert.rejects(() => startBackgroundJob(host, 's', args.command, { isolation: args.isolation }), /needs human approval/);
+    assert.equal(calls.length, 1);
+    assert.equal(jobs.length, 1);
+    rows.pop();
+    await startBackgroundJob(host, 's', args.command, { isolation: args.isolation });
+    assert.equal(calls.length, 2);
+    assert.equal(calls[1].isolation, 'direct');
+
     let started = 0;
     const bg = toolNamed('bg_run', {
       startBackgroundJob: async (_sessionId, _command, options) => {
@@ -311,4 +330,26 @@ test('saved approval is what allows a direct command to run [AC:model-sandbox-is
     services.directIsolationApproved('s', 'bash', { command: 'printf hi', isolation: 'os' }),
     false
   );
+});
+
+test('shell isolation approval does not intercept unrelated tool inputs [AC:model-sandbox-isolation#AC-3]', () => {
+  const plan = planDirectIsolationHold(
+    [{ name: 'custom_database_tool', input: { isolation: 'direct' } }], [], 's',
+    { kind: 'native', os: true, remote: false }
+  );
+  assert.deepEqual(plan, { wait: false, create: [] });
+});
+
+test('same-millisecond approvals fail closed regardless of row order [AC:model-sandbox-isolation#AC-3]', () => {
+  const args = { command: 'printf hi', isolation: 'direct' };
+  const row = { sessionId: 's', toolName: 'bash', args, createdAt: '2026-10-19T00:00:00.000Z' };
+  for (const status of ['pending', 'rejected']) {
+    const rows = [{ ...row, status: 'approved' }, { ...row, status }];
+    for (const ordered of [rows, [...rows].reverse()]) {
+      assert.equal(approvalGrantsDirectIsolation(ordered, 's', 'bash', args), false);
+      const plan = planDirectIsolationHold([{ name: 'bash', input: args }], ordered, 's',
+        { kind: 'native', os: true, remote: false });
+      assert.equal(plan.wait, status === 'pending');
+    }
+  }
 });

@@ -12,7 +12,7 @@ import type { AgentSandbox } from '../sandbox/agent-sandbox-types.js';
 import {
   DIRECT_ISOLATION_REFUSAL,
   decideShellIsolation,
-  requestsDirectIsolation,
+  approvalGrantsDirectIsolation,
   shellIsolationAvailability
 } from '../sandbox/model-isolation.js';
 import {
@@ -396,7 +396,7 @@ export async function startBackgroundJob(
   }
   const decision = decideShellIsolation(options?.isolation, shellIsolationAvailability(sandbox.kind));
   if (!decision.ok) throw new Error(decision.message);
-  if (decision.explicitDirect && !bgRunDirectApproved(host, sessionId, command)) {
+  if (decision.explicitDirect && !bgRunDirectApproved(host, sessionId, command, options?.isolation)) {
     throw new Error(DIRECT_ISOLATION_REFUSAL);
   }
   const job = host.store.createBackgroundJob({
@@ -430,16 +430,6 @@ export async function startBackgroundJob(
   return job;
 }
 
-function bgRunDirectApproved(host: SpawnHost, sessionId: string, command: string): boolean {
-  const rows = host.store.listApprovals({ status: 'approved' });
-  return rows.some((row) => {
-    const args = row.args ?? {};
-    return (
-      row.sessionId === sessionId &&
-      row.toolName === 'bg_run' &&
-      row.status === 'approved' &&
-      String(args.command ?? '') === command &&
-      requestsDirectIsolation(args.isolation)
-    );
-  });
+function bgRunDirectApproved(host: SpawnHost, sessionId: string, command: string, isolation: unknown): boolean {
+  return approvalGrantsDirectIsolation(host.store.listApprovals(), sessionId, 'bg_run', { command, isolation });
 }

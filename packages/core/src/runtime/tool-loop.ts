@@ -368,7 +368,7 @@ function holdDirectIsolation(
     shellIsolationAvailability(agentSandboxKindFromEnv(process.env))
   );
   for (const item of plan.create) {
-    deps.store.createApproval({
+    hostFromDeps(deps).createApproval({
       sessionId: session.id,
       toolName: item.toolName,
       reason: `Approval required to run ${item.toolName} without OS isolation`,
