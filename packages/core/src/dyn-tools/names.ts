@@ -75,6 +75,7 @@ export function collectReservedDynToolNames(processTools?: Array<{ name: string 
 
 export function isReservedDynToolName(name: string, reserved: Iterable<string>): boolean {
   if (isDelegatedProductAdminTool(name)) return true;
+  if (name.startsWith('factory_')) return true;
   if (name.startsWith('cron_')) return true;
   if (isPtcReservedIdentifier(name)) return true;
   if (PTC_NAMESPACE_BLOCKED_NAMES.has(name)) return true;
