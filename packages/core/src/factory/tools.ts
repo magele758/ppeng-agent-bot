@@ -95,6 +95,21 @@ function assertSettingsWritable(session: SessionRecord): void {
   }
 }
 
+function assertHumanSetup(store: SqliteStateStore, rooms: BotRoomService, session: SessionRecord): void {
+  if (session.mode === 'subagent') throw new AuthorizationError('Delegated children cannot configure the factory');
+  const principal = principalFromSession(store, session);
+  if (typeof session.metadata.roomId === 'string') {
+    const turn = rooms.turns(principal, session.metadata.roomId).find(
+      item => item.currentSessionId === session.id && item.status === 'running',
+    );
+    if (!turn) throw new AuthorizationError('Active human room request required');
+    return;
+  }
+  if (readApprovalWake(session.metadata)?.kind !== 'human') throw new AuthorizationError('Explicit human request required');
+  const message = store.listMessages(session.id).filter(item => item.role === 'user').at(-1);
+  if (!message || session.metadata.relayHopMessageId === message.id) throw new AuthorizationError('Explicit human request required');
+}
+
 function resolveBotId(store: SqliteStateStore, ref: unknown): string {
   const name = typeof ref === "string" ? ref.trim() : "";
   if (!name) throw new ValidationError("Unknown Bot");
@@ -388,6 +403,7 @@ export function createFactoryTools(
           const principal = principalFromSession(store, session);
           if (!canWriteFactorySettings(store, principal)) return denied();
           assertSettingsWritable(session);
+          assertHumanSetup(store, rooms, session);
           if (!isObj(args) || !Array.isArray(args.machines) || args.machines.length > 50) {
             throw new ValidationError("Invalid machines");
           }
@@ -399,6 +415,10 @@ export function createFactoryTools(
             seen.add(machine.id);
             machines.push(machine);
           }
+          const current = liveSession(store, session);
+          if (!sameBotPrincipal(principalFromSession(store, current), principal) || !canWriteFactorySettings(store, principal)) return denied();
+          assertSettingsWritable(current);
+          assertHumanSetup(store, rooms, current);
           const previous = factory.settings(principal);
           const coordinator = coordinatorId(store, principal, args.coordinatorBotId);
           const roomId = roomFor(
@@ -434,6 +454,7 @@ export function createFactoryTools(
           const principal = principalFromSession(store, session);
           if (!canWriteFactorySettings(store, principal)) return denied();
           assertSettingsWritable(session);
+          assertHumanSetup(store, rooms, session);
           const enabled = isObj(args) ? args.enabled : undefined;
           return { ok: true, content: JSON.stringify(factory.setPatrol(principal, enabled as boolean)) };
         } catch (error) {

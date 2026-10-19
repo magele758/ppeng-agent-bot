@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import childProcess from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SqliteStateStore } from "../dist/storage.js";
@@ -75,13 +75,14 @@ async function fixture(t, opts = {}) {
     },
   };
   const service = new FactoryService({ store, rooms }, transport);
-  const metadata = { botId: superBot.id, ...(login ? { userId, tenantId } : {}) };
+  const metadata = { approvalWake: {kind: "human", source: "lab-chat"}, botId: superBot.id, ...(login ? { userId, tenantId } : {}) };
   const session = store.createSession({
     title: "Super Bot chat",
     mode: "chat",
     agentId: superBot.id,
     metadata,
   });
+  store.appendMessage(session.id, "user", [{type:"text",text:"Configure the factory"}]);
   t.after(async () => {
     await service.close();
     store.db.close();
@@ -356,21 +357,12 @@ test("several discovered checkouts are not written into factory settings", async
 });
 
 test("factory_list_repos calls listGitCheckouts for the saved alias and does not spawn", async (t) => {
-  const discoverPath = join(import.meta.dirname, "../dist/factory/discover.js");
-  const previousDiscover = existsSync(discoverPath) ? readFileSync(discoverPath, "utf8") : undefined;
-  writeFileSync(
-    discoverPath,
-    `export async function listGitCheckouts(alias, ...extra) {
-      if (extra.length) throw new Error("extra arguments");
-      if (typeof alias !== "string" || alias.includes(${JSON.stringify(TOKEN)})) throw new Error("token leaked");
-      return ["/only/" + alias, "/also/" + alias];
-    }
-    `,
-  );
-  t.after(() => {
-    if (previousDiscover === undefined) rmSync(discoverPath, { force: true });
-    else writeFileSync(discoverPath, previousDiscover);
-  });
+  const deps = {listGitCheckouts: async (alias, ...extra) => {
+    assert.equal(extra.length,0);
+    assert.equal(typeof alias,'string');
+    assert.equal(alias.includes(TOKEN),false);
+    return ['/only/'+alias,'/also/'+alias];
+  }};
   const previous = process.env.RAW_AGENT_AUTH_TOKEN;
   process.env.RAW_AGENT_AUTH_TOKEN = TOKEN;
   t.after(() => {
@@ -384,9 +376,9 @@ test("factory_list_repos calls listGitCheckouts for the saved alias and does not
     return original.apply(childProcess, args);
   });
   const f = await fixture(t);
-  const save = tool(createFactoryTools(f.store, f.rooms, f.service), "factory_settings_save");
+  const save = tool(createFactoryTools(f.store, f.rooms, f.service, deps), "factory_settings_save");
   assert.equal((await save.execute({ session: f.session }, { machines: [machine(f.worker.id)] })).ok, true);
-  const list = tool(createFactoryTools(f.store, f.rooms, f.service), "factory_list_repos");
+  const list = tool(createFactoryTools(f.store, f.rooms, f.service, deps), "factory_list_repos");
   const result = await list.execute({ session: f.session }, { machineId: "ubuntu1", sshAlias: "elsewhere" });
   assert.equal(result.ok, false, result.content);
   const listed = await list.execute({ session: f.session }, { machineId: "ubuntu1" });
@@ -426,4 +418,42 @@ test("plan mode does not write factory settings", async (t) => {
   assert.match(result.content, /plan mode/);
   assert.equal(f.store.getDaemonControl(settingsKey(f.principal)), undefined);
   assert.equal(f.rooms.list(f.principal).length, 0);
+});
+
+
+test("factory setup rejects delegated and unattended writes even under the owner's identity", async (t) => {
+  const f = await fixture(t);
+  const tools = createFactoryTools(f.store, f.rooms, f.service);
+  for (const source of ['bot-message', 'delegation', 'routine', 'scheduler']) {
+    f.store.updateSession(f.session.id,{metadata:{...f.session.metadata,approvalWake:{kind:'unattended',source}}});
+    for (const [name,args] of [['factory_settings_save',{machines:[machine(f.worker.id)]}],['factory_patrol_set',{enabled:true}]]) {
+      assert.equal((await tool(tools,name).execute({session:f.session},args)).ok,false,source+name);
+    }
+    assert.equal(f.store.getDaemonControl(settingsKey(f.principal)),undefined);
+  }
+  f.store.updateSession(f.session.id,{mode:'subagent',metadata:f.session.metadata});
+  assert.equal((await tool(tools,'factory_settings_save').execute({session:f.session},{machines:[]})).ok,false);
+  assert.equal((await tool(tools,'factory_patrol_set').execute({session:f.session},{enabled:true})).ok,false);
+  assert.equal(f.rooms.list(f.principal).length,0);
+});
+
+test("factory settings revalidate administrator authority after asynchronous discovery", async (t) => {
+  const f=await fixture(t);
+  const save=tool(createFactoryTools(f.store,f.rooms,f.service,{listGitCheckouts:async()=>{
+    grant(f.store,f.principal.userId,f.principal.tenantId,'member'); return ['/srv/app'];
+  }}),'factory_settings_save');
+  assert.equal((await save.execute({session:f.session},{machines:[{sshAlias:'worker',fillRepository:true}]})).ok,false);
+  assert.equal(f.store.getDaemonControl(settingsKey(f.principal)),undefined);
+  assert.equal(f.rooms.list(f.principal).length,0);
+});
+
+
+test("incomplete discovery leaves settings and rooms untouched", async (t) => {
+  const f=await fixture(t);
+  const save=tool(createFactoryTools(f.store,f.rooms,f.service,{listGitCheckouts:async()=>{throw new Error('Repository discovery was incomplete');}}),'factory_settings_save');
+  const result=await save.execute({session:f.session},{machines:[{sshAlias:'worker',fillRepository:true}]});
+  assert.equal(result.ok,false);
+  assert.match(result.content,/incomplete/);
+  assert.equal(f.store.getDaemonControl(settingsKey(f.principal)),undefined);
+  assert.equal(f.rooms.list(f.principal).length,0);
 });

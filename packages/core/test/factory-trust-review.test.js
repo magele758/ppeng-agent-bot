@@ -64,3 +64,13 @@ test('factory log credentials redact complete headers and quoted values [AC:mult
     assert.ok(clean.log.includes('[REDACTED'), log);
   }
 });
+
+
+test('factory setup names cannot be shadowed or inherited by delegated children', async () => {
+  const {isReservedDynToolName}=await import('../dist/dyn-tools/names.js');
+  const {stripSubagentDeniedTools}=await import('../dist/runtime/subagent-policy.js');
+  for(const name of ['factory_settings_save','factory_patrol_set','factory_list_repos']) {
+    assert.equal(isReservedDynToolName(name,[]),true,name);
+    assert.deepEqual(stripSubagentDeniedTools({mode:'subagent'},[{name}]),[],name);
+  }
+});

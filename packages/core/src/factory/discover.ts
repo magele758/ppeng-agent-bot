@@ -27,8 +27,8 @@ def bad_path(text):
         if part in ('.','..') or sensitive(part):
             return True
     return False
-def emit(paths):
-    print(json.dumps({'paths':paths},ensure_ascii=False),flush=True)
+def emit(paths, complete):
+    print(json.dumps({'paths':paths,'complete':complete},ensure_ascii=False),flush=True)
 raw=req['roots'] if 'roots' in req else None
 if raw is None:
     bases=[pathlib.Path.home()]
@@ -43,6 +43,7 @@ else:
 found=[]
 seen=set()
 visited=0
+complete=True
 def prune(name):
     # Metadata and dependency/cache dirs. A checkout that is itself the root is still reported.
     return name in {'.git','node_modules','.cache','.npm','__pycache__'} or sensitive(name)
@@ -83,9 +84,11 @@ def add(path, base_real):
     seen.add(text)
     found.append(text)
 def onerror(_err):
-    return None
+    global complete
+    complete=False
 for base in bases:
     if len(found)>=100 or visited>20000:
+        complete=False
         break
     try:
         if not base.is_dir():
@@ -99,10 +102,12 @@ for base in bases:
     for dirpath, dirnames, _filenames in os.walk(base, topdown=True, onerror=onerror, followlinks=False):
         visited+=1
         if visited>20000:
+            complete=False
             dirnames[:]=[]
             break
         current=pathlib.Path(dirpath)
         if len(current.parts)-base_depth>16:
+            complete=False
             dirnames[:]=[]
             continue
         kept=[]
@@ -122,10 +127,11 @@ for base in bases:
         if looks_like_checkout(current):
             add(current, base_real)
         if len(found)>=100:
+            complete=False
             dirnames[:]=[]
             break
 found.sort()
-emit(found[:100])
+emit(found[:100], complete)
 `;
 
 const SENSITIVE_PARTS = new Set([".ssh", ".gnupg", ".aws", ".kube", ".docker"]);
@@ -168,6 +174,9 @@ function validateRoots(roots: string[]): void {
 function checkoutPaths(value: unknown): string[] {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("Invalid remote receipt");
+  }
+  if ((value as { complete?: unknown }).complete !== true) {
+    throw new Error("Repository discovery was incomplete; specify a narrower root");
   }
   const paths = (value as { paths?: unknown }).paths;
   if (!Array.isArray(paths) || paths.length > 100) throw new Error("Invalid remote receipt");

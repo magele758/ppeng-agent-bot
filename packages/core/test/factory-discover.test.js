@@ -269,3 +269,16 @@ function assertFixedSsh(argv, alias) {
 function realpath(path) {
   return realpathSync(path);
 }
+
+
+test("discovery refuses a unique-looking result when the depth budget hides another checkout", async (t) => {
+  const home=realpath(mkdtempSync(join(tmpdir(),'factory-discover-depth-')));
+  t.after(()=>rmSync(home,{recursive:true,force:true}));
+  const ssh=useSsh(t,home);
+  initRepo(join(home,'visible'));
+  initRepo(join(home,...Array.from({length:18},(_,i)=>'deep'+i),'hidden'));
+  await assert.rejects(listGitCheckouts('factorybox',[home]),/discovery was incomplete/);
+  const receipt=JSON.parse(ssh.read().pythonStdout);
+  assert.equal(receipt.complete,false);
+  assert.deepEqual(receipt.paths,[join(home,'visible')]);
+});
