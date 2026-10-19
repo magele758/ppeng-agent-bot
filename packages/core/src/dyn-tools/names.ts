@@ -1,3 +1,4 @@
+import { isDelegatedProductAdminTool } from '../tools/product-admin-names.js';
 import { isPtcReservedIdentifier, PTC_NAMESPACE_BLOCKED_NAMES } from '../ptc/hooks.js';
 import { DYN_META_TOOL_NAMES } from './types.js';
 
@@ -73,6 +74,7 @@ export function collectReservedDynToolNames(processTools?: Array<{ name: string 
 }
 
 export function isReservedDynToolName(name: string, reserved: Iterable<string>): boolean {
+  if (isDelegatedProductAdminTool(name)) return true;
   if (name.startsWith('cron_')) return true;
   if (isPtcReservedIdentifier(name)) return true;
   if (PTC_NAMESPACE_BLOCKED_NAMES.has(name)) return true;

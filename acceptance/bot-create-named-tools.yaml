@@ -1,0 +1,30 @@
+id: bot-create-named-tools
+title: 对话里能用 create_bot 和 create_room 创建
+status: implemented
+requirement: |
+  没有 create_bot / create_room 工具？我不是说要加这些工具吗？
+  不是加密内容，是一些秘钥类的东西，模型说无法读取，但是创建 bot 又需要，你看这个怎么处理比较好？要么创建 bot 不要存这些呢，只存必要的信息，免得搞的乱。
+criteria:
+  - id: AC-1
+    given: 用户正在和通用助手私聊，或和一个没有单独限制工具的 bot 私聊
+    when: 这一轮准备可用能力
+    then: 可用能力里有名为 create_bot 和 create_room 的两项，并且提示写明可以创建 bot 和群聊；如果某个 bot 被单独限制了工具且名单里没有这两项，则看不到它们
+  - id: AC-2
+    given: 用户正在私聊
+    when: 用户让当前 bot 用 create_bot 新建一个 bot，并给出名字、头衔、简介、人设、要用的工具或技能、实验室里已有的模型、外观和单轮上限
+    then: 花名册里出现这个 bot，这些信息都已保存；保存下来的内容里没有 API key、token、secret 或 password，模型只记服务商和模型的引用
+  - id: AC-3
+    given: 花名册里至少有两个 bot
+    when: 用户让当前 bot 用 create_room 新建群聊，并给出标题、成员和主持人
+    then: 群聊存在，标题、成员和主持人都与给出的一致
+  - id: AC-4
+    given: 同一个没有工具白名单的 bot
+    when: 它处在群聊回合，或作为子代理准备可用能力
+    then: 看不到 create_bot 和 create_room
+  - id: AC-5
+    given: 用户让 bot 创建另一个 bot，并附上 API key、token、secret 或 password，或者指定一个实验室里还没有配好密钥的模型
+    when: 创建工具返回结果
+    then: 这些秘钥不会被存进新 bot；结果告诉它改用实验室里已经配置好的模型，而不是去读取秘钥
+notes: |
+  删除仍要明确确认。带空格的 bypass 仍按解析后的模式拒绝。
+  群聊回合和子代理不提供这套管理能力。

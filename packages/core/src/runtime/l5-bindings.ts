@@ -458,7 +458,8 @@ export function createRuntimeToolServices(rt: L5Bindable) {
       spawnSubagentOutcome(spawnFrom(rt), context, prompt, role, opts),
     spawnTeammate: (context, input) => spawnTeammate(spawnFrom(rt), context, input),
     spawnTeammateOutcome: (context, input) => spawnTeammateOutcome(spawnFrom(rt), context, input),
-    startBackgroundJob: (sessionId, command) => startBackgroundJob(spawnFrom(rt), sessionId, command),
+    startBackgroundJob: (sessionId, command, options) =>
+      startBackgroundJob(spawnFrom(rt), sessionId, command, options),
     compactContext: async (context, opts) => {
       const compacted = await autoCompactSession(compactFrom(rt), context, opts);
       if (compacted.replaced) {

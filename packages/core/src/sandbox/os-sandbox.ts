@@ -57,6 +57,8 @@ export interface SandboxExecResult {
   signal: NodeJS.Signals | null;
   /** Which sandbox tier was actually used. */
   tier: 0 | 1 | 2;
+  /** Provider that ran, or `unavailable` when a strict per-call mode was refused. */
+  backend?: string;
 }
 
 export interface SandboxProvider {
@@ -358,6 +360,12 @@ export class SandboxManager {
       allowNetwork?: boolean;
       envOptions?: SanitizeEnvOptions;
       sessionId?: string;
+      /**
+       * Per-call isolation. When set with `strict`, an unavailable mode does not
+       * fall back to direct — the command is not started.
+       */
+      mode?: SandboxMode;
+      strict?: boolean;
     },
   ): Promise<SandboxExecResult> {
     const refused = commandHardlineProcessRefusal(command);
@@ -365,11 +373,26 @@ export class SandboxManager {
       return { stdout: '', stderr: refused.stderr, code: refused.code, signal: null, tier: 0 };
     }
     this.refreshProvider();
+    let provider = this.provider;
+    if (options?.mode) {
+      const picked = this.selectProvider(options.mode);
+      if (options.strict && !explicitModeHonored(options.mode, picked)) {
+        return {
+          stdout: '',
+          stderr: `Isolation ${options.mode} is not available; command was not run.`,
+          code: 126,
+          signal: null,
+          tier: 0,
+          backend: 'unavailable'
+        };
+      }
+      provider = picked;
+    }
     const env = sanitizeSpawnEnv({
       ...options?.envOptions,
       stripCredentials: options?.envOptions?.stripCredentials ?? true,
     });
-    return this.provider.execute(command, {
+    const result = await provider.execute(command, {
       cwd,
       workspace: options?.workspace ?? cwd,
       env,
@@ -378,6 +401,7 @@ export class SandboxManager {
       allowNetwork: explicitNetworkAllowed(options?.allowNetwork),
       sessionId: options?.sessionId,
     });
+    return { ...result, backend: provider.name };
   }
 
   private refreshProvider(): void {
@@ -409,8 +433,29 @@ export class SandboxManager {
       }
     }
 
-    // 'auto' fallback or 'container' (Tier 2 not yet implemented)
+    // Configured 'auto' with no OS sandbox, or configured 'container'
+    // (Tier 2 is not implemented). Per-call strict mode refuses container
+    // and an explicit os request that this host cannot honor.
     return new DirectProvider();
+  }
+}
+
+function explicitModeHonored(mode: SandboxMode, provider: SandboxProvider): boolean {
+  switch (mode) {
+    case 'direct':
+      return provider.name === 'direct';
+    case 'os':
+      return provider.tier === 1;
+    case 'cloudflare-computer':
+      return provider.name === 'cloudflare-computer' && provider.isAvailable();
+    case 'container':
+      return false;
+    case 'auto':
+      return true;
+    default: {
+      const neverMode: never = mode;
+      return neverMode;
+    }
   }
 }
 
