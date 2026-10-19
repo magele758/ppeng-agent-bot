@@ -107,7 +107,7 @@
     "packages/core/src/runtime.ts": "39a27d34e3704fe8380d1aba7e1b9fc8e7b4b24a8ceef8476490f2f29f0053f4",
     "packages/core/src/storage.ts": "aa55d749fbaac626b2ffa51c78bc97e8ca47fe37717a5e5499b2772a4e3205eb",
     "packages/core/src/stores/session-store.ts": "55cd214535b84936676393062a14cf63007e3725d7bd27aca1409075bbfa6e84",
-    "packages/core/src/bots/bot-work.ts": "19a710f12efdd7b9c388c235838a54257a90f5130da3ece7aaf30248289dddd4",
+    "packages/core/src/bots/bot-work.ts": "858ff7e32b99d6dd9e6ea1e3025dddc3fee584c2aaedc488bd96672b5ff3b855",
     "packages/core/src/runtime/subagent-policy.ts": "6a08e1262ccd479f772095b0450fd8bda077d09bd43bec67087bc68c7cc9f1d1",
     "packages/core/src/runtime/session-control.ts": "adcb4cefa9ae95ec4fc63bba169d865b1b44f9829f21f4c78c149f8877fdeb01",
     "packages/core/src/runtime/session-facade.ts": "57ef1a5d55782f26ac7b4ff6223d5d205938060dd8e58bf72f1d5ca3f9a84c00",
@@ -123,9 +123,6 @@
     "packages/core/src/runtime/l5-bindings.ts": "7de1bb21de661f66287234d6db003edbd3d16cc815ae7f23903d56e35b37ed13",
     "packages/agent-loop/src/assembly/create-assembled-loop.ts": "acae47516f5b679639849351381b4d7a746ddcd07e1a1a2e3ddf52373b87eaf9",
     "packages/agent-loop/src/assembly/max-host.ts": "95e8997dbc33e67efe5bd6f0d0746418989b23749e8f8f7b8bfbbb2a501fac4a",
-    "packages/core/src/session/writer-claim.ts": "48dbe681713d9049fc19510b61bbd99774170c7da79e496dc994ee80ac11efff",
-    "packages/agent-loop/src/session/writer-claim.ts": "349510a83419f13914d10d023d64f334abeb6484b4928746262e2fcc61e34876",
-    "packages/core/src/turn/prepare-view.ts": "f57ef6b40a45f346182f899a0287239e2f42e3d03b77bd6e088e3ff6bda1c941",
     "scripts/formal/restart-model.mjs": "c7483dbecc5d2824676c859b48c20c17b1b6c049b4c931ceb32d5b1200a873b4",
     "scripts/formal/restart-child.mjs": "dcab76a03260ed6e39dc1f6b77b21e267d963484f71c2e4f98338bbcb20b43eb",
     "scripts/formal/restart-runtime.mjs": "1bab66f44dff0d4e384bfcd7d1b5dcb3235d5c80271ea0637f210bdca29455be",
@@ -143,6 +140,9 @@
     "scripts/formal/lifecycle-verifier.mjs": "92ccfc90ab23a79031c5280cdf02bdaaf8dabadeb1dcbdf23d035f5718ab2226",
     "scripts/formal/pairing-verifier.mjs": "dada48c004b65153c9aabaea8737c6c626dfb9f351dff507b77ae419d6a4ed58",
     "scripts/formal/restart-cases.mjs": "52101fb273241e7bdafabf5d5bff91c3dca25d14729c9b5376f518e92e17ca78",
+    "packages/core/src/session/writer-claim.ts": "48dbe681713d9049fc19510b61bbd99774170c7da79e496dc994ee80ac11efff",
+    "packages/agent-loop/src/session/writer-claim.ts": "349510a83419f13914d10d023d64f334abeb6484b4928746262e2fcc61e34876",
+    "packages/core/src/turn/prepare-view.ts": "f57ef6b40a45f346182f899a0287239e2f42e3d03b77bd6e088e3ff6bda1c941",
     "acceptance/session-restart-recovery-verification.yaml": "e51ba546dc35cbc0cb79fe46342b78597ac76b06f58c2402134d3f1291ecf70c",
     "acceptance/session-lifecycle-verification.yaml": "1515638ee7076c29d195dd32704a816fb586cc1750189a523d3d3045bb572db3",
     "acceptance/session-lifecycle-state-consistency.yaml": "cf4af95c0938e1c4c493cc360ea0e37a307e715614d631331ef341244341d3b8",
@@ -170,7 +170,7 @@
     "packages/core/src/approval/unattended-approval.ts": "74aff0a40282eaffa6a84610d4c0e2550f94eee268c99ea72f80b1b44879ebfd",
     "packages/core/test/unattended-approval-writer-scope.test.js": "23c17f903361bc53bbb0b7733eb4bf9147b4977c4dc546f800862cf2856b9371",
     "packages/core/src/sandbox/model-isolation.ts": "ebbe3a893976214b72de4d4d995a7e4458d1a9275165aeaebf3f0dae1d942129",
-    "packages/core/src/runtime/spawn-host.ts": "a087208d90bf31d0b458bbc546f6be51167d0f8e91f96ad32967c76c2d88046d",
-    "packages/core/test/model-sandbox-isolation.test.js": "a079f30070173d361291ae59fa4f70829cf116daed4b7fec6b3593abe7a17d35"
+    "packages/core/test/model-sandbox-isolation.test.js": "a079f30070173d361291ae59fa4f70829cf116daed4b7fec6b3593abe7a17d35",
+    "packages/core/src/runtime/spawn-host.ts": "a087208d90bf31d0b458bbc546f6be51167d0f8e91f96ad32967c76c2d88046d"
   }
 }
