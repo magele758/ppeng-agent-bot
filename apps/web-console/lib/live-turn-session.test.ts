@@ -114,3 +114,14 @@ test('returning to A does not let an old steer response clear the new composer [
   assert.equal(steerResponseApplies(1, 1, 'a', 'b'), false);
   assert.equal(steerResponseApplies(1, 1, 'a', 'a'), true);
 });
+
+test('selection already changed before generation detaches still refuses old session adoption [AC:bot-switch-live-turn#AC-1]', async () => {
+  const {mayClaimSelectedSession, canFollowSession} = await import('./live-turn-session.ts');
+  assert.equal(mayClaimSelectedSession(2, 2, 'b', 'a'), false);
+  assert.equal(mayClaimSelectedSession(3, 2, 'a', 'a'), false);
+  assert.equal(mayClaimSelectedSession(2, 2, null, 'a'), true);
+  assert.equal(mayClaimSelectedSession(2, 2, 'a', 'a'), true);
+  assert.equal(canFollowSession('b', 'a'), false);
+  assert.equal(canFollowSession('a', 'a'), true);
+  assert.equal(canFollowSession(null, 'a'), true);
+});

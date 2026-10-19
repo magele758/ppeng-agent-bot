@@ -89,3 +89,14 @@ export function steerResponseApplies(generation: number, currentGeneration: numb
   session: string, currentSession: string | null): boolean {
   return generation === currentGeneration && session === currentSession;
 }
+
+/** Also check selection before React has detached the previous generation. */
+export function mayClaimSelectedSession(activeGeneration: number, paintGeneration: number,
+  selectedSessionId: string | null, nextSessionId: string): boolean {
+  return streamPaintApplies(activeGeneration, paintGeneration) &&
+    (selectedSessionId == null || selectedSessionId === nextSessionId);
+}
+
+export function canFollowSession(selected: string | null, requested: string): boolean {
+  return selected == null || selected === requested;
+}

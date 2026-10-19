@@ -23,6 +23,9 @@ import { feedSseBuffer } from '@/lib/sse';
 import { liveSessionFollowRequest, type LiveStreamArm } from '@/lib/live-stream-attach';
 import {
   detachLiveTurn,
+  liveTurnBelongsToSelection,
+  mayClaimSelectedSession,
+  canFollowSession,
   screenLiveTurn,
   streamPaintApplies,
   botOpenApplies,
@@ -227,6 +230,11 @@ export interface PlayChatDeps {
   tick: (opts?: { includePlayPanel?: boolean }) => Promise<void>;
 }
 
+function activeFollowMatches(follow: { sessionId: string; controller: AbortController; ready: Promise<void> } | null,
+  sessionId: string): follow is { sessionId: string; controller: AbortController; ready: Promise<void> } {
+  return follow?.sessionId === sessionId && !follow.controller.signal.aborted;
+}
+
 function isSessionResult(event: string, payload: { session?: { id?: string } }): payload is { session: { id: string } } {
   return event === 'result' && Boolean(payload.session?.id);
 }
@@ -415,6 +423,15 @@ export function usePlayChat(deps: PlayChatDeps) {
 
   const liveTurnCurrent = (generation: number) => streamPaintApplies(liveGenRef.current, generation);
 
+  const liveTurnOnScreen = (generation: number) =>
+    liveTurnCurrent(generation) && liveTurnBelongsToSelection(liveOwnerRef.current, selectedSessionRef.current);
+
+  const assertSessionClaim = (generation: number, sessionId: string) => {
+    if (!mayClaimSelectedSession(liveGenRef.current, generation, selectedSessionRef.current, sessionId)) {
+      throw new Error('Detached session selection');
+    }
+  };
+
   const assertLiveTurn = (generation: number) => {
     if (!liveTurnCurrent(generation)) throw new Error('Detached live turn');
   };
@@ -486,7 +503,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     [cancelScheduledPlayScroll]
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     playStickToBottomRef.current = true;
     setShowJumpToLatest(false);
     const follow = liveFollowRef.current;
@@ -1411,7 +1428,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     const nextId = () => `s-${++idCounter}`;
 
     const sync = () => {
-      if (opts?.liveGen != null && !streamPaintApplies(liveGenRef.current, opts.liveGen)) return;
+      if (!liveTurnOnScreen(streamGeneration)) return;
       setStreamOverlay({ segments: [...segments] });
     };
 
@@ -1434,7 +1451,7 @@ export function usePlayChat(deps: PlayChatDeps) {
           envelope?: Record<string, unknown>;
           session?: { id: string };
         };
-        if (!liveTurnCurrent(streamGeneration)) return;
+        if (!liveTurnOnScreen(streamGeneration)) return;
         if (event === 'ready') {
           opts?.onReady?.();
         }
@@ -1508,6 +1525,7 @@ export function usePlayChat(deps: PlayChatDeps) {
         }
         if (isSessionResult(event, p)) {
           const sid = p.session.id;
+          assertSessionClaim(streamGeneration, sid);
           liveOwnerRef.current = sid;
           onSession?.(sid);
           selectedSessionRef.current = sid;
@@ -1522,7 +1540,7 @@ export function usePlayChat(deps: PlayChatDeps) {
    * `ready` resolves once the server is subscribed, before that run begins.
    */
   const reportFollowError = (error: unknown, controller: AbortController, generation: number) => {
-    if (controller.signal.aborted || !liveTurnCurrent(generation)) return;
+    if (controller.signal.aborted || !liveTurnOnScreen(generation)) return;
     if (error instanceof Error && error.name === 'AbortError') return;
     setPlayStatus({ text: String(error), err: true });
   };
@@ -1538,7 +1556,8 @@ export function usePlayChat(deps: PlayChatDeps) {
 
   const armLiveSessionStream = (sessionId: string): LiveStreamArm => {
     const current = liveFollowRef.current;
-    if (current?.sessionId === sessionId && !current.controller.signal.aborted) {
+    if (!canFollowSession(selectedSessionRef.current, sessionId)) return { ready: Promise.resolve(), cancel: () => undefined };
+    if (activeFollowMatches(current, sessionId)) {
       return {
         ready: current.ready,
         cancel: () => current.controller.abort()
@@ -1642,7 +1661,7 @@ export function usePlayChat(deps: PlayChatDeps) {
         sessionListStickTopRef.current = true;
         await tick({ includePlayPanel: true });
       } catch (err) {
-        if (!liveTurnCurrent(generation)) return;
+        if (!liveTurnOnScreen(generation)) return;
         setPlayStatus({ text: String(err), err: true });
       } finally {
         finishLiveTurn(generation);
@@ -1877,7 +1896,7 @@ export function usePlayChat(deps: PlayChatDeps) {
             }),
           })) as { session: { id: string } };
           const newSid = data.session.id;
-          assertLiveTurn(generation);
+          assertSessionClaim(generation, newSid);
           liveOwnerRef.current = newSid;
           selectedSessionRef.current = newSid;
           setSelectedSessionId(newSid);
@@ -1907,7 +1926,7 @@ export function usePlayChat(deps: PlayChatDeps) {
           }),
         })) as { session: { id: string } };
         const newSid = data.session.id;
-        assertLiveTurn(generation);
+        assertSessionClaim(generation, newSid);
         liveOwnerRef.current = newSid;
         selectedSessionRef.current = newSid;
         setSelectedSessionId(newSid);
@@ -1922,7 +1941,7 @@ export function usePlayChat(deps: PlayChatDeps) {
       sessionListStickTopRef.current = true;
       await tick({ includePlayPanel: true });
     } catch (e) {
-      if (!liveTurnCurrent(generation)) return;
+      if (!liveTurnOnScreen(generation)) return;
       setPlayStatus({ text: modelErrorText(e instanceof Error ? e.message : String(e), t), err: true });
       const persisted = e instanceof PlayStreamError && e.persisted;
       if (!persisted) {
