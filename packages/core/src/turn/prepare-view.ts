@@ -3,6 +3,7 @@
  */
 
 import { envBool } from '../env.js';
+import { embedReplyQuotes } from '../reply-quote.js';
 import { resolveMicroCompactConfig } from '../session/compact-settings.js';
 import { resolveHistoryTokenBudget } from '../session/session-budget.js';
 import {
@@ -37,6 +38,7 @@ export {
 export interface PrepareViewHost {
   store: {
     getImageAsset(id: string): ImageAssetRecord | undefined;
+    readHistoryById?(sessionId: string, messageId: string): SessionMessage | undefined;
     getDaemonControl?(key: string): unknown;
     setDaemonControl?(key: string,value: unknown): void;
     agentMemory?(): unknown;
@@ -61,7 +63,10 @@ export async function prepareMessagesForModel(
     dynSettings.enabled || messagesMayNeedRetiredAnnotation(messages, session);
   sealSharedExposure(host.store,session.id,messages);
   const scoped=messages.filter(message=>sharedMessageVisible(host.store,session.id,message));
-  return prepareRichView(session, coordinatorViewOf(session, scoped), {
+  return prepareRichView(session, coordinatorViewOf(session, embedReplyQuotes(scoped, id => {
+    const original = host.store.readHistoryById?.(session.id, id);
+    return original && sharedMessageVisible(host.store, session.id, original) ? original : undefined;
+  })), {
     getImageAsset: (id) => host.store.getImageAsset(id),
     annotateRetired: (msgs, sess) => {
       if (!mayNeedRetired) return msgs;

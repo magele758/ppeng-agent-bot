@@ -28,6 +28,7 @@ import { MailStore } from './stores/mail-store.js';
 import { ApprovalStore } from './stores/approval-store.js';
 import { BackgroundJobStore } from './stores/background-job-store.js';
 import { MiscStore } from './stores/misc-store.js';
+import type { SurfaceWriteOpts } from './session/surface-store.js';
 import { SessionStore } from './stores/session-store.js';
 import type { CreateSessionInput } from './stores/session-store.js';
 import { ContextSnapshotStore } from './session/context-snapshot-store.js';
@@ -199,7 +200,8 @@ export class SqliteStateStore {
         key TEXT,
         surface_op TEXT DEFAULT 'append',
         replaces_start INTEGER,
-        replaces_end INTEGER
+        replaces_end INTEGER,
+        reply_to_json TEXT
       );
 
       CREATE TABLE IF NOT EXISTS tasks (
@@ -507,7 +509,7 @@ export class SqliteStateStore {
     sessionId: string,
     role: MessageRole,
     parts: SessionMessage['parts'],
-    opts?: { key?: string; expectedWriterRunId?: string }
+    opts?: SurfaceWriteOpts
   ): SessionMessage {
     const r = this.sessions.appendMessage(sessionId, role, parts, opts);
     this.bumpVersion();
@@ -591,6 +593,8 @@ export class SqliteStateStore {
   readHistoryById(sessionId: string, messageId: string) {
     return this.sessions.readHistoryById(sessionId, messageId);
   }
+
+  validateMessageQuote(sessionId: string, role: MessageRole, raw: unknown) { return this.sessions.quoteForAppend(sessionId, role, raw); }
 
   enqueueSteer(sessionId: string, text: string, opts?: EnqueueSteerOptions): InboxItem {
     return this.transaction(() => {

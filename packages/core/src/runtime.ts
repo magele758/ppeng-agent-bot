@@ -64,6 +64,7 @@ import type {
   SelfHealEventRecord,
   SelfHealPolicy,
   SelfHealRunRecord,
+  MessageReplyTo,
   SessionMessage,
   SessionRecord,
   ImageAssetRecord,
@@ -1027,7 +1028,7 @@ export class RawAgentRuntime {
       attachmentIds?: string[];
       contextSources?: unknown;
       autoRun?: boolean;
-      replyTo?: string;
+      replyTo?: string | MessageReplyTo;
     }
   ): SessionRecord {
     const extra = this.attachmentIngest.expandForMessage(sessionId, options?.attachmentIds);
@@ -1047,6 +1048,10 @@ export class RawAgentRuntime {
   }
 
   enqueueSteer(sessionId: string, text: string, opts?: EnqueueSteerOptions): SteerAck {
+    if (opts?.replyTo) {
+      if (opts.steerMode === 'subagent') throw new ValidationError('Quoted steering must target the current conversation');
+      opts = { ...opts, replyTo: this.store.validateMessageQuote(sessionId, opts.role ?? 'user', opts.replyTo) };
+    }
     const admit = () => {
       const ack = enqueueSteerFn(this.store, sessionId, text, opts);
       if (ack.status !== 'not_submitted' && opts?.steerMode !== 'subagent') requestSteerContinuation(this.store, sessionId, ack.item);
@@ -1086,6 +1091,7 @@ export class RawAgentRuntime {
   promoteSteerToSubagent(sessionId: string, itemId: string, role?: string) {
     const item = this.store.getUnclaimedInbox(sessionId, itemId);
     if (!item) throw new NotFoundError('Steer', itemId);
+    if (item.replyTo) throw new ValidationError('Quoted steering must target the current conversation');
     const spawned = this.startSteeringSubagent(sessionId, item.text, role, item.id, item.contextParts);
     this.store.removeUnclaimedInbox(sessionId, itemId);
     dropHumanSteerContinuation(this.store, sessionId, itemId);

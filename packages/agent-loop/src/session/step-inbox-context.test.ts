@@ -13,3 +13,10 @@ it('upgrades standalone legacy inbox tables and preserves context through edits 
   expect(store.claim('s', 'next-step')[0]).toMatchObject({ text: 'read it carefully', contextParts });
   db.close();
 });
+
+it('persists the short reply pointer through SQLite inbox edits and claim [AC:bot-reply-quote#AC-5]',()=>{
+ const db=new DatabaseSync(':memory:');db.exec('CREATE TABLE session_inbox (id TEXT PRIMARY KEY, session_id TEXT, target TEXT, role TEXT, text TEXT, key TEXT, created_at TEXT, claimed_at TEXT)');
+ const store=new StepInboxStore(db),replyTo={messageId:'original',excerpt:'short'};
+ const item=store.enqueue('s','quote',{replyTo});store.updateUnclaimed('s',item.id,'edited quote');
+ expect(store.claim('s','next-step')[0]).toMatchObject({text:'edited quote',replyTo});db.close();
+});

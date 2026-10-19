@@ -180,3 +180,9 @@ it('retains dragged context when an inbox message lands [AC:composer-drag-contex
   applyClaimedInbox(store, 's1', [{ role: 'user', text: 'read it', contextParts }]);
   expect(appends[0]?.parts).toEqual([{ type: 'text', text: 'read it' }, ...contextParts]);
 });
+
+it('retains quote pointer while applying a claimed inbox message [AC:bot-reply-quote#AC-5]',()=>{
+ const {store,appends}=recordingStore();const replyTo={messageId:'original',excerpt:'short'};
+ applyClaimedInbox(store,'s1',[{role:'user',text:'quoted',replyTo}]);
+ expect(appends[0]?.opts).toMatchObject({replyTo});
+});

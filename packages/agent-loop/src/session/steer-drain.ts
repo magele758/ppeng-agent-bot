@@ -10,6 +10,7 @@
  * No RAW_AGENT_* env vars.
  */
 
+import type { MessageReplyTo } from '../types.js';
 import type { InboxItem, InboxTarget } from './step-inbox.js';
 import type { SteerInterruptPolicy } from './steer-interrupt.js';
 import { closeOpenToolWave } from './tool-wave-close.js';
@@ -39,7 +40,7 @@ export interface SteerDrainClaimStore {
     sessionId: string,
     role: SessionMessage['role'],
     parts: SessionMessage['parts'],
-    opts?: { key?: string; expectedWriterRunId?: string }
+    opts?: { key?: string; expectedWriterRunId?: string; replyTo?: MessageReplyTo }
   ): SessionMessage;
   hideByKey(sessionId: string, key: string): number;
   claimInbox(sessionId: string, target: InboxTarget): InboxItem[];
@@ -117,9 +118,7 @@ export function drainSteerAtToolLaunch(input: {
       input.sessionId,
       item.role,
       [{ type: 'text', text: item.text }, ...(item.contextParts ?? [])],
-      item.key
-        ? { key: item.key, expectedWriterRunId: input.expectedWriterRunId }
-        : { expectedWriterRunId: input.expectedWriterRunId }
+      { ...(item.key ? { key: item.key } : {}), expectedWriterRunId: input.expectedWriterRunId, ...(item.replyTo ? { replyTo: item.replyTo } : {}) }
     );
   }
   const closed = closeOpenToolWave(input.store, input.sessionId, 'skipped_due_to_steer', {

@@ -57,12 +57,23 @@ export interface TodoItem {
   activeForm: string;
 }
 
+/** Short pointer to an existing bot reply. The full quoted body stays on the original message. */
+export interface MessageReplyTo {
+  messageId: string;
+  /** Author of the quoted bot message. Required when the quote is sent in a room. */
+  botId?: string;
+  /** Display excerpt, at most 120 characters. */
+  excerpt: string;
+}
+
 export interface SessionMessage {
   id: string;
   sessionId: string;
   role: MessageRole;
   parts: MessagePart[];
   createdAt: string;
+  /** Quote of an existing bot reply. Absent on a normal message. */
+  replyTo?: MessageReplyTo;
   /** Monotonic WAL sequence for this session. Present on fold() / listMessages after surface migration. */
   seq?: number;
   /** Optional stable key (steer / fact / summary). Same-key overwrite hides the previous visible node. */

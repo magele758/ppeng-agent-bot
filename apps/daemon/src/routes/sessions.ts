@@ -32,6 +32,7 @@ import {
   type ModelStreamChunk,
   type RawAgentRuntime,
   type RequestAuth,
+  type MessageReplyTo,
   type SessionRecord
 } from '@ppeng/agent-core';
 import type { RouteSpec } from '../routing.js';
@@ -56,8 +57,12 @@ function hasContextSources(body: Record<string, unknown>): boolean {
   return normalizeContextSources(body.contextSources).length > 0;
 }
 
-function replyToFromBody(body: Record<string, unknown>): string | undefined {
-  return typeof body.replyTo === 'string' ? body.replyTo : undefined;
+function replyToFromBody(body: Record<string, unknown>): string | MessageReplyTo | undefined {
+  const raw = body.replyTo;
+  if (typeof raw === 'string') return raw;
+  if (raw == null) return undefined;
+  if (typeof raw === 'object' && !Array.isArray(raw)) return raw as MessageReplyTo;
+  throw new ValidationError('Invalid replyTo');
 }
 
 function sessionMetadataFromBody(
@@ -231,7 +236,7 @@ function sendBodyContentToSession(
   const attIds = attachmentIdsFromBody(body);
   maybeMergeOptionalGroupsFromBody(runtime, sessionId, body);
   runtime.sendUserMessage(sessionId, message || (imgIds.length ? '(image)' : '(attachment)'), {
-    replyTo: typeof body.replyTo === 'string' ? body.replyTo : undefined,
+    replyTo: replyToFromBody(body),
     imageAssetIds: imgIds,
     attachmentIds: attIds,
     contextSources: body.contextSources,
@@ -816,7 +821,7 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         if (commandText && (await replyBotChatCommand(runtime, id, commandText, response))) return;
         maybeMergeOptionalGroupsFromBody(runtime, id, body);
         runtime.sendUserMessage(id, message || (imgIds.length ? '(image)' : '(attachment)'), {
-          replyTo: typeof body.replyTo === 'string' ? body.replyTo : undefined,
+          replyTo: replyToFromBody(body),
           imageAssetIds: imgIds,
           attachmentIds: attIds,
           contextSources: body.contextSources,
@@ -868,7 +873,7 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         maybeMergeOptionalGroupsFromBody(runtime, id, body);
         if (msg || imgIds.length > 0 || attIds.length > 0 || hasContextSources(body)) {
           runtime.sendUserMessage(id, msg || (imgIds.length ? '(image)' : '(attachment)'), {
-            replyTo: typeof body.replyTo === 'string' ? body.replyTo : undefined,
+            replyTo: replyToFromBody(body),
             imageAssetIds: imgIds,
             attachmentIds: attIds,
             contextSources: body.contextSources,
@@ -931,7 +936,9 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
           typeof body.subagentRole === 'string' && body.subagentRole.trim()
             ? body.subagentRole.trim()
             : undefined;
-        const ack = runtime.enqueueSteer(id, text, { target, key, role, steerMode, subagentRole, contextParts });
+        const replyTo = replyToFromBody(body);
+        if (typeof replyTo === 'string') throw new ValidationError('Quoted steering requires a message pointer');
+        const ack = runtime.enqueueSteer(id, text, { target, key, role, steerMode, subagentRole, contextParts, replyTo });
         json(response, 200, steerHttpFromCoreAck(ack, runtime.getSession(id)));
       }
     },
@@ -1096,7 +1103,7 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         const openedBot = openBotFromBody(runtime, body, auth);
         const sendOpts = {
           autoRun: true,
-          replyTo: typeof body.replyTo === 'string' ? body.replyTo : undefined,
+          replyTo: replyToFromBody(body),
           imageAssetIds: imgIds,
           attachmentIds: attIds,
           contextSources: body.contextSources
@@ -1149,7 +1156,7 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         const openedBot = openBotFromBody(runtime, body, auth);
         const sendOpts = {
           autoRun: true,
-          replyTo: typeof body.replyTo === 'string' ? body.replyTo : undefined,
+          replyTo: replyToFromBody(body),
           imageAssetIds: imgIds,
           attachmentIds: attIds,
           contextSources: body.contextSources

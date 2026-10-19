@@ -58,6 +58,14 @@ import {
 } from '@/lib/live-turn-session';
 import { userPreviewText } from '@/lib/chat-utils';
 import {
+  emptyReplyQuoteMemory,
+  forgetPendingReply,
+  rememberPendingReply,
+  stampReplyQuotes,
+  withReplyTo,
+  type ReplyQuote
+} from '@/lib/reply-quote';
+import {
   contextLabelsOf,
   composerHasAttachments,
   contextSubmission,
@@ -300,6 +308,11 @@ export function usePlayChat(deps: PlayChatDeps) {
   const [playStatus, setPlayStatus] = useState<{ text: string; ok?: boolean; err?: boolean }>({ text: '' });
   const [optimisticUser, setOptimisticUser] = useState<string | null>(null);
   const [optimisticContext, setOptimisticContext] = useState<ContextLabel[]>([]);
+  const [optimisticReply, setOptimisticReply] = useState<ReplyQuote | null>(null);
+  const [replyQuote, setReplyQuote] = useState<ReplyQuote | null>(null);
+  const replyQuoteRef = useRef<ReplyQuote | null>(null);
+  const replyMemoryRef = useRef(emptyReplyQuoteMemory());
+  replyQuoteRef.current = replyQuote;
   const { pendingContext, setPendingContext, addPendingContext } = usePendingComposerContext(() => {
     setPlayStatus({ text: t('play.composer.contextTruncated') });
   });
@@ -426,6 +439,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     if (!pendingSteerTextRef.current) {
       setOptimisticUser(null);
       setOptimisticContext([]);
+      setOptimisticReply(null);
     }
     setStreamOverlay(null);
     setWaitTyping(false);
@@ -711,6 +725,15 @@ export function usePlayChat(deps: PlayChatDeps) {
   }, [botId]);
 
   useEffect(() => {
+    setReplyQuote(null);
+    setOptimisticReply(null);
+    replyMemoryRef.current = emptyReplyQuoteMemory();
+  }, [playSurface, botId, selectedSessionId]);
+
+  const quoteReply = (quote: ReplyQuote) => setReplyQuote(quote);
+  const cancelReplyQuote = () => setReplyQuote(null);
+
+  useEffect(() => {
     setSpeechDictationAvailable(getSpeechRecognitionCtor() !== null);
   }, []);
 
@@ -949,7 +972,7 @@ export function usePlayChat(deps: PlayChatDeps) {
       playStickToBottomRef.current = planned.stick;
       showLatestWhenStuck(planned.stick, setShowJumpToLatest);
       feedScrollIntentRef.current = planned.intent;
-      setSessionMessages(planned.messages);
+      setSessionMessages(stampReplyQuotes(planned.messages, replyMemoryRef.current));
       setHistoryCursor(planned.cursor);
       setFeedRevision((revision) => revision + 1);
       setSteerInbox(mapSteerInboxItems(data.inbox));
@@ -1065,6 +1088,7 @@ export function usePlayChat(deps: PlayChatDeps) {
         pendingSteerTextRef.current = null;
         setOptimisticUser(null);
         setOptimisticContext([]);
+        setOptimisticReply(null);
         await refreshPlayPanel();
       } catch {
         /* steer landing is best-effort */
@@ -1298,7 +1322,9 @@ export function usePlayChat(deps: PlayChatDeps) {
       playStickToBottomRef.current = planned.stick;
       showLatestWhenStuck(planned.stick, setShowJumpToLatest);
       feedScrollIntentRef.current = planned.intent;
-      setSessionMessages((prev) => prependHistoryPage(prev as Array<ChatMessage & { id: string }>, older));
+      setSessionMessages((prev) =>
+        stampReplyQuotes(prependHistoryPage(prev as Array<ChatMessage & { id: string }>, older), replyMemoryRef.current)
+      );
       setHistoryCursor(data.hasMore ? data.nextCursor : null);
       historyAutoBlockedRef.current = false;
       setFeedRevision((revision) => revision + 1);
@@ -1698,6 +1724,20 @@ export function usePlayChat(deps: PlayChatDeps) {
 
   const sendPlayMessage = async () => {
     const text = playInput.trim();
+    const quoteSnapshot = replyQuoteRef.current;
+    const replyFields = withReplyTo({}, quoteSnapshot);
+    const sentText = text || '(attachment)';
+    const consumeQuote = (visible: boolean) => {
+      if (!quoteSnapshot) return;
+      rememberPendingReply(
+        replyMemoryRef.current,
+        sentText,
+        quoteSnapshot,
+        historyMessagesRef.current.map((message) => messageId(message)).filter(Boolean)
+      );
+      if (visible) setOptimisticReply(quoteSnapshot);
+      setReplyQuote(null);
+    };
     const imageAssetIds = [...pendingImageAssetIds];
     const attachmentIds = [...pendingAttachmentIds];
     const contextSnapshot = pendingContext;
@@ -1739,6 +1779,7 @@ export function usePlayChat(deps: PlayChatDeps) {
         return;
       }
       stopSpeechDictation();
+      consumeQuote(immediate);
       if (immediate) {
         pendingSteerKnownIdsRef.current = new Set(
           historyMessagesRef.current.map((message) => messageId(message)).filter(Boolean)
@@ -1758,8 +1799,8 @@ export function usePlayChat(deps: PlayChatDeps) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(
             immediate
-              ? { text: submission.message, target, ...contextFields }
-              : { text: submission.message, target, ...steerBodyFromQueryMode(execMode), ...contextFields }
+              ? { text: submission.message, target, ...contextFields, ...replyFields }
+              : { text: submission.message, target, ...steerBodyFromQueryMode(execMode), ...contextFields, ...replyFields }
           ),
         })) as { ok?: boolean; status?: string; reason?: string; item?: SteerInboxItem };
         if (!steerResponseApplies(steerGeneration, liveGenRef.current, steerSessionId, selectedSessionRef.current)) return;
@@ -1772,12 +1813,16 @@ export function usePlayChat(deps: PlayChatDeps) {
           ]);
         }
         if (data.status === 'rejected' || data.status === 'not_submitted') {
+          forgetPendingReply(replyMemoryRef.current);
+          if (!immediate) setReplyQuote(quoteSnapshot);
           if (immediate) {
             pendingSteerTextRef.current = null;
             setOptimisticUser(null);
             setOptimisticContext([]);
+            setOptimisticReply(null);
             setPlayInput(text);
             setPendingContext(contextSnapshot);
+            setReplyQuote(quoteSnapshot);
           }
           const why =
             data.reason === 'session_ended'
@@ -1800,13 +1845,17 @@ export function usePlayChat(deps: PlayChatDeps) {
         }
       } catch (err) {
         if (!steerResponseApplies(steerGeneration, liveGenRef.current, steerSessionId, selectedSessionRef.current)) return;
+        if (!immediate) setReplyQuote(quoteSnapshot);
         if (immediate) {
           pendingSteerTextRef.current = null;
           setOptimisticUser(null);
           setOptimisticContext([]);
+          setOptimisticReply(null);
           setPlayInput(text);
           setPendingContext(contextSnapshot);
+          setReplyQuote(quoteSnapshot);
         }
+        forgetPendingReply(replyMemoryRef.current);
         setPlayStatus({ text: err instanceof Error ? err.message : String(err), err: true });
       }
       return;
@@ -1826,6 +1875,7 @@ export function usePlayChat(deps: PlayChatDeps) {
       requestScrollPlayToBottom();
       setOptimisticUser(preview);
       setOptimisticContext(contextLabels);
+      consumeQuote(true);
       setStreamOverlay({ segments: [] });
       clearComposerOnly();
     };
@@ -1834,6 +1884,7 @@ export function usePlayChat(deps: PlayChatDeps) {
       requestScrollPlayToBottom();
       setOptimisticUser(preview);
       setOptimisticContext(contextLabels);
+      consumeQuote(true);
       setWaitTyping(true);
       clearComposerOnly();
     };
@@ -1857,6 +1908,7 @@ export function usePlayChat(deps: PlayChatDeps) {
               imageAssetIds,
               attachmentIds,
               ...contextFields,
+              ...replyFields,
               ...optionalGroupsBody(optionalToolGroupsFeature, enabledOptionalGroupIds),
               ...orchestrationBody(taskMode, orchestrationEngine, skillScope),
               ...modelRefBody(modelRefForSend),
@@ -1875,6 +1927,7 @@ export function usePlayChat(deps: PlayChatDeps) {
               imageAssetIds,
               attachmentIds,
               ...contextFields,
+              ...replyFields,
               ...optionalGroupsBody(optionalToolGroupsFeature, enabledOptionalGroupIds),
               ...orchestrationBody(taskMode, orchestrationEngine, skillScope),
               ...modelRefBody(modelRefForSend),
@@ -1897,6 +1950,7 @@ export function usePlayChat(deps: PlayChatDeps) {
             imageAssetIds,
             attachmentIds,
             ...contextFields,
+            ...replyFields,
             ...optionalGroupsBody(optionalToolGroupsFeature, enabledOptionalGroupIds),
             ...orchestrationBody(taskMode, orchestrationEngine, skillScope),
             ...modelRefBody(modelRefForSend),
@@ -1917,6 +1971,7 @@ export function usePlayChat(deps: PlayChatDeps) {
               imageAssetIds,
               attachmentIds,
               ...contextFields,
+              ...replyFields,
               ...optionalGroupsBody(optionalToolGroupsFeature, enabledOptionalGroupIds),
               ...orchestrationBody(taskMode, orchestrationEngine, skillScope),
               ...modelRefBody(modelRefForSend),
@@ -1944,6 +1999,7 @@ export function usePlayChat(deps: PlayChatDeps) {
             imageAssetIds,
             attachmentIds,
             ...contextFields,
+            ...replyFields,
             agentId: resolveComposerAgentId(agentId, agents),
             autoRun: true,
             background: true,
@@ -1977,6 +2033,9 @@ export function usePlayChat(deps: PlayChatDeps) {
           setPendingImageAssetIds(imageSnapshot);
           setPendingAttachmentIds(attachmentSnapshot);
           setPendingContext(contextSnapshot);
+          forgetPendingReply(replyMemoryRef.current);
+          setOptimisticReply(null);
+          setReplyQuote(quoteSnapshot);
         });
         finishLiveTurn(generation);
         await tickIfPersisted(persisted, () => tick({ includePlayPanel: true }));
@@ -2101,6 +2160,10 @@ export function usePlayChat(deps: PlayChatDeps) {
     playStatus,
     setPlayStatus,
     optimisticUser: screen.optimisticUser,
+    optimisticReply: screen.optimisticUser ? optimisticReply : null,
+    replyQuote,
+    quoteReply,
+    cancelReplyQuote,
     streamOverlay: visibleStream(screen.hasStream, streamOverlay),
     waitTyping: screen.waitTyping,
     playSending: screen.playSending,

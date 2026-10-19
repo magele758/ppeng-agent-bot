@@ -140,11 +140,11 @@ function restorePendingSources(store:SqliteStateStore,id:string):void {
    const role=request.summaryId?'system':request.role??'user',floor=request.summarySeqFloor??request.seq;
    if(steer){if(!store.db.prepare('SELECT 1 FROM session_inbox WHERE id=? AND claimed_at IS NOT NULL').get(request.summaryId??request.id))return request;if(visible.some(message=>message.key===sourceKey&&Number(message.seq)>floor))return request;}
    else if(visible.some(message=>message.id===request.id||(request.deliveryKey&&message.key===request.deliveryKey&&Number(message.seq)>(request.deliverySeqFloor??request.seq))))return request;
-   const source=(steer?store.db.prepare('SELECT role,parts_json FROM session_messages WHERE session_id=? AND key=? AND seq>? AND role=? ORDER BY seq LIMIT 1').get(id,sourceKey??'',floor,role):store.db.prepare('SELECT role,parts_json FROM session_messages WHERE session_id=? AND id=?').get(id,request.id)) as {role:import('../types.js').MessageRole;parts_json:string}|undefined;
+   const source=(steer?store.db.prepare('SELECT role,parts_json,reply_to_json FROM session_messages WHERE session_id=? AND key=? AND seq>? AND role=? ORDER BY seq LIMIT 1').get(id,sourceKey??'',floor,role):store.db.prepare('SELECT role,parts_json,reply_to_json FROM session_messages WHERE session_id=? AND id=?').get(id,request.id)) as {role:import('../types.js').MessageRole;parts_json:string;reply_to_json:string|null}|undefined;
    if(!source)return request;
    const deliveryKey=steer?sourceKey:request.deliveryKey??'human-source:'+request.id;
    const deliverySeqFloor=Number((store.db.prepare('SELECT MAX(seq) AS seq FROM session_messages WHERE session_id=?').get(id) as {seq:number|null}).seq??0);
-   visible.push(store.appendMessage(id,source.role,JSON.parse(source.parts_json),{key:deliveryKey}));changed=true;
+   visible.push(store.appendMessage(id,source.role,JSON.parse(source.parts_json),{key:deliveryKey,...(source.reply_to_json?{replyTo:JSON.parse(source.reply_to_json)}:{})}));changed=true;
    return steer?request:{...request,deliveryKey,deliverySeqFloor};
   });
   return changed?{...current,pending}:current;

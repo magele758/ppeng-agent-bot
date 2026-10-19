@@ -7,6 +7,7 @@ import { messageHasStructuredParts, msgPartsToText, normalizedRole } from '@/lib
 import { buildFeedSlots, type FeedSlot } from '@/lib/feed-window';
 import { formatHash } from '@/lib/nav';
 import { useI18n } from '@/lib/i18n';
+import type { ReplyQuote } from '@/lib/reply-quote';
 import { indexResolvedToolCallIds, indexToolCalls } from '@/lib/tool-io';
 import { sliceConversationTurns } from '@/lib/turn-feed-stats';
 import { ApprovalBanner } from './ApprovalBanner';
@@ -30,6 +31,8 @@ export function PlayTranscript(props: {
   onNewSession: () => void;
   onApprovalsChanged: () => void;
   onAttachStream?: (sessionId: string) => { ready: Promise<void>; cancel: () => void };
+  replyQuoteBot?: { id: string; name: string } | null;
+  onQuoteReply?: (quote: ReplyQuote) => void;
 }) {
   const view = transcriptView(props.chat, props.sessionApprovals, props.turnFeedStatLines, Boolean(props.selectedSessionId));
   return (
@@ -263,11 +266,13 @@ function renderTranscriptSlot(slot: FeedSlot, view: TranscriptModel, props: {
   selectedSessionId: string | null;
   onApprovalsChanged: () => void;
   onAttachStream?: (sessionId: string) => { ready: Promise<void>; cancel: () => void };
+  replyQuoteBot?: { id: string; name: string } | null;
+  onQuoteReply?: (quote: ReplyQuote) => void;
 }): ReactNode {
   const sessionId = props.selectedSessionId ?? '';
   const live = renderLiveSlot(slot, view, props.chat, sessionId, props.onApprovalsChanged, props.onAttachStream);
   if (live) return live;
-  return renderStoredSlot(slot, view, sessionId, props.chat.showModelView, props.onApprovalsChanged, props.onAttachStream);
+  return renderStoredSlot(slot, view, sessionId, props.chat.showModelView, props.onApprovalsChanged, props.onAttachStream, props.replyQuoteBot ?? null, props.onQuoteReply);
 }
 
 function renderLiveSlot(slot: FeedSlot, view: TranscriptModel, chat: Chat, sessionId: string, onDone: () => void, onAttach?: (sessionId: string) => { ready: Promise<void>; cancel: () => void }): ReactNode {
@@ -278,7 +283,16 @@ function renderLiveSlot(slot: FeedSlot, view: TranscriptModel, chat: Chat, sessi
 
 function renderOptimisticOrStream(slot: FeedSlot, view: TranscriptModel, chat: Chat, sessionId: string): ReactNode {
   if (slot.kind === 'optimistic') {
-    return <ChatTurnPlain role="user" text={chat.optimisticUser ?? ''} contextLabels={chat.optimisticContext} />;
+    const reply = chat.optimisticReply;
+    return (
+      <ChatTurnPlain
+        role="user"
+        text={chat.optimisticUser ?? ''}
+        contextLabels={chat.optimisticContext}
+        replyTo={reply}
+        replyBotName={reply?.botName}
+      />
+    );
   }
   if (slot.kind !== 'stream') return null;
   return <ChatTurnStreaming segments={chat.streamOverlay?.segments ?? []} sessionId={sessionId} resolvedCallIds={view.resolved} />;
@@ -290,8 +304,17 @@ function renderTypingOrTrail(slot: FeedSlot, view: TranscriptModel, onDone: () =
   return <ApprovalBanner approvals={view.anchors.trailing} onDone={onDone} onAttachStream={onAttach} />;
 }
 
-function renderStoredSlot(slot: FeedSlot, view: TranscriptModel, sessionId: string, modelView: boolean, onDone: () => void, onAttach?: (sessionId: string) => { ready: Promise<void>; cancel: () => void }): ReactNode {
-  if (slot.kind === 'message') return messageSlot(view, sessionId, slotIndex(slot), modelView);
+function renderStoredSlot(
+  slot: FeedSlot,
+  view: TranscriptModel,
+  sessionId: string,
+  modelView: boolean,
+  onDone: () => void,
+  onAttach: ((sessionId: string) => { ready: Promise<void>; cancel: () => void }) | undefined,
+  quoteBot: { id: string; name: string } | null,
+  onQuote?: (quote: ReplyQuote) => void
+): ReactNode {
+  if (slot.kind === 'message') return messageSlot(view, sessionId, slotIndex(slot), modelView, quoteBot, onQuote);
   if (slot.kind === 'stats') return statsLine(view.lines, slot.turnIndex);
   if (slot.kind === 'approval') return approvalSlot(slot, view, onDone, onAttach);
   return null;
@@ -302,15 +325,23 @@ function slotIndex(slot: FeedSlot): number {
   return slot.messageIndex;
 }
 
-function messageSlot(view: TranscriptModel, sessionId: string, index: number, modelView: boolean): ReactNode {
+function messageSlot(
+  view: TranscriptModel,
+  sessionId: string,
+  index: number,
+  modelView: boolean,
+  quoteBot: { id: string; name: string } | null,
+  onQuote?: (quote: ReplyQuote) => void
+): ReactNode {
   const message = view.messages[index];
   if (!message) return null;
+  const replyNames = quoteBot ? { [quoteBot.id]: quoteBot.name } : undefined;
   if (messageHasStructuredParts(message.parts)) {
-    return <ChatTurnFromMessage m={message} sessionId={sessionId} msgIndex={index} modelView={modelView} toolCallsById={view.calls} resolvedCallIds={view.resolved} />;
+    return <ChatTurnFromMessage m={message} sessionId={sessionId} msgIndex={index} modelView={modelView} toolCallsById={view.calls} resolvedCallIds={view.resolved} quoteBot={quoteBot} onQuote={onQuote} replyNames={replyNames} />;
   }
   const role = normalizedRole(message);
   if (role === 'tool' || role === 'system') return <ChatTurnPlain role={role} text={msgPartsToText(message.parts)} />;
-  return <ChatTurnFromMessage m={message} sessionId={sessionId} msgIndex={index} modelView={modelView} toolCallsById={view.calls} resolvedCallIds={view.resolved} />;
+  return <ChatTurnFromMessage m={message} sessionId={sessionId} msgIndex={index} modelView={modelView} toolCallsById={view.calls} resolvedCallIds={view.resolved} quoteBot={quoteBot} onQuote={onQuote} replyNames={replyNames} />;
 }
 
 function approvalSlot(slot: FeedSlot, view: TranscriptModel, onDone: () => void, onAttach?: (sessionId: string) => { ready: Promise<void>; cancel: () => void }): ReactNode {

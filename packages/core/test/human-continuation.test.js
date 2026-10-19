@@ -92,3 +92,7 @@ test('folded steer and shared overflow summary sources resume once from original
   await drainHumanContinuations({store,isSessionRunning:()=>false,runSession:async id=>{calls++;const observer=createHumanContinuationObserver(store,id);noteHumanModelInput(store,id,store.foldMessages(id));observer({type:'model_done',stopReason:'end'});}});await wait();assert.equal(ledger(store,session.id).pending.length,0);assert.equal(calls,1);for(const original of originals){const rows=store.db.prepare('SELECT COUNT(*) AS n FROM session_messages WHERE session_id=? AND key=? AND role=?').get(session.id,original.key,original.role);assert.equal(rows.n,2);}store.db.close();
  }
 });
+
+test('human continuation restores the original quote pointer after compaction [AC:bot-reply-quote#AC-5]',async()=>{
+ const {store,session}=fixture();try{const original=store.appendMessage(session.id,'assistant',[{type:'text',text:'full quoted answer'}]);const quote={messageId:original.id,excerpt:'quoted'};const source=store.appendMessage(session.id,'user',[{type:'text',text:'explain quote'}],{replyTo:quote});requestHumanRun(store,session.id);store.appendReplacement(session.id,{startSeq:source.seq,endSeq:source.seq,role:'system',parts:[{type:'text',text:'compressed'}]});let delivered;await drainHumanContinuations({store,isSessionRunning:()=>false,runSession:async id=>{delivered=store.foldMessages(id).find(m=>m.key==='human-source:'+source.id);}});await wait();assert.deepEqual(delivered?.replyTo,quote);}finally{store.db.close();}
+});

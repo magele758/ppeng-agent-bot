@@ -1,3 +1,4 @@
+import type { MessageReplyTo } from '../types.js';
 import type { TextPart } from '@ppeng/api-types';
 import { DatabaseSync } from 'node:sqlite';
 import { createId, nowIso } from '../helpers.js';
@@ -14,6 +15,7 @@ export interface InboxItem {
   role: InboxRole;
   text: string;
   contextParts?: TextPart[];
+  replyTo?: MessageReplyTo;
   key?: string;
   createdAt: string;
   claimedAt?: string;
@@ -24,6 +26,7 @@ export type SteerMode = 'prompt' | 'subagent';
 export interface EnqueueSteerOptions {
   /** Trusted host-prepared attachment text and display metadata; preserved through edits/drain. */
   contextParts?: TextPart[];
+  replyTo?: MessageReplyTo;
   target?: InboxTarget;
   key?: string;
   role?: InboxRole;
@@ -46,10 +49,12 @@ export class StepInboxStore {
 
   private ensureContextColumn(): void {
     if (this.contextColumnReady) return;
-    const hasColumn = () => (this.db.prepare('PRAGMA table_info(session_inbox)').all() as Array<{ name: string }>).some(column => column.name === 'context_parts_json');
-    if (!hasColumn()) {
-      try { this.db.exec('ALTER TABLE session_inbox ADD COLUMN context_parts_json TEXT'); }
-      catch (error) { if (!hasColumn()) throw error; }
+    for (const column of ['context_parts_json','reply_to_json']) {
+      const hasColumn = () => (this.db.prepare('PRAGMA table_info(session_inbox)').all() as Array<{ name: string }>).some(item => item.name === column);
+      if (!hasColumn()) {
+        try { this.db.exec(`ALTER TABLE session_inbox ADD COLUMN ${column} TEXT`); }
+        catch (error) { if (!hasColumn()) throw error; }
+      }
     }
     this.contextColumnReady = true;
   }
@@ -165,13 +170,14 @@ export class StepInboxStore {
       role: opts.role ?? 'user',
       text,
       contextParts: opts.contextParts,
+      replyTo: opts.replyTo,
       key: opts.key,
       createdAt: nowIso()
     };
     this.db
       .prepare(
-        `INSERT INTO session_inbox (id, session_id, target, role, text, key, created_at, context_parts_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO session_inbox (id, session_id, target, role, text, key, created_at, context_parts_json, reply_to_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         item.id,
@@ -181,7 +187,8 @@ export class StepInboxStore {
         item.text,
         item.key ?? null,
         item.createdAt,
-        item.contextParts?.length ? JSON.stringify(item.contextParts) : null
+        item.contextParts?.length ? JSON.stringify(item.contextParts) : null,
+        item.replyTo ? JSON.stringify(item.replyTo) : null
       );
     return item;
   }
@@ -210,6 +217,7 @@ function mapInboxRow(row: Record<string, unknown>): InboxItem {
     sessionId: String(row.session_id ?? ''),
     target: (row.target as InboxTarget) ?? 'next-step',
     role: (row.role as InboxRole) ?? 'user',
+    replyTo: row.reply_to_json ? JSON.parse(String(row.reply_to_json)) as MessageReplyTo : undefined,
     contextParts: row.context_parts_json ? JSON.parse(String(row.context_parts_json)) as TextPart[] : undefined,
     text: String(row.text ?? ''),
     key: row.key ? String(row.key) : undefined,

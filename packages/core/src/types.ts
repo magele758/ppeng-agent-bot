@@ -26,6 +26,7 @@ export type {
   MailRecord,
   MailStatus,
   MessagePart,
+  MessageReplyTo,
   MessageRole,
   ModelAdapter,
   ModelStreamChunk,

@@ -7,6 +7,7 @@
  */
 
 import { createId } from '../helpers.js';
+import type { MessageReplyTo } from '../types.js';
 import type { SessionMessage, SessionRecord } from '../types.js';
 
 export const WORKING_LOG_APPENDIX_HEAD =
@@ -28,7 +29,7 @@ export interface PrepareTurnInputStore {
     sessionId: string,
     role: SessionMessage['role'],
     parts: SessionMessage['parts'],
-    opts?: { key?: string }
+    opts?: { key?: string; replyTo?: MessageReplyTo }
   ): SessionMessage;
   hideByKey?(sessionId: string, key: string): number;
 }
@@ -37,6 +38,7 @@ export interface ClaimedInboxItem {
   key?: string;
   role: 'user' | 'system';
   text: string;
+  replyTo?: MessageReplyTo;
   contextParts?: import('@ppeng/api-types').TextPart[];
 }
 
@@ -128,7 +130,7 @@ export function applyClaimedInbox(
       sessionId,
       item.role,
       [textPart(item.text), ...(item.contextParts ?? [])],
-      item.key ? { key: item.key } : undefined
+      { ...(item.key ? { key: item.key } : {}), ...(item.replyTo ? { replyTo: item.replyTo } : {}) }
     );
   }
 }

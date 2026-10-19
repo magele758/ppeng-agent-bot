@@ -1004,6 +1004,17 @@ export const MIGRATIONS: Migration[] = [
         db.exec('ALTER TABLE session_inbox ADD COLUMN context_parts_json TEXT');
       }
     }
+  },
+  {
+    version: 32,
+    description: 'session_messages.reply_to_json stores a short bot-reply quote on a user message',
+    up: (db) => {
+      if (!hasTable(db, 'session_messages')) return;
+      if (!hasColumn(db, 'session_messages', 'reply_to_json')) {
+        db.exec('ALTER TABLE session_messages ADD COLUMN reply_to_json TEXT');
+      }
+      if (!hasColumn(db, 'session_inbox', 'reply_to_json')) db.exec('ALTER TABLE session_inbox ADD COLUMN reply_to_json TEXT');
+    }
   }
 ];
 
