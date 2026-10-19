@@ -1,6 +1,6 @@
 id: superbot-factory-setup
 title: Super Bot 独立配好多机软件工厂
-status: approved
+status: implemented
 requirement: |
   如果我想要super bot有超级大的权限，可以把这一套都独立的完成，需要给他加哪些能力，放开哪些权限，我觉得super bot的权限可以是全能的，分多个agent先分析，然后给我结论
   那就分多个agent去完成，我想要让他能力超强
