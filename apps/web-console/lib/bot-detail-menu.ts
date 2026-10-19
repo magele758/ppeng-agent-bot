@@ -7,7 +7,7 @@ const SECRET_KEY = /token|secret|password|api[_-]?key|credential|bearer/i;
 
 export function presentMemoryValue(key: string, value: string, hidden: string): string {
   if (SECRET_KEY.test(key)) return hidden;
-  const cleaned = value.replace(SECRET_TEXT, hidden);
+  const cleaned = redactMemoryStructure(value, hidden);
   if (cleaned.length <= 240) return cleaned;
   return `${cleaned.slice(0, 240)}…`;
 }
@@ -37,5 +37,17 @@ export async function commitRoutineEnabled<T extends RoutineToggle>(
     };
   } catch {
     return { jobs: [...jobs], applied: false };
+  }
+}
+
+/** Stored memory may be JSON; secret key names remain sensitive at every depth. */
+function redactMemoryStructure(value: string, hidden: string): string {
+  try {
+    return JSON.stringify(JSON.parse(value), (key: string, item: unknown) => {
+      if (SECRET_KEY.test(key)) return hidden;
+      return typeof item === 'string' ? redactSensitiveText(item, hidden) : item;
+    });
+  } catch {
+    return redactSensitiveText(value, hidden);
   }
 }
