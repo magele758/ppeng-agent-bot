@@ -7,6 +7,7 @@
  */
 
 import type { SessionRecord } from '../types.js';
+import { isDelegatedProductAdminTool } from '../tools/product-admin-names.js';
 
 /** Write memory, outbound IM, cron/routine creation, and asking the user. */
 export const SUBAGENT_DENIED_TOOLS = [
@@ -32,7 +33,7 @@ export function stripSubagentDeniedTools<T extends { name: string }>(
   tools: readonly T[]
 ): T[] {
   if (session?.mode !== 'subagent') return tools as T[];
-  return tools.filter((tool) => !DENIED.has(tool.name));
+  return tools.filter((tool) => !DENIED.has(tool.name) && !isDelegatedProductAdminTool(tool.name));
 }
 
 type SubagentRecoveryStore = {

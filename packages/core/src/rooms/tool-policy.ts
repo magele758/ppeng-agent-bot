@@ -13,5 +13,5 @@ export function filterRoomTools<T extends { name: string }>(
   session: { metadata?: Record<string, unknown> }, tools: readonly T[]
 ): T[] {
   if (typeof session.metadata?.roomId !== 'string') return tools as T[];
-  return tools.filter(tool => !DENIED.has(tool.name) && !/^(bot_|cron_|routine_|team_|swarm_|orchestration_|spawn_)/.test(tool.name));
+  return tools.filter(tool => !DENIED.has(tool.name) && !/^(bot_|lab_|cron_|routine_|team_|swarm_|orchestration_|spawn_)/.test(tool.name));
 }

@@ -1,5 +1,6 @@
 import { FactoryService } from './factory/service.js';
 import { createFactoryTools } from './factory/tools.js';
+import { createProductAdminTools } from './tools/product-admin-tools.js';
 import { BotRoomService } from './rooms/index.js';
 import { recoverBotWork, tickBotWork, createBotManagementTools, expireOverdueBotWork, isBotWorkSessionBlocked, type BotWorkHost } from './bots/bot-work.js';
 import { applyConcurrentBotForks, clearActiveWorkPiece } from './bots/concurrent-fork.js';
@@ -154,6 +155,7 @@ import {
   getBot as getBotFn,
   listBots as listBotsFn,
   openBot as openBotFn,
+  syncBotAgentSpecs,
   updateBot as updateBotFn
 } from './bots/bot-facade.js';
 import { applyBotChatCommand, type BotChatCommandResult } from './bots/bot-chat-commands.js';
@@ -513,6 +515,19 @@ export class RawAgentRuntime {
       hasUnconfirmedEffects: (id, since) => this.hasUnconfirmedEffects(id, since) });
     this.factory = new FactoryService({store:this.store,rooms:this.rooms});
     this.tools.push(...createFactoryTools(this.store,this.rooms,this.factory));
+    this.tools.push(...createProductAdminTools({
+      store: this.store,
+      facade: sessionFacadeFrom(this.l5()),
+      rooms: this.rooms,
+      toolNames: () => this.tools.map((tool) => tool.name),
+      skillNames: async () => (await this.listSkills()).map((skill) => skill.name),
+      createTeamPlan: (input) => this.createTeamPlan(input),
+      startTeamPlan: (id) => this.startTeamPlan(id),
+      resumeTeamPlan: (id) => this.resumeTeamPlan(id),
+      startSwarmRun: (id, tasks) => this.startSwarmRun(id, tasks),
+      cancelSession: (id) => this.cancelSession(id)
+    }));
+    syncBotAgentSpecs(this.store);
     this.computerUse = new LcuComputerUseProvider({
       clientFactory: options.computerUseClientFactory,
       enabled: () => readLcuSettings(this.store).enabled,
