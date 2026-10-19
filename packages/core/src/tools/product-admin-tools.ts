@@ -22,7 +22,7 @@ import {
   type BotPrincipal
 } from '../bots/bot-identity.js';
 import { createBot, getBot, openBot, updateBot } from '../bots/bot-facade.js';
-import { readBotModelOverride } from '../bots/bot-model.js';
+import { normalizeBotModelOverride, readBotModelOverride } from '../bots/bot-model.js';
 import { BotFunctionalGroupService } from '../bots/functional-groups.js';
 import { setBotWorkControl, type BotWorkHost } from '../bots/bot-work.js';
 import type { BotRecord, UpdateBotInput } from '../bots/types.js';
@@ -31,6 +31,7 @@ import { tryCreateDynToolStore } from '../dyn-tools/store.js';
 import { createLogger } from '../logger.js';
 import {
   deleteProvider,
+  findProvider,
   patchProvider,
   pickerOptions,
   publicCatalogPayload,
@@ -72,10 +73,40 @@ export interface ProductAdminHost {
 }
 
 const SECRET_FIELD = /^(apiKey|api_key|apiKeyMasked|secretKey|secret|token|password|accessToken|refreshToken|authorization|privateKey|publicKey)$/i;
+const LAB_MODEL_NOTICE = '用实验室里已配置的模型。不要读取 API key、token 或 secret。';
 const SWARM_STRATEGIES = new Set<SwarmStrategy>(['pipeline', 'parallel-review', 'best-of-n', 'debate', 'research-implement-review']);
 const RESEARCH_STATUSES = new Set<ResearchStatus>(['pending', 'searching', 'extracting', 'synthesizing', 'critiquing', 'completed', 'failed']);
 const ORCH_STATUSES = new Set<OrchestrationStatus>(['pending', 'running', 'waiting_approval', 'completed', 'failed', 'blocked']);
 const RISK = new Set<RiskLevel>(['low', 'medium', 'high']);
+
+function assertNoSecretFields(value: unknown, depth = 0): void {
+  if (depth > 8 || !value || typeof value !== 'object') return;
+  if (Array.isArray(value)) {
+    for (const item of value) assertNoSecretFields(item, depth + 1);
+    return;
+  }
+  for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+    if (SECRET_FIELD.test(key)) throw new ValidationError(LAB_MODEL_NOTICE);
+    assertNoSecretFields(item, depth + 1);
+  }
+}
+
+function pinLabModel(
+  store: SqliteStateStore,
+  raw: unknown
+): { pin: { providerId: string; modelId: string } | null; notice?: string } {
+  const catalog = readModelCatalog(store);
+  const options = pickerOptions(catalog, process.env).map((option) => ({
+    providerId: option.providerId,
+    modelId: option.modelId
+  }));
+  const pin = normalizeBotModelOverride(raw, options);
+  if (!pin) return { pin: null };
+  const provider = findProvider(catalog, pin.providerId, process.env);
+  const usable = !!provider && (provider.kind === 'heuristic' || Boolean(provider.apiKey.trim() && provider.baseUrl.trim()));
+  if (!usable) return { pin: null, notice: LAB_MODEL_NOTICE };
+  return { pin: { providerId: pin.providerId, modelId: pin.modelId } };
+}
 
 export function redactSecrets(value: unknown): unknown {
   if (Array.isArray(value)) return value.map((item) => redactSecrets(item));
@@ -155,7 +186,10 @@ function botView(store: SqliteStateStore, bot: BotRecord) {
     maxTurns: session?.metadata?.maxTurns ?? null,
     allowedTools: session?.metadata?.allowedTools ?? null,
     allowedSkills: session?.metadata?.allowedSkills ?? null,
-    modelOverride: readBotModelOverride(session?.metadata) ?? null
+    modelOverride: readBotModelOverride(session?.metadata) ?? null,
+    persona: typeof session?.metadata?.persona === 'string' && session.metadata.persona.trim()
+      ? session.metadata.persona
+      : null
   };
 }
 
@@ -296,20 +330,42 @@ export function createProductAdminTools(host: ProductAdminHost): ToolContract<Re
     },
     {
       name: 'bot_create',
-      description: 'Create a bot in this product. You can do this. Required: name. Optional: title, description, faceShape, faceColor, avatar.',
+      description: 'Create a bot in this product. You can do this. Same capability as create_bot. Required: name. Optional: title, description, persona, allowedTools, allowedSkills, modelOverride {providerId, modelId} for a model already configured in the lab, faceShape, faceColor, avatar, maxTurns (24|48|96). Do not send API keys, tokens, secrets, or passwords.',
       properties: {
         name: { type: 'string' },
         title: { type: 'string' },
         description: { type: 'string' },
+        persona: { type: 'string' },
+        allowedTools: { type: 'array', items: { type: 'string' } },
+        allowedSkills: { type: 'array', items: { type: 'string' } },
+        modelOverride: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            providerId: { type: 'string' },
+            modelId: { type: 'string' }
+          },
+          required: ['providerId', 'modelId']
+        },
         faceShape: { type: 'string' },
         faceColor: { type: 'string' },
-        avatar: { type: 'string' }
+        avatar: { type: 'string' },
+        maxTurns: { type: 'number' }
       },
       required: ['name'],
       approval: 'auto',
       write: true,
       async run(ctx, args) {
+        assertNoSecretFields(args);
+        let modelNotice: string | undefined;
+        let modelPin: { providerId: string; modelId: string } | undefined;
+        if ('modelOverride' in args) {
+          const decision = pinLabModel(store, args.modelOverride);
+          if (decision.notice) modelNotice = decision.notice;
+          else if (decision.pin) modelPin = decision.pin;
+        }
         const principal = principalOf(store, ctx.session);
+        const persona = typeof args.persona === 'string' ? args.persona.trim() : '';
         const bot = createBot(host.facade, {
           name: str(args, 'name'),
           title: typeof args.title === 'string' ? args.title : undefined,
@@ -325,11 +381,37 @@ export function createProductAdminTools(host: ProductAdminHost): ToolContract<Re
             metadata: {
               ...session.metadata,
               userId: principal.userId,
-              ...(principal.tenantId ? { tenantId: principal.tenantId } : {})
+              ...(principal.tenantId ? { tenantId: principal.tenantId } : {}),
+              ...(persona ? { persona } : {})
             }
           });
         }
-        return { bot: botView(store, getBot(store, bot.id)) };
+        const patch: UpdateBotInput = {};
+        if ('maxTurns' in args) patch.maxTurns = args.maxTurns;
+        if ('allowedTools' in args) patch.allowedTools = args.allowedTools;
+        if ('allowedSkills' in args) patch.allowedSkills = args.allowedSkills;
+        if (modelPin) patch.modelOverride = modelPin;
+        let next = getBot(store, bot.id);
+        if (persona || Object.keys(patch).length > 0) {
+          const dyn = tryCreateDynToolStore(store);
+          const skillCatalog = patch.allowedSkills !== undefined && host.skillNames
+            ? (await host.skillNames()).map((name) => ({ name }))
+            : undefined;
+          if (patch.allowedSkills !== undefined && !skillCatalog) {
+            throw new ValidationError('allowedSkills requires a skill catalog');
+          }
+          next = updateBot(host.facade, bot.id, patch, {
+            toolCatalog: host.toolNames().map((name) => ({ name })),
+            dynToolNames: dyn ? dyn.list({ sessionId: bot.canonicalSessionId }).map((record) => record.name) : undefined,
+            skillCatalog,
+            modelOptions: pickerOptions(readModelCatalog(store), process.env).map((option) => ({
+              providerId: option.providerId,
+              modelId: option.modelId
+            }))
+          });
+        }
+        const view = { bot: botView(store, next) };
+        return modelNotice ? { ...view, modelNotice } : view;
       }
     },
     {
@@ -436,7 +518,7 @@ export function createProductAdminTools(host: ProductAdminHost): ToolContract<Re
     },
     {
       name: 'bot_room_create',
-      description: 'Create a group chat. You can do this. Required: title and botIds (ids or names). Optional: hostBotId, maxBotTurns (1-20), maxToolCalls, maxCostUsd.',
+      description: 'Create a group chat. You can do this. Same capability as create_room. Required: title and botIds (ids or names). Optional: hostBotId, maxBotTurns (1-20), maxToolCalls, maxCostUsd.',
       properties: {
         title: { type: 'string' },
         botIds: { type: 'array', items: { type: 'string' } },
@@ -1165,5 +1247,22 @@ export function createProductAdminTools(host: ProductAdminHost): ToolContract<Re
     }
   ];
 
-  return tools.map(spec => define(spec, store));
+  const published = tools.flatMap((spec) => {
+    if (spec.name === 'bot_create') {
+      return [spec, {
+        ...spec,
+        name: 'create_bot',
+        description: 'Create a bot. You can do this; the tool name is create_bot. Required: name. Optional: title, description, persona, allowedTools, allowedSkills, modelOverride {providerId, modelId} for a model already configured in the lab, faceShape, faceColor, avatar, maxTurns (24|48|96). Do not send API keys, tokens, secrets, or passwords.'
+      }];
+    }
+    if (spec.name === 'bot_room_create') {
+      return [spec, {
+        ...spec,
+        name: 'create_room',
+        description: 'Create a group chat. You can do this; the tool name is create_room. Required: title and botIds (ids or names). Optional: hostBotId, maxBotTurns (1-20), maxToolCalls, maxCostUsd.'
+      }];
+    }
+    return [spec];
+  });
+  return published.map(spec => define(spec, store));
 }

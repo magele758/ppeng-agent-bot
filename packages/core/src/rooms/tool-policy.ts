@@ -1,3 +1,5 @@
+import { isDelegatedProductAdminTool } from '../tools/product-admin-names.js';
+
 /**
  * Room work cannot schedule other members, spawn work, or escape the Room's turn budget.
  * `message_agent` is the one private-delivery exception: a member may send one roster bot a 1:1
@@ -13,5 +15,9 @@ export function filterRoomTools<T extends { name: string }>(
   session: { metadata?: Record<string, unknown> }, tools: readonly T[]
 ): T[] {
   if (typeof session.metadata?.roomId !== 'string') return tools as T[];
-  return tools.filter(tool => !DENIED.has(tool.name) && !/^(bot_|lab_|cron_|routine_|team_|swarm_|orchestration_|spawn_)/.test(tool.name));
+  return tools.filter(tool =>
+    !DENIED.has(tool.name) &&
+    !isDelegatedProductAdminTool(tool.name) &&
+    !/^(bot_|lab_|cron_|routine_|team_|swarm_|orchestration_|spawn_)/.test(tool.name)
+  );
 }
