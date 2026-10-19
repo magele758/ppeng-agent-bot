@@ -1,6 +1,7 @@
 id: ci-gate-speedup
 title: CI门禁去重与并行提速（保持现有验证范围）
-status: approved
+status: retired
+retiredReason: 用户确认由ci-fast-and-bihourly-gates替代触发频率与合并条件；原9条及历史记录保留，性能对比未验收。
 requirement: |
   哪些是必须要跑的，哪些是可以统一批量跑的？看看门禁是不是可以提提速
 notes: |

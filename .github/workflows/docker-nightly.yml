@@ -1,60 +1,21 @@
-# 合入 main（镜像相关路径）或每天定时推一组「最新」镜像到 GHCR；nightly 已是当前 SHA 则跳过。
-# 流程：构建并 load 到 runner（不推）→ 起容器跑 scripts/deploy-smoke.mjs（启发式模型、临时 state）→ 再推 tag。
-# 部署冒烟和 release gate（完整测试）均强制阻断；失败、取消或跳过不发布。
-# PR 只构建 + 冒烟，不登录 GHCR、不推送。
-# 不含 Evolution / 真模型 / 桌面 DMG。手动重打：Actions → Docker nightly → Run workflow → force.
-
+# Image publication keeps full validation; ordinary commits use only the Quick gate.
 name: Docker nightly
-
 on:
   schedule:
-    # 16:00 UTC = 北京时间 00:00
-    - cron: '0 16 * * *'
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/docker-nightly.yml'
-      - 'scripts/docker-nightly-should-build.mjs'
-      - 'scripts/release/image-smoke.mjs'
-      - 'deploy/docker/**'
-      - 'apps/daemon/**'
-      - 'apps/cli/**'
-      - 'apps/web-console/**'
-      - 'packages/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'tsconfig.json'
-      - 'tsconfig.base.json'
-      - 'domains.manifest.json'
-      - 'scripts/build-workspace.mjs'
-      - 'scripts/lib/**'
-      - 'scripts/deploy-smoke.mjs'
+    - cron: 0 16 * * *
   workflow_dispatch:
     inputs:
       force:
         description: Ignore existing nightly SHA and rebuild
         type: boolean
         default: false
-  pull_request:
-    paths:
-      - '.github/workflows/docker-nightly.yml'
-      - 'scripts/docker-nightly-should-build.mjs'
-      - 'scripts/release/image-smoke.mjs'
-      - 'deploy/docker/Dockerfile.daemon'
-      - 'deploy/docker/Dockerfile.web'
-      - 'scripts/deploy-smoke.mjs'
-      - 'scripts/lib/deploy-smoke-lib.mjs'
-      - 'scripts/test/deploy-smoke-lib.test.mjs'
-
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'publish' }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) ||
+    'publish' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-
 permissions:
   contents: read
   packages: write
-
 jobs:
   self-test:
     name: Skip-logic self-test
@@ -63,18 +24,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-
+          node-version: "22"
       - name: Decide helper self-test
         run: node scripts/docker-nightly-should-build.mjs --self-test
-
       - name: Deploy smoke unit tests
         run: node --test scripts/test/deploy-smoke-lib.test.mjs
-
   decide:
     name: Skip if nightly already this SHA
     needs: self-test
@@ -88,40 +45,42 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Image prefix
         id: meta
         run: |
           prefix="ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')"
           echo "image_prefix=${prefix}" >> "$GITHUB_OUTPUT"
-
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Read nightly revision labels
         id: labels
         env:
           IMAGE_PREFIX: ${{ steps.meta.outputs.image_prefix }}
-        run: |
+        run: >
           set +e
+
           daemon_rev=""
+
           web_rev=""
+
           if docker pull "${IMAGE_PREFIX}/daemon:nightly"; then
             daemon_rev="$(docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "${IMAGE_PREFIX}/daemon:nightly")"
           fi
+
           if docker pull "${IMAGE_PREFIX}/web:nightly"; then
             web_rev="$(docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "${IMAGE_PREFIX}/web:nightly")"
           fi
+
           set -e
+
           {
             echo "daemon_rev=${daemon_rev}"
             echo "web_rev=${web_rev}"
           } >> "$GITHUB_OUTPUT"
-
       - name: Decide
         id: decide
         env:
@@ -130,24 +89,22 @@ jobs:
           DOCKER_NIGHTLY_WEB_REV: ${{ steps.labels.outputs.web_rev }}
           DOCKER_NIGHTLY_FORCE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.force == 'true' }}
         run: node scripts/docker-nightly-should-build.mjs >> "$GITHUB_OUTPUT"
-
       - name: Summary
-        run: |
-          echo "should_build=${{ steps.decide.outputs.should_build }} reason=${{ steps.decide.outputs.reason }} sha=${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
-
+        run: >
+          echo "should_build=${{ steps.decide.outputs.should_build }} reason=${{ steps.decide.outputs.reason }} sha=${{
+          github.sha }}" >> "$GITHUB_STEP_SUMMARY"
   release-gate:
     name: Release gate
     needs: decide
     if: needs.decide.outputs.should_build == 'true'
     uses: ./.github/workflows/release-gate.yml
-
-  # 构建 → 本地起容器 → 部署冒烟；镜像以 tar 交给 push job，保证推的就是冒烟过的那份。
   build:
     name: Build images + deploy smoke
-    needs: [self-test, decide]
-    if: >-
-      !cancelled() && needs.self-test.result == 'success' &&
-      (github.event_name == 'pull_request' || needs.decide.outputs.should_build == 'true')
+    needs:
+      - self-test
+      - decide
+    if: "!cancelled() && needs.self-test.result == 'success' && (github.event_name == 'pull_request' ||
+      needs.decide.outputs.should_build == 'true')"
     runs-on: ubuntu-latest
     timeout-minutes: 50
     outputs:
@@ -158,19 +115,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-
+          node-version: "22"
       - name: Created timestamp
         id: meta
         run: echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
       - name: Build daemon (load, no push)
         uses: docker/build-push-action@v6
         with:
@@ -189,7 +142,6 @@ jobs:
             org.opencontainers.image.created=${{ steps.meta.outputs.created }}
           cache-from: type=gha,scope=docker-nightly-daemon
           cache-to: ${{ env.PUBLISH == 'true' && 'type=gha,mode=max,scope=docker-nightly-daemon' || '' }}
-
       - name: Build web (load, no push)
         uses: docker/build-push-action@v6
         with:
@@ -208,7 +160,6 @@ jobs:
             org.opencontainers.image.created=${{ steps.meta.outputs.created }}
           cache-from: type=gha,scope=docker-nightly-web
           cache-to: ${{ env.PUBLISH == 'true' && 'type=gha,mode=max,scope=docker-nightly-web' || '' }}
-
       - name: Start stack (heuristic model, ephemeral state)
         run: |
           token="$(openssl rand -hex 24)"
@@ -227,10 +178,8 @@ jobs:
             -e RAW_AGENT_AUTH_TOKEN="${token}" \
             -p 127.0.0.1:33815:33815 \
             "${IMAGE_PREFIX}/web:nightly"
-
       - name: Verify exact image pair and restart persistence
         run: node scripts/release/image-smoke.mjs "${IMAGE_PREFIX}/daemon:nightly" "${IMAGE_PREFIX}/web:nightly"
-
       - name: Preserve image evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -239,27 +188,18 @@ jobs:
           path: test-results/image-smoke.json
           if-no-files-found: ignore
           retention-days: 14
-
       - name: Deploy smoke
         id: smoke
         continue-on-error: true
-        run: >-
-          node scripts/deploy-smoke.mjs
-          --daemon-url http://127.0.0.1:37070
-          --web-url http://127.0.0.1:33815
-          --token "$SMOKE_TOKEN"
-          --expect-adapter heuristic
-          --startup-timeout-ms 120000
-          --json-out "$RUNNER_TEMP/deploy-smoke.json"
-          > /dev/null
-
+        run: node scripts/deploy-smoke.mjs --daemon-url http://127.0.0.1:37070 --web-url http://127.0.0.1:33815 --token
+          "$SMOKE_TOKEN" --expect-adapter heuristic --startup-timeout-ms 120000 --json-out
+          "$RUNNER_TEMP/deploy-smoke.json" > /dev/null
       - name: Container logs
         if: ${{ !cancelled() && steps.smoke.outcome == 'failure' }}
         run: |
           docker ps -a
           docker logs --tail 200 smoke-daemon || true
           docker logs --tail 200 smoke-web || true
-
       - name: Smoke verdict
         if: ${{ !cancelled() && steps.smoke.outcome != 'skipped' }}
         env:
@@ -271,7 +211,6 @@ jobs:
           echo "::error title=Deploy smoke::Deploy smoke failed (${OUTCOME}); images will not be pushed"
           echo "**Deploy smoke failed — push blocked.**" >> "$GITHUB_STEP_SUMMARY"
           exit 1
-
       - name: Upload smoke summary
         if: ${{ !cancelled() && steps.smoke.outcome != 'skipped' }}
         uses: actions/upload-artifact@v4
@@ -281,7 +220,6 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
           overwrite: true
-
       - name: Save images for push
         if: env.PUBLISH == 'true' && steps.smoke.outcome == 'success'
         run: |
@@ -289,7 +227,6 @@ jobs:
             "${IMAGE_PREFIX}/daemon:nightly" "${IMAGE_PREFIX}/daemon:latest" \
             "${IMAGE_PREFIX}/web:nightly" "${IMAGE_PREFIX}/web:latest" \
             | gzip -1 > "$RUNNER_TEMP/nightly-images.tar.gz"
-
       - name: Upload images
         if: env.PUBLISH == 'true' && steps.smoke.outcome == 'success'
         uses: actions/upload-artifact@v4
@@ -299,19 +236,17 @@ jobs:
           retention-days: 1
           compression-level: 0
           overwrite: true
-
       - name: Stop stack
         if: always()
         run: docker rm -f smoke-web smoke-daemon >/dev/null 2>&1 || true
-
-  # Both image checks and the release gate must succeed before publication.
   push:
     name: Push nightly images
-    needs: [decide, release-gate, build]
-    if: >-
-      !cancelled() && needs.decide.outputs.should_build == 'true' &&
-      needs.build.result == 'success' && needs.build.outputs.smoke == 'success' &&
-      needs.release-gate.result == 'success'
+    needs:
+      - decide
+      - release-gate
+      - build
+    if: "!cancelled() && needs.decide.outputs.should_build == 'true' && needs.build.result == 'success' &&
+      needs.build.outputs.smoke == 'success' && needs.release-gate.result == 'success'"
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -324,37 +259,30 @@ jobs:
           SMOKE: ${{ needs.build.outputs.smoke }}
         run: |
           echo "release_gate=${GATE} deploy_smoke=${SMOKE} mode=enforce" | tee -a "$GITHUB_STEP_SUMMARY"
-
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-
+          node-version: "22"
       - name: Download image evidence
         uses: actions/download-artifact@v4
         with:
           name: image-smoke-evidence
           path: test-results
-
       - name: Download images
         uses: actions/download-artifact@v4
         with:
           name: nightly-images
           path: ${{ runner.temp }}
-
       - name: Load images
         run: gunzip -c "$RUNNER_TEMP/nightly-images.tar.gz" | docker load
-
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Push
         run: |
           for role in daemon web; do

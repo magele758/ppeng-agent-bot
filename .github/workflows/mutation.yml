@@ -2,8 +2,6 @@
 name: Mutation
 on:
   workflow_call: null
-  schedule:
-    - cron: 23 3 * * 1
   workflow_dispatch: null
 concurrency:
   group: mutation-${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}

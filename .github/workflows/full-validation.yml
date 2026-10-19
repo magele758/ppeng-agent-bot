@@ -1,0 +1,15 @@
+name: Full validation
+on:
+  schedule:
+    - cron: 17 */2 * * *
+  workflow_dispatch: null
+permissions:
+  contents: read
+concurrency:
+  group: full-validation-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  full:
+    name: Release gate
+    uses: ./.github/workflows/release-gate.yml
+    secrets: inherit

@@ -1,34 +1,55 @@
-# 每次 push / PR：release-gate.yml（构建 + 单元/回归/集成/E2E + agent-loop vitest + CRAP 门禁，无需密钥）
-# 可选：配置 Repository secrets 后，额外跑真模型冒烟（OpenAI 兼容或 Anthropic）
-
+# Frequent feedback is bounded; full checks remain manually available and run every two hours.
 name: CI
-
 on:
   push:
-    branches: [main]
-  pull_request:
+    branches:
+      - main
+  pull_request: null
   workflow_dispatch:
     inputs:
       benchmark_baseline:
         description: Measure the frozen legacy schedule on this same source revision (manual only)
         type: boolean
         default: false
-
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
-  cancel-in-progress: true
-
+  group: ${{ github.event_name == 'workflow_dispatch' && (inputs.benchmark_baseline && format('benchmark-{0}',
+    github.run_id) || format('full-validation-{0}', github.ref)) || format('ci-{0}', github.ref) }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 jobs:
-  # 构建、单元/回归/集成/E2E、agent-loop vitest、CRAP 门禁都在 release-gate.yml，
-  # 对外只暴露一个检查「Release gate / Main release gate」，供 main 分支保护设为 required。
   release-gate:
     name: Release gate
     uses: ./.github/workflows/release-gate.yml
     secrets: inherit
-    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.benchmark_baseline }}
-
+    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.benchmark_baseline }}
   benchmark-baseline:
     name: Benchmark baseline
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.benchmark_baseline }}
     uses: ./.github/workflows/benchmark-gate-baseline.yml
     secrets: inherit
+  quick:
+    name: Quick gate
+    if: ${{ github.event_name != 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Bounded quick verification
+        run: node scripts/ci/quick-gate.mjs
+        env:
+          CI_PUSH_BEFORE: ${{ github.event.before }}
+          CI_PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      - name: Preserve quick result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quick-gate-evidence
+          path: test-results/quick-gate.json
+          if-no-files-found: error
+          retention-days: 30
