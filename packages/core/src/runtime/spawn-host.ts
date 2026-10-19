@@ -10,6 +10,12 @@ import { CommandHardlineDeniedError, matchCommandHardline } from '../sandbox/com
 import { createAgentSandboxFromEnv } from '../sandbox/create-agent-sandbox.js';
 import type { AgentSandbox } from '../sandbox/agent-sandbox-types.js';
 import {
+  DIRECT_ISOLATION_REFUSAL,
+  decideShellIsolation,
+  approvalGrantsDirectIsolation,
+  shellIsolationAvailability
+} from '../sandbox/model-isolation.js';
+import {
   formatSubagentSummary,
   resolveSubagentAgentId,
   type SubagentSpawnArgs
@@ -356,7 +362,8 @@ export async function spawnTeammateOutcome(
 export async function startBackgroundJob(
   host: SpawnHost,
   sessionId: string,
-  command: string
+  command: string,
+  options?: { isolation?: unknown }
 ): Promise<BackgroundJobRecord> {
   const denied = matchCommandHardline(command);
   if (denied) throw new CommandHardlineDeniedError(denied);
@@ -382,17 +389,21 @@ export async function startBackgroundJob(
   } catch {
     workspace = cwd;
   }
-  const job = host.store.createBackgroundJob({
-    sessionId,
-    command,
-    status: 'running'
-  });
-
   let sandbox = host.sandbox;
   if (!sandbox) {
     sandbox = createAgentSandboxFromEnv();
     host.setSandbox(sandbox);
   }
+  const decision = decideShellIsolation(options?.isolation, shellIsolationAvailability(sandbox.kind));
+  if (!decision.ok) throw new Error(decision.message);
+  if (decision.explicitDirect && !bgRunDirectApproved(host, sessionId, command, options?.isolation)) {
+    throw new Error(DIRECT_ISOLATION_REFUSAL);
+  }
+  const job = host.store.createBackgroundJob({
+    sessionId,
+    command,
+    status: 'running'
+  });
   const ac = new AbortController();
   host.backgroundJobAborts.set(job.id, ac);
   sandbox
@@ -402,7 +413,8 @@ export async function startBackgroundJob(
       workspace,
       signal: ac.signal,
       sessionId,
-      allowNetwork: true
+      allowNetwork: true,
+      ...(decision.localMode === 'inherit' ? {} : { isolation: decision.localMode })
     })
     .then((result) => {
       host.backgroundJobAborts.delete(job.id);
@@ -416,4 +428,8 @@ export async function startBackgroundJob(
     });
 
   return job;
+}
+
+function bgRunDirectApproved(host: SpawnHost, sessionId: string, command: string, isolation: unknown): boolean {
+  return approvalGrantsDirectIsolation(host.store.listApprovals(), sessionId, 'bg_run', { command, isolation });
 }

@@ -157,31 +157,31 @@ export const settingsEntries = {
   sandbox: {
     title: '命令沙箱',
     keywords: '沙箱 sandbox bash 隔离 安全 无隔离 direct bwrap seatbelt 容器 命令执行 权限 密钥保护',
-    desc: '决定 Agent 执行命令时用什么方式与你的电脑隔离，避免误读密钥或破坏文件。保存后立即生效。',
+    desc: '隔离由对话里的 Agent 每次执行命令时自己选，你不必先在这里指定。Agent 没选时，用这台电脑上最强的可用隔离。只有 Agent 在某次命令里选择无隔离，并且你批准之后，才会去掉系统隔离。',
     fields: {
       mode: {
         label: '隔离方式',
-        hint: '推荐保持「自动」；仅在需要排查问题或使用远程沙箱时再改。'
+        hint: '这一项不必改。留在「自动」即可，它不会替 Agent 决定每次怎么隔离。'
       }
     },
     options: {
       mode: {
-        auto: { label: '自动', desc: '推荐。按本机能力自动选择最强的隔离；不支持系统隔离时仅做环境变量脱敏。' },
-        os: { label: '系统级隔离', desc: 'macOS 使用 seatbelt、Linux 使用 bwrap，禁止命令读取 ~/.ssh 等密钥目录。' },
-        direct: { label: '直接执行（无隔离）', desc: '只做环境变量脱敏，命令拥有与本服务相同的权限。' },
-        container: { label: '容器', desc: '本机暂未实现，实际会按「直接执行」运行。' },
-        'cloudflare-computer': { label: 'Cloudflare 远程沙箱', desc: '命令发送到你配置的 Cloudflare Computer 执行，需在「沙箱 · Cloudflare 连接」里填写连接信息。' }
+        auto: { label: '自动', desc: '推荐。Agent 自己选；没指定时用本机最强隔离。' },
+        os: { label: '系统级隔离', desc: 'macOS 使用 seatbelt、Linux 使用 bwrap，禁止命令读取 ~/.ssh 等密钥目录。Agent 可以在单次命令里自己选这项。' },
+        direct: { label: '直接执行（无隔离）', desc: '只做环境变量脱敏。对话里的命令不会因为保存了这项就去掉隔离。' },
+        container: { label: '容器', desc: '还没有做，不能当作一种隔离。保存这项不会让命令去掉系统隔离。' },
+        'cloudflare-computer': { label: 'Cloudflare 远程沙箱', desc: '命令可以发到已接通的远程电脑。Agent 在某次命令里选择远程时才会用，不必先在这里改模式。' }
       }
     },
     risk: {
-      direct: '「直接执行」没有任何系统隔离（无隔离）：命令可以读写本服务能访问的所有文件，包括密钥目录。只应在受信任的环境使用。',
-      container: '容器模式在本机尚未实现，实际按「直接执行」运行，同样没有系统隔离（无隔离）。'
+      direct: '无隔离表示命令可以读写本服务能访问的所有文件，包括密钥目录。在这里选择它不会让对话里的命令去掉隔离；只有 Agent 在某次命令里选择无隔离并且你批准后才会那样执行。',
+      container: '容器隔离还没有做。保存这项不会让命令去掉系统隔离，也不会改成无隔离执行。'
     }
   },
   sandboxCloudflare: {
     title: '沙箱 · Cloudflare 连接',
     keywords: 'cloudflare 远程沙箱 endpoint 令牌 token workspace 工作区 账号 account 超时 密钥库',
-    desc: '只有把隔离方式设为「Cloudflare 远程沙箱」时才会用到。令牌不保存在这里，请放进密钥库。',
+    desc: '远程电脑的连接信息。对话里的 Agent 在某次命令选择远程执行时才会用到，不必先把隔离方式改成远程。令牌不保存在这里，请放进密钥库。',
     fields: {
       endpoint: { label: '服务地址', hint: 'Cloudflare Computer 部署后的访问地址。' },
       workspace: { label: '工作区名称', hint: '远程沙箱里使用的工作区，只能含字母、数字、点、下划线和连字符。' },

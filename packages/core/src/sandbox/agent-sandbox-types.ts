@@ -33,6 +33,12 @@ export interface AgentSandboxExecRequest {
   allowNetwork?: boolean;
   /** Optional affinity for remote/microservice routing or auditing. */
   sessionId?: string;
+  /**
+   * Per-call isolation for the native runner. Omit to keep that runner's
+   * configured mode. Shell tools pass an explicit mode so a saved setting
+   * cannot weaken the call.
+   */
+  isolation?: 'auto' | 'direct' | 'os' | 'container' | 'cloudflare-computer';
 }
 
 export interface AgentSandbox {

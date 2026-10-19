@@ -17,6 +17,7 @@ import {
   type RunContext
 } from '../types.js';
 import { protectModelSocialScheduleMetadata } from '../social-schedule.js';
+import { approvalGrantsDirectIsolation } from '../sandbox/model-isolation.js';
 import type { SqliteStateStore } from '../storage.js';
 
 export interface ToolServicesHost {
@@ -59,7 +60,11 @@ export interface ToolServicesHost {
     context: RunContext,
     input: { name: string; role: string; prompt: string }
   ) => Promise<{ ok: boolean; content: string }>;
-  startBackgroundJob: (sessionId: string, command: string) => Promise<BackgroundJobRecord>;
+  startBackgroundJob: (
+    sessionId: string,
+    command: string,
+    options?: { isolation?: unknown }
+  ) => Promise<BackgroundJobRecord>;
   compactContext?: (context: RunContext, opts?: { force?: boolean }) => Promise<string>;
 }
 
@@ -125,7 +130,9 @@ export function createToolServices(host: ToolServicesHost): RuntimeToolServices 
       const messages = host.store.listMailbox(agentId, true);
       return messages.map((message) => host.store.markMailRead(message.id));
     },
-    startBackgroundJob: async (sessionId, command) => host.startBackgroundJob(sessionId, command),
+    startBackgroundJob: async (sessionId, command, options) => host.startBackgroundJob(sessionId, command, options),
+    directIsolationApproved: (sessionId, toolName, args) =>
+      approvalGrantsDirectIsolation(host.store.listApprovals(), sessionId, toolName, args),
     getBackgroundJob: async (jobId) => host.store.getBackgroundJob(jobId),
     listBackgroundJobs: async (sessionId) => host.store.listBackgroundJobs(sessionId),
     listWorkspaces: async () =>

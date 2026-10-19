@@ -4,7 +4,7 @@
 
 ## 执行边界
 
-`RAW_AGENT_AGENT_SANDBOX_KIND` 选择 agent sandbox 后端：`native`、`remote_vm`、`microservice`。只有 native 后端继续读取 `RAW_AGENT_SANDBOX_MODE=auto|direct|os|container`。
+`RAW_AGENT_AGENT_SANDBOX_KIND` 选择 agent sandbox 后端：`native`、`remote_vm`、`microservice`。本机 shell 工具的隔离由模型在每次命令里选（`os` / `direct` / `remote`）；省略时用最强可用隔离。`direct` 要审批。`container` 未实现。`RAW_AGENT_SANDBOX_MODE` 只是没传当次隔离时的回退。
 
 无论使用哪种隔离方式，启动子进程都应经过 `sanitizeSpawnEnv()` 清除 `NODE_OPTIONS`、`LD_PRELOAD`、`DYLD_INSERT_LIBRARIES` 等注入变量。工具输出回到模型前再由 `result-redaction.ts` 替换已知敏感环境变量值。
 

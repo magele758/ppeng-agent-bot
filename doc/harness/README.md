@@ -105,7 +105,7 @@ runSessionKernel（turn/kernel.ts）
 - SQLite transcript 是事实源；micro-compact 只改变送给模型的视图。
 - `SessionLoopGuard` 观察跨轮工具行为；流式复读 watchdog 观察单次模型流，两者不是同一机制。
 - `GoalGate` 是软完成门，不是安全授权系统；异常时按代码选择 fail-open。
-- `RAW_AGENT_AGENT_SANDBOX_KIND` 选择执行后端，`RAW_AGENT_SANDBOX_MODE` 只控制 native 后端里的隔离方式。
+- `RAW_AGENT_AGENT_SANDBOX_KIND` 选择执行后端。本机命令隔离由模型每次自选；`RAW_AGENT_SANDBOX_MODE` 只是没传当次隔离时的回退。
 - daemon 负责 HTTP、鉴权、SSE 和调度；core 是产品宿主，默认 turn loop 在 agent-loop SDK。
 - 文档没有配套结果文件时，不声称成功率、成本节省比例或与其他框架的优劣。
 
