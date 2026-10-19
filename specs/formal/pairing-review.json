@@ -84,7 +84,6 @@
     }
   ],
   "sha256": {
-    ".github/workflows/release-gate.yml": "190bffb310b2635710d7124b5f18bc285a4d6387bdb5dd0b8d74a86bac83c73f",
     "packages/agent-loop/src/approval/approval-policy.ts": "7914ae1d0d9a6ed9d2a13231df87d93a40de741c52a0ef28601edc60474c2a0b",
     "packages/agent-loop/src/approval/permission-mode.ts": "456d2e76d423519da0b5d81e802bda5d8683989c7d1ee223a9a9b1266f6d73aa",
     "packages/agent-loop/src/helpers.ts": "bf25c3ef116b15cfddfe90d8de0b0983af81c20f0008ef884b82b4aa4ccb9c53",
@@ -105,10 +104,11 @@
     "packages/core/src/runtime/tool-loop.ts": "c534d5c7f8de80b308e75316b6bf087bf8afbea2ec86b90835304a60e89fe21d",
     "scripts/formal/pairing-verifier.mjs": "dada48c004b65153c9aabaea8737c6c626dfb9f351dff507b77ae419d6a4ed58",
     "scripts/formal/pairing-worker.mjs": "eea60aa4a4399261d6d589da3c6e6a53d24640bf9f13985557982efcbdccffe1",
-    "scripts/formal/run-formal-regression.mjs": "d223e02a4ef59557f6dd93e7719a41097f5ce7ae553b8b62c147c1ff8e33a3f3",
     "scripts/formal/run-pairing-verification.mjs": "21b6f72d2507874705da902adc1d31ec26146a8fd1e7e6d083d5d2f3abb08380",
     "scripts/test/tool-call-pairing-verification.test.mjs": "9b6a865b45c53905e80882df099566054f93d5db2cf51a97cda54e7928bf7d7b",
     "skills/verify-tool-call-pairing/SKILL.md": "82a97197e931689169e9bd6fcb97bb5df925fca4dac78a78fa103ddc6efb422a",
+    "scripts/formal/run-formal-regression.mjs": "d223e02a4ef59557f6dd93e7719a41097f5ce7ae553b8b62c147c1ff8e33a3f3",
+    ".github/workflows/release-gate.yml": "190bffb310b2635710d7124b5f18bc285a4d6387bdb5dd0b8d74a86bac83c73f",
     "packages/agent-loop/src/runtime/tool-loop.test.ts": "0b4d43a90242bed882af09b99dced7f43e6d84f9ea309872f4857a924c18728f",
     "skills/agent-loop/SKILL.md": "96693d1c5d0a4f6d12469a37d9fd24b548c6d62a86c37953c408109d92ddd772",
     "packages/agent-loop/src/turn/host.ts": "480fee8995c829dbe5973618d5e38859efd84e537e0daa5417bd8e7d20c4b00c",
@@ -126,7 +126,7 @@
     "packages/agent-loop/src/session/inbox-overflow.ts": "7b7b1cd937ccbdead275d54ad40e5be8dbafb20b904661ac6ba8d462ba1c6b77",
     "packages/core/src/stores/migrations/index.ts": "61d61d8a9cac1eeb5b21312972244dc0b6d421f06f9ecd0092582e5f533d68b0",
     "packages/core/src/sandbox/model-isolation.ts": "ebbe3a893976214b72de4d4d995a7e4458d1a9275165aeaebf3f0dae1d942129",
-    "packages/core/test/model-sandbox-isolation.test.js": "a079f30070173d361291ae59fa4f70829cf116daed4b7fec6b3593abe7a17d35",
-    "packages/core/src/runtime/spawn-host.ts": "a087208d90bf31d0b458bbc546f6be51167d0f8e91f96ad32967c76c2d88046d"
+    "packages/core/src/runtime/spawn-host.ts": "a087208d90bf31d0b458bbc546f6be51167d0f8e91f96ad32967c76c2d88046d",
+    "packages/core/test/model-sandbox-isolation.test.js": "a079f30070173d361291ae59fa4f70829cf116daed4b7fec6b3593abe7a17d35"
   }
 }
