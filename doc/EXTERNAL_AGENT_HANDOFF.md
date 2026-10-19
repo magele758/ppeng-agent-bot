@@ -84,6 +84,7 @@ curl 'https://your-lab.example/api/external-agent/v1/tasks/task_...' \
 | `waiting_input` | 等待人工补充，`reason` 为 `human_input_required`；在 Lab 中回复后继续查询 |
 | `failed` | 失败，查看 `reason`；`execution_failed` 表示执行宿主失败 |
 | `cancelled` | 已中断或取消，查看 `reason` |
+| `unknown` | 执行结果暂时无法确认，`reason` 为 `execution_state_unknown`；在 Lab 核查后再决定后续操作，不按“仍在运行”持续等待，也不要自动重复执行 |
 
 `progress` 为任务当前的待办列表，`result` 在任务结束前也可能包含已产生的助手文本；完成以 `status` 为准。返回值不包含内部会话、系统提示词、工具调用或接入配置。通常每隔 1–3 秒查询一次即可。外部调用者只能查看相同接入方标识提交的任务；不同接入方即使使用相同来源任务编号，也各自创建独立任务。
 

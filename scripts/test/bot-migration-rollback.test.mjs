@@ -61,7 +61,8 @@ test('real v24 ownerless Bot/cron upgrade is idempotent and rollback restores a 
   const beforeDir=join(temporary,'before-upgrade');const beforeManifest=stoppedSnapshot(stateDir,beforeDir);
 
   const current=new SqliteStateStore(dbFile);const currentHost=host(current,stateDir);
-  assert.equal(getCurrentSchemaVersion(current.db),LATEST_SCHEMA_VERSION);assert.equal(LATEST_SCHEMA_VERSION,30);
+  assert.equal(getCurrentSchemaVersion(current.db),LATEST_SCHEMA_VERSION);assert.equal(LATEST_SCHEMA_VERSION,31);
+  assert.ok(current.db.prepare('PRAGMA table_info(session_inbox)').all().some(column=>column.name==='context_parts_json'));
   assert.equal(current.getBot(ids.bots.planner.id).hidden,true);assert.deepEqual(current.listMessages(ids.bots.researcher.sessionId),originalMessages);
   const installation=openBot(currentHost,ids.bots.researcher.id);assert.equal(installation.sessionId,ids.bots.researcher.sessionId);assert.equal(current.getSession(installation.sessionId).metadata.userId,undefined);
   assert.throws(()=>openBot(currentHost,ids.bots.researcher.id,{userId:'new-login',tenantId:'new-tenant'}));

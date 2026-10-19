@@ -21,7 +21,7 @@ test.describe('Lab 模型所见', () => {
     await expect(page.locator('#panel-play')).toBeVisible();
 
     await page.getByLabel('消息内容').fill(LONG_BASH_PROMPT);
-    await page.getByRole('button', { name: '发送' }).click();
+    await page.getByRole('button', { name: '发送', exact: true }).click();
 
     const resultFold = page.locator('#playMessages .chat-tool-fold--result').first();
     await expect(resultFold).toBeVisible({ timeout: 60_000 });
@@ -31,7 +31,7 @@ test.describe('Lab 模型所见', () => {
     await expect(resultFold.locator('.chat-tool-io__block--out')).toContainText(STORED_MARKER);
 
     await page.getByLabel('消息内容').fill(FOLLOWUP_PROMPT);
-    await page.getByRole('button', { name: '发送' }).click();
+    await page.getByRole('button', { name: '发送', exact: true }).click();
     await expect(page.locator('#playMessages .chat-turn--user .chat-bubble__body').nth(1)).toContainText(
       FOLLOWUP_PROMPT,
       { timeout: 60_000 }

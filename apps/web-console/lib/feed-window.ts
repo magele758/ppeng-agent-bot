@@ -120,6 +120,9 @@ export function historyWindow(options: {
   const overscan = options.overscanPx ?? FEED_OVERSCAN_PX;
   const fallback = options.fallbackRows ?? FEED_FALLBACK_ROWS;
   if (count <= 0) return { start: 0, end: 0, padTop: 0, padBottom: 0 };
+  // A handful of tall bubbles (file fences, working log) still fits one page.
+  // Windowing them lets a new reply replace an older assistant in the DOM.
+  if (count <= fallback) return { start: 0, end: count, padTop: 0, padBottom: 0 };
   const total = options.prefix[count] ?? 0;
   const viewport = options.viewport;
   if (viewport <= 0) {

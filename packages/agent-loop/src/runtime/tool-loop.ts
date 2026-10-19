@@ -86,6 +86,8 @@ export interface CompletedWaveItem {
 // ============================================================================
 
 export interface ToolLoopHost {
+  /** Reject a revoked execution before dispatching another tool. */
+  assertSessionWritable?(sessionId: string): void;
   /** Injected env; replaces direct process.env reads. */
   env: Record<string, string | undefined>;
 
@@ -699,6 +701,8 @@ async function executeSingleToolWithApprovals(
   };
 
   try {
+    if (context.abortSignal?.aborted) throw new Error('Session aborted before tool dispatch');
+    host.assertSessionWritable?.(sessionId);
     let result = await tool.execute(context, execInput as Record<string, unknown>);
     if (completed) {
       completed.push({ tool, toolCallId: toolCall.toolCallId, args: (execInput ?? {}) as Record<string, unknown>, snapshot, context });
@@ -854,6 +858,8 @@ export async function executeToolCalls(
   const approvalFor = createApprovalLookup(host, sessionId);
 
   for (const chunk of partitionForParallel(validToolCalls, maxParallelToolCalls)) {
+    if (context.abortSignal?.aborted) break;
+    host.assertSessionWritable?.(sessionId);
     const chunkResults = await Promise.all(
       chunk.map((tc) => executeSingleToolWithApprovals(host, tools, tc, context, allowExternalAiTools, sessionId, completed, approvalFor))
     );
@@ -887,7 +893,9 @@ export function processToolResults(
   onModelStreamChunk?: (chunk: ModelStreamChunk) => void
 ): void {
   const images: import('../types.js').ImagePart[] = [];
-  const paired = toolResultIdsAlreadyPaired(host, sessionId);
+  // Own the batch snapshot: hosts may return a shared/read-only set, or omit it.
+  // Recreate it on each call so a later occurrence of a reused id can reopen.
+  const paired = new Set(toolResultIdsAlreadyPaired(host, sessionId));
   for (const r of results) {
     if (skipPersistedToolResult(r, paired)) continue;
     images.push(...(r.images ?? []));
@@ -926,6 +934,7 @@ export function processToolResults(
     }
 
     host.appendMessage(session.id, 'tool', parts);
+    paired.add(r.toolCallId);
 
     if (r.isExternal) {
       const idemKey = stableJsonHash(

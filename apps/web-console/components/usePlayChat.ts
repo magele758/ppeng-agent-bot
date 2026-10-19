@@ -22,6 +22,16 @@ import { rollbackToCheckpoint, streamCheckpoint, type StreamSegment } from '@/li
 import { feedSseBuffer } from '@/lib/sse';
 import { liveSessionFollowRequest, type LiveStreamArm } from '@/lib/live-stream-attach';
 import { userPreviewText } from '@/lib/chat-utils';
+import {
+  contextLabelsOf,
+  limitContextSources,
+  contextSourcesBody,
+  contextSourcesForSend,
+  withContextIds,
+  type ContextLabel,
+  type ContextSource,
+  type PendingContextSource
+} from '@/lib/composer-context';
 import { playSendAckToneIfEnabled } from '@/lib/send-ack-feedback';
 import {
   parseSessionChrome,
@@ -246,6 +256,8 @@ export function usePlayChat(deps: PlayChatDeps) {
   >([]);
   const [playStatus, setPlayStatus] = useState<{ text: string; ok?: boolean; err?: boolean }>({ text: '' });
   const [optimisticUser, setOptimisticUser] = useState<string | null>(null);
+  const [optimisticContext, setOptimisticContext] = useState<ContextLabel[]>([]);
+  const [pendingContext, setPendingContext] = useState<PendingContextSource[]>([]);
   const [streamOverlay, setStreamOverlay] = useState<{ segments: StreamSegment[] } | null>(null);
   const [waitTyping, setWaitTyping] = useState(false);
   const [playSending, setPlaySending] = useState(false);
@@ -324,6 +336,18 @@ export function usePlayChat(deps: PlayChatDeps) {
     setPlayInput('');
     setPendingImageAssetIds([]);
     setPendingAttachmentIds([]);
+    setPendingContext([]);
+  };
+
+  const addPendingContext = (sources: ContextSource[]) => {
+    if (sources.length === 0) return;
+    const result = limitContextSources([...pendingContext, ...withContextIds(sources)]);
+    setPendingContext(result.sources);
+    if (result.truncated) setPlayStatus({ text: t('play.composer.contextTruncated') });
+  };
+
+  const removePendingContext = (id: string) => {
+    setPendingContext((current) => current.filter((item) => item.id !== id));
   };
 
   const composerIsCanonicalBot = () => {
@@ -355,7 +379,10 @@ export function usePlayChat(deps: PlayChatDeps) {
   };
 
   const clearStreamingShell = () => {
-    if (!pendingSteerTextRef.current) setOptimisticUser(null);
+    if (!pendingSteerTextRef.current) {
+      setOptimisticUser(null);
+      setOptimisticContext([]);
+    }
     setStreamOverlay(null);
     setWaitTyping(false);
   };
@@ -960,6 +987,7 @@ export function usePlayChat(deps: PlayChatDeps) {
         if (!landed) return;
         pendingSteerTextRef.current = null;
         setOptimisticUser(null);
+        setOptimisticContext([]);
         await refreshPlayPanel();
       } catch {
         /* steer landing is best-effort */
@@ -1508,12 +1536,16 @@ export function usePlayChat(deps: PlayChatDeps) {
     const text = playInput.trim();
     const imageAssetIds = [...pendingImageAssetIds];
     const attachmentIds = [...pendingAttachmentIds];
+    const contextSnapshot = pendingContext;
+    const contextSources = contextSourcesForSend(pendingContext);
+    const contextFields = contextSourcesBody(contextSources);
+    const contextLabels = contextLabelsOf(contextSources);
     const commandBotId = playSurface === 'bot' ? botIdRef.current : '';
     if (
       planBotComposerSend({
         botSelected: Boolean(commandBotId),
         text,
-        hasAttachments: imageAssetIds.length > 0 || attachmentIds.length > 0
+        hasAttachments: imageAssetIds.length > 0 || attachmentIds.length > 0 || contextSources.length > 0
       }) === 'command'
     ) {
       stopSpeechDictation();
@@ -1558,7 +1590,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     }
     const running = playSending || Boolean(streamOverlay) || waitTyping;
     if (running) {
-      if (!text || !selectedSessionId) return;
+      if ((!text && contextSources.length === 0) || !selectedSessionId) return;
       const immediate =
         decideRunningTurnSend({ canonicalBotChat: composerIsCanonicalBot() }) === 'steer';
       if (!immediate && steerInterruptPolicy === 'disabled') {
@@ -1574,6 +1606,7 @@ export function usePlayChat(deps: PlayChatDeps) {
         acknowledgeLocalSendCommitted();
         requestScrollPlayToBottom();
         setOptimisticUser(userPreviewText(text, []));
+        setOptimisticContext(contextLabels);
         clearComposerOnly();
       }
       try {
@@ -1584,8 +1617,8 @@ export function usePlayChat(deps: PlayChatDeps) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(
             immediate
-              ? { text, target: 'next-step' }
-              : { text, target, ...steerBodyFromQueryMode(execMode) }
+              ? { text: text || '(attachment)', target: 'next-step', ...contextFields }
+              : { text: text || '(attachment)', target, ...steerBodyFromQueryMode(execMode), ...contextFields }
           ),
         })) as { ok?: boolean; status?: string; reason?: string; item?: SteerInboxItem };
         acknowledgeLocalSendCommitted();
@@ -1600,7 +1633,9 @@ export function usePlayChat(deps: PlayChatDeps) {
           if (immediate) {
             pendingSteerTextRef.current = null;
             setOptimisticUser(null);
+            setOptimisticContext([]);
             setPlayInput(text);
+            setPendingContext(contextSnapshot);
           }
           const why =
             data.reason === 'session_ended'
@@ -1625,14 +1660,16 @@ export function usePlayChat(deps: PlayChatDeps) {
         if (immediate) {
           pendingSteerTextRef.current = null;
           setOptimisticUser(null);
+          setOptimisticContext([]);
           setPlayInput(text);
+          setPendingContext(contextSnapshot);
         }
         setPlayStatus({ text: err instanceof Error ? err.message : String(err), err: true });
       }
       return;
     }
     stopSpeechDictation();
-    if (!text && imageAssetIds.length === 0 && attachmentIds.length === 0) return;
+    if (!text && imageAssetIds.length === 0 && attachmentIds.length === 0 && contextSources.length === 0) return;
     const draftSnapshot = playInput;
     const imageSnapshot = [...pendingImageAssetIds];
     const attachmentSnapshot = [...pendingAttachmentIds];
@@ -1644,6 +1681,7 @@ export function usePlayChat(deps: PlayChatDeps) {
       acknowledgeLocalSendCommitted();
       requestScrollPlayToBottom();
       setOptimisticUser(preview);
+      setOptimisticContext(contextLabels);
       setStreamOverlay({ segments: [] });
       clearComposerOnly();
     };
@@ -1651,6 +1689,7 @@ export function usePlayChat(deps: PlayChatDeps) {
       acknowledgeLocalSendCommitted();
       requestScrollPlayToBottom();
       setOptimisticUser(preview);
+      setOptimisticContext(contextLabels);
       setWaitTyping(true);
       clearComposerOnly();
     };
@@ -1672,6 +1711,7 @@ export function usePlayChat(deps: PlayChatDeps) {
               message: text || '(attachment)',
               imageAssetIds,
               attachmentIds,
+              ...contextFields,
               ...optionalGroupsBody(optionalToolGroupsFeature, enabledOptionalGroupIds),
               ...orchestrationBody(taskMode, orchestrationEngine, skillScope),
               ...modelRefBody(modelRefForSend),
@@ -1688,6 +1728,7 @@ export function usePlayChat(deps: PlayChatDeps) {
               message: text || '(attachment)',
               imageAssetIds,
               attachmentIds,
+              ...contextFields,
               ...optionalGroupsBody(optionalToolGroupsFeature, enabledOptionalGroupIds),
               ...orchestrationBody(taskMode, orchestrationEngine, skillScope),
               ...modelRefBody(modelRefForSend),
@@ -1708,6 +1749,7 @@ export function usePlayChat(deps: PlayChatDeps) {
             agentId: resolveComposerAgentId(agentId, agents),
             imageAssetIds,
             attachmentIds,
+            ...contextFields,
             ...optionalGroupsBody(optionalToolGroupsFeature, enabledOptionalGroupIds),
             ...orchestrationBody(taskMode, orchestrationEngine, skillScope),
             ...modelRefBody(modelRefForSend),
@@ -1726,6 +1768,7 @@ export function usePlayChat(deps: PlayChatDeps) {
               agentId: resolveComposerAgentId(agentId, agents),
               imageAssetIds,
               attachmentIds,
+              ...contextFields,
               ...optionalGroupsBody(optionalToolGroupsFeature, enabledOptionalGroupIds),
               ...orchestrationBody(taskMode, orchestrationEngine, skillScope),
               ...modelRefBody(modelRefForSend),
@@ -1750,6 +1793,7 @@ export function usePlayChat(deps: PlayChatDeps) {
             message: text || '(attachment)',
             imageAssetIds,
             attachmentIds,
+            ...contextFields,
             agentId: resolveComposerAgentId(agentId, agents),
             autoRun: true,
             background: true,
@@ -1778,6 +1822,7 @@ export function usePlayChat(deps: PlayChatDeps) {
         setPlayInput(draftSnapshot);
         setPendingImageAssetIds(imageSnapshot);
         setPendingAttachmentIds(attachmentSnapshot);
+        setPendingContext(contextSnapshot);
       }
       clearStreamingShell();
       if (persisted) {
@@ -1883,6 +1928,10 @@ export function usePlayChat(deps: PlayChatDeps) {
     setPendingImageAssetIds,
     pendingAttachmentIds,
     setPendingAttachmentIds,
+    pendingContext,
+    addPendingContext,
+    removePendingContext,
+    optimisticContext,
     sessionFileArtifacts,
     playStatus,
     setPlayStatus,

@@ -15,6 +15,8 @@
     "test": "npm run build && npm run test:unit",
     "test:unit": "node --experimental-strip-types --test --test-concurrency=1 \"packages/core/test/**/*.test.js\" \"packages/capability-gateway/test/**/*.test.js\" \"packages/agent-sre/test/**/*.test.js\" \"packages/agent-stock/test/**/*.test.js\" \"packages/agent-homeiot/test/**/*.test.js\" \"packages/agent-erp/test/**/*.test.js\" \"apps/web-console/lib/**/*.test.ts\" \"apps/web-console/components/**/*.test.ts\" \"apps/daemon/test/**/*.test.ts\" \"scripts/**/*.test.mjs\" \"apps/desktop/src/**/*.test.ts\"",
     "test:formal": "node scripts/formal/run-formal-regression.mjs",
+    "test:pairing": "node scripts/formal/run-pairing-verification.mjs",
+    "test:lifecycle": "node scripts/formal/run-lifecycle-verification.mjs",
     "test:acceptance": "node scripts/acceptance/acceptance-gate.mjs",
     "test:acceptance:results": "node scripts/acceptance/acceptance-gate.mjs --results coverage/acceptance/results",
     "test:acceptance:full": "node scripts/acceptance/acceptance-gate.mjs --collect unit,vitest,e2e",
@@ -86,7 +88,9 @@
     "build:desktop": "node scripts/build-desktop.mjs",
     "publish:npm": "node scripts/publish-npm-packages.mjs",
     "test:bot:faults": "node --test packages/core/test/bot-release-faults.test.js",
-    "test:bot:release-evidence": "node scripts/bot-release/evidence.mjs"
+    "test:bot:release-evidence": "node scripts/bot-release/evidence.mjs",
+    "test:restart": "node scripts/formal/run-restart-verification.mjs",
+    "test:concurrency": "node scripts/formal/run-concurrency-verification.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",

@@ -1,0 +1,21 @@
+id: tool-call-pairing-batch-dedup
+title: 同批重复工具结果去重（验证试点发现 F-1）
+status: implemented
+requirement: |
+  确认，这 8 条验收标准可以，按项目规范开始实现，先写失败测试再实现验证。
+notes: |
+  这是已批准试点发现 F-1 后提出的独立产品修复；用户已确认以下三条标准并授权实施。
+  发现及真实组件反例见 doc/formal/tool-call-pairing-findings.md。
+criteria:
+  - id: AC-1
+    given: 某次工具调用的相同结果在同一批返回中重复出现
+    when: 系统记录这一批结果
+    then: 有效对话中该次调用仅保留一个结果，重复返回不会额外产生结果记录
+  - id: AC-2
+    given: 多个不同工具调用的结果混合返回，其中部分结果重复出现
+    when: 系统记录这些结果
+    then: 每次调用恰好对应一个正确的结果，不会因为去重而丢掉其他调用的结果
+  - id: AC-3
+    given: 旧调用已经完成，后续新调用复用了同一调用标识
+    when: 新调用返回结果
+    then: 新调用的结果仍被正确记录，不会被当作旧调用的重复结果丢弃

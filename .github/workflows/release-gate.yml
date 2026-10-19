@@ -32,7 +32,9 @@ jobs:
   tests:
     name: Build, unit tests, HTTP regression, E2E
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # The four process-verification gates and full formal regression each take
+    # about five minutes, in addition to the unit and browser suites.
+    timeout-minutes: 35
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -57,6 +59,54 @@ jobs:
           if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
             sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           fi
+
+      - name: Bounded pairing verification (no retries)
+        run: npm run test:pairing
+
+      - name: Upload pairing verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tool-call-pairing-verification
+          path: coverage/formal/pairing/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Session lifecycle verification (no retries)
+        run: npm run test:lifecycle
+
+      - name: Upload session lifecycle evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: session-lifecycle-verification
+          path: coverage/formal/lifecycle/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Process restart recovery verification (no retries)
+        run: npm run test:restart
+
+      - name: Upload process restart recovery evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: session-restart-recovery-verification
+          path: coverage/formal/restart/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Multiprocess session verification (no retries)
+        run: npm run test:concurrency
+
+      - name: Upload multiprocess session evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: session-multiprocess-concurrency-verification
+          path: coverage/formal/concurrency/
+          if-no-files-found: error
+          retention-days: 30
 
       # Retry recovery remains visible and fails unless explicitly allowlisted.
       - name: Unit tests

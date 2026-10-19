@@ -5,6 +5,7 @@
  * role+text. `claimAndApplyInbox` no-ops when the host has no inbox.
  */
 
+import type { TextPart } from '@ppeng/api-types';
 import type { MessagePart, MessageRole, SessionMessage } from '../types.js';
 import type { InboxTarget } from './step-inbox.js';
 
@@ -12,6 +13,7 @@ export interface ClaimedInboxItem {
   key?: string;
   role: 'user' | 'system';
   text: string;
+  contextParts?: TextPart[];
 }
 
 export interface ApplyClaimedInboxOpts {
@@ -46,7 +48,7 @@ export function applyClaimedInbox(
     store.appendMessage(
       sessionId,
       item.role,
-      [textPart(item.text)],
+      [textPart(item.text), ...(item.contextParts ?? [])],
       item.key
         ? { key: item.key, expectedWriterRunId: opts?.expectedWriterRunId }
         : { expectedWriterRunId: opts?.expectedWriterRunId }

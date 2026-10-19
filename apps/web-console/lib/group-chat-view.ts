@@ -17,9 +17,15 @@ export function roomHistoryUrl(roomId: string, older: boolean, cursor: number | 
   const suffix = older && cursor ? `&beforeSeq=${cursor}` : '';
   return `/api/bot-rooms/${roomId}/messages?limit=50${suffix}`;
 }
-export function roomComposerDisabled(room: { status: string } | null, busy: boolean, text: string): boolean {
+export function roomComposerDisabled(
+  room: { status: string } | null,
+  busy: boolean,
+  text: string,
+  hasContext = false
+): boolean {
   if (busy || !room) return true;
-  return room.status !== 'active' || !text.trim();
+  if (room.status !== 'active') return true;
+  return !text.trim() && !hasContext;
 }
 export type GroupComposerCommand = 'next' | 'previous' | 'dismiss' | 'choose' | 'send' | 'none';
 export function groupComposerCommand(key: string, shift: boolean, composing: boolean, mentionOpen: boolean, optionCount: number, hasActiveMention: boolean): GroupComposerCommand {

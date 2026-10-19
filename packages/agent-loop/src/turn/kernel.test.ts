@@ -1249,3 +1249,20 @@ describe('runSessionKernel wiring', () => {
     expect(out.status).toBe('waiting_approval');
   });
 });
+
+it('rejected contender preserves the active controller [AC:session-multiprocess-state-consistency#AC-2]', async () => {
+  let entered!: () => void, release!: () => void;
+  const ready = new Promise<void>(resolve => { entered = resolve; });
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const controllers = new Map<string, AbortController>();
+  const { host, session } = createHarness({ model: async () => { entered(); await gate; return textResult('done'); }, host: {sessionAbortControllers:controllers} });
+  const running = runSessionKernel(host, session.id);
+  try {
+    await ready;
+    const controller = controllers.get(session.id);
+    expect(controller).toBeDefined();
+    await expect(runSessionKernel(host,session.id)).rejects.toThrow(/writer claim/i);
+    expect(controllers.get(session.id)).toBe(controller);
+  } finally { release(); await running; }
+  expect(controllers.has(session.id)).toBe(false);
+});

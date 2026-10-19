@@ -12,12 +12,14 @@ import {
   normalizedRole
 } from '@/lib/chat-utils';
 import { parseCronUserPrompt } from '@/lib/cron';
-import { renderMarkdown } from '@/lib/markdown';
 import { A2uiSurface } from './a2ui/A2uiSurface';
+import { MarkdownHtml, StaticHtml } from './MarkdownHtml';
 import { foldA2uiMessages } from './a2ui/fold';
 import { surfacePartKey, useSurfaceContext } from './a2ui/SurfaceContext';
 import type { A2uiMessage, SurfaceState } from './a2ui/types';
 import { useI18n, type MessageKey } from '@/lib/i18n';
+import { ComposerMessageContext } from './ComposerContext';
+import type { ContextLabel } from '@/lib/composer-context';
 import { parseSpawnBlocked } from '@/lib/spawn-blocked';
 import { SpawnBlockedNotice, SpawnBlockedPill } from './SpawnBlockedNotice';
 import {
@@ -214,10 +216,7 @@ function ToolResultFold({
         </summary>
         {spawnBlocked ? <SpawnBlockedNotice blocked={spawnBlocked} /> : null}
         {isSubagent && !stub && !modelView && !spawnBlocked ? (
-          <div
-            className="chat-subagent-summary chat-bubble__md"
-            dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }}
-          />
+          <MarkdownHtml className="chat-subagent-summary chat-bubble__md" text={content} />
         ) : (
           <ToolIoBlocks input={inputText} output={content} />
         )}
@@ -347,11 +346,7 @@ function StructuredBubble({
       );
     } else {
       nodes.push(
-        <div
-          key={nodes.length}
-          className="chat-bubble__body chat-bubble__md"
-          dangerouslySetInnerHTML={{ __html: renderMarkdown(joined) }}
-        />
+        <MarkdownHtml key={nodes.length} className="chat-bubble__body chat-bubble__md" text={joined} />
       );
     }
   };
@@ -470,10 +465,7 @@ export function ChatTurnFromMessage({
     ) : r === 'tool' || r === 'system' ? (
       <pre className="chat-bubble__pre">{msgPartsToText(m.parts)}</pre>
     ) : (
-      <div
-        className="chat-bubble__body chat-bubble__md"
-        dangerouslySetInnerHTML={{ __html: renderMarkdown(msgPartsToText(m.parts)) }}
-      />
+      <MarkdownHtml className="chat-bubble__body chat-bubble__md" text={msgPartsToText(m.parts)} />
     );
   const artifactBubble = r === 'tool' || r === 'system';
   const isSteerMessage =
@@ -484,10 +476,7 @@ export function ChatTurnFromMessage({
   const cronPrompt = r === 'user' ? parseCronUserPrompt(msgPartsToText(m.parts)) : null;
   const cronBubble =
     cronPrompt && !(messageHasStructuredParts(m.parts) && m.parts) ? (
-      <div
-        className="chat-bubble__body chat-bubble__md"
-        dangerouslySetInnerHTML={{ __html: renderMarkdown(cronPrompt.body || cronPrompt.name) }}
-      />
+      <MarkdownHtml className="chat-bubble__body chat-bubble__md" text={cronPrompt.body || cronPrompt.name} />
     ) : bubble;
   return (
     <div className={`chat-turn ${buildModClass(r)}${noAvatar ? ' chat-turn--no-avatar' : ''}`}>
@@ -506,7 +495,10 @@ export function ChatTurnFromMessage({
             </span>
           ) : null}
         </div>
-        <div className={`chat-bubble${artifactBubble ? ' chat-bubble--artifact' : ''}`}>{cronBubble}</div>
+        <div className={`chat-bubble${artifactBubble ? ' chat-bubble--artifact' : ''}`}>
+          {cronBubble}
+          {r === 'user' ? <ComposerMessageContext message={m} /> : null}
+        </div>
       </div>
     </div>
   );
@@ -516,12 +508,14 @@ export function ChatTurnPlain({
   role,
   text,
   labelOverride,
-  extraClass = ''
+  extraClass = '',
+  contextLabels
 }: {
   role: 'user' | 'assistant' | 'tool' | 'system' | 'stream';
   text: string;
   labelOverride?: string;
   extraClass?: string;
+  contextLabels?: readonly ContextLabel[];
 }) {
   const { t } = useI18n();
   const stream = role === 'stream';
@@ -540,11 +534,9 @@ export function ChatTurnPlain({
           {usePre ? (
             <pre className="chat-bubble__pre">{text}</pre>
           ) : (
-            <div
-              className="chat-bubble__body chat-bubble__md"
-              dangerouslySetInnerHTML={{ __html: renderMarkdown(text) }}
-            />
+            <MarkdownHtml className="chat-bubble__body chat-bubble__md" text={text} />
           )}
+          {role === 'user' ? <ComposerMessageContext labels={contextLabels} /> : null}
         </div>
       </div>
     </div>
@@ -598,10 +590,10 @@ export function ChatTurnStreaming({
                 return <A2uiSurface key={seg.id} state={state} sessionId={sessionId} />;
               }
               return (
-                <div
+                <StaticHtml
                   key={seg.id}
                   className="chat-bubble__body chat-bubble__md chat-stream-fold__text"
-                  dangerouslySetInnerHTML={{ __html: seg.html }}
+                  html={seg.html}
                 />
               );
             })

@@ -90,7 +90,7 @@ export function applyClaimedInbox(
 ): void {
   for (const item of items) {
     if (item.key) store.hideByKey(sessionId, item.key);
-    store.appendMessage(sessionId, item.role, [textPart(item.text)], item.key ? { key: item.key } : undefined);
+    store.appendMessage(sessionId, item.role, [textPart(item.text), ...(item.contextParts ?? [])], item.key ? { key: item.key } : undefined);
   }
 }
 
