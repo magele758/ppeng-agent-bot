@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { FactoryProduction } from "./FactoryProduction";
 import { FactoryDelivery, FactoryDeliveryTask } from "./FactoryDelivery";
 import { FactoryDevelopment, DevelopmentTask } from "./FactoryDevelopment";
 import { api } from "@/lib/api";
@@ -168,6 +169,7 @@ export function FactoryView() {
         <FactoryCommands controller={controller} />
         <FactoryDevelopment machines={settings.machines} refresh={controller.refresh} />
         <FactoryDelivery machines={settings.machines} />
+        <FactoryProduction />
       </>}
     </section>
   );

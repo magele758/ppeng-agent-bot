@@ -1,3 +1,4 @@
+import { FactoryProduction } from "./production.js";
 import { FactoryDelivery } from "./delivery.js";
 import { FactoryDevelopment } from "./development.js";
 import { verifyReady, mergeDevelopmentIssueLedger } from "./development-evidence.js";
@@ -72,6 +73,7 @@ function path(v: unknown): string {
 export class FactoryService {
   readonly development: FactoryDevelopment;
   readonly delivery: FactoryDelivery;
+  readonly production: FactoryProduction;
   private readonly pending = new Set<Promise<unknown>>();
   private ticking = false;
   private tickPromise?: Promise<void>;
@@ -83,6 +85,7 @@ export class FactoryService {
     private clock: () => number = Date.now,
   ) {
     this.development = new FactoryDevelopment(host.store, this);
+    this.production = new FactoryProduction(host.store, this, clock);
     this.delivery = new FactoryDelivery(host.store,this,transport,clock);
     host.store.db
       .exec(`CREATE TABLE IF NOT EXISTS factory_tasks(id TEXT PRIMARY KEY,principal TEXT NOT NULL,machine_id TEXT NOT NULL,status TEXT NOT NULL,idem TEXT NOT NULL,data TEXT NOT NULL,UNIQUE(principal,idem));

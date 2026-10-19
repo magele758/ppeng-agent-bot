@@ -119,3 +119,15 @@ node scripts/acceptance/acceptance-gate.mjs --results a.xml --results dir/   # �
 - 门禁证明「有通过的带标签测试」，不证明测试真的验证了标准描述的行为——这由 PR 评审与
   [`acceptance-first`](../skills/acceptance-first/SKILL.md) 纪律保证（禁止给空测试打标签）。
 - 结果模式按标题里的标签归集，不逐个核对静态扫到的带标签测试都出现在结果里：一条标准只要有一个通过、没有失败即可。
+
+## 软件交付与现场验收阶段
+
+2026-10-19用户明确批准第四阶段按8条本地软件标准单独交付，原40条原文与approved状态保留为现场验收。规格可选 `verificationStage: software | deployment`，省略为software。
+
+- `npm run test:acceptance` 默认软件阶段；所有既有软件规格仍阻断。
+- `npm run test:acceptance:deployment` 运行 `--stage all`，软件及现场规格全部参与，现场缺项仍阻断发布验收。
+- 也可显式 `--stage software|deployment|all`；非法阶段拒绝。
+- 软件报告完整保留现场标准、批准状态及未通过状态，标记 `applicable:false`，不得据软件通过宣称现场就绪。
+- 已批准的软件基线不能通过改变verificationStage迁出软件门禁。新增/调整适用阶段同样必须经用户明确批准，不得用此字段规避验收。
+
+阶段门禁仍只是自动化追踪；现场就绪还必须校验真实制品、实际入口和原始运行证据。静态标签、模拟用例或短时本地回归不能代替真实双机与24小时运行。
