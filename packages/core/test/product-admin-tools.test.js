@@ -11,7 +11,7 @@ import { syncBotAgentSpecs } from '../dist/bots/bot-facade.js';
 import { filterToolsForSession } from '../dist/turn/resolve-turn-tools.js';
 import { PromptBuilder } from '../dist/model/prompt-builder.js';
 
-function fixture() {
+function fixture(overrides = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'product-admin-'));
   const store = new SqliteStateStore(join(dir, 'state.db'));
   const facade = {
@@ -33,6 +33,7 @@ function fixture() {
     store,
     facade,
     rooms,
+    ...overrides,
     toolNames: () => tools.map((tool) => tool.name)
   });
   const session = createChatSession(facade, { title: '私聊', agentId: 'general' });
@@ -277,5 +278,114 @@ test('permission mode cannot be set to bypass, including padded text', async () 
   const allowed = await call(fx, 'lab_session_update', { sessionId: session.body.session.id, permissionMode: 'ask' });
   assert.equal(allowed.ok, true);
   assert.equal(allowed.body.session.permissionMode, 'ask');
+  fx.store.db.close();
+});
+
+test('product tools enforce global admin and resource ownership for private chat callers', async () => {
+  const fx = fixture();
+  const alice = {...fx.session, metadata: {userId: 'alice', tenantId: 'tenant'}};
+  const bob = {...fx.session, metadata: {userId: 'bob', tenantId: 'tenant'}};
+  for (const [name,args] of [
+    ['lab_settings_update', {area:'discovery', patch:{enabled:false}}],
+    ['lab_model_provider_upsert', {name:'Evil',modelId:'x'}],
+    ['lab_project_create', {name:'Foreign'}]
+  ]) assert.equal((await call(fx,name,args,alice)).ok, false, name);
+  for (const [create,list,update,args,idKey,resultKey,listKey] of [
+    ['lab_research_task_create','lab_research_task_list','lab_research_task_update',{query:'private'},'taskId','task','tasks'],
+    ['lab_orchestration_run_create','lab_orchestration_run_list','lab_orchestration_run_status',{title:'private'},'runId','run','runs'],
+    ['lab_swarm_run_create','lab_swarm_run_list','lab_swarm_run_start',{goal:'private'},'runId','run','runs']
+  ]) {
+    const created = await call(fx,create,args,alice);
+    assert.equal(created.ok,true);
+    assert.equal((await call(fx,list,{},alice)).body[listKey].length,1);
+    assert.equal((await call(fx,list,{},bob)).body[listKey].length,0);
+    assert.equal((await call(fx,update,{[idKey]:created.body[resultKey].id,status:'completed'},bob)).ok,false);
+  }
+  fx.store.db.close();
+});
+
+test('legacy bot ownership cannot be bypassed through product tools', async () => {
+  const fx = fixture();
+  const created = await call(fx,'bot_create',{name:'private'});
+  fx.store.db.prepare('DELETE FROM bot_definition_owners WHERE bot_id=?').run(created.body.bot.id);
+  fx.store.updateSession(created.body.bot.canonicalSessionId,{metadata:{userId:'alice',tenantId:'tenant'}});
+  const bob = {...fx.session, metadata:{userId:'bob',tenantId:'tenant'}};
+  assert.equal((await call(fx,'bot_update',{bot:created.body.bot.id,title:'stolen'},bob)).ok,false);
+  fx.store.db.close();
+});
+
+test('admin permissions follow persisted tenant membership and revocation', async () => {
+  const fx = fixture();
+  const memory = fx.store.agentMemory();
+  memory.upsertUser({id:'admin',status:'active'});
+  memory.upsertTenant({id:'tenant',name:'Tenant'});
+  memory.addMembership({userId:'admin',tenantId:'tenant',role:'admin'});
+  const session = {...fx.session, metadata:{userId:'admin',tenantId:'tenant'}};
+  assert.equal((await call(fx,'lab_project_create',{name:'allowed'},session)).ok,true);
+  assert.equal((await call(fx,'lab_settings_update',{area:'discovery',patch:{enabled:false}},session)).ok,true);
+  const foreign = await call(fx,'lab_research_task_create',{query:'private'}, {...session,metadata:{userId:'other',tenantId:'tenant'}});
+  assert.equal((await call(fx,'lab_research_task_update',{taskId:` ${foreign.body.task.id} `,status:'completed'},session)).ok,false);
+  memory.addMembership({userId:'admin',tenantId:'tenant',role:'member'});
+  assert.equal((await call(fx,'lab_project_list',{},session)).ok,true);
+  assert.equal((await call(fx,'lab_project_create',{name:'denied'},session)).ok,false);
+  fx.store.db.close();
+});
+
+test('team tools check the linked session owner before starting and claim newly created plans', async () => {
+  let started = 0;
+  const fx = fixture({startTeamPlan(){started++;return {};}, async createTeamPlan(){return {plan:{id:'new-plan'}};}});
+  const alice = createChatSession(fx.facade,{agentId:'general',title:'Alice',metadata:{userId:'alice',tenantId:'t'}});
+  const bob = {...fx.session,metadata:{userId:'bob',tenantId:'t'}};
+  fx.store.teams().upsert({id:'private-plan',sessionId:alice.id,objective:'private',status:'drafting',tasks:[],edges:[],gates:[],workspaceSyncMode:'directory-copy',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()});
+  assert.equal((await call(fx,'lab_team_plan_get',{planId:'private-plan'},bob)).ok,false);
+  assert.equal((await call(fx,'lab_team_plan_start',{planId:'private-plan'},bob)).ok,false);
+  assert.equal(started,0);
+  assert.equal((await call(fx,'lab_team_plan_start',{planId:'private-plan'},alice)).ok,true);
+  assert.equal(started,1);
+  assert.equal((await call(fx,'lab_team_plan_create',{objective:'mine'},alice)).ok,true);
+  assert.equal(fx.store.db.prepare("SELECT user_id FROM resource_owners WHERE kind='team-plan' AND resource_id='new-plan'").get().user_id,'alice');
+  fx.store.db.close();
+});
+
+test('moving a bot out of a shared group cancels its exposed running session', async () => {
+  const cancelled=[];
+  const fx=fixture({cancelSession(id){cancelled.push(id);}});
+  const bot=(await call(fx,'bot_create',{name:'worker'})).body.bot;
+  const group=(await call(fx,'bot_group_create',{name:'secret'})).body.group;
+  assert.equal((await call(fx,'bot_group_assign',{bot:bot.id,groupId:group.id})).ok,true);
+  fx.store.setDaemonControl(`bot.sharedExposure:${bot.canonicalSessionId}`,{active:{groupId:group.id,fromSeq:1,startedAt:new Date().toISOString()},revoked:[]});
+  assert.equal((await call(fx,'bot_group_assign',{bot:bot.id,groupId:null})).ok,true);
+  assert.deepEqual(cancelled,[bot.canonicalSessionId]);
+  fx.store.db.close();
+});
+
+test('provider updates keep the saved key write-only and preserve the provider identity', async () => {
+  const fx=fixture();
+  const first=await call(fx,'lab_model_provider_upsert',{name:'Original',modelId:'first',apiKey:'secret-original'});
+  const id=first.body.provider.id;
+  const updated=await call(fx,'lab_model_provider_upsert',{id,name:'Renamed',kind:'anthropic-compatible',baseUrl:'https://example.test',modelId:'second',apiKey:'secret-replaced',useJsonMode:false});
+  assert.equal(updated.ok,true);
+  assert.equal(updated.body.provider.id,id);
+  assert.equal(updated.body.provider.name,'Renamed');
+  assert.ok(!JSON.stringify(updated).includes('secret-replaced'));
+  const listed=await call(fx,'lab_model_providers_list');
+  assert.ok(!JSON.stringify(listed).includes('secret-replaced'));
+  assert.equal((await call(fx,'lab_model_provider_delete',{id,confirm:true})).ok,true);
+  fx.store.db.close();
+});
+
+test('bot tool and skill allowlists validate the catalog and can be cleared', async () => {
+  const fx=fixture({skillNames:async()=>['Research']});
+  const bot=(await call(fx,'bot_create',{name:'worker'})).body.bot;
+  assert.equal((await call(fx,'bot_update',{bot:bot.id,allowedTools:['missing']})).ok,false);
+  const update=await call(fx,'bot_update',{bot:bot.id,allowedTools:['bot_list'],allowedSkills:['Research'],hidden:true});
+  assert.equal(update.ok,true);
+  assert.deepEqual(update.body.bot.allowedTools,['bot_list']);
+  assert.deepEqual(update.body.bot.allowedSkills,['Research']);
+  assert.equal(update.body.bot.hidden,true);
+  const cleared=await call(fx,'bot_update',{bot:bot.id,allowedTools:[],allowedSkills:[],hidden:false});
+  assert.equal(cleared.ok,true);
+  assert.deepEqual(cleared.body.bot.allowedTools,[]);
+  assert.deepEqual(cleared.body.bot.allowedSkills,[]);
   fx.store.db.close();
 });

@@ -4,6 +4,7 @@
  * Reuses the same stores and services as the daemon routes.
  */
 
+import { withProductAccess } from './product-admin-access.js';
 import { createId, nowIso } from '../id.js';
 import { AuthorizationError, NotFoundError, ValidationError } from '../errors.js';
 import type { SqliteStateStore } from '../storage.js';
@@ -114,6 +115,12 @@ function principalOf(store: SqliteStateStore, session: SessionRecord): BotPrinci
 function assertCanManageBot(store: SqliteStateStore, principal: BotPrincipal, bot: BotRecord): void {
   const owner = botDefinitionOwner(store, bot.id);
   const installation = resolveBotPrincipal(store);
+  if (!owner) {
+    const session = store.getSession(bot.canonicalSessionId);
+    if (!session || !sameBotPrincipal(principalFromSession(store, session), principal)) {
+      throw new AuthorizationError('Bot belongs to another principal');
+    }
+  }
   if (owner && !sameBotPrincipal(owner, principal) && !sameBotPrincipal(owner, installation)) {
     throw new AuthorizationError('Bot belongs to another principal');
   }
@@ -227,7 +234,7 @@ interface Spec {
   run: (ctx: RunContext, args: Record<string, unknown>) => Promise<unknown>;
 }
 
-function define(spec: Spec): ToolContract<Record<string, unknown>> {
+function define(spec: Spec, store: SqliteStateStore): ToolContract<Record<string, unknown>> {
   return {
     name: spec.name,
     description: spec.description,
@@ -245,7 +252,7 @@ function define(spec: Spec): ToolContract<Record<string, unknown>> {
         if (spec.confirm && input.confirm !== true) {
           throw new ValidationError(`${spec.confirm} requires confirm: true`);
         }
-        return { ok: true, content: JSON.stringify(redactSecrets(await spec.run(ctx, input))) };
+        return { ok: true, content: JSON.stringify(redactSecrets(await withProductAccess(store, ctx.session, spec.name, spec.write === true, input, () => spec.run(ctx, input)))) };
       } catch (error) {
         return { ok: false, content: JSON.stringify({ error: safeError(error) }) };
       }
@@ -255,7 +262,7 @@ function define(spec: Spec): ToolContract<Record<string, unknown>> {
 
 export function createProductAdminTools(host: ProductAdminHost): ToolContract<Record<string, unknown>>[] {
   const store = host.store;
-  const groups = () => new BotFunctionalGroupService(store);
+  const groups = () => new BotFunctionalGroupService(store, host.cancelSession);
   const str = (args: Record<string, unknown>, key: string) => (typeof args[key] === 'string' ? args[key].trim() : '');
 
   const tools: Spec[] = [
@@ -1158,5 +1165,5 @@ export function createProductAdminTools(host: ProductAdminHost): ToolContract<Re
     }
   ];
 
-  return tools.map(define);
+  return tools.map(spec => define(spec, store));
 }
