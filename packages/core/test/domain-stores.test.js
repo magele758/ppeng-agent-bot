@@ -1,6 +1,6 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseSync } from 'node:sqlite';
+import { SqliteStateStore } from '../dist/storage.js';
 import { unlinkSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { SessionStore } from '../dist/stores/session-store.js';
@@ -11,59 +11,10 @@ let db;
 let sessionStore;
 let imageStore;
 
-function initSchema(database) {
-  database.exec(`
-    PRAGMA journal_mode = WAL;
-    CREATE TABLE IF NOT EXISTS sessions (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      mode TEXT NOT NULL,
-      status TEXT NOT NULL,
-      agent_id TEXT NOT NULL,
-      task_id TEXT,
-      workspace_id TEXT,
-      parent_session_id TEXT,
-      background INTEGER NOT NULL,
-      summary TEXT,
-      todo_json TEXT NOT NULL,
-      metadata_json TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS session_messages (
-      id TEXT PRIMARY KEY,
-      session_id TEXT NOT NULL,
-      role TEXT NOT NULL,
-      parts_json TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      seq INTEGER,
-      key TEXT,
-      surface_op TEXT DEFAULT 'append',
-      replaces_start INTEGER,
-      replaces_end INTEGER
-    );
-    CREATE TABLE IF NOT EXISTS image_assets (
-      id TEXT PRIMARY KEY,
-      session_id TEXT NOT NULL,
-      sha256 TEXT NOT NULL,
-      mime_type TEXT NOT NULL,
-      source_type TEXT NOT NULL,
-      source_url TEXT,
-      local_rel_path TEXT NOT NULL,
-      size_bytes INTEGER NOT NULL,
-      derived_from_json TEXT NOT NULL,
-      retention_tier TEXT NOT NULL,
-      kind TEXT NOT NULL,
-      last_access_at TEXT NOT NULL,
-      created_at TEXT NOT NULL
-    );
-  `);
-}
-
 // Shared setup/teardown for both suites
 before(() => {
-  db = new DatabaseSync(DB_PATH);
-  initSchema(db);
+  // Exercise domain stores against the production schema and migrations.
+  db = new SqliteStateStore(DB_PATH).db;
   sessionStore = new SessionStore(db);
   imageStore = new ImageAssetStore(db);
 });

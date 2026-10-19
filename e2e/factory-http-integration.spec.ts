@@ -1,17 +1,21 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type APIRequestContext } from "@playwright/test";
+
+// These tests exercise factory admission, not Bot creation. The shared E2E
+// daemon may already have a full roster; hidden Bots still count toward it.
+async function coordinatorBot(request: APIRequestContext): Promise<{ id: string }> {
+  const response = await request.get('/api/bot-work/default');
+  expect(response.status(), await response.text()).toBe(200);
+  const { bot } = await response.json();
+  expect(bot.id).toEqual(expect.any(String));
+  return bot;
+}
 
 test("real Lab proxy persists factory configuration and shares Room task state [AC:multi-machine-readonly-pilot#AC-1] [AC:multi-machine-readonly-pilot#AC-3] [AC:multi-machine-readonly-pilot#AC-13]", async ({
   page,
   request,
 }) => {
   const initial = await (await request.get("/api/factory/settings")).json();
-  const bot = (
-    await (
-      await request.post("/api/bots", {
-        data: { name: "Factory HTTP " + Date.now() },
-      })
-    ).json()
-  ).bot;
+  const bot = await coordinatorBot(request);
   const room = (
     await (
       await request.post("/api/bot-rooms", {
@@ -99,9 +103,7 @@ test("real Lab proxy persists factory configuration and shares Room task state [
 test("real Lab proxy shares controlled-development Room admission, task evidence and cancellation [AC:multi-machine-controlled-development#AC-3] [AC:multi-machine-controlled-development#AC-5] [AC:multi-machine-controlled-development#AC-21] [AC:multi-machine-controlled-development#AC-24] [AC:multi-machine-controlled-development#AC-27]", async ({ page, request }) => {
   const initial = await (await request.get("/api/factory/settings")).json();
   const userId = initial.settings.owner.userId;
-  const botResponse = await request.post("/api/bots", { data: { name: "Development HTTP " + Date.now() } });
-  expect(botResponse.ok()).toBe(true);
-  const { bot } = await botResponse.json();
+  const bot = await coordinatorBot(request);
   const roomResponse = await request.post("/api/bot-rooms", { data: { title: "Development HTTP", botIds: [bot.id], hostBotId: bot.id } });
   expect(roomResponse.ok()).toBe(true);
   const { room } = await roomResponse.json();
