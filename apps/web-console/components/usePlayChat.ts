@@ -22,12 +22,33 @@ import { rollbackToCheckpoint, streamCheckpoint, type StreamSegment } from '@/li
 import { feedSseBuffer } from '@/lib/sse';
 import { liveSessionFollowRequest, type LiveStreamArm } from '@/lib/live-stream-attach';
 import {
+  applyWhen,
+  assertLiveTurn,
+  assertSameSession,
   detachLiveTurn,
+  generationForArm,
+  handleSteerFailure,
   liveTurnBelongsToSelection,
+  liveTurnIsRunning,
+  liveTurnOwnerId,
+  LiveTurnSuperseded,
   mayClaimSelectedSession,
+  ownsLiveTurn,
+  releaseArmOwner,
+  releaseIfCurrent,
+  reportOwnedError,
+  restoreComposerUnlessPersisted,
+  resultSessionId,
+  runIf,
   screenLiveTurn,
+  shouldSkipForeignLiveArm,
+  shouldSurfaceLiveArmError,
+  shouldTickLiveArm,
+  streamOverlayVisible,
   streamPaintApplies,
-  UNBOUND_LIVE_TURN,
+  streamSessionAllowed,
+  tickIfPersisted,
+  visibleLiveOverlay,
 } from '@/lib/live-turn-session';
 import { userPreviewText } from '@/lib/chat-utils';
 import {
@@ -1401,8 +1422,16 @@ export function usePlayChat(deps: PlayChatDeps) {
     const nextId = () => `s-${++idCounter}`;
 
     const sync = () => {
-      if (opts?.liveGen != null && !streamPaintApplies(liveGenRef.current, opts.liveGen)) return;
-      if (!liveTurnBelongsToSelection(liveOwnerRef.current, selectedSessionRef.current)) return;
+      if (
+        !streamOverlayVisible({
+          liveGen: opts?.liveGen,
+          activeGeneration: liveGenRef.current,
+          liveSessionId: liveOwnerRef.current,
+          selectedSessionId: selectedSessionRef.current,
+        })
+      ) {
+        return;
+      }
       setStreamOverlay({ segments: [...segments] });
     };
 
@@ -1496,15 +1525,16 @@ export function usePlayChat(deps: PlayChatDeps) {
           }
           sync();
         }
-        if (event === 'result' && p.session?.id) {
-          const sid = p.session.id;
-          if (
-            opts?.liveGen != null &&
-            !mayClaimSelectedSession(liveGenRef.current, opts.liveGen, selectedSessionRef.current, sid)
-          ) {
-            return;
-          }
-          if (selectedSessionRef.current != null && selectedSessionRef.current !== sid) return;
+        const sid = resultSessionId(event, p.session?.id);
+        if (
+          sid &&
+          streamSessionAllowed({
+            liveGen: opts?.liveGen,
+            activeGeneration: liveGenRef.current,
+            selectedSessionId: selectedSessionRef.current,
+            sessionId: sid,
+          })
+        ) {
           liveOwnerRef.current = sid;
           onSession?.(sid);
           selectedSessionRef.current = sid;
@@ -1520,7 +1550,7 @@ export function usePlayChat(deps: PlayChatDeps) {
    */
   const armLiveSessionStream = (sessionId: string): LiveStreamArm => {
     const selected = selectedSessionRef.current;
-    if (selected && selected !== sessionId) {
+    if (shouldSkipForeignLiveArm(selected, sessionId)) {
       return { ready: Promise.resolve(), cancel: () => undefined };
     }
     const current = liveFollowRef.current;
@@ -1540,8 +1570,8 @@ export function usePlayChat(deps: PlayChatDeps) {
     });
     const follow = { sessionId, controller, ready };
     liveFollowRef.current = follow;
-    const claimedHere = liveOwnerRef.current !== sessionId;
-    const generation = claimedHere ? claimLiveTurn(sessionId) : liveGenRef.current;
+    const alreadyOwner = liveOwnerRef.current === sessionId;
+    const generation = generationForArm(alreadyOwner, liveGenRef.current, () => claimLiveTurn(sessionId));
     setStreamOverlay({ segments: [] });
     const { url, body } = liveSessionFollowRequest(sessionId);
     void (async () => {
@@ -1554,18 +1584,23 @@ export function usePlayChat(deps: PlayChatDeps) {
         });
       } catch (error) {
         const aborted = controller.signal.aborted || (error instanceof Error && error.name === 'AbortError');
-        if (!aborted && liveTurnOnScreen(generation)) {
+        if (shouldSurfaceLiveArmError(aborted, liveTurnOnScreen(generation))) {
           setPlayStatus({ text: error instanceof Error ? error.message : String(error), err: true });
         }
       } finally {
         resolveReady();
         if (liveFollowRef.current?.controller !== controller) return;
         liveFollowRef.current = null;
-        if (liveTurnCurrent(generation)) {
-          clearStreamingShell();
-          if (claimedHere && liveOwnerRef.current === sessionId) liveOwnerRef.current = null;
+        applyWhen(liveTurnCurrent(generation), () => clearStreamingShell());
+        applyWhen(
+          releaseArmOwner(liveTurnCurrent(generation), !alreadyOwner, liveOwnerRef.current === sessionId),
+          () => {
+            liveOwnerRef.current = null;
+          }
+        );
+        if (shouldTickLiveArm(liveTurnCurrent(generation), controller.signal.aborted)) {
+          await tick({ includePlayPanel: true });
         }
-        if (!controller.signal.aborted && liveTurnCurrent(generation)) await tick({ includePlayPanel: true });
       }
     })();
     return { ready, cancel: () => controller.abort() };
@@ -1625,15 +1660,15 @@ export function usePlayChat(deps: PlayChatDeps) {
       }) === 'command'
     ) {
       stopSpeechDictation();
-      const generation = claimLiveTurn(selectedSessionRef.current ?? UNBOUND_LIVE_TURN);
+      const generation = claimLiveTurn(liveTurnOwnerId(selectedSessionRef.current));
       setPlaySending(true);
       try {
         let sid = selectedSessionRef.current;
         if (!sid) {
           const opened = await openBotSession(commandBotId, { liveGen: generation });
-          if (!mayClaimSelectedSession(liveGenRef.current, generation, selectedSessionRef.current, opened.sessionId)) {
-            return;
-          }
+          assertLiveTurn(
+            mayClaimSelectedSession(liveGenRef.current, generation, selectedSessionRef.current, opened.sessionId)
+          );
           sid = opened.sessionId;
         }
         const data = (await api(`/api/sessions/${sid}/messages`, {
@@ -1648,7 +1683,7 @@ export function usePlayChat(deps: PlayChatDeps) {
             modelOverride?: { modelId?: string } | null;
           };
         };
-        if (!liveTurnOnScreen(generation)) return;
+        assertLiveTurn(liveTurnOnScreen(generation));
         acknowledgeLocalSendCommitted();
         clearComposerOnly();
         finishLiveTurn(generation);
@@ -1657,10 +1692,11 @@ export function usePlayChat(deps: PlayChatDeps) {
         sessionListStickTopRef.current = true;
         await tick({ includePlayPanel: true });
       } catch (err) {
-        if (!liveTurnOnScreen(generation)) return;
-        setPlayStatus({ text: err instanceof Error ? err.message : String(err), err: true });
+        reportOwnedError(ownsLiveTurn(err, liveTurnOnScreen(generation)), () =>
+          setPlayStatus({ text: err instanceof Error ? err.message : String(err), err: true })
+        );
       } finally {
-        if (liveTurnCurrent(generation)) setPlaySending(false);
+        releaseIfCurrent(liveTurnCurrent(generation), () => setPlaySending(false));
       }
       return;
     }
@@ -1671,9 +1707,12 @@ export function usePlayChat(deps: PlayChatDeps) {
       });
       return;
     }
-    const running =
-      liveTurnBelongsToSelection(liveOwnerRef.current, selectedSessionRef.current) &&
-      (playSending || Boolean(streamOverlay) || waitTyping);
+    const running = liveTurnIsRunning(
+      liveTurnBelongsToSelection(liveOwnerRef.current, selectedSessionRef.current),
+      playSending,
+      Boolean(streamOverlay),
+      waitTyping
+    );
     if (running) {
       if (!submission.hasContent || !selectedSessionId) return;
       const steerSessionId = selectedSessionId;
@@ -1707,7 +1746,7 @@ export function usePlayChat(deps: PlayChatDeps) {
               : { text: submission.message, target, ...steerBodyFromQueryMode(execMode), ...contextFields }
           ),
         })) as { ok?: boolean; status?: string; reason?: string; item?: SteerInboxItem };
-        if (selectedSessionRef.current !== steerSessionId) return;
+        assertSameSession(selectedSessionRef.current, steerSessionId);
         acknowledgeLocalSendCommitted();
         clearComposerOnly();
         if (execMode !== 'subagent' && data.item?.id) {
@@ -1744,15 +1783,19 @@ export function usePlayChat(deps: PlayChatDeps) {
           setPlayStatus({ text: t('play.status.steered'), ok: true });
         }
       } catch (err) {
-        if (selectedSessionRef.current !== steerSessionId) return;
-        if (immediate) {
-          pendingSteerTextRef.current = null;
-          setOptimisticUser(null);
-          setOptimisticContext([]);
-          setPlayInput(text);
-          setPendingContext(contextSnapshot);
-        }
-        setPlayStatus({ text: err instanceof Error ? err.message : String(err), err: true });
+        handleSteerFailure({
+          superseded: err instanceof LiveTurnSuperseded,
+          sameSession: selectedSessionRef.current === steerSessionId,
+          immediate,
+          restore: () => {
+            pendingSteerTextRef.current = null;
+            setOptimisticUser(null);
+            setOptimisticContext([]);
+            setPlayInput(text);
+            setPendingContext(contextSnapshot);
+          },
+          report: () => setPlayStatus({ text: err instanceof Error ? err.message : String(err), err: true }),
+        });
       }
       return;
     }
@@ -1762,7 +1805,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     const imageSnapshot = [...pendingImageAssetIds];
     const attachmentSnapshot = [...pendingAttachmentIds];
     setPlayStatus({ text: '' });
-    const generation = claimLiveTurn(selectedSessionId ?? UNBOUND_LIVE_TURN);
+    const generation = claimLiveTurn(liveTurnOwnerId(selectedSessionId));
     setPlaySending(true);
 
     const preview = userPreviewText(text || '(image)', imageAssetIds);
@@ -1789,12 +1832,12 @@ export function usePlayChat(deps: PlayChatDeps) {
       let sid = selectedSessionId;
       if (!sid && activeBotId) {
         const opened = await openBotSession(activeBotId, { liveGen: generation });
-        if (!mayClaimSelectedSession(liveGenRef.current, generation, selectedSessionRef.current, opened.sessionId)) {
-          return;
-        }
+        assertLiveTurn(
+          mayClaimSelectedSession(liveGenRef.current, generation, selectedSessionRef.current, opened.sessionId)
+        );
         sid = opened.sessionId;
       }
-      if (!liveTurnOnScreen(generation)) return;
+      assertLiveTurn(liveTurnOnScreen(generation));
       if (sid) {
         if (useStream) {
           beginStreamTurn();
@@ -1830,7 +1873,7 @@ export function usePlayChat(deps: PlayChatDeps) {
             }),
           });
         }
-        if (!liveTurnOnScreen(generation)) return;
+        assertLiveTurn(liveTurnOnScreen(generation));
         finishLiveTurn(generation);
         setPlayStatus({ text: t('play.status.sent'), ok: true });
       } else if (activeBotId) {
@@ -1850,7 +1893,7 @@ export function usePlayChat(deps: PlayChatDeps) {
             ...modelRefBody(modelRefForSend),
             ...workspaceBindingBody(workspaceBinding),
           }, undefined, { liveGen: generation });
-          if (!liveTurnOnScreen(generation)) return;
+          assertLiveTurn(liveTurnOnScreen(generation));
           finishLiveTurn(generation);
           setPlayStatus({ text: t('play.status.streamDone'), ok: true });
         } else {
@@ -1872,14 +1915,14 @@ export function usePlayChat(deps: PlayChatDeps) {
             }),
           })) as { session: { id: string } };
           const newSid = data.session.id;
-          if (!mayClaimSelectedSession(liveGenRef.current, generation, selectedSessionRef.current, newSid)) return;
+          assertLiveTurn(mayClaimSelectedSession(liveGenRef.current, generation, selectedSessionRef.current, newSid));
           liveOwnerRef.current = newSid;
           selectedSessionRef.current = newSid;
           setSelectedSessionId(newSid);
-          if (!liveTurnOnScreen(generation)) return;
+          assertLiveTurn(liveTurnOnScreen(generation));
           finishLiveTurn(generation);
           await refreshPlayPanel();
-          if (!liveTurnCurrent(generation)) return;
+          assertLiveTurn(liveTurnCurrent(generation));
           setPlayStatus({ text: t('play.status.sessionCreated'), ok: true });
         }
       } else {
@@ -1904,38 +1947,37 @@ export function usePlayChat(deps: PlayChatDeps) {
           }),
         })) as { session: { id: string } };
         const newSid = data.session.id;
-        if (!mayClaimSelectedSession(liveGenRef.current, generation, selectedSessionRef.current, newSid)) return;
+        assertLiveTurn(mayClaimSelectedSession(liveGenRef.current, generation, selectedSessionRef.current, newSid));
         liveOwnerRef.current = newSid;
         selectedSessionRef.current = newSid;
         setSelectedSessionId(newSid);
-        if (!liveTurnOnScreen(generation)) return;
+        assertLiveTurn(liveTurnOnScreen(generation));
         finishLiveTurn(generation);
         await refreshPlayPanel();
-        if (!liveTurnCurrent(generation)) return;
+        assertLiveTurn(liveTurnCurrent(generation));
         setPlayStatus({ text: t('play.status.taskCreated'), ok: true });
       }
-      if (!liveTurnCurrent(generation)) return;
+      assertLiveTurn(liveTurnCurrent(generation));
       if (!hadSession && !activeBotId && selectedSessionRef.current) {
         await persistPendingStrategy(selectedSessionRef.current);
       }
       sessionListStickTopRef.current = true;
       await tick({ includePlayPanel: true });
     } catch (e) {
-      if (!liveTurnOnScreen(generation)) return;
-      setPlayStatus({ text: modelErrorText(e instanceof Error ? e.message : String(e), t), err: true });
-      const persisted = e instanceof PlayStreamError && e.persisted;
-      if (!persisted) {
-        setPlayInput(draftSnapshot);
-        setPendingImageAssetIds(imageSnapshot);
-        setPendingAttachmentIds(attachmentSnapshot);
-        setPendingContext(contextSnapshot);
-      }
-      finishLiveTurn(generation);
-      if (persisted) {
-        await tick({ includePlayPanel: true });
-      }
+      await runIf(ownsLiveTurn(e, liveTurnOnScreen(generation)), async () => {
+        setPlayStatus({ text: modelErrorText(e instanceof Error ? e.message : String(e), t), err: true });
+        const persisted = e instanceof PlayStreamError && e.persisted;
+        restoreComposerUnlessPersisted(persisted, () => {
+          setPlayInput(draftSnapshot);
+          setPendingImageAssetIds(imageSnapshot);
+          setPendingAttachmentIds(attachmentSnapshot);
+          setPendingContext(contextSnapshot);
+        });
+        finishLiveTurn(generation);
+        await tickIfPersisted(persisted, () => tick({ includePlayPanel: true }));
+      });
     } finally {
-      if (liveTurnCurrent(generation)) setPlaySending(false);
+      releaseIfCurrent(liveTurnCurrent(generation), () => setPlaySending(false));
     }
   };
 
@@ -2052,7 +2094,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     playStatus,
     setPlayStatus,
     optimisticUser: screen.optimisticUser,
-    streamOverlay: screen.hasStream ? streamOverlay : null,
+    streamOverlay: visibleLiveOverlay(screen.hasStream, streamOverlay),
     waitTyping: screen.waitTyping,
     playSending: screen.playSending,
     composerAckFlash,
