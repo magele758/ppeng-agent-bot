@@ -9,19 +9,20 @@
  * than any of the budgets, so the assertions keep their teeth.
  */
 
-function cpuMsSince(start) {
-  const { user, system } = process.cpuUsage(start);
-  return (user + system) / 1000;
-}
-
 /** Run `fn` `runs` times; return its last result and the smallest CPU time (ms) of a run. */
 export function bestCpuMs(fn, runs = 3) {
   let ms = Infinity;
   let result;
+  // Node's loader and compilation workers can consume process CPU while a
+  // synchronous validator runs. Charge its executing thread when available;
+  // retain the original process clock on older Node versions. Budgets and the
+  // number of measurements remain unchanged.
+  const clock = (process.threadCpuUsage ?? process.cpuUsage).bind(process);
   for (let i = 0; i < runs; i += 1) {
-    const start = process.cpuUsage();
+    const start = clock();
     result = fn();
-    ms = Math.min(ms, cpuMsSince(start));
+    const { user, system } = clock(start);
+    ms = Math.min(ms, (user + system) / 1000);
   }
   return { result, ms };
 }

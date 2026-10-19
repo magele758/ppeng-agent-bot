@@ -2,7 +2,7 @@ import { appendFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 export function releaseFailures(needs) {
   const optional = new Set(['remote-model-smoke']);
-  const required = ['tests', 'crap', 'acceptance', 'mutation', 'secrets-gate'];
+  const required = ['tests', 'crap', 'browser', 'acceptance', 'mutation', 'secrets-gate'];
   return [...new Set([...required, ...Object.keys(needs)])].filter(name => {
     // Starter has 12 cases; the empirical gate requires at least 30.
     // Keep its real outcome visible, but do not block Main on this diagnostic.
