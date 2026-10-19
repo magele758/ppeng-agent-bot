@@ -1,4 +1,15 @@
-import { test, expect } from '@playwright/test';
+import { test as base, expect } from '@playwright/test';
+
+const test = base.extend<{ originalBot: { id: string; name: string } }>({
+  originalBot: async ({ request }, use) => {
+    // Establish the real built-in conversation even when this test runs alone.
+    // Hidden ordinary Bots still consume roster capacity, so do not leak one per run.
+    const response = await request.get('/api/bot-work/default');
+    expect(response.ok()).toBeTruthy();
+    const { bot } = await response.json();
+    await use(bot);
+  }
+});
 
 for (const entry of ['chat', 'management'] as const) {
   test.describe(entry, () => {
@@ -34,7 +45,7 @@ for (const entry of ['chat', 'management'] as const) {
   });
 }
 
-test('invalid names cannot submit; server failure preserves inputs for retry; cancel preserves chat [AC:bot-face-first-creation#AC-4]', async ({ page, request }) => {
+test('invalid names cannot submit; server failure preserves inputs for retry; cancel preserves chat [AC:bot-face-first-creation#AC-4]', async ({ page, request, originalBot }) => {
   const bots = (await (await request.get('/api/bots')).json()).bots as { name: string }[];
   let posts = 0;
   await page.route('**/api/bots', async route => {
@@ -42,11 +53,10 @@ test('invalid names cannot submit; server failure preserves inputs for retry; ca
     posts += 1;
     await route.fulfill({ status: 503, json: { error: 'Try again' } });
   });
+  // Begin with an existing conversation, independently of suite order and default-Bot startup.
+  await page.addInitScript(({ id }) => localStorage.setItem('lab.selectedBot', id), originalBot);
   await page.goto('/#/bot');
   const original = page.locator('#playTitle');
-  const originalBot = bots[0];
-  expect(originalBot).toBeTruthy();
-  await page.locator('#sessionListMini .list-item--bot-chat').filter({ has: page.locator('.session-item__title').getByText(originalBot.name, { exact: true }) }).click();
   await expect(original).toHaveText(originalBot.name);
   const originalText = await original.textContent();
   await page.locator('#btnPlayCreate').click();
@@ -54,11 +64,9 @@ test('invalid names cannot submit; server failure preserves inputs for retry; ca
   const form = page.getByRole('form', { name: '新建 Bot' });
   const submit = form.getByTestId('bot-create-submit');
   await expect(submit).toBeDisabled();
-  if (bots[0]) {
-    await form.getByTestId('bot-create-name').fill(bots[0].name);
-    await expect(submit).toBeDisabled();
-    await expect(form.getByRole('alert')).toContainText('已经有同名的 Bot');
-  }
+  await form.getByTestId('bot-create-name').fill(originalBot.name);
+  await expect(submit).toBeDisabled();
+  await expect(form.getByRole('alert')).toContainText('已经有同名的 Bot');
   await form.getByTestId('bot-create-name').fill('Retry Face Bot');
   await form.getByTestId('bot-create-title').fill('My title');
   await form.getByTestId('bot-create-description').fill('My description');

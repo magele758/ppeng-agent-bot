@@ -1,5 +1,6 @@
 // Pure helpers for gate-health.mjs (unit-tested in scripts/test/gate-health-lib.test.mjs).
 
+export const QUICK_CHECK = 'Quick gate';
 export const GATE_CHECK = 'Release gate / Main release gate';
 export const GATE_JOB_PREFIX = 'Release gate / ';
 
@@ -20,9 +21,9 @@ export function gateOutcome(conclusion) {
 }
 
 /** Reduce one run + its jobs (GitHub jobs API shape) to what the report needs. */
-export function summarizeRun(run, jobs, mainBranch = 'main') {
-  const gateJobs = jobs.filter((j) => j.name.startsWith(GATE_JOB_PREFIX));
-  const gate = gateJobs.find((j) => j.name === GATE_CHECK);
+export function summarizeRun(run, jobs, mainBranch = 'main', requiredCheck = GATE_CHECK) {
+  const gateJobs = jobs.filter((j) => requiredCheck === QUICK_CHECK ? j.name === QUICK_CHECK : j.name.startsWith(GATE_JOB_PREFIX));
+  const gate = gateJobs.find((j) => j.name === requiredCheck);
   const failedJobs = [];
   const failedSteps = [];
   for (const job of gateJobs) {
@@ -110,7 +111,7 @@ export function summarizeFlaky(entries) {
  * Decide whether `main` requires the gate check. `protection` is the (admin-only) protection
  * endpoint result, `branch` the public branch summary, `rules` the public active-rules list.
  */
-export function evaluateProtection({ protection, branch, rules }) {
+export function evaluateProtection({ protection, branch, rules, requiredCheck = GATE_CHECK }) {
   const contexts = new Set();
   let strict = null;
   let source;
@@ -133,14 +134,15 @@ export function evaluateProtection({ protection, branch, rules }) {
     if (rule.type !== 'required_status_checks') continue;
     for (const c of rule.parameters?.required_status_checks ?? []) {
       contexts.add(c.context);
-      if (c.context === GATE_CHECK) rulesetRequires = true;
+      if (c.context === requiredCheck) rulesetRequires = true;
     }
     if (rule.parameters?.strict_required_status_checks_policy) strict = true;
   }
   if (Array.isArray(rules)) source += ' + rulesets';
   const known = protection?.status === 200 || Boolean(branch) || Array.isArray(rules);
-  const required = contexts.has(GATE_CHECK);
+  const required = contexts.has(requiredCheck);
   return {
+    checkedContext: requiredCheck,
     status: required ? 'required' : known ? 'not-required' : 'unknown',
     source,
     protectedBranch: protection?.status === 200 ? true : branch ? Boolean(branch.protected) : null,
@@ -162,7 +164,7 @@ export function renderText(report) {
   const { meta, aggregate, flaky, protection } = report;
   const lines = [];
   lines.push(`Release gate health — ${meta.repo}, workflow ${meta.workflow}, last ${meta.runs} completed runs (${meta.from ?? '?'} … ${meta.to ?? '?'})`);
-  lines.push('', `Pass rate of "${GATE_CHECK}" (pass / (pass + fail)):`);
+  lines.push('', `Pass rate of "${meta.check ?? GATE_CHECK}" (pass / (pass + fail)):`);
   for (const scope of ['main', 'pr', 'other', 'all']) lines.push(tallyLine(scope, aggregate.byScope[scope]));
   lines.push('', 'Most failing gate jobs:');
   lines.push(...(aggregate.jobFailures.length ? aggregate.jobFailures.map((j) => `  ${j.count}× ${j.name}`) : ['  (none)']));
@@ -183,7 +185,7 @@ export function renderText(report) {
   }
   lines.push('', `Branch protection on ${meta.branch}:`);
   const req = { required: 'yes', 'not-required': 'NO', unknown: 'unknown' }[protection.status];
-  lines.push(`  "${GATE_CHECK}" required: ${req}${protection.viaRuleset ? ' (via ruleset)' : ''}`);
+  lines.push(`  "${protection.checkedContext ?? GATE_CHECK}" required: ${req}${protection.viaRuleset ? ' (via ruleset)' : ''}`);
   lines.push(`  protected: ${protection.protectedBranch ?? 'unknown'}; up-to-date required: ${protection.strict ?? 'unknown'}`);
   lines.push(`  required checks: ${protection.requiredChecks.length ? protection.requiredChecks.join(', ') : '(none)'}`);
   lines.push(`  source: ${protection.source}`);

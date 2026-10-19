@@ -11,14 +11,15 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { aggregateRuns, evaluateProtection, renderText, summarizeFlaky, summarizeRun } from './gate-health-lib.mjs';
+import { QUICK_CHECK, GATE_CHECK, aggregateRuns, evaluateProtection, renderText, summarizeFlaky, summarizeRun } from './gate-health-lib.mjs';
 
 function parseArgs(argv) {
-  const args = { limit: 30, workflow: 'ci.yml', branch: 'main', repo: null, artifacts: true, json: false };
+  const args = { limit: 30, workflow: 'ci.yml', check: QUICK_CHECK, branch: 'main', repo: null, artifacts: true, json: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--limit') args.limit = Number(argv[++i]);
     else if (a === '--workflow') args.workflow = argv[++i];
+    else if (a === '--full') { args.workflow = 'full-validation.yml'; args.check = GATE_CHECK; }
     else if (a === '--branch') args.branch = argv[++i];
     else if (a === '--repo') args.repo = argv[++i];
     else if (a === '--no-artifacts') args.artifacts = false;
@@ -85,7 +86,7 @@ function main() {
   const flakyEntries = [];
   for (const run of runs) {
     const { jobs } = ghJson(['api', `repos/${repo}/actions/runs/${run.databaseId}/jobs?per_page=100`]);
-    summaries.push(summarizeRun(run, jobs, args.branch));
+    summaries.push(summarizeRun(run, jobs, args.branch, args.check));
     if (args.artifacts) {
       const { artifacts } = ghJson(['api', `repos/${repo}/actions/runs/${run.databaseId}/artifacts?per_page=100`]);
       const names = artifacts.filter((a) => !a.expired && a.name.startsWith('flaky-tests-')).map((a) => a.name);
@@ -96,6 +97,7 @@ function main() {
   const branchSummary = ghApiSoft(`repos/${repo}/branches/${args.branch}`);
   const rules = ghApiSoft(`repos/${repo}/rules/branches/${args.branch}`);
   const protection = evaluateProtection({
+    requiredCheck: QUICK_CHECK,
     protection: ghApiSoft(`repos/${repo}/branches/${args.branch}/protection`),
     branch: branchSummary.body,
     rules: rules.status === 200 ? rules.body : null
@@ -103,7 +105,7 @@ function main() {
 
   const dates = runs.map((r) => r.createdAt).sort();
   const report = {
-    meta: { repo, workflow: args.workflow, branch: args.branch, runs: runs.length, from: dates[0] ?? null, to: dates.at(-1) ?? null },
+    meta: { repo, check: args.check, workflow: args.workflow, branch: args.branch, runs: runs.length, from: dates[0] ?? null, to: dates.at(-1) ?? null },
     aggregate: aggregateRuns(summaries),
     flaky: args.artifacts ? summarizeFlaky(flakyEntries) : null,
     protection
