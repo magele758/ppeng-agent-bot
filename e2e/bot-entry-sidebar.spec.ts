@@ -101,6 +101,8 @@ test('drag-only grouping persists successful moves and restores failed moves wit
  const { bots } = await (await page.request.get('/api/bots')).json();
  const bot = bots.find((item: { hidden?: boolean }) => !item.hidden);
  expect(bot).toBeTruthy();
+ const { bot: defaultBot } = await (await page.request.get('/api/bot-work/default')).json();
+ await page.addInitScript(id => localStorage.setItem('lab.selectedBot', id), defaultBot.id);
  const groups = [{ id: 'drag-source', name: 'Drag source', botIds: [bot.id] }, { id: 'drag-target', name: 'Drag target', botIds: [] as string[] }];
  let fail = false; let writes = 0;
  await page.route('**/api/bot-functional-groups', route => route.fulfill({ json: { groups } }));
@@ -113,21 +115,44 @@ test('drag-only grouping persists successful moves and restores failed moves wit
   groups.find(group => group.id === groupId)?.botIds.push(bot.id);
   return route.fulfill({ json: { bot } });
  });
- await page.goto('/#/bot');
+ const openReadyPage = async (reload = false) => {
+  // A visible sidebar can precede the default Bot's post-open overview refresh.
+  // That refresh restores scroll position, which can move another row beneath
+  // native drag coordinates. Wait for its selected-session hydration first.
+  const opened = page.waitForResponse(response =>
+   new URL(response.url()).pathname === `/api/bots/${defaultBot.id}/open`);
+  const hydrated = page.waitForResponse(response =>
+   new URL(response.url()).pathname === `/api/sessions/${defaultBot.canonicalSessionId}/artifacts`);
+  await Promise.all([reload ? page.reload() : page.goto('/#/bot'), opened, hydrated]);
+  await expect(page.locator('#playTitle')).toHaveText(defaultBot.name);
+ };
+ await openReadyPage();
  const source = page.getByTestId('functional-group-drag-source');
  const target = page.getByTestId('functional-group-drag-target');
  const ungrouped = page.getByTestId('functional-group-ungrouped');
- const rowIn = (container: typeof source) => container.locator('.list-item--session').filter({ hasText: bot.name });
- await rowIn(source).dragTo(target.locator('h3'));
+ const rowIn = (container: typeof source) => container.locator(`[data-bot-id="${bot.id}"] .list-item--session`);
+ const moveTo = async (from: typeof source, to: typeof source, groupId: string | null, status: number) => {
+  // Observe all Bot moves so accidentally dragging a neighbouring row fails
+  // with its actual identity, instead of timing out on an unrelated error.
+  const moved = page.waitForResponse(response =>
+   response.request().method() === 'PUT' && new URL(response.url()).pathname.endsWith('/functional-group'));
+  const [, response] = await Promise.all([rowIn(from).dragTo(to.locator('h3')), moved]);
+  expect(new URL(response.url()).pathname).toBe(`/api/bots/${bot.id}/functional-group`);
+  expect(response.request().postDataJSON()).toEqual({ groupId });
+  expect(response.status()).toBe(status);
+  await response.finished();
+  await expect(to).toHaveAttribute('aria-busy', 'false');
+ };
+ await moveTo(source, target, 'drag-target', 200);
  await expect(rowIn(target)).toBeVisible();
  await expect.poll(() => groups[1].botIds).toContain(bot.id);
- await page.reload(); await expect(rowIn(target)).toBeVisible();
- await rowIn(target).dragTo(ungrouped.locator('h3'));
+ await openReadyPage(true); await expect(rowIn(target)).toBeVisible();
+ await moveTo(target, ungrouped, null, 200);
  await expect(rowIn(ungrouped)).toBeVisible();
  await expect.poll(() => groups[1].botIds).toEqual([]);
- await page.reload(); await expect(rowIn(ungrouped)).toBeVisible();
+ await openReadyPage(true); await expect(rowIn(ungrouped)).toBeVisible();
  fail = true;
- await rowIn(ungrouped).dragTo(source.locator('h3'));
+ await moveTo(ungrouped, source, 'drag-source', 503);
  await expect(page.getByRole('alert').filter({ hasText: 'Drag save unavailable' })).toBeVisible();
  await expect(rowIn(ungrouped)).toBeVisible(); await expect(rowIn(source)).toHaveCount(0);
  await rowIn(ungrouped).click(); await expect(page.locator('#playTitle')).toContainText(bot.name);
