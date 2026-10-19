@@ -37,6 +37,8 @@ export function stripSubagentDeniedTools<T extends { name: string }>(
 }
 
 type SubagentRecoveryStore = {
+  isSessionWriterLive?(sessionId: string): boolean;
+  transaction?<T>(fn: () => T): T;
   listSessions(): SessionRecord[];
   updateSession(
     sessionId: string,
@@ -49,9 +51,11 @@ type SubagentRecoveryStore = {
  * already have happened, so they are `unknown` and must not be replayed.
  */
 export function markInterruptedSubagentsUnknown(store: SubagentRecoveryStore): SessionRecord[] {
+  const recover = () => {
   const marked: SessionRecord[] = [];
   for (const session of store.listSessions()) {
     if (session.mode !== 'subagent' || session.status !== 'running') continue;
+    if (store.isSessionWriterLive?.(session.id)) continue;
     marked.push(
       store.updateSession(session.id, {
         status: 'unknown',
@@ -63,4 +67,6 @@ export function markInterruptedSubagentsUnknown(store: SubagentRecoveryStore): S
     );
   }
   return marked;
+  };
+  return store.transaction ? store.transaction(recover) : recover();
 }

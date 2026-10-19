@@ -501,15 +501,26 @@ export function expireOverdueBotWork(host:BotWorkHost,sessionId?:string):boolean
 /** Boot recovery fences old attempts; unconfirmed processing is never blindly rerun. */
 export function recoverBotWork(store:SqliteStateStore):void {
  ensureBotWorkSchema(store);
- const interrupted=store.db.prepare("SELECT * FROM bot_work_messages WHERE status='processing' AND session_id IN (SELECT id FROM sessions WHERE status != 'waiting_approval')").all() as Record<string,unknown>[];
- store.db.exec('BEGIN IMMEDIATE');
- try {
+ store.transaction(() => {
+  // The recovery-owner lock can transfer while another runtime is still working.
+  // Hold the main DB transaction while probing writer handles and fencing only
+  // abandoned work, so a new writer cannot be admitted between these steps.
+  const live = store.listSessions().filter(session => store.isSessionWriterLive(session.id)).map(session => session.id);
+  const liveJson = JSON.stringify(live);
+  const inactiveSessions = 'session_id NOT IN (SELECT value FROM json_each(?))';
+  const inactiveTasks = `id NOT IN (SELECT task_id FROM bot_work_messages WHERE session_id IN (SELECT value FROM json_each(?)) AND task_id IS NOT NULL)`;
+  const interrupted=store.db.prepare(`SELECT * FROM bot_work_messages WHERE status='processing' AND session_id IN (SELECT id FROM sessions WHERE status != 'waiting_approval') AND ${inactiveSessions}`).all(liveJson) as Record<string,unknown>[];
   for(const id of new Set(interrupted.map(row=>String(row.session_id)))) {
+   const writer = store.getSession(id)?.activeWriterRunId;
+   if (writer) store.releaseWriter(id, writer);
    retireBotExecution(store,id,interrupted.filter(row=>row.session_id===id),'Execution interrupted');
   }
-  store.db.exec("UPDATE bot_work_tasks SET status='unknown',failure_reason='Execution context missing; verify effects before retry',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE status IN ('running','waiting_approval') AND id IN (SELECT task_id FROM bot_work_messages WHERE status='processing' AND session_id NOT IN (SELECT id FROM sessions)); UPDATE bot_work_messages SET status='failed' WHERE status='processing' AND session_id NOT IN (SELECT id FROM sessions); UPDATE bot_work_tasks SET status='waiting_approval' WHERE status='running' AND id IN (SELECT task_id FROM bot_work_messages WHERE status='processing' AND session_id IN (SELECT id FROM sessions WHERE status='waiting_approval')); UPDATE bot_work_tasks SET status='unknown',failure_reason='Process interrupted; verify side effects before retry',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE status='running'; UPDATE bot_work_messages SET status='failed' WHERE status='processing' AND session_id NOT IN (SELECT id FROM sessions WHERE status='waiting_approval') AND (kind != 'task' OR task_id IN (SELECT id FROM bot_work_tasks WHERE status='unknown')); UPDATE bot_work_leases SET fence=fence+1,expires=0;");
-  store.db.exec('COMMIT');
- }catch(err){store.db.exec('ROLLBACK');throw err;}
+  store.db.exec("UPDATE bot_work_tasks SET status='unknown',failure_reason='Execution context missing; verify effects before retry',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE status IN ('running','waiting_approval') AND id IN (SELECT task_id FROM bot_work_messages WHERE status='processing' AND session_id NOT IN (SELECT id FROM sessions)); UPDATE bot_work_messages SET status='failed' WHERE status='processing' AND session_id NOT IN (SELECT id FROM sessions);");
+  store.db.prepare(`UPDATE bot_work_tasks SET status='waiting_approval' WHERE status='running' AND id IN (SELECT task_id FROM bot_work_messages WHERE status='processing' AND session_id IN (SELECT id FROM sessions WHERE status='waiting_approval')) AND ${inactiveTasks}`).run(liveJson);
+  store.db.prepare(`UPDATE bot_work_tasks SET status='unknown',failure_reason='Process interrupted; verify side effects before retry',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE status='running' AND ${inactiveTasks}`).run(liveJson);
+  store.db.prepare(`UPDATE bot_work_messages SET status='failed' WHERE status='processing' AND session_id NOT IN (SELECT id FROM sessions WHERE status='waiting_approval') AND (kind != 'task' OR task_id IN (SELECT id FROM bot_work_tasks WHERE status='unknown')) AND ${inactiveSessions}`).run(liveJson);
+  store.db.prepare(`UPDATE bot_work_leases SET fence=fence+1,expires=0 WHERE ${inactiveSessions}`).run(liveJson);
+ });
 }
 export async function tickBotWork(host:BotWorkHost):Promise<void> {
  ensureBotWorkSchema(host.store);expireOverdueBotWork(host);

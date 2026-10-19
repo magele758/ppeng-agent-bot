@@ -253,7 +253,11 @@ export const play = {
     fetchUrl: 'Fetch',
     pendingAria: 'Pending attachments',
     pendingImage: 'Img {id}…',
-    pendingAttachment: 'File {id}…'
+    pendingAttachment: 'File {id}…',
+    contextList: 'Selected context',
+    removeContext: 'Remove {name}',
+    contextTruncated: 'Context was limited to 20 sources and 200,000 text characters',
+    contextWithMessage: 'Files and folders with this message'
   },
 
   stopMenu: {

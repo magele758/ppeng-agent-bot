@@ -994,6 +994,16 @@ export const MIGRATIONS: Migration[] = [
     up: (db) => {
       ensureBotWorkSchema({ db });
     }
+  },
+  {
+    version: 31,
+    description: 'preserve attachment context on queued steer messages',
+    up: (db) => {
+      const columns = db.prepare('PRAGMA table_info(session_inbox)').all() as Array<{ name: string }>;
+      if (!columns.some(column => column.name === 'context_parts_json')) {
+        db.exec('ALTER TABLE session_inbox ADD COLUMN context_parts_json TEXT');
+      }
+    }
   }
 ];
 

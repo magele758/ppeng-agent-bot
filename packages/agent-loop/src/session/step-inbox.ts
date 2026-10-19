@@ -1,3 +1,4 @@
+import type { TextPart } from '@ppeng/api-types';
 import { DatabaseSync } from 'node:sqlite';
 import { createId, nowIso } from '../helpers.js';
 import { applyInboxOverflow, resolveInboxOverflowCap } from './inbox-overflow.js';
@@ -12,6 +13,7 @@ export interface InboxItem {
   target: InboxTarget;
   role: InboxRole;
   text: string;
+  contextParts?: TextPart[];
   key?: string;
   createdAt: string;
   claimedAt?: string;
@@ -20,6 +22,8 @@ export interface InboxItem {
 export type SteerMode = 'prompt' | 'subagent';
 
 export interface EnqueueSteerOptions {
+  /** Trusted host-prepared attachment text and display metadata; preserved through edits/drain. */
+  contextParts?: TextPart[];
   target?: InboxTarget;
   key?: string;
   role?: InboxRole;
@@ -37,7 +41,18 @@ export interface EnqueueSteerOptions {
  * folds oldest unclaimed items into one system summary when over the cap.
  */
 export class StepInboxStore {
+  private contextColumnReady = false;
   constructor(private readonly db: DatabaseSync) {}
+
+  private ensureContextColumn(): void {
+    if (this.contextColumnReady) return;
+    const hasColumn = () => (this.db.prepare('PRAGMA table_info(session_inbox)').all() as Array<{ name: string }>).some(column => column.name === 'context_parts_json');
+    if (!hasColumn()) {
+      try { this.db.exec('ALTER TABLE session_inbox ADD COLUMN context_parts_json TEXT'); }
+      catch (error) { if (!hasColumn()) throw error; }
+    }
+    this.contextColumnReady = true;
+  }
 
   enqueue(sessionId: string, text: string, opts: EnqueueSteerOptions = {}): InboxItem {
     const item = this.insert(sessionId, text, opts);
@@ -142,19 +157,21 @@ export class StepInboxStore {
   }
 
   private insert(sessionId: string, text: string, opts: EnqueueSteerOptions = {}): InboxItem {
+    this.ensureContextColumn();
     const item: InboxItem = {
       id: createId('steer'),
       sessionId,
       target: opts.target ?? 'next-step',
       role: opts.role ?? 'user',
       text,
+      contextParts: opts.contextParts,
       key: opts.key,
       createdAt: nowIso()
     };
     this.db
       .prepare(
-        `INSERT INTO session_inbox (id, session_id, target, role, text, key, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO session_inbox (id, session_id, target, role, text, key, created_at, context_parts_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         item.id,
@@ -163,7 +180,8 @@ export class StepInboxStore {
         item.role,
         item.text,
         item.key ?? null,
-        item.createdAt
+        item.createdAt,
+        item.contextParts?.length ? JSON.stringify(item.contextParts) : null
       );
     return item;
   }
@@ -192,6 +210,7 @@ function mapInboxRow(row: Record<string, unknown>): InboxItem {
     sessionId: String(row.session_id ?? ''),
     target: (row.target as InboxTarget) ?? 'next-step',
     role: (row.role as InboxRole) ?? 'user',
+    contextParts: row.context_parts_json ? JSON.parse(String(row.context_parts_json)) as TextPart[] : undefined,
     text: String(row.text ?? ''),
     key: row.key ? String(row.key) : undefined,
     createdAt: String(row.created_at ?? ''),

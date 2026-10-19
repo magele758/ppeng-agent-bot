@@ -116,7 +116,7 @@ export function drainSteerAtToolLaunch(input: {
     input.store.appendMessage(
       input.sessionId,
       item.role,
-      [{ type: 'text', text: item.text }],
+      [{ type: 'text', text: item.text }, ...(item.contextParts ?? [])],
       item.key
         ? { key: item.key, expectedWriterRunId: input.expectedWriterRunId }
         : { expectedWriterRunId: input.expectedWriterRunId }

@@ -61,6 +61,9 @@ export interface TurnKernelStore {
   // Concurrent writer control (no-op stubs are valid for single-writer setups)
   claimWriter(sessionId: string, runId: string): void;
   releaseWriter(sessionId: string, runId: string): void;
+  /** Scope all async persistence to this execution generation (Node hosts may use ALS). */
+  runWithWriter?<T>(sessionId: string, runId: string, fn: () => Promise<T>): Promise<T>;
+  isWriterCurrent?(sessionId: string, runId: string): boolean;
 
   // Approval records
   listApprovals(filter?: { status?: 'pending' | 'approved' | 'rejected' }): Array<{

@@ -17,6 +17,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { dumpDatabase } from './sql-dump.mjs';
+import { sanitizeScriptEnv } from '../spawn-utils.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '../..');
@@ -36,11 +37,12 @@ export const SNAPSHOT_REVISIONS = [
   { version: 26, ref: '16bcceb', note: 'saved face shape and color, before routine leases and summary links (v27)' },
   { version: 27, ref: 'b9518b3', note: 'routine leases and summary links, before context stack snapshots (v28)' },
   { version: 28, ref: 'd0caa00', note: 'context stack snapshots, before bots.avatar (v29)' },
-  { version: 29, ref: '1b4d428', note: 'bots.avatar, before bot_work_messages.source_room (v30)' }
+  { version: 29, ref: '1b4d428', note: 'bots.avatar, before bot_work_messages.source_room (v30)' },
+  { version: 30, ref: 'decf8cfca70fabf81d22994f939594ae53664c0a', note: 'room work provenance, before queued steer attachment context (v31)' }
 ];
 
 function run(cmd, args, cwd) {
-  const res = spawnSync(cmd, args, { cwd, encoding: 'utf8' });
+  const res = spawnSync(cmd, args, { cwd, encoding: 'utf8', env: sanitizeScriptEnv() });
   if (res.status !== 0) {
     throw new Error(`${cmd} ${args.join(' ')} failed in ${cwd}:\n${res.stdout}\n${res.stderr}`);
   }

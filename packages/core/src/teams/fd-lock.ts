@@ -65,6 +65,12 @@ export async function acquireFdLock(dbPath: string, wait: FdLockWait): Promise<H
   }
 }
 
+/** Non-blocking startup ownership check; reuse the same kernel-owned lock. */
+export function tryAcquireFdLock(dbPath: string): HeldFdLock | undefined {
+  mkdirSync(dirname(dbPath), { recursive: true });
+  return tryBeginExclusive(dbPath);
+}
+
 function throwIfLockWaitExpired(budget: AsyncLockWait, timeout: string | Error): void {
   if (!budget.expired()) return;
   throw typeof timeout === 'string' ? new Error(timeout) : timeout;

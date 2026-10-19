@@ -5,7 +5,7 @@ import type { BotInfo } from '@/lib/types';
 import { api } from '@/lib/api';
 import { mergeHistoryWindow } from '@/lib/history-window';
 import { useI18n, type MessageKey } from '@/lib/i18n';
-import { renderMarkdown } from '@/lib/markdown';
+import { sameData } from '@/lib/same-data';
 import {
   BOT_GROUPS_CHANGED_EVENT,
   activeMentionQuery,
@@ -16,6 +16,7 @@ import {
   removeGroupMember,
   type GroupMemberCode
 } from '@/lib/bot-group';
+import { MarkdownHtml } from '../MarkdownHtml';
 import { BotFace } from '../BotFace';
 import { useBotWorkStates } from '../bot-work/BotWorkState';
 import { MODEL_PROVIDERS_CHANGED_EVENT } from '@/lib/model-providers';
@@ -25,6 +26,8 @@ import { RoomSharedContextEditor } from './RoomSharedContextEditor';
 import './play-group.css';
 import '../bot-work/bot-work.css';
 import { BotRooms } from '../bot-work/BotRooms';
+import { ComposerContextChips, ComposerMessageContext, ComposerNotice, useComposerFileDrop } from '../ComposerContext';
+import { composerClassName, contextSubmission, limitContextSources, contextSourcesBody, contextSourcesForSend, withContextIds, type PendingContextSource } from '@/lib/composer-context';
 
 type Room = {
   id: string;
@@ -40,6 +43,7 @@ type RoomMessage = {
   seq: number;
   text: string;
   attachmentIds?: string[];
+  contextSources?: unknown;
   sender: { type: 'user' | 'bot'; id: string; name: string };
 };
 
@@ -120,10 +124,8 @@ function GroupTurn({
       <div className="chat-turn__content">
         <div className="chat-turn__label">{name}</div>
         <div className="chat-bubble">
-          <div
-            className="chat-bubble__body chat-bubble__md"
-            dangerouslySetInnerHTML={{ __html: renderMarkdown(message.text) }}
-          />
+          <MarkdownHtml className="chat-bubble__body chat-bubble__md" text={message.text} />
+          <ComposerMessageContext role={kind} message={message} />
         </div>
         {attachmentLabel ? <p className="play-group-hint">{attachmentLabel}</p> : null}
       </div>
@@ -158,11 +160,25 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
   const [addId, setAddId] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [pendingContext, setPendingContext] = useState<PendingContextSource[]>([]);
+  const [contextNotice, setContextNotice] = useState('');
   const [loadError, setLoadError] = useState(false);
   const messagesRef = useRef<RoomMessage[]>([]);
   const roomIdRef = useRef(roomId);
   const feedRef = useRef<HTMLDivElement>(null);
   roomIdRef.current = roomId;
+
+  const commitMessages = (next: RoomMessage[]) => {
+    if (sameData(messagesRef.current, next)) return;
+    messagesRef.current = next;
+    setMessages(next);
+  };
+
+  const acceptMessage = (message?: RoomMessage) => {
+    if (!message) return;
+    if (messagesRef.current.some(item => item.id === message.id)) return;
+    commitMessages([...messagesRef.current, message]);
+  };
 
   const applyHistory = (
     page: { messages: RoomMessage[]; hasMore: boolean; nextCursor: number | null },
@@ -172,8 +188,7 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
     const next = older
       ? [...page.messages, ...messagesRef.current]
       : mergeHistoryWindow(messagesRef.current, page.messages, true).messages;
-    messagesRef.current = next;
-    setMessages(next);
+    commitMessages(next);
     if (older || firstLoad) setCursor(page.hasMore ? page.nextCursor : null);
   };
 
@@ -191,9 +206,11 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
     ];
     if (roomIdRef.current !== id) return;
     applyHistory(history, older);
-    setTurns(Array.isArray(turnData.turns) ? turnData.turns : []);
-    setRoom(current.room);
-    setModels(current.models ?? null);
+    const turns = Array.isArray(turnData.turns) ? turnData.turns : [];
+    setTurns((prev) => (sameData(prev, turns) ? prev : turns));
+    setRoom((prev) => (sameData(prev, current.room) ? prev : current.room));
+    const models = current.models ?? null;
+    setModels((prev) => (sameData(prev, models) ? prev : models));
     setLoadError(false);
   };
 
@@ -205,6 +222,8 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
     setTurns([]);
     setCursor(null);
     setText('');
+    setPendingContext([]);
+    setContextNotice('');
     setAddId('');
     setError('');
     let active = true;
@@ -245,6 +264,17 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
   const mentionKey = mention ? `${mention.start}:${mention.query}` : '';
   const mentionOpen = Boolean(mention && mentionKey !== mentionDismissed && room?.status === 'active' && !busy);
   const activeMention = mentionOptions[Math.min(mentionIndex, Math.max(mentionOptions.length - 1, 0))];
+
+  const contextDrop = useComposerFileDrop((sources, truncated) => {
+    if (sources.length === 0) return;
+    const result = limitContextSources([...pendingContext, ...withContextIds(sources)]);
+    setPendingContext(result.sources);
+    if (truncated || result.truncated) setContextNotice(t('play.composer.contextTruncated'));
+  }, roomId);
+
+  const removePendingContext = (id: string) => {
+    setPendingContext((current) => current.filter((item) => item.id !== id));
+  };
 
   const syncCaret = (el: HTMLTextAreaElement) => setCaret(el.selectionStart ?? el.value.length);
 
@@ -322,28 +352,33 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
   const send = async () => {
     if (!room) return;
     const submitted = text.trim();
-    if (!submitted) return;
+    const contextSources = contextSourcesForSend(pendingContext);
+    const contextFields = contextSourcesBody(contextSources);
+    const submission = contextSubmission(submitted, contextSources);
+    if (!submission.hasContent) return;
+    const textSnapshot = text;
+    const contextSnapshot = pendingContext;
     setText('');
+    setPendingContext([]);
+    setContextNotice('');
     setBusy(true);
     setError('');
     try {
       const result = (await api(
         `/api/bot-rooms/${room.id}/messages`,
         jsonBody({
-          text: submitted,
-          idempotencyKey: crypto.randomUUID()
+          text: submission.message,
+          idempotencyKey: crypto.randomUUID(),
+          ...contextFields
         })
       )) as { message?: RoomMessage };
-      if (result.message && !messagesRef.current.some((item) => item.id === result.message!.id)) {
-        const next = [...messagesRef.current, result.message];
-        messagesRef.current = next;
-        setMessages(next);
-      }
+      acceptMessage(result.message);
       // Acceptance is durable even when the subsequent read fails. Do not
       // restore an accepted message into the composer and invite duplicates.
       await loadRoom(false).catch(() => setLoadError(true));
     } catch {
-      setText(submitted);
+      setText(textSnapshot);
+      setPendingContext(contextSnapshot);
       setError(t('play.group.sendFailed'));
     } finally {
       setBusy(false);
@@ -447,12 +482,19 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
           </div>
         </div>
         <form
-          className="play-group-composer"
+          className={composerClassName('play-group-composer', contextDrop.over)}
+          data-testid="composer-drop-target"
+          data-surface="group"
+          onDragEnter={contextDrop.onDragEnter}
+          onDragOver={contextDrop.onDragOver}
+          onDragLeave={contextDrop.onDragLeave}
+          onDrop={contextDrop.onDrop}
           onSubmit={(event) => {
             event.preventDefault();
             void send();
           }}
         >
+          <ComposerContextChips items={pendingContext} onRemove={removePendingContext} />
           {mentionOpen ? (
             <ul id="play-group-mentions" className="play-group-mentions" role="listbox" aria-label={t('play.group.mentionList')}>
               {mentionOptions.length === 0 ? (
@@ -515,11 +557,12 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
             type="submit"
             className="btn btn-primary btn-sm"
             data-testid="play-group-send"
-            disabled={roomComposerDisabled(room, busy, text)}
+            disabled={roomComposerDisabled(room, busy, text, pendingContext.length > 0)}
           >
             {busy ? t('play.group.sending') : t('play.group.send')}
           </button>
         </form>
+        <ComposerNotice text={contextNotice} />
         {room && room.status !== 'active' ? <p className="play-group-hint">{t('play.group.paused')}</p> : null}
       </div>
     </div>

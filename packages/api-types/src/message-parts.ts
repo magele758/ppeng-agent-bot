@@ -1,8 +1,34 @@
 export type MessageRole = 'system' | 'user' | 'assistant' | 'tool';
 
+/** One dragged file. `text` is the extracted file body (possibly truncated). */
+export interface ContextFileSource {
+  kind: 'file';
+  name: string;
+  text: string;
+}
+
+export interface ContextFolderEntry {
+  path: string;
+  text: string;
+}
+
+/** One dragged folder. Entry `text` is the file body (possibly truncated). */
+export interface ContextFolderSource {
+  kind: 'folder';
+  name: string;
+  entries: ContextFolderEntry[];
+}
+
+export type ContextSource = ContextFileSource | ContextFolderSource;
+
 export interface TextPart {
   type: 'text';
   text: string;
+  /**
+   * Dragged file/folder context persisted on the user message that carried it.
+   * Model adapters read `text` only; this field is for reload and display.
+   */
+  contextSources?: ContextSource[];
 }
 
 /** Chain-of-thought / reasoning from the model (persisted for UI; replayed to the API as text). */

@@ -26,6 +26,8 @@ import {
   stampOwnerMetadata,
   storedToolResultToJson,
   ValidationError,
+  normalizeContextSources,
+  applyContextSources,
   upsertGoalFromApi,
   type ModelStreamChunk,
   type RawAgentRuntime,
@@ -48,6 +50,10 @@ function imageAssetIdsFromBody(body: Record<string, unknown>): string[] {
 function attachmentIdsFromBody(body: Record<string, unknown>): string[] {
   if (!Array.isArray(body.attachmentIds)) return [];
   return body.attachmentIds.map(String).filter(Boolean);
+}
+
+function hasContextSources(body: Record<string, unknown>): boolean {
+  return normalizeContextSources(body.contextSources).length > 0;
 }
 
 function replyToFromBody(body: Record<string, unknown>): string | undefined {
@@ -177,7 +183,13 @@ function openBotFromBody(
 }
 
 function plainCommandText(body: Record<string, unknown>): string | undefined {
-  if (imageAssetIdsFromBody(body).length > 0 || attachmentIdsFromBody(body).length > 0) return undefined;
+  if (
+    imageAssetIdsFromBody(body).length > 0 ||
+    attachmentIdsFromBody(body).length > 0 ||
+    hasContextSources(body)
+  ) {
+    return undefined;
+  }
   const message = typeof body.message === 'string' ? body.message.trim() : '';
   return message || undefined;
 }
@@ -204,7 +216,8 @@ function hasUserContent(body: Record<string, unknown>): boolean {
   return (
     Boolean(message) ||
     imageAssetIdsFromBody(body).length > 0 ||
-    attachmentIdsFromBody(body).length > 0
+    attachmentIdsFromBody(body).length > 0 ||
+    hasContextSources(body)
   );
 }
 
@@ -221,6 +234,7 @@ function sendBodyContentToSession(
     replyTo: typeof body.replyTo === 'string' ? body.replyTo : undefined,
     imageAssetIds: imgIds,
     attachmentIds: attIds,
+    contextSources: body.contextSources,
     autoRun: body.autoRun !== false
   });
 }
@@ -417,6 +431,7 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
             message: typeof body.message === 'string' ? body.message : undefined,
             imageAssetIds: imageAssetIdsFromBody(body),
             attachmentIds: attachmentIdsFromBody(body),
+            contextSources: body.contextSources,
             agentId: typeof body.agentId === 'string' ? body.agentId : undefined,
             blockedBy: Array.isArray(body.blockedBy) ? body.blockedBy.map(String) : undefined,
             background: body.background !== false,
@@ -452,14 +467,12 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
           message: typeof body.message === 'string' ? body.message : undefined,
           imageAssetIds: imageAssetIdsFromBody(body),
           attachmentIds: attachmentIdsFromBody(body),
+          contextSources: body.contextSources,
           agentId: typeof body.agentId === 'string' ? body.agentId : undefined,
           background: body.background === true,
           metadata: sessionMetadataFromBody(runtime, body, auth)
         });
-        const hasContent =
-          (typeof body.message === 'string' && body.message.trim()) ||
-          imageAssetIdsFromBody(body).length > 0 ||
-          attachmentIdsFromBody(body).length > 0;
+        const hasContent = hasUserContent(body);
         if (body.autoRun !== false && hasContent) await runtime.runHumanSession(session.id);
         json(response, 201, {
           session: runtime.getSession(session.id),
@@ -790,8 +803,8 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         const message = String(body.message ?? '').trim();
         const imgIds = imageAssetIdsFromBody(body);
         const attIds = attachmentIdsFromBody(body);
-        if (!message && imgIds.length === 0 && attIds.length === 0) {
-          throw new ValidationError('Missing message, imageAssetIds, or attachmentIds');
+        if (!message && imgIds.length === 0 && attIds.length === 0 && !hasContextSources(body)) {
+          throw new ValidationError('Missing message, imageAssetIds, attachmentIds, or contextSources');
         }
         const commandText = plainCommandText(body);
         if (commandText && (await replyBotChatCommand(runtime, id, commandText, response))) return;
@@ -800,6 +813,7 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
           replyTo: typeof body.replyTo === 'string' ? body.replyTo : undefined,
           imageAssetIds: imgIds,
           attachmentIds: attIds,
+          contextSources: body.contextSources,
     autoRun: body.autoRun !== false
         });
         if (body.autoRun !== false) await runtime.runHumanSession(id);
@@ -846,11 +860,12 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         const commandText = plainCommandText(body);
         if (commandText && (await replyBotChatCommand(runtime, id, commandText, response))) return;
         maybeMergeOptionalGroupsFromBody(runtime, id, body);
-        if (msg || imgIds.length > 0 || attIds.length > 0) {
+        if (msg || imgIds.length > 0 || attIds.length > 0 || hasContextSources(body)) {
           runtime.sendUserMessage(id, msg || (imgIds.length ? '(image)' : '(attachment)'), {
             replyTo: typeof body.replyTo === 'string' ? body.replyTo : undefined,
             imageAssetIds: imgIds,
             attachmentIds: attIds,
+            contextSources: body.contextSources,
     autoRun: body.autoRun !== false
           });
         }
@@ -898,8 +913,10 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
       handler: async ({ requireParam, readBody, response }) => {
         const id = requireParam('id');
         const body = (await readBody()) as Record<string, unknown>;
-        const text = String(body.text ?? body.message ?? '').trim();
+        const sources = normalizeContextSources(body.contextSources);
+        const text = String(body.text ?? body.message ?? '').trim() || (sources.length ? '(attachment)' : '');
         if (!text) throw new ValidationError('Missing steer text');
+        const contextParts = applyContextSources([], sources) as import('@ppeng/api-types').TextPart[];
         const target = body.target === 'next-run' ? 'next-run' : 'next-step';
         const key = typeof body.key === 'string' && body.key.trim() ? body.key.trim() : undefined;
         const role = body.role === 'system' ? 'system' : 'user';
@@ -908,7 +925,7 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
           typeof body.subagentRole === 'string' && body.subagentRole.trim()
             ? body.subagentRole.trim()
             : undefined;
-        const ack = runtime.enqueueSteer(id, text, { target, key, role, steerMode, subagentRole });
+        const ack = runtime.enqueueSteer(id, text, { target, key, role, steerMode, subagentRole, contextParts });
         json(response, 200, steerHttpFromCoreAck(ack, runtime.getSession(id)));
       }
     },
@@ -1066,13 +1083,18 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         const imgIds = imageAssetIdsFromBody(body);
         const attIds = attachmentIdsFromBody(body);
         const sessionId = typeof body.sessionId === 'string' ? body.sessionId : undefined;
-        if (!message && imgIds.length === 0 && attIds.length === 0) {
-          throw new ValidationError('Missing message, imageAssetIds, or attachmentIds');
+        if (!message && imgIds.length === 0 && attIds.length === 0 && !hasContextSources(body)) {
+          throw new ValidationError('Missing message, imageAssetIds, attachmentIds, or contextSources');
         }
         let session;
         const openedBot = openBotFromBody(runtime, body, auth);
-        const sendOpts = { autoRun: true, replyTo: typeof body.replyTo === 'string' ? body.replyTo : undefined,
-          imageAssetIds: imgIds, attachmentIds: attIds };
+        const sendOpts = {
+          autoRun: true,
+          replyTo: typeof body.replyTo === 'string' ? body.replyTo : undefined,
+          imageAssetIds: imgIds,
+          attachmentIds: attIds,
+          contextSources: body.contextSources
+        };
         const commandText = plainCommandText(body);
         if (openedBot) {
           if (commandText && (await replyBotChatCommand(runtime, openedBot.sessionId, commandText, response))) return;
@@ -1089,6 +1111,7 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
             message: message || undefined,
             imageAssetIds: imgIds.length ? imgIds : undefined,
             attachmentIds: attIds.length ? attIds : undefined,
+            contextSources: body.contextSources,
             agentId: typeof body.agentId === 'string' ? body.agentId : undefined,
             background: false,
             metadata: sessionMetadataFromBody(runtime, body, auth)
@@ -1113,13 +1136,18 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         const imgIds = imageAssetIdsFromBody(body);
         const attIds = attachmentIdsFromBody(body);
         const sessionId = typeof body.sessionId === 'string' ? body.sessionId : undefined;
-        if (!message && imgIds.length === 0 && attIds.length === 0) {
-          throw new ValidationError('Missing message, imageAssetIds, or attachmentIds');
+        if (!message && imgIds.length === 0 && attIds.length === 0 && !hasContextSources(body)) {
+          throw new ValidationError('Missing message, imageAssetIds, attachmentIds, or contextSources');
         }
         let session;
         const openedBot = openBotFromBody(runtime, body, auth);
-        const sendOpts = { autoRun: true, replyTo: typeof body.replyTo === 'string' ? body.replyTo : undefined,
-          imageAssetIds: imgIds, attachmentIds: attIds };
+        const sendOpts = {
+          autoRun: true,
+          replyTo: typeof body.replyTo === 'string' ? body.replyTo : undefined,
+          imageAssetIds: imgIds,
+          attachmentIds: attIds,
+          contextSources: body.contextSources
+        };
         const commandText = plainCommandText(body);
         if (openedBot) {
           if (commandText && (await replyBotChatCommand(runtime, openedBot.sessionId, commandText, response))) return;
@@ -1136,6 +1164,7 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
             message: message || undefined,
             imageAssetIds: imgIds.length ? imgIds : undefined,
             attachmentIds: attIds.length ? attIds : undefined,
+            contextSources: body.contextSources,
             agentId: typeof body.agentId === 'string' ? body.agentId : undefined,
             background: false,
             metadata: sessionMetadataFromBody(runtime, body, auth)
