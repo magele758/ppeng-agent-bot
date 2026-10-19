@@ -8,7 +8,7 @@
  */
 
 import { createId, nowIso } from '../helpers.js';
-import type { MessageRole, SessionMessage, SessionRecord } from '../types.js';
+import type { MessageReplyTo, MessageRole, SessionMessage, SessionRecord } from '../types.js';
 import {
   assertReplaceRangeClosed,
   assertReplaceRangeCovered,
@@ -23,6 +23,8 @@ import type { EnqueueSteerOptions, InboxItem, InboxTarget } from './step-inbox.j
 export interface SurfaceWriteOpts {
   key?: string;
   expectedWriterRunId?: string;
+  /** Quote pointer stored with this append. Callers pass the short excerpt, not the quoted body. */
+  replyTo?: MessageReplyTo;
 }
 
 export interface SurfaceReplaceInput {
@@ -82,7 +84,8 @@ function nodeToMessage(node: SurfaceNode): SessionMessage {
     parts: node.parts,
     createdAt: node.createdAt,
     seq: node.seq,
-    ...(node.key ? { key: node.key } : {})
+    ...(node.key ? { key: node.key } : {}),
+    ...(node.replyTo ? { replyTo: node.replyTo } : {})
   };
 }
 
@@ -172,7 +175,8 @@ export class MemorySurfaceStore implements SessionSurfaceStoreExt {
         parts,
         surfaceOp: 'append',
         key: opts?.key,
-        expectedWriterRunId: opts?.expectedWriterRunId
+        expectedWriterRunId: opts?.expectedWriterRunId,
+        replyTo: opts?.replyTo
       })
     );
   }
@@ -352,6 +356,7 @@ export class MemorySurfaceStore implements SessionSurfaceStoreExt {
     replacesStart?: number;
     replacesEnd?: number;
     expectedWriterRunId?: string;
+    replyTo?: MessageReplyTo;
   }): SurfaceNode {
     const session = this.sessions.get(input.sessionId);
     assertWriterClaim({
@@ -372,7 +377,8 @@ export class MemorySurfaceStore implements SessionSurfaceStoreExt {
       replacesEnd: input.replacesEnd,
       role: input.role,
       parts: input.parts,
-      createdAt: nowIso()
+      createdAt: nowIso(),
+      ...(input.replyTo ? { replyTo: input.replyTo } : {})
     };
     list.push(node);
     this.nodes.set(input.sessionId, list);

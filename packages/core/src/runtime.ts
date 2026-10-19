@@ -64,6 +64,7 @@ import type {
   SelfHealEventRecord,
   SelfHealPolicy,
   SelfHealRunRecord,
+  MessageReplyTo,
   SessionMessage,
   SessionRecord,
   ImageAssetRecord,
@@ -1027,7 +1028,7 @@ export class RawAgentRuntime {
       attachmentIds?: string[];
       contextSources?: unknown;
       autoRun?: boolean;
-      replyTo?: string;
+      replyTo?: string | MessageReplyTo;
     }
   ): SessionRecord {
     const extra = this.attachmentIngest.expandForMessage(sessionId, options?.attachmentIds);

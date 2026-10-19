@@ -8,7 +8,7 @@
  *                 fold(surface) = SessionMessage[]
  */
 
-import type { MessagePart, MessageRole, SessionMessage } from '../types.js';
+import type { MessagePart, MessageReplyTo, MessageRole, SessionMessage } from '../types.js';
 
 export type SurfaceOp = 'append' | 'replace' | 'hide';
 
@@ -23,6 +23,8 @@ export interface SurfaceNode {
   role: MessageRole;
   parts: MessagePart[];
   createdAt: string;
+  /** Quote pointer copied onto the visible message. Not the quoted body. */
+  replyTo?: MessageReplyTo;
 }
 
 export class SurfaceInvariantError extends Error {
@@ -196,7 +198,8 @@ export function surfaceNodeToMessage(node: SurfaceNode): SessionMessage {
     parts: node.parts,
     createdAt: node.createdAt,
     seq: node.seq,
-    ...(node.key ? { key: node.key } : {})
+    ...(node.key ? { key: node.key } : {}),
+    ...(node.replyTo ? { replyTo: node.replyTo } : {})
   };
 }
 

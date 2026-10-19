@@ -265,6 +265,14 @@ export const play = {
     contextWithMessage: 'Files and folders with this message'
   },
 
+  replyQuote: {
+    action: 'Quote',
+    actionAria: 'Quote this reply from {name}',
+    quoting: 'Quoting {name}',
+    cancel: 'Cancel quote',
+    from: '{name} said'
+  },
+
   stopMenu: {
     thisTurn: 'Stop this turn',
     thisTurnHint: 'Cancel the current session run',

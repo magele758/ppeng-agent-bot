@@ -41,6 +41,7 @@ import { resolveLivingFaceMood } from '@/lib/bot-face';
 import { ComposerBotPicker } from './ComposerBotPicker';
 import { shouldOpenSessionSettingsOnInboxGrowth } from '@/lib/running-turn-send';
 import { ComposerContextChips, useComposerFileDrop } from './ComposerContext';
+import { ComposerReplyQuote } from './ReplyQuote';
 import { composerClassName, composerSendDisabled } from '@/lib/composer-context';
 import { ComposerModelPicker } from './ComposerModelPicker';
 import { SessionSettingsPanel, type ExecPreset } from './sections/chat/SessionSettingsPanel';
@@ -999,6 +1000,12 @@ export function PlayPanel({
                   sessionApprovals={sessionApprovals}
                   turnFeedStatLines={turnFeedStatLines}
                   botSurface={botSurface}
+                  replyQuoteBot={
+                    botSurface && chat.botId
+                      ? { id: chat.botId, name: selectedBot?.name?.trim() || headerBotName || chat.botId }
+                      : null
+                  }
+                  onQuoteReply={botSurface ? chat.quoteReply : undefined}
                   footer={feedHasTurns && !statsLive ? <ChatStopReasonFooter outcome={chrome?.outcome} /> : null}
                   onOpenModelSetup={onOpenModelSetup}
                   onNewSession={onNewSession}
@@ -1048,6 +1055,11 @@ export function PlayPanel({
                   onDrop={contextDrop.onDrop}
                 >
                   <ComposerContextChips items={chat.pendingContext} onRemove={chat.removePendingContext} />
+                  <ComposerReplyQuote
+                    quote={botSurface ? chat.replyQuote : null}
+                    surface="direct"
+                    onCancel={chat.cancelReplyQuote}
+                  />
                   <textarea
                     ref={chat.playInputRef}
                     id="playInput"
