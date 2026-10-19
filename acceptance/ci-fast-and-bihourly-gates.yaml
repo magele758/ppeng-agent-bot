@@ -1,6 +1,6 @@
 id: ci-fast-and-bihourly-gates
 title: 两分钟快速门禁与每两小时完整验证
-status: approved
+status: implemented
 requirement: |
   把高频的gate控制在2min以内
   复杂的按照小时去执行，每2个小时执行一次，避免老是阻塞提交
