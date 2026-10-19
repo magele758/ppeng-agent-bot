@@ -63,3 +63,8 @@ test('runner-local evidence paths are evaluated at step scope [AC:ci-gate-speedu
   assert.doesNotMatch(JSON.stringify(job.env??{}),/runner\./,'runner context is not available in job env');
   for(const name of ['Unit tests with V8 coverage','Formal invariants + MockLLM E2E'])assert.match(job.steps.find(s=>s.name===name).env?.CI_VERIFICATION_EVIDENCE_DIR??'',/runner.temp/);
 });
+test('all reviewed verification inputs are checked before expensive unit execution [AC:ci-gate-speedup#AC-6]',()=>{
+  const steps=workflow('release-gate').jobs.crap.steps;
+  const preflight=steps.findIndex(s=>(s.run??'').includes('reviewed-verification-inputs.mjs'));
+  assert.ok(preflight>=0&&preflight<steps.findIndex(s=>s.name==='Unit tests with V8 coverage'));
+});
