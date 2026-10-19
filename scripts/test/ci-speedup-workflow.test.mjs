@@ -58,3 +58,8 @@ test('baseline measurements are manual only and cannot replace a PR required gat
   assert.notEqual(doc.jobs['benchmark-baseline'].name,'Release gate');
   assert.match(doc.jobs['release-gate'].if,/benchmark_baseline/);
 });
+test('runner-local evidence paths are evaluated at step scope [AC:ci-gate-speedup#AC-4]',()=>{
+  const job=workflow('release-gate').jobs.crap;
+  assert.doesNotMatch(JSON.stringify(job.env??{}),/runner\./,'runner context is not available in job env');
+  for(const name of ['Unit tests with V8 coverage','Formal invariants + MockLLM E2E'])assert.match(job.steps.find(s=>s.name===name).env?.CI_VERIFICATION_EVIDENCE_DIR??'',/runner.temp/);
+});

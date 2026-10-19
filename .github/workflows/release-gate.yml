@@ -103,12 +103,15 @@ jobs:
       - name: Prepare acceptance results dir
         run: mkdir -p "${{ runner.temp }}/acceptance-results"
       - name: Unit tests with V8 coverage
-        run: node scripts/ci/retry-failed-tests.mjs --script test:unit --label unit-coverage --report "$RUNNER_TEMP/flaky-tests/unit-coverage.json"
-          --junit "$RUNNER_TEMP/acceptance-results/unit.xml"
+        run: node scripts/ci/retry-failed-tests.mjs --script test:unit --label unit-coverage --report
+          "$RUNNER_TEMP/flaky-tests/unit-coverage.json" --junit "$RUNNER_TEMP/acceptance-results/unit.xml"
         env:
           NODE_V8_COVERAGE: ${{ runner.temp }}/v8-coverage
+          CI_VERIFICATION_EVIDENCE_DIR: ${{ runner.temp }}/verification-evidence
       - name: Formal invariants + MockLLM E2E
         run: npm run test:formal
+        env:
+          CI_VERIFICATION_EVIDENCE_DIR: ${{ runner.temp }}/verification-evidence
       - name: Upload flaky test report
         if: always()
         uses: actions/upload-artifact@v4
@@ -119,9 +122,9 @@ jobs:
           retention-days: 30
       - name: agent-loop vitest with coverage
         working-directory: packages/agent-loop
-        run: npx --no-install vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=json --coverage.reportsDirectory=${{
-          runner.temp }}/vitest-coverage --reporter=default --reporter=junit --outputFile.junit=${{ runner.temp
-          }}/acceptance-results/vitest.xml
+        run: npx --no-install vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=json
+          --coverage.reportsDirectory=${{ runner.temp }}/vitest-coverage --reporter=default --reporter=junit
+          --outputFile.junit=${{ runner.temp }}/acceptance-results/vitest.xml
       - name: CRAP gate
         run: node scripts/crap/crap-gate.mjs --node-cov ${{ runner.temp }}/v8-coverage --vitest-cov ${{ runner.temp
           }}/vitest-coverage/coverage-final.json
@@ -182,7 +185,6 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
     env:
-      CI_VERIFICATION_EVIDENCE_DIR: ${{ runner.temp }}/verification-evidence
       CI_VERIFICATION_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
   acceptance:
     name: Acceptance criteria gate
@@ -251,8 +253,8 @@ jobs:
             echo "has-key=false" >> "$GITHUB_OUTPUT"
           fi
 
-          if [ -n "$HARNESS_EVAL_API_KEY" ]; then echo "has-harness-key=true" >> "$GITHUB_OUTPUT"; else echo "has-harness-key=false" >>
-          "$GITHUB_OUTPUT"; fi
+          if [ -n "$HARNESS_EVAL_API_KEY" ]; then echo "has-harness-key=true" >> "$GITHUB_OUTPUT"; else echo
+          "has-harness-key=false" >> "$GITHUB_OUTPUT"; fi
   remote-model-smoke:
     name: Remote model smoke (optional)
     runs-on: ubuntu-latest
