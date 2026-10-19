@@ -133,19 +133,31 @@
         "packages/core/src/session/inbox-overflow.ts",
         "apps/daemon/src/routes/sessions.ts"
       ]
+    },
+    {
+      "step": "PR204 fork quote and visibility supplemental dependencies; targeted real-kernel regressions supplement bounded probes without widening proof claims",
+      "files": [
+        "packages/core/src/session/session-fork.ts",
+        "packages/core/src/bots/shared-context-isolation.ts",
+        "packages/core/src/stores/session-store.ts",
+        "packages/agent-loop/src/session/surface-store.ts",
+        "packages/core/test/session-fork.test.js",
+        "packages/core/test/bot-reply-quote.test.js",
+        "packages/agent-loop/src/session/fork-quote.test.ts"
+      ]
     }
   ],
   "sha256": {
     "packages/core/src/runtime.ts": "4a0a9e559658b98ff413f4696a893b309b6c2bcd8b5fece16fa18e47a7979f42",
     "packages/core/src/storage.ts": "d4530e2ad8547119cf6fba7c0e7e4a7b360ba17c0095365e554178ee50f1bf98",
-    "packages/core/src/stores/session-store.ts": "913b4e7cd425d8d0e395877a7017f99b21cc8f44fd08d2a7dab470dd96fde90d",
+    "packages/core/src/stores/session-store.ts": "fbe877421acdc97a69fbe67d2e3be300d5ebd811c748d2d227aedddff2d38446",
     "packages/core/src/bots/bot-work.ts": "19a710f12efdd7b9c388c235838a54257a90f5130da3ece7aaf30248289dddd4",
     "packages/core/src/runtime/subagent-policy.ts": "e88cb316e439ba84f678e808cbdd9b4f73aea119d264c57f971934d5887297d3",
     "packages/core/src/runtime/session-control.ts": "adcb4cefa9ae95ec4fc63bba169d865b1b44f9829f21f4c78c149f8877fdeb01",
     "packages/core/src/runtime/session-facade.ts": "77e1142b7397012b22c10fd5e928e7c10f7ff2645f5f584cb6f4e0008a64c711",
     "apps/daemon/src/server.ts": "263f0f69871cdd03fc04d5324b95cd9f956e056147f870ff909bf40813f48e04",
     "packages/agent-loop/src/turn/kernel.ts": "f13b291237ee2339f26e3f86f721d16b91fa09a078086a4890ebdc8a6b5cab34",
-    "packages/agent-loop/src/session/surface-store.ts": "a5618a66e7972815f0c5fe727c8076cfa797da7c4ac86bb04c8ed1214f5b9324",
+    "packages/agent-loop/src/session/surface-store.ts": "b49bf08ee2fff9e3d92f340ea2933315cebb4d7a6ab01f4d693a234416275fd4",
     "packages/agent-loop/src/session/interrupt.ts": "1842240883d68a0ca20da065c9d2ba238a24a782bca5f9148f0da51026236f96",
     "packages/agent-loop/src/session/run-outcome.ts": "e373fac7f6f8341b6a7a043af1ef28a6aab031d805cfb5cd0f0194951eceb615",
     "packages/agent-loop/src/runtime/tool-loop.ts": "0901923d09a09b3a5ee80f2a975d5c2d95344498c977944e1b2250ac1899b824",
@@ -211,11 +223,15 @@
     "packages/core/src/session/reply-quote.ts": "945f595cb0004dac6b35d66b820a5cd6ba865d41bc86f1363ecdde5dc9c42b27",
     "packages/core/src/rooms/index.ts": "744551a2153054307dcb2805dab21fca2e83ab6d650efa07c844888a74be1a84",
     "packages/core/src/session/human-continuation.ts": "5127f51c5f9303f22998b8497507322989c9cc91c7f6d0a3393bfe0617d9a8f7",
-    "packages/core/test/bot-reply-quote.test.js": "a666c9533c3e830cbf1305b8acddd4b8c02ca464d98349d5fb1436c6f45d8097",
+    "packages/core/test/bot-reply-quote.test.js": "d105139c4fff42c3deb45d8aadff9c0298750a80795c71ae6b4825135582f50e",
     "packages/core/test/human-continuation.test.js": "9b55bbde7a4eb128f3b12cc8d23777ca7aa9c5fadf90503982515f6313e51188",
     "packages/agent-loop/src/session/step-inbox-context.test.ts": "a94e66dbf16d0d82717fabaf50413048150815bf517a07d65c8d8165e5ffb29a",
     "packages/agent-loop/src/session/apply-claimed-inbox.test.ts": "a57e40b13b4260fbd01d1cd1623476515d5d10a5c99280261bc725f337e9f91d",
-    "apps/daemon/src/routes/sessions.ts": "bde4264dc8fb980cc16b95b5a48dfafefbc708272a9bb155ff99ffa2d689359d"
+    "apps/daemon/src/routes/sessions.ts": "bde4264dc8fb980cc16b95b5a48dfafefbc708272a9bb155ff99ffa2d689359d",
+    "packages/core/src/session/session-fork.ts": "4f35397b2641885ac71b044828793b84d461c0266c7892ef394d7b4b6ed0e1e4",
+    "packages/core/src/bots/shared-context-isolation.ts": "d7adbfde162699e0b82e7b4b377bda6e027b73f78bfac7313b71a854295e3857",
+    "packages/core/test/session-fork.test.js": "037e264ccf09c5e33c281f9fdc0334d127abf7f90835e754765515c92c4c0c75",
+    "packages/agent-loop/src/session/fork-quote.test.ts": "5691846bf0b8d1c8c840996ad31cc28383cd24ece2178b4766d47c32f4e06f2e"
   },
-  "notes": " PR202 vertical/security review: quote pointers validated at host admission and retained by durable/memory inbox, all drain paths and compaction continuation; quoted subagent admission/promotion rejects explicitly. Both kernels resolve only visible same-session assistant sources at model view. Room binds the source author and uses explicit empty recipients for departed authors. Quoted inputs remain outside lossy overflow summaries. Real runtime, route, SQLite, SDK and UI regressions supplement existing bounded probes without expanding their proof claims. No acceptance criteria or thresholds weakened."
+  "notes": " PR202 vertical/security review: quote pointers validated at host admission and retained by durable/memory inbox, all drain paths and compaction continuation; quoted subagent admission/promotion rejects explicitly. Both kernels resolve only visible same-session assistant sources at model view. Room binds the source author and uses explicit empty recipients for departed authors. Quoted inputs remain outside lossy overflow summaries. Real runtime, route, SQLite, SDK and UI regressions supplement existing bounded probes without expanding their proof claims. No acceptance criteria or thresholds weakened. PR204 independent vertical/security review: quoted WAL fork copies now remap source IDs in SQLite and portable memory stores. Child history inherits revoked constraints and closes active/pending exposure at its copied boundary, without changing parent scope or blocking fresh private turns. A host unable to persist required constraints rejects before child creation. Fail-first SQLite/memory and both-kernel quote/privacy regressions cover this boundary; existing bounded source/process scope, criteria and thresholds unchanged."
 }

@@ -149,12 +149,24 @@
         "packages/core/src/session/inbox-overflow.ts",
         "apps/daemon/src/routes/sessions.ts"
       ]
+    },
+    {
+      "step": "PR204 fork quote and visibility supplemental dependencies; targeted real-kernel regressions supplement bounded probes without widening proof claims",
+      "files": [
+        "packages/core/src/session/session-fork.ts",
+        "packages/core/src/bots/shared-context-isolation.ts",
+        "packages/core/src/stores/session-store.ts",
+        "packages/agent-loop/src/session/surface-store.ts",
+        "packages/core/test/session-fork.test.js",
+        "packages/core/test/bot-reply-quote.test.js",
+        "packages/agent-loop/src/session/fork-quote.test.ts"
+      ]
     }
   ],
   "sha256": {
     "packages/core/src/runtime.ts": "4a0a9e559658b98ff413f4696a893b309b6c2bcd8b5fece16fa18e47a7979f42",
     "packages/core/src/storage.ts": "d4530e2ad8547119cf6fba7c0e7e4a7b360ba17c0095365e554178ee50f1bf98",
-    "packages/core/src/stores/session-store.ts": "913b4e7cd425d8d0e395877a7017f99b21cc8f44fd08d2a7dab470dd96fde90d",
+    "packages/core/src/stores/session-store.ts": "fbe877421acdc97a69fbe67d2e3be300d5ebd811c748d2d227aedddff2d38446",
     "packages/core/src/stores/approval-store.ts": "64cef1660e4364ba5263fde5d7abe38334706970ab03266a141dd338027ba170",
     "packages/core/src/runtime/restart-recovery.ts": "e221e8e3ee374a97f6aa75dd08e8a81411c5f967d3caf914cbf1dd30e373dcf4",
     "packages/core/src/runtime/session-control.ts": "adcb4cefa9ae95ec4fc63bba169d865b1b44f9829f21f4c78c149f8877fdeb01",
@@ -195,13 +207,13 @@
     "acceptance/tool-call-pairing-verification.yaml": "f8c593809d9020a7415d784bb078ac145a047f8dfa8f2a9b6bd19cd48707864a",
     "acceptance/tool-call-pairing-batch-dedup.yaml": "2dfdc5c23baf08eb9f8c4dfaf545579113825df9576c63915692d2e486e538ae",
     "packages/agent-loop/src/turn/host.ts": "480fee8995c829dbe5973618d5e38859efd84e537e0daa5417bd8e7d20c4b00c",
-    "packages/agent-loop/src/session/surface-store.ts": "a5618a66e7972815f0c5fe727c8076cfa797da7c4ac86bb04c8ed1214f5b9324",
+    "packages/agent-loop/src/session/surface-store.ts": "b49bf08ee2fff9e3d92f340ea2933315cebb4d7a6ab01f4d693a234416275fd4",
     "packages/core/src/turn/host.ts": "c12a4c8865357f5b91565be5a25e40a4f40bc866e070646f5a3ceab81105de39",
     "packages/core/src/turn/kernel.ts": "d88a5e8d61e98ae9a592df048d6fabf4106d2c248e9bad13751e6c7a219f2569",
     "packages/core/src/runtime/tool-loop.ts": "c534d5c7f8de80b308e75316b6bf087bf8afbea2ec86b90835304a60e89fe21d",
     "packages/core/src/stores/trace.ts": "e28512beea9465352068009c6a42e8ab8e3aedbd7c5deff1c8bfe4da09b88333",
-    "skills/agent-loop/SKILL.md": "229710bd96f3024f881ee46fb87bfb83d3653f8e014c020066814cfb687ba34f",
-    "packages/agent-loop/SKILL.md": "229710bd96f3024f881ee46fb87bfb83d3653f8e014c020066814cfb687ba34f",
+    "skills/agent-loop/SKILL.md": "4c2ba556a5d37114c7cb7453c0090cf6d4ea5d576613c0475e084f3b632eeccf",
+    "packages/agent-loop/SKILL.md": "4c2ba556a5d37114c7cb7453c0090cf6d4ea5d576613c0475e084f3b632eeccf",
     "scripts/test/session-multiprocess-state-consistency.test.mjs": "050990c7ddc41c4be1e61ed8ae9e5f9b170ab780e8c7ec3046d9b2c8f064718a",
     "acceptance/session-multiprocess-state-consistency.yaml": "f4006713194595ae4b03e8d16cbe45937ff9cb687e8d673e216fd4994940a1a8",
     "packages/core/test/writer-claim.test.js": "338a9772447852804bcdeb30edfe8d0710e52af90a94cc06c03883df2e03d6e7",
@@ -232,11 +244,15 @@
     "packages/core/src/session/reply-quote.ts": "945f595cb0004dac6b35d66b820a5cd6ba865d41bc86f1363ecdde5dc9c42b27",
     "packages/core/src/rooms/index.ts": "744551a2153054307dcb2805dab21fca2e83ab6d650efa07c844888a74be1a84",
     "packages/core/src/session/human-continuation.ts": "5127f51c5f9303f22998b8497507322989c9cc91c7f6d0a3393bfe0617d9a8f7",
-    "packages/core/test/bot-reply-quote.test.js": "a666c9533c3e830cbf1305b8acddd4b8c02ca464d98349d5fb1436c6f45d8097",
+    "packages/core/test/bot-reply-quote.test.js": "d105139c4fff42c3deb45d8aadff9c0298750a80795c71ae6b4825135582f50e",
     "packages/core/test/human-continuation.test.js": "9b55bbde7a4eb128f3b12cc8d23777ca7aa9c5fadf90503982515f6313e51188",
     "packages/agent-loop/src/session/step-inbox-context.test.ts": "a94e66dbf16d0d82717fabaf50413048150815bf517a07d65c8d8165e5ffb29a",
     "packages/agent-loop/src/session/apply-claimed-inbox.test.ts": "a57e40b13b4260fbd01d1cd1623476515d5d10a5c99280261bc725f337e9f91d",
-    "apps/daemon/src/routes/sessions.ts": "bde4264dc8fb980cc16b95b5a48dfafefbc708272a9bb155ff99ffa2d689359d"
+    "apps/daemon/src/routes/sessions.ts": "bde4264dc8fb980cc16b95b5a48dfafefbc708272a9bb155ff99ffa2d689359d",
+    "packages/core/src/session/session-fork.ts": "4f35397b2641885ac71b044828793b84d461c0266c7892ef394d7b4b6ed0e1e4",
+    "packages/core/src/bots/shared-context-isolation.ts": "d7adbfde162699e0b82e7b4b377bda6e027b73f78bfac7313b71a854295e3857",
+    "packages/core/test/session-fork.test.js": "037e264ccf09c5e33c281f9fdc0334d127abf7f90835e754765515c92c4c0c75",
+    "packages/agent-loop/src/session/fork-quote.test.ts": "5691846bf0b8d1c8c840996ad31cc28383cd24ece2178b4766d47c32f4e06f2e"
   },
-  "notes": " PR202 vertical/security review: quote pointers validated at host admission and retained by durable/memory inbox, all drain paths and compaction continuation; quoted subagent admission/promotion rejects explicitly. Both kernels resolve only visible same-session assistant sources at model view. Room binds the source author and uses explicit empty recipients for departed authors. Quoted inputs remain outside lossy overflow summaries. Real runtime, route, SQLite, SDK and UI regressions supplement existing bounded probes without expanding their proof claims. No acceptance criteria or thresholds weakened."
+  "notes": " PR202 vertical/security review: quote pointers validated at host admission and retained by durable/memory inbox, all drain paths and compaction continuation; quoted subagent admission/promotion rejects explicitly. Both kernels resolve only visible same-session assistant sources at model view. Room binds the source author and uses explicit empty recipients for departed authors. Quoted inputs remain outside lossy overflow summaries. Real runtime, route, SQLite, SDK and UI regressions supplement existing bounded probes without expanding their proof claims. No acceptance criteria or thresholds weakened. PR204 independent vertical/security review: quoted WAL fork copies now remap source IDs in SQLite and portable memory stores. Child history inherits revoked constraints and closes active/pending exposure at its copied boundary, without changing parent scope or blocking fresh private turns. A host unable to persist required constraints rejects before child creation. Fail-first SQLite/memory and both-kernel quote/privacy regressions cover this boundary; existing bounded source/process scope, criteria and thresholds unchanged."
 }

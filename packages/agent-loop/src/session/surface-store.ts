@@ -338,9 +338,12 @@ export class MemorySurfaceStore implements SessionSurfaceStoreExt {
 
   copyWalPrefix(fromId: string, toId: string, endSeq: number): number {
     const src = this.nodes.get(fromId) ?? [];
-    const prefix = src.filter((n) => n.seq <= endSeq).map((n) => ({
+    const nodes = src.filter((n) => n.seq <= endSeq);
+    const copiedIds = new Map(nodes.map(node => [node.id, createId('msg')]));
+    const prefix = nodes.map((n) => ({
       ...n,
-      id: createId('msg'),
+      id: copiedIds.get(n.id)!,
+      ...(n.replyTo ? { replyTo: { ...n.replyTo, messageId: copiedIds.get(n.replyTo.messageId) ?? n.replyTo.messageId } } : {}),
       sessionId: toId,
       parts: [...n.parts]
     }));

@@ -3,6 +3,7 @@
  * Open turn / open tool wave → 409 (do not silently trim).
  */
 
+import { sharedExposureKey, sharedExposureState, type SharedExposureLookup } from '../bots/shared-context-isolation.js';
 import { ConflictError, NotFoundError } from '../errors.js';
 import { readSessionModelOverride } from '../model/provider-catalog.js';
 import { isToolWaveOpen } from './surface-invariants.js';
@@ -23,7 +24,7 @@ export interface ForkCreateSessionInput {
 
 export type SessionForkReject = 'turn_open' | 'wave_open' | 'empty' | 'not_found';
 
-export interface SessionForkStore {
+export interface SessionForkStore extends SharedExposureLookup {
   getSession(id: string): SessionRecord | undefined;
   createSession(input: ForkCreateSessionInput): SessionRecord;
   updateSession(
@@ -107,6 +108,21 @@ export function forkSession(store: SessionForkStore, input: ForkSessionInput): F
   });
   if (!boundary.ok) throw forkRejectToError(boundary.reason, session.id);
 
+  // A fork copies history, not membership in the parent's sharing domain.
+  // Freeze inherited/pending exposure at the copied boundary so fresh private
+  // child messages stay usable without reviving any withdrawn shared source.
+  const exposure = sharedExposureState(store, session.id);
+  const closedAt = new Date().toISOString();
+  const inherited = [
+    ...exposure.revoked,
+    ...(exposure.active ? [{ fromSeq: exposure.active.fromSeq, toSeq: boundary.endSeq,
+      startedAt: exposure.active.startedAt, endedAt: closedAt }] : [])
+  ].map(range => ({ ...range, toSeq: Math.min(range.pending ? boundary.endSeq : range.toSeq, boundary.endSeq), pending: false }))
+    .filter(range => range.fromSeq <= range.toSeq);
+  if (inherited.length && !store.setDaemonControl) {
+    throw new ConflictError('Cannot preserve shared-context restrictions in this fork');
+  }
+
   const pinned = readSessionModelOverride(session.metadata);
   const child = store.createSession({
     title: input.title?.trim() || `Fork of ${session.title}`.slice(0, 80),
@@ -122,6 +138,7 @@ export function forkSession(store: SessionForkStore, input: ForkSessionInput): F
       ...(pinned ? { modelOverride: pinned } : {})
     }
   });
+  if (inherited.length) store.setDaemonControl!(sharedExposureKey(child.id), { revoked: inherited });
   const copied = store.copyWalPrefix(session.id, child.id, boundary.endSeq);
   const next = store.updateSession(child.id, {
     metadata: {
