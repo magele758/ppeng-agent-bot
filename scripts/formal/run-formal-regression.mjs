@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Formal regression: executable invariants + MockLLM E2E + TLA draft presence.
- * Does NOT run TLC. Passing is not a formal proof.
+ * Formal regression: invariants + MockLLM + bounded pairing/lifecycle model and implementation verification.
+ * Does NOT run TLC. A bounded design-model pass is not a proof of the whole implementation.
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -9,6 +9,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { checkTla } from './tla-sanity.mjs';
+import { sanitizeScriptEnv } from '../spawn-utils.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -38,7 +39,27 @@ function fail(msg) {
   process.exit(1);
 }
 
-console.log('formal regression (invariants / PBT / MockLLM; not TLC)\n');
+console.log('formal regression (bounded pairing/lifecycle models + implementation probes / invariants / PBT / MockLLM; not TLC)\n');
+
+const pairing = spawnSync(process.execPath, ['scripts/formal/run-pairing-verification.mjs'], {
+  cwd: ROOT, stdio: 'inherit', env: sanitizeScriptEnv(), timeout: 70000,
+});
+if (pairing.error || pairing.status !== 0) fail(`pairing verification did not pass (${pairing.error?.message ?? pairing.status})`);
+
+const lifecycle = spawnSync(process.execPath, ['scripts/formal/run-lifecycle-verification.mjs'], {
+  cwd: ROOT, stdio: 'inherit', env: sanitizeScriptEnv(), timeout: 190000,
+});
+if (lifecycle.error || lifecycle.status !== 0) fail(`lifecycle verification did not pass (${lifecycle.error?.message ?? lifecycle.status})`);
+
+const restart = spawnSync(process.execPath, ['scripts/formal/run-restart-verification.mjs'], {
+  cwd: ROOT, stdio: 'inherit', env: sanitizeScriptEnv(), timeout: 310000,
+});
+if (restart.error || restart.status !== 0) fail(`restart recovery verification did not pass (${restart.error?.message ?? restart.status})`);
+
+const concurrency = spawnSync(process.execPath, ['scripts/formal/run-concurrency-verification.mjs'], {
+  cwd: ROOT, stdio: 'inherit', env: sanitizeScriptEnv(), timeout: 550000,
+});
+if (concurrency.error || concurrency.status !== 0) fail(`multiprocess concurrency verification did not pass (${concurrency.error?.message ?? concurrency.status})`);
 
 for (const rel of REQUIRED) {
   const full = join(ROOT, rel);
@@ -61,10 +82,10 @@ const start = Date.now();
 const res = spawnSync(
   process.execPath,
   ['--experimental-strip-types', '--test', ...TESTS],
-  { cwd: ROOT, stdio: 'inherit', env: { ...process.env } }
+  { cwd: ROOT, stdio: 'inherit', env: sanitizeScriptEnv() }
 );
 if (res.status !== 0) fail(`unit suite failed (exit ${res.status})`);
 
 console.log(
-  `\nformal regression checks passed (${Date.now() - start}ms; unit/PBT/MockLLM only, not formally verified)`
+  `\nformal regression checks passed (${Date.now() - start}ms; bounded pairing/lifecycle models + implementation probes + unit/PBT/MockLLM; not a whole-system proof)`
 );

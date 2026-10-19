@@ -42,6 +42,9 @@ export interface TurnKernelStore extends SessionSurfaceStore {
   getImageAsset(id: string): ImageAssetRecord | undefined;
   claimWriter(sessionId: string, runId: string): void;
   releaseWriter(sessionId: string, runId: string): void;
+  /** Scope all async persistence to this execution generation (Node hosts may use ALS). */
+  runWithWriter?<T>(sessionId: string, runId: string, fn: () => Promise<T>): Promise<T>;
+  isWriterCurrent?(sessionId: string, runId: string): boolean;
   listApprovals(filter?: { status?: ApprovalRecord['status'] }): ApprovalRecord[];
   getDaemonControl?(key: string): unknown;
   projects?(): ProjectStore;

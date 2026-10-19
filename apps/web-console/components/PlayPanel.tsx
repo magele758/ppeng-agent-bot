@@ -39,6 +39,8 @@ import { botChatHeaderTitle, botNameFromCanonicalTitle, botPermissionsHref } fro
 import { BotFace } from './BotFace';
 import { resolveLivingFaceMood } from '@/lib/bot-face';
 import { ComposerBotPicker } from './ComposerBotPicker';
+import { ComposerContextChips, useComposerFileDrop } from './ComposerContext';
+import { composerClassName, composerSendDisabled } from '@/lib/composer-context';
 import { ComposerModelPicker } from './ComposerModelPicker';
 import { SessionSettingsPanel, type ExecPreset } from './sections/chat/SessionSettingsPanel';
 import { PlayBotGroupChat } from './play-group/PlayBotGroupChat';
@@ -259,6 +261,10 @@ export function PlayPanel({
   accountMenu
 }: PlayPanelProps) {
   const { t } = useI18n();
+  const contextDrop = useComposerFileDrop((sources, truncated) => {
+    chat.addPendingContext(sources);
+    if (truncated) chat.setPlayStatus({ text: t('play.composer.contextTruncated') });
+  }, `${playSurface}:${chat.botId}:${selectedSessionId}`);
   const [attachOpen, setAttachOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
@@ -1019,7 +1025,16 @@ export function PlayPanel({
                 <label className="sr-only" htmlFor="playInput">
                   {t('play.messageContent')}
                 </label>
-                <div className={`chat-composer${chat.composerAckFlash ? ' chat-composer--ack-flash' : ''}`}>
+                <div
+                  className={composerClassName('chat-composer', contextDrop.over, chat.composerAckFlash)}
+                  data-testid="composer-drop-target"
+                  data-surface={botSurface ? 'bot' : 'chat'}
+                  onDragEnter={contextDrop.onDragEnter}
+                  onDragOver={contextDrop.onDragOver}
+                  onDragLeave={contextDrop.onDragLeave}
+                  onDrop={contextDrop.onDrop}
+                >
+                  <ComposerContextChips items={chat.pendingContext} onRemove={chat.removePendingContext} />
                   <textarea
                     ref={chat.playInputRef}
                     id="playInput"
@@ -1086,15 +1101,7 @@ export function PlayPanel({
                               : t('play.composer.queueHint')
                           : t('play.send')
                     }
-                    disabled={
-                      chat.workspaceAvailability.blocked
-                        ? true
-                        : steerDisabled
-                          ? true
-                          : chatRunning
-                            ? chat.playInput.trim().length === 0
-                            : false
-                    }
+                    disabled={composerSendDisabled(chat.workspaceAvailability.blocked, steerDisabled, chatRunning, chat.playInput, chat.pendingContext)}
                     onClick={() => void chat.sendPlayMessage()}
                   >
                     {chat.playSending || Boolean(chat.streamOverlay) || chat.waitTyping ? (

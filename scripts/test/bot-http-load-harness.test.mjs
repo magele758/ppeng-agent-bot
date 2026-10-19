@@ -5,8 +5,16 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {sanitizeSpawnEnv} from '../../packages/core/dist/sandbox/env-sanitizer.js';
-import {runHttpLoad} from '../bot-release/http-load.mjs';
+import {runHttpLoad, untrackedFingerprintInput} from '../bot-release/http-load.mjs';
 import {controlledOperation} from '../bot-release/http-controlled-operation.mjs';
+test('dirty fingerprint records vanished files but preserves non-ENOENT errors', () => {
+ const missing = Object.assign(new Error('deleted by concurrent test'), { code: 'ENOENT' });
+ const input = untrackedFingerprintInput(['temporary-output'], () => { throw missing; });
+ assert.match(input, /temporary-output:missing-during-snapshot/);
+ assert.notEqual(input, untrackedFingerprintInput([]));
+ const denied = Object.assign(new Error('permission denied'), { code: 'EACCES' });
+ assert.throws(() => untrackedFingerprintInput(['source'], () => { throw denied; }), error => error === denied);
+});
 test('controlled Room oracle selects current trigger despite old and later referenced operations',()=>{
  const text=content=>({type:'text',text:content});
  const messages=[{role:'user',parts:[text('http_op_1 prior')]},{role:'assistant',parts:[text('http_op_999 result')]},{role:'user',parts:[text('Room\nTrigger: '+JSON.stringify({text:'http_op_2 current'})+'\nHistory: '+JSON.stringify([{text:'http_op_1 old'},{text:'http_op_999 other referenced operation'}]))]},{role:'tool',parts:[{type:'tool_result',content:'http_op_555'}]}];

@@ -77,6 +77,7 @@ export type ToolExecResult = {
 export type { FileApprovalPolicy };
 
 export interface ToolLoopStore {
+  assertCurrentWriter?(sessionId: string): void;
   appendMessage: (sessionId: string, role: 'tool' | 'user' | 'assistant' | 'system', parts: MessagePart[]) => unknown;
   listApprovals: (filter?: { status?: ApprovalStatus }) => ApprovalRecord[];
   createApproval: (input: {
@@ -135,6 +136,7 @@ function adaptFilePolicy(policy: FileApprovalPolicy | undefined): LoopFilePolicy
 function hostFromDeps(deps: ToolLoopDeps): ToolLoopHost {
   return {
     env: process.env,
+    assertSessionWritable: (sessionId) => deps.store.assertCurrentWriter?.(sessionId),
     gateDirtyInput: true,
     appendMessage: (sessionId, role, parts) => {
       deps.store.appendMessage(sessionId, role, parts);

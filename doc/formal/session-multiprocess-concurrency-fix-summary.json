@@ -1,0 +1,189 @@
+{
+  "schema": 1,
+  "date": "2026-10-19",
+  "objective": "Five approved multiprocess consistency repairs; original acceptance criteria preserved",
+  "specs": [
+    {
+      "id": "session-multiprocess-concurrency-verification",
+      "status": "implemented",
+      "criteria": 15,
+      "criteriaSha256": "9af655cfb8771f62006b357f7b0c09ff447388144a88f8ca5609077e60074e2f"
+    },
+    {
+      "id": "session-multiprocess-state-consistency",
+      "status": "implemented",
+      "criteria": 5,
+      "criteriaSha256": "b90cc16c692bb50dae52ce92fd27afa2a22b5ffab218eb4e9732e164ceac0319"
+    }
+  ],
+  "model": {
+    "status": "pass",
+    "exhausted": true,
+    "states": 7062,
+    "transitions": 15884
+  },
+  "combined": {
+    "status": "pass",
+    "exitCode": 0,
+    "actualProcesses": {
+      "completed": true,
+      "passed": 62,
+      "failed": 0,
+      "incomplete": 0
+    },
+    "existing": {
+      "restart": {
+        "status": "pass",
+        "scenarios": 43
+      },
+      "lifecycle": {
+        "status": "pass",
+        "scenarios": 20
+      },
+      "pairing": {
+        "status": "pass"
+      }
+    },
+    "mutations": {
+      "status": "pass",
+      "restored": true,
+      "mutants": [
+        {
+          "name": "ownership",
+          "loaded": true,
+          "killed": true,
+          "sourceUnchanged": true
+        },
+        {
+          "name": "stale",
+          "loaded": true,
+          "killed": true,
+          "sourceUnchanged": true
+        },
+        {
+          "name": "approval",
+          "loaded": true,
+          "killed": true,
+          "sourceUnchanged": true
+        }
+      ]
+    }
+  },
+  "tests": {
+    "firstFiveRed": {
+      "tests": 5,
+      "pass": 0,
+      "fail": 5,
+      "skipped": 0,
+      "cancelled": 0,
+      "todo": 0
+    },
+    "acceptanceVerificationRepairAndRestartFix": {
+      "tests": 24,
+      "pass": 24,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0,
+      "todo": 0
+    },
+    "core": {
+      "tests": 2904,
+      "pass": 2901,
+      "fail": 0,
+      "skipped": 3,
+      "cancelled": 0,
+      "todo": 0
+    },
+    "sdk": {
+      "files": 41,
+      "passed": 408,
+      "failed": 0,
+      "skipped": 0,
+      "build": "pass"
+    },
+    "formalRelated": {
+      "tests": 25,
+      "pass": 25,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0,
+      "todo": 0
+    },
+    "daemon": {
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0,
+      "todo": 0
+    },
+    "actualStreamRed": {
+      "tests": 1,
+      "pass": 0,
+      "fail": 1,
+      "skipped": 0,
+      "cancelled": 0,
+      "todo": 0
+    },
+    "streamAndFollowerFinal": {
+      "tests": 3,
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0,
+      "todo": 0
+    },
+    "node22Unit": {
+      "tests": 6,
+      "pass": 6,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0,
+      "todo": 0
+    }
+  },
+  "node22": {
+    "version": "v22.21.1",
+    "status": "pass",
+    "completed": true,
+    "scenarios": 9
+  },
+  "staticAcceptance": {
+    "status": "pass",
+    "gatedCriteria": "523/523",
+    "mode": "static tag coverage; actual behavior checked separately"
+  },
+  "environmentSkips": [
+    "Two Agent Room tests require external configuration",
+    "One no-FTS5 migration fixture needs /exec-daemon/node, absent here",
+    "Linux bubblewrap-only suites skipped on macOS separately from individual test count"
+  ],
+  "builds": {
+    "coreAndDaemon": "TypeScript 5.9.3 -b apps/daemon with references: pass",
+    "sdk": "npm run build --workspace=@ppeng/agent-loop: pass"
+  },
+  "reviewManifestHashes": {
+    "specs/formal/concurrency-review.json": "9edb17d72868223bfee6a21f9e4c097f7c6dd37ce32219ae0d7b2d59fb7e0637",
+    "specs/formal/restart-review.json": "065b3f892a9d21d2e2996a4d2941934d4d26baf997594078a5b00c716ed5678c",
+    "specs/formal/lifecycle-review.json": "55e7b1b81f2bb73549a30987114d114655d5f27cfe1b8d3523d5ba7cd43654de",
+    "specs/formal/pairing-review.json": "079cf95d47d962f948a7536e164e3260eadd5997c346cd45cb8cb3d2759634d2"
+  },
+  "scope": "Healthy same-host local DB, ordinary chat/task, bounded controlled schedules and model/tool I/O. Additional same-process two-runtime stream/controller tests. No multi-host or arbitrary external exactly-once guarantee. Full E2E was not part of this run.",
+  "archive": {
+    "source": "/Users/penglei/developer/self-test-grounding/ppeng-agent-core/.e2e-web-tmp",
+    "destination": "/var/folders/8d/zqj9mv4x1cj9c8q6snjvh3yr0000gn/T/ppeng-unused-e2e-mcUJv4/e2e-web-tmp",
+    "reason": "Untracked E2E build copy interfered with acceptance scan; 370 source/config/style files matched apps/web-console exactly; lsof found no users. Entire directory retained, nothing deleted.",
+    "sourceFilesCompared": 370,
+    "identical": 370
+  },
+  "notes": [
+    "Five fix tests first failed on actual OS-process counterexamples, then passed.",
+    "SDK contender-controller regression separately failed before repair; full SDK suite then passed 408.",
+    "Stream test now explicitly uses runTurnStream. The initial non-stream helper was corrected before red proof; the actual streaming test then failed and passed after delivery fencing.",
+    "Legacy writer/cancel assertions were aligned to approved behavior while retaining rejection, outcome and approval-cleanup assertions. No Given/When/Then changed.",
+    "An intermediate combined run saw source fingerprint drift during work; the final fresh command passed all four verifiers.",
+    "Unused copied E2E tree polluted static scan. Complete directory retained outside the project; no gate rules weakened.",
+    "Only status/docs and their reviewed fingerprints changed after green validation.",
+    "Original discovery evidence and validation-summary files were not overwritten."
+  ]
+}

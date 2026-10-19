@@ -1,0 +1,2821 @@
+{
+  "recordedAt": "2026-10-19",
+  "redPhase": {
+    "passed": 0,
+    "failed": 11,
+    "reason": "verification module absent before implementation"
+  },
+  "currentTests": {
+    "passed": 9,
+    "failed": 2,
+    "failingCriteria": [
+      "AC-3",
+      "AC-5"
+    ]
+  },
+  "runtimeComparison": {
+    "nodes": [
+      "v26.7.0",
+      "v22.21.1"
+    ],
+    "identicalExceptVersion": true
+  },
+  "pairingPreserved": true,
+  "relatedTests": {
+    "passed": 30,
+    "failed": 0
+  },
+  "acceptanceGate": "static pass; runtime criteria AC-3/AC-5 remain failing",
+  "verification": {
+    "schema": 1,
+    "status": "fail",
+    "node": "v22.21.1",
+    "scope": {
+      "checker": "session-lifecycle-explicit-state/1",
+      "bounds": {
+        "modes": [
+          "chat",
+          "task"
+        ],
+        "sequentialRuns": 2,
+        "approvalsPerRun": 2,
+        "retriesPerRun": 1,
+        "toolWavesPerRun": 1
+      },
+      "assumptions": [
+        "One process and one active writer per session.",
+        "Cancellation does not undo external effects; already recorded terminal results are immutable.",
+        "Retry means model request retry, not replay of successful tool work.",
+        "Each synchronous decision/record operation is atomic; await boundaries are distinct events."
+      ],
+      "exclusions": [
+        "unbounded runs/retries",
+        "process kill, power loss, corrupted storage",
+        "multiple-process writers",
+        "live upstreams, UI rendering and arbitrary external tool effects"
+      ]
+    },
+    "review": {
+      "status": "reviewed",
+      "changed": [],
+      "mapping": [
+        {
+          "step": "Public runtime, cancellation, approvals and completion; exercised through RawAgentRuntime with SQLite",
+          "files": [
+            "packages/core/src/runtime.ts",
+            "packages/core/src/runtime/session-control.ts",
+            "packages/core/src/runtime/session-facade.ts",
+            "packages/core/src/runtime/session-complete.ts"
+          ]
+        },
+        {
+          "step": "Default assembled kernel, retry and interrupt/outcome paths; no table-only proof",
+          "files": [
+            "packages/agent-loop/src/turn/kernel.ts",
+            "packages/agent-loop/src/runtime/tool-loop.ts",
+            "packages/agent-loop/src/session/interrupt.ts",
+            "packages/agent-loop/src/session/run-outcome.ts",
+            "packages/core/src/runtime/tool-loop.ts",
+            "packages/agent-loop/src/assembly/create-assembled-loop.ts",
+            "packages/agent-loop/src/assembly/mini-host.ts",
+            "packages/agent-loop/src/assembly/normal-host.ts",
+            "packages/agent-loop/src/assembly/full-host.ts",
+            "packages/agent-loop/src/assembly/max-host.ts",
+            "packages/core/src/runtime/l5-bindings.ts"
+          ]
+        },
+        {
+          "step": "Specification, independent runtime fixtures, source mutations, execution/reporting, tests and instructions",
+          "files": [
+            "scripts/formal/lifecycle-model.mjs",
+            "scripts/formal/lifecycle-runtime.mjs",
+            "scripts/formal/lifecycle-verifier.mjs",
+            "scripts/formal/lifecycle-worker.mjs",
+            "scripts/formal/lifecycle-mutations.mjs",
+            "scripts/formal/lifecycle-loader.mjs",
+            "scripts/formal/lifecycle-register.mjs",
+            "scripts/formal/run-lifecycle-verification.mjs",
+            "scripts/test/session-lifecycle-verification.test.mjs",
+            "skills/verify-session-lifecycle/SKILL.md",
+            "scripts/formal/run-formal-regression.mjs",
+            ".github/workflows/release-gate.yml"
+          ]
+        }
+      ]
+    },
+    "model": {
+      "status": "pass",
+      "exhausted": true,
+      "states": 368,
+      "transitions": 2290,
+      "scope": {
+        "checker": "session-lifecycle-explicit-state/1",
+        "bounds": {
+          "modes": [
+            "chat",
+            "task"
+          ],
+          "sequentialRuns": 2,
+          "approvalsPerRun": 2,
+          "retriesPerRun": 1,
+          "toolWavesPerRun": 1
+        },
+        "assumptions": [
+          "One process and one active writer per session.",
+          "Cancellation does not undo external effects; already recorded terminal results are immutable.",
+          "Retry means model request retry, not replay of successful tool work.",
+          "Each synchronous decision/record operation is atomic; await boundaries are distinct events."
+        ],
+        "exclusions": [
+          "unbounded runs/retries",
+          "process kill, power loss, corrupted storage",
+          "multiple-process writers",
+          "live upstreams, UI rendering and arbitrary external tool effects"
+        ]
+      }
+    },
+    "runtime": {
+      "completed": true,
+      "engine": "RawAgentRuntime/SQLite/agent-loop",
+      "status": "fail",
+      "scenarios": [
+        {
+          "name": "chat",
+          "status": "pass",
+          "events": [
+            "run-1: start/resume",
+            "run settled"
+          ],
+          "snapshots": [
+            {
+              "run": "run-1",
+              "status": "idle",
+              "outcome": {
+                "kind": "idle",
+                "reason": "end"
+              },
+              "interrupt": false,
+              "approvals": [],
+              "executed": [],
+              "modelCalls": 1
+            }
+          ],
+          "checks": [
+            {
+              "label": "returned status equals stored status",
+              "ok": true,
+              "expected": "idle",
+              "actual": "idle"
+            },
+            {
+              "label": "terminal status, outcome and latch agree",
+              "ok": true,
+              "expected": "idle",
+              "actual": {
+                "run": "run-1",
+                "status": "idle",
+                "outcome": {
+                  "kind": "idle",
+                  "reason": "end"
+                },
+                "interrupt": false,
+                "approvals": [],
+                "executed": [],
+                "modelCalls": 1
+              }
+            }
+          ]
+        },
+        {
+          "name": "task",
+          "status": "pass",
+          "events": [
+            "run-1: start/resume",
+            "run settled"
+          ],
+          "snapshots": [
+            {
+              "run": "run-1",
+              "status": "completed",
+              "outcome": {
+                "kind": "completed",
+                "reason": "end"
+              },
+              "interrupt": false,
+              "approvals": [],
+              "executed": [],
+              "modelCalls": 1
+            }
+          ],
+          "checks": [
+            {
+              "label": "returned status equals stored status",
+              "ok": true,
+              "expected": "completed",
+              "actual": "completed"
+            },
+            {
+              "label": "terminal status, outcome and latch agree",
+              "ok": true,
+              "expected": "completed",
+              "actual": {
+                "run": "run-1",
+                "status": "completed",
+                "outcome": {
+                  "kind": "completed",
+                  "reason": "end"
+                },
+                "interrupt": false,
+                "approvals": [],
+                "executed": [],
+                "modelCalls": 1
+              }
+            }
+          ]
+        },
+        {
+          "name": "cancel-model",
+          "status": "pass",
+          "events": [
+            "run-1: start/resume",
+            "cancel at model",
+            "settled cancellation"
+          ],
+          "snapshots": [
+            {
+              "run": "run-1",
+              "status": "running",
+              "outcome": null,
+              "interrupt": false,
+              "approvals": [],
+              "executed": [],
+              "modelCalls": 1
+            },
+            {
+              "run": "run-1",
+              "status": "failed",
+              "outcome": {
+                "kind": "aborted",
+                "reason": "abort"
+              },
+              "interrupt": false,
+              "approvals": [],
+              "executed": [],
+              "modelCalls": 1
+            }
+          ],
+          "checks": [
+            {
+              "label": "returned status equals stored status",
+              "ok": true,
+              "expected": "failed",
+              "actual": "failed"
+            },
+            {
+              "label": "cancelled outcome and no running/approval latch",
+              "ok": true,
+              "expected": "aborted; no active state or pending approval",
+              "actual": {
+                "run": "run-1",
+                "status": "failed",
+                "outcome": {
+                  "kind": "aborted",
+                  "reason": "abort"
+                },
+                "interrupt": false,
+                "approvals": [],
+                "executed": [],
+                "modelCalls": 1
+              }
+            },
+            {
+              "label": "no new model work after cancellation",
+              "ok": true,
+              "expected": 1,
+              "actual": 1
+            }
+          ]
+        },
+        {
+          "name": "cancel-tool",
+          "status": "pass",
+          "events": [
+            "run-1: start/resume",
+            "cancel at tool",
+            "settled cancellation"
+          ],
+          "snapshots": [
+            {
+              "run": "run-1",
+              "status": "running",
+              "outcome": null,
+              "interrupt": false,
+              "approvals": [],
+              "executed": [
+                "a",
+                "b"
+              ],
+              "modelCalls": 1
+            },
+            {
+              "run": "run-1",
+              "status": "failed",
+              "outcome": {
+                "kind": "aborted",
+                "reason": "abort"
+              },
+              "interrupt": false,
+              "approvals": [],
+              "executed": [
+                "a",
+                "b"
+              ],
+              "modelCalls": 1
+            }
+          ],
+          "checks": [
+            {
+              "label": "returned status equals stored status",
+              "ok": true,
+              "expected": "failed",
+              "actual": "failed"
+            },
+            {
+              "label": "cancelled outcome and no running/approval latch",
+              "ok": true,
+              "expected": "aborted; no active state or pending approval",
+              "actual": {
+                "run": "run-1",
+                "status": "failed",
+                "outcome": {
+                  "kind": "aborted",
+                  "reason": "abort"
+                },
+                "interrupt": false,
+                "approvals": [],
+                "executed": [
+                  "a",
+                  "b"
+                ],
+                "modelCalls": 1
+              }
+            },
+            {
+              "label": "no new model work after cancellation",
+              "ok": true,
+              "expected": 1,
+              "actual": 1
+            }
+          ]
+        },
+        {
+          "name": "cancel-retry",
+          "status": "pass",
+          "events": [
+            "run-1: start/resume",
+            "cancel at retry",
+            "settled cancellation"
+          ],
+          "snapshots": [
+            {
+              "run": "run-1",
+              "status": "running",
+              "outcome": null,
+              "interrupt": false,
+              "approvals": [],
+              "executed": [],
+              "modelCalls": 1
+            },
+            {
+              "run": "run-1",
+              "status": "failed",
+              "outcome": {
+                "kind": "aborted",
+                "reason": "abort"
+              },
+              "interrupt": false,
+              "approvals": [],
+              "executed": [],
+              "modelCalls": 1
+            }
+          ],
+          "checks": [
+            {
+              "label": "returned status equals stored status",
+              "ok": true,
+              "expected": "failed",
+              "actual": "failed"
+            },
+            {
+              "label": "cancelled outcome and no running/approval latch",
+              "ok": true,
+              "expected": "aborted; no active state or pending approval",
+              "actual": {
+                "run": "run-1",
+                "status": "failed",
+                "outcome": {
+                  "kind": "aborted",
+                  "reason": "abort"
+                },
+                "interrupt": false,
+                "approvals": [],
+                "executed": [],
+                "modelCalls": 1
+              }
+            },
+            {
+              "label": "no new model work after cancellation",
+              "ok": true,
+              "expected": 1,
+              "actual": 1
+            }
+          ]
+        },
+        {
+          "name": "cancel-approval",
+          "status": "pass",
+          "events": [
+            "run-1: start/resume",
+            "waiting approval",
+            "settled cancellation"
+          ],
+          "snapshots": [
+            {
+              "run": "run-1",
+              "status": "waiting_approval",
+              "outcome": {
+                "kind": "waiting_approval",
+                "reason": "waiting_approval"
+              },
+              "interrupt": true,
+              "approvals": [
+                {
+                  "tool": "lifecycle_a",
+                  "decision": "pending"
+                },
+                {
+                  "tool": "lifecycle_b",
+                  "decision": "pending"
+                }
+              ],
+              "executed": [],
+              "modelCalls": 1
+            },
+            {
+              "run": "run-1",
+              "status": "idle",
+              "outcome": {
+                "kind": "aborted",
+                "reason": "abort"
+              },
+              "interrupt": false,
+              "approvals": [
+                {
+                  "tool": "lifecycle_a",
+                  "decision": "rejected"
+                },
+                {
+                  "tool": "lifecycle_b",
+                  "decision": "rejected"
+                }
+              ],
+              "executed": [],
+              "modelCalls": 1
+            }
+          ],
+          "checks": [
+            {
+              "label": "returned status equals stored status",
+              "ok": true,
+              "expected": "waiting_approval",
+              "actual": "waiting_approval"
+            },
+            {
+              "label": "cancelled outcome and no running/approval latch",
+              "ok": true,
+              "expected": "aborted; no active state or pending approval",
+              "actual": {
+                "run": "run-1",
+                "status": "idle",
+                "outcome": {
+                  "kind": "aborted",
+                  "reason": "abort"
+                },
+                "interrupt": false,
+                "approvals": [
+                  {
+                    "tool": "lifecycle_a",
+                    "decision": "rejected"
+                  },
+                  {
+                    "tool": "lifecycle_b",
+                    "decision": "rejected"
+                  }
+                ],
+                "executed": [],
+                "modelCalls": 1
+              }
+            }
+          ]
+        },
+        {
+          "name": "late-cancel-completed",
+          "status": "fail",
+          "events": [
+            "run-1: start/resume",
+            "old run ended",
+            "late duplicate cancel"
+          ],
+          "snapshots": [
+            {
+              "run": "run-1",
+              "status": "completed",
+              "outcome": {
+                "kind": "completed",
+                "reason": "end"
+              },
+              "interrupt": false,
+              "approvals": [],
+              "executed": [],
+              "modelCalls": 1
+            },
+            {
+              "run": "run-1",
+              "status": "completed",
+              "outcome": {
+                "kind": "aborted",
+                "reason": "abort"
+              },
+              "interrupt": false,
+              "approvals": [],
+              "executed": [],
+              "modelCalls": 1
+            }
+          ],
+          "checks": [
+            {
+              "label": "returned status equals stored status",
+              "ok": true,
+              "expected": "completed",
+              "actual": "completed"
+            },
+            {
+              "label": "precondition: expected old outcome reached",
+              "ok": true,
+              "expected": "completed",
+              "actual": {
+                "kind": "completed",
+                "reason": "end"
+              }
+            },
+            {
+              "label": "late cancel cannot rewrite recorded outcome",
+              "ok": false,
+              "expected": {
+                "run": "run-1",
+                "status": "completed",
+                "outcome": {
+                  "kind": "completed",
+                  "reason": "end"
+                },
+                "interrupt": false,
+                "approvals": [],
+                "executed": [],
+                "modelCalls": 1
+              },
+              "actual": {
+                "run": "run-1",
+                "status": "completed",
+                "outcome": {
+                  "kind": "aborted",
+                  "reason": "abort"
+                },
+                "interrupt": false,
+                "approvals": [],
+                "executed": [],
+                "modelCalls": 1
+              }
+            }
+          ]
+        },
+        {
+          "name": "late-cancel-failed",
+          "status": "fail",
+          "events": [
+            "run-1: start/resume",
+            "run-1: rejected persistent model failure",
+            "old run ended",
+            "late duplicate cancel"
+          ],
+          "snapshots": [
+            {
+              "run": "run-1",
+              "status": "failed",
+              "outcome": {
+                "kind": "failed",
+                "reason": "model_error"
+              },
+              "interrupt": false,
+              "approvals": [],
+              "executed": [],
+              "modelCalls": 2
+            },
+            {
+              "run": "run-1",
+              "status": "failed",
+              "outcome": {
+                "kind": "aborted",
+                "reason": "abort"
+              },
+              "interrupt": false,
+              "approvals": [],
+              "executed": [],
+              "modelCalls": 2
+            }
+          ],
+          "checks": [
+            {
+              "label": "precondition: expected old outcome reached",
+              "ok": true,
+              "expected": "failed",
+              "actual": {
+                "kind": "failed",
+                "reason": "model_error"
+              }
+            },
+            {
+              "label": "late cancel cannot rewrite recorded outcome",
+              "ok": false,
+              "expected": {
+                "run": "run-1",
+                "status": "failed",
+                "outcome": {
+                  "kind": "failed",
+                  "reason": "model_error"
+                },
+                "interrupt": false,
+                "approvals": [],
+                "executed": [],
+                "modelCalls": 2
+              },
+              "actual": {
+                "run": "run-1",
+                "status": "failed",
+                "outcome": {
+                  "kind": "aborted",
+                  "reason": "abort"
+                },
+                "interrupt": false,
+                "approvals": [],
+                "executed": [],
+                "modelCalls": 2
+              }
+            }
+          ]
+        },
+        {
+          "name": "late-cancel-aborted",
+          "status": "pass",
+          "events": [
+            "run-1: start/resume",
+            "cancel at model",
+            "settled cancellation",
+            "old run ended",
+            "late duplicate cancel"
+          ],
+          "snapshots": [
+            {
+              "run": "run-1",
+              "status": "running",
+              "outcome": null,
+              "interrupt": false,
+              "approvals": [],
+              "executed": [],
+              "modelCalls": 1
+            },
+            {
+              "run": "run-1",
+              "status": "failed",
+              "outcome": {
+                "kind": "aborted",
+                "reason": "abort"
+              },
+              "interrupt": false,
+              "approvals": [],
+              "executed": [],
+              "modelCalls": 1
+            },
+            {
+              "run": "run-1",
+              "status": "failed",
+              "outcome": {
+                "kind": "aborted",
+                "reason": "abort"
+              },
+              "interrupt": false,
+              "approvals": [],
+              "executed": [],
+              "modelCalls": 1
+            },
+            {
+              "run": "run-1",
+              "status": "failed",
+              "outcome": {
+                "kind": "aborted",
+                "reason": "abort"
+              },
+              "interrupt": false,
+              "approvals": [],
+              "executed": [],
+              "modelCalls": 1
+            }
+          ],
+          "checks": [
+            {
+              "label": "returned status equals stored status",
+              "ok": true,
+              "expected": "failed",
+              "actual": "failed"
+            },
+            {
+              "label": "cancelled outcome and no running/approval latch",
+              "ok": true,
+              "expected": "aborted; no active state or pending approval",
+              "actual": {
+                "run": "run-1",
+                "status": "failed",
+                "outcome": {
+                  "kind": "aborted",
+                  "reason": "abort"
+                },
+                "interrupt": false,
+                "approvals": [],
+                "executed": [],
+                "modelCalls": 1
+              }
+            },
+            {
+              "label": "no new model work after cancellation",
+              "ok": true,
+              "expected": 1,
+              "actual": 1
+            },
+            {
+              "label": "precondition: expected old outcome reached",
+              "ok": true,
+              "expected": "aborted",
+              "actual": {
+                "kind": "aborted",
+                "reason": "abort"
+              }
+            },
+            {
+              "label": "late cancel cannot rewrite recorded outcome",
+              "ok": true,
+              "expected": {
+                "run": "run-1",
+                "status": "failed",
+                "outcome": {
+                  "kind": "aborted",
+                  "reason": "abort"
+                },
+                "interrupt": false,
+                "approvals": [],
+                "executed": [],
+                "modelCalls": 1
+              },
+              "actual": {
+                "run": "run-1",
+                "status": "failed",
+                "outcome": {
+                  "kind": "aborted",
+                  "reason": "abort"
+                },
+                "interrupt": false,
+                "approvals": [],
+                "executed": [],
+                "modelCalls": 1
+              }
+            }
+          ]
+        },
+        {
+          "name": "old-signal-new-run",
+          "status": "pass",
+          "events": [
+            "run-1: start/resume",
+            "run-2: start/resume",
+            "new run waiting",
+            "old caller signal aborts",
+            "run settled"
+          ],
+          "snapshots": [
+            {
+              "run": "run-2",
+              "status": "running",
+              "outcome": {
+                "kind": "idle",
+                "reason": "end"
+              },
+              "interrupt": false,
+              "approvals": [],
+              "executed": [],
+              "modelCalls": 2
+            },
+            {
+              "run": "run-2",
+              "status": "running",
+              "outcome": {
+                "kind": "idle",
+                "reason": "end"
+              },
+              "interrupt": false,
+              "approvals": [],
+              "executed": [],
+              "modelCalls": 2
+            },
+            {
+              "run": "run-2",
+              "status": "idle",
+              "outcome": {
+                "kind": "idle",
+                "reason": "end"
+              },
+              "interrupt": false,
+              "approvals": [],
+              "executed": [],
+              "modelCalls": 2
+            }
+          ],
+          "checks": [
+            {
+              "label": "returned status equals stored status",
+              "ok": true,
+              "expected": "idle",
+              "actual": "idle"
+            },
+            {
+              "label": "old signal leaves new run unchanged",
+              "ok": true,
+              "expected": {
+                "run": "run-2",
+                "status": "running",
+                "outcome": {
+                  "kind": "idle",
+                  "reason": "end"
+                },
+                "interrupt": false,
+                "approvals": [],
+                "executed": [],
+                "modelCalls": 2
+              },
+              "actual": {
+                "run": "run-2",
+                "status": "running",
+                "outcome": {
+                  "kind": "idle",
+                  "reason": "end"
+                },
+                "interrupt": false,
+                "approvals": [],
+                "executed": [],
+                "modelCalls": 2
+              }
+            },
+            {
+              "label": "returned status equals stored status",
+              "ok": true,
+              "expected": "idle",
+              "actual": "idle"
+            },
+            {
+              "label": "terminal status, outcome and latch agree",
+              "ok": true,
+              "expected": "idle",
+              "actual": {
+                "run": "run-2",
+                "status": "idle",
+                "outcome": {
+                  "kind": "idle",
+                  "reason": "end"
+                },
+                "interrupt": false,
+                "approvals": [],
+                "executed": [],
+                "modelCalls": 2
+              }
+            }
+          ]
+        },
+        {
+          "name": "old-approval-new-run",
+          "status": "pass",
+          "events": [
+            "run-1: start/resume",
+            "settled cancellation",
+            "run-2: start/resume",
+            "new run waiting",
+            "old approval arrives",
+            "run settled"
+          ],
+          "snapshots": [
+            {
+              "run": "run-1",
+              "status": "idle",
+              "outcome": {
+                "kind": "aborted",
+                "reason": "abort"
+              },
+              "interrupt": false,
+              "approvals": [
+                {
+                  "tool": "lifecycle_a",
+                  "decision": "rejected"
+                },
+                {
+                  "tool": "lifecycle_b",
+                  "decision": "rejected"
+                }
+              ],
+              "executed": [],
+              "modelCalls": 1
+            },
+            {
+              "run": "run-2",
+              "status": "running",
+              "outcome": {
+                "kind": "aborted",
+                "reason": "abort"
+              },
+              "interrupt": false,
+              "approvals": [
+                {
+                  "tool": "lifecycle_a",
+                  "decision": "rejected"
+                },
+                {
+                  "tool": "lifecycle_b",
+                  "decision": "rejected"
+                }
+              ],
+              "executed": [],
+              "modelCalls": 2
+            },
+            {
+              "run": "run-2",
+              "status": "running",
+              "outcome": {
+                "kind": "aborted",
+                "reason": "abort"
+              },
+              "interrupt": false,
+              "approvals": [
+                {
+                  "tool": "lifecycle_a",
+                  "decision": "rejected"
+                },
+                {
+                  "tool": "lifecycle_b",
+                  "decision": "rejected"
+                }
+              ],
+              "executed": [],
+              "modelCalls": 2
+            },
+            {
+              "run": "run-2",
+              "status": "idle",
+              "outcome": {
+                "kind": "idle",
+                "reason": "end"
+              },
+              "interrupt": false,
+              "approvals": [
+                {
+                  "tool": "lifecycle_a",
+                  "decision": "rejected"
+                },
+                {
+                  "tool": "lifecycle_b",
+                  "decision": "rejected"
+                }
+              ],
+              "executed": [],
+              "modelCalls": 2
+            }
+          ],
+          "checks": [
+            {
+              "label": "returned status equals stored status",
+              "ok": true,
+              "expected": "waiting_approval",
+              "actual": "waiting_approval"
+            },
+            {
+              "label": "cancelled outcome and no running/approval latch",
+              "ok": true,
+              "expected": "aborted; no active state or pending approval",
+              "actual": {
+                "run": "run-1",
+                "status": "idle",
+                "outcome": {
+                  "kind": "aborted",
+                  "reason": "abort"
+                },
+                "interrupt": false,
+                "approvals": [
+                  {
+                    "tool": "lifecycle_a",
+                    "decision": "rejected"
+                  },
+                  {
+                    "tool": "lifecycle_b",
+                    "decision": "rejected"
+                  }
+                ],
+                "executed": [],
+                "modelCalls": 1
+              }
+            },
+            {
+              "label": "old approval leaves new run unchanged",
+              "ok": true,
+              "expected": {
+                "run": "run-2",
+                "status": "running",
+                "outcome": {
+                  "kind": "aborted",
+                  "reason": "abort"
+                },
+                "interrupt": false,
+                "approvals": [
+                  {
+                    "tool": "lifecycle_a",
+                    "decision": "rejected"
+                  },
+                  {
+                    "tool": "lifecycle_b",
+                    "decision": "rejected"
+                  }
+                ],
+                "executed": [],
+                "modelCalls": 2
+              },
+              "actual": {
+                "run": "run-2",
+                "status": "running",
+                "outcome": {
+                  "kind": "aborted",
+                  "reason": "abort"
+                },
+                "interrupt": false,
+                "approvals": [
+                  {
+                    "tool": "lifecycle_a",
+                    "decision": "rejected"
+                  },
+                  {
+                    "tool": "lifecycle_b",
+                    "decision": "rejected"
+                  }
+                ],
+                "executed": [],
+                "modelCalls": 2
+              }
+            },
+            {
+              "label": "returned status equals stored status",
+              "ok": true,
+              "expected": "idle",
+              "actual": "idle"
+            },
+            {
+              "label": "terminal status, outcome and latch agree",
+              "ok": true,
+              "expected": "idle",
+              "actual": {
+                "run": "run-2",
+                "status": "idle",
+                "outcome": {
+                  "kind": "idle",
+                  "reason": "end"
+                },
+                "interrupt": false,
+                "approvals": [
+                  {
+                    "tool": "lifecycle_a",
+                    "decision": "rejected"
+                  },
+                  {
+                    "tool": "lifecycle_b",
+                    "decision": "rejected"
+                  }
+                ],
+                "executed": [],
+                "modelCalls": 2
+              }
+            }
+          ]
+        },
+        {
+          "name": "old-retry-new-run",
+          "status": "pass",
+          "events": [
+            "run-1: start/resume",
+            "cancel at retry",
+            "settled cancellation",
+            "run-2: start/resume",
+            "run settled",
+            "new run ended",
+            "old retry due time passed"
+          ],
+          "snapshots": [
+            {
+              "run": "run-1",
+              "status": "running",
+              "outcome": null,
+              "interrupt": false,
+              "approvals": [],
+              "executed": [],
+              "modelCalls": 1
+            },
+            {
+              "run": "run-1",
+              "status": "failed",
+              "outcome": {
+                "kind": "aborted",
+                "reason": "abort"
+              },
+              "interrupt": false,
+              "approvals": [],
+              "executed": [],
+              "modelCalls": 1
+            },
+            {
+              "run": "run-2",
+              "status": "idle",
+              "outcome": {
+                "kind": "idle",
+                "reason": "end"
+              },
+              "interrupt": false,
+              "approvals": [],
+              "executed": [],
+              "modelCalls": 2
+            },
+            {
+              "run": "run-2",
+              "status": "idle",
+              "outcome": {
+                "kind": "idle",
+                "reason": "end"
+              },
+              "interrupt": false,
+              "approvals": [],
+              "executed": [],
+              "modelCalls": 2
+            },
+            {
+              "run": "run-2",
+              "status": "idle",
+              "outcome": {
+                "kind": "idle",
+                "reason": "end"
+              },
+              "interrupt": false,
+              "approvals": [],
+              "executed": [],
+              "modelCalls": 2
+            }
+          ],
+          "checks": [
+            {
+              "label": "returned status equals stored status",
+              "ok": true,
+              "expected": "failed",
+              "actual": "failed"
+            },
+            {
+              "label": "cancelled outcome and no running/approval latch",
+              "ok": true,
+              "expected": "aborted; no active state or pending approval",
+              "actual": {
+                "run": "run-1",
+                "status": "failed",
+                "outcome": {
+                  "kind": "aborted",
+                  "reason": "abort"
+                },
+                "interrupt": false,
+                "approvals": [],
+                "executed": [],
+                "modelCalls": 1
+              }
+            },
+            {
+              "label": "no new model work after cancellation",
+              "ok": true,
+              "expected": 1,
+              "actual": 1
+            },
+            {
+              "label": "returned status equals stored status",
+              "ok": true,
+              "expected": "idle",
+              "actual": "idle"
+            },
+            {
+              "label": "terminal status, outcome and latch agree",
+              "ok": true,
+              "expected": "idle",
+              "actual": {
+                "run": "run-2",
+                "status": "idle",
+                "outcome": {
+                  "kind": "idle",
+                  "reason": "end"
+                },
+                "interrupt": false,
+                "approvals": [],
+                "executed": [],
+                "modelCalls": 2
+              }
+            },
+            {
+              "label": "old retry did not start another request",
+              "ok": true,
+              "expected": {
+                "run": "run-2",
+                "status": "idle",
+                "outcome": {
+                  "kind": "idle",
+                  "reason": "end"
+                },
+                "interrupt": false,
+                "approvals": [],
+                "executed": [],
+                "modelCalls": 2
+              },
+              "actual": {
+                "run": "run-2",
+                "status": "idle",
+                "outcome": {
+                  "kind": "idle",
+                  "reason": "end"
+                },
+                "interrupt": false,
+                "approvals": [],
+                "executed": [],
+                "modelCalls": 2
+              }
+            }
+          ]
+        },
+        {
+          "name": "retry-success",
+          "status": "pass",
+          "events": [
+            "run-1: start/resume",
+            "retry waiting",
+            "run settled"
+          ],
+          "snapshots": [
+            {
+              "run": "run-1",
+              "status": "running",
+              "outcome": null,
+              "interrupt": false,
+              "approvals": [],
+              "executed": [],
+              "modelCalls": 1
+            },
+            {
+              "run": "run-1",
+              "status": "idle",
+              "outcome": {
+                "kind": "idle",
+                "reason": "end"
+              },
+              "interrupt": false,
+              "approvals": [],
+              "executed": [],
+              "modelCalls": 2
+            }
+          ],
+          "checks": [
+            {
+              "label": "retry is still running",
+              "ok": true,
+              "expected": "running",
+              "actual": "running"
+            },
+            {
+              "label": "returned status equals stored status",
+              "ok": true,
+              "expected": "idle",
+              "actual": "idle"
+            },
+            {
+              "label": "terminal status, outcome and latch agree",
+              "ok": true,
+              "expected": "idle",
+              "actual": {
+                "run": "run-1",
+                "status": "idle",
+                "outcome": {
+                  "kind": "idle",
+                  "reason": "end"
+                },
+                "interrupt": false,
+                "approvals": [],
+                "executed": [],
+                "modelCalls": 2
+              }
+            },
+            {
+              "label": "one retry, no tool replay",
+              "ok": true,
+              "expected": {
+                "models": 2,
+                "tools": 0
+              },
+              "actual": {
+                "models": 2,
+                "tools": 0
+              }
+            }
+          ]
+        },
+        {
+          "name": "retry-exhausted",
+          "status": "pass",
+          "events": [
+            "run-1: start/resume",
+            "retry waiting",
+            "run-1: rejected probe retryable failure",
+            "run settled"
+          ],
+          "snapshots": [
+            {
+              "run": "run-1",
+              "status": "running",
+              "outcome": null,
+              "interrupt": false,
+              "approvals": [],
+              "executed": [],
+              "modelCalls": 1
+            },
+            {
+              "run": "run-1",
+              "status": "failed",
+              "outcome": {
+                "kind": "failed",
+                "reason": "model_error"
+              },
+              "interrupt": false,
+              "approvals": [],
+              "executed": [],
+              "modelCalls": 2
+            }
+          ],
+          "checks": [
+            {
+              "label": "retry is still running",
+              "ok": true,
+              "expected": "running",
+              "actual": "running"
+            },
+            {
+              "label": "terminal status, outcome and latch agree",
+              "ok": true,
+              "expected": "failed",
+              "actual": {
+                "run": "run-1",
+                "status": "failed",
+                "outcome": {
+                  "kind": "failed",
+                  "reason": "model_error"
+                },
+                "interrupt": false,
+                "approvals": [],
+                "executed": [],
+                "modelCalls": 2
+              }
+            },
+            {
+              "label": "one retry, no tool replay",
+              "ok": true,
+              "expected": {
+                "models": 2,
+                "tools": 0
+              },
+              "actual": {
+                "models": 2,
+                "tools": 0
+              }
+            }
+          ]
+        },
+        {
+          "name": "retry-after-tool",
+          "status": "pass",
+          "events": [
+            "run-1: start/resume",
+            "retry waiting",
+            "run settled"
+          ],
+          "snapshots": [
+            {
+              "run": "run-1",
+              "status": "running",
+              "outcome": null,
+              "interrupt": false,
+              "approvals": [],
+              "executed": [
+                "a",
+                "b"
+              ],
+              "modelCalls": 2
+            },
+            {
+              "run": "run-1",
+              "status": "idle",
+              "outcome": {
+                "kind": "idle",
+                "reason": "end"
+              },
+              "interrupt": false,
+              "approvals": [],
+              "executed": [
+                "a",
+                "b"
+              ],
+              "modelCalls": 3
+            }
+          ],
+          "checks": [
+            {
+              "label": "retry is still running",
+              "ok": true,
+              "expected": "running",
+              "actual": "running"
+            },
+            {
+              "label": "returned status equals stored status",
+              "ok": true,
+              "expected": "idle",
+              "actual": "idle"
+            },
+            {
+              "label": "terminal status, outcome and latch agree",
+              "ok": true,
+              "expected": "idle",
+              "actual": {
+                "run": "run-1",
+                "status": "idle",
+                "outcome": {
+                  "kind": "idle",
+                  "reason": "end"
+                },
+                "interrupt": false,
+                "approvals": [],
+                "executed": [
+                  "a",
+                  "b"
+                ],
+                "modelCalls": 3
+              }
+            },
+            {
+              "label": "one retry, no tool replay",
+              "ok": true,
+              "expected": {
+                "models": 3,
+                "tools": 2
+              },
+              "actual": {
+                "models": 3,
+                "tools": 2
+              }
+            }
+          ]
+        },
+        {
+          "name": "approval-wait",
+          "status": "pass",
+          "events": [
+            "run-1: start/resume",
+            "waiting for both"
+          ],
+          "snapshots": [
+            {
+              "run": "run-1",
+              "status": "waiting_approval",
+              "outcome": {
+                "kind": "waiting_approval",
+                "reason": "waiting_approval"
+              },
+              "interrupt": true,
+              "approvals": [
+                {
+                  "tool": "lifecycle_a",
+                  "decision": "pending"
+                },
+                {
+                  "tool": "lifecycle_b",
+                  "decision": "pending"
+                }
+              ],
+              "executed": [],
+              "modelCalls": 1
+            }
+          ],
+          "checks": [
+            {
+              "label": "returned status equals stored status",
+              "ok": true,
+              "expected": "waiting_approval",
+              "actual": "waiting_approval"
+            },
+            {
+              "label": "two real approval records",
+              "ok": true,
+              "expected": 2,
+              "actual": 2
+            },
+            {
+              "label": "approval wait with no execution",
+              "ok": true,
+              "expected": "waiting_approval",
+              "actual": {
+                "run": "run-1",
+                "status": "waiting_approval",
+                "outcome": {
+                  "kind": "waiting_approval",
+                  "reason": "waiting_approval"
+                },
+                "interrupt": true,
+                "approvals": [
+                  {
+                    "tool": "lifecycle_a",
+                    "decision": "pending"
+                  },
+                  {
+                    "tool": "lifecycle_b",
+                    "decision": "pending"
+                  }
+                ],
+                "executed": [],
+                "modelCalls": 1
+              }
+            }
+          ]
+        },
+        {
+          "name": "approval-partial",
+          "status": "fail",
+          "events": [
+            "run-1: start/resume",
+            "only first approval decided",
+            "run-1: start/resume",
+            "resume while second pending"
+          ],
+          "snapshots": [
+            {
+              "run": "run-1",
+              "status": "idle",
+              "outcome": {
+                "kind": "waiting_approval",
+                "reason": "waiting_approval"
+              },
+              "interrupt": true,
+              "approvals": [
+                {
+                  "tool": "lifecycle_a",
+                  "decision": "approved"
+                },
+                {
+                  "tool": "lifecycle_b",
+                  "decision": "pending"
+                }
+              ],
+              "executed": [],
+              "modelCalls": 1
+            },
+            {
+              "run": "run-1",
+              "status": "waiting_approval",
+              "outcome": {
+                "kind": "waiting_approval",
+                "reason": "waiting_approval"
+              },
+              "interrupt": true,
+              "approvals": [
+                {
+                  "tool": "lifecycle_a",
+                  "decision": "approved"
+                },
+                {
+                  "tool": "lifecycle_b",
+                  "decision": "pending"
+                }
+              ],
+              "executed": [],
+              "modelCalls": 1
+            }
+          ],
+          "checks": [
+            {
+              "label": "returned status equals stored status",
+              "ok": true,
+              "expected": "waiting_approval",
+              "actual": "waiting_approval"
+            },
+            {
+              "label": "two real approval records",
+              "ok": true,
+              "expected": 2,
+              "actual": 2
+            },
+            {
+              "label": "partial decision stays waiting",
+              "ok": false,
+              "expected": "waiting_approval",
+              "actual": {
+                "run": "run-1",
+                "status": "idle",
+                "outcome": {
+                  "kind": "waiting_approval",
+                  "reason": "waiting_approval"
+                },
+                "interrupt": true,
+                "approvals": [
+                  {
+                    "tool": "lifecycle_a",
+                    "decision": "approved"
+                  },
+                  {
+                    "tool": "lifecycle_b",
+                    "decision": "pending"
+                  }
+                ],
+                "executed": [],
+                "modelCalls": 1
+              }
+            },
+            {
+              "label": "returned status equals stored status",
+              "ok": true,
+              "expected": "waiting_approval",
+              "actual": "waiting_approval"
+            },
+            {
+              "label": "still no execution",
+              "ok": true,
+              "expected": 0,
+              "actual": 0
+            }
+          ]
+        },
+        {
+          "name": "approval-resume",
+          "status": "pass",
+          "events": [
+            "run-1: start/resume",
+            "run-1: start/resume",
+            "run settled",
+            "before repeat decision",
+            "repeat decision"
+          ],
+          "snapshots": [
+            {
+              "run": "run-1",
+              "status": "idle",
+              "outcome": {
+                "kind": "idle",
+                "reason": "end"
+              },
+              "interrupt": false,
+              "approvals": [
+                {
+                  "tool": "lifecycle_a",
+                  "decision": "approved"
+                },
+                {
+                  "tool": "lifecycle_b",
+                  "decision": "approved"
+                }
+              ],
+              "executed": [
+                "a",
+                "b"
+              ],
+              "modelCalls": 2
+            },
+            {
+              "run": "run-1",
+              "status": "idle",
+              "outcome": {
+                "kind": "idle",
+                "reason": "end"
+              },
+              "interrupt": false,
+              "approvals": [
+                {
+                  "tool": "lifecycle_a",
+                  "decision": "approved"
+                },
+                {
+                  "tool": "lifecycle_b",
+                  "decision": "approved"
+                }
+              ],
+              "executed": [
+                "a",
+                "b"
+              ],
+              "modelCalls": 2
+            },
+            {
+              "run": "run-1",
+              "status": "idle",
+              "outcome": {
+                "kind": "idle",
+                "reason": "end"
+              },
+              "interrupt": false,
+              "approvals": [
+                {
+                  "tool": "lifecycle_a",
+                  "decision": "approved"
+                },
+                {
+                  "tool": "lifecycle_b",
+                  "decision": "approved"
+                }
+              ],
+              "executed": [
+                "a",
+                "b"
+              ],
+              "modelCalls": 2
+            }
+          ],
+          "checks": [
+            {
+              "label": "returned status equals stored status",
+              "ok": true,
+              "expected": "waiting_approval",
+              "actual": "waiting_approval"
+            },
+            {
+              "label": "two real approval records",
+              "ok": true,
+              "expected": 2,
+              "actual": 2
+            },
+            {
+              "label": "returned status equals stored status",
+              "ok": true,
+              "expected": "idle",
+              "actual": "idle"
+            },
+            {
+              "label": "terminal status, outcome and latch agree",
+              "ok": true,
+              "expected": "idle",
+              "actual": {
+                "run": "run-1",
+                "status": "idle",
+                "outcome": {
+                  "kind": "idle",
+                  "reason": "end"
+                },
+                "interrupt": false,
+                "approvals": [
+                  {
+                    "tool": "lifecycle_a",
+                    "decision": "approved"
+                  },
+                  {
+                    "tool": "lifecycle_b",
+                    "decision": "approved"
+                  }
+                ],
+                "executed": [
+                  "a",
+                  "b"
+                ],
+                "modelCalls": 2
+              }
+            },
+            {
+              "label": "only approved operations execute once",
+              "ok": true,
+              "expected": [
+                "a",
+                "b"
+              ],
+              "actual": [
+                "a",
+                "b"
+              ]
+            },
+            {
+              "label": "duplicate decision is inert",
+              "ok": true,
+              "expected": {
+                "run": "run-1",
+                "status": "idle",
+                "outcome": {
+                  "kind": "idle",
+                  "reason": "end"
+                },
+                "interrupt": false,
+                "approvals": [
+                  {
+                    "tool": "lifecycle_a",
+                    "decision": "approved"
+                  },
+                  {
+                    "tool": "lifecycle_b",
+                    "decision": "approved"
+                  }
+                ],
+                "executed": [
+                  "a",
+                  "b"
+                ],
+                "modelCalls": 2
+              },
+              "actual": {
+                "run": "run-1",
+                "status": "idle",
+                "outcome": {
+                  "kind": "idle",
+                  "reason": "end"
+                },
+                "interrupt": false,
+                "approvals": [
+                  {
+                    "tool": "lifecycle_a",
+                    "decision": "approved"
+                  },
+                  {
+                    "tool": "lifecycle_b",
+                    "decision": "approved"
+                  }
+                ],
+                "executed": [
+                  "a",
+                  "b"
+                ],
+                "modelCalls": 2
+              }
+            }
+          ]
+        },
+        {
+          "name": "approval-mixed",
+          "status": "pass",
+          "events": [
+            "run-1: start/resume",
+            "run-1: start/resume",
+            "run settled",
+            "before repeat decision",
+            "repeat decision"
+          ],
+          "snapshots": [
+            {
+              "run": "run-1",
+              "status": "idle",
+              "outcome": {
+                "kind": "idle",
+                "reason": "end"
+              },
+              "interrupt": false,
+              "approvals": [
+                {
+                  "tool": "lifecycle_a",
+                  "decision": "approved"
+                },
+                {
+                  "tool": "lifecycle_b",
+                  "decision": "rejected"
+                }
+              ],
+              "executed": [
+                "a"
+              ],
+              "modelCalls": 2
+            },
+            {
+              "run": "run-1",
+              "status": "idle",
+              "outcome": {
+                "kind": "idle",
+                "reason": "end"
+              },
+              "interrupt": false,
+              "approvals": [
+                {
+                  "tool": "lifecycle_a",
+                  "decision": "approved"
+                },
+                {
+                  "tool": "lifecycle_b",
+                  "decision": "rejected"
+                }
+              ],
+              "executed": [
+                "a"
+              ],
+              "modelCalls": 2
+            },
+            {
+              "run": "run-1",
+              "status": "idle",
+              "outcome": {
+                "kind": "idle",
+                "reason": "end"
+              },
+              "interrupt": false,
+              "approvals": [
+                {
+                  "tool": "lifecycle_a",
+                  "decision": "approved"
+                },
+                {
+                  "tool": "lifecycle_b",
+                  "decision": "rejected"
+                }
+              ],
+              "executed": [
+                "a"
+              ],
+              "modelCalls": 2
+            }
+          ],
+          "checks": [
+            {
+              "label": "returned status equals stored status",
+              "ok": true,
+              "expected": "waiting_approval",
+              "actual": "waiting_approval"
+            },
+            {
+              "label": "two real approval records",
+              "ok": true,
+              "expected": 2,
+              "actual": 2
+            },
+            {
+              "label": "returned status equals stored status",
+              "ok": true,
+              "expected": "idle",
+              "actual": "idle"
+            },
+            {
+              "label": "terminal status, outcome and latch agree",
+              "ok": true,
+              "expected": "idle",
+              "actual": {
+                "run": "run-1",
+                "status": "idle",
+                "outcome": {
+                  "kind": "idle",
+                  "reason": "end"
+                },
+                "interrupt": false,
+                "approvals": [
+                  {
+                    "tool": "lifecycle_a",
+                    "decision": "approved"
+                  },
+                  {
+                    "tool": "lifecycle_b",
+                    "decision": "rejected"
+                  }
+                ],
+                "executed": [
+                  "a"
+                ],
+                "modelCalls": 2
+              }
+            },
+            {
+              "label": "only approved operations execute once",
+              "ok": true,
+              "expected": [
+                "a"
+              ],
+              "actual": [
+                "a"
+              ]
+            },
+            {
+              "label": "rejections recorded",
+              "ok": true,
+              "expected": 1,
+              "actual": 1
+            },
+            {
+              "label": "duplicate decision is inert",
+              "ok": true,
+              "expected": {
+                "run": "run-1",
+                "status": "idle",
+                "outcome": {
+                  "kind": "idle",
+                  "reason": "end"
+                },
+                "interrupt": false,
+                "approvals": [
+                  {
+                    "tool": "lifecycle_a",
+                    "decision": "approved"
+                  },
+                  {
+                    "tool": "lifecycle_b",
+                    "decision": "rejected"
+                  }
+                ],
+                "executed": [
+                  "a"
+                ],
+                "modelCalls": 2
+              },
+              "actual": {
+                "run": "run-1",
+                "status": "idle",
+                "outcome": {
+                  "kind": "idle",
+                  "reason": "end"
+                },
+                "interrupt": false,
+                "approvals": [
+                  {
+                    "tool": "lifecycle_a",
+                    "decision": "approved"
+                  },
+                  {
+                    "tool": "lifecycle_b",
+                    "decision": "rejected"
+                  }
+                ],
+                "executed": [
+                  "a"
+                ],
+                "modelCalls": 2
+              }
+            }
+          ]
+        },
+        {
+          "name": "approval-rejected",
+          "status": "pass",
+          "events": [
+            "run-1: start/resume",
+            "run-1: start/resume",
+            "run settled",
+            "before repeat decision",
+            "repeat decision"
+          ],
+          "snapshots": [
+            {
+              "run": "run-1",
+              "status": "idle",
+              "outcome": {
+                "kind": "idle",
+                "reason": "end"
+              },
+              "interrupt": false,
+              "approvals": [
+                {
+                  "tool": "lifecycle_a",
+                  "decision": "rejected"
+                },
+                {
+                  "tool": "lifecycle_b",
+                  "decision": "rejected"
+                }
+              ],
+              "executed": [],
+              "modelCalls": 2
+            },
+            {
+              "run": "run-1",
+              "status": "idle",
+              "outcome": {
+                "kind": "idle",
+                "reason": "end"
+              },
+              "interrupt": false,
+              "approvals": [
+                {
+                  "tool": "lifecycle_a",
+                  "decision": "rejected"
+                },
+                {
+                  "tool": "lifecycle_b",
+                  "decision": "rejected"
+                }
+              ],
+              "executed": [],
+              "modelCalls": 2
+            },
+            {
+              "run": "run-1",
+              "status": "idle",
+              "outcome": {
+                "kind": "idle",
+                "reason": "end"
+              },
+              "interrupt": false,
+              "approvals": [
+                {
+                  "tool": "lifecycle_a",
+                  "decision": "rejected"
+                },
+                {
+                  "tool": "lifecycle_b",
+                  "decision": "rejected"
+                }
+              ],
+              "executed": [],
+              "modelCalls": 2
+            }
+          ],
+          "checks": [
+            {
+              "label": "returned status equals stored status",
+              "ok": true,
+              "expected": "waiting_approval",
+              "actual": "waiting_approval"
+            },
+            {
+              "label": "two real approval records",
+              "ok": true,
+              "expected": 2,
+              "actual": 2
+            },
+            {
+              "label": "returned status equals stored status",
+              "ok": true,
+              "expected": "idle",
+              "actual": "idle"
+            },
+            {
+              "label": "terminal status, outcome and latch agree",
+              "ok": true,
+              "expected": "idle",
+              "actual": {
+                "run": "run-1",
+                "status": "idle",
+                "outcome": {
+                  "kind": "idle",
+                  "reason": "end"
+                },
+                "interrupt": false,
+                "approvals": [
+                  {
+                    "tool": "lifecycle_a",
+                    "decision": "rejected"
+                  },
+                  {
+                    "tool": "lifecycle_b",
+                    "decision": "rejected"
+                  }
+                ],
+                "executed": [],
+                "modelCalls": 2
+              }
+            },
+            {
+              "label": "only approved operations execute once",
+              "ok": true,
+              "expected": [],
+              "actual": []
+            },
+            {
+              "label": "rejections recorded",
+              "ok": true,
+              "expected": 2,
+              "actual": 2
+            },
+            {
+              "label": "duplicate decision is inert",
+              "ok": true,
+              "expected": {
+                "run": "run-1",
+                "status": "idle",
+                "outcome": {
+                  "kind": "idle",
+                  "reason": "end"
+                },
+                "interrupt": false,
+                "approvals": [
+                  {
+                    "tool": "lifecycle_a",
+                    "decision": "rejected"
+                  },
+                  {
+                    "tool": "lifecycle_b",
+                    "decision": "rejected"
+                  }
+                ],
+                "executed": [],
+                "modelCalls": 2
+              },
+              "actual": {
+                "run": "run-1",
+                "status": "idle",
+                "outcome": {
+                  "kind": "idle",
+                  "reason": "end"
+                },
+                "interrupt": false,
+                "approvals": [
+                  {
+                    "tool": "lifecycle_a",
+                    "decision": "rejected"
+                  },
+                  {
+                    "tool": "lifecycle_b",
+                    "decision": "rejected"
+                  }
+                ],
+                "executed": [],
+                "modelCalls": 2
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "mutations": {
+      "status": "pass",
+      "restored": true,
+      "baselineStatus": "fail",
+      "mutants": [
+        {
+          "name": "cancel",
+          "file": "packages/core/src/runtime/session-control.ts",
+          "before": "b7dee6c6bfcf8c1eee8c43e897308b13ca8bf26f7c503c7ac636eac0b0122747",
+          "after": "4d018a8b7c043a096b48f3ed84fac597cbd97b27798a6a845503b4188bd5e9b7",
+          "killed": true,
+          "counterexample": {
+            "name": "cancel-model",
+            "status": "fail",
+            "events": [
+              "run-1: start/resume",
+              "cancel at model",
+              "settled cancellation"
+            ],
+            "snapshots": [
+              {
+                "run": "run-1",
+                "status": "running",
+                "outcome": null,
+                "interrupt": false,
+                "approvals": [],
+                "executed": [],
+                "modelCalls": 1
+              },
+              {
+                "run": "run-1",
+                "status": "idle",
+                "outcome": {
+                  "kind": "idle",
+                  "reason": "end"
+                },
+                "interrupt": false,
+                "approvals": [],
+                "executed": [],
+                "modelCalls": 1
+              }
+            ],
+            "checks": [
+              {
+                "label": "returned status equals stored status",
+                "ok": true,
+                "expected": "idle",
+                "actual": "idle"
+              },
+              {
+                "label": "cancelled outcome and no running/approval latch",
+                "ok": false,
+                "expected": "aborted; no active state or pending approval",
+                "actual": {
+                  "run": "run-1",
+                  "status": "idle",
+                  "outcome": {
+                    "kind": "idle",
+                    "reason": "end"
+                  },
+                  "interrupt": false,
+                  "approvals": [],
+                  "executed": [],
+                  "modelCalls": 1
+                }
+              },
+              {
+                "label": "no new model work after cancellation",
+                "ok": true,
+                "expected": 1,
+                "actual": 1
+              }
+            ]
+          }
+        },
+        {
+          "name": "retry",
+          "file": "packages/agent-loop/src/turn/kernel.ts",
+          "before": "d2d6b09fae61eca58195082fff8899cfef3df7bb395395a4814d4fb10df67769",
+          "after": "aaa9ba620907089a469c4957196d612825f4838915873a87080c9a57b031cf85",
+          "killed": true,
+          "counterexample": {
+            "name": "retry-exhausted",
+            "status": "fail",
+            "events": [
+              "run-1: start/resume",
+              "retry waiting",
+              "run-1: rejected probe retryable failure",
+              "run settled"
+            ],
+            "snapshots": [
+              {
+                "run": "run-1",
+                "status": "running",
+                "outcome": null,
+                "interrupt": false,
+                "approvals": [],
+                "executed": [],
+                "modelCalls": 1
+              },
+              {
+                "run": "run-1",
+                "status": "running",
+                "outcome": {
+                  "kind": "idle",
+                  "reason": "model_error"
+                },
+                "interrupt": false,
+                "approvals": [],
+                "executed": [],
+                "modelCalls": 2
+              }
+            ],
+            "checks": [
+              {
+                "label": "retry is still running",
+                "ok": true,
+                "expected": "running",
+                "actual": "running"
+              },
+              {
+                "label": "terminal status, outcome and latch agree",
+                "ok": false,
+                "expected": "failed",
+                "actual": {
+                  "run": "run-1",
+                  "status": "running",
+                  "outcome": {
+                    "kind": "idle",
+                    "reason": "model_error"
+                  },
+                  "interrupt": false,
+                  "approvals": [],
+                  "executed": [],
+                  "modelCalls": 2
+                }
+              },
+              {
+                "label": "one retry, no tool replay",
+                "ok": true,
+                "expected": {
+                  "models": 2,
+                  "tools": 0
+                },
+                "actual": {
+                  "models": 2,
+                  "tools": 0
+                }
+              }
+            ]
+          }
+        },
+        {
+          "name": "approval",
+          "file": "packages/agent-loop/src/turn/kernel.ts",
+          "before": "d2d6b09fae61eca58195082fff8899cfef3df7bb395395a4814d4fb10df67769",
+          "after": "7604e5398b7dc0c6e8db841218d88b9d46097fb60073a3c4c91ea62b7e8c2896",
+          "killed": true,
+          "counterexample": {
+            "name": "approval-resume",
+            "status": "fail",
+            "events": [
+              "run-1: start/resume",
+              "run-1: start/resume",
+              "run settled",
+              "before repeat decision",
+              "repeat decision"
+            ],
+            "snapshots": [
+              {
+                "run": "run-1",
+                "status": "idle",
+                "outcome": {
+                  "kind": "idle",
+                  "reason": "end"
+                },
+                "interrupt": false,
+                "approvals": [
+                  {
+                    "tool": "lifecycle_a",
+                    "decision": "approved"
+                  },
+                  {
+                    "tool": "lifecycle_b",
+                    "decision": "approved"
+                  }
+                ],
+                "executed": [
+                  "a",
+                  "b",
+                  "a",
+                  "b"
+                ],
+                "modelCalls": 2
+              },
+              {
+                "run": "run-1",
+                "status": "idle",
+                "outcome": {
+                  "kind": "idle",
+                  "reason": "end"
+                },
+                "interrupt": false,
+                "approvals": [
+                  {
+                    "tool": "lifecycle_a",
+                    "decision": "approved"
+                  },
+                  {
+                    "tool": "lifecycle_b",
+                    "decision": "approved"
+                  }
+                ],
+                "executed": [
+                  "a",
+                  "b",
+                  "a",
+                  "b"
+                ],
+                "modelCalls": 2
+              },
+              {
+                "run": "run-1",
+                "status": "idle",
+                "outcome": {
+                  "kind": "idle",
+                  "reason": "end"
+                },
+                "interrupt": false,
+                "approvals": [
+                  {
+                    "tool": "lifecycle_a",
+                    "decision": "approved"
+                  },
+                  {
+                    "tool": "lifecycle_b",
+                    "decision": "approved"
+                  }
+                ],
+                "executed": [
+                  "a",
+                  "b",
+                  "a",
+                  "b"
+                ],
+                "modelCalls": 2
+              }
+            ],
+            "checks": [
+              {
+                "label": "returned status equals stored status",
+                "ok": true,
+                "expected": "waiting_approval",
+                "actual": "waiting_approval"
+              },
+              {
+                "label": "two real approval records",
+                "ok": true,
+                "expected": 2,
+                "actual": 2
+              },
+              {
+                "label": "returned status equals stored status",
+                "ok": true,
+                "expected": "idle",
+                "actual": "idle"
+              },
+              {
+                "label": "terminal status, outcome and latch agree",
+                "ok": true,
+                "expected": "idle",
+                "actual": {
+                  "run": "run-1",
+                  "status": "idle",
+                  "outcome": {
+                    "kind": "idle",
+                    "reason": "end"
+                  },
+                  "interrupt": false,
+                  "approvals": [
+                    {
+                      "tool": "lifecycle_a",
+                      "decision": "approved"
+                    },
+                    {
+                      "tool": "lifecycle_b",
+                      "decision": "approved"
+                    }
+                  ],
+                  "executed": [
+                    "a",
+                    "b",
+                    "a",
+                    "b"
+                  ],
+                  "modelCalls": 2
+                }
+              },
+              {
+                "label": "only approved operations execute once",
+                "ok": false,
+                "expected": [
+                  "a",
+                  "b"
+                ],
+                "actual": [
+                  "a",
+                  "b",
+                  "a",
+                  "b"
+                ]
+              },
+              {
+                "label": "duplicate decision is inert",
+                "ok": true,
+                "expected": {
+                  "run": "run-1",
+                  "status": "idle",
+                  "outcome": {
+                    "kind": "idle",
+                    "reason": "end"
+                  },
+                  "interrupt": false,
+                  "approvals": [
+                    {
+                      "tool": "lifecycle_a",
+                      "decision": "approved"
+                    },
+                    {
+                      "tool": "lifecycle_b",
+                      "decision": "approved"
+                    }
+                  ],
+                  "executed": [
+                    "a",
+                    "b",
+                    "a",
+                    "b"
+                  ],
+                  "modelCalls": 2
+                },
+                "actual": {
+                  "run": "run-1",
+                  "status": "idle",
+                  "outcome": {
+                    "kind": "idle",
+                    "reason": "end"
+                  },
+                  "interrupt": false,
+                  "approvals": [
+                    {
+                      "tool": "lifecycle_a",
+                      "decision": "approved"
+                    },
+                    {
+                      "tool": "lifecycle_b",
+                      "decision": "approved"
+                    }
+                  ],
+                  "executed": [
+                    "a",
+                    "b",
+                    "a",
+                    "b"
+                  ],
+                  "modelCalls": 2
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "negativeControls": [
+      {
+        "fault": "cancel",
+        "result": {
+          "status": "fail",
+          "exhausted": false,
+          "states": 2,
+          "transitions": 1,
+          "scope": {
+            "checker": "session-lifecycle-explicit-state/1",
+            "bounds": {
+              "modes": [
+                "chat",
+                "task"
+              ],
+              "sequentialRuns": 2,
+              "approvalsPerRun": 2,
+              "retriesPerRun": 1,
+              "toolWavesPerRun": 1
+            },
+            "assumptions": [
+              "One process and one active writer per session.",
+              "Cancellation does not undo external effects; already recorded terminal results are immutable.",
+              "Retry means model request retry, not replay of successful tool work.",
+              "Each synchronous decision/record operation is atomic; await boundaries are distinct events."
+            ],
+            "exclusions": [
+              "unbounded runs/retries",
+              "process kill, power loss, corrupted storage",
+              "multiple-process writers",
+              "live upstreams, UI rendering and arbitrary external tool effects"
+            ]
+          },
+          "counterexample": {
+            "events": [
+              {
+                "type": "start",
+                "mode": "chat"
+              },
+              {
+                "type": "cancel",
+                "run": 1
+              }
+            ],
+            "check": {
+              "ok": false,
+              "run": 1,
+              "status": "running",
+              "outcome": "aborted",
+              "issues": [
+                "cancelled run continued"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "fault": "retry",
+        "result": {
+          "status": "fail",
+          "exhausted": false,
+          "states": 34,
+          "transitions": 61,
+          "scope": {
+            "checker": "session-lifecycle-explicit-state/1",
+            "bounds": {
+              "modes": [
+                "chat",
+                "task"
+              ],
+              "sequentialRuns": 2,
+              "approvalsPerRun": 2,
+              "retriesPerRun": 1,
+              "toolWavesPerRun": 1
+            },
+            "assumptions": [
+              "One process and one active writer per session.",
+              "Cancellation does not undo external effects; already recorded terminal results are immutable.",
+              "Retry means model request retry, not replay of successful tool work.",
+              "Each synchronous decision/record operation is atomic; await boundaries are distinct events."
+            ],
+            "exclusions": [
+              "unbounded runs/retries",
+              "process kill, power loss, corrupted storage",
+              "multiple-process writers",
+              "live upstreams, UI rendering and arbitrary external tool effects"
+            ]
+          },
+          "counterexample": {
+            "events": [
+              {
+                "type": "start",
+                "mode": "chat"
+              },
+              {
+                "type": "model-error",
+                "run": 1
+              },
+              {
+                "type": "retry-tick",
+                "run": 1
+              },
+              {
+                "type": "model-error",
+                "run": 1
+              }
+            ],
+            "check": {
+              "ok": false,
+              "run": 1,
+              "status": "running",
+              "outcome": "failed",
+              "issues": [
+                "terminal outcome with active state",
+                "status/outcome mismatch"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "fault": "approval",
+        "result": {
+          "status": "fail",
+          "exhausted": false,
+          "states": 71,
+          "transitions": 190,
+          "scope": {
+            "checker": "session-lifecycle-explicit-state/1",
+            "bounds": {
+              "modes": [
+                "chat",
+                "task"
+              ],
+              "sequentialRuns": 2,
+              "approvalsPerRun": 2,
+              "retriesPerRun": 1,
+              "toolWavesPerRun": 1
+            },
+            "assumptions": [
+              "One process and one active writer per session.",
+              "Cancellation does not undo external effects; already recorded terminal results are immutable.",
+              "Retry means model request retry, not replay of successful tool work.",
+              "Each synchronous decision/record operation is atomic; await boundaries are distinct events."
+            ],
+            "exclusions": [
+              "unbounded runs/retries",
+              "process kill, power loss, corrupted storage",
+              "multiple-process writers",
+              "live upstreams, UI rendering and arbitrary external tool effects"
+            ]
+          },
+          "counterexample": {
+            "events": [
+              {
+                "type": "start",
+                "mode": "chat"
+              },
+              {
+                "type": "request-approval",
+                "run": 1
+              },
+              {
+                "type": "approve",
+                "run": 1,
+                "index": 0
+              },
+              {
+                "type": "approve",
+                "run": 1,
+                "index": 1
+              },
+              {
+                "type": "resume",
+                "run": 1
+              }
+            ],
+            "check": {
+              "ok": false,
+              "run": 1,
+              "status": "running",
+              "outcome": null,
+              "issues": [
+                "approved operation repeated"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "exitCode": 1
+  }
+}

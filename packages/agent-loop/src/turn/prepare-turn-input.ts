@@ -37,6 +37,7 @@ export interface ClaimedInboxItem {
   key?: string;
   role: 'user' | 'system';
   text: string;
+  contextParts?: import('@ppeng/api-types').TextPart[];
 }
 
 export interface PrepareTurnInputDeps {
@@ -126,7 +127,7 @@ export function applyClaimedInbox(
     store.appendMessage(
       sessionId,
       item.role,
-      [textPart(item.text)],
+      [textPart(item.text), ...(item.contextParts ?? [])],
       item.key ? { key: item.key } : undefined
     );
   }

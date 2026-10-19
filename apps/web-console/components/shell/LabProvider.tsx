@@ -27,6 +27,7 @@ import {
 } from '@/lib/nav';
 import type { ModelProvidersResponse } from '@/lib/model-providers';
 import { fetchList, idleLabListState, settleList, type LabListKey, type LabListState, type ListFetch } from '@/lib/list-load';
+import { sameData } from '@/lib/same-data';
 import type {
   AgentInfo,
   ApprovalItem,
@@ -245,9 +246,10 @@ export function LabProvider({ children }: { children: ReactNode }) {
       const [ver, health] = await Promise.all([api('/api/version'), api('/api/health')]);
       const v = ver as { name?: string; version?: string };
       const h = health as { adapter?: string };
-      setServerMeta({ name: v.name ?? '—', version: v.version ?? '—', adapter: h.adapter });
+      const next = { name: v.name ?? '—', version: v.version ?? '—', adapter: h.adapter };
+      setServerMeta((prev) => (sameData(prev, next) ? prev : next));
     } catch {
-      setServerMeta(null);
+      setServerMeta((prev) => (prev === null ? prev : null));
     }
   }, []);
 
@@ -299,17 +301,24 @@ export function LabProvider({ children }: { children: ReactNode }) {
     const sessFetched = (sess as { sessions?: SessionSummary[] }).sessions;
     const agFetched = (ag as { agents?: AgentInfo[] }).agents;
     const botsFetched = (botsRes as { bots?: BotInfo[] }).bots;
-    // 拉取失败（undefined）时保留现有列表，避免瞬时错误清空会话/Agent
+    // 拉取失败（undefined）时保留现有列表，避免瞬时错误清空会话/Agent。
+    // 内容没变时保留原引用，避免 2.8s 轮询重渲染整页、冲掉文本选区。
     const sList = sessFetched ?? sessionsRef.current;
-    if (sessFetched) setSessions(sessFetched);
-    if (agFetched) setAgents(agFetched);
-    if (botsFetched) setBots(botsFetched);
+    if (sessFetched) setSessions((prev) => (sameData(prev, sessFetched) ? prev : sessFetched));
+    if (agFetched) setAgents((prev) => (sameData(prev, agFetched) ? prev : agFetched));
+    if (botsFetched) setBots((prev) => (sameData(prev, botsFetched) ? prev : botsFetched));
     const snap = listsRef.current;
     const nextState: LabListState = { ...listStateRef.current };
-    const keep = <T,>(key: LabListKey, current: T[], fetched: ListFetch<T>, commit: (items: T[]) => void) => {
+    const keep = <T,>(
+      key: LabListKey,
+      current: T[],
+      fetched: ListFetch<T>,
+      commit: (update: T[] | ((prev: T[]) => T[])) => void
+    ) => {
       const settled = settleList(current, nextState[key], fetched);
       nextState[key] = settled.state;
-      if (fetched.ok) commit(settled.items);
+      if (!fetched.ok) return;
+      commit((prev) => (sameData(prev, settled.items) ? prev : settled.items));
     };
     keep('tasks', snap.tasks, tasksRes, setTasks);
     keep('socialSchedules', snap.socialSchedules, socialRes, setSocialSchedules);
@@ -321,7 +330,7 @@ export function LabProvider({ children }: { children: ReactNode }) {
     keep('orchestrationRuns', snap.orchestrationRuns, orchRes, setOrchestrationRuns);
     keep('mail', snap.mailAll, mailRes, setMailAll);
     listStateRef.current = nextState;
-    setListState(nextState);
+    setListState((prev) => (sameData(prev, nextState) ? prev : nextState));
 
     applyScrollSnapshot(listScroll);
     if (sessionListStickTopRef.current) {

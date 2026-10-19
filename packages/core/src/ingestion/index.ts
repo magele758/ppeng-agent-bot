@@ -36,3 +36,11 @@ export type {
 export type { AttachmentStatus, StatusSink } from './status.js';
 export { AttachmentIngestService } from './attachment-ingest-service.js';
 export type { AttachmentRecord } from './attachment-ingest-service.js';
+export {
+  applyContextSources,
+  contextSourceModelText,
+  normalizeContextSources,
+  CONTEXT_SOURCE_LIMIT,
+  CONTEXT_TEXT_CHAR_LIMIT
+} from './context-sources.js';
+export type { ContextFileSource, ContextFolderEntry, ContextFolderSource, ContextSource } from './context-sources.js';

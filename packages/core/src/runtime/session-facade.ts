@@ -23,6 +23,7 @@ import type { SqliteStateStore } from '../storage.js';
 import { tryCreateDynToolStore } from '../dyn-tools/store.js';
 import { inheritModelOverride } from './spawn-policy.js';
 import { DYN_TOOL_PROMOTE_APPROVAL } from '../dyn-tools/types.js';
+import { applyContextSources, normalizeContextSources } from '../ingestion/context-sources.js';
 import type {
   AgentSpec,
   ApprovalRecord,
@@ -291,7 +292,7 @@ export function sendUserMessage(
   host: SessionFacadeHost,
   sessionId: string,
   message: string,
-  options?: { imageAssetIds?: string[]; replyTo?: string }
+  options?: { imageAssetIds?: string[]; replyTo?: string; contextSources?: unknown }
 ): SessionRecord {
   const session = host.store.getSession(sessionId);
   if (!session) {
@@ -299,12 +300,13 @@ export function sendUserMessage(
   }
 
   const ids = options?.imageAssetIds?.filter(Boolean) ?? [];
+  const sources = normalizeContextSources(options?.contextSources);
   const text = message.trim();
-  if (!text && ids.length === 0) {
-    throw new ValidationError('Message or imageAssetIds required');
+  if (!text && ids.length === 0 && sources.length === 0) {
+    throw new ValidationError('Message, imageAssetIds, or contextSources required');
   }
   const context = routineReplyContext(host.store, session, options?.replyTo);
-  const parts = userMessageParts(text || '(image)', ids, host.store);
+  const parts = applyContextSources(userMessageParts(text || (ids.length ? '(image)' : ''), ids, host.store), sources);
   if (context) parts.unshift(textPart(context));
   host.store.appendMessage(session.id, 'user', parts);
   mergeSessionMetadata(host.store, session.id, {
@@ -404,6 +406,7 @@ export async function approve(
     throw new NotFoundError('Approval', approvalId);
   }
   if (existing.status !== 'pending') return existing;
+  return store.transaction(() => {
   const approval = store.updateApproval(approvalId, decision);
   if (approval.status !== decision) return approval;
   disarmUnattendedApprovalExpiry(approval.id);
@@ -424,13 +427,17 @@ export async function approve(
     }
   }
   const session = store.getSession(approval.sessionId);
-  if (session && session.status === 'waiting_approval') {
+  if (session && session.status === 'waiting_approval'
+    && !store.listApprovals({ status: 'pending' }).some(item => item.sessionId === session.id)) {
     store.updateSession(session.id, { status: 'idle' });
     store.appendMessage(
       session.id,
       'user',
-      [textPart(`Approval for ${approval.toolName} was ${decision}. Continue.`)]
+      [textPart(`Approval for ${approval.toolName} was ${decision}. Continue.`)],
+      { expectedWriterRunId: session.activeWriterRunId }
     );
+    if (session.activeWriterRunId) store.releaseWriter(session.id, session.activeWriterRunId);
   }
   return approval;
+  });
 }

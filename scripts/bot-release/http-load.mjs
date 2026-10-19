@@ -11,6 +11,17 @@ import {runFixedHttpWindow} from './http-fixed-window.mjs';
 import {sanitizeSpawnEnv} from '../../packages/core/dist/sandbox/env-sanitizer.js';
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,Math.max(0,ms)));
 const hash=text=>createHash('sha256').update(text).digest('hex');
+export function untrackedFingerprintInput(paths, read = readFileSync) {
+ return paths.map(path => {
+  try { return path + ':' + hash(read(path)); }
+  catch (error) {
+   // Test outputs can disappear after git enumerates them. Record that race
+   // explicitly in the fingerprint instead of silently omitting the path.
+   if (error?.code === 'ENOENT') return path + ':missing-during-snapshot';
+   throw error;
+  }
+ }).join('\n');
+}
 const workloadText=readFileSync(new URL('./workload.v1.json',import.meta.url),'utf8'),workload=JSON.parse(workloadText);
 const quantile=(samples,q)=>{const sorted=[...samples].sort((a,b)=>a-b);return sorted[Math.max(0,Math.ceil(sorted.length*q)-1)]??null;};
 const summary=samples=>({count:samples.length,p50Ms:quantile(samples,.5),p95Ms:quantile(samples,.95),p99Ms:quantile(samples,.99),maxMs:samples.length?Math.max(...samples):null});
@@ -22,7 +33,7 @@ export async function runHttpLoad({smoke=false,smokeSeconds=10,out='test-results
  const output=resolve(out);mkdirSync(dirname(output),{recursive:true});const stateDir=join(dirname(output),'http-load-state-'+Date.now());mkdirSync(stateDir,{recursive:true});
  const sha=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8',env:sanitizeSpawnEnv()}).trim(),diff=execFileSync('git',['diff','HEAD'],{encoding:'utf8',maxBuffer:32*1024**2,env:sanitizeSpawnEnv()});
  const paths=execFileSync('git',['ls-files','--others','--exclude-standard','-z'],{encoding:'utf8',env:sanitizeSpawnEnv()}).split('\0').filter(Boolean).sort();
- const report={version:1,layer:'real daemon app/auth over loopback HTTP; driver and daemon are separate processes',mode:smoke?'harness-fixture':'full-http-protocol',fullProtocol:false,workloadHash:hash(workloadText),executableFingerprint:readExecutableFingerprint(),candidate:{sha,dirtyFingerprint:hash(diff+paths.map(path=>path+':'+hash(readFileSync(path))).join('\n'))},hardware:{cpuMax:readOptional('/sys/fs/cgroup/cpu.max'),memoryMax:readOptional('/sys/fs/cgroup/memory.max'),cpuset:readOptional('/sys/fs/cgroup/cpuset.cpus.effective'),disk:'overlay; underlying SSD unverified',node:process.version,requiredNode:readOptional('.nvmrc')},referenceHardwareMatched:false,stateDir,startedAt:new Date().toISOString(),browserFirstScreen:{status:'unverified',reason:'HTTP page latency is not browser rendering latency'},limitations:['Shared environment CPU quota; concurrent soak invalidates standard-hardware performance evidence.','Disk SSD identity and an enforced dedicated 8 GiB environment are unverified.','Controlled local model/software; no live provider validation.'],errors:[]};
+ const report={version:1,layer:'real daemon app/auth over loopback HTTP; driver and daemon are separate processes',mode:smoke?'harness-fixture':'full-http-protocol',fullProtocol:false,workloadHash:hash(workloadText),executableFingerprint:readExecutableFingerprint(),candidate:{sha,dirtyFingerprint:hash(diff+untrackedFingerprintInput(paths))},hardware:{cpuMax:readOptional('/sys/fs/cgroup/cpu.max'),memoryMax:readOptional('/sys/fs/cgroup/memory.max'),cpuset:readOptional('/sys/fs/cgroup/cpuset.cpus.effective'),disk:'overlay; underlying SSD unverified',node:process.version,requiredNode:readOptional('.nvmrc')},referenceHardwareMatched:false,stateDir,startedAt:new Date().toISOString(),browserFirstScreen:{status:'unverified',reason:'HTTP page latency is not browser rendering latency'},limitations:['Shared environment CPU quota; concurrent soak invalidates standard-hardware performance evidence.','Disk SSD identity and an enforced dedicated 8 GiB environment are unverified.','Controlled local model/software; no live provider validation.'],errors:[]};
  const disk=statfsSync(dirname(output));report.resources={availableDiskBytes:Number(disk.bavail)*Number(disk.bsize),minimumRecommendedBytes:14*1024**3};
  const runningSoaks=execFileSync('ps',['-eo','pid,args'],{encoding:'utf8',env:sanitizeSpawnEnv()}).split('\n').filter(line=>/^\s*\d+\s+(?:\S*\/)?node\s+.*scripts\/bot-release\/(?:soak|http-soak|http-load|http-soak-daemon|http-load-daemon)\.mjs/.test(line)).map(line=>({pid:Number(line.trim().split(/\s+/)[0]),command:line.trim()})).filter(item=>item.pid!==process.pid);
  report.resources.runningSoaks=runningSoaks;

@@ -13,7 +13,7 @@ import {
   type CompletedWaveItem,
   type ToolLoopHost,
 } from './tool-loop.js';
-import type { ApprovalRecord, RunContext, SessionRecord, ToolCallPart, ToolContract } from '../types.js';
+import type { ApprovalRecord, MessagePart, RunContext, SessionRecord, ToolCallPart, ToolContract } from '../types.js';
 
 const ctx = { session: { id: 's1', metadata: {} } } as unknown as RunContext;
 
@@ -718,6 +718,47 @@ describe('pre_tool_use ask', () => {
 });
 
 describe('already paired tool results', () => {
+  it('deduplicates identical results within a batch with or without a history provider [AC:tool-call-pairing-batch-dedup#AC-1]', () => {
+    for (const withHistory of [false, true]) {
+      const history = new Set<string>();
+      const h = host(withHistory ? { pairedToolCallIds: () => history } : {});
+      const r = { toolCallId: 'a', name: 'echo', ok: true, content: 'first result' };
+      processToolResults(h, [r, { ...r }], [], ctx.session, undefined, 's1');
+      expect(h.appended).toEqual([{ role: 'tool', parts: [expect.objectContaining(r)] }]);
+      expect(h.traces).toEqual(['tool_end']);
+      expect([...history]).toEqual([]);
+    }
+  });
+
+  it('keeps every distinct call result in an interleaved duplicate batch [AC:tool-call-pairing-batch-dedup#AC-2]', () => {
+    const h = host({ pairedToolCallIds: () => new Set(['old']) });
+    const a = { toolCallId: 'a', name: 'echo', ok: true, content: 'from a' };
+    const b = { toolCallId: 'b', name: 'echo', ok: false, content: 'failure from b' };
+    const old = { toolCallId: 'old', name: 'echo', ok: true, content: 'already recorded' };
+    processToolResults(h, [old, b, a, b, old, a], [], ctx.session, undefined, 's1');
+    expect(h.appended).toEqual([
+      { role: 'tool', parts: [expect.objectContaining(b)] },
+      { role: 'tool', parts: [expect.objectContaining(a)] },
+    ]);
+    expect(h.traces).toEqual(['tool_end', 'tool_end']);
+  });
+
+  it('records a new occurrence of a reused id once even when its result repeats [AC:tool-call-pairing-batch-dedup#AC-3]', () => {
+    const messages: Array<{ parts: MessagePart[] }> = [
+      { parts: [call('echo', {}, 'reused')] },
+      { parts: [{ type: 'tool_result', toolCallId: 'reused', name: 'echo', ok: true, content: 'old' }] },
+    ];
+    const h = host({
+      pairedToolCallIds: () => pairedToolCallIdsFromMessages(messages),
+      appendMessage: (_sid, _role, parts) => { messages.push({ parts }); },
+    });
+    messages.push({ parts: [call('echo', { new: true }, 'reused')] });
+    const fresh = { toolCallId: 'reused', name: 'echo', ok: true, content: 'new' };
+    processToolResults(h, [fresh, { ...fresh }], [], ctx.session, undefined, 's1');
+    processToolResults(h, [fresh], [], ctx.session, undefined, 's1');
+    expect(messages.flatMap(m => m.parts).filter(p => p.type === 'tool_result').map(p => p.content)).toEqual(['old', 'new']);
+  });
+
   it('does not append a second result for the same tool call id', () => {
     const h = host({
       pairedToolCallIds: () => new Set(['done-1']),

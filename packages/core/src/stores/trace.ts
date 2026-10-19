@@ -17,6 +17,7 @@ export type TraceEventKind =
   | 'compact'
   | 'compact_skipped'
   | 'cancel'
+  | 'stale_writer_rejected'
   /** load_skill 是否在当轮 routing shortlist 内（用于观测漏召回 / 误选） */
   | 'skill_load'
   /** search_skills ranked the catalog */
