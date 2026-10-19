@@ -45,15 +45,16 @@ export function canonicalBotChatTitle(name: string): string {
   return `Bot Chat · ${name}`;
 }
 
-export function botInstructions(input: { name: string; title: string; description: string }): string {
+export function botInstructions(input: { name: string; title: string; description: string; persona?: string }): string {
   const bits = [
     `You are ${input.name}${input.title && input.title !== input.name ? ` (${input.title})` : ''}.`,
     input.description.trim(),
+    input.persona?.trim() ? `Persona: ${input.persona.trim()}` : '',
     'You are a named persistent teammate. Continue this conversation; do not treat it as a disposable chat.',
     'You choose the execution style for each request — do not ask the user to pick Chat / Task / Orchestrator / Self-Heal / Planner / Generator / Evaluator.',
     'Q&A: answer directly. Multi-step or implementation: TodoWrite, tools, task_create. Cross-cutting work: orchestrate teammates or spawn_subagent. Research/plan/implement/review as the task requires.',
     "Whether a tool call needs approval is decided by this session's permissionMode.",
-    'When bot_create, bot_update, bot_room_create, bot_room_update, or lab_settings_update is in your tool list, you can create and update bots, group chats, and saved Lab settings yourself. Do not claim you lack that ability. Deleting a group chat, member, session, or provider needs confirm: true and approval. Never repeat API keys or tokens. Do not approve tool calls or outbound drafts for the user.',
+    'You can create bots and group chats (可以创建 bot 和群聊) with create_bot and create_room. The same actions are also available as bot_create, bot_update, bot_room_create, bot_room_update, and lab_settings_update when they are in your tool list. Do not claim you lack that ability. Deleting a group chat, member, session, or provider needs confirm: true and approval. Never repeat API keys or tokens. Do not read secrets; reference a model already configured in the lab. Do not approve tool calls or outbound drafts for the user.',
     'This is a long-lived conversation. Older turns are compacted and keyframes are kept (session cut); do not ask the user to start a new chat.'
   ].filter(Boolean);
   return bits.join('\n');
@@ -86,15 +87,21 @@ function allocateBotId(store: SqliteStateStore, name: string): string {
   return createId('bot');
 }
 
+function readPersona(metadata: Record<string, unknown> | undefined): string | undefined {
+  const persona = metadata?.persona;
+  return typeof persona === 'string' && persona.trim() ? persona.trim() : undefined;
+}
+
 function botAgentSpec(
   bot: Pick<BotRecord, 'id' | 'name' | 'title' | 'description'>,
-  allowedTools?: string[]
+  allowedTools?: string[],
+  persona?: string
 ): AgentSpec {
   return {
     id: bot.id,
     name: bot.name,
     role: bot.title || 'Bot',
-    instructions: botInstructions(bot),
+    instructions: botInstructions({ ...bot, persona }),
     capabilities: ['bot', 'tool-use', 'task-management', 'orchestration'],
     autonomous: true,
     domainId: 'bot',
@@ -104,14 +111,14 @@ function botAgentSpec(
 
 function refreshBotAgent(host: SessionFacadeHost, bot: BotRecord): void {
   const session = host.store.getSession(bot.canonicalSessionId);
-  host.store.upsertAgent(botAgentSpec(bot, readPositiveAllowedTools(session?.metadata)));
+  host.store.upsertAgent(botAgentSpec(bot, readPositiveAllowedTools(session?.metadata), readPersona(session?.metadata)));
 }
 
 /** Rewrite stored bot agent instructions so existing bots pick up capability text after an upgrade. */
 export function syncBotAgentSpecs(store: SqliteStateStore): void {
   for (const bot of store.listBots({ includeHidden: true })) {
     const session = store.getSession(bot.canonicalSessionId);
-    store.upsertAgent(botAgentSpec(bot, readPositiveAllowedTools(session?.metadata)));
+    store.upsertAgent(botAgentSpec(bot, readPositiveAllowedTools(session?.metadata), readPersona(session?.metadata)));
   }
 }
 

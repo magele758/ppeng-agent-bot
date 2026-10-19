@@ -402,6 +402,178 @@ test('swarm start passes valid seed tasks only after checking ownership', async 
   fx.store.db.close();
 });
 
+test('private chats list create_bot and create_room and the prompt says so [AC:bot-create-named-tools#AC-1]', async () => {
+  const fx = fixture();
+  const names = fx.tools.map((tool) => tool.name);
+  assert.ok(names.includes('create_bot'));
+  assert.ok(names.includes('create_room'));
+  const createBot = fx.tools.find((tool) => tool.name === 'create_bot');
+  const props = Object.keys(createBot.inputSchema.properties ?? {});
+  for (const banned of ['apiKey', 'api_key', 'token', 'secret', 'password']) {
+    assert.equal(props.some((key) => key.toLowerCase() === banned.toLowerCase()), false, banned);
+  }
+  const modelProps = Object.keys(createBot.inputSchema.properties?.modelOverride?.properties ?? {});
+  assert.deepEqual(modelProps.sort(), ['modelId', 'providerId']);
+
+  const prefix = new PromptBuilder({ store: fx.store, repoRoot: fx.dir, stateDir: fx.dir }).buildStablePrefix({
+    agent: GENERAL,
+    session: fx.session,
+    repoRoot: fx.dir
+  });
+  assert.match(prefix, /create_bot/);
+  assert.match(prefix, /create_room/);
+  assert.match(prefix, /可以创建 bot 和群聊/);
+
+  const visible = (agent, session) => filterToolsForSession({
+    env: {},
+    tools: fx.tools,
+    agent,
+    session,
+    settingsStore: fx.store
+  }).tools.map((tool) => tool.name);
+  const general = visible(GENERAL, fx.session);
+  assert.ok(general.includes('create_bot'));
+  assert.ok(general.includes('create_room'));
+
+  const created = await call(fx, 'create_bot', { name: '未限制' });
+  const openBot = fx.store.getAgent(created.body.bot.id);
+  const canonical = fx.store.getSession(created.body.bot.canonicalSessionId);
+  const botTurn = visible(openBot, canonical);
+  assert.ok(botTurn.includes('create_bot'));
+  assert.ok(botTurn.includes('create_room'));
+
+  const limited = await call(fx, 'bot_update', { bot: created.body.bot.id, allowedTools: ['bot_list'] });
+  assert.equal(limited.ok, true);
+  const narrowed = visible(fx.store.getAgent(created.body.bot.id), fx.store.getSession(created.body.bot.canonicalSessionId));
+  assert.equal(narrowed.includes('create_bot'), false);
+  assert.equal(narrowed.includes('create_room'), false);
+  fx.store.db.close();
+});
+
+test('create_bot stores profile fields and only a model reference [AC:bot-create-named-tools#AC-2]', async () => {
+  const fx = fixture({ skillNames: async () => ['Research'] });
+  const secret = 'sk-create-bot-should-not-store';
+  const provider = await call(fx, 'lab_model_provider_upsert', {
+    name: 'Lab',
+    baseUrl: 'https://api.example.com/v1',
+    modelId: 'lab-model',
+    apiKey: secret
+  });
+  assert.equal(provider.ok, true);
+  const created = await call(fx, 'create_bot', {
+    name: '资料员',
+    title: '文档助手',
+    description: '负责读文档',
+    persona: '说话简短',
+    allowedTools: ['bot_list'],
+    allowedSkills: ['Research'],
+    modelOverride: { providerId: provider.body.provider.id, modelId: 'lab-model' },
+    faceShape: 'star',
+    faceColor: 'blue',
+    avatar: '📚',
+    maxTurns: 48
+  });
+  assert.equal(created.ok, true, JSON.stringify(created.body));
+  assert.equal(created.body.bot.name, '资料员');
+  assert.equal(created.body.bot.title, '文档助手');
+  assert.equal(created.body.bot.description, '负责读文档');
+  assert.equal(created.body.bot.persona, '说话简短');
+  assert.deepEqual(created.body.bot.allowedTools, ['bot_list']);
+  assert.deepEqual(created.body.bot.allowedSkills, ['Research']);
+  assert.deepEqual(created.body.bot.modelOverride, { providerId: provider.body.provider.id, modelId: 'lab-model' });
+  assert.equal(created.body.bot.faceShape, 'star');
+  assert.equal(created.body.bot.faceColor, 'blue');
+  assert.equal(created.body.bot.avatar, '📚');
+  assert.equal(created.body.bot.maxTurns, 48);
+  const session = fx.store.getSession(created.body.bot.canonicalSessionId);
+  const stored = JSON.stringify(session.metadata) + JSON.stringify(fx.store.getBot(created.body.bot.id)) + JSON.stringify(created.body);
+  assert.equal(stored.includes(secret), false);
+  assert.equal(Object.keys(session.metadata).some((key) => /apiKey|token|secret|password/i.test(key)), false);
+  assert.equal(session.metadata.modelOverride.apiKey, undefined);
+  assert.match(fx.store.getAgent(created.body.bot.id).instructions, /说话简短/);
+  fx.store.db.close();
+});
+
+test('create_room stores title, members, and host [AC:bot-create-named-tools#AC-3]', async () => {
+  const fx = fixture();
+  const host = await call(fx, 'create_bot', { name: '主持' });
+  const member = await call(fx, 'create_bot', { name: '成员' });
+  const room = await call(fx, 'create_room', {
+    title: '立项会',
+    botIds: [host.body.bot.id, member.body.bot.name],
+    hostBotId: member.body.bot.name
+  });
+  assert.equal(room.ok, true, JSON.stringify(room.body));
+  assert.equal(room.body.room.title, '立项会');
+  assert.deepEqual(room.body.room.botIds.sort(), [host.body.bot.id, member.body.bot.id].sort());
+  assert.equal(room.body.room.hostBotId, member.body.bot.id);
+  fx.store.db.close();
+});
+
+test('group-chat turns and subagents do not see create_bot or create_room [AC:bot-create-named-tools#AC-4]', async () => {
+  const fx = fixture();
+  const created = await call(fx, 'bot_create', { name: 'Alpha' });
+  const other = await call(fx, 'bot_create', { name: 'Beta' });
+  const room = await call(fx, 'bot_room_create', { title: '群', botIds: [created.body.bot.id, other.body.bot.id] });
+  const canonical = fx.store.getSession(created.body.bot.canonicalSessionId);
+  const names = (session) => filterToolsForSession({
+    env: {},
+    tools: fx.tools,
+    agent: fx.store.getAgent(created.body.bot.id),
+    session,
+    settingsStore: fx.store
+  }).tools.map((tool) => tool.name);
+  const roomTurn = names({ ...canonical, metadata: { ...canonical.metadata, roomId: room.body.room.id } });
+  assert.equal(roomTurn.includes('create_bot'), false);
+  assert.equal(roomTurn.includes('create_room'), false);
+  const child = filterToolsForSession({
+    env: {},
+    tools: fx.tools,
+    agent: GENERAL,
+    session: { ...fx.session, mode: 'subagent' },
+    settingsStore: fx.store
+  }).tools.map((tool) => tool.name);
+  assert.equal(child.includes('create_bot'), false);
+  assert.equal(child.includes('create_room'), false);
+  fx.store.db.close();
+});
+
+test('create_bot refuses secrets and a model that has no lab key [AC:bot-create-named-tools#AC-5]', async () => {
+  const fx = fixture();
+  for (const extra of [
+    { apiKey: 'sk-should-not-land' },
+    { token: 'tok-should-not-land' },
+    { secret: 'sec-should-not-land' },
+    { password: 'pw-should-not-land' },
+    { modelOverride: { providerId: 'p', modelId: 'm', apiKey: 'sk-nested' } }
+  ]) {
+    const refused = await call(fx, 'create_bot', { name: '不该出现', ...extra });
+    assert.equal(refused.ok, false, JSON.stringify(extra));
+    assert.match(refused.body.error, /用实验室里已配置的模型/);
+    assert.match(refused.body.error, /不要读取/);
+    assert.equal(fx.store.getBotByName('不该出现'), undefined);
+  }
+  const bare = await call(fx, 'lab_model_provider_upsert', {
+    name: 'No Key',
+    baseUrl: 'https://api.example.com/v1',
+    modelId: 'needs-key'
+  });
+  assert.equal(bare.ok, true);
+  const created = await call(fx, 'create_bot', {
+    name: '仍可创建',
+    modelOverride: { providerId: bare.body.provider.id, modelId: 'needs-key' }
+  });
+  assert.equal(created.ok, true, JSON.stringify(created.body));
+  assert.equal(created.body.bot.modelOverride, null);
+  assert.match(created.body.modelNotice, /用实验室里已配置的模型/);
+  assert.match(created.body.modelNotice, /不要读取/);
+  const session = fx.store.getSession(created.body.bot.canonicalSessionId);
+  const stored = JSON.stringify(session.metadata);
+  assert.equal(stored.includes('apiKey'), false);
+  assert.equal(session.metadata.modelOverride, undefined);
+  fx.store.db.close();
+});
+
 test('project creation validates roots before persisting and retains the selected primary directory', async () => {
   const fx=fixture();
   const invalid=await call(fx,'lab_project_create',{name:'bad',roots:[{path:join(fx.dir,'missing')}]});

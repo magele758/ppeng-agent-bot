@@ -1,11 +1,13 @@
-/** Product-admin tools a delegated child must not inherit. Room turns already drop every `bot_*` / `lab_*` name. */
+/** Product-admin tools a delegated child must not inherit. Room turns drop every `bot_*` / `lab_*` name and these aliases. */
 const EXACT = new Set([
   'bot_list',
   'bot_get',
   'bot_create',
+  'create_bot',
   'bot_update',
   'bot_open',
-  'bot_work_control_set'
+  'bot_work_control_set',
+  'create_room'
 ]);
 
 export function isDelegatedProductAdminTool(name: string): boolean {
