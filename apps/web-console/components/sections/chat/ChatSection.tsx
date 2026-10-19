@@ -6,6 +6,7 @@ import { filterSessionsByQuery } from '@ppeng/api-types';
 import { api } from '@/lib/api';
 import { pickDefaultAgentId } from '@/lib/default-agent';
 import { useI18n } from '@/lib/i18n';
+import { leaveCancelsRun } from '@/lib/run-leave';
 import { createDefaultBotLoadGuard, startDefaultBotLoadEffect } from '@/lib/bot-console-selection';
 import {
   botForCanonicalSession,
@@ -213,8 +214,9 @@ export function ChatSection({ active }: { active: boolean }) {
         const sess = sessionsRef.current.find((s) => s.id === id);
         if (sess?.agentId) chat.setAgentId(sess.agentId);
       }
+      const panel = chat.refreshPlayPanel();
       await loadOverview();
-      await chat.refreshPlayPanel();
+      await panel;
       chat.requestScrollPlayToBottom();
       return surface;
     },
@@ -310,9 +312,10 @@ export function ChatSection({ active }: { active: boolean }) {
           tick({ includePlayPanel: true })
         )
       }
-      onCancelSession={() =>
-        void api(`/api/sessions/${selectedSessionId}/cancel`, { method: 'POST' }).then(() => tick())
-      }
+      onCancelSession={() => {
+        if (!selectedSessionId || !leaveCancelsRun('stop')) return;
+        void api(`/api/sessions/${selectedSessionId}/cancel`, { method: 'POST' }).then(() => tick());
+      }}
       onOpenTrace={() => navigate('settings', 'ops', 'trajectory')}
       onApprovalsChanged={() => void tick({ includePlayPanel: true })}
       onAttachStream={(sessionId) => chat.armLiveSessionStream(sessionId)}

@@ -1450,7 +1450,11 @@ export class RawAgentRuntime {
       this.emitTrace(sessionId, { kind: 'stale_writer_rejected', payload: { channel: 'model_stream' } });
       return;
     }
-    direct?.(chunk);
+    try {
+      direct?.(chunk);
+    } catch (error) {
+      this.log.warn('model stream direct listener failed', { sessionId, error: String(error) });
+    }
     const listeners = this.modelStreamListeners.get(sessionId);
     if (!listeners) return;
     for (const listener of [...listeners]) {
@@ -1504,8 +1508,9 @@ export class RawAgentRuntime {
       hooks?: KernelHookRegistry;
       onEvent?: KernelHookListener;
       /**
-       * Cancels the run (same as `cancelSession`) when aborted, e.g. the SSE client
-       * went away. Ignored when the call joins a run that is already in flight.
+       * Cancels the run (same as `cancelSession`) when aborted. Only an explicit
+       * stop should pass this. A dropped SSE connection is not a user cancel.
+       * Ignored when the call joins a run that is already in flight.
        */
       signal?: AbortSignal;
     }

@@ -50,5 +50,9 @@ export function sseSend(
   data: unknown
 ): void {
   if (response.destroyed || response.writableEnded) return;
-  response.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  try {
+    response.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  } catch {
+    /* A disconnected client must not fail the run that is still writing. */
+  }
 }

@@ -40,28 +40,45 @@ export function streamPaintApplies(activeGeneration: number, paintGeneration: nu
 }
 
 /**
- * What the main transcript should draw for the selected session.
- * Saved messages stay as given. Optimistic bubbles, the streaming placeholder,
- * and the waiting 「…」 only stay when they belong to that session.
+ * A fetched transcript belongs on screen only for the session it was loaded for.
+ * An empty id means nothing foreign is loaded yet.
  */
-export function screenLiveTurn<T>(input: {
+export function transcriptBound(
+  loadedSessionId: string | null | undefined,
+  selectedSessionId: string | null
+): boolean {
+  if (loadedSessionId == null || loadedSessionId === '') return true;
+  return loadedSessionId === selectedSessionId;
+}
+
+/**
+ * What the main transcript should draw for the selected session.
+ * Messages loaded for another session stay off screen, including text that
+ * already streamed. Optimistic bubbles, the streaming placeholder, and the
+ * waiting 「…」 only stay when this session owns the live turn.
+ */
+export function screenLiveTurn<T extends readonly unknown[]>(input: {
   selectedSessionId: string | null;
-  messages: readonly T[];
+  loadedSessionId?: string | null;
+  messages: T | [];
   liveSessionId: string | null;
   optimisticUser: string | null;
   hasStream: boolean;
   waitTyping: boolean;
   playSending: boolean;
 }): {
-  messages: readonly T[];
+  messages: T | [];
+  bound: boolean;
   optimisticUser: string | null;
   hasStream: boolean;
   waitTyping: boolean;
   playSending: boolean;
 } {
-  const show = liveTurnBelongsToSelection(input.liveSessionId, input.selectedSessionId);
+  const bound = transcriptBound(input.loadedSessionId, input.selectedSessionId);
+  const show = bound && liveTurnBelongsToSelection(input.liveSessionId, input.selectedSessionId);
   return {
-    messages: input.messages,
+    messages: bound ? input.messages : [],
+    bound,
     optimisticUser: show ? input.optimisticUser : null,
     hasStream: show && input.hasStream,
     waitTyping: show && input.waitTyping,

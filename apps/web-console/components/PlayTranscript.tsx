@@ -220,6 +220,7 @@ function transcriptView(chat: Chat, approvals: ApprovalItem[], lines: Array<stri
 }
 
 function feedIsEmpty(chat: Chat): boolean {
+  if (chat.transcriptReady === false) return false;
   return !chat.optimisticUser && chat.sessionMessages.length === 0 && !chat.streamOverlay && !chat.waitTyping;
 }
 
