@@ -118,6 +118,7 @@ test.describe('Chat experience', () => {
     await page.goto('/');
     await page.locator('#nav-bot').click();
     await page.locator('#sessionListMini .list-item--bot-chat').first().click();
+    await expect(page.getByTestId('bot-detail-toggle')).toHaveCount(1);
     const manage = page.locator('#panel-play').getByRole('link', { name: /的权限设置/ });
     await expect(manage.first()).toBeVisible();
     await manage.first().click();

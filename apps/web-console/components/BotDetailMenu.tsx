@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { botPermissionsHref } from '@/lib/bot-chat-header';
 import {
   commitRoutineEnabled,
   presentMemoryValue,
@@ -277,4 +278,12 @@ export function BotDetailToggle({ botId, open, onToggle }: { botId: string; open
 export function BotDetailPane({ visible, botId, botName, agentId }: { visible: boolean; botId: string; botName: string; agentId?: string }) {
   if (!visible) return null;
   return <BotDetailMenu key={botId} botId={botId} botName={botName || botId} agentId={agentId || botId} />;
+}
+
+export function BotPermissionsLink({ botId, botName }: { botId: string; botName: string }) {
+  const { t } = useI18n();
+  if (!botId) return null;
+  return <a className="chat-panel-header__permissions" href={botPermissionsHref(botId)} data-testid="chat-header-permissions" aria-label={t('play.header.permissionsAria', { name: botName })}>
+    {t('play.header.permissions')}
+  </a>;
 }
