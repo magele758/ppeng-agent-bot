@@ -1,5 +1,5 @@
 /**
- * WAL writer claim (A4 / Phase 3). Empty claim = legacy append-always.
+ * WAL writer claim (A4 / Phase 3). Empty claim permits legacy writes without an explicit expected id.
  * A non-empty `activeWriterRunId` requires a matching expected / bound id.
  */
 
@@ -29,7 +29,10 @@ export function assertWriterClaim(input: {
   boundWriterRunId?: string;
 }): void {
   const active = input.activeWriterRunId || undefined;
-  if (!active) return;
+  if (!active) {
+    if (input.expectedWriterRunId !== undefined) throw new WriterClaimError(input.sessionId, input.expectedWriterRunId, undefined);
+    return;
+  }
   const expected = input.expectedWriterRunId ?? input.boundWriterRunId;
   if (expected !== active) {
     throw new WriterClaimError(input.sessionId, expected, active);

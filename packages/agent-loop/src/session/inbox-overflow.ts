@@ -98,15 +98,31 @@ export function planInboxOverflow<T>(unclaimed: readonly T[], cap: number | null
 }
 
 export function summarizeInboxOverflow(
-  items: ReadonlyArray<Pick<InboxItem, 'role' | 'text' | 'target'>>
+  items: ReadonlyArray<Pick<InboxItem, 'role' | 'text' | 'target' | 'contextParts' | 'key'>>
 ): string {
-  const lines = items.map((item, i) => {
-    const role = item.role ?? 'user';
-    const target = item.target ?? 'next-step';
-    return `${i + 1}. [${role}/${target}] ${clip(item.text ?? '', ITEM_TEXT_MAX)}`;
-  });
-  const head = `${INBOX_OVERFLOW_PREFIX} ${items.length} older unclaimed item(s) summarized (drop=summarize):`;
-  return clip([head, ...lines].join('\n'), SUMMARY_MAX);
+  let summary = `${INBOX_OVERFLOW_PREFIX} ${items.length} older unclaimed item(s) summarized (drop=summarize):`;
+  const neutralize = (text: string) => text.replaceAll('«end external»', '‹end external›').replaceAll('«external', '‹external');
+  for (const [index, item] of items.entries()) {
+    const line = `${index + 1}. [${item.role ?? 'user'}/${item.target ?? 'next-step'}] ${clip(neutralize(item.text ?? ''), ITEM_TEXT_MAX)}`;
+    const remaining = SUMMARY_MAX - summary.length - 1;
+    if (remaining <= 0) break;
+    // Re-folded summaries may themselves contain attachment excerpts. Keep their boundary intact.
+    if (item.key !== INBOX_OVERFLOW_KEY) summary += '\n' + clip(line, remaining);
+    const excerpts = item.key === INBOX_OVERFLOW_KEY ? [item.text] : (item.contextParts ?? []).flatMap(part => {
+      if (!part.contextSources?.length) return [part.text];
+      return part.contextSources.flatMap(source => source.kind === 'file'
+        ? [source.name + '\n' + source.text]
+        : source.entries.length ? source.entries.map(entry => source.name + '/' + entry.path + '\n' + entry.text) : [source.name]);
+    });
+    if (!excerpts.length) continue;
+    const start = '\n«external source=attachment label="inbox excerpt"»\n';
+    const end = '\n«end external»';
+    const budget = Math.min(480, SUMMARY_MAX - summary.length - start.length - end.length);
+    if (budget <= 0) continue;
+    // Clip the body before adding delimiters, never clip away the closing fence.
+    summary += start + clip(neutralize(excerpts.join('\n')), budget) + end;
+  }
+  return summary;
 }
 
 /**

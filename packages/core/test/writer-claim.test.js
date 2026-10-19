@@ -51,6 +51,8 @@ test('claimed writer: matching expected/bound appends; expired run is rejected',
     (err) => err instanceof WriterClaimError && err.code === 'WRITER_CLAIM_MISMATCH'
   );
 
+  assert.throws(() => store.claimWriter(session.id, 'run_b'), WriterClaimError);
+  store.releaseWriter(session.id, 'run_a');
   store.claimWriter(session.id, 'run_b');
   assert.throws(
     () =>
@@ -83,4 +85,47 @@ test('MemorySurfaceStore writer claim matches SQLite semantics', () => {
       }),
     WriterClaimError
   );
+});
+
+test('expired async generation cannot write into an empty or successor claim [AC:session-multiprocess-state-consistency#AC-2]', async () => {
+  const store = tmpStore(), session = sessionOf(store);
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  try {
+    store.claimWriter(session.id, 'old');
+    const old = store.runWithWriter(session.id, 'old', async () => {
+      await gate;
+      assert.throws(() => store.updateSession(session.id, { status: 'failed' }), WriterClaimError);
+      assert.throws(() => store.appendMessage(session.id, 'assistant', [{ type: 'text', text: 'late' }]), WriterClaimError);
+    });
+    store.releaseWriter(session.id, 'old');
+    store.claimWriter(session.id, 'new');
+    store.updateSession(session.id, { status: 'running' });
+    release(); await old;
+    assert.equal(store.getSession(session.id).status, 'running');
+    assert.equal(store.getSession(session.id).activeWriterRunId, 'new');
+    assert.equal(store.listMessages(session.id).length, 0);
+    store.releaseWriter(session.id, 'new');
+    await store.runWithWriter(session.id, 'old', async () => {
+      assert.throws(() => store.updateSession(session.id, { status: 'failed' }), WriterClaimError);
+    });
+    for (const surface of [store, createMemorySurfaceStore()]) {
+      const id = surface === store ? session.id : surface.createSession({ title: 'empty', mode: 'chat', agentId: 'general' }).id;
+      assert.throws(() => surface.appendMessage(id, 'assistant', [{type:'text',text:'expired'}], {expectedWriterRunId:'old'}), WriterClaimError);
+      surface.appendMessage(id, 'user', [{type:'text',text:'legacy without explicit generation'}]);
+    }
+  } finally { store.db.close(); }
+});
+
+test('closing a store releases only its own OS-held writer handle [AC:session-multiprocess-state-consistency#AC-1]', () => {
+  const first=tmpStore(), session=sessionOf(first), second=new SqliteStateStore(first.dbPath);
+  try {
+    first.claimWriter(session.id,'first');
+    assert.throws(()=>second.claimWriter(session.id,'second'),WriterClaimError);
+    first.db.close();
+    second.claimWriter(session.id,'second');
+    assert.equal(second.getSession(session.id).activeWriterRunId,'second');
+    second.releaseWriter(session.id,'first');
+    assert.equal(second.getSession(session.id).activeWriterRunId,'second');
+  } finally { if(first.db.isOpen)first.db.close();second.db.close(); }
 });

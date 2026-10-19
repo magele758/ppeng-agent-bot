@@ -1,0 +1,191 @@
+{
+  "schema": 1,
+  "date": "2026-10-19",
+  "status": "pass",
+  "node": "v26.7.0",
+  "repairSpecification": "session-restart-recovery-state-consistency",
+  "repairStatus": "implemented",
+  "verificationStatus": "implemented",
+  "acceptanceCriteriaChanged": false,
+  "initialRed": {
+    "tests": 4,
+    "failed": 4,
+    "reason": "real process state/writer/approval/model-view counterexamples before product changes"
+  },
+  "verification": {
+    "command": "npm run test:restart",
+    "exitCode": 0,
+    "scenarios": 43,
+    "passed": 43,
+    "model": {
+      "status": "pass",
+      "exhausted": true,
+      "states": 874,
+      "transitions": 1664
+    },
+    "mutations": {
+      "status": "pass",
+      "restored": true,
+      "controls": [
+        {
+          "name": "running",
+          "killed": true,
+          "loaded": true
+        },
+        {
+          "name": "retry",
+          "killed": true,
+          "loaded": true
+        },
+        {
+          "name": "approval",
+          "killed": true,
+          "loaded": true
+        }
+      ]
+    },
+    "lifecycle": "pass",
+    "pairing": "pass"
+  },
+  "tests": {
+    "core": {
+      "total": 2896,
+      "passed": 2893,
+      "failed": 0,
+      "skipped": 3
+    },
+    "verificationAndRepair": {
+      "total": 36,
+      "passed": 36,
+      "failed": 0
+    },
+    "daemonAndGatePolicy": {
+      "total": 10,
+      "passed": 10,
+      "failed": 0
+    },
+    "sdk": {
+      "files": 41,
+      "passed": 407,
+      "failed": 0
+    },
+    "originalFormal": {
+      "passed": 25,
+      "failed": 0
+    },
+    "node22": {
+      "version": "22.21.1",
+      "passed": 11,
+      "failed": 0,
+      "scope": "file-lock, live-owner guard and eight selected real repair process scenarios"
+    },
+    "e2e": {
+      "startTime": "2026-10-19T04:54:35.424Z",
+      "duration": 96563.128,
+      "expected": 160,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0,
+      "errors": []
+    },
+    "acceptance": {
+      "specs": 87,
+      "byStatus": {
+        "draft": 4,
+        "approved": 8,
+        "implemented": 75,
+        "retired": 0
+      },
+      "criteria": 575,
+      "gatedCriteria": 496,
+      "gatedOk": 496
+    }
+  },
+  "builds": {
+    "workspaceTypeScript": "pass",
+    "nextProduction": "pass"
+  },
+  "gate": {
+    "command": "npm run test:formal",
+    "exitCode": 0
+  },
+  "sourceChanges": [
+    "packages/core/src/runtime.ts",
+    "packages/core/src/runtime/restart-recovery.ts",
+    "packages/core/src/teams/fd-lock.ts"
+  ],
+  "coordination": "Existing OS-owned SQLite file lock; no PID leases, heartbeats, new environment flags or SDK source changes",
+  "testAlignment": "Old subagent acceptance unchanged: subagents stay unknown/non-replayed, ordinary chats are not unknown; the obsolete running assertion now checks approved failed/process_interrupted semantics.",
+  "sourceSha256": {
+    "packages/core/src/runtime.ts": "564ec8bd814186794803cf9f1da679ad9812f8e79ef1dc24361a3ec31b400ba1",
+    "packages/core/src/storage.ts": "f5f0c0d086b048673b5085b3ee1445db0fa6eddd3159a4f73dedc2674c5b2406",
+    "packages/core/src/stores/session-store.ts": "3656a432d9e476510d316d834d5b313b4f7e18040e0f20922e5b925acccebff7",
+    "packages/core/src/bots/bot-work.ts": "fe8708116611653f9668e9117310afdebb832bda62e0ef3f7e8763e5d5afa77f",
+    "packages/core/src/runtime/subagent-policy.ts": "f74fbe1b3d10b987802b664e1ceb5a83e7aafeb908c2de67c3d2a343ae97a2f9",
+    "packages/core/src/runtime/session-control.ts": "9869b0ab5ba9f37cf14ed743ffffea44f38925c57b6e0c4c2a0991880d16101d",
+    "packages/core/src/runtime/session-facade.ts": "45aae9ab02186bb71c36ac212b28b22cc141f7070d20c2fb4afa3286e6c756de",
+    "apps/daemon/src/server.ts": "263f0f69871cdd03fc04d5324b95cd9f956e056147f870ff909bf40813f48e04",
+    "packages/agent-loop/src/turn/kernel.ts": "d2d6b09fae61eca58195082fff8899cfef3df7bb395395a4814d4fb10df67769",
+    "packages/agent-loop/src/session/surface-store.ts": "ec9f7ce06469f0d4b4fceb61635812215e820ab480edb697f3536b03620fa0f0",
+    "packages/agent-loop/src/session/interrupt.ts": "1842240883d68a0ca20da065c9d2ba238a24a782bca5f9148f0da51026236f96",
+    "packages/agent-loop/src/session/run-outcome.ts": "e373fac7f6f8341b6a7a043af1ef28a6aab031d805cfb5cd0f0194951eceb615",
+    "packages/agent-loop/src/runtime/tool-loop.ts": "078644ec84986d12ca1fb62ae3a61cad62a0f8e21bfa57519d506b4f14a202e2",
+    "packages/core/src/runtime/tool-loop.ts": "3460b499277d910a3ee5a36c8ca4bcafbf0821f318b8f727bba390f25031fc65",
+    "packages/core/src/session/tool-wave-close.ts": "ee706916e65e394883004418482916671b2dd095c01336289d660c2d86a3f568",
+    "packages/core/src/session/context-stack.ts": "90fc635977e08317238a3b82efb4d13cd04afcea9cd21620a8767cadbe071528",
+    "packages/core/src/runtime/l5-bindings.ts": "0c07c5753b0f6fca65dccb9912dc4a0cfa2283990a0dd828d52f9118089c2049",
+    "packages/agent-loop/src/assembly/create-assembled-loop.ts": "acae47516f5b679639849351381b4d7a746ddcd07e1a1a2e3ddf52373b87eaf9",
+    "packages/agent-loop/src/assembly/max-host.ts": "95e8997dbc33e67efe5bd6f0d0746418989b23749e8f8f7b8bfbbb2a501fac4a",
+    "scripts/formal/restart-model.mjs": "c7483dbecc5d2824676c859b48c20c17b1b6c049b4c931ceb32d5b1200a873b4",
+    "scripts/formal/restart-child.mjs": "dcab76a03260ed6e39dc1f6b77b21e267d963484f71c2e4f98338bbcb20b43eb",
+    "scripts/formal/restart-runtime.mjs": "1bab66f44dff0d4e384bfcd7d1b5dcb3235d5c80271ea0637f210bdca29455be",
+    "scripts/formal/restart-mutations.mjs": "cbb27c1138047f4d73126915bd7b1c3f89c26e1cf9d6c0c44b4770ffaa577566",
+    "scripts/formal/restart-loader.mjs": "aa887d684428e6f87739c54ea3ecedc980899bee4f7371c2fbc5eff5d4219d07",
+    "scripts/formal/restart-register.mjs": "c71bf5d2e38f67946781dfaa0370caa4a659b63183ebfc47d6e25f91ec022f20",
+    "scripts/formal/restart-verifier.mjs": "d33821317c10379f236648f6b7d1503a9ce4124ef852da7b16594e75a5bd3a62",
+    "scripts/formal/restart-worker.mjs": "179b8b4256c8983e2f080e8552b92b3b7bf6e516a4cf9f2e2c2284875d329098",
+    "scripts/formal/run-restart-verification.mjs": "726c99039230adb4ac651976feae4921c0bb8b729485b4d4f41fe802290da293",
+    "scripts/test/session-restart-recovery-verification.test.mjs": "4c072a4b33544d54eeaa8ea3490ea7e54526dffa46f02a9779e93c9dcab41221",
+    "skills/verify-session-restart/SKILL.md": "66569f64d0c44cf822e7cbdb30fdf858e9400da34de9c219e02ae62b28708298",
+    "package.json": "6530ef150780fdc0dfa9e3003310533cbea221e59edfaf0b6576c1fddbf2fd78",
+    "scripts/formal/run-formal-regression.mjs": "9e9f7337fac1cb5febea7290aace852aff3c32d4adf7196b03effb3d8dc4dcb6",
+    ".github/workflows/release-gate.yml": "e34b0dfdc16dc3f19a6f405136eaa493dd81f6b5a6318e01b6804fb4223faefb",
+    "scripts/formal/lifecycle-verifier.mjs": "92ccfc90ab23a79031c5280cdf02bdaaf8dabadeb1dcbdf23d035f5718ab2226",
+    "scripts/formal/pairing-verifier.mjs": "dada48c004b65153c9aabaea8737c6c626dfb9f351dff507b77ae419d6a4ed58",
+    "scripts/formal/restart-cases.mjs": "52101fb273241e7bdafabf5d5bff91c3dca25d14729c9b5376f518e92e17ca78",
+    "packages/core/src/session/writer-claim.ts": "48dbe681713d9049fc19510b61bbd99774170c7da79e496dc994ee80ac11efff",
+    "packages/agent-loop/src/session/writer-claim.ts": "b00eb1de3ad5640f0d5bf9eaac323f476ae12923bae613bf2bc45f8ae19c3bb0",
+    "packages/core/src/turn/prepare-view.ts": "f57ef6b40a45f346182f899a0287239e2f42e3d03b77bd6e088e3ff6bda1c941",
+    "acceptance/session-restart-recovery-verification.yaml": "e51ba546dc35cbc0cb79fe46342b78597ac76b06f58c2402134d3f1291ecf70c",
+    "acceptance/session-lifecycle-verification.yaml": "1515638ee7076c29d195dd32704a816fb586cc1750189a523d3d3045bb572db3",
+    "acceptance/session-lifecycle-state-consistency.yaml": "cf4af95c0938e1c4c493cc360ea0e37a307e715614d631331ef341244341d3b8",
+    "acceptance/tool-call-pairing-verification.yaml": "f8c593809d9020a7415d784bb078ac145a047f8dfa8f2a9b6bd19cd48707864a",
+    "acceptance/tool-call-pairing-batch-dedup.yaml": "2dfdc5c23baf08eb9f8c4dfaf545579113825df9576c63915692d2e486e538ae",
+    "packages/core/src/runtime/restart-recovery.ts": "5a8fa95d94b6e2154a221f9674225e1ee8e95783c76e66a45517f6ce898ea735",
+    "packages/core/test/restart-recovery-ownership.test.js": "41cb87b87fdb196c8dbd04f3497b15d85cb5d4d04d609f1d11475ca4c5d5589e",
+    "scripts/test/session-restart-recovery-fix.test.mjs": "fa6bd2422b8a9802014c6438f3a6f435c697559b8c1a5207fa356dd65aafc460",
+    "acceptance/session-restart-recovery-state-consistency.yaml": "ba443aab253e1545934abe88a53b1ab017030051d05b49b626a7f8c0d4aef116",
+    "packages/core/test/subagent-delegation-policy.test.js": "0c6e2eecc3befd802e41ad358e7fce2dbd46586cab06859bf869e8c2830a08a8",
+    "packages/core/src/teams/fd-lock.ts": "d57a0749119f69108c5da9d47f93b4c6ad937c00b1e4115cc923a7c4957e3735"
+  },
+  "rawReportSha256": "c483fa7e223d7870e1eef4b4245ac3f446c354d6735421fa2bd304ce5f938a43",
+  "originalFailureEvidence": "doc/formal/session-restart-recovery-evidence.json",
+  "rawEvidenceDirectory": "coverage/formal/restart/fix",
+  "developmentService": {
+    "lab": "http://127.0.0.1:23000",
+    "daemon": "http://127.0.0.1:37070",
+    "health": [
+      200,
+      200
+    ],
+    "note": "Original development process paused for the E2E production build. Another live development instance was present at completion; duplicate relaunch exited on occupied web port, its temporary daemon cleaned up, and the generated ports file was repaired to the verified live instance.",
+    "uiHealth": 200
+  },
+  "limitations": [
+    "power loss, corrupt storage or schema migration",
+    "simultaneous process writers",
+    "Bot queue and independent scheduler recovery protocols",
+    "live upstreams, arbitrary tool effects and UI",
+    "unbounded restarts, retries and approvals"
+  ]
+}

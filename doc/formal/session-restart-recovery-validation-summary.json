@@ -1,0 +1,113 @@
+{
+  "schema": 1,
+  "date": "2026-10-19",
+  "verificationImplemented": true,
+  "acceptanceStatus": "approved",
+  "overallStatus": "fail",
+  "reportSha256": "ca5817292e0e2e26ede7329f57fd65d613780b5dc55ac683aae55a7d59690b5c",
+  "node": "v26.7.0",
+  "model": {
+    "status": "pass",
+    "exhausted": true,
+    "states": 874,
+    "transitions": 1664
+  },
+  "realProcesses": {
+    "completed": true,
+    "scenarios": 43,
+    "passed": 15,
+    "failed": 28,
+    "failedCriteria": [
+      "AC-1",
+      "AC-2",
+      "AC-5",
+      "AC-7",
+      "AC-9"
+    ]
+  },
+  "mutations": {
+    "status": "pass",
+    "restored": true,
+    "controls": [
+      {
+        "name": "running",
+        "loaded": true,
+        "killed": true,
+        "counterexample": "terminal-completed-task-SIGKILL"
+      },
+      {
+        "name": "retry",
+        "loaded": true,
+        "killed": true,
+        "counterexample": "retry-cancelled-chat-SIGKILL"
+      },
+      {
+        "name": "approval",
+        "loaded": true,
+        "killed": true,
+        "counterexample": "approval-partial-approved-chat-SIGKILL"
+      }
+    ]
+  },
+  "tests": {
+    "initialRed": {
+      "total": 13,
+      "failed": 13,
+      "reason": "verification module not yet implemented"
+    },
+    "acceptanceAndExisting": {
+      "total": 32,
+      "passed": 27,
+      "failed": 5,
+      "skipped": 0
+    },
+    "coreAndGate": {
+      "total": 44,
+      "passed": 44,
+      "failed": 0
+    },
+    "originalFormal": {
+      "total": 25,
+      "passed": 25,
+      "failed": 0
+    },
+    "wrapperAfterTimeoutHardening": {
+      "total": 2,
+      "passed": 2,
+      "failed": 0
+    },
+    "timeoutDescendantProbe": {
+      "status": "pass",
+      "workerStatus": "incomplete",
+      "heartbeatBefore": 34,
+      "heartbeatAfter": 34,
+      "descendantStopped": true
+    },
+    "staticAcceptance": {
+      "specs": 86,
+      "byStatus": {
+        "draft": 4,
+        "approved": 9,
+        "implemented": 73,
+        "retired": 0
+      },
+      "criteria": 568,
+      "gatedCriteria": 492,
+      "gatedOk": 492
+    }
+  },
+  "commands": [
+    {
+      "command": "npm run test:restart",
+      "exitCode": 1
+    },
+    {
+      "command": "npm run test:formal",
+      "exitCode": 1,
+      "reason": "existing pairing/lifecycle passed; new restart gate rejected real product counterexamples"
+    }
+  ],
+  "newProductCodeChanges": false,
+  "repairDraft": "acceptance/session-restart-recovery-state-consistency.yaml",
+  "rawEvidenceDirectory": "coverage/formal/restart"
+}

@@ -21,6 +21,9 @@ coverage/
 packages/*/coverage/
 *.tsbuildinfo
 .agent-state/
+# Local SSH credentials and isolated E2E workspace copies.
+.agent-ssh/
+.e2e-web-tmp/
 # Playwright persistent profiles (cookies / local storage). Never commit.
 browser-profiles/
 .evolution-worktrees/

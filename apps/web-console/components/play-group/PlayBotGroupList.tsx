@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { BotInfo } from '@/lib/types';
 import { api } from '@/lib/api';
+import { sameData } from '@/lib/same-data';
 import { useI18n } from '@/lib/i18n';
 import {
   BOT_GROUPS_CHANGED_EVENT,
@@ -53,7 +54,8 @@ export function PlayBotGroupList({
         .then((data) => {
           if (!active || revision !== roomRevision.current) return;
           const list = (data as { rooms?: Room[] }).rooms;
-          setRooms(Array.isArray(list) ? list : []);
+          const next = Array.isArray(list) ? list : [];
+          setRooms((prev) => (sameData(prev, next) ? prev : next));
         })
         .catch(() => {
           // Preserve the last known list on a transient polling failure.

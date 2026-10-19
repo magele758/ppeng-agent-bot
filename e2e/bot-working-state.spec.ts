@@ -1,7 +1,7 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from './helpers/bot-pair';
 
-test('actual work switches list idle motion to continuous work and back across refresh [AC:bot-list-idle-motion#AC-2] [AC:bot-working-animation#AC-1] [AC:bot-working-animation#AC-2] [AC:bot-working-animation#AC-3] [AC:bot-working-animation#AC-4]',async({page})=>{
- const {bots}=await (await page.request.get('/api/bots')).json();expect(bots.length).toBeGreaterThan(1);
+test('actual work switches list idle motion to continuous work and back across refresh [AC:bot-list-idle-motion#AC-2] [AC:bot-working-animation#AC-1] [AC:bot-working-animation#AC-2] [AC:bot-working-animation#AC-3] [AC:bot-working-animation#AC-4]',async({page,botPair:bots})=>{
+ expect(bots.length).toBeGreaterThan(1);
  const [a,b]=bots;let counts:Record<string,number>={};let observed=-1;
  await page.route('**/api/bot-work/status',r=>{observed=counts[a.id]??0;return r.fulfill({json:{bots:bots.map((bot:{id:string})=>({bot,activeWorkCount:counts[bot.id]??0}))}});});
  const room={id:'working-state-probe',title:'Working state probe',botIds:[a.id,b.id],hostBotId:a.id,status:'active',maxBotTurns:2};

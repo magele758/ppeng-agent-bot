@@ -1,0 +1,1191 @@
+{
+  "recordedAt": "2026-10-19",
+  "redPhase": {
+    "command": "node --test scripts/test/tool-call-pairing-verification.test.mjs",
+    "passed": 0,
+    "failed": 8,
+    "reason": "ERR_MODULE_NOT_FOUND: pairing-verifier.mjs did not exist before implementation"
+  },
+  "currentTests": {
+    "passed": 7,
+    "failed": 1,
+    "failingCriterion": "tool-call-pairing-verification#AC-2",
+    "finding": "F-1 duplicate-batch"
+  },
+  "runtimeComparison": {
+    "versions": [
+      "v26.7.0",
+      "v22.21.1"
+    ],
+    "identicalExceptRuntime": true
+  },
+  "verification": {
+    "schema": 1,
+    "status": "fail",
+    "runtime": "v26.7.0",
+    "scope": {
+      "checker": "pairing-explicit-state/1",
+      "properties": [
+        "one result per call occurrence",
+        "prior matching call",
+        "result provenance",
+        "pending is not completed"
+      ],
+      "bounds": {
+        "calls": 2,
+        "retriesPerCall": 1,
+        "approvalWaitsPerCall": 1,
+        "duplicateBatchesPerCall": 1,
+        "duplicateDeliveriesPerCall": 1
+      },
+      "assumptions": [
+        "One writer; synchronous append of a message is indivisible; no callback re-entry into persistence.",
+        "The model starts after two distinct call ids are recorded in one wave; all enabled event orders are explored.",
+        "Success, failure, unknown-tool and rejection abstract arbitrary payloads; retry occurs before persistence.",
+        "Cancellation closes outstanding calls; a normal end requires all calls settled; no liveness claim.",
+        "The design model specifies deduplication even within a returned batch; source probes independently check that promise."
+      ],
+      "exclusions": [
+        "process kill, power loss, storage corruption",
+        "multiple writers and external side effects",
+        "unbounded calls/retries",
+        "full kernel, database, network and UI execution; source probes cover the mapped component boundary"
+      ]
+    },
+    "review": {
+      "status": "reviewed",
+      "changed": [],
+      "mapping": [
+        {
+          "step": "Execute/approval/result persistence and fold recovery; real source component probes (not a full kernel proof)",
+          "files": [
+            "packages/agent-loop/src/approval/approval-policy.ts",
+            "packages/agent-loop/src/approval/permission-mode.ts",
+            "packages/agent-loop/src/helpers.ts",
+            "packages/agent-loop/src/model/tool-result-problem.ts",
+            "packages/agent-loop/src/model/upstream-error.ts",
+            "packages/agent-loop/src/recovery/find-similar-tool-name.ts",
+            "packages/agent-loop/src/recovery/pair-unmatched-tool-calls.ts",
+            "packages/agent-loop/src/recovery/unknown-tool-result.ts",
+            "packages/agent-loop/src/runtime/dirty-input-gate.ts",
+            "packages/agent-loop/src/runtime/tool-loop.ts",
+            "packages/agent-loop/src/session/surface-invariants.ts",
+            "packages/agent-loop/src/session/tool-wave-close.ts",
+            "packages/agent-loop/src/streaming/index.ts",
+            "packages/agent-loop/src/streaming/reasoning-spin-watchdog.ts",
+            "packages/agent-loop/src/streaming/repetition-watchdog.ts",
+            "packages/agent-loop/src/streaming/stream-reset.ts"
+          ]
+        },
+        {
+          "step": "Caller wiring reviewed: serialized kernel invokes host persistence; cancellation closes the fold. Same-batch dedup differs from the model (F-1).",
+          "files": [
+            "packages/agent-loop/src/turn/kernel.ts",
+            "packages/core/src/runtime/tool-loop.ts"
+          ]
+        },
+        {
+          "step": "Bounded specification, independent oracle, failure controls, evidence, governance and regression",
+          "files": [
+            "scripts/formal/pairing-verifier.mjs",
+            "scripts/formal/pairing-worker.mjs",
+            "scripts/formal/run-pairing-verification.mjs",
+            "scripts/test/tool-call-pairing-verification.test.mjs",
+            "skills/verify-tool-call-pairing/SKILL.md",
+            "scripts/formal/run-formal-regression.mjs",
+            ".github/workflows/release-gate.yml"
+          ]
+        }
+      ]
+    },
+    "model": {
+      "status": "pass",
+      "exhausted": true,
+      "states": 5988,
+      "transitions": 11392,
+      "terminalStates": 2900,
+      "scope": {
+        "checker": "pairing-explicit-state/1",
+        "properties": [
+          "one result per call occurrence",
+          "prior matching call",
+          "result provenance",
+          "pending is not completed"
+        ],
+        "bounds": {
+          "calls": 2,
+          "retriesPerCall": 1,
+          "approvalWaitsPerCall": 1,
+          "duplicateBatchesPerCall": 1,
+          "duplicateDeliveriesPerCall": 1
+        },
+        "assumptions": [
+          "One writer; synchronous append of a message is indivisible; no callback re-entry into persistence.",
+          "The model starts after two distinct call ids are recorded in one wave; all enabled event orders are explored.",
+          "Success, failure, unknown-tool and rejection abstract arbitrary payloads; retry occurs before persistence.",
+          "Cancellation closes outstanding calls; a normal end requires all calls settled; no liveness claim.",
+          "The design model specifies deduplication even within a returned batch; source probes independently check that promise."
+        ],
+        "exclusions": [
+          "process kill, power loss, storage corruption",
+          "multiple writers and external side effects",
+          "unbounded calls/retries",
+          "full kernel, database, network and UI execution; source probes cover the mapped component boundary"
+        ]
+      }
+    },
+    "source": {
+      "status": "fail",
+      "scenarios": [
+        {
+          "name": "normal",
+          "status": "complete",
+          "pending": [],
+          "issues": [],
+          "events": [
+            "record calls",
+            "execute echo",
+            "persist results",
+            "finish"
+          ],
+          "messages": [
+            {
+              "role": "assistant",
+              "parts": [
+                {
+                  "type": "tool_call",
+                  "toolCallId": "a",
+                  "name": "echo",
+                  "input": {
+                    "token": "a"
+                  }
+                }
+              ]
+            },
+            {
+              "role": "tool",
+              "parts": [
+                {
+                  "type": "tool_result",
+                  "toolCallId": "a",
+                  "name": "echo",
+                  "ok": true,
+                  "content": "origin:a"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "parallel-reversed",
+          "status": "complete",
+          "pending": [],
+          "issues": [],
+          "events": [
+            "record calls",
+            "execute a and b",
+            "persist b then a",
+            "finish"
+          ],
+          "messages": [
+            {
+              "role": "assistant",
+              "parts": [
+                {
+                  "type": "tool_call",
+                  "toolCallId": "a",
+                  "name": "echo",
+                  "input": {
+                    "token": "a"
+                  }
+                },
+                {
+                  "type": "tool_call",
+                  "toolCallId": "b",
+                  "name": "echo",
+                  "input": {
+                    "token": "b"
+                  }
+                }
+              ]
+            },
+            {
+              "role": "tool",
+              "parts": [
+                {
+                  "type": "tool_result",
+                  "toolCallId": "b",
+                  "name": "echo",
+                  "ok": true,
+                  "content": "origin:b"
+                }
+              ]
+            },
+            {
+              "role": "tool",
+              "parts": [
+                {
+                  "type": "tool_result",
+                  "toolCallId": "a",
+                  "name": "echo",
+                  "ok": true,
+                  "content": "origin:a"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "failure",
+          "status": "complete",
+          "pending": [],
+          "issues": [],
+          "events": [
+            "record calls",
+            "tool throws",
+            "persist failure",
+            "finish"
+          ],
+          "messages": [
+            {
+              "role": "assistant",
+              "parts": [
+                {
+                  "type": "tool_call",
+                  "toolCallId": "a",
+                  "name": "echo",
+                  "input": {
+                    "token": "a"
+                  }
+                }
+              ]
+            },
+            {
+              "role": "tool",
+              "parts": [
+                {
+                  "type": "tool_result",
+                  "toolCallId": "a",
+                  "name": "echo",
+                  "ok": false,
+                  "content": "probe failure",
+                  "problem": {
+                    "type": "https://ppeng.dev/problem/agent-tool",
+                    "title": "Tool raised an exception",
+                    "status": 500,
+                    "detail": "probe failure",
+                    "instance": "urn:ppeng:agent-core:tool:echo:a",
+                    "code": "TOOL_UNHANDLED_EXCEPTION"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "unknown",
+          "status": "complete",
+          "pending": [],
+          "issues": [],
+          "events": [
+            "record calls",
+            "unknown tool",
+            "persist failure",
+            "finish"
+          ],
+          "messages": [
+            {
+              "role": "assistant",
+              "parts": [
+                {
+                  "type": "tool_call",
+                  "toolCallId": "a",
+                  "name": "echo",
+                  "input": {
+                    "token": "a"
+                  }
+                }
+              ]
+            },
+            {
+              "role": "tool",
+              "parts": [
+                {
+                  "type": "tool_result",
+                  "toolCallId": "a",
+                  "name": "echo",
+                  "ok": false,
+                  "content": "{\"error\":\"Tool 'echo' is not available in this agent.\",\"error_code\":\"UNKNOWN_TOOL\",\"available_tools_sample\":[],\"did_you_mean\":null,\"hint\":\"This tool may be disabled by configuration or not registered. If the failure looks like a configuration issue, inform the user instead of silently switching tools.\"}",
+                  "problem": {
+                    "type": "https://ppeng.dev/problem/agent-tool",
+                    "title": "Unknown tool",
+                    "status": 404,
+                    "detail": "No tool definition matches name echo.",
+                    "instance": "urn:ppeng:agent-core:tool:echo:a",
+                    "code": "UNKNOWN_TOOL"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "rejected",
+          "status": "complete",
+          "pending": [],
+          "issues": [],
+          "events": [
+            "record calls",
+            "wait for approval",
+            "reject approval",
+            "record rejection",
+            "finish"
+          ],
+          "messages": [
+            {
+              "role": "assistant",
+              "parts": [
+                {
+                  "type": "tool_call",
+                  "toolCallId": "a",
+                  "name": "echo",
+                  "input": {
+                    "token": "a"
+                  }
+                }
+              ]
+            },
+            {
+              "role": "tool",
+              "parts": [
+                {
+                  "type": "tool_result",
+                  "toolCallId": "a",
+                  "name": "echo",
+                  "ok": false,
+                  "content": "Approval for echo was rejected.",
+                  "problem": {
+                    "type": "https://ppeng.dev/problem/agent-tool",
+                    "title": "Approval rejected",
+                    "status": 403,
+                    "detail": "Approval for echo was rejected.",
+                    "instance": "urn:ppeng:agent-core:tool:echo:a",
+                    "code": "APPROVAL_REJECTED"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "cancelled",
+          "status": "complete",
+          "pending": [],
+          "issues": [],
+          "events": [
+            "record calls",
+            "cancel wave",
+            "repeat closure",
+            "finish"
+          ],
+          "messages": [
+            {
+              "role": "assistant",
+              "parts": [
+                {
+                  "type": "tool_call",
+                  "toolCallId": "a",
+                  "name": "echo",
+                  "input": {
+                    "token": "a"
+                  }
+                },
+                {
+                  "type": "tool_call",
+                  "toolCallId": "b",
+                  "name": "echo",
+                  "input": {
+                    "token": "b"
+                  }
+                }
+              ]
+            },
+            {
+              "role": "tool",
+              "parts": [
+                {
+                  "type": "tool_result",
+                  "toolCallId": "a",
+                  "name": "echo",
+                  "ok": false,
+                  "content": "[interrupted] tool wave closed before completion"
+                },
+                {
+                  "type": "tool_result",
+                  "toolCallId": "b",
+                  "name": "echo",
+                  "ok": false,
+                  "content": "[interrupted] tool wave closed before completion"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "retry",
+          "status": "complete",
+          "pending": [],
+          "issues": [],
+          "events": [
+            "record calls",
+            "execute without persisting",
+            "retry execution",
+            "persist once",
+            "finish"
+          ],
+          "messages": [
+            {
+              "role": "assistant",
+              "parts": [
+                {
+                  "type": "tool_call",
+                  "toolCallId": "a",
+                  "name": "echo",
+                  "input": {
+                    "token": "a"
+                  }
+                }
+              ]
+            },
+            {
+              "role": "tool",
+              "parts": [
+                {
+                  "type": "tool_result",
+                  "toolCallId": "a",
+                  "name": "echo",
+                  "ok": true,
+                  "content": "origin:a"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "duplicate-delivery",
+          "status": "complete",
+          "pending": [],
+          "issues": [],
+          "events": [
+            "record calls",
+            "execute",
+            "persist",
+            "deliver again",
+            "finish"
+          ],
+          "messages": [
+            {
+              "role": "assistant",
+              "parts": [
+                {
+                  "type": "tool_call",
+                  "toolCallId": "a",
+                  "name": "echo",
+                  "input": {
+                    "token": "a"
+                  }
+                }
+              ]
+            },
+            {
+              "role": "tool",
+              "parts": [
+                {
+                  "type": "tool_result",
+                  "toolCallId": "a",
+                  "name": "echo",
+                  "ok": true,
+                  "content": "origin:a"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "duplicate-batch",
+          "status": "violation",
+          "pending": [],
+          "issues": [
+            {
+              "code": "duplicate-result",
+              "id": "a",
+              "index": 2
+            }
+          ],
+          "events": [
+            "record calls",
+            "execute a",
+            "deliver same result twice in one batch",
+            "finish"
+          ],
+          "messages": [
+            {
+              "role": "assistant",
+              "parts": [
+                {
+                  "type": "tool_call",
+                  "toolCallId": "a",
+                  "name": "echo",
+                  "input": {
+                    "token": "a"
+                  }
+                }
+              ]
+            },
+            {
+              "role": "tool",
+              "parts": [
+                {
+                  "type": "tool_result",
+                  "toolCallId": "a",
+                  "name": "echo",
+                  "ok": true,
+                  "content": "origin:a"
+                }
+              ]
+            },
+            {
+              "role": "tool",
+              "parts": [
+                {
+                  "type": "tool_result",
+                  "toolCallId": "a",
+                  "name": "echo",
+                  "ok": true,
+                  "content": "origin:a"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "reused-id",
+          "status": "complete",
+          "pending": [],
+          "issues": [],
+          "events": [
+            "record calls",
+            "complete a",
+            "new call reuses a",
+            "complete second a",
+            "finish"
+          ],
+          "messages": [
+            {
+              "role": "assistant",
+              "parts": [
+                {
+                  "type": "tool_call",
+                  "toolCallId": "a",
+                  "name": "echo",
+                  "input": {
+                    "token": "a"
+                  }
+                }
+              ]
+            },
+            {
+              "role": "tool",
+              "parts": [
+                {
+                  "type": "tool_result",
+                  "toolCallId": "a",
+                  "name": "echo",
+                  "ok": true,
+                  "content": "origin:a"
+                }
+              ]
+            },
+            {
+              "role": "assistant",
+              "parts": [
+                {
+                  "type": "tool_call",
+                  "toolCallId": "a",
+                  "name": "echo",
+                  "input": {
+                    "token": "a"
+                  }
+                }
+              ]
+            },
+            {
+              "role": "tool",
+              "parts": [
+                {
+                  "type": "tool_result",
+                  "toolCallId": "a",
+                  "name": "echo",
+                  "ok": true,
+                  "content": "origin:a"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "recovery",
+          "status": "complete",
+          "pending": [],
+          "issues": [],
+          "events": [
+            "record calls",
+            "recover unpaired call",
+            "finish"
+          ],
+          "messages": [
+            {
+              "role": "assistant",
+              "parts": [
+                {
+                  "type": "tool_call",
+                  "toolCallId": "a",
+                  "name": "echo",
+                  "input": {
+                    "token": "a"
+                  }
+                }
+              ]
+            },
+            {
+              "role": "tool",
+              "parts": [
+                {
+                  "type": "tool_result",
+                  "toolCallId": "a",
+                  "name": "echo",
+                  "ok": false,
+                  "content": "{\"error\":\"tool_result_missing\",\"error_raw\":\"Tool call had no result (interrupted, empty name, or persist gap).\"}"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "running",
+          "status": "pending",
+          "pending": [
+            "a"
+          ],
+          "issues": [],
+          "events": [
+            "record calls",
+            "tool still executing"
+          ],
+          "messages": [
+            {
+              "role": "assistant",
+              "parts": [
+                {
+                  "type": "tool_call",
+                  "toolCallId": "a",
+                  "name": "echo",
+                  "input": {
+                    "token": "a"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "waiting-approval",
+          "status": "pending",
+          "pending": [
+            "a"
+          ],
+          "issues": [],
+          "events": [
+            "record calls",
+            "wait for approval"
+          ],
+          "messages": [
+            {
+              "role": "assistant",
+              "parts": [
+                {
+                  "type": "tool_call",
+                  "toolCallId": "a",
+                  "name": "echo",
+                  "input": {
+                    "token": "a"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "files": [
+        "packages/agent-loop/src/approval/approval-policy.ts",
+        "packages/agent-loop/src/approval/permission-mode.ts",
+        "packages/agent-loop/src/helpers.ts",
+        "packages/agent-loop/src/model/tool-result-problem.ts",
+        "packages/agent-loop/src/model/upstream-error.ts",
+        "packages/agent-loop/src/recovery/find-similar-tool-name.ts",
+        "packages/agent-loop/src/recovery/pair-unmatched-tool-calls.ts",
+        "packages/agent-loop/src/recovery/unknown-tool-result.ts",
+        "packages/agent-loop/src/runtime/dirty-input-gate.ts",
+        "packages/agent-loop/src/runtime/tool-loop.ts",
+        "packages/agent-loop/src/session/surface-invariants.ts",
+        "packages/agent-loop/src/session/tool-wave-close.ts",
+        "packages/agent-loop/src/streaming/index.ts",
+        "packages/agent-loop/src/streaming/reasoning-spin-watchdog.ts",
+        "packages/agent-loop/src/streaming/repetition-watchdog.ts",
+        "packages/agent-loop/src/streaming/stream-reset.ts"
+      ]
+    },
+    "mutations": {
+      "status": "pass",
+      "mutants": [
+        {
+          "name": "missing",
+          "killed": true,
+          "counterexample": {
+            "name": "normal",
+            "status": "violation",
+            "pending": [
+              "a"
+            ],
+            "issues": [
+              {
+                "code": "missing-result",
+                "id": "a"
+              }
+            ],
+            "events": [
+              "record calls",
+              "execute echo",
+              "persist results",
+              "finish"
+            ],
+            "messages": [
+              {
+                "role": "assistant",
+                "parts": [
+                  {
+                    "type": "tool_call",
+                    "toolCallId": "a",
+                    "name": "echo",
+                    "input": {
+                      "token": "a"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "file": "packages/agent-loop/src/runtime/tool-loop.ts",
+          "from": "host.appendMessage(session.id, 'tool', parts);",
+          "to": "/* deliberately omit result persistence */",
+          "sourceBefore": "45270a65a92ba98ba5df2ae7f7b52ff56cad9352ed4c697b4d73ce2c347799b1",
+          "sourceAfter": "dd4461ebd7d955f6d0efe36a752e8a8791e6cb2202f3630c0cad95c717040ea1"
+        },
+        {
+          "name": "duplicate",
+          "killed": true,
+          "counterexample": {
+            "name": "normal",
+            "status": "violation",
+            "pending": [],
+            "issues": [
+              {
+                "code": "duplicate-result",
+                "id": "a",
+                "index": 2
+              }
+            ],
+            "events": [
+              "record calls",
+              "execute echo",
+              "persist results",
+              "finish"
+            ],
+            "messages": [
+              {
+                "role": "assistant",
+                "parts": [
+                  {
+                    "type": "tool_call",
+                    "toolCallId": "a",
+                    "name": "echo",
+                    "input": {
+                      "token": "a"
+                    }
+                  }
+                ]
+              },
+              {
+                "role": "tool",
+                "parts": [
+                  {
+                    "type": "tool_result",
+                    "toolCallId": "a",
+                    "name": "echo",
+                    "ok": true,
+                    "content": "origin:a"
+                  }
+                ]
+              },
+              {
+                "role": "tool",
+                "parts": [
+                  {
+                    "type": "tool_result",
+                    "toolCallId": "a",
+                    "name": "echo",
+                    "ok": true,
+                    "content": "origin:a"
+                  }
+                ]
+              }
+            ]
+          },
+          "file": "packages/agent-loop/src/runtime/tool-loop.ts",
+          "from": "host.appendMessage(session.id, 'tool', parts);",
+          "to": "host.appendMessage(session.id, 'tool', parts); host.appendMessage(session.id, 'tool', parts);",
+          "sourceBefore": "45270a65a92ba98ba5df2ae7f7b52ff56cad9352ed4c697b4d73ce2c347799b1",
+          "sourceAfter": "fb5d2296b086bbcdb0d7e722fac974d26446185613035edcb2c544b6fcaebe1a"
+        },
+        {
+          "name": "misassociated",
+          "killed": true,
+          "counterexample": {
+            "name": "normal",
+            "status": "violation",
+            "pending": [
+              "a"
+            ],
+            "issues": [
+              {
+                "code": "orphan-result",
+                "id": "wrong-call-id",
+                "index": 1
+              },
+              {
+                "code": "missing-result",
+                "id": "a"
+              }
+            ],
+            "events": [
+              "record calls",
+              "execute echo",
+              "persist results",
+              "finish"
+            ],
+            "messages": [
+              {
+                "role": "assistant",
+                "parts": [
+                  {
+                    "type": "tool_call",
+                    "toolCallId": "a",
+                    "name": "echo",
+                    "input": {
+                      "token": "a"
+                    }
+                  }
+                ]
+              },
+              {
+                "role": "tool",
+                "parts": [
+                  {
+                    "type": "tool_result",
+                    "toolCallId": "wrong-call-id",
+                    "name": "echo",
+                    "ok": true,
+                    "content": "origin:a"
+                  }
+                ]
+              }
+            ]
+          },
+          "file": "packages/agent-loop/src/runtime/tool-loop.ts",
+          "from": "toolCallId: r.toolCallId,",
+          "to": "toolCallId: 'wrong-call-id',",
+          "sourceBefore": "45270a65a92ba98ba5df2ae7f7b52ff56cad9352ed4c697b4d73ce2c347799b1",
+          "sourceAfter": "713769189d18848fab8576cc57721a4130dc5c50deb1bde631c69ef68e64a0fd"
+        }
+      ],
+      "restored": true,
+      "baselineStatus": "fail"
+    },
+    "negativeControls": [
+      {
+        "fault": "missing",
+        "result": {
+          "status": "fail",
+          "exhausted": false,
+          "states": 1,
+          "transitions": 1,
+          "scope": {
+            "checker": "pairing-explicit-state/1",
+            "properties": [
+              "one result per call occurrence",
+              "prior matching call",
+              "result provenance",
+              "pending is not completed"
+            ],
+            "bounds": {
+              "calls": 2,
+              "retriesPerCall": 1,
+              "approvalWaitsPerCall": 1,
+              "duplicateBatchesPerCall": 1,
+              "duplicateDeliveriesPerCall": 1
+            },
+            "assumptions": [
+              "One writer; synchronous append of a message is indivisible; no callback re-entry into persistence.",
+              "The model starts after two distinct call ids are recorded in one wave; all enabled event orders are explored.",
+              "Success, failure, unknown-tool and rejection abstract arbitrary payloads; retry occurs before persistence.",
+              "Cancellation closes outstanding calls; a normal end requires all calls settled; no liveness claim.",
+              "The design model specifies deduplication even within a returned batch; source probes independently check that promise."
+            ],
+            "exclusions": [
+              "process kill, power loss, storage corruption",
+              "multiple writers and external side effects",
+              "unbounded calls/retries",
+              "full kernel, database, network and UI execution; source probes cover the mapped component boundary"
+            ]
+          },
+          "counterexample": {
+            "events": [
+              {
+                "type": "cancel"
+              }
+            ],
+            "check": {
+              "status": "violation",
+              "pending": [
+                "a",
+                "b"
+              ],
+              "issues": [
+                {
+                  "code": "missing-result",
+                  "id": "a"
+                },
+                {
+                  "code": "missing-result",
+                  "id": "b"
+                }
+              ]
+            },
+            "parts": [
+              {
+                "type": "tool_call",
+                "toolCallId": "a",
+                "name": "echo",
+                "input": {
+                  "token": "a"
+                }
+              },
+              {
+                "type": "tool_call",
+                "toolCallId": "b",
+                "name": "echo",
+                "input": {
+                  "token": "b"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "fault": "duplicate",
+        "result": {
+          "status": "fail",
+          "exhausted": false,
+          "states": 14,
+          "transitions": 14,
+          "scope": {
+            "checker": "pairing-explicit-state/1",
+            "properties": [
+              "one result per call occurrence",
+              "prior matching call",
+              "result provenance",
+              "pending is not completed"
+            ],
+            "bounds": {
+              "calls": 2,
+              "retriesPerCall": 1,
+              "approvalWaitsPerCall": 1,
+              "duplicateBatchesPerCall": 1,
+              "duplicateDeliveriesPerCall": 1
+            },
+            "assumptions": [
+              "One writer; synchronous append of a message is indivisible; no callback re-entry into persistence.",
+              "The model starts after two distinct call ids are recorded in one wave; all enabled event orders are explored.",
+              "Success, failure, unknown-tool and rejection abstract arbitrary payloads; retry occurs before persistence.",
+              "Cancellation closes outstanding calls; a normal end requires all calls settled; no liveness claim.",
+              "The design model specifies deduplication even within a returned batch; source probes independently check that promise."
+            ],
+            "exclusions": [
+              "process kill, power loss, storage corruption",
+              "multiple writers and external side effects",
+              "unbounded calls/retries",
+              "full kernel, database, network and UI execution; source probes cover the mapped component boundary"
+            ]
+          },
+          "counterexample": {
+            "events": [
+              {
+                "type": "success",
+                "id": "a"
+              },
+              {
+                "type": "duplicate-batch",
+                "id": "a"
+              }
+            ],
+            "check": {
+              "status": "violation",
+              "pending": [
+                "b"
+              ],
+              "issues": [
+                {
+                  "code": "duplicate-result",
+                  "id": "a",
+                  "index": 3
+                }
+              ]
+            },
+            "parts": [
+              {
+                "type": "tool_call",
+                "toolCallId": "a",
+                "name": "echo",
+                "input": {
+                  "token": "a"
+                }
+              },
+              {
+                "type": "tool_call",
+                "toolCallId": "b",
+                "name": "echo",
+                "input": {
+                  "token": "b"
+                }
+              },
+              {
+                "type": "tool_result",
+                "toolCallId": "a",
+                "name": "echo",
+                "ok": true,
+                "content": "origin:a"
+              },
+              {
+                "type": "tool_result",
+                "toolCallId": "a",
+                "name": "echo",
+                "ok": true,
+                "content": "origin:a"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "fault": "misassociated",
+        "result": {
+          "status": "fail",
+          "exhausted": false,
+          "states": 13,
+          "transitions": 13,
+          "scope": {
+            "checker": "pairing-explicit-state/1",
+            "properties": [
+              "one result per call occurrence",
+              "prior matching call",
+              "result provenance",
+              "pending is not completed"
+            ],
+            "bounds": {
+              "calls": 2,
+              "retriesPerCall": 1,
+              "approvalWaitsPerCall": 1,
+              "duplicateBatchesPerCall": 1,
+              "duplicateDeliveriesPerCall": 1
+            },
+            "assumptions": [
+              "One writer; synchronous append of a message is indivisible; no callback re-entry into persistence.",
+              "The model starts after two distinct call ids are recorded in one wave; all enabled event orders are explored.",
+              "Success, failure, unknown-tool and rejection abstract arbitrary payloads; retry occurs before persistence.",
+              "Cancellation closes outstanding calls; a normal end requires all calls settled; no liveness claim.",
+              "The design model specifies deduplication even within a returned batch; source probes independently check that promise."
+            ],
+            "exclusions": [
+              "process kill, power loss, storage corruption",
+              "multiple writers and external side effects",
+              "unbounded calls/retries",
+              "full kernel, database, network and UI execution; source probes cover the mapped component boundary"
+            ]
+          },
+          "counterexample": {
+            "events": [
+              {
+                "type": "success",
+                "id": "a"
+              },
+              {
+                "type": "deliver",
+                "id": "a"
+              }
+            ],
+            "check": {
+              "status": "violation",
+              "pending": [
+                "a"
+              ],
+              "issues": [
+                {
+                  "code": "misassociated-result",
+                  "id": "b",
+                  "index": 2
+                }
+              ]
+            },
+            "parts": [
+              {
+                "type": "tool_call",
+                "toolCallId": "a",
+                "name": "echo",
+                "input": {
+                  "token": "a"
+                }
+              },
+              {
+                "type": "tool_call",
+                "toolCallId": "b",
+                "name": "echo",
+                "input": {
+                  "token": "b"
+                }
+              },
+              {
+                "type": "tool_result",
+                "toolCallId": "b",
+                "name": "echo",
+                "ok": true,
+                "content": "origin:a"
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "exitCode": 1
+  }
+}

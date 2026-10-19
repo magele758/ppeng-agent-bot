@@ -22,9 +22,11 @@ const APPROVAL_STATUSES: ReadonlyArray<ApprovalRecord['status']> = ['pending', '
 export function shouldResumeAfterApproval(
   approvalStatus: ApprovalRecord['status'],
   sessionStatus: string | undefined,
-  pendingLeft: boolean
+  pendingLeft: boolean,
+  metadata?: Record<string, unknown>
 ): boolean {
   if (sessionStatus !== 'idle') return false;
+  if (metadata && (!metadata.interrupt || (metadata.outcome as { kind?: string } | undefined)?.kind === 'aborted')) return false;
   if (approvalStatus === 'approved') return true;
   return approvalStatus === 'rejected' && !pendingLeft;
 }
@@ -193,7 +195,7 @@ export function miscRoutes(runtime: RawAgentRuntime, opts: MiscOptions): RouteSp
         const pendingLeft = runtime
           .listApprovals('pending')
           .some((item) => item.sessionId === approval.sessionId);
-        if (session && shouldResumeAfterApproval(approval.status, session.status, pendingLeft)) {
+        if (session && shouldResumeAfterApproval(approval.status, session.status, pendingLeft, session.metadata)) {
           // Routine runs resume under the routine lease. `handled` and `busy` must not fall
           // through to a bare runSession (peer owner, other approvals still pending, or a
           // rejection that finish() already recorded). Only a non-routine session does.

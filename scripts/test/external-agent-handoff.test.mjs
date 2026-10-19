@@ -147,6 +147,53 @@ test('parallel retries and application restart retain a single task [AC:external
   assert.equal(d.runtime.listTasks().length, 1);
 });
 
+test('cancelling a task waiting for input is observable as cancelled [AC:external-agent-task-handoff#AC-2]', async t => {
+  const d = await boot(t);
+  const accepted = await d.submit();
+  await d.wait(accepted.data.task.id);
+  const task = d.runtime.getTask(accepted.data.task.id);
+  const session = d.runtime.getSession(task.sessionId);
+  d.runtime.store.updateTask(task.id, { status: 'in_progress' });
+  d.runtime.store.updateSession(session.id, { status: 'waiting_approval', metadata: { ...session.metadata,
+    askUserPending: true, outcome: { kind: 'waiting_approval', reason: 'waiting_approval' } } });
+  assert.equal((await d.call(d.tokenA, 'GET', `${TASKS}/${task.id}`)).data.task.status, 'waiting_input');
+  d.runtime.cancelSession(session.id);
+  const queried = await d.call(d.tokenA, 'GET', `${TASKS}/${task.id}`);
+  assert.equal(queried.data.task.status, 'cancelled');
+  assert.equal(queried.data.task.reason, 'abort');
+});
+
+test('interrupted execution exposes uncertainty rather than claiming it is still running [AC:external-agent-task-handoff#AC-2]', async t => {
+  const d = await boot(t);
+  const accepted = await d.submit();
+  await d.wait(accepted.data.task.id);
+  const task = d.runtime.getTask(accepted.data.task.id);
+  d.runtime.store.updateTask(task.id, { status: 'in_progress' });
+  d.runtime.store.updateSession(task.sessionId, { status: 'unknown', metadata: {} });
+  const queried = await d.call(d.tokenA, 'GET', `${TASKS}/${task.id}`);
+  assert.equal(queried.data.task.status, 'unknown');
+  assert.equal(queried.data.task.reason, 'execution_state_unknown');
+});
+
+test('terminal task states are not masked by stale pending questions [AC:external-agent-task-handoff#AC-2]', async t => {
+  const d = await boot(t);
+  const accepted = await d.submit();
+  await d.wait(accepted.data.task.id);
+  const task = d.runtime.getTask(accepted.data.task.id);
+  const cases = [
+    { taskStatus: 'failed', sessionStatus: 'failed', outcome: { kind: 'failed', reason: 'model_error' }, status: 'failed', reason: 'model_error' },
+    { taskStatus: 'completed', sessionStatus: 'completed', outcome: { kind: 'completed', reason: 'end' }, status: 'completed', reason: undefined },
+    { taskStatus: 'cancelled', sessionStatus: 'waiting_approval', outcome: { kind: 'waiting_approval', reason: 'waiting_approval' }, status: 'cancelled', reason: 'cancelled' }
+  ];
+  for (const item of cases) {
+    d.runtime.store.updateTask(task.id, { status: item.taskStatus });
+    d.runtime.store.updateSession(task.sessionId, { status: item.sessionStatus, metadata: { askUserPending: true, outcome: item.outcome } });
+    const queried = await d.call(d.tokenA, 'GET', `${TASKS}/${task.id}`);
+    assert.equal(queried.data.task.status, item.status);
+    assert.equal(queried.data.task.reason, item.reason);
+  }
+});
+
 test('host execution failure becomes queryable instead of leaving an accepted task running [AC:external-agent-task-handoff#AC-2]', async t => {
   const d = await boot(t);
   d.runtime.runSession = async () => { throw new Error('simulated host failure'); };

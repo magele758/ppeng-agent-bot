@@ -5,7 +5,7 @@
  * {@link UNATTENDED_APPROVAL_TTL_MS}. A human-present chat approval has no
  * deadline and keeps waiting. The timeout is a named constant — not an env var.
  */
-import { unmatchedToolCallsFromFold, mergeInterruptMetadata } from '@ppeng/agent-loop/session';
+import { unmatchedToolCallsFromFold, mergeInterruptMetadata, parseRunInterrupt } from '@ppeng/agent-loop/session';
 import type { ApprovalRecord, MessagePart, SessionMessage, SessionRecord } from '../types.js';
 
 /** 10 minutes. Not configurable via the environment. */
@@ -24,6 +24,8 @@ export interface ApprovalWake {
 }
 
 export interface UnattendedApprovalExpiryStore {
+  transaction?<T>(fn: () => T): T;
+  runWithoutWriterScope?<T>(fn: () => T): T;
   listApprovals(filter?: { status?: ApprovalRecord['status'] }): ApprovalRecord[];
   getApproval(id: string): ApprovalRecord | undefined;
   markApprovalExpired(id: string, expireReason: string): ApprovalRecord | undefined;
@@ -101,13 +103,23 @@ function denialParts(store: UnattendedApprovalExpiryStore, sessionId: string): M
   }));
 }
 
-function closeDeniedSession(store: UnattendedApprovalExpiryStore, sessionId: string): void {
+function closeDeniedSession(store: UnattendedApprovalExpiryStore, sessionId: string, expiredIds: ReadonlySet<string>): void {
   const pending = store
     .listApprovals({ status: 'pending' })
     .filter((item) => item.sessionId === sessionId);
   if (pending.length > 0) return;
   const session = store.getSession(sessionId);
   if (!session) return;
+  const interrupt = parseRunInterrupt(session.metadata);
+  // An old pending record may outlive its original pause. Never close a newer wave.
+  if (session.status !== 'waiting_approval') return;
+  if (interrupt) {
+    if (!interrupt.approvalIds.some(id => expiredIds.has(id))) return;
+  } else if (session.metadata?.interrupt !== undefined || session.activeWriterRunId) {
+    return;
+  }
+  // Legacy/custom hosts may park without a checkpoint. With no writer and no
+  // pending approvals, retain their established expiry-to-idle transition.
   const parts = denialParts(store, sessionId);
   if (parts.length > 0) {
     store.appendMessage(sessionId, 'tool', parts);
@@ -129,6 +141,13 @@ export function expireDueUnattendedApprovals(
   store: UnattendedApprovalExpiryStore,
   now = Date.now()
 ): ApprovalRecord[] {
+  const expire = () => expireDueApprovalsInTransaction(store, now);
+  const transaction = () => store.transaction ? store.transaction(expire) : expire();
+  // Timers armed by a turn inherit its ALS scope, but the parked turn has released its claim.
+  return store.runWithoutWriterScope ? store.runWithoutWriterScope(transaction) : transaction();
+}
+
+function expireDueApprovalsInTransaction(store: UnattendedApprovalExpiryStore, now: number): ApprovalRecord[] {
   const due = store.listApprovals({ status: 'pending' }).filter((approval) => {
     if (!approval.expiresAt) return false;
     const deadline = Date.parse(approval.expiresAt);
@@ -143,8 +162,9 @@ export function expireDueUnattendedApprovals(
     }
   }
   const sessions = new Set(expired.map((approval) => approval.sessionId));
+  const expiredIds = new Set(expired.map(approval => approval.id));
   for (const sessionId of sessions) {
-    closeDeniedSession(store, sessionId);
+    closeDeniedSession(store, sessionId, expiredIds);
   }
   return expired;
 }
