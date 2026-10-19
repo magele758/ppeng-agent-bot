@@ -64,12 +64,14 @@ export const factory = {
   started: "Started",
   finished: "Finished",
   notAvailable: "Not available",
-  saveBeforePatrol: "Save the coordination room settings before changing patrol.",
+  saveBeforePatrol:
+    "Save the coordination room settings before changing patrol.",
   details: "Details",
   scope:
     "Connections use local SSH configuration; passwords and private keys are not stored here. Zero-capacity machines reject tasks. Read-only tasks keep read-only permissions; development and remote delivery require separate grants.",
   developmentTitle: "Phase 2: controlled development",
-  developmentHint: "Develop, test and independently review on the original machine until locally READY. Configure and authorize remote delivery separately; deployment is deferred.",
+  developmentHint:
+    "Develop, test and independently review on the original machine until locally READY. Configure and authorize remote delivery separately; deployment is deferred.",
   developmentEnable: "Enable development for this project",
   devImage: "Execution image pinned by digest",
   devToolPath: "Installed coding tool absolute path",
@@ -102,7 +104,8 @@ export const factory = {
   devConfirmPolicy: "Confirm new policy",
   devChooseProject: "Save a machine and project configuration first.",
   devReadyCheckPassed: "Development readiness checks passed.",
-  devReadyCheckFailed: "Development readiness checks failed. Dispatch is blocked.",
+  devReadyCheckFailed:
+    "Development readiness checks failed. Dispatch is blocked.",
   devCheckPassed: "Passed",
   devCheckFailed: "Failed",
   devPause: "Pause development task",
@@ -110,31 +113,39 @@ export const factory = {
   devStage: "Development stage",
   devRound: "Repair round",
   devVerifyCurrent: "Revalidate retained code (keep consumed rounds)",
-  devLocalReady: "Local development is READY; remote delivery and deployment appear in the delivery panel below.",
-  deliveryMergeIdentity: "Separate merge identity (App, installation, ruleset IDs and private credential reference; null when absent)",
+  devLocalReady:
+    "Local development is READY; remote delivery and deployment appear in the delivery panel below.",
+  deliveryMergeIdentity:
+    "Separate merge identity (App, installation, ruleset IDs and private credential reference; null when absent)",
   deliveryVerify: "Verify actual remote state (read only)",
   deliveryPause: "Pause remote delivery",
   deliveryCancel: "Cancel remote delivery",
-  devNotDelivered: "Local development is not READY; see the delivery panel for remote status.",
-  devStaleEvidence: "Existing evidence is stale. Confirm the current policy and run checks again.",
+  devNotDelivered:
+    "Local development is not READY; see the delivery panel for remote status.",
+  devStaleEvidence:
+    "Existing evidence is stale. Confirm the current policy and run checks again.",
   devEvidence: "View commits, checks, review and decision evidence",
   devReassignMachine: "Explicit reassignment target",
   devReassign: "Reassign after original execution ends",
   deliverySelect: "Select",
   deliverySnapshot: "Read next page of the complete evidence snapshot",
-  deliveryCiVariablesDigest: "Verified GitHub CI variables digest (required when variables exist)",
+  deliveryCiVariablesDigest:
+    "Verified GitHub CI variables digest (required when variables exist)",
   deliveryTitle: "Controlled remote delivery",
-  deliveryScope: "Local READY requires an explicit delivery grant. Stops at PR or MERGED; deployment is deferred.",
+  deliveryScope:
+    "Local READY requires an explicit delivery grant. Stops at PR or MERGED; deployment is deferred.",
   deliveryRepository: "GitHub repository (owner/repo)",
   deliveryRepositoryNodeId: "Verified repository Node ID",
   deliveryTarget: "Target branch",
-  deliveryCredentialRef: "Publisher credential reference on original machine (no secret)",
+  deliveryCredentialRef:
+    "Publisher credential reference on original machine (no secret)",
   deliveryUsers: "Authorized user IDs (comma separated)",
   deliveryEnable: "Enable remote delivery for this project",
   deliveryAllowMerge: "Allow task-specific delivery through MERGED (squash)",
   deliveryChecks: "Trusted CI (workflowId, job, appId)",
   deliveryWorkflows: "Reviewed target workflows (path → Git blob SHA)",
-  deliveryDownstream: "Workflows and external triggers verified: no deployment or extra release",
+  deliveryDownstream:
+    "Workflows and external triggers verified: no deployment or extra release",
   deliveryRetries: "Maximum platform error retries",
   deliveryDeadline: "Delivery deadline (milliseconds)",
   deliveryPreflight: "Verify remote readiness",
@@ -147,4 +158,84 @@ export const factory = {
   deliveryRevoke: "Revoke subsequent remote writes",
   deliveryResume: "Continue using current evidence",
   deliverySensitive: "Separately confirm sensitive scope at current commit",
+  productionTitle: "Phase four: local release preparation",
+  productionScope:
+    "Local preparation only. Deployment, project access, real environments and long-running evidence require separate verification.",
+  productionPlan: "Deployment and project checklist (no credentials)",
+  productionError:
+    "Preparation failed. Check administrator access and configuration. Do not enter credentials here.",
+  productionSave: "Save preparation settings",
+  productionReload: "Reload",
+  productionPreflight: "Check local prerequisites",
+  productionCreate: "Freeze a local validation run",
+  productionAssess: "Assess local run",
+  productionRuns: "Local validation runs",
+  productionFrozen: "Frozen settings revision",
+  productionUnset: "Candidate not set",
+  productionNotReady:
+    "Not deployed; release readiness has not been established.",
+  productionMissing: "Missing verification evidence",
+  productionUnsaved:
+    "Save changes before checking prerequisites or freezing a run.",
+  productionVisibility: "Project visibility",
+  productionPrivate: "Private",
+  productionPublic: "Public",
+  productionScopeConfirmed:
+    "Deployment and project scope is defined (saving does not authorize execution)",
+  productionPublicConfirmed:
+    "Intended public content and scope confirmed (nothing is automatically published)",
+  productionLocalOnly:
+    "Only local preparation is enabled; deployment has not been executed.",
+  productionNeedScope:
+    "Deployment host, entry point or scope is not confirmed.",
+  productionNeedProject: "Real project identity is not confirmed.",
+  productionNeedCandidate:
+    "Source revision and daemon/web digests are not confirmed.",
+  productionNeedWorkers: "Two authorized execution machines are not confirmed.",
+  productionNeedConnections:
+    "Supported models and software connections are not defined.",
+  productionNeedBudget: "A live-model spending budget is not authorized.",
+  productionNeedStorage:
+    "Local persistent storage is unavailable or not writable.",
+  productionNeedDisk:
+    "Available local disk space is insufficient or unverified.",
+  productionSettingsChanged:
+    "Settings have changed; this run does not validate the new settings.",
+  productionExpired:
+    "This validation window has expired; its history is retained.",
+  productionUnavailable: "This item is not verified.",
+  productionFieldHost: "Deployment host alias (leave empty if unconfirmed)",
+  productionFieldEntryUrl: "Factory entry URL (no credentials)",
+  productionFieldRepository: "Real project repository (owner/repo)",
+  productionFieldRepositoryNodeId: "Real repository identity",
+  productionFieldTarget: "Real project target branch",
+  productionFieldSourceSha: "Candidate source SHA",
+  productionFieldDaemonDigest: "Daemon artifact digest (sha256)",
+  productionFieldWebDigest: "Web artifact digest (sha256)",
+  productionFieldWorkerIds: "Worker IDs (comma-separated)",
+  productionFieldModelIds: "Supported model IDs (comma-separated)",
+  productionFieldConnectionIds: "Software connection IDs (comma-separated)",
+  productionFieldMaxTasks: "Task limit",
+  productionFieldMaxRounds: "Rounds per task",
+  productionFieldMaxCostUsd:
+    "Model spending limit (USD; 0 means not authorized)",
+  productionFieldDeadlineMs: "Validation deadline (milliseconds)",
+  productionFieldMinFreeDiskGiB: "Minimum free disk (GiB)",
+  productionGateBuild: "Build and artifacts",
+  productionGateUnit: "Unit tests",
+  productionGateIntegration: "Integration and regression",
+  productionGateBrowser: "Browser verification at the deployed entry",
+  productionGateFaults: "Fault and process recovery",
+  productionGateMigration: "Migration and data rollback",
+  productionGatePerformance: "Full performance protocol",
+  productionGateSoak: "Continuous 24-hour soak",
+  productionGateModel: "Live-model verification",
+  productionGateSoftware: "Live-software verification",
+  productionGateAcceptance: "Acceptance gate",
+  productionGateCrap: "Coverage and complexity gate",
+  productionGateRuntime: "Actual runtime identity",
+  productionGateProject: "Two-host real project delivery",
+  productionGateBackup: "Isolated backup restoration",
+  productionGateCutover: "Actual cutover and rollback",
+  productionGateReview: "Vertical-slice review",
 };

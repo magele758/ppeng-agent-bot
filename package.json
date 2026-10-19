@@ -90,7 +90,8 @@
     "test:bot:faults": "node --test packages/core/test/bot-release-faults.test.js",
     "test:bot:release-evidence": "node scripts/bot-release/evidence.mjs",
     "test:restart": "node scripts/formal/run-restart-verification.mjs",
-    "test:concurrency": "node scripts/formal/run-concurrency-verification.mjs"
+    "test:concurrency": "node scripts/formal/run-concurrency-verification.mjs",
+    "test:acceptance:deployment": "node scripts/acceptance/acceptance-gate.mjs --stage all --out coverage/acceptance-deployment"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",

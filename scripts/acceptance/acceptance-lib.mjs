@@ -16,7 +16,7 @@ export const GATED_STATUSES = new Set(['approved', 'implemented']);
 const FEATURE_ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const CRITERION_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const TAG_RE = /\[AC:([^\]\r\n]*)\]/g;
-const KNOWN_SPEC_KEYS = new Set(['id', 'title', 'status', 'requirement', 'criteria', 'retiredReason', 'owner', 'notes', 'links']);
+const KNOWN_SPEC_KEYS = new Set(['id', 'title', 'status', 'requirement', 'criteria', 'retiredReason', 'owner', 'notes', 'links', 'verificationStage']);
 const KNOWN_CRITERION_KEYS = new Set(['id', 'given', 'when', 'then', 'notes']);
 const CRITERION_TEXT_FIELDS = ['given', 'when', 'then'];
 
@@ -76,6 +76,7 @@ export function validateSpec(raw, stem, where = `acceptance/${stem}.yaml`) {
     errors.push(`${where}: status must be one of ${STATUSES.join(' | ')} (got ${JSON.stringify(raw.status)})`);
   }
   if (!isNonEmptyString(raw.requirement)) errors.push(`${where}: \`requirement\` (the user's original words) must be a non-empty string`);
+  if (raw.verificationStage !== undefined && !['software', 'deployment'].includes(raw.verificationStage)) errors.push(`${where}: invalid verificationStage`);
   if (raw.status === 'retired' && !isNonEmptyString(raw.retiredReason)) {
     warnings.push(`${where}: retired spec should explain why in \`retiredReason\``);
   }
@@ -100,6 +101,7 @@ export function validateSpec(raw, stem, where = `acceptance/${stem}.yaml`) {
       id: raw.id,
       title: raw.title.trim(),
       status: raw.status,
+      verificationStage: raw.verificationStage ?? 'software',
       requirement: raw.requirement.trim(),
       retiredReason: isNonEmptyString(raw.retiredReason) ? raw.retiredReason.trim() : undefined,
       file: where,
@@ -409,7 +411,8 @@ function failureMessage(spec, c, state, tally) {
  * @param {string[]} [input.orphanFiles]  files with `[AC:` that no configured runner executes
  * @param {Array|null} [input.results]    parsed JUnit cases (null/undefined = static mode)
  */
-export function evaluateAcceptance({ specs, specErrors = [], specWarnings = [], staticTests, orphanFiles = [], results = null }) {
+export function evaluateAcceptance({ specs, specErrors = [], specWarnings = [], staticTests, orphanFiles = [], results = null, stage = 'all' }) {
+  if (!['all','software','deployment'].includes(stage)) throw new Error('Invalid acceptance stage');
   const errors = [...specErrors];
   const warnings = [...specWarnings];
   const notices = [];
@@ -473,7 +476,9 @@ export function evaluateAcceptance({ specs, specErrors = [], specWarnings = [], 
       return { ...c, state, tests: staticList, results: resultsMode ? tally : undefined };
     });
 
-    if (GATED_STATUSES.has(spec.status)) {
+    const applicable = stage === 'all' || (spec.verificationStage ?? 'software') === stage;
+    if (!applicable) notices.push(`${spec.file}: ${spec.verificationStage} acceptance remains ${spec.status}; not certified by the ${stage} gate`);
+    if (GATED_STATUSES.has(spec.status) && applicable) {
       for (const c of criteria) {
         if (FAILING_STATES.has(c.state)) errors.push(failureMessage(spec, c, c.state, c.results ?? { failedTitles: [] }));
       }
@@ -486,7 +491,7 @@ export function evaluateAcceptance({ specs, specErrors = [], specWarnings = [], 
     }
 
     const ok = !GATED_STATUSES.has(spec.status) || criteria.every((c) => !FAILING_STATES.has(c.state));
-    specReports.push({ id: spec.id, title: spec.title, status: spec.status, file: spec.file, retiredReason: spec.retiredReason, ok, criteria });
+    specReports.push({ applicable, verificationStage: spec.verificationStage ?? 'software', id: spec.id, title: spec.title, status: spec.status, file: spec.file, retiredReason: spec.retiredReason, ok, criteria });
   }
 
   const resultSources = resultsMode
@@ -503,6 +508,7 @@ export function evaluateAcceptance({ specs, specErrors = [], specWarnings = [], 
   return {
     ok: errors.length === 0,
     mode: resultsMode ? 'results' : 'static',
+    stage,
     errors,
     warnings,
     notices,
@@ -520,7 +526,7 @@ function summarize(specReports) {
   for (const s of specReports) {
     byStatus[s.status] += 1;
     criteria += s.criteria.length;
-    if (GATED_STATUSES.has(s.status)) {
+    if (GATED_STATUSES.has(s.status) && s.applicable !== false) {
       gatedCriteria += s.criteria.length;
       gatedOk += s.criteria.filter((c) => !FAILING_STATES.has(c.state)).length;
     }
@@ -552,6 +558,7 @@ export function renderMarkdown(report) {
     `${summary.specs} spec(s): ${STATUSES.map((s) => `${summary.byStatus[s]} ${s}`).join(', ')}. ` +
       `Gated criteria OK: ${summary.gatedOk}/${summary.gatedCriteria}.`,
   );
+  if (report.stage) lines.push('', `Verification stage: **${report.stage}**. Other stages remain separately required.`);
   if (report.resultSources.length) {
     lines.push('');
     lines.push('Results ingested: ' + report.resultSources.map((r) => `\`${r.source}\` ${r.passed}✓ ${r.failed}✗ ${r.skipped}⊘`).join(', '));
@@ -570,6 +577,7 @@ export function renderMarkdown(report) {
   }
   for (const spec of report.specs) {
     lines.push('', `### \`${spec.id}\` — ${mdCell(spec.title)} (${spec.status})`, '');
+    if (spec.applicable === false) lines.push(`**${spec.verificationStage}: pending separate acceptance; this gate does not certify these criteria.**`, '');
     if (spec.retiredReason) lines.push(`Retired: ${mdCell(spec.retiredReason)}`, '');
     lines.push('| Criterion | Given | When | Then | State | Tests |', '|---|---|---|---|---|---|');
     for (const c of spec.criteria) {

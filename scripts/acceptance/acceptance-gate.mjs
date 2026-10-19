@@ -54,14 +54,15 @@ const TESTISH_RE = /(?:\.(?:test|spec)\.[cm]?[jt]sx?$)|(?:(?:^|\/)(?:test|tests|
 class UsageError extends Error {}
 
 function parseArgs(argv) {
-  const args = { root: REPO_ROOT, out: null, results: [], collect: null };
+  const args = { root: REPO_ROOT, out: null, results: [], collect: null, stage: 'software' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const next = () => {
       if (i + 1 >= argv.length) throw new UsageError(`${a} needs a value`);
       return argv[++i];
     };
-    if (a === '--results') args.results.push(next());
+    if (a === '--stage') { args.stage = next(); if (!['software','deployment','all'].includes(args.stage)) throw new UsageError('Invalid acceptance stage'); }
+    else if (a === '--results') args.results.push(next());
     else if (a === '--out') args.out = next();
     else if (a === '--root') args.root = path.resolve(next());
     else if (a === '--collect') {
@@ -226,7 +227,7 @@ function main() {
   }
   const { staticTests, orphanFiles, runnableCount } = scanTests(args.root);
   const results = args.results.length ? loadResults(args.results, args.root) : null;
-  const report = evaluateAcceptance({ specs, specErrors, specWarnings, staticTests, orphanFiles, results });
+  const report = evaluateAcceptance({ specs, specErrors, specWarnings, staticTests, orphanFiles, results, stage: args.stage });
 
   const md = renderMarkdown(report);
   fs.mkdirSync(args.out, { recursive: true });

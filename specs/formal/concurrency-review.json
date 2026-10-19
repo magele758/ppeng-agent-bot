@@ -132,7 +132,7 @@
     "scripts/test/session-multiprocess-concurrency-verification.test.mjs": "2959477bf83f71db519b0502b43ae3b56364856edfd01a2e4c91db4f6bfae9b0",
     "acceptance/session-multiprocess-concurrency-verification.yaml": "54b7898bde92c56cbd2c4dd367b924fbb4cab48c17437bf1facbd3dccbe9d859",
     "skills/verify-session-concurrency/SKILL.md": "d973bcff55e060e4973a157d484f238376e4adedacd2c6b1509c1b8a6efe85c4",
-    "package.json": "b47870df48e89e905a4c65fd95ceadc3d1a4e369a40e018372fafdbcc25bae77",
+    "package.json": "9325d9e8b046254cd44bb41f16c5a611674c32ce0a5c9c07f634b6139a8a757e",
     "scripts/formal/run-formal-regression.mjs": "d223e02a4ef59557f6dd93e7719a41097f5ce7ae553b8b62c147c1ff8e33a3f3",
     ".github/workflows/release-gate.yml": "190bffb310b2635710d7124b5f18bc285a4d6387bdb5dd0b8d74a86bac83c73f",
     "scripts/spawn-utils.mjs": "c659465a7beefbeef2faa994b27c0af9573cb7b0ca4f1398f92ec86ffb4185f1",
