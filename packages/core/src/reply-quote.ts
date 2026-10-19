@@ -34,7 +34,7 @@ export function mentionsForReplyQuote(
   replyTo: ReplyQuote | undefined
 ): readonly string[] | undefined {
   if (mentions !== undefined) return mentions;
-  if (replyTo?.botId && memberIds.includes(replyTo.botId)) return [replyTo.botId];
+  if (replyTo?.botId) return memberIds.includes(replyTo.botId) ? [replyTo.botId] : [];
   return undefined;
 }
 

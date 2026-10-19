@@ -6,7 +6,7 @@
  */
 
 import type { TextPart } from '@ppeng/api-types';
-import type { MessagePart, MessageRole, SessionMessage } from '../types.js';
+import type { MessagePart, MessageReplyTo, MessageRole, SessionMessage } from '../types.js';
 import type { InboxTarget } from './step-inbox.js';
 
 export interface ClaimedInboxItem {
@@ -14,6 +14,7 @@ export interface ClaimedInboxItem {
   role: 'user' | 'system';
   text: string;
   contextParts?: TextPart[];
+  replyTo?: MessageReplyTo;
 }
 
 export interface ApplyClaimedInboxOpts {
@@ -26,7 +27,7 @@ export interface ApplyClaimedInboxStore {
     sessionId: string,
     role: MessageRole,
     parts: MessagePart[],
-    opts?: { key?: string; expectedWriterRunId?: string }
+    opts?: { key?: string; expectedWriterRunId?: string; replyTo?: MessageReplyTo }
   ): SessionMessage;
   claimInbox?(sessionId: string, target: InboxTarget): ClaimedInboxItem[];
 }
@@ -50,8 +51,8 @@ export function applyClaimedInbox(
       item.role,
       [textPart(item.text), ...(item.contextParts ?? [])],
       item.key
-        ? { key: item.key, expectedWriterRunId: opts?.expectedWriterRunId }
-        : { expectedWriterRunId: opts?.expectedWriterRunId }
+        ? { key: item.key, expectedWriterRunId: opts?.expectedWriterRunId, ...(item.replyTo ? {replyTo:item.replyTo} : {}) }
+        : { expectedWriterRunId: opts?.expectedWriterRunId, ...(item.replyTo ? {replyTo:item.replyTo} : {}) }
     );
   }
 }

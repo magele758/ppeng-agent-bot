@@ -594,6 +594,8 @@ export class SqliteStateStore {
     return this.sessions.readHistoryById(sessionId, messageId);
   }
 
+  validateMessageQuote(sessionId: string, role: MessageRole, raw: unknown) { return this.sessions.quoteForAppend(sessionId, role, raw); }
+
   enqueueSteer(sessionId: string, text: string, opts?: EnqueueSteerOptions): InboxItem {
     return this.transaction(() => {
     this.assertCurrentWriter(sessionId);

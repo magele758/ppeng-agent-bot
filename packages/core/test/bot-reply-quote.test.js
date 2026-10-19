@@ -399,3 +399,65 @@ test('quoting one room bot addresses only that bot and keeps the full reply [AC:
     f.store.db.close();
   }
 });
+
+for (const kernelVariant of ['ppeng','agent-loop']) {
+ test(`${kernelVariant} real runtime loads a quoted reply outside the fold [AC:bot-reply-quote#AC-1] [AC:bot-reply-quote#AC-6]`,async()=>{
+  const captured=[];const runtime=new RawAgentRuntime({repoRoot:mkdtempSync(join(tmpdir(),'quote-runtime-')),stateDir:mkdtempSync(join(tmpdir(),'quote-state-')),modelAdapter:{name:'quote-runtime',async runTurn(input){captured.push(input.messages);return {stopReason:'end',assistantParts:[{type:'text',text:'done'}]};}}});
+  try {
+   runtime.store.setDaemonControl('loop_settings',{kernelVariant});
+   const session=runtime.createChatSession({title:'real quote'});
+   const old=runtime.store.appendMessage(session.id,'assistant',[{type:'text',text:fullReply}],{key:'old-quote'});
+   runtime.store.hideByKey(session.id,'old-quote');
+   runtime.sendUserMessage(session.id,'please explain',{replyTo:{messageId:old.id,excerpt}});
+   await runtime.runSession(session.id);
+   assert.ok(captured.length>0);
+   assert.match(JSON.stringify(captured),/TAIL_MARKER_94/);
+   const stored=runtime.getSessionMessages(session.id).find(m=>m.role==='user');
+   assert.equal(JSON.stringify(stored).includes('TAIL_MARKER_94'),false);
+  }finally{await runtime.destroy();}
+ });
+ test(`${kernelVariant} HTTP steer preserves quote through inbox and actual model turn [AC:bot-reply-quote#AC-1] [AC:bot-reply-quote#AC-5]`,async()=>{
+  const captured=[];const runtime=new RawAgentRuntime({repoRoot:mkdtempSync(join(tmpdir(),'quote-steer-repo-')),stateDir:mkdtempSync(join(tmpdir(),'quote-steer-state-')),modelAdapter:{name:'quote-steer',async runTurn(input){captured.push(input.messages);return {stopReason:'end',assistantParts:[{type:'text',text:'done'}]};}}});
+  let sid;
+  try {
+   runtime.store.setDaemonControl('loop_settings',{kernelVariant});
+   const session=runtime.createChatSession({title:'queued quote'});sid=session.id;
+   const old=runtime.store.appendMessage(sid,'assistant',[{type:'text',text:fullReply}],{key:'old-quote'});
+   runtime.store.hideByKey(sid,'old-quote');runtime.store.claimWriter(sid,'external-running');runtime.store.updateSession(sid,{status:'running'});
+   await call(runtime,'POST','/api/sessions/:id/steer',{id:sid},{text:'steer quoted reply',replyTo:{messageId:old.id,excerpt}});
+   const queued=runtime.store.listUnclaimedInbox(sid).find(i=>i.text==='steer quoted reply');
+   assert.deepEqual(queued?.replyTo,{messageId:old.id,excerpt:excerpt.trim()});
+   runtime.store.releaseWriter(sid,'external-running');runtime.store.updateSession(sid,{status:'idle'});
+   await runtime.runSession(sid);
+   assert.match(JSON.stringify(captured),/TAIL_MARKER_94/);
+   const stored=runtime.getSessionMessages(sid).find(m=>m.role==='user'&&m.parts.some(p=>p.text==='steer quoted reply'));
+   assert.deepEqual(stored?.replyTo,queued.replyTo);assert.equal(JSON.stringify(stored).includes('TAIL_MARKER_94'),false);
+  }finally{if(sid)runtime.store.releaseWriter(sid,'external-running');await runtime.destroy();}
+ });
+}
+
+test('Room quote derives its addressee from the source and rejects forged authors [AC:bot-reply-quote#AC-4]',()=>{
+ const f=roomFixture();try{
+  const room=f.rooms.create(f.principal,{title:'bound quote',botIds:[f.alpha.id,f.beta.id],hostBotId:f.alpha.id});
+  const source=deliverBotRoomMessage(f.store,{roomId:room.id,botId:f.beta.id,principal:f.principal,text:fullReply,idempotencyKey:'quote-source'}).message;
+  assert.throws(()=>f.rooms.send(f.principal,room.id,{text:'forged',replyTo:{messageId:source.id,botId:f.alpha.id,excerpt}}),ValidationError);
+  const sent=f.rooms.send(f.principal,room.id,{text:'derived',replyTo:{messageId:source.id,excerpt}});
+  assert.equal(sent.message.replyTo.botId,f.beta.id);assert.deepEqual(sent.turn.mentionedBotIds,[f.beta.id]);
+ }finally{f.store.db.close();}
+});
+
+for (const kernelVariant of ['ppeng','agent-loop']) test(`${kernelVariant} quote cannot recall revoked shared context [AC:bot-reply-quote#AC-1]`,async()=>{
+ const captured=[];const runtime=new RawAgentRuntime({repoRoot:mkdtempSync(join(tmpdir(),'quote-revoked-')),stateDir:mkdtempSync(join(tmpdir(),'quote-revoked-state-')),modelAdapter:{name:'quote-revoked',async runTurn(input){captured.push(input.messages);return {stopReason:'end',assistantParts:[{type:'text',text:'done'}]};}}});
+ try{runtime.store.setDaemonControl('loop_settings',{kernelVariant});const s=runtime.createChatSession({title:'revoked quote'});const old=runtime.store.appendMessage(s.id,'assistant',[{type:'text',text:'REVOKED_PRIVATE_BODY_43'}]);runtime.store.setDaemonControl('bot.sharedExposure:'+s.id,{revoked:[{fromSeq:old.seq,toSeq:old.seq,startedAt:'a',endedAt:'b'}]});runtime.sendUserMessage(s.id,'explain',{replyTo:{messageId:old.id,excerpt:'old'}});await runtime.runSession(s.id);assert.ok(captured.length);assert.doesNotMatch(JSON.stringify(captured),/REVOKED_PRIVATE_BODY_43/);}finally{await runtime.destroy();}
+});
+test('quoted steer cannot be silently promoted to a child without its source [AC:bot-reply-quote#AC-5]',async()=>{
+ const runtime=openRuntime();try{const s=runtime.createChatSession({title:'quote promotion'});const old=runtime.store.appendMessage(s.id,'assistant',[{type:'text',text:fullReply}]);const item=runtime.store.enqueueSteer(s.id,'explain',{replyTo:{messageId:old.id,excerpt}});assert.throws(()=>runtime.promoteSteerToSubagent(s.id,item.id),ValidationError);assert.equal(runtime.store.getUnclaimedInbox(s.id,item.id).replyTo.messageId,old.id);assert.throws(()=>runtime.enqueueSteer(s.id,'explain',{steerMode:'subagent',replyTo:{messageId:old.id,excerpt}}),ValidationError);}finally{await runtime.destroy();}
+});
+
+test('quote of a departed Room author does not broadcast [AC:bot-reply-quote#AC-4]',()=>{
+ const f=roomFixture();try{const room=f.rooms.create(f.principal,{title:'departed quote',botIds:[f.alpha.id,f.beta.id],hostBotId:f.alpha.id});const source=deliverBotRoomMessage(f.store,{roomId:room.id,botId:f.beta.id,principal:f.principal,text:fullReply,idempotencyKey:'departed-source'}).message;f.rooms.removeMember(f.principal,room.id,f.beta.id);const sent=f.rooms.send(f.principal,room.id,{text:'explain this',replyTo:{messageId:source.id,excerpt}});assert.deepEqual(sent.turn.mentionedBotIds,[]);assert.equal(isRestrainedMember(sent.turn,f.alpha.id),true);}finally{f.store.db.close();}
+});
+for (const kernelVariant of ['ppeng','agent-loop']) test(`${kernelVariant} overflow delivers the exact quoted source to the model [AC:bot-reply-quote#AC-5]`,async()=>{
+ const captured=[];const runtime=new RawAgentRuntime({repoRoot:mkdtempSync(join(tmpdir(),'quote-overflow-')),stateDir:mkdtempSync(join(tmpdir(),'quote-overflow-state-')),modelAdapter:{name:'quote-overflow',async runTurn(input){captured.push(input.messages);return {stopReason:'end',assistantParts:[{type:'text',text:'done'}]};}}});
+ try{runtime.store.setDaemonControl('loop_settings',{kernelVariant,inboxOverflowCap:2});const s=runtime.createChatSession({title:'quote overflow'});const old=runtime.store.appendMessage(s.id,'assistant',[{type:'text',text:fullReply}],{key:'folded-source'});runtime.store.hideByKey(s.id,'folded-source');const quote={messageId:old.id,excerpt};const item=runtime.store.enqueueSteer(s.id,'quoted oldest',{replyTo:quote});for(const text of ['a','b','c','d'])runtime.store.enqueueSteer(s.id,text);assert.deepEqual(runtime.store.listUnclaimedInbox(s.id).find(i=>i.id===item.id)?.replyTo,quote);await runtime.runSession(s.id);assert.ok(captured.length);assert.match(JSON.stringify(captured),/TAIL_MARKER_94/);const delivered=runtime.store.foldMessages(s.id).find(m=>m.role==='user'&&m.parts.some(part=>part.type==='text'&&part.text==='quoted oldest'));assert.deepEqual(delivered.replyTo,{...quote,excerpt:excerpt.trim()});assert.doesNotMatch(JSON.stringify(delivered),/TAIL_MARKER_94/);}finally{await runtime.destroy();}
+});

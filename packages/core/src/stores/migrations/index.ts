@@ -1013,6 +1013,7 @@ export const MIGRATIONS: Migration[] = [
       if (!hasColumn(db, 'session_messages', 'reply_to_json')) {
         db.exec('ALTER TABLE session_messages ADD COLUMN reply_to_json TEXT');
       }
+      if (!hasColumn(db, 'session_inbox', 'reply_to_json')) db.exec('ALTER TABLE session_inbox ADD COLUMN reply_to_json TEXT');
     }
   }
 ];

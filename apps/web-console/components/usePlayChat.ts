@@ -1814,6 +1814,7 @@ export function usePlayChat(deps: PlayChatDeps) {
         }
         if (data.status === 'rejected' || data.status === 'not_submitted') {
           forgetPendingReply(replyMemoryRef.current);
+          if (!immediate) setReplyQuote(quoteSnapshot);
           if (immediate) {
             pendingSteerTextRef.current = null;
             setOptimisticUser(null);
@@ -1844,6 +1845,7 @@ export function usePlayChat(deps: PlayChatDeps) {
         }
       } catch (err) {
         if (!steerResponseApplies(steerGeneration, liveGenRef.current, steerSessionId, selectedSessionRef.current)) return;
+        if (!immediate) setReplyQuote(quoteSnapshot);
         if (immediate) {
           pendingSteerTextRef.current = null;
           setOptimisticUser(null);

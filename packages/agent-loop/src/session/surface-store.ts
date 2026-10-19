@@ -275,6 +275,7 @@ export class MemorySurfaceStore implements SessionSurfaceStoreExt {
       role: opts.role ?? 'user',
       text,
       contextParts: opts.contextParts,
+      replyTo: opts.replyTo,
       key: opts.key,
       createdAt: nowIso()
     };

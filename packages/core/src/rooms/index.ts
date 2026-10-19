@@ -212,7 +212,8 @@ export class BotRoomService {
     const quote = normalizeReplyQuote(raw);
     const original = decode<BotRoomMessage>(this.store.db.prepare('SELECT data FROM bot_room_messages WHERE id=? AND room_id=?').get(quote.messageId, roomId));
     if (!original || original.sender.type !== 'bot') throw new ValidationError('replyTo must quote a bot reply');
-    return quote;
+    if (quote.botId && quote.botId !== original.sender.id) throw new ValidationError('replyTo bot does not match the original author');
+    return { ...quote, botId: original.sender.id };
   }
   private validateMessageInput(input: BotRoomMessageInput): { text: string; attachments: string[]; contextSources: ContextSource[] } {
     const text = typeof input.text === 'string' ? input.text.trim() : '';

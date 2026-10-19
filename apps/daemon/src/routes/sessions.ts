@@ -936,7 +936,9 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
           typeof body.subagentRole === 'string' && body.subagentRole.trim()
             ? body.subagentRole.trim()
             : undefined;
-        const ack = runtime.enqueueSteer(id, text, { target, key, role, steerMode, subagentRole, contextParts });
+        const replyTo = replyToFromBody(body);
+        if (typeof replyTo === 'string') throw new ValidationError('Quoted steering requires a message pointer');
+        const ack = runtime.enqueueSteer(id, text, { target, key, role, steerMode, subagentRole, contextParts, replyTo });
         json(response, 200, steerHttpFromCoreAck(ack, runtime.getSession(id)));
       }
     },

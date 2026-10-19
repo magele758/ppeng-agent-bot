@@ -134,7 +134,9 @@ export function applyInboxOverflow(
   sessionId: string,
   cap: number | null | undefined
 ): InboxItem | undefined {
-  const fold = planInboxOverflow(host.listUnclaimed(sessionId), cap);
+  // Quoted human inputs require their exact source at model time. Never acknowledge
+  // them via a lossy system summary; the cap applies to summarizable inputs only.
+  const fold = planInboxOverflow(host.listUnclaimed(sessionId).filter(item => !item.replyTo), cap);
   if (fold.length === 0) return undefined;
   host.markClaimed(fold.map((item) => item.id));
   return host.enqueueSummary(sessionId, summarizeInboxOverflow(fold), {

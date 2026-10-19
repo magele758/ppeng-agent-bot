@@ -672,7 +672,7 @@ export class SessionStore {
     return (row?.m ?? 0) + 1;
   }
 
-  private quoteForAppend(sessionId: string, role: MessageRole, raw: unknown): MessageReplyTo | undefined {
+  quoteForAppend(sessionId: string, role: MessageRole, raw: unknown): MessageReplyTo | undefined {
     if (raw == null) return undefined;
     if (role !== 'user') throw new ValidationError('replyTo is only valid on a user message');
     const quote = normalizeReplyQuote(raw);
