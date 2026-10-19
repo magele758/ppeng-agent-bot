@@ -29,6 +29,7 @@ export function compareAcceptance(base, current) {
     if (!['approved', 'implemented'].includes(prior.status)) continue;
     const next = current.find(s => s.id === prior.id);
     if (!next || rank[next.status] < rank[prior.status]) errors.push(`${prior.id}: acceptance status removed/downgraded from ${prior.status}`);
+    if (next && (prior.verificationStage ?? 'software') === 'software' && (next.verificationStage ?? 'software') !== 'software') errors.push(`${prior.id}: approved software stage moved out of the software gate`);
     for (const criterion of prior.criteria) {
       if (!next?.criteria.some(c => c.id === criterion.id)) errors.push(`${prior.id}#${criterion.id}: base criterion removed`);
     }

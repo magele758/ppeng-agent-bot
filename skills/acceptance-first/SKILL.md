@@ -92,3 +92,9 @@ node scripts/acceptance/acceptance-gate.mjs --collect unit,vitest   # 只跑部�
 ## 5. PR 描述
 
 填写 [`.github/pull_request_template.md`](../../.github/pull_request_template.md) 的 **Acceptance** 一节：涉及的 spec id、每个 spec 的状态（新起草 / 已批准 / 已实现 / 已废弃）、标准是否有改动（改动需负责人重新确认）、门禁结果（贴 `npm run test:acceptance` 摘要）。
+
+## 经用户批准的阶段拆分
+
+用户于2026-10-19明确批准第四阶段按8条本地软件标准单独交付、原40条作为现场验收保留。可选规格字段 `verificationStage: software | deployment`（省略为software）。新增或改动此字段需要用户明确确认适用阶段；它不改变criteria原文或批准状态。
+
+软件合并运行 `npm run test:acceptance`；现场完整验收运行 `npm run test:acceptance:deployment`（`--stage all`）。报告必须保留不适用现场条目的真实状态及未认证提示；软件通过不能冒充现场通过。基线已批准的软件规格不能迁出软件门禁。此阶段拆分不得用作给其他未完成需求绕过门禁的通用许可。

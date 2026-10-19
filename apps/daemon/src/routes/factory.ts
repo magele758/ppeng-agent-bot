@@ -1,4 +1,8 @@
-import { resolveBotPrincipal, type RawAgentRuntime } from "@ppeng/agent-core";
+import {
+  ValidationError,
+  resolveBotPrincipal,
+  type RawAgentRuntime,
+} from "@ppeng/agent-core";
 import type { RouteSpec, RouteContext } from "../routing.js";
 import { json } from "../http-utils.js";
 export function factoryRoutes(runtime: RawAgentRuntime): RouteSpec[] {
@@ -13,6 +17,83 @@ export function factoryRoutes(runtime: RawAgentRuntime): RouteSpec[] {
     void runtime.factory.tick().catch(() => {});
   };
   return [
+    {
+      method: "GET",
+      pattern: "/api/factory/production/settings",
+      handler: (ctx) =>
+        json(ctx.response, 200, {
+          settings: runtime.factory.production.settings(principal(ctx)),
+        }),
+    },
+    {
+      method: "PATCH",
+      pattern: "/api/factory/production/settings",
+      handler: async (ctx) =>
+        json(ctx.response, 200, {
+          settings: runtime.factory.production.save(
+            principal(ctx),
+            await ctx.readBody(),
+          ),
+        }),
+    },
+    {
+      method: "POST",
+      pattern: "/api/factory/production/preflight",
+      handler: async (ctx) => {
+        const body = await ctx.readBody();
+        if (!body || typeof body !== "object" || Array.isArray(body) || Object.keys(body).length)
+          throw new ValidationError("Preflight accepts no overrides");
+        json(
+          ctx.response,
+          200,
+          runtime.factory.production.preflight(principal(ctx)),
+        );
+      },
+    },
+    {
+      method: "GET",
+      pattern: "/api/factory/production/runs",
+      handler: (ctx) =>
+        json(ctx.response, 200, {
+          runs: runtime.factory.production.list(principal(ctx)),
+        }),
+    },
+    {
+      method: "POST",
+      pattern: "/api/factory/production/runs",
+      handler: async (ctx) =>
+        json(ctx.response, 201, {
+          run: runtime.factory.production.create(
+            principal(ctx),
+            await ctx.readBody(),
+          ),
+        }),
+    },
+    {
+      method: "GET",
+      pattern: "/api/factory/production/runs/:id",
+      handler: (ctx) =>
+        json(ctx.response, 200, {
+          run: runtime.factory.production.get(
+            principal(ctx),
+            ctx.requireParam("id"),
+          ),
+        }),
+    },
+    {
+      method: "POST",
+      pattern: "/api/factory/production/runs/:id/assess",
+      handler: async (ctx) =>
+        json(
+          ctx.response,
+          200,
+          runtime.factory.production.assess(
+            principal(ctx),
+            ctx.requireParam("id"),
+            await ctx.readBody(),
+          ),
+        ),
+    },
     {
       method: "GET",
       pattern: "/api/factory/delivery/tasks/:id/evidence/:digest",
