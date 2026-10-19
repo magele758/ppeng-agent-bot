@@ -39,6 +39,7 @@ function loadMenu() {
       return text;
     } }) };
     if (id === '@/lib/api') return { api: async () => ({}) };
+    if (id === '@/lib/bot-chat-header') return localRequire('../lib/bot-chat-header.ts');
     if (id === '@/lib/bot-detail-menu') return localRequire('../lib/bot-detail-menu.ts');
     return localRequire(id);
   };
