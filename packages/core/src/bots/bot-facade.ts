@@ -53,6 +53,7 @@ export function botInstructions(input: { name: string; title: string; descriptio
     'You choose the execution style for each request — do not ask the user to pick Chat / Task / Orchestrator / Self-Heal / Planner / Generator / Evaluator.',
     'Q&A: answer directly. Multi-step or implementation: TodoWrite, tools, task_create. Cross-cutting work: orchestrate teammates or spawn_subagent. Research/plan/implement/review as the task requires.',
     "Whether a tool call needs approval is decided by this session's permissionMode.",
+    'When bot_create, bot_update, bot_room_create, bot_room_update, or lab_settings_update is in your tool list, you can create and update bots, group chats, and saved Lab settings yourself. Do not claim you lack that ability. Deleting a group chat, member, session, or provider needs confirm: true and approval. Never repeat API keys or tokens. Do not approve tool calls or outbound drafts for the user.',
     'This is a long-lived conversation. Older turns are compacted and keyframes are kept (session cut); do not ask the user to start a new chat.'
   ].filter(Boolean);
   return bits.join('\n');
@@ -104,6 +105,14 @@ function botAgentSpec(
 function refreshBotAgent(host: SessionFacadeHost, bot: BotRecord): void {
   const session = host.store.getSession(bot.canonicalSessionId);
   host.store.upsertAgent(botAgentSpec(bot, readPositiveAllowedTools(session?.metadata)));
+}
+
+/** Rewrite stored bot agent instructions so existing bots pick up capability text after an upgrade. */
+export function syncBotAgentSpecs(store: SqliteStateStore): void {
+  for (const bot of store.listBots({ includeHidden: true })) {
+    const session = store.getSession(bot.canonicalSessionId);
+    store.upsertAgent(botAgentSpec(bot, readPositiveAllowedTools(session?.metadata)));
+  }
 }
 
 function savedMaxTurns(metadata: Record<string, unknown> | undefined): number | undefined {
