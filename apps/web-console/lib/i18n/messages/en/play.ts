@@ -40,6 +40,11 @@ export const play = {
     saveShared: "Save shared information",
     saved: "Saved"
   },
+  pin: {
+    title: "Pinned",
+    empty: "Drag a Bot here to pin it",
+    hint: "Drag a Bot out of this area to unpin it"
+  },
   send: 'Send',
   add: 'New',
   chat: 'Chat',
@@ -703,6 +708,39 @@ export const play = {
 
   stored: {
     expand: 'Expand stored original'
+  },
+
+  botDetail: {
+    open: 'Details',
+    close: 'Hide',
+    aria: 'Bot details',
+    title: '{name}',
+    routines: 'Schedules',
+    files: 'Files',
+    memory: 'Memory',
+    routinesEmpty: 'This Bot has no scheduled jobs',
+    filesEmpty: 'This Bot has not generated any files or materials',
+    memoryEmpty: 'This Bot has no memories',
+    loading: 'Loading…',
+    loadFailed: 'Could not load this Bot’s details',
+    on: 'On',
+    off: 'Off',
+    turnOn: 'Turn on',
+    turnOff: 'Turn off',
+    toggleFailed: 'Could not change it. The previous state is unchanged',
+    openFolder: 'Open containing folder',
+    openFolderFailed: 'Could not open the containing folder',
+    openedFolder: 'Opened the containing folder',
+    redacted: 'Sensitive content hidden',
+    next: 'Next {when}',
+    kindArtifact: 'Generated material',
+    kindWorkingLog: 'Working log',
+    scopeScratch: 'Scratch',
+    scopeLong: 'Session memory',
+    scopeUser: 'User memory',
+    scopeTeam: 'Team memory',
+    scopeProject: 'Project memory',
+    scopeOther: 'Other memory'
   },
 
   status: {

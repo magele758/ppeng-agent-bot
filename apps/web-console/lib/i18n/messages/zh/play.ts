@@ -40,6 +40,11 @@ export const play = {
     saveShared: "保存共享信息",
     saved: "已保存"
   },
+  pin: {
+    title: "置顶",
+    empty: "把 Bot 拖到这里置顶",
+    hint: "把 Bot 拖出此区域可取消置顶"
+  },
   send: '发送',
   add: '新增',
   chat: '对话',
@@ -700,6 +705,39 @@ export const play = {
 
   stored: {
     expand: '展开原文（落库）'
+  },
+
+  botDetail: {
+    open: '详情',
+    close: '收起',
+    aria: 'Bot 详情',
+    title: '{name}',
+    routines: '定时任务',
+    files: '文件资料',
+    memory: '记忆',
+    routinesEmpty: '这个 Bot 还没有定时任务',
+    filesEmpty: '这个 Bot 还没有生成过文件或资料',
+    memoryEmpty: '这个 Bot 还没有记忆',
+    loading: '正在读取…',
+    loadFailed: '没能读到这个 Bot 的详情',
+    on: '已开启',
+    off: '已关闭',
+    turnOn: '开启',
+    turnOff: '关闭',
+    toggleFailed: '没能切换，状态保持原样',
+    openFolder: '打开所在目录',
+    openFolderFailed: '没能打开所在目录',
+    openedFolder: '已打开所在目录',
+    redacted: '已隐藏敏感内容',
+    next: '下次 {when}',
+    kindArtifact: '生成的资料',
+    kindWorkingLog: '工作记录',
+    scopeScratch: '本轮草稿',
+    scopeLong: '会话长期记忆',
+    scopeUser: '用户记忆',
+    scopeTeam: '团队记忆',
+    scopeProject: '项目记忆',
+    scopeOther: '其他记忆'
   },
 
   status: {

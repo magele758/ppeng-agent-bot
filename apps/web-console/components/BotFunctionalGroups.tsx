@@ -8,8 +8,8 @@ import { useI18n } from '@/lib/i18n';
 import styles from './BotFunctionalGroups.module.css';
 import { BotEntryDialog } from './BotEntryDialog';
 
+import { BOT_DRAG_MIME } from '@/lib/bot-pin-area';
 import { canMoveBot, factEditorState, functionalGroupRows, functionalGroupPresentation, groupSaveDisabled, functionalGroupSaveRequest, moveBotInGroups, upsertFunctionalGroup, type FunctionalGroup } from '@/lib/functional-group-view';
-const BOT_DRAG = 'application/x-agent-home-bot';
 
 export function BotFunctionalGroups({ bots, sessions, renderSession, createRequest = 0 }: {
   createRequest?: number;
@@ -90,9 +90,9 @@ export function BotFunctionalGroups({ bots, sessions, renderSession, createReque
     return <section key={presentation.key} data-testid={`functional-group-${presentation.key}`}
       className={`${styles.group} ${dragTarget === groupId ? styles.dropTarget : ''}`}
       aria-busy={pending}
-      onDragOver={(event) => { if (pending || !event.dataTransfer.types.includes(BOT_DRAG)) return; event.preventDefault(); event.dataTransfer.dropEffect = 'move'; setDragTarget(groupId); }}
+      onDragOver={(event) => { if (pending || !event.dataTransfer.types.includes(BOT_DRAG_MIME)) return; event.preventDefault(); event.dataTransfer.dropEffect = 'move'; setDragTarget(groupId); }}
       onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragTarget(undefined); }}
-      onDrop={(event) => { event.preventDefault(); setDragTarget(undefined); void move(event.dataTransfer.getData(BOT_DRAG), groupId); }}>
+      onDrop={(event) => { event.preventDefault(); setDragTarget(undefined); void move(event.dataTransfer.getData(BOT_DRAG_MIME), groupId); }}>
       <div className={styles.heading}>
         <h3>{presentation.name}</h3>
         <span className={styles.count}>{rows.length}</span>
@@ -106,7 +106,8 @@ export function BotFunctionalGroups({ bots, sessions, renderSession, createReque
       {rows.map((session) => {
         const bot = botForCanonicalSession(bots, session.id, sessions);
         return <div key={session.id} draggable={!!bot && !pending} className={styles.draggable}
-          onDragStart={(event) => { if (!bot || pending) { event.preventDefault(); return; } event.dataTransfer.setData(BOT_DRAG, bot.id); event.dataTransfer.effectAllowed = 'move'; }}
+          data-bot-id={bot?.id} data-bot-name={bot?.name}
+          onDragStart={(event) => { if (!bot || pending) { event.preventDefault(); return; } event.dataTransfer.setData(BOT_DRAG_MIME, bot.id); event.dataTransfer.effectAllowed = 'move'; }}
           onDragEnd={() => setDragTarget(undefined)}>
           {renderSession(session)}
         </div>;

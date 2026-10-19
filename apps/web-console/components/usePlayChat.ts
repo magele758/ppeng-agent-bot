@@ -63,7 +63,7 @@ import {
   type SteerInboxItem,
   type SteerInterruptPolicy
 } from '@/lib/query-queue';
-import { decideRunningTurnSend, isCanonicalBotChatMetadata } from '@/lib/running-turn-send';
+import { decideRunningTurnSend, isCanonicalBotChatMetadata, planRunningTurnDelivery } from '@/lib/running-turn-send';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 /** Stream already persisted the user turn; do not put the draft back in the composer. */
@@ -1559,9 +1559,12 @@ export function usePlayChat(deps: PlayChatDeps) {
     const running = playSending || Boolean(streamOverlay) || waitTyping;
     if (running) {
       if (!text || !selectedSessionId) return;
-      const immediate =
-        decideRunningTurnSend({ canonicalBotChat: composerIsCanonicalBot() }) === 'steer';
-      if (!immediate && steerInterruptPolicy === 'disabled') {
+      const delivery = planRunningTurnDelivery({
+        canonicalBotChat: composerIsCanonicalBot(),
+        interruptPolicy: steerInterruptPolicy
+      });
+      const immediate = delivery.optimistic;
+      if (delivery.blocked) {
         setPlayStatus({ text: t('play.status.steerDisabled'), err: true });
         return;
       }
@@ -1577,20 +1580,20 @@ export function usePlayChat(deps: PlayChatDeps) {
         clearComposerOnly();
       }
       try {
-        const target = immediate || steerInterruptPolicy !== 'queue' ? 'next-step' : 'next-run';
+        const target = delivery.target;
         const execMode = queryExecModeRef.current;
         const data = (await api(`/api/sessions/${selectedSessionId}/steer`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(
             immediate
-              ? { text, target: 'next-step' }
+              ? { text, target }
               : { text, target, ...steerBodyFromQueryMode(execMode) }
           ),
         })) as { ok?: boolean; status?: string; reason?: string; item?: SteerInboxItem };
         acknowledgeLocalSendCommitted();
         clearComposerOnly();
-        if (execMode !== 'subagent' && data.item?.id) {
+        if (delivery.revealSettings && execMode !== 'subagent' && data.item?.id) {
           setSteerInbox((prev) => [
             ...prev,
             { id: data.item!.id, text: data.item!.text || text, target, mode: 'steering' }

@@ -1244,6 +1244,11 @@ export async function runSessionKernel(
         } else {
           await waitSteeringChildrenIdle(sid);
         }
+        const steeredNow = host.store.claimInbox(sid, 'next-step');
+        if (steeredNow.length > 0) {
+          applyClaimedInbox(host.store, sid, steeredNow);
+          continue;
+        }
         return host.handleTurnCompletion(session, agent, task).then((completed) =>
           finishEnded(completed, 'end')
         );

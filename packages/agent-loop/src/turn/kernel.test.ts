@@ -234,6 +234,29 @@ describe('runSessionKernel wiring', () => {
     expect(names).toEqual(['dyn_echo']);
   });
 
+  it('injects a next-step steer before the run ends [AC:bot-immediate-steer#AC-1]', async () => {
+    const seen: string[] = [];
+    const { host, session, surface } = createHarness({
+      model: () => textResult('draft'),
+    });
+    const orig = host.runTurnWithRetries.bind(host);
+    host.runTurnWithRetries = async (input, onStream) => {
+      const text = input.messages
+        .flatMap((message) => message.parts)
+        .filter((part) => part.type === 'text')
+        .map((part) => part.text)
+        .join('\n');
+      seen.push(text);
+      if (seen.length === 1) surface.enqueueSteer(session.id, 'listen now', { target: 'next-step' });
+      return orig(input, onStream);
+    };
+    await runSessionKernel(host, session.id);
+    expect(seen.length).toBeGreaterThanOrEqual(2);
+    expect(seen[0]).not.toContain('listen now');
+    expect(seen[1]).toContain('listen now');
+    expect(surface.listUnclaimedInbox(session.id)).toEqual([]);
+  });
+
   it('drains steer before opening a tool wave', async () => {
     let executed = 0;
     const { host, session, surface } = createHarness({
