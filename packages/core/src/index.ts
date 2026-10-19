@@ -10,3 +10,5 @@ export * from './exports/public.js';
 
 export { FactoryService } from './factory/service.js';
 export type { FactoryMachine, FactoryTask, FactorySettings, FactoryTransport } from './factory/types.js';
+
+export type { DevelopmentPolicy, DevelopmentSpec, DevelopmentState, DevelopmentPreflight } from './factory/development-types.js';
