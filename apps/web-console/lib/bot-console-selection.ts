@@ -84,6 +84,20 @@ export function createDefaultBotLoadGuard() {
   };
 }
 
+/**
+ * The automatic Super Bot load may claim the screen only while this load is
+ * still current and the user has not chosen a session since it started.
+ * An in-flight open is a separate guard; this one stops selectBot from
+ * starting after the click has already moved the selection.
+ */
+export function defaultBotLoadMaySelect(
+  selectionAtStart: string | null,
+  selectionNow: string | null,
+  cancelled: boolean
+): boolean {
+  return !cancelled && selectionAtStart === selectionNow;
+}
+
 export function startDefaultBotLoadEffect(
   guard: ReturnType<typeof createDefaultBotLoadGuard>,
   input: DefaultBotLoadInput,
