@@ -2,7 +2,8 @@ import { createId, nowIso } from '../id.js';
 import { AuthorizationError, ConflictError, NotFoundError, ValidationError } from '../errors.js';
 import { botPrincipalKey, principalFromSession, sameBotPrincipal, resolveBotPrincipal, type BotPrincipal } from '../bots/bot-identity.js';
 import type { SqliteStateStore } from '../storage.js';
-import type { SessionRecord } from '../types.js';
+import type { MessageReplyTo, SessionRecord } from '../types.js';
+import { normalizeReplyQuote } from '../session/reply-quote.js';
 import type { KernelHookListener } from '@ppeng/agent-loop';
 import { fenceExternalContent } from '../safety/external-content.js';
 import { contextSourceModelText, normalizeContextSources, type ContextSource } from '../ingestion/context-sources.js';
@@ -22,14 +23,16 @@ export interface BotRoom {
 export interface BotRoomMessage {
   id: string; roomId: string; seq: number; sender: { type: 'user' | 'bot'; id: string; name: string };
   text: string; attachmentIds: string[]; contextSources?: ContextSource[]; turnId?: string; createdAt: string;
+  /** Short quote pointer. The full bot reply stays on the original message. */
+  replyTo?: MessageReplyTo;
 }
-export interface BotRoomMessageInput { text: string; mentions?: string[]; attachmentIds?: string[]; contextSources?: unknown; idempotencyKey?: string }
+export interface BotRoomMessageInput { text: string; mentions?: string[]; attachmentIds?: string[]; contextSources?: unknown; idempotencyKey?: string; replyTo?: unknown }
 export type RoomTurnStatus = 'queued' | 'running' | 'waiting_approval' | 'completed' | 'failed' | 'cancelled' | 'unknown';
 export interface BotRoomTurn {
   id: string; roomId: string; messageId: string; status: RoomTurnStatus; botIds: string[];
   /** Present only when the triggering message named members. Empty means an @ matched nobody, so everyone is restrained. */
   mentionedBotIds?: string[];
-  /** Bot message the user quoted. The full reply is loaded by this id for the model; it is not copied onto the user message. */
+  /** Bot message the user quoted. The full reply is loaded by this id. The user message keeps only the short replyTo pointer. */
   replyToMessageId?: string;
   maxBotTurns: number; botTurns: number; toolCalls: number; costUsd: number; costStatus: 'unknown' | 'estimated'; cursor: number; currentSessionId?: string; startSeq?: number; startCostUsd?: number; startedAt?: string; partialResult?: string; silentBotIds?: string[]; handedOffBotIds?: string[];
   terminationReason?: string; createdAt: string; updatedAt: string;
@@ -198,11 +201,18 @@ export class BotRoomService {
     turn.updatedAt = nowIso();
     this.store.db.prepare('UPDATE bot_room_turns SET status=?,data=? WHERE id=?').run(turn.status,JSON.stringify(turn),turn.id);
   }
-  private append(roomId: string, sender: BotRoomMessage['sender'], text: string, attachmentIds: string[], turnId?: string, idem?: string, contextSources?: ContextSource[]): BotRoomMessage {
+  private append(roomId: string, sender: BotRoomMessage['sender'], text: string, attachmentIds: string[], turnId?: string, idem?: string, contextSources?: ContextSource[], replyTo?: MessageReplyTo): BotRoomMessage {
     const row = this.store.db.prepare('SELECT COALESCE(MAX(seq),0)+1 AS seq FROM bot_room_messages WHERE room_id=?').get(roomId) as {seq:number};
-    const message: BotRoomMessage = { id:createId('room_msg'),roomId,seq:row.seq,sender,text,attachmentIds,createdAt:nowIso(),...(contextSources?.length?{contextSources}:{}),...(turnId?{turnId}:{}) };
+    const message: BotRoomMessage = { id:createId('room_msg'),roomId,seq:row.seq,sender,text,attachmentIds,createdAt:nowIso(),...(contextSources?.length?{contextSources}:{}),...(turnId?{turnId}:{}),...(replyTo?{replyTo}:{}) };
     this.store.db.prepare('INSERT INTO bot_room_messages(id,room_id,seq,idem_key,data) VALUES(?,?,?,?,?)').run(message.id,roomId,message.seq,idem??null,JSON.stringify(message));
     return message;
+  }
+  /** Same short pointer the session API stores. The quoted body is not copied onto this message. */
+  private persistableQuote(roomId: string, raw: unknown): MessageReplyTo {
+    const quote = normalizeReplyQuote(raw);
+    const original = decode<BotRoomMessage>(this.store.db.prepare('SELECT data FROM bot_room_messages WHERE id=? AND room_id=?').get(quote.messageId, roomId));
+    if (!original || original.sender.type !== 'bot') throw new ValidationError('replyTo must quote a bot reply');
+    return quote;
   }
   private validateMessageInput(input: BotRoomMessageInput): { text: string; attachments: string[]; contextSources: ContextSource[] } {
     const text = typeof input.text === 'string' ? input.text.trim() : '';
@@ -271,7 +281,7 @@ export class BotRoomService {
     const duplicate = this.duplicateReceipt(id, input, text, attachments, contextSources);
     if (duplicate) return duplicate;
     this.authorizeAttachments(principal, attachments);
-    const quote = readReplyQuote(input);
+    const quote = input.replyTo == null ? undefined : this.persistableQuote(id, input.replyTo);
     const named = this.resolveMentions(room, text, input.mentions);
     const schedule = scheduleRoomTurn(room.botIds, mentionsForReplyQuote(room.botIds, named, quote));
     return this.tx(() => {
@@ -281,7 +291,7 @@ export class BotRoomService {
       const pending = this.store.db.prepare("SELECT COUNT(*) AS count FROM bot_room_turns WHERE room_id=? AND status IN ('queued','running','waiting_approval')").get(id) as { count: number };
       if (pending.count >= 1000) throw new ConflictError('Room queue capacity reached; retry later');
       const turnId = createId('room_turn');
-      const message = this.append(id, { type: 'user', id: principal.userId, name: principal.userId }, text, attachments, turnId, input.idempotencyKey, contextSources);
+      const message = this.append(id, { type: 'user', id: principal.userId, name: principal.userId }, text, attachments, turnId, input.idempotencyKey, contextSources, quote);
       const now = nowIso();
       const turn: BotRoomTurn = { id: turnId, roomId: id, messageId: message.id, status: 'queued', botIds: schedule.botIds, ...(schedule.mentionedBotIds !== undefined ? { mentionedBotIds: schedule.mentionedBotIds } : {}), ...(quote ? { replyToMessageId: quote.messageId } : {}), maxBotTurns: room.maxBotTurns, botTurns: 0, toolCalls: 0, costUsd: 0, costStatus: 'unknown', cursor: 0, createdAt: now, updatedAt: now };
       this.store.db.prepare('INSERT INTO bot_room_turns(id,room_id,status,data) VALUES(?,?,?,?)').run(turn.id, id, turn.status, JSON.stringify(turn));

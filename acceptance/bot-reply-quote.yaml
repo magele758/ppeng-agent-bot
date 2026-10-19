@@ -1,6 +1,6 @@
 id: bot-reply-quote
 title: 引用某条 Bot 回复再发消息
-status: approved
+status: implemented
 requirement: |
   我还想要加一个回复bot里某个具体回复的能力，类似引用的能力
 owner: user

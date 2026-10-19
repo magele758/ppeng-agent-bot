@@ -86,13 +86,16 @@ function alreadyQuoted(parts: ReadonlyArray<{ type: string; text?: string }> | u
 }
 
 /** Model view only. The stored user message keeps replyTo and does not gain the full body. */
-export function embedReplyQuotes<T extends SessionMessage>(messages: readonly T[]): T[] {
+export function embedReplyQuotes<T extends SessionMessage>(
+  messages: readonly T[],
+  loadOriginal?: (messageId: string) => QuoteMessage | undefined
+): T[] {
   const byId = new Map(messages.map((message) => [message.id, message]));
   return messages.map((message) => {
     if (message.role !== 'user') return message;
     const quote = readReplyQuote(message);
     if (!quote || alreadyQuoted(message.parts)) return message;
-    const original = byId.get(quote.messageId);
+    const original = byId.get(quote.messageId) ?? loadOriginal?.(quote.messageId);
     if (!original) return message;
     const fullText = botReplyText(original);
     if (!fullText) return message;

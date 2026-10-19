@@ -175,6 +175,18 @@ for (const snapshot of SNAPSHOTS) {
     store.db.close();
   });
 
+  // v32 adds session_messages.reply_to_json with no DEFAULT, so a pre-existing row stays NULL.
+  if (v < 32) test(`v${v} -> latest: session_messages.reply_to_json defaults to NULL [AC:schema-upgrade-safety#AC-1]`, () => {
+    const { store } = restore(snapshot);
+    const columns = store.db.prepare('PRAGMA table_info(session_messages)').all();
+    const replyTo = columns.find((column) => column.name === 'reply_to_json');
+    assert.ok(replyTo, 'session_messages.reply_to_json exists after upgrade');
+    assert.equal(replyTo.dflt_value, null);
+    const rows = store.db.prepare('SELECT reply_to_json FROM session_messages').all();
+    for (const row of rows) assert.equal(row.reply_to_json, null);
+    store.db.close();
+  });
+
   // v30 adds bot_work_messages.source_room with no DEFAULT, so a pre-existing row stays NULL.
   if (v < 30) test(`v${v} -> latest: bot_work_messages.source_room defaults to NULL [AC:schema-upgrade-safety#AC-1]`, () => {
     const { store } = restore(snapshot);

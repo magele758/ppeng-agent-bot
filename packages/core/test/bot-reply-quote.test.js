@@ -275,6 +275,43 @@ test('a quoted bot reply is given in full to the answering bot [AC:bot-reply-quo
   assert.doesNotMatch(plainShown, /msg_bot/);
 });
 
+test('prompt assembly loads the quoted reply by messageId when it is outside the fold [AC:bot-reply-quote#AC-1]', async () => {
+  const botReply = {
+    id: 'msg_old',
+    sessionId: 'sess',
+    role: 'assistant',
+    parts: [{ type: 'text', text: fullReply }],
+    createdAt: '2026-10-19T00:00:00.000Z'
+  };
+  const quoted = {
+    id: 'msg_user',
+    sessionId: 'sess',
+    role: 'user',
+    parts: [{ type: 'text', text: 'about that earlier reply' }],
+    createdAt: '2026-10-19T00:00:02.000Z',
+    replyTo: { messageId: 'msg_old', botId: 'bot_a', excerpt }
+  };
+  const packed = await prepareTurnInput('sess', {
+    store: {
+      getSession: () => sessionRecord('sess'),
+      foldMessages: () => [quoted],
+      readHistoryById: (sessionId, messageId) =>
+        sessionId === 'sess' && messageId === 'msg_old' ? botReply : undefined,
+      appendMessage: () => quoted,
+      hideByKey: () => 0
+    },
+    autoCompact: async () => {},
+    claimNextStep: () => [],
+    prepareView: async (_session, messages) => messages,
+    buildAppendix: async () => ''
+  });
+  const shown = packed.messages.find(message => message.id === 'msg_user').parts.map(part => part.text).join('\n');
+  assert.match(shown, /TAIL_MARKER_94/);
+  assert.match(shown, /msg_old/);
+  assert.equal(quoted.parts.length, 1);
+  assert.equal(quoted.parts[0].text, 'about that earlier reply');
+});
+
 function roomFixture() {
   const dir = mkdtempSync(join(tmpdir(), 'bot-reply-quote-'));
   const store = new SqliteStateStore(join(dir, 'state.db'));
@@ -321,6 +358,10 @@ test('quoting one room bot addresses only that bot and keeps the full reply [AC:
     });
     assert.equal(sent.message.text, 'explain this');
     assert.ok(!JSON.stringify(sent.message).includes('TAIL_MARKER_94'));
+    assert.deepEqual(sent.message.replyTo, { messageId: delivered.message.id, botId: f.beta.id, excerpt: excerpt.trim() });
+    const listed = f.rooms.messages(f.principal, room.id).messages.find(message => message.id === sent.message.id);
+    assert.deepEqual(listed.replyTo, sent.message.replyTo);
+    assert.ok(!JSON.stringify(listed).includes('TAIL_MARKER_94'));
     assert.deepEqual(sent.turn.mentionedBotIds, [f.beta.id]);
     assert.equal(sent.turn.botIds[0], f.beta.id);
     assert.equal(isRestrainedMember(sent.turn, f.alpha.id), true);

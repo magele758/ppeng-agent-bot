@@ -1,8 +1,9 @@
 /**
  * Unique packing seam for one model shot.
  *
- * Order: autoCompact → claim next-step inbox → fold → quote context → view
- * (images / refusal / micro-compact) → memory / working-log appendix.
+ * Order: autoCompact → claim next-step inbox → fold → quote context (full
+ * original loaded by messageId) → view (images / refusal / micro-compact) →
+ * memory / working-log appendix.
  *
  * ModelAdapter.runTurn must only receive `messages` from this function.
  */
@@ -16,6 +17,8 @@ import { embedReplyQuotes } from '../reply-quote.js';
 export interface PrepareTurnInputStore {
   getSession(id: string): SessionRecord | undefined;
   foldMessages(sessionId: string): SessionMessage[];
+  /** Load one stored message by id when the quote target is outside the fold. */
+  readHistoryById?(sessionId: string, messageId: string): SessionMessage | undefined;
   appendMessage(
     sessionId: string,
     role: SessionMessage['role'],
@@ -111,7 +114,9 @@ export async function prepareTurnInput(
     applyClaimedInbox(deps.store, sessionId, claimedInbox);
   }
 
-  const folded = embedReplyQuotes(deps.store.foldMessages(sessionId));
+  const folded = embedReplyQuotes(deps.store.foldMessages(sessionId), (messageId) =>
+    deps.store.readHistoryById?.(sessionId, messageId)
+  );
   const budgeted = deps.applyFoldBudget ? deps.applyFoldBudget(session, folded) : folded;
   const prepared = await deps.prepareView(session, budgeted);
   const query = lastUserQueryFromMessages(prepared);
