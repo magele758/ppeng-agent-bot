@@ -58,7 +58,7 @@ const { HARNESS_ARTIFACT_DIR, HARNESS_ARTIFACT_FILES } = await import('../types.
  * Bump when `buildStablePrefix` (or any helper that feeds it) changes wording.
  * See `./AGENTS.md`.
  */
-export const STABLE_SYSTEM_VERSION = 'v5';
+export const STABLE_SYSTEM_VERSION = 'v7';
 
 /** Appended when `RAW_AGENT_AGENTIC_SAFETY_APPENDIX` is set; English to match the rest of the stable prefix. */
 export const RUNTIME_AGENTIC_SAFETY_APPENDIX = `Runtime safety appendix (policy text only; does not replace model-level safety training):
@@ -383,6 +383,7 @@ export class PromptBuilder {
       'Use persistent tasks for long-lived work and teammates only for clearly separable work.',
       'For large builds: load_skill(Long-running harness) and use harness_write_spec for cross-session handoffs.',
       'Use memory_set/memory_get for scratch and long-term notes; handoff_state copies scratch to subagents.',
+      'You can create bots and group chats (可以创建 bot 和群聊) with create_bot and create_room. The same actions are also available as bot_create, bot_update, bot_room_create, bot_room_update, and lab_settings_update when they are in your tool list. Do not claim you lack that ability. Deletes need confirm: true and approval. Never repeat API keys or tokens. Do not read secrets; reference a model already configured in the lab. Do not approve tool calls or outbound drafts for the user.',
       'When the user attaches images or you need OCR/visual detail from stored screenshots, call vision_analyze with asset_ids (from [image id] markers) and a focused prompt. Requires RAW_AGENT_VL_MODEL_NAME.',
       resolveDiscoveryEnabled(this.deps.store, process.env)
         ? 'Capability discovery is enabled: bound tools are not all injected upfront. Prefer tool_search(query) then load_capability_tool(id) before calling a discovered capability. Skills manage playbooks; Tool Search manages the callable tool surface.'

@@ -104,11 +104,11 @@
     }
   ],
   "sha256": {
-    "packages/core/src/runtime.ts": "564b7fc3667cf083839c3b6e1bbb4b6d9fa2d0b77ac4dd18853d62a4bf8cfa46",
+    "packages/core/src/runtime.ts": "5be09d488b404d760ebab65d59a1e33ceb32d7a2492fd28906d97b053883a6e3",
     "packages/core/src/storage.ts": "aa55d749fbaac626b2ffa51c78bc97e8ca47fe37717a5e5499b2772a4e3205eb",
     "packages/core/src/stores/session-store.ts": "55cd214535b84936676393062a14cf63007e3725d7bd27aca1409075bbfa6e84",
-    "packages/core/src/bots/bot-work.ts": "332b105df47328e207fcb0ebbea8b6ea77a048979974c5f92d667b655638c706",
-    "packages/core/src/runtime/subagent-policy.ts": "7ea5db3ef5f2cd1481cc0ce62be6db4038018db177e7d8633fd17d79308eecb2",
+    "packages/core/src/bots/bot-work.ts": "19a710f12efdd7b9c388c235838a54257a90f5130da3ece7aaf30248289dddd4",
+    "packages/core/src/runtime/subagent-policy.ts": "6a08e1262ccd479f772095b0450fd8bda077d09bd43bec67087bc68c7cc9f1d1",
     "packages/core/src/runtime/session-control.ts": "adcb4cefa9ae95ec4fc63bba169d865b1b44f9829f21f4c78c149f8877fdeb01",
     "packages/core/src/runtime/session-facade.ts": "57ef1a5d55782f26ac7b4ff6223d5d205938060dd8e58bf72f1d5ca3f9a84c00",
     "apps/daemon/src/server.ts": "263f0f69871cdd03fc04d5324b95cd9f956e056147f870ff909bf40813f48e04",

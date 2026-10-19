@@ -120,7 +120,7 @@
     }
   ],
   "sha256": {
-    "packages/core/src/runtime.ts": "564b7fc3667cf083839c3b6e1bbb4b6d9fa2d0b77ac4dd18853d62a4bf8cfa46",
+    "packages/core/src/runtime.ts": "5be09d488b404d760ebab65d59a1e33ceb32d7a2492fd28906d97b053883a6e3",
     "packages/core/src/storage.ts": "aa55d749fbaac626b2ffa51c78bc97e8ca47fe37717a5e5499b2772a4e3205eb",
     "packages/core/src/stores/session-store.ts": "55cd214535b84936676393062a14cf63007e3725d7bd27aca1409075bbfa6e84",
     "packages/core/src/stores/approval-store.ts": "64cef1660e4364ba5263fde5d7abe38334706970ab03266a141dd338027ba170",
@@ -187,8 +187,8 @@
     "packages/core/src/stores/migrations/index.ts": "61d61d8a9cac1eeb5b21312972244dc0b6d421f06f9ecd0092582e5f533d68b0",
     "packages/core/src/approval/unattended-approval.ts": "74aff0a40282eaffa6a84610d4c0e2550f94eee268c99ea72f80b1b44879ebfd",
     "packages/core/test/unattended-approval-writer-scope.test.js": "23c17f903361bc53bbb0b7733eb4bf9147b4977c4dc546f800862cf2856b9371",
-    "packages/core/src/bots/bot-work.ts": "332b105df47328e207fcb0ebbea8b6ea77a048979974c5f92d667b655638c706",
-    "packages/core/src/runtime/subagent-policy.ts": "7ea5db3ef5f2cd1481cc0ce62be6db4038018db177e7d8633fd17d79308eecb2",
+    "packages/core/src/bots/bot-work.ts": "19a710f12efdd7b9c388c235838a54257a90f5130da3ece7aaf30248289dddd4",
+    "packages/core/src/runtime/subagent-policy.ts": "6a08e1262ccd479f772095b0450fd8bda077d09bd43bec67087bc68c7cc9f1d1",
     "packages/core/test/approval-admission-race.test.js": "7cc7a84f410356079645121a3e060573ef2782d4287be6959924efb195c782cc",
     "packages/core/src/sandbox/model-isolation.ts": "ebbe3a893976214b72de4d4d995a7e4458d1a9275165aeaebf3f0dae1d942129",
     "packages/core/src/runtime/spawn-host.ts": "a087208d90bf31d0b458bbc546f6be51167d0f8e91f96ad32967c76c2d88046d",
