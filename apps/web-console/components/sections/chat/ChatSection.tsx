@@ -7,7 +7,7 @@ import { api } from '@/lib/api';
 import { pickDefaultAgentId } from '@/lib/default-agent';
 import { useI18n } from '@/lib/i18n';
 import { leaveCancelsRun } from '@/lib/run-leave';
-import { createDefaultBotLoadGuard, startDefaultBotLoadEffect } from '@/lib/bot-console-selection';
+import { createDefaultBotLoadGuard, defaultBotLoadMaySelect, startDefaultBotLoadEffect } from '@/lib/bot-console-selection';
 import {
   botForCanonicalSession,
   filterSessionsByPlaySurface,
@@ -49,22 +49,13 @@ export function ChatSection({ active }: { active: boolean }) {
   const lastChatSessionRef = useRef<string | null>(null);
   const lastBotSessionRef = useRef<string | null>(null);
   const playSurfaceRef = useRef<PlaySurface>(playSurface);
-  const sessionsRef = useRef<SessionSummary[]>([]);
-  const agentsRef = useRef<AgentInfo[]>([]);
-  const botsRef = useRef<BotInfo[]>([]);
-
-  useEffect(() => {
-    playSurfaceRef.current = playSurface;
-  }, [playSurface]);
-  useEffect(() => {
-    sessionsRef.current = sessions;
-  }, [sessions]);
-  useEffect(() => {
-    agentsRef.current = agents;
-  }, [agents]);
-  useEffect(() => {
-    botsRef.current = bots;
-  }, [bots]);
+  const sessionsRef = useRef<SessionSummary[]>(sessions);
+  const agentsRef = useRef<AgentInfo[]>(agents);
+  const botsRef = useRef<BotInfo[]>(bots);
+  playSurfaceRef.current = playSurface;
+  sessionsRef.current = sessions;
+  agentsRef.current = agents;
+  botsRef.current = bots;
 
   const sidebarSessions = useMemo(
     () => filterSessionsByQuery(sessions, sessionSidebarFilter),
@@ -118,6 +109,10 @@ export function ChatSection({ active }: { active: boolean }) {
       defaultBotGuard,
       { playSurface, botId: chat.botId, selectedSessionId },
       async (isCancelled) => {
+        const selectionAtStart = selectedSessionRef.current;
+        const intentAtStart = chat.getBotSelectionVersion();
+        const maySelect = () =>
+          defaultBotLoadMaySelect(selectionAtStart, selectedSessionRef.current, isCancelled() || intentAtStart !== chat.getBotSelectionVersion());
         try {
           let saved = '';
           try {
@@ -128,20 +123,20 @@ export function ChatSection({ active }: { active: boolean }) {
           if (saved) {
             try {
               await api(`/api/bots/${encodeURIComponent(saved)}`);
-              if (isCancelled()) return;
+              if (!maySelect()) return;
               await chat.selectBot(saved);
               return;
             } catch {
-              if (isCancelled()) return;
+              if (!maySelect()) return;
             }
           }
-          if (isCancelled()) return;
+          if (!maySelect()) return;
           const data = (await api('/api/bot-work/default')) as { bot: BotInfo };
-          if (isCancelled()) return;
+          if (!maySelect()) return;
           upsertBot(data.bot);
           await chat.selectBot(data.bot.id);
         } catch (e) {
-          if (!isCancelled()) chat.setPlayStatus({ text: String(e), err: true });
+          if (maySelect()) chat.setPlayStatus({ text: String(e), err: true });
         }
       }
     );

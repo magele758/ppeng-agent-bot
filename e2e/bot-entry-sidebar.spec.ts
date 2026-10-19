@@ -1,4 +1,24 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
+
+/** Center the row and press it before revealing the drop target. `dragTo` scrolls after mouse-down, so a partly visible row drags whichever neighbor sits under that point. */
+async function dragSessionRow(page: Page, row: Locator, target: Locator) {
+  await row.evaluate((element) => element.scrollIntoView({ block: 'center', inline: 'nearest' }));
+  const source = await row.boundingBox();
+  expect(source).toBeTruthy();
+  const start = { x: source!.x + 24, y: source!.y + source!.height / 2 };
+  expect(await row.evaluate((element, point) => {
+    const hit = document.elementFromPoint(point.x, point.y);
+    return !!hit && (hit === element || element.contains(hit));
+  }, start)).toBe(true);
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(start.x + 12, start.y, { steps: 4 });
+  await target.scrollIntoViewIfNeeded();
+  const drop = await target.boundingBox();
+  expect(drop).toBeTruthy();
+  await page.mouse.move(drop!.x + Math.min(40, drop!.width / 2), drop!.y + Math.min(12, drop!.height / 2), { steps: 12 });
+  await page.mouse.up();
+}
 
 test.beforeAll(async ({ request }) => {
  const { bots } = await (await request.get('/api/bots')).json();
@@ -101,6 +121,8 @@ test('drag-only grouping persists successful moves and restores failed moves wit
  const { bots } = await (await page.request.get('/api/bots')).json();
  const bot = bots.find((item: { hidden?: boolean }) => !item.hidden);
  expect(bot).toBeTruthy();
+ const { bot: defaultBot } = await (await page.request.get('/api/bot-work/default')).json();
+ await page.addInitScript(id => localStorage.setItem('lab.selectedBot', id), defaultBot.id);
  const groups = [{ id: 'drag-source', name: 'Drag source', botIds: [bot.id] }, { id: 'drag-target', name: 'Drag target', botIds: [] as string[] }];
  let fail = false; let writes = 0;
  await page.route('**/api/bot-functional-groups', route => route.fulfill({ json: { groups } }));
@@ -113,21 +135,44 @@ test('drag-only grouping persists successful moves and restores failed moves wit
   groups.find(group => group.id === groupId)?.botIds.push(bot.id);
   return route.fulfill({ json: { bot } });
  });
- await page.goto('/#/bot');
+ const openReadyPage = async (reload = false) => {
+  // A visible sidebar can precede the default Bot's post-open overview refresh.
+  // That refresh restores scroll position, which can move another row beneath
+  // native drag coordinates. Wait for its selected-session hydration first.
+  const opened = page.waitForResponse(response =>
+   new URL(response.url()).pathname === `/api/bots/${defaultBot.id}/open`);
+  const hydrated = page.waitForResponse(response =>
+   new URL(response.url()).pathname === `/api/sessions/${defaultBot.canonicalSessionId}/artifacts`);
+  await Promise.all([reload ? page.reload() : page.goto('/#/bot'), opened, hydrated]);
+  await expect(page.locator('#playTitle')).toHaveText(defaultBot.name);
+ };
+ await openReadyPage();
  const source = page.getByTestId('functional-group-drag-source');
  const target = page.getByTestId('functional-group-drag-target');
  const ungrouped = page.getByTestId('functional-group-ungrouped');
- const rowIn = (container: typeof source) => container.locator('.list-item--session').filter({ hasText: bot.name });
- await rowIn(source).dragTo(target.locator('h3'));
+ const rowIn = (container: typeof source) => container.locator(`[data-bot-id="${bot.id}"] .list-item--session`);
+ const moveTo = async (from: typeof source, to: typeof source, groupId: string | null, status: number) => {
+  // Observe all Bot moves so accidentally dragging a neighbouring row fails
+  // with its actual identity, instead of timing out on an unrelated error.
+  const moved = page.waitForResponse(response =>
+   response.request().method() === 'PUT' && new URL(response.url()).pathname.endsWith('/functional-group'));
+  const [, response] = await Promise.all([dragSessionRow(page, rowIn(from), to.locator('h3')), moved]);
+  expect(new URL(response.url()).pathname).toBe(`/api/bots/${bot.id}/functional-group`);
+  expect(response.request().postDataJSON()).toEqual({ groupId });
+  expect(response.status()).toBe(status);
+  await response.finished();
+  await expect(to).toHaveAttribute('aria-busy', 'false');
+ };
+ await moveTo(source, target, 'drag-target', 200);
  await expect(rowIn(target)).toBeVisible();
  await expect.poll(() => groups[1].botIds).toContain(bot.id);
- await page.reload(); await expect(rowIn(target)).toBeVisible();
- await rowIn(target).dragTo(ungrouped.locator('h3'));
+ await openReadyPage(true); await expect(rowIn(target)).toBeVisible();
+ await moveTo(target, ungrouped, null, 200);
  await expect(rowIn(ungrouped)).toBeVisible();
  await expect.poll(() => groups[1].botIds).toEqual([]);
- await page.reload(); await expect(rowIn(ungrouped)).toBeVisible();
+ await openReadyPage(true); await expect(rowIn(ungrouped)).toBeVisible();
  fail = true;
- await rowIn(ungrouped).dragTo(source.locator('h3'));
+ await moveTo(ungrouped, source, 'drag-source', 503);
  await expect(page.getByRole('alert').filter({ hasText: 'Drag save unavailable' })).toBeVisible();
  await expect(rowIn(ungrouped)).toBeVisible(); await expect(rowIn(source)).toHaveCount(0);
  await rowIn(ungrouped).click(); await expect(page.locator('#playTitle')).toContainText(bot.name);
@@ -160,4 +205,101 @@ test('create dialog keeps actions visible while content scrolls and backdrop dis
  await open();
  await page.keyboard.press('Escape');
  await expect(dialog).toHaveCount(0);
+});
+
+test('pressing and cancelling a Bot row gesture preserves the current conversation [AC:bot-group-drag-only#AC-2]', async ({ page, request }) => {
+ const { bots } = await (await request.get('/api/bots')).json();
+ const [current, other] = bots.filter((bot: { hidden?: boolean }) => !bot.hidden);
+ expect(current).toBeTruthy(); expect(other).toBeTruthy();
+ await page.addInitScript(id => localStorage.setItem('lab.selectedBot', id), current.id);
+ await page.goto('/#/bot');
+ const title = page.locator('#playTitle');
+ await expect(title).toHaveText(current.name);
+ const row = page.locator(`#sessionListMini [data-bot-id="${other.id}"] .list-item--session`);
+ await expect(row).toHaveCount(1);
+ await row.scrollIntoViewIfNeeded();
+ const box = await row.boundingBox();
+ expect(box).not.toBeNull();
+ await page.mouse.move(box!.x + 12, box!.y + box!.height / 2);
+ await page.mouse.down();
+ try {
+  // Allow React to commit any pointer handler before checking the unchanged view.
+  await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => resolve())));
+  await expect(title).toHaveText(current.name);
+  await expect(row).not.toHaveClass(/\bselected\b/);
+  // Releasing outside the row cancels the click, as with a cancelled drag.
+  await page.mouse.move(1, 1, { steps: 5 });
+ } finally {
+  await page.mouse.up();
+ }
+ await expect(title).toHaveText(current.name);
+ await row.click();
+ await expect(title).toHaveText(other.name);
+});
+
+test('an explicit Bot click wins a delayed saved-default lookup [AC:bot-face-first-creation#AC-4]', async ({ page, request }) => {
+ const { bots } = await (await request.get('/api/bots')).json();
+ const [saved, chosen] = bots.filter((bot: { hidden?: boolean }) => !bot.hidden);
+ expect(saved).toBeTruthy(); expect(chosen).toBeTruthy();
+ let releaseLookup!: () => void;
+ const lookupGate = new Promise<void>(resolve => { releaseLookup = resolve; });
+ let lookupStarted!: () => void;
+ const lookupSeen = new Promise<void>(resolve => { lookupStarted = resolve; });
+ let savedOpens = 0;
+ page.on('request', req => {
+  if (new URL(req.url()).pathname === `/api/bots/${saved.id}/open`) savedOpens++;
+ });
+ await page.addInitScript(id => localStorage.setItem('lab.selectedBot', id), saved.id);
+ await page.route(`**/api/bots/${saved.id}`, async route => {
+  if (route.request().method() !== 'GET') return route.continue();
+  lookupStarted();
+  await lookupGate;
+  await route.fulfill({ json: { bot: saved } });
+ });
+ try {
+  await page.goto('/#/bot');
+  await lookupSeen;
+  const row = page.locator(`#sessionListMini [data-bot-id="${chosen.id}"] .list-item--session`);
+  await expect(row).toHaveCount(1);
+  await row.click();
+  await expect(page.locator('#playTitle')).toHaveText(chosen.name);
+  const returned = page.waitForResponse(response => new URL(response.url()).pathname === `/api/bots/${saved.id}`);
+  releaseLookup();
+  const response = await returned;
+  await response.finished();
+  // The loader's promise continuation runs before the following rendered frame.
+  await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => resolve())));
+  await expect(page.locator('#playTitle')).toHaveText(chosen.name);
+  await expect(row).toHaveClass(/\bselected\b/);
+  expect(savedOpens).toBe(0);
+ } finally {
+  releaseLookup();
+ }
+});
+
+test('composer Bot choice wins while its open and the saved-default lookup are both pending [AC:bot-face-first-creation#AC-4]', async ({ page, request }) => {
+ const { bots } = await (await request.get('/api/bots')).json();
+ const [saved, chosen] = bots.filter((bot: { hidden?: boolean }) => !bot.hidden);
+ expect(saved).toBeTruthy(); expect(chosen).toBeTruthy();
+ let releaseLookup!: () => void, seenLookup!: () => void, releaseChosen!: () => void, seenChosen!: () => void;
+ const lookupGate = new Promise<void>(r => { releaseLookup = r; });
+ const lookupSeen = new Promise<void>(r => { seenLookup = r; });
+ const chosenGate = new Promise<void>(r => { releaseChosen = r; });
+ const chosenSeen = new Promise<void>(r => { seenChosen = r; });
+ let savedOpens = 0;
+ page.on('request', req => { if (new URL(req.url()).pathname === `/api/bots/${saved.id}/open`) savedOpens++; });
+ await page.addInitScript(id => localStorage.setItem('lab.selectedBot', id), saved.id);
+ await page.route(`**/api/bots/${saved.id}`, async route => { if (route.request().method() !== 'GET') return route.continue(); seenLookup(); await lookupGate; await route.fulfill({ json: { bot: saved } }); });
+ await page.route(`**/api/bots/${chosen.id}/open`, async route => { seenChosen(); await chosenGate; await route.continue(); });
+ try {
+  await page.goto('/#/bot'); await lookupSeen;
+  await page.locator('.composer-bot-picker__trigger').click();
+  await page.locator('#botSelectMenu').getByRole('option', { name: chosen.name, exact: true }).click();
+  await chosenSeen;
+  const returned = page.waitForResponse(r => new URL(r.url()).pathname === `/api/bots/${saved.id}`);
+  releaseLookup(); await (await returned).finished();
+  await page.evaluate(() => new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r()))));
+  expect(savedOpens).toBe(0);
+  releaseChosen(); await expect(page.locator('#playTitle')).toHaveText(chosen.name);
+ } finally { releaseLookup(); releaseChosen(); }
 });
