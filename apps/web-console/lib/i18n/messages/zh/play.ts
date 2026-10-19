@@ -265,6 +265,14 @@ export const play = {
     contextWithMessage: '这条消息带上的文件和文件夹'
   },
 
+  replyQuote: {
+    action: '引用',
+    actionAria: '引用 {name} 的这条回复',
+    quoting: '引用 {name}',
+    cancel: '取消引用',
+    from: '{name} 说'
+  },
+
   stopMenu: {
     thisTurn: '停止本轮',
     thisTurnHint: '取消当前会话运行',

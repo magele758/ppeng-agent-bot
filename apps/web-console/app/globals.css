@@ -300,6 +300,51 @@ body,
   line-height: 1;
 }
 
+.composer-reply-quote,
+.chat-reply-quote {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: baseline;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0 0 6px;
+  padding: 6px 8px;
+  border-left: 3px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--color-surface-raised) 70%, transparent);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.composer-reply-quote {
+  flex: 1 0 100%;
+}
+
+.composer-reply-quote__who,
+.chat-reply-quote__who {
+  font-weight: 600;
+}
+
+.composer-reply-quote__excerpt,
+.chat-reply-quote__excerpt {
+  flex: 1 1 8rem;
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.composer-reply-quote__cancel,
+.chat-reply-quote__start {
+  text-transform: none;
+  letter-spacing: normal;
+  font-family: inherit;
+}
+
+.chat-turn__label .chat-reply-quote__start {
+  margin-left: 8px;
+}
+
 .composer-message-context {
   margin-top: 6px;
 }

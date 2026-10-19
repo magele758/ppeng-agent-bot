@@ -27,7 +27,9 @@ import './play-group.css';
 import '../bot-work/bot-work.css';
 import { BotRooms } from '../bot-work/BotRooms';
 import { ComposerContextChips, ComposerMessageContext, ComposerNotice, useComposerFileDrop, usePendingComposerContext } from '../ComposerContext';
+import { BotReplyQuoteAction, ComposerReplyQuote, MessageReplyQuote } from '../ReplyQuote';
 import { composerClassName, contextSubmission, contextSourcesBody, contextSourcesForSend } from '@/lib/composer-context';
+import { attachSentReply, keepLocalReplyTo, readStoredReplyTo, withReplyTo, type ReplyQuote } from '@/lib/reply-quote';
 
 type Room = {
   id: string;
@@ -44,6 +46,7 @@ type RoomMessage = {
   text: string;
   attachmentIds?: string[];
   contextSources?: unknown;
+  replyTo?: unknown;
   sender: { type: 'user' | 'bot'; id: string; name: string };
 };
 
@@ -92,12 +95,16 @@ function GroupTurn({
   message,
   name,
   mood,
-  attachmentLabel
+  attachmentLabel,
+  onQuote,
+  quotedName
 }: {
   message: RoomMessage;
   name: string;
   mood: 'idle' | 'speaking';
   attachmentLabel?: string;
+  onQuote: (quote: ReplyQuote) => void;
+  quotedName: string;
 }) {
   const kind = message.sender.type;
   switch (kind) {
@@ -122,8 +129,21 @@ function GroupTurn({
         />
       ) : null}
       <div className="chat-turn__content">
-        <div className="chat-turn__label">{name}</div>
+        <div className="chat-turn__label">
+          {name}
+          <BotReplyQuoteAction
+            reply={{
+              messageId: message.id,
+              botId: message.sender.id,
+              botName: name,
+              text: message.text,
+              author: user ? 'user' : 'bot'
+            }}
+            onQuote={onQuote}
+          />
+        </div>
         <div className="chat-bubble">
+          {user ? <MessageReplyQuote replyTo={readStoredReplyTo(message)} botName={quotedName} /> : null}
           <MarkdownHtml className="chat-bubble__body chat-bubble__md" text={message.text} />
           <ComposerMessageContext role={kind} message={message} />
         </div>
@@ -153,6 +173,8 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
   const [turns, setTurns] = useState<RoomTurn[]>([]);
   const [cursor, setCursor] = useState<number | null>(null);
   const [text, setText] = useState('');
+  const [replyQuote, setReplyQuote] = useState<ReplyQuote | null>(null);
+  useEffect(() => setReplyQuote(null), [roomId]);
   const [caret, setCaret] = useState(0);
   const [mentionIndex, setMentionIndex] = useState(0);
   const [mentionDismissed, setMentionDismissed] = useState<string | null>(null);
@@ -190,7 +212,7 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
     const next = older
       ? [...page.messages, ...messagesRef.current]
       : mergeHistoryWindow(messagesRef.current, page.messages, true).messages;
-    commitMessages(next);
+    commitMessages(keepLocalReplyTo(messagesRef.current, next));
     if (older || firstLoad) setCursor(page.hasMore ? page.nextCursor : null);
   };
 
@@ -358,27 +380,30 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
     if (!submission.hasContent) return;
     const textSnapshot = text;
     const contextSnapshot = pendingContext;
+    const quoteSnapshot = replyQuote;
     setText('');
     setPendingContext([]);
+    setReplyQuote(null);
     setContextNotice('');
     setBusy(true);
     setError('');
     try {
       const result = (await api(
         `/api/bot-rooms/${room.id}/messages`,
-        jsonBody({
+        jsonBody(withReplyTo({
           text: submission.message,
           idempotencyKey: crypto.randomUUID(),
           ...contextFields
-        })
+        }, quoteSnapshot))
       )) as { message?: RoomMessage };
-      acceptMessage(result.message);
+      acceptMessage(result.message ? attachSentReply(result.message, quoteSnapshot) : undefined);
       // Acceptance is durable even when the subsequent read fails. Do not
       // restore an accepted message into the composer and invite duplicates.
       await loadRoom(false).catch(() => setLoadError(true));
     } catch {
       setText(textSnapshot);
       setPendingContext(contextSnapshot);
+      setReplyQuote(quoteSnapshot);
       setError(t('play.group.sendFailed'));
     } finally {
       setBusy(false);
@@ -462,6 +487,10 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
                 const name = senderName(message, bots, t('play.me'));
                 const mood = groupMessageMood(message, lastFromLive?.id, workStates);
                 const count = message.attachmentIds?.length ?? 0;
+                const storedReply = readStoredReplyTo(message);
+                const quotedName = storedReply
+                  ? bots.find((bot) => bot.id === storedReply.botId)?.name ?? storedReply.botId
+                  : '';
                 return (
                   <GroupTurn
                     key={message.id}
@@ -469,6 +498,8 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
                     name={name}
                     mood={mood}
                     attachmentLabel={count > 0 ? t('play.group.attachmentCount', { count }) : undefined}
+                    onQuote={setReplyQuote}
+                    quotedName={quotedName}
                   />
                 );
               })}
@@ -495,6 +526,7 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
           }}
         >
           <ComposerContextChips items={pendingContext} onRemove={removePendingContext} />
+          <ComposerReplyQuote quote={replyQuote} surface="group" onCancel={() => setReplyQuote(null)} />
           {mentionOpen ? (
             <ul id="play-group-mentions" className="play-group-mentions" role="listbox" aria-label={t('play.group.mentionList')}>
               {mentionOptions.length === 0 ? (
