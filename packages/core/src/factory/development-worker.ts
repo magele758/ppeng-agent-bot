@@ -2,6 +2,11 @@
 export const DEVELOPMENT_WORKER=String.raw`
 import os,sys,json,time,pathlib,subprocess,hashlib,fcntl,socket,socketserver,http.server,threading,urllib.request,urllib.error,re,selectors,stat,shutil,base64
 
+def review_json(text):
+    if not isinstance(text,str):raise ValueError("Review text required")
+    text=text.strip();fence=chr(96)*3
+    match=re.fullmatch(re.escape(fence)+r"(?:json)?[ \t]*\n([\s\S]*?)\n"+re.escape(fence),text)
+    return json.loads(match.group(1) if match else text)
 def identity():
     return hashlib.sha256(pathlib.Path('/etc/machine-id').read_bytes().strip()).hexdigest()
 def process_token(pid):
@@ -180,6 +185,7 @@ class Controller:
                 if self.resume_stage in ('PAUSED','DEFERRED','FAILED','TIMED_OUT','CANCELLED'):self.resume_stage=prior.get('checkpointStage')
                 self.artifacts=prior.get('artifacts',{});self.logs=[prior.get('log','')]
             elif self.work.exists():self.work=self.d/('work-'+str(self.g))
+        if self.spec.get('verifyCurrent'):self.resume_stage='TEST'
     def output_evidence(self,out,err,private):
         if private:return
         self.command_index+=1
@@ -268,9 +274,29 @@ class Controller:
         self.storage_check()
     def run_host(self,args):
         self.stopping();return host(args, min(30,max(1,self.deadline-time.monotonic())))
-    def docker_args(self,readonly=False):
+    def docker_args(self,readonly=False,protect_tests=False):
         args=['docker','run','--name',self.name,'--network','none','--read-only','--cap-drop=ALL','--security-opt=no-new-privileges','--pids-limit','128','--memory','2g','--cpus','2','--user',str(os.getuid())+':'+str(os.getgid()),'--tmpfs','/tmp:rw,nosuid,nodev,size=128m']
         for source,dest,ro in [(self.work,'/workspace',readonly),(self.input,'/input',True),(self.broker_dir,'/broker',True),(pathlib.Path(self.p['toolPath']),'/tools/claude',True)]:args+=['--mount','type=bind,src='+str(source)+',dst='+dest+(',readonly' if ro else '')]
+        if protect_tests and self.state.get('red'):
+            files=self.state.get('deliveryFrozenFiles',self.state['red'].get('files',[]))
+            if len(files)>256:raise Deferred('Frozen test mount budget exceeded')
+            frozen=safe_dir(self.input/'frozen-tests')
+            for index,(name,digest) in enumerate(files):
+                relative=pathlib.PurePosixPath(name)
+                if relative.is_absolute() or '..' in relative.parts:raise Deferred('Invalid frozen test path')
+                path=self.work/name
+                if any(p.is_symlink() for p in [path,*path.parents]):raise Deferred('Unsafe frozen test path')
+                fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+                with os.fdopen(fd,'rb') as f:
+                    if not stat.S_ISREG(os.fstat(f.fileno()).st_mode):raise Deferred('Regular frozen test required')
+                    data=f.read(1048577)
+                if len(data)>1048576 or hashlib.sha256(data).hexdigest()!=digest:raise Deferred('Frozen behavioral tests were modified')
+                target=frozen/str(index)
+                if not target.exists():
+                    fd=os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o400)
+                    with os.fdopen(fd,'wb') as f:f.write(data)
+                elif target.is_symlink() or hashlib.sha256(target.read_bytes()).hexdigest()!=digest:raise Deferred('Frozen test snapshot integrity mismatch')
+                args+=['--mount','type=bind,src='+str(target)+',dst=/workspace/'+name+',readonly']
         args+=['--workdir','/workspace','--env','HOME=/tmp/home','--env','GIT_CONFIG_GLOBAL=/dev/null','--env','GIT_CONFIG_NOSYSTEM=1','--env','GIT_TERMINAL_PROMPT=0','--env','ANTHROPIC_AUTH_TOKEN=broker-only','--env','ANTHROPIC_BASE_URL=http://127.0.0.1:18491','--env','ANTHROPIC_MODEL='+self.p['model'],'--env','CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1','--env','DISABLE_AUTOUPDATER=1',self.p['image']]
         return args
     def command(self,argv,readonly=False,model=False,private=False):
@@ -278,7 +304,7 @@ class Controller:
         if self.broker:self.broker.active=model
         # The wrapper is controller-owned and mounted read-only; no shell interpolation.
         wrapper=['node','/input/run.cjs',json.dumps(argv), 'model' if model else 'plain']
-        child=subprocess.Popen(self.docker_args(readonly)+wrapper,env=git_env(),stdout=subprocess.PIPE,stderr=subprocess.PIPE,start_new_session=True)
+        child=subprocess.Popen(self.docker_args(readonly,protect_tests=model and not readonly)+wrapper,env=git_env(),stdout=subprocess.PIPE,stderr=subprocess.PIPE,start_new_session=True)
         self.container=self.name;out=bytearray();err=bytearray();self.last_stderr='';sel=selectors.DefaultSelector();sel.register(child.stdout,selectors.EVENT_READ,'stdout');sel.register(child.stderr,selectors.EVENT_READ,'stderr')
         try:
             while sel.get_map():
@@ -350,7 +376,7 @@ class Controller:
         self.broker.policy=self.p;self.broker.key=key;self.broker.slots=threading.BoundedSemaphore(2);self.broker.calls=0;self.broker.active=False
         threading.Thread(target=self.broker.serve_forever,daemon=True).start()
     def agent(self,prompt,review=False):
-        if not review:prompt='The trusted controller runs all tests and creates Git commits AFTER this tool exits. Only read and edit the intended test/code files, then promptly finish. Do not run tests, poll Bash/background tasks, make Git commits, or wait for controller stages inside this tool. '+prompt
+        if not review:prompt='The trusted controller runs all tests and creates Git commits AFTER this tool exits. During RED edit only tests. In DEV/FIX edit production files only: all existing tests are immutable read-only mounts, including any coverage gaps mentioned by reviewers. If the saved production fix is already present, finish immediately with DONE. Make one bounded pass over the requested files and finish. Do not run tests, poll Bash/background tasks, make Git commits, or wait for controller stages inside this tool. '+prompt
         if self.spec.get('dependency'):prompt+='\nVerified dependency artifact: /input/dependency.bundle at commit '+self.spec['dependency']['sha']+'. Baseline HEAD stays as requested. Use the exact verified artifact as required.'
         args=list(self.p['reviewArgv'] if review else self.p['codeArgv'])+['--model',self.p['model'],prompt]
         for attempt in range(self.p['maxRetries']+1):
@@ -379,7 +405,7 @@ class Controller:
         return rows
     def red(self):
         self.save('RED')
-        prompt='Write ONLY behavioral regression tests for these approved criteria. Do not implement or change production code, dependency definitions, checks or skip tests. Tests must include literal criterion IDs in titles. Only write the regression tests and finish; the controller will execute them after you exit. Requirement: '+self.spec['requirement']+'\nApproved criteria: '+json.dumps(self.p['criteria'])
+        prompt='Write ONLY behavioral regression tests for these approved criteria. Do not implement or change production code, dependency definitions, checks or skip tests. Tests must include literal criterion IDs in titles. Independently verify expected values with exact arithmetic or other reliable oracles; do not invent numeric constants. Only write the regression tests and finish; the controller will execute them after you exit. Requirement: '+self.spec['requirement']+'\nApproved criteria: '+json.dumps(self.p['criteria'])
         before=self.digest()
         self.agent(prompt)
         # Test identity freezes after red and cannot be changed in implementation/fix.
@@ -398,7 +424,8 @@ class Controller:
     def commit(self):
         self.git('add','--all');self.git('commit','--allow-empty','-m','Factory task '+self.task['id']+' round '+str(self.round));return self.git('rev-parse','HEAD')
     def review(self,sha):
-        files=self.git('diff','--name-only',self.spec['baseline'],sha).splitlines()
+        review_base=self.state.get('deliveryBase',self.spec['baseline'])
+        files=self.git('diff','--name-only',review_base,sha).splitlines()
         if not files:raise Deferred('No task diff to review')
         prior=list(self.spec.get('reviewCarry',{}).get('issues',[]))+list(self.state.get('issueLedger',self.state.get('review',{}).get('issues',[])));ledger={}
         if not prior:
@@ -429,12 +456,13 @@ class Controller:
         # Controller assigns every changed file, including tests and configuration.
         for index in range(0,len(files),10):
             segment=files[index:index+10]
-            prompt='Read-only independent vertical-slice review. Review full requirement, approved criteria and these changed files against baseline '+self.spec['baseline']+' at commit '+sha+'. Read full content and follow connected call paths. Files: '+json.dumps(segment)+'\nRequirement: '+self.spec['requirement']+'\nCriteria: '+json.dumps(self.p['criteria'])+'\nReturn ONLY JSON {"verdict":"CLEAN"|"BLOCKING","issues":[{"id":"...","severity":"P0"|"P1"|"P2","description":"...","closed":false}]}. Missing coverage, unsafe bypass, weakened tests, dead code, incomplete behavior or a gate failure is blocking.'
+            prompt='Read-only independent vertical-slice review. Review full requirement, approved criteria and these changed files against verified current baseline '+review_base+' (original baseline '+self.spec['baseline']+') at commit '+sha+'. Read full content and follow connected call paths. Files: '+json.dumps(segment)+'\nRequirement: '+self.spec['requirement']+'\nCriteria: '+json.dumps(self.p['criteria'])+'\nReturn ONLY JSON {"verdict":"CLEAN"|"BLOCKING","issues":[{"id":"...","severity":"P0"|"P1"|"P2","description":"...","closed":false}]}. Missing coverage, unsafe bypass, weakened tests, dead code, incomplete behavior or a gate failure is blocking.'
+            prompt+='\nEvaluate regression coverage across the repository, including immutable assertions in CI workflows. A genuine existing CI regression for the exact case is coverage; do not demand duplicate coverage in a frozen local test file. Verify imports (node:assert/strict differs from loose node:assert), execute the existing checks where possible, and close a proven coverage false positive explicitly with its original ID, reason, evidence and current SHA. Missing actual coverage or failing behavior remains blocking. Never close an issue just because tests are frozen.'
             prompt+='\nKnown issue ledger (must retain IDs): '+json.dumps(list(ledger.values()))+'\nExplicitly verify every known issue. Omitted issues remain open. Closing requires the same id/severity/description, closed:true, nonempty reason, nonempty evidence describing validation, and evidenceSha equal to '+sha+'. CLEAN alone or a severity downgrade cannot close a blocker. Retain P2 issues.'
             out=self.agent(prompt,True)
             try:
-                value=json.loads(out)
-                if isinstance(value,dict) and 'result' in value:value=json.loads(value['result'])
+                value=review_json(out)
+                if isinstance(value,dict) and 'result' in value:value=review_json(value['result'])
                 if not isinstance(value,dict) or value.get('verdict') not in ('CLEAN','BLOCKING') or not isinstance(value.get('issues'),list):raise ValueError('verdict')
                 if value['verdict']=='BLOCKING' and not value['issues']:raise ValueError('issues')
                 if any(not isinstance(x,dict) or x.get('severity') not in ('P0','P1','P2') or not isinstance(x.get('description'),str) or not x['description'].strip() or not isinstance(x.get('id'),str) or not x['id'].strip() or len(x['id'])>160 for x in value['issues']):raise ValueError('issues')
@@ -463,12 +491,38 @@ class Controller:
         try:data,metadata=bundle_envelope(json.loads(out),sha)
         except Exception:raise Deferred('Artifact export integrity invalid')
         store_bundle(self.d/('artifact-'+str(self.g)+'.bundle'),data);self.state['artifact']=metadata
+    def delivery_sync(self):
+        delivery=self.spec.get('deliveryInput')
+        if not delivery or delivery.get('generation',self.g)!=self.g:return
+        base=delivery.get('baseSha','')
+        if not re.fullmatch(r'[a-f0-9]{40}',base) or self.git('rev-parse','HEAD')!=delivery.get('previousSha'):raise Deferred('Delivery candidate changed before synchronization')
+        if base!=self.state.get('deliveryBase',self.spec['baseline']):
+            artifact=self.d/('delivery-'+base+'.bundle');meta=read_json(self.d/('delivery-'+base+'.json'));data=read_bundle(artifact)
+            if meta.get('baseSha')!=base or meta.get('bytes')!=len(data) or meta.get('digest')!=hashlib.sha256(data).hexdigest():raise Deferred('Target bundle integrity mismatch')
+            store_bundle(self.input/'delivery.bundle',data)
+            self.git('bundle','verify','/input/delivery.bundle');self.git('fetch','--no-tags','/input/delivery.bundle','refs/factory/base')
+            if self.git('rev-parse','FETCH_HEAD')!=base:raise Deferred('Target bundle commit mismatch')
+            self.save('TEST')
+            code,out=self.command(['git','-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false','merge','--no-edit',base])
+            self.state.setdefault('deliverySyncs',[]).append({'baseSha':base,'exitCode':code,'output':out[-8192:]})
+            if code:raise Deferred('Merge conflict retained in original isolated workspace; explicit decision required')
+        self.state['deliveryBase']=base
+        digest=self.digest()
+        # Retain every original frozen test byte. Additional tests from the verified target
+        # are also run, but cannot replace the original red test identity.
+        current=dict(digest['files']);original=dict(self.state['red']['files'])
+        if any(current.get(name)!=value for name,value in original.items()) or digest['protected']!=self.state['protectedDigest']:raise Deferred('Target changed frozen tests or gates; explicit policy confirmation required')
+        self.state['deliveryTestDigest']=digest['digest'];self.state['deliveryFrozenFiles']=digest['files']
+        self.resume_stage='TEST'
+        if delivery.get('repair'):
+            self.save('FIX');self.agent('Repair the actual trusted remote CI failure within the original requirement. Do not change tests, checks or automation. CI evidence: '+json.dumps(delivery.get('ci'))+'\nRequirement: '+self.spec['requirement'])
     def run(self):
         if self.state.get('evidenceRecoveryRequired') or self.spec.get('reviewCarry',{}).get('evidenceRecoveryRequired'):raise Deferred('Full prior evidence must be recovered before resume')
         self.save('START');self.setup()
+        self.delivery_sync()
         if 'red' not in self.state:self.red()
         current=self.digest()
-        if current['digest']!=self.state['red']['testDigest'] or current['protected']!=self.state['protectedDigest']:raise Deferred('Frozen tests or gate definitions changed before resume')
+        if current['digest']!=self.state.get('deliveryTestDigest',self.state['red']['testDigest']) or current['protected']!=self.state['protectedDigest']:raise Deferred('Frozen tests or gate definitions changed before resume')
         if self.resume_stage in ('WAITING_DECISION','FIX'):
             if self.resume_stage=='WAITING_DECISION':self.round+=1
             if self.round>self.p['maxRounds']:raise Deferred('Repair rounds require explicit approval')
@@ -476,7 +530,7 @@ class Controller:
         elif self.resume_stage not in ('TEST','REVIEW'):
             self.save('DEV');self.agent('Implement the requirement using the frozen failing tests. Only edit production code and finish; the controller will test, review and commit after you exit. Do not modify tests, dependency definitions or gate commands. Requirement: '+self.spec['requirement']+'\nCriteria: '+json.dumps(self.p['criteria']))
         while True:
-            self.stopping();current=self.digest();self.state['greenTestDigest']=current['digest']
+            self.stopping();current=self.digest();self.state['greenTestDigest']=self.state['red']['testDigest'] if self.spec.get('deliveryInput') and current['digest']==self.state.get('deliveryTestDigest') else current['digest']
             if current['protected']!=self.state['protectedDigest']:raise Deferred('Dependency or gate definitions were modified')
             if self.state['greenTestDigest']!=self.state['red']['testDigest']:raise Deferred('Frozen behavioral tests were modified')
             sha=self.commit();self.state['sha']=sha;self.save('TEST');self.state['checks']=self.checks(sha)

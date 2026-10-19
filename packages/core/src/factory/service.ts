@@ -1,3 +1,4 @@
+import { FactoryDelivery } from "./delivery.js";
 import { FactoryDevelopment } from "./development.js";
 import { verifyReady, mergeDevelopmentIssueLedger } from "./development-evidence.js";
 import type { DevelopmentSpec, DevelopmentPolicy } from "./development-types.js";
@@ -70,9 +71,11 @@ function path(v: unknown): string {
 }
 export class FactoryService {
   readonly development: FactoryDevelopment;
+  readonly delivery: FactoryDelivery;
   private readonly pending = new Set<Promise<unknown>>();
   private ticking = false;
   private tickPromise?: Promise<void>;
+  private deliveryTick?: Promise<void>;
   private closed = false;
   constructor(
     private host: { store: SqliteStateStore; rooms: BotRoomService },
@@ -80,6 +83,7 @@ export class FactoryService {
     private clock: () => number = Date.now,
   ) {
     this.development = new FactoryDevelopment(host.store, this);
+    this.delivery = new FactoryDelivery(host.store,this,transport,clock);
     host.store.db
       .exec(`CREATE TABLE IF NOT EXISTS factory_tasks(id TEXT PRIMARY KEY,principal TEXT NOT NULL,machine_id TEXT NOT NULL,status TEXT NOT NULL,idem TEXT NOT NULL,data TEXT NOT NULL,UNIQUE(principal,idem));
    CREATE TABLE IF NOT EXISTS factory_outbox(key TEXT PRIMARY KEY,principal TEXT NOT NULL,room_id TEXT NOT NULL,bot_id TEXT NOT NULL,body TEXT NOT NULL,sent INTEGER NOT NULL DEFAULT 0);`);
@@ -402,6 +406,16 @@ export class FactoryService {
       throw new AuthorizationError("Room is not configured for factory");
     const room = this.host.rooms.get(p, roomId);
     const parts = message.trim().split(/\s+/);
+    if (parts[1] === "deliver") {
+      if(room.status!=="active")throw new ConflictError("Room is paused");
+      let input;try{input=JSON.parse(message.trim().slice("/factory deliver ".length));}catch{throw new ValidationError("Delivery command requires explicit taskId and scope or action");}
+      if(!isObj(input)||typeof input.taskId!=="string"||!/^factory_[A-Za-z0-9_-]+$/.test(input.taskId))throw new ValidationError("Explicit factory taskId required");
+      const task=this.get(p,input.taskId);if(task.roomId!==roomId)throw new AuthorizationError("Task belongs to another room");
+      if(input.action==="revoke"||input.action==="pause"||input.action==="cancel")this.delivery.control(p,task.id,input.action);
+      else if(input.action)this.delivery.decide(p,task.id,input);
+      else this.delivery.grant(p,task.id,input);
+      return task;
+    }
     if (parts[1] === "develop") {
       if (room.status !== "active") throw new ConflictError("Room is paused");
       let input; try { input=JSON.parse(message.trim().slice("/factory develop ".length)); } catch { throw new ValidationError("Use /factory develop followed by a task JSON object"); }
@@ -573,11 +587,17 @@ export class FactoryService {
     this.outbox(task,"result:"+task.id+":"+task.status+suffix,
       task.development ? this.developmentMessage(task) : `[factory] ${task.id} ${task.machineId} ${task.status}\n${JSON.stringify(task.result ?? {})}${task.error ? "\n"+task.error : ""}`);
   }
+  deliveryNotice(task:FactoryTask,r:import("./delivery-types.js").DeliveryRecord) {
+    const hour=Number(new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Shanghai",hour:"2-digit",hour12:false}).format(new Date(this.clock())));
+    if(hour>=1&&hour<8&&!["PUSHED","MERGED","WAITING_DECISION","DEFERRED","VERIFYING"].includes(r.stage))return;
+    const key="delivery:"+task.id+":"+r.stage+":"+r.candidate+":"+(r.pr?.number??"")+":"+createHash("sha256").update(r.reason??"").digest("hex").slice(0,16);
+    this.outbox(task,key,`[factory] ${task.id} ${task.machineId} ${r.stage}\n`+JSON.stringify({taskId:task.id,machineId:task.machineId,sha:r.candidate,pr:r.pr?.url,delivery:r.stage,deployment:r.deployment,nextAction:r.reason??(r.stage==="MERGED"?"Deployment deferred":r.stage==="CI_WAIT"?"Await current trusted CI":"See delivery evidence in Lab")}));
+  }
   private developmentMessage(task: FactoryTask): string {
-    const development=task.development!;const result=task.result?.development as any;
+    const development=task.development!;const result=task.result?.development as any;const delivery=this.delivery.current(task.principal,task.id);
     const summary={taskId:task.id,machineId:task.machineId,status:task.status,stage:development.stage,
-      round:development.round,baseline:development.baseline,sha:result?.sha??null,delivery:development.delivery,
-      nextAction:this.developmentNextAction(task),updatedAt:task.updatedAt,evidence:"Lab > Operations > Factory > "+task.id};
+      round:development.round,baseline:development.baseline,sha:result?.sha??null,delivery:this.delivery.current(task.principal,task.id)?.stage??development.delivery,deployment:"not_deployed",pr:this.delivery.current(task.principal,task.id)?.pr?.url,
+      nextAction:delivery?(delivery.reason?.slice(0,240)??(delivery.stage==="MERGED"?"Merged; deployment deferred":delivery.stage==="CI_WAIT"?"Await current trusted CI":delivery.stage==="PR_READY"?"PR grant complete; further scope requires explicit authorization":"See delivery evidence and decisions in Lab")):this.developmentNextAction(task),decisionHistory:delivery?.decisions.slice(-3),updatedAt:task.updatedAt,evidence:"Lab > Operations > Factory > "+task.id};
     return `[factory] ${task.id} ${task.machineId} ${task.status}\n${JSON.stringify(summary)}`;
   }
   private developmentNextAction(task: FactoryTask): string {
@@ -724,10 +744,19 @@ export class FactoryService {
           await this.patrol(cfg.owner);
         if (this.closed) return;
       }
+      this.advanceDelivery();
       this.flushOutbox();
     } finally {
       this.ticking = false;
     }
+  }
+  private advanceDelivery() {
+    // A single tracked delivery poll bounds concurrency without blocking machine scheduling.
+    if (this.deliveryTick || this.closed) return;
+    this.deliveryTick = this.delivery.tick().catch(() => { console.warn("[factory] Delivery scheduling unavailable; retained remote state requires inspection"); }).finally(() => {
+      this.deliveryTick = undefined;
+      if (!this.closed) this.flushOutbox();
+    });
   }
   cancel(p: BotPrincipal, id: string) {
     return this.tx(() => {
@@ -873,5 +902,6 @@ export class FactoryService {
     this.closed = true;
     await this.transport.close?.();
     await this.tickPromise?.catch(() => {});
+    await this.deliveryTick;
   }
 }

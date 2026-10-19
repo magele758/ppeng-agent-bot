@@ -1,3 +1,5 @@
+import { DELIVERY_WORKER } from "./delivery-worker.js";
+import type { DeliveryRequest } from "./delivery-types.js";
 import { createHash } from "node:crypto";
 import { DEVELOPMENT_WORKER } from "./development-worker.js";
 import type { DevelopmentPolicy, DevelopmentPreflight } from "./development-types.js";
@@ -173,7 +175,7 @@ export class SshFactoryTransport implements FactoryTransport {
           (r) => r.id === task?.repositoryId,
         ),
         logPath = repo?.logs?.find((l) => l.id === task?.logId)?.path;
-      const program = task?.development || action === "preflight" ? `source=__import__('base64').b64decode('${Buffer.from(DEVELOPMENT_WORKER).toString("base64")}').decode();globals()['_SOURCE']=source;exec(source)` : bootstrap;
+      const program = action === "delivery" ? `import base64;exec(base64.b64decode('${Buffer.from(DELIVERY_WORKER).toString("base64")}'))` : task?.development || action === "preflight" ? `source=__import__('base64').b64decode('${Buffer.from(DEVELOPMENT_WORKER).toString("base64")}').decode();globals()['_SOURCE']=source;exec(source)` : bootstrap;
       const child = spawn(
         "ssh",
         [
@@ -213,7 +215,7 @@ export class SshFactoryTransport implements FactoryTransport {
           terminateProcessTree(child);
           end(new Error("SSH response unavailable; verify remote receipt"));
         },
-        action === "preflight" ? 90000 : action === "start" ? Math.max(90000,(task?.timeoutMs ?? 30000) + 15000) : action === "stop" ? 25000 : 15000,
+        action === "delivery" ? 120000 : action === "preflight" ? 90000 : action === "start" ? Math.max(90000,(task?.timeoutMs ?? 30000) + 15000) : action === "stop" ? 25000 : 15000,
       );
       child.stdout?.on("data", (part) => {
         output += part.toString();
@@ -236,9 +238,13 @@ export class SshFactoryTransport implements FactoryTransport {
       });
       child.stdin?.on("error", () => {});
       const wireTask = task?.development ? {id:task.id,identity:task.identity,repositoryPath:task.repositoryPath,principal:task.principal,machineId:task.machineId,
-        development:{requirement:task.development.requirement,baseline:task.development.baseline,policy:task.development.policy,generation:task.development.generation,round:task.development.round,dependency:task.development.dependency,reviewCarry:task.development.reviewCarry}} : task;
+        development:{requirement:task.development.requirement,baseline:task.development.baseline,policy:task.development.policy,generation:task.development.generation,round:task.development.round,dependency:task.development.dependency,reviewCarry:task.development.reviewCarry,deliveryInput:task.development.deliveryInput,verifyCurrent:task.development.verifyCurrent}} : task;
       child.stdin?.end(JSON.stringify({ action, task:wireTask, logPath, ...extra }));
     });
+  }
+  async delivery(m:FactoryMachine,request:DeliveryRequest,t?:FactoryTask){
+    const result=await this.invoke(m,"delivery",t,request) as any;
+    if(result?.publisherError){const error=Object.assign(new Error("Publisher refused operation: "+result.detail),{publisherFinished:result.publisherFinished===true,publisherRefused:result.publisherError==="PublisherRefusal"&&result.publisherFinished===true,action:request.action});throw error;}return result;
   }
   async probe(m: FactoryMachine) {
     const r = (await this.invoke(m, "probe")) as {
