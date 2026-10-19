@@ -401,3 +401,16 @@ test('swarm start passes valid seed tasks only after checking ownership', async 
   assert.deepEqual(starts,[{id,tasks:[{title:'implement',description:'details',requiredRole:'worker',blockedBy:['prepare']}]}]);
   fx.store.db.close();
 });
+
+test('project creation validates roots before persisting and retains the selected primary directory', async () => {
+  const fx=fixture();
+  const invalid=await call(fx,'lab_project_create',{name:'bad',roots:[{path:join(fx.dir,'missing')}]});
+  assert.equal(invalid.ok,false);
+  assert.equal(fx.store.projects().list().length,0);
+  const created=await call(fx,'lab_project_create',{name:'valid',roots:[null,{}, {path:fx.dir,alias:'source',primary:true}]});
+  assert.equal(created.ok,true,JSON.stringify(created));
+  assert.equal(created.body.project.roots.length,1);
+  assert.equal(created.body.project.roots[0].alias,'source');
+  assert.equal(created.body.project.roots[0].isPrimary,true);
+  fx.store.db.close();
+});
