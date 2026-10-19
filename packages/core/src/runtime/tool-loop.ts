@@ -19,6 +19,9 @@ import {
   type CommandHardlineMatch
 } from '../sandbox/command-hardline.js';
 import { redactToolContent } from '../sandbox/result-redaction.js';
+import { agentSandboxKindFromEnv } from '../sandbox/create-agent-sandbox.js';
+import { planDirectIsolationHold, shellIsolationAvailability } from '../sandbox/model-isolation.js';
+import { stableJsonHash } from './helpers.js';
 import { toolInfraProblem } from '../model/tool-result-problem.js';
 import { maybeArchiveToolResult } from '../artifact/archive-tool-result.js';
 import type { IngestionSettingsStore } from '../ingestion/settings.js';
@@ -310,7 +313,7 @@ export function checkToolApprovals(
 ): 'waiting' | 'skip' | 'proceed' {
   if (closure) closure.reported = true;
   if (refuseHardlineToolCalls(deps, validToolCalls, session)) return 'skip';
-  return checkToolApprovalsA(
+  const decision = checkToolApprovalsA(
     hostFromDeps(deps),
     toolsForTurn(deps, turnTools),
     validToolCalls,
@@ -320,6 +323,8 @@ export function checkToolApprovals(
     deps.envApprovalPolicy,
     closure
   );
+  if (decision !== 'proceed') return decision;
+  return holdDirectIsolation(deps, validToolCalls, session);
 }
 
 /** Assembled-loop path: file policy is already the loop shape. */
@@ -335,7 +340,7 @@ export function checkToolApprovalsForLoop(
 ): 'waiting' | 'skip' | 'proceed' {
   if (closure) closure.reported = true;
   if (refuseHardlineToolCalls(deps, validToolCalls, session)) return 'skip';
-  return checkToolApprovalsA(
+  const decision = checkToolApprovalsA(
     hostFromDeps(deps),
     toolsForTurn(deps, turnTools),
     validToolCalls,
@@ -345,6 +350,31 @@ export function checkToolApprovalsForLoop(
     envApprovalPolicy,
     closure
   );
+  if (decision !== 'proceed') return decision;
+  return holdDirectIsolation(deps, validToolCalls, session);
+}
+
+function holdDirectIsolation(
+  deps: ToolLoopDeps,
+  calls: ToolCallPart[],
+  session: SessionRecord
+): 'waiting' | 'proceed' {
+  const plan = planDirectIsolationHold(
+    calls,
+    deps.store.listApprovals(),
+    session.id,
+    shellIsolationAvailability(agentSandboxKindFromEnv(process.env))
+  );
+  for (const item of plan.create) {
+    deps.store.createApproval({
+      sessionId: session.id,
+      toolName: item.toolName,
+      reason: `Approval required to run ${item.toolName} without OS isolation`,
+      args: item.args,
+      idempotencyKey: `direct-isolation:${item.toolName}:${stableJsonHash(item.toolName, item.args)}`
+    });
+  }
+  return plan.wait ? 'waiting' : 'proceed';
 }
 
 export async function executeSingleTool(
