@@ -21,6 +21,15 @@ import { renderMarkdown } from '@/lib/markdown';
 import { rollbackToCheckpoint, streamCheckpoint, type StreamSegment } from '@/lib/stream-segments';
 import { feedSseBuffer } from '@/lib/sse';
 import { liveSessionFollowRequest, type LiveStreamArm } from '@/lib/live-stream-attach';
+import {
+  detachLiveTurn,
+  screenLiveTurn,
+  streamPaintApplies,
+  botOpenApplies,
+  visibleStream,
+  liveTurnRunning,
+  UNBOUND_LIVE_TURN,
+} from '@/lib/live-turn-session';
 import { userPreviewText } from '@/lib/chat-utils';
 import {
   contextLabelsOf,
@@ -217,6 +226,10 @@ export interface PlayChatDeps {
   tick: (opts?: { includePlayPanel?: boolean }) => Promise<void>;
 }
 
+function isSessionResult(event: string, payload: { session?: { id?: string } }): payload is { session: { id: string } } {
+  return event === 'result' && Boolean(payload.session?.id);
+}
+
 export function usePlayChat(deps: PlayChatDeps) {
   const {
     selectedSessionId,
@@ -312,6 +325,9 @@ export function usePlayChat(deps: PlayChatDeps) {
     controller: AbortController;
     ready: Promise<void>;
   } | null>(null);
+  const liveOwnerRef = useRef<string | null>(null);
+  const liveGenRef = useRef(0);
+  const botOpenRequestRef = useRef(0);
   const playInputRef = useRef<HTMLTextAreaElement>(null);
   const playInputLiveRef = useRef('');
   const speechRecRef = useRef<SpeechRecognitionLike | null>(null);
@@ -389,6 +405,26 @@ export function usePlayChat(deps: PlayChatDeps) {
     setWaitTyping(false);
   };
 
+  const claimLiveTurn = (sessionId: string) => {
+    const generation = liveGenRef.current + 1;
+    liveGenRef.current = generation;
+    liveOwnerRef.current = sessionId;
+    return generation;
+  };
+
+  const liveTurnCurrent = (generation: number) => streamPaintApplies(liveGenRef.current, generation);
+
+  const assertLiveTurn = (generation: number) => {
+    if (!liveTurnCurrent(generation)) throw new Error('Detached live turn');
+  };
+
+  const finishLiveTurn = (generation: number) => {
+    if (!liveTurnCurrent(generation)) return;
+    liveOwnerRef.current = null;
+    clearStreamingShell();
+    setPlaySending(false);
+  };
+
   const cancelScheduledPlayScroll = useCallback(() => {
     if (stickRafRef.current == null) return;
     cancelAnimationFrame(stickRafRef.current);
@@ -454,6 +490,16 @@ export function usePlayChat(deps: PlayChatDeps) {
     setShowJumpToLatest(false);
     const follow = liveFollowRef.current;
     if (follow && follow.sessionId !== selectedSessionId) follow.controller.abort();
+    const detached = detachLiveTurn(
+      { generation: liveGenRef.current, liveSessionId: liveOwnerRef.current },
+      selectedSessionId
+    );
+    if (!detached.detached) return;
+    liveGenRef.current = detached.generation;
+    liveOwnerRef.current = detached.liveSessionId;
+    pendingSteerTextRef.current = null;
+    clearStreamingShell();
+    setPlaySending(false);
   }, [selectedSessionId]);
 
   useEffect(() => {
@@ -1250,13 +1296,20 @@ export function usePlayChat(deps: PlayChatDeps) {
   }, []);
 
   const openBotSession = useCallback(
-    async (id: string): Promise<{ bot: BotInfo; sessionId: string }> => {
+    async (id: string, adopt?: { liveGen: number }): Promise<{ bot: BotInfo; sessionId: string }> => {
+      const requestId = ++botOpenRequestRef.current;
+      const selectedAtStart = selectedSessionRef.current;
+      const generation = adopt?.liveGen ?? liveGenRef.current;
       const data = (await api(`/api/bots/${encodeURIComponent(id)}/open`, {
         method: 'POST'
       })) as OpenBotResponse;
       const opened = parseOpenBotResponse(data);
+      if (!botOpenApplies(requestId, botOpenRequestRef.current, selectedAtStart, selectedSessionRef.current, liveTurnCurrent(generation))) return opened;
       applyBotSelection(opened.bot);
       upsertBot?.(opened.bot);
+      if (adopt) {
+        liveOwnerRef.current = opened.sessionId;
+      }
       selectedSessionRef.current = opened.sessionId;
       setSelectedSessionId(opened.sessionId);
       return opened;
@@ -1266,6 +1319,13 @@ export function usePlayChat(deps: PlayChatDeps) {
 
   const selectBot = useCallback(
     async (id: string) => {
+      // Invalidate pending opens and stream callbacks as soon as selection is requested.
+      botOpenRequestRef.current += 1;
+      liveGenRef.current += 1;
+      liveOwnerRef.current = null;
+      pendingSteerTextRef.current = null;
+      clearStreamingShell();
+      setPlaySending(false);
       if (!id) {
         applyBotSelection(null);
         return;
@@ -1302,9 +1362,10 @@ export function usePlayChat(deps: PlayChatDeps) {
   const readSseFetch = async (
     url: string,
     body: unknown,
-    onSession?: (id: string) => void,
-    opts?: { onReady?: () => void; signal?: AbortSignal; extraAttempts?: number }
+    onSession: ((id: string) => void) | undefined,
+    opts: { onReady?: () => void; signal?: AbortSignal; extraAttempts?: number; liveGen: number }
   ) => {
+    const streamGeneration = opts.liveGen;
     const throwIfAborted = () => {
       if (opts?.signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError');
     };
@@ -1349,6 +1410,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     const nextId = () => `s-${++idCounter}`;
 
     const sync = () => {
+      if (opts?.liveGen != null && !streamPaintApplies(liveGenRef.current, opts.liveGen)) return;
       setStreamOverlay({ segments: [...segments] });
     };
 
@@ -1371,6 +1433,7 @@ export function usePlayChat(deps: PlayChatDeps) {
           envelope?: Record<string, unknown>;
           session?: { id: string };
         };
+        if (!liveTurnCurrent(streamGeneration)) return;
         if (event === 'ready') {
           opts?.onReady?.();
         }
@@ -1442,8 +1505,9 @@ export function usePlayChat(deps: PlayChatDeps) {
           }
           sync();
         }
-        if (event === 'result' && p.session?.id) {
+        if (isSessionResult(event, p)) {
           const sid = p.session.id;
+          liveOwnerRef.current = sid;
           onSession?.(sid);
           selectedSessionRef.current = sid;
           setSelectedSessionId(sid);
@@ -1456,6 +1520,21 @@ export function usePlayChat(deps: PlayChatDeps) {
    * Listen for the run that an ask_user approve/reject is about to start.
    * `ready` resolves once the server is subscribed, before that run begins.
    */
+  const reportFollowError = (error: unknown, controller: AbortController, generation: number) => {
+    if (controller.signal.aborted || !liveTurnCurrent(generation)) return;
+    if (error instanceof Error && error.name === 'AbortError') return;
+    setPlayStatus({ text: String(error), err: true });
+  };
+
+  const finishFollow = async (controller: AbortController, generation: number, claimedHere: boolean) => {
+    if (liveFollowRef.current?.controller !== controller) return;
+    liveFollowRef.current = null;
+    if (!liveTurnCurrent(generation)) return;
+    clearStreamingShell();
+    if (claimedHere) liveOwnerRef.current = null;
+    if (!controller.signal.aborted) await tick({ includePlayPanel: true });
+  };
+
   const armLiveSessionStream = (sessionId: string): LiveStreamArm => {
     const current = liveFollowRef.current;
     if (current?.sessionId === sessionId && !current.controller.signal.aborted) {
@@ -1474,6 +1553,8 @@ export function usePlayChat(deps: PlayChatDeps) {
     });
     const follow = { sessionId, controller, ready };
     liveFollowRef.current = follow;
+    const claimedHere = liveOwnerRef.current !== sessionId;
+    const generation = claimedHere ? claimLiveTurn(sessionId) : liveGenRef.current;
     setStreamOverlay({ segments: [] });
     const { url, body } = liveSessionFollowRequest(sessionId);
     void (async () => {
@@ -1481,19 +1562,14 @@ export function usePlayChat(deps: PlayChatDeps) {
         await readSseFetch(url, body, undefined, {
           signal: controller.signal,
           extraAttempts: 0,
-          onReady: () => resolveReady()
+          onReady: () => resolveReady(),
+          liveGen: generation
         });
       } catch (error) {
-        const aborted = controller.signal.aborted || (error instanceof Error && error.name === 'AbortError');
-        if (!aborted) {
-          setPlayStatus({ text: error instanceof Error ? error.message : String(error), err: true });
-        }
+        reportFollowError(error, controller, generation);
       } finally {
         resolveReady();
-        if (liveFollowRef.current?.controller !== controller) return;
-        liveFollowRef.current = null;
-        clearStreamingShell();
-        if (!controller.signal.aborted) await tick({ includePlayPanel: true });
+        await finishFollow(controller, generation, claimedHere);
       }
     })();
     return { ready, cancel: () => controller.abort() };
@@ -1534,6 +1610,44 @@ export function usePlayChat(deps: PlayChatDeps) {
     return sid;
   };
 
+  const sendBotCommand = async (commandBotId: string, text: string) => {
+      stopSpeechDictation();
+      const generation = claimLiveTurn(selectedSessionRef.current ?? UNBOUND_LIVE_TURN);
+      setPlaySending(true);
+      try {
+        let sid = selectedSessionRef.current;
+        if (!sid) {
+          sid = (await openBotSession(commandBotId, { liveGen: generation })).sessionId;
+          assertLiveTurn(generation);
+        }
+        const data = (await api(`/api/sessions/${sid}/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text, autoRun: false })
+        })) as {
+          command?: {
+            code?: string;
+            ok?: boolean;
+            arg?: string;
+            modelOverride?: { modelId?: string } | null;
+          };
+        };
+        assertLiveTurn(generation);
+        acknowledgeLocalSendCommitted();
+        clearComposerOnly();
+        clearStreamingShell();
+        const status = botComposerStatusText(t, data.command);
+        setPlayStatus({ text: status.text, ok: !status.err, err: status.err });
+        sessionListStickTopRef.current = true;
+        await tick({ includePlayPanel: true });
+      } catch (err) {
+        if (!liveTurnCurrent(generation)) return;
+        setPlayStatus({ text: String(err), err: true });
+      } finally {
+        finishLiveTurn(generation);
+      }
+  };
+
   const sendPlayMessage = async () => {
     const text = playInput.trim();
     const imageAssetIds = [...pendingImageAssetIds];
@@ -1552,37 +1666,7 @@ export function usePlayChat(deps: PlayChatDeps) {
         hasAttachments
       }) === 'command'
     ) {
-      stopSpeechDictation();
-      setPlaySending(true);
-      try {
-        let sid = selectedSessionRef.current;
-        if (!sid) {
-          sid = (await openBotSession(commandBotId)).sessionId;
-        }
-        const data = (await api(`/api/sessions/${sid}/messages`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text, autoRun: false })
-        })) as {
-          command?: {
-            code?: string;
-            ok?: boolean;
-            arg?: string;
-            modelOverride?: { modelId?: string } | null;
-          };
-        };
-        acknowledgeLocalSendCommitted();
-        clearComposerOnly();
-        clearStreamingShell();
-        const status = botComposerStatusText(t, data.command);
-        setPlayStatus({ text: status.text, ok: !status.err, err: status.err });
-        sessionListStickTopRef.current = true;
-        await tick({ includePlayPanel: true });
-      } catch (err) {
-        setPlayStatus({ text: err instanceof Error ? err.message : String(err), err: true });
-      } finally {
-        setPlaySending(false);
-      }
+      await sendBotCommand(commandBotId, text);
       return;
     }
     if (workspaceAvailability.blocked) {
@@ -1592,9 +1676,10 @@ export function usePlayChat(deps: PlayChatDeps) {
       });
       return;
     }
-    const running = playSending || Boolean(streamOverlay) || waitTyping;
+    const running = liveTurnRunning(liveOwnerRef.current, selectedSessionRef.current, playSending, Boolean(streamOverlay), waitTyping);
     if (running) {
       if (!submission.hasContent || !selectedSessionId) return;
+      const steerSessionId = selectedSessionId;
       const delivery = planRunningTurnDelivery({
         canonicalBotChat: composerIsCanonicalBot(),
         interruptPolicy: steerInterruptPolicy
@@ -1624,10 +1709,11 @@ export function usePlayChat(deps: PlayChatDeps) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(
             immediate
-              ? { text: submission.message, target: 'next-step', ...contextFields }
+              ? { text: submission.message, target, ...contextFields }
               : { text: submission.message, target, ...steerBodyFromQueryMode(execMode), ...contextFields }
           ),
         })) as { ok?: boolean; status?: string; reason?: string; item?: SteerInboxItem };
+        if (selectedSessionRef.current !== steerSessionId) return;
         acknowledgeLocalSendCommitted();
         clearComposerOnly();
         if (delivery.revealSettings && execMode !== 'subagent' && data.item?.id) {
@@ -1664,6 +1750,7 @@ export function usePlayChat(deps: PlayChatDeps) {
           setPlayStatus({ text: t('play.status.steered'), ok: true });
         }
       } catch (err) {
+        if (selectedSessionRef.current !== steerSessionId) return;
         if (immediate) {
           pendingSteerTextRef.current = null;
           setOptimisticUser(null);
@@ -1681,6 +1768,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     const imageSnapshot = [...pendingImageAssetIds];
     const attachmentSnapshot = [...pendingAttachmentIds];
     setPlayStatus({ text: '' });
+    const generation = claimLiveTurn(selectedSessionId ?? UNBOUND_LIVE_TURN);
     setPlaySending(true);
 
     const preview = userPreviewText(text || '(image)', imageAssetIds);
@@ -1706,9 +1794,10 @@ export function usePlayChat(deps: PlayChatDeps) {
       const hadSession = Boolean(selectedSessionRef.current);
       let sid = selectedSessionId;
       if (!sid && activeBotId) {
-        const opened = await openBotSession(activeBotId);
+        const opened = await openBotSession(activeBotId, { liveGen: generation });
         sid = opened.sessionId;
       }
+      assertLiveTurn(generation);
       if (sid) {
         if (useStream) {
           beginStreamTurn();
@@ -1724,7 +1813,8 @@ export function usePlayChat(deps: PlayChatDeps) {
               ...modelRefBody(modelRefForSend),
               ...workspaceBindingBody(workspaceBinding),
             },
-            undefined
+            undefined,
+            { liveGen: generation }
           );
         } else {
           beginWaitTurn();
@@ -1743,7 +1833,8 @@ export function usePlayChat(deps: PlayChatDeps) {
             }),
           });
         }
-        clearStreamingShell();
+        assertLiveTurn(generation);
+        finishLiveTurn(generation);
         setPlayStatus({ text: t('play.status.sent'), ok: true });
       } else if (activeBotId) {
         throw new Error(t('play.status.openBotFailed'));
@@ -1761,8 +1852,9 @@ export function usePlayChat(deps: PlayChatDeps) {
             ...orchestrationBody(taskMode, orchestrationEngine, skillScope),
             ...modelRefBody(modelRefForSend),
             ...workspaceBindingBody(workspaceBinding),
-          });
-          clearStreamingShell();
+          }, undefined, { liveGen: generation });
+          assertLiveTurn(generation);
+          finishLiveTurn(generation);
           setPlayStatus({ text: t('play.status.streamDone'), ok: true });
         } else {
           beginWaitTurn();
@@ -1783,9 +1875,11 @@ export function usePlayChat(deps: PlayChatDeps) {
             }),
           })) as { session: { id: string } };
           const newSid = data.session.id;
+          assertLiveTurn(generation);
+          liveOwnerRef.current = newSid;
           selectedSessionRef.current = newSid;
           setSelectedSessionId(newSid);
-          clearStreamingShell();
+          finishLiveTurn(generation);
           await refreshPlayPanel();
           setPlayStatus({ text: t('play.status.sessionCreated'), ok: true });
         }
@@ -1811,18 +1905,22 @@ export function usePlayChat(deps: PlayChatDeps) {
           }),
         })) as { session: { id: string } };
         const newSid = data.session.id;
+        assertLiveTurn(generation);
+        liveOwnerRef.current = newSid;
         selectedSessionRef.current = newSid;
         setSelectedSessionId(newSid);
-        clearStreamingShell();
+        finishLiveTurn(generation);
         await refreshPlayPanel();
         setPlayStatus({ text: t('play.status.taskCreated'), ok: true });
       }
+      assertLiveTurn(generation);
       if (!hadSession && !activeBotId && selectedSessionRef.current) {
         await persistPendingStrategy(selectedSessionRef.current);
       }
       sessionListStickTopRef.current = true;
       await tick({ includePlayPanel: true });
     } catch (e) {
+      if (!liveTurnCurrent(generation)) return;
       setPlayStatus({ text: modelErrorText(e instanceof Error ? e.message : String(e), t), err: true });
       const persisted = e instanceof PlayStreamError && e.persisted;
       if (!persisted) {
@@ -1831,12 +1929,12 @@ export function usePlayChat(deps: PlayChatDeps) {
         setPendingAttachmentIds(attachmentSnapshot);
         setPendingContext(contextSnapshot);
       }
-      clearStreamingShell();
+      finishLiveTurn(generation);
       if (persisted) {
         await tick({ includePlayPanel: true });
       }
     } finally {
-      setPlaySending(false);
+      if (liveTurnCurrent(generation)) setPlaySending(false);
     }
   };
 
@@ -1913,6 +2011,16 @@ export function usePlayChat(deps: PlayChatDeps) {
     scrollPlayToBottom,
   ]);
 
+  const screen = screenLiveTurn({
+    selectedSessionId,
+    messages: sessionMessages,
+    liveSessionId: liveOwnerRef.current,
+    optimisticUser,
+    hasStream: streamOverlay != null,
+    waitTyping,
+    playSending,
+  });
+
   return {
     historyCursor,historyLoading,loadOlderHistory,
     // State
@@ -1942,10 +2050,10 @@ export function usePlayChat(deps: PlayChatDeps) {
     sessionFileArtifacts,
     playStatus,
     setPlayStatus,
-    optimisticUser,
-    streamOverlay,
-    waitTyping,
-    playSending,
+    optimisticUser: screen.optimisticUser,
+    streamOverlay: visibleStream(screen.hasStream, streamOverlay),
+    waitTyping: screen.waitTyping,
+    playSending: screen.playSending,
     composerAckFlash,
     speechDictationAvailable,
     speechDictating,
