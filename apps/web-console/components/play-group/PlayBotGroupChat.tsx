@@ -26,8 +26,8 @@ import { RoomSharedContextEditor } from './RoomSharedContextEditor';
 import './play-group.css';
 import '../bot-work/bot-work.css';
 import { BotRooms } from '../bot-work/BotRooms';
-import { ComposerContextChips, ComposerMessageContext, ComposerNotice, useComposerFileDrop } from '../ComposerContext';
-import { composerClassName, contextSubmission, limitContextSources, contextSourcesBody, contextSourcesForSend, withContextIds, type PendingContextSource } from '@/lib/composer-context';
+import { ComposerContextChips, ComposerMessageContext, ComposerNotice, useComposerFileDrop, usePendingComposerContext } from '../ComposerContext';
+import { composerClassName, contextSubmission, contextSourcesBody, contextSourcesForSend } from '@/lib/composer-context';
 
 type Room = {
   id: string;
@@ -160,8 +160,10 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
   const [addId, setAddId] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [pendingContext, setPendingContext] = useState<PendingContextSource[]>([]);
   const [contextNotice, setContextNotice] = useState('');
+  const { pendingContext, setPendingContext, addPendingContext } = usePendingComposerContext(() => {
+    setContextNotice(t('play.composer.contextTruncated'));
+  });
   const [loadError, setLoadError] = useState(false);
   const messagesRef = useRef<RoomMessage[]>([]);
   const roomIdRef = useRef(roomId);
@@ -266,10 +268,8 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
   const activeMention = mentionOptions[Math.min(mentionIndex, Math.max(mentionOptions.length - 1, 0))];
 
   const contextDrop = useComposerFileDrop((sources, truncated) => {
-    if (sources.length === 0) return;
-    const result = limitContextSources([...pendingContext, ...withContextIds(sources)]);
-    setPendingContext(result.sources);
-    if (truncated || result.truncated) setContextNotice(t('play.composer.contextTruncated'));
+    addPendingContext(sources);
+    if (truncated) setContextNotice(t('play.composer.contextTruncated'));
   }, roomId);
 
   const removePendingContext = (id: string) => {
