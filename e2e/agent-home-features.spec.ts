@@ -101,11 +101,16 @@ test.describe('Chat and Bot mode', () => {
 
     await page.locator('#nav-bot').click();
     await expect(page.locator('#nav-bot')).toHaveAttribute('aria-current', 'page');
-    await expect(list.locator('.list-item--bot-chat')).toHaveCount(3);
+    const roster = list.getByTestId('functional-group-ungrouped');
+    const pinned = list.getByTestId('bot-pin-area');
+    await expect(roster.locator('.list-item--bot-chat')).toHaveCount(3);
+    await expect(pinned.getByTestId('bot-pin-item')).toHaveCount(1);
+    await expect(pinned.getByTestId('bot-pin-item')).toHaveAttribute('data-bot-id', 'super-bot');
+    await expect(pinned.locator('[data-bot-face-slot] > *')).toHaveCount(1);
     await expect(list.locator('.list-item--group')).toHaveCount(1);
     await expect(list.locator('.list-item--group')).toContainText('群聊');
     await expect(list.locator('.list-item--group').locator('[data-bot-face-slot]')).toHaveCount(0);
-    const desk = list.locator('.list-item--bot-chat', { hasText: 'DeskBot' });
+    const desk = roster.locator('.list-item--bot-chat', { hasText: 'DeskBot' });
     await expect(desk.locator('.session-item__question-text')).toHaveText(
       '桌面现在怎么样 请把今天的安排、未读消息、明天的会议和还没做完的事都看一下'
     );
@@ -132,10 +137,10 @@ test.describe('Chat and Bot mode', () => {
       const shifted = await desk.locator('.session-item__question-text').evaluate((el) => getComputedStyle(el).transform);
       expect(shifted).not.toBe('none');
     }
-    await expect(list.locator('[data-bot-face-slot] > *')).toHaveCount(3);
-    await expect(list.locator('.list-item--bot-chat', { hasText: '小八' })).toContainText('还没提问');
-    await expect(list.locator('.list-item--bot-chat', { hasText: '小八' })).not.toContainText('bot-xiaoba');
-    await expect(list.locator('.list-item--bot-chat', { hasText: 'Super Bot' })).not.toContainText('super-bot');
+    await expect(roster.locator('[data-bot-face-slot] > *')).toHaveCount(3);
+    await expect(roster.locator('.list-item--bot-chat', { hasText: '小八' })).toContainText('还没提问');
+    await expect(roster.locator('.list-item--bot-chat', { hasText: '小八' })).not.toContainText('bot-xiaoba');
+    await expect(roster.locator('.list-item--bot-chat', { hasText: 'Super Bot' })).not.toContainText('super-bot');
     await expect(list).not.toContainText('Bot Chat');
     await expect(list).not.toContainText('Deploy review');
     const options = page.locator('#botSelect option');
