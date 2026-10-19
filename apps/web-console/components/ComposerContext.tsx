@@ -94,12 +94,15 @@ export function ComposerContextChips({
 
 export function ComposerMessageContext({
   message,
-  labels
+  labels,
+  role = 'user'
 }: {
   message?: unknown;
   labels?: readonly ContextLabel[];
+  role?: string;
 }) {
   const { t } = useI18n();
+  if (role !== 'user') return null;
   const items = labels ?? contextLabelsFromMessage(message);
   if (items.length === 0) return null;
   return (
@@ -116,4 +119,8 @@ export function ComposerMessageContext({
       ))}
     </ul>
   );
+}
+
+export function ComposerNotice({ text }: { text: string }) {
+  return text ? <p className="play-group-hint">{text}</p> : null;
 }

@@ -497,7 +497,7 @@ export function ChatTurnFromMessage({
         </div>
         <div className={`chat-bubble${artifactBubble ? ' chat-bubble--artifact' : ''}`}>
           {cronBubble}
-          {r === 'user' ? <ComposerMessageContext message={m} /> : null}
+          <ComposerMessageContext role={r} message={m} />
         </div>
       </div>
     </div>
@@ -536,7 +536,7 @@ export function ChatTurnPlain({
           ) : (
             <MarkdownHtml className="chat-bubble__body chat-bubble__md" text={text} />
           )}
-          {role === 'user' ? <ComposerMessageContext labels={contextLabels} /> : null}
+          <ComposerMessageContext role={role} labels={contextLabels} />
         </div>
       </div>
     </div>

@@ -24,6 +24,8 @@ import { liveSessionFollowRequest, type LiveStreamArm } from '@/lib/live-stream-
 import { userPreviewText } from '@/lib/chat-utils';
 import {
   contextLabelsOf,
+  composerHasAttachments,
+  contextSubmission,
   limitContextSources,
   contextSourcesBody,
   contextSourcesForSend,
@@ -1540,12 +1542,14 @@ export function usePlayChat(deps: PlayChatDeps) {
     const contextSources = contextSourcesForSend(pendingContext);
     const contextFields = contextSourcesBody(contextSources);
     const contextLabels = contextLabelsOf(contextSources);
+    const hasAttachments = composerHasAttachments(imageAssetIds, attachmentIds, contextSources);
+    const submission = contextSubmission(text, contextSources);
     const commandBotId = playSurface === 'bot' ? botIdRef.current : '';
     if (
       planBotComposerSend({
         botSelected: Boolean(commandBotId),
         text,
-        hasAttachments: imageAssetIds.length > 0 || attachmentIds.length > 0 || contextSources.length > 0
+        hasAttachments
       }) === 'command'
     ) {
       stopSpeechDictation();
@@ -1590,7 +1594,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     }
     const running = playSending || Boolean(streamOverlay) || waitTyping;
     if (running) {
-      if ((!text && contextSources.length === 0) || !selectedSessionId) return;
+      if (!submission.hasContent || !selectedSessionId) return;
       const immediate =
         decideRunningTurnSend({ canonicalBotChat: composerIsCanonicalBot() }) === 'steer';
       if (!immediate && steerInterruptPolicy === 'disabled') {
@@ -1617,8 +1621,8 @@ export function usePlayChat(deps: PlayChatDeps) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(
             immediate
-              ? { text: text || '(attachment)', target: 'next-step', ...contextFields }
-              : { text: text || '(attachment)', target, ...steerBodyFromQueryMode(execMode), ...contextFields }
+              ? { text: submission.message, target: 'next-step', ...contextFields }
+              : { text: submission.message, target, ...steerBodyFromQueryMode(execMode), ...contextFields }
           ),
         })) as { ok?: boolean; status?: string; reason?: string; item?: SteerInboxItem };
         acknowledgeLocalSendCommitted();
@@ -1669,7 +1673,7 @@ export function usePlayChat(deps: PlayChatDeps) {
       return;
     }
     stopSpeechDictation();
-    if (!text && imageAssetIds.length === 0 && attachmentIds.length === 0 && contextSources.length === 0) return;
+    if (!text && !hasAttachments) return;
     const draftSnapshot = playInput;
     const imageSnapshot = [...pendingImageAssetIds];
     const attachmentSnapshot = [...pendingAttachmentIds];

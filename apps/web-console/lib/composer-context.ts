@@ -14,6 +14,26 @@ export type PendingContextSource = ContextSource & { id: string };
 
 export type ContextLabel = { kind: 'file' | 'folder'; name: string };
 
+/** Share attachment presence across image, upload, and dragged-context collections. */
+export function composerHasAttachments(...collections: readonly (readonly unknown[])[]): boolean {
+  return collections.some(items => items.length > 0);
+}
+
+/** Text and dragged context are both valid submissions, including context-only sends. */
+export function contextSubmission(text: string, sources: readonly ContextSource[]) {
+  return { hasContent: Boolean(text) || sources.length > 0, message: text || '(attachment)' };
+}
+
+export function composerClassName(base: string, over: boolean, acknowledged = false): string {
+  return `${base}${acknowledged ? ' chat-composer--ack-flash' : ''}${over ? ' is-drop-over' : ''}`;
+}
+
+export function composerSendDisabled(blocked: boolean, steerDisabled: boolean, running: boolean, text: string, contexts: readonly ContextSource[]): boolean {
+  if (blocked || steerDisabled) return true;
+  if (!running) return false;
+  return !contextSubmission(text.trim(), contexts).hasContent;
+}
+
 export type DroppedItem = {
   kind: string;
   webkitGetAsEntry?: () => FileSystemEntry | null;

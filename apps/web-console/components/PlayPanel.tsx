@@ -40,6 +40,7 @@ import { BotFace } from './BotFace';
 import { resolveLivingFaceMood } from '@/lib/bot-face';
 import { ComposerBotPicker } from './ComposerBotPicker';
 import { ComposerContextChips, useComposerFileDrop } from './ComposerContext';
+import { composerClassName, composerSendDisabled } from '@/lib/composer-context';
 import { ComposerModelPicker } from './ComposerModelPicker';
 import { SessionSettingsPanel, type ExecPreset } from './sections/chat/SessionSettingsPanel';
 import { PlayBotGroupChat } from './play-group/PlayBotGroupChat';
@@ -1025,7 +1026,7 @@ export function PlayPanel({
                   {t('play.messageContent')}
                 </label>
                 <div
-                  className={`chat-composer${chat.composerAckFlash ? ' chat-composer--ack-flash' : ''}${contextDrop.over ? ' is-drop-over' : ''}`}
+                  className={composerClassName('chat-composer', contextDrop.over, chat.composerAckFlash)}
                   data-testid="composer-drop-target"
                   data-surface={botSurface ? 'bot' : 'chat'}
                   onDragEnter={contextDrop.onDragEnter}
@@ -1100,15 +1101,7 @@ export function PlayPanel({
                               : t('play.composer.queueHint')
                           : t('play.send')
                     }
-                    disabled={
-                      chat.workspaceAvailability.blocked
-                        ? true
-                        : steerDisabled
-                          ? true
-                          : chatRunning
-                            ? chat.playInput.trim().length === 0 && chat.pendingContext.length === 0
-                            : false
-                    }
+                    disabled={composerSendDisabled(chat.workspaceAvailability.blocked, steerDisabled, chatRunning, chat.playInput, chat.pendingContext)}
                     onClick={() => void chat.sendPlayMessage()}
                   >
                     {chat.playSending || Boolean(chat.streamOverlay) || chat.waitTyping ? (

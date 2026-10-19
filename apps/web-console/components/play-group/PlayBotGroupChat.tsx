@@ -26,8 +26,8 @@ import { RoomSharedContextEditor } from './RoomSharedContextEditor';
 import './play-group.css';
 import '../bot-work/bot-work.css';
 import { BotRooms } from '../bot-work/BotRooms';
-import { ComposerContextChips, ComposerMessageContext, useComposerFileDrop } from '../ComposerContext';
-import { limitContextSources, contextSourcesBody, contextSourcesForSend, withContextIds, type PendingContextSource } from '@/lib/composer-context';
+import { ComposerContextChips, ComposerMessageContext, ComposerNotice, useComposerFileDrop } from '../ComposerContext';
+import { composerClassName, contextSubmission, limitContextSources, contextSourcesBody, contextSourcesForSend, withContextIds, type PendingContextSource } from '@/lib/composer-context';
 
 type Room = {
   id: string;
@@ -125,7 +125,7 @@ function GroupTurn({
         <div className="chat-turn__label">{name}</div>
         <div className="chat-bubble">
           <MarkdownHtml className="chat-bubble__body chat-bubble__md" text={message.text} />
-          {user ? <ComposerMessageContext message={message} /> : null}
+          <ComposerMessageContext role={kind} message={message} />
         </div>
         {attachmentLabel ? <p className="play-group-hint">{attachmentLabel}</p> : null}
       </div>
@@ -168,6 +168,18 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
   const feedRef = useRef<HTMLDivElement>(null);
   roomIdRef.current = roomId;
 
+  const commitMessages = (next: RoomMessage[]) => {
+    if (sameData(messagesRef.current, next)) return;
+    messagesRef.current = next;
+    setMessages(next);
+  };
+
+  const acceptMessage = (message?: RoomMessage) => {
+    if (!message) return;
+    if (messagesRef.current.some(item => item.id === message.id)) return;
+    commitMessages([...messagesRef.current, message]);
+  };
+
   const applyHistory = (
     page: { messages: RoomMessage[]; hasMore: boolean; nextCursor: number | null },
     older: boolean
@@ -176,10 +188,7 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
     const next = older
       ? [...page.messages, ...messagesRef.current]
       : mergeHistoryWindow(messagesRef.current, page.messages, true).messages;
-    if (!sameData(messagesRef.current, next)) {
-      messagesRef.current = next;
-      setMessages(next);
-    }
+    commitMessages(next);
     if (older || firstLoad) setCursor(page.hasMore ? page.nextCursor : null);
   };
 
@@ -345,7 +354,8 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
     const submitted = text.trim();
     const contextSources = contextSourcesForSend(pendingContext);
     const contextFields = contextSourcesBody(contextSources);
-    if (!submitted && contextSources.length === 0) return;
+    const submission = contextSubmission(submitted, contextSources);
+    if (!submission.hasContent) return;
     const textSnapshot = text;
     const contextSnapshot = pendingContext;
     setText('');
@@ -357,16 +367,12 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
       const result = (await api(
         `/api/bot-rooms/${room.id}/messages`,
         jsonBody({
-          text: submitted || '(attachment)',
+          text: submission.message,
           idempotencyKey: crypto.randomUUID(),
           ...contextFields
         })
       )) as { message?: RoomMessage };
-      if (result.message && !messagesRef.current.some((item) => item.id === result.message!.id)) {
-        const next = [...messagesRef.current, result.message];
-        messagesRef.current = next;
-        setMessages(next);
-      }
+      acceptMessage(result.message);
       // Acceptance is durable even when the subsequent read fails. Do not
       // restore an accepted message into the composer and invite duplicates.
       await loadRoom(false).catch(() => setLoadError(true));
@@ -476,7 +482,7 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
           </div>
         </div>
         <form
-          className={`play-group-composer${contextDrop.over ? ' is-drop-over' : ''}`}
+          className={composerClassName('play-group-composer', contextDrop.over)}
           data-testid="composer-drop-target"
           data-surface="group"
           onDragEnter={contextDrop.onDragEnter}
@@ -556,7 +562,7 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
             {busy ? t('play.group.sending') : t('play.group.send')}
           </button>
         </form>
-        {contextNotice ? <p className="play-group-hint">{contextNotice}</p> : null}
+        <ComposerNotice text={contextNotice} />
         {room && room.status !== 'active' ? <p className="play-group-hint">{t('play.group.paused')}</p> : null}
       </div>
     </div>

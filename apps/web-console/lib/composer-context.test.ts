@@ -2,6 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   CONTEXT_TEXT_LIMIT,
+  composerHasAttachments,
+  contextSubmission,
+  composerClassName,
+  composerSendDisabled,
   contextLabelsFromMessage,
   contextSourcesBody,
   contextSourcesForSend,
@@ -10,6 +14,24 @@ import {
   withContextIds,
   type ContextSource
 } from './composer-context.ts';
+
+test('composer submissions preserve attachment-only send and running-send guards', () => {
+  const sources: ContextSource[] = [{ kind: 'file', name: 'note.txt', text: 'body' }];
+  assert.equal(composerHasAttachments([], [], sources), true);
+  assert.equal(composerHasAttachments(['image'], [], []), true);
+  assert.equal(composerHasAttachments([], ['upload'], []), true);
+  assert.equal(composerHasAttachments([], [], []), false);
+  assert.deepEqual(contextSubmission('', []), { hasContent: false, message: '(attachment)' });
+  assert.deepEqual(contextSubmission('', sources), { hasContent: true, message: '(attachment)' });
+  assert.deepEqual(contextSubmission('hello', []), { hasContent: true, message: 'hello' });
+  assert.equal(composerSendDisabled(false, false, true, ' ', []), true);
+  assert.equal(composerSendDisabled(false, false, true, '', sources), false);
+  assert.equal(composerSendDisabled(false, false, false, '', []), false);
+  assert.equal(composerSendDisabled(true, false, false, 'hello', sources), true);
+  assert.equal(composerSendDisabled(false, true, false, 'hello', sources), true);
+  assert.equal(composerClassName('chat-composer', true, true), 'chat-composer chat-composer--ack-flash is-drop-over');
+  assert.equal(composerClassName('play-group-composer', false), 'play-group-composer');
+});
 
 test('text files keep their text and binary files keep only the name', async () => {
   const note = new File(['unique sentence'], 'note.txt', { type: 'text/plain' });

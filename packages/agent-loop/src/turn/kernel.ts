@@ -271,12 +271,24 @@ function sessionForTurn(host: TurnKernelHost, sessionId: string, fallback: Sessi
   return host.store.getSession(sessionId) ?? fallback;
 }
 
-export async function runSessionKernel(
+interface KernelExecution {
+  session: SessionRecord;
+  agent: AgentSpec;
+  controller: AbortController;
+  writerRunId: string;
+  resumeFromInterrupt?: RunInterruptState;
+}
+
+// Keep admission and scope ownership separate from the existing turn implementation.
+// The public import remains runSessionKernel; hosts do not construct KernelExecution.
+export { runSessionKernelWithWriterScope as runSessionKernel };
+
+async function runSessionKernelWithWriterScope(
   host: TurnKernelHost,
   sessionId: string,
   options?: TurnKernelOptions
 ): Promise<SessionRecord> {
-  let session: SessionRecord = host.store.getSession(sessionId)!;
+  const session: SessionRecord = host.store.getSession(sessionId)!;
   if (!session) {
     throw new NotFoundError(`Session not found: ${sessionId}`);
   }
@@ -295,7 +307,7 @@ export async function runSessionKernel(
     });
     return parked;
   }
-  let resumeFromInterrupt: RunInterruptState | undefined =
+  const resumeFromInterrupt: RunInterruptState | undefined =
     resumeDecision.action === 'resume_tools' ? resumeDecision.interrupt : undefined;
 
   const agent = host.store.getAgent(session.agentId);
@@ -306,7 +318,6 @@ export async function runSessionKernel(
   const existingController = host.sessionAbortControllers?.get(sessionId);
   const controller = existingController ?? new AbortController();
   host.sessionAbortControllers?.set(sessionId, controller);
-  const signal = controller.signal;
   const sid = session.id;
   const writerRunId = createId('run');
   try { host.store.claimWriter(sessionId, writerRunId); }
@@ -320,7 +331,26 @@ export async function runSessionKernel(
     host.sessionAbortControllers?.delete(sessionId);
     return host.store.getSession(sid) ?? session;
   }
-  const execute = async (): Promise<SessionRecord> => {
+  const settle = async (): Promise<SessionRecord> => {
+    try { return await runSessionKernel(host, sessionId, { session, agent, controller, writerRunId, resumeFromInterrupt }, options); }
+    finally {
+      if (host.sessionAbortControllers?.get(sid) === controller) host.sessionAbortControllers.delete(sid);
+      host.store.releaseWriter(sid, writerRunId);
+    }
+  };
+  return host.store.runWithWriter ? host.store.runWithWriter(sid, writerRunId, settle) : settle();
+}
+
+async function runSessionKernel(
+  host: TurnKernelHost,
+  sessionId: string,
+  execution: KernelExecution,
+  options?: TurnKernelOptions
+): Promise<SessionRecord> {
+  let { session, resumeFromInterrupt } = execution;
+  const { agent, controller, writerRunId } = execution;
+  const signal = controller.signal;
+  const sid = session.id;
   const loopConfig = resolveLoopConfig(
     { maxTurns: host.maxTurnsPerRun, maxContextTokens: host.maxContextTokens },
     host.loopConfig,
@@ -1597,13 +1627,4 @@ export async function runSessionKernel(
     }
     throw err;
   }
-  };
-  const settle = async (): Promise<SessionRecord> => {
-    try { return await execute(); }
-    finally {
-      if (host.sessionAbortControllers?.get(sid) === controller) host.sessionAbortControllers.delete(sid);
-      host.store.releaseWriter(sid, writerRunId);
-    }
-  };
-  return host.store.runWithWriter ? host.store.runWithWriter(sid, writerRunId, settle) : settle();
 }
