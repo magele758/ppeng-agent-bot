@@ -20,6 +20,15 @@ import type { A2uiMessage, SurfaceState } from './a2ui/types';
 import { useI18n, type MessageKey } from '@/lib/i18n';
 import { ComposerMessageContext } from './ComposerContext';
 import type { ContextLabel } from '@/lib/composer-context';
+import { BotReplyQuoteAction, MessageReplyQuote } from './ReplyQuote';
+import {
+  replyAuthorName,
+  replyMessageId,
+  replySourceText,
+  readStoredReplyTo,
+  type ReplyQuote,
+  type ReplyTo
+} from '@/lib/reply-quote';
 import { parseSpawnBlocked } from '@/lib/spawn-blocked';
 import { SpawnBlockedNotice, SpawnBlockedPill } from './SpawnBlockedNotice';
 import {
@@ -429,7 +438,10 @@ export function ChatTurnFromMessage({
   msgIndex = 0,
   modelView = false,
   toolCallsById,
-  resolvedCallIds
+  resolvedCallIds,
+  quoteBot = null,
+  onQuote,
+  replyNames
 }: {
   m: ChatMessage;
   sessionId?: string;
@@ -437,9 +449,13 @@ export function ChatTurnFromMessage({
   modelView?: boolean;
   toolCallsById?: ReadonlyMap<string, ToolCallPart>;
   resolvedCallIds?: ReadonlySet<string>;
+  quoteBot?: { id: string; name: string } | null;
+  onQuote?: (quote: ReplyQuote) => void;
+  replyNames?: Readonly<Record<string, string>>;
 }) {
   const { t } = useI18n();
   const r = normalizedRole(m);
+  const storedReply = r === 'user' ? readStoredReplyTo(m) : null;
   /** 与流式行一致：助手侧（含「调用工具」等结构化气泡）统一不占左侧头像列 */
   const noAvatar = r === 'tool' || r === 'system' || r === 'assistant';
   if (
@@ -484,6 +500,18 @@ export function ChatTurnFromMessage({
       <div className="chat-turn__content">
         <div className="chat-turn__label">
           {roleLabel(r, t)}
+          {onQuote && quoteBot ? (
+            <BotReplyQuoteAction
+              reply={{
+                messageId: replyMessageId(m),
+                botId: quoteBot.id,
+                botName: quoteBot.name,
+                text: replySourceText(m.parts),
+                author: r === 'assistant' ? 'bot' : 'user'
+              }}
+              onQuote={onQuote}
+            />
+          ) : null}
           {isSteerMessage ? (
             <span className="chat-steer-tag" title={t('play.turns.steerTagTitle')}>
               {t('play.turns.steerTag')}
@@ -496,6 +524,9 @@ export function ChatTurnFromMessage({
           ) : null}
         </div>
         <div className={`chat-bubble${artifactBubble ? ' chat-bubble--artifact' : ''}`}>
+          {storedReply ? (
+            <MessageReplyQuote replyTo={storedReply} botName={replyAuthorName(storedReply, replyNames)} />
+          ) : null}
           {cronBubble}
           <ComposerMessageContext role={r} message={m} />
         </div>
@@ -509,13 +540,17 @@ export function ChatTurnPlain({
   text,
   labelOverride,
   extraClass = '',
-  contextLabels
+  contextLabels,
+  replyTo = null,
+  replyBotName
 }: {
   role: 'user' | 'assistant' | 'tool' | 'system' | 'stream';
   text: string;
   labelOverride?: string;
   extraClass?: string;
   contextLabels?: readonly ContextLabel[];
+  replyTo?: ReplyTo | null;
+  replyBotName?: string;
 }) {
   const { t } = useI18n();
   const stream = role === 'stream';
@@ -531,6 +566,7 @@ export function ChatTurnPlain({
       <div className="chat-turn__content">
         <div className="chat-turn__label">{label}</div>
         <div className="chat-bubble">
+          {role === 'user' ? <MessageReplyQuote replyTo={replyTo} botName={replyBotName} /> : null}
           {usePre ? (
             <pre className="chat-bubble__pre">{text}</pre>
           ) : (
