@@ -231,7 +231,7 @@ export interface PlayChatDeps {
 }
 
 function activeFollowMatches(follow: { sessionId: string; controller: AbortController; ready: Promise<void> } | null,
-  sessionId: string): follow is { sessionId: string; controller: AbortController; ready: Promise<void> } {
+  sessionId: string): boolean {
   return follow?.sessionId === sessionId && !follow.controller.signal.aborted;
 }
 
@@ -1559,8 +1559,8 @@ export function usePlayChat(deps: PlayChatDeps) {
     if (!canFollowSession(selectedSessionRef.current, sessionId)) return { ready: Promise.resolve(), cancel: () => undefined };
     if (activeFollowMatches(current, sessionId)) {
       return {
-        ready: current.ready,
-        cancel: () => current.controller.abort()
+        ready: current!.ready,
+        cancel: () => current!.controller.abort()
       };
     }
     current?.controller.abort();
