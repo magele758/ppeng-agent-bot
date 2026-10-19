@@ -299,21 +299,6 @@ async function runSessionKernelWithWriterScope(
     .filter((a) => a.sessionId === sessionId)
     .map((a) => a.id);
   const resumeDecision = decideInterruptResume({ session, pendingApprovalIds });
-  if (resumeDecision.action === 'yield_waiting') {
-    const parked = sessionParkedForApproval(host.store, session);
-    await options?.latch?.emit({
-      type: 'waiting_approval',
-      approvalIds: resumeDecision.interrupt.approvalIds,
-    });
-    return parked;
-  }
-  const resumeFromInterrupt: RunInterruptState | undefined =
-    resumeDecision.action === 'resume_tools' ? resumeDecision.interrupt : undefined;
-
-  const agent = host.store.getAgent(session.agentId);
-  if (!agent) {
-    throw new NotFoundError(`Agent not found: ${session.agentId}`);
-  }
 
   const existingController = host.sessionAbortControllers?.get(sessionId);
   const controller = existingController ?? new AbortController();
@@ -325,14 +310,27 @@ async function runSessionKernelWithWriterScope(
     if (!existingController && host.sessionAbortControllers?.get(sessionId) === controller) host.sessionAbortControllers.delete(sessionId);
     throw error;
   }
-  // Re-read after admission: another executor may have consumed the captured pause.
-  if (resumeFromInterrupt && !host.store.getSession(sid)?.metadata?.interrupt) {
-    host.store.releaseWriter(sid, writerRunId);
-    host.sessionAbortControllers?.delete(sessionId);
-    return host.store.getSession(sid) ?? session;
-  }
   const settle = async (): Promise<SessionRecord> => {
-    try { return await runSessionKernel(host, sessionId, { session, agent, controller, writerRunId, resumeFromInterrupt }, options); }
+    try {
+      // Admission may follow another executor completing or replacing this pause.
+      // Recompute from persisted state while writes are bound to our new claim.
+      const admittedSession = host.store.getSession(sid);
+      if (!admittedSession) throw new NotFoundError(`Session not found: ${sid}`);
+      const decision = decideInterruptResume({
+        session: admittedSession,
+        pendingApprovalIds: host.store.listApprovals({ status: 'pending' }).filter(a => a.sessionId === sid).map(a => a.id)
+      });
+      if (decision.action === 'yield_waiting') {
+        const parked = sessionParkedForApproval(host.store, admittedSession);
+        await options?.latch?.emit({ type: 'waiting_approval', approvalIds: decision.interrupt.approvalIds });
+        return parked;
+      }
+      if (resumeDecision.action !== 'none' && decision.action === 'none') return admittedSession;
+      const agent = host.store.getAgent(admittedSession.agentId);
+      if (!agent) throw new NotFoundError(`Agent not found: ${admittedSession.agentId}`);
+      const resumeFromInterrupt = decision.action === 'resume_tools' ? decision.interrupt : undefined;
+      return await runSessionKernel(host, sessionId, { session: admittedSession, agent, controller, writerRunId, resumeFromInterrupt }, options);
+    }
     finally {
       if (host.sessionAbortControllers?.get(sid) === controller) host.sessionAbortControllers.delete(sid);
       host.store.releaseWriter(sid, writerRunId);

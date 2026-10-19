@@ -40,6 +40,37 @@ test.describe('消息框拖入文件和文件夹', () => {
     }
   });
 
+  test('同批完成的并发拖放在三处输入框均保留全部文件 [AC:composer-drag-context#AC-1]', async ({ page }) => {
+    for (const surface of ['chat', 'bot', 'group'] as const) {
+      await openSurface(page, surface);
+      await composerInput(page, surface).fill(`parallel drops ${surface} ${stamp()}`);
+      await dropTarget(page, surface).evaluate((target) => {
+        const finish: Array<() => void> = [];
+        for (const name of ['parallel-a.txt', 'parallel-b.txt']) {
+          const entry = {
+            name, isFile: true, isDirectory: false,
+            file: (resolve: (file: unknown) => void) => finish.push(() => resolve({
+              name, size: 6,
+              slice: () => ({ arrayBuffer: async () => new TextEncoder().encode('phrase').buffer, text: async () => 'phrase' })
+            }))
+          };
+          const event = new DragEvent('drop', { bubbles: true, cancelable: true });
+          Object.defineProperty(event, 'dataTransfer', { value: { items: [{ kind: 'file', webkitGetAsEntry: () => entry }] } });
+          target.dispatchEvent(event);
+        }
+        if (finish.length !== 2) throw Error('Both reads must be pending before releasing the barrier');
+        finish.forEach(resolve => resolve());
+      });
+      await expect(contextChip(page, surface, 'file', 'parallel-a.txt')).toBeVisible();
+      await expect(contextChip(page, surface, 'file', 'parallel-b.txt')).toBeVisible();
+      const body = await sendAndFinish(page, surface);
+      expect(body.contextSources).toEqual([
+        { kind: 'file', name: 'parallel-a.txt', text: 'phrase' },
+        { kind: 'file', name: 'parallel-b.txt', text: 'phrase' }
+      ]);
+    }
+  });
+
   test('三处输入框拖入文件后草稿还在，可单独拿掉，发送不再包含该文件 [AC:composer-drag-context#AC-1]', async ({ page }) => {
     const token = stamp();
     for (const surface of ['chat', 'bot', 'group'] as const) {

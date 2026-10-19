@@ -26,14 +26,11 @@ import {
   contextLabelsOf,
   composerHasAttachments,
   contextSubmission,
-  limitContextSources,
   contextSourcesBody,
   contextSourcesForSend,
-  withContextIds,
   type ContextLabel,
-  type ContextSource,
-  type PendingContextSource
 } from '@/lib/composer-context';
+import { usePendingComposerContext } from './ComposerContext';
 import { playSendAckToneIfEnabled } from '@/lib/send-ack-feedback';
 import {
   parseSessionChrome,
@@ -259,7 +256,9 @@ export function usePlayChat(deps: PlayChatDeps) {
   const [playStatus, setPlayStatus] = useState<{ text: string; ok?: boolean; err?: boolean }>({ text: '' });
   const [optimisticUser, setOptimisticUser] = useState<string | null>(null);
   const [optimisticContext, setOptimisticContext] = useState<ContextLabel[]>([]);
-  const [pendingContext, setPendingContext] = useState<PendingContextSource[]>([]);
+  const { pendingContext, setPendingContext, addPendingContext } = usePendingComposerContext(() => {
+    setPlayStatus({ text: t('play.composer.contextTruncated') });
+  });
   const [streamOverlay, setStreamOverlay] = useState<{ segments: StreamSegment[] } | null>(null);
   const [waitTyping, setWaitTyping] = useState(false);
   const [playSending, setPlaySending] = useState(false);
@@ -339,13 +338,6 @@ export function usePlayChat(deps: PlayChatDeps) {
     setPendingImageAssetIds([]);
     setPendingAttachmentIds([]);
     setPendingContext([]);
-  };
-
-  const addPendingContext = (sources: ContextSource[]) => {
-    if (sources.length === 0) return;
-    const result = limitContextSources([...pendingContext, ...withContextIds(sources)]);
-    setPendingContext(result.sources);
-    if (result.truncated) setPlayStatus({ text: t('play.composer.contextTruncated') });
   };
 
   const removePendingContext = (id: string) => {
