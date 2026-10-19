@@ -133,7 +133,6 @@ export function ChatSection({ active }: { active: boolean }) {
           const data = (await api('/api/bot-work/default')) as { bot: BotInfo };
           if (!maySelect()) return;
           upsertBot(data.bot);
-          if (!maySelect()) return;
           await chat.selectBot(data.bot.id);
         } catch (e) {
           if (maySelect()) chat.setPlayStatus({ text: String(e), err: true });

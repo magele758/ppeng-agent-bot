@@ -161,3 +161,73 @@ test('create dialog keeps actions visible while content scrolls and backdrop dis
  await page.keyboard.press('Escape');
  await expect(dialog).toHaveCount(0);
 });
+
+test('pressing and cancelling a Bot row gesture preserves the current conversation [AC:bot-group-drag-only#AC-2]', async ({ page, request }) => {
+ const { bots } = await (await request.get('/api/bots')).json();
+ const [current, other] = bots.filter((bot: { hidden?: boolean }) => !bot.hidden);
+ expect(current).toBeTruthy(); expect(other).toBeTruthy();
+ await page.addInitScript(id => localStorage.setItem('lab.selectedBot', id), current.id);
+ await page.goto('/#/bot');
+ const title = page.locator('#playTitle');
+ await expect(title).toHaveText(current.name);
+ const row = page.locator(`#sessionListMini [data-bot-id="${other.id}"] .list-item--session`);
+ await expect(row).toHaveCount(1);
+ await row.scrollIntoViewIfNeeded();
+ const box = await row.boundingBox();
+ expect(box).not.toBeNull();
+ await page.mouse.move(box!.x + 12, box!.y + box!.height / 2);
+ await page.mouse.down();
+ try {
+  // Allow React to commit any pointer handler before checking the unchanged view.
+  await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => resolve())));
+  await expect(title).toHaveText(current.name);
+  await expect(row).not.toHaveClass(/\bselected\b/);
+  // Releasing outside the row cancels the click, as with a cancelled drag.
+  await page.mouse.move(1, 1, { steps: 5 });
+ } finally {
+  await page.mouse.up();
+ }
+ await expect(title).toHaveText(current.name);
+ await row.click();
+ await expect(title).toHaveText(other.name);
+});
+
+test('an explicit Bot click wins a delayed saved-default lookup [AC:bot-face-first-creation#AC-4]', async ({ page, request }) => {
+ const { bots } = await (await request.get('/api/bots')).json();
+ const [saved, chosen] = bots.filter((bot: { hidden?: boolean }) => !bot.hidden);
+ expect(saved).toBeTruthy(); expect(chosen).toBeTruthy();
+ let releaseLookup!: () => void;
+ const lookupGate = new Promise<void>(resolve => { releaseLookup = resolve; });
+ let lookupStarted!: () => void;
+ const lookupSeen = new Promise<void>(resolve => { lookupStarted = resolve; });
+ let savedOpens = 0;
+ page.on('request', req => {
+  if (new URL(req.url()).pathname === `/api/bots/${saved.id}/open`) savedOpens++;
+ });
+ await page.addInitScript(id => localStorage.setItem('lab.selectedBot', id), saved.id);
+ await page.route(`**/api/bots/${saved.id}`, async route => {
+  if (route.request().method() !== 'GET') return route.continue();
+  lookupStarted();
+  await lookupGate;
+  await route.fulfill({ json: { bot: saved } });
+ });
+ try {
+  await page.goto('/#/bot');
+  await lookupSeen;
+  const row = page.locator(`#sessionListMini [data-bot-id="${chosen.id}"] .list-item--session`);
+  await expect(row).toHaveCount(1);
+  await row.click();
+  await expect(page.locator('#playTitle')).toHaveText(chosen.name);
+  const returned = page.waitForResponse(response => new URL(response.url()).pathname === `/api/bots/${saved.id}`);
+  releaseLookup();
+  const response = await returned;
+  await response.finished();
+  // The loader's promise continuation runs before the following rendered frame.
+  await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => resolve())));
+  await expect(page.locator('#playTitle')).toHaveText(chosen.name);
+  await expect(row).toHaveClass(/\bselected\b/);
+  expect(savedOpens).toBe(0);
+ } finally {
+  releaseLookup();
+ }
+});
