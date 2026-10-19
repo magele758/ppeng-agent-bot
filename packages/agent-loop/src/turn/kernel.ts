@@ -1345,6 +1345,13 @@ async function runSessionKernel(
           await host.waitSteeringChildrenIdle(sid);
         }
 
+        // A steer that arrived during this shot must enter before the run closes.
+        // Otherwise it sits until a later run, which is the queue/next-run behavior.
+        const steeredNow = claimAndApplyInbox(host.store, sid, 'next-step', {
+          expectedWriterRunId: writerRunId,
+        });
+        if (steeredNow.length > 0) continue;
+
         host.onSessionOutcome?.({
           sessionId: session.id,
           agentId: agent.id,

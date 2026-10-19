@@ -102,6 +102,7 @@ export function PlayBotGroupList({
             role="button"
             tabIndex={0}
             data-testid="play-group-row"
+            draggable={false}
             aria-current={selected ? 'true' : undefined}
             aria-label={t('play.group.openAria', { title: room.title })}
             onClick={() => onOpen(room.id)}

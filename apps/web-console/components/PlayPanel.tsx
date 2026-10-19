@@ -35,10 +35,11 @@ import { groupSessionsByDate } from '@/lib/session-groups';
 import { WorkspacePicker } from './WorkspacePicker';
 import { catalogToPickerOptions } from '@/lib/model-providers';
 import { useBotWorkMood } from './bot-work/BotWorkState';
-import { botChatHeaderTitle, botNameFromCanonicalTitle, botPermissionsHref } from '@/lib/bot-chat-header';
+import { botChatHeaderTitle, botNameFromCanonicalTitle } from '@/lib/bot-chat-header';
 import { BotFace } from './BotFace';
 import { resolveLivingFaceMood } from '@/lib/bot-face';
 import { ComposerBotPicker } from './ComposerBotPicker';
+import { shouldOpenSessionSettingsOnInboxGrowth } from '@/lib/running-turn-send';
 import { ComposerContextChips, useComposerFileDrop } from './ComposerContext';
 import { composerClassName, composerSendDisabled } from '@/lib/composer-context';
 import { ComposerModelPicker } from './ComposerModelPicker';
@@ -47,6 +48,8 @@ import { PlayBotGroupChat } from './play-group/PlayBotGroupChat';
 import { PlayBotGroupList } from './play-group/PlayBotGroupList';
 import { SessionListRow } from './SessionListRow';
 import { BotFunctionalGroups } from './BotFunctionalGroups';
+import { BotPinArea } from './BotPinArea';
+import { BotPermissionsLink, BotDetailPane, BotDetailToggle, botDetailIsVisible, botDetailMainClass } from './BotDetailMenu';
 import { useBotSessionQuestions } from './useBotSessionQuestions';
 import { BotEntryDialog } from './BotEntryDialog';
 import { BotCreateForm } from './sections/agents/BotCreateForm';
@@ -291,6 +294,7 @@ export function PlayPanel({
   const configPanelRef = useRef<HTMLDivElement>(null);
   const prevSteerCountRef = useRef(0);
   const [railTab, setRailTab] = useState<'activity' | 'context' | 'artifacts' | 'cron' | 'trajectory'>('activity');
+  const [botDetailOpen, setBotDetailOpen] = useState(false);
   const flatAgents = sortAgentsById(agents);
   const supportAgents = useMemo(() => supportAgentsOf(flatAgents), [flatAgents]);
   const supportByDomain = useMemo(() => groupAgentsByDomain(supportAgents), [supportAgents]);
@@ -418,6 +422,7 @@ export function PlayPanel({
     sessionTitle: chat.playTitle
   });
   const headerBotId = headerBotChat ? chat.botId || selectedBot?.id || '' : '';
+  const botDetailVisible = botDetailIsVisible(botDetailOpen, headerBotId, openGroupId);
   const headerWorkMood = useBotWorkMood(headerBotId);
   const pickerWorkMood = useBotWorkMood(chat.botId);
   const headerFaceMood = resolveLivingFaceMood({live:headerWorkMood!=='idle',segments:chat.streamOverlay?.segments});
@@ -553,11 +558,17 @@ export function PlayPanel({
   }, [selectedSessionId, statsLive, chat.sessionMessages.length]);
   useEffect(() => {
     const n = chat.steerInbox.length;
-    if (n > prevSteerCountRef.current) {
+    if (
+      shouldOpenSessionSettingsOnInboxGrowth({
+        previousCount: prevSteerCountRef.current,
+        nextCount: n,
+        immediateSteer
+      })
+    ) {
       setConfigOpen(true);
     }
     prevSteerCountRef.current = n;
-  }, [chat.steerInbox.length]);
+  }, [chat.steerInbox.length, immediateSteer]);
   const feedHasTurns =
     chat.sessionMessages.length > 0 ||
     Boolean(chat.optimisticUser) ||
@@ -819,6 +830,16 @@ export function PlayPanel({
           ) : null}
           </div>
           <div className="list-scroll play-sidebar__list" id="sessionListMini">
+              <BotPinArea
+                active={botSurface}
+                bots={botRoster}
+                sessions={sessions}
+                renderSession={renderSession}
+                onOpenSession={(sessionId) => {
+                  setOpenGroupId(null);
+                  onSelectSession(sessionId);
+                }}
+              />
             {botSurface ? (
               <PlayBotGroupList
                 bots={botRoster}
@@ -846,7 +867,7 @@ export function PlayPanel({
           </div>
         </aside>
 
-        <div className="play-main-col">
+        <div className={botDetailMainClass(botDetailVisible)}>
           {botSurface && openGroupId ? <PlayBotGroupChat key={openGroupId} roomId={openGroupId} bots={botRoster} /> : null}
           <div className="play-main chat-panel" hidden={botSurface && openGroupId != null}>
             <header className={`chat-panel-header${headerBotName ? ' chat-panel-header--bot' : ''}`}>
@@ -864,16 +885,8 @@ export function PlayPanel({
                   <h2 className="chat-panel-title" id="playTitle">
                     {headerTitle}
                   </h2>
-                  {headerBotId ? (
-                    <a
-                      className="chat-panel-header__permissions"
-                      href={botPermissionsHref(headerBotId)}
-                      data-testid="chat-header-permissions"
-                      aria-label={t('play.header.permissionsAria', { name: headerBotName || headerTitle })}
-                    >
-                      {t('play.header.permissions')}
-                    </a>
-                  ) : null}
+                  <BotPermissionsLink botId={headerBotId} botName={headerBotName || headerTitle} />
+                  <BotDetailToggle botId={headerBotId} open={botDetailOpen} onToggle={() => setBotDetailOpen(open => !open)} />
                 </div>
                 {selectedSessionId ? (
                   <div className="session-chrome" id="playMeta">
@@ -1289,6 +1302,7 @@ export function PlayPanel({
               </div>
             </div>
           </div>
+          <BotDetailPane visible={botDetailVisible} botId={headerBotId} botName={headerBotName} agentId={selectedBot?.agentId} />
         </div>
 
         <aside className="play-rail">

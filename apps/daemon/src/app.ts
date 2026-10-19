@@ -26,6 +26,7 @@ import { Router } from './routing.js';
 import { attachmentRoutes } from './routes/attachments.js';
 import { authRoutes } from './routes/auth.js';
 import { botsRoutes } from './routes/bots.js';
+import { botMaterialRoutes } from './routes/bot-materials.js';
 import { capabilitiesRoutes } from './routes/capabilities.js';
 import { compactRoutes } from './routes/compact.js';
 import { gatewaySettingsRoutes } from './routes/gateway-settings.js';
@@ -87,6 +88,7 @@ export function buildDaemonRouter(deps: DaemonAppDeps): Router {
     .addAll(miscRoutes(runtime, { pkgName: deps.pkgName, pkgVersion: deps.pkgVersion }))
     .addAll(sessionsRoutes(runtime))
     .addAll(botsRoutes(runtime))
+    .addAll(botMaterialRoutes(runtime))
     .addAll(botFunctionalGroupRoutes(runtime))
     .addAll(botWorkRoutes(runtime))
     .addAll(botRoomsRoutes(runtime))

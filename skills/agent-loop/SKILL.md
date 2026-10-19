@@ -27,6 +27,7 @@ SDK 提供 4 个组装档位（高档位包含所有低档位模块）：
 > 完整 26 个模块矩阵与 `AssembledLoopIo` 注入端口定义见 [modules-and-ports.md](references/modules-and-ports.md)。
 
 ### 开发者红线（Hard Constraints）
+- **结束前接收转向**：模型返回无工具的正常结束轮，在等待 steering 子任务结束后再次消费 `next-step` inbox；若有新输入，按原 writerRunId 写入并进入下一轮，而不提前调用完成回调。`next-run` 保留到下一次运行，既有轮数/取消/预算上限仍生效。
 - **Steer 附件上下文**：`EnqueueSteerOptions.contextParts?: TextPart[]` 接收宿主已规范化并加不可信内容围栏的附件文本及展示元数据；SQLite inbox 使用 `session_inbox.context_parts_json` 列，独立 `StepInboxStore` 在首次写入时兼容升级旧表，core 则通过版本迁移升级。显式开启 inbox overflow summarize 策略时，旧项按既有有损摘要策略保留用户文字及有界附件名称/正文摘录；总摘要仍限制 2400 字符，附件摘录在截断后加完整不可信内容围栏，重复折叠也保留信任边界。inbox 编辑只改用户文字，claim/apply 与 tool-launch drain 保留 contextParts，内存 store 同样支持；不得将未经验证的 HTTP parts 直接传入此端口。
 - **Mini 纯净性**：`src/mini.ts` 及其依赖链路中**绝对禁止引入任何 Node 内置模块**（`node:fs`、`node:sqlite`、`node:child_process`、`node:vm` 等）。所有 Node 重模块必须标记 `nodeOnly: true` 并使用动态 `import()` 加载。
 - **类型单一切实来源（SSOT）**：循环层的类型以 `src/types.ts` 为唯一真源，上层（如 `packages/core`）只做 re-export，禁止重复声明导致类型分叉。
