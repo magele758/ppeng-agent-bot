@@ -1,14 +1,43 @@
 'use client';
 
-import { useEffect, useRef, useState, type DragEvent } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState, type DragEvent, type SetStateAction } from 'react';
 import { useI18n } from '@/lib/i18n';
 import {
   contextLabelsFromMessage,
   readDroppedContext,
+  limitContextSources,
+  withContextIds,
   type ContextLabel,
   type ContextSource,
   type PendingContextSource
 } from '@/lib/composer-context';
+
+type PendingState = { sources: PendingContextSource[]; truncations: number };
+type PendingAction = { kind: 'add'; sources: PendingContextSource[] }
+  | { kind: 'set'; update: SetStateAction<PendingContextSource[]> };
+
+function reducePendingContext(state: PendingState, action: PendingAction): PendingState {
+  if (action.kind === 'set') {
+    return { ...state, sources: typeof action.update === 'function' ? action.update(state.sources) : action.update };
+  }
+  const result = limitContextSources([...state.sources, ...action.sources]);
+  return { sources: result.sources, truncations: state.truncations + Number(result.truncated) };
+}
+
+/** Fold concurrent reads against the latest pending state; report truncation after commit. */
+export function usePendingComposerContext(onTruncated: () => void) {
+  const [state, dispatch] = useReducer(reducePendingContext, { sources: [], truncations: 0 });
+  const notice = useRef(onTruncated);
+  notice.current = onTruncated;
+  useEffect(() => {
+    if (state.truncations) notice.current();
+  }, [state.truncations]);
+  const setPendingContext = useCallback((update: SetStateAction<PendingContextSource[]>) => dispatch({ kind: 'set', update }), []);
+  const addPendingContext = useCallback((sources: ContextSource[]) => {
+    if (sources.length) dispatch({ kind: 'add', sources: withContextIds(sources) });
+  }, []);
+  return { pendingContext: state.sources, setPendingContext, addPendingContext };
+}
 
 export function useComposerFileDrop(onAdd: (sources: ContextSource[], truncated: boolean) => void, scope: string) {
   const scopeRef = useRef(scope);

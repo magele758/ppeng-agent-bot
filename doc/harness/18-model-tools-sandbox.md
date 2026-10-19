@@ -211,14 +211,16 @@ Tier 0 **不**限制文件系统/网络——那是 Tier 1。
 
 ### 6.2 Tier 1 — `SandboxManager`
 
-`packages/core/src/sandbox/os-sandbox.ts`；`bash` / `bg_run` 经此路由。
+`packages/core/src/sandbox/os-sandbox.ts`。`bash` / `bg_run` / `work_evidence` 每次调用都可以带 `isolation`：`os`（本机 seatbelt / bwrap）、`direct`（只做环境消毒，必须先审批，未批准不执行）、`remote`（已接通的远程电脑；没接通则本次不执行，不退回本机）。省略时用本机当前最强可用隔离，不需要人先设模式。`container` 未实现，传了也不会跑，更不会悄悄当成 direct。
 
-| `RAW_AGENT_SANDBOX_MODE` | 行为 |
+`RAW_AGENT_SANDBOX_MODE` 只给没传当次隔离的旧调用做回退，不是模型要用某种隔离的前提。
+
+| `RAW_AGENT_SANDBOX_MODE`（仅回退） | 行为 |
 |-------------------------|------|
 | `auto`（默认） | 有则用 macOS `sandbox-exec` 或 Linux `bwrap`；否则 Direct（仅 Tier 0） |
 | `os` | 强制尝试 OS 沙箱；不可用则仍降级 Direct |
 | `direct` | 仅 Tier 0 |
-| `container` | 预留 Tier 2（当前同 Direct） |
+| `container` | 预留 Tier 2（当前同 Direct；模型侧不可选） |
 
 **macOS seatbelt**：deny `~/.ssh`、`~/.aws`、`~/.gnupg`、`~/.kube`、`~/.docker` 读写；显式 allow workspace。未传 `allowNetwork: true` 时 `(deny network*)`。  
 **Linux bwrap**：namespace 隔离同类敏感路径；未传 `allowNetwork: true` 时 `--unshare-net`。  
