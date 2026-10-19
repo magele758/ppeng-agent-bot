@@ -35,7 +35,7 @@ import { groupSessionsByDate } from '@/lib/session-groups';
 import { WorkspacePicker } from './WorkspacePicker';
 import { catalogToPickerOptions } from '@/lib/model-providers';
 import { useBotWorkMood } from './bot-work/BotWorkState';
-import { botChatHeaderTitle, botNameFromCanonicalTitle, botPermissionsHref } from '@/lib/bot-chat-header';
+import { botChatHeaderTitle, botNameFromCanonicalTitle } from '@/lib/bot-chat-header';
 import { BotFace } from './BotFace';
 import { resolveLivingFaceMood } from '@/lib/bot-face';
 import { ComposerBotPicker } from './ComposerBotPicker';
@@ -49,7 +49,7 @@ import { PlayBotGroupList } from './play-group/PlayBotGroupList';
 import { SessionListRow } from './SessionListRow';
 import { BotFunctionalGroups } from './BotFunctionalGroups';
 import { BotPinArea } from './BotPinArea';
-import { BotDetailPane, BotDetailToggle, botDetailIsVisible, botDetailMainClass } from './BotDetailMenu';
+import { BotPermissionsLink, BotDetailPane, BotDetailToggle, botDetailIsVisible, botDetailMainClass } from './BotDetailMenu';
 import { useBotSessionQuestions } from './useBotSessionQuestions';
 import { BotEntryDialog } from './BotEntryDialog';
 import { BotCreateForm } from './sections/agents/BotCreateForm';
@@ -885,19 +885,8 @@ export function PlayPanel({
                   <h2 className="chat-panel-title" id="playTitle">
                     {headerTitle}
                   </h2>
+                  <BotPermissionsLink botId={headerBotId} botName={headerBotName || headerTitle} />
                   <BotDetailToggle botId={headerBotId} open={botDetailOpen} onToggle={() => setBotDetailOpen(open => !open)} />
-                  {headerBotId ? (
-                    <button
-                      type="button"
-                      className="chat-panel-header__detail"
-                      data-testid="bot-detail-toggle"
-                      aria-expanded={botDetailOpen}
-                      aria-controls="bot-detail-panel"
-                      onClick={() => setBotDetailOpen((open) => !open)}
-                    >
-                      {botDetailOpen ? t('play.botDetail.close') : t('play.botDetail.open')}
-                    </button>
-                  ) : null}
                 </div>
                 {selectedSessionId ? (
                   <div className="session-chrome" id="playMeta">
