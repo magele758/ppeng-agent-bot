@@ -389,3 +389,15 @@ test('bot tool and skill allowlists validate the catalog and can be cleared', as
   assert.deepEqual(cleared.body.bot.allowedSkills,[]);
   fx.store.db.close();
 });
+
+test('swarm start passes valid seed tasks only after checking ownership', async () => {
+  const starts=[];
+  const fx=fixture({startSwarmRun(id,tasks){starts.push({id,tasks});return {id,status:'running'};}});
+  const session={...fx.session,metadata:{userId:'alice',tenantId:'t'}};
+  const created=await call(fx,'lab_swarm_run_create',{goal:'build'},session);
+  const id=created.body.run.id;
+  const result=await call(fx,'lab_swarm_run_start',{runId:id,tasks:[null,{}, {title:'implement',description:'details',requiredRole:'worker',blockedBy:['prepare']}]},session);
+  assert.equal(result.ok,true);
+  assert.deepEqual(starts,[{id,tasks:[{title:'implement',description:'details',requiredRole:'worker',blockedBy:['prepare']}]}]);
+  fx.store.db.close();
+});
