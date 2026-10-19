@@ -13,6 +13,14 @@ export function factoryRoutes(runtime: RawAgentRuntime): RouteSpec[] {
     void runtime.factory.tick().catch(() => {});
   };
   return [
+    {method:"PATCH",pattern:"/api/factory/development/:machine/:repository",handler:async ctx=>json(ctx.response,200,{settings:runtime.factory.development.save(principal(ctx),ctx.requireParam("machine"),ctx.requireParam("repository"),await ctx.readBody())})},
+    {method:"POST",pattern:"/api/factory/development/:machine/:repository/preflight",handler:async ctx=>{const input=await ctx.readBody() as {baseline:string};json(ctx.response,200,await runtime.factory.development.preflight(principal(ctx),ctx.requireParam("machine"),ctx.requireParam("repository"),input.baseline));}},
+    {method:"POST",pattern:"/api/factory/development/tasks",handler:async ctx=>{const task=runtime.factory.development.submit(principal(ctx),await ctx.readBody());json(ctx.response,202,{task});wake();}},
+    {method:"GET",pattern:"/api/factory/development/decisions",handler:ctx=>json(ctx.response,200,{tasks:runtime.factory.development.decisions(principal(ctx))})},
+    {method:"GET",pattern:"/api/factory/development/tasks/:id",handler:ctx=>json(ctx.response,200,{task:runtime.factory.development.current(principal(ctx),ctx.requireParam("id"))})},
+    {method:"POST",pattern:"/api/factory/development/tasks/:id/control",handler:async ctx=>{const input=await ctx.readBody() as {action:string};json(ctx.response,200,{task:await runtime.factory.development.control(principal(ctx),ctx.requireParam("id"),input.action)});}},
+    {method:"POST",pattern:"/api/factory/development/tasks/:id/decision",handler:async ctx=>{const task=runtime.factory.development.decide(principal(ctx),ctx.requireParam("id"),await ctx.readBody());json(ctx.response,202,{task});wake();}},
+    {method:"GET",pattern:"/api/factory/development/:machine/:repository",handler:ctx=>json(ctx.response,200,{settings:runtime.factory.development.settings(principal(ctx),ctx.requireParam("machine"),ctx.requireParam("repository"))})},
     {
       method: "GET",
       pattern: "/api/factory/settings",

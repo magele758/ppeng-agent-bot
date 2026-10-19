@@ -1,3 +1,6 @@
+import { FactoryDevelopment } from "./development.js";
+import { verifyReady, mergeDevelopmentIssueLedger } from "./development-evidence.js";
+import type { DevelopmentSpec, DevelopmentPolicy } from "./development-types.js";
 import { redactFactoryOutput } from "./redaction.js";
 import { createHash, randomUUID } from "node:crypto";
 import {
@@ -66,6 +69,7 @@ function path(v: unknown): string {
   return s;
 }
 export class FactoryService {
+  readonly development: FactoryDevelopment;
   private readonly pending = new Set<Promise<unknown>>();
   private ticking = false;
   private tickPromise?: Promise<void>;
@@ -75,6 +79,7 @@ export class FactoryService {
     private transport: FactoryTransport = new SshFactoryTransport(),
     private clock: () => number = Date.now,
   ) {
+    this.development = new FactoryDevelopment(host.store, this);
     host.store.db
       .exec(`CREATE TABLE IF NOT EXISTS factory_tasks(id TEXT PRIMARY KEY,principal TEXT NOT NULL,machine_id TEXT NOT NULL,status TEXT NOT NULL,idem TEXT NOT NULL,data TEXT NOT NULL,UNIQUE(principal,idem));
    CREATE TABLE IF NOT EXISTS factory_outbox(key TEXT PRIMARY KEY,principal TEXT NOT NULL,room_id TEXT NOT NULL,bot_id TEXT NOT NULL,body TEXT NOT NULL,sent INTEGER NOT NULL DEFAULT 0);`);
@@ -284,8 +289,8 @@ export class FactoryService {
   }
   private write(t: FactoryTask) {
     this.host.store.db
-      .prepare("UPDATE factory_tasks SET status=?,data=? WHERE id=?")
-      .run(t.status, JSON.stringify(t), t.id);
+      .prepare("UPDATE factory_tasks SET status=?,data=?,machine_id=? WHERE id=?")
+      .run(t.status, JSON.stringify(t), t.machineId, t.id);
   }
   submit(p: BotPrincipal, input: unknown): FactoryTask {
     if (!isObj(input)) throw new ValidationError("Invalid task");
@@ -367,6 +372,24 @@ export class FactoryService {
       return task;
     });
   }
+  enqueueDevelopment(p: BotPrincipal, input: Record<string, unknown>, spec: DevelopmentSpec): FactoryTask {
+    return this.tx(() => {
+      const old = this.list(p).find(t => t.requestKey === input.requestKey);
+      if (old) { if (!old.development) throw new ConflictError("Request already used for readonly work"); if(old.machineId!==input.machineId || old.repositoryId!==input.repositoryId || old.development.requirement!==spec.requirement || old.development.baseline!==spec.baseline || JSON.stringify(old.development.dependency)!==JSON.stringify(spec.dependency)) throw new ConflictError("Request key already used for a different development request"); return old; }
+      const t = this.submit(p, {...input, operation: "snapshot", timeoutMs: 120000});
+      t.operation = "develop"; t.timeoutMs = spec.policy.timeoutMs; t.development = spec;
+      this.write(t); return t;
+    });
+  }
+  updateDevelopment(t: FactoryTask) { t.updatedAt = this.now(); t.history.push({status:t.status,at:t.updatedAt}); this.write(t); }
+  developmentPreflight(m: FactoryMachine, policy: DevelopmentPolicy, baseline: string) {
+    if (!this.transport.preflight) return Promise.resolve({ready:false, checks:[{id:"isolation",ok:false,detail:"Development runtime unavailable"}]});
+    return this.transport.preflight(m, policy, baseline);
+  }
+  developmentStop(t: FactoryTask, action: string) {
+    if (!this.transport.stop) return Promise.resolve({status:"unknown" as const,seq:t.seq+1,finished:false,error:"Stop cannot be verified",result:{development:{generation:t.development!.generation,stage:t.development!.stage,round:t.development!.round}}});
+    return this.transport.stop(t.machine,t,action);
+  }
   fromRoom(
     p: BotPrincipal,
     roomId: string,
@@ -379,6 +402,11 @@ export class FactoryService {
       throw new AuthorizationError("Room is not configured for factory");
     const room = this.host.rooms.get(p, roomId);
     const parts = message.trim().split(/\s+/);
+    if (parts[1] === "develop") {
+      if (room.status !== "active") throw new ConflictError("Room is paused");
+      let input; try { input=JSON.parse(message.trim().slice("/factory develop ".length)); } catch { throw new ValidationError("Use /factory develop followed by a task JSON object"); }
+      return this.development.submit(p,{...input,roomId,requestKey:"room:"+createHash("sha256").update(JSON.stringify([roomId,requestKey])).digest("hex")});
+    }
     if (parts[1] === "status" && parts.length === 3)
       return this.get(p, parts[2]!);
     if (parts[1] !== "run" || parts.length < 5 || parts.length > 6)
@@ -406,7 +434,7 @@ export class FactoryService {
         createHash("sha256")
           .update(JSON.stringify([botPrincipalKey(t.principal), t.id, key]))
           .digest("hex"),
-      `[factory] ${t.id} ${t.machineId} ${t.status}\n${JSON.stringify({ updatedAt: t.updatedAt, result: t.result, error: t.error })}`,
+      t.development ? this.developmentMessage(t) : `[factory] ${t.id} ${t.machineId} ${t.status}\n${JSON.stringify({ updatedAt: t.updatedAt, result: t.result, error: t.error })}`,
     );
     this.flushOutbox();
   }
@@ -433,7 +461,7 @@ export class FactoryService {
   private claim(id: string): FactoryTask | undefined {
     return this.tx(() => {
       const t = this.raw(id);
-      if (t.status !== "queued") return;
+      if (t.status !== "queued" || !this.development.readyToClaim(t)) return;
       const m = this.machine(t.principal, t.machineId);
       if (!m.online || m.capacity === 0) return;
       const hosts = this.configs()
@@ -456,60 +484,125 @@ export class FactoryService {
       return t;
     });
   }
-  acceptReport(id: string, r: FactoryReport) {
-    r = redactFactoryOutput(r);
+  acceptReport(id: string, report: FactoryReport) {
     if (this.closed || !this.host.store.db.isOpen) return;
     this.tx(() => {
-      const t = this.raw(id);
-      if (
-        TERMINAL.has(t.status) ||
-        !Number.isSafeInteger(r.seq) ||
-        r.seq < t.seq ||
-        (r.seq === t.seq && r.status === t.status)
-      )
-        return;
-      if (r.identity && t.identity && r.identity !== t.identity) {
-        r = {
-          status: "unknown",
-          seq: r.seq,
-          error: "Machine identity changed; verify execution",
-          finished: false,
-        };
-      }
-      if (TERMINAL.has(r.status) && !r.finished)
-        r = { ...r, status: "unknown" };
-      if (!["running", "unknown", ...TERMINAL].includes(r.status)) return;
-      const before = t.status;
-      t.status = r.status;
-      t.seq = r.seq;
-      t.lastCheckedAt = this.now();
-      t.error = r.error;
-      t.result = r.result ?? t.result;
-      t.identity = r.identity ?? t.identity;
-      // A poll is not progress: unchanged reports do not refresh progress timestamps.
-      if (before !== t.status || r.result) {
-        t.updatedAt = this.now();
-        if (before !== t.status)
-          t.history.push({ status: t.status, at: t.updatedAt });
-      }
-      if (TERMINAL.has(t.status)) t.finishedAt = this.now();
-      this.write(t);
-      if (
-        before !== t.status &&
-        (TERMINAL.has(t.status) || t.status === "unknown")
-      )
-        this.outbox(
-          t,
-          "result:" + t.id + ":" + t.status,
-          `[factory] ${t.id} ${t.machineId} ${t.status}\n${JSON.stringify(t.result ?? {})}${t.error ? "\n" + t.error : ""}`,
-        );
+      const task = this.raw(id);
+      if (!this.reportIsNew(task, report)) return;
+      let accepted = this.normalizeReport(task, redactFactoryOutput(report));
+      if (!accepted) return;
+      if (task.development) accepted = this.developmentReport(task, accepted);
+      if (!accepted) return;
+      this.persistReport(task, accepted);
     });
   }
-  private unknown(id: string) {
+  private reportIsNew(task: FactoryTask, report: FactoryReport): boolean {
+    if (TERMINAL.has(task.status) || !Number.isSafeInteger(report.seq)) return false;
+    const development = report.result?.development as any;
+    if (task.development && development && development.generation !== task.development.generation) return false;
+    if (report.seq < task.seq) return false;
+    if (report.seq !== task.seq) return true;
+    return !task.development && report.status !== task.status;
+  }
+  private normalizeReport(task: FactoryTask, report: FactoryReport): FactoryReport | undefined {
+    if (report.identity && task.identity && report.identity !== task.identity) {
+      return {status:"unknown",seq:report.seq,error:"Machine identity changed; verify execution",finished:false};
+    }
+    if (TERMINAL.has(report.status) && !report.finished) report = {...report,status:"unknown"};
+    return ["running", "unknown", ...TERMINAL].includes(report.status) ? report : undefined;
+  }
+  private developmentProgressValid(task: FactoryTask, data: any): boolean {
+    const development = task.development!;
+    if (data.generation !== development.generation) return false;
+    if (data.round !== undefined) {
+      if (!Number.isSafeInteger(data.round)) return false;
+      if (data.round < development.round || data.round > development.policy.maxRounds) return false;
+    }
+    return ["QUEUED","WAITING_DEPENDENCY","START","RED","DEV","TEST","REVIEW","FIX","READY","WAITING_DECISION","PAUSED","DEFERRED","FAILED","CANCELLED","TIMED_OUT","VERIFYING"].includes(data.stage);
+  }
+  private failedReady(report: FactoryReport, message: string): FactoryReport {
+    return {...report,status:"failed",error:message,result:{...report.result,development:{...(report.result?.development as any),stage:"FAILED"}}};
+  }
+  private developmentReport(task: FactoryTask, report: FactoryReport): FactoryReport | undefined {
+    const data = report.result?.development as any;
+    if (!data) return report.status === "unknown" ? report : undefined;
+    if (!this.developmentProgressValid(task, data)) return;
+    try {
+      const carry={issueLedger:task.development!.reviewCarry?.issues??[]};
+      const prior=mergeDevelopmentIssueLedger(carry,task.result?.development??{});
+      data.issueLedger=mergeDevelopmentIssueLedger({issueLedger:prior},data);
+      if(data.review)data.review={...data.review,issues:data.issueLedger};
+      report={...report,result:{...report.result,development:data}};
+    } catch { return; }
+    if (data.stage === "READY" && report.status !== "succeeded") report=this.failedReady(report,"READY requires successful completed execution");
+    if (report.status === "succeeded") report=this.verifyReadyReport(task,report);
+    const current=report.result?.development as any;
+    task.development!.stage=current.stage;
+    task.development!.round=current.round ?? task.development!.round;
+    return report;
+  }
+  private verifyReadyReport(task: FactoryTask, report: FactoryReport): FactoryReport {
+    try {
+      if (task.development!.reviewCarry?.evidenceRecoveryRequired) throw new Error("Prior review evidence recovery required");
+      if (!this.development.current(task.principal,task.id).evidenceCurrent) throw new Error("Development strategy changed");
+      const data=report.result?.development as any;
+      verifyReady(task.development!.policy,data);
+      if (data.manifest.baseline !== task.development!.baseline) throw new Error("Workspace baseline mismatch");
+      return report;
+    } catch(error) {
+      return this.failedReady(report,"READY evidence rejected: "+String(error));
+    }
+  }
+  private persistReport(task: FactoryTask, report: FactoryReport) {
+    const before=task.status;
+    task.status=report.status;task.seq=report.seq;task.lastCheckedAt=this.now();
+    task.error=report.error;task.result=report.result ?? task.result;task.identity=report.identity ?? task.identity;
+    // A poll is not progress: unchanged reports do not refresh progress timestamps.
+    if(before!==task.status || report.result){
+      task.updatedAt=this.now();
+      if(before!==task.status)task.history.push({status:task.status,at:task.updatedAt});
+    }
+    if(TERMINAL.has(task.status))task.finishedAt=this.now();
+    this.write(task);
+    if(before!==task.status)this.notifyReport(task);
+  }
+  private notifyReport(task: FactoryTask) {
+    if (!TERMINAL.has(task.status) && task.status!=="unknown") return;
+    if (!this.shouldNotifyResult(task)) return;
+    const suffix=task.development ? ":"+task.development.generation+":"+task.development.stage : "";
+    this.outbox(task,"result:"+task.id+":"+task.status+suffix,
+      task.development ? this.developmentMessage(task) : `[factory] ${task.id} ${task.machineId} ${task.status}\n${JSON.stringify(task.result ?? {})}${task.error ? "\n"+task.error : ""}`);
+  }
+  private developmentMessage(task: FactoryTask): string {
+    const development=task.development!;const result=task.result?.development as any;
+    const summary={taskId:task.id,machineId:task.machineId,status:task.status,stage:development.stage,
+      round:development.round,baseline:development.baseline,sha:result?.sha??null,delivery:development.delivery,
+      nextAction:this.developmentNextAction(task),updatedAt:task.updatedAt,evidence:"Lab > Operations > Factory > "+task.id};
+    return `[factory] ${task.id} ${task.machineId} ${task.status}\n${JSON.stringify(summary)}`;
+  }
+  private developmentNextAction(task: FactoryTask): string {
+    if(task.status==="unknown")return "Verify remote execution before resuming or releasing capacity";
+    switch(task.development!.stage){
+      case "READY":return "Review local commit and evidence in Lab; not pushed";
+      case "WAITING_DECISION":return "Authorized user decision required in Lab";
+      case "PAUSED":return "Await explicit resume or cancellation";
+      case "WAITING_DEPENDENCY":return "Wait for verified dependency artifact";
+      case "CANCELLED":return "Execution cancelled; inspect retained evidence in Lab";
+      case "DEFERRED":case "FAILED":case "TIMED_OUT":return "Inspect retained evidence before authorizing continuation";
+      default:return "Monitor development stages and evidence in Lab";
+    }
+  }
+  private shouldNotifyResult(t: FactoryTask): boolean {
+    if (!t.development) return true;
+    const hour = (new Date(this.clock()).getUTCHours() + 8) % 24;
+    if (hour < 1 || hour >= 8) return true;
+    return t.status === "unknown" || ["WAITING_DECISION", "DEFERRED", "FAILED", "TIMED_OUT"].includes(t.development.stage);
+  }
+  private unknown(id: string, generation?: number) {
     if (this.closed || !this.host.store.db.isOpen) return;
     this.tx(() => {
       const t = this.raw(id);
-      if (TERMINAL.has(t.status)) return;
+      if (TERMINAL.has(t.status) || (generation !== undefined && t.development?.generation !== generation)) return;
       if (t.status !== "unknown") {
         t.status = "unknown";
         t.updatedAt = this.now();
@@ -518,12 +611,30 @@ export class FactoryService {
         this.write(t);
         this.outbox(
           t,
-          "result:" + t.id + ":unknown",
+          "result:" + t.id + ":unknown" + (t.development ? ":" + t.development.generation : ""),
           `[factory] ${t.id} ${t.machineId} unknown: execution needs verification`,
         );
       }
       this.machineState(t.principal, t.machineId, { online: false });
     });
+  }
+  private async prepareDependency(task: FactoryTask, machine: FactoryMachine) {
+    if (!task.development?.dependency) return true;
+    const source=this.development.dependencySource(task);
+    if(!source || !this.transport.prepareDependency) return false;
+    if(this.development.readyToClaim(task)) return true;
+    try {
+      const receipt=await this.transport.prepareDependency(machine,{...task,machine,identity:machine.identity},source);
+      if(this.closed) return false;
+      const current=this.raw(task.id);
+      if(current.status!=="queued" || current.development?.generation!==task.development.generation) return false;
+      if(receipt.sha!==current.development.dependency?.sha) throw Error("Dependency artifact commit mismatch");
+      current.development.dependencyPrepared={...receipt,generation:current.development.generation,identity:machine.identity!,sshAlias:machine.sshAlias};
+      current.development.stage="QUEUED";delete current.error;this.write(current);return true;
+    } catch {
+      if(!this.closed) {const current=this.raw(task.id);if(current.status==="queued" && current.development?.generation===task.development.generation){current.error="Dependency artifact unavailable; waiting for verified transfer";this.write(current);}}
+      return false;
+    }
   }
   private track(p: Promise<unknown>) {
     this.pending.add(p);
@@ -548,7 +659,7 @@ export class FactoryService {
           this.acceptReport(task.id, r);
           this.machineState(task.principal, task.machineId, { online: true });
         } catch {
-          this.unknown(task.id);
+          this.unknown(task.id,task.development?.generation);
         }
       }
       const checked = new Set<string>();
@@ -562,6 +673,7 @@ export class FactoryService {
             checked.add(key);
           }
           const current = this.machine(task.principal, task.machineId);
+          if (task.development && this.settings(task.principal).coordinatorBotId !== task.coordinatorBotId) throw new AuthorizationError("Coordinator changed before execution");
           if (
             !current.botIds.includes(task.botId) ||
             !current.repositories.some(
@@ -572,6 +684,8 @@ export class FactoryService {
             throw new AuthorizationError(
               "Task configuration is no longer authorized",
             );
+          if (!await this.prepareDependency(task,current)) continue;
+          if (this.closed) return;
           claimed = this.claim(task.id);
         } catch (error) {
           if (this.closed) return;
@@ -586,6 +700,7 @@ export class FactoryService {
             finished: true,
             error:
               "Machine configuration or permission changed before execution",
+            ...(task.development ? {result:{development:{generation:task.development.generation,stage:"FAILED",round:task.development.round}}} : {}),
           });
           continue;
         }
@@ -596,7 +711,7 @@ export class FactoryService {
               this.acceptReport(claimed.id, r);
             },
             () => {
-              if (!this.closed) this.unknown(claimed.id);
+              if (!this.closed) this.unknown(claimed.id,claimed.development?.generation);
             },
           ),
         );
@@ -644,7 +759,7 @@ export class FactoryService {
         JSON.stringify(t.principal),
         t.roomId,
         t.coordinatorBotId,
-        body.slice(0, 16000),
+        redactFactoryOutput(body).slice(0, 16000),
       );
   }
   flushOutbox() {
@@ -687,27 +802,14 @@ export class FactoryService {
       ) ?? { checks: {}, notified: {} }
     );
   }
-  async patrol(p: BotPrincipal) {
-    const tasks = this.list(p).filter((t) => !TERMINAL.has(t.status)),
-      state = this.patrolState(p),
-      cfg = this.settings(p);
-    const fingerprint = JSON.stringify(
-      tasks.map((t) => [t.id, t.status, t.updatedAt]),
-    );
-    const stale = tasks.filter(
-      (t) =>
-        ["running", "unknown"].includes(t.status) &&
-        this.clock() - Date.parse(t.updatedAt) > 3600000,
-    );
-    if (tasks.length && (state.fingerprint !== fingerprint || stale.length))
-      for (const t of stale) {
+  private async inspectPatrolTask(t: FactoryTask, state: PatrolState) {
         let signals;
         try {
           signals = await this.transport.inspect(t.machine, t);
         } catch {
           signals = { process: null, fresh: null, commit: null, cpu: null };
         }
-        if (this.closed) return state;
+        if (this.closed) return;
         const kind =
           signals.process === false && !signals.fresh
             ? "stuck"
@@ -724,6 +826,23 @@ export class FactoryService {
           );
           state.notified[key] = true;
         }
+  }
+  async patrol(p: BotPrincipal) {
+    const tasks = this.list(p).filter((t) => !TERMINAL.has(t.status)),
+      state = this.patrolState(p),
+      cfg = this.settings(p);
+    const fingerprint = JSON.stringify(
+      tasks.map((t) => [t.id, t.status, t.updatedAt]),
+    );
+    const stale = tasks.filter(
+      (t) =>
+        ["running", "unknown"].includes(t.status) &&
+        this.clock() - Date.parse(t.updatedAt) > 3600000,
+    );
+    if (tasks.length && (state.fingerprint !== fingerprint || stale.length))
+      for (const t of stale) {
+        await this.inspectPatrolTask(t,state);
+        if (this.closed) return state;
       }
     if (this.closed) return state;
     state.fingerprint = fingerprint;

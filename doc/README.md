@@ -52,6 +52,7 @@
 | [`JEV_INTEGRATION.md`](JEV_INTEGRATION.md) | Optional host integration; sagaGate helper only | Lab 配置、独立 profile、12 个切入点及接线状态、PTC noul/choice、回退与 Langfuse |
 | [`MEMORY_MULTIUSER.md`](MEMORY_MULTIUSER.md) | Implemented (agent backend) | 五层 `agent_memory`、HTTP `/api/memory`、对话回路经 bridge |
 | [`MULTI_MACHINE_READONLY_PILOT.md`](MULTI_MACHINE_READONLY_PILOT.md) | Read-only pilot | 群到任务、SSH 机器执行与容量、统一状态、巡检和真实双机试跑 |
+| [`MULTI_MACHINE_CONTROLLED_DEVELOPMENT.md`](MULTI_MACHINE_CONTROLLED_DEVELOPMENT.md) | Controlled development | 第二阶段独立授权、隔离开发、测试自审修复与本地READY证据 |
 | [`TEAMS_SWARM.md`](TEAMS_SWARM.md) | Pipeline MVP | `SwarmExecutor` + `/api/swarm/*` + Lab Ops 面板 |
 | [`AGENT_ORCHESTRATOR.md`](AGENT_ORCHESTRATOR.md) | Engine + CRUD | `OrchestrationEngine.tick`、Evolution 可选记账 |
 | [`PTC_DYNAMIC_WORKFLOW.md`](PTC_DYNAMIC_WORKFLOW.md) | Dynamic workflow | 模型生成 async JavaScript，通过 `ptc_exec` 编排 Agent 与只读工具 |
