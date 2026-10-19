@@ -40,6 +40,8 @@ import { BotFace } from './BotFace';
 import { resolveLivingFaceMood } from '@/lib/bot-face';
 import { ComposerBotPicker } from './ComposerBotPicker';
 import { shouldOpenSessionSettingsOnInboxGrowth } from '@/lib/running-turn-send';
+import { ComposerContextChips, useComposerFileDrop } from './ComposerContext';
+import { composerClassName, composerSendDisabled } from '@/lib/composer-context';
 import { ComposerModelPicker } from './ComposerModelPicker';
 import { SessionSettingsPanel, type ExecPreset } from './sections/chat/SessionSettingsPanel';
 import { PlayBotGroupChat } from './play-group/PlayBotGroupChat';
@@ -47,7 +49,7 @@ import { PlayBotGroupList } from './play-group/PlayBotGroupList';
 import { SessionListRow } from './SessionListRow';
 import { BotFunctionalGroups } from './BotFunctionalGroups';
 import { BotPinArea } from './BotPinArea';
-import { BotDetailMenu } from './BotDetailMenu';
+import { BotDetailPane, BotDetailToggle, botDetailIsVisible, botDetailMainClass } from './BotDetailMenu';
 import { useBotSessionQuestions } from './useBotSessionQuestions';
 import { BotEntryDialog } from './BotEntryDialog';
 import { BotCreateForm } from './sections/agents/BotCreateForm';
@@ -262,6 +264,10 @@ export function PlayPanel({
   accountMenu
 }: PlayPanelProps) {
   const { t } = useI18n();
+  const contextDrop = useComposerFileDrop((sources, truncated) => {
+    chat.addPendingContext(sources);
+    if (truncated) chat.setPlayStatus({ text: t('play.composer.contextTruncated') });
+  }, `${playSurface}:${chat.botId}:${selectedSessionId}`);
   const [attachOpen, setAttachOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
@@ -416,7 +422,7 @@ export function PlayPanel({
     sessionTitle: chat.playTitle
   });
   const headerBotId = headerBotChat ? chat.botId || selectedBot?.id || '' : '';
-  const botDetailVisible = botDetailOpen && Boolean(headerBotId) && openGroupId == null;
+  const botDetailVisible = botDetailIsVisible(botDetailOpen, headerBotId, openGroupId);
   const headerWorkMood = useBotWorkMood(headerBotId);
   const pickerWorkMood = useBotWorkMood(chat.botId);
   const headerFaceMood = resolveLivingFaceMood({live:headerWorkMood!=='idle',segments:chat.streamOverlay?.segments});
@@ -824,8 +830,8 @@ export function PlayPanel({
           ) : null}
           </div>
           <div className="list-scroll play-sidebar__list" id="sessionListMini">
-            {botSurface ? (
               <BotPinArea
+                active={botSurface}
                 bots={botRoster}
                 sessions={sessions}
                 renderSession={renderSession}
@@ -834,7 +840,6 @@ export function PlayPanel({
                   onSelectSession(sessionId);
                 }}
               />
-            ) : null}
             {botSurface ? (
               <PlayBotGroupList
                 bots={botRoster}
@@ -862,7 +867,7 @@ export function PlayPanel({
           </div>
         </aside>
 
-        <div className={`play-main-col${botDetailVisible ? ' is-bot-detail-open' : ''}`}>
+        <div className={botDetailMainClass(botDetailVisible)}>
           {botSurface && openGroupId ? <PlayBotGroupChat key={openGroupId} roomId={openGroupId} bots={botRoster} /> : null}
           <div className="play-main chat-panel" hidden={botSurface && openGroupId != null}>
             <header className={`chat-panel-header${headerBotName ? ' chat-panel-header--bot' : ''}`}>
@@ -880,16 +885,7 @@ export function PlayPanel({
                   <h2 className="chat-panel-title" id="playTitle">
                     {headerTitle}
                   </h2>
-                  {headerBotId ? (
-                    <a
-                      className="chat-panel-header__permissions"
-                      href={botPermissionsHref(headerBotId)}
-                      data-testid="chat-header-permissions"
-                      aria-label={t('play.header.permissionsAria', { name: headerBotName || headerTitle })}
-                    >
-                      {t('play.header.permissions')}
-                    </a>
-                  ) : null}
+                  <BotDetailToggle botId={headerBotId} open={botDetailOpen} onToggle={() => setBotDetailOpen(open => !open)} />
                   {headerBotId ? (
                     <button
                       type="button"
@@ -1053,7 +1049,16 @@ export function PlayPanel({
                 <label className="sr-only" htmlFor="playInput">
                   {t('play.messageContent')}
                 </label>
-                <div className={`chat-composer${chat.composerAckFlash ? ' chat-composer--ack-flash' : ''}`}>
+                <div
+                  className={composerClassName('chat-composer', contextDrop.over, chat.composerAckFlash)}
+                  data-testid="composer-drop-target"
+                  data-surface={botSurface ? 'bot' : 'chat'}
+                  onDragEnter={contextDrop.onDragEnter}
+                  onDragOver={contextDrop.onDragOver}
+                  onDragLeave={contextDrop.onDragLeave}
+                  onDrop={contextDrop.onDrop}
+                >
+                  <ComposerContextChips items={chat.pendingContext} onRemove={chat.removePendingContext} />
                   <textarea
                     ref={chat.playInputRef}
                     id="playInput"
@@ -1120,15 +1125,7 @@ export function PlayPanel({
                               : t('play.composer.queueHint')
                           : t('play.send')
                     }
-                    disabled={
-                      chat.workspaceAvailability.blocked
-                        ? true
-                        : steerDisabled
-                          ? true
-                          : chatRunning
-                            ? chat.playInput.trim().length === 0
-                            : false
-                    }
+                    disabled={composerSendDisabled(chat.workspaceAvailability.blocked, steerDisabled, chatRunning, chat.playInput, chat.pendingContext)}
                     onClick={() => void chat.sendPlayMessage()}
                   >
                     {chat.playSending || Boolean(chat.streamOverlay) || chat.waitTyping ? (
@@ -1316,14 +1313,7 @@ export function PlayPanel({
               </div>
             </div>
           </div>
-          {botDetailVisible ? (
-            <BotDetailMenu
-              key={headerBotId}
-              botId={headerBotId}
-              botName={headerBotName || headerBotId}
-              agentId={selectedBot?.agentId || headerBotId}
-            />
-          ) : null}
+          <BotDetailPane visible={botDetailVisible} botId={headerBotId} botName={headerBotName} agentId={selectedBot?.agentId} />
         </div>
 
         <aside className="play-rail">

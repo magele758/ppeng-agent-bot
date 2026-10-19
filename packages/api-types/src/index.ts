@@ -1,5 +1,9 @@
 export type {
   MessageRole,
+  ContextFileSource,
+  ContextFolderEntry,
+  ContextFolderSource,
+  ContextSource,
   TextPart,
   ReasoningPart,
   ImageRetentionTier,

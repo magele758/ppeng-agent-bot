@@ -122,7 +122,9 @@ export class SqliteStateStore {
     this.approvals = new ApprovalStore(this.db);
     this.jobs = new BackgroundJobStore(this.db);
     this.misc = new MiscStore(this.db);
-    this.sessions = new SessionStore(this.db);
+    this.sessions = new SessionStore(this.db, dbPath);
+    const closeDb = this.db.close.bind(this.db);
+    this.db.close = () => { this.sessions.releaseWriterLocks(); closeDb(); };
     this.inbox = new StepInboxStore(this.db);
     this.imageAssets = new ImageAssetStore(this.db);
     this.attachments = new AttachmentStore(this.db);
@@ -483,6 +485,14 @@ export class SqliteStateStore {
     return this.contextSnapshots.list(sessionId);
   }
 
+  getLocalWriterId(sessionId: string): string | undefined { return this.sessions.getLocalWriterId(sessionId); }
+  runWithWriter<T>(sessionId: string, runId: string, fn: () => Promise<T>): Promise<T> { return this.sessions.runWithWriter(sessionId, runId, fn); }
+  runWithoutWriterScope<T>(fn: () => T): T { return this.sessions.runWithoutWriterScope(fn); }
+  isWriterCurrent(sessionId: string, runId: string): boolean { return this.sessions.isWriterCurrent(sessionId, runId); }
+  assertCurrentWriter(sessionId: string): void { this.sessions.assertCurrentWriter(sessionId); }
+  isSessionWriterLive(sessionId: string): boolean { return this.sessions.isSessionWriterLive(sessionId); }
+  transaction<T>(fn: () => T): T { return this.sessions.transaction(fn); }
+
   claimWriter(sessionId: string, runId: string): void {
     this.sessions.claimWriter(sessionId, runId);
     this.bumpVersion();
@@ -583,15 +593,21 @@ export class SqliteStateStore {
   }
 
   enqueueSteer(sessionId: string, text: string, opts?: EnqueueSteerOptions): InboxItem {
+    return this.transaction(() => {
+    this.assertCurrentWriter(sessionId);
     const r = this.inbox.enqueue(sessionId, text, opts);
     this.bumpVersion();
     return r;
+    });
   }
 
   claimInbox(sessionId: string, target: 'next-step' | 'next-run'): InboxItem[] {
+    return this.transaction(() => {
+    this.assertCurrentWriter(sessionId);
     const r = this.inbox.claim(sessionId, target);
     if (r.length > 0) this.bumpVersion();
     return r;
+    });
   }
 
   listUnclaimedInbox(sessionId: string): InboxItem[] {
@@ -693,9 +709,13 @@ export class SqliteStateStore {
   }
 
   updateTask(taskId: string, patch: Partial<Omit<TaskRecord, 'id' | 'createdAt'>>): TaskRecord {
+    return this.transaction(() => {
+    const sessionId = this.tasks.getTask(taskId)?.sessionId;
+    if (sessionId) this.assertCurrentWriter(sessionId);
     const r = this.tasks.updateTask(taskId, patch);
     this.bumpVersion();
     return r;
+    });
   }
 
   appendEvent(input: Omit<TaskEvent, 'id' | 'createdAt'> & { createdAt?: string }): TaskEvent {
@@ -711,6 +731,8 @@ export class SqliteStateStore {
   createApproval(
     input: Omit<ApprovalRecord, 'id' | 'status' | 'createdAt' | 'updatedAt'> & { idempotencyKey?: string }
   ): ApprovalRecord {
+    return this.transaction(() => {
+    this.assertCurrentWriter(input.sessionId);
     const session = this.getSession(input.sessionId);
     const deadline = unattendedApprovalDeadline(readApprovalWake(session?.metadata));
     const r = this.approvals.createApproval({
@@ -720,6 +742,7 @@ export class SqliteStateStore {
     });
     this.bumpVersion();
     return r;
+    });
   }
 
   listApprovals(filter?: { status?: ApprovalStatus }): ApprovalRecord[] {

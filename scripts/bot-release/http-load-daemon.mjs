@@ -55,7 +55,11 @@ const original=fixture.runtime.sendUserMessage.bind(fixture.runtime);fixture.run
 // Bind the oracle to the durable triggering message at the true execution entry.
 // Later tool messages, approval continuations and arriving notifications cannot change this run's operation.
 const originalRun=fixture.runtime.runSession.bind(fixture.runtime);fixture.runtime.runSession=(sid,...args)=>{
- if(!fixture.runtime.isSessionRunning(sid)){const latest=[...store.listHistory(sid,{limit:50}).messages].reverse().find(message=>message.role==='user');const durableKind=latest?store.db.prepare('SELECT kind FROM bot_work_messages WHERE message_ref=?').get(latest.id)?.kind:undefined;contexts.set(sid,{operation:controlledOperation(latest?[latest]:[],durableKind),durableKind,messageId:latest?.id});}
+ // A resumed approval receives a new writer generation, but still belongs to
+ // the captured triggering operation. The latest user row is its approval
+ // continuation, not a new benchmark request.
+ const resuming=Boolean(store.getSession(sid)?.metadata?.interrupt)&&contexts.has(sid);
+ if(!fixture.runtime.isSessionRunning(sid)&&!resuming){const latest=[...store.listHistory(sid,{limit:50}).messages].reverse().find(message=>message.role==='user');const durableKind=latest?store.db.prepare('SELECT kind FROM bot_work_messages WHERE message_ref=?').get(latest.id)?.kind:undefined;contexts.set(sid,{operation:controlledOperation(latest?[latest]:[],durableKind),durableKind,messageId:latest?.id});}
  return originalRun(sid,...args);
 };
 // Match daemon's normal 1500ms, nonoverlapping scheduler interval, rather than accelerating it for the benchmark.

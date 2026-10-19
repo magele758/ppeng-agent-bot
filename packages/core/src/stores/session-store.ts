@@ -1,3 +1,7 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { createHash } from 'node:crypto';
+import { dirname, join } from 'node:path';
+import { tryAcquireFdLock, type HeldFdLock } from '../teams/fd-lock.js';
 import type { HistoryOptions, HistoryPage, HistoryContext } from '../session/history/types.js';
 import { DatabaseSync } from 'node:sqlite';
 import { captureTaskContext, taskContextTodos } from '../session/task-context.js';
@@ -14,7 +18,7 @@ import {
   type SurfaceNode,
   type SurfaceOp
 } from '../session/surface-invariants.js';
-import { assertWriterClaim } from '../session/writer-claim.js';
+import { assertWriterClaim, WriterClaimError } from '../session/writer-claim.js';
 import type { SurfaceWriteOpts } from '../session/surface-store.js';
 
 export interface CreateSessionInput {
@@ -63,7 +67,58 @@ export class SessionStore {
   private readonly writerBindings = new Map<string, string>();
   private historyFts: boolean | undefined;
 
-  constructor(private readonly db: DatabaseSync) {}
+  private readonly writerScope = new AsyncLocalStorage<{ sessionId: string; runId: string }>();
+  private readonly writerLocks = new Map<string, { runId: string; held: HeldFdLock }>();
+  constructor(private readonly db: DatabaseSync, private readonly dbPath?: string) {}
+
+  getLocalWriterId(sessionId: string): string | undefined { return this.writerBindings.get(sessionId); }
+
+  runWithWriter<T>(sessionId: string, runId: string, fn: () => Promise<T>): Promise<T> {
+    return this.writerScope.run({ sessionId, runId }, fn);
+  }
+
+  /** Control-plane operations must validate current persisted state, not inherit a finished turn. */
+  runWithoutWriterScope<T>(fn: () => T): T { return this.writerScope.exit(fn); }
+
+  isWriterCurrent(sessionId: string, runId: string): boolean {
+    return this.getSession(sessionId)?.activeWriterRunId === runId;
+  }
+
+  assertCurrentWriter(sessionId: string): void {
+    const scope = this.writerScope.getStore();
+    if (scope?.sessionId === sessionId && !this.isWriterCurrent(sessionId, scope.runId)) {
+      throw new WriterClaimError(sessionId, scope.runId, this.getSession(sessionId)?.activeWriterRunId);
+    }
+  }
+
+  transaction<T>(fn: () => T): T {
+    if (this.db.isTransaction) return fn();
+    this.db.exec('BEGIN IMMEDIATE');
+    try { const result = fn(); this.db.exec('COMMIT'); return result; }
+    catch (error) { this.db.exec('ROLLBACK'); throw error; }
+  }
+
+  private writerPath(sessionId: string, runId: string): string | undefined {
+    if (!this.dbPath || this.dbPath === ':memory:') return undefined;
+    const key = createHash('sha256').update(sessionId + '\0' + runId).digest('hex');
+    return join(dirname(this.dbPath), 'writer-locks', key + '.lock.db');
+  }
+
+  isSessionWriterLive(sessionId: string): boolean {
+    const runId = this.getSession(sessionId)?.activeWriterRunId;
+    if (!runId) return false;
+    if (this.writerLocks.get(sessionId)?.runId === runId) return true;
+    const path = this.writerPath(sessionId, runId);
+    if (!path) return true;
+    const probe = tryAcquireFdLock(path);
+    if (!probe) return true;
+    probe.release(); return false;
+  }
+
+  releaseWriterLocks(): void {
+    for (const { held } of this.writerLocks.values()) held.release();
+    this.writerLocks.clear();
+  }
 
   createSession(input: CreateSessionInput): SessionRecord {
     const now = nowIso();
@@ -136,6 +191,8 @@ export class SessionStore {
     sessionId: string,
     patch: Partial<Omit<SessionRecord, 'id' | 'createdAt'>>
   ): SessionRecord {
+    return this.transaction(() => {
+    this.assertCurrentWriter(sessionId);
     const existing = this.getSession(sessionId);
     if (!existing) {
       throw new Error(`Session ${sessionId} not found`);
@@ -171,6 +228,7 @@ export class SessionStore {
       );
 
     return next;
+    });
   }
 
   /**
@@ -219,25 +277,35 @@ export class SessionStore {
 
   claimWriter(sessionId: string, runId: string): void {
     const existing = this.getSession(sessionId);
-    if (!existing) {
-      throw new Error(`Session ${sessionId} not found`);
-    }
-    this.db
-      .prepare(`UPDATE sessions SET active_writer_run_id = ?, updated_at = ? WHERE id = ?`)
-      .run(runId, nowIso(), sessionId);
-    this.writerBindings.set(sessionId, runId);
+    if (!existing) throw new Error(`Session ${sessionId} not found`);
+    if (this.writerLocks.get(sessionId)?.runId === runId && existing.activeWriterRunId === runId) return;
+    const path = this.writerPath(sessionId, runId);
+    const held = path ? tryAcquireFdLock(path) : undefined;
+    if (path && !held) throw new WriterClaimError(sessionId, runId, existing.activeWriterRunId);
+    try {
+      if (existing.activeWriterRunId && this.isSessionWriterLive(sessionId)) {
+        throw new WriterClaimError(sessionId, runId, existing.activeWriterRunId);
+      }
+      const result = this.db.prepare(
+        'UPDATE sessions SET active_writer_run_id = ?, updated_at = ? WHERE id = ? AND active_writer_run_id IS ?'
+      ).run(runId, nowIso(), sessionId, existing.activeWriterRunId ?? null);
+      if (!Number(result.changes)) throw new WriterClaimError(sessionId, runId, this.getSession(sessionId)?.activeWriterRunId);
+      // A revoked older context may still be unwinding. Its handle is no longer authoritative.
+      this.writerLocks.get(sessionId)?.held.release();
+      if (held) this.writerLocks.set(sessionId, { runId, held });
+      this.writerBindings.set(sessionId, runId);
+    } catch (error) { held?.release(); throw error; }
   }
 
   releaseWriter(sessionId: string, runId: string): void {
     const existing = this.getSession(sessionId);
     if (existing?.activeWriterRunId === runId) {
-      this.db
-        .prepare(`UPDATE sessions SET active_writer_run_id = NULL, updated_at = ? WHERE id = ?`)
-        .run(nowIso(), sessionId);
+      this.db.prepare('UPDATE sessions SET active_writer_run_id = NULL, updated_at = ? WHERE id = ? AND active_writer_run_id = ?')
+        .run(nowIso(), sessionId, runId);
     }
-    if (this.writerBindings.get(sessionId) === runId) {
-      this.writerBindings.delete(sessionId);
-    }
+    const lock = this.writerLocks.get(sessionId);
+    if (lock?.runId === runId) { lock.held.release(); this.writerLocks.delete(sessionId); }
+    if (this.writerBindings.get(sessionId) === runId) this.writerBindings.delete(sessionId);
   }
 
   /**
@@ -609,7 +677,12 @@ export class SessionStore {
     replacesEnd?: number;
     expectedWriterRunId?: string;
   }): SurfaceNode {
+    return this.transaction(() => {
+    this.assertCurrentWriter(input.sessionId);
     const session = this.getSession(input.sessionId);
+    if (input.expectedWriterRunId !== undefined && input.expectedWriterRunId !== session?.activeWriterRunId) {
+      throw new WriterClaimError(input.sessionId, input.expectedWriterRunId, session?.activeWriterRunId);
+    }
     assertWriterClaim({
       sessionId: input.sessionId,
       activeWriterRunId: session?.activeWriterRunId,
@@ -652,6 +725,7 @@ export class SessionStore {
 
     this.db.prepare(`UPDATE sessions SET updated_at = ? WHERE id = ?`).run(node.createdAt, input.sessionId);
     return node;
+    });
   }
 
   private mapSurfaceRow(row: Record<string, unknown>): SurfaceNode {

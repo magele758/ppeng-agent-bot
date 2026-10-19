@@ -1,6 +1,7 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './helpers/bot-pair';
 
-test('list idle faces blink, peek and sway out of phase without moving rows [AC:bot-list-idle-motion#AC-1]', async ({ page }) => {
+test('list idle faces blink, peek and sway out of phase without moving rows [AC:bot-list-idle-motion#AC-1]', async ({ page, botPair }) => {
+  expect(botPair.length).toBeGreaterThan(1);
   await page.route('**/api/bot-work/status', r => r.fulfill({ json: { bots: [] } }));
   await page.goto('/#/bot');
   const faces = page.locator('#sessionListMini .session-item__face svg.bot-face');
@@ -25,9 +26,8 @@ test('list idle faces blink, peek and sway out of phase without moving rows [AC:
   expect(result[0].phase).not.toEqual(result[1].phase);
 });
 
-test('reduced motion stops idle animation and retains working cues [AC:bot-list-idle-motion#AC-3]', async ({ page }) => {
+test('reduced motion stops idle animation and retains working cues [AC:bot-list-idle-motion#AC-3]', async ({ page, botPair: bots }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  const { bots } = await (await page.request.get('/api/bots')).json();
   await page.route('**/api/bot-work/status', r => r.fulfill({ json: { bots: bots.map((bot: { id: string }, i: number) => ({ bot, activeWorkCount: i === 0 ? 1 : 0 })) } }));
   await page.goto('/#/bot');
   const faces = page.locator('#sessionListMini .session-item__face svg.bot-face');

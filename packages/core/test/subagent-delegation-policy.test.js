@@ -327,7 +327,12 @@ test('restart marks an in-flight subagent unknown and does not replay it as succ
   assert.notEqual(unknown?.status, 'completed');
   assert.notEqual(unknown?.status, 'idle');
   assert.equal(second.getSession(finishedChild.id)?.status, 'idle');
-  assert.equal(second.getSession(runningChat.id)?.status, 'running');
+  // Ordinary interrupted chats now settle under the approved restart-recovery
+  // contract; the subagent contract still forbids changing them to unknown.
+  const interruptedChat = second.getSession(runningChat.id);
+  assert.notEqual(interruptedChat?.status, 'unknown');
+  assert.equal(interruptedChat?.status, 'failed');
+  assert.equal(interruptedChat?.metadata?.outcome?.reason, 'process_interrupted');
 
   const replayed = await second.runSession(runningChild.id);
   assert.equal(replayed.status, 'unknown');

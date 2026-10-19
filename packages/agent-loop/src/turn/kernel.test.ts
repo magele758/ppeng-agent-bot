@@ -1,4 +1,5 @@
 import { mkdtempSync, rmSync } from 'node:fs';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -1271,4 +1272,45 @@ describe('runSessionKernel wiring', () => {
     const out = await runSessionKernel(host, session.id);
     expect(out.status).toBe('waiting_approval');
   });
+});
+
+it('rejected contender preserves the active controller [AC:session-multiprocess-state-consistency#AC-2]', async () => {
+  let entered!: () => void, release!: () => void;
+  const ready = new Promise<void>(resolve => { entered = resolve; });
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const controllers = new Map<string, AbortController>();
+  const { host, session } = createHarness({ model: async () => { entered(); await gate; return textResult('done'); }, host: {sessionAbortControllers:controllers} });
+  const running = runSessionKernel(host, session.id);
+  try {
+    await ready;
+    const controller = controllers.get(session.id);
+    expect(controller).toBeDefined();
+    await expect(runSessionKernel(host,session.id)).rejects.toThrow(/writer claim/i);
+    expect(controllers.get(session.id)).toBe(controller);
+  } finally { release(); await running; }
+  expect(controllers.has(session.id)).toBe(false);
+});
+
+it('public kernel keeps model, asynchronous completion and release inside its admitted writer scope', async () => {
+  const scope = new AsyncLocalStorage<string>();
+  const observed: string[] = [];
+  const { host, store, session } = createHarness();
+  const checkScope = (phase: string) => {
+    expect(scope.getStore()).toBeTruthy();
+    expect(scope.getStore()).toBe(store.getSession(session.id)?.activeWriterRunId);
+    observed.push(phase);
+  };
+  store.runWithWriter = (_id, runId, fn) => scope.run(runId, fn);
+  host.runTurnWithRetries = async () => { checkScope('model'); return textResult('done'); };
+  host.handleTurnCompletion = async record => {
+    await Promise.resolve();
+    checkScope('completion');
+    return store.updateSession(record.id, { status: 'idle' });
+  };
+  const release = store.releaseWriter;
+  store.releaseWriter = (id, runId) => { checkScope('release'); release(id, runId); };
+  await runSessionKernel(host, session.id);
+  expect(observed).toEqual(['model', 'completion', 'release']);
+  expect(store.getSession(session.id)?.activeWriterRunId).toBeUndefined();
+  expect(scope.getStore()).toBeUndefined();
 });

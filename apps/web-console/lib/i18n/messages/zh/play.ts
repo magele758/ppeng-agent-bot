@@ -258,7 +258,11 @@ export const play = {
     fetchUrl: '拉取',
     pendingAria: '待发送附件',
     pendingImage: '图 {id}…',
-    pendingAttachment: '附件 {id}…'
+    pendingAttachment: '附件 {id}…',
+    contextList: '已选上下文',
+    removeContext: '移除 {name}',
+    contextTruncated: '上下文已限制为 20 个来源、合计 200,000 个文本字符',
+    contextWithMessage: '这条消息带上的文件和文件夹'
   },
 
   stopMenu: {

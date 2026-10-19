@@ -139,8 +139,10 @@ test('详情菜单可打开收起，窄屏改为覆盖而不挤占对话 [AC:bot
   assert.equal(closed.includes('data-testid="bot-detail-panel"'), false);
   const panel = readFileSync(new URL('./PlayPanel.tsx', import.meta.url), 'utf8');
   const css = readFileSync(new URL('../app/globals.css', import.meta.url), 'utf8');
-  assert.match(panel, /data-testid="bot-detail-toggle"/);
-  assert.match(panel, /is-bot-detail-open/);
+  const details = readFileSync(new URL('./BotDetailMenu.tsx', import.meta.url), 'utf8');
+  assert.match(panel, /BotDetailToggle/);
+  assert.match(details, /data-testid="bot-detail-toggle"/);
+  assert.match(details, /is-bot-detail-open/);
   assert.match(panel, /BotDetailMenu/);
   assert.match(css, /max-width:\s*1100px/);
   assert.match(css, /\.bot-detail-menu/);

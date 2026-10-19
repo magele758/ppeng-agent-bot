@@ -1,0 +1,121 @@
+{
+  "schema": 1,
+  "reviewedAt": "2026-10-19",
+  "reviewNote": "Reviewed the five approved multiprocess repairs: per-execution fresh nonce admission uses atomic SQLite compare/update and kernel-owned per-run OS lock liveness (no heartbeat/env flags); startup skips live peer writers. Node ALS scopes session/WAL/task/inbox/approval writes across awaited host callbacks, including empty-claim revocation; explicit generation writes are always fenced. Both kernels await complete outcome handling before releasing, including handleTurnCompletion.then, guard stale catch/cleanup and retain compatible optional host ports for mini without Node imports. Approval decision/continuation/state are one transaction and revoke a parked claim only after persisting its authorized control message. Cancellation handles the saved-last-decision window, fences old callback tokens, and daemon continuation uses the actual current checkpoint. Tool dispatch checks abort/current generation between chunks and immediately before execution. SDK skills synchronized. Legacy writer test now requires legitimate release and still asserts stale-write rejection; legacy cancellation test strengthens running to failed/aborted while retaining parked cleanup. Observation cuts remain before admission/release reads and before the atomic approval transaction; no state reconstruction. Source mutants updated to disable actual new live-writer guard/CAS release, still requiring new red cases from green baselines. Final review: admission failure preserves an existing controller; the runtime owns cleanup of the controller it created. New SDK regression first failed and is part of the full suite. Historical prepared snapshots remain append-only observations and are not blocked after ordinary run completion. Fresh-input and late-approval controls, stale rejection trace, live-peer boot and dead-peer handoff extend coverage to 62 OS-process scenarios without changing Given/When/Then. Late stream regression explicitly uses runTurnStream, first reproduced old chunks reaching direct/follower consumers, then passed after the same ALS generation fence was applied at delivery. No stream is published from a revoked generation; normal approval follower tests remain green. Final metadata/docs review after all-green probes: verification and five-fix specs promoted to implemented with exact criteria equality checked. Only status and explanatory skill/documentation changed after validation; original counterexample evidence remains intact. Review follow-up after integration of origin/main factory delivery/development: reviewed pre-admission abort isolation, live Bot/subagent ownership during recovery handoff, and transactional unattended-approval expiry outside the inherited turn scope with matching-pause validation. Real timer regressions verify expiry cleanup and restoration of stale-writer rejection. Reviewed context persistence through SQLite/in-memory inbox, edit/claim/drain/subagent routes and additive v31 migration; lossy overflow retains bounded fenced attachment excerpts with delimiter neutralization. SDK guides updated. These added mapping paths are source-review dependencies, not claims that bounded process fixtures exercise every UI or expiry path. Acceptance criteria were not weakened; original counterexample evidence retained. CI-only review: tests job timeout increased from 20 to 35 minutes after measured formal regression took 314 seconds; all verification steps, evidence uploads, child timeouts and failure gates remain intact. Reviewed kernel admission refactor: public runSessionKernel is an unchanged-signature alias to a small admission/scope wrapper; the established top-level turn implementation and helper identities are preserved. Claim, checkpoint reread, asynchronous completion, stale rejection and finally release retain their ordering and writer scope. SDK test explicitly checks model/completion/release scope and public cleanup. No CRAP baseline or threshold change. PR193 review: merged current main writer fencing and awaited completion; reviewed final next-step inbox drain after steering children settle, preserving context parts and continuing only when items exist. Next-run and existing turn/budget limits are unchanged. SDK guides synchronized; kernel regression and full SDK suite pass. No acceptance criteria or verification scope changed.",
+  "mapping": [
+    {
+      "step": "Execute/approval/result persistence and fold recovery; real source component probes (not a full kernel proof)",
+      "files": [
+        "packages/agent-loop/src/approval/approval-policy.ts",
+        "packages/agent-loop/src/approval/permission-mode.ts",
+        "packages/agent-loop/src/helpers.ts",
+        "packages/agent-loop/src/model/tool-result-problem.ts",
+        "packages/agent-loop/src/model/upstream-error.ts",
+        "packages/agent-loop/src/recovery/find-similar-tool-name.ts",
+        "packages/agent-loop/src/recovery/pair-unmatched-tool-calls.ts",
+        "packages/agent-loop/src/recovery/unknown-tool-result.ts",
+        "packages/agent-loop/src/runtime/dirty-input-gate.ts",
+        "packages/agent-loop/src/runtime/tool-loop.ts",
+        "packages/agent-loop/src/session/surface-invariants.ts",
+        "packages/agent-loop/src/session/tool-wave-close.ts",
+        "packages/agent-loop/src/streaming/index.ts",
+        "packages/agent-loop/src/streaming/reasoning-spin-watchdog.ts",
+        "packages/agent-loop/src/streaming/repetition-watchdog.ts",
+        "packages/agent-loop/src/streaming/stream-reset.ts"
+      ]
+    },
+    {
+      "step": "Caller wiring reviewed: serialized kernel invokes host persistence; cancellation closes the fold. F-1 same-batch dedup repaired by updating an owned batch set after each synchronous append.",
+      "files": [
+        "packages/agent-loop/src/turn/kernel.ts",
+        "packages/core/src/runtime/tool-loop.ts"
+      ]
+    },
+    {
+      "step": "Bounded specification, independent oracle, failure controls, evidence, governance and regression",
+      "files": [
+        "scripts/formal/pairing-verifier.mjs",
+        "scripts/formal/pairing-worker.mjs",
+        "scripts/formal/run-pairing-verification.mjs",
+        "scripts/test/tool-call-pairing-verification.test.mjs",
+        "skills/verify-tool-call-pairing/SKILL.md",
+        "scripts/formal/run-formal-regression.mjs",
+        ".github/workflows/release-gate.yml"
+      ]
+    },
+    {
+      "step": "Approved F-1 fix: same-batch, mixed calls, reused id regression tests and SDK contract guidance",
+      "files": [
+        "packages/agent-loop/src/runtime/tool-loop.test.ts",
+        "skills/agent-loop/SKILL.md"
+      ]
+    },
+    {
+      "step": "Approved multiprocess generation fencing and compatible host contracts",
+      "files": [
+        "packages/agent-loop/src/turn/host.ts",
+        "packages/agent-loop/src/session/writer-claim.ts",
+        "packages/core/src/stores/session-store.ts",
+        "packages/core/src/storage.ts",
+        "packages/agent-loop/SKILL.md"
+      ]
+    },
+    {
+      "step": "Reviewed cross-layer follow-up dependencies; dedicated regressions supplement bounded model coverage",
+      "files": [
+        "packages/core/src/session/step-inbox.ts",
+        "packages/agent-loop/src/session/step-inbox.ts",
+        "packages/agent-loop/src/session/apply-claimed-inbox.ts",
+        "packages/agent-loop/src/session/steer-drain.ts",
+        "packages/agent-loop/src/turn/prepare-turn-input.ts",
+        "packages/core/src/turn/prepare-turn-input.ts",
+        "packages/core/src/session/inbox-overflow.ts",
+        "packages/agent-loop/src/session/inbox-overflow.ts",
+        "packages/core/src/stores/migrations/index.ts"
+      ]
+    }
+  ],
+  "sha256": {
+    ".github/workflows/release-gate.yml": "190bffb310b2635710d7124b5f18bc285a4d6387bdb5dd0b8d74a86bac83c73f",
+    "packages/agent-loop/src/approval/approval-policy.ts": "7914ae1d0d9a6ed9d2a13231df87d93a40de741c52a0ef28601edc60474c2a0b",
+    "packages/agent-loop/src/approval/permission-mode.ts": "456d2e76d423519da0b5d81e802bda5d8683989c7d1ee223a9a9b1266f6d73aa",
+    "packages/agent-loop/src/helpers.ts": "bf25c3ef116b15cfddfe90d8de0b0983af81c20f0008ef884b82b4aa4ccb9c53",
+    "packages/agent-loop/src/model/tool-result-problem.ts": "bda7ebbfdec5471170d8655b78b79ac480d99ea9febeae10fee3433f092e3c31",
+    "packages/agent-loop/src/model/upstream-error.ts": "3d29593c606090f82263cf11ab890bb5ffaa56d6e623ab8ed5eaefdc79b3f510",
+    "packages/agent-loop/src/recovery/find-similar-tool-name.ts": "9d32a361e5acf43ee0dfe6d54591b1810db028ec5a899fc03fb6b93558fa13a3",
+    "packages/agent-loop/src/recovery/pair-unmatched-tool-calls.ts": "dbc93185fe469e2af39cea60363b28efb6c1eb50914d7337a9a3d423238ebc51",
+    "packages/agent-loop/src/recovery/unknown-tool-result.ts": "c0b2c43857500ef9e6ff51554ab89a7d7021ee0542bb52f3f12dcbdce9548639",
+    "packages/agent-loop/src/runtime/dirty-input-gate.ts": "5f8cc3f71edc05b14d6583167521fbdae87598c837c9bbe0e25f9ae61f5d6eab",
+    "packages/agent-loop/src/runtime/tool-loop.ts": "0901923d09a09b3a5ee80f2a975d5c2d95344498c977944e1b2250ac1899b824",
+    "packages/agent-loop/src/session/surface-invariants.ts": "04d16dcd82ad386e497d851e657a0cfcf80dac39752783127734860fcb984bf4",
+    "packages/agent-loop/src/session/tool-wave-close.ts": "ee706916e65e394883004418482916671b2dd095c01336289d660c2d86a3f568",
+    "packages/agent-loop/src/streaming/index.ts": "89600f21450443a7989f909b092afcaa5b818979eef6c31864c6adf008d8c0bf",
+    "packages/agent-loop/src/streaming/reasoning-spin-watchdog.ts": "d3202b710d59880772e4256a8fcf6478566f66744d4291cef52983a8f935b15f",
+    "packages/agent-loop/src/streaming/repetition-watchdog.ts": "4d5a927a5b0b6bfc16f37eb65fc3789bd4907e17d7362cdd3e07576294b88b17",
+    "packages/agent-loop/src/streaming/stream-reset.ts": "c486cd3833f30eb84a65e4937293ab4280543a3b71db22dd25160e40389125e8",
+    "packages/agent-loop/src/turn/kernel.ts": "454c769d64eb719db5bcd441b4cdf3b1b71599bb825a5d0b232b68cc739c90ec",
+    "packages/core/src/runtime/tool-loop.ts": "395433d6e12e69523e65d1b2c8f77c126f4cf9485ff7bf6159d63dd36a88c3f4",
+    "scripts/formal/pairing-verifier.mjs": "dada48c004b65153c9aabaea8737c6c626dfb9f351dff507b77ae419d6a4ed58",
+    "scripts/formal/pairing-worker.mjs": "eea60aa4a4399261d6d589da3c6e6a53d24640bf9f13985557982efcbdccffe1",
+    "scripts/formal/run-formal-regression.mjs": "d223e02a4ef59557f6dd93e7719a41097f5ce7ae553b8b62c147c1ff8e33a3f3",
+    "scripts/formal/run-pairing-verification.mjs": "21b6f72d2507874705da902adc1d31ec26146a8fd1e7e6d083d5d2f3abb08380",
+    "scripts/test/tool-call-pairing-verification.test.mjs": "9b6a865b45c53905e80882df099566054f93d5db2cf51a97cda54e7928bf7d7b",
+    "skills/verify-tool-call-pairing/SKILL.md": "82a97197e931689169e9bd6fcb97bb5df925fca4dac78a78fa103ddc6efb422a",
+    "packages/agent-loop/src/runtime/tool-loop.test.ts": "0b4d43a90242bed882af09b99dced7f43e6d84f9ea309872f4857a924c18728f",
+    "skills/agent-loop/SKILL.md": "b6f58ff9c79dde815f4d123b0634151a3c25d35969e0909e1a1682b62d79ef08",
+    "packages/agent-loop/src/turn/host.ts": "480fee8995c829dbe5973618d5e38859efd84e537e0daa5417bd8e7d20c4b00c",
+    "packages/agent-loop/src/session/writer-claim.ts": "349510a83419f13914d10d023d64f334abeb6484b4928746262e2fcc61e34876",
+    "packages/core/src/stores/session-store.ts": "55cd214535b84936676393062a14cf63007e3725d7bd27aca1409075bbfa6e84",
+    "packages/core/src/storage.ts": "aa55d749fbaac626b2ffa51c78bc97e8ca47fe37717a5e5499b2772a4e3205eb",
+    "packages/agent-loop/SKILL.md": "b6f58ff9c79dde815f4d123b0634151a3c25d35969e0909e1a1682b62d79ef08",
+    "packages/core/src/session/step-inbox.ts": "eb7ae7e2a859ccf5b16c954623d678987cab123b86fbb5621895a12ad2f8949f",
+    "packages/agent-loop/src/session/step-inbox.ts": "8d4d20f5a1b079ef14ad3f1379b6f9226d11b02977c274a021bf40b252a3d105",
+    "packages/agent-loop/src/session/apply-claimed-inbox.ts": "b2e8b8659f3c9c50b0c37f0607ebd3de5b697fc24f4f6c6047147d9734ad68da",
+    "packages/agent-loop/src/session/steer-drain.ts": "0410e494db380b5bf3efc68f66c544f58491083a673bcbb231a357bccf0d27d6",
+    "packages/agent-loop/src/turn/prepare-turn-input.ts": "27fd324003a2f741b1f16661d05ef494c0dd16fd724723d9a64f85ee84e72cc0",
+    "packages/core/src/turn/prepare-turn-input.ts": "f76587fd0fd131fba0484d1d04fa77f2f1118733d7f878d4b18607ecc50513fc",
+    "packages/core/src/session/inbox-overflow.ts": "4193cda70752029b6db425ebfdb2e623080e9d3cd3608beb72fa60e4337705e5",
+    "packages/agent-loop/src/session/inbox-overflow.ts": "7b7b1cd937ccbdead275d54ad40e5be8dbafb20b904661ac6ba8d462ba1c6b77",
+    "packages/core/src/stores/migrations/index.ts": "61d61d8a9cac1eeb5b21312972244dc0b6d421f06f9ecd0092582e5f533d68b0"
+  }
+}

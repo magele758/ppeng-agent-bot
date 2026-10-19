@@ -43,10 +43,10 @@ export function botMaterialRoutes(runtime: RawAgentRuntime): RouteSpec[] {
     {
       method: 'POST',
       pattern: '/api/bots/:id/materials/:materialId/reveal',
-      handler: ({ requireParam, response }) => {
+      handler: async ({ requireParam, response }) => {
         const stored = materialsFor(runtime, requireParam('id'));
         try {
-          revealRegisteredMaterial({
+          await revealRegisteredMaterial({
             materialId: requireParam('materialId'),
             files: stored,
             stateDir: runtime.stateDir,

@@ -244,6 +244,66 @@ body,
     box-shadow: 0 0 0 0 transparent;
   }
 }
+.chat-composer {
+  flex-wrap: wrap;
+}
+
+.chat-composer.is-drop-over,
+.play-group-composer.is-drop-over {
+  outline: 2px dashed var(--color-border-strong);
+  outline-offset: 2px;
+}
+
+.play-group-composer {
+  flex-wrap: wrap;
+}
+
+.composer-context-chips,
+.composer-message-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.composer-context-chips {
+  flex: 1 0 100%;
+}
+
+.composer-context-chip,
+.composer-message-context li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 2px 6px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  font-size: 12px;
+}
+
+.composer-context-chip__name,
+.composer-message-context li {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-context-chip__remove {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.composer-message-context {
+  margin-top: 6px;
+}
+
 .chat-composer.chat-composer--ack-flash {
   animation: composer-ack-pulse 240ms ease-out;
 }

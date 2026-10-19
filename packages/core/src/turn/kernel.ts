@@ -329,16 +329,30 @@ export async function continueResumedToolWave(input: {
   return undefined;
 }
 
-export async function runSessionKernel(
+interface KernelRunOptions {
+  onModelStreamChunk?: (chunk: ModelStreamChunk) => void;
+  latch?: AgentLoopLatch;
+  steerDrainPolicy?: SteerDrainPolicy;
+}
+
+interface KernelExecution {
+  session: SessionRecord;
+  agent: AgentSpec;
+  controller: AbortController;
+  writerRunId: string;
+  resumeFromInterrupt?: RunInterruptState;
+}
+
+// Keep admission and scope ownership separate from the existing turn implementation.
+// The public import remains runSessionKernel; hosts do not construct KernelExecution.
+export { runSessionKernelWithWriterScope as runSessionKernel };
+
+async function runSessionKernelWithWriterScope(
   host: TurnKernelHost,
   sessionId: string,
-  options?: {
-    onModelStreamChunk?: (chunk: ModelStreamChunk) => void;
-    latch?: AgentLoopLatch;
-    steerDrainPolicy?: SteerDrainPolicy;
-  }
+  options?: KernelRunOptions
 ): Promise<SessionRecord> {
-  let session = host.store.getSession(sessionId);
+  const session: SessionRecord = host.store.getSession(sessionId)!;
   if (!session) {
     throw new NotFoundError('Session', sessionId);
   }
@@ -357,7 +371,7 @@ export async function runSessionKernel(
     });
     return parked;
   }
-  let resumeFromInterrupt: RunInterruptState | undefined =
+  const resumeFromInterrupt: RunInterruptState | undefined =
     resumeDecision.action === 'resume_tools' ? resumeDecision.interrupt : undefined;
 
   const agent = host.store.getAgent(session.agentId);
@@ -365,12 +379,42 @@ export async function runSessionKernel(
     throw new NotFoundError('Agent', session.agentId);
   }
 
-  const controller = new AbortController();
+  const existingController = host.sessionAbortControllers.get(sessionId);
+  const controller = existingController ?? new AbortController();
   host.sessionAbortControllers.set(sessionId, controller);
+  const sid = session.id;
+  const writerRunId = createId('run');
+  try { host.store.claimWriter(sessionId, writerRunId); }
+  catch (error) {
+    if (!existingController && host.sessionAbortControllers?.get(sessionId) === controller) host.sessionAbortControllers.delete(sessionId);
+    throw error;
+  }
+  // Re-read after admission: another executor may have consumed the captured pause.
+  if (resumeFromInterrupt && !host.store.getSession(sid)?.metadata?.interrupt) {
+    host.store.releaseWriter(sid, writerRunId);
+    host.sessionAbortControllers?.delete(sessionId);
+    return host.store.getSession(sid) ?? session;
+  }
+  const settle = async (): Promise<SessionRecord> => {
+    try { return await runSessionKernel(host, sessionId, { session, agent, controller, writerRunId, resumeFromInterrupt }, options); }
+    finally {
+      if (host.sessionAbortControllers?.get(sid) === controller) host.sessionAbortControllers.delete(sid);
+      host.store.releaseWriter(sid, writerRunId);
+    }
+  };
+  return host.store.runWithWriter ? host.store.runWithWriter(sid, writerRunId, settle) : settle();
+}
+
+async function runSessionKernel(
+  host: TurnKernelHost,
+  sessionId: string,
+  execution: KernelExecution,
+  options?: KernelRunOptions
+): Promise<SessionRecord> {
+  let { session, resumeFromInterrupt } = execution;
+  const { agent, controller, writerRunId } = execution;
   const signal = controller.signal;
   const sid = session.id;
-  const writerRunId = resumeFromInterrupt?.writerRunId ?? createId('run');
-  host.store.claimWriter(sessionId, writerRunId);
   try {
     beginEventLogRun(host.store, sid, writerRunId);
   } catch {
@@ -516,7 +560,7 @@ export async function runSessionKernel(
     for (let turn = 0; turn < maxTurnsPerRun; turn += 1) {
       if (signal.aborted) {
         closeWaveIfOpen();
-        return finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'abort');
+        return await finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'abort');
       }
 
       const refreshedSession = host.store.getSession(session.id) as SessionRecord;
@@ -711,7 +755,7 @@ export async function runSessionKernel(
         host.store.appendMessage(sid, 'system', [
           textPart(beforeTurn.message ?? beforeTurn.systemMessage ?? 'blocked by before_turn extension')
         ]);
-        return finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'before_turn_blocked');
+        return await finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'before_turn_blocked');
       }
       if (beforeTurn.systemMessage) {
         host.store.appendMessage(sid, 'system', [textPart(beforeTurn.systemMessage)]);
@@ -747,7 +791,7 @@ export async function runSessionKernel(
           } else {
             await waitSteeringChildrenIdle(sid);
           }
-          return host.handleTurnCompletion(session, agent, task).then((completed) =>
+          return await host.handleTurnCompletion(session, agent, task).then((completed) =>
             finishEnded(completed, 'end')
           );
         }
@@ -777,7 +821,7 @@ export async function runSessionKernel(
             host.store.appendMessage(sid, 'system', [
               textPart(`[recovery] Stopped: model output degenerated into repetition (${error.reason})`)
             ]);
-            return finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'repetition');
+            return await finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'repetition');
           }
           try {
             turnResult = await host.runTurnWithRetries(turnInput, options?.onModelStreamChunk);
@@ -790,7 +834,7 @@ export async function runSessionKernel(
             host.store.appendMessage(sid, 'system', [
               textPart(`[recovery] Stopped: model output degenerated into repetition (${reason})`)
             ]);
-            return finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'repetition');
+            return await finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'repetition');
           }
         } else if (isContextOverflowError(error)) {
           void host.emitTrace(sid, {
@@ -813,7 +857,7 @@ export async function runSessionKernel(
           turnResult = await host.runTurnWithRetries(turnInput, options?.onModelStreamChunk);
         } else if (signal.aborted) {
           closeWaveIfOpen();
-          return finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'abort');
+          return await finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'abort');
         } else {
           void host.emitTrace(sid, {
             kind: 'model_error',
@@ -1006,7 +1050,7 @@ export async function runSessionKernel(
       }
       if (recovery.action === 'abort' && recovery.reason === 'user_abort') {
         closeWaveIfOpen();
-        return finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'abort');
+        return await finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'abort');
       }
       if (recovery.action === 'retry-same-input') {
         host.store.appendMessage(sid, 'system', [
@@ -1034,14 +1078,14 @@ export async function runSessionKernel(
           kind: 'recovery_abort',
           payload: { reason, trigger: 'turn_recovery' }
         });
-        return finishEnded(host.store.updateSession(session.id, { status: 'idle' }), reason);
+        return await finishEnded(host.store.updateSession(session.id, { status: 'idle' }), reason);
       }
 
       if (turnResult.assistantParts.length === 0) {
         host.store.appendMessage(sid, 'system', [
           textPart('[recovery] Stopped: model returned no assistant content after retries.')
         ]);
-        return finishEnded(host.store.updateSession(session.id, { status: 'idle' }), 'empty_assistant');
+        return await finishEnded(host.store.updateSession(session.id, { status: 'idle' }), 'empty_assistant');
       }
 
       // Reasoning spin: several turns in a row with only reasoning / empty output.
@@ -1055,7 +1099,7 @@ export async function runSessionKernel(
           kind: 'reasoning_spin_abort',
           payload: { reason: spinReason, streak: spinWatchdog!.streak }
         });
-        return finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'reasoning_spin');
+        return await finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'reasoning_spin');
       }
 
       let pendingRecoveryAdvisory: string | undefined;
@@ -1072,7 +1116,7 @@ export async function runSessionKernel(
               textPart(`[recovery] Stopped: ${graceOut.reason} (critical strike)`)
             ]);
             if (tryAutoFork('repetition-aborted')) continue;
-            return finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'repetition');
+            return await finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'repetition');
           }
           pendingRecoveryAdvisory = graceOut.advisory;
           void host.emitTrace(sid, {
@@ -1094,7 +1138,7 @@ export async function runSessionKernel(
             signals: { trigger: 'repetition', reason: graceOut.reason }
           });
           if (tryAutoFork('repetition-aborted')) continue;
-          return finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'repetition');
+          return await finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'repetition');
         }
       }
 
@@ -1249,13 +1293,13 @@ export async function runSessionKernel(
           applyClaimedInbox(host.store, sid, steeredNow);
           continue;
         }
-        return host.handleTurnCompletion(session, agent, task).then((completed) =>
+        return await host.handleTurnCompletion(session, agent, task).then((completed) =>
           finishEnded(completed, 'end')
         );
       }
 
       if (!assistantMessage) {
-        return finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'missing_assistant');
+        return await finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'missing_assistant');
       }
       type ToolCallPart = Extract<MessagePart, { type: 'tool_call' }>;
       const toolCalls = assistantMessage.parts.filter(
@@ -1400,7 +1444,7 @@ export async function runSessionKernel(
               textPart(`[recovery] Stopped: ${graceOut.reason} (critical strike)`)
             ]);
             if (tryAutoFork('deadloop-exhausted')) continue;
-            return finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'tool_loop');
+            return await finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'tool_loop');
           }
           host.store.appendMessage(session.id, 'system', [textPart(graceOut.advisory)]);
           void host.emitTrace(sid, {
@@ -1424,7 +1468,7 @@ export async function runSessionKernel(
             signals: { trigger: 'tools', reason: graceOut.reason }
           });
           if (tryAutoFork('deadloop-exhausted')) continue;
-          return finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'tool_loop');
+          return await finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'tool_loop');
         }
       }
     }
@@ -1435,8 +1479,12 @@ export async function runSessionKernel(
       outcome: 'partial',
       signals: { reason: 'max_turns_exhausted', maxTurns: maxTurnsPerRun }
     });
-    return finishEnded(host.store.updateSession(session.id, { status: 'idle' }), 'max_turns');
+    return await finishEnded(host.store.updateSession(session.id, { status: 'idle' }), 'max_turns');
   } catch (err) {
+    if (host.store.isWriterCurrent && !host.store.isWriterCurrent(sid, writerRunId)) {
+      host.emitTrace(sid, { kind: 'stale_writer_rejected', payload: { writerRunId } });
+      return host.store.getSession(sid) ?? session;
+    }
     const aborted = signal.aborted || (err instanceof Error && /session aborted/i.test(err.message));
     const reason = aborted ? 'abort' : err instanceof Error ? err.message : String(err);
     const rewind = rewindTail(reason);
@@ -1450,11 +1498,7 @@ export async function runSessionKernel(
     }
     throw err;
   } finally {
-    host.sessionAbortControllers.delete(sessionId);
-    const current = host.store.getSession(sessionId);
-    if (current?.status !== 'waiting_approval') {
-      host.store.releaseWriter(sessionId, writerRunId);
-    }
+
     // Both per-session maps must outlive a single run (turn shape seeds the next
     // run's budget, cumulative tokens span turns), so they are pruned by size
     // rather than cleared here — a long-lived daemon would otherwise leak a

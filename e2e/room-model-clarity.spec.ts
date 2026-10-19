@@ -1,7 +1,7 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from './helpers/bot-pair';
 
-test('room displays the global default and each member model source with a settings entry [AC:global-default-model-clarity#AC-4]',async({page})=>{
- const {bots}=await (await page.request.get('/api/bots')).json();expect(bots.length).toBeGreaterThan(1);
+test('room displays the global default and each member model source with a settings entry [AC:global-default-model-clarity#AC-4]',async({page,botPair:bots})=>{
+ expect(bots.length).toBeGreaterThan(1);
  const room={id:'model-display-probe',title:'Model display probe',botIds:bots.slice(0,2).map((b:{id:string})=>b.id),status:'active',hostBotId:bots[0].id,maxBotTurns:2};
  const model={providerId:'test',providerName:'Probe provider',modelId:'Default-text-model'};
  await page.route('**/api/bot-rooms',r=>r.fulfill({json:{rooms:[room]}}));

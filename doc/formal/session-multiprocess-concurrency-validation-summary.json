@@ -1,0 +1,180 @@
+{
+  "schema": 1,
+  "date": "2026-10-19",
+  "scope": "Same-host local healthy SQLite, ordinary chat/task, real overlapping OS processes; bounded schedules, not full daemon HTTP or unbounded proof",
+  "verificationSpec": {
+    "id": "session-multiprocess-concurrency-verification",
+    "status": "approved",
+    "criteria": 15,
+    "criteriaUnchanged": true
+  },
+  "repairSpec": {
+    "id": "session-multiprocess-state-consistency",
+    "status": "draft",
+    "criteria": 5
+  },
+  "productRepairApplied": false,
+  "overall": {
+    "status": "fail",
+    "exitCode": 1
+  },
+  "model": {
+    "status": "pass",
+    "exhausted": true,
+    "states": 7062,
+    "transitions": 15884
+  },
+  "runtime": {
+    "completed": true,
+    "scenarios": 58,
+    "passed": 20,
+    "failed": 38,
+    "incomplete": 0,
+    "failedCriteria": [
+      "AC-1",
+      "AC-2",
+      "AC-3",
+      "AC-4",
+      "AC-5",
+      "AC-6",
+      "AC-8",
+      "AC-9"
+    ]
+  },
+  "mutations": {
+    "status": "pass",
+    "restored": true,
+    "cases": [
+      {
+        "name": "ownership",
+        "killed": true,
+        "loaded": true,
+        "sourceUnchanged": true,
+        "before": "156ca2e97de1d0d90e84b41f220e76d159314adbd5e7b395371a6e0d3354d4fe",
+        "after": "7c7cf04a4229aeb59267e3f8bd5510b98cfd5a5462b9ecde1fb9228ef6e5f482"
+      },
+      {
+        "name": "stale",
+        "killed": true,
+        "loaded": true,
+        "sourceUnchanged": true,
+        "before": "3656a432d9e476510d316d834d5b313b4f7e18040e0f20922e5b925acccebff7",
+        "after": "03011e0d901ef6539236c5d20bc9ab9e15d9be7cd031dcad2361b85c6871a4be"
+      },
+      {
+        "name": "approval",
+        "killed": true,
+        "loaded": true,
+        "sourceUnchanged": true,
+        "before": "373a1914a1beef374423bd59e0836065467dce1fb5b3c7be3b08c1775bbb1c08",
+        "after": "0523714498a36aff42de3c2235accb0a72158ad21f9536b0624bfba40577e672"
+      }
+    ]
+  },
+  "existing": {
+    "restart": {
+      "status": "pass",
+      "scenarios": 43
+    },
+    "lifecycle": {
+      "status": "pass",
+      "scenarios": 20
+    },
+    "pairing": {
+      "status": "pass"
+    }
+  },
+  "tests": {
+    "firstRed": {
+      "tests": 15,
+      "pass": 0,
+      "fail": 15,
+      "skipped": 0,
+      "cancelled": 0,
+      "todo": 0
+    },
+    "taggedFinal": {
+      "tests": 15,
+      "pass": 7,
+      "fail": 8,
+      "skipped": 0,
+      "cancelled": 0,
+      "todo": 0
+    },
+    "priorFixesAndLiveOwner": {
+      "tests": 8,
+      "pass": 8,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0,
+      "todo": 0
+    },
+    "invariantsMockGoalSurface": {
+      "tests": 25,
+      "pass": 25,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0,
+      "todo": 0
+    },
+    "timeoutGrandchildControls": {
+      "tests": 2,
+      "pass": 2,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0,
+      "todo": 0
+    },
+    "sourceReviewControls": {
+      "tests": 2,
+      "pass": 2,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0,
+      "todo": 0
+    }
+  },
+  "node22Smoke": {
+    "node": "v22.21.1",
+    "model": "pass",
+    "completed": true,
+    "scenarios": [
+      {
+        "name": "claim-A-chat",
+        "status": "fail"
+      },
+      {
+        "name": "release-race-chat",
+        "status": "fail"
+      },
+      {
+        "name": "approval-partial-task",
+        "status": "pass"
+      },
+      {
+        "name": "approval-resume-approved-task",
+        "status": "fail"
+      }
+    ],
+    "note": "Same known product counterexamples reproduce; not four green product cases."
+  },
+  "staticAcceptance": {
+    "status": "pass",
+    "mode": "static tag coverage only; does not imply runtime success",
+    "gatedCriteria": "518/518"
+  },
+  "freshBuild": "TypeScript 5.9.3 -b apps/daemon (and project references)",
+  "sourceReview": "reviewed",
+  "reviewManifestHashes": {
+    "specs/formal/concurrency-review.json": "76544cf7af36a906c2034bb976616deb86747a915fc393a084d8dfd696002409",
+    "specs/formal/restart-review.json": "e77e0dfc3aee42c9fcebdf474fa2bd0306d5f9e4c498b42852b5a36dbec872d5",
+    "specs/formal/lifecycle-review.json": "2db7763ea84e83de2b4f7dc833223846324ebc9cbbb0c9728e6a7d5fe8ca78d2",
+    "specs/formal/pairing-review.json": "e3c3f253c501e7be731cc12445d81b144ec83cd18f1fde06ca7d7769f1305f47"
+  },
+  "notes": [
+    "Original red tests and the intermediate checker normalization failure are retained in coverage/formal/concurrency/.",
+    "Approval ID normalization was corrected without altering durable data or weakening criteria.",
+    "Shared restart suite extraction preserves standalone command behavior and avoids a separately detached subtree inside the concurrency worker.",
+    "No full unit or E2E success is claimed by this scoped run; the new acceptance tests intentionally remain red for the product counterexamples."
+  ]
+}

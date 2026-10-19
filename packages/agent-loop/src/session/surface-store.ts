@@ -17,7 +17,7 @@ import {
   type SurfaceNode,
   type SurfaceOp
 } from './surface-invariants.js';
-import { assertWriterClaim } from './writer-claim.js';
+import { assertWriterClaim, WriterClaimError } from './writer-claim.js';
 import type { EnqueueSteerOptions, InboxItem, InboxTarget } from './step-inbox.js';
 
 export interface SurfaceWriteOpts {
@@ -140,6 +140,9 @@ export class MemorySurfaceStore implements SessionSurfaceStoreExt {
   claimWriter(sessionId: string, runId: string): void {
     const existing = this.sessions.get(sessionId);
     if (!existing) throw new Error(`Session ${sessionId} not found`);
+    if (existing.activeWriterRunId && existing.activeWriterRunId !== runId) {
+      throw new WriterClaimError(sessionId, runId, existing.activeWriterRunId);
+    }
     existing.activeWriterRunId = runId;
     existing.updatedAt = nowIso();
     this.writerBindings.set(sessionId, runId);
@@ -267,6 +270,7 @@ export class MemorySurfaceStore implements SessionSurfaceStoreExt {
       target: opts.target ?? 'next-step',
       role: opts.role ?? 'user',
       text,
+      contextParts: opts.contextParts,
       key: opts.key,
       createdAt: nowIso()
     };

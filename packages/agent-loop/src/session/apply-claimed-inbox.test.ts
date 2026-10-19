@@ -173,3 +173,10 @@ describe('claimAndApplyInbox', () => {
     expect(appends[1]?.opts).toEqual({ expectedWriterRunId: 'run_c' });
   });
 });
+
+it('retains dragged context when an inbox message lands [AC:composer-drag-context#AC-3]', () => {
+  const { store, appends } = recordingStore();
+  const contextParts = [{ type: 'text' as const, text: 'fenced unique file sentence', contextSources: [{ kind: 'file' as const, name: 'note.txt', text: 'unique file sentence' }] }];
+  applyClaimedInbox(store, 's1', [{ role: 'user', text: 'read it', contextParts }]);
+  expect(appends[0]?.parts).toEqual([{ type: 'text', text: 'read it' }, ...contextParts]);
+});

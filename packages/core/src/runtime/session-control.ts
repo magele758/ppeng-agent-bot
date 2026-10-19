@@ -3,7 +3,7 @@
  */
 
 import type { McpManager } from '../mcp/mcp-manager.js';
-import { mergeInterruptMetadata } from '../session/interrupt.js';
+import { parseRunInterrupt, mergeInterruptMetadata } from '../session/interrupt.js';
 import { mergeOutcomeMetadata, runOutcomeFromEnd } from '../session/run-outcome.js';
 import { closeOpenToolWave } from '../session/tool-wave-close.js';
 import type { SqliteStateStore } from '../storage.js';
@@ -25,44 +25,40 @@ function parkedCancelStatus(session: SessionRecord): 'failed' | 'idle' {
   return 'idle';
 }
 
-function releaseParkedApproval(host: SessionControlHost, session: SessionRecord): boolean {
-  if (session.status !== 'waiting_approval') return false;
-  for (const approval of host.store.listApprovals({ status: 'pending' })) {
-    if (approval.sessionId !== session.id) continue;
-    host.store.updateApproval(approval.id, 'rejected');
-  }
-  const metadata = session.metadata ? session.metadata : {};
-  const outcome = runOutcomeFromEnd({ reason: 'abort', sessionStatus: 'failed' });
-  host.store.updateSession(session.id, {
-    status: parkedCancelStatus(session),
-    metadata: mergeInterruptMetadata(mergeOutcomeMetadata(metadata, outcome), null)
-  });
-  return true;
-}
-
-export function cancelSession(host: SessionControlHost, sessionId: string): void {
-  try {
-    closeOpenToolWave(host.store, sessionId, 'interrupted');
-  } catch {
-    /* fold/append must not block abort */
-  }
-  const session = host.store.getSession(sessionId);
-  if (session && !releaseParkedApproval(host, session)) {
+export function cancelSession(host: SessionControlHost, sessionId: string, expectedWriterRunId?: string): void {
+  const controller = host.sessionAbortControllers.get(sessionId);
+  let cancelled = false;
+  host.store.transaction(() => {
+    const session = host.store.getSession(sessionId);
+    if (!session) return;
+    if (expectedWriterRunId !== undefined && session.activeWriterRunId !== expectedWriterRunId) {
+      host.emitTrace(sessionId, { kind: 'stale_writer_rejected', payload: { expectedWriterRunId } });
+      return;
+    }
+    const paused = !!parseRunInterrupt(session.metadata);
+    const active = session.status === 'running' || session.status === 'waiting_approval' || paused
+      || (controller !== undefined && !controller.signal.aborted);
+    if (!active) return;
+    host.store.assertCurrentWriter(sessionId);
+    closeOpenToolWave(host.store, sessionId, 'interrupted', { expectedWriterRunId: session.activeWriterRunId });
+    for (const approval of host.store.listApprovals({ status: 'pending' })) {
+      if (approval.sessionId === sessionId) host.store.updateApproval(approval.id, 'rejected');
+    }
     const outcome = runOutcomeFromEnd({ reason: 'abort', sessionStatus: 'failed' });
     host.store.updateSession(sessionId, {
-      metadata: mergeOutcomeMetadata(session.metadata ?? {}, outcome)
+      status: paused && session.status !== 'running' ? parkedCancelStatus(session) : 'failed',
+      metadata: mergeInterruptMetadata(mergeOutcomeMetadata(session.metadata ?? {}, outcome), null)
     });
-  }
-  const controller = host.sessionAbortControllers.get(sessionId);
+    if (session.activeWriterRunId) host.store.releaseWriter(sessionId, session.activeWriterRunId);
+    cancelled = true;
+  });
+  if (!cancelled) return;
   controller?.abort();
   for (const jobId of [...host.backgroundJobAborts.keys()]) {
     const ac = host.backgroundJobAborts.get(jobId);
     if (!ac) continue;
     const job = host.store.getBackgroundJob(jobId);
-    if (job?.sessionId === sessionId) {
-      ac.abort();
-      host.backgroundJobAborts.delete(jobId);
-    }
+    if (job?.sessionId === sessionId) { ac.abort(); host.backgroundJobAborts.delete(jobId); }
   }
   void host.emitTrace(sessionId, { kind: 'cancel', payload: {} });
 }

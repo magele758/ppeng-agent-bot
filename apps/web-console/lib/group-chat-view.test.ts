@@ -32,6 +32,7 @@ test('room composer cannot submit a paused, missing, busy or blank conversation'
   assert.equal(roomComposerDisabled({ status: 'active' }, true, 'hello'), true);
   assert.equal(roomComposerDisabled({ status: 'paused' }, false, 'hello'), true);
   assert.equal(roomComposerDisabled({ status: 'active' }, false, '  '), true);
+  assert.equal(roomComposerDisabled({ status: 'active' }, false, '  ', true), false);
   assert.equal(roomComposerDisabled({ status: 'active' }, false, 'hello'), false);
 });
 

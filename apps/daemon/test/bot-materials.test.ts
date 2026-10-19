@@ -3,8 +3,10 @@ import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
+import { EventEmitter } from 'node:events';
 import {
   collectBotMaterials,
+  openParentDirectory,
   revealRegisteredMaterial,
   toPublicBotMaterial,
   type DirectoryOpener
@@ -14,12 +16,14 @@ function opener(): { spawn: DirectoryOpener; calls: Array<{ command: string; arg
   const calls: Array<{ command: string; args: string[]; env: NodeJS.ProcessEnv }> = [];
   const spawn: DirectoryOpener = (command, args, options) => {
     calls.push({ command, args, env: options.env });
-    return { unref() {} };
+    const child = new EventEmitter();
+    queueMicrotask(() => child.emit('exit', 0));
+    return child;
   };
   return { spawn, calls };
 }
 
-test('已登记文件会打开它的父目录 [AC:bot-detail-menu#AC-5]', () => {
+test('已登记文件会打开它的父目录 [AC:bot-detail-menu#AC-5]', async () => {
   const home = mkdtempSync(join(tmpdir(), 'bot-mat-home-'));
   const stateDir = join(home, 'state');
   const file = join(stateDir, 'artifacts', 'sess-a', 'note.txt');
@@ -40,7 +44,7 @@ test('已登记文件会打开它的父目录 [AC:bot-detail-menu#AC-5]', () => 
   assert.equal('absPath' in materials[0]!, true);
   const { spawn, calls } = opener();
   const expectedParent = dirname(realpathSync(file));
-  const opened = revealRegisteredMaterial({
+  const opened = await revealRegisteredMaterial({
     materialId: 'art-note',
     files: materials,
     stateDir,
@@ -58,7 +62,7 @@ test('已登记文件会打开它的父目录 [AC:bot-detail-menu#AC-5]', () => 
   assert.equal(calls[0]?.env.RAW_AGENT_AUTH_TOKEN, undefined);
   for (const [platform, command] of [['linux', 'xdg-open'], ['win32', 'explorer']] as const) {
     const next = opener();
-    revealRegisteredMaterial({
+    await revealRegisteredMaterial({
       materialId: 'art-note',
       files: materials,
       stateDir,
@@ -216,4 +220,17 @@ test('材料响应只留文件名，不回绝对路径 [AC:bot-detail-menu#AC-5]
   assert.equal(body.includes('.ssh'), false);
   assert.equal(body.includes('/tmp'), false);
   rmSync(home, { recursive: true, force: true });
+});
+
+
+test('missing or failing directory opener rejects without an uncaught error [AC:bot-detail-menu#AC-5]', async () => {
+  const child = new EventEmitter();
+  const completion = openParentDirectory('/safe/folder', { spawn: () => child });
+  assert.equal(child.listenerCount('error'), 1);
+  queueMicrotask(() => child.emit('error', Object.assign(new Error('missing opener'), { code: 'ENOENT' })));
+  await assert.rejects(completion, /missing opener/);
+  const failed = new EventEmitter();
+  const failedCompletion = openParentDirectory('/safe/folder', { spawn: () => failed });
+  queueMicrotask(() => failed.emit('exit', 3));
+  await assert.rejects(failedCompletion);
 });

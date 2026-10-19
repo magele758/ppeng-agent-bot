@@ -50,6 +50,33 @@ test('the page before the newest page stitches without overlap or a duplicate ed
   assert.equal(scrollTopToAnchor(120, 80, 16), 184);
 });
 
+test('a short transcript stays fully mounted when the bubbles are taller than the viewport', () => {
+  const count = 9;
+  const prefix = prefixHeights(count, () => 800);
+  const stuck = historyWindow({
+    count,
+    scrollTop: 0,
+    viewport: 437,
+    prefix,
+    stickToBottom: true,
+    overscanPx: 480
+  });
+  assert.equal(stuck.start, 0);
+  assert.equal(stuck.end, count);
+  assert.equal(stuck.padTop, 0);
+  assert.equal(stuck.padBottom, 0);
+  const parked = historyWindow({
+    count,
+    scrollTop: 0,
+    viewport: 437,
+    prefix,
+    stickToBottom: false,
+    overscanPx: 0
+  });
+  assert.equal(parked.start, 0);
+  assert.equal(parked.end, count);
+});
+
 test('loaded rows stay windowed and the tail stays mounted while following the bottom [AC:play-feed-window#AC-3]', () => {
   const count = 200;
   const prefix = prefixHeights(count, () => FEED_ROW_ESTIMATE_PX);

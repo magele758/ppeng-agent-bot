@@ -276,7 +276,9 @@ function renderLiveSlot(slot: FeedSlot, view: TranscriptModel, chat: Chat, sessi
 }
 
 function renderOptimisticOrStream(slot: FeedSlot, view: TranscriptModel, chat: Chat, sessionId: string): ReactNode {
-  if (slot.kind === 'optimistic') return <ChatTurnPlain role="user" text={chat.optimisticUser ?? ''} />;
+  if (slot.kind === 'optimistic') {
+    return <ChatTurnPlain role="user" text={chat.optimisticUser ?? ''} contextLabels={chat.optimisticContext} />;
+  }
   if (slot.kind !== 'stream') return null;
   return <ChatTurnStreaming segments={chat.streamOverlay?.segments ?? []} sessionId={sessionId} resolvedCallIds={view.resolved} />;
 }

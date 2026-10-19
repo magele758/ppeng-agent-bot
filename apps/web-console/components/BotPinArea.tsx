@@ -34,8 +34,10 @@ export function BotPinArea({
   bots,
   sessions,
   renderSession,
-  onOpenSession
+  onOpenSession,
+  active = true
 }: {
+  active?: boolean;
   bots: readonly BotInfo[];
   sessions: readonly SessionSummary[];
   renderSession: (session: SessionSummary) => ReactNode;
@@ -84,6 +86,7 @@ export function BotPinArea({
     if (decision.next) commitBotPinState(decision.next);
   };
 
+  if (!active) return null;
   return (
     <section
       className={`${styles.pin}${over ? ` ${styles.dropTarget}` : ''}`}

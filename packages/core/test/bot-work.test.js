@@ -330,3 +330,28 @@ test('retired Bot task sources no longer pin active goals or unfinished todos wh
  assert.ok(!session.todo.some(todo=>todo.content==='retired delegated pending'));assert.ok(session.todo.some(todo=>todo.content==='independent pending'));assert.ok(session.todo.some(todo=>todo.status==='completed'));assert.ok(!Object.values(session.metadata.taskContext.todos).flat().some(todo=>todo.content==='retired delegated pending'&&todo.status!=='completed'));
  assert.equal(listBotTasks(store,principal).find(item=>item.id===task.id).status,'unknown');assert.throws(()=>retryBotTask(host,principal,task.id),/verification/);
 });
+
+test('boot recovery preserves live Bot work while retiring a dead peer', async () => {
+ const {store,host}=setup();const principal=resolveBotPrincipal(store);const boss=ensureSuperBot(host,principal);
+ const live=createBot(host,{name:'live'}),dead=createBot(host,{name:'dead'});
+ host.runSession=()=>new Promise(()=>{});
+ const liveTask=dispatchBotTask(host,{principal,requesterBotId:boss.bot.id,targetBotId:live.id,input:'live'});
+ const deadTask=dispatchBotTask(host,{principal,requesterBotId:boss.bot.id,targetBotId:dead.id,input:'dead'});
+ await tickBotWork(host);
+ const sid=store.db.prepare('SELECT session_id FROM bot_work_messages WHERE task_id=?').get(liveTask.id).session_id;
+ store.claimWriter(sid,'live-writer');
+ const deadSid=store.db.prepare('SELECT session_id FROM bot_work_messages WHERE task_id=?').get(deadTask.id).session_id;
+ const departed=new SqliteStateStore(store.dbPath);
+ departed.claimWriter(deadSid,'departed-writer');departed.db.close();
+ const beforeSession=store.getSession(sid),beforeTask=listBotTasks(store,principal).find(t=>t.id===liveTask.id);
+ const beforeLease=store.db.prepare('SELECT * FROM bot_work_leases WHERE session_id=?').get(sid);
+ const other=new SqliteStateStore(store.dbPath);
+ try {
+  recoverBotWork(other);
+  assert.deepEqual(store.getSession(sid),beforeSession);
+  assert.deepEqual(listBotTasks(store,principal).find(t=>t.id===liveTask.id),beforeTask);
+  assert.deepEqual(store.db.prepare('SELECT * FROM bot_work_leases WHERE session_id=?').get(sid),beforeLease);
+  assert.equal(listBotTasks(store,principal).find(t=>t.id===deadTask.id).status,'unknown');
+  assert.equal(store.getSession(deadSid).activeWriterRunId,undefined);
+ } finally {other.db.close();store.db.close();}
+});

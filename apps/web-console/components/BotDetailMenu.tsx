@@ -30,6 +30,109 @@ export type BotDetailPreview = {
   memories: MemoryItem[];
 };
 
+
+function DetailSectionState({ loading, failed, count, emptyKey }: { loading: boolean; failed: boolean; count: number; emptyKey: MessageKey }) {
+  const { t } = useI18n();
+  if (failed) return <p className={styles.alert} role="alert">{t('play.botDetail.loadFailed')}</p>;
+  if (loading || count > 0) return null;
+  return <p className={styles.empty}>{t(emptyKey)}</p>;
+}
+function DetailNextRun({ when }: { when?: string }) {
+  const { t } = useI18n();
+  return when ? <p className={styles.meta}>{t('play.botDetail.next', { when })}</p> : null;
+}
+function fulfilledList<T>(result: PromiseSettledResult<unknown>, field: string): T[] {
+  if (result.status !== 'fulfilled') return [];
+  const value = (result.value as Record<string, unknown>)[field];
+  return Array.isArray(value) ? value as T[] : [];
+}
+
+function DetailRoutines({ jobs, loading, failed, toggleError, busyId, onToggle }: { jobs: RoutineItem[]; loading: boolean; failed: boolean; toggleError: boolean; busyId: string | null; onToggle: (job: RoutineItem) => void }) {
+  const { t } = useI18n();
+  const hidden = t('play.botDetail.redacted');
+  return (<section data-testid="bot-detail-section-routines" aria-label={t('play.botDetail.routines')}>
+            <DetailSectionState loading={loading} failed={failed} count={jobs.length} emptyKey="play.botDetail.routinesEmpty" />
+            {toggleError ? <p className={styles.alert} role="alert">{t('play.botDetail.toggleFailed')}</p> : null}
+            {jobs.map((job) => (
+              <article key={job.id} className={styles.item} data-testid="bot-detail-routine" data-routine-id={job.id} data-enabled={job.enabled ? 'true' : 'false'}>
+                <div className={styles.name}>{redactSensitiveText(job.name || job.id, hidden)}</div>
+                <p className={styles.meta}>{job.enabled ? t('play.botDetail.on') : t('play.botDetail.off')}</p>
+                <DetailNextRun when={job.nextRunAt} />
+                <div className={styles.actions}>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    data-testid="bot-detail-routine-toggle"
+                    aria-pressed={job.enabled}
+                    disabled={busyId === job.id}
+                    onClick={() => onToggle(job)}
+                  >
+                    {job.enabled ? t('play.botDetail.turnOff') : t('play.botDetail.turnOn')}
+                  </button>
+                </div>
+              </article>
+            ))}
+          </section>);
+}
+
+function DetailFiles({ files, loading, failed, folderError, folderOk, busyId, onOpenFolder }: { files: MaterialItem[]; loading: boolean; failed: boolean; folderError: boolean; folderOk: boolean; busyId: string | null; onOpenFolder: (id: string) => void }) {
+  const { t } = useI18n();
+  const hidden = t('play.botDetail.redacted');
+  return (<section data-testid="bot-detail-section-files" aria-label={t('play.botDetail.files')}>
+            <DetailSectionState loading={loading} failed={failed} count={files.length} emptyKey="play.botDetail.filesEmpty" />
+            {folderError ? <p className={styles.alert} role="alert">{t('play.botDetail.openFolderFailed')}</p> : null}
+            {folderOk ? <p className={styles.ok}>{t('play.botDetail.openedFolder')}</p> : null}
+            {files.map((file) => (
+              <article key={file.id} className={styles.item} data-testid="bot-detail-file" data-material-id={file.id}>
+                <div className={styles.name}>{redactSensitiveText(file.name || file.id, hidden)}</div>
+                <p className={styles.meta}>
+                  {file.kind === 'working-log' ? t('play.botDetail.kindWorkingLog') : t('play.botDetail.kindArtifact')}
+                </p>
+                <div className={styles.actions}>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    data-testid="bot-detail-open-folder"
+                    disabled={busyId === file.id}
+                    onClick={() => onOpenFolder(file.id)}
+                  >
+                    {t('play.botDetail.openFolder')}
+                  </button>
+                </div>
+              </article>
+            ))}
+          </section>);
+}
+
+function DetailMemories({ memories, loading, failed }: { memories: MemoryItem[]; loading: boolean; failed: boolean }) {
+  const { t } = useI18n();
+  const hidden = t('play.botDetail.redacted');
+  return (<section data-testid="bot-detail-section-memory" aria-label={t('play.botDetail.memory')}>
+            <DetailSectionState loading={loading} failed={failed} count={memories.length} emptyKey="play.botDetail.memoryEmpty" />
+            {memories.map((entry) => (
+              <article key={entry.id} className={styles.item} data-testid="bot-detail-memory">
+                <div className={styles.name}>{redactSensitiveText(entry.key, hidden)}</div>
+                <p className={styles.meta}>{t(SCOPE_KEY[entry.scope] ?? 'play.botDetail.scopeOther')}</p>
+                <p className={styles.value}>{presentMemoryValue(entry.key, entry.value, hidden)}</p>
+              </article>
+            ))}
+          </section>);
+}
+
+
+function DetailBody({ section, loading, sectionError, jobs, files, memories, toggleError, folderError, folderOk, busyId, onToggle, onOpenFolder }: {
+  section: Section; loading: boolean; sectionError: Record<Section, boolean>; jobs: RoutineItem[]; files: MaterialItem[]; memories: MemoryItem[];
+  toggleError: boolean; folderError: boolean; folderOk: boolean; busyId: string | null; onToggle: (job: RoutineItem) => void; onOpenFolder: (id: string) => void;
+}) {
+  const { t } = useI18n();
+  return (      <div className={styles.body}>
+        {loading ? <p className={styles.meta}>{t('play.botDetail.loading')}</p> : null}
+        {section === 'routines' ? <DetailRoutines jobs={jobs} loading={loading} failed={sectionError.routines} toggleError={toggleError} busyId={busyId} onToggle={onToggle} /> : null}
+        {section === 'files' ? <DetailFiles files={files} loading={loading} failed={sectionError.files} folderError={folderError} folderOk={folderOk} busyId={busyId} onOpenFolder={onOpenFolder} /> : null}
+        {section === 'memory' ? <DetailMemories memories={memories} loading={loading} failed={sectionError.memory} /> : null}
+      </div>);
+}
+
 export function BotDetailMenu({
   botId,
   botName,
@@ -49,9 +152,10 @@ export function BotDetailMenu({
 }) {
   const { t } = useI18n();
   const [section, setSection] = useState<Section>(initialSection);
-  const [jobs, setJobs] = useState<RoutineItem[]>(preview?.jobs ?? []);
-  const [files, setFiles] = useState<MaterialItem[]>(preview?.files ?? []);
-  const [memories, setMemories] = useState<MemoryItem[]>(preview?.memories ?? []);
+  const initial = preview ?? { jobs: [], files: [], memories: [] };
+  const [jobs, setJobs] = useState<RoutineItem[]>(initial.jobs);
+  const [files, setFiles] = useState<MaterialItem[]>(initial.files);
+  const [memories, setMemories] = useState<MemoryItem[]>(initial.memories);
   const [loading, setLoading] = useState(!preview);
   const [sectionError, setSectionError] = useState({ routines: false, files: false, memory: false });
   const [toggleError, setToggleError] = useState(showToggleError);
@@ -78,18 +182,9 @@ export function BotDetailMenu({
         api(`/api/memory?agentId=${encodeURIComponent(memoryAgentId)}&limit=100`, { signal: ac.signal })
       ]);
       if (ac.signal.aborted) return;
-      if (jobResult.status === 'fulfilled') {
-        const data = jobResult.value as { jobs?: RoutineItem[] };
-        setJobs(Array.isArray(data.jobs) ? data.jobs : []);
-      }
-      if (fileResult.status === 'fulfilled') {
-        const data = fileResult.value as { materials?: MaterialItem[] };
-        setFiles(Array.isArray(data.materials) ? data.materials : []);
-      }
-      if (memoryResult.status === 'fulfilled') {
-        const data = memoryResult.value as { entries?: MemoryItem[] };
-        setMemories(Array.isArray(data.entries) ? data.entries : []);
-      }
+      setJobs(fulfilledList<RoutineItem>(jobResult, 'jobs'));
+      setFiles(fulfilledList<MaterialItem>(fileResult, 'materials'));
+      setMemories(fulfilledList<MemoryItem>(memoryResult, 'entries'));
       setSectionError({
         routines: jobResult.status === 'rejected',
         files: fileResult.status === 'rejected',
@@ -102,7 +197,6 @@ export function BotDetailMenu({
 
   if (!open) return null;
 
-  const hidden = t('play.botDetail.redacted');
   const onToggle = (job: RoutineItem) => {
     const next = !job.enabled;
     setBusyId(job.id);
@@ -162,75 +256,25 @@ export function BotDetailMenu({
           </button>
         ))}
       </div>
-      <div className={styles.body}>
-        {loading ? <p className={styles.meta}>{t('play.botDetail.loading')}</p> : null}
-        {section === 'routines' ? (
-          <section data-testid="bot-detail-section-routines" aria-label={t('play.botDetail.routines')}>
-            {sectionError.routines ? <p className={styles.alert} role="alert">{t('play.botDetail.loadFailed')}</p> : null}
-            {toggleError ? <p className={styles.alert} role="alert">{t('play.botDetail.toggleFailed')}</p> : null}
-            {!loading && !sectionError.routines && !jobs.length ? <p className={styles.empty}>{t('play.botDetail.routinesEmpty')}</p> : null}
-            {jobs.map((job) => (
-              <article key={job.id} className={styles.item} data-testid="bot-detail-routine" data-routine-id={job.id} data-enabled={job.enabled ? 'true' : 'false'}>
-                <div className={styles.name}>{redactSensitiveText(job.name || job.id, hidden)}</div>
-                <p className={styles.meta}>{job.enabled ? t('play.botDetail.on') : t('play.botDetail.off')}</p>
-                {job.nextRunAt ? <p className={styles.meta}>{t('play.botDetail.next', { when: job.nextRunAt })}</p> : null}
-                <div className={styles.actions}>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    data-testid="bot-detail-routine-toggle"
-                    aria-pressed={job.enabled}
-                    disabled={busyId === job.id}
-                    onClick={() => onToggle(job)}
-                  >
-                    {job.enabled ? t('play.botDetail.turnOff') : t('play.botDetail.turnOn')}
-                  </button>
-                </div>
-              </article>
-            ))}
-          </section>
-        ) : null}
-        {section === 'files' ? (
-          <section data-testid="bot-detail-section-files" aria-label={t('play.botDetail.files')}>
-            {sectionError.files ? <p className={styles.alert} role="alert">{t('play.botDetail.loadFailed')}</p> : null}
-            {folderError ? <p className={styles.alert} role="alert">{t('play.botDetail.openFolderFailed')}</p> : null}
-            {folderOk ? <p className={styles.ok}>{t('play.botDetail.openedFolder')}</p> : null}
-            {!loading && !sectionError.files && !files.length ? <p className={styles.empty}>{t('play.botDetail.filesEmpty')}</p> : null}
-            {files.map((file) => (
-              <article key={file.id} className={styles.item} data-testid="bot-detail-file" data-material-id={file.id}>
-                <div className={styles.name}>{redactSensitiveText(file.name || file.id, hidden)}</div>
-                <p className={styles.meta}>
-                  {file.kind === 'working-log' ? t('play.botDetail.kindWorkingLog') : t('play.botDetail.kindArtifact')}
-                </p>
-                <div className={styles.actions}>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    data-testid="bot-detail-open-folder"
-                    disabled={busyId === file.id}
-                    onClick={() => onOpenFolder(file.id)}
-                  >
-                    {t('play.botDetail.openFolder')}
-                  </button>
-                </div>
-              </article>
-            ))}
-          </section>
-        ) : null}
-        {section === 'memory' ? (
-          <section data-testid="bot-detail-section-memory" aria-label={t('play.botDetail.memory')}>
-            {sectionError.memory ? <p className={styles.alert} role="alert">{t('play.botDetail.loadFailed')}</p> : null}
-            {!loading && !sectionError.memory && !memories.length ? <p className={styles.empty}>{t('play.botDetail.memoryEmpty')}</p> : null}
-            {memories.map((entry) => (
-              <article key={entry.id} className={styles.item} data-testid="bot-detail-memory">
-                <div className={styles.name}>{redactSensitiveText(entry.key, hidden)}</div>
-                <p className={styles.meta}>{t(SCOPE_KEY[entry.scope] ?? 'play.botDetail.scopeOther')}</p>
-                <p className={styles.value}>{presentMemoryValue(entry.key, entry.value, hidden)}</p>
-              </article>
-            ))}
-          </section>
-        ) : null}
-      </div>
+      <DetailBody section={section} loading={loading} sectionError={sectionError} jobs={jobs} files={files} memories={memories} toggleError={toggleError} folderError={folderError} folderOk={folderOk} busyId={busyId} onToggle={onToggle} onOpenFolder={onOpenFolder} />
     </aside>
   );
+}
+
+export function botDetailIsVisible(open: boolean, botId: string, groupId: string | null): boolean {
+  return open && Boolean(botId) && groupId == null;
+}
+export function botDetailMainClass(visible: boolean): string {
+  return `play-main-col${visible ? ' is-bot-detail-open' : ''}`;
+}
+export function BotDetailToggle({ botId, open, onToggle }: { botId: string; open: boolean; onToggle: () => void }) {
+  const { t } = useI18n();
+  if (!botId) return null;
+  return <button type="button" className="chat-panel-header__detail" data-testid="bot-detail-toggle" aria-expanded={open} aria-controls="bot-detail-panel" onClick={onToggle}>
+    {open ? t('play.botDetail.close') : t('play.botDetail.open')}
+  </button>;
+}
+export function BotDetailPane({ visible, botId, botName, agentId }: { visible: boolean; botId: string; botName: string; agentId?: string }) {
+  if (!visible) return null;
+  return <BotDetailMenu key={botId} botId={botId} botName={botName || botId} agentId={agentId || botId} />;
 }

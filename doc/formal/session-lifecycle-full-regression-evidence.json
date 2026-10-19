@@ -1,0 +1,90 @@
+{
+  "schema": 1,
+  "date": "2026-10-19",
+  "status": "pass",
+  "environment": {
+    "platform": "darwin",
+    "buildNode": "v26.7.0",
+    "testNode": "v22.21.1"
+  },
+  "commands": [
+    {
+      "command": "npm run build",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run test:unit",
+      "exitCode": 0,
+      "tests": 3828,
+      "suites": 174,
+      "pass": 3824,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 4,
+      "todo": 0,
+      "duration_ms": 393474.062833
+    },
+    {
+      "command": "npm run test --workspace=@ppeng/agent-loop",
+      "exitCode": 0,
+      "testFiles": 41,
+      "passed": 407,
+      "failed": 0
+    },
+    {
+      "command": "npm run test:e2e -- --reporter=list,json",
+      "exitCode": 0,
+      "startTime": "2026-10-19T03:18:23.223Z",
+      "duration": 95165.399,
+      "expected": 160,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0,
+      "errors": []
+    },
+    {
+      "command": "npm run test:acceptance",
+      "exitCode": 0,
+      "summary": {
+        "specs": 84,
+        "byStatus": {
+          "draft": 3,
+          "approved": 8,
+          "implemented": 73,
+          "retired": 0
+        },
+        "criteria": 551,
+        "gatedCriteria": 479,
+        "gatedOk": 479
+      }
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0
+    }
+  ],
+  "skips": {
+    "tests": [
+      "Agent Room MCP: 2 tests require AGENT_ROOM_URL and AGENT_ROOM_TOKEN",
+      "schema migration without FTS5: /exec-daemon/node unavailable",
+      "packed Electron daemon health: Electron executable or Linux packaged daemon artifact unavailable"
+    ],
+    "suites": [
+      "LinuxBwrapProvider integration: Linux only",
+      "real bubblewrap: bubblewrap unavailable on macOS"
+    ]
+  },
+  "newProductDefects": [],
+  "acceptanceCriteriaChanged": false,
+  "sha256": {
+    "packages/core/src/runtime/session-control.ts": "9869b0ab5ba9f37cf14ed743ffffea44f38925c57b6e0c4c2a0991880d16101d",
+    "packages/core/src/runtime/session-facade.ts": "45aae9ab02186bb71c36ac212b28b22cc141f7070d20c2fb4afa3286e6c756de",
+    "packages/core/test/session-lifecycle-state-consistency.test.js": "3614712ffaca1758d130888634f11a05b9f9ca233874f0e69d056865c9a5e0dc",
+    "acceptance/session-lifecycle-state-consistency.yaml": "cf4af95c0938e1c4c493cc360ea0e37a307e715614d631331ef341244341d3b8",
+    "acceptance/session-lifecycle-verification.yaml": "1515638ee7076c29d195dd32704a816fb586cc1750189a523d3d3045bb572db3",
+    "acceptance/tool-call-pairing-verification.yaml": "f8c593809d9020a7415d784bb078ac145a047f8dfa8f2a9b6bd19cd48707864a",
+    "acceptance/tool-call-pairing-batch-dedup.yaml": "2dfdc5c23baf08eb9f8c4dfaf545579113825df9576c63915692d2e486e538ae"
+  },
+  "rawEvidenceDirectory": "coverage/formal/full-regression",
+  "scope": "Full configured root unit suite, full agent-loop Vitest suite and full Chromium E2E suite on the current working tree. Existing environment-conditional skips retained; no retry overrides or acceptance changes."
+}

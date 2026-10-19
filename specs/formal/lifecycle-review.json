@@ -1,0 +1,141 @@
+{
+  "schema": 1,
+  "reviewedAt": "2026-10-19",
+  "reviewNote": "Reviewed the five approved multiprocess repairs: per-execution fresh nonce admission uses atomic SQLite compare/update and kernel-owned per-run OS lock liveness (no heartbeat/env flags); startup skips live peer writers. Node ALS scopes session/WAL/task/inbox/approval writes across awaited host callbacks, including empty-claim revocation; explicit generation writes are always fenced. Both kernels await complete outcome handling before releasing, including handleTurnCompletion.then, guard stale catch/cleanup and retain compatible optional host ports for mini without Node imports. Approval decision/continuation/state are one transaction and revoke a parked claim only after persisting its authorized control message. Cancellation handles the saved-last-decision window, fences old callback tokens, and daemon continuation uses the actual current checkpoint. Tool dispatch checks abort/current generation between chunks and immediately before execution. SDK skills synchronized. Legacy writer test now requires legitimate release and still asserts stale-write rejection; legacy cancellation test strengthens running to failed/aborted while retaining parked cleanup. Observation cuts remain before admission/release reads and before the atomic approval transaction; no state reconstruction. Source mutants updated to disable actual new live-writer guard/CAS release, still requiring new red cases from green baselines. Final review: admission failure preserves an existing controller; the runtime owns cleanup of the controller it created. New SDK regression first failed and is part of the full suite. Historical prepared snapshots remain append-only observations and are not blocked after ordinary run completion. Fresh-input and late-approval controls, stale rejection trace, live-peer boot and dead-peer handoff extend coverage to 62 OS-process scenarios without changing Given/When/Then. Late stream regression explicitly uses runTurnStream, first reproduced old chunks reaching direct/follower consumers, then passed after the same ALS generation fence was applied at delivery. No stream is published from a revoked generation; normal approval follower tests remain green. Final metadata/docs review after all-green probes: verification and five-fix specs promoted to implemented with exact criteria equality checked. Only status and explanatory skill/documentation changed after validation; original counterexample evidence remains intact. Review follow-up after integration of origin/main factory delivery/development: reviewed pre-admission abort isolation, live Bot/subagent ownership during recovery handoff, and transactional unattended-approval expiry outside the inherited turn scope with matching-pause validation. Real timer regressions verify expiry cleanup and restoration of stale-writer rejection. Reviewed context persistence through SQLite/in-memory inbox, edit/claim/drain/subagent routes and additive v31 migration; lossy overflow retains bounded fenced attachment excerpts with delimiter neutralization. SDK guides updated. These added mapping paths are source-review dependencies, not claims that bounded process fixtures exercise every UI or expiry path. Acceptance criteria were not weakened; original counterexample evidence retained. Legacy checkpointless parked hosts retain expiry settlement only with no writer and no pending approvals; checkpointed sessions still require matching pause IDs. Existing delegated Bot expiry and all expiry regressions pass (47 targeted tests). CI-only review: tests job timeout increased from 20 to 35 minutes after measured formal regression took 314 seconds; all verification steps, evidence uploads, child timeouts and failure gates remain intact. Reviewed kernel admission refactor: public runSessionKernel is an unchanged-signature alias to a small admission/scope wrapper; the established top-level turn implementation and helper identities are preserved. Claim, checkpoint reread, asynchronous completion, stale rejection and finally release retain their ordering and writer scope. SDK test explicitly checks model/completion/release scope and public cleanup. No CRAP baseline or threshold change. PR193 review: merged current main writer fencing and awaited completion; reviewed final next-step inbox drain after steering children settle, preserving context parts and continuing only when items exist. Next-run and existing turn/budget limits are unchanged. SDK guides synchronized; kernel regression and full SDK suite pass. No acceptance criteria or verification scope changed.",
+  "mapping": [
+    {
+      "step": "Public runtime, cancellation, approvals and completion; exercised through RawAgentRuntime with SQLite",
+      "files": [
+        "packages/core/src/runtime.ts",
+        "packages/core/src/runtime/session-control.ts",
+        "packages/core/src/runtime/session-facade.ts",
+        "packages/core/src/runtime/session-complete.ts"
+      ]
+    },
+    {
+      "step": "Default assembled kernel, retry and interrupt/outcome paths; no table-only proof",
+      "files": [
+        "packages/agent-loop/src/turn/kernel.ts",
+        "packages/agent-loop/src/runtime/tool-loop.ts",
+        "packages/agent-loop/src/session/interrupt.ts",
+        "packages/agent-loop/src/session/run-outcome.ts",
+        "packages/core/src/runtime/tool-loop.ts",
+        "packages/agent-loop/src/assembly/create-assembled-loop.ts",
+        "packages/agent-loop/src/assembly/mini-host.ts",
+        "packages/agent-loop/src/assembly/normal-host.ts",
+        "packages/agent-loop/src/assembly/full-host.ts",
+        "packages/agent-loop/src/assembly/max-host.ts",
+        "packages/core/src/runtime/l5-bindings.ts"
+      ]
+    },
+    {
+      "step": "Specification, independent runtime fixtures, source mutations, execution/reporting, tests and instructions",
+      "files": [
+        "scripts/formal/lifecycle-model.mjs",
+        "scripts/formal/lifecycle-runtime.mjs",
+        "scripts/formal/lifecycle-verifier.mjs",
+        "scripts/formal/lifecycle-worker.mjs",
+        "scripts/formal/lifecycle-mutations.mjs",
+        "scripts/formal/lifecycle-loader.mjs",
+        "scripts/formal/lifecycle-register.mjs",
+        "scripts/formal/run-lifecycle-verification.mjs",
+        "scripts/test/session-lifecycle-verification.test.mjs",
+        "skills/verify-session-lifecycle/SKILL.md",
+        "scripts/formal/run-formal-regression.mjs",
+        ".github/workflows/release-gate.yml",
+        "packages/core/test/session-lifecycle-state-consistency.test.js",
+        "packages/core/src/runtime/restart-recovery.ts",
+        "packages/core/test/restart-recovery-ownership.test.js",
+        "scripts/test/session-restart-recovery-fix.test.mjs",
+        "packages/core/test/subagent-delegation-policy.test.js",
+        "packages/core/src/runtime.ts",
+        "packages/core/src/teams/fd-lock.ts"
+      ]
+    },
+    {
+      "step": "Approved multiprocess generation fencing and compatible host contracts",
+      "files": [
+        "packages/agent-loop/src/turn/host.ts",
+        "packages/core/src/storage.ts",
+        "packages/core/src/stores/session-store.ts",
+        "packages/agent-loop/src/session/writer-claim.ts",
+        "packages/core/src/turn/kernel.ts",
+        "packages/core/src/turn/host.ts",
+        "apps/daemon/src/routes/misc.ts"
+      ]
+    },
+    {
+      "step": "Reviewed cross-layer follow-up dependencies; dedicated regressions supplement bounded model coverage",
+      "files": [
+        "packages/core/src/session/step-inbox.ts",
+        "packages/agent-loop/src/session/step-inbox.ts",
+        "packages/agent-loop/src/session/apply-claimed-inbox.ts",
+        "packages/agent-loop/src/session/steer-drain.ts",
+        "packages/agent-loop/src/turn/prepare-turn-input.ts",
+        "packages/core/src/turn/prepare-turn-input.ts",
+        "packages/core/src/session/inbox-overflow.ts",
+        "packages/agent-loop/src/session/inbox-overflow.ts",
+        "packages/core/src/stores/migrations/index.ts",
+        "packages/core/src/approval/unattended-approval.ts",
+        "packages/core/test/unattended-approval-writer-scope.test.js",
+        "packages/core/src/bots/bot-work.ts",
+        "packages/core/src/runtime/subagent-policy.ts"
+      ]
+    }
+  ],
+  "sha256": {
+    "packages/core/src/runtime.ts": "564b7fc3667cf083839c3b6e1bbb4b6d9fa2d0b77ac4dd18853d62a4bf8cfa46",
+    "packages/core/src/runtime/session-control.ts": "adcb4cefa9ae95ec4fc63bba169d865b1b44f9829f21f4c78c149f8877fdeb01",
+    "packages/core/src/runtime/session-facade.ts": "57ef1a5d55782f26ac7b4ff6223d5d205938060dd8e58bf72f1d5ca3f9a84c00",
+    "packages/core/src/runtime/session-complete.ts": "dc1ac19365583096d95892d5f424293ab5ef2e0e3494665451a2ed951fc7f6e5",
+    "packages/agent-loop/src/turn/kernel.ts": "454c769d64eb719db5bcd441b4cdf3b1b71599bb825a5d0b232b68cc739c90ec",
+    "packages/agent-loop/src/runtime/tool-loop.ts": "0901923d09a09b3a5ee80f2a975d5c2d95344498c977944e1b2250ac1899b824",
+    "packages/agent-loop/src/session/interrupt.ts": "1842240883d68a0ca20da065c9d2ba238a24a782bca5f9148f0da51026236f96",
+    "packages/agent-loop/src/session/run-outcome.ts": "e373fac7f6f8341b6a7a043af1ef28a6aab031d805cfb5cd0f0194951eceb615",
+    "packages/core/src/runtime/tool-loop.ts": "395433d6e12e69523e65d1b2c8f77c126f4cf9485ff7bf6159d63dd36a88c3f4",
+    "packages/agent-loop/src/assembly/create-assembled-loop.ts": "acae47516f5b679639849351381b4d7a746ddcd07e1a1a2e3ddf52373b87eaf9",
+    "packages/agent-loop/src/assembly/mini-host.ts": "3c13742908f0cc48e130148bdc7af75ebb23ce00c5f51005442ab771c4ddc181",
+    "packages/agent-loop/src/assembly/normal-host.ts": "da1277222a77d1817b2c92bf926b2525d9fb54d015f28dd49f998bccd97942bb",
+    "packages/agent-loop/src/assembly/full-host.ts": "bdcef2a93867179250eee752111985bebf56f5d9ee0603b2c2584252514f337e",
+    "packages/agent-loop/src/assembly/max-host.ts": "95e8997dbc33e67efe5bd6f0d0746418989b23749e8f8f7b8bfbbb2a501fac4a",
+    "packages/core/src/runtime/l5-bindings.ts": "0c07c5753b0f6fca65dccb9912dc4a0cfa2283990a0dd828d52f9118089c2049",
+    "scripts/formal/lifecycle-model.mjs": "fa7e31c20b10016e13a081789a16a4cd459b8425b719ed2f0bc165245faf7b66",
+    "scripts/formal/lifecycle-runtime.mjs": "0def3b3c466c7d8afae039cc6c5be1271c11a76e8e73b53a338b10f02ff317f9",
+    "scripts/formal/lifecycle-verifier.mjs": "92ccfc90ab23a79031c5280cdf02bdaaf8dabadeb1dcbdf23d035f5718ab2226",
+    "scripts/formal/lifecycle-worker.mjs": "90a76d722badf5e30c6bc13217445b0e83cae4825dc2abca6480ae7ec4d8d00c",
+    "scripts/formal/lifecycle-mutations.mjs": "94f18b6266672a1118d234903bd8ce5c59def98c8f7bdb1e708cf967ee86d96b",
+    "scripts/formal/lifecycle-loader.mjs": "c82dadf04f197ff785d1e1ac83cdfaf9e62f1081892645b60134043928259441",
+    "scripts/formal/lifecycle-register.mjs": "251838988311d2a8b7b56e578ee213a7d092c38614c413a20081746482046c5f",
+    "scripts/formal/run-lifecycle-verification.mjs": "291a061844f67b532f7946e856421f578199a12170570112b6b9c0897e4c69fa",
+    "scripts/test/session-lifecycle-verification.test.mjs": "8996374d57d4a809f5f1557b905664cdfea6a278d618b8f8fb9a37985a4ca35c",
+    "skills/verify-session-lifecycle/SKILL.md": "8f8c0dc1112c315295ef0482d2c22317a78301ca4c6b0ba047f0f7f245de203b",
+    "scripts/formal/run-formal-regression.mjs": "d223e02a4ef59557f6dd93e7719a41097f5ce7ae553b8b62c147c1ff8e33a3f3",
+    ".github/workflows/release-gate.yml": "190bffb310b2635710d7124b5f18bc285a4d6387bdb5dd0b8d74a86bac83c73f",
+    "packages/core/test/session-lifecycle-state-consistency.test.js": "3614712ffaca1758d130888634f11a05b9f9ca233874f0e69d056865c9a5e0dc",
+    "packages/core/src/runtime/restart-recovery.ts": "e221e8e3ee374a97f6aa75dd08e8a81411c5f967d3caf914cbf1dd30e373dcf4",
+    "packages/core/test/restart-recovery-ownership.test.js": "e13006456b7d836d21e3d6e79bc5c387193be641b75bc65d68ac927f462d4a83",
+    "scripts/test/session-restart-recovery-fix.test.mjs": "fa6bd2422b8a9802014c6438f3a6f435c697559b8c1a5207fa356dd65aafc460",
+    "packages/core/test/subagent-delegation-policy.test.js": "0c6e2eecc3befd802e41ad358e7fce2dbd46586cab06859bf869e8c2830a08a8",
+    "packages/core/src/teams/fd-lock.ts": "d57a0749119f69108c5da9d47f93b4c6ad937c00b1e4115cc923a7c4957e3735",
+    "packages/agent-loop/src/turn/host.ts": "480fee8995c829dbe5973618d5e38859efd84e537e0daa5417bd8e7d20c4b00c",
+    "packages/core/src/storage.ts": "aa55d749fbaac626b2ffa51c78bc97e8ca47fe37717a5e5499b2772a4e3205eb",
+    "packages/core/src/stores/session-store.ts": "55cd214535b84936676393062a14cf63007e3725d7bd27aca1409075bbfa6e84",
+    "packages/agent-loop/src/session/writer-claim.ts": "349510a83419f13914d10d023d64f334abeb6484b4928746262e2fcc61e34876",
+    "packages/core/src/turn/kernel.ts": "5d2d0669686d79b480fbc6f444cf554b3587f70e57f78a20fd62497a11a3a273",
+    "packages/core/src/turn/host.ts": "c12a4c8865357f5b91565be5a25e40a4f40bc866e070646f5a3ceab81105de39",
+    "apps/daemon/src/routes/misc.ts": "68df1b182132c33f8321c37247ef3f173e6b7232b068938ad0b8f1a2e17720db",
+    "packages/core/src/session/step-inbox.ts": "eb7ae7e2a859ccf5b16c954623d678987cab123b86fbb5621895a12ad2f8949f",
+    "packages/agent-loop/src/session/step-inbox.ts": "8d4d20f5a1b079ef14ad3f1379b6f9226d11b02977c274a021bf40b252a3d105",
+    "packages/agent-loop/src/session/apply-claimed-inbox.ts": "b2e8b8659f3c9c50b0c37f0607ebd3de5b697fc24f4f6c6047147d9734ad68da",
+    "packages/agent-loop/src/session/steer-drain.ts": "0410e494db380b5bf3efc68f66c544f58491083a673bcbb231a357bccf0d27d6",
+    "packages/agent-loop/src/turn/prepare-turn-input.ts": "27fd324003a2f741b1f16661d05ef494c0dd16fd724723d9a64f85ee84e72cc0",
+    "packages/core/src/turn/prepare-turn-input.ts": "f76587fd0fd131fba0484d1d04fa77f2f1118733d7f878d4b18607ecc50513fc",
+    "packages/core/src/session/inbox-overflow.ts": "4193cda70752029b6db425ebfdb2e623080e9d3cd3608beb72fa60e4337705e5",
+    "packages/agent-loop/src/session/inbox-overflow.ts": "7b7b1cd937ccbdead275d54ad40e5be8dbafb20b904661ac6ba8d462ba1c6b77",
+    "packages/core/src/stores/migrations/index.ts": "61d61d8a9cac1eeb5b21312972244dc0b6d421f06f9ecd0092582e5f533d68b0",
+    "packages/core/src/approval/unattended-approval.ts": "74aff0a40282eaffa6a84610d4c0e2550f94eee268c99ea72f80b1b44879ebfd",
+    "packages/core/test/unattended-approval-writer-scope.test.js": "23c17f903361bc53bbb0b7733eb4bf9147b4977c4dc546f800862cf2856b9371",
+    "packages/core/src/bots/bot-work.ts": "332b105df47328e207fcb0ebbea8b6ea77a048979974c5f92d667b655638c706",
+    "packages/core/src/runtime/subagent-policy.ts": "7ea5db3ef5f2cd1481cc0ce62be6db4038018db177e7d8633fd17d79308eecb2"
+  }
+}

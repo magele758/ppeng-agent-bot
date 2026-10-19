@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useI18n, type MessageKey } from "@/lib/i18n";
 import { applyHistoryPage, historyBeforeQuery, historyPollStale, historyWindowAnchor, loadEarlierCursorAfterReset, mergeHistoryWindow, olderHistoryPageStale } from "@/lib/history-window";
+import { sameData } from "@/lib/same-data";
 import type { BotInfo } from "@/lib/types";
 import { api, json, useAction, Feedback, Result, Status } from "./shared";
 type Room = {
@@ -104,12 +105,20 @@ export function BotRooms({ bots, selectedRoomId }: { bots: BotInfo[]; selectedRo
           if (historyPollStale(active, roomIdRef.current, room.id, historyEpoch.current, epoch)) return;
           const page = history as { messages: Message[]; hasMore: boolean; nextCursor: number | null };
           const merged = mergeHistoryWindow(messagesRef.current, page.messages, true);
-          messagesRef.current = merged.messages;
-          setMessages(merged.messages);
+          if (!sameData(messagesRef.current, merged.messages)) {
+            messagesRef.current = merged.messages;
+            setMessages(merged.messages);
+          }
           // A disjoint tail skipped a page. The next older read starts at the oldest row still shown.
           if (merged.reset) rememberCursor(loadEarlierCursorAfterReset(merged.messages, page.hasMore, page.nextCursor));
-          setTurns((status as { turns: Turn[] }).turns);
-          setRoom(prev=>prev?{...prev,status:(current as {room:Room}).room.status,botIds:(current as {room:Room}).room.botIds}:(current as {room:Room}).room);
+          const turns = (status as { turns: Turn[] }).turns;
+          setTurns((prev) => (sameData(prev, turns) ? prev : turns));
+          const live = (current as { room: Room }).room;
+          setRoom((prev) => {
+            if (!prev) return live;
+            const next = { ...prev, status: live.status, botIds: live.botIds };
+            return sameData(prev, next) ? prev : next;
+          });
         })
         .catch(() => {});
     }, 2000);

@@ -11,6 +11,7 @@ import { createHistoryTools } from './session/history/tools.js';
  */
 
 import { join } from 'node:path';
+import { acquireRuntimeProcessOwnership, recoverInterruptedSessions } from './runtime/restart-recovery.js';
 import { randomUUID } from 'node:crypto';
 import { LcuComputerUseProvider, type LcuDeps } from './computer-use/lcu-provider.js';
 import { createLcuApprovalHandler } from './computer-use/approval.js';
@@ -135,6 +136,7 @@ import {
 } from './sandbox/sandbox-settings.js';
 import { probeCloudflareComputerHealth } from './sandbox/cloudflare-computer-client.js';
 import { createId } from './id.js';
+import { normalizeContextSources } from './ingestion/context-sources.js';
 import { textPart } from './runtime/session-facade.js';
 import {
   approve as approveDecision,
@@ -297,6 +299,8 @@ export class RawAgentRuntime {
     userId: string;
   } | undefined;
 
+  private releaseProcessOwnership: () => void = () => {};
+
   constructor(options: RuntimeOptions) {
     this.repoRoot = options.repoRoot;
     this.stateDir = options.stateDir;
@@ -310,8 +314,20 @@ export class RawAgentRuntime {
         }
       : undefined;
     this.store = new SqliteStateStore(join(this.stateDir, 'runtime.sqlite'));
-    recoverBotWork(this.store);
-    const interruptedSubagents = markInterruptedSubagentsUnknown(this.store);
+    let interruptedSubagents: SessionRecord[] = [];
+    try {
+      const ownership = acquireRuntimeProcessOwnership(this.store);
+      if (ownership) {
+        this.releaseProcessOwnership = ownership.release;
+        recoverInterruptedSessions(this.store);
+        recoverBotWork(this.store);
+        interruptedSubagents = markInterruptedSubagentsUnknown(this.store);
+      }
+    } catch (error) {
+      this.releaseProcessOwnership();
+      this.store.db.close();
+      throw error;
+    }
     if (interruptedSubagents.length > 0) {
       this.log.warn('in-flight subagents marked unknown after restart', {
         count: interruptedSubagents.length,
@@ -559,9 +575,15 @@ export class RawAgentRuntime {
     return this.connectors.software.unconfirmedForSession(sessionId, startedAt).length > 0;
   }
 
-  cancelSession(sessionId: string): void {
-    blockHumanContinuations(this.store, sessionId);
-    cancelSessionFn(this.sessionControlHost(), sessionId);
+  cancelSession(sessionId: string, options?: { expectedWriterRunId?: string }): void {
+    this.store.transaction(() => {
+      if (options?.expectedWriterRunId !== undefined && !this.store.isWriterCurrent(sessionId, options.expectedWriterRunId)) {
+        this.emitTrace(sessionId, { kind: 'stale_writer_rejected', payload: { expectedWriterRunId: options.expectedWriterRunId } });
+        return;
+      }
+      blockHumanContinuations(this.store, sessionId);
+      cancelSessionFn(this.sessionControlHost(), sessionId, options?.expectedWriterRunId);
+    });
   }
 
   /**
@@ -797,6 +819,7 @@ export class RawAgentRuntime {
     message?: string;
     imageAssetIds?: string[];
     attachmentIds?: string[];
+    contextSources?: unknown;
     agentId?: string;
     background?: boolean;
     metadata?: Record<string, unknown>;
@@ -806,12 +829,14 @@ export class RawAgentRuntime {
       message: undefined,
       imageAssetIds: undefined
     });
+    const sources = normalizeContextSources(input.contextSources);
     const extra = this.attachmentIngest.expandForMessage(session.id, input.attachmentIds);
     const imageAssetIds = [...(input.imageAssetIds ?? []), ...extra.imageAssetIds];
     const text = [input.message, ...extra.textParts].filter((s) => String(s ?? '').trim()).join('\n\n');
-    if (text || imageAssetIds.length > 0) {
+    if (text || imageAssetIds.length > 0 || sources.length > 0) {
       return sendUserMessageFn(sessionFacadeFrom(this.l5()), session.id, text || '(attachment)', {
-        imageAssetIds
+        imageAssetIds,
+        contextSources: sources
       });
     }
     return session;
@@ -823,12 +848,14 @@ export class RawAgentRuntime {
     message?: string;
     imageAssetIds?: string[];
     attachmentIds?: string[];
+    contextSources?: unknown;
     agentId?: string;
     blockedBy?: string[];
     background?: boolean;
     metadata?: Record<string, unknown>;
   }): { task: TaskRecord; session: SessionRecord } {
-    const hasAtt = Boolean(input.attachmentIds?.length);
+    const sources = normalizeContextSources(input.contextSources);
+    const hasAtt = Boolean(input.attachmentIds?.length) || sources.length > 0;
     const result = createTaskSessionFn(sessionFacadeFrom(this.l5()), {
       ...input,
       message: hasAtt ? undefined : input.message,
@@ -838,9 +865,10 @@ export class RawAgentRuntime {
     const extra = this.attachmentIngest.expandForMessage(result.session.id, input.attachmentIds);
     const imageAssetIds = [...(input.imageAssetIds ?? []), ...extra.imageAssetIds];
     const text = [input.message, ...extra.textParts].filter((s) => String(s ?? '').trim()).join('\n\n');
-    if (text || imageAssetIds.length > 0) {
+    if (text || imageAssetIds.length > 0 || sources.length > 0) {
       sendUserMessageFn(sessionFacadeFrom(this.l5()), result.session.id, text || '(attachment)', {
-        imageAssetIds
+        imageAssetIds,
+        contextSources: sources
       });
     }
     return { task: result.task, session: this.store.getSession(result.session.id) ?? result.session };
@@ -979,14 +1007,24 @@ export class RawAgentRuntime {
   sendUserMessage(
     sessionId: string,
     message: string,
-    options?: { imageAssetIds?: string[]; attachmentIds?: string[]; autoRun?: boolean; replyTo?: string }
+    options?: {
+      imageAssetIds?: string[];
+      attachmentIds?: string[];
+      contextSources?: unknown;
+      autoRun?: boolean;
+      replyTo?: string;
+    }
   ): SessionRecord {
     const extra = this.attachmentIngest.expandForMessage(sessionId, options?.attachmentIds);
     const imageAssetIds = [...(options?.imageAssetIds ?? []), ...extra.imageAssetIds];
     const text = [message, ...extra.textParts].filter((s) => String(s).trim()).join('\n\n');
     const body = text || (imageAssetIds.length > 0 ? '(attachment)' : message);
     const append = () => {
-      const session = sendUserMessageFn(sessionFacadeFrom(this.l5()), sessionId, body, { imageAssetIds, replyTo: options?.replyTo });
+      const session = sendUserMessageFn(sessionFacadeFrom(this.l5()), sessionId, body, {
+        imageAssetIds,
+        replyTo: options?.replyTo,
+        contextSources: options?.contextSources
+      });
       if (options?.autoRun) requestHumanRun(this.store, sessionId);
       return session;
     };
@@ -1006,7 +1044,7 @@ export class RawAgentRuntime {
       ? admit()
       : withHumanContinuationAdmission(this.store, sessionId, admit);
     if (ack.status !== 'not_submitted' && opts?.steerMode === 'subagent') {
-      this.startSteeringSubagent(sessionId, text, opts.subagentRole, ack.item.id);
+      this.startSteeringSubagent(sessionId, text, opts.subagentRole, ack.item.id, opts.contextParts);
       // SubAgent is a parallel child — do not also drain the same text as a parent steer.
       this.store.removeUnclaimedInbox(sessionId, ack.item.id);
     }
@@ -1033,7 +1071,7 @@ export class RawAgentRuntime {
   promoteSteerToSubagent(sessionId: string, itemId: string, role?: string) {
     const item = this.store.getUnclaimedInbox(sessionId, itemId);
     if (!item) throw new NotFoundError('Steer', itemId);
-    const spawned = this.startSteeringSubagent(sessionId, item.text, role, item.id);
+    const spawned = this.startSteeringSubagent(sessionId, item.text, role, item.id, item.contextParts);
     this.store.removeUnclaimedInbox(sessionId, itemId);
     dropHumanSteerContinuation(this.store, sessionId, itemId);
     return { spawned: true as const, childSessionId: spawned?.sessionId, item };
@@ -1043,7 +1081,8 @@ export class RawAgentRuntime {
     parentSessionId: string,
     prompt: string,
     role?: string,
-    steerId?: string
+    steerId?: string,
+    contextParts?: import('@ppeng/api-types').TextPart[]
   ): { sessionId: string } | undefined {
     const parent = this.store.getSession(parentSessionId);
     if (!parent) return undefined;
@@ -1072,7 +1111,7 @@ export class RawAgentRuntime {
             ...inheritBotIdentityMetadata(parent, this.store)
           }
         });
-        this.store.appendMessage(childSession.id, 'user', [textPart(childPrompt)]);
+        this.store.appendMessage(childSession.id, 'user', [textPart(childPrompt), ...(contextParts ?? [])]);
         const done = this.runSession(childSession.id).then(() => undefined);
         return { sessionId: childSession.id, done };
       }
@@ -1391,6 +1430,11 @@ export class RawAgentRuntime {
     chunk: ModelStreamChunk,
     direct?: (chunk: ModelStreamChunk) => void
   ): void {
+    try { this.store.assertCurrentWriter(sessionId); }
+    catch {
+      this.emitTrace(sessionId, { kind: 'stale_writer_rejected', payload: { channel: 'model_stream' } });
+      return;
+    }
     direct?.(chunk);
     const listeners = this.modelStreamListeners.get(sessionId);
     if (!listeners) return;
@@ -1505,7 +1549,8 @@ export class RawAgentRuntime {
     const kernelVariant = loopKv?.kernelVariant ?? 'agent-loop';
     const assemblyPreset: LoopPreset = parseLoopPreset(loopKv?.assemblyPreset) ?? 'max';
     this.log.info(`runSession kernel=${kernelVariant} assembly=${assemblyPreset}`);
-    this.sessionAbortControllers.set(sessionId, new AbortController());
+    const runController = new AbortController();
+    this.sessionAbortControllers.set(sessionId, runController);
     const unlinkCallerSignal = this.cancelOnAbort(sessionId, callerSignal);
     const coreHost = bindTurnKernelHost(this.l5());
     const sessionMaxTurns = resolveSessionMaxTurns(
@@ -1565,6 +1610,7 @@ export class RawAgentRuntime {
       })
       .finally(() => {
       unlinkCallerSignal();
+      if (this.sessionAbortControllers.get(sessionId) === runController) this.sessionAbortControllers.delete(sessionId);
       this.runningSessions.delete(sessionId);
       clearActiveWorkPiece(sessionId);
       releaseHumanModelInput(this.store, sessionId);
@@ -1578,7 +1624,15 @@ export class RawAgentRuntime {
   /** Cancel `sessionId` when `signal` aborts; returns the unlink function. */
   private cancelOnAbort(sessionId: string, signal: AbortSignal | undefined): () => void {
     if (!signal) return () => undefined;
-    const cancel = () => this.cancelSession(sessionId);
+    const controller = this.sessionAbortControllers.get(sessionId);
+    const cancel = () => {
+      if (controller !== this.sessionAbortControllers.get(sessionId) || controller?.signal.aborted) return;
+      const writerRunId = this.store.getLocalWriterId(sessionId);
+      // Admission is asynchronous. An aborted contender has no authority over
+      // a writer owned by another runtime, but must stop its own pending run.
+      if (writerRunId === undefined) { controller?.abort(); return; }
+      this.cancelSession(sessionId, { expectedWriterRunId: writerRunId });
+    };
     if (signal.aborted) {
       cancel();
       return () => undefined;
@@ -1608,7 +1662,13 @@ export class RawAgentRuntime {
       backgroundJobAborts: this.backgroundJobAborts,
       mcpManager: this.mcpManager,
       store: this.store,
-      beforeClose: () => flushPreparedContextSnapshots(this.store)
+      beforeClose: () => {
+        try {
+          flushPreparedContextSnapshots(this.store);
+        } finally {
+          this.releaseProcessOwnership();
+        }
+      }
     });
   }
 

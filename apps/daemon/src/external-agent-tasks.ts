@@ -8,6 +8,19 @@ function identity(task: TaskRecord): HandoffIdentity | undefined {
   return task.metadata.externalAgent as HandoffIdentity | undefined;
 }
 
+function taskStateReason(status: string, outcome?: { kind?: string; reason?: string }): string | undefined {
+  if (status === 'waiting_approval') return 'human_approval_required';
+  if (status === 'waiting_input') return 'human_input_required';
+  if (status === 'unknown') return 'execution_state_unknown';
+  if (status === 'failed') return outcome?.kind === 'failed' ? outcome.reason ?? status : status;
+  if (status === 'cancelled') return outcome?.kind === 'aborted' ? outcome.reason ?? status : status;
+  return undefined;
+}
+
+function waitingForInput(status: string, pending: unknown): boolean {
+  return pending === true && ['queued', 'running', 'waiting_approval'].includes(status);
+}
+
 /** Expose task output/progress, never the full session, system prompts, tools or credentials. */
 export function externalTaskView(runtime: RawAgentRuntime, client: ExternalAgentClient, id: string) {
   const task = runtime.getTask(id);
@@ -19,12 +32,11 @@ export function externalTaskView(runtime: RawAgentRuntime, client: ExternalAgent
   if (session?.status === 'running') status = 'running';
   if (session?.status === 'completed') status = 'completed';
   if (session?.status === 'failed' || outcome?.kind === 'failed') status = 'failed';
-  if (outcome?.kind === 'aborted' || task.status === 'cancelled') status = 'cancelled';
   if (session?.status === 'waiting_approval') status = 'waiting_approval';
-  if (pendingInput) status = 'waiting_input';
-  const reason = status === 'waiting_approval' ? 'human_approval_required'
-    : status === 'waiting_input' ? 'human_input_required'
-    : status === 'failed' || status === 'cancelled' ? outcome?.reason ?? status : undefined;
+  if (session?.status === 'unknown') status = 'unknown';
+  if (outcome?.kind === 'aborted' || task.status === 'cancelled') status = 'cancelled';
+  if (waitingForInput(status, pendingInput)) status = 'waiting_input';
+  const reason = taskStateReason(status, outcome);
   return {
     id: task.id, title: task.title, agentId: task.ownerAgentId,
     source: identity(task)!.source, sourceTaskId: identity(task)!.sourceTaskId,

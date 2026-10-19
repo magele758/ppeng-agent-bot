@@ -34,7 +34,7 @@ describe('prepareTurnInput', () => {
     const surface = createMemorySurfaceStore();
     const session = surface.createSession({ title: 't', mode: 'chat', agentId: 'a' });
     surface.appendMessage(session.id, 'user', [{ type: 'text', text: 'hello' }]);
-    surface.enqueueSteer(session.id, 'steer me', { target: 'next-step' });
+    surface.enqueueSteer(session.id, 'steer me', { target: 'next-step', contextParts: [{ type: 'text', text: 'unique dragged context' }] });
 
     const order: string[] = [];
     let compactCalls = 0;
@@ -71,6 +71,7 @@ describe('prepareTurnInput', () => {
     expect(order).toEqual(['compact', 'claim', 'fold', 'view', 'appendix']);
     expect(compactCalls).toBe(1);
     expect(packed.claimedInbox).toHaveLength(1);
+    expect(JSON.stringify(packed.messages)).toContain('unique dragged context');
     expect(packed.foldSeqs.length).toBeGreaterThan(0);
     const lastUser = [...packed.messages].reverse().find((m) => m.role === 'user');
     expect(lastUser?.parts.some((p) => p.type === 'text' && p.text.includes('[memory] note'))).toBe(

@@ -2,6 +2,7 @@
  * Registered files a bot has already produced, and a guarded "open parent folder".
  * Callers pass a material id. Paths never come from the request body.
  */
+import type { EventEmitter } from 'node:events';
 import { realpathSync } from 'node:fs';
 import { spawn as nodeSpawn } from 'node:child_process';
 import { dirname, isAbsolute, join, relative, sep } from 'node:path';
@@ -18,7 +19,7 @@ export type DirectoryOpener = (
   command: string,
   args: string[],
   options: { env: NodeJS.ProcessEnv; detached: boolean; stdio: 'ignore'; windowsHide: boolean }
-) => { unref?: () => void };
+) => Pick<EventEmitter, 'once'> & { unref?: () => void };
 
 const SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,200}$/;
 
@@ -158,7 +159,7 @@ function openCommand(platform: NodeJS.Platform): string {
 export function openParentDirectory(
   parentDir: string,
   options?: { platform?: NodeJS.Platform; spawn?: DirectoryOpener; env?: NodeJS.ProcessEnv }
-): void {
+): Promise<void> {
   const spawnFn = options?.spawn ?? ((command, args, opts) => nodeSpawn(command, args, opts));
   const child = spawnFn(openCommand(options?.platform ?? process.platform), [parentDir], {
     env: sanitizeSpawnEnv({ base: options?.env, stripCredentials: true }),
@@ -166,7 +167,14 @@ export function openParentDirectory(
     stdio: 'ignore',
     windowsHide: true
   });
-  child.unref?.();
+  return new Promise<void>((resolve, reject) => {
+    child.once('error', reject);
+    child.once('exit', (code: number | null) => {
+      if (code !== 0) { reject(new RevealRejected()); return; }
+      child.unref?.();
+      resolve();
+    });
+  });
 }
 
 export function revealRegisteredMaterial(input: {
@@ -177,10 +185,9 @@ export function revealRegisteredMaterial(input: {
   platform?: NodeJS.Platform;
   spawn?: DirectoryOpener;
   env?: NodeJS.ProcessEnv;
-}): string {
+}): Promise<string> {
   const parent = resolveBotMaterialParent(input);
-  openParentDirectory(parent, input);
-  return parent;
+  return openParentDirectory(parent, input).then(() => parent);
 }
 
 export type PublicBotMaterial = {
