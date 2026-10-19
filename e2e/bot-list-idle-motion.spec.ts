@@ -32,7 +32,9 @@ test('reduced motion stops idle animation and retains working cues [AC:bot-list-
   await page.goto('/#/bot');
   const faces = page.locator('#sessionListMini .session-item__face svg.bot-face');
   await expect(faces.locator('[data-bob]').first()).toBeVisible();
-  expect(await faces.evaluateAll(nodes => nodes.reduce((count, face) => count + face.getAnimations({ subtree: true }).length, 0))).toBe(0);
+  // Hydration/status changes can leave cancelled CSS animations in the browser's
+  // animation list until its next rendering update. Wait for the observable state.
+  await expect.poll(() => faces.evaluateAll(nodes => nodes.reduce((count, face) => count + face.getAnimations({ subtree: true }).length, 0))).toBe(0);
   const working = faces.filter({ has: page.locator('title') }).first();
   await expect(working).toHaveAttribute('data-face-working', 'true');
   await expect(working.locator('.bot-face__work-label')).toBeVisible();
