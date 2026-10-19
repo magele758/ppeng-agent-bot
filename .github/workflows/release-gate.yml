@@ -32,9 +32,9 @@ jobs:
   tests:
     name: Build, unit tests, HTTP regression, E2E
     runs-on: ubuntu-latest
-    # The four process-verification gates and full formal regression each take
-    # about five minutes, in addition to the unit and browser suites.
-    timeout-minutes: 35
+    # Hosted runners need about 14 minutes for the process gates and 18 for units,
+    # followed by full formal verification, package/API regressions and browser E2E.
+    timeout-minutes: 55
     steps:
       - name: Checkout
         uses: actions/checkout@v4
