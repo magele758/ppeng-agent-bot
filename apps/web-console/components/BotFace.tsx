@@ -13,6 +13,8 @@ import {
   ellipsisScale,
   happyBeat,
   hoverDelight,
+  BUSY_BLINK_PACE,
+  busyPose,
   mouthKindForGesture,
   mouthPath,
   mouthFilled,
@@ -110,14 +112,22 @@ function Silhouette({ shape, fill, dashed }: { shape: BotFaceShape | 'empty'; fi
     case 'cloud':
       return (
         <g fill={fill} stroke={stroke} strokeWidth="1.2" strokeDasharray={dash}>
-          <ellipse cx="24" cy="36" rx="12" ry="10" />
-          <ellipse cx="36" cy="30" rx="14" ry="12" />
-          <ellipse cx="48" cy="36" rx="10" ry="9" />
-          <rect x="16" y="34" width="36" height="12" rx="6" />
+          <ellipse cx="20" cy="40" rx="16" ry="16" />
+          <ellipse cx="34" cy="26" rx="16" ry="15" />
+          <ellipse cx="50" cy="38" rx="13" ry="14" />
+          <rect x="12" y="34" width="40" height="20" rx="10" />
         </g>
       );
     case 'star':
-      return <path d="M32 4 39 25 60 32 39 39 32 60 25 39 4 32 25 25Z" fill={fill} stroke={stroke} strokeWidth="1.2" strokeDasharray={dash} />;
+      return (
+        <path
+          d="M32 10C50 6 60 18 58 34C56 52 44 60 32 58C16 60 4 48 8 32C12 14 18 8 32 10Z"
+          fill={fill}
+          stroke={stroke}
+          strokeWidth="1.2"
+          strokeDasharray={dash}
+        />
+      );
     case 'clover':
       return (
         <g fill={fill} stroke={stroke} strokeWidth="1.2" strokeDasharray={dash}>
@@ -172,7 +182,15 @@ function Silhouette({ shape, fill, dashed }: { shape: BotFaceShape | 'empty'; fi
     case 'triangle':
       return <path d="M32 8 58 54H6Z" fill={fill} stroke={stroke} strokeWidth="1.2" strokeDasharray={dash} />;
     case 'house':
-      return <path d="M32 6 58 28V58H6V28Z" fill={fill} stroke={stroke} strokeWidth="1.2" strokeDasharray={dash} />;
+      return (
+        <path
+          d="M12 40C12 18 20 8 32 8C44 8 52 18 52 40V46C52 56 44 60 32 60C20 60 12 56 12 46Z"
+          fill={fill}
+          stroke={stroke}
+          strokeWidth="1.2"
+          strokeDasharray={dash}
+        />
+      );
     case 'splat':
       return (
         <path
@@ -285,7 +303,9 @@ export function BotFace({
         happyUntilMs: happyUntilRef.current
       });
       root.setAttribute('data-face-gesture', gesture);
-      const blinkStep = reduced ? { clock: blink, open: 1 } : stepBlinkClock(blink, now, Math.random());
+      const blinkStep = reduced
+        ? { clock: blink, open: 1 }
+        : stepBlinkClock(blink, now, Math.random(), BUSY_BLINK_PACE);
       blink = blinkStep.clock;
       if (!reduced && now >= idle.untilMs) idle = nextIdleLook(now, Math.random(), Math.random());
       const rect = root.getBoundingClientRect();
@@ -297,21 +317,24 @@ export function BotFace({
         idle
       });
       // Work motion is driven by elapsed time, independent of streamed tokens.
-      const wave = Math.sin(now * Math.PI * 2 / 1800);
-      const scan = Math.sin(now * Math.PI * 2 / 2400);
-      const lookX = moodRef.current === 'tool' ? scan * 0.5 : pose.lookX + wave * 0.2;
-      const targetY = pose.lookY + scan * 0.12;
+      const busy = busyPose(now);
+      const lookX = reduced ? 0 : moodRef.current === 'tool' ? busy.lookX : pose.lookX * 0.25 + busy.lookX;
+      const targetY = reduced ? 0 : busy.lookY;
       shownX = reduced ? 0 : damp(shownX, lookX, dt);
       shownY = reduced ? 0 : damp(shownY, targetY, dt);
-      let bob = reduced ? 0 : wave * 1.25;
+      let bob = reduced ? 0 : busy.bob;
+      let tilt = reduced ? 0 : busy.tilt;
       if (!reduced && gesture === 'hover' && hoverAtRef.current !== null) {
         bob = hoverDelight(now - hoverAtRef.current).dy * 0.45;
+        tilt = 0;
       } else if (!reduced && gesture === 'happy' && happyUntilRef.current !== null) {
         bob = happyBeat(now - (happyUntilRef.current - HAPPY_BEAT_MS)).dy * 0.4;
+        tilt = 0;
       } else if (!reduced && gesture === 'sleepy') {
         bob = sleepyBreath((now % 2800) / 2800) * 0.35;
+        tilt = 0;
       }
-      root.querySelector('[data-bob]')?.setAttribute('transform', `translate(0 ${bob.toFixed(2)})`);
+      root.querySelector('[data-bob]')?.setAttribute('transform', `translate(0 ${bob.toFixed(2)}) rotate(${tilt.toFixed(2)} 32 36)`);
       root.querySelector('[data-look]')?.setAttribute('transform', `translate(${(shownX * 3.4).toFixed(2)} ${(shownY * 2.2).toFixed(2)})`);
       const openness = gesture === 'sleepy' ? 0.34 * blinkStep.open : blinkStep.open;
       const drop = gesture === 'sleepy' ? 1.4 : 0;

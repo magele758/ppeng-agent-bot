@@ -6,7 +6,9 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import ts from 'typescript';
 import sharp from 'sharp';
-import { faceLayout } from '../lib/bot-face.ts';
+import { faceLayout, BOT_FACE_PICKER_SHAPES } from '../lib/bot-face.ts';
+import { en } from '../lib/i18n/messages/en/index.ts';
+import { zh } from '../lib/i18n/messages/zh/index.ts';
 
 // Render the actual TSX component in this node:test suite, preserving React's
 // server renderer while resolving the app alias and ignoring its CSS import.
@@ -168,6 +170,121 @@ test('reduced motion holds body and expression still with a visible localized wo
     assert.match(markup, /class="bot-face__work-label"[^>]*>工作中/);
     const css = readFileSync(new URL('./bot-face.css', import.meta.url), 'utf8');
     assert.match(css, /prefers-reduced-motion: reduce/);
+    cleanups.forEach(cleanup => { if (typeof cleanup === 'function') cleanup(); });
+  } finally { Object.assign(globals, originals); }
+});
+
+async function measureListFace(shape: string) {
+  const size = 40;
+  const layout = faceLayout(shape as 'cloud');
+  const markup = renderToStaticMarkup(React.createElement(BotFace, {
+    name: 'Ubuntu2', shape, color: 'purple', mood: 'idle'
+  }));
+  const { data, info } = await sharp(Buffer.from(markup.replace('<svg ', `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" `)))
+    .ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const pixel = (x: number, y: number) => {
+    const px = Math.max(0, Math.min(info.width - 1, Math.round(x * size / 64)));
+    const py = Math.max(0, Math.min(info.height - 1, Math.round(y * size / 64)));
+    const i = (py * info.width + px) * 4;
+    return [...data.subarray(i, i + 4)];
+  };
+  const white = (sample: number[]) => sample[0] > 190 && sample[1] > 190 && sample[2] > 190 && sample[3] > 200;
+  let mouthInk = 0;
+  for (let y = layout.mouthY - 1; y <= layout.mouthY + 4; y++) {
+    for (let x = 27; x <= 37; x++) {
+      if (white(pixel(x, y))) mouthInk++;
+    }
+  }
+  let minX = size;
+  let minY = size;
+  let maxX = 0;
+  let maxY = 0;
+  const rows = new Array<number>(info.height).fill(0);
+  for (let y = 0; y < info.height; y++) {
+    let left = -1;
+    let right = -1;
+    for (let x = 0; x < info.width; x++) {
+      if (data[(y * info.width + x) * 4 + 3] > 40) {
+        if (left < 0) left = x;
+        right = x;
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+      }
+    }
+    rows[y] = left < 0 ? 0 : right - left + 1;
+  }
+  const height = maxY - minY + 1;
+  return {
+    markup,
+    mouthInk,
+    height,
+    eyeL: white(pixel(layout.left, layout.eyeY)),
+    eyeR: white(pixel(layout.right, layout.eyeY)),
+    widthNearTop: rows[minY + Math.round((height - 1) * 0.1)]
+  };
+}
+
+test('尖角星和尖顶房子换成圆润脸，选择器和列表用同一张 [AC:bot-face-readable-shapes#AC-1] [AC:bot-face-readable-shapes#AC-2]', async () => {
+  const source = readFileSync(new URL('./BotFace.tsx', import.meta.url), 'utf8');
+  const list = readFileSync(new URL('./SessionListRow.tsx', import.meta.url), 'utf8');
+  const picker = readFileSync(new URL('./BotFaceChoice.tsx', import.meta.url), 'utf8');
+  assert.match(list, /from '\.\/BotFace'/);
+  assert.match(picker, /from '\.\/BotFace'/);
+  assert.equal(source.includes('M32 4 39 25 60 32'), false);
+  assert.equal(source.includes('M32 6 58 28V58H6V28Z'), false);
+  assert.notEqual(zh.agents.bots.faceShape.star, '星星');
+  assert.notEqual(zh.agents.bots.faceShape.house, '房子');
+  assert.notEqual(en.agents.bots.faceShape.star, 'Star');
+  assert.notEqual(en.agents.bots.faceShape.house, 'House');
+  for (const shape of ['star', 'house'] as const) {
+    const face = await measureListFace(shape);
+    assert.match(face.markup, new RegExp(`data-bot-shape="${shape}"`));
+    assert.match(face.markup, /data-mouth=""[^>]*opacity="1"/);
+    assert.equal(face.eyeL && face.eyeR, true, `${shape} eyes stay visible`);
+    assert.ok(face.mouthInk > 0, `${shape} mouth stays inside the silhouette`);
+    assert.ok(face.widthNearTop >= 16, `${shape} is rounded, top width ${face.widthNearTop}`);
+  }
+});
+
+test('云朵在列表尺寸下嘴巴可见 [AC:bot-face-readable-shapes#AC-3]', async () => {
+  const cloud = await measureListFace('cloud');
+  assert.equal(cloud.eyeL && cloud.eyeR, true);
+  assert.ok(cloud.mouthInk > 0, `cloud mouth ink ${cloud.mouthInk}`);
+  assert.ok(cloud.height >= 26, `cloud is still a thin sliver, height ${cloud.height}`);
+  for (const shape of BOT_FACE_PICKER_SHAPES) {
+    if (shape === 'cloud') continue;
+    const face = await measureListFace(shape);
+    assert.ok(face.mouthInk > 0, `${shape} mouth remains visible`);
+  }
+});
+
+test('干活时头像连续侧看和点头，空闲列表仍是慢动作 [AC:bot-face-readable-shapes#AC-4]', () => {
+  const globals = globalThis as any;
+  const originals = { window: globals.window, document: globals.document, requestAnimationFrame: globals.requestAnimationFrame };
+  let callback: (now: number) => void;
+  globals.window = { matchMedia: () => ({ matches: false }), addEventListener() {}, removeEventListener() {} };
+  globals.document = { hidden: false };
+  globals.requestAnimationFrame = (next: (now: number) => void) => { callback = next; return 1; };
+  try {
+    const { root, nodes } = motionRoot();
+    const effects: Array<() => unknown> = [];
+    const { BotFace: Face } = loadComponent('./BotFace.tsx', effects, root);
+    renderToStaticMarkup(React.createElement(Face, { name: 'Ubuntu2', shape: 'cloud', color: 'purple', mood: 'speaking' }));
+    const cleanups = effects.map(effect => effect());
+    const samples = [1000, 1260, 1520, 2100].map((now) => {
+      callback(now);
+      return nodes['[data-bob]'].getAttribute('transform') ?? '';
+    });
+    assert.ok(samples.every((body) => /rotate\([-\d.]+ 32 36\)/.test(body)), `body should tilt while busy: ${samples.join(' | ')}`);
+    const tilts = samples.map((body) => Number(/rotate\(([-\d.]+)/.exec(body)?.[1]));
+    assert.ok(Math.max(...tilts) - Math.min(...tilts) > 4, `tilt should keep changing: ${tilts.join(',')}`);
+    const css = readFileSync(new URL('./bot-face.css', import.meta.url), 'utf8');
+    const working = css.slice(css.indexOf('@keyframes bot-face-working'), css.indexOf('@keyframes bot-face-idle-body'));
+    assert.match(working, /translate\(-/);
+    assert.match(css, /bot-face-working 0\.\d+s/);
+    assert.match(css, /bot-face-idle-body 8\.8s/);
     cleanups.forEach(cleanup => { if (typeof cleanup === 'function') cleanup(); });
   } finally { Object.assign(globals, originals); }
 });
