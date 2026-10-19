@@ -1,0 +1,56 @@
+id: superbot-factory-setup
+title: Super Bot 独立配好多机软件工厂
+status: approved
+requirement: |
+  如果我想要super bot有超级大的权限，可以把这一套都独立的完成，需要给他加哪些能力，放开哪些权限，我觉得super bot的权限可以是全能的，分多个agent先分析，然后给我结论
+  那就分多个agent去完成，我想要让他能力超强
+owner: user
+notes: |
+  负责人已确认这 11 条。实现前先写带标签的失败测试，通过后再把 status 改为 implemented。
+  「超强」指 Super Bot 能独自做完多机工厂的配置和只读试跑。
+  连机器仍用已经配好的 SSH 别名。不把 daemon 访问令牌、SSH 私钥交给它，也不让它抓取内网地址。
+criteria:
+  - id: AC-1
+    given: 主人正在和 Super Bot 对话，多机工厂还没有这份配置
+    when: 主人让 Super Bot 配好机器的 SSH 别名、容量、关联 Bot，并用 Super Bot 自己做协调
+    then: 「设置 → 运维 → 多机软件工厂」里能看到这份已保存的配置，且只属于这位主人
+  - id: AC-2
+    given: 还没有给工厂用的群
+    when: 主人让 Super Bot 准备工厂
+    then: 出现一个包含 Super Bot 的群，工厂配置指向这个群
+  - id: AC-3
+    given: 某台机器已保存在工厂里，SSH 别名能连上，远端有 Git 检出
+    when: 主人让 Super Bot 找出这台机器上的仓库
+    then: Super Bot 列出这些检出的绝对路径；只有一个时，这台机器的仓库路径就是它
+  - id: AC-4
+    given: 主人没有指定协调 Bot
+    when: Super Bot 保存工厂配置
+    then: 协调 Bot 是 Super Bot 自己，并且它已是该群成员
+  - id: AC-5
+    given: 主人没有指定谁可以派单
+    when: Super Bot 保存工厂配置
+    then: 派单名单里有这位主人，他可以发起这台机器的连接检查
+  - id: AC-6
+    given: 新建的工厂配置，没有人要求打开巡检
+    when: Super Bot 保存配置
+    then: 巡检保持关闭
+  - id: AC-7
+    given: 工厂配置已经保存，巡检是关闭的
+    when: 主人明确让 Super Bot 打开巡检
+    then: 巡检变为开启，页面上看得到
+  - id: AC-8
+    given: Super Bot 已经是协调 Bot，工厂配置已生效
+    when: 主人再让它修改机器、仓库或巡检
+    then: 修改能保存，页面上能看到新结果
+  - id: AC-9
+    given: 跟 Super Bot 说话的人不是这套安装的主人，也不是管理员
+    when: 他让 Super Bot 改工厂配置
+    then: 已有配置不变，并说明没有权限
+  - id: AC-10
+    given: 机器已通过连接检查，仓库路径已填，主人在派单名单里，协调 Bot 是 Super Bot
+    when: 主人让 Super Bot 对这台机器做一次只读试跑
+    then: 只读试跑开始；远端没有执行主人没点名的其它命令
+  - id: AC-11
+    given: Super Bot 正在完成上述配置或试跑
+    when: 它连接机器并保存配置
+    then: 它拿不到 daemon 的访问令牌，读不到 SSH 私钥，也不会去抓取内网地址
