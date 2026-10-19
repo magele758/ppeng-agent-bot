@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { FactoryDevelopment, DevelopmentTask } from "./FactoryDevelopment";
 import { api } from "@/lib/api";
 import { useI18n, type MessageKey } from "@/lib/i18n";
 
@@ -28,6 +29,8 @@ type Task = {
   machineId: string;
   status: string;
   updatedAt: string;
+  development?: {stage:string;round:number;baseline?:string;delivery?:string;decisions?:unknown[]};
+  evidenceCurrent?: boolean;
   identity?: string;
   startedAt?: string;
   finishedAt?: string;
@@ -162,6 +165,7 @@ export function FactoryView() {
         <FactoryTasks controller={controller} />
         <FactoryPatrol controller={controller} />
         <FactoryCommands controller={controller} />
+        <FactoryDevelopment machines={settings.machines} refresh={controller.refresh} />
       </>}
     </section>
   );
@@ -584,11 +588,11 @@ function FactoryTasks({ controller }: { controller: FactoryController }) {
               <tr key={task.id}>
                 <td>{task.id}</td>
                 <td>{task.machineId}</td>
-                <td>{status(task.status)}</td>
+                <td>{task.development ? `${task.development.stage} · ${t("factory.devRound")}: ${task.development.round}` : status(task.status)}</td>
                 <td>{new Date(task.updatedAt).toLocaleString()}</td>
                 <td>
-                  <FactoryTaskEvidence task={task} status={status} />
-                  {task.status === "queued" && (
+                  {task.development ? <DevelopmentTask task={task} setTask={() => {void refresh();}} /> : <FactoryTaskEvidence task={task} status={status} />}
+                  {!task.development && task.status === "queued" && (
                     <button
                       disabled={busy}
                       onClick={() =>

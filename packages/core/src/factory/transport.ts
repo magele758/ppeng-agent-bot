@@ -1,3 +1,6 @@
+import { createHash } from "node:crypto";
+import { DEVELOPMENT_WORKER } from "./development-worker.js";
+import type { DevelopmentPolicy, DevelopmentPreflight } from "./development-types.js";
 import { spawn, type ChildProcess } from "node:child_process";
 import { sanitizeSpawnEnv } from "../sandbox/env-sanitizer.js";
 import {
@@ -119,8 +122,9 @@ const REPORT_STATES = new Set([
   "succeeded",
   "failed",
   "timed_out",
+  "cancelled",
 ]);
-function verifiedReport(value: unknown): FactoryReport {
+function verifiedReport(value: unknown, development = false): FactoryReport {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new Error("Invalid remote receipt");
   const r = value as Record<string, unknown>;
@@ -134,11 +138,11 @@ function verifiedReport(value: unknown): FactoryReport {
   )
     throw new Error("Invalid remote receipt");
   if (
-    ["succeeded", "failed", "timed_out"].includes(String(r.status)) &&
+    ["succeeded", "failed", "timed_out", "cancelled"].includes(String(r.status)) &&
     r.finished !== true
   )
     throw new Error("Unverified remote receipt");
-  if (r.status === "succeeded") {
+  if (r.status === "succeeded" && !development) {
     const result = r.result as Record<string, unknown> | undefined;
     if (
       !result ||
@@ -158,14 +162,18 @@ export class SshFactoryTransport implements FactoryTransport {
     machine: FactoryMachine,
     action: string,
     task?: FactoryTask,
+    extra?: Record<string, unknown>,
   ): Promise<unknown> {
     if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/.test(machine.sshAlias))
       return Promise.reject(new Error("Invalid SSH alias"));
+    if (task?.development?.reviewCarry && Buffer.byteLength(JSON.stringify(task.development.reviewCarry),"utf8") > 262144)
+      return Promise.reject(new Error("Review summary exceeds continuation budget; recovery required"));
     return new Promise((resolve, reject) => {
       const repo = machine.repositories.find(
           (r) => r.id === task?.repositoryId,
         ),
         logPath = repo?.logs?.find((l) => l.id === task?.logId)?.path;
+      const program = task?.development || action === "preflight" ? `source=__import__('base64').b64decode('${Buffer.from(DEVELOPMENT_WORKER).toString("base64")}').decode();globals()['_SOURCE']=source;exec(source)` : bootstrap;
       const child = spawn(
         "ssh",
         [
@@ -182,7 +190,7 @@ export class SshFactoryTransport implements FactoryTransport {
           "ServerAliveCountMax=2",
           "--",
           machine.sshAlias,
-          `python3 -I -c "${bootstrap}"`,
+          `python3 -I -c "${program}"`,
         ],
         {
           env: sanitizeSpawnEnv({ stripCredentials: true }),
@@ -205,11 +213,11 @@ export class SshFactoryTransport implements FactoryTransport {
           terminateProcessTree(child);
           end(new Error("SSH response unavailable; verify remote receipt"));
         },
-        action === "start" ? (task?.timeoutMs ?? 30000) + 15000 : 15000,
+        action === "preflight" ? 90000 : action === "start" ? Math.max(90000,(task?.timeoutMs ?? 30000) + 15000) : action === "stop" ? 25000 : 15000,
       );
       child.stdout?.on("data", (part) => {
         output += part.toString();
-        if (output.length > 131072) {
+        if (output.length > (task?.development || action === "artifact" ? 2097152 : 131072)) {
           terminateProcessTree(child);
           end(new Error("Remote result exceeds limit"));
         }
@@ -227,7 +235,9 @@ export class SshFactoryTransport implements FactoryTransport {
         }
       });
       child.stdin?.on("error", () => {});
-      child.stdin?.end(JSON.stringify({ action, task, logPath }));
+      const wireTask = task?.development ? {id:task.id,identity:task.identity,repositoryPath:task.repositoryPath,principal:task.principal,machineId:task.machineId,
+        development:{requirement:task.development.requirement,baseline:task.development.baseline,policy:task.development.policy,generation:task.development.generation,round:task.development.round,dependency:task.development.dependency,reviewCarry:task.development.reviewCarry}} : task;
+      child.stdin?.end(JSON.stringify({ action, task:wireTask, logPath, ...extra }));
     });
   }
   async probe(m: FactoryMachine) {
@@ -244,13 +254,29 @@ export class SshFactoryTransport implements FactoryTransport {
     return r;
   }
   async start(m: FactoryMachine, t: FactoryTask) {
-    return verifiedReport(await this.invoke(m, "start", t));
+    return verifiedReport(await this.invoke(m, "start", t), !!t.development);
   }
   async status(m: FactoryMachine, t: FactoryTask) {
-    return verifiedReport(await this.invoke(m, "status", t));
+    return verifiedReport(await this.invoke(m, "status", t), !!t.development);
   }
   async inspect(m: FactoryMachine, t: FactoryTask) {
     return this.invoke(m, "inspect", t) as Promise<FactorySignals>;
+  }
+  async preflight(m: FactoryMachine, policy: DevelopmentPolicy, baseline: string): Promise<DevelopmentPreflight> {
+    const r = await this.invoke(m,"preflight",undefined,{policy,baseline,repositoryPath:m.repositories[0]?.path}) as DevelopmentPreflight;
+    if(typeof r?.ready!=="boolean" || !Array.isArray(r.checks)) throw Error("Invalid preflight response");
+    return r;
+  }
+  async stop(m: FactoryMachine, t: FactoryTask, action: string) {
+    return verifiedReport(await this.invoke(m,"stop",t,{control:action}),true);
+  }
+  async prepareDependency(m: FactoryMachine, target: FactoryTask, source: FactoryTask) {
+    const artifact=await this.invoke(source.machine,"artifact",source,{sha:target.development!.dependency!.sha}) as {sha:string;digest:string;bytes:number;base64:string};
+    const bytes=Buffer.from(artifact.base64,"base64");
+    if(bytes.length>700000 || bytes.length!==artifact.bytes || createHash("sha256").update(bytes).digest("hex")!==artifact.digest || artifact.sha!==target.development!.dependency!.sha) throw Error("Invalid dependency artifact");
+    const result=await this.invoke(m,"import-artifact",target,{artifact}) as {sha:string;digest:string;bytes:number};
+    if(result.sha!==artifact.sha || result.digest!==artifact.digest || result.bytes!==artifact.bytes) throw Error("Dependency import receipt mismatch");
+    return result;
   }
   async close() {
     for (const child of this.children) terminateProcessTree(child);

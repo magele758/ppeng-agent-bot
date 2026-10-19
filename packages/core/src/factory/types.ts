@@ -1,5 +1,5 @@
 import type { BotPrincipal } from "../bots/bot-identity.js";
-export type FactoryOperation = "snapshot" | "count-files" | "read-log";
+export type FactoryOperation = "snapshot" | "count-files" | "read-log" | "develop";
 export type FactoryStatus =
   | "queued"
   | "running"
@@ -39,6 +39,7 @@ export interface FactoryTask {
   repositoryId: string;
   repositoryPath: string;
   operation: FactoryOperation;
+  development?: import("./development-types.js").DevelopmentSpec;
   logId?: string;
   botId: string;
   roomId?: string;
@@ -77,7 +78,10 @@ export interface FactoryTransport {
   ): Promise<{ identity: string; hostname: string }>;
   start(machine: FactoryMachine, task: FactoryTask): Promise<FactoryReport>;
   status(machine: FactoryMachine, task: FactoryTask): Promise<FactoryReport>;
+  preflight?(machine: FactoryMachine, policy: import("./development-types.js").DevelopmentPolicy, baseline: string): Promise<import("./development-types.js").DevelopmentPreflight>;
+  stop?(machine: FactoryMachine, task: FactoryTask, action: string): Promise<FactoryReport>;
   inspect(machine: FactoryMachine, task: FactoryTask): Promise<FactorySignals>;
+  prepareDependency?(machine: FactoryMachine, task: FactoryTask, source: FactoryTask): Promise<{sha:string;digest:string;bytes:number}>;
   close?(): Promise<void>;
 }
 export interface PatrolState {

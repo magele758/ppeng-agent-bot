@@ -66,7 +66,7 @@ test("factory Lab saves configuration, probes and shows unified task progress [A
   ).toBeVisible();
   completed = true;
   await page.getByTestId("factory-refresh").click();
-  await page.locator('[data-testid="factory-panel"] summary').click();
+  await page.locator('[data-testid="factory-panel"] .factory-table summary').click();
   await expect(page.getByText("verified-sha", { exact: false })).toBeVisible();
   await page.reload();
   await expect(page.getByTestId("factory-machine-capacity")).toHaveValue("2");
@@ -146,7 +146,7 @@ test("factory patrol reflects persisted updates and cannot target an unsaved roo
 
 test("factory task details expose verified machine and execution times [AC:multi-machine-readonly-pilot#AC-14]", async ({ page }) => {
   await mockConfiguredFactory(page, route => route.fulfill({ json: boardFor("succeeded") }));
-  await page.locator('[data-testid="factory-panel"] summary').click();
+  await page.locator('[data-testid="factory-panel"] .factory-table summary').click();
   await expect(page.getByText("verified-host", { exact: true })).toBeVisible();
   await expect(page.getByText("开始时间", { exact: true })).toBeVisible();
   await expect(page.getByText("结束时间", { exact: true })).toBeVisible();
