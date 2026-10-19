@@ -179,7 +179,9 @@ jobs:
   crap:
     name: agent-loop tests + CRAP gate
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Full unit/process suites with V8 instrumentation exceed 20 minutes on hosted runners.
+    # Preserve all test, coverage and CRAP thresholds; allow instrumentation overhead.
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4

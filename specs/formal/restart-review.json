@@ -128,7 +128,7 @@
     "skills/verify-session-restart/SKILL.md": "a1dfc931bfe87e734da516b684e141d7e1ecf667ff7af69b734a3f390c362c07",
     "package.json": "b47870df48e89e905a4c65fd95ceadc3d1a4e369a40e018372fafdbcc25bae77",
     "scripts/formal/run-formal-regression.mjs": "d223e02a4ef59557f6dd93e7719a41097f5ce7ae553b8b62c147c1ff8e33a3f3",
-    ".github/workflows/release-gate.yml": "e2c88e939f48536ec8407e090c50350a20601bf2a58d48717f630d5a95b7bbdf",
+    ".github/workflows/release-gate.yml": "1a878e57924b4fa0cedeab5b895eab11e908bb73ab01229d5540cde311268329",
     "scripts/formal/lifecycle-verifier.mjs": "92ccfc90ab23a79031c5280cdf02bdaaf8dabadeb1dcbdf23d035f5718ab2226",
     "scripts/formal/pairing-verifier.mjs": "dada48c004b65153c9aabaea8737c6c626dfb9f351dff507b77ae419d6a4ed58",
     "scripts/formal/restart-cases.mjs": "52101fb273241e7bdafabf5d5bff91c3dca25d14729c9b5376f518e92e17ca78",

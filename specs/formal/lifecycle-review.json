@@ -110,7 +110,7 @@
     "scripts/test/session-lifecycle-verification.test.mjs": "8996374d57d4a809f5f1557b905664cdfea6a278d618b8f8fb9a37985a4ca35c",
     "skills/verify-session-lifecycle/SKILL.md": "8f8c0dc1112c315295ef0482d2c22317a78301ca4c6b0ba047f0f7f245de203b",
     "scripts/formal/run-formal-regression.mjs": "d223e02a4ef59557f6dd93e7719a41097f5ce7ae553b8b62c147c1ff8e33a3f3",
-    ".github/workflows/release-gate.yml": "e2c88e939f48536ec8407e090c50350a20601bf2a58d48717f630d5a95b7bbdf",
+    ".github/workflows/release-gate.yml": "1a878e57924b4fa0cedeab5b895eab11e908bb73ab01229d5540cde311268329",
     "packages/core/test/session-lifecycle-state-consistency.test.js": "3614712ffaca1758d130888634f11a05b9f9ca233874f0e69d056865c9a5e0dc",
     "packages/core/src/runtime/restart-recovery.ts": "e221e8e3ee374a97f6aa75dd08e8a81411c5f967d3caf914cbf1dd30e373dcf4",
     "packages/core/test/restart-recovery-ownership.test.js": "e13006456b7d836d21e3d6e79bc5c387193be641b75bc65d68ac927f462d4a83",

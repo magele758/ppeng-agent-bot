@@ -76,7 +76,7 @@
     }
   ],
   "sha256": {
-    ".github/workflows/release-gate.yml": "e2c88e939f48536ec8407e090c50350a20601bf2a58d48717f630d5a95b7bbdf",
+    ".github/workflows/release-gate.yml": "1a878e57924b4fa0cedeab5b895eab11e908bb73ab01229d5540cde311268329",
     "packages/agent-loop/src/approval/approval-policy.ts": "7914ae1d0d9a6ed9d2a13231df87d93a40de741c52a0ef28601edc60474c2a0b",
     "packages/agent-loop/src/approval/permission-mode.ts": "456d2e76d423519da0b5d81e802bda5d8683989c7d1ee223a9a9b1266f6d73aa",
     "packages/agent-loop/src/helpers.ts": "bf25c3ef116b15cfddfe90d8de0b0983af81c20f0008ef884b82b4aa4ccb9c53",
