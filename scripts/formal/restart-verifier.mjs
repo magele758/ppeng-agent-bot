@@ -4,20 +4,29 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { sanitizeScriptEnv } from '../spawn-utils.mjs';
+import { withVerificationEvidence } from '../ci/verification-evidence.mjs';
 import { CASES } from './restart-cases.mjs';
 import { MUTATIONS } from './restart-mutations.mjs';
 export { SCOPE, exploreRestartModel, replayRestart } from './restart-model.mjs';
 export const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'../..');
 const sha=s=>createHash('sha256').update(s).digest('hex');
-const env=()=>sanitizeScriptEnv({PATH:process.env.PATH,SystemRoot:process.env.SystemRoot,TEMP:process.env.TEMP,TMP:process.env.TMP});
+const env=()=>sanitizeScriptEnv({PATH:process.env.PATH,SystemRoot:process.env.SystemRoot,TEMP:process.env.TEMP,TMP:process.env.TMP,CI_VERIFICATION_EVIDENCE_DIR:process.env.CI_VERIFICATION_EVIDENCE_DIR,CI_VERIFICATION_RUN_ID:process.env.CI_VERIFICATION_RUN_ID});
 let built=false;
 function build(){if(built)return;const ts=JSON.parse(readFileSync(join(ROOT,'node_modules/typescript/package.json')));if(ts.version!=='5.9.3')throw new Error('TypeScript 5.9.3 required; npm ci');const r=spawnSync(process.execPath,[join(ROOT,'node_modules/typescript/bin/tsc'),'-b','packages/core'],{cwd:ROOT,env:env(),encoding:'utf8',timeout:60000,maxBuffer:4e6});if(r.error||r.status!==0)throw new Error('Fresh core build failed: '+(r.error?.message??r.stdout+r.stderr));built=true;}
-export async function verifyRestartRuntime({mutation,only,childExecutable,executable=process.execPath}={}){
+export async function verifyRestartRuntime(options={}){
+  build();
+  return withVerificationEvidence({root:ROOT,kind:'restart-runtime',options,environment:env(),validate:r=>r.completed===true&&JSON.stringify(r.scenarios?.map(s=>s.name))===JSON.stringify(CASES.map(c=>c.name))&&r.scenarios.every(s=>s.status==='pass'&&s.checks?.length&&s.checks.every(c=>c.ok===true)&&s.snapshots?.length&&s.processes?.length>=2&&s.processes.every(p=>p.freshPid&&p.exitedBeforeNext))},()=>executeRestartRuntime(options));
+}
+async function executeRestartRuntime({mutation,only,childExecutable,executable=process.execPath}={}){
   build();const r=spawnSync(executable,[join(ROOT,'scripts/formal/restart-runtime.mjs'),'--config',JSON.stringify({mutation,only,childExecutable})],{cwd:ROOT,env:env(),encoding:'utf8',timeout:180000,maxBuffer:20e6});
   if(r.error||r.signal)return {completed:false,status:'incomplete',reason:r.error?.message??r.signal,scenarios:[]};
   try{const report=JSON.parse(r.stdout);if(!report.scenarios?.length||![0,1,2].includes(r.status))throw new Error('Missing runtime stages');if(report.completed){const expected=CASES.filter(c=>!only||only.includes(c.name)).map(c=>c.name);if(JSON.stringify(report.scenarios.map(s=>s.name))!==JSON.stringify(expected)||report.scenarios.some(s=>!['pass','fail'].includes(s.status)||!s.checks.length||!s.snapshots.length||s.processes.length<2||s.processes.some(p=>!p.freshPid||!p.exitedBeforeNext)))throw new Error('Missing process/scenario completion evidence');const status=report.scenarios.every(s=>s.status==='pass')?'pass':'fail';if(report.status!==status||r.status!==(status==='pass'?0:1))throw new Error('Runtime exit/status mismatch');}else if(report.status!=='incomplete'||r.status!==2)throw new Error('Incomplete runtime misreported');return report;}catch(e){return {completed:false,status:'incomplete',reason:e.message+'; '+r.stderr.slice(-1200),scenarios:[]};}
 }
 export async function verifyRestartMutations(){
+  build();
+  return withVerificationEvidence({root:ROOT,kind:'restart-mutations',environment:env(),validate:r=>r.restored===true&&r.baselineStatus==='pass'&&JSON.stringify(r.mutants?.map(m=>m.name))===JSON.stringify(Object.keys(MUTATIONS))&&r.mutants.every(m=>m.loaded&&m.killed&&m.before!==m.after&&m.counterexample?.status==='fail')},()=>executeRestartMutations());
+}
+async function executeRestartMutations(){
   const only=Object.values(MUTATIONS).flatMap(m=>m.cases),baseline=await verifyRestartRuntime({only}),mutants=[];
   if(!baseline.completed)throw new Error('Mutation baseline incomplete: '+JSON.stringify(baseline));
   for(const [name,m]of Object.entries(MUTATIONS)){

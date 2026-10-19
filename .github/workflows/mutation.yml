@@ -1,45 +1,15 @@
-# 变异测试门禁（见 doc/MUTATION_TESTING.md）。可独立运行，也由 release-gate.yml 调用；
-# 分片失败或分数跌破基线都会阻断 Main release gate。
-# 每周全量跑一次；PR 只在关键模块源码 / 测试 / 门禁脚本变化时触发。
-# command-hardline 变异体最多，按变异体序号交错切 3 片并行；gate job 合并各片报告后按基线判定。
-
+# Complete mutation gate: called once by PR CI; scheduled and manual entry points remain.
 name: Mutation
-
 on:
-  workflow_call:
+  workflow_call: null
   schedule:
-    - cron: '23 3 * * 1'
-  workflow_dispatch:
-  pull_request:
-    paths:
-      - packages/core/src/sandbox/command-hardline.ts
-      - packages/core/src/bots/bot-policy.ts
-      - packages/core/src/bots/bot-facade.ts
-      - packages/core/src/turn/resolve-turn-tools.ts
-      - packages/core/src/model/fallback-chain.ts
-      - packages/core/src/model/error-class.ts
-      - packages/core/src/memory/bot-memory-scope.ts
-      - packages/core/src/memory/store.ts
-      - packages/core/src/skill-proposals/validate.ts
-      - packages/core/src/tools/message-agent.ts
-      - packages/core/test/command-hardline.test.js
-      - packages/core/test/bot-policy.test.js
-      - packages/core/test/bots.test.js
-      - packages/core/test/model-fallback.test.js
-      - packages/core/test/bot-memory-namespace.test.js
-      - packages/core/test/skill-proposals.test.js
-      - packages/core/test/message-agent.test.js
-      - scripts/mutation/**
-      - scripts/crap/crap-lib.mjs
-      - .github/workflows/mutation.yml
-
+    - cron: 23 3 * * 1
+  workflow_dispatch: null
 concurrency:
-  group: mutation-${{ github.workflow }}-${{ github.ref }}
+  group: mutation-${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
   cancel-in-progress: true
-
 permissions:
   contents: read
-
 jobs:
   mutate:
     name: Mutate (${{ matrix.name }})
@@ -59,19 +29,14 @@ jobs:
             args: --module bot-policy,bot-permission,model-fallback-chain,model-error-class,memory-namespace,skill-proposal-validate,message-agent
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
           cache: npm
-
       - run: npm ci
-
       - run: node scripts/build-workspace.mjs
-
       - name: Run mutation tests
         run: node scripts/mutation/run-mutation.mjs ${{ matrix.args }} --no-gate --out coverage/mutation/${{ matrix.name }}
-
       - name: Upload shard report
         if: always()
         uses: actions/upload-artifact@v4
@@ -80,36 +45,29 @@ jobs:
           path: coverage/mutation/${{ matrix.name }}
           if-no-files-found: ignore
           retention-days: 7
-
   gate:
     name: Mutation gate
     needs: mutate
-    if: always()
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
           cache: npm
-
       - run: npm ci
-
       - uses: actions/download-artifact@v4
         with:
           pattern: mutation-*
           path: coverage/mutation-shards
-
       - name: Require successful shards
         env:
           SHARDS: ${{ needs.mutate.result }}
         run: test "$SHARDS" = success
-
       - name: Merge shard reports and check the baseline
         run: node scripts/mutation/run-mutation.mjs --merge coverage/mutation-shards --out coverage/mutation
-
       - name: Upload mutation report
         if: always()
         uses: actions/upload-artifact@v4

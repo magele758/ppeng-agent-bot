@@ -45,13 +45,13 @@ test('npm and Docker publication require a successful release gate, including fo
 
 test('release gate retains deterministic test layers and does not tolerate failures', () => {
   const doc = workflow('release-gate');
-  assert.deepEqual(needs(doc.jobs.gate).sort(), ['acceptance', 'compact-ab', 'crap', 'harness', 'mutation', 'remote-model-smoke', 'secrets-gate', 'tests']);
-  assert.equal(doc.jobs.gate.if, 'always()');
+  assert.deepEqual(needs(doc.jobs.gate).sort(), ['acceptance', 'browser', 'compact-ab', 'crap', 'harness', 'mutation', 'remote-model-smoke', 'secrets-gate', 'tests']);
+  assert.equal(doc.jobs.gate.if, '${{ !cancelled() }}');
   for (const job of Object.values(doc.jobs)) {
     assert.notEqual(job['continue-on-error'], true);
     for (const step of job.steps ?? []) assert.notEqual(step['continue-on-error'], true);
   }
-  const runs = doc.jobs.tests.steps.map((step) => step.run).filter(Boolean);
+  const runs = Object.values(doc.jobs).flatMap(job => job.steps ?? []).map((step) => step.run).filter(Boolean);
   for (const script of ['build', 'test:formal', 'test:package', 'agent:eval:verify', 'test:regression', 'test:integration']) {
     assert.ok(runs.includes(`npm run ${script}`), `missing release layer: ${script}`);
   }
@@ -124,7 +124,7 @@ test('actual gate summary script accepts only success/success/success; failure, 
         for (const acceptance of states) {
           const child = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', step.run], {
             env: sanitizeScriptEnv({
-              ...process.env, RESULTS: JSON.stringify({ tests: {result: tests}, crap: {result: crap}, acceptance: {result: acceptance}, mutation: {result: 'success'}, 'secrets-gate': {result: 'success'}, harness: {result: 'failure'} }), GITHUB_STEP_SUMMARY: join(dir, 'summary.md')
+              ...process.env, RESULTS: JSON.stringify({ tests: {result: tests}, crap: {result: crap}, acceptance: {result: acceptance}, browser: {result:'success'}, mutation: {result: 'success'}, 'secrets-gate': {result: 'success'}, harness: {result: 'failure'} }), GITHUB_STEP_SUMMARY: join(dir, 'summary.md')
             }),
             encoding: 'utf8', timeout: 5_000
           });

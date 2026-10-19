@@ -92,7 +92,7 @@ test('release gate consumes every participating quality result [AC:ci-audit-p1-p
  const workflow=parse(readFileSync('.github/workflows/release-gate.yml','utf8'));
  for(const job of ['mutation','remote-model-smoke','harness','compact-ab']) assert.ok(workflow.jobs.gate.needs.includes(job),job);
  const { releaseFailures }=await import('../ci/release-results.mjs');
- const required={tests:{result:'success'},crap:{result:'success'},acceptance:{result:'success'},mutation:{result:'success'},'secrets-gate':{result:'success'}};
+ const required={tests:{result:'success'},crap:{result:'success'},browser:{result:'success'},acceptance:{result:'success'},mutation:{result:'success'},'secrets-gate':{result:'success'}};
  for(const name of ['remote-model-smoke']) {
   assert.deepEqual(releaseFailures({...required,[name]:{result:'skipped'}}),[]);
   assert.ok(releaseFailures({...required,[name]:{result:'failure'}}).includes(name));
@@ -168,7 +168,7 @@ test('release CLI reports non-blocking diagnostics in stdout and step summary [A
  const dir = mkdtempSync(join(tmpdir(), 'release-summary-'));
  try {
   const summary = join(dir, 'summary.md');
-  const needs = Object.fromEntries(['tests','crap','acceptance','mutation','secrets-gate'].map(name => [name,{result:'success'}]));
+  const needs = Object.fromEntries(['tests','crap','browser','acceptance','mutation','secrets-gate'].map(name => [name,{result:'success'}]));
   needs.harness = {result:'failure'};
   needs['compact-ab'] = {result:'failure'};
   const run = spawnSync(process.execPath, ['scripts/ci/release-results.mjs', JSON.stringify(needs)], {encoding:'utf8',env:{...sanitizeScriptEnv(),GITHUB_STEP_SUMMARY:summary}});

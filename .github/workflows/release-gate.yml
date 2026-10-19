@@ -1,10 +1,6 @@
-# main 发布卡点（可复用）：完整测试 + agent-loop 单测 + CRAP 门禁 + 验收标准门禁，汇总为一个检查「Main release gate」。
-# 调用方：ci.yml（每次 push / PR）、publish-npm.yml（发 npm 前）、docker-nightly.yml（推镜像前）。
-# 分支保护请把「Release gate / Main release gate」设为 main 的 required status check（见 doc/CI.md）。
-# npm 与 Docker 推送强制要求此门禁成功；无观察模式旁路。
-
+# Full validation scope preserved; browser/API run on an independent runner.
+# Legacy required context names remain stable; Main release gate includes every required result.
 name: Release gate
-
 on:
   workflow_call:
     secrets:
@@ -18,152 +14,48 @@ on:
         required: false
       HARNESS_EVAL_API_KEY:
         required: false
-  workflow_dispatch:
-
+  workflow_dispatch: null
 permissions:
   contents: read
-
-# workflow_call inherits the caller's event; share its base with all gate scripts.
 env:
   CI_PUSH_BEFORE: ${{ github.event.before }}
   CI_PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-
 jobs:
   tests:
     name: Build, unit tests, HTTP regression, E2E
     runs-on: ubuntu-latest
-    # Hosted runners need about 14 minutes for the process gates and 18 for units,
-    # followed by full formal verification, package/API regressions and browser E2E.
-    timeout-minutes: 55
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version-file: '.nvmrc'
+          node-version-file: .nvmrc
           cache: npm
-
+      - name: Record measured candidate inputs
+        run: node scripts/ci/gate-provenance.mjs "$RUNNER_TEMP/gate-provenance.json"
       - name: Install dependencies
         run: npm ci
-
       - name: TypeScript build
         run: npm run build
-
-      # Ubuntu 24.04 AppArmor blocks the user+net namespace the routine precheck uses to drop network.
       - name: Allow precheck network namespaces
         run: |
           if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
             sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           fi
-
-      - name: Bounded pairing verification (no retries)
-        run: npm run test:pairing
-
-      - name: Upload pairing verification evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: tool-call-pairing-verification
-          path: coverage/formal/pairing/
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Session lifecycle verification (no retries)
-        run: npm run test:lifecycle
-
-      - name: Upload session lifecycle evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: session-lifecycle-verification
-          path: coverage/formal/lifecycle/
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Process restart recovery verification (no retries)
-        run: npm run test:restart
-
-      - name: Upload process restart recovery evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: session-restart-recovery-verification
-          path: coverage/formal/restart/
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Multiprocess session verification (no retries)
-        run: npm run test:concurrency
-
-      - name: Upload multiprocess session evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: session-multiprocess-concurrency-verification
-          path: coverage/formal/concurrency/
-          if-no-files-found: error
-          retention-days: 30
-
-      # Retry recovery remains visible and fails unless explicitly allowlisted.
-      - name: Unit tests
-        run: node scripts/ci/retry-failed-tests.mjs --script test:unit --label unit --report "$RUNNER_TEMP/flaky-tests/unit.json"
-
-      - name: Upload flaky test report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: flaky-tests-unit
-          path: ${{ runner.temp }}/flaky-tests/unit.json
-          if-no-files-found: ignore
-          retention-days: 30
-
       - name: Bot queue and process recovery invariants (no retries)
         run: npm run test:bot:faults
-
       - name: Install and exercise public npm tarballs
         run: npm run test:package
-
-      - name: Formal invariants + MockLLM E2E
-        run: npm run test:formal
-
       - name: Fast capability contracts (fail on any failed case)
         run: npm run agent:eval:fast -- --exit-on-fail --out test-results/fast-eval
-
       - name: Verify evaluator against scripted harness outcomes (not live model quality)
         run: npm run agent:eval:verify
-
-      - name: Regression (daemon + API)
-        run: npm run test:regression
-        env:
-          RAW_AGENT_MODEL_PROVIDER: heuristic
-
-      - name: Integration (mailbox + approval + social)
-        run: npm run test:integration
-        env:
-          RAW_AGENT_MODEL_PROVIDER: heuristic
-
-      - name: Install Playwright Chromium
-        run: npm run test:e2e:install
-
-      - name: E2E (Agent Lab)
-        run: npm run test:e2e -- --reporter=dot,junit
-        env:
-          RAW_AGENT_MODEL_PROVIDER: heuristic
-          PLAYWRIGHT_JUNIT_OUTPUT_FILE: ${{ runner.temp }}/acceptance-results/e2e.xml
-
-      - name: Upload acceptance results (e2e)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: acceptance-results-e2e
-          path: ${{ runner.temp }}/acceptance-results/
-          if-no-files-found: ignore
-          retention-days: 7
-
+      - name: Preserve stricter uninstrumented performance contracts
+        run: node scripts/ci/ci-unit-performance.mjs
       - name: Preserve test evidence even on failure
         if: always()
         uses: actions/upload-artifact@v4
@@ -175,52 +67,48 @@ jobs:
             doc/eval-results/
           if-no-files-found: ignore
           retention-days: 14
-
+      - name: Preserve measured candidate inputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-provenance
+          path: ${{ runner.temp }}/gate-provenance.json
+          if-no-files-found: error
+          retention-days: 30
   crap:
     name: agent-loop tests + CRAP gate
     runs-on: ubuntu-latest
-    # Full unit/process suites with V8 instrumentation exceed 20 minutes on hosted runners.
-    # Preserve all test, coverage and CRAP thresholds; allow instrumentation overhead.
     timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version-file: '.nvmrc'
+          node-version-file: .nvmrc
           cache: npm
-
       - name: Install dependencies
         run: npm ci
-
       - name: Verify coverage toolchain
         run: npm run test:crap -- --preflight
-
       - name: TypeScript build (workspace packages)
         run: node scripts/build-workspace.mjs
-
-      # Ubuntu 24.04 AppArmor blocks the user+net namespace the routine precheck uses to drop network.
       - name: Allow precheck network namespaces
         run: |
           if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
             sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           fi
-
       - name: Prepare acceptance results dir
         run: mkdir -p "${{ runner.temp }}/acceptance-results"
-
       - name: Unit tests with V8 coverage
-        run: >-
-          node scripts/ci/retry-failed-tests.mjs --script test:unit --label unit-coverage
-          --report "$RUNNER_TEMP/flaky-tests/unit-coverage.json"
+        run: node scripts/ci/retry-failed-tests.mjs --script test:unit --label unit-coverage --report "$RUNNER_TEMP/flaky-tests/unit-coverage.json"
           --junit "$RUNNER_TEMP/acceptance-results/unit.xml"
         env:
           NODE_V8_COVERAGE: ${{ runner.temp }}/v8-coverage
-
+      - name: Formal invariants + MockLLM E2E
+        run: npm run test:formal
       - name: Upload flaky test report
         if: always()
         uses: actions/upload-artifact@v4
@@ -229,22 +117,14 @@ jobs:
           path: ${{ runner.temp }}/flaky-tests/unit-coverage.json
           if-no-files-found: ignore
           retention-days: 30
-
       - name: agent-loop vitest with coverage
         working-directory: packages/agent-loop
-        run: >-
-          npx --no-install vitest run
-          --coverage.enabled --coverage.provider=v8 --coverage.reporter=json
-          --coverage.reportsDirectory=${{ runner.temp }}/vitest-coverage
-          --reporter=default --reporter=junit
-          --outputFile.junit=${{ runner.temp }}/acceptance-results/vitest.xml
-
+        run: npx --no-install vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=json --coverage.reportsDirectory=${{
+          runner.temp }}/vitest-coverage --reporter=default --reporter=junit --outputFile.junit=${{ runner.temp
+          }}/acceptance-results/vitest.xml
       - name: CRAP gate
-        run: >-
-          node scripts/crap/crap-gate.mjs
-          --node-cov ${{ runner.temp }}/v8-coverage
-          --vitest-cov ${{ runner.temp }}/vitest-coverage/coverage-final.json
-
+        run: node scripts/crap/crap-gate.mjs --node-cov ${{ runner.temp }}/v8-coverage --vitest-cov ${{ runner.temp
+          }}/vitest-coverage/coverage-final.json
       - name: Upload CRAP report
         if: always()
         uses: actions/upload-artifact@v4
@@ -253,7 +133,6 @@ jobs:
           path: coverage/crap/
           if-no-files-found: ignore
           retention-days: 14
-
       - name: Upload acceptance results (unit + vitest)
         if: always()
         uses: actions/upload-artifact@v4
@@ -262,12 +141,56 @@ jobs:
           path: ${{ runner.temp }}/acceptance-results/
           if-no-files-found: ignore
           retention-days: 7
-
+      - name: Upload pairing verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tool-call-pairing-verification
+          path: coverage/formal/pairing/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload lifecycle verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: session-lifecycle-verification
+          path: coverage/formal/lifecycle/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload restart verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: session-restart-recovery-verification
+          path: coverage/formal/restart/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload concurrency verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: session-multiprocess-concurrency-verification
+          path: coverage/formal/concurrency/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Preserve verification reuse records
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-reuse-evidence
+          path: ${{ runner.temp }}/verification-evidence/
+          if-no-files-found: ignore
+          retention-days: 30
+    env:
+      CI_VERIFICATION_EVIDENCE_DIR: ${{ runner.temp }}/verification-evidence
+      CI_VERIFICATION_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
   acceptance:
     name: Acceptance criteria gate
-    # Runs after a red test job too, so the summary still shows which criteria lack a passing test.
     if: ${{ !cancelled() }}
-    needs: [tests, crap]
+    needs:
+      - tests
+      - crap
+      - browser
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -275,29 +198,21 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version-file: '.nvmrc'
+          node-version-file: .nvmrc
           cache: npm
-
       - name: Install dependencies
         run: npm ci
-
       - name: Download JUnit results
-        # A job that died before uploading leaves criteria without passing results; the gate then fails them.
         uses: actions/download-artifact@v4
         with:
           pattern: acceptance-results-*
           merge-multiple: true
           path: ${{ runner.temp }}/acceptance-results
-
       - name: Acceptance gate (every approved criterion has a passing test)
-        run: >-
-          node scripts/acceptance/acceptance-gate.mjs
-          --results ${{ runner.temp }}/acceptance-results
-
+        run: node scripts/acceptance/acceptance-gate.mjs --results ${{ runner.temp }}/acceptance-results
       - name: Upload acceptance report
         if: always()
         uses: actions/upload-artifact@v4
@@ -306,7 +221,6 @@ jobs:
           path: coverage/acceptance/
           if-no-files-found: ignore
           retention-days: 14
-
   secrets-gate:
     name: Check remote-smoke secrets
     runs-on: ubuntu-latest
@@ -320,42 +234,43 @@ jobs:
           fetch-depth: 0
       - name: Resolve comparison base
         id: base
-        run: |
-          base=$(node --input-type=module -e 'import { baseRevision } from "./scripts/ci/base-revision.mjs"; console.log(baseRevision(process.cwd()));')
+        run: >
+          base=$(node --input-type=module -e 'import { baseRevision } from "./scripts/ci/base-revision.mjs";
+          console.log(baseRevision(process.cwd()));')
+
           echo "ref=$base" >> "$GITHUB_OUTPUT"
       - name: Detect RAW_AGENT_API_KEY
         id: check
         env:
           RAW_AGENT_API_KEY: ${{ secrets.RAW_AGENT_API_KEY }}
           HARNESS_EVAL_API_KEY: ${{ secrets.HARNESS_EVAL_API_KEY }}
-        run: |
+        run: >
           if [ -n "$RAW_AGENT_API_KEY" ]; then
             echo "has-key=true" >> "$GITHUB_OUTPUT"
           else
             echo "has-key=false" >> "$GITHUB_OUTPUT"
           fi
-          if [ -n "$HARNESS_EVAL_API_KEY" ]; then echo "has-harness-key=true" >> "$GITHUB_OUTPUT"; else echo "has-harness-key=false" >> "$GITHUB_OUTPUT"; fi
 
-  # 使用你在 GitHub 配置的 Secrets 调用真实第三方 API（见 docs/CI.md）
+          if [ -n "$HARNESS_EVAL_API_KEY" ]; then echo "has-harness-key=true" >> "$GITHUB_OUTPUT"; else echo "has-harness-key=false" >>
+          "$GITHUB_OUTPUT"; fi
   remote-model-smoke:
     name: Remote model smoke (optional)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [tests, secrets-gate]
-    # 至少提供 API Key；OpenAI 兼容还需 BASE_URL + MODEL_NAME（可在 Secrets 中一并配置）
+    needs:
+      - tests
+      - crap
+      - browser
+      - secrets-gate
     if: ${{ github.event.repository.fork == false && needs.secrets-gate.outputs.has-key == 'true' }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
           cache: npm
-
       - run: npm ci
-
       - run: npm run build
-
       - name: Remote smoke (OpenAI-compatible)
         if: ${{ vars.RAW_AGENT_CI_PROVIDER != 'anthropic-compatible' }}
         run: npm run test:remote
@@ -365,7 +280,6 @@ jobs:
           RAW_AGENT_BASE_URL: ${{ secrets.RAW_AGENT_BASE_URL }}
           RAW_AGENT_MODEL_NAME: ${{ secrets.RAW_AGENT_MODEL_NAME }}
           RAW_AGENT_USE_JSON_MODE: ${{ vars.RAW_AGENT_USE_JSON_MODE }}
-
       - name: Remote smoke (Anthropic-compatible)
         if: ${{ vars.RAW_AGENT_CI_PROVIDER == 'anthropic-compatible' }}
         run: npm run test:remote
@@ -375,32 +289,42 @@ jobs:
           RAW_AGENT_ANTHROPIC_URL: ${{ secrets.RAW_AGENT_ANTHROPIC_URL }}
           RAW_AGENT_BASE_URL: ${{ secrets.RAW_AGENT_BASE_URL }}
           RAW_AGENT_MODEL_NAME: ${{ secrets.RAW_AGENT_MODEL_NAME }}
-
-
   mutation:
     uses: ./.github/workflows/mutation.yml
-
-  # Diagnostic only in Main until a qualifying >=30-case experiment exists.
-  # Preserve the reusable workflow failure and artifacts; aggregation reports it.
   harness:
-    needs: [tests, secrets-gate]
+    needs:
+      - tests
+      - crap
+      - browser
+      - secrets-gate
     if: ${{ github.event.repository.fork == false && needs.secrets-gate.outputs.has-harness-key == 'true' }}
     uses: ./.github/workflows/harness-quality.yml
     with:
       baseline_ref: ${{ needs.secrets-gate.outputs.base-ref }}
       experiment: scripts/agent-eval/experiments/starter.json
     secrets: inherit
-
   compact-ab:
-    needs: [tests, secrets-gate]
+    needs:
+      - tests
+      - crap
+      - browser
+      - secrets-gate
     if: ${{ github.event.repository.fork == false && needs.secrets-gate.outputs.has-key == 'true' }}
     uses: ./.github/workflows/compact-ab.yml
     secrets: inherit
-
   gate:
     name: Main release gate
-    if: always()
-    needs: [tests, crap, acceptance, mutation, secrets-gate, remote-model-smoke, harness, compact-ab]
+    if: ${{ !cancelled() }}
+    needs:
+      - tests
+      - browser
+      - crap
+      - acceptance
+      - mutation
+      - secrets-gate
+      - remote-model-smoke
+      - harness
+      - compact-ab
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -412,3 +336,60 @@ jobs:
         env:
           RESULTS: ${{ toJSON(needs) }}
         run: node scripts/ci/release-results.mjs "$RESULTS"
+  browser:
+    name: Browser and HTTP regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: TypeScript build
+        run: npm run build
+      - name: Allow precheck network namespaces
+        run: |
+          if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+      - name: Regression (daemon + API)
+        run: npm run test:regression
+        env:
+          RAW_AGENT_MODEL_PROVIDER: heuristic
+      - name: Integration (mailbox + approval + social)
+        run: npm run test:integration
+        env:
+          RAW_AGENT_MODEL_PROVIDER: heuristic
+      - name: Install Playwright Chromium
+        run: npm run test:e2e:install
+      - name: E2E (Agent Lab)
+        run: npm run test:e2e -- --reporter=dot,junit
+        env:
+          RAW_AGENT_MODEL_PROVIDER: heuristic
+          PLAYWRIGHT_JUNIT_OUTPUT_FILE: ${{ runner.temp }}/acceptance-results/e2e.xml
+      - name: Upload acceptance results (e2e)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: acceptance-results-e2e
+          path: ${{ runner.temp }}/acceptance-results/
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Preserve test evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-test-evidence
+          path: |
+            test-results/
+            playwright-report/
+            doc/eval-results/
+          if-no-files-found: ignore
+          retention-days: 14

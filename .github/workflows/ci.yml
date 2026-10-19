@@ -5,11 +5,17 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      benchmark_baseline:
+        description: Measure the frozen legacy schedule on this same source revision (manual only)
+        type: boolean
+        default: false
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -18,4 +24,11 @@ jobs:
   release-gate:
     name: Release gate
     uses: ./.github/workflows/release-gate.yml
+    secrets: inherit
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.benchmark_baseline }}
+
+  benchmark-baseline:
+    name: Benchmark baseline
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.benchmark_baseline }}
+    uses: ./.github/workflows/benchmark-gate-baseline.yml
     secrets: inherit

@@ -31,9 +31,13 @@ test('reduced motion stops idle animation and retains working cues [AC:bot-list-
   await page.route('**/api/bot-work/status', r => r.fulfill({ json: { bots: bots.map((bot: { id: string }, i: number) => ({ bot, activeWorkCount: i === 0 ? 1 : 0 })) } }));
   await page.goto('/#/bot');
   const faces = page.locator('#sessionListMini .session-item__face svg.bot-face');
-  await expect(faces.locator('[data-bob]').first()).toBeVisible();
-  expect(await faces.evaluateAll(nodes => nodes.reduce((count, face) => count + face.getAnimations({ subtree: true }).length, 0))).toBe(0);
+  await expect(faces.nth(1)).toBeVisible();
   const working = faces.filter({ has: page.locator('title') }).first();
   await expect(working).toHaveAttribute('data-face-working', 'true');
   await expect(working.locator('.bot-face__work-label')).toBeVisible();
+  // Visibility alone does not establish the final status/styles during hydration.
+  // Observe the actual settled state rather than taking one animation snapshot.
+  await expect.poll(() => faces.evaluateAll(nodes => nodes.reduce((count, face) => count + face.getAnimations({ subtree: true }).length, 0))).toBe(0);
+  const idleParts = faces.locator('[data-bob], [data-look], [data-eye]');
+  for (const part of await idleParts.all()) await expect(part).toHaveCSS('animation-name', 'none');
 });
