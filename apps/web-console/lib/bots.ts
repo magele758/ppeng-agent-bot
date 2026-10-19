@@ -38,11 +38,11 @@ export function writeStoredPlaySurface(surface: PlaySurface): void {
 }
 
 /** Sidebar session → Bot roster match (canonical session or per-user bot chat). */
-export function botForCanonicalSession(
-  bots: readonly BotInfo[],
+export function botForCanonicalSession<T extends { id: string; canonicalSessionId?: string | null }>(
+  bots: readonly T[],
   sessionId: string | null | undefined,
   sessions?: readonly { id: string; metadata?: Record<string, unknown> }[]
-): BotInfo | undefined {
+): T | undefined {
   if (!sessionId) return undefined;
   const byCanon = bots.find((b) => b.canonicalSessionId === sessionId);
   if (byCanon) return byCanon;

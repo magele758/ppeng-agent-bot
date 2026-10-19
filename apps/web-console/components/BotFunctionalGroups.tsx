@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { BotInfo, SessionSummary } from '@/lib/types';
 import { botForCanonicalSession } from '@/lib/bots';
 import { api } from '@/lib/api';
@@ -8,7 +8,7 @@ import { useI18n } from '@/lib/i18n';
 import styles from './BotFunctionalGroups.module.css';
 import { BotEntryDialog } from './BotEntryDialog';
 
-import { BOT_DRAG_MIME } from '@/lib/bot-pin-area';
+import { BOT_DRAG_MIME, getBotPinServerSnapshot, getBotPinSnapshot, groupRowsWithoutPinnedBots, subscribeBotPins } from '@/lib/bot-pin-area';
 import { canMoveBot, factEditorState, functionalGroupRows, functionalGroupPresentation, groupSaveDisabled, functionalGroupSaveRequest, moveBotInGroups, upsertFunctionalGroup, type FunctionalGroup } from '@/lib/functional-group-view';
 
 export function BotFunctionalGroups({ bots, sessions, renderSession, createRequest = 0 }: {
@@ -18,6 +18,7 @@ export function BotFunctionalGroups({ bots, sessions, renderSession, createReque
   renderSession: (session: SessionSummary) => ReactNode;
 }) {
   const { t } = useI18n();
+  const pinState = useSyncExternalStore(subscribeBotPins, getBotPinSnapshot, getBotPinServerSnapshot);
   const [groups, setGroups] = useState<FunctionalGroup[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState('');
@@ -86,7 +87,7 @@ export function BotFunctionalGroups({ bots, sessions, renderSession, createReque
   const section = (group: FunctionalGroup | null) => {
     const presentation = functionalGroupPresentation(group, t('play.functionalGroups.ungrouped'));
     const groupId = presentation.id;
-    const rows = functionalGroupRows(groups, bots, sessions, groupId);
+    const rows = groupRowsWithoutPinnedBots(functionalGroupRows(groups, bots, sessions, groupId), bots, sessions, pinState);
     return <section key={presentation.key} data-testid={`functional-group-${presentation.key}`}
       className={`${styles.group} ${dragTarget === groupId ? styles.dropTarget : ''}`}
       aria-busy={pending}
