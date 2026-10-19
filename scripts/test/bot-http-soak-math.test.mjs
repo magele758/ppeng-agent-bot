@@ -1,10 +1,30 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {BoundedHistogram,latencyWithinThreshold,RssWindows,queueGrowth} from '../bot-release/http-soak-stats.mjs';
+import {readFileSync} from 'node:fs';
+import {BoundedHistogram,httpSoakFixturePassed,httpSoakProtocolPassed,latencyWithinThreshold,RssWindows,queueGrowth} from '../bot-release/http-soak-stats.mjs';
 import {expectedWorkload} from '../bot-release/http-soak-schedule.mjs';
 import {isFreshCompletedOutput,pendingHumanInputs,hasControlledSoftwareResult,pendingControlledOperations} from '../bot-release/http-soak-oracle.mjs';
 test('24h immutable offered protocol retains hourly burst and exact 50 percent hotspot',()=>{
  const result=expectedWorkload({warmupSeconds:1800,measurementSeconds:86400,burstEverySeconds:3600,burstDurationSeconds:60});assert.equal(result.readWarmup,72000);assert.equal(result.readMeasurement,3456000);assert.equal(result.measurement,197640);assert.equal(result.burst,27600);assert.equal(result.hot,13800);assert.deepEqual(result.kinds,{human:79056,routine:39528,dispatch:39528,room:39528});
+});
+test('published latency SLO still gates a full soak and stays outside smoke acceptance',()=>{
+ const thresholds=JSON.parse(readFileSync(new URL('../bot-release/workload.v1.json',import.meta.url),'utf8')).thresholdsMs;
+ assert.deepEqual({pageP95:thresholds.pageP95,statusP95:thresholds.statusP95,searchP95:thresholds.searchP95,receiveP95:thresholds.receiveP95},{pageP95:500,statusP95:500,searchP95:1000,receiveP95:500});
+ const page=new BoundedHistogram();for(let i=0;i<151;i++)page.add(200);for(let i=0;i<9;i++)page.add(602);
+ const status=new BoundedHistogram();for(let i=0;i<60;i++)status.add(200);for(let i=0;i<4;i++)status.add(565);
+ assert.equal(page.quantile(.95)>thresholds.pageP95,true);assert.equal(status.quantile(.95)>thresholds.statusP95,true);
+ assert.equal(latencyWithinThreshold(page,thresholds.pageP95,'strict'),false);assert.equal(latencyWithinThreshold(status,thresholds.statusP95,'strict'),false);
+ const gates={functionalPassed:true,schedulingPassed:true,inputProtocolPassed:true,approvalProtocolPassed:true,durabilityPassed:true};
+ assert.equal(httpSoakFixturePassed({...gates,smoke:true,latencyHarnessPassed:false}),true);
+ assert.equal(httpSoakFixturePassed({...gates,smoke:false,latencyHarnessPassed:false}),false);
+ assert.equal(httpSoakFixturePassed({...gates,smoke:false,latencyHarnessPassed:true}),true);
+ assert.equal(httpSoakFixturePassed({...gates,smoke:true,latencyHarnessPassed:false,functionalPassed:false}),false);
+ assert.equal(httpSoakFixturePassed({...gates,smoke:false,latencyHarnessPassed:true,durabilityPassed:false}),false);
+ const protocol={schedulingPassed:true,inputProtocolPassed:true,approvalProtocolPassed:true,durabilityPassed:true,fullDurationReady:true};
+ assert.equal(httpSoakProtocolPassed({...protocol,smoke:true,latencyProtocolPassed:false}),false);
+ assert.equal(httpSoakProtocolPassed({...protocol,smoke:false,latencyProtocolPassed:false}),false);
+ assert.equal(httpSoakProtocolPassed({...protocol,smoke:false,latencyProtocolPassed:true}),true);
+ assert.equal(httpSoakProtocolPassed({...protocol,smoke:true,latencyProtocolPassed:true,fullDurationReady:false}),true);
 });
 test('smoke latency gate keeps the published SLO on the median and mean',()=>{
  const stalled=new BoundedHistogram();for(let i=0;i<32;i++)stalled.add(150);stalled.add(747);stalled.add(1020);

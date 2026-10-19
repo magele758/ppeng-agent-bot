@@ -13,7 +13,9 @@ export class BoundedHistogram {
  * the same SLO. Smoke keeps those two checks at the SLO and bounds the tail with
  * nearest-rank p90 at SMOKE_TAIL_FACTOR x the SLO. With 34 samples p90 is the
  * fourth-slowest, so four ~1s stalls on a coverage-instrumented CI runner do not
- * fail the fixture, while multi-second tails still do. Full soaks are unchanged.
+ * fail latencyHarnessPassed, while multi-second tails still do. Full soaks are unchanged.
+ * That classification stays on the report. It does not decide the compressed
+ * fixture, whose acceptance is burst counts, input evidence, and 24h refusal.
  */
 export const SMOKE_TAIL_FACTOR = 3;
 export function latencyWithinThreshold(histogram, thresholdMs, mode) {
@@ -21,6 +23,14 @@ export function latencyWithinThreshold(histogram, thresholdMs, mode) {
  if (mode === 'strict') return histogram.quantile(0.95) <= thresholdMs;
  if (mode === 'smoke') return histogram.quantile(0.5) <= thresholdMs && histogram.sum / histogram.count <= thresholdMs && histogram.quantile(0.9) <= thresholdMs * SMOKE_TAIL_FACTOR;
  throw new Error(`Unknown latency mode: ${mode}`);
+}
+/** Smoke records latency and still passes when only the shared-runner SLO misses. A full soak keeps the strict harness SLO. */
+export function httpSoakFixturePassed({smoke,functionalPassed,schedulingPassed,inputProtocolPassed,approvalProtocolPassed,latencyHarnessPassed,durabilityPassed}){
+ return Boolean(functionalPassed&&schedulingPassed&&inputProtocolPassed&&approvalProtocolPassed&&(smoke||latencyHarnessPassed)&&(smoke||durabilityPassed));
+}
+/** Strict protocol evidence. latencyProtocolPassed stays required; smoke still cannot become a 24h acceptance. */
+export function httpSoakProtocolPassed({smoke,schedulingPassed,inputProtocolPassed,approvalProtocolPassed,latencyProtocolPassed,durabilityPassed,fullDurationReady}){
+ return Boolean(schedulingPassed&&inputProtocolPassed&&approvalProtocolPassed&&latencyProtocolPassed&&(smoke||(durabilityPassed&&fullDurationReady)));
 }
 export function processTreeRss(rootPid){
  let names;try{names=readdirSync('/proc');}catch(error){if(error&&error.code==='ENOENT')return {processes:[],rssBytes:0,rootPresent:false,unavailable:true};throw error;}
