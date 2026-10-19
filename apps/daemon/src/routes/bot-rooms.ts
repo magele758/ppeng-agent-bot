@@ -21,7 +21,7 @@ export function botRoomsRoutes(runtime: RawAgentRuntime & { rooms: BotRoomServic
     {method:'GET',pattern:'/api/bot-rooms/:id/messages',handler:ctx=>{const limit=ctx.url.searchParams.get('limit');const beforeSeq=ctx.url.searchParams.get('beforeSeq');json(ctx.response,200,rooms.messages(principal(ctx),ctx.requireParam('id'),{...(limit?{limit:Number(limit)}:{}),...(beforeSeq?{beforeSeq:Number(beforeSeq)}:{})}));}},
     {method:'POST',pattern:'/api/bot-rooms/:id/messages',handler:async ctx=>{const input=await body(ctx);try{const owner=principal(ctx),roomId=ctx.requireParam('id'),text=typeof input.text==='string'?input.text:'';
  const requestKey=typeof input.idempotencyKey==='string'?input.idempotencyKey:randomUUID();
- const messageInput={text,mentions:input.mentions as string[]|undefined,attachmentIds:input.attachmentIds as string[]|undefined,contextSources:input.contextSources,idempotencyKey:requestKey};
+ const messageInput={text,mentions:input.mentions as string[]|undefined,attachmentIds:input.attachmentIds as string[]|undefined,contextSources:input.contextSources,idempotencyKey:requestKey,...(input.replyTo!==undefined?{replyTo:input.replyTo}:{})};
  if(text.trim().startsWith('/factory ')){
    // Room validation, durable human input and task acceptance commit together.
    // A rejected command cannot leave runnable work behind.
