@@ -5,6 +5,7 @@
 
 export type {
   SessionMessage,
+  MessageReplyTo,
   SessionRecord,
   SessionMode,
   SessionStatus,

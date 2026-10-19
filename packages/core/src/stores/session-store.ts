@@ -7,7 +7,9 @@ import { DatabaseSync } from 'node:sqlite';
 import { captureTaskContext, taskContextTodos } from '../session/task-context.js';
 import { createId, nowIso } from '../id.js';
 import { serializeJson, parseJson, optionalString, boolToInt, intToBool } from './storage-helpers.js';
-import type { MessageRole, SessionMessage, SessionRecord, SessionStatus } from '../types.js';
+import { ValidationError } from '../errors.js';
+import { normalizeReplyQuote, replyToFromColumn } from '../session/reply-quote.js';
+import type { MessageReplyTo, MessageRole, SessionMessage, SessionRecord, SessionStatus } from '../types.js';
 import {
   assertNoOpenToolWaveForCompact,
   assertReplaceRangeClosed,
@@ -347,13 +349,15 @@ export class SessionStore {
     parts: SessionMessage['parts'],
     opts?: SurfaceWriteOpts
   ): SessionMessage {
+    const replyTo = this.quoteForAppend(sessionId, role, opts?.replyTo);
     const node = this.insertSurfaceNode({
       sessionId,
       role,
       parts,
       surfaceOp: 'append',
       key: opts?.key,
-      expectedWriterRunId: opts?.expectedWriterRunId
+      expectedWriterRunId: opts?.expectedWriterRunId,
+      replyTo
     });
     const message = this.surfaceToMessage(node);
     const session = this.getSession(sessionId);
@@ -637,8 +641,8 @@ export class SessionStore {
     const insert = this.db.prepare(`
       INSERT INTO session_messages (
         id, session_id, role, parts_json, created_at,
-        seq, key, surface_op, replaces_start, replaces_end
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        seq, key, surface_op, replaces_start, replaces_end, reply_to_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     for (const node of nodes) {
       insert.run(
@@ -651,7 +655,8 @@ export class SessionStore {
         node.key ?? null,
         node.surfaceOp,
         node.replacesStart ?? null,
-        node.replacesEnd ?? null
+        node.replacesEnd ?? null,
+        node.replyTo ? serializeJson(node.replyTo) : null
       );
     }
     if (nodes.length > 0) {
@@ -667,6 +672,21 @@ export class SessionStore {
     return (row?.m ?? 0) + 1;
   }
 
+  private quoteForAppend(sessionId: string, role: MessageRole, raw: unknown): MessageReplyTo | undefined {
+    if (raw == null) return undefined;
+    if (role !== 'user') throw new ValidationError('replyTo is only valid on a user message');
+    const quote = normalizeReplyQuote(raw);
+    const row = this.db
+      .prepare(
+        `SELECT role FROM session_messages
+         WHERE id = ? AND session_id = ? AND (surface_op IS NULL OR surface_op != 'hide')`
+      )
+      .get(quote.messageId, sessionId) as { role: string } | undefined;
+    if (!row) throw new ValidationError('replyTo message not found');
+    if (row.role !== 'assistant') throw new ValidationError('replyTo must quote a bot reply');
+    return quote;
+  }
+
   private insertSurfaceNode(input: {
     sessionId: string;
     role: MessageRole;
@@ -676,6 +696,7 @@ export class SessionStore {
     replacesStart?: number;
     replacesEnd?: number;
     expectedWriterRunId?: string;
+    replyTo?: MessageReplyTo;
   }): SurfaceNode {
     return this.transaction(() => {
     this.assertCurrentWriter(input.sessionId);
@@ -700,15 +721,16 @@ export class SessionStore {
       replacesEnd: input.replacesEnd,
       role: input.role,
       parts: input.parts,
-      createdAt: now
+      createdAt: now,
+      ...(input.replyTo ? { replyTo: input.replyTo } : {})
     };
 
     this.db
       .prepare(`
         INSERT INTO session_messages (
           id, session_id, role, parts_json, created_at,
-          seq, key, surface_op, replaces_start, replaces_end
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          seq, key, surface_op, replaces_start, replaces_end, reply_to_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
       .run(
         node.id,
@@ -720,7 +742,8 @@ export class SessionStore {
         node.key ?? null,
         node.surfaceOp,
         node.replacesStart ?? null,
-        node.replacesEnd ?? null
+        node.replacesEnd ?? null,
+        node.replyTo ? serializeJson(node.replyTo) : null
       );
 
     this.db.prepare(`UPDATE sessions SET updated_at = ? WHERE id = ?`).run(node.createdAt, input.sessionId);
@@ -735,6 +758,7 @@ export class SessionStore {
     const replacesStart =
       row.replaces_start == null ? undefined : Number(row.replaces_start);
     const replacesEnd = row.replaces_end == null ? undefined : Number(row.replaces_end);
+    const replyTo = replyToFromColumn(row.reply_to_json);
     return {
       id: String(row.id),
       sessionId: String(row.session_id),
@@ -745,7 +769,8 @@ export class SessionStore {
       replacesEnd: Number.isFinite(replacesEnd as number) ? replacesEnd : undefined,
       role: String(row.role) as MessageRole,
       parts: parseJson<SessionMessage['parts']>(String(row.parts_json)) ?? [],
-      createdAt: String(row.created_at)
+      createdAt: String(row.created_at),
+      ...(replyTo ? { replyTo } : {})
     };
   }
 
@@ -757,7 +782,8 @@ export class SessionStore {
       parts: node.parts,
       createdAt: node.createdAt,
       seq: node.seq,
-      ...(node.key ? { key: node.key } : {})
+      ...(node.key ? { key: node.key } : {}),
+      ...(node.replyTo ? { replyTo: node.replyTo } : {})
     };
   }
 

@@ -30,6 +30,7 @@ import type {
   ImagePart,
   MailRecord,
   MessagePart,
+  MessageReplyTo,
   SessionMessage,
   SessionRecord,
   TaskRecord
@@ -292,7 +293,7 @@ export function sendUserMessage(
   host: SessionFacadeHost,
   sessionId: string,
   message: string,
-  options?: { imageAssetIds?: string[]; replyTo?: string; contextSources?: unknown }
+  options?: { imageAssetIds?: string[]; replyTo?: string | MessageReplyTo; contextSources?: unknown }
 ): SessionRecord {
   const session = host.store.getSession(sessionId);
   if (!session) {
@@ -305,10 +306,12 @@ export function sendUserMessage(
   if (!text && ids.length === 0 && sources.length === 0) {
     throw new ValidationError('Message, imageAssetIds, or contextSources required');
   }
-  const context = routineReplyContext(host.store, session, options?.replyTo);
+  const routineReplyId = typeof options?.replyTo === 'string' ? options.replyTo : undefined;
+  const quote = typeof options?.replyTo === 'object' ? options.replyTo : undefined;
+  const context = routineReplyContext(host.store, session, routineReplyId);
   const parts = applyContextSources(userMessageParts(text || (ids.length ? '(image)' : ''), ids, host.store), sources);
   if (context) parts.unshift(textPart(context));
-  host.store.appendMessage(session.id, 'user', parts);
+  host.store.appendMessage(session.id, 'user', parts, quote ? { replyTo: quote } : undefined);
   mergeSessionMetadata(host.store, session.id, {
     [APPROVAL_WAKE_KEY]: { kind: 'human', source: 'lab-chat' }
   });
