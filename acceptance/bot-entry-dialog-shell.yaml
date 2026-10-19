@@ -1,0 +1,27 @@
+id: bot-entry-dialog-shell
+title: 新建 Bot 弹窗遮罩与底部按钮
+status: implemented
+owner: user
+requirement: |
+  这个白边是什么？搞成半透明遮罩，然后底部按钮 fix 在 dialog 底部，免得滚动，而且也不知道下面有什么，点击遮罩要能关闭弹窗。
+criteria:
+  - id: AC-1
+    given: 用户打开新建 Bot 弹窗
+    when: 查看弹窗和它盖住的页面
+    then: 弹窗四周没有白边或亮边，页面被半透明遮罩压暗，但仍能看出后面还有界面
+  - id: AC-2
+    given: 新建 Bot 的名称、描述、脸型和颜色比弹窗高
+    when: 刚打开弹窗，以及滚动这些内容
+    then: 「创建 Bot」和「取消」一直停在弹窗底部，打开时就能看见，不跟着内容滚出弹窗
+  - id: AC-3
+    given: 新建 Bot 弹窗已打开
+    when: 点击弹窗外的遮罩
+    then: 弹窗关闭，且没有新建 Bot
+  - id: AC-4
+    given: 新建 Bot 弹窗已打开
+    when: 点击弹窗内部
+    then: 弹窗保持打开
+  - id: AC-5
+    given: 新建 Bot 弹窗已打开，且按 Esc 可以关闭
+    when: 按 Esc
+    then: 弹窗仍然关闭，且没有新建 Bot

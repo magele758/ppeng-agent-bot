@@ -134,3 +134,30 @@ test('drag-only grouping persists successful moves and restores failed moves wit
  expect((await page.request.get(`/api/sessions/${bot.canonicalSessionId}`)).ok()).toBeTruthy();
  expect(writes).toBe(3);
 });
+
+test('create dialog keeps actions visible while content scrolls and backdrop dismisses [AC:bot-entry-dialog-shell#AC-1] [AC:bot-entry-dialog-shell#AC-2] [AC:bot-entry-dialog-shell#AC-3] [AC:bot-entry-dialog-shell#AC-4] [AC:bot-entry-dialog-shell#AC-5]', async ({ page }) => {
+ await page.setViewportSize({ width: 1000, height: 600 });
+ await page.goto('/#/bot');
+ const open = async () => {
+  await page.locator('#btnPlayCreate').click();
+  await page.getByRole('menuitem', { name: '新建 Bot', exact: true }).click();
+ };
+ await open();
+ const dialog = page.getByRole('dialog');
+ const actions = dialog.locator('.ag-form__actions');
+ const before = await actions.boundingBox();
+ expect(before).not.toBeNull();
+ expect(before!.y + before!.height).toBeLessThanOrEqual(600);
+ const scroll = dialog.locator('.ag-form__scroll');
+ expect(await scroll.evaluate(el => el.scrollHeight > el.clientHeight)).toBe(true);
+ await scroll.evaluate(el => { el.scrollTop = el.scrollHeight; });
+ expect((await actions.boundingBox())!.y).toBeCloseTo(before!.y, 0);
+ await dialog.locator('h2,h3').first().click();
+ await expect(dialog).toBeVisible();
+ expect(await page.locator('.bot-entry-backdrop').evaluate(el => getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0.6)');
+ await page.mouse.click(5, 5);
+ await expect(dialog).toHaveCount(0);
+ await open();
+ await page.keyboard.press('Escape');
+ await expect(dialog).toHaveCount(0);
+});

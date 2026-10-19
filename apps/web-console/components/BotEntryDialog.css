@@ -1,0 +1,71 @@
+.bot-entry-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgb(0 0 0 / 0.6);
+}
+
+.bot-entry-dialog {
+  width: min(640px, 100%);
+  max-height: min(85vh, calc(100dvh - 48px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  border: none;
+  outline: none;
+  border-radius: 12px;
+  box-shadow: 0 16px 48px rgb(0 0 0 / 0.45);
+  padding: 0;
+}
+
+.bot-entry-dialog > .ag-panel:has(.ag-form__scroll) {
+  display: contents;
+}
+
+.bot-entry-dialog .ag-panel__head {
+  flex: 0 0 auto;
+  padding: var(--ui-space-4) var(--ui-space-4) 0;
+}
+
+.bot-entry-dialog .ag-form:has(.ag-form__scroll) {
+  display: contents;
+}
+
+.ag-form__scroll {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-3);
+  min-width: 0;
+}
+
+.bot-entry-dialog .ag-form__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--ui-space-4);
+}
+
+.bot-entry-dialog .ag-field__error {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0 var(--ui-space-4) var(--ui-space-2);
+}
+
+.bot-entry-dialog .ag-form__actions {
+  flex: 0 0 auto;
+  padding: var(--ui-space-3) var(--ui-space-4);
+  border-top: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+}
+
+.bot-entry-dialog > form {
+  overflow: auto;
+  min-height: 0;
+}
