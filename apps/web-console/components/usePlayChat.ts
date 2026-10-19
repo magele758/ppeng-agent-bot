@@ -24,17 +24,37 @@ import { feedSseBuffer } from '@/lib/sse';
 import { liveSessionFollowRequest, type LiveStreamArm } from '@/lib/live-stream-attach';
 import { shouldResumeRunningTurn } from '@/lib/run-leave';
 import {
+  applyWhen,
+  assertSameSession,
   detachLiveTurn,
+  generationForArm,
+  handleSteerFailure,
   liveTurnBelongsToSelection,
+  liveTurnIsRunning,
+  liveTurnOwnerId,
   mayClaimSelectedSession,
   canFollowSession,
+  ownsLiveTurn,
+  releaseArmOwner,
+  releaseIfCurrent,
+  reportOwnedError,
+  restoreComposerUnlessPersisted,
+  resultSessionId,
+  runIf,
   screenLiveTurn,
+  shouldSkipForeignLiveArm,
+  shouldSurfaceLiveArmError,
+  shouldTickLiveArm,
+  streamOverlayVisible,
   streamPaintApplies,
   botOpenApplies,
   visibleStream,
   liveTurnRunning,
   steerResponseApplies,
   UNBOUND_LIVE_TURN,
+  streamSessionAllowed,
+  tickIfPersisted,
+  visibleLiveOverlay,
 } from '@/lib/live-turn-session';
 import { userPreviewText } from '@/lib/chat-utils';
 import {
@@ -1565,8 +1585,8 @@ export function usePlayChat(deps: PlayChatDeps) {
     });
     const follow = { sessionId, controller, ready };
     liveFollowRef.current = follow;
-    const claimedHere = liveOwnerRef.current !== sessionId;
-    const generation = claimedHere ? claimLiveTurn(sessionId) : liveGenRef.current;
+    const alreadyOwner = liveOwnerRef.current === sessionId;
+    const generation = generationForArm(alreadyOwner, liveGenRef.current, () => claimLiveTurn(sessionId));
     setStreamOverlay({ segments: [] });
     const { url, body } = liveSessionFollowRequest(sessionId);
     void (async () => {
@@ -1581,7 +1601,7 @@ export function usePlayChat(deps: PlayChatDeps) {
         reportFollowError(error, controller, generation);
       } finally {
         resolveReady();
-        await finishFollow(controller, generation, claimedHere);
+        await finishFollow(controller, generation, !alreadyOwner);
       }
     })();
     return { ready, cancel: () => controller.abort() };
@@ -1640,7 +1660,7 @@ export function usePlayChat(deps: PlayChatDeps) {
 
   const sendBotCommand = async (commandBotId: string, text: string) => {
       stopSpeechDictation();
-      const generation = claimLiveTurn(selectedSessionRef.current ?? UNBOUND_LIVE_TURN);
+      const generation = claimLiveTurn(liveTurnOwnerId(selectedSessionRef.current));
       setPlaySending(true);
       try {
         let sid = selectedSessionRef.current;
@@ -1797,7 +1817,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     const imageSnapshot = [...pendingImageAssetIds];
     const attachmentSnapshot = [...pendingAttachmentIds];
     setPlayStatus({ text: '' });
-    const generation = claimLiveTurn(selectedSessionId ?? UNBOUND_LIVE_TURN);
+    const generation = claimLiveTurn(liveTurnOwnerId(selectedSessionId));
     setPlaySending(true);
 
     const preview = userPreviewText(text || '(image)', imageAssetIds);
@@ -1949,21 +1969,20 @@ export function usePlayChat(deps: PlayChatDeps) {
       sessionListStickTopRef.current = true;
       await tick({ includePlayPanel: true });
     } catch (e) {
-      if (!liveTurnOnScreen(generation)) return;
-      setPlayStatus({ text: modelErrorText(e instanceof Error ? e.message : String(e), t), err: true });
-      const persisted = e instanceof PlayStreamError && e.persisted;
-      if (!persisted) {
-        setPlayInput(draftSnapshot);
-        setPendingImageAssetIds(imageSnapshot);
-        setPendingAttachmentIds(attachmentSnapshot);
-        setPendingContext(contextSnapshot);
-      }
-      finishLiveTurn(generation);
-      if (persisted) {
-        await tick({ includePlayPanel: true });
-      }
+      await runIf(ownsLiveTurn(e, liveTurnOnScreen(generation)), async () => {
+        setPlayStatus({ text: modelErrorText(e instanceof Error ? e.message : String(e), t), err: true });
+        const persisted = e instanceof PlayStreamError && e.persisted;
+        restoreComposerUnlessPersisted(persisted, () => {
+          setPlayInput(draftSnapshot);
+          setPendingImageAssetIds(imageSnapshot);
+          setPendingAttachmentIds(attachmentSnapshot);
+          setPendingContext(contextSnapshot);
+        });
+        finishLiveTurn(generation);
+        await tickIfPersisted(persisted, () => tick({ includePlayPanel: true }));
+      });
     } finally {
-      if (liveTurnCurrent(generation)) setPlaySending(false);
+      releaseIfCurrent(liveTurnCurrent(generation), () => setPlaySending(false));
     }
   };
 

@@ -117,3 +117,127 @@ export function mayClaimSelectedSession(activeGeneration: number, paintGeneratio
 export function canFollowSession(selected: string | null, requested: string): boolean {
   return selected == null || selected === requested;
 }
+
+/** Thrown when a newer selection owns the screen and this turn must stop quietly. */
+export class LiveTurnSuperseded extends Error {
+  constructor() {
+    super('live turn superseded');
+    this.name = 'LiveTurnSuperseded';
+  }
+}
+
+export function liveTurnOwnerId(sessionId: string | null): string {
+  return sessionId ?? UNBOUND_LIVE_TURN;
+}
+
+export function visibleLiveOverlay<T>(show: boolean, overlay: T): T | null {
+  return show ? overlay : null;
+}
+
+export function assertLiveTurn(ok: boolean): void {
+  if (!ok) throw new LiveTurnSuperseded();
+}
+
+export function assertSameSession(current: string | null, expected: string): void {
+  if (current !== expected) throw new LiveTurnSuperseded();
+}
+
+export function releaseIfCurrent(current: boolean, release: () => void): void {
+  if (current) release();
+}
+
+export function liveTurnIsRunning(
+  belongs: boolean,
+  sending: boolean,
+  streaming: boolean,
+  waiting: boolean
+): boolean {
+  return belongs && (sending || streaming || waiting);
+}
+
+export function ownsLiveTurn(err: unknown, onScreen: boolean): boolean {
+  return !(err instanceof LiveTurnSuperseded) && onScreen;
+}
+
+export function reportOwnedError(owned: boolean, report: () => void): void {
+  if (owned) report();
+}
+
+export async function runIf(ok: boolean, action: () => Promise<void> | void): Promise<void> {
+  if (ok) await action();
+}
+
+export function restoreComposerUnlessPersisted(persisted: boolean, restore: () => void): void {
+  if (!persisted) restore();
+}
+
+export async function tickIfPersisted(persisted: boolean, tick: () => Promise<unknown>): Promise<void> {
+  if (persisted) await tick();
+}
+
+export function handleSteerFailure(input: {
+  superseded: boolean;
+  sameSession: boolean;
+  immediate: boolean;
+  restore: () => void;
+  report: () => void;
+}): void {
+  if (input.superseded || !input.sameSession) return;
+  if (input.immediate) input.restore();
+  input.report();
+}
+
+export function resultSessionId(event: string, sessionId: string | undefined): string | null {
+  if (event !== 'result' || !sessionId) return null;
+  return sessionId;
+}
+
+export function streamSessionAllowed(input: {
+  liveGen: number | undefined;
+  activeGeneration: number;
+  selectedSessionId: string | null;
+  sessionId: string;
+}): boolean {
+  if (
+    input.liveGen != null &&
+    !mayClaimSelectedSession(input.activeGeneration, input.liveGen, input.selectedSessionId, input.sessionId)
+  ) {
+    return false;
+  }
+  if (input.selectedSessionId != null && input.selectedSessionId !== input.sessionId) return false;
+  return true;
+}
+
+export function streamOverlayVisible(input: {
+  liveGen: number | undefined;
+  activeGeneration: number;
+  liveSessionId: string | null;
+  selectedSessionId: string | null;
+}): boolean {
+  if (input.liveGen != null && !streamPaintApplies(input.activeGeneration, input.liveGen)) return false;
+  return liveTurnBelongsToSelection(input.liveSessionId, input.selectedSessionId);
+}
+
+export function shouldSkipForeignLiveArm(selected: string | null, sessionId: string): boolean {
+  return Boolean(selected) && selected !== sessionId;
+}
+
+export function generationForArm(alreadyOwner: boolean, current: number, claim: () => number): number {
+  return alreadyOwner ? current : claim();
+}
+
+export function shouldSurfaceLiveArmError(aborted: boolean, onScreen: boolean): boolean {
+  return !aborted && onScreen;
+}
+
+export function releaseArmOwner(current: boolean, claimedHere: boolean, ownerIsSession: boolean): boolean {
+  return current && claimedHere && ownerIsSession;
+}
+
+export function shouldTickLiveArm(current: boolean, aborted: boolean): boolean {
+  return current && !aborted;
+}
+
+export function applyWhen(cond: boolean, effect: () => void): void {
+  if (cond) effect();
+}
