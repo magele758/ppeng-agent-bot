@@ -1,6 +1,6 @@
 /**
- * POST /api/chat/stream: a client that disconnects mid-stream cancels the run and
- * the upstream model request (replayed by a slow fake OpenAI-compatible server).
+ * POST /api/chat/stream: dropping the SSE client (refresh, navigation) must not
+ * cancel the run. Only an explicit cancel stops it.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -43,32 +43,67 @@ async function setup(responses) {
   });
   setCatalogDefaultRef(runtime.store, { providerId: 'replay', modelId: 'replay-model' });
 
-  const route = sessionsRoutes(runtime).find((r) => r.method === 'POST' && r.pattern === '/api/chat/stream');
+  const routes = sessionsRoutes(runtime);
   const server = createServer((request, response) => {
     let raw = '';
     request.on('data', (piece) => (raw += piece));
     request.on('end', () => {
-      void route.handler({
-        request,
-        response,
-        url: new URL(`http://x${request.url}`),
-        parts: [],
-        params: {},
-        requireParam: () => '',
-        readBody: async () => JSON.parse(raw),
-        auth: ANONYMOUS_AUTH
+      const url = new URL(`http://x${request.url}`);
+      const route = routes.find(
+        (item) => item.method === request.method && matchPattern(item.pattern, url.pathname)
+      );
+      if (!route) {
+        response.statusCode = 404;
+        response.end('no route');
+        return;
+      }
+      const params = matchPattern(route.pattern, url.pathname) ?? {};
+      void Promise.resolve(
+        route.handler({
+          request,
+          response,
+          url,
+          parts: url.pathname.split('/').filter(Boolean),
+          params,
+          requireParam: (name) => {
+            const value = params[name];
+            if (!value) throw new Error(`missing ${name}`);
+            return value;
+          },
+          readBody: async () => (raw ? JSON.parse(raw) : {}),
+          auth: ANONYMOUS_AUTH
+        })
+      ).catch((error) => {
+        if (!response.writableEnded) {
+          response.statusCode = 500;
+          response.end(error instanceof Error ? error.message : String(error));
+        }
       });
     });
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const url = `http://127.0.0.1:${server.address().port}/api/chat/stream`;
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const url = `${base}/api/chat/stream`;
   const close = async () => {
     await runtime.destroy();
     server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
     await upstream.close();
   };
-  return { upstream, runtime, url, close };
+  return { upstream, runtime, url, base, close };
+}
+
+function matchPattern(pattern, pathname) {
+  const expected = pattern.split('/').filter(Boolean);
+  const actual = pathname.split('/').filter(Boolean);
+  if (expected.length !== actual.length) return null;
+  const params = {};
+  for (let i = 0; i < expected.length; i += 1) {
+    const part = expected[i];
+    if (part.startsWith(':')) params[part.slice(1)] = decodeURIComponent(actual[i]);
+    else if (part !== actual[i]) return null;
+  }
+  return params;
 }
 
 function postChat(url, title, signal) {
@@ -93,7 +128,11 @@ function sessionByTitle(runtime, title) {
   return runtime.store.listSessions().find((s) => s.title === title);
 }
 
-test('client disconnect mid-stream cancels the run and aborts the upstream request [AC:chat-basics#AC-5]', async () => {
+function outcomeOf(session) {
+  return session?.metadata?.outcome;
+}
+
+test('刷新或断开流式连接不会中止回合，完成后回复留在历史里 [AC:refresh-keeps-agent-run#AC-1] [AC:refresh-keeps-agent-run#AC-3] [AC:chat-basics#AC-5]', async () => {
   const env = await setup([slowAnswer]);
   try {
     const ac = new AbortController();
@@ -107,16 +146,83 @@ test('client disconnect mid-stream cancels the run and aborts the upstream reque
       seen += dec.decode(value);
     }
     assert.match(seen, /tok0/);
-    const disconnectedAt = Date.now();
     ac.abort();
 
-    assert.ok(await waitFor(() => env.upstream.abandoned() === 1), 'upstream request was abandoned');
-    assert.ok(Date.now() - disconnectedAt < 2000, 'upstream aborted promptly, not after the full answer');
     const session = sessionByTitle(env.runtime, 'sse-dc');
+    assert.ok(await waitFor(() => /tok29/.test(env.runtime.getLatestAssistantText(session.id)), 8000));
+    assert.equal(env.upstream.abandoned(), 0, 'refresh must not abandon the upstream request');
+    const settled = env.runtime.getSession(session.id);
+    const outcome = outcomeOf(settled);
+    assert.notEqual(outcome?.kind, 'aborted');
+    assert.notEqual(outcome?.reason, 'abort');
+    assert.notEqual(outcome?.reason, 'user_abort');
+    const kinds = (await env.runtime.listTraceEvents(session.id)).map((e) => e.kind);
+    assert.ok(!kinds.includes('cancel'), `refresh traced a cancel (${kinds.join(',')})`);
+    assert.equal(env.upstream.requests.length, 1);
+  } finally {
+    await env.close();
+  }
+});
+
+test('断开后重新跟上同一场，能看到后续输出和完成后的回复 [AC:refresh-keeps-agent-run#AC-3]', async () => {
+  const env = await setup([slowAnswer]);
+  try {
+    const ac = new AbortController();
+    const res = await postChat(env.url, 'sse-rejoin', ac.signal);
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let seen = '';
+    while (!seen.includes('tok0')) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      seen += dec.decode(value);
+    }
+    assert.match(seen, /tok0/);
+    const session = sessionByTitle(env.runtime, 'sse-rejoin');
+    ac.abort();
+    const follow = await fetch(`${env.base}/api/sessions/${encodeURIComponent(session.id)}/stream`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ follow: true })
+    });
+    const followed = await follow.text();
+    assert.match(env.runtime.getLatestAssistantText(session.id), /tok29/);
+    assert.match(followed, /tok29|text_delta/);
+    const outcome = outcomeOf(env.runtime.getSession(session.id));
+    assert.notEqual(outcome?.kind, 'aborted');
+  } finally {
+    await env.close();
+  }
+});
+
+test('明确停止仍然会终止正在生成的回复 [AC:refresh-keeps-agent-run#AC-2] [AC:chat-basics#AC-5]', async () => {
+  const env = await setup([slowAnswer]);
+  try {
+    const ac = new AbortController();
+    const res = await postChat(env.url, 'sse-stop', ac.signal);
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let seen = '';
+    while (!seen.includes('tok0')) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      seen += dec.decode(value);
+    }
+    assert.match(seen, /tok0/);
+    const session = sessionByTitle(env.runtime, 'sse-stop');
+    const disconnectedAt = Date.now();
+    const cancel = await fetch(`${env.base}/api/sessions/${encodeURIComponent(session.id)}/cancel`, {
+      method: 'POST'
+    });
+    assert.equal(cancel.status, 200);
+    assert.ok(await waitFor(() => env.upstream.abandoned() === 1), 'explicit stop abandons upstream');
+    assert.ok(Date.now() - disconnectedAt < 2000, 'explicit stop aborts promptly');
     assert.ok(await waitFor(() => env.runtime.getSession(session.id).status !== 'running'));
     const kinds = (await env.runtime.listTraceEvents(session.id)).map((e) => e.kind);
     assert.ok(kinds.includes('cancel'), `cancel traced (got ${kinds.join(',')})`);
-    assert.equal(env.upstream.requests.length, 1, 'cancelled run is not retried');
+    const outcome = outcomeOf(env.runtime.getSession(session.id));
+    assert.equal(outcome?.kind, 'aborted');
+    ac.abort();
   } finally {
     await env.close();
   }

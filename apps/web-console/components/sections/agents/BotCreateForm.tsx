@@ -91,6 +91,7 @@ export function BotCreateForm({ existingNames, onCreated, onCancel }: BotCreateF
           void submit();
         }}
       >
+        <div className="ag-form__scroll">
         <div className="ag-field">
           <label className="ag-field__label" htmlFor="bot-create-name">
             {t('agents.bots.nameLabel')}
@@ -159,6 +160,7 @@ export function BotCreateForm({ existingNames, onCreated, onCancel }: BotCreateF
           onColor={(color) => setFace((current) => ({ ...current, color }))}
         />
 
+        </div>
         <CreateFieldErrors nameProblem={nameProblem} error={error} />
         <div className="ag-form__actions">
           <button type="submit" className="btn btn-primary btn-sm" data-testid="bot-create-submit" disabled={!botCreateReady(name, nameProblem, null, busy)}>

@@ -59,10 +59,64 @@ test('切换会话后画面不再绘制上一场进行中的回合 [AC:bot-switc
   );
 });
 
+test('切走后、新会话装上画面前，不再绘制上一场已经写出的文字和后续吐字 [AC:bot-switch-live-turn#AC-4]', () => {
+  const writtenOnA = [
+    { id: 'a-user', role: 'user', text: 'A 的问题' },
+    { id: 'a-assistant', role: 'assistant', text: 'A 正在吐的字' },
+  ];
+  const beforeBLoads = screenLiveTurn({
+    selectedSessionId: 'session-b',
+    loadedSessionId: 'session-a',
+    messages: writtenOnA,
+    liveSessionId: 'session-a',
+    optimisticUser: 'A 正在发送',
+    hasStream: true,
+    waitTyping: true,
+    playSending: true,
+  });
+  assert.deepEqual(beforeBLoads.messages, []);
+  assert.equal(beforeBLoads.bound, false);
+  assert.equal(beforeBLoads.optimisticUser, null);
+  assert.equal(beforeBLoads.hasStream, false);
+  assert.equal(beforeBLoads.waitTyping, false);
+  assert.equal(beforeBLoads.playSending, false);
+
+  const laterTokens = screenLiveTurn({
+    selectedSessionId: 'session-b',
+    loadedSessionId: 'session-a',
+    messages: [...writtenOnA, { id: 'a-more', role: 'assistant', text: 'A 后续 token' }],
+    liveSessionId: 'session-b',
+    optimisticUser: '…',
+    hasStream: true,
+    waitTyping: true,
+    playSending: true,
+  });
+  assert.deepEqual(laterTokens.messages, []);
+  assert.equal(laterTokens.hasStream, false);
+  assert.equal(laterTokens.waitTyping, false);
+  assert.equal(laterTokens.optimisticUser, null);
+
+  const bLoaded = screenLiveTurn({
+    selectedSessionId: 'session-b',
+    loadedSessionId: 'session-b',
+    messages: historyB,
+    liveSessionId: 'session-a',
+    optimisticUser: 'A 正在发送',
+    hasStream: true,
+    waitTyping: true,
+    playSending: true,
+  });
+  assert.equal(bLoaded.bound, true);
+  assert.equal(bLoaded.messages, historyB);
+  assert.equal(bLoaded.hasStream, false);
+  assert.equal(bLoaded.optimisticUser, null);
+});
+
 test('留在当前会话时继续显示这场进行中的回合 [AC:bot-switch-live-turn#AC-3]', () => {
   const historyA = [{ id: 'a-user', role: 'user', text: 'A 的问题' }];
   const screen = screenLiveTurn({
     selectedSessionId: 'session-a',
+    loadedSessionId: 'session-a',
     messages: historyA,
     liveSessionId: 'session-a',
     optimisticUser: 'A 正在发送',
@@ -70,6 +124,7 @@ test('留在当前会话时继续显示这场进行中的回合 [AC:bot-switch-l
     waitTyping: false,
     playSending: true,
   });
+  assert.equal(screen.bound, true);
   assert.equal(screen.messages, historyA);
   assert.equal(screen.optimisticUser, 'A 正在发送');
   assert.equal(screen.hasStream, true);

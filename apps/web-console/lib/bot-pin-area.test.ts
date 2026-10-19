@@ -9,12 +9,15 @@ import {
   commitBotPinState,
   getBotPinSnapshot,
   nextStateAfterPinDragEnd,
+  groupRowsWithoutPinnedBots,
   nextStateAfterPinDrop,
   pinDragKind,
   resultOfPinAreaDrop,
   visiblePinnedBots
 } from './bot-pin-area.ts';
 import { BOT_PIN_STORAGE_KEY, displayPinnedIds, loadBotPinState, type BotPinState } from './bot-pin.ts';
+import { functionalGroupRows } from './functional-group-view.ts';
+import type { BotInfo, SessionSummary } from './types.ts';
 
 const superBot = { id: 'super', name: 'Super Bot', builtin: true, canonicalSessionId: 'sess-super' };
 const desk = { id: 'desk', name: 'DeskBot', canonicalSessionId: 'sess-desk' };
@@ -122,6 +125,60 @@ test('pin chrome follows the active language and does not translate Super Bot [A
   assert.match(zh.play.pin.empty, /\p{Script=Han}/u);
   assert.doesNotMatch(en.play.pin.empty, /\p{Script=Han}/u);
   assert.match(en.play.pin.empty, /[A-Za-z]/);
+});
+
+test('pinned bots leave the groups below and return after unpin [AC:bot-pin-area#AC-8]', () => {
+  const play = readFileSync(new URL('../components/PlayPanel.tsx', import.meta.url), 'utf8');
+  const groupsView = readFileSync(new URL('../components/BotFunctionalGroups.tsx', import.meta.url), 'utf8');
+  assert.match(play, /<BotPinArea/);
+  assert.match(groupsView, /groupRowsWithoutPinnedBots\(/);
+
+  const roster = [
+    { id: 'super', name: 'Super Bot', builtin: true, canonicalSessionId: 'sess-super', hidden: false },
+    { id: 'desk', name: 'DeskBot', canonicalSessionId: 'sess-desk', hidden: false },
+    { id: 'xiaoba', name: '小八', canonicalSessionId: 'sess-xiaoba', hidden: false }
+  ] as BotInfo[];
+  const sessions = [
+    { id: 'sess-super' },
+    { id: 'sess-super-user', metadata: { botId: 'super', canonicalBotChat: true } },
+    { id: 'sess-desk' },
+    { id: 'sess-xiaoba' },
+    { id: 'sess-other' }
+  ] as SessionSummary[];
+  const groups = [{ id: 'home', name: 'Home', botIds: ['desk'] }];
+  const membership = structuredClone(groups);
+  const shown = (groupId: string | null, state: BotPinState) => groupRowsWithoutPinnedBots(
+    functionalGroupRows(groups, roster, sessions, groupId),
+    roster,
+    sessions,
+    state
+  ).map((session) => session.id);
+
+  assert.deepEqual(functionalGroupRows(groups, roster, sessions, null).map((session) => session.id), [
+    'sess-super', 'sess-super-user', 'sess-xiaoba', 'sess-other'
+  ]);
+  assert.deepEqual(shown(null, fresh), ['sess-xiaoba', 'sess-other']);
+  assert.deepEqual(shown('home', fresh), ['sess-desk']);
+
+  const pinnedDesk = nextStateAfterPinDrop(fresh, roster, 'desk');
+  assert.ok(pinnedDesk);
+  assert.deepEqual(shown('home', pinnedDesk), []);
+  assert.deepEqual(shown(null, pinnedDesk), ['sess-xiaoba', 'sess-other']);
+  assert.deepEqual(functionalGroupRows(groups, roster, sessions, 'home').map((session) => session.id), ['sess-desk']);
+
+  const onlyXiaoba: BotPinState = { customized: true, ids: ['xiaoba'] };
+  assert.deepEqual(shown(null, onlyXiaoba), ['sess-super', 'sess-super-user', 'sess-other']);
+  assert.deepEqual(shown('home', onlyXiaoba), ['sess-desk']);
+
+  const deskBack = nextStateAfterPinDragEnd(pinnedDesk, roster, 'desk', false);
+  assert.ok(deskBack);
+  assert.deepEqual(shown('home', deskBack), ['sess-desk']);
+  assert.equal(displayPinnedIds(roster, deskBack).includes('desk'), false);
+
+  const superBack = nextStateAfterPinDragEnd(fresh, roster, 'super', false);
+  assert.ok(superBack);
+  assert.deepEqual(shown(null, superBack), ['sess-super', 'sess-super-user', 'sess-xiaoba', 'sess-other']);
+  assert.deepEqual(groups, membership);
 });
 
 test('commitBotPinState writes the list the bot page reloads [AC:bot-pin-area#AC-2]', () => {

@@ -1,3 +1,4 @@
+import { botForCanonicalSession } from './bots.ts';
 import {
   BOT_PIN_STORAGE_KEY,
   displayPinnedIds,
@@ -92,6 +93,21 @@ export function visiblePinnedBots<T extends PinRosterBot>(bots: readonly T[], st
   return displayPinnedIds(roster, state).flatMap((id) => {
     const bot = byId.get(id);
     return bot ? [bot] : [];
+  });
+}
+
+/** Rows already drawn in the pin area stay out of the groups underneath. Membership is unchanged. */
+export function groupRowsWithoutPinnedBots<T extends { id: string; metadata?: Record<string, unknown> }>(
+  rows: readonly T[],
+  bots: readonly PinRosterBot[],
+  sessions: readonly { id: string; metadata?: Record<string, unknown> }[],
+  state: BotPinState
+): T[] {
+  const pinned = new Set(visiblePinnedBots(bots, state).map((bot) => bot.id));
+  if (pinned.size === 0) return rows.slice();
+  return rows.filter((row) => {
+    const bot = botForCanonicalSession(bots, row.id, sessions);
+    return !bot || !pinned.has(bot.id);
   });
 }
 

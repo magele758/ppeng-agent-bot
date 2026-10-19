@@ -300,24 +300,29 @@ function buildTeamOverviewPulse(
   };
 }
 
+function endSse(response: ServerResponse<IncomingMessage>): void {
+  if (response.destroyed || response.writableEnded) return;
+  try {
+    response.end();
+  } catch {
+    /* The browser already went away. That is not a user stop. */
+  }
+}
+
 async function streamRun(
   runtime: RawAgentRuntime,
   response: ServerResponse<IncomingMessage>,
   sessionId: string
 ) {
   sseInit(response);
-  // The SSE client is the only consumer of this run: when it goes away, stop the
-  // run (and with it the upstream model request) instead of streaming into the void.
-  const clientGone = new AbortController();
-  const onClose = () => {
-    if (!response.writableEnded) clientGone.abort();
-  };
-  response.on('close', onClose);
+  // Refresh, hot reload, and a dropped socket are not a user stop. The run keeps
+  // going so a later visit can follow it, and the finished turn stays in history.
+  // Explicit stop is POST /cancel, which calls cancelSession on its own.
+  response.on('error', () => undefined);
   try {
     await runtime.runHumanSession(sessionId, {
       onModelStreamChunk: (chunk: ModelStreamChunk) => sseSend(response, 'model', chunk),
-      steerDrainPolicy: readLoopSettings(runtime.store).steerDrainPolicy,
-      signal: clientGone.signal
+      steerDrainPolicy: readLoopSettings(runtime.store).steerDrainPolicy
     });
     sseSend(response, 'result', {
       session: runtime.getSession(sessionId),
@@ -326,7 +331,7 @@ async function streamRun(
   } catch (error) {
     sseSend(response, 'error', { message: error instanceof Error ? error.message : String(error) });
   }
-  response.end();
+  endSse(response);
 }
 
 const FOLLOW_RUN_WAIT_MS = 20_000;
@@ -341,6 +346,7 @@ async function followSessionStream(
   sessionId: string
 ) {
   sseInit(response);
+  response.on('error', () => undefined);
   const detach = runtime.subscribeModelStream(sessionId, (chunk: ModelStreamChunk) => {
     sseSend(response, 'model', chunk);
   });
@@ -368,7 +374,7 @@ async function followSessionStream(
   } finally {
     detach();
     response.removeListener('close', onClose);
-    if (!response.writableEnded) response.end();
+    endSse(response);
   }
 }
 

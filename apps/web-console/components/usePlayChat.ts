@@ -21,6 +21,7 @@ import { renderMarkdown } from '@/lib/markdown';
 import { rollbackToCheckpoint, streamCheckpoint, type StreamSegment } from '@/lib/stream-segments';
 import { feedSseBuffer } from '@/lib/sse';
 import { liveSessionFollowRequest, type LiveStreamArm } from '@/lib/live-stream-attach';
+import { shouldResumeRunningTurn } from '@/lib/run-leave';
 import {
   detachLiveTurn,
   liveTurnBelongsToSelection,
@@ -329,6 +330,9 @@ export function usePlayChat(deps: PlayChatDeps) {
   const [queryExecMode, setQueryExecMode] = useState<QueryExecMode>('steering');
 
   const playMessagesRef = useRef<HTMLDivElement>(null);
+  const playSendingLiveRef = useRef(false);
+  playSendingLiveRef.current = playSending;
+  const chromeSessionRef = useRef<string | null>(null);
   const liveFollowRef = useRef<{
     sessionId: string;
     controller: AbortController;
@@ -840,6 +844,7 @@ export function usePlayChat(deps: PlayChatDeps) {
   const refreshPlayPanel = useCallback(async () => {
     const sid = selectedSessionRef.current;
     if (!sid) {
+      chromeSessionRef.current = null;
       historySessionRef.current='';
       historyAutoBlockedRef.current = false;
       setHistoryCursor(null);
@@ -909,6 +914,7 @@ export function usePlayChat(deps: PlayChatDeps) {
           ? 'ptc'
           : 'legacy'
       );
+      chromeSessionRef.current = sid;
       setSessionChrome(chrome);
       setGoalDraft(chrome.goalCondition ?? '');
       setAutonomyDraft(permissionToAutonomy(chrome.permissionMode));
@@ -973,6 +979,7 @@ export function usePlayChat(deps: PlayChatDeps) {
         setSessionFileArtifacts([]);
       }
     } catch {
+      chromeSessionRef.current = null;
       historySessionRef.current = '';
       setHistoryCursor(null);
       rememberCanonicalBotChat(null);
@@ -1271,6 +1278,7 @@ export function usePlayChat(deps: PlayChatDeps) {
       reason,
       blocked: historyAutoBlockedRef.current
     })) return;
+    if (historySessionRef.current !== sid) return;
     const epoch = feedEpochRef.current;
     historyLoadingRef.current = true;
     setHistoryLoading(true);
@@ -1281,6 +1289,7 @@ export function usePlayChat(deps: PlayChatDeps) {
         nextCursor: number | null;
       };
       if (!pageEpochCurrent(selectedSessionRef.current, sid!, epoch, feedEpochRef.current)) return;
+      if (historySessionRef.current !== sid) return;
       const older = (data.messages ?? []) as Array<ChatMessage & { id: string }>;
       const planned = planFeedScroll('prepend', playStickToBottomRef.current, readFeedAnchor(playMessagesRef.current));
       playStickToBottomRef.current = planned.stick;
@@ -1594,6 +1603,22 @@ export function usePlayChat(deps: PlayChatDeps) {
     })();
     return { ready, cancel: () => controller.abort() };
   };
+
+  const armLiveSessionStreamRef = useRef(armLiveSessionStream);
+  armLiveSessionStreamRef.current = armLiveSessionStream;
+
+  useEffect(() => {
+    const sid = selectedSessionId;
+    if (!sid || chromeSessionRef.current !== sid) return;
+    if (!shouldResumeRunningTurn({ status: sessionChrome?.status, locallySending: playSendingLiveRef.current })) {
+      return;
+    }
+    const armed = armLiveSessionStreamRef.current(sid);
+    return () => {
+      // Stop watching only. Closing this follow socket does not cancel the server run.
+      armed.cancel();
+    };
+  }, [selectedSessionId, sessionChrome?.status]);
 
   const ensurePlaySessionForImages = async (): Promise<string> => {
     if (selectedSessionRef.current) return selectedSessionRef.current;
@@ -2034,6 +2059,7 @@ export function usePlayChat(deps: PlayChatDeps) {
 
   const screen = screenLiveTurn({
     selectedSessionId,
+    loadedSessionId: historySessionRef.current,
     messages: sessionMessages,
     liveSessionId: liveOwnerRef.current,
     optimisticUser,
@@ -2044,8 +2070,9 @@ export function usePlayChat(deps: PlayChatDeps) {
 
   return {
     historyCursor,historyLoading,loadOlderHistory,
+    transcriptReady: screen.bound,
     // State
-    sessionMessages,
+    sessionMessages: screen.messages,
     playTitle,
     playMeta,
     sessionChrome,
@@ -2115,7 +2142,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     modelViewPayload,
     showJumpToLatest,
     displayMessages:
-      showModelView && modelViewPayload?.modelView ? modelViewPayload.modelView : sessionMessages,
+      screen.bound && showModelView && modelViewPayload?.modelView ? modelViewPayload.modelView : screen.messages,
     optionalToolGroupsFeature,
     optionalToolCatalog,
     enabledOptionalGroupIds,
