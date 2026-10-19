@@ -95,8 +95,8 @@ RAW_AGENT_WEB_PORT=33815
 # daemon 与内置 Web Console 会共用同一个 token，无需手动配置
 RAW_AGENT_AUTH_TOKEN=your-secret-token
 
-# 沙箱模式（默认 auto 自动检测）
-RAW_AGENT_SANDBOX_MODE=auto
+# 沙箱：对话里的 Agent 每次自己选隔离，一般不用设。这行只是旧调用的回退。
+# RAW_AGENT_SANDBOX_MODE=auto
 
 # 外部 AI 工具（需要本地安装对应 CLI）
 RAW_AGENT_EXTERNAL_AI_TOOLS=1
@@ -180,12 +180,8 @@ RAW_AGENT_SKILL_ROUTING_MODE=hybrid
 **症状**：bash 命令执行报错
 
 **解决方案**：
-1. 检查 `RAW_AGENT_SANDBOX_MODE` 配置
-2. 某些命令可能被沙箱阻止（如访问 ~/.ssh）
-3. 如需临时禁用沙箱（不推荐）：
-   ```bash
-   RAW_AGENT_SANDBOX_MODE=direct
-   ```
+1. 系统级隔离会挡住 ~/.ssh 等目录；需要碰到这些目录时，由对话里的 Agent 在该次命令选择无隔离，并等你批准
+2. 不要靠改环境变量关掉隔离
 
 ### 内存/磁盘占用过高
 

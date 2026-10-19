@@ -168,7 +168,11 @@ export function writeSandboxSettings(store: SandboxSettingsStore, patch: Sandbox
   return next;
 }
 
-/** Persisted Lab mode wins; otherwise existing RAW_AGENT_SANDBOX_MODE. */
+/**
+ * Persisted Lab mode wins; otherwise existing RAW_AGENT_SANDBOX_MODE.
+ * Shell tools do not use this as the per-call default: the model picks, and
+ * an omitted choice is the strongest isolation available on this machine.
+ */
 export function resolveSandboxMode(
   store: SandboxSettingsStore | undefined,
   env: NodeJS.ProcessEnv = process.env

@@ -14,6 +14,14 @@ import { sanitizeSpawnEnv } from '../sandbox/env-sanitizer.js';
 import { redactToolContent } from '../sandbox/result-redaction.js';
 import { createAgentSandboxFromEnv } from '../sandbox/create-agent-sandbox.js';
 import type { AgentSandbox } from '../sandbox/agent-sandbox-types.js';
+import type { SandboxMode } from '../sandbox/sandbox-settings.js';
+import {
+  DIRECT_ISOLATION_REFUSAL,
+  decideShellIsolation,
+  isolationInputSchema,
+  shellCallNeedsDirectApproval,
+  shellIsolationAvailability
+} from '../sandbox/model-isolation.js';
 import { createExternalAiTools } from './external-ai-tools.js';
 import { bashCommandNeedsApproval } from './bash-command-policy.js';
 import { globWorkspaceFiles } from './glob-files.js';
@@ -129,7 +137,13 @@ export interface RuntimeToolServices {
     input: { toAgentId: string; content: string; type?: string; correlationId?: string }
   ) => Promise<MailRecord>;
   readInbox: (agentId: string) => Promise<MailRecord[]>;
-  startBackgroundJob: (sessionId: string, command: string) => Promise<BackgroundJobRecord>;
+  startBackgroundJob: (
+    sessionId: string,
+    command: string,
+    options?: { isolation?: unknown }
+  ) => Promise<BackgroundJobRecord>;
+  /** True only when a person has approved this exact direct-isolation call. Missing hook fails closed. */
+  directIsolationApproved?: (sessionId: string, toolName: string, args: Record<string, unknown>) => boolean;
   getBackgroundJob: (jobId: string) => Promise<BackgroundJobRecord | undefined>;
   listBackgroundJobs: (sessionId?: string) => Promise<BackgroundJobRecord[]>;
   listWorkspaces: () => Promise<Array<{ id: string; taskId: string; name: string; rootPath: string; mode: string }>>;
@@ -210,7 +224,13 @@ function workEvidenceDiffCap(): number {
 function shellExecution(
   command: string,
   cwd: string,
-  options?: { timeoutMs?: number; signal?: AbortSignal; sessionId?: string; workspace?: string | string[] }
+  options?: {
+    timeoutMs?: number;
+    signal?: AbortSignal;
+    sessionId?: string;
+    workspace?: string | string[];
+    isolation?: SandboxMode;
+  }
 ): Promise<ToolExecutionResult> {
   const sandbox = getAgentSandbox();
   return sandbox
@@ -221,15 +241,16 @@ function shellExecution(
       timeoutMs: options?.timeoutMs,
       signal: options?.signal,
       sessionId: options?.sessionId,
-      allowNetwork: true
+      allowNetwork: true,
+      ...(options?.isolation ? { isolation: options.isolation } : {})
     })
     .then((result) => {
-    if (options?.signal?.aborted) return {ok:false, content:'(command aborted)', metadata:{exitCode:result.code, signal:result.signal}};
+    if (options?.signal?.aborted) return {ok:false, content:'(command aborted)', metadata:{exitCode:result.code, signal:result.signal, ...(result.backend ? { sandbox_backend: result.backend } : {})}};
     const combined = [result.stdout.trim(), result.stderr.trim()].filter(Boolean).join('\n');
     const raw = combined || `(command exited with ${result.code ?? result.signal ?? 'unknown'} and no output)`;
     // P0 return-path redaction: injected/host secret values must not flow back to the model.
     const ok = result.code === 0 && result.signal === null;
-    return {ok, content:redactToolContent(ok ? raw : `${raw}\n[exit_code=${result.code ?? 'unknown'}; signal=${result.signal ?? 'none'}]`, process.env), metadata:{exitCode:result.code, signal:result.signal}};
+    return {ok, content:redactToolContent(ok ? raw : `${raw}\n[exit_code=${result.code ?? 'unknown'}; signal=${result.signal ?? 'none'}]`, process.env), metadata:{exitCode:result.code, signal:result.signal, ...(result.backend ? { sandbox_backend: result.backend } : {})}};
   });
 }
 
@@ -305,6 +326,21 @@ function parseTodoItems(raw: unknown): TodoItem[] {
 
 export function createBuiltinTools(services: RuntimeToolServices): ToolContract<any>[] {
   const riskyShellTokens = ['rm ', 'git reset', 'git checkout', 'git clean', 'npm publish', 'sudo '];
+
+  function gateShell(context: RunContext, toolName: string, args: { isolation?: unknown }) {
+    const decision = decideShellIsolation(args.isolation, shellIsolationAvailability(getAgentSandbox().kind));
+    if (!decision.ok) return { ok: false as const, content: decision.message };
+    if (
+      decision.explicitDirect &&
+      services.directIsolationApproved?.(context.session.id, toolName, args as Record<string, unknown>) !== true
+    ) {
+      return { ok: false as const, content: DIRECT_ISOLATION_REFUSAL };
+    }
+    return {
+      ok: true as const,
+      mode: decision.localMode === 'inherit' ? undefined : decision.localMode
+    };
+  }
 
   const readFileTool: ToolContract<{ path?: string; limit?: number; offset_line?: number }> = {
     name: 'read_file',
@@ -701,25 +737,32 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
     }
   };
 
-  const bashTool: ToolContract<{ command: string; timeout_ms?: number }> = {
+  const bashTool: ToolContract<{ command: string; timeout_ms?: number; isolation?: string }> = {
     name: 'bash',
-    description: 'Run a shell command inside the workspace root. Optional timeout_ms (default from env RAW_AGENT_BASH_TIMEOUT_MS).',
+    description:
+      'Run a shell command inside the workspace root. Optional timeout_ms (default from env RAW_AGENT_BASH_TIMEOUT_MS). Optional isolation chooses os, direct, or remote for this command; omit it for the strongest available.',
     inputSchema: {
       type: 'object',
       properties: {
         command: { type: 'string' },
-        timeout_ms: { type: 'number' }
+        timeout_ms: { type: 'number' },
+        isolation: isolationInputSchema()
       },
       required: ['command']
     },
     approvalMode: 'auto',
     sideEffectLevel: 'workspace',
     needsApproval(_context, args) {
-      return bashCommandNeedsApproval(args.command);
+      return (
+        shellCallNeedsDirectApproval(args.isolation, shellIsolationAvailability(getAgentSandbox().kind)) ||
+        bashCommandNeedsApproval(args.command)
+      );
     },
     async execute(context, args) {
       const denied = commandHardlineToolResult(String(args.command ?? ''));
       if (denied) return denied;
+      const gated = gateShell(context, 'bash', args);
+      if (!gated.ok) return { ok: false, content: gated.content };
       const envDefault = Number(process.env.RAW_AGENT_BASH_TIMEOUT_MS);
       const timeoutMs =
         typeof args.timeout_ms === 'number' && args.timeout_ms > 0
@@ -731,7 +774,8 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
           timeoutMs,
           signal: context.abortSignal,
           sessionId: context.session.id,
-          workspace: sandboxWorkspaceRoots(context)
+          workspace: sandboxWorkspaceRoots(context),
+          isolation: gated.mode
         });
     }
   };
@@ -740,6 +784,7 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
     verify_command?: string;
     verify_timeout_ms?: number;
     include_diff_stat?: boolean;
+    isolation?: string;
   }> = {
     name: 'work_evidence',
     description:
@@ -755,17 +800,21 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
         include_diff_stat: {
           type: 'boolean',
           description: 'When false, skip unstaged/staged git diff --stat sections (still collects status porcelain). Default true.'
-        }
+        },
+        isolation: isolationInputSchema()
       }
     },
     approvalMode: 'auto',
     sideEffectLevel: 'workspace',
     needsApproval(_context, args) {
+      if (shellCallNeedsDirectApproval(args.isolation, shellIsolationAvailability(getAgentSandbox().kind))) return true;
       const cmd = String(args.verify_command ?? '').trim();
       if (!cmd) return false;
       return riskyShellTokens.some((token) => cmd.includes(token));
     },
     async execute(context, args) {
+      const gated = gateShell(context, 'work_evidence', args);
+      if (!gated.ok) return { ok: false, content: gated.content };
       const cwd = primaryWorkspacePath(context);
       const sandbox = getAgentSandbox();
       const sessionId = context.session.id;
@@ -775,7 +824,16 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
       const workspace = sandboxWorkspaceRoots(context);
 
       const execEvidence = async (command: string, timeoutMs: number) =>
-        sandbox.execute({ command, cwd, workspace, timeoutMs, signal, sessionId, allowNetwork: true });
+        sandbox.execute({
+          command,
+          cwd,
+          workspace,
+          timeoutMs,
+          signal,
+          sessionId,
+          allowNetwork: true,
+          ...(gated.mode ? { isolation: gated.mode } : {})
+        });
 
       const inside = await execEvidence('git rev-parse --is-inside-work-tree', 15_000);
       const gitAvailable = inside.code === 0 && inside.stdout.trim() === 'true';
@@ -1259,22 +1317,29 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
     }
   };
 
-  const bgRunTool: ToolContract<{ command: string }> = {
+  const bgRunTool: ToolContract<{ command: string; isolation?: string }> = {
     name: 'bg_run',
-    description: 'Run a long command in the background.',
+    description:
+      'Run a long command in the background. Optional isolation chooses os, direct, or remote for this command; omit it for the strongest available.',
     inputSchema: {
       type: 'object',
       properties: {
-        command: { type: 'string' }
+        command: { type: 'string' },
+        isolation: isolationInputSchema()
       },
       required: ['command']
     },
     approvalMode: 'auto',
     sideEffectLevel: 'workspace',
+    needsApproval(_context, args) {
+      return shellCallNeedsDirectApproval(args.isolation, shellIsolationAvailability(getAgentSandbox().kind));
+    },
     async execute(context, args) {
       const denied = commandHardlineToolResult(String(args.command ?? ''));
       if (denied) return denied;
-      const job = await services.startBackgroundJob(context.session.id, args.command);
+      const gated = gateShell(context, 'bg_run', args);
+      if (!gated.ok) return { ok: false, content: gated.content };
+      const job = await services.startBackgroundJob(context.session.id, args.command, { isolation: args.isolation });
       return {
         ok: true,
         content: JSON.stringify(job, null, 2)

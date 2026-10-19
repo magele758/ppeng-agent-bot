@@ -159,31 +159,31 @@ export const settingsEntries = {
   sandbox: {
     title: 'Command sandbox',
     keywords: 'sandbox bash isolation security no isolation direct bwrap seatbelt container command execution permissions secrets protection',
-    desc: 'How commands run by the agent are kept apart from your computer, so they cannot read secrets or damage files by mistake. Saved changes apply immediately.',
+    desc: 'The agent chooses isolation for each command. You do not have to pick a mode first. When the agent omits it, the strongest isolation this machine can do is used. No isolation runs only if the agent asks for that command and you approve.',
     fields: {
       mode: {
         label: 'Isolation mode',
-        hint: 'Keep "Auto" unless you are troubleshooting or using a remote sandbox.'
+        hint: 'You can leave this on Auto. It does not choose isolation for the agent.'
       }
     },
     options: {
       mode: {
-        auto: { label: 'Auto', desc: 'Recommended. Picks the strongest isolation your machine supports; falls back to scrubbing environment variables only.' },
-        os: { label: 'OS-level isolation', desc: 'Uses seatbelt on macOS and bwrap on Linux; commands cannot read key folders such as ~/.ssh.' },
-        direct: { label: 'Run directly (no isolation)', desc: 'Only scrubs environment variables; commands have the same permissions as this service.' },
-        container: { label: 'Container', desc: 'Not implemented on this machine yet; it actually runs directly.' },
-        'cloudflare-computer': { label: 'Cloudflare remote sandbox', desc: 'Sends commands to the Cloudflare Computer you configure. Fill in the connection under "Sandbox · Cloudflare connection".' }
+        auto: { label: 'Auto', desc: 'Recommended. The agent chooses per command. An omitted choice uses the strongest isolation on this machine.' },
+        os: { label: 'OS-level isolation', desc: 'Uses seatbelt on macOS and bwrap on Linux; commands cannot read key folders such as ~/.ssh. The agent can choose this on a single command.' },
+        direct: { label: 'Run directly (no isolation)', desc: 'Only scrubs environment variables. Saving this does not turn isolation off for the agent.' },
+        container: { label: 'Container', desc: 'Not available. Saving this does not turn isolation off.' },
+        'cloudflare-computer': { label: 'Cloudflare remote sandbox', desc: 'Commands can run on a connected remote computer. The agent picks remote on that command; you do not switch the mode first.' }
       }
     },
     risk: {
-      direct: '"Run directly" has no OS isolation (no isolation): commands can read and write everything this service can reach, including key folders. Use it only in a trusted environment.',
-      container: 'Container mode is not implemented on this machine and actually runs directly, so there is no OS isolation (no isolation) either.'
+      direct: 'No isolation means a command can read and write every file this service can reach, including key folders. Choosing it here does not turn isolation off. The agent must ask for no isolation on that command, and you must approve, before it runs that way.',
+      container: 'Container isolation is not available. Saving this does not run commands without isolation.'
     }
   },
   sandboxCloudflare: {
     title: 'Sandbox · Cloudflare connection',
     keywords: 'cloudflare remote sandbox endpoint token workspace account timeout secret vault',
-    desc: 'Only used when the isolation mode is "Cloudflare remote sandbox". The token is not stored here; keep it in the secret vault.',
+    desc: 'Connection for a remote computer. The agent uses it when it picks remote for a command. You do not have to switch the isolation mode first. The token is not stored here; keep it in the secret vault.',
     fields: {
       endpoint: { label: 'Service URL', hint: 'Where your Cloudflare Computer is deployed.' },
       workspace: { label: 'Workspace name', hint: 'Workspace used in the remote sandbox. Letters, digits, dots, underscores and hyphens only.' },

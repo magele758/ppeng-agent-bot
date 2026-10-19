@@ -26,7 +26,9 @@ export class NativeAgentSandbox implements AgentSandbox {
       timeoutMs: req.timeoutMs,
       signal: req.signal,
       allowNetwork: req.allowNetwork,
-      sessionId: req.sessionId
+      sessionId: req.sessionId,
+      mode: req.isolation,
+      strict: req.isolation !== undefined
     });
     return {
       stdout: r.stdout,
@@ -34,7 +36,7 @@ export class NativeAgentSandbox implements AgentSandbox {
       code: r.code,
       signal: r.signal,
       kind: 'native',
-      backend: this.manager.activeProvider.name
+      backend: r.backend ?? this.manager.activeProvider.name
     };
   }
 }
