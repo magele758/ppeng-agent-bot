@@ -73,6 +73,7 @@ export interface FactorySignals {
   cpu: number | null;
 }
 export interface FactoryTransport {
+  delivery?(machine: FactoryMachine, request: import("./delivery-types.js").DeliveryRequest, task?:FactoryTask): Promise<any>;
   probe(
     machine: FactoryMachine,
   ): Promise<{ identity: string; hostname: string }>;

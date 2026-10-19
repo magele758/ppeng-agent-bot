@@ -53,6 +53,7 @@
 | [`MEMORY_MULTIUSER.md`](MEMORY_MULTIUSER.md) | Implemented (agent backend) | 五层 `agent_memory`、HTTP `/api/memory`、对话回路经 bridge |
 | [`MULTI_MACHINE_READONLY_PILOT.md`](MULTI_MACHINE_READONLY_PILOT.md) | Read-only pilot | 群到任务、SSH 机器执行与容量、统一状态、巡检和真实双机试跑 |
 | [`MULTI_MACHINE_CONTROLLED_DEVELOPMENT.md`](MULTI_MACHINE_CONTROLLED_DEVELOPMENT.md) | Controlled development | 第二阶段独立授权、隔离开发、测试自审修复与本地READY证据 |
+| [`MULTI_MACHINE_CONTROLLED_DELIVERY.md`](MULTI_MACHINE_CONTROLLED_DELIVERY.md) | Controlled remote delivery | 第三阶段任务授权、原机发布器、可信CI、受保护合入与MERGED证据 |
 | [`TEAMS_SWARM.md`](TEAMS_SWARM.md) | Pipeline MVP | `SwarmExecutor` + `/api/swarm/*` + Lab Ops 面板 |
 | [`AGENT_ORCHESTRATOR.md`](AGENT_ORCHESTRATOR.md) | Engine + CRUD | `OrchestrationEngine.tick`、Evolution 可选记账 |
 | [`PTC_DYNAMIC_WORKFLOW.md`](PTC_DYNAMIC_WORKFLOW.md) | Dynamic workflow | 模型生成 async JavaScript，通过 `ptc_exec` 编排 Agent 与只读工具 |
@@ -147,3 +148,5 @@
 - 新能力：在对应专题文档顶部增加 **Implementation status** 表，并回本目录一行。
 - 改默认调用链或包边界：同步根目录中英文 README、Harness 入口与 from-zero 入门路径；专题细节留在对应章节，避免在各索引重复维护。
 - 改 SDK 契约：同步 `skills/agent-loop/SKILL.md`；以源码、类型与对应测试核验，不能把计划中的功能直接标为已实现。
+
+- [工厂独立合入 App 配置](FACTORY_MERGE_APP_SETUP.md)：单仓最小权限、服务端目标限制与原机凭据引用。

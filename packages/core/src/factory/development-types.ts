@@ -13,6 +13,8 @@ export type DevelopmentStage='QUEUED'|'WAITING_DEPENDENCY'|'START'|'RED'|'DEV'|'
 export interface DevelopmentSpec {
  requirement:string; baseline:string; policy:DevelopmentPolicy; generation:number;
  stage:DevelopmentStage; round:number; delivery:'not_pushed';
+ verifyCurrent?:boolean;
+ deliveryInput?:{generation?:number;baseSha:string;previousSha:string;ci?:unknown;repair:boolean};
  dependency?:{taskId:string;sha:string};
  reviewCarry?:{issues:unknown[];evidenceRecoveryRequired?:boolean};
  dependencyPrepared?:{generation:number;sha:string;digest:string;bytes:number;identity:string;sshAlias:string};

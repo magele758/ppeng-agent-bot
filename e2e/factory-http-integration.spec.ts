@@ -146,7 +146,7 @@ test("real Lab proxy shares controlled-development Room admission, task evidence
   const row = page.getByRole("row").filter({ hasText: task.id });
   await expect(row).toContainText("QUEUED");
   await expect(row).toContainText("修复轮次");
-  await expect(row).toContainText("尚未发布交付");
+  await expect(row).toContainText("本地开发尚未 READY");
   await row.locator("summary").click();
   await expect(row.locator("pre")).toContainText(baseline);
   await expect(row.locator("pre")).toContainText("not_pushed");

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { FactoryDelivery, FactoryDeliveryTask } from "./FactoryDelivery";
 import { FactoryDevelopment, DevelopmentTask } from "./FactoryDevelopment";
 import { api } from "@/lib/api";
 import { useI18n, type MessageKey } from "@/lib/i18n";
@@ -166,6 +167,7 @@ export function FactoryView() {
         <FactoryPatrol controller={controller} />
         <FactoryCommands controller={controller} />
         <FactoryDevelopment machines={settings.machines} refresh={controller.refresh} />
+        <FactoryDelivery machines={settings.machines} />
       </>}
     </section>
   );
@@ -591,7 +593,7 @@ function FactoryTasks({ controller }: { controller: FactoryController }) {
                 <td>{task.development ? `${task.development.stage} · ${t("factory.devRound")}: ${task.development.round}` : status(task.status)}</td>
                 <td>{new Date(task.updatedAt).toLocaleString()}</td>
                 <td>
-                  {task.development ? <DevelopmentTask task={task} setTask={() => {void refresh();}} /> : <FactoryTaskEvidence task={task} status={status} />}
+                  {task.development ? <><DevelopmentTask task={task} setTask={() => {void refresh();}} /><FactoryDeliveryTask id={task.id}/></> : <FactoryTaskEvidence task={task} status={status} />}
                   {!task.development && task.status === "queued" && (
                     <button
                       disabled={busy}

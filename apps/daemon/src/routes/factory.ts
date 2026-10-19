@@ -13,14 +13,230 @@ export function factoryRoutes(runtime: RawAgentRuntime): RouteSpec[] {
     void runtime.factory.tick().catch(() => {});
   };
   return [
-    {method:"PATCH",pattern:"/api/factory/development/:machine/:repository",handler:async ctx=>json(ctx.response,200,{settings:runtime.factory.development.save(principal(ctx),ctx.requireParam("machine"),ctx.requireParam("repository"),await ctx.readBody())})},
-    {method:"POST",pattern:"/api/factory/development/:machine/:repository/preflight",handler:async ctx=>{const input=await ctx.readBody() as {baseline:string};json(ctx.response,200,await runtime.factory.development.preflight(principal(ctx),ctx.requireParam("machine"),ctx.requireParam("repository"),input.baseline));}},
-    {method:"POST",pattern:"/api/factory/development/tasks",handler:async ctx=>{const task=runtime.factory.development.submit(principal(ctx),await ctx.readBody());json(ctx.response,202,{task});wake();}},
-    {method:"GET",pattern:"/api/factory/development/decisions",handler:ctx=>json(ctx.response,200,{tasks:runtime.factory.development.decisions(principal(ctx))})},
-    {method:"GET",pattern:"/api/factory/development/tasks/:id",handler:ctx=>json(ctx.response,200,{task:runtime.factory.development.current(principal(ctx),ctx.requireParam("id"))})},
-    {method:"POST",pattern:"/api/factory/development/tasks/:id/control",handler:async ctx=>{const input=await ctx.readBody() as {action:string};json(ctx.response,200,{task:await runtime.factory.development.control(principal(ctx),ctx.requireParam("id"),input.action)});}},
-    {method:"POST",pattern:"/api/factory/development/tasks/:id/decision",handler:async ctx=>{const task=runtime.factory.development.decide(principal(ctx),ctx.requireParam("id"),await ctx.readBody());json(ctx.response,202,{task});wake();}},
-    {method:"GET",pattern:"/api/factory/development/:machine/:repository",handler:ctx=>json(ctx.response,200,{settings:runtime.factory.development.settings(principal(ctx),ctx.requireParam("machine"),ctx.requireParam("repository"))})},
+    {
+      method: "GET",
+      pattern: "/api/factory/delivery/tasks/:id/evidence/:digest",
+      handler: (ctx) =>
+        json(
+          ctx.response,
+          200,
+          runtime.factory.delivery.evidence(
+            principal(ctx),
+            ctx.requireParam("id"),
+            ctx.requireParam("digest"),
+            Number(ctx.url.searchParams.get("offset") ?? 0),
+          ),
+        ),
+    },
+    {
+      method: "GET",
+      pattern: "/api/factory/delivery/queue",
+      handler: (ctx) =>
+        json(ctx.response, 200, {
+          queue: runtime.factory.delivery.queue(principal(ctx)),
+        }),
+    },
+    {
+      method: "GET",
+      pattern: "/api/factory/delivery/tasks/:id",
+      handler: async (ctx) =>
+        json(ctx.response, 200, {
+          delivery: runtime.factory.delivery.current(
+            principal(ctx),
+            ctx.requireParam("id"),
+          ),
+        }),
+    },
+    {
+      method: "POST",
+      pattern: "/api/factory/delivery/tasks/:id/verify",
+      handler: async (ctx) =>
+        json(ctx.response, 200, {
+          delivery: await runtime.factory.delivery.verifyRemote(
+            principal(ctx),
+            ctx.requireParam("id"),
+          ),
+        }),
+    },
+    {
+      method: "POST",
+      pattern: "/api/factory/delivery/tasks/:id/grant",
+      handler: async (ctx) => {
+        const delivery = runtime.factory.delivery.grant(
+          principal(ctx),
+          ctx.requireParam("id"),
+          await ctx.readBody(),
+        );
+        json(ctx.response, 202, { delivery });
+        wake();
+      },
+    },
+    {
+      method: "POST",
+      pattern: "/api/factory/delivery/tasks/:id/control",
+      handler: async (ctx) => {
+        const body = (await ctx.readBody()) as { action: string };
+        json(ctx.response, 200, {
+          delivery: runtime.factory.delivery.control(
+            principal(ctx),
+            ctx.requireParam("id"),
+            body.action,
+          ),
+        });
+      },
+    },
+    {
+      method: "POST",
+      pattern: "/api/factory/delivery/tasks/:id/decision",
+      handler: async (ctx) => {
+        const delivery = runtime.factory.delivery.decide(
+          principal(ctx),
+          ctx.requireParam("id"),
+          await ctx.readBody(),
+        );
+        json(ctx.response, 202, { delivery });
+        wake();
+      },
+    },
+    {
+      method: "GET",
+      pattern: "/api/factory/delivery/:machine/:repository",
+      handler: async (ctx) =>
+        json(ctx.response, 200, {
+          settings: runtime.factory.delivery.settings(
+            principal(ctx),
+            ctx.requireParam("machine"),
+            ctx.requireParam("repository"),
+          ),
+        }),
+    },
+    {
+      method: "PATCH",
+      pattern: "/api/factory/delivery/:machine/:repository",
+      handler: async (ctx) =>
+        json(ctx.response, 200, {
+          settings: runtime.factory.delivery.save(
+            principal(ctx),
+            ctx.requireParam("machine"),
+            ctx.requireParam("repository"),
+            await ctx.readBody(),
+          ),
+        }),
+    },
+    {
+      method: "POST",
+      pattern: "/api/factory/delivery/:machine/:repository/preflight",
+      handler: async (ctx) =>
+        json(
+          ctx.response,
+          200,
+          await runtime.factory.delivery.preflight(
+            principal(ctx),
+            ctx.requireParam("machine"),
+            ctx.requireParam("repository"),
+          ),
+        ),
+    },
+    {
+      method: "PATCH",
+      pattern: "/api/factory/development/:machine/:repository",
+      handler: async (ctx) =>
+        json(ctx.response, 200, {
+          settings: runtime.factory.development.save(
+            principal(ctx),
+            ctx.requireParam("machine"),
+            ctx.requireParam("repository"),
+            await ctx.readBody(),
+          ),
+        }),
+    },
+    {
+      method: "POST",
+      pattern: "/api/factory/development/:machine/:repository/preflight",
+      handler: async (ctx) => {
+        const input = (await ctx.readBody()) as { baseline: string };
+        json(
+          ctx.response,
+          200,
+          await runtime.factory.development.preflight(
+            principal(ctx),
+            ctx.requireParam("machine"),
+            ctx.requireParam("repository"),
+            input.baseline,
+          ),
+        );
+      },
+    },
+    {
+      method: "POST",
+      pattern: "/api/factory/development/tasks",
+      handler: async (ctx) => {
+        const task = runtime.factory.development.submit(
+          principal(ctx),
+          await ctx.readBody(),
+        );
+        json(ctx.response, 202, { task });
+        wake();
+      },
+    },
+    {
+      method: "GET",
+      pattern: "/api/factory/development/decisions",
+      handler: (ctx) =>
+        json(ctx.response, 200, {
+          tasks: runtime.factory.development.decisions(principal(ctx)),
+        }),
+    },
+    {
+      method: "GET",
+      pattern: "/api/factory/development/tasks/:id",
+      handler: (ctx) =>
+        json(ctx.response, 200, {
+          task: runtime.factory.development.current(
+            principal(ctx),
+            ctx.requireParam("id"),
+          ),
+        }),
+    },
+    {
+      method: "POST",
+      pattern: "/api/factory/development/tasks/:id/control",
+      handler: async (ctx) => {
+        const input = (await ctx.readBody()) as { action: string };
+        json(ctx.response, 200, {
+          task: await runtime.factory.development.control(
+            principal(ctx),
+            ctx.requireParam("id"),
+            input.action,
+          ),
+        });
+      },
+    },
+    {
+      method: "POST",
+      pattern: "/api/factory/development/tasks/:id/decision",
+      handler: async (ctx) => {
+        const task = runtime.factory.development.decide(
+          principal(ctx),
+          ctx.requireParam("id"),
+          await ctx.readBody(),
+        );
+        json(ctx.response, 202, { task });
+        wake();
+      },
+    },
+    {
+      method: "GET",
+      pattern: "/api/factory/development/:machine/:repository",
+      handler: (ctx) =>
+        json(ctx.response, 200, {
+          settings: runtime.factory.development.settings(
+            principal(ctx),
+            ctx.requireParam("machine"),
+            ctx.requireParam("repository"),
+          ),
+        }),
+    },
     {
       method: "GET",
       pattern: "/api/factory/settings",
