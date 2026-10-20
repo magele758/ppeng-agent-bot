@@ -1,6 +1,6 @@
 # The GitHub App cannot workflow_dispatch. pull_request still can start Actions,
-# so this branch runs the same release-gate jobs as Full validation.
-# The head ref keeps every other PR on the quick gate (AC-4).
+# so this pull request runs the same release-gate jobs as Full validation.
+# Only this head ref starts the gate; every other PR stays on the quick gate (AC-4).
 name: PR release gate
 on:
   pull_request: null
@@ -12,6 +12,6 @@ concurrency:
 jobs:
   full:
     name: Release gate
-    if: github.head_ref == 'cursor/fix-actions-39394459730'
+    if: github.head_ref == 'cursor/fix-actions-39418487857'
     uses: ./.github/workflows/release-gate.yml
     secrets: inherit
