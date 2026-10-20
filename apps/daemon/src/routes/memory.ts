@@ -48,10 +48,38 @@ function memoryWriteOwner(auth: RequestAuth, body: Record<string, unknown>): { u
   };
 }
 
+function assertMemoryOwner(runtime: RawAgentRuntime, auth: RequestAuth, entry: {userId?:string;tenantId?:string;sessionId?:string}): void {
+  if (!auth.isolate) return;
+  if (!auth.user || (entry.userId && entry.userId !== auth.user.id) || (entry.tenantId && entry.tenantId !== auth.user.tenantId)) throw new NotFoundError('Memory');
+  if (entry.sessionId) guardSession(runtime, entry.sessionId, auth, { allowMissing: true });
+  if (!entry.userId && !entry.sessionId && !auth.admin) throw new NotFoundError('Memory');
+}
+
 const MEMBER_ROLES = new Set(['owner', 'admin', 'member', 'viewer']);
 
 export function memoryRoutes(runtime: RawAgentRuntime): RouteSpec[] {
   return [
+    {
+      method: 'GET', pattern: '/api/memory/suppressions',
+      handler: ({ auth, url, response }) => {
+        const agentId = url.searchParams.get('agentId');
+        const suppressions = getStore(runtime).listSuppressions().filter(row => {
+          try { assertMemoryOwner(runtime, auth, row.memory); } catch { return false; }
+          return !agentId || row.memory.agentId === agentId;
+        });
+        json(response, 200, { suppressions });
+      }
+    },
+    {
+      method: 'POST', pattern: '/api/memory/suppressions/:id/restore',
+      handler: ({ auth, requireParam, response }) => {
+        const id = requireParam('id');
+        const row = getStore(runtime).listSuppressions().find(item => item.id === id);
+        if (!row) throw new NotFoundError('Memory');
+        assertMemoryOwner(runtime, auth, row.memory);
+        json(response, 200, { entry: getStore(runtime).restoreSuppression(id) });
+      }
+    },
     {
       method: 'GET',
       pattern: '/api/memory/settings',
@@ -285,9 +313,12 @@ export function memoryRoutes(runtime: RawAgentRuntime): RouteSpec[] {
     {
       method: 'DELETE',
       pattern: '/api/memory/:id',
-      handler: ({ requireParam, response }) => {
+      handler: ({ auth, requireParam, response }) => {
         const id = requireParam('id');
-        getStore(runtime).delete(id);
+        const entry = getStore(runtime).getEntryById(id);
+        if (!entry) throw new NotFoundError('Memory');
+        assertMemoryOwner(runtime, auth, entry);
+        getStore(runtime).deleteAndSuppress(id);
         json(response, 200, { ok: true });
       }
     },

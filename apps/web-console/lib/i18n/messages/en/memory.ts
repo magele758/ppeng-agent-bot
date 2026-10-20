@@ -1,4 +1,9 @@
 export const memory = {
+  suppressionTitle: 'Automatic learning blocked',
+  suppressionHint: 'Deleted facts remain blocked until you choose to remember them again. Original conversation history is retained.',
+  suppressionReason: 'Deleted by you; blocked {count} automatic writes',
+  rememberAgain: 'Remember again',
+
   title: 'Memory',
   desc: 'Facts and preferences agents remember, layered by scope. Pick a scope to browse, search, add and edit.',
   sourceUi: 'UI config',

@@ -73,6 +73,7 @@ export function BotCronPanel({
   const [cronDraft, setCronDraft] = useState('0 9 * * *');
   const [precheckKind, setPrecheckKind] = useState<'none' | 'script' | 'predicate'>('none');
   const [precheckSource, setPrecheckSource] = useState('');
+  const [precheckMode,setPrecheckMode]=useState<'strict'|'compat'>('strict');
   const { t } = useI18n();
 
   const generatedCron = useMemo(() => {
@@ -123,7 +124,7 @@ export function BotCronPanel({
           ...(scheduleKind==='cron'?{cron:generatedCron}:scheduleKind==='once'?{onceAt:zonedLocalToIso(onceAt,timezone)}:scheduleKind==='interval'?{intervalMs:intervalSeconds*1000}:{event,conclusions:event==='ci/status'?conclusions.split(',').map(s=>s.trim()).filter(Boolean):[],...(eventSecret?{secretEnv:eventSecret}:{})}),
           timezone,missedPolicy,
           expiresAt:supportsRoutineExpiration(scheduleKind)&&expiresAt?zonedLocalToIso(expiresAt,timezone):null,
-          ...(precheck ? { precheck } : editingId ? { precheck: null } : {})
+          ...(precheck ? { precheck: {...precheck,mode:precheckMode} } : editingId ? { precheck: null } : {})
         })
       });
       setEditingId(null);
@@ -131,7 +132,7 @@ export function BotCronPanel({
       setName('');
       setPrompt('');
       setPrecheckKind('none');
-      setPrecheckSource('');
+      setPrecheckSource('');setPrecheckMode('strict');
       await load();
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -320,6 +321,7 @@ export function BotCronPanel({
             />
           </label>
         ) : null}
+        {precheckKind !== 'none' && <label><span>{t('botWork.precheckMode')}</span><select data-testid="strict-precheck-mode" value={precheckMode} onChange={e=>setPrecheckMode(e.target.value as 'strict'|'compat')}><option value="strict">{t('botWork.precheckStrict')}</option><option value="compat">{t('botWork.precheckCompat')}</option></select></label>}
         {precheckKind !== 'none' ? <p className="bot-cron-form__preview">{t('play.cronPanel.precheckHint')}</p> : null}
         {scheduleKind==='cron'&&<p className="bot-cron-form__preview">{describeCron(generatedCron)}</p>}
         <button type="submit" className="btn btn-primary btn-sm" disabled={busy}>
@@ -351,7 +353,7 @@ export function BotCronPanel({
               </p>
               <p>{String(routineTimezone(job.timezone, timezone))}</p>
               {job.expiresAt&&<p className="bot-cron-card__meta">{t('botWork.expiresAt')}: {formatWhen(job.expiresAt)}</p>}
-              <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={()=>{setEditingId(job.id);setExpiresAt(job.expiresAt?zonedInstantToLocal(job.expiresAt,routineTimezone(job.timezone, timezone)):'');setName(job.name);setPrompt(job.prompt);setTimezone(String(routineTimezone(job.timezone, timezone)));setMissedPolicy(String(job.missedPolicy??'coalesce'));if(job.scheduleKind==='once_at'){setScheduleKind('once');setOnceAt(zonedInstantToLocal(job.scheduleValue,routineTimezone(job.timezone, timezone)));}else if(job.scheduleKind==='every_ms'){setScheduleKind('interval');setIntervalSeconds(Number(job.scheduleValue)/1000);}else if(job.scheduleKind==='event'){setScheduleKind('event');setEvent(job.scheduleValue);setEventSecret(String(job.metadata.secretEnv??''));setConclusions(Array.isArray(job.metadata.conclusions)?job.metadata.conclusions.join(', '):'');}else{setScheduleKind('cron');setPreset('custom');setCronDraft(job.scheduleValue);}const check=job.metadata.precheck as {kind?:'script'|'predicate';source?:string}|undefined;setPrecheckKind(check?.kind??'none');setPrecheckSource(check?.source??'');}}>{t('botWork.edit')}</button>
+              <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={()=>{setEditingId(job.id);setExpiresAt(job.expiresAt?zonedInstantToLocal(job.expiresAt,routineTimezone(job.timezone, timezone)):'');setName(job.name);setPrompt(job.prompt);setTimezone(String(routineTimezone(job.timezone, timezone)));setMissedPolicy(String(job.missedPolicy??'coalesce'));if(job.scheduleKind==='once_at'){setScheduleKind('once');setOnceAt(zonedInstantToLocal(job.scheduleValue,routineTimezone(job.timezone, timezone)));}else if(job.scheduleKind==='every_ms'){setScheduleKind('interval');setIntervalSeconds(Number(job.scheduleValue)/1000);}else if(job.scheduleKind==='event'){setScheduleKind('event');setEvent(job.scheduleValue);setEventSecret(String(job.metadata.secretEnv??''));setConclusions(Array.isArray(job.metadata.conclusions)?job.metadata.conclusions.join(', '):'');}else{setScheduleKind('cron');setPreset('custom');setCronDraft(job.scheduleValue);}const check=job.metadata.precheck as {kind?:'script'|'predicate';source?:string}|undefined;setPrecheckKind(check?.kind??'none');setPrecheckSource(check?.source??'');setPrecheckMode(job.metadata.precheckMode==='strict'?'strict':'compat');}}>{t('botWork.edit')}</button>
               <RoutineRuns jobId={job.id}/>
               <div className="bot-cron-card__actions">
                 <button

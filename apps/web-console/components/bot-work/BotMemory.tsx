@@ -1,4 +1,5 @@
 "use client";
+import { MemorySuppressions } from "../MemorySuppressions";
 import { useEffect, useState } from "react";
 import { ownedByBot, shownRows } from "@/lib/bot-panel-reset";
 import { useI18n } from "@/lib/i18n";
@@ -141,6 +142,7 @@ export function BotMemory({
           </button>
         </form>
       )}
+      <MemorySuppressions agentId={botId} revision={entries} onRestore={() => reload(botId)} />
       <Result value={visibleContext} />
     </section>
   );

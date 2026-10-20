@@ -42,7 +42,7 @@ test('expired executing occurrence becomes unknown without replay [AC:bot-routin
  assert.equal(runs.get(run.id).status,'unknown');assert.equal(calls,0);lease.release();a.db.close();b.db.close();
 });
 
-test('separate daemon processes contend for the same SQLite occurrence [AC:bot-routine-lifecycle#AC-12]',async()=>{
+test('separate daemon processes contend for the same SQLite occurrence [AC:bot-routine-lifecycle#AC-12] [AC:routine-failure-governance#AC-9]',async()=>{
  const {spawn}=await import('node:child_process');
  const {sanitizeSpawnEnv}=await import('../dist/sandbox/env-sanitizer.js');
  const {a,b,h,runs,run}=fixture();

@@ -64,7 +64,7 @@ test('谓词与脚本返回 wakeAgent false 时不开始模型回合 [AC:bot-gat
     name: '谓词预检',
     prompt: '如果有变化就总结',
     cron: '0 9 * * *',
-    precheck: { kind: 'predicate', source: '{"wakeAgent":false}' }
+    precheck: { mode: 'compat', kind: 'predicate', source: '{"wakeAgent":false}' }
   });
   due(host, predJob);
   await tickCronJobs(host);
@@ -79,7 +79,7 @@ test('谓词与脚本返回 wakeAgent false 时不开始模型回合 [AC:bot-gat
     name: '文件谓词',
     prompt: '读文件',
     cron: '0 9 * * *',
-    precheck: { kind: 'predicate', source: `file:${file}` }
+    precheck: { mode: 'compat', kind: 'predicate', source: `file:${file}` }
   });
   due(host, fileJob);
   await tickCronJobs(host);
@@ -90,7 +90,7 @@ test('谓词与脚本返回 wakeAgent false 时不开始模型回合 [AC:bot-gat
     name: '脚本预检',
     prompt: '跑模型',
     cron: '0 9 * * *',
-    precheck: { kind: 'script', source: `printf '%s\\n' '{"wakeAgent": false}'` }
+    precheck: { mode: 'compat', kind: 'script', source: `printf '%s\\n' '{"wakeAgent": false}'` }
   });
   due(host, scriptJob);
   await tickCronJobs(host);
@@ -118,7 +118,7 @@ test('预检要求唤醒、没有预检、或没有明确拒绝时仍开始模�
     name: '唤醒',
     prompt: '有变化',
     cron: '0 9 * * *',
-    precheck: { kind: 'predicate', source: '{"wakeAgent": true}' }
+    precheck: { mode: 'compat', kind: 'predicate', source: '{"wakeAgent": true}' }
   });
   due(host, wake);
   await tickCronJobs(host);
@@ -128,7 +128,7 @@ test('预检要求唤醒、没有预检、或没有明确拒绝时仍开始模�
     name: '非严格假',
     prompt: '仍要跑',
     cron: '0 9 * * *',
-    precheck: { kind: 'predicate', source: '{"wakeAgent": 0}' }
+    precheck: { mode: 'compat', kind: 'predicate', source: '{"wakeAgent": 0}' }
   });
   due(host, fuzzy);
   await tickCronJobs(host);
@@ -138,7 +138,7 @@ test('预检要求唤醒、没有预检、或没有明确拒绝时仍开始模�
     name: '纯文本脚本',
     prompt: '脚本没拒绝',
     cron: '0 9 * * *',
-    precheck: { kind: 'script', source: `printf '%s\\n' hello` }
+    precheck: { mode: 'compat', kind: 'script', source: `printf '%s\\n' hello` }
   });
   due(host, textScript);
   await tickCronJobs(host);
@@ -158,7 +158,7 @@ test('预检保存在例行任务上，重新读取后下次触发仍生效 [AC:
     name: '晨报',
     prompt: '总结',
     cron: '15 8 * * *',
-    precheck: { kind: 'script', source: 'printf skip' }
+    precheck: { mode: 'compat', kind: 'script', source: 'printf skip' }
   });
 
   const listed = listCronJobs(
@@ -169,7 +169,7 @@ test('预检保存在例行任务上，重新读取后下次触发仍生效 [AC:
   assert.deepEqual(listed[0].metadata.precheck, { kind: 'script', source: 'printf skip' });
 
   const updated = updateCronJob(host, job.id, {
-    precheck: { kind: 'predicate', source: '{"wakeAgent":false}' }
+    precheck: { mode: 'compat', kind: 'predicate', source: '{"wakeAgent":false}' }
   });
   assert.equal(updated.metadata.precheck.kind, 'predicate');
   assert.equal(updated.metadata.botId, bot.id);
@@ -182,7 +182,7 @@ test('预检保存在例行任务上，重新读取后下次触发仍生效 [AC:
   await tickCronJobs(host);
   assert.equal(runs.length, before);
 
-  updateCronJob(host, job.id, { precheck: { kind: 'predicate', source: '{"wakeAgent":true}' } });
+  updateCronJob(host, job.id, { precheck: { mode: 'compat', kind: 'predicate', source: '{"wakeAgent":true}' } });
   host.cronStore.update(job.id, { nextRunAt: new Date(Date.now() - 1000).toISOString() });
   await tickCronJobs(host);
   assert.equal(runs.length, before + 1);
@@ -225,7 +225,7 @@ test('预检失败、非零退出或抛错时不开始模型回合 [AC:routine-p
     name: '失败预检',
     prompt: '不要跑模型',
     cron: '0 9 * * *',
-    precheck: { kind: 'script', source: 'exit 9' }
+    precheck: { mode: 'compat', kind: 'script', source: 'exit 9' }
   });
   due(host, job);
   await tickCronJobs(host);
@@ -248,7 +248,7 @@ test('预检输出不唤醒时，即使退出码非零也不开始模型回合 [
     name: '非零仍不唤醒',
     prompt: '不要跑模型',
     cron: '0 9 * * *',
-    precheck: { kind: 'script', source: `printf '%s\\n' '{"wakeAgent":false}'; exit 3` }
+    precheck: { mode: 'compat', kind: 'script', source: `printf '%s\\n' '{"wakeAgent":false}'; exit 3` }
   });
   due(host, job);
   await tickCronJobs(host);
@@ -257,7 +257,7 @@ test('预检输出不唤醒时，即使退出码非零也不开始模型回合 [
   store.db.close();
 });
 
-test('预检脚本看不到守护进程环境，也不能访问公网 [AC:routine-precheck-fail-closed#AC-3]', async () => {
+test('预检脚本看不到守护进程环境，也不能访问公网 [AC:routine-precheck-fail-closed#AC-3] [AC:routine-strict-precheck#AC-5]', async () => {
   const secret = `precheck-secret-${Date.now()}`;
   const names = ['RAW_AGENT_API_KEY', 'RAW_AGENT_AUTH_TOKEN', 'GITHUB_TOKEN'];
   const previous = new Map(names.map((name) => [name, process.env[name]]));
@@ -279,7 +279,7 @@ s.setTimeout(800, () => { s.destroy(); finish(leak || !fileOk); });
 `);
   try {
     const result = await evaluateRoutinePrecheck(
-      { kind: 'script', source: 'node probe.mjs' },
+      { kind: 'script', source: 'node probe.mjs', mode: 'strict' },
       { cwd: dir, env: { PPENG_EVENT_FILE: file }, denyEnv: ['RAW_AGENT_API_KEY'] }
     );
     assert.equal(result.reason, undefined);
@@ -306,7 +306,7 @@ test('预检正常结束且没有明确拒绝时仍开始模型回合 [AC:routin
     name: '纯文本仍唤醒',
     prompt: '要跑',
     cron: '0 9 * * *',
-    precheck: { kind: 'script', source: `printf '%s\\n' hello` }
+    precheck: { mode: 'compat', kind: 'script', source: `printf '%s\\n' hello` }
   });
   due(host, job);
   await tickCronJobs(host);

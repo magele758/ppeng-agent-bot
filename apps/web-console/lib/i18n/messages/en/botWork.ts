@@ -1,4 +1,22 @@
 export const botWork = {
+  healthTitle: "Routine failure governance",
+  healthPrivate: "Failure and recovery notices appear only in your private task center.",
+  healthPaused: "Automatically paused: hard failure threshold reached",
+  healthActive: "Future triggers enabled",
+  healthCounts: "Consecutive failures: {failures}; hard failures: {hard}",
+  failureTransient: "Transient failure",
+  failureHard: "Hard failure",
+  healthNext: "Earliest execution: {time}",
+  healthThreshold: "Hard failure pause threshold",
+  healthMaxWait: "Maximum backoff (minutes)",
+  healthCooldown: "Notification cooldown (minutes)",
+  healthSave: "Save policy",
+  healthResume: "Resume future executions",
+  healthResumeHint: "Resuming clears failures and backoff. Only future triggers run; missed work is not replayed.",
+  healthFailureNotice: "The task entered a failure period. Check its run records.",
+  healthRecoveryNotice: "The task has successfully recovered.",
+
+  precheckMode:'Precheck mode',precheckStrict:'Strict: require a valid decision',precheckCompat:'Compatible: preserve legacy behavior',precheckFailed:'Precheck failed',precheckNoChange:'No change',
   unresolved: "Unresolved tasks", taskHistory: "Task history",
   costUnknown:'Cost not measured',costEstimate:'Estimated cost (USD)',turnProgress:'Turn progress',termination:'Termination reason',reasons:{members_completed:'Members completed their turns',budget:'Turn limit reached',tool_budget:'Tool call limit reached',cost_budget:'Cost budget reached',external_effect_unconfirmed:'External outcome needs review',interrupted_requires_review:'Interrupted; review required',user_abort:'Stopped by user',member_execution_failed:'Member execution failed'},
 

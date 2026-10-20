@@ -6,6 +6,8 @@ import { api, json, useAction, Feedback, Result, Status } from "./shared";
 type Run = {
   id: string;
   status: string;
+  precheckOutcome?: string;
+  failureClass?: string;
   sessionId?: string;
   result?: unknown;
   error?: string;
@@ -62,8 +64,9 @@ export function RoutineRuns({ jobId }: { jobId: string }) {
       {runs.map((r) => (
         <article key={r.id}>
           <span>
-            {r.scheduledAt} · <Status value={r.status} /> · {r.attempt}
+            {r.scheduledAt} · {r.precheckOutcome==='failed'?t('botWork.precheckFailed'):r.precheckOutcome==='no_change'?t('botWork.precheckNoChange'):<Status value={r.status} />} · {r.attempt}
           </span>
+          {r.failureClass&&<span>{r.failureClass==='transient'?t('botWork.failureTransient'):t('botWork.failureHard')}</span>}
           <button
             type="button"
             disabled={action.busy}

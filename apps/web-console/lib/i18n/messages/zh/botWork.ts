@@ -1,4 +1,22 @@
 export const botWork = {
+  healthTitle: "例行任务故障治理",
+  healthPrivate: "故障和恢复通知仅在私人任务中心显示。",
+  healthPaused: "自动暂停：连续硬失败达到阈值",
+  healthActive: "后续触发已启用",
+  healthCounts: "连续失败 {failures} 次，其中硬失败 {hard} 次",
+  failureTransient: "临时故障",
+  failureHard: "硬故障",
+  healthNext: "最早可执行时间：{time}",
+  healthThreshold: "连续硬失败暂停阈值",
+  healthMaxWait: "失败等待上限（分钟）",
+  healthCooldown: "通知冷却时间（分钟）",
+  healthSave: "保存策略",
+  healthResume: "恢复后续执行",
+  healthResumeHint: "恢复会清零失败序列和退避，从之后的触发继续，不补跑错过的工作。",
+  healthFailureNotice: "任务进入故障期，请检查运行记录。",
+  healthRecoveryNotice: "任务已成功恢复。",
+
+  precheckMode:'预检模式',precheckStrict:'严格：仅有效结论放行',precheckCompat:'兼容：保留旧任务行为',precheckFailed:'预检失败',precheckNoChange:'无变化',
   unresolved: "未解决任务", taskHistory: "历史任务",
   costUnknown:'费用尚未计量',costEstimate:'估算费用（美元）',turnProgress:'发言进度',termination:'结束原因',reasons:{members_completed:'成员已完成发言',budget:'达到发言次数上限',tool_budget:'达到工具调用上限',cost_budget:'达到费用预算',external_effect_unconfirmed:'外部操作结果待核对',interrupted_requires_review:'执行中断，需要核对',user_abort:'用户已停止',member_execution_failed:'成员执行失败'},
 

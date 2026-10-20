@@ -37,3 +37,6 @@ export type {
 export { RoutineRunStore, ensureRoutineSchema, drainRoutineRuns, materializeRoutineOccurrences, cancelRoutineRun, retryRoutineRun, routineSettings, resumeApprovalContinuation } from './routine-runtime.js';
 export type { RoutineRun, RoutineAttempt, RoutineRunStatus, RoutineRuntimeHost, RoutineContinuation, RoutineRoomDelivery } from './routine-runtime.js';
 export { nextZonedCronRunAt, normalizeRoutineTimezone, skippedZonedCronMinutes } from './cron-next.js';
+
+export { RoutineHealthStore, classifyRoutineFailure, isGovernedRoutine } from './routine-health.js';
+export type { RoutineHealth, RoutineFailurePolicy, RoutineFailureClass } from './routine-health.js';
