@@ -136,6 +136,10 @@ importers:
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
+    optionalDependencies:
+      sharp:
+        specifier: ^0.33.5
+        version: 0.33.5
 
   packages/agent-erp:
     dependencies:

@@ -1,12 +1,14 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
 
 const ownedJobs: string[] = [];
+// The shared E2E daemon fills the ordinary roster (hidden Bots still count).
+// These checks need a Bot that already exists, so they use the built-in Super Bot.
 async function reliabilityBot(request: APIRequestContext) {
- const {bots}=await (await request.get('/api/bots')).json();
- const existing=bots.find((bot:{name:string})=>bot.name==='E2E Reliability fixture');
- if(existing)return existing;
- const response=await request.post('/api/bots',{data:{name:'E2E Reliability fixture'}});
- expect(response.ok(),await response.text()).toBeTruthy();return (await response.json()).bot;
+ const response = await request.get('/api/bot-work/default');
+ expect(response.ok(), await response.text()).toBeTruthy();
+ const { bot } = await response.json();
+ expect(bot?.id).toEqual(expect.any(String));
+ return bot;
 }
 test.afterEach(async ({request}) => {
  for (const id of ownedJobs.splice(0)) expect((await request.delete(`/api/cron/jobs/${id}`)).ok()).toBeTruthy();
@@ -35,7 +37,9 @@ test('Lab explicitly upgrades a legacy precheck [AC:routine-strict-precheck#AC-1
  const bot=await reliabilityBot(request);
  const {job}=await (await request.post('/api/cron/jobs',{data:{botId:bot.id,name:'strict-check',prompt:'inspect',intervalMs:60000,precheck:{kind:'predicate',source:'{"wakeAgent":false}',mode:'compat'}}})).json();
  ownedJobs.push(job.id);
- await page.goto('/#/agents/bots');await page.getByTestId(`bot-card-${bot.id}`).click();
+ await page.goto('/#/agents/bots');
+ await page.getByRole('searchbox', { name: '搜索 Bot' }).fill(bot.name);
+ await page.getByTestId(`bot-card-${bot.id}`).click();
  await page.getByTestId('bot-detail').getByRole('button',{name:'展开或收起：定时任务'}).click();
  const panel=page.locator('.bot-cron-panel');await panel.getByRole('button',{name:'修改',exact:true}).click();
  const mode=panel.getByTestId('strict-precheck-mode');await expect(mode).toHaveValue('compat');await mode.selectOption('strict');
