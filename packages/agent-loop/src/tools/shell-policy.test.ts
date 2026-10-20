@@ -75,6 +75,29 @@ describe('shell-policy history gating', () => {
     expect(decision.reason).toMatch(/Code search limit/);
   });
 
+  it('does not treat ssh payloads as local browsing [AC:bypass-remote-shell#AC-3]', () => {
+    const heredoc = "ssh -o BatchMode=yes Win4090 \"wsl -d Ubuntu -e bash --norc --noprofile\" <<'EOF'\nfind /home/shinemo -type d\nEOF";
+    const quoted = 'ssh -o BatchMode=yes Win4090 "find /home/shinemo -iname agent"';
+    const history = Array.from({ length: 12 }, () => bash(heredoc));
+    expect(isUnboundedFsWalk(heredoc)).toBe(false);
+    expect(isDirectoryBrowseCommand(heredoc)).toBe(false);
+    expect(isUnboundedFsWalk(quoted)).toBe(false);
+    expect(checkShellPolicy(heredoc, history)).toEqual({ blocked: false });
+    expect(checkShellPolicy(quoted, history)).toEqual({ blocked: false });
+    expect(checkShellPolicy("ssh host 'ls /usr && du ~/'", history).blocked).toBe(false);
+  });
+
+  it('still blocks local directory browsing and unbounded walks [AC:bypass-remote-shell#AC-4]', () => {
+    const history = Array.from({ length: 8 }, (_, i) => bash(`ls src/dir${i}`));
+    const decision = checkShellPolicy('ls src/another', history);
+    expect(decision.blocked).toBe(true);
+    expect(decision.reason).toMatch(/Directory browse limit/);
+    expect(isUnboundedFsWalk('find /home -type d')).toBe(true);
+    expect(shellPolicyBlock('find /usr -type f').reason).toMatch(/maxdepth/);
+    expect(isUnboundedFsWalk("find /home -type d && ssh host 'echo ok'")).toBe(true);
+    expect(checkShellPolicy('ls src/ok', history.slice(0, 7)).blocked).toBe(false);
+  });
+
   it('respects a custom config', () => {
     const history = [bash('ls a'), bash('ls b')];
     expect(checkShellPolicy('ls c', history, {

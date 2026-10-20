@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import type { ApprovalItem, ChatMessage } from '@/lib/types';
 import { anchorApprovals } from '@/lib/approval-feed';
 import { messageHasStructuredParts, msgPartsToText, normalizedRole } from '@/lib/chat-utils';
-import { buildFeedSlots, type FeedSlot } from '@/lib/feed-window';
+import { buildFeedSlots, steerStreamPlacement, type FeedSlot } from '@/lib/feed-window';
 import { formatHash } from '@/lib/nav';
 import { useI18n } from '@/lib/i18n';
 import type { ReplyQuote } from '@/lib/reply-quote';
@@ -238,15 +238,19 @@ function toolSites(segments: ReadonlyArray<{ kind: string; name?: string; toolCa
 
 function slotsFor(messages: ChatMessage[], lines: Array<string | null>, chat: Chat, anchors: Anchors): FeedSlot[] {
   const turns = sliceConversationTurns(messages as Array<{ role?: string; createdAt?: unknown }>);
+  const segmentCount = chat.streamOverlay?.segments.length ?? 0;
+  const steerStream = chat.steerStreamPrefix == null ? undefined : steerStreamPlacement(chat.steerStreamPrefix, segmentCount);
+  const stream = steerStream ? steerStream.prefix || steerStream.suffix : Boolean(chat.streamOverlay);
   return buildFeedSlots({
     messages: messages.map((message) => ({ id: messageId(message) })),
     turns: turns.map((slice, turnIndex) => turnSlot(slice.endIndex, turnIndex, lines, turns.length, chat)),
     approvalIndexes: [...anchors.afterMessage.keys()],
     optimistic: Boolean(chat.optimisticUser),
-    stream: Boolean(chat.streamOverlay),
+    stream,
     streamApproval: anchors.afterStream.length > 0,
     typing: chat.waitTyping,
-    trail: anchors.trailing.length > 0
+    trail: anchors.trailing.length > 0,
+    steerStream
   });
 }
 
@@ -295,7 +299,15 @@ function renderOptimisticOrStream(slot: FeedSlot, view: TranscriptModel, chat: C
     );
   }
   if (slot.kind !== 'stream') return null;
-  return <ChatTurnStreaming segments={chat.streamOverlay?.segments ?? []} sessionId={sessionId} resolvedCallIds={view.resolved} />;
+  return <ChatTurnStreaming segments={streamSegmentsFor(slot, chat)} sessionId={sessionId} resolvedCallIds={view.resolved} />;
+}
+
+function streamSegmentsFor(slot: FeedSlot, chat: Chat) {
+  const all = chat.streamOverlay?.segments ?? [];
+  const prefix = chat.steerStreamPrefix;
+  if (prefix == null || slot.streamPart == null) return all;
+  if (slot.streamPart === 'prefix') return all.slice(0, prefix);
+  return all.slice(prefix);
 }
 
 function renderTypingOrTrail(slot: FeedSlot, view: TranscriptModel, onDone: () => void, onAttach?: (sessionId: string) => { ready: Promise<void>; cancel: () => void }): ReactNode {

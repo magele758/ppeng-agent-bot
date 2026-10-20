@@ -19,7 +19,9 @@ import {
   streamEventNeedsTranscriptRefetch,
   buildFeedSlots,
   heightScrollShift,
-  shouldAutoLoadOlder
+  shouldAutoLoadOlder,
+  steerPrefixCount,
+  steerStreamPlacement
 } from './feed-window.ts';
 
 const page = (from: number, to: number) =>
@@ -75,6 +77,61 @@ test('a short transcript stays fully mounted when the bubbles are taller than th
   });
   assert.equal(parked.start, 0);
   assert.equal(parked.end, count);
+});
+
+test('插话停在落库那一格，输出结束前后不挪 [AC:bot-steer-visible#AC-1] [AC:bot-steer-visible#AC-4]', () => {
+  const open = { prefix: 2, holdOpen: true };
+  assert.equal(steerPrefixCount({ show: true, split: open, segmentCount: 5 }), 5);
+  open.holdOpen = false;
+  open.prefix = 5;
+  assert.equal(steerPrefixCount({ show: true, split: open, segmentCount: 8 }), 5);
+  assert.deepEqual(steerStreamPlacement(5, 8), { prefix: true, suffix: true });
+  assert.equal(steerPrefixCount({ show: false, split: open, segmentCount: 8 }), null);
+
+  const during = buildFeedSlots({
+    messages: page(1, 4),
+    turns: [],
+    approvalIndexes: [],
+    optimistic: true,
+    stream: true,
+    streamApproval: false,
+    typing: true,
+    trail: true,
+    steerStream: { prefix: true, suffix: true }
+  });
+  const duringAt = during.findIndex((slot) => slot.kind === 'optimistic');
+  assert.equal(during[duringAt - 1]?.streamPart, 'prefix');
+  assert.ok(during.findIndex((slot) => slot.streamPart === 'suffix') > duringAt);
+  assert.ok(during.findIndex((slot) => slot.kind === 'typing') > duringAt);
+  assert.notEqual(during.at(-1)?.kind, 'optimistic');
+
+  const landed = buildFeedSlots({
+    messages: [...page(1, 4), { id: 'shot' }, { id: 'steer' }],
+    turns: [],
+    approvalIndexes: [],
+    optimistic: false,
+    stream: true,
+    streamApproval: false,
+    typing: false,
+    trail: false
+  });
+  const landedAt = landed.findIndex((slot) => slot.key === 'm:steer');
+  assert.equal(landedAt, duringAt);
+  assert.ok(landed.findIndex((slot) => slot.kind === 'stream') > landedAt);
+  assert.equal(landed.filter((slot) => slot.kind === 'optimistic').length, 0);
+
+  const ended = buildFeedSlots({
+    messages: [...page(1, 4), { id: 'shot' }, { id: 'steer' }, { id: 'later' }],
+    turns: [],
+    approvalIndexes: [],
+    optimistic: false,
+    stream: false,
+    streamApproval: false,
+    typing: false,
+    trail: false
+  });
+  assert.equal(ended.findIndex((slot) => slot.key === 'm:steer'), duringAt);
+  assert.equal(ended[duringAt + 1]?.key, 'm:later');
 });
 
 test('loaded rows stay windowed and the tail stays mounted while following the bottom [AC:play-feed-window#AC-3]', () => {

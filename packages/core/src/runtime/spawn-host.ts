@@ -6,6 +6,7 @@ import { builtinAgents } from '../builtin-agents.js';
 import { ResearchPipeline } from '../deepresearch/pipeline.js';
 import { NotFoundError } from '../errors.js';
 import { inheritBotIdentityMetadata } from '../memory/bot-memory-scope.js';
+import { resolvePermissionMode } from '../approval/permission-mode.js';
 import { CommandHardlineDeniedError, matchCommandHardline } from '../sandbox/command-hardline.js';
 import { createAgentSandboxFromEnv } from '../sandbox/create-agent-sandbox.js';
 import type { AgentSandbox } from '../sandbox/agent-sandbox-types.js';
@@ -396,7 +397,11 @@ export async function startBackgroundJob(
   }
   const decision = decideShellIsolation(options?.isolation, shellIsolationAvailability(sandbox.kind));
   if (!decision.ok) throw new Error(decision.message);
-  if (decision.explicitDirect && !bgRunDirectApproved(host, sessionId, command, options?.isolation)) {
+  if (
+    decision.explicitDirect &&
+    resolvePermissionMode(session.metadata, process.env) !== 'bypass' &&
+    !bgRunDirectApproved(host, sessionId, command, options?.isolation)
+  ) {
     throw new Error(DIRECT_ISOLATION_REFUSAL);
   }
   const job = host.store.createBackgroundJob({

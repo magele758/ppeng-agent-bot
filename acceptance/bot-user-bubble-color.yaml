@@ -1,0 +1,26 @@
+id: bot-user-bubble-color
+title: 用户消息使用 Bot 自己的主题色
+status: draft
+requirement: |
+  每个bot里，用户发送的消息用bot的主题色，如果bot主题色是深色，就把用户对话框里的文字换成浅色，这个bot对话框用的主题色，不随系统主题深浅变化
+criteria:
+  - id: AC-1
+    given: 打开某个 Bot 的对话，这个 Bot 有自己的主题色
+    when: 查看用户发出的消息，包括刚发出还没落库的插话
+    then: 这些用户气泡的底色是这个 Bot 的主题色
+  - id: AC-2
+    given: 这个 Bot 的主题色偏深
+    when: 查看用户气泡里的文字
+    then: 文字是浅色，能从深色底上读清
+  - id: AC-3
+    given: 这个 Bot 的主题色偏浅
+    when: 查看用户气泡里的文字
+    then: 文字保持深色，能从浅色底上读清
+  - id: AC-4
+    given: 系统外观在浅色和深色之间切换
+    when: 再看同一个 Bot 对话里的用户气泡
+    then: 底色仍是该 Bot 的主题色，不跟着系统外观变
+  - id: AC-5
+    given: 两个主题色不同的 Bot
+    when: 分别打开它们的对话
+    then: 各自的用户气泡只用自己的主题色，不会串到另一个 Bot

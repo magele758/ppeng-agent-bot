@@ -20,6 +20,7 @@ import {
   resultSessionId,
   runIf,
   screenLiveTurn,
+  steerUiAfterSend,
   shouldDetachLiveTurn,
   shouldSkipForeignLiveArm,
   shouldSurfaceLiveArmError,
@@ -134,6 +135,64 @@ test('切走后、新会话装上画面前，不再绘制上一场已经写出�
   assert.equal(bLoaded.messages, historyB);
   assert.equal(bLoaded.hasStream, false);
   assert.equal(bLoaded.optimisticUser, null);
+});
+
+test('本场直播结束后，未落库的插话仍留在当前对话流 [AC:bot-steer-visible#AC-1] [AC:bot-steer-visible#AC-2]', () => {
+  const history = [{ id: 'u1', role: 'user', text: '先做这个' }];
+  const screen = screenLiveTurn({
+    selectedSessionId: 'session-a',
+    loadedSessionId: 'session-a',
+    messages: history,
+    liveSessionId: null,
+    optimisticUser: '先停一下',
+    pendingSteerSessionId: 'session-a',
+    steerLanded: false,
+    hasStream: false,
+    waitTyping: false,
+    playSending: false,
+  });
+  assert.equal(screen.optimisticUser, '先停一下');
+  assert.equal(screen.hasStream, false);
+
+  const elsewhere = screenLiveTurn({
+    selectedSessionId: 'session-b',
+    loadedSessionId: 'session-b',
+    messages: historyB,
+    liveSessionId: null,
+    optimisticUser: '先停一下',
+    pendingSteerSessionId: 'session-a',
+    steerLanded: false,
+    hasStream: false,
+    waitTyping: false,
+    playSending: false,
+  });
+  assert.equal(elsewhere.optimisticUser, null);
+});
+
+test('插话写入正式消息后不再多画一条 [AC:bot-steer-visible#AC-3]', () => {
+  const screen = screenLiveTurn({
+    selectedSessionId: 'session-a',
+    loadedSessionId: 'session-a',
+    messages: [{ id: 'u2', role: 'user', text: '先停一下' }],
+    liveSessionId: 'session-a',
+    optimisticUser: '先停一下',
+    pendingSteerSessionId: 'session-a',
+    steerLanded: true,
+    hasStream: true,
+    waitTyping: false,
+    playSending: true,
+  });
+  assert.equal(screen.optimisticUser, null);
+  assert.equal(screen.hasStream, true);
+});
+
+test('被拒绝的插话离开对话流并回到输入框 [AC:bot-steer-visible#AC-5]', () => {
+  const view = steerUiAfterSend({ rejected: true, text: '先停一下', optimistic: '先停一下' });
+  assert.equal(view.bubble, null);
+  assert.equal(view.composer, '先停一下');
+  const kept = steerUiAfterSend({ rejected: false, text: '先停一下', optimistic: '先停一下' });
+  assert.equal(kept.bubble, '先停一下');
+  assert.equal(kept.composer, null);
 });
 
 test('留在当前会话时继续显示这场进行中的回合 [AC:bot-switch-live-turn#AC-3]', () => {

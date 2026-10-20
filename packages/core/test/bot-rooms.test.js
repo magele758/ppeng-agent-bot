@@ -645,6 +645,26 @@ function recordingRun(f, body) {
   f.host.runSession = async (id, options) => { f.runs.push(id); return body(id, options); };
 }
 
+test('a group turn says the reply is posted as that bot [AC:bot-room-speaker-identity#AC-1] [AC:bot-room-speaker-identity#AC-3]', async () => {
+  const f = fixture();
+  const room = f.rooms.create(f.principal, { title: 'Team', botIds: [f.a.id] });
+  recordingRun(f, async (id) => {
+    f.store.appendMessage(id, 'assistant', [{ type: 'text', text: 'plan from me' }]);
+    f.store.updateSession(id, { status: 'idle' });
+  });
+  f.rooms.send(f.principal, room.id, { text: 'say the plan', mentions: [f.a.id] });
+  await f.rooms.tick();
+  const member = f.store.listSessions().find((session) => session.metadata?.roomId === room.id && session.metadata?.botId === f.a.id);
+  const prompts = userPrompts(f.store, member.id);
+  assert.ok(prompts.some((text) => text.includes('posted in this Room under your own name')));
+  assert.ok(prompts.some((text) => text.includes('You do not choose a sender')));
+  const posted = f.rooms.messages(f.principal, room.id).messages.filter((message) => message.sender.type === 'bot');
+  assert.equal(posted.length, 1);
+  assert.equal(posted[0].sender.id, f.a.id);
+  assert.equal(posted[0].sender.name, f.a.name);
+  assert.equal(posted[0].text, 'plan from me');
+});
+
 test('a member replying [SILENT] posts nothing and the next member still speaks [AC:bot-rooms#AC-2]', async () => {
   const f = fixture();
   const room = f.rooms.create(f.principal, { title: 'Silence', botIds: [f.a.id, f.b.id] });

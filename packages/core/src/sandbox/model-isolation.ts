@@ -14,7 +14,7 @@ export const MODEL_ISOLATION_VALUES = ['os', 'direct', 'remote'] as const;
 export const MODEL_ISOLATION_DESCRIPTION = [
   'Isolation for this single command. Omit it and the runtime uses the strongest isolation this machine can apply.',
   'os — stronger local isolation: macOS seatbelt or Linux bubblewrap blocks ~/.ssh, ~/.aws, ~/.gnupg, ~/.kube, and ~/.docker. Use this, or omit the field, for ordinary workspace commands.',
-  'direct — weaker: no OS sandbox, only environment scrubbing, so the command can read those secret folders. Use it only when the user needs something the OS sandbox blocks. It does not run until a person approves it.',
+  'direct — weaker: no OS sandbox, only environment scrubbing, so the command can read those secret folders. Use it only when the user needs something the OS sandbox blocks. It does not run until a person approves it, unless this chat is already set to never ask for approval.',
   'remote — stronger than the local sandbox when a remote computer is already connected: the command runs there instead of on this machine. If none is connected, the command does not run and is not moved onto this machine.',
   'Container isolation is not offered.'
 ].join(' ');

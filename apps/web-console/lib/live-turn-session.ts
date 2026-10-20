@@ -54,8 +54,9 @@ export function transcriptBound(
 /**
  * What the main transcript should draw for the selected session.
  * Messages loaded for another session stay off screen, including text that
- * already streamed. Optimistic bubbles, the streaming placeholder, and the
- * waiting 「…」 only stay when this session owns the live turn.
+ * already streamed. The streaming placeholder and the waiting 「…」 stay only
+ * while this session owns the live turn. A steer bubble stays on this session
+ * until its official message lands, even after the local stream follow ends.
  */
 export function screenLiveTurn<T extends readonly unknown[]>(input: {
   selectedSessionId: string | null;
@@ -63,6 +64,8 @@ export function screenLiveTurn<T extends readonly unknown[]>(input: {
   messages: T | [];
   liveSessionId: string | null;
   optimisticUser: string | null;
+  pendingSteerSessionId?: string | null;
+  steerLanded?: boolean;
   hasStream: boolean;
   waitTyping: boolean;
   playSending: boolean;
@@ -76,14 +79,29 @@ export function screenLiveTurn<T extends readonly unknown[]>(input: {
 } {
   const bound = transcriptBound(input.loadedSessionId, input.selectedSessionId);
   const show = bound && liveTurnBelongsToSelection(input.liveSessionId, input.selectedSessionId);
+  const holdSteer = bound
+    && input.steerLanded !== true
+    && input.pendingSteerSessionId != null
+    && input.pendingSteerSessionId === input.selectedSessionId
+    && Boolean(input.optimisticUser);
   return {
     messages: bound ? input.messages : [],
     bound,
-    optimisticUser: show ? input.optimisticUser : null,
+    optimisticUser: input.steerLanded ? null : (show || holdSteer ? input.optimisticUser : null),
     hasStream: show && input.hasStream,
     waitTyping: show && input.waitTyping,
     playSending: show && input.playSending,
   };
+}
+
+/** A rejected immediate steer leaves the transcript and returns to the composer. */
+export function steerUiAfterSend(input: {
+  rejected: boolean;
+  text: string;
+  optimistic: string | null;
+}): { bubble: string | null; composer: string | null } {
+  if (input.rejected) return { bubble: null, composer: input.text };
+  return { bubble: input.optimistic, composer: null };
 }
 
 /** Apply an async Bot open only while its request, selection and turn still match. */

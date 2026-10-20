@@ -9,6 +9,7 @@ import {
   resolveWorkspacePath,
   sandboxWorkspaceRoots
 } from '../workspace/index.js';
+import { resolvePermissionMode } from '../approval/permission-mode.js';
 import { commandHardlineToolResult } from '../sandbox/command-hardline.js';
 import { sanitizeSpawnEnv } from '../sandbox/env-sanitizer.js';
 import { redactToolContent } from '../sandbox/result-redaction.js';
@@ -332,6 +333,7 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
     if (!decision.ok) return { ok: false as const, content: decision.message };
     if (
       decision.explicitDirect &&
+      resolvePermissionMode(context.session.metadata, process.env) !== 'bypass' &&
       services.directIsolationApproved?.(context.session.id, toolName, args as Record<string, unknown>) !== true
     ) {
       return { ok: false as const, content: DIRECT_ISOLATION_REFUSAL };

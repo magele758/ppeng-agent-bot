@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { commitRoutineEnabled, presentMemoryValue } from './bot-detail-menu.ts';
+import { commitRoutineEnabled, commitRoutineRemoved, presentMemoryValue } from './bot-detail-menu.ts';
 
 test('开启后再关闭，定时任务状态跟着变 [AC:bot-detail-menu#AC-3]', async () => {
   const turnedOn = await commitRoutineEnabled(
@@ -15,6 +15,19 @@ test('开启后再关闭，定时任务状态跟着变 [AC:bot-detail-menu#AC-3]
   const turnedOff = await commitRoutineEnabled(turnedOn.jobs, 'morning', false, async () => ({ enabled: false }));
   assert.equal(turnedOff.applied, true);
   assert.equal(turnedOff.jobs[0]?.enabled, false);
+});
+
+test('详情卡片可以删除定时任务，失败时任务还在', async () => {
+  const jobs = [{ id: 'morning', enabled: true }, { id: 'evening', enabled: false }];
+  const removed = await commitRoutineRemoved(jobs, 'morning', async () => undefined);
+  assert.equal(removed.applied, true);
+  assert.deepEqual(removed.jobs.map((job) => job.id), ['evening']);
+
+  const rejected = await commitRoutineRemoved(jobs, 'morning', async () => {
+    throw new Error('delete failed');
+  });
+  assert.equal(rejected.applied, false);
+  assert.deepEqual(rejected.jobs, jobs);
 });
 
 test('保存失败或服务端没有改状态时，不假装已经切换 [AC:bot-detail-menu#AC-4]', async () => {

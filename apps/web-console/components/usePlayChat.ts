@@ -11,6 +11,7 @@ import {
   readFeedAnchor,
   sessionFeedSearch,
   showLatestWhenStuck,
+  steerPrefixCount,
   type FeedScrollIntent
 } from '@/lib/feed-window';
 import { prependHistoryPage } from '@/lib/history-window';
@@ -42,6 +43,7 @@ import {
   resultSessionId,
   runIf,
   screenLiveTurn,
+  steerUiAfterSend,
   shouldSkipForeignLiveArm,
   shouldSurfaceLiveArmError,
   shouldTickLiveArm,
@@ -357,7 +359,12 @@ export function usePlayChat(deps: PlayChatDeps) {
   const canonicalBotChatKnownRef = useRef(false);
   const canonicalForSessionRef = useRef<string | null>(null);
   const pendingSteerTextRef = useRef<string | null>(null);
+  const pendingSteerSessionRef = useRef<string | null>(null);
   const pendingSteerKnownIdsRef = useRef<Set<string>>(new Set());
+  const streamSegmentsRef = useRef<StreamSegment[]>([]);
+  const modelShotOpenRef = useRef(false);
+  const steerSplitRef = useRef<{ prefix: number; holdOpen: boolean } | null>(null);
+  const [steerSplit, setSteerSplit] = useState<{ prefix: number; holdOpen: boolean } | null>(null);
   const [steerInbox, setSteerInbox] = useState<SteerInboxItem[]>([]);
   const [steerPolicyBusy, setSteerPolicyBusy] = useState(false);
   const [queryExecMode, setQueryExecMode] = useState<QueryExecMode>('steering');
@@ -435,12 +442,29 @@ export function usePlayChat(deps: PlayChatDeps) {
     publishImmediateSteer();
   };
 
+  const publishSteerSplit = (split: { prefix: number; holdOpen: boolean } | null) => {
+    steerSplitRef.current = split;
+    setSteerSplit(split);
+  };
+  const clearSteerSplit = () => {
+    if (!steerSplitRef.current) return;
+    publishSteerSplit(null);
+  };
+  const anchorSteerSplit = () => {
+    publishSteerSplit({
+      prefix: streamSegmentsRef.current.length,
+      holdOpen: modelShotOpenRef.current
+    });
+  };
   const clearStreamingShell = () => {
     if (!pendingSteerTextRef.current) {
       setOptimisticUser(null);
       setOptimisticContext([]);
       setOptimisticReply(null);
+      clearSteerSplit();
     }
+    streamSegmentsRef.current = [];
+    modelShotOpenRef.current = false;
     setStreamOverlay(null);
     setWaitTyping(false);
   };
@@ -547,6 +571,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     liveGenRef.current = detached.generation;
     liveOwnerRef.current = detached.liveSessionId;
     pendingSteerTextRef.current = null;
+    pendingSteerSessionRef.current = null;
     clearStreamingShell();
     setPlaySending(false);
   }, [selectedSessionId]);
@@ -1086,6 +1111,8 @@ export function usePlayChat(deps: PlayChatDeps) {
         });
         if (!landed) return;
         pendingSteerTextRef.current = null;
+        pendingSteerSessionRef.current = null;
+        clearSteerSplit();
         setOptimisticUser(null);
         setOptimisticContext([]);
         setOptimisticReply(null);
@@ -1380,6 +1407,7 @@ export function usePlayChat(deps: PlayChatDeps) {
       liveGenRef.current += 1;
       liveOwnerRef.current = null;
       pendingSteerTextRef.current = null;
+      pendingSteerSessionRef.current = null;
       clearStreamingShell();
       setPlaySending(false);
       if (!id) {
@@ -1465,8 +1493,15 @@ export function usePlayChat(deps: PlayChatDeps) {
     let idCounter = 0;
     const nextId = () => `s-${++idCounter}`;
 
+    streamSegmentsRef.current = segments;
+    modelShotOpenRef.current = false;
+    if (steerSplitRef.current) publishSteerSplit({ prefix: 0, holdOpen: false });
     const sync = () => {
       if (!liveTurnOnScreen(streamGeneration)) return;
+      streamSegmentsRef.current = segments;
+      if (steerSplitRef.current?.holdOpen) {
+        steerSplitRef.current = { prefix: segments.length, holdOpen: true };
+      }
       setStreamOverlay({ segments: [...segments] });
     };
 
@@ -1499,6 +1534,12 @@ export function usePlayChat(deps: PlayChatDeps) {
         }
         if (event === 'model' && p.type === 'done') {
           turnCheckpoint = streamCheckpoint(segments);
+          modelShotOpenRef.current = false;
+          const split = steerSplitRef.current;
+          if (split?.holdOpen) publishSteerSplit({ prefix: segments.length, holdOpen: false });
+        }
+        if (event === 'model' && (p.type === 'text_delta' || p.type === 'reasoning_delta' || p.type === 'tool_call_start')) {
+          modelShotOpenRef.current = true;
         }
         if (event === 'model' && p.type === 'stream_reset') {
           rollbackToCheckpoint(segments, turnCheckpoint);
@@ -1785,6 +1826,8 @@ export function usePlayChat(deps: PlayChatDeps) {
           historyMessagesRef.current.map((message) => messageId(message)).filter(Boolean)
         );
         pendingSteerTextRef.current = text;
+        pendingSteerSessionRef.current = steerSessionId;
+        anchorSteerSplit();
         acknowledgeLocalSendCommitted();
         requestScrollPlayToBottom();
         setOptimisticUser(userPreviewText(text, []));
@@ -1816,11 +1859,14 @@ export function usePlayChat(deps: PlayChatDeps) {
           forgetPendingReply(replyMemoryRef.current);
           if (!immediate) setReplyQuote(quoteSnapshot);
           if (immediate) {
+            const rejected = steerUiAfterSend({ rejected: true, text, optimistic: pendingSteerTextRef.current });
             pendingSteerTextRef.current = null;
-            setOptimisticUser(null);
+            pendingSteerSessionRef.current = null;
+            clearSteerSplit();
+            setOptimisticUser(rejected.bubble);
             setOptimisticContext([]);
             setOptimisticReply(null);
-            setPlayInput(text);
+            setPlayInput(rejected.composer ?? text);
             setPendingContext(contextSnapshot);
             setReplyQuote(quoteSnapshot);
           }
@@ -1847,11 +1893,14 @@ export function usePlayChat(deps: PlayChatDeps) {
         if (!steerResponseApplies(steerGeneration, liveGenRef.current, steerSessionId, selectedSessionRef.current)) return;
         if (!immediate) setReplyQuote(quoteSnapshot);
         if (immediate) {
+          const rejected = steerUiAfterSend({ rejected: true, text, optimistic: pendingSteerTextRef.current });
           pendingSteerTextRef.current = null;
-          setOptimisticUser(null);
+          pendingSteerSessionRef.current = null;
+          clearSteerSplit();
+          setOptimisticUser(rejected.bubble);
           setOptimisticContext([]);
           setOptimisticReply(null);
-          setPlayInput(text);
+          setPlayInput(rejected.composer ?? text);
           setPendingContext(contextSnapshot);
           setReplyQuote(quoteSnapshot);
         }
@@ -2118,12 +2167,22 @@ export function usePlayChat(deps: PlayChatDeps) {
     scrollPlayToBottom,
   ]);
 
+  const pendingSteerText = pendingSteerTextRef.current;
+  const steerLanded = Boolean(
+    pendingSteerText &&
+      sessionMessages.some((message) => {
+        const id = messageId(message);
+        return message.role === 'user' && Boolean(id) && !pendingSteerKnownIdsRef.current.has(id) && messageUserText(message).includes(pendingSteerText);
+      })
+  );
   const screen = screenLiveTurn({
     selectedSessionId,
     loadedSessionId: historySessionRef.current,
     messages: sessionMessages,
     liveSessionId: liveOwnerRef.current,
     optimisticUser,
+    pendingSteerSessionId: pendingSteerSessionRef.current,
+    steerLanded,
     hasStream: streamOverlay != null,
     waitTyping,
     playSending,
@@ -2160,6 +2219,11 @@ export function usePlayChat(deps: PlayChatDeps) {
     playStatus,
     setPlayStatus,
     optimisticUser: screen.optimisticUser,
+    steerStreamPrefix: steerPrefixCount({
+      show: Boolean(screen.optimisticUser),
+      split: steerSplit,
+      segmentCount: streamOverlay?.segments.length ?? 0
+    }),
     optimisticReply: screen.optimisticUser ? optimisticReply : null,
     replyQuote,
     quoteReply,

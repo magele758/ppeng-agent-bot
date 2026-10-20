@@ -53,16 +53,137 @@ export function isGuiLaunchCommand(cmd: string): boolean {
 
 const DIR_CMD_RE = /(?:^|[\s;&|`($])(?:\/(?:usr\/)?bin\/)?(?:ls|find|tree|du)\b/i;
 
+/**
+ * Directory walks inside an ssh command run on the other machine.
+ * Local browse limits only look at the part that stays on this machine.
+ */
+function commandWithoutRemoteShell(command: string): string {
+  const src = String(command ?? '');
+  let out = '';
+  let i = 0;
+  let quote: "'" | '"' | '`' | null = null;
+  while (i < src.length) {
+    const ch = src[i]!;
+    if (quote) {
+      out += ch;
+      if (ch === '\\' && quote !== "'" && i + 1 < src.length) {
+        out += src[i + 1];
+        i += 2;
+        continue;
+      }
+      if (ch === quote) quote = null;
+      i += 1;
+      continue;
+    }
+    if (ch === "'" || ch === '"' || ch === '`') {
+      quote = ch;
+      out += ch;
+      i += 1;
+      continue;
+    }
+    const word = sshWordLength(src, i);
+    if (word > 0) {
+      const skipped = skipSshInvocation(src, i + word);
+      out += skipped.localBetween;
+      i = skipped.next;
+      continue;
+    }
+    out += ch;
+    i += 1;
+  }
+  return out;
+}
+
+function sshWordLength(src: string, i: number): number {
+  if (i > 0 && /[A-Za-z0-9_]/.test(src[i - 1]!)) return 0;
+  const matched = /^(?:\/(?:usr\/)?bin\/)?ssh(?![A-Za-z0-9_])/.exec(src.slice(i));
+  return matched ? matched[0].length : 0;
+}
+
+function skipSshInvocation(src: string, i: number): { next: number; localBetween: string } {
+  let quote: "'" | '"' | '`' | null = null;
+  const heredocs: string[] = [];
+  while (i < src.length) {
+    const ch = src[i]!;
+    if (quote) {
+      if (ch === '\\' && quote !== "'" && i + 1 < src.length) {
+        i += 2;
+        continue;
+      }
+      if (ch === quote) quote = null;
+      i += 1;
+      continue;
+    }
+    if (ch === "'" || ch === '"' || ch === '`') {
+      quote = ch;
+      i += 1;
+      continue;
+    }
+    if (ch === '<' && src[i + 1] === '<') {
+      const parsed = readHeredocDelim(src, i);
+      if (parsed) {
+        heredocs.push(parsed.delim);
+        i = parsed.next;
+        continue;
+      }
+    }
+    if (ch === '\n' || ch === ';' || ch === '|' || ch === '&') break;
+    i += 1;
+  }
+  if (heredocs.length === 0) return { next: i, localBetween: '' };
+  let localBetween = '';
+  if (src[i] !== '\n' && i < src.length) {
+    const lineEnd = src.indexOf('\n', i);
+    if (lineEnd === -1) return { next: src.length, localBetween: '' };
+    localBetween = src.slice(i, lineEnd + 1);
+    i = lineEnd + 1;
+  } else if (src[i] === '\n') {
+    i += 1;
+  }
+  for (const delim of heredocs) i = skipHeredocBody(src, i, delim);
+  return { next: i, localBetween };
+}
+
+function readHeredocDelim(src: string, i: number): { delim: string; next: number } | null {
+  let j = i + 2;
+  if (src[j] === '<') return null;
+  if (src[j] === '-') j += 1;
+  while (src[j] === ' ' || src[j] === '\t') j += 1;
+  const opener = src[j];
+  const quoted = opener === "'" || opener === '"';
+  if (quoted) j += 1;
+  const start = j;
+  while (j < src.length && /[A-Za-z0-9_]/.test(src[j]!)) j += 1;
+  if (j === start) return null;
+  if (quoted) {
+    if (src[j] !== opener) return null;
+    j += 1;
+  }
+  return { delim: src.slice(start, j), next: j };
+}
+
+function skipHeredocBody(src: string, i: number, delim: string): number {
+  while (i < src.length) {
+    const nl = src.indexOf('\n', i);
+    const end = nl === -1 ? src.length : nl;
+    const line = src.slice(i, end).replace(/\r$/, '');
+    i = nl === -1 ? src.length : nl + 1;
+    if (line.trim() === delim) return i;
+  }
+  return i;
+}
+
 export function isUnboundedFsWalk(cmd: string): boolean {
-  if (!DIR_CMD_RE.test(cmd)) return false;
+  const local = commandWithoutRemoteShell(cmd);
+  if (!DIR_CMD_RE.test(local)) return false;
   // Penalize when no depth/maxdepth limit is present
-  const hasDepthLimit = /--max-depth\s*=?\s*\d|-maxdepth\s+\d|-depth\s+\d/i.test(cmd);
-  const hasPathSpecifier = /(?:\/(?:usr|etc|var|opt|home|root)\b|~\/|\$HOME\b)/.test(cmd);
+  const hasDepthLimit = /--max-depth\s*=?\s*\d|-maxdepth\s+\d|-depth\s+\d/i.test(local);
+  const hasPathSpecifier = /(?:\/(?:usr|etc|var|opt|home|root)\b|~\/|\$HOME\b)/.test(local);
   return hasPathSpecifier && !hasDepthLimit;
 }
 
 export function isDirectoryBrowseCommand(cmd: string): boolean {
-  return DIR_CMD_RE.test(String(cmd ?? ''));
+  return DIR_CMD_RE.test(commandWithoutRemoteShell(String(cmd ?? '')));
 }
 
 // ============================================================================

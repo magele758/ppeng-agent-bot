@@ -306,8 +306,18 @@ function routineParent(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineR
  }
  return parent;
 }
+/**
+ * The bot's own scheduled work keeps an explicit never-ask setting.
+ * Spawned children still downgrade bypass and auto through childPermissionMode.
+ */
+function routinePermissionMode(metadata: Record<string, unknown> | undefined): string {
+  const raw = metadata?.permissionMode;
+  const parentMode = typeof raw === 'string' && raw.trim() ? raw.trim() : undefined;
+  if (parentMode === 'bypass') return 'bypass';
+  return childPermissionMode(metadata) ?? 'ask';
+}
 function routineWorkMetadata(host:RoutineRuntimeHost,parent:SessionRecord,run:RoutineRun):Record<string,unknown>{
- return {...principalFromSession(host.store,parent),...inheritBotAllowlists(parent.metadata),...inheritModelOverride(parent.metadata),permissionMode:childPermissionMode(parent.metadata)??'ask',maxTurns:parent.metadata?.maxTurns??32,...(typeof parent.metadata?.botId==='string'?{botId:parent.metadata.botId}:{}),...(typeof parent.metadata?.workspaceId==='string'?{workspaceId:parent.metadata.workspaceId}:{}),canonicalBotChat:false,routineRunId:run.id,routineId:run.routineId,routineParentSessionId:parent.id};
+ return {...principalFromSession(host.store,parent),...inheritBotAllowlists(parent.metadata),...inheritModelOverride(parent.metadata),permissionMode:routinePermissionMode(parent.metadata),maxTurns:parent.metadata?.maxTurns??32,...(typeof parent.metadata?.botId==='string'?{botId:parent.metadata.botId}:{}),...(typeof parent.metadata?.workspaceId==='string'?{workspaceId:parent.metadata.workspaceId}:{}),canonicalBotChat:false,routineRunId:run.id,routineId:run.routineId,routineParentSessionId:parent.id};
 }
 function claimRoutineSession(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun,parent:SessionRecord,lease:RoutineLease):SessionRecord|undefined {
  host.store.db.exec('BEGIN IMMEDIATE');

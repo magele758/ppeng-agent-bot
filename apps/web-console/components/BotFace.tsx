@@ -361,6 +361,46 @@ export function BotFace({
   const layout = view.layout;
   const maskId = `bot-face-${reactId}`;
   const classes = botFaceClassName({ size, className, empty: view.empty });
+  const drawn = (
+    <g data-bob="">
+      <Silhouette shape={view.drawnShape} fill={view.color ? BOT_FACE_SWATCH[view.color] : '#E6E8EE'} dashed={!view.color} />
+      <g mask={`url(#${maskId})`}>
+        <g data-blush="" opacity="0">
+          <ellipse cx={layout.left - 7} cy={layout.eyeY + 8} rx="3.4" ry="1.7" fill="#000" />
+          <ellipse cx={layout.right + 7} cy={layout.eyeY + 8} rx="3.4" ry="1.7" fill="#000" />
+        </g>
+        <g data-look="">
+          <Eye cx={layout.left} cy={layout.eyeY} ink={view.eyes} width={view.eyeW} height={view.eyeH} />
+          <Eye cx={layout.right} cy={layout.eyeY} ink={view.eyes} width={view.eyeW} height={view.eyeH} />
+          <path
+            data-mouth=""
+            data-y={layout.mouthY}
+            d={mouthPath(view.mouth, layout.mouthY, view.mouthOpen)}
+            fill={mouthFilled(view.mouth) ? view.eyes : 'none'}
+            stroke={mouthFilled(view.mouth) ? 'none' : view.eyes}
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            opacity={mouthVisible(view.mouth) ? 1 : 0}
+          />
+        </g>
+        {view.expression === 'ellipsis'
+          ? DOTS.map((dx, i) => (
+              <circle
+                key={dx}
+                data-dot=""
+                data-i={i}
+                data-cx={32 + dx}
+                data-cy={layout.markY}
+                cx={32 + dx}
+                cy={layout.markY}
+                r="1.35"
+                fill={view.eyes}
+              />
+            ))
+          : null}
+      </g>
+    </g>
+  );
 
   return (
     <svg
@@ -392,44 +432,7 @@ export function BotFace({
           <Silhouette shape={view.drawnShape} fill="#fff" />
         </mask>
       </defs>
-      <g data-bob="">
-        <Silhouette shape={view.drawnShape} fill={view.color ? BOT_FACE_SWATCH[view.color] : '#E6E8EE'} dashed={!view.color} />
-        <g mask={`url(#${maskId})`}>
-          <g data-blush="" opacity="0">
-            <ellipse cx={layout.left - 7} cy={layout.eyeY + 8} rx="3.4" ry="1.7" fill="#000" />
-            <ellipse cx={layout.right + 7} cy={layout.eyeY + 8} rx="3.4" ry="1.7" fill="#000" />
-          </g>
-          <g data-look="">
-            <Eye cx={layout.left} cy={layout.eyeY} ink={view.eyes} width={view.eyeW} height={view.eyeH} />
-            <Eye cx={layout.right} cy={layout.eyeY} ink={view.eyes} width={view.eyeW} height={view.eyeH} />
-            <path
-              data-mouth=""
-              data-y={layout.mouthY}
-              d={mouthPath(view.mouth, layout.mouthY, view.mouthOpen)}
-              fill={mouthFilled(view.mouth) ? view.eyes : 'none'}
-              stroke={mouthFilled(view.mouth) ? 'none' : view.eyes}
-              strokeWidth="1.6"
-              strokeLinecap="round"
-              opacity={mouthVisible(view.mouth) ? 1 : 0}
-            />
-          </g>
-          {view.expression === 'ellipsis'
-            ? DOTS.map((dx, i) => (
-                <circle
-                  key={dx}
-                  data-dot=""
-                  data-i={i}
-                  data-cx={32 + dx}
-                  data-cy={layout.markY}
-                  cx={32 + dx}
-                  cy={layout.markY}
-                  r="1.35"
-                  fill={view.eyes}
-                />
-              ))
-            : null}
-        </g>
-      </g>
+      {drawn}
       {working ? <text className="bot-face__work-label" x="32" y="62" textAnchor="middle">{workLabel}</text> : null}
     </svg>
   );

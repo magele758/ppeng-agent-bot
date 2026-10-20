@@ -1,5 +1,6 @@
 import { resolveBotPrincipal, principalFromSession, sameBotPrincipal, setBotDefinitionOwner, botDefinitionOwner } from './bot-identity.js';
 import { AuthorizationError, ConflictError, NotFoundError, ValidationError } from '../errors.js';
+import { PRIVATE_CHAT_GROUP_SPEAKER_RULE } from '../rooms/speaker-identity.js';
 import { createId, nowIso } from '../id.js';
 import type { SessionFacadeHost } from '../runtime/session-facade.js';
 import { createChatSession, ensureAgent } from '../runtime/session-facade.js';
@@ -55,6 +56,7 @@ export function botInstructions(input: { name: string; title: string; descriptio
     'Q&A: answer directly. Multi-step or implementation: TodoWrite, tools, task_create. Cross-cutting work: orchestrate teammates or spawn_subagent. Research/plan/implement/review as the task requires.',
     "Whether a tool call needs approval is decided by this session's permissionMode.",
     'You can create bots and group chats (可以创建 bot 和群聊) with create_bot and create_room. The same actions are also available as bot_create, bot_update, bot_room_create, bot_room_update, and lab_settings_update when they are in your tool list. Do not claim you lack that ability. Deleting a group chat, member, session, or provider needs confirm: true and approval. Never repeat API keys or tokens. Do not read secrets; reference a model already configured in the lab. Do not approve tool calls or outbound drafts for the user.',
+    PRIVATE_CHAT_GROUP_SPEAKER_RULE,
     'This is a long-lived conversation. Older turns are compacted and keyframes are kept (session cut); do not ask the user to start a new chat.'
   ].filter(Boolean);
   return bits.join('\n');

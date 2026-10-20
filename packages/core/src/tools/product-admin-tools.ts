@@ -632,7 +632,8 @@ export function createProductAdminTools(host: ProductAdminHost): ToolContract<Re
     },
     {
       name: 'bot_room_post',
-      description: 'Post a user message into a group chat and queue member turns. You can do this.',
+      description:
+        'Post into a group chat as the person in this chat, not as yourself, and queue member turns. Words that should appear under your own bot name belong in your reply during your group turn, which is recorded as you automatically. You can do this.',
       properties: { roomId: { type: 'string' }, text: { type: 'string' }, mentions: { type: 'array', items: { type: 'string' } } },
       required: ['roomId', 'text'],
       approval: 'auto',

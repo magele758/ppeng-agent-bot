@@ -107,6 +107,17 @@ test('三块都没有数据时显示空状态 [AC:bot-detail-menu#AC-2]', () => 
   assert.match(memory, /这个 Bot 还没有记忆/);
 });
 
+test('详情卡片可以删除定时任务', () => {
+  const card = render({ ...botB, open: true, initialSection: 'routines' });
+  assert.match(card, /data-testid="bot-detail-routine-delete"/);
+  assert.match(card, /删除/);
+  assert.match(card, /data-testid="bot-detail-routine-toggle"/);
+  const source = readFileSync(new URL('./BotDetailMenu.tsx', import.meta.url), 'utf8');
+  assert.match(source, /commitRoutineRemoved/);
+  assert.match(source, /method:\s*'DELETE'/);
+  assert.match(source, /play\.botDetail\.remove/);
+});
+
 test('开启和关闭按钮反映当前状态，失败时保持原状态并说明失败 [AC:bot-detail-menu#AC-3] [AC:bot-detail-menu#AC-4]', () => {
   const off = render({
     ...botA,

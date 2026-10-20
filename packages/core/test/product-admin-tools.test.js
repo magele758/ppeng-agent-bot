@@ -147,6 +147,25 @@ test('deleting a group chat requires confirm and keeps the bots [AC:bot-product-
   fx.store.db.close();
 });
 
+test('private chat and the group-post tool say who the speaker is [AC:bot-room-speaker-identity#AC-2]', async () => {
+  const fx = fixture();
+  const created = await call(fx, 'bot_create', { name: 'Alpha', description: '助手' });
+  const instructions = fx.store.getAgent(created.body.bot.id).instructions;
+  assert.match(instructions, /posted under your own name automatically/);
+  assert.match(instructions, /bot_room_post posts as the person/);
+  const prefix = new PromptBuilder({ store: fx.store, repoRoot: fx.dir, stateDir: fx.dir }).buildStablePrefix({
+    agent: GENERAL,
+    session: fx.session,
+    repoRoot: fx.dir
+  });
+  assert.match(prefix, /bot_room_post posts as the person/);
+  assert.match(prefix, /do not use it for words that should appear as you/);
+  const post = fx.tools.find((tool) => tool.name === 'bot_room_post');
+  assert.match(post.description, /not as yourself/);
+  assert.match(post.description, /group turn/);
+  fx.store.db.close();
+});
+
 test('private chats can manage the product; group-chat turns cannot [AC:bot-product-admin#AC-6]', async () => {
   const fx = fixture();
   const created = await call(fx, 'bot_create', { name: 'Alpha', description: '助手' });

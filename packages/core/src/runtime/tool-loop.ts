@@ -20,6 +20,7 @@ import {
 } from '../sandbox/command-hardline.js';
 import { redactToolContent } from '../sandbox/result-redaction.js';
 import { agentSandboxKindFromEnv } from '../sandbox/create-agent-sandbox.js';
+import { resolvePermissionMode } from '../approval/permission-mode.js';
 import { planDirectIsolationHold, shellIsolationAvailability } from '../sandbox/model-isolation.js';
 import { stableJsonHash } from './helpers.js';
 import { toolInfraProblem } from '../model/tool-result-problem.js';
@@ -361,6 +362,7 @@ function holdDirectIsolation(
   calls: ToolCallPart[],
   session: SessionRecord
 ): 'waiting' | 'proceed' {
+  if (resolvePermissionMode(session.metadata, process.env) === 'bypass') return 'proceed';
   const plan = planDirectIsolationHold(
     calls,
     deps.store.listApprovals(),

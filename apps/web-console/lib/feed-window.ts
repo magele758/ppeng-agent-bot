@@ -16,6 +16,30 @@ export interface FeedSlot {
   kind: FeedSlotKind;
   messageIndex?: number;
   turnIndex?: number;
+  /** In-flight shot above a steer, or output that continues under it. */
+  streamPart?: 'prefix' | 'suffix';
+}
+
+export interface SteerStreamPlacement {
+  prefix: boolean;
+  suffix: boolean;
+}
+
+/** How much of the live stream stays above a steer. An open shot keeps growing above it; once that shot ends, the count freezes. */
+export function steerPrefixCount(input: {
+  show: boolean;
+  split: { prefix: number; holdOpen: boolean } | null;
+  segmentCount: number;
+}): number | null {
+  if (!input.show || !input.split) return null;
+  const live = input.split.holdOpen ? input.segmentCount : input.split.prefix;
+  return Math.max(0, Math.min(live, input.segmentCount));
+}
+
+/** Prefix segments are the shot that will be stored above the steer. Later segments are the output under it. */
+export function steerStreamPlacement(prefixCount: number, segmentCount: number): SteerStreamPlacement {
+  const prefix = Math.max(0, Math.min(prefixCount, segmentCount));
+  return { prefix: prefix > 0, suffix: segmentCount > prefix };
 }
 
 export interface FeedRange {
@@ -65,6 +89,11 @@ export function buildFeedSlots(args: {
   streamApproval: boolean;
   typing: boolean;
   trail: boolean;
+  /**
+   * Set while a steer is on screen. The in-flight shot stays above that row;
+   * later live rows stay under it, where the saved user message will sit.
+   */
+  steerStream?: SteerStreamPlacement;
 }): FeedSlot[] {
   const slots: FeedSlot[] = [];
   const turnByEnd = new Map(args.turns.map((turn) => [turn.endIndex, turn]));
@@ -83,8 +112,19 @@ export function buildFeedSlots(args: {
       });
     }
   }
+  const steer = args.optimistic ? args.steerStream : undefined;
+  const prefixStream = Boolean(steer?.prefix && args.stream);
+  if (prefixStream) slots.push({ key: 'stream', kind: 'stream', pin: true, streamPart: 'prefix' });
   if (args.optimistic) slots.push({ key: 'optimistic', kind: 'optimistic', pin: true });
-  if (args.stream) slots.push({ key: 'stream', kind: 'stream', pin: true });
+  const suffixStream = Boolean(args.stream) && (!prefixStream || Boolean(steer?.suffix));
+  if (suffixStream) {
+    slots.push({
+      key: prefixStream ? 'stream-after' : 'stream',
+      kind: 'stream',
+      pin: true,
+      streamPart: steer ? 'suffix' : undefined
+    });
+  }
   if (args.streamApproval) slots.push({ key: 'apr-stream', kind: 'approval', pin: true });
   if (args.typing) slots.push({ key: 'typing', kind: 'typing', pin: true });
   if (args.trail) slots.push({ key: 'apr-trail', kind: 'trail', pin: true });

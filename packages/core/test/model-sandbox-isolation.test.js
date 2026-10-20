@@ -121,7 +121,7 @@ test('the model can pick os or an approved direct run without a prior mode setti
   }
 });
 
-test('direct isolation does not run until approval, including bypass [AC:model-sandbox-isolation#AC-3]', async () => {
+test('direct isolation does not run until approval outside bypass [AC:model-sandbox-isolation#AC-3] [AC:bypass-remote-shell#AC-2]', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'iso-direct-'));
   const marker = join(dir, 'ran.txt');
   const command = `printf ran > ${JSON.stringify(marker)}`;
@@ -134,7 +134,7 @@ test('direct isolation does not run until approval, including bypass [AC:model-s
     assert.equal(refused.content, DIRECT_ISOLATION_REFUSAL);
     assert.equal(existsSync(marker), false);
 
-    for (const permissionMode of ['auto', 'bypass']) {
+    for (const permissionMode of ['auto']) {
       const approvals = [];
       const armed = [];
       const messages = [];
@@ -181,6 +181,124 @@ test('direct isolation does not run until approval, including bypass [AC:model-s
       assert.equal(existsSync(marker), false);
     }
   } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('bypass runs a direct command without creating an approval [AC:bypass-remote-shell#AC-1]', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'iso-bypass-'));
+  const marker = join(dir, 'ran.txt');
+  const command = `printf ran > ${JSON.stringify(marker)}`;
+  try {
+    const approvals = [];
+    const session = { id: 'sess-iso', metadata: { permissionMode: 'bypass' } };
+    const runCtx = { ...ctx(dir), session };
+    const deps = {
+      armUnattendedApproval() {},
+      tools: createBuiltinTools({}),
+      store: {
+        appendMessage() {},
+        listApprovals: () => approvals,
+        createApproval(input) {
+          const row = { id: 'appr-1', status: 'pending', createdAt: '2026-10-20T00:00:00.000Z', ...input };
+          approvals.push(row);
+          return row;
+        },
+        deleteApproval() {},
+        getTask: () => undefined,
+        updateTask() {}
+      },
+      envApprovalPolicy: undefined,
+      maxParallelToolCalls: 1,
+      modelAdapter: {},
+      stateDir: dir,
+      emitTrace() {}
+    };
+    const decision = checkToolApprovals(
+      deps,
+      [{ type: 'tool_call', toolCallId: 'c1', name: 'bash', input: { command, isolation: 'direct' } }],
+      runCtx,
+      undefined,
+      session,
+      deps.tools
+    );
+    assert.equal(decision, 'proceed');
+    assert.equal(approvals.length, 0);
+    const ran = await bashTool().execute(runCtx, { command, isolation: 'direct' });
+    assert.equal(ran.ok, true, ran.content);
+    assert.equal(existsSync(marker), true);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('bypass direct still refuses destructive commands before they run [AC:bypass-remote-shell#AC-5]', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'iso-hard-'));
+  const marker = join(dir, 'ran.txt');
+  try {
+    const approvals = [];
+    const messages = [];
+    const session = { id: 'sess-iso', metadata: { permissionMode: 'bypass' } };
+    const runCtx = { ...ctx(dir), session };
+    const deps = {
+      armUnattendedApproval() {},
+      tools: createBuiltinTools({}),
+      store: {
+        appendMessage: (_sessionId, _role, parts) => messages.push(parts),
+        listApprovals: () => approvals,
+        createApproval(input) {
+          approvals.push(input);
+          return input;
+        },
+        deleteApproval() {},
+        getTask: () => undefined,
+        updateTask() {}
+      },
+      envApprovalPolicy: undefined,
+      maxParallelToolCalls: 1,
+      modelAdapter: {},
+      stateDir: dir,
+      emitTrace() {}
+    };
+    for (const command of ['rm -rf /', 'reboot']) {
+      approvals.length = 0;
+      messages.length = 0;
+      const decision = checkToolApprovals(
+        deps,
+        [{ type: 'tool_call', toolCallId: 'c1', name: 'bash', input: { command, isolation: 'direct' } }],
+        runCtx,
+        undefined,
+        session,
+        deps.tools
+      );
+      assert.equal(decision, 'skip', command);
+      assert.equal(approvals.length, 0, command);
+      assert.match(JSON.stringify(messages), /COMMAND_HARDLINE/, command);
+      const refused = await bashTool().execute(runCtx, { command: `${command}; printf ran > ${JSON.stringify(marker)}`, isolation: 'direct' });
+      assert.equal(refused.ok, false, command);
+      assert.match(refused.content, /COMMAND_HARDLINE/);
+      assert.equal(existsSync(marker), false);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('bypass direct still scrubs injectable environment variables [AC:bypass-remote-shell#AC-6]', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'iso-bypass-env-'));
+  const prev = process.env.LD_PRELOAD;
+  process.env.LD_PRELOAD = '/tmp/ppeng-sandbox-evil.so';
+  try {
+    const session = { id: 'sess-iso', metadata: { permissionMode: 'bypass' } };
+    const result = await bashTool().execute(
+      { ...ctx(dir), session },
+      { command: 'printenv LD_PRELOAD || true', isolation: 'direct' }
+    );
+    assert.equal(result.ok, true, result.content);
+    assert.equal(result.content.includes('ppeng-sandbox-evil'), false);
+  } finally {
+    if (prev === undefined) delete process.env.LD_PRELOAD;
+    else process.env.LD_PRELOAD = prev;
     rmSync(dir, { recursive: true, force: true });
   }
 });

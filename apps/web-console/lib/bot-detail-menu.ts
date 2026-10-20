@@ -40,6 +40,21 @@ export async function commitRoutineEnabled<T extends RoutineToggle>(
   }
 }
 
+/** Drop a routine only after delete succeeds. A thrown delete leaves the previous list. */
+export async function commitRoutineRemoved<T extends { id: string }>(
+  jobs: readonly T[],
+  id: string,
+  persist: (id: string) => Promise<unknown>
+): Promise<{ jobs: T[]; applied: boolean }> {
+  if (!jobs.some((job) => job.id === id)) return { jobs: [...jobs], applied: false };
+  try {
+    await persist(id);
+    return { jobs: jobs.filter((job) => job.id !== id), applied: true };
+  } catch {
+    return { jobs: [...jobs], applied: false };
+  }
+}
+
 /** Stored memory may be JSON; secret key names remain sensitive at every depth. */
 function redactMemoryStructure(value: string, hidden: string): string {
   try {
