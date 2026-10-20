@@ -18,7 +18,8 @@ try{
   run(['scripts/ci/reviewed-verification-inputs.mjs']);
   run(['scripts/build-workspace.mjs']);
   run(['node_modules/typescript/bin/tsc','-p','apps/web-console','--noEmit']);
-  run(['--experimental-strip-types','--test','packages/core/test/approval-policy.test.js','packages/core/test/permission-mode.test.js',
+  run(['--experimental-strip-types','--test','packages/core/test/domain-stores.test.js','packages/core/test/session-fork.test.js','packages/core/test/bot-reply-quote.test.js',
+    'scripts/test/ci-parallel-validation.test.mjs','packages/core/test/approval-policy.test.js','packages/core/test/permission-mode.test.js',
     'scripts/test/ci-fast-bihourly.test.mjs','scripts/test/ci-audit.test.mjs','scripts/test/ci-verification-evidence.test.mjs',
     'scripts/test/ci-evidence-review-drift.test.mjs','scripts/test/ci-performance-clock.test.mjs','scripts/test/ci-gate-measurements.test.mjs',
     'scripts/test/ci-speedup-workflow.test.mjs','scripts/test/release-workflow-policy.test.mjs','scripts/test/acceptance-lib.test.mjs','scripts/test/acceptance-stages.test.mjs']);

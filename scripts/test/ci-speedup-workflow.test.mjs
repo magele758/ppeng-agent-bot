@@ -25,7 +25,7 @@ test('browser/API checks start independently of long verification and mutation c
 test('functional and coverage results come from one unit execution, with explicit plain performance verification [AC:ci-gate-speedup#AC-5]', () => {
   const jobs = workflow('release-gate').jobs;
   const all = Object.values(jobs).flatMap(j => j.steps ?? []).map(s => s.run ?? '');
-  assert.equal(all.filter(s => s.includes('retry-failed-tests.mjs --script test:unit')).length, 1);
+  assert.equal(all.filter(s => s.includes('validation-lane.mjs unit --out')).length, 1);
   assert.ok(all.some(s => s.includes('ci-unit-performance')), 'the stricter uninstrumented performance contract must remain');
 });
 
@@ -59,12 +59,12 @@ test('baseline measurements are manual only and cannot replace a PR required gat
   assert.match(doc.jobs['release-gate'].if,/benchmark_baseline/);
 });
 test('runner-local evidence paths are evaluated at step scope [AC:ci-gate-speedup#AC-4]',()=>{
-  const job=workflow('release-gate').jobs.crap;
-  assert.doesNotMatch(JSON.stringify(job.env??{}),/runner\./,'runner context is not available in job env');
-  for(const name of ['Unit tests with V8 coverage','Formal invariants + MockLLM E2E'])assert.match(job.steps.find(s=>s.name===name).env?.CI_VERIFICATION_EVIDENCE_DIR??'',/runner.temp/);
+  const jobs=workflow('release-gate').jobs;
+  for(const lane of ['unit','formal'])assert.doesNotMatch(JSON.stringify(jobs[lane].env??{}),/runner\./,'runner context is not available in job env');
+  assert.match(jobs.formal.steps.find(s=>s.name==='Run formal coverage lane').env?.CI_VERIFICATION_EVIDENCE_DIR??'',/runner.temp/);
 });
 test('all reviewed verification inputs are checked before expensive unit execution [AC:ci-gate-speedup#AC-6]',()=>{
-  const steps=workflow('release-gate').jobs.crap.steps;
+  const steps=workflow('release-gate').jobs.unit.steps;
   const preflight=steps.findIndex(s=>(s.run??'').includes('reviewed-verification-inputs.mjs'));
-  assert.ok(preflight>=0&&preflight<steps.findIndex(s=>s.name==='Unit tests with V8 coverage'));
+  assert.ok(preflight>=0&&preflight<steps.findIndex(s=>s.name==='Run unit coverage lane'));
 });

@@ -8,6 +8,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { FORMAL_REGRESSION_TESTS } from '../ci/test-partition.mjs';
 import { checkTla } from './tla-sanity.mjs';
 import { sanitizeScriptEnv } from '../spawn-utils.mjs';
 
@@ -27,12 +28,9 @@ const REQUIRED = [
   'doc/formal/README.md'
 ];
 
-const TESTS = [
-  'packages/core/test/formal-invariants.test.js',
-  'packages/core/test/mock-llm-e2e.test.js',
-  'packages/core/test/goal-state-machine.test.js',
-  'packages/core/test/session-surface.test.js'
-];
+const TESTS = FORMAL_REGRESSION_TESTS;
+const verificationOnly=process.argv.slice(2).includes('--verification-only');
+if(process.argv.slice(2).some(a=>a!=='--verification-only'))throw new Error('Unknown formal argument');
 
 function fail(msg) {
   console.error(`✗ ${msg}`);
@@ -79,7 +77,7 @@ for (const file of tla) {
   console.log('  ✓ structural sanity ' + file);
 }
 const start = Date.now();
-const res = spawnSync(
+const res = verificationOnly ? {status:0} : spawnSync(
   process.execPath,
   ['--experimental-strip-types', '--test', ...TESTS],
   { cwd: ROOT, stdio: 'inherit', env: sanitizeScriptEnv() }
