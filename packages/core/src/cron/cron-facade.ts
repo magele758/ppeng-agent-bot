@@ -119,7 +119,9 @@ export function parseRoutinePrecheck(raw: unknown): RoutinePrecheck {
   if (source.length > MAX_PRECHECK_SOURCE) {
     throw new ValidationError('precheck.source must be ≤ 4000 characters');
   }
-  return { kind, source: source.trim() };
+  const mode = (raw as {mode?:unknown}).mode;
+  if(mode !== undefined && mode !== 'strict' && mode !== 'compat') throw new ValidationError('Invalid precheck mode');
+  return { kind, source: source.trim(), ...(mode ? {mode} : {}) };
 }
 
 export function ensureCronStore(host: CronFacadeHost): CronJobStore {
@@ -191,7 +193,7 @@ export function createCronJob(host:CronFacadeHost,input:CreateCronJobInput):Cron
  if(botId)metadata.botId=botId;
  if(roomId)metadata.roomId=roomId;
  if(input.conclusions!==undefined)metadata.conclusions=normalizeCiConclusions(input.conclusions);
- if(input.precheck!=null)metadata.precheck=parseRoutinePrecheck(input.precheck);
+ if(input.precheck!=null){const {mode,...precheck}=parseRoutinePrecheck(input.precheck);metadata.precheck=precheck;metadata.precheckMode=mode??'strict';}
  if(schedule.scheduleKind==='event'){if(!input.secretEnv)throw new ValidationError('secretEnv required for event');metadata.secretEnv=normalizeSecretEnv(input.secretEnv);metadata.prompt=prompt;}
  return ensureCronStore(host).create({expiresAt:normalizeExpiresAt(input.expiresAt,schedule.scheduleKind),name,prompt,sessionId:session.id,agentId:session.agentId,timezone,missedPolicy:normalizeMissedPolicy(input.missedPolicy),ruleVersion:1,metadata,enabled:input.enabled!==false,...schedule});
 }
@@ -215,7 +217,7 @@ function contentPatch(host:CronFacadeHost,current:CronJobRecord,patch:UpdateCron
  const metadata={...(next.metadata??current.metadata)};
  if(patch.conclusions!==undefined)metadata.conclusions=normalizeCiConclusions(patch.conclusions);
  if(patch.secretEnv!==undefined)metadata.secretEnv=normalizeSecretEnv(patch.secretEnv);
- if(patch.precheck!==undefined){if(patch.precheck===null)delete metadata.precheck;else metadata.precheck=parseRoutinePrecheck(patch.precheck);}
+ if(patch.precheck!==undefined){if(patch.precheck===null){delete metadata.precheck;delete metadata.precheckMode;}else{const {mode,...precheck}=parseRoutinePrecheck(patch.precheck);metadata.precheck=precheck;if(mode)metadata.precheckMode=mode;}}
  if(patch.roomId!==undefined){
   if(patch.roomId===null)delete metadata.roomId;
   else {const roomId=patch.roomId.trim();if(!roomId)throw new ValidationError('roomId is required');const botId=typeof metadata.botId==='string'?metadata.botId:undefined;assertBotRoomTarget(host.store,roomId,botId,jobPrincipal(host,current));metadata.roomId=roomId;}

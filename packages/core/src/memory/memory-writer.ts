@@ -1,3 +1,4 @@
+import { MemorySuppressedError } from './deletion-suppression.js';
 /**
  * Gated write + semantic-merge persist. Used by memory_set, curator, extract, dreamer.
  */
@@ -42,6 +43,10 @@ export interface GatedWriteResult {
 }
 
 export function gatedMemorySet(store: AgentMemoryStore, input: GatedWriteInput): GatedWriteResult {
+  try { return gatedMemorySetInner(store, input); }
+  catch (error) { if (error instanceof MemorySuppressedError) return { ok: false, reason: 'user_deleted' }; throw error; }
+}
+function gatedMemorySetInner(store: AgentMemoryStore, input: GatedWriteInput): GatedWriteResult {
   const gate = evaluateMemoryWrite({
     value: input.value,
     key: input.key,
@@ -73,7 +78,7 @@ export function gatedMemorySet(store: AgentMemoryStore, input: GatedWriteInput):
   return { ok: true, reason: gate.reason, entry };
 }
 
-export function saveSemanticFact(
+function saveSemanticFactInner(
   store: AgentMemoryStore,
   input: {
     userId: string;
@@ -96,6 +101,7 @@ export function saveSemanticFact(
   if (!gate.allow) return null;
 
   const agentId = input.agentId?.trim() || undefined;
+  store.assertNotSuppressed({scope:'user.memory',userId:input.userId,tenantId:input.tenantId,agentId,value:input.content});
   const agentFilter = agentId ? { agentId } : { agentUnscoped: true as const };
   const listed = store.search({
     scope: 'user.memory',
@@ -183,4 +189,9 @@ function categoryFromKey(key: string, namespace: string): string {
 function slugKey(content: string): string {
   const s = content.replace(/\s+/g, '').toLowerCase().replace(/[^\u4e00-\u9fa5a-z0-9]/g, '');
   return (s.slice(0, 32) || 'fact') + '_' + String(content.length);
+}
+
+export function saveSemanticFact(store: AgentMemoryStore, input: Parameters<typeof saveSemanticFactInner>[1]): ReturnType<typeof saveSemanticFactInner> {
+  try { return saveSemanticFactInner(store, input); }
+  catch (error) { if (error instanceof MemorySuppressedError) return null; throw error; }
 }

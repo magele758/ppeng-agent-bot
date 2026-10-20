@@ -1,3 +1,4 @@
+import { ensureMemorySuppressionSchema } from '../../memory/deletion-suppression.js';
 import { ensureSoftwareInvocationSchema } from '../../connectors/software-execution.js';
 import { ensureBotWorkSchema } from '../../bots/bot-work.js';
 import { ensureBotRoomSchema } from '../../rooms/index.js';
@@ -1015,7 +1016,8 @@ export const MIGRATIONS: Migration[] = [
       }
       if (!hasColumn(db, 'session_inbox', 'reply_to_json')) db.exec('ALTER TABLE session_inbox ADD COLUMN reply_to_json TEXT');
     }
-  }
+  },
+  { version: 33, description: 'durable memory deletion suppression', up: ensureMemorySuppressionSchema }
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

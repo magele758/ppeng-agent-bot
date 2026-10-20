@@ -4,7 +4,7 @@
  * Persistence is stateDir/cron/jobs.json. Tick always runs (no RAW_AGENT_* switch).
  */
 
-import { ValidationError, RoutineRunStore, cancelRoutineRun, retryRoutineRun, drainRoutineRuns, routineSettings, type RoutineRun, type RequestAuth, type RawAgentRuntime, type UpdateCronJobInput } from '@ppeng/agent-core';
+import { RoutineHealthStore, isGovernedRoutine, ValidationError, RoutineRunStore, cancelRoutineRun, retryRoutineRun, drainRoutineRuns, routineSettings, type RoutineRun, type RequestAuth, type RawAgentRuntime, type UpdateCronJobInput } from '@ppeng/agent-core';
 import type { RouteSpec } from '../routing.js';
 import { json } from '../http-utils.js';
 import { visibleCronJobs, sessionVisible } from '../access/visibility.js';
@@ -15,6 +15,17 @@ export function cronRoutes(runtime: RawAgentRuntime): RouteSpec[] {
   const host = {store:runtime.store,stateDir:runtime.stateDir,log:{warn:console.warn,info:console.info},runSession:(id:string)=>runtime.runSession(id),cancelSession:(id:string)=>runtime.cancelSession(id),isSessionRunning:(id:string)=>runtime.isSessionRunning(id),hasUnconfirmedEffects:(id:string,startedAt:string)=>runtime.connectors.software.unconfirmedForSession(id,startedAt).length>0};
   const readRun = (id:string,auth:RequestAuth):RoutineRun | undefined => {const run=new RoutineRunStore(runtime.store).get(id);return run && sessionVisible(runtime,run.mainSessionId,auth)?run:undefined};
   return [
+    ...(['GET','PATCH','POST'] as const).map(method => ({
+      method, pattern:method==='POST'?'/api/cron/jobs/:id/resume':'/api/cron/jobs/:id/health',
+      handler:async({requireParam,response,auth,readBody}:Parameters<RouteSpec['handler']>[0])=>{
+        const job=runtime.getCronJob(requireParam('id'));
+        if(!job || !sessionVisible(runtime,job.sessionId,auth)){json(response,404,{error:'Task not found'});return;}
+        if(!isGovernedRoutine(job)){json(response,400,{error:'Failure governance requires a recurring task'});return;}
+        const store=new RoutineHealthStore(runtime.store);
+        const health=method==='PATCH'?store.configure(job.id,await readBody()):method==='POST'?store.resume(job.id):store.get(job.id);
+        json(response,200,{health});
+      }
+    })),
     {method:'GET',pattern:'/api/cron/settings',handler:({response})=>json(response,200,{settings:routineSettings(runtime.store)})},
     {method:'PATCH',pattern:'/api/cron/settings',handler:async({readBody,response})=>{const body=await readBody() as {dialogToolsEnabled?:boolean};if(typeof body.dialogToolsEnabled!=='boolean'){json(response,400,{error:'dialogToolsEnabled must be boolean'});return;}json(response,200,{settings:routineSettings(runtime.store,body)});}},
     {method:'GET',pattern:'/api/cron/jobs/:id/runs',handler:({requireParam,response,auth,url})=>{const beforeText=url.searchParams.get('before');const before=beforeText===null?undefined:Number(beforeText);if(before!==undefined&&(!Number.isSafeInteger(before)||before<1)){json(response,400,{error:'before must be a positive cursor'});return;}const page=new RoutineRunStore(runtime.store).page(requireParam('id'),{before});const runs=page.runs.filter(run=>sessionVisible(runtime,run.mainSessionId,auth)).map(publicRun);json(response,200,{runs,...(page.nextCursor?{nextCursor:page.nextCursor}:{})});}},

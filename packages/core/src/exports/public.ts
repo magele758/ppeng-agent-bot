@@ -810,3 +810,5 @@ export type { RoutineRun, RoutineRunStatus, RoutineRuntimeHost, RoutineContinuat
 export { parseOpenApiSpec } from '../discovery/adapters/openapi.js';
 
 export * from '../rooms/index.js';
+export { RoutineHealthStore, isGovernedRoutine } from '../cron/routine-health.js';
+export type { RoutineHealth, RoutineFailurePolicy } from '../cron/routine-health.js';

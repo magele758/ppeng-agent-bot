@@ -339,11 +339,16 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
         'admin'
       )
     ],
+    ['GET /api/cron/jobs/:id/health', cronJob],
+    ['PATCH /api/cron/jobs/:id/health', cronJob],
+    ['POST /api/cron/jobs/:id/resume', cronJob],
     ['GET /api/cron/jobs/:id', cronJob],
     ['PATCH /api/cron/jobs/:id', cronJob],
     ['DELETE /api/cron/jobs/:id', cronJob],
 
     // memory / users / tenants
+    ['GET /api/memory/suppressions', selfFiltered('memory-entry')],
+    ['POST /api/memory/suppressions/:id/restore', selfFiltered('memory-entry')],
     ['GET /api/memory/settings', AUTHENTICATED],
     ['PATCH /api/memory/settings', ADMIN],
     ['GET /api/memory/observations', selfFiltered('memory-entry')],

@@ -1,6 +1,7 @@
 'use client';
 
 import { useI18n } from '@/lib/i18n';
+import { RoutineHealthCenter } from '../../bot-work/RoutineHealth';
 import { OrchestrationPanel } from '../../OrchestrationPanel';
 import { EmptyState, SettingsGroup } from '../../ui';
 import { useLab } from '../../shell/LabProvider';
@@ -12,6 +13,7 @@ export function RunsView() {
   const { orchestrationRuns, swarmRuns, listState } = useLab();
   return (
     <>
+      <RoutineHealthCenter />
       <OrchestrationPanel runs={orchestrationRuns} loadError={listState.orchestrationRuns.error} />
       <SettingsGroup title={t('tasks.runs.swarmTitle')} description={t('tasks.runs.swarmDesc')} collapsible>
         <ListFallback

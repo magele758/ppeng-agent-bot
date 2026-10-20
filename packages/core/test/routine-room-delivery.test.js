@@ -84,7 +84,7 @@ test('whitespace output posts nothing and stays failed [AC:bot-routine-lifecycle
   blank.store.db.close();
 });
 
-test('silence, precheck skip, failure and empty output post nothing [AC:bot-routine-lifecycle#AC-14]', async () => {
+test('silence, precheck skip, failure and empty output post nothing [AC:bot-routine-lifecycle#AC-14] [AC:routine-failure-governance#AC-5]', async () => {
   const silent = fixture('[NO_UPDATE]');
   const silentJob = createCronJob(silent.host, { botId: silent.bot.id, userId: silent.principal.userId, tenantId: silent.principal.tenantId, name: 'quiet', prompt: 'check', intervalMs: 60000, roomId: silent.room.id });
   const silentRun = new RoutineRunStore(silent.store).enqueue(silentJob, new Date().toISOString());

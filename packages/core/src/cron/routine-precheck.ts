@@ -58,11 +58,13 @@ const BLOCKED_OVERRIDE_KEYS = new Set([
 export interface RoutinePrecheck {
   kind: 'script' | 'predicate';
   source: string;
+  mode?: 'strict' | 'compat';
 }
 
 export interface PrecheckResult {
   wakeAgent: boolean;
   reason?: string;
+  state?: unknown;
 }
 
 /** Last non-empty line. `false` only when `wakeAgent` is the boolean false. */
@@ -90,7 +92,21 @@ export function readStoredPrecheck(metadata: Record<string, unknown> | undefined
   if ((kind !== 'script' && kind !== 'predicate') || typeof source !== 'string' || !source.trim()) {
     return undefined;
   }
-  return { kind, source: source.trim() };
+  return { kind, source: source.trim(), mode: metadata?.precheckMode === 'strict' || (raw as RoutinePrecheck).mode === 'strict' ? 'strict' : 'compat' };
+}
+
+function parseStrictGate(output: string): PrecheckResult {
+  try {
+    const value: unknown = JSON.parse(output.trim().split(/\r?\n/).at(-1) ?? '');
+    if (!value || typeof value !== 'object' || Array.isArray(value) || typeof (value as {wakeAgent?:unknown}).wakeAgent !== 'boolean') {
+      return {wakeAgent:false, reason:'Precheck requires a JSON object with boolean wakeAgent'};
+    }
+    const gate = value as PrecheckResult;
+    if ('state' in gate && Buffer.byteLength(JSON.stringify(gate.state), 'utf8') > 16 * 1024) {
+      return {wakeAgent:false, reason:'Precheck state exceeds 16 KiB'};
+    }
+    return {wakeAgent:gate.wakeAgent, ...('state' in gate ? {state:gate.state} : {})};
+  } catch { return {wakeAgent:false, reason:'Precheck output is empty or invalid JSON'}; }
 }
 
 function filePredicateWakes(source: string, cwd: string): boolean | undefined {
@@ -176,11 +192,15 @@ interface ScriptOutput {
   stdout: string;
   code: number | null;
   signal: NodeJS.Signals | null;
+  truncated: boolean;
+  timedOut?: boolean;
 }
 
 function collectChild(child: ChildProcess, cleanup: () => void): Promise<ScriptOutput> {
   return new Promise((resolve, reject) => {
     let stdout = '';
+    let truncated = false;
+    let timedOut = false;
     let settled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const finish = (fn: () => void) => {
@@ -190,18 +210,18 @@ function collectChild(child: ChildProcess, cleanup: () => void): Promise<ScriptO
       cleanup();
       fn();
     };
-    timer = setTimeout(() => terminateProcessTree(child), PRECHECK_TIMEOUT_MS);
+    timer = setTimeout(() => { timedOut = true; terminateProcessTree(child); }, PRECHECK_TIMEOUT_MS);
     child.stdout?.on('data', (chunk) => {
-      if (stdout.length >= MAX_STDOUT) return;
+      if (stdout.length >= MAX_STDOUT) { truncated = true; return; }
       stdout += chunk.toString();
-      if (stdout.length > MAX_STDOUT) stdout = stdout.slice(0, MAX_STDOUT);
+      if (stdout.length > MAX_STDOUT) { truncated = true; stdout = stdout.slice(0, MAX_STDOUT); }
     });
     child.stderr?.on('data', () => {});
     child.on('error', (error) => finish(() => reject(error)));
     child.on('close', (code, signal) => finish(() => resolve({
       stdout: stdout.slice(0, MAX_STDOUT),
       code,
-      signal
+      signal, truncated, timedOut
     })));
   });
 }
@@ -236,7 +256,7 @@ async function runPrecheckScript(
   spawnEnv?: { env?: NodeJS.ProcessEnv; denyEnv?: string[] }
 ): Promise<ScriptOutput> {
   const refused = commandHardlineProcessRefusal(command);
-  if (refused) return { stdout: '', code: refused.code, signal: null };
+  if (refused) return { stdout: '', code: refused.code, signal: null, truncated: false };
   const mode = isolationMode();
   const env = precheckChildEnv(spawnEnv);
   switch (mode) {
@@ -274,12 +294,14 @@ export async function evaluateRoutinePrecheck(
   if (precheck.kind === 'predicate') {
     const fileGate = filePredicateWakes(precheck.source, cwd);
     if (fileGate !== undefined) return { wakeAgent: fileGate };
-    return { wakeAgent: parseWakeGate(precheck.source) };
+    return precheck.mode === 'strict' ? parseStrictGate(precheck.source) : { wakeAgent: parseWakeGate(precheck.source) };
   }
   if (precheck.kind === 'script') {
     try {
       const run = await runPrecheckScript(precheck.source, cwd, { env: opts?.env, denyEnv: opts?.denyEnv });
+      if(run.timedOut)return {wakeAgent:false,reason:'Precheck timed out'};
       const failed = run.code !== 0 || run.signal != null;
+      if (!failed && precheck.mode === 'strict') return run.truncated ? {wakeAgent:false, reason:'Precheck output exceeded limit'} : parseStrictGate(run.stdout);
       if (failed || !parseWakeGate(run.stdout)) {
         return { wakeAgent: false, ...(failed ? { reason: `Precheck exited ${run.code ?? run.signal ?? 'unknown'}` } : {}) };
       }

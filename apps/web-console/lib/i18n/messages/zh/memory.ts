@@ -1,4 +1,9 @@
 export const memory = {
+  suppressionTitle: '阻止自动学习',
+  suppressionHint: '删除的事实会持续阻止自动学习，直到你选择重新记住。历史原文不会被删除。',
+  suppressionReason: '用户已删除，阻止自动学习；已阻止 {count} 次自动写回',
+  rememberAgain: '重新记住',
+
   title: '记忆',
   desc: 'Agent 记住的事实与偏好，按范围分层。选一个范围即可查看、搜索、添加和修改。',
   sourceUi: '界面配置',

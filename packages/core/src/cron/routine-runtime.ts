@@ -1,3 +1,4 @@
+import { RoutineHealthStore, classifyRoutineFailure, isGovernedRoutine, type RoutineFailureClass } from './routine-health.js';
 /** Durable occurrence ledger. Configuration and individual execution have independent lifecycles. */
 import { ensureRoutineSummarySchema } from './routine-continuation.js';
 import { RoutineLease, ensureRoutineLeaseSchema } from './routine-lease.js';
@@ -19,7 +20,7 @@ import { BotQueueCapacityError, checkBotWorkCapacity, botWorkControl, resumeAppr
 import { openBot } from '../bots/bot-facade.js';
 import { principalFromSession } from '../bots/bot-identity.js';
 import { CronJobStore, type CronJobRecord } from './cron-store.js';
-import { evaluateRoutinePrecheck, readStoredPrecheck } from './routine-precheck.js';
+import { type PrecheckResult, evaluateRoutinePrecheck, readStoredPrecheck } from './routine-precheck.js';
 import { nextZonedCronRunAt, skippedZonedCronMinutes } from './cron-next.js';
 import { deliverBotRoomMessage } from '../rooms/index.js';
 import { isSilenceToken } from '../bots/silence.js';
@@ -30,7 +31,7 @@ export interface RoutineAttempt { number:number;sessionId:string;startedAt:strin
 export interface RoutineRun {
  id:string; routineId:string; scheduledAt:string; timezone:string; status:RoutineRunStatus;
  approvalIds?:string[];resumeStartedAt?:string; attempts?:RoutineAttempt[]; sessionId?:string; mainSessionId:string; attempt:number; result?:string; error?:string;
- precheckChecked?:boolean; missedCount:number; createdAt:string; updatedAt:string; startedAt?:string; finishedAt?:string; ownerPid?:number;
+ failureClass?:RoutineFailureClass; precheckOutcome?:'ready'|'no_change'|'failed'; precheckState?:unknown; precheckChecked?:boolean; missedCount:number; createdAt:string; updatedAt:string; startedAt?:string; finishedAt?:string; ownerPid?:number;
  summaryMessageId?:string; eventBody?:string; notificationSent?:boolean; requiresEffectVerification?:boolean; roomDelivery?:RoutineRoomDelivery; job:CronJobRecord;
 }
 export interface RoutineRuntimeHost {
@@ -43,6 +44,7 @@ export interface RoutineRuntimeHost {
 const active = new WeakMap<SqliteStateStore,Set<string>>();
 function activeFor(store:SqliteStateStore):Set<string> { let set=active.get(store); if(!set){set=new Set();active.set(store,set)}return set; }
 export function ensureRoutineSchema(store:Pick<SqliteStateStore,'db'>):void {
+ store.db.exec('CREATE TABLE IF NOT EXISTS routine_precheck_state(routine_id TEXT PRIMARY KEY,state_json TEXT NOT NULL)');
  ensureRoutineLeaseSchema(store);
  ensureRoutineSummarySchema(store);
  store.db.exec(`CREATE TABLE IF NOT EXISTS bot_routine_runs(id TEXT PRIMARY KEY,routine_id TEXT NOT NULL,occurrence_key TEXT NOT NULL UNIQUE,status TEXT NOT NULL,payload TEXT NOT NULL,notified INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS idx_bot_routine_runs ON bot_routine_runs(routine_id,status); CREATE INDEX IF NOT EXISTS idx_bot_routine_status ON bot_routine_runs(status)`);
@@ -112,6 +114,8 @@ function postRoomResult(host:RoutineRuntimeHost,run:RoutineRun):RoutineRoomDeliv
  return refusedRoom(host,run,roomId,delivery.reason);
 }
 function summarize(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):void {
+ if(run.status==='failed'&&!run.failureClass)run=runs.update(run.id,{failureClass:classifyRoutineFailure(run.error)});
+ new RoutineHealthStore(host.store).observe(run);
  if(run.notificationSent)return;
  if(run.status==='silent'){runs.update(run.id,{notificationSent:true});return;}
  const parent=host.store.getSession(run.mainSessionId)??repairRoutineOwnerSession(host,run.job);
@@ -172,7 +176,7 @@ function failRoutineExecution(host:RoutineRuntimeHost,runs:RoutineRunStore,id:st
  const unconfirmed=unknownEffects(host,current);
  if(!['running','waiting_approval'].includes(current.status)&&!(current.status==='cancelled'&&unconfirmed))return;
  const reason=error instanceof Error?error.message:String(error);
- const failed=runs.update(id,{status:unconfirmed?'unknown':'failed',error:unconfirmed?'External effects are unconfirmed; verify before retry':reason,finishedAt:nowIso()});summarize(host,runs,failed);
+ const failed=runs.update(id,{status:unconfirmed?'unknown':'failed',error:unconfirmed?'External effects are unconfirmed; verify before retry':reason,failureClass:classifyRoutineFailure(error),finishedAt:nowIso()});summarize(host,runs,failed);
 }
 function launchRoutineSession(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun,sessionId:string,lease:RoutineLease):void {
  const executing=activeFor(host.store);executing.add(run.id);
@@ -251,22 +255,46 @@ function recoverRoutineRuns(host:RoutineRuntimeHost,runs:RoutineRunStore,executi
   }finally{if(!handedOff)lease.release();}
  }
 }
-async function evaluateRunPrecheck(host:RoutineRuntimeHost,run:RoutineRun):Promise<{wakeAgent:boolean;reason?:string}>{
+async function evaluateRunPrecheck(host:RoutineRuntimeHost,run:RoutineRun):Promise<PrecheckResult>{
  const precheck=readStoredPrecheck(run.job.metadata);if(!precheck)return {wakeAgent:true};
  let directory:string|undefined;let env:NodeJS.ProcessEnv|undefined;
  try{
   if(precheck.kind==='script'&&run.eventBody!==undefined){directory=mkdtempSync(join(tmpdir(),'ppeng-event-run-'));const path=join(directory,'event.json');writeFileSync(path,run.eventBody,{encoding:'utf8',mode:0o600});env={PPENG_EVENT_FILE:path};}
+  if(precheck.mode==='strict'){const saved=host.store.db.prepare('SELECT state_json FROM routine_precheck_state WHERE routine_id=?').get(run.routineId);env={...env,PPENG_PRECHECK_STATE:saved?String(saved.state_json):'null'};}
   const secret=run.job.metadata.secretEnv;
   return await evaluateRoutinePrecheck(precheck,{cwd:host.stateDir,...(env?{env}:{}),...(typeof secret==='string'?{denyEnv:[secret]}:{})});
  }finally{if(directory)rmSync(directory,{recursive:true,force:true});}
 }
 async function precheckAllowsRun(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun,lease:RoutineLease):Promise<boolean>{
- if(run.precheckChecked)return true;const gate=await evaluateRunPrecheck(host,run);
- return lease.whileOwned(()=>{
-  if(runs.get(run.id)?.status!=='queued')return false;
-  if(gate.wakeAgent){runs.update(run.id,{precheckChecked:true});return true;}
-  const skipped=runs.update(run.id,{precheckChecked:true,status:'skipped',error:gate.reason?`Precheck failed; model not started: ${gate.reason}`:'Precheck requested no model turn',finishedAt:nowIso()});summarize(host,runs,skipped);return false;
- })??false;
+ if(run.precheckChecked)return true;
+ const taskLease=RoutineLease.acquire(host.store,`precheck:${run.routineId}`);
+ if(!taskLease)return false;
+ const stop=taskLease.heartbeat(()=>{});
+ try {
+  const gate=await evaluateRunPrecheck(host,run);
+  return lease.whileOwned(()=>taskLease.whileOwned(()=>{
+   if(runs.get(run.id)?.status!=='queued')return false;
+   const strict=readStoredPrecheck(run.job.metadata)?.mode==='strict';
+   let state:unknown;
+   if(strict){
+    const saved=host.store.db.prepare('SELECT state_json FROM routine_precheck_state WHERE routine_id=?').get(run.routineId);
+    state=saved?JSON.parse(String(saved.state_json)):undefined;
+    if(!gate.reason && 'state' in gate){
+     host.store.db.exec('SAVEPOINT precheck_cursor');
+     try{
+      host.store.db.prepare('INSERT INTO routine_precheck_state(routine_id,state_json) VALUES(?,?) ON CONFLICT(routine_id) DO UPDATE SET state_json=excluded.state_json').run(run.routineId,JSON.stringify(gate.state));
+      host.store.db.exec('RELEASE precheck_cursor');state=gate.state;
+     }catch(error){
+      host.store.db.exec('ROLLBACK TO precheck_cursor; RELEASE precheck_cursor');
+      gate.wakeAgent=false;gate.reason=`Precheck cursor could not be saved: ${error instanceof Error?error.message:String(error)}`;
+     }
+    }
+   }
+   const snapshot:Partial<RoutineRun>=strict?{precheckState:state,precheckOutcome:gate.reason?'failed':gate.wakeAgent?'ready':'no_change'}:{};
+   if(gate.wakeAgent){runs.update(run.id,{...snapshot,precheckChecked:true});return true;}
+   const skipped=runs.update(run.id,{...snapshot,precheckChecked:true,status:strict&&gate.reason?'failed':'skipped',error:gate.reason?`Precheck failed; model not started: ${gate.reason}`:'Precheck requested no model turn',finishedAt:nowIso()});summarize(host,runs,skipped);return false;
+  }))??false;
+ }finally{stop();taskLease.release();}
 }
 function routineParent(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):SessionRecord|undefined {
  const parent=host.store.getSession(run.mainSessionId)??repairRoutineOwnerSession(host,run.job);
@@ -284,7 +312,7 @@ function routineWorkMetadata(host:RoutineRuntimeHost,parent:SessionRecord,run:Ro
 function claimRoutineSession(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun,parent:SessionRecord,lease:RoutineLease):SessionRecord|undefined {
  host.store.db.exec('BEGIN IMMEDIATE');
  try{
-  if(!lease.renew()){host.store.db.exec('ROLLBACK');return undefined;}
+  if(!lease.renew() || (run.attempt===1&&!new RoutineHealthStore(host.store).allows(run.job))){host.store.db.exec('ROLLBACK');return undefined;}
   const session=host.store.createSession({title:`Routine: ${run.job.name}`,mode:'chat',agentId:parent.agentId,background:false,metadata:routineWorkMetadata(host,parent,run)});
   if(!runs.claim(run.id,session.id)){host.store.db.exec('ROLLBACK');return undefined;}
   const roomNote=routineRoomId(run)?' Your reply is posted to the group, so include only what is worth posting.':'';
@@ -303,6 +331,9 @@ async function dispatchRoutineQueue(host:RoutineRuntimeHost,runs:RoutineRunStore
   let handedOff=false;const stop=lease.heartbeat(()=>{});
   try{
    const run=runs.get(candidate.id);if(!run||run.status!=='queued')continue;
+   const health=new RoutineHealthStore(host.store);if(run.attempt===1&&!health.allows(run.job))continue;
+   const resumeAfter=health.get(run.routineId).resumeAfter;
+   if(run.attempt===1&&isGovernedRoutine(run.job)&&resumeAfter!==undefined&&Date.parse(run.scheduledAt)<=resumeAfter){const skipped=runs.update(run.id,{status:'skipped',error:'Missed occurrence discarded on explicit resume',finishedAt:nowIso()});summarize(host,runs,skipped);continue;}
    const parent=routineParent(host,runs,run);if(!parent)continue;
    if(!await precheckAllowsRun(host,runs,run,lease))continue;
    const session=claimRoutineSession(host,runs,run,parent,lease);if(!session)continue;
@@ -366,7 +397,7 @@ export function retryRoutineRun(host:RoutineRuntimeHost,id:string,opts?:{confirm
  if(run.sessionId&&host.hasUnconfirmedEffects?.(run.sessionId,run.startedAt??run.createdAt)&&['failed','cancelled'].includes(run.status))run=runs.update(id,{status:'unknown',error:'External effects are unconfirmed; verify before retry',notificationSent:false});
  if((run.status==='unknown'||run.requiresEffectVerification)&&!opts?.confirmUnknown)throw new ValidationError('Verify previously performed effects and confirmUnknown before retry');
  if(!['failed','cancelled','unknown'].includes(run.status)||activeFor(host.store).has(id))throw new ValidationError('Only stopped failed, cancelled or unknown runs can be retried');
- host.store.db.exec('BEGIN IMMEDIATE');try{if(host.store.db.prepare('SELECT 1 FROM bot_routine_leases WHERE run_id=? AND expires_at>?').get(id,Date.now()))throw new ValidationError('Routine worker still holds an active lease');const parent=host.store.getSession(run.mainSessionId);if(parent)checkBotWorkCapacity(host.store,principalFromSession(host.store,parent),String(run.job.metadata.botId??run.job.agentId));const queued=runs.update(id,{status:'queued',attempt:run.attempt+1,sessionId:undefined,summaryMessageId:undefined,error:undefined,result:undefined,finishedAt:undefined,notificationSent:false,requiresEffectVerification:false});host.store.db.exec('COMMIT');return queued;}catch(error){host.store.db.exec('ROLLBACK');throw error;}
+ host.store.db.exec('BEGIN IMMEDIATE');try{if(host.store.db.prepare('SELECT 1 FROM bot_routine_leases WHERE run_id=? AND expires_at>?').get(id,Date.now()))throw new ValidationError('Routine worker still holds an active lease');const parent=host.store.getSession(run.mainSessionId);if(parent)checkBotWorkCapacity(host.store,principalFromSession(host.store,parent),String(run.job.metadata.botId??run.job.agentId));const queued=runs.update(id,{status:'queued',attempt:run.attempt+1,precheckChecked:false,precheckOutcome:undefined,precheckState:undefined,failureClass:undefined,sessionId:undefined,summaryMessageId:undefined,error:undefined,result:undefined,finishedAt:undefined,notificationSent:false,requiresEffectVerification:false});host.store.db.exec('COMMIT');return queued;}catch(error){host.store.db.exec('ROLLBACK');throw error;}
 }
 export function routineSettings(store:SqliteStateStore,patch?:{dialogToolsEnabled?:boolean}):{dialogToolsEnabled:boolean}{
  const prior=store.getDaemonControl<{dialogToolsEnabled?:boolean}>('routine.settings');
@@ -428,6 +459,7 @@ function admitRoutinePlan(host:RoutineRuntimeHost,runs:RoutineRunStore,job:CronJ
  const created:RoutineRun[]=[];let blocked:BotQueueCapacityError|undefined;
  host.store.db.exec('BEGIN IMMEDIATE');
  try{
+  if(!new RoutineHealthStore(host.store).allows(job,now)){host.store.db.exec('COMMIT');return {created};}
   for(let index=0;index<output.length;index++){
    const time=output[index]!;
    try{created.push(runs.enqueue(job,new Date(time).toISOString(),plannedOccurrenceOptions(job,time,index,now,schedule,plan)));}
@@ -446,6 +478,12 @@ function checkpointRoutinePlan(config:CronJobStore,job:CronJobRecord,schedule:Mi
 /** Persist receipts before advancing configuration; partial catch-up and replay share one checkpoint. */
 export function materializeRoutineOccurrences(host:RoutineRuntimeHost,config:CronJobStore,job:CronJobRecord,now=Date.now()):RoutineRun[] {
  if(routineExpired(job,now))return [];
+ const health=new RoutineHealthStore(host.store);if(!health.allows(job,now))return [];
+ const resumeAfter=health.get(job.id).resumeAfter;
+ if(isGovernedRoutine(job)&&resumeAfter!==undefined&&scheduleDue(job)<=resumeAfter){
+  const nextRunAt=job.scheduleKind==='every_ms'?new Date(Math.max(now,resumeAfter)+Number(job.scheduleValue)).toISOString():nextZonedCronRunAt(job.scheduleValue,job.timezone??'UTC',new Date(Math.max(now,resumeAfter))).toISOString();
+  config.update(job.id,{nextRunAt,metadata:{...job.metadata,catchUpPlan:undefined}});return [];
+ }
  const runs=new RoutineRunStore(host.store);rememberRoutinePrincipal(host,config,job);recordSkippedLocalTimes(runs,job,now);
  const due=scheduleDue(job);if(!Number.isFinite(due)||due>now)return [];
  const schedule=missedSchedule(job,due,now),plan=catchUpPlan(runs,job,schedule);

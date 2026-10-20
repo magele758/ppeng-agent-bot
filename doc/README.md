@@ -17,6 +17,8 @@
 
 ---
 
+第一批记忆与调度可靠性能力的操作入口、边界和接口见 [FIRST_BATCH_RELIABILITY.md](FIRST_BATCH_RELIABILITY.md)。
+
 ## Start here / 从这里读
 
 | Document | 中文说明 |

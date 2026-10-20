@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { MemorySuppressions } from './MemorySuppressions';
 import { api } from '@/lib/api';
 import { useI18n, type MessageKey } from '@/lib/i18n';
 import { useLab } from './shell/LabProvider';
@@ -221,6 +222,7 @@ export function MemoryPanel() {
           ))}
         </div>
 
+        <MemorySuppressions revision={rows} onRestore={loadEntries} />
         <div className={styles.toolbar}>
           <input
             id="memorySearch"

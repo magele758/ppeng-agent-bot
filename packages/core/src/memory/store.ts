@@ -1,3 +1,4 @@
+import { MemorySuppressedError, readSuppressions, sameSuppressionScope, suppressionFactKey, type MemorySuppression } from './deletion-suppression.js';
 import type { DatabaseSync } from 'node:sqlite';
 import { createId, nowIso } from '../id.js';
 import type {
@@ -208,6 +209,24 @@ export class AgentMemoryStore {
   // ── Memory CRUD ──
 
   set(memory: Omit<AgentMemory, 'id' | 'createdAt' | 'updatedAt' | 'accessCount'> & Partial<Pick<AgentMemory, 'id' | 'createdAt' | 'updatedAt' | 'accessCount'>>): AgentMemory {
+    this.db.exec('SAVEPOINT memory_write');
+    try {
+      const blocked = this.findSuppression(memory);
+      if (blocked) {
+        this.db.prepare('UPDATE memory_suppressions SET blocked_count=blocked_count+1,last_blocked_at=? WHERE id=?').run(nowIso(), blocked.id);
+        this.db.exec('RELEASE memory_write');
+        throw new MemorySuppressedError();
+      }
+      const entry = this.setAllowed(memory);
+      this.db.exec('RELEASE memory_write');
+      return entry;
+    } catch (error) {
+      if (!(error instanceof MemorySuppressedError)) this.db.exec('ROLLBACK TO memory_write; RELEASE memory_write');
+      throw error;
+    }
+  }
+
+  private setAllowed(memory: Parameters<AgentMemoryStore['set']>[0]): AgentMemory {
     const now = nowIso();
     const agentId = memory.agentId?.trim() || undefined;
     const owner = ownerClause({
@@ -320,6 +339,45 @@ export class AgentMemoryStore {
       | Record<string, unknown>
       | undefined;
     return row ? this.withSources(row) : null;
+  }
+
+  listSuppressions(): MemorySuppression[] { return readSuppressions(this.db); }
+
+  findSuppression(memory: Pick<AgentMemory, 'scope'|'userId'|'tenantId'|'sessionId'|'agentId'|'value'>): MemorySuppression | undefined {
+    const key = suppressionFactKey(memory.value);
+    return this.listSuppressions().find(row => sameSuppressionScope(row.memory, memory) && suppressionFactKey(row.memory.value) === key);
+  }
+
+  assertNotSuppressed(memory: Parameters<AgentMemoryStore['findSuppression']>[0]): void {
+    const blocked = this.findSuppression(memory);
+    if (!blocked) return;
+    this.db.prepare('UPDATE memory_suppressions SET blocked_count=blocked_count+1,last_blocked_at=? WHERE id=?').run(nowIso(), blocked.id);
+    throw new MemorySuppressedError();
+  }
+
+  deleteAndSuppress(id: string): MemorySuppression | undefined {
+    this.db.exec('SAVEPOINT memory_delete');
+    try {
+      const memory = this.getEntryById(id);
+      if (!memory) { this.db.exec('RELEASE memory_delete'); return undefined; }
+      const sid = createId('msup');
+      this.db.prepare('INSERT INTO memory_suppressions(id,memory_json,reason,created_at) VALUES(?,?,?,?)').run(sid, JSON.stringify(memory), 'user_deleted', nowIso());
+      this.delete(id);
+      this.db.exec('RELEASE memory_delete');
+      return this.listSuppressions().find(row => row.id === sid);
+    } catch (error) { this.db.exec('ROLLBACK TO memory_delete; RELEASE memory_delete'); throw error; }
+  }
+
+  restoreSuppression(id: string): AgentMemory | undefined {
+    this.db.exec('SAVEPOINT memory_restore');
+    try {
+      const row = this.listSuppressions().find(item => item.id === id);
+      if (!row) { this.db.exec('RELEASE memory_restore'); return undefined; }
+      this.db.prepare('DELETE FROM memory_suppressions WHERE id=?').run(id);
+      const entry = this.set({ ...row.memory, expiresAt: undefined });
+      this.db.exec('RELEASE memory_restore');
+      return entry;
+    } catch (error) { this.db.exec('ROLLBACK TO memory_restore; RELEASE memory_restore'); throw error; }
   }
 
   delete(id: string): void {
