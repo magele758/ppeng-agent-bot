@@ -20,6 +20,12 @@
   background: var(--ui-bg);
 }
 
+.chat-composer__bot-face {
+  align-self: center;
+  width: 32px;
+  height: 32px;
+}
+
 /* —— 输入区 dock：附件 / 会话设置 / 模型 / 工作区 同一行 —— */
 .chat-composer-outer .chat-composer-dock {
   flex-wrap: wrap;

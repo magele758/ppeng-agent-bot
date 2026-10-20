@@ -144,9 +144,9 @@ test('预检要求唤醒、没有预检、或没有明确拒绝时仍开始模�
   await tickCronJobs(host);
 
   assert.equal(runs.length, 4);
-  assert.ok(runs.every(id=>id!==bot.canonicalSessionId));
-  assert.ok(store.listMessages(runs[0]).some((m) => m.role === 'user' && JSON.stringify(m).includes('直接跑')));
-  assert.ok(!store.listMessages(bot.canonicalSessionId).some(m=>m.role==='user'));
+  assert.ok(runs.every((id) => id === bot.canonicalSessionId));
+  assert.ok(store.listMessages(bot.canonicalSessionId).some((m) => m.role === 'user' && JSON.stringify(m).includes('直接跑')));
+  assert.equal(store.listSessions().some((item) => String(item.title).startsWith('Routine:')), false);
   store.db.close();
 });
 

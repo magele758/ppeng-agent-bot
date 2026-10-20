@@ -38,7 +38,6 @@ import { useBotWorkMood } from './bot-work/BotWorkState';
 import { botChatHeaderTitle, botNameFromCanonicalTitle } from '@/lib/bot-chat-header';
 import { BotFace } from './BotFace';
 import { resolveLivingFaceMood } from '@/lib/bot-face';
-import { ComposerBotPicker } from './ComposerBotPicker';
 import { shouldOpenSessionSettingsOnInboxGrowth } from '@/lib/running-turn-send';
 import { ComposerContextChips, useComposerFileDrop } from './ComposerContext';
 import { ComposerReplyQuote } from './ReplyQuote';
@@ -304,6 +303,17 @@ export function PlayPanel({
   const chatRunning = chat.playSending || Boolean(chat.streamOverlay) || chat.waitTyping;
   const immediateSteer = chat.immediateSteer;
   const steerDisabled = chatRunning && !immediateSteer && chat.steerInterruptPolicy === 'disabled';
+  const composerStatusText =
+    chat.playStatus.text ||
+    (chat.workspaceAvailability.blocked
+      ? chat.workspaceAvailability.reason || t('play.composer.workspaceBlocked')
+      : chatRunning
+        ? steerDisabled
+          ? t('play.composer.statusDisabled')
+          : immediateSteer || chat.steerInterruptPolicy !== 'queue'
+            ? t('play.composer.statusSteer')
+            : t('play.composer.statusQueue')
+        : '');
   const runningPlaceholder = immediateSteer
     ? t('play.composer.runningSteer')
     : chat.steerInterruptPolicy === 'disabled'
@@ -1054,6 +1064,14 @@ export function PlayPanel({
                   onDragLeave={contextDrop.onDragLeave}
                   onDrop={contextDrop.onDrop}
                 >
+                  {botSurface && (selectedBot?.name || headerBotName) ? (
+                    <BotFace
+                      name={selectedBot?.name || headerBotName}
+                      mood={pickerFaceMood}
+                      testId="composer-bot-face"
+                      className="chat-composer__bot-face"
+                    />
+                  ) : null}
                   <ComposerContextChips items={chat.pendingContext} onRemove={chat.removePendingContext} />
                   <ComposerReplyQuote
                     quote={botSurface ? chat.replyQuote : null}
@@ -1140,6 +1158,7 @@ export function PlayPanel({
                 </div>
 
                 <div className="chat-composer-dock">
+                  {botSurface ? null : (
                   <div className="chat-composer-dock__left">
                     <button
                       type="button"
@@ -1175,20 +1194,6 @@ export function PlayPanel({
                         ▾
                       </span>
                     </button>
-                    {botSurface ? (
-                      <ComposerBotPicker
-                        bots={botRoster.map((b) => ({ id: b.id, name: b.name }))}
-                        value={chat.botId}
-                        selectedName={selectedBot?.name ?? ''}
-                        orphan={
-                          chat.botId && !botRoster.some((b) => b.id === chat.botId)
-                            ? { id: chat.botId, name: selectedBot?.name ?? chat.botId }
-                            : null
-                        }
-                        mood={pickerFaceMood}
-                        onSelect={(id) => void chat.selectBot(id)}
-                      />
-                    ) : null}
                     <div className="chat-composer-dock__pickers">
                     <ComposerModelPicker
                       options={enabledModelOptions}
@@ -1208,25 +1213,17 @@ export function PlayPanel({
                     />
                     </div>
                   </div>
+                  )}
                   <p
                     id="playStatus"
                     className={`chat-composer-hint${chat.playStatus.ok ? ' ok' : ''}${chat.playStatus.err || (!chat.playStatus.text && chat.workspaceAvailability.blocked) ? ' err' : ''}`}
                     role="status"
                   >
-                    {chat.playStatus.text ||
-                      (chat.workspaceAvailability.blocked
-                        ? chat.workspaceAvailability.reason || t('play.composer.workspaceBlocked')
-                        : chatRunning
-                          ? steerDisabled
-                            ? t('play.composer.statusDisabled')
-                            : immediateSteer || chat.steerInterruptPolicy !== 'queue'
-                              ? t('play.composer.statusSteer')
-                              : t('play.composer.statusQueue')
-                          : '')}
+                    {composerStatusText}
                   </p>
                 </div>
 
-                {attachOpen ? (
+                {attachOpen && !botSurface ? (
                   <div id="composerAttachPanel" className="composer-attach-panel">
                     <input
                       type="file"
@@ -1263,7 +1260,7 @@ export function PlayPanel({
                   </div>
                 ) : null}
 
-                {configOpen ? (
+                {configOpen && !botSurface ? (
                   <SessionSettingsPanel
                     panelRef={configPanelRef}
                     chat={chat}

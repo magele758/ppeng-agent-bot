@@ -68,7 +68,7 @@ test('a silence token posts nothing and sends no summary [AC:bot-routine-lifecyc
     assert.equal(done.status, 'silent');
     assert.equal(done.roomDelivery, undefined);
     assert.equal(silent.rooms.messages(silent.principal, silent.room.id).messages.length, 0);
-    assert.equal(silent.store.listMessages(done.mainSessionId).length, 0);
+    assert.equal(silent.store.listMessages(done.mainSessionId).some((message) => JSON.stringify(message).includes('[routine:')), false);
     silent.store.db.close();
   }
 });
@@ -91,7 +91,7 @@ test('silence, precheck skip, failure and empty output post nothing [AC:bot-rout
   const silentLedger = await finish(silent.host, silent.store);
   assert.equal(silentLedger.get(silentRun.id).status, 'silent');
   assert.equal(silent.rooms.messages(silent.principal, silent.room.id).messages.length, 0);
-  assert.equal(silent.store.listMessages(silentLedger.get(silentRun.id).mainSessionId).length, 0);
+  assert.equal(silent.store.listMessages(silentLedger.get(silentRun.id).mainSessionId).some((message) => JSON.stringify(message).includes('[routine:')), false);
   silent.store.db.close();
 
   const skipped = fixture('should not run');
@@ -130,8 +130,9 @@ test('a routine without a room keeps the private summary only [AC:bot-routine-li
   assert.equal(ledger.get(run.id).status, 'completed');
   assert.equal(ledger.get(run.id).roomDelivery, undefined);
   assert.equal(rooms.messages(principal, room.id).messages.length, 0);
-  assert.equal(store.listMessages(ledger.get(run.id).mainSessionId).length, 1);
-  const prompt = store.listMessages(ledger.get(run.id).sessionId).find(message => message.role === 'user');
+  assert.equal(ledger.get(run.id).sessionId, bot.canonicalSessionId);
+  assert.ok(store.listMessages(bot.canonicalSessionId).some(message => JSON.stringify(message).includes(run.id)));
+  const prompt = store.listMessages(bot.canonicalSessionId).find(message => message.role === 'user');
   assert.equal(JSON.stringify(prompt).includes('posted to the group'), false);
   store.db.close();
 });

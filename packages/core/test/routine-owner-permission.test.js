@@ -147,13 +147,14 @@ test('ask bot routine still fails when nobody answers [AC:routine-owner-permissi
   assert.equal(denied.expireReason, UNATTENDED_APPROVAL_EXPIRE_REASON);
 });
 
-test('auto bot routine still asks before a shell command', async (t) => {
-  const { session, host, seen } = fixture(t, 'auto');
+test('auto bot routine keeps the main session auto and is not rewritten to ask', async (t) => {
+  const { store, session, host, seen } = fixture(t, 'auto');
   const run = await fire(host, session);
-  assert.equal(seen.mode, 'ask');
-  assert.equal(seen.decision, 'waiting');
-  assert.equal(seen.executed, false);
-  assert.equal(run.status, 'waiting_approval');
+  assert.equal(run.sessionId, session.id);
+  assert.equal(seen.mode, 'auto');
+  assert.equal(store.getSession(session.id).metadata.permissionMode, 'auto');
+  assert.equal(store.listSessions().some((item) => String(item.title).startsWith('Routine:')), false);
+  assert.equal(seen.approvals.some((item) => String(item.reason).includes('permissionMode=ask')), false);
 });
 
 test('spawned child of a bypass bot still asks [AC:routine-owner-permission#AC-3]', async (t) => {

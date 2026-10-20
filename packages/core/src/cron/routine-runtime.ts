@@ -12,7 +12,7 @@ import { NotFoundError, ValidationError } from '../errors.js';
 import type { Logger } from '../logger.js';
 import type { ApprovalRecord, SessionRecord } from '../types.js';
 import { childPermissionMode, inheritBotAllowlists, inheritModelOverride } from '../runtime/spawn-policy.js';
-import { textPart } from '../runtime/session-facade.js';
+import { enqueueSteer, textPart } from '../runtime/session-facade.js';
 import { stampSessionWake } from '../approval/unattended-approval.js';
 import { parseRunOutcome } from '../session/run-outcome.js';
 import { assistantTextsFromFold } from '../session/visible-assistant.js';
@@ -32,7 +32,7 @@ export interface RoutineRun {
  id:string; routineId:string; scheduledAt:string; timezone:string; status:RoutineRunStatus;
  approvalIds?:string[];resumeStartedAt?:string; attempts?:RoutineAttempt[]; sessionId?:string; mainSessionId:string; attempt:number; result?:string; error?:string;
  failureClass?:RoutineFailureClass; precheckOutcome?:'ready'|'no_change'|'failed'; precheckState?:unknown; precheckChecked?:boolean; missedCount:number; createdAt:string; updatedAt:string; startedAt?:string; finishedAt?:string; ownerPid?:number;
- summaryMessageId?:string; eventBody?:string; notificationSent?:boolean; requiresEffectVerification?:boolean; roomDelivery?:RoutineRoomDelivery; job:CronJobRecord;
+ summaryMessageId?:string; eventBody?:string; notificationSent?:boolean; requiresEffectVerification?:boolean; roomDelivery?:RoutineRoomDelivery; steerKey?:string; job:CronJobRecord;
 }
 export interface RoutineRuntimeHost {
  store:SqliteStateStore; stateDir:string; log:Pick<Logger,'warn'|'info'>;
@@ -132,7 +132,24 @@ function summarize(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):
  runs.update(run.id,{notificationSent:true,summaryMessageId:summary.id,...(roomDelivery?{roomDelivery:roomDelivery}:{})});if(ownTransaction)host.store.db.exec('COMMIT');
  }catch(error){if(ownTransaction)host.store.db.exec('ROLLBACK');throw error;}
 }
-function resultText(host:RoutineRuntimeHost,id:string):string {return assistantTextsFromFold(host.store,id).at(-1)?.trim().slice(0,16000)??'';}
+function sharedBotRun(host:RoutineRuntimeHost,run:RoutineRun):boolean {
+ if(!run.sessionId||run.sessionId!==run.mainSessionId||!run.startedAt)return false;
+ const session=host.store.getSession(run.sessionId);return !!session&&isBotMainSession(session);
+}
+/** Only this attempt's reply counts. The bot chat already holds older turns. */
+function resultText(host:RoutineRuntimeHost,run:RoutineRun):string {
+ if(!run.sessionId)return '';
+ if(!sharedBotRun(host,run))return assistantTextsFromFold(host.store,run.sessionId).at(-1)?.trim().slice(0,16000)??'';
+ const start=Date.parse(run.startedAt!);
+ const prior=host.store.foldMessages(run.sessionId).filter(message=>Date.parse(message.createdAt)<start).at(-1);
+ return assistantTextsFromFold(host.store,run.sessionId,prior?.id).at(-1)?.trim().slice(0,16000)??'';
+}
+function approvalsForSession(host:RoutineRuntimeHost,run:RoutineRun):ApprovalRecord[] {
+ const rows=host.store.listApprovals().filter(approval=>approval.sessionId===run.sessionId);
+ if(!sharedBotRun(host,run))return rows;
+ const start=Date.parse(run.startedAt!);
+ return rows.filter(approval=>Date.parse(approval.createdAt)>=start);
+}
 function unknownEffects(host:RoutineRuntimeHost,run:RoutineRun):boolean {
  return !!run.sessionId&&host.hasUnconfirmedEffects?.(run.sessionId,run.startedAt??run.createdAt)===true;
 }
@@ -154,7 +171,7 @@ function completionError(session:SessionRecord|undefined,denied:boolean,result:s
  return result.trim()?'Session did not complete':'Execution ended without a result';
 }
 function completionResult(host:RoutineRuntimeHost,run:RoutineRun,session:SessionRecord|undefined,approvals:ApprovalRecord[]):Partial<RoutineRun>{
- const result=run.sessionId?resultText(host,run.sessionId):'';
+ const result=resultText(host,run);
  if(unknownEffects(host,run))return {status:'unknown',result,error:'External effects are unconfirmed; verify before retry'};
  const denied=approvals.some(approval=>approval.status==='rejected');const outcome=parseRunOutcome(session?.metadata?.outcome);
  const stopped=outcome?.kind==='aborted'||outcome?.kind==='failed'||(outcome?.kind==='idle'&&outcome.reason!=='end');
@@ -166,7 +183,7 @@ function finish(host:RoutineRuntimeHost,runs:RoutineRunStore,id:string,expectedS
  if(run.status==='cancelled'&&unknownEffects(host,run)){const corrected=runs.update(id,{...completionResult(host,run,run.sessionId?host.store.getSession(run.sessionId):undefined,[]),notificationSent:false});summarize(host,runs,corrected);return;}
  if(!['running','waiting_approval'].includes(run.status))return;
  const session=run.sessionId?host.store.getSession(run.sessionId):undefined;
- const approvals=host.store.listApprovals().filter(approval=>approval.sessionId===run.sessionId);
+ const approvals=approvalsForSession(host,run);
  if(isWaitingForDecision(session,approvals)){runs.update(id,{status:'waiting_approval',approvalIds:approvalCheckpoint(approvals)});return;}
  if(session?.status==='running')return;
  const completed=runs.update(id,{...completionResult(host,run,session,approvals),finishedAt:nowIso()});summarize(host,runs,completed);
@@ -319,6 +336,71 @@ function routinePermissionMode(metadata: Record<string, unknown> | undefined): s
 function routineWorkMetadata(host:RoutineRuntimeHost,parent:SessionRecord,run:RoutineRun):Record<string,unknown>{
  return {...principalFromSession(host.store,parent),...inheritBotAllowlists(parent.metadata),...inheritModelOverride(parent.metadata),permissionMode:routinePermissionMode(parent.metadata),maxTurns:parent.metadata?.maxTurns??32,...(typeof parent.metadata?.botId==='string'?{botId:parent.metadata.botId}:{}),...(typeof parent.metadata?.workspaceId==='string'?{workspaceId:parent.metadata.workspaceId}:{}),canonicalBotChat:false,routineRunId:run.id,routineId:run.routineId,routineParentSessionId:parent.id};
 }
+/** Bot routines run in the canonical chat. Ordinary chats keep a separate working session. */
+function isBotMainSession(session:SessionRecord):boolean {
+ return session.metadata?.canonicalBotChat===true && typeof session.metadata.botId==='string' && session.metadata.botId.trim().length>0;
+}
+function routinePromptText(run:RoutineRun):string {
+ const roomNote=routineRoomId(run)?' Your reply is posted to the group, so include only what is worth posting.':'';
+ return `[cron:${run.job.name}] ${run.job.prompt}\nWhen there is nothing new to report, reply only '[NO_UPDATE]'.${roomNote}`;
+}
+function botJobRemoved(host:RoutineRuntimeHost,run:RoutineRun):boolean {
+ return new CronJobStore(host.stateDir).get(run.routineId)===undefined;
+}
+function dropBotSteer(host:RoutineRuntimeHost,sessionId:string,key:string|undefined):void {
+ if(!key)return;
+ for(const item of host.store.listUnclaimedInbox(sessionId)) if(item.key===key) host.store.removeUnclaimedInbox(sessionId,item.id);
+}
+function cancelRemovedBotRun(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun,sessionId:string):void {
+ dropBotSteer(host,sessionId,run.steerKey??`routine:${run.id}`);
+ runs.update(run.id,{status:'cancelled',error:'Routine was removed before it started',finishedAt:nowIso(),notificationSent:true});
+}
+function botSessionTalking(host:RoutineRuntimeHost,session:SessionRecord,reserved:Set<string>):boolean {
+ return reserved.has(session.id) || session.status==='running' || host.isSessionRunning?.(session.id)===true;
+}
+function steeredUserMessage(host:RoutineRuntimeHost,sessionId:string,key:string) {
+ return host.store.listMessages(sessionId).find(message=>message.key===key && message.role==='user');
+}
+function assistantAfterSteer(host:RoutineRuntimeHost,sessionId:string,seq:number):boolean {
+ return host.store.listMessages(sessionId).some(message=>message.role==='assistant' && Number(message.seq)>seq);
+}
+/** Claim the bot's own chat. Append the prompt only when it is not already parked as a steer. */
+function claimBotMainSession(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun,parent:SessionRecord,lease:RoutineLease,append:boolean):SessionRecord|undefined {
+ host.store.db.exec('BEGIN IMMEDIATE');
+ try{
+  if(!lease.renew() || (run.attempt===1&&!new RoutineHealthStore(host.store).allows(run.job))){host.store.db.exec('ROLLBACK');return undefined;}
+  if(append){host.store.appendMessage(parent.id,'user',[textPart(routinePromptText(run))],{key:`routine:${run.id}`});stampSessionWake(host.store,parent.id,{kind:'unattended',source:'routine'});}
+  if(!runs.claim(run.id,parent.id)){host.store.db.exec('ROLLBACK');return undefined;}
+  host.store.db.exec('COMMIT');return parent;
+ }catch(error){host.store.db.exec('ROLLBACK');throw error;}
+}
+type BotDispatch='launched'|'parked'|'finished'|'skip';
+function dispatchBotMain(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun,parent:SessionRecord,lease:RoutineLease,reserved:Set<string>):BotDispatch {
+ if(parent.status==='waiting_approval')return 'parked';
+ if(botSessionTalking(host,parent,reserved)){
+  const key=run.steerKey??`routine:${run.id}`;
+  if(!run.steerKey){
+   const ack=enqueueSteer(host.store,parent.id,routinePromptText(run),{key,role:'user'});
+   if(ack.status!=='not_submitted')runs.update(run.id,{steerKey:key});
+  }
+  return 'parked';
+ }
+ const key=run.steerKey;
+ if(key){
+  const parked=host.store.listUnclaimedInbox(parent.id).some(item=>item.key===key);
+  const spoken=steeredUserMessage(host,parent.id,key);
+  if(parked||spoken){
+   if(spoken&&assistantAfterSteer(host,parent.id,Number(spoken.seq))){
+    if(!claimBotMainSession(host,runs,run,parent,lease,false))return 'skip';
+    finish(host,runs,run.id,parent.id);return 'finished';
+   }
+   if(!claimBotMainSession(host,runs,run,parent,lease,false))return 'skip';
+   return 'launched';
+  }
+ }
+ if(!claimBotMainSession(host,runs,run,parent,lease,true))return 'skip';
+ return 'launched';
+}
 function claimRoutineSession(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun,parent:SessionRecord,lease:RoutineLease):SessionRecord|undefined {
  host.store.db.exec('BEGIN IMMEDIATE');
  try{
@@ -334,7 +416,7 @@ function busyRoutines(runs:RoutineRunStore,all:RoutineRun[],executing:Set<string
  for(const id of executing){const current=runs.get(id);if(current)busy.add(current.routineId);}return busy;
 }
 async function dispatchRoutineQueue(host:RoutineRuntimeHost,runs:RoutineRunStore,executing:Set<string>):Promise<void>{
- const all=runs.pending(),busy=busyRoutines(runs,all,executing);
+ const all=runs.pending(),busy=busyRoutines(runs,all,executing),reserved=new Set<string>();
  for(const candidate of all.filter(item=>item.status==='queued')){
   if(busy.has(candidate.routineId))continue;
   const lease=RoutineLease.acquire(host.store,candidate.id);if(!lease)continue;
@@ -345,7 +427,14 @@ async function dispatchRoutineQueue(host:RoutineRuntimeHost,runs:RoutineRunStore
    const resumeAfter=health.get(run.routineId).resumeAfter;
    if(run.attempt===1&&isGovernedRoutine(run.job)&&resumeAfter!==undefined&&Date.parse(run.scheduledAt)<=resumeAfter){const skipped=runs.update(run.id,{status:'skipped',error:'Missed occurrence discarded on explicit resume',finishedAt:nowIso()});summarize(host,runs,skipped);continue;}
    const parent=routineParent(host,runs,run);if(!parent)continue;
+   if(isBotMainSession(parent)&&botJobRemoved(host,run)){cancelRemovedBotRun(host,runs,run,parent.id);continue;}
    if(!await precheckAllowsRun(host,runs,run,lease))continue;
+   if(isBotMainSession(parent)){
+    const outcome=dispatchBotMain(host,runs,runs.get(run.id)??run,parent,lease,reserved);
+    if(outcome==='launched'){reserved.add(parent.id);busy.add(run.routineId);handedOff=true;launchRoutineSession(host,runs,run,parent.id,lease);}
+    else if(outcome==='parked')busy.add(run.routineId);
+    continue;
+   }
    const session=claimRoutineSession(host,runs,run,parent,lease);if(!session)continue;
    busy.add(run.routineId);handedOff=true;launchRoutineSession(host,runs,run,session.id,lease);
   }finally{stop();if(!handedOff)lease.release();}
