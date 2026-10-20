@@ -45,18 +45,19 @@ test('npm and Docker publication require a successful release gate, including fo
 
 test('release gate retains deterministic test layers and does not tolerate failures', () => {
   const doc = workflow('release-gate');
-  assert.deepEqual(needs(doc.jobs.gate).sort(), ['acceptance', 'browser', 'compact-ab', 'crap', 'harness', 'mutation', 'remote-model-smoke', 'secrets-gate', 'tests']);
+  assert.deepEqual(needs(doc.jobs.gate).sort(), ['acceptance', 'browser', 'compact-ab', 'crap', 'formal', 'harness', 'mutation', 'remote-model-smoke', 'sdk', 'secrets-gate', 'tests', 'unit']);
   assert.equal(doc.jobs.gate.if, '${{ !cancelled() }}');
   for (const job of Object.values(doc.jobs)) {
     assert.notEqual(job['continue-on-error'], true);
     for (const step of job.steps ?? []) assert.notEqual(step['continue-on-error'], true);
   }
   const runs = Object.values(doc.jobs).flatMap(job => job.steps ?? []).map((step) => step.run).filter(Boolean);
-  for (const script of ['build', 'test:formal', 'test:package', 'agent:eval:verify', 'test:regression', 'test:integration']) {
+  for (const script of ['build', 'test:package', 'agent:eval:verify', 'test:regression', 'test:integration']) {
     assert.ok(runs.includes(`npm run ${script}`), `missing release layer: ${script}`);
   }
   // test:unit runs through the flaky-retry wrapper; e2e adds a JUnit reporter for the acceptance gate.
-  assert.ok(runs.some((run) => run.startsWith('node scripts/ci/retry-failed-tests.mjs --script test:unit')), 'missing release layer: test:unit');
+  for(const lane of ['unit','formal','sdk'])assert.ok(runs.some(run=>run.includes(`validation-lane.mjs ${lane} --out`)),`missing release layer: ${lane}`);
+  assert.match(readFileSync('scripts/ci/validation-lane.mjs','utf8'),/run-formal-regression.mjs/);
   assert.ok(runs.some((run) => run.startsWith('npm run test:e2e')), 'missing release layer: test:e2e');
   assert.ok(runs.some(run => run.startsWith('npm run agent:eval:fast -- --exit-on-fail')));
   const evidence = doc.jobs.tests.steps.find(
@@ -73,8 +74,9 @@ test('release gate retains deterministic test layers and does not tolerate failu
     assert.equal(node.with['node-version-file'], '.nvmrc');
   }
   const coverageRuns = doc.jobs.crap.steps.map((step) => step.run ?? '').join('\n');
-  assert.match(coverageRuns, /vitest run/);
-  assert.match(coverageRuns, /--coverage.enabled/);
+  assert.doesNotMatch(coverageRuns,/vitest run|test:unit|test:formal/);
+  assert.match(coverageRuns,/validation-artifacts.mjs/);
+  assert.match(readFileSync('scripts/ci/validation-lane.mjs','utf8'),/--coverage.enabled/);
   assert.match(coverageRuns, /crap-gate\.mjs/);
   assert.doesNotMatch(coverageRuns, /--update-baseline|\|\|\s*true/);
 });
@@ -124,7 +126,7 @@ test('actual gate summary script accepts only success/success/success; failure, 
         for (const acceptance of states) {
           const child = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', step.run], {
             env: sanitizeScriptEnv({
-              ...process.env, RESULTS: JSON.stringify({ tests: {result: tests}, crap: {result: crap}, acceptance: {result: acceptance}, browser: {result:'success'}, mutation: {result: 'success'}, 'secrets-gate': {result: 'success'}, harness: {result: 'failure'} }), GITHUB_STEP_SUMMARY: join(dir, 'summary.md')
+              ...process.env, RESULTS: JSON.stringify({unit:{result:'success'},formal:{result:'success'},sdk:{result:'success'}, tests: {result: tests}, crap: {result: crap}, acceptance: {result: acceptance}, browser: {result:'success'}, mutation: {result: 'success'}, 'secrets-gate': {result: 'success'}, harness: {result: 'failure'} }), GITHUB_STEP_SUMMARY: join(dir, 'summary.md')
             }),
             encoding: 'utf8', timeout: 5_000
           });

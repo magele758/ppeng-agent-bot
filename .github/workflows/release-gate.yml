@@ -1,5 +1,4 @@
-# Full validation scope preserved; browser/API run on an independent runner.
-# Legacy required context names remain stable; Main release gate includes every required result.
+# Independent coverage lanes; CRAP consumes verified artifacts without rerunning tests.
 name: Release gate
 on:
   workflow_call:
@@ -75,8 +74,8 @@ jobs:
           path: ${{ runner.temp }}/gate-provenance.json
           if-no-files-found: error
           retention-days: 30
-  crap:
-    name: agent-loop tests + CRAP gate
+  unit:
+    name: Functional unit tests + coverage
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -102,49 +101,76 @@ jobs:
           if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
             sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           fi
-      - name: Prepare acceptance results dir
-        run: mkdir -p "${{ runner.temp }}/acceptance-results"
-      - name: Unit tests with V8 coverage
-        run: node scripts/ci/retry-failed-tests.mjs --script test:unit --label unit-coverage --report
-          "$RUNNER_TEMP/flaky-tests/unit-coverage.json" --junit "$RUNNER_TEMP/acceptance-results/unit.xml"
-        env:
-          NODE_V8_COVERAGE: ${{ runner.temp }}/v8-coverage
-          CI_VERIFICATION_EVIDENCE_DIR: ${{ runner.temp }}/verification-evidence
-      - name: Formal invariants + MockLLM E2E
-        run: npm run test:formal
-        env:
-          CI_VERIFICATION_EVIDENCE_DIR: ${{ runner.temp }}/verification-evidence
-      - name: Upload flaky test report
+      - name: Run unit coverage lane
+        run: |-
+          mkdir -p "$RUNNER_TEMP/validation"
+          node scripts/ci/validation-lane.mjs unit --out "$RUNNER_TEMP/validation/unit"
+      - name: Preserve validation-unit
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: flaky-tests-unit-coverage
-          path: ${{ runner.temp }}/flaky-tests/unit-coverage.json
-          if-no-files-found: ignore
+          name: validation-unit
+          path: ${{ runner.temp }}/validation/unit
+          if-no-files-found: error
           retention-days: 30
-      - name: agent-loop vitest with coverage
-        working-directory: packages/agent-loop
-        run: npx --no-install vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=json
-          --coverage.reportsDirectory=${{ runner.temp }}/vitest-coverage --reporter=default --reporter=junit
-          --outputFile.junit=${{ runner.temp }}/acceptance-results/vitest.xml
-      - name: CRAP gate
-        run: node scripts/crap/crap-gate.mjs --node-cov ${{ runner.temp }}/v8-coverage --vitest-cov ${{ runner.temp
-          }}/vitest-coverage/coverage-final.json
-      - name: Upload CRAP report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: crap-report
-          path: coverage/crap/
-          if-no-files-found: ignore
-          retention-days: 14
-      - name: Upload acceptance results (unit + vitest)
+      - name: Preserve acceptance-results-unit
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: acceptance-results-unit
-          path: ${{ runner.temp }}/acceptance-results/
-          if-no-files-found: ignore
+          path: ${{ runner.temp }}/validation/unit/results
+          if-no-files-found: error
+          retention-days: 7
+  formal:
+    name: Formal + real process verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CI_VERIFICATION_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Review fingerprint preflight
+        run: node scripts/ci/reviewed-verification-inputs.mjs
+      - name: Verify coverage toolchain
+        run: npm run test:crap -- --preflight
+      - name: TypeScript build (workspace packages)
+        run: node scripts/build-workspace.mjs
+      - name: Allow precheck network namespaces
+        run: |
+          if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+      - name: Run formal coverage lane
+        run: |-
+          mkdir -p "$RUNNER_TEMP/validation"
+          node scripts/ci/validation-lane.mjs formal --out "$RUNNER_TEMP/validation/formal"
+        env:
+          CI_VERIFICATION_EVIDENCE_DIR: ${{ runner.temp }}/verification-evidence
+      - name: Preserve validation-formal
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-formal
+          path: ${{ runner.temp }}/validation/formal
+          if-no-files-found: error
+          retention-days: 30
+      - name: Preserve acceptance-results-formal
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: acceptance-results-formal
+          path: ${{ runner.temp }}/validation/formal/results
+          if-no-files-found: error
           retention-days: 7
       - name: Upload pairing verification evidence
         if: always()
@@ -186,13 +212,116 @@ jobs:
           path: ${{ runner.temp }}/verification-evidence/
           if-no-files-found: ignore
           retention-days: 30
-    env:
-      CI_VERIFICATION_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+  sdk:
+    name: agent-loop SDK tests + coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Review fingerprint preflight
+        run: node scripts/ci/reviewed-verification-inputs.mjs
+      - name: Verify coverage toolchain
+        run: npm run test:crap -- --preflight
+      - name: TypeScript build (workspace packages)
+        run: node scripts/build-workspace.mjs
+      - name: Run sdk coverage lane
+        run: |-
+          mkdir -p "$RUNNER_TEMP/validation"
+          node scripts/ci/validation-lane.mjs sdk --out "$RUNNER_TEMP/validation/sdk"
+      - name: Preserve validation-sdk
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-sdk
+          path: ${{ runner.temp }}/validation/sdk
+          if-no-files-found: error
+          retention-days: 30
+      - name: Preserve acceptance-results-sdk
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: acceptance-results-sdk
+          path: ${{ runner.temp }}/validation/sdk/results
+          if-no-files-found: error
+          retention-days: 7
+  crap:
+    name: CRAP gate (verified coverage artifacts)
+    needs:
+      - unit
+      - formal
+      - sdk
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify coverage toolchain
+        run: npm run test:crap -- --preflight
+      - name: TypeScript build (workspace packages)
+        run: node scripts/build-workspace.mjs
+      - name: Download unit coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: validation-unit
+          path: ${{ runner.temp }}/validation/unit
+      - name: Download formal coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: validation-formal
+          path: ${{ runner.temp }}/validation/formal
+      - name: Download sdk coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: validation-sdk
+          path: ${{ runner.temp }}/validation/sdk
+      - name: Validate and merge complete coverage
+        run: node scripts/ci/validation-artifacts.mjs "$RUNNER_TEMP/validation" "$RUNNER_TEMP/merged-coverage"
+      - name: CRAP gate
+        run: node scripts/crap/crap-gate.mjs --node-cov "$RUNNER_TEMP/merged-coverage/node" --vitest-cov
+          "$RUNNER_TEMP/merged-coverage/vitest.json"
+      - name: Preserve crap-report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: crap-report
+          path: coverage/crap/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Preserve coverage-reuse-evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reuse-evidence
+          path: ${{ runner.temp }}/merged-coverage/verified-inputs.json
+          if-no-files-found: error
+          retention-days: 30
   acceptance:
     name: Acceptance criteria gate
     if: ${{ !cancelled() }}
     needs:
       - tests
+      - unit
+      - formal
+      - sdk
       - crap
       - browser
     runs-on: ubuntu-latest
@@ -329,6 +458,9 @@ jobs:
       - remote-model-smoke
       - harness
       - compact-ab
+      - unit
+      - formal
+      - sdk
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

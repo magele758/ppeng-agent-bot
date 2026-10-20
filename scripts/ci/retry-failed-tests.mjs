@@ -10,6 +10,9 @@
  * --junit writes JUnit for the first pass to <file.xml> and for each retry to <file>.retry-N.xml.
  */
 import { spawnSync } from 'node:child_process';
+import { discoverTests } from './test-partition.mjs';
+import { shellQuote } from './flaky-retry-lib.mjs';
+import { sanitizeScriptEnv } from '../spawn-utils.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -36,6 +39,7 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--script') args.script = argv[++i];
+    else if (a === '--lane') args.lane = argv[++i];
     else if (a === '--junit') args.junit = path.resolve(argv[++i]);
     else if (a === '--label') args.label = argv[++i];
     else if (a === '--report') args.report = argv[++i];
@@ -50,7 +54,12 @@ function main() {
   const args = parseArgs(process.argv.slice(2));
   const root = args.cwd;
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-  const command = pkg.scripts?.[args.script];
+  let command = pkg.scripts?.[args.script];
+  if(args.lane){
+    if(!['unit','formal'].includes(args.lane)||args.script!=='test:unit')throw new Error('Invalid test partition');
+    const plan=discoverTests({root,command});
+    command=['node',...plan.flags,...plan[args.lane].map(shellQuote)].join(' ');
+  }
   if (!command) throw new Error(`package.json has no script "${args.script}"`);
   const { flags } = splitNodeTestCommand(command);
 
@@ -70,7 +79,7 @@ function main() {
   });
 
   console.log(`[retry-failed-tests] npm run ${args.script} (first pass)`);
-  const first = spawnSync('sh', ['-c', shellCommand], { cwd: root, stdio: 'inherit', env: process.env });
+  const first = spawnSync('sh', ['-c', shellCommand], { cwd: root, stdio: 'inherit', env: sanitizeScriptEnv() });
   const firstExitCode = first.status ?? 1;
   const failures = fs.existsSync(failuresFile) ? parseFailureLines(fs.readFileSync(failuresFile, 'utf8')) : [];
   const { files, unattributed } = groupFailuresByFile(failures, root);
@@ -88,7 +97,7 @@ function main() {
         ...flags,
         ...(retryJunit ? ['--test-reporter=spec', '--test-reporter-destination=stdout', ...junitFlags(retryJunit)] : [])
       ];
-      const r = spawnSync(process.execPath, buildRetryArgs(retryFlags, group.file), { cwd: root, stdio: 'inherit', env: process.env });
+      const r = spawnSync(process.execPath, buildRetryArgs(retryFlags, group.file), { cwd: root, stdio: 'inherit', env: sanitizeScriptEnv() });
       retryExitCodes[group.file] = r.status ?? 1;
     }
     ({ flaky, failed } = classifyRetry(files, retryExitCodes));
