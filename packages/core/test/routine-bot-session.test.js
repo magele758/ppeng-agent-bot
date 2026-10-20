@@ -150,6 +150,53 @@ test('主会话正在回复时 Bot 定时任务插话且不另开会话 [AC:bot-
   store.db.close();
 });
 
+test('忙碌时插进主会话的其他回复不算定时任务结果，空闲后会再跑一轮 [AC:bot-routine-main-session#AC-1] [AC:bot-routine-main-session#AC-5]', async () => {
+  const stateDir = mkdtempSync(join(tmpdir(), 'routine-bot-steer-answer-'));
+  const store = new SqliteStateStore(join(stateDir, 'state.db'));
+  const started = [];
+  const host = hostFor(store, stateDir, async (id) => {
+    started.push(id);
+    store.appendMessage(id, 'assistant', [{ type: 'text', text: 'routine answer' }]);
+    const current = store.getSession(id);
+    store.updateSession(id, {
+      status: 'idle',
+      metadata: { ...current.metadata, outcome: { kind: 'idle', reason: 'end' } }
+    });
+    return store.getSession(id);
+  });
+  const bot = createBot(host, { name: 'Busy bot' });
+  const main = store.getSession(bot.canonicalSessionId);
+  store.updateSession(main.id, {
+    status: 'running',
+    metadata: { ...main.metadata, permissionMode: 'bypass', userId: 'alice' }
+  });
+  const job = createCronJob(host, { botId: bot.id, userId: 'alice', name: 'while talking', prompt: '插进来看一眼', intervalMs: 60000 });
+  const run = new RoutineRunStore(store).enqueue(job, new Date().toISOString());
+  await drainRoutineRuns(host);
+  const parked = new RoutineRunStore(store).get(run.id);
+  assert.equal(parked.status, 'queued');
+  const inbox = store.listUnclaimedInbox(bot.canonicalSessionId);
+  assert.equal(inbox.length, 1);
+  store.appendMessage(bot.canonicalSessionId, 'user', [{ type: 'text', text: inbox[0].text }], { key: inbox[0].key });
+  store.db.prepare('UPDATE session_inbox SET claimed_at=? WHERE id=?').run(new Date().toISOString(), inbox[0].id);
+  store.appendMessage(bot.canonicalSessionId, 'assistant', [{ type: 'text', text: 'Completed other work' }]);
+  const busy = store.getSession(bot.canonicalSessionId);
+  store.updateSession(bot.canonicalSessionId, {
+    status: 'idle',
+    metadata: { ...busy.metadata, outcome: { kind: 'idle', reason: 'end' } }
+  });
+  await drainRoutineRuns(host);
+  await new Promise((resolve) => setImmediate(resolve));
+  const done = new RoutineRunStore(store).get(run.id);
+  assert.equal(started.length, 1);
+  assert.equal(started[0], bot.canonicalSessionId);
+  assert.equal(done.sessionId, bot.canonicalSessionId);
+  assert.equal(done.status, 'completed');
+  assert.match(done.result, /routine answer/);
+  assert.equal(routineSessions(store).length, 0);
+  store.db.close();
+});
+
 test('已删除的 Bot 定时任务不再开会话 [AC:bot-routine-main-session#AC-6]', async () => {
   const stateDir = mkdtempSync(join(tmpdir(), 'routine-bot-removed-'));
   const store = new SqliteStateStore(join(stateDir, 'state.db'));

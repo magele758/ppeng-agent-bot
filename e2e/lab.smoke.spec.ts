@@ -16,20 +16,19 @@ test.describe('Agent Lab console', () => {
   test('chat and bot surfaces coexist with the default coordinator [AC:default-super-bot#AC-1]', async ({ page, request }) => {
     await page.goto('/');
     await expect(page.locator('#nav-chat')).toHaveAttribute('aria-current', 'page');
-    await expect(page.locator('#botSelect')).toHaveCount(0);
+    await expect(page.getByTestId('composer-bot-face')).toHaveCount(0);
     await expect(page.getByRole('button', { name: '新增' })).toBeVisible();
 
     await page.locator('#nav-bot').click();
     await expect(page.locator('#nav-bot')).toHaveAttribute('aria-current', 'page');
-    const botSelect = page.locator('#botSelect');
-    await expect(botSelect).toBeVisible();
-    // Authorized default-Super behavior replaces the former empty selection.
     const { bot: defaultBot } = await (await request.get('/api/bot-work/default')).json();
-    await expect(botSelect).toHaveValue(defaultBot.id);
-    await expect(botSelect.locator('option').first()).toHaveText('选择 Bot');
+    await expect(page.getByTestId('composer-bot-face')).toBeVisible();
+    await expect(page.locator('#playTitle')).toHaveText(defaultBot.name);
+    await expect(page.locator(`#sessionListMini [data-bot-id="${defaultBot.id}"] .list-item--session`)).toHaveClass(/\bselected\b/);
+    await expect(page.locator('#botSelect')).toHaveCount(0);
     await expect(page.locator('.chat-composer-dock').getByRole('button', { name: '新建 Bot' })).toHaveCount(0);
     await page.locator('#nav-chat').click();
-    await expect(page.locator('#botSelect')).toHaveCount(0);
+    await expect(page.getByTestId('composer-bot-face')).toHaveCount(0);
 
     // 统一新建入口在独立弹窗里创建，保留当前对话。
     await page.getByRole('button', { name: '新增' }).click();

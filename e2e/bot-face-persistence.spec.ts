@@ -41,7 +41,7 @@ test('created Bot appearance and optional fields persist across reload, picker, 
     const row = page.locator('#sessionListMini .list-item--bot-chat').filter({ has: page.locator('.session-item__title').getByText(name, { exact: true }) });
     await verify(row.locator('[data-bot-shape]').first());
     await verify(page.locator('.chat-panel-header--bot [data-bot-shape]'));
-    await verify(page.getByTestId('bot-picker-face'));
+    await verify(page.getByTestId('composer-bot-face'));
     const other = bots.find((item: { id: string; hidden?: boolean }) => item.id !== bot.id && !item.hidden);
     const roomResult = await request.post('/api/bot-rooms', { data: { title: `Face room ${bot.id}`, botIds: [bot.id, other.id], hostBotId: bot.id } });
     expect(roomResult.ok()).toBeTruthy();
