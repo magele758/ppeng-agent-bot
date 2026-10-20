@@ -5,7 +5,7 @@ description: Run bounded multiprocess session verification for writer contention
 
 # Multiprocess session verification
 
-Run `npm run test:concurrency` from the repository root. Requires Node >=22 with SQLite FTS5, installed dependencies and TypeScript 5.9.3. No real model key or host .env is loaded. No new product flags/settings are introduced.
+Run `pnpm run test:concurrency` from the repository root. Requires Node >=22 with SQLite FTS5, installed dependencies and TypeScript 5.9.3. No real model key or host .env is loaded. No new product flags/settings are introduced.
 
 ## Execution and evidence
 
@@ -18,7 +18,7 @@ Run `npm run test:concurrency` from the repository root. Requires Node >=22 with
 
 ## Gates and review
 
-Reports: `coverage/formal/concurrency/report.json` and `report.md`, or `npm run test:concurrency -- --out <directory>`. Exit 0 means completed, reviewed and all green; exit 1 means actual mismatch or source review required; exit 2 means incomplete evidence. CI has an explicit no-retry command and uploads evidence even after failure. The formal regression command includes this gate.
+Reports: `coverage/formal/concurrency/report.json` and `report.md`, or `pnpm run test:concurrency --out <directory>`. Exit 0 means completed, reviewed and all green; exit 1 means actual mismatch or source review required; exit 2 means incomplete evidence. CI has an explicit no-retry command and uploads evidence even after failure. The formal regression command includes this gate.
 
 Read `specs/formal/concurrency-review.json` to review mappings and every changed source path. Observe `needs-review` before updating SHA-256 hashes. Explain reviewed changes, rerun actual probes and mutations, and refresh overlapping older gate metadata only after reviewing those shared changes. Hash changes are not proof. Keep the approved verification standard `approved` while product counterexamples remain; never mark it implemented using only checker/model self-tests.
 

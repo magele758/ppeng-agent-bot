@@ -25,7 +25,7 @@ learn
 
 问题：
 
-- capability tags / source score **脚本已有**（`npm run evolution:tag`、`npm run evolution:source-scores`），缺 inbox/结果文档全链路默认写入与观测聚合。
+- capability tags / source score **脚本已有**（`pnpm run evolution:tag`、`pnpm run evolution:source-scores`），缺 inbox/结果文档全链路默认写入与观测聚合。
 - failure 类型过粗。
 - 成本/耗时没有结构化聚合。
 - 自动合并未统一接 Harness / release smoke。
@@ -76,7 +76,7 @@ subagent
 3. 变更是否可 bounded？
 4. 风险是否需要 PR / 人工批准？
 
-**Capability tagging 实现策略**：第一阶段用**规则匹配**（关键词 + URL 模式 + inbox section），不使用模型打 tag（成本高且不稳定）。例如 URL 含 `arxiv.org/abs/cs.CR` 打 `security`；标题含 `K8s`/`Helm`/`deploy` 打 `deployment`。规则与 CLI 入口：`scripts/evolution/capability-tagger.mjs`（`npm run evolution:tag`）。待 Harness eval 验证规则准确度后再考虑模型辅助。
+**Capability tagging 实现策略**：第一阶段用**规则匹配**（关键词 + URL 模式 + inbox section），不使用模型打 tag（成本高且不稳定）。例如 URL 含 `arxiv.org/abs/cs.CR` 打 `security`；标题含 `K8s`/`Helm`/`deploy` 打 `deployment`。规则与 CLI 入口：`scripts/evolution/capability-tagger.mjs`（`pnpm run evolution:tag`）。待 Harness eval 验证规则准确度后再考虑模型辅助。
 
 ## Source score
 
@@ -114,7 +114,7 @@ score =
 - fetch_fail 高的源优先修抓取或移除。
 - success 高的源可加入主源头白名单。
 
-校准策略：**第一阶段只做统计报告**（`scripts/evolution/source-score-report.mjs`，`npm run evolution:source-scores`），不自动调权或移除 feed。待累积 200+ 条处理记录后，再用统计结果人工校准公式权重。
+校准策略：**第一阶段只做统计报告**（`scripts/evolution/source-score-report.mjs`，`pnpm run evolution:source-scores`），不自动调权或移除 feed。待累积 200+ 条处理记录后，再用统计结果人工校准公式权重。
 
 ## Failure taxonomy
 

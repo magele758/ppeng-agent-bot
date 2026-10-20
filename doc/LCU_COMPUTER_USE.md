@@ -25,9 +25,9 @@ LCU 由 `packages/core/src/computer-use` 管理，通用 `agent-loop` 只接收�
 验收文件：`acceptance/lcu-computer-use.yaml`。
 
 - `node --test packages/core/test/lcu-computer-use.test.js`
-- `npm run test --workspace=@ppeng/agent-loop`
-- `npm run build --workspace=@ppeng/agent-loop`
-- `npm run test:e2e -- e2e/lcu-computer-use.spec.ts`
-- `npm run test:acceptance`
+- `pnpm run test --workspace=@ppeng/agent-loop`
+- `pnpm run build --workspace=@ppeng/agent-loop`
+- `pnpm run test:e2e e2e/lcu-computer-use.spec.ts`
+- `pnpm run test:acceptance`
 
 真实验收必须由 Agent 经 LCU 创建临时 TextEdit 文档，输入并保存指定文字，再由独立文件读取检查，并检查截图实际到达模型。协议 mock 和 UI 开关测试不能代替这一步。

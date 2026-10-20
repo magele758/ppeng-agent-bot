@@ -61,7 +61,7 @@ export class DaemonClient {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const hint = /fetch failed|ECONNREFUSED|ENOTFOUND/i.test(message)
-        ? ` (daemon not listening? start with: npm run start:daemon or npm run start:supervised → ${this.baseUrl})`
+        ? ` (daemon not listening? start with: pnpm run start:daemon or pnpm run start:supervised → ${this.baseUrl})`
         : '';
       throw new Error(`${message}${hint}`);
     }

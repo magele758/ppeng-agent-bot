@@ -176,7 +176,7 @@ pending → running_tests → fixing → tests_passed → merging
 
 ### 4.3 supervisor 握手
 
-`scripts/supervisor.mjs`（`npm run start:supervised`）：
+`scripts/supervisor.mjs`（`pnpm run start:supervised`）：
 
 1. 拉起 daemon 子进程，等 `/api/health`  
 2. 轮询 `restart-request`（`SUPERVISOR_POLL_MS`，默认 3s）  
@@ -186,7 +186,7 @@ pending → running_tests → fixing → tests_passed → merging
 
 ### 4.4 flow 脚本
 
-`npm run self-heal:flow` → `scripts/self-heal-flow.sh`：
+`pnpm run self-heal:flow` → `scripts/self-heal-flow.sh`：
 
 - 默认：脏工作区则 stash → 调 daemon → 轮询终态 → stash pop  
 - `sheal_*`：只 resume 指定 run  
@@ -201,7 +201,7 @@ pending → running_tests → fixing → tests_passed → merging
 
 | 入口 | 作用 |
 |------|------|
-| `npm run evolution -- [opts]` | 统一 CLI（`scripts/evolution-cli.mjs`）；`--help` |
+| `pnpm run evolution [opts]` | 统一 CLI（`scripts/evolution-cli.mjs`）；`--help` |
 | `evolution:learn` / `evolution:run-day` / `evolution:pipeline` | 底层分步 |
 | `--learn` / `--agent` / `--review` / `--merge` / `--pipeline-build` | 常用开关；见根 `.env.example` `EVOLUTION_*` |
 
@@ -209,14 +209,14 @@ pending → running_tests → fixing → tests_passed → merging
 
 | 开关 / 脚本 | 作用 |
 |-------------|------|
-| `scripts/evolution/capability-tagger.mjs`（`npm run evolution:tag`） | 能力打标 |
+| `scripts/evolution/capability-tagger.mjs`（`pnpm run evolution:tag`） | 能力打标 |
 | `scripts/evolution/source-score-report.mjs` | 来源评分 |
 | run-day → `doc/evolution/runs/YYYY-MM-DD.jsonl` | 运行事件 |
 | `EVOLUTION_MERGE_RISK_CHECK=1` | `merge-gate.mjs`：low 自动 / medium 警告 / high → `doc/evolution/backlog/` |
 | `EVOLUTION_HARNESS_GATE=1` | 合并前 `agent:eval --mode fast --exit-on-fail` |
 | `EVOLUTION_USE_ORCHESTRATOR=1` | 记账到 Orchestrator |
 
-**A/B Release**：`npm run release`（`scripts/release-orchestrator.mjs`）；Compose `stable|candidate` / Helm `values-candidate.yaml`；报告 `doc/evolution/reports/<release_run_id>.json` — 见 [`../SELF_EVOLUTION_AB_RELEASE.md`](../SELF_EVOLUTION_AB_RELEASE.md)。
+**A/B Release**：`pnpm run release`（`scripts/release-orchestrator.mjs`）；Compose `stable|candidate` / Helm `values-candidate.yaml`；报告 `doc/evolution/reports/<release_run_id>.json` — 见 [`../SELF_EVOLUTION_AB_RELEASE.md`](../SELF_EVOLUTION_AB_RELEASE.md)。
 
 观测：daemon `GET /api/evolution/overview|results|result/:id`（Lab `/evolution`）。
 
@@ -229,11 +229,11 @@ pending → running_tests → fixing → tests_passed → merging
 ### 6.1 入口
 
 ```bash
-npm run agent:eval                 # 默认 fast
-npm run agent:eval:fast            # 同上 --mode fast
-npm run agent:eval -- --mode nightly
-npm run agent:eval -- --case session-create
-npm run agent:eval -- --mode fast --exit-on-fail
+pnpm run agent:eval                 # 默认 fast
+pnpm run agent:eval:fast            # 同上 --mode fast
+pnpm run agent:eval --mode nightly
+pnpm run agent:eval --case session-create
+pnpm run agent:eval --mode fast --exit-on-fail
 ```
 
 - Runner：`scripts/agent-eval/runner.mjs`  
@@ -260,7 +260,7 @@ CI / merge-gate / release gates 均带 `--exit-on-fail`（见 `doc/CI.md`、`scr
 
 | 项 | 说明 |
 |----|------|
-| 入口 | `npm run test:e2e` → `scripts/e2e-run.mjs` |
+| 入口 | `pnpm run test:e2e` → `scripts/e2e-run.mjs` |
 | 自管栈 | 临时 daemon + Next `start`（随机端口）；注入**同一**随机 `RAW_AGENT_AUTH_TOKEN`；Next middleware 出站补 Bearer |
 | 断言 | Playwright 可经 `PLAYWRIGHT_AUTH_PROBE_DAEMON_ORIGIN` 验「直连 daemon 401 / 经 Lab 200」 |
 | 外置栈 | 设 `PLAYWRIGHT_BASE_URL` 指向已有控制台时，不自拉进程，也无上述 auth 双端断言 |

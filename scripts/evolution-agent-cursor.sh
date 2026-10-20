@@ -58,7 +58,7 @@ Rules:
 - Do NOT add unrelated features, do NOT change build configs, do NOT modify .env or secrets.
 - The change must be small enough to be safe: prefer adding a useful helper, improving an existing
   function's robustness, or implementing a clearly useful missing feature suggested by the excerpt.
-- After making changes, run: npm run test:unit to verify they pass.
+- After making changes, run: pnpm run test:unit to verify they pass.
 - Do NOT commit — the pipeline will commit for you.
 
 If you cannot find a meaningful, safe feature improvement inspired by the excerpt, output a single line:

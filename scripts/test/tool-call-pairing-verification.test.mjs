@@ -96,5 +96,5 @@ test('changed covered source or verification invalidates reviewed fingerprints [
   assert.ok(drifted.changed.some(x => x.endsWith('runtime/tool-loop.ts')));
   const skill = readFileSync(join(ROOT, 'skills/verify-tool-call-pairing/SKILL.md'), 'utf8');
   assert.match(skill, /^---\nname: verify-tool-call-pairing/m);
-  assert.match(skill, /npm run test:pairing/);
+  assert.match(skill, /pnpm run test:pairing/);
 });

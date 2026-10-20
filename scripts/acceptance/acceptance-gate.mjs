@@ -3,9 +3,9 @@
  * Acceptance gate: every criterion of an approved/implemented acceptance/<id>.yaml must be backed
  * by a test titled with [AC:<id>#<criterion>] (and, given results, by one that passed).
  *
- *   npm run test:acceptance                  static traceability only (no tests are run)
- *   npm run test:acceptance:results          gate against JUnit files in coverage/acceptance/results/
- *   npm run test:acceptance:full             run test:unit + agent-loop vitest + e2e with JUnit
+ *   pnpm run test:acceptance                  static traceability only (no tests are run)
+ *   pnpm run test:acceptance:results          gate against JUnit files in coverage/acceptance/results/
+ *   pnpm run test:acceptance:full             run test:unit + agent-loop vitest + e2e with JUnit
  *                                            reporters into coverage/acceptance/results/, then gate
  *   node scripts/acceptance/acceptance-gate.mjs --results <file-or-dir> [--results ...]
  *   node scripts/acceptance/acceptance-gate.mjs --collect unit,vitest   (subset of runners)
@@ -187,16 +187,16 @@ function collect(root, runners, dir) {
     unit: () => {
       const file = path.join(dir, 'unit.xml');
       const reporters = `--test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=${file}`;
-      return ['npm', ['run', 'test:unit'], { cwd: root, env: { ...process.env, NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} ${reporters}`.trim() } }];
+      return ['pnpm', ['run', 'test:unit'], { cwd: root, env: { ...process.env, NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} ${reporters}`.trim() } }];
     },
     vitest: () => [
-      'npx',
-      ['--no-install', 'vitest', 'run', '--reporter=default', '--reporter=junit', `--outputFile.junit=${path.join(dir, 'vitest.xml')}`],
+      'pnpm',
+      ['exec', 'vitest', 'run', '--reporter=default', '--reporter=junit', `--outputFile.junit=${path.join(dir, 'vitest.xml')}`],
       { cwd: path.join(root, 'packages/agent-loop') },
     ],
     e2e: () => [
-      'npm',
-      ['run', 'test:e2e', '--', '--reporter=list,junit'],
+      'pnpm',
+      ['run', 'test:e2e', '--reporter=list,junit'],
       { cwd: root, env: { ...process.env, PLAYWRIGHT_JUNIT_OUTPUT_FILE: path.join(dir, 'e2e.xml') } },
     ],
   };

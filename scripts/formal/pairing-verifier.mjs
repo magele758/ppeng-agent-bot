@@ -141,7 +141,7 @@ const MUTATIONS = {
 /** Transpile the actual source dependency closure into a disposable directory, never use possibly stale dist. */
 async function sourceCopy(mutation) {
   const ts = await import('typescript');
-  if (ts.version !== '5.9.3') throw new Error(`Needs TypeScript 5.9.3, got ${ts.version}; npm ci`);
+  if (ts.version !== '5.9.3') throw new Error(`Needs TypeScript 5.9.3, got ${ts.version}; pnpm install --frozen-lockfile`);
   const dir = mkdtempSync(join(tmpdir(), 'pairing-source-'));
   const built = new Set();
   let evidence;

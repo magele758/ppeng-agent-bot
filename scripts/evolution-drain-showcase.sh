@@ -3,7 +3,7 @@
 #
 # 用法:
 #   bash scripts/evolution-drain-showcase.sh [选项]
-#   npm run evolution:drain-showcase -- [选项]
+#   pnpm run evolution:drain-showcase [选项]
 #
 # 可选参数（未传则沿用下列默认，与旧版硬编码一致）:
 #   --research <cursor|generic|none>   研究/评估阶段 CLI（对应 EVOLUTION_RESEARCH_CMD；省略=与 evolution-cli 一致：仅 agent=cursor 时默认 cursor）
@@ -18,7 +18,7 @@
 #   --target-branch <b>                 合并目标分支
 #   --skip-rebase                       传入 evolution-cli
 #   --pipeline-build                    learn 前先编译 gateway
-#   --no-showcase                       跳过 npm run evolution:showcase-deploy
+#   --no-showcase                       跳过 pnpm run evolution:showcase-deploy
 #   -h, --help                          打印本说明
 #
 set -euo pipefail
@@ -121,7 +121,7 @@ done
 source "$ROOT/scripts/evolution/refuse-if-hidden.sh"
 evolution_refuse_if_hidden "$ROOT"
 
-npm run evolution -- \
+pnpm run evolution \
   "${PIPELINE_BUILD_FLAG[@]}" \
   --learn \
   "${AGENT[@]}" \
@@ -138,5 +138,5 @@ npm run evolution -- \
   --until-empty
 
 if [[ "$SHOWCASE" -eq 1 ]]; then
-  npm run evolution:showcase-deploy
+  pnpm run evolution:showcase-deploy
 fi

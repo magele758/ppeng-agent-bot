@@ -194,7 +194,7 @@ Swarm 输出不能只靠自然语言总结，必须经过 Harness：
 4. planner 汇总结果、标记 SwarmRun completed。
 5. 超时（默认 10 分钟）自动停止并汇总。
 
-验收：`npm run test:unit` 中有一个 heuristic 模式下的 2-agent pipeline case。
+验收：`pnpm run test:unit` 中有一个 heuristic 模式下的 2-agent pipeline case。
 
 ## debate 协议
 

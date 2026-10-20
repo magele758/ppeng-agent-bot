@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import {createRequire} from 'node:module';
 /** Isolated, retained CUA fixture. Starts no browser and never rebuilds artifacts. */
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
@@ -40,7 +41,7 @@ async function main(registry) {
   const token = randomBytes(24).toString('hex');
   const env = { ...envForEphemeralDaemon(basics), RAW_AGENT_MODEL_PROVIDER: 'heuristic', RAW_AGENT_E2E_ISOLATE: '1', RAW_AGENT_STATE_DIR: stateDir, RAW_AGENT_SELF_HEAL_AUTO_START: '0', RAW_AGENT_AUTH_TOKEN: token };
   const daemonChild = registry.spawnService('daemon', process.execPath, ['apps/daemon/dist/server.js'], { cwd: root, env: { ...env, RAW_AGENT_DAEMON_HOST:'127.0.0.1',RAW_AGENT_DAEMON_PORT:String(daemonPort) } });
-  const nextChild = registry.spawnService('next', process.execPath, [join(root,'node_modules/next/dist/bin/next'),'start','-p',String(webPort),'-H','127.0.0.1'], { cwd:join(root,'apps/web-console'),env:{...env,DAEMON_PROXY_TARGET:daemonBase} });
+  const nextChild = registry.spawnService('next', process.execPath, [createRequire(join(root,'apps/web-console/package.json')).resolve('next/dist/bin/next'),'start','-p',String(webPort),'-H','127.0.0.1'], { cwd:join(root,'apps/web-console'),env:{...env,DAEMON_PROXY_TARGET:daemonBase} });
   fixture = createServer((req,res) => {
     res.setHeader('Content-Type','application/json');
     if (req.method === 'GET' && req.url?.split('?')[0] === '/weather') res.end(JSON.stringify({ city:'Fixture City',temperature:21,marker:'CUA_LOCAL_SOFTWARE_OK' }));

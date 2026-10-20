@@ -3,7 +3,7 @@
  * 统一 Evolution 管线入口。
  *
  * 用法：node scripts/evolution-cli.mjs [options]
- *   或：npm run evolution -- [options]
+ *   或：pnpm run evolution [options]
  *
  * 选项：
  *   --learn                  先执行 learn（拉 RSS → inbox）
@@ -26,10 +26,10 @@
  *   -h, --help               打印此帮助
  *
  * 示例：
- *   npm run evolution -- --learn --agent cursor --review codex
- *   npm run evolution -- --preset cursor-composer
- *   npm run evolution -- --preset cursor-composer --concurrency 5 --merge
- *   npm run evolution -- --learn-only
+ *   pnpm run evolution --learn --agent cursor --review codex
+ *   pnpm run evolution --preset cursor-composer
+ *   pnpm run evolution --preset cursor-composer --concurrency 5 --merge
+ *   pnpm run evolution --learn-only
  */
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
@@ -51,7 +51,7 @@ const EVOLUTION_CONCURRENCY_CLI_MAX = maxEvolutionConcurrencyFromEnv();
 // ── arg parsing ──────────────────────────────────────────────────────────────
 
 const HELP = `
-Usage: npm run evolution -- [options]
+Usage: pnpm run evolution [options]
 
   --learn                  先执行 learn（拉 RSS → inbox）
   --learn-only             仅执行 learn，不跑 run-day
@@ -73,10 +73,10 @@ Usage: npm run evolution -- [options]
   -h, --help               打印此帮助
 
 Examples:
-  npm run evolution -- --learn --agent cursor --review codex
-  npm run evolution -- --preset cursor-composer
-  npm run evolution -- --preset cursor-composer --merge --concurrency 5
-  npm run evolution -- --learn-only
+  pnpm run evolution --learn --agent cursor --review codex
+  pnpm run evolution --preset cursor-composer
+  pnpm run evolution --preset cursor-composer --merge --concurrency 5
+  pnpm run evolution --learn-only
 `.trim();
 
 const VALID_AGENTS  = new Set(['cursor', 'claude', 'codex', 'full', 'multi']);
@@ -351,7 +351,7 @@ async function main() {
 
   // ── 1. optional build ────────────────────────────────────────────────────
   if (opts.pipelineBuild) {
-    const buildCmd = process.env.EVOLUTION_PIPELINE_BUILD_CMD ?? 'npx tsc -b packages/capability-gateway';
+    const buildCmd = process.env.EVOLUTION_PIPELINE_BUILD_CMD ?? 'pnpm exec tsc -b packages/capability-gateway';
     await sh(buildCmd, env);
   }
 

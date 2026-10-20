@@ -8,8 +8,8 @@
   "scripts": {
     "build": "tsc",
     "start": "electron .",
-    "dev": "npm run build && electron .",
-    "pack": "npm run build && electron-builder --dir",
+    "dev": "pnpm run build && electron .",
+    "pack": "pnpm run build && electron-builder --dir",
     "dist": "node ../../scripts/build-desktop.mjs",
     "dist:mac:arm64": "node ../../scripts/build-desktop.mjs --platform mac --arch arm64",
     "dist:win:x64": "node ../../scripts/build-desktop.mjs --platform win --arch x64",
@@ -29,7 +29,9 @@
     "mac": {
       "category": "public.app-category.developer-tools",
       "identity": null,
-      "target": ["dmg"],
+      "target": [
+        "dmg"
+      ],
       "icon": "assets/icon.png",
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
@@ -37,7 +39,9 @@
       "entitlementsInherit": "assets/entitlements.mac.plist"
     },
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "icon": "assets/icon.png",
       "executableName": "RawAgent"
     },
@@ -46,7 +50,9 @@
       "allowToChangeInstallationDirectory": true
     },
     "linux": {
-      "target": ["AppImage"],
+      "target": [
+        "AppImage"
+      ],
       "icon": "assets/icon.png",
       "category": "Development",
       "executableName": "raw-agent"
@@ -84,17 +90,23 @@
       {
         "from": "server-bundle",
         "to": "server-bundle",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "../../apps/web-console/.next/standalone",
         "to": "web",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "../../apps/web-console/.next/static",
         "to": "web/apps/web-console/.next/static",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "../../.env.example",

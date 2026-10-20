@@ -10,11 +10,11 @@ description: Verify lifecycle consistency when changing session cancellation, mo
 
 ## 一键运行
 
-仓库根目录 `npm ci`（Node 22+，锁定 TypeScript 5.9.3），然后：
+仓库根目录 `pnpm install --frozen-lockfile`（Node 22+，锁定 TypeScript 5.9.3），然后：
 
 ```sh
-npm run test:lifecycle
-npm run test:pairing
+pnpm run test:lifecycle
+pnpm run test:pairing
 node --test scripts/test/session-lifecycle-verification.test.mjs
 ```
 

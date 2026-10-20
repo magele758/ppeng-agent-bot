@@ -2,13 +2,13 @@
 /**
  * Mutation gate for critical core modules (see doc/MUTATION_TESTING.md).
  *
- *   npm run test:mutation                           all modules in scripts/mutation/mutation.config.json
- *   npm run test:mutation -- --module a,b           only these modules
- *   npm run test:mutation -- --update-baseline      ratchet mutation-baseline.json up to this run's scores
- *   npm run test:mutation -- --update-baseline --allow-decrease   also accept lower scores
- *   npm run test:mutation -- --list                 print the mutants, run nothing
- *   npm run test:mutation -- --shard 2/4 --no-gate --out <dir>   one interleaved quarter (CI matrix)
- *   npm run test:mutation -- --merge <dir>          gate on every mutation-report.json under <dir>
+ *   pnpm run test:mutation                           all modules in scripts/mutation/mutation.config.json
+ *   pnpm run test:mutation --module a,b           only these modules
+ *   pnpm run test:mutation --update-baseline      ratchet mutation-baseline.json up to this run's scores
+ *   pnpm run test:mutation --update-baseline --allow-decrease   also accept lower scores
+ *   pnpm run test:mutation --list                 print the mutants, run nothing
+ *   pnpm run test:mutation --shard 2/4 --no-gate --out <dir>   one interleaved quarter (CI matrix)
+ *   pnpm run test:mutation --merge <dir>          gate on every mutation-report.json under <dir>
  *
  * Other flags: --concurrency <n> (default: CPU count), --operators a,b, --max-mutants <n> (even
  * sample per file, for quick local loops), --no-gate (always exit 0 after reporting), --out <dir>.

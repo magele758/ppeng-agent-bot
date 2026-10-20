@@ -14,7 +14,7 @@
 - [ ] Every approved criterion has a test tagged `[AC:<feature-id>#<criterion-id>]`
 - [ ] No criterion was deleted or weakened to make the gate pass (use `status: retired` + `retiredReason`)
 
-Gate result (`npm run test:acceptance`):
+Gate result (`pnpm test:acceptance`):
 
 ```
 <paste the "Acceptance gate — …" summary line and any errors>

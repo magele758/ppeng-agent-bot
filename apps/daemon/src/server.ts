@@ -398,7 +398,7 @@ server.listen(port, host, () => {
 });
 
 // `setInterval` does not wait for an async callback: a scheduler tick that is
-// still awaiting (self-heal `npm run test:unit`, a model turn, a merge) must not
+// still awaiting (self-heal `pnpm run test:unit`, a model turn, a merge) must not
 // be overlapped by the next one, or the same work gets spawned every 1.5s.
 let schedulerTickInFlight = false;
 const schedulerTimer = setInterval(async () => {

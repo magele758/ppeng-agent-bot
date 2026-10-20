@@ -35,11 +35,12 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - run: node scripts/build-workspace.mjs
       - name: Checkout frozen baseline
         uses: actions/checkout@v4
@@ -49,7 +50,7 @@ jobs:
       - name: Build baseline independently
         working-directory: .eval-baseline
         run: |
-          npm ci
+          node ../scripts/install-frozen.mjs
           node scripts/build-workspace.mjs
       - name: Paired empirical evaluation (failure and inconclusive do not pass)
         env:
@@ -57,7 +58,7 @@ jobs:
           RAW_AGENT_BASE_URL: ${{ vars.HARNESS_EVAL_BASE_URL }}
           RAW_AGENT_MODEL_NAME: ${{ vars.HARNESS_EVAL_MODEL_NAME }}
           EXPERIMENT: ${{ inputs.experiment }}
-        run: npm run agent:eval:compare -- --config "$EXPERIMENT" --baseline-root .eval-baseline --candidate-root . --out test-results/harness-quality
+        run: pnpm run agent:eval:compare --config "$EXPERIMENT" --baseline-root .eval-baseline --candidate-root . --out test-results/harness-quality
       - name: Keep transcripts, configuration fingerprints and comparison evidence
         if: always()
         uses: actions/upload-artifact@v4

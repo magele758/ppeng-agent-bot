@@ -5,7 +5,7 @@ Agent Lab 是 Next.js App Router 应用。它只调用 daemon API，不在浏览
 ## 启动整套开发环境
 
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 `scripts/dev-lab.mjs` 加载根 `.env`（若存在），编译后并行启动 daemon 与 Next，并自动设置代理。请打开日志打印的 Agent Lab 地址：
@@ -42,7 +42,7 @@ browser
 ## E2E
 
 ```bash
-npm run test:e2e
+pnpm run test:e2e
 ```
 
 默认模式会启动随机端口的临时 daemon 和 Next，并使用随机同源 token 验证：直连受保护 daemon 返回 401，经 Web Console 代理可访问。

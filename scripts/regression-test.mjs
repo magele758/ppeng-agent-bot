@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * 自动化回归：构建后启动 daemon，对关键 HTTP 接口做黑盒探测。
- * 用法：npm run build && node scripts/regression-test.mjs
+ * 用法：pnpm run build && node scripts/regression-test.mjs
  */
 import { spawn } from 'node:child_process';
 import { readFileSync, mkdtempSync, realpathSync, rmSync, existsSync } from 'node:fs';
@@ -17,7 +17,7 @@ const expectedPkg = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf
 // child that crashes with `Cannot find module 'apps/daemon/dist/server.js'`.
 const daemonEntry = join(repoRoot, 'apps', 'daemon', 'dist', 'server.js');
 if (!existsSync(daemonEntry)) {
-  console.error(`regression-test: ${daemonEntry} missing — run \`npm run build\` first.`);
+  console.error(`regression-test: ${daemonEntry} missing — run \`pnpm run build\` first.`);
   process.exit(2);
 }
 

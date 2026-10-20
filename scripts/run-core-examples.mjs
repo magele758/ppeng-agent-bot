@@ -2,7 +2,7 @@
 /**
  * 顺序运行 packages/core/examples/*.mjs（heuristic / 内置脚本适配器，不依赖真实 API key）。
  * 用于验证「@ppeng/agent-core 作为可嵌入 SDK」的最小公开面在构建产物（dist/）上仍可用。
- * 前置：npm run build（或至少 `npx tsc -b packages/core`）产出 packages/core/dist/。
+ * 前置：pnpm run build（或至少 `pnpm exec tsc -b packages/core`）产出 packages/core/dist/。
  */
 import { readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

@@ -81,7 +81,7 @@ So `sre-oncall` only sees SRE + safe-read tools, never the stock tools and never
    - Static-import the bundle in `apps/daemon/src/domain-loader.ts` and add it to `REGISTRY` (keys must match the manifest; drift throws at load).
    - Add the package to `apps/daemon/package.json` dependencies and `apps/daemon/tsconfig.json` references, plus root `test:unit` globs.
 
-   Root `npm run build`, Docker daemon image, and `scripts/prepare-desktop-server.mjs` all read the same manifest — do not hardcode domain package lists elsewhere.
+   Root `pnpm run build`, Docker daemon image, and `scripts/prepare-desktop-server.mjs` all read the same manifest — do not hardcode domain package lists elsewhere.
 
 That's it — the runtime mounts the bundle, the agent selector groups it, and the skill router routes its skills.
 

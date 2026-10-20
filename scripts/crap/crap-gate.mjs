@@ -2,9 +2,9 @@
 /**
  * CRAP release gate.
  *
- *   npm run test:crap                     run unit + agent-loop vitest with coverage, then gate
- *   npm run test:crap -- --preflight      check runner/provider resolution without running tests
- *   npm run test:crap -- --update-baseline  accept the current debt as the new baseline
+ *   pnpm run test:crap                     run unit + agent-loop vitest with coverage, then gate
+ *   pnpm run test:crap --preflight      check runner/provider resolution without running tests
+ *   pnpm run test:crap --update-baseline  accept the current debt as the new baseline
  *   node scripts/crap/crap-gate.mjs --node-cov <dir> --vitest-cov <coverage-final.json>
  *                                         reuse coverage collected by an earlier CI step
  *
@@ -68,7 +68,7 @@ function run(cmd, cmdArgs, opts) {
 
 function collectNodeCoverage(tmp) {
   const dir = path.join(tmp, 'v8');
-  run(resolveBin('npm'), ['run', 'test:unit'], { cwd: ROOT, env: { ...process.env, NODE_V8_COVERAGE: dir } });
+  run(resolveBin('pnpm'), ['run', 'test:unit'], { cwd: ROOT, env: { ...process.env, NODE_V8_COVERAGE: dir } });
   return dir;
 }
 
@@ -205,7 +205,7 @@ function renderMarkdown(result, rows, args, metadata) {
     lines.push(
       '',
       `${result.improved.length} baselined function(s) improved or were removed; ` +
-        'run `npm run test:crap -- --update-baseline` to lock in the gain.',
+        'run `pnpm run test:crap --update-baseline` to lock in the gain.',
     );
   }
   const worst = [...rows].sort((a, b) => b.crap - a.crap).slice(0, 15);

@@ -186,7 +186,7 @@ DeepResearch 必须被 eval 约束：
 
 短期：
 
-- CLI：`npm run start:cli -- research "<query>"`
+- CLI：`pnpm run start:cli research "<query>"`
 - Web：Agent Lab 增加 Research mode 或从 Orchestration run 触发。
 
 长期：

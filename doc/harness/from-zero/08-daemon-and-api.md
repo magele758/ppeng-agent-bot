@@ -5,10 +5,10 @@ daemon 用 Node `http` 和自定义 `Router` 暴露 core runtime。路由只负�
 ## 启动
 
 ```bash
-npm run dev:daemon
+pnpm run dev:daemon
 ```
 
-该命令先编译 `packages/core` 和 `apps/daemon`，再启动 `apps/daemon/dist/server.js`。监听地址以启动日志为准。下面 curl 示例假设地址为 `http://127.0.0.1:37070`，请替换为你的实际地址；若用 `npm run dev` 启动整套环境，也可查看 `.agent-state/dev-lab.ports.json`。
+该命令先编译 `packages/core` 和 `apps/daemon`，再启动 `apps/daemon/dist/server.js`。监听地址以启动日志为准。下面 curl 示例假设地址为 `http://127.0.0.1:37070`，请替换为你的实际地址；若用 `pnpm run dev` 启动整套环境，也可查看 `.agent-state/dev-lab.ports.json`。
 
 ## 不调用模型的最小验证
 

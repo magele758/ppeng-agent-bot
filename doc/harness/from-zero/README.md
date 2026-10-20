@@ -44,26 +44,26 @@ packages/agent-loop         可嵌入循环 SDK（产品默认 max）
 | [06 Skills 路由](06-skills-routing.md) | 为什么先 shortlist 再 load？ | 查看 routing trace |
 | [07 沙箱与恢复](07-sandbox-and-safety.md) | 执行隔离和循环治理分别在哪？ | 跑 sandbox / recovery 单测 |
 | [08 Daemon API](08-daemon-and-api.md) | 如何建会话、发消息、流式运行？ | 用 curl 跑通 |
-| [09 Web Console](09-web-console.md) | 浏览器如何在不拿 token 的情况下访问 daemon？ | `npm run dev` |
-| [10 Eval Harness](10-eval-harness.md) | fast eval 实际验证什么、退出码是什么？ | `npm run agent:eval:fast` |
+| [09 Web Console](09-web-console.md) | 浏览器如何在不拿 token 的情况下访问 daemon？ | `pnpm run dev` |
+| [10 Eval Harness](10-eval-harness.md) | fast eval 实际验证什么、退出码是什么？ | `pnpm run agent:eval:fast` |
 | [11 Evolution / Self-Heal](11-evolution-and-self-heal.md) | 哪些能力会改代码，哪些只编排会话？ | 查看入口与状态文件 |
 
 ## 最短实践路径
 
 ```bash
-npm run build
-npm run test:unit
-npm run agent:eval:fast -- --exit-on-fail
+pnpm run build
+pnpm run test:unit
+pnpm run agent:eval:fast --exit-on-fail
 ```
 
 `agent:eval:fast` 会拉起一个临时 daemon，强制使用 heuristic adapter，写入临时 state 目录，结束后清理进程和 state。结果追加到 `doc/eval-results/YYYY-MM-DD.jsonl`。
 
-`--exit-on-fail` 使失败返回非零退出码。若修改循环 SDK，另跑 `npm run test --workspace=@ppeng/agent-loop` 与 `npm run build --workspace=@ppeng/agent-loop`，根目录单测不包含这套 Vitest 测试。
+`--exit-on-fail` 使失败返回非零退出码。若修改循环 SDK，另跑 `pnpm run test --workspace=@ppeng/agent-loop` 与 `pnpm run build --workspace=@ppeng/agent-loop`，根目录单测不包含这套 Vitest 测试。
 
 要看真实 UI：
 
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 打开启动日志中的 Agent Lab 地址。开发启动器当前首选 daemon 27070 / Lab 23000，允许配置覆盖，端口冲突时后移；实际地址记录在 `.agent-state/dev-lab.ports.json`。

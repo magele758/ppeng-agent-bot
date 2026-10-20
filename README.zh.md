@@ -68,12 +68,14 @@ SDK 提供 `mini / normal / full / max` 四档装配。浏览器和扩展宿主�
 
 ## 快速开始
 
-前置条件：Node.js 22+（SQLite 需支持 FTS5）与 npm。在仓库根目录执行：
+前置条件：Node.js 22+（SQLite 需支持 FTS5）与 pnpm 10.29.2。在仓库根目录执行：
 
 ```bash
-npm install
-npm run build
-npm run dev
+corepack enable
+corepack prepare pnpm@10.29.2 --activate
+pnpm install
+pnpm run build
+pnpm run dev
 ```
 
 打开**终端打印的 Agent Lab 地址**，在对话区「配置模型」填写服务商 Base URL / API Key，发现模型并选择后发送消息。采用界面配置时，不需要先复制 `.env`。
@@ -83,10 +85,10 @@ npm run dev
 不接真实模型也可以在构建后验证 HTTP 能力：
 
 ```bash
-npm run agent:eval:fast -- --exit-on-fail
+pnpm run agent:eval:fast --exit-on-fail
 ```
 
-该命令使用隔离的 heuristic daemon，不代表真实模型回答质量。CLI/HTTP 的进一步操作见[从零教程](doc/harness/from-zero/README.md)。单独启动 Next 时，将 `DAEMON_PROXY_TARGET` 指向实际 daemon 地址；生产 UI 使用 `npm run build:web-console` 与 `npm run start:web-console`。
+该命令使用隔离的 heuristic daemon，不代表真实模型回答质量。CLI/HTTP 的进一步操作见[从零教程](doc/harness/from-zero/README.md)。单独启动 Next 时，将 `DAEMON_PROXY_TARGET` 指向实际 daemon 地址；生产 UI 使用 `pnpm run build:web-console` 与 `pnpm run start:web-console`。
 
 ---
 
@@ -96,12 +98,12 @@ npm run agent:eval:fast -- --exit-on-fail
 
 1. **先读 [`AGENTS.md`](AGENTS.md)** — 工作区约定、环境变量、Evolution/自愈/前端行为与常见坑。
 2. **代码位置**：循环 SDK → `packages/agent-loop`；产品宿主与集成 → `packages/core`；HTTP API → `apps/daemon`；Agent Lab → `apps/web-console`；Evolution → `scripts/evolution*`。
-3. **改完怎么验**：逻辑改动跑 `npm run test:unit`；全量 TS 编译用 `npm run build`。界面/E2E 见 [`doc/TESTING.md`](doc/TESTING.md)、必要时 `npm run test:e2e`。
+3. **改完怎么验**：逻辑改动跑 `pnpm run test:unit`；全量 TS 编译用 `pnpm run build`。界面/E2E 见 [`doc/TESTING.md`](doc/TESTING.md)、必要时 `pnpm run test:e2e`。
 4. **配置与密钥**：支持的功能优先使用 Lab UI 与持久化 settings API，避免新增功能开关 env。必要的连接、进程引导或 CI 回退配置参考 [`.env.example`](.env.example)；**切勿提交 `.env`**。env 修改需重启进程；界面设置的生效范围以各 API 为准。
-5. **Evolution**：`npm run evolution -- --help` 查看参数（`--learn`、`--agent`、`--review`、`--until-empty`、`--research`、`--test-agent` 等）。一键 drain + 展示站：`npm run evolution:drain-showcase -- --help`。`run-day` 默认只处理 inbox **「今日新条目」** 分段（下文 Evolution 一节）。
+5. **Evolution**：`pnpm run evolution --help` 查看参数（`--learn`、`--agent`、`--review`、`--until-empty`、`--research`、`--test-agent` 等）。一键 drain + 展示站：`pnpm run evolution:drain-showcase --help`。`run-day` 默认只处理 inbox **「今日新条目」** 分段（下文 Evolution 一节）。
 6. **子进程 / 沙箱**：新增 `spawn` 须走 `sanitizeSpawnEnv()` 与现有沙箱封装（`packages/core/src/sandbox/env-sanitizer.ts`、`packages/core/src/sandbox/os-sandbox.ts`、`SandboxManager`），勿在完整父进程环境下裸调 `spawn`。
 7. **Skills**：仓库内 `skills/**/SKILL.md`；可与 `~/.agents/**/SKILL.md` 合并（见 `AGENTS.md`）。
-8. **循环 SDK 改动**：契约变化须同步 [`skills/agent-loop/SKILL.md`](skills/agent-loop/SKILL.md)，并执行 `npm run test --workspace=@ppeng/agent-loop` 与 `npm run build --workspace=@ppeng/agent-loop`；根目录 `test:unit` 不能代替 SDK 的 Vitest 测试。
+8. **循环 SDK 改动**：契约变化须同步 [`skills/agent-loop/SKILL.md`](skills/agent-loop/SKILL.md)，并执行 `pnpm run test --workspace=@ppeng/agent-loop` 与 `pnpm run build --workspace=@ppeng/agent-loop`；根目录 `test:unit` 不能代替 SDK 的 Vitest 测试。
 
 架构与 API 全貌：[`doc/ARCHITECTURE.md`](doc/ARCHITECTURE.md)。
 
@@ -111,24 +113,24 @@ npm run agent:eval:fast -- --exit-on-fail
 
 | 命令 | 说明 |
 |------|------|
-| `npm run build` | TypeScript 工作区编译 + Next 生产构建 |
-| `npm run test` | build + 单测 |
-| `npm run test:unit` | 仅单测 |
-| `npm run test:regression` | 临时 daemon HTTP 回归 |
-| `npm run test:e2e` | 临时 daemon + Playwright |
-| `npm run test:e2e:install` | 安装 Playwright Chromium |
-| `npm run test:remote` | 真模型冒烟（需环境变量） |
-| `npm run agent:eval:fast -- --exit-on-fail` | 隔离 heuristic daemon 的 HTTP 能力检查，失败返回非零 |
-| `npm run test --workspace=@ppeng/agent-loop` | 循环 SDK 的 Vitest 测试 |
-| `npm run ci` | build + unit + formal + fast eval + 评估引擎 simulation + 包产物自检 + CRAP + regression + integration + e2e |
-| `npm run start:daemon` / `start:supervised` | 守护进程 / 监督拉起 |
-| `npm run start:cli` | CLI（含 `self-heal`、`chat` 等） |
-| `npm run dev:lab` | 开发辅助（Next + 代理） |
-| `npm run evolution -- --help` | 统一进化入口，查看全部参数 |
-| `npm run evolution -- --learn --agent cursor --review codex` | learn + cursor 开发 + codex review |
-| `npm run evolution -- --learn-only` | 仅拉 RSS → inbox |
-| `npm run evolution:pipeline` | learn → run-day → 可选合并后重载（一键） |
-| `npm run ai:tools` | 检测本机 `claude` / `codex` 等 CLI |
+| `pnpm run build` | TypeScript 工作区编译 + Next 生产构建 |
+| `pnpm run test` | build + 单测 |
+| `pnpm run test:unit` | 仅单测 |
+| `pnpm run test:regression` | 临时 daemon HTTP 回归 |
+| `pnpm run test:e2e` | 临时 daemon + Playwright |
+| `pnpm run test:e2e:install` | 安装 Playwright Chromium |
+| `pnpm run test:remote` | 真模型冒烟（需环境变量） |
+| `pnpm run agent:eval:fast --exit-on-fail` | 隔离 heuristic daemon 的 HTTP 能力检查，失败返回非零 |
+| `pnpm run test --workspace=@ppeng/agent-loop` | 循环 SDK 的 Vitest 测试 |
+| `pnpm run ci` | build + unit + formal + fast eval + 评估引擎 simulation + 包产物自检 + CRAP + regression + integration + e2e |
+| `pnpm run start:daemon` / `start:supervised` | 守护进程 / 监督拉起 |
+| `pnpm run start:cli` | CLI（含 `self-heal`、`chat` 等） |
+| `pnpm run dev:lab` | 开发辅助（Next + 代理） |
+| `pnpm run evolution --help` | 统一进化入口，查看全部参数 |
+| `pnpm run evolution --learn --agent cursor --review codex` | learn + cursor 开发 + codex review |
+| `pnpm run evolution --learn-only` | 仅拉 RSS → inbox |
+| `pnpm run evolution:pipeline` | learn → run-day → 可选合并后重载（一键） |
+| `pnpm run ai:tools` | 检测本机 `claude` / `codex` 等 CLI |
 
 详见 [`doc/TESTING.md`](doc/TESTING.md)、[`doc/CI.md`](doc/CI.md)、[`.env.example`](.env.example)。
 
@@ -149,7 +151,7 @@ Daemon API 示例：`GET /api/version`、`GET /api/health`、`GET /api/traces?se
 
 ## Evolution（持续学习）
 
-统一入口：`npm run evolution -- [options]`（`--help` 查看全部参数）。
+统一入口：`pnpm run evolution [options]`（`--help` 查看全部参数）。
 
 **分步固定流程**（learn → run-day → 展示站）：[`doc/evolution/README.md`](doc/evolution/README.md)。
 
@@ -159,15 +161,15 @@ Daemon API 示例：`GET /api/version`、`GET /api/health`、`GET /api/traces?se
 
 | 命令 | 说明 |
 |------|------|
-| `npm run evolution -- --learn-only` | 仅拉 RSS → inbox，不跑开发 |
-| `npm run evolution -- --learn --agent claude` | learn + Claude 实现（默认） |
-| `npm run evolution -- --learn --agent cursor` | learn + Cursor composer-2-fast 实现 |
-| `npm run evolution -- --learn --agent cursor --review codex` | learn + Cursor 实现 + Codex review |
-| `npm run evolution -- --learn --agent cursor --review cursor` | learn + Cursor 全链路 |
-| `npm run evolution -- --learn --agent cursor --model claude-opus-4-7-thinking-max --review cursor` | learn + Cursor Opus-Max 实现与 review |
-| `npm run evolution -- --learn --agent full` | learn + 研究→多CLI路由实现（自动按难度分配） |
-| `npm run evolution -- --learn --agent cursor --review codex --concurrency 5 --merge` | 5 路并发 + 自动合并 |
-| `npm run evolution -- --pipeline-build --learn --agent cursor --review codex` | 先编译 gateway + learn + 开发 |
+| `pnpm run evolution --learn-only` | 仅拉 RSS → inbox，不跑开发 |
+| `pnpm run evolution --learn --agent claude` | learn + Claude 实现（默认） |
+| `pnpm run evolution --learn --agent cursor` | learn + Cursor composer-2-fast 实现 |
+| `pnpm run evolution --learn --agent cursor --review codex` | learn + Cursor 实现 + Codex review |
+| `pnpm run evolution --learn --agent cursor --review cursor` | learn + Cursor 全链路 |
+| `pnpm run evolution --learn --agent cursor --model claude-opus-4-7-thinking-max --review cursor` | learn + Cursor Opus-Max 实现与 review |
+| `pnpm run evolution --learn --agent full` | learn + 研究→多CLI路由实现（自动按难度分配） |
+| `pnpm run evolution --learn --agent cursor --review codex --concurrency 5 --merge` | 5 路并发 + 自动合并 |
+| `pnpm run evolution --pipeline-build --learn --agent cursor --review codex` | 先编译 gateway + learn + 开发 |
 
 **部分常用参数**（完整列表与当前默认值以 `--help` 为准）：
 
@@ -194,7 +196,7 @@ Daemon API 示例：`GET /api/version`、`GET /api/health`、`GET /api/traces?se
 - review / rebase / merge 等失败时，实验分支会尽量保留，便于人工接管；可在 `doc/evolution/failure/` 中查看对应条目，再到本地 `exp/evolution-*` 分支检查。
 - `evolution:learn` 若大量 RSS 失败，优先检查代理 / DNS / TLS；`news.ycombinator.com` 证书异常通常是本机网络或代理链路问题，不是仓库代码问题。
 
-底层仍可直接使用 `npm run evolution:pipeline`（bash 一键：build→learn→run-day→可选重载），或 `npm run evolution:learn` / `npm run evolution:run-day` 单独执行。高级细粒度调参（plan、test-agent、review rounds 等）见 `scripts/evolution-quality-pipeline.env.example` 与 `.env.example`。
+底层仍可直接使用 `pnpm run evolution:pipeline`（bash 一键：build→learn→run-day→可选重载），或 `pnpm run evolution:learn` / `pnpm run evolution:run-day` 单独执行。高级细粒度调参（plan、test-agent、review rounds 等）见 `scripts/evolution-quality-pipeline.env.example` 与 `.env.example`。
 
 > **已停止维护（2026-10-16）：** 自进化流水线（`evolution:*` 脚本、`scripts/evolution*`）不再维护，请勿扩展，后续可能移除。详见 `scripts/evolution/DEPRECATED.md`。
 
@@ -202,10 +204,10 @@ Daemon API 示例：`GET /api/version`、`GET /api/health`、`GET /api/traces?se
 
 ## 自愈（Self-heal）
 
-`npm run start:daemon`（或 supervised）后：
+`pnpm run start:daemon`（或 supervised）后：
 
 ```bash
-npm run start:cli -- self-heal start '{"testPreset":"unit","autoMerge":false}'
+pnpm run start:cli self-heal start '{"testPreset":"unit","autoMerge":false}'
 ```
 
 调度器在隔离 worktree 跑白名单测试；失败可驱动 **self-healer** 会话。可选 `autoMerge` / `autoRestartDaemon`，配合 `GET /api/daemon/restart-request` 与 `POST .../ack`。详见 [`doc/ARCHITECTURE.md`](doc/ARCHITECTURE.md)。
@@ -260,7 +262,7 @@ npm run start:cli -- self-heal start '{"testPreset":"unit","autoMerge":false}'
 
 ## CI
 
-`npm run ci` 执行构建、单测、formal、fast 契约 eval、评估引擎 simulation、tarball 安装自检、CRAP、HTTP 回归、integration 与 E2E。命令见 [`package.json`](package.json)，流程见 [CI](doc/CI.md)。npm 与 Docker 必须先通过门禁并验证实际产物才发布；部署边界见[发布可靠性计划](doc/RELEASE_RELIABILITY_PLAN.md)，新功能/提示词的真实模型配对回归见 [Harness 评估](doc/HARNESS_EVALUATION.md)。simulation 不代表能力提升。可选真模型冒烟需要凭证；fork PR 无法读取上游 Secret。
+`pnpm run ci` 执行构建、单测、formal、fast 契约 eval、评估引擎 simulation、tarball 安装自检、CRAP、HTTP 回归、integration 与 E2E。命令见 [`package.json`](package.json)，流程见 [CI](doc/CI.md)。npm 与 Docker 必须先通过门禁并验证实际产物才发布；部署边界见[发布可靠性计划](doc/RELEASE_RELIABILITY_PLAN.md)，新功能/提示词的真实模型配对回归见 [Harness 评估](doc/HARNESS_EVALUATION.md)。simulation 不代表能力提升。可选真模型冒烟需要凭证；fork PR 无法读取上游 Secret。
 
 ---
 

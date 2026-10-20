@@ -6,8 +6,8 @@
 
 | Job | 内容 | 是否需要密钥 |
 |-----|------|----------------|
-| **Release gate**（[`release-gate.yml`](../.github/workflows/release-gate.yml)） | 两个并行 Job + 验收 + 汇总：① `npm ci` → `build` → `test:unit` → `test:formal` → `agent:eval:fast -- --exit-on-fail` → `test:regression` → `test:integration` → `test:e2e`（启发式模型）；② 工具链预检后带覆盖率跑 `test:unit` 与 SDK vitest → [CRAP 门禁](CRAP_GATE.md)；③ **Acceptance criteria gate**：收集 ①② 的 JUnit 结果，证明每条已批准验收标准都有通过的测试（[验收门禁](ACCEPTANCE_GATE.md)）；④ **Main release gate** 汇总上述检查、mutation 及参与运行的可选模型检查，仅成功或明确允许的跳过才通过 | 否 |
-| **remote-model-smoke** | `npm run test:remote`：真实调用你配置的第三方 API，跑一轮简单对话 | 是（可选） |
+| **Release gate**（[`release-gate.yml`](../.github/workflows/release-gate.yml)） | 两个并行 Job + 验收 + 汇总：① `pnpm install --frozen-lockfile` → `build` → `test:unit` → `test:formal` → `agent:eval:fast -- --exit-on-fail` → `test:regression` → `test:integration` → `test:e2e`（启发式模型）；② 工具链预检后带覆盖率跑 `test:unit` 与 SDK vitest → [CRAP 门禁](CRAP_GATE.md)；③ **Acceptance criteria gate**：收集 ①② 的 JUnit 结果，证明每条已批准验收标准都有通过的测试（[验收门禁](ACCEPTANCE_GATE.md)）；④ **Main release gate** 汇总上述检查、mutation 及参与运行的可选模型检查，仅成功或明确允许的跳过才通过 | 否 |
+| **remote-model-smoke** | `pnpm run test:remote`：真实调用你配置的第三方 API，跑一轮简单对话 | 是（可选） |
 
 远程冒烟 **仅在你配置了 `RAW_AGENT_API_KEY` 时才会执行**，未配置时整 Job 跳过，不影响通过。真模型压缩 A/B 不在这条流水线里，见下方「压缩 A/B」。
 
@@ -47,8 +47,8 @@ Main release gate 对 mutation 和真模型 smoke 保持阻断；缺密钥的可
 ### 门禁健康报告
 
 ```bash
-npm run ci:gate-health              # 默认最近 30 次 CI 运行（main + PR）
-npm run ci:gate-health -- --limit 50 --json
+pnpm run ci:gate-health              # 默认最近 30 次 CI 运行（main + PR）
+pnpm run ci:gate-health --limit 50 --json
 ```
 
 [`scripts/ci/gate-health.mjs`](../scripts/ci/gate-health.mjs) 只读（`gh run list` / `gh api` GET / `gh run download`，需本机 `gh` 已登录）：统计 `Release gate / Main release gate` 通过率（分 main / PR）、最常失败的 Job / Step、flaky artifact 里的 flaky 次数，以及 `main` 分支保护是否已把该检查设为 required（无权限或未配置时如实显示）。决定是否收紧/放宽门禁前先看它。
@@ -64,18 +64,18 @@ gate 只卡发布；要让**合并**也被卡住，需要仓库管理员在 GitH
 5. 在搜索框输入 `Main release gate`，选中 **`Release gate / Main release gate`**（列表只显示近期跑过的检查；搜不到先让任一 PR 跑一次 CI）。
 6. （建议）勾选 **Do not allow bypassing the above settings**，保存 **Create / Save changes**。
 
-配置后 `npm run ci:gate-health` 的 `Branch protection` 一行会显示 `required: yes`。未配置时 CI 失败只是红叉，不会阻止合并。
+配置后 `pnpm run ci:gate-health` 的 `Branch protection` 一行会显示 `required: yes`。未配置时 CI 失败只是红叉，不会阻止合并。
 
 ## 本地与 CI 对齐
 
 ```bash
 nvm use                    # .nvmrc 与发布门禁统一使用 Node 22
-npm ci                     # 恢复锁定依赖；不要靠放宽版本/基线解决工具冲突
-npm run ci
+pnpm install --frozen-lockfile                     # 恢复锁定依赖；不要靠放宽版本/基线解决工具冲突
+pnpm run ci
 ```
 
 等价于：构建 + 单元测试 + 验收标准静态追踪 + formal 不变量/MockLLM + fast eval（失败退出）+ 能力评估引擎 simulation 自检 + npm tarball 安装/运行自检 + CRAP 门禁 + HTTP 回归 + 集成测试 + E2E。Playwright 输出到 `test-results/playwright`，保留其他测试证据，flaky 重试成功仍失败。发布边界见 [发布可靠性计划](RELEASE_RELIABILITY_PLAN.md)，真实模型 A/B 与提示词回归见 [Harness 评估](HARNESS_EVALUATION.md)。
-CI 里的验收门禁基于测试结果（JUnit）判定；本地对齐用 `npm run test:acceptance:full`，见 [`ACCEPTANCE_GATE.md`](ACCEPTANCE_GATE.md)。
+CI 里的验收门禁基于测试结果（JUnit）判定；本地对齐用 `pnpm run test:acceptance:full`，见 [`ACCEPTANCE_GATE.md`](ACCEPTANCE_GATE.md)。
 
 
 ## 配置第三方模型（Repository secrets）
@@ -141,7 +141,7 @@ CI 日志会打一行 `key_len=… base_has_v1=…`（不打印密钥或主机�
 3. 对 `keep_recent` 与 `after_text_assistant` 各问一次「listing 里的 tarball 文件名是什么」；
 4. 报告写清 tool 名、stdout 摘要、silent/restated 召回、token、折叠字数，作为 artifact `compact-ab-report` 上传。
 
-质量回退只写进报告的 `quality_regression`；接口失败或空回复才会失败。默认 `silent`；Run workflow 时可填 `silent,restated`。本地：`npm run test:compact-ab`。启发式模型下脚本直接 skip。分析结论见 [`doc/harness/04-context-economics.md`](harness/04-context-economics.md)。
+质量回退只写进报告的 `quality_regression`；接口失败或空回复才会失败。默认 `silent`；Run workflow 时可填 `silent,restated`。本地：`pnpm run test:compact-ab`。启发式模型下脚本直接 skip。分析结论见 [`doc/harness/04-context-economics.md`](harness/04-context-economics.md)。
 
 ## Fork 的 Pull Request
 
@@ -149,7 +149,7 @@ CI 日志会打一行 `key_len=… base_has_v1=…`（不打印密钥或主机�
 
 ## SDK examples（未接入门禁）
 
-`npm run test:examples` 跑 `packages/core/examples/`（`@ppeng/agent-core` 嵌入场景验收，见 [`EMBEDDING_SDK.md`](EMBEDDING_SDK.md)）。目前**不在** `npm run ci` / GitHub Actions 内，需本地或 PR review 时手动跑；后续观察稳定后再考虑纳入。
+`pnpm run test:examples` 跑 `packages/core/examples/`（`@ppeng/agent-core` 嵌入场景验收，见 [`EMBEDDING_SDK.md`](EMBEDDING_SDK.md)）。目前**不在** `pnpm run ci` / GitHub Actions 内，需本地或 PR review 时手动跑；后续观察稳定后再考虑纳入。
 
 ## 每日 Docker 镜像（GHCR）
 
@@ -224,13 +224,13 @@ docker pull ghcr.io/<owner>/<repo>/web:nightly
 | 触发 | 每天 17:00 UTC（北京时间 01:00）打齐 5 套；Actions → **Desktop artifacts** → Run workflow（可只打一套）；推送 `desktop-v*`（agent 可用，不发版；`desktop-v0.1.0-mac-arm64` 只打一套）；推送 `v*` 打齐并挂到 GitHub Release。定时仅在默认分支生效 |
 | 不含 | Docker nightly、Evolution、真模型、Apple 公证（CI 不签名，仅 ad-hoc） |
 | Mac 打开 | 未公证时系统会报「已损坏」。M 系列用 `mac-arm64` DMG，先 `xattr -cr` 再打开，见 [`apps/desktop/README.md`](../apps/desktop/README.md) |
-| 本地 | `npm run build:desktop`（当前机器）；或 `--platform mac\|win\|linux --arch x64\|arm64` |
+| 本地 | `pnpm run build:desktop`（当前机器）；或 `--platform mac\|win\|linux --arch x64\|arm64` |
 
 本地交叉打别的 OS/arch 不可靠：请用对应 runner 或同架构机器。
 
 ## npm 包（@mage-ai-lab/api-types、@mage-ai-lab/agent-loop）
 
-操作清单见 [`NPM_PUBLISH.md`](NPM_PUBLISH.md)。[`.github/workflows/publish-npm.yml`](../.github/workflows/publish-npm.yml) **不跟普通分支 push / PR**，只在推送 tag `npm-v*`、手动运行或 `npm-v*` 正式 Release 时启动。脚本是 [`scripts/publish-npm-packages.mjs`](../scripts/publish-npm-packages.mjs)：编译后把工作区 `@ppeng/*` 改写成 `@mage-ai-lab/*`，打包并在隔离 consumer 安装，检查 exports、类型和 mini 运行后才发布同一 tarball，不改仓库里的包名。`npm run test:package` 仅验证，不访问发布接口、不需要 token；证据含 SHA256。
+操作清单见 [`NPM_PUBLISH.md`](NPM_PUBLISH.md)。[`.github/workflows/publish-npm.yml`](../.github/workflows/publish-npm.yml) **不跟普通分支 push / PR**，只在推送 tag `npm-v*`、手动运行或 `npm-v*` 正式 Release 时启动。脚本是 [`scripts/publish-npm-packages.mjs`](../scripts/publish-npm-packages.mjs)：编译后把工作区 `@ppeng/*` 改写成 `@mage-ai-lab/*`，打包并在隔离 consumer 安装，检查 exports、类型和 mini 运行后才发布同一 tarball，不改仓库里的包名。`pnpm run test:package` 仅验证，不访问发布接口、不需要 token；证据含 SHA256。
 
 | 项 | 说明 |
 |----|------|
@@ -238,7 +238,7 @@ docker pull ghcr.io/<owner>/<repo>/web:nightly
 | 认证 | npm Trusted Publisher（OIDC，`id-token: write`，npm 11.12.0）。工作流不读取 `NPM_TOKEN` |
 | 版本 | tag 推送不改版本，发已提交的版本；已在 npm 上则跳过。手动 `patch`/`minor`/`major` 取两个包的仓库版本和 npm 已发版本中较高者再递增，提交并推送 `npm-v<version>`。手动 `republish` 时若都已存在则失败 |
 | 卡点 | `publish` 必须等待 release gate 成功（含 dry run），失败、取消、跳过均不发布 |
-| 本地 | `npm login` 后 `npm run publish:npm`；只打包不上传：`NPM_PUBLISH_DRY_RUN=1 npm run publish:npm` |
+| 本地 | `npm login` 后 `pnpm run publish:npm`；只打包不上传：`NPM_PUBLISH_DRY_RUN=1 pnpm run publish:npm` |
 
 ## 与本项目环境变量总表
 

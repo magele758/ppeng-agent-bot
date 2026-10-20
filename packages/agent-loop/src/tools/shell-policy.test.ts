@@ -41,7 +41,7 @@ describe('shell-policy static checks', () => {
     expect(isDirectoryBrowseCommand('cat README.md')).toBe(false);
     expect(isCodeSearchCommand('rg foo src')).toBe(true);
     expect(isCodeSearchCommand('git grep TODO')).toBe(true);
-    expect(isCodeSearchCommand('npm run build')).toBe(false);
+    expect(isCodeSearchCommand('pnpm run build')).toBe(false);
   });
 });
 

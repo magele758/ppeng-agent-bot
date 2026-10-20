@@ -73,12 +73,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           architecture: ${{ matrix.node_arch }}
-          cache: npm
+          cache: pnpm
 
       - name: Cache Electron downloads
         uses: actions/cache@v4
@@ -87,7 +88,7 @@ jobs:
           key: electron-${{ matrix.id }}-${{ hashFiles('apps/desktop/package.json') }}
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build ${{ matrix.id }}
         run: node scripts/build-desktop.mjs --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}

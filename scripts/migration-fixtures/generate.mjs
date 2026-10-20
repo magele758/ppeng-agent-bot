@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import {linkHistoricalDependencies} from '../lib/package-manager.mjs';
 /**
  * Regenerate the schema snapshots in scripts/migration-fixtures/snapshots/.
  *
@@ -55,17 +56,7 @@ function run(cmd, args, cwd) {
  * Old checkout gets the host's third-party packages, but its own workspace
  * packages (@ppeng/*) must resolve inside the checkout, not to today's code.
  */
-function linkNodeModules(checkout) {
-  const dest = join(checkout, 'node_modules');
-  mkdirSync(join(dest, '@ppeng'), { recursive: true });
-  for (const entry of readdirSync(join(ROOT, 'node_modules'))) {
-    if (entry === '@ppeng' || entry === '.bin') continue;
-    symlinkSync(join(ROOT, 'node_modules', entry), join(dest, entry));
-  }
-  for (const pkg of readdirSync(join(ROOT, 'node_modules/@ppeng'))) {
-    symlinkSync(readlinkSync(join(ROOT, 'node_modules/@ppeng', pkg)), join(dest, '@ppeng', pkg));
-  }
-}
+function linkNodeModules(checkout) { linkHistoricalDependencies(checkout, ROOT); }
 
 function generate({ version, ref, note }) {
   const sha = run('git', ['rev-parse', ref], ROOT);

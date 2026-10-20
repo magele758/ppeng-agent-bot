@@ -1,3 +1,4 @@
+import {createRequire} from 'node:module';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -7,7 +8,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const playwrightCli = join(repoRoot, 'node_modules', 'playwright', 'cli.js');
+const playwrightCli = createRequire(import.meta.url).resolve('@playwright/test/package.json').replace(/package\.json$/, 'cli.js');
 
 /**
  * Run one browser-less spec under the repo's real playwright.config.ts

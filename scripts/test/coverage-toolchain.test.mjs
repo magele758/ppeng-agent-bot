@@ -14,7 +14,7 @@ test('coverage preflight rejects plugin mismatch and the observed hoisted-runner
     { vitest: '1.6.1', coverageV8: '1.6.1' },
     {}
   ]) {
-    assert.throws(() => assertCoverageVersions(versions), /Coverage toolchain mismatch.*npm ci/);
+    assert.throws(() => assertCoverageVersions(versions), /Coverage toolchain mismatch.*pnpm install --frozen-lockfile/);
   }
 });
 

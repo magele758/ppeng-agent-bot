@@ -794,7 +794,7 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
       properties: {
         verify_command: {
           type: 'string',
-          description: 'Optional shell command to run in the workspace root (e.g. npm run test); stdout/stderr and exit_code are included in the payload.'
+          description: 'Optional shell command to run in the workspace root (e.g. pnpm run test); stdout/stderr and exit_code are included in the payload.'
         },
         verify_timeout_ms: { type: 'number' },
         include_diff_stat: {

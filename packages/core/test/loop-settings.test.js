@@ -1,6 +1,6 @@
 /**
  * Daemon-owned loop settings + steer HTTP mapping (Phase 4 host).
- * Lives in core/test so it runs with `npm run test:unit` after daemon tsc.
+ * Lives in core/test so it runs with `pnpm run test:unit` after daemon tsc.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';

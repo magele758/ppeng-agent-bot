@@ -4,6 +4,6 @@
   "type": "module",
   "main": "./dist/index.js",
   "dependencies": {
-    "@ppeng/daemon-client": "0.1.0"
+    "@ppeng/daemon-client": "workspace:*"
   }
 }

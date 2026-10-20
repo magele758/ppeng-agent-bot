@@ -27,7 +27,7 @@ test('new formal imports and all existing tests get one owner; unsupported comma
   const p=partitionTests(files,f=>source[f]);
   assert.deepEqual(p.formal,['a.test.mjs','new.test.mjs']);assert.deepEqual(p.unit,['b.test.mjs']);
   assert.throws(()=>partitionTests(['a.test.mjs','a.test.mjs'],f=>source[f]),/duplicate/i);
-  assert.throws(()=>discoverTests({root:process.cwd(),command:'npm run something'}),/node|unsupported/i);
+  assert.throws(()=>discoverTests({root:process.cwd(),command:'pnpm run something'}),/node|unsupported/i);
   const actual=discoverTests();assert.ok(actual.unit.length>400);assert.ok(actual.formal.includes('scripts/test/session-multiprocess-concurrency-verification.test.mjs'));
   assert.equal(new Set([...actual.unit,...actual.formal]).size,actual.unit.length+actual.formal.length);
 });
@@ -54,7 +54,7 @@ test('CRAP consumes verified coverage from every lane without launching tests [A
   const job=workflow('release-gate').jobs.crap;
   assert.deepEqual([...job.needs].sort(),['formal','sdk','unit']);
   const commands=job.steps.map(s=>s.run??'').join('\n');assert.match(commands,/validation-artifacts.mjs/);
-  assert.doesNotMatch(commands,/retry-failed-tests|vitest run|npm run test:unit|npm run test:formal|--update-baseline/);
+  assert.doesNotMatch(commands,/retry-failed-tests|vitest run|pnpm run test:unit|pnpm run test:formal|--update-baseline/);
 }));
 
 test('wrong candidate, attempt, inputs, omitted lane and corrupted evidence are rejected [AC:ci-parallel-validation#AC-6]',()=>fixtures(({lib,root,identity,expected})=>{

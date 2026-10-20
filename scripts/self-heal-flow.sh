@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # 一键：主仓有未提交改动则 stash → 调用 daemon 自愈 → 轮询到结束 → stash pop
-# 依赖：daemon 已运行（npm run start:supervised 或 start:daemon）
+# 依赖：daemon 已运行（pnpm run start:supervised 或 start:daemon）
 #
 # 用法：
-#   npm run self-heal:flow
-#   npm run self-heal:flow -- sheal_xxx          # 只 resume 指定 run
-#   npm run self-heal:flow -- --new              # 强制新开一条（忽略可恢复的 blocked/stopped/failed）
-#   SELF_HEAL_FLOW_NO_STASH=1 npm run self-heal:flow   # 不自动 stash（主仓必须已干净）
+#   pnpm run self-heal:flow
+#   pnpm run self-heal:flow sheal_xxx          # 只 resume 指定 run
+#   pnpm run self-heal:flow --new              # 强制新开一条（忽略可恢复的 blocked/stopped/failed）
+#   SELF_HEAL_FLOW_NO_STASH=1 pnpm run self-heal:flow   # 不自动 stash（主仓必须已干净）
 #
 set -euo pipefail
 
@@ -102,7 +102,7 @@ need_python
 stash_if_needed
 
 if ! curl -sf --connect-timeout 2 --max-time 5 "$BASE/api/health" >/dev/null; then
-  die "daemon not reachable at $BASE — start: npm run start:supervised (or start:daemon)"
+  die "daemon not reachable at $BASE — start: pnpm run start:supervised (or start:daemon)"
 fi
 
 pick_run_id() {

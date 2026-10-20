@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 读取 doc/evolution/inbox 最新 md，对每条候选创建 git worktree、npm ci、跑测试；
+ * 读取 doc/evolution/inbox 最新 md，对每条候选创建 git worktree、pnpm install --frozen-lockfile、跑测试；
  * 写 doc/evolution/success 或 failure；可选合并到主分支（默认关闭）。
  *
  * 环境变量见 .env.example EVOLUTION_*
@@ -10,7 +10,7 @@
  * 文件的流程一致。跑测试命令时会从子进程环境剥离 `RAW_AGENT_SELF_HEAL_*`（与默认单测一致），除非
  * `EVOLUTION_PRESERVE_SELF_HEAL_ENV=1`。
  *
- * 可选 `EVOLUTION_AGENT_CMD`：`npm ci` 之后、构建之前，在 worktree 内执行（并写入 `.evolution/` 摘录与约束文件）。
+ * 可选 `EVOLUTION_AGENT_CMD`：`pnpm install --frozen-lockfile` 之后、构建之前，在 worktree 内执行（并写入 `.evolution/` 摘录与约束文件）。
  * 测试通过后默认在 worktree 内 `git rebase` 目标分支；冲突时可用 `EVOLUTION_REBASE_CONFLICT_CMD` / Codex 等多轮修复后再 merge 主仓（见 .env.example）。
  * 可选质量链路：`EVOLUTION_PLAN_CMD`（如 Codex 写 `.evolution/dev-plan.md`）→ `EVOLUTION_AGENT_CMD` 开发 → 构建后可选 `EVOLUTION_TEST_AGENT_CMD`（推荐 Gemini）补强测试 → `EVOLUTION_TEST_CMD` → 通过后 `EVOLUTION_REVIEW_CMD` 与 `EVOLUTION_REFINE_CMD` 循环直至 APPROVE。
  *
@@ -1042,7 +1042,7 @@ async function main() {
     trace('启动');
     const inboxPath = pickInboxFile();
     if (!inboxPath) {
-      trace('结束：无 inbox，请先执行 npm run evolution:learn');
+      trace('结束：无 inbox，请先执行 pnpm run evolution:learn');
       return;
     }
 
@@ -1083,21 +1083,21 @@ async function main() {
     }
 
     const targetBranch = process.env.EVOLUTION_TARGET_BRANCH?.trim() || process.env.RAW_AGENT_SELF_HEAL_TARGET_BRANCH?.trim() || 'main';
-    const testCmd = process.env.EVOLUTION_TEST_CMD?.trim() || 'npm run test:unit';
+    const testCmd = process.env.EVOLUTION_TEST_CMD?.trim() || 'pnpm run test:unit';
     const skipCi = truthy(process.env.EVOLUTION_SKIP_NPM_CI);
     /** dist/ 被 gitignore，与 `npm test`（先 build）不同，单独跑 test:unit 前必须编译 TS */
     const skipBuild = truthy(process.env.EVOLUTION_SKIP_BUILD);
     const buildCmd =
       process.env.EVOLUTION_BUILD_CMD !== undefined
         ? process.env.EVOLUTION_BUILD_CMD.trim()
-        : 'npx tsc -b packages/core packages/capability-gateway';
+        : 'pnpm exec tsc -b packages/core packages/capability-gateway';
 
     trace(`inbox: ${inboxPath}`);
     trace(
       `解析: ${newlyListedItems.length > 0 ? '仅执行“今日新条目”分段' : 'inbox 无“今日新条目”分段，回退全量解析'}；` +
       `待处理候选 ${parsedTotal} 条，执行 ${items.length} 条（已处理 ${skippedCount} 条${rawMax && Number(rawMax) > 0 ? `，EVOLUTION_MAX_ITEMS 安全帽=${rawMax}` : ''}）`
     );
-    trace(`策略: 目标分支=${targetBranch}, 测试=${testCmd}, npm ci=${skipCi ? '跳过' : '执行'}, 构建=${skipBuild || !buildCmd ? '跳过' : buildCmd}, 自动合并=${autoMerge ? '是' : '否'}`);
+    trace(`策略: 目标分支=${targetBranch}, 测试=${testCmd}, pnpm install --frozen-lockfile=${skipCi ? '跳过' : '执行'}, 构建=${skipBuild || !buildCmd ? '跳过' : buildCmd}, 自动合并=${autoMerge ? '是' : '否'}`);
     trace(
       '说明：每条会先抓取来源 URL 的正文摘录（供对照）；验证阶段在本仓库独立 worktree 跑白名单测试，不克隆外链仓库。'
     );
@@ -1268,20 +1268,20 @@ async function main() {
 
       if (!skipCi) {
         const tCi = Date.now();
-        const ci = await sh('npm ci', wtPath);
+        const ci = await sh('pnpm install --frozen-lockfile', wtPath);
         testOut += ci.out + ci.err;
-        itemTrace(`npm ci → exit=${ci.code} (${Date.now() - tCi}ms)`);
+        itemTrace(`pnpm install --frozen-lockfile → exit=${ci.code} (${Date.now() - tCi}ms)`);
         if (ci.code !== 0) {
-          itemTrace('结果: 失败（npm ci）→ 已写 doc/evolution/failure/');
+          itemTrace('结果: 失败（pnpm install --frozen-lockfile）→ 已写 doc/evolution/failure/');
           await removeWorktree(wtPath, branch, itemTrace);
           await writeFailureDoc({
             slug,
             title,
             link,
             branch,
-            testCmd: 'npm ci',
+            testCmd: 'pnpm install --frozen-lockfile',
             errTail: testOut,
-          analysis: 'npm ci 失败（依赖或网络）。可设置 EVOLUTION_SKIP_NPM_CI=1 跳过安装（需自行保证 worktree 可测）。',
+          analysis: 'pnpm install --frozen-lockfile 失败（依赖或网络）。可设置 EVOLUTION_SKIP_NPM_CI=1 跳过安装（需自行保证 worktree 可测）。',
           sourceExcerpt,
           sourceFetchError
         });
@@ -1289,7 +1289,7 @@ async function main() {
         return;
       }
       } else {
-        itemTrace('npm ci 已跳过（EVOLUTION_SKIP_NPM_CI）');
+        itemTrace('pnpm install --frozen-lockfile 已跳过（EVOLUTION_SKIP_NPM_CI）');
       }
 
       let agentHookCmd = '';
@@ -1577,7 +1577,7 @@ async function main() {
             testCmd: buildCmd,
             errTail: testOut,
             analysis:
-              '构建失败。仓库的 test:unit 依赖 packages/*/dist；默认会在 npm ci 后执行 `npx tsc -b packages/core packages/capability-gateway`。可设 EVOLUTION_BUILD_CMD 覆盖或 EVOLUTION_SKIP_BUILD=1（需 worktree 内已有 dist）。',
+              '构建失败。仓库的 test:unit 依赖 packages/*/dist；默认会在 pnpm install --frozen-lockfile 后执行 `pnpm exec tsc -b packages/core packages/capability-gateway`。可设 EVOLUTION_BUILD_CMD 覆盖或 EVOLUTION_SKIP_BUILD=1（需 worktree 内已有 dist）。',
             sourceExcerpt,
             sourceFetchError
           });

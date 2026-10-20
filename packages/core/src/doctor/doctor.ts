@@ -19,7 +19,7 @@ import type { SecretVault } from '../secrets/secret-vault.js';
 
 const requireFromHere = createRequire(import.meta.url);
 const PLAYWRIGHT_INSTALL_HINT =
-  'npx playwright install chromium（仓库根目录已有 @playwright/test 时可直接执行）';
+  'pnpm exec playwright install chromium（仓库根目录已有 @playwright/test 时可直接执行）';
 
 export type DoctorSeverity = 'ok' | 'warn' | 'fail';
 
@@ -288,7 +288,7 @@ export function runDoctor(opts: DoctorOptions): DoctorReport {
   if (existsSync(coreDist)) {
     push(checks, 'build', 'Core build (dist)', 'ok', 'packages/core/dist present');
   } else {
-    push(checks, 'build', 'Core build (dist)', 'warn', 'packages/core/dist missing', 'Run: npx tsc -b packages/core');
+    push(checks, 'build', 'Core build (dist)', 'warn', 'packages/core/dist missing', 'Run: pnpm exec tsc -b packages/core');
   }
 
   const summary = {

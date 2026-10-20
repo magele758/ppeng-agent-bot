@@ -31,7 +31,7 @@ test('bashCommandNeedsApproval: process substitution fetch', () => {
 });
 
 test('bashCommandNeedsApproval: benign commands stay auto', () => {
-  assert.equal(bashCommandNeedsApproval('npm run test:unit'), false);
+  assert.equal(bashCommandNeedsApproval('pnpm run test:unit'), false);
   assert.equal(bashCommandNeedsApproval('npm ci'), false);
   assert.equal(bashCommandNeedsApproval('ls -la'), false);
   assert.equal(bashCommandNeedsApproval('echo hello | wc -l'), false);

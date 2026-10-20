@@ -4,13 +4,17 @@
   "type": "module",
   "main": "./dist/server.js",
   "dependencies": {
-    "@ppeng/agent-capability-gateway": "0.1.0",
-    "@ppeng/agent-core": "0.1.0",
-    "@ppeng/agent-homeiot": "0.1.0",
-    "@ppeng/agent-sre": "0.1.0",
-    "@ppeng/agent-stock": "0.1.0",
-    "@ppeng/agent-erp": "0.1.0",
+    "@ppeng/agent-capability-gateway": "workspace:*",
+    "@ppeng/agent-core": "workspace:*",
+    "@ppeng/agent-homeiot": "workspace:*",
+    "@ppeng/agent-sre": "workspace:*",
+    "@ppeng/agent-stock": "workspace:*",
+    "@ppeng/agent-erp": "workspace:*",
     "dotenv": "^17.4.2",
     "redis": "^4.7.0"
-  }
+  },
+  "files": [
+    "dist",
+    "web-stub"
+  ]
 }

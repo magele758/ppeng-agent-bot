@@ -8,7 +8,7 @@
 # 环境：在 .env 中配置 EVOLUTION_*；合并后自动 build + 重载 daemon 示例：
 #   EVOLUTION_POST_MERGE_RELOAD=1
 #   EVOLUTION_RELOAD_DAEMON=1
-# 并确保 daemon 由 `npm run start:supervised` 拉起。
+# 并确保 daemon 由 `pnpm run start:supervised` 拉起。
 
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

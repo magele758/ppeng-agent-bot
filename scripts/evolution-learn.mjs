@@ -8,7 +8,7 @@
  * - 本地文件目录（EVOLUTION_LOCAL_SOURCES，git 不跟踪的私有资料）
  * - 历史归档目录（EVOLUTION_ARCHIVE_DIR，已爬取但未测试的资料）
  *
- * 用法：npm run evolution:learn
+ * 用法：pnpm run evolution:learn
  * 环境：EVOLUTION_GATEWAY_CONFIG、RAW_AGENT_STATE_DIR（默认 .agent-state）
  *       EVOLUTION_LOCAL_SOURCES — 本地/Obsidian 子目录（逗号分隔；无 http 链接时每 .md 整篇为一条，link 为 file://）
  *       EVOLUTION_ARCHIVE_DIR    — 历史归档目录（已爬取但未测试）

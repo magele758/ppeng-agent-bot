@@ -64,7 +64,7 @@ type Preflight = {
         detail?: string;
     }[];
 };
-const initial: Profile = { enabled: false, allowedUserIds: [], image: '', toolPath: '', model: '', modelUrl: '', credentialRef: '', codeArgv: ['/tools/claude', '--print', '--output-format', 'json', '--dangerously-skip-permissions'], reviewArgv: ['/tools/claude', '--print', '--output-format', 'json', '--dangerously-skip-permissions'], checks: [{ id: 'unit', argv: ['npm', 'test'], required: true }], redCheck: 'unit', install: ['npm', 'ci', '--offline'], timeoutMs: 3600000, maxRounds: 6, maxRetries: 1, minDiskMb: 2048, maxWorkspaceMiB:1024, criteria: [], criteriaApproved: false, baselineFailures: [] };
+const initial: Profile = { enabled: false, allowedUserIds: [], image: '', toolPath: '', model: '', modelUrl: '', credentialRef: '', codeArgv: ['/tools/claude', '--print', '--output-format', 'json', '--dangerously-skip-permissions'], reviewArgv: ['/tools/claude', '--print', '--output-format', 'json', '--dangerously-skip-permissions'], checks: [{ id: 'unit', argv: ['pnpm', 'test'], required: true }], redCheck: 'unit', install: ['pnpm', 'install', '--frozen-lockfile', '--offline'], timeoutMs: 3600000, maxRounds: 6, maxRetries: 1, minDiskMb: 2048, maxWorkspaceMiB:1024, criteria: [], criteriaApproved: false, baselineFailures: [] };
 const send = (body: unknown, method = 'POST') => ({ method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 const decisionTasks = (value: unknown): Task[] => { const tasks = (value as {
     tasks?: Task[];

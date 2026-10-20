@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import {createRequire} from 'node:module';
 /**
  * 启动临时 daemon + Next 控制台（生产构建），再跑 Playwright。
  * CI：PLAYWRIGHT_BASE_URL 不设，由本脚本写入。
@@ -21,8 +22,8 @@ import { freePort, runWithCleanup } from './e2e-lifecycle.mjs';
 import { envForEphemeralDaemon, sanitizeScriptEnv } from './spawn-utils.mjs';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
-const playwrightCli = join(repoRoot, 'node_modules', 'playwright', 'cli.js');
-const nextBin = join(repoRoot, 'node_modules', 'next', 'dist', 'bin', 'next');
+const playwrightCli = createRequire(import.meta.url).resolve('@playwright/test/package.json').replace(/package\.json$/, 'cli.js');
+const nextBin = createRequire(join(repoRoot,'apps/web-console/package.json')).resolve('next/dist/bin/next');
 const webConsoleDir = join(repoRoot, 'apps', 'web-console');
 const webNextDir = join(webConsoleDir, '.next');
 
@@ -78,7 +79,7 @@ function ensureNextBuild() {
     console.error('[e2e] apps/web-console/.next is not a complete production build (next dev output?); rebuilding');
     rmSync(webNextDir, { recursive: true, force: true });
   }
-  const b = spawnSync('npm', ['run', 'build', '--workspace=@ppeng/agent-lab-web'], {
+  const b = spawnSync('pnpm', ['--filter', '@ppeng/agent-lab-web', 'run', 'build'], {
     cwd: repoRoot,
     env: { ...process.env },
     stdio: 'inherit',
@@ -87,7 +88,7 @@ function ensureNextBuild() {
   return b.status ?? 1;
 }
 
-/** Extra CLI args (`npm run test:e2e -- --reporter=list,junit`) are forwarded to `playwright test`. */
+/** Extra CLI args (`pnpm run test:e2e --reporter=list,junit`) are forwarded to `playwright test`. */
 function runPlaywright(registry, env) {
   return registry.spawnTask(process.execPath, [playwrightCli, 'test', ...process.argv.slice(2)], {
     cwd: repoRoot,

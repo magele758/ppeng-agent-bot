@@ -17,7 +17,7 @@
 | mutation / Mutate (others) | 10分51秒 | success | Run mutation tests: 10分04秒 |
 | Browser and HTTP regression | 4分49秒 | failure | E2E (Agent Lab): 3分03秒 |
 | Build, unit tests, HTTP regression, E2E | 2分07秒 | success | TypeScript build: 1分00秒 |
-| mutation / Mutation gate | 0分37秒 | success | Run npm ci: 0分19秒 |
+| mutation / Mutation gate | 0分37秒 | success | Run pnpm install --frozen-lockfile: 0分19秒 |
 | Acceptance criteria gate | 0分33秒 | failure | Install dependencies: 0分16秒 |
 | Main release gate | 0分11秒 | failure | Run actions/setup-node@v4: 0分05秒 |
 | Check remote-smoke secrets | 0分05秒 | success | Run actions/checkout@v4: 0分02秒 |

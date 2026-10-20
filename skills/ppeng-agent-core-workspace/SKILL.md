@@ -26,16 +26,16 @@ description: Work effectively in the ppeng-agent-core (Raw Agent SDK) monorepo�
 
 ## 改代码后怎么验
 
-- 逻辑/核心包：`npm run test:unit`
-- 全量 TS：`npm run build`
+- 逻辑/核心包：`pnpm run test:unit`
+- 全量 TS：`pnpm run build`
 - 回归/E2E：见 [`doc/TESTING.md`](../../doc/TESTING.md)
 
 不要提交 `.env`；改模型或运行相关变量后需**重启 daemon** 才生效。
 
 ## Evolution（持续学习管线）
 
-- 统一入口：`npm run evolution -- --help`（含 `--learn`、`--agent`、`--review`、`--until-empty`、`--research`、`--test-agent` 等）。
-- 一键 learn + 排空 inbox + 可选展示站：`npm run evolution:drain-showcase -- --help` 或 `bash scripts/evolution-drain-showcase.sh --help`。
+- 统一入口：`pnpm run evolution --help`（含 `--learn`、`--agent`、`--review`、`--until-empty`、`--research`、`--test-agent` 等）。
+- 一键 learn + 排空 inbox + 可选展示站：`pnpm run evolution:drain-showcase --help` 或 `bash scripts/evolution-drain-showcase.sh --help`。
 - **默认** `run-day` 只处理当日 inbox 的 **「今日新条目」** 分段；`--items` 是每轮上限而非「总轮数」。
 - 常用命令表：[`references/evolution.md`](references/evolution.md)。
 

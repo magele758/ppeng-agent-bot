@@ -40,9 +40,9 @@ criteria:
 
 | 运行器 | 文件集合来源 |
 |---|---|
-| node:test（`npm run test:unit`） | `package.json` 中 `test:unit` 脚本 `--test` 之后的路径 / glob |
+| node:test（`pnpm run test:unit`） | `package.json` 中 `test:unit` 脚本 `--test` 之后的路径 / glob |
 | vitest（agent-loop） | `packages/agent-loop/vitest.config.ts` 的 `include` |
-| Playwright（`npm run test:e2e`） | `playwright.config.ts` 的 `testDir` 下 `*.spec.ts` / `*.test.ts` |
+| Playwright（`pnpm run test:e2e`） | `playwright.config.ts` 的 `testDir` 下 `*.spec.ts` / `*.test.ts` |
 
 测试类文件（`*.test.*` / `*.spec.*` 或位于 `test/`、`e2e/` 目录）里出现 `[AC:` 却不在上述集合中 → **失败**（标签写了但测试永远不会跑）。
 `test.skip` / `.todo` / `.fixme` 静态上不算覆盖。
@@ -75,7 +75,7 @@ criteria:
 |---|---|
 | node:test | CI：`scripts/ci/retry-failed-tests.mjs --junit <dir>/unit.xml`，首轮写 `unit.xml`，flaky 重跑写 `unit.retry-N.xml`，门禁把二者当同一用例的多次运行（任一次通过即通过）。本地 `test:acceptance:full`：`NODE_OPTIONS="--test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=<dir>/unit.xml"`（node 只认文件列表之前的 reporter 参数；目标目录需先存在） |
 | vitest | `vitest run --reporter=default --reporter=junit --outputFile.junit=<dir>/vitest.xml` |
-| Playwright | `npm run test:e2e -- --reporter=dot,junit`，`PLAYWRIGHT_JUNIT_OUTPUT_FILE=<dir>/e2e.xml`（`scripts/e2e-run.mjs` 会把额外参数转给 `playwright test`） |
+| Playwright | `pnpm run test:e2e --reporter=dot,junit`，`PLAYWRIGHT_JUNIT_OUTPUT_FILE=<dir>/e2e.xml`（`scripts/e2e-run.mjs` 会把额外参数转给 `playwright test`） |
 
 用例标题 = 祖先 `<testsuite>` 名 + `<testcase>` 名，所以 node:test 的 `describe` 标签也能对上。
 
@@ -92,10 +92,10 @@ criteria:
 ## 本地使用
 
 ```bash
-npm run test:acceptance             # 静态追踪（不跑测试，秒级；已包含在 npm run ci）
-npm run test:acceptance:full        # 跑 unit + agent-loop vitest + e2e（带 JUnit），再基于结果判定；需先 npm run build
+pnpm run test:acceptance             # 静态追踪（不跑测试，秒级；已包含在 pnpm run ci）
+pnpm run test:acceptance:full        # 跑 unit + agent-loop vitest + e2e（带 JUnit），再基于结果判定；需先 pnpm run build
 node scripts/acceptance/acceptance-gate.mjs --collect unit,vitest      # 只跑部分运行器
-npm run test:acceptance:results     # 用 coverage/acceptance/results/ 下已有的 JUnit 文件判定
+pnpm run test:acceptance:results     # 用 coverage/acceptance/results/ 下已有的 JUnit 文件判定
 node scripts/acceptance/acceptance-gate.mjs --results a.xml --results dir/   # 任意结果文件 / 目录
 ```
 
@@ -124,8 +124,8 @@ node scripts/acceptance/acceptance-gate.mjs --results a.xml --results dir/   # �
 
 2026-10-19用户明确批准第四阶段按8条本地软件标准单独交付，原40条原文与approved状态保留为现场验收。规格可选 `verificationStage: software | deployment`，省略为software。
 
-- `npm run test:acceptance` 默认软件阶段；所有既有软件规格仍阻断。
-- `npm run test:acceptance:deployment` 运行 `--stage all`，软件及现场规格全部参与，现场缺项仍阻断发布验收。
+- `pnpm run test:acceptance` 默认软件阶段；所有既有软件规格仍阻断。
+- `pnpm run test:acceptance:deployment` 运行 `--stage all`，软件及现场规格全部参与，现场缺项仍阻断发布验收。
 - 也可显式 `--stage software|deployment|all`；非法阶段拒绝。
 - 软件报告完整保留现场标准、批准状态及未通过状态，标记 `applicable:false`，不得据软件通过宣称现场就绪。
 - 已批准的软件基线不能通过改变verificationStage迁出软件门禁。新增/调整适用阶段同样必须经用户明确批准，不得用此字段规避验收。

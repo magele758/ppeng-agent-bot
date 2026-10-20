@@ -42,12 +42,12 @@
 ## 常用命令
 
 ```bash
-npm run release                    # 完整流水线 start
-npm run release:git-sync
-npm run release:status
-npm run release:observe -- --run-id rel_YYYYMMDD_NNN
-npm run release:promote -- --run-id rel_YYYYMMDD_NNN
-npm run release:rollback -- --run-id rel_YYYYMMDD_NNN
+pnpm run release                    # 完整流水线 start
+pnpm run release:git-sync
+pnpm run release:status
+pnpm run release:observe --run-id rel_YYYYMMDD_NNN
+pnpm run release:promote --run-id rel_YYYYMMDD_NNN
+pnpm run release:rollback --run-id rel_YYYYMMDD_NNN
 ```
 
 ## Compose ↔ Helm 对齐
@@ -68,4 +68,4 @@ npm run release:rollback -- --run-id rel_YYYYMMDD_NNN
 ## 相关文档
 
 - 能力地图：[`SELF_EVOLUTION_V2.md`](SELF_EVOLUTION_V2.md)
-- Evolution 管线：根目录 `AGENTS.md` / `npm run evolution -- --help`
+- Evolution 管线：根目录 `AGENTS.md` / `pnpm run evolution --help`

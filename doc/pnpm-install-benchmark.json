@@ -1,0 +1,54 @@
+{
+  "environment": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "node": "v26.7.0",
+    "npm": "11.19.0",
+    "pnpm": "10.29.2",
+    "registry": "https://registry.npmjs.org/",
+    "dependencyVersions": "Preserved from original npm lock; optional @emnapi/runtime pinned to original 1.9.1",
+    "lifecycleScripts": false,
+    "pnpmNetworkConcurrency": 4
+  },
+  "samples": [
+    {
+      "manager": "npm",
+      "cache": "cold",
+      "elapsedMs": 71377,
+      "exitCode": 0,
+      "nodeModulesBytes": 779841536
+    },
+    {
+      "manager": "npm",
+      "cache": "warm",
+      "elapsedMs": 4331,
+      "exitCode": 0,
+      "nodeModulesBytes": 771076096
+    },
+    {
+      "manager": "pnpm",
+      "cache": "cold",
+      "elapsedMs": 595636,
+      "exitCode": 0,
+      "nodeModulesBytes": 753926144
+    },
+    {
+      "manager": "pnpm",
+      "cache": "warm",
+      "elapsedMs": 3109,
+      "exitCode": 0,
+      "nodeModulesBytes": 753926144
+    }
+  ],
+  "cacheBytes": {
+    "npm": 204206080,
+    "pnpm": 748965888
+  },
+  "limitations": [
+    "One cold and one warm sample per manager, not a statistical benchmark.",
+    "Cold caches are independent empty directories; warm runs reuse only the corresponding manager cache after removing every node_modules.",
+    "Lifecycle scripts are disabled equally; separate regression validates approved native build scripts.",
+    "Network resets and registry latency affect cold results; the measurements do not prove a universal speedup.",
+    "nodeModulesBytes is du allocated disk usage of the installed tree minus the clean manifest tree; pnpm shared-store links are not additional independent physical storage."
+  ]
+}

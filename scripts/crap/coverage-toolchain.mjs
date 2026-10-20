@@ -6,7 +6,7 @@ export function assertCoverageVersions({ vitest, coverageV8, providerVitest }) {
   if (!vitest || !coverageV8 || !providerVitest || vitest !== coverageV8 || vitest !== providerVitest) {
     throw new Error(
       `Coverage toolchain mismatch: vitest=${vitest}, coverage-v8=${coverageV8}, ` +
-      `provider resolves vitest=${providerVitest}. Restore dependencies with npm ci ` +
+      `provider resolves vitest=${providerVitest}. Restore dependencies with pnpm install --frozen-lockfile ` +
       `under the CI Node version before collecting coverage; do not update the CRAP baseline.`
     );
   }
@@ -27,7 +27,7 @@ export function resolveCoverageToolchain(root) {
   };
   assertCoverageVersions(versions);
   const bin = typeof runner.bin === 'string' ? runner.bin : runner.bin?.vitest;
-  if (!bin) throw new Error('Installed Vitest has no CLI entry; restore dependencies with npm ci.');
+  if (!bin) throw new Error('Installed Vitest has no CLI entry; restore dependencies with pnpm install --frozen-lockfile.');
   const cli = path.resolve(path.dirname(runnerPath), bin);
   if (!fs.existsSync(cli)) throw new Error(`Vitest CLI missing: ${cli}`);
   return {

@@ -5,7 +5,7 @@ import type { SelfHealPolicy } from '../types.js';
 import { sanitizeSpawnEnv } from '../sandbox/env-sanitizer.js';
 import { npmScriptForSelfHealPolicy } from './self-heal-policy.js';
 
-/** 为子进程补足 PATH（supervisor/受限环境常见缺 Homebrew、同目录 npm），并剥离危险注入变量。 */
+/** 为子进程补足 PATH（supervisor/受限环境常见缺 Homebrew、同目录 pnpm），并剥离危险注入变量。 */
 export function enrichSpawnEnv(overrides?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const base = sanitizeSpawnEnv({ overrides });
   const extraDirs = [
@@ -21,19 +21,15 @@ export function enrichSpawnEnv(overrides?: NodeJS.ProcessEnv): NodeJS.ProcessEnv
   return { ...base, PATH };
 }
 
-/** Daemon 若从 supervisor/GUI 启动，PATH 可能不含 npm；优先用与当前 node 同目录的 npm。 */
+/** Daemon 若从 supervisor/GUI 启动，PATH 可能不含 pnpm；优先用与当前 node 同目录的 pnpm。 */
 export function resolveNpmBin(): string {
+  // Legacy bootstrap override name retained for existing installations; point it at pnpm.
   const explicit = process.env.RAW_AGENT_NPM_BIN?.trim() || process.env.RAW_AGENT_NPM?.trim();
   if (explicit) return explicit;
   const dir = path.dirname(process.execPath);
-  if (process.platform === 'win32') {
-    const cmd = path.join(dir, 'npm.cmd');
-    if (existsSync(cmd)) return cmd;
-  } else {
-    const npm = path.join(dir, 'npm');
-    if (existsSync(npm)) return npm;
-  }
-  return 'npm';
+  const candidates = [path.join(dir, process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'),
+    ...(process.env.PATH ?? '').split(path.delimiter).map(dir => path.join(dir, process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'))];
+  return candidates.find(candidate => existsSync(candidate)) ?? 'pnpm';
 }
 
 /** 显式路径优先，其次常见安装位置，避免 spawn git ENOENT。 */
@@ -61,9 +57,9 @@ function spawnCapture(
   options?: { timeoutMs?: number; signal?: AbortSignal; env?: NodeJS.ProcessEnv }
 ): Promise<{ code: number | null; output: string }> {
   return new Promise((resolve, reject) => {
-    // Own process group (POSIX) so `npm run …` and everything it forks
+    // Own process group (POSIX) so `pnpm run …` and everything it forks
     // (`node --test` workers, `next build`, tsc) die together on abort/timeout.
-    // Killing only the npm pid orphans the whole tree.
+    // Killing only the package-manager pid orphans the whole tree.
     const detached = process.platform !== 'win32';
     const child = spawn(command, args, {
       cwd,

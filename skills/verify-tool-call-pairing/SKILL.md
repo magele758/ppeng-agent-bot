@@ -10,16 +10,16 @@ description: Verify tool-call/result pairing when editing persistence, retry, ca
 
 ## 运行
 
-在仓库根目录执行 `npm ci`（Node 22+，锁定 TypeScript 5.9.3），然后：
+在仓库根目录执行 `pnpm install --frozen-lockfile`（Node 22+，锁定 TypeScript 5.9.3），然后：
 
 ```sh
-npm run test:pairing
+pnpm run test:pairing
 node --test scripts/test/tool-call-pairing-verification.test.mjs
 ```
 
 不需模型密钥、Java 或已有 dist 构建。工具是仓库固定的 `pairing-explicit-state/1` 显式状态穷举器，不是 TLC。工具代码及模型随复核指纹固定，报告记录 Node 版本。
 
-`coverage/formal/pairing/report.json` 和 `report.md` 包含范围、模型结果、真实代码探针、故障演练、复核状态。退出码 0=全部通过，1=约束违反/演练漏检/需要复核，2=工具缺失、超时或未完成。`npm run test:formal` 和发布门禁会执行此入口。不要把单测通过、模型通过或旧报告当作整体通过。
+`coverage/formal/pairing/report.json` 和 `report.md` 包含范围、模型结果、真实代码探针、故障演练、复核状态。退出码 0=全部通过，1=约束违反/演练漏检/需要复核，2=工具缺失、超时或未完成。`pnpm run test:formal` 和发布门禁会执行此入口。不要把单测通过、模型通过或旧报告当作整体通过。
 
 ## 覆盖代码及模型对应
 

@@ -15,7 +15,7 @@ import { readFileSync } from 'node:fs';
  * runs. The guard is about what gets committed, so it reads the committed blob
  * (HEAD) and only falls back to the working tree outside a git checkout.
  */
-const LOCKFILES = ['yarn.lock', 'package-lock.json'];
+const LOCKFILES = ['pnpm-lock.yaml'];
 const HOME_DIR = /(?:^|[\s"'=])(?:\/home\/|\/Users\/|[A-Za-z]:\\Users\\)/m;
 
 function absoluteFileLocators(text) {

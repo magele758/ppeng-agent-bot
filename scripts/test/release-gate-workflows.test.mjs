@@ -19,7 +19,7 @@ test('release-gate.yml keeps the required-check job name and the flaky-aware uni
   assert.match(src, /node scripts\/ci\/validation-lane\.mjs unit --out/);
   const runner=readFileSync(new URL('../ci/validation-lane.mjs',import.meta.url),'utf8');
   assert.match(runner, /retry-failed-tests\.mjs','--script','test:unit','--lane',lane/);
-  assert.doesNotMatch(src, /run: npm run test:unit/, 'unit tests must go through the retry wrapper');
+  assert.doesNotMatch(src, /run: pnpm run test:unit/, 'unit tests must go through the retry wrapper');
 });
 
 test('ci.yml exposes the gate as "Release gate / Main release gate"', () => {

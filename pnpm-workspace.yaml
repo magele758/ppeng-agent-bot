@@ -1,0 +1,15 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Install scripts are opt-in, including native and desktop build tools.
+onlyBuiltDependencies:
+  - sharp
+  - electron
+  - esbuild
+  - '@swc/core'
+  - unrs-resolver
+
+# Preserve npm's previously locked optional WebAssembly runtime during migration.
+overrides:
+  '@emnapi/runtime': 1.9.1

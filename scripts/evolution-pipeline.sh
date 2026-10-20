@@ -4,12 +4,12 @@
 #
 # 环境变量（见 .env.example「自进化一键管线」）：
 #   EVOLUTION_SKIP_PIPELINE_BUILD — 跳过管线开头的编译
-#   EVOLUTION_PIPELINE_BUILD_CMD — 默认 npx tsc -b packages/capability-gateway
+#   EVOLUTION_PIPELINE_BUILD_CMD — 默认 pnpm exec tsc -b packages/capability-gateway
 #   EVOLUTION_PIPELINE_LEARN_ONLY — 仅跑 learn
 #   EVOLUTION_POST_MERGE_RELOAD — 跑完 run-day 后执行 evolution-post-merge-reload.sh
 #   EVOLUTION_PIPELINE_USE_ENV_AGENT — 为 1 时 evolution-cli 沿用 .env 的 agent；否则默认 Claude preset
 #
-# 用法：npm run evolution:pipeline
+# 用法：pnpm run evolution:pipeline
 
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

@@ -83,5 +83,5 @@ test('covered lifecycle sources and checker changes require review [AC:session-l
     const changed = checkLifecycleReview({ read: p => readFileSync(p, 'utf8') + (p.endsWith(suffix) ? '\n// changed' : '') });
     assert.equal(changed.status, 'needs-review');
   }
-  assert.match(readFileSync(join(ROOT, 'skills/verify-session-lifecycle/SKILL.md'), 'utf8'), /npm run test:lifecycle/);
+  assert.match(readFileSync(join(ROOT, 'skills/verify-session-lifecycle/SKILL.md'), 'utf8'), /pnpm run test:lifecycle/);
 });
