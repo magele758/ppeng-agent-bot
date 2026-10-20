@@ -19,6 +19,7 @@ import {
   subagentMemorySessionIds
 } from '../dist/memory/bot-memory-scope.js';
 import { AgentMemoryStore } from '../dist/memory/store.js';
+import { MemorySuppressedError } from '../dist/memory/deletion-suppression.js';
 import { dreamNowForUser } from '../dist/memory/memory-dreamer.js';
 import { shortCompactConclusion, shortCompactSummaryConclusion } from '../dist/runtime/compact-host.js';
 import { spawnSubagentOutcome, spawnTeammate } from '../dist/runtime/spawn-host.js';
@@ -1404,6 +1405,110 @@ test('search falls back to LIKE when the FTS table is missing [AC:schema-upgrade
   row(am, { key: 'a', value: 'kiwi beta', userId: 'u1' });
   assert.deepEqual(am.search({ query: 'beta kiwi' }), []);
   assert.deepEqual(am.search({ query: 'wi be' }).map((m) => m.key), ['a']);
+  store.db.close();
+});
+
+function spyPrepare(db) {
+  const calls = [];
+  const original = db.prepare;
+  db.prepare = function (sql, ...rest) {
+    calls.push(String(sql));
+    return original.call(this, sql, ...rest);
+  };
+  return calls;
+}
+
+function assertAutocommit(db) {
+  db.exec('BEGIN IMMEDIATE');
+  db.exec('ROLLBACK');
+}
+
+test('null user id stays separate in list and FTS search', () => {
+  const { store } = tmpStore();
+  const am = store.agentMemory();
+  am.set({ scope: 'user.memory', namespace: 'fact', key: 'anon', value: 'papaya solo', importance: 0.5, confidence: 'medium' });
+  am.set({ scope: 'user.memory', namespace: 'fact', key: 'owned', value: 'papaya solo', userId: 'u1', importance: 0.5, confidence: 'medium' });
+  assert.deepEqual(am.search({ query: 'papaya solo', userId: null }).map((m) => m.key), ['anon']);
+  assert.deepEqual(am.search({ scope: 'user.memory', userId: null, limit: 20 }).map((m) => m.key), ['anon']);
+  store.db.close();
+});
+
+test('a queryless search and a missing FTS table never issue MATCH', () => {
+  const { store } = tmpStore();
+  const live = spyPrepare(store.db);
+  const am = new AgentMemoryStore(store.db);
+  am.set({ scope: 'user.memory', namespace: 'fact', key: 'a', value: 'alpha row', importance: 0.5, confidence: 'medium' });
+  live.length = 0;
+  assert.deepEqual(am.search({ limit: 5 }).map((m) => m.key), ['a']);
+  assert.equal(live.some((sql) => sql.includes('MATCH')), false);
+
+  store.db.exec(
+    'DROP TRIGGER agent_memory_ai; DROP TRIGGER agent_memory_ad; DROP TRIGGER agent_memory_au; DROP TABLE agent_memory_fts;'
+  );
+  const fallen = new AgentMemoryStore(store.db);
+  live.length = 0;
+  assert.deepEqual(fallen.search({ query: 'alpha' }).map((m) => m.key), ['a']);
+  assert.equal(live.some((sql) => sql.includes('MATCH')), false);
+  store.db.close();
+});
+
+test('exact capacity does not evict; one extra drops the lower-importance row', () => {
+  const { store } = tmpStore();
+  const calls = spyPrepare(store.db);
+  const am = new AgentMemoryStore(store.db, { 'user.memory': 1 });
+  calls.length = 0;
+  am.set({ scope: 'user.memory', namespace: 'fact', key: 'old', value: 'one', importance: 0.1, confidence: 'medium' });
+  assert.equal(calls.some((sql) => sql.includes('ORDER BY importance')), false);
+  am.set({ scope: 'user.memory', namespace: 'fact', key: 'new', value: 'two', importance: 0.9, confidence: 'medium' });
+  assert.deepEqual(am.search({ scope: 'user.memory', limit: 10 }).map((m) => m.key), ['new']);
+  store.db.close();
+});
+
+test('suppression blocks the rewrite, and a later write failure rolls the row back', () => {
+  const { store } = tmpStore();
+  const am = store.agentMemory();
+  const created = am.set({
+    scope: 'user.memory',
+    namespace: 'semantic',
+    key: 'preference:style',
+    value: '用户偏好简洁回答',
+    userId: 'u1',
+    importance: 0.8,
+    confidence: 'high'
+  });
+  assertAutocommit(store.db);
+  assert.ok(am.deleteAndSuppress(created.id));
+  assert.throws(
+    () => am.set({
+      scope: 'user.memory',
+      namespace: 'semantic',
+      key: 'preference:style',
+      value: '用户偏好简洁回答',
+      userId: 'u1',
+      importance: 0.8,
+      confidence: 'high'
+    }),
+    (error) => error instanceof MemorySuppressedError
+  );
+  assert.equal(am.getEntryById(created.id), null);
+  assert.equal(am.listSuppressions()[0].blockedCount, 1);
+  assertAutocommit(store.db);
+
+  store.db.exec(
+    "CREATE TRIGGER reject_memory_sources BEFORE INSERT ON agent_memory_sources BEGIN SELECT RAISE(ABORT, 'sources rejected'); END"
+  );
+  assert.throws(() => am.set({
+    scope: 'user.memory',
+    namespace: 'fact',
+    key: 'fresh',
+    value: 'not suppressed',
+    userId: 'u2',
+    importance: 0.5,
+    confidence: 'medium',
+    sourceRefs: [{ sessionId: 's', messageId: 'm', seq: 1 }]
+  }));
+  assert.equal(am.search({ scope: 'user.memory', userId: 'u2', limit: 10 }).length, 0);
+  assertAutocommit(store.db);
   store.db.close();
 });
 

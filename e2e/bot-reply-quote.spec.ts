@@ -1,11 +1,14 @@
 import { test, expect } from '@playwright/test';
 
 test('quote survives send and reload through the real chat API [AC:bot-reply-quote#AC-1] [AC:bot-reply-quote#AC-5]', async ({ page, request }) => {
+  // Two streaming waits are each allowed 60s, so the test budget has to cover both plus the reload.
+  test.setTimeout(180_000);
   const created = await request.post('/api/bots', { data: { name: `Quote ${Date.now()}` } });
   expect(created.status()).toBe(201);
   const { bot } = await created.json();
   async function openBot() {
     await page.goto('/#/agents/bots');
+    await page.getByRole('searchbox', { name: '搜索 Bot' }).fill(bot.name);
     await page.getByTestId(`bot-card-${bot.id}`).click();
     await page.getByTestId('bot-detail').getByRole('button', { name: '打开对话', exact: true }).click();
   }
