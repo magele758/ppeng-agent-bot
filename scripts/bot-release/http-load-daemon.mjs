@@ -3,7 +3,7 @@ import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
 import {join} from 'node:path';
 import {createServer} from 'node:http';
 import {boot} from '../test/helpers/bot-http-fixture.mjs';
-import {controlledOperation} from './http-controlled-operation.mjs';
+import {controlledOperation,preferUnansweredCron} from './http-controlled-operation.mjs';
 const workload=JSON.parse(readFileSync(new URL('./workload.v1.json',import.meta.url),'utf8'));
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 let fixture,closed=false,ticking=false,cycles=0,modelTurns=0,toolCalls=0,artifactBytes=0;
@@ -28,7 +28,7 @@ const software=createServer(async(req,res)=>{let raw='';for await(const part of 
  const base={key:input.key,artifact:artifact??null,result:''};base.result='r'.repeat(Math.max(0,workload.payloadBytes.toolResult-Buffer.byteLength(JSON.stringify(base))));res.setHeader('content-type','application/json');res.end(JSON.stringify(base));});
 await new Promise(resolve=>software.listen(0,'127.0.0.1',resolve));
 const toolName='http_benchmark_software';
-const extraTools=[{name:toolName,description:'Controlled local software benchmark',inputSchema:{type:'object',properties:{key:{type:'string'},kind:{type:'string'}},required:['key','kind']},approvalMode:'never',sideEffectLevel:'none',async execute(ctx,input){const r=await fetch(`http://127.0.0.1:${software.address().port}`,{method:'POST',body:JSON.stringify(input),signal:ctx.signal});return {ok:r.ok,content:await r.text()};}}];
+const extraTools=[{name:toolName,description:'Controlled local software benchmark',inputSchema:{type:'object',properties:{key:{type:'string'},kind:{type:'string'}},required:['key','kind']},approvalMode:'auto',sideEffectLevel:'none',needsApproval(context,input){const operation=String(input?.key??'').split(':')[0];if(!/^http_op_\d+$/.test(operation)||!fixture)return false;return Boolean(fixture.runtime.store.db.prepare("SELECT 1 FROM session_messages WHERE session_id=? AND role='user' AND instr(parts_json, ?)>0 LIMIT 1").get(context.session.id,`[cron:${operation}]`));},async execute(ctx,input){const r=await fetch(`http://127.0.0.1:${software.address().port}`,{method:'POST',body:JSON.stringify(input),signal:ctx.signal});return {ok:r.ok,content:await r.text()};}}];
 const modelAdapter={name:'http-benchmark-controlled',contextWindow:131072,async runTurn(input){modelTurns++;const execution=fixture.runtime.store.getSession(input.sessionId)?.activeWriterRunId??'unbound',executionKey=input.sessionId+':'+execution;if(!executionContexts.has(executionKey))executionContexts.set(executionKey,contexts.get(input.sessionId)??{});const context=executionContexts.get(executionKey),operation=context.operation;const key=operation+':'+input.sessionId;if(context.durableKind==='result')notificationRuns++;if(operation)turnCounts[executionKey]=(turnCounts[executionKey]??0)+1;
  if(operation&&!seen.has(key)){seen.add(key);starts.push({operation,sessionId:input.sessionId,startedAt:Date.now(),cycle:cycles});}
  await sleep(workload.controlledLatencyMs.modelTurn);
@@ -59,7 +59,7 @@ const originalRun=fixture.runtime.runSession.bind(fixture.runtime);fixture.runti
  // the captured triggering operation. The latest user row is its approval
  // continuation, not a new benchmark request.
  const resuming=Boolean(store.getSession(sid)?.metadata?.interrupt)&&contexts.has(sid);
- if(!fixture.runtime.isSessionRunning(sid)&&!resuming){const latest=[...store.listHistory(sid,{limit:50}).messages].reverse().find(message=>message.role==='user');const durableKind=latest?store.db.prepare('SELECT kind FROM bot_work_messages WHERE message_ref=?').get(latest.id)?.kind:undefined;contexts.set(sid,{operation:controlledOperation(latest?[latest]:[],durableKind),durableKind,messageId:latest?.id});}
+ if(!fixture.runtime.isSessionRunning(sid)&&!resuming){const history=store.listHistory(sid,{limit:50}).messages;const latest=[...history].reverse().find(message=>message.role==='user');const durableKind=latest?store.db.prepare('SELECT kind FROM bot_work_messages WHERE message_ref=?').get(latest.id)?.kind:undefined;contexts.set(sid,{operation:preferUnansweredCron(history,sid,controlledOperation(latest?[latest]:[],durableKind)),durableKind,messageId:latest?.id});}
  return originalRun(sid,...args);
 };
 // Match daemon's normal 1500ms, nonoverlapping scheduler interval, rather than accelerating it for the benchmark.

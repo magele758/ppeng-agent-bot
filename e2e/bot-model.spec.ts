@@ -49,10 +49,9 @@ test.describe('Bot model setting', () => {
     };
     const composerModelSelect = async () => {
       await page.getByTestId('bot-detail').getByRole('button', { name: '打开对话' }).click();
-      await expect(page.locator('#playModelSelect')).toBeVisible();
       await expect(page).toHaveURL(/#\/bot/);
       await expect(page.locator('#nav-bot')).toHaveAttribute('aria-current', 'page');
-      return page.locator('#playModelSelect');
+      await expect(page.locator('#playModelSelect')).toHaveCount(0);
     };
 
     await openSettings();
@@ -65,7 +64,7 @@ test.describe('Bot model setting', () => {
     await select.selectOption({ label: 'e2e-model-b' });
     await expect.poll(() => pinnedModel(request, session.id)).toBe('e2e-model-b');
     await expect(select).toHaveValue(`${providerId}::e2e-model-b`);
-    await expect(await composerModelSelect()).toBeDisabled();
+    await composerModelSelect();
 
     await openSettings();
     await expect(page.getByLabel('Bot 使用的模型')).toHaveValue(`${providerId}::e2e-model-b`);
@@ -73,7 +72,7 @@ test.describe('Bot model setting', () => {
     await page.getByLabel('Bot 使用的模型').selectOption('');
     await expect.poll(() => pinnedModel(request, session.id)).toBeUndefined();
     await expect(page.getByLabel('Bot 使用的模型')).toHaveValue('');
-    await expect(await composerModelSelect()).toBeEnabled();
+    await composerModelSelect();
   });
 
   test('the daemon rejects a model that is not in the configured list [AC:bots#AC-4]', async ({ request }) => {

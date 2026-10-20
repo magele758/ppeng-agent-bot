@@ -6,7 +6,7 @@ import {join} from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {sanitizeSpawnEnv} from '../../packages/core/dist/sandbox/env-sanitizer.js';
 import {runHttpLoad, untrackedFingerprintInput} from '../bot-release/http-load.mjs';
-import {controlledOperation} from '../bot-release/http-controlled-operation.mjs';
+import {controlledOperation,preferUnansweredCron} from '../bot-release/http-controlled-operation.mjs';
 test('dirty fingerprint records vanished files but preserves non-ENOENT errors', () => {
  const missing = Object.assign(new Error('deleted by concurrent test'), { code: 'ENOENT' });
  const input = untrackedFingerprintInput(['temporary-output'], () => { throw missing; });
@@ -19,6 +19,11 @@ test('controlled Room oracle selects current trigger despite old and later refer
  const text=content=>({type:'text',text:content});
  const messages=[{role:'user',parts:[text('http_op_1 prior')]},{role:'assistant',parts:[text('http_op_999 result')]},{role:'user',parts:[text('Room\nTrigger: '+JSON.stringify({text:'http_op_2 current'})+'\nHistory: '+JSON.stringify([{text:'http_op_1 old'},{text:'http_op_999 other referenced operation'}]))]},{role:'tool',parts:[{type:'tool_result',content:'http_op_555'}]}];
  assert.equal(controlledOperation(messages),'http_op_2');assert.equal(controlledOperation([{role:'user',parts:[text('Message from Worker: Task t completed: http_op_9 original result')]}],'result'),undefined);assert.equal(controlledOperation([{role:'user',parts:[text('http_op_3 current')]},{role:'assistant',parts:[text('http_op_999 quoted')]}]),'http_op_3');assert.equal(controlledOperation([{role:'user',parts:[text('Trigger: '+JSON.stringify({text:'No operation'})+'\nHistory http_op_123')]}]),undefined);
+ const sessionId='session_a',done={type:'tool_result',toolCallId:'controlled_http_op_3:'+sessionId,ok:true,content:'ok'};
+ const shared=[{role:'user',parts:[text('[cron:http_op_4] http_op_4 iii')]},{role:'user',parts:[text('http_op_3 current')]},{role:'assistant',parts:[done]}];
+ assert.equal(preferUnansweredCron(shared,sessionId,'http_op_3'),'http_op_4');
+ assert.equal(preferUnansweredCron([{role:'user',parts:[text('http_op_3 current')]},{role:'user',parts:[text('[cron:http_op_4] http_op_4 iii')]}],sessionId,'http_op_4'),'http_op_4');
+ assert.equal(preferUnansweredCron([{role:'user',parts:[text('[cron:http_op_4] http_op_4 iii')]},{role:'user',parts:[text('http_op_3 current')]}],sessionId,'http_op_3'),'http_op_3');
 });
 test('real authenticated HTTP load fixture observes fixed read/write mix and refuses release acceptance [AC:bot-release-readiness#AC-3]',{timeout:60000},async()=>{
  const directory=mkdtempSync(join(tmpdir(),'bot-http-load-test-'));

@@ -293,8 +293,9 @@ test('composer Bot choice wins while its open and the saved-default lookup are b
  await page.route(`**/api/bots/${chosen.id}/open`, async route => { seenChosen(); await chosenGate; await route.continue(); });
  try {
   await page.goto('/#/bot'); await lookupSeen;
-  await page.locator('.composer-bot-picker__trigger').click();
-  await page.locator('#botSelectMenu').getByRole('option', { name: chosen.name, exact: true }).click();
+  const row = page.locator(`#sessionListMini [data-bot-id="${chosen.id}"] .list-item--session`);
+  await expect(row).toHaveCount(1);
+  await row.click();
   await chosenSeen;
   const returned = page.waitForResponse(r => new URL(r.url()).pathname === `/api/bots/${saved.id}`);
   releaseLookup(); await (await returned).finished();
