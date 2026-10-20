@@ -33,4 +33,4 @@
 4. 允许 GitHub Actions 用 `GITHUB_TOKEN` 推送到你按下 Run workflow 的那个分支（一般是 `main`），并创建 tag。工作流身份是 `github-actions[bot]`。如果分支保护拦住机器人推送，版本提交会失败、包也不会发出去。要么给这个 bot 开推送例外，要么自己把版本改好后用 `republish`。
 5. Cursor 项目里的 `gh` 是 GitHub App（`ghs_` token），能推 tag，不能 `workflow_dispatch`。发布做法：把版本提交进要发布的提交，再 `git push origin npm-v<version>`。例如两个包都是 `0.1.2` 时推送 `npm-v0.1.2`。版本已在 npm 上则这次运行跳过。把该 tag 的 GitHub Release 从 pre-release 改成正式版仍会再跑一次，同样已存在则跳过。
 6. 这两个包已经在 npm 上，**不需要**为了「让 Trusted Publisher 能保存」再手动发一版。也不要手动重发 `0.1.1`。成功后 npm 上应出现 `@mage-ai-lab/api-types@0.1.2` 和 `@mage-ai-lab/agent-loop@0.1.2`。
-7. 只有在自己电脑上发布时才需要 `npm login`，然后 `npm run publish:npm`。CI 不走这条路。
+7. 只有在自己电脑上发布时才需要 `npm login`，然后 `pnpm run publish:npm`。CI 不走这条路。

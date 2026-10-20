@@ -78,7 +78,7 @@ function main() {
     ]
   });
 
-  console.log(`[retry-failed-tests] npm run ${args.script} (first pass)`);
+  console.log(`[retry-failed-tests] pnpm run ${args.script} (first pass)`);
   const first = spawnSync('sh', ['-c', shellCommand], { cwd: root, stdio: 'inherit', env: sanitizeScriptEnv() });
   const firstExitCode = first.status ?? 1;
   const failures = fs.existsSync(failuresFile) ? parseFailureLines(fs.readFileSync(failuresFile, 'utf8')) : [];

@@ -123,7 +123,7 @@ Working log 是辅助恢复文件，SQLite transcript 仍是会话事实源；�
 
 仓库当前能验证的是触发条件、选择结果和“落库 transcript 不被 micro-compact 改写”等不变量。token 节省、信息损失和触发频率取决于模型、工具输出与会话分布，必须从 `turn_end.usage`、`micro_compact`、compact trace 和任务结果中计算，不能写成固定百分比。
 
-「模型消费过 tool_result 后再改成占位」是 `microCompactMessages` 的可选 `policy`（`after_any_assistant` / `after_text_assistant`），**默认仍是 `keep_recent`**。Lab「更多 → 工具结果压缩」或对话区配置里切换，`PATCH /api/compact/settings` 写入 `daemon_control.compact_settings`，保存立即生效，不新增环境变量。离线对照：`npm run experiment:tool-result-evict`。真模型 A/B：**仅手动** Actions「Compact A/B」或本地 `npm run test:compact-ab`。
+「模型消费过 tool_result 后再改成占位」是 `microCompactMessages` 的可选 `policy`（`after_any_assistant` / `after_text_assistant`），**默认仍是 `keep_recent`**。Lab「更多 → 工具结果压缩」或对话区配置里切换，`PATCH /api/compact/settings` 写入 `daemon_control.compact_settings`，保存立即生效，不新增环境变量。离线对照：`pnpm run experiment:tool-result-evict`。真模型 A/B：**仅手动** Actions「Compact A/B」或本地 `pnpm run test:compact-ab`。
 
 ### 实验结论（2026-09-02）
 

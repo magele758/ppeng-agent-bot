@@ -77,12 +77,12 @@
 
 ```bash
 node scripts/build-workspace.mjs                       # 先编译
-npm run test:mutation                                  # 全部模块 + 门禁
-npm run test:mutation -- --module bot-policy,message-agent
-npm run test:mutation -- --module command-hardline --max-mutants 200   # 均匀抽样，快速迭代
-npm run test:mutation -- --list --module memory-namespace              # 只列变异体
-npm run test:mutation -- --update-baseline             # 分数提高后锁定（只升不降）
-npm run test:mutation -- --help
+pnpm run test:mutation                                  # 全部模块 + 门禁
+pnpm run test:mutation --module bot-policy,message-agent
+pnpm run test:mutation --module command-hardline --max-mutants 200   # 均匀抽样，快速迭代
+pnpm run test:mutation --list --module memory-namespace              # 只列变异体
+pnpm run test:mutation --update-baseline             # 分数提高后锁定（只升不降）
+pnpm run test:mutation --help
 ```
 
 | 参数 | 作用 |

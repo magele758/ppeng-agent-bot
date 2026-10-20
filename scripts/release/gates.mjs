@@ -45,11 +45,11 @@ export async function runG0(repoRoot, report) {
     setGate(report, 'g0', 'fail', failures[0]);
     return { ok: false, failures };
   }
-  const build = spawnSync('npm', ['run', 'build'], { cwd: repoRoot, env: sanitizeScriptEnv(), encoding: 'utf8', shell: true });
-  if (build.status !== 0) failures.push('npm run build failed');
+  const build = spawnSync('pnpm', ['run', 'build'], { cwd: repoRoot, env: sanitizeScriptEnv(), encoding: 'utf8', shell: true });
+  if (build.status !== 0) failures.push('pnpm run build failed');
 
-  const unit = spawnSync('npm', ['run', 'test:unit'], { cwd: repoRoot, env: sanitizeScriptEnv(), encoding: 'utf8', shell: true });
-  if (unit.status !== 0) failures.push('npm run test:unit failed');
+  const unit = spawnSync('pnpm', ['run', 'test:unit'], { cwd: repoRoot, env: sanitizeScriptEnv(), encoding: 'utf8', shell: true });
+  if (unit.status !== 0) failures.push('pnpm run test:unit failed');
 
   if (truthy(process.env.EVOLUTION_HARNESS_GATE)) {
     const harness = await runCmd(process.execPath, ['scripts/agent-eval/runner.mjs', '--mode', 'fast', '--exit-on-fail'], repoRoot);
@@ -115,15 +115,15 @@ export async function runG2(cfg, report) {
   }
 
   if (!failures.length) {
-    const reg = spawnSync('npm', ['run', 'test:regression'], { cwd: cfg.repoRoot, env, encoding: 'utf8', shell: true });
+    const reg = spawnSync('pnpm', ['run', 'test:regression'], { cwd: cfg.repoRoot, env, encoding: 'utf8', shell: true });
     if (reg.status !== 0) failures.push('test:regression failed');
   }
   if (!failures.length) {
-    const it = spawnSync('npm', ['run', 'test:integration'], { cwd: cfg.repoRoot, env, encoding: 'utf8', shell: true });
+    const it = spawnSync('pnpm', ['run', 'test:integration'], { cwd: cfg.repoRoot, env, encoding: 'utf8', shell: true });
     if (it.status !== 0) failures.push('test:integration failed');
   }
   if (!failures.length && existsSync(join(cfg.repoRoot, 'apps', 'web-console', '.next', 'BUILD_ID'))) {
-    const e2e = spawnSync('npm', ['run', 'test:e2e'], { cwd: cfg.repoRoot, env, encoding: 'utf8', shell: true });
+    const e2e = spawnSync('pnpm', ['run', 'test:e2e'], { cwd: cfg.repoRoot, env, encoding: 'utf8', shell: true });
     if (e2e.status !== 0) failures.push('test:e2e failed');
   } else if (!failures.length) {
     failures.push('web-console not built; skip e2e or run build:web-console first');

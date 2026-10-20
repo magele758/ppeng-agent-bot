@@ -1,3 +1,4 @@
+import {linkHistoricalDependencies} from '../lib/package-manager.mjs';
 /** Real pinned old binary + fresh fixture only. No live state or user credentials are touched. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -27,11 +28,7 @@ function run(command, args, cwd = ROOT) {
  return result.stdout.trim();
 }
 function host(store,stateDir) {return {store,stateDir,cronStore:undefined,setCronStore(next){this.cronStore=next},runImageRetention:async()=>{},wakeAllAutonomousSessions(){},wakeAgentSessions(){}};}
-function linkDependencies(checkout) {
- const target=join(checkout,'node_modules');mkdirSync(join(target,'@ppeng'),{recursive:true});
- for(const entry of readdirSync(join(ROOT,'node_modules')))if(entry!=='.bin'&&entry!=='@ppeng')symlinkSync(join(ROOT,'node_modules',entry),join(target,entry));
- for(const pkg of readdirSync(join(ROOT,'node_modules/@ppeng')))symlinkSync(readlinkSync(join(ROOT,'node_modules/@ppeng',pkg)),join(target,'@ppeng',pkg));
-}
+function linkDependencies(checkout) { linkHistoricalDependencies(checkout, ROOT); }
 function hash(path) {return createHash('sha256').update(readFileSync(path)).digest('hex');}
 /** Writer already closed. Checkpoint then close the connection before copying a complete file set. */
 function stoppedSnapshot(source,target) {

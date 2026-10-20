@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * 手动：构建展示站并同步到 EVOLUTION_SHOWCASE_DEPLOY_DIR（不要求 EVOLUTION_SHOWCASE_AUTO_DEPLOY）。
- * 用法：npm run evolution:showcase-deploy
+ * 用法：pnpm run evolution:showcase-deploy
  */
 import { config as loadDotenv } from 'dotenv';
 import { dirname, join } from 'node:path';

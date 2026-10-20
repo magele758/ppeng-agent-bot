@@ -74,7 +74,7 @@ function identity(repo) {
   for (const pkg of ['api-types', 'agent-loop', 'core']) walk(join(repo, 'packages', pkg, 'dist'));
   return { gitSha: revision.stdout.trim(), dirty: Boolean(git(['status', '--porcelain', '--untracked-files=no']).stdout.trim()),
     sourceDiffHash: hash(git(['diff', 'HEAD', '--', 'packages', 'apps/daemon']).stdout),
-    buildHash: hash(blobs), lockHash: hash(readFileSync(join(repo, 'package-lock.json'), 'utf8')) };
+    buildHash: hash(blobs), lockHash: hash(readFileSync(join(repo, existsSync(join(repo,'pnpm-lock.yaml'))?'pnpm-lock.yaml':'package-lock.json'), 'utf8')) };
 }
 
 const identities = Object.fromEntries(Object.entries(variants).map(([key, value]) => [key, identity(value.repoRoot)]));

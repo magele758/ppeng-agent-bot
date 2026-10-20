@@ -11,8 +11,8 @@
 仓库内（workspace 依赖）：
 
 ```bash
-npm install
-npx tsc -b packages/core   # 或根目录 npm run build（连带 daemon/cli/web-console）
+pnpm install
+pnpm exec tsc -b packages/core   # 或根目录 pnpm run build（连带 daemon/cli/web-console）
 ```
 
 产物：`packages/core/dist/*.js` + `.d.ts`。`package.json` 的 `files` 只打包 `dist/`、`examples/`、`README.md`、`CHANGELOG.md`——发布到 npm 时不含 `src/`、`test/`。
@@ -188,11 +188,11 @@ import { filterSessionsByQuery, type ApiSessionSummary } from '@ppeng/api-types'
 本地验收：
 
 ```bash
-npx tsc -b packages/core   # 先构建，示例读 dist/
-npm run test:examples      # 依次跑全部示例（01–10），任一非 0 退出即失败
+pnpm exec tsc -b packages/core   # 先构建，示例读 dist/
+pnpm run test:examples      # 依次跑全部示例（01–10），任一非 0 退出即失败
 ```
 
-`test:examples` 未接入 `npm run ci`（避免与其他子进程测试重复拉起临时状态目录），但会在本地/PR review 时按需手动跑；纳入完整门禁前会先观察其稳定性。
+`test:examples` 未接入 `pnpm run ci`（避免与其他子进程测试重复拉起临时状态目录），但会在本地/PR review 时按需手动跑；纳入完整门禁前会先观察其稳定性。
 
 ---
 

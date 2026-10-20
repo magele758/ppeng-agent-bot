@@ -68,9 +68,9 @@ node scripts/factory-readonly-pilot.mjs <本机配置.json> <证据目录>
 自动化检查：
 
 ```sh
-npx tsc -b packages/core apps/daemon
+pnpm exec tsc -b packages/core apps/daemon
 node --test packages/core/test/factory-readonly.test.js scripts/test/factory-routes.test.mjs scripts/test/route-access-contract.test.mjs
-npm run test:acceptance
+pnpm run test:acceptance
 ```
 
 前端验收用例：`e2e/factory-readonly.spec.ts`，覆盖配置保存、连接反馈、状态刷新、结果展开与刷新后保留配置。真实多机证据独立于界面测试，不能用模拟机器通过代替。

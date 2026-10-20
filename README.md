@@ -69,12 +69,14 @@ SDK presets are `mini / normal / full / max`. Browser and extension hosts must u
 
 ## Quick start
 
-Prerequisites: Node.js 22+ with SQLite FTS5 support, and npm. Run these commands from the repository root:
+Prerequisites: Node.js 22+ with SQLite FTS5 support, and pnpm 10.29.2. Run these commands from the repository root:
 
 ```bash
-npm install
-npm run build
-npm run dev
+corepack enable
+corepack prepare pnpm@10.29.2 --activate
+pnpm install
+pnpm run build
+pnpm run dev
 ```
 
 Open the **Agent Lab URL printed in the terminal**. Configure a provider (Base URL / API Key) in chat's model settings, discover models, then select one and send a message. No `.env` copy is required for this UI-first setup.
@@ -84,17 +86,17 @@ The dev launcher selects available ports and wires the proxy automatically; chos
 For a no-key smoke check, use the isolated heuristic eval after building:
 
 ```bash
-npm run agent:eval:fast -- --exit-on-fail
+pnpm run agent:eval:fast --exit-on-fail
 ```
 
-This verifies HTTP capabilities, not real-model answer quality. For CLI/HTTP walkthroughs, continue with the [from-zero tutorial](doc/harness/from-zero/README.md). To start Next separately, set `DAEMON_PROXY_TARGET` to the actual daemon address; production UI commands are `npm run build:web-console` and `npm run start:web-console`.
+This verifies HTTP capabilities, not real-model answer quality. For CLI/HTTP walkthroughs, continue with the [from-zero tutorial](doc/harness/from-zero/README.md). To start Next separately, set `DAEMON_PROXY_TARGET` to the actual daemon address; production UI commands are `pnpm run build:web-console` and `pnpm run start:web-console`.
 
 ### Desktop Client (macOS / Windows / Linux)
 
 Electron app that bundles daemon + Lab. Local pack matches this machine:
 
 ```bash
-npm run build:desktop
+pnpm run build:desktop
 # Output: apps/desktop/release/RawAgent-<version>-<os>-<arch>.{dmg,exe,AppImage}
 ```
 
@@ -108,12 +110,12 @@ If you are an **automated coding agent** (Cursor, Codex, Claude Code, etc.) work
 
 1. **Read [`AGENTS.md`](AGENTS.md) first** — workspace conventions, env vars, Evolution/self-heal/web-console notes, and operational gotchas.
 2. **Where code lives**: loop SDK → `packages/agent-loop`; product host & integrations → `packages/core`; HTTP API → `apps/daemon`; Agent Lab → `apps/web-console`; Evolution → `scripts/evolution*`.
-3. **After edits**: `npm run test:unit` for logic; `npm run build` for TypeScript across packages. UI/E2E → `doc/TESTING.md`, `npm run test:e2e` when relevant.
+3. **After edits**: `pnpm run test:unit` for logic; `pnpm run build` for TypeScript across packages. UI/E2E → `doc/TESTING.md`, `pnpm run test:e2e` when relevant.
 4. **Secrets & config**: prefer Lab UI and persisted settings APIs for supported options; avoid adding feature-switch env vars. Use [`.env.example`](.env.example) for necessary connection/bootstrap or CI fallback configuration; **never commit `.env`**. Env changes require process restart; consult each settings API for its effective scope.
-5. **Evolution**: `npm run evolution -- --help` for flags (`--learn`, `--agent`, `--review`, `--until-empty`, `--research`, `--test-agent`, …). Optional full drain + showcase: `npm run evolution:drain-showcase -- --help`. Inbox processing defaults to the **「今日新条目」** section (see README Evolution section below).
+5. **Evolution**: `pnpm run evolution --help` for flags (`--learn`, `--agent`, `--review`, `--until-empty`, `--research`, `--test-agent`, …). Optional full drain + showcase: `pnpm run evolution:drain-showcase --help`. Inbox processing defaults to the **「今日新条目」** section (see README Evolution section below).
 6. **Spawning / sandbox**: new subprocess code must use `sanitizeSpawnEnv()` and existing sandbox helpers (`packages/core/src/sandbox/env-sanitizer.ts`, `packages/core/src/sandbox/os-sandbox.ts`, `SandboxManager`) — not raw `spawn` with full parent env.
 7. **Skills**: `skills/**/SKILL.md`; optional merge with `~/.agents/**/SKILL.md` (details in `AGENTS.md`).
-8. **Loop SDK changes**: update [`skills/agent-loop/SKILL.md`](skills/agent-loop/SKILL.md) alongside SDK contracts, and run both `npm run test --workspace=@ppeng/agent-loop` and `npm run build --workspace=@ppeng/agent-loop`. Root `test:unit` does not replace the SDK's Vitest suite.
+8. **Loop SDK changes**: update [`skills/agent-loop/SKILL.md`](skills/agent-loop/SKILL.md) alongside SDK contracts, and run both `pnpm run test --workspace=@ppeng/agent-loop` and `pnpm run build --workspace=@ppeng/agent-loop`. Root `test:unit` does not replace the SDK's Vitest suite.
 
 Deeper architecture: [`doc/ARCHITECTURE.md`](doc/ARCHITECTURE.md).
 
@@ -123,24 +125,24 @@ Deeper architecture: [`doc/ARCHITECTURE.md`](doc/ARCHITECTURE.md).
 
 | Script | Description |
 |--------|-------------|
-| `npm run build` | TypeScript workspace build + Next production build |
-| `npm run test` | build + unit tests |
-| `npm run test:unit` | unit tests only |
-| `npm run test:regression` | temp daemon HTTP regression |
-| `npm run test:e2e` | temp daemon + Playwright (Agent Lab) |
-| `npm run test:e2e:install` | Playwright Chromium |
-| `npm run test:remote` | real-model smoke (needs env; skipped if unset) |
-| `npm run agent:eval:fast -- --exit-on-fail` | Isolated heuristic daemon; HTTP capability checks, nonzero on failure |
-| `npm run test --workspace=@ppeng/agent-loop` | Loop SDK Vitest suite |
-| `npm run ci` | build + unit + formal + fast eval + quality-engine simulation + package smoke + CRAP gate + regression + integration + e2e |
-| `npm run start:daemon` / `start:supervised` | daemon / supervisor |
-| `npm run start:cli` | CLI (`self-heal`, `chat`, …) |
-| `npm run dev:lab` | dev helper (Next + daemon proxy) |
-| `npm run evolution -- --help` | unified evolution entry, see all options |
-| `npm run evolution -- --learn --agent cursor --review codex` | learn + cursor implement + codex review |
-| `npm run evolution -- --learn-only` | pull RSS → inbox only |
-| `npm run evolution:pipeline` | learn → run-day → optional post-merge reload (one-shot) |
-| `npm run ai:tools` | check external CLIs (`claude`, `codex`, …) |
+| `pnpm run build` | TypeScript workspace build + Next production build |
+| `pnpm run test` | build + unit tests |
+| `pnpm run test:unit` | unit tests only |
+| `pnpm run test:regression` | temp daemon HTTP regression |
+| `pnpm run test:e2e` | temp daemon + Playwright (Agent Lab) |
+| `pnpm run test:e2e:install` | Playwright Chromium |
+| `pnpm run test:remote` | real-model smoke (needs env; skipped if unset) |
+| `pnpm run agent:eval:fast --exit-on-fail` | Isolated heuristic daemon; HTTP capability checks, nonzero on failure |
+| `pnpm run test --workspace=@ppeng/agent-loop` | Loop SDK Vitest suite |
+| `pnpm run ci` | build + unit + formal + fast eval + quality-engine simulation + package smoke + CRAP gate + regression + integration + e2e |
+| `pnpm run start:daemon` / `start:supervised` | daemon / supervisor |
+| `pnpm run start:cli` | CLI (`self-heal`, `chat`, …) |
+| `pnpm run dev:lab` | dev helper (Next + daemon proxy) |
+| `pnpm run evolution --help` | unified evolution entry, see all options |
+| `pnpm run evolution --learn --agent cursor --review codex` | learn + cursor implement + codex review |
+| `pnpm run evolution --learn-only` | pull RSS → inbox only |
+| `pnpm run evolution:pipeline` | learn → run-day → optional post-merge reload (one-shot) |
+| `pnpm run ai:tools` | check external CLIs (`claude`, `codex`, …) |
 
 See [`doc/TESTING.md`](doc/TESTING.md), [`doc/CI.md`](doc/CI.md), [`.env.example`](.env.example).
 
@@ -161,7 +163,7 @@ Daemon API examples: `GET /api/version`, `GET /api/health`, `GET /api/traces?ses
 
 ## Evolution (continuous learning)
 
-Unified entry: `npm run evolution -- [options]` (run `--help` for all flags).
+Unified entry: `pnpm run evolution [options]` (run `--help` for all flags).
 
 **Typical split-command loop** (learn → run-day batch → Pages showcase): fixed three-step sequence in [`doc/evolution/README.md`](doc/evolution/README.md).
 
@@ -171,15 +173,15 @@ Unified entry: `npm run evolution -- [options]` (run `--help` for all flags).
 
 | Command | Description |
 |---------|-------------|
-| `npm run evolution -- --learn-only` | Pull RSS → inbox only, no dev |
-| `npm run evolution -- --learn --agent claude` | learn + Claude implement (default) |
-| `npm run evolution -- --learn --agent cursor` | learn + Cursor composer-2-fast |
-| `npm run evolution -- --learn --agent cursor --review codex` | learn + Cursor implement + Codex review |
-| `npm run evolution -- --learn --agent cursor --review cursor` | learn + Cursor full pipeline |
-| `npm run evolution -- --learn --agent cursor --model claude-opus-4-7-thinking-max --review cursor` | learn + Cursor Opus-Max implement & review |
-| `npm run evolution -- --learn --agent full` | learn + research → multi-CLI routing by difficulty |
-| `npm run evolution -- --learn --agent cursor --review codex --concurrency 5 --merge` | 5 parallel worktrees + auto-merge |
-| `npm run evolution -- --pipeline-build --learn --agent cursor --review codex` | build gateway + learn + dev |
+| `pnpm run evolution --learn-only` | Pull RSS → inbox only, no dev |
+| `pnpm run evolution --learn --agent claude` | learn + Claude implement (default) |
+| `pnpm run evolution --learn --agent cursor` | learn + Cursor composer-2-fast |
+| `pnpm run evolution --learn --agent cursor --review codex` | learn + Cursor implement + Codex review |
+| `pnpm run evolution --learn --agent cursor --review cursor` | learn + Cursor full pipeline |
+| `pnpm run evolution --learn --agent cursor --model claude-opus-4-7-thinking-max --review cursor` | learn + Cursor Opus-Max implement & review |
+| `pnpm run evolution --learn --agent full` | learn + research → multi-CLI routing by difficulty |
+| `pnpm run evolution --learn --agent cursor --review codex --concurrency 5 --merge` | 5 parallel worktrees + auto-merge |
+| `pnpm run evolution --pipeline-build --learn --agent cursor --review codex` | build gateway + learn + dev |
 
 **Selected flags** (use `--help` for the complete, current list):
 
@@ -206,7 +208,7 @@ Unified entry: `npm run evolution -- [options]` (run `--help` for all flags).
 - Review / rebase / merge failures try to keep the experiment branch around for manual takeover. Check `doc/evolution/failure/` for the matching record, then inspect the local `exp/evolution-*` branch.
 - If `evolution:learn` shows widespread RSS failures, check proxy / DNS / TLS first. A `news.ycombinator.com` certificate mismatch usually points to local network or proxy interception rather than repo code.
 
-`npm run evolution:pipeline` (bash one-shot: build→learn→run-day→optional reload) and the low-level `evolution:learn` / `evolution:run-day` scripts are still available. For advanced fine-grained tuning (plan, test-agent, review rounds, etc.) see `scripts/evolution-quality-pipeline.env.example` and `.env.example`.
+`pnpm run evolution:pipeline` (bash one-shot: build→learn→run-day→optional reload) and the low-level `evolution:learn` / `evolution:run-day` scripts are still available. For advanced fine-grained tuning (plan, test-agent, review rounds, etc.) see `scripts/evolution-quality-pipeline.env.example` and `.env.example`.
 
 > **Deprecated (2026-10-16):** the self-evolution pipeline (`evolution:*` scripts, `scripts/evolution*`) is no longer maintained. Do not extend it; it may be removed later. See `scripts/evolution/DEPRECATED.md`.
 
@@ -214,10 +216,10 @@ Unified entry: `npm run evolution -- [options]` (run `--help` for all flags).
 
 ## Self-heal
 
-After `npm run start:daemon` (or supervised flow):
+After `pnpm run start:daemon` (or supervised flow):
 
 ```bash
-npm run start:cli -- self-heal start '{"testPreset":"unit","autoMerge":false}'
+pnpm run start:cli self-heal start '{"testPreset":"unit","autoMerge":false}'
 ```
 
 Scheduler runs whitelist tests in an isolated worktree; failures can drive a **self-healer** session. Optional `autoMerge` / `autoRestartDaemon` with `GET /api/daemon/restart-request` + `POST .../ack`. See [`doc/ARCHITECTURE.md`](doc/ARCHITECTURE.md).
@@ -272,7 +274,7 @@ Environment variables remain useful for secrets/upstream connections, process bo
 
 ## CI
 
-`npm run ci` runs build, unit, formal, fast contract eval, quality-engine simulation, tarball installation smoke, CRAP, HTTP regression, integration, and E2E checks. See [`package.json`](package.json) and [CI](doc/CI.md). npm and Docker publication require the release gate and test the actual artifacts before publishing. See the [reliability plan](doc/RELEASE_RELIABILITY_PLAN.md) for deployment boundaries and [harness evaluation](doc/HARNESS_EVALUATION.md) for paired real-model feature/prompt regression. Simulation is not capability evidence. Optional **remote model smoke** requires credentials; fork PRs do not receive upstream secrets.
+`pnpm run ci` runs build, unit, formal, fast contract eval, quality-engine simulation, tarball installation smoke, CRAP, HTTP regression, integration, and E2E checks. See [`package.json`](package.json) and [CI](doc/CI.md). npm and Docker publication require the release gate and test the actual artifacts before publishing. See the [reliability plan](doc/RELEASE_RELIABILITY_PLAN.md) for deployment boundaries and [harness evaluation](doc/HARNESS_EVALUATION.md) for paired real-model feature/prompt regression. Simulation is not capability evidence. Optional **remote model smoke** requires credentials; fork PRs do not receive upstream secrets.
 
 ---
 

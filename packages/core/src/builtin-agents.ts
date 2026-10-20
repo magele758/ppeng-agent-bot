@@ -28,7 +28,7 @@ export const builtinAgents: AgentSpec[] = [
       '- Frontend: apps/web-console/ — Next.js 15 App Router. Entry: app/page.tsx → components/AgentLabApp.tsx. Shared helpers in lib/ (api.ts, sse.ts, chat-utils.ts, markdown.ts, types.ts). NOT a SPA; no apps/web-console/src/.\n' +
       '- E2E tests (e2e/lab.smoke.spec.ts) run against the Next.js origin, not the daemon directly. Next proxies /api/* to daemon via DAEMON_PROXY_TARGET.\n' +
       '- Playwright selectors target Next components: #panel-play, #panel-ops, #panel-teams, #playMessages, #playInput, .chat-turn--user .chat-bubble__body.\n\n' +
-      'WORKFLOW: prefer read_file/grep_workspace before write_file/edit_file. Use bash only for safe commands (npm run ..., node). Never merge, push, or modify git state outside the workspace. After edits, rely on the harness to re-run tests. If stuck, summarize blockers briefly.',
+      'WORKFLOW: prefer read_file/grep_workspace before write_file/edit_file. Use bash only for safe commands (pnpm run ..., node). Never merge, push, or modify git state outside the workspace. After edits, rely on the harness to re-run tests. If stuck, summarize blockers briefly.',
     capabilities: ['coding', 'tool-use', 'testing']
   },
   {

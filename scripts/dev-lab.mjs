@@ -2,7 +2,7 @@
 /**
  * 一键本地调试：先编译 core + daemon，再并行启动 daemon 与 Next（带 DAEMON_PROXY_TARGET）。
  * 端口冲突时在首选端口起向后退避（daemon / web 各 span 个候选）。
- * 用法：npm run dev
+ * 用法：pnpm run dev
  */
 import dotenv from 'dotenv';
 import { spawn, spawnSync } from 'node:child_process';
@@ -21,7 +21,7 @@ const WEB_PORT_PREFERRED = Number(process.env.RAW_AGENT_WEB_PORT ?? process.env.
 const PORT_SPAN = Math.max(1, Number(process.env.RAW_AGENT_PORT_SPAN ?? 20));
 
 function runTsc() {
-  const r = spawnSync(resolveBin('npx'), ['tsc', '-b', 'packages/core', 'apps/daemon'], {
+  const r = spawnSync(resolveBin('pnpm'), ['exec', 'tsc', '-b', 'packages/core', 'apps/daemon'], {
     cwd: root,
     stdio: 'inherit',
     env: sanitizeScriptEnv(),
@@ -82,8 +82,8 @@ const daemon = spawn(process.execPath, ['apps/daemon/dist/server.js'], {
 // Bind IPv4 0.0.0.0 so Cloud Agent port detection (typically /proc/net/tcp)
 // can see Lab. Default `next dev` only appears on tcp6 `:::port`.
 const web = spawn(
-  resolveBin('npm'),
-  ['run', 'dev', '--workspace=@ppeng/agent-lab-web', '--', '-p', String(webPort), '-H', '0.0.0.0'],
+  resolveBin('pnpm'),
+  ['--filter', '@ppeng/agent-lab-web', 'run', 'dev', '-p', String(webPort), '-H', '0.0.0.0'],
   {
     cwd: root,
     stdio: 'inherit',

@@ -1,4 +1,16 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type APIRequestContext } from '@playwright/test';
+
+const ownedJobs: string[] = [];
+async function reliabilityBot(request: APIRequestContext) {
+ const {bots}=await (await request.get('/api/bots')).json();
+ const existing=bots.find((bot:{name:string})=>bot.name==='E2E Reliability fixture');
+ if(existing)return existing;
+ const response=await request.post('/api/bots',{data:{name:'E2E Reliability fixture'}});
+ expect(response.ok(),await response.text()).toBeTruthy();return (await response.json()).bot;
+}
+test.afterEach(async ({request}) => {
+ for (const id of ownedJobs.splice(0)) expect((await request.delete(`/api/cron/jobs/${id}`)).ok()).toBeTruthy();
+});
 
 test('delete and explicitly remember from Lab [AC:memory-deletion-suppression#AC-1] [AC:memory-deletion-suppression#AC-6]', async ({ page, request }) => {
   await page.addInitScript(() => localStorage.setItem('lab.locale', 'zh'));
@@ -20,8 +32,9 @@ test('delete and explicitly remember from Lab [AC:memory-deletion-suppression#AC
 
 test('Lab explicitly upgrades a legacy precheck [AC:routine-strict-precheck#AC-1]',async({page,request})=>{
  await page.addInitScript(()=>localStorage.setItem('lab.locale','zh'));
- const {bot}=await (await request.post('/api/bots',{data:{name:`strict-${Date.now()}`}})).json();
+ const bot=await reliabilityBot(request);
  const {job}=await (await request.post('/api/cron/jobs',{data:{botId:bot.id,name:'strict-check',prompt:'inspect',intervalMs:60000,precheck:{kind:'predicate',source:'{"wakeAgent":false}',mode:'compat'}}})).json();
+ ownedJobs.push(job.id);
  await page.goto('/#/agents/bots');await page.getByTestId(`bot-card-${bot.id}`).click();
  await page.getByTestId('bot-detail').getByRole('button',{name:'展开或收起：定时任务'}).click();
  const panel=page.locator('.bot-cron-panel');await panel.getByRole('button',{name:'修改',exact:true}).click();
@@ -32,8 +45,9 @@ test('Lab explicitly upgrades a legacy precheck [AC:routine-strict-precheck#AC-1
 
 test('private task center saves policy and explicitly resumes [AC:routine-failure-governance#AC-1] [AC:routine-failure-governance#AC-8]',async({page,request})=>{
  await page.addInitScript(()=>localStorage.setItem('lab.locale','zh'));
- const {bot}=await(await request.post('/api/bots',{data:{name:`health-${Date.now()}`}})).json();
+ const bot=await reliabilityBot(request);
  const {job}=await(await request.post('/api/cron/jobs',{data:{botId:bot.id,name:'health policy',prompt:'inspect',intervalMs:60000}})).json();
+ ownedJobs.push(job.id);
  await page.goto('/#/tasks/runs');
  const card=page.getByTestId(`routine-health-${job.id}`);await expect(card).toBeVisible();
  await card.getByLabel('连续硬失败暂停阈值').fill('3');

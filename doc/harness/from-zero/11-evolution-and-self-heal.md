@@ -4,7 +4,7 @@
 
 ## Self-Heal
 
-入口包括 `POST /api/self-heal/start` 和 `npm run self-heal:flow`。核心调度器在 `packages/core/src/self-heal/self-heal-scheduler.ts`：创建隔离 worktree、运行白名单测试、创建 self-healer session、重试并按配置合并。`scripts/supervisor.mjs` 负责 daemon 请求重启时的进程握手。
+入口包括 `POST /api/self-heal/start` 和 `pnpm run self-heal:flow`。核心调度器在 `packages/core/src/self-heal/self-heal-scheduler.ts`：创建隔离 worktree、运行白名单测试、创建 self-healer session、重试并按配置合并。`scripts/supervisor.mjs` 负责 daemon 请求重启时的进程握手。
 
 `self-heal:flow` 还处理主工作区 stash / pop；执行前先阅读脚本参数，确认是否允许它暂存当前改动。
 
@@ -13,7 +13,7 @@
 统一 CLI 是：
 
 ```bash
-npm run evolution -- --help
+pnpm run evolution --help
 ```
 
 `scripts/evolution-cli.mjs` 负责解析 preset 和参数；`evolution-run-day.mjs` 负责工作树、实现 agent、build、test、review/refine 和可选 merge。高风险合并、harness gate 与 release gate 都是额外开关，不应假设默认开启。

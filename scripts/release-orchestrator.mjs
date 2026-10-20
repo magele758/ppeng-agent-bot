@@ -168,7 +168,7 @@ async function cmdStart(args) {
   if (cfg.autoPromote) {
     await cmdPromote({ runId: report.release_run_id });
   } else {
-    console.log('release-orchestrator: G2 pass — manual promote with: npm run release:promote -- --run-id', report.release_run_id);
+    console.log('release-orchestrator: G2 pass — manual promote with: pnpm run release:promote --run-id', report.release_run_id);
   }
 }
 

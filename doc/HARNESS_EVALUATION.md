@@ -6,10 +6,10 @@
 
 ```bash
 # 不调用模型：验证真实 runtime、隔离、评分器和报告链路
-npm run agent:eval:verify
+pnpm run agent:eval:verify
 
 # 真模型：先分别构建两个可信 checkout，再比较；输出目录必须不存在
-npm run agent:eval:compare -- --config scripts/agent-eval/experiments/starter.json \
+pnpm run agent:eval:compare --config scripts/agent-eval/experiments/starter.json \
   --baseline-root /absolute/path/to/baseline --candidate-root /absolute/path/to/candidate \
   --out test-results/harness-quality-example
 ```

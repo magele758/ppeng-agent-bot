@@ -9,7 +9,7 @@
  *   EVOLUTION_SHOWCASE_GIT_REMOTE_BRANCH — 可选，同步目标分支（默认取 Pages 仓当前分支名）
  *   EVOLUTION_SHOWCASE_GIT_SYNC_MODE — reset（默认）| rebase。纯生成首页建议 reset：fetch + 中止未完成合并 + reset --hard origin/<分支>，再覆盖 dist，避免 rebase 冲突
  *   EVOLUTION_SHOWCASE_DEPLOY_ARTIFACTS — 逗号分隔，从 dist 拷入 Pages 根目录的白名单（默认 index.html,styles.css,app.js,data）
- *   EVOLUTION_SHOWCASE_POST_COPY_CMD — 可选，复制后在 DEPLOY_DIR 执行的 shell（如未来 Astro：`npm ci && npm run build`）
+ *   EVOLUTION_SHOWCASE_POST_COPY_CMD — 可选，复制后在 DEPLOY_DIR 执行的 shell（如未来 Astro：`pnpm install --frozen-lockfile && pnpm run build`）
  */
 import { cpSync, existsSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -33,7 +33,7 @@ function parseDeployArtifacts() {
 
 /**
  * @param {{ trace?: (msg: string) => void; manual?: boolean }} [options]
- * - manual: true 时忽略 EVOLUTION_SHOWCASE_AUTO_DEPLOY（供 npm run evolution:showcase-deploy）
+ * - manual: true 时忽略 EVOLUTION_SHOWCASE_AUTO_DEPLOY（供 pnpm run evolution:showcase-deploy）
  * @returns {Promise<{ ok: boolean; skipped?: string }>}
  */
 export async function deployShowcase(options = {}) {

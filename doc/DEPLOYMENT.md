@@ -173,11 +173,11 @@ candidate
 脚本入口：
 
 ```bash
-npm run build
-npm run test:unit
-npm run test:integration
-npm run test:e2e
-npm run deploy:smoke -- --daemon-url <daemon> --web-url <web> [--token <token>]
+pnpm run build
+pnpm run test:unit
+pnpm run test:integration
+pnpm run test:e2e
+pnpm run deploy:smoke --daemon-url <daemon> --web-url <web> [--token <token>]
 ```
 
 ## 部署冒烟（deploy-smoke）

@@ -44,6 +44,14 @@ export function packPublicArtifacts(repoRoot, staging, env = process.env) {
     rewriteTree(dest);
     const pkgFile = join(dest, 'package.json');
     const pkg = JSON.parse(readFileSync(pkgFile, 'utf8'));
+    for (const group of ['dependencies','optionalDependencies','peerDependencies']) {
+      for (const [dep,range] of Object.entries(pkg[group] ?? {})) {
+        if (!range.startsWith('workspace:')) continue;
+        const local = PUBLIC_PACKAGES.map(name => JSON.parse(readFileSync(join(repoRoot,'packages',name,'package.json'),'utf8'))).find(p => rewriteScope(p.name) === dep);
+        if (!local) throw new Error(`Unresolved public workspace dependency ${dep}`);
+        pkg[group][dep] = local.version;
+      }
+    }
     pkg.publishConfig = { access: 'public', registry: 'https://registry.npmjs.org/' };
     if (env.GITHUB_REPOSITORY) pkg.repository = { type: 'git', url: `git+https://github.com/${env.GITHUB_REPOSITORY}.git` };
     writeFileSync(pkgFile, JSON.stringify(pkg, null, 2));

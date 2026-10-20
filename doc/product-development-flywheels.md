@@ -247,7 +247,7 @@
 | **A** | `evolution-learn` + inbox；`AGENTS.md` / Skills 沉淀偏好；Web 控制台 UX 约定 | 把「知识反馈 → 改搜集策略」**显式化**：例如在 `doc/evolution/` 增加**季度 feed 复盘**小节，或 gateway 配置旁维护「能力标签 ↔ feed 映射」表，避免只靠记忆改 RSS。 |
 | **B** | `/evolution` 观测页；`doc/evolution/{success,failure,no-op}`；Daemon trace API | 缺**统一产品指标**（DAU/转化/关键路径耗时）与代码进化指标并列；可将「断链」定义为**功能矩阵**：网关 / 会话 / 沙箱 / 自愈 / 领域包逐项打勾，定期对照 no-op 理由看是**信号不足**还是**门槛过严**。 |
 | **C** | Self-heal；`@ppeng/agent-sre` 只读 `k8s_get` 等；sandbox 分层 | 生产向仍缺 **K8s/Helm 一键部署与 SLI/SLO**；短期可把 **SRE persona + 外部可观测后端**（Prometheus/Loki 链接写进 domain 配置说明）写进运维文档，形成「监控 → issue → PR」模板。 |
-| **D** | `npm run evolution --` 管线；已收紧的 `gateway.config.example.json` feeds | 增加**「能力维度 checklist」**（运行时 / 控制台 / Evolution / 插件）每次 learn 前扫一眼，决定本轮 `--items` 与 agent 组合；重大扩展走 **Domain 包**（`doc/DOMAIN_AGENTS.md`）而非堆 RSS。 |
+| **D** | `pnpm run evolution --` 管线；已收紧的 `gateway.config.example.json` feeds | 增加**「能力维度 checklist」**（运行时 / 控制台 / Evolution / 插件）每次 learn 前扫一眼，决定本轮 `--items` 与 agent 组合；重大扩展走 **Domain 包**（`doc/DOMAIN_AGENTS.md`）而非堆 RSS。 |
 | **E** | 沙箱、审批、网关、Evolution `.env` 白名单 | 安全需求清单 → CI 门禁（依赖扫描、secret 扫描、关键路径权限测试）；重大变更走 **Loop E 与 C** 双签。 |
 | **F** | 模型/并发/压缩相关 env；Evolution 资源消耗 | 为 daemon / evolution 定义**预算与配额**文档；关键路径加延迟与成本字段进 Loop B 仪表盘。 |
 | **G** | HTTP API、A2UI、MCP、插件清单 | API 变更与 **CHANGELOG** 联动；契约测试目录与 PR 模板勾选「破坏性变更」。 |

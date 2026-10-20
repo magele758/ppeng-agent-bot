@@ -6,7 +6,7 @@ function isPreset(v: unknown): v is SelfHealTestPreset {
   return typeof v === 'string' && (PRESETS as string[]).includes(v);
 }
 
-/** npm script name for `npm run <x>` (allowed characters). */
+/** npm script name for `pnpm run <x>` (allowed characters). */
 export function isValidCustomNpmScriptName(name: string): boolean {
   return /^[a-zA-Z0-9:_-]+$/.test(name);
 }

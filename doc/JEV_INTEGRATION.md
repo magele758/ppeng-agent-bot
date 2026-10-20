@@ -185,7 +185,7 @@ Jev 会收到对应切入点选取的任务、上下文、工具参数或候选�
 构建后运行现有定向测试（mock 请求，不验证真实服务连通性）：
 
 ```bash
-npx tsc -b packages/core
+pnpm exec tsc -b packages/core
 node --experimental-strip-types --test packages/core/test/jev-settings.test.js packages/core/test/jev-points.test.js packages/core/test/jev-trace.test.js packages/core/test/langfuse-settings.test.js
 ```
 

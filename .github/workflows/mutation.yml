@@ -27,11 +27,12 @@ jobs:
             args: --module bot-policy,bot-permission,model-fallback-chain,model-error-class,memory-namespace,skill-proposal-validate,message-agent
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: npm
-      - run: npm ci
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - run: node scripts/build-workspace.mjs
       - name: Run mutation tests
         run: node scripts/mutation/run-mutation.mjs ${{ matrix.args }} --no-gate --out coverage/mutation/${{ matrix.name }}
@@ -51,11 +52,12 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: npm
-      - run: npm ci
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - uses: actions/download-artifact@v4
         with:
           pattern: mutation-*

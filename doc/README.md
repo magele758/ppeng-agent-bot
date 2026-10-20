@@ -19,6 +19,8 @@
 
 第一批记忆与调度可靠性能力的操作入口、边界和接口见 [FIRST_BATCH_RELIABILITY.md](FIRST_BATCH_RELIABILITY.md)。
 
+依赖安装、工作区命令、容器和历史验证的 pnpm 迁移说明见 [PNPM_MIGRATION.md](PNPM_MIGRATION.md)。
+
 ## Start here / 从这里读
 
 | Document | 中文说明 |
@@ -32,7 +34,7 @@
 | [`RELEASE_RELIABILITY_PLAN.md`](RELEASE_RELIABILITY_PLAN.md) | 减少人工发布验证：已落地的确定性测试/强制门禁，以及产物验证、候选观测与回滚计划 |
 | [`HARNESS_EVALUATION.md`](HARNESS_EVALUATION.md) | 新功能与系统提示词的配对评估、消融、质量/成本门禁、真实模型回归边界 |
 | [`formal/README.md`](formal/README.md) | 可执行不变量 / PBT / MockLLM；TLA 草稿非 TLC 证明 |
-| [`CI.md`](CI.md) | GitHub Actions、本地 `npm run ci` 对齐、main 发布卡点（Release gate，默认卡 npm / Docker 发布）、flaky 单测重试策略、门禁健康报告、启用分支保护步骤 |
+| [`CI.md`](CI.md) | GitHub Actions、本地 `pnpm run ci` 对齐、main 发布卡点（Release gate，默认卡 npm / Docker 发布）、flaky 单测重试策略、门禁健康报告、启用分支保护步骤 |
 | [`NPM_PUBLISH.md`](NPM_PUBLISH.md) | 公开包自动发布：OIDC、触发方式、维护者要在 npm 上完成的 Trusted Publisher 设置 |
 | [`CRAP_GATE.md`](CRAP_GATE.md) | CRAP（复杂度 × 覆盖率）门禁：公式、数据来源、棘轮基线、失败处理 |
 | [`ACCEPTANCE_GATE.md`](ACCEPTANCE_GATE.md) | 验收标准门禁：`acceptance/*.yaml`（Given/When/Then）↔ `[AC:id#AC-n]` 测试标签、draft/approved/implemented 语义、JUnit 结果采集；工作流见 [`acceptance-first`](../skills/acceptance-first/SKILL.md) |
@@ -129,7 +131,7 @@
 |----------|----------|
 | [`DEPLOYMENT.md`](DEPLOYMENT.md) | Docker / Compose / Helm、发布冒烟 |
 | [`K8S_CLOUD_RUNTIME.md`](K8S_CLOUD_RUNTIME.md) | K8s / 云上运行时规划 |
-| [`HARNESS_EVAL.md`](HARNESS_EVAL.md) | `npm run agent:eval`、fast/nightly cases |
+| [`HARNESS_EVAL.md`](HARNESS_EVAL.md) | `pnpm run agent:eval`、fast/nightly cases |
 | [`IM_AGENT_INTEGRATION.md`](IM_AGENT_INTEGRATION.md) | 飞书 / 企微 / Webhook、静默回复、投递账本、例行预检 |
 
 ---

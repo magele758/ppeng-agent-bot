@@ -23,14 +23,14 @@ run_payload() {
   export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 
   if [[ -z "${EVOLUTION_PM2_EVOLUTION_ARGS:-}" ]]; then
-    npm run evolution -- --pipeline-build --learn --agent cursor --review codex --concurrency 5 --items 200
+    pnpm run evolution --pipeline-build --learn --agent cursor --review codex --concurrency 5 --items 200
   else
     # shellcheck disable=SC2086
-    npm run evolution -- ${EVOLUTION_PM2_EVOLUTION_ARGS}
+    pnpm run evolution ${EVOLUTION_PM2_EVOLUTION_ARGS}
   fi
 
   if is_truthy "${EVOLUTION_PM2_RUN_SHOWCASE:-1}"; then
-    npm run evolution:showcase-deploy
+    pnpm run evolution:showcase-deploy
   fi
 }
 

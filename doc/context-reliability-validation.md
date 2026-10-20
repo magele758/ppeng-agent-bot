@@ -25,7 +25,7 @@
 ```bash
 node --test scripts/test/context-reliability-eval.test.mjs
 node --test scripts/test/harness-quality.test.mjs
-npm run test:acceptance
+pnpm run test:acceptance
 ```
 
 第一项检验样例覆盖、样例版本一致性、证据分类和召回失败判断；它不运行 LLM，也不验证运行时本身。运行时的任务状态、摘要、历史检索、权限隔离、召回降级测试以及普通/Bot 既有预算回归由对应模块的测试负责。需附真实输出或 JUnit 文件，不能由样例存在推导为运行时通过。
@@ -34,7 +34,7 @@ npm run test:acceptance
 
 ```bash
 node scripts/build-workspace.mjs
-npm run agent:eval:compare -- --config scripts/agent-eval/experiments/context-reliability.json --simulation --trials 1 --out test-results/context-simulation-<run-id>
+pnpm run agent:eval:compare --config scripts/agent-eval/experiments/context-reliability.json --simulation --trials 1 --out test-results/context-simulation-<run-id>
 node scripts/context-reliability-eval.mjs --results test-results/context-simulation-<run-id> --out test-results/context-simulation-summary-<run-id>
 ```
 
@@ -51,7 +51,7 @@ node scripts/context-reliability-eval.mjs --out test-results/context-readiness-<
 冻结 baseline 和 candidate，分别完成构建后运行；不要在评估期间改构建产物：
 
 ```bash
-npm run agent:eval:compare -- --config scripts/agent-eval/experiments/context-reliability.json --baseline-root /absolute/path/to/frozen-baseline --candidate-root . --out test-results/context-live-<run-id>
+pnpm run agent:eval:compare --config scripts/agent-eval/experiments/context-reliability.json --baseline-root /absolute/path/to/frozen-baseline --candidate-root . --out test-results/context-live-<run-id>
 node scripts/context-reliability-eval.mjs --results test-results/context-live-<run-id> --out test-results/context-live-summary-<run-id>
 ```
 
@@ -118,7 +118,7 @@ AC-14 的测试先以缺少实现模块 `ERR_MODULE_NOT_FOUND` 失败，再完�
 
 交叉复查再补两项实际失败测试并修复：任务状态逐字段规范化，异常数据不会导致消息已落库后报错，有效要求不会因其他坏项被丢弃；fast 模式的 `persistentMemory=off` 放入共享编译入口，使预览与真实请求同样为空。精确纠正只忽略前导“请”，不扩大为模糊替代；可选记忆读取 host 的租户过滤也与搜索对齐。最终完整 unit/vitest 和 HTTP 回归在这些修复后的构建上重新运行。
 
-`acceptance/context-reliability.yaml` 已从 approved 标为 implemented；最终 `npm run test:acceptance` 静态检查通过，日志在 `test-results/context-reliability/logs/acceptance-static.log`。结果报告保存的是标记前实际测试记录，14 条标准均 passing；全局 28 条浏览器标准仍为 not-run，保持失败门禁不作伪。
+`acceptance/context-reliability.yaml` 已从 approved 标为 implemented；最终 `pnpm run test:acceptance` 静态检查通过，日志在 `test-results/context-reliability/logs/acceptance-static.log`。结果报告保存的是标记前实际测试记录，14 条标准均 passing；全局 28 条浏览器标准仍为 not-run，保持失败门禁不作伪。
 
 ## 提交前 Review
 

@@ -2,7 +2,7 @@
  * Process-tree termination for spawned shells.
  *
  * `child.kill()` only signals the direct child: `bash -c "sleep 999"` (or
- * `npm run …`, `bwrap … bash -c …`) leaves its descendants running after a
+ * `pnpm run …`, `bwrap … bash -c …`) leaves its descendants running after a
  * timeout. On POSIX we spawn the child as its own process-group leader
  * (`detached: true`) and signal the whole group with `process.kill(-pid)`.
  */

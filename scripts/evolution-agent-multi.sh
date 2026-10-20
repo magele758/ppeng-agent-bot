@@ -33,7 +33,7 @@
 # ── 用法 ─────────────────────────────────────────────────────────────────────
 #   在 .env 中设置：
 #     EVOLUTION_AGENT_CMD=bash scripts/evolution-agent-multi.sh
-# 跑 npm run evolution:pipeline 且要用本配置时还需：
+# 跑 pnpm run evolution:pipeline 且要用本配置时还需：
 #     EVOLUTION_PIPELINE_USE_ENV_AGENT=1
 #
 #   可选只用部分 CLI（未安装的自动跳过 fallback）：
@@ -74,7 +74,7 @@ Rules:
 - Do NOT add unrelated features, do NOT change build configs, do NOT modify .env or secrets.
 - The change must be small enough to be safe: prefer adding a useful helper, improving an existing
   function's robustness, or implementing a clearly useful missing feature suggested by the excerpt.
-- After making changes, run: npm run test:unit to verify they pass.
+- After making changes, run: pnpm run test:unit to verify they pass.
 - Do NOT commit — the pipeline will commit for you.
 
 If you cannot find a meaningful, safe feature improvement inspired by the excerpt, output a single line:

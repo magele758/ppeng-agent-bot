@@ -50,7 +50,7 @@ function run(command, args, cwd = repoRoot) {
 }
 
 function npmArgs(args) {
-  return process.platform === 'win32' ? ['npm.cmd', args] : ['npm', args];
+  return process.platform === 'win32' ? ['pnpm.cmd', args] : ['pnpm', args];
 }
 
 const flags = parseArgs(process.argv.slice(2));
@@ -72,17 +72,17 @@ if (!flags.skipWorkspaceBuild) {
 }
 
 if (!existsSync(join(repoRoot, 'apps', 'daemon', 'dist'))) {
-  console.error('❌ 找不到 apps/daemon/dist，请先运行 npm run build');
+  console.error('❌ 找不到 apps/daemon/dist，请先运行 pnpm run build');
   process.exit(1);
 }
 if (!existsSync(join(repoRoot, 'apps', 'web-console', '.next', 'standalone'))) {
-  console.error('❌ 找不到 web-console standalone，请先运行 npm run build');
+  console.error('❌ 找不到 web-console standalone，请先运行 pnpm run build');
   process.exit(1);
 }
 
 run(process.execPath, [join(repoRoot, 'scripts', 'prepare-desktop-server.mjs')]);
 
-const [npm, npmInstall] = npmArgs(['install']);
+const [npm, npmInstall] = npmArgs(['install','--frozen-lockfile']);
 run(npm, npmInstall, desktopDir);
 
 const [npmTsc, tscArgs] = npmArgs(['run', 'build']);

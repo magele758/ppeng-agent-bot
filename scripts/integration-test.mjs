@@ -9,7 +9,7 @@
  * Spawns a fresh heuristic-adapter daemon on a random port + temp stateDir
  * (same recipe as scripts/regression-test.mjs).
  *
- * Usage:  npm run build && node scripts/integration-test.mjs
+ * Usage:  pnpm run build && node scripts/integration-test.mjs
  */
 import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
@@ -24,7 +24,7 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 // E14: same dist guard as regression-test.mjs.
 const daemonEntry = join(repoRoot, 'apps', 'daemon', 'dist', 'server.js');
 if (!existsSync(daemonEntry)) {
-  console.error(`integration-test: ${daemonEntry} missing — run \`npm run build\` first.`);
+  console.error(`integration-test: ${daemonEntry} missing — run \`pnpm run build\` first.`);
   process.exit(2);
 }
 

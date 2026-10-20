@@ -29,24 +29,25 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - uses: pnpm/action-setup@v4
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: npm
+          cache: pnpm
       - name: Record measured candidate inputs
         run: node scripts/ci/gate-provenance.mjs "$RUNNER_TEMP/gate-provenance.json"
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
       - name: TypeScript build
-        run: npm run build
+        run: pnpm run build
       - name: Allow precheck network namespaces
         run: |
           if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
             sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           fi
       - name: Bounded pairing verification (no retries)
-        run: npm run test:pairing
+        run: pnpm run test:pairing
       - name: Upload pairing verification evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -56,7 +57,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
       - name: Session lifecycle verification (no retries)
-        run: npm run test:lifecycle
+        run: pnpm run test:lifecycle
       - name: Upload session lifecycle evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -66,7 +67,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
       - name: Process restart recovery verification (no retries)
-        run: npm run test:restart
+        run: pnpm run test:restart
       - name: Upload process restart recovery evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -76,7 +77,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
       - name: Multiprocess session verification (no retries)
-        run: npm run test:concurrency
+        run: pnpm run test:concurrency
       - name: Upload multiprocess session evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -96,27 +97,27 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
       - name: Bot queue and process recovery invariants (no retries)
-        run: npm run test:bot:faults
+        run: pnpm run test:bot:faults
       - name: Install and exercise public npm tarballs
-        run: npm run test:package
+        run: pnpm run test:package
       - name: Formal invariants + MockLLM E2E
-        run: npm run test:formal
+        run: pnpm run test:formal
       - name: Fast capability contracts (fail on any failed case)
-        run: npm run agent:eval:fast -- --exit-on-fail --out test-results/fast-eval
+        run: pnpm run agent:eval:fast --exit-on-fail --out test-results/fast-eval
       - name: Verify evaluator against scripted harness outcomes (not live model quality)
-        run: npm run agent:eval:verify
+        run: pnpm run agent:eval:verify
       - name: Regression (daemon + API)
-        run: npm run test:regression
+        run: pnpm run test:regression
         env:
           RAW_AGENT_MODEL_PROVIDER: heuristic
       - name: Integration (mailbox + approval + social)
-        run: npm run test:integration
+        run: pnpm run test:integration
         env:
           RAW_AGENT_MODEL_PROVIDER: heuristic
       - name: Install Playwright Chromium
-        run: npm run test:e2e:install
+        run: pnpm run test:e2e:install
       - name: E2E (Agent Lab)
-        run: npm run test:e2e -- --reporter=dot,junit
+        run: pnpm run test:e2e --reporter=dot,junit
         env:
           RAW_AGENT_MODEL_PROVIDER: heuristic
           PLAYWRIGHT_JUNIT_OUTPUT_FILE: ${{ runner.temp }}/acceptance-results/e2e.xml
@@ -156,15 +157,16 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - uses: pnpm/action-setup@v4
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: npm
+          cache: pnpm
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
       - name: Verify coverage toolchain
-        run: npm run test:crap -- --preflight
+        run: pnpm run test:crap --preflight
       - name: TypeScript build (workspace packages)
         run: node scripts/build-workspace.mjs
       - name: Allow precheck network namespaces
@@ -224,13 +226,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - uses: pnpm/action-setup@v4
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: npm
+          cache: pnpm
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
       - name: Download JUnit results
         uses: actions/download-artifact@v4
         with:
@@ -289,15 +292,16 @@ jobs:
     if: ${{ github.event.repository.fork == false && needs.secrets-gate.outputs.has-key == 'true' }}
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: npm
-      - run: npm ci
-      - run: npm run build
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
       - name: Remote smoke (OpenAI-compatible)
         if: ${{ vars.RAW_AGENT_CI_PROVIDER != 'anthropic-compatible' }}
-        run: npm run test:remote
+        run: pnpm run test:remote
         env:
           RAW_AGENT_MODEL_PROVIDER: openai-compatible
           RAW_AGENT_API_KEY: ${{ secrets.RAW_AGENT_API_KEY }}
@@ -306,7 +310,7 @@ jobs:
           RAW_AGENT_USE_JSON_MODE: ${{ vars.RAW_AGENT_USE_JSON_MODE }}
       - name: Remote smoke (Anthropic-compatible)
         if: ${{ vars.RAW_AGENT_CI_PROVIDER == 'anthropic-compatible' }}
-        run: npm run test:remote
+        run: pnpm run test:remote
         env:
           RAW_AGENT_MODEL_PROVIDER: anthropic-compatible
           RAW_AGENT_API_KEY: ${{ secrets.RAW_AGENT_API_KEY }}
@@ -348,6 +352,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc

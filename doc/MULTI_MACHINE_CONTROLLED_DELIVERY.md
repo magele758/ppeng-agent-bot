@@ -83,11 +83,11 @@ GET       /api/factory/delivery/tasks/:id/evidence/:digest?offset=0
 ## 验证入口
 
 ```bash
-npx tsc -b packages/core apps/daemon
+pnpm exec tsc -b packages/core apps/daemon
 node --test packages/core/test/factory-*.test.js
 node --test scripts/test/factory-delivery-routes.test.mjs scripts/test/route-access-contract.test.mjs
-npm run test:acceptance
-npm run test:e2e -- e2e/factory-delivery.spec.ts e2e/factory-development.spec.ts e2e/factory-readonly.spec.ts e2e/factory-http-integration.spec.ts
+pnpm run test:acceptance
+pnpm run test:e2e e2e/factory-delivery.spec.ts e2e/factory-development.spec.ts e2e/factory-readonly.spec.ts e2e/factory-http-integration.spec.ts
 node scripts/factory-delivery-pilot.mjs /private/config.json /private/evidence-dir
 ```
 

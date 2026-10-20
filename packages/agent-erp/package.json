@@ -11,7 +11,7 @@
     }
   },
   "dependencies": {
-    "@ppeng/agent-core": "0.1.0"
+    "@ppeng/agent-core": "workspace:*"
   },
   "peerDependencies": {
     "@ppeng/agent-core": "0.1.0"

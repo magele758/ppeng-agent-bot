@@ -141,7 +141,7 @@ export type SelfHealTestPreset = 'unit' | 'regression' | 'e2e' | 'remote' | 'ci'
 export interface SelfHealPolicy {
   /** npm script preset or custom (see customNpmScript). */
   testPreset: SelfHealTestPreset | 'custom';
-  /** When testPreset is custom: must be `npm run <script>` with allowed script name. */
+  /** When testPreset is custom: must be `pnpm run <script>` with allowed script name. */
   customNpmScript?: string;
   maxFixIterations: number;
   autoMerge: boolean;

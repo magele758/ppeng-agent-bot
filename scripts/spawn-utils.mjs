@@ -57,7 +57,7 @@ const EPHEMERAL_DAEMON_STRIPPED_KEYS = [
  * `<cwd>/.env` and would put them straight back. Pointing dotenv at the null
  * device makes that load a no-op; only the explicit shell env (CI vars) and
  * what the caller layers on top reach the daemon.
- * Real local `npm run dev` / supervised deploy intentionally keep `.env`.
+ * Real local `pnpm run dev` / supervised deploy intentionally keep `.env`.
  */
 export function envForEphemeralDaemon(base = process.env) {
   const out = sanitizeScriptEnv(base);

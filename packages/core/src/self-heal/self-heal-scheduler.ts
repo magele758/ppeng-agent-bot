@@ -104,7 +104,7 @@ export class SelfHealScheduler {
    * Runs whose `advanceRun` is still awaiting (npm test / model turn). The
    * daemon tick fires every 1.5s regardless of the previous tick, and the
    * persisted status only flips after the awaited work finishes — without this
-   * guard every tick re-spawned `npm run test:unit` for the same run.
+   * guard every tick re-spawned `pnpm run test:unit` for the same run.
    */
   private readonly inFlight = new Set<string>();
   private terminalTasksReconciled = false;
@@ -246,7 +246,7 @@ export class SelfHealScheduler {
       if (!this.multiRunWarned) {
         this.multiRunWarned = true;
         this.log.warn(
-          `${activeHb.length} concurrent runs (only one is normal). List: npm run start:cli -- self-heal runs — stop one: npm run start:cli -- self-heal stop <runId>`,
+          `${activeHb.length} concurrent runs (only one is normal). List: pnpm run start:cli self-heal runs — stop one: pnpm run start:cli self-heal stop <runId>`,
         );
       }
     } else {
@@ -301,7 +301,7 @@ export class SelfHealScheduler {
     const sessSt = sess?.status ?? '—';
     const branch = run.worktreeBranch ?? '—';
     const age = formatAgeSince(run.createdAt);
-    return `phase=${run.status} npm run ${npm} branch=${branch} fix#${run.fixIteration} age=${age} session=${sessTail}(${sessSt})`;
+    return `phase=${run.status} pnpm run ${npm} branch=${branch} fix#${run.fixIteration} age=${age} session=${sessTail}(${sessSt})`;
   }
 
   private emitHeartbeat(run: SelfHealRunRecord): void {
@@ -406,7 +406,7 @@ export class SelfHealScheduler {
           ? 'You may use claude_code, codex_exec, or cursor_agent for complex fixes; they are pre-approved in this session.'
           : 'Fix using read_file / write_file / edit_file / bash only under the workspace root.',
         'Do not merge into the main repository or run git push; the harness merges after tests pass.',
-        `Test command: npm run … (preset ${policy.testPreset}).`,
+        `Test command: pnpm run … (preset ${policy.testPreset}).`,
       ].join('\n'),
       agentId: policy.agentId ?? 'self-healer',
       background: true,
@@ -443,7 +443,7 @@ export class SelfHealScheduler {
 
     let npmScript = String(policy.testPreset);
     try { npmScript = npmScriptForSelfHealPolicy(policy); } catch { /* keep */ }
-    this.logRun(r.id, `running npm run ${npmScript} (worktree ${ws?.mode ?? '?'}) …`);
+    this.logRun(r.id, `running pnpm run ${npmScript} (worktree ${ws?.mode ?? '?'}) …`);
 
     const { ok, output } = await runSelfHealNpmTest(wsRoot, policy);
     const trimmedOut = output.slice(0, 120_000);

@@ -31,12 +31,12 @@ console.log(runtime.getLatestAssistantText(session.id));
 更多可运行示例见 [`examples/`](examples/)（`01`–`07`，均用启发式/脚本化适配器，无需真实 API key）：
 
 ```bash
-npx tsc -b packages/core   # 构建 dist/
+pnpm exec tsc -b packages/core   # 构建 dist/
 node packages/core/examples/01-chat-session.mjs
 node packages/core/examples/07-custom-agent.mjs
 ```
 
-或在仓库根目录一次跑完全部示例：`npm run test:examples`。
+或在仓库根目录一次跑完全部示例：`pnpm run test:examples`。
 
 ## 文档
 

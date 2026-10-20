@@ -33,7 +33,7 @@ CRAP(m) = comp(m)² × (1 − cov(m))³ + comp(m)
 
 | 来源 | 覆盖哪些代码 | 怎么采 |
 |---|---|---|
-| `npm run test:unit`（node --test，跑 `dist/*.js`） | core / gateway / domain 包 / daemon / cli | `NODE_V8_COVERAGE` 原始 V8 块覆盖，按进程合并后经 `*.js.map` 映射回 `src/*.ts` 行 |
+| `pnpm run test:unit`（node --test，跑 `dist/*.js`） | core / gateway / domain 包 / daemon / cli | `NODE_V8_COVERAGE` 原始 V8 块覆盖，按进程合并后经 `*.js.map` 映射回 `src/*.ts` 行 |
 | `packages/agent-loop` vitest | agent-loop 源码 | `@vitest/coverage-v8` 的 `coverage-final.json`（istanbul 语句） |
 
 两路按 TS 源码行取并集。范围：`packages/*/src`、`apps/daemon/src`、`apps/cli/src`（排除 `*.test.ts`、`*.d.ts`）。
@@ -48,7 +48,7 @@ CRAP(m) = comp(m)² × (1 − cov(m))³ + comp(m)
 
 1. **新增**（或原来 ≤ 30、现在 > 30）的函数 CRAP > 30 → 失败。
 2. 基线内函数 CRAP 超过 `基线 × 1.05 + 1` → 失败（容差吸收计时相关路径的覆盖抖动；实测两次全量运行 0 抖动）。
-3. 基线内函数变好或被删除 → 提示 `npm run test:crap -- --update-baseline` 锁定收益（不强制）。
+3. 基线内函数变好或被删除 → 提示 `pnpm run test:crap --update-baseline` 锁定收益（不强制）。
 
 所以：存量可以慢慢还，但只能变少，不能变多。
 
@@ -56,10 +56,10 @@ CRAP(m) = comp(m)² × (1 − cov(m))³ + comp(m)
 
 ```bash
 nvm use                      # 与 CI 对齐 Node 22
-npm run test:crap -- --preflight  # 先检查 Vitest 与覆盖率插件是否解析为同版本
-npm run build                 # 门禁读 dist 的 source map
-npm run test:crap             # 带覆盖率跑 test:unit + agent-loop vitest，再判定
-npm run test:crap:update      # 还债后更新基线（提交 crap-baseline.json）
+pnpm run test:crap --preflight  # 先检查 Vitest 与覆盖率插件是否解析为同版本
+pnpm run build                 # 门禁读 dist 的 source map
+pnpm run test:crap             # 带覆盖率跑 test:unit + agent-loop vitest，再判定
+pnpm run test:crap:update      # 还债后更新基线（提交 crap-baseline.json）
 node scripts/crap/crap-gate.mjs --node-cov <dir> --vitest-cov <coverage-final.json>  # 复用已采的覆盖率
 ```
 
@@ -76,7 +76,7 @@ JSON 增加 `metadata`（Node、平台、架构、测试工具版本、生成时
 
 - **新函数超标**：补单测提高覆盖，或拆小函数降低复杂度。别靠调阈值。
 - **基线函数变差**：通常是删了/改坏了覆盖它的测试，或往大函数里继续堆分支。
-- **确实需要接受新债务**（少见）：`npm run test:crap:update` 并在 PR 描述里说明原因，review 时会看到基线 diff。
+- **确实需要接受新债务**（少见）：`pnpm run test:crap:update` 并在 PR 描述里说明原因，review 时会看到基线 diff。
 
 ## 局限（与其它手段互补）
 

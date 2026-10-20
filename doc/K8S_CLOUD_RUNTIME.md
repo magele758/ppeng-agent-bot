@@ -138,7 +138,7 @@
 - **SQLite**：不推荐网络共享 FS 多写；**单 Pod RWO** 最稳。  
 - **快照**：云平台卷快照 Cron；或 **Velero**（含 PV）。  
 - **应用一致**：daemon 静默前 flush（利用 `preStop` + 就绪摘除）；大变更前触发 **停机窗口备份**。  
-- **Evolution/docs 工件**：若在容器内跑 `npm run evolution`，需挂载可写 **`stateDir`/仓库** 或使用 **Job** PVC（见 §10）。
+- **Evolution/docs 工件**：若在容器内跑 `pnpm run evolution`，需挂载可写 **`stateDir`/仓库** 或使用 **Job** PVC（见 §10）。
 
 ---
 
@@ -172,7 +172,7 @@
 
 - **Self-heal HTTP**：`/api/self-heal/start`、`/api/self-heal/status`、runs CRUD（`apps/daemon/src/routes/self-heal.ts`）；需 **git/npm 能力与策略**——容器内常需挂 **emptyDir/workspace**、或仅把 API 用作 **控制面**。  
 - **Daemon 重启握手**：`/api/daemon/restart-request`、`/api/daemon/restart-request/ack`（`misc.ts`）。  
-- **Evolution**：`npm run evolution -- …`、`scripts/evolution-cli.mjs`；cron 示例 `scripts/cron-evolution.example.sh` → `evolution-pipeline.sh`；与 **merge gate、harness eval**（`EVOLUTION_MERGE_RISK_CHECK`、`EVOLUTION_HARNESS_GATE`、`doc/HARNESS_EVAL.md`）可组成质量闭环。
+- **Evolution**：`pnpm run evolution …`、`scripts/evolution-cli.mjs`；cron 示例 `scripts/cron-evolution.example.sh` → `evolution-pipeline.sh`；与 **merge gate、harness eval**（`EVOLUTION_MERGE_RISK_CHECK`、`EVOLUTION_HARNESS_GATE`、`doc/HARNESS_EVAL.md`）可组成质量闭环。
 
 ### 11.2 建议 K8s 编排形态
 

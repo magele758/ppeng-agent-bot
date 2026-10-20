@@ -5,7 +5,7 @@ description: Run and review bounded process restart recovery verification for ru
 
 # Process restart recovery verification
 
-Run from repository root: `npm run test:restart`. Requires Node >=22 with SQLite FTS5, installed dependencies and TypeScript 5.9.3. No real model keys or host .env are loaded. Existing process settings used by the hermetic children are not new product configuration.
+Run from repository root: `pnpm run test:restart`. Requires Node >=22 with SQLite FTS5, installed dependencies and TypeScript 5.9.3. No real model keys or host .env are loaded. Existing process settings used by the hermetic children are not new product configuration.
 
 ## What executes
 
@@ -18,7 +18,7 @@ Run from repository root: `npm run test:restart`. Requires Node >=22 with SQLite
 
 ## Evidence and exit codes
 
-`coverage/formal/restart/report.json` and `report.md`, or `npm run test:restart -- --out <directory>`. Exit 0 only for complete, reviewed, all-green checks. Exit 1 for actual mismatches or unreviewed changes; exit 2 for missing tools, child failure, timeout or incomplete evidence. CI has an explicit no-retry step and uploads evidence even on failure. `npm run test:formal` keeps both existing gates and adds restart verification.
+`coverage/formal/restart/report.json` and `report.md`, or `pnpm run test:restart --out <directory>`. Exit 0 only for complete, reviewed, all-green checks. Exit 1 for actual mismatches or unreviewed changes; exit 2 for missing tools, child failure, timeout or incomplete evidence. CI has an explicit no-retry step and uploads evidence even on failure. `pnpm run test:formal` keeps both existing gates and adds restart verification.
 
 For a defect, retain the failed actual-process trace, affected acceptance IDs, observed phase and SIGTERM/SIGKILL exit evidence. Follow `skills/acceptance-first/SKILL.md`: create a separate draft repair specification and request confirmation, without changing product code or weakening this approved verification spec. Leave `session-restart-recovery-verification` approved until its actual acceptance tests pass.
 

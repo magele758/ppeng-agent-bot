@@ -152,7 +152,7 @@ rg -n 'foldMessages|prepareTurnInput' packages/agent-loop/src/turn/prepare-turn-
 
 内核单测（优先于再加 e2e）：
 
-- SDK：`npm run test --workspace=@ppeng/agent-loop`；构建：`npm run build --workspace=@ppeng/agent-loop`。
+- SDK：`pnpm run test --workspace=@ppeng/agent-loop`；构建：`pnpm run build --workspace=@ppeng/agent-loop`。
 - 以下 core 测试用于产品侧回归，不代替 SDK 的 Vitest 测试：
 - `packages/core/test/session-surface.test.js`
 - `packages/core/test/prepare-turn-input.test.js`

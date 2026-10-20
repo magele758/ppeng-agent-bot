@@ -5,7 +5,7 @@ import { ROOT, runVerificationProcess } from './pairing-verifier.mjs';
 
 const args = process.argv.slice(2);
 if (args.length && (args.length !== 2 || args[0] !== '--out')) {
-  console.error('Usage: npm run test:pairing -- [--out report-directory]');
+  console.error('Usage: pnpm run test:pairing [--out report-directory]');
   process.exit(2);
 }
 const out = args.length ? resolve(args[1]) : join(ROOT, 'coverage/formal/pairing');

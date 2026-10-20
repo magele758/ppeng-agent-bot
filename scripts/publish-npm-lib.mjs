@@ -9,7 +9,6 @@ export const PUBLIC_VERSION_FILES = [
   "packages/agent-loop/package.json",
   "packages/core/package.json",
   "apps/web-console/package.json",
-  "package-lock.json",
 ];
 const NPM_TOKEN_ENV_KEYS = [
   "NPM_TOKEN",

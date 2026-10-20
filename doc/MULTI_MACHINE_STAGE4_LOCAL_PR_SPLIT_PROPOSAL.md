@@ -17,4 +17,4 @@
 
 本次批准后分别维护本地软件验收和现场验收的适用阶段：原40条原文、批准记录与待完成状态必须全部保留；不得通过删除标准、补无关标签或忽略失败测试来伪造现场完成。具体门禁变更会在PR里直接展示。
 
-现场完整验收继续由 `npm run test:acceptance:deployment`（包含软件和现场全部标准）阻断未完成项；本次软件合并使用 `npm run test:acceptance`。既有已批准软件标准不能迁出软件门禁。
+现场完整验收继续由 `pnpm run test:acceptance:deployment`（包含软件和现场全部标准）阻断未完成项；本次软件合并使用 `pnpm run test:acceptance`。既有已批准软件标准不能迁出软件门禁。

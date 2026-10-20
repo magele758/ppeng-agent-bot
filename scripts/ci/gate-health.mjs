@@ -4,7 +4,7 @@
  * jobs/steps, flaky unit tests (flaky-tests-* artifacts) and whether main's branch protection
  * requires "Release gate / Main release gate". Only uses `gh` GET calls and `gh run download`.
  *
- * Usage: npm run ci:gate-health -- [--limit 30] [--workflow ci.yml] [--branch main] [--repo owner/name]
+ * Usage: pnpm run ci:gate-health [--limit 30] [--workflow ci.yml] [--branch main] [--repo owner/name]
  *        [--no-artifacts] [--json]
  */
 import { spawnSync } from 'node:child_process';

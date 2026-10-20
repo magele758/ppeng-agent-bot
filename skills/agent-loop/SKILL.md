@@ -41,7 +41,7 @@ SDK 提供 4 个组装档位（高档位包含所有低档位模块）：
 - **工具结果脱敏**：宿主提供 `redactSecrets` 时，每个工具结果（含抛错信息）在归档或截断前都会经过它，不限 shell。
 - **执行代际与暂停恢复**：每次内核执行（包括审批恢复）使用新的 writerRunId；审批 checkpoint 的 writerRunId 仅为原暂停信息，不是再次执行的授权。claimWriter 必须拒绝有效占用；显式 expectedWriterRunId 即使遇到空占用也必须拒绝旧写入，只有不带显式代际的空占用写入保留 legacy 行为；恢复取得资格后重读 checkpoint，已被其他执行者消费的暂停不重放。内核等待异步完成/失败/暂停处理全部落盘后，才在 finally 释放占用，审批暂停也释放执行占用并保留 interrupt。宿主可实现 TurnKernelStore.runWithWriter(sessionId, runId, fn) 将整个异步执行绑定到该代际，并实现 isWriterCurrent 让失效回调仅记录 stale_writer_rejected，不改写新状态；省略端口的单写者宿主保持兼容。Node SQLite 宿主用异步上下文、原子占用比较更新及 OS 持有的锁证明活跃性；mini 内核不引入任何 Node 模块。ToolLoopHost.assertSessionWritable 是可选的派发前检查，工具波每个 chunk 及真正执行前检查取消/写入资格，已发出的外部副作用不承诺撤销。
 - **内核入口分层**：公开 `runSessionKernel(host, sessionId, options)` 仍使用原签名；内部 admission wrapper 负责 claim、可选 `runWithWriter` 和最终释放，原 turn 实现保持独立。取得执行资格后必须在 writer scope 内重读 session、agent 和 pending approvals 并重新判断暂停/恢复；不能只检查 interrupt 是否存在。已消费的暂停不重开模型，新暂停保留最新审批和工具ID；等待事件失败也释放 claim。模型调用、异步 completion 及释放都在同一 writer scope 内，宿主无需传入内部执行状态。
-- **工具结果去重**：`processToolResults` 每次调用复制宿主 `pairedToolCallIds` 返回的历史集合，并在结果成功追加后更新本批集合；同批重复结果只记录第一份，且不重复发送其截图、A2UI 或结束 trace。未提供历史回调时仍保证同批去重；跨批去重依赖宿主返回当前有效对话的已配对集合（可用 `pairedToolCallIdsFromMessages`）。集合不会跨调用缓存或反向修改宿主集合，因此历史已完成后再次使用同一调用 ID 的新调用仍可记录结果。相关改动执行仓库 `npm run test:pairing` 并复核 `skills/verify-tool-call-pairing/SKILL.md` 中的代码/模型对应关系。
+- **工具结果去重**：`processToolResults` 每次调用复制宿主 `pairedToolCallIds` 返回的历史集合，并在结果成功追加后更新本批集合；同批重复结果只记录第一份，且不重复发送其截图、A2UI 或结束 trace。未提供历史回调时仍保证同批去重；跨批去重依赖宿主返回当前有效对话的已配对集合（可用 `pairedToolCallIdsFromMessages`）。集合不会跨调用缓存或反向修改宿主集合，因此历史已完成后再次使用同一调用 ID 的新调用仍可记录结果。相关改动执行仓库 `pnpm run test:pairing` 并复核 `skills/verify-tool-call-pairing/SKILL.md` 中的代码/模型对应关系。
 
 ---
 
@@ -140,8 +140,8 @@ Jev 不是 SDK 模块：未配置入口时宿主不调用它，SDK 接入参数�
 - `response.failed` / `response.cancelled`（以及终止帧中的对应 status）必须抛错，不能伪装成成功的空回答。重试仍由上层 tool-loop 负责，不在 adapter 内新增重试。
 - 与共享适配器重构合并后，上述处理集中在 SDK 的 Responses 事件 handler / `finishResponsesStream`；core 保持薄 shim。终止帧有实际内容（含兼容字段 `output_text`）时优先采用，否则保留累计分片并合并终止元数据。
 - `rewindUncommittedTail` 以带 `seq` 的折叠可见消息判断是否仍有尾部；不能把 `hideRange` 自己追加的 WAL 控制行当成新尾部，重复恢复必须幂等。不提供消息 `seq` 的自定义宿主保留物理 WAL head 的保守回退。
-- SDK 单测包含 `src/model/responses-terminal.test.ts`。跨 SDK/core 的分片、工具参数、重复终止帧、HTTP 错误和取消契约由根目录 `scripts/test/responses-protocol.test.mjs` 检查（先构建，随后 `npm run test:unit`）。
-- 公开 npm 包另跑 `npm run test:package`：改 scope 后打 tarball、隔离安装、校验所有 exports/类型解析、mini 静态依赖闭包和实际 mini 会话。发布脚本只发布同一批验证过的 tarball；不以 workspace 内导入成功代替产物验收。
+- SDK 单测包含 `src/model/responses-terminal.test.ts`。跨 SDK/core 的分片、工具参数、重复终止帧、HTTP 错误和取消契约由根目录 `scripts/test/responses-protocol.test.mjs` 检查（先构建，随后 `pnpm run test:unit`）。
+- 公开 npm 包另跑 `pnpm run test:package`：改 scope 后打 tarball、隔离安装、校验所有 exports/类型解析、mini 静态依赖闭包和实际 mini 会话。发布脚本只发布同一批验证过的 tarball；不以 workspace 内导入成功代替产物验收。
 
 观测也在宿主侧。内核只调用 `emitTrace`。`packages/core` 把这些事件镜像到 Langfuse（Lab「更多 → Langfuse」；没保存入口不会上报），并把真正发出的 Jev HTTP 记成 `jev_call`，在 Langfuse 里是当前轮下面的 `jev.<切入点>`。没发出 HTTP 的切入点不会出现。不要为了 Langfuse 或 Jev 在 mini 里静态 import Node。
 
@@ -194,8 +194,8 @@ Jev 不是 SDK 模块：未配置入口时宿主不调用它，SDK 接入参数�
 6. **验证构建与测试**：
    ```bash
    cd packages/agent-loop
-   npm run build   # tsc -b 检查
-   npm run test    # vitest 测试
+   pnpm run build   # tsc -b 检查
+   pnpm run test    # vitest 测试
    ```
 7. **同步更新 Skill**：**核心指令——任何对 API 导出、档位或核心契约的改动，必须同步更新本文件（`skills/agent-loop/SKILL.md`）与 `references/`**。
 

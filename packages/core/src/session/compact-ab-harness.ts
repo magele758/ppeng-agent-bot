@@ -121,7 +121,7 @@ const ALLOWED_CASES = new Set<string>(['silent', 'restated']);
 
 const LS_COMMAND = 'ls -la /opt/app/releases';
 const GIT_COMMAND = 'git status';
-const TEST_COMMAND = 'npx node --test packages/core/test/release-ready.test.js';
+const TEST_COMMAND = 'node --test packages/core/test/release-ready.test.js';
 
 /** Probe fact: release tarball filename. Only appears in the ls stdout. */
 export function makeSecretToken(): string {

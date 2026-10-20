@@ -31,6 +31,9 @@ function tryListen(port, host) {
 
 /** @returns {Promise<boolean>} true if port is free on loopback IPv4 and IPv6 (when available) */
 export async function isPortFree(port) {
+  // Probe the actual Next bind address too: macOS can permit a specific bind
+  // while a wildcard holder would still block Next's 0.0.0.0 listener.
+  if (!await tryListen(port, '0.0.0.0')) return false;
   const v4 = await tryListen(port, '127.0.0.1');
   if (!v4) return false;
   const v6 = await tryListen(port, '::');

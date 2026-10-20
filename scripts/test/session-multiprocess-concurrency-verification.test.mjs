@@ -74,5 +74,5 @@ test('source drift and prior verifier failures block verdict [AC:session-multipr
   const good={model:{status:'pass',exhausted:true},runtime:{completed:true,status:'pass'},review:{status:'reviewed'},mutations:{status:'pass',restored:true},existing:{restart:{status:'pass'},lifecycle:{status:'pass'},pairing:{status:'pass'}}};
   assert.equal(concurrencyVerdict(good),'pass');
   for(const key of ['restart','lifecycle','pairing'])assert.equal(concurrencyVerdict({...good,existing:{...good.existing,[key]:{status:'fail'}}}),'fail');
-  assert.match(readFileSync(join(ROOT,'skills/verify-session-concurrency/SKILL.md'),'utf8'),/npm run test:concurrency/);
+  assert.match(readFileSync(join(ROOT,'skills/verify-session-concurrency/SKILL.md'),'utf8'),/pnpm run test:concurrency/);
 });

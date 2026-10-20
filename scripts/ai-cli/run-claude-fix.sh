@@ -20,5 +20,5 @@ fi
 
 echo "repo: $ROOT"
 echo "using: claude -p（文档: doc/EXTERNAL_AI_CLI.md）"
-# 透传参数在 -p 与提示词之间，例如: npm run ai:claude -- --model sonnet
+# 透传参数在 -p 与提示词之间，例如: pnpm run ai:claude --model sonnet
 exec claude -p "$@" "$PROMPT"

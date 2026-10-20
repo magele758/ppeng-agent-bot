@@ -110,7 +110,7 @@ export function electronBuilderBinCandidates(desktopDir, repoRoot, platform = pr
 export function resolveElectronBuilderBin(desktopDir, repoRoot, platform = process.platform) {
   const found = electronBuilderBinCandidates(desktopDir, repoRoot, platform).find((path) => existsSync(path));
   if (!found) {
-    throw new Error('electron-builder not found; run npm ci at the workspace root');
+    throw new Error('electron-builder not found; run pnpm install --frozen-lockfile at the workspace root');
   }
   return found;
 }

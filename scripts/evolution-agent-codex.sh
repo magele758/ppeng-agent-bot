@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# evolution-run-day：Codex 版（npm run ai:codex）。更常用 Claude 见 scripts/evolution-agent-claude.sh。
+# evolution-run-day：Codex 版（pnpm run ai:codex）。更常用 Claude 见 scripts/evolution-agent-claude.sh。
 set -euo pipefail
 EX="${EVOLUTION_SOURCE_EXCERPT_FILE:-}"
 CO="${EVOLUTION_AGENT_CONSTRAINTS_FILE:-}"
@@ -25,7 +25,7 @@ if [[ -n "${AI_FIX_PROMPT:-}" ]]; then
   fi
 fi
 # --full-auto：低摩擦自动模式（sandbox workspace-write + 自动审批），不再弹确认。
-# 若需完全不沙箱（如需要 npm run test），设 AI_CODEX_FULL_AUTO=1 改用 --dangerously-bypass-approvals-and-sandbox。
+# 若需完全不沙箱（如需要 pnpm run test），设 AI_CODEX_FULL_AUTO=1 改用 --dangerously-bypass-approvals-and-sandbox。
 if [[ "${AI_CODEX_FULL_AUTO:-}" == "1" ]]; then
   exec codex exec --dangerously-bypass-approvals-and-sandbox "$PROMPT"
 else

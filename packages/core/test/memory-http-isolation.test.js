@@ -1,6 +1,6 @@
 /**
  * Memory HTTP read routes under auth.isolate (daemon routes, driven without a socket).
- * Lives in core/test so it runs with `npm run test:unit` after daemon tsc.
+ * Lives in core/test so it runs with `pnpm run test:unit` after daemon tsc.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';

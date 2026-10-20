@@ -19,34 +19,34 @@
 - 默认超时 **600s**；可在工具参数里传 `timeout_ms`。
 - 仍需本机 **PATH** 已安装并登录对应 CLI；未安装会返回非 0 / 错误信息。
 
-无需再让用户敲 `npm run ai:*`；由 Agent 在工具回合里自行决定是否调用（系统提示里已简要说明 Main Agent 的用法）。
+无需再让用户敲 `pnpm run ai:*`；由 Agent 在工具回合里自行决定是否调用（系统提示里已简要说明 Main Agent 的用法）。
 
 ## 检查本机是否已安装
 
 ```bash
-npm run ai:tools
+pnpm run ai:tools
 ```
 
 或手动：`command -v claude`、`command -v codex`、`command -v agent`。
 
-## 统一入口（默认任务：跑 `npm run ci` 直到绿）
+## 统一入口（默认任务：跑 `pnpm run ci` 直到绿）
 
 | npm 脚本 | 底层 CLI | 说明 |
 |----------|-----------|------|
-| `npm run ai:claude` | `claude -p`（`--print`） | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) |
-| `npm run ai:codex` | `codex exec --sandbox workspace-write` | [Codex CLI](https://developers.openai.com/codex/cli/) |
-| `npm run ai:cursor` | `agent --print` | [Cursor Agent CLI](https://cursor.com/docs/cli/overview) |
+| `pnpm run ai:claude` | `claude -p`（`--print`） | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) |
+| `pnpm run ai:codex` | `codex exec --sandbox workspace-write` | [Codex CLI](https://developers.openai.com/codex/cli/) |
+| `pnpm run ai:cursor` | `agent --print` | [Cursor Agent CLI](https://cursor.com/docs/cli/overview) |
 
 自定义提示词（覆盖默认「修 CI」说明）：
 
 ```bash
-AI_FIX_PROMPT='只运行 npm run test:unit 并修复失败' npm run ai:claude
+AI_FIX_PROMPT='只运行 pnpm run test:unit 并修复失败' pnpm run ai:claude
 ```
 
 使用自定义提示词文件：
 
 ```bash
-AI_FIX_PROMPT_FILE=./my-prompt.txt npm run ai:codex
+AI_FIX_PROMPT_FILE=./my-prompt.txt pnpm run ai:codex
 ```
 
 默认提示词文件：[`scripts/ai-cli/prompts/fix-ci-default.txt`](../scripts/ai-cli/prompts/fix-ci-default.txt)。
@@ -67,7 +67,7 @@ AI_FIX_PROMPT_FILE=./my-prompt.txt npm run ai:codex
 本仓库脚本默认 `codex exec --full-auto`（沙箱可写工作区 + 自动审批，不再弹确认）。若你希望完全绕过沙箱（**更危险**，仅用于外部已隔离的环境）：
 
 ```bash
-AI_CODEX_FULL_AUTO=1 npm run ai:codex
+AI_CODEX_FULL_AUTO=1 pnpm run ai:codex
 ```
 
 ### Cursor Agent CLI
@@ -81,12 +81,12 @@ AI_CODEX_FULL_AUTO=1 npm run ai:codex
 agent -p "$(cat scripts/ai-cli/prompts/fix-ci-default.txt)"
 ```
 
-## 与 `npm run ci` 的关系
+## 与 `pnpm run ci` 的关系
 
 | 命令 | 作用 |
 |------|------|
-| `npm run ci` | 仅**检查**（build + unit + regression + e2e），不调用外部 AI。 |
-| `npm run ai:*` | 把「跑 CI + 按提示修问题」交给**已安装的**外部 CLI；**不会**自动安装 CLI。 |
+| `pnpm run ci` | 仅**检查**（build + unit + regression + e2e），不调用外部 AI。 |
+| `pnpm run ai:*` | 把「跑 CI + 按提示修问题」交给**已安装的**外部 CLI；**不会**自动安装 CLI。 |
 
 ## Windows
 

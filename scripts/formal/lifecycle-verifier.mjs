@@ -14,7 +14,7 @@ let built = false;
 function build() {
   if (built) return;
   const ts = JSON.parse(readFileSync(join(ROOT, 'node_modules/typescript/package.json'), 'utf8'));
-  if (ts.version !== '5.9.3') throw new Error('TypeScript 5.9.3 required; npm ci');
+  if (ts.version !== '5.9.3') throw new Error('TypeScript 5.9.3 required; pnpm install --frozen-lockfile');
   const r = spawnSync(process.execPath, [join(ROOT, 'node_modules/typescript/bin/tsc'), '-b', 'packages/core'], { cwd: ROOT, env: env(), encoding: 'utf8', timeout: 60000, maxBuffer: 4e6 });
   if (r.error || r.status !== 0) throw new Error(`Fresh build failed: ${r.error?.message ?? r.stdout + r.stderr}`);
   built = true;

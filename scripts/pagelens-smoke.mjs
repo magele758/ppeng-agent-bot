@@ -6,7 +6,7 @@
  *
  * 用法：node scripts/pagelens-smoke.mjs [--base http://127.0.0.1:23000] [--tab <tabId>]
  *        [--only nav,routes,...] [--expect-bots DeskBot,小八] [--json] [--list]
- * 前置：控制台已启动（npm run dev），Chrome 里 PageLens 扩展可用且放行该 origin。
+ * 前置：控制台已启动（pnpm run dev），Chrome 里 PageLens 扩展可用且放行该 origin。
  * 结束时标签页回到 #/chat（对话模式、筛选已清空）。存在 FAIL 时退出码为 1。
  */
 import { execFileSync } from 'node:child_process';

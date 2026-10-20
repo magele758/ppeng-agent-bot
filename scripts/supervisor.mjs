@@ -9,7 +9,7 @@
  *
  * Usage:
  *   node scripts/supervisor.mjs
- *   # or: npm run start:supervised
+ *   # or: pnpm run start:supervised
  *
  * Environment vars forwarded to daemon unchanged.
  * Set SUPERVISOR_POLL_MS   to control restart-request poll interval (default 3000).

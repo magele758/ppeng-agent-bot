@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 示例：`evolution:run-day` 在 npm ci 之后、构建之前执行 EVOLUTION_AGENT_CMD。
+# 示例：`evolution:run-day` 在 pnpm install --frozen-lockfile 之后、构建之前执行 EVOLUTION_AGENT_CMD。
 # 环境变量（节选）：
 #   EVOLUTION_WT_ROOT / EVOLUTION_WORKTREE — worktree 绝对路径
 #   EVOLUTION_SOURCE_TITLE / EVOLUTION_SOURCE_URL

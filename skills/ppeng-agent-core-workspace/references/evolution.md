@@ -4,11 +4,11 @@
 
 | 命令 | 作用 |
 |------|------|
-| `npm run evolution -- --help` | 统一 CLI 全部参数 |
-| `npm run evolution:learn` | 仅 RSS/本地源 → inbox + digest skill |
-| `npm run evolution:run-day` | 仅跑 run-day（需已有 inbox） |
-| `npm run evolution:pipeline` | bash 一键：build→learn→run-day→可选重载 |
-| `npm run evolution:drain-showcase -- [opts]` | drain-showcase 包装：`--research` / `--agent` / `--review` / `--test-agent` 等 |
+| `pnpm run evolution --help` | 统一 CLI 全部参数 |
+| `pnpm run evolution:learn` | 仅 RSS/本地源 → inbox + digest skill |
+| `pnpm run evolution:run-day` | 仅跑 run-day（需已有 inbox） |
+| `pnpm run evolution:pipeline` | bash 一键：build→learn→run-day→可选重载 |
+| `pnpm run evolution:drain-showcase [opts]` | drain-showcase 包装：`--research` / `--agent` / `--review` / `--test-agent` 等 |
 | `bash scripts/evolution-drain-showcase.sh --help` | 同上脚本内帮助 |
 
 ## evolution-cli 常用参数（以 `--help` 为准）

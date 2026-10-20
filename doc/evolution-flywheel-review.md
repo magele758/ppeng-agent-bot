@@ -146,10 +146,10 @@ candidate change
 
 | 卡点 | 必跑内容 | 失败下一跳 |
 |------|----------|------------|
-| Build | `npm run build` | 回到 Coding 修复 |
-| Unit | `npm run test:unit` | 回到 Coding / H eval |
-| Integration | `npm run test:integration` | 回到契约/运行时修复 |
-| E2E | `npm run test:e2e` | 回到 UI/UX 或 API 修复 |
+| Build | `pnpm run build` | 回到 Coding 修复 |
+| Unit | `pnpm run test:unit` | 回到 Coding / H eval |
+| Integration | `pnpm run test:integration` | 回到契约/运行时修复 |
+| E2E | `pnpm run test:e2e` | 回到 UI/UX 或 API 修复 |
 | Contract | HTTP/SSE/A2UI/MCP/domain schema 或 golden tests | 回到 G 契约回路 |
 | Security | secret scan、dependency audit、env/sandbox/approval 检查 | 回到 E 安全回路 |
 | Deploy smoke | daemon `/api/health`、web `/`、`/evolution`、API proxy、stateDir 可写 | 回到 C SRE 回路 |

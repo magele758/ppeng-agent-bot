@@ -3,7 +3,7 @@ import{mkdirSync,writeFileSync}from'node:fs';
 import{join,resolve}from'node:path';
 import{ROOT,runConcurrencyProcess}from'./concurrency-verifier.mjs';
 const args=process.argv.slice(2);
-if(args.length&&(args.length!==2||args[0]!=='--out')){console.error('Usage: npm run test:concurrency -- [--out directory]');process.exit(2);}
+if(args.length&&(args.length!==2||args[0]!=='--out')){console.error('Usage: pnpm run test:concurrency [--out directory]');process.exit(2);}
 const out=args.length?resolve(args[1]):join(ROOT,'coverage/formal/concurrency');
 const report=runConcurrencyProcess();
 const lines=['# Multiprocess session verification','',`Overall: **${report.status}** (exit ${report.exitCode})`,

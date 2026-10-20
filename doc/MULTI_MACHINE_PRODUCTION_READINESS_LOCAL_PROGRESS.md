@@ -4,9 +4,9 @@
 
 ## 范围与门禁
 
-- 本地8条：[本地软件规格](../acceptance/multi-machine-local-foundation.yaml)。软件合并运行 `npm run test:acceptance`，包含全部既有软件标准。
+- 本地8条：[本地软件规格](../acceptance/multi-machine-local-foundation.yaml)。软件合并运行 `pnpm run test:acceptance`，包含全部既有软件标准。
 - 原40条：[现场规格](../acceptance/multi-machine-production-readiness.yaml)。原文、编号和approved状态不变，新增 `verificationStage: deployment` 记录用户确认的适用阶段。
-- 现场完整检查：`npm run test:acceptance:deployment`（`--stage all`），同时要求软件与现场标准，目前仍阻断19个缺项。软件门禁报告保留现场每条的真实missing/not-run状态、`ok:false`及`applicable:false`，不把现场条目标成通过。
+- 现场完整检查：`pnpm run test:acceptance:deployment`（`--stage all`），同时要求软件与现场标准，目前仍阻断19个缺项。软件门禁报告保留现场每条的真实missing/not-run状态、`ok:false`及`applicable:false`，不把现场条目标成通过。
 - 已批准/已实现的软件规格不能迁出软件门禁；阶段值非法直接失败。没有删除或降级原标准，没有无关测试标签或占位跳过。
 - 未执行现场部署、真实项目接入、GitHub App扩权或业务部署。
 

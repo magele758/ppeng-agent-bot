@@ -52,7 +52,7 @@ function request(url, options = {}) {
 // ── Daemon 启动 ────────────────────────────────────────────────────────────
 const daemonEntry = join(repoRoot, 'apps', 'daemon', 'dist', 'server.js');
 if (!externalBaseUrl && !existsSync(daemonEntry)) {
-  console.error(`[eval] daemon dist missing — run \`npm run build\` first: ${daemonEntry}`);
+  console.error(`[eval] daemon dist missing — run \`pnpm run build\` first: ${daemonEntry}`);
   process.exit(2);
 }
 

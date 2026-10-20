@@ -53,13 +53,13 @@ test('release gate retains deterministic test layers and does not tolerate failu
   }
   const runs = Object.values(doc.jobs).flatMap(job => job.steps ?? []).map((step) => step.run).filter(Boolean);
   for (const script of ['build', 'test:package', 'agent:eval:verify', 'test:regression', 'test:integration']) {
-    assert.ok(runs.includes(`npm run ${script}`), `missing release layer: ${script}`);
+    assert.ok(runs.includes(`pnpm run ${script}`), `missing release layer: ${script}`);
   }
   // test:unit runs through the flaky-retry wrapper; e2e adds a JUnit reporter for the acceptance gate.
   for(const lane of ['unit','formal','sdk'])assert.ok(runs.some(run=>run.includes(`validation-lane.mjs ${lane} --out`)),`missing release layer: ${lane}`);
   assert.match(readFileSync('scripts/ci/validation-lane.mjs','utf8'),/run-formal-regression.mjs/);
-  assert.ok(runs.some((run) => run.startsWith('npm run test:e2e')), 'missing release layer: test:e2e');
-  assert.ok(runs.some(run => run.startsWith('npm run agent:eval:fast -- --exit-on-fail')));
+  assert.ok(runs.some((run) => run.startsWith('pnpm run test:e2e')), 'missing release layer: test:e2e');
+  assert.ok(runs.some(run => run.startsWith('pnpm run agent:eval:fast --exit-on-fail')));
   const evidence = doc.jobs.tests.steps.find(
     (step) => step.uses?.startsWith('actions/upload-artifact@') && step.with?.name === 'release-test-evidence'
   );
@@ -67,7 +67,7 @@ test('release gate retains deterministic test layers and does not tolerate failu
   assert.match(evidence.with.path, /test-results\//);
   assert.match(evidence.with.path, /doc\/eval-results\//);
   const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
-  assert.ok(pkg.scripts.ci.includes('npm run agent:eval:fast -- --exit-on-fail'));
+  assert.ok(pkg.scripts.ci.includes('pnpm run agent:eval:fast --exit-on-fail'));
   assert.equal(readFileSync(new URL('../../.nvmrc', import.meta.url), 'utf8').trim(), '22');
   for (const job of [doc.jobs.tests, doc.jobs.crap, doc.jobs.acceptance, workflow('publish-npm').jobs.publish]) {
     const node = job.steps.find((step) => step.uses?.startsWith('actions/setup-node@'));

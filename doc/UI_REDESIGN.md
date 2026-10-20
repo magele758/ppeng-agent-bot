@@ -62,7 +62,7 @@ foundation 已在 `messages/{zh,en}/index.ts` 注册全部新命名空间，work
 
 1. foundation → 2. WS1–WS6 并行（路径互不相交）→ 3. 最后一个 PR 删除空的占位与废弃的 `MorePanel/HomePanel/旧 key`（由架构师/最后合并者做）。
 - e2e 选择器已在 foundation 更新为：Rail 链接 `getByRole('link', {name})`、各 section 根节点 `#section-<id>`、子页 `#section-<id>-<sub>`；沿用旧 id（`#panel-play`、`#btnModelSetup`、`#listApprovals` 等）。
-- CI 每个 PR 需：`npm run build:web-console`、`npm run test:unit`、`npm run test:acceptance`、相关 e2e。
+- CI 每个 PR 需：`pnpm run build:web-console`、`pnpm run test:unit`、`pnpm run test:acceptance`、相关 e2e。
 
 ## 8. Foundation 实际落地结构（分支 `ui-redesign-base`）
 

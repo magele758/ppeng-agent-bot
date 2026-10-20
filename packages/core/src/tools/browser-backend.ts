@@ -20,7 +20,7 @@ import { ingestImageAsset } from '../image-assets.js';
 import type { BrowserAction } from './browser-tools.js';
 
 export const BROWSER_INSTALL_HINT =
-  '本机安装: npm i -D playwright && npx playwright install chromium（仓库根目录已有 @playwright/test 时可直接 npx playwright install chromium）';
+  '本机安装: pnpm install --frozen-lockfile && pnpm exec playwright install chromium';
 
 export type BrowserErrorCode =
   | 'browser_not_installed'

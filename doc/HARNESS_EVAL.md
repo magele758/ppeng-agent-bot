@@ -128,9 +128,9 @@ next_action
 ## 脚本入口建议
 
 ```bash
-npm run agent:eval -- --mode fast
-npm run agent:eval -- --mode nightly
-npm run agent:eval -- --case skill-routing-basic
+pnpm run agent:eval --mode fast
+pnpm run agent:eval --mode nightly
+pnpm run agent:eval --case skill-routing-basic
 ```
 
 CI 只跑 fast；nightly 可由本机或自建 runner 跑真实模型。

@@ -6,13 +6,9 @@
   "engines": {
     "node": ">=22"
   },
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
   "scripts": {
-    "build": "node scripts/build-workspace.mjs && npm run build:web-console",
-    "test": "npm run build && npm run test:unit",
+    "build": "node scripts/build-workspace.mjs && pnpm run build:web-console",
+    "test": "pnpm run build && pnpm run test:unit",
     "test:unit": "node --experimental-strip-types --test --test-concurrency=1 \"packages/core/test/**/*.test.js\" \"packages/capability-gateway/test/**/*.test.js\" \"packages/agent-sre/test/**/*.test.js\" \"packages/agent-stock/test/**/*.test.js\" \"packages/agent-homeiot/test/**/*.test.js\" \"packages/agent-erp/test/**/*.test.js\" \"apps/web-console/lib/**/*.test.ts\" \"apps/web-console/components/**/*.test.ts\" \"apps/daemon/test/**/*.test.ts\" \"scripts/**/*.test.mjs\" \"apps/desktop/src/**/*.test.ts\"",
     "test:formal": "node scripts/formal/run-formal-regression.mjs",
     "test:pairing": "node scripts/formal/run-pairing-verification.mjs",
@@ -27,7 +23,7 @@
     "test:mutation": "node scripts/mutation/run-mutation.mjs",
     "test:regression": "node scripts/regression-test.mjs",
     "test:integration": "node scripts/integration-test.mjs",
-    "audit:upstream": "npm audit --registry=https://registry.npmjs.org",
+    "audit:upstream": "pnpm audit --registry=https://registry.npmjs.org",
     "test:e2e": "node scripts/e2e-run.mjs",
     "test:e2e:install": "playwright install --with-deps chromium",
     "test:pagelens": "node scripts/pagelens-smoke.mjs",
@@ -38,15 +34,15 @@
     "ai:cursor": "bash scripts/ai-cli/run-cursor-agent-fix.sh",
     "test:remote": "node scripts/remote-smoke.mjs",
     "test:compact-ab": "node scripts/compact-ab-eval.mjs",
-    "ci": "npm run build && npm run test:unit && npm run test:acceptance && npm run test:formal && npm run agent:eval:fast -- --exit-on-fail --out test-results/fast-eval && npm run agent:eval:verify && npm run test:package && npm run test:crap && npm run test:regression && npm run test:integration && npm run test:e2e",
+    "ci": "pnpm run build && pnpm run test:unit && pnpm run test:acceptance && pnpm run test:formal && pnpm run agent:eval:fast --exit-on-fail --out test-results/fast-eval && pnpm run agent:eval:verify && pnpm run test:package && pnpm run test:crap && pnpm run test:regression && pnpm run test:integration && pnpm run test:e2e",
     "start:daemon": "node apps/daemon/dist/server.js",
     "start:supervised": "node scripts/supervisor.mjs",
     "self-heal:flow": "bash scripts/self-heal-flow.sh",
     "start:cli": "node apps/cli/dist/index.js",
     "waveterm:parallel": "bash scripts/waveterm-parallel-blocks.sh",
-    "dev:daemon": "npx tsc -b packages/core apps/daemon && node apps/daemon/dist/server.js",
+    "dev:daemon": "pnpm exec tsc -b packages/core apps/daemon && node apps/daemon/dist/server.js",
     "dev:cli": "node --experimental-strip-types apps/cli/src/index.ts",
-    "dev:web-console": "npm run dev --workspace=@ppeng/agent-lab-web",
+    "dev:web-console": "pnpm --filter @ppeng/agent-lab-web run dev",
     "evolution": "node scripts/evolution-cli.mjs",
     "evolution:preset:list": "node scripts/evolution-cli.mjs --list-presets",
     "evolution:cursor-composer": "node scripts/evolution-cli.mjs --preset cursor-composer",
@@ -74,10 +70,10 @@
     "agent:eval:verify": "node scripts/agent-eval/compare.mjs --config scripts/agent-eval/experiments/starter.json --simulation --trials 1",
     "experiment:tool-result-evict": "node scripts/experiment-tool-result-evict.mjs",
     "doctor": "node scripts/doctor.mjs",
-    "build:web-console": "npm run build --workspace=@ppeng/agent-lab-web",
-    "start:web-console": "npm run start --workspace=@ppeng/agent-lab-web",
+    "build:web-console": "pnpm --filter @ppeng/agent-lab-web run build",
+    "start:web-console": "pnpm --filter @ppeng/agent-lab-web run start",
     "dev": "node scripts/dev-lab.mjs",
-    "dev:lab": "npm run dev",
+    "dev:lab": "pnpm run dev",
     "deploy:smoke": "node scripts/deploy-smoke.mjs",
     "release": "node scripts/release-orchestrator.mjs start",
     "release:git-sync": "node scripts/release-orchestrator.mjs git-sync",
@@ -96,12 +92,19 @@
   "devDependencies": {
     "@playwright/test": "^1.59.1",
     "@types/node": "^24.12.2",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "@ppeng/agent-core": "workspace:*",
+    "@ppeng/agent-loop": "workspace:*",
+    "@ppeng/api-types": "workspace:*",
+    "next": "15.5.15",
+    "react": "19.2.5",
+    "react-dom": "19.2.5"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "dotenv": "^17.4.2",
     "vscode-jsonrpc": "^8.2.1",
     "yaml": "^2.8.3"
-  }
+  },
+  "packageManager": "pnpm@10.29.2"
 }

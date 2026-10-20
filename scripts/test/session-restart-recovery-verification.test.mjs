@@ -65,5 +65,5 @@ test('source drift and failed existing verifiers block the combined gate [AC:ses
   for (const suffix of ['runtime.ts', 'restart-model.mjs']) assert.equal(checkRestartReview({ read: p => readFileSync(p, 'utf8') + (p.endsWith(suffix) ? '\n// changed' : '') }).status, 'needs-review');
   const pass = { model: { status: 'pass', exhausted: true }, runtime: { status: 'pass', completed: true }, mutations: { status: 'pass', restored: true }, review: { status: 'reviewed' }, existing: { lifecycle: { status: 'pass' }, pairing: { status: 'pass' } } };
   for (const key of ['lifecycle', 'pairing']) assert.equal(restartVerdict({ ...pass, existing: { ...pass.existing, [key]: { status: 'fail' } } }), 'fail');
-  assert.match(readFileSync(join(ROOT, 'skills/verify-session-restart/SKILL.md'), 'utf8'), /npm run test:restart/);
+  assert.match(readFileSync(join(ROOT, 'skills/verify-session-restart/SKILL.md'), 'utf8'), /pnpm run test:restart/);
 });

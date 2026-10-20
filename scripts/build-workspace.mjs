@@ -16,6 +16,6 @@ const projects = [
   'apps/cli',
 ];
 
-const cmd = ['npx', 'tsc', '-b', ...projects];
+const cmd = ['pnpm', 'exec', 'tsc', '-b', ...projects];
 console.log(`[build-workspace] ${cmd.join(' ')}`);
 execSync(cmd.join(' '), { cwd: repoRoot, stdio: 'inherit' });

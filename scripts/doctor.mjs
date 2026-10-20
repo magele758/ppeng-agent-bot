@@ -12,7 +12,7 @@ const repoRoot = join(__dirname, '..');
 const dist = join(repoRoot, 'packages', 'core', 'dist', 'doctor', 'doctor.js');
 
 if (!existsSync(dist)) {
-  console.error('doctor: packages/core/dist missing — run: npx tsc -b packages/core');
+  console.error('doctor: packages/core/dist missing — run: pnpm exec tsc -b packages/core');
   process.exit(2);
 }
 

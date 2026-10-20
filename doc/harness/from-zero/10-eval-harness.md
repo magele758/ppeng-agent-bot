@@ -14,8 +14,8 @@
 ## 运行
 
 ```bash
-npm run build
-npm run agent:eval:fast
+pnpm run build
+pnpm run agent:eval:fast
 node scripts/agent-eval/runner.mjs --case session-create
 node scripts/agent-eval/runner.mjs --mode fast --exit-on-fail
 ```
@@ -26,7 +26,7 @@ node scripts/agent-eval/runner.mjs --mode fast --exit-on-fail
 - 带 `--exit-on-fail`：存在失败或 daemon 未正常启动时退出 1。
 - dist 不存在时退出 2；找不到 case 时退出 1。
 
-因此 CI 和合并门必须显式使用 `--exit-on-fail`。`npm run agent:eval:fast` 本身没有附带该参数。
+因此 CI 和合并门必须显式使用 `--exit-on-fail`。`pnpm run agent:eval:fast` 本身没有附带该参数。
 
 ## Case 能表达什么
 

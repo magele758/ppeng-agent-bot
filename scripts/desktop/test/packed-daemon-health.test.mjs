@@ -1,3 +1,4 @@
+import {createRequire} from 'node:module';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
@@ -8,7 +9,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const electronBin = join(repoRoot, 'node_modules', 'electron', 'dist', 'electron');
+const electronBin = createRequire(join(repoRoot,'apps/desktop/package.json'))('electron');
 const packedDaemon = join(
   repoRoot,
   'apps/desktop/release/linux-unpacked/resources/server-bundle/apps/daemon/dist/server.js'

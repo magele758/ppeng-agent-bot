@@ -98,7 +98,7 @@ stream chunk 先推客户端，消息异步落 SQLite——首 token 不被 DB I
 
 `middleware.ts`：`appendDaemonBearerIfConfigured`——若 Next 进程配置了与 daemon **相同**的 `RAW_AGENT_AUTH_TOKEN`，且出站请求尚无 `Authorization`，则注入 `Bearer`。浏览器永不看到 token。
 
-开发：`npm run dev` / `dev:lab`（根 `.env` → 并行 daemon+Next）；Next 默认 `http://127.0.0.1:33815`。E2E（`npm run test:e2e`）临时随机 token，断言直连 daemon 401 / 经 Lab 200。
+开发：`pnpm run dev` / `dev:lab`（根 `.env` → 并行 daemon+Next）；Next 默认 `http://127.0.0.1:33815`。E2E（`pnpm run test:e2e`）临时随机 token，断言直连 daemon 401 / 经 Lab 200。
 
 ### 3.2 产品行为（实现路径）
 
