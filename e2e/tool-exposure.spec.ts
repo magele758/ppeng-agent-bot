@@ -1,0 +1,55 @@
+import { expect, test } from '@playwright/test';
+test('tool settings distinguish modes, persist and explain visibility [AC:tool-exposure-tiers#AC-10] [AC:tool-exposure-tiers#AC-13] [AC:tool-exposure-tiers#AC-11]', async ({ page, request }) => {
+    const r = await request.get('/api/tool-exposure/settings');
+    expect(r.status()).toBe(200);
+    await page.addInitScript(() => { if (!localStorage.getItem('lab.locale'))
+        localStorage.setItem('lab.locale', 'zh'); });
+    await page.goto('/#/settings/tools');
+    const card = page.getByTestId('tool-exposure-settings');
+    await expect(card).toBeVisible();
+    await card.getByRole('combobox', { name: '工具提供方式', exact: true }).selectOption('full');
+    await expect.poll(async () => (await (await request.get('/api/tool-exposure/settings')).json()).settings.mode).toBe('full');
+    await page.reload();
+    await expect(card.getByRole('combobox', { name: '工具提供方式', exact: true })).toHaveValue('full');
+    await card.getByRole('combobox', { name: '工具提供方式', exact: true }).selectOption('progressive');
+    await expect(card).toContainText('外部服务发现');
+    await expect(card.getByTestId('tool-exposure-counts')).toContainText('已注册');
+    await expect(card).toContainText('尚未加载');
+    await page.evaluate(() => localStorage.setItem('lab.locale', 'en'));
+    await page.reload();
+    await expect(card).toContainText('Tool delivery');
+    await expect(card).toContainText('External service discovery');
+});
+test('session detail and clear route preserve messages [AC:tool-exposure-tiers#AC-13] [AC:tool-exposure-tiers#AC-15]', async ({ request }) => {
+    const s = await request.post('/api/sessions', { data: { agentId: 'general', mode: 'chat', title: 'Exposure acceptance' } });
+    expect(s.ok()).toBeTruthy();
+    const body = await s.json();
+    const id = body.session.id;
+    const view = await request.get(`/api/sessions/${id}/tool-exposure`);
+    expect(view.status()).toBe(200);
+    const d = await view.json();
+    expect(d.counts.registered).toBe(d.items.length);
+    expect(d.counts.available).toBe(d.counts.provided + d.counts.pending);
+    expect(d.items.some((t: any) => t.reason === 'not_configured')).toBeTruthy();
+    const before = await (await request.get(`/api/sessions/${id}`)).json();
+    expect((await request.delete(`/api/sessions/${id}/tool-exposure`)).ok()).toBeTruthy();
+    const after = await (await request.get(`/api/sessions/${id}`)).json();
+    expect(after.messages).toEqual(before.messages);
+});
+test('pinning is saved for one agent and invalid settings are rejected [AC:tool-exposure-tiers#AC-6] [AC:tool-exposure-tiers#AC-11]', async ({ page, request }) => {
+    await page.addInitScript(() => localStorage.setItem('lab.locale', 'zh'));
+    await page.goto('/#/settings/tools');
+    const card = page.getByTestId('tool-exposure-settings');
+    const group = card.getByRole('checkbox', { name: 'Bot 配置', exact: true });
+    await group.click();
+    await expect(group).toBeChecked();
+    await expect.poll(async () => (await (await request.get('/api/tool-exposure/settings')).json()).settings.pinnedGroups.general).toContain('bot-config');
+    await page.reload();
+    await expect(group).toBeChecked();
+    const view = await (await request.get('/api/tool-exposure/settings?agentId=general')).json();
+    expect(view.items.find((i: any) => i.name === 'bot_create').state).toBe('provided');
+    expect((await request.patch('/api/tool-exposure/settings', { data: { mode: 'invalid' } })).status()).toBe(400);
+    expect((await request.patch('/api/tool-exposure/settings', { data: { agentId: 'general', groups: ['does-not-exist'] } })).status()).toBe(400);
+    await group.click();
+    await expect(group).not.toBeChecked();
+});

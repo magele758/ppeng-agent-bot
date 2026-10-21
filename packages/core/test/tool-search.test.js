@@ -60,7 +60,9 @@ test('tool_search: budget limits hits for ≥30 bound cards', async () => {
     env: { RAW_AGENT_DISCOVERY: '0' }
   });
   const offRes = await off[0].execute({ sessionId: 's' }, { query: 'x' });
-  assert.equal(offRes.ok, false);
+  assert.equal(offRes.ok, true);
+  assert.equal(JSON.parse(offRes.content).externalDiscoveryEnabled, false);
+  assert.deepEqual(JSON.parse(offRes.content).hits, []);
 
   store.db.close();
   rmSync(dir, { recursive: true, force: true });

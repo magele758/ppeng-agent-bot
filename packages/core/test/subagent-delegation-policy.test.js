@@ -39,11 +39,13 @@ class ScriptedAdapter {
 }
 
 function runtimeWith(adapter) {
-  return new RawAgentRuntime({
+  const rt = new RawAgentRuntime({
     repoRoot: mkdtempSync(join(tmpdir(), 'sub-deleg-repo-')),
     stateDir: mkdtempSync(join(tmpdir(), 'sub-deleg-state-')),
     modelAdapter: adapter
   });
+  rt.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
+  return rt;
 }
 
 function toolStub(name) {
@@ -237,6 +239,7 @@ test('bot and plain parents keep their tools; a child loses the denylist even on
   const parent = filterToolsForSession({
     env,
     tools: catalog,
+    settingsStore: {getDaemonControl:key=>key==='tool_exposure_settings'?{mode:'full',pinnedGroups:{}}:undefined},
     agent: agentStub(),
     session: {
       id: 'parent',
@@ -250,6 +253,7 @@ test('bot and plain parents keep their tools; a child loses the denylist even on
   const plainChild = filterToolsForSession({
     env,
     tools: catalog,
+    settingsStore: {getDaemonControl:key=>key==='tool_exposure_settings'?{mode:'full',pinnedGroups:{}}:undefined},
     agent: agentStub(),
     session: {
       id: 'child',
@@ -267,6 +271,7 @@ test('bot and plain parents keep their tools; a child loses the denylist even on
   const botChild = filterToolsForSession({
     env,
     tools: catalog,
+    settingsStore: {getDaemonControl:key=>key==='tool_exposure_settings'?{mode:'full',pinnedGroups:{}}:undefined},
     agent: agentStub(),
     session: {
       id: 'bot-child',

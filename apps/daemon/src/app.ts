@@ -1,3 +1,4 @@
+import { toolExposureRoutes } from './routes/tool-exposure.js';
 import { factoryRoutes } from './routes/factory.js';
 import { botRoomsRoutes } from './routes/bot-rooms.js';
 import { botFunctionalGroupRoutes } from './routes/bot-functional-groups.js';
@@ -127,6 +128,7 @@ export function buildDaemonRouter(deps: DaemonAppDeps): Router {
     .addAll(skillSettingsRoutes(runtime))
     .addAll(skillProposalRoutes(runtime))
     .addAll(dynToolRoutes(runtime))
+    .addAll(toolExposureRoutes(runtime))
     .addAll(attachmentRoutes(runtime))
     .addAll(sandboxRoutes(runtime))
     .addAll(trajectoryRoutes(runtime))
