@@ -114,10 +114,10 @@ test('runtime fallback after a mid-stream drop resets the client stream; transcr
     const chunks = [];
     await runtime.runSession(session.id, { onModelStreamChunk: (c) => chunks.push(c) });
 
-    assert.equal(primary.requests.length, 2, 'primary keeps one in-chain retry');
+    assert.equal(primary.requests.length, 6, 'primary keeps the full default retry budget');
     assert.equal(backup.requests.length, 1);
     const resets = chunks.filter((c) => c.type === 'stream_reset').map((c) => c.reason);
-    assert.deepEqual(resets, ['retry', 'fallback']);
+    assert.deepEqual(resets, ['retry', 'retry', 'retry', 'retry', 'retry', 'fallback']);
     const fallbackAt = chunks.findIndex((c) => c.type === 'stream_reset' && c.reason === 'fallback');
     assert.ok(
       chunks.slice(fallbackAt + 1).every((c) => c.type !== 'text_delta' || !c.text.includes('PARTIAL')),

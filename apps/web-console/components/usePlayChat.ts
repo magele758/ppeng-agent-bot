@@ -19,6 +19,7 @@ import {
 import { prependHistoryPage } from '@/lib/history-window';
 import { api } from '@/lib/api';
 import { loadSessionPanelResource, transcriptModelView } from '@/lib/session-panel-resource';
+import { readRetryProgress, type RetryProgress } from '@/lib/model-retry';
 import { modelErrorText } from '@/lib/model-errors';
 import { getSpeechRecognitionCtor, type SpeechRecognitionLike } from '@/lib/speech-dictation';
 import { renderMarkdown } from '@/lib/markdown';
@@ -267,7 +268,7 @@ function activeFollowMatches(follow: { sessionId: string; controller: AbortContr
 }
 
 function isSessionResult(event: string, payload: { session?: { id?: string } }): payload is { session: { id: string } } {
-  return event === 'result' && Boolean(payload.session?.id);
+  return (event === 'result' || event === 'session') && Boolean(payload.session?.id);
 }
 
 export function usePlayChat(deps: PlayChatDeps) {
@@ -321,7 +322,7 @@ export function usePlayChat(deps: PlayChatDeps) {
   const { pendingContext, setPendingContext, addPendingContext } = usePendingComposerContext(() => {
     setPlayStatus({ text: t('play.composer.contextTruncated') });
   });
-  const [streamOverlay, setStreamOverlay] = useState<{ segments: StreamSegment[] } | null>(null);
+  const [streamOverlay, setStreamOverlay] = useState<{ segments: StreamSegment[]; retry?: RetryProgress } | null>(null);
   const [waitTyping, setWaitTyping] = useState(false);
   const [playSending, setPlaySending] = useState(false);
   const [composerAckFlash, setComposerAckFlash] = useState(false);
@@ -1493,6 +1494,8 @@ export function usePlayChat(deps: PlayChatDeps) {
       throw lastErr ?? new Error('SSE connection failed');
     }
     const segments: StreamSegment[] = [];
+    let retry: RetryProgress | undefined;
+    let lastRetry: RetryProgress | undefined;
     let turnCheckpoint = streamCheckpoint(segments);
     let idCounter = 0;
     const nextId = () => `s-${++idCounter}`;
@@ -1506,7 +1509,7 @@ export function usePlayChat(deps: PlayChatDeps) {
       if (steerSplitRef.current?.holdOpen) {
         steerSplitRef.current = { prefix: segments.length, holdOpen: true };
       }
-      setStreamOverlay({ segments: [...segments] });
+      setStreamOverlay({ segments: [...segments], retry });
     };
 
     const reader = res.body?.getReader();
@@ -1534,9 +1537,27 @@ export function usePlayChat(deps: PlayChatDeps) {
         }
         if (event === 'error') {
           const raw = typeof p.message === 'string' && p.message.trim() ? p.message.trim() : 'stream error';
-          throw new PlayStreamError(t('play.status.runFailed', { error: modelErrorText(raw, t) }));
+          const failure = lastRetry?.phase === 'failed' ? lastRetry : undefined;
+          const message = failure?.reason === 'exhausted'
+            ? t('play.retry.exhausted', { requests: failure.requests, reason: failure.message })
+            : failure?.reason === 'wait_limit'
+              ? t('play.retry.waitLimit', { requests: failure.requests, reason: failure.message })
+              : lastRetry?.phase === 'cancelled' ? t('play.retry.stopped')
+              : t('play.status.runFailed', { error: modelErrorText(raw, t) });
+          throw new PlayStreamError(message);
+        }
+        if (event === 'model' && p.type === 'model_retry') {
+          const progress = readRetryProgress(p);
+          if (progress) {
+            lastRetry = progress;
+            retry = ['waiting', 'requesting', 'switching'].includes(progress.phase) ? progress : undefined;
+            sync();
+          }
         }
         if (event === 'model' && p.type === 'done') {
+          retry = undefined;
+          lastRetry = undefined;
+          sync();
           turnCheckpoint = streamCheckpoint(segments);
           modelShotOpenRef.current = false;
           const split = steerSplitRef.current;
@@ -2196,6 +2217,13 @@ export function usePlayChat(deps: PlayChatDeps) {
   });
 
   return {
+    stopLiveTurn: () => {
+      liveGenRef.current += 1;
+      liveOwnerRef.current = null;
+      clearStreamingShell();
+      setPlaySending(false);
+      setPlayStatus({ text: t('play.retry.stopped') });
+    },
     historyCursor,historyLoading,loadOlderHistory,
     transcriptReady: screen.bound,
     loadedTranscriptSessionId: historySessionRef.current,

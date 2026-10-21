@@ -320,6 +320,7 @@ async function streamRun(
   sessionId: string
 ) {
   sseInit(response);
+  sseSend(response, 'session', { session: runtime.getSession(sessionId) });
   // Refresh, hot reload, and a dropped socket are not a user stop. The run keeps
   // going so a later visit can follow it, and the finished turn stays in history.
   // Explicit stop is POST /cancel, which calls cancelSession on its own.

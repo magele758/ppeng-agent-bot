@@ -2,7 +2,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { runTurnWithRetries, type ToolLoopHost } from '../runtime/tool-loop.js';
 import { resolveRunProfile } from '../runtime/run-profile.js';
 import { CHECKPOINTS_METADATA_KEY } from '../session/checkpoint.js';
 import { createWaitingApprovalInterrupt } from '../session/interrupt.js';
@@ -1313,4 +1314,26 @@ it('public kernel keeps model, asynchronous completion and release inside its ad
   expect(observed).toEqual(['model', 'completion', 'release']);
   expect(store.getSession(session.id)?.activeWriterRunId).toBeUndefined();
   expect(scope.getStore()).toBeUndefined();
+});
+
+
+it('continues after a completed tool wave without replaying it [AC:model-retry-progress#AC-2]', async () => {
+  vi.useFakeTimers();
+  try {
+    let count = 0;
+    const { host, session, calls, store } = createHarness({ model: () => {
+      count++;
+      if (count === 1) return toolResult('echo');
+      if (count <= 4) throw new Error('fetch failed');
+      return textResult('recovered after tool');
+    }});
+    host.runTurnWithRetries = (input, stream) => runTurnWithRetries({ env: {} } as ToolLoopHost, host.modelAdapter, input, stream);
+    const pending = runSessionKernel(host, session.id).catch(e => e);
+    await vi.runAllTimersAsync();
+    const ended = await pending;
+    expect(ended.status).toBe('idle');
+    expect(calls.execute).toBe(1);
+    expect(store.foldMessages(session.id).filter(m => m.role === 'user')).toHaveLength(1);
+    expect(store.foldMessages(session.id).at(-1)?.parts).toEqual([{ type: 'text', text: 'recovered after tool' }]);
+  } finally { vi.useRealTimers(); }
 });

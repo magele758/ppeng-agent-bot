@@ -82,3 +82,6 @@ export {
   maybeLogLlmRequest,
   sanitizeLlmRequestBodyForDebug,
 } from './llm-prompt-debug.js';
+
+export { classifyModelError, isUpstreamRetryableCategory, isTerminalModelErrorCategory } from './error-class.js';
+export type { ModelErrorCategory, ModelErrorClassification } from './error-class.js';

@@ -822,7 +822,7 @@ test('planModelFallback: primary ref is dropped when its provider cannot serve (
   store.db.close();
 });
 
-test('runtime: empty chain + mini preset + upstream always 503 -> primary is hit exactly once', async () => {
+test('runtime: empty chain + mini preset respects explicit zero retries', async () => {
   const primary = await upstream((_req, res) => {
     res.writeHead(503, { 'content-type': 'text/plain' });
     res.end('Service Unavailable');
@@ -832,12 +832,12 @@ test('runtime: empty chain + mini preset + upstream always 503 -> primary is hit
     res.end(chatCompletion('unused'));
   });
   try {
-    await withEnv({ RAW_AGENT_STREAM: '0' }, async () => {
+    await withEnv({ RAW_AGENT_STREAM: '0', RAW_AGENT_MODEL_MAX_RETRIES: '0' }, async () => {
       const { runtime } = runtimeForUpstreams(primary, backup);
       runtime.store.setDaemonControl('loop_settings', { assemblyPreset: 'mini' });
       const session = runtime.createChatSession({ title: 'mini-empty', message: 'hi' });
       await assert.rejects(runtime.runSession(session.id), /503/);
-      assert.equal(primary.hits.count, 1, 'mini keeps its single call without retries');
+      assert.equal(primary.hits.count, 1, 'explicit zero disables retries');
       assert.equal(backup.hits.count, 0);
       await runtime.destroy();
     });
@@ -847,7 +847,7 @@ test('runtime: empty chain + mini preset + upstream always 503 -> primary is hit
   }
 });
 
-test('runtime: active chain caps stacked retries (primary 2 attempts, each backup 1)', async () => {
+test('runtime: active chain respects explicit one retry on primary and backup', async () => {
   const primary = await upstream((_req, res) => {
     res.writeHead(503, { 'content-type': 'text/plain' });
     res.end('primary down');
@@ -858,7 +858,7 @@ test('runtime: active chain caps stacked retries (primary 2 attempts, each backu
   });
   try {
     for (const preset of ['mini', 'max']) {
-      await withEnv({ RAW_AGENT_STREAM: '0', RAW_AGENT_MODEL_MAX_RETRIES: '9' }, async () => {
+      await withEnv({ RAW_AGENT_STREAM: '0', RAW_AGENT_MODEL_MAX_RETRIES: '1' }, async () => {
         primary.hits.count = 0;
         backup.hits.count = 0;
         const { runtime } = runtimeForUpstreams(primary, backup);
@@ -867,7 +867,7 @@ test('runtime: active chain caps stacked retries (primary 2 attempts, each backu
         const session = runtime.createChatSession({ title: `cap-${preset}`, message: 'hi' });
         await assert.rejects(runtime.runSession(session.id), /503/);
         assert.equal(primary.hits.count, 2, `${preset}: primary = 1 retry`);
-        assert.equal(backup.hits.count, 1, `${preset}: backup = no retry`);
+        assert.equal(backup.hits.count, 2, `${preset}: backup = 1 retry`);
         await runtime.destroy();
       });
     }
@@ -1055,4 +1055,51 @@ test('classifyModelError: nullish errors return before invoking text classifiers
   } finally {
     exec.mock.restore();
   }
+});
+
+
+test('runtime: default chain allows six primary and two backup requests [AC:model-retry-progress#AC-5]', async () => {
+  const primary = await upstream((_req, res) => { res.writeHead(503); res.end('primary down'); });
+  const backup = await upstream((_req, res) => { res.writeHead(503); res.end('backup down'); });
+  try {
+    await withEnv({ RAW_AGENT_STREAM: '0', RAW_AGENT_MODEL_MAX_RETRIES: '' }, async () => {
+      const { runtime } = runtimeForUpstreams(primary, backup);
+      try {
+        writeModelFallbackSettings(runtime.store, { chain: [B] }, {});
+        const session = runtime.createChatSession({ title: 'retry-defaults', message: 'hi' });
+        const chunks = [];
+        await assert.rejects(runtime.runSession(session.id, { onModelStreamChunk: c => chunks.push(c) }), /503/);
+        assert.equal(primary.hits.count, 6);
+        assert.equal(backup.hits.count, 2);
+        assert.equal(chunks.at(-1)?.requests, 8);
+        assert.equal(runtime.store.getSession(session.id).status, 'failed');
+      } finally { await runtime.destroy(); }
+    });
+  } finally { primary.close(); backup.close(); }
+});
+
+
+test('runtime: cancelling a backoff prevents retry and fallback [AC:model-retry-progress#AC-7]', async () => {
+  const primary = await upstream((_req, res) => { res.writeHead(503); res.end('primary down'); });
+  const backup = await upstream((_req, res) => { res.writeHead(200); res.end(chatCompletion('must not run')); });
+  try {
+    await withEnv({ RAW_AGENT_STREAM: '0', RAW_AGENT_MODEL_MAX_RETRIES: '' }, async () => {
+      const { runtime } = runtimeForUpstreams(primary, backup);
+      try {
+        writeModelFallbackSettings(runtime.store, { chain: [B] }, {});
+        const session = runtime.createChatSession({ title: 'cancel-backoff', message: 'hi' });
+        let cancelledAt = 0;
+        await runtime.runSession(session.id, { onModelStreamChunk: c => {
+          if (c.type === 'model_retry' && c.phase === 'waiting') {
+            cancelledAt = Date.now();
+            runtime.cancelSession(session.id);
+          }
+        }}).catch(error => assert.match(error.message, /aborted/i));
+        assert.ok(cancelledAt > 0);
+        assert.ok(Date.now() - cancelledAt < 1000);
+        assert.equal(primary.hits.count, 1);
+        assert.equal(backup.hits.count, 0);
+      } finally { await runtime.destroy(); }
+    });
+  } finally { primary.close(); backup.close(); }
 });

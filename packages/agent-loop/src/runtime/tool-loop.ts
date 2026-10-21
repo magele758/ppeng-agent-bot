@@ -9,6 +9,7 @@ import type {
   HttpProblemDetails,
   MessagePart,
   ModelAdapter,
+  ModelRetryProgress,
   ModelStreamChunk,
   ModelTurnInput,
   ModelTurnResult,
@@ -21,6 +22,7 @@ import type {
 } from '../types.js';
 import { envBool, envInt } from '../helpers.js';
 import { toolInfraProblem } from '../model/tool-result-problem.js';
+import { classifyModelError } from '../model/error-class.js';
 import { retryAfterMsOf } from '../model/upstream-error.js';
 import { gateDirtyToolInput } from './dirty-input-gate.js';
 import { buildUnknownToolResultContent } from '../recovery/unknown-tool-result.js';
@@ -973,33 +975,51 @@ export async function runTurnWithRetries(
   onStream?: (chunk: ModelStreamChunk) => void,
   opts?: { maxRetries?: number }
 ): Promise<ModelTurnResult> {
-  const envRetries = envInt(host.env, 'RAW_AGENT_MODEL_MAX_RETRIES', 2);
+  const rawRetries = host.env.RAW_AGENT_MODEL_MAX_RETRIES?.trim();
+  const configuredRetries = Number(rawRetries);
+  const envRetries = rawRetries && Number.isFinite(configuredRetries) && configuredRetries >= 0 ? Math.floor(configuredRetries) : 5;
   const maxRetries =
     opts?.maxRetries !== undefined && Number.isFinite(opts.maxRetries)
       ? Math.max(0, Math.min(envRetries, Math.floor(opts.maxRetries)))
       : envRetries;
   const { signal, ...turnInput } = input;
-  const useStream =
-    Boolean(onStream) &&
-    typeof modelAdapter.runTurnStream === 'function' &&
-    envBool(host.env, 'RAW_AGENT_STREAM', true);
-
+  const useStream = Boolean(onStream) && typeof modelAdapter.runTurnStream === 'function' && envBool(host.env, 'RAW_AGENT_STREAM', true);
   const stream = useStream && onStream ? createStreamResetTracker(onStream) : undefined;
   let lastError: unknown;
+  let requests = 0;
+  const progress = (phase: ModelRetryProgress['phase'], retry: number, reason: ModelRetryProgress['reason'] = 'temporary', delayMs?: number) => {
+    onStream?.({ type: 'model_retry', phase, model: modelAdapter.modelName ?? modelAdapter.name, retry, maxRetries, requests,
+      message: lastError instanceof Error ? lastError.message.slice(0, 300) : String(lastError ?? ''), reason,
+      ...(delayMs === undefined ? {} : { delayMs }) });
+  };
+  const checkAbort = (attempt: number) => {
+    if (!signal?.aborted) return;
+    progress('cancelled', attempt);
+    throw new Error('Session aborted');
+  };
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
-    if (signal?.aborted) throw new Error('Session aborted');
+    checkAbort(attempt);
+    if (attempt > 0) progress('requesting', attempt);
+    requests++;
     try {
-      if (stream) {
-        return await runStreamTurnWithRepetitionGuard(host, modelAdapter, turnInput, signal, stream.onChunk);
-      }
-      return await modelAdapter.runTurn({ ...turnInput, signal });
+      const result = stream
+        ? await runStreamTurnWithRepetitionGuard(host, modelAdapter, turnInput, signal, stream.onChunk)
+        : await modelAdapter.runTurn({ ...turnInput, signal });
+      if (attempt > 0) progress('recovered', attempt);
+      return result;
     } catch (error) {
       lastError = error;
-      if (signal?.aborted) throw new Error('Session aborted');
-      if (error instanceof RepetitionLoopAbortError || attempt === maxRetries) break;
+      checkAbort(attempt);
       const delayMs = retryDelayMs(error, attempt);
-      if (delayMs === undefined) break;
+      const category = classifyModelError(error).category;
+      const permanent = ['auth', 'bad_request', 'content_filter', 'aborted', 'watchdog'].includes(category);
+      if (error instanceof RepetitionLoopAbortError || permanent || delayMs === undefined || attempt === maxRetries) {
+        const reason = permanent ? 'permanent' : delayMs === undefined ? 'wait_limit' : 'exhausted';
+        progress('failed', attempt, reason);
+        break;
+      }
       stream?.resetIfDirty('retry');
+      progress('waiting', attempt + 1, 'temporary', delayMs);
       await abortableSleep(delayMs, signal);
     }
   }
@@ -1007,11 +1027,13 @@ export async function runTurnWithRetries(
 }
 
 /** Longest server-requested wait we sit out in-process; longer asks fail fast (fallback can take over). */
-export const MAX_RETRY_AFTER_MS = 20_000;
+export const MAX_RETRY_AFTER_MS = 120_000;
 
 /** Backoff before the next attempt, honoring `Retry-After`; `undefined` = do not retry. */
 export function retryDelayMs(error: unknown, attempt: number): number | undefined {
-  const backoff = 400 * (attempt + 1);
+  const category = classifyModelError(error).category;
+  if (['auth', 'bad_request', 'content_filter', 'aborted', 'watchdog'].includes(category)) return undefined;
+  const backoff = Math.min(30_000, 2_000 * 2 ** attempt);
   const retryAfter = retryAfterMsOf(error);
   if (retryAfter === undefined) return backoff;
   return retryAfter > MAX_RETRY_AFTER_MS ? undefined : Math.max(backoff, retryAfter);
@@ -1026,6 +1048,7 @@ function abortableSleep(ms: number, signal: AbortSignal | undefined): Promise<vo
     };
     const timer = setTimeout(done, ms);
     signal?.addEventListener('abort', done, { once: true });
+    if (signal?.aborted) done();
   });
 }
 
