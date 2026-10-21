@@ -109,6 +109,11 @@ test('a joined human send runs again only when that message was not forked', asy
   const follow = { store, isRunning: () => false, runSession: async () => { calls += 1; if (calls === 1) return 'joined'; const observe = createHumanContinuationObserver(store, session.id); noteHumanModelInput(store, session.id, [message]); observe({ type: 'model_done', stopReason: 'end' }); return 'answered'; } };
   assert.equal(await runAnsweredHumanSession(follow, session.id), 'answered');
   assert.equal(calls, 2);
+  requestHumanRun(store, session.id);
+  calls = 0;
+  const stopped = { store, isRunning: () => false, runSession: async () => { calls += 1; blockHumanContinuations(store, session.id); const current = store.getSession(session.id); store.updateSession(session.id, { status: 'idle', metadata: { ...current.metadata, outcome: { kind: 'aborted', reason: 'user_abort' } } }); return 'aborted'; } };
+  assert.equal(await runAnsweredHumanSession(stopped, session.id), 'aborted');
+  assert.equal(calls, 1);
   store.db.close();
 });
 
