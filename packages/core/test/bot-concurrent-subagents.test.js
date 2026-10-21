@@ -268,12 +268,14 @@ test('sub-agent context and memory search reuse parent notes and global bot memo
     const history = JSON.parse((await historySearch.execute(ctx, { query: '蓝鲸' })).content);
     assert.equal(history.memories.some((hit) => hit.origin === 'parent' && hit.excerpt.includes('父级蓝鲸备忘')), true);
     assert.equal(history.memories.some((hit) => hit.origin === 'global' && hit.excerpt.includes('全局蓝鲸备忘')), true);
-    assert.equal(JSON.stringify(history).includes('父会话上下文'), false);
+    assert.equal(JSON.stringify(history.matches).includes('父会话上下文'), true);
     assert.equal(JSON.stringify(history).includes('其他机器人'), false);
     assert.equal(JSON.stringify(history).includes('白鲸'), false);
     const historyRead = createHistoryTools(store).find((tool) => tool.name === 'history_read');
     const parentMessage = store.foldMessages(parent.id).find((message) => message.role === 'user');
-    assert.equal((await historyRead.execute(ctx, { ref: `history:${parent.id}:${parentMessage.id}:0` })).ok, false);
+    const parentRead = await historyRead.execute(ctx, { ref: `history:${parent.id}:${parentMessage.id}:0` });
+    assert.equal(parentRead.ok, true);
+    assert.match(parentRead.content, /父会话上下文里的蓝鲸航线/);
     const appendix = compileTurnAppendix({ session: store.getSession(child.id), query: '蓝鲸备忘', store });
     assert.match(appendix, /父级蓝鲸备忘/);
     assert.match(appendix, /全局蓝鲸备忘/);

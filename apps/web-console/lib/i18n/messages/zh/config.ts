@@ -44,6 +44,7 @@ export const configMessages = {
   reasonNotConfigured: '未配置连接信息，使用本地兜底（无需操作）',
   reasonPartialConfig: '配了一半，已回退本地（见告警）',
   reasonManualOnly: '默认关闭，需要时手动开启',
+  reasonDefaultOn: '默认开启',
   reasonExplicitOn: '由环境变量显式开启',
   reasonExplicitOff: '由环境变量显式关闭',
   reasonExplicitProvider: '由 RAW_AGENT_*_PROVIDER 显式指定',

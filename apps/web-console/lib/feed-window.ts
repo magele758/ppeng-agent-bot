@@ -320,6 +320,24 @@ export interface ScrollTarget {
   getBoundingClientRect: () => { top: number };
 }
 
+function anchorAligned(current: number, offset: number, tries: number): boolean {
+  return Math.abs(current - offset) <= 1 || tries > 4;
+}
+
+function resolveViewportFeedScroll(el: ScrollTarget, pending: Extract<FeedScrollIntent, { kind: 'viewport' }>, tries: number): {
+  intent: FeedScrollIntent | null;
+  tries: number;
+  scrollTop: number | null;
+} {
+  const node = pending.key != null ? el.querySelector(`[data-feed-key="${cssEscape(pending.key)}"]`) : null;
+  if (!node) return { intent: pending, tries, scrollTop: null };
+  const delta = node.getBoundingClientRect().top - pending.top;
+  if (Math.abs(delta) <= 1) return { intent: pending, tries, scrollTop: null };
+  const next = preservedScrollTop(el.scrollTop + delta, el.scrollHeight, el.clientHeight);
+  if (Math.abs(next - el.scrollTop) < 0.5) return { intent: pending, tries, scrollTop: null };
+  return { intent: pending, tries, scrollTop: next };
+}
+
 /** Align the scroller to a pending intent. Returns the next intent (kept while row heights settle). */
 export function resolveFeedScroll(el: ScrollTarget, pending: FeedScrollIntent | null, tries: number): {
   intent: FeedScrollIntent | null;
@@ -330,20 +348,12 @@ export function resolveFeedScroll(el: ScrollTarget, pending: FeedScrollIntent | 
   if (pending.kind === 'bottom') {
     return { intent: null, tries: 0, scrollTop: Math.max(0, el.scrollHeight - el.clientHeight) };
   }
-  if (pending.kind === 'viewport') {
-    const node = pending.key != null ? el.querySelector(`[data-feed-key="${cssEscape(pending.key)}"]`) : null;
-    if (!node) return { intent: pending, tries, scrollTop: null };
-    const delta = node.getBoundingClientRect().top - pending.top;
-    if (Math.abs(delta) <= 1) return { intent: pending, tries, scrollTop: null };
-    const next = preservedScrollTop(el.scrollTop + delta, el.scrollHeight, el.clientHeight);
-    if (Math.abs(next - el.scrollTop) < 0.5) return { intent: pending, tries, scrollTop: null };
-    return { intent: pending, tries, scrollTop: next };
-  }
+  if (pending.kind === 'viewport') return resolveViewportFeedScroll(el, pending, tries);
   const nextTries = tries + 1;
   const node = pending.key != null ? el.querySelector(`[data-feed-key="${cssEscape(pending.key)}"]`) : null;
   if (node && pending.offset != null) {
     const current = node.getBoundingClientRect().top - el.getBoundingClientRect().top;
-    const done = Math.abs(current - pending.offset) <= 1 || nextTries > 4;
+    const done = anchorAligned(current, pending.offset, nextTries);
     return {
       intent: done ? null : pending,
       tries: done ? 0 : nextTries,

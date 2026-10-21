@@ -1,4 +1,6 @@
 'use client';
+import { goalMessage } from '@/lib/bot-goals';
+import { noteBotFirstTaskSent } from '@/lib/bot-first-task';
 
 import { botComposerStatusText, planBotComposerSend } from '@/lib/bot-chat-commands';
 import { parseBotModelOverride, resolveLoadedComposerModelRef } from '@/lib/bot-model';
@@ -301,6 +303,7 @@ export function usePlayChat(deps: PlayChatDeps) {
   const [goalDraft, setGoalDraft] = useState('');
   const [autonomyDraft, setAutonomyDraft] = useState<AutonomyLevel>('balanced');
   const [playInput, setPlayInput] = useState('');
+  const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [imageUrlInput, setImageUrlInput] = useState('');
   const [pendingImageAssetIds, setPendingImageAssetIds] = useState<string[]>([]);
   const [pendingAttachmentIds, setPendingAttachmentIds] = useState<string[]>([]);
@@ -334,6 +337,7 @@ export function usePlayChat(deps: PlayChatDeps) {
   );
   const [agentId, setAgentId] = useState('general');
   const [botId, setBotId] = useState('');
+  useEffect(() => { setSelectedGoalId(null); }, [botId, selectedSessionId]);
   const botIdRef = useRef('');
   const [botModelOverride, setBotModelOverride] = useState<ModelRef | null>(null);
   const loadedPinRef = useRef<{ sid: string; pinned: boolean }>({ sid: '', pinned: false });
@@ -1726,6 +1730,7 @@ export function usePlayChat(deps: PlayChatDeps) {
   };
 
   const sendBotCommand = async (commandBotId: string, text: string) => {
+      noteBotFirstTaskSent();
       stopSpeechDictation();
       const generation = claimLiveTurn(liveTurnOwnerId(selectedSessionRef.current));
       setPlaySending(true);
@@ -1764,7 +1769,7 @@ export function usePlayChat(deps: PlayChatDeps) {
   };
 
   const sendPlayMessage = async () => {
-    const text = playInput.trim();
+    const text = goalMessage(playInput.trim(), playSurface === 'bot' ? selectedGoalId : null);
     const quoteSnapshot = replyQuoteRef.current;
     const replyFields = withReplyTo({}, quoteSnapshot);
     const sentText = text || '(attachment)';
@@ -1920,6 +1925,7 @@ export function usePlayChat(deps: PlayChatDeps) {
 
     const preview = userPreviewText(text || '(image)', imageAssetIds);
     const beginStreamTurn = () => {
+      if (playSurface === 'bot') noteBotFirstTaskSent();
       acknowledgeLocalSendCommitted();
       requestScrollPlayToBottom();
       setOptimisticUser(preview);
@@ -1929,6 +1935,7 @@ export function usePlayChat(deps: PlayChatDeps) {
       clearComposerOnly();
     };
     const beginWaitTurn = () => {
+      if (playSurface === 'bot') noteBotFirstTaskSent();
       acknowledgeLocalSendCommitted();
       requestScrollPlayToBottom();
       setOptimisticUser(preview);
@@ -2191,6 +2198,7 @@ export function usePlayChat(deps: PlayChatDeps) {
   return {
     historyCursor,historyLoading,loadOlderHistory,
     transcriptReady: screen.bound,
+    loadedTranscriptSessionId: historySessionRef.current,
     // State
     sessionMessages: screen.messages,
     playTitle,
@@ -2203,6 +2211,8 @@ export function usePlayChat(deps: PlayChatDeps) {
     autonomyLevel: sessionChrome
       ? permissionToAutonomy(sessionChrome.permissionMode)
       : autonomyDraft,
+    selectedGoalId,
+    setSelectedGoalId,
     playInput,
     setPlayInput,
     imageUrlInput,

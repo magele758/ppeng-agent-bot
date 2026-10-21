@@ -98,9 +98,11 @@ export function SkillCaptureCards({ sessionId, onLayoutChange }: { sessionId: st
 
   return <div className="skill-capture-list">
     {storageError && <p role="status">{t('skillProposals.captureDismissStorageError')}</p>}
-    {captures.filter(capture => capture.status !== 'saved' || !dismissed.has(capture.id)).map(capture => {
+    {captures.filter(capture => !['saved', 'rejected'].includes(capture.status) || !dismissed.has(capture.id)).map(capture => {
       const saved = capture.status === 'saved';
-      const detailsOpen = !saved || expanded.has(capture.id);
+      const dismissible = saved || capture.status === 'rejected';
+      const collapsible = dismissible || capture.status === 'failed';
+      const detailsOpen = dismissible ? expanded.has(capture.id) : !expanded.has(capture.id);
       const working = capture.status === 'processing' || busy.has(capture.id);
       return <section key={capture.id} className="skill-capture-card" tabIndex={-1} role="dialog" aria-modal="false" aria-label={t('skillProposals.captureTitle')} data-testid={`skill-capture-${capture.id}`}>
         <header><strong>{t('skillProposals.captureTitle')}</strong><span>{t(capture.kind === 'update' ? 'skillProposals.kindUpdate' : 'skillProposals.kindNew')}</span></header>
@@ -112,6 +114,7 @@ export function SkillCaptureCards({ sessionId, onLayoutChange }: { sessionId: st
           <dt>{t('skillProposals.captureReason')}</dt><dd>{capture.reason}</dd>
           <dt>{t('skillProposals.captureSummary')}</dt><dd>{capture.summary}</dd>
         </dl>
+        {capture.error && <p role="alert">{capture.error}</p>}
         </div>
         {capture.status === 'pending' && !working ? <>
           {capture.ownerBotId && <BotSkillSharing bots={bots} owner={capture.ownerBotId} selected={sharing[capture.id] ?? capture.sharedBotIds ?? []} onChange={ids => setSharing(current => ({ ...current, [capture.id]: ids }))} />}
@@ -121,11 +124,11 @@ export function SkillCaptureCards({ sessionId, onLayoutChange }: { sessionId: st
             <button className="btn btn-ghost btn-sm" onClick={() => void decide(capture, 'reject')}>{t('skillProposals.reject')}</button>
           </div>
         </> : <p role="status">{t(working ? 'skillProposals.captureProcessing' : capture.status === 'saved' ? 'skillProposals.captureSaved' : capture.status === 'rejected' ? 'skillProposals.captureRejected' : 'skillProposals.captureFailed')}</p>}
-        {saved && <div className="skill-capture-actions">
+        {collapsible && <div className="skill-capture-actions">
           <button type="button" className="btn btn-ghost btn-sm" aria-expanded={detailsOpen} aria-controls={`capture-details-${capture.id}`} onClick={() => setExpanded(current => { const next = new Set(current); if (next.has(capture.id)) next.delete(capture.id); else next.add(capture.id); return next; })}>{t(detailsOpen ? 'skillProposals.captureCollapse' : 'skillProposals.captureExpand')}</button>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={event => dismiss(capture.id, event.currentTarget)}>{t('skillProposals.captureDismiss')}</button>
+          <>{dismissible && <button type="button" className="btn btn-ghost btn-sm" onClick={event => dismiss(capture.id, event.currentTarget)}>{t(saved ? 'skillProposals.captureDismiss' : 'skillProposals.dismissResult')}</button>}</>
         </div>}
-        {capture.error || errors[capture.id] ? <p role="alert">{capture.error || errors[capture.id]}</p> : null}
+        {errors[capture.id] ? <p role="alert">{errors[capture.id]}</p> : null}
       </section>;
     })}
   </div>;

@@ -1,4 +1,5 @@
 'use client';
+import { BotGoals } from '../../bot-work/BotGoals';
 import { BotDetailSkills } from '../../BotDetailSkills';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -272,6 +273,7 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
         }}
       />
 
+      {sessionId && <BotGoals key={`${bot.id}:${sessionId}`} botId={bot.id} sessionId={sessionId}/>}
       <BotRuntimeControl botId={bot.id}/>
       </div>
       <div role="tabpanel" id="bot-page-history" aria-labelledby="bot-tab-history" hidden={detailTab !== 'history'}>

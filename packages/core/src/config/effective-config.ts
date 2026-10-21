@@ -676,8 +676,13 @@ function resolveManual(input: EffectiveConfigInput): EffectiveItem[] {
       'Set in Lab.'));
   } else {
     const d = envFlag(env, 'RAW_AGENT_DISCOVERY');
-    out.push(item('manual.discovery', 'manual', d.on, d.on ? 'on' : 'off', d.set ? 'explicit-env' : 'local-fallback',
-      d.set ? (d.on ? 'explicit_on' : 'explicit_off') : 'manual_only', 'Capability discovery is opt-in.'));
+    if (d.set) {
+      out.push(item('manual.discovery', 'manual', d.on, d.on ? 'on' : 'off', 'explicit-env',
+        d.on ? 'explicit_on' : 'explicit_off', 'Capability discovery is opt-in.'));
+    } else {
+      out.push(item('manual.discovery', 'manual', true, 'on', 'local-fallback',
+        'default_on', 'Capability discovery is on by default.'));
+    }
   }
   return out;
 }

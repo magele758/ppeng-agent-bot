@@ -1,3 +1,4 @@
+import { goals } from './goals.ts';
 import { polish } from './polish.ts';
 import { factory } from './factory.ts';
 import { botWork } from './botWork.ts';
@@ -21,6 +22,7 @@ import { skillProposals } from './skillProposals.ts';
 import { teams } from './teams.ts';
 
 export const zh = {
+  goals,
   polish,
   factory,
   externalAgents,

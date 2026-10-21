@@ -1,0 +1,14 @@
+.bot-goals { border: 1px solid var(--border, #ddd); border-radius: 10px; margin: 8px 0; font-size: 13px; background: var(--surface, transparent); }
+.bot-goals summary { cursor: pointer; padding: 10px 12px; font-weight: 600; }
+.bot-goals__body { padding: 0 12px 12px; max-height: 45vh; overflow: auto; overflow-anchor: none; }
+.bot-goals__list article { border-top: 1px solid var(--border, #ddd); padding: 12px 0; }
+.bot-goals__list header { display: flex; justify-content: space-between; gap: 12px; }
+.bot-goals dl { display: grid; grid-template-columns: minmax(70px, auto) 1fr; gap: 4px 12px; }
+.bot-goals dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.bot-goals dt { opacity: .7; }
+.bot-goals ul { padding-left: 18px; margin: 0; }
+.bot-goals label { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.bot-goals input { width: 90px; }
+.bot-goals select { max-width: 220px; }
+.bot-goals__actions, .bot-goals__actions form { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.bot-goals__settings { display: grid; gap: 10px; }

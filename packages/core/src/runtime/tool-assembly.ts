@@ -7,11 +7,28 @@ import { CronJobStore, createCronTools } from '../cron/cron-store.js';
 import { CapabilityRegistry } from '../discovery/registry.js';
 import type { SqliteStateStore } from '../storage.js';
 import { createTailscaleTools } from '../tools/tailscale-tools.js';
+import {
+  DISCLOSED_TOOL_NAMES_META,
+  readDisclosedToolNames
+} from '../tools/deferred-disclosure.js';
 import { createToolSearchTools } from '../tools/tool-search.js';
 import { ingestBrowserScreenshotPng } from '../tools/browser-backend.js';
 import { createBrowserTools, defaultBrowserAction } from '../tools/browser-tools.js';
 import { resolveBrowserToolsEnabled } from '../tools/browser-settings.js';
 import type { ToolContract } from '../types.js';
+
+function discloseOnDemandTool(store: SqliteStateStore, sessionId: string, name: string): void {
+  const session = store.getSession(sessionId);
+  if (!session || !name) return;
+  const names = readDisclosedToolNames(session.metadata);
+  if (names.includes(name)) return;
+  store.updateSession(sessionId, {
+    metadata: {
+      ...session.metadata,
+      [DISCLOSED_TOOL_NAMES_META]: [...names, name]
+    }
+  });
+}
 
 export function assembleOptionalTools(input: {
   env: NodeJS.ProcessEnv;
@@ -19,6 +36,8 @@ export function assembleOptionalTools(input: {
   stateDir: string;
   getCronStore: () => CronJobStore;
   routineHost?: RoutineRuntimeHost;
+  /** Read when tool_search or load_capability_tool runs, not while assembling. */
+  getCatalog?: () => ToolContract<any>[];
 }): ToolContract<any>[] {
   const optionalExtras: ToolContract<any>[] = [];
   if (resolveBrowserToolsEnabled(input.store, input.env)) {
@@ -46,7 +65,9 @@ export function assembleOptionalTools(input: {
           return Array.isArray(raw) ? raw.map(String) : [];
         },
         env: input.env,
-        settingsStore: input.store
+        settingsStore: input.store,
+        getCatalog: input.getCatalog,
+        discloseTool: (sessionId, name) => discloseOnDemandTool(input.store, sessionId, name)
       }),
       ...createTailscaleTools({
         getRegistry,

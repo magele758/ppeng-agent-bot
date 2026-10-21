@@ -31,6 +31,7 @@ const REASON_CODES = [
   'not_configured',
   'partial_config',
   'manual_only',
+  'default_on',
   'explicit_on',
   'explicit_off',
   'explicit_provider',

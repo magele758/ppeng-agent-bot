@@ -29,6 +29,7 @@ import type {
   SessionRecord,
   TaskRecord
 } from '../types.js';
+import { forkOpeningMessage, inheritForkRetrievalMetadata, latestUserTriggerParts } from '../bots/fork-inheritance.js';
 import { inheritWorkspaceBinding, resolveEffectiveWorkspace, workspaceBindingFromMetadata } from '../workspace/index.js';
 import type { OrchestrationRun } from '../orchestrator/types.js';
 import {
@@ -248,7 +249,7 @@ export async function spawnSubagentOutcome(
   if (inheritedMode) {
     childMeta.permissionMode = inheritedMode;
   }
-  Object.assign(childMeta, inheritWorkspaceBinding(context.session.metadata));
+  Object.assign(childMeta, inheritForkRetrievalMetadata(context.session.metadata));
   Object.assign(childMeta, inheritBotIdentityMetadata(context.session, host.store));
 
   const subagent = host.store.createSession({
@@ -276,7 +277,18 @@ export async function spawnSubagentOutcome(
     role === 'review' || role === 'evaluator' || role === 'reviewer'
       ? `\n\nWhen finished, include a line: confidence: <0-100>`
       : '';
-  host.store.appendMessage(subagent.id, 'user', [textPart(`${prompt}${reviewHint}`)]);
+  const taskText = `${prompt}${reviewHint}`;
+  host.store.appendMessage(
+    subagent.id,
+    'user',
+    forkOpeningMessage({
+      store: host.store,
+      parentSessionId: context.session.id,
+      childSessionId: subagent.id,
+      taskText,
+      triggerParts: latestUserTriggerParts(host.store.foldMessages(context.session.id))
+    })
+  );
   const cancelChild = () => host.cancelSession?.(subagent.id);
   if (opts?.signal?.aborted) throw new Error('Subagent spawn aborted');
   opts?.signal?.addEventListener('abort', cancelChild, { once: true });
