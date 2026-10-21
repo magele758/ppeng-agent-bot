@@ -16,6 +16,8 @@ Run from repository root: `pnpm run test:restart`. Requires Node >=22 with SQLit
 5. Three isolated ESM source mutations alter real product startup: retain phantom running state, re-run a previously cancelled retry, and forget a persisted approval decision. Source files are never edited. Each mutant must load, add a failure to a previously passing scenario, and restore exactly to its baseline. A pre-existing red case is not a killed mutation.
 6. The command includes current lifecycle and pairing verifiers. All must pass to report overall pass. Source/model mappings and SHA-256 fingerprints require review.
 
+Independent scenarios run in pairs, each with its own temporary repository and state directory. Within one scenario, every predecessor still exits before the next generation opens its database. Results retain the fixed inventory order; infrastructure failures wait for peer cleanup and propagate without retry. This scheduling avoids serial startup and retry-observation waits exceeding the existing 180-second batch budget; no scenario, observation window, mutation or timeout is removed or relaxed.
+
 ## Evidence and exit codes
 
 `coverage/formal/restart/report.json` and `report.md`, or `pnpm run test:restart --out <directory>`. Exit 0 only for complete, reviewed, all-green checks. Exit 1 for actual mismatches or unreviewed changes; exit 2 for missing tools, child failure, timeout or incomplete evidence. CI has an explicit no-retry step and uploads evidence even on failure. `pnpm run test:formal` keeps both existing gates and adds restart verification.

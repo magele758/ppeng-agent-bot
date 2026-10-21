@@ -6,6 +6,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sanitizeScriptEnv } from '../spawn-utils.mjs';
 import { CASES } from './restart-cases.mjs';
+import { runIndependentScenarios } from './independent-scenarios.mjs';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const live = new Set();
 process.on('SIGTERM', () => { for (const p of live) p.kill('SIGKILL'); process.exit(2); });
@@ -110,7 +111,7 @@ async function runCase(c,mutation,childExecutable){
 export async function runRestartCases({mutation,only,childExecutable}={}){
   const selected=CASES.filter(c=>!only||only.includes(c.name));
   if(!selected.length||only&&selected.length!==new Set(only).size)return {completed:false,status:'incomplete',reason:'Unknown or empty scenario selection',scenarios:[]};
-  const scenarios=[];for(const c of selected)scenarios.push(await runCase(c,mutation,childExecutable));
+  const scenarios=await runIndependentScenarios(selected,c=>runCase(c,mutation,childExecutable));
   const completed=scenarios.every(s=>s.status!=='incomplete');return {completed,engine:'sequential OS processes / RawAgentRuntime production startup+destroy / SQLite / agent-loop',status:completed?(scenarios.every(s=>s.status==='pass')?'pass':'fail'):'incomplete',scenarios};
 }
 if(process.argv[1]===fileURLToPath(import.meta.url)){

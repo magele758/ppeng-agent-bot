@@ -1110,7 +1110,7 @@ test('a Room private message still stops at three hops and a full tool budget bl
     await rt.rooms.tick();
     await waitFor(async () => {
       const row = rt.store.db.prepare("SELECT hop, status FROM bot_work_messages WHERE target_bot=? ORDER BY seq DESC LIMIT 1").get(bots[3].id);
-      return row && row.status !== 'pending' ? row : null;
+      return row && !['pending', 'processing'].includes(row.status) ? row : null;
     });
     const delivered = rt.store.db.prepare('SELECT sender_bot, target_bot, hop, source_room FROM bot_work_messages ORDER BY seq').all();
     for (const row of delivered) hops.push(row.hop);
@@ -1120,6 +1120,7 @@ test('a Room private message still stops at three hops and a full tool budget bl
     const epsilon = rt.store.db.prepare('SELECT id FROM bot_work_messages WHERE target_bot=?').get(bots[4].id);
     assert.equal(epsilon, undefined);
     const blocked = bots.flatMap(bot => rt.store.listMessages(bot.canonicalSessionId)).flatMap(message => message.parts).find(part => part.type === 'tool_result' && String(part.content).includes('HOP_LIMIT'));
+    assert.ok(blocked, 'the completed third hop must persist its refusal before assertions');
     assert.equal(JSON.parse(blocked.content).error_code, 'HOP_LIMIT');
     const roomText = rt.rooms.messages(principal, room.id).messages.map(message => message.text).join('\n');
     assert.equal(roomText.includes('forward'), false);

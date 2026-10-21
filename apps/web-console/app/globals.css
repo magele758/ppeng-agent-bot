@@ -1833,6 +1833,7 @@ details.trace-row,
 .play-layout--rail.is-rail-collapsed { grid-template-columns: clamp(180px, 220px, 260px) minmax(0, 1fr); }
 .play-layout--rail > .play-rail[hidden] { display: none; }
 .play-sidebar__head[data-testid='session-toolbar'] { justify-content: flex-start; gap: 6px; flex-wrap: wrap; padding: 10px; }
+.play-sidebar__head .create-menu { margin-left: 0; }
 .play-sidebar__head .play-sidebar__batch { margin-left: auto; }
 .play-sidebar__tools[hidden] { display: none; }
 .play-sidebar__search { display: flex; align-items: center; min-width: 0; }

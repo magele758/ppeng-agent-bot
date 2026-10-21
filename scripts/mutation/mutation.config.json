@@ -28,7 +28,7 @@
     },
     "model-error-class": {
       "description": "upstream error classification (model/error-class.ts)",
-      "mutate": ["packages/core/dist/model/error-class.js"],
+      "mutate": ["packages/agent-loop/dist/model/error-class.js"],
       "testFiles": ["packages/core/test/model-fallback.test.js"]
     },
     "memory-namespace": {

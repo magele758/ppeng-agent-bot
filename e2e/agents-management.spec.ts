@@ -151,6 +151,7 @@ test.describe('Bots page', () => {
     await page.getByTestId(`bot-card-${bot.id}`).click();
     const detail = page.getByTestId('bot-detail');
     const permission = detail.getByLabel('Bot 权限档');
+    await detail.getByRole('tab', { name: '能力与权限' }).click();
     await expect(permission).toBeEnabled();
     await expect(permission).toHaveValue('auto');
     await expect(detail.getByLabel('Bot 使用的模型')).toBeEnabled();
@@ -164,12 +165,13 @@ test.describe('Bots page', () => {
     await detail.getByLabel('Bot 轮数上限').selectOption('48');
     await expect.poll(async () => (await sessionMeta()).maxTurns).toBe(48);
 
-    await detail.getByRole('button', { name: /展开或收起：定时任务/ }).click();
+    await detail.getByRole('tab', { name: '任务与自动化' }).click();
     await expect(detail.getByRole('button', { name: '添加定时任务' })).toBeVisible();
 
     await page.reload();
     await page.getByTestId(`bot-card-${bot.id}`).click();
     const again = page.getByTestId('bot-detail');
+    await again.getByRole('tab', { name: '能力与权限' }).click();
     await expect(again.getByLabel('Bot 权限档')).toHaveValue('ask');
     await expect(again.getByLabel('Bot 轮数上限')).toHaveValue('48');
   });

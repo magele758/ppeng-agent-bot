@@ -4,6 +4,7 @@ import { test, expect, type Page } from '@playwright/test';
 async function openBotSettings(page: Page, name: string) {
   await page.goto('/#/agents/bots');
   await page.getByRole('listitem').filter({ hasText: name }).first().click();
+  await page.getByTestId('bot-detail').getByRole('tab', { name: '能力与权限' }).click();
   await expect(page.getByTestId('bot-detail').getByLabel('Bot 权限档')).toBeEnabled();
 }
 

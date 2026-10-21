@@ -33,7 +33,7 @@ test('one accessible New menu opens dedicated creation without losing the curren
  const sidebar=page.locator('#panel-play.active .play-sidebar');
  await expect(sidebar.locator('.play-sidebar__head a')).toHaveCount(0);
  await expect(sidebar.getByTestId('play-group-create')).toHaveCount(0);
- const create=sidebar.locator('#btnPlayCreate'); await expect(create).toHaveText('新建');
+ const create=sidebar.locator('#btnPlayCreate'); await expect(create).toHaveAccessibleName('新建');
  await create.hover(); await expect(sidebar.getByRole('menu')).toBeVisible();
  const itemBounds=await sidebar.getByRole('menuitem').first().boundingBox();expect(itemBounds).toBeTruthy();await page.mouse.move(itemBounds!.x+itemBounds!.width/2,itemBounds!.y+itemBounds!.height/2,{steps:20});await expect(sidebar.getByRole('menu')).toBeVisible();
  await expect(sidebar.getByRole('menuitem')).toHaveCount(3);
@@ -301,4 +301,17 @@ test('sidebar Bot choice wins while the saved-default lookup is still pending [A
   await expect(page.locator('#playTitle')).toHaveText(chosen.name);
   await expect(row).toHaveClass(/\bselected\b/);
  } finally { releaseLookup(); }
+});
+
+test('loading Bot sessions preserves the hovered New menu [AC:bot-entry-simplification#AC-2]',async({page})=>{
+ const {bots}=await (await page.request.get('/api/bots')).json();
+ let release!:()=>void;const ready=new Promise<void>(resolve=>{release=resolve;});
+ await page.route('**/api/sessions',async route=>{await ready;await route.fulfill({json:{sessions:[{id:'late-toolbar-session',title:'Late session',status:'idle',metadata:{botId:bots[0].id,canonicalBotChat:true}}]}});});
+ await page.goto('/#/bot');
+ const create=page.locator('#btnPlayCreate');await create.hover();
+ await expect(page.getByRole('menu')).toBeVisible();
+ const before=await create.boundingBox();release();
+ await expect(page.locator('.play-sidebar__batch')).toBeVisible();
+ await expect.poll(async()=> (await create.boundingBox())?.x).toBe(before!.x);
+ await expect(page.getByRole('menu')).toBeVisible();
 });

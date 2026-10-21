@@ -175,6 +175,7 @@ test.describe('Chat and Bot mode', () => {
     const list = page.locator('#sessionListMini');
     const filter = page.getByLabel('筛选会话列表');
     await expect(list.locator('.list-item')).toHaveCount(2);
+    await page.getByRole('button', { name: '筛选会话', exact: true }).click();
 
     await filter.fill('weekly');
     await expect(list.locator('.list-item')).toHaveCount(1);

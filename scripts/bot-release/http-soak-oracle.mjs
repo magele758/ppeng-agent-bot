@@ -27,3 +27,11 @@ export function pendingControlledOperations(operations,{completed,explicitDecisi
  }
  return [...new Set([...operations,...observed])].filter(operation=>!completed(operation)&&explicitDecision(operation)?.finished!==1);
 }
+
+/** Reports are bounded excerpts; completion requires the original task's observed durable output. */
+export function hasDispatchCompletion(operation,task,evidence){
+ return task?.status==='completed'&&typeof task.result==='string'&&task.result.length>0
+  &&evidence?.operation===operation&&evidence.sessionId===task.sessionId
+  &&Number.isSafeInteger(task.sourceSeq)&&task.sourceSeq>0&&evidence.sourceSeq===task.sourceSeq
+  &&Number.isSafeInteger(evidence.outputSeq)&&evidence.outputSeq>task.sourceSeq&&evidence.outcome==='completed';
+}
