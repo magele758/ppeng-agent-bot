@@ -8,10 +8,13 @@ import type { SqliteStateStore } from '../storage.js';
 import { listPendingHumanWork } from '../session/human-continuation.js';
 import { inheritBotIdentityMetadata } from '../memory/bot-memory-scope.js';
 import { childPermissionMode, inheritBotAllowlists, inheritModelOverride } from '../runtime/spawn-policy.js';
+import { forkOpeningMessage, inheritForkRetrievalMetadata, visibleTaskText } from './fork-inheritance.js';
 
 export interface WorkPiece {
   id: string;
   text: string;
+  /** Set when the source message carries images or attachment references but no visible text. */
+  hasAttachment?: boolean;
 }
 
 export interface ConcurrentForkPlan {
@@ -35,7 +38,7 @@ export function planConcurrentBotForks(input: {
   activePieceId?: string;
   pending: readonly WorkPiece[];
 }): ConcurrentForkPlan {
-  const pending = input.pending.filter((piece) => piece.id && piece.text.trim());
+  const pending = input.pending.filter((piece) => piece.id && (piece.text.trim() || piece.hasAttachment));
   if (!input.inFlight) {
     if (pending.length <= 1) return { parentPieceId: pending[0]?.id, forks: [] };
     return { parentPieceId: pending[0]!.id, forks: pending.slice(1) };
@@ -78,11 +81,20 @@ export function parseConcurrentForks(metadata: Record<string, unknown> | undefin
 
 function pieceText(message: SessionMessage | undefined): string {
   if (!message) return '';
-  return message.parts
-    .map((part) => (part.type === 'text' ? part.text : ''))
-    .filter(Boolean)
-    .join('\n')
-    .trim();
+  return visibleTaskText(
+    message.parts
+      .map((part) => (part.type === 'text' ? part.text : ''))
+      .filter(Boolean)
+      .join('\n')
+  );
+}
+
+function pieceHasAttachment(message: SessionMessage | undefined): boolean {
+  if (!message) return false;
+  return message.parts.some((part) => {
+    if (part.type === 'image') return true;
+    return part.type === 'text' && (part.contextSources?.length ?? 0) > 0;
+  });
 }
 
 export function pendingBotWorkPieces(store: SqliteStateStore, sessionId: string): WorkPiece[] {
@@ -92,10 +104,14 @@ export function pendingBotWorkPieces(store: SqliteStateStore, sessionId: string)
   if (waiting.length === 0) return [];
   const messages = new Map(store.foldMessages(sessionId).map((message) => [message.id, message]));
   const pieces: WorkPiece[] = [];
+  const goalIntake = store.getDaemonControl<Record<string, string>>(`bot.goal-intake:${sessionId}`) ?? {};
   for (const pending of waiting) {
-    const text = pieceText(messages.get(pending.id));
-    if (!text) continue;
-    pieces.push({ id: pending.id, text });
+    if (goalIntake[pending.id] && !goalIntake[pending.id]!.startsWith('goal_')) continue;
+    const message = messages.get(pending.id);
+    const text = pieceText(message);
+    const hasAttachment = pieceHasAttachment(message);
+    if (!text && !hasAttachment) continue;
+    pieces.push({ id: pending.id, text, ...(hasAttachment ? { hasAttachment: true } : {}) });
   }
   return pieces;
 }
@@ -215,6 +231,7 @@ function finishFork(
 function spawnWorkChild(host: ConcurrentForkHost, parent: SessionRecord, piece: WorkPiece): SessionRecord {
   const botId = typeof parent.metadata?.botId === 'string' ? parent.metadata.botId : undefined;
   const permissionMode = childPermissionMode(parent.metadata);
+  const goalId = host.store.getDaemonControl<Record<string,string>>(`bot.goal-intake:${parent.id}`)?.[piece.id];
   const child = host.store.createSession({
     title: `子任务: ${piece.text.slice(0, 40)}`,
     mode: 'subagent',
@@ -223,6 +240,7 @@ function spawnWorkChild(host: ConcurrentForkHost, parent: SessionRecord, piece: 
     parentSessionId: parent.id,
     background: true,
     metadata: {
+      ...(goalId?.startsWith('goal_') ? { botGoalId: goalId, botGoalScopeSessionId: parent.id } : {}),
       parentSessionId: parent.id,
       spawnSource: 'concurrent-bot-work',
       sourceMessageId: piece.id,
@@ -233,9 +251,21 @@ function spawnWorkChild(host: ConcurrentForkHost, parent: SessionRecord, piece: 
         agentAllowedTools: host.store.getAgent(parent.agentId)?.allowedTools
       }),
       ...inheritModelOverride(parent.metadata),
-      ...inheritBotIdentityMetadata(parent, host.store)
+      ...inheritBotIdentityMetadata(parent, host.store),
+      ...inheritForkRetrievalMetadata(parent.metadata)
     }
   });
-  host.store.appendMessage(child.id, 'user', [{ type: 'text', text: piece.text }]);
+  const source = host.store.foldMessages(parent.id).find((message) => message.id === piece.id);
+  host.store.appendMessage(
+    child.id,
+    'user',
+    forkOpeningMessage({
+      store: host.store,
+      parentSessionId: parent.id,
+      childSessionId: child.id,
+      taskText: piece.text,
+      triggerParts: source?.parts
+    })
+  );
   return child;
 }

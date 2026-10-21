@@ -16,7 +16,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { AuthStore, hashToken, RawAgentRuntime } from '@ppeng/agent-core';
+import { AuthStore, BotGoalService, hashToken, RawAgentRuntime } from '@ppeng/agent-core';
 import { createDaemonApp } from '../../apps/daemon/dist/app.js';
 import { buildRoutePolicy } from '../../apps/daemon/dist/access/policy.js';
 import { Router } from '../../apps/daemon/dist/routing.js';
@@ -347,14 +347,28 @@ test('route access contract: every route is classified, isolated, and A-owned da
       .filter(([k]) => k !== 'user')
       .map(([, v]) => v)
       .concat(['A-MEM-SECRET', 'A-CRON', 'A-PLAN', 'A-SWARM', 'A-RESEARCH', 'A-ORCH']);
+    const ownBot = (await d.call('B', 'POST', '/api/bots', { name: 'B goal fixture' })).data.bot;
+    const ownSession = (await d.call('B', 'POST', `/api/bots/${ownBot.id}/open`, {})).data.session;
+    const ownGoals = new BotGoalService(d.runtime.store, Date.now, ownSession.id);
+    const ownGoal = ownGoals.create({ botId: ownBot.id, sessionId: ownSession.id, title: 'B goal', objective: 'B work' });
+    const scopedCases = {
+      'GET /api/bots/:id/goals': { path: `/api/bots/${ownBot.id}/goals?sessionId=${ownSession.id}` },
+      'PATCH /api/bots/:id/goals/settings': { path: `/api/bots/${ownBot.id}/goals/settings`, body: { sessionId: ownSession.id, maxConcurrent: 2 } },
+      'POST /api/bots/:id/goals/:goalId/actions': { path: `/api/bots/${ownBot.id}/goals/${ownGoal.id}/actions`, body: { sessionId: ownSession.id, action: 'pause' } }
+    };
     for (const r of routes.filter((x) => x.access.kind === 'self-filtered')) {
       const k = key(r);
       let res;
+      const scoped = scopedCases[k];
+      if (r.access.resource === 'bot-goals') assert.ok(scoped, `${k}: add a concrete scoped fixture`);
       if (r.method === 'GET') {
-        res = await d.call('B', 'GET', r.pattern);
+        res = await d.call('B', 'GET', scoped?.path ?? r.pattern);
       } else {
-        assert.ok(k in writeCases, `${k}: add a self-filtered write case`);
-        res = await d.call('B', r.method, r.pattern, writeCases[k]);
+        assert.ok(k in writeCases || scoped?.body, `${k}: add a self-filtered write case`);
+        res = await d.call('B', r.method, scoped?.path ?? r.pattern, scoped?.body ?? writeCases[k]);
+      }
+      if (scoped) {
+        assert.equal(res.status, 200, `${k}: B can use their own goal scope`);
       }
       assert.ok(![401, 403].includes(res.status), `${k} -> ${res.status}`);
       for (const s of secrets) assert.ok(!res.text.includes(s), `${k} leaked ${s}`);
@@ -503,4 +517,45 @@ test('functional groups and explicit global/group/room facts stay isolated acros
   assert.equal(preservedBot.status,200);
   assert.equal(preservedBot.data.bot.id,botId);
   assert.equal(preservedBot.data.bot.name,'A scoped Bot');
+});
+
+
+test('Bot goal reads and writes reject another owner and preserve session-scoped preferences', async t => {
+  const d = await bootDaemon(labEnv({ RAW_AGENT_AUTH_TOKEN: DAEMON_TOKEN }));
+  t.after(() => d.close());
+  const fixtures = {};
+  const sharedBot = d.runtime.createBot({ name: 'Shared goal Bot' });
+  for (const who of ['A', 'B']) {
+    const bot = sharedBot;
+    const opened = await d.call(who, 'POST', `/api/bots/${bot.id}/open`, {});
+    assert.equal(opened.status, 200);
+    const sessionId = opened.data.session.id;
+    const service = new BotGoalService(d.runtime.store, Date.now, sessionId);
+    const goal = service.create({ botId: bot.id, sessionId, title: `${who}-PRIVATE-GOAL`, objective: `${who}-PRIVATE-WORK` });
+    fixtures[who] = { bot, sessionId, service, goal };
+  }
+  const a = fixtures.A;
+  const b = fixtures.B;
+  assert.notEqual(a.sessionId, b.sessionId, 'shared Bot retains separate principal sessions');
+  const aBase = `/api/bots/${a.bot.id}/goals`;
+  for (const [method, path, body] of [
+    ['GET', `${aBase}?sessionId=${a.sessionId}`],
+    ['PATCH', `${aBase}/settings`, { sessionId: a.sessionId, maxConcurrent: 19 }],
+    ['POST', `${aBase}/${a.goal.id}/actions`, { sessionId: a.sessionId, action: 'cancel' }]
+  ]) {
+    const rejected = await d.call('B', method, path, body);
+    assert.ok([403, 404].includes(rejected.status), `${method} ${path}: ${rejected.status}`);
+    assert.ok(!rejected.text.includes('A-PRIVATE'));
+  }
+  const mixed = await d.call('B', 'POST', `/api/bots/${b.bot.id}/goals/${a.goal.id}/actions`, { sessionId: b.sessionId, action: 'cancel' });
+  assert.equal(mixed.status, 400, 'goal ID cannot escape the permitted session');
+  assert.equal(a.service.get(a.bot.id, a.goal.id).status, 'queued');
+  assert.notEqual(a.service.readSettings().maxConcurrent, 19);
+  const aRead = await d.call('A', 'GET', `${aBase}?sessionId=${a.sessionId}`);
+  assert.equal(aRead.status, 200);
+  assert.ok(aRead.text.includes('A-PRIVATE-GOAL'));
+  const bRead = await d.call('B', 'GET', `/api/bots/${b.bot.id}/goals?sessionId=${b.sessionId}`);
+  assert.equal(bRead.status, 200);
+  assert.ok(!bRead.text.includes(a.goal.id));
+  assert.ok(!bRead.text.includes('A-PRIVATE'));
 });

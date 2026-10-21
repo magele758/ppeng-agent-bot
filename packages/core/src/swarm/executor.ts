@@ -40,11 +40,14 @@ export class SwarmExecutor {
 
   constructor(private readonly deps: SwarmExecutorDeps) {}
 
-  private launchTeammate(sessionId: string): void {
+  private launchTeammate(sessionId: string, runId: string): void {
     if (this.launching.has(sessionId)) return;
     this.launching.add(sessionId);
     void Promise.resolve()
-      .then(() => this.deps.runSession(sessionId))
+      .then(() => {
+        const status = this.deps.store.getRun(runId)?.status;
+        if (status === 'running' || status === 'planning') return this.deps.runSession(sessionId);
+      })
       .catch(() => {
         this.deps.enqueueSchedulerWake(sessionId, 'swarm.task');
       })
@@ -114,7 +117,13 @@ export class SwarmExecutor {
     return this.deps.store.getRun(runId);
   }
 
+  private isDispatchable(runId: string): boolean {
+    const status = this.deps.store.getRun(runId)?.status;
+    return status === 'running' || status === 'planning';
+  }
+
   private async tickRun(run: SwarmRun): Promise<void> {
+    if (!this.isDispatchable(run.id)) return;
     if (run.status === 'planning') {
       this.deps.store.updateRunStatus(run.id, 'running');
     }
@@ -134,6 +143,7 @@ export class SwarmExecutor {
     }
 
     for (const task of tasks) {
+      if (!this.isDispatchable(run.id)) return;
       if (task.status !== 'pending') continue;
       if (!this.dependenciesMet(tasks, task)) continue;
       if (activeCount >= run.budget.maxTeammates) break;
@@ -141,6 +151,7 @@ export class SwarmExecutor {
       activeCount += 1;
     }
 
+    if (!this.isDispatchable(run.id)) return;
     const refreshed = this.deps.store.listTasks(run.id);
     if (refreshed.length > 0 && refreshed.every((t) => TERMINAL_TASK.includes(t.status))) {
       const failed = refreshed.some((t) => t.status === 'failed');
@@ -196,7 +207,7 @@ export class SwarmExecutor {
       artifacts
     });
 
-    this.launchTeammate(session.id);
+    this.launchTeammate(session.id, run.id);
   }
 
   private advanceInProgressTask(run: SwarmRun, task: SwarmTask, sessions: SessionRecord[]): void {

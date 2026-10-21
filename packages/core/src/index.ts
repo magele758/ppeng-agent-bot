@@ -12,3 +12,5 @@ export { FactoryService } from './factory/service.js';
 export type { FactoryMachine, FactoryTask, FactorySettings, FactoryTransport } from './factory/types.js';
 
 export type { DevelopmentPolicy, DevelopmentSpec, DevelopmentState, DevelopmentPreflight } from './factory/development-types.js';
+export { BotGoalService } from './bots/goals/service.js';
+export type { BotGoal, GoalSettings, GoalReport } from './bots/goals/types.js';

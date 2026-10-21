@@ -44,6 +44,7 @@ export const configMessages = {
   reasonNotConfigured: 'Nothing configured; using the local fallback (no action needed)',
   reasonPartialConfig: 'Half-configured; fell back to local (see warnings)',
   reasonManualOnly: 'Off by default; enable it when you need it',
+  reasonDefaultOn: 'On by default',
   reasonExplicitOn: 'Turned on explicitly by an env var',
   reasonExplicitOff: 'Turned off explicitly by an env var',
   reasonExplicitProvider: 'Forced by RAW_AGENT_*_PROVIDER',

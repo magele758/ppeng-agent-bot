@@ -6,6 +6,8 @@
 import type { SessionRecord, ToolContract } from '../types.js';
 import type { SqliteStateStore } from '../storage.js';
 import { resolveBotMemoryAgentId, type BotMemorySession } from '../memory/bot-memory-scope.js';
+import { primaryWorkspacePath } from '../workspace/index.js';
+import { loadForkSiblingFileFacts, privateFileFragments, redactHelpMessage } from '../bots/fork-sibling-isolation.js';
 
 export const ASK_BOT_HELP_TOOL = 'ask_bot_help';
 
@@ -103,7 +105,14 @@ export function createSubagentHelpTool(store: SqliteStateStore): ToolContract<{ 
       if (targets.length === 0) {
         return { ok: false, content: JSON.stringify({ ok: false, error: 'No parent or sibling of this bot is available.' }) };
       }
-      const note = `[bot-help] Sub-agent ${context.session.id} asks: ${message}`;
+      const facts = loadForkSiblingFileFacts(
+        store,
+        context.session,
+        primaryWorkspacePath(context),
+        context.stateDir
+      );
+      const visible = redactHelpMessage(message, privateFileFragments(facts));
+      const note = `[bot-help] Sub-agent ${context.session.id} asks: ${visible}`;
       const delivered: string[] = [];
       for (const target of targets) {
         if (deliver(store, target.id, `bot-help:${context.session.id}:${target.id}`, note)) delivered.push(target.id);

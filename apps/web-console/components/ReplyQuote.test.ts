@@ -36,8 +36,8 @@ function translate(key: string, vars?: Record<string, string>): string {
   return text;
 }
 
-function loadQuoteUi() {
-  const source = readFileSync(new URL('./ReplyQuote.tsx', import.meta.url), 'utf8');
+function loadQuoteUi(file = './ReplyQuote.tsx') {
+  const source = readFileSync(new URL(file, import.meta.url), 'utf8');
   const compiled = ts.transpileModule(source, {
     compilerOptions: {
       target: ts.ScriptTarget.ES2022,
@@ -50,6 +50,7 @@ function loadQuoteUi() {
   const requireComponent = (id: string) => {
     if (id.endsWith('.css')) return {};
     if (id === 'react') return React;
+    if (id === './WorkspaceIcon') return loadQuoteUi('./WorkspaceIcon.tsx');
     if (id === '@/lib/i18n') return { useI18n: () => ({ t: translate }) };
     if (id === '@/lib/reply-quote') return localRequire('../lib/reply-quote.ts');
     return localRequire(id);

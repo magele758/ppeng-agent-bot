@@ -316,6 +316,9 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
 
     // bots + cron
     ['GET /api/bots', selfFiltered('bot')],
+    ['GET /api/bots/:id/goals', selfFiltered('bot-goals')],
+    ['PATCH /api/bots/:id/goals/settings', selfFiltered('bot-goals')],
+    ['POST /api/bots/:id/goals/:goalId/actions', selfFiltered('bot-goals')],
     ['GET /api/bot-functional-groups', selfFiltered('bot-functional-group')],
     ['POST /api/bot-functional-groups', selfFiltered('bot-functional-group')],
     ['PATCH /api/bot-functional-groups/:id', selfFiltered('bot-functional-group')],

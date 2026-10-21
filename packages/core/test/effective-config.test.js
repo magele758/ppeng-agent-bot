@@ -450,9 +450,22 @@ test('manual capabilities: binaries on PATH never auto-enable anything', () => {
   const ext = byId(cfg, 'manual.externalAiTools');
   assert.equal(ext.enabled, false);
   assert.ok(ext.hints.some((h) => h.code === 'local_binaries_detected' && /claude/.test(h.message)));
-  for (const id of ['externalAiTools', 'browser', 'cron', 'a2ui', 'discovery']) {
+  for (const id of ['externalAiTools', 'browser', 'cron', 'a2ui']) {
     assert.equal(byId(cfg, `manual.${id}`).enabled, false, id);
   }
+  const discovery = byId(cfg, 'manual.discovery');
+  assert.equal(discovery.enabled, true);
+  assert.equal(discovery.mode, 'on');
+  assert.equal(discovery.source, 'local-fallback');
+  assert.equal(discovery.reasonCode, 'default_on');
+  const discoveryOff = resolveEffectiveConfig({ env: { RAW_AGENT_DISCOVERY: '0' } });
+  assert.equal(byId(discoveryOff, 'manual.discovery').enabled, false);
+  assert.equal(byId(discoveryOff, 'manual.discovery').source, 'explicit-env');
+  assert.equal(byId(discoveryOff, 'manual.discovery').reasonCode, 'explicit_off');
+  const discoveryOn = resolveEffectiveConfig({ env: { RAW_AGENT_DISCOVERY: '1' } });
+  assert.equal(byId(discoveryOn, 'manual.discovery').enabled, true);
+  assert.equal(byId(discoveryOn, 'manual.discovery').source, 'explicit-env');
+  assert.equal(byId(discoveryOn, 'manual.discovery').reasonCode, 'explicit_on');
   const on = resolveEffectiveConfig({ env: { RAW_AGENT_EXTERNAL_AI_TOOLS: '1', RAW_AGENT_CRON_TOOLS: '0' } });
   assert.equal(byId(on, 'manual.externalAiTools').enabled, true);
   assert.equal(byId(on, 'manual.externalAiTools').source, 'explicit-env');

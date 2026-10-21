@@ -38,7 +38,7 @@ export interface DiscoverySettingsStore {
 
 export function defaultDiscoverySettings(): DiscoverySettings {
   return {
-    enabled: false,
+    enabled: true,
     tailscaleEnabled: false,
     activeScanEnabled: false,
     hostAllowlist: [],
@@ -113,7 +113,8 @@ export function hasPersistedDiscoverySettings(store: DiscoverySettingsStore | un
 
 /**
  * Effective discovery master switch.
- * Persisted UI/API settings win when present; otherwise env fallback (CI/eval).
+ * Persisted UI/API settings win when present.
+ * Otherwise RAW_AGENT_DISCOVERY: missing defaults to on; 0/false/no/off turns it off.
  */
 export function resolveDiscoveryEnabled(
   store: DiscoverySettingsStore | undefined,
@@ -122,7 +123,7 @@ export function resolveDiscoveryEnabled(
   if (isSettingsStore(store) && hasPersistedDiscoverySettings(store)) {
     return readDiscoverySettings(store).enabled;
   }
-  return envBool(env, 'RAW_AGENT_DISCOVERY', false);
+  return envBool(env, 'RAW_AGENT_DISCOVERY', true);
 }
 
 /**

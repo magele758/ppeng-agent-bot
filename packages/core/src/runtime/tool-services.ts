@@ -19,6 +19,8 @@ import {
 import { protectModelSocialScheduleMetadata } from '../social-schedule.js';
 import { approvalGrantsDirectIsolation } from '../sandbox/model-isolation.js';
 import type { SqliteStateStore } from '../storage.js';
+import { primaryWorkspacePath } from '../workspace/index.js';
+import { loadForkSiblingFileFacts, recordForkSiblingWrite } from '../bots/fork-sibling-isolation.js';
 
 export interface ToolServicesHost {
   store: SqliteStateStore;
@@ -254,6 +256,11 @@ export function createToolServices(host: ToolServicesHost): RuntimeToolServices 
         imageDataUrls: urls,
         signal: sig
       });
+    },
+    forkSiblingFileFacts: (context) =>
+      loadForkSiblingFileFacts(host.store, context.session, primaryWorkspacePath(context), context.stateDir),
+    noteForkSiblingWrite: (context, absolutePath) => {
+      recordForkSiblingWrite(host.store, context.session, primaryWorkspacePath(context), absolutePath);
     }
   };
 }

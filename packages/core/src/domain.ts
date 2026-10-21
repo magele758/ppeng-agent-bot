@@ -14,6 +14,7 @@
  * the conflicting bundle from the load list.
  */
 
+import { withOnDemandDisclosure } from './tools/deferred-disclosure.js';
 import type { AgentSpec, SkillSpec, ToolContract } from './types.js';
 
 export interface DomainBundle {
@@ -54,7 +55,7 @@ export function mergeDomainBundles(bundles: DomainBundle[]): MergedDomainBundles
     for (const t of b.tools) {
       if (seenToolNames.has(t.name)) continue;
       seenToolNames.add(t.name);
-      tools.push(t);
+      tools.push(withOnDemandDisclosure(t));
     }
     if (b.skills) {
       for (const s of b.skills) {
