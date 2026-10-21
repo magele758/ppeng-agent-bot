@@ -1,0 +1,130 @@
+{
+  "date": "2026-10-21",
+  "model": "deepseek-v4-flash-0731",
+  "transport": "Real configured model adapter + daemon HTTP routes + isolated SQLite/runtime/local tools",
+  "cases": [
+    {
+      "name": "file",
+      "passed": true,
+      "goalId": "goal_47b376eb-b131-4f9b-a72f-152dbe8f53eb",
+      "status": "completed",
+      "revision": 1,
+      "strategy": "direct",
+      "workerAgents": [
+        "live-file"
+      ],
+      "toolNames": [
+        "read_file",
+        "bash",
+        "write_file",
+        "goal_checkpoint"
+      ],
+      "approvals": [],
+      "repoRoot": "/var/folders/8d/zqj9mv4x1cj9c8q6snjvh3yr0000gn/T/bot-live-repo-wzsd0A",
+      "rawReport": "/var/folders/8d/zqj9mv4x1cj9c8q6snjvh3yr0000gn/T/bot-live-state-lfyqIa/report.json"
+    },
+    {
+      "name": "planner",
+      "passed": true,
+      "goalId": "goal_df287c0b-4356-4b7e-9870-228480de24a9",
+      "status": "completed",
+      "revision": 1,
+      "strategy": "subagent",
+      "workerAgents": [
+        "live-planner",
+        "live-planner",
+        "planner"
+      ],
+      "toolNames": [
+        "goal_dispatch",
+        "read_file",
+        "task_list",
+        "goal_checkpoint",
+        "bash",
+        "TodoWrite",
+        "harness_write_spec",
+        "task_create"
+      ],
+      "approvals": [],
+      "repoRoot": "/var/folders/8d/zqj9mv4x1cj9c8q6snjvh3yr0000gn/T/bot-live-repo-wzsd0A",
+      "rawReport": "/var/folders/8d/zqj9mv4x1cj9c8q6snjvh3yr0000gn/T/bot-live-state-lfyqIa/report.json"
+    },
+    {
+      "name": "approval",
+      "passed": true,
+      "goalId": "goal_9c7c08da-834e-4400-8cfd-e04c8b8b00c8",
+      "status": "completed",
+      "revision": 1,
+      "strategy": "direct",
+      "workerAgents": [
+        "live-approval"
+      ],
+      "toolNames": [
+        "bash",
+        "read_file",
+        "goal_checkpoint"
+      ],
+      "approvals": [
+        {
+          "id": "approval_dc2ae9e47c5c438ab561486ed09d6869",
+          "toolName": "bash",
+          "status": "approved"
+        }
+      ],
+      "repoRoot": "/var/folders/8d/zqj9mv4x1cj9c8q6snjvh3yr0000gn/T/bot-live-repo-uwB2js",
+      "rawReport": "/var/folders/8d/zqj9mv4x1cj9c8q6snjvh3yr0000gn/T/bot-live-state-RpMjrz/report.json"
+    },
+    {
+      "name": "cancel",
+      "passed": true,
+      "goalId": "goal_e464e17e-e78f-4505-bc02-05e4a7757096",
+      "status": "cancelled",
+      "revision": 2,
+      "strategy": "direct",
+      "workerAgents": [
+        "live-cancel"
+      ],
+      "toolNames": [
+        "bash"
+      ],
+      "approvals": [],
+      "repoRoot": "/var/folders/8d/zqj9mv4x1cj9c8q6snjvh3yr0000gn/T/bot-live-repo-vjLh8g",
+      "rawReport": "/var/folders/8d/zqj9mv4x1cj9c8q6snjvh3yr0000gn/T/bot-live-state-y2H797/report.json"
+    },
+    {
+      "name": "amend",
+      "passed": true,
+      "goalId": "goal_d59243c3-4e66-4a0f-9c8e-5f2611bf840b",
+      "status": "completed",
+      "revision": 2,
+      "strategy": "subagent",
+      "workerAgents": [
+        "live-amend",
+        "live-amend"
+      ],
+      "toolNames": [
+        "bash",
+        "bg_check",
+        "write_file",
+        "read_file",
+        "goal_checkpoint"
+      ],
+      "approvals": [],
+      "repoRoot": "/var/folders/8d/zqj9mv4x1cj9c8q6snjvh3yr0000gn/T/bot-live-repo-7iaLNa",
+      "rawReport": "/var/folders/8d/zqj9mv4x1cj9c8q6snjvh3yr0000gn/T/bot-live-state-51JJuf/report.json"
+    }
+  ],
+  "checks": {
+    "functionalTests": 57,
+    "writerAndInheritanceTests": 10,
+    "coreBuild": "passed",
+    "acceptanceGate": "passed"
+  },
+  "notes": [
+    "Five scenarios passed across separate isolated runs after fixes; this is not a single uninterrupted all-scenarios run.",
+    "Earlier failures exposed missing dispatch verification, stale background writer scope, idle background cancellation, underspecified TodoWrite schema, and overly broad specialist inference.",
+    "An intermediate all-scenarios runner was stopped while waiting for a child approval missed by the harness. The harness now finds approvals across the Bot scope; approval was rerun successfully.",
+    "Remote factory, self-heal test pipeline, browser, desktop and disabled Evolution were not live-tested by this suite.",
+    "Raw reports are retained locally in temporary directories and may be removed by OS cleanup."
+  ]
+}

@@ -1,0 +1,31 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {fixture} from './factory-development-fixture.js';
+import {BotGoalService} from '../dist/bots/goals/service.js';
+import {createGoalFactoryDevelopmentTool,cancelSpecialty,specialtyStatus} from '../dist/bots/goals/specialty-services.js';
+import {filterFactoryTools} from '../dist/factory/tool-policy.js';
+
+test('Bot factory development uses approved policy, retains goal constraints and can cancel [AC:bot-autonomous-execution-coverage#AC-3] [AC:bot-autonomous-execution-coverage#AC-7]',async t=>{
+ const f=await fixture(t),bot=f.bots[0],sid=bot.canonicalSessionId;
+ const goals=new BotGoalService(f.store,Date.now,sid);
+ const goal=goals.create({botId:bot.id,sessionId:sid,title:'Factory',objective:'工厂实现加法',constraints:['不要发布']});
+ const execution=goals.claim(bot.id,goal.id,{strategy:'factory'});goals.updateExecution(bot.id,execution.id,{sessionId:sid});
+ f.store.updateSession(sid,{metadata:{...f.store.getSession(sid).metadata,botGoalId:goal.id,botGoalExecutionId:execution.id}});
+ const tool=createGoalFactoryDevelopmentTool({store:f.store,factory:f.service});
+ const ctx={session:f.store.getSession(sid),agent:f.store.getAgent(bot.agentId)};
+ assert.equal(filterFactoryTools(ctx.session,[tool],f.store).length,0);
+ const policy={enabled:true,allowedUserIds:['owner'],image:'factory-test@sha256:'+'a'.repeat(64),toolPath:'/opt/claude',model:'configured-model',modelUrl:'https://model.example/v1',credentialRef:'factory-test',checks:[{id:'unit',argv:['node','--test'],required:true}],redCheck:'unit',install:['npm','ci','--offline'],reviewArgv:['/tools/claude','--print'],codeArgv:['/tools/claude','--print'],timeoutMs:60000,maxRounds:6,maxRetries:1,minDiskMb:128,criteria:[{id:'AC-1',given:'numbers',when:'add',then:'correct sum'}],criteriaApproved:true,baselineFailures:[]};
+ f.service.development.save(f.principal,'u0','core',policy);
+ assert.equal(filterFactoryTools(ctx.session,[tool],f.store).length,1);
+ const args={machineId:'u0',repositoryId:'core',operation:'develop',baseline:'a'.repeat(40)};
+ const result=await tool.execute(ctx,args);assert.equal(result.ok,true);
+ const task=JSON.parse(result.content);assert.match(task.development.requirement,/不要发布/);assert.equal(task.development.policy.criteriaApproved,true);
+ assert.equal(JSON.parse((await tool.execute(ctx,args)).content).id,task.id);
+ goals.report(bot.id,execution.id,{kind:'waiting',summary:'factory started',wait:{source:'factory',correlationId:task.id}});
+ const host={store:f.store,factory:f.service,isRunning:()=>false,cancelSession(){}};
+ assert.equal(specialtyStatus(host,ctx.session,goals.get(bot.id,goal.id)).status,'queued');
+ goals.control(bot.id,goal.id,'cancel');assert.equal(await cancelSpecialty(host,ctx.session,goals.get(bot.id,goal.id)),true);
+ assert.equal(f.service.get(f.principal,task.id).status,'cancelled');assert.equal(f.starts.length,0);
+ f.service.development.save(f.principal,'u0','core',{...policy,criteriaApproved:false});
+ assert.equal(filterFactoryTools(ctx.session,[tool],f.store).length,0);
+});

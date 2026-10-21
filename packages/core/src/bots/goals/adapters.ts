@@ -1,4 +1,4 @@
-import { selectGoalRoute, type GoalCapabilities, type GoalRoute, type GoalRouteRequest, type GoalStrategy } from './routing.js';
+import { selectGoalRoute, goalSpecialist, type GoalCapabilities, type GoalRoute, type GoalRouteRequest, type GoalStrategy } from './routing.js';
 
 export interface GoalExecutionRequest extends GoalRouteRequest {
   goalId: string;
@@ -6,6 +6,10 @@ export interface GoalExecutionRequest extends GoalRouteRequest {
   executionId: string;
   sessionId?: string;
   tasks?: unknown[];
+  progress?: string;
+  evidence?: string[];
+  constraints?: string[];
+  factory?: { machineId: string; repositoryId: string; operation: 'snapshot' | 'count-files' | 'read-log' | 'develop'; logId?: string; baseline?: string };
 }
 export interface GoalAdapterResult {
   status: 'progress' | 'waiting' | 'blocked' | 'candidate_completed' | 'failed' | 'cancelled';
@@ -37,11 +41,23 @@ export function createGoalExecutionAdapters(host: GoalExecutionAdapterHost) {
       const route = selectGoalRoute(request, await host.getCapabilities(request));
       const strategy = route.strategy;
       if (route.blocked || !strategy) return {status:'blocked',content:route.reason,route};
+      const routeRequest = request;
+      const role = strategy === 'orchestrator' ? 'main' : request.role ?? goalSpecialist(request.task);
+      request = {...request,task:[request.task, request.progress ? `Previous progress: ${request.progress}` : '', request.evidence?.length ? `Evidence: ${JSON.stringify(request.evidence)}` : '', request.constraints?.length ? `Constraints: ${JSON.stringify(request.constraints)}` : ''].filter(Boolean).join('\n')};
       let knownReference: string | undefined;
       try {
-        if (strategy === 'direct' || strategy === 'subagent' || strategy === 'ptc') {
+        if (strategy === 'direct' || strategy === 'subagent' || strategy === 'ptc' || strategy === 'orchestrator') {
+          request = {...request, role};
           const result = await host.runSessionExecution({...request,strategy,taskMode:route.taskMode,metadata:{goalId:request.goalId,goalRevision:request.revision,goalExecutionId:request.executionId,taskRunMode:route.taskMode,...(strategy === 'ptc' ? {orchestrationEngine:'ptc'} : {})}});
           return {...result,route};
+        }
+        if (strategy === 'self_heal' || strategy === 'evolution' || strategy === 'factory') {
+          if (strategy === 'factory' && !request.factory) return {status:'blocked',content:'Discover the authorized machine and repository with factory_status, then supply factory task details. Do not guess a target or substitute ordinary execution.',route};
+          const name = strategy === 'factory' ? request.factory?.operation === 'develop' ? 'goal_factory_develop' : 'factory_dispatch' : strategy === 'self_heal' ? 'goal_self_heal_start' : 'goal_evolution_start';
+          const result = await host.invokeAuthorizedTool(name,strategy === 'factory' ? {...request.factory} : {},request);
+          if (result.waitingApproval) return {status:'waiting',waitingApproval:true,content:result.content,route};
+          const reference = result.ok ? referenceFrom(result.content) ?? referenceFrom(result.content,'run') : undefined;
+          return {status:reference ? 'waiting' : 'blocked',reference,content:result.content,route};
         }
         if (strategy === 'bot_delegate') {
           const result = await host.invokeAuthorizedTool('bot_delegate',{target:request.delegateBotId,input:request.task,idempotencyKey:request.executionId},request);
@@ -58,7 +74,7 @@ export function createGoalExecutionAdapters(host: GoalExecutionAdapterHost) {
         if (!reference) return {status:'blocked',content:created.content,route};
         knownReference = reference;
         // Revalidate after creation; a policy change must prevent the start side effect.
-        const fresh = selectGoalRoute({...request,preferredStrategy:strategy},await host.getCapabilities(request));
+        const fresh = selectGoalRoute({...routeRequest,preferredStrategy:strategy},await host.getCapabilities(routeRequest));
         if (fresh.strategy !== strategy || fresh.blocked) return {status:'blocked',reference,content:`Created but not started: ${fresh.reason}`,route:fresh};
         const started = await host.invokeAuthorizedTool(team ? 'lab_team_plan_start' : 'lab_swarm_run_start',team ? {planId:reference} : {runId:reference,tasks:request.tasks},request);
         return {status:started.ok || started.waitingApproval ? 'waiting' : 'blocked',waitingApproval:started.waitingApproval,reference,content:started.content,route};

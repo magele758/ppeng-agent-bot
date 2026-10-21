@@ -39,10 +39,11 @@ export function observeGoalBudget(host:GoalRuntimeHost,sessionId:string):KernelH
    const refs=owner?.metadata.botGoalAuthorizedWaits;
    if(!Array.isArray(refs))continue;
    for(const ref of refs as WaitReference[]) {
-    if(ref.goalId!==goal.id||ref.source!=='session'||typeof ref.correlationId!=='string')continue;
+    if(ref.goalId!==goal.id||!['session','self_heal'].includes(String(ref.source))||typeof ref.correlationId!=='string')continue;
     if(ref.executionId&&ref.executionId!==execution.id)continue;
-    if(execution.status!=='running'&&!(goal.wait?.source==='session'&&goal.wait.correlationId===ref.correlationId))continue;
-    const worker=host.store.getSession(ref.correlationId);
+    if(execution.status!=='running'&&!(goal.wait&&goal.wait.source===ref.source&&goal.wait.correlationId===ref.correlationId))continue;
+    const workerId=ref.source==='self_heal'?host.store.getSelfHealRun(ref.correlationId)?.sessionId:ref.correlationId;
+    const worker=workerId?host.store.getSession(workerId):undefined;
     if(!worker||worker.metadata.botGoalId!==goal.id||worker.metadata.botGoalScopeSessionId!==scope.sessionId||worker.metadata.botId!==scope.botId)continue;
     if(sessions.has(worker.id)||executions.some(e=>e.sessionId===worker.id))continue;
     sessions.set(worker.id,{execution:false,cost:finiteCost(worker.metadata.usageCostUsd)});
