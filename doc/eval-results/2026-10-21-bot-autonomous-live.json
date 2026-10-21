@@ -126,5 +126,56 @@
     "An intermediate all-scenarios runner was stopped while waiting for a child approval missed by the harness. The harness now finds approvals across the Bot scope; approval was rerun successfully.",
     "Remote factory, self-heal test pipeline, browser, desktop and disabled Evolution were not live-tested by this suite.",
     "Raw reports are retained locally in temporary directories and may be removed by OS cleanup."
-  ]
+  ],
+  "independentPrVerification": {
+    "sourceRevision": "3cb491c0df15c564eb016e8ceba6e27c17cd6b47",
+    "rawReport": "/var/folders/8d/zqj9mv4x1cj9c8q6snjvh3yr0000gn/T/bot-live-state-E8IseT/report.json",
+    "singleRun": true,
+    "scenarios": [
+      {
+        "name": "file",
+        "passed": true,
+        "goalId": "goal_331f5fdd-4591-4a28-b8a3-4b1aa96582cc",
+        "status": "completed",
+        "revision": 1,
+        "strategy": "direct"
+      },
+      {
+        "name": "planner",
+        "passed": true,
+        "goalId": "goal_ee35616d-3bbb-4dfe-babc-dcc67ffdeffb",
+        "status": "completed",
+        "revision": 1,
+        "strategy": "subagent"
+      },
+      {
+        "name": "approval",
+        "passed": true,
+        "goalId": "goal_3f053824-e180-4a94-bc84-d5cc6408ed60",
+        "status": "completed",
+        "revision": 1,
+        "strategy": "direct"
+      },
+      {
+        "name": "cancel",
+        "passed": true,
+        "goalId": "goal_807a8140-d386-4d0e-9549-bc0ca4c788d9",
+        "status": "cancelled",
+        "revision": 2,
+        "strategy": "direct"
+      },
+      {
+        "name": "amend",
+        "passed": true,
+        "goalId": "goal_8f8764e4-fb47-4aaa-b88c-72ab52fef8ee",
+        "status": "completed",
+        "revision": 2,
+        "strategy": "subagent"
+      }
+    ],
+    "regressionTests": 449,
+    "coreAndDaemonBuild": "passed",
+    "acceptanceGate": "passed",
+    "quickGate": "passed"
+  }
 }
