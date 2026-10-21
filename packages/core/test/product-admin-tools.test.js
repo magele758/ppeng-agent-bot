@@ -168,6 +168,7 @@ test('private chat and the group-post tool say who the speaker is [AC:bot-room-s
 
 test('private chats can manage the product; group-chat turns cannot [AC:bot-product-admin#AC-6]', async () => {
   const fx = fixture();
+  fx.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
   const created = await call(fx, 'bot_create', { name: 'Alpha', description: '助手' });
   const botAgent = fx.store.getAgent(created.body.bot.id);
   assert.match(botAgent.instructions, /bot_create/);
@@ -423,6 +424,7 @@ test('swarm start passes valid seed tasks only after checking ownership', async 
 
 test('private chats list create_bot and create_room and the prompt says so [AC:bot-create-named-tools#AC-1]', async () => {
   const fx = fixture();
+  fx.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
   const names = fx.tools.map((tool) => tool.name);
   assert.ok(names.includes('create_bot'));
   assert.ok(names.includes('create_room'));

@@ -1,3 +1,4 @@
+import { toolGroup } from './tool-exposure.js';
 /**
  * Tool Search meta-tools — progressive disclosure for bound capabilities.
  */
@@ -114,7 +115,8 @@ function hiddenOnDemandTools(
 function deferredQueryMatches(tool: { name: string; description?: string }, query: string): boolean {
   const tokens = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
   if (tokens.length === 0) return true;
-  const hay = `${tool.name} ${tool.description ?? ''}`.toLowerCase();
+  const group=toolGroup(tool.name);
+  const hay = `${tool.name} ${tool.description ?? ''} ${group.id} ${group.labelEn} ${group.labelZh}`.toLowerCase();
   return tokens.every((token) => hay.includes(token));
 }
 
@@ -142,7 +144,7 @@ export function createToolSearchTools(services: ToolSearchServices): ToolContrac
   const toolSearch: ToolContract<{ query: string; limit?: number }> = {
     name: 'tool_search',
     description:
-      'Search bound capability tools and hidden on-demand domain tools by keyword. Returns top-k hits. Use load_capability_tool with a capability id or a deferred tool name.',
+      'Search authorized local tools by name, capability group or keyword. Automatically load up to 5 matches for the next turn without executing them. External capability cards, when enabled, are informational and loaded by id separately.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -155,26 +157,32 @@ export function createToolSearchTools(services: ToolSearchServices): ToolContrac
     sideEffectLevel: 'system',
     async execute(ctx, args): Promise<ToolExecutionResult> {
       const discoveryOn = isOn();
-      const budget = toolDisclosureBudget(env());
+      const budget = Math.min(5, Math.max(1, toolDisclosureBudget(env())));
       const limit = Math.min(
-        Number.isFinite(args.limit) && (args.limit as number) > 0 ? Number(args.limit) : budget,
+        Number.isFinite(args.limit) && (args.limit as number) > 0 ? Math.floor(Number(args.limit)) : budget,
         budget
       );
       const query = String(args.query ?? '');
       const deferred = deferredToolHits(hiddenOnDemandTools(ctx, services), query, limit);
-      if (!discoveryOn && deferred.length === 0) {
-        return { ok: false, content: DISCOVERY_DISABLED };
-      }
+
       const capability = discoveryOn
         ? searchBoundCapabilities(services.getRegistry(), query, limit).map((hit) => ({
             ...hit,
             source: 'capability' as const
           }))
         : [];
-      const hits = discoveryOn ? [...capability, ...deferred] : deferred;
+      const loaded: string[] = [];
+      const failures: Array<{name:string;reason:string}> = [];
+      for(const hit of deferred) {
+        try {
+          if(!services.discloseTool || !ctx.session?.id) throw new Error('Tool loading is unavailable');
+          services.discloseTool(ctx.session.id,hit.name); loaded.push(hit.name);
+        } catch(error) { failures.push({name:hit.name,reason:error instanceof Error?error.message:'Load failed'}); }
+      }
+      const hits = [...deferred, ...capability].slice(0,limit);
       return {
-        ok: true,
-        content: JSON.stringify({ budget, count: hits.length, hits }, null, 2)
+        ok: failures.length === 0,
+        content: JSON.stringify({ budget, count: hits.length, hits, loaded, failures, status: failures.length?'load_failed':hits.length?'matched':'no_match', externalDiscoveryEnabled: discoveryOn }, null, 2)
       };
     }
   };
@@ -201,7 +209,8 @@ export function createToolSearchTools(services: ToolSearchServices): ToolContrac
         if (!hidden.some((tool) => tool.name === name) || !disclose || !sessionId) {
           return { ok: false, content: `Cannot load tool ${name}.` };
         }
-        disclose(sessionId, name);
+        try { disclose(sessionId, name); }
+        catch(error) { return {ok:false,content:JSON.stringify({status:'load_failed',name,reason:error instanceof Error?error.message:'Load failed'})}; }
         return { ok: true, content: `${name} can be called on the next step.` };
       }
       if (!isOn()) {

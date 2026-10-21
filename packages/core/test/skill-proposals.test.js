@@ -304,6 +304,7 @@ test('skill_propose is hidden unless the switch is on (and refuses when called w
     filterToolsForSession({ env: {}, tools: [other, tool], agent, session, settingsStore: settings }).tools.map((t) => t.name);
   assert.deepEqual(names(off), ['load_skill']);
   const on = enabledSettings();
+  on.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
   assert.deepEqual(names(on), ['load_skill', 'skill_propose']);
   writeSkillProposalSettings(on, { enabled: false });
   assert.deepEqual(names(on), ['load_skill'], 'switch off takes effect immediately');

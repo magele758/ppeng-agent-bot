@@ -138,11 +138,11 @@ test('隐藏的股票行情能被搜到、加载并在下一步调用 [AC:necess
     session: fresh,
     repoRoot: dir
   });
-  assert.match(prefix, /stock quotes and cluster queries/);
-  assert.match(prefix, /tool_search\(query\)/);
-  assert.match(prefix, /load_capability_tool/);
-  assert.match(prefix, /next step/);
-  assert.match(prefix, /turned off/);
+  assert.match(prefix, /Tool delivery is progressive/);
+  assert.match(prefix, /tool_search/);
+  assert.match(prefix, /loaded automatically/);
+  assert.match(prefix, /callable next turn/);
+  assert.match(prefix, /permissions and configuration/);
 });
 
 test('关掉本机桌面操作后不能搜出或加载桌面工具 [AC:necessary-tool-injection#AC-3]', async (t) => {

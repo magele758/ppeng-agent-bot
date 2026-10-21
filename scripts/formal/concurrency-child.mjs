@@ -43,6 +43,7 @@ const runtime=new RawAgentRuntime({repoRoot:join(config.dir,'repo'),stateDir:joi
         if(r.holdTool&&(r.phase!=='partial-tools'||id==='b')){entered(r,`tool-${id}-entered`);await gate(r);}
         return {ok:true,content:`result-${id}`};
       }}))});
+runtime.store.setDaemonControl('tool_exposure_settings', {mode:'full',pinnedGroups:{}});
 // Approval policy is configured through the existing tool specification, not store state.
 // The registry stores the provided tool objects; per-scenario approval is chosen before execution.
 function approvalPolicy(approval){for(const name of ['concurrency_a','concurrency_b']){const tool=runtime.tools.find(tool=>tool.name===name);if(tool)tool.approvalMode=approval?'always':'never';}}

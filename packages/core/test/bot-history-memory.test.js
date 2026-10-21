@@ -145,6 +145,7 @@ test('routine dialogue tools override optional group choice and respect Bot allo
  const rt=new RawAgentRuntime({repoRoot:tempDir('tools-repo-'),stateDir:tempDir('tools-state-'),modelAdapter:{name:'fixture',runTurn:async()=>({assistantParts:[],stopReason:'end'}),summarizeMessages:async()=>''}});track(rt.store);
  try {
  const bot=rt.createBot({name:'Routine owner'}),s=rt.getSession(rt.openBot(bot.id).sessionId);rt.mergeSessionMetadata(s.id,{enabledOptionalToolGroups:[]});
+ rt.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
  rt.store.setDaemonControl('routine.settings',{dialogToolsEnabled:true});const host=bindTurnKernelHost(rt.l5());
  const input=()=>({session:rt.getSession(s.id),agent:rt.store.getAgent(bot.agentId),messages:[],systemPromptChars:0});
  const enabled=await host.resolveTurnTools(input());assert.ok(enabled.tools.some(t=>t.name==='cron_create'));

@@ -122,11 +122,12 @@ test('Bot 已保存的工具名单以外不能出现股票行情 [AC:necessary-t
   assert.equal(names(hidden).includes('quote_get'), false);
 });
 
-test('领域人设的工具名单会留下已标按需披露的工具，合并后的领域工具默认按需披露', () => {
+test('领域人设固定 SRE 包后留下已授权工具，合并后的领域工具默认按需披露', () => {
   const rawK8s = tool('k8s_get', 'Query a Kubernetes cluster');
   const k8s = withOnDemandDisclosure(rawK8s);
   const read = tool('read_file', 'Read a file');
   const { visible, hidden } = split([read, k8s], {
+    settingsStore: {getDaemonControl: key => key === 'tool_exposure_settings' ? {mode:'progressive',pinnedGroups:{'sre-oncall':['sre']}} : undefined},
     agent: {
       id: 'sre-oncall',
       name: 'SRE',

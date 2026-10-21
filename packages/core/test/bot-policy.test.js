@@ -633,12 +633,14 @@ function resolveNames(store, bot, sessionId, { tools, dynTools }) {
     session,
     sessionId: session.id,
     systemPromptChars: 10,
+    settingsStore: store,
     dynTools
   }).turnTools.map((tool) => tool.name);
 }
 
 test('non-empty allowedTools also constrains MCP and PTC dynamic tools; empty keeps everything', () => {
   const store = tempStore();
+  store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
   const host = facadeHost(store);
   const bot = createBot(host, { name: 'Gate' });
   const catalog = [{ name: 'read_file' }, { name: 'bash' }];

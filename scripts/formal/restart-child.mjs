@@ -39,6 +39,7 @@ const runtime = new RawAgentRuntime({ repoRoot: join(config.dir, 'repo'), stateD
       return { ok: true, content: `result-${id}` };
     }
   })) });
+runtime.store.setDaemonControl('tool_exposure_settings', {mode:'full',pinnedGroups:{}});
 function snapshot() {
   const s = runtime.getSession(sid);
   return { sid, status: s.status, outcome: s.metadata?.outcome ?? null, interrupt: s.metadata?.interrupt ?? null, writer: s.activeWriterRunId ?? null,

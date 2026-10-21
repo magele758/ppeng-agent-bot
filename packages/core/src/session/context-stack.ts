@@ -647,7 +647,8 @@ export async function previewSessionContextStack(
   const jevNames = await applyJevToolSelect(
     host.store,
     query,
-    selected.turnTools.map((tool) => ({ name: tool.name, description: tool.description }))
+    selected.turnTools.map((tool) => ({ name: tool.name, description: tool.description })),
+    { preserveExposure: true }
   );
   const turnTools = jevNames
     ? selected.turnTools.filter((tool) => new Set(jevNames).has(tool.name))

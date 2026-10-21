@@ -28,6 +28,7 @@ import {
   resolveWebSearchTemplate,
   type WebSettingsReadStore
 } from '../tools/web-settings.js';
+import { readToolExposure, toolGroup } from '../tools/tool-exposure.js';
 import { readDisclosedToolNames, splitDeferredTools } from '../tools/deferred-disclosure.js';
 import { DYN_META_TOOL_NAMES, SEARCH_DYN_TOOLS_NAME } from '../dyn-tools/types.js';
 import { readDynToolSettings } from '../dyn-tools/settings.js';
@@ -83,20 +84,24 @@ function applyAllowlists<T extends { name: string }>(
   return tools.filter((t) => lists.every((allow) => allow.has(t.name)));
 }
 
-function authorizeToolsForSession(input: {
+export function authorizeToolsForSession(input: {
   env: NodeJS.ProcessEnv;
   tools: ToolContract<any>[];
   agent: AgentSpec;
   session: SessionRecord;
   settingsStore?: WebSettingsReadStore;
-}): { allowExternalAiTools: boolean; tools: ToolContract<any>[] } {
+}, reasons?: Map<string,string>): { allowExternalAiTools: boolean; tools: ToolContract<any>[] } {
+  let last=input.tools;
+  const checkpoint=(next: ToolContract<any>[],reason:string)=>{const kept=new Set(next.map(t=>t.name));for(const t of last)if(!kept.has(t.name)&&!reasons?.has(t.name))reasons?.set(t.name,reason);last=next;};
   const externalAiCapabilityGate = envBool(input.env, 'RAW_AGENT_EXTERNAL_AI_TOOLS', false);
   const sessionOptIn = input.session.metadata?.allowExternalAiTools === true;
   const allowExternalAiTools = externalAiCapabilityGate && sessionOptIn;
   const externallyGated = allowExternalAiTools
     ? input.tools
     : input.tools.filter((t) => !t.isExternal);
+  checkpoint(externallyGated,'disabled');
   let tools = applyAllowlists(externallyGated, allowlistsFor(input.agent, input.session));
+  checkpoint(tools,'not_allowed');
   if ((input.settingsStore?.getDaemonControl?.('computer_use_settings') as { enabled?: boolean } | undefined)?.enabled !== true) {
     tools = tools.filter(tool => !tool.name.startsWith('lcu_'));
   }
@@ -105,6 +110,16 @@ function authorizeToolsForSession(input: {
     tools = tools.filter((tool) => !hidden.has(tool.name));
   }
 
+  const browser = input.settingsStore?.getDaemonControl?.('browser_settings') as {enabled?: boolean} | undefined;
+  if (!(browser ? browser.enabled === true : envBool(input.env,'RAW_AGENT_BROWSER_TOOLS',false))) {
+    tools=tools.filter(tool=>toolGroup(tool.name).id!=='browser');
+  }
+  const discovery = input.settingsStore?.getDaemonControl?.('discovery_settings') as {enabled?: boolean; tailscaleEnabled?:boolean} | undefined;
+  const tailscaleOn=discovery ? discovery.enabled===true && discovery.tailscaleEnabled===true : envBool(input.env,'RAW_AGENT_DISCOVERY',true)&&envBool(input.env,'RAW_AGENT_TAILSCALE_DISCOVERY',false);
+  if(!tailscaleOn)tools=tools.filter(tool=>!tool.name.startsWith('tailscale_'));
+  const routine=input.settingsStore?.getDaemonControl?.('routine.settings') as {dialogToolsEnabled?:boolean}|undefined;
+  if(routine?.dialogToolsEnabled===false)tools=tools.filter(tool=>!tool.name.startsWith('cron_'));
+  checkpoint(tools,'disabled');
   const assembled = tools;
 
   const hasExplicitOptionalToolSelection =
@@ -120,15 +135,19 @@ function authorizeToolsForSession(input: {
       ? input.session.metadata?.enabledOptionalToolGroups
       : [];
     const enabled = mergeEnabledOptionalToolGroups(defaultOptionalGroups, clientEnabled);
+    if (isCanonicalBotChatSession(input.session) && routine?.dialogToolsEnabled !== false && !enabled.includes('cron')) enabled.push('cron');
     tools = filterToolsByOptionalGroups(tools, enabled, groups).tools;
   }
 
+  checkpoint(tools,'disabled');
   const profile = runProfileFromSession(input.session);
   tools = applyRunProfileToTools(tools, profile, assembled);
+  checkpoint(tools,'mode');
   if (!resolveWebSearchTemplate(input.settingsStore, input.env)) {
     tools = tools.filter((t) => t.name !== 'web_search');
   }
 
+  checkpoint(tools,'not_configured');
   const dynSettings = readDynToolSettings(input.settingsStore);
   const meta = new Set<string>(DYN_META_TOOL_NAMES);
   if (!dynSettings.enabled) {
@@ -158,6 +177,7 @@ function authorizeToolsForSession(input: {
   if (!readSkillProposalSettings(input.settingsStore).enabled) {
     tools = tools.filter((t) => t.name !== SKILL_PROPOSE_TOOL_NAME);
   }
+  checkpoint(tools,'disabled');
   if (!isCanonicalBotChatSession(input.session) && !isRoomMemberSession(input.session)) {
     tools = tools.filter((t) => t.name !== MESSAGE_AGENT_TOOL_NAME);
   }
@@ -166,17 +186,23 @@ function authorizeToolsForSession(input: {
     const roomOnly = new Set<string>(ROOM_RETRIEVAL_TOOL_NAMES);
     tools = tools.filter((tool) => !roomOnly.has(tool.name));
   }
-  return { allowExternalAiTools, tools: filterFactoryTools(input.session, filterRoomTools(input.session, stripSubagentDeniedTools(input.session, tools)), input.settingsStore) };
+  checkpoint(tools,'mode');
+  const finalTools=filterFactoryTools(input.session, filterRoomTools(input.session, stripSubagentDeniedTools(input.session, tools)), input.settingsStore);
+  checkpoint(finalTools,'policy');
+  return {allowExternalAiTools,tools:finalTools};
 }
 
 function partitionDeferred(
   agent: AgentSpec,
   session: SessionRecord,
-  tools: readonly ToolContract<any>[]
+  tools: readonly ToolContract<any>[],
+  settingsStore?: WebSettingsReadStore
 ) {
+  const settings=readToolExposure(settingsStore);
+  if(settings.mode==='full') return {visible:tools.filter(t=>!['tool_search','load_capability_tool'].includes(t.name)),hidden:[]};
+  const pinned=new Set(Object.hasOwn(settings.pinnedGroups,agent.id) ? settings.pinnedGroups[agent.id] : []);
   return splitDeferredTools({
-    tools,
-    agentAllowedTools: agent.allowedTools,
+    tools: tools.map(tool => toolGroup(tool.name).tier > 1 && !pinned.has(toolGroup(tool.name).id) ? {...tool,disclosure:'on_demand'} : {...tool,disclosure:undefined}),
     disclosedNames: readDisclosedToolNames(session.metadata)
   });
 }
@@ -191,7 +217,7 @@ export function filterToolsForSession(input: {
   const authorized = authorizeToolsForSession(input);
   return {
     allowExternalAiTools: authorized.allowExternalAiTools,
-    tools: partitionDeferred(input.agent, input.session, authorized.tools).visible
+    tools: partitionDeferred(input.agent, input.session, authorized.tools, input.settingsStore).visible
   };
 }
 
@@ -204,7 +230,7 @@ export function hiddenDeferredToolsForSession(input: {
   settingsStore?: WebSettingsReadStore;
 }): ToolContract<any>[] {
   const authorized = authorizeToolsForSession(input);
-  return partitionDeferred(input.agent, input.session, authorized.tools).hidden;
+  return partitionDeferred(input.agent, input.session, authorized.tools, input.settingsStore).hidden;
 }
 
 /** A Room member turn is the only non-canonical session allowed to call message_agent. */
@@ -290,4 +316,17 @@ export function resolveTurnTools(input: {
     fingerprint: toolsetLock.fingerprint,
     promptCacheKey: toolsetLock.promptCacheKey
   };
+}
+
+export function inspectToolExposure(input: Parameters<typeof filterToolsForSession>[0]) {
+  const reasons=new Map<string,string>();
+  const authorized=authorizeToolsForSession(input,reasons).tools;
+  const available=new Set(authorized.map(t=>t.name));
+  const provided=new Set(filterToolsForSession(input).tools.map(t=>t.name));
+  const mode=readToolExposure(input.settingsStore).mode;
+  const items=input.tools.map(t=>({name:t.name,group:toolGroup(t.name).id,tier:toolGroup(t.name).tier,
+    state:provided.has(t.name)?'provided':available.has(t.name)&&!(mode==='full'&&['tool_search','load_capability_tool'].includes(t.name))?'pending':'unavailable',
+    reason:provided.has(t.name)?'provided':reasons.get(t.name)??(mode==='full'&&['tool_search','load_capability_tool'].includes(t.name)?'mode':'not_loaded')}));
+  const count=(state:string)=>items.filter(t=>t.state===state).length;
+  return {mode,items,counts:{registered:items.length,available:count('provided')+count('pending'),provided:count('provided'),pending:count('pending'),unavailable:count('unavailable')}};
 }
