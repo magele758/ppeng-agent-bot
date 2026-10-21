@@ -1,0 +1,228 @@
+import type { MessagePart, SessionRecord } from '../../types.js';
+import { createLogger } from '../../logger.js';
+import { stableJsonHash } from '../../runtime/helpers.js';
+import { TeamPlanStore } from '../../teams/store.js';
+import { getBotTask, cancelBotTask } from '../bot-work.js';
+import { principalFromSession } from '../bot-identity.js';
+import { inheritBotIdentityMetadata } from '../../memory/bot-memory-scope.js';
+import { childPermissionMode, inheritBotAllowlists, inheritModelOverride } from '../../runtime/spawn-policy.js';
+import { inheritWorkspaceBinding } from '../../workspace/index.js';
+import { announceGoalState, bindGoalExecution, goalScope, settleGoalExecution, type GoalRuntimeHost } from './runtime-host.js';
+import type { BotGoal, GoalExecution } from './types.js';
+
+const ticking = new WeakSet<object>();
+const ended = new Set(['completed', 'failed', 'cancelled', 'unknown', 'expired', 'rejected']);
+interface AuthorizedWait { goalId: string; source: string; correlationId: string }
+
+function authorizedWait(host: GoalRuntimeHost, goal: BotGoal, executions: GoalExecution[]): boolean {
+ const wait = goal.wait;
+ if (!wait) return false;
+ return executions.some(execution => {
+  const session = execution.sessionId ? host.store.getSession(execution.sessionId) : undefined;
+  const entries = session?.metadata.botGoalAuthorizedWaits;
+  return Array.isArray(entries) && entries.some((entry: AuthorizedWait) => entry?.goalId === goal.id && entry.source === wait.source && entry.correlationId === wait.correlationId);
+ });
+}
+
+/** Reads only an execution reference actually returned by the authorized dispatch gateway. */
+function waitStatus(host: GoalRuntimeHost, parent: SessionRecord, goal: BotGoal, executions: GoalExecution[]): string | undefined {
+ const wait = goal.wait;
+ if (!wait || !authorizedWait(host, goal, executions)) return 'unauthorized';
+ const ownedSessions = new Set(executions.flatMap(e => e.sessionId ? [e.sessionId] : []));
+ if (wait.source === 'session') {
+  const session = host.store.getSession(wait.correlationId);
+  if (!session || session.metadata.botGoalScopeSessionId !== parent.id || session.metadata.botGoalId !== goal.id) return 'unauthorized';
+  if (host.isRunning(session.id) || session.status === 'waiting_approval') return 'running';
+  const outcome = session.metadata.outcome as {kind?: string} | undefined;
+  if (session.status === 'failed' || session.status === 'unknown') return session.status;
+  return outcome?.kind === 'completed' || outcome?.kind === 'idle' || session.status === 'idle' ? 'completed' : undefined;
+ }
+ if (wait.source === 'bot_task') {
+  const task = getBotTask(host.store, principalFromSession(host.store, parent), wait.correlationId);
+  return task?.requesterBotId === goal.botId ? task.status : 'unauthorized';
+ }
+ if (wait.source === 'team_dag') {
+  const plan = new TeamPlanStore(host.store.db).get(wait.correlationId);
+  return plan?.sessionId && ownedSessions.has(plan.sessionId) ? plan.status : 'unauthorized';
+ }
+ if (wait.source === 'swarm') return host.store.swarm().getRun(wait.correlationId)?.status ?? 'unknown';
+ return 'unsupported';
+}
+
+function externalWorkers(host: GoalRuntimeHost, goal: BotGoal): SessionRecord[] {
+ const wait = goal.wait;
+ if (!wait) return [];
+ return host.store.listSessions().filter(session =>
+  wait.source === 'session' ? session.id === wait.correlationId :
+  wait.source === 'swarm' ? session.metadata.swarmRunId === wait.correlationId :
+  wait.source === 'team_dag' ? session.metadata.teamPlanId === wait.correlationId :
+  wait.source === 'bot_task' ? session.metadata.botWorkTaskId === wait.correlationId : false);
+}
+
+function drainExternal(host: GoalRuntimeHost, parent: SessionRecord, goal: BotGoal, executions: GoalExecution[]): void {
+ const scope = goalScope(host.store, parent)!;
+ const wait = goal.wait;
+ if (!wait) return;
+ const state = waitStatus(host, parent, goal, executions);
+ if (state === 'unauthorized' || state === 'unsupported') {
+  if(goal.status==='queued')scope.service.block(goal.botId,goal.id,'External execution cancellation is unavailable; reconciliation is required');
+  scope.service.setDraining(goal.botId,goal.id,true,'External execution cancellation is unavailable; reconciliation is required');
+  return;
+ }
+ // Persist terminal dispatch state first; only then interrupt already-running workers.
+ if (wait.source === 'swarm' && !ended.has(state ?? '')) host.store.swarm().updateRunStatus(wait.correlationId,'cancelled');
+ else if (wait.source === 'team_dag' && !ended.has(state ?? '')) new TeamPlanStore(host.store.db).updateStatus(wait.correlationId,'cancelled');
+ else if (wait.source === 'bot_task' && !ended.has(state ?? '')) cancelBotTask({store:host.store,runSession:host.run,isSessionRunning:host.isRunning,cancelSession:host.cancel,log:createLogger('bot-goal-cancel')},principalFromSession(host.store,parent),wait.correlationId);
+ const workers = externalWorkers(host,goal);
+ for (const worker of workers) {
+  if (!host.isRunning(worker.id) && worker.status !== 'waiting_approval') continue;
+  host.cancel(worker.id);
+  if (!host.isRunning(worker.id)) {
+   const live=host.store.getSession(worker.id);
+   if(live)host.store.updateSession(worker.id,{status:'idle',metadata:{...live.metadata,outcome:{kind:'aborted',reason:'Goal paused or cancelled'},botGoalExternalCancelled:true}});
+  }
+ }
+ const draining = workers.some(worker => host.isRunning(worker.id));
+ if(!draining&&goal.status==='queued')scope.service.finishAmendDrain(goal.botId,goal.id,waitEvidence(host,parent,goal,'stopped after constraints changed',executions));
+ else scope.service.setDraining(goal.botId,goal.id,draining,goal.status==='blocked'?goal.blockedReason:draining ? 'External workers are stopping; completed effects are not rolled back' : undefined);
+}
+
+function waitEvidence(host: GoalRuntimeHost, parent: SessionRecord, goal: BotGoal, status: string, executions: GoalExecution[]): {summary:string;evidence:string[];costUsd:number} {
+ const wait=goal.wait!;
+ const evidence:string[]=[`${wait.source} ${wait.correlationId} reported ${status}; verify against goal conditions`];
+ if(wait.source==='bot_task') {
+  const task=getBotTask(host.store,principalFromSession(host.store,parent),wait.correlationId);
+  if(task?.result)evidence.push(task.result.slice(-12000));
+  if(task?.failureReason)evidence.push(task.failureReason.slice(-2000));
+ }
+ if(wait.source==='team_dag') {
+  const plan=new TeamPlanStore(host.store.db).get(wait.correlationId);
+  if(plan)evidence.push(JSON.stringify({tasks:plan.tasks,gates:plan.gates}).slice(-16000));
+ }
+ if(wait.source==='swarm') evidence.push(JSON.stringify(host.store.swarm().listTasks(wait.correlationId)).slice(-16000));
+ let costUsd=0;
+ for(const worker of externalWorkers(host,goal)) {
+  const output=host.store.foldMessages(worker.id).filter(m=>m.role==='assistant').flatMap(m=>m.parts.filter(p=>p.type==='text').map(p=>p.text)).join('\n').slice(-8000);
+  if(output)evidence.push(`Session ${worker.id}: ${output}`);
+  // Executions already settled into this Goal own their own cost accounting.
+  if(worker.metadata.canonicalBotChat !== true && !executions.some(e=>e.sessionId===worker.id)) {
+   const cost=Number(worker.metadata.usageCostUsd??0);
+   if(Number.isFinite(cost)&&cost>0)costUsd+=cost;
+  }
+ }
+ return {summary:`${wait.source} ${wait.correlationId}: ${status}. Inspect recorded evidence before continuing.`,evidence,costUsd};
+}
+
+function spawnContinuation(host: GoalRuntimeHost, parent: SessionRecord, goal: BotGoal): void {
+ const scope = goalScope(host.store, parent)!;
+ const permissionMode = childPermissionMode(parent.metadata);
+ const child = host.store.createSession({
+  title: goal.title, mode: 'subagent', agentId: parent.agentId, taskId: parent.taskId,
+  parentSessionId: parent.id, background: true,
+  metadata: {
+   parentSessionId: parent.id, spawnSource: 'bot-goal-continuation', subagentRole: parent.agentId,
+   ...inheritBotAllowlists(parent.metadata, {agentAllowedTools: host.store.getAgent(parent.agentId)?.allowedTools}),
+   ...inheritModelOverride(parent.metadata), ...inheritBotIdentityMetadata(parent, host.store),
+   ...inheritWorkspaceBinding(parent.metadata), ...(permissionMode ? {permissionMode} : {}),
+   botId: goal.botId, botGoalId: goal.id, botGoalScopeSessionId: parent.id
+  }
+ });
+ const taskText = `Continue goal ${goal.id} under revision ${goal.revision}.\nObjective: ${goal.objective}\nConstraints: ${JSON.stringify(goal.constraints)}\nPrevious progress: ${goal.progress}\nEvidence: ${JSON.stringify(goal.evidence)}\nNext step: ${goal.nextStep ?? 'Inspect the prior result and continue safely.'}\nDo not repeat external operations whose result is unknown.`;
+ host.store.appendMessage(child.id, 'user', [{type: 'text', text: taskText}]);
+ if (!bindGoalExecution(host, child)) {
+  host.store.deleteSession(child.id);
+  return;
+ }
+ // Claiming and binding happen synchronously before run() so concurrent ticks cannot duplicate dispatch.
+ try {
+  void host.run(child.id).then(() => settleGoalExecution(host,child.id)).catch(async error => {
+   try { await settleGoalExecution(host,child.id,error); }
+   catch { scope.service.block(goal.botId,goal.id,'Continuation failed; execution requires reconciliation'); }
+  });
+ } catch (error) {
+  void settleGoalExecution(host,child.id,error).catch(() => scope.service.block(goal.botId,goal.id,'Continuation failed; execution requires reconciliation'));
+ }
+}
+
+function resumeApprovedDispatch(host: GoalRuntimeHost, session: SessionRecord, goal: BotGoal, execution: GoalExecution): boolean {
+ const dispatch=session.metadata.botGoalDispatch as {executionId?:string;request?:Record<string,unknown>;result?:{waitingApproval?:boolean}}|undefined;
+ if(dispatch?.executionId!==execution.id||!dispatch.result?.waitingApproval)return false;
+ const scope=goalScope(host.store,session)!;
+ const ledger=host.store.getDaemonControl<{parts:MessagePart[]}[]>(`bot.goal-tool-ledger:${session.id}:${execution.id}`)??[];
+ const calls=new Map<string,Extract<MessagePart,{type:'tool_call'}>>();
+ const results=new Map<string,Extract<MessagePart,{type:'tool_result'}>>();
+ for(const part of ledger.flatMap(m=>m.parts)) {
+  if(part.type==='tool_call')calls.set(part.toolCallId,part);
+  if(part.type==='tool_result')results.set(part.toolCallId,part);
+ }
+ const waiting=[...results.values()].filter(result=>{try{return JSON.parse(result.content)?.status==='goal_dispatch_waiting_approval';}catch{return false;}});
+ const approvals=host.store.listApprovals();
+ const decisions=waiting.map(result=>{
+  const call=calls.get(result.toolCallId);
+  return call?approvals.filter(a=>a.sessionId===session.id&&a.toolName===call.name&&stableJsonHash(call.name,a.args)===stableJsonHash(call.name,call.input)).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt))[0]:undefined;
+ });
+ if(!decisions.length||decisions.some(d=>!d||d.status==='pending')) {
+  if(execution.leaseUntil>Date.now())scope.service.updateExecution(goal.botId,execution.id,{leaseUntil:Date.now()+scope.service.readSettings().leaseMs});
+  return true;
+ }
+ if(decisions.some(d=>d?.status==='rejected')) {
+  if(host.isRunning(session.id)){host.cancel(session.id);return true;}
+  scope.service.report(goal.botId,execution.id,{kind:'blocked',summary:'Goal execution approval was rejected',owner:execution.owner,fence:execution.fence});
+  return true;
+ }
+ if(host.isRunning(session.id))return false;
+ const key=decisions.map(d=>`${d!.id}:${d!.updatedAt}`).sort().join('|');
+ if(session.metadata.botGoalApprovalResume===key)return true;
+ if(execution.leaseUntil<=Date.now())return true;
+ scope.service.updateExecution(goal.botId,execution.id,{leaseUntil:Date.now()+scope.service.readSettings().leaseMs});
+ host.store.updateSession(session.id,{status:'idle',metadata:{...session.metadata,botGoalApprovalResume:key}});
+ const request=dispatch.request??{};
+ const args=Object.fromEntries(['preferredStrategy','workKind','delegateBotId','tasks'].filter(k=>request[k]!==undefined).map(k=>[k,request[k]]));
+ host.store.enqueueSteer(session.id,`[goal approval resolved] Resume goal_dispatch with exactly these approved selection arguments: ${JSON.stringify(args)}. The original execution and stable call IDs remain active. Do not create a new independent operation.`,{role:'system',key:`goal-approval:${execution.id}:${key}`});
+ try {void host.run(session.id).then(()=>settleGoalExecution(host,session.id)).catch(error=>settleGoalExecution(host,session.id,error)).catch(()=>{});}
+ catch(error){void settleGoalExecution(host,session.id,error).catch(()=>{});}
+ return true;
+}
+
+export async function tickBotGoals(host: GoalRuntimeHost): Promise<void> {
+ if (ticking.has(host.store)) return;
+ ticking.add(host.store);
+ try {
+  for (const parent of host.store.listSessions().filter(s => s.metadata.canonicalBotChat === true)) {
+   const scope = goalScope(host.store,parent);
+   if (!scope) continue;
+   const {service,botId} = scope;
+   for (const goal of service.list(botId)) {
+    if (goal.wait && goal.draining) drainExternal(host,parent,goal,service.executions(botId,goal.id));
+    for (const execution of service.executions(botId,goal.id).filter(e => e.status === 'running')) {
+     const session = execution.sessionId ? host.store.getSession(execution.sessionId) : undefined;
+     const running = session && host.isRunning(session.id);
+     if (session && goal.status === 'running' && resumeApprovedDispatch(host,session,goal,execution)) continue;
+     if (goal.status === 'paused' || goal.status === 'cancelled') {
+      if (running) host.cancel(session.id);
+      if (!session || !host.isRunning(session.id)) service.report(botId,execution.id,{kind:'cancelled',summary:'Execution stopped following user control',owner:execution.owner,fence:execution.fence});
+     } else if (session && (running || session.status === 'waiting_approval')) {
+      if (execution.leaseUntil > Date.now()) service.updateExecution(botId,execution.id,{leaseUntil:Date.now()+service.readSettings().leaseMs});
+      else { host.cancel(session.id); service.block(botId,goal.id,'Execution lease expired; stopping before recovery'); }
+     }
+    }
+   }
+   service.recover(botId);
+   for (const goal of service.list(botId).filter(g => g.status === 'waiting')) {
+    const status = waitStatus(host,parent,goal,service.executions(botId,goal.id));
+    if (status === 'unauthorized' || status === 'unsupported') { service.block(botId,goal.id,'Wait reference is not an authorized supported execution'); continue; }
+    if (status && ended.has(status)) service.wake(botId,{goalId:goal.id,eventId:`${goal.wait!.source}:${goal.wait!.correlationId}:${status}:${goal.attempts}`,source:goal.wait!.source,correlationId:goal.wait!.correlationId,...waitEvidence(host,parent,goal,status,service.executions(botId,goal.id))});
+   }
+   for (const goal of service.list(botId).filter(g => g.status === 'queued' && !g.activeExecutionId && !g.draining)) {
+    // New human receipts belong to the main runtime's existing intake/fork path.
+    if (goal.attempts === 0 && goal.sourceMessageId) {
+     const deferred = host.store.listSessions().find(s => s.parentSessionId === parent.id && s.metadata.botGoalId === goal.id && s.metadata.botGoalScopeSessionId === parent.id && !host.isRunning(s.id));
+     if (!deferred && !goal.resumeRequested) continue;
+    }
+    if (service.list(botId).filter(g => g.activeExecutionId).length >= service.readSettings().maxConcurrent) break;
+    spawnContinuation(host,parent,goal);
+   }
+   for (const goal of service.list(botId)) announceGoalState(host,goal);
+  }
+ } finally { ticking.delete(host.store); }
+}

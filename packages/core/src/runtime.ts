@@ -4,8 +4,13 @@ import { createProductAdminTools } from './tools/product-admin-tools.js';
 import { BotRoomService } from './rooms/index.js';
 import { recoverBotWork, tickBotWork, createBotManagementTools, expireOverdueBotWork, isBotWorkSessionBlocked, type BotWorkHost } from './bots/bot-work.js';
 import { applyConcurrentBotForks, clearActiveWorkPiece } from './bots/concurrent-fork.js';
+import { inheritWorkspaceBinding } from './workspace/index.js';
 import { createSubagentHelpTool } from './runtime/subagent-help.js';
 import { createHistoryTools } from './session/history/tools.js';
+import { prepareGoalIntake, bindGoalExecution, settleGoalExecution, createGoalCheckpointTool, goalScope, goalWorkKind, type GoalRuntimeHost } from './bots/goals/runtime-host.js';
+import { tickBotGoals } from './bots/goals/scheduler.js';
+import { createRuntimeGoalDispatchTool } from './bots/goals/runtime-dispatch.js';
+import { observeGoalBudget } from './bots/goals/budget.js';
 /**
  * L5 runtime host façade: MCP / mailbox / approvals / scheduler / public API.
  * The session turn loop lives in `turn/kernel.ts` (`runSessionKernel`).
@@ -92,7 +97,7 @@ import { SkillManagementService, createSkillManageTool, createSkillProposeTool, 
 import { redactToolContent } from './sandbox/result-redaction.js';
 import { createStoreScratchPersist } from './ptc/scratchpad.js';
 import { inheritBotIdentityMetadata } from './memory/bot-memory-scope.js';
-import { botTeammatePermission, inheritBotAllowlists, inheritModelOverride } from './runtime/spawn-policy.js';
+import { botTeammatePermission, childPermissionMode, inheritBotAllowlists, inheritModelOverride } from './runtime/spawn-policy.js';
 import { scratchKeyFilterFromInherit } from './memory/ptc-meta.js';
 import { runGoalVerify } from './goal/run-verify.js';
 import { filterToolsForSession } from './turn/resolve-turn-tools.js';
@@ -185,6 +190,7 @@ import { flushPreparedContextSnapshots,
   schedulerFrom,
   sessionFacadeFrom,
   spawnFrom,
+  toolLoopDepsFrom,
   type L5Bindable
 } from './runtime/l5-bindings.js';
 import { autoCompactSession } from './runtime/compact-host.js';
@@ -594,6 +600,28 @@ export class RawAgentRuntime {
       resumeTeamPlan: (id) => this.resumeTeamPlan(id),
       startSwarmRun: (id, tasks) => this.startSwarmRun(id, tasks),
       cancelSession: (id) => this.cancelSession(id)
+    }));
+    this.tools.push(createGoalCheckpointTool(this.store));
+    this.tools.push(createRuntimeGoalDispatchTool({
+      store: this.store, goalHost: this.goalRuntimeHost(), deps: () => toolLoopDepsFrom(this.l5()),
+      filePolicy: () => this.mergedFilePolicy(),
+      authorizedTools: context => filterToolsForSession({env:process.env,tools:this.tools,agent:context.agent,session:context.session,settingsStore:this.store}).tools,
+      runWorker: async (context, request) => {
+        const scope=goalScope(this.store,context.session);
+        if(!scope)return {status:'blocked',content:'Goal scope is unavailable'};
+        const goal=scope.service.get(scope.botId,request.goalId);
+        const execution=scope.service.executions(scope.botId,request.goalId).find(item=>item.id===request.executionId);
+        if(!goal||goal.status!=='running'||goal.activeExecutionId!==execution?.id||goal.revision!==request.revision||!execution||execution.status!=='running'||execution.goalRevision!==request.revision||execution.sessionId!==context.session.id||execution.leaseUntil<=Date.now())return {status:'blocked',content:'Goal execution changed before worker creation'};
+        const child=this.store.createSession({title:request.task.slice(0,100),mode:'subagent',agentId:context.agent.id,parentSessionId:context.session.id,background:true,
+          metadata:{...inheritBotAllowlists(context.session.metadata,{agentAllowedTools:context.agent.allowedTools}),...inheritModelOverride(context.session.metadata),
+            ...inheritBotIdentityMetadata(context.session,this.store),...inheritWorkspaceBinding(context.session.metadata),permissionMode:childPermissionMode(context.session.metadata),
+            botId:scope.botId,botGoalId:request.goalId,botGoalScopeSessionId:scope.sessionId,botGoalWorker:true,
+            botGoalWorkerRevision:request.revision,botGoalWorkerExecutionId:request.executionId,botGoalWorkerFence:execution.fence,
+            taskRunMode:request.taskMode,...(request.strategy==='ptc'?{orchestrationEngine:'ptc'}:{})}});
+        this.store.appendMessage(child.id,'user',[textPart(request.task)]);
+        void this.runSession(child.id).catch(error=>this.log.warn('Goal worker failed',{sessionId:child.id,error:String(error)}));
+        return {status:'waiting',reference:`session:${child.id}`,content:'Isolated execution started; await and verify its result.'};
+      }
     }));
     syncBotAgentSpecs(this.store);
     this.computerUse = new LcuComputerUseProvider({
@@ -1304,6 +1332,7 @@ export class RawAgentRuntime {
   async runScheduler(): Promise<void> {
     void this.factory.tick().catch(error => this.log.warn('Factory scheduler failed', {error:String(error)}));
     await tickBotWork(this.botWorkRuntimeHost());
+    await tickBotGoals(this.goalRuntimeHost());
     void this.rooms.tick().catch((error) => this.log.warn('Room scheduler failed', { error: String(error) }));
     await runSchedulerFn(schedulerFrom(this.l5()));
     await this.drainHumanContinuations();
@@ -1541,6 +1570,27 @@ export class RawAgentRuntime {
     }
   }
 
+  goalRuntimeHost(): GoalRuntimeHost {
+    return {
+      store: this.store,
+      isRunning: id => this.runningSessions.has(id),
+      cancel: id => this.cancelSession(id),
+      run: id => this.runSession(id),
+      judge: this.modelAdapter.completeText?.bind(this.modelAdapter),
+      capabilities: (session, goal) => {
+        const agent = this.store.getAgent(session.agentId);
+        const preference = goalScope(this.store, session)?.service.readSettings().preferredStrategy;
+        const candidate = goalWorkKind(goal.objective) === 'batch' || preference === 'ptc'
+          ? { ...session, metadata: { ...session.metadata, taskRunMode: 'dynamic_workflow', orchestrationEngine: 'ptc' } } : session;
+        const selected = agent ? filterToolsForSession({ env: process.env, tools: this.tools, agent, session: candidate, settingsStore: this.store }).tools : [];
+        return { registeredTools: this.tools.map(t => t.name), allowedTools: selected.map(t => t.name),
+          enabledStrategies: ['direct','subagent','bot_delegate','ptc','team_dag','swarm'],
+          ptcEnabled: selected.some(t => t.name === 'ptc_exec'), hasWorkspace: Boolean(session.workspaceId || this.repoRoot),
+          budgetRemaining: goal.budgetUsd - goal.costUsd };
+      }
+    };
+  }
+
   /** Explicit human run request; subsystem runs keep their own original result promise. */
   runHumanSession(sessionId: string, options?: Parameters<RawAgentRuntime['runSession']>[1]): Promise<SessionRecord> {
     requestHumanRun(this.store, sessionId);
@@ -1590,6 +1640,7 @@ export class RawAgentRuntime {
     if (parked?.mode === 'subagent' && parked.status === 'unknown') {
       return parked;
     }
+    if (parked?.metadata.canonicalBotChat === true) await prepareGoalIntake(this.goalRuntimeHost(), parked);
     const existing = this.runningSessions.get(sessionId);
     if (existing && !options?.latch) {
       this.forkConcurrentBotWork(parked, true);
@@ -1603,10 +1654,13 @@ export class RawAgentRuntime {
     if (existing && options?.latch) {
       await existing.catch(() => undefined);
     }
+    const goalSession = this.store.getSession(sessionId);
+    if (goalSession && !bindGoalExecution(this.goalRuntimeHost(), goalSession)) return goalSession;
     this.forkConcurrentBotWork(parked, false);
     const observeHuman = createHumanContinuationObserver(this.store, sessionId);
+    const observeBudget = observeGoalBudget(this.goalRuntimeHost(), sessionId);
     const callerEvent = options?.onEvent;
-    options = { ...options, onEvent: async event => { await observeHuman(event); await callerEvent?.(event); } };
+    options = { ...options, onEvent: async event => { await observeHuman(event); await observeBudget(event); await callerEvent?.(event); } };
     const directChunk = options?.onModelStreamChunk;
     if (directChunk || (this.modelStreamListeners.get(sessionId)?.size ?? 0) > 0) {
       options = {
@@ -1675,7 +1729,9 @@ export class RawAgentRuntime {
           }
         })()
     )
-      .catch((err: unknown) => {
+      .then(async result => { await settleGoalExecution(this.goalRuntimeHost(), sessionId); return result; })
+      .catch(async (err: unknown) => {
+        await settleGoalExecution(this.goalRuntimeHost(), sessionId, err);
         if (err instanceof NotFoundError) throw err;
         if (err && typeof err === 'object' && (err as { name?: string }).name === 'NotFoundError') {
           const msg = err instanceof Error ? err.message : String(err);

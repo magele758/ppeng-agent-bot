@@ -234,9 +234,12 @@ export class TeamDagExecutor {
   }
 
   private async tickPlan(plan: TeamPlan, settings: TeamsDagSettings): Promise<void> {
+    if (this.deps.store.get(plan.id)?.status !== 'running') return;
     const tasks = [...plan.tasks];
     await this.recoverStale(tasks);
+    if (this.deps.store.get(plan.id)?.status !== 'running') return;
     await this.advanceFinished(plan, tasks);
+    if (this.deps.store.get(plan.id)?.status !== 'running') return;
 
     const completed = new Set(tasks.filter((t) => t.status === 'done').map((t) => t.id));
     const excluded = new Set(
@@ -261,12 +264,14 @@ export class TeamDagExecutor {
     }
 
     for (const task of tasks) {
+      if (this.deps.store.get(plan.id)?.status !== 'running') return;
       if (task.status !== 'ready') continue;
       if (running >= settings.maxConcurrent) break;
       await this.dispatch(plan, task, settings);
       running += 1;
     }
 
+    if (this.deps.store.get(plan.id)?.status !== 'running') return;
     let gates = plan.gates.length ? plan.gates : initGatesFromSettings(settings);
     const workersSettled =
       tasks.length > 0 && tasks.every((t) => t.status === 'done' || t.status === 'failed' || t.status === 'cancelled');
@@ -276,6 +281,7 @@ export class TeamDagExecutor {
       gates = await this.advanceGates(plan, gates);
     }
 
+    if (this.deps.store.get(plan.id)?.status !== 'running') return;
     const next: TeamPlan = {
       ...plan,
       tasks,
@@ -304,6 +310,7 @@ export class TeamDagExecutor {
 
   private async advanceFinished(plan: TeamPlan, tasks: TeamDagTask[]): Promise<void> {
     for (const task of tasks) {
+      if (this.deps.store.get(plan.id)?.status !== 'running') return;
       if (task.status !== 'running' || !task.sessionId) continue;
       if (!this.deps.sessionTeammateFinished(task.sessionId)) continue;
       if (task.workspacePath) {
@@ -397,6 +404,7 @@ export class TeamDagExecutor {
       }
     }
 
+    if (this.deps.store.get(plan.id)?.status !== 'running') return;
     const session = this.deps.createTeammateSession({
       name: `dag-${task.id}`,
       role: ROLE_PROMPT[task.role],
@@ -430,6 +438,7 @@ export class TeamDagExecutor {
       sessionId: session.id,
       taskId: hostTask.id
     });
+    if (this.deps.store.get(plan.id)?.status !== 'running') return;
     this.deps.enqueueSchedulerWake(session.id, 'teams.dag.task');
   }
 

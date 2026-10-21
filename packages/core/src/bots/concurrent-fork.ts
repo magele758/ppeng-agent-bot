@@ -92,7 +92,9 @@ export function pendingBotWorkPieces(store: SqliteStateStore, sessionId: string)
   if (waiting.length === 0) return [];
   const messages = new Map(store.foldMessages(sessionId).map((message) => [message.id, message]));
   const pieces: WorkPiece[] = [];
+  const goalIntake = store.getDaemonControl<Record<string, string>>(`bot.goal-intake:${sessionId}`) ?? {};
   for (const pending of waiting) {
+    if (goalIntake[pending.id] && !goalIntake[pending.id]!.startsWith('goal_')) continue;
     const text = pieceText(messages.get(pending.id));
     if (!text) continue;
     pieces.push({ id: pending.id, text });
@@ -215,6 +217,7 @@ function finishFork(
 function spawnWorkChild(host: ConcurrentForkHost, parent: SessionRecord, piece: WorkPiece): SessionRecord {
   const botId = typeof parent.metadata?.botId === 'string' ? parent.metadata.botId : undefined;
   const permissionMode = childPermissionMode(parent.metadata);
+  const goalId = host.store.getDaemonControl<Record<string,string>>(`bot.goal-intake:${parent.id}`)?.[piece.id];
   const child = host.store.createSession({
     title: `子任务: ${piece.text.slice(0, 40)}`,
     mode: 'subagent',
@@ -223,6 +226,7 @@ function spawnWorkChild(host: ConcurrentForkHost, parent: SessionRecord, piece: 
     parentSessionId: parent.id,
     background: true,
     metadata: {
+      ...(goalId?.startsWith('goal_') ? { botGoalId: goalId, botGoalScopeSessionId: parent.id } : {}),
       parentSessionId: parent.id,
       spawnSource: 'concurrent-bot-work',
       sourceMessageId: piece.id,
