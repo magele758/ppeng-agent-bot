@@ -375,7 +375,7 @@ function routineParent(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineR
 }
 /**
  * The bot's own scheduled work keeps an explicit never-ask setting.
- * Spawned children still downgrade bypass and auto through childPermissionMode.
+ * Spawned children also inherit the effective mode through childPermissionMode.
  */
 function routinePermissionMode(metadata: Record<string, unknown> | undefined): string {
   const raw = metadata?.permissionMode;

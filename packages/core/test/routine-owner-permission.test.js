@@ -157,7 +157,7 @@ test('auto bot routine keeps the main session auto and is not rewritten to ask',
   assert.equal(seen.approvals.some((item) => String(item.reason).includes('permissionMode=ask')), false);
 });
 
-test('spawned child of a bypass bot still asks [AC:routine-owner-permission#AC-3]', async (t) => {
+test('spawned child inherits the effective bypass setting [AC:routine-owner-permission#AC-3]', async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'routine-owner-spawn-'));
   const store = new SqliteStateStore(join(dir, 'state.db'));
   t.after(() => store.db.close());
@@ -197,7 +197,7 @@ test('spawned child of a bypass bot still asks [AC:routine-owner-permission#AC-3
   );
   const child = store.listSessions().find((item) => item.parentSessionId === session.id);
   assert.ok(child);
-  assert.equal(child.metadata.permissionMode, 'ask');
-  const gate = applyPermissionModeGate('ask', 'bash', 'auto');
-  assert.equal(gate?.action, 'require_approval');
+  assert.equal(child.metadata.permissionMode, 'bypass');
+  const gate = applyPermissionModeGate(child.metadata.permissionMode, 'bash', 'auto');
+  assert.equal(gate?.action, 'proceed');
 });

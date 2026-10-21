@@ -135,9 +135,13 @@ export function subagentMemorySessionIds(session: BotMemorySession, lookup?: Bot
 export function inheritBotIdentityMetadata(
   parent: BotMemorySession,
   lookup?: BotMemoryLookup
-): { userId?: string; tenantId?: string } {
-  if (!resolveBotMemoryAgentId(parent, lookup)) return {};
-  const out: { userId?: string; tenantId?: string } = {};
+): { botId?: string; userId?: string; tenantId?: string } {
+  const agentId = resolveBotMemoryAgentId(parent, lookup);
+  if (!agentId) return {};
+  const out: { botId?: string; userId?: string; tenantId?: string } = {};
+  const botId = parent.metadata?.botId;
+  if (typeof botId === 'string' && botId.trim()) out.botId = botId.trim();
+  else out.botId = lookup?.listBots?.({ includeHidden: true }).find(bot => bot.agentId === agentId)?.id;
   const userId = parent.metadata?.userId;
   if (typeof userId === 'string' && userId.trim()) out.userId = userId.trim();
   const tenantId = parent.metadata?.tenantId;

@@ -620,3 +620,66 @@ test('invalid creation configuration leaves no partial Bot, agent, or session [A
   assert.equal(result.ok, true, JSON.stringify(result.body));
  } finally { fx.store.db.close(); }
 });
+
+test('Bot task chats snapshot trusted permissions and retain identity after restart [AC:bot-task-permission-inheritance#AC-1] [AC:bot-task-permission-inheritance#AC-2] [AC:bot-task-permission-inheritance#AC-3] [AC:bot-task-permission-inheritance#AC-7]', async () => {
+  const fx = fixture();
+  const created = await call(fx, 'bot_create', { name: 'Task owner' });
+  const bot = fx.store.getBot(created.body.bot.id);
+  const original = fx.store.getSession(bot.canonicalSessionId);
+  const existing = fx.store.updateSession(fx.session.id, { metadata: { ...fx.session.metadata, permissionMode: 'ask' } });
+  const pending = fx.store.createApproval({ sessionId: existing.id, toolName: 'bash', args: { command: 'echo old' }, reason: 'existing request' });
+  const tasks = [];
+  for (const mode of ['auto', 'bypass', 'ask', 'acceptEdits', 'plan']) {
+    const source = fx.store.updateSession(original.id, { metadata: { ...original.metadata, permissionMode: mode, allowedTools: ['read_file', 'lab_session_create'], allowedSkills: ['review'], workspaceBinding: { kind: 'project', projectId: 'project-scope' }, workspaceBindingBound: true } });
+    const result = await call(fx, 'lab_session_create', { title: `Task ${mode}` }, source);
+    if (mode === 'plan') {
+      assert.equal(result.ok, false);
+      assert.match(result.body.error, /Plan mode is read-only/);
+      continue;
+    }
+    assert.equal(result.ok, true, JSON.stringify(result.body));
+    const child = fx.store.getSession(result.body.session.id);
+    assert.equal(child.metadata.permissionMode, mode);
+    assert.equal(child.metadata.botId, bot.id);
+    assert.equal(child.agentId, bot.agentId);
+    assert.notEqual(child.metadata.canonicalBotChat, true);
+    assert.deepEqual(child.metadata.allowedTools, source.metadata.allowedTools);
+    assert.deepEqual(child.metadata.allowedSkills, ['review']);
+    assert.deepEqual(child.metadata.workspaceBinding, source.metadata.workspaceBinding);
+    assert.equal(child.metadata.workspaceBindingBound, true);
+    tasks.push(child);
+    const nested = await call(fx, 'lab_session_create', {}, child);
+    assert.equal(nested.ok, true);
+    assert.equal(nested.body.session.permissionMode, mode);
+    assert.equal(nested.body.session.botId, bot.id);
+  }
+  fx.store.db.close();
+  const reopened = new SqliteStateStore(join(fx.dir, 'state.db'));
+  try {
+    for (const task of tasks) {
+      assert.deepEqual(reopened.getSession(task.id).metadata, task.metadata);
+    }
+    assert.deepEqual(reopened.getSession(existing.id), existing);
+    assert.deepEqual(reopened.listApprovals({ status: 'pending' }), [pending]);
+  } finally { reopened.db.close(); }
+});
+
+test('task creation ignores forged permission and Bot fields and refuses cross-Bot agent impersonation [AC:bot-task-permission-inheritance#AC-6]', async () => {
+  const fx = fixture();
+  try {
+    const a = await call(fx, 'bot_create', { name: 'Source' });
+    const b = await call(fx, 'bot_create', { name: 'Target' });
+    const bot = fx.store.getBot(a.body.bot.id);
+    const original = fx.store.getSession(bot.canonicalSessionId);
+    const source = fx.store.updateSession(original.id, { metadata: { ...original.metadata, permissionMode: 'ask' } });
+    const forged = await call(fx, 'lab_session_create', { permissionMode: 'bypass', botId: b.body.bot.id, metadata: { permissionMode: 'bypass', botId: b.body.bot.id } }, source);
+    assert.equal(forged.ok, true);
+    assert.equal(forged.body.session.permissionMode, 'ask');
+    assert.equal(forged.body.session.botId, bot.id);
+    const crossed = await call(fx, 'lab_session_create', { agentId: b.body.bot.id }, source);
+    assert.equal(crossed.ok, false);
+    assert.match(crossed.body.error, /bot_delegate/);
+    const ordinary = await call(fx, 'lab_session_create', { agentId: b.body.bot.id });
+    assert.equal(ordinary.ok, false);
+  } finally { fx.store.db.close(); }
+});

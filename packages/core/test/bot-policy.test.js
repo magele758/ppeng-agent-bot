@@ -99,7 +99,7 @@ async function spawnChild(store, session, opts) {
   return child;
 }
 
-test('bot spawn downgrades bypass and auto to ask and does not copy full scratch', async () => {
+test('bot spawn inherits permissions without copying full scratch [AC:bot-task-permission-inheritance#AC-1] [AC:bot-task-permission-inheritance#AC-2]', async () => {
   const store = tempStore();
   const bypassParent = parentSession(store, {
     canonicalBotChat: true,
@@ -107,7 +107,7 @@ test('bot spawn downgrades bypass and auto to ask and does not copy full scratch
     permissionMode: 'bypass'
   });
   const bypassChild = await spawnChild(store, bypassParent);
-  assert.equal(bypassChild.metadata.permissionMode, 'ask');
+  assert.equal(bypassChild.metadata.permissionMode, 'bypass');
   assert.deepEqual(scratchKeys(store, bypassChild.id), []);
 
   const autoParent = parentSession(store, {
@@ -115,7 +115,7 @@ test('bot spawn downgrades bypass and auto to ask and does not copy full scratch
     permissionMode: 'auto'
   });
   const autoChild = await spawnChild(store, autoParent);
-  assert.equal(autoChild.metadata.permissionMode, 'ask');
+  assert.equal(autoChild.metadata.permissionMode, 'auto');
   assert.deepEqual(scratchKeys(store, autoChild.id), []);
 
   const askParent = parentSession(store, {
@@ -139,7 +139,7 @@ test('bot spawn copies scratch only through a caller-supplied key filter', async
   const child = await spawnChild(store, parent, {
     scratchKeyFilter: (key) => key === 'alpha'
   });
-  assert.equal(child.metadata.permissionMode, 'ask');
+  assert.equal(child.metadata.permissionMode, 'bypass');
   assert.deepEqual(scratchKeys(store, child.id), ['alpha']);
   store.db.close();
 });
@@ -256,13 +256,13 @@ async function spawnMate(store, session) {
   return child;
 }
 
-test('bot teammate: no full scratch copy; bypass/auto drop to ask, plan/ask stay', async () => {
+test('bot teammate retains every permission mode without scratch [AC:bot-task-permission-inheritance#AC-3]', async () => {
   const store = tempStore();
   for (const [parentMode, expected] of [
-    ['bypass', 'ask'],
-    ['auto', 'ask'],
+    ['bypass', 'bypass'],
+    ['auto', 'auto'],
     ['ask', 'ask'],
-    ['plan', 'plan']
+    ['plan', 'plan'], ['acceptEdits', 'acceptEdits']
   ]) {
     const parent = parentSession(store, {
       canonicalBotChat: true,
@@ -804,7 +804,7 @@ test('bot teammate inherits allowedTools and allowedSkills; non-bot teammate doe
   store.db.close();
 });
 
-test('steering subagent of a bot inherits its allowlists; a non-bot parent does not', async () => {
+test('steering subagent inherits Bot permissions and allowlists [AC:bot-task-permission-inheritance#AC-2]', async () => {
   const adapter = {
     name: 'idle',
     async runTurn() {
@@ -821,11 +821,13 @@ test('steering subagent of a bot inherits its allowlists; a non-bot parent does 
   });
   const bot = rt.createBot({ name: 'Steerer' });
   rt.mergeSessionMetadata(bot.canonicalSessionId, {
+    permissionMode: 'bypass',
     allowedTools: BOT_TOOLS,
     allowedSkills: ['alpha-skill']
   });
   const spawned = rt.startSteeringSubagent(bot.canonicalSessionId, 'look into it', 'review');
   const child = rt.getSession(spawned.sessionId);
+  assert.equal(child.metadata.permissionMode, 'bypass');
   assert.deepEqual(child.metadata.allowedTools, BOT_TOOLS);
   assert.deepEqual(child.metadata.allowedSkills, ['alpha-skill']);
 
@@ -901,4 +903,21 @@ test('filterToolsForSession intersects agent and session allowlists; empty lists
   assert.deepEqual(names(['bash', 'TodoWrite'], undefined), ['bash', 'TodoWrite']);
   assert.deepEqual(names(undefined, ['read_file', 'bash']), ['read_file', 'bash']);
   assert.deepEqual(names(['bash', 'TodoWrite'], ['read_file', 'bash']), ['bash']);
+});
+
+test('nested Bot subagents preserve scoped tools skills memory and permission [AC:bot-task-permission-inheritance#AC-2] [AC:bot-task-permission-inheritance#AC-5]', async () => {
+  const store = tempStore();
+  try {
+    const parent = parentSession(store, { botId: 'researcher', permissionMode: 'bypass', allowedTools: ['read_file'], allowedSkills: ['review'], userId: 'alice' });
+    const first = await spawnChild(store, parent);
+    const second = await spawnChild(store, first);
+    for (const child of [first, second]) {
+      assert.equal(child.metadata.permissionMode, 'bypass');
+      assert.equal(child.metadata.botId, 'researcher');
+      assert.deepEqual(child.metadata.allowedTools, ['read_file']);
+      assert.deepEqual(child.metadata.allowedSkills, ['review']);
+      assert.equal(child.metadata.userId, 'alice');
+      assert.deepEqual(scratchKeys(store, child.id), []);
+    }
+  } finally { store.db.close(); }
 });

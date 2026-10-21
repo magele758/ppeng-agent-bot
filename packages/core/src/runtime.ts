@@ -92,7 +92,7 @@ import { SkillManagementService, createSkillManageTool, createSkillProposeTool, 
 import { redactToolContent } from './sandbox/result-redaction.js';
 import { createStoreScratchPersist } from './ptc/scratchpad.js';
 import { inheritBotIdentityMetadata } from './memory/bot-memory-scope.js';
-import { inheritBotAllowlists, inheritModelOverride } from './runtime/spawn-policy.js';
+import { botTeammatePermission, inheritBotAllowlists, inheritModelOverride } from './runtime/spawn-policy.js';
 import { scratchKeyFilterFromInherit } from './memory/ptc-meta.js';
 import { runGoalVerify } from './goal/run-verify.js';
 import { filterToolsForSession } from './turn/resolve-turn-tools.js';
@@ -1176,6 +1176,7 @@ export class RawAgentRuntime {
             parentSessionId: pid,
             subagentRole: childRole ?? role ?? parent.agentId,
             spawnSource: 'steering',
+            ...botTeammatePermission(parent.metadata),
             ...inheritBotAllowlists(parent.metadata, {
               agentAllowedTools: this.store.getAgent(agentId)?.allowedTools
             }),

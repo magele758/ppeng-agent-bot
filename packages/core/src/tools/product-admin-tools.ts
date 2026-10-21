@@ -11,6 +11,9 @@ import type { SqliteStateStore } from '../storage.js';
 import type { RunContext, SessionRecord, ToolContract } from '../types.js';
 import type { SessionFacadeHost } from '../runtime/session-facade.js';
 import { createChatSession } from '../runtime/session-facade.js';
+import { childPermissionMode, inheritBotAllowlists, inheritModelOverride } from '../runtime/spawn-policy.js';
+import { inheritBotIdentityMetadata } from '../memory/bot-memory-scope.js';
+import { inheritWorkspaceBinding } from '../workspace/index.js';
 import { parsePermissionMode } from '../approval/permission-mode.js';
 import { parseSessionMaxTurns } from '../runtime/session-max-turns.js';
 import {
@@ -769,17 +772,37 @@ export function createProductAdminTools(host: ProductAdminHost): ToolContract<Re
     },
     {
       name: 'lab_session_create',
-      description: 'Create a chat session. You can do this. Optional title, agentId, and first message. Cannot set permissionMode to bypass.',
+      description: 'Create a chat session. You can do this. Optional title, agentId, and first message. Own Bot tasks inherit existing permissions; use bot_delegate for another Bot. Permission and identity cannot be supplied.',
       properties: { title: { type: 'string' }, agentId: { type: 'string' }, message: { type: 'string' } },
       approval: 'auto',
       write: true,
       async run(ctx, args) {
-        const principal = principalOf(store, ctx.session);
+        const source = store.getSession(ctx.session.id);
+        if (!source) throw new NotFoundError('Session', ctx.session.id);
+        const principal = principalOf(store, source);
+        const identity = inheritBotIdentityMetadata(source, store);
+        const sourceBot = identity.botId ? store.getBot(identity.botId) : undefined;
+        const agentId = str(args, 'agentId') || sourceBot?.agentId || 'general';
+        const targetBot = store.listBots({ includeHidden: true }).find(bot => bot.agentId === agentId || bot.id === agentId);
+        if (targetBot && targetBot.id !== sourceBot?.id) {
+          throw new ValidationError('Use bot_delegate to run work as another Bot');
+        }
         const session = createChatSession(host.facade, {
           title: str(args, 'title') || 'Chat Session',
-          agentId: str(args, 'agentId') || 'general',
+          agentId,
           message: typeof args.message === 'string' ? args.message : undefined,
-          metadata: { userId: principal.userId, ...(principal.tenantId ? { tenantId: principal.tenantId } : {}) }
+          metadata: {
+            userId: principal.userId,
+            ...(principal.tenantId ? { tenantId: principal.tenantId } : {}),
+            ...(sourceBot ? {
+              ...identity,
+              parentSessionId: source.id,
+              permissionMode: childPermissionMode(source.metadata),
+              ...inheritWorkspaceBinding(source.metadata),
+              ...inheritBotAllowlists({ ...source.metadata, botId: sourceBot.id }, { agentAllowedTools: store.getAgent(agentId)?.allowedTools }),
+              ...inheritModelOverride(source.metadata)
+            } : {})
+          }
         });
         return { session: sessionView(session) };
       }

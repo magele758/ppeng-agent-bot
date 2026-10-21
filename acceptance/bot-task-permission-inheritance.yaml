@@ -1,0 +1,41 @@
+id: bot-task-permission-inheritance
+title: 同 Bot 任务继承权限，跨 Bot 按目标权限执行
+status: implemented
+requirement: |
+  可以，就按这个规则改，先按项目要求写验收标准，同一个 Bot 创建的任务会话继承 auto 权限，跨 Bot 按目标 Bot 的权限，bypass 不自动继承。
+  bypass也要继承
+notes: |
+  以用户最后补充为准：同 Bot 派生任务同时继承 auto 和 bypass。
+  覆盖子 Agent、并发子任务，以及 Bot 为自己的工作新建的任务聊天会话。
+  本次定义创建时的继承；不追溯修改已有会话、不自动批准已有待审操作。
+  保留 bots AC-5 的人工设置 bypass 确认要求；继承已经生效的档位不要求重复确认。
+  保留 subagent-delegation AC-2 的子任务能力限制，以及 command-hardline 的禁止命令规则。
+criteria:
+  - id: AC-1
+    given: 用户的 Bot 当前处于 auto 权限档位
+    when: 该 Bot 为自己的工作创建任务会话，包括子 Agent、并发子任务或独立任务聊天
+    then: 新任务使用 auto，不被降为逐项询问；相同操作遵循主 Bot 的 auto 审批规则，原本仍需审批的操作不会被自动放行
+  - id: AC-2
+    given: 用户的 Bot 已经处于生效的 bypass 权限档位
+    when: 该 Bot 为自己的工作创建任务会话，或任务继续派生同 Bot 的子任务
+    then: 新任务继承 bypass，不因会话拆分再次要求批准原本在该档位无需审批的操作，也不要求用户重新确认已经生效的档位
+  - id: AC-3
+    given: Bot 处于 plan、ask 或 acceptEdits 权限档位
+    when: 它创建自己的任务会话
+    then: 新任务保留相应档位，不提升为 auto 或 bypass；计划模式禁止的执行或委派仍被禁止
+  - id: AC-4
+    given: Bot A 与 Bot B 具有不同的权限档位且允许协作
+    when: Bot A 把任务委派给 Bot B
+    then: 任务按 Bot B 当前生效的权限执行；A 的 auto 或 bypass 不覆盖 B 的限制，A 的较低档位也不改写 B 的设置；B 再派生自己的任务时沿用 B 的权限
+  - id: AC-5
+    given: 一个任务继承了所属 Bot 的权限档位
+    when: 它使用工具、技能或软件连接
+    then: 它仍受所属 Bot 的访问范围及该类子任务原有能力限制约束，不获得其他 Bot 的私有资源，不绕过禁止命令规则；权限档位继承不等于新增工具或资源授权
+  - id: AC-6
+    given: Agent 尝试在创建任务时指定高于实际授权的权限，或冒充另一个 Bot
+    when: 系统确定新任务的身份和权限
+    then: 不接受这种提权或冒充；只能沿用真实来源 Bot 或合法委派目标 Bot 已生效的权限，不能通过声明身份自行获得 bypass
+  - id: AC-7
+    given: 新建任务已经继承权限，且系统中还有既有低权限会话和待审操作
+    when: 刷新页面或重启服务后继续查看这些会话
+    then: 新任务的归属和继承档位保持一致；既有会话不会被批量提权，既有待审操作不会自动批准或执行
