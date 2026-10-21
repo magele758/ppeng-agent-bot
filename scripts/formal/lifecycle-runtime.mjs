@@ -54,7 +54,7 @@ function terminal(h, expected) {
 }
 function observeRetry() {
   const wait = deferred(), original = globalThis.setTimeout;
-  globalThis.setTimeout = (fn, delay, ...args) => { const timer = original(fn, delay, ...args); if (delay === 400) wait.resolve(); return timer; };
+  globalThis.setTimeout = (fn, delay, ...args) => { const timer = original(fn, delay, ...args); if (delay === 2000) wait.resolve(); return timer; };
   return wait.promise;
 }
 async function park(h) { h.model = async (_input, n) => n === 1 ? toolTurn() : text(); await h.run(); return h.rt.listApprovals().filter(a => a.sessionId === h.sid).sort((a, b) => a.toolName.localeCompare(b.toolName)); }
@@ -103,7 +103,7 @@ try {
     h.runNumber = 2; h.rt.sendUserMessage(h.sid, 'next'); h.model = async () => text(); await h.run(); terminal(h, 'idle');
     const before = h.snap('new run ended');
     // The real retry timer is cleared on abort. Wait beyond its original due time to detect leaked callbacks.
-    await new Promise(r => setTimeout(r, 450));
+    await new Promise(r => setTimeout(r, 2050));
     const after = h.snap('old retry due time passed'); h.check('old retry did not start another request', JSON.stringify(before) === JSON.stringify(after), before, after);
   });
   for (const kind of ['success', 'exhausted', 'after-tool']) await scenario(`retry-${kind}`, async h => {
