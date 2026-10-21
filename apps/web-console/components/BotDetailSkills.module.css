@@ -1,0 +1,11 @@
+.root { display: grid; gap: 16px; min-width: 0; overflow-wrap: anywhere; }
+.root > h4, .root > p { margin: 0; }
+.controls { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.controls > label { display: flex; flex-direction: column; gap: 6px; flex: 1 1 200px; min-width: 0; }
+.controls input, .controls select { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
+.controls > button { max-width: 100%; white-space: normal; }
+.root > div:not(.controls) { min-width: 0; margin: 0; }
+.root pre { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%; }
+.root small { display: block; color: var(--ui-text-muted); }
+.root details { min-width: 0; }
+.root summary { cursor: pointer; }

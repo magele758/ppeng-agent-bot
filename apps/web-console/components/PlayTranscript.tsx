@@ -60,7 +60,7 @@ export function PlayTranscript(props: {
             const feed = props.chat.playMessagesRef.current;
             if (feed && props.chat.playStickToBottomRef.current) feed.scrollTop = feed.scrollHeight;
           }}
-        /> : null}{props.selectedSessionId ? <SkillOperationCards key={'operations-'+props.selectedSessionId} sessionId={props.selectedSessionId}/> : null}{props.footer}</>}
+        /> : null}{props.selectedSessionId ? <SkillOperationCards key={'operations-'+props.selectedSessionId} sessionId={props.selectedSessionId} onLayoutChange={() => { const feed = props.chat.playMessagesRef.current; if (feed && props.chat.playStickToBottomRef.current) feed.scrollTop = feed.scrollHeight; }}/> : null}{props.footer}</>}
       />
     </SurfaceContextProvider>
   );

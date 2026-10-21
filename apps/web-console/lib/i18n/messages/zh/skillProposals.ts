@@ -1,6 +1,7 @@
 export const skillProposals = {
   captureExpand: "查看详情",
   captureCollapse: "收起详情",
+  dismissResult: "关闭提示",
   captureDismiss: "关闭已保存提示",
   captureDismissStorageError: "提示已关闭，但浏览器未能记住此操作，刷新后可能再次显示。",
   sourceBuiltin: "内置",

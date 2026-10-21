@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { BotSkillSharing, useSkillBots } from "./BotSkillSharing";
+import styles from "./BotDetailSkills.module.css";
 type Action =
   "create" | "update" | "share" | "unshare" | "set_sharing" | "delete";
 type Status = "pending" | "processing" | "saved" | "rejected" | "failed";
@@ -114,10 +115,10 @@ function SkillPanel({ botId }: { botId: string }) {
   }
   const botName = (id: string) => bots.find((b) => b.id === id)?.name ?? id;
   return (
-    <section data-testid="bot-detail-skills">
+    <section className={styles.root} data-testid="bot-detail-skills">
       <h4>{t("skillProposals.detailTitle")}</h4>
       {policy && (
-        <>
+        <div className={styles.controls}>
           <label>
             {t("skillProposals.selection")}{" "}
             <select
@@ -143,7 +144,7 @@ function SkillPanel({ botId }: { botId: string }) {
           >
             {t("skillProposals.saveSelection")}
           </button>
-        </>
+        </div>
       )}
       {dirty && <p role="status">{t("skillProposals.unsaved")}</p>}
       {error && (
@@ -155,6 +156,7 @@ function SkillPanel({ botId }: { botId: string }) {
         </p>
       )}
       {message && <p role="status">{message}</p>}
+      <div className={styles.controls}>
       <label>
         {t("skillProposals.search")}{" "}
         <input
@@ -166,6 +168,7 @@ function SkillPanel({ botId }: { botId: string }) {
       <button className="btn btn-ghost btn-sm" onClick={() => setQuery("")}>
         {t("skillProposals.clearSearch")}
       </button>
+      </div>
       {!data && !error && <p>{t("skillProposals.loading")}</p>}
       {data &&
         data.skills.filter((s) =>
