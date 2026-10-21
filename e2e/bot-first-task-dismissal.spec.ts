@@ -1,10 +1,18 @@
 import { test, expect, type Page, type APIRequestContext } from '@playwright/test';
 
+const createdBotIds: string[] = [];
 async function createBot(request: APIRequestContext) {
   const response = await request.post('/api/bots', { data: { name: `First guide ${crypto.randomUUID()}` } });
   expect(response.status()).toBe(201);
-  return (await response.json()).bot;
+  const bot = (await response.json()).bot;
+  createdBotIds.push(bot.id);
+  return bot;
 }
+test.afterEach(async ({ request }) => {
+  for (const id of createdBotIds.splice(0)) {
+    await request.patch(`/api/bots/${id}`, { data: { hidden: true } });
+  }
+});
 async function selectBot(page: Page, id: string) {
   await page.locator(`#sessionListMini [data-bot-id="${id}"] .list-item--session`).click();
 }

@@ -1,7 +1,15 @@
 import { test, expect } from '@playwright/test';
 
+const createdBotIds: string[] = [];
+test.afterEach(async ({ request }) => {
+  for (const id of createdBotIds.splice(0)) {
+    await request.patch(`/api/bots/${id}`, { data: { hidden: true } });
+  }
+});
+
 test('a new Bot offers a first task without claiming unconnected software [AC:bot-product-p1#AC-1] [AC:bot-product-p1#AC-2]', async ({ page, request }) => {
   const { bot } = await (await request.post('/api/bots', { data: { name: `First task ${crypto.randomUUID()}` } })).json();
+  createdBotIds.push(bot.id);
   await page.goto('/#/bot');
   await page.locator('#sessionListMini .list-item--bot-chat').filter({ hasText: bot.name }).click();
   const guide = page.getByTestId('bot-first-task');
@@ -13,6 +21,7 @@ test('a new Bot offers a first task without claiming unconnected software [AC:bo
 
 test('guided HTTP binding persists and reports an unsuccessful check honestly [AC:bot-product-p1#AC-3] [AC:bot-product-p1#AC-5] [AC:bot-product-p1#AC-6] [AC:bot-product-p1#AC-8]', async ({ page, request }) => {
   const { bot } = await (await request.post('/api/bots', { data: { name: `Guided connection ${crypto.randomUUID()}` } })).json();
+  createdBotIds.push(bot.id);
   await page.route(`**/api/bots/${bot.id}/connections/guided-http/probe`, route => route.fulfill({ json: {
     connection: { connectorId: 'guided-http', health: 'unavailable', healthReason: 'authorization_required', lastProbeAt: new Date().toISOString(), tools: [] },
   } }));
@@ -38,6 +47,7 @@ test('guided HTTP binding persists and reports an unsuccessful check honestly [A
 
 test('first delivery can be revised with a persistent source version [AC:bot-product-p1#AC-7] [AC:bot-product-p2#AC-1]', async ({ page, request }) => {
   const { bot } = await (await request.post('/api/bots', { data: { name: `First delivery ${crypto.randomUUID()}` } })).json();
+  createdBotIds.push(bot.id);
   await page.goto('/#/tasks/bots');
   const panel = page.getByTestId('bot-team-work');
   await panel.getByLabel('执行 Bot', { exact: true }).selectOption(bot.id);
@@ -73,6 +83,7 @@ test('first delivery can be revised with a persistent source version [AC:bot-pro
 
 test('separate guided connections never overwrite each other’s saved credential [AC:bot-product-p1#AC-6]', async ({ page, request }) => {
   const { bot } = await (await request.post('/api/bots', { data: { name: `Credential isolation ${crypto.randomUUID()}` } })).json();
+  createdBotIds.push(bot.id);
   const secretPaths: string[] = [];
   await page.route('**/api/secrets/*', route => {
     secretPaths.push(new URL(route.request().url()).pathname);
@@ -97,6 +108,7 @@ test('separate guided connections never overwrite each other’s saved credentia
 
 test('OpenAPI file form grants only selected read scope without hand-written tool definitions [AC:bot-product-p1#AC-3] [AC:bot-product-p1#AC-5]', async ({ page, request }) => {
   const { bot } = await (await request.post('/api/bots', { data: { name: `File connection ${crypto.randomUUID()}` } })).json();
+  createdBotIds.push(bot.id);
   await page.goto(`/#/agents/bots?bot=${bot.id}&focus=connections`);
   const wizard = page.getByTestId('bot-connection-wizard');
   await wizard.getByLabel('连接方式', { exact: true }).selectOption('openapi');

@@ -45,7 +45,9 @@ test.describe('Bot model setting', () => {
     const openSettings = async () => {
       await page.goto('/#/agents/bots');
       await page.getByRole('listitem').filter({ hasText: name }).first().click();
-      await expect(page.getByTestId('bot-detail').getByLabel('Bot 使用的模型')).toBeEnabled();
+      const detail = page.getByTestId('bot-detail');
+      await detail.getByRole('tab', { name: '能力与权限', exact: true }).click();
+      await expect(detail.getByLabel('Bot 使用的模型')).toBeVisible();
     };
     const composerModelSelect = async () => {
       await page.getByTestId('bot-detail').getByRole('button', { name: '打开对话' }).click();

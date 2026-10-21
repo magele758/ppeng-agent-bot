@@ -295,41 +295,66 @@ export function PlayPanel({
     pendingQuestion: chat.optimisticUser
   });
   const createMenuRef = useRef<HTMLDivElement>(null);
+  const createMenuCloseTimer = useRef<number | null>(null);
+  const clearCreateMenuClose = () => {
+    if (createMenuCloseTimer.current === null) return;
+    window.clearTimeout(createMenuCloseTimer.current);
+    createMenuCloseTimer.current = null;
+  };
+  const openCreateMenu = () => {
+    clearCreateMenuClose();
+    setCreateMenuOpen(true);
+  };
+  const scheduleCreateMenuClose = () => {
+    clearCreateMenuClose();
+    createMenuCloseTimer.current = window.setTimeout(() => setCreateMenuOpen(false), 400);
+  };
+  useEffect(() => clearCreateMenuClose, []);
   const configBtnRef = useRef<HTMLButtonElement>(null);
   const configPanelRef = useRef<HTMLDivElement>(null);
   const prevSteerCountRef = useRef(0);
   const [railCollapsed, setRailCollapsed] = useState(false);
-  const railAnchorRef = useRef<{ key?: string; top: number; bottom: boolean } | null>(null);
   useLayoutEffect(() => {
-    const anchor = railAnchorRef.current;
     const feed = chat.playMessagesRef.current;
-    if (!anchor || !feed) return;
-    let frame = 0;
+    if (!feed || chat.feedScrollIntentRef.current?.kind !== 'viewport') return;
     let stopped = false;
-    let stableFrames = 0;
-    let previousLayout = '';
-    const deadline = performance.now() + 500;
-    const restore = () => {
-      if (stopped) return;
-      const row = anchor.key ? feed.querySelector<HTMLElement>(`[data-feed-key="${CSS.escape(anchor.key)}"]`) : null;
-      const layout = `${feed.scrollHeight}:${feed.clientWidth}:${feed.clientHeight}:${row?.getBoundingClientRect().top}`;
-      stableFrames = layout === previousLayout ? stableFrames + 1 : 0;
-      previousLayout = layout;
-      if (anchor.bottom) feed.scrollTop = feed.scrollHeight - feed.clientHeight;
-      else if (row) feed.scrollTop += row.getBoundingClientRect().top - anchor.top;
-      if (stableFrames < 3 && performance.now() < deadline) frame = requestAnimationFrame(restore);
-      else railAnchorRef.current = null;
+    let frame = 0;
+    const apply = () => {
+      const intent = chat.feedScrollIntentRef.current;
+      if (stopped || intent?.kind !== 'viewport' || !intent.key) return;
+      const row = feed.querySelector<HTMLElement>(`[data-feed-key="${CSS.escape(intent.key)}"]`);
+      if (!row) return;
+      const delta = row.getBoundingClientRect().top - intent.top;
+      if (Math.abs(delta) > 1) feed.scrollTop += delta;
     };
-    const stop = () => { stopped = true; cancelAnimationFrame(frame); if (railAnchorRef.current === anchor) railAnchorRef.current = null; };
+    const tick = () => {
+      if (stopped) return;
+      apply();
+      frame = requestAnimationFrame(tick);
+    };
+    const observer = new ResizeObserver(apply);
+    observer.observe(feed);
+    const track = feed.querySelector('.chat-feed__track');
+    if (track) observer.observe(track);
+    let cap = 0;
+    const stop = () => {
+      if (stopped) return;
+      stopped = true;
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      window.clearTimeout(cap);
+      if (chat.feedScrollIntentRef.current?.kind === 'viewport') chat.feedScrollIntentRef.current = null;
+    };
+    cap = window.setTimeout(stop, 12000);
     feed.addEventListener('wheel', stop, { passive: true });
     feed.addEventListener('touchstart', stop, { passive: true });
-    frame = requestAnimationFrame(restore);
+    frame = requestAnimationFrame(tick);
     return () => {
       stop();
       feed.removeEventListener('wheel', stop);
       feed.removeEventListener('touchstart', stop);
     };
-  }, [railCollapsed, chat.playMessagesRef]);
+  }, [railCollapsed, chat.playMessagesRef, chat.feedScrollIntentRef]);
   const [filterOpen, setFilterOpen] = useState(false);
   const [railTab, setRailTab] = useState<'activity' | 'context' | 'artifacts' | 'cron' | 'trajectory'>('activity');
   const [botDetailOpen, setBotDetailOpen] = useState(false);
@@ -780,9 +805,9 @@ export function PlayPanel({
       <div className={`play-layout play-layout--rail${railCollapsed ? ' is-rail-collapsed' : ''}`}>
         <aside className="play-sidebar">
           <div className="play-sidebar__head" data-testid="session-toolbar" role="toolbar" aria-label={t('polish.toolbar')}>
-            <div className="create-menu" ref={createMenuRef} onMouseEnter={() => setCreateMenuOpen(true)} onMouseLeave={() => setCreateMenuOpen(false)} onKeyDown={(event) => {
+            <div className="create-menu" ref={createMenuRef} onMouseEnter={openCreateMenu} onMouseLeave={scheduleCreateMenuClose} onKeyDown={(event) => {
               if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
-              event.preventDefault(); setCreateMenuOpen(true);
+              event.preventDefault(); openCreateMenu();
               requestAnimationFrame(() => {
                 const items = Array.from(createMenuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
                 const next = nextMenuIndex(event.key, items.indexOf(document.activeElement as HTMLElement), items.length);
@@ -798,7 +823,7 @@ export function PlayPanel({
                 aria-haspopup="menu"
                 aria-expanded={createMenuOpen}
                 aria-controls="playCreateMenu"
-                onClick={() => setCreateMenuOpen(true)}
+                onClick={openCreateMenu}
               >
                 <WorkspaceIcon kind="plus" />
               </button>
@@ -975,7 +1000,17 @@ export function PlayPanel({
                 ) : null}
               </div>
               <div className="chat-panel-header__actions play-toolbar">
-                <button type="button" className="btn btn-ghost rail-toggle" aria-label={t(railCollapsed ? 'polish.expandRail' : 'polish.collapseRail')} title={t(railCollapsed ? 'polish.expandRail' : 'polish.collapseRail')} aria-expanded={!railCollapsed} onClick={() => { const feed = chat.playMessagesRef.current; const anchor = readFeedAnchor(feed); railAnchorRef.current = { key: anchor.key, top: (feed?.getBoundingClientRect().top ?? 0) + (anchor.offset ?? 0), bottom: chat.playStickToBottomRef.current }; chat.feedScrollIntentRef.current = planFeedScroll(chat.playStickToBottomRef.current ? 'bottom' : 'pin', chat.playStickToBottomRef.current, anchor).intent; setRailCollapsed(value => !value); }}><WorkspaceIcon kind="panel" /></button>
+                <button type="button" className="btn btn-ghost rail-toggle" aria-label={t(railCollapsed ? 'polish.expandRail' : 'polish.collapseRail')} title={t(railCollapsed ? 'polish.expandRail' : 'polish.collapseRail')} aria-expanded={!railCollapsed} onClick={() => {
+                  const feed = chat.playMessagesRef.current;
+                  const anchor = readFeedAnchor(feed);
+                  const nearBottom = !feed || feed.scrollHeight - feed.scrollTop - feed.clientHeight <= 16;
+                  if (!nearBottom) chat.playStickToBottomRef.current = false;
+                  const absoluteTop = (feed?.getBoundingClientRect().top ?? 0) + (anchor.offset ?? 0);
+                  chat.feedScrollIntentRef.current = nearBottom
+                    ? planFeedScroll('bottom', true, anchor).intent
+                    : { kind: 'viewport', top: absoluteTop, key: anchor.key };
+                  setRailCollapsed((value) => !value);
+                }}><WorkspaceIcon kind="panel" /></button>
                 {accountMenu}
                 <button
                   type="button"
@@ -1101,7 +1136,6 @@ export function PlayPanel({
                 ) : null}
 
                 <div className="composer-preview-row">
-                  <ComposerContextChips items={chat.pendingContext} onRemove={chat.removePendingContext} />
                   <ComposerReplyQuote
                     quote={botSurface ? chat.replyQuote : null}
                     surface="direct"
@@ -1120,6 +1154,7 @@ export function PlayPanel({
                   onDragLeave={contextDrop.onDragLeave}
                   onDrop={contextDrop.onDrop}
                 >
+                  <ComposerContextChips items={chat.pendingContext} onRemove={chat.removePendingContext} />
                   {botSurface && (selectedBot?.name || headerBotName) ? (
                     <BotFace
                       name={selectedBot?.name || headerBotName}

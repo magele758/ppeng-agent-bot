@@ -52,7 +52,8 @@ export interface FeedRange {
 export type FeedScrollIntent =
   | { kind: 'bottom' }
   | { kind: 'pin'; top: number; key?: string; offset?: number }
-  | { kind: 'prepend'; top: number; height: number; key?: string; offset?: number };
+  | { kind: 'prepend'; top: number; height: number; key?: string; offset?: number }
+  | { kind: 'viewport'; top: number; key?: string };
 
 export interface FeedTurnSlot {
   endIndex: number;
@@ -329,6 +330,15 @@ export function resolveFeedScroll(el: ScrollTarget, pending: FeedScrollIntent | 
   if (pending.kind === 'bottom') {
     return { intent: null, tries: 0, scrollTop: Math.max(0, el.scrollHeight - el.clientHeight) };
   }
+  if (pending.kind === 'viewport') {
+    const node = pending.key != null ? el.querySelector(`[data-feed-key="${cssEscape(pending.key)}"]`) : null;
+    if (!node) return { intent: pending, tries, scrollTop: null };
+    const delta = node.getBoundingClientRect().top - pending.top;
+    if (Math.abs(delta) <= 1) return { intent: pending, tries, scrollTop: null };
+    const next = preservedScrollTop(el.scrollTop + delta, el.scrollHeight, el.clientHeight);
+    if (Math.abs(next - el.scrollTop) < 0.5) return { intent: pending, tries, scrollTop: null };
+    return { intent: pending, tries, scrollTop: next };
+  }
   const nextTries = tries + 1;
   const node = pending.key != null ? el.querySelector(`[data-feed-key="${cssEscape(pending.key)}"]`) : null;
   if (node && pending.offset != null) {
@@ -412,7 +422,7 @@ export function captureFeedAnchor(root: HTMLElement): { key: string; offset: num
   const rows = root.querySelectorAll<HTMLElement>('[data-feed-key]');
   for (const row of rows) {
     const box = row.getBoundingClientRect();
-    if (box.bottom <= rootBox.top + 1) continue;
+    if (box.bottom <= rootBox.top) continue;
     const key = row.dataset.feedKey ?? '';
     if (!key) continue;
     return { key, offset: box.top - rootBox.top };

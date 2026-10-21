@@ -192,6 +192,14 @@ test('scroll intent keeps an anchor row and a short page can auto-load [AC:play-
   assert.equal(bottom.scrollTop, 300);
   const pinned = resolveFeedScroll({ ...el, querySelector: () => null }, { kind: 'pin', top: 40 }, 0);
   assert.equal(pinned.scrollTop, 40);
+  const viewport = resolveFeedScroll(el, { kind: 'viewport', top: 40, key: 'm:1' }, 0);
+  assert.equal(viewport.scrollTop, 40);
+  assert.equal(viewport.intent?.kind, 'viewport');
+  el.scrollTop = 40;
+  el.querySelector = () => ({ getBoundingClientRect: () => ({ top: 40 }) });
+  const held = resolveFeedScroll(el, viewport.intent, viewport.tries);
+  assert.equal(held.intent?.kind, 'viewport');
+  assert.equal(held.scrollTop, null);
   const planned = nextTranscriptWindow({
     sameSession: true,
     previous: page(1, 40),

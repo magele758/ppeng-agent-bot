@@ -173,6 +173,7 @@ test.describe('Chat and Bot mode', () => {
     await mockHome(page);
     await page.goto('/#/chat');
     const list = page.locator('#sessionListMini');
+    await page.getByTestId('session-toolbar').getByRole('button', { name: '筛选会话', exact: true }).click();
     const filter = page.getByLabel('筛选会话列表');
     await expect(list.locator('.list-item')).toHaveCount(2);
 

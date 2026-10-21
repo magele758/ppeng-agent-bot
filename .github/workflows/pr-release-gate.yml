@@ -12,6 +12,6 @@ concurrency:
 jobs:
   full:
     name: Release gate
-    if: github.head_ref == 'cursor/fix-current-actions-failures'
+    if: github.head_ref == 'cursor/fix-full-validation-repeat'
     uses: ./.github/workflows/release-gate.yml
     secrets: inherit

@@ -234,13 +234,18 @@ test('createBot: non-slug name still works; empty name rejected', () => {
   store.db.close();
 });
 
-test('createBot: roster cap', () => {
+test('createBot: roster cap is the visible roster', () => {
   const store = tempStore();
   const h = host(store);
+  const bots = [];
   for (let i = 0; i < BOT_ROSTER_CAP; i += 1) {
-    createBot(h, { name: `Cap ${i}` });
+    bots.push(createBot(h, { name: `Cap ${i}` }));
   }
   assert.throws(() => createBot(h, { name: 'Overflow' }), ValidationError);
+  updateBot(h, bots[0].id, { hidden: true });
+  const freed = createBot(h, { name: 'After hide' });
+  assert.equal(freed.hidden, false);
+  assert.throws(() => createBot(h, { name: 'Still full' }), ValidationError);
   store.db.close();
 });
 
