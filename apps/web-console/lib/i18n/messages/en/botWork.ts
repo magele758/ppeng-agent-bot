@@ -1,4 +1,6 @@
 export const botWork = {
+  firstTaskDismiss: "Dismiss first-task guide",
+  firstTaskDismissStorageError: "Guide dismissed, but this browser could not save the preference. It may appear again after reloading.",
   routineSourceVersion: "Source task {task} · delivery {attempt}. Confirm fresh inputs and the schedule for each run.",
   collaborationProgress: "Completed {completed} / {total} tasks",
   collaborationBlocked: "Some work is blocked",

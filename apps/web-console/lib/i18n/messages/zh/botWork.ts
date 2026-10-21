@@ -1,4 +1,6 @@
 export const botWork = {
+  firstTaskDismiss: "关闭首次任务引导",
+  firstTaskDismissStorageError: "引导已关闭，但浏览器未能保存偏好，刷新后可能再次显示。",
   routineSourceVersion: "来源任务 {task} · 第 {attempt} 次交付。请确认每次执行所需的新输入与时间。",
   collaborationProgress: "已完成 {completed} / {total} 项",
   collaborationBlocked: "部分工作受阻",
