@@ -23,7 +23,7 @@ type Message = {
   text: string;
   attachmentIds: string[];
 };
-export function BotRooms({ bots, selectedRoomId }: { bots: BotInfo[]; selectedRoomId?: string }) {
+export function BotRooms({ bots, selectedRoomId, memberEditor = true }: { bots: BotInfo[]; selectedRoomId?: string; memberEditor?: boolean }) {
   const { t } = useI18n();
   const action = useAction();
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -343,6 +343,7 @@ export function BotRooms({ bots, selectedRoomId }: { bots: BotInfo[]; selectedRo
               }
             />
           </label>
+          {memberEditor ? <>
           <ul>
             {room.botIds.map((id) => (
               <li role="presentation" key={id}>
@@ -386,6 +387,7 @@ export function BotRooms({ bots, selectedRoomId }: { bots: BotInfo[]; selectedRo
           >
             {t("botWork.save")}
           </button>
+          </> : null}
           {cursor != null && (
             <button
               disabled={action.busy}

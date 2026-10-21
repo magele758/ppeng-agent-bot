@@ -10,7 +10,9 @@ test('completed task becomes a persisted routine with inputs, destination, timez
  createdBotIds.push(bot.id);
  const {task}=await(await request.post('/api/bot-work/tasks',{data:{targetBotId:bot.id,input:'Summarize project progress'}})).json();
  await expect.poll(async()=> (await(await request.get(`/api/bot-work/tasks/${task.id}`)).json()).task.status).toBe('completed');
- const {room}=await(await request.post('/api/bot-rooms',{data:{title:'Report destination',botIds:[bot.id]}})).json();
+ const {bot:peer}=await(await request.post('/api/bots',{data:{name:`Routine peer ${crypto.randomUUID()}`}})).json();
+ createdBotIds.push(peer.id);
+ const {room}=await(await request.post('/api/bot-rooms',{data:{title:'Report destination',botIds:[bot.id,peer.id],hostBotId:bot.id}})).json();
  await page.goto('/#/tasks/bots');
  const panel=page.getByTestId('bot-team-work');
  const open=async()=>{await panel.locator('article').filter({hasText:bot.name}).getByRole('button',{name:'详情',exact:true}).click();await panel.getByRole('button',{name:'保存为例行任务',exact:true}).click();};
@@ -73,7 +75,9 @@ test('routine report can be reviewed and approved without re-executing the task 
  createdBotIds.push(bot.id);
  const {task}=await(await request.post('/api/bot-work/tasks',{data:{targetBotId:bot.id,input:'Prepare report'}})).json();
  await expect.poll(async()=> (await(await request.get(`/api/bot-work/tasks/${task.id}`)).json()).task.status).toBe('completed');
- const {room}=await(await request.post('/api/bot-rooms',{data:{title:'Approved report destination',botIds:[bot.id]}})).json();
+ const {bot:peer}=await(await request.post('/api/bots',{data:{name:`Publish peer ${crypto.randomUUID()}`}})).json();
+ createdBotIds.push(peer.id);
+ const {room}=await(await request.post('/api/bot-rooms',{data:{title:'Approved report destination',botIds:[bot.id,peer.id],hostBotId:bot.id}})).json();
  const {job}=await(await request.post('/api/cron/jobs',{data:{botId:bot.id,name:'Review publication',prompt:'Reply with a report',onceAt:new Date(Date.now()+1000).toISOString(),roomId:room.id,deliveryPolicy:{inputSources:'Current project',changesOnly:true,failureThreshold:2,approvalBeforeSend:true}}})).json();
  let runId='';await expect.poll(async()=>{const {runs}=await(await request.get(`/api/cron/jobs/${job.id}/runs`)).json();runId=runs[0]?.id??'';return runs[0]?.publication;},{timeout:20000}).toBe('pending');
  expect((await(await request.get(`/api/bot-rooms/${room.id}/messages`)).json()).messages).toHaveLength(0);

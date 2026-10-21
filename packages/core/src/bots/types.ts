@@ -64,6 +64,7 @@ export interface OpenBotResult {
 export const BOT_NAME_MAX = 64;
 export const BOT_TITLE_MAX = 80;
 export const BOT_DESCRIPTION_MAX = 2000;
+/** Default ordinary-bot roster size. The live cap is the saved room setting `rosterCap`, which starts at this value and can be raised without an environment variable or a restart. */
 export const BOT_ROSTER_CAP = 50;
 
 export const CANONICAL_BOT_CHAT_META = 'canonicalBotChat';

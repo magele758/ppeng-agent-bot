@@ -1,5 +1,6 @@
 import { filterFactoryTools } from '../factory/tool-policy.js';
 import { filterRoomTools } from '../rooms/tool-policy.js';
+import { ROOM_RETRIEVAL_TOOL_NAMES } from '../rooms/room-retrieval-tools.js';
 /**
  * Per-turn tool allowlist: external-AI gate, agent/session whitelist, optional groups.
  */
@@ -64,7 +65,13 @@ function allowlistsFor(agent: AgentSpec, session: SessionRecord): ReadonlySet<st
   }
   const metaAllowed = session.metadata?.allowedTools;
   if (Array.isArray(metaAllowed) && metaAllowed.length > 0) {
-    lists.push(new Set(metaAllowed.map((n) => String(n))));
+    const names = metaAllowed.map((n) => String(n));
+    if (isRoomMemberSession(session)) {
+      for (const name of ROOM_RETRIEVAL_TOOL_NAMES) {
+        if (!names.includes(name)) names.push(name);
+      }
+    }
+    lists.push(new Set(names));
   }
   return lists;
 }
@@ -155,6 +162,10 @@ function authorizeToolsForSession(input: {
     tools = tools.filter((t) => t.name !== MESSAGE_AGENT_TOOL_NAME);
   }
   tools = withSubagentHelp(input.session, tools, input.tools);
+  if (!isRoomMemberSession(input.session)) {
+    const roomOnly = new Set<string>(ROOM_RETRIEVAL_TOOL_NAMES);
+    tools = tools.filter((tool) => !roomOnly.has(tool.name));
+  }
   return { allowExternalAiTools, tools: filterFactoryTools(input.session, filterRoomTools(input.session, stripSubagentDeniedTools(input.session, tools)), input.settingsStore) };
 }
 

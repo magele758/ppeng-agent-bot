@@ -15,6 +15,11 @@ import {
   isMemoryContextAppendixText
 } from '../memory/memory-gate.js';
 import { resolveBotMemoryAgentId, resolveSubagentMemoryAccess } from '../memory/bot-memory-scope.js';
+import {
+  formatTouchedForPrivateChat,
+  privateFactsVisibleInRoomTurn,
+  queryTouchedForPrivateChat
+} from '../rooms/touched-memory.js';
 import { memoryBackendFromEnv, sessionScopeToAgent } from '../memory/memory-backend.js';
 import { recallProgressive, recallProgressiveAsync, type RecallContext, type RecallDiagnostic } from '../memory/memory-recall.js';
 import { resolveMemorySettings } from '../memory/memory-settings.js';
@@ -221,14 +226,69 @@ function buildSources(input: CompileTurnAppendixInput): RecallSources | null {
   return source && 'store' in source ? recallProgressive(source) : source;
 }
 
-export function compileTurnAppendix(input: CompileTurnAppendixInput): string {
+function roomIdOf(session: CompileTurnAppendixInput['session']): string {
+  const roomId = session.metadata?.roomId;
+  return typeof roomId === 'string' ? roomId.trim() : '';
+}
+
+function botIdOf(session: CompileTurnAppendixInput['session']): string {
+  const botId = session.metadata?.botId;
+  return typeof botId === 'string' ? botId.trim() : '';
+}
+
+function touchDatabase(store: CompileTurnAppendixInput['store']): Parameters<typeof queryTouchedForPrivateChat>[0] | undefined {
+  const db = (store as { db?: { exec?: unknown; prepare?: unknown } } | undefined)?.db;
+  if (!db || typeof db.exec !== 'function' || typeof db.prepare !== 'function') return undefined;
+  return db as Parameters<typeof queryTouchedForPrivateChat>[0];
+}
+
+function isRoomMemoryTurn(input: CompileTurnAppendixInput): boolean {
+  if (roomIdOf(input.session)) return true;
+  const namespaced = resolveBotMemoryAgentId(input.session, input.store);
+  return typeof namespaced === 'string' && namespaced.startsWith('room:');
+}
+
+/** Fact text only. The private transcript stays out of the room turn. */
+function roomPrivateFactAppendix(input: CompileTurnAppendixInput): string {
+  const memory = input.store?.agentMemory?.();
+  if (!memory || !isRoomMemoryTurn(input)) return '';
+  const facts = privateFactsVisibleInRoomTurn(memory, input.session, input.store);
+  if (!facts.length) return '';
+  return ['Private facts this bot remembers. Not a copy of the private transcript.', ...facts.map(fact => `- ${fact}`)].join('\n');
+}
+
+/** Private chats only. A room turn already received its own push. */
+function touchedPrivateChatAppendix(input: CompileTurnAppendixInput): string {
+  if (roomIdOf(input.session) || isRoomMemoryTurn(input)) return '';
+  const botId = botIdOf(input.session);
+  const db = touchDatabase(input.store);
+  if (!botId || !db) return '';
+  return formatTouchedForPrivateChat(queryTouchedForPrivateChat(db, { botId }));
+}
+
+function turnMemoryExtras(input: CompileTurnAppendixInput): string {
   try {
-    const sources = buildSources(input);
-    if (!sources) return '';
-    return formatCompiledContextPack(packFromSources(sources, input.query));
+    return [roomPrivateFactAppendix(input), touchedPrivateChatAppendix(input)].filter(Boolean).join('\n\n');
   } catch {
     return '';
   }
+}
+
+function joinAppendix(base: string, extra: string): string {
+  if (!extra) return base;
+  if (!base) return extra;
+  return `${base}\n\n${extra}`;
+}
+
+export function compileTurnAppendix(input: CompileTurnAppendixInput): string {
+  let base = '';
+  try {
+    const sources = buildSources(input);
+    base = !sources ? '' : formatCompiledContextPack(packFromSources(sources, input.query));
+  } catch {
+    base = '';
+  }
+  return joinAppendix(base, turnMemoryExtras(input));
 }
 
 /** Shared real-turn and preview pipeline: identity, settings, embeddings, logs and Jev. */
@@ -257,13 +317,14 @@ export async function compileTurnAppendixAsync(input: CompileTurnAppendixInput):
   const pack = await previewContextPackAsync(input);
   // Store only bounded, sanitized diagnostics; never persist upstream errors or credentials.
   const current = input.store?.getSession?.(input.session.id)?.metadata ?? input.session.metadata;
-  if (!pack.diagnostics.length && !current.memoryRecallDiagnostics) return formatCompiledContextPack(pack);
-  const metadata = { ...current, memoryRecallDiagnostics: pack.diagnostics };
-  input.session.metadata = metadata;
-  if (JSON.stringify(current.memoryRecallDiagnostics) !== JSON.stringify(pack.diagnostics)) {
-    try { input.store?.updateSession?.(input.session.id, { metadata }); } catch { /* best-effort observation */ }
+  if (pack.diagnostics.length || current.memoryRecallDiagnostics) {
+    const metadata = { ...current, memoryRecallDiagnostics: pack.diagnostics };
+    input.session.metadata = metadata;
+    if (JSON.stringify(current.memoryRecallDiagnostics) !== JSON.stringify(pack.diagnostics)) {
+      try { input.store?.updateSession?.(input.session.id, { metadata }); } catch { /* best-effort observation */ }
+    }
   }
-  return formatCompiledContextPack(pack);
+  return joinAppendix(formatCompiledContextPack(pack), turnMemoryExtras(input));
 }
 
 /** Legacy synchronous API uses the same identity/settings inputs, without network retrieval. */

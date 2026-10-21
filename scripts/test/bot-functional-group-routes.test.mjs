@@ -42,13 +42,13 @@ test('actual model requests receive current shared facts on both kernels without
  try {
   const { BotFunctionalGroupService }=await import('@ppeng/agent-core');
   const service=new BotFunctionalGroupService(rt.store),principal=resolveBotPrincipal(rt.store);
-  const a=rt.createBot({name:'Member'}),b=rt.createBot({name:'Other'});
+  const a=rt.createBot({name:'Member'}),b=rt.createBot({name:'Other'}),c=rt.createBot({name:'Third'});
   const group=service.create(principal,'Research');service.move(principal,a.id,group.id);
   service.setShared(principal,{scope:'global'},{location:'GLOBAL',fallback:'FALLBACK'});
   service.setShared(principal,{scope:'group',id:group.id},{location:'GROUP',groupOnly:'GROUP_ONLY'});
-  const room=rt.rooms.create(principal,{title:'Shared',botIds:[a.id]});
+  const room=rt.rooms.create(principal,{title:'Shared',botIds:[a.id,c.id],hostBotId:a.id});
   service.setShared(principal,{scope:'room',id:room.id},{location:'ROOM'});
-  const unrelated=rt.rooms.create(principal,{title:'Other room',botIds:[b.id]});
+  const unrelated=rt.rooms.create(principal,{title:'Other room',botIds:[b.id,c.id]});
   service.setShared(principal,{scope:'room',id:unrelated.id},{unrelated:'OTHER_ROOM_ONLY'});
   for (const kernel of ['ppeng','agent-loop']) {
    rt.store.setDaemonControl('loop_settings',{kernelVariant:kernel});

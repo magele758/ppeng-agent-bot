@@ -151,25 +151,25 @@ test('routine dialogue tools override optional group choice and respect Bot allo
  rt.mergeSessionMetadata(s.id,{allowedTools:['memory_get']});const limited=await host.resolveTurnTools(input());assert.ok(!limited.tools.some(t=>t.name==='cron_create'));
  } finally {await rt.destroy();stores.delete(rt.store);if(old===undefined)delete process.env.RAW_AGENT_OPTIONAL_TOOL_GROUPS;else process.env.RAW_AGENT_OPTIONAL_TOOL_GROUPS=old;}
 });
-test('Room prompts and inherited child memory cannot recall private Bot facts',()=>{
+test('Room prompts and inherited child memory can recall this bot private facts',()=>{
  const s=fresh(),am=s.agentMemory();
  const room=s.createSession({title:'room',mode:'chat',agentId:'bot',metadata:{roomId:'room-1',botId:'bot',userId:'u'}});
  const child=s.createSession({title:'child',mode:'subagent',agentId:'worker',parentSessionId:room.id,metadata:{userId:'u'}});
  am.set({scope:'user.memory',namespace:'semantic',key:'fact:private',value:'PRIVATE_ROOM_SECRET_CONTACT',userId:'u',agentId:'bot'});
  return import('../dist/session/context-compiler.js').then(({compileTurnAppendix:compile})=>import('../dist/memory/bot-memory-scope.js').then(({resolveBotMemoryAgentId})=>{
   assert.equal(resolveBotMemoryAgentId(room,s),'room:room-1:bot');assert.equal(resolveBotMemoryAgentId(child,s),'room:room-1:bot');
-  assert.ok(!compile({session:room,query:'PRIVATE_ROOM_SECRET_CONTACT',store:s}).includes('PRIVATE_ROOM_SECRET_CONTACT'));
-  assert.ok(!compile({session:child,query:'PRIVATE_ROOM_SECRET_CONTACT',store:s}).includes('PRIVATE_ROOM_SECRET_CONTACT'));
+  assert.ok(compile({session:room,query:'PRIVATE_ROOM_SECRET_CONTACT',store:s}).includes('PRIVATE_ROOM_SECRET_CONTACT'));
+  assert.ok(compile({session:child,query:'PRIVATE_ROOM_SECRET_CONTACT',store:s}).includes('PRIVATE_ROOM_SECRET_CONTACT'));
  }));
 });
-test('real Room model input and memory_get tool exclude private Bot memory',async()=>{
+test('real Room model input includes this bot private facts and memory_get stays on the room namespace',async()=>{
  const {RawAgentRuntime}=await import('../dist/runtime.js');let captured;
  const adapter={name:'room-spy',contextWindow:131072,async runTurn(input){captured=input;return {assistantParts:[{type:'text',text:'room reply'}],stopReason:'end'};},async summarizeMessages(){return ''}};
  const repoRoot=tempDir('room-spy-repo-'),stateDir=tempDir('room-spy-state-');const rt=new RawAgentRuntime({repoRoot,stateDir,modelAdapter:adapter});track(rt.store);
  try {
- const bot=rt.createBot({name:'Private worker'}), principal={userId:'u'}, room=rt.rooms.create(principal,{title:'Shared Room',botIds:[bot.id]});
+ const bot=rt.createBot({name:'Private worker'}), peer=rt.createBot({name:'Private peer'}), principal={userId:'u'}, room=rt.rooms.create(principal,{title:'Shared Room',botIds:[bot.id,peer.id],hostBotId:bot.id});
  rt.store.agentMemory().set({scope:'user.memory',namespace:'semantic',key:'fact:private',value:'PRIVATE_CONTACT_ONLY_PERSONAL',userId:'u',agentId:bot.agentId});
- rt.rooms.send(principal,room.id,{text:'Recall the contact'});await rt.rooms.tick();assert.ok(captured);assert.ok(!JSON.stringify(captured.messages).includes('PRIVATE_CONTACT_ONLY_PERSONAL'));assert.ok(!captured.systemPrompt.includes('PRIVATE_CONTACT_ONLY_PERSONAL'));
+  rt.rooms.send(principal,room.id,{text:'Recall the contact'});await rt.rooms.tick();assert.ok(captured);assert.ok(JSON.stringify(captured.messages).includes('PRIVATE_CONTACT_ONLY_PERSONAL'));assert.ok(!captured.systemPrompt.includes('PRIVATE_CONTACT_ONLY_PERSONAL'));
  assert.ok(captured.sessionId, 'the model spy captures the actual Room execution context');
  const tool=rt.tools.find(t=>t.name==='memory_get');const response=await tool.execute({session:rt.getSession(captured.sessionId),agent:rt.store.getAgent(bot.agentId),repoRoot,stateDir},{scope:'user'});assert.ok(!response.content.includes('PRIVATE_CONTACT_ONLY_PERSONAL'));
  } finally {await rt.destroy();stores.delete(rt.store);}

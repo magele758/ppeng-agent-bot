@@ -10,16 +10,28 @@ async function coordinatorBot(request: APIRequestContext): Promise<{ id: string 
   return bot;
 }
 
+async function roomPeer(request: APIRequestContext, hostId: string): Promise<{ id: string }> {
+  const roster = await request.get('/api/bots');
+  expect(roster.ok()).toBeTruthy();
+  const { bots } = await roster.json() as { bots: { id: string }[] };
+  const existing = bots.find(bot => bot.id !== hostId);
+  if (existing) return existing;
+  const created = await request.post('/api/bots', { data: { name: `Factory room peer ${Date.now()}` } });
+  expect(created.ok(), await created.text()).toBeTruthy();
+  return (await created.json()).bot;
+}
+
 test("real Lab proxy persists factory configuration and shares Room task state [AC:multi-machine-readonly-pilot#AC-1] [AC:multi-machine-readonly-pilot#AC-3] [AC:multi-machine-readonly-pilot#AC-13]", async ({
   page,
   request,
 }) => {
   const initial = await (await request.get("/api/factory/settings")).json();
   const bot = await coordinatorBot(request);
+  const peer = await roomPeer(request, bot.id);
   const room = (
     await (
       await request.post("/api/bot-rooms", {
-        data: { title: "Factory HTTP", botIds: [bot.id], hostBotId: bot.id },
+        data: { title: "Factory HTTP", botIds: [bot.id, peer.id], hostBotId: bot.id },
       })
     ).json()
   ).room;
@@ -104,7 +116,8 @@ test("real Lab proxy shares controlled-development Room admission, task evidence
   const initial = await (await request.get("/api/factory/settings")).json();
   const userId = initial.settings.owner.userId;
   const bot = await coordinatorBot(request);
-  const roomResponse = await request.post("/api/bot-rooms", { data: { title: "Development HTTP", botIds: [bot.id], hostBotId: bot.id } });
+  const peer = await roomPeer(request, bot.id);
+  const roomResponse = await request.post("/api/bot-rooms", { data: { title: "Development HTTP", botIds: [bot.id, peer.id], hostBotId: bot.id } });
   expect(roomResponse.ok()).toBe(true);
   const { room } = await roomResponse.json();
   const configured = await request.patch("/api/factory/settings", { data: {
