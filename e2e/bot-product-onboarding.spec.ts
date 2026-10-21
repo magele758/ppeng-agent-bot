@@ -1,14 +1,21 @@
 import { test, expect } from '@playwright/test';
+import { allocateBot, openFirstBot, presentAsNewBotUser } from './helpers/bot-first-task';
 
 test('a new Bot offers a first task without claiming unconnected software [AC:bot-product-p1#AC-1] [AC:bot-product-p1#AC-2]', async ({ page, request }) => {
-  const { bot } = await (await request.post('/api/bots', { data: { name: `First task ${crypto.randomUUID()}` } })).json();
-  await page.goto('/#/bot');
+  await presentAsNewBotUser(page);
+  const held = await allocateBot(request);
+  try {
+  const bot = held.bot;
+  await openFirstBot(page, bot.id);
   await page.locator('#sessionListMini .list-item--bot-chat').filter({ hasText: bot.name }).click();
   const guide = page.getByTestId('bot-first-task');
   await expect(guide).toContainText('第一件事');
   await guide.getByRole('button', { name: '整理我提供的材料', exact: true }).click();
   await expect(page.locator('#playInput')).toHaveValue(/材料/);
   await expect(guide.getByRole('link', { name: '检查软件连接' })).toHaveAttribute('href', /focus=connections/);
+  } finally {
+    await held.release();
+  }
 });
 
 test('guided HTTP binding persists and reports an unsuccessful check honestly [AC:bot-product-p1#AC-3] [AC:bot-product-p1#AC-5] [AC:bot-product-p1#AC-6] [AC:bot-product-p1#AC-8]', async ({ page, request }) => {

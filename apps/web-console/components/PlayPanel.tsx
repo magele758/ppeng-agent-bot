@@ -50,8 +50,11 @@ import { SessionSettingsPanel, type ExecPreset } from './sections/chat/SessionSe
 import { PlayBotGroupChat } from './play-group/PlayBotGroupChat';
 import { PlayBotGroupList } from './play-group/PlayBotGroupList';
 import { SessionListRow } from './SessionListRow';
+import { BotGoals } from './bot-work/BotGoals';
 import { BotWorkSummary } from './bot-work/BotWorkSummary';
 import { BotFirstTask } from './bot-work/BotFirstTask';
+import { useBotFirstTask } from './bot-work/useBotFirstTask';
+import type { BotFirstTaskConversation } from '@/lib/bot-first-task';
 import { BotFunctionalGroups } from './BotFunctionalGroups';
 import { BotPinArea } from './BotPinArea';
 import { BotPermissionsLink, BotDetailPane, BotDetailToggle, botDetailIsVisible, botDetailMainClass } from './BotDetailMenu';
@@ -471,6 +474,23 @@ export function PlayPanel({
     sessionTitle: chat.playTitle
   });
   const headerBotId = headerBotChat ? chat.botId || selectedBot?.id || '' : '';
+  const transcriptSettled = Boolean(selectedSessionId) && chat.loadedTranscriptSessionId === selectedSessionId;
+  const firstTaskConversation: BotFirstTaskConversation = !headerBotId
+    ? 'absent'
+    : !transcriptSettled
+      ? 'loading'
+      : chat.historyCursor == null && !chat.sessionMessages.some((message) => message.role !== 'system')
+        ? 'empty'
+        : 'started';
+  const firstTask = useBotFirstTask({
+    botId: headerBotId,
+    conversation: firstTaskConversation,
+    sessions,
+    bots,
+    currentSessionId: selectedSessionId,
+    playInput: chat.playInput,
+    setPlayInput: chat.setPlayInput
+  });
   const botDetailVisible = botDetailIsVisible(botDetailOpen, headerBotId, openGroupId);
   const headerWorkMood = useBotWorkMood(headerBotId);
   const pickerWorkMood = useBotWorkMood(chat.botId);
@@ -1089,8 +1109,9 @@ export function PlayPanel({
                 ) : null}
               </div>
               <div className="chat-composer-outer">
-                {headerBotId && selectedSessionId && chat.transcriptReady && chat.historyCursor == null && !chat.sessionMessages.some(message => message.role !== 'system') &&
-                  <BotFirstTask key={headerBotId} onDismiss={() => chat.playInputRef.current?.focus({ preventScroll: true })} botId={headerBotId} needsModel={chat.needsModelSetup} onChoose={chat.setPlayInput} onConfigureModel={onOpenModelSetup} />}
+                {headerBotId && selectedSessionId && <BotGoals key={`${headerBotId}:${selectedSessionId}`} botId={headerBotId} sessionId={selectedSessionId} selectedGoalId={chat.selectedGoalId} onSelectGoal={chat.setSelectedGoalId} />}
+                {(firstTask.phase === 'visible' || firstTask.storageFailed) && headerBotId &&
+                  <BotFirstTask key={headerBotId} storageFailed={firstTask.storageFailed} onDismiss={() => { firstTask.dismiss(); chat.playInputRef.current?.focus({ preventScroll: true }); }} botId={headerBotId} needsModel={chat.needsModelSetup} onChoose={chat.setPlayInput} onConfigureModel={onOpenModelSetup} />}
                 {chat.needsModelSetup && selectedSessionId ? (
                   <div className="model-setup-banner" role="status">
                     <span>{t('play.chrome.needsModel')}</span>
@@ -1115,6 +1136,7 @@ export function PlayPanel({
                   className={composerClassName('chat-composer', contextDrop.over, chat.composerAckFlash)}
                   data-testid="composer-drop-target"
                   data-surface={botSurface ? 'bot' : 'chat'}
+                  data-first-task={headerBotId ? firstTask.phase : undefined}
                   onDragEnter={contextDrop.onDragEnter}
                   onDragOver={contextDrop.onDragOver}
                   onDragLeave={contextDrop.onDragLeave}
