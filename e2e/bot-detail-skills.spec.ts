@@ -3,18 +3,18 @@ const bots = [
   { id: "a", name: "Bot A", agentId: "general", canonicalSessionId: "sa" },
   { id: "b", name: "Bot B", agentId: "general", canonicalSessionId: "sb" },
 ];
-async function setup(page: Page) {
+async function setup(page: Page, long = false) {
   let policy = { mode: "all", ids: [] as string[] };
   let rows = [
     {
       id: "own",
-      name: "check",
+      name: long ? "LongSkill".repeat(50) : "check",
       description: "health check",
       ownerBotId: "a",
       sharedBotIds: [],
       canManage: true,
       enabled: true,
-      content: "# Own checks",
+      content: long ? "long-content-".repeat(500) : "# Own checks",
       revision: "r1",
     },
     {
@@ -200,7 +200,8 @@ test("one operation confirmation completes without body review [AC:agent-skill-m
   await expect(card).toContainText("Bot B");
   await card.getByRole("button", { name: "确认并执行" }).click();
   await expect(card).toContainText("已完成");
-  await expect(card.getByRole("button")).toHaveCount(0);
+  await expect(card.getByRole("button", { name: "确认并执行" })).toHaveCount(0);
+  await expect(card.getByRole("button", { name: "关闭提示", exact: true })).toBeVisible();
   expect(confirmations).toBe(1);
 });
 
@@ -234,4 +235,51 @@ test('chat detail close icon works on narrow screens [AC:bot-detail-menu#AC-7]',
   await expect(sidebar).toHaveCount(0);
   await page.getByTestId('bot-detail-toggle').click();
   await expect(sidebar).toBeVisible();
+});
+
+for (const width of [1280, 820]) test(`skills controls stay grouped at every font size at ${width} [AC:bot-skill-panel-layout#AC-1] [AC:bot-skill-panel-layout#AC-2] [AC:bot-skill-panel-layout#AC-3] [AC:bot-skill-panel-layout#AC-4]`, async ({page}) => {
+  await page.setViewportSize({width,height:804});
+  const {policy}=await setup(page, true);
+  await page.route('**/api/sessions',r=>r.fulfill({json:{sessions:bots.map(b=>({id:b.canonicalSessionId,title:b.name,agentId:b.agentId,status:'idle',mode:'chat',metadata:{botId:b.id}}))}}));
+  await page.goto('/#/bot'); await page.reload();await page.getByRole('button',{name:/^Bot A/}).first().click();
+  const drawer=page.getByTestId('bot-detail-panel');if(!await drawer.isVisible()) await page.getByTestId('bot-detail-toggle').click();
+  await drawer.getByRole('tab',{name:'技能',exact:true}).click();
+  const panel=drawer.getByTestId('bot-detail-skills');
+  for(const size of [13,14,15,16,18]){
+    await page.evaluate(size=>document.documentElement.setAttribute('data-font-size',String(size)),size);
+    const select=panel.getByLabel('技能使用范围'),search=panel.getByLabel('搜索技能'),save=panel.getByRole('button',{name:'保存使用范围'});
+    await expect(search).toBeVisible();
+    const label=search.locator('..');
+    expect(await label.evaluate(el=>{const range=document.createRange();range.selectNode(el.firstChild!);return range.getClientRects().length;})).toBe(1);
+    const a=await save.boundingBox(),b=await search.boundingBox();expect(b!.y).toBeGreaterThanOrEqual(a!.y+a!.height);
+    for(const control of [select,search,save,panel.getByRole('button',{name:'清除搜索'})]){
+      const box=await control.boundingBox(),outer=await drawer.boundingBox();expect(box!.x).toBeGreaterThanOrEqual(outer!.x);expect(box!.x+box!.width).toBeLessThanOrEqual(outer!.x+outer!.width);
+      expect(await control.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
+    }
+  }
+  const longRow=panel.getByTestId('skill-row-own');
+  await longRow.locator('summary').click();
+  expect(await longRow.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);
+  await expect(longRow.locator('pre')).toBeVisible();
+  await panel.getByLabel('技能使用范围').selectOption('selected');
+  await panel.getByTestId('skill-row-own').getByRole('checkbox').first().check();
+  await panel.getByLabel('搜索技能').fill('absent');await expect(panel).toContainText('没有匹配');
+  await panel.getByRole('button',{name:'清除搜索'}).focus();await page.keyboard.press('Enter');
+  await expect(panel.getByTestId('skill-row-own').getByRole('checkbox').first()).toBeChecked();
+  await page.route('**/api/bots/a/skills',r=>r.request().method()==='PATCH'?r.fulfill({status:409,json:{error:'Save conflict'}}):r.fallback());
+  await panel.getByRole('button',{name:'保存使用范围'}).click();await expect(panel.getByRole('alert')).toContainText('Save conflict');await expect(panel).toContainText('尚未保存');
+  expect(policy().mode).toBe('all');
+});
+
+test('English skill controls preserve selection through search and save [AC:bot-skill-panel-layout#AC-4]', async ({page}) => {
+ const {panel,policy}=await setup(page);
+ await page.evaluate(()=>localStorage.setItem('lab.locale','en'));
+ await page.addInitScript(()=>localStorage.setItem('lab.locale','en'));
+ await page.reload();await page.getByText('Bot A',{exact:true}).first().click();
+ await page.getByTestId('bot-detail').getByRole('tab',{name:'Skills',exact:true}).click();
+ const select=panel.locator('select').first();await select.selectOption('selected');
+ const own=panel.getByTestId('skill-row-own').getByRole('checkbox').first();await own.check();
+ const search=panel.locator('input:not([type="checkbox"])').first();await search.fill('absent');
+ await panel.getByRole('button',{name:'Clear search',exact:true}).click();await expect(own).toBeChecked();
+ await panel.getByRole('button',{name:'Save selection',exact:true}).click();await expect.poll(policy).toEqual({mode:'selected',ids:['own']});
 });
