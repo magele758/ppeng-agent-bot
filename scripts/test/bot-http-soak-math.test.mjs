@@ -7,7 +7,7 @@ import {isFreshCompletedOutput,pendingHumanInputs,hasControlledSoftwareResult,pe
 test('24h immutable offered protocol retains hourly burst and exact 50 percent hotspot',()=>{
  const result=expectedWorkload({warmupSeconds:1800,measurementSeconds:86400,burstEverySeconds:3600,burstDurationSeconds:60});assert.equal(result.readWarmup,72000);assert.equal(result.readMeasurement,3456000);assert.equal(result.measurement,197640);assert.equal(result.burst,27600);assert.equal(result.hot,13800);assert.deepEqual(result.kinds,{human:79056,routine:39528,dispatch:39528,room:39528});
 });
-test('published latency SLO still gates a full soak and stays outside smoke acceptance',()=>{
+test('published latency SLO still gates a full soak and stays outside smoke acceptance [AC:composer-drop-retirement-soak-isolation#AC-5]',()=>{
  const thresholds=JSON.parse(readFileSync(new URL('../bot-release/workload.v1.json',import.meta.url),'utf8')).thresholdsMs;
  assert.deepEqual({pageP95:thresholds.pageP95,statusP95:thresholds.statusP95,searchP95:thresholds.searchP95,receiveP95:thresholds.receiveP95},{pageP95:500,statusP95:500,searchP95:1000,receiveP95:500});
  const page=new BoundedHistogram();for(let i=0;i<151;i++)page.add(200);for(let i=0;i<9;i++)page.add(602);
@@ -80,4 +80,12 @@ test('successful archived software result uses actual invocation identity and re
 
 test('explicitly emitted decisions retire before later input drops their typed result without inventing a new confirmation',()=>{
  const decisions=new Map([['old',{finished:1}],['awaiting',{finished:0}]]);const options={completed:operation=>operation==='terminal',explicitDecision:operation=>decisions.get(operation)};assert.deepEqual(pendingControlledOperations(['old','awaiting','new','unknown','old','terminal'],options),['awaiting','new','unknown']);assert.equal(decisions.get('awaiting').finished,0);assert.equal(decisions.has('new'),false);
+});
+
+test('compacted routine prompt still requires a confirmation from its observed typed result [AC:composer-drop-retirement-soak-isolation#AC-5]',()=>{
+ const sessionId='shared';
+ const result=(operation,extra={})=>({type:'tool_result',name:'http_benchmark_software',toolCallId:'controlled_'+operation+':'+sessionId,ok:true,content:'archived',...extra});
+ const decisions=new Map([['http_op_24',{finished:0}],['http_op_34',{finished:0}],['http_op_14',{finished:1}],['http_op_25',{finished:0}]]);
+ const messages=[{role:'user',parts:[{type:'text',text:'[cron:http_op_34] latest'}]},{role:'tool',parts:[result('http_op_24'),result('http_op_34'),result('http_op_14'),result('http_op_25',{ok:false}),result('http_op_99'),result('http_op_25',{toolCallId:'controlled_http_op_25:other'})]}];
+ assert.deepEqual(pendingControlledOperations(['http_op_34'],{messages,sessionId,completed:()=>false,explicitDecision:operation=>decisions.get(operation)}),['http_op_34','http_op_24']);
 });

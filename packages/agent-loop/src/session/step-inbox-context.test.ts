@@ -3,7 +3,7 @@ const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite') as typeof
 import { expect, it } from 'vitest';
 import { StepInboxStore } from './step-inbox.js';
 
-it('upgrades standalone legacy inbox tables and preserves context through edits [AC:composer-drag-context#AC-3]', () => {
+it('upgrades standalone legacy inbox tables and preserves context through edits', () => {
   const db = new DatabaseSync(':memory:');
   db.exec('CREATE TABLE session_inbox (id TEXT PRIMARY KEY, session_id TEXT, target TEXT, role TEXT, text TEXT, key TEXT, created_at TEXT, claimed_at TEXT)');
   const store = new StepInboxStore(db);

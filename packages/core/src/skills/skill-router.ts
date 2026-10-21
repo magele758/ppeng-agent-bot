@@ -4,6 +4,7 @@
  *
  * 改造前/后对照与 env 说明见仓库 `doc/skill-router-baseline.md`.
  */
+import { setImmediate as yieldToIO } from 'node:timers/promises';
 import type { SkillSpec } from '../types.js';
 import { matchSkills } from './builtin-skills.js';
 import {
@@ -137,8 +138,11 @@ export function buildSkillRouting(
     };
   }
 
+  return finishSkillRouting(userText, allSkills, mode, routeSkillsLexical(userText, allSkills, topK));
+}
+
+function finishSkillRouting(userText: string, allSkills: SkillSpec[], mode: SkillRoutingMode, routed: RoutedSkill[]): SkillRoutingResult {
   const keywordMatched = mode === 'hybrid' ? matchSkills(userText, allSkills) : [];
-  const routed = routeSkillsLexical(userText, allSkills, topK);
   const confidence = assessRoutingConfidence(routed);
   const nameSet = new Set<string>();
   for (const r of routed) {
@@ -354,4 +358,26 @@ export function buildSkillRoutingWithToolQuality(
         : '')
     }
   };
+}
+
+/**
+ * Runtime routing yields between bounded catalog batches so cold lexical scans
+ * cannot monopolize the daemon's HTTP event loop. Every skill is still scored.
+ */
+export async function buildSkillRoutingCooperative(
+  userText: string,
+  allSkills: SkillSpec[],
+  options: { mode: SkillRoutingMode; topK: number }
+): Promise<SkillRoutingResult> {
+  const { mode, topK } = options;
+  if (mode === 'legacy' || !userText.trim() || !Number.isFinite(topK) || topK < 1) {
+    return buildSkillRouting(userText, allSkills, options);
+  }
+  const ranked: RoutedSkill[] = [];
+  for (let offset = 0; offset < allSkills.length; offset += 16) {
+    await yieldToIO();
+    ranked.push(...routeSkillsLexical(userText, allSkills.slice(offset, offset + 16), topK));
+  }
+  ranked.sort((a, b) => b.score - a.score || a.skill.name.localeCompare(b.skill.name));
+  return finishSkillRouting(userText, allSkills, mode, ranked.slice(0, topK));
 }
