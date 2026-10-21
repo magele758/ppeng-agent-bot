@@ -204,7 +204,7 @@ test('prepareTurnInput fold sees overflow summary after cap=2 third enqueue', as
   rmSync(stateDir, { recursive: true, force: true });
 });
 
-test('cap=1 preserves attachment excerpts behind complete fences [AC:composer-drag-context#AC-3]', () => {
+test('cap=1 preserves attachment excerpts behind complete fences', () => {
   const ctx = tempStore();
   try {
     const session = ctx.store.createSession({ title: 'attachment overflow', mode: 'chat', agentId: 'general' });

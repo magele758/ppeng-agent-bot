@@ -26,7 +26,7 @@ import { RoomSharedContextEditor } from './RoomSharedContextEditor';
 import './play-group.css';
 import '../bot-work/bot-work.css';
 import { BotRooms } from '../bot-work/BotRooms';
-import { ComposerContextChips, ComposerMessageContext, ComposerNotice, useComposerFileDrop, usePendingComposerContext } from '../ComposerContext';
+import { ComposerContextChips, ComposerMessageContext, ComposerNotice, ignoreComposerDrop, usePendingComposerContext } from '../ComposerContext';
 import { BotReplyQuoteAction, ComposerReplyQuote, MessageReplyQuote } from '../ReplyQuote';
 import { composerClassName, contextSubmission, contextSourcesBody, contextSourcesForSend } from '@/lib/composer-context';
 import { attachSentReply, keepLocalReplyTo, readStoredReplyTo, withReplyTo, type ReplyQuote } from '@/lib/reply-quote';
@@ -289,10 +289,6 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
   const mentionOpen = Boolean(mention && mentionKey !== mentionDismissed && room?.status === 'active' && !busy);
   const activeMention = mentionOptions[Math.min(mentionIndex, Math.max(mentionOptions.length - 1, 0))];
 
-  const contextDrop = useComposerFileDrop((sources, truncated) => {
-    addPendingContext(sources);
-    if (truncated) setContextNotice(t('play.composer.contextTruncated'));
-  }, roomId);
 
   const removePendingContext = (id: string) => {
     setPendingContext((current) => current.filter((item) => item.id !== id));
@@ -513,13 +509,11 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
           </div>
         </div>
         <form
-          className={composerClassName('play-group-composer', contextDrop.over)}
+          className={composerClassName('play-group-composer')}
           data-testid="composer-drop-target"
           data-surface="group"
-          onDragEnter={contextDrop.onDragEnter}
-          onDragOver={contextDrop.onDragOver}
-          onDragLeave={contextDrop.onDragLeave}
-          onDrop={contextDrop.onDrop}
+          onDragOver={ignoreComposerDrop}
+          onDrop={ignoreComposerDrop}
           onSubmit={(event) => {
             event.preventDefault();
             void send();

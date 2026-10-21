@@ -34,7 +34,7 @@
     "ai:cursor": "bash scripts/ai-cli/run-cursor-agent-fix.sh",
     "test:remote": "node scripts/remote-smoke.mjs",
     "test:compact-ab": "node scripts/compact-ab-eval.mjs",
-    "ci": "pnpm run build && pnpm run test:unit && pnpm run test:acceptance && pnpm run test:formal && pnpm run agent:eval:fast --exit-on-fail --out test-results/fast-eval && pnpm run agent:eval:verify && pnpm run test:package && pnpm run test:crap && pnpm run test:regression && pnpm run test:integration && pnpm run test:e2e",
+    "ci": "pnpm run build && pnpm run test:unit && pnpm run test:bot:soak:performance && pnpm run test:acceptance && pnpm run test:formal && pnpm run agent:eval:fast --exit-on-fail --out test-results/fast-eval && pnpm run agent:eval:verify && pnpm run test:package && pnpm run test:crap && pnpm run test:regression && pnpm run test:integration && pnpm run test:e2e",
     "start:daemon": "node apps/daemon/dist/server.js",
     "start:supervised": "node scripts/supervisor.mjs",
     "self-heal:flow": "bash scripts/self-heal-flow.sh",
@@ -87,7 +87,8 @@
     "test:bot:release-evidence": "node scripts/bot-release/evidence.mjs",
     "test:restart": "node scripts/formal/run-restart-verification.mjs",
     "test:concurrency": "node scripts/formal/run-concurrency-verification.mjs",
-    "test:acceptance:deployment": "node scripts/acceptance/acceptance-gate.mjs --stage all --out coverage/acceptance-deployment"
+    "test:acceptance:deployment": "node scripts/acceptance/acceptance-gate.mjs --stage all --out coverage/acceptance-deployment",
+    "test:bot:soak:performance": "node scripts/bot-release/soak-performance.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",

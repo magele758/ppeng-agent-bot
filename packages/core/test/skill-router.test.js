@@ -12,6 +12,7 @@ import {
 } from '../dist/skills/skill-matcher.js';
 import {
   buildSkillRouting,
+  buildSkillRoutingCooperative,
   buildSkillRoutingWithRobustness,
   skillRoutingModeFromEnv,
   skillRoutingTopKFromEnv
@@ -293,4 +294,34 @@ test('needsRebuild: cache invalidates when routing-relevant metadata changes', (
       : skill
   );
   assert.equal(needsRebuild(cache, updated), true);
+});
+
+test('lexical reuse preserves substring scores and observes every mutable skill field [AC:composer-drop-retirement-soak-isolation#AC-6]',()=>{
+ const skill={id:'other',name:'Other',description:'',content:'',aliases:[],triggerWords:[],source:'workspace'};
+ const fields=[['content',2,'body'],['triggerWords',5,'trigger'],['description',6,'desc'],['id',10,'id'],['aliases',12,'alias'],['name',14,'name']];
+ for(const [field,weight,label] of fields){
+  const before=routeSkillsLexical('needle', [skill],1)[0];
+  assert.equal(before.score,0);
+  skill[field]=Array.isArray(skill[field])?['prefixNeedleSuffix']:'prefixNeedleSuffix';
+  for(let i=0;i<3;i++){
+   const hit=routeSkillsLexical('needle',[skill],1)[0];
+   assert.equal(hit.score,weight+(field==='content'?10:22));
+   assert.equal(hit.reason.split(', ')[0],label+':needle');
+  }
+  if(Array.isArray(skill[field]))skill[field].splice(0,1,'unrelated');
+  else skill[field]='unrelated';
+  assert.equal(routeSkillsLexical('needle',[skill],1)[0].score,0);
+ }
+});
+
+test('cold skill routing yields to pending I/O without changing any ranking [AC:composer-drop-retirement-soak-isolation#AC-6]',async()=>{
+ const skills=Array.from({length:96},(_,i)=>({id:'skill-'+i,name:'Skill '+i,description:'needle optional',content:'body fragment '.repeat(1800),source:'workspace'}));
+ for(const mode of ['lexical','hybrid','legacy'])for(const query of ['needle body missing','', '⚡']){
+  let ioRan=false;
+  const io=new Promise(resolve=>setImmediate(()=>{ioRan=true;resolve();}));
+  const actual=await buildSkillRoutingCooperative(query,skills,{mode,topK:8});
+  if(mode!=='legacy'&&query.trim())assert.equal(ioRan,true,'routing must let ready I/O run before the whole catalog finishes');
+  assert.deepEqual(actual,buildSkillRouting(query,skills,{mode,topK:8}));
+  await io;
+ }
 });

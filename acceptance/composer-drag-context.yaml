@@ -1,6 +1,7 @@
 id: composer-drag-context
 title: 消息框拖入文件和文件夹作为上下文
-status: implemented
+status: retired
+retiredReason: 用户已批准整体移除消息框拖拽功能，保留加号附件和历史上下文；由 composer-drop-retirement-soak-isolation 替代入口行为验收。
 requirement: |
   我需要新增一个输入框支持拖拽文件、文件夹作为上下文的信息源的能力，无论是对话或者bot模式，帮我加好
 notes: |

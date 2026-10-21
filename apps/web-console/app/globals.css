@@ -267,11 +267,6 @@ body,
   flex-wrap: wrap;
 }
 
-.chat-composer.is-drop-over,
-.play-group-composer.is-drop-over {
-  outline: 2px dashed var(--color-border-strong);
-  outline-offset: 2px;
-}
 
 .play-group-composer {
   flex-wrap: wrap;
