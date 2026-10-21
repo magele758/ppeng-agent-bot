@@ -2,28 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
-import { parseBotActivityItems, type BotActivityItem, type BotActivityStatus } from '@/lib/bot-activity';
+import { parseBotActivityItems, type BotActivityItem } from '@/lib/bot-activity';
 import { useI18n } from '@/lib/i18n';
+import { routineStatusPresentation } from '@/lib/routine-status';
 
 const POLL_MS = 3000;
-
-function statusLabel(
-  status: BotActivityStatus,
-  t: (key: 'play.activity.workRunning' | 'play.activity.workWaiting' | 'play.activity.workDone') => string
-): string {
-  switch (status) {
-    case 'running':
-      return t('play.activity.workRunning');
-    case 'waiting':
-      return t('play.activity.workWaiting');
-    case 'done':
-      return t('play.activity.workDone');
-    default: {
-      const exhaustive: never = status;
-      return exhaustive;
-    }
-  }
-}
 
 function startedLocale(locale: string): string {
   if (locale === 'zh') return 'zh-CN';
@@ -43,21 +26,22 @@ function formatStarted(iso: string, locale: string): string {
 
 function BotActivityRow({
   item,
-  label,
   started
 }: {
   item: BotActivityItem;
-  label: string;
   started: string;
 }) {
+  const { t } = useI18n();
+  const outcome = routineStatusPresentation(item.outcomeStatus ?? (item.status === 'running' ? 'running' : 'unknown'));
+  const visibleLabel = t(outcome.key);
   return (
     <article
       className={`activity-card activity-card--${item.status}`}
       role="listitem"
-      aria-label={`${label} ${item.title}`}
+      aria-label={`${visibleLabel} ${item.title}`}
     >
       <div className="activity-card__summary bot-activity__row">
-        <span className={`activity-card__phase activity-card__phase--${item.status}`}>{label}</span>
+        <span className={`activity-card__phase activity-card__phase--${outcome.status}`} style={outcome.style}>{visibleLabel}</span>
         <span className="activity-card__name" title={item.title}>{item.title}</span>
       </div>
       <div className="bot-activity__meta">
@@ -90,7 +74,6 @@ function BotActivityBody({
         <BotActivityRow
           key={item.id}
           item={item}
-          label={statusLabel(item.status, t)}
           started={t('play.activity.workStarted', { time: formatStarted(item.startedAt, locale) })}
         />
       ))}

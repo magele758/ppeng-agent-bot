@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSkillBots } from '../../BotSkillSharing';
 import { api } from '@/lib/api';
 import { SKILL_SOURCES, filterSkills, type SkillItem } from '@/lib/agents-view';
 import { useI18n, type MessageKey } from '@/lib/i18n';
@@ -17,6 +18,7 @@ const SOURCE_LABEL: Record<SkillItem['source'], MessageKey> = {
 
 export function SkillsView() {
   const { t } = useI18n();
+  const bots = useSkillBots();
   const [skills, setSkills] = useState<SkillItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -93,6 +95,7 @@ export function SkillsView() {
               <span className="ag-chips">
                 <span className="chip chip-muted">{t(SOURCE_LABEL[s.source])}</span>
               </span>
+              {s.ownerBotId ? <span className="ag-card__sub">{t('skillProposals.ownerBot', { name: bots.find(b => b.id === s.ownerBotId)?.name ?? s.ownerBotId })}</span> : s.source === 'user' ? <span className="ag-card__sub">{t('skillProposals.legacyShared')}</span> : null}
               <p className="ag-card__desc">{s.description}</p>
               {s.triggerWords?.length ? (
                 <span className="ag-card__sub">{t('agents.skills.triggers', { words: s.triggerWords.join(', ') })}</span>

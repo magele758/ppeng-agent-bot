@@ -409,6 +409,7 @@ export {
   SKILL_PROPOSE_TOOL_NAME,
   SkillProposalError,
   SkillProposalStore,
+  SkillCaptureService,
   createSkillProposeTool,
   defaultSkillProposalSettings,
   findSecretLikeContent,
@@ -812,3 +813,10 @@ export { parseOpenApiSpec } from '../discovery/adapters/openapi.js';
 export * from '../rooms/index.js';
 export { RoutineHealthStore, isGovernedRoutine } from '../cron/routine-health.js';
 export type { RoutineHealth, RoutineFailurePolicy } from '../cron/routine-health.js';
+
+export { botCollaborations } from "../bots/bot-work.js";
+
+export { decideRoutinePublication } from "../cron/routine-runtime.js";
+
+export {readBotSkillSelection, botSkillSelectionKey, selectBotSkills} from '../skills/bot-selection.js';
+export type {SkillManagementInput} from '../skill-proposals/management.js';

@@ -15,6 +15,7 @@ export interface BotActivityItem {
   kind: BotActivityKind;
   title: string;
   status: BotActivityStatus;
+  outcomeStatus: string;
   botId: string;
   botName: string;
   startedAt: string;
@@ -144,6 +145,7 @@ function routineItem(
     kind: 'routine',
     title: clip(title),
     status,
+    outcomeStatus: run.status,
     botId,
     botName: botLabel(botId, names, focus.agentId),
     startedAt: run.startedAt || run.createdAt
@@ -175,6 +177,7 @@ function sessionItem(
     kind: 'background',
     title: clip(session.title || session.id),
     status,
+    outcomeStatus: session.status,
     botId,
     botName: botLabel(botId, names, session.agentId),
     startedAt: session.createdAt
@@ -198,6 +201,7 @@ function jobItem(
     kind: 'background',
     title: clip(job.command || job.id),
     status,
+    outcomeStatus: job.status,
     botId,
     botName: botLabel(botId, names, fallback),
     startedAt: job.createdAt

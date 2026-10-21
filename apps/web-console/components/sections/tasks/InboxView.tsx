@@ -9,6 +9,7 @@ import { EmptyState, SettingsGroup } from '../../ui';
 import { useLab } from '../../shell/LabProvider';
 import { ListFallback } from './ListFallback';
 import styles from './tasks.module.css';
+import { ApprovalActionPreview } from '../../ApprovalActionPreview';
 
 /** 待审批工具调用、站内邮件与工作区 */
 export function InboxView() {
@@ -116,6 +117,7 @@ export function InboxView() {
                       {t('tasks.openSession')}
                     </button>
                   </div>
+                  <ApprovalActionPreview args={a.args} />
                 </div>
               );
             })}
@@ -148,7 +150,7 @@ export function InboxView() {
                   {draft.receiveId ? <span>{t('tasks.inbox.draftRecipient', { id: draft.receiveId })}</span> : null}
                   {draft.error ? <span>{draft.error}</span> : null}
                 </div>
-                <div>{draft.text.slice(0, 280)}</div>
+                <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{draft.text}</div>
                 <div className={styles.actions}>
                   {draft.status === 'sending' ? null : (
                     <>

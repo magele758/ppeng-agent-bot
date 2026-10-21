@@ -10,6 +10,7 @@
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, join, resolve, sep } from 'node:path';
+import { botSkillId } from '../skills/bot-scope.js';
 import { createId, nowIso } from '../id.js';
 import {
   SKILL_PROPOSAL_MAX_PENDING,
@@ -28,6 +29,9 @@ export type SkillProposalKind = 'new' | 'update';
 
 export interface SkillProposalRecord {
   id: string;
+  captureId?: string;
+  ownerBotId?: string;
+  sharedBotIds?: string[];
   name: string;
   description: string;
   body: string;
@@ -84,6 +88,8 @@ export function renderSkillMarkdown(record: SkillProposalRecord): string {
     `description: "${description}"`,
     `proposed-by-session: ${record.sessionId}`,
     `approved-at: ${record.decidedAt ?? nowIso()}`,
+    `proposal-id: ${record.id}`,
+    ...(record.ownerBotId ? [`owner-bot: ${record.ownerBotId}`, `shared-bots: ${JSON.stringify(record.sharedBotIds ?? [])}`] : []),
     '---',
     '',
     record.body,
@@ -92,13 +98,27 @@ export function renderSkillMarkdown(record: SkillProposalRecord): string {
 }
 
 export interface CreateSkillProposalInput extends SkillProposalDraft {
+  captureId?: string;
+  ownerBotId?: string;
+  sharedBotIds?: string[];
   sessionId: string;
   agentId?: string;
   replaces?: { name: string; source?: string };
 }
 
 export class SkillProposalStore {
-  constructor(private readonly stateDir: string) {}
+  constructor(private readonly stateDir: string) {
+    const directory = skillProposalsDir(stateDir);
+    if (!existsSync(directory)) return;
+    for (const file of readdirSync(directory).filter(f => /^sp_[a-f0-9]{32}\.revoking$/.test(f))) {
+      const record = this.get(file.replace(/\.revoking$/, ''));
+      if (!record || !isValidSkillProposalName(record.name)) continue;
+      const backup = join(directory, file);
+      const target = join(userSkillsDir(stateDir), record.ownerBotId ? join('.bots', botSkillId(record.ownerBotId, record.name)) : record.name);
+      if (record.status === 'approved' && !existsSync(target)) renameSync(backup, target);
+      else if (record.status === 'revoked') rmSync(backup, {recursive:true,force:true});
+    }
+  }
 
   private recordPath(id: string): string {
     return join(skillProposalsDir(this.stateDir), `${id}.json`);
@@ -139,7 +159,7 @@ export class SkillProposalStore {
   create(input: CreateSkillProposalInput): SkillProposalRecord {
     const draft = validateSkillProposalDraft(input);
     const pending = this.list({ status: 'pending' });
-    const sameName = pending.find((p) => p.name === draft.name);
+    const sameName = pending.find((p) => p.name === draft.name && p.ownerBotId === input.ownerBotId);
     if (sameName) {
       if (sameName.sessionId !== input.sessionId) {
         throw new SkillProposalError(
@@ -156,7 +176,9 @@ export class SkillProposalStore {
     }
     const record: SkillProposalRecord = {
       id: createId('sp'),
+      ...(input.captureId ? { captureId: input.captureId } : {}),
       ...draft,
+      ...(input.ownerBotId ? { ownerBotId: input.ownerBotId, sharedBotIds: input.sharedBotIds ?? [] } : {}),
       sessionId: input.sessionId,
       ...(input.agentId ? { agentId: input.agentId } : {}),
       kind: input.replaces ? 'update' : 'new',
@@ -189,7 +211,8 @@ export class SkillProposalStore {
       throw new SkillProposalError(`stored proposal looks like it contains a secret (${secret})`, 'secret');
     }
     const root = resolve(userSkillsDir(this.stateDir));
-    const dir = resolve(root, basename(record.name));
+    const relativeDir = record.ownerBotId ? join('.bots', botSkillId(record.ownerBotId, record.name)) : basename(record.name);
+    const dir = resolve(root, relativeDir);
     if (!dir.startsWith(root + sep)) {
       throw new SkillProposalError('resolved skill path escapes the user skills directory');
     }
@@ -197,12 +220,57 @@ export class SkillProposalStore {
       ...record,
       status: 'approved',
       decidedAt: nowIso(),
-      installedPath: join('skills', basename(record.name), 'SKILL.md')
+      installedPath: join('skills', relativeDir, 'SKILL.md')
     };
     mkdirSync(dir, { recursive: true });
-    atomicWrite(join(dir, 'SKILL.md'), renderSkillMarkdown(decided));
-    this.write(decided);
+    const path = join(dir, 'SKILL.md');
+    const previous = existsSync(path) ? readFileSync(path, 'utf8') : undefined;
+    atomicWrite(path, renderSkillMarkdown(decided));
+    try {
+      this.write(decided);
+    } catch (error) {
+      if (previous !== undefined) atomicWrite(path, previous);
+      else rmSync(path, { force: true });
+      throw error;
+    }
     return decided;
+  }
+
+  isInstalled(record: SkillProposalRecord): boolean {
+    if (!isValidSkillProposalName(record.name)) return false;
+    const path = join(this.stateDir, 'skills', record.ownerBotId ? join('.bots', botSkillId(record.ownerBotId, record.name)) : record.name, 'SKILL.md');
+    try {
+      const head = readFileSync(path, 'utf8').split('\n').slice(0, 8);
+      return head.includes(`approved-at: ${record.decidedAt}`) && head.includes(`proposed-by-session: ${record.sessionId}`) && (!head.some(line => line.startsWith('proposal-id:')) || head.includes(`proposal-id: ${record.id}`));
+    } catch { return false; }
+  }
+
+  setSharing(id: string, ownerBotId: string, sharedBotIds: string[], validate: (owner: string, ids: string[]) => void): SkillProposalRecord {
+    const record = this.get(id);
+    if (!record || record.status !== 'approved') throw new SkillProposalError('Approved skill not found', 'not_found');
+    if (!isValidSkillProposalName(record.name)) throw new SkillProposalError('Invalid skill name');
+    if (record.ownerBotId && record.ownerBotId !== ownerBotId) throw new SkillProposalError('Skill owner cannot be changed', 'conflict');
+    if (!Array.isArray(sharedBotIds) || sharedBotIds.some(id => typeof id !== 'string') || !ownerBotId) throw new SkillProposalError('Invalid sharing scope');
+    const recipients = [...new Set(sharedBotIds)].filter(id => id !== ownerBotId);
+    validate(ownerBotId, recipients);
+    const oldPath = join(this.stateDir, 'skills', record.ownerBotId ? join('.bots', botSkillId(record.ownerBotId, record.name)) : record.name, 'SKILL.md');
+    const before = readFileSync(oldPath, 'utf8');
+    if (!this.isInstalled(record)) throw new SkillProposalError('Skill was changed by another approval', 'conflict');
+    const relativeDir = join('skills', '.bots', botSkillId(ownerBotId, record.name));
+    const newPath = join(this.stateDir, relativeDir, 'SKILL.md');
+    if (oldPath !== newPath && existsSync(newPath)) throw new SkillProposalError('This Bot already owns a skill with that name', 'conflict');
+    const next = { ...record, ownerBotId, sharedBotIds: recipients, installedPath: join(relativeDir, 'SKILL.md') };
+    mkdirSync(join(this.stateDir, relativeDir), { recursive: true });
+    atomicWrite(newPath, renderSkillMarkdown(next));
+    try {
+      if (oldPath !== newPath) rmSync(oldPath);
+      this.write(next);
+    } catch (error) {
+      atomicWrite(oldPath, before);
+      if (oldPath !== newPath) rmSync(newPath, { force: true });
+      throw error;
+    }
+    return next;
   }
 
   reject(id: string, reason?: string): SkillProposalRecord {
@@ -235,23 +303,16 @@ export class SkillProposalStore {
       throw new SkillProposalError('stored proposal has an invalid name');
     }
     const root = resolve(userSkillsDir(this.stateDir));
-    const dir = resolve(root, record.name);
+    const dir = resolve(root, record.ownerBotId ? join('.bots', botSkillId(record.ownerBotId, record.name)) : record.name);
     if (!dir.startsWith(root + sep)) {
       throw new SkillProposalError('resolved skill path escapes the user skills directory');
     }
     let outcome: SkillRevokeOutcome = 'missing';
+    const backup = join(skillProposalsDir(this.stateDir), `${id}.revoking`);
     if (existsSync(dir)) {
-      let ours = false;
-      try {
-        const head = readFileSync(join(dir, 'SKILL.md'), 'utf8').split('\n').slice(0, 8);
-        ours =
-          head.includes(`approved-at: ${record.decidedAt}`) &&
-          head.includes(`proposed-by-session: ${record.sessionId}`);
-      } catch {
-        ours = false;
-      }
+      const ours = this.isInstalled(record);
       if (ours) {
-        rmSync(dir, { recursive: true, force: true });
+        renameSync(dir, backup);
         outcome = 'removed';
       } else {
         outcome = 'foreign';
@@ -263,7 +324,13 @@ export class SkillProposalStore {
       revokedAt: nowIso(),
       revokeOutcome: outcome
     };
-    this.write(revoked);
+    try { this.write(revoked); } catch (error) {
+      if (outcome === 'removed') renameSync(backup, dir);
+      throw error;
+    }
+    if (outcome === 'removed') {
+      try { rmSync(backup, { recursive: true, force: true }); } catch { /* Already revoked; retry journal cleanup when the store reopens. */ }
+    }
     return { proposal: revoked, outcome };
   }
 }

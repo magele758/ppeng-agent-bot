@@ -50,6 +50,8 @@ interface ContextStackPayload {
   budget: ContextStackBudget;
 }
 
+interface RequestMetric { sessionId: string; sentAt: string; estimatedTokens: number; windowTokens: number; actualInputTokens?: number }
+
 type TFn = ReturnType<typeof useI18n>['t'];
 
 function kindKey(kind: string): MessageKey | null {
@@ -390,6 +392,8 @@ export function ContextStackPanel({
   messageCount: number;
 }) {
   const { t, locale } = useI18n();
+  const [requestFailed, setRequestFailed] = useState(false);
+  const [latest, setLatest] = useState<RequestMetric | null>(null);
   const [data, setData] = useState<ContextStackPayload | null>(null);
   const [snapshots, setSnapshots] = useState<ReplaySnapshot[]>([]);
   const [err, setErr] = useState<string | null>(null);
@@ -402,6 +406,7 @@ export function ContextStackPanel({
     const sid = sessionId;
     const ticket = ++request.current;
     if (!sid) {
+      setLatest(null);
       setData(null);
       setSnapshots([]);
       setErr(null);
@@ -419,6 +424,8 @@ export function ContextStackPanel({
       const stack = readStack(stackResult);
       setData(stack.data);
       setErr(stack.err);
+      setRequestFailed(historyResult.status === 'rejected');
+      setLatest(historyResult.status === 'fulfilled' ? (historyResult.value as { latestRequest?: RequestMetric }).latestRequest ?? null : null);
       const history = readSnapshots(historyResult);
       setSnapshots(history.snapshots);
       setReplayErr(history.err);
@@ -435,6 +442,19 @@ export function ContextStackPanel({
     void load();
   }, [load, running, messageCount]);
 
+  useEffect(() => {
+    if (!sessionId) return;
+    let alive = true;
+    const poll = async () => {
+      try {
+        const response = await api(`/api/sessions/${encodeURIComponent(sessionId)}/context-snapshots?latestOnly=1`) as { latestRequest?: RequestMetric };
+        if (alive) { setLatest(response.latestRequest ?? null); setRequestFailed(false); }
+      } catch { if (alive) { setLatest(null); setRequestFailed(true); } }
+    };
+    const timer = setInterval(() => void poll(), running ? 1000 : 1500);
+    return () => { alive = false; clearInterval(timer); };
+  }, [sessionId, running]);
+  const sent = latest?.sessionId === sessionId ? latest : null;
   const body = matchingBody(data, sessionId);
   const showLoading = Boolean(sessionId) && loading && !body;
 
@@ -446,6 +466,14 @@ export function ContextStackPanel({
           {t('play.contextStack.refresh')}
         </button>
       </div>
+      {sessionId && <section className="request-metric" data-testid="latest-request-metric">
+        <h4>{t('polish.requestTitle')}</h4>
+        <strong>{sent ? t('polish.requestUnits', { count: sent.estimatedTokens.toLocaleString(locale) }) : t(requestFailed ? 'polish.requestError' : 'polish.waiting')}</strong>
+        <p>{t('polish.estimate')} · {t('polish.window')}: {sent && sent.windowTokens > 0 ? ((sent.estimatedTokens / sent.windowTokens) * 100).toFixed(1) + '%' : t('polish.unknown')}</p>
+        <p>{t('polish.actual')}: {sent?.actualInputTokens != null ? sent.actualInputTokens.toLocaleString(locale) : t('polish.unknown')}</p>
+        {sent && <p>{t('polish.sentAt')}: <time dateTime={sent.sentAt}>{new Date(sent.sentAt).toLocaleTimeString(locale)}</time></p>}
+      </section>}
+      <p className="empty-hint">{t(selectedId === 'live' ? 'polish.preview' : 'polish.historyNotice')}</p>
       <MissingSession sessionId={sessionId} t={t} />
       <LoadError err={err} t={t} />
       <ReplayError err={replayErr} t={t} />

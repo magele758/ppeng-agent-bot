@@ -1,14 +1,14 @@
 .root { padding-bottom: 12px; }
 .pin { border-bottom: 1px solid var(--border, #ddd); min-height: 72px; }
-.hint { margin: 0; padding: 0 12px 10px; font-size: 11px; color: var(--text-muted, #777); }
+.hint { margin: 0; padding: 0 12px 10px; font-size: var(--ui-text-xs); color: var(--ui-text-muted); }
 .toolbar, .heading { display: flex; align-items: center; gap: 4px; padding: 8px 10px; }
-.toolbar { justify-content: space-between; font-size: 12px; color: var(--text-muted, #777); }
-.heading h3 { flex: 1; min-width: 0; overflow-wrap: anywhere; margin: 0; font-size: 12px; font-weight: 600; }
-.heading button { padding: 3px; font-size: 11px; }
-.count { font-size: 11px; color: var(--text-muted, #777); }
+.toolbar { justify-content: space-between; font-size: 12px; color: var(--ui-text-muted); }
+.heading h3 { color: var(--ui-text-muted); flex: 1; min-width: 0; overflow-wrap: anywhere; margin: 0; font-size: 12px; font-weight: 600; }
+.heading button { padding: 3px; font-size: var(--ui-text-md); }
+.count { font-size: var(--ui-text-xs); color: var(--ui-text-muted); }
 .group { border-top: 1px solid var(--border, #ddd); min-height: 66px; }
 .dropTarget { background: var(--accent-soft, #e5eee8); outline: 2px solid var(--accent, #587b62); outline-offset: -2px; }
-.empty { padding: 8px 12px 12px; font-size: 11px; color: var(--text-muted, #777); }
+.empty { padding: 8px 12px 12px; font-size: var(--ui-text-xs); color: var(--ui-text-muted); }
 .draggable { position: relative; }
 .draggable[draggable=true] { cursor: grab; }
 .editor { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px; }
@@ -17,7 +17,7 @@
 .error { font-size: 12px; padding: 8px 10px; color: var(--danger, #b42318); overflow-wrap: anywhere; }
 .shared { border-top: 1px solid var(--border, #ddd); padding: 10px; font-size: 12px; }
 .shared summary { cursor: pointer; }
-.shared p { line-height: 1.5; color: var(--text-muted, #777); }
+.shared p { line-height: 1.5; color: var(--ui-text-muted); }
 .shared label, .shared select { display: block; width: 100%; margin-bottom: 6px; }
 .fact { display: grid; grid-template-columns: minmax(0, 1fr) 24px; gap: 4px; margin: 10px 0; }
 .fact input { width: 100%; min-width: 0; grid-column: 1; box-sizing: border-box; font-size: 12px; }

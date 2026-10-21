@@ -14,6 +14,8 @@ import { ApprovalBanner } from './ApprovalBanner';
 import { ChatFeedWindow } from './ChatFeedWindow';
 import { ChatTurnFromMessage, ChatTurnPlain, ChatTurnStreaming } from './ChatTurns';
 import { SurfaceContextProvider } from './a2ui/SurfaceContext';
+import { SkillOperationCards } from './SkillOperationCards';
+import { SkillCaptureCards } from './SkillCaptureCards';
 import type { usePlayChat } from './usePlayChat';
 
 type Chat = ReturnType<typeof usePlayChat>;
@@ -21,6 +23,7 @@ type Calls = ReturnType<typeof indexToolCalls>;
 type Anchors = ReturnType<typeof anchorApprovals<ApprovalItem>>;
 
 export function PlayTranscript(props: {
+  layoutKey?: string;
   chat: Chat;
   selectedSessionId: string | null;
   sessionApprovals: ApprovalItem[];
@@ -38,6 +41,7 @@ export function PlayTranscript(props: {
   return (
     <SurfaceContextProvider messages={props.chat.displayMessages}>
       <ChatFeedWindow
+        layoutKey={props.layoutKey}
         scrollerRef={props.chat.playMessagesRef}
         slots={view.slots}
         renderSlot={(slot) => renderTranscriptSlot(slot, view, props)}
@@ -49,7 +53,14 @@ export function PlayTranscript(props: {
         onStickScroll={props.chat.handlePlayMessagesScroll}
         onRequestOlder={(reason) => void props.chat.loadOlderHistory(reason)}
         header={<FeedHeader view={view} {...props} />}
-        footer={props.footer}
+        footer={<>{props.selectedSessionId ? <SkillCaptureCards
+          key={props.selectedSessionId}
+          sessionId={props.selectedSessionId}
+          onLayoutChange={() => {
+            const feed = props.chat.playMessagesRef.current;
+            if (feed && props.chat.playStickToBottomRef.current) feed.scrollTop = feed.scrollHeight;
+          }}
+        /> : null}{props.selectedSessionId ? <SkillOperationCards key={'operations-'+props.selectedSessionId} sessionId={props.selectedSessionId}/> : null}{props.footer}</>}
       />
     </SurfaceContextProvider>
   );

@@ -306,12 +306,12 @@ export function sendUserMessage(
   if (!text && ids.length === 0 && sources.length === 0) {
     throw new ValidationError('Message, imageAssetIds, or contextSources required');
   }
-  const routineReplyId = typeof options?.replyTo === 'string' ? options.replyTo : undefined;
+  const routineReplyId = typeof options?.replyTo === 'string' ? options.replyTo : options?.replyTo?.messageId;
   const quote = typeof options?.replyTo === 'object' ? options.replyTo : undefined;
   const context = routineReplyContext(host.store, session, routineReplyId);
   const parts = applyContextSources(userMessageParts(text || (ids.length ? '(image)' : ''), ids, host.store), sources);
   if (context) parts.unshift(textPart(context));
-  host.store.appendMessage(session.id, 'user', parts, quote ? { replyTo: quote } : undefined);
+  host.store.appendMessage(session.id, 'user', parts, { ...(quote ? { replyTo: quote } : {}), ...(context ? { key: `routine-context:${routineReplyId ?? 'latest'}` } : {}) });
   mergeSessionMetadata(host.store, session.id, {
     [APPROVAL_WAKE_KEY]: { kind: 'human', source: 'lab-chat' }
   });

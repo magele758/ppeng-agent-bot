@@ -1,3 +1,5 @@
+import {readBotSkillSelection, selectBotSkills} from '../skills/bot-selection.js';
+import { filterSkillsByBot, sessionBotId } from '../skills/bot-scope.js';
 /**
  * Prompt builder: constructs the stable system prefix and dynamic per-turn context.
  *
@@ -165,6 +167,8 @@ export interface PromptContext {
 }
 
 export interface SkillSearchHit {
+  id?: string;
+  ownerBotId?: string;
   name: string;
   description: string;
   score: number;
@@ -176,7 +180,7 @@ function scoringModeForSearch(mode: SkillRoutingMode): SkillRoutingMode {
 }
 
 function buildFullSkillBlock(skills: SkillSpec[], routing: SkillRoutingResult): string {
-  const skillLines = skills.map((s) => `- ${s.name}: ${s.description}`).join('\n');
+  const skillLines = skills.map((s) => `- ${s.name}${s.ownerBotId ? ` (Bot ${s.ownerBotId}, id: ${s.id})` : ""}: ${s.description}`).join('\n');
   const matchedLines = routing.keywordMatched
     .map((s) => `- ${s.name}: ${s.promptFragment ?? s.description}`)
     .join('\n');
@@ -189,7 +193,7 @@ function buildFullSkillBlock(skills: SkillSpec[], routing: SkillRoutingResult): 
 }
 
 function buildShortlistSkillBlock(routing: SkillRoutingResult): string {
-  const routedNames = new Set(routing.routed.map((r) => r.skill.name));
+  const routedNames = new Set(routing.routed.map((r) => r.skill.id));
   const lines: string[] = [
     `Skill routing (${routing.mode}). Likely-relevant skills for this turn — call load_skill(name) for full SKILL.md:`,
     'Use exact skill names as shown. To find a skill not listed, call search_skills(query) then load_skill(name).'
@@ -204,11 +208,11 @@ function buildShortlistSkillBlock(routing: SkillRoutingResult): string {
     lines.push(`ℹ️ Routing confidence: ${routing.confidence.level}. ${routing.confidence.reason}`);
   }
   for (const r of routing.routed) {
-    lines.push(`- ${r.skill.name}: ${r.skill.description} [score=${r.score}; ${r.reason}]`);
+    lines.push(`- ${r.skill.name}${r.skill.ownerBotId ? ` (Bot ${r.skill.ownerBotId}, id: ${r.skill.id})` : ""}: ${r.skill.description} [score=${r.score}; ${r.reason}]`);
   }
   for (const s of routing.keywordMatched) {
-    if (routedNames.has(s.name)) continue;
-    lines.push(`- ${s.name}: ${s.description} [keyword hint]`);
+    if (routedNames.has(s.id)) continue;
+    lines.push(`- ${s.name}${s.ownerBotId ? ` (Bot ${s.ownerBotId}, id: ${s.id})` : ""}: ${s.description} [keyword hint]`);
   }
   const strict = skillLoadStrictFromEnv(process.env);
   lines.push(
@@ -297,12 +301,19 @@ export class PromptBuilder {
    * Rank the catalog for search_skills. Always uses lexical/hybrid scoring
    * (legacy routing is listing-only and would make search useless).
    */
+  async skillsForSession(sessionId: string): Promise<SkillSpec[]> {
+    const session = typeof this.deps.store.getSession === 'function' ? this.deps.store.getSession(sessionId) : undefined;
+    const botId = sessionBotId(session?.metadata);
+    const visible = selectBotSkills(filterSkillsByBot(await this.allSkills(), botId), readBotSkillSelection(this.deps.store, botId));
+    return session ? filterSkillsByScope(visible, runProfileFromSession(session).skillScope, requestedSkillNames(session.metadata)) : visible;
+  }
+
   async searchSkills(query: string, sessionId: string, limit?: number): Promise<SkillSearchHit[]> {
     const topK =
       typeof limit === 'number' && Number.isFinite(limit)
         ? Math.min(20, Math.max(1, Math.floor(limit)))
         : skillRoutingTopKFromEnv(process.env);
-    let skills = await this.allSkills();
+    let skills = await this.skillsForSession(sessionId);
     const session =
       typeof this.deps.store.getSession === 'function'
         ? this.deps.store.getSession(sessionId)
@@ -321,8 +332,10 @@ export class PromptBuilder {
     const hits: SkillSearchHit[] = [];
     const seen = new Set<string>();
     for (const r of routing.routed) {
-      seen.add(r.skill.name);
+      seen.add(r.skill.id);
       hits.push({
+        id: r.skill.id,
+        ownerBotId: r.skill.ownerBotId,
         name: r.skill.name,
         description: r.skill.description,
         score: r.score,
@@ -330,8 +343,10 @@ export class PromptBuilder {
       });
     }
     for (const s of routing.keywordMatched) {
-      if (seen.has(s.name)) continue;
+      if (seen.has(s.id)) continue;
       hits.push({
+        id: s.id,
+        ownerBotId: s.ownerBotId,
         name: s.name,
         description: s.description,
         score: 0,
@@ -340,7 +355,7 @@ export class PromptBuilder {
     }
     this.searchHitsBySession.set(
       sessionId,
-      hits.map((h) => h.name)
+      hits.flatMap((h) => [h.id ?? h.name, h.name])
     );
     return hits;
   }
@@ -406,7 +421,7 @@ export class PromptBuilder {
     const profile = runProfileFromSession(ctx.session);
     const skills = filterSkillsByAllowlist(
       filterSkillsByScope(
-        await this.allSkills(),
+        await this.skillsForSession(ctx.session.id),
         profile.skillScope,
         requestedSkillNames(ctx.session.metadata)
       ),
@@ -419,6 +434,8 @@ export class PromptBuilder {
     let routing = buildSkillRouting(userText, skills, { mode, topK });
     const shortlistCandidates = [
       ...routing.routed.map((r) => ({
+        id: r.skill.id,
+        ownerBotId: r.skill.ownerBotId,
         name: r.skill.name,
         description: r.skill.description
       })),

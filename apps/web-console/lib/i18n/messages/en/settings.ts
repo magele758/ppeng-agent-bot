@@ -1,4 +1,12 @@
 export const settings = {
+  fontSize: {
+    title: 'Font size', keywords: 'font size text appearance typography',
+    description: 'Adjust text throughout the console. Changes apply immediately and are saved in this browser.',
+    option: '{size}px', defaultOption: '{size}px (default)', reset: 'Restore default',
+    preview: 'Reading comfortably. Aa — 清晰阅读，舒适交流 · 0123456789',
+    saveFailed: 'Could not save the font size. It is applied for now, but may reset when you reopen the page.'
+  },
+
   categories: {
     general: 'General',
     models: 'Models',

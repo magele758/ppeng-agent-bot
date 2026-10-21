@@ -46,10 +46,12 @@ function formatWhen(iso?: string): string {
 
 export function BotCronPanel({
   botId,
-  botName
+  botName,
+  taskTemplate
 }: {
   botId: string | null;
   botName?: string;
+  taskTemplate?: {taskId:string;attempt:number;prompt:string};
 }) {
   const [editingId,setEditingId]=useState<string|null>(null);
   const [scheduleKind,setScheduleKind]=useState('cron');
@@ -66,7 +68,11 @@ export function BotCronPanel({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [name, setName] = useState('');
-  const [prompt, setPrompt] = useState('');
+  const [prompt, setPrompt] = useState(taskTemplate?.prompt??'');
+  const [sourceDelivery,setSourceDelivery]=useState(taskTemplate?{taskId:taskTemplate.taskId,attempt:taskTemplate.attempt}:undefined);
+  const [deliveryPolicy,setDeliveryPolicy]=useState({inputSources:'',changesOnly:false,failureThreshold:1,approvalBeforeSend:false});
+  const [roomId,setRoomId]=useState('');
+  const [rooms,setRooms]=useState<{id:string;title:string;botIds:string[]}[]>([]);
   const [preset, setPreset] = useState<CronPreset>('daily');
   const [time, setTime] = useState('09:00');
   const [weekday, setWeekday] = useState(1);
@@ -105,6 +111,7 @@ export function BotCronPanel({
 
   useEffect(() => {
     void load();
+    void api('/api/bot-rooms').then(data=>setRooms((data as {rooms:{id:string;title:string;botIds:string[]}[]}).rooms)).catch(e=>setErr(String(e)));
     void api('/api/cron/settings').then(data=>setDialogTools((data as {settings:{dialogToolsEnabled:boolean}}).settings.dialogToolsEnabled)).catch(e=>setErr(String(e)));
   }, [load]);
 
@@ -122,7 +129,8 @@ export function BotCronPanel({
           name: name.trim(),
           prompt: prompt.trim(),
           ...(scheduleKind==='cron'?{cron:generatedCron}:scheduleKind==='once'?{onceAt:zonedLocalToIso(onceAt,timezone)}:scheduleKind==='interval'?{intervalMs:intervalSeconds*1000}:{event,conclusions:event==='ci/status'?conclusions.split(',').map(s=>s.trim()).filter(Boolean):[],...(eventSecret?{secretEnv:eventSecret}:{})}),
-          timezone,missedPolicy,
+          timezone,missedPolicy,deliveryPolicy,roomId:roomId||null,
+          ...(!editingId&&sourceDelivery?{sourceDelivery}:{}),
           expiresAt:supportsRoutineExpiration(scheduleKind)&&expiresAt?zonedLocalToIso(expiresAt,timezone):null,
           ...(precheck ? { precheck: {...precheck,mode:precheckMode} } : editingId ? { precheck: null } : {})
         })
@@ -130,7 +138,7 @@ export function BotCronPanel({
       setEditingId(null);
       setExpiresAt('');
       setName('');
-      setPrompt('');
+      setPrompt('');setSourceDelivery(undefined);setRoomId('');setDeliveryPolicy({inputSources:'',changesOnly:false,failureThreshold:1,approvalBeforeSend:false});
       setPrecheckKind('none');
       setPrecheckSource('');setPrecheckMode('strict');
       await load();
@@ -214,6 +222,7 @@ export function BotCronPanel({
         <label className="field field--stack">
           <span>{t('play.cronPanel.prompt')}</span>
           <textarea
+            aria-label={t('play.cronPanel.prompt')}
             className="input-compact bot-cron-form__prompt"
             required
             rows={3}
@@ -223,6 +232,13 @@ export function BotCronPanel({
           />
         </label>
         <label className="field field--stack"><span>{t('botWork.schedule')}</span><select value={scheduleKind} onChange={e=>setScheduleKind(e.target.value)}><option value="cron">{t('botWork.cron')}</option><option value="once">{t('botWork.once')}</option><option value="interval">{t('botWork.interval')}</option><option value="event">{t('botWork.event')}</option></select></label>
+        {sourceDelivery&&<p>{t('botWork.routineSourceVersion',{task:sourceDelivery.taskId,attempt:sourceDelivery.attempt})}</p>}
+        <label className="field field--stack"><span>{t('botWork.routineInputs')}</span><textarea aria-label={t('botWork.routineInputs')} value={deliveryPolicy.inputSources} onChange={e=>setDeliveryPolicy({...deliveryPolicy,inputSources:e.target.value})}/></label>
+        <label className="field field--stack"><span>{t('botWork.routineOutput')}</span><select aria-label={t('botWork.routineOutput')} value={roomId} onChange={e=>setRoomId(e.target.value)}><option value="">{t('botWork.routineOutputChat')}</option>{rooms.filter(room=>room.botIds.includes(botId??'')).map(room=><option key={room.id} value={room.id}>{room.title}</option>)}</select></label>
+        <label><input type="checkbox" checked={deliveryPolicy.changesOnly} onChange={e=>setDeliveryPolicy({...deliveryPolicy,changesOnly:e.target.checked})}/>{t('botWork.routineChangesOnly')}</label>
+        <label className="field field--stack"><span>{t('botWork.routineFailureThreshold')}</span><input type="number" min={1} max={100} required value={deliveryPolicy.failureThreshold} onChange={e=>setDeliveryPolicy({...deliveryPolicy,failureThreshold:Number(e.target.value)})}/></label>
+        <label><input type="checkbox" checked={deliveryPolicy.approvalBeforeSend} onChange={e=>setDeliveryPolicy({...deliveryPolicy,approvalBeforeSend:e.target.checked})}/>{t('botWork.routineApprovalBeforeSend')}</label>
+        <p>{t('botWork.routineNotificationNote')}</p>
         <label className="field field--stack"><span>{t('botWork.timezone')}</span><input required value={timezone} onChange={e=>setTimezone(e.target.value)}/></label>
         <label className="field field--stack"><span>{t('botWork.missed')}</span><select value={missedPolicy} onChange={e=>setMissedPolicy(e.target.value)}><option value="coalesce">{t('botWork.coalesce')}</option><option value="skip">{t('botWork.skip')}</option><option value="catch_up">{t('botWork.catchUp')}</option></select></label>
         {scheduleKind==='once'&&<label>{t('botWork.onceAt')}<input type="datetime-local" required value={onceAt} onChange={e=>setOnceAt(e.target.value)}/></label>}
@@ -312,7 +328,8 @@ export function BotCronPanel({
           <label className="field field--stack">
             <span>{precheckKind === 'script' ? t('play.cronPanel.precheckScript') : t('play.cronPanel.precheckPredicate')}</span>
             <textarea
-              className="input-compact bot-cron-form__prompt"
+              aria-label={t('play.cronPanel.prompt')}
+            className="input-compact bot-cron-form__prompt"
               required
               rows={2}
               placeholder={t('play.cronPanel.precheckPh')}
@@ -353,7 +370,7 @@ export function BotCronPanel({
               </p>
               <p>{String(routineTimezone(job.timezone, timezone))}</p>
               {job.expiresAt&&<p className="bot-cron-card__meta">{t('botWork.expiresAt')}: {formatWhen(job.expiresAt)}</p>}
-              <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={()=>{setEditingId(job.id);setExpiresAt(job.expiresAt?zonedInstantToLocal(job.expiresAt,routineTimezone(job.timezone, timezone)):'');setName(job.name);setPrompt(job.prompt);setTimezone(String(routineTimezone(job.timezone, timezone)));setMissedPolicy(String(job.missedPolicy??'coalesce'));if(job.scheduleKind==='once_at'){setScheduleKind('once');setOnceAt(zonedInstantToLocal(job.scheduleValue,routineTimezone(job.timezone, timezone)));}else if(job.scheduleKind==='every_ms'){setScheduleKind('interval');setIntervalSeconds(Number(job.scheduleValue)/1000);}else if(job.scheduleKind==='event'){setScheduleKind('event');setEvent(job.scheduleValue);setEventSecret(String(job.metadata.secretEnv??''));setConclusions(Array.isArray(job.metadata.conclusions)?job.metadata.conclusions.join(', '):'');}else{setScheduleKind('cron');setPreset('custom');setCronDraft(job.scheduleValue);}const check=job.metadata.precheck as {kind?:'script'|'predicate';source?:string}|undefined;setPrecheckKind(check?.kind??'none');setPrecheckSource(check?.source??'');setPrecheckMode(job.metadata.precheckMode==='strict'?'strict':'compat');}}>{t('botWork.edit')}</button>
+              <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={()=>{setEditingId(job.id);setSourceDelivery(job.metadata.sourceDelivery as {taskId:string;attempt:number}|undefined);setRoomId(String(job.metadata.roomId??''));setDeliveryPolicy((job.metadata.deliveryPolicy as typeof deliveryPolicy)??{inputSources:'',changesOnly:false,failureThreshold:1,approvalBeforeSend:false});setExpiresAt(job.expiresAt?zonedInstantToLocal(job.expiresAt,routineTimezone(job.timezone, timezone)):'');setName(job.name);setPrompt(job.prompt);setTimezone(String(routineTimezone(job.timezone, timezone)));setMissedPolicy(String(job.missedPolicy??'coalesce'));if(job.scheduleKind==='once_at'){setScheduleKind('once');setOnceAt(zonedInstantToLocal(job.scheduleValue,routineTimezone(job.timezone, timezone)));}else if(job.scheduleKind==='every_ms'){setScheduleKind('interval');setIntervalSeconds(Number(job.scheduleValue)/1000);}else if(job.scheduleKind==='event'){setScheduleKind('event');setEvent(job.scheduleValue);setEventSecret(String(job.metadata.secretEnv??''));setConclusions(Array.isArray(job.metadata.conclusions)?job.metadata.conclusions.join(', '):'');}else{setScheduleKind('cron');setPreset('custom');setCronDraft(job.scheduleValue);}const check=job.metadata.precheck as {kind?:'script'|'predicate';source?:string}|undefined;setPrecheckKind(check?.kind??'none');setPrecheckSource(check?.source??'');setPrecheckMode(job.metadata.precheckMode==='strict'?'strict':'compat');}}>{t('botWork.edit')}</button>
               <RoutineRuns jobId={job.id}/>
               <div className="bot-cron-card__actions">
                 <button

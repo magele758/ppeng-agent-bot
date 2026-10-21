@@ -8,6 +8,8 @@ const colors: Partial<Record<Status, { color: string; backgroundColor: string; b
   completed: { color: '#17613b', backgroundColor: '#e3f4e9', borderStyle: 'solid' },
 };
 export function routineStatusPresentation(value: string) {
+  if (value === 'error') value = 'failed';
+  if (value === 'pending') value = 'queued';
   const status: Status = known.includes(value as Status) ? value as Status : 'unknown';
   return {
     key: `botWork.states.${status}` as const,

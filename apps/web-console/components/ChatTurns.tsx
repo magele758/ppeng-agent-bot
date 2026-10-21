@@ -13,6 +13,7 @@ import {
 } from '@/lib/chat-utils';
 import { parseCronUserPrompt } from '@/lib/cron';
 import { A2uiSurface } from './a2ui/A2uiSurface';
+import { ReadableMessage } from './ReadableMessage';
 import { MarkdownHtml, StaticHtml } from './MarkdownHtml';
 import { foldA2uiMessages } from './a2ui/fold';
 import { surfacePartKey, useSurfaceContext } from './a2ui/SurfaceContext';
@@ -481,7 +482,7 @@ export function ChatTurnFromMessage({
     ) : r === 'tool' || r === 'system' ? (
       <pre className="chat-bubble__pre">{msgPartsToText(m.parts)}</pre>
     ) : (
-      <MarkdownHtml className="chat-bubble__body chat-bubble__md" text={msgPartsToText(m.parts)} />
+      <ReadableMessage text={msgPartsToText(m.parts)} role={r} messageKey={(m as { key?: string }).key} />
     );
   const artifactBubble = r === 'tool' || r === 'system';
   const isSteerMessage =

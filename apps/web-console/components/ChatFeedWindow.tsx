@@ -57,6 +57,7 @@ function FeedRow({
 }
 
 export function ChatFeedWindow({
+  layoutKey,
   scrollerRef,
   slots,
   renderSlot,
@@ -70,6 +71,7 @@ export function ChatFeedWindow({
   header,
   footer
 }: {
+  layoutKey?: string;
   scrollerRef: RefObject<HTMLDivElement | null>;
   slots: FeedSlot[];
   renderSlot: (slot: FeedSlot) => ReactNode;
@@ -90,7 +92,8 @@ export function ChatFeedWindow({
   const applyingScrollRef = useRef(false);
   const nearTopRef = useRef(false);
   const intentTriesRef = useRef(0);
-  const [scrollTop, setScrollTop] = useState(0);
+  const [scrollPosition, setScrollPosition] = useState({ top: 0 });
+  const scrollTop = scrollPosition.top;
   const [viewport, setViewport] = useState(0);
   const [heightsVersion, setHeightsVersion] = useState(0);
   const { history, pinned } = splitPinnedSuffix(slots);
@@ -130,11 +133,19 @@ export function ChatFeedWindow({
       applyingScrollRef.current = true;
       el.scrollTop = applied.scrollTop;
       applyingScrollRef.current = false;
-      setScrollTop(applied.scrollTop);
+      setScrollPosition({ top: el.scrollTop });
+    }
+    // Layout and browser scroll anchoring can clamp the offset without a new
+    // scroll event. Reconcile that position before leaving a tail-only window.
+    if (applied.scrollTop == null && el.scrollHeight > el.clientHeight &&
+        (Math.abs(el.scrollTop - scrollTop) > 1 ||
+          (el.scrollTop <= 1 && range.padTop > 0 && stickToBottomRef.current))) {
+      onStickScroll();
+      setScrollPosition({ top: el.scrollTop });
     }
     if (el.clientHeight !== viewport) setViewport(el.clientHeight);
     if (shouldAutoLoadOlder(hasOlder, olderLoading, el.scrollHeight, el.clientHeight)) onRequestOlderRef.current('auto');
-  }, [hasOlder, heightsVersion, olderLoading, revision, scrollerRef, scrollIntentRef, slots.length, viewport]);
+  }, [layoutKey, hasOlder, heightsVersion, olderLoading, revision, scrollerRef, scrollIntentRef, slots.length, viewport, scrollTop, range.padTop, onStickScroll, stickToBottomRef]);
 
   const onScroll = (event: UIEvent<HTMLDivElement>) => {
     if (applyingScrollRef.current) return;
@@ -150,7 +161,9 @@ export function ChatFeedWindow({
       stickToBottom: stickToBottomRef.current,
       fallbackRows: FEED_FALLBACK_ROWS
     });
-    setScrollTop((current) => (Math.abs(current - top) < 1 && rangesEqual(range, next) ? current : top));
+    // A ref-only follow/anchor change can alter the window even at the same offset.
+    // Keep a new state identity in that case so the visible rows are recomputed.
+    setScrollPosition((current) => (Math.abs(current.top - top) < 1 && rangesEqual(range, next) ? current : { top }));
     setViewport(el.clientHeight);
     const nearTop = top < FEED_NEAR_TOP_PX;
     const enteredTop = nearTop && !nearTopRef.current;

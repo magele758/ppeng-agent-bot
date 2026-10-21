@@ -60,7 +60,7 @@ const EXTRA_RESERVED = new Set<string>([
   'bot_team_status',
   'bot_delegate',
   'bot_task_results',
-  'skill_propose'
+  'skill_propose', 'skill_manage'
 ]);
 
 export function collectReservedDynToolNames(processTools?: Array<{ name: string }>): Set<string> {

@@ -439,3 +439,49 @@ test('a live canonical bot over 20% and under 50% still receives the old prefix 
   const events = await runtime.listTraceEvents(session.id);
   assert.equal(events.some((event) => event.kind === 'request_over_budget'), false);
 });
+
+test('records final model requests independently of preview and protects latest metrics [AC:bot-workspace-interaction-polish#AC-9] [AC:bot-workspace-interaction-polish#AC-10]', async () => {
+  const { observeModelRequests } = await import('../dist/runtime/request-metrics.js');
+  const values = new Map();
+  const store = { getDaemonControl: key => values.get(key), setDaemonControl: (key, value) => values.set(key, value) };
+  let finish;
+  const adapter = { name: 'fixture', contextWindow: 131072, summarizeMessages: async () => '', runTurn: async input => input.messages[0].id === 'slow' ? new Promise(resolve => { finish = resolve; }) : { usage: { inputTokens: 128, outputTokens: 2, totalTokens: 130, requests: 1 } } };
+  const observed = observeModelRequests(store, adapter, new Map());
+  const slow = observed.runTurn(requestOf([text('user','slow',{ id:'slow' })]));
+  const sent = requestOf([text('user','final shaped message')],{ systemPrompt:'system',tools:[{name:'read',description:'read data',inputSchema:{type:'object'}}] });
+  await observed.runTurn(sent);
+  const metric = values.get('session.latestRequest:s');
+  assert.equal(metric.estimatedTokens, tokens(sent));
+  assert.equal(metric.actualInputTokens,128);
+  assert.equal(metric.windowTokens,131072);
+  finish({usage:{inputTokens:999,requests:1}}); await slow;
+  assert.equal(values.get('session.latestRequest:s').actualInputTokens,128);
+});
+
+test('runtime publishes the exact final input after budget shaping [AC:bot-workspace-interaction-polish#AC-9]', async () => {
+  const adapter = new RecordingAdapter(() => 'SHAPED_SUMMARY');
+  const runtime = new RawAgentRuntime({repoRoot:mkdtempSync(join(tmpdir(),'request-repo-')),stateDir:mkdtempSync(join(tmpdir(),'request-state-')),modelAdapter:adapter});
+  try {
+    const session = runtime.createChatSession({title:'metrics',message:'seed'});
+    runtime.store.appendMessage(session.id,'user',[{type:'text',text:'old '.repeat(40000)}]);
+    runtime.store.appendMessage(session.id,'user',[{type:'text',text:'latest'}]);
+    await runtime.runSession(session.id);
+    const sent = adapter.inputs.at(-1);
+    const metric = runtime.store.getDaemonControl(`session.latestRequest:${session.id}`);
+    assert.equal(metric.estimatedTokens,estimateNormalRequestTokens(sent));
+    assert.equal(metric.actualInputTokens,undefined);
+    assert.equal(metric.windowTokens,adapter.contextWindow);
+    assert.ok(Date.parse(metric.sentAt));
+  } finally { runtime.store.db.close(); }
+});
+
+test('upstream cumulative usage is not displayed as current request length [AC:bot-workspace-interaction-polish#AC-10]', async () => {
+  const {observeModelRequests}=await import('../dist/runtime/request-metrics.js');
+  const values=new Map(), store={getDaemonControl:key=>values.get(key),setDaemonControl:(key,value)=>values.set(key,value)};
+  let usage=30000;
+  const adapter={name:'cumulative',summarizeMessages:async()=>'',runTurn:async()=>({usage:{inputTokens:usage,outputTokens:1,totalTokens:usage+1,requests:1}})};
+  await observeModelRequests(store,adapter,new Map()).runTurn(requestOf([text('user','a')]));
+  usage=60000;
+  await observeModelRequests(store,adapter,new Map()).runTurn(requestOf([text('user','b')]));
+  assert.equal(values.get('session.latestRequest:s').actualInputTokens,30000);
+});

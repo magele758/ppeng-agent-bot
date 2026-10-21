@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { BotSkillManager } from './BotSkillManager';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { parseRemindDraft, REMIND_MAX, REMIND_MIN } from '@/lib/skill-proposal-remind';
@@ -18,6 +19,10 @@ interface SettingsResponse {
 
 interface ProposalSummary {
   id: string;
+  installed?: boolean;
+  ownerBotId?: string;
+  sharedBotIds?: string[];
+  blockedBotIds?: string[];
   name: string;
   description: string;
   sessionId: string;
@@ -145,35 +150,6 @@ export function SkillProposalsCard() {
     }
   };
 
-  const revoke = async (row: ProposalSummary) => {
-    if (!window.confirm(t('skillProposals.revokeConfirm', { name: row.name }))) return;
-    setBusy(true);
-    setMsg(null);
-    setErr(null);
-    try {
-      const data = (await api(`/api/skill-proposals/${encodeURIComponent(row.id)}/revoke`, {
-        method: 'POST',
-        headers: JSON_HEADERS,
-        body: '{}'
-      })) as { outcome?: 'removed' | 'missing' | 'foreign' };
-      const base = t('skillProposals.revokedMsg', { name: row.name });
-      const extra =
-        data.outcome === 'missing'
-          ? t('skillProposals.revokeMissingHint')
-          : data.outcome === 'foreign'
-            ? t('skillProposals.revokeForeignHint')
-            : row.replaces
-              ? t('skillProposals.revokeRestoredHint')
-              : '';
-      setMsg(extra ? `${base} ${extra}` : base);
-      await loadProposals();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-      await loadProposals();
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const statusLabel = (status: ProposalSummary['status']): string => {
     switch (status) {
@@ -204,7 +180,7 @@ export function SkillProposalsCard() {
   }
 
   const pending = proposals.filter((p) => p.status === 'pending');
-  const approved = proposals.filter((p) => p.status === 'approved');
+  const approved = proposals.filter((p) => p.status === 'approved' && p.installed !== false);
   const decided = proposals.filter((p) => p.status === 'rejected' || p.status === 'revoked').slice(0, 10);
 
   return (
@@ -293,7 +269,7 @@ export function SkillProposalsCard() {
                   </span>
                 </div>
                 <div className="muted" style={{ fontSize: '0.75rem' }}>
-                  {t('skillProposals.fromSession', { session: row.sessionId })}
+                  {row.ownerBotId ? t('skillProposals.ownerBot', { name: row.ownerBotId }) : t('skillProposals.legacyShared')} · {t('skillProposals.fromSession', { session: row.sessionId })}
                 </div>
                 {row.replaces ? (
                   <div className="muted" style={{ fontSize: '0.75rem' }}>
@@ -360,39 +336,7 @@ export function SkillProposalsCard() {
             );
           })
         )}
-        {approved.length ? (
-          <>
-            <div className="card-head" style={{ paddingLeft: 0 }}>
-              <h4 style={{ margin: 0 }}>
-                {t('skillProposals.approvedTitle')} ({approved.length})
-              </h4>
-            </div>
-            {approved.map((row) => (
-              <div
-                key={row.id}
-                className="row"
-                style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}
-                data-testid={`skill-approved-${row.name}`}
-              >
-                <strong style={{ fontSize: '0.85rem' }}>{row.name}</strong>
-                <span className="badge">{statusLabel(row.status)}</span>
-                {row.replaces ? (
-                  <span className="muted" style={{ fontSize: '0.75rem' }}>
-                    {t('skillProposals.replaces', { name: row.replaces.name })}
-                  </span>
-                ) : null}
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  disabled={busy}
-                  onClick={() => void revoke(row)}
-                >
-                  {t('skillProposals.revoke')}
-                </button>
-              </div>
-            ))}
-          </>
-        ) : null}
+        <BotSkillManager skills={approved} onChange={loadProposals} />
         {decided.length ? (
           <>
             <div className="card-head" style={{ paddingLeft: 0 }}>

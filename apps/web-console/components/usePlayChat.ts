@@ -541,7 +541,7 @@ export function usePlayChat(deps: PlayChatDeps) {
       return;
     }
 
-    if (userMovedUp) {
+    if (userMovedUp || currentTop <= 1) {
       playStickToBottomRef.current = false;
       cancelScheduledPlayScroll();
       setShowJumpToLatest(true);

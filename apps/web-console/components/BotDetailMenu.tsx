@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { RoutineSchedule, type ScheduleJob } from './RoutineSchedule';
 import { api } from '@/lib/api';
 import { botPermissionsHref } from '@/lib/bot-chat-header';
 import {
@@ -14,7 +15,7 @@ import { useI18n, type MessageKey } from '@/lib/i18n';
 import styles from './BotDetailMenu.module.css';
 
 type Section = 'routines' | 'files' | 'memory';
-type RoutineItem = RoutineToggle & { name: string; nextRunAt?: string; scheduleValue?: string };
+type RoutineItem = RoutineToggle & ScheduleJob & { name: string; nextRunAt?: string; scheduleValue?: string };
 type MaterialItem = { id: string; name: string; kind: 'artifact' | 'working-log'; createdAt?: string; sourceTool?: string };
 type MemoryItem = { id: string; scope: string; key: string; value: string };
 
@@ -49,7 +50,7 @@ function fulfilledList<T>(result: PromiseSettledResult<unknown>, field: string):
   return Array.isArray(value) ? value as T[] : [];
 }
 
-function DetailRoutines({ jobs, loading, failed, toggleError, deleteError, busyId, onToggle, onDelete }: { jobs: RoutineItem[]; loading: boolean; failed: boolean; toggleError: boolean; deleteError: boolean; busyId: string | null; onToggle: (job: RoutineItem) => void; onDelete: (job: RoutineItem) => void }) {
+function DetailRoutines({ onSaved, jobs, loading, failed, toggleError, deleteError, busyId, onToggle, onDelete }: { onSaved: (job: ScheduleJob) => void; jobs: RoutineItem[]; loading: boolean; failed: boolean; toggleError: boolean; deleteError: boolean; busyId: string | null; onToggle: (job: RoutineItem) => void; onDelete: (job: RoutineItem) => void }) {
   const { t } = useI18n();
   const hidden = t('play.botDetail.redacted');
   return (<section data-testid="bot-detail-section-routines" aria-label={t('play.botDetail.routines')}>
@@ -60,7 +61,8 @@ function DetailRoutines({ jobs, loading, failed, toggleError, deleteError, busyI
               <article key={job.id} className={styles.item} data-testid="bot-detail-routine" data-routine-id={job.id} data-enabled={job.enabled ? 'true' : 'false'}>
                 <div className={styles.name}>{redactSensitiveText(job.name || job.id, hidden)}</div>
                 <p className={styles.meta}>{job.enabled ? t('play.botDetail.on') : t('play.botDetail.off')}</p>
-                <DetailNextRun when={job.nextRunAt} />
+                <RoutineSchedule job={job} onSaved={onSaved} />
+                <DetailNextRun when={job.enabled ? job.nextRunAt : undefined} />
                 <div className={styles.actions}>
                   <button
                     type="button"
@@ -132,14 +134,14 @@ function DetailMemories({ memories, loading, failed }: { memories: MemoryItem[];
 }
 
 
-function DetailBody({ section, loading, sectionError, jobs, files, memories, toggleError, deleteError, folderError, folderOk, busyId, onToggle, onDelete, onOpenFolder }: {
-  section: Section; loading: boolean; sectionError: Record<Section, boolean>; jobs: RoutineItem[]; files: MaterialItem[]; memories: MemoryItem[];
+function DetailBody({ onSaved, section, loading, sectionError, jobs, files, memories, toggleError, deleteError, folderError, folderOk, busyId, onToggle, onDelete, onOpenFolder }: {
+  onSaved: (job: ScheduleJob) => void; section: Section; loading: boolean; sectionError: Record<Section, boolean>; jobs: RoutineItem[]; files: MaterialItem[]; memories: MemoryItem[];
   toggleError: boolean; deleteError: boolean; folderError: boolean; folderOk: boolean; busyId: string | null; onToggle: (job: RoutineItem) => void; onDelete: (job: RoutineItem) => void; onOpenFolder: (id: string) => void;
 }) {
   const { t } = useI18n();
   return (      <div className={styles.body}>
         {loading ? <p className={styles.meta}>{t('play.botDetail.loading')}</p> : null}
-        {section === 'routines' ? <DetailRoutines jobs={jobs} loading={loading} failed={sectionError.routines} toggleError={toggleError} deleteError={deleteError} busyId={busyId} onToggle={onToggle} onDelete={onDelete} /> : null}
+        {section === 'routines' ? <DetailRoutines onSaved={onSaved} jobs={jobs} loading={loading} failed={sectionError.routines} toggleError={toggleError} deleteError={deleteError} busyId={busyId} onToggle={onToggle} onDelete={onDelete} /> : null}
         {section === 'files' ? <DetailFiles files={files} loading={loading} failed={sectionError.files} folderError={folderError} folderOk={folderOk} busyId={busyId} onOpenFolder={onOpenFolder} /> : null}
         {section === 'memory' ? <DetailMemories memories={memories} loading={loading} failed={sectionError.memory} /> : null}
       </div>);
@@ -281,7 +283,7 @@ export function BotDetailMenu({
           </button>
         ))}
       </div>
-      <DetailBody section={section} loading={loading} sectionError={sectionError} jobs={jobs} files={files} memories={memories} toggleError={toggleError} deleteError={deleteError} folderError={folderError} folderOk={folderOk} busyId={busyId} onToggle={onToggle} onDelete={onDelete} onOpenFolder={onOpenFolder} />
+      <DetailBody onSaved={updated => setJobs(current => current.map(job => job.id === updated.id ? { ...job, ...updated } : job))} section={section} loading={loading} sectionError={sectionError} jobs={jobs} files={files} memories={memories} toggleError={toggleError} deleteError={deleteError} folderError={folderError} folderOk={folderOk} busyId={busyId} onToggle={onToggle} onDelete={onDelete} onOpenFolder={onOpenFolder} />
     </aside>
   );
 }

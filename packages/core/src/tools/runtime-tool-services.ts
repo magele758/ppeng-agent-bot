@@ -1,4 +1,5 @@
 export interface MemoryToolServices {
+  currentUserText?(sessionId: string): Promise<string>;
   upsertSessionMemory(
     sessionId: string,
     scope: 'scratch' | 'long',

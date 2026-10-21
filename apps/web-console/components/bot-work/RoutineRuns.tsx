@@ -14,6 +14,9 @@ type Run = {
   scheduledAt: string;
   attempt: number;
   requiresEffectVerification?: boolean;
+  publication?: 'pending'|'approved'|'rejected';
+  notificationReason?:string;
+  job?:{metadata:{roomId?:string}};
 };
 export function RoutineRuns({ jobId }: { jobId: string }) {
   const { t } = useI18n();
@@ -66,6 +69,13 @@ export function RoutineRuns({ jobId }: { jobId: string }) {
           <span>
             {r.scheduledAt} · {r.precheckOutcome==='failed'?t('botWork.precheckFailed'):r.precheckOutcome==='no_change'?t('botWork.precheckNoChange'):<Status value={r.status} />} · {r.attempt}
           </span>
+          {r.publication==='pending'&&<div role="status">
+            <p>{t('botWork.routinePublicationPending')}</p>
+            <p>{t('botWork.routineOutput')}: {r.job?.metadata.roomId??t('botWork.routineOutputChat')}</p>
+            <Result value={r.result}/>
+            {[true,false].map(approved=><button key={String(approved)} type="button" disabled={action.busy} onClick={()=>void action.run(async()=>{await api(`/api/cron/runs/${r.id}/publication`,json({approved}));await load();})}>{t(approved?'botWork.routinePublish':'botWork.routineReject')}</button>)}
+          </div>}
+          {r.notificationReason&&<p>{t(r.notificationReason==='unchanged'?'botWork.routineUnchanged':r.notificationReason==='rejected'?'botWork.routineRejected':'botWork.routineBelowThreshold')}</p>}
           {r.failureClass&&<span>{r.failureClass==='transient'?t('botWork.failureTransient'):t('botWork.failureHard')}</span>}
           <button
             type="button"

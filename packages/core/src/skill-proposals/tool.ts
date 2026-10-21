@@ -1,94 +1,52 @@
-import type { RunContext, SkillSpec, ToolContract, ToolExecutionResult } from '../types.js';
-import { readSkillProposalSettings, type SkillProposalSettingsStore } from './settings.js';
-import { SkillProposalStore } from './store.js';
-import {
-  SKILL_PROPOSAL_BODY_MAX,
-  SKILL_PROPOSAL_DESCRIPTION_MAX,
-  SKILL_PROPOSAL_NAME_MAX,
-  SkillProposalError,
-  validateSkillProposalDraft
-} from './validate.js';
+import type { RunContext, ToolContract } from '../types.js';
+import type {SkillManagementService,SkillManagementInput} from './management.js';
+import type { SkillCaptureService, SkillCaptureSuggestion } from './capture.js';
 
 export const SKILL_PROPOSE_TOOL_NAME = 'skill_propose';
-
 export interface SkillProposeToolDeps {
-  settingsStore?: SkillProposalSettingsStore;
-  getStateDir(): string;
-  listSkills(): Promise<SkillSpec[]>;
+  captures: SkillCaptureService;
+  management?: SkillManagementService;
   emitTrace?: (sessionId: string, event: { kind: string; payload?: Record<string, unknown> }) => void;
 }
-
-function fail(content: string): ToolExecutionResult {
-  return { ok: false, content };
-}
-
-function findExisting(skills: SkillSpec[], name: string): SkillSpec | undefined {
-  return skills.find((skill) =>
-    [skill.name, skill.id, ...(skill.aliases ?? [])].some(
-      (key) => typeof key === 'string' && key.trim().toLowerCase() === name
-    )
-  );
-}
-
-export function createSkillProposeTool(deps: SkillProposeToolDeps): ToolContract<{
-  name: string;
-  description: string;
-  body: string;
-}> {
+export function createSkillProposeTool(deps: SkillProposeToolDeps): ToolContract<SkillCaptureSuggestion & Record<string, unknown>> {
   return {
     name: SKILL_PROPOSE_TOOL_NAME,
     description:
-      'Propose a reusable skill (a SKILL.md playbook) distilled from a workflow you just completed successfully. ' +
-      'The proposal goes into a human review queue only; it is NOT installed or loadable until a person approves it in Lab. ' +
-      `name: lowercase letters/digits separated by hyphens (max ${SKILL_PROPOSAL_NAME_MAX}). ` +
-      `description: one line saying when to use it (max ${SKILL_PROPOSAL_DESCRIPTION_MAX} chars). ` +
-      `body: markdown instructions without YAML frontmatter (max ${SKILL_PROPOSAL_BODY_MAX} chars). ` +
-      'Never include secrets, tokens, or credentials. Reusing an existing skill name files an update proposal for review.',
+      'Suggest capturing a reusable skill from a successfully completed workflow, or updating an existing skill. ' +
+      'Decide whether the experience is worth recording yourself. Submit ONLY an intent (name, description, reason, summary), NOT a skill body. ' +
+      'A non-blocking confirmation card appears in this conversation. Only after the human confirms will the runtime distill and save the skill automatically, without a second review. ' +
+      'New Bot skills are private by default. For explicit user commands to create/update, or to manage sharing/deletion, use skill_manage; skill_propose is for autonomous suggestions. Use the exact owned skill name and targetSkillId for updates; choose a new name for built-in or ~/.agents skills that cannot be replaced. ' +
+      'Do not repeat rejected suggestions. Continue the current task without waiting for a decision. Never include secrets.',
     inputSchema: {
       type: 'object',
+      additionalProperties: false,
       properties: {
-        name: { type: 'string', description: 'kebab-case skill name' },
-        description: { type: 'string', description: 'One-line trigger description' },
-        body: { type: 'string', description: 'Markdown body of the skill (no frontmatter)' }
+        targetSkillId: { type: 'string', description: 'Exact search result ID for updating an owned skill. Shared skills are read-only; omit to propose a separate private skill.' },
+        name: { type: 'string', description: 'Exact target name, lowercase kebab-case, at most 64 characters' },
+        description: { type: 'string', description: 'One-line trigger, at most 300 characters' },
+        reason: { type: 'string', description: 'Why this successful experience is worth recording, at most 300 characters' },
+        summary: { type: 'string', description: 'Scope and planned changes for the human to confirm, at most 2000 characters. Not a skill body.' }
       },
-      required: ['name', 'description', 'body']
+      required: ['name', 'description', 'reason', 'summary']
     },
     approvalMode: 'never',
     sideEffectLevel: 'workspace',
-    async execute(context: RunContext, args): Promise<ToolExecutionResult> {
-      if (!readSkillProposalSettings(deps.settingsStore).enabled) {
-        return fail('skill_propose is disabled. A human can enable it in Lab → More → Skill proposals.');
-      }
+    async execute(context: RunContext, args) {
       try {
-        const draft = validateSkillProposalDraft(args);
-        const existing = findExisting(await deps.listSkills(), draft.name);
-        if (existing?.source === 'builtin') {
-          return fail(`"${draft.name}" is a built-in skill and cannot be updated by proposal; choose a different name.`);
+        if(deps.management && typeof context.session.metadata?.botId === 'string'){
+          const own=(await deps.management.catalog(context.session.id)).find(s=>s.canManage&&s.name===args.name);
+          const input:SkillManagementInput={action:own?'update':'create',skillId:args.targetSkillId??own?.id,name:args.name,description:args.description,reason:args.reason,summary:args.summary};
+          const key=context.session.id;
+          if(await deps.management.hasExplicitRequest(key,input)){
+            const operation=await deps.management.request(key,context.agent.id,input,'user');
+            return {ok:operation.status==='saved',content:JSON.stringify({operation,note:'Explicit user command executed; no second body review.'})};
+          }
         }
-        const record = new SkillProposalStore(deps.getStateDir()).create({
-          ...draft,
-          sessionId: context.session.id,
-          agentId: context.agent.id,
-          ...(existing ? { replaces: { name: existing.name, source: existing.source } } : {})
-        });
-        deps.emitTrace?.(context.session.id, {
-          kind: 'skill_propose',
-          payload: { proposalId: record.id, name: record.name, proposalKind: record.kind }
-        });
-        return {
-          ok: true,
-          content: JSON.stringify({
-            ok: true,
-            proposalId: record.id,
-            name: record.name,
-            kind: record.kind,
-            status: 'pending',
-            note: 'Queued for human review. It is not loadable until approved.'
-          })
-        };
+        const capture = await deps.captures.suggest(context.session.id, context.agent.id, args);
+        deps.emitTrace?.(context.session.id, { kind: 'skill_propose', payload: { captureId: capture.id, name: capture.name, status: capture.status } });
+        return { ok: true, content: JSON.stringify({ capture, note: 'Intent only. Continue the task. The human decides in the conversation; no body is distilled or installed before confirmation.' }) };
       } catch (error) {
-        if (error instanceof SkillProposalError) return fail(error.message);
-        throw error;
+        return { ok: false, content: error instanceof Error ? error.message : String(error) };
       }
     }
   };

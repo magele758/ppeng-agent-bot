@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { BotInfo, SessionSummary } from '@/lib/types';
 import { botForCanonicalSession } from '@/lib/bots';
 import { api } from '@/lib/api';
@@ -135,6 +135,7 @@ export function BotFunctionalGroups({ bots, sessions, renderSession, createReque
 
 function SharedFacts({ groups }: { groups: FunctionalGroup[] }) {
   const { t } = useI18n();
+  const drafts = useRef(new Map<string, { key: string; value: string }[]>());
   const [scope, setScope] = useState('global');
   const [rows, setRows] = useState<{ key: string; value: string }[]>([]);
   const [error, setError] = useState('');
@@ -144,6 +145,7 @@ function SharedFacts({ groups }: { groups: FunctionalGroup[] }) {
   const [loadedPath, setLoadedPath] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
   const path = scope === 'global' ? '/api/bot-shared-context?scope=global' : `/api/bot-shared-context?scope=group&id=${encodeURIComponent(scope)}`;
+  const editRows = (next: { key: string; value: string }[]) => { drafts.current.set(path, next); setRows(next); };
   const ready = loadedPath === path;
   const controls = factEditorState(rows, busy, ready);
   useEffect(() => { if (scope !== 'global' && !groups.some((g) => g.id === scope)) setScope('global'); }, [groups, scope]);
@@ -151,7 +153,7 @@ function SharedFacts({ groups }: { groups: FunctionalGroup[] }) {
     if (!open) return;
     let alive = true;
     setBusy(true); setError(''); setSaved(false); setRows([]); setLoadedPath(null);
-    void api(path).then((data) => { if (alive) { setRows(Object.entries((data as { entries: Record<string, string> }).entries).map(([key, value]) => ({ key, value }))); setLoadedPath(path); } })
+    void api(path).then((data) => { if (alive) { setRows(drafts.current.get(path) ?? Object.entries((data as { entries: Record<string, string> }).entries).map(([key, value]) => ({ key, value }))); setLoadedPath(path); } })
       .catch((cause: unknown) => { if (alive) setError(String(cause)); })
       .finally(() => { if (alive) setBusy(false); });
     return () => { alive = false; };
@@ -162,6 +164,7 @@ function SharedFacts({ groups }: { groups: FunctionalGroup[] }) {
     try {
       const entries = Object.fromEntries(rows.filter((r) => r.key.trim()).map((r) => [r.key.trim(), r.value]));
       await api(path, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ entries }) });
+      drafts.current.delete(path);
       setSaved(true);
     } catch (cause) { setError(String(cause)); }
     finally { setBusy(false); }
@@ -173,11 +176,11 @@ function SharedFacts({ groups }: { groups: FunctionalGroup[] }) {
       <option value="global">{t('play.functionalGroups.global')}</option>{groups.map((g) => <option value={g.id} key={g.id}>{g.name}</option>)}
     </select></label>
     {rows.map((row, index) => <div className={styles.fact} key={index}>
-      <input aria-label={t('play.functionalGroups.factName', { index: index + 1 })} placeholder={t('play.functionalGroups.factNameHint')} value={row.key} disabled={controls.disabled} onChange={(event) => { setSaved(false); setRows(rows.map((r, i) => i === index ? { ...r, key: event.target.value } : r)); }} />
-      <input aria-label={t('play.functionalGroups.factValue', { index: index + 1 })} placeholder={t('play.functionalGroups.factValueHint')} value={row.value} disabled={controls.disabled} onChange={(event) => { setSaved(false); setRows(rows.map((r, i) => i === index ? { ...r, value: event.target.value } : r)); }} />
-      <button className="btn btn-ghost btn-sm" disabled={controls.disabled} aria-label={t('play.functionalGroups.removeFact', { index: index + 1 })} onClick={() => { setSaved(false); setRows(rows.filter((_, i) => i !== index)); }}>×</button>
+      <input aria-label={t('play.functionalGroups.factName', { index: index + 1 })} placeholder={t('play.functionalGroups.factNameHint')} value={row.key} disabled={controls.disabled} onChange={(event) => { setSaved(false); editRows(rows.map((r, i) => i === index ? { ...r, key: event.target.value } : r)); }} />
+      <input aria-label={t('play.functionalGroups.factValue', { index: index + 1 })} placeholder={t('play.functionalGroups.factValueHint')} value={row.value} disabled={controls.disabled} onChange={(event) => { setSaved(false); editRows(rows.map((r, i) => i === index ? { ...r, value: event.target.value } : r)); }} />
+      <button className="btn btn-ghost btn-sm" disabled={controls.disabled} aria-label={t('play.functionalGroups.removeFact', { index: index + 1 })} onClick={() => { setSaved(false); editRows(rows.filter((_, i) => i !== index)); }}>×</button>
     </div>)}
-    <button className="btn btn-ghost btn-sm" disabled={controls.disabled} onClick={() => { setSaved(false); setRows([...rows, { key: '', value: '' }]); }}>{t('play.functionalGroups.addFact')}</button>
+    <button className="btn btn-ghost btn-sm" disabled={controls.disabled} onClick={() => { setSaved(false); editRows([...rows, { key: '', value: '' }]); }}>{t('play.functionalGroups.addFact')}</button>
     <button className="btn btn-sm" disabled={controls.saveDisabled} onClick={() => { void save(); }}>{t('play.functionalGroups.saveShared')}</button>
     <GroupLoadError error={error && t('play.functionalGroups.failed', { error })} loaded={ready} busy={busy} retry={() => setRetry(n => n + 1)} />
     {saved ? <p role="status">{t('play.functionalGroups.saved')}</p> : null}

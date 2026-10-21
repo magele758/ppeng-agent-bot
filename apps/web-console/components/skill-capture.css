@@ -1,0 +1,16 @@
+.skill-capture-list { display: grid; gap: 12px; }
+.skill-capture-card {
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  border-radius: var(--ui-radius-lg);
+  padding: var(--ui-space-4);
+  margin: var(--ui-space-2) 0;
+  overflow-wrap: anywhere;
+}
+.skill-capture-card header, .skill-capture-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.skill-capture-card header { justify-content: space-between; }
+.skill-capture-card h4 { margin: 12px 0 4px; }
+.skill-capture-card p { margin: 8px 0; }
+.skill-capture-card dt { font-weight: 600; margin-top: 8px; }
+.skill-capture-card dd { margin: 4px 0; white-space: pre-wrap; }

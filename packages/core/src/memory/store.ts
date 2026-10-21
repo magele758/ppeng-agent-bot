@@ -208,6 +208,20 @@ export class AgentMemoryStore {
 
   // ── Memory CRUD ──
 
+  private ensureRevisions(): void {
+    this.db.exec(`CREATE TABLE IF NOT EXISTS agent_memory_revisions (
+      seq INTEGER PRIMARY KEY AUTOINCREMENT, memory_id TEXT NOT NULL, payload TEXT NOT NULL);
+      CREATE INDEX IF NOT EXISTS idx_memory_revision_id ON agent_memory_revisions(memory_id,seq);`);
+  }
+
+  /** Audit-only: old values are never included in normal recall/search results. */
+  revisions(id: string): Array<Pick<AgentMemory, 'value'|'source'|'updatedAt'|'sourceRefs'>> {
+    this.ensureRevisions();
+    const rows = this.db.prepare('SELECT payload FROM agent_memory_revisions WHERE memory_id=? ORDER BY seq DESC LIMIT 50')
+      .all(id) as { payload: string }[];
+    return rows.map(row => JSON.parse(row.payload));
+  }
+
   set(memory: Omit<AgentMemory, 'id' | 'createdAt' | 'updatedAt' | 'accessCount'> & Partial<Pick<AgentMemory, 'id' | 'createdAt' | 'updatedAt' | 'accessCount'>>): AgentMemory {
     this.db.exec('SAVEPOINT memory_write');
     try {
@@ -246,6 +260,13 @@ export class AgentMemoryStore {
       | undefined;
 
     if (existing) {
+      const previous = this.getEntryById(existing.id)!;
+      if (previous.value !== memory.value) {
+        this.ensureRevisions();
+        this.db.prepare('INSERT INTO agent_memory_revisions(memory_id,payload) VALUES(?,?)').run(existing.id,
+          JSON.stringify({ value: previous.value, source: previous.source, updatedAt: previous.updatedAt, sourceRefs: previous.sourceRefs }));
+        this.db.prepare('DELETE FROM agent_memory_revisions WHERE memory_id=? AND seq NOT IN (SELECT seq FROM agent_memory_revisions WHERE memory_id=? ORDER BY seq DESC LIMIT 50)').run(existing.id,existing.id);
+      }
       this.db
         .prepare(
           `UPDATE agent_memory SET value = ?, importance = ?, source = ?, confidence = ?,
@@ -382,6 +403,8 @@ export class AgentMemoryStore {
 
   delete(id: string): void {
     this.ensureSources();
+    this.ensureRevisions();
+    this.db.prepare('DELETE FROM agent_memory_revisions WHERE memory_id=?').run(id);
     this.db.prepare('DELETE FROM agent_memory_sources WHERE memory_id = ?').run(id);
     this.deleteEmbedding(id);
     this.db.prepare(`DELETE FROM agent_memory WHERE id = ?`).run(id);

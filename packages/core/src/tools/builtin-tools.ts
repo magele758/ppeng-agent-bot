@@ -74,6 +74,7 @@ import {
 } from '../a2ui/index.js';
 
 export interface RuntimeToolServices {
+  currentUserText?(sessionId: string): Promise<string>;
   loadSkill: (name: string, sessionId: string) => Promise<{ content?: string; error?: string }>;
   searchSkills: (
     query: string,

@@ -1,8 +1,10 @@
+import { FontSizeSettingsCard } from '../../../FontSizeSettingsCard';
 import { LanguageSettingsCard } from '../../../LanguageSettingsCard';
 import { ThemeSettingsCard } from '../../../ThemeSettingsCard';
 import type { SettingsEntry } from '../registry';
 
 export const generalEntries: SettingsEntry[] = [
+  { id: 'font-size', category: 'general', titleKey: 'settings.fontSize.title', keywordsKey: 'settings.fontSize.keywords', render: () => <FontSizeSettingsCard /> },
   {
     id: 'language',
     category: 'general',

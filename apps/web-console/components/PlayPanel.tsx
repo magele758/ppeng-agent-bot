@@ -1,5 +1,8 @@
 'use client';
 
+import { planFeedScroll, readFeedAnchor } from '@/lib/feed-window';
+import { WorkspaceIcon } from './WorkspaceIcon';
+
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import type { AgentInfo, ApprovalItem, BotInfo, SessionSummary } from '@/lib/types';
 import { botForCanonicalSession, visibleBotRoster, type PlaySurface } from '@/lib/bots';
@@ -47,6 +50,8 @@ import { SessionSettingsPanel, type ExecPreset } from './sections/chat/SessionSe
 import { PlayBotGroupChat } from './play-group/PlayBotGroupChat';
 import { PlayBotGroupList } from './play-group/PlayBotGroupList';
 import { SessionListRow } from './SessionListRow';
+import { BotWorkSummary } from './bot-work/BotWorkSummary';
+import { BotFirstTask } from './bot-work/BotFirstTask';
 import { BotFunctionalGroups } from './BotFunctionalGroups';
 import { BotPinArea } from './BotPinArea';
 import { BotPermissionsLink, BotDetailPane, BotDetailToggle, botDetailIsVisible, botDetailMainClass } from './BotDetailMenu';
@@ -293,6 +298,27 @@ export function PlayPanel({
   const configBtnRef = useRef<HTMLButtonElement>(null);
   const configPanelRef = useRef<HTMLDivElement>(null);
   const prevSteerCountRef = useRef(0);
+  const [railCollapsed, setRailCollapsed] = useState(false);
+  const railAnchorRef = useRef<{ key?: string; top: number; bottom: boolean } | null>(null);
+  useLayoutEffect(() => {
+    const anchor = railAnchorRef.current;
+    const feed = chat.playMessagesRef.current;
+    if (!anchor || !feed) return;
+    let frame = 0;
+    let remaining = 3;
+    const restore = () => {
+      if (anchor.bottom) feed.scrollTop = feed.scrollHeight - feed.clientHeight;
+      else if (anchor.key) {
+        const row = feed.querySelector<HTMLElement>(`[data-feed-key="${CSS.escape(anchor.key)}"]`);
+        if (row) feed.scrollTop += row.getBoundingClientRect().top - anchor.top;
+      }
+      if (--remaining > 0) frame = requestAnimationFrame(restore);
+      else railAnchorRef.current = null;
+    };
+    frame = requestAnimationFrame(restore);
+    return () => cancelAnimationFrame(frame);
+  }, [railCollapsed, chat.playMessagesRef]);
+  const [filterOpen, setFilterOpen] = useState(false);
   const [railTab, setRailTab] = useState<'activity' | 'context' | 'artifacts' | 'cron' | 'trajectory'>('activity');
   const [botDetailOpen, setBotDetailOpen] = useState(false);
   const flatAgents = sortAgentsById(agents);
@@ -713,7 +739,7 @@ export function PlayPanel({
         selectMode={selectMode}
         deleting={deleting}
         status={
-          statusKey ? (
+          rowBot ? <BotWorkSummary botId={rowBot.id} /> : statusKey ? (
             <span className={`session-item__status session-item__status--${s.status}`}>
               <span className={statusDotClass(s.status)} aria-hidden="true" />
               {t(statusKey)}
@@ -739,9 +765,9 @@ export function PlayPanel({
   return (
     <section className={`panel ${active ? 'active' : ''}`} id="panel-play">
       {renderCreateDialog()}
-      <div className="play-layout play-layout--rail">
+      <div className={`play-layout play-layout--rail${railCollapsed ? ' is-rail-collapsed' : ''}`}>
         <aside className="play-sidebar">
-          <div className="play-sidebar__head">
+          <div className="play-sidebar__head" data-testid="session-toolbar" role="toolbar" aria-label={t('polish.toolbar')}>
             <div className="create-menu" ref={createMenuRef} onMouseEnter={() => setCreateMenuOpen(true)} onMouseLeave={() => setCreateMenuOpen(false)} onKeyDown={(event) => {
               if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
               event.preventDefault(); setCreateMenuOpen(true);
@@ -754,13 +780,15 @@ export function PlayPanel({
               <button
                 type="button"
                 id="btnPlayCreate"
+                aria-label={botSurface ? t('play.entry.new') : t('play.add')}
+                title={botSurface ? t('play.entry.new') : t('play.add')}
                 className={`btn btn-primary btn-sm${createMenuOpen ? ' is-open' : ''}`}
                 aria-haspopup="menu"
                 aria-expanded={createMenuOpen}
                 aria-controls="playCreateMenu"
                 onClick={() => setCreateMenuOpen(true)}
               >
-                {botSurface ? t('play.entry.new') : t('play.add')}
+                <WorkspaceIcon kind="plus" />
               </button>
               {createMenuOpen ? (
                 <div className="create-menu__pop" id="playCreateMenu" role="menu">
@@ -771,23 +799,7 @@ export function PlayPanel({
                 </div>
               ) : null}
             </div>
-          </div>
-          {botRemoveError ? <p role="alert" className="play-group-error">{botRemoveError}</p> : null}
-          <div className="play-sidebar__tools">
-          {onSessionFilterChange ? (
-            <label className="play-sidebar__search">
-              <span className="sr-only">{t('play.sidebar.filterSessions')}</span>
-              <input
-                type="search"
-                className="input-compact"
-                placeholder={t('play.sidebar.filterPlaceholder')}
-                autoComplete="off"
-                value={sessionFilter}
-                onChange={(e) => onSessionFilterChange(e.target.value)}
-                aria-label={t('play.sidebar.filterAria')}
-              />
-            </label>
-          ) : null}
+            <button type="button" className="btn btn-ghost" aria-label={t('play.sidebar.filterSessions')} title={t('play.sidebar.filterSessions')} aria-expanded={filterOpen} onClick={() => setFilterOpen(value => !value)}><WorkspaceIcon kind="search" /></button>
           {onDeleteSessions && sessions.length ? (
             <div
               className={`play-sidebar__batch${selectMode ? ' is-selecting' : ''}`}
@@ -834,11 +846,30 @@ export function PlayPanel({
                   aria-label={t('play.sidebar.selectAria')}
                   onClick={() => setSelectMode(true)}
                 >
-                  {t('play.sidebar.select')}
+                  <WorkspaceIcon kind="select" />
                 </button>
               )}
             </div>
           ) : null}
+          </div>
+          {botRemoveError ? <p role="alert" className="play-group-error">{botRemoveError}</p> : null}
+          <div className="play-sidebar__tools" hidden={!filterOpen && !sessionFilter}>
+          {onSessionFilterChange && (filterOpen || sessionFilter) ? (
+            <label className="play-sidebar__search">
+              <span className="sr-only">{t('play.sidebar.filterSessions')}</span>
+              <input
+                type="search"
+                className="input-compact"
+                placeholder={t('play.sidebar.filterPlaceholder')}
+                autoComplete="off"
+                value={sessionFilter}
+                onChange={(e) => onSessionFilterChange(e.target.value)}
+                aria-label={t('play.sidebar.filterAria')}
+              />
+              <button type="button" className="btn btn-ghost" aria-label={t('polish.clearFilter')} onClick={() => onSessionFilterChange('')}><WorkspaceIcon kind="close" /></button>
+            </label>
+          ) : null}
+
           </div>
           <div className="list-scroll play-sidebar__list" id="sessionListMini">
               <BotPinArea
@@ -899,6 +930,7 @@ export function PlayPanel({
                   <BotPermissionsLink botId={headerBotId} botName={headerBotName || headerTitle} />
                   <BotDetailToggle botId={headerBotId} open={botDetailOpen} onToggle={() => setBotDetailOpen(open => !open)} />
                 </div>
+                {headerBotId && <BotWorkSummary botId={headerBotId} />}
                 {selectedSessionId ? (
                   <div className="session-chrome" id="playMeta">
                     {chrome?.status || selectedSession?.status ? (
@@ -931,6 +963,7 @@ export function PlayPanel({
                 ) : null}
               </div>
               <div className="chat-panel-header__actions play-toolbar">
+                <button type="button" className="btn btn-ghost rail-toggle" aria-label={t(railCollapsed ? 'polish.expandRail' : 'polish.collapseRail')} title={t(railCollapsed ? 'polish.expandRail' : 'polish.collapseRail')} aria-expanded={!railCollapsed} onClick={() => { const feed = chat.playMessagesRef.current; const anchor = readFeedAnchor(feed); railAnchorRef.current = { key: anchor.key, top: (feed?.getBoundingClientRect().top ?? 0) + (anchor.offset ?? 0), bottom: chat.playStickToBottomRef.current }; chat.feedScrollIntentRef.current = planFeedScroll(chat.playStickToBottomRef.current ? 'bottom' : 'pin', chat.playStickToBottomRef.current, anchor).intent; setRailCollapsed(value => !value); }}><WorkspaceIcon kind="panel" /></button>
                 {accountMenu}
                 <button
                   type="button"
@@ -1005,6 +1038,7 @@ export function PlayPanel({
             <div className="chat-panel-body">
               <div className="chat-feed-shell">
                 <PlayTranscript
+                  layoutKey={railCollapsed ? 'collapsed' : 'expanded'}
                   chat={chat}
                   selectedSessionId={selectedSessionId}
                   sessionApprovals={sessionApprovals}
@@ -1043,6 +1077,8 @@ export function PlayPanel({
                 ) : null}
               </div>
               <div className="chat-composer-outer">
+                {headerBotId && selectedSessionId && chat.transcriptReady && !chat.sessionMessages.some(message => message.role === 'user') &&
+                  <BotFirstTask botId={headerBotId} needsModel={chat.needsModelSetup} onChoose={chat.setPlayInput} onConfigureModel={onOpenModelSetup} />}
                 {chat.needsModelSetup && selectedSessionId ? (
                   <div className="model-setup-banner" role="status">
                     <span>{t('play.chrome.needsModel')}</span>
@@ -1052,6 +1088,14 @@ export function PlayPanel({
                   </div>
                 ) : null}
 
+                <div className="composer-preview-row">
+                  <ComposerContextChips items={chat.pendingContext} onRemove={chat.removePendingContext} />
+                  <ComposerReplyQuote
+                    quote={botSurface ? chat.replyQuote : null}
+                    surface="direct"
+                    onCancel={chat.cancelReplyQuote}
+                  />
+                </div>
                 <label className="sr-only" htmlFor="playInput">
                   {t('play.messageContent')}
                 </label>
@@ -1072,12 +1116,6 @@ export function PlayPanel({
                       className="chat-composer__bot-face"
                     />
                   ) : null}
-                  <ComposerContextChips items={chat.pendingContext} onRemove={chat.removePendingContext} />
-                  <ComposerReplyQuote
-                    quote={botSurface ? chat.replyQuote : null}
-                    surface="direct"
-                    onCancel={chat.cancelReplyQuote}
-                  />
                   <textarea
                     ref={chat.playInputRef}
                     id="playInput"
@@ -1314,7 +1352,7 @@ export function PlayPanel({
           <BotDetailPane visible={botDetailVisible} botId={headerBotId} botName={headerBotName} agentId={selectedBot?.agentId} />
         </div>
 
-        <aside className="play-rail">
+        <aside className="play-rail" hidden={railCollapsed}>
           <div className="play-rail__tabs" role="tablist" aria-label={t('play.rail.aria')}>
             <button
               type="button"

@@ -6,14 +6,7 @@ import { approvalShownLines } from '@/lib/approval-feed';
 import { attachBeforeAskUserDecision, type LiveStreamArm } from '@/lib/live-stream-attach';
 import { useI18n } from '@/lib/i18n';
 import type { ApprovalItem } from '@/lib/types';
-
-function argsPreview(args: unknown): string {
-  try {
-    return JSON.stringify(args ?? {}, null, 2);
-  } catch {
-    return String(args ?? '');
-  }
-}
+import { ApprovalActionPreview } from './ApprovalActionPreview';
 
 export function ApprovalBanner({
   approvals,
@@ -96,7 +89,7 @@ function ApprovalItemRow({
       {isAsk ? (
         shown.question ? <p className="approval-banner__q">{shown.question}</p> : null
       ) : (
-        <pre className="approval-banner__args">{argsPreview(a.args)}</pre>
+        <ApprovalActionPreview args={a.args} />
       )}
       {isAsk ? (
         <textarea

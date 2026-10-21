@@ -4,6 +4,9 @@ status: implemented
 requirement: |
   Agent 可以把总结出的经验提交成技能提案，但必须由人在 Lab 里审核批准后才会生效，
   批准过的技能也能随时撤销。
+notes: |
+  用户已确认 skill-capture-intent-confirmation 的新流程：新建议先确认意图，再自动提炼保存。
+  AC-2、AC-3 的正文审核行为保留用于旧版待审提案；新建议由新规格覆盖，不要求二次审核正文。
 criteria:
   - id: AC-1
     given: 技能提案开关默认关闭
@@ -11,10 +14,10 @@ criteria:
     then: 保存后立即生效，Agent 才能看到并使用提交技能提案的工具；关闭时 Agent 看不到该工具，强行调用也会被拒绝
   - id: AC-2
     given: 已开启技能提案
-    when: Agent 提交一个技能提案
+    when: 处理旧版流程已经提交的技能提案
     then: Lab「Bots 与 Agents → 技能」页出现待审批卡片，显示来源会话；批准前技能不会被安装，也不能被加载
   - id: AC-3
-    given: 有一个待审批的提案
+    given: 有一个旧版流程的待审批提案
     when: 用户查看完整内容后点击批准
     then: 技能被安装，Agent 可以通过 load_skill 加载它
   - id: AC-4

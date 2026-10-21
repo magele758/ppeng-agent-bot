@@ -31,7 +31,9 @@ export function buildSkillProposeReminder(input: {
   if (!toolVisible(input.agent, input.session)) return '';
   return (
     `[skill-review reminder] ${input.turn} tool iterations so far in this run. ` +
-    'If you have just completed a non-trivial workflow that would be worth reusing, you may call skill_propose ' +
-    '(human-reviewed queue; nothing is installed until approved). Otherwise ignore this note.'
+    'If you have just completed a successful, non-trivial workflow worth reusing or improving an existing skill, ' +
+    'call skill_propose with only the name, description, reason and summary to request human confirmation BEFORE distillation. ' +
+    'After confirmation the runtime distills and saves automatically. Do not write a skill body before confirmation. ' +
+    'Never repeat a rejected suggestion. If nothing is worth recording, ignore this note and continue the task.'
   );
 }

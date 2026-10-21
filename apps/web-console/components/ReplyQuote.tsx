@@ -1,5 +1,6 @@
 'use client';
 
+import { WorkspaceIcon } from './WorkspaceIcon';
 import { useI18n } from '@/lib/i18n';
 import { quoteFromReply, type QuoteableReply, type ReplyQuote, type ReplyTo } from '@/lib/reply-quote';
 
@@ -21,9 +22,10 @@ export function ReplyQuoteButton({
       data-testid="reply-quote-start"
       data-message-id={messageId}
       aria-label={ariaLabel}
+      title={ariaLabel}
       onClick={onQuote}
     >
-      {label}
+      <WorkspaceIcon kind="quote" /><span className="sr-only">{label}</span>
     </button>
   );
 }
@@ -76,7 +78,7 @@ export function ComposerReplyQuote({
         aria-label={t('play.replyQuote.cancel')}
         onClick={onCancel}
       >
-        {t('play.replyQuote.cancel')}
+        <WorkspaceIcon kind="close" />
       </button>
     </div>
   );

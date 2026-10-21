@@ -91,7 +91,8 @@ export class RoutineHealthStore {
         state.lastFailureClass=kind;state.lastFailureAt=now;
         const wait=delay(state);if(wait)state.nextEligibleAt=now+wait;
         if(state.hardFailures>=state.policy.hardFailureThreshold){state.paused=true;state.pauseReason='hard_failure_threshold';}
-        if(state.failures===1 && (state.lastAlertAt===undefined || now-state.lastAlertAt>=state.policy.notificationCooldownMs)) {
+        const alertThreshold=(run.job.metadata.deliveryPolicy as {failureThreshold?:number}|undefined)?.failureThreshold??1;
+        if((state.failures===alertThreshold||state.paused&&!state.incidentNotified) && (state.lastAlertAt===undefined || now-state.lastAlertAt>=state.policy.notificationCooldownMs)) {
           state.notices.push({kind:'failure',at:now,runId:run.id});state.lastAlertAt=now;state.incidentNotified=true;
         }
       }

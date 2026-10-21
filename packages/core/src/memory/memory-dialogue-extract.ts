@@ -19,9 +19,14 @@ export interface DialogueExtractResult {
   facts: DialogueExtractFact[];
 }
 
+export function isTemporaryMemoryInstruction(text: string): boolean {
+  return /(?:仅|只)(?:在)?(?:这次|本次|当前)|本次(?:任务|对话|回复)|临时(?:要求|偏好|使用)|不要(?:保存|记住)|(?:for|this)\s+(?:this\s+)?(?:task|turn|time)\s+only|do\s+not\s+(?:remember|save)/i.test(text);
+}
+
 export function shouldAttemptDialogueExtract(userText: string): boolean {
   const t = (userText || '').trim();
   if (!t || t.length < 2) return false;
+  if (isTemporaryMemoryInstruction(t)) return false;
   if (isTrivialChitchat(t)) return false;
   if (isLowValueSemanticContent(t)) return false;
   return SEMANTIC_SIGNAL_RE.test(t);
@@ -98,7 +103,8 @@ export function heuristicExtractDialogueFacts(userText: string): DialogueExtract
 export const DIALOGUE_EXTRACT_SYSTEM = `你是用户记忆抽取助手。只从本轮对话中提炼「可跨会话复用」的用户侧信息。
 输出严格 JSON，不要 markdown 包裹。
 维度：preference / fact / entity / concept。
-不编造；无合格条目返回 {"facts":[]}；禁止密钥与测试噪声。`;
+不编造；无合格条目返回 {"facts":[]}；禁止密钥与测试噪声。
+本次任务的临时要求不得保存。用户明确纠正旧事实时，content 用「更正：」开头，完整写出纠正后的事实。`;
 
 export function buildDialogueExtractUserPrompt(params: { userText: string; assistantText?: string }): string {
   const assistant = (params.assistantText || '').trim();
