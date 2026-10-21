@@ -40,7 +40,7 @@ test('Lab explicitly upgrades a legacy precheck [AC:routine-strict-precheck#AC-1
  await page.goto('/#/agents/bots');
  await page.getByRole('searchbox', { name: '搜索 Bot' }).fill(bot.name);
  await page.getByTestId(`bot-card-${bot.id}`).click();
- await page.getByTestId('bot-detail').getByRole('button',{name:'展开或收起：定时任务'}).click();
+ await page.getByTestId('bot-detail').getByRole('tab',{name:'任务与自动化'}).click();
  const panel=page.locator('.bot-cron-panel');await panel.getByRole('button',{name:'修改',exact:true}).click();
  const mode=panel.getByTestId('strict-precheck-mode');await expect(mode).toHaveValue('compat');await mode.selectOption('strict');
  await panel.locator('button[type=submit]').click();
