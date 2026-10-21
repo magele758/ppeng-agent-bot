@@ -1,4 +1,10 @@
 import { observeModelRequests } from './request-metrics.js';
+import {
+  commitPrepareSnapshot,
+  createPrepareSlot,
+  linkPrepareSlot,
+  type PrepareSlot
+} from './snapshot-request-metrics.js';
 import { resolveBotWindowBudget } from '../session/history/window.js';
 import { BotFunctionalGroupService } from '../bots/functional-groups.js';
 import { hasRevokedSharedContext } from '../bots/shared-context-isolation.js';
@@ -517,6 +523,7 @@ type ModelTurnCall = TurnKernelHost['runTurnWithRetries'];
 interface QueuedPreparedSnapshot {
   sessionId: string;
   blocks: ContextSnapshotBlock[];
+  slot: PrepareSlot;
 }
 
 interface PreparedSnapshotQueue extends Array<QueuedPreparedSnapshot> {
@@ -536,7 +543,8 @@ const pendingPreparedSnapshots = new WeakMap<L5Bindable['store'], PreparedSnapsh
 function writeQueuedPreparedSnapshot(store: L5Bindable['store'], item: QueuedPreparedSnapshot): boolean {
   if (!store.db.isOpen) return false;
   try {
-    store.appendContextSnapshot(item.sessionId, item.blocks);
+    const snapshot = store.appendContextSnapshot(item.sessionId, item.blocks);
+    if (snapshot?.id) commitPrepareSnapshot(store, item.slot, snapshot.id);
     return true;
   } catch {
     return false;
@@ -641,14 +649,16 @@ export function queuePreparedContextSnapshot(
   store: L5Bindable['store'],
   sessionId: string,
   blocks: ContextSnapshotBlock[]
-): void {
+): PrepareSlot {
   let queue = pendingPreparedSnapshots.get(store);
   if (!queue) {
     queue = [];
     pendingPreparedSnapshots.set(store, queue);
   }
-  queue.push({ sessionId, blocks });
+  const slot = createPrepareSlot(sessionId);
+  queue.push({ sessionId, blocks, slot });
   if (!snapshotDrainPending(queue)) schedulePreparedSnapshotDrain(store, queue);
+  return slot;
 }
 
 /**
@@ -664,6 +674,7 @@ function fitProductModelRequest(
   const adapter = session
     ? resolveSessionModelAdapter(rt.store, session, process.env, rt.modelAdapter)
     : rt.modelAdapter;
+  let slot: PrepareSlot | undefined;
   if (session) {
     try {
       const blocks = preparedContextSnapshotBlocksFor(rt.store, {
@@ -678,7 +689,7 @@ function fitProductModelRequest(
         adapter,
         env: process.env
       });
-      queuePreparedContextSnapshot(rt.store, session.id, blocks);
+      slot = queuePreparedContextSnapshot(rt.store, session.id, blocks);
     } catch {
       /* Replay history must not change the turn or write a summary. */
     }
@@ -703,6 +714,9 @@ function fitProductModelRequest(
       })
   }).then(fitted => {
     if (fitted.sessionId) noteHumanModelInput(rt.store, fitted.sessionId, fitted.messages);
+    if (slot && fitted.sessionId && fitted.messages) {
+      linkPrepareSlot(rt.store, fitted.sessionId, fitted.messages, slot);
+    }
     return fitted;
   });
 }

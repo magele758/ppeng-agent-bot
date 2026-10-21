@@ -208,6 +208,8 @@ import {
 import type { CronJobRecord } from './cron/cron-store.js';
 
 export interface RuntimeOptions {
+  /** Desktop updater validation: prohibit task execution until this process exits. */
+  updateValidation?: boolean;
   /** Optional native transport seam for embedders and isolated protocol tests. */
   computerUseClientFactory?: LcuDeps['clientFactory'];
   repoRoot: string;
@@ -315,7 +317,18 @@ export class RawAgentRuntime {
 
   private releaseProcessOwnership: () => void = () => {};
 
+  private desktopUpdateSuspended = false;
+  private pendingSessionAdmissions = 0;
+
+  get activeExecutionCount(): number {
+    return this.runningSessions.size + this.backgroundJobAborts.size + this.pendingSessionAdmissions;
+  }
+
+  suspendForDesktopUpdate(): void { this.desktopUpdateSuspended = true; }
+  resumeAfterDesktopUpdateCancelled(): void { this.desktopUpdateSuspended = false; }
+
   constructor(options: RuntimeOptions) {
+    this.desktopUpdateSuspended = options.updateValidation === true;
     this.repoRoot = options.repoRoot;
     this.stateDir = options.stateDir;
     this.hooks = createKernelHookRegistry();
@@ -647,6 +660,7 @@ export class RawAgentRuntime {
 
   /** Tick due cron jobs: append prompt to owning session and enqueue a run. */
   async tickCronJobs(): Promise<number> {
+    if (this.desktopUpdateSuspended) return 0;
     return tickCronJobsFn(schedulerFrom(this.l5()));
   }
 
@@ -1345,10 +1359,11 @@ export class RawAgentRuntime {
   }
 
   async runScheduler(): Promise<void> {
-    void this.factory.tick().catch(error => this.log.warn('Factory scheduler failed', {error:String(error)}));
+    if (this.desktopUpdateSuspended) return;
+    await this.factory.tick().catch(error => this.log.warn('Factory scheduler failed', {error:String(error)}));
     await tickBotWork(this.botWorkRuntimeHost());
     await tickBotGoals(this.goalRuntimeHost());
-    void this.rooms.tick().catch((error) => this.log.warn('Room scheduler failed', { error: String(error) }));
+    await this.rooms.tick().catch((error) => this.log.warn('Room scheduler failed', { error: String(error) }));
     await runSchedulerFn(schedulerFrom(this.l5()));
     await this.drainHumanContinuations();
   }
@@ -1613,6 +1628,7 @@ export class RawAgentRuntime {
   }
 
   private drainHumanContinuations(): Promise<void> {
+    if (this.desktopUpdateSuspended) return Promise.resolve();
     return drainHumanContinuations({ store: this.store, runSession: (id) => this.runSession(id),
       isSessionRunning: (id) => this.runningSessions.has(id),
       hasUnconfirmedEffects: (id) => this.hasUnconfirmedEffects(id, '1970-01-01T00:00:00.000Z'), log: this.log });
@@ -1638,136 +1654,142 @@ export class RawAgentRuntime {
       signal?: AbortSignal;
     }
   ): Promise<SessionRecord> {
-    expireOverdueBotWork(this.botWorkRuntimeHost(), sessionId);
-    if (isBotWorkSessionBlocked(this.store, sessionId)) {
-      const stopped = this.store.getSession(sessionId);
-      if (!stopped) throw new NotFoundError('Session', sessionId);
-      return stopped;
-    }
-    const parked = this.store.getSession(sessionId);
-    if (typeof parked?.metadata?.roomId === 'string') {
-      this.rooms.prepareSession(sessionId);
-    }
-    if (typeof parked?.metadata?.roomId === 'string' && !options?.onEvent) {
-      const budgetHook = this.rooms.budgetHookForSession(sessionId);
-      if (budgetHook) options = { ...options, onEvent: budgetHook };
-    }
-    if (parked?.mode === 'subagent' && parked.status === 'unknown') {
-      return parked;
-    }
-    if (parked?.metadata.canonicalBotChat === true) await prepareGoalIntake(this.goalRuntimeHost(), parked);
-    const existing = this.runningSessions.get(sessionId);
-    if (existing && !options?.latch) {
-      this.forkConcurrentBotWork(parked, true);
-      const late = options?.onModelStreamChunk;
-      if (late) {
-        const detach = this.subscribeModelStream(sessionId, late);
-        void existing.finally(() => detach());
+    if (this.desktopUpdateSuspended) throw new ValidationError("Desktop update in progress");
+    this.pendingSessionAdmissions++;
+    try {
+      expireOverdueBotWork(this.botWorkRuntimeHost(), sessionId);
+      if (isBotWorkSessionBlocked(this.store, sessionId)) {
+        const stopped = this.store.getSession(sessionId);
+        if (!stopped) throw new NotFoundError('Session', sessionId);
+        return stopped;
       }
-      return existing;
-    }
-    if (existing && options?.latch) {
-      await existing.catch(() => undefined);
-    }
-    const goalSession = this.store.getSession(sessionId);
-    if (goalSession && !bindGoalExecution(this.goalRuntimeHost(), goalSession)) return goalSession;
-    this.forkConcurrentBotWork(parked, false);
-    const observeHuman = createHumanContinuationObserver(this.store, sessionId);
-    const observeBudget = observeGoalBudget(this.goalRuntimeHost(), sessionId);
-    const callerEvent = options?.onEvent;
-    options = { ...options, onEvent: async event => { await observeHuman(event); await observeBudget(event); await callerEvent?.(event); } };
-    const directChunk = options?.onModelStreamChunk;
-    if (directChunk || (this.modelStreamListeners.get(sessionId)?.size ?? 0) > 0) {
-      options = {
-        ...options,
-        onModelStreamChunk: (chunk) => this.deliverModelStreamChunk(sessionId, chunk, directChunk)
-      };
-    }
-    const { signal: callerSignal, ...runOptions } = options ?? {};
-    expireDueUnattendedApprovals(this.store);
-
-    // Kernel selection: `loop_settings.kernelVariant` (Lab UI). Default is
-    // `@ppeng/agent-loop` (`agent-loop`). Explicit `ppeng` keeps the local
-    // packages/core kernel as a reference path.
-    const loopKv = this.store.getDaemonControl<{
-      kernelVariant?: string;
-      assemblyPreset?: string;
-    }>('loop_settings');
-    const kernelVariant = loopKv?.kernelVariant ?? 'agent-loop';
-    const assemblyPreset: LoopPreset = parseLoopPreset(loopKv?.assemblyPreset) ?? 'max';
-    this.log.info(`runSession kernel=${kernelVariant} assembly=${assemblyPreset}`);
-    const runController = new AbortController();
-    this.sessionAbortControllers.set(sessionId, runController);
-    const unlinkCallerSignal = this.cancelOnAbort(sessionId, callerSignal);
-    const coreHost = bindTurnKernelHost(this.l5());
-    const sessionMaxTurns = resolveSessionMaxTurns(
-      this.store.getSession(sessionId)?.metadata,
-      this.maxTurnsPerRun
-    );
-    const hooks = mergeKernelHookRegistries(this.hooks, options?.hooks);
-    const agentLoopOptions = {
-      ...runOptions,
-      hooks,
-      onEvent: options?.onEvent,
-      config: {
-        ...coreHost.loopConfig,
-        maxTurns: sessionMaxTurns
+      const parked = this.store.getSession(sessionId);
+      if (typeof parked?.metadata?.roomId === 'string') {
+        this.rooms.prepareSession(sessionId);
       }
-    };
-    const ppengOptions = {
-      ...runOptions,
-      latch: fanoutKernelLatch(options?.latch, hooks, options?.onEvent) as AgentLoopLatch
-    };
-    const promise = runWithJevTrace(
-      {
-        sessionId,
-        emit: (event) => this.emitTrace(sessionId, event)
-      },
-      () =>
-        (async () => {
-          try {
-            await this.computerUse.beginTurn(sessionId, randomUUID());
-            for (const tool of this.computerUse.tools()) {
-              const index = this.tools.findIndex(item => item.name === tool.name);
-              if (index >= 0) this.tools[index] = tool; else this.tools.push(tool);
-            }
-            return await (kernelVariant === 'ppeng'
-          ? runSessionKernelPpeng(coreHost, sessionId, ppengOptions)
-          : createAssembledLoop({
-              preset: assemblyPreset,
-              io: l5ToAssembledIo(this.l5(), sessionId),
-              hooks,
-              config: coreHost.loopConfig
-            }).then((assembled) => assembled.run(sessionId, agentLoopOptions)));
-          } finally {
-            await this.computerUse.endTurn(sessionId, this.sessionAbortControllers.get(sessionId)?.signal.aborted ? 'Interrupt' : 'Stop');
-          }
-        })()
-    )
-      .then(async result => { await settleGoalExecution(this.goalRuntimeHost(), sessionId); return result; })
-      .catch(async (err: unknown) => {
-        await settleGoalExecution(this.goalRuntimeHost(), sessionId, err);
-        if (err instanceof NotFoundError) throw err;
-        if (err && typeof err === 'object' && (err as { name?: string }).name === 'NotFoundError') {
-          const msg = err instanceof Error ? err.message : String(err);
-          if (/Agent not found/i.test(msg)) {
-            throw new NotFoundError('Agent', sessionId);
-          }
-          throw new NotFoundError('Session', sessionId);
+      if (typeof parked?.metadata?.roomId === 'string' && !options?.onEvent) {
+        const budgetHook = this.rooms.budgetHookForSession(sessionId);
+        if (budgetHook) options = { ...options, onEvent: budgetHook };
+      }
+      if (parked?.mode === 'subagent' && parked.status === 'unknown') {
+        return parked;
+      }
+      if (parked?.metadata.canonicalBotChat === true) await prepareGoalIntake(this.goalRuntimeHost(), parked);
+      const existing = this.runningSessions.get(sessionId);
+      if (existing && !options?.latch) {
+        this.forkConcurrentBotWork(parked, true);
+        const late = options?.onModelStreamChunk;
+        if (late) {
+          const detach = this.subscribeModelStream(sessionId, late);
+          void existing.finally(() => detach());
         }
-        throw err;
-      })
-      .finally(() => {
-      unlinkCallerSignal();
-      if (this.sessionAbortControllers.get(sessionId) === runController) this.sessionAbortControllers.delete(sessionId);
-      this.runningSessions.delete(sessionId);
-      clearActiveWorkPiece(sessionId);
-      releaseHumanModelInput(this.store, sessionId);
-      this.scheduleHumanContinuations();
-    });
-    this.runningSessions.set(sessionId, promise);
-    this.notifySessionRunStarted(sessionId, promise);
-    return promise;
+        return existing;
+      }
+      if (existing && options?.latch) {
+        await existing.catch(() => undefined);
+      }
+      const goalSession = this.store.getSession(sessionId);
+      if (goalSession && !bindGoalExecution(this.goalRuntimeHost(), goalSession)) return goalSession;
+      this.forkConcurrentBotWork(parked, false);
+      const observeHuman = createHumanContinuationObserver(this.store, sessionId);
+      const observeBudget = observeGoalBudget(this.goalRuntimeHost(), sessionId);
+      const callerEvent = options?.onEvent;
+      options = { ...options, onEvent: async event => { await observeHuman(event); await observeBudget(event); await callerEvent?.(event); } };
+      const directChunk = options?.onModelStreamChunk;
+      if (directChunk || (this.modelStreamListeners.get(sessionId)?.size ?? 0) > 0) {
+        options = {
+          ...options,
+          onModelStreamChunk: (chunk) => this.deliverModelStreamChunk(sessionId, chunk, directChunk)
+        };
+      }
+      const { signal: callerSignal, ...runOptions } = options ?? {};
+      expireDueUnattendedApprovals(this.store);
+  
+      // Kernel selection: `loop_settings.kernelVariant` (Lab UI). Default is
+      // `@ppeng/agent-loop` (`agent-loop`). Explicit `ppeng` keeps the local
+      // packages/core kernel as a reference path.
+      const loopKv = this.store.getDaemonControl<{
+        kernelVariant?: string;
+        assemblyPreset?: string;
+      }>('loop_settings');
+      const kernelVariant = loopKv?.kernelVariant ?? 'agent-loop';
+      const assemblyPreset: LoopPreset = parseLoopPreset(loopKv?.assemblyPreset) ?? 'max';
+      this.log.info(`runSession kernel=${kernelVariant} assembly=${assemblyPreset}`);
+      const runController = new AbortController();
+      this.sessionAbortControllers.set(sessionId, runController);
+      const unlinkCallerSignal = this.cancelOnAbort(sessionId, callerSignal);
+      const coreHost = bindTurnKernelHost(this.l5());
+      const sessionMaxTurns = resolveSessionMaxTurns(
+        this.store.getSession(sessionId)?.metadata,
+        this.maxTurnsPerRun
+      );
+      const hooks = mergeKernelHookRegistries(this.hooks, options?.hooks);
+      const agentLoopOptions = {
+        ...runOptions,
+        hooks,
+        onEvent: options?.onEvent,
+        config: {
+          ...coreHost.loopConfig,
+          maxTurns: sessionMaxTurns
+        }
+      };
+      const ppengOptions = {
+        ...runOptions,
+        latch: fanoutKernelLatch(options?.latch, hooks, options?.onEvent) as AgentLoopLatch
+      };
+      const promise = runWithJevTrace(
+        {
+          sessionId,
+          emit: (event) => this.emitTrace(sessionId, event)
+        },
+        () =>
+          (async () => {
+            try {
+              await this.computerUse.beginTurn(sessionId, randomUUID());
+              for (const tool of this.computerUse.tools()) {
+                const index = this.tools.findIndex(item => item.name === tool.name);
+                if (index >= 0) this.tools[index] = tool; else this.tools.push(tool);
+              }
+              return await (kernelVariant === 'ppeng'
+            ? runSessionKernelPpeng(coreHost, sessionId, ppengOptions)
+            : createAssembledLoop({
+                preset: assemblyPreset,
+                io: l5ToAssembledIo(this.l5(), sessionId),
+                hooks,
+                config: coreHost.loopConfig
+              }).then((assembled) => assembled.run(sessionId, agentLoopOptions)));
+            } finally {
+              await this.computerUse.endTurn(sessionId, this.sessionAbortControllers.get(sessionId)?.signal.aborted ? 'Interrupt' : 'Stop');
+            }
+          })()
+      )
+        .then(async result => { await settleGoalExecution(this.goalRuntimeHost(), sessionId); return result; })
+        .catch(async (err: unknown) => {
+          await settleGoalExecution(this.goalRuntimeHost(), sessionId, err);
+          if (err instanceof NotFoundError) throw err;
+          if (err && typeof err === 'object' && (err as { name?: string }).name === 'NotFoundError') {
+            const msg = err instanceof Error ? err.message : String(err);
+            if (/Agent not found/i.test(msg)) {
+              throw new NotFoundError('Agent', sessionId);
+            }
+            throw new NotFoundError('Session', sessionId);
+          }
+          throw err;
+        })
+        .finally(() => {
+        unlinkCallerSignal();
+        if (this.sessionAbortControllers.get(sessionId) === runController) this.sessionAbortControllers.delete(sessionId);
+        this.runningSessions.delete(sessionId);
+        clearActiveWorkPiece(sessionId);
+        releaseHumanModelInput(this.store, sessionId);
+        this.scheduleHumanContinuations();
+      });
+      this.runningSessions.set(sessionId, promise);
+      this.notifySessionRunStarted(sessionId, promise);
+      return promise;
+    } finally {
+      this.pendingSessionAdmissions--;
+    }
   }
 
   /** Cancel `sessionId` when `signal` aborts; returns the unlink function. */

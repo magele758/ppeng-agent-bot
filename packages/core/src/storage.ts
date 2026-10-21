@@ -33,6 +33,7 @@ import { SessionStore } from './stores/session-store.js';
 import type { CreateSessionInput } from './stores/session-store.js';
 import { ContextSnapshotStore } from './session/context-snapshot-store.js';
 import type { ContextSnapshot, ContextSnapshotBlock } from './session/context-snapshots.js';
+import { attachSnapshotRequestMetrics } from './runtime/snapshot-request-metrics.js';
 import { StepInboxStore, type EnqueueSteerOptions, type InboxItem } from './session/step-inbox.js';
 import { ImageAssetStore } from './stores/image-asset-store.js';
 import { AttachmentStore } from './stores/attachment-store.js';
@@ -484,7 +485,7 @@ export class SqliteStateStore {
   }
 
   listContextSnapshots(sessionId: string): ContextSnapshot[] {
-    return this.contextSnapshots.list(sessionId);
+    return attachSnapshotRequestMetrics(this, sessionId, this.contextSnapshots.list(sessionId));
   }
 
   getLocalWriterId(sessionId: string): string | undefined { return this.sessions.getLocalWriterId(sessionId); }

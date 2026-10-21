@@ -16,6 +16,7 @@ import {
   type ReplaySnapshot
 } from '@/lib/context-stack-replay';
 import { useI18n, type MessageKey } from '@/lib/i18n';
+import { metricForTurn, toSentRequestMetrics, type SentRequestSource } from '@/lib/request-metric-turn';
 
 interface ContextStackBlock {
   id: string;
@@ -49,8 +50,6 @@ interface ContextStackPayload {
   blocks: ContextStackBlock[];
   budget: ContextStackBudget;
 }
-
-interface RequestMetric { sessionId: string; sentAt: string; estimatedTokens: number; windowTokens: number; actualInputTokens?: number }
 
 type TFn = ReturnType<typeof useI18n>['t'];
 
@@ -382,6 +381,78 @@ function ContextStackBody({
   );
 }
 
+function formatSentAt(label: string | null, locale: string): { dateTime: string; text: string } | null {
+  if (!label) return null;
+  const date = new Date(label);
+  if (Number.isNaN(date.getTime())) return { dateTime: label, text: label };
+  return { dateTime: label, text: date.toLocaleTimeString(locale) };
+}
+
+function formatWindow(percent: number | null, unknown: string): string {
+  if (percent == null) return unknown;
+  return `${percent.toFixed(1)}%`;
+}
+
+function metricSource(
+  sessionId: string | null,
+  payload: SentRequestSource | null,
+  latestRequest: SentRequestSource['latestRequest']
+): SentRequestSource {
+  if (!sessionId) return { snapshots: [], requests: [], latestRequest: null };
+  const payloadSession = typeof payload?.sessionId === 'string' ? payload.sessionId : '';
+  const samePayload = payload && (!payloadSession || payloadSession === sessionId) ? payload : null;
+  const latestSession = latestRequest && typeof latestRequest.sessionId === 'string' ? latestRequest.sessionId : '';
+  const latest = latestRequest && (!latestSession || latestSession === sessionId) ? latestRequest : null;
+  return {
+    sessionId,
+    snapshots: samePayload?.snapshots ?? [],
+    requests: samePayload?.requests ?? [],
+    latestRequest: latest
+  };
+}
+
+function selectedTurnNumber(frames: readonly ReplayFrame[], selectedId: string): number | null {
+  const frame = selectContextReplayFrame(frames, replayFrameIndex(frames, selectedId));
+  if (!frame || frame.live) return null;
+  return frame.turn;
+}
+
+function RequestMetricSection({
+  source,
+  selectedTurnNumber: turn,
+  requestFailed,
+  locale,
+  t
+}: {
+  source: SentRequestSource;
+  selectedTurnNumber: number | null;
+  requestFailed: boolean;
+  locale: string;
+  t: TFn;
+}) {
+  const view = metricForTurn({ sent: toSentRequestMetrics(source), selectedTurnNumber: turn });
+  const sentAt = view.status === 'ready' ? formatSentAt(view.metric.sentAtLabel, locale) : null;
+  const title = view.status === 'ready' && !view.isLatest
+    ? t('polish.requestTurnTitle', { turn: String(view.metric.turnNumber) })
+    : t('polish.requestTitle');
+  const headline = view.status === 'ready'
+    ? t('polish.requestUnits', { count: view.metric.estimatedTokens.toLocaleString(locale) })
+    : t(requestFailed ? 'polish.requestError' : 'polish.waiting');
+  const windowText = formatWindow(view.status === 'ready' ? view.metric.windowPercent : null, t('polish.unknown'));
+  const upstreamText = view.status === 'ready' && view.metric.upstreamInputTokens != null
+    ? view.metric.upstreamInputTokens.toLocaleString(locale)
+    : t('polish.unknown');
+  return (
+    <section className="request-metric" data-testid="latest-request-metric">
+      <h4>{title}</h4>
+      <strong>{headline}</strong>
+      <p>{t('polish.estimate')} · {t('polish.window')}: {windowText}</p>
+      <p>{t('polish.actual')}: {upstreamText}</p>
+      {sentAt ? <p>{t('polish.sentAt')}: <time dateTime={sentAt.dateTime}>{sentAt.text}</time></p> : null}
+    </section>
+  );
+}
+
 export function ContextStackPanel({
   sessionId,
   running,
@@ -393,7 +464,8 @@ export function ContextStackPanel({
 }) {
   const { t, locale } = useI18n();
   const [requestFailed, setRequestFailed] = useState(false);
-  const [latest, setLatest] = useState<RequestMetric | null>(null);
+  const [snapshotPayload, setSnapshotPayload] = useState<SentRequestSource | null>(null);
+  const [latestRequest, setLatestRequest] = useState<SentRequestSource['latestRequest']>(null);
   const [data, setData] = useState<ContextStackPayload | null>(null);
   const [snapshots, setSnapshots] = useState<ReplaySnapshot[]>([]);
   const [err, setErr] = useState<string | null>(null);
@@ -406,7 +478,8 @@ export function ContextStackPanel({
     const sid = sessionId;
     const ticket = ++request.current;
     if (!sid) {
-      setLatest(null);
+      setLatestRequest(null);
+      setSnapshotPayload(null);
       setData(null);
       setSnapshots([]);
       setErr(null);
@@ -425,7 +498,16 @@ export function ContextStackPanel({
       setData(stack.data);
       setErr(stack.err);
       setRequestFailed(historyResult.status === 'rejected');
-      setLatest(historyResult.status === 'fulfilled' ? (historyResult.value as { latestRequest?: RequestMetric }).latestRequest ?? null : null);
+      if (historyResult.status === 'fulfilled') {
+        const value = historyResult.value as SentRequestSource;
+        if (!value.sessionId || value.sessionId === sid) {
+          setSnapshotPayload(value);
+          setLatestRequest(value.latestRequest ?? null);
+        }
+      } else {
+        setSnapshotPayload(null);
+        setLatestRequest(null);
+      }
       const history = readSnapshots(historyResult);
       setSnapshots(history.snapshots);
       setReplayErr(history.err);
@@ -436,6 +518,13 @@ export function ContextStackPanel({
 
   useEffect(() => {
     setSelectedId('live');
+    setSnapshotPayload(null);
+    setLatestRequest(null);
+    setSnapshots([]);
+    setData(null);
+    setErr(null);
+    setReplayErr(null);
+    setRequestFailed(false);
   }, [sessionId]);
 
   useEffect(() => {
@@ -447,15 +536,24 @@ export function ContextStackPanel({
     let alive = true;
     const poll = async () => {
       try {
-        const response = await api(`/api/sessions/${encodeURIComponent(sessionId)}/context-snapshots?latestOnly=1`) as { latestRequest?: RequestMetric };
-        if (alive) { setLatest(response.latestRequest ?? null); setRequestFailed(false); }
-      } catch { if (alive) { setLatest(null); setRequestFailed(true); } }
+        const response = await api(`/api/sessions/${encodeURIComponent(sessionId)}/context-snapshots?latestOnly=1`) as SentRequestSource;
+        if (!alive) return;
+        if (response.sessionId && response.sessionId !== sessionId) return;
+        setLatestRequest(response.latestRequest ?? null);
+        setRequestFailed(false);
+      } catch {
+        if (alive) {
+          setLatestRequest(null);
+          setRequestFailed(true);
+        }
+      }
     };
     const timer = setInterval(() => void poll(), running ? 1000 : 1500);
     return () => { alive = false; clearInterval(timer); };
   }, [sessionId, running]);
-  const sent = latest?.sessionId === sessionId ? latest : null;
   const body = matchingBody(data, sessionId);
+  const frames = body ? buildContextReplayFrames(snapshots, body.blocks) : [];
+  const source = metricSource(sessionId, snapshotPayload, latestRequest);
   const showLoading = Boolean(sessionId) && loading && !body;
 
   return (
@@ -466,13 +564,15 @@ export function ContextStackPanel({
           {t('play.contextStack.refresh')}
         </button>
       </div>
-      {sessionId && <section className="request-metric" data-testid="latest-request-metric">
-        <h4>{t('polish.requestTitle')}</h4>
-        <strong>{sent ? t('polish.requestUnits', { count: sent.estimatedTokens.toLocaleString(locale) }) : t(requestFailed ? 'polish.requestError' : 'polish.waiting')}</strong>
-        <p>{t('polish.estimate')} · {t('polish.window')}: {sent && sent.windowTokens > 0 ? ((sent.estimatedTokens / sent.windowTokens) * 100).toFixed(1) + '%' : t('polish.unknown')}</p>
-        <p>{t('polish.actual')}: {sent?.actualInputTokens != null ? sent.actualInputTokens.toLocaleString(locale) : t('polish.unknown')}</p>
-        {sent && <p>{t('polish.sentAt')}: <time dateTime={sent.sentAt}>{new Date(sent.sentAt).toLocaleTimeString(locale)}</time></p>}
-      </section>}
+      {sessionId ? (
+        <RequestMetricSection
+          source={source}
+          selectedTurnNumber={selectedTurnNumber(frames, selectedId)}
+          requestFailed={requestFailed}
+          locale={locale}
+          t={t}
+        />
+      ) : null}
       <p className="empty-hint">{t(selectedId === 'live' ? 'polish.preview' : 'polish.historyNotice')}</p>
       <MissingSession sessionId={sessionId} t={t} />
       <LoadError err={err} t={t} />

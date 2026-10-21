@@ -116,3 +116,39 @@ Then restart via tray menu → "Restart Services".
 If `RAW_AGENT_AUTH_TOKEN` is missing from the user `.env`, the app generates a random token on
 first launch and saves it there; the daemon and bundled web console are always started with the
 same token, so the UI never gets an unexpected 401.
+
+## Safe local updates (macOS Apple Silicon)
+
+The **Raw Agent → 更新客户端… / Update client…** menu (also available in the tray)
+opens a picker for a prepared `Raw Agent.app`. Mount the new DMG first, then select
+its app. The dialog shows the current/new version, build timestamp and release
+notes. Selecting a file or building a release does not install it: installation
+starts only after clicking **更新客户端 / Update client**.
+
+Active tasks, scheduler work or mutating requests prevent the update; retry when
+idle. The desktop privately asks its daemon to stop accepting work, quits, and
+hands off to an independent helper. The helper backs up the old application and
+entire user-data directory before replacing the app. Backup, validation logs and
+`Recover.command` are stored in a timestamp-independent unique transaction folder
+under the sibling `agent-desktop-updates` directory. Backups are retained.
+
+The new daemon starts in validation mode: regular requests, session execution,
+schedulers, gateway startup and startup self-healing are blocked. After startup,
+the helper stops validation processes, checks database integrity, preserved record
+identities/content and asset availability, then permits normal startup. Failures
+restore the old application and data. Interrupted updates block normal startup
+and offer recovery. If the installed app is missing, run the backup folder's
+`Recover.command`. Recovery terminates recorded validation processes before
+restoring data; a failed recovery retains backups and reports manual recovery.
+
+The currently installed pre-updater version requires a **one-time manual install**
+of the first updater-capable build, with the client exited. Replacing only the
+application bundle preserves its separate user-data directory. Subsequent updates
+use the menu above. There is no automatic download or background installation.
+Never replace the client while it is running.
+
+Development/QA must use a disposable app copy and an explicit
+`--user-data-dir=/absolute/temporary/test-profile`, plus synthetic data. Never point
+a test profile, daemon, or proxy at the production client's data or services.
+Updates preserve existing workspace bindings; they do not copy or roll back files
+outside the user-data directory. Validation does not execute tools in those paths.
