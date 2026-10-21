@@ -1,7 +1,13 @@
 import {test,expect} from '@playwright/test';
 
+const createdBotIds: string[] = [];
+test.afterEach(async ({ request }) => {
+  for (const id of createdBotIds.splice(0)) await request.patch(`/api/bots/${id}`, { data: { hidden: true } });
+});
+
 test('completed task becomes a persisted routine with inputs, destination, timezone and notification rules [AC:bot-product-p2#AC-7]',async({page,request})=>{
  const {bot}=await(await request.post('/api/bots',{data:{name:`Routine source ${crypto.randomUUID()}`}})).json();
+ createdBotIds.push(bot.id);
  const {task}=await(await request.post('/api/bot-work/tasks',{data:{targetBotId:bot.id,input:'Summarize project progress'}})).json();
  await expect.poll(async()=> (await(await request.get(`/api/bot-work/tasks/${task.id}`)).json()).task.status).toBe('completed');
  const {room}=await(await request.post('/api/bot-rooms',{data:{title:'Report destination',botIds:[bot.id]}})).json();
@@ -33,7 +39,7 @@ test('completed task becomes a persisted routine with inputs, destination, timez
 });
 
 test('delegated members appear under one goal with collected deliveries [AC:bot-product-p2#AC-5]',async({page,request})=>{
- const create=async(name:string)=>(await(await request.post('/api/bots',{data:{name:`${name} ${crypto.randomUUID()}`}})).json()).bot;
+ const create=async(name:string)=>{const bot=(await(await request.post('/api/bots',{data:{name:`${name} ${crypto.randomUUID()}`}})).json()).bot;createdBotIds.push(bot.id);return bot;};
  const boss=await create('Coordinator'),worker=await create('Member');
  const goal=`Unified launch report ${crypto.randomUUID()}`;
  const root=(await(await request.post('/api/bot-work/tasks',{data:{targetBotId:boss.id,input:goal}})).json()).task;
@@ -64,6 +70,7 @@ test('blocked collaboration exposes partial output and only retries the affected
 
 test('routine report can be reviewed and approved without re-executing the task [AC:bot-product-p2#AC-7]',async({page,request})=>{
  const {bot}=await(await request.post('/api/bots',{data:{name:`Publish report ${crypto.randomUUID()}`}})).json();
+ createdBotIds.push(bot.id);
  const {task}=await(await request.post('/api/bot-work/tasks',{data:{targetBotId:bot.id,input:'Prepare report'}})).json();
  await expect.poll(async()=> (await(await request.get(`/api/bot-work/tasks/${task.id}`)).json()).task.status).toBe('completed');
  const {room}=await(await request.post('/api/bot-rooms',{data:{title:'Approved report destination',botIds:[bot.id]}})).json();

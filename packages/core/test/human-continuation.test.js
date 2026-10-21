@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {mkdtempSync} from 'node:fs';import {tmpdir} from 'node:os';import {join} from 'node:path';
 import {SqliteStateStore} from '../dist/storage.js';
-import {requestHumanRun,noteHumanModelInput,releaseHumanModelInput,requestSteerContinuation,dropHumanSteerContinuation,createHumanContinuationObserver,drainHumanContinuations,blockHumanContinuations,withHumanContinuationAdmission,hasHumanContinuationLease} from '../dist/session/human-continuation.js';
+import {requestHumanRun,noteHumanModelInput,releaseHumanModelInput,requestSteerContinuation,dropHumanSteerContinuation,createHumanContinuationObserver,drainHumanContinuations,blockHumanContinuations,withHumanContinuationAdmission,hasHumanContinuationLease,unansweredHumanWork,runAnsweredHumanSession} from '../dist/session/human-continuation.js';
 import {claimBotSession,releaseBotSession,updateBotWorkSettings} from '../dist/bots/bot-work.js';
 function fixture(){const path=join(mkdtempSync(join(tmpdir(),'human-tail-')),'state.db');const store=new SqliteStateStore(path);const session=store.createSession({title:'human',mode:'chat',agentId:'general',background:false,metadata:{userId:'alice',botId:'quota-bot',outcome:{kind:'idle',reason:'end'}}});return {store,session,path};}
 const ledger=(store,id)=>store.getDaemonControl('session.humanContinuation:'+id);
@@ -91,6 +91,30 @@ test('folded steer and shared overflow summary sources resume once from original
   const originals=store.claimInbox(session.id,'next-step').map(item=>store.appendMessage(session.id,item.role,[{type:'text',text:item.text}],{key:item.key}));store.appendReplacement(session.id,{startSeq:originals[0].seq,endSeq:originals.at(-1).seq,role:'system',parts:[{type:'text',text:'compressed historical notes'}]});let calls=0;
   await drainHumanContinuations({store,isSessionRunning:()=>false,runSession:async id=>{calls++;const observer=createHumanContinuationObserver(store,id);noteHumanModelInput(store,id,store.foldMessages(id));observer({type:'model_done',stopReason:'end'});}});await wait();assert.equal(ledger(store,session.id).pending.length,0);assert.equal(calls,1);for(const original of originals){const rows=store.db.prepare('SELECT COUNT(*) AS n FROM session_messages WHERE session_id=? AND key=? AND role=?').get(session.id,original.key,original.role);assert.equal(rows.n,2);}store.db.close();
  }
+});
+
+test('a joined human send runs again only when that message was not forked', async () => {
+  const { store, session } = fixture();
+  const message = add(store, session.id, 'while busy');
+  requestHumanRun(store, session.id);
+  assert.equal(unansweredHumanWork(store, session.id, [message.id]), true);
+  store.updateSession(session.id, { metadata: { ...session.metadata, concurrentBotForks: [{ sourceMessageId: message.id, childSessionId: 'child', status: 'running' }] } });
+  assert.equal(unansweredHumanWork(store, session.id, [message.id]), false);
+  let calls = 0;
+  const host = { store, isRunning: () => false, runSession: async () => { calls += 1; return 'done'; } };
+  assert.equal(await runAnsweredHumanSession(host, session.id), 'done');
+  assert.equal(calls, 1);
+  store.updateSession(session.id, { metadata: { ...session.metadata, concurrentBotForks: [] } });
+  calls = 0;
+  const follow = { store, isRunning: () => false, runSession: async () => { calls += 1; if (calls === 1) return 'joined'; const observe = createHumanContinuationObserver(store, session.id); noteHumanModelInput(store, session.id, [message]); observe({ type: 'model_done', stopReason: 'end' }); return 'answered'; } };
+  assert.equal(await runAnsweredHumanSession(follow, session.id), 'answered');
+  assert.equal(calls, 2);
+  requestHumanRun(store, session.id);
+  calls = 0;
+  const stopped = { store, isRunning: () => false, runSession: async () => { calls += 1; blockHumanContinuations(store, session.id); const current = store.getSession(session.id); store.updateSession(session.id, { status: 'idle', metadata: { ...current.metadata, outcome: { kind: 'aborted', reason: 'user_abort' } } }); return 'aborted'; } };
+  assert.equal(await runAnsweredHumanSession(stopped, session.id), 'aborted');
+  assert.equal(calls, 1);
+  store.db.close();
 });
 
 test('human continuation restores the original quote pointer after compaction [AC:bot-reply-quote#AC-5]',async()=>{

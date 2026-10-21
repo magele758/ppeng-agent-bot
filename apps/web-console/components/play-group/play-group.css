@@ -242,4 +242,4 @@
 .play-group-member__model { font-size: 10px; color: var(--text-muted); overflow-wrap: anywhere; }
 .play-group-member > .bot-face { flex: 0 0 auto; width: 28px; height: 28px; }
 
-.create-menu__pop::before { content: ""; position: absolute; left: 0; right: 0; top: -6px; height: 6px; }
+.create-menu__pop::before { content: ""; position: absolute; left: -12px; right: -12px; top: -20px; height: 24px; }

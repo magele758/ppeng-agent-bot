@@ -363,7 +363,7 @@ test('due one-time work reaches a completed run and its result is inspectable [A
 });
 
 // Dedicated review fixtures are reused only by the same test across repeat-each runs.
-// Bot deletion is not an API operation and hidden Bots still count toward the roster cap.
+// There is no delete API. Hiding a Bot frees its visible roster slot; these named fixtures stay and are reused.
 async function ensureReviewBot(request: APIRequestContext, name: string): Promise<{ id: string; name: string }> {
   const roster = await request.get('/api/bots');
   expect(roster.ok()).toBeTruthy();

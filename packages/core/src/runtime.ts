@@ -121,7 +121,7 @@ import { AgentLoopHandle, type AgentLoopLatch } from './runtime/agent-loop.js';
 import type { EnqueueSteerOptions } from './session/step-inbox.js';
 import { decideSteerAdmission, type SteerAck } from './session/steer-ack.js';
 import { resolveSteerInterruptPolicy } from './session/steer-interrupt.js';
-import { requestHumanRun, requestSteerContinuation, dropHumanSteerContinuation, withHumanContinuationAdmission, createHumanContinuationObserver, drainHumanContinuations, blockHumanContinuations, releaseHumanModelInput } from './session/human-continuation.js';
+import { requestHumanRun, requestSteerContinuation, dropHumanSteerContinuation, withHumanContinuationAdmission, createHumanContinuationObserver, drainHumanContinuations, blockHumanContinuations, releaseHumanModelInput, runAnsweredHumanSession } from './session/human-continuation.js';
 import { type SteerDrainPolicy } from './session/steer-drain.js';
 import { runSessionKernel as runSessionKernelPpeng } from './turn/kernel.js';
 import {
@@ -1651,7 +1651,11 @@ export class RawAgentRuntime {
   /** Explicit human run request; subsystem runs keep their own original result promise. */
   runHumanSession(sessionId: string, options?: Parameters<RawAgentRuntime['runSession']>[1]): Promise<SessionRecord> {
     requestHumanRun(this.store, sessionId);
-    return this.runSession(sessionId, options);
+    return runAnsweredHumanSession({
+      store: this.store,
+      isRunning: (id) => this.runningSessions.has(id),
+      runSession: (id, runOptions) => this.runSession(id, runOptions)
+    }, sessionId, options);
   }
 
   private drainHumanContinuations(): Promise<void> {

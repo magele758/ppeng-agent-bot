@@ -1,3 +1,5 @@
+import { visibleTaskText } from '../fork-inheritance.js';
+
 export interface GoalMessageIntent {
   kind: 'new_goal' | 'amend_goal' | 'query' | 'pause' | 'resume' | 'cancel' | 'chat';
   goalId?: string;
@@ -64,37 +66,95 @@ function fallbackIntents(raw: string, goals: GoalIntakeContext[]): GoalIntentPro
   });
 }
 
-/** Judge proposals are untrusted. Callers still validate scoped target ownership and goal revision. */
-export async function classifyGoalIntents(raw: string, goals: GoalIntakeContext[], judge?: GoalIntentJudge): Promise<GoalIntentProposal[]> {
-  const fallback = fallbackIntents(raw, goals);
-  if (!judge || raw.length > 12000 || fallback.every(intent => intent.kind === 'query' || intent.kind === 'chat')) return fallback;
+const JUDGE_KINDS = new Set(['new_goal', 'amend_goal', 'query', 'pause', 'resume', 'cancel', 'reprioritize', 'chat']);
+const JUDGE_INSTRUCTIONS = 'Return JSON {intents:[{kind,goalId?,text,priority?}]}. kinds: new_goal, amend_goal, query, pause, resume, cancel, reprioritize, chat. Split independent intents; text must be an exact nonempty excerpt of the message. Queries and discussion of controls are never control requests. Preserve explicit [goal:id] targeting. Use only supplied goal IDs; omit goalId when ambiguous. Do not infer cancellation or completion. priority must be an integer for reprioritize.';
+
+function judgeSkipped(judge: GoalIntentJudge | undefined, raw: string, fallback: GoalIntentProposal[]): boolean {
+  return !judge || raw.length > 12000 || fallback.every(intent => intent.kind === 'query' || intent.kind === 'chat');
+}
+function outputTooLarge(output: unknown): boolean {
+  return typeof output === 'string' && output.length > 16000;
+}
+function parsedJudge(output: unknown): { intents?: unknown[] } {
+  if (typeof output !== 'string') return output as { intents?: unknown[] };
+  return JSON.parse(output) as { intents?: unknown[] };
+}
+function usableIntents(decoded: { intents?: unknown[] } | null | undefined): unknown[] | undefined {
+  if (!decoded || !Array.isArray(decoded.intents)) return undefined;
+  if (!decoded.intents.length || decoded.intents.length > 8) return undefined;
+  return decoded.intents;
+}
+function intentTextOk(item: { kind?: string; text?: unknown } | null, raw: string): boolean {
+  return !!item && JUDGE_KINDS.has(String(item.kind)) && typeof item.text === 'string' && !!item.text.trim() && raw.includes(item.text);
+}
+function intentGoalOk(item: { goalId?: unknown }, goals: GoalIntakeContext[]): boolean {
+  if (item.goalId === undefined) return true;
+  return typeof item.goalId === 'string' && goals.some(goal => goal.id === item.goalId);
+}
+function intentKindOk(item: { kind: string }, baseline: GoalMessageIntent): boolean {
+  if (['query', 'chat'].includes(baseline.kind) && item.kind !== baseline.kind) return false;
+  return !['pause', 'cancel', 'resume'].includes(item.kind) || baseline.kind === item.kind;
+}
+function priorityOk(item: { kind: string; priority?: number }): boolean {
+  if (item.kind !== 'reprioritize') return true;
+  return Number.isSafeInteger(item.priority) && Math.abs(item.priority!) <= 100;
+}
+function proposalFrom(item: { kind: GoalIntentProposal['kind']; text: string; goalId?: string; priority?: number }): GoalIntentProposal {
+  return { kind: item.kind, text: item.text, ...(item.goalId ? { goalId: item.goalId } : {}), ...(item.kind === 'reprioritize' ? { priority: item.priority! } : {}) } as GoalIntentProposal;
+}
+function confirmedProposal(item: { kind: string; text: string; goalId?: string; priority?: number }, explicit: string | undefined): GoalIntentProposal | undefined {
+  const baseline = classifyGoalMessage(item.text);
+  if (explicit && item.goalId !== explicit) return undefined;
+  if (!intentKindOk(item, baseline) || !priorityOk(item)) return undefined;
+  return proposalFrom(item as { kind: GoalIntentProposal['kind']; text: string; goalId?: string; priority?: number });
+}
+function judgeProposal(item: { kind?: string; text?: string; goalId?: string; priority?: number } | null, raw: string, goals: GoalIntakeContext[], explicit: string | undefined): GoalIntentProposal | undefined {
+  if (!item || !intentTextOk(item, raw) || !intentGoalOk(item, goals)) return undefined;
+  return confirmedProposal(item as { kind: string; text: string; goalId?: string; priority?: number }, explicit);
+}
+function collectJudgeProposals(intents: unknown[], raw: string, goals: GoalIntakeContext[]): GoalIntentProposal[] | undefined {
+  const explicit = raw.match(targetPattern)?.[1];
+  const proposals: GoalIntentProposal[] = [];
+  for (const item of intents) {
+    const proposal = judgeProposal(item as { kind?: string; text?: string; goalId?: string; priority?: number } | null, raw, goals, explicit);
+    if (!proposal) return undefined;
+    proposals.push(proposal);
+  }
+  return proposals;
+}
+function keepsFallbackClauses(fallback: GoalIntentProposal[], proposals: GoalIntentProposal[]): boolean {
+  if (fallback.length <= 1) return true;
+  return !fallback.some(intent => !proposals.some(proposal => proposal.text.includes(intent.text)));
+}
+function proposalsForOutput(raw: string, goals: GoalIntakeContext[], fallback: GoalIntentProposal[], output: unknown): GoalIntentProposal[] | undefined {
+  if (outputTooLarge(output)) return undefined;
+  const intents = usableIntents(parsedJudge(output));
+  if (!intents) return undefined;
+  const proposals = collectJudgeProposals(intents, raw, goals);
+  if (!proposals || !keepsFallbackClauses(fallback, proposals)) return undefined;
+  return proposals;
+}
+function raceGoalJudge(raw: string, goals: GoalIntakeContext[], judge: GoalIntentJudge, controller: AbortController, remember: (timer: ReturnType<typeof setTimeout>) => void): Promise<unknown> {
+  return Promise.race([
+    judge({ text: raw, goals: goals.slice(0, 50).map(goal => ({ ...goal, title: goal.title.slice(0, 300) })), signal: controller.signal, instructions: JUDGE_INSTRUCTIONS }),
+    new Promise<never>((_, reject) => { remember(setTimeout(() => { controller.abort(); reject(new Error('Goal intent judge timed out')); }, 3000)); })
+  ]);
+}
+async function judgedIntents(raw: string, goals: GoalIntakeContext[], fallback: GoalIntentProposal[], judge: GoalIntentJudge): Promise<GoalIntentProposal[] | undefined> {
   const controller = new AbortController();
   let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
-    const output = await Promise.race([
-      judge({ text: raw, goals: goals.slice(0, 50).map(goal => ({ ...goal, title: goal.title.slice(0, 300) })), signal: controller.signal,
-        instructions: 'Return JSON {intents:[{kind,goalId?,text,priority?}]}. kinds: new_goal, amend_goal, query, pause, resume, cancel, reprioritize, chat. Split independent intents; text must be an exact nonempty excerpt of the message. Queries and discussion of controls are never control requests. Preserve explicit [goal:id] targeting. Use only supplied goal IDs; omit goalId when ambiguous. Do not infer cancellation or completion. priority must be an integer for reprioritize.' }),
-      new Promise<never>((_, reject) => { timeout = setTimeout(() => { controller.abort(); reject(new Error('Goal intent judge timed out')); }, 3000); })
-    ]);
-    if (typeof output === 'string' && output.length > 16000) return fallback;
-    const decoded = typeof output === 'string' ? JSON.parse(output) : output;
-    if (!decoded || !Array.isArray(decoded.intents) || !decoded.intents.length || decoded.intents.length > 8) return fallback;
-    const explicit = raw.match(targetPattern)?.[1];
-    const allowed = new Set(['new_goal', 'amend_goal', 'query', 'pause', 'resume', 'cancel', 'reprioritize', 'chat']);
-    const proposals: GoalIntentProposal[] = [];
-    for (const item of decoded.intents) {
-      if (!item || !allowed.has(item.kind) || typeof item.text !== 'string' || !item.text.trim() || !raw.includes(item.text)) return fallback;
-      if (item.goalId !== undefined && (typeof item.goalId !== 'string' || !goals.some(goal => goal.id === item.goalId))) return fallback;
-      if (explicit && item.goalId !== explicit) return fallback;
-      const baseline = classifyGoalMessage(item.text);
-      if (['query', 'chat'].includes(baseline.kind) && item.kind !== baseline.kind) return fallback;
-      if (['pause', 'cancel', 'resume'].includes(item.kind) && baseline.kind !== item.kind) return fallback;
-      if (item.kind === 'reprioritize' && (!Number.isSafeInteger(item.priority) || Math.abs(item.priority) > 100)) return fallback;
-      proposals.push({ kind: item.kind, text: item.text, ...(item.goalId ? { goalId: item.goalId } : {}), ...(item.kind === 'reprioritize' ? { priority: item.priority } : {}) } as GoalIntentProposal);
-    }
-    // A model must not silently drop an independently recognized query or control clause.
-    if (fallback.length > 1 && fallback.some(intent => !proposals.some(proposal => proposal.text.includes(intent.text)))) return fallback;
-    return proposals;
-  } catch { return fallback; }
+    const output = await raceGoalJudge(raw, goals, judge, controller, timer => { timeout = timer; });
+    return proposalsForOutput(raw, goals, fallback, output);
+  } catch { return undefined; }
   finally { if (timeout) clearTimeout(timeout); controller.abort(); }
+}
+
+/** Judge proposals are untrusted. Callers still validate scoped target ownership and goal revision. */
+export async function classifyGoalIntents(raw: string, goals: GoalIntakeContext[], judge?: GoalIntentJudge): Promise<GoalIntentProposal[]> {
+  const text = visibleTaskText(raw);
+  const fallback = fallbackIntents(text, goals);
+  if (judgeSkipped(judge, text, fallback)) return fallback;
+  const judged = await judgedIntents(text, goals, fallback, judge!);
+  return judged ?? fallback;
 }

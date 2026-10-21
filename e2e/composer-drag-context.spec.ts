@@ -240,12 +240,15 @@ test.describe('消息框拖入文件和文件夹', () => {
     expect(saved.contextSources).toEqual([fileWire(file), folderWire(folder)]);
   });
 
-  test('拖入选中文字、链接或空拖放不会产生无名称上下文，之后仍能发送 [AC:composer-drag-context#AC-6]', async ({ page }) => {
+  test('拖入选中文字、链接或空拖放不会产生无名称上下文，之后仍能发送 [AC:composer-drag-context#AC-6]', async ({ page, request }) => {
     const token = stamp();
+    const quiet = await openQuietBot(request);
+    try {
     for (const surface of ['chat', 'bot', 'group'] as const) {
       const draft = `空拖放草稿 ${surface} ${token}`;
       const sent = `${draft} 继续发送`;
-      await openSurface(page, surface);
+      if (surface === 'bot') await openBot(page, quiet.name);
+      else await openSurface(page, surface);
       await composerInput(page, surface).fill(draft);
       await dropOn(page, surface, { text: `选中的一段文字 ${token}` });
       await dropOn(page, surface, { uri: `https://example.com/drag-${token}` });
@@ -258,6 +261,9 @@ test.describe('消息框拖入文件和文件夹', () => {
       expect(body.message ?? body.text).toContain(sent);
       const turn = await sentTurn(page, surface, sent);
       await expect(turn.locator('[data-testid="composer-message-context"]')).toHaveCount(0);
+    }
+    } finally {
+      if (quiet.id !== alpha.id) await request.patch(`/api/bots/${quiet.id}`, { data: { hidden: true } });
     }
   });
 
@@ -322,6 +328,29 @@ async function createRoom(
 async function openChat(page: Page): Promise<void> {
   await page.goto('/#/chat');
   await expect(dropTarget(page, 'chat')).toBeVisible();
+}
+
+async function openQuietBot(request: APIRequestContext): Promise<Bot> {
+  const name = `空拖放 ${stamp()}`;
+  const res = await request.post('/api/bots', { data: { name } });
+  if (res.status() === 201) return (JSON.parse(await res.text()) as { bot: Bot }).bot;
+  await waitUntilQuiet(request, alpha.canonicalSessionId);
+  return alpha;
+}
+
+async function waitUntilQuiet(request: APIRequestContext, sessionId: string): Promise<void> {
+  const deadline = Date.now() + 20_000;
+  while (Date.now() < deadline) {
+    const res = await request.get(`/api/sessions/${sessionId}?includeMessages=false`);
+    if (res.ok()) {
+      const data = JSON.parse(await res.text()) as { session?: { status?: string; metadata?: { concurrentBotForks?: Array<{ status?: string }> } } };
+      const status = data.session?.status;
+      const forks = data.session?.metadata?.concurrentBotForks ?? [];
+      const busy = status === 'running' || status === 'waiting_approval' || forks.some((fork) => fork.status === 'running');
+      if (!busy) return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
 }
 
 async function openBot(page: Page, name: string): Promise<void> {
@@ -431,6 +460,7 @@ async function sendAndFinish(page: Page, surface: Surface): Promise<{ message?: 
   if (surface !== 'group') {
     await expect
       .poll(async () => page.locator('#playMessages').evaluate((root, text) => {
+        root.scrollTop = root.scrollHeight;
         const turns = Array.from(root.querySelectorAll('.chat-turn'));
         const userIndex = turns.findLastIndex(turn => turn.classList.contains('chat-turn--user') && turn.textContent?.includes(text));
         return userIndex >= 0 && turns.slice(userIndex + 1).some(turn => turn.classList.contains('chat-turn--assistant'));

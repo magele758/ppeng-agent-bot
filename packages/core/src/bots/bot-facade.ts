@@ -225,7 +225,10 @@ export function createBot(host: SessionFacadeHost, input: CreateBotInput, option
     throw new ConflictError(`Bot name already exists: ${name}`);
   }
   const builtinId = host.store.getDaemonControl<string>('bot.superBotId');
-  const ordinaryCount = host.store.countBots({ includeHidden: true }) - (builtinId && host.store.getBot(builtinId) ? 1 : 0);
+  const builtin = builtinId ? host.store.getBot(builtinId) : undefined;
+  // Removed (hidden) bots leave the visible roster, so a user can create another.
+  // The cap still blocks a 51st visible ordinary bot. The built-in Super Bot is not ordinary.
+  const ordinaryCount = host.store.countBots({ includeHidden: false }) - (builtin && !builtin.hidden ? 1 : 0);
   if (!options?.builtin && ordinaryCount >= BOT_ROSTER_CAP) {
     throw new ValidationError(`Bot roster cap reached (${BOT_ROSTER_CAP})`);
   }

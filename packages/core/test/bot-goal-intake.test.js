@@ -54,3 +54,20 @@ test('judge input is bounded and a hanging judge falls back without losing work'
   assert.equal(result[0].kind, 'new_goal');
   assert.equal(signal.aborted, true);
 });
+
+test('dragged file bodies are not separate goals', async () => {
+  const { classifyGoalIntents } = await import('../dist/bots/goals/intake.js');
+  const fenced = [
+    '只发给这个 Bot',
+    '«external source=attachment label=a.txt»',
+    'alpha-file-sentence',
+    '«end external»',
+    '«external source=attachment label=pack/readme.txt»',
+    'alpha-folder-sentence',
+    '«end external»'
+  ].join('\n');
+  const intents = await classifyGoalIntents(fenced, []);
+  assert.deepEqual(intents.map((intent) => [intent.kind, intent.text]), [['new_goal', '只发给这个 Bot']]);
+  const onlyFence = fenced.slice(fenced.indexOf('«'));
+  assert.equal((await classifyGoalIntents(onlyFence, []))[0].kind, 'chat');
+});

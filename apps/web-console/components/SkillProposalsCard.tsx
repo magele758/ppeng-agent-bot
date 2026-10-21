@@ -336,7 +336,7 @@ export function SkillProposalsCard() {
             );
           })
         )}
-        <BotSkillManager skills={approved} onChange={loadProposals} />
+        <BotSkillManager skills={approved} onChange={loadProposals} onNotice={setMsg} />
         {decided.length ? (
           <>
             <div className="card-head" style={{ paddingLeft: 0 }}>

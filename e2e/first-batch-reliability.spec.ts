@@ -1,7 +1,6 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
 
 const ownedJobs: string[] = [];
-// The shared E2E daemon fills the ordinary roster (hidden Bots still count).
 // These checks need a Bot that already exists, so they use the built-in Super Bot.
 async function reliabilityBot(request: APIRequestContext) {
  const response = await request.get('/api/bot-work/default');
@@ -40,7 +39,7 @@ test('Lab explicitly upgrades a legacy precheck [AC:routine-strict-precheck#AC-1
  await page.goto('/#/agents/bots');
  await page.getByRole('searchbox', { name: '搜索 Bot' }).fill(bot.name);
  await page.getByTestId(`bot-card-${bot.id}`).click();
- await page.getByTestId('bot-detail').getByRole('button',{name:'展开或收起：定时任务'}).click();
+ await page.getByTestId('bot-detail').getByRole('tab', { name: '任务与自动化', exact: true }).click();
  const panel=page.locator('.bot-cron-panel');await panel.getByRole('button',{name:'修改',exact:true}).click();
  const mode=panel.getByTestId('strict-precheck-mode');await expect(mode).toHaveValue('compat');await mode.selectOption('strict');
  await panel.locator('button[type=submit]').click();
