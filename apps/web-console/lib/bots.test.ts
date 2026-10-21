@@ -57,6 +57,21 @@ test('filterSessionsByPlaySurface treats per-user bot chats as bot surface', () 
   assert.equal(botForCanonicalSession([bot], 'sess_user_bot', sessions)?.id, 'researcher');
 });
 
+test('filterSessionsByPlaySurface keeps bot work out of ordinary chat without a roster hit', () => {
+  const sessions = [
+    { id: 'chat' },
+    { id: 'canon', metadata: { canonicalBotChat: true, botId: 'missing' } },
+    { id: 'worker', metadata: { spawnSource: 'bot-goal-continuation', botId: 'missing' } },
+    { id: 'fork', metadata: { botGoalWorker: true } },
+    { id: 'room', metadata: { roomId: 'room-1', canonicalBotChat: true } }
+  ];
+  assert.deepEqual(filterSessionsByPlaySurface(sessions, [], 'chat').map((s) => s.id), ['chat']);
+  assert.deepEqual(
+    filterSessionsByPlaySurface(sessions, [], 'bot').map((s) => s.id),
+    ['canon', 'worker', 'fork']
+  );
+});
+
 test('filterSessionsByPlaySurface splits chat vs bot canonical', () => {
   const sessions = [{ id: 'sess_chat' }, { id: 'sess_bot' }, { id: 'sess_other' }];
   assert.deepEqual(

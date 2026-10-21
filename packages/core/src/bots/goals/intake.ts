@@ -1,3 +1,5 @@
+import { visibleTaskText } from '../fork-inheritance.js';
+
 export interface GoalMessageIntent {
   kind: 'new_goal' | 'amend_goal' | 'query' | 'pause' | 'resume' | 'cancel' | 'chat';
   goalId?: string;
@@ -150,8 +152,9 @@ async function judgedIntents(raw: string, goals: GoalIntakeContext[], fallback: 
 
 /** Judge proposals are untrusted. Callers still validate scoped target ownership and goal revision. */
 export async function classifyGoalIntents(raw: string, goals: GoalIntakeContext[], judge?: GoalIntentJudge): Promise<GoalIntentProposal[]> {
-  const fallback = fallbackIntents(raw, goals);
-  if (judgeSkipped(judge, raw, fallback)) return fallback;
-  const judged = await judgedIntents(raw, goals, fallback, judge!);
+  const text = visibleTaskText(raw);
+  const fallback = fallbackIntents(text, goals);
+  if (judgeSkipped(judge, text, fallback)) return fallback;
+  const judged = await judgedIntents(text, goals, fallback, judge!);
   return judged ?? fallback;
 }

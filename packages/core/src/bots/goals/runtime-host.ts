@@ -210,13 +210,16 @@ function startBoundGoal(host:GoalRuntimeHost,session:SessionRecord,scope:NonNull
  host.store.enqueueSteer(session.id,goalInstructions(goal,route.strategy!,route.reason),{role:'system',key:`goal-execution:${execution.id}`});
  return true;
 }
+function answerCanonicalChat(session:SessionRecord,bound:boolean):boolean {
+ return bound||session.metadata.canonicalBotChat===true;
+}
 export function bindGoalExecution(host:GoalRuntimeHost,session:SessionRecord):boolean {
  const scope=goalScope(host.store,session);
  if(!scope)return true;
  if(session.metadata.botGoalWorker===true)return isGoalWorkerCurrent(host.store,session);
  const decided=decidedBind(host,session,scope);
- if(decided.done)return decided.result;
- return startBoundGoal(host,session,scope,decided.goal);
+ const bound=decided.done?decided.result:startBoundGoal(host,session,scope,decided.goal);
+ return answerCanonicalChat(session,bound);
 }
 function goalInstructions(goal:BotGoal,strategy:string,reason:string):string {
  return `[goal ${goal.id} revision ${goal.revision}] Objective: ${goal.objective}\nConstraints: ${JSON.stringify(goal.constraints)}\nCompletion conditions: ${JSON.stringify(goal.completionCriteria)}\nExecution: ${strategy}. ${reason}\nPrevious progress: ${goal.progress}\nNext step: ${goal.nextStep??''}\nUse goal_checkpoint to preserve concrete progress, evidence, or a durable wait condition before returning. Returning a response does not complete the goal. For team_dag/swarm/bot_delegate use goal_dispatch to launch the selected executor. For PTC use ptc_exec. Do not repeat unconfirmed external actions.`;

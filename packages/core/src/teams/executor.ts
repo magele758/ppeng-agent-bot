@@ -367,6 +367,56 @@ export class TeamDagExecutor {
     }
   }
 
+  private async bindFallbackWorkspace(taskId: string, task: TeamDagTask): Promise<void> {
+    try {
+      const fallback = await this.deps.bindWorkspaceForTask(taskId);
+      if (fallback) task.workspacePath = fallback;
+    } catch {
+      /* workspace optional */
+    }
+  }
+
+  private async assignIsolatedWorkspace(
+    task: TeamDagTask,
+    settings: TeamsDagSettings,
+    hostTaskId: string,
+    destRoot: string
+  ): Promise<WorkspaceRecord | undefined> {
+    try {
+      const ws = await createTeamWorkerWorkspace({
+        workspaceManager: this.deps.workspaceManager,
+        sourceRoot: this.deps.sourceRoot,
+        destRoot,
+        taskId: hostTaskId,
+        hint: task.title,
+        mode: settings.workspaceSyncMode
+      });
+      task.workspacePath = ws.rootPath;
+      if (ws.record) task.workspaceId = ws.record.id;
+      return ws.record;
+    } catch {
+      await this.bindFallbackWorkspace(hostTaskId, task);
+      return undefined;
+    }
+  }
+
+  private async resolveTeamWorkspace(
+    plan: TeamPlan,
+    task: TeamDagTask,
+    settings: TeamsDagSettings,
+    hostTaskId: string
+  ): Promise<{ inheritMeta: ReturnType<typeof inheritWorkspaceBinding>; hostBound: boolean; workspaceRecord?: WorkspaceRecord }> {
+    const parent = plan.sessionId ? this.deps.getSession(plan.sessionId) : undefined;
+    const inheritMeta = inheritWorkspaceBinding(parent?.metadata);
+    const hostBinding = workspaceBindingFromMetadata(parent?.metadata);
+    const hostBound = hostBinding.kind === 'project' || hostBinding.kind === 'cloud_folder';
+    const destRoot = teamTaskWorkspaceDir(this.deps.stateDir, plan.id, task.id);
+    const workspaceRecord = hostBound
+      ? undefined
+      : await this.assignIsolatedWorkspace(task, settings, hostTaskId, destRoot);
+    return { inheritMeta, hostBound, workspaceRecord };
+  }
+
   private async dispatch(plan: TeamPlan, task: TeamDagTask, settings: TeamsDagSettings): Promise<void> {
     const hostTask = this.deps.createTask({
       title: `[team-dag] ${task.title}`,
@@ -374,35 +424,7 @@ export class TeamDagExecutor {
       metadata: { teamPlanId: plan.id, teamTaskId: task.id }
     });
     task.taskId = hostTask.id;
-
-    const destRoot = teamTaskWorkspaceDir(this.deps.stateDir, plan.id, task.id);
-    let workspaceRecord: WorkspaceRecord | undefined;
-    const parent = plan.sessionId ? this.deps.getSession(plan.sessionId) : undefined;
-    const inheritMeta = inheritWorkspaceBinding(parent?.metadata);
-    const hostBinding = workspaceBindingFromMetadata(parent?.metadata);
-    const hostBound = hostBinding.kind === 'project' || hostBinding.kind === 'cloud_folder';
-    if (!hostBound) {
-      try {
-        const ws = await createTeamWorkerWorkspace({
-          workspaceManager: this.deps.workspaceManager,
-          sourceRoot: this.deps.sourceRoot,
-          destRoot,
-          taskId: hostTask.id,
-          hint: task.title,
-          mode: settings.workspaceSyncMode
-        });
-        task.workspacePath = ws.rootPath;
-        workspaceRecord = ws.record;
-        if (ws.record) task.workspaceId = ws.record.id;
-      } catch {
-        try {
-          const fallback = await this.deps.bindWorkspaceForTask(hostTask.id);
-          if (fallback) task.workspacePath = fallback;
-        } catch {
-          /* workspace optional */
-        }
-      }
-    }
+    const placed = await this.resolveTeamWorkspace(plan, task, settings, hostTask.id);
 
     if (this.deps.store.get(plan.id)?.status !== 'running') return;
     const session = this.deps.createTeammateSession({
@@ -415,7 +437,7 @@ export class TeamDagExecutor {
         task.description ?? '',
         task.dependsOn.length ? `Depends on: ${task.dependsOn.join(', ')}` : '',
         task.workspacePath ? `Isolated workspace is already bound. Write deliverables there.` : '',
-        hostBound ? 'Inherit the host workspace binding; write deliverables in those roots.' : '',
+        placed.hostBound ? 'Inherit the host workspace binding; write deliverables in those roots.' : '',
         'Complete this task, then stop.'
       ]
         .filter(Boolean)
@@ -423,10 +445,10 @@ export class TeamDagExecutor {
       taskId: hostTask.id,
       parentSessionId: plan.sessionId,
       background: true,
-      metadata: { teamPlanId: plan.id, teamTaskId: task.id, teamRole: task.role, ...inheritMeta }
+      metadata: { teamPlanId: plan.id, teamTaskId: task.id, teamRole: task.role, ...placed.inheritMeta }
     });
-    if (workspaceRecord && this.deps.registerWorkspace) {
-      this.deps.registerWorkspace(workspaceRecord, hostTask.id, session.id);
+    if (placed.workspaceRecord && this.deps.registerWorkspace) {
+      this.deps.registerWorkspace(placed.workspaceRecord, hostTask.id, session.id);
     }
     task.sessionId = session.id;
     task.status = 'running';

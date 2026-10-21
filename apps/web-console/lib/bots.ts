@@ -54,6 +54,12 @@ export function botForCanonicalSession<T extends { id: string; canonicalSessionI
   return undefined;
 }
 
+/** Background bot work is not an ordinary conversation on either play surface. */
+function backgroundBotWork(metadata: Record<string, unknown> | undefined): boolean {
+  const source = metadata?.spawnSource;
+  return metadata?.botGoalWorker === true || source === 'bot-goal-continuation' || source === 'concurrent-bot-work';
+}
+
 export function filterSessionsByPlaySurface<
   T extends { id: string; metadata?: Record<string, unknown> }
 >(
@@ -61,15 +67,11 @@ export function filterSessionsByPlaySurface<
   bots: readonly BotInfo[],
   surface: PlaySurface
 ): T[] {
-  const botIds = new Set(bots.map((b) => b.id));
   const canonical = new Set(
     bots.map((b) => b.canonicalSessionId).filter((id): id is string => Boolean(id))
   );
-  const isBotSession = (s: T) => {
-    if (canonical.has(s.id)) return true;
-    const botId = typeof s.metadata?.botId === 'string' ? s.metadata.botId : '';
-    return Boolean(botId && botIds.has(botId) && s.metadata?.canonicalBotChat === true);
-  };
+  const isBotSession = (s: T) =>
+    canonical.has(s.id) || s.metadata?.canonicalBotChat === true || backgroundBotWork(s.metadata);
   return sessions.filter((s) => !s.metadata?.roomId && (surface === 'bot' ? isBotSession(s) : !isBotSession(s)));
 }
 

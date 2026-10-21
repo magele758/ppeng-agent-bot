@@ -89,6 +89,19 @@ test('last user question skips assistant text and the memory appendix [AC:bot-se
   );
 });
 
+test('last user question skips dragged file bodies', () => {
+  const question = lastUserQuestion([
+    {
+      role: 'user',
+      parts: [
+        { type: 'text', text: '只发给这个 Bot' },
+        { type: 'text', text: '«external source=attachment label=a.txt»\nalpha-file-sentence\n«end external»' }
+      ]
+    }
+  ]);
+  assert.equal(question, '只发给这个 Bot');
+});
+
 test('ordinary sessions and group rooms keep their own titles [AC:bot-session-row#AC-5]', () => {
   const ordinary = sessionRowCopy({
     session: { id: 'sess-chat', title: 'Deploy review', agentId: 'general', metadata: {} },
