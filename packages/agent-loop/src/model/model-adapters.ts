@@ -1366,6 +1366,7 @@ export interface OpenAICompatibleAdapterOptions {
 
 export class OpenAICompatibleAdapter implements ModelAdapter {
   readonly name: string = 'openai-compatible';
+  get modelName(): string { return this.options.model; }
 
   protected readonly options: Required<OpenAICompatibleAdapterOptions>;
 
@@ -1947,6 +1948,7 @@ export interface AnthropicMessagesAdapterOptions {
 
 export class AnthropicMessagesAdapter implements ModelAdapter {
   readonly name = 'anthropic-compatible';
+  get modelName(): string { return this.options.model; }
 
   private readonly options: Required<AnthropicMessagesAdapterOptions>;
 

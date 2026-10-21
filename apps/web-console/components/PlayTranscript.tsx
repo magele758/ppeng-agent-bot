@@ -310,7 +310,7 @@ function renderOptimisticOrStream(slot: FeedSlot, view: TranscriptModel, chat: C
     );
   }
   if (slot.kind !== 'stream') return null;
-  return <ChatTurnStreaming segments={streamSegmentsFor(slot, chat)} sessionId={sessionId} resolvedCallIds={view.resolved} />;
+  return <ChatTurnStreaming retry={slot.streamPart === 'prefix' ? undefined : chat.streamOverlay?.retry} segments={streamSegmentsFor(slot, chat)} sessionId={sessionId} resolvedCallIds={view.resolved} />;
 }
 
 function streamSegmentsFor(slot: FeedSlot, chat: Chat) {

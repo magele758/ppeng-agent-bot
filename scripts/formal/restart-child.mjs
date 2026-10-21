@@ -15,7 +15,7 @@ function hold(signal) { return new Promise(resolve => { if (signal?.aborted) ret
 const originalTimer = globalThis.setTimeout;
 if (config.generation === 1 && config.phase === 'retry') globalThis.setTimeout = (fn, delay, ...args) => {
   const timer = originalTimer(fn, delay, ...args);
-  if (delay === 400) entered('retry-timer-registered');
+  if (delay === 2000) entered('retry-timer-registered');
   return timer;
 };
 const runtime = new RawAgentRuntime({ repoRoot: join(config.dir, 'repo'), stateDir: join(config.dir, 'state'), maxParallelToolCalls: 1,

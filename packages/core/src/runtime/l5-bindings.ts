@@ -43,6 +43,7 @@ import { readWorkingLogAppendix } from '../session/working-log.js';
 import { imageBufferToDataUrl, touchImageAccess } from '../image-assets.js';
 import type {
   ModelAdapter,
+  ModelStreamChunk,
   ModelTurnResult,
   SessionRecord,
   ToolContract
@@ -511,9 +512,9 @@ function runTurnViaFallbackChain(
     emitTrace: (event) => {
       if (sessionId) rt.emitTrace(sessionId, event as Parameters<L5Bindable['emitTrace']>[1]);
     },
-    // Retries stack on top of the chain: the primary keeps one, each backup gets none.
+    // The primary uses the configured retry budget; backups get at most one retry.
     invoke: (adapter, index) =>
-      invokeContextModel(rt, adapter, input, stream.forAttempt(index), { maxRetries: index === 0 ? 1 : 0 })
+      invokeContextModel(rt, adapter, input, stream.forAttempt(index, adapter), index === 0 ? undefined : { maxRetries: 1 })
   });
 }
 
@@ -736,11 +737,26 @@ function runTurnWithNormalRequestBudget(
  * contract retries use. Only the winning attempt reaches the transcript.
  */
 function fallbackStream(onStream: Parameters<TurnKernelHost['runTurnWithRetries']>[1]) {
+  let priorRequests = 0;
+  let currentRequests = 0;
+  let lastFailure: Extract<ModelStreamChunk, { type: 'model_retry' }> | undefined;
   const tracker = onStream ? createStreamResetTracker(onStream) : undefined;
   return {
-    forAttempt(index: number) {
-      if (index > 0) tracker?.resetIfDirty('fallback');
-      return tracker?.onChunk;
+    forAttempt(index: number, adapter: ModelAdapter) {
+      if (index > 0) {
+        priorRequests += currentRequests;
+        currentRequests = 0;
+        tracker?.resetIfDirty('fallback');
+        if (lastFailure) onStream?.({ ...lastFailure, phase: 'switching', model: adapter.modelName ?? adapter.name,
+          retry: 0, maxRetries: 1, requests: priorRequests });
+      }
+      return onStream ? (chunk: ModelStreamChunk) => {
+        if (chunk.type === 'model_retry') {
+          currentRequests = chunk.requests;
+          if (chunk.phase === 'failed') lastFailure = chunk;
+          tracker!.onChunk({ ...chunk, requests: priorRequests + currentRequests });
+        } else tracker!.onChunk(chunk);
+      } : undefined;
     }
   };
 }
@@ -869,7 +885,7 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
         }
         const reset = fallbackStream(stream);
         return withProviderFallback(candidates, (adapter, index) =>
-          invokeContextModel(rt, adapter, fitted, reset.forAttempt(index))
+          invokeContextModel(rt, adapter, fitted, reset.forAttempt(index, adapter), index === 0 ? undefined : { maxRetries: 1 })
         );
       }),
     waitSteeringChildrenIdle: (sessionId) => waitSteeringChildrenIdle(sessionId),
@@ -1226,8 +1242,7 @@ export function l5ToAssembledIo(rt: L5Bindable, sessionId?: string): AssembledLo
   const toolDeps = toolLoopDepsFrom(rt);
   const toolIterations = new Set<number>();
   let lastReminderIteration = -1;
-  const chainActive =
-    planModelFallback({ store: rt.store, primary: rt.modelAdapter, env: process.env }) !== undefined;
+  const chainActive = planModelFallback({ store: rt.store, primary: rt.modelAdapter, env: process.env }) !== undefined;
   return {
     model: rt.modelAdapter,
     tools: rt.tools,
@@ -1271,7 +1286,13 @@ export function l5ToAssembledIo(rt: L5Bindable, sessionId?: string): AssembledLo
     resolveFilePolicy: async () => adaptFilePolicyForLoop(await rt.mergedFilePolicy()),
     resolveImageDataUrl: host.resolveImageDataUrl,
     resolveModelAdapter: session => observeModelRequests(rt.store, host.resolveModelAdapter?.(session) ?? rt.modelAdapter, rt.cumulativeInputTokensBySession),
-    ...(chainActive || (sessionId && isCanonicalBotChat(rt.store.getSession(sessionId) ?? {})) ? {runTurnWithRetries: host.runTurnWithRetries} : {}),
+    runTurnWithRetries: chainActive || (sessionId && isCanonicalBotChat(rt.store.getSession(sessionId) ?? {}))
+      ? host.runTurnWithRetries
+      : (input, stream) => {
+        const session = input.sessionId ? rt.store.getSession(input.sessionId) : undefined;
+        const adapter = session ? host.resolveModelAdapter?.(session) ?? rt.modelAdapter : rt.modelAdapter;
+        return invokeContextModel(rt, adapter, input, stream);
+      },
     fitModelRequest: (input) => fitProductModelRequest(rt, input),
     resolveTurnTools: host.resolveTurnTools,
     resolveRunProfile: host.resolveRunProfile,

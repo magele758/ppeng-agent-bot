@@ -66,17 +66,18 @@ function runningLease(goal: BotGoal, execution: GoalExecution, executionId: stri
   return goal.activeExecutionId === executionId && execution.status === 'running' && execution.leaseUntil > now;
 }
 
-function waitingOnSession(goal: BotGoal, execution: GoalExecution, sessionId: string): boolean {
-  if (goal.status !== 'waiting' || execution.status !== 'finished') return false;
-  return goal.wait?.source === 'session' && goal.wait.correlationId === sessionId;
+function ownsWait(goal: BotGoal, execution: GoalExecution, live: SessionRecord): boolean {
+  if (goal.status !== 'waiting' || execution.status !== 'finished' || !goal.wait) return false;
+  if (goal.wait.source === 'session' && goal.wait.correlationId === live.id) return true;
+  return goal.wait.source === 'self_heal' && goal.wait.correlationId === live.metadata.selfHealRunId;
 }
 
-function sameAuthorizedWait(wait: { goalId?: string; executionId?: string; source?: string; correlationId?: string } | undefined, goalId: string, executionId: string, sessionId: string): boolean {
-  return wait?.goalId === goalId && wait?.executionId === executionId && wait?.source === 'session' && wait?.correlationId === sessionId;
+function sameAuthorizedWait(wait: { goalId?: string; executionId?: string; source?: string; correlationId?: string } | undefined, goalId: string, executionId: string, source: string, correlationId: string): boolean {
+  return wait?.goalId === goalId && wait?.executionId === executionId && wait?.source === source && wait?.correlationId === correlationId;
 }
 
-function waitAuthorized(waits: unknown, goalId: string, executionId: string, sessionId: string): boolean {
-  return Array.isArray(waits) && waits.some(wait => sameAuthorizedWait(wait, goalId, executionId, sessionId));
+function waitAuthorized(waits: unknown, goalId: string, executionId: string, source: string, correlationId: string): boolean {
+  return Array.isArray(waits) && waits.some(wait => sameAuthorizedWait(wait, goalId, executionId, source, correlationId));
 }
 
 function identifiedWorker(store: SqliteStateStore, session: SessionRecord): { live: SessionRecord; identity: GoalWorkerIdentity } | undefined {
@@ -96,16 +97,17 @@ function ownedExecution(store: SqliteStateStore, found: { live: SessionRecord; i
   return { identity: found.identity, loaded, owner, sessionId: found.live.id };
 }
 
-function goalWorkerStillCurrent(ctx: { identity: GoalWorkerIdentity; loaded: LoadedGoalExecution; owner: SessionRecord; sessionId: string }, now: number): boolean {
+function goalWorkerStillCurrent(ctx: { identity: GoalWorkerIdentity; loaded: LoadedGoalExecution; owner: SessionRecord; live: SessionRecord }, now: number): boolean {
   if (ctx.loaded.goal.status === 'running') return runningLease(ctx.loaded.goal, ctx.loaded.execution, ctx.identity.executionId, now);
-  if (!waitingOnSession(ctx.loaded.goal, ctx.loaded.execution, ctx.sessionId)) return false;
-  return waitAuthorized(ctx.owner.metadata.botGoalAuthorizedWaits, ctx.identity.goalId, ctx.identity.executionId, ctx.sessionId);
+  if (!ownsWait(ctx.loaded.goal, ctx.loaded.execution, ctx.live)) return false;
+  const wait = ctx.loaded.goal.wait!;
+  return waitAuthorized(ctx.owner.metadata.botGoalAuthorizedWaits, ctx.identity.goalId, ctx.identity.executionId, wait.source, wait.correlationId);
 }
 
 /** Workers can resume their own revision while waiting, but cannot claim or follow a newer execution. */
 export function isGoalWorkerCurrent(store: SqliteStateStore, session: SessionRecord): boolean {
   const found = identifiedWorker(store, session);
   const ctx = found ? ownedExecution(store, found) : undefined;
-  if (!ctx) return false;
-  return goalWorkerStillCurrent(ctx, Date.now());
+  if (!ctx || !found) return false;
+  return goalWorkerStillCurrent({ ...ctx, live: found.live }, Date.now());
 }

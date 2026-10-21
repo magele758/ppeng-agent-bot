@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { ModelRetryStatus } from './ModelRetryStatus';
+import type { RetryProgress } from '@/lib/model-retry';
 import type { StreamSegment } from '@/lib/stream-segments';
 import { formatStreamToolArgs } from '@/lib/stream-segments';
 import type { ChatMessage, MessagePart } from '@/lib/types';
@@ -582,11 +584,13 @@ export function ChatTurnPlain({
 
 export function ChatTurnStreaming({
   segments,
+  retry,
   typing,
   sessionId = '',
   resolvedCallIds
 }: {
   segments: StreamSegment[];
+  retry?: RetryProgress;
   typing?: boolean;
   sessionId?: string;
   resolvedCallIds?: ReadonlySet<string>;
@@ -599,6 +603,7 @@ export function ChatTurnStreaming({
       <div className="chat-turn__content">
         <div className="chat-turn__label">{t('play.role.streaming')}</div>
         <div className="chat-bubble chat-bubble--stream-blocks">
+          {retry ? <ModelRetryStatus progress={retry} /> : null}
           {segments.length === 0 ? (
             <div className="chat-stream-placeholder muted">…</div>
           ) : (

@@ -17,7 +17,7 @@ export function createStreamResetTracker(onStream: (chunk: ModelStreamChunk) => 
   let dirty = false;
   return {
     onChunk(chunk) {
-      dirty = chunk.type !== 'stream_reset';
+      if (chunk.type !== 'model_retry') dirty = chunk.type !== 'stream_reset';
       onStream(chunk);
     },
     resetIfDirty(reason) {

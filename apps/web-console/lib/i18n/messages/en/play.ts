@@ -1,5 +1,15 @@
 /** Play / Chat copy. Do not add as const. */
 export const play = {
+  retry: {
+    waiting: '{model} · Retry {retry}/{max} · Retrying in {seconds}s',
+    requesting: '{model} · Retrying {retry}/{max}',
+    switching: 'Switching to backup model: {model}',
+    reason: 'Reason: {reason}',
+    exhausted: 'Automatic retries exhausted after {requests} requests. Last error: {reason}',
+    waitLimit: 'Upstream requested a wait exceeding 120 seconds. Stopped after {requests} requests. Last error: {reason}',
+    stopped: 'Stopped',
+  },
+
   imageUnsupported: 'The current model does not support images. Select an image-capable model, or remove the current images and send text only.',
   groupSettings: { title: 'Group chat settings' },
   entry: { new: 'New', remove: 'Remove', removeBot: 'Remove Bot “{name}”', removeBotConfirm: 'Remove Bot “{name}”? It will be hidden from the Bot list. Existing conversations, group chats and tasks are kept; this does not delete conversations.', removeFailed: 'Removal failed: {error}' },

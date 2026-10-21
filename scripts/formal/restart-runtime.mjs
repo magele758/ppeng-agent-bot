@@ -62,7 +62,7 @@ async function runCase(c,mutation,childExecutable){
     await stop(c.termination);await boot();let after=await get('new process read persisted state');
     if(['model','tool','partial-tools','retry'].includes(c.phase)){
       check(c.phase==='retry'?'AC-2':'AC-1','lost execution has a truthful settled outcome',isInterrupted(after),'interrupted/unknown, not running or successful',norm(after));
-      await pause(500);const quiet=await get('old retry deadline passed');
+      await pause(2050);const quiet=await get('old retry deadline passed');
       check(c.phase==='retry'?'AC-2':'AC-1','no automatic old model/tool work after boot',quiet.ledger.filter(e=>e.generation===2).length===0,0,quiet.ledger.filter(e=>e.generation===2));after=quiet;
     }
     if(approval){

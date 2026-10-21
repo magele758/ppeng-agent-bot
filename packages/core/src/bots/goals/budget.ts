@@ -25,26 +25,32 @@ function addActiveCosts(host: GoalRuntimeHost, active: { sessionId?: string }[],
     sessions.set(owner.id, { execution: true, cost: sessionCost(owner.metadata) });
   }
 }
-function sameGoalSessionRef(ref: WaitReference, goal: { id: string }): ref is WaitReference & { correlationId: string } {
-  return ref.goalId === goal.id && ref.source === 'session' && typeof ref.correlationId === 'string';
+function chargeableRef(ref: WaitReference, goal: { id: string }): ref is WaitReference & { correlationId: string; source: string } {
+  return ref.goalId === goal.id && (ref.source === 'session' || ref.source === 'self_heal') && typeof ref.correlationId === 'string';
 }
 function executionRefOk(ref: WaitReference, execution: { id: string }): boolean {
   return !ref.executionId || ref.executionId === execution.id;
 }
-function liveExecutionRef(execution: { status: string }, goal: { wait?: { source?: string; correlationId?: string } }, correlationId: string): boolean {
-  return execution.status === 'running' || (goal.wait?.source === 'session' && goal.wait.correlationId === correlationId);
+function liveExecutionRef(execution: { status: string }, goal: { wait?: { source?: string; correlationId?: string } }, ref: { source?: string; correlationId: string }): boolean {
+  const wait = goal.wait;
+  return execution.status === 'running' || (wait?.source === ref.source && wait?.correlationId === ref.correlationId);
 }
-function refTargetsExecution(ref: WaitReference, execution: { id: string; status: string }, goal: { id: string; wait?: { source?: string; correlationId?: string } }): boolean {
-  if (!sameGoalSessionRef(ref, goal)) return false;
+function refTargetsExecution(ref: WaitReference, execution: { id: string; status: string }, goal: { id: string; wait?: { source?: string; correlationId?: string } }): ref is WaitReference & { correlationId: string; source: string } {
+  if (!chargeableRef(ref, goal)) return false;
   if (!executionRefOk(ref, execution)) return false;
-  return liveExecutionRef(execution, goal, ref.correlationId);
+  return liveExecutionRef(execution, goal, ref);
 }
 function workerBelongs(worker: { id: string; metadata: { botGoalId?: unknown; botGoalScopeSessionId?: unknown; botId?: unknown; usageCostUsd?: unknown } } | undefined, goalId: string, scope: { sessionId: string; botId: string }): worker is { id: string; metadata: { botGoalId?: unknown; botGoalScopeSessionId?: unknown; botId?: unknown; usageCostUsd?: unknown } } {
   return !!worker && worker.metadata.botGoalId === goalId && worker.metadata.botGoalScopeSessionId === scope.sessionId && worker.metadata.botId === scope.botId;
 }
+function workerSessionId(host: GoalRuntimeHost, ref: WaitReference & { correlationId: string; source: string }): string | undefined {
+  if (ref.source === 'self_heal') return host.store.getSelfHealRun(ref.correlationId)?.sessionId;
+  return ref.correlationId;
+}
 function rememberWorker(host: GoalRuntimeHost, ref: WaitReference, execution: { id: string; status: string; sessionId?: string }, goal: { id: string; wait?: { source?: string; correlationId?: string } }, scope: { sessionId: string; botId: string }, executions: { sessionId?: string }[], sessions: Map<string, GoalCost>): void {
   if (!refTargetsExecution(ref, execution, goal)) return;
-  const worker = host.store.getSession(ref.correlationId!);
+  const sessionId = workerSessionId(host, ref);
+  const worker = sessionId ? host.store.getSession(sessionId) : undefined;
   if (!workerBelongs(worker, goal.id, scope)) return;
   if (sessions.has(worker.id) || executions.some(item => item.sessionId === worker.id)) return;
   sessions.set(worker.id, { execution: false, cost: finiteCost(worker.metadata.usageCostUsd) });

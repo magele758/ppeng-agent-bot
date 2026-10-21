@@ -24,7 +24,7 @@ function entered(r,stage){r.enter(stage);}
 const originalTimer=globalThis.setTimeout;
 globalThis.setTimeout=(fn,delay,...args)=>{
   const r=run;
-  if(delay===400&&r?.phase==='retry'){
+  if(delay===2000&&r?.phase==='retry'){
     const timer=originalTimer(()=>{if(r.finishing)fn(...args);else gate(r).then(()=>fn(...args));},delay);
     entered(r,'retry-timer-registered');return timer;
   }

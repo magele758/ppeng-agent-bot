@@ -2,7 +2,7 @@ import type { SqliteStateStore } from '../../storage.js';
 import type { SessionRecord, ToolContract, ModelAdapter } from '../../types.js';
 import { BotGoalService } from './service.js';
 import { classifyGoalIntents, type GoalIntentProposal } from './intake.js';
-import { selectGoalRoute, type GoalCapabilities, type GoalStrategy, type GoalWorkKind } from './routing.js';
+import { selectGoalRoute, goalWorkKind, type GoalCapabilities, type GoalStrategy, type GoalWorkKind } from './routing.js';
 import type { BotGoal, GoalReport } from './types.js';
 import { listPendingHumanWork } from '../../session/human-continuation.js';
 import { preserveGoalBudgetReport } from './budget.js';
@@ -15,6 +15,8 @@ export interface GoalRuntimeHost {
  cancel(id:string):void;
  run(id:string):Promise<unknown>;
  capabilities(session:SessionRecord,goal:BotGoal):GoalCapabilities;
+ inspectSpecialty?(parent:SessionRecord,goal:BotGoal):{status:string;evidence:string[];draining?:boolean};
+ cancelSpecialty?(parent:SessionRecord,goal:BotGoal):boolean|Promise<boolean>;
  judge?: ModelAdapter['completeText'];
 }
 export function announceGoalState(host:GoalRuntimeHost,goal:BotGoal):void {
@@ -36,14 +38,11 @@ export function goalScope(store:SqliteStateStore,session:SessionRecord):{botId:s
  if(!parent||parent.metadata?.botId!==botId||parent.metadata?.canonicalBotChat!==true)return undefined;
  return {botId,sessionId,service:new BotGoalService(store,Date.now,sessionId)};
 }
-export function goalWorkKind(text:string):GoalWorkKind {
- if(/\b(swarm|pipeline)\b|角色流水线/i.test(text))return 'role_pipeline';
- if(/\b(dag|dependency)\b|依赖关系|任务图/i.test(text))return 'dependency_plan';
- if(/\b(batch|ptc)\b|批量|汇总.*数据/i.test(text))return 'batch';
- if(/\b(browser|webpage)\b|浏览器|网页操作/i.test(text))return 'browser';
- if(/\b(desktop)\b|桌面操作/i.test(text))return 'computer';
- if(/\b(research|investigate)\b|调研|研究/i.test(text))return 'research';
- return 'general';
+export { goalWorkKind };
+export function goalExecutionTask(goal:BotGoal):string {
+ const next=goal.nextStep?.trim();
+ if (next && !/^(Inspect authorized|Reconcile partial|Apply updated constraints)/.test(next)) return next;
+ return goal.evidence.length || next ? 'Verify existing execution evidence against the objective and constraints; continue only the remaining work.' : goal.objective;
 }
 
 /** Every receipt is associated before the existing concurrent-fork planner sees it. */
@@ -98,12 +97,12 @@ function announceClarification(host:GoalRuntimeHost,sessionId:string,sourceId:st
  host.store.enqueueSteer(sessionId,'[goal coordination] The latest message has an ambiguous goal reference. Ask which goal is intended; do not modify or cancel any goal.',{role:'system',key:`goal-clarify:${sourceId}`});
  return true;
 }
-function announceQuery(host:GoalRuntimeHost,sessionId:string,receiptId:string,goals:BotGoal[]|undefined):void {
- host.store.enqueueSteer(sessionId,`[goal status] ${JSON.stringify(goals?.map(goal=>({id:goal.id,title:goal.title,status:goal.status,progress:goal.progress,nextStep:goal.nextStep,reason:goal.blockedReason})))}`,{role:'system',key:`goal-query:${receiptId}`});
+function announceQuery(host:GoalRuntimeHost,session:SessionRecord,receiptId:string,goals:BotGoal[]|undefined):void {
+ host.store.enqueueSteer(session.id,`[goal status] ${JSON.stringify(goals?.map(goal=>({id:goal.id,title:goal.title,status:goal.status,progress:goal.progress,nextStep:goal.nextStep,reason:goal.blockedReason,...(goal.wait&&['self_heal','factory','evolution'].includes(goal.wait.source)?{execution:host.inspectSpecialty?.(session,goal)}:{})})))}`,{role:'system',key:`goal-query:${receiptId}`});
 }
 function announceIntake(host:GoalRuntimeHost,session:SessionRecord,sourceId:string,receiptId:string,intent:{kind:string},result:{duplicate?:boolean;clarification?:boolean;goal?:BotGoal;goals?:BotGoal[]},service:BotGoalService,botId:string):void {
  if(announceClarification(host,session.id,sourceId,result))return;
- if(intent.kind==='query'){announceQuery(host,session.id,receiptId,result.goals);return;}
+ if(intent.kind==='query'){announceQuery(host,session,receiptId,result.goals);return;}
  if(result.goal&&intent.kind!=='new_goal')followRunningIntents(host,botId,result.goal.id,intent.kind,result.goal.revision,result.goal.constraints,receiptId,service);
 }
 async function applyIntakeIntent(host:GoalRuntimeHost,session:SessionRecord,service:BotGoalService,botId:string,known:Record<string,string>,receiptId:string,intent:GoalIntentProposal,index:number):Promise<void> {
@@ -183,9 +182,6 @@ function preferredRoute(strategy:string,modePreference:GoalWorkKind|undefined):{
 function claimStrategy(session:SessionRecord,strategy:string|undefined):string {
  return session.mode==='subagent'&&strategy==='direct'?'subagent':strategy!;
 }
-function ptcEngine(strategy:string|undefined):{orchestrationEngine?:'ptc'} {
- return strategy==='ptc'?{orchestrationEngine:'ptc'}:{};
-}
 function originalProfile(metadata:SessionRecord['metadata']):{taskRunMode:unknown;orchestrationEngine:unknown} {
  return {taskRunMode:metadata.taskRunMode??null,orchestrationEngine:metadata.orchestrationEngine??null};
 }
@@ -201,12 +197,13 @@ function decidedBind(host:GoalRuntimeHost,session:SessionRecord,scope:NonNullabl
 function startBoundGoal(host:GoalRuntimeHost,session:SessionRecord,scope:NonNullable<ReturnType<typeof goalScope>>,goal:BotGoal):boolean {
  const settings=scope.service.readSettings();
  const modePreference=modePreferenceOf(settings.preferredStrategy);
- const route=selectGoalRoute({task:goal.objective,workKind:modePreference??goalWorkKind(goal.objective),independentWork:false,...preferredRoute(settings.preferredStrategy,modePreference)},host.capabilities(session,goal));
+ const executionTask=goalExecutionTask(goal);
+ const route=selectGoalRoute({task:executionTask,workKind:modePreference??goalWorkKind(executionTask),independentWork:false,...preferredRoute(settings.preferredStrategy,modePreference)},host.capabilities(session,goal));
  if(route.blocked){announceGoalState(host,scope.service.block(scope.botId,goal.id,route.reason));return false;}
  const execution=scope.service.claim(scope.botId,goal.id,{strategy:claimStrategy(session,route.strategy),strategyReason:route.reason,safeToRetry:false});
  if(!execution)return false;
  scope.service.updateExecution(scope.botId,execution.id,{sessionId:session.id,runRef:`session:${session.id}`});
- host.store.updateSession(session.id,{metadata:{...session.metadata,botGoalId:goal.id,botGoalExecutionId:execution.id,botGoalScopeSessionId:scope.sessionId,botGoalCostStart:Number(session.metadata.usageCostUsd??0),botGoalCheckpoint:undefined,botGoalOriginalProfile:originalProfile(session.metadata),taskRunMode:route.taskMode,...ptcEngine(route.strategy)}});
+ host.store.updateSession(session.id,{metadata:{...session.metadata,botGoalId:goal.id,botGoalExecutionId:execution.id,botGoalScopeSessionId:scope.sessionId,botGoalCostStart:Number(session.metadata.usageCostUsd??0),botGoalCheckpoint:undefined,botGoalOriginalProfile:originalProfile(session.metadata),taskRunMode:route.strategy==='direct'?route.taskMode:'auto',orchestrationEngine:'legacy'}});
  host.store.enqueueSteer(session.id,goalInstructions(goal,route.strategy!,route.reason),{role:'system',key:`goal-execution:${execution.id}`});
  return true;
 }
@@ -222,7 +219,7 @@ export function bindGoalExecution(host:GoalRuntimeHost,session:SessionRecord):bo
  return answerCanonicalChat(session,bound);
 }
 function goalInstructions(goal:BotGoal,strategy:string,reason:string):string {
- return `[goal ${goal.id} revision ${goal.revision}] Objective: ${goal.objective}\nConstraints: ${JSON.stringify(goal.constraints)}\nCompletion conditions: ${JSON.stringify(goal.completionCriteria)}\nExecution: ${strategy}. ${reason}\nPrevious progress: ${goal.progress}\nNext step: ${goal.nextStep??''}\nUse goal_checkpoint to preserve concrete progress, evidence, or a durable wait condition before returning. Returning a response does not complete the goal. For team_dag/swarm/bot_delegate use goal_dispatch to launch the selected executor. For PTC use ptc_exec. Do not repeat unconfirmed external actions.`;
+ return `[goal ${goal.id} revision ${goal.revision}] Objective: ${goal.objective}\nConstraints: ${JSON.stringify(goal.constraints)}\nCompletion conditions: ${JSON.stringify(goal.completionCriteria)}\nExecution: ${strategy}. ${reason}\nPrevious progress: ${goal.progress}\nEvidence: ${JSON.stringify(goal.evidence)}\nNext step: ${goal.nextStep??''}\nUse goal_checkpoint to preserve concrete progress, evidence, or a durable wait condition before returning. Returning a response does not complete the goal. When Execution is not direct, your first action must be goal_dispatch to launch that executor (factory may first discover targets). A direct answer does not fulfill a selected specialist execution. For subagent/orchestrator/self_heal/factory/team_dag/swarm/bot_delegate use goal_dispatch to launch the selected executor. For PTC use goal_dispatch to create an isolated dynamic-workflow worker. Select the next workKind and specialist role yourself from the task and existing evidence; never ask the user to configure modes. When goal_dispatch returns waiting, end this turn immediately; the scheduler will resume with actual results. Do not poll worker history or sleep. Inspect existing results before launching another phase; do not repeat completed or unconfirmed external actions. For factory discover authorized targets through factory_status, then pass factory details to goal_dispatch.`;
 }
 
 function executionIds(metadata:SessionRecord['metadata']):{goalId:string;executionId:string}|undefined {
@@ -298,9 +295,17 @@ async function maybeVerify(host:GoalRuntimeHost,goal:BotGoal,tail:ReturnType<Goa
  if(report.kind!=='candidate_completed'&&report.kind!=='progress')return report;
  return verifyCompletion(host,goal,tail,assistant,{...report,verified:false});
 }
-async function settledReport(host:GoalRuntimeHost,goal:BotGoal,tail:ReturnType<GoalRuntimeHost['store']['foldMessages']>,assistant:string,checkpoint:GoalReport|undefined,error:unknown,status:string,outcome:{kind?:string}|undefined):Promise<GoalReport> {
+function unlaunchedExecutor(session:SessionRecord,execution:{strategy:string;id:string},goal:BotGoal):GoalReport|undefined {
+ const dispatch=session.metadata.botGoalDispatch as {executionId?:string}|undefined;
+ if(session.metadata.botGoalWorker||session.mode==='subagent'||execution.strategy==='direct'||goal.evidence.length)return undefined;
+ if(dispatch?.executionId===execution.id)return undefined;
+ return {kind:'progress',summary:'The selected executor has not been launched; a direct response cannot verify that execution.',advanced:false,nextStep:`Call goal_dispatch with preferredStrategy=${execution.strategy} to execute the original objective, then inspect its actual result.`};
+}
+async function settledReport(host:GoalRuntimeHost,goal:BotGoal,tail:ReturnType<GoalRuntimeHost['store']['foldMessages']>,assistant:string,checkpoint:GoalReport|undefined,error:unknown,status:string,outcome:{kind?:string}|undefined,session:SessionRecord,execution:{strategy:string;id:string}):Promise<GoalReport> {
  const failed=interruptedReport(error,status)??abortedReport(outcome);
  if(failed)return failed;
+ const unlaunched=unlaunchedExecutor(session,execution,goal);
+ if(unlaunched)return unlaunched;
  return maybeVerify(host,goal,tail,assistant,baseReport(checkpoint,assistant));
 }
 function reportCost(metadata:SessionRecord['metadata']):number {
@@ -320,7 +325,7 @@ async function finishSettlement(host:GoalRuntimeHost,sessionId:string,ctx:NonNul
  const {tail,assistant}=assistantTranscript(host.store.foldMessages(sessionId),ctx.execution.startedAt);
  const outcome=ctx.session.metadata.outcome as {kind?:string;reason?:string}|undefined;
  const goal=ctx.scope.service.get(ctx.scope.botId,ctx.ids.goalId)!;
- const report=await settledReport(host,goal,tail,assistant,checkpoint,error,ctx.session.status,outcome);
+ const report=await settledReport(host,goal,tail,assistant,checkpoint,error,ctx.session.status,outcome,ctx.session,ctx.execution);
  const settled=ctx.scope.service.report(ctx.scope.botId,ctx.ids.executionId,preserveGoalBudgetReport(host,sessionId,{...withCheckpointWait(report,checkpoint,reportCost(ctx.session.metadata)),owner:ctx.execution.owner,fence:ctx.execution.fence}));
  announceGoalState(host,settled);
  restoreOriginalProfile(host,sessionId);

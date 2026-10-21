@@ -979,7 +979,13 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
     inputSchema: {
       type: 'object',
       properties: {
-        items: { type: 'array' }
+        items: { type: 'array', items: {
+          type: 'object', properties: {
+            content: {type:'string',minLength:1},
+            status: {type:'string',enum:['pending','in_progress','completed']},
+            activeForm: {type:'string',minLength:1,description:'Present-tense activity label; required for every item.'}
+          }, required:['content','status','activeForm'], additionalProperties:false
+        }, description:'At most one item may be in_progress.' }
       },
       required: ['items']
     },

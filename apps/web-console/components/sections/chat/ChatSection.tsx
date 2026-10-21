@@ -308,7 +308,9 @@ export function ChatSection({ active }: { active: boolean }) {
         )
       }
       onCancelSession={() => {
-        if (!selectedSessionId || !leaveCancelsRun('stop')) return;
+        if (!leaveCancelsRun('stop')) return;
+        chat.stopLiveTurn();
+        if (!selectedSessionId) return;
         void api(`/api/sessions/${selectedSessionId}/cancel`, { method: 'POST' }).then(() => tick());
       }}
       onOpenTrace={() => navigate('settings', 'ops', 'trajectory')}
