@@ -552,6 +552,7 @@ test("coordinator tool converts a human Room request to a task and refuses anoth
 
 test("factory bots and room cannot escape read-only mode through shell or dynamic tools [AC:multi-machine-readonly-pilot#AC-7]", async (t) => {
   const f = await fixture(t);
+  f.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
   const { filterToolsForSession, resolveTurnTools } =
     await import("../dist/turn/resolve-turn-tools.js");
   const names = [

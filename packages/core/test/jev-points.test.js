@@ -333,3 +333,7 @@ test('applyJevPreTurn wrap: goalGate active forces call_model even if point woul
     globalThis.fetch = orig;
   }
 });
+test('explicit tool delivery is authoritative without another model round [AC:tool-exposure-tiers#AC-1] [AC:tool-exposure-tiers#AC-7]',async()=>{
+ const store=kvStore();writeJevSettings(store,{baseUrl:'https://example.invalid/v1',profile:'custom',points:{toolSelect:true}});const original=globalThis.fetch;let calls=0;globalThis.fetch=async()=>{calls++;return new Response(JSON.stringify({answers:{}}),{status:200});};
+ try{assert.equal(await applyJevToolSelectWrap(store,'t',[{name:'read_file'},{name:'bot_create'}],{preserveExposure:true}),null);assert.equal(calls,0);}finally{globalThis.fetch=original;}
+});

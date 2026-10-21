@@ -29,6 +29,7 @@ async function scenario(name, fn, { mode = 'chat', approval = false } = {}) {
   h.rt = new RawAgentRuntime({ repoRoot: join(dir, 'repo'), stateDir: join(dir, 'state'), modelAdapter: {
     name: 'lifecycle-controlled', runTurn: input => { h.modelCalls++; return h.model(input, h.modelCalls); }, summarizeMessages: async () => '', completeText: async () => '{"met":true,"reason":"probe"}',
   }, extraTools: ['a', 'b'].map(id => ({ name: `lifecycle_${id}`, description: 'Local lifecycle probe', inputSchema: { type: 'object' }, approvalMode: approval ? 'always' : 'never', sideEffectLevel: 'none', execute: async (ctx, args) => { h.executed.push(id); return h.tool(ctx, args); } })) });
+  h.rt.store.setDaemonControl('tool_exposure_settings', {mode:'full',pinnedGroups:{}});
   const input = { title: name, message: 'run local probe', background: false };
   h.sid = mode === 'task' ? h.rt.createTaskSession(input).session.id : h.rt.createChatSession(input).id;
   h.run = async options => {

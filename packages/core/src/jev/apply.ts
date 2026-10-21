@@ -320,8 +320,10 @@ export async function applyJevContextSelect(
 export async function applyJevToolSelect(
   store: JevSettingsStore,
   taskText: string,
-  tools: ReadonlyArray<{ name: string; description?: string }>
+  tools: ReadonlyArray<{ name: string; description?: string }>,
+  options?: { preserveExposure?: boolean }
 ): Promise<string[] | null> {
+  if (options?.preserveExposure) return null;
   const chain = resolveJevChain(store);
   if (!chainHas(chain, 'toolSelect')) return null;
   return applyJevToolSelectPoint(chain!, taskText, tools);
