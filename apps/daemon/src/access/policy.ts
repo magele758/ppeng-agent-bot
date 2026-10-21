@@ -193,6 +193,8 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
 
     ['GET /api/bot-rooms', selfFiltered('bot-room')],
     ['POST /api/bot-rooms', selfFiltered('bot-room')],
+    ['GET /api/bot-rooms/settings', selfFiltered('bot-room')],
+    ['PATCH /api/bot-rooms/settings', selfFiltered('bot-room')],
     ['GET /api/bot-rooms/:id', selfFiltered('bot-room')],
     ['DELETE /api/bot-rooms/:id', selfFiltered('bot-room')],
     ['PATCH /api/bot-rooms/:id', selfFiltered('bot-room')],

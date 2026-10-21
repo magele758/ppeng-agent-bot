@@ -8,6 +8,8 @@ import { applyConcurrentBotForks, clearActiveWorkPiece } from './bots/concurrent
 import { forkOpeningMessage, inheritForkRetrievalMetadata } from './bots/fork-inheritance.js';
 import { createSubagentHelpTool } from './runtime/subagent-help.js';
 import { createHistoryTools } from './session/history/tools.js';
+import { createRoomRetrievalTools } from './rooms/room-retrieval-tools.js';
+import { recordRetrieved } from './rooms/touched-memory.js';
 import { prepareGoalIntake, goalExecutionTask, bindGoalExecution, settleGoalExecution, createGoalCheckpointTool, goalScope, goalWorkKind, type GoalRuntimeHost } from './bots/goals/runtime-host.js';
 import { tickBotGoals } from './bots/goals/scheduler.js';
 import { createRuntimeGoalDispatchTool } from './bots/goals/runtime-dispatch.js';
@@ -245,6 +247,76 @@ export interface RuntimeOptions {
   extensions?: ExtensionSpec[];
 }
 
+function roomTouchScope(session: { metadata?: Record<string, unknown> | null } | undefined, store: SqliteStateStore): { roomId: string; botId: string; turnId: string } | undefined {
+  const meta = session?.metadata;
+  const roomId = typeof meta?.roomId === 'string' ? meta.roomId.trim() : '';
+  const botId = typeof meta?.botId === 'string' ? meta.botId.trim() : '';
+  if (!roomId || !botId) return undefined;
+  const stamped = typeof meta?.roomTurnId === 'string' ? meta.roomTurnId.trim() : '';
+  if (stamped) return { roomId, botId, turnId: stamped };
+  try {
+    const row = store.db.prepare(
+      "SELECT id FROM bot_room_turns WHERE room_id=? AND status='running' ORDER BY rowid DESC LIMIT 1"
+    ).get(roomId) as { id?: string } | undefined;
+    return typeof row?.id === 'string' && row.id ? { roomId, botId, turnId: row.id } : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Record only the messages or attachment body a room read tool actually returned. */
+function noteRoomRetrieval(store: SqliteStateStore, toolName: string, session: { metadata?: Record<string, unknown> | null } | undefined, content: string): void {
+  const scope = roomTouchScope(session, store);
+  if (!scope) return;
+  let parsed: unknown;
+  try { parsed = JSON.parse(content); } catch { return; }
+  if (!parsed || typeof parsed !== 'object') return;
+  const body = parsed as Record<string, unknown>;
+  try {
+    if (toolName === 'room_history_read' && Array.isArray(body.messages)) {
+      for (const item of body.messages) {
+        if (!item || typeof item !== 'object') continue;
+        const message = item as Record<string, unknown>;
+        const id = typeof message.messageId === 'string' ? message.messageId : '';
+        const text = typeof message.text === 'string' ? message.text : '';
+        if (!id || !text.trim()) continue;
+        const attachmentIds = Array.isArray(message.attachmentIds)
+          ? message.attachmentIds.filter((value): value is string => typeof value === 'string')
+          : undefined;
+        recordRetrieved(store.db, {
+          ...scope,
+          message: { id, seq: typeof message.seq === 'number' ? message.seq : undefined, text, attachmentIds }
+        });
+      }
+      return;
+    }
+    if (toolName === 'room_material_read') {
+      const id = typeof body.materialId === 'string' ? body.materialId : '';
+      const text = typeof body.text === 'string' ? body.text : '';
+      if (!id || !text.trim()) return;
+      recordRetrieved(store.db, {
+        ...scope,
+        attachment: { id, name: typeof body.name === 'string' ? body.name : undefined, text }
+      });
+    }
+  } catch {
+    // The read already succeeded. A ledger miss must not hide that text.
+  }
+}
+
+function withRoomRetrievalTouch(store: SqliteStateStore, tool: ToolContract): ToolContract {
+  if (tool.name !== 'room_history_read' && tool.name !== 'room_material_read') return tool;
+  const run = tool.execute.bind(tool);
+  return {
+    ...tool,
+    async execute(context, args) {
+      const result = await run(context, args);
+      if (result.ok) noteRoomRetrieval(store, tool.name, context.session, result.content);
+      return result;
+    }
+  };
+}
+
 export class RawAgentRuntime {
   private readonly log = createLogger('runtime');
   readonly repoRoot: string;
@@ -464,6 +536,7 @@ export class RawAgentRuntime {
       ...optionalExtras,
       messageAgentTool,
       ...createHistoryTools(this.store),
+      ...createRoomRetrievalTools(this.store).map(tool => withRoomRetrievalTouch(this.store, tool)),
       createSubagentHelpTool(this.store),
       ...createBotManagementTools({ store: this.store, runSession: (id) => this.runSession(id),
         isSessionRunning: (id) => this.runningSessions.has(id), cancelSession: (id) => this.cancelSession(id),

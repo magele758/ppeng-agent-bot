@@ -38,7 +38,7 @@ function makeRuntime() {
   return { rt, adapter };
 }
 
-test('normalizeContextSources drops unnamed sources and enforces limits [AC:composer-drag-context#AC-3]', () => {
+test('normalizeContextSources drops unnamed sources and enforces limits', () => {
   const emptyName = normalizeContextSources([{ kind: 'file', name: '  ', text: 'skip' }]);
   assert.equal(emptyName.length, 0);
 
@@ -66,7 +66,7 @@ test('normalizeContextSources drops unnamed sources and enforces limits [AC:comp
   assert.equal(folder[0].entries[0].path, 'inner.txt');
 });
 
-test('chat send persists contextSources and model text after reload [AC:composer-drag-context#AC-3]', () => {
+test('chat send persists contextSources and model text after reload', () => {
   const { rt } = makeRuntime();
   const session = rt.createChatSession({ title: 'drag ctx' });
   const filePhrase = 'unique-drag-file-phrase-ac3';
@@ -109,7 +109,7 @@ test('chat send persists contextSources and model text after reload [AC:composer
   assert.ok(contextSourceModelText(carrier.contextSources).includes(filePhrase));
 });
 
-test('contextSources stay on the sending session only [AC:composer-drag-context#AC-4]', () => {
+test('contextSources stay on the sending session only', () => {
   const { rt } = makeRuntime();
   const a = rt.createChatSession({ title: 'A' });
   const b = rt.createChatSession({ title: 'B' });
@@ -123,14 +123,18 @@ test('contextSources stay on the sending session only [AC:composer-drag-context#
   assert.ok(!JSON.stringify(bMsgs).includes('secret-a'));
 });
 
-test('bot room message persists contextSources for members [AC:composer-drag-context#AC-5]', () => {
+test('bot room message persists contextSources for members', () => {
   const dir = mkdtempSync(join(tmpdir(), 'ctx-room-'));
   const store = new SqliteStateStore(join(dir, 'state.db'));
   const facade = { store, runImageRetention: async () => {}, wakeAllAutonomousSessions: () => {}, wakeAgentSessions: () => {} };
   const bot = createBot(facade, { name: 'RoomBot' });
+  const peer = createBot(facade, { name: 'RoomPeer' });
   const principal = { userId: 'owner', tenantId: 'team' };
   store.updateSession(bot.canonicalSessionId, {
     metadata: { ...store.getSession(bot.canonicalSessionId).metadata, ...principal }
+  });
+  store.updateSession(peer.canonicalSessionId, {
+    metadata: { ...store.getSession(peer.canonicalSessionId).metadata, ...principal }
   });
   const host = {
     store,
@@ -139,7 +143,7 @@ test('bot room message persists contextSources for members [AC:composer-drag-con
     cancelSession: () => {}
   };
   const rooms = new BotRoomService(host);
-  const room = rooms.create(principal, { title: 'Ctx', botIds: [bot.id], hostBotId: bot.id });
+  const room = rooms.create(principal, { title: 'Ctx', botIds: [bot.id, peer.id], hostBotId: bot.id });
   const phrase = 'room-unique-phrase-ac5';
   const sent = rooms.send(principal, room.id, {
     text: 'discuss',
@@ -177,7 +181,7 @@ test('applyContextSources skips empty model bodies but keeps names on carrier', 
   assert.ok(texts.some((p) => p.text.includes('body')));
 });
 
-test('queued steer context survives reopening and editing before landing [AC:composer-drag-context#AC-4]', async () => {
+test('queued steer context survives reopening and editing before landing', async () => {
   const { applyClaimedInbox } = await import('@ppeng/agent-loop');
   const { rt } = makeRuntime();
   const session = rt.createChatSession({ title: 'queued context' });

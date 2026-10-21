@@ -15,10 +15,13 @@ test("factory HTTP denies non-admin settings and foreign work, room commands per
   const bot = (
     await f.call("alice", "POST", "/api/bots", { name: "Factory Coordinator" })
   ).body.bot;
+  const peer = (
+    await f.call("alice", "POST", "/api/bots", { name: "Factory Peer" })
+  ).body.bot;
   const room = (
     await f.call("alice", "POST", "/api/bot-rooms", {
       title: "Factory",
-      botIds: [bot.id],
+      botIds: [bot.id, peer.id],
       hostBotId: bot.id,
     })
   ).body.room;
@@ -109,10 +112,14 @@ test("rejected factory Room requests leave no tasks or messages [AC:multi-machin
   const bot = (
     await f.call("alice", "POST", "/api/bots", { name: "Atomic Coordinator" })
   ).body.bot;
+  const peer = (
+    await f.call("alice", "POST", "/api/bots", { name: "Atomic Peer" })
+  ).body.bot;
   const room = (
     await f.call("alice", "POST", "/api/bot-rooms", {
       title: "Atomic Factory",
-      botIds: [bot.id],
+      botIds: [bot.id, peer.id],
+      hostBotId: bot.id,
     })
   ).body.room;
   await f.call("alice", "PATCH", "/api/factory/settings", {

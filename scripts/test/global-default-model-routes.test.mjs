@@ -61,7 +61,8 @@ test('HTTP global default hot switches outgoing requests and rejects stale selec
     rt.updateBot(bot.id, { modelOverride: null });
     await run(bot.canonicalSessionId, 'second');
     const principal = resolveBotPrincipal(rt.store);
-    const room = rt.rooms.create(principal, { title: 'Wire test', botIds: [bot.id] });
+    const peer = rt.createBot({ name: 'Default peer' });
+    const room = rt.rooms.create(principal, { title: 'Wire test', botIds: [bot.id, peer.id], hostBotId: bot.id });
     const runRoom = async (expected) => {
       const before = calls.length;
       rt.rooms.send(principal, room.id, { text: 'Reply briefly.' });

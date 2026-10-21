@@ -333,7 +333,7 @@ export function createProductAdminTools(host: ProductAdminHost): ToolContract<Re
     },
     {
       name: 'bot_create',
-      description: 'Create a bot in this product. You can do this. Same capability as create_bot. Required: name. Optional: title, description, persona, allowedTools, allowedSkills, modelOverride {providerId, modelId} for a model already configured in the lab, faceShape, faceColor, avatar, maxTurns (24|48|96). Do not send API keys, tokens, secrets, or passwords.',
+      description: 'Create a bot in this product. You can do this. Same capability as create_bot. Required: name. Optional: title, description, persona, allowedTools, allowedSkills, modelOverride {providerId, modelId} for a model already configured in the lab, faceShape, faceColor, avatar, maxTurns (24|48|96). Ordinary bots stop at the saved roster cap (default 50). Raising that cap is a saved room setting and applies without an environment variable or a restart. Do not send API keys, tokens, secrets, or passwords.',
       properties: {
         name: { type: 'string' },
         title: { type: 'string' },
@@ -520,7 +520,7 @@ export function createProductAdminTools(host: ProductAdminHost): ToolContract<Re
     },
     {
       name: 'bot_room_create',
-      description: 'Create a group chat. You can do this. Same capability as create_room. Required: title and botIds (ids or names). Optional: hostBotId, maxBotTurns (1-20), maxToolCalls, maxCostUsd.',
+      description: 'Create a group chat. You can do this. Same capability as create_room. Required: title and at least 2 different botIds (ids or names). Optional: hostBotId, maxBotTurns (1-20, this room only), maxToolCalls, maxCostUsd. The member count cannot exceed the saved per-room member cap (default 50). Changing that global cap does not change this room\'s maxBotTurns.',
       properties: {
         title: { type: 'string' },
         botIds: { type: 'array', items: { type: 'string' } },
@@ -580,20 +580,25 @@ export function createProductAdminTools(host: ProductAdminHost): ToolContract<Re
     },
     {
       name: 'bot_room_add_member',
-      description: 'Add a bot to a group chat. You can do this.',
-      properties: { roomId: { type: 'string' }, bot: { type: 'string' } },
-      required: ['roomId', 'bot'],
+      description: 'Add a bot, or every authorized member of a functional group, to a group chat. Pass bot or groupId. A room keeps at least 2 members and cannot pass the saved member cap (default 50). Bots you cannot use are skipped and named. If the authorized remainder does not fit, nobody new is added and the people already in the room stay. You can do this.',
+      properties: { roomId: { type: 'string' }, bot: { type: 'string' }, groupId: { type: 'string' } },
+      required: ['roomId'],
       approval: 'auto',
       write: true,
       async run(ctx, args) {
         const principal = principalOf(store, ctx.session);
-        const bot = managedBot(store, principal, str(args, 'bot'));
-        return { room: host.rooms.addMember(principal, str(args, 'roomId'), bot.id) };
+        const roomId = str(args, 'roomId');
+        const groupId = str(args, 'groupId');
+        if (groupId) return host.rooms.addGroup(principal, roomId, groupId);
+        const botRef = str(args, 'bot');
+        if (!botRef) throw new ValidationError('bot or groupId is required');
+        const bot = managedBot(store, principal, botRef);
+        return { room: host.rooms.addMember(principal, roomId, bot.id) };
       }
     },
     {
       name: 'bot_room_remove_member',
-      description: 'Remove a bot from a group chat. Destructive: pass confirm true.',
+      description: 'Remove a bot from a group chat. A room keeps at least 2 members. Destructive: pass confirm true.',
       properties: { roomId: { type: 'string' }, bot: { type: 'string' }, confirm: { type: 'boolean' } },
       required: ['roomId', 'bot', 'confirm'],
       approval: 'always',
@@ -1275,14 +1280,14 @@ export function createProductAdminTools(host: ProductAdminHost): ToolContract<Re
       return [spec, {
         ...spec,
         name: 'create_bot',
-        description: 'Create a bot. You can do this; the tool name is create_bot. Required: name. Optional: title, description, persona, allowedTools, allowedSkills, modelOverride {providerId, modelId} for a model already configured in the lab, faceShape, faceColor, avatar, maxTurns (24|48|96). Do not send API keys, tokens, secrets, or passwords.'
+        description: 'Create a bot. You can do this; the tool name is create_bot. Required: name. Optional: title, description, persona, allowedTools, allowedSkills, modelOverride {providerId, modelId} for a model already configured in the lab, faceShape, faceColor, avatar, maxTurns (24|48|96). Ordinary bots stop at the saved roster cap (default 50). Raising that cap is a saved room setting and applies without an environment variable or a restart. Do not send API keys, tokens, secrets, or passwords.'
       }];
     }
     if (spec.name === 'bot_room_create') {
       return [spec, {
         ...spec,
         name: 'create_room',
-        description: 'Create a group chat. You can do this; the tool name is create_room. Required: title and botIds (ids or names). Optional: hostBotId, maxBotTurns (1-20), maxToolCalls, maxCostUsd.'
+        description: 'Create a group chat. You can do this; the tool name is create_room. Required: title and at least 2 different botIds (ids or names). Optional: hostBotId, maxBotTurns (1-20, this room only), maxToolCalls, maxCostUsd. The member count cannot exceed the saved per-room member cap (default 50). Changing that global cap does not change this room\'s maxBotTurns.'
       }];
     }
     return [spec];

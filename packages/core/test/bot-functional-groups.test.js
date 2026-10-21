@@ -13,12 +13,12 @@ function fixture() {
   const path = join(mkdtempSync(join(tmpdir(), 'functional-groups-')), 'state.db');
   const store = new SqliteStateStore(path);
   const facade = {store, runImageRetention:async()=>{},wakeAllAutonomousSessions:()=>{},wakeAgentSessions:()=>{}};
-  const a = createBot(facade,{name:'Alpha'}), b=createBot(facade,{name:'Beta'});
+  const a = createBot(facade,{name:'Alpha'}), b=createBot(facade,{name:'Beta'}), c=createBot(facade,{name:'Gamma'});
   const principal={userId:'owner'};
-  for(const bot of [a,b]) { store.updateSession(bot.canonicalSessionId,{metadata:{...store.getSession(bot.canonicalSessionId).metadata,...principal}}); setBotDefinitionOwner(store,bot.id,principal); }
+  for(const bot of [a,b,c]) { store.updateSession(bot.canonicalSessionId,{metadata:{...store.getSession(bot.canonicalSessionId).metadata,...principal}}); setBotDefinitionOwner(store,bot.id,principal); }
   const groups = new BotFunctionalGroupService(store);
   const rooms = new BotRoomService({store,createChatSession:()=>{throw Error('unused');},runSession:async()=>{},cancelSession:()=>{}});
-  return {path,store,a,b,principal,groups,rooms};
+  return {path,store,facade,a,b,c,principal,groups,rooms};
 }
 
 test('functional groups and moves survive reopen; deleting a group preserves bots and private history [AC:bot-functional-groups#AC-6] [AC:bot-functional-groups#AC-7]',()=>{
@@ -70,7 +70,7 @@ test('scope isolation and reassignment revoke old group reads without exposing p
  assert.throws(()=>f.groups.get({userId:'stranger'},g1.id));
  assert.throws(()=>f.groups.setShared({userId:'stranger'},{scope:'group',id:g1.id},{secret:'hack'}));
  assert.throws(()=>f.groups.move({userId:'stranger'},f.a.id,null));
- const otherRoom=f.rooms.create(f.principal,{title:'Private room',botIds:[f.b.id]});
+ const otherRoom=f.rooms.create(f.principal,{title:'Private room',botIds:[f.b.id,f.c.id]});
  f.groups.setShared(f.principal,{scope:'room',id:otherRoom.id},{roomSecret:'OTHER'});
  assert.deepEqual(f.groups.sharedForSession({...session,metadata:{...session.metadata,roomId:otherRoom.id,botId:f.a.id}}),{});
 });
@@ -95,7 +95,7 @@ test('child uses parent identity and current membership despite forged bot and r
  f.groups.setShared(f.principal,{scope:'global'},{fallback:'GLOBAL'});
  f.groups.setShared(f.principal,{scope:'group',id:g1.id},{secret:'ONE'});
  f.groups.setShared(f.principal,{scope:'group',id:g2.id},{secret:'TWO'});
- const foreignRoom=f.rooms.create(f.principal,{title:'Other room',botIds:[f.b.id]});
+ const foreignRoom=f.rooms.create(f.principal,{title:'Other room',botIds:[f.b.id,f.c.id]});
  f.groups.setShared(f.principal,{scope:'room',id:foreignRoom.id},{secret:'OTHER_ROOM'});
  const parent=f.store.getSession(f.a.canonicalSessionId);
  const child=childOf(f,parent,{roomId:foreignRoom.id});
@@ -141,7 +141,10 @@ test('tenant ownership partitions moves and shared scopes even for the same user
  f.groups.move(tenantA,f.a.id,group.id);
  f.groups.setShared(tenantA,{scope:'global'},{secret:'A_GLOBAL'});
  f.groups.setShared(tenantA,{scope:'group',id:group.id},{secret:'A_GROUP'});
- const room=f.rooms.create(tenantA,{title:'Tenant A room',botIds:[f.a.id]});
+ const peer=createBot(f.facade,{name:'TenantPeer'});
+ f.store.updateSession(peer.canonicalSessionId,{metadata:{...f.store.getSession(peer.canonicalSessionId).metadata,...tenantA}});
+ setBotDefinitionOwner(f.store,peer.id,tenantA);
+ const room=f.rooms.create(tenantA,{title:'Tenant A room',botIds:[f.a.id,peer.id]});
  f.groups.setShared(tenantA,{scope:'room',id:room.id},{secret:'A_ROOM'});
  assert.throws(()=>f.groups.move(tenantB,f.a.id,null));
  assert.throws(()=>f.groups.getShared(tenantB,{scope:'group',id:group.id}));

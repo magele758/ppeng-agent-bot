@@ -240,6 +240,7 @@ function selfFilteredWriteCases(f) {
     'PUT /api/bots/:id/functional-group': { groupId: null },
     'PUT /api/bot-shared-context': { entries: { note: 'B own scope' } },
     'DELETE /api/bot-rooms/:id': {},
+    'PATCH /api/bot-rooms/settings': { maxWaveSpeakers: 4 },
     'POST /api/bot-rooms': { title: 'B-room', botIds: ['missing-private-target'] },
     'PATCH /api/bot-rooms/:id': { title: 'B-change' },
     'POST /api/bot-rooms/:id/members': { botId: 'missing-private-target' },
@@ -437,7 +438,9 @@ test('Bot work and Room writes reject another principal over real HTTP', async t
   t.after(() => d.close());
   const bot = await d.call('A', 'POST', '/api/bots', {name:'Owner-only Bot'});
   assert.equal(bot.status,201);
-  const room = await d.call('A','POST','/api/bot-rooms',{title:'A private room',botIds:[bot.data.bot.id]});
+  const peer = await d.call('A', 'POST', '/api/bots', {name:'Owner-only Peer'});
+  assert.equal(peer.status,201);
+  const room = await d.call('A','POST','/api/bot-rooms',{title:'A private room',botIds:[bot.data.bot.id, peer.data.bot.id]});
   assert.equal(room.status,201);
   const rid=room.data.room.id;
   for (const [method,path,body] of [
@@ -463,11 +466,13 @@ test('functional groups and explicit global/group/room facts stay isolated acros
   t.after(() => d.close());
   const bot = await d.call('A','POST','/api/bots',{name:'A scoped Bot'});
   assert.equal(bot.status,201);
+  const peer = await d.call('A','POST','/api/bots',{name:'A scoped Peer'});
+  assert.equal(peer.status,201);
   const botId=bot.data.bot.id;
   const group = await d.call('A','POST','/api/bot-functional-groups',{name:'A private function'});
   assert.equal(group.status,201);
   const groupId=group.data.group.id;
-  const room=await d.call('A','POST','/api/bot-rooms',{title:'A shared facts room',botIds:[botId]});
+  const room=await d.call('A','POST','/api/bot-rooms',{title:'A shared facts room',botIds:[botId, peer.data.bot.id]});
   assert.equal(room.status,201);
   const roomId=room.data.room.id;
   assert.equal((await d.call('A','PUT',`/api/bots/${botId}/functional-group`,{groupId})).status,200);

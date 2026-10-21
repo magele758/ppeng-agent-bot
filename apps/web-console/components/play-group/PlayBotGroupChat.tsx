@@ -10,7 +10,6 @@ import {
   BOT_GROUPS_CHANGED_EVENT,
   activeMentionQuery,
   addGroupMember,
-  filterMentionMembers,
   groupSpeakBudget,
   insertMention,
   removeGroupMember,
@@ -23,10 +22,28 @@ import { MODEL_PROVIDERS_CHANGED_EVENT } from '@/lib/model-providers';
 import { groupComposerCommand, runGroupComposerCommand, groupMessageMood, roomComposerDisabled, roomDefaultModelLabel, roomMemberModelLabel, roomHistoryUrl } from '@/lib/group-chat-view';
 import type { RoomModelConfiguration } from '@/lib/room-models';
 import { RoomSharedContextEditor } from './RoomSharedContextEditor';
+import { RoomGoalBar } from './RoomGoalBar';
+import { RoomMemberDrawer } from './RoomMemberDrawer';
+import {
+  groupRemovalPlan,
+  memberNeedsPerson,
+  mentionChoices,
+  normalizeFunctionalGroups,
+  pendingApprovalId,
+  readRoomGoal,
+  roomApprovalMode,
+  showInlineApprove,
+  speakingBotIds,
+  tileMembersInHeader,
+  uniqueMemberIds,
+  type FunctionalGroupRef,
+  type MentionChoice,
+  type RoomApprovalMode
+} from './room-console';
 import './play-group.css';
 import '../bot-work/bot-work.css';
 import { BotRooms } from '../bot-work/BotRooms';
-import { ComposerContextChips, ComposerMessageContext, ComposerNotice, useComposerFileDrop, usePendingComposerContext } from '../ComposerContext';
+import { ComposerContextChips, ComposerMessageContext, ComposerNotice, ignoreComposerDrop, usePendingComposerContext } from '../ComposerContext';
 import { BotReplyQuoteAction, ComposerReplyQuote, MessageReplyQuote } from '../ReplyQuote';
 import { composerClassName, contextSubmission, contextSourcesBody, contextSourcesForSend } from '@/lib/composer-context';
 import { attachSentReply, keepLocalReplyTo, readStoredReplyTo, withReplyTo, type ReplyQuote } from '@/lib/reply-quote';
@@ -162,11 +179,34 @@ function senderName(message: RoomMessage, bots: readonly BotInfo[], me: string):
   return exhaustive;
 }
 
+function mentionDetail(option: MentionChoice, groupCount: (count: number) => string): string {
+  switch (option.kind) {
+    case 'group':
+      return groupCount(option.count);
+    case 'bot':
+      return option.detail;
+    default: {
+      const exhaustive: never = option.kind;
+      return exhaustive;
+    }
+  }
+}
+
 export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: readonly BotInfo[] }) {
   const { t } = useI18n();
   const workStates = useBotWorkStates();
   const [showSettings, setShowSettings] = useState(false);
-  useEffect(() => setShowSettings(false), [roomId]);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [membersClosed, setMembersClosed] = useState(false);
+  const [groups, setGroups] = useState<FunctionalGroupRef[]>([]);
+  const [approvalMode, setApprovalMode] = useState<RoomApprovalMode>('private');
+  const [goalBusy, setGoalBusy] = useState(false);
+  useEffect(() => {
+    setShowSettings(false);
+    setDrawerOpen(false);
+    setMembersClosed(false);
+  }, [roomId]);
+  useEffect(() => setMembersClosed(false), [showSettings]);
   const [models,setModels] = useState<RoomModelConfiguration|null>(null);
   const [room, setRoom] = useState<Room | null>(null);
   const [messages, setMessages] = useState<RoomMessage[]>([]);
@@ -183,7 +223,7 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [contextNotice, setContextNotice] = useState('');
-  const { pendingContext, setPendingContext, addPendingContext } = usePendingComposerContext(() => {
+  const { pendingContext, setPendingContext } = usePendingComposerContext(() => {
     setContextNotice(t('play.composer.contextTruncated'));
   });
   const [loadError, setLoadError] = useState(false);
@@ -219,14 +259,18 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
   const loadRoom = async (older = false) => {
     const id = roomId;
     const historyUrl = roomHistoryUrl(id, older, cursor);
-    const [history, turnData, current] = (await Promise.all([
+    const [history, turnData, current, groupData, settingsData] = (await Promise.all([
       api(historyUrl),
       api(`/api/bot-rooms/${id}/turns`),
-      api(`/api/bot-rooms/${id}`)
+      api(`/api/bot-rooms/${id}`),
+      api('/api/bot-functional-groups').catch(() => null),
+      api('/api/bot-rooms/settings').catch(() => null)
     ])) as [
       { messages: RoomMessage[]; hasMore: boolean; nextCursor: number | null },
       { turns: RoomTurn[] },
-      { room: Room; models?: RoomModelConfiguration }
+      { room: Room; models?: RoomModelConfiguration },
+      unknown,
+      unknown
     ];
     if (roomIdRef.current !== id) return;
     applyHistory(history, older);
@@ -235,6 +279,14 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
     setRoom((prev) => (sameData(prev, current.room) ? prev : current.room));
     const models = current.models ?? null;
     setModels((prev) => (sameData(prev, models) ? prev : models));
+    if (groupData) {
+      const nextGroups = normalizeFunctionalGroups(groupData);
+      setGroups((prev) => (sameData(prev, nextGroups) ? prev : nextGroups));
+    }
+    if (settingsData && typeof settingsData === 'object') {
+      const nextMode = roomApprovalMode((settingsData as { settings?: unknown }).settings);
+      setApprovalMode((prev) => (prev === nextMode ? prev : nextMode));
+    }
     setLoadError(false);
   };
 
@@ -280,19 +332,25 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
     return typeof raw === 'string' ? raw.replace(/\s+/g, ' ').trim() : '';
   };
   const known = new Set(bots.map((bot) => bot.id));
+  const memberIds = uniqueMemberIds(room?.botIds ?? []);
+  const crowded = room ? !tileMembersInHeader(memberIds.length) : false;
+  const membersOpen = crowded && (drawerOpen || showSettings) && !membersClosed;
   const speaking = turns.some((turn) => turn.status === 'queued' || turn.status === 'running' || turn.status === 'waiting_approval');
-  const available = bots.filter((bot) => room && !room.botIds.includes(bot.id));
-  const mentionMembers = (room?.botIds ?? []).map((id) => ({ id, name: nameOf(id) }));
+  const speakingIds = speakingBotIds(turns);
+  const speakingNames = speakingIds.map(nameOf).join(t('play.group.nameSeparator'));
+  const available = bots.filter((bot) => room && !memberIds.includes(bot.id));
+  const mentionRoster = memberIds.map((id) => {
+    const bot = bots.find((item) => item.id === id);
+    return { id, name: bot?.name ?? id, title: bot?.title ?? '', description: bot?.description ?? '' };
+  });
   const mention = activeMentionQuery(text, caret);
-  const mentionOptions = mention ? filterMentionMembers(mentionMembers, mention.query) : [];
+  const mentionOptions = mention ? mentionChoices(mentionRoster, groups, mention.query, new Set(memberIds)) : [];
+  const goal = readRoomGoal(room);
+  const approveVisible = showInlineApprove(approvalMode, memberNeedsPerson(turns));
   const mentionKey = mention ? `${mention.start}:${mention.query}` : '';
   const mentionOpen = Boolean(mention && mentionKey !== mentionDismissed && room?.status === 'active' && !busy);
   const activeMention = mentionOptions[Math.min(mentionIndex, Math.max(mentionOptions.length - 1, 0))];
 
-  const contextDrop = useComposerFileDrop((sources, truncated) => {
-    addPendingContext(sources);
-    if (truncated) setContextNotice(t('play.composer.contextTruncated'));
-  }, roomId);
 
   const removePendingContext = (id: string) => {
     setPendingContext((current) => current.filter((item) => item.id !== id));
@@ -331,9 +389,9 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
     window.dispatchEvent(new Event(BOT_GROUPS_CHANGED_EVENT));
   };
 
-  const addMember = async () => {
-    if (!room || !addId) return;
-    const check = addGroupMember(room.botIds, addId, known);
+  const addMember = async (botId = addId) => {
+    if (!room || !botId) return;
+    const check = addGroupMember(room.botIds, botId, known);
     if (!check.ok) {
       setError(t(issueKey(check.code)));
       return;
@@ -341,7 +399,7 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
     setBusy(true);
     setError('');
     try {
-      const data = (await api(`/api/bot-rooms/${room.id}/members`, jsonBody({ botId: addId }))) as { room: Room };
+      const data = (await api(`/api/bot-rooms/${room.id}/members`, jsonBody({ botId }))) as { room: Room };
       await changeMembers(data.room);
     } catch {
       setError(t('play.group.saveFailed'));
@@ -366,6 +424,81 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
       await changeMembers(data.room);
     } catch {
       setError(t('play.group.saveFailed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const addFunctionalGroup = async (groupId: string) => {
+    if (!room || !groupId) return;
+    setBusy(true);
+    setError('');
+    try {
+      const data = (await api(`/api/bot-rooms/${room.id}/members`, jsonBody({ groupId }))) as { room: Room };
+      await changeMembers(data.room);
+    } catch {
+      setError(t('play.group.saveFailed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const removeFunctionalGroup = async (groupId: string) => {
+    if (!room) return;
+    const group = groups.find((item) => item.id === groupId);
+    if (!group) return;
+    const plan = groupRemovalPlan(room.botIds, group.botIds);
+    if (!plan.ok) {
+      setError(t(issueKey(plan.code)));
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      let next = room;
+      for (const botId of plan.remove) {
+        const data = (await api(`/api/bot-rooms/${room.id}/members/${encodeURIComponent(botId)}`, { method: 'DELETE' })) as { room: Room };
+        next = data.room;
+      }
+      await changeMembers(next);
+    } catch {
+      setError(t('play.group.saveFailed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runGoalAction = async (action: 'pause' | 'cancel' | 'amend', constraint?: string) => {
+    const current = readRoomGoal(room);
+    if (!room || !current?.id) return;
+    setGoalBusy(true);
+    setError('');
+    try {
+      await api(`/api/bot-rooms/${room.id}/goals/${encodeURIComponent(current.id)}/actions`, jsonBody({
+        action,
+        ...(constraint ? { constraint } : {})
+      }));
+      await loadRoom(false);
+    } catch {
+      setError(t('play.roomGoal.actionFailed'));
+    } finally {
+      setGoalBusy(false);
+    }
+  };
+
+  const approveInline = async () => {
+    const approvalId = pendingApprovalId(turns);
+    if (!room || !approvalId) {
+      setError(t('play.group.approveUnavailable'));
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      await api(`/api/bot-rooms/${room.id}/approvals/${encodeURIComponent(approvalId)}`, jsonBody({ action: 'approve' }));
+      await loadRoom(false);
+    } catch {
+      setError(t('play.group.approveUnavailable'));
     } finally {
       setBusy(false);
     }
@@ -424,13 +557,68 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
           </div>
           <p className="play-group-model-hint">{t('play.groupModel.priorityHint')}</p>
         </div>
-        <button type="button" className="btn btn-ghost btn-sm" aria-expanded={showSettings} onClick={() => setShowSettings(value => !value)}>{t('play.groupSettings.title')}</button>
+        <div className="play-group-header-actions">
+          {crowded ? (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              data-testid="play-group-members-open"
+              aria-label={t('play.group.manageMembers')}
+              aria-expanded={membersOpen}
+              onClick={() => {
+                if (membersOpen) {
+                  setDrawerOpen(false);
+                  setMembersClosed(true);
+                  return;
+                }
+                setMembersClosed(false);
+                setDrawerOpen(true);
+              }}
+            >
+              {t('play.group.memberCount', { count: memberIds.length })}
+            </button>
+          ) : null}
+          <button type="button" className="btn btn-ghost btn-sm" aria-expanded={showSettings} onClick={() => setShowSettings(value => !value)}>{t('play.groupSettings.title')}</button>
+        </div>
       </header>
-      {showSettings && <div className="play-group-settings" data-testid="room-settings"><BotRooms key={roomId} bots={[...bots]} selectedRoomId={roomId} /></div>}
+      <RoomGoalBar
+        goal={goal}
+        busy={goalBusy}
+        onPause={() => void runGoalAction('pause')}
+        onCancel={() => void runGoalAction('cancel')}
+        onAmend={(constraint) => void runGoalAction('amend', constraint)}
+      />
+      {membersOpen && room ? (
+        <RoomMemberDrawer
+          memberIds={memberIds}
+          bots={[...bots]}
+          groups={groups}
+          hostId={room.hostBotId}
+          speakingIds={speakingIds}
+          busy={busy}
+          error={error}
+          onClose={() => {
+            setDrawerOpen(false);
+            setMembersClosed(true);
+          }}
+          onAddMember={(botId) => void addMember(botId)}
+          onRemoveMember={(botId) => void removeMember(botId)}
+          onAddGroup={(groupId) => void addFunctionalGroup(groupId)}
+          onRemoveGroup={(groupId) => void removeFunctionalGroup(groupId)}
+        />
+      ) : null}
+      {showSettings && <div className="play-group-settings" data-testid="room-settings"><BotRooms key={roomId} bots={[...bots]} selectedRoomId={roomId} memberEditor={!crowded} /></div>}
+      {crowded ? (
+        <div className="play-group-members" data-testid="play-group-member-summary">
+          {error && !membersOpen ? <p className="play-group-error">{error}</p> : null}
+          <RoomReplyFailure turn={turns.at(-1)} />
+          {room ? <RoomSharedContextEditor roomId={room.id} /> : null}
+        </div>
+      ) : (
       <div className="play-group-members">
         <div className="play-group-member-row">
           <span className="play-group-badge">{t('play.group.badge')}</span>
-          {room?.botIds.map((id) => {
+          {memberIds.map((id) => {
             const description = descriptionOf(id);
             return (
               <span key={id} className="play-group-member">
@@ -449,7 +637,7 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
                 <button
                   type="button"
                   className="btn btn-ghost btn-sm"
-                  disabled={busy || !room || room.botIds.length <= 2}
+                  disabled={busy || !room || memberIds.length <= 2}
                   aria-label={t('play.group.removeAria', { name: nameOf(id) })}
                   onClick={() => void removeMember(id)}
                 >
@@ -472,11 +660,12 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
             {t('play.group.add')}
           </button>
         </div>
-        {room && room.botIds.length <= 2 ? <p className="play-group-hint">{t('play.group.keepTwo')}</p> : null}
+        {room && memberIds.length <= 2 ? <p className="play-group-hint">{t('play.group.keepTwo')}</p> : null}
         {error ? <p className="play-group-error">{error}</p> : null}
         <RoomReplyFailure turn={turns.at(-1)} />
         {room ? <RoomSharedContextEditor roomId={room.id} /> : null}
       </div>
+      )}
       <div className="chat-panel-body">
         <div className="chat-feed-shell">
           <div className="chat-feed" role="log" ref={feedRef} aria-label={t('play.group.transcript')}>
@@ -503,7 +692,20 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
                   />
                 );
               })}
-              {speaking ? <p className="play-group-hint">{t('play.group.membersSpeaking')}</p> : null}
+              {speakingNames ? <p className="play-group-speaking" data-testid="play-group-speaking">{t('play.group.speakingNow', { names: speakingNames })}</p> : null}
+              {speaking && !speakingNames ? <p className="play-group-hint">{t('play.group.membersSpeaking')}</p> : null}
+              {approveVisible ? (
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  data-testid="play-group-approve"
+                  aria-label={t('play.group.approveAria')}
+                  disabled={busy}
+                  onClick={() => void approveInline()}
+                >
+                  {t('play.group.approve')}
+                </button>
+              ) : null}
               {cursor != null ? (
                 <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => void loadRoom(true)}>
                   {t('play.group.older')}
@@ -513,13 +715,11 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
           </div>
         </div>
         <form
-          className={composerClassName('play-group-composer', contextDrop.over)}
+          className={composerClassName('play-group-composer')}
           data-testid="composer-drop-target"
           data-surface="group"
-          onDragEnter={contextDrop.onDragEnter}
-          onDragOver={contextDrop.onDragOver}
-          onDragLeave={contextDrop.onDragLeave}
-          onDrop={contextDrop.onDrop}
+          onDragOver={ignoreComposerDrop}
+          onDrop={ignoreComposerDrop}
           onSubmit={(event) => {
             event.preventDefault();
             void send();
@@ -534,18 +734,21 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
               ) : (
                 mentionOptions.map((option, index) => {
                   const selected = option.id === activeMention?.id;
+                  const detail = mentionDetail(option, (count) => t('play.group.mentionGroupCount', { count }));
                   return (
                     <li key={option.id} id={`play-group-mention-${option.id}`} role="option" aria-selected={selected}>
                       <button
                         type="button"
                         className={`play-group-mentions__option${selected ? ' is-active' : ''}`}
                         data-testid="play-group-mention"
+                        data-kind={option.kind}
                         onMouseDown={(event) => event.preventDefault()}
                         onMouseEnter={() => setMentionIndex(index)}
-                        onClick={() => chooseMention(option.name)}
+                        onClick={() => chooseMention(option.insert)}
                       >
                         <BotFace name={option.name} size="sm" />
                         <span>{option.name}</span>
+                        {detail ? <span className="play-group-mentions__detail">{detail}</span> : null}
                       </button>
                     </li>
                   );
@@ -580,7 +783,7 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
                 next: () => setMentionIndex(index => (index + 1) % mentionOptions.length),
                 previous: () => setMentionIndex(index => (index - 1 + mentionOptions.length) % mentionOptions.length),
                 dismiss: () => setMentionDismissed(mentionKey),
-                choose: () => chooseMention(activeMention!.name),
+                choose: () => chooseMention(activeMention!.insert),
                 send: () => event.currentTarget.form?.requestSubmit()
               });
             }}

@@ -372,13 +372,10 @@ test('quoting one room bot addresses only that bot and keeps the full reply [AC:
     const betaPrompt = f.prompts.find(prompt => prompt.botId === f.beta.id);
     const alphaPrompt = f.prompts.find(prompt => prompt.botId === f.alpha.id);
     assert.ok(betaPrompt);
-    assert.ok(alphaPrompt);
+    assert.equal(alphaPrompt, undefined);
     const quoted = new RegExp(`\\[reply-quote\\] target=${delivered.message.id}[\\s\\S]*TAIL_MARKER_94`);
     assert.match(betaPrompt.text, quoted);
     assert.doesNotMatch(betaPrompt.text, /not @-mentioned/);
-    assert.match(alphaPrompt.text, quoted);
-    assert.match(alphaPrompt.text, /not @-mentioned/);
-    assert.match(alphaPrompt.text, /\[SILENT\]/);
 
     f.prompts.length = 0;
     const named = f.rooms.send(f.principal, room.id, {
@@ -393,8 +390,7 @@ test('quoting one room bot addresses only that bot and keeps the full reply [AC:
     const betaNamed = f.prompts.find(prompt => prompt.botId === f.beta.id);
     const quotedAgain = new RegExp(`\\[reply-quote\\] target=${delivered.message.id}[\\s\\S]*TAIL_MARKER_94`);
     assert.match(alphaNamed.text, quotedAgain);
-    assert.match(betaNamed.text, /not @-mentioned/);
-    assert.match(betaNamed.text, quotedAgain);
+    assert.equal(betaNamed, undefined);
   } finally {
     f.store.db.close();
   }
@@ -455,7 +451,18 @@ test('quoted steer cannot be silently promoted to a child without its source [AC
 });
 
 test('quote of a departed Room author does not broadcast [AC:bot-reply-quote#AC-4]',()=>{
- const f=roomFixture();try{const room=f.rooms.create(f.principal,{title:'departed quote',botIds:[f.alpha.id,f.beta.id],hostBotId:f.alpha.id});const source=deliverBotRoomMessage(f.store,{roomId:room.id,botId:f.beta.id,principal:f.principal,text:fullReply,idempotencyKey:'departed-source'}).message;f.rooms.removeMember(f.principal,room.id,f.beta.id);const sent=f.rooms.send(f.principal,room.id,{text:'explain this',replyTo:{messageId:source.id,excerpt}});assert.deepEqual(sent.turn.mentionedBotIds,[]);assert.equal(isRestrainedMember(sent.turn,f.alpha.id),true);}finally{f.store.db.close();}
+ const f=roomFixture();try{
+  const facade={store:f.store,runImageRetention:async()=>{},wakeAllAutonomousSessions(){},wakeAgentSessions(){}};
+  const gamma=createBot(facade,{name:'Gamma'});
+  const session=f.store.getSession(gamma.canonicalSessionId);
+  f.store.updateSession(gamma.canonicalSessionId,{metadata:{...session.metadata,...f.principal}});
+  const room=f.rooms.create(f.principal,{title:'departed quote',botIds:[f.alpha.id,f.beta.id,gamma.id],hostBotId:f.alpha.id});
+  const source=deliverBotRoomMessage(f.store,{roomId:room.id,botId:f.beta.id,principal:f.principal,text:fullReply,idempotencyKey:'departed-source'}).message;
+  f.rooms.removeMember(f.principal,room.id,f.beta.id);
+  const sent=f.rooms.send(f.principal,room.id,{text:'explain this',replyTo:{messageId:source.id,excerpt}});
+  assert.deepEqual(sent.turn.mentionedBotIds,[]);
+  assert.equal(isRestrainedMember(sent.turn,f.alpha.id),true);
+ }finally{f.store.db.close();}
 });
 for (const kernelVariant of ['ppeng','agent-loop']) test(`${kernelVariant} overflow delivers the exact quoted source to the model [AC:bot-reply-quote#AC-5]`,async()=>{
  const captured=[];const runtime=new RawAgentRuntime({repoRoot:mkdtempSync(join(tmpdir(),'quote-overflow-')),stateDir:mkdtempSync(join(tmpdir(),'quote-overflow-state-')),modelAdapter:{name:'quote-overflow',async runTurn(input){captured.push(input.messages);return {stopReason:'end',assistantParts:[{type:'text',text:'done'}]};}}});
