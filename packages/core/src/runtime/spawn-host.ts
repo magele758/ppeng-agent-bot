@@ -435,13 +435,15 @@ export async function startBackgroundJob(
     })
     .then((result) => {
       host.backgroundJobAborts.delete(job.id);
+      if (!host.store.db.isOpen) return;
       const output = [result.stdout.trim(), result.stderr.trim()].filter(Boolean).join('\n') || '(no output)';
       host.store.updateBackgroundJob(job.id, 'completed', output);
-      host.store.appendMessage(sessionId, 'user', [textPart(`Background job ${job.id} completed.\n${output.slice(0, 4000)}`)]);
+      host.store.runWithoutWriterScope(() => host.store.enqueueSteer(sessionId, `Background job ${job.id} completed.\n${output.slice(0, 4000)}`, {role:'user',key:`background-job:${job.id}`}));
     }).catch((error) => {
       host.backgroundJobAborts.delete(job.id);
+      if (!host.store.db.isOpen) return;
       host.store.updateBackgroundJob(job.id, 'error', String(error));
-      host.store.appendMessage(sessionId, 'user', [textPart(`Background job ${job.id} failed: ${String(error)}`)]);
+      host.store.runWithoutWriterScope(() => host.store.enqueueSteer(sessionId, `Background job ${job.id} failed: ${String(error)}`, {role:'user',key:`background-job:${job.id}`}));
     });
 
   return job;

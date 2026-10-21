@@ -17,7 +17,8 @@ export function isGoalWorkerCurrent(store:SqliteStateStore,session:SessionRecord
  const owner=execution.sessionId?store.getSession(execution.sessionId):undefined;
  if(!owner||owner.metadata.botId!==botId||(owner.id!==scopeId&&owner.metadata.botGoalScopeSessionId!==scopeId))return false;
  if(goal.status==='running')return goal.activeExecutionId===executionId&&execution.status==='running'&&execution.leaseUntil>Date.now();
- if(goal.status!=='waiting'||execution.status!=='finished'||goal.wait?.source!=='session'||goal.wait.correlationId!==live.id)return false;
+ const ownWait = goal.wait?.source==='session' && goal.wait.correlationId===live.id || goal.wait?.source==='self_heal' && goal.wait.correlationId===live.metadata.selfHealRunId;
+ if(goal.status!=='waiting'||execution.status!=='finished'||!ownWait)return false;
  const waits=owner.metadata.botGoalAuthorizedWaits;
- return Array.isArray(waits)&&waits.some(wait=>wait?.goalId===goalId&&wait.executionId===executionId&&wait.source==='session'&&wait.correlationId===live.id);
+ return Array.isArray(waits)&&waits.some(wait=>wait?.goalId===goalId&&wait.executionId===executionId&&wait.source===goal.wait!.source&&wait.correlationId===goal.wait!.correlationId);
 }

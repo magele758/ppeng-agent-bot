@@ -2,7 +2,7 @@ import type { SqliteStateStore } from '../../storage.js';
 import type { SessionRecord, ToolContract, ModelAdapter } from '../../types.js';
 import { BotGoalService } from './service.js';
 import { classifyGoalIntents } from './intake.js';
-import { selectGoalRoute, type GoalCapabilities, type GoalStrategy, type GoalWorkKind } from './routing.js';
+import { selectGoalRoute, goalWorkKind, type GoalCapabilities, type GoalStrategy, type GoalWorkKind } from './routing.js';
 import type { BotGoal, GoalReport } from './types.js';
 import { listPendingHumanWork } from '../../session/human-continuation.js';
 import { preserveGoalBudgetReport } from './budget.js';
@@ -15,6 +15,8 @@ export interface GoalRuntimeHost {
  cancel(id:string):void;
  run(id:string):Promise<unknown>;
  capabilities(session:SessionRecord,goal:BotGoal):GoalCapabilities;
+ inspectSpecialty?(parent:SessionRecord,goal:BotGoal):{status:string;evidence:string[];draining?:boolean};
+ cancelSpecialty?(parent:SessionRecord,goal:BotGoal):boolean|Promise<boolean>;
  judge?: ModelAdapter['completeText'];
 }
 export function announceGoalState(host:GoalRuntimeHost,goal:BotGoal):void {
@@ -36,14 +38,11 @@ export function goalScope(store:SqliteStateStore,session:SessionRecord):{botId:s
  if(!parent||parent.metadata?.botId!==botId||parent.metadata?.canonicalBotChat!==true)return undefined;
  return {botId,sessionId,service:new BotGoalService(store,Date.now,sessionId)};
 }
-export function goalWorkKind(text:string):GoalWorkKind {
- if(/\b(swarm|pipeline)\b|角色流水线/i.test(text))return 'role_pipeline';
- if(/\b(dag|dependency)\b|依赖关系|任务图/i.test(text))return 'dependency_plan';
- if(/\b(batch|ptc)\b|批量|汇总.*数据/i.test(text))return 'batch';
- if(/\b(browser|webpage)\b|浏览器|网页操作/i.test(text))return 'browser';
- if(/\b(desktop)\b|桌面操作/i.test(text))return 'computer';
- if(/\b(research|investigate)\b|调研|研究/i.test(text))return 'research';
- return 'general';
+export { goalWorkKind } from './routing.js';
+export function goalExecutionTask(goal:BotGoal):string {
+ const next=goal.nextStep?.trim();
+ if (next && !/^(Inspect authorized|Reconcile partial|Apply updated constraints)/.test(next)) return next;
+ return goal.evidence.length || next ? 'Verify existing execution evidence against the objective and constraints; continue only the remaining work.' : goal.objective;
 }
 
 /** Every receipt is associated before the existing concurrent-fork planner sees it. */
@@ -89,7 +88,7 @@ async function applyGoalIntake(host:GoalRuntimeHost,session:SessionRecord):Promi
   if(result.clarification){
    host.store.enqueueSteer(session.id,'[goal coordination] The latest message has an ambiguous goal reference. Ask which goal is intended; do not modify or cancel any goal.',{role:'system',key:`goal-clarify:${sourceId}`});
   } else if(intent.kind==='query'){
-   host.store.enqueueSteer(session.id,`[goal status] ${JSON.stringify(result.goals?.map(g=>({id:g.id,title:g.title,status:g.status,progress:g.progress,nextStep:g.nextStep,reason:g.blockedReason})))}`,{role:'system',key:`goal-query:${receipt.id}`});
+   host.store.enqueueSteer(session.id,`[goal status] ${JSON.stringify(result.goals?.map(g=>({id:g.id,title:g.title,status:g.status,progress:g.progress,nextStep:g.nextStep,reason:g.blockedReason,...(g.wait&&['self_heal','factory','evolution'].includes(g.wait.source)?{execution:host.inspectSpecialty?.(session,g)}:{})})))}`,{role:'system',key:`goal-query:${receipt.id}`});
   } else if(result.goal&&intent.kind!=='new_goal'){
    for(const execution of service.executions(botId,result.goal.id).filter(e=>e.status==='running')){
     if(!execution.sessionId)continue;
@@ -127,17 +126,18 @@ export function bindGoalExecution(host:GoalRuntimeHost,session:SessionRecord):bo
  if(!goal)return true;
  const settings=service.readSettings();
  const modePreference=settings.preferredStrategy==='deep_research'?'research':settings.preferredStrategy==='browser'?'browser':settings.preferredStrategy==='computer'?'computer':undefined;
- const route=selectGoalRoute({task:goal.objective,workKind:modePreference??goalWorkKind(goal.objective),independentWork:false,...(settings.preferredStrategy!=='auto'&&!modePreference?{preferredStrategy:settings.preferredStrategy as GoalStrategy}:{})},host.capabilities(session,goal));
+ const executionTask=goalExecutionTask(goal);
+ const route=selectGoalRoute({task:executionTask,workKind:modePreference??goalWorkKind(executionTask),independentWork:false,...(settings.preferredStrategy!=='auto'&&!modePreference?{preferredStrategy:settings.preferredStrategy as GoalStrategy}:{})},host.capabilities(session,goal));
  if(route.blocked){announceGoalState(host,service.block(botId,goal.id,route.reason));return false;}
  const execution=service.claim(botId,goal.id,{strategy:session.mode==='subagent'&&route.strategy==='direct'?'subagent':route.strategy!,strategyReason:route.reason,safeToRetry:false});
  if(!execution)return false;
  service.updateExecution(botId,execution.id,{sessionId:session.id,runRef:`session:${session.id}`});
- host.store.updateSession(session.id,{metadata:{...session.metadata,botGoalId:goal.id,botGoalExecutionId:execution.id,botGoalScopeSessionId:scope.sessionId,botGoalCostStart:Number(session.metadata.usageCostUsd??0),botGoalCheckpoint:undefined,botGoalOriginalProfile:{taskRunMode:session.metadata.taskRunMode??null,orchestrationEngine:session.metadata.orchestrationEngine??null},taskRunMode:route.taskMode,...(route.strategy==='ptc'?{orchestrationEngine:'ptc'}:{})}});
+ host.store.updateSession(session.id,{metadata:{...session.metadata,botGoalId:goal.id,botGoalExecutionId:execution.id,botGoalScopeSessionId:scope.sessionId,botGoalCostStart:Number(session.metadata.usageCostUsd??0),botGoalCheckpoint:undefined,botGoalOriginalProfile:{taskRunMode:session.metadata.taskRunMode??null,orchestrationEngine:session.metadata.orchestrationEngine??null},taskRunMode:route.strategy==='direct'?route.taskMode:'auto',orchestrationEngine:'legacy'}});
  host.store.enqueueSteer(session.id,goalInstructions(goal,route.strategy!,route.reason),{role:'system',key:`goal-execution:${execution.id}`});
  return true;
 }
 function goalInstructions(goal:BotGoal,strategy:string,reason:string):string {
- return `[goal ${goal.id} revision ${goal.revision}] Objective: ${goal.objective}\nConstraints: ${JSON.stringify(goal.constraints)}\nCompletion conditions: ${JSON.stringify(goal.completionCriteria)}\nExecution: ${strategy}. ${reason}\nPrevious progress: ${goal.progress}\nNext step: ${goal.nextStep??''}\nUse goal_checkpoint to preserve concrete progress, evidence, or a durable wait condition before returning. Returning a response does not complete the goal. For team_dag/swarm/bot_delegate use goal_dispatch to launch the selected executor. For PTC use ptc_exec. Do not repeat unconfirmed external actions.`;
+ return `[goal ${goal.id} revision ${goal.revision}] Objective: ${goal.objective}\nConstraints: ${JSON.stringify(goal.constraints)}\nCompletion conditions: ${JSON.stringify(goal.completionCriteria)}\nExecution: ${strategy}. ${reason}\nPrevious progress: ${goal.progress}\nEvidence: ${JSON.stringify(goal.evidence)}\nNext step: ${goal.nextStep??''}\nUse goal_checkpoint to preserve concrete progress, evidence, or a durable wait condition before returning. Returning a response does not complete the goal. When Execution is not direct, your first action must be goal_dispatch to launch that executor (factory may first discover targets). A direct answer does not fulfill a selected specialist execution. For subagent/orchestrator/self_heal/factory/team_dag/swarm/bot_delegate use goal_dispatch to launch the selected executor. For PTC use goal_dispatch to create an isolated dynamic-workflow worker. Select the next workKind and specialist role yourself from the task and existing evidence; never ask the user to configure modes. When goal_dispatch returns waiting, end this turn immediately; the scheduler will resume with actual results. Do not poll worker history or sleep. Inspect existing results before launching another phase; do not repeat completed or unconfirmed external actions. For factory discover authorized targets through factory_status, then pass factory details to goal_dispatch.`;
 }
 
 export async function settleGoalExecution(host:GoalRuntimeHost,sessionId:string,error?:unknown):Promise<void> {
@@ -162,6 +162,9 @@ export async function settleGoalExecution(host:GoalRuntimeHost,sessionId:string,
  let report:GoalReport=checkpoint?{...checkpoint,advanced:false}:{kind:'candidate_completed',summary:assistant||'Execution returned without completion evidence',evidence:[],advanced:false};
  if(error||session.status==='failed'||session.status==='unknown')report={kind:'blocked',summary:`Execution interrupted: ${String(error??session.status)}`};
  else if(outcome?.kind==='aborted')report={kind:'blocked',summary:'Execution was interrupted; review progress before resuming'};
+ else if (!session.metadata.botGoalWorker && session.mode !== 'subagent' && execution.strategy !== 'direct' && !goal.evidence.length && (!dispatch || dispatch.executionId !== executionId)) {
+  report={kind:'progress',summary:'The selected executor has not been launched; a direct response cannot verify that execution.',advanced:false,nextStep:`Call goal_dispatch with preferredStrategy=${execution.strategy} to execute the original objective, then inspect its actual result.`};
+ }
  else if(report.kind==='candidate_completed'||report.kind==='progress'){
   report={...report,verified:false};
   if(host.judge&&assistant){

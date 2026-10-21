@@ -3,7 +3,7 @@ import type { MessagePart, RunContext, ToolContract } from '../../types.js';
 import type { FileApprovalPolicy, ToolLoopDeps } from '../../runtime/tool-loop.js';
 import { stableJsonHash } from '../../runtime/helpers.js';
 import { createGoalDispatchTool } from './dispatch-tool.js';
-import { goalScope, goalWorkKind, type GoalRuntimeHost } from './runtime-host.js';
+import { goalScope, goalWorkKind, goalExecutionTask, type GoalRuntimeHost } from './runtime-host.js';
 import { invokeGoalTool } from './tool-gateway.js';
 import type { GoalAdapterResult, GoalExecutionAdapterHost, GoalExecutionRequest } from './adapters.js';
 import type { GoalReport } from './types.js';
@@ -13,13 +13,13 @@ export interface RuntimeGoalDispatchHost {
   goalHost: GoalRuntimeHost;
   deps(): ToolLoopDeps;
   filePolicy(): Promise<FileApprovalPolicy | undefined>;
-  authorizedTools(context: RunContext): ToolContract<any>[];
+  authorizedTools(context: RunContext, request?: GoalExecutionRequest): ToolContract<any>[];
   /** PTC must be an isolated child with inherited restrictions and scoped execution metadata. */
   runWorker?(context: RunContext, request: Parameters<GoalExecutionAdapterHost['runSessionExecution']>[0]): Promise<GoalAdapterResult>;
 }
 interface DispatchRecord { executionId: string; request: GoalExecutionRequest; result: GoalAdapterResult }
 function selectionKey(request: GoalExecutionRequest): string {
-  return stableJsonHash('goal_dispatch',{preferredStrategy:request.preferredStrategy,workKind:request.workKind,delegateBotId:request.delegateBotId,tasks:request.tasks});
+  return stableJsonHash('goal_dispatch',{preferredStrategy:request.preferredStrategy,workKind:request.workKind,delegateBotId:request.delegateBotId,tasks:request.tasks,role:request.role,factory:request.factory});
 }
 export function createRuntimeGoalDispatchTool(host: RuntimeGoalDispatchHost): ToolContract<any> {
   const freshContext = (context: RunContext): RunContext => ({...context,session:host.store.getSession(context.session.id) ?? context.session});
@@ -51,7 +51,7 @@ export function createRuntimeGoalDispatchTool(host: RuntimeGoalDispatchHost): To
       getTask: id => deps.store.getTask(id),
       updateTask: (id,patch) => deps.store.updateTask(id,patch)
     }};
-    const tools = host.authorizedTools(fresh).map(tool => tool.name===name ? {...tool,execute:async (toolContext:RunContext,toolArgs:Record<string,unknown>) => {
+    const tools = host.authorizedTools(fresh,request).map(tool => tool.name===name ? {...tool,execute:async (toolContext:RunContext,toolArgs:Record<string,unknown>) => {
       if(!isCurrent(toolContext,request))return {ok:false,content:'Goal revision or execution changed before dispatch; reconcile before proceeding'};
       return worker?worker(toolContext,toolArgs):tool.execute(toolContext,toolArgs);
     }} : tool);
@@ -73,17 +73,17 @@ export function createRuntimeGoalDispatchTool(host: RuntimeGoalDispatchHost): To
         return previous.request;
       }
       if (execution.runRef && execution.runRef !== `session:${fresh.session.id}`) return undefined;
-      return {goalId,revision:goal.revision,executionId,sessionId:fresh.session.id,task:`${goal.objective}\nConstraints: ${JSON.stringify(goal.constraints)}\nCompletion conditions: ${JSON.stringify(goal.completionCriteria)}`,workKind:goalWorkKind(goal.objective)};
+      return {goalId,revision:goal.revision,executionId,sessionId:fresh.session.id,task:goalExecutionTask(goal),progress:`Objective: ${goal.objective}\nCompletion conditions: ${JSON.stringify(goal.completionCriteria)}\n${goal.progress}`,evidence:goal.evidence,constraints:goal.constraints,workKind:goalWorkKind(goalExecutionTask(goal))};
     },
     getCapabilities(context,request) {
       const fresh = freshContext(context);
       const scope = goalScope(host.store,fresh.session);
       const goal = scope?.service.get(scope.botId,request.goalId);
       const previous = fresh.session.metadata.botGoalDispatch as DispatchRecord | undefined;
-      const tools = host.authorizedTools(fresh);
+      const tools = host.authorizedTools(fresh,request);
       if (!scope || !goal || goal.revision !== request.revision || goal.status !== 'running' || goal.activeExecutionId !== request.executionId || (previous?.executionId===request.executionId && previous.result.waitingApproval && selectionKey(previous.request)!==selectionKey(request))) return {registeredTools:[],allowedTools:[],enabledStrategies:[]};
       const capabilities = host.goalHost.capabilities(fresh.session,goal);
-      return {...capabilities,registeredTools:tools.map(tool=>tool.name),allowedTools:tools.map(tool=>tool.name),ptcEnabled:Boolean(host.runWorker&&capabilities.ptcEnabled),budgetRemaining:Math.max(0,goal.budgetUsd-goal.costUsd)};
+      return {...capabilities,registeredTools:tools.map(tool=>tool.name),allowedTools:tools.map(tool=>tool.name),ptcEnabled:Boolean(host.runWorker&&tools.some(tool=>tool.name==='ptc_exec')),budgetRemaining:Math.max(0,goal.budgetUsd-goal.costUsd)};
     },
     async runSessionExecution(context,request) {
       if(!isCurrent(context,request))return {status:'blocked',content:'Goal revision or execution changed before worker launch'};
@@ -91,7 +91,7 @@ export function createRuntimeGoalDispatchTool(host: RuntimeGoalDispatchHost): To
         if (!host.runWorker) return {status:'blocked',content:'No isolated PTC worker adapter is available'};
         return host.runWorker(freshContext(context),request);
       }
-      const result = await invoke(context,'spawn_subagent',{prompt:request.task},request,host.runWorker ? async workerContext => {
+      const result = await invoke(context,'spawn_subagent',{prompt:request.task,...(request.role?{role:request.role}:{})},request,host.runWorker ? async workerContext => {
         const worker = await host.runWorker!(freshContext(workerContext),request);
         return {ok:worker.status!=='failed'&&worker.status!=='blocked',content:JSON.stringify({goalWorker:worker})};
       } : undefined);
@@ -112,7 +112,7 @@ export function createRuntimeGoalDispatchTool(host: RuntimeGoalDispatchHost): To
       if (!goal) return;
       const prior = fresh.session.metadata.botGoalDispatch as DispatchRecord | undefined;
       if (prior?.executionId===request.executionId && prior.result.waitingApproval && selectionKey(prior.request)!==selectionKey(request)) return;
-      const source = result.route?.strategy === 'bot_delegate' ? 'bot_task' : result.route?.strategy === 'team_dag' ? 'team_dag' : result.route?.strategy === 'swarm' ? 'swarm' : 'session';
+      const source = result.route?.strategy === 'self_heal' ? 'self_heal' : result.route?.strategy === 'factory' ? 'factory' : result.route?.strategy === 'evolution' ? 'evolution' : result.route?.strategy === 'bot_delegate' ? 'bot_task' : result.route?.strategy === 'team_dag' ? 'team_dag' : result.route?.strategy === 'swarm' ? 'swarm' : 'session';
       const reference = source==='session' && result.reference?.startsWith('session:') ? result.reference.slice(8) : result.reference;
       const existing = Array.isArray(fresh.session.metadata.botGoalAuthorizedWaits) ? fresh.session.metadata.botGoalAuthorizedWaits as Array<Record<string,unknown>> : [];
       const authorized = reference ? [...existing.filter(wait=>wait.executionId!==request.executionId),{source,correlationId:reference,goalId:request.goalId,executionId:request.executionId}] : existing;
