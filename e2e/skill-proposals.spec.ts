@@ -70,7 +70,7 @@ test.describe('Skill proposals card', () => {
     const row = card.getByTestId('skill-proposal-e2e-revoke-me');
     await row.getByRole('button', { name: '查看完整内容' }).click();
     await row.getByRole('button', { name: '批准' }).click();
-    const approvedRow = card.getByTestId('skill-approved-e2e-revoke-me');
+    const approvedRow = card.getByTestId('bot-skill-manager').locator('article').filter({ has: page.getByRole('heading', { name: 'e2e-revoke-me', exact: true }) });
     await expect(approvedRow).toBeVisible();
     const installed = join(stateDir!, 'skills', 'e2e-revoke-me', 'SKILL.md');
     expect(existsSync(installed)).toBe(true);
@@ -92,7 +92,7 @@ test.describe('Skill proposals card', () => {
       void dialog.accept();
     });
     await approvedRow.getByRole('button', { name: '撤销' }).click();
-    await expect(card.getByText('已撤销「e2e-revoke-me」', { exact: false })).toBeVisible();
+    await expect.poll(() => store.list({ status: 'revoked' }).some(proposal => proposal.name === 'e2e-revoke-me')).toBe(true);
     await expect(approvedRow).toHaveCount(0);
     await expect(card.getByTestId('skill-decided-e2e-revoke-me')).toContainText('已撤销');
     expect(existsSync(join(stateDir!, 'skills', 'e2e-revoke-me'))).toBe(false);
