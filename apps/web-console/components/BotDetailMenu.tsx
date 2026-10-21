@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { BotDetailSkills } from './BotDetailSkills';
 import { RoutineSchedule, type ScheduleJob } from './RoutineSchedule';
 import { api } from '@/lib/api';
 import { botPermissionsHref } from '@/lib/bot-chat-header';
@@ -14,7 +15,7 @@ import {
 import { useI18n, type MessageKey } from '@/lib/i18n';
 import styles from './BotDetailMenu.module.css';
 
-type Section = 'routines' | 'files' | 'memory';
+type Section = 'routines' | 'files' | 'memory' | 'skills';
 type RoutineItem = RoutineToggle & ScheduleJob & { name: string; nextRunAt?: string; scheduleValue?: string };
 type MaterialItem = { id: string; name: string; kind: 'artifact' | 'working-log'; createdAt?: string; sourceTool?: string };
 type MemoryItem = { id: string; scope: string; key: string; value: string };
@@ -135,7 +136,7 @@ function DetailMemories({ memories, loading, failed }: { memories: MemoryItem[];
 
 
 function DetailBody({ onSaved, section, loading, sectionError, jobs, files, memories, toggleError, deleteError, folderError, folderOk, busyId, onToggle, onDelete, onOpenFolder }: {
-  onSaved: (job: ScheduleJob) => void; section: Section; loading: boolean; sectionError: Record<Section, boolean>; jobs: RoutineItem[]; files: MaterialItem[]; memories: MemoryItem[];
+  onSaved: (job: ScheduleJob) => void; section: Section; loading: boolean; sectionError: Record<Exclude<Section, 'skills'>, boolean>; jobs: RoutineItem[]; files: MaterialItem[]; memories: MemoryItem[];
   toggleError: boolean; deleteError: boolean; folderError: boolean; folderOk: boolean; busyId: string | null; onToggle: (job: RoutineItem) => void; onDelete: (job: RoutineItem) => void; onOpenFolder: (id: string) => void;
 }) {
   const { t } = useI18n();
@@ -152,6 +153,7 @@ export function BotDetailMenu({
   botName,
   agentId,
   open = true,
+  onClose,
   initialSection = 'routines',
   preview,
   showToggleError = false
@@ -160,6 +162,7 @@ export function BotDetailMenu({
   botName: string;
   agentId?: string;
   open?: boolean;
+  onClose?: () => void;
   initialSection?: Section;
   preview?: BotDetailPreview;
   showToggleError?: boolean;
@@ -267,9 +270,10 @@ export function BotDetailMenu({
     >
       <div className={styles.head}>
         <h3 className={styles.title}>{t('play.botDetail.title', { name: botName })}</h3>
+        {onClose && <button type="button" className={styles.close} data-testid="bot-detail-close" aria-label={t('play.botDetail.close')} title={t('play.botDetail.close')} onClick={onClose}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>}
       </div>
       <div className={styles.tabs} role="tablist" aria-label={t('play.botDetail.aria')}>
-        {(['routines', 'files', 'memory'] as const).map((id) => (
+        {(['routines', 'files', 'memory', 'skills'] as const).map((id) => (
           <button
             key={id}
             type="button"
@@ -279,11 +283,12 @@ export function BotDetailMenu({
             aria-selected={section === id}
             onClick={() => setSection(id)}
           >
-            {t(id === 'routines' ? 'play.botDetail.routines' : id === 'files' ? 'play.botDetail.files' : 'play.botDetail.memory')}
+            {t(id === 'skills' ? 'skillProposals.detailTab' : id === 'routines' ? 'play.botDetail.routines' : id === 'files' ? 'play.botDetail.files' : 'play.botDetail.memory')}
           </button>
         ))}
       </div>
-      <DetailBody onSaved={updated => setJobs(current => current.map(job => job.id === updated.id ? { ...job, ...updated } : job))} section={section} loading={loading} sectionError={sectionError} jobs={jobs} files={files} memories={memories} toggleError={toggleError} deleteError={deleteError} folderError={folderError} folderOk={folderOk} busyId={busyId} onToggle={onToggle} onDelete={onDelete} onOpenFolder={onOpenFolder} />
+      <div className={styles.body} hidden={section !== 'skills'}>{section === 'skills' && <BotDetailSkills botId={botId} />}</div>
+      {section !== 'skills' && <DetailBody onSaved={updated => setJobs(current => current.map(job => job.id === updated.id ? { ...job, ...updated } : job))} section={section} loading={loading} sectionError={sectionError} jobs={jobs} files={files} memories={memories} toggleError={toggleError} deleteError={deleteError} folderError={folderError} folderOk={folderOk} busyId={busyId} onToggle={onToggle} onDelete={onDelete} onOpenFolder={onOpenFolder} />}
     </aside>
   );
 }
@@ -301,9 +306,9 @@ export function BotDetailToggle({ botId, open, onToggle }: { botId: string; open
     {open ? t('play.botDetail.close') : t('play.botDetail.open')}
   </button>;
 }
-export function BotDetailPane({ visible, botId, botName, agentId }: { visible: boolean; botId: string; botName: string; agentId?: string }) {
+export function BotDetailPane({ visible, botId, botName, agentId, onClose }: { visible: boolean; botId: string; botName: string; agentId?: string; onClose: () => void }) {
   if (!visible) return null;
-  return <BotDetailMenu key={botId} botId={botId} botName={botName || botId} agentId={agentId || botId} />;
+  return <BotDetailMenu key={botId} botId={botId} botName={botName || botId} agentId={agentId || botId} onClose={onClose} />;
 }
 
 export function BotPermissionsLink({ botId, botName }: { botId: string; botName: string }) {

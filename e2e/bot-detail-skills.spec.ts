@@ -203,3 +203,35 @@ test("one operation confirmation completes without body review [AC:agent-skill-m
   await expect(card.getByRole("button")).toHaveCount(0);
   expect(confirmations).toBe(1);
 });
+
+test("chat detail exposes and manages current Bot skills [AC:bot-detail-skill-management#AC-1] [AC:bot-detail-skill-management#AC-3]", async ({ page }) => {
+  const { policy } = await setup(page);
+  await page.route('**/api/sessions', r => r.fulfill({ json: { sessions: bots.map(b => ({ id: b.canonicalSessionId, title: b.name, agentId: b.agentId, status: 'idle', mode: 'chat', metadata: { botId: b.id } })) } }));
+  await page.goto('/#/bot');
+  await page.reload();
+  await page.getByRole('button', { name: /^Bot A/ }).first().click();
+  const sidebar = page.getByTestId('bot-detail-panel');
+  if (!(await sidebar.isVisible())) await page.getByTestId('bot-detail-toggle').click();
+  await sidebar.getByRole('tab', { name: '技能', exact: true }).click({ timeout: 5000 });
+  await expect(sidebar.getByTestId('skill-row-own')).toBeVisible();
+  await expect(sidebar.getByTestId('skill-row-shared')).toContainText('只读');
+  await sidebar.getByLabel('技能使用范围').selectOption('selected');
+  await sidebar.getByRole('button', { name: '保存使用范围' }).click();
+  await expect.poll(policy).toEqual({ mode: 'selected', ids: [] });
+  await expect(page).toHaveURL(/#\/bot$/);
+});
+
+test('chat detail close icon works on narrow screens [AC:bot-detail-menu#AC-7]', async ({ page }) => {
+  await setup(page);
+  await page.route('**/api/sessions', r => r.fulfill({ json: { sessions: bots.map(b => ({ id: b.canonicalSessionId, title: b.name, agentId: b.agentId, status: 'idle', mode: 'chat', metadata: { botId: b.id } })) } }));
+  await page.setViewportSize({ width: 823, height: 804 });
+  await page.goto('/#/bot');
+  await page.reload();
+  await page.getByRole('button', { name: /^Bot A/ }).first().click();
+  const sidebar = page.getByTestId('bot-detail-panel');
+  if (!(await sidebar.isVisible())) await page.getByTestId('bot-detail-toggle').click();
+  await sidebar.getByTestId('bot-detail-close').click({ timeout: 5000 });
+  await expect(sidebar).toHaveCount(0);
+  await page.getByTestId('bot-detail-toggle').click();
+  await expect(sidebar).toBeVisible();
+});

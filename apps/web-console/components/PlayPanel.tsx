@@ -1361,7 +1361,7 @@ export function PlayPanel({
               </div>
             </div>
           </div>
-          <BotDetailPane visible={botDetailVisible} botId={headerBotId} botName={headerBotName} agentId={selectedBot?.agentId} />
+          <BotDetailPane onClose={() => setBotDetailOpen(false)} visible={botDetailVisible} botId={headerBotId} botName={headerBotName} agentId={selectedBot?.agentId} />
         </div>
 
         <aside className="play-rail" hidden={railCollapsed}>

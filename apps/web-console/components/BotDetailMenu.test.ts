@@ -32,6 +32,15 @@ function loadMenu() {
   const mod = { exports: {} as { BotDetailMenu?: React.ComponentType<Record<string, unknown>> } };
   const requireComponent = (id: string) => {
     if (id.endsWith('.css')) return {};
+    if (id === './RoutineSchedule') {
+      const routine = ts.transpileModule(readFileSync(new URL('./RoutineSchedule.tsx', import.meta.url), 'utf8'), {
+        compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true }
+      }).outputText;
+      const module = { exports: {} };
+      new Function('require', 'module', 'exports', routine)(requireComponent, module, module.exports);
+      return module.exports;
+    }
+    if (id === './BotDetailSkills') return { BotDetailSkills: () => null };
     if (id === 'react') return React;
     if (id === '@/lib/i18n') return { useI18n: () => ({ t: (key: string, vars?: Record<string, string>) => {
       let text = copy[key] ?? key;
