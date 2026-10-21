@@ -16,11 +16,14 @@ Bot 侧栏移组拖拽不属于本次退役范围。
 
 - 功能验证：`node --test scripts/test/bot-http-soak-harness.test.mjs`。继续检查固定输入、真实工作完成、调度、审批、故障收尾及短测不得冒充完整验收。
 - 独立性能验证：先执行 `node scripts/build-workspace.mjs`，再执行 `pnpm run test:bot:soak:performance`。
-- 性能执行器以独立子进程运行既有压缩负载，移除覆盖率采集环境，不继承 Node 注入参数；不改变原负载或 p95 门槛。
+- 性能执行器以独立子进程运行既有压缩负载，移除覆盖率采集环境，不继承 Node 注入参数；不改变原负载。
 - 全量 Release gate 增加独立 `soak-performance` job。失败、取消、跳过或缺失均不能通过 Main release gate。本地 `pnpm run ci` 同样包含它。
 - 结果保存在 `test-results/soak-performance/http-soak.json` 和 `performance.json`，CI 无论成败均上传证据。
 
-性能门槛沿用 workload.v1：page/status/receive p95 不超过 500ms，search p95 不超过 1000ms。
+本地和完整浸泡门槛沿用 workload.v1：page/status/receive p95 不超过 500ms，search p95 不超过 1000ms。
+2026-10-21 用户看到 GitHub runner 的 receive p95 1481ms 后明确确认：GitHub 短时检查的 receive 上限改为 2000ms，其余门槛不变。
+CI 显式使用 `pnpm run test:bot:soak:performance --profile github-actions`；不传参数仍按本地 500ms 检查。
+`performance.json` 保存 profile 和每项实际门槛。原始 `http-soak.json` 的完整协议判断仍按原门槛保留，不将本次调整冒充完整浸泡通过。
 缺样本、非正常结束或功能失败同样判定性能验证未通过。独立执行不意味着共享机器满足标准硬件条件。
 压缩负载的性能通过也不等于完整浸泡或发布验收通过；完整发布证据要求继续有效。
 
