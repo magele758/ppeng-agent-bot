@@ -26,6 +26,7 @@ export type {
   MessageRole,
   ModelAdapter,
   ModelStreamChunk,
+  ModelRetryProgress,
   StreamResetReason,
   ModelTurnInput,
   ModelTurnResult,

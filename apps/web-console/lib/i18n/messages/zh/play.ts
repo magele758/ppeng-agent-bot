@@ -1,5 +1,15 @@
 /** Play / Chat 界面文案。不要加 as const。 */
 export const play = {
+  retry: {
+    waiting: '{model} · 重试 {retry}/{max} · {seconds} 秒后重试',
+    requesting: '{model} · 正在重试 {retry}/{max}',
+    switching: '正在切换备选模型：{model}',
+    reason: '原因：{reason}',
+    exhausted: '自动重试已耗尽，共请求 {requests} 次。最后错误：{reason}',
+    waitLimit: '上游要求等待超过 120 秒，已停止等待，共请求 {requests} 次。最后错误：{reason}',
+    stopped: '已停止',
+  },
+
   imageUnsupported: '当前模型不支持图片。请选择支持图片的模型，或移除本次图片后发送纯文本。',
   groupSettings: { title: '群聊设置' },
   entry: { new: '新建', remove: '移除', removeBot: '移除 Bot「{name}」', removeBotConfirm: '移除 Bot「{name}」？它将从 Bot 列表隐藏，已有对话、群聊和任务会保留；这不会删除会话。', removeFailed: '移除失败：{error}' },

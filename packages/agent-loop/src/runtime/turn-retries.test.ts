@@ -36,7 +36,7 @@ function adapterFor(baseUrl: string): OpenAiChatAdapter {
 }
 
 describe('runTurnWithRetries', () => {
-  it('emits stream_reset before re-streaming a failed attempt [AC:upstream-resilience#AC-3]', async () => {
+  it('emits stream_reset before re-streaming a failed attempt [AC:upstream-resilience#AC-3] [AC:model-retry-progress#AC-8]', async () => {
     const server = await startReplayServer([partialThenError, fullAnswer]);
     try {
       const chunks: ModelStreamChunk[] = [];
@@ -44,6 +44,7 @@ describe('runTurnWithRetries', () => {
       expect(server.requests).toHaveLength(2);
       expect(chunks.filter((c) => c.type === 'stream_reset')).toEqual([{ type: 'stream_reset', reason: 'retry' }]);
       expect(visibleText(chunks)).toBe('hello again');
+      expect(chunks.at(-1)).toMatchObject({ type: 'model_retry', phase: 'recovered' });
       expect(result.assistantParts).toEqual([{ type: 'text', text: 'hello again' }]);
     } finally {
       await server.close();
@@ -79,7 +80,7 @@ describe('runTurnWithRetries', () => {
 
   it('fails fast when Retry-After exceeds the in-process cap [AC:upstream-resilience#AC-4]', async () => {
     const server = await startReplayServer([
-      { status: 429, headers: { 'retry-after': '120' }, json: { error: { message: 'Rate limit reached' } } },
+      { status: 429, headers: { 'retry-after': '121' }, json: { error: { message: 'Rate limit reached' } } },
       fullAnswer
     ]);
     try {
@@ -87,7 +88,7 @@ describe('runTurnWithRetries', () => {
         (e: unknown) => e
       );
       expect(err).toBeInstanceOf(UpstreamHttpError);
-      expect((err as UpstreamHttpError).retryAfterMs).toBe(120_000);
+      expect((err as UpstreamHttpError).retryAfterMs).toBe(121_000);
       expect(server.requests).toHaveLength(1);
     } finally {
       await server.close();
@@ -113,14 +114,14 @@ describe('runTurnWithRetries', () => {
 });
 
 describe('retryDelayMs', () => {
-  it('uses linear backoff without Retry-After', () => {
-    expect(retryDelayMs(new Error('x'), 0)).toBe(400);
-    expect(retryDelayMs(new Error('x'), 2)).toBe(1200);
+  it('uses capped exponential backoff without Retry-After', () => {
+    expect(retryDelayMs(new Error('x'), 0)).toBe(2000);
+    expect(retryDelayMs(new Error('x'), 2)).toBe(8000);
   });
 
   it('never waits less than the backoff, and gives up past the cap', () => {
     const ask = (ms: number) => new UpstreamHttpError('429', { status: 429, retryAfterMs: ms });
-    expect(retryDelayMs(ask(100), 1)).toBe(800);
+    expect(retryDelayMs(ask(100), 1)).toBe(4000);
     expect(retryDelayMs(ask(5_000), 0)).toBe(5_000);
     expect(retryDelayMs(ask(MAX_RETRY_AFTER_MS + 1), 0)).toBeUndefined();
   });

@@ -345,7 +345,21 @@ export interface ModelTurnResult {
   requestId?: string;
 }
 
+export interface ModelRetryProgress {
+  type: 'model_retry';
+  phase: 'waiting' | 'requesting' | 'switching' | 'recovered' | 'failed' | 'cancelled';
+  model: string;
+  retry: number;
+  maxRetries: number;
+  /** Actual requests in this model turn, including earlier fallback candidates. */
+  requests: number;
+  message: string;
+  reason: 'temporary' | 'exhausted' | 'wait_limit' | 'permanent';
+  delayMs?: number;
+}
+
 export type ModelStreamChunk =
+  | ModelRetryProgress
   | { type: 'text_delta'; text: string }
   | { type: 'reasoning_delta'; text: string }
   | { type: 'tool_call_start'; toolCallId: string; name: string }
@@ -384,6 +398,8 @@ export interface TextCompletionInput {
 
 export interface ModelAdapter {
   name: string;
+  /** User-facing model identifier, when known. */
+  readonly modelName?: string;
   runTurn(input: ModelTurnInput): Promise<ModelTurnResult>;
   summarizeMessages(input: SummaryInput): Promise<string>;
   /** Optional streaming turn; default falls back to runTurn without chunks. */
