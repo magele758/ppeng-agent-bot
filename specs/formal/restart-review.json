@@ -215,7 +215,7 @@
     }
   ],
   "sha256": {
-    "packages/core/src/runtime.ts": "64fa7b4fc55425d79786a2ee77da00ca137c76c8cf8a380a4466fd595401399d",
+    "packages/core/src/runtime.ts": "aaf656b1f05e3e7796f814dc76ee8e7883101e7df4902f9515cb404f58572830",
     "packages/core/src/storage.ts": "357bd3e45e8b253f39e7f5f392b5de512030d99353aa79c931c6c50ca200109e",
     "packages/core/src/stores/session-store.ts": "fbe877421acdc97a69fbe67d2e3be300d5ebd811c748d2d227aedddff2d38446",
     "packages/core/src/bots/bot-work.ts": "e43652e5224e649432afaf6f7d1fc88656c113f444d1897bcbd9cbffd0040970",
@@ -289,9 +289,9 @@
     "packages/core/src/reply-quote.ts": "e3551eb81ae046f631824c896a67b231052314068ef84c7d472c7a5069084234",
     "packages/core/src/session/reply-quote.ts": "945f595cb0004dac6b35d66b820a5cd6ba865d41bc86f1363ecdde5dc9c42b27",
     "packages/core/src/rooms/index.ts": "a2c67d885bbc3af82546a4d34243d12167e4401783a1868aef4ddb7543ad9acd",
-    "packages/core/src/session/human-continuation.ts": "5127f51c5f9303f22998b8497507322989c9cc91c7f6d0a3393bfe0617d9a8f7",
+    "packages/core/src/session/human-continuation.ts": "328da3cbef89af084980442dff8a1a1a6ddcc7f2a99521e3a34dff4902fc8f34",
     "packages/core/test/bot-reply-quote.test.js": "d105139c4fff42c3deb45d8aadff9c0298750a80795c71ae6b4825135582f50e",
-    "packages/core/test/human-continuation.test.js": "9b55bbde7a4eb128f3b12cc8d23777ca7aa9c5fadf90503982515f6313e51188",
+    "packages/core/test/human-continuation.test.js": "eeb052e154f9b1ca881a6fd4f73763286b42f67eb5598daaebf9ac283c32c262",
     "packages/agent-loop/src/session/step-inbox-context.test.ts": "a94e66dbf16d0d82717fabaf50413048150815bf517a07d65c8d8165e5ffb29a",
     "packages/agent-loop/src/session/apply-claimed-inbox.test.ts": "a57e40b13b4260fbd01d1cd1623476515d5d10a5c99280261bc725f337e9f91d",
     "apps/daemon/src/routes/sessions.ts": "6856ef931d4ed70ced6040d6e3f0566f04f7b79fe6f1999dc29e7fe213acbbb5",

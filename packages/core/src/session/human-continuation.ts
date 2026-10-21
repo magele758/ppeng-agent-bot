@@ -162,6 +162,42 @@ export function listPendingHumanWork(store: SqliteStateStore, sessionId: string)
     .filter((request) => request.kind !== 'steer')
     .map((request) => ({ id: request.id, seq: request.seq }));
 }
+function forkSourceId(item: unknown): string | undefined {
+  if (!item || typeof item !== 'object') return undefined;
+  const id = (item as { sourceMessageId?: unknown }).sourceMessageId;
+  return typeof id === 'string' ? id : undefined;
+}
+function forkedHumanIds(store: SqliteStateStore, sessionId: string): Set<string> {
+  const raw = store.getSession(sessionId)?.metadata?.concurrentBotForks;
+  const ids = new Set<string>();
+  if (!Array.isArray(raw)) return ids;
+  for (const item of raw) {
+    const id = forkSourceId(item);
+    if (id) ids.add(id);
+  }
+  return ids;
+}
+/** Pending human messages this joined run did not take and did not hand to a sub-agent. */
+export function unansweredHumanWork(store: SqliteStateStore, sessionId: string, messageIds: readonly string[]): boolean {
+  if (messageIds.length === 0) return false;
+  const pending = new Set(listPendingHumanWork(store, sessionId).map((row) => row.id));
+  const forked = forkedHumanIds(store, sessionId);
+  return messageIds.some((id) => pending.has(id) && !forked.has(id));
+}
+/**
+ * A send that joins an in-flight turn returns before the new message is read.
+ * Run that message once the joined turn ends, unless a sub-agent already owns it.
+ */
+export async function runAnsweredHumanSession<T, O>(
+  host: { store: SqliteStateStore; isRunning(sessionId: string): boolean; runSession(sessionId: string, options?: O): Promise<T> },
+  sessionId: string,
+  options?: O
+): Promise<T> {
+  const queued = listPendingHumanWork(host.store, sessionId).map((row) => row.id);
+  const first = await host.runSession(sessionId, options);
+  if (host.isRunning(sessionId) || !unansweredHumanWork(host.store, sessionId, queued)) return first;
+  return host.runSession(sessionId, options);
+}
 /** Dispatch only: slow model/tool work never blocks the scheduler or another chat. */
 export async function drainHumanContinuations(host:HumanContinuationHost):Promise<void> {
  const executing=activeFor(host.store);
