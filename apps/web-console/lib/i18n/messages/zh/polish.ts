@@ -37,6 +37,7 @@ export const polish = {
   "sourcePreview": "来源内容",
   "sourceUnavailable": "来源不存在或无权查看。",
   "requestTitle": "最近一次已发送请求",
+  "requestTurnTitle": "第 {turn} 次已发送请求",
   "estimate": "发送时估算",
   "actual": "上游输入用量",
   "preview": "下一轮预览（估算）",
