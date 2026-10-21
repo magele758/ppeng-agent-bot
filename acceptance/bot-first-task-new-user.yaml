@@ -1,0 +1,27 @@
+id: bot-first-task-new-user
+title: 首次任务引导只给新用户看
+status: implemented
+requirement: |
+  这个不要每个bot新建都展示，只有新用户才展示
+notes: |
+  「新用户」指这个账号还没有向任何 Bot 发过消息，也没有关闭过「让 Bot 完成第一件事」。
+  引导最多出现在新用户第一次打开的那个尚未开始的 Bot 对话里，不跟着每个新建 Bot 再出现。
+  批准后需改写已实现标准：bot-first-task-dismissal 的 AC-2、AC-3，以及 bot-product-p1 的 AC-1
+  里「每个新 Bot 的空对话都出现示例」这一层。关闭、示例只填入输入框、已有对话不打扰，仍按原标准。
+criteria:
+  - id: AC-1
+    given: 这个账号还没有向任何 Bot 发过消息，也没有关闭过首次任务引导
+    when: 第一次打开一个尚未开始对话的 Bot
+    then: 看到「让 Bot 完成第一件事」，可以选示例或直接说明目标
+  - id: AC-2
+    given: 新用户已经在一个 Bot 上看到过首次任务引导，还没关闭，也还没发过消息
+    when: 新建或切换到另一个尚未开始对话的 Bot
+    then: 另一个 Bot 不显示该引导
+  - id: AC-3
+    given: 新用户还没关闭引导，也还没发过消息
+    when: 刷新或重新进入当时出现引导的那个 Bot
+    then: 引导仍在，输入框里已有的草稿还在
+  - id: AC-4
+    given: 这个账号已经向任意 Bot 发过消息，或已经关闭过首次任务引导
+    when: 新建 Bot 并打开它尚未开始的对话，包括刷新和再次进入
+    then: 不显示「让 Bot 完成第一件事」
