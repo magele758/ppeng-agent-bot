@@ -228,7 +228,7 @@
     "packages/core/src/stores/migrations/index.ts": "0053af1717ff1cc62755cf1cf1c1d47916388be957a6d53439133cc9789753f7",
     "packages/core/src/approval/unattended-approval.ts": "74aff0a40282eaffa6a84610d4c0e2550f94eee268c99ea72f80b1b44879ebfd",
     "packages/core/test/unattended-approval-writer-scope.test.js": "23c17f903361bc53bbb0b7733eb4bf9147b4977c4dc546f800862cf2856b9371",
-    "packages/core/src/bots/bot-work.ts": "253cb2cb6a979ee41392862a16e9312b956f65691a732db7ee78b8bff1384c86",
+    "packages/core/src/bots/bot-work.ts": "e43652e5224e649432afaf6f7d1fc88656c113f444d1897bcbd9cbffd0040970",
     "packages/core/src/runtime/subagent-policy.ts": "e88cb316e439ba84f678e808cbdd9b4f73aea119d264c57f971934d5887297d3",
     "packages/core/src/sandbox/model-isolation.ts": "3b768d8f5592180ba2bd30636819da17190361ad2f5523aec6bbd9c670f43600",
     "packages/core/src/runtime/spawn-host.ts": "7cc8c4c07a3ef330ae330d4a1da6d55b72d37ca262f543ff6040544e7862c15d",
@@ -267,7 +267,7 @@
     "packages/core/src/bots/bot-delivery.ts": "aa190739668d35a81bc19c9e72f97994cdfd5290fbd10eae97d063c18734d5aa",
     "packages/core/src/runtime/request-metrics.ts": "3a9d916493b1f0c789853af2e71a0f6f72b940253045581d803608c5c2c2aa3a",
     "packages/core/src/skill-proposals/capture.ts": "3e68543bf909752fb490ace1bc56a34e0602d7dc0333a45e670d18f023d757eb",
-    "packages/core/src/skill-proposals/management.ts": "2221c3cadb721f1de2965365ccf79e45b7ab0f82e1b20809fde9199d74a49fc9",
+    "packages/core/src/skill-proposals/management.ts": "e8812054dd996203a6da64e9e6aef2c4f1a4fc3391408cce7f7927973d1e7e8a",
     "packages/core/src/runtime/spawn-policy.ts": "4889022804d3797796d018abfbe084a2373f1bf630098c6470d932a0c67ebabd",
     "packages/core/src/memory/bot-memory-scope.ts": "bffdcf6cf3e848ea1f2fcc5059b54345d3ee9d49ff98b3a57e917e88593d50c9",
     "packages/core/src/tools/product-admin-tools.ts": "066b993af96e9ad4ab2997344143dda31fea6a551af46488e9555c1364c2c887"

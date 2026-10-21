@@ -184,7 +184,7 @@
     "packages/core/src/runtime.ts": "9131ca818fe270960eaa8dc039e62c55b4d8ce62e883bb2ca1b8db085c4238dd",
     "packages/core/src/storage.ts": "d4530e2ad8547119cf6fba7c0e7e4a7b360ba17c0095365e554178ee50f1bf98",
     "packages/core/src/stores/session-store.ts": "fbe877421acdc97a69fbe67d2e3be300d5ebd811c748d2d227aedddff2d38446",
-    "packages/core/src/bots/bot-work.ts": "253cb2cb6a979ee41392862a16e9312b956f65691a732db7ee78b8bff1384c86",
+    "packages/core/src/bots/bot-work.ts": "e43652e5224e649432afaf6f7d1fc88656c113f444d1897bcbd9cbffd0040970",
     "packages/core/src/runtime/subagent-policy.ts": "e88cb316e439ba84f678e808cbdd9b4f73aea119d264c57f971934d5887297d3",
     "packages/core/src/runtime/session-control.ts": "adcb4cefa9ae95ec4fc63bba169d865b1b44f9829f21f4c78c149f8877fdeb01",
     "packages/core/src/runtime/session-facade.ts": "446b5d01582f4deb5dcd567929c2c05c39ca1b7b3cdfd0678e65329c5e2b29ac",
@@ -280,7 +280,7 @@
     "packages/core/src/bots/bot-delivery.ts": "aa190739668d35a81bc19c9e72f97994cdfd5290fbd10eae97d063c18734d5aa",
     "packages/core/src/runtime/request-metrics.ts": "3a9d916493b1f0c789853af2e71a0f6f72b940253045581d803608c5c2c2aa3a",
     "packages/core/src/skill-proposals/capture.ts": "3e68543bf909752fb490ace1bc56a34e0602d7dc0333a45e670d18f023d757eb",
-    "packages/core/src/skill-proposals/management.ts": "2221c3cadb721f1de2965365ccf79e45b7ab0f82e1b20809fde9199d74a49fc9",
+    "packages/core/src/skill-proposals/management.ts": "e8812054dd996203a6da64e9e6aef2c4f1a4fc3391408cce7f7927973d1e7e8a",
     "packages/core/src/runtime/spawn-policy.ts": "4889022804d3797796d018abfbe084a2373f1bf630098c6470d932a0c67ebabd",
     "packages/core/src/memory/bot-memory-scope.ts": "bffdcf6cf3e848ea1f2fcc5059b54345d3ee9d49ff98b3a57e917e88593d50c9",
     "packages/core/src/tools/product-admin-tools.ts": "066b993af96e9ad4ab2997344143dda31fea6a551af46488e9555c1364c2c887"

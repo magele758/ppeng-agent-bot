@@ -391,6 +391,26 @@ function cssEscape(value: string): string {
   return value.replace(/["\\]/g, '\\$&');
 }
 
+/** Pixels to add to scrollTop so a held row stays at the saved viewport Y. Zero when it already matches. */
+export function viewportAnchorDelta(rowTop: number, savedTop: number): number {
+  const delta = rowTop - savedTop;
+  return Math.abs(delta) > 1 ? delta : 0;
+}
+
+export function feedNearBottom(feed: { scrollHeight: number; scrollTop: number; clientHeight: number } | null): boolean {
+  if (!feed) return true;
+  return feed.scrollHeight - feed.scrollTop - feed.clientHeight <= 16;
+}
+
+export function railToggleIntent(
+  nearBottom: boolean,
+  anchor: { key?: string; offset?: number; top: number; height: number },
+  absoluteTop: number
+): FeedScrollIntent {
+  if (nearBottom) return planFeedScroll('bottom', true, anchor).intent;
+  return { kind: 'viewport', top: absoluteTop, key: anchor.key };
+}
+
 export function planFeedScroll(
   kind: 'bottom' | 'pin' | 'prepend',
   stickToBottom: boolean,

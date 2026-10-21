@@ -1,6 +1,6 @@
 'use client';
 
-import { planFeedScroll, readFeedAnchor } from '@/lib/feed-window';
+import { feedNearBottom, planFeedScroll, railToggleIntent, readFeedAnchor, viewportAnchorDelta } from '@/lib/feed-window';
 import { WorkspaceIcon } from './WorkspaceIcon';
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
@@ -324,8 +324,7 @@ export function PlayPanel({
       if (stopped || intent?.kind !== 'viewport' || !intent.key) return;
       const row = feed.querySelector<HTMLElement>(`[data-feed-key="${CSS.escape(intent.key)}"]`);
       if (!row) return;
-      const delta = row.getBoundingClientRect().top - intent.top;
-      if (Math.abs(delta) > 1) feed.scrollTop += delta;
+      feed.scrollTop += viewportAnchorDelta(row.getBoundingClientRect().top, intent.top);
     };
     const tick = () => {
       if (stopped) return;
@@ -1003,12 +1002,10 @@ export function PlayPanel({
                 <button type="button" className="btn btn-ghost rail-toggle" aria-label={t(railCollapsed ? 'polish.expandRail' : 'polish.collapseRail')} title={t(railCollapsed ? 'polish.expandRail' : 'polish.collapseRail')} aria-expanded={!railCollapsed} onClick={() => {
                   const feed = chat.playMessagesRef.current;
                   const anchor = readFeedAnchor(feed);
-                  const nearBottom = !feed || feed.scrollHeight - feed.scrollTop - feed.clientHeight <= 16;
+                  const nearBottom = feedNearBottom(feed);
                   if (!nearBottom) chat.playStickToBottomRef.current = false;
                   const absoluteTop = (feed?.getBoundingClientRect().top ?? 0) + (anchor.offset ?? 0);
-                  chat.feedScrollIntentRef.current = nearBottom
-                    ? planFeedScroll('bottom', true, anchor).intent
-                    : { kind: 'viewport', top: absoluteTop, key: anchor.key };
+                  chat.feedScrollIntentRef.current = railToggleIntent(nearBottom, anchor, absoluteTop);
                   setRailCollapsed((value) => !value);
                 }}><WorkspaceIcon kind="panel" /></button>
                 {accountMenu}
