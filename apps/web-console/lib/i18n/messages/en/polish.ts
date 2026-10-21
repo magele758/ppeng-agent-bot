@@ -37,6 +37,7 @@ export const polish = {
   "sourcePreview": "Source content",
   "sourceUnavailable": "Source unavailable or access denied.",
   "requestTitle": "Latest sent request",
+  "requestTurnTitle": "Sent request {turn}",
   "estimate": "Estimate at send time",
   "actual": "Upstream input usage",
   "preview": "Next request preview (estimate)",

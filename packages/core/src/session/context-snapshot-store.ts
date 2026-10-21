@@ -15,6 +15,10 @@ const CONTEXT_SNAPSHOT_LIMIT = (() => {
   return Number.isFinite(v) && v >= 1 && v <= 10_000 ? Math.floor(v) : 50;
 })();
 
+export function contextSnapshotRetentionLimit(): number {
+  return CONTEXT_SNAPSHOT_LIMIT;
+}
+
 /** Sessions whose latest-row fingerprint digest stays in memory (LRU). */
 const FINGERPRINT_CACHE_LIMIT = 512;
 

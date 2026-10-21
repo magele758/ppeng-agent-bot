@@ -36,6 +36,12 @@ export interface ContextSnapshot {
   turn: number;
   createdAt: string;
   blocks: ContextSnapshotBlock[];
+  /** Send-time estimate for this prepare. Absent when that send was not metered. */
+  estimatedTokens?: number;
+  windowTokens?: number;
+  /** Upstream input tokens for this send. Omitted when the provider did not report them. */
+  actualInputTokens?: number;
+  sentAt?: string;
 }
 
 export interface ContextSnapshotWriteStore {
