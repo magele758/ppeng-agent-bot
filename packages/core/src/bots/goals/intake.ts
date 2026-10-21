@@ -79,22 +79,28 @@ export async function classifyGoalIntents(raw: string, goals: GoalIntakeContext[
     if (typeof output === 'string' && output.length > 16000) return fallback;
     const decoded = typeof output === 'string' ? JSON.parse(output) : output;
     if (!decoded || !Array.isArray(decoded.intents) || !decoded.intents.length || decoded.intents.length > 8) return fallback;
-    const explicit = raw.match(targetPattern)?.[1];
-    const allowed = new Set(['new_goal', 'amend_goal', 'query', 'pause', 'resume', 'cancel', 'reprioritize', 'chat']);
-    const proposals: GoalIntentProposal[] = [];
-    for (const item of decoded.intents) {
-      if (!item || !allowed.has(item.kind) || typeof item.text !== 'string' || !item.text.trim() || !raw.includes(item.text)) return fallback;
-      if (item.goalId !== undefined && (typeof item.goalId !== 'string' || !goals.some(goal => goal.id === item.goalId))) return fallback;
-      if (explicit && item.goalId !== explicit) return fallback;
-      const baseline = classifyGoalMessage(item.text);
-      if (['query', 'chat'].includes(baseline.kind) && item.kind !== baseline.kind) return fallback;
-      if (['pause', 'cancel', 'resume'].includes(item.kind) && baseline.kind !== item.kind) return fallback;
-      if (item.kind === 'reprioritize' && (!Number.isSafeInteger(item.priority) || Math.abs(item.priority) > 100)) return fallback;
-      proposals.push({ kind: item.kind, text: item.text, ...(item.goalId ? { goalId: item.goalId } : {}), ...(item.kind === 'reprioritize' ? { priority: item.priority } : {}) } as GoalIntentProposal);
-    }
+    const proposals = validateGoalProposals(raw, goals, decoded.intents);
+    if (!proposals) return fallback;
     // A model must not silently drop an independently recognized query or control clause.
     if (fallback.length > 1 && fallback.some(intent => !proposals.some(proposal => proposal.text.includes(intent.text)))) return fallback;
     return proposals;
   } catch { return fallback; }
   finally { if (timeout) clearTimeout(timeout); controller.abort(); }
+}
+
+function validateGoalProposals(raw: string, goals: GoalIntakeContext[], items: Array<{kind:string;text:string;goalId?:string;priority?:number}>): GoalIntentProposal[] | undefined {
+    const explicit = raw.match(targetPattern)?.[1];
+    const allowed = new Set(['new_goal', 'amend_goal', 'query', 'pause', 'resume', 'cancel', 'reprioritize', 'chat']);
+    const proposals: GoalIntentProposal[] = [];
+    for (const item of items) {
+      if (!item || !allowed.has(item.kind) || typeof item.text !== 'string' || !item.text.trim() || !raw.includes(item.text)) return undefined;
+      if (item.goalId !== undefined && (typeof item.goalId !== 'string' || !goals.some(goal => goal.id === item.goalId))) return undefined;
+      if (explicit && item.goalId !== explicit) return undefined;
+      const baseline = classifyGoalMessage(item.text);
+      if (['query', 'chat'].includes(baseline.kind) && item.kind !== baseline.kind) return undefined;
+      if (['pause', 'cancel', 'resume'].includes(item.kind) && baseline.kind !== item.kind) return undefined;
+      if (item.kind === 'reprioritize' && (!Number.isSafeInteger(item.priority) || Math.abs(item.priority!) > 100)) return undefined;
+      proposals.push({ kind: item.kind, text: item.text, ...(item.goalId ? { goalId: item.goalId } : {}), ...(item.kind === 'reprioritize' ? { priority: item.priority } : {}) } as GoalIntentProposal);
+    }
+    return proposals;
 }

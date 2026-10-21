@@ -1,3 +1,4 @@
+import type { BotGoalService } from './service.js';
 import type { MessagePart, SessionRecord } from '../../types.js';
 import { createLogger } from '../../logger.js';
 import { stableJsonHash } from '../../runtime/helpers.js';
@@ -194,18 +195,7 @@ export async function tickBotGoals(host: GoalRuntimeHost): Promise<void> {
    const {service,botId} = scope;
    for (const goal of service.list(botId)) {
     if (goal.wait && goal.draining) drainExternal(host,parent,goal,service.executions(botId,goal.id));
-    for (const execution of service.executions(botId,goal.id).filter(e => e.status === 'running')) {
-     const session = execution.sessionId ? host.store.getSession(execution.sessionId) : undefined;
-     const running = session && host.isRunning(session.id);
-     if (session && goal.status === 'running' && resumeApprovedDispatch(host,session,goal,execution)) continue;
-     if (goal.status === 'paused' || goal.status === 'cancelled') {
-      if (running) host.cancel(session.id);
-      if (!session || !host.isRunning(session.id)) service.report(botId,execution.id,{kind:'cancelled',summary:'Execution stopped following user control',owner:execution.owner,fence:execution.fence});
-     } else if (session && (running || session.status === 'waiting_approval')) {
-      if (execution.leaseUntil > Date.now()) service.updateExecution(botId,execution.id,{leaseUntil:Date.now()+service.readSettings().leaseMs});
-      else { host.cancel(session.id); service.block(botId,goal.id,'Execution lease expired; stopping before recovery'); }
-     }
-    }
+    maintainGoalExecutions(host,goal,service,botId);
    }
    service.recover(botId);
    for (const goal of service.list(botId).filter(g => g.status === 'waiting')) {
@@ -225,4 +215,19 @@ export async function tickBotGoals(host: GoalRuntimeHost): Promise<void> {
    for (const goal of service.list(botId)) announceGoalState(host,goal);
   }
  } finally { ticking.delete(host.store); }
+}
+
+function maintainGoalExecutions(host:GoalRuntimeHost,goal:BotGoal,service:BotGoalService,botId:string):void {
+    for (const execution of service.executions(botId,goal.id).filter(e => e.status === 'running')) {
+     const session = execution.sessionId ? host.store.getSession(execution.sessionId) : undefined;
+     const running = session && host.isRunning(session.id);
+     if (session && goal.status === 'running' && resumeApprovedDispatch(host,session,goal,execution)) continue;
+     if (goal.status === 'paused' || goal.status === 'cancelled') {
+      if (running) host.cancel(session.id);
+      if (!session || !host.isRunning(session.id)) service.report(botId,execution.id,{kind:'cancelled',summary:'Execution stopped following user control',owner:execution.owner,fence:execution.fence});
+     } else if (session && (running || session.status === 'waiting_approval')) {
+      if (execution.leaseUntil > Date.now()) service.updateExecution(botId,execution.id,{leaseUntil:Date.now()+service.readSettings().leaseMs});
+      else { host.cancel(session.id); service.block(botId,goal.id,'Execution lease expired; stopping before recovery'); }
+     }
+    }
 }

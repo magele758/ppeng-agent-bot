@@ -201,24 +201,7 @@ export class SkillManagementService {
     input: SkillManagementInput,
     authorization?: "user",
   ): Promise<SkillOperation> {
-    if ("body" in input) throw Error("Submit intent only, not a skill body");
-    if (JSON.stringify(input).length > 6000)
-      throw Error("Skill operation is too large");
-    if (findSecretLikeContent(JSON.stringify(input)))
-      throw Error("Possible secret in skill operation");
-    if (input.action === "create" && !isValidSkillProposalName(input.name))
-      throw Error("Invalid skill name");
-    if (
-      ![
-        "create",
-        "update",
-        "share",
-        "unshare",
-        "set_sharing",
-        "delete",
-      ].includes(input.action)
-    )
-      throw Error("Unknown skill operation");
+    validateManagementInput(input);
     const owner = this.deps.getBotId(session);
     if (!owner) throw Error("A Bot context is required");
     const requestKey = this.deps.requestKey?.(session);
@@ -486,4 +469,25 @@ export function createSkillManageTool(
       }
     },
   };
+}
+
+function validateManagementInput(input:SkillManagementInput):void {
+    if ("body" in input) throw Error("Submit intent only, not a skill body");
+    if (JSON.stringify(input).length > 6000)
+      throw Error("Skill operation is too large");
+    if (findSecretLikeContent(JSON.stringify(input)))
+      throw Error("Possible secret in skill operation");
+    if (input.action === "create" && !isValidSkillProposalName(input.name))
+      throw Error("Invalid skill name");
+    if (
+      ![
+        "create",
+        "update",
+        "share",
+        "unshare",
+        "set_sharing",
+        "delete",
+      ].includes(input.action)
+    )
+      throw Error("Unknown skill operation");
 }

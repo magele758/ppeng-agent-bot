@@ -623,3 +623,23 @@ test('reminder: every N iterations on the user side, off by default', () => {
   writeSkillProposalSettings(s, { enabled: false });
   assert.equal(buildSkillProposeReminder({ ...base, turn: 4 }), '');
 });
+
+test('startup resolves interrupted revoke according to the durable approval decision', async t => {
+ const {renameSync}=await import('node:fs');
+ for(const decision of ['approved','revoked']) {
+  await t.test(decision,t=>{
+   const dir=tmp('proposal-recovery');t.after(()=>rmSync(dir,{recursive:true,force:true}));
+   const store=new SkillProposalStore(dir);
+   const proposal=store.create({...GOOD,sessionId:'s'});const approved=store.approve(proposal.id);
+   const target=join(dir,approved.installedPath,'..');
+   const backup=join(dir,'skill-proposals',proposal.id+'.revoking');
+   renameSync(target,backup);
+   if(decision==='revoked')writeFileSync(join(dir,'skill-proposals',proposal.id+'.json'),JSON.stringify({...approved,status:'revoked'}));
+   const recovered=new SkillProposalStore(dir);
+   assert.equal(recovered.get(proposal.id).status,decision);
+   assert.equal(existsSync(target),decision==='approved');
+   assert.equal(existsSync(backup),false);
+   if(decision==='approved')assert.match(readFileSync(join(target,'SKILL.md'),'utf8'),/Deploy staging/);
+  });
+ }
+});

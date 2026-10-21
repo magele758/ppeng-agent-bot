@@ -1,6 +1,6 @@
 import type { KernelHookListener } from '@ppeng/agent-loop';
 import { goalScope, type GoalRuntimeHost } from './runtime-host.js';
-import type { GoalReport } from './types.js';
+import type { BotGoal, GoalExecution, GoalReport } from './types.js';
 
 interface BudgetMarker {
  goalId: string;
@@ -27,27 +27,7 @@ export function observeGoalBudget(host:GoalRuntimeHost,sessionId:string):KernelH
   if(!goal||['completed','cancelled','failed','paused'].includes(goal.status))return;
   const executions=scope.service.executions(scope.botId,goal.id);
   const active=executions.filter(e=>e.status==='running');
-  const sessions=new Map<string,{execution:boolean;cost:number}>();
-  for(const execution of active) {
-   const owner=execution.sessionId?host.store.getSession(execution.sessionId):undefined;
-   if(!owner)continue;
-   sessions.set(owner.id,{execution:true,cost:Math.max(0,finiteCost(owner.metadata.usageCostUsd)-finiteCost(owner.metadata.botGoalCostStart))});
-  }
-  // Only references returned by authorized dispatch count; arbitrary child metadata cannot charge a goal.
-  for(const execution of executions) {
-   const owner=execution.sessionId?host.store.getSession(execution.sessionId):undefined;
-   const refs=owner?.metadata.botGoalAuthorizedWaits;
-   if(!Array.isArray(refs))continue;
-   for(const ref of refs as WaitReference[]) {
-    if(ref.goalId!==goal.id||ref.source!=='session'||typeof ref.correlationId!=='string')continue;
-    if(ref.executionId&&ref.executionId!==execution.id)continue;
-    if(execution.status!=='running'&&!(goal.wait?.source==='session'&&goal.wait.correlationId===ref.correlationId))continue;
-    const worker=host.store.getSession(ref.correlationId);
-    if(!worker||worker.metadata.botGoalId!==goal.id||worker.metadata.botGoalScopeSessionId!==scope.sessionId||worker.metadata.botId!==scope.botId)continue;
-    if(sessions.has(worker.id)||executions.some(e=>e.sessionId===worker.id))continue;
-    sessions.set(worker.id,{execution:false,cost:finiteCost(worker.metadata.usageCostUsd)});
-   }
-  }
+  const sessions=goalSessionCosts(host,scope,goal,executions,active);
   const spentUsd=goal.costUsd+[...sessions.values()].reduce((sum,s)=>sum+s.cost,0);
   if(spentUsd<goal.budgetUsd)return;
   const reason=`Goal budget exhausted (${spentUsd.toFixed(6)} USD / ${goal.budgetUsd.toFixed(6)} USD); current output retained`;
@@ -69,4 +49,29 @@ export function preserveGoalBudgetReport(host:GoalRuntimeHost,sessionId:string,r
  const marker=session?.metadata.botGoalBudgetExceeded as BudgetMarker|undefined;
  if(!session||!marker||marker.goalId!==session.metadata.botGoalId||!marker.executionIds.includes(String(session.metadata.botGoalExecutionId)))return report;
  return {...report,kind:'blocked',summary:marker.reason,verified:false,advanced:false};
+}
+
+function goalSessionCosts(host:GoalRuntimeHost,scope:NonNullable<ReturnType<typeof goalScope>>,goal:BotGoal,executions:GoalExecution[],active:GoalExecution[]):Map<string,{execution:boolean;cost:number}> {
+  const sessions=new Map<string,{execution:boolean;cost:number}>();
+  for(const execution of active) {
+   const owner=execution.sessionId?host.store.getSession(execution.sessionId):undefined;
+   if(!owner)continue;
+   sessions.set(owner.id,{execution:true,cost:Math.max(0,finiteCost(owner.metadata.usageCostUsd)-finiteCost(owner.metadata.botGoalCostStart))});
+  }
+  // Only references returned by authorized dispatch count; arbitrary child metadata cannot charge a goal.
+  for(const execution of executions) {
+   const owner=execution.sessionId?host.store.getSession(execution.sessionId):undefined;
+   const refs=owner?.metadata.botGoalAuthorizedWaits;
+   if(!Array.isArray(refs))continue;
+   for(const ref of refs as WaitReference[]) {
+    if(ref.goalId!==goal.id||ref.source!=='session'||typeof ref.correlationId!=='string')continue;
+    if(ref.executionId&&ref.executionId!==execution.id)continue;
+    if(execution.status!=='running'&&!(goal.wait?.source==='session'&&goal.wait.correlationId===ref.correlationId))continue;
+    const worker=host.store.getSession(ref.correlationId);
+    if(!worker||worker.metadata.botGoalId!==goal.id||worker.metadata.botGoalScopeSessionId!==scope.sessionId||worker.metadata.botId!==scope.botId)continue;
+    if(sessions.has(worker.id)||executions.some(e=>e.sessionId===worker.id))continue;
+    sessions.set(worker.id,{execution:false,cost:finiteCost(worker.metadata.usageCostUsd)});
+   }
+  }
+ return sessions;
 }

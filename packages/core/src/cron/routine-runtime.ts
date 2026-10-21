@@ -167,6 +167,9 @@ function summarize(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):
  if(parent&&parent.id!==run.mainSessionId){runs.update(run.id,{mainSessionId:parent.id});run.mainSessionId=parent.id;}
  if(!parent){const roomDelivery=postRoomResult(host,run);if(roomDelivery?.status==='delivered')host.store.setDaemonControl(`routine.last-published:${run.routineId}`,run.result?.trim()??'');runs.update(run.id,{notificationSent:true,...(roomDelivery?{roomDelivery}:{})});return;}
  if(parent.status==='running'||parent.status==='waiting_approval'||host.isSessionRunning?.(parent.id))return;
+ appendRoutineSummary(host,runs,run);
+}
+function appendRoutineSummary(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):void {
  const description=run.result||run.error||run.status;
  // Insert the summary and notification marker atomically. No user instruction or private run transcript.
  const ownTransaction=!host.store.db.isTransaction;if(ownTransaction)host.store.db.exec('BEGIN IMMEDIATE');

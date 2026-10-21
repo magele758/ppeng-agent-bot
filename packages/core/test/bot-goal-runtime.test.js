@@ -56,3 +56,53 @@ test('real runtime continues an unfinished goal after a returned turn and verifi
   await tickBotGoals(runtime.goalRuntimeHost());assert.equal(service.list(bot.id)[0].attempts,2);
  }finally{await runtime.destroy();}
 });
+
+test('goal checkpoints validate assignment and authorized waits before preserving evidence', async () => {
+ const {createGoalCheckpointTool}=await import('../dist/bots/goals/runtime-host.js');
+ const runtime=new RawAgentRuntime({repoRoot:mkdtempSync(join(tmpdir(),'checkpoint-repo-')),stateDir:mkdtempSync(join(tmpdir(),'checkpoint-state-'))});
+ try {
+  const bot=runtime.createBot({name:'Checkpoint'});const sid=runtime.openBot(bot.id).sessionId;
+  const service=new BotGoalService(runtime.store,Date.now,sid);
+  const goal=service.create({botId:bot.id,sessionId:sid,title:'Check',objective:'Verify result'});
+  const tool=createGoalCheckpointTool(runtime.store);
+  const invoke=args=>tool.execute({session:runtime.getSession(sid)},args);
+  assert.equal((await invoke({kind:'progress',summary:'no assignment'})).ok,false);
+  runtime.store.updateSession(sid,{metadata:{...runtime.getSession(sid).metadata,botGoalId:goal.id}});
+  assert.equal((await invoke({kind:'invalid',summary:'invalid'})).ok,false);
+  assert.equal((await invoke({kind:'progress',summary:'Measured result',evidence:['proof',123],nextStep:'Verify'})).ok,true);
+  const checkpoint=runtime.getSession(sid).metadata.botGoalCheckpoint;
+  assert.deepEqual(checkpoint.evidence,['proof']);assert.equal(checkpoint.nextStep,'Verify');
+  assert.equal((await invoke({kind:'waiting',summary:'untrusted',wait:{source:'session',correlationId:'foreign'}})).ok,false);
+  assert.deepEqual(runtime.getSession(sid).metadata.botGoalCheckpoint,checkpoint);
+  runtime.store.updateSession(sid,{metadata:{...runtime.getSession(sid).metadata,botGoalAuthorizedWaits:[{goalId:goal.id,source:'session',correlationId:'worker'}]}});
+  assert.equal((await invoke({kind:'waiting',summary:'Waiting for worker',wait:{source:'session',correlationId:'worker'}})).ok,true);
+  assert.deepEqual(runtime.getSession(sid).metadata.botGoalCheckpoint.wait,{source:'session',correlationId:'worker'});
+  assert.equal(service.get(bot.id,goal.id).status,'queued','a checkpoint alone never completes a goal');
+ }finally{await runtime.destroy();}
+});
+
+test('goal intake coordinates queries, ambiguous references and controls of active executions', async () => {
+ const {prepareGoalIntake}=await import('../dist/bots/goals/runtime-host.js');
+ const runtime=new RawAgentRuntime({repoRoot:mkdtempSync(join(tmpdir(),'intake-repo-')),stateDir:mkdtempSync(join(tmpdir(),'intake-state-'))});
+ try {
+  const bot=runtime.createBot({name:'Intake'});const sid=runtime.openBot(bot.id).sessionId;
+  const service=new BotGoalService(runtime.store,Date.now,sid);
+  const goal=service.create({botId:bot.id,sessionId:sid,title:'Fix',objective:'Fix login'});
+  const execution=service.claim(bot.id,goal.id,{strategy:'direct'});
+  const worker=runtime.store.createSession({title:'Worker',mode:'subagent',agentId:bot.agentId,parentSessionId:sid,metadata:{botId:bot.id,botGoalScopeSessionId:sid}});
+  service.updateExecution(bot.id,execution.id,{sessionId:worker.id});
+  const cancelled=[];
+  const host={store:runtime.store,cancel:id=>cancelled.push(id)};
+  async function intake(text){runtime.sendUserMessage(sid,text,{autoRun:true});await prepareGoalIntake(host,runtime.getSession(sid));}
+  await intake(`[goal:${goal.id}] 不要修改已有数据`);
+  assert.deepEqual(cancelled,[worker.id]);assert.deepEqual(service.get(bot.id,goal.id).constraints,['不要修改已有数据']);
+  await intake(`[goal:${goal.id}] 暂停`);
+  assert.deepEqual(cancelled,[worker.id,worker.id]);assert.equal(service.get(bot.id,goal.id).status,'paused');
+  await intake('现在进度怎么样？');
+  await intake('[goal:missing] 修改部署配置');
+  const steers=runtime.store.listUnclaimedInbox(sid);
+  assert.ok(steers.some(s=>s.text.includes('[goal status]')));
+  assert.ok(steers.some(s=>s.text.includes('ambiguous goal reference')));
+  assert.equal(service.list(bot.id).length,1);
+ }finally{await runtime.destroy();}
+});

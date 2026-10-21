@@ -18,6 +18,10 @@ export function isGoalWorkerCurrent(store:SqliteStateStore,session:SessionRecord
  if(!owner||owner.metadata.botId!==botId||(owner.id!==scopeId&&owner.metadata.botGoalScopeSessionId!==scopeId))return false;
  if(goal.status==='running')return goal.activeExecutionId===executionId&&execution.status==='running'&&execution.leaseUntil>Date.now();
  if(goal.status!=='waiting'||execution.status!=='finished'||goal.wait?.source!=='session'||goal.wait.correlationId!==live.id)return false;
+ return hasAuthorizedWorkerWait(owner,goalId,executionId,live.id);
+}
+
+function hasAuthorizedWorkerWait(owner:SessionRecord,goalId:string,executionId:string,workerId:string):boolean {
  const waits=owner.metadata.botGoalAuthorizedWaits;
- return Array.isArray(waits)&&waits.some(wait=>wait?.goalId===goalId&&wait.executionId===executionId&&wait.source==='session'&&wait.correlationId===live.id);
+ return Array.isArray(waits)&&waits.some(wait=>wait?.goalId===goalId&&wait.executionId===executionId&&wait.source==='session'&&wait.correlationId===workerId);
 }

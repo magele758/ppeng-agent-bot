@@ -138,3 +138,22 @@ test('Planner LLM 失败则启发式拆步', async () => {
     ['collect', 'write']
   );
 });
+
+test('starting a plan dispatches ready work with inherited workspace and wakes only its worker', async t => {
+ const dir=mkdtempSync(join(tmpdir(),'team-dispatch-'));const sqlite=new SqliteStateStore(join(dir,'state.db'));
+ t.after(()=>{sqlite.db.close();rmSync(dir,{recursive:true,force:true});});
+ const store=sqlite.teams(),sessions=[],wakes=[];
+ const binding={kind:'project',projectId:'existing-project'};
+ const executor=new TeamDagExecutor({...fakeDeps(store,dir),
+  getSession:id=>id==='parent'?{id,metadata:{workspaceBinding:binding}}:sessions.find(s=>s.id===id),
+  createTeammateSession:input=>{const session={...input,id:'worker-session',agentId:'worker',status:'running'};sessions.push(session);return session;},
+  enqueueSchedulerWake:(...args)=>wakes.push(args),
+  bindWorkspaceForTask:async()=>{assert.fail('host-bound work must not create an isolated fallback');}
+ });
+ const {plan}=await executor.createPlan({objective:'Write report',sessionId:'parent',tasks:[{id:'a',title:'A',role:'worker',dependsOn:[]},{id:'b',title:'B',role:'worker',dependsOn:['a']}]});
+ executor.start(plan.id);await executor.tick();
+ assert.equal(sessions.length,1);assert.deepEqual(sessions[0].metadata.workspaceBinding,binding);
+ assert.match(sessions[0].prompt,/Inherit the host workspace binding/);
+ assert.deepEqual(wakes,[['worker-session','teams.dag.task']]);
+ const saved=store.get(plan.id);assert.equal(saved.tasks[0].status,'running');assert.equal(saved.tasks[1].status,'pending');
+});

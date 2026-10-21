@@ -88,6 +88,11 @@ export class BotGoalService {
    if(e.leaseUntil<=this.clock()){g.status='blocked';g.blockedReason='Execution lease expired; reconcile result before retry';this.event(s,'expired_result',g,result.summary);return g;}
    if(e.goalRevision!==g.revision){g.status='queued';if(result.wait){g.wait=result.wait;g.draining=true;}g.blockedReason='Previous result used outdated constraints; reconciliation required';this.event(s,'stale_result',g,result.summary);return g;}
    g.noProgress=result.advanced === true || (result.advanced === undefined && result.summary&&result.summary!==g.progress)?0:g.noProgress+1;g.progress=result.summary;g.nextStep=result.nextStep;g.blockedReason=undefined;
+   this.applyReportState(s,g,result);
+   if(!terminal.has(g.status))this.limit(g,this.readSettings());this.event(s,'result',g,result.summary);return g;
+  });
+ }
+ private applyReportState(s:GoalSnapshot,g:BotGoal,result:GoalReport):void {
    switch(result.kind){
     case 'candidate_completed':g.status=result.verified&&Boolean(result.evidence?.length)?'completed':'blocked';if(g.status==='blocked')g.blockedReason='Completion evidence requires verification';break;
     case 'waiting':if(!result.wait?.source||!result.wait.correlationId){g.status='blocked';g.blockedReason='Missing durable wait condition';}else{const wake=s.wakeEvents?.find(w=>(!w.goalId||w.goalId===g.id)&&w.source===result.wait!.source&&w.correlationId===result.wait!.correlationId&&(!w.sessionId||w.sessionId===g.sessionId)&&!w.consumedBy.includes(g.id));if(wake){wake.consumedBy.push(g.id);g.status='queued';g.nextStep=`Inspect authorized ${wake.source} result ${wake.correlationId} before continuing`;g.wait=undefined;this.applyWakeData(s,g,wake);}else{g.status='waiting';g.wait=result.wait;}}break;
@@ -96,8 +101,6 @@ export class BotGoalService {
     case 'cancelled':g.status='cancelled';break;
     case 'progress':g.status='queued';break;
    }
-   if(!terminal.has(g.status))this.limit(g,this.readSettings());this.event(s,'result',g,result.summary);return g;
-  });
  }
  private applyWakeData(s:GoalSnapshot,g:BotGoal,event:{summary?:string;evidence?:string[];costUsd?:number}):void{if(event.summary)g.progress=event.summary;g.evidence.push(...(event.evidence??[]));const cost=Number.isFinite(event.costUsd)?Math.max(0,event.costUsd!):0;g.costUsd+=cost;if(g.parentGoalId){const parent=this.find(s,g.parentGoalId);parent.costUsd+=cost;this.limit(parent,this.readSettings());}this.limit(g,this.readSettings());}
  wake(botId:string,event:{goalId?:string;eventId:string;source:string;correlationId:string;summary?:string;evidence?:string[];costUsd?:number}):BotGoal[]{return mutateGoalSnapshot(this.store,botId,s=>{
