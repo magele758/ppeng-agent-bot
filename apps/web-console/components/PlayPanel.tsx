@@ -1089,8 +1089,8 @@ export function PlayPanel({
                 ) : null}
               </div>
               <div className="chat-composer-outer">
-                {headerBotId && selectedSessionId && chat.transcriptReady && !chat.sessionMessages.some(message => message.role === 'user') &&
-                  <BotFirstTask botId={headerBotId} needsModel={chat.needsModelSetup} onChoose={chat.setPlayInput} onConfigureModel={onOpenModelSetup} />}
+                {headerBotId && selectedSessionId && chat.transcriptReady && chat.historyCursor == null && !chat.sessionMessages.some(message => message.role !== 'system') &&
+                  <BotFirstTask key={headerBotId} onDismiss={() => chat.playInputRef.current?.focus({ preventScroll: true })} botId={headerBotId} needsModel={chat.needsModelSetup} onChoose={chat.setPlayInput} onConfigureModel={onOpenModelSetup} />}
                 {chat.needsModelSetup && selectedSessionId ? (
                   <div className="model-setup-banner" role="status">
                     <span>{t('play.chrome.needsModel')}</span>
