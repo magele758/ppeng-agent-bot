@@ -91,3 +91,19 @@
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
+
+.close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.close:hover { background: var(--color-surface-strong); }
+.close:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
