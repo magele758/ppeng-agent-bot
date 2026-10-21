@@ -253,9 +253,9 @@ export const settingsEntries = {
   discovery: {
     title: 'Capability discovery',
     keywords: 'discovery probe allowlist tailscale active scan lan network scan port devices',
-    desc: 'Let the agent discover external capabilities on your network (for example services on Tailscale devices). Everything is off by default.',
+    desc: 'Let the agent discover external capabilities on your network (for example services on Tailscale devices). The master switch is on by default; reading the device list and active scanning stay off by default.',
     fields: {
-      enabled: { label: 'Enable capability discovery', hint: 'Master switch. When off, the other options have no effect.' },
+      enabled: { label: 'Enable capability discovery', hint: 'Master switch, on by default. When off, the other options have no effect.' },
       tailscale: { label: 'Read the Tailscale device list', hint: 'Fetch devices from the local Tailscale to find usable services.' },
       activeScan: { label: 'Allow active scanning', hint: 'Actively send probe requests to allowlisted hosts and ports.' },
       hosts: { label: 'Hosts allowed to be probed', hint: 'Comma separated, e.g. api.example.com.' },

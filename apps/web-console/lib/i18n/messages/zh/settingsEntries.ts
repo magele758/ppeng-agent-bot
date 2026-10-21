@@ -251,9 +251,9 @@ export const settingsEntries = {
   discovery: {
     title: '能力发现',
     keywords: '发现 discovery 探查 白名单 tailscale 主动扫描 局域网 网络扫描 端口 设备',
-    desc: '让 Agent 发现网络里可用的外部能力（例如 Tailscale 设备上的服务）。默认全部关闭。',
+    desc: '让 Agent 发现网络里可用的外部能力（例如 Tailscale 设备上的服务）。总开关默认开启；读取设备列表和主动扫描仍默认关闭。',
     fields: {
-      enabled: { label: '启用能力发现', hint: '总开关；关闭时其余选项都不生效。' },
+      enabled: { label: '启用能力发现', hint: '总开关，默认开启；关闭时其余选项都不生效。' },
       tailscale: { label: '读取 Tailscale 设备列表', hint: '从本机 Tailscale 获取设备，用于发现可用服务。' },
       activeScan: { label: '允许主动扫描', hint: '主动向白名单内的主机和端口发探测请求。' },
       hosts: { label: '允许探查的主机', hint: '用逗号分隔，如 api.example.com。' },

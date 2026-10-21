@@ -31,7 +31,7 @@ interface DiscoveryEffective {
   source: string;
 }
 
-const DEFAULTS = { enabled: false, tailscaleEnabled: false, activeScanEnabled: false } as const;
+const DEFAULTS = { enabled: true, tailscaleEnabled: false, activeScanEnabled: false } as const;
 const LIST_KEYS = ['hostAllowlist', 'cidrAllowlist'] as const;
 const EMPTY_LISTS = { hostAllowlist: '', cidrAllowlist: '' };
 

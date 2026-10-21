@@ -28,6 +28,13 @@ import { bashCommandNeedsApproval } from './bash-command-policy.js';
 import { globWorkspaceFiles } from './glob-files.js';
 import { isVaultMetadataDirName } from './markdown-vault-noise.js';
 import { SENSITIVE_READ_REFUSAL, sensitiveReadRefusal } from '../workspace/sensitive-read.js';
+import {
+  OTHER_BOT_FILE_REFUSAL,
+  SIBLING_FILE_REFUSAL,
+  decideForkSiblingFileRead,
+  filterGrepContent,
+  type ForkSiblingFileFacts
+} from '../bots/fork-sibling-isolation.js';
 import { runWorkspaceGrep } from './grep-workspace.js';
 import { readFileLineRange, shouldStreamReadFile } from './read-file-range.js';
 import { lspSendRequest, parseLspConfigFromEnv } from './lsp-client.js';
@@ -201,6 +208,10 @@ export interface RuntimeToolServices {
   compactContext?: (context: RunContext, opts?: { force?: boolean }) => Promise<string>;
   /** Lab KV for web_search URL; env is CI fallback. */
   webSearchSettingsStore?: WebSettingsReadStore;
+  /** Sibling-file facts for a sub-task read. Missing hook keeps the previous read behavior. */
+  forkSiblingFileFacts?: (context: RunContext) => ForkSiblingFileFacts;
+  /** Record a file this sub-task just created so siblings cannot read it. */
+  noteForkSiblingWrite?: (context: RunContext, absolutePath: string) => void;
 }
 
 // Lazy singleton — native | remote_vm | microservice via RAW_AGENT_AGENT_SANDBOX_KIND
@@ -345,6 +356,37 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
     };
   }
 
+  function forkFacts(context: RunContext): ForkSiblingFileFacts | undefined {
+    return services.forkSiblingFileFacts?.(context);
+  }
+
+  function forkRefusal(facts: ForkSiblingFileFacts | undefined, absolutePath: string): string | undefined {
+    if (!facts) return undefined;
+    const decision = decideForkSiblingFileRead(facts, absolutePath);
+    if (decision.allow) return undefined;
+    switch (decision.kind) {
+      case 'sibling-private':
+        return SIBLING_FILE_REFUSAL;
+      case 'other-bot-private':
+        return OTHER_BOT_FILE_REFUSAL;
+      default: {
+        const unreachable: never = decision;
+        return unreachable;
+      }
+    }
+  }
+
+  async function visibleDirectoryLines(directory: string, facts: ForkSiblingFileFacts | undefined): Promise<string[]> {
+    const entries = await readdir(directory, { withFileTypes: true });
+    const lines: string[] = [];
+    for (const entry of entries) {
+      if (isVaultMetadataDirName(entry.name)) continue;
+      if (forkRefusal(facts, join(directory, entry.name))) continue;
+      lines.push(`${entry.isDirectory() ? 'dir' : 'file'} ${entry.name}`);
+    }
+    return lines;
+  }
+
   const readFileTool: ToolContract<{ path?: string; limit?: number; offset_line?: number }> = {
     name: 'read_file',
     description:
@@ -361,6 +403,7 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
     sideEffectLevel: 'none',
     ptc: { kind: 'read' },
     async execute(context, args) {
+      const facts = forkFacts(context);
       if (!args.path) {
         const roots = context.workspaceRoots?.length
           ? context.workspaceRoots
@@ -370,10 +413,9 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
           if (sensitiveReadRefusal(root.path, undefined, 'directory')) {
             return { ok: false, content: SENSITIVE_READ_REFUSAL };
           }
-          const entries = await readdir(root.path, { withFileTypes: true });
-          const lines = entries
-            .filter((entry) => !isVaultMetadataDirName(entry.name))
-            .map((entry) => `${entry.isDirectory() ? 'dir' : 'file'} ${entry.name}`);
+          const blocked = forkRefusal(facts, root.path);
+          if (blocked) return { ok: false, content: blocked };
+          const lines = await visibleDirectoryLines(root.path, facts);
           blocks.push(`@${root.alias}${root.primary ? ' (primary)' : ''}: ${root.path}\n${lines.join('\n') || '(empty)'}`);
         }
         return {
@@ -386,14 +428,13 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
       const readable = await readableStat(target);
       if (!readable.ok) return { ok: false, content: SENSITIVE_READ_REFUSAL };
       const targetStat = readable.stat;
+      const blocked = forkRefusal(facts, target);
+      if (blocked) return { ok: false, content: blocked };
       const limit = typeof args.limit === 'number' && args.limit > 0 ? args.limit : undefined;
       const offsetLine = typeof args.offset_line === 'number' && args.offset_line >= 0 ? args.offset_line : 0;
 
       if (targetStat.isDirectory()) {
-        const entries = await readdir(target, { withFileTypes: true });
-        const lines = entries
-          .filter((entry) => !isVaultMetadataDirName(entry.name))
-          .map((entry) => `${entry.isDirectory() ? 'dir' : 'file'} ${entry.name}`);
+        const lines = await visibleDirectoryLines(target, facts);
         const sliced =
           limit && lines.length > limit ? [...lines.slice(0, limit), `... (${lines.length - limit} more entries)`] : lines;
         return {
@@ -451,22 +492,33 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
     sideEffectLevel: 'none',
     ptc: { kind: 'read' },
     async execute(context, args) {
+      const facts = forkFacts(context);
       const roots = sandboxWorkspaceRoots(context);
       const max = typeof args.max_matches === 'number' && args.max_matches > 0 ? args.max_matches : 50;
       const ctx = typeof args.context_lines === 'number' && args.context_lines >= 0 ? args.context_lines : 0;
+      const visible = (content: string, cwd: string) => (facts ? filterGrepContent(content, facts, cwd) : content);
       if (roots.length <= 1) {
+        const cwd = roots[0] ?? primaryWorkspacePath(context);
+        const blocked = forkRefusal(facts, cwd);
+        if (blocked) return { ok: false, content: blocked };
         const result = await runWorkspaceGrep({
-          cwd: roots[0] ?? primaryWorkspacePath(context),
+          cwd,
           pattern: args.pattern,
           glob: args.glob,
           maxMatches: max,
           contextLines: ctx
         });
-        return { ok: result.ok, content: result.content };
+        return { ok: result.ok, content: visible(result.content, cwd) };
       }
       const chunks: string[] = [];
       let ok = true;
       for (const root of roots) {
+        const blocked = forkRefusal(facts, root);
+        if (blocked) {
+          ok = false;
+          chunks.push(`[${root}]\n${blocked}`);
+          continue;
+        }
         const result = await runWorkspaceGrep({
           cwd: root,
           pattern: args.pattern,
@@ -475,7 +527,7 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
           contextLines: ctx
         });
         if (!result.ok) ok = false;
-        chunks.push(`[${root}]\n${result.content}`);
+        chunks.push(`[${root}]\n${visible(result.content, root)}`);
       }
       return { ok, content: chunks.join('\n\n') };
     }
@@ -697,8 +749,15 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
     sideEffectLevel: 'workspace',
     async execute(context, args) {
       const target = repoPath(context, args.path);
+      let created = false;
+      try {
+        await stat(target);
+      } catch {
+        created = true;
+      }
       await mkdir(dirname(target), { recursive: true });
       await writeFile(target, args.content, 'utf8');
+      if (created) services.noteForkSiblingWrite?.(context, target);
       await persistCloudFolderAfterWrite(context, target);
       return {
         ok: true,

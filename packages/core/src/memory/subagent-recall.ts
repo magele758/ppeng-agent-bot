@@ -1,6 +1,7 @@
 /**
  * Read-only memory a bot sub-agent may reuse: the parent session's notes
- * and the bot's durable memory. Does not include another bot or the shared pool.
+ * and the bot's user, team, and project memory. Does not include another bot
+ * or the shared pool. An empty match is empty; there is no wider retry.
  */
 
 import { sharedMemoryVisible } from '../bots/shared-context-isolation.js';
@@ -21,7 +22,7 @@ interface MemoryListStore extends BotMemoryLookup {
   ): Array<{ key?: string; value?: string; scope?: string }>;
   agentMemory?(): {
     search(filter: {
-      scope: 'user.memory';
+      scope: 'user.memory' | 'team.memory' | 'project.memory';
       agentId: string;
       userId?: string | null;
       tenantId?: string;
@@ -85,19 +86,20 @@ export function collectSubagentMemoryHits(
   // ponytail: always search bot memory, but use a scoped filter so an ownerless session
   // (no userId, no tenantId) only matches user_id IS NULL rows — not other users' memory.
   // A session with userId searches by userId; a session with only tenantId searches by tenantId.
-  // Both cases cannot widen to another user's rows.
+  // Both cases cannot widen to another user's rows. No second query against the shared pool.
   if (memory) {
-    // ponytail: always search, but never let the filter widen to other users' rows.
-    // userId present → exact match; tenant-only → userId IS NULL + tenantId;
-    // ownerless legacy session → userId IS NULL (no tenantId condition).
-    const rows = userId
-      ? memory.search({ scope: 'user.memory', agentId: access.botAgentId, limit: 40, userId, ...(tenantId ? { tenantId, tenantOrGlobal: true as const } : {}) })
-      : tenantId
-        ? memory.search({ scope: 'user.memory', agentId: access.botAgentId, limit: 40, userId: null, tenantId })
-        : memory.search({ scope: 'user.memory', agentId: access.botAgentId, limit: 40, userId: null });
-    for (const row of rows) {
-      if (!sharedMemoryVisible(store, row)) continue;
-      push(hit('global', row, needle));
+    const durable = ['user.memory', 'team.memory', 'project.memory'] as const;
+    for (const scope of durable) {
+      const toolScope = scope === 'user.memory' ? 'user' : scope === 'team.memory' ? 'team' : 'project';
+      const rows = userId
+        ? memory.search({ scope, agentId: access.botAgentId, limit: 40, userId, ...(tenantId ? { tenantId, tenantOrGlobal: true as const } : {}) })
+        : tenantId
+          ? memory.search({ scope, agentId: access.botAgentId, limit: 40, userId: null, tenantId })
+          : memory.search({ scope, agentId: access.botAgentId, limit: 40, userId: null });
+      for (const row of rows) {
+        if (!sharedMemoryVisible(store, row)) continue;
+        push(hit('global', { ...row, scope: toolScope }, needle));
+      }
     }
   }
   return hits;

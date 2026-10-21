@@ -61,7 +61,7 @@ const { HARNESS_ARTIFACT_DIR, HARNESS_ARTIFACT_FILES } = await import('../types.
  * Bump when `buildStablePrefix` (or any helper that feeds it) changes wording.
  * See `./AGENTS.md`.
  */
-export const STABLE_SYSTEM_VERSION = 'v8';
+export const STABLE_SYSTEM_VERSION = 'v9';
 
 /** Appended when `RAW_AGENT_AGENTIC_SAFETY_APPENDIX` is set; English to match the rest of the stable prefix. */
 export const RUNTIME_AGENTIC_SAFETY_APPENDIX = `Runtime safety appendix (policy text only; does not replace model-level safety training):
@@ -405,6 +405,7 @@ export class PromptBuilder {
       resolveDiscoveryEnabled(this.deps.store, process.env)
         ? 'Capability discovery is enabled: bound tools are not all injected upfront. Prefer tool_search(query) then load_capability_tool(id) before calling a discovered capability. Skills manage playbooks; Tool Search manages the callable tool surface.'
         : '',
+      'Domain tools such as stock quotes and cluster queries are not in the tool list by default. When one is needed, call tool_search(query), then load_capability_tool with the returned name, and call that tool on the next step. Do not search for capabilities the user has turned off.',
       harnessLines.length > 0 ? harnessLines.join('\n') : '',
     ]
       .filter(Boolean)

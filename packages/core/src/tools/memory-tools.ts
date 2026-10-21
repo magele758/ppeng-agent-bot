@@ -1,10 +1,13 @@
 import { sharedMemoryVisible } from '../bots/shared-context-isolation.js';
 import { sourcePage } from '../session/history-retrieval.js';
+import { readWorkingLogTail, workingLogPath } from '../session/working-log.js';
 import type { ToolContract } from '../types.js';
 import {
   resolveBotMemoryAgentId,
+  resolveSubagentMemoryAccess,
   subagentMemorySessionIds,
-  type BotMemoryLookup
+  type BotMemoryLookup,
+  type BotMemorySession
 } from '../memory/bot-memory-scope.js';
 import { evaluateMemoryWrite } from '../memory/memory-gate.js';
 import { isTemporaryMemoryInstruction } from '../memory/memory-dialogue-extract.js';
@@ -40,7 +43,7 @@ export interface ExtendedMemoryToolServices extends MemoryToolServices {
   listAgentMemory?: (input: {
     scope: MemoryScope;
     sessionId?: string;
-    userId?: string;
+    userId?: string | null;
     tenantId?: string;
     tenantOrGlobal?: boolean;
     agentId?: string;
@@ -60,6 +63,7 @@ export interface ExtendedMemoryToolServices extends MemoryToolServices {
   botLookup?: BotMemoryLookup;
 }
 
+const EMPTY_NOTICE = '没有找到';
 const FENCE_OPEN = '«external ';
 const FENCE_CLOSE = '«end external»';
 const SEARCH_EXCERPT_CHARS = 180;
@@ -211,6 +215,45 @@ function agentScopeOf(scope: MemoryToolScope): MemoryScope {
   return mapped;
 }
 
+interface AgentIdentityRow {
+  agentId?: string;
+  tenantId?: string;
+  userId?: string;
+  sessionId?: string;
+}
+
+function agentRowReadable(
+  row: AgentIdentityRow,
+  session: BotMemorySession,
+  services: ExtendedMemoryToolServices,
+  agentId: string | undefined,
+  ids: { userId?: string; tenantId?: string }
+): boolean {
+  if ((row.agentId || undefined) !== agentId) return false;
+  if (row.tenantId && row.tenantId !== ids.tenantId) return false;
+  if (ids.userId) return row.userId === ids.userId;
+  if (resolveSubagentMemoryAccess(session, services.botLookup)) return !row.userId;
+  return row.sessionId === session.id;
+}
+
+function parentWorkingLogItem(
+  context: { stateDir?: string; session: BotMemorySession },
+  services: ExtendedMemoryToolServices
+): MemorySearchItem | undefined {
+  const parentId = resolveSubagentMemoryAccess(context.session, services.botLookup)?.parentSessionId;
+  if (!parentId || parentId === context.session.id || !context.stateDir) return undefined;
+  const value = readWorkingLogTail(workingLogPath(context.stateDir, parentId), 20_000).trim();
+  if (!value) return undefined;
+  return {
+    id: `working-log:${parentId}`,
+    scope: 'long',
+    key: 'parent.working-log',
+    value,
+    updatedAt: '1970-01-01T00:00:00.000Z',
+    importance: 0.4
+  };
+}
+
 function toAgentMemory(item: MemorySearchItem): AgentMemory {
   return {
     id: item.id,
@@ -301,7 +344,8 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
 
   const memoryGetTool: ToolContract<{ scope?: MemoryToolScope; namespace?: string }> = {
     name: 'memory_get',
-    description: 'List memory entries for a scope (scratch|long|user|team|project).',
+    description:
+      'List memory entries for a scope (scratch|long|user|team|project). A bot sub-agent also lists the parent session notes and the user, team, and project memory that bot can use.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -315,8 +359,13 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
     async execute(context, args) {
       const scope = args.scope ?? 'scratch';
       if (SESSION_SCOPES.has(scope)) {
-        const rows = (await services.listSessionMemory(context.session.id, scope as 'scratch' | 'long'))
-          .filter(row => sharedMemoryVisible(services.botLookup ?? {}, row, context.session.id));
+        const sessionIds = subagentMemorySessionIds(context.session, services.botLookup);
+        const ids = sessionIds.length > 0 ? sessionIds : [context.session.id];
+        const rows: unknown[] = [];
+        for (const sessionId of ids) {
+          const listed = await services.listSessionMemory(sessionId, scope as 'scratch' | 'long');
+          rows.push(...listed.filter((row) => sharedMemoryVisible(services.botLookup ?? {}, row, sessionId)));
+        }
         return {
           ok: true,
           content: rows.length > 0 ? JSON.stringify(rows, null, 2) : 'No memory entries.'
@@ -329,13 +378,16 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
       if (!agentScope) {
         return { ok: false, content: `Unknown scope ${scope}` };
       }
-      const ids = resolveIds(context);
       const botAgentId = resolveBotMemoryAgentId(context.session, services.botLookup);
+      const access = resolveSubagentMemoryAccess(context.session, services.botLookup);
+      const ids = access ? retrievalIds(context) : resolveIds(context);
+      const ownerless = Boolean(access) && !ids.userId;
       const rows = (await services.listAgentMemory({
         scope: agentScope,
-        sessionId: context.session.id,
-        userId: ids.userId,
+        ...(access ? {} : { sessionId: context.session.id }),
+        userId: ownerless ? null : ids.userId,
         tenantId: ids.tenantId,
+        ...(access ? { tenantOrGlobal: !ownerless } : {}),
         limit: 40,
         ...(botAgentId ? { agentId: botAgentId } : { agentUnscoped: true })
       })).filter(row => sharedMemoryVisible(services.botLookup ?? {}, row));
@@ -432,7 +484,7 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
   const memorySearchTool: ToolContract<{ query: string; scope?: MemoryToolScope; limit?: number }> = {
     name: 'memory_search',
     description:
-      'Search memories and return the top matching keys with short excerpts. scope: scratch|long|user|team|project; omit to search every scope visible to this session. Does not dump the memory store. Excerpts keep existing «external …» «end external» fences intact.',
+      'Search memories and return the top matching keys with short excerpts. scope: scratch|long|user|team|project; omit to search every scope visible to this session. A bot sub-agent also searches the parent bot\'s notes, team and project memory, and the parent working log. No match is an explicit empty result and does not fall back to other bots or the shared pool. Does not dump the memory store. Excerpts keep existing «external …» «end external» fences intact.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -487,17 +539,25 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
         if (!services.listAgentMemory) continue;
         const ids = retrievalIds(context);
         const botAgentId = resolveBotMemoryAgentId(context.session, services.botLookup);
+        const ownerless = Boolean(resolveSubagentMemoryAccess(context.session, services.botLookup)) && !ids.userId;
         const rows = await services.listAgentMemory({
           scope: agentScopeOf(scope),
-          sessionId: ids.userId ? undefined : context.session.id,
-          userId: ids.userId,
+          sessionId: ids.userId || ownerless ? undefined : context.session.id,
+          userId: ownerless ? null : ids.userId,
           tenantId: ids.tenantId,
-          tenantOrGlobal: true,
+          tenantOrGlobal: !ownerless,
           query,
           limit: Math.max(limit * 4, 24),
           ...(botAgentId ? { agentId: botAgentId } : { agentUnscoped: true })
         });
         pushRows(rows, scope);
+      }
+      if (!requested || requested === 'long') {
+        const log = parentWorkingLogItem(context, services);
+        if (log && !seen.has(log.id)) {
+          seen.add(log.id);
+          items.push(log);
+        }
       }
       const matched = items.filter((item) => lexicalOverlapScore(`${item.key} ${item.value}`, query) > 0);
       const byId = new Map(matched.map((item) => [item.id, item]));
@@ -515,7 +575,9 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
           excerpt: excerptPreservingFences(row.value)
         };
       });
-      return { ok: true, content: JSON.stringify({ matches }, null, 2) };
+      const explicitEmpty = matches.length === 0 && resolveSubagentMemoryAccess(context.session, services.botLookup);
+      const body = explicitEmpty ? { matches, found: false, notice: EMPTY_NOTICE } : { matches };
+      return { ok: true, content: JSON.stringify(body, null, 2) };
     }
   };
 
@@ -537,6 +599,14 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
       let id: string;
       try { id = decodeURIComponent(match[2]!); } catch { return unavailable; }
       let item: MemorySearchItem | undefined;
+      if (scope === 'long' && id.startsWith('working-log:')) {
+        const sessionId = id.slice('working-log:'.length);
+        const parentId = resolveSubagentMemoryAccess(context.session, services.botLookup)?.parentSessionId;
+        if (!context.stateDir || !parentId || sessionId !== parentId) return unavailable;
+        const value = readWorkingLogTail(workingLogPath(context.stateDir, sessionId), 20_000).trim();
+        if (!value) return unavailable;
+        return { ok: true, content: JSON.stringify({ ref: args.ref, scope, key: 'parent.working-log', ...sourcePage(value, args.offset, args.limit) }) };
+      }
       if (SESSION_SCOPES.has(scope)) {
         for (const sessionId of subagentMemorySessionIds(context.session, services.botLookup)) {
           const rows = await services.listSessionMemory(sessionId, scope as 'scratch' | 'long');
@@ -549,17 +619,17 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
         const agentId = resolveBotMemoryAgentId(context.session, services.botLookup);
         // A guessed id must never bypass the identity constraints used by search.
         if (!row || !sharedMemoryVisible(services.botLookup ?? {}, row) || row.scope !== agentScopeOf(scope)
-          || (row.agentId || undefined) !== agentId
-          || (Boolean(row.tenantId) && row.tenantId !== ids.tenantId)
-          || (ids.userId ? row.userId !== ids.userId : row.sessionId !== context.session.id)) return unavailable;
+          || !agentRowReadable(row, context.session, services, agentId, ids)) return unavailable;
         item = readSearchItem(row, scope);
       } else if (services.listAgentMemory) {
         const ids = retrievalIds(context);
         const agentId = resolveBotMemoryAgentId(context.session, services.botLookup);
-        const rows = await services.listAgentMemory({ scope: agentScopeOf(scope), sessionId: ids.userId ? undefined : context.session.id,
-          userId: ids.userId, tenantId: ids.tenantId, tenantOrGlobal: true, limit: 200,
+        const ownerless = Boolean(resolveSubagentMemoryAccess(context.session, services.botLookup)) && !ids.userId;
+        const rows = await services.listAgentMemory({ scope: agentScopeOf(scope),
+          sessionId: ids.userId || ownerless ? undefined : context.session.id,
+          userId: ownerless ? null : ids.userId, tenantId: ids.tenantId, tenantOrGlobal: !ownerless, limit: 200,
           ...(agentId ? { agentId } : { agentUnscoped: true }) });
-        item = rows.filter(row => sharedMemoryVisible(services.botLookup ?? {}, row)).map(row => readSearchItem(row, scope)).find(row => row?.id === id && row.scope === scope);
+        item = rows.filter(row => sharedMemoryVisible(services.botLookup ?? {}, row) && agentRowReadable(row as AgentIdentityRow, context.session, services, agentId, ids)).map(row => readSearchItem(row, scope)).find(row => row?.id === id && row.scope === scope);
       }
       return item ? { ok: true, content: JSON.stringify({ ref: args.ref, scope, key: item.key, ...sourcePage(item.value, args.offset, args.limit) }) } : unavailable;
     }

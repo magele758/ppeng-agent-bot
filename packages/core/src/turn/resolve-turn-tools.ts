@@ -27,6 +27,7 @@ import {
   resolveWebSearchTemplate,
   type WebSettingsReadStore
 } from '../tools/web-settings.js';
+import { readDisclosedToolNames, splitDeferredTools } from '../tools/deferred-disclosure.js';
 import { DYN_META_TOOL_NAMES, SEARCH_DYN_TOOLS_NAME } from '../dyn-tools/types.js';
 import { readDynToolSettings } from '../dyn-tools/settings.js';
 import { tryCreateDynToolStore } from '../dyn-tools/store.js';
@@ -75,7 +76,7 @@ function applyAllowlists<T extends { name: string }>(
   return tools.filter((t) => lists.every((allow) => allow.has(t.name)));
 }
 
-export function filterToolsForSession(input: {
+function authorizeToolsForSession(input: {
   env: NodeJS.ProcessEnv;
   tools: ToolContract<any>[];
   agent: AgentSpec;
@@ -155,6 +156,44 @@ export function filterToolsForSession(input: {
   }
   tools = withSubagentHelp(input.session, tools, input.tools);
   return { allowExternalAiTools, tools: filterFactoryTools(input.session, filterRoomTools(input.session, stripSubagentDeniedTools(input.session, tools)), input.settingsStore) };
+}
+
+function partitionDeferred(
+  agent: AgentSpec,
+  session: SessionRecord,
+  tools: readonly ToolContract<any>[]
+) {
+  return splitDeferredTools({
+    tools,
+    agentAllowedTools: agent.allowedTools,
+    disclosedNames: readDisclosedToolNames(session.metadata)
+  });
+}
+
+export function filterToolsForSession(input: {
+  env: NodeJS.ProcessEnv;
+  tools: ToolContract<any>[];
+  agent: AgentSpec;
+  session: SessionRecord;
+  settingsStore?: WebSettingsReadStore;
+}): { allowExternalAiTools: boolean; tools: ToolContract<any>[] } {
+  const authorized = authorizeToolsForSession(input);
+  return {
+    allowExternalAiTools: authorized.allowExternalAiTools,
+    tools: partitionDeferred(input.agent, input.session, authorized.tools).visible
+  };
+}
+
+/** On-demand tools that passed authorization and are withheld from this turn. */
+export function hiddenDeferredToolsForSession(input: {
+  env: NodeJS.ProcessEnv;
+  tools: ToolContract<any>[];
+  agent: AgentSpec;
+  session: SessionRecord;
+  settingsStore?: WebSettingsReadStore;
+}): ToolContract<any>[] {
+  const authorized = authorizeToolsForSession(input);
+  return partitionDeferred(input.agent, input.session, authorized.tools).hidden;
 }
 
 /** A Room member turn is the only non-canonical session allowed to call message_agent. */
