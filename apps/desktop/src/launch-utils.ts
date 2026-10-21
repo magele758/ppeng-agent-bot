@@ -96,6 +96,7 @@ export function spawnElectronNode(opts: {
   cwd: string;
   env: Record<string, string>;
   name: string;
+  ipc?: boolean;
   onLog?: (chunk: string) => void;
 }): SupervisedChild {
   let logs = '';
@@ -106,7 +107,7 @@ export function spawnElectronNode(opts: {
   const child = spawn(opts.execPath, [opts.script], {
     cwd: opts.cwd,
     env: opts.env,
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: opts.ipc ? ['ignore', 'pipe', 'pipe', 'ipc'] : ['ignore', 'pipe', 'pipe'],
     windowsHide: true
   });
 

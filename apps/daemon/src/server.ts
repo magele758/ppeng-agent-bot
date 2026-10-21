@@ -1,4 +1,7 @@
 import 'dotenv/config';
+import { DesktopUpdateGate } from './desktop-update-gate.js';
+const desktopUpdateGate = new DesktopUpdateGate(process.argv.includes('--desktop-update-validation'));
+const desktopValidation = process.argv.includes('--desktop-update-validation');
 import { randomBytes } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readFileSync } from 'node:fs';
@@ -173,6 +176,7 @@ if (domains.unknown.length > 0) {
 const runtime = new RawAgentRuntime({
   repoRoot,
   stateDir,
+  updateValidation: desktopValidation,
   extraAgents: domains.merged.agents,
   extraTools: domains.merged.tools,
   extraSkills: domains.merged.skills,
@@ -188,7 +192,7 @@ const loopOn = writeLoopSettings(runtime.store, {
 });
 log.info(`loop kernel=${loopOn.kernelVariant} assembly=${loopOn.assemblyPreset}`);
 
-const gatewayCtx = await createGatewayContext(runtime, repoRoot, stateDir);
+const gatewayCtx = desktopValidation ? undefined : await createGatewayContext(runtime, repoRoot, stateDir);
 if (gatewayCtx) {
   log.info(`capability-gateway enabled at ${gatewayCtx.env.pathPrefix}`);
   startGatewayLearnTicker(() => gatewayCtx, (e) => log.error('gateway learn tick failed', e)).unref();
@@ -347,6 +351,17 @@ const app = createDaemonApp({
 
 const server = createServer(async (request, response) => {
   const url = new URL(request.url ?? '/', `http://${host}:${port}`);
+  if (desktopUpdateGate.locked) {
+    if (desktopValidation && url.pathname === '/api/health') {
+      json(response, 200, { ok: true, desktopUpdateValidation: true });
+    } else json(response, 503, { error: 'Desktop update in progress' });
+    return;
+  }
+  const mutation = !['GET', 'HEAD', 'OPTIONS'].includes(request.method ?? 'GET');
+  if (mutation) {
+    desktopUpdateGate.mutations++;
+    response.once('close', () => { desktopUpdateGate.mutations--; });
+  }
   try {
     // API / gateway responses are JSON or SSE — apply non-HTML security headers
     // up-front so even error paths get them (static files reapply their own).
@@ -390,6 +405,7 @@ function warnUnsetOauthPublicOrigin(): void {
 server.listen(port, host, () => {
   log.info(`listening on http://${host}:${port}`);
   warnUnsetOauthPublicOrigin();
+  if (desktopValidation) return;
   void runtime.warmMcp().catch((error) => {
     log.warn('MCP HTTP warm connect failed', errorMessage(error));
   });
@@ -402,12 +418,14 @@ server.listen(port, host, () => {
 // be overlapped by the next one, or the same work gets spawned every 1.5s.
 let schedulerTickInFlight = false;
 const schedulerTimer = setInterval(async () => {
-  if (schedulerTickInFlight) return;
+  if (schedulerTickInFlight || desktopUpdateGate.locked) return;
   schedulerTickInFlight = true;
+  desktopUpdateGate.schedulerRunning = true;
   try {
     await schedulerTick();
   } finally {
     schedulerTickInFlight = false;
+    desktopUpdateGate.schedulerRunning = false;
   }
 }, 1_500);
 schedulerTimer.unref();
@@ -523,3 +541,14 @@ async function shutdown(signal: string): Promise<void> {
 for (const sig of ['SIGTERM', 'SIGINT'] as const) {
   process.on(sig, () => { void shutdown(sig); });
 }
+
+process.on('message', (message: unknown) => {
+  if (!message || typeof message !== 'object') return;
+  if ((message as {type?:string}).type === 'desktop-update-cancel' && !desktopValidation) {
+    desktopUpdateGate.locked = false; runtime.resumeAfterDesktopUpdateCancelled(); return;
+  }
+  if ((message as {type?:string}).type !== 'desktop-update-prepare') return;
+  const activeRows = runtime.store.db.prepare("SELECT count(*) AS n FROM sessions WHERE status IN ('running','queued')").get() as {n:number};
+  const ok = desktopUpdateGate.prepare(runtime.activeExecutionCount + activeRows.n, () => runtime.suspendForDesktopUpdate());
+  process.send?.({ type: 'desktop-update-prepared', ok });
+});

@@ -1,3 +1,4 @@
+import { showUpdate, checkUpdateStartup, updateText } from './update-ui';
 import { app, BrowserWindow, Tray, Menu, shell, dialog } from 'electron';
 import { type ChildProcess } from 'node:child_process';
 import * as path from 'path';
@@ -15,6 +16,12 @@ import {
 
 // 统一 userData 目录名（否则会用 package.json 的 scoped 名 @ppeng/agent-desktop）
 app.setName('agent-desktop');
+const profileDirectory = app.commandLine.getSwitchValue('user-data-dir');
+if (profileDirectory) {
+  fs.mkdirSync(path.resolve(profileDirectory), { recursive: true });
+  app.setPath('userData', path.resolve(profileDirectory));
+}
+if (!app.requestSingleInstanceLock()) app.exit(0);
 if (process.platform === 'win32') {
   app.setAppUserModelId('dev.ppeng.agent');
 }
@@ -250,6 +257,7 @@ async function startDaemon(port: number, authToken: string): Promise<void> {
     cwd: daemonCwd,
     env,
     name: 'Daemon',
+    ipc: true,
     onLog: (chunk) => pipeChildLog('[Daemon]', chunk)
   });
   daemonProcess = child.process;
@@ -421,6 +429,7 @@ function createTray(): void {
       }
     },
     { type: 'separator' },
+    { label: updateText().menu, click: () => { void showUpdate(() => daemonProcess, () => webProcess); } },
     {
       label: 'Open State Directory',
       click: () => {
@@ -487,6 +496,19 @@ app.whenReady().then(async () => {
   console.log('[App] User data:', app.getPath('userData'));
   console.log('[App] Is packaged:', app.isPackaged);
 
+  try {
+    if (!await checkUpdateStartup()) { app.quit(); return; }
+  } catch (error) {
+    dialog.showErrorBox(updateText().error, String(error)); app.quit(); return;
+  }
+  Menu.setApplicationMenu(Menu.buildFromTemplate([
+    { label: 'Raw Agent', submenu: [
+      { role: 'about' },
+      { label: updateText().menu, click: () => { void showUpdate(() => daemonProcess, () => webProcess); } },
+      { type: 'separator' }, { role: 'quit' }
+    ] },
+    { role: 'editMenu' }, { role: 'viewMenu' }, { role: 'windowMenu' }
+  ]));
   createTray();
   await createWindow();
 
