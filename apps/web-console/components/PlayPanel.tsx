@@ -305,18 +305,30 @@ export function PlayPanel({
     const feed = chat.playMessagesRef.current;
     if (!anchor || !feed) return;
     let frame = 0;
-    let remaining = 3;
+    let stopped = false;
+    let stableFrames = 0;
+    let previousLayout = '';
+    const deadline = performance.now() + 500;
     const restore = () => {
+      if (stopped) return;
+      const row = anchor.key ? feed.querySelector<HTMLElement>(`[data-feed-key="${CSS.escape(anchor.key)}"]`) : null;
+      const layout = `${feed.scrollHeight}:${feed.clientWidth}:${feed.clientHeight}:${row?.getBoundingClientRect().top}`;
+      stableFrames = layout === previousLayout ? stableFrames + 1 : 0;
+      previousLayout = layout;
       if (anchor.bottom) feed.scrollTop = feed.scrollHeight - feed.clientHeight;
-      else if (anchor.key) {
-        const row = feed.querySelector<HTMLElement>(`[data-feed-key="${CSS.escape(anchor.key)}"]`);
-        if (row) feed.scrollTop += row.getBoundingClientRect().top - anchor.top;
-      }
-      if (--remaining > 0) frame = requestAnimationFrame(restore);
+      else if (row) feed.scrollTop += row.getBoundingClientRect().top - anchor.top;
+      if (stableFrames < 3 && performance.now() < deadline) frame = requestAnimationFrame(restore);
       else railAnchorRef.current = null;
     };
+    const stop = () => { stopped = true; cancelAnimationFrame(frame); if (railAnchorRef.current === anchor) railAnchorRef.current = null; };
+    feed.addEventListener('wheel', stop, { passive: true });
+    feed.addEventListener('touchstart', stop, { passive: true });
     frame = requestAnimationFrame(restore);
-    return () => cancelAnimationFrame(frame);
+    return () => {
+      stop();
+      feed.removeEventListener('wheel', stop);
+      feed.removeEventListener('touchstart', stop);
+    };
   }, [railCollapsed, chat.playMessagesRef]);
   const [filterOpen, setFilterOpen] = useState(false);
   const [railTab, setRailTab] = useState<'activity' | 'context' | 'artifacts' | 'cron' | 'trajectory'>('activity');
