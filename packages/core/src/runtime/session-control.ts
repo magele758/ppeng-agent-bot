@@ -37,7 +37,8 @@ export function cancelSession(host: SessionControlHost, sessionId: string, expec
     }
     const paused = !!parseRunInterrupt(session.metadata);
     const active = session.status === 'running' || session.status === 'waiting_approval' || paused
-      || (controller !== undefined && !controller.signal.aborted);
+      || (controller !== undefined && !controller.signal.aborted)
+      || [...host.backgroundJobAborts].some(([id, ac]) => !ac.signal.aborted && host.store.getBackgroundJob(id)?.sessionId === sessionId);
     if (!active) return;
     host.store.assertCurrentWriter(sessionId);
     closeOpenToolWave(host.store, sessionId, 'interrupted', { expectedWriterRunId: session.activeWriterRunId });

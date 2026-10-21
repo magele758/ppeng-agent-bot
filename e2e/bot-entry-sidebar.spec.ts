@@ -33,7 +33,7 @@ test('one accessible New menu opens dedicated creation without losing the curren
  const sidebar=page.locator('#panel-play.active .play-sidebar');
  await expect(sidebar.locator('.play-sidebar__head a')).toHaveCount(0);
  await expect(sidebar.getByTestId('play-group-create')).toHaveCount(0);
- const create=sidebar.locator('#btnPlayCreate'); await expect(create).toHaveText('新建');
+ const create=sidebar.locator('#btnPlayCreate'); await expect(create).toHaveAccessibleName('新建');
  await create.hover(); await expect(sidebar.getByRole('menu')).toBeVisible();
  const itemBounds=await sidebar.getByRole('menuitem').first().boundingBox();expect(itemBounds).toBeTruthy();await page.mouse.move(itemBounds!.x+itemBounds!.width/2,itemBounds!.y+itemBounds!.height/2,{steps:20});await expect(sidebar.getByRole('menu')).toBeVisible();
  await expect(sidebar.getByRole('menuitem')).toHaveCount(3);

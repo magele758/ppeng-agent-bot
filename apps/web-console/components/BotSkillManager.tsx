@@ -4,7 +4,7 @@ import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { BotSkillSharing, useSkillBots, type SkillBot } from './BotSkillSharing';
 export type ManagedSkill = { id: string; name: string; ownerBotId?: string; sharedBotIds?: string[]; blockedBotIds?: string[] };
-export function BotSkillManager({ skills, onChange }: { skills: ManagedSkill[]; onChange: () => Promise<void> }) {
+export function BotSkillManager({ skills, onChange, onNotice }: { skills: ManagedSkill[]; onChange: () => Promise<void>; onNotice?: (text: string) => void }) {
   const { t } = useI18n();
   const bots = useSkillBots();
   const [view, setView] = useState('');
@@ -14,10 +14,10 @@ export function BotSkillManager({ skills, onChange }: { skills: ManagedSkill[]; 
     <label>{t('skillProposals.filterBot')} <select aria-label={t('skillProposals.filterBot')} value={view} onChange={e => setView(e.target.value)}>
       <option value="">{t('skillProposals.allBots')}</option>{bots.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
     </select></label>
-    {visible.map(s => <ManagedRow key={`${s.id}:${s.ownerBotId}:${s.sharedBotIds?.join(',')}`} skill={s} bots={bots} readOnly={!!view && !!s.ownerBotId && s.ownerBotId !== view} onChange={onChange} />)}
+    {visible.map(s => <ManagedRow key={`${s.id}:${s.ownerBotId}:${s.sharedBotIds?.join(',')}`} skill={s} bots={bots} readOnly={!!view && !!s.ownerBotId && s.ownerBotId !== view} onChange={onChange} onNotice={onNotice} />)}
   </section>;
 }
-function ManagedRow({ skill, bots, readOnly, onChange }: { skill: ManagedSkill; bots: SkillBot[]; readOnly: boolean; onChange: () => Promise<void> }) {
+function ManagedRow({ skill, bots, readOnly, onChange, onNotice }: { skill: ManagedSkill; bots: SkillBot[]; readOnly: boolean; onChange: () => Promise<void>; onNotice?: (text: string) => void }) {
   const { t } = useI18n();
   const [owner, setOwner] = useState(skill.ownerBotId ?? '');
   const [selected, setSelected] = useState(skill.sharedBotIds ?? []);
@@ -41,10 +41,11 @@ function ManagedRow({ skill, bots, readOnly, onChange }: { skill: ManagedSkill; 
       const result = await api(`/api/skill-proposals/${encodeURIComponent(skill.id)}/revoke`, { method: 'POST' }) as { outcome?: string };
       await onChange();
       if (result.outcome === 'foreign') setError(t('skillProposals.revokeForeignHint'));
+      else onNotice?.(t('skillProposals.revokedMsg', { name: skill.name }));
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setBusy(false); }
   }
-  return <article className="skill-capture-card" data-testid={`skill-managed-${skill.id}`}>
+  return <article className="skill-capture-card" data-testid={`skill-approved-${skill.name}`}>
     <h4>{skill.name}</h4>
     <p>{skill.ownerBotId ? t('skillProposals.ownerBot', { name: name(skill.ownerBotId) }) : t('skillProposals.legacyShared')} · {readOnly ? t('skillProposals.receivedReadOnly') : t('skillProposals.owned')}</p>
     <p>{t('skillProposals.recipients', { names: skill.ownerBotId ? (skill.sharedBotIds?.map(name).join(', ') || t('skillProposals.privateScope')) : t('skillProposals.allBots') })}</p>

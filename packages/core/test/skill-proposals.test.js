@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -603,6 +603,31 @@ test('revoke: an update proposal only removes the user copy, so the repo version
     if (prevOff === undefined) delete process.env.RAW_AGENT_AGENTS_SKILLS;
     else process.env.RAW_AGENT_AGENTS_SKILLS = prevOff;
   }
+});
+
+test('reopening the queue finishes an interrupted revoke', () => {
+  const stateDir = tmp('sp-revoking');
+  const store = new SkillProposalStore(stateDir);
+  const rec = store.create({ ...GOOD, sessionId: 'sess_abc' });
+  store.approve(rec.id);
+  const target = join(stateDir, 'skills', rec.name);
+  const journal = join(stateDir, 'skill-proposals', `${rec.id}.revoking`);
+  renameSync(target, journal);
+  assert.equal(existsSync(target), false);
+  new SkillProposalStore(stateDir);
+  assert.equal(existsSync(join(target, 'SKILL.md')), true);
+  assert.equal(existsSync(journal), false);
+  assert.equal(store.revoke(rec.id).outcome, 'removed');
+  mkdirSync(journal);
+  writeFileSync(join(journal, 'SKILL.md'), 'stale');
+  new SkillProposalStore(stateDir);
+  assert.equal(existsSync(journal), false);
+  const strayId = `sp_${'b'.repeat(32)}`;
+  const stray = join(stateDir, 'skill-proposals', `${strayId}.revoking`);
+  writeFileSync(join(stateDir, 'skill-proposals', `${strayId}.json`), JSON.stringify({ ...store.get(rec.id), id: strayId, name: 'not a name', status: 'revoked' }));
+  mkdirSync(stray);
+  new SkillProposalStore(stateDir);
+  assert.equal(existsSync(stray), true);
 });
 
 test('reminder: every N iterations on the user side, off by default', () => {

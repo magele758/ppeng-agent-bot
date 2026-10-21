@@ -3,6 +3,19 @@ import type { BotInfo } from './types.ts';
 
 /** Memory appendix is injected beside the user turn; it is not the question they asked. */
 const MEMORY_APPENDIX_MARK = '本轮相关记忆与用户背景';
+/** Dragged file bodies are untrusted data, not the question the user typed. */
+const EXTERNAL_FENCE = /«external [\s\S]*?«end external»/g;
+
+function partText(part: { type?: string; text?: string } | undefined): string {
+  if (!part || part.type !== 'text' || typeof part.text !== 'string') return '';
+  return part.text;
+}
+
+function questionLine(part: { type?: string; text?: string } | undefined): string {
+  const text = partText(part).replace(EXTERNAL_FENCE, ' ');
+  if (!text.trim() || text.includes(MEMORY_APPENDIX_MARK)) return '';
+  return oneLineQuestion(text);
+}
 
 export type QuestionMessage = {
   role?: string;
@@ -67,10 +80,7 @@ export function lastUserQuestion(messages: readonly QuestionMessage[]): string {
     if (!message || message.role !== 'user') continue;
     const parts = message.parts ?? [];
     for (let p = parts.length - 1; p >= 0; p -= 1) {
-      const part = parts[p];
-      if (!part || part.type !== 'text' || typeof part.text !== 'string') continue;
-      if (!part.text.trim() || part.text.includes(MEMORY_APPENDIX_MARK)) continue;
-      const line = oneLineQuestion(part.text);
+      const line = questionLine(parts[p]);
       if (line) return line;
     }
   }

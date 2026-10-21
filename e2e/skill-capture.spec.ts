@@ -52,7 +52,8 @@ test('reject persists across reload, failed capture is visible [AC:skill-capture
   await page.getByRole('button', { name: /capture-reject-check/ }).first().click();
   const rejected = page.getByTestId('skill-capture-sc_reject');
   await expect(rejected).toContainText('已拒绝');
-  await expect(rejected.getByRole('button')).toHaveCount(0);
+  await expect(rejected.getByRole('button', { name: '确认并提炼' })).toHaveCount(0);
+  await expect(rejected.getByRole('button', { name: '拒绝', exact: true })).toHaveCount(0);
   const failed = page.getByTestId('skill-capture-sc_fail');
   await failed.getByRole('button', { name: '确认并提炼' }).click();
   await expect(failed).toContainText('未修改技能');

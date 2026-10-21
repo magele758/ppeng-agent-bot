@@ -7,7 +7,10 @@ import {
   feedRange,
   historyWindow,
   nextTranscriptWindow,
+  feedNearBottom,
   planFeedScroll,
+  railToggleIntent,
+  viewportAnchorDelta,
   prefixHeights,
   preservedScrollTop,
   rangeIncluding,
@@ -192,6 +195,14 @@ test('scroll intent keeps an anchor row and a short page can auto-load [AC:play-
   assert.equal(bottom.scrollTop, 300);
   const pinned = resolveFeedScroll({ ...el, querySelector: () => null }, { kind: 'pin', top: 40 }, 0);
   assert.equal(pinned.scrollTop, 40);
+  const viewport = resolveFeedScroll(el, { kind: 'viewport', top: 40, key: 'm:1' }, 0);
+  assert.equal(viewport.scrollTop, 40);
+  assert.equal(viewport.intent?.kind, 'viewport');
+  el.scrollTop = 40;
+  el.querySelector = () => ({ getBoundingClientRect: () => ({ top: 40 }) });
+  const held = resolveFeedScroll(el, viewport.intent, viewport.tries);
+  assert.equal(held.intent?.kind, 'viewport');
+  assert.equal(held.scrollTop, null);
   const planned = nextTranscriptWindow({
     sameSession: true,
     previous: page(1, 40),
@@ -231,6 +242,16 @@ test('a refresh keeps the scroll offset unless the reader is already on the tail
   const tail = planFeedScroll('pin', true, anchor);
   assert.equal(tail.stick, true);
   assert.equal(tail.intent.kind, 'bottom');
+  assert.equal(feedNearBottom(null), true);
+  assert.equal(feedNearBottom({ scrollHeight: 100, scrollTop: 80, clientHeight: 20 }), true);
+  assert.equal(feedNearBottom({ scrollHeight: 100, scrollTop: 0, clientHeight: 20 }), false);
+  assert.equal(viewportAnchorDelta(40, 40), 0);
+  assert.equal(viewportAnchorDelta(41, 40), 0);
+  assert.equal(viewportAnchorDelta(10, 40), -30);
+  const held = railToggleIntent(false, anchor, 90);
+  assert.equal(held.kind, 'viewport');
+  if (held.kind === 'viewport') assert.equal(held.top, 90);
+  assert.equal(railToggleIntent(true, anchor, 90).kind, 'bottom');
   assert.equal(preservedScrollTop(480, 500, 200), 300);
   assert.equal(preservedScrollTop(40, 500, 200), 40);
 });

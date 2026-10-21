@@ -10,6 +10,8 @@ const FACTORY_READONLY_DISPATCH_OPS = [
 ] as const;
 
 const COORDINATOR_FACTORY_TOOLS = new Set([
+  'goal_dispatch',
+  'goal_checkpoint',
   "factory_status",
   "factory_dispatch",
   "factory_settings_save",
@@ -115,8 +117,13 @@ export function filterFactoryTools<T extends { name: string }>(
     cfg.machines.some((m) => m.botIds.includes(String(botId)));
   if (!bound && meta.roomId !== cfg.roomId) return tools;
   const coordinator = botId === cfg.coordinatorBotId;
+  const developmentAuthorized = coordinator && cfg.machines.some(machine => machine.allowedUserIds?.includes(userId) && machine.repositories?.some(repo => {
+    const policy=store?.getDaemonControl?.('factory.development:'+JSON.stringify([tenantId,userId])+':'+machine.id+':'+repo.id) as {enabled?:boolean;criteriaApproved?:boolean;allowedUserIds?:string[]}|undefined;
+    return policy?.enabled===true && policy.criteriaApproved===true && policy.allowedUserIds?.includes(userId);
+  }));
   const kept: T[] = [];
   for (const tool of tools) {
+    if (tool.name === 'goal_factory_develop' && developmentAuthorized) { kept.push(tool); continue; }
     if (tool.name === "factory_status") {
       kept.push(tool);
       continue;
