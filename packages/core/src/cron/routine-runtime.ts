@@ -182,13 +182,17 @@ function sharedBotRun(host:RoutineRuntimeHost,run:RoutineRun):boolean {
  if(!run.sessionId||run.sessionId!==run.mainSessionId||!run.startedAt)return false;
  const session=host.store.getSession(run.sessionId);return !!session&&isBotMainSession(session);
 }
-/** Only this attempt's reply counts. The bot chat already holds older turns. */
+/** Replies after this run's prompt count. Claim time can be later than the answer. */
 function resultText(host:RoutineRuntimeHost,run:RoutineRun):string {
  if(!run.sessionId)return '';
  if(!sharedBotRun(host,run))return assistantTextsFromFold(host.store,run.sessionId).at(-1)?.trim().slice(0,16000)??'';
+ const folded=host.store.foldMessages(run.sessionId);
+ const key=run.steerKey??`routine:${run.id}`;
+ const prompt=folded.find(message=>message.role==='user'&&message.key===key);
  const start=Date.parse(run.startedAt!);
- const prior=host.store.foldMessages(run.sessionId).filter(message=>Date.parse(message.createdAt)<start).at(-1);
- return assistantTextsFromFold(host.store,run.sessionId,prior?.id).at(-1)?.trim().slice(0,16000)??'';
+ const afterId=prompt?.id??folded.filter(message=>Date.parse(message.createdAt)<start).at(-1)?.id;
+ const texts=assistantTextsFromFold(host.store,run.sessionId,afterId).map(text=>text.trim()).filter(text=>text.length>0&&!text.startsWith('[routine:'));
+ return texts.join('\n').slice(0,16000);
 }
 function approvalsForSession(host:RoutineRuntimeHost,run:RoutineRun):ApprovalRecord[] {
  const rows=host.store.listApprovals().filter(approval=>approval.sessionId===run.sessionId);
@@ -410,9 +414,6 @@ function botSessionTalking(host:RoutineRuntimeHost,session:SessionRecord,reserve
 function steeredUserMessage(host:RoutineRuntimeHost,sessionId:string,key:string) {
  return host.store.listMessages(sessionId).find(message=>message.key===key && message.role==='user');
 }
-function assistantAfterSteer(host:RoutineRuntimeHost,sessionId:string,seq:number):boolean {
- return host.store.listMessages(sessionId).some(message=>message.role==='assistant' && Number(message.seq)>seq);
-}
 /** Claim the bot's own chat. Append the prompt only when it is not already parked as a steer. */
 function claimBotMainSession(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun,parent:SessionRecord,lease:RoutineLease,append:boolean):SessionRecord|undefined {
  host.store.db.exec('BEGIN IMMEDIATE');
@@ -439,10 +440,9 @@ function dispatchBotMain(host:RoutineRuntimeHost,runs:RoutineRunStore,run:Routin
   const parked=host.store.listUnclaimedInbox(parent.id).some(item=>item.key===key);
   const spoken=steeredUserMessage(host,parent.id,key);
   if(parked||spoken){
-   if(spoken&&assistantAfterSteer(host,parent.id,Number(spoken.seq))){
-    if(!claimBotMainSession(host,runs,run,parent,lease,false))return 'skip';
-    finish(host,runs,run.id,parent.id);return 'finished';
-   }
+   // A later assistant can belong to work that was already in flight. It is not
+   // this routine's result; claim time would also hide it. Run the main session
+   // again so the parked prompt is actually answered.
    if(!claimBotMainSession(host,runs,run,parent,lease,false))return 'skip';
    return 'launched';
   }

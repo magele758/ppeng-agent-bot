@@ -29,4 +29,3 @@ export async function openChat(page: Page, theme = 'light', botView = false) {
   await page.locator('.session-item__title', { hasText: title }).click();
   await expect(page.locator('.chat-turn--assistant .chat-bubble__md')).toContainText('Reading comfortably');
 }
-

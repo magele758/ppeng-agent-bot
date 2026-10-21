@@ -145,13 +145,15 @@ test.describe('Chat and Bot mode', () => {
     await expect(pinned.locator('.list-item--bot-chat', { hasText: 'Super Bot' })).not.toContainText('super-bot');
     await expect(list).not.toContainText('Bot Chat');
     await expect(list).not.toContainText('Deploy review');
-    const options = page.locator('#botSelect option');
-    await expect(options).toHaveText(['选择 Bot', 'Super Bot', 'DeskBot', '小八']);
+    const composerFace = page.getByTestId('composer-bot-face');
+    await expect(composerFace).toBeVisible();
+    await expect(composerFace).toHaveAttribute('data-bot-shape', (await pinned.locator('[data-bot-shape]').first().getAttribute('data-bot-shape')) ?? '');
+    await expect(page.locator('#botSelect')).toHaveCount(0);
 
     await page.locator('#nav-chat').click();
     await expect(page.locator('#nav-chat')).toHaveAttribute('aria-current', 'page');
     await expect(list).toContainText('Weekly notes');
-    await expect(page.locator('#botSelect')).toHaveCount(0);
+    await expect(page.getByTestId('composer-bot-face')).toHaveCount(0);
   });
 
   test('Bots page roster shows both bots as cards and filters by name [AC:agents-management#AC-5]', async ({ page }) => {

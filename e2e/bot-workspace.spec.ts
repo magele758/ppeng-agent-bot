@@ -208,12 +208,14 @@ test("default Super Bot is selected and a saved alternative survives reload [AC:
   ).json();
   await page.goto("/");
   await page.locator("#nav-bot").click();
-  const selectedBot = page.locator("#sessionListMini .list-item--bot-chat.selected");
-  await expect(selectedBot).toContainText(superBot.name);
-  await page.locator("#sessionListMini .list-item--bot-chat").filter({ hasText: bot.name }).click();
-  await expect(selectedBot).toContainText(bot.name);
+  const row = (id: string) => page.locator(`#sessionListMini [data-bot-id="${id}"] .list-item--session`);
+  await expect(page.locator("#playTitle")).toHaveText(superBot.name);
+  await expect(row(superBot.id)).toHaveClass(/\bselected\b/);
+  await row(bot.id).click();
+  await expect(page.locator("#playTitle")).toHaveText(bot.name);
   await page.reload();
-  await expect(selectedBot).toContainText(bot.name);
+  await expect(page.locator("#playTitle")).toHaveText(bot.name);
+  await expect(row(bot.id)).toHaveClass(/\bselected\b/);
 });
 
 test("assign work through Super Bot and inspect the persisted result [AC:default-super-bot#AC-5] [AC:default-super-bot#AC-8]", async ({
@@ -349,12 +351,12 @@ test('edit and delete private Bot memory while retaining its history source [AC:
  const original=await(await request.get(`/api/sessions/${session.id}/history?query=favorite`)).json();expect(original.messages.length).toBeGreaterThan(0);
 });
 
-test('due Bot work completes in its main conversation and its result is inspectable [AC:bot-routine-main-session#AC-1] [AC:bot-routine-lifecycle#AC-3]',async({page,request})=>{
+test('due one-time work reaches a completed run and its result is inspectable [AC:bot-routine-main-session#AC-1] [AC:bot-routine-lifecycle#AC-3]',async({page,request})=>{
  const {bot}=await(await request.post('/api/bots',{data:{name:`Due routine ${Date.now()}`}})).json();
  const created=await request.post('/api/cron/jobs',{data:{botId:bot.id,name:`Due ${bot.id}`,prompt:'Reply ready.',onceAt:new Date(Date.now()+500).toISOString(),timezone:'Asia/Shanghai',missedPolicy:'coalesce'}});expect(created.ok()).toBeTruthy();const {job}=await created.json();
  await expect.poll(async()=>{const {runs}=await(await request.get(`/api/cron/jobs/${job.id}/runs`)).json();return runs[0]?.status;},{timeout:30000}).toBe('completed');
  await page.goto('/#/agents/bots');await page.getByTestId(`bot-card-${bot.id}`).click();await page.getByTestId('bot-detail').getByRole('button',{name:'展开或收起：定时任务'}).click();const panel=page.locator('.bot-cron-panel');await panel.getByRole('button',{name:'运行记录',exact:true}).click();await expect(panel.getByText('已完成',{exact:true})).toBeVisible();await panel.getByRole('button',{name:'详情',exact:true}).click();await expect(panel.locator('pre')).toContainText('completed');
- const {runs}=await(await request.get(`/api/cron/jobs/${job.id}/runs`)).json();expect(runs[0].sessionId).toBe(bot.canonicalSessionId);expect(runs[0].result).toBeTruthy();
+  const {runs}=await(await request.get(`/api/cron/jobs/${job.id}/runs`)).json();expect(runs[0].sessionId).toBe(bot.canonicalSessionId);expect(runs[0].result).toBeTruthy();
 });
 
 // Dedicated review fixtures are reused only by the same test across repeat-each runs.
