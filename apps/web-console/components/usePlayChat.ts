@@ -2123,11 +2123,12 @@ export function usePlayChat(deps: PlayChatDeps) {
   };
 
   const handleFileUpload = async (files: FileList) => {
+    const selectedFiles = Array.from(files);
     try {
       const sid = await ensurePlaySessionForImages();
       const imgIds = [...pendingImageAssetIds];
       const attIds = [...pendingAttachmentIds];
-      for (const file of files) {
+      for (const file of selectedFiles) {
         const b64 = await fileToBase64Data(file);
         const data = (await api(`/api/sessions/${sid}/attachments/ingest-base64`, {
           method: 'POST',
@@ -2147,7 +2148,7 @@ export function usePlayChat(deps: PlayChatDeps) {
       }
       setPendingImageAssetIds(imgIds);
       setPendingAttachmentIds(attIds);
-      setPlayStatus({ text: t('play.status.addedFiles', { count: files.length }), ok: true });
+      setPlayStatus({ text: t('play.status.addedFiles', { count: selectedFiles.length }), ok: true });
       await tick({ includePlayPanel: true });
     } catch (err) {
       setPlayStatus({ text: err instanceof Error ? err.message : String(err), err: true });

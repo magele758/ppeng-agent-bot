@@ -174,7 +174,7 @@ describe('claimAndApplyInbox', () => {
   });
 });
 
-it('retains dragged context when an inbox message lands [AC:composer-drag-context#AC-3]', () => {
+it('retains attachment context when an inbox message lands', () => {
   const { store, appends } = recordingStore();
   const contextParts = [{ type: 'text' as const, text: 'fenced unique file sentence', contextSources: [{ kind: 'file' as const, name: 'note.txt', text: 'unique file sentence' }] }];
   applyClaimedInbox(store, 's1', [{ role: 'user', text: 'read it', contextParts }]);

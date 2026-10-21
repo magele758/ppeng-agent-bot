@@ -42,7 +42,7 @@ import { botChatHeaderTitle, botNameFromCanonicalTitle } from '@/lib/bot-chat-he
 import { BotFace } from './BotFace';
 import { resolveLivingFaceMood } from '@/lib/bot-face';
 import { shouldOpenSessionSettingsOnInboxGrowth } from '@/lib/running-turn-send';
-import { ComposerContextChips, useComposerFileDrop } from './ComposerContext';
+import { ComposerContextChips, ignoreComposerDrop } from './ComposerContext';
 import { ComposerReplyQuote } from './ReplyQuote';
 import { composerClassName, composerSendDisabled } from '@/lib/composer-context';
 import { ComposerModelPicker } from './ComposerModelPicker';
@@ -272,10 +272,6 @@ export function PlayPanel({
   accountMenu
 }: PlayPanelProps) {
   const { t } = useI18n();
-  const contextDrop = useComposerFileDrop((sources, truncated) => {
-    chat.addPendingContext(sources);
-    if (truncated) chat.setPlayStatus({ text: t('play.composer.contextTruncated') });
-  }, `${playSurface}:${chat.botId}:${selectedSessionId}`);
   const [attachOpen, setAttachOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
@@ -1164,14 +1160,12 @@ export function PlayPanel({
                   {t('play.messageContent')}
                 </label>
                 <div
-                  className={composerClassName('chat-composer', contextDrop.over, chat.composerAckFlash)}
+                  className={composerClassName('chat-composer', chat.composerAckFlash)}
                   data-testid="composer-drop-target"
                   data-surface={botSurface ? 'bot' : 'chat'}
                   data-first-task={headerBotId ? firstTask.phase : undefined}
-                  onDragEnter={contextDrop.onDragEnter}
-                  onDragOver={contextDrop.onDragOver}
-                  onDragLeave={contextDrop.onDragLeave}
-                  onDrop={contextDrop.onDrop}
+                  onDragOver={ignoreComposerDrop}
+                  onDrop={ignoreComposerDrop}
                 >
                   <ComposerContextChips items={chat.pendingContext} onRemove={chat.removePendingContext} />
                   {botSurface && (selectedBot?.name || headerBotName) ? (
@@ -1262,7 +1256,6 @@ export function PlayPanel({
                 </div>
 
                 <div className="chat-composer-dock">
-                  {botSurface ? null : (
                   <div className="chat-composer-dock__left">
                     <button
                       type="button"
@@ -1275,6 +1268,7 @@ export function PlayPanel({
                     >
                       +
                     </button>
+                    {!botSurface ? <>
                     <button
                       type="button"
                       ref={configBtnRef}
@@ -1316,8 +1310,8 @@ export function PlayPanel({
                       onAvailabilityChange={chat.setWorkspaceAvailability}
                     />
                     </div>
+                    </> : null}
                   </div>
-                  )}
                   <p
                     id="playStatus"
                     className={`chat-composer-hint${chat.playStatus.ok ? ' ok' : ''}${chat.playStatus.err || (!chat.playStatus.text && chat.workspaceAvailability.blocked) ? ' err' : ''}`}
@@ -1327,7 +1321,7 @@ export function PlayPanel({
                   </p>
                 </div>
 
-                {attachOpen && !botSurface ? (
+                {attachOpen ? (
                   <div id="composerAttachPanel" className="composer-attach-panel">
                     <input
                       type="file"

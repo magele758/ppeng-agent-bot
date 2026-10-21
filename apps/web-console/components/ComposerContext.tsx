@@ -1,10 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useReducer, useRef, useState, type DragEvent, type SetStateAction } from 'react';
+import { useCallback, useEffect, useReducer, useRef, type DragEvent, type SetStateAction } from 'react';
 import { useI18n } from '@/lib/i18n';
 import {
   contextLabelsFromMessage,
-  readDroppedContext,
   limitContextSources,
   withContextIds,
   type ContextLabel,
@@ -39,49 +38,9 @@ export function usePendingComposerContext(onTruncated: () => void) {
   return { pendingContext: state.sources, setPendingContext, addPendingContext };
 }
 
-export function useComposerFileDrop(onAdd: (sources: ContextSource[], truncated: boolean) => void, scope: string) {
-  const scopeRef = useRef(scope);
-  const generation = useRef(0);
-  if (scopeRef.current !== scope) { scopeRef.current = scope; generation.current++; }
-  useEffect(() => () => { generation.current++; }, []);
-  const [over, setOver] = useState(false);
-  const onAddRef = useRef(onAdd);
-  onAddRef.current = onAdd;
-
-  const onDragEnter = (event: DragEvent<HTMLElement>) => {
-    event.preventDefault();
-    setOver(true);
-  };
-
-  const onDragOver = (event: DragEvent<HTMLElement>) => {
-    event.preventDefault();
-    if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
-  };
-
-  const onDragLeave = (event: DragEvent<HTMLElement>) => {
-    const next = event.relatedTarget;
-    if (next instanceof Node && event.currentTarget.contains(next)) return;
-    setOver(false);
-  };
-
-  const onDrop = (event: DragEvent<HTMLElement>) => {
-    event.preventDefault();
-    setOver(false);
-    const transfer = event.dataTransfer;
-    if (!transfer) return;
-    const started = generation.current;
-    void readDroppedContext(transfer).then(
-      (result) => {
-        if (started !== generation.current || result.sources.length === 0) return;
-        onAddRef.current(result.sources, result.truncated);
-      },
-      () => {
-        /* Keep the draft and do not add an empty chip. */
-      }
-    );
-  };
-
-  return { over, onDragEnter, onDragOver, onDragLeave, onDrop };
+export function ignoreComposerDrop(event: DragEvent<HTMLElement>) {
+  event.preventDefault();
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'none';
 }
 
 export function ComposerContextChips({

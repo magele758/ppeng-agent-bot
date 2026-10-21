@@ -19,7 +19,7 @@ import {
   mergeSkillsByName
 } from '../skills/builtin-skills.js';
 import {
-  buildSkillRouting,
+  buildSkillRoutingCooperative,
   skillLoadStrictFromEnv,
   skillRoutingModeFromEnv,
   skillRoutingTopKFromEnv,
@@ -326,7 +326,7 @@ export class PromptBuilder {
         readAllowedSkillNames(session.metadata)
       );
     }
-    const routing = buildSkillRouting(query.trim(), skills, {
+    const routing = await buildSkillRoutingCooperative(query.trim(), skills, {
       mode: scoringModeForSearch(skillRoutingModeFromEnv(process.env)),
       topK
     });
@@ -433,7 +433,7 @@ export class PromptBuilder {
     const userText = textFromMessage(lastUser ?? { parts: [], role: 'user', id: '', sessionId: '', createdAt: '' });
     const mode = skillRoutingModeFromEnv(process.env);
     const topK = skillRoutingTopKFromEnv(process.env);
-    let routing = buildSkillRouting(userText, skills, { mode, topK });
+    let routing = await buildSkillRoutingCooperative(userText, skills, { mode, topK });
     const shortlistCandidates = [
       ...routing.routed.map((r) => ({
         id: r.skill.id,

@@ -20,6 +20,29 @@ env:
   CI_PUSH_BEFORE: ${{ github.event.before }}
   CI_PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
 jobs:
+  soak-performance:
+    name: HTTP soak performance (no coverage)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/build-workspace.mjs
+      - name: Verify HTTP soak performance
+        run: pnpm run test:bot:soak:performance
+      - name: Preserve HTTP soak performance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: soak-performance
+          path: test-results/soak-performance/
+          if-no-files-found: error
+          retention-days: 14
   tests:
     name: Build, unit tests, HTTP regression, E2E
     runs-on: ubuntu-latest
@@ -456,6 +479,7 @@ jobs:
     name: Main release gate
     if: ${{ !cancelled() }}
     needs:
+      - soak-performance
       - tests
       - browser
       - crap

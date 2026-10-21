@@ -15,6 +15,15 @@ export function hasControlledSoftwareResult(messages,operation,sessionId){
  return messages.some(message=>message.parts.some(part=>part.type==='tool_result'&&part.name==='http_benchmark_software'&&part.toolCallId===id&&part.ok===true));
 }
 /** Retire only a decision actually emitted after a seen successful result; a raw call count is not completion. */
-export function pendingControlledOperations(operations,{completed,explicitDecision}){
- return [...new Set(operations)].filter(operation=>!completed(operation)&&explicitDecision(operation)?.finished!==1);
+export function pendingControlledOperations(operations,{completed,explicitDecision,messages=[],sessionId}){
+ // Compaction can summarize an earlier cron prompt while retaining its tool result.
+ // Only a previously started decision plus a currently observed successful result
+ // authorizes confirmation; database effects alone never manufacture completion.
+ const observed=[];
+ for(const message of messages)for(const part of message.parts??[]){
+  if(part.type!=='tool_result'||part.name!=='http_benchmark_software'||part.ok!==true)continue;
+  const operation=part.toolCallId?.match(/^controlled_(http_op_\d+):/)?.[1];
+  if(operation&&part.toolCallId===`controlled_${operation}:${sessionId}`&&explicitDecision(operation)?.finished===0)observed.push(operation);
+ }
+ return [...new Set([...operations,...observed])].filter(operation=>!completed(operation)&&explicitDecision(operation)?.finished!==1);
 }

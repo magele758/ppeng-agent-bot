@@ -334,53 +334,61 @@ function computeHolonomyCorrection(
   return { correction, cycleCount };
 }
 
-/** 词法得分：每个 query token 只在 name / description / body 中计一次，取最高档权重 */
-function lexicalScoreForSkill(skill: SkillSpec, queryTokens: string[]): { score: number; hits: string[] } {
-  const id = (skill.id ?? '').toLowerCase();
-  const name = (skill.name ?? '').toLowerCase();
-  const aliases = (skill.aliases ?? []).join(' ').toLowerCase();
-  const desc = (skill.description ?? '').toLowerCase();
-  const triggerWords = (skill.triggerWords ?? []).join(' ').toLowerCase();
-  const body = (skill.content ?? '').slice(0, BODY_SLICE).toLowerCase();
+interface LexicalDocument {
+  source: string[];
+  fields: string[];
+  meta: string;
+  tokenFields: Map<string, number>;
+}
+const lexicalDocuments = new WeakMap<SkillSpec, LexicalDocument>();
+const LEXICAL_TOKEN_CACHE_LIMIT = 256;
+const LEXICAL_TOKEN_CACHE_MAX_LENGTH = 128;
+const lexicalWeights = [14, 12, 10, 6, 5, 2];
+const lexicalLabels = ['name', 'alias', 'id', 'desc', 'trigger', 'body'];
 
+function lexicalDocument(skill: SkillSpec): LexicalDocument {
+  const source = [skill.name ?? '', (skill.aliases ?? []).join(' '), skill.id ?? '',
+    skill.description ?? '', (skill.triggerWords ?? []).join(' '), (skill.content ?? '').slice(0, BODY_SLICE)];
+  const cached = lexicalDocuments.get(skill);
+  if (cached && source.every((value, i) => value === cached.source[i])) return cached;
+  const fields = source.map(value => value.toLowerCase());
+  const document = { source, fields, meta: fields.slice(0, 5).join(' '), tokenFields: new Map<string, number>() };
+  lexicalDocuments.set(skill, document);
+  return document;
+}
+
+/** Preserve substring semantics and highest-field weights; reuse repeated query tokens. */
+function lexicalScoreForSkill(skill: SkillSpec, queryTokens: string[], fullQ: string): { score: number; hits: string[] } {
+  const document = lexicalDocument(skill);
   let score = 0;
   const hits: string[] = [];
-
-  for (const t of queryTokens) {
-    if (!t) continue;
-    if (name.includes(t)) {
-      score += 14;
-      hits.push(`name:${t}`);
-    } else if (aliases.includes(t)) {
-      score += 12;
-      hits.push(`alias:${t}`);
-    } else if (id.includes(t)) {
-      score += 10;
-      hits.push(`id:${t}`);
-    } else if (desc.includes(t)) {
-      score += 6;
-      hits.push(`desc:${t}`);
-    } else if (triggerWords.includes(t)) {
-      score += 5;
-      hits.push(`trigger:${t}`);
-    } else if (body.includes(t)) {
-      score += 2;
-      hits.push(`body:${t}`);
+  for (const token of queryTokens) {
+    if (!token) continue;
+    let field = document.tokenFields.get(token);
+    if (field === undefined) {
+      field = document.fields.findIndex(text => text.includes(token));
+      // Long input blobs must not grow a cache proportional to conversation size.
+      if (token.length <= LEXICAL_TOKEN_CACHE_MAX_LENGTH) {
+        if (document.tokenFields.size >= LEXICAL_TOKEN_CACHE_LIMIT) {
+          document.tokenFields.delete(document.tokenFields.keys().next().value!);
+        }
+        document.tokenFields.set(token, field);
+      }
+    }
+    if (field >= 0) {
+      score += lexicalWeights[field]!;
+      hits.push(`${lexicalLabels[field]}:${token}`);
     }
   }
-
-  const fullQ = queryTokens.join(' ').trim();
   if (fullQ.length >= 4) {
-    const blob = `${name} ${aliases} ${id} ${desc} ${triggerWords}`;
-    if (blob.includes(fullQ)) {
+    if (document.meta.includes(fullQ)) {
       score += 22;
       hits.push('phrase:meta');
-    } else if (body.includes(fullQ)) {
+    } else if (document.fields[5]!.includes(fullQ)) {
       score += 10;
       hits.push('phrase:body');
     }
   }
-
   return { score, hits };
 }
 
@@ -415,6 +423,7 @@ export function routeSkillsLexical(query: string, skills: SkillSpec[], topK: num
   }
 
   const queryTokens = uniqueTokens(tokenize(q));
+  const fullQ = queryTokens.join(' ').trim();
   if (queryTokens.length === 0) {
     const lowerQ = q.toLowerCase();
     return skills
@@ -433,7 +442,7 @@ export function routeSkillsLexical(query: string, skills: SkillSpec[], topK: num
 
   const ranked = skills
     .map((skill) => {
-      const { score, hits } = lexicalScoreForSkill(skill, queryTokens);
+      const { score, hits } = lexicalScoreForSkill(skill, queryTokens, fullQ);
       const reason = hits.length ? hits.slice(0, 6).join(', ') : 'no-hit';
       return { skill, score, reason };
     })
@@ -684,13 +693,14 @@ export function routeSkillsWithFusion(
   }
 
   const queryTokens = uniqueTokens(tokenize(q));
+  const fullQ = queryTokens.join(' ').trim();
   const queryTokenSet = new Set(queryTokens);
   const skillByName = new Map(skills.map(s => [s.name, s]));
 
   // First pass: compute base lexical scores
   const baseScores = new Map<string, { score: number; hits: string[] }>();
   for (const skill of skills) {
-    const result = lexicalScoreForSkill(skill, queryTokens);
+    const result = lexicalScoreForSkill(skill, queryTokens, fullQ);
     baseScores.set(skill.name, result);
   }
 

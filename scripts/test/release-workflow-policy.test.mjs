@@ -45,7 +45,7 @@ test('npm and Docker publication require a successful release gate, including fo
 
 test('release gate retains deterministic test layers and does not tolerate failures', () => {
   const doc = workflow('release-gate');
-  assert.deepEqual(needs(doc.jobs.gate).sort(), ['acceptance', 'browser', 'compact-ab', 'crap', 'formal', 'harness', 'mutation', 'remote-model-smoke', 'sdk', 'secrets-gate', 'tests', 'unit']);
+  assert.deepEqual(needs(doc.jobs.gate).sort(), ['acceptance', 'browser', 'compact-ab', 'crap', 'formal', 'harness', 'mutation', 'remote-model-smoke', 'sdk', 'secrets-gate', 'soak-performance', 'tests', 'unit']);
   assert.equal(doc.jobs.gate.if, '${{ !cancelled() }}');
   for (const job of Object.values(doc.jobs)) {
     assert.notEqual(job['continue-on-error'], true);
@@ -126,7 +126,7 @@ test('actual gate summary script accepts only success/success/success; failure, 
         for (const acceptance of states) {
           const child = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', step.run], {
             env: sanitizeScriptEnv({
-              ...process.env, RESULTS: JSON.stringify({unit:{result:'success'},formal:{result:'success'},sdk:{result:'success'}, tests: {result: tests}, crap: {result: crap}, acceptance: {result: acceptance}, browser: {result:'success'}, mutation: {result: 'success'}, 'secrets-gate': {result: 'success'}, harness: {result: 'failure'} }), GITHUB_STEP_SUMMARY: join(dir, 'summary.md')
+              ...process.env, RESULTS: JSON.stringify({unit:{result:'success'},formal:{result:'success'},sdk:{result:'success'}, tests: {result: tests}, crap: {result: crap}, acceptance: {result: acceptance}, browser: {result:'success'}, mutation: {result: 'success'}, 'secrets-gate': {result: 'success'}, 'soak-performance': {result: 'success'}, harness: {result: 'failure'} }), GITHUB_STEP_SUMMARY: join(dir, 'summary.md')
             }),
             encoding: 'utf8', timeout: 5_000
           });
