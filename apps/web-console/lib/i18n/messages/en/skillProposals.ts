@@ -1,4 +1,8 @@
 export const skillProposals = {
+  captureExpand: "View details",
+  captureCollapse: "Collapse details",
+  captureDismiss: "Dismiss saved notification",
+  captureDismissStorageError: "Notification dismissed, but this browser could not remember it. It may appear again after reloading.",
   sourceBuiltin: "Built-in",
   sourceWorkspace: "Workspace",
   sourceUser: "Captured skill",
