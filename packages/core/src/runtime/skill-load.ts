@@ -41,6 +41,8 @@ export async function resolveSkillSearch(
       {
         query: q,
         hits: hits.map((h) => ({
+          id: h.id,
+          ownerBotId: h.ownerBotId,
           name: h.name,
           description: h.description,
           score: h.score,
@@ -49,7 +51,7 @@ export async function resolveSkillSearch(
         hint:
           hits.length === 0
             ? 'No matching skills. Try a shorter query, or load_skill with an exact name if you know it.'
-            : 'Call load_skill with an exact name from hits.'
+            : 'Call load_skill with an exact id from hits when names overlap.'
       },
       null,
       2
@@ -62,12 +64,15 @@ export async function resolveSkillLoad(
   name: string,
   sessionId: string
 ): Promise<{ content?: string; error?: string }> {
-  const skills = await host.promptBuilder.allSkills();
+  const skills = await host.promptBuilder.skillsForSession(sessionId);
   const normalizedName = name.trim().toLowerCase();
-  const found = skills.find((skill) => {
+  const matches = skills.filter((skill) => {
     const lookupKeys = [skill.name, skill.id, ...(skill.aliases ?? [])];
     return lookupKeys.some((candidate) => candidate.trim().toLowerCase() === normalizedName);
   });
+  const exact = matches.find(s => s.ownerBotId && s.id.toLowerCase() === normalizedName);
+  if (!exact && matches.length > 1) return { error: `Ambiguous skill "${name}". Choose an id: ${matches.map(s => `${s.id} (Bot ${s.ownerBotId ?? 'shared'})`).join(', ')}` };
+  const found = exact ?? matches[0];
   if (!found?.content) {
     return { error: `Skill "${name}" not found.` };
   }

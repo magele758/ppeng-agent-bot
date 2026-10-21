@@ -62,6 +62,7 @@
 | [`AGENT_ORCHESTRATOR.md`](AGENT_ORCHESTRATOR.md) | Engine + CRUD | `OrchestrationEngine.tick`、Evolution 可选记账 |
 | [`PTC_DYNAMIC_WORKFLOW.md`](PTC_DYNAMIC_WORKFLOW.md) | Dynamic workflow | 模型生成 async JavaScript，通过 `ptc_exec` 编排 Agent 与只读工具 |
 | [`DYNAMIC_TOOLS.md`](DYNAMIC_TOOLS.md) | Implemented (L1 factory) | PTC cell 收割为具名工具、会话粘滞、Lab 开关与晋升 |
+| [`SKILL_CAPTURE.md`](SKILL_CAPTURE.md) | Implemented | 模型建议沉淀技能、对话内确认一次后自动提炼保存、旧提案兼容与撤销 |
 | [`../docs/plans/2026-09-09-ptc-variable-control.md`](../docs/plans/2026-09-09-ptc-variable-control.md) | Plan | PTC 中间变量：可见性 / 配额 / 子 Agent 继承 / return 外溢 / replay 对齐 |
 | [`../docs/plans/2026-09-14-dynamic-tool-factory.md`](../docs/plans/2026-09-14-dynamic-tool-factory.md) | Plan | 动态工具厂：PTC cell 收割为具名工具、会话粘滞、memory 晋升 |
 | [`WORKSPACE_PROJECT.md`](WORKSPACE_PROJECT.md) | Lab UI + API | 多根 Project / 云端 Folder；会话 write-once 绑定，根不可用禁止回退 |

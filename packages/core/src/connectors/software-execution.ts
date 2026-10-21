@@ -29,6 +29,7 @@ export interface SoftwareTool {name: string; description: string; inputSchema: R
 export interface SoftwareConnection {
   principal: string; botId: string; connectorId: string; revision?: string; secretEnv?: string; credRef?: string;
   tools: SoftwareTool[]; health: 'configured'|'ready'|'degraded'|'unavailable'; lastProbeAt?: string;
+  healthReason?: 'authorization_required'|'check_failed'|'invocation_required';
 }
 export interface Invocation {
   id: string; seq?: number; principal: string; botId: string; connectorId: string; toolName: string; sessionId?: string; taskId?: string;
@@ -368,16 +369,20 @@ export class SoftwareExecution {
   private secret(c:SoftwareConnection):string|undefined {const name=c.secretEnv??c.credRef?.replace(/^vault:/,'');if(!name)return undefined;assertSoftwareCredentialName(name);return this.env[name]??new SecretVault(this.store).resolveNamed([name])[name];}
   async probe(principal:string,botId:string,id:string):Promise<SoftwareConnection> {
     const c=this.list(principal,botId).find(c=>c.connectorId===id);if(!c)throw new ValidationError('Connection not found');
+    let reason: SoftwareConnection['healthReason'] = 'check_failed';
     try {
-      if((c.secretEnv||c.credRef)&&!this.secret(c))throw new Error('Credential unavailable');
+      if((c.secretEnv||c.credRef)&&!this.secret(c)){reason='authorization_required';throw new Error('Credential unavailable');}
       for(const t of c.tools) if(t.executor.kind==='http') {
         const url=new URL(t.executor.url.replace(/\{[^}]+\}/g,'probe'));const address=await this.validateUrl(url);
         const secret=this.secret(c);const headers:Record<string,string>={};
         if(secret&&t.executor.auth){const auth=t.executor.auth;if(auth.kind==='bearer')headers.authorization='Bearer '+secret;else if(auth.kind==='header')headers[auth.name??'X-API-Key']=secret;else url.searchParams.set(auth.name??'api_key',secret);}
-        const response=await requestApprovedAddress(url,address,{method:'HEAD',headers,signal:AbortSignal.timeout(5000)});await response.body?.cancel();if(!response.ok)throw new Error('Probe failed');
-      } else throw new Error('MCP readiness requires a successful tool invocation');
+        const response=await requestApprovedAddress(url,address,{method:'HEAD',headers,signal:AbortSignal.timeout(5000)});await response.body?.cancel();
+        if(response.status===401||response.status===403)reason='authorization_required';
+        if(!response.ok)throw new Error('Probe failed');
+      } else {reason='invocation_required';throw new Error('MCP readiness requires a successful tool invocation');}
       c.health='ready';
-    } catch {c.health='unavailable';}
+      delete c.healthReason;
+    } catch {c.health='unavailable';c.healthReason=reason;}
     const rows=this.connections(),key=connectionKey(principal,botId,id);
     if(!rows[key]||rows[key]!.revision!==c.revision)throw new ValidationError('Connection changed or revoked during probe');
     c.lastProbeAt=new Date().toISOString();rows[key]=c;this.store.setDaemonControl(CONNECTIONS,rows);return c;
@@ -421,17 +426,20 @@ export class SoftwareExecution {
     const current = this.connections()[connectionKey(binding.principal, binding.botId, binding.connection.connectorId)];
     if (!current || current.revision !== binding.connection.revision) throw new Error('Connection revoked');
   }
-  private updateHealth(binding: ExecutionBinding, health: SoftwareConnection['health']): void {
+  private updateHealth(binding: ExecutionBinding, health: SoftwareConnection['health'], reason?: SoftwareConnection['healthReason']): void {
     const rows = this.connections();
     const key = connectionKey(binding.principal, binding.botId, binding.connection.connectorId);
     const current = rows[key];
     if (!current || current.revision !== binding.connection.revision) return;
     current.health = health;
+    if(reason)current.healthReason=reason;
+    else if(health==='ready')delete current.healthReason;
     this.store.setDaemonControl(CONNECTIONS, rows);
   }
   private completeInvocation(row: Invocation, binding: ExecutionBinding, result: ToolExecutionResult): ToolExecutionResult {
     const safe = JSON.parse(redact(JSON.stringify(result), binding.secret)) as ToolExecutionResult;
-    this.updateHealth(binding, safe.ok ? 'ready' : 'degraded');
+    this.updateHealth(binding, safe.ok ? 'ready' : 'degraded',
+      safe.metadata?.status===401||safe.metadata?.status===403 ? 'authorization_required' : undefined);
     row.state = safe.ok ? 'completed' : row.write ? 'unknown' : 'failed';
     row.result = safe;
     row.finishedAt = new Date().toISOString();
@@ -489,7 +497,10 @@ export class SoftwareExecution {
     try { binding = this.executionBinding(ctx, name); }
     catch (error) { return {ok: false, content: error instanceof Error ? error.message : String(error)}; }
     if (!binding) return {ok: false, content: 'Connection not granted for this Bot'};
-    if ((binding.connection.secretEnv || binding.connection.credRef) && !binding.secret) return {ok: false, content: 'Credential unavailable'};
+    if ((binding.connection.secretEnv || binding.connection.credRef) && !binding.secret) {
+      this.updateHealth(binding,'unavailable','authorization_required');
+      return {ok: false, content: 'Credential unavailable; repair this Bot connection before continuing', metadata: {connectorId:binding.connection.connectorId, reason:'authorization_required'}};
+    }
     const inputError = validateSoftwareArguments(binding.tool.inputSchema, args);
     if (inputError) return {ok: false, content: inputError};
     const key = typeof args.idempotency_key === 'string' ? args.idempotency_key : undefined;

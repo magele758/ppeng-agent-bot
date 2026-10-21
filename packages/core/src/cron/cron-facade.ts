@@ -1,3 +1,5 @@
+import { parseRoutineDeliveryPolicy } from './routine-delivery-policy.js';
+import { getBotTask, type BotDeliverySource } from '../bots/bot-work.js';
 import { createId } from '../id.js';
 import { routineExpired } from './routine-deadline.js';
 import { RoutineRunStore, drainRoutineRuns, type RoutineRuntimeHost, type RoutineRun } from './routine-runtime.js';
@@ -15,6 +17,8 @@ import type { RoutinePrecheck } from './routine-precheck.js';
 import { assertCredentialEnvName } from '../secrets/credential-env.js';
 
 export interface CreateCronJobInput {
+  deliveryPolicy?: unknown;
+  sourceDelivery?: BotDeliverySource;
   name: string;
   prompt: string;
   onceAt?: string;
@@ -45,6 +49,7 @@ export interface CreateCronJobInput {
 }
 
 export interface UpdateCronJobInput {
+  deliveryPolicy?: unknown;
   name?: string;
   prompt?: string;
   onceAt?: string;
@@ -190,6 +195,16 @@ export function createCronJob(host:CronFacadeHost,input:CreateCronJobInput):Cron
  const roomId=input.roomId?.trim();
  if(roomId)assertBotRoomTarget(host.store,roomId,botId,principal);
  const metadata:Record<string,unknown>={principal};
+ if(input.deliveryPolicy!==undefined)metadata.deliveryPolicy=parseRoutineDeliveryPolicy(input.deliveryPolicy);
+ if(input.sourceDelivery){
+  if(typeof input.sourceDelivery.taskId!=='string'||!Number.isInteger(input.sourceDelivery.attempt))throw new ValidationError('Invalid source delivery');
+  const source=getBotTask(host.store,principal,input.sourceDelivery.taskId);
+  const version=source?.deliveryVersions?.find(v=>v.attempt===input.sourceDelivery!.attempt);
+  if(!source||!version||version.executionStatus!=='completed'||source.targetBotId!==botId)throw new ValidationError('Completed source delivery for this bot not found');
+  metadata.sourceDelivery={taskId:source.id,attempt:version.attempt};
+  metadata.sourceReport=version.report;
+ }
+
  if(botId)metadata.botId=botId;
  if(roomId)metadata.roomId=roomId;
  if(input.conclusions!==undefined)metadata.conclusions=normalizeCiConclusions(input.conclusions);
@@ -215,6 +230,7 @@ function contentPatch(host:CronFacadeHost,current:CronJobRecord,patch:UpdateCron
  if(patch.prompt!==undefined)next.prompt=normalizePrompt(patch.prompt);
  if(patch.enabled!==undefined)next.enabled=patch.enabled;
  const metadata={...(next.metadata??current.metadata)};
+ if(patch.deliveryPolicy!==undefined)metadata.deliveryPolicy=parseRoutineDeliveryPolicy(patch.deliveryPolicy);
  if(patch.conclusions!==undefined)metadata.conclusions=normalizeCiConclusions(patch.conclusions);
  if(patch.secretEnv!==undefined)metadata.secretEnv=normalizeSecretEnv(patch.secretEnv);
  if(patch.precheck!==undefined){if(patch.precheck===null){delete metadata.precheck;delete metadata.precheckMode;}else{const {mode,...precheck}=parseRoutinePrecheck(patch.precheck);metadata.precheck=precheck;if(mode)metadata.precheckMode=mode;}}

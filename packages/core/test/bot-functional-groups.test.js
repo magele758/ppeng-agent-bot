@@ -170,3 +170,20 @@ test('shared roster Bot keeps separate functional memberships and facts for each
  assert.deepEqual(f.groups.sharedForSession(session),{secret:'FIRST'});
  f.store.db.close();
 });
+
+test('next prompt reads saved shared changes, deletes and owner isolation [AC:bot-workspace-interaction-polish#AC-6]', async () => {
+ const f=fixture(), group=f.groups.create(f.principal,'Scoped');
+ f.groups.move(f.principal,f.a.id,group.id);
+ const prompt={lastCognitivePhaseBySession:new Map(),getRouting:()=>{},buildStablePrefix:()=>'',buildSystemPrompt:()=>'',buildMemoryAppendixAsync:async()=>''};
+ const binding=bindMemoryAppendixPrompt({store:f.store,promptBuilder:prompt,stateDir:'/tmp'});
+ const read=()=>binding.buildMemoryAppendix({session:f.store.getSession(f.a.canonicalSessionId)});
+ f.groups.setShared(f.principal,{scope:'global'},{language:'GLOBAL'});
+ f.groups.setShared(f.principal,{scope:'group',id:group.id},{language:'GROUP'});
+ f.groups.setShared({userId:'other'},{scope:'global'},{secret:'OTHER_USER_SECRET'});
+ assert.match(await read(),/GROUP/); assert.doesNotMatch(await read(),/GLOBAL|OTHER_USER_SECRET/);
+ f.groups.setShared(f.principal,{scope:'group',id:group.id},{language:'UPDATED'});
+ assert.match(await read(),/UPDATED/); assert.doesNotMatch(await read(),/GROUP/);
+ f.groups.setShared(f.principal,{scope:'group',id:group.id},{});
+ assert.match(await read(),/GLOBAL/); assert.doesNotMatch(await read(),/UPDATED/);
+ f.store.db.close();
+});

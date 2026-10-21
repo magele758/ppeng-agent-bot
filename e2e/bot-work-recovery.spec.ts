@@ -17,7 +17,7 @@ test('a known task finishing after loading older history remains visible [AC:def
   await page.goto('/#/tasks/bots');
   const panel = page.getByTestId('bot-team-work');
   await expect(panel.locator('article').filter({ hasText: current.input })).toContainText('执行中');
-  await panel.locator('summary').click();
+  await panel.getByTestId('bot-work-history-toggle').click();
   await panel.getByRole('button', { name: '加载更早记录', exact: true }).click();
   await expect(panel.locator('article').filter({ hasText: current.input })).toContainText('已完成', { timeout: 10000 });
   await expect(panel.locator('article').filter({ hasText: older.input })).toBeVisible();
@@ -37,7 +37,7 @@ test('a cancelled routine with unconfirmed effects still requires explicit retry
   });
   await page.goto('/#/agents/bots');
   await page.getByTestId(`bot-card-${bot.id}`).click();
-  await page.getByTestId('bot-detail').getByRole('button', { name: '展开或收起：定时任务' }).click();
+  await page.locator('#bot-tab-automation').click();
   const panel = page.locator('.bot-cron-panel');
   await panel.getByRole('button', { name: '运行记录', exact: true }).click();
   await expect(panel.getByRole('button', { name: '重试', exact: true })).toBeDisabled();

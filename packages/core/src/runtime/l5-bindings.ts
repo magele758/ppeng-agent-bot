@@ -1,3 +1,4 @@
+import { observeModelRequests } from './request-metrics.js';
 import { resolveBotWindowBudget } from '../session/history/window.js';
 import { BotFunctionalGroupService } from '../bots/functional-groups.js';
 import { hasRevokedSharedContext } from '../bots/shared-context-isolation.js';
@@ -31,6 +32,8 @@ import { resolveModelRoute, withProviderFallback } from '../model/registry-route
 import { waitSteeringChildrenIdle } from '../session/steering-subagent.js';
 import { runCaseGovernance } from '../evolving/case-governance.js';
 import { scheduleBackgroundCaseReview } from '../evolving/index.js';
+import { buildSkillProposeReminder } from '../skill-proposals/reminder.js';
+import { readWorkingLogAppendix } from '../session/working-log.js';
 import { imageBufferToDataUrl, touchImageAccess } from '../image-assets.js';
 import type {
   ModelAdapter,
@@ -304,7 +307,7 @@ async function invokeContextModel(
   const session = input.sessionId ? rt.store.getSession(input.sessionId) : undefined;
   if (!session || !isCanonicalBotChat(session)) {
     if (input.sessionId) noteHumanModelInput(rt.store, input.sessionId, input.messages);
-    return toolLoopRunTurn(adapter, input, onStream, retries);
+    return toolLoopRunTurn(observeModelRequests(rt.store, adapter, rt.cumulativeInputTokensBySession), input, onStream, retries);
   }
   activeAdapters(rt).set(session.id, adapter);
   try {
@@ -332,7 +335,7 @@ async function invokeContextModel(
       rt.emitTrace(session.id,{kind:'compact_skipped',payload:{reason:'context_budget',...budget,adapter:adapter.name}});
     }
     noteHumanModelInput(rt.store, session.id, messages);
-    return await toolLoopRunTurn(adapter, {...input,messages}, onStream, retries);
+    return await toolLoopRunTurn(observeModelRequests(rt.store, adapter, rt.cumulativeInputTokensBySession), {...input,messages}, onStream, retries);
   } finally { activeAdapters(rt).delete(session.id); }
 }
 
@@ -1207,6 +1210,8 @@ function adaptFilePolicyForLoop(
 export function l5ToAssembledIo(rt: L5Bindable, sessionId?: string): AssembledLoopIo {
   const host = bindTurnKernelHost(rt);
   const toolDeps = toolLoopDepsFrom(rt);
+  const toolIterations = new Set<number>();
+  let lastReminderIteration = -1;
   const chainActive =
     planModelFallback({ store: rt.store, primary: rt.modelAdapter, env: process.env }) !== undefined;
   return {
@@ -1227,14 +1232,31 @@ export function l5ToAssembledIo(rt: L5Bindable, sessionId?: string): AssembledLo
         payload: event.payload ?? event.data
       });
     },
-    promptBuilder: host.promptBuilder,
+    promptBuilder: {
+      ...host.promptBuilder,
+      buildMemoryAppendix: async (ctx, opts) => {
+        const memory = await host.promptBuilder.buildMemoryAppendix(ctx, opts);
+        const reminder = buildSkillProposeReminder({
+          settingsStore: rt.store,
+          turn: toolIterations.size,
+          agent: ctx.agent,
+          session: ctx.session
+        });
+        if (reminder && lastReminderIteration !== toolIterations.size) {
+          lastReminderIteration = toolIterations.size;
+          void rt.emitTrace(ctx.sessionId, { kind: 'skill_propose_reminder', payload: { turn: toolIterations.size } });
+        }
+        const appendix = memory || (reminder ? readWorkingLogAppendix(rt.stateDir, ctx.sessionId, process.env) : '');
+        return [appendix, reminder].filter(Boolean).join('\n\n');
+      }
+    },
     mergeSessionMetadata: (sessionId, patch) => rt.mergeSessionMetadata(sessionId, patch),
     ensureMcpLoaded: (sessionId) => rt.mcpManager.ensureLoaded(sessionId),
     ensureWorkspaceRoot: (session, task) => host.ensureWorkspaceRoot(session, task),
     resolveWorkspaceRoots: host.resolveWorkspaceRoots,
     resolveFilePolicy: async () => adaptFilePolicyForLoop(await rt.mergedFilePolicy()),
     resolveImageDataUrl: host.resolveImageDataUrl,
-    resolveModelAdapter: host.resolveModelAdapter,
+    resolveModelAdapter: session => observeModelRequests(rt.store, host.resolveModelAdapter?.(session) ?? rt.modelAdapter, rt.cumulativeInputTokensBySession),
     ...(chainActive || (sessionId && isCanonicalBotChat(rt.store.getSession(sessionId) ?? {})) ? {runTurnWithRetries: host.runTurnWithRetries} : {}),
     fitModelRequest: (input) => fitProductModelRequest(rt, input),
     resolveTurnTools: host.resolveTurnTools,
@@ -1263,7 +1285,10 @@ export function l5ToAssembledIo(rt: L5Bindable, sessionId?: string): AssembledLo
     ingestMailbox: host.ingestMailbox,
     autoClaimTask: host.autoClaimTask,
     applyFoldBudget: (session, folded) => host.applyOptionalFoldBudget(session, folded),
-    recordToolUse: host.recordToolUse,
+    recordToolUse: (input) => {
+      toolIterations.add(input.turn);
+      host.recordToolUse?.(input);
+    },
     noteGoalWaitingUser: host.noteGoalWaitingUser,
     shouldLatchBeforeTools: host.shouldLatchBeforeTools,
     applyAutoFork: host.applyAutoFork,

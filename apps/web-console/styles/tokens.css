@@ -14,12 +14,17 @@
   --ui-radius-lg: 12px;
 
   /* type scale */
+  --reading-size: 14px;
+  --control-size: max(12px, calc(var(--reading-size) - 1px));
+  --font-size-base: var(--control-size);
+  --font-size-sm: var(--control-size);
+  --font-size-md: var(--reading-size);
   --ui-text-xs: 12px;
-  --ui-text-sm: 13px;
-  --ui-text-md: 14px;
-  --ui-text-lg: 16px;
-  --ui-text-xl: 20px;
-  --ui-text-2xl: 24px;
+  --ui-text-sm: var(--control-size);
+  --ui-text-md: var(--control-size);
+  --ui-text-lg: var(--reading-size);
+  --ui-text-xl: calc(var(--reading-size) + 4px);
+  --ui-text-2xl: calc(var(--reading-size) + 8px);
   --ui-leading-tight: 1.3;
   --ui-leading-normal: 1.5;
 
@@ -50,3 +55,9 @@
   --ui-ok: var(--color-ok);
   --ui-focus: 2px solid var(--color-text-secondary);
 }
+
+:root[data-font-size="13"] { --reading-size: 13px; }
+:root[data-font-size="14"] { --reading-size: 14px; }
+:root[data-font-size="15"] { --reading-size: 15px; }
+:root[data-font-size="16"] { --reading-size: 16px; }
+:root[data-font-size="18"] { --reading-size: 18px; }

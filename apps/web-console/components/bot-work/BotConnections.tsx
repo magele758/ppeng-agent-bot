@@ -4,6 +4,7 @@ import { ownedByBot, shownRows } from "@/lib/bot-panel-reset";
 import { useI18n } from "@/lib/i18n";
 import { api, json, useAction, Feedback, Result, Status } from "./shared";
 import { useBotPanelRead } from "./use-bot-panel-read";
+import { ConnectionWizard } from "./ConnectionWizard";
 type Invocation = {
   id: string;
   toolName: string;
@@ -14,8 +15,9 @@ type Invocation = {
 type Connection = {
   connectorId: string;
   health: string;
+  healthReason?: string;
   lastProbeAt?: string;
-  tools: { name: string; description: string }[];
+  tools: { name: string; description: string; executor?: { kind: string; method?: string; readOnly?: boolean } }[];
 };
 export function BotConnections({ botId }: { botId: string }) {
   const { t } = useI18n();
@@ -34,6 +36,7 @@ export function BotConnections({ botId }: { botId: string }) {
   const [unsupported, setUnsupported] = useState<unknown[]>([]);
   const [unsupportedBotId, setUnsupportedBotId] = useState("");
   const [tools, setTools] = useState("");
+  const [probeFailed, setProbeFailed] = useState(false);
   const visibleConnections = shownRows(botId, loadedBotId, connections);
   const visibleInvocations = shownRows(botId, invocationBotId, invocations);
   const visibleUnsupported = ownedByBot(botId, unsupportedBotId, unsupported);
@@ -52,6 +55,7 @@ export function BotConnections({ botId }: { botId: string }) {
   };
   useEffect(() => {
     const ac = new AbortController();
+    setProbeFailed(false);
     void action.run(() => load(botId, ac.signal));
     return () => ac.abort();
   }, [botId]);
@@ -59,6 +63,9 @@ export function BotConnections({ botId }: { botId: string }) {
     <section className="ag-panel" data-testid="bot-connections">
       <h3>{t("botWork.connections")}</h3>
       <p>{t("botWork.softwareHint")}</p>
+      <ConnectionWizard key={botId} botId={botId} ready={loadedBotId === botId} existingIds={visibleConnections.map(connection => connection.connectorId)} onSaved={() => load(botId)} />
+      <details>
+      <summary>{t("botWork.advancedConnection")}</summary>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -146,18 +153,28 @@ export function BotConnections({ botId }: { botId: string }) {
           </button>
         </form>
       </details>
+      </details>
       <Feedback {...action} />
+      {probeFailed && <p role="status">{t("botWork.connectionProbeFailed")}</p>}
       {botId === loadedBotId && !visibleConnections.length && !action.busy && <p>{t("botWork.empty")}</p>}
       {visibleConnections.map((c) => (
         <article key={c.connectorId}>
           <h4>{c.connectorId}</h4>
           <p>
-            {t("botWork.health")}: <Status value={c.health} /> · {c.lastProbeAt}
+            {t("botWork.health")}: <Status value={c.health} /> · {c.lastProbeAt
+              ? <time dateTime={c.lastProbeAt}>{t("botWork.lastConnectionCheck", { time: c.lastProbeAt })}</time>
+              : t("botWork.connectionNotChecked")}
           </p>
+          {c.healthReason === 'authorization_required' && <p role="alert">{t("botWork.connectionAuthorizationRequired")}</p>}
           <ul>
             {c.tools.map((tool) => (
               <li role="presentation" key={tool.name}>
                 {tool.name} — {tool.description}
+                <p>{t("botWork.operationScope")}: {tool.executor
+                  ? tool.executor.kind === 'http'
+                    ? t(['GET', 'HEAD', 'OPTIONS'].includes(tool.executor.method ?? 'GET') ? 'botWork.httpReadScope' : 'botWork.httpWriteScope', { method: tool.executor.method ?? 'GET' })
+                    : t(tool.executor.readOnly === true ? 'botWork.mcpReadScope' : 'botWork.mcpWriteScope')
+                  : t('botWork.connectionScopeUnknown')}</p>
               </li>
             ))}
           </ul>
@@ -169,9 +186,10 @@ export function BotConnections({ botId }: { botId: string }) {
                 const probed = await panel.read(requestedBotId, () =>
                   api(connectionPath(requestedBotId, `/${encodeURIComponent(c.connectorId)}/probe`), {
                     method: "POST",
-                  }),
+                  }) as Promise<{ connection: Connection }>,
                 );
                 if (!probed) return;
+                setProbeFailed(probed.connection.health !== 'ready');
                 await load(requestedBotId);
               });
             }}

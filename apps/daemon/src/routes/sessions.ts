@@ -577,9 +577,9 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
     {
       method: 'GET',
       pattern: '/api/sessions/:id/context-snapshots',
-      handler: ({ requireParam, response }) => {
+      handler: ({ requireParam, response, url }) => {
         const id = requireParam('id');
-        json(response, 200, { sessionId: id, snapshots: runtime.listContextSnapshots(id) });
+        json(response, 200, { sessionId: id, snapshots: url.searchParams.get('latestOnly') === '1' ? [] : runtime.listContextSnapshots(id), latestRequest: runtime.store.getDaemonControl(`session.latestRequest:${id}`) ?? null });
       }
     },
 
@@ -642,6 +642,13 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
           }) : undefined;
         } catch (error) { json(response, 400, {error: error instanceof Error ? error.message : String(error)}); return; }
         const messages = !includeMessages ? [] : page?.messages ?? runtime.getSessionMessages(id);
+        // Historical results are identified by server-owned links, never by matching user text.
+        if (messages.length && runtime.store.db.prepare("SELECT 1 FROM sqlite_master WHERE name='bot_routine_summary_links'").get()) {
+          const links = new Map(runtime.store.db.prepare('SELECT message_id,run_id FROM bot_routine_summary_links WHERE main_session_id=?').all(id).map(row => [String(row.message_id), String(row.run_id)]));
+          for (const message of messages) {
+            if (message.role === 'assistant' && !message.key && links.has(message.id)) message.key = `routine-result:${links.get(message.id)}`;
+          }
+        }
         const latestAssistant = page || !includeMessages
           ? [...messages].reverse().find(message => message.role === 'assistant')?.parts.filter(part => part.type === 'text').map(part => part.text).join('')
           : runtime.getLatestAssistantText(id);

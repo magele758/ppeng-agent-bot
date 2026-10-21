@@ -21,12 +21,24 @@ export function connectorRoutes(runtime: RawAgentRuntime): RouteSpec[] {
     {method:'POST',pattern:'/api/connectors/:id/revoke',handler:({requireParam,response})=>json(response,200,{connector:runtime.connectors.toPublic(runtime.connectors.revokeConnector(requireParam('id')))})},
     {method:'GET',pattern:'/api/bots/:id/connections',handler:ctx=>{const {principal,botId}=scope(ctx);json(ctx.response,200,{connections:software.list(principal,botId)});}},
     {method:'PUT',pattern:'/api/bots/:id/connections/:connectorId',handler:async ctx=>{
-      const {principal,botId}=scope(ctx);const body=runtime.connectors.softwareBindingInput(ctx.requireParam('connectorId'),await ctx.readBody());await credentialGate(ctx,principal,botId,ctx.requireParam('connectorId'),body);const connection=runtime.connectors.bindSoftware(principal,botId,ctx.requireParam('connectorId'),body);runtime.syncConnectorTools();json(ctx.response,200,{connection});
+      const {principal,botId}=scope(ctx);const body=runtime.connectors.softwareBindingInput(ctx.requireParam('connectorId'),await ctx.readBody());await credentialGate(ctx,principal,botId,ctx.requireParam('connectorId'),body);
+      if(body.createOnly===true&&software.list(principal,botId).some(connection=>connection.connectorId===ctx.requireParam('connectorId')))throw new ValidationError('Connection already exists');
+      const connection=runtime.connectors.bindSoftware(principal,botId,ctx.requireParam('connectorId'),body);runtime.syncConnectorTools();json(ctx.response,200,{connection});
     }},
     {method:'DELETE',pattern:'/api/bots/:id/connections/:connectorId',handler:ctx=>{const {principal,botId}=scope(ctx);software.revoke(principal,botId,ctx.requireParam('connectorId'));runtime.syncConnectorTools();json(ctx.response,200,{ok:true});}},
     {method:'POST',pattern:'/api/bots/:id/connections/:connectorId/probe',handler:async ctx=>{const {principal,botId}=scope(ctx);await credentialGate(ctx,principal,botId,ctx.requireParam('connectorId'));json(ctx.response,200,{connection:await software.probe(principal,botId,ctx.requireParam('connectorId'))});}},
     {method:'GET',pattern:'/api/bots/:id/connections/:connectorId/invocations',handler:ctx=>{const {principal,botId}=scope(ctx);const limit=Number(ctx.url.searchParams.get('limit')??100);if(!Number.isInteger(limit)||limit<1||limit>200)throw new ValidationError('Invalid invocation page size');const before=ctx.url.searchParams.get('beforeSeq');const page=software.invocations(principal,botId,ctx.requireParam('connectorId'),{limit:limit+1,...(before?{beforeSeq:Number(before)}:{})});const hasMore=page.length>limit;const invocations=page.slice(0,limit);json(ctx.response,200,{invocations,hasMore,nextCursor:hasMore?invocations.at(-1)?.seq??null:null});}},
     {method:'POST',pattern:'/api/bots/:id/connections/:connectorId/invocations/:invocationId/resolve',handler:async ctx=>{const {principal,botId}=scope(ctx);const body=await ctx.readBody() as Record<string,unknown>;json(ctx.response,200,{invocation:software.resolveInvocation(principal,botId,ctx.requireParam('connectorId'),ctx.requireParam('invocationId'),body.state,body.note)});}},
-    {method:'POST',pattern:'/api/bots/:id/connections/import',handler:async ctx=>{const {principal,botId}=scope(ctx);const b=await ctx.readBody() as Record<string,unknown>;const parsed=parseOpenApiSpec(b.spec);await credentialGate(ctx,principal,botId,String(b.connectorId??parsed.capability.name),b);const connection=software.bind(principal,botId,String(b.connectorId??parsed.capability.name),{tools:parsed.tools,secretEnv:b.secretEnv,credRef:b.credRef});runtime.syncConnectorTools();json(ctx.response,200,{connection,unsupported:parsed.unsupported});}}
+    {method:'POST',pattern:'/api/bots/:id/connections/import',handler:async ctx=>{
+      const {principal,botId}=scope(ctx);
+      const body=await ctx.readBody() as Record<string,unknown>;
+      const parsed=parseOpenApiSpec(body.spec);
+      const connectorId=String(body.connectorId??parsed.capability.name);
+      await credentialGate(ctx,principal,botId,connectorId,body);
+      if(body.createOnly===true&&software.list(principal,botId).some(connection=>connection.connectorId===connectorId))throw new ValidationError('Connection already exists');
+      const tools=body.readOnlyOnly===true ? parsed.tools.filter(tool=>['GET','HEAD','OPTIONS'].includes(tool.method)) : parsed.tools;
+      const connection=software.bind(principal,botId,connectorId,{tools,secretEnv:body.secretEnv,credRef:body.credRef});
+      runtime.syncConnectorTools();json(ctx.response,200,{connection,unsupported:parsed.unsupported});
+    }}
   ];
 }

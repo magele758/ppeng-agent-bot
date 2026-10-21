@@ -146,6 +146,8 @@ export function createToolServices(host: ToolServicesHost): RuntimeToolServices 
     upsertSessionMemory: async (sessionId, scope, key, value, metadata) => {
       void (await host.store.upsertSessionMemory({ sessionId, scope, key, value, metadata }));
     },
+    currentUserText: async (sessionId) => host.store.listHistory(sessionId,{role:'user',limit:1}).messages
+      .flatMap(message=>message.parts.filter(part=>part.type==='text').map(part=>part.text)).join('\n'),
     listSessionMemory: async (sessionId, scope) => host.store.listSessionMemory(sessionId, scope),
     deleteSessionMemory: async (sessionId, scope, key) =>
       host.store.deleteSessionMemory(sessionId, scope, key),

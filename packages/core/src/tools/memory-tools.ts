@@ -7,6 +7,7 @@ import {
   type BotMemoryLookup
 } from '../memory/bot-memory-scope.js';
 import { evaluateMemoryWrite } from '../memory/memory-gate.js';
+import { isTemporaryMemoryInstruction } from '../memory/memory-dialogue-extract.js';
 import { hybridOrderMemories } from '../memory/memory-recall.js';
 import { lexicalOverlapScore } from '../memory/memory-semantic-merge.js';
 import type { AgentMemory, MemoryScope } from '../memory/types.js';
@@ -248,6 +249,9 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
     approvalMode: 'never',
     sideEffectLevel: 'none',
     async execute(context, args) {
+      if(args.scope!=='scratch'&&services.currentUserText&&isTemporaryMemoryInstruction(await services.currentUserText(context.session.id))){
+        return {ok:false,content:'This user instruction is temporary. Use scratch memory for this task; do not change long-term preferences.'};
+      }
       const kind =
         args.scope === 'user' || args.scope === 'team' || args.scope === 'project' ? 'semantic' : 'scratch';
       const gate = evaluateMemoryWrite({

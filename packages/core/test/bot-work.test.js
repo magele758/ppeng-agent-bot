@@ -19,6 +19,28 @@ function setup() {
  const host={store,runImageRetention:async()=>{},wakeAllAutonomousSessions(){},wakeAgentSessions(){},log:{warn(){},info(){},debug(){},error(){}},runSession:async(id)=>{runs.push(id);store.appendMessage(id,'assistant',[{type:'text',text:'completed result'}]);return store.getSession(id)}};
  return {store,host,runs};
 }
+test('a current unmet goal is not reported as a completed delegated task [AC:bot-product-p0#AC-2] [AC:bot-product-p0#AC-7]', async () => {
+ const {store,host}=setup();const boss=createBot(host,{name:'Goal boss'}),worker=createBot(host,{name:'Goal worker'});const principal=resolveBotPrincipal(store);
+ host.runSession=async id=>{
+  store.appendMessage(id,'assistant',[{type:'text',text:'Partial work, missing the second source.'}]);
+  const session=store.getSession(id);
+  store.updateSession(id,{metadata:{...session.metadata,goalCondition:'Collect two sources',goalLedger:[{met:false,reason:'Only one source collected',at:new Date(Date.now()+1).toISOString(),turn:1}]}});
+ };
+ dispatchBotTask(host,{principal,requesterBotId:boss.id,targetBotId:worker.id,input:'Collect two sources'});
+ await tickBotWork(host);
+ const task=listBotTasks(store,principal)[0];
+ assert.equal(task.status,'failed');
+ assert.match(task.failureReason,/Only one source collected/);
+ assert.match(task.result,/Partial work/);
+});
+test('an old goal judgment cannot fail a fresh task [AC:bot-product-p0#AC-2]', async () => {
+ const {store,host}=setup();const boss=createBot(host,{name:'Old goal boss'}),worker=createBot(host,{name:'Old goal worker'});const principal=resolveBotPrincipal(store);
+ const chat=openBot(host,worker.id,principal),session=store.getSession(chat.sessionId);
+ store.updateSession(chat.sessionId,{metadata:{...session.metadata,goalCondition:'Old goal',goalLedger:[{met:false,reason:'Old failure',at:'2000-01-01T00:00:00Z',turn:1}]}});
+ dispatchBotTask(host,{principal,requesterBotId:boss.id,targetBotId:worker.id,input:'New work'});
+ await tickBotWork(host);
+ assert.equal(listBotTasks(store,principal)[0].status,'completed');
+});
 test('busy recipient persists and later drains [AC:bot-reliable-messaging#AC-1]', async()=>{
  const {store,host,runs}=setup(); const a=createBot(host,{name:'A'}),b=createBot(host,{name:'B'});
  const principal=resolveBotPrincipal(store); const target=openBot(host,b.id,principal);

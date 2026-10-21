@@ -4,6 +4,7 @@ export type BotActivityItem = {
   id: string;
   title: string;
   status: BotActivityStatus;
+  outcomeStatus?: string;
   botId: string;
   botName: string;
   startedAt: string;
@@ -27,6 +28,7 @@ export function parseBotActivityItems(payload: unknown): BotActivityItem[] {
       id: row.id,
       title: row.title,
       status: row.status,
+      ...(typeof row.outcomeStatus === 'string' ? { outcomeStatus: row.outcomeStatus } : {}),
       botId: typeof row.botId === 'string' ? row.botId : '',
       botName:
         typeof row.botName === 'string' && row.botName.trim()

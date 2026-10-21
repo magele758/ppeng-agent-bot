@@ -135,6 +135,8 @@ export function miscRoutes(runtime: RawAgentRuntime, opts: MiscOptions): RouteSp
             description: s.description,
             source: s.source ?? 'workspace',
             skillPath: s.skillPath,
+            ownerBotId: s.ownerBotId,
+            sharedBotIds: s.sharedBotIds,
             aliases: s.aliases ?? [],
             triggerWords: s.triggerWords ?? []
           }))

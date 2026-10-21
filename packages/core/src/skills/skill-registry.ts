@@ -1,6 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, dirname, join, relative } from 'node:path';
+import { botSkillId } from './bot-scope.js';
 import type { SkillSpec } from '../types.js';
 
 export type SkillFrontmatterValue = string | string[];
@@ -144,10 +145,10 @@ export function parseSkillFrontmatter(text: string): { meta: Record<string, Skil
 export function mergeSkillsByName(primary: SkillSpec[], override: SkillSpec[]): SkillSpec[] {
   const m = new Map<string, SkillSpec>();
   for (const s of primary) {
-    m.set(s.name, s);
+    m.set(s.ownerBotId ? botSkillId(s.ownerBotId, s.name) : s.name, s);
   }
   for (const s of override) {
-    m.set(s.name, s);
+    m.set(s.ownerBotId ? botSkillId(s.ownerBotId, s.name) : s.name, s);
   }
   return Array.from(m.values()).sort((left, right) => left.name.localeCompare(right.name));
 }
@@ -186,7 +187,9 @@ async function loadSkillsFromTree(
       const parsed = parseSkillFrontmatter(text);
       const name = frontmatterString(parsed.meta, 'name') ?? (basename(dirname(file)) || `${source}-skill`);
       const description = frontmatterString(parsed.meta, 'description') ?? `${source} skill`;
-      const id = frontmatterString(parsed.meta, 'id') ?? name;
+      const ownerBotId = source === 'user' ? frontmatterString(parsed.meta, 'owner-bot') : undefined;
+      const sharedBotIds = ownerBotId ? frontmatterList(parsed.meta, 'shared-bots') ?? [] : undefined;
+      const id = ownerBotId ? botSkillId(ownerBotId, name) : frontmatterString(parsed.meta, 'id') ?? name;
       const aliases = frontmatterList(parsed.meta, 'aliases', 'alias');
       const triggerWords = frontmatterList(
         parsed.meta,
@@ -202,6 +205,8 @@ async function loadSkillsFromTree(
           : undefined;
       skills.push({
         id,
+        ownerBotId,
+        sharedBotIds,
         name,
         description,
         content: parsed.body,

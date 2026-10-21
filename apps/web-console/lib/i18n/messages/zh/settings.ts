@@ -1,4 +1,12 @@
 export const settings = {
+  fontSize: {
+    title: '字体大小', keywords: '字体 字号 外观 大小 font size text appearance',
+    description: '调整整个控制台的文字大小，立即生效并保存在此浏览器。',
+    option: '{size}px', defaultOption: '{size}px（默认）', reset: '恢复默认',
+    preview: '清晰阅读，舒适交流。Aa — Reading comfortably · 0123456789',
+    saveFailed: '无法保存字号；本次调整已生效，重新打开页面后可能恢复默认。'
+  },
+
   categories: {
     general: '通用',
     models: '模型',

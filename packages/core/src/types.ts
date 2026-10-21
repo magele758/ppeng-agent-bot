@@ -62,6 +62,8 @@ export type {
 // ============================================================================
 
 export interface SkillSpec {
+  ownerBotId?: string;
+  sharedBotIds?: string[];
   id: string;
   name: string;
   description: string;

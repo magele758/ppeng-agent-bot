@@ -4,6 +4,7 @@ import '../../bot-work/bot-work.css';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 import { readBotGroupCreate, readBotPermissionsTarget } from '@/lib/bot-chat-header';
+import { readBotConnectionsTarget } from '@/lib/bot-recovery-link';
 import { filterBots } from '@/lib/agents-view';
 import { applyBotsHash, botCardSelected, botCardSubtitle, botsPane, showBotsEmpty, visibleBotRoster } from '@/lib/bots';
 import { useI18n } from '@/lib/i18n';
@@ -30,7 +31,7 @@ export function BotsView() {
 
   useEffect(() => {
     const apply = () => {
-      applyBotsHash(window.location.hash, readBotGroupCreate, readBotPermissionsTarget, {
+      applyBotsHash(window.location.hash, readBotGroupCreate, hash => readBotPermissionsTarget(hash) ?? readBotConnectionsTarget(hash), {
         setCreating,
         setCreatingGroup,
         setNotice,

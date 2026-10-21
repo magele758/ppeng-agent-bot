@@ -23,6 +23,7 @@ export function mergeSemanticFactContent(existing: string, incoming: string): st
   if (!a) return b;
   if (!b) return a;
   if (a === b) return a;
+  if (/^(?:更正|纠正|修正|correction)\s*[:：]/i.test(b)) return b;
   if (a.includes(b)) return a;
   if (b.includes(a)) return b;
 

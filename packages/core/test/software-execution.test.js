@@ -8,6 +8,24 @@ const ctx=(bot='a',user='u')=>({session:{id:'s',metadata:{botId:bot,userId:user}
 async function server(fn){const s=createServer(fn);await new Promise(r=>s.listen(0,'127.0.0.1',r));return {url:`http://127.0.0.1:${s.address().port}`,close:()=>new Promise(r=>{s.closeAllConnections();s.close(r);})};}
 const decl=(url,method='GET')=>({name:'software_test',description:'test',inputSchema:{type:'object'},executor:{kind:'http',url,method}});
 
+test('authorization failures remain visible until a real successful check [AC:bot-product-p1#AC-5] [AC:bot-product-p1#AC-6]', async () => {
+ let authorized=false;
+ const s=await server((q,r)=>{r.writeHead(authorized?200:401);r.end('external response');});
+ try {
+  const e=new SoftwareExecution(memory(),{RAW_AGENT_WEB_FETCH_ALLOW_PRIVATE:'1'}),p=e.principal({userId:'u'});
+  e.bind(p,'a','local',{tools:[decl(s.url)]});
+  const check=await e.probe(p,'a','local');
+  assert.equal(check.healthReason,'authorization_required');
+  assert.ok(check.lastProbeAt);
+  const result=await e.execute(ctx(),'software_test',{});
+  assert.equal(result.ok,false);
+  assert.equal(e.list(p,'a')[0].healthReason,'authorization_required');
+  authorized=true;
+  assert.equal((await e.probe(p,'a','local')).health,'ready');
+  assert.equal(e.list(p,'a')[0].healthReason,undefined);
+ } finally {await s.close();}
+});
+
 test('real bound HTTP result and write idempotency [AC:bot-software-execution#AC-1] [AC:bot-software-execution#AC-5]',async()=>{
  let count=0;const s=await server((q,r)=>{count++;r.end(JSON.stringify({worked:true,auth:q.headers.authorization}));});
  try {const e=new SoftwareExecution(memory(),{RAW_AGENT_WEB_FETCH_ALLOW_PRIVATE:'1',TOKEN:'private-secret-123'});const t=decl(s.url,'POST');t.executor.auth={kind:'bearer'};e.bind(e.principal({userId:'u'}),'a','local',{tools:[t],secretEnv:'TOKEN'});

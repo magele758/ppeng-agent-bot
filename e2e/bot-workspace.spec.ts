@@ -21,8 +21,10 @@ test("team work, history, rooms and software have real product entry points [AC:
   await page.goto("/#/agents/bots");
   await expect(page.getByTestId("bot-rooms")).toHaveCount(0);
   await page.getByTestId(`bot-card-${bot.id}`).click();
-  await expect(page.getByTestId("bot-history")).toBeVisible();
+  await page.locator("#bot-tab-permissions").click();
   await expect(page.getByTestId("bot-connections")).toBeVisible();
+  await page.locator("#bot-tab-history").click();
+  await expect(page.getByTestId("bot-history")).toBeVisible();
   await page
     .getByTestId("bot-history-query")
     .fill("missing exact historical phrase");
@@ -72,10 +74,7 @@ test("schedule a one-time job and inspect its durable run history [AC:bot-routin
   ).json();
   await page.goto("/#/agents/bots");
   await page.getByTestId(`bot-card-${bot.id}`).click();
-  await page
-    .getByTestId("bot-detail")
-    .getByRole("button", { name: "展开或收起：定时任务" })
-    .click();
+  await page.locator("#bot-tab-automation").click();
   const panel = page.locator(".bot-cron-panel");
   await panel.getByLabel("名称", { exact: true }).fill(`Once ${bot.id}`);
   await panel
@@ -112,7 +111,9 @@ test("import a Bot software connection and revoke it persistently [AC:bot-softwa
   ).json();
   await page.goto("/#/agents/bots");
   await page.getByTestId(`bot-card-${bot.id}`).click();
+  await page.locator("#bot-tab-permissions").click();
   const panel = page.getByTestId("bot-connections");
+  await panel.getByText("高级接口导入与绑定", { exact: true }).click();
   await panel.getByLabel("连接标识").fill("e2e-weather");
   await panel.getByLabel("OpenAPI 文档（JSON）").fill(
     JSON.stringify({
@@ -135,6 +136,7 @@ test("import a Bot software connection and revoke it persistently [AC:bot-softwa
   ).toBeVisible();
   await page.reload();
   await page.getByTestId(`bot-card-${bot.id}`).click();
+  await page.locator("#bot-tab-permissions").click();
   await expect(
     panel.getByRole("heading", { name: "e2e-weather" }),
   ).toBeVisible();
@@ -170,6 +172,7 @@ test("search older original text and open surrounding history [AC:bot-history-me
   }
   await page.goto("/#/agents/bots");
   await page.getByTestId(`bot-card-${bot.id}`).click();
+  await page.locator("#bot-tab-history").click();
   const panel = page.getByTestId("bot-history");
   await expect(
     panel.getByText("Original historical anchor 77331", { exact: false }),
@@ -240,7 +243,7 @@ test("assign work through Super Bot and inspect the persisted result [AC:default
       )?.status;
     })
     .toBe("completed");
-  await panel.locator("summary").click();
+  await panel.getByTestId("bot-work-history-toggle").click();
   await panel.getByRole("button", { name: "刷新", exact: true }).click();
   await panel
     .locator("article")
@@ -248,7 +251,7 @@ test("assign work through Super Bot and inspect the persisted result [AC:default
     .getByRole("button", { name: "详情", exact: true })
     .click();
   await expect(
-    panel.getByRole("complementary").getByText("已完成", { exact: true }),
+    panel.getByRole("complementary").locator(":scope > p").getByText("已完成", { exact: true }),
   ).toBeVisible();
 });
 
@@ -331,17 +334,22 @@ test("Bot chat opens a bounded history page and loads older messages [AC:bot-his
   expect(modelViewRequests).toHaveLength(0);
 });
 
-test('edit and delete private Bot memory while retaining its history source [AC:bot-history-memory#AC-3]',async({page,request})=>{
+test('edit and delete private Bot memory while retaining its history source [AC:bot-history-memory#AC-3] [AC:bot-product-p2#AC-2]',async({page,request})=>{
  const {bot}=await(await request.post('/api/bots',{data:{name:`Memory ${Date.now()}`}})).json();
  const {session}=await(await request.post(`/api/bots/${bot.id}/open`)).json();
  await request.post(`/api/sessions/${session.id}/messages`,{data:{message:'Source says favorite color is green.',autoRun:false}});
  const {messages}=await(await request.get(`/api/sessions/${session.id}/history`)).json();
  const source=messages.find((message:{role:string})=>message.role==='user');
  const created=await request.post('/api/memory',{data:{scope:'user.memory',agentId:bot.id,key:'favorite-color',value:'green',sourceRefs:[{sessionId:session.id,messageId:source.id,seq:source.seq}]}});expect(created.ok()).toBeTruthy();
- await page.goto('/#/agents/bots');await page.getByTestId(`bot-card-${bot.id}`).click();const panel=page.getByTestId('bot-memory');
+ await page.goto('/#/agents/bots');await page.getByTestId(`bot-card-${bot.id}`).click();await page.locator('#bot-tab-history').click();const panel=page.getByTestId('bot-memory');
+ await expect(panel.locator('.memory-entry__summary')).toHaveText('green');
+ await panel.locator('.memory-entry > details').first().locator('summary').first().click();
+ await expect(panel).toContainText('适用范围：用户长期记忆');
+ await expect(panel).toContainText('更新时间：');
+ await panel.getByTestId('memory-sources').locator('summary').click();await panel.getByRole('button',{name:/记忆来源/}).click();await expect(panel.getByText(/Source says favorite color is green/)).toBeVisible();
+ await panel.getByRole('button',{name:'修改',exact:true}).click();await panel.getByRole('textbox').fill('blue');await panel.getByRole('button',{name:'保存',exact:true}).click();await expect(panel.locator('.memory-entry__summary')).toHaveText('blue');
+ await panel.getByText('查看变更记录',{exact:true}).click();
  await expect(panel.getByText('green',{exact:true})).toBeVisible();
- await panel.getByRole('button',{name:/记忆来源/}).click();await expect(panel.getByText(/Source says favorite color is green/)).toBeVisible();
- await panel.getByRole('button',{name:'修改',exact:true}).click();await panel.getByRole('textbox').fill('blue');await panel.getByRole('button',{name:'保存',exact:true}).click();await expect(panel.getByText('blue',{exact:true})).toBeVisible();
  await panel.getByRole('button',{name:'移除',exact:true}).click();await expect(panel.getByText('暂无记录',{exact:true})).toBeVisible();
  const original=await(await request.get(`/api/sessions/${session.id}/history?query=favorite`)).json();expect(original.messages.length).toBeGreaterThan(0);
 });
@@ -350,7 +358,7 @@ test('due one-time work reaches a completed run and its result is inspectable [A
  const {bot}=await(await request.post('/api/bots',{data:{name:`Due routine ${Date.now()}`}})).json();
  const created=await request.post('/api/cron/jobs',{data:{botId:bot.id,name:`Due ${bot.id}`,prompt:'Reply ready.',onceAt:new Date(Date.now()+500).toISOString(),timezone:'Asia/Shanghai',missedPolicy:'coalesce'}});expect(created.ok()).toBeTruthy();const {job}=await created.json();
  await expect.poll(async()=>{const {runs}=await(await request.get(`/api/cron/jobs/${job.id}/runs`)).json();return runs[0]?.status;},{timeout:30000}).toBe('completed');
- await page.goto('/#/agents/bots');await page.getByTestId(`bot-card-${bot.id}`).click();await page.getByTestId('bot-detail').getByRole('button',{name:'展开或收起：定时任务'}).click();const panel=page.locator('.bot-cron-panel');await panel.getByRole('button',{name:'运行记录',exact:true}).click();await expect(panel.getByText('已完成',{exact:true})).toBeVisible();await panel.getByRole('button',{name:'详情',exact:true}).click();await expect(panel.locator('pre')).toContainText('completed');
+ await page.goto('/#/agents/bots');await page.getByTestId(`bot-card-${bot.id}`).click();await page.locator('#bot-tab-automation').click();const panel=page.locator('.bot-cron-panel');await panel.getByRole('button',{name:'运行记录',exact:true}).click();await expect(panel.getByText('已完成',{exact:true})).toBeVisible();await panel.getByRole('button',{name:'详情',exact:true}).click();await expect(panel.locator('pre')).toContainText('completed');
   const {runs}=await(await request.get(`/api/cron/jobs/${job.id}/runs`)).json();expect(runs[0].sessionId).toBe(bot.canonicalSessionId);expect(runs[0].result).toBeTruthy();
 });
 
@@ -402,7 +410,7 @@ test('editing a routine can remove its existing precheck [AC:bot-routine-lifecyc
   const { job } = await (await request.post('/api/cron/jobs', { data: { botId: bot.id, name: `Clear existing precheck ${Date.now()}`, prompt: 'Reply ready.', onceAt: new Date(Date.now() + 86400000).toISOString(), timezone: 'UTC', missedPolicy: 'coalesce', precheck: { kind: 'predicate', source: '{"wakeAgent":false}' } } })).json();
   await page.goto('/#/agents/bots');
   await page.getByTestId(`bot-card-${bot.id}`).click();
-  await page.getByTestId('bot-detail').getByRole('button', { name: '展开或收起：定时任务' }).click();
+  await page.locator('#bot-tab-automation').click();
   const panel = page.locator('.bot-cron-panel');
   await panel.locator('article').filter({ hasText: job.name }).getByRole('button', { name: '修改', exact: true }).click();
   await expect(panel.getByRole('combobox', { name: '预检', exact: true })).toHaveValue('predicate');
@@ -414,7 +422,7 @@ test('editing a routine can remove its existing precheck [AC:bot-routine-lifecyc
   }).toBeNull();
   await page.reload();
   await page.getByTestId(`bot-card-${bot.id}`).click();
-  await page.getByTestId('bot-detail').getByRole('button', { name: '展开或收起：定时任务' }).click();
+  await page.locator('#bot-tab-automation').click();
   await panel.locator('article').filter({ hasText: job.name }).getByRole('button', { name: '修改', exact: true }).click();
   await expect(panel.getByRole('combobox', { name: '预检', exact: true })).toHaveValue('none');
 });

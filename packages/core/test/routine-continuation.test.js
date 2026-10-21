@@ -66,3 +66,11 @@ test('summary links survive reopen and never import another owner or chat [AC:bo
  const work=reopened.getSession(run.sessionId);reopened.updateSession(work.id,{metadata:{...work.metadata,userId:'bob'}});
  sendUserMessage(host,main.id,'now isolated',{replyTo:summary.id});assert.equal(reopened.listMessages(main.id).at(-1).parts[0].text,'now isolated');reopened.db.close();
 });
+
+test('posted results and follow-ups carry trusted display provenance [AC:bot-workspace-interaction-polish#AC-3]', async () => {
+  const {store,main,host,summary} = await fixture();
+  assert.match(summary.key, /^routine-result:/);
+  sendUserMessage(host, main.id, '继续', {replyTo: summary.id});
+  assert.match(store.listMessages(main.id).at(-1).key, /^routine-context:/);
+  store.db.close();
+});

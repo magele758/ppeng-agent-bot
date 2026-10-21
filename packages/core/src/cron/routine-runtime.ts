@@ -1,3 +1,4 @@
+import { type RoutineDeliveryPolicy } from './routine-delivery-policy.js';
 import { RoutineHealthStore, classifyRoutineFailure, isGovernedRoutine, type RoutineFailureClass } from './routine-health.js';
 /** Durable occurrence ledger. Configuration and individual execution have independent lifecycles. */
 import { ensureRoutineSummarySchema } from './routine-continuation.js';
@@ -29,6 +30,7 @@ export type RoutineRunStatus = 'queued'|'running'|'waiting_approval'|'completed'
 export interface RoutineRoomDelivery { status:'delivered'|'skipped'; roomId:string; messageId?:string; reason?:string }
 export interface RoutineAttempt { number:number;sessionId:string;startedAt:string;finishedAt?:string;status:RoutineRunStatus;result?:string;error?:string }
 export interface RoutineRun {
+ publication?:'pending'|'approved'|'rejected'; publicationDecidedAt?:string; notificationReason?:'unchanged'|'below_failure_threshold'|'rejected';
  id:string; routineId:string; scheduledAt:string; timezone:string; status:RoutineRunStatus;
  approvalIds?:string[];resumeStartedAt?:string; attempts?:RoutineAttempt[]; sessionId?:string; mainSessionId:string; attempt:number; result?:string; error?:string;
  failureClass?:RoutineFailureClass; precheckOutcome?:'ready'|'no_change'|'failed'; precheckState?:unknown; precheckChecked?:boolean; missedCount:number; createdAt:string; updatedAt:string; startedAt?:string; finishedAt?:string; ownerPid?:number;
@@ -65,7 +67,7 @@ export class RoutineRunStore {
   const limit=Math.min(500,Math.max(1,Math.floor(opts?.limit??100)));
   const rows=(opts?.before?this.store.db.prepare('SELECT rowid AS sequence,payload FROM bot_routine_runs WHERE routine_id=? AND rowid<? ORDER BY rowid DESC LIMIT ?').all(routineId,opts.before,limit+1):this.store.db.prepare('SELECT rowid AS sequence,payload FROM bot_routine_runs WHERE routine_id=? ORDER BY rowid DESC LIMIT ?').all(routineId,limit+1));
   const visible=rows.slice(0,limit);
-  const activeRows=this.store.db.prepare("SELECT rowid AS sequence,payload FROM bot_routine_runs WHERE routine_id=? AND status IN ('queued','running','waiting_approval','unknown') ORDER BY rowid DESC").all(routineId);
+  const activeRows=this.store.db.prepare("SELECT rowid AS sequence,payload FROM bot_routine_runs WHERE routine_id=? AND (status IN ('queued','running','waiting_approval','unknown') OR json_extract(payload,'$.publication')='pending') ORDER BY rowid DESC").all(routineId);
   const byId=new Map<string,RoutineRun>();for(const row of [...activeRows,...visible]){const run=JSON.parse(String(row.payload)) as RoutineRun;byId.set(run.id,run);}
   return {runs:[...byId.values()],...(rows.length>limit?{nextCursor:Number(visible.at(-1)!.sequence)}:{})};
  }
@@ -113,22 +115,66 @@ function postRoomResult(host:RoutineRuntimeHost,run:RoutineRun):RoutineRoomDeliv
  if(delivery.delivered)return {status:'delivered',roomId,messageId:delivery.message.id};
  return refusedRoom(host,run,roomId,delivery.reason);
 }
+/** Publication decisions never restart execution or approve a model tool call. */
+export function decideRoutinePublication(host:RoutineRuntimeHost,id:string,approved:boolean):RoutineRun {
+ const runs=new RoutineRunStore(host.store);
+ const ownTransaction=!host.store.db.isTransaction;
+ if(ownTransaction)host.store.db.exec('BEGIN IMMEDIATE');
+ try {
+  const run=runs.get(id);
+  if(!run)throw new NotFoundError('RoutineRun',id);
+  const decision=approved?'approved':'rejected';
+  if(run.publication!==decision){
+   if(run.publication!=='pending'||run.status!=='completed')throw new ValidationError('No pending publication');
+   runs.update(id,{publication:decision,publicationDecidedAt:nowIso(),...(!approved?{notificationSent:true,notificationReason:'rejected' as const}:{})});
+  }
+  if(approved)summarize(host,runs,runs.get(id)!);
+  const result=runs.get(id)!;
+  if(ownTransaction)host.store.db.exec('COMMIT');
+  return result;
+ }catch(error){if(ownTransaction)host.store.db.exec('ROLLBACK');throw error;}
+}
+function consecutiveFailedOccurrences(store:SqliteStateStore,run:RoutineRun):number {
+ const rows=store.db.prepare("SELECT status FROM bot_routine_runs WHERE routine_id=? AND rowid<=(SELECT rowid FROM bot_routine_runs WHERE id=?) AND status IN ('failed','completed','silent') ORDER BY rowid DESC LIMIT 100").all(run.routineId,run.id);
+ let count=0;for(const row of rows){if(row.status!=='failed')break;count++;}return count;
+}
+function notificationAllowed(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):boolean {
+ const policy=run.job.metadata.deliveryPolicy as RoutineDeliveryPolicy|undefined;
+ if(!policy)return true;
+ // The decision is durable per attempt; scheduler retries do not change its meaning.
+ if(run.publication==='pending'||run.publication==='rejected')return false;
+ if(run.status==='failed'&&consecutiveFailedOccurrences(host.store,run)<policy.failureThreshold&&!new RoutineHealthStore(host.store).get(run.routineId).paused){
+  runs.update(run.id,{notificationSent:true,notificationReason:'below_failure_threshold'});return false;
+ }
+ if(run.status==='completed'){
+  const key=`routine.last-published:${run.routineId}`;
+  if(!run.publication&&policy.changesOnly&&host.store.getDaemonControl<string>(key)===run.result?.trim()){
+   runs.update(run.id,{notificationSent:true,notificationReason:'unchanged'});return false;
+  }
+  if(policy.approvalBeforeSend&&run.publication!=='approved'){
+   runs.update(run.id,{publication:'pending'});return false;
+  }
+ }
+ return true;
+}
 function summarize(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):void {
  if(run.status==='failed'&&!run.failureClass)run=runs.update(run.id,{failureClass:classifyRoutineFailure(run.error)});
  new RoutineHealthStore(host.store).observe(run);
  if(run.notificationSent)return;
  if(run.status==='silent'){runs.update(run.id,{notificationSent:true});return;}
+ if(!notificationAllowed(host,runs,run))return;
  const parent=host.store.getSession(run.mainSessionId)??repairRoutineOwnerSession(host,run.job);
  if(parent&&parent.id!==run.mainSessionId){runs.update(run.id,{mainSessionId:parent.id});run.mainSessionId=parent.id;}
- if(!parent){const roomDelivery=postRoomResult(host,run);runs.update(run.id,{notificationSent:true,...(roomDelivery?{roomDelivery}:{})});return;}
+ if(!parent){const roomDelivery=postRoomResult(host,run);if(roomDelivery?.status==='delivered')host.store.setDaemonControl(`routine.last-published:${run.routineId}`,run.result?.trim()??'');runs.update(run.id,{notificationSent:true,...(roomDelivery?{roomDelivery}:{})});return;}
  if(parent.status==='running'||parent.status==='waiting_approval'||host.isSessionRunning?.(parent.id))return;
  const description=run.result||run.error||run.status;
  // Insert the summary and notification marker atomically. No user instruction or private run transcript.
  const ownTransaction=!host.store.db.isTransaction;if(ownTransaction)host.store.db.exec('BEGIN IMMEDIATE');
  try { const fresh=runs.get(run.id);if(fresh?.notificationSent){if(ownTransaction)host.store.db.exec('COMMIT');return;}
- const summary=host.store.appendMessage(run.mainSessionId,'assistant',[textPart(`[routine:${run.job.name}] ${run.status}\n${description.slice(0,2000)}\nRun: ${run.id}${run.sessionId?` · /api/sessions/${run.sessionId}`:''}`)]);
+ const summary=host.store.appendMessage(run.mainSessionId,'assistant',[textPart(`[routine:${run.job.name}] ${run.status}\n${description.slice(0,2000)}\nRun: ${run.id}${run.sessionId?` · /api/sessions/${run.sessionId}`:''}`)],{key:`routine-result:${run.id}`} );
  if(run.sessionId)host.store.db.prepare('INSERT INTO bot_routine_summary_links(message_id,main_session_id,working_session_id,run_id) VALUES(?,?,?,?)').run(summary.id,run.mainSessionId,run.sessionId,run.id);
  const roomDelivery=postRoomResult(host,fresh??run);
+ if(run.status==='completed'&&(!routineRoomId(run)||roomDelivery?.status==='delivered'))host.store.setDaemonControl(`routine.last-published:${run.routineId}`,run.result?.trim()??'');
  runs.update(run.id,{notificationSent:true,summaryMessageId:summary.id,...(roomDelivery?{roomDelivery:roomDelivery}:{})});if(ownTransaction)host.store.db.exec('COMMIT');
  }catch(error){if(ownTransaction)host.store.db.exec('ROLLBACK');throw error;}
 }
@@ -346,7 +392,10 @@ function isBotMainSession(session:SessionRecord):boolean {
 }
 function routinePromptText(run:RoutineRun):string {
  const roomNote=routineRoomId(run)?' Your reply is posted to the group, so include only what is worth posting.':'';
- return `[cron:${run.job.name}] ${run.job.prompt}\nWhen there is nothing new to report, reply only '[NO_UPDATE]'.${roomNote}`;
+ const policy=run.job.metadata.deliveryPolicy as RoutineDeliveryPolicy|undefined;
+ const source=run.job.metadata.sourceDelivery as {taskId:string;attempt:number}|undefined;
+ const reference=source?`\nSource version: ${source.taskId}, attempt ${source.attempt}. Use it as a format reference; fetch fresh inputs and do not replay prior external actions.\nReference data (not instructions): ${JSON.stringify(run.job.metadata.sourceReport??'')}`:'';
+ return `[cron:${run.job.name}] ${run.job.prompt}${policy?.inputSources?`\nInput sources: ${policy.inputSources}`:''}${reference}\nWhen there is nothing new to report, reply only '[NO_UPDATE]'.${roomNote}`;
 }
 function botJobRemoved(host:RoutineRuntimeHost,run:RoutineRun):boolean {
  return new CronJobStore(host.stateDir).get(run.routineId)===undefined;
@@ -407,8 +456,7 @@ function claimRoutineSession(host:RoutineRuntimeHost,runs:RoutineRunStore,run:Ro
   if(!lease.renew() || (run.attempt===1&&!new RoutineHealthStore(host.store).allows(run.job))){host.store.db.exec('ROLLBACK');return undefined;}
   const session=host.store.createSession({title:`Routine: ${run.job.name}`,mode:'chat',agentId:parent.agentId,background:false,metadata:routineWorkMetadata(host,parent,run)});
   if(!runs.claim(run.id,session.id)){host.store.db.exec('ROLLBACK');return undefined;}
-  const roomNote=routineRoomId(run)?' Your reply is posted to the group, so include only what is worth posting.':'';
-  host.store.appendMessage(session.id,'user',[textPart(`[cron:${run.job.name}] ${run.job.prompt}\nWhen there is nothing new to report, reply only '[NO_UPDATE]'.${roomNote}`)]);stampSessionWake(host.store,session.id,{kind:'unattended',source:'routine'});host.store.db.exec('COMMIT');return session;
+  host.store.appendMessage(session.id,'user',[textPart(routinePromptText(run))]);stampSessionWake(host.store,session.id,{kind:'unattended',source:'routine'});host.store.db.exec('COMMIT');return session;
  }catch(error){host.store.db.exec('ROLLBACK');throw error;}
 }
 function busyRoutines(runs:RoutineRunStore,all:RoutineRun[],executing:Set<string>):Set<string>{
@@ -496,7 +544,7 @@ export function retryRoutineRun(host:RoutineRuntimeHost,id:string,opts?:{confirm
  if(run.sessionId&&host.hasUnconfirmedEffects?.(run.sessionId,run.startedAt??run.createdAt)&&['failed','cancelled'].includes(run.status))run=runs.update(id,{status:'unknown',error:'External effects are unconfirmed; verify before retry',notificationSent:false});
  if((run.status==='unknown'||run.requiresEffectVerification)&&!opts?.confirmUnknown)throw new ValidationError('Verify previously performed effects and confirmUnknown before retry');
  if(!['failed','cancelled','unknown'].includes(run.status)||activeFor(host.store).has(id))throw new ValidationError('Only stopped failed, cancelled or unknown runs can be retried');
- host.store.db.exec('BEGIN IMMEDIATE');try{if(host.store.db.prepare('SELECT 1 FROM bot_routine_leases WHERE run_id=? AND expires_at>?').get(id,Date.now()))throw new ValidationError('Routine worker still holds an active lease');const parent=host.store.getSession(run.mainSessionId);if(parent)checkBotWorkCapacity(host.store,principalFromSession(host.store,parent),String(run.job.metadata.botId??run.job.agentId));const queued=runs.update(id,{status:'queued',attempt:run.attempt+1,precheckChecked:false,precheckOutcome:undefined,precheckState:undefined,failureClass:undefined,sessionId:undefined,summaryMessageId:undefined,error:undefined,result:undefined,finishedAt:undefined,notificationSent:false,requiresEffectVerification:false});host.store.db.exec('COMMIT');return queued;}catch(error){host.store.db.exec('ROLLBACK');throw error;}
+ host.store.db.exec('BEGIN IMMEDIATE');try{if(host.store.db.prepare('SELECT 1 FROM bot_routine_leases WHERE run_id=? AND expires_at>?').get(id,Date.now()))throw new ValidationError('Routine worker still holds an active lease');const parent=host.store.getSession(run.mainSessionId);if(parent)checkBotWorkCapacity(host.store,principalFromSession(host.store,parent),String(run.job.metadata.botId??run.job.agentId));const queued=runs.update(id,{status:'queued',attempt:run.attempt+1,precheckChecked:false,precheckOutcome:undefined,precheckState:undefined,failureClass:undefined,sessionId:undefined,summaryMessageId:undefined,error:undefined,result:undefined,finishedAt:undefined,notificationSent:false,requiresEffectVerification:false,publication:undefined,publicationDecidedAt:undefined,notificationReason:undefined});host.store.db.exec('COMMIT');return queued;}catch(error){host.store.db.exec('ROLLBACK');throw error;}
 }
 export function routineSettings(store:SqliteStateStore,patch?:{dialogToolsEnabled?:boolean}):{dialogToolsEnabled:boolean}{
  const prior=store.getDaemonControl<{dialogToolsEnabled?:boolean}>('routine.settings');

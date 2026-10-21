@@ -266,7 +266,8 @@ export function memoryRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         if (orderBy) filter.orderBy = orderBy;
 
         const entries = store.search(filter);
-        json(response, 200, { entries });
+        json(response, 200, { entries: url.searchParams.get('includeRevisions') === '1'
+          ? entries.map(entry => ({ ...entry, revisions: store.revisions(entry.id) })) : entries });
       }
     },
 

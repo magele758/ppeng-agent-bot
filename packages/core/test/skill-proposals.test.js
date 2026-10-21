@@ -7,6 +7,7 @@ import {
   SKILL_PROPOSAL_BODY_MAX,
   SKILL_PROPOSAL_MAX_PENDING,
   SkillProposalStore,
+  SkillCaptureService,
   buildSkillProposeReminder,
   createSkillProposeTool,
   defaultSkillProposalSettings,
@@ -46,9 +47,11 @@ function ctx(sessionId = 'sess_1') {
 
 function makeTool(settings, stateDir, skills = []) {
   return createSkillProposeTool({
-    settingsStore: settings,
-    getStateDir: () => stateDir,
-    listSkills: async () => skills
+    captures: new SkillCaptureService({
+      stateDir, settingsStore: settings, listSkills: async () => skills,
+      getEvidence: () => 'Successfully completed the workflow',
+      complete: async () => JSON.stringify(GOOD), reloadSkills: async () => {}
+    })
   });
 }
 
@@ -311,56 +314,35 @@ test('skill_propose is hidden unless the switch is on (and refuses when called w
   assert.equal(existsSync(join(stateDir, 'skill-proposals')), false, 'nothing written while disabled');
 });
 
-test('skill_propose queues a proposal and never touches skills dirs [AC:skill-proposals#AC-2]', async () => {
+test('legacy proposals remain pending until approved [AC:skill-proposals#AC-2]', async () => {
   const stateDir = tmp('sp-tool-queue');
-  const tool = makeTool(enabledSettings(), stateDir);
-  const res = await tool.execute(ctx('sess_abc'), GOOD);
-  assert.equal(res.ok, true, res.content);
-  const out = JSON.parse(res.content);
-  assert.equal(out.status, 'pending');
-  assert.equal(out.kind, 'new');
   const store = new SkillProposalStore(stateDir);
-  const [rec] = store.list();
+  const rec = store.create({ ...GOOD, sessionId: 'sess_abc', agentId: 'general' });
   assert.equal(rec.sessionId, 'sess_abc');
-  assert.equal(rec.agentId, 'general');
   assert.equal(rec.status, 'pending');
-  assert.equal(existsSync(join(stateDir, 'skills')), false, 'not installed before approval');
-  assert.deepEqual((await loadStateDirSkills(stateDir)).length, 0);
-
-  for (const bad of [{ ...GOOD, name: '../../etc/passwd' }, { ...GOOD, body: `x sk-abcdefghijklmnopqrstuvwxyz123` }]) {
-    const r = await tool.execute(ctx(), bad);
-    assert.equal(r.ok, false);
-  }
-  assert.equal(store.list().length, 1);
+  assert.equal(existsSync(join(stateDir, 'skills')), false);
+  assert.equal((await loadStateDirSkills(stateDir)).length, 0);
+  store.approve(rec.id);
+  assert.equal((await loadStateDirSkills(stateDir)).length, 1);
 });
 
-test('same-name proposals: update kind for existing skills, builtin blocked, cross-session duplicate blocked', async () => {
-  const stateDir = tmp('sp-dup');
-  const existing = [
+test('skill_propose submits an intent, refuses bodies and protected targets', async () => {
+  const stateDir = tmp('sp-intent-tool');
+  const tool = makeTool(enabledSettings(), stateDir, [
     { id: 'deploy-staging', name: 'deploy-staging', description: 'x', content: 'old', source: 'workspace' },
-    { id: 'Long-running harness', name: 'Long-running harness', description: 'x', content: 'b', source: 'builtin' }
-  ];
-  const tool = makeTool(enabledSettings(), stateDir, existing);
-  const upd = JSON.parse((await tool.execute(ctx('s1'), GOOD)).content);
-  assert.equal(upd.kind, 'update');
-  const rec = new SkillProposalStore(stateDir).get(upd.proposalId);
-  assert.deepEqual(rec.replaces, { name: 'deploy-staging', source: 'workspace' });
-
-  const again = await tool.execute(ctx('s1'), { ...GOOD, body: `${GOOD.body}\nmore` });
-  assert.equal(again.ok, true);
-  assert.equal(new SkillProposalStore(stateDir).list({ status: 'pending' }).length, 1, 'same session supersedes its pending proposal');
-
-  const cross = await tool.execute(ctx('s2'), GOOD);
-  assert.equal(cross.ok, false);
-  assert.match(cross.content, /another session/);
-
-  const builtin = await tool.execute(ctx(), { ...GOOD, name: 'long-running-harness' });
-  assert.equal(builtin.ok, true, 'slug differs from the builtin literal name, so it is a new skill');
-  const b2 = await makeTool(enabledSettings(), tmp('sp-dup2'), [
     { id: 'harness', name: 'harness', description: 'x', content: 'b', source: 'builtin' }
-  ]).execute(ctx(), { ...GOOD, name: 'harness' });
-  assert.equal(b2.ok, false);
-  assert.match(b2.content, /built-in/);
+  ]);
+  const intent = { name: GOOD.name, description: GOOD.description, reason: 'Workflow succeeded', summary: 'Deploy and verify health' };
+  const result = await tool.execute(ctx('s1'), intent);
+  assert.equal(result.ok, true, result.content);
+  const capture = JSON.parse(result.content).capture;
+  assert.equal(capture.kind, 'update');
+  assert.equal(capture.status, 'pending');
+  assert.equal((await tool.execute(ctx('s1'), GOOD)).ok, false);
+  assert.equal((await tool.execute(ctx('s1'), { ...intent, name: 'harness' })).ok, false);
+  const again = JSON.parse((await tool.execute(ctx('s1'), intent)).content).capture;
+  assert.equal(again.id, capture.id);
+  assert.equal(new SkillProposalStore(stateDir).list().length, 0);
 });
 
 test('queue is capped', async () => {

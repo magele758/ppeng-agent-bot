@@ -12,6 +12,8 @@ export interface AgentDetail {
 }
 
 export interface SkillItem {
+  ownerBotId?: string;
+  sharedBotIds?: string[];
   id: string;
   name: string;
   description: string;
