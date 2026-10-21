@@ -1600,7 +1600,7 @@ test('inheritBotIdentityMetadata returns an empty object for ordinary parents', 
   assert.deepEqual(inheritBotIdentityMetadata({ agentId: 'general', metadata: { userId: 'u1' } }), {});
   assert.deepEqual(
     inheritBotIdentityMetadata({ metadata: { botId: 'b1', userId: ' u1 ', tenantId: ' ' } }),
-    { userId: 'u1' }
+    { botId: 'b1', userId: 'u1' }
   );
 });
 

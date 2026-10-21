@@ -75,3 +75,38 @@ test('approval blocker resumes its member once while preserving completed siblin
  assert.equal(work.botCollaborations(store,principal)[0].status,'completed');assert.equal(siblingEffects,1);assert.equal(guardedEffects,1);
  }finally{await new Promise(setImmediate);store.db.close();rmSync(dir,{recursive:true,force:true});}
 });
+
+test('cross-Bot delegation executes with target permissions and target children inherit them [AC:bot-task-permission-inheritance#AC-4]', async () => {
+  const { spawnSubagent } = await import('../dist/runtime/spawn-host.js');
+  for (const [sourceMode, targetMode] of [['bypass', 'ask'], ['auto', 'acceptEdits'], ['ask', 'bypass'], ['bypass', 'auto']]) {
+    const dir = mkdtempSync(join(tmpdir(), 'delegate-permissions-'));
+    const store = new SqliteStateStore(join(dir, 'state.db'));
+    const observed = [];
+    const host = { store, runImageRetention: async () => {}, wakeAllAutonomousSessions() {}, wakeAgentSessions() {}, log: { warn() {}, info() {}, debug() {}, error() {} }, async runSession(id) {
+      const target = store.getSession(id);
+      observed.push(target.metadata.permissionMode);
+      await spawnSubagent({ store, repoRoot: dir, stateDir: dir, workspaceManager: {}, backgroundJobAborts: new Map(), setSandbox() {}, runSession: async childId => store.getSession(childId) }, { session: target, agent: store.getAgent(target.agentId), repoRoot: dir, stateDir: dir }, 'local child');
+      store.appendMessage(id, 'assistant', [{ type: 'text', text: 'done' }]);
+      store.updateSession(id, { status: 'completed' });
+    } };
+    try {
+      const boss = createBot(host, { name: 'Boss' });
+      const worker = createBot(host, { name: 'Worker' });
+      const principal = work.resolveBotPrincipal(store);
+      const source = work.openBotWorkContext(host, boss.id, principal);
+      const target = work.openBotWorkContext(host, worker.id, principal);
+      store.updateSession(source.id, { metadata: { ...source.metadata, permissionMode: sourceMode } });
+      store.updateSession(target.id, { metadata: { ...target.metadata, permissionMode: targetMode } });
+      const delegate = work.createBotManagementTools(host).find(tool => tool.name === 'bot_delegate');
+      const result = await delegate.execute({ session: store.getSession(source.id), agent: store.getAgent(boss.agentId) }, { target: worker.id, input: 'work', idempotencyKey: 'permission' });
+      assert.equal(result.ok, true);
+      await new Promise(setImmediate);
+      assert.deepEqual(observed, [targetMode]);
+      const child = store.listSessions().find(session => session.parentSessionId === target.id);
+      assert.ok(child);
+      assert.equal(child.metadata.permissionMode, targetMode);
+      assert.equal(child.metadata.botId, worker.id);
+      assert.equal(store.getSession(source.id).metadata.permissionMode, sourceMode);
+    } finally { store.db.close(); rmSync(dir, { recursive: true, force: true }); }
+  }
+});

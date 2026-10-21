@@ -108,7 +108,7 @@ test('one in-flight bot turn does not fork a sub-agent [AC:bot-concurrent-subage
   }
 });
 
-test('two or more concurrent bot pieces fork one sub-agent each and the parent stays coordinator [AC:bot-concurrent-subagents#AC-2]', async () => {
+test('two or more concurrent bot pieces inherit bypass and the parent stays coordinator [AC:bot-concurrent-subagents#AC-2] [AC:bot-task-permission-inheritance#AC-2]', async () => {
   const parentId = { current: '' };
   let release = () => {};
   const gate = {};
@@ -119,6 +119,7 @@ test('two or more concurrent bot pieces fork one sub-agent each and the parent s
   try {
     const bot = runtime.createBot({ name: 'Coordinator' });
     const session = runtime.getSession(runtime.openBot(bot.id).sessionId);
+    runtime.store.updateSession(session.id, { metadata: { ...session.metadata, permissionMode: 'bypass' } });
     parentId.current = session.id;
     runtime.sendUserMessage(session.id, 'keep on the parent', { autoRun: true });
     runtime.sendUserMessage(session.id, 'extra piece alpha', { autoRun: true });
@@ -127,6 +128,7 @@ test('two or more concurrent bot pieces fork one sub-agent each and the parent s
     await new Promise((resolve) => setImmediate(resolve));
     const children = subsOf(runtime, session.id);
     assert.equal(children.length, 2);
+    assert.ok(children.every(child => child.metadata.permissionMode === 'bypass'));
     const prompts = children.map((child) => JSON.stringify(runtime.store.foldMessages(child.id)));
     assert.equal(prompts.some((text) => text.includes('extra piece alpha')), true);
     assert.equal(prompts.some((text) => text.includes('extra piece beta')), true);

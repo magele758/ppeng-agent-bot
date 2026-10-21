@@ -2,7 +2,7 @@ import { readAllowedSkillNames } from '../skills/skill-allowlist.js';
 import { readSessionModelOverride, type SessionModelOverride } from '../model/provider-catalog.js';
 
 /**
- * Subagent inheritance. Bot parents do not pass bypass/auto down, and do not
+ * Subagent inheritance. Children keep the effective permission mode and do not
  * copy the whole scratch pad unless the caller already supplied a key filter.
  */
 
@@ -19,8 +19,6 @@ export function childPermissionMode(
 ): string | undefined {
   const raw = metadata?.permissionMode;
   const parentMode = typeof raw === 'string' && raw.trim() ? raw.trim() : undefined;
-  if (!isBotParentSession(metadata)) return parentMode;
-  if (parentMode === 'bypass' || parentMode === 'auto') return 'ask';
   return parentMode;
 }
 
@@ -48,7 +46,7 @@ export function inheritModelOverride(
 
 /**
  * Teammates from non-Bot parents keep today's behavior (no inherited mode). A
- * Bot parent passes its mode down through the same downgrade as subagents, so
+ * Bot parent passes its effective mode down like subagents, so
  * a plan/ask Bot cannot fall back to the auto default via a teammate.
  */
 export function botTeammatePermission(

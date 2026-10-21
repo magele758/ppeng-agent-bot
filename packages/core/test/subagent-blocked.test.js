@@ -97,7 +97,7 @@ function assertBlocked(runtime, parentId) {
   return { body, child };
 }
 
-test('bot parent (auto): child drops to ask, bash is parked, parent gets a blocked result with approval id', async () => {
+test('bot parent (auto): inherited auto still parks high-risk bash with approval id [AC:bot-task-permission-inheritance#AC-1]', async () => {
   const runtime = makeRuntime('bash');
   const parent = runtime.createChatSession({
     title: 'bot parent',
@@ -106,7 +106,7 @@ test('bot parent (auto): child drops to ask, bash is parked, parent gets a block
   });
   await runtime.runSession(parent.id);
   const { child } = assertBlocked(runtime, parent.id);
-  assert.equal(child.metadata.permissionMode, 'ask');
+  assert.equal(child.metadata.permissionMode, 'auto');
   assert.equal(runtime.getLatestAssistantText(parent.id), 'parent done');
 });
 
@@ -304,4 +304,30 @@ test('teammate that finishes its first run keeps the plain spawned text', async 
   const part = teammateResult(runtime, parent.id);
   assert.equal(part.ok, true);
   assert.equal(part.content, `Spawned teammate mate in session ${mate.id}`);
+});
+
+test('inherited bypass executes a child write without creating an approval [AC:bot-task-permission-inheritance#AC-2]', async () => {
+  const { readFileSync } = await import('node:fs');
+  const repoRoot = mkdtempSync(join(tmpdir(), 'child-bypass-'));
+  const runtime = new RawAgentRuntime({
+    repoRoot,
+    stateDir: mkdtempSync(join(tmpdir(), 'child-bypass-state-')),
+    modelAdapter: new ScriptedAdapter(input => {
+      const child = input.agent.id === 'researcher';
+      const tool = child ? 'write_file' : 'spawn_subagent';
+      if (input.messages.some(message => message.parts.some(part => part.type === 'tool_result' && part.name === tool))) {
+        return { stopReason: 'end', assistantParts: [{ type: 'text', text: 'done' }] };
+      }
+      return { stopReason: 'tool_use', assistantParts: [{ type: 'tool_call', toolCallId: child ? 'write-child' : 'spawn-child', name: tool,
+        input: child ? { path: join(repoRoot, 'proof.txt'), content: 'child effect' } : { role: 'research', prompt: 'write proof.txt' } }] };
+    })
+  });
+  try {
+    const parent = runtime.createChatSession({ title: 'Bot', message: 'go', metadata: { botId: 'owner', permissionMode: 'bypass' } });
+    await runtime.runSession(parent.id);
+    assert.equal(spawnResult(runtime, parent.id).ok, true);
+    assert.equal(readFileSync(join(repoRoot, 'proof.txt'), 'utf8'), 'child effect');
+    assert.deepEqual(runtime.listApprovals(), []);
+    assert.equal(childOf(runtime, parent.id).metadata.permissionMode, 'bypass');
+  } finally { await runtime.destroy(); }
 });
