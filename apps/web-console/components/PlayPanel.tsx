@@ -276,7 +276,7 @@ export function PlayPanel({
   accountMenu,
   catalogSessions
 }: PlayPanelProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [attachOpen, setAttachOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
@@ -708,7 +708,9 @@ export function PlayPanel({
     () => ({
       elapsed: t('play.stats.elapsed'),
       input: t('play.stats.input'),
-      output: t('play.stats.output')
+      output: t('play.stats.output'),
+      ended: t('play.stats.ended'),
+      sessionEnded: t('play.stats.sessionEnded')
     }),
     [t]
   );
@@ -718,12 +720,13 @@ export function PlayPanel({
       messages: chat.sessionMessages as Array<{ role?: string; createdAt?: unknown }>,
       traces: feedTraces,
       running: statsLive,
+      sessionOpen: headerStatus === 'waiting_approval',
       now: nowMs
     });
-  }, [selectedSessionId, feedHasTurns, chat.sessionMessages, feedTraces, statsLive, nowMs]);
+  }, [selectedSessionId, feedHasTurns, chat.sessionMessages, feedTraces, statsLive, headerStatus, nowMs]);
   const turnFeedStatLines = useMemo(
-    () => turnFeedStats.map((stat) => formatTurnFeedStatsLine(stat, turnStatsLabels)),
-    [turnFeedStats, turnStatsLabels]
+    () => turnFeedStats.map((stat) => formatTurnFeedStatsLine(stat, turnStatsLabels, locale)),
+    [turnFeedStats, turnStatsLabels, locale]
   );
 
   useEffect(() => {

@@ -38,6 +38,10 @@ export type TurnFeedStat = {
   elapsedMs?: number;
   usageTotals?: SessionUsageTotals;
   usageCostUsd?: number;
+  /** Wall-clock end of this turn. Absent while this turn is still open. */
+  endedAtMs?: number;
+  /** Last turn of a session that has finished. Its endedAtMs is when the session ended. */
+  sessionEnded?: boolean;
 };
 
 function isUserRole(role: unknown): boolean {
@@ -76,6 +80,8 @@ type ModelTurnWindow = {
   endMs: number;
   usage?: SessionUsageTotals;
   costUsd?: number;
+  /** Still in progress; endMs is "now", not a real end. */
+  open?: boolean;
 };
 
 /**
@@ -113,7 +119,7 @@ export function extractModelTurnWindows(
     }
   }
   if (openStart != null && typeof opts?.openEndMs === 'number' && opts.openEndMs >= openStart) {
-    windows.push({ startMs: openStart, endMs: opts.openEndMs });
+    windows.push({ startMs: openStart, endMs: opts.openEndMs, open: true });
   }
   return windows;
 }
@@ -159,15 +165,29 @@ function windowOverlaps(
   return true;
 }
 
+function latestReplyMs(messages: TurnFeedStatMessage[], slice: ConversationTurnSlice): number | undefined {
+  let end: number | undefined;
+  for (let i = slice.startIndex; i <= slice.endIndex; i += 1) {
+    const msg = messages[i];
+    if (!msg || msg.role === 'user') continue;
+    const t = parseTimeMs(msg.createdAt);
+    if (t == null) continue;
+    end = end == null ? t : Math.max(end, t);
+  }
+  return end;
+}
+
 /**
  * Build one stats object per conversation turn. Returns null entries when that
- * turn has neither elapsed nor real usage/cost (caller should not render).
+ * turn has neither elapsed, real usage/cost, nor an end time.
  */
 export function buildTurnFeedStats(input: {
   messages: TurnFeedStatMessage[];
   traces?: TurnFeedTraceEvent[];
   /** While the latest turn is still running, extend its end to `now`. */
   running?: boolean;
+  /** Latest turn has not finished (running, or waiting on the user). */
+  sessionOpen?: boolean;
   now?: number;
 }): Array<TurnFeedStat | null> {
   const slices = sliceConversationTurns(input.messages);
@@ -182,13 +202,16 @@ export function buildTurnFeedStats(input: {
     const slice = slices[si]!;
     const next = slices[si + 1];
     const bounds = messageWindowBounds(input.messages, slice, next);
+    const sessionOpen = Boolean(input.running || input.sessionOpen);
     const isLiveTail = Boolean(input.running) && si === slices.length - 1;
+    const isOpenTail = sessionOpen && si === slices.length - 1;
 
     let usage: SessionUsageTotals | undefined;
     let costUsd = 0;
     let hasCost = false;
     let firstModelStart: number | undefined;
     let lastModelEnd: number | undefined;
+    let lastClosedEnd: number | undefined;
 
     for (const win of modelWindows) {
       if (!windowOverlaps(win, bounds.startMs, bounds.endMsExclusive)) continue;
@@ -200,6 +223,9 @@ export function buildTurnFeedStats(input: {
       firstModelStart =
         firstModelStart == null ? win.startMs : Math.min(firstModelStart, win.startMs);
       lastModelEnd = lastModelEnd == null ? win.endMs : Math.max(lastModelEnd, win.endMs);
+      if (!win.open) {
+        lastClosedEnd = lastClosedEnd == null ? win.endMs : Math.max(lastClosedEnd, win.endMs);
+      }
     }
 
     let elapsedMs: number | undefined;
@@ -219,11 +245,19 @@ export function buildTurnFeedStats(input: {
     }
     if (usage) stat.usageTotals = usage;
     if (hasCost && costUsd > 0) stat.usageCostUsd = Math.round(costUsd * 1e6) / 1e6;
+    if (!isOpenTail) {
+      const endedAtMs = lastClosedEnd ?? latestReplyMs(input.messages, slice);
+      if (endedAtMs != null) {
+        stat.endedAtMs = endedAtMs;
+        if (!sessionOpen && si === slices.length - 1) stat.sessionEnded = true;
+      }
+    }
 
     const hasAnything =
       stat.elapsedMs != null ||
       hasRealUsageTotals(stat.usageTotals) ||
-      (typeof stat.usageCostUsd === 'number' && stat.usageCostUsd > 0);
+      (typeof stat.usageCostUsd === 'number' && stat.usageCostUsd > 0) ||
+      stat.endedAtMs != null;
     out.push(hasAnything ? stat : null);
   }
 
@@ -232,13 +266,17 @@ export function buildTurnFeedStats(input: {
 
 export function formatTurnFeedStatsLine(
   stat: TurnFeedStat | null | undefined,
-  labels?: ChatFeedStatsLabels
+  labels?: ChatFeedStatsLabels,
+  locale?: string
 ): string | null {
   if (!stat) return null;
   return formatChatFeedStatsLine({
     elapsedMs: stat.elapsedMs,
     usageTotals: stat.usageTotals,
     usageCostUsd: stat.usageCostUsd,
-    labels
+    endedAtMs: stat.endedAtMs,
+    sessionEnded: stat.sessionEnded,
+    labels,
+    locale
   });
 }

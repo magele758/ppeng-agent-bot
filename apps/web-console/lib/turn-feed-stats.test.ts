@@ -129,3 +129,185 @@ test('formatTurnFeedStatsLine reuses feed footer formatting', () => {
   );
   assert.equal(formatTurnFeedStatsLine(null), null);
 });
+
+const endTimeLabels = {
+  elapsed: '执行',
+  input: '输入',
+  output: '输出',
+  ended: '结束',
+  sessionEnded: '会话结束'
+};
+
+function expectedEndClock(ms: number, locale: 'zh' | 'en'): string {
+  const tag = locale === 'zh' ? 'zh-CN' : 'en';
+  return new Intl.DateTimeFormat(tag, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(ms);
+}
+
+test('finished turn stats keep usage and add a local end time [AC:turn-stats-end-time#AC-1]', () => {
+  const endedAt = Date.parse('2026-10-22T08:47:00.000Z');
+  const stats = buildTurnFeedStats({
+    messages: [
+      { role: 'user', createdAt: '2026-10-22T08:46:56.000Z' },
+      { role: 'assistant', createdAt: '2026-10-22T08:47:00.000Z' }
+    ],
+    traces: [
+      { kind: 'turn_start', ts: '2026-10-22T08:46:56.000Z' },
+      {
+        kind: 'turn_end',
+        ts: '2026-10-22T08:47:00.000Z',
+        payload: { usage: { inputTokens: 20_500, outputTokens: 275, totalTokens: 20_775 }, costUsd: 0.05 }
+      }
+    ]
+  });
+  assert.equal(stats[0]?.endedAtMs, endedAt);
+  assert.equal(stats[0]?.sessionEnded, true);
+  const line = formatTurnFeedStatsLine(stats[0], endTimeLabels, 'zh');
+  assert.equal(
+    line,
+    `执行 4s · 输入 20.5k · 输出 275 · $0.050 · 会话结束 ${expectedEndClock(endedAt, 'zh')}`
+  );
+  const english = formatTurnFeedStatsLine(
+    stats[0],
+    { elapsed: 'Ran', input: 'In', output: 'Out', ended: 'Ended', sessionEnded: 'Session ended' },
+    'en'
+  );
+  assert.equal(
+    english,
+    `Ran 4s · In 20.5k · Out 275 · $0.050 · Session ended ${expectedEndClock(endedAt, 'en')}`
+  );
+});
+
+test('finished turn without traces uses the reply time [AC:turn-stats-end-time#AC-1]', () => {
+  const endedAt = Date.parse('2026-09-03T12:00:40.000Z');
+  const stats = buildTurnFeedStats({
+    messages: [
+      { role: 'user', createdAt: '2026-09-03T12:00:00.000Z' },
+      { role: 'assistant', createdAt: '2026-09-03T12:00:40.000Z' }
+    ]
+  });
+  assert.equal(stats[0]?.endedAtMs, endedAt);
+  assert.equal(stats[0]?.elapsedMs, 40_000);
+  const line = formatTurnFeedStatsLine(stats[0], endTimeLabels, 'zh') ?? '';
+  assert.match(line, /^执行 40s · 会话结束 /);
+  assert.ok(line.endsWith(expectedEndClock(endedAt, 'zh')));
+});
+
+test('a running turn does not invent an end time [AC:turn-stats-end-time#AC-2]', () => {
+  const now = Date.parse('2026-10-22T08:47:30.000Z');
+  const stats = buildTurnFeedStats({
+    messages: [
+      { role: 'user', createdAt: '2026-10-22T08:46:56.000Z' },
+      { role: 'assistant', createdAt: '2026-10-22T08:47:00.000Z' }
+    ],
+    traces: [
+      { kind: 'turn_start', ts: '2026-10-22T08:46:56.000Z' },
+      {
+        kind: 'turn_end',
+        ts: '2026-10-22T08:47:00.000Z',
+        payload: { usage: { inputTokens: 20_500, outputTokens: 275 }, costUsd: 0.05 }
+      },
+      { kind: 'turn_start', ts: '2026-10-22T08:47:01.000Z' }
+    ],
+    running: true,
+    now
+  });
+  assert.equal(stats[0]?.endedAtMs, undefined);
+  assert.notEqual(stats[0]?.sessionEnded, true);
+  const line = formatTurnFeedStatsLine(stats[0], endTimeLabels, 'zh') ?? '';
+  assert.match(line, /执行 /);
+  assert.match(line, /输入 20\.5k/);
+  assert.match(line, /输出 275/);
+  assert.match(line, /\$0\.050/);
+  assert.doesNotMatch(line, /结束/);
+  assert.equal(line.includes(expectedEndClock(now, 'zh')), false);
+});
+
+test('waiting on the user does not show a session end time [AC:turn-stats-end-time#AC-2]', () => {
+  const endedAt = Date.parse('2026-10-22T08:47:00.000Z');
+  const stats = buildTurnFeedStats({
+    messages: [
+      { role: 'user', createdAt: '2026-10-22T08:46:56.000Z' },
+      { role: 'assistant', createdAt: '2026-10-22T08:47:00.000Z' }
+    ],
+    traces: [
+      { kind: 'turn_start', ts: '2026-10-22T08:46:56.000Z' },
+      {
+        kind: 'turn_end',
+        ts: '2026-10-22T08:47:00.000Z',
+        payload: { usage: { inputTokens: 100, outputTokens: 10 }, costUsd: 0.02 }
+      }
+    ],
+    sessionOpen: true
+  });
+  assert.equal(stats[0]?.endedAtMs, undefined);
+  assert.notEqual(stats[0]?.sessionEnded, true);
+  const line = formatTurnFeedStatsLine(stats[0], endTimeLabels, 'zh') ?? '';
+  assert.match(line, /执行 /);
+  assert.doesNotMatch(line, /结束/);
+  assert.equal(line.includes(expectedEndClock(endedAt, 'zh')), false);
+});
+
+test('earlier turns show their own end and the last turn shows when the session ended [AC:turn-stats-end-time#AC-3]', () => {
+  const firstEnd = Date.parse('2026-09-03T12:00:10.000Z');
+  const sessionEnd = Date.parse('2026-09-03T12:01:03.000Z');
+  const messages = [
+    { role: 'user', createdAt: '2026-09-03T12:00:00.000Z' },
+    { role: 'assistant', createdAt: '2026-09-03T12:00:05.000Z' },
+    { role: 'tool', createdAt: '2026-09-03T12:00:06.000Z' },
+    { role: 'assistant', createdAt: '2026-09-03T12:00:10.000Z' },
+    { role: 'user', createdAt: '2026-09-03T12:01:00.000Z' },
+    { role: 'assistant', createdAt: '2026-09-03T12:01:03.000Z' }
+  ];
+  const traces = [
+    { kind: 'turn_start', ts: '2026-09-03T12:00:01.000Z' },
+    {
+      kind: 'turn_end',
+      ts: '2026-09-03T12:00:05.000Z',
+      payload: { usage: { inputTokens: 1000, outputTokens: 100, totalTokens: 1100 }, costUsd: 0.01 }
+    },
+    { kind: 'turn_start', ts: '2026-09-03T12:00:06.000Z' },
+    {
+      kind: 'turn_end',
+      ts: '2026-09-03T12:00:10.000Z',
+      payload: { usage: { inputTokens: 2000, outputTokens: 50, totalTokens: 2050 }, costUsd: 0.02 }
+    },
+    { kind: 'turn_start', ts: '2026-09-03T12:01:01.000Z' },
+    {
+      kind: 'turn_end',
+      ts: '2026-09-03T12:01:03.000Z',
+      payload: { usage: { inputTokens: 500, outputTokens: 40, totalTokens: 540 }, costUsd: 0.005 }
+    }
+  ];
+  const stats = buildTurnFeedStats({ messages, traces });
+  assert.equal(stats[0]?.endedAtMs, firstEnd);
+  assert.notEqual(stats[0]?.sessionEnded, true);
+  assert.equal(stats[1]?.endedAtMs, sessionEnd);
+  assert.equal(stats[1]?.sessionEnded, true);
+  const earlier = formatTurnFeedStatsLine(stats[0], endTimeLabels, 'zh') ?? '';
+  const last = formatTurnFeedStatsLine(stats[1], endTimeLabels, 'zh') ?? '';
+  assert.match(earlier, /执行 9s · 输入 3k · 输出 150 · \$0\.030 · 结束 /);
+  assert.doesNotMatch(earlier, /会话结束/);
+  assert.ok(earlier.endsWith(expectedEndClock(firstEnd, 'zh')));
+  assert.match(last, /执行 2s · 输入 500 · 输出 40 · \$0\.0050 · 会话结束 /);
+  assert.ok(last.endsWith(expectedEndClock(sessionEnd, 'zh')));
+  assert.notEqual(expectedEndClock(firstEnd, 'zh'), expectedEndClock(sessionEnd, 'zh'));
+});
+
+test('a turn with no end timestamp does not show an end time [AC:turn-stats-end-time#AC-4]', () => {
+  const stats = buildTurnFeedStats({
+    messages: [{ role: 'user', createdAt: '2026-09-03T12:00:00.000Z' }]
+  });
+  assert.equal(stats[0]?.endedAtMs, undefined);
+  assert.equal(formatTurnFeedStatsLine(stats[0], endTimeLabels, 'zh'), null);
+
+  const blank = buildTurnFeedStats({
+    messages: [{ role: 'user' }, { role: 'assistant' }]
+  });
+  assert.equal(blank[0], null);
+  assert.equal(formatTurnFeedStatsLine(blank[0], endTimeLabels, 'zh'), null);
+});
