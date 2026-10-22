@@ -1,0 +1,33 @@
+id: goal-update-presentation
+title: 目标更新用紧凑状态卡展示
+status: implemented
+requirement: |
+  [goal update] {"id":"goal_84377e09-043c-4a93-86de-3e834e1678be","title":"可以考虑让bo”: 这种要么不展示，要么补个UI来展示，不要搞裸的
+notes: |
+  选择补一块紧凑的目标状态卡，而不是把这类通知整个藏起来。
+  卡片只放用户能读的目标标题、状态和一句原因，并且只出现在这条通知所属的对话里。
+criteria:
+  - id: AC-1
+    given: 当前这段 Bot 对话里有一条目标更新通知，里面带有目标标题、状态、原因，以及给模型看的英文叮嘱
+    when: 我打开或刷新这段对话
+    then: 这条通知不再显示成以 [goal update] 开头的花括号原文，对话里也看不到 Briefly tell the user this meaningful change. 和 Do not restart this goal or treat this notification as a new user task.
+  - id: AC-2
+    given: 这段对话里有一条目标更新通知
+    when: 我查看这条通知
+    then: 它显示为一块紧凑的目标状态卡，主标题是目标标题，状态用能读的说法（如受阻、进行中、完成，并与这条通知的实际情况一致），另有一句人话原因；内部编号不当作主标题
+  - id: AC-3
+    given: 一条目标更新的状态是受阻，原因原文是 Completion verification unavailable; evidence retained for review
+    when: 我看对话里对应的状态卡
+    then: 能看出目标受阻，原因写成完成核验不可用、证据留着待查；卡片上不堆这句英文原文
+  - id: AC-4
+    given: 这段对话里没有目标更新通知
+    when: 我打开这段对话
+    then: 对话里不额外出现一块空的目标状态卡
+  - id: AC-5
+    given: 同一段对话里还有我发出的消息和助手的回复
+    when: 我查看这段对话
+    then: 我的消息和助手回复仍按原来的样子显示，不被收成目标状态卡，也不被藏起来
+  - id: AC-6
+    given: 另一个目标或另一个会话里有一条目标更新
+    when: 我看着当前这段对话
+    then: 当前对话不出现那条不属于这里的目标更新
