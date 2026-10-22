@@ -1,0 +1,21 @@
+id: play-group-delete-menu
+title: 群聊行的删除收进悬停图标菜单
+status: implemented
+requirement: |
+  这个太扎眼了，搞成iconfont，隐藏的hover菜单里
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  沿用仓库已有描边图标，不新引图标库。确认、取消和失败重试仍按 bot-functional-groups AC-1/AC-2 与 bot-entry-simplification AC-7。Bot 行和功能分组的删除按钮不在这次改动里。
+criteria:
+  - id: AC-1
+    given: 会话列表里有一条群聊，且当前不是触摸设备
+    when: 用户没有把指针停在这一行上，也没有用键盘聚焦到这一行
+    then: 这一行不显示「删除」文字按钮
+  - id: AC-2
+    given: 会话列表里有一条群聊
+    when: 用户把指针停在这一行上、用键盘聚焦到这一行，或正在使用触摸设备
+    then: 出现图标菜单，其中的删除图标可被点到或用键盘选中，无障碍名称仍是「删除群聊」加该群名称
+  - id: AC-3
+    given: 群聊行上的删除图标已经出现
+    when: 用户点这个图标
+    then: 仍先确认；取消则群聊还在；确认后删除的是这一条群聊；失败时群聊保留并显示错误，可以重试

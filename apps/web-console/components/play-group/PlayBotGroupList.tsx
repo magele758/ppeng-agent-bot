@@ -9,6 +9,7 @@ import {
   BOT_GROUPS_CHANGED_EVENT,
   groupMatchesQuery,
 } from '@/lib/bot-group';
+import { WorkspaceIcon } from '../WorkspaceIcon';
 import './play-group.css';
 
 type Room = {
@@ -120,19 +121,23 @@ export function PlayBotGroupList({
                 <span className="session-item__agent">{names}</span>
               </div>
             </div>
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm play-group-delete"
-              data-testid="play-group-delete"
-              aria-label={t('play.group.deleteAria', { title: room.title })}
-              disabled={deletingId !== null}
-              onClick={(event) => {
-                event.stopPropagation();
-                void deleteGroup(room);
-              }}
-            >
-              {deletingId === room.id ? t('play.group.deleting') : t('play.group.deleteLabel')}
-            </button>
+            <div className="play-group-menu" data-testid="play-group-menu">
+              <button
+                type="button"
+                className="btn btn-ghost btn-icon btn-sm play-group-delete"
+                data-testid="play-group-delete"
+                aria-label={t('play.group.deleteAria', { title: room.title })}
+                title={deletingId === room.id ? t('play.group.deleting') : t('play.group.deleteLabel')}
+                aria-busy={deletingId === room.id}
+                disabled={deletingId !== null}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void deleteGroup(room);
+                }}
+              >
+                <WorkspaceIcon kind="trash" />
+              </button>
+            </div>
           </div>
         );
       })}
