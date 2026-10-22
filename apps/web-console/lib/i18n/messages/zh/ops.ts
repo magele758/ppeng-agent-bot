@@ -60,7 +60,8 @@ export const ops = {
     toolsCount: '{n} 个工具',
     tokensCount: '{n} tokens',
     showing: '显示 {shown} / {total} 轮',
-    autoRefresh: '每 3 秒自动刷新'
+    autoRefresh: '每 3 秒自动刷新',
+    earlierHidden: '还有 {n} 条更早的记录没有显示。'
   },
 
   hint: {
@@ -83,6 +84,11 @@ export const ops = {
       what: '输出被截断',
       why: '触及 token / max_tokens 上限',
       next: '提高上限、要求模型更短，或拆成多步任务'
+    },
+    goalUnmet: {
+      what: '目标还没达成',
+      why: '评判没有通过',
+      next: '看目标原文和 reason，再决定续跑或改目标'
     },
     generic: {
       what: '异常事件',

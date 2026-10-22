@@ -92,6 +92,8 @@ export interface SelfHealContext {
   runSession: (sessionId: string) => Promise<void>;
   /** Binds a workspace to a task, returns workspace root. */
   bindWorkspaceForTask: (taskId: string) => Promise<string | undefined>;
+  /** Parent trace row so a goal-owned heal session can be opened from the parent trajectory. */
+  emitTrace?: (sessionId: string, event: { kind: 'child_session'; payload: Record<string, unknown> }) => void;
 }
 
 export class SelfHealScheduler {
@@ -431,7 +433,10 @@ export class SelfHealScheduler {
       background: true,
       metadata: sessionMeta,
     });
-    if (owner) this.ctx.store.updateSession(session.id,{parentSessionId:owner.parentSessionId});
+    if (owner) {
+      this.ctx.store.updateSession(session.id,{parentSessionId:owner.parentSessionId});
+      this.ctx.emitTrace?.(owner.parentSessionId, { kind: 'child_session', payload: { childSessionId: session.id, source: 'bot-goal-worker' } });
+    }
     this.ctx.store.updateTask(task.id, { status: 'in_progress' });
     this.ctx.store.updateSelfHealRun(r.id, { status: 'running_tests', taskId: task.id, sessionId: session.id });
     this.ctx.store.appendSelfHealEvent({ runId: r.id, kind: 'task_created', payload: { taskId: task.id, sessionId: session.id } });

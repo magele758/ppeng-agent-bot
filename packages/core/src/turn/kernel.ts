@@ -44,10 +44,17 @@ import {
   markGoalWaitingUser,
   persistGoalAfterEval,
   readGoalSettings,
+  resolveGoalCondition,
   runGoalVerify,
   tryGoalStore,
   type GoalGate
 } from '../goal/index.js';
+import { redactToolContent } from '../sandbox/result-redaction.js';
+import {
+  attachGoalText,
+  repetitionTraceFields,
+  turnTraceFields
+} from '../stores/trace-visible.js';
 import { estimateUsageCostUsd, llmPromptDebugEnabled, mergeCostUsd, mergeUsage, splitCumulativePromptTokens } from '@ppeng/agent-loop';
 import { readWorkingLogAppendix } from '../session/working-log.js';
 import { applyClaimedInbox, prepareTurnInput } from './prepare-turn-input.js';
@@ -121,6 +128,10 @@ import {
   workspaceBindingFromMetadata,
   type WorkspaceStoreHost
 } from '../workspace/index.js';
+
+function redactForTrace(text: string): string {
+  return redactToolContent(text, process.env);
+}
 
 function hasWorkspaceStores(store: unknown): store is WorkspaceStoreHost {
   return (
@@ -690,7 +701,8 @@ async function runSessionKernel(
             confidence: routing.confidence.level,
             shortlistCount: routing.shortlistNames.length,
             topSkill: routing.routed[0]?.skill.name
-          } : undefined
+          } : undefined,
+          ...turnTraceFields({ messages: rawVisible, redact: redactForTrace })
         }
       });
 
@@ -808,7 +820,7 @@ async function runSessionKernel(
         if (isRepetitionAbort(error)) {
           void host.emitTrace(sid, {
             kind: 'repetition_abort',
-            payload: { reason: error.reason, retry: true }
+            payload: { reason: error.reason, retry: true, ...repetitionTraceFields(error.sample, redactForTrace) }
           });
           const repChoice = await applyJevRecoveryChoice(
             host.store,
@@ -828,9 +840,10 @@ async function runSessionKernel(
             turnResult = await host.runTurnWithRetries(turnInput, options?.onModelStreamChunk);
           } catch (retryError) {
             const reason = isRepetitionAbort(retryError) ? retryError.reason : error.reason;
+            const sample = isRepetitionAbort(retryError) ? retryError.sample : error.sample;
             void host.emitTrace(sid, {
               kind: 'repetition_abort',
-              payload: { reason, retry: false }
+              payload: { reason, retry: false, ...repetitionTraceFields(sample, redactForTrace) }
             });
             host.store.appendMessage(sid, 'system', [
               textPart(`[recovery] Stopped: model output degenerated into repetition (${reason})`)
@@ -948,7 +961,12 @@ async function runSessionKernel(
           ...(turnResult.truncated ? { truncated: true } : {}),
           ...(turnResult.requestId ? { requestId: turnResult.requestId } : {}),
           ...(turnCostUsd !== undefined ? { costUsd: turnCostUsd, costModel: turnCostModel } : {}),
-          stableSystemVersion: STABLE_SYSTEM_VERSION
+          stableSystemVersion: STABLE_SYSTEM_VERSION,
+          ...turnTraceFields({
+            messages: rawVisible,
+            assistantParts: turnResult.assistantParts,
+            redact: redactForTrace
+          })
         }
       });
 
@@ -958,7 +976,13 @@ async function runSessionKernel(
           kind: 'turn_truncated',
           payload: {
             finishReason: turnResult.finishReason ?? 'length',
-            ...(turnResult.usage ? { outputTokens: turnResult.usage.outputTokens } : {})
+            ...(turnResult.usage ? { outputTokens: turnResult.usage.outputTokens } : {}),
+            ...turnTraceFields({
+              messages: rawVisible,
+              assistantParts: turnResult.assistantParts,
+              includeReasoning: true,
+              redact: redactForTrace
+            })
           }
         });
       }
@@ -1098,7 +1122,16 @@ async function runSessionKernel(
         host.store.appendMessage(sid, 'system', [textPart(`[recovery] Stopped: ${spinReason}`)]);
         void host.emitTrace(sid, {
           kind: 'reasoning_spin_abort',
-          payload: { reason: spinReason, streak: spinWatchdog!.streak }
+          payload: {
+            reason: spinReason,
+            streak: spinWatchdog!.streak,
+            ...turnTraceFields({
+              messages: rawVisible,
+              assistantParts: turnResult.assistantParts,
+              includeReasoning: true,
+              redact: redactForTrace
+            })
+          }
         });
         return await finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'reasoning_spin');
       }
@@ -1205,15 +1238,19 @@ async function runSessionKernel(
             host.store.appendMessage(sid, 'system', [
               textPart(`[jev-route] Achieved: ${route.reason}`)
             ]);
+            const achievedGoal = goalStore?.findLatestBySession(sid);
             void host.emitTrace(sid, {
               kind: 'goal_eval',
-              payload: {
+              payload: attachGoalText({
                 met: true,
                 reason: route.reason,
                 source: 'jev-route',
                 decision: 'achieved',
                 turnsUsed: goalGate.getTurnsUsed()
-              }
+              }, {
+                goal: resolveGoalCondition((host.store.getSession(sid) ?? session).metadata) ?? achievedGoal?.condition,
+                title: achievedGoal?.spec.goal
+              })
             });
           } else {
             const snapshot = softSnapshot;
@@ -1254,15 +1291,19 @@ async function runSessionKernel(
                 gate: goalGate
               });
             }
+            const judgedSession = host.store.getSession(sid) ?? session;
             void host.emitTrace(sid, {
               kind: 'goal_eval',
-              payload: {
+              payload: attachGoalText({
                 met: evalResult.met,
                 reason: evalResult.reason,
                 source: evalResult.source,
                 decision: decision.kind,
                 turnsUsed: goalGate.getTurnsUsed()
-              }
+              }, {
+                goal: resolveGoalCondition(judgedSession.metadata) ?? rec?.condition,
+                title: rec?.spec.goal
+              })
             });
             if (decision.kind === 'continue') {
               const reason =

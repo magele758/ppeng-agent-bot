@@ -56,7 +56,8 @@ import {
   resolveTurnTools as selectTurnTools
 } from '../turn/resolve-turn-tools.js';
 import { runLifecycleHook as runEnvLifecycleHook } from '../hooks/lifecycle-hooks.js';
-import { createGoalGateFromMetadata } from '../goal/goal-gate.js';
+import { createGoalGateFromMetadata, resolveGoalCondition } from '../goal/goal-gate.js';
+import { attachGoalText } from '../stores/trace-visible.js';
 import {
   ensureGoalEntityFromMetadata,
   markGoalWaitingUser,
@@ -1014,15 +1015,19 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
       // route.done only fires when goalGate point is off (see applyJevRoute).
       // Skip another deep-model completeText round for completion.
       if (route.kind === 'done') {
+        const achievedGoal = tryGoalStore(rt.store)?.findLatestBySession(session.id);
         void rt.emitTrace(session.id, {
           kind: 'goal_eval',
-          payload: {
+          payload: attachGoalText({
             met: true,
             reason: route.reason,
             source: 'jev-route',
             decision: 'achieved',
             turnsUsed: gate.getTurnsUsed()
-          }
+          }, {
+            goal: resolveGoalCondition(session.metadata) ?? achievedGoal?.condition,
+            title: achievedGoal?.spec.goal
+          })
         });
         return {
           met: true,
@@ -1078,16 +1083,21 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
           gate
         });
       }
+      const judgedSession = rt.store.getSession(session.id) ?? session;
+      const judgedGoal = goalStore?.findLatestBySession(session.id);
       void rt.emitTrace(session.id, {
         kind: 'goal_eval',
-        payload: {
+        payload: attachGoalText({
           met: evalResult.met,
           reason: evalResult.reason,
           source: evalResult.source,
           decision: decision.kind,
           turnsUsed: gate.getTurnsUsed(),
           jevGoalGate: chainHas(resolveJevChain(rt.store), 'goalGate')
-        }
+        }, {
+          goal: resolveGoalCondition(judgedSession.metadata) ?? judgedGoal?.condition,
+          title: judgedGoal?.spec.goal
+        })
       });
       if (decision.kind === 'continue') {
         return {

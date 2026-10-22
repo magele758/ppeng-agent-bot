@@ -47,7 +47,13 @@ describe('streaming/repetition-watchdog', () => {
     it('stores the reason', () => {
       const err = new RepetitionLoopAbortError('test reason');
       expect(err.reason).toBe('test reason');
+      expect(err.sample).toBe('');
       expect(err.message).toContain('test reason');
+    });
+
+    it('keeps an optional sample of the repeated text', () => {
+      const err = new RepetitionLoopAbortError('sequence repeated', '停在这里停在这里');
+      expect(err.sample).toBe('停在这里停在这里');
     });
 
     it('isRepetitionAbort identifies the error', () => {

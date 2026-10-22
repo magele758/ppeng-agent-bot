@@ -9,6 +9,8 @@ export type TraceEventKind =
   | 'turn_truncated'
   | 'tool_start'
   | 'tool_end'
+  /** Parent session recorded a child session another trajectory can be opened for */
+  | 'child_session'
   | 'model_error'
   /** Global fallback chain switched this turn to the next configured model */
   | 'model_fallback'

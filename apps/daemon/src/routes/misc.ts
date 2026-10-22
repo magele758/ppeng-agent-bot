@@ -246,8 +246,8 @@ export function miscRoutes(runtime: RawAgentRuntime, opts: MiscOptions): RouteSp
         if (!sessionId) throw new ValidationError('Missing sessionId');
         guardSession(runtime, sessionId, auth);
         const limit = Number(url.searchParams.get('limit') ?? '500');
-        const events = await runtime.listTraceEvents(sessionId, Number.isFinite(limit) ? limit : 500);
-        json(response, 200, { sessionId, events });
+        const page = await runtime.listTracePage(sessionId, Number.isFinite(limit) ? limit : 500);
+        json(response, 200, { sessionId, events: page.events, omittedEarlier: page.omittedEarlier });
       }
     },
     {

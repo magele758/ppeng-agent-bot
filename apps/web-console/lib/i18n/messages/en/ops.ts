@@ -60,7 +60,8 @@ export const ops = {
     toolsCount: '{n} tools',
     tokensCount: '{n} tokens',
     showing: 'Showing {shown} / {total} turns',
-    autoRefresh: 'Auto-refreshes every 3s'
+    autoRefresh: 'Auto-refreshes every 3s',
+    earlierHidden: '{n} earlier records are not shown.'
   },
 
   hint: {
@@ -83,6 +84,11 @@ export const ops = {
       what: 'Output truncated',
       why: 'Hit the token / max_tokens limit',
       next: 'Raise the limit, ask for shorter output, or split into steps'
+    },
+    goalUnmet: {
+      what: 'Goal not met',
+      why: 'The judge did not pass this goal',
+      next: 'Read the goal sentence and the reason, then continue or change the goal'
     },
     generic: {
       what: 'Abnormal event',

@@ -22,12 +22,18 @@ const ERROR_KINDS = new Set([
   'refusal_preservation'
 ]);
 
-function isErrorKind(kind: string): boolean {
+function isErrorKind(kind: string, payload?: unknown): boolean {
+  if (kind === 'goal_eval') return unmetGoal(payload);
   if (ERROR_KINDS.has(kind)) return true;
   return kind.includes('error') || kind.includes('fail');
 }
 
-export type ErrorHintCode = 'modelError' | 'recoveryAbort' | 'cancel' | 'truncated' | 'generic';
+function unmetGoal(payload: unknown): boolean {
+  const p = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {};
+  return p.met === false;
+}
+
+export type ErrorHintCode = 'modelError' | 'recoveryAbort' | 'cancel' | 'truncated' | 'goalUnmet' | 'generic';
 
 /** Maps an error-ish trace kind to an i18n hint code (`ops.hint.<code>.what|why|next`). */
 export function errorHintCode(kind: string): ErrorHintCode {
@@ -40,14 +46,27 @@ export function errorHintCode(kind: string): ErrorHintCode {
       return 'cancel';
     case 'turn_truncated':
       return 'truncated';
+    case 'goal_eval':
+      return 'goalUnmet';
     default:
       return 'generic';
   }
 }
 
+function textField(payload: Record<string, unknown>, key: string): string {
+  const value = payload[key];
+  return typeof value === 'string' ? value.trim() : '';
+}
+
 /** Free-text reason carried by an error event payload, if any. */
 export function errorPayloadMessage(payload: unknown): string {
   const p = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {};
+  if (unmetGoal(p)) {
+    const sentence = textField(p, 'goal') || textField(p, 'title');
+    const reason = textField(p, 'reason') || textField(p, 'message') || textField(p, 'error');
+    if (sentence && reason) return `${sentence} — ${reason}`;
+    return sentence || reason;
+  }
   if (typeof p.message === 'string') return p.message;
   if (typeof p.error === 'string') return p.error;
   return '';
@@ -83,13 +102,13 @@ export function groupTraceEvents(rows: TraceRow[]): TraceGroup[] {
         endTs: ev.ts,
         durationMs: null,
         events: [ev],
-        hasError: isErrorKind(ev.kind)
+        hasError: isErrorKind(ev.kind, ev.payload)
       };
       continue;
     }
     current.events.push(ev);
     current.endTs = ev.ts;
-    if (isErrorKind(ev.kind)) current.hasError = true;
+    if (isErrorKind(ev.kind, ev.payload)) current.hasError = true;
     if (ev.kind === 'turn_end' || ev.kind === 'cancel') {
       flush();
     }
@@ -127,7 +146,7 @@ export function summarizeGroup(group: Pick<TraceGroup, 'events'>): TraceTurnSumm
   let model: string | undefined;
   for (const ev of group.events) {
     if (ev.kind === 'tool_start') toolCalls += 1;
-    if (isErrorKind(ev.kind)) errorEvents += 1;
+    if (isErrorKind(ev.kind, ev.payload)) errorEvents += 1;
     if (ev.kind === 'turn_end' && ev.payload && typeof ev.payload === 'object') {
       const p = ev.payload as Record<string, unknown>;
       const usage = p.usage && typeof p.usage === 'object' ? (p.usage as Record<string, unknown>) : {};
