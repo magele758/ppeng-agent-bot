@@ -65,7 +65,7 @@ test('HTTP global default hot switches outgoing requests and rejects stale selec
     const room = rt.rooms.create(principal, { title: 'Wire test', botIds: [bot.id, peer.id], hostBotId: bot.id });
     const runRoom = async (expected) => {
       const before = calls.length;
-      rt.rooms.send(principal, room.id, { text: 'Reply briefly.' });
+      rt.rooms.send(principal, room.id, { text: 'Reply briefly.', mentions: [bot.id] });
       await rt.rooms.tick();
       assert.ok(calls.length > before, 'room request reached upstream');
       assert.equal(calls.at(-1), expected);
