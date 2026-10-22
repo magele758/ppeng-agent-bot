@@ -283,6 +283,7 @@ export function PlayPanel({
   const { upsertBot, setBots, tick } = useLab();
   const [selectMode, setSelectMode] = useState(false);
   const [checkedIds, setCheckedIds] = useState<string[]>([]);
+  const [composerFocused, setComposerFocused] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [openGroupId, setOpenGroupId] = useState<string | null>(null);
   const [groupCount, setGroupCount] = useState(0);
@@ -419,6 +420,16 @@ export function PlayPanel({
   };
 
   const onComposerKeyDown = (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Tab' && !event.shiftKey && botSurface) {
+      if (chat.acceptInputSuggestion()) {
+        event.preventDefault();
+        return;
+      }
+    }
+    if (event.key === 'Escape' && botSurface && chat.dismissInputSuggestion()) {
+      event.preventDefault();
+      return;
+    }
     const native = event.nativeEvent;
     const decision = decideComposerEnter({
       key: event.key,
@@ -494,6 +505,8 @@ export function PlayPanel({
     sessionTitle: chat.playTitle
   });
   const headerBotId = headerBotChat ? chat.botId || selectedBot?.id || '' : '';
+  const showGhost =
+    botSurface && composerFocused && !chatRunning && Boolean(chat.ghostSuggestion) && !chat.playInput.trim();
   const transcriptSettled = Boolean(selectedSessionId) && chat.loadedTranscriptSessionId === selectedSessionId;
   const firstTaskConversation: BotFirstTaskConversation = !headerBotId
     ? 'absent'
@@ -1176,25 +1189,44 @@ export function PlayPanel({
                       className="chat-composer__bot-face"
                     />
                   ) : null}
+                  <div className="chat-composer-field">
                   <textarea
                     ref={chat.playInputRef}
                     id="playInput"
                     className="chat-composer-input"
                     rows={1}
                     placeholder={
-                      chatRunning
-                        ? runningPlaceholder
-                        : botSurface && selectedBot
-                          ? t('play.messageToBot', { name: selectedBot.name })
-                          : t('play.messageToAgent')
+                      showGhost
+                        ? ''
+                        : chatRunning
+                          ? runningPlaceholder
+                          : botSurface && selectedBot
+                            ? t('play.messageToBot', { name: selectedBot.name })
+                            : t('play.messageToAgent')
                     }
                     autoComplete="off"
                     value={chat.playInput}
-                    onChange={(e) => chat.setPlayInput(e.target.value)}
+                    aria-describedby={showGhost ? 'playInputSuggestion' : undefined}
+                    onChange={(e) => {
+                      chat.noteComposerTyped();
+                      chat.setPlayInput(e.target.value);
+                    }}
+                    onFocus={() => setComposerFocused(true)}
+                    onBlur={() => {
+                      setComposerFocused(false);
+                      chat.noteComposerBlur();
+                    }}
                     onCompositionStart={onComposerCompositionStart}
                     onCompositionEnd={onComposerCompositionEnd}
                     onKeyDown={onComposerKeyDown}
                   />
+                  {showGhost ? (
+                    <span id="playInputSuggestion" className="chat-composer-ghost" aria-hidden="true">
+                      <span className="chat-composer-ghost__text">{chat.ghostSuggestion}</span>
+                      <span className="chat-composer-ghost__hint">{t('play.composer.suggestion')}</span>
+                    </span>
+                  ) : null}
+                  </div>
                   {chat.speechDictationAvailable ? (
                     <button
                       type="button"

@@ -39,6 +39,7 @@ import { goalRoutes } from './routes/goals.js';
 import { jevRoutes } from './routes/jev.js';
 import { langfuseRoutes } from './routes/langfuse.js';
 import { loopRoutes } from './routes/loop.js';
+import { inputSuggestionRoutes } from './routes/input-suggestion.js';
 import { mailboxRoutes } from './routes/mailbox.js';
 import { mcpOAuthRoutes } from './routes/mcp-oauth.js';
 import { memoryRoutes } from './routes/memory.js';
@@ -100,6 +101,7 @@ export function buildDaemonRouter(deps: DaemonAppDeps): Router {
     .addAll(cronRoutes(runtime))
     .addAll(configRoutes(runtime, { ...deps.config, env, repoRoot }))
     .addAll(loopRoutes(runtime))
+    .addAll(inputSuggestionRoutes(runtime))
     .addAll(compactRoutes(runtime))
     .addAll(gatewaySettingsRoutes(runtime))
     .addAll(tasksRoutes(runtime))

@@ -121,6 +121,15 @@ import {
   type SteerInterruptPolicy
 } from '@/lib/query-queue';
 import { decideRunningTurnSend, isCanonicalBotChatMetadata, planRunningTurnDelivery } from '@/lib/running-turn-send';
+import {
+  applyGhostKey,
+  emptyGhost,
+  ghostFromSuggestion,
+  ghostText,
+  suggestionStillCurrent,
+  type GhostState,
+  type InputSuggestion
+} from '@/lib/input-suggestion';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 /** Stream already persisted the user turn; do not put the draft back in the composer. */
@@ -304,6 +313,11 @@ export function usePlayChat(deps: PlayChatDeps) {
   const [goalDraft, setGoalDraft] = useState('');
   const [autonomyDraft, setAutonomyDraft] = useState<AutonomyLevel>('balanced');
   const [playInput, setPlayInput] = useState('');
+  const [inputGhost, setInputGhost] = useState<GhostState>(emptyGhost);
+  const [suggestionEnabled, setSuggestionEnabled] = useState(true);
+  const suggestionReqRef = useRef(0);
+  const suggestionSessionRef = useRef<string | null>(null);
+  const requestInputSuggestionRef = useRef<(sessionId: string) => Promise<void>>(async () => undefined);
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [imageUrlInput, setImageUrlInput] = useState('');
   const [pendingImageAssetIds, setPendingImageAssetIds] = useState<string[]>([]);
@@ -408,11 +422,32 @@ export function usePlayChat(deps: PlayChatDeps) {
     }, 240);
   }, []);
 
+  const clearInputSuggestion = () => setInputGhost(emptyGhost());
+
   const clearComposerOnly = () => {
     setPlayInput('');
     setPendingImageAssetIds([]);
     setPendingAttachmentIds([]);
     setPendingContext([]);
+    clearInputSuggestion();
+  };
+
+  const inputGhostRef = useRef(inputGhost);
+  inputGhostRef.current = inputGhost;
+
+  const acceptInputSuggestion = () => {
+    const next = applyGhostKey(inputGhostRef.current, 'Tab', playInputLiveRef.current);
+    if (next.commit === undefined) return false;
+    playInputLiveRef.current = next.commit;
+    setPlayInput(next.commit);
+    setInputGhost(next.state);
+    return true;
+  };
+
+  const dismissInputSuggestion = () => {
+    if (!ghostText(inputGhostRef.current)) return false;
+    setInputGhost(emptyGhost());
+    return true;
   };
 
   const removePendingContext = (id: string) => {
@@ -636,6 +671,60 @@ export function usePlayChat(deps: PlayChatDeps) {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = (await api('/api/input-suggestion/settings')) as {
+          settings?: { enabled?: boolean };
+        };
+        if (!cancelled && typeof data.settings?.enabled === 'boolean') {
+          setSuggestionEnabled(data.settings.enabled);
+        }
+      } catch {
+        /* default on */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const requestInputSuggestion = useCallback(async (sessionId: string) => {
+    if (playSurface !== 'bot' || !suggestionEnabled) {
+      setInputGhost(emptyGhost());
+      return;
+    }
+    if (playInputLiveRef.current.trim()) return;
+    const requestId = suggestionReqRef.current + 1;
+    suggestionReqRef.current = requestId;
+    suggestionSessionRef.current = sessionId;
+    const issued = { requestId, sessionId };
+    try {
+      const data = (await api(`/api/sessions/${sessionId}/input-suggestion`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId })
+      })) as { suggestion?: InputSuggestion | null; enabled?: boolean };
+      if (typeof data.enabled === 'boolean') setSuggestionEnabled(data.enabled);
+      const current = { requestId: suggestionReqRef.current, sessionId: suggestionSessionRef.current ?? '' };
+      if (!suggestionStillCurrent(issued, current)) return;
+      if (playInputLiveRef.current.trim()) return;
+      setInputGhost(ghostFromSuggestion(data.suggestion));
+    } catch {
+      const current = { requestId: suggestionReqRef.current, sessionId: suggestionSessionRef.current ?? '' };
+      if (suggestionStillCurrent(issued, current)) setInputGhost(emptyGhost());
+    }
+  }, [playSurface, suggestionEnabled]);
+
+  requestInputSuggestionRef.current = requestInputSuggestion;
+
+  useEffect(() => {
+    suggestionReqRef.current += 1;
+    suggestionSessionRef.current = selectedSessionId;
+    setInputGhost(emptyGhost());
+  }, [selectedSessionId]);
 
   const queryExecModeRef = useRef(queryExecMode);
   queryExecModeRef.current = queryExecMode;
@@ -1655,7 +1744,11 @@ export function usePlayChat(deps: PlayChatDeps) {
     if (!liveTurnCurrent(generation)) return;
     clearStreamingShell();
     if (claimedHere) liveOwnerRef.current = null;
-    if (!controller.signal.aborted) await tick({ includePlayPanel: true });
+    if (!controller.signal.aborted) {
+      await tick({ includePlayPanel: true });
+      const sid = selectedSessionRef.current;
+      if (playSurface === 'bot' && sid) void requestInputSuggestionRef.current(sid);
+    }
   };
 
   const armLiveSessionStream = (sessionId: string): LiveStreamArm => {
@@ -2015,6 +2108,7 @@ export function usePlayChat(deps: PlayChatDeps) {
         assertLiveTurn(generation);
         finishLiveTurn(generation);
         setPlayStatus({ text: t('play.status.sent'), ok: true });
+        if (playSurface === 'bot') void requestInputSuggestion(sid);
       } else if (activeBotId) {
         throw new Error(t('play.status.openBotFailed'));
       } else if (mode === 'chat') {
@@ -2244,6 +2338,16 @@ export function usePlayChat(deps: PlayChatDeps) {
     setSelectedGoalId,
     playInput,
     setPlayInput,
+    inputGhost,
+    ghostSuggestion: ghostText(inputGhost),
+    acceptInputSuggestion,
+    dismissInputSuggestion,
+    noteComposerTyped: () => {
+      if (ghostText(inputGhostRef.current)) setInputGhost(emptyGhost());
+    },
+    noteComposerBlur: () => {
+      if (ghostText(inputGhostRef.current)) setInputGhost(emptyGhost());
+    },
     imageUrlInput,
     setImageUrlInput,
     pendingImageAssetIds,

@@ -1,0 +1,33 @@
+id: bot-input-suggestion
+title: Bot 输入框下一句建议
+status: implemented
+requirement: |
+  开发 /home/shinemo/wt/ppeng-input-suggestion（分支 feat/ppeng-input-suggestion，基线 origin/main 665d041c）：实现「bot 模式输入框下一句建议（ghost text + Tab 提交）」新功能。
+
+  功能需求：
+  1. 在 bot 会话/Agent Lab 输入框实现下一句建议：输入框内显示淡色建议文本（ghost text），视觉上明显区别于真实输入，不占真实值。
+  2. Tab 键把建议落为真实输入（可继续编辑，再回车发送）；用户不按 Tab 直接打字 → 正常输入、建议立即消失。
+  3. Esc 撤销建议；发送后清除建议；输入框已有内容或失焦时不显示。
+  4. 建议来源：每轮 assistant 回复结束后，bot 基于本会话最近上下文静默生成 1 条「下一次可能输入」，可附 1-2 条备选（Tab 可循环）；轻量模型调用、可配置开关（默认开）。
+  5. 竞态防护：建议请求带 requestId，新请求覆盖旧请求，防乱序串台。
+criteria:
+  - id: AC-1
+    given: Bot 对话的输入框是空的，并且里面有一条淡色的下一句建议
+    when: 按 Tab
+    then: 这条建议变成可以继续修改的真实输入，再回车可以发送；如果没按 Tab 就直接打字，建议马上消失，打出来的字就是自己输入的
+  - id: AC-2
+    given: Bot 刚回复完一轮，下一句建议的开关开着（默认就是开的）
+    when: 回复结束
+    then: 根据这段对话的最近内容生成一条下一句，还可以有一两条备选；把开关关掉后再回复，不再生成
+  - id: AC-3
+    given: 输入框里正在显示下一句建议
+    when: 按 Esc，或者把消息发出去，或者输入框里已经有字，或者输入框失去焦点
+    then: 建议消失，不会被一起发出去，也不会留在输入框里
+  - id: AC-4
+    given: 连续两次为同一段对话生成下一句，先发出的那次更慢
+    when: 后一次的结果先回来，前一次随后才回来
+    then: 只保留后一次的建议，先发出的那次不能覆盖它，也不能串到别的对话
+  - id: AC-5
+    given: 有多条备选
+    when: 已经用 Tab 填入当前这一条后再按 Tab
+    then: 真实输入换成下一条备选，到最后一条之后回到第一条

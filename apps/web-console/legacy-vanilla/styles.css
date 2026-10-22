@@ -2029,8 +2029,42 @@ textarea {
   box-shadow: none;
 }
 
+.chat-composer-field {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 24px;
+}
+
+.chat-composer-ghost {
+  position: absolute;
+  inset: 4px 0 auto 0;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  overflow: hidden;
+  pointer-events: none;
+  white-space: nowrap;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--muted-2) 78%, transparent);
+}
+
+.chat-composer-ghost__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-composer-ghost__hint {
+  flex: 0 0 auto;
+  font-size: 0.75rem;
+  letter-spacing: 0.01em;
+}
+
 .chat-composer-input {
   flex: 1;
+  width: 100%;
   min-height: 24px;
   max-height: 160px;
   margin: 4px 0;

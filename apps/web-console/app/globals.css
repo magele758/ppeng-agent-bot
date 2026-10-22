@@ -1880,6 +1880,7 @@ details.trace-row,
 /* Reading size is independent of browser zoom and physical display pixels. */
 .lab-shell .chat-bubble__body,
 .lab-shell .chat-composer-input,
+.lab-shell .chat-composer-ghost,
 .lab-shell .routine-context-card pre,
 .font-size-preview {
   font-size: var(--reading-size);
