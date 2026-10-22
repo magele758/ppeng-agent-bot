@@ -22,6 +22,7 @@ export type SteerDrainPolicy = 'next_shot_only' | 'tool_launch';
 export type SteerInterruptPolicy = 'queue' | 'steer' | 'disabled';
 export type KernelVariant = 'ppeng' | 'agent-loop';
 export type AssemblyPreset = 'mini' | 'normal' | 'full' | 'max';
+export type RepeatGuardMode = 'weak' | 'all' | 'off';
 
 type LabTaskMode =
   | 'computer'
@@ -42,6 +43,7 @@ interface LoopSettings {
   steerInterruptPolicy: SteerInterruptPolicy;
   kernelVariant: KernelVariant;
   assemblyPreset: AssemblyPreset;
+  repeatGuard: RepeatGuardMode;
   updatedAt: string;
 }
 
@@ -61,10 +63,12 @@ const DEFAULTS = {
   steerDrainPolicy: 'next_shot_only',
   kernelVariant: 'agent-loop',
   assemblyPreset: 'max',
-  inboxOverflowCap: null
+  inboxOverflowCap: null,
+  repeatGuard: 'weak'
 } as const satisfies Partial<LoopSettings>;
 
 const INTERRUPT_POLICIES: readonly SteerInterruptPolicy[] = ['queue', 'steer', 'disabled'];
+const REPEAT_GUARDS: readonly RepeatGuardMode[] = ['weak', 'all', 'off'];
 const KERNELS: readonly KernelVariant[] = ['agent-loop', 'ppeng'];
 const ASSEMBLIES: readonly AssemblyPreset[] = ['mini', 'normal', 'full', 'max'];
 const INBOX_CAP_RANGE = { min: 0, max: 100000 } as const;
@@ -233,6 +237,11 @@ function AgentLoopBasicCard() {
   const taskModeOptions = TASK_MODE_OPTIONS.map((o) => ({ value: o.value, label: label(`options.taskMode.${o.value}.label`) }));
   const scopeOptions = SKILL_SCOPE_OPTIONS.map((o) => ({ value: o.value, label: label(`options.skillScope.${o.value}.label`) }));
   const interruptOptions = INTERRUPT_POLICIES.map((v) => ({ value: v, label: label(`options.interrupt.${v}.label`) }));
+  const repeatGuardOptions = REPEAT_GUARDS.map((v) => ({
+    value: v,
+    label: label(`options.repeatGuard.${v}.label`)
+  }));
+  const repeatGuard = s?.repeatGuard ?? 'weak';
 
   return (
     <SettingsGroup id="card-agent-loop" title={t(`${base}.title` as MessageKey)} description={label('desc')}>
@@ -262,6 +271,18 @@ function AgentLoopBasicCard() {
               isDefault={(s.defaultSkillScope ?? 'full') === DEFAULTS.defaultSkillScope}
               onRestore={() => void r.save({ defaultSkillScope: DEFAULTS.defaultSkillScope })}
               onChange={(defaultSkillScope) => void r.save({ defaultSkillScope })}
+            />
+            <SelectField
+              id="field-repeatGuard"
+              label={label('fields.repeatGuard.label')}
+              hint={`${label('fields.repeatGuard.hint')} ${label(`options.repeatGuard.${repeatGuard}.desc`)}`}
+              value={repeatGuard}
+              options={repeatGuardOptions}
+              disabled={r.busy}
+              defaultText={label(`options.repeatGuard.${DEFAULTS.repeatGuard}.label`)}
+              isDefault={repeatGuard === DEFAULTS.repeatGuard}
+              onRestore={() => void r.save({ repeatGuard: DEFAULTS.repeatGuard })}
+              onChange={(repeatGuard) => void r.save({ repeatGuard })}
             />
             <SelectField
               id="field-steerInterrupt"

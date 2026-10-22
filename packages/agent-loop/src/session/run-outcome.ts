@@ -78,11 +78,11 @@ export function runOutcomeFromEnd(input: {
       rewind
     });
   }
-  if (reason === 'tool_loop' || reason === 'missing_assistant') {
+  if (reason === 'tool_loop' || reason === 'repeat_detection' || reason === 'missing_assistant') {
     return buildRunOutcome({
       kind: input.sessionStatus === 'failed' ? 'failed' : 'idle',
       reason,
-      failureStage: input.failureStage ?? (reason === 'tool_loop' ? 'tool' : 'model'),
+      failureStage: input.failureStage ?? (reason === 'missing_assistant' ? 'model' : 'tool'),
       rewind
     });
   }

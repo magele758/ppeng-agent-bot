@@ -294,14 +294,21 @@ export function shellPolicyBlock(cmd: string): PolicyDecision {
   return { blocked: false };
 }
 
+export interface ShellPolicyOptions {
+  /** Directory browse / code search caps. GUI launch and unbounded walks always block. Default true. */
+  historyLimits?: boolean;
+}
+
 export function checkShellPolicy(
   cmd: string,
   history: HistoryEntry[],
-  config: ShellPolicyConfig = DEFAULT_SHELL_POLICY_CONFIG
+  config: ShellPolicyConfig = DEFAULT_SHELL_POLICY_CONFIG,
+  options: ShellPolicyOptions = {}
 ): PolicyDecision {
   // Static command checks
   const staticCheck = shellPolicyBlock(cmd);
   if (staticCheck.blocked) return staticCheck;
+  if (options.historyLimits === false) return { blocked: false };
 
   // Directory browse loop
   if (isDirectoryBrowseCommand(cmd)) {

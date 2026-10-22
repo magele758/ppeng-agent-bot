@@ -27,7 +27,10 @@ import {
   advisoryGraceEnabled
 } from '@ppeng/agent-loop';
 import {
+  applyRepeatGuard,
   formatRiskAdvisory,
+  loopGuardStopReason,
+  modelIdentity,
   recoveryPolicyEnabled,
   RiskEngine,
   riskEngineConfigFromEnv,
@@ -1432,8 +1435,19 @@ async function runSessionKernel(
           validToolCalls.map((tc) => ({ name: tc.name, input: tc.input })),
           results.map((r) => ({ name: r.name, ok: r.ok }))
         );
-        const graceOut = advisoryGrace ? advisoryGrace.apply(ar) : ar.abort
-          ? { action: 'abort' as const, reason: ar.reason }
+        const live = host.store.getSession(session.id) ?? session;
+        const adapter = adapterOf(live);
+        const guarded = applyRepeatGuard({
+          store: host.store,
+          identity: modelIdentity({
+            modelName: adapter.modelName,
+            adapterName: adapter.name,
+            metadata: live.metadata,
+          }),
+          decision: ar,
+        });
+        const graceOut = advisoryGrace ? advisoryGrace.apply(guarded) : guarded.abort
+          ? { action: 'abort' as const, reason: guarded.reason }
           : { action: 'continue' as const };
         if (graceOut.action === 'advise') {
           const strike = noteCriticalHit(recoveryState);
@@ -1442,7 +1456,10 @@ async function runSessionKernel(
               textPart(`[recovery] Stopped: ${graceOut.reason} (critical strike)`)
             ]);
             if (tryAutoFork('deadloop-exhausted')) continue;
-            return await finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'tool_loop');
+            return await finishFailed(
+              host.store.updateSession(session.id, { status: 'idle' }),
+              loopGuardStopReason(graceOut.reason)
+            );
           }
           host.store.appendMessage(session.id, 'system', [textPart(graceOut.advisory)]);
           void host.emitTrace(sid, {
@@ -1466,7 +1483,10 @@ async function runSessionKernel(
             signals: { trigger: 'tools', reason: graceOut.reason }
           });
           if (tryAutoFork('deadloop-exhausted')) continue;
-          return await finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'tool_loop');
+          return await finishFailed(
+            host.store.updateSession(session.id, { status: 'idle' }),
+            loopGuardStopReason(graceOut.reason)
+          );
         }
       }
     }

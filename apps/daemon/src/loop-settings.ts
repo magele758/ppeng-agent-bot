@@ -29,6 +29,12 @@ export type { SteerDrainPolicy };
 /** Default: steer lands on the next model shot only (kernel lock); inbox never drops. */
 export type KernelVariant = 'ppeng' | 'agent-loop';
 export type AssemblyPreset = 'mini' | 'normal' | 'full' | 'max';
+/**
+ * Same three values as `parseRepeatGuardMode` in
+ * packages/agent-loop/src/recovery/repeat-guard.ts.
+ * Missing or unknown stays `weak` (strong models are not cut off).
+ */
+export type RepeatGuardMode = 'weak' | 'all' | 'off';
 
 export interface LoopSettings {
   steerDrainPolicy: SteerDrainPolicy;
@@ -48,6 +54,11 @@ export interface LoopSettings {
   kernelVariant: KernelVariant;
   /** A assembly tier when kernelVariant is agent-loop. Product default is max. */
   assemblyPreset: AssemblyPreset;
+  /**
+   * Identical tool-content aborts and file-view count caps.
+   * `weak` (default) constrains weak models only; `all` constrains every model; `off` constrains none.
+   */
+  repeatGuard: RepeatGuardMode;
   updatedAt: string;
 }
 
@@ -59,6 +70,7 @@ export interface LoopSettingsPatch {
   steerInterruptPolicy?: SteerInterruptPolicy;
   kernelVariant?: KernelVariant;
   assemblyPreset?: AssemblyPreset;
+  repeatGuard?: RepeatGuardMode;
 }
 
 export interface LoopSettingsStore {
@@ -75,6 +87,7 @@ export function defaultLoopSettings(): LoopSettings {
     steerInterruptPolicy: DEFAULT_STEER_INTERRUPT_POLICY,
     kernelVariant: 'agent-loop',
     assemblyPreset: 'max',
+    repeatGuard: 'weak',
     updatedAt: new Date().toISOString()
   };
 }
@@ -96,6 +109,7 @@ export function normalizeLoopSettings(raw: Partial<LoopSettings> | null | undefi
     steerInterruptPolicy: interrupt ?? base.steerInterruptPolicy,
     kernelVariant: parseKernelVariant(raw.kernelVariant) ?? base.kernelVariant,
     assemblyPreset: parseAssemblyPreset(raw.assemblyPreset) ?? base.assemblyPreset,
+    repeatGuard: parseRepeatGuardMode(raw.repeatGuard) ?? base.repeatGuard,
     updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : base.updatedAt
   };
 }
@@ -105,6 +119,17 @@ export function parseKernelVariant(raw: unknown): KernelVariant | undefined {
 
 export function parseAssemblyPreset(raw: unknown): AssemblyPreset | undefined {
   return raw === 'mini' || raw === 'normal' || raw === 'full' || raw === 'max' ? raw : undefined;
+}
+
+export function parseRepeatGuardMode(raw: unknown): RepeatGuardMode | undefined {
+  switch (raw) {
+    case 'weak':
+    case 'all':
+    case 'off':
+      return raw;
+    default:
+      return undefined;
+  }
 }
 
 export function readLoopSettings(store: LoopSettingsStore): LoopSettings {
