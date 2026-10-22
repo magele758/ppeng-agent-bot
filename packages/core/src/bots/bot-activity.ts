@@ -19,6 +19,8 @@ export interface BotActivityItem {
   botId: string;
   botName: string;
   startedAt: string;
+  /** This activity's own conversation. Omitted when it has not started one. */
+  sessionId?: string;
 }
 
 const DONE_WINDOW_MS = 30 * 60 * 1000;
@@ -127,6 +129,19 @@ function hiddenFromOwner(run: RoutineRun, focus: SessionRecord, byId: Map<string
   return !sameOwner(focus, main);
 }
 
+/** Only the id passed in. A missing routine session must not fall back to the bot chat. */
+function conversationSessionId(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const id = value.trim();
+  return id || undefined;
+}
+
+function withConversation(item: BotActivityItem, sessionId: string | undefined): BotActivityItem {
+  const id = conversationSessionId(sessionId);
+  if (!id) return item;
+  return { ...item, sessionId: id };
+}
+
 function routineItem(
   run: RoutineRun,
   focus: SessionRecord,
@@ -140,16 +155,19 @@ function routineItem(
   if (!keepRow(status, stamp, now)) return undefined;
   const botId = textMeta(run.job.metadata, 'botId') || textMeta(focus.metadata, 'botId');
   const title = run.job.name || run.job.prompt || run.id;
-  return {
-    id: `routine:${run.id}`,
-    kind: 'routine',
-    title: clip(title),
-    status,
-    outcomeStatus: run.status,
-    botId,
-    botName: botLabel(botId, names, focus.agentId),
-    startedAt: run.startedAt || run.createdAt
-  };
+  return withConversation(
+    {
+      id: `routine:${run.id}`,
+      kind: 'routine',
+      title: clip(title),
+      status,
+      outcomeStatus: run.status,
+      botId,
+      botName: botLabel(botId, names, focus.agentId),
+      startedAt: run.startedAt || run.createdAt
+    },
+    run.sessionId
+  );
 }
 
 function isRelatedSession(session: SessionRecord, focus: SessionRecord): boolean {
@@ -172,16 +190,19 @@ function sessionItem(
   const status = botActivityStatus(session.status);
   if (!keepRow(status, session.updatedAt, now)) return undefined;
   const botId = textMeta(session.metadata, 'botId') || textMeta(focus.metadata, 'botId');
-  return {
-    id: `session:${session.id}`,
-    kind: 'background',
-    title: clip(session.title || session.id),
-    status,
-    outcomeStatus: session.status,
-    botId,
-    botName: botLabel(botId, names, session.agentId),
-    startedAt: session.createdAt
-  };
+  return withConversation(
+    {
+      id: `session:${session.id}`,
+      kind: 'background',
+      title: clip(session.title || session.id),
+      status,
+      outcomeStatus: session.status,
+      botId,
+      botName: botLabel(botId, names, session.agentId),
+      startedAt: session.createdAt
+    },
+    session.id
+  );
 }
 
 function jobItem(
@@ -196,16 +217,19 @@ function jobItem(
   const session = byId.get(job.sessionId);
   const botId = textMeta(session?.metadata, 'botId') || textMeta(focus.metadata, 'botId');
   const fallback = session?.agentId ?? focus.agentId;
-  return {
-    id: `job:${job.id}`,
-    kind: 'background',
-    title: clip(job.command || job.id),
-    status,
-    outcomeStatus: job.status,
-    botId,
-    botName: botLabel(botId, names, fallback),
-    startedAt: job.createdAt
-  };
+  return withConversation(
+    {
+      id: `job:${job.id}`,
+      kind: 'background',
+      title: clip(job.command || job.id),
+      status,
+      outcomeStatus: job.status,
+      botId,
+      botName: botLabel(botId, names, fallback),
+      startedAt: job.createdAt
+    },
+    job.sessionId
+  );
 }
 
 function collectRoutines(

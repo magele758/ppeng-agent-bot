@@ -151,9 +151,11 @@ export class SessionLoopGuard {
 
     if (this.sameCallStreak >= this.sameToolStreakMax) {
       const label = summarizeToolRound(toolCalls);
+      // Prefix is the user-visible repeat-detection marker. Kernels drop this abort
+      // when repeatGuard is off, or the model is strong under the default `weak` mode.
       return {
         abort: true,
-        reason: `same tool-call content in ${this.sameToolStreakMax} consecutive tool rounds (${label})`
+        reason: `repeat detection: same tool-call content in ${this.sameToolStreakMax} consecutive tool rounds (${label})`
       };
     }
     return { abort: false };

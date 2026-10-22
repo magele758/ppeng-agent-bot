@@ -5,7 +5,13 @@
 
 import type { AssembledLoop, CreateAssembledLoopInput } from './io.js';
 import { createFullAssembledLoop } from './full-host.js';
-import { checkShellPolicy, shellHistoryFromFold } from '../tools/shell-policy.js';
+import {
+  classifyModelTier,
+  modelIdentity,
+  repeatLimitsActive,
+  resolveRepeatGuardMode,
+} from '../recovery/repeat-guard.js';
+import { DEFAULT_SHELL_POLICY_CONFIG, checkShellPolicy, shellHistoryFromFold } from '../tools/shell-policy.js';
 import { interceptToolOutput } from '../tools/tool-result-guardian.js';
 import type { ToolExecResult } from '../turn/host.js';
 
@@ -34,7 +40,19 @@ export async function createMaxAssembledLoop(
         const history = shellHistoryFromFold(
           assembled.host.store.foldMessages(context.session.id)
         );
-        const decision = checkShellPolicy(cmd, history);
+        const session = assembled.host.store.getSession(context.session.id) ?? context.session;
+        const adapter = assembled.host.resolveModelAdapter?.(session) ?? assembled.host.modelAdapter;
+        const historyLimits = repeatLimitsActive(
+          resolveRepeatGuardMode(assembled.host.store),
+          classifyModelTier(
+            modelIdentity({
+              modelName: adapter.modelName,
+              adapterName: adapter.name,
+              metadata: session.metadata,
+            })
+          )
+        );
+        const decision = checkShellPolicy(cmd, history, DEFAULT_SHELL_POLICY_CONFIG, { historyLimits });
         if (decision.blocked) {
           blockedResults.push({
             toolCallId: tc.toolCallId,

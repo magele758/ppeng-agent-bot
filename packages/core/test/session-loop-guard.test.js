@@ -60,7 +60,7 @@ test('afterToolRound aborts when the same tool-call content repeats', () => {
   assert.equal(g.afterToolRound(reordered, ok).abort, false);
   const t = g.afterToolRound(call, ok);
   assert.equal(t.abort, true);
-  assert.match(t.reason, /same tool-call content/);
+  assert.match(t.reason, /repeat detection: same tool-call content/);
   assert.match(t.reason, /bash/);
   assert.doesNotMatch(t.reason, /first tool/);
 });

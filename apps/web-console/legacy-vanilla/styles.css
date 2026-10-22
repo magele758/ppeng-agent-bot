@@ -1363,6 +1363,26 @@ textarea {
   font-size: 0.8125rem;
 }
 
+.chat-turn--goal-update .chat-bubble {
+  font-family: var(--font-family-stack);
+  max-width: min(100%, 22rem);
+  padding: 8px 10px;
+}
+.goal-update-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--font-family-stack);
+  font-size: var(--font-size-sm);
+  line-height: 1.35;
+}
+.goal-update-card__title { font-weight: 600; }
+.goal-update-card__status { font-size: var(--font-size-xs); font-weight: 600; }
+.goal-update-card__status[data-status='blocked'],
+.goal-update-card__status[data-status='failed'] { color: #c9a227; }
+.goal-update-card__status[data-status='completed'] { color: #3d9a6a; }
+.goal-update-card__reason { font-weight: 400; }
+
 /* 纯 tool/system 行：非对话型、更紧凑 */
 .chat-bubble--artifact {
   padding: 6px 10px !important;

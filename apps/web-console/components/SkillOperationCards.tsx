@@ -4,6 +4,11 @@ import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import "./skill-capture.css";
 import { useSkillBots } from "./BotSkillSharing";
+import {
+  skillOperationCardIsBar,
+  skillOperationCardStatus,
+  visibleSkillOperationCards,
+} from "./skill-operation-card-model";
 type Action =
   "create" | "update" | "share" | "unshare" | "set_sharing" | "delete";
 type Status = "pending" | "processing" | "saved" | "rejected" | "failed";
@@ -22,6 +27,7 @@ export function SkillOperationCards({ sessionId, onLayoutChange }: { sessionId: 
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [confirming, setConfirming] = useState<Set<string>>(new Set());
   const [toggled, setToggled] = useState<Set<string>>(new Set());
   const [storageError, setStorageError] = useState(false);
   const focusTarget = useRef<HTMLElement | null>(null);
@@ -43,7 +49,7 @@ export function SkillOperationCards({ sessionId, onLayoutChange }: { sessionId: 
       focusTarget.current.scrollIntoView({ block: 'nearest' });
     }
     focusTarget.current = null;
-  }, [rows, dismissed, toggled]);
+  }, [rows, dismissed, toggled, confirming]);
   function dismiss(id: string, button: HTMLButtonElement) {
     const card = button.closest('.skill-capture-card');
     focusTarget.current = (card?.nextElementSibling ?? card?.previousElementSibling) as HTMLElement | null;
@@ -68,7 +74,16 @@ export function SkillOperationCards({ sessionId, onLayoutChange }: { sessionId: 
       clearInterval(timer);
     };
   }, [endpoint]);
-  async function decide(id: string, action: string) {
+  function stopConfirming(id: string) {
+    setConfirming((current) => {
+      if (!current.has(id)) return current;
+      const next = new Set(current);
+      next.delete(id);
+      return next;
+    });
+  }
+  async function decide(id: string, action: "confirm" | "reject") {
+    if (action === "confirm") setConfirming((current) => new Set(current).add(id));
     setBusy(id);
     setError("");
     try {
@@ -77,8 +92,10 @@ export function SkillOperationCards({ sessionId, onLayoutChange }: { sessionId: 
         { method: "POST" },
       )) as { operation: Operation };
       setRows((rows) => rows.map((r) => (r.id === id ? data.operation : r)));
+      if (action === "confirm") stopConfirming(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+      if (action === "confirm") stopConfirming(id);
     } finally {
       setBusy("");
     }
@@ -86,13 +103,13 @@ export function SkillOperationCards({ sessionId, onLayoutChange }: { sessionId: 
   return (
     <div className="skill-capture-list">
       {storageError && <p role="status">{t("skillProposals.captureDismissStorageError")}</p>}
-      {rows.filter(row => !['saved', 'rejected'].includes(row.status) || !dismissed.has(row.id)).map((row) => {
-        const dismissible = row.status === 'saved' || row.status === 'rejected';
-        const collapsible = dismissible || row.status === 'failed';
-        const open = dismissible ? toggled.has(row.id) : !toggled.has(row.id);
+      {visibleSkillOperationCards(rows, dismissed, confirming).map((row) => {
+        const bar = skillOperationCardIsBar(row, confirming);
+        const status = skillOperationCardStatus(row, confirming);
+        const open = bar ? toggled.has(row.id) : !toggled.has(row.id);
         return (
         <section
-          className="skill-capture-card"
+          className={bar && !open ? "skill-capture-card skill-capture-card--bar" : "skill-capture-card"}
           tabIndex={-1}
           data-testid={`skill-operation-${row.id}`}
           role="dialog"
@@ -103,6 +120,7 @@ export function SkillOperationCards({ sessionId, onLayoutChange }: { sessionId: 
           <h4>
             {t(`skillProposals.action_${row.input.action}`)} · {row.name}
           </h4>
+          {bar ? <p role="status">{t(`skillProposals.op_${status}`)}</p> : null}
           <div id={`operation-details-${row.id}`} hidden={!open}>
           <p>{row.input.reason}</p>
           <p>{row.input.summary}</p>
@@ -115,7 +133,7 @@ export function SkillOperationCards({ sessionId, onLayoutChange }: { sessionId: 
           </p>
           {row.error && <p role="alert">{row.error}</p>}
           </div>
-          {row.status === "pending" ? (
+          {!bar && row.status === "pending" ? (
             <>
               <button
                 className="btn btn-primary btn-sm"
@@ -132,12 +150,10 @@ export function SkillOperationCards({ sessionId, onLayoutChange }: { sessionId: 
                 {t("skillProposals.reject")}
               </button>
             </>
-          ) : (
-            <p role="status">{t(`skillProposals.op_${row.status}`)}</p>
-          )}
-          {collapsible && <div className="skill-capture-actions">
+          ) : null}
+          {bar && <div className="skill-capture-actions">
             <button type="button" className="btn btn-ghost btn-sm" aria-expanded={open} aria-controls={`operation-details-${row.id}`} onClick={() => setToggled(current => { const next = new Set(current); if(next.has(row.id)) next.delete(row.id); else next.add(row.id); return next; })}>{t(open ? 'skillProposals.captureCollapse' : 'skillProposals.captureExpand')}</button>
-            {dismissible && <button type="button" className="btn btn-ghost btn-sm" onClick={event => dismiss(row.id, event.currentTarget)}>{t('skillProposals.dismissResult')}</button>}
+            <button type="button" className="btn btn-ghost btn-sm" aria-label={t('skillProposals.dismissResult')} onClick={event => dismiss(row.id, event.currentTarget)}>{t('skillProposals.dismissResult')}</button>
           </div>}
         </section>
       );})}

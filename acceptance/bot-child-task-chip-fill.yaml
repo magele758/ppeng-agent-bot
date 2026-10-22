@@ -1,0 +1,21 @@
+id: bot-child-task-chip-fill
+title: 子任务芯片有底色
+status: implemented
+requirement: |
+  这种加个背景色做颜色区分
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  底色沿用侧栏悬停和活动卡已有的表面色，不新造一套亮色。
+criteria:
+  - id: AC-1
+    given: 对话里「子任务」后面有一条子任务芯片
+    when: 用户看这条芯片
+    then: 芯片有一块和周围对话正文不同的底色；旁边的「子任务」几个字仍是原来的字，没有这块底。芯片上的字仍是这条子任务的短摘，并且能从这块底上读清
+  - id: AC-2
+    given: 这条子任务芯片已经显示在对话里
+    when: 用户把指针悬停在芯片上，或用键盘把焦点移到芯片上
+    then: 底色或描边会跟着变，能看出这块可以点；字仍然读得清
+  - id: AC-3
+    given: 这条子任务芯片已经显示在对话里
+    when: 用户点击它
+    then: 打开的仍是对应的那条子任务，芯片上的说法没有被改掉

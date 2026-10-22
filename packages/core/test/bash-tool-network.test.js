@@ -59,7 +59,7 @@ test('bash tool keeps model settings and drops RAW_AGENT API keys', async () => 
       { command: 'printf %s "$RAW_AGENT_API_KEY|$RAW_AGENT_MODEL_NAME"' }
     );
     assert.equal(result.ok, true, result.content);
-    assert.equal(result.content, '|kept-model');
+    assert.equal(String(result.content).split('\n[os-sandbox:')[0], '|kept-model');
   } finally {
     if (previousKey === undefined) delete process.env.RAW_AGENT_API_KEY;
     else process.env.RAW_AGENT_API_KEY = previousKey;

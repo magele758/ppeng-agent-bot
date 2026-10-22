@@ -14,6 +14,8 @@ import {
   normalizedRole
 } from '@/lib/chat-utils';
 import { parseCronUserPrompt } from '@/lib/cron';
+import { presentGoalUpdate, readMessageSessionId } from '@/lib/goal-update-notice';
+import { GoalUpdateCard } from './GoalUpdateCard';
 import { A2uiSurface } from './a2ui/A2uiSurface';
 import { ReadableMessage } from './ReadableMessage';
 import { MarkdownHtml, StaticHtml } from './MarkdownHtml';
@@ -32,6 +34,7 @@ import {
   type ReplyQuote,
   type ReplyTo
 } from '@/lib/reply-quote';
+import { osSandboxReasonKey, parseOsSandboxReason } from '@/lib/os-sandbox-reason';
 import { parseSpawnBlocked } from '@/lib/spawn-blocked';
 import { SpawnBlockedNotice, SpawnBlockedPill } from './SpawnBlockedNotice';
 import {
@@ -190,6 +193,7 @@ function ToolResultFold({
   }
   const isLowConf = content.includes('[low-confidence:');
   const spawnBlocked = parseSpawnBlocked(p.name, content);
+  const sandboxReason = parseOsSandboxReason(content);
 
   return (
     <div className="chat-tool-result-block">
@@ -223,6 +227,11 @@ function ToolResultFold({
             <span className="chat-tool-fold__pill chat-tool-fold__pill--model-view">{t('play.modelViewOnly')}</span>
           ) : null}
           {spawnBlocked ? <SpawnBlockedPill /> : null}
+          {sandboxReason ? (
+            <span className="chat-tool-fold__pill" data-testid="os-sandbox-reason">
+              {t(osSandboxReasonKey(sandboxReason))}
+            </span>
+          ) : null}
           {stub ? <span className="chat-tool-fold__pill chat-tool-fold__pill--stub">{t('play.stub')}</span> : null}
           {trimmed ? <span className="chat-tool-fold__pill chat-tool-fold__pill--trim">{t('play.trimmed')}</span> : null}
         </summary>
@@ -461,6 +470,14 @@ export function ChatTurnFromMessage({
   const storedReply = r === 'user' ? readStoredReplyTo(m) : null;
   /** 与流式行一致：助手侧（含「调用工具」等结构化气泡）统一不占左侧头像列 */
   const noAvatar = r === 'tool' || r === 'system' || r === 'assistant';
+  const presented =
+    r === 'system'
+      ? presentGoalUpdate(msgPartsToText(m.parts), {
+          messageSessionId: readMessageSessionId(m as { sessionId?: unknown }),
+          conversationId: sessionId
+        })
+      : { kind: 'absent' as const };
+  if (presented.kind === 'hidden') return null;
   if (
     messageHasStructuredParts(m.parts) &&
     resolvedCallIds &&
@@ -468,8 +485,10 @@ export function ChatTurnFromMessage({
   ) {
     return null;
   }
+  const goalCard = presented.kind === 'card' ? <GoalUpdateCard notice={presented.notice} /> : null;
   const bubble =
-    messageHasStructuredParts(m.parts) && m.parts ? (
+    goalCard ??
+    (messageHasStructuredParts(m.parts) && m.parts ? (
       <div className="chat-bubble--stream-blocks">
         <StructuredBubble
           parts={m.parts}
@@ -485,7 +504,7 @@ export function ChatTurnFromMessage({
       <pre className="chat-bubble__pre">{msgPartsToText(m.parts)}</pre>
     ) : (
       <ReadableMessage text={msgPartsToText(m.parts)} role={r} messageKey={(m as { key?: string }).key} />
-    );
+    ));
   const artifactBubble = r === 'tool' || r === 'system';
   const isSteerMessage =
     r === 'user' &&
@@ -498,7 +517,7 @@ export function ChatTurnFromMessage({
       <MarkdownHtml className="chat-bubble__body chat-bubble__md" text={cronPrompt.body || cronPrompt.name} />
     ) : bubble;
   return (
-    <div className={`chat-turn ${buildModClass(r)}${noAvatar ? ' chat-turn--no-avatar' : ''}`}>
+    <div className={`chat-turn ${buildModClass(r)}${noAvatar ? ' chat-turn--no-avatar' : ''}${goalCard ? ' chat-turn--goal-update' : ''}`}>
       {!noAvatar ? <div className="chat-avatar">{avatarText(r, t('play.me'))}</div> : null}
       <div className="chat-turn__content">
         <div className="chat-turn__label">
@@ -545,7 +564,9 @@ export function ChatTurnPlain({
   extraClass = '',
   contextLabels,
   replyTo = null,
-  replyBotName
+  replyBotName,
+  messageSessionId,
+  conversationId
 }: {
   role: 'user' | 'assistant' | 'tool' | 'system' | 'stream';
   text: string;
@@ -554,23 +575,30 @@ export function ChatTurnPlain({
   contextLabels?: readonly ContextLabel[];
   replyTo?: ReplyTo | null;
   replyBotName?: string;
+  messageSessionId?: string;
+  conversationId?: string;
 }) {
   const { t } = useI18n();
+  const presented = role === 'system' ? presentGoalUpdate(text, { messageSessionId, conversationId }) : { kind: 'absent' as const };
+  if (presented.kind === 'hidden') return null;
   const stream = role === 'stream';
   const mod = buildModClass(role === 'stream' ? 'assistant' : role, stream);
   const av = avatarText(role === 'stream' ? 'assistant' : role, t('play.me'), stream);
   const label = labelOverride ?? (stream ? t('play.role.streaming') : roleLabel(role, t));
-  const usePre = role === 'tool' || role === 'system';
+  const goalCard = presented.kind === 'card';
+  const usePre = (role === 'tool' || role === 'system') && !goalCard;
   const noAvatar =
     role === 'tool' || role === 'system' || role === 'assistant' || role === 'stream';
   return (
-    <div className={`chat-turn ${mod} ${noAvatar ? 'chat-turn--no-avatar' : ''} ${extraClass}`.trim()}>
+    <div className={`chat-turn ${mod} ${noAvatar ? 'chat-turn--no-avatar' : ''} ${goalCard ? 'chat-turn--goal-update' : ''} ${extraClass}`.trim()}>
       {!noAvatar ? <div className="chat-avatar">{av}</div> : null}
       <div className="chat-turn__content">
         <div className="chat-turn__label">{label}</div>
         <div className="chat-bubble">
           {role === 'user' ? <MessageReplyQuote replyTo={replyTo} botName={replyBotName} /> : null}
-          {usePre ? (
+          {presented.kind === 'card' ? (
+            <GoalUpdateCard notice={presented.notice} />
+          ) : usePre ? (
             <pre className="chat-bubble__pre">{text}</pre>
           ) : (
             <MarkdownHtml className="chat-bubble__body chat-bubble__md" text={text} />

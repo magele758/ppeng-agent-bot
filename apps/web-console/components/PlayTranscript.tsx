@@ -4,13 +4,16 @@ import type { ReactNode } from 'react';
 import type { ApprovalItem, ChatMessage } from '@/lib/types';
 import { anchorApprovals } from '@/lib/approval-feed';
 import { messageHasStructuredParts, msgPartsToText, normalizedRole } from '@/lib/chat-utils';
+import { readMessageSessionId } from '@/lib/goal-update-notice';
 import { buildFeedSlots, steerStreamPlacement, type FeedSlot } from '@/lib/feed-window';
 import { formatHash } from '@/lib/nav';
 import { useI18n } from '@/lib/i18n';
 import type { ReplyQuote } from '@/lib/reply-quote';
 import { indexResolvedToolCallIds, indexToolCalls } from '@/lib/tool-io';
 import { sliceConversationTurns } from '@/lib/turn-feed-stats';
+import { placeChildTaskEntries, type ChildTaskStreamEntry } from '@/lib/bot-child-task-stream';
 import { ApprovalBanner } from './ApprovalBanner';
+import { BotChildTaskStreamEntry } from './BotChildTaskStreamEntry';
 import { ChatFeedWindow } from './ChatFeedWindow';
 import { ChatTurnFromMessage, ChatTurnPlain, ChatTurnStreaming } from './ChatTurns';
 import { SurfaceContextProvider } from './a2ui/SurfaceContext';
@@ -36,8 +39,10 @@ export function PlayTranscript(props: {
   onAttachStream?: (sessionId: string) => { ready: Promise<void>; cancel: () => void };
   replyQuoteBot?: { id: string; name: string } | null;
   onQuoteReply?: (quote: ReplyQuote) => void;
+  childTaskEntries?: readonly ChildTaskStreamEntry[];
+  onOpenChildTask?: (sessionId: string) => void;
 }) {
-  const view = transcriptView(props.chat, props.sessionApprovals, props.turnFeedStatLines, Boolean(props.selectedSessionId));
+  const view = transcriptView(props.chat, props.sessionApprovals, props.turnFeedStatLines, Boolean(props.selectedSessionId), props.childTaskEntries ?? []);
   return (
     <SurfaceContextProvider messages={props.chat.displayMessages}>
       <ChatFeedWindow
@@ -212,24 +217,33 @@ interface TranscriptModel {
   resolved: Set<string>;
   lines: Array<string | null>;
   anchors: Anchors;
+  childTaskGroups: Map<number, ChildTaskStreamEntry[]>;
 }
 
-function transcriptView(chat: Chat, approvals: ApprovalItem[], lines: Array<string | null>, selected: boolean): TranscriptModel {
+function transcriptView(
+  chat: Chat,
+  approvals: ApprovalItem[],
+  lines: Array<string | null>,
+  selected: boolean,
+  childTasks: readonly ChildTaskStreamEntry[]
+): TranscriptModel {
   const messages = chat.displayMessages;
   const stored = chat.sessionMessages;
   const empty = feedIsEmpty(chat);
   const source = stored.length ? stored : messages;
   const resolved = indexResolvedToolCallIds(source);
   const anchors = anchorApprovals(messages, approvals, resolved, toolSites(chat.streamOverlay?.segments));
+  const childTaskGroups = placeChildTaskEntries(messages.map(feedStamp), childTasks);
   return {
     empty,
     selected,
-    slots: empty ? [] : slotsFor(messages, lines, chat, anchors),
+    slots: empty ? [] : withChildTaskSlots(slotsFor(messages, lines, chat, anchors), childTaskGroups),
     messages,
     calls: indexToolCalls(source),
     resolved,
     lines,
-    anchors
+    anchors,
+    childTaskGroups
   };
 }
 
@@ -276,6 +290,22 @@ function messageId(message: ChatMessage): string | undefined {
   return id;
 }
 
+function feedStamp(message: ChatMessage): { id?: string; createdAt?: unknown } {
+  const raw = message as ChatMessage & { createdAt?: unknown };
+  return { id: messageId(message), createdAt: raw.createdAt };
+}
+
+function withChildTaskSlots(slots: FeedSlot[], groups: Map<number, ChildTaskStreamEntry[]>): FeedSlot[] {
+  if (groups.size === 0) return slots;
+  const next: FeedSlot[] = [];
+  for (const slot of slots) {
+    next.push(slot);
+    if (slot.kind !== 'message' || slot.messageIndex == null || !groups.has(slot.messageIndex)) continue;
+    next.push({ key: `child:${slot.messageIndex}`, kind: 'child-task', messageIndex: slot.messageIndex });
+  }
+  return next;
+}
+
 function renderTranscriptSlot(slot: FeedSlot, view: TranscriptModel, props: {
   chat: Chat;
   selectedSessionId: string | null;
@@ -283,7 +313,12 @@ function renderTranscriptSlot(slot: FeedSlot, view: TranscriptModel, props: {
   onAttachStream?: (sessionId: string) => { ready: Promise<void>; cancel: () => void };
   replyQuoteBot?: { id: string; name: string } | null;
   onQuoteReply?: (quote: ReplyQuote) => void;
+  onOpenChildTask?: (sessionId: string) => void;
 }): ReactNode {
+  if (slot.kind === 'child-task') {
+    const group = view.childTaskGroups.get(slot.messageIndex ?? -1) ?? [];
+    return <BotChildTaskStreamEntry entries={group} onOpen={props.onOpenChildTask} />;
+  }
   const sessionId = props.selectedSessionId ?? '';
   const live = renderLiveSlot(slot, view, props.chat, sessionId, props.onApprovalsChanged, props.onAttachStream);
   if (live) return live;
@@ -363,7 +398,16 @@ function messageSlot(
     return <ChatTurnFromMessage m={message} sessionId={sessionId} msgIndex={index} modelView={modelView} toolCallsById={view.calls} resolvedCallIds={view.resolved} quoteBot={quoteBot} onQuote={onQuote} replyNames={replyNames} />;
   }
   const role = normalizedRole(message);
-  if (role === 'tool' || role === 'system') return <ChatTurnPlain role={role} text={msgPartsToText(message.parts)} />;
+  if (role === 'tool' || role === 'system') {
+    return (
+      <ChatTurnPlain
+        role={role}
+        text={msgPartsToText(message.parts)}
+        messageSessionId={readMessageSessionId(message as { sessionId?: unknown })}
+        conversationId={sessionId}
+      />
+    );
+  }
   return <ChatTurnFromMessage m={message} sessionId={sessionId} msgIndex={index} modelView={modelView} toolCallsById={view.calls} resolvedCallIds={view.resolved} quoteBot={quoteBot} onQuote={onQuote} replyNames={replyNames} />;
 }
 

@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useLab } from '@/components/shell/LabProvider';
 import { api } from '@/lib/api';
-import { parseBotActivityItems, type BotActivityItem } from '@/lib/bot-activity';
+import { activityOpenSessionId, openBotActivitySession, parseBotActivityItems, type BotActivityItem } from '@/lib/bot-activity';
 import { useI18n } from '@/lib/i18n';
 import { routineStatusPresentation } from '@/lib/routine-status';
 
@@ -24,31 +25,89 @@ function formatStarted(iso: string, locale: string): string {
   }).format(at);
 }
 
-function BotActivityRow({
+type OpenActivitySession = (sessionId: string, opts?: { focusChat?: boolean }) => void;
+
+export function BotActivityCardView({
   item,
-  started
+  started,
+  statusLabel,
+  phaseStatus,
+  phaseStyle,
+  openLabel,
+  onOpenSession
 }: {
   item: BotActivityItem;
   started: string;
-}) {
-  const { t } = useI18n();
-  const outcome = routineStatusPresentation(item.outcomeStatus ?? (item.status === 'running' ? 'running' : 'unknown'));
-  const visibleLabel = t(outcome.key);
+  statusLabel: string;
+  phaseStatus: string;
+  phaseStyle: CSSProperties;
+  openLabel: string;
+  onOpenSession: OpenActivitySession;
+}): ReactNode {
+  const summary = (
+    <span className="activity-card__summary bot-activity__row">
+      <span className={`activity-card__phase activity-card__phase--${phaseStatus}`} style={phaseStyle}>{statusLabel}</span>
+      <span className="activity-card__name" title={item.title}>{item.title}</span>
+    </span>
+  );
+  const meta = (
+    <span className="bot-activity__meta">
+      <span className="bot-activity__bot">{item.botName}</span>
+      <time className="bot-activity__time" dateTime={item.startedAt}>{started}</time>
+    </span>
+  );
+  const target = activityOpenSessionId(item);
   return (
     <article
       className={`activity-card activity-card--${item.status}`}
       role="listitem"
-      aria-label={`${visibleLabel} ${item.title}`}
+      {...(target ? {} : { 'aria-label': `${statusLabel} ${item.title}` })}
     >
-      <div className="activity-card__summary bot-activity__row">
-        <span className={`activity-card__phase activity-card__phase--${outcome.status}`} style={outcome.style}>{visibleLabel}</span>
-        <span className="activity-card__name" title={item.title}>{item.title}</span>
-      </div>
-      <div className="bot-activity__meta">
-        <span className="bot-activity__bot">{item.botName}</span>
-        <time className="bot-activity__time" dateTime={item.startedAt}>{started}</time>
-      </div>
+      {target ? (
+        <button
+          type="button"
+          className="bot-activity__open"
+          data-session-id={target}
+          aria-label={openLabel}
+          onClick={() => {
+            openBotActivitySession(onOpenSession, item);
+          }}
+        >
+          {summary}
+          {meta}
+        </button>
+      ) : (
+        <>
+          {summary}
+          {meta}
+        </>
+      )}
     </article>
+  );
+}
+
+export function BotActivityRow({
+  item,
+  started,
+  onOpenSession
+}: {
+  item: BotActivityItem;
+  started: string;
+  onOpenSession: OpenActivitySession;
+}) {
+  const { t } = useI18n();
+  const outcome = routineStatusPresentation(item.outcomeStatus ?? (item.status === 'running' ? 'running' : 'unknown'));
+  const statusLabel = t(outcome.key);
+  return (
+    <BotActivityCardView
+      item={item}
+      started={started}
+      statusLabel={statusLabel}
+      phaseStatus={outcome.status}
+      phaseStyle={outcome.style}
+      openLabel={t('play.activity.workOpenSession', { status: statusLabel, title: item.title })}
+      onOpenSession={onOpenSession}
+    />
   );
 }
 
@@ -57,13 +116,15 @@ function BotActivityBody({
   loaded,
   error,
   t,
-  locale
+  locale,
+  onOpenSession
 }: {
   items: BotActivityItem[];
   loaded: boolean;
   error: boolean;
   t: (key: 'play.activity.workLoadFailed' | 'play.activity.workLoading' | 'play.activity.workEmpty' | 'play.activity.workStarted' | 'play.activity.workRunning' | 'play.activity.workWaiting' | 'play.activity.workDone', vars?: Record<string, string | number>) => string;
   locale: string;
+  onOpenSession: OpenActivitySession;
 }) {
   if (error) return <div className="empty-hint" role="alert">{t('play.activity.workLoadFailed')}</div>;
   if (!loaded) return <div className="empty-hint">{t('play.activity.workLoading')}</div>;
@@ -75,6 +136,7 @@ function BotActivityBody({
           key={item.id}
           item={item}
           started={t('play.activity.workStarted', { time: formatStarted(item.startedAt, locale) })}
+          onOpenSession={onOpenSession}
         />
       ))}
     </>
@@ -88,6 +150,7 @@ function BotActivityBody({
  */
 export function BotActivityList({ sessionId }: { sessionId: string }) {
   const { t, locale } = useI18n();
+  const { openSession } = useLab();
   const [items, setItems] = useState<BotActivityItem[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
@@ -143,7 +206,7 @@ export function BotActivityList({ sessionId }: { sessionId: string }) {
         </div>
       </div>
       <div className="activity-panel__list" role="list">
-        <BotActivityBody items={items} loaded={loaded} error={error} t={t} locale={locale} />
+        <BotActivityBody items={items} loaded={loaded} error={error} t={t} locale={locale} onOpenSession={openSession} />
       </div>
     </div>
   );

@@ -62,7 +62,7 @@ export const settingsEntries = {
   },
   agentLoop: {
     title: 'Default chat behavior',
-    keywords: 'default mode task mode taskmode skill scope interrupt steer message while running loop',
+    keywords: 'default mode task mode taskmode skill scope interrupt steer message while running loop repeat detection weak model strong model file view',
     desc: 'What new chats start with, and what happens when you send another message while the agent is still working. Changes apply immediately, no restart needed.',
     fields: {
       taskMode: {
@@ -76,6 +76,10 @@ export const settingsEntries = {
       interrupt: {
         label: 'New message while working',
         hint: 'How to handle a new message you send while the agent is still on the previous one.'
+      },
+      repeatGuard: {
+        label: 'Repeat detection',
+        hint: 'By default this only stops weak models from repeating the same tools, or from browsing and searching files too many times. Strong models are not stopped by it. A saved choice applies on the next turn, with no restart. The sandbox, approvals, and sensitive-path refusal stay in place.'
       }
     },
     options: {
@@ -97,6 +101,11 @@ export const settingsEntries = {
         queue: { label: 'Queue it', desc: 'Handle the new message after the current step finishes. The safest choice.' },
         steer: { label: 'Steer right away', desc: 'Change direction on the next step. A model request already in flight is not cancelled.' },
         disabled: { label: 'Do not accept', desc: 'Ignore new messages while the agent works; send again once it is done.' }
+      },
+      repeatGuard: {
+        weak: { label: 'Weak models only', desc: 'Default. The local demo model and small models still stop when tools repeat or file views pile up. Common large models, and models that cannot be classified, do not.' },
+        all: { label: 'All models', desc: 'Strong models also stop when tools repeat or file views pile up.' },
+        off: { label: 'Off', desc: 'No model stops for repeated tools or file-view counts. Safety limits still apply.' }
       }
     }
   },
@@ -205,31 +214,31 @@ export const settingsEntries = {
   sandbox: {
     title: 'Command sandbox',
     keywords: 'sandbox bash isolation security no isolation direct bwrap seatbelt container command execution permissions secrets protection',
-    desc: 'The agent chooses isolation for each command. You do not have to pick a mode first. When the agent omits it, the strongest isolation this machine can do is used. No isolation runs only if the agent asks for that command and you approve.',
+    desc: 'The isolation mode saved here constrains later commands, including ssh. Run directly does not use the OS sandbox. OS-level isolation, or Auto when a command does not drop it, still uses the OS sandbox, and the conversation says why. The OS sandbox still cannot read key folders.',
     fields: {
       mode: {
         label: 'Isolation mode',
-        hint: 'You can leave this on Auto. It does not choose isolation for the agent.'
+        hint: 'Saving this constrains later shell commands immediately.'
       }
     },
     options: {
       mode: {
-        auto: { label: 'Auto', desc: 'Recommended. The agent chooses per command. An omitted choice uses the strongest isolation on this machine.' },
-        os: { label: 'OS-level isolation', desc: 'Uses seatbelt on macOS and bwrap on Linux; commands cannot read key folders such as ~/.ssh. The agent can choose this on a single command.' },
-        direct: { label: 'Run directly (no isolation)', desc: 'Only scrubs environment variables. Saving this does not turn isolation off for the agent.' },
-        container: { label: 'Container', desc: 'Not available. Saving this does not turn isolation off.' },
-        'cloudflare-computer': { label: 'Cloudflare remote sandbox', desc: 'Commands can run on a connected remote computer. The agent picks remote on that command; you do not switch the mode first.' }
+        auto: { label: 'Auto', desc: 'The agent can choose per command. An omitted choice uses the strongest isolation on this machine, so a command may still use the OS sandbox. It is not switched to a direct run for ssh.' },
+        os: { label: 'OS-level isolation', desc: 'Uses seatbelt on macOS and bwrap on Linux; commands cannot read key folders such as ~/.ssh. After this is saved, one command cannot switch to a direct run, and the conversation says why.' },
+        direct: { label: 'Run directly (no isolation)', desc: 'No OS sandbox, only environment scrubbing. The ssh client runs this way.' },
+        container: { label: 'Container', desc: 'Not available. Saving this does not run the command, and does not switch it to a direct run or the OS sandbox.' },
+        'cloudflare-computer': { label: 'Cloudflare remote sandbox', desc: 'Commands go to a connected remote computer. If it is not connected, the command does not run and is not pulled back to this machine.' }
       }
     },
     risk: {
-      direct: 'No isolation means a command can read and write every file this service can reach, including key folders. Choosing it here does not turn isolation off. The agent must ask for no isolation on that command, and you must approve, before it runs that way.',
-      container: 'Container isolation is not available. Saving this does not run commands without isolation.'
+      direct: 'No isolation means a command can read and write every file this service can reach, including key folders. This saved mode is what later shell commands use.',
+      container: 'Container isolation is not available. Saving this does not run the command, and does not switch it to no isolation or the OS sandbox.'
     }
   },
   sandboxCloudflare: {
     title: 'Sandbox · Cloudflare connection',
     keywords: 'cloudflare remote sandbox endpoint token workspace account timeout secret vault',
-    desc: 'Connection for a remote computer. The agent uses it when it picks remote for a command. You do not have to switch the isolation mode first. The token is not stored here; keep it in the secret vault.',
+    desc: 'Connection for a remote computer. When the isolation mode is Auto, the agent uses it by choosing remote for a command. When the saved mode is the remote sandbox, commands go here. If it is not connected, the command does not run and is not pulled back to this machine. The token is not stored here; keep it in the secret vault.',
     fields: {
       endpoint: { label: 'Service URL', hint: 'Where your Cloudflare Computer is deployed.' },
       workspace: { label: 'Workspace name', hint: 'Workspace used in the remote sandbox. Letters, digits, dots, underscores and hyphens only.' },

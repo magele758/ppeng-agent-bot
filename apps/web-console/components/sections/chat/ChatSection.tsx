@@ -10,7 +10,7 @@ import { leaveCancelsRun } from '@/lib/run-leave';
 import { createDefaultBotLoadGuard, defaultBotLoadMaySelect, startDefaultBotLoadEffect } from '@/lib/bot-console-selection';
 import {
   botForCanonicalSession,
-  filterSessionsByPlaySurface,
+  sessionsForPlaySurface,
   writeStoredPlaySurface,
   type PlaySurface
 } from '@/lib/bots';
@@ -72,15 +72,10 @@ export function ChatSection({ active }: { active: boolean }) {
     return [cur, ...sidebarSessions];
   }, [sessions, sidebarSessions, selectedSessionId, sessionSidebarFilter]);
 
-  const playSidebarSessions = useMemo(() => {
-    const scoped = filterSessionsByPlaySurface(playOpsSidebarSessions, bots, playSurface);
-    if (!selectedSessionId) return scoped;
-    if (scoped.some((s) => s.id === selectedSessionId)) return scoped;
-    const cur = playOpsSidebarSessions.find((s) => s.id === selectedSessionId);
-    if (!cur) return scoped;
-    if (filterSessionsByPlaySurface([cur], bots, playSurface).length === 0) return scoped;
-    return [cur, ...scoped];
-  }, [playOpsSidebarSessions, bots, playSurface, selectedSessionId]);
+  const playSidebarSessions = useMemo(
+    () => sessionsForPlaySurface(playOpsSidebarSessions, bots, playSurface, selectedSessionId),
+    [playOpsSidebarSessions, bots, playSurface, selectedSessionId]
+  );
 
   const setPlaySurface = useCallback((next: PlaySurface) => {
     playSurfaceRef.current = next;
@@ -288,6 +283,7 @@ export function ChatSection({ active }: { active: boolean }) {
     <PlayPanel
       active={active}
       sessions={playSidebarSessions}
+      catalogSessions={sessions}
       agents={agents}
       bots={bots}
       playSurface={playSurface}

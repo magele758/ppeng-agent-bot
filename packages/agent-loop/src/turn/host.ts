@@ -76,8 +76,8 @@ export interface TurnKernelStore {
   }>;
 
   /**
-   * Optional Lab/daemon KV. Kernel reads `loop_settings` for steer-drain
-   * when the embedder persists it; omit for in-memory hosts.
+   * Optional Lab/daemon KV. Kernel reads `loop_settings` for steer-drain and
+   * `repeatGuard` when the embedder persists it; omit for in-memory hosts.
    */
   getDaemonControl?(key: string): unknown;
 

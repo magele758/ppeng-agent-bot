@@ -262,6 +262,7 @@ export const play = {
     reasoning_spin: 'Reasoning spin',
     loop_guard_critical: 'Loop guard',
     tool_loop: 'Tool loop',
+    repeat_detection: 'Repeat detection: the same tools were called again and again',
     missing_assistant: 'Missing assistant reply',
     before_turn_blocked: 'Turn blocked',
     rewound: 'Rewound',
@@ -568,7 +569,12 @@ export const play = {
     cronTagTitle: 'Triggered by a Bot cron job',
     toolObservation: 'Screenshots returned by tools, not a new user instruction.',
     toolShotAlt: 'Tool screenshot',
-    enlargeImage: 'Enlarge screenshot'
+    enlargeImage: 'Enlarge screenshot',
+    osSandbox: {
+      savedOs: 'This command still used the OS sandbox: the saved isolation mode is OS-level, and it was not switched to a direct run. Key folders stay unreadable.',
+      autoStrongest: 'This command still used the OS sandbox: the isolation mode is Auto, so an unspecified command uses the strongest isolation on this machine. It was not switched to a direct run.',
+      autoModelOs: 'This command still used the OS sandbox: the isolation mode is Auto, and this command selected OS-level isolation.'
+    }
   },
 
 
@@ -758,7 +764,8 @@ export const play = {
     workRunning: 'Running',
     workWaiting: 'Waiting',
     workDone: 'Done',
-    workStarted: 'Started {time}'
+    workStarted: 'Started {time}',
+    workOpenSession: '{status}. Open the session for {title}'
   },
 
   stored: {
@@ -797,7 +804,9 @@ export const play = {
     scopeUser: 'User memory',
     scopeTeam: 'Team memory',
     scopeProject: 'Project memory',
-    scopeOther: 'Other memory'
+    scopeOther: 'Other memory',
+    childTasks: 'Child tasks',
+    childTasksEmpty: 'No child tasks right now'
   },
 
   status: {
@@ -827,5 +836,28 @@ export const play = {
     taskCreated: 'Task session created',
     addedFiles: 'Added {count} attachment(s)',
     addedRemote: 'Added remote attachment'
-  }
+  },
+
+  childTask: {
+    owner: 'From {name}',
+    streamLabel: 'Child tasks',
+    streamOpen: 'Open this child task: {excerpt}'
+  },
+
+  goalUpdate: {
+    cardAria: 'Goal status',
+    titleFallback: 'Goal updated',
+    statusBlocked: 'Blocked',
+    statusRunning: 'In progress',
+    statusCompleted: 'Done',
+    statusFailed: 'Failed',
+    statusQueued: 'Queued',
+    statusWaiting: 'Waiting',
+    statusPaused: 'Paused',
+    statusCancelled: 'Cancelled',
+    statusUnknown: 'Status updated',
+    reasonVerifyUnavailable: 'The completion check is unavailable, and the evidence is kept for review',
+    reasonFallback: 'This change is noted, and the details are kept for review'
+  },
+
 };

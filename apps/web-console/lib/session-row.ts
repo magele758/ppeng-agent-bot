@@ -1,4 +1,4 @@
-import { botForCanonicalSession } from './bots.ts';
+import { botForCanonicalSession, isBotForkChildSession } from './bots.ts';
 import type { BotInfo } from './types.ts';
 
 /** Memory appendix is injected beside the user turn; it is not the question they asked. */
@@ -43,6 +43,13 @@ export type PlainSessionRowCopy = {
   title: string;
 };
 
+export type ChildTaskSessionRowCopy = {
+  kind: 'child-task';
+  title: string;
+  /** Roster name, readable bot title, or a short mark. Never a raw long id. */
+  ownerName: string;
+};
+
 export function oneLineQuestion(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
 }
@@ -54,6 +61,52 @@ export function stripBotChatPrefix(title: string): string {
 function metadataString(metadata: Record<string, unknown> | undefined, key: string): string {
   const value = metadata?.[key];
   return typeof value === 'string' ? value.trim() : '';
+}
+
+/** Generated bot ids (`bot_` + hex) and bare hex blobs. Short slugs stay readable. */
+const OPAQUE_LONG_ID = /^(?:bot_)?[0-9a-f]{16,}$/i;
+
+function isOpaqueLongId(value: string): boolean {
+  return OPAQUE_LONG_ID.test(value.trim());
+}
+
+function readableBotMark(value: string): string {
+  const text = value.trim();
+  if (!text || isOpaqueLongId(text)) return '';
+  return text;
+}
+
+function shortBotMark(botId: string): string {
+  const id = botId.trim();
+  if (!id) return '';
+  if (isOpaqueLongId(id)) return id.replace(/^bot_/i, '').slice(0, 4).toUpperCase();
+  if (id.length > 24) return id.slice(0, 8);
+  return id;
+}
+
+/** A forked child task, not the bot's own canonical chat and not a group room. */
+export function isChildTaskSession(session: SessionRowSession, bots: readonly BotInfo[]): boolean {
+  if (metadataString(session.metadata, 'roomId')) return false;
+  if (session.metadata?.canonicalBotChat === true) return false;
+  if (bots.some((bot) => bot.canonicalSessionId === session.id)) return false;
+  return isBotForkChildSession(session.metadata);
+}
+
+function childTaskTitle(session: SessionRowSession, unnamed: string): string {
+  const title = stripBotChatPrefix(session.title ?? '');
+  const botId = metadataString(session.metadata, 'botId');
+  if (!title || title === botId || title === session.id) return unnamed;
+  return title;
+}
+
+function childTaskOwnerName(session: SessionRowSession, bots: readonly BotInfo[], unnamed: string): string {
+  const botId = metadataString(session.metadata, 'botId');
+  const bot = botId ? bots.find((item) => item.id === botId) : undefined;
+  const named = readableBotMark(bot?.name ?? '') || readableBotMark(bot?.title ?? '');
+  if (named) return named;
+  const short = shortBotMark(botId);
+  if (short && short !== session.id) return short;
+  return unnamed;
 }
 
 /** A single-bot chat row. Group rooms and ordinary sessions stay on the plain title. */
@@ -112,7 +165,14 @@ export function sessionRowCopy(input: {
   question: string;
   emptyHint: string;
   unnamed: string;
-}): BotSessionRowCopy | PlainSessionRowCopy {
+}): BotSessionRowCopy | PlainSessionRowCopy | ChildTaskSessionRowCopy {
+  if (isChildTaskSession(input.session, input.bots)) {
+    return {
+      kind: 'child-task',
+      title: childTaskTitle(input.session, input.unnamed),
+      ownerName: childTaskOwnerName(input.session, input.bots, input.unnamed)
+    };
+  }
   if (!isSingleBotChat(input.session, input.bots)) {
     return { kind: 'plain', title: input.session.title || input.unnamed };
   }

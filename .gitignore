@@ -21,6 +21,8 @@ coverage/
 packages/*/coverage/
 *.tsbuildinfo
 .agent-state/
+# 本地评审与试验日志，不进主仓
+.agent-spills/
 # Local SSH credentials and isolated E2E workspace copies.
 .agent-ssh/
 .e2e-web-tmp/

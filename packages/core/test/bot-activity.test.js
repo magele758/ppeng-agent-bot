@@ -469,3 +469,88 @@ test('subagent child with parentSessionId appears as background waiting in the a
   assert.equal(items.some((item) => item.id === 'session:sub-ac5' && item.kind === 'background' && item.status === 'waiting'), true,
     'subagent child must appear as background waiting');
 });
+
+test('activity cards name only their own conversation [AC:bot-activity-open-session#AC-1] [AC:bot-activity-open-session#AC-2]', () => {
+  const focus = session({});
+  const child = session({
+    id: 'child-grok',
+    title: 'grok child',
+    mode: 'subagent',
+    status: 'running',
+    parentSessionId: 'focus',
+    background: true,
+    metadata: { canonicalBotChat: false }
+  });
+  const command = 'cd /Users/penglei/xunmengkeji/agent-group-for-tango/ai-agent-node && grok --prompt-file plan.md';
+  const items = assembleBotActivity({
+    focus,
+    sessions: [focus, child],
+    jobs: [
+      {
+        id: 'bg-child',
+        sessionId: 'child-grok',
+        command,
+        status: 'completed',
+        createdAt: '2026-10-16T11:40:00.000Z',
+        updatedAt: '2026-10-16T11:50:00.000Z'
+      },
+      {
+        id: 'bg-here',
+        sessionId: 'focus',
+        command: 'echo here',
+        status: 'completed',
+        createdAt: '2026-10-16T11:41:00.000Z',
+        updatedAt: '2026-10-16T11:51:00.000Z'
+      }
+    ],
+    routines: [
+      routine({
+        id: 'run-worker',
+        status: 'completed',
+        sessionId: 'worker-sess',
+        finishedAt: '2026-10-16T11:55:00.000Z',
+        updatedAt: '2026-10-16T11:55:00.000Z',
+        startedAt: '2026-10-16T11:50:00.000Z',
+        job: { name: 'Worker digest', sessionId: 'focus', metadata: { botId: 'ada' } }
+      }),
+      routine({
+        id: 'run-queued',
+        status: 'queued',
+        startedAt: undefined,
+        createdAt: '2026-10-16T11:10:00.000Z',
+        job: { name: 'Not started', sessionId: 'focus', metadata: { botId: 'ada' } }
+      }),
+      routine({
+        id: 'run-blank',
+        status: 'running',
+        sessionId: '   ',
+        job: { name: 'Blank session', metadata: { botId: 'ada' } }
+      })
+    ],
+    botNames: new Map([['ada', 'Ada']]),
+    now: NOW
+  });
+
+  const commandCard = items.find((item) => item.title === command);
+  assert.equal(commandCard.sessionId, 'child-grok');
+  assert.notEqual(commandCard.sessionId, 'focus');
+  assert.notEqual(commandCard.sessionId, commandCard.id);
+
+  const here = items.find((item) => item.title === 'echo here');
+  assert.equal(here.sessionId, 'focus');
+
+  const childCard = items.find((item) => item.id === 'session:child-grok');
+  assert.equal(childCard.sessionId, 'child-grok');
+  assert.notEqual(childCard.sessionId, 'focus');
+
+  const worker = items.find((item) => item.title === 'Worker digest');
+  assert.equal(worker.sessionId, 'worker-sess');
+  assert.notEqual(worker.sessionId, 'focus');
+
+  for (const title of ['Not started', 'Blank session']) {
+    const card = items.find((item) => item.title === title);
+    assert.ok(card, title);
+    assert.equal(card.sessionId, undefined);
+    assert.equal(Object.hasOwn(card, 'sessionId'), false);
+  }
+});

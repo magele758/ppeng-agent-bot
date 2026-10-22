@@ -54,10 +54,41 @@ export function botForCanonicalSession<T extends { id: string; canonicalSessionI
   return undefined;
 }
 
-/** Background bot work is not an ordinary conversation on either play surface. */
-function backgroundBotWork(metadata: Record<string, unknown> | undefined): boolean {
+/** A bot-spawned child task (goal worker or concurrent fork), not the bot's own chat. */
+export function isBotForkChildSession(metadata: Record<string, unknown> | undefined): boolean {
   const source = metadata?.spawnSource;
   return metadata?.botGoalWorker === true || source === 'bot-goal-continuation' || source === 'concurrent-bot-work';
+}
+
+/** Child tasks leave the bot sidebar. A bot's own canonical chat is never one of them. */
+export function isSidebarForkChild<T extends { id: string; metadata?: Record<string, unknown> }>(
+  session: T,
+  bots: readonly { canonicalSessionId?: string | null }[]
+): boolean {
+  if (!isBotForkChildSession(session.metadata)) return false;
+  if (session.metadata?.canonicalBotChat === true) return false;
+  return !bots.some((bot) => bot.canonicalSessionId === session.id);
+}
+
+/** Child tasks belonging to this bot. Titles stay the stored task text. */
+export function childTasksForBot<T extends { id: string; title: string; metadata?: Record<string, unknown> }>(
+  sessions: readonly T[],
+  bot: { id: string; canonicalSessionId?: string | null }
+): T[] {
+  const parentIds = new Set<string>();
+  if (bot.canonicalSessionId) parentIds.add(bot.canonicalSessionId);
+  for (const session of sessions) {
+    if (session.metadata?.canonicalBotChat === true && session.metadata.botId === bot.id) {
+      parentIds.add(session.id);
+    }
+  }
+  return sessions.filter((session) => {
+    if (!isSidebarForkChild(session, [bot])) return false;
+    const botId = typeof session.metadata?.botId === 'string' ? session.metadata.botId : '';
+    if (botId) return botId === bot.id;
+    const parent = session.metadata?.parentSessionId;
+    return typeof parent === 'string' && parentIds.has(parent);
+  });
 }
 
 export function filterSessionsByPlaySurface<
@@ -70,9 +101,45 @@ export function filterSessionsByPlaySurface<
   const canonical = new Set(
     bots.map((b) => b.canonicalSessionId).filter((id): id is string => Boolean(id))
   );
-  const isBotSession = (s: T) =>
-    canonical.has(s.id) || s.metadata?.canonicalBotChat === true || backgroundBotWork(s.metadata);
-  return sessions.filter((s) => !s.metadata?.roomId && (surface === 'bot' ? isBotSession(s) : !isBotSession(s)));
+  const isBotSession = (s: T) => canonical.has(s.id) || s.metadata?.canonicalBotChat === true;
+  return sessions.filter((s) => {
+    if (s.metadata?.roomId) return false;
+    const child = isSidebarForkChild(s, bots);
+    if (surface === 'bot') return !child && isBotSession(s);
+    if (child) return true;
+    return !isBotSession(s);
+  });
+}
+
+/** Sidebar rows for one play surface, including a selected row only when that surface already keeps it. */
+export function sessionsForPlaySurface<
+  T extends { id: string; metadata?: Record<string, unknown> }
+>(
+  sessions: readonly T[],
+  bots: readonly BotInfo[],
+  surface: PlaySurface,
+  selectedSessionId?: string | null
+): T[] {
+  const scoped = filterSessionsByPlaySurface(sessions, bots, surface);
+  if (!selectedSessionId) return scoped;
+  if (scoped.some((session) => session.id === selectedSessionId)) return scoped;
+  const current = sessions.find((session) => session.id === selectedSessionId);
+  if (!current) return scoped;
+  if (filterSessionsByPlaySurface([current], bots, surface).length === 0) return scoped;
+  return [current, ...scoped];
+}
+
+/** The chat a pinned bot shows. Child tasks are not that chat. */
+export function sessionForPinnedBot<
+  T extends { id: string; metadata?: Record<string, unknown> },
+  B extends { id: string; canonicalSessionId?: string | null }
+>(bot: B, bots: readonly B[], sessions: readonly T[]): T | undefined {
+  const rows = sessions.filter((session) => !isSidebarForkChild(session, bots));
+  if (bot.canonicalSessionId) {
+    const direct = rows.find((session) => session.id === bot.canonicalSessionId);
+    if (direct) return direct;
+  }
+  return rows.find((session) => botForCanonicalSession(bots, session.id, rows)?.id === bot.id);
 }
 
 export function visibleBotRoster(bots: readonly BotInfo[]): BotInfo[] {

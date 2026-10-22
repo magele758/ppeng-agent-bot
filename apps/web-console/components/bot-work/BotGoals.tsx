@@ -2,15 +2,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
-import { goalActions, type BotGoalsSnapshot, type BotGoalSettings, type GoalStrategy } from '@/lib/bot-goals';
+import { goalActions, goalsPanelState, type BotGoalsSnapshot, type BotGoalSettings, type GoalStrategy } from '@/lib/bot-goals';
 import './bot-goals.css';
 
-export function BotGoals({ botId, sessionId, selectedGoalId, onSelectGoal }: {
+export function BotGoals({ botId, sessionId, selectedGoalId, onSelectGoal, initialSnapshot = null }: {
   botId: string; sessionId: string; selectedGoalId?: string | null; onSelectGoal?: (id: string | null) => void;
+  initialSnapshot?: BotGoalsSnapshot | null;
 }) {
   const { t } = useI18n();
-  const [snapshot, setSnapshot] = useState<BotGoalsSnapshot | null>(null);
-  const [draft, setDraft] = useState<BotGoalSettings | null>(null);
+  const [snapshot, setSnapshot] = useState<BotGoalsSnapshot | null>(initialSnapshot);
+  const [draft, setDraft] = useState<BotGoalSettings | null>(initialSnapshot?.settings ?? null);
   const [error, setError] = useState('');
   const [listFailed, setListFailed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -54,21 +55,21 @@ export function BotGoals({ botId, sessionId, selectedGoalId, onSelectGoal }: {
     } catch (err) { if (alive.current) setError(String(err)); }
     finally { if (alive.current) setBusy(false); }
   };
-  const goals = snapshot?.goals ?? [];
+  const panel = goalsPanelState(snapshot?.goals ?? []);
   useEffect(() => {
     if (snapshot && selectedGoalId && !snapshot.goals.some(goal => goal.id === selectedGoalId && goalActions(goal.status).length > 0)) onSelectGoal?.(null);
   }, [snapshot, selectedGoalId, onSelectGoal]);
-  const selectedTitle = goals.find(goal => goal.id === selectedGoalId)?.title;
-  if (listFailed || !snapshot || goals.length < 2) return null;
+  const selectedTitle = panel.items.find(goal => goal.id === selectedGoalId)?.title;
+  if (listFailed || !snapshot || !panel.show) return null;
   return <details className="bot-goals" data-testid="bot-goals">
-    <summary>{t('goals.title')} ({goals.filter(g => !['completed', 'failed', 'cancelled'].includes(g.status)).length}){selectedTitle ? ` · ${selectedTitle}` : ''}</summary>
+    <summary>{t('goals.title')} ({panel.count}){selectedTitle ? ` · ${selectedTitle}` : ''}</summary>
     <div className="bot-goals__body">
       {error && <p role="alert">{t('goals.error', { error })}</p>}
       {onSelectGoal && <label>{t('goals.target')}<select value={selectedGoalId ?? ''} onChange={e => onSelectGoal(e.target.value || null)}>
         <option value="">{t('goals.automatic')}</option>
-        {goals.filter(g => !['completed', 'failed', 'cancelled'].includes(g.status)).map(g => <option key={g.id} value={g.id}>{g.title}</option>)}
+        {panel.items.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}
       </select></label>}
-      <div className="bot-goals__list">{goals.map(goal => <article key={goal.id} data-testid={`bot-goal-${goal.id}`}>
+      <div className="bot-goals__list">{panel.items.map(goal => <article key={goal.id} data-testid={`bot-goal-${goal.id}`}>
         <header><strong>{goal.title}</strong><span>{t(`goals.status.${goal.status}`)}</span></header>
         <dl>
           {goal.progress && <><dt>{t('goals.progress')}</dt><dd>{goal.progress}</dd></>}

@@ -75,6 +75,21 @@ describe('shell-policy history gating', () => {
     expect(decision.reason).toMatch(/Code search limit/);
   });
 
+  it('skips browse and search caps when history limits are off, and still blocks GUI and unbounded walks [AC:loop-guard-model-switch#AC-2] [AC:loop-guard-model-switch#AC-4]', () => {
+    const browse = Array.from({ length: 8 }, (_, i) => bash(`ls src/dir${i}`));
+    expect(checkShellPolicy('ls src/another', browse, undefined, { historyLimits: false })).toEqual({
+      blocked: false,
+    });
+    const searches = [bash('rg a'), bash('rg b'), bash('rg c'), bash('rg d')];
+    expect(checkShellPolicy('rg zzz', searches, undefined, { historyLimits: false }).blocked).toBe(false);
+    expect(checkShellPolicy('open /Applications', browse, undefined, { historyLimits: false }).reason).toMatch(
+      /GUI launch/
+    );
+    expect(checkShellPolicy('find /usr -name "*.so"', [], undefined, { historyLimits: false }).reason).toMatch(
+      /maxdepth/
+    );
+  });
+
   it('does not treat ssh payloads as local browsing [AC:bypass-remote-shell#AC-3]', () => {
     const heredoc = "ssh -o BatchMode=yes Win4090 \"wsl -d Ubuntu -e bash --norc --noprofile\" <<'EOF'\nfind /home/shinemo -type d\nEOF";
     const quoted = 'ssh -o BatchMode=yes Win4090 "find /home/shinemo -iname agent"';

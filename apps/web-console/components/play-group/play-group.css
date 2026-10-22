@@ -19,9 +19,35 @@
   gap: 6px;
 }
 
+.play-group-menu {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.list-item--group:hover > .play-group-menu,
+.list-item--group:focus-within > .play-group-menu,
+.play-group-menu:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .play-group-menu {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
 .play-group-delete {
   flex: 0 0 auto;
   color: var(--ui-text-muted);
+}
+
+.play-group-delete svg {
+  display: block;
 }
 
 .room-shared-context {

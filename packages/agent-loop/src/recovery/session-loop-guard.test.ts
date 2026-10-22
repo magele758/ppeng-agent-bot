@@ -77,6 +77,7 @@ describe('recovery/session-loop-guard', () => {
       guard.afterToolRound(sameCall, ok);
       const result = guard.afterToolRound(sameCall, ok);
       expect(result.abort).toBe(true);
+      if (result.abort) expect(result.reason).toMatch(/^repeat detection: same tool-call content/);
     });
   });
 });

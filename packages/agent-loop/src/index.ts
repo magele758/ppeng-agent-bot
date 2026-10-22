@@ -88,6 +88,18 @@ export type {
 // L1: Recovery
 export { findSimilarToolName, recoveryPolicyEnabled, SessionLoopGuard } from './recovery/index.js';
 export type { LoopGuardToolCall } from './recovery/index.js';
+export {
+  applyRepeatGuard,
+  classifyModelTier,
+  DEFAULT_REPEAT_GUARD_MODE,
+  isContentRepeatAbort,
+  loopGuardStopReason,
+  modelIdentity,
+  parseRepeatGuardMode,
+  repeatLimitsActive,
+  resolveRepeatGuardMode,
+} from './recovery/index.js';
+export type { ModelIdentityInput, ModelTier, RepeatGuardMode } from './recovery/index.js';
 
 export {
   AUTO_FORK_USED_KEY,

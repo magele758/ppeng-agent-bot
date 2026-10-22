@@ -7,6 +7,7 @@ import { createId } from '../helpers.js';
 import { NotFoundError } from '../errors.js';
 import { ReasoningSpinWatchdog, RepetitionLoopAbortError } from '../streaming/index.js';
 import { recoveryPolicyEnabled, SessionLoopGuard } from '../recovery/session-loop-guard.js';
+import { applyRepeatGuard, loopGuardStopReason, modelIdentity } from '../recovery/repeat-guard.js';
 import {
   AdvisoryGrace,
   advisoryGraceBudget,
@@ -1552,8 +1553,19 @@ async function runSessionKernel(
         toolCalls.map((tc) => ({ name: tc.name, input: tc.input })),
         results.map((r) => ({ name: r.name, ok: r.ok }))
       ) ?? { abort: false as const };
-      const toolRepDecision: { abort: boolean; reason: string } = toolRep.abort
-        ? { abort: true, reason: toolRep.reason }
+      const live = host.store.getSession(sid) ?? session;
+      const adapter = adapterOf(live);
+      const guarded = applyRepeatGuard({
+        store: host.store,
+        identity: modelIdentity({
+          modelName: adapter.modelName,
+          adapterName: adapter.name,
+          metadata: live.metadata,
+        }),
+        decision: toolRep,
+      });
+      const toolRepDecision: { abort: boolean; reason: string } = guarded.abort
+        ? { abort: true, reason: guarded.reason }
         : { abort: false, reason: '' };
       const toolGraceOut = advisoryGrace.apply(toolRepDecision);
       if (toolGraceOut.action === 'advise') {
@@ -1565,7 +1577,7 @@ async function runSessionKernel(
           if (await tryAutoFork('deadloop-exhausted')) continue;
           return await finishFailed(
             host.store.updateSession(session.id, { status: 'idle' }),
-            'tool_loop'
+            loopGuardStopReason(toolGraceOut.reason)
           );
         }
         host.store.appendMessage(session.id, 'system', [textPart(toolGraceOut.advisory)]);
@@ -1592,7 +1604,7 @@ async function runSessionKernel(
         if (await tryAutoFork('deadloop-exhausted')) continue;
         return await finishFailed(
           host.store.updateSession(session.id, { status: 'idle' }),
-          'tool_loop'
+          loopGuardStopReason(toolGraceOut.reason)
         );
       }
     }

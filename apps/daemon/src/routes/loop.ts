@@ -13,6 +13,7 @@ import {
   parseInboxOverflowCap,
   parseAssemblyPreset,
   parseKernelVariant,
+  parseRepeatGuardMode,
   parseSteerDrainPolicy,
   readLoopSettings,
   writeLoopSettings,
@@ -119,6 +120,13 @@ export function loopRoutes(runtime: RawAgentRuntime): RouteSpec[] {
             throw new ValidationError('assemblyPreset must be mini, normal, full, or max');
           }
           patch.assemblyPreset = parsed;
+        }
+        if (body && 'repeatGuard' in body) {
+          const parsed = parseRepeatGuardMode(body.repeatGuard);
+          if (!parsed) {
+            throw new ValidationError('repeatGuard must be weak, all, or off');
+          }
+          patch.repeatGuard = parsed;
         }
         const settings = writeLoopSettings(runtime.store, patch);
         json(response, 200, {

@@ -15,7 +15,30 @@ import {
 import { useI18n, type MessageKey } from '@/lib/i18n';
 import styles from './BotDetailMenu.module.css';
 
-type Section = 'routines' | 'files' | 'memory' | 'skills';
+type Section = 'routines' | 'tasks' | 'files' | 'memory' | 'skills';
+type LoadedSection = 'routines' | 'files' | 'memory';
+
+const DETAIL_SECTIONS = ['routines', 'tasks', 'files', 'memory', 'skills'] as const satisfies readonly Section[];
+
+function sectionLabel(id: Section): MessageKey {
+  switch (id) {
+    case 'routines':
+      return 'play.botDetail.routines';
+    case 'tasks':
+      return 'play.botDetail.childTasks';
+    case 'files':
+      return 'play.botDetail.files';
+    case 'memory':
+      return 'play.botDetail.memory';
+    case 'skills':
+      return 'skillProposals.detailTab';
+    default: {
+      const exhaustive: never = id;
+      return exhaustive;
+    }
+    }
+}
+
 type RoutineItem = RoutineToggle & ScheduleJob & { name: string; nextRunAt?: string; scheduleValue?: string };
 type MaterialItem = { id: string; name: string; kind: 'artifact' | 'working-log'; createdAt?: string; sourceTool?: string };
 type MemoryItem = { id: string; scope: string; key: string; value: string };
@@ -135,13 +158,39 @@ function DetailMemories({ memories, loading, failed }: { memories: MemoryItem[];
 }
 
 
-function DetailBody({ onSaved, section, loading, sectionError, jobs, files, memories, toggleError, deleteError, folderError, folderOk, busyId, onToggle, onDelete, onOpenFolder }: {
-  onSaved: (job: ScheduleJob) => void; section: Section; loading: boolean; sectionError: Record<Exclude<Section, 'skills'>, boolean>; jobs: RoutineItem[]; files: MaterialItem[]; memories: MemoryItem[];
-  toggleError: boolean; deleteError: boolean; folderError: boolean; folderOk: boolean; busyId: string | null; onToggle: (job: RoutineItem) => void; onDelete: (job: RoutineItem) => void; onOpenFolder: (id: string) => void;
+function DetailChildTasks({ tasks, onOpen }: {
+  tasks: ReadonlyArray<{ id: string; title: string }>;
+  onOpen?: (sessionId: string) => void;
 }) {
   const { t } = useI18n();
-  return (      <div className={styles.body}>
-        {loading ? <p className={styles.meta}>{t('play.botDetail.loading')}</p> : null}
+  return (
+    <section className={styles.tasks} data-testid="bot-detail-child-tasks" aria-label={t('play.botDetail.childTasks')}>
+      <h4 className={styles.sectionLabel}>{t('play.botDetail.childTasks')}</h4>
+      {tasks.length === 0 ? <p className={styles.empty}>{t('play.botDetail.childTasksEmpty')}</p> : tasks.map((task) => (
+        <button
+          key={task.id}
+          type="button"
+          className={`${styles.item} ${styles.task}`}
+          data-testid="bot-detail-child-task"
+          data-session-id={task.id}
+          onClick={() => onOpen?.(task.id)}
+        >
+          <span className={styles.name}>{task.title}</span>
+        </button>
+      ))}
+    </section>
+  );
+}
+
+function DetailBody({ onSaved, section, loading, sectionError, jobs, files, memories, toggleError, deleteError, folderError, folderOk, busyId, onToggle, onDelete, onOpenFolder, childTasks, onOpenChildTask }: {
+  onSaved: (job: ScheduleJob) => void; section: Section; loading: boolean; sectionError: Record<LoadedSection, boolean>; jobs: RoutineItem[]; files: MaterialItem[]; memories: MemoryItem[];
+  toggleError: boolean; deleteError: boolean; folderError: boolean; folderOk: boolean; busyId: string | null; onToggle: (job: RoutineItem) => void; onDelete: (job: RoutineItem) => void; onOpenFolder: (id: string) => void;
+  childTasks: ReadonlyArray<{ id: string; title: string }>; onOpenChildTask?: (sessionId: string) => void;
+}) {
+  const { t } = useI18n();
+  return (      <div className={styles.body} data-testid="bot-detail-scroll">
+        {loading && section !== 'tasks' ? <p className={styles.meta}>{t('play.botDetail.loading')}</p> : null}
+        {section === 'tasks' ? <DetailChildTasks tasks={childTasks} onOpen={onOpenChildTask} /> : null}
         {section === 'routines' ? <DetailRoutines onSaved={onSaved} jobs={jobs} loading={loading} failed={sectionError.routines} toggleError={toggleError} deleteError={deleteError} busyId={busyId} onToggle={onToggle} onDelete={onDelete} /> : null}
         {section === 'files' ? <DetailFiles files={files} loading={loading} failed={sectionError.files} folderError={folderError} folderOk={folderOk} busyId={busyId} onOpenFolder={onOpenFolder} /> : null}
         {section === 'memory' ? <DetailMemories memories={memories} loading={loading} failed={sectionError.memory} /> : null}
@@ -156,7 +205,9 @@ export function BotDetailMenu({
   onClose,
   initialSection = 'routines',
   preview,
-  showToggleError = false
+  showToggleError = false,
+  childTasks = [],
+  onOpenChildTask
 }: {
   botId: string;
   botName: string;
@@ -166,6 +217,8 @@ export function BotDetailMenu({
   initialSection?: Section;
   preview?: BotDetailPreview;
   showToggleError?: boolean;
+  childTasks?: ReadonlyArray<{ id: string; title: string }>;
+  onOpenChildTask?: (sessionId: string) => void;
 }) {
   const { t } = useI18n();
   const [section, setSection] = useState<Section>(initialSection);
@@ -273,7 +326,7 @@ export function BotDetailMenu({
         {onClose && <button type="button" className={styles.close} data-testid="bot-detail-close" aria-label={t('play.botDetail.close')} title={t('play.botDetail.close')} onClick={onClose}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>}
       </div>
       <div className={styles.tabs} role="tablist" aria-label={t('play.botDetail.aria')}>
-        {(['routines', 'files', 'memory', 'skills'] as const).map((id) => (
+        {DETAIL_SECTIONS.map((id) => (
           <button
             key={id}
             type="button"
@@ -283,12 +336,12 @@ export function BotDetailMenu({
             aria-selected={section === id}
             onClick={() => setSection(id)}
           >
-            {t(id === 'skills' ? 'skillProposals.detailTab' : id === 'routines' ? 'play.botDetail.routines' : id === 'files' ? 'play.botDetail.files' : 'play.botDetail.memory')}
+            {t(sectionLabel(id))}
           </button>
         ))}
       </div>
       <div className={styles.body} hidden={section !== 'skills'}>{section === 'skills' && <BotDetailSkills botId={botId} />}</div>
-      {section !== 'skills' && <DetailBody onSaved={updated => setJobs(current => current.map(job => job.id === updated.id ? { ...job, ...updated } : job))} section={section} loading={loading} sectionError={sectionError} jobs={jobs} files={files} memories={memories} toggleError={toggleError} deleteError={deleteError} folderError={folderError} folderOk={folderOk} busyId={busyId} onToggle={onToggle} onDelete={onDelete} onOpenFolder={onOpenFolder} />}
+      {section !== 'skills' && <DetailBody onSaved={updated => setJobs(current => current.map(job => job.id === updated.id ? { ...job, ...updated } : job))} section={section} loading={loading} sectionError={sectionError} jobs={jobs} files={files} memories={memories} toggleError={toggleError} deleteError={deleteError} folderError={folderError} folderOk={folderOk} busyId={busyId} onToggle={onToggle} onDelete={onDelete} onOpenFolder={onOpenFolder} childTasks={childTasks} onOpenChildTask={onOpenChildTask} />}
     </aside>
   );
 }
@@ -306,9 +359,17 @@ export function BotDetailToggle({ botId, open, onToggle }: { botId: string; open
     {open ? t('play.botDetail.close') : t('play.botDetail.open')}
   </button>;
 }
-export function BotDetailPane({ visible, botId, botName, agentId, onClose }: { visible: boolean; botId: string; botName: string; agentId?: string; onClose: () => void }) {
+export function BotDetailPane({ visible, botId, botName, agentId, onClose, childTasks, onOpenChildTask }: {
+  visible: boolean;
+  botId: string;
+  botName: string;
+  agentId?: string;
+  onClose: () => void;
+  childTasks?: ReadonlyArray<{ id: string; title: string }>;
+  onOpenChildTask?: (sessionId: string) => void;
+}) {
   if (!visible) return null;
-  return <BotDetailMenu key={botId} botId={botId} botName={botName || botId} agentId={agentId || botId} onClose={onClose} />;
+  return <BotDetailMenu key={botId} botId={botId} botName={botName || botId} agentId={agentId || botId} onClose={onClose} childTasks={childTasks} onOpenChildTask={onOpenChildTask} />;
 }
 
 export function BotPermissionsLink({ botId, botName }: { botId: string; botName: string }) {

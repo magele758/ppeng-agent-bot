@@ -19,9 +19,11 @@ import type { SandboxMode } from '../sandbox/sandbox-settings.js';
 import {
   DIRECT_ISOLATION_REFUSAL,
   decideShellIsolation,
+  formatOsSandboxNote,
   isolationInputSchema,
   shellCallNeedsDirectApproval,
-  shellIsolationAvailability
+  shellIsolationAvailability,
+  type OsSandboxReason
 } from '../sandbox/model-isolation.js';
 import { createExternalAiTools } from './external-ai-tools.js';
 import { bashCommandNeedsApproval } from './bash-command-policy.js';
@@ -234,6 +236,15 @@ function workEvidenceDiffCap(): number {
   return Math.min(n, 2_000_000);
 }
 
+function withOsSandboxNote(result: ToolExecutionResult, reason: OsSandboxReason | undefined): ToolExecutionResult {
+  if (!reason) return result;
+  return {
+    ...result,
+    content: `${result.content}\n${formatOsSandboxNote(reason)}`,
+    metadata: { ...result.metadata, os_sandbox_reason: reason }
+  };
+}
+
 function shellExecution(
   command: string,
   cwd: string,
@@ -243,6 +254,7 @@ function shellExecution(
     sessionId?: string;
     workspace?: string | string[];
     isolation?: SandboxMode;
+    osSandboxReason?: OsSandboxReason;
   }
 ): Promise<ToolExecutionResult> {
   const sandbox = getAgentSandbox();
@@ -258,12 +270,20 @@ function shellExecution(
       ...(options?.isolation ? { isolation: options.isolation } : {})
     })
     .then((result) => {
-    if (options?.signal?.aborted) return {ok:false, content:'(command aborted)', metadata:{exitCode:result.code, signal:result.signal, ...(result.backend ? { sandbox_backend: result.backend } : {})}};
+    if (options?.signal?.aborted) {
+      return withOsSandboxNote(
+        {ok:false, content:'(command aborted)', metadata:{exitCode:result.code, signal:result.signal, ...(result.backend ? { sandbox_backend: result.backend } : {})}},
+        options.osSandboxReason
+      );
+    }
     const combined = [result.stdout.trim(), result.stderr.trim()].filter(Boolean).join('\n');
     const raw = combined || `(command exited with ${result.code ?? result.signal ?? 'unknown'} and no output)`;
     // P0 return-path redaction: injected/host secret values must not flow back to the model.
     const ok = result.code === 0 && result.signal === null;
-    return {ok, content:redactToolContent(ok ? raw : `${raw}\n[exit_code=${result.code ?? 'unknown'}; signal=${result.signal ?? 'none'}]`, process.env), metadata:{exitCode:result.code, signal:result.signal, ...(result.backend ? { sandbox_backend: result.backend } : {})}};
+    return withOsSandboxNote(
+      {ok, content:redactToolContent(ok ? raw : `${raw}\n[exit_code=${result.code ?? 'unknown'}; signal=${result.signal ?? 'none'}]`, process.env), metadata:{exitCode:result.code, signal:result.signal, ...(result.backend ? { sandbox_backend: result.backend } : {})}},
+      options?.osSandboxReason
+    );
   });
 }
 
@@ -352,7 +372,8 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
     }
     return {
       ok: true as const,
-      mode: decision.localMode === 'inherit' ? undefined : decision.localMode
+      mode: decision.localMode === 'inherit' ? undefined : decision.localMode,
+      osSandboxReason: decision.osSandboxReason
     };
   }
 
@@ -802,7 +823,7 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
   const bashTool: ToolContract<{ command: string; timeout_ms?: number; isolation?: string }> = {
     name: 'bash',
     description:
-      'Run a shell command inside the workspace root. Optional timeout_ms (default from env RAW_AGENT_BASH_TIMEOUT_MS). Optional isolation chooses os, direct, or remote for this command; omit it for the strongest available.',
+      'Run a shell command inside the workspace root. Optional timeout_ms (default from env RAW_AGENT_BASH_TIMEOUT_MS). Optional isolation is honored when the saved mode is Auto; omit it to follow the saved mode. Auto uses the strongest available.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -837,7 +858,8 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
           signal: context.abortSignal,
           sessionId: context.session.id,
           workspace: sandboxWorkspaceRoots(context),
-          isolation: gated.mode
+          isolation: gated.mode,
+          osSandboxReason: gated.osSandboxReason
         });
     }
   };
@@ -960,6 +982,7 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
         };
       }
 
+      if (gated.osSandboxReason) evidence.os_sandbox_note = formatOsSandboxNote(gated.osSandboxReason);
       const payload = `${JSON.stringify(evidence, null, 2)}\n`;
       const vc =
         typeof evidence.verify === 'object' && evidence.verify !== null
@@ -1388,7 +1411,7 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
   const bgRunTool: ToolContract<{ command: string; isolation?: string }> = {
     name: 'bg_run',
     description:
-      'Run a long command in the background. Optional isolation chooses os, direct, or remote for this command; omit it for the strongest available.',
+      'Run a long command in the background. Optional isolation is honored when the saved mode is Auto; omit it to follow the saved mode. Auto uses the strongest available.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1408,9 +1431,12 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
       const gated = gateShell(context, 'bg_run', args);
       if (!gated.ok) return { ok: false, content: gated.content };
       const job = await services.startBackgroundJob(context.session.id, args.command, { isolation: args.isolation });
+      const payload = gated.osSandboxReason
+        ? { ...job, os_sandbox_note: formatOsSandboxNote(gated.osSandboxReason) }
+        : job;
       return {
         ok: true,
-        content: JSON.stringify(job, null, 2)
+        content: JSON.stringify(payload, null, 2)
       };
     }
   };
