@@ -882,6 +882,25 @@ body,
 .activity-panel__actions { display: flex; align-items: center; gap: 6px; }
 .bot-activity { margin-bottom: 12px; }
 .bot-activity__row { cursor: default; }
+button.bot-activity__open {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+button.bot-activity__open .bot-activity__row { cursor: pointer; }
+button.bot-activity__open:focus-visible {
+  outline: 2px solid var(--color-accent, #3d7ea6);
+  outline-offset: 2px;
+}
 .bot-activity__meta {
   display: flex;
   justify-content: space-between;

@@ -8,10 +8,29 @@ export type BotActivityItem = {
   botId: string;
   botName: string;
   startedAt: string;
+  sessionId?: string;
 };
 
 function isStatus(value: unknown): value is BotActivityStatus {
   return value === 'running' || value === 'waiting' || value === 'done';
+}
+
+/** Session this card may open. Blank and missing ids are not targets. */
+export function activityOpenSessionId(item: { sessionId?: string | null }): string | undefined {
+  if (typeof item.sessionId !== 'string') return undefined;
+  const sessionId = item.sessionId.trim();
+  return sessionId || undefined;
+}
+
+/** Open this activity's own session. Returns false when there is nothing to open. */
+export function openBotActivitySession(
+  openSession: (sessionId: string, opts?: { focusChat?: boolean }) => unknown,
+  item: { sessionId?: string | null }
+): boolean {
+  const sessionId = activityOpenSessionId(item);
+  if (!sessionId) return false;
+  openSession(sessionId, { focusChat: true });
+  return true;
 }
 
 /** Keep only rows the activity rail can render. */
@@ -24,6 +43,7 @@ export function parseBotActivityItems(payload: unknown): BotActivityItem[] {
     const row = item as Partial<BotActivityItem>;
     if (typeof row.id !== 'string' || typeof row.title !== 'string' || !isStatus(row.status)) continue;
     if (typeof row.startedAt !== 'string') continue;
+    const sessionId = activityOpenSessionId({ sessionId: typeof row.sessionId === 'string' ? row.sessionId : undefined });
     rows.push({
       id: row.id,
       title: row.title,
@@ -36,7 +56,8 @@ export function parseBotActivityItems(payload: unknown): BotActivityItem[] {
           : typeof row.botId === 'string'
             ? row.botId
             : '',
-      startedAt: row.startedAt
+      startedAt: row.startedAt,
+      ...(sessionId ? { sessionId } : {})
     });
   }
   return rows;

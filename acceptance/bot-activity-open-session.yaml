@@ -1,0 +1,20 @@
+id: bot-activity-open-session
+title: 活动卡点击打开所属会话
+status: implemented
+notes: |
+  assumedApproval: standing-order-2026-10-22
+requirement: |
+  这种要能点击跳转到会话里
+criteria:
+  - id: AC-1
+    given: 右侧「正在进行」里有一张活动卡，这条活动属于某一段会话
+    when: 用户点击这张卡上的状态或摘要
+    then: 打开的是这条活动自己的会话，用户能看到那段对话，不会打开另一段会话
+  - id: AC-2
+    given: 活动卡没有可打开的会话
+    when: 用户查看或点这张卡
+    then: 卡片不像可点击的控件，点它不会打开任何会话，也不会打开另一段会话
+  - id: AC-3
+    given: 活动卡属于某一段会话
+    when: 用户查看这张卡
+    then: 整张卡（含状态和摘要）可点、键盘能到达、光标是指针，并且有可访问名称说明点击会打开对应会话；中文和英文界面各自使用对应语言
