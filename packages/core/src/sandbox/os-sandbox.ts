@@ -137,6 +137,9 @@ function normalizeWorkspaceRoots(workspace: string | string[]): string[] {
   return [...new Set(list)];
 }
 
+/** Home directories the OS sandbox hides. Shared by seatbelt and bwrap. */
+export const OS_SANDBOX_SENSITIVE_HOME_DIRS = ['.ssh', '.aws', '.gnupg', '.kube', '.docker'] as const;
+
 function buildSeatbeltProfile(workspace: string | string[], home: string, allowNetwork: boolean): string {
   const roots = normalizeWorkspaceRoots(workspace);
   const lines: string[] = [
@@ -144,16 +147,10 @@ function buildSeatbeltProfile(workspace: string | string[], home: string, allowN
     '(allow default)',
     '',
     '; --- Deny access to sensitive directories ---',
-    `(deny file-read* (subpath "${home}/.ssh"))`,
-    `(deny file-write* (subpath "${home}/.ssh"))`,
-    `(deny file-read* (subpath "${home}/.aws"))`,
-    `(deny file-write* (subpath "${home}/.aws"))`,
-    `(deny file-read* (subpath "${home}/.gnupg"))`,
-    `(deny file-write* (subpath "${home}/.gnupg"))`,
-    `(deny file-read* (subpath "${home}/.kube"))`,
-    `(deny file-write* (subpath "${home}/.kube"))`,
-    `(deny file-read* (subpath "${home}/.docker"))`,
-    `(deny file-write* (subpath "${home}/.docker"))`,
+    ...OS_SANDBOX_SENSITIVE_HOME_DIRS.flatMap((dir) => [
+      `(deny file-read* (subpath "${home}/${dir}"))`,
+      `(deny file-write* (subpath "${home}/${dir}"))`
+    ])
   ];
 
   if (!allowNetwork) {
@@ -243,8 +240,6 @@ export class MacOSSandboxProvider implements SandboxProvider {
 // Linux bubblewrap provider
 // ---------------------------------------------------------------------------
 
-const SENSITIVE_HOME_DIRS = ['.ssh', '.aws', '.gnupg', '.kube', '.docker'];
-
 export class LinuxBwrapProvider implements SandboxProvider {
   readonly name = 'bwrap';
   readonly tier = 1 as const;
@@ -275,7 +270,7 @@ export class LinuxBwrapProvider implements SandboxProvider {
       // Block sensitive directories by overlaying empty tmpfs. bwrap cannot
       // create a missing mount point on the read-only root, and a missing
       // directory has nothing to hide, so only existing ones are overlaid.
-      ...SENSITIVE_HOME_DIRS.map((d) => join(home, d)).filter((p) => existsSync(p)).flatMap((p) => ['--tmpfs', p]),
+      ...OS_SANDBOX_SENSITIVE_HOME_DIRS.map((d) => join(home, d)).filter((p) => existsSync(p)).flatMap((p) => ['--tmpfs', p]),
     ];
 
     if (!explicitNetworkAllowed(options.allowNetwork)) {

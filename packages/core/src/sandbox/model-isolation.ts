@@ -1,22 +1,44 @@
 /**
- * Per-command isolation chosen by the dialogue model.
- * Humans do not pick a mode before a shell tool can use one.
+ * Shell isolation.
+ * A saved Lab mode (or the env fallback when nothing was saved) constrains
+ * bash, bg_run, and work_evidence. Auto still lets the model choose, and an
+ * omitted choice under Auto is the strongest isolation this machine can apply.
  * Container is not a choice: it is not implemented and must not run as direct.
  */
 
 import { sortKeys } from '../runtime/helpers.js';
-import type { SandboxMode } from './sandbox-settings.js';
+import {
+  getBoundSandboxSettingsStore,
+  resolveSandboxMode,
+  type SandboxMode
+} from './sandbox-settings.js';
 import { LinuxBwrapProvider, MacOSSandboxProvider } from './os-sandbox.js';
 import { CloudflareComputerProvider } from './cloudflare-computer-provider.js';
 
 export const MODEL_ISOLATION_VALUES = ['os', 'direct', 'remote'] as const;
 
+export const OS_SANDBOX_REASONS = ['saved-os', 'auto-strongest', 'auto-model-os'] as const;
+export type OsSandboxReason = (typeof OS_SANDBOX_REASONS)[number];
+
+const OS_SANDBOX_NOTE: Record<OsSandboxReason, string> = {
+  'saved-os':
+    'This command ran inside the OS sandbox because the saved isolation mode is OS-level. It was not switched to a direct run. Key folders such as ~/.ssh stay unreadable.',
+  'auto-strongest':
+    'This command ran inside the OS sandbox because the saved isolation mode is Auto, which uses the strongest isolation on this machine when the command does not drop it. It was not switched to a direct run. Key folders such as ~/.ssh stay unreadable.',
+  'auto-model-os':
+    'This command ran inside the OS sandbox because the saved isolation mode is Auto and this command selected OS-level isolation. It was not switched to a direct run. Key folders such as ~/.ssh stay unreadable.'
+};
+
+export function formatOsSandboxNote(reason: OsSandboxReason): string {
+  return `[os-sandbox:${reason}] ${OS_SANDBOX_NOTE[reason]}`;
+}
+
 export const MODEL_ISOLATION_DESCRIPTION = [
-  'Isolation for this single command. Omit it and the runtime uses the strongest isolation this machine can apply.',
-  'os — stronger local isolation: macOS seatbelt or Linux bubblewrap blocks ~/.ssh, ~/.aws, ~/.gnupg, ~/.kube, and ~/.docker. Use this, or omit the field, for ordinary workspace commands.',
-  'direct — weaker: no OS sandbox, only environment scrubbing, so the command can read those secret folders. Use it only when the user needs something the OS sandbox blocks. It does not run until a person approves it, unless this chat is already set to never ask for approval.',
-  'remote — stronger than the local sandbox when a remote computer is already connected: the command runs there instead of on this machine. If none is connected, the command does not run and is not moved onto this machine.',
-  'Container isolation is not offered.'
+  'Isolation for this single command. The saved isolation mode constrains it. Omit this field to follow that saved mode. Auto, the default, uses the strongest isolation this machine can apply.',
+  'os — stronger local isolation: macOS seatbelt or Linux bubblewrap blocks ~/.ssh, ~/.aws, ~/.gnupg, ~/.kube, and ~/.docker. Under Auto you may choose this for one command. A saved OS-level mode stays on this even if you ask for direct.',
+  'direct — weaker: no OS sandbox, only environment scrubbing, so the command can read those secret folders. Under Auto it does not run until a person approves it, unless this chat is already set to never ask for approval. A saved direct mode already runs this way, and choosing os does not put the command back into the OS sandbox.',
+  'remote — stronger than the local sandbox when a remote computer is already connected: the command runs there instead of on this machine. If none is connected, the command does not run and is not moved onto this machine. Under Auto you may choose this for one command.',
+  'Container isolation is not offered. A saved container mode does not run the command and does not fall back to direct.'
 ].join(' ');
 
 export const DIRECT_ISOLATION_REFUSAL =
@@ -58,7 +80,7 @@ export interface ShellIsolationAvailability {
 }
 
 export type ShellIsolationDecision =
-  | { ok: true; explicitDirect: boolean; localMode: SandboxMode | 'inherit' }
+  | { ok: true; explicitDirect: boolean; localMode: SandboxMode | 'inherit'; osSandboxReason?: OsSandboxReason }
   | { ok: false; message: string };
 
 export interface IsolationApprovalRow {
@@ -94,11 +116,17 @@ export function shellCallNeedsDirectApproval(raw: unknown, availability: ShellIs
   return decision.ok && decision.explicitDirect;
 }
 
-export function decideShellIsolation(raw: unknown, availability: ShellIsolationAvailability): ShellIsolationDecision {
+export function decideShellIsolation(
+  raw: unknown,
+  availability: ShellIsolationAvailability,
+  savedMode?: SandboxMode
+): ShellIsolationDecision {
+  const saved = savedMode ?? resolveSandboxMode(getBoundSandboxSettingsStore(), process.env);
+  if (saved === 'container') return { ok: false, message: CONTAINER_ISOLATION_REFUSAL };
   const requested = parseRequestedIsolation(raw);
   switch (availability.kind) {
     case 'native':
-      return decideNative(requested, availability);
+      return decideNative(requested, availability, saved);
     case 'remote_vm':
     case 'microservice':
       return decideOffMachine(requested);
@@ -158,15 +186,42 @@ function parseRequestedIsolation(raw: unknown): RequestedIsolation {
   return { kind: 'unknown' };
 }
 
-function decideNative(requested: RequestedIsolation, availability: ShellIsolationAvailability): ShellIsolationDecision {
+function decideNative(
+  requested: RequestedIsolation,
+  availability: ShellIsolationAvailability,
+  saved: SandboxMode
+): ShellIsolationDecision {
+  switch (saved) {
+    case 'direct':
+      return { ok: true, explicitDirect: false, localMode: 'direct' };
+    case 'os':
+      return availability.os
+        ? { ok: true, explicitDirect: false, localMode: 'os', osSandboxReason: 'saved-os' }
+        : { ok: false, message: OS_UNAVAILABLE_REFUSAL };
+    case 'container':
+      return { ok: false, message: CONTAINER_ISOLATION_REFUSAL };
+    case 'cloudflare-computer':
+      return availability.remote
+        ? { ok: true, explicitDirect: false, localMode: 'cloudflare-computer' }
+        : { ok: false, message: REMOTE_UNAVAILABLE_REFUSAL };
+    case 'auto':
+      return decideAuto(requested, availability);
+    default: {
+      const neverSaved: never = saved;
+      return neverSaved;
+    }
+  }
+}
+
+function decideAuto(requested: RequestedIsolation, availability: ShellIsolationAvailability): ShellIsolationDecision {
   switch (requested.kind) {
     case 'default':
       return availability.os
-        ? { ok: true, explicitDirect: false, localMode: 'os' }
+        ? { ok: true, explicitDirect: false, localMode: 'os', osSandboxReason: 'auto-strongest' }
         : { ok: true, explicitDirect: false, localMode: 'direct' };
     case 'os':
       return availability.os
-        ? { ok: true, explicitDirect: false, localMode: 'os' }
+        ? { ok: true, explicitDirect: false, localMode: 'os', osSandboxReason: 'auto-model-os' }
         : { ok: false, message: OS_UNAVAILABLE_REFUSAL };
     case 'direct':
       return { ok: true, explicitDirect: true, localMode: 'direct' };

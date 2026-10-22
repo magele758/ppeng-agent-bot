@@ -21,6 +21,26 @@ import {
 
 const nativeAvailability = () => shellIsolationAvailability('native');
 
+function pinSavedMode(mode) {
+  const prev = process.env.RAW_AGENT_SANDBOX_MODE;
+  process.env.RAW_AGENT_SANDBOX_MODE = mode;
+  bindSandboxSettingsStore({
+    getDaemonControl(key) {
+      return key === SANDBOX_SETTINGS_KEY ? { mode } : undefined;
+    },
+    setDaemonControl() {}
+  });
+  return () => {
+    bindSandboxSettingsStore(undefined);
+    if (prev === undefined) delete process.env.RAW_AGENT_SANDBOX_MODE;
+    else process.env.RAW_AGENT_SANDBOX_MODE = prev;
+  };
+}
+
+function commandBody(content) {
+  return String(content).split('\n[os-sandbox:')[0];
+}
+
 function ctx(dir) {
   return {
     repoRoot: dir,
@@ -55,44 +75,36 @@ test('shell tools offer implemented isolations and not container [AC:model-sandb
   }
 });
 
-test('omitted isolation uses the strongest sandbox even if env and saved mode are direct [AC:model-sandbox-isolation#AC-1]', async () => {
+test('omitted isolation uses the strongest sandbox when the saved mode is auto [AC:model-sandbox-isolation#AC-1] [AC:saved-sandbox-mode-constrains-shell#AC-3]', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'iso-omit-'));
-  const prev = process.env.RAW_AGENT_SANDBOX_MODE;
-  process.env.RAW_AGENT_SANDBOX_MODE = 'direct';
-  bindSandboxSettingsStore({
-    getDaemonControl(key) {
-      return key === SANDBOX_SETTINGS_KEY ? { mode: 'direct' } : undefined;
-    },
-    setDaemonControl() {}
-  });
+  const restore = pinSavedMode('auto');
   try {
     const bash = bashTool();
     const command = 'printf hi';
     assert.equal(bash.needsApproval(ctx(dir), { command }), false);
     const result = await bash.execute(ctx(dir), { command });
     assert.equal(result.ok, true, result.content);
-    assert.equal(result.content, 'hi');
+    assert.equal(commandBody(result.content), 'hi');
     const osUp = nativeAvailability().os;
     if (osUp) {
       assert.ok(
         result.metadata.sandbox_backend === 'sandbox-exec' || result.metadata.sandbox_backend === 'bwrap',
         result.metadata.sandbox_backend
       );
+      assert.match(result.content, /\[os-sandbox:auto-strongest\]/);
     } else {
       assert.equal(result.metadata.sandbox_backend, 'direct');
+      assert.equal(String(result.content).includes('[os-sandbox:'), false);
     }
   } finally {
-    bindSandboxSettingsStore(undefined);
-    if (prev === undefined) delete process.env.RAW_AGENT_SANDBOX_MODE;
-    else process.env.RAW_AGENT_SANDBOX_MODE = prev;
+    restore();
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test('the model can pick os or an approved direct run without a prior mode setting [AC:model-sandbox-isolation#AC-2] [AC:model-sandbox-isolation#AC-3]', async () => {
+test('the model can pick os or an approved direct run when the saved mode is auto [AC:model-sandbox-isolation#AC-2] [AC:model-sandbox-isolation#AC-3]', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'iso-pick-'));
-  const prev = process.env.RAW_AGENT_SANDBOX_MODE;
-  process.env.RAW_AGENT_SANDBOX_MODE = 'direct';
+  const restore = pinSavedMode('auto');
   try {
     const osUp = nativeAvailability().os;
     const bash = bashTool({
@@ -104,6 +116,7 @@ test('the model can pick os or an approved direct run without a prior mode setti
       assert.ok(
         osResult.metadata.sandbox_backend === 'sandbox-exec' || osResult.metadata.sandbox_backend === 'bwrap'
       );
+      assert.match(osResult.content, /\[os-sandbox:auto-model-os\]/);
     } else {
       const missing = await bash.execute(ctx(dir), { command: 'printf os', isolation: 'os' });
       assert.equal(missing.ok, false);
@@ -114,14 +127,15 @@ test('the model can pick os or an approved direct run without a prior mode setti
     assert.equal(direct.ok, true, direct.content);
     assert.equal(direct.content, 'direct');
     assert.equal(direct.metadata.sandbox_backend, 'direct');
+    assert.equal(String(direct.content).includes('[os-sandbox:'), false);
   } finally {
-    if (prev === undefined) delete process.env.RAW_AGENT_SANDBOX_MODE;
-    else process.env.RAW_AGENT_SANDBOX_MODE = prev;
+    restore();
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
 test('direct isolation does not run until approval outside bypass [AC:model-sandbox-isolation#AC-3] [AC:bypass-remote-shell#AC-2]', async () => {
+  const restore = pinSavedMode('auto');
   const dir = mkdtempSync(join(tmpdir(), 'iso-direct-'));
   const marker = join(dir, 'ran.txt');
   const command = `printf ran > ${JSON.stringify(marker)}`;
@@ -181,6 +195,7 @@ test('direct isolation does not run until approval outside bypass [AC:model-sand
       assert.equal(existsSync(marker), false);
     }
   } finally {
+    restore();
     rmSync(dir, { recursive: true, force: true });
   }
 });
@@ -304,13 +319,13 @@ test('bypass direct still scrubs injectable environment variables [AC:bypass-rem
 });
 
 test('unavailable os isolation and container do not run and do not fall back to direct [AC:model-sandbox-isolation#AC-4]', async () => {
-  const missingOs = decideShellIsolation('os', { kind: 'native', os: false, remote: false });
+  const missingOs = decideShellIsolation('os', { kind: 'native', os: false, remote: false }, 'auto');
   assert.equal(missingOs.ok, false);
   assert.equal(missingOs.message, OS_UNAVAILABLE_REFUSAL);
-  const container = decideShellIsolation('container', { kind: 'native', os: true, remote: true });
+  const container = decideShellIsolation('container', { kind: 'native', os: true, remote: true }, 'auto');
   assert.equal(container.ok, false);
   assert.equal(container.message, CONTAINER_ISOLATION_REFUSAL);
-  const remoteMissing = decideShellIsolation('remote', { kind: 'native', os: true, remote: false });
+  const remoteMissing = decideShellIsolation('remote', { kind: 'native', os: true, remote: false }, 'auto');
   assert.equal(remoteMissing.ok, false);
   assert.match(remoteMissing.message, /not run/i);
   assert.equal(remoteMissing.message.toLowerCase().includes('direct'), false);
@@ -318,6 +333,7 @@ test('unavailable os isolation and container do not run and do not fall back to 
   const dir = mkdtempSync(join(tmpdir(), 'iso-refuse-'));
   const marker = join(dir, 'ran.txt');
   const command = `printf ran > ${JSON.stringify(marker)}`;
+  const restore = pinSavedMode('auto');
   try {
     const bash = bashTool({ directIsolationApproved: () => true });
     const refused = await bash.execute(ctx(dir), { command, isolation: 'container' });
@@ -329,11 +345,13 @@ test('unavailable os isolation and container do not run and do not fall back to 
     assert.notEqual(manager.backend, 'direct');
     assert.equal(existsSync(marker), false);
   } finally {
+    restore();
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
 test('environment scrubbing still applies for os and approved direct [AC:model-sandbox-isolation#AC-5]', async () => {
+  const restore = pinSavedMode('auto');
   const dir = mkdtempSync(join(tmpdir(), 'iso-env-'));
   const prev = process.env.LD_PRELOAD;
   process.env.LD_PRELOAD = '/tmp/ppeng-sandbox-evil.so';
@@ -349,6 +367,7 @@ test('environment scrubbing still applies for os and approved direct [AC:model-s
       assert.equal(result.content.includes('ppeng-sandbox-evil'), false, isolation);
     }
   } finally {
+    restore();
     if (prev === undefined) delete process.env.LD_PRELOAD;
     else process.env.LD_PRELOAD = prev;
     rmSync(dir, { recursive: true, force: true });
@@ -357,8 +376,7 @@ test('environment scrubbing still applies for os and approved direct [AC:model-s
 
 test('bg_run and work_evidence honor the same isolation choice and direct approval [AC:model-sandbox-isolation#AC-2] [AC:model-sandbox-isolation#AC-3]', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'iso-bg-'));
-  const prev = process.env.RAW_AGENT_SANDBOX_MODE;
-  process.env.RAW_AGENT_SANDBOX_MODE = 'direct';
+  const restore = pinSavedMode('auto');
   const calls = [];
   const jobs = [];
   const host = {
@@ -429,8 +447,7 @@ test('bg_run and work_evidence honor the same isolation choice and direct approv
     assert.equal(evidenceBlocked.content, CONTAINER_ISOLATION_REFUSAL);
     assert.equal(evidenceBlocked.content.includes('git_is_repo'), false);
   } finally {
-    if (prev === undefined) delete process.env.RAW_AGENT_SANDBOX_MODE;
-    else process.env.RAW_AGENT_SANDBOX_MODE = prev;
+    restore();
     rmSync(dir, { recursive: true, force: true });
   }
 });
@@ -462,6 +479,8 @@ test('shell isolation approval does not intercept unrelated tool inputs [AC:mode
 });
 
 test('same-millisecond approvals fail closed regardless of row order [AC:model-sandbox-isolation#AC-3]', () => {
+  const restore = pinSavedMode('auto');
+  try {
   const args = { command: 'printf hi', isolation: 'direct' };
   const row = { sessionId: 's', toolName: 'bash', args, createdAt: '2026-10-19T00:00:00.000Z' };
   for (const status of ['pending', 'rejected']) {
@@ -472,5 +491,8 @@ test('same-millisecond approvals fail closed regardless of row order [AC:model-s
         { kind: 'native', os: true, remote: false });
       assert.equal(plan.wait, status === 'pending');
     }
+  }
+  } finally {
+    restore();
   }
 });

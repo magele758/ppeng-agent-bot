@@ -34,9 +34,9 @@ export interface AgentSandboxExecRequest {
   /** Optional affinity for remote/microservice routing or auditing. */
   sessionId?: string;
   /**
-   * Per-call isolation for the native runner. Omit to keep that runner's
-   * configured mode. Shell tools pass an explicit mode so a saved setting
-   * cannot weaken the call.
+   * Per-call isolation for the native runner. Shell tools pass the mode after
+   * the saved isolation setting has constrained the call. Omit to keep that
+   * runner's configured mode.
    */
   isolation?: 'auto' | 'direct' | 'os' | 'container' | 'cloudflare-computer';
 }

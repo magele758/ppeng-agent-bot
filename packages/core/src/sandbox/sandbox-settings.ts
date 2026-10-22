@@ -170,8 +170,8 @@ export function writeSandboxSettings(store: SandboxSettingsStore, patch: Sandbox
 
 /**
  * Persisted Lab mode wins; otherwise existing RAW_AGENT_SANDBOX_MODE.
- * Shell tools do not use this as the per-call default: the model picks, and
- * an omitted choice is the strongest isolation available on this machine.
+ * Shell tools use this effective mode as a constraint. Auto still lets the
+ * model choose, and an omitted Auto choice is the strongest isolation available.
  */
 export function resolveSandboxMode(
   store: SandboxSettingsStore | undefined,

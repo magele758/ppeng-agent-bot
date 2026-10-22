@@ -59,7 +59,7 @@ export const settingsEntries = {
   },
   agentLoop: {
     title: '对话默认行为',
-    keywords: '默认模式 任务模式 taskmode 技能范围 skill scope 插话 打断 中途发消息 工作中发消息 loop',
+    keywords: '默认模式 任务模式 taskmode 技能范围 skill scope 插话 打断 中途发消息 工作中发消息 loop 重复检测 弱模型 强模型 读文件 查看文件',
     desc: '新建对话时的默认做法，以及你在 Agent 还在工作时再发消息会怎样。改动保存后立即生效，无需重启。',
     fields: {
       taskMode: {
@@ -73,6 +73,10 @@ export const settingsEntries = {
       interrupt: {
         label: '工作中发来新消息',
         hint: 'Agent 还在处理上一条消息时，你又发了新消息，系统怎么处理。'
+      },
+      repeatGuard: {
+        label: '重复检测',
+        hint: '默认只拦住弱模型反复调用同一批工具，或过多地查看、搜索文件。强模型不会因此停下。保存后下一轮生效，不用重启。安全沙箱、审批和敏感路径拒绝保持不变。'
       }
     },
     options: {
@@ -94,6 +98,11 @@ export const settingsEntries = {
         queue: { label: '排队等待', desc: '等当前这一步做完再处理新消息，最稳妥。' },
         steer: { label: '立即转向', desc: '下一步马上按新消息调整方向；已发出的模型请求不会被取消。' },
         disabled: { label: '不接收', desc: 'Agent 工作期间忽略新消息，跑完才能再发。' }
+      },
+      repeatGuard: {
+        weak: { label: '仅弱模型', desc: '默认。本地演示模型和小模型仍会因工具重复或查看次数过多而停下；常见大模型和无法判断的模型不会。' },
+        all: { label: '全部模型', desc: '强模型也会因工具重复或查看次数过多而停下。' },
+        off: { label: '关闭', desc: '任何模型都不会因此停下。安全限制仍然有效。' }
       }
     }
   },
@@ -202,31 +211,31 @@ export const settingsEntries = {
   sandbox: {
     title: '命令沙箱',
     keywords: '沙箱 sandbox bash 隔离 安全 无隔离 direct bwrap seatbelt 容器 命令执行 权限 密钥保护',
-    desc: '隔离由对话里的 Agent 每次执行命令时自己选，你不必先在这里指定。Agent 没选时，用这台电脑上最强的可用隔离。只有 Agent 在某次命令里选择无隔离，并且你批准之后，才会去掉系统隔离。',
+    desc: '这里保存的隔离方式会约束后续命令，包括 ssh。直接执行不套系统沙箱。系统级隔离，或自动且没另外指定时，命令仍走系统沙箱，对话里会写明原因。系统沙箱仍然不能读密钥目录。',
     fields: {
       mode: {
         label: '隔离方式',
-        hint: '这一项不必改。留在「自动」即可，它不会替 Agent 决定每次怎么隔离。'
+        hint: '保存后立即约束后续 shell。'
       }
     },
     options: {
       mode: {
-        auto: { label: '自动', desc: '推荐。Agent 自己选；没指定时用本机最强隔离。' },
-        os: { label: '系统级隔离', desc: 'macOS 使用 seatbelt、Linux 使用 bwrap，禁止命令读取 ~/.ssh 等密钥目录。Agent 可以在单次命令里自己选这项。' },
-        direct: { label: '直接执行（无隔离）', desc: '只做环境变量脱敏。对话里的命令不会因为保存了这项就去掉隔离。' },
-        container: { label: '容器', desc: '还没有做，不能当作一种隔离。保存这项不会让命令去掉系统隔离。' },
-        'cloudflare-computer': { label: 'Cloudflare 远程沙箱', desc: '命令可以发到已接通的远程电脑。Agent 在某次命令里选择远程时才会用，不必先在这里改模式。' }
+        auto: { label: '自动', desc: 'Agent 可以自选。没指定时用本机最强隔离，命令仍可能走系统沙箱，不会为了 ssh 改成直接执行。' },
+        os: { label: '系统级隔离', desc: 'macOS 使用 seatbelt、Linux 使用 bwrap，禁止命令读取 ~/.ssh 等密钥目录。保存后单次命令不能改成直接执行，对话里会说明原因。' },
+        direct: { label: '直接执行（无隔离）', desc: '不套系统沙箱，只做环境变量脱敏。ssh 客户端按这个方式运行。' },
+        container: { label: '容器', desc: '还没有做。保存后命令不会运行，也不会改成直接执行或系统沙箱。' },
+        'cloudflare-computer': { label: 'Cloudflare 远程沙箱', desc: '命令发到已接通的远程电脑。没接通则不运行，不会拉回本机。' }
       }
     },
     risk: {
-      direct: '无隔离表示命令可以读写本服务能访问的所有文件，包括密钥目录。在这里选择它不会让对话里的命令去掉隔离；只有 Agent 在某次命令里选择无隔离并且你批准后才会那样执行。',
-      container: '容器隔离还没有做。保存这项不会让命令去掉系统隔离，也不会改成无隔离执行。'
+      direct: '无隔离表示命令可以读写本服务能访问的所有文件，包括密钥目录。这是已保存的隔离方式，后续 shell 会按它执行。',
+      container: '容器隔离还没有做。保存后命令不会运行，也不会改成无隔离或系统沙箱。'
     }
   },
   sandboxCloudflare: {
     title: '沙箱 · Cloudflare 连接',
     keywords: 'cloudflare 远程沙箱 endpoint 令牌 token workspace 工作区 账号 account 超时 密钥库',
-    desc: '远程电脑的连接信息。对话里的 Agent 在某次命令选择远程执行时才会用到，不必先把隔离方式改成远程。令牌不保存在这里，请放进密钥库。',
+    desc: '远程电脑的连接信息。隔离方式为自动时，Agent 在某次命令选择远程才会用到；隔离方式保存为远程沙箱时，命令发到这里。没接通则命令不运行，不会拉回本机。令牌不保存在这里，请放进密钥库。',
     fields: {
       endpoint: { label: '服务地址', hint: 'Cloudflare Computer 部署后的访问地址。' },
       workspace: { label: '工作区名称', hint: '远程沙箱里使用的工作区，只能含字母、数字、点、下划线和连字符。' },
