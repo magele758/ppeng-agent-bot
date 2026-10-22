@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { filterSessionsByPlaySurface, sessionForPinnedBot, sessionsForPlaySurface } from './bots.ts';
+import { childTasksForBot, filterSessionsByPlaySurface, sessionForPinnedBot, sessionsForPlaySurface } from './bots.ts';
 import { functionalGroupRows } from './functional-group-view.ts';
+import { sessionRowCopy } from './session-row.ts';
 import type { BotInfo, SessionSummary } from './types.ts';
 
 function bot(id: string, canonicalSessionId: string): BotInfo {
@@ -217,6 +218,102 @@ test('没有子任务时普通会话列表不多出空入口 [AC:bot-child-task-
   const quiet = sessions.filter((session) => !childIds.includes(session.id));
   const list = chatList(quiet);
   assert.deepEqual(list.map((session) => session.id), ['chat-1', 'plain-lookalike']);
+});
+
+const spoken = {
+  id: 'spoken',
+  title: '你写到我项目里了？我是让你沉淀到自己的bot的skill目录里',
+  mode: 'subagent',
+  status: 'idle',
+  agentId: 'researcher',
+  parentSessionId: 'sess-researcher',
+  metadata: {
+    botId: 'researcher',
+    parentSessionId: 'sess-researcher',
+    spawnSource: 'bot-goal-continuation'
+  }
+} as SessionSummary;
+
+const unmarked = {
+  id: 'unmarked-sub',
+  title: '同类子任务',
+  mode: 'subagent',
+  status: 'idle',
+  agentId: 'researcher',
+  parentSessionId: 'sess-researcher',
+  metadata: { botId: 'researcher', parentSessionId: 'sess-researcher' }
+} as SessionSummary;
+
+const ownedChat = {
+  id: 'owned-chat',
+  title: '我自己的普通会话',
+  mode: 'chat',
+  status: 'idle',
+  agentId: 'general',
+  parentSessionId: 'sess-researcher',
+  metadata: { botId: 'researcher', parentSessionId: 'sess-researcher' }
+} as SessionSummary;
+
+const leakedRows = [...sessions, spoken, unmarked, ownedChat];
+
+test('用户原话标题的子任务和没有派生来源的子代理都不出现在 Bot 侧栏分组 [AC:bot-sidebar-child-sessions#AC-1]', () => {
+  const botLeft = sessionsForPlaySurface(leakedRows, bots, 'bot', 'spoken');
+  const research = functionalGroupRows(groups, bots, leakedRows, 'research');
+  const ungrouped = functionalGroupRows(groups, bots, leakedRows, null);
+  const pins = [researcher, writer].flatMap((bot) => {
+    const row = sessionForPinnedBot(bot, bots, leakedRows);
+    return row ? [row] : [];
+  });
+  const shown = [...botLeft, ...research, ...ungrouped, ...pins].map((session) => session.id);
+  assert.equal(shown.includes('spoken'), false);
+  assert.equal(shown.includes('unmarked-sub'), false);
+  assert.equal(research.filter((session) => session.id === 'sess-researcher' || session.id === 'sess-researcher-user').length, 2);
+  assert.equal(pins.some((session) => session.id === 'sess-researcher'), true);
+  assert.equal(ungrouped.some((session) => session.id === 'sess-writer'), true);
+});
+
+test('子任务仍在普通会话列表，主对话也能按任务原文找到它 [AC:bot-sidebar-child-sessions#AC-2]', () => {
+  const chat = sessionsForPlaySurface(leakedRows, bots, 'chat', 'spoken');
+  assert.equal(chat.some((session) => session.id === 'spoken'), true);
+  assert.equal(chat.some((session) => session.id === 'unmarked-sub'), true);
+  const titles = childTasksForBot(leakedRows, researcher).map((session) => session.title);
+  assert.equal(titles.includes(spoken.title), true);
+  assert.equal(titles.includes(unmarked.title), true);
+  const copy = sessionRowCopy({
+    session: spoken,
+    bots,
+    question: '',
+    emptyHint: '空',
+    unnamed: '未命名'
+  });
+  assert.equal(copy.kind, 'child-task');
+  assert.equal(copy.kind === 'child-task' ? copy.title : '', spoken.title);
+});
+
+test('Bot 自己的对话和用户普通会话仍留在各自列表 [AC:bot-sidebar-child-sessions#AC-3]', () => {
+  const botLeft = filterSessionsByPlaySurface(leakedRows, bots, 'bot');
+  const chat = filterSessionsByPlaySurface(leakedRows, bots, 'chat');
+  assert.equal(botLeft.some((session) => session.id === 'sess-researcher'), true);
+  assert.equal(botLeft.some((session) => session.id === 'sess-researcher-user'), true);
+  assert.equal(chat.some((session) => session.id === 'chat-1'), true);
+  assert.equal(chat.some((session) => session.id === 'owned-chat'), true);
+  assert.equal(botLeft.some((session) => session.id === 'owned-chat'), false);
+  const plain = sessionRowCopy({
+    session: ownedChat,
+    bots,
+    question: '',
+    emptyHint: '空',
+    unnamed: '未命名'
+  });
+  assert.equal(plain.kind, 'plain');
+  const canon = sessionRowCopy({
+    session: leakedRows.find((session) => session.id === 'sess-researcher-user')!,
+    bots,
+    question: '在吗',
+    emptyHint: '空',
+    unnamed: '未命名'
+  });
+  assert.equal(canon.kind, 'bot');
 });
 
 test('没有子任务的 Bot 不多出空入口 [AC:bot-child-task-chat-entry#AC-12]', () => {
