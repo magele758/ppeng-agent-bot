@@ -307,6 +307,7 @@ export const play = {
     removeContext: 'Remove {name}',
     contextTruncated: 'Context was limited to 20 sources and 200,000 text characters',
     contextWithMessage: 'Files and folders with this message',
+    nextHintTab: 'Press Tab to insert this suggestion',
     suggestion: 'Suggested next message. Tab fills it in, Esc dismisses it',
     suggestionCycle: '{count} more. Tab again to switch'
   },

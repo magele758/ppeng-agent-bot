@@ -188,6 +188,7 @@ async function seedFixtures(d) {
 function bodyRefCases(f) {
   return {
     'POST /api/sessions': { workspaceBinding: { kind: 'cloud_folder', cloudFolderId: f['cloud-folder'] }, autoRun: false },
+    'POST /api/lab/composer-hint': { sessionId: f.session },
     'POST /api/chat': { sessionId: f.session, message: 'B-INJECT' },
     'POST /api/chat/stream': { sessionId: f.session, message: 'B-INJECT' },
     'GET /api/traces': `?sessionId=${f.session}`,

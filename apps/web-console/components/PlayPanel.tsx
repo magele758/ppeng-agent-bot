@@ -30,6 +30,14 @@ import { ArtifactRail } from './ArtifactRail';
 import { BotCronPanel } from './BotCronPanel';
 import { composerModelLocked } from '@/lib/bot-model';
 import { COMPOSITION_ENTER_GUARD_MS, IME_COMPOSITION_KEY_CODE, decideComposerEnter } from '@/lib/composer-enter';
+import {
+  composerDraftFromTyping,
+  composerHintKey,
+  composerHintPresentation,
+  isBotMainComposerSession,
+  lastCompletedTurn,
+  shouldRequestComposerHint,
+} from '@/lib/composer-next-hint';
 import { ApprovalBanner } from './ApprovalBanner';
 import { GoalStatusCard } from './GoalStatusCard';
 import { TrajectoryPanel } from './TrajectoryPanel';
@@ -55,6 +63,7 @@ import { BotGoals } from './bot-work/BotGoals';
 import { BotWorkSummary } from './bot-work/BotWorkSummary';
 import { BotFirstTask } from './bot-work/BotFirstTask';
 import { useBotFirstTask } from './bot-work/useBotFirstTask';
+import { usePlayComposerHint } from './usePlayComposerHint';
 import type { BotFirstTaskConversation } from '@/lib/bot-first-task';
 import { BotFunctionalGroups } from './BotFunctionalGroups';
 import { BotPinArea } from './BotPinArea';
@@ -392,6 +401,7 @@ export function PlayPanel({
   const compositionActiveRef = useRef(false);
   const compositionJustEndedRef = useRef(false);
   const compositionGuardTimerRef = useRef<number | null>(null);
+  const nextHintRef = useRef('');
 
   useEffect(() => {
     return () => {
@@ -425,6 +435,21 @@ export function PlayPanel({
   };
 
   const onComposerKeyDown = (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+    const tab = composerHintKey({
+      key: event.key,
+      draft: chat.playInput,
+      hint: nextHintRef.current,
+      shiftKey: event.shiftKey,
+      altKey: event.altKey,
+      metaKey: event.metaKey,
+      ctrlKey: event.ctrlKey,
+      isComposing: event.nativeEvent.isComposing,
+    });
+    if (tab.accept) {
+      event.preventDefault();
+      chat.setPlayInput(tab.draft);
+      return;
+    }
     if (event.key === 'Tab' && !event.shiftKey && botSurface) {
       if (chat.acceptInputSuggestion()) {
         event.preventDefault();
@@ -510,13 +535,6 @@ export function PlayPanel({
     sessionTitle: chat.playTitle
   });
   const headerBotId = headerBotChat ? chat.botId || selectedBot?.id || '' : '';
-  const showGhost =
-    botSurface && composerFocused && !chatRunning && Boolean(chat.ghostSuggestion) && !chat.playInput.trim();
-  const suggestionHint = showGhost
-    ? chat.inputGhost.items.length > 1
-      ? t('play.composer.suggestionCycle', { count: chat.inputGhost.items.length - 1 })
-      : t('play.composer.suggestion')
-    : '';
   const detailChildTasks = useMemo(() => {
     if (!headerBotId) return [];
     return childTasksForBot(catalogSessions ?? sessions, {
@@ -568,6 +586,42 @@ export function PlayPanel({
     chat.playSending ||
     Boolean(chat.streamOverlay) ||
     chat.waitTyping;
+  const nextHint = usePlayComposerHint({
+    sessionId: selectedSessionId,
+    messages: chat.sessionMessages,
+    draft: chat.playInput,
+    enabled: shouldRequestComposerHint({
+      surface: playSurface,
+      botMain: isBotMainComposerSession(selectedSession),
+      groupOpen: openGroupId != null,
+      draft: chat.playInput,
+      generating: sessionBusy,
+      hasAssistantReply: lastCompletedTurn(chat.sessionMessages) != null,
+    }),
+  });
+  nextHintRef.current = nextHint;
+  const hintView = composerHintPresentation({
+    draft: chat.playInput,
+    hint: nextHint,
+    idlePlaceholder:
+      botSurface && selectedBot
+        ? t('play.messageToBot', { name: selectedBot.name })
+        : t('play.messageToAgent'),
+    running: chatRunning,
+    runningPlaceholder,
+  });
+  const showGhost =
+    botSurface &&
+    composerFocused &&
+    !chatRunning &&
+    Boolean(chat.ghostSuggestion) &&
+    !chat.playInput.trim() &&
+    !hintView.hintVisible;
+  const suggestionHint = showGhost
+    ? chat.inputGhost.items.length > 1
+      ? t('play.composer.suggestionCycle', { count: chat.inputGhost.items.length - 1 })
+      : t('play.composer.suggestion')
+    : '';
 
   const sessionApprovals = useMemo(
     () =>
@@ -1230,22 +1284,16 @@ export function PlayPanel({
                     id="playInput"
                     className="chat-composer-input"
                     rows={1}
-                    placeholder={
-                      showGhost
-                        ? ''
-                        : chatRunning
-                          ? runningPlaceholder
-                          : botSurface && selectedBot
-                            ? t('play.messageToBot', { name: selectedBot.name })
-                            : t('play.messageToAgent')
-                    }
+                    placeholder={showGhost ? '' : hintView.placeholder}
+                    title={hintView.hintVisible ? t('play.composer.nextHintTab') : undefined}
+                    data-next-hint={hintView.hintVisible ? 'shown' : 'off'}
                     autoComplete="off"
-                    value={chat.playInput}
+                    value={hintView.value}
                     aria-describedby={showGhost ? 'playInputSuggestion' : undefined}
-                    aria-keyshortcuts={showGhost ? 'Tab Escape' : undefined}
+                    aria-keyshortcuts={hintView.hintVisible ? 'Tab' : showGhost ? 'Tab Escape' : undefined}
                     onChange={(e) => {
                       chat.noteComposerTyped();
-                      chat.setPlayInput(e.target.value);
+                      chat.setPlayInput(composerDraftFromTyping(e.target.value, nextHint).draft);
                     }}
                     onFocus={() => {
                       setComposerFocused(true);
