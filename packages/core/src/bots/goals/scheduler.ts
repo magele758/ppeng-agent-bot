@@ -7,6 +7,7 @@ import { principalFromSession } from '../bot-identity.js';
 import { inheritBotIdentityMetadata } from '../../memory/bot-memory-scope.js';
 import { childPermissionMode, inheritBotAllowlists, inheritModelOverride } from '../../runtime/spawn-policy.js';
 import { inheritForkRetrievalMetadata, forkOpeningMessage } from '../fork-inheritance.js';
+import { childSessionTrace } from '../../stores/trace-visible.js';
 import { announceGoalState, bindGoalExecution, goalScope, settleGoalExecution, type GoalRuntimeHost } from './runtime-host.js';
 import type { BotGoal, GoalExecution } from './types.js';
 
@@ -143,6 +144,7 @@ function spawnContinuation(host: GoalRuntimeHost, parent: SessionRecord, goal: B
   host.store.deleteSession(child.id);
   return;
  }
+ host.emitTrace?.(parent.id, childSessionTrace(child.id, 'bot-goal-continuation'));
  // Claiming and binding happen synchronously before run() so concurrent ticks cannot duplicate dispatch.
  try {
   void host.run(child.id).then(() => settleGoalExecution(host,child.id)).catch(async error => {

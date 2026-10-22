@@ -256,6 +256,7 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
     ['GET /api/sessions/:id/goal', session],
     ['POST /api/sessions/:id/ask-user/reply', session],
     ['GET /api/sessions/:id/trajectory', session],
+    ['POST /api/lab/composer-hint', owner('session', sessionBodyRef('sessionId'))],
     ['POST /api/chat', owner('session', sessionBodyRef('sessionId'))],
     ['POST /api/chat/stream', owner('session', sessionBodyRef('sessionId'))],
     [

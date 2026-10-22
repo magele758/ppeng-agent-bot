@@ -1,4 +1,4 @@
-import { botForCanonicalSession, isBotForkChildSession } from './bots.ts';
+import { botForCanonicalSession, isSidebarForkChild } from './bots.ts';
 import type { BotInfo } from './types.ts';
 
 /** Memory appendix is injected beside the user turn; it is not the question they asked. */
@@ -26,6 +26,8 @@ export type SessionRowSession = {
   id: string;
   title?: string;
   agentId?: string;
+  mode?: string;
+  parentSessionId?: string | null;
   metadata?: Record<string, unknown>;
 };
 
@@ -87,9 +89,7 @@ function shortBotMark(botId: string): string {
 /** A forked child task, not the bot's own canonical chat and not a group room. */
 export function isChildTaskSession(session: SessionRowSession, bots: readonly BotInfo[]): boolean {
   if (metadataString(session.metadata, 'roomId')) return false;
-  if (session.metadata?.canonicalBotChat === true) return false;
-  if (bots.some((bot) => bot.canonicalSessionId === session.id)) return false;
-  return isBotForkChildSession(session.metadata);
+  return isSidebarForkChild(session, bots);
 }
 
 function childTaskTitle(session: SessionRowSession, unnamed: string): string {

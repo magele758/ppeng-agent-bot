@@ -54,24 +54,40 @@ export function botForCanonicalSession<T extends { id: string; canonicalSessionI
   return undefined;
 }
 
+type SidebarSession = {
+  id: string;
+  mode?: string;
+  parentSessionId?: string | null;
+  metadata?: Record<string, unknown>;
+};
+
 /** A bot-spawned child task (goal worker or concurrent fork), not the bot's own chat. */
 export function isBotForkChildSession(metadata: Record<string, unknown> | undefined): boolean {
   const source = metadata?.spawnSource;
   return metadata?.botGoalWorker === true || source === 'bot-goal-continuation' || source === 'concurrent-bot-work';
 }
 
+function linkedParentSessionId(session: SidebarSession): string {
+  const column = typeof session.parentSessionId === 'string' ? session.parentSessionId.trim() : '';
+  if (column) return column;
+  const meta = session.metadata?.parentSessionId;
+  return typeof meta === 'string' ? meta.trim() : '';
+}
+
 /** Child tasks leave the bot sidebar. A bot's own canonical chat is never one of them. */
-export function isSidebarForkChild<T extends { id: string; metadata?: Record<string, unknown> }>(
+export function isSidebarForkChild<T extends SidebarSession>(
   session: T,
   bots: readonly { canonicalSessionId?: string | null }[]
 ): boolean {
-  if (!isBotForkChildSession(session.metadata)) return false;
   if (session.metadata?.canonicalBotChat === true) return false;
-  return !bots.some((bot) => bot.canonicalSessionId === session.id);
+  if (bots.some((bot) => bot.canonicalSessionId === session.id)) return false;
+  if (isBotForkChildSession(session.metadata)) return true;
+  if (session.metadata?.roomId) return false;
+  return session.mode === 'subagent' && linkedParentSessionId(session).length > 0;
 }
 
 /** Child tasks belonging to this bot. Titles stay the stored task text. */
-export function childTasksForBot<T extends { id: string; title: string; metadata?: Record<string, unknown> }>(
+export function childTasksForBot<T extends SidebarSession & { title: string }>(
   sessions: readonly T[],
   bot: { id: string; canonicalSessionId?: string | null }
 ): T[] {
@@ -86,13 +102,13 @@ export function childTasksForBot<T extends { id: string; title: string; metadata
     if (!isSidebarForkChild(session, [bot])) return false;
     const botId = typeof session.metadata?.botId === 'string' ? session.metadata.botId : '';
     if (botId) return botId === bot.id;
-    const parent = session.metadata?.parentSessionId;
-    return typeof parent === 'string' && parentIds.has(parent);
+    const parent = linkedParentSessionId(session);
+    return parent.length > 0 && parentIds.has(parent);
   });
 }
 
 export function filterSessionsByPlaySurface<
-  T extends { id: string; metadata?: Record<string, unknown> }
+  T extends SidebarSession
 >(
   sessions: readonly T[],
   bots: readonly BotInfo[],
@@ -113,7 +129,7 @@ export function filterSessionsByPlaySurface<
 
 /** Sidebar rows for one play surface, including a selected row only when that surface already keeps it. */
 export function sessionsForPlaySurface<
-  T extends { id: string; metadata?: Record<string, unknown> }
+  T extends SidebarSession
 >(
   sessions: readonly T[],
   bots: readonly BotInfo[],
@@ -131,7 +147,7 @@ export function sessionsForPlaySurface<
 
 /** The chat a pinned bot shows. Child tasks are not that chat. */
 export function sessionForPinnedBot<
-  T extends { id: string; metadata?: Record<string, unknown> },
+  T extends SidebarSession,
   B extends { id: string; canonicalSessionId?: string | null }
 >(bot: B, bots: readonly B[], sessions: readonly T[]): T | undefined {
   const rows = sessions.filter((session) => !isSidebarForkChild(session, bots));

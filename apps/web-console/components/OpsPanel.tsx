@@ -43,6 +43,7 @@ export interface OpsPanelProps {
   selectedSessionId: string | null;
   onSelectSession: (id: string) => void;
   traceRows: { kind: string; ts: string; payload?: unknown }[];
+  omittedEarlier?: number;
   traceError: boolean;
   traceLoaded: boolean;
 }
@@ -62,6 +63,7 @@ export function OpsPanel({
   selectedSessionId,
   onSelectSession,
   traceRows,
+  omittedEarlier = 0,
   traceError,
   traceLoaded
 }: OpsPanelProps) {
@@ -295,6 +297,11 @@ export function OpsPanel({
               <p className="muted small">
                 {t('ops.trajHint')} · {t('ops.trace.autoRefresh')}
               </p>
+              {omittedEarlier > 0 ? (
+                <p className="ops-trace-omitted" role="status" data-testid="trace-earlier-hidden">
+                  {t('ops.trace.earlierHidden', { n: omittedEarlier })}
+                </p>
+              ) : null}
               <div className="trace-timeline" id="traceTimeline">
                 {renderTraceBody()}
               </div>

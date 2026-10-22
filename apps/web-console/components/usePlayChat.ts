@@ -1,5 +1,6 @@
 'use client';
 import { goalMessage } from '@/lib/bot-goals';
+import { composerMessageToSend } from '@/lib/composer-next-hint';
 import { noteBotFirstTaskSent } from '@/lib/bot-first-task';
 
 import { botComposerStatusText, planBotComposerSend } from '@/lib/bot-chat-commands';
@@ -1914,7 +1915,7 @@ export function usePlayChat(deps: PlayChatDeps) {
   };
 
   const sendPlayMessage = async () => {
-    const text = goalMessage(playInput.trim(), playSurface === 'bot' ? selectedGoalId : null);
+    const text = goalMessage(composerMessageToSend(playInput), playSurface === 'bot' ? selectedGoalId : null);
     const quoteSnapshot = replyQuoteRef.current;
     const replyFields = withReplyTo({}, quoteSnapshot);
     const sentText = text || '(attachment)';

@@ -9,6 +9,7 @@ import {
   filterValidToolCalls,
   pairedToolCallIdsFromMessages,
   processToolResults,
+  runTurnWithRetries,
   truncateToolContent,
   type CompletedWaveItem,
   type ToolLoopHost,
@@ -820,5 +821,130 @@ describe('multimodal tool observations', () => {
     processToolResults(h, [r, { toolCallId: 'other-call', name: 'other', ok: true, content: 'done' }], [], ctx.session, undefined, 's1');
     expect(h.appended.map((m: any) => m.role)).toEqual(['tool','tool','user']);
     expect((h.appended[2] as any).parts).toContainEqual(image);
+  });
+});
+
+describe('session trace tool_end payload', () => {
+  function captureHost(redactSecrets?: (text: string) => string) {
+    const payloads: Array<{ kind: string; payload?: Record<string, unknown> }> = [];
+    const h = host({
+      emitTrace: (_sid, ev) => {
+        payloads.push(ev as { kind: string; payload?: Record<string, unknown> });
+      },
+      ...(redactSecrets ? { redactSecrets } : {}),
+    });
+    return { h, payloads };
+  }
+
+  it('[AC:ops-session-trace-repair#AC-1] failed tool_end keeps the command and the real error, with secrets redacted', () => {
+    const secret = 'sk-live-secret-value';
+    const { h, payloads } = captureHost((text) => text.split(secret).join('[REDACTED:RAW_AGENT_API_KEY]'));
+    const toolCall = call('bash', { command: `echo ${secret}` }, 'bash-1');
+    processToolResults(
+      h,
+      [{
+        toolCallId: 'bash-1',
+        name: 'bash',
+        ok: false,
+        content: `bash: not found\n[exit_code=127]\n${secret}`,
+      }],
+      [toolCall],
+      ctx.session,
+      undefined,
+      's1'
+    );
+    const payload = payloads[0]?.payload ?? {};
+    expect(payloads[0]?.kind).toBe('tool_end');
+    expect(payload.ok).toBe(false);
+    expect(String(payload.input)).toContain('echo');
+    expect(String(payload.input)).toContain('[REDACTED:RAW_AGENT_API_KEY]');
+    expect(String(payload.input)).not.toContain(secret);
+    expect(String(payload.content)).toContain('bash: not found');
+    expect(String(payload.content)).toContain('[exit_code=127]');
+    expect(String(payload.content)).not.toContain(secret);
+  });
+
+  it('[AC:ops-session-trace-repair#AC-2] successful tool_end keeps args and head-tail clips a long body', () => {
+    const { h, payloads } = captureHost();
+    const body = `${'S'.repeat(100_000)}MIDDLE${'E'.repeat(100_000)}`;
+    processToolResults(
+      h,
+      [{ toolCallId: 'bash-2', name: 'bash', ok: true, content: body }],
+      [call('bash', { command: 'ls' }, 'bash-2')],
+      ctx.session,
+      undefined,
+      's1'
+    );
+    const payload = payloads[0]?.payload ?? {};
+    const content = String(payload.content);
+    expect(String(payload.input)).toContain('ls');
+    expect(content.startsWith('S')).toBe(true);
+    expect(content.endsWith('E')).toBe(true);
+    expect(content).toContain('chars truncated');
+    expect(content).not.toContain('MIDDLE');
+    expect(content.length).toBeLessThan(body.length);
+  });
+
+  it('[AC:ops-session-trace-repair#AC-4] tool_end records a child session id from metadata or a session reference', () => {
+    const { h, payloads } = captureHost();
+    processToolResults(
+      h,
+      [
+        {
+          toolCallId: 'spawn-1',
+          name: 'spawn_subagent',
+          ok: true,
+          content: 'summary only',
+          metadata: { childSessionId: 'child-meta' },
+        },
+        {
+          toolCallId: 'goal-1',
+          name: 'goal_dispatch',
+          ok: true,
+          content: JSON.stringify({ status: 'waiting', reference: 'session:child-ref' }),
+        },
+        {
+          toolCallId: 'mate-1',
+          name: 'spawn_teammate',
+          ok: true,
+          content: 'Spawned teammate mate in session hidden',
+          metadata: { teammateSessionId: 'mate-9' },
+        },
+      ],
+      [
+        call('spawn_subagent', { prompt: 'look' }, 'spawn-1'),
+        call('goal_dispatch', { task: 'go' }, 'goal-1'),
+        call('spawn_teammate', { name: 'mate' }, 'mate-1'),
+      ],
+      ctx.session,
+      undefined,
+      's1'
+    );
+    expect(payloads.map((ev) => ev.payload?.childSessionId)).toEqual(['child-meta', 'child-ref', 'mate-9']);
+  });
+
+  it('[AC:ops-session-trace-repair#AC-3] repetition abort keeps the repeated stream text', async () => {
+    const h = host({
+      env: {
+        RAW_AGENT_STREAM_WATCHDOG_MIN_LEN: '20',
+        RAW_AGENT_STREAM_WATCHDOG_CHAR_RUN: '10',
+        RAW_AGENT_MODEL_MAX_RETRIES: '0',
+      },
+    });
+    const repeated = 'a'.repeat(80);
+    const adapter = {
+      name: 'script',
+      async runTurn() {
+        throw new Error('unused');
+      },
+      async runTurnStream(input: { signal?: AbortSignal }, onChunk: (chunk: { type: 'text_delta'; text: string }) => void) {
+        onChunk({ type: 'text_delta', text: repeated });
+        if (input.signal?.aborted) throw new Error('aborted');
+        return { stopReason: 'end' as const, assistantParts: [] };
+      },
+    };
+    await expect(
+      runTurnWithRetries(h, adapter as never, { sessionId: 's1', messages: [], tools: [] } as never, () => {})
+    ).rejects.toMatchObject({ sample: repeated });
   });
 });

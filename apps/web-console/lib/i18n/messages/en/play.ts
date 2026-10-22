@@ -226,7 +226,7 @@ export const play = {
   chrome: {
     goalMet: 'Goal met',
     goalOpen: 'Goal open',
-    feedStatsAria: 'This turn runtime and usage',
+    feedStatsAria: 'This turn runtime, usage, and end time',
     autonomyTitle: 'Autonomy / permissionMode',
     costTitle: 'Estimated cumulative cost',
     noGoal: 'No goal set',
@@ -272,7 +272,9 @@ export const play = {
   stats: {
     elapsed: 'Ran',
     input: 'In',
-    output: 'Out'
+    output: 'Out',
+    ended: 'Ended',
+    sessionEnded: 'Session ended'
   },
 
   composer: {
@@ -305,6 +307,7 @@ export const play = {
     removeContext: 'Remove {name}',
     contextTruncated: 'Context was limited to 20 sources and 200,000 text characters',
     contextWithMessage: 'Files and folders with this message',
+    nextHintTab: 'Press Tab to insert this suggestion',
     suggestion: 'Suggested next message. Tab fills it in, Esc dismisses it',
     suggestionCycle: '{count} more. Tab again to switch'
   },

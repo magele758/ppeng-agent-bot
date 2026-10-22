@@ -1,0 +1,21 @@
+id: bot-sidebar-child-sessions
+title: Bot 侧栏不列出子任务会话
+status: implemented
+requirement: |
+  这种子任务的会话又跑到bot的列表里了？修复一下
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  与 bot-fork-sessions-in-detail、bot-child-task-chat-entry 一致：子任务离开 Bot 侧栏（含功能分组和未分组），普通会话列表和主对话里的子任务入口保留。本条补上标题就是用户原话、以及没有派生来源标记的同类子代理。
+criteria:
+  - id: AC-1
+    given: 某只 Bot 的主对话派生了子任务，标题就是用户当时说的那句话，并且挂在 Bot 侧栏的功能分组或未分组里，看起来像一条普通会话
+    when: 用户查看 Bot 侧栏，包括置顶、各个功能分组和未分组
+    then: 这些子任务不再作为侧栏里的一行出现，也不计入分组数量；这只 Bot 自己的对话仍留在原来的分组
+  - id: AC-2
+    given: 这些子任务已经从 Bot 侧栏拿掉
+    when: 用户在这只 Bot 的主对话里看子任务入口，或到普通会话列表里找这条子任务
+    then: 主对话里仍能看到并点开这条子任务；普通会话列表里也还有它，标题仍是用户原话
+  - id: AC-3
+    given: 侧栏里还有这只 Bot 自己的对话，以及用户自己的普通聊天会话
+    when: 用户分别查看 Bot 侧栏和普通会话列表
+    then: Bot 自己的对话仍在 Bot 侧栏，用户的普通聊天会话仍在普通会话列表，都没有被当成子任务拿掉

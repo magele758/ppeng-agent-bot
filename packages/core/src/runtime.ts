@@ -58,7 +58,8 @@ import {
   readModelCatalog
 } from './model/provider-catalog.js';
 import { SqliteStateStore } from './storage.js';
-import { readSessionTraceEvents } from './stores/read-traces.js';
+import { readSessionTracePage, type SessionTracePage } from './stores/read-traces.js';
+import { childSessionTrace } from './stores/trace-visible.js';
 import { appendTraceEvent } from './stores/trace.js';
 import type { TraceEvent } from './stores/trace.js';
 import { createBuiltinTools } from './tools/builtin-tools.js';
@@ -479,7 +480,8 @@ export class RawAgentRuntime {
         typeof this.modelAdapter.completeText === 'function'
           ? this.modelAdapter.completeText(input)
           : Promise.resolve(''),
-      spawnHost: () => spawnFrom(this.l5())
+      spawnHost: () => spawnFrom(this.l5()),
+      emitTrace: (sessionId, event) => this.emitTrace(sessionId, event)
     });
     this.selfHeal = collab.selfHeal;
     this.socialSchedule = collab.socialSchedule;
@@ -725,6 +727,7 @@ export class RawAgentRuntime {
             botGoalWorkerRevision:request.revision,botGoalWorkerExecutionId:request.executionId,botGoalWorkerFence:execution.fence,
             taskRunMode:request.taskMode,...(request.strategy==='ptc'?{orchestrationEngine:'ptc'}:{})}});
         this.store.appendMessage(child.id,'user',forkOpeningMessage({store:this.store,parentSessionId:context.session.id,childSessionId:child.id,taskText:request.task}));
+        this.emitTrace(context.session.id, childSessionTrace(child.id, 'bot-goal-worker'));
         void this.runSession(child.id).catch(error=>this.log.warn('Goal worker failed',{sessionId:child.id,error:String(error)}));
         return {status:'waiting',reference:`session:${child.id}`,content:'Isolated execution started; await and verify its result.'};
       }
@@ -1009,11 +1012,15 @@ export class RawAgentRuntime {
     return this.store.countPendingMailboxByRecipient();
   }
 
-  async listTraceEvents(sessionId: string, limit?: number): Promise<TraceEvent[]> {
+  async listTracePage(sessionId: string, limit?: number): Promise<SessionTracePage> {
     // Trace emission remains non-blocking for model/tool execution. Readers must
     // nevertheless see the writes that were already emitted when they asked.
     await Promise.all(this.pendingTraceWrites.get(sessionId) ?? []);
-    return readSessionTraceEvents(this.stateDir, sessionId, limit ?? 500);
+    return readSessionTracePage(this.stateDir, sessionId, limit ?? 500);
+  }
+
+  async listTraceEvents(sessionId: string, limit?: number): Promise<TraceEvent[]> {
+    return (await this.listTracePage(sessionId, limit)).events;
   }
 
   createChatSession(input: {
@@ -1679,7 +1686,8 @@ export class RawAgentRuntime {
         {
           store: this.store,
           runSession: (id) => this.runSession(id),
-          log: this.log
+          log: this.log,
+          emitTrace: (sessionId, event) => this.emitTrace(sessionId, event)
         },
         session.id,
         inFlight
@@ -1705,6 +1713,7 @@ export class RawAgentRuntime {
       cancel: id => this.cancelSession(id),
       run: id => this.runSession(id),
       judge: this.modelAdapter.completeText?.bind(this.modelAdapter),
+      emitTrace: (sessionId, event) => this.emitTrace(sessionId, event),
       inspectSpecialty: (parent,goal) => specialtyStatus(this.goalSpecialtyHost(),parent,goal),
       cancelSpecialty: (parent,goal) => cancelSpecialty(this.goalSpecialtyHost(),parent,goal),
       capabilities: (session, goal) => {

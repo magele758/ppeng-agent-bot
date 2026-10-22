@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
+import { opsTraceUrl } from '@/lib/trace-page';
 import { OpsPanel } from '../../OpsPanel';
 import { useLab } from '../../shell/LabProvider';
 import { SubTabs } from '../../ui';
@@ -15,12 +16,14 @@ type TraceRow = { kind: string; ts: string; payload: unknown };
 function TrajectoryView() {
   const { sessions, selectedSessionId, openSession } = useLab();
   const [traceRows, setTraceRows] = useState<TraceRow[]>([]);
+  const [omittedEarlier, setOmittedEarlier] = useState(0);
   const [traceError, setTraceError] = useState(false);
   const [traceLoaded, setTraceLoaded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setTraceRows([]);
+    setOmittedEarlier(0);
     setTraceError(false);
     setTraceLoaded(false);
 
@@ -29,11 +32,13 @@ function TrajectoryView() {
       const el = document.getElementById('traceTimeline');
       const top = el?.scrollTop ?? 0;
       try {
-        const { events } = (await api(
-          `/api/traces?sessionId=${encodeURIComponent(selectedSessionId)}&limit=500`
-        )) as { events?: TraceRow[] };
+        const body = (await api(opsTraceUrl(selectedSessionId))) as {
+          events?: TraceRow[];
+          omittedEarlier?: number;
+        };
         if (cancelled) return;
-        setTraceRows(events ?? []);
+        setTraceRows(body.events ?? []);
+        setOmittedEarlier(typeof body.omittedEarlier === 'number' ? body.omittedEarlier : 0);
         setTraceError(false);
         setTraceLoaded(true);
       } catch {
@@ -64,6 +69,7 @@ function TrajectoryView() {
       selectedSessionId={selectedSessionId}
       onSelectSession={(id) => void openSession(id)}
       traceRows={traceRows}
+      omittedEarlier={omittedEarlier}
       traceError={traceError}
       traceLoaded={traceLoaded}
     />

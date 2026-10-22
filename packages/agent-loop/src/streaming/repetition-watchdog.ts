@@ -120,10 +120,13 @@ export function detectRepetitionLoop(
 /** Thrown by the stream consumer when {@link detectRepetitionLoop} fires. */
 export class RepetitionLoopAbortError extends Error {
   readonly reason: string;
-  constructor(reason: string) {
+  /** Accumulated stream text that tripped the watchdog, so a trace can show the loop. */
+  readonly sample: string;
+  constructor(reason: string, sample = '') {
     super(`repetition loop aborted: ${reason}`);
     this.name = 'RepetitionLoopAbortError';
     this.reason = reason;
+    this.sample = sample;
   }
 }
 

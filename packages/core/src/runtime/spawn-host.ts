@@ -148,6 +148,15 @@ export async function runOrchestrationSubagentStage(
 export interface SubagentOutcome {
   ok: boolean;
   content: string;
+  metadata?: Record<string, unknown>;
+}
+
+function withChildSession(
+  outcome: SubagentOutcome,
+  childSessionId: string,
+  key: 'childSessionId' | 'teammateSessionId' = 'childSessionId'
+): SubagentOutcome {
+  return { ...outcome, metadata: { ...outcome.metadata, [key]: childSessionId } };
 }
 
 /** Text form for callers that only need a string (PTC cells, dyn tools). */
@@ -187,7 +196,7 @@ function unfinishedSubagentOutcome(
 ): SubagentOutcome | undefined {
   if (!child) return undefined;
   if (child.status === 'waiting_approval') {
-    return {
+    return withChildSession({
       ok: false,
       content: JSON.stringify({
         blocked: true,
@@ -197,10 +206,10 @@ function unfinishedSubagentOutcome(
         remediation:
           'The subagent is waiting for human approval and did not finish. Ask the user to approve it on the approvals page (POST /api/approvals/:id/approve), or continue without this subagent using steps that need no approval.'
       })
-    };
+    }, child.id);
   }
   if (child.status === 'failed') {
-    return {
+    return withChildSession({
       ok: false,
       content: JSON.stringify({
         blocked: false,
@@ -209,7 +218,7 @@ function unfinishedSubagentOutcome(
         remediation:
           'The subagent run failed or was aborted and produced no final answer. Retry with a narrower task, or continue without it.'
       })
-    };
+    }, child.id);
   }
   return undefined;
 }
@@ -308,7 +317,7 @@ export async function spawnSubagentOutcome(
     minConfidence: opts?.minConfidence ?? (role === 'review' || role === 'evaluator' ? 80 : undefined),
     summaryMaxChars: opts?.summaryMaxChars
   });
-  return { ok: true, content: summary.text };
+  return withChildSession({ ok: true, content: summary.text }, subagent.id);
 }
 
 export async function spawnTeammate(
@@ -354,7 +363,7 @@ export async function spawnTeammateOutcome(
   const after = host.store.getSession(session.id);
   if (after?.status === 'waiting_approval') {
     const pending = pendingApprovalsOf(host, after);
-    return {
+    return withChildSession({
       ok: true,
       content: JSON.stringify({
         spawned: true,
@@ -367,9 +376,9 @@ export async function spawnTeammateOutcome(
         remediation:
           'The teammate exists but is waiting for human approval and is not making progress. Ask the user to approve it on the approvals page (POST /api/approvals/:id/approve). Do not spawn a duplicate teammate; continue with steps that need no approval in the meantime.'
       })
-    };
+    }, after.id, 'teammateSessionId');
   }
-  return { ok: true, content: spawned };
+  return withChildSession({ ok: true, content: spawned }, session.id, 'teammateSessionId');
 }
 
 export async function startBackgroundJob(

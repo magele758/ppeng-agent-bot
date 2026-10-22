@@ -40,7 +40,7 @@ test('nested dispatch keeps tool audit pairs out of the outer model transcript',
  const audit=f.store.getDaemonControl(`bot.goal-tool-ledger:${f.session.id}:${f.execution.id}`);
  assert.deepEqual(audit.map(m=>m.role),['assistant','tool','assistant','tool']);
 });
-test('real Runtime subagent dispatch preserves valid outer model tool pairing',async t=>{
+test('real Runtime subagent dispatch preserves valid outer model tool pairing [AC:ops-session-trace-repair#AC-4]',async t=>{
  const {RawAgentRuntime}=await import('../dist/runtime.js');
  const dir=mkdtempSync(join(tmpdir(),'goal-route-real-'));let mainSession,dispatched=false,checked=false;
  const runtime=new RawAgentRuntime({repoRoot:dir,stateDir:join(dir,'state'),modelAdapter:{name:'goal-dispatch-script',async runTurn(input){
@@ -59,6 +59,8 @@ test('real Runtime subagent dispatch preserves valid outer model tool pairing',a
  const dispatch=runtime.store.getSession(mainSession).metadata.botGoalDispatch;
  assert.equal(dispatch.result.status,'waiting');assert.match(dispatch.result.reference,/^session:/);
  const worker=runtime.store.getSession(dispatch.result.reference.slice(8));assert.equal(worker.metadata.botGoalWorker,true);assert.equal(worker.metadata.taskRunMode,'auto');
+ const traces=await runtime.listTraceEvents(worker.parentSessionId,5000);
+ assert.ok(traces.some((event)=>event.kind==='child_session'&&event.payload?.childSessionId===worker.id&&event.payload?.source==='bot-goal-worker'),'parent trace should name the goal worker');
 });
 test('revision change during async policy lookup fences the pending side effect',async t=>{
  const f=fixture(t);f.host.filePolicy=async()=>{f.service.amend('b',f.goal.id,'Do not launch the plan');return undefined};

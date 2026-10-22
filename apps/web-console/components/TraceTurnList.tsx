@@ -46,6 +46,8 @@ function hintKeys(kind: string): { what: MessageKey; why: MessageKey; next: Mess
       return { what: 'ops.hint.cancel.what', why: 'ops.hint.cancel.why', next: 'ops.hint.cancel.next' };
     case 'truncated':
       return { what: 'ops.hint.truncated.what', why: 'ops.hint.truncated.why', next: 'ops.hint.truncated.next' };
+    case 'goalUnmet':
+      return { what: 'ops.hint.goalUnmet.what', why: 'ops.hint.goalUnmet.why', next: 'ops.hint.goalUnmet.next' };
     case 'generic':
       return { what: 'ops.hint.generic.what', why: 'ops.hint.generic.why', next: 'ops.hint.generic.next' };
     default: {
@@ -80,7 +82,7 @@ function TurnItem({
 
   const summary = useMemo(() => summarizeGroup(group), [group]);
   const pct = group.durationMs != null ? Math.max(4, Math.round((group.durationMs / maxMs) * 100)) : 8;
-  const firstError = group.events.find((ev) => isErrorKind(ev.kind));
+  const firstError = group.events.find((ev) => isErrorKind(ev.kind, ev.payload));
   const keys = firstError ? hintKeys(firstError.kind) : null;
   const reason = firstError ? errorPayloadMessage(firstError.payload) : '';
 
@@ -112,7 +114,7 @@ function TurnItem({
       </summary>
       <div className="trace-group__body">
         {group.events.map((ev, i) => {
-          const err = isErrorKind(ev.kind);
+          const err = isErrorKind(ev.kind, ev.payload);
           const k = err ? hintKeys(ev.kind) : null;
           return (
             <details key={`${group.id}-${i}`} className={`trace-row${err ? ' trace-row--err' : ''}`}>

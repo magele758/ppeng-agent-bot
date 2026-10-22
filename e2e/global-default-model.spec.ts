@@ -30,3 +30,78 @@ test('no real configured model is clearly shown with setup guidance [AC:global-d
  await expect(page.locator('#card-model-providers')).toContainText('尚未配置可用模型');
  await expect(page.locator('#card-model-providers').getByRole('button',{name:'配置模型',exact:true})).toBeVisible();
 });
+
+type Box={x:number;y:number;width:number;height:number};
+function midY(box:Box){return box.y+box.height/2;}
+function linesOf(items:Box[]){
+ const sorted=[...items].sort((a,b)=>a.y-b.y||a.x-b.x);
+ const groups:Box[][]=[];
+ for(const item of sorted){
+  const last=groups.at(-1);
+  if(!last||item.y>=last[0].y+last[0].height-2) groups.push([item]);
+  else last.push(item);
+ }
+ return groups;
+}
+async function defaultRowBoxes(page:Page){
+ return page.evaluate(()=>{
+  const body=document.querySelector('#card-model-providers .ui-group__body');
+  const row=document.querySelector('.model-default-row');
+  const label=row?.querySelector('label');
+  const select=row?.querySelector('select');
+  const note=row?.querySelector(':scope > .muted');
+  const box=(el:Element)=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};};
+  if(!body||!row||!label||!select) return null;
+  return {body:box(body),label:box(label),select:box(select),note:note?box(note):null};
+ });
+}
+
+test('global default title, menu, and provider note share one centered row [AC:global-default-model-row-align#AC-1]',async({page})=>{
+ await mockCatalog(page);
+ await page.setViewportSize({width:1440,height:900});
+ await page.goto('/#/settings/models');
+ const boxes=await defaultRowBoxes(page);
+ expect(boxes?.note).toBeTruthy();
+ const {body,label,select,note}=boxes!;
+ expect(Math.abs(midY(label)-midY(select))).toBeLessThanOrEqual(2);
+ expect(Math.abs(midY(note!)-midY(select))).toBeLessThanOrEqual(2);
+ expect(note!.y).toBeGreaterThanOrEqual(select.y-2);
+ expect(note!.y+note!.height).toBeLessThanOrEqual(select.y+select.height+2);
+ expect(Math.abs(label.x-body.x)).toBeLessThanOrEqual(1);
+ expect(note!.x).toBeGreaterThanOrEqual(select.x+select.width-1);
+ expect(note!.x+note!.width).toBeLessThanOrEqual(body.x+body.width+1);
+ expect(select.x+select.width).toBeLessThanOrEqual(body.x+body.width+1);
+});
+
+test('narrow global default row wraps without shifting its left edge [AC:global-default-model-row-align#AC-2]',async({page})=>{
+ await mockCatalog(page);
+ await page.setViewportSize({width:480,height:900});
+ await page.goto('/#/settings/models');
+ const boxes=await defaultRowBoxes(page);
+ expect(boxes?.note).toBeTruthy();
+ const {body,label,select,note}=boxes!;
+ const items=[label,select,note!];
+ expect(Math.max(...items.map(item=>item.y))).toBeGreaterThan(label.y+label.height);
+ for(const line of linesOf(items)){
+  expect(Math.abs(Math.min(...line.map(item=>item.x))-body.x)).toBeLessThanOrEqual(1);
+  for(const item of line){
+   expect(item.x).toBeGreaterThanOrEqual(body.x-1);
+   expect(item.x+item.width).toBeLessThanOrEqual(body.x+body.width+1);
+  }
+ }
+});
+
+test('empty global default row stays centered on the card edge [AC:global-default-model-row-align#AC-3]',async({page})=>{
+ await mockCatalog(page,true);
+ await page.setViewportSize({width:1440,height:900});
+ await page.goto('/#/settings/models');
+ const boxes=await defaultRowBoxes(page);
+ expect(boxes).toBeTruthy();
+ expect(boxes!.note).toBeNull();
+ const {body,label,select}=boxes!;
+ expect(Math.abs(midY(label)-midY(select))).toBeLessThanOrEqual(2);
+ expect(label.y).toBeGreaterThanOrEqual(select.y-2);
+ expect(label.y+label.height).toBeLessThanOrEqual(select.y+select.height+2);
+ expect(Math.abs(label.x-body.x)).toBeLessThanOrEqual(1);
+ expect(select.x+select.width).toBeLessThanOrEqual(body.x+body.width+1);
+});

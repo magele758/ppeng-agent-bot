@@ -53,6 +53,7 @@ export function createRuntimeCollaborators(input: {
   workspaceManager?: WorkspaceManager;
   completeText?: (input: { system: string; user: string }) => Promise<string>;
   spawnHost: () => SpawnHost;
+  emitTrace?: SelfHealContext['emitTrace'];
 }): {
   selfHeal: SelfHealScheduler;
   socialSchedule: SocialScheduleService;
@@ -69,6 +70,7 @@ export function createRuntimeCollaborators(input: {
     createTaskSession: (args) => input.createTaskSession(args),
     runSession: (sid) => input.runSession(sid),
     bindWorkspaceForTask: (tid) => input.bindWorkspaceForTask(tid),
+    emitTrace: input.emitTrace,
   };
   const selfHeal = new SelfHealScheduler(selfHealCtx);
   const socialSchedule = new SocialScheduleService(input.store);

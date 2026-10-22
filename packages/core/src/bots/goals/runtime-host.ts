@@ -18,6 +18,7 @@ export interface GoalRuntimeHost {
  inspectSpecialty?(parent:SessionRecord,goal:BotGoal):{status:string;evidence:string[];draining?:boolean};
  cancelSpecialty?(parent:SessionRecord,goal:BotGoal):boolean|Promise<boolean>;
  judge?: ModelAdapter['completeText'];
+ emitTrace?(sessionId: string, event: { kind: 'child_session'; payload: Record<string, unknown> }): void;
 }
 export function announceGoalState(host:GoalRuntimeHost,goal:BotGoal):void {
  if(!['completed','blocked','failed'].includes(goal.status))return;

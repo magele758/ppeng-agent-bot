@@ -178,12 +178,28 @@
 .model-default-row {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: center;
+  justify-content: flex-start;
   gap: var(--ui-space-3);
-  margin-bottom: var(--ui-space-3);
+  margin: 0 0 var(--ui-space-3);
+  min-width: 0;
+  max-width: 100%;
 }
-.model-default-row .field {
-  min-width: 260px;
+.model-default-row > label {
+  flex: 0 0 auto;
+  margin: 0;
+}
+.model-default-row > select {
+  flex: 0 1 auto;
+  width: min(260px, 100%);
+  max-width: 100%;
+  min-width: 0;
+}
+.model-default-row > .muted {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
 }
 
 /* provider list */

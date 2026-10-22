@@ -53,6 +53,7 @@ import { sandboxRoutes } from './routes/sandbox.js';
 import { secretsRoutes } from './routes/secrets.js';
 import { selfHealRoutes } from './routes/self-heal.js';
 import { sessionsRoutes } from './routes/sessions.js';
+import { composerHintRoutes } from './routes/composer-hint.js';
 import { skillEvalRoutes } from './routes/skill-eval.js';
 import { skillProposalRoutes } from './routes/skill-proposals.js';
 import { skillSettingsRoutes } from './routes/skill-settings.js';
@@ -90,6 +91,7 @@ export function buildDaemonRouter(deps: DaemonAppDeps): Router {
     .addAll(authRoutes({ runtime, authStore: deps.authStore, env }))
     .addAll(miscRoutes(runtime, { pkgName: deps.pkgName, pkgVersion: deps.pkgVersion }))
     .addAll(sessionsRoutes(runtime))
+    .addAll(composerHintRoutes(runtime))
     .addAll(botsRoutes(runtime))
     .addAll(botMaterialRoutes(runtime))
     .addAll(botFunctionalGroupRoutes(runtime))

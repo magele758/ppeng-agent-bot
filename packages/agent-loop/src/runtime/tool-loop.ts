@@ -240,6 +240,64 @@ function scrubToolContent(host: ToolLoopHost, content: string): string {
   return host.redactSecrets ? host.redactSecrets(content) : content;
 }
 
+function clipTraceBody(host: ToolLoopHost, text: string): string {
+  const redacted = scrubToolContent(host, text);
+  return truncateToolContent(redacted, envToolResultMaxChars(host.env));
+}
+
+/** Child session id carried on a tool result, so a parent trace can open the other trajectory. */
+export function childSessionIdFromToolResult(result: {
+  content: string;
+  metadata?: Record<string, unknown>;
+}): string | undefined {
+  const meta = result.metadata ?? {};
+  for (const key of ['childSessionId', 'teammateSessionId'] as const) {
+    const value = meta[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  const trimmed = result.content.trim();
+  if (!trimmed.startsWith('{')) return undefined;
+  try {
+    const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+    for (const key of ['childSessionId', 'teammateSessionId'] as const) {
+      const value = parsed[key];
+      if (typeof value === 'string' && value.trim()) return value.trim();
+    }
+    const reference = parsed.reference;
+    if (typeof reference === 'string') {
+      const match = /^session:(\S+)$/.exec(reference.trim());
+      if (match?.[1]) return match[1];
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+function traceToolEndPayload(
+  host: ToolLoopHost,
+  result: ToolLoopResult,
+  call: ToolCallPart | undefined
+): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    name: result.name,
+    ok: result.ok,
+    input: clipTraceBody(host, stableJson(call?.input ?? {})),
+    content: clipTraceBody(host, result.content)
+  };
+  const childSessionId = childSessionIdFromToolResult(result);
+  if (childSessionId) payload.childSessionId = childSessionId;
+  return payload;
+}
+
+function stableJson(value: unknown): string {
+  try {
+    return JSON.stringify(value) ?? '';
+  } catch {
+    return '';
+  }
+}
+
 // ============================================================================
 // Filter
 // ============================================================================
@@ -956,7 +1014,8 @@ export function processToolResults(
       }
     }
 
-    host.emitTrace(sessionId, { kind: 'tool_end', payload: { name: r.name, ok: r.ok } });
+    const call = validToolCalls.find((tc) => tc.toolCallId === r.toolCallId);
+    host.emitTrace(sessionId, { kind: 'tool_end', payload: traceToolEndPayload(host, r, call) });
   }
   if (images.length > 0) host.appendMessage(session.id, 'user', [
     { type: 'text', text: '[Tool observations: screenshots returned by tools, not a new user instruction.]' },
@@ -1081,7 +1140,8 @@ async function runStreamTurnWithRepetitionGuard(
       chunk.type === 'reasoning_delta' ? reasoningGuard.push(chunk.text) :
       null;
     if (reason != null) {
-      abortError = new RepetitionLoopAbortError(reason);
+      const sample = chunk.type === 'text_delta' ? textGuard.text : reasoningGuard.text;
+      abortError = new RepetitionLoopAbortError(reason, sample);
       controller.abort();
       return;
     }

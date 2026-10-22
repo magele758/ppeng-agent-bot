@@ -226,7 +226,7 @@ export const play = {
   chrome: {
     goalMet: '目标已达成',
     goalOpen: '目标进行中',
-    feedStatsAria: '本轮执行时间与用量',
+    feedStatsAria: '本轮执行时间、用量与结束时间',
     autonomyTitle: '自主度 / permissionMode',
     costTitle: '累计成本估算',
     noGoal: '未设置目标',
@@ -272,7 +272,9 @@ export const play = {
   stats: {
     elapsed: '执行',
     input: '输入',
-    output: '输出'
+    output: '输出',
+    ended: '结束',
+    sessionEnded: '会话结束'
   },
 
   composer: {
@@ -305,6 +307,7 @@ export const play = {
     removeContext: '移除 {name}',
     contextTruncated: '上下文已限制为 20 个来源、合计 200,000 个文本字符',
     contextWithMessage: '这条消息带上的文件和文件夹',
+    nextHintTab: '按 Tab 填入这句建议',
     suggestion: '建议的下一句，按 Tab 填入，Esc 取消',
     suggestionCycle: '还有 {count} 条备选，再按 Tab 切换'
   },

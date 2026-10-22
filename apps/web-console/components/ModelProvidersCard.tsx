@@ -408,29 +408,27 @@ function GlobalDefaultModelSelect({ grouped, defaultRef, defaultLabel, busy, set
   const { t } = useI18n();
   return (
     <div className="model-default-row">
-      <div className="field">
-        <label htmlFor="model-default-select">{t('settings.model.globalDefault.title')}</label>
-        <select
-          id="model-default-select"
-          value={defaultRef ? encodeModelValue(defaultRef) : ''}
-          disabled={busy || grouped.length === 0}
-          onChange={(e) => {
-            const ref = decodeModelValue(e.target.value);
-            if (ref) void setDefault(ref.providerId, ref.modelId);
-          }}
-        >
-          {!defaultRef ? <option value="">{t('settings.model.globalDefault.empty')}</option> : null}
-          {grouped.map((g) => (
-            <optgroup key={g.providerId} label={g.providerName}>
-              {g.options.map((o) => (
-                <option key={encodeModelValue(o)} value={encodeModelValue(o)}>
-                  {o.modelId}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
-      </div>
+      <label htmlFor="model-default-select">{t('settings.model.globalDefault.title')}</label>
+      <select
+        id="model-default-select"
+        value={defaultRef ? encodeModelValue(defaultRef) : ''}
+        disabled={busy || grouped.length === 0}
+        onChange={(e) => {
+          const ref = decodeModelValue(e.target.value);
+          if (ref) void setDefault(ref.providerId, ref.modelId);
+        }}
+      >
+        {!defaultRef ? <option value="">{t('settings.model.globalDefault.empty')}</option> : null}
+        {grouped.map((g) => (
+          <optgroup key={g.providerId} label={g.providerName}>
+            {g.options.map((o) => (
+              <option key={encodeModelValue(o)} value={encodeModelValue(o)}>
+                {o.modelId}
+              </option>
+            ))}
+          </optgroup>
+        ))}
+      </select>
       {defaultLabel ? <span className="muted small">{defaultLabel}</span> : null}
     </div>
   );

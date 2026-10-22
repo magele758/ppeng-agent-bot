@@ -9,6 +9,7 @@ import { listPendingHumanWork } from '../session/human-continuation.js';
 import { inheritBotIdentityMetadata } from '../memory/bot-memory-scope.js';
 import { childPermissionMode, inheritBotAllowlists, inheritModelOverride } from '../runtime/spawn-policy.js';
 import { forkOpeningMessage, inheritForkRetrievalMetadata, visibleTaskText } from './fork-inheritance.js';
+import { childSessionTrace } from '../stores/trace-visible.js';
 
 export interface WorkPiece {
   id: string;
@@ -173,6 +174,7 @@ export interface ConcurrentForkHost {
   store: SqliteStateStore;
   runSession(sessionId: string): Promise<unknown>;
   log: { warn(message: string, details?: unknown): void };
+  emitTrace?(sessionId: string, event: { kind: 'child_session'; payload: Record<string, unknown> }): void;
 }
 
 export function applyConcurrentBotForks(host: ConcurrentForkHost, sessionId: string, inFlight: boolean): string[] {
@@ -194,6 +196,7 @@ export function applyConcurrentBotForks(host: ConcurrentForkHost, sessionId: str
   for (const piece of plan.forks) {
     if (knownSources.has(piece.id)) continue;
     const child = spawnWorkChild(host, session, piece);
+    host.emitTrace?.(sessionId, childSessionTrace(child.id, 'concurrent-bot-work'));
     created.push({ sourceMessageId: piece.id, childSessionId: child.id, status: 'running' });
     knownSources.add(piece.id);
     const childId = child.id;

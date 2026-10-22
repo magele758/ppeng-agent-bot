@@ -184,13 +184,35 @@ export type ChatFeedStatsLabels = {
   elapsed?: string;
   input?: string;
   output?: string;
+  ended?: string;
+  sessionEnded?: string;
 };
+
+function feedTimeLocale(locale: string | undefined): string {
+  if (!locale || locale === 'zh' || locale === 'zh-CN') return 'zh-CN';
+  if (locale === 'en' || locale.startsWith('en-')) return 'en';
+  return locale;
+}
+
+/** Month, day, and clock — same fields as context replay and bot activity. */
+export function formatFeedEndTime(ms: number, locale?: string): string | null {
+  if (typeof ms !== 'number' || !Number.isFinite(ms) || ms <= 0) return null;
+  return new Intl.DateTimeFormat(feedTimeLocale(locale), {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(ms);
+}
 
 export function formatChatFeedStatsLine(input: {
   elapsedMs?: number;
   usageTotals?: SessionUsageTotals;
   usageCostUsd?: number;
+  endedAtMs?: number;
+  sessionEnded?: boolean;
   labels?: ChatFeedStatsLabels;
+  locale?: string;
 }): string | null {
   const elapsedLabel = input.labels?.elapsed ?? '执行';
   const inputLabel = input.labels?.input ?? '输入';
@@ -212,6 +234,13 @@ export function formatChatFeedStatsLine(input: {
   }
   if (typeof input.usageCostUsd === 'number' && Number.isFinite(input.usageCostUsd) && input.usageCostUsd > 0) {
     parts.push(formatCostUsd(input.usageCostUsd));
+  }
+  const clock = formatFeedEndTime(input.endedAtMs ?? Number.NaN, input.locale);
+  if (clock) {
+    const endedLabel = input.sessionEnded
+      ? (input.labels?.sessionEnded ?? '会话结束')
+      : (input.labels?.ended ?? '结束');
+    parts.push(`${endedLabel} ${clock}`);
   }
   return parts.length ? parts.join(' · ') : null;
 }
