@@ -59,15 +59,17 @@ test('回复结束后才生成下一句建议，关闭开关后不再生成，�
       async completeText(input: { user: string; signal?: AbortSignal }) {
         const n = calls.push(input.user);
         const signal = input.signal;
-        if (n === 1) {
-          await Promise.race([
-            secondGate,
-            new Promise<void>((resolve) => {
-              if (!signal) return;
-              if (signal.aborted) resolve();
-              else signal.addEventListener('abort', () => resolve(), { once: true });
-            })
-          ]);
+        const waitForAbort = () =>
+          new Promise<void>((resolve) => {
+            if (!signal) return;
+            if (signal.aborted) resolve();
+            else signal.addEventListener('abort', () => resolve(), { once: true });
+          });
+        // suggest(1) is superseded by suggest(2); suggest(4) is cancelled mid-flight.
+        // Both must stay parked on the signal until abort, or the handler returns a suggestion.
+        if (n === 1 || n === 3) {
+          if (n === 1) await Promise.race([secondGate, waitForAbort()]);
+          else await waitForAbort();
           aborted.push(Boolean(signal?.aborted));
           if (signal?.aborted) throw new DOMException('aborted', 'AbortError');
           return JSON.stringify({ suggestions: ['旧建议，不应显示'] });
