@@ -2,7 +2,7 @@
 
 import { useRef, useState, useSyncExternalStore, type DragEvent, type ReactNode } from 'react';
 import type { BotInfo, SessionSummary } from '@/lib/types';
-import { botForCanonicalSession } from '@/lib/bots';
+import { sessionForPinnedBot } from '@/lib/bots';
 import { useI18n } from '@/lib/i18n';
 import {
   BOT_DRAG_MIME,
@@ -17,18 +17,6 @@ import {
   visiblePinnedBots
 } from '@/lib/bot-pin-area';
 import styles from './BotFunctionalGroups.module.css';
-
-function sessionForBot(
-  bot: BotInfo,
-  bots: readonly BotInfo[],
-  sessions: readonly SessionSummary[]
-): SessionSummary | undefined {
-  if (bot.canonicalSessionId) {
-    const direct = sessions.find((session) => session.id === bot.canonicalSessionId);
-    if (direct) return direct;
-  }
-  return sessions.find((session) => botForCanonicalSession(bots, session.id, sessions)?.id === bot.id);
-}
 
 export function BotPinArea({
   bots,
@@ -103,7 +91,7 @@ export function BotPinArea({
       </div>
       {pinned.length === 0 ? <p className={styles.empty}>{t('play.pin.empty')}</p> : <p className={styles.hint}>{t('play.pin.hint')}</p>}
       {pinned.map((bot) => {
-        const session = sessionForBot(bot, bots, sessions);
+        const session = sessionForPinnedBot(bot, bots, sessions);
         const sessionId = session?.id || bot.canonicalSessionId || '';
         const row = session ? renderSession(session) : null;
         return (

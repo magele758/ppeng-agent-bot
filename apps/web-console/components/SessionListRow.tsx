@@ -53,16 +53,20 @@ export function SessionListRow({
   const mood = useBotWorkMood(botId);
   const title = copy.title;
   const bot = copy.kind === 'bot';
+  const child = copy.kind === 'child-task';
   const faceName = copy.kind === 'bot' ? copy.faceName : '';
   const subtitle = copy.kind === 'bot' ? copy.subtitle : '';
   const hasQuestion = copy.kind === 'bot' && copy.hasQuestion;
+  const owner = copy.kind === 'child-task' ? t('play.childTask.owner', { name: copy.ownerName }) : '';
 
   return (
     <div
       className={`list-item list-item--session${bot ? ' list-item--bot-chat' : ''}${selected ? ' selected' : ''}${checked ? ' is-checked' : ''}`}
       role="button"
       tabIndex={0}
-      data-session-kind={bot ? 'bot' : 'plain'}
+      data-session-id={session.id}
+      data-session-kind={child ? 'child-task' : bot ? 'bot' : 'plain'}
+      aria-current={selected ? 'true' : undefined}
       onClick={() => {
         if (selectMode) {
           onToggleChecked(!checked);
@@ -96,7 +100,7 @@ export function SessionListRow({
         <div className="session-item__title">{title}</div>
         <div className="session-item__meta">
           {status}
-          <SessionRowSubtitle bot={bot} subtitle={subtitle} hasQuestion={hasQuestion} agentId={session.agentId} />
+          <SessionRowSubtitle bot={bot} subtitle={subtitle} hasQuestion={hasQuestion} agentId={session.agentId} owner={owner} />
         </div>
       </div>
       {onDelete && !selectMode ? (
@@ -117,7 +121,10 @@ export function SessionListRow({
   );
 }
 
-function SessionRowSubtitle({ bot, subtitle, hasQuestion, agentId }: { bot: boolean; subtitle: string; hasQuestion: boolean; agentId?: string }) {
+function SessionRowSubtitle({ bot, subtitle, hasQuestion, agentId, owner }: { bot: boolean; subtitle: string; hasQuestion: boolean; agentId?: string; owner?: string }) {
+  if (owner) {
+    return <span className="session-item__agent session-item__owner" data-testid="session-child-task-owner">{owner}</span>;
+  }
   return bot ? (
     <div className={`session-item__question${hasQuestion ? ' is-question' : ''}`}>
       <span className="session-item__question-text">{subtitle}</span>

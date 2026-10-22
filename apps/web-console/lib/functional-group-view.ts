@@ -1,5 +1,5 @@
 import type { BotInfo, SessionSummary } from './types';
-import { botForCanonicalSession } from './bots.ts';
+import { botForCanonicalSession, isSidebarForkChild } from './bots.ts';
 
 export type FunctionalGroup = { id: string; name: string; botIds: string[] };
 export type SharedFact = { key: string; value: string };
@@ -10,6 +10,7 @@ export function groupForBot(groups: readonly FunctionalGroup[], botId: string): 
 
 export function functionalGroupRows(groups: readonly FunctionalGroup[], bots: readonly BotInfo[], sessions: readonly SessionSummary[], groupId: string | null) {
   return sessions.filter(session => {
+    if (isSidebarForkChild(session, bots)) return false;
     const bot = botForCanonicalSession(bots, session.id, sessions);
     if (bot?.hidden) return false;
     const assigned = bot ? groupForBot(groups, bot.id) : null;

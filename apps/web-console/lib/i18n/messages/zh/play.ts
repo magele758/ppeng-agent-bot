@@ -262,6 +262,7 @@ export const play = {
     reasoning_spin: '思考空转',
     loop_guard_critical: '循环保护',
     tool_loop: '工具循环',
+    repeat_detection: '重复检测：同一批工具被反复调用',
     missing_assistant: '缺少助手回复',
     before_turn_blocked: '开轮被拦截',
     rewound: '已回滚',
@@ -568,7 +569,12 @@ export const play = {
     cronTagTitle: 'Bot 定时任务触发',
     toolObservation: '工具返回的截图，不是新的用户指令。',
     toolShotAlt: '工具截图',
-    enlargeImage: '放大查看截图'
+    enlargeImage: '放大查看截图',
+    osSandbox: {
+      savedOs: '这次仍走系统沙箱：隔离方式保存的是系统级隔离，没有改成直接执行。密钥目录仍然不可读。',
+      autoStrongest: '这次仍走系统沙箱：隔离方式是自动，未另外指定时用本机最强隔离，没有改成直接执行。',
+      autoModelOs: '这次仍走系统沙箱：隔离方式是自动，这次命令选了系统级隔离。'
+    }
   },
 
 
@@ -755,7 +761,8 @@ export const play = {
     workRunning: '进行中',
     workWaiting: '等待',
     workDone: '已完成',
-    workStarted: '开始于 {time}'
+    workStarted: '开始于 {time}',
+    workOpenSession: '{status}，打开「{title}」所在的会话'
   },
 
   stored: {
@@ -794,7 +801,9 @@ export const play = {
     scopeUser: '用户记忆',
     scopeTeam: '团队记忆',
     scopeProject: '项目记忆',
-    scopeOther: '其他记忆'
+    scopeOther: '其他记忆',
+    childTasks: '子任务',
+    childTasksEmpty: '目前没有子任务'
   },
 
   status: {
@@ -824,5 +833,28 @@ export const play = {
     taskCreated: '任务会话已创建',
     addedFiles: '已添加 {count} 个附件',
     addedRemote: '已添加远程附件'
-  }
+  },
+
+  childTask: {
+    owner: '属于{name}',
+    streamLabel: '子任务',
+    streamOpen: '打开这条子任务：{excerpt}'
+  },
+
+  goalUpdate: {
+    cardAria: '目标状态',
+    titleFallback: '目标有更新',
+    statusBlocked: '受阻',
+    statusRunning: '进行中',
+    statusCompleted: '完成',
+    statusFailed: '失败',
+    statusQueued: '排队中',
+    statusWaiting: '等待中',
+    statusPaused: '已暂停',
+    statusCancelled: '已取消',
+    statusUnknown: '状态已更新',
+    reasonVerifyUnavailable: '完成核验不可用、证据留着待查',
+    reasonFallback: '这次变化已记下，细节留待查看'
+  },
+
 };

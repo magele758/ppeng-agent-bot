@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { displayedQuestion, lastUserQuestion, sessionRowCopy, sessionWorkBotId } from './session-row.ts';
 import type { BotInfo } from './types.ts';
 
@@ -152,4 +153,141 @@ test('work identity prefers canonical roster then metadata and ignores invalid i
   assert.equal(sessionWorkBotId({ id: 'other', metadata: { botId: 'standalone' } }, []), 'standalone');
   assert.equal(sessionWorkBotId({ id: 'other', metadata: { botId: 42 } }, []), '');
   assert.equal(sessionWorkBotId({ id: 'other' }, []), '');
+});
+
+const longBotId = `bot_${'cd'.repeat(16)}`;
+const childSessionId = 'sess_9f3c0a1b2c3d4e5f';
+
+function childSession(id: string, title: string, botId: string) {
+  return {
+    id,
+    title,
+    agentId: botId,
+    metadata: { botId, spawnSource: 'bot-goal-continuation' as const, botGoalWorker: true }
+  };
+}
+
+test('点开 Bot 详情里的子任务，主区打开的就是这条子任务 [AC:bot-child-task-chat-entry#AC-1]', () => {
+  const panel = readFileSync(new URL('../components/PlayPanel.tsx', import.meta.url), 'utf8');
+  const menu = readFileSync(new URL('../components/BotDetailMenu.tsx', import.meta.url), 'utf8');
+  assert.match(menu, /data-session-id=\{task\.id\}/);
+  assert.match(menu, /onOpen\?\.\(task\.id\)/);
+  const start = panel.indexOf('onOpenChildTask=');
+  const end = panel.indexOf('}}', start);
+  assert.ok(start >= 0 && end > start);
+  const handler = panel.slice(start, end + 2);
+  assert.match(handler, /onSelectSession\(sessionId\)/);
+  assert.equal(handler.includes('canonicalSessionId'), false);
+  assert.equal(handler.includes('.botId'), false);
+});
+
+test('子任务入口标题是任务原文，不是裸的 bot id [AC:bot-child-task-chat-entry#AC-4]', () => {
+  const named = bot({ id: longBotId, name: '资料员', canonicalSessionId: 'sess-canon-researcher' });
+  const prefixed = sessionRowCopy({
+    session: childSession('child-a', 'Bot Chat · 整理本周纪要', longBotId),
+    bots: [named],
+    question: '',
+    emptyHint,
+    unnamed
+  });
+  assert.equal(prefixed.kind, 'child-task');
+  if (prefixed.kind !== 'child-task') return;
+  assert.equal(prefixed.title, '整理本周纪要');
+  assert.equal(prefixed.title.includes('Bot Chat'), false);
+  assert.notEqual(prefixed.title, longBotId);
+  assert.notEqual(prefixed.title, 'child-a');
+
+  const bare = sessionRowCopy({
+    session: childSession('child-bare', longBotId, longBotId),
+    bots: [named],
+    question: '',
+    emptyHint,
+    unnamed
+  });
+  assert.equal(bare.kind, 'child-task');
+  if (bare.kind !== 'child-task') return;
+  assert.equal(bare.title, unnamed);
+  assert.notEqual(bare.title, longBotId);
+  assert.notEqual(bare.title, 'child-bare');
+});
+
+test('子任务入口显示所属 Bot 的名字，而不是一长串 id [AC:bot-child-task-chat-entry#AC-5]', () => {
+  const named = bot({ id: longBotId, name: '资料员', canonicalSessionId: 'sess-canon-researcher' });
+  const copy = sessionRowCopy({
+    session: childSession(childSessionId, '整理本周纪要', longBotId),
+    bots: [named],
+    question: '',
+    emptyHint,
+    unnamed
+  });
+  assert.equal(copy.kind, 'child-task');
+  if (copy.kind !== 'child-task') return;
+  assert.equal(copy.title, '整理本周纪要');
+  assert.equal(copy.ownerName, '资料员');
+  assert.equal(copy.ownerName.includes(longBotId), false);
+  assert.notEqual(copy.title, childSessionId);
+  assert.notEqual(copy.ownerName, childSessionId);
+});
+
+test('没有 Bot 名字时用可读短标记，标题不用会话 id [AC:bot-child-task-chat-entry#AC-5]', () => {
+  const nameless = bot({ id: longBotId, name: ' ', title: ' ', canonicalSessionId: 'sess-canon-nameless' });
+  const copy = sessionRowCopy({
+    session: childSession(childSessionId, '整理本周纪要', longBotId),
+    bots: [nameless],
+    question: '',
+    emptyHint,
+    unnamed
+  });
+  assert.equal(copy.kind, 'child-task');
+  if (copy.kind !== 'child-task') return;
+  assert.equal(copy.title, '整理本周纪要');
+  assert.notEqual(copy.title, childSessionId);
+  assert.notEqual(copy.ownerName, longBotId);
+  assert.equal(copy.ownerName, 'CDCD');
+  assert.ok(copy.ownerName.length > 0 && copy.ownerName.length <= 8);
+
+  const titled = bot({ id: longBotId, name: '', title: '值班助手', canonicalSessionId: 'sess-canon-titled' });
+  const byTitle = sessionRowCopy({
+    session: childSession(childSessionId, '整理本周纪要', longBotId),
+    bots: [titled],
+    question: '',
+    emptyHint,
+    unnamed
+  });
+  assert.equal(byTitle.kind, 'child-task');
+  if (byTitle.kind !== 'child-task') return;
+  assert.equal(byTitle.ownerName, '值班助手');
+  assert.notEqual(byTitle.ownerName, longBotId);
+  assert.notEqual(byTitle.title, childSessionId);
+
+  const slug = bot({ id: 'ada', name: '', title: '', canonicalSessionId: 'sess-ada-canon' });
+  const slugCopy = sessionRowCopy({
+    session: childSession('sess_child_not_title', '把纪要发给我', 'ada'),
+    bots: [slug],
+    question: '',
+    emptyHint,
+    unnamed
+  });
+  assert.equal(slugCopy.kind, 'child-task');
+  if (slugCopy.kind !== 'child-task') return;
+  assert.equal(slugCopy.ownerName, 'ada');
+  assert.equal(slugCopy.title, '把纪要发给我');
+  assert.notEqual(slugCopy.title, 'sess_child_not_title');
+  assert.notEqual(slugCopy.title, 'ada');
+});
+
+test('只有子任务会话才标归属，普通会话仍用自己的标题', () => {
+  const copy = sessionRowCopy({
+    session: {
+      id: 'plain-lookalike',
+      title: '整理本周纪要',
+      agentId: 'researcher',
+      metadata: { botId: 'researcher' }
+    },
+    bots: [bot({ id: 'researcher', name: '资料员', canonicalSessionId: 'sess-canon-researcher' })],
+    question: 'ignored',
+    emptyHint,
+    unnamed
+  });
+  assert.deepEqual(copy, { kind: 'plain', title: '整理本周纪要' });
 });

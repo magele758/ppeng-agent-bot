@@ -169,3 +169,307 @@ test('详情菜单可打开收起，窄屏改为覆盖而不挤占对话 [AC:bot
   assert.match(css, /\.bot-detail-menu/);
   assert.match(css, /position:\s*absolute/);
 });
+
+const researcherTasks = [
+  { id: 'child-1', title: '整理本周纪要' },
+  { id: 'child-2', title: '对照竞品价格' }
+];
+const writerTasks = [{ id: 'child-3', title: '写发布说明' }];
+
+test('详情菜单只列出当前 Bot 的子任务，换 Bot 后看不到另一只的 [AC:bot-fork-sessions-in-detail#AC-2]', () => {
+  const first = render({
+    botId: 'researcher',
+    botName: '资料员',
+    open: true,
+    initialSection: 'tasks',
+    preview: { jobs: [], files: [], memories: [] },
+    childTasks: researcherTasks
+  });
+  const second = render({
+    botId: 'writer',
+    botName: '写作者',
+    open: true,
+    initialSection: 'tasks',
+    preview: { jobs: [], files: [], memories: [] },
+    childTasks: writerTasks
+  });
+  assert.match(first, /data-testid="bot-detail-child-tasks"/);
+  assert.match(first, /data-bot-id="researcher"/);
+  assert.match(first, /整理本周纪要/);
+  assert.match(first, /对照竞品价格/);
+  assert.equal(first.includes('写发布说明'), false);
+  assert.equal(first.includes('目前没有子任务'), false);
+  assert.match(second, /data-bot-id="writer"/);
+  assert.match(second, /写发布说明/);
+  assert.equal(second.includes('整理本周纪要'), false);
+  assert.equal(second.includes('对照竞品价格'), false);
+});
+
+test('没有子任务时详情里说明目前没有子任务 [AC:bot-fork-sessions-in-detail#AC-3]', () => {
+  const html = render({
+    botId: 'bot-empty',
+    botName: '空',
+    open: true,
+    initialSection: 'tasks',
+    preview: { jobs: [], files: [], memories: [] },
+    childTasks: []
+  });
+  assert.match(html, /data-testid="bot-detail-child-tasks"/);
+  assert.match(html, /目前没有子任务/);
+  assert.equal(html.includes('data-testid="bot-detail-child-task"'), false);
+});
+
+test('点开详情里的子任务会打开这条子任务会话 [AC:bot-fork-sessions-in-detail#AC-4]', () => {
+  const opened: string[] = [];
+  const clicks: Array<() => void> = [];
+  const jsxRuntime = localRequire('react/jsx-runtime') as {
+    jsx: (type: unknown, props: Record<string, unknown> | null, key?: string) => unknown;
+    jsxs: (type: unknown, props: Record<string, unknown> | null, key?: string) => unknown;
+  };
+  const originalJsx = jsxRuntime.jsx;
+  const originalJsxs = jsxRuntime.jsxs;
+  const spy = (original: typeof jsxRuntime.jsx) => (type: unknown, props: Record<string, unknown> | null, key?: string) => {
+    if (props?.['data-testid'] === 'bot-detail-child-task' && props['data-session-id'] === 'child-1' && typeof props.onClick === 'function') {
+      clicks.push(props.onClick as () => void);
+    }
+    return original(type, props, key);
+  };
+  jsxRuntime.jsx = spy(originalJsx);
+  jsxRuntime.jsxs = spy(originalJsxs);
+  try {
+    const html = render({
+      botId: 'researcher',
+      botName: '资料员',
+      open: true,
+      initialSection: 'tasks',
+      preview: { jobs: [], files: [], memories: [] },
+      childTasks: researcherTasks,
+      onOpenChildTask: (id: string) => opened.push(id)
+    });
+    assert.match(html, /data-session-id="child-1"/);
+    assert.match(html, /整理本周纪要/);
+    assert.equal(clicks.length > 0, true);
+    clicks[0]!();
+    assert.deepEqual(opened, ['child-1']);
+  } finally {
+    jsxRuntime.jsx = originalJsx;
+    jsxRuntime.jsxs = originalJsxs;
+  }
+  const panel = readFileSync(new URL('./PlayPanel.tsx', import.meta.url), 'utf8');
+  assert.match(panel, /onOpenChildTask/);
+  assert.match(panel, /onSelectSession\(sessionId\)/);
+});
+
+const emptyPreview = { jobs: [], files: [], memories: [] };
+
+function tabIds(html: string): string[] {
+  return [...html.matchAll(/role="tab"[^>]*data-testid="(bot-detail-tab-[^"]+)"/g)].map((match) => match[1]!);
+}
+
+function innerHtml(html: string, marker: string): string {
+  const markerAt = html.indexOf(marker);
+  assert.ok(markerAt >= 0, marker);
+  const tagStart = html.lastIndexOf('<', markerAt);
+  const tagName = /^<([A-Za-z0-9]+)/.exec(html.slice(tagStart))?.[1];
+  assert.ok(tagName);
+  const token = new RegExp(`<(/?)${tagName}\\b[^>]*>`, 'gi');
+  token.lastIndex = tagStart;
+  let depth = 0;
+  let innerStart = -1;
+  let match: RegExpExecArray | null;
+  while ((match = token.exec(html))) {
+    if (match[0].endsWith('/>')) continue;
+    const closing = match[1] === '/';
+    if (!closing && depth === 0) innerStart = token.lastIndex;
+    depth += closing ? -1 : 1;
+    if (depth === 0) return html.slice(innerStart, match.index);
+  }
+  assert.fail(`unclosed ${marker}`);
+}
+
+test('打开详情时子任务不铺在顶部，其它页签能直接点到 [AC:bot-detail-child-tasks-tab#AC-1]', () => {
+  const longTitle = '自动在输入框填下一次可能输入的内容'.repeat(6);
+  const tasks = Array.from({ length: 12 }, (_, index) => ({ id: `child-${index}`, title: `${longTitle} #${index}` }));
+  const html = render({
+    botId: 'researcher',
+    botName: '资料员',
+    open: true,
+    onClose: () => {},
+    preview: emptyPreview,
+    childTasks: tasks
+  });
+  const tabs = tabIds(html);
+  assert.deepEqual(tabs[0], 'bot-detail-tab-routines');
+  for (const id of ['bot-detail-tab-files', 'bot-detail-tab-memory', 'bot-detail-tab-skills', 'bot-detail-tab-tasks']) {
+    assert.equal(tabs.includes(id), true, id);
+  }
+  assert.match(html, /data-testid="bot-detail-tab-routines"[^>]*aria-selected="true"/);
+  assert.equal(/data-testid="bot-detail-tab-tasks"[^>]*aria-selected="true"/.test(html), false);
+  const tablist = html.indexOf('role="tablist"');
+  const taskBlock = html.indexOf('data-testid="bot-detail-child-tasks"');
+  assert.ok(tablist > html.indexOf('data-testid="bot-detail-close"'));
+  assert.equal(taskBlock === -1 || taskBlock > tablist, true);
+  assert.equal(html.includes(longTitle), false);
+  assert.equal(html.includes('data-testid="bot-detail-child-task"'), false);
+});
+
+test('点子任务页签能看到当前 Bot 的子任务原文标题 [AC:bot-detail-child-tasks-tab#AC-2]', () => {
+  const html = render({
+    botId: 'researcher',
+    botName: '资料员',
+    open: true,
+    initialSection: 'tasks',
+    preview: emptyPreview,
+    childTasks: researcherTasks
+  });
+  assert.match(html, /data-testid="bot-detail-tab-tasks"[^>]*>子任务</);
+  assert.match(html, /data-testid="bot-detail-tab-tasks"[^>]*aria-selected="true"/);
+  assert.match(html, /data-testid="bot-detail-child-tasks"/);
+  assert.match(html, /data-session-id="child-1"/);
+  assert.match(html, /整理本周纪要/);
+  assert.match(html, /data-session-id="child-2"/);
+  assert.match(html, /对照竞品价格/);
+  assert.equal(html.includes('写发布说明'), false);
+  assert.match(html, /data-bot-id="researcher"/);
+});
+
+test('没有子任务时页签里说明目前没有，顶部不留空白列表 [AC:bot-detail-child-tasks-tab#AC-3]', () => {
+  const tab = render({
+    botId: 'bot-empty',
+    botName: '空',
+    open: true,
+    initialSection: 'tasks',
+    preview: emptyPreview,
+    childTasks: []
+  });
+  assert.match(tab, /data-testid="bot-detail-tab-tasks"[^>]*aria-selected="true"/);
+  assert.match(tab, /data-testid="bot-detail-child-tasks"/);
+  assert.match(tab, /目前没有子任务/);
+  assert.equal(tab.includes('data-testid="bot-detail-child-task"'), false);
+
+  const top = render({
+    botId: 'bot-empty',
+    botName: '空',
+    open: true,
+    onClose: () => {},
+    preview: emptyPreview,
+    childTasks: []
+  });
+  const tablist = top.indexOf('role="tablist"');
+  const taskBlock = top.indexOf('data-testid="bot-detail-child-tasks"');
+  assert.ok(tablist > top.indexOf('data-testid="bot-detail-close"'));
+  assert.equal(taskBlock, -1);
+  assert.equal(top.includes('目前没有子任务'), false);
+  assert.match(top, /data-testid="bot-detail-tab-routines"[^>]*aria-selected="true"/);
+  assert.equal(tabIds(top).includes('bot-detail-tab-tasks'), true);
+});
+
+test('换 Bot 后页签里只有那一只的子任务 [AC:bot-detail-child-tasks-tab#AC-4]', () => {
+  const first = render({
+    botId: 'researcher',
+    botName: '资料员',
+    open: true,
+    initialSection: 'tasks',
+    preview: emptyPreview,
+    childTasks: researcherTasks
+  });
+  const second = render({
+    botId: 'writer',
+    botName: '写作者',
+    open: true,
+    initialSection: 'tasks',
+    preview: emptyPreview,
+    childTasks: writerTasks
+  });
+  assert.match(first, /data-bot-id="researcher"/);
+  assert.match(first, /data-testid="bot-detail-tab-tasks"[^>]*aria-selected="true"/);
+  assert.match(first, /整理本周纪要/);
+  assert.match(first, /对照竞品价格/);
+  assert.equal(first.includes('写发布说明'), false);
+  assert.match(second, /data-bot-id="writer"/);
+  assert.match(second, /data-testid="bot-detail-tab-tasks"[^>]*aria-selected="true"/);
+  assert.match(second, /写发布说明/);
+  assert.equal(second.includes('整理本周纪要'), false);
+  assert.equal(second.includes('对照竞品价格'), false);
+});
+
+test('在页签里点开一条，主区打开这条子任务 [AC:bot-detail-child-tasks-tab#AC-5]', () => {
+  const opened: string[] = [];
+  const clicks: Array<() => void> = [];
+  const jsxRuntime = localRequire('react/jsx-runtime') as {
+    jsx: (type: unknown, props: Record<string, unknown> | null, key?: string) => unknown;
+    jsxs: (type: unknown, props: Record<string, unknown> | null, key?: string) => unknown;
+  };
+  const originalJsx = jsxRuntime.jsx;
+  const originalJsxs = jsxRuntime.jsxs;
+  const spy = (original: typeof jsxRuntime.jsx) => (type: unknown, props: Record<string, unknown> | null, key?: string) => {
+    if (props?.['data-testid'] === 'bot-detail-child-task' && props['data-session-id'] === 'child-1' && typeof props.onClick === 'function') {
+      clicks.push(props.onClick as () => void);
+    }
+    return original(type, props, key);
+  };
+  jsxRuntime.jsx = spy(originalJsx);
+  jsxRuntime.jsxs = spy(originalJsxs);
+  try {
+    const html = render({
+      botId: 'researcher',
+      botName: '资料员',
+      open: true,
+      initialSection: 'tasks',
+      preview: emptyPreview,
+      childTasks: researcherTasks,
+      onOpenChildTask: (id: string) => opened.push(id)
+    });
+    assert.match(html, /data-testid="bot-detail-tab-tasks"[^>]*aria-selected="true"/);
+    assert.match(html, /整理本周纪要/);
+    assert.equal(clicks.length > 0, true);
+    clicks[0]!();
+    assert.deepEqual(opened, ['child-1']);
+  } finally {
+    jsxRuntime.jsx = originalJsx;
+    jsxRuntime.jsxs = originalJsxs;
+  }
+  const panel = readFileSync(new URL('./PlayPanel.tsx', import.meta.url), 'utf8');
+  const start = panel.indexOf('onOpenChildTask=');
+  const end = panel.indexOf('}}', start);
+  assert.ok(start >= 0 && end > start);
+  const handler = panel.slice(start, end + 2);
+  assert.match(handler, /onSelectSession\(sessionId\)/);
+  assert.equal(handler.includes('canonicalSessionId'), false);
+});
+
+test('子任务很多时列表在页签内滚动，页签栏和关闭按钮留在屏幕里 [AC:bot-detail-child-tasks-tab#AC-6]', () => {
+  const longTitle = '很长的任务原文标题'.repeat(12);
+  const tasks = Array.from({ length: 30 }, (_, index) => ({ id: `child-${index}`, title: `${longTitle}-${index}` }));
+  const html = render({
+    botId: 'researcher',
+    botName: '资料员',
+    open: true,
+    initialSection: 'tasks',
+    onClose: () => {},
+    preview: emptyPreview,
+    childTasks: tasks
+  });
+  const closeAt = html.indexOf('data-testid="bot-detail-close"');
+  const tablistAt = html.indexOf('role="tablist"');
+  const scrollAt = html.indexOf('data-testid="bot-detail-scroll"');
+  assert.ok(closeAt >= 0 && tablistAt > closeAt && scrollAt > tablistAt);
+  const tabs = innerHtml(html, 'role="tablist"');
+  const scroll = innerHtml(html, 'data-testid="bot-detail-scroll"');
+  assert.equal(tabs.includes(longTitle), false);
+  assert.equal(tabs.includes('data-testid="bot-detail-close"'), false);
+  assert.match(tabs, /data-testid="bot-detail-tab-tasks"/);
+  assert.equal(scroll.includes('data-testid="bot-detail-close"'), false);
+  assert.equal(scroll.includes('role="tablist"'), false);
+  assert.match(scroll, /data-testid="bot-detail-child-tasks"/);
+  assert.match(scroll, /data-session-id="child-0"/);
+  assert.match(scroll, /data-session-id="child-29"/);
+  assert.equal(scroll.includes(`${longTitle}-0`), true);
+  assert.equal(scroll.includes(`${longTitle}-29`), true);
+  const css = readFileSync(new URL('./BotDetailMenu.module.css', import.meta.url), 'utf8');
+  assert.match(css, /\.panel\s*\{[^}]*overflow:\s*hidden/);
+  assert.match(css, /\.body\s*\{[^}]*min-height:\s*0/);
+  assert.match(css, /\.body\s*\{[^}]*overflow:\s*auto/);
+  assert.match(css, /\.head\s*\{[^}]*flex-shrink:\s*0/);
+  assert.match(css, /\.tabs\s*\{[^}]*flex-shrink:\s*0/);
+});

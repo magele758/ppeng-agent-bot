@@ -5,7 +5,8 @@ import { WorkspaceIcon } from './WorkspaceIcon';
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import type { AgentInfo, ApprovalItem, BotInfo, SessionSummary } from '@/lib/types';
-import { botForCanonicalSession, visibleBotRoster, type PlaySurface } from '@/lib/bots';
+import { streamChildTaskEntries } from '@/lib/bot-child-task-stream';
+import { botForCanonicalSession, childTasksForBot, visibleBotRoster, type PlaySurface } from '@/lib/bots';
 import { collectActivityTools, collectArtifacts } from '@/lib/activity-tools';
 import {
   formatCostUsd,
@@ -99,6 +100,8 @@ export interface PlayPanelProps {
   onSessionFilterChange?: (value: string) => void;
   onOpenModelSetup: () => void;
   accountMenu?: ReactNode;
+  /** Full session catalog. The sidebar `sessions` list omits bot child tasks. */
+  catalogSessions?: SessionSummary[];
 }
 
 function statusDotClass(status: string): string {
@@ -124,6 +127,7 @@ const STOP_REASON_DETAIL: Record<string, MessageKey> = {
   reasoning_spin: 'play.stopReason.reasoning_spin',
   loop_guard_critical: 'play.stopReason.loop_guard_critical',
   tool_loop: 'play.stopReason.tool_loop',
+  repeat_detection: 'play.stopReason.repeat_detection',
   missing_assistant: 'play.stopReason.missing_assistant',
   before_turn_blocked: 'play.stopReason.before_turn_blocked',
   rewound: 'play.stopReason.rewound'
@@ -269,7 +273,8 @@ export function PlayPanel({
   sessionFilter = '',
   onSessionFilterChange,
   onOpenModelSetup,
-  accountMenu
+  accountMenu,
+  catalogSessions
 }: PlayPanelProps) {
   const { t } = useI18n();
   const [attachOpen, setAttachOpen] = useState(false);
@@ -512,6 +517,24 @@ export function PlayPanel({
       ? t('play.composer.suggestionCycle', { count: chat.inputGhost.items.length - 1 })
       : t('play.composer.suggestion')
     : '';
+  const detailChildTasks = useMemo(() => {
+    if (!headerBotId) return [];
+    return childTasksForBot(catalogSessions ?? sessions, {
+      id: headerBotId,
+      canonicalSessionId: selectedBot?.canonicalSessionId
+    }).map((session) => ({ id: session.id, title: session.title }));
+  }, [catalogSessions, sessions, headerBotId, selectedBot?.canonicalSessionId]);
+  const streamChildTasks = useMemo(() => {
+    if (playSurface !== 'bot' || !headerBotId) return [];
+    const catalog = catalogSessions ?? sessions;
+    const current = catalog.find((session) => session.id === selectedSessionId) ?? null;
+    return streamChildTaskEntries({
+      surface: playSurface,
+      sessions: catalog,
+      bot: { id: headerBotId, canonicalSessionId: selectedBot?.canonicalSessionId },
+      current
+    });
+  }, [playSurface, headerBotId, catalogSessions, sessions, selectedSessionId, selectedBot?.canonicalSessionId]);
   const transcriptSettled = Boolean(selectedSessionId) && chat.loadedTranscriptSessionId === selectedSessionId;
   const firstTaskConversation: BotFirstTaskConversation = !headerBotId
     ? 'absent'
@@ -773,7 +796,6 @@ export function PlayPanel({
     el.style.height = 'auto';
     el.style.height = `${el.scrollHeight}px`;
   }, [chat.playInput, chat.playInputRef]);
-
 
   const removeBot = async (rowBot: BotInfo) => {
     if (deleting || !window.confirm(t('play.entry.removeBotConfirm', { name: rowBot.name }))) return;
@@ -1133,6 +1155,11 @@ export function PlayPanel({
                   onNewSession={onNewSession}
                   onApprovalsChanged={onApprovalsChanged}
                   onAttachStream={onAttachStream}
+                  childTaskEntries={streamChildTasks}
+                  onOpenChildTask={(sessionId) => {
+                    setOpenGroupId(null);
+                    onSelectSession(sessionId);
+                  }}
                 />
                 {chat.showJumpToLatest ? (
                   <button
@@ -1452,7 +1479,10 @@ export function PlayPanel({
               </div>
             </div>
           </div>
-          <BotDetailPane onClose={() => setBotDetailOpen(false)} visible={botDetailVisible} botId={headerBotId} botName={headerBotName} agentId={selectedBot?.agentId} />
+          <BotDetailPane onClose={() => setBotDetailOpen(false)} visible={botDetailVisible} botId={headerBotId} botName={headerBotName} agentId={selectedBot?.agentId} childTasks={detailChildTasks} onOpenChildTask={(sessionId) => {
+            setOpenGroupId(null);
+            onSelectSession(sessionId);
+          }} />
         </div>
 
         <aside className="play-rail" hidden={railCollapsed}>
