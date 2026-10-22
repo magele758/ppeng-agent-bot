@@ -28,7 +28,7 @@ test('completed operations compact and close without mutation [AC:skill-operatio
  }
  await expect(card(page,'pending').getByRole('button',{name:'确认并执行'})).toBeVisible();
  await expect(card(page,'processing').getByRole('status')).toBeVisible();
- await expect(card(page,'failed').getByRole('alert')).toBeVisible();expect(writes).toEqual([]);
+ const failed=card(page,'failed');await expect(failed.getByRole('status')).toContainText('失败');await failed.getByRole('button',{name:'查看详情',exact:true}).click();await expect(failed.getByRole('alert')).toBeVisible();expect(writes).toEqual([]);
 });
 test('dismissal persists and isolates sessions and new results [AC:skill-operation-card-dismissal#AC-3]',async({page})=>{
  const {operations,polls}=await setup(page);
@@ -50,12 +50,17 @@ test('rejected capture and operation can close persistently [AC:skill-operation-
 });
 test('failed details collapse without losing failure status [AC:skill-operation-card-dismissal#AC-8]',async({page})=>{
  await setup(page);
- for(const row of [card(page,'failed'),page.getByTestId('skill-capture-failed')]){
- await expect(row.getByRole('alert')).toBeVisible();await row.getByRole('button',{name:'收起详情',exact:true}).click();
- await expect(row.getByRole('alert')).not.toBeVisible();await expect(row.getByRole('status')).toContainText('失败');
- await expect(row.getByRole('button',{name:'关闭提示',exact:true})).toHaveCount(0);
- await row.getByRole('button',{name:'查看详情',exact:true}).click();await expect(row.getByRole('alert')).toBeVisible();
- }
+ const operation=card(page,'failed');
+ await expect(operation.getByRole('status')).toContainText('失败');await expect(operation.getByRole('alert')).not.toBeVisible();
+ await expect(operation.getByRole('button',{name:'关闭提示',exact:true})).toBeVisible();
+ await operation.getByRole('button',{name:'查看详情',exact:true}).click();await expect(operation.getByRole('alert')).toBeVisible();
+ await operation.getByRole('button',{name:'收起详情',exact:true}).click();
+ await expect(operation.getByRole('alert')).not.toBeVisible();await expect(operation.getByRole('status')).toContainText('失败');
+ const capture=page.getByTestId('skill-capture-failed');
+ await expect(capture.getByRole('alert')).toBeVisible();await capture.getByRole('button',{name:'收起详情',exact:true}).click();
+ await expect(capture.getByRole('alert')).not.toBeVisible();await expect(capture.getByRole('status')).toContainText('失败');
+ await expect(capture.getByRole('button',{name:'关闭提示',exact:true})).toHaveCount(0);
+ await capture.getByRole('button',{name:'查看详情',exact:true}).click();await expect(capture.getByRole('alert')).toBeVisible();
 });
 for(const width of [1280,820]) test(`keyboard dismissal leaves usable conversation at ${width} [AC:skill-operation-card-dismissal#AC-5] [AC:skill-operation-card-dismissal#AC-6]`,async({page})=>{
  await page.setViewportSize({width,height:804});await setup(page);
