@@ -1,8 +1,8 @@
 {
   "suite": "scripts/agent-eval/quality-cases/starter.json",
   "trials": 3,
-  "baseline": { "repoRoot": ".", "systemAppendix": "", "daemonControl": {} },
-  "candidate": { "repoRoot": ".", "systemAppendix": "", "daemonControl": {} },
+  "baseline": { "repoRoot": ".", "systemAppendix": "", "daemonControl": { "tool_exposure_settings": { "mode": "full", "pinnedGroups": {} } } },
+  "candidate": { "repoRoot": ".", "systemAppendix": "", "daemonControl": { "tool_exposure_settings": { "mode": "full", "pinnedGroups": {} } } },
   "model": {
     "provider": "openai-compatible",
     "apiKeyEnv": "RAW_AGENT_API_KEY",
