@@ -150,6 +150,28 @@ async function judgedIntents(raw: string, goals: GoalIntakeContext[], fallback: 
   finally { if (timeout) clearTimeout(timeout); controller.abort(); }
 }
 
+const recallInquiry = /复述|还记得|记不记得|记得不|记得吗|do you still remember|\brecite\b/i;
+const exploreInquiry = /看看[\s\S]{0,40}(?:有什么|哪些)[\s\S]{0,24}(?:可以|能)(?:搬|借鉴|复用|迁移|参考)|有什么可以(?:搬|借鉴|复用|迁移)|see what[\s\S]{0,60}could be ported/i;
+const consultInquiry = /商量一下|商量商量|讨论一下|你觉得|你怎么看|要不要先|是否应该|是不是该|你先说说|先确认一下|我先看看你|let's discuss|what do you think/i;
+
+function hasStatedOutcome(text: string): boolean {
+  return /完成结果(?:是|为)|验收(?:标准|条件)是|(?:交付物|结果)是/.test(text);
+}
+function hasImperativeWork(text: string): boolean {
+  const stripped = text.replace(/开发规则|开发规范|开发约定/g, '');
+  return /(?:请|帮我|麻烦)[\s\S]{0,16}(?:分析|实现|添加|修复|编写|设计|检查|调查|改成|做完|搬到|迁移到|开发)/.test(stripped)
+    || /^(?:请|帮我|麻烦)?\s*(?:分析|实现|添加|修复|编写|设计|检查|调查|改成|做完|搬到|迁移到|开发)/.test(stripped);
+}
+/** Asking, discussing, or checking memory without a stated deliverable. Shared room classification stays unchanged. */
+export function isUndirectedInquiry(text: string): boolean {
+  if (hasStatedOutcome(text) || hasImperativeWork(text)) return false;
+  return recallInquiry.test(text) || exploreInquiry.test(text) || consultInquiry.test(text);
+}
+export function releaseOpenInquiry(intent: GoalIntentProposal): GoalIntentProposal {
+  if (intent.kind === 'query' || intent.kind === 'chat' || intent.kind === 'pause' || intent.kind === 'resume' || intent.kind === 'cancel') return intent;
+  return isUndirectedInquiry(intent.text) ? { kind: 'chat', text: intent.text } : intent;
+}
+
 /** Judge proposals are untrusted. Callers still validate scoped target ownership and goal revision. */
 export async function classifyGoalIntents(raw: string, goals: GoalIntakeContext[], judge?: GoalIntentJudge): Promise<GoalIntentProposal[]> {
   const text = visibleTaskText(raw);

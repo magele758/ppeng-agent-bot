@@ -1,7 +1,7 @@
 import type { SqliteStateStore } from '../../storage.js';
 import type { SessionRecord, ToolContract, ModelAdapter } from '../../types.js';
 import { BotGoalService } from './service.js';
-import { classifyGoalIntents, type GoalIntentProposal } from './intake.js';
+import { classifyGoalIntents, releaseOpenInquiry, type GoalIntentProposal } from './intake.js';
 import { selectGoalRoute, goalWorkKind, type GoalCapabilities, type GoalStrategy, type GoalWorkKind } from './routing.js';
 import type { BotGoal, GoalReport } from './types.js';
 import { listPendingHumanWork } from '../../session/human-continuation.js';
@@ -120,7 +120,7 @@ async function ingestReceipt(host:GoalRuntimeHost,session:SessionRecord,service:
  const message=messages.get(receipt.id);
  const text=message?.parts.filter(part=>part.type==='text').map(part=>part.text).join('\n')??'';
  if(!text.trim())return;
- const intents=await classifyGoalIntents(text,service.list(botId),intakeJudge(host));
+ const intents=(await classifyGoalIntents(text,service.list(botId),intakeJudge(host))).map(releaseOpenInquiry);
  known[receipt.id]='chat';
  for(const [index,intent] of intents.entries())await applyIntakeIntent(host,session,service,botId,known,receipt.id,intent,index);
 }

@@ -10,8 +10,11 @@ const settings = {
 };
 
 const statusLabel: Record<string, string> = {
+  queued: '排队中',
   running: '执行中',
   waiting: '等待中',
+  blocked: '已阻塞',
+  paused: '已暂停',
   completed: '已完成',
   failed: '失败',
   cancelled: '已取消',
@@ -197,7 +200,7 @@ test('a failed goal list stays hidden on open, refresh, and switch [AC:bot-goals
   await installGoals(page, pair.id, {
     goals: [
       goal('g-run', 'Fix login', 'running', 'Verify login'),
-      goal('g-done', 'Ship notes', 'completed'),
+      goal('g-wait', 'Watch deployment', 'waiting', 'Wait for deployment'),
     ],
     fail: false,
   });
@@ -222,14 +225,14 @@ test('two listed goals show progress and the next-message association [AC:bot-go
   await installGoals(page, mixed.id, {
     goals: [
       goal('g-run', 'Fix login', 'running', 'Verify login'),
-      goal('g-done', 'Ship notes', 'completed'),
+      goal('g-wait', 'Watch deployment', 'waiting', 'Wait for deployment'),
     ],
     fail: false,
   });
   await installGoals(page, terminal.id, {
     goals: [
-      goal('g-fail', 'Restore backup', 'failed', 'Ask for a new backup'),
-      goal('g-stop', 'Retire job', 'cancelled'),
+      goal('g-block', 'Need a decision', 'blocked', 'Ask which backup to restore'),
+      goal('g-pause', 'Hold the migration', 'paused'),
     ],
     fail: false,
   });
@@ -241,24 +244,23 @@ test('two listed goals show progress and the next-message association [AC:bot-go
   await expect(running).toContainText('Fix login');
   await expect(running).toContainText(statusLabel.running);
   await expect(running).toContainText('Verify login');
-  const done = panel.getByTestId('bot-goal-g-done');
-  await expect(done).toContainText('Ship notes');
-  await expect(done).toContainText(statusLabel.completed);
+  await expect(panel.getByTestId('bot-goal-g-wait')).toContainText('Watch deployment');
+  await expect(panel.getByTestId('bot-goal-g-wait')).toContainText(statusLabel.waiting);
   await panel.getByLabel('下一条消息关联的目标').selectOption('g-run');
   await expect(panel.locator(':scope > summary')).toContainText('Fix login');
 
   await openBot(page, terminal);
   const closed = await expandGoals(page);
-  await expect(closed.getByTestId('bot-goal-g-fail')).toContainText(statusLabel.failed);
-  await expect(closed.getByTestId('bot-goal-g-fail')).toContainText('Ask for a new backup');
-  await expect(closed.getByTestId('bot-goal-g-stop')).toContainText(statusLabel.cancelled);
+  await expect(closed.getByTestId('bot-goal-g-block')).toContainText(statusLabel.blocked);
+  await expect(closed.getByTestId('bot-goal-g-block')).toContainText('Ask which backup to restore');
+  await expect(closed.getByTestId('bot-goal-g-pause')).toContainText(statusLabel.paused);
   await expect(closed.getByLabel('下一条消息关联的目标')).toBeVisible();
 });
 
 test('the goals panel appears and disappears when the listed count crosses two [AC:bot-goals-panel-threshold#AC-3] [AC:low-interference-onboarding-goals#AC-3] [AC:low-interference-onboarding-goals#AC-4]', async ({ page }) => {
   const bot = fixture('threshold-live', 'Threshold live');
   const running = goal('g-run', 'Fix login', 'running', 'Verify login');
-  const cancelled = goal('g-stop', 'Retire job', 'cancelled');
+  const waiting = goal('g-wait', 'Watch deployment', 'waiting', 'Wait for deployment');
   const board: GoalBoard = { goals: [running], fail: false };
   await installLab(page, [bot]);
   await installGoals(page, bot.id, board);
@@ -269,16 +271,153 @@ test('the goals panel appears and disappears when the listed count crosses two [
     (window as Window & { __goalPanel?: string }).__goalPanel = 'live';
   });
 
-  board.goals = [running, cancelled];
+  board.goals = [running, waiting];
   await expect(page.getByTestId('bot-goals')).toBeVisible();
   const panel = await expandGoals(page);
   await expect(panel.getByTestId('bot-goal-g-run')).toContainText('Verify login');
   await expect(panel.getByTestId('bot-goal-g-run')).toContainText(statusLabel.running);
-  await expect(panel.getByTestId('bot-goal-g-stop')).toContainText(statusLabel.cancelled);
+  await expect(panel.getByTestId('bot-goal-g-wait')).toContainText(statusLabel.waiting);
   await panel.getByLabel('下一条消息关联的目标').selectOption('g-run');
   await expect(panel.locator(':scope > summary')).toContainText('Fix login');
 
-  board.goals = [cancelled];
+  board.goals = [waiting];
   await expectGoalsHidden(page, 15_000);
   expect(await page.evaluate(() => (window as Window & { __goalPanel?: string }).__goalPanel)).toBe('live');
+});
+
+test('completed goals are omitted and the count is only in-progress work [AC:bot-goals-panel-rules#AC-4]', async ({ page }) => {
+  const bot = fixture('rules-done', 'Rules done');
+  await installLab(page, [bot]);
+  await installGoals(page, bot.id, {
+    goals: [
+      goal('g-run', 'Fix login', 'running', 'Verify login'),
+      goal('g-wait', 'Watch deployment', 'waiting', 'Wait for deployment'),
+      goal('g-done', 'Ship notes', 'completed'),
+    ],
+    fail: false,
+  });
+  await page.goto('/#/bot');
+  await openBot(page, bot);
+  const panel = await expandGoals(page);
+  await expect(panel.locator(':scope > summary')).toContainText('目标与进展 (2)');
+  await expect(panel.getByTestId('bot-goal-g-run')).toContainText('Fix login');
+  await expect(panel.getByTestId('bot-goal-g-wait')).toContainText('Watch deployment');
+  await expect(panel.getByTestId('bot-goal-g-done')).toHaveCount(0);
+  await expect(panel).not.toContainText('Ship notes');
+  await expect(panel).not.toContainText(statusLabel.completed);
+});
+
+test('old finished goals do not keep the panel on screen [AC:bot-goals-panel-rules#AC-5]', async ({ page }) => {
+  const bot = fixture('rules-few', 'Rules few');
+  const board: GoalBoard = {
+    goals: [
+      goal('g-run', 'Fix login', 'running', 'Verify login'),
+      goal('g-done', 'Ship notes', 'completed'),
+      goal('g-fail', 'Restore backup', 'failed'),
+      goal('g-stop', 'Retire job', 'cancelled'),
+    ],
+    fail: false,
+  };
+  await installLab(page, [bot]);
+  await installGoals(page, bot.id, board);
+  await page.goto('/#/bot');
+  await openBot(page, bot);
+  await expectGoalsHidden(page);
+  await reloadBot(page, bot);
+  await expectGoalsHidden(page);
+  await page.waitForTimeout(1000);
+  await expectGoalsHidden(page);
+  board.goals = [
+    goal('g-done', 'Ship notes', 'completed'),
+    goal('g-fail', 'Restore backup', 'failed'),
+  ];
+  await reloadBot(page, bot);
+  await expectGoalsHidden(page);
+});
+
+test('only in-progress goals are listed once two of them exist [AC:bot-goals-panel-rules#AC-6]', async ({ page }) => {
+  const bot = fixture('rules-active', 'Rules active');
+  await installLab(page, [bot]);
+  await installGoals(page, bot.id, {
+    goals: [
+      goal('g-q', 'Queue the rollout', 'queued'),
+      goal('g-r', 'Fix login', 'running', 'Verify login'),
+      goal('g-w', 'Watch deployment', 'waiting', 'Wait for deployment'),
+      goal('g-b', 'Need a decision', 'blocked', 'Ask which backup to restore'),
+      goal('g-p', 'Hold the migration', 'paused'),
+      goal('g-c', 'Ship notes', 'completed'),
+      goal('g-f', 'Restore backup', 'failed'),
+      goal('g-x', 'Retire job', 'cancelled'),
+    ],
+    fail: false,
+  });
+  await page.goto('/#/bot');
+  await openBot(page, bot);
+  const panel = await expandGoals(page);
+  await expect(panel.locator(':scope > summary')).toContainText('目标与进展 (5)');
+  for (const [id, title] of [
+    ['g-q', 'Queue the rollout'],
+    ['g-r', 'Fix login'],
+    ['g-w', 'Watch deployment'],
+    ['g-b', 'Need a decision'],
+    ['g-p', 'Hold the migration'],
+  ] as const) {
+    await expect(panel.getByTestId(`bot-goal-${id}`)).toContainText(title);
+  }
+  await expect(panel.getByTestId('bot-goal-g-c')).toHaveCount(0);
+  await expect(panel.getByTestId('bot-goal-g-f')).toHaveCount(0);
+  await expect(panel.getByTestId('bot-goal-g-x')).toHaveCount(0);
+  await expect(panel).not.toContainText('Ship notes');
+  await expect(panel).not.toContainText('Restore backup');
+  await expect(panel).not.toContainText('Retire job');
+});
+
+test('the panel appears and disappears as in-progress goals cross two [AC:bot-goals-panel-rules#AC-7]', async ({ page }) => {
+  const bot = fixture('rules-live', 'Rules live');
+  const running = goal('g-run', 'Fix login', 'running', 'Verify login');
+  const done = goal('g-done', 'Ship notes', 'completed');
+  const queued = goal('g-q', 'Queue the rollout', 'queued');
+  const board: GoalBoard = { goals: [running, done], fail: false };
+  await installLab(page, [bot]);
+  await installGoals(page, bot.id, board);
+  await page.goto('/#/bot');
+  await openBot(page, bot);
+  await expectGoalsHidden(page);
+  await page.evaluate(() => {
+    (window as Window & { __goalPanel?: string }).__goalPanel = 'live';
+  });
+
+  board.goals = [running, done, queued];
+  const panel = await expandGoals(page);
+  await expect(panel.locator(':scope > summary')).toContainText('目标与进展 (2)');
+  await expect(panel.getByTestId('bot-goal-g-run')).toContainText('Fix login');
+  await expect(panel.getByTestId('bot-goal-g-q')).toContainText('Queue the rollout');
+  await expect(panel.getByTestId('bot-goal-g-done')).toHaveCount(0);
+
+  board.goals = [done, queued];
+  await expectGoalsHidden(page, 15_000);
+  expect(await page.evaluate(() => (window as Window & { __goalPanel?: string }).__goalPanel)).toBe('live');
+});
+
+test('goals from another chat of the same Bot stay out of this panel [AC:bot-goals-panel-rules#AC-8]', async ({ page }) => {
+  const bot = fixture('rules-scope', 'Rules scope');
+  const requested: string[] = [];
+  await installLab(page, [bot]);
+  await page.route((url) => url.pathname === `/api/bots/${bot.id}/goals`, async (route) => {
+    const sessionId = new URL(route.request().url()).searchParams.get('sessionId') ?? '';
+    requested.push(sessionId);
+    const goals = sessionId === bot.sessionId
+      ? [goal('g-run', 'Fix login', 'running', 'Verify login'), goal('g-wait', 'Watch deployment', 'waiting', 'Wait for deployment')]
+      : [goal('g-other', 'OTHER-SESSION-GOAL', 'running', 'Do not show')];
+    await route.fulfill({ json: { goals, settings } });
+  });
+  await page.goto('/#/bot');
+  await openBot(page, bot);
+  const panel = await expandGoals(page);
+  await expect(panel.getByTestId('bot-goal-g-run')).toContainText('Fix login');
+  await expect(panel.getByTestId('bot-goal-g-wait')).toContainText('Watch deployment');
+  await expect(panel).not.toContainText('OTHER-SESSION-GOAL');
+  await expect(page.locator('.chat-composer-outer')).not.toContainText('OTHER-SESSION-GOAL');
+  expect(requested.length).toBeGreaterThan(0);
+  expect(requested.every((sessionId) => sessionId === bot.sessionId)).toBe(true);
 });
