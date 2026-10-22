@@ -49,3 +49,4 @@ description: Work effectively in the ppeng-agent-core (Raw Agent SDK) monorepo�
 
 - 目录与包边界细节 → [`references/layout.md`](references/layout.md)
 - Evolution/脚本速查 → [`references/evolution.md`](references/evolution.md)
+- **4090 机自主开发 SOP（协调者视角：claude-m 远程开发 → 复审 → 合入 main）** → [`references/dev-sop.md`](references/dev-sop.md)
