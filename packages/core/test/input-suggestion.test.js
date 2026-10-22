@@ -12,6 +12,7 @@ import {
   parseInputSuggestion,
   readInputSuggestionSettings,
   recentSuggestionTurns,
+  suggestionPrompt,
   suggestionVisible,
   writeInputSuggestionSettings
 } from '../dist/session/input-suggestion.js';
@@ -80,6 +81,19 @@ test('建议来自最近对话，模型输出被整理成一条主建议和至�
   assert.equal(parseInputSuggestion('not json but a line').primary, 'not json but a line');
   assert.equal(parseInputSuggestion('{"suggestions":[]}'), null);
   assert.equal(parseInputSuggestion(''), null);
+
+  const early = '甲开头'.repeat(900);
+  const middle = '乙中间'.repeat(900);
+  const latest = '丙最近'.repeat(40);
+  const prompt = suggestionPrompt([
+    { role: 'user', text: early },
+    { role: 'assistant', text: middle },
+    { role: 'user', text: latest }
+  ]);
+  assert.ok(prompt.length <= 4000);
+  assert.match(prompt, /丙最近/);
+  assert.doesNotMatch(prompt, /甲开头/, '超长时丢掉最早的轮次，保留最近几轮');
+  assert.match(prompt, /^assistant: 乙中间/);
 });
 
 test('后发出的建议请求覆盖先发出的，过期响应不能串到当前会话 [AC:bot-input-suggestion#AC-4]', () => {

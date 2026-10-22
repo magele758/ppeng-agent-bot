@@ -126,6 +126,7 @@ import {
   emptyGhost,
   ghostFromSuggestion,
   ghostText,
+  shouldRefreshSuggestion,
   suggestionStillCurrent,
   type GhostState,
   type InputSuggestion
@@ -317,6 +318,8 @@ export function usePlayChat(deps: PlayChatDeps) {
   const [suggestionEnabled, setSuggestionEnabled] = useState(true);
   const suggestionReqRef = useRef(0);
   const suggestionSessionRef = useRef<string | null>(null);
+  const suggestionTurnRef = useRef(0);
+  const suggestionAbortRef = useRef<AbortController | null>(null);
   const requestInputSuggestionRef = useRef<(sessionId: string) => Promise<void>>(async () => undefined);
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [imageUrlInput, setImageUrlInput] = useState('');
@@ -691,37 +694,51 @@ export function usePlayChat(deps: PlayChatDeps) {
     };
   }, []);
 
+  const suggestionRaceNow = () => ({
+    requestId: suggestionReqRef.current,
+    sessionId: suggestionSessionRef.current ?? '',
+    turnGeneration: suggestionTurnRef.current
+  });
+
   const requestInputSuggestion = useCallback(async (sessionId: string) => {
     if (playSurface !== 'bot' || !suggestionEnabled) {
       setInputGhost(emptyGhost());
       return;
     }
     if (playInputLiveRef.current.trim()) return;
+    suggestionAbortRef.current?.abort();
+    const controller = new AbortController();
+    suggestionAbortRef.current = controller;
     const requestId = suggestionReqRef.current + 1;
     suggestionReqRef.current = requestId;
     suggestionSessionRef.current = sessionId;
-    const issued = { requestId, sessionId };
+    const issued = { requestId, sessionId, turnGeneration: suggestionTurnRef.current };
     try {
       const data = (await api(`/api/sessions/${sessionId}/input-suggestion`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId })
+        body: JSON.stringify({ requestId }),
+        signal: controller.signal
       })) as { suggestion?: InputSuggestion | null; enabled?: boolean };
       if (typeof data.enabled === 'boolean') setSuggestionEnabled(data.enabled);
-      const current = { requestId: suggestionReqRef.current, sessionId: suggestionSessionRef.current ?? '' };
-      if (!suggestionStillCurrent(issued, current)) return;
+      if (!suggestionStillCurrent(issued, suggestionRaceNow())) return;
       if (playInputLiveRef.current.trim()) return;
       setInputGhost(ghostFromSuggestion(data.suggestion));
-    } catch {
-      const current = { requestId: suggestionReqRef.current, sessionId: suggestionSessionRef.current ?? '' };
-      if (suggestionStillCurrent(issued, current)) setInputGhost(emptyGhost());
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') return;
+      if (suggestionStillCurrent(issued, suggestionRaceNow())) setInputGhost(emptyGhost());
+    } finally {
+      if (suggestionAbortRef.current === controller) suggestionAbortRef.current = null;
     }
   }, [playSurface, suggestionEnabled]);
 
   requestInputSuggestionRef.current = requestInputSuggestion;
 
   useEffect(() => {
+    suggestionAbortRef.current?.abort();
+    suggestionAbortRef.current = null;
     suggestionReqRef.current += 1;
+    suggestionTurnRef.current += 1;
     suggestionSessionRef.current = selectedSessionId;
     setInputGhost(emptyGhost());
   }, [selectedSessionId]);
@@ -932,7 +949,10 @@ export function usePlayChat(deps: PlayChatDeps) {
         else interim += t;
       }
       speechFinalAccumRef.current += deltaFinal;
-      setPlayInput(speechPrefixRef.current + speechFinalAccumRef.current + interim);
+      const spoken = speechPrefixRef.current + speechFinalAccumRef.current + interim;
+      playInputLiveRef.current = spoken;
+      if (spoken.trim()) setInputGhost(emptyGhost());
+      setPlayInput(spoken);
     };
     rec.onerror = (ev) => {
       if (ev.error === 'aborted' || ev.error === 'no-speech') return;
@@ -1747,7 +1767,18 @@ export function usePlayChat(deps: PlayChatDeps) {
     if (!controller.signal.aborted) {
       await tick({ includePlayPanel: true });
       const sid = selectedSessionRef.current;
-      if (playSurface === 'bot' && sid) void requestInputSuggestionRef.current(sid);
+      if (
+        sid &&
+        shouldRefreshSuggestion({
+          botChat: playSurface === 'bot',
+          enabled: suggestionEnabled,
+          draft: playInputLiveRef.current,
+          busy: false,
+          hasSuggestion: Boolean(ghostText(inputGhostRef.current))
+        })
+      ) {
+        void requestInputSuggestionRef.current(sid);
+      }
     }
   };
 
@@ -2108,7 +2139,17 @@ export function usePlayChat(deps: PlayChatDeps) {
         assertLiveTurn(generation);
         finishLiveTurn(generation);
         setPlayStatus({ text: t('play.status.sent'), ok: true });
-        if (playSurface === 'bot') void requestInputSuggestion(sid);
+        if (
+          shouldRefreshSuggestion({
+            botChat: playSurface === 'bot',
+            enabled: suggestionEnabled,
+            draft: playInputLiveRef.current,
+            busy: false,
+            hasSuggestion: Boolean(ghostText(inputGhostRef.current))
+          })
+        ) {
+          void requestInputSuggestion(sid);
+        }
       } else if (activeBotId) {
         throw new Error(t('play.status.openBotFailed'));
       } else if (mode === 'chat') {
@@ -2347,6 +2388,22 @@ export function usePlayChat(deps: PlayChatDeps) {
     },
     noteComposerBlur: () => {
       if (ghostText(inputGhostRef.current)) setInputGhost(emptyGhost());
+    },
+    noteComposerFocus: () => {
+      const sid = selectedSessionRef.current;
+      if (
+        !sid ||
+        !shouldRefreshSuggestion({
+          botChat: playSurface === 'bot',
+          enabled: suggestionEnabled,
+          draft: playInputLiveRef.current,
+          busy: playSendingLiveRef.current || Boolean(streamOverlay) || waitTyping,
+          hasSuggestion: Boolean(ghostText(inputGhostRef.current))
+        })
+      ) {
+        return;
+      }
+      void requestInputSuggestionRef.current(sid);
     },
     imageUrlInput,
     setImageUrlInput,

@@ -5,6 +5,7 @@ import {
   emptyGhost,
   ghostFromSuggestion,
   ghostText,
+  shouldRefreshSuggestion,
   suggestionStillCurrent,
   tabAcceptsGhost
 } from './input-suggestion.ts';
@@ -59,9 +60,24 @@ test('Tab 在多条建议间切换，Esc 与发送清空建议 [AC:bot-input-sug
 });
 
 test('新的建议请求覆盖旧请求，旧响应不能再显示 [AC:bot-input-suggestion#AC-4]', () => {
-  const older = { requestId: 1, sessionId: 'bot-a' };
-  const newer = { requestId: 2, sessionId: 'bot-a' };
+  const older = { requestId: 1, sessionId: 'bot-a', turnGeneration: 3 };
+  const newer = { requestId: 2, sessionId: 'bot-a', turnGeneration: 3 };
   assert.equal(suggestionStillCurrent(older, newer), false);
   assert.equal(suggestionStillCurrent(newer, newer), true);
-  assert.equal(suggestionStillCurrent(newer, { requestId: 2, sessionId: 'bot-b' }), false);
+  assert.equal(suggestionStillCurrent(newer, { requestId: 2, sessionId: 'bot-b', turnGeneration: 3 }), false);
+  assert.equal(
+    suggestionStillCurrent(newer, { requestId: 2, sessionId: 'bot-a', turnGeneration: 4 }),
+    false,
+    '轮次变了之后，上一轮的响应不能再显示'
+  );
+});
+
+test('失焦清掉建议后，空输入框重新聚焦或回复结束会再请求 [AC:bot-input-suggestion#AC-3]', () => {
+  const idle = { botChat: true, enabled: true, draft: '', busy: false, hasSuggestion: false };
+  assert.equal(shouldRefreshSuggestion(idle), true, '建议被清掉且输入仍为空时重新请求');
+  assert.equal(shouldRefreshSuggestion({ ...idle, hasSuggestion: true }), false, '已经显示着就不再请求');
+  assert.equal(shouldRefreshSuggestion({ ...idle, draft: '语音写进来了' }), false, '有字时不请求');
+  assert.equal(shouldRefreshSuggestion({ ...idle, busy: true }), false, '回复还没结束不请求');
+  assert.equal(shouldRefreshSuggestion({ ...idle, botChat: false }), false);
+  assert.equal(shouldRefreshSuggestion({ ...idle, enabled: false }), false);
 });

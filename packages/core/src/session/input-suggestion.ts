@@ -117,15 +117,18 @@ export function recentSuggestionTurns(messages: SessionMessage[], limit = CONTEX
   return turns.slice(-limit);
 }
 
+/** Keep the newest lines that fit. Dropping the head, not the tail, when the cap is hit. */
 export function suggestionPrompt(turns: SuggestionTurn[]): string {
   const lines: string[] = [];
   let used = 0;
-  for (const turn of turns) {
+  for (let i = turns.length - 1; i >= 0; i -= 1) {
+    const turn = turns[i]!;
     const line = `${turn.role}: ${turn.text}`;
     if (used + line.length > CONTEXT_CHARS) break;
     lines.push(line);
     used += line.length;
   }
+  lines.reverse();
   return lines.join('\n');
 }
 

@@ -487,7 +487,7 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
     ['PATCH /api/loop/settings', ADMIN],
     ['GET /api/input-suggestion/settings', AUTHENTICATED],
     ['PATCH /api/input-suggestion/settings', ADMIN],
-    ['POST /api/sessions/:id/input-suggestion', AUTHENTICATED],
+    ['POST /api/sessions/:id/input-suggestion', session],
     ['GET /api/model-fallback/settings', AUTHENTICATED],
     ['PATCH /api/model-fallback/settings', ADMIN],
     ['GET /api/model-providers', AUTHENTICATED],

@@ -23,15 +23,42 @@ function isBotChat(session: { mode?: string; metadata?: Record<string, unknown> 
   return session.mode === 'chat' && session.metadata?.canonicalBotChat === true;
 }
 
-const suggestionRequests = new Map<string, { current: number }>();
+interface SuggestionFlight {
+  current: number;
+  controller: AbortController | null;
+}
 
-function latestSuggestionRequest(sessionId: string): { current: number } {
+const suggestionRequests = new Map<string, SuggestionFlight>();
+
+/** Drop an in-flight guess for a session that is gone. Safe when none is running. */
+export function cancelInputSuggestion(sessionId: string): void {
+  const slot = suggestionRequests.get(sessionId);
+  if (!slot) return;
+  slot.controller?.abort();
+  suggestionRequests.delete(sessionId);
+}
+
+function beginSuggestionFlight(sessionId: string, requestId: number | undefined): {
+  slot: SuggestionFlight;
+  controller: AbortController;
+  signal: AbortSignal;
+} {
   let slot = suggestionRequests.get(sessionId);
   if (!slot) {
-    slot = { current: 0 };
+    slot = { current: 0, controller: null };
     suggestionRequests.set(sessionId, slot);
   }
-  return slot;
+  slot.controller?.abort();
+  if (requestId !== undefined) slot.current = Math.max(slot.current, requestId);
+  const controller = new AbortController();
+  slot.controller = controller;
+  const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(12_000)]);
+  return { slot, controller, signal };
+}
+
+function endSuggestionFlight(sessionId: string, controller: AbortController): void {
+  const slot = suggestionRequests.get(sessionId);
+  if (slot?.controller === controller) suggestionRequests.delete(sessionId);
 }
 
 function effective(runtime: RawAgentRuntime) {
@@ -95,16 +122,18 @@ export function inputSuggestionRoutes(runtime: RawAgentRuntime): RouteSpec[] {
           return;
         }
         const prompt = inputSuggestionRequest(turns);
-        const latest = latestSuggestionRequest(sessionId);
-        if (requestId !== undefined) latest.current = Math.max(latest.current, requestId);
+        const { slot, controller, signal } = beginSuggestionFlight(sessionId, requestId);
         let suggestion = null;
         try {
-          const text = await complete({ ...prompt, jsonMode: true, signal: AbortSignal.timeout(12_000) });
-          suggestion = parseInputSuggestion(text);
+          const text = await complete({ ...prompt, jsonMode: true, signal });
+          if (!signal.aborted) suggestion = parseInputSuggestion(text);
         } catch {
           suggestion = null;
+        } finally {
+          endSuggestionFlight(sessionId, controller);
         }
-        if (requestId !== undefined && latest.current !== requestId) suggestion = null;
+        if (requestId !== undefined && slot.current !== requestId) suggestion = null;
+        if (signal.aborted) suggestion = null;
         json(response, 200, { suggestion, enabled: true, requestId });
       }
     }

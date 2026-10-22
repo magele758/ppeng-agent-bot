@@ -507,6 +507,11 @@ export function PlayPanel({
   const headerBotId = headerBotChat ? chat.botId || selectedBot?.id || '' : '';
   const showGhost =
     botSurface && composerFocused && !chatRunning && Boolean(chat.ghostSuggestion) && !chat.playInput.trim();
+  const suggestionHint = showGhost
+    ? chat.inputGhost.items.length > 1
+      ? t('play.composer.suggestionCycle', { count: chat.inputGhost.items.length - 1 })
+      : t('play.composer.suggestion')
+    : '';
   const transcriptSettled = Boolean(selectedSessionId) && chat.loadedTranscriptSessionId === selectedSessionId;
   const firstTaskConversation: BotFirstTaskConversation = !headerBotId
     ? 'absent'
@@ -1207,11 +1212,15 @@ export function PlayPanel({
                     autoComplete="off"
                     value={chat.playInput}
                     aria-describedby={showGhost ? 'playInputSuggestion' : undefined}
+                    aria-keyshortcuts={showGhost ? 'Tab Escape' : undefined}
                     onChange={(e) => {
                       chat.noteComposerTyped();
                       chat.setPlayInput(e.target.value);
                     }}
-                    onFocus={() => setComposerFocused(true)}
+                    onFocus={() => {
+                      setComposerFocused(true);
+                      chat.noteComposerFocus();
+                    }}
                     onBlur={() => {
                       setComposerFocused(false);
                       chat.noteComposerBlur();
@@ -1221,9 +1230,11 @@ export function PlayPanel({
                     onKeyDown={onComposerKeyDown}
                   />
                   {showGhost ? (
-                    <span id="playInputSuggestion" className="chat-composer-ghost" aria-hidden="true">
-                      <span className="chat-composer-ghost__text">{chat.ghostSuggestion}</span>
-                      <span className="chat-composer-ghost__hint">{t('play.composer.suggestion')}</span>
+                    <span id="playInputSuggestion" className="chat-composer-ghost">
+                      <span className="chat-composer-ghost__text" aria-hidden="true">
+                        {chat.ghostSuggestion}
+                      </span>
+                      <span className="chat-composer-ghost__hint">{suggestionHint}</span>
                     </span>
                   ) : null}
                   </div>

@@ -82,9 +82,30 @@ export function tabAcceptsGhost(state: GhostState, draft: string): boolean {
 export interface SuggestionRace {
   requestId: number;
   sessionId: string;
+  /** Live turn generation when the request was issued. A newer turn drops the response. */
+  turnGeneration: number;
 }
 
-/** Newer request or a session switch invalidates an in-flight response. */
+/** Newer request, a session switch, or a newer turn invalidates an in-flight response. */
 export function suggestionStillCurrent(issued: SuggestionRace, current: SuggestionRace): boolean {
-  return issued.requestId === current.requestId && issued.sessionId === current.sessionId;
+  return (
+    issued.requestId === current.requestId &&
+    issued.sessionId === current.sessionId &&
+    issued.turnGeneration === current.turnGeneration
+  );
+}
+
+/**
+ * Ask again when the empty composer can show a guess and nothing is already on screen.
+ * Blur hides the ghost without forgetting it; focus, or the reply ending, brings it back.
+ * A draft, a busy turn, or a non-bot surface does not ask.
+ */
+export function shouldRefreshSuggestion(input: {
+  botChat: boolean;
+  enabled: boolean;
+  draft: string;
+  busy: boolean;
+  hasSuggestion: boolean;
+}): boolean {
+  return input.botChat && input.enabled && !input.busy && input.draft.trim().length === 0 && !input.hasSuggestion;
 }

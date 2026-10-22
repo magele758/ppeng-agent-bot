@@ -35,6 +35,7 @@ import {
   type MessageReplyTo,
   type SessionRecord
 } from '@ppeng/agent-core';
+import { cancelInputSuggestion } from './input-suggestion.js';
 import type { RouteSpec } from '../routing.js';
 import { etagFromState, json, sendIfNotModified, sseInit, sseSend } from '../http-utils.js';
 import { steerHttpFromCoreAck } from '../steer-ack.js';
@@ -425,6 +426,7 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
           const session = runtime.getSession(id);
           return Boolean(session && canAccessSession(session, auth));
         });
+        for (const id of allowed) cancelInputSuggestion(id);
         json(response, 200, runtime.deleteSessions(allowed));
       }
     },
@@ -620,6 +622,7 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
       handler: ({ requireParam, response }) => {
         const id = requireParam('id');
         if (!runtime.deleteSession(id)) throw new NotFoundError('Session');
+        cancelInputSuggestion(id);
         json(response, 200, { ok: true, id });
       }
     },
