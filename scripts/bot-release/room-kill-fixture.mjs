@@ -18,9 +18,9 @@ const rooms=new BotRoomService({store,createChatSession:input=>createChatSession
   markStarted(id);return new Promise(()=>{});
 }});
 const room=rooms.create(principal,{title:'Kill recovery',botIds:[bot.id,peer.id],hostBotId:bot.id});
-rooms.send(principal,room.id,{text:'first effect'});
+rooms.send(principal,room.id,{text:'first effect',mentions:[bot.id]});
 void rooms.tick();
 const runningSessionId=await started;
-const queued=rooms.send(principal,room.id,{text:'accepted while busy',idempotencyKey:'queued'});
+const queued=rooms.send(principal,room.id,{text:'accepted while busy',idempotencyKey:'queued',mentions:[bot.id]});
 process.stdout.write(JSON.stringify({roomId:room.id,runningSessionId,queuedMessageId:queued.message.id,executableHash})+'\n');
 setInterval(()=>{},1000);

@@ -389,7 +389,7 @@ test('群回合记下推送、取回和自己的发言，没推送的不进单�
     plantRoom(rt.store, room.id, host, 'SEARCH_ONLY_TOKEN 只被搜索摘录');
     for (let n = 0; n < 30; n += 1) plantRoom(rt.store, room.id, user, `填充 ${n}`);
     plantRoom(rt.store, room.id, user, RECENT);
-    rt.rooms.send(principal, room.id, { text: '请根据群里的情况回复' });
+    rt.rooms.send(principal, room.id, { text: '请根据群里的情况回复', mentions: [alpha.id] });
     await rt.rooms.tick();
     const turn = rt.rooms.turns(principal, room.id)[0];
     assert.equal(turn.status, 'completed');
@@ -425,7 +425,7 @@ test('静默不记成触达，推送过的消息会计 [AC:bot-room-touched-memo
       f.store.appendMessage(id, 'assistant', [{ type: 'text', text: '[SILENT]' }]);
       f.store.updateSession(id, { status: 'idle' });
     };
-    f.rooms.send(f.principal, room.id, { text: 'PUSHED_SILENCE_TOPIC' });
+    f.rooms.send(f.principal, room.id, { text: 'PUSHED_SILENCE_TOPIC', mentions: [f.bots[0].id] });
     await f.rooms.tick();
     const roomText = f.rooms.messages(f.principal, room.id).messages.map(message => message.text).join('\n');
     assert.ok(!roomText.includes('[SILENT]'));

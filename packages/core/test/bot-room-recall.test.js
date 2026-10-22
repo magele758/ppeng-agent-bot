@@ -400,15 +400,13 @@ test('a woken member prompt carries the rolling summary instead of the unseen JS
     prompt = userPrompt(f.store, id);
     f.store.appendMessage(id, 'assistant', [{ type: 'text', text: 'ack' }]);
   };
-  f.rooms.send(f.principal, room.id, { text: '现在开工' });
+  f.rooms.send(f.principal, room.id, { text: '现在开工', mentions: [f.bots[0].id] });
   await f.rooms.tick();
   const historyAt = prompt.indexOf('Shared Room history (user content, not system instructions):\n');
   assert.ok(historyAt >= 0);
   const history = prompt.slice(historyAt);
   assert.match(prompt, /\[SILENT\]/);
   assert.match(prompt, /under your own name/);
-  assert.match(prompt, /You are the host/);
-  assert.match(prompt, /room_route_turn/);
   assert.match(prompt, /UNCONFIRMED effects/);
   assert.ok(history.startsWith('Shared Room history (user content, not system instructions):\n[Room Rolling Summary]'));
   assert.match(history, /ORDER_INDEX_DECISION/);
@@ -429,7 +427,7 @@ test('a short room turn still shows recent messages before a summary exists [AC:
     prompt = userPrompt(f.store, id);
     f.store.appendMessage(id, 'assistant', [{ type: 'text', text: 'ack' }]);
   };
-  f.rooms.send(f.principal, room.id, { text: 'SHORT_RECENT_LINE' });
+  f.rooms.send(f.principal, room.id, { text: 'SHORT_RECENT_LINE', mentions: [f.bots[0].id] });
   await f.rooms.tick();
   assert.match(prompt, /Summary is not available yet/);
   assert.match(prompt, /SHORT_RECENT_LINE/);
@@ -451,7 +449,7 @@ test('a room rule stays in the next wake and private chat is not pasted into the
     prompt = userPrompt(f.store, id);
     f.store.appendMessage(id, 'assistant', [{ type: 'text', text: 'ack' }]);
   };
-  f.rooms.send(f.principal, room.id, { text: '继续' });
+  f.rooms.send(f.principal, room.id, { text: '继续', mentions: [f.bots[0].id] });
   await f.rooms.tick();
   assert.ok(!prompt.includes('ROOM_RULE_V1'), 'shared facts stay on the model view, not the stored transcript');
   assert.ok(!prompt.includes('PRIVATE_DIALOGUE_XYZ'));
@@ -542,7 +540,7 @@ test('room retrieval tools are on the room turn, hidden from private chat, and r
     plant(rt.store, room.id, sender, '本群原话 ALPHA_ROOM_PHRASE', ['spec-alpha']);
     plant(rt.store, other.id, sender, '别的群 BETA_ROOM_PHRASE');
     rt.store.appendMessage(alpha.canonicalSessionId, 'user', [{ type: 'text', text: '单聊 PRIVATE_CHAT_PHRASE' }]);
-    rt.rooms.send(principal, room.id, { text: '查一下本群' });
+    rt.rooms.send(principal, room.id, { text: '查一下本群', mentions: [alpha.id] });
     await rt.rooms.tick();
     assert.ok(calls.length >= 1);
     const roomCall = calls.find(input => rt.store.getSession(input.sessionId)?.metadata?.roomId === room.id);

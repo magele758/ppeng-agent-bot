@@ -170,7 +170,7 @@ test('real Room model input includes this bot private facts and memory_get stays
  try {
  const bot=rt.createBot({name:'Private worker'}), peer=rt.createBot({name:'Private peer'}), principal={userId:'u'}, room=rt.rooms.create(principal,{title:'Shared Room',botIds:[bot.id,peer.id],hostBotId:bot.id});
  rt.store.agentMemory().set({scope:'user.memory',namespace:'semantic',key:'fact:private',value:'PRIVATE_CONTACT_ONLY_PERSONAL',userId:'u',agentId:bot.agentId});
-  rt.rooms.send(principal,room.id,{text:'Recall the contact'});await rt.rooms.tick();assert.ok(captured);assert.ok(JSON.stringify(captured.messages).includes('PRIVATE_CONTACT_ONLY_PERSONAL'));assert.ok(!captured.systemPrompt.includes('PRIVATE_CONTACT_ONLY_PERSONAL'));
+  rt.rooms.send(principal,room.id,{text:'Recall the contact',mentions:[bot.id]});await rt.rooms.tick();assert.ok(captured);assert.ok(JSON.stringify(captured.messages).includes('PRIVATE_CONTACT_ONLY_PERSONAL'));assert.ok(!captured.systemPrompt.includes('PRIVATE_CONTACT_ONLY_PERSONAL'));
  assert.ok(captured.sessionId, 'the model spy captures the actual Room execution context');
  const tool=rt.tools.find(t=>t.name==='memory_get');const response=await tool.execute({session:rt.getSession(captured.sessionId),agent:rt.store.getAgent(bot.agentId),repoRoot,stateDir},{scope:'user'});assert.ok(!response.content.includes('PRIVATE_CONTACT_ONLY_PERSONAL'));
  } finally {await rt.destroy();stores.delete(rt.store);}

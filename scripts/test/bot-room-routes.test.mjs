@@ -55,8 +55,8 @@ test('Room API capacity rejection is explicitly retryable and does not accept th
     updateBotWorkSettings(rt.store,{perBot:1,perPrincipal:2});
     setBotWorkControl({store:rt.store,runSession:id=>rt.runSession(id),log:{info(){},warn(){},error(){},debug(){}}},principal,bot.id,{paused:true,disabled:false});
     const id=(await call(rt,'POST','/api/bot-rooms',{}, {title:'Capacity',botIds:[bot.id,peer.id]})).body.room.id;
-    assert.equal((await call(rt,'POST','/api/bot-rooms/:id/messages',{id},{text:'accepted',idempotencyKey:'first'})).status,202);
-    const rejected=await call(rt,'POST','/api/bot-rooms/:id/messages',{id},{text:'overflow'});
+    assert.equal((await call(rt,'POST','/api/bot-rooms/:id/messages',{id},{text:'accepted',mentions:[bot.id],idempotencyKey:'first'})).status,202);
+    const rejected=await call(rt,'POST','/api/bot-rooms/:id/messages',{id},{text:'overflow',mentions:[bot.id]});
     assert.equal(rejected.status,429);assert.equal(rejected.body.accepted,false);assert.equal(rejected.body.retryable,true);assert.equal(rejected.body.error_code,'QUEUE_FULL');
     const messages=(await call(rt,'GET','/api/bot-rooms/:id/messages',{id})).body.messages;
     assert.equal(messages.length,1);assert.equal(messages[0].text,'accepted');

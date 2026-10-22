@@ -9,6 +9,7 @@
 - Python 相关任务优先用 conda 创建独立虚拟环境再执行，避免污染全局。
 - **前端用户可见文案走 i18n**：禁止硬编码中英文；必须 `const { t } = useI18n();` + `t('namespace.key')`（`apps/web-console/lib/i18n`）。新增能力同步改 zh/en 同一套 key。语言偏好走 Lab UI + `localStorage`，禁止 `RAW_AGENT_LANG` 等语言 env。详见下方「前端 i18n」。
 - **验收优先（核心指令）：禁止停下来等批准。** 新需求 / 行为变更当轮写 [`acceptance/<id>.yaml`](skills/acceptance-first/SKILL.md)（直接 `approved`，`notes` 含 `assumedApproval: standing-order-2026-10-22`），接着写标题带 `[AC:<id>#<AC-n>]` 的失败测试并实现，通过后改 `implemented`。禁止把 Given/When/Then 贴出来问「是否正确完整」，禁止说「确认后我再改」，禁止派「只起草标准」的子任务。改已有标准、和旧规格冲突、两种做法都说得通，都同一轮做完，回复里用一句话说明。只有用户原话明确说先看标准或先别写代码时才停。禁止删/弱化标准来过门禁（用 `retired` + `retiredReason`）。门禁 `pnpm run test:acceptance`。详见 `skills/acceptance-first/SKILL.md`、`doc/ACCEPTANCE_GATE.md`。
+- **做完先审查再合并（核心指令）：** 功能或修复做完后先 review。没问题就 commit、开 PR、合并，不要等用户再说「合并 PR」。review 有问题先改到通过再提交。不要 force push，不要跳过 hooks。用户明确说先别提交或先别合并时才停。
 - **`@ppeng/agent-loop` SDK 契约与 Skill 同步（核心指令）**：**凡是修改或升级 `packages/agent-loop`（新增/改动 API 导出、模块分层、组装档位 mini/normal/full/max、TurnKernelHost/IO 契约等），必须同步更新 `skills/agent-loop/SKILL.md`**，确保其他 Coding Agent 随时获得最新的 SDK 开发与调用指引；改动后必须在 `packages/agent-loop` 跑通 `pnpm run test`（vitest）和 `pnpm run build`。
 
 ## Learned Workspace Facts

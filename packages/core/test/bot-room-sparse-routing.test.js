@@ -74,7 +74,7 @@ test('an authorized functional group joins and an unauthorized bot is skipped wi
   assert.deepEqual(f.rooms.get(f.principal, full.id).botIds, [f.bots[0].id, f.bots[1].id, f.bots[2].id]);
 });
 
-test('an @ wakes only named members inside the cap, and silence does not summon anyone else [AC:bot-room-sparse-routing#AC-2] [AC:bot-room-sparse-routing#AC-6]', async () => {
+test('an @ wakes only named members inside the cap, and silence does not summon anyone else [AC:bot-room-sparse-routing#AC-2] [AC:bot-room-sparse-routing#AC-6] [AC:bot-room-speaker-pick#AC-6] [AC:bot-room-speaker-pick#AC-7]', async () => {
   const f = fixture();
   f.rooms.writeSettings({ maxWaveSpeakers: 2 });
   const room = f.rooms.create(f.principal, { title: 'Named', botIds: f.bots.slice(0, 3).map(bot => bot.id), hostBotId: f.bots[0].id, maxBotTurns: 1 });
@@ -97,7 +97,7 @@ test('an @ wakes only named members inside the cap, and silence does not summon 
   assert.notEqual(turn.terminationReason, 'failed');
 });
 
-test('an unknown @ posts a not-found notice and does not wake the room [AC:bot-room-sparse-routing#AC-3] [AC:bot-rooms#AC-2]', async () => {
+test('an unknown @ posts a not-found notice and does not wake the room [AC:bot-room-sparse-routing#AC-3] [AC:bot-rooms#AC-2] [AC:bot-room-speaker-pick#AC-7]', async () => {
   const f = fixture();
   const room = f.rooms.create(f.principal, { title: 'Missing', botIds: [f.bots[0].id, f.bots[1].id], hostBotId: f.bots[0].id });
   const sent = f.rooms.send(f.principal, room.id, { text: '@NoSuchMember hello' });
@@ -110,42 +110,31 @@ test('an unknown @ posts a not-found notice and does not wake the room [AC:bot-r
   assert.equal(posted[0].sender.id, f.bots[0].id);
 });
 
-test('an unnamed message runs the host, or only the members the host selects [AC:bot-room-sparse-routing#AC-4]', async () => {
+test('an unnamed message that matches nobody wakes nobody [AC:bot-room-sparse-routing#AC-4] [AC:bot-room-speaker-pick#AC-5]', async () => {
   const f = fixture();
   const ids = f.bots.slice(0, 3).map(bot => bot.id);
   f.rooms.writeSettings({ maxWaveSpeakers: 2 });
   const room = f.rooms.create(f.principal, { title: 'Open', botIds: ids, hostBotId: f.bots[0].id });
   const sent = f.rooms.send(f.principal, room.id, { text: 'ordinary question' });
-  assert.deepEqual(sent.turn.botIds, [f.bots[0].id]);
-  f.host.runSession = async id => {
-    f.runs.push(id);
-    if (f.store.getSession(id).agentId === f.bots[0].id) f.rooms.routeTurn(id, [f.bots[1].id, f.bots[2].id]);
-    f.store.appendMessage(id, 'assistant', [{ type: 'text', text: `reply:${f.store.getSession(id).agentId}` }]);
-    f.store.updateSession(id, { status: 'idle' });
-  };
+  assert.deepEqual(sent.turn.botIds, []);
+  assert.equal(sent.turn.mentionedBotIds, undefined);
   await f.rooms.tick();
-  assert.deepEqual(f.runs.map(id => f.store.getSession(id).agentId), [f.bots[0].id, f.bots[1].id]);
-  assert.ok(!f.runs.some(id => f.store.getSession(id).agentId === f.bots[2].id));
+  assert.equal(f.runs.length, 0);
+  assert.equal(f.rooms.messages(f.principal, room.id).messages.some(message => message.sender.type === 'bot'), false);
 });
 
-test('a 2-person unnamed turn still shows a reply when the host stays silent [AC:bot-room-sparse-routing#AC-5]', async () => {
+test('a 2-person unnamed turn that matches nobody posts nothing [AC:bot-room-sparse-routing#AC-5] [AC:bot-room-speaker-pick#AC-5]', async () => {
   const f = fixture();
   const room = f.rooms.create(f.principal, { title: 'Small', botIds: [f.bots[0].id, f.bots[1].id], hostBotId: f.bots[0].id });
-  f.host.runSession = async id => {
-    f.runs.push(id);
-    f.store.appendMessage(id, 'assistant', [{ type: 'text', text: '[SILENT]' }]);
-    f.store.updateSession(id, { status: 'idle' });
-  };
   f.rooms.send(f.principal, room.id, { text: 'anyone there?' });
   await f.rooms.tick();
   const turn = f.rooms.turns(f.principal, room.id)[0];
   assert.equal(turn.status, 'completed');
   assert.notEqual(turn.status, 'failed');
+  assert.equal(f.runs.length, 0);
   const posted = f.rooms.messages(f.principal, room.id).messages.filter(message => message.sender.type === 'bot');
-  assert.equal(posted.length, 1);
-  assert.equal(posted[0].sender.id, f.bots[0].id);
-  assert.ok(!posted[0].text.includes('[SILENT]'));
-  assert.equal(f.runs.length, 1);
+  assert.equal(posted.length, 0);
+  assert.equal(f.rooms.messages(f.principal, room.id).messages.some(message => message.text.includes('我先接住')), false);
 });
 
 test('rooms cannot be created or reduced below two members, and a member is not duplicated [AC:bot-room-sparse-routing#AC-7]', () => {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { budgetedSpeakers, scheduleRoomTurn } from '../src/rooms/scheduling.ts';
+import { budgetedSpeakers, scheduleRoomTurn } from '../dist/rooms/scheduling.js';
 
 const alpha = 'bot_alpha';
 const beta = 'bot_beta';
@@ -21,10 +21,23 @@ test('a repeated mention is scheduled once [AC:bot-rooms#AC-2]', () => {
   assert.ok(!schedule.botIds.includes(alpha));
 });
 
-test('no mention schedules only the host [AC:bot-rooms#AC-2] [AC:bot-room-sparse-routing#AC-4]', () => {
-  const schedule = scheduleRoomTurn(room, undefined, { hostBotId: beta });
+test('no mention with no overlap schedules nobody [AC:bot-rooms#AC-2] [AC:bot-room-sparse-routing#AC-4] [AC:bot-room-speaker-pick#AC-5]', () => {
+  const cards = room.map(id => ({ id, name: id, title: id, description: '', groupName: '' }));
+  const schedule = scheduleRoomTurn(room, undefined, { hostBotId: beta, message: 'ordinary question', cards });
+  assert.deepEqual(schedule.botIds, []);
+  assert.equal(schedule.mentionedBotIds, undefined);
+});
+
+test('no mention schedules overlapping members within the cap [AC:bot-room-speaker-pick#AC-1] [AC:bot-room-speaker-pick#AC-2] [AC:bot-room-sparse-routing#AC-4]', () => {
+  const cards = [
+    { id: alpha, name: 'Alpha', title: 'Alpha', description: '', groupName: '' },
+    { id: beta, name: 'Beta', title: '证书管理员', description: '负责集群证书续期', groupName: '' },
+    { id: gamma, name: 'Gamma', title: 'Gamma', description: '', groupName: '' }
+  ];
+  const schedule = scheduleRoomTurn(room, undefined, { hostBotId: alpha, maxSpeakers: 4, message: '证书怎么续期', cards });
   assert.deepEqual(schedule.botIds, [beta]);
   assert.equal(schedule.mentionedBotIds, undefined);
+  assert.ok((schedule.speakerScores ?? []).some(item => item.id === alpha && item.score < 2));
 });
 
 test('an empty mention list schedules nobody [AC:bot-rooms#AC-2] [AC:bot-room-sparse-routing#AC-3]', () => {
