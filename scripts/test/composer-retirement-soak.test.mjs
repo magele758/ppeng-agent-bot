@@ -25,7 +25,7 @@ test('HTTP soak performance runs independently with preserved evidence [AC:compo
   const job = jobs['soak-performance'];
   assert.ok(job, 'independent performance job is required');
   assert.equal(job.needs, undefined);
-  assert.ok(job.steps.some(step => step.run === 'pnpm run test:bot:soak:performance'));
+  assert.ok(job.steps.some(step => step.run === 'pnpm run test:bot:soak:performance --profile github-actions'));
   assert.ok(job.steps.some(step => step.if === 'always()' && step.with?.path === 'test-results/soak-performance/'));
   assert.ok(jobs.gate.needs.includes('soak-performance'));
 });
@@ -45,6 +45,17 @@ test('performance measurement refuses instrumentation and missing/slow samples w
   assert.equal(performanceResult(report).passed, true);
   assert.equal(performanceResult(report).fullSoakAccepted, false);
   assert.equal(performanceResult({ ...report, latency: { ...report.latency, receive: { count: 34, p95Ms: 501 } } }).passed, false);
+  const remote = { ...report, latency: { ...report.latency, receive: { count: 34, p95Ms: 1481 } } };
+  assert.equal(performanceResult(remote).passed, false);
+  assert.equal(performanceResult(remote, 'github-actions').passed, true);
+  assert.equal(performanceResult(remote, 'github-actions').profile, 'github-actions');
+  assert.equal(performanceResult(remote, 'github-actions').checks.find(check => check.name === 'receive').thresholdMs, 2000);
+  for (const [name, boundary] of Object.entries({ page: 500, status: 500, search: 1000, receive: 2000 })) {
+    const at = { ...report, latency: { ...report.latency, [name]: { count: 34, p95Ms: boundary } } };
+    assert.equal(performanceResult(at, 'github-actions').passed, true);
+    assert.equal(performanceResult({ ...at, latency: { ...at.latency, [name]: { count: 34, p95Ms: boundary + 1 } } }, 'github-actions').passed, false);
+  }
+  assert.throws(() => performanceResult(report, 'unknown'), /profile/);
   assert.equal(performanceResult({ ...report, latency: {} }).passed, false);
   assert.equal(performanceResult({ ...report, fixturePassed: false }).passed, false);
   assert.equal(performanceResult({ ...report, status: 'running' }).passed, false);

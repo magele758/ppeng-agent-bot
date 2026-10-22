@@ -518,6 +518,7 @@ test('room retrieval tools are on the room turn, hidden from private chat, and r
       async summarizeMessages() { return ''; }
     }
   });
+  rt.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
   try {
     const alpha = rt.createBot({ name: 'RecallAlpha' });
     const beta = rt.createBot({ name: 'RecallBeta' });

@@ -163,6 +163,8 @@ function oldestClosedWave(messages: readonly SessionMessage[]): { start: number;
   for (let i = 0; i < messages.length; i += 1) {
     const wave = closedWaveAt(messages, i);
     if (!wave) continue;
+    // A successful result is still pending model consumption until a later turn.
+    if (!messages.slice(wave.end).some(message => message.role === 'assistant' || message.role === 'user')) continue;
     if (userIdx >= wave.start && userIdx < wave.end) continue;
     return wave;
   }

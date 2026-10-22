@@ -24,6 +24,7 @@ test('accepted input arriving during a tool wave enters the next model input eve
  const gate=deferred(),entered=deferred(),inputs=[];let fixture;
  try{
   fixture=await boot(false,{extraTools:[{name:'busy_barrier',description:'Fixture barrier',inputSchema:{type:'object',properties:{}},approvalMode:'never',sideEffectLevel:'none',async execute(){entered.resolve();await gate.promise;return {ok:true,content:'barrier done'}}}],modelAdapter:{name:'busy-tool-barrier',async summarizeMessages(){return ''},async runTurn(input){inputs.push(userTexts(input));if(inputs.length===1)return {stopReason:'tool_use',assistantParts:[{type:'tool_call',toolCallId:'busy_call',name:'busy_barrier',input:{}}]};return {stopReason:'end',assistantParts:[{type:'text',text:'One combined reply'}]};}}});
+  fixture.runtime.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
   const id=await open(fixture),first=send(fixture,id,'busy_tool_first');await Promise.race([entered.promise,first.then(r=>{throw new Error('request ended before barrier: '+JSON.stringify(r))})]);
   const second=send(fixture,id,'busy_tool_second');await until(()=>persisted(fixture,id,'busy_tool_second'),'second input accepted during tool');gate.resolve();const responses=await Promise.all([first,second]);assert.ok(responses.every(r=>r.status===200));assert.equal(inputs.length,2);assert.ok(inputs[1].includes('busy_tool_first'));assert.ok(inputs[1].includes('busy_tool_second'));
  }finally{gate.resolve();if(fixture)await fixture.close();}

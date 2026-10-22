@@ -79,3 +79,16 @@ test('unverified progress cannot reset the stall limit with new summaries',t=>{
 test('external waiting and constraint-draining work keeps its resource reservation [AC:bot-multi-goal-coordination#AC-11]',t=>{
  const {s}=fixture(t);const a=create(s,'Deployment',{resources:['prod']}),b=create(s,'Other deployment',{resources:['prod']});const e=s.claim('b',a.id,{strategy:'swarm'});s.report('b',e.id,{kind:'waiting',summary:'deployment in progress',wait:{source:'swarm',correlationId:'run'}});assert.equal(s.claim('b',b.id,{strategy:'direct'}),undefined);s.amend('b',a.id,'Use staging instead');assert.equal(s.claim('b',b.id,{strategy:'direct'}),undefined);s.finishAmendDrain('b',a.id,{summary:'Old deployment stopped',evidence:['stopped'],costUsd:0});assert.ok(s.claim('b',b.id,{strategy:'direct'}));
 });
+
+test('targeted intent receipts apply controls once and retain amended constraints', t => {
+ const {s}=fixture(t);const goal=create(s);
+ const amendment={kind:'amend_goal',goalId:goal.id,text:'Keep existing data',sourceMessageId:'amend-1'};
+ assert.deepEqual(s.applyIntent('b',amendment).goal.constraints,['Keep existing data']);
+ assert.equal(s.applyIntent('b',amendment).duplicate,true);
+ assert.equal(s.get('b',goal.id).revision,2);
+ for(const [kind,status] of [['pause','paused'],['resume','queued'],['cancel','cancelled']]) {
+  assert.equal(s.applyIntent('b',{kind,goalId:goal.id,sourceMessageId:kind}).goal.status,status);
+  assert.equal(s.applyIntent('b',{kind,goalId:goal.id,sourceMessageId:kind}).duplicate,true);
+ }
+ assert.deepEqual(s.get('b',goal.id).constraints,['Keep existing data']);
+});

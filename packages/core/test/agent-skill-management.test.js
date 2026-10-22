@@ -400,3 +400,32 @@ test("tool list uses compact summaries without instruction bodies [AC:agent-skil
 });
 
 test('explicit follow-up resolves an existing suggestion by its skill name [AC:agent-skill-management#AC-3]', async t=>{const x=fixture(t);x.seed();let key='first';x.deps.requestKey=()=>key;const skill=(await x.service.catalog('a:1'))[0];const input={action:'share',skillId:skill.id,botIds:['b']};const pending=await x.service.request('a:1','agent',input);key='second';x.deps.authorize=async(s,input)=>input.name==='test-check';const done=await x.service.request('a:1','agent',input);assert.equal(done.id,pending.id);assert.equal(done.status,'saved');});
+
+test('restart reconciles interrupted management against installed effects without replay', async t => {
+ const {readFileSync,writeFileSync}=await import('node:fs');
+ for(const action of ['create','share','unshare','set_sharing','delete']) {
+  await t.test(action,async t=>{
+   const x=fixture(t);x.authorize();
+   let input={action:'create',name:'recovered-check',description:'check',reason:'Successful workflow',summary:'Save checks'};
+   if(action!=='create'){
+    const proposal=x.seed();
+    if(action==='unshare')x.proposals.setSharing(proposal.id,'a',['b'],()=>{});
+    input={action,skillId:(await x.service.catalog('a:1'))[0].id,botIds:['b']};
+   }
+   const done=await x.service.request('a:1','agent',input);assert.equal(done.status,'saved',done.error);
+   const path=join(x.dir,'skill-operations',done.id+'.json');
+   const row=JSON.parse(readFileSync(path,'utf8'));row.status='processing';writeFileSync(path,JSON.stringify(row));
+   const before=await x.service.catalog('a:1');
+   const recovered=x.restart();assert.equal(recovered.list('a:1')[0].status,'saved');
+   assert.deepEqual(await recovered.catalog('a:1'),before);
+  });
+ }
+ await t.test('unapplied operation remains failed',async t=>{
+  const x=fixture(t);x.seed();
+  const op=await x.service.request('a:1','agent',{action:'delete',skillId:(await x.service.catalog('a:1'))[0].id});
+  const path=join(x.dir,'skill-operations',op.id+'.json');
+  writeFileSync(path,JSON.stringify({...op,status:'processing'}));
+  const recovered=x.restart();assert.equal(recovered.list('a:1')[0].status,'failed');
+  assert.equal((await recovered.catalog('a:1')).length,1);
+ });
+});

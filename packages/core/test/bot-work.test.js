@@ -179,6 +179,7 @@ test('unconfirmed external effect overrides confident assistant completion',asyn
 test('real approval decision resumes before scheduler marks delegated terminal',async()=>{
  let effects=0;
  const rt=new RawAgentRuntime({repoRoot:mkdtempSync(join(tmpdir(),'approval-work-repo-')),stateDir:mkdtempSync(join(tmpdir(),'approval-work-state-')),extraTools:[{name:'guarded_effect',description:'Controlled approval effect',inputSchema:{type:'object',properties:{}},approvalMode:'always',sideEffectLevel:'workspace',async execute(){effects++;return {ok:true,content:'effect confirmed'};}}],modelAdapter:{name:'approval-work',async summarizeMessages(){return '';},async runTurn(input){if(input.messages.some(m=>m.parts.some(p=>p.type==='tool_result'&&p.name==='guarded_effect'&&p.ok)))return {stopReason:'end',assistantParts:[{type:'text',text:'approved work completed'}]};return {stopReason:'tool_use',assistantParts:[{type:'tool_call',name:'guarded_effect',toolCallId:'controlled-call',input:{}}]};}}});
+ rt.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
  try{
  const principal=resolveBotPrincipal(rt.store),boss=ensureSuperBot({store:rt.store,runSession:id=>rt.runSession(id),log:{warn(){}}},principal),worker=rt.createBot({name:'Approval Worker'});
  // Keep deadline calculation and synchronous persistence on one fixture clock instant.
@@ -325,6 +326,7 @@ test('unknown recovery protects the pending receipt delivery alias without reapp
 test('real public approve and run reject an overdue paused task while fresh human input remains usable',async()=>{
  let effects=0;
  const rt=new RawAgentRuntime({repoRoot:mkdtempSync(join(tmpdir(),'deadline-public-repo-')),stateDir:mkdtempSync(join(tmpdir(),'deadline-public-state-')),extraTools:[{name:'deadline_public_effect',description:'Deadline guarded effect',inputSchema:{type:'object',properties:{}},approvalMode:'always',sideEffectLevel:'workspace',async execute(){effects++;return {ok:true,content:'effect'};}}],modelAdapter:{name:'deadline-public',async summarizeMessages(){return '';},async runTurn(input){const latest=input.messages.filter(message=>message.role==='user').at(-1);if(latest?.parts.some(part=>part.type==='text'&&part.text.includes('perform deadline guarded action')))return {stopReason:'tool_use',assistantParts:[{type:'tool_call',name:'deadline_public_effect',toolCallId:'deadline-public-call',input:{}}]};return {stopReason:'end',assistantParts:[{type:'text',text:'Fresh human request answered'}]};}}});
+ rt.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
  try{
  const principal=resolveBotPrincipal(rt.store),sender=rt.createBot({name:'Public deadline sender'}),worker=rt.createBot({name:'Public deadline worker'}),host={store:rt.store,runSession:id=>rt.runSession(id),isSessionRunning:id=>rt.isSessionRunning(id),log:{warn(){}}};
  const task=dispatchBotTask(host,{principal,requesterBotId:sender.id,targetBotId:worker.id,input:'perform deadline guarded action',deadline:new Date(Date.now()+60000).toISOString()});await rt.runScheduler();let approval;

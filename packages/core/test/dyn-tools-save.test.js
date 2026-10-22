@@ -72,6 +72,7 @@ test('AE1 MockLLM: save_as_tool then next turn tools[] contains name and cell ru
     mockText('done')
   ]);
   const runtime = new RawAgentRuntime({ repoRoot, stateDir, modelAdapter: model });
+  runtime.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
   writeDynToolSettings(runtime.store, {
     enabled: true,
     allowSave: true,

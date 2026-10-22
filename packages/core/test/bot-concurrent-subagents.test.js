@@ -45,10 +45,27 @@ function subsOf(runtime, parentId) {
 async function settle(runtime, parentId) {
   for (let i = 0; i < 50; i += 1) {
     const children = subsOf(runtime, parentId);
-    if (children.length === 0 || children.every((child) => child.status !== 'running')) return;
+    const forks = runtime.getSession(parentId).metadata.concurrentBotForks ?? [];
+    if (children.every((child) => child.status !== 'running') && forks.every((fork) => fork.status !== 'running')) return;
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
+  assert.fail('concurrent child results did not settle before teardown');
 }
+
+test('settle waits for coordinator completion after a child becomes idle', async () => {
+  let finished = false;
+  const runtime = {
+    listSessions: () => [{ id: 'child', mode: 'subagent', parentSessionId: 'parent', status: 'idle' }],
+    getSession: () => ({ metadata: { concurrentBotForks: [{ childSessionId: 'child', status: finished ? 'idle' : 'running' }] } })
+  };
+  const completion = new Promise(resolve => setImmediate(() => { finished = true; resolve(); }));
+  try {
+    await settle(runtime, 'parent');
+    assert.equal(finished, true, 'idle child still has a pending coordinator result');
+  } finally {
+    await completion;
+  }
+});
 
 test('plan keeps a single in-flight turn and forks every extra piece [AC:bot-concurrent-subagents#AC-1] [AC:bot-concurrent-subagents#AC-2]', () => {
   const only = planConcurrentBotForks({
@@ -168,14 +185,14 @@ test('a second piece arriving during an in-flight turn forks exactly that piece 
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(subsOf(runtime, session.id).length, 0);
     runtime.sendUserMessage(session.id, 'arrived while busy', { autoRun: true });
-    runtime.runHumanSession(session.id);
+    const joined = runtime.runHumanSession(session.id);
     await new Promise((resolve) => setImmediate(resolve));
     const children = subsOf(runtime, session.id);
     assert.equal(children.length, 1);
     assert.match(JSON.stringify(runtime.store.foldMessages(children[0].id)), /arrived while busy/);
     assert.equal(runtime.getSession(session.id).mode, 'chat');
     release();
-    await running;
+    await Promise.all([running, joined]);
     await settle(runtime, session.id);
   } finally {
     release();

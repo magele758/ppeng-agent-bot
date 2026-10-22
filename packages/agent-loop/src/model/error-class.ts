@@ -102,57 +102,66 @@ function hasAbortedSignal(chain: Array<Record<string, unknown>>): boolean {
 }
 
 export function classifyModelError(err: unknown): ModelErrorClassification {
-  const make = (category: ModelErrorCategory, status?: number): ModelErrorClassification => ({
-    category,
-    upstreamRetryable: UPSTREAM_RETRYABLE.has(category),
-    ...(status !== undefined ? { status } : {})
-  });
-
-  if (err === null || err === undefined) return make('unknown');
+  if (err === null || err === undefined) return modelErrorClassification('unknown');
   const chain = errorChain(err);
   const text = chainText(chain, typeof err === 'string' ? err : '');
   const names = chain.map((c) => (typeof c.name === 'string' ? c.name : ''));
   const parsedStatus = statusOf(chain, text);
   const status = parsedStatus !== undefined && parsedStatus >= 400 ? parsedStatus : undefined;
 
-  // 1. Structured signals always win.
-  if (names.includes('RepetitionLoopAbortError')) return make('watchdog');
-  if (names.includes('TimeoutError')) return make('timeout', status);
-  if (names.includes('AbortError') || chain.some((c) => c.code === 'ABORT_ERR') || hasAbortedSignal(chain)) {
-    return make('aborted');
-  }
-  if (chain.some((c) => c.code === 'content_filter' || c.type === 'content_filter')) {
-    return make('content_filter', status);
-  }
+  const structured = classifyStructuredError(chain, names, status);
+  if (structured) return structured;
 
   // 2. Upstream-outage status codes outrank body keywords (a 503 body may mention "moderation").
   if (status !== undefined) {
-    if (status === 429) return make('rate_limited', status);
-    if (status === 408) return make('timeout', status);
-    if (status === 504) return make('server_error', status);
-    if (status === 529) return make('overloaded', status);
-    if (status >= 500) return make(OVERLOADED_RE.test(text) ? 'overloaded' : 'server_error', status);
+    if (status === 429) return modelErrorClassification('rate_limited', status);
+    if (status === 408) return modelErrorClassification('timeout', status);
+    if (status === 504) return modelErrorClassification('server_error', status);
+    if (status === 529) return modelErrorClassification('overloaded', status);
+    if (status >= 500) return modelErrorClassification(OVERLOADED_RE.test(text) ? 'overloaded' : 'server_error', status);
   }
 
   // 3. Keyword classes: terminal ones only when no outage status already decided.
   if (status === undefined && STRUCTURED_SERVER_RE.test(text)) {
-    return make(OVERLOADED_RE.test(text) ? 'overloaded' : 'server_error');
+    return modelErrorClassification(OVERLOADED_RE.test(text) ? 'overloaded' : 'server_error');
   }
-  if (WATCHDOG_RE.test(text)) return make('watchdog');
-  if (ABORT_RE.test(text)) return make('aborted');
-  if (CONTENT_FILTER_RE.test(text)) return make('content_filter', status);
+  if (WATCHDOG_RE.test(text)) return modelErrorClassification('watchdog');
+  if (ABORT_RE.test(text)) return modelErrorClassification('aborted');
+  if (CONTENT_FILTER_RE.test(text)) return modelErrorClassification('content_filter', status);
 
   if (status !== undefined) {
-    if (status === 401 || status === 403) return make('auth', status);
-    return make('bad_request', status);
+    if (status === 401 || status === 403) return modelErrorClassification('auth', status);
+    return modelErrorClassification('bad_request', status);
   }
 
-  if (AUTH_RE.test(text)) return make('auth');
-  if (BAD_REQUEST_RE.test(text)) return make('bad_request');
-  if (OVERLOADED_RE.test(text)) return make('overloaded');
-  if (RATE_LIMIT_RE.test(text)) return make('rate_limited');
-  if (TIMEOUT_RE.test(text)) return make('timeout');
-  if (CONNECTION_RE.test(text)) return make('connection');
-  if (SERVER_RE.test(text)) return make('server_error');
-  return make('unknown', parsedStatus);
+  if (AUTH_RE.test(text)) return modelErrorClassification('auth');
+  if (BAD_REQUEST_RE.test(text)) return modelErrorClassification('bad_request');
+  if (OVERLOADED_RE.test(text)) return modelErrorClassification('overloaded');
+  if (RATE_LIMIT_RE.test(text)) return modelErrorClassification('rate_limited');
+  if (TIMEOUT_RE.test(text)) return modelErrorClassification('timeout');
+  if (CONNECTION_RE.test(text)) return modelErrorClassification('connection');
+  if (SERVER_RE.test(text)) return modelErrorClassification('server_error');
+  return modelErrorClassification('unknown', parsedStatus);
+}
+
+function modelErrorClassification(category: ModelErrorCategory, status?: number): ModelErrorClassification {
+  return {
+    category,
+    upstreamRetryable: UPSTREAM_RETRYABLE.has(category),
+    ...(status !== undefined ? { status } : {})
+  };
+}
+
+function classifyStructuredError(chain: Array<Record<string, unknown>>, names: string[], status?: number): ModelErrorClassification | undefined {
+  // 1. Structured signals always win.
+  if (names.includes('RepetitionLoopAbortError')) return modelErrorClassification('watchdog');
+  if (names.includes('TimeoutError')) return modelErrorClassification('timeout', status);
+  if (names.includes('AbortError') || chain.some((c) => c.code === 'ABORT_ERR') || hasAbortedSignal(chain)) {
+    return modelErrorClassification('aborted');
+  }
+  if (chain.some((c) => c.code === 'content_filter' || c.type === 'content_filter')) {
+    return modelErrorClassification('content_filter', status);
+  }
+
+  return undefined;
 }

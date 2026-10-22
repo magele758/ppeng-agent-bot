@@ -485,3 +485,16 @@ test('upstream cumulative usage is not displayed as current request length [AC:b
   await observeModelRequests(store,adapter,new Map()).runTurn(requestOf([text('user','b')]));
   assert.equal(values.get('session.latestRequest:s').actualInputTokens,30000);
 });
+
+test('budget summarizes older context before discarding an unobserved tool result [AC:normal-session-request-budget#AC-3]', async () => {
+  const messages = [text('user', 'OLD_PREFIX '.repeat(300)), text('assistant', 'previous reply'), latestUser(), ...wave('fresh', 'fresh successful effect')];
+  const input = requestOf(messages, { systemPrompt: 'prompt', maxContextTokens: 1500 });
+  let summarized;
+  const actual = await applyNormalSessionRequestBudget(input, { maxContextTokens: 1500, summarize: async prefix => { summarized = prefix; return 'older context summary'; } });
+  assert.ok(summarized, 'older prefix must be summarized to make room for the fresh result');
+  assert.ok(actual.messages.some(message => message.id === 'a-fresh'));
+  assert.ok(actual.messages.some(message => message.id === 't-fresh'));
+  assert.ok(joined(actual.messages).includes(QUESTION));
+  assert.ok(tokens(actual) <= normalRequestCapTokens(1500));
+  assert.equal(hasOrphan(actual.messages), false);
+});

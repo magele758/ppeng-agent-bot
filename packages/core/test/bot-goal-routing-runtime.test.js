@@ -52,6 +52,7 @@ test('real Runtime subagent dispatch preserves valid outer model tool pairing',a
   return {stopReason:'end',assistantParts:[{type:'text',text:'Analysis evidence returned.'}]};
  },async summarizeMessages(){return 'summary';}}});
  t.after(async()=>{await runtime.destroy();rmSync(dir,{recursive:true,force:true})});
+ runtime.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
  const bot=runtime.createBot({name:'Dispatch review'});mainSession=runtime.openBot(bot.id).sessionId;
  runtime.sendUserMessage(mainSession,'实现一个简单功能',{autoRun:true});await runtime.runHumanSession(mainSession);
  assert.equal(dispatched,true);assert.equal(checked,true);

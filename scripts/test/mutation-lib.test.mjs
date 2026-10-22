@@ -254,3 +254,11 @@ test('renderMarkdown marks failing modules and lists undetected mutants with esc
   assert.match(md, /`src\/x\.ts:3` \| logical \| `a \\\|\\\| b` → `a && 'b'` \| survived/);
   assert.doesNotMatch(md, /ok: \d+ undetected/);
 });
+
+test('model error mutation targets the implementation behind the core re-export', async () => {
+  const { readFileSync } = await import('node:fs');
+  const config = JSON.parse(readFileSync(new URL('../mutation/mutation.config.json', import.meta.url), 'utf8'));
+  const files = config.modules['model-error-class'].mutate;
+  assert.deepEqual(files, ['packages/agent-loop/dist/model/error-class.js']);
+  for (const file of files) assert.ok(generateMutants(file, readFileSync(file, 'utf8')).length > 0);
+});

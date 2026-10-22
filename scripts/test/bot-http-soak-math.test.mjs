@@ -89,3 +89,14 @@ test('compacted routine prompt still requires a confirmation from its observed t
  const messages=[{role:'user',parts:[{type:'text',text:'[cron:http_op_34] latest'}]},{role:'tool',parts:[result('http_op_24'),result('http_op_34'),result('http_op_14'),result('http_op_25',{ok:false}),result('http_op_99'),result('http_op_25',{toolCallId:'controlled_http_op_25:other'})]}];
  assert.deepEqual(pendingControlledOperations(['http_op_34'],{messages,sessionId,completed:()=>false,explicitDecision:operation=>decisions.get(operation)}),['http_op_34','http_op_24']);
 });
+
+test('dispatch completion uses source-bound durable output even when the bounded report omits it',async()=>{
+ const {hasDispatchCompletion}=await import('../bot-release/http-soak-oracle.mjs');
+ const task={status:'completed',result:'o'.repeat(12000),sessionId:'target',sourceSeq:105};
+ const proof={operation:'http_op_47',sessionId:'target',sourceSeq:105,outputSeq:117,outcome:'completed'};
+ assert.equal(hasDispatchCompletion('http_op_47',task,proof),true);
+ for(const changed of [{operation:'http_op_48'},{sessionId:'other'},{sourceSeq:104},{outputSeq:105},{outcome:'failed'}])assert.equal(hasDispatchCompletion('http_op_47',task,{...proof,...changed}),false);
+ for(const changed of [{status:'running'},{status:'failed'},{result:''},{sourceSeq:null}])assert.equal(hasDispatchCompletion('http_op_47',{...task,...changed},proof),false);
+ assert.equal(hasDispatchCompletion('http_op_47',task,undefined),false);
+ assert.equal(hasDispatchCompletion('http_op_47',{...task,result:'Completed http_op_47 '},undefined),false);
+});

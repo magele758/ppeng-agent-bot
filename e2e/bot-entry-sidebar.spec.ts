@@ -302,3 +302,16 @@ test('sidebar Bot choice wins while the saved-default lookup is still pending [A
   await expect(row).toHaveClass(/\bselected\b/);
  } finally { releaseLookup(); }
 });
+
+test('loading Bot sessions preserves the hovered New menu [AC:bot-entry-simplification#AC-2]',async({page})=>{
+ const {bots}=await (await page.request.get('/api/bots')).json();
+ let release!:()=>void;const ready=new Promise<void>(resolve=>{release=resolve;});
+ await page.route('**/api/sessions',async route=>{await ready;await route.fulfill({json:{sessions:[{id:'late-toolbar-session',title:'Late session',status:'idle',metadata:{botId:bots[0].id,canonicalBotChat:true}}]}});});
+ await page.goto('/#/bot');
+ const create=page.locator('#btnPlayCreate');await create.hover();
+ await expect(page.getByRole('menu')).toBeVisible();
+ const before=await create.boundingBox();release();
+ await expect(page.locator('.play-sidebar__batch')).toBeVisible();
+ await expect.poll(async()=> (await create.boundingBox())?.x).toBe(before!.x);
+ await expect(page.getByRole('menu')).toBeVisible();
+});

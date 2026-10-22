@@ -13,6 +13,7 @@ function fixture(t,modelAdapter) {
   const dir=mkdtempSync(join(tmpdir(),'bot-auto-lifecycle-'));
   const runtime=new RawAgentRuntime({repoRoot:dir,stateDir:join(dir,'state'),modelAdapter:modelAdapter??{name:'fixture',async runTurn(){return {stopReason:'end',assistantParts:[{type:'text',text:'Evidence received'}]}},async summarizeMessages(){return 'summary'}}});
   t.after(async()=>{await runtime.destroy();rmSync(dir,{recursive:true,force:true})});
+  runtime.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
   const bot=runtime.createBot({name:'Autonomous'}),sid=runtime.openBot(bot.id).sessionId;
   const store=runtime.store,service=new BotGoalService(store,Date.now,sid);
   return {runtime,store,service,bot,sid,dir};
@@ -123,12 +124,13 @@ test('research profile belongs to the worker and cannot disable Bot dispatch [AC
   const worker=f.store.getSession(dispatch.result.reference.slice(8));
   assert.equal(worker.agentId,'researcher');assert.equal(worker.metadata.taskRunMode,'deep_research');
 });
-test('authorized on-demand browser tools count as available without user configuration [AC:bot-autonomous-execution-coverage#AC-2]',async t=>{
+test('authorized on-demand browser tools count as available without prior disclosure [AC:bot-autonomous-execution-coverage#AC-2]',async t=>{
   let sid,dispatched=false;
   const f=fixture(t,{name:'browser-script',async runTurn(input){
     if(input.sessionId===sid&&!dispatched){dispatched=true;return {stopReason:'tool',assistantParts:[{type:'tool_call',toolCallId:'browser',name:'goal_dispatch',input:{workKind:'browser'}}]};}
     return {stopReason:'end',assistantParts:[{type:'text',text:'Browser result'}]};
   },async summarizeMessages(){return 'summary'}});sid=f.sid;
+  f.store.setDaemonControl('browser_settings',{enabled:true});
   f.runtime.tools.push({name:'browser_navigate',description:'Browser fixture',inputSchema:{type:'object'},disclosure:'on_demand',sideEffectLevel:'none',approvalMode:'never',async execute(){return {ok:true,content:'Page loaded'}}});
   f.runtime.sendUserMessage(sid,'使用浏览器读取网页',{autoRun:true});await f.runtime.runHumanSession(sid);
   const dispatch=f.store.getSession(sid).metadata.botGoalDispatch;

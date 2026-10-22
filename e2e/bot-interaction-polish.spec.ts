@@ -171,7 +171,10 @@ test('large history stays responsive across scroll and rail resize [AC:bot-works
     expect(Date.now() - started).toBeLessThan(1000);
   }
   expect(await feed.locator('.chat-feed__row').count()).toBeLessThan(60);
-  const anchor = await feed.locator('.chat-feed__row').evaluateAll(rows => rows.find(row => row.getBoundingClientRect().bottom > document.querySelector('#playMessages')!.getBoundingClientRect().top)?.getAttribute('data-feed-key'));
+  // Exercise a clipped preceding row: its final pixel is not the reading anchor.
+  await feed.evaluate(el => { const top=el.getBoundingClientRect().top; const row=Array.from(el.querySelectorAll('.chat-feed__row')).find(row=>row.getBoundingClientRect().bottom>top+1); if(row)el.scrollTop+=row.getBoundingClientRect().bottom-top-1; });
+  await page.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));
+  const anchor = await feed.locator('.chat-feed__row').evaluateAll(rows => rows.find(row => row.getBoundingClientRect().bottom > document.querySelector('#playMessages')!.getBoundingClientRect().top + 1)?.getAttribute('data-feed-key'));
   const anchorTop = (await feed.locator(`[data-feed-key="${anchor}"]`).boundingBox())!.y;
   await page.getByRole('button', { name: '收起信息栏', exact: true }).click();
   await expect(feed.locator(`[data-feed-key="${anchor}"]`)).toBeVisible();

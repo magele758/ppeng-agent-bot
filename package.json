@@ -25,6 +25,7 @@
     "test:integration": "node scripts/integration-test.mjs",
     "audit:upstream": "pnpm audit --registry=https://registry.npmjs.org",
     "test:e2e": "node scripts/e2e-run.mjs",
+    "test:e2e:full": "node scripts/e2e-suite.mjs",
     "test:e2e:install": "playwright install --with-deps chromium",
     "test:pagelens": "node scripts/pagelens-smoke.mjs",
     "test:examples": "node scripts/run-core-examples.mjs",

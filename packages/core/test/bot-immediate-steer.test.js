@@ -12,12 +12,14 @@ function userTexts(input) {
 }
 
 function runtimeWith(adapter, extraTools = []) {
-  return new RawAgentRuntime({
+  const runtime = new RawAgentRuntime({
     repoRoot: mkdtempSync(join(tmpdir(), 'bot-steer-repo-')),
     stateDir: mkdtempSync(join(tmpdir(), 'bot-steer-state-')),
     modelAdapter: adapter,
     extraTools
   });
+  runtime.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
+  return runtime;
 }
 
 test('canonical bot steer during a tool wave lands on the next shot without an approval [AC:bot-immediate-steer#AC-1] [AC:bot-immediate-steer#AC-3]', async () => {

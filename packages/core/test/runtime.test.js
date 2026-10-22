@@ -27,11 +27,13 @@ class ScriptedAdapter {
 function runtimeWithAdapter(adapter) {
   const repoRoot = mkdtempSync(join(tmpdir(), 'raw-agent-repo-'));
   const stateDir = mkdtempSync(join(tmpdir(), 'raw-agent-state-'));
-  return new RawAgentRuntime({
+  const runtime = new RawAgentRuntime({
     repoRoot,
     stateDir,
     modelAdapter: adapter
   });
+  runtime.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
+  return runtime;
 }
 
 test('chat session can do a simple reply through the raw loop', async () => {

@@ -193,4 +193,3 @@ function isSend(url: string, method: string, surface: Surface): boolean {
     /\/api\/sessions\/[^/]+\/messages(?:\?|$)/.test(url)
   );
 }
-

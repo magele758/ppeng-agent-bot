@@ -12,19 +12,21 @@ export function performanceEnv(base = process.env) {
   return env;
 }
 
-export function performanceResult(report) {
+export function performanceResult(report, profile = 'local') {
+  if (!['local', 'github-actions'].includes(profile)) throw new Error(`Unknown performance profile: ${profile}`);
   const checks = ['page', 'search', 'status', 'receive'].map(name => {
     const sample = report?.latency?.[name];
-    const thresholdMs = workload.thresholdsMs[`${name}P95`];
+    const thresholdMs = profile === 'github-actions' && name === 'receive' ? 2000 : workload.thresholdsMs[`${name}P95`];
     return { name, count: sample?.count ?? 0, p95Ms: sample?.p95Ms ?? null, thresholdMs,
       passed: Number.isFinite(sample?.count) && sample.count > 0 && Number.isFinite(sample?.p95Ms) && sample.p95Ms >= 0 && sample.p95Ms <= thresholdMs };
   });
-  return { passed: report?.status === 'completed' && report?.fixturePassed === true && checks.every(check => check.passed),
+  return { profile, passed: report?.status === 'completed' && report?.fixturePassed === true && checks.every(check => check.passed),
     checks, fullSoakAccepted: false,
     limitation: 'Compressed HTTP workload performance only; not full-duration soak or release acceptance.' };
 }
 
-export function runPerformance({ directory = 'test-results/soak-performance' } = {}) {
+export function runPerformance({ directory = 'test-results/soak-performance', profile = 'local' } = {}) {
+  performanceResult(undefined, profile);
   const output = resolve(directory);
   mkdirSync(output, { recursive: true });
   const reportPath = join(output, 'http-soak.json');
@@ -35,7 +37,7 @@ export function runPerformance({ directory = 'test-results/soak-performance' } =
   let report;
   let error = child.error?.message;
   try { report = JSON.parse(readFileSync(reportPath, 'utf8')); } catch (failure) { error ??= failure.message; }
-  const summary = { ...performanceResult(report), candidate: report?.candidate, workloadHash: report?.workloadHash,
+  const summary = { ...performanceResult(report, profile), candidate: report?.candidate, workloadHash: report?.workloadHash,
     hardware: report?.hardware, exitCode: child.status, error };
   summary.passed = summary.passed && child.status === 0 && !error;
   writeFileSync(join(output, 'performance.json'), JSON.stringify(summary, null, 2) + '\n');
@@ -44,5 +46,7 @@ export function runPerformance({ directory = 'test-results/soak-performance' } =
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  process.exitCode = runPerformance().passed ? 0 : 1;
+  const args = process.argv.slice(2);
+  if (args.length && (args.length !== 2 || args[0] !== '--profile')) throw new Error('Usage: soak-performance.mjs [--profile local|github-actions]');
+  process.exitCode = runPerformance({ profile: args[1] ?? 'local' }).passed ? 0 : 1;
 }

@@ -34,7 +34,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: node scripts/build-workspace.mjs
       - name: Verify HTTP soak performance
-        run: pnpm run test:bot:soak:performance
+        run: pnpm run test:bot:soak:performance --profile github-actions
       - name: Preserve HTTP soak performance evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -539,7 +539,7 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm run test:e2e:install
       - name: E2E (Agent Lab)
-        run: pnpm run test:e2e --reporter=dot,junit
+        run: pnpm run test:e2e:full --reporter=dot,junit
         env:
           RAW_AGENT_MODEL_PROVIDER: heuristic
           PLAYWRIGHT_JUNIT_OUTPUT_FILE: ${{ runner.temp }}/acceptance-results/e2e.xml

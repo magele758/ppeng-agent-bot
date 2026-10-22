@@ -115,6 +115,7 @@ test('agent.allowedTools filters the per-turn tool list', async () => {
     extraTools: [dummyTool('only_this')],
     extraAgents: [dummyAgent('narrow', ['only_this'], 'demo')],
   });
+  rt.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
 
   const session = rt.createChatSession({ agentId: 'narrow', title: 'narrow' });
   await rt.runSession(session.id);

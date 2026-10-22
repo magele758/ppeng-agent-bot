@@ -374,6 +374,9 @@ test('bg_run and work_evidence honor the same isolation choice and direct approv
     setSandbox() {},
     backgroundJobAborts: new Map(),
     store: {
+      db: { isOpen: true },
+      runWithoutWriterScope: fn => fn(),
+      enqueueSteer() {},
       getSession: () => ({ id: 's', metadata: {} }),
       createBackgroundJob(input) {
         const job = { id: 'j1', ...input };

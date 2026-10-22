@@ -362,6 +362,7 @@ test('群回合记下推送、取回和自己的发言，没推送的不进单�
       async summarizeMessages() { return ''; }
     }
   });
+  rt.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
   try {
     const alpha = rt.createBot({ name: 'TouchAlpha' });
     const beta = rt.createBot({ name: 'TouchBeta' });

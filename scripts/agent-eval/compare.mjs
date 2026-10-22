@@ -35,7 +35,7 @@ for (const label of ['baseline', 'candidate']) {
   if (v.systemAppendix != null && typeof v.systemAppendix !== 'string') throw new Error('systemAppendix must be text');
   if (v.daemonControl != null && (typeof v.daemonControl !== 'object' || Array.isArray(v.daemonControl))) throw new Error('daemonControl must be an object');
   for (const key of Object.keys(v.daemonControl ?? {})) {
-    if (!['loop_settings', 'compact_settings', 'memory_settings', 'skill_settings', 'dyn_tool_settings', 'discovery_settings', 'jev_settings'].includes(key)) throw new Error(`unsupported persisted experiment setting: ${key}`);
+    if (!['loop_settings', 'compact_settings', 'memory_settings', 'skill_settings', 'dyn_tool_settings', 'discovery_settings', 'jev_settings', 'tool_exposure_settings'].includes(key)) throw new Error(`unsupported persisted experiment setting: ${key}`);
   }
   if (!options.simulation && v.simulationFault) throw new Error('simulationFault is forbidden in live eval');
   for (const key of Object.keys(v)) if (!['repoRoot', 'systemAppendix', 'daemonControl', 'simulationFault'].includes(key)) throw new Error(`unknown variant option ${key}`);

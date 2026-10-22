@@ -5,8 +5,8 @@ import {
   intakeRoomMessage,
   readRoomGoals,
   writeRoomGoals,
-} from '../src/rooms/room-goals.ts';
-import { checkpointRoomTask } from '../src/rooms/room-tasks.ts';
+} from '../dist/rooms/room-goals.js';
+import { checkpointRoomTask } from '../dist/rooms/room-tasks.js';
 
 const roomId = 'room-1';
 const members = [

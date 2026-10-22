@@ -35,7 +35,7 @@ const modelAdapter={name:'http-benchmark-controlled',contextWindow:131072,async 
  const result=input.messages.some(message=>message.parts.some(part=>part.type==='tool_result'&&String(part.content).includes(key)));
  if(operation&&!result&&input.tools.some(tool=>tool.name===toolName))return {stopReason:'tool_use',assistantParts:[{type:'tool_call',toolCallId:'controlled_'+key,name:toolName,input:{key,kind:Number(operation.split('_').at(-1))%3===0?'write':'read'}}]};
  return {stopReason:'end',assistantParts:[{type:'text',text:(`Completed ${operation??'notification'} `).padEnd(workload.payloadBytes.output,'o')}]};},async summarizeMessages(){return 'Controlled historical summary; original benchmark sources remain accessible by sequence.';}};
-fixture=await boot(false,{stateDir,modelAdapter,extraTools});
+fixture=await boot(false,{stateDir,modelAdapter,extraTools});fixture.runtime.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
 const call=fixture.call,check=async(method,path,body)=>{const result=await call('alice',method,path,body);if(result.status>=300)throw new Error(`${method} ${path}: ${result.status} ${JSON.stringify(result.body)}`);return result.body;};
 const superBot=(await check('GET','/api/bot-work/default')).bot,bots=[superBot];
 for(let i=1;i<workload.dataset.botsIncludingSuper;i++)bots.push((await check('POST','/api/bots',{name:'HTTP Benchmark Bot '+i})).bot);
