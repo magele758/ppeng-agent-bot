@@ -303,7 +303,9 @@ export const play = {
     contextList: '已选上下文',
     removeContext: '移除 {name}',
     contextTruncated: '上下文已限制为 20 个来源、合计 200,000 个文本字符',
-    contextWithMessage: '这条消息带上的文件和文件夹'
+    contextWithMessage: '这条消息带上的文件和文件夹',
+    suggestion: '建议的下一句，按 Tab 填入，Esc 取消',
+    suggestionCycle: '还有 {count} 条备选，再按 Tab 切换'
   },
 
   replyQuote: {

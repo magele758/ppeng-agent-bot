@@ -107,6 +107,28 @@ export {
   writeCompactSettings
 } from './compact-settings.js';
 export type { CompactSettings, CompactSettingsPatch, CompactSettingsStore } from './compact-settings.js';
+export {
+  INPUT_SUGGESTION_SETTINGS_KEY,
+  INPUT_SUGGESTION_MAX,
+  acceptSuggestionResponse,
+  defaultInputSuggestionSettings,
+  hasPersistedInputSuggestionSettings,
+  inputSuggestionRequest,
+  normalizeInputSuggestionSettings,
+  parseInputSuggestion,
+  readInputSuggestionSettings,
+  recentSuggestionTurns,
+  suggestionPrompt,
+  suggestionVisible,
+  writeInputSuggestionSettings
+} from './input-suggestion.js';
+export type {
+  InputSuggestion,
+  InputSuggestionSettings,
+  InputSuggestionSettingsPatch,
+  InputSuggestionSettingsStore,
+  SuggestionTurn
+} from './input-suggestion.js';
 export { resolveHistoryTokenBudget } from './session-budget.js';
 export { decideSteerAdmission, steerAckToHttp, sessionSteersImmediately } from './steer-ack.js';
 export type { SteerAck, SteerAckStatus, HttpSteerAck } from './steer-ack.js';

@@ -139,6 +139,17 @@ export const settingsEntries = {
       inboxCap: '不限制'
     }
   },
+  inputSuggestion: {
+    title: '下一句建议',
+    keywords: '输入建议 ghost text Tab 补全 下一句 淡色 输入框 bot',
+    desc: 'Bot 回复结束后，在空的输入框里用淡色字猜你下一句可能想发的话。Tab 采纳，Esc 取消。关闭后不再生成。',
+    fields: {
+      enabled: {
+        label: '回复结束后建议下一句',
+        hint: '默认开启。只在 Bot 对话、输入框为空且正在输入时显示，不占用你已经打的字。'
+      }
+    }
+  },
   compact: {
     title: '上下文压缩',
     keywords: '压缩 上下文太长 窗口太满 超长 省 token 费用 成本 工具结果 折叠 占位 compact micro',

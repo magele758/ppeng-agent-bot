@@ -1,4 +1,5 @@
 import { AgentLoopEngineSettingsCard, AgentLoopSettingsCard } from '../../../AgentLoopSettingsCard';
+import { InputSuggestionSettingsCard } from '../../../InputSuggestionSettingsCard';
 import { CompactSettingsCard } from '../../../CompactSettingsCard';
 import { GoalSettingsCard, GoalVerifySettingsCard } from '../../../GoalSettingsCard';
 import { BotLimits } from '../../../bot-work/BotLimits';
@@ -19,6 +20,13 @@ export const behaviorEntries: SettingsEntry[] = [
     titleKey: 'settingsEntries.agentLoop.title',
     keywordsKey: 'settingsEntries.agentLoop.keywords',
     render: () => <AgentLoopSettingsCard />
+  },
+  {
+    id: 'inputSuggestion',
+    category: 'behavior',
+    titleKey: 'settingsEntries.inputSuggestion.title',
+    keywordsKey: 'settingsEntries.inputSuggestion.keywords',
+    render: () => <InputSuggestionSettingsCard />
   },
   {
     id: 'goal',

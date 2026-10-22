@@ -142,6 +142,17 @@ export const settingsEntries = {
       inboxCap: 'No limit'
     }
   },
+  inputSuggestion: {
+    title: 'Next-message suggestion',
+    keywords: 'input suggestion ghost text tab completion next message composer bot',
+    desc: 'After a bot replies, the empty composer shows a faint guess of what you might type next. Tab accepts it, Esc dismisses it. Turn this off to stop generating guesses.',
+    fields: {
+      enabled: {
+        label: 'Suggest the next message after a reply',
+        hint: 'On by default. Shown only in a bot chat, while the composer is empty and focused. It never replaces text you already typed.'
+      }
+    }
+  },
   compact: {
     title: 'Context compaction',
     keywords: 'compact compaction context too long window full oversized save tokens cost tool results collapse placeholder micro',

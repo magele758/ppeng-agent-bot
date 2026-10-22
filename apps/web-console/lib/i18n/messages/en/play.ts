@@ -303,7 +303,9 @@ export const play = {
     contextList: 'Selected context',
     removeContext: 'Remove {name}',
     contextTruncated: 'Context was limited to 20 sources and 200,000 text characters',
-    contextWithMessage: 'Files and folders with this message'
+    contextWithMessage: 'Files and folders with this message',
+    suggestion: 'Suggested next message. Tab fills it in, Esc dismisses it',
+    suggestionCycle: '{count} more. Tab again to switch'
   },
 
   replyQuote: {
