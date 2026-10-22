@@ -106,18 +106,37 @@ export interface CreateSkillProposalInput extends SkillProposalDraft {
   replaces?: { name: string; source?: string };
 }
 
+function revokingSkillPath(stateDir: string, record: SkillProposalRecord): string {
+  const name = record.ownerBotId ? join('.bots', botSkillId(record.ownerBotId, record.name)) : record.name;
+  return join(userSkillsDir(stateDir), name);
+}
+
+function moveApprovedRevokeBack(status: string, backup: string, target: string): boolean {
+  if (status !== 'approved' || existsSync(target)) return false;
+  renameSync(backup, target);
+  return true;
+}
+
+function dropRevokedJournal(status: string, backup: string): void {
+  if (status === 'revoked') rmSync(backup, { recursive: true, force: true });
+}
+
 export class SkillProposalStore {
   constructor(private readonly stateDir: string) {
     const directory = skillProposalsDir(stateDir);
     if (!existsSync(directory)) return;
-    for (const file of readdirSync(directory).filter(f => /^sp_[a-f0-9]{32}\.revoking$/.test(f))) {
-      const record = this.get(file.replace(/\.revoking$/, ''));
-      if (!record || !isValidSkillProposalName(record.name)) continue;
-      const backup = join(directory, file);
-      const target = join(userSkillsDir(stateDir), record.ownerBotId ? join('.bots', botSkillId(record.ownerBotId, record.name)) : record.name);
-      if (record.status === 'approved' && !existsSync(target)) renameSync(backup, target);
-      else if (record.status === 'revoked') rmSync(backup, {recursive:true,force:true});
+    for (const file of readdirSync(directory).filter(name => /^sp_[a-f0-9]{32}\.revoking$/.test(name))) {
+      this.restoreRevokingFile(file);
     }
+  }
+
+  private restoreRevokingFile(file: string): void {
+    const record = this.get(file.replace(/\.revoking$/, ''));
+    if (!record || !isValidSkillProposalName(record.name)) return;
+    const backup = join(skillProposalsDir(this.stateDir), file);
+    const target = revokingSkillPath(this.stateDir, record);
+    if (moveApprovedRevokeBack(record.status, backup, target)) return;
+    dropRevokedJournal(record.status, backup);
   }
 
   private recordPath(id: string): string {

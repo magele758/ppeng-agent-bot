@@ -35,6 +35,10 @@ export const settings = {
     gateway: {
       title: 'Gateway & IM access',
       keywords: 'feishu lark wecom wechat gateway IM webhook token secret encrypt allowlist sender botId signature'
+    },
+    roomCapacity: {
+      title: 'Room size',
+      keywords: 'room members roster cap speakers per round'
     }
   },
   saveState: {
@@ -167,5 +171,14 @@ export const settings = {
       desc: 'Restrict which senders may come in through the generic webhook.',
       allowedSenders: 'Webhook sender allowlist'
     }
+  },
+  roomCapacity: {
+    description: 'Roster size, room size, and speakers per round are saved here and apply immediately.',
+    rosterCap: 'Roster cap',
+    maxRoomMembers: 'Room member cap',
+    maxWaveSpeakers: 'Speakers per round',
+    save: 'Save',
+    saved: 'Saved',
+    saveFailed: 'Could not save room size settings'
   }
 };

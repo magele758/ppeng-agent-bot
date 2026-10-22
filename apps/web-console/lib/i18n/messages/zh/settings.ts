@@ -35,6 +35,10 @@ export const settings = {
     gateway: {
       title: '网关与 IM 接入',
       keywords: '飞书 feishu lark 企业微信 wecom 网关 gateway IM webhook token secret encrypt 白名单 allowlist 发送者 botId 签名'
+    },
+    roomCapacity: {
+      title: '群规模',
+      keywords: '群 成员 名册 上限 每轮发言 room roster capacity'
     }
   },
   saveState: {
@@ -167,5 +171,14 @@ export const settings = {
       desc: '限制哪些发送者可以通过通用 Webhook 入站。',
       allowedSenders: 'Webhook 发送者白名单'
     }
+  },
+  roomCapacity: {
+    description: '名册、单群人数和每轮发言人数保存在这里，保存后立即生效。',
+    rosterCap: '名册上限',
+    maxRoomMembers: '单群人数上限',
+    maxWaveSpeakers: '每轮发言人数',
+    save: '保存',
+    saved: '已保存',
+    saveFailed: '无法保存群规模设置'
   }
 };

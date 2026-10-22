@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, existsSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, existsSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SkillManagementService } from "../dist/skill-proposals/management.js";
@@ -323,6 +323,54 @@ test("runtime tool verifies human request, executes explicit command and propose
   assert.equal(done.status, "saved", done.error);
   assert.match(checked, /Share auth-check with B/);
 });
+test("restart settles an interrupted skill operation from the files already on disk", async (t) => {
+  const x = fixture(t);
+  const proposal = x.seed();
+  const captureId = "sc_" + "c".repeat(32);
+  mkdirSync(join(x.dir, "skill-captures"), { recursive: true });
+  writeFileSync(join(x.dir, "skill-captures", `${captureId}.json`), JSON.stringify({
+    id: captureId, sessionId: "a:1", name: "test-check", status: "saved", kind: "new",
+    description: "check", reason: "done", summary: "done", createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z"
+  }));
+  const dir = join(x.dir, "skill-operations");
+  mkdirSync(dir, { recursive: true });
+  const write = (suffix, input, extra = {}) => {
+    const id = "sm_" + suffix.padStart(32, "0");
+    writeFileSync(join(dir, `${id}.json`), JSON.stringify({
+      id, sessionId: "a:1", agentId: "agent", ownerBotId: "a", input, name: "test-check",
+      affectedBotIds: ["a"], revision: "rev", status: "processing", authorization: "user",
+      createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z", ...extra
+    }));
+    return id;
+  };
+  const savedCapture = write("1", { action: "create", name: "test-check", description: "check", reason: "done", summary: "done" }, { captureId });
+  const missedCreate = write("2", { action: "create", name: "test-check", description: "check", reason: "done", summary: "done" });
+  x.proposals.setSharing(proposal.id, "a", ["b"], () => {});
+  const shareDone = write("3", { action: "share", skillId: "x", botIds: ["b"] });
+  const shareMissed = write("4", { action: "share", skillId: "x", botIds: ["missing-bot"] });
+  const unshareDone = write("5", { action: "unshare", skillId: "x", botIds: ["missing-bot"] });
+  const unshareMissed = write("6", { action: "unshare", skillId: "x", botIds: ["b"] });
+  const sharingDone = write("7", { action: "set_sharing", skillId: "x", botIds: ["b"] });
+  const sharingMissed = write("8", { action: "set_sharing", skillId: "x", botIds: [] });
+  const deleteMissed = write("9", { action: "delete", skillId: "x" });
+  const settled = Object.fromEntries(x.restart().list("a:1").map((row) => [row.id, row]));
+  assert.equal(settled[savedCapture].status, "saved");
+  assert.equal(settled[savedCapture].error, undefined);
+  assert.equal(settled[missedCreate].status, "failed");
+  assert.match(settled[missedCreate].error, /interrupted/);
+  assert.equal(settled[shareDone].status, "saved");
+  assert.equal(settled[shareMissed].status, "failed");
+  assert.equal(settled[unshareDone].status, "saved");
+  assert.equal(settled[unshareMissed].status, "failed");
+  assert.equal(settled[sharingDone].status, "saved");
+  assert.equal(settled[sharingMissed].status, "failed");
+  assert.equal(settled[deleteMissed].status, "failed");
+  x.proposals.revoke(proposal.id);
+  const deleteDone = write("a", { action: "delete", skillId: "x" });
+  const afterRevoke = x.restart().list("a:1").find((row) => row.id === deleteDone);
+  assert.equal(afterRevoke.status, "saved");
+});
+
 test("failed revoke restores installed file [AC:agent-skill-management#AC-7]", async (t) => {
   const x = fixture(t);
   const p = x.seed();

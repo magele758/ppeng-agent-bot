@@ -205,6 +205,7 @@ test('dynamic_workflow exposes ptc_exec and composes subagents end-to-end', asyn
     stateDir: mkdtempSync(join(tmpdir(), 'ptc-state-')),
     modelAdapter: adapter
   });
+  runtime.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
   const { session } = runtime.createTaskSession({
     title: 'PTC task',
     message: 'run dynamically',
@@ -242,6 +243,7 @@ test('standard sessions deny ptc_exec from the model tool surface', async () => 
       }
     }
   });
+  runtime.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
   const session = runtime.createChatSession({ title: 'normal', message: 'hello' });
   await runtime.runSession(session.id);
   assert.ok(!names.includes('ptc_exec'));
@@ -639,6 +641,7 @@ test('agent() copies ptc.* only when inherit_scratch allows it', async () => {
     stateDir: mkdtempSync(join(tmpdir(), 'ptc-inherit-state-')),
     modelAdapter: adapter
   });
+  runtime.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
   const { session } = runtime.createTaskSession({
     title: 'PTC inherit',
     message: 'run inherit',

@@ -69,8 +69,8 @@ test('runtime grading counts rejected known tools and does not double-count exec
         expected: { exact: 'OK', requiredTools: ['save_result'], maxToolCalls: 1, state: { answer: 42 } },
         script: [{ tool: 'save_result', input: { key: 'answer', value: 42 } }, { text: 'OK' }] }
     ]));
-    writeFileSync(config, JSON.stringify({ suite: tasks, trials: 1, baseline: { repoRoot: resolve('.') },
-      candidate: { repoRoot: resolve('.') }, model: { provider: 'openai-compatible' },
+    writeFileSync(config, JSON.stringify({ suite: tasks, trials: 1, baseline: { repoRoot: resolve('.'), daemonControl: { tool_exposure_settings: { mode: 'full', pinnedGroups: {} } } },
+      candidate: { repoRoot: resolve('.'), daemonControl: { tool_exposure_settings: { mode: 'full', pinnedGroups: {} } } }, model: { provider: 'openai-compatible' },
       policy: { maxLatencyRatio: 100 }, limits: { timeoutMs: 10_000 } }));
     const command = spawnSync(process.execPath, ['scripts/agent-eval/compare.mjs', '--config', config, '--simulation', '--out', out], {
       env: sanitizeScriptEnv(), encoding: 'utf8', timeout: 25_000

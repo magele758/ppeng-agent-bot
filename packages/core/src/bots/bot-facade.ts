@@ -1,6 +1,7 @@
 import { resolveBotPrincipal, principalFromSession, sameBotPrincipal, setBotDefinitionOwner, botDefinitionOwner } from './bot-identity.js';
 import { AuthorizationError, ConflictError, NotFoundError, ValidationError } from '../errors.js';
 import { PRIVATE_CHAT_GROUP_SPEAKER_RULE } from '../rooms/speaker-identity.js';
+import { readRoomSettings } from '../rooms/settings.js';
 import { createId, nowIso } from '../id.js';
 import type { SessionFacadeHost } from '../runtime/session-facade.js';
 import { createChatSession, ensureAgent } from '../runtime/session-facade.js';
@@ -20,7 +21,6 @@ import {
   BOT_DEFAULT_PERMISSION_MODE,
   BOT_DESCRIPTION_MAX,
   BOT_NAME_MAX,
-  BOT_ROSTER_CAP,
   BOT_TITLE_MAX,
   CANONICAL_BOT_CHAT_META,
   SESSION_CUT_META,
@@ -225,9 +225,13 @@ export function createBot(host: SessionFacadeHost, input: CreateBotInput, option
     throw new ConflictError(`Bot name already exists: ${name}`);
   }
   const builtinId = host.store.getDaemonControl<string>('bot.superBotId');
-  const ordinaryCount = host.store.countBots({ includeHidden: true }) - (builtinId && host.store.getBot(builtinId) ? 1 : 0);
-  if (!options?.builtin && ordinaryCount >= BOT_ROSTER_CAP) {
-    throw new ValidationError(`Bot roster cap reached (${BOT_ROSTER_CAP})`);
+  const builtin = builtinId ? host.store.getBot(builtinId) : undefined;
+  // Removed (hidden) bots leave the visible roster, so a user can create another.
+  // The saved roster cap still blocks another visible ordinary bot. The built-in Super Bot is not ordinary.
+  const ordinaryCount = host.store.countBots({ includeHidden: false }) - (builtin && !builtin.hidden ? 1 : 0);
+  const rosterCap = readRoomSettings(host.store).rosterCap;
+  if (!options?.builtin && ordinaryCount >= rosterCap) {
+    throw new ValidationError(`Bot roster cap reached (${rosterCap})`);
   }
 
   const id = allocateBotId(host.store, name);

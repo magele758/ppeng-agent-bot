@@ -81,6 +81,7 @@ async function run(list, name, args) {
 
 test('app control stays off until Lab saves it, then the three actions appear [AC:macos-app-control#AC-1]', async () => {
   const store = memoryStore();
+  store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
   assert.deepEqual(readAppControlSettings(store), { enabled: false });
   assert.deepEqual(APP_CONTROL_TOOL_NAMES, ['app_activate', 'app_type_text', 'app_keystroke']);
   const catalog = createAppControlTools({ enabled: () => false, approvals: approvals(), platform: () => 'linux', spawn() { throw new Error('spawned'); } });

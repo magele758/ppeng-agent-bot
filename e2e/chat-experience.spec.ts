@@ -108,7 +108,7 @@ test.describe('Chat experience', () => {
 
     await page.getByRole('button', { name: '新增' }).click();
     await page.getByRole('menuitem', { name: /新建会话/ }).click();
-    await page.getByRole('button', { name: '筛选会话', exact: true }).click();
+    await page.getByTestId('session-toolbar').getByRole('button', { name: '筛选会话', exact: true }).click();
     await page.getByLabel('筛选会话列表').fill('zzz-no-such-session-zzz');
     await expect(item).toHaveCount(0);
     await page.getByLabel('筛选会话列表').fill(title);

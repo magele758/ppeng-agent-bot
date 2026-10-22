@@ -54,11 +54,13 @@ function makeRuntime(childBehavior) {
     }
     return { stopReason: 'end', assistantParts: [{ type: 'text', text: 'parent done' }] };
   });
-  return new RawAgentRuntime({
+  const runtime = new RawAgentRuntime({
     repoRoot: mkdtempSync(join(tmpdir(), 'sub-blocked-repo-')),
     stateDir: mkdtempSync(join(tmpdir(), 'sub-blocked-state-')),
     modelAdapter: adapter
   });
+  runtime.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
+  return runtime;
 }
 
 function spawnResult(runtime, sessionId) {
@@ -194,6 +196,7 @@ test('teammate parked on approval stays visible through session status, outcome 
     stateDir: mkdtempSync(join(tmpdir(), 'mate-state-')),
     modelAdapter: adapter
   });
+  runtime.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
   const parent = runtime.createChatSession({
     title: 'mate parent',
     message: 'go',
@@ -245,11 +248,13 @@ function makeTeammateRuntime(mateBehavior) {
     }
     return { stopReason: 'end', assistantParts: [{ type: 'text', text: 'parent done' }] };
   });
-  return new RawAgentRuntime({
+  const runtime = new RawAgentRuntime({
     repoRoot: mkdtempSync(join(tmpdir(), 'mate2-repo-')),
     stateDir: mkdtempSync(join(tmpdir(), 'mate2-state-')),
     modelAdapter: adapter
   });
+  runtime.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
+  return runtime;
 }
 
 function teammateResult(runtime, parentId) {
@@ -322,6 +327,7 @@ test('inherited bypass executes a child write without creating an approval [AC:b
         input: child ? { path: join(repoRoot, 'proof.txt'), content: 'child effect' } : { role: 'research', prompt: 'write proof.txt' } }] };
     })
   });
+  runtime.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
   try {
     const parent = runtime.createChatSession({ title: 'Bot', message: 'go', metadata: { botId: 'owner', permissionMode: 'bypass' } });
     await runtime.runSession(parent.id);

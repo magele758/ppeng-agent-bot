@@ -1872,7 +1872,7 @@ details.trace-row,
 .schedule-editor label { display: grid; gap: 4px; }
 .schedule-editor input { width: 100%; min-width: 0; }
 .play-sidebar__head .create-menu__pop { left: 0; right: auto; }
-.create-menu__pop::before { content: ''; position: absolute; left: 0; right: 0; top: -6px; height: 6px; }
+.create-menu__pop::before { content: ''; position: absolute; left: -12px; right: -12px; top: -20px; height: 24px; }
 .routine-result-card summary, .routine-context-card summary { font-size: var(--control-size); }
 .routine-context-card pre { font-size: var(--reading-size); line-height: 1.5; }
 .memory-source-preview pre { font: inherit; line-height: 1.5; }

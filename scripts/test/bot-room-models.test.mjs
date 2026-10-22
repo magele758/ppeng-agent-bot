@@ -29,7 +29,7 @@ test('Room shows each member model source and updates the global default without
 
 test('a room without a usable real model clearly reports unconfigured rather than a builtin demo [AC:global-default-model-clarity#AC-5]',async()=>{
  const rt=runtime();try{
- const bot=rt.createBot({name:'UnconfiguredBot'}),room=rt.rooms.create(resolveBotPrincipal(rt.store),{title:'Empty models',botIds:[bot.id]});
+ const bot=rt.createBot({name:'UnconfiguredBot'}),peer=rt.createBot({name:'UnconfiguredPeer'}),room=rt.rooms.create(resolveBotPrincipal(rt.store),{title:'Empty models',botIds:[bot.id,peer.id]});
  const data=await get(rt,room.id);
  assert.equal(data.models.defaultModel,null);
  assert.equal(data.models.members[0].model,null);

@@ -16,10 +16,14 @@ function fixture(reply = 'room report') {
   const facade = { store, stateDir, cronStore: undefined, setCronStore(s) { this.cronStore = s; }, runImageRetention: async () => {}, wakeAllAutonomousSessions() {}, wakeAgentSessions() {} };
   const principal = { userId: 'alice', tenantId: 'team' };
   const bot = createBot(facade, { name: 'RoomBot' });
+  const peer = createBot(facade, { name: 'RoomPeer' });
+  const keeper = createBot(facade, { name: 'RoomKeeper' });
   store.updateSession(bot.canonicalSessionId, { metadata: { ...store.getSession(bot.canonicalSessionId).metadata, ...principal } });
+  store.updateSession(peer.canonicalSessionId, { metadata: { ...store.getSession(peer.canonicalSessionId).metadata, ...principal } });
+  store.updateSession(keeper.canonicalSessionId, { metadata: { ...store.getSession(keeper.canonicalSessionId).metadata, ...principal } });
   const host = { ...facade, log: { warn() {}, info() {} }, runSession: async (id) => { if (reply !== null) store.appendMessage(id, 'assistant', [{ type: 'text', text: reply }]); return store.getSession(id); } };
   const rooms = new BotRoomService({ store, createChatSession: () => { throw new Error('room turn'); }, runSession: async () => { throw new Error('room turn'); }, cancelSession() {} });
-  const room = rooms.create(principal, { title: 'Standup', botIds: [bot.id] });
+  const room = rooms.create(principal, { title: 'Standup', botIds: [bot.id, peer.id, keeper.id], hostBotId: bot.id });
   return { store, host, principal, bot, rooms, room };
 }
 
@@ -140,8 +144,10 @@ test('a routine without a room keeps the private summary only [AC:bot-routine-li
 test('another principal, a non-member and a non-bot routine cannot target a room, and null clears it [AC:bot-routine-lifecycle#AC-14]', () => {
   const { store, host, principal, bot, rooms, room } = fixture();
   const bob = createBot(host, { name: 'BobBot' });
+  const bobPeer = createBot(host, { name: 'BobPeer' });
   store.updateSession(bob.canonicalSessionId, { metadata: { ...store.getSession(bob.canonicalSessionId).metadata, userId: 'bob' } });
-  const other = rooms.create({ userId: 'bob' }, { title: 'Other', botIds: [bob.id] });
+  store.updateSession(bobPeer.canonicalSessionId, { metadata: { ...store.getSession(bobPeer.canonicalSessionId).metadata, userId: 'bob' } });
+  const other = rooms.create({ userId: 'bob' }, { title: 'Other', botIds: [bob.id, bobPeer.id] });
   assert.throws(() => createCronJob(host, { botId: bot.id, userId: principal.userId, tenantId: principal.tenantId, name: 'foreign', prompt: 'check', intervalMs: 60000, roomId: other.id }), AuthorizationError);
   const outsider = createBot(host, { name: 'Outsider' });
   store.updateSession(outsider.canonicalSessionId, { metadata: { ...store.getSession(outsider.canonicalSessionId).metadata, ...principal } });

@@ -53,6 +53,9 @@ function loadQuoteUi(file = './ReplyQuote.tsx') {
     if (id === './WorkspaceIcon') return loadQuoteUi('./WorkspaceIcon.tsx');
     if (id === '@/lib/i18n') return { useI18n: () => ({ t: translate }) };
     if (id === '@/lib/reply-quote') return localRequire('../lib/reply-quote.ts');
+    if (id === './WorkspaceIcon' || id.endsWith('/WorkspaceIcon')) {
+      return { WorkspaceIcon: () => React.createElement('span', { 'aria-hidden': 'true' }) };
+    }
     return localRequire(id);
   };
   new Function('require', 'module', 'exports', compiled)(requireComponent, mod, mod.exports);

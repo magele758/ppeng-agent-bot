@@ -59,7 +59,7 @@ test('browser and computer modes require real available tools; specialty flows s
  const browser=selectGoalRoute({task:'Browse',workKind:'browser'},{...capabilities,registeredTools:['browser_navigate']});
  assert.equal(browser.taskMode,'browser');assert.equal(browser.blocked,false);
  const specialty=selectGoalRoute({task:'Evolve',preferredStrategy:'evolution'},{...capabilities,enabledStrategies:[...capabilities.enabledStrategies,'evolution']});
- assert.equal(specialty.strategy,'direct');assert.match(specialty.reason,/no verified lifecycle adapter/);
+ assert.equal(specialty.blocked,true);assert.equal(specialty.strategy,undefined);assert.match(specialty.reason,/unavailable|not enabled/);
 });
 test('goal dispatch tool binds to current goal and never accepts cross-goal identity',async()=>{
  const {createGoalDispatchTool}=await import('../dist/bots/goals/dispatch-tool.js');

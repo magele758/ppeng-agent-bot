@@ -15,7 +15,7 @@ import {
 import { filterToolsForSession, resolveTurnTools } from '../dist/turn/resolve-turn-tools.js';
 
 function kvStore() {
-  const map = new Map();
+  const map = new Map([['tool_exposure_settings',{mode:'full',pinnedGroups:{}}]]);
   return {
     getDaemonControl(key) {
       return map.get(key);
@@ -144,7 +144,7 @@ test('enabled=false unloads all dyn meta tools including search_dyn_tools', () =
 
 test('search_dyn_tools stays hidden until active count exceeds hydrateTopK', () => {
   const rows = [];
-  const kv = new Map();
+  const kv = new Map([['tool_exposure_settings',{mode:'full',pinnedGroups:{}}]]);
   const store = {
     getDaemonControl(key) {
       return kv.get(key);

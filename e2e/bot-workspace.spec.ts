@@ -264,11 +264,16 @@ test("group reply is shown automatically and stays out of private chat [AC:bot-r
       data: { name: `Group speaker ${Date.now()}` },
     })
   ).json();
+  const { bot: peer } = await (
+    await request.post("/api/bots", {
+      data: { name: `Group peer ${Date.now()}` },
+    })
+  ).json();
   const { room } = await (
     await request.post("/api/bot-rooms", {
       data: {
         title: `Discussion ${bot.id}`,
-        botIds: [bot.id],
+        botIds: [bot.id, peer.id],
         hostBotId: bot.id,
         maxBotTurns: 2,
       },
@@ -363,7 +368,7 @@ test('due one-time work reaches a completed run and its result is inspectable [A
 });
 
 // Dedicated review fixtures are reused only by the same test across repeat-each runs.
-// Bot deletion is not an API operation and hidden Bots still count toward the roster cap.
+// There is no delete API. Hiding a Bot frees its visible roster slot; these named fixtures stay and are reused.
 async function ensureReviewBot(request: APIRequestContext, name: string): Promise<{ id: string; name: string }> {
   const roster = await request.get('/api/bots');
   expect(roster.ok()).toBeTruthy();
@@ -389,15 +394,14 @@ for (const routing of ['everyone', 'text-mention'] as const) {
     const log = panel.getByRole('log');
     if (routing === 'everyone') {
       await expect(log.getByText(host.name, { exact: true })).toBeVisible({ timeout: 30000 });
-      await expect(log.getByText(member.name, { exact: true })).toBeVisible();
+      await expect(log.getByText(member.name, { exact: true })).toHaveCount(0);
     } else {
-      // Mentioned member speaks first. The unmentioned host is still scheduled and may stay [SILENT].
       await expect(log.getByText(member.name, { exact: true })).toBeVisible({ timeout: 30000 });
     }
     await expect.poll(async () => {
       const { turns } = await (await request.get(`/api/bot-rooms/${room.id}/turns`)).json();
       return turns[0]?.botIds;
-    }, { timeout: 30000 }).toEqual(routing === 'everyone' ? [host.id, member.id] : [member.id, host.id]);
+    }, { timeout: 30000 }).toEqual(routing === 'everyone' ? [host.id] : [member.id]);
     if (routing === 'text-mention') {
       const { turns } = await (await request.get(`/api/bot-rooms/${room.id}/turns`)).json();
       expect(turns[0].mentionedBotIds).toEqual([member.id]);
@@ -429,7 +433,8 @@ test('editing a routine can remove its existing precheck [AC:bot-routine-lifecyc
 
 test('Room polling preserves access to messages across a missed page [AC:bot-rooms#AC-6]', async ({ page, request }) => {
   const bot = await ensureReviewBot(request, 'E2E Review Room Gap');
-  const { room } = await (await request.post('/api/bot-rooms', { data: { title: `Gap ${bot.id} ${Date.now()}`, botIds: [bot.id] } })).json();
+  const peer = await ensureReviewBot(request, 'E2E Review Room Gap Peer');
+  const { room } = await (await request.post('/api/bot-rooms', { data: { title: `Gap ${bot.id} ${Date.now()}`, botIds: [bot.id, peer.id], hostBotId: bot.id } })).json();
   // Pause so the burst stays user rows. A speaking member would insert replies and push item 1 past one older page.
   expect((await request.post(`/api/bot-rooms/${room.id}/stop`)).ok()).toBeTruthy();
   await request.post(`/api/bot-rooms/${room.id}/messages`, { data: { text: 'Room gap initial' } });
@@ -456,7 +461,8 @@ test('switching Rooms clears the previous room draft, mentions and attachments [
   const rooms = [];
   for (const suffix of ['A', 'B']) {
     const bot = await ensureReviewBot(request, `E2E Review Scope ${suffix}`);
-    const { room } = await (await request.post('/api/bot-rooms', { data: { title: `Scope ${bot.id} ${Date.now()}`, botIds: [bot.id] } })).json();
+    const peer = await ensureReviewBot(request, 'E2E Review Scope Peer');
+    const { room } = await (await request.post('/api/bot-rooms', { data: { title: `Scope ${bot.id} ${Date.now()}`, botIds: [bot.id, peer.id], hostBotId: bot.id } })).json();
     rooms.push({ bot, room });
   }
   const panel = await openRoomSettings(page, rooms[0].room.title);

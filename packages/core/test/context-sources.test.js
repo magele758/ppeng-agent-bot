@@ -128,9 +128,13 @@ test('bot room message persists contextSources for members', () => {
   const store = new SqliteStateStore(join(dir, 'state.db'));
   const facade = { store, runImageRetention: async () => {}, wakeAllAutonomousSessions: () => {}, wakeAgentSessions: () => {} };
   const bot = createBot(facade, { name: 'RoomBot' });
+  const peer = createBot(facade, { name: 'RoomPeer' });
   const principal = { userId: 'owner', tenantId: 'team' };
   store.updateSession(bot.canonicalSessionId, {
     metadata: { ...store.getSession(bot.canonicalSessionId).metadata, ...principal }
+  });
+  store.updateSession(peer.canonicalSessionId, {
+    metadata: { ...store.getSession(peer.canonicalSessionId).metadata, ...principal }
   });
   const host = {
     store,
@@ -139,7 +143,7 @@ test('bot room message persists contextSources for members', () => {
     cancelSession: () => {}
   };
   const rooms = new BotRoomService(host);
-  const room = rooms.create(principal, { title: 'Ctx', botIds: [bot.id], hostBotId: bot.id });
+  const room = rooms.create(principal, { title: 'Ctx', botIds: [bot.id, peer.id], hostBotId: bot.id });
   const phrase = 'room-unique-phrase-ac5';
   const sent = rooms.send(principal, room.id, {
     text: 'discuss',

@@ -95,14 +95,17 @@ test('未保存且未设置 RAW_AGENT_DISCOVERY 时 tool_search 不会因未开�
   });
 });
 
-test('已保存关闭后即使环境为开 tool_search 仍因未开启被拒绝 [AC:discovery-default-on#AC-2]', async () => {
+test('已保存关闭后外部发现拒绝而本地搜索独立 [AC:discovery-default-on#AC-2]', async () => {
   await withStore(async (store) => {
     writeDiscoverySettings(store, { enabled: false });
     const env = { RAW_AGENT_DISCOVERY: '1' };
     assert.equal(resolveDiscoveryEnabled(store, env), false);
     const res = await runToolSearch(store, env);
-    assert.equal(res.ok, false);
-    assert.match(String(res.content), /disabled|未开启/);
+    assert.equal(res.ok, true);
+    assert.equal(JSON.parse(res.content).externalDiscoveryEnabled, false);
+    assert.deepEqual(JSON.parse(res.content).hits, []);
+    const tools=createToolSearchTools({settingsStore:store,env,getRegistry:()=>{throw new Error('Disabled discovery must not access registry');}});
+    assert.equal((await tools.find(t=>t.name==='load_capability_tool').execute({}, {id:'external-capability'})).ok,false);
   });
 });
 
@@ -117,14 +120,17 @@ test('已保存开启后即使环境为关 tool_search 也不会因未开启失�
   });
 });
 
-test('未保存且 RAW_AGENT_DISCOVERY=0 时 tool_search 因未开启被拒绝 [AC:discovery-default-on#AC-4]', async () => {
+test('安装关闭外部发现不阻止本地搜索 [AC:discovery-default-on#AC-4]', async () => {
   await withStore(async (store) => {
     assert.equal(hasPersistedDiscoverySettings(store), false);
     const env = { RAW_AGENT_DISCOVERY: '0' };
     assert.equal(resolveDiscoveryEnabled(store, env), false);
     const res = await runToolSearch(store, env);
-    assert.equal(res.ok, false);
-    assert.match(String(res.content), /disabled|未开启/);
+    assert.equal(res.ok, true);
+    assert.equal(JSON.parse(res.content).externalDiscoveryEnabled, false);
+    assert.deepEqual(JSON.parse(res.content).hits, []);
+    const tools=createToolSearchTools({settingsStore:store,env,getRegistry:()=>{throw new Error('Disabled discovery must not access registry');}});
+    assert.equal((await tools.find(t=>t.name==='load_capability_tool').execute({}, {id:'external-capability'})).ok,false);
   });
 });
 

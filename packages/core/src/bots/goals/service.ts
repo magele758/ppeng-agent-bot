@@ -3,6 +3,22 @@ import type { BotGoal, GoalExecution, GoalIntent, GoalReport, GoalSettings, Goal
 import { mutateGoalSnapshot, readGoalSnapshot } from './store.js';
 import { readGoalSettings, writeGoalSettings } from './settings.js';
 const terminal = new Set(['completed', 'cancelled', 'failed']);
+function finiteReportCost(value: number | undefined): number {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+function reportAdvanced(result: GoalReport, goal: BotGoal): boolean {
+  return result.advanced === true || (result.advanced === undefined && !!result.summary && result.summary !== goal.progress);
+}
+function sameWakeIdentity(event: { goalId?: string; source: string; correlationId: string }, goal: BotGoal, wait: { source: string; correlationId: string }): boolean {
+  return (!event.goalId || event.goalId === goal.id) && event.source === wait.source && event.correlationId === wait.correlationId;
+}
+function wakeSessionMatches(event: { sessionId?: string }, goal: BotGoal): boolean {
+  return !event.sessionId || event.sessionId === goal.sessionId;
+}
+function wakeMatches(event: { goalId?: string; source: string; correlationId: string; sessionId?: string; consumedBy: string[] }, goal: BotGoal, wait: { source: string; correlationId: string }): boolean {
+  if (!sameWakeIdentity(event, goal, wait)) return false;
+  return wakeSessionMatches(event, goal) && !event.consumedBy.includes(goal.id);
+}
 export class BotGoalService {
  constructor(private readonly store: GoalStore, private readonly clock: () => number = Date.now, private readonly scopeSessionId?: string) {}
  private date(): string { return new Date(this.clock()).toISOString(); }
@@ -25,19 +41,37 @@ export class BotGoalService {
    s.goals.push(g);this.event(s,'created',g);return g;
   });
  }
+ private duplicateIntent(s: GoalSnapshot, goal: BotGoal, intent: GoalIntent): { goal: BotGoal; duplicate: true } | undefined {
+  const key = `intent:${goal.sessionId}:${goal.id}:${intent.kind}:${intent.sourceMessageId}`;
+  if (intent.sourceMessageId && s.processed.includes(key)) return { goal: this.find(s, goal.id), duplicate: true };
+  return undefined;
+ }
+ private applyIntentControl(s: GoalSnapshot, goal: BotGoal, intent: GoalIntent): void {
+  if (intent.kind === 'pause' || intent.kind === 'resume' || intent.kind === 'cancel') this.controlState(s, goal, intent.kind);
+ }
+ private applyIntentChange(s: GoalSnapshot, goal: BotGoal, intent: GoalIntent): void {
+  if (intent.kind === 'amend_goal') { this.amendState(s, goal, intent.text ?? ''); return; }
+  this.applyIntentControl(s, goal, intent);
+ }
+ private rememberIntent(s: GoalSnapshot, goal: BotGoal, intent: GoalIntent): void {
+  if (!intent.sourceMessageId) return;
+  s.processed.push(`intent:${goal.sessionId}:${goal.id}:${intent.kind}:${intent.sourceMessageId}`);
+ }
+ private commitIntent(s: GoalSnapshot, goal: BotGoal, intent: GoalIntent): { goal: BotGoal; duplicate?: true } {
+  const duplicate = this.duplicateIntent(s, goal, intent);
+  if (duplicate) return duplicate;
+  const current = this.find(s, goal.id);
+  this.applyIntentChange(s, current, intent);
+  this.rememberIntent(s, goal, intent);
+  return { goal: current };
+ }
  applyIntent(botId: string, intent: GoalIntent): { goal?: BotGoal; goals?: BotGoal[]; clarification?: boolean; duplicate?: boolean } {
   if (intent.kind === 'query') return { goals: intent.goalId ? this.list(botId).filter(g => g.id === intent.goalId) : this.list(botId) };
   if (intent.kind === 'new_goal') return { goal: this.create({ botId, sessionId: this.scopeSessionId ?? intent.sessionId ?? '', title: intent.text ?? '', objective: intent.text ?? '', sourceMessageId: intent.sourceMessageId }) };
   const candidates = this.list(botId).filter(g => intent.goalId ? g.id === intent.goalId : !terminal.has(g.status));
   if (candidates.length !== 1) return { clarification: true };
   const goal = candidates[0]!;
-  return mutateGoalSnapshot(this.store,botId,s => {
-   const key = `intent:${goal.sessionId}:${goal.id}:${intent.kind}:${intent.sourceMessageId}`;
-   if (intent.sourceMessageId && s.processed.includes(key)) return { goal: this.find(s,goal.id), duplicate: true };
-   const g=this.find(s,goal.id);
-   if (intent.kind === 'amend_goal') this.amendState(s,g,intent.text ?? ''); else if (intent.kind === 'pause' || intent.kind === 'resume' || intent.kind === 'cancel') this.controlState(s,g,intent.kind);
-   if (intent.sourceMessageId) s.processed.push(key);return { goal:g };
-  });
+  return mutateGoalSnapshot(this.store, botId, s => this.commitIntent(s, goal, intent));
  }
  private amendState(s: GoalSnapshot,g: BotGoal,constraint: string): void {
   if (!constraint.trim()) throw new Error('Constraint required');
@@ -76,31 +110,118 @@ export class BotGoalService {
   if(reason){g.status='blocked';g.blockedReason=reason;g.nextStep='User review required';return true;}return false;
  }
  report(botId:string,id:string,result:GoalReport):BotGoal {
-  return mutateGoalSnapshot(this.store,botId,s=>{
-   const e=s.executions.find(x=>x.id===id);if(!e)throw new Error('Execution not found');const g=this.find(s,e.goalId);
-   if ((result.owner !== undefined && result.owner !== e.owner) || (result.fence !== undefined && result.fence !== e.fence)) throw new Error('Execution fence mismatch');
-   const eventKey=`result:${id}:${result.eventId??'final'}`;if(s.processed.includes(eventKey)||e.status!=='running')return g;
-   s.processed.push(eventKey);e.status='finished';e.summary=result.summary;e.endedAt=this.date();g.activeExecutionId=undefined;g.draining=false;
-   const cost=typeof result.costUsd==='number'&&Number.isFinite(result.costUsd)?Math.max(0,result.costUsd):0;g.costUsd+=cost;
-   if(g.parentGoalId){const parent=this.find(s,g.parentGoalId);parent.costUsd+=cost;this.limit(parent,this.readSettings());}
-   g.evidence.push(...(result.evidence??[]));
-   if(terminal.has(g.status)||g.status==='paused'){if(result.wait){g.wait=result.wait;g.draining=true;}else if(g.wait)g.draining=true;this.event(s,'late_result',g,result.summary);return g;}
-   if(e.leaseUntil<=this.clock()){g.status='blocked';g.blockedReason='Execution lease expired; reconcile result before retry';this.event(s,'expired_result',g,result.summary);return g;}
-   if(e.goalRevision!==g.revision){g.status='queued';if(result.wait){g.wait=result.wait;g.draining=true;}g.blockedReason='Previous result used outdated constraints; reconciliation required';this.event(s,'stale_result',g,result.summary);return g;}
-   g.noProgress=result.advanced === true || (result.advanced === undefined && result.summary&&result.summary!==g.progress)?0:g.noProgress+1;g.progress=result.summary;g.nextStep=result.nextStep;g.blockedReason=undefined;
-   this.applyReportState(s,g,result);
-   if(!terminal.has(g.status))this.limit(g,this.readSettings());this.event(s,'result',g,result.summary);return g;
-  });
+  return mutateGoalSnapshot(this.store,botId,s => this.applyReport(s,id,result));
  }
- private applyReportState(s:GoalSnapshot,g:BotGoal,result:GoalReport):void {
-   switch(result.kind){
-    case 'candidate_completed':g.status=result.verified&&Boolean(result.evidence?.length)?'completed':'blocked';if(g.status==='blocked')g.blockedReason='Completion evidence requires verification';break;
-    case 'waiting':if(!result.wait?.source||!result.wait.correlationId){g.status='blocked';g.blockedReason='Missing durable wait condition';}else{const wake=s.wakeEvents?.find(w=>(!w.goalId||w.goalId===g.id)&&w.source===result.wait!.source&&w.correlationId===result.wait!.correlationId&&(!w.sessionId||w.sessionId===g.sessionId)&&!w.consumedBy.includes(g.id));if(wake){wake.consumedBy.push(g.id);g.status='queued';g.nextStep=`Inspect authorized ${wake.source} result ${wake.correlationId} before continuing`;g.wait=undefined;this.applyWakeData(s,g,wake);}else{g.status='waiting';g.wait=result.wait;}}break;
-    case 'blocked':g.status='blocked';g.blockedReason=result.summary||'Execution blocked';if(result.wait){g.wait=result.wait;g.draining=true;}break;
-    case 'failed':g.status='blocked';g.blockedReason=result.summary||'Execution failed';break;
-    case 'cancelled':g.status='cancelled';break;
-    case 'progress':g.status='queued';break;
-   }
+ private applyReport(s:GoalSnapshot,id:string,result:GoalReport):BotGoal {
+  const opened=this.openReportedExecution(s,id,result);
+  if(opened.stopped)return opened.goal;
+  this.recordReportProgress(opened.goal,result);
+  this.applyReportKind(s,opened.goal,result);
+  if(!terminal.has(opened.goal.status))this.limit(opened.goal,this.readSettings());
+  this.event(s,'result',opened.goal,result.summary);
+  return opened.goal;
+ }
+ private openReportedExecution(s:GoalSnapshot,id:string,result:GoalReport):{goal:BotGoal;stopped:boolean} {
+  const execution=this.requireExecution(s,id);
+  const goal=this.find(s,execution.goalId);
+  this.assertReportFence(execution,result);
+  if(this.duplicateReport(s,id,result,execution))return {goal,stopped:true};
+  this.acceptReport(s,id,execution,goal,result);
+  return this.settleReportGuards(s,execution,goal,result);
+ }
+ private requireExecution(s:GoalSnapshot,id:string):GoalExecution {
+  const execution=s.executions.find(item=>item.id===id);
+  if(!execution)throw new Error('Execution not found');
+  return execution;
+ }
+ private assertReportFence(execution:GoalExecution,result:GoalReport):void {
+  if((result.owner!==undefined&&result.owner!==execution.owner)||(result.fence!==undefined&&result.fence!==execution.fence))throw new Error('Execution fence mismatch');
+ }
+ private duplicateReport(s:GoalSnapshot,id:string,result:GoalReport,execution:GoalExecution):boolean {
+  return s.processed.includes(`result:${id}:${result.eventId??'final'}`)||execution.status!=='running';
+ }
+ private acceptReport(s:GoalSnapshot,id:string,execution:GoalExecution,goal:BotGoal,result:GoalReport):void {
+  s.processed.push(`result:${id}:${result.eventId??'final'}`);
+  execution.status='finished';execution.summary=result.summary;execution.endedAt=this.date();
+  goal.activeExecutionId=undefined;goal.draining=false;
+  this.addReportCost(s,goal,result);
+  goal.evidence.push(...(result.evidence??[]));
+ }
+ private addReportCost(s:GoalSnapshot,goal:BotGoal,result:GoalReport):void {
+  const cost=finiteReportCost(result.costUsd);
+  goal.costUsd+=cost;
+  if(goal.parentGoalId)this.chargeParent(s,goal.parentGoalId,cost);
+ }
+ private chargeParent(s:GoalSnapshot,parentGoalId:string,cost:number):void {
+  const parent=this.find(s,parentGoalId);
+  parent.costUsd+=cost;
+  this.limit(parent,this.readSettings());
+ }
+ private settleReportGuards(s:GoalSnapshot,execution:GoalExecution,goal:BotGoal,result:GoalReport):{goal:BotGoal;stopped:boolean} {
+  if(this.lateReport(s,goal,result))return {goal,stopped:true};
+  if(this.expiredReport(s,execution,goal,result))return {goal,stopped:true};
+  if(this.staleReport(s,execution,goal,result))return {goal,stopped:true};
+  return {goal,stopped:false};
+ }
+ private lateReport(s:GoalSnapshot,goal:BotGoal,result:GoalReport):boolean {
+  if(!terminal.has(goal.status)&&goal.status!=='paused')return false;
+  if(result.wait){goal.wait=result.wait;goal.draining=true;}
+  else if(goal.wait)goal.draining=true;
+  this.event(s,'late_result',goal,result.summary);
+  return true;
+ }
+ private expiredReport(s:GoalSnapshot,execution:GoalExecution,goal:BotGoal,result:GoalReport):boolean {
+  if(execution.leaseUntil>this.clock())return false;
+  goal.status='blocked';goal.blockedReason='Execution lease expired; reconcile result before retry';
+  this.event(s,'expired_result',goal,result.summary);
+  return true;
+ }
+ private staleReport(s:GoalSnapshot,execution:GoalExecution,goal:BotGoal,result:GoalReport):boolean {
+  if(execution.goalRevision===goal.revision)return false;
+  goal.status='queued';
+  if(result.wait){goal.wait=result.wait;goal.draining=true;}
+  goal.blockedReason='Previous result used outdated constraints; reconciliation required';
+  this.event(s,'stale_result',goal,result.summary);
+  return true;
+ }
+ private recordReportProgress(goal:BotGoal,result:GoalReport):void {
+  goal.noProgress=reportAdvanced(result,goal)?0:goal.noProgress+1;
+  goal.progress=result.summary;goal.nextStep=result.nextStep;goal.blockedReason=undefined;
+ }
+ private applyReportKind(s:GoalSnapshot,goal:BotGoal,result:GoalReport):void {
+  if(result.kind==='candidate_completed'||result.kind==='waiting'){this.applyCompletionOrWait(s,goal,result);return;}
+  this.applyTerminalReportKind(goal,result);
+ }
+ private applyCompletionOrWait(s:GoalSnapshot,goal:BotGoal,result:GoalReport):void {
+  if(result.kind==='candidate_completed')this.markCandidateCompleted(goal,result);
+  else this.markWaiting(s,goal,result);
+ }
+ private markCandidateCompleted(goal:BotGoal,result:GoalReport):void {
+  goal.status=result.verified&&Boolean(result.evidence?.length)?'completed':'blocked';
+  if(goal.status==='blocked')goal.blockedReason='Completion evidence requires verification';
+ }
+ private markWaiting(s:GoalSnapshot,goal:BotGoal,result:GoalReport):void {
+  if(!result.wait?.source||!result.wait.correlationId){goal.status='blocked';goal.blockedReason='Missing durable wait condition';return;}
+  const wake=s.wakeEvents?.find(event=>wakeMatches(event,goal,result.wait!));
+  if(wake)this.consumeWake(s,goal,wake);
+  else {goal.status='waiting';goal.wait=result.wait;}
+ }
+ private consumeWake(s:GoalSnapshot,goal:BotGoal,wake:{source:string;correlationId:string;consumedBy:string[];summary?:string;evidence?:string[];costUsd?:number}):void {
+  wake.consumedBy.push(goal.id);
+  goal.status='queued';
+  goal.nextStep=`Inspect authorized ${wake.source} result ${wake.correlationId} before continuing`;
+  goal.wait=undefined;
+  this.applyWakeData(s,goal,wake);
+ }
+ private applyTerminalReportKind(goal:BotGoal,result:GoalReport):void {
+  if(result.kind==='blocked'||result.kind==='failed')this.markBlockedReport(goal,result);
+  else if(result.kind==='cancelled')goal.status='cancelled';
+  else if(result.kind==='progress')goal.status='queued';
+ }
+ private markBlockedReport(goal:BotGoal,result:GoalReport):void {
+  goal.status='blocked';
+  goal.blockedReason=result.summary||(result.kind==='failed'?'Execution failed':'Execution blocked');
+  if(result.kind==='blocked'&&result.wait){goal.wait=result.wait;goal.draining=true;}
  }
  private applyWakeData(s:GoalSnapshot,g:BotGoal,event:{summary?:string;evidence?:string[];costUsd?:number}):void{if(event.summary)g.progress=event.summary;g.evidence.push(...(event.evidence??[]));const cost=Number.isFinite(event.costUsd)?Math.max(0,event.costUsd!):0;g.costUsd+=cost;if(g.parentGoalId){const parent=this.find(s,g.parentGoalId);parent.costUsd+=cost;this.limit(parent,this.readSettings());}this.limit(g,this.readSettings());}
  wake(botId:string,event:{goalId?:string;eventId:string;source:string;correlationId:string;summary?:string;evidence?:string[];costUsd?:number}):BotGoal[]{return mutateGoalSnapshot(this.store,botId,s=>{

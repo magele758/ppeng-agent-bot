@@ -82,6 +82,7 @@ test('a2ui_render produces SSE chunks and SurfaceUpdatePart on the tool message'
     const { repoRoot, stateDir } = makeDirs();
     const adapter = new TwoCallA2uiAdapter();
     const rt = new RawAgentRuntime({ repoRoot, stateDir, modelAdapter: adapter });
+    rt.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
     const session = rt.createChatSession({ title: 'a2ui-rt' });
 
     const chunks = [];

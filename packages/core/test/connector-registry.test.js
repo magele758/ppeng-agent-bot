@@ -219,6 +219,7 @@ test('a later model turn omits a revoked connector and never sees the secret', a
         }
       }
     });
+    rt.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
     const session = rt.store.createSession({
       title: 'connectors',
       mode: 'chat',

@@ -42,6 +42,36 @@ test('runtime intent -> session route confirmation -> searchable and loadable wi
   const loaded=await resolveSkillLoad(host,'http-release-check',session.id);assert.match(loaded.content,/health endpoint/);
 });
 
+test('bot skill selection patch saves the current revision and rejects a stale one', async t => {
+  const dir = mkdtempSync(join(tmpdir(), 'skill-selection-patch-'));
+  const runtime = new RawAgentRuntime({ repoRoot: dir, stateDir: join(dir, 'state'), modelAdapter: {
+    name: 'idle', runTurn: async () => ({ stopReason: 'end', assistantParts: [] }), summarizeMessages: async () => ''
+  } });
+  t.after(async () => { await runtime.destroy(); rmSync(dir, { recursive: true, force: true }); });
+  const bot = runtime.createBot({ name: 'SkillBot' });
+  const routes = skillProposalRoutes(runtime);
+  const get = routes.find(route => route.method === 'GET' && route.pattern === '/api/bots/:id/skills');
+  const patch = routes.find(route => route.method === 'PATCH' && route.pattern === '/api/bots/:id/skills');
+  async function call(route, body) {
+    let payload;
+    let status = 200;
+    await route.handler({
+      auth: ANON,
+      requireParam: () => bot.id,
+      readBody: async () => body,
+      response: { setHeader() {}, end(raw) { payload = JSON.parse(raw); }, writeHead(code) { status = code; } }
+    });
+    return { payload, status };
+  }
+  const current = await call(get);
+  assert.equal(current.payload.policy.mode, 'all');
+  await assert.rejects(() => call(patch, { policy: { mode: 'all', ids: [] }, revision: 'stale' }), /Skill settings changed/);
+  await assert.rejects(() => call(patch, { policy: { mode: 'custom', ids: [] }, revision: current.payload.revision }), /Invalid skill selection/);
+  const saved = await call(patch, { policy: { mode: 'selected', ids: [] }, revision: current.payload.revision });
+  assert.equal(saved.payload.policy.mode, 'selected');
+  assert.deepEqual(saved.payload.policy.ids, []);
+});
+
 test('assembled Bot host reminds after ten tool iterations, not ten parallel calls [AC:skill-capture-intent-confirmation#AC-1]', async t=>{
   const {l5ToAssembledIo}=await import('../dist/runtime/l5-bindings.js');
   const dir=mkdtempSync(join(tmpdir(),'skill-capture-reminder-'));

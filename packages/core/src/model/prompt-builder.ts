@@ -1,3 +1,4 @@
+import { toolDirectory } from '../tools/tool-exposure.js';
 import {readBotSkillSelection, selectBotSkills} from '../skills/bot-selection.js';
 import { filterSkillsByBot, sessionBotId } from '../skills/bot-scope.js';
 /**
@@ -61,7 +62,7 @@ const { HARNESS_ARTIFACT_DIR, HARNESS_ARTIFACT_FILES } = await import('../types.
  * Bump when `buildStablePrefix` (or any helper that feeds it) changes wording.
  * See `./AGENTS.md`.
  */
-export const STABLE_SYSTEM_VERSION = 'v9';
+export const STABLE_SYSTEM_VERSION = 'v10';
 
 /** Appended when `RAW_AGENT_AGENTIC_SAFETY_APPENDIX` is set; English to match the rest of the stable prefix. */
 export const RUNTIME_AGENTIC_SAFETY_APPENDIX = `Runtime safety appendix (policy text only; does not replace model-level safety training):
@@ -403,9 +404,9 @@ export class PromptBuilder {
       PRIVATE_CHAT_GROUP_SPEAKER_RULE,
       'When the user attaches images or you need OCR/visual detail from stored screenshots, call vision_analyze with asset_ids (from [image id] markers) and a focused prompt. Requires RAW_AGENT_VL_MODEL_NAME.',
       resolveDiscoveryEnabled(this.deps.store, process.env)
-        ? 'Capability discovery is enabled: bound tools are not all injected upfront. Prefer tool_search(query) then load_capability_tool(id) before calling a discovered capability. Skills manage playbooks; Tool Search manages the callable tool surface.'
+        ? 'External service discovery is enabled. It is separate from local tool delivery. Capability cards describe external bindings; they are not executable tools by themselves.'
         : '',
-      'Domain tools such as stock quotes and cluster queries are not in the tool list by default. When one is needed, call tool_search(query), then load_capability_tool with the returned name, and call that tool on the next step. Do not search for capabilities the user has turned off.',
+      toolDirectory(this.deps.store),
       harnessLines.length > 0 ? harnessLines.join('\n') : '',
     ]
       .filter(Boolean)

@@ -1,3 +1,4 @@
+import { createGoalFactoryDevelopmentTool, createGoalSelfHealTool, specialtyStatus, cancelSpecialty } from './bots/goals/specialty-services.js';
 import { FactoryService } from './factory/service.js';
 import { createFactoryTools } from './factory/tools.js';
 import { createProductAdminTools } from './tools/product-admin-tools.js';
@@ -7,7 +8,9 @@ import { applyConcurrentBotForks, clearActiveWorkPiece } from './bots/concurrent
 import { forkOpeningMessage, inheritForkRetrievalMetadata } from './bots/fork-inheritance.js';
 import { createSubagentHelpTool } from './runtime/subagent-help.js';
 import { createHistoryTools } from './session/history/tools.js';
-import { prepareGoalIntake, bindGoalExecution, settleGoalExecution, createGoalCheckpointTool, goalScope, goalWorkKind, type GoalRuntimeHost } from './bots/goals/runtime-host.js';
+import { createRoomRetrievalTools } from './rooms/room-retrieval-tools.js';
+import { recordRetrieved } from './rooms/touched-memory.js';
+import { prepareGoalIntake, goalExecutionTask, bindGoalExecution, settleGoalExecution, createGoalCheckpointTool, goalScope, goalWorkKind, type GoalRuntimeHost } from './bots/goals/runtime-host.js';
 import { tickBotGoals } from './bots/goals/scheduler.js';
 import { createRuntimeGoalDispatchTool } from './bots/goals/runtime-dispatch.js';
 import { observeGoalBudget } from './bots/goals/budget.js';
@@ -101,7 +104,7 @@ import { inheritBotIdentityMetadata } from './memory/bot-memory-scope.js';
 import { botTeammatePermission, childPermissionMode, inheritBotAllowlists, inheritModelOverride } from './runtime/spawn-policy.js';
 import { scratchKeyFilterFromInherit } from './memory/ptc-meta.js';
 import { runGoalVerify } from './goal/run-verify.js';
-import { filterToolsForSession } from './turn/resolve-turn-tools.js';
+import { filterToolsForSession, hiddenDeferredToolsForSession } from './turn/resolve-turn-tools.js';
 import { markInterruptedSubagentsUnknown } from './runtime/subagent-policy.js';
 import { ResearchPipeline } from './deepresearch/pipeline.js';
 import { ImageIngestService } from './services/image-ingest-service.js';
@@ -120,7 +123,7 @@ import { AgentLoopHandle, type AgentLoopLatch } from './runtime/agent-loop.js';
 import type { EnqueueSteerOptions } from './session/step-inbox.js';
 import { decideSteerAdmission, type SteerAck } from './session/steer-ack.js';
 import { resolveSteerInterruptPolicy } from './session/steer-interrupt.js';
-import { requestHumanRun, requestSteerContinuation, dropHumanSteerContinuation, withHumanContinuationAdmission, createHumanContinuationObserver, drainHumanContinuations, blockHumanContinuations, releaseHumanModelInput } from './session/human-continuation.js';
+import { requestHumanRun, requestSteerContinuation, dropHumanSteerContinuation, withHumanContinuationAdmission, createHumanContinuationObserver, drainHumanContinuations, blockHumanContinuations, releaseHumanModelInput, runAnsweredHumanSession } from './session/human-continuation.js';
 import { type SteerDrainPolicy } from './session/steer-drain.js';
 import { runSessionKernel as runSessionKernelPpeng } from './turn/kernel.js';
 import {
@@ -242,6 +245,76 @@ export interface RuntimeOptions {
   maxParallelToolCalls?: number;
   /** In-process extension handlers (pi-style phases). */
   extensions?: ExtensionSpec[];
+}
+
+function roomTouchScope(session: { metadata?: Record<string, unknown> | null } | undefined, store: SqliteStateStore): { roomId: string; botId: string; turnId: string } | undefined {
+  const meta = session?.metadata;
+  const roomId = typeof meta?.roomId === 'string' ? meta.roomId.trim() : '';
+  const botId = typeof meta?.botId === 'string' ? meta.botId.trim() : '';
+  if (!roomId || !botId) return undefined;
+  const stamped = typeof meta?.roomTurnId === 'string' ? meta.roomTurnId.trim() : '';
+  if (stamped) return { roomId, botId, turnId: stamped };
+  try {
+    const row = store.db.prepare(
+      "SELECT id FROM bot_room_turns WHERE room_id=? AND status='running' ORDER BY rowid DESC LIMIT 1"
+    ).get(roomId) as { id?: string } | undefined;
+    return typeof row?.id === 'string' && row.id ? { roomId, botId, turnId: row.id } : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Record only the messages or attachment body a room read tool actually returned. */
+function noteRoomRetrieval(store: SqliteStateStore, toolName: string, session: { metadata?: Record<string, unknown> | null } | undefined, content: string): void {
+  const scope = roomTouchScope(session, store);
+  if (!scope) return;
+  let parsed: unknown;
+  try { parsed = JSON.parse(content); } catch { return; }
+  if (!parsed || typeof parsed !== 'object') return;
+  const body = parsed as Record<string, unknown>;
+  try {
+    if (toolName === 'room_history_read' && Array.isArray(body.messages)) {
+      for (const item of body.messages) {
+        if (!item || typeof item !== 'object') continue;
+        const message = item as Record<string, unknown>;
+        const id = typeof message.messageId === 'string' ? message.messageId : '';
+        const text = typeof message.text === 'string' ? message.text : '';
+        if (!id || !text.trim()) continue;
+        const attachmentIds = Array.isArray(message.attachmentIds)
+          ? message.attachmentIds.filter((value): value is string => typeof value === 'string')
+          : undefined;
+        recordRetrieved(store.db, {
+          ...scope,
+          message: { id, seq: typeof message.seq === 'number' ? message.seq : undefined, text, attachmentIds }
+        });
+      }
+      return;
+    }
+    if (toolName === 'room_material_read') {
+      const id = typeof body.materialId === 'string' ? body.materialId : '';
+      const text = typeof body.text === 'string' ? body.text : '';
+      if (!id || !text.trim()) return;
+      recordRetrieved(store.db, {
+        ...scope,
+        attachment: { id, name: typeof body.name === 'string' ? body.name : undefined, text }
+      });
+    }
+  } catch {
+    // The read already succeeded. A ledger miss must not hide that text.
+  }
+}
+
+function withRoomRetrievalTouch(store: SqliteStateStore, tool: ToolContract): ToolContract {
+  if (tool.name !== 'room_history_read' && tool.name !== 'room_material_read') return tool;
+  const run = tool.execute.bind(tool);
+  return {
+    ...tool,
+    async execute(context, args) {
+      const result = await run(context, args);
+      if (result.ok) noteRoomRetrieval(store, tool.name, context.session, result.content);
+      return result;
+    }
+  };
 }
 
 export class RawAgentRuntime {
@@ -463,6 +536,7 @@ export class RawAgentRuntime {
       ...optionalExtras,
       messageAgentTool,
       ...createHistoryTools(this.store),
+      ...createRoomRetrievalTools(this.store).map(tool => withRoomRetrievalTouch(this.store, tool)),
       createSubagentHelpTool(this.store),
       ...createBotManagementTools({ store: this.store, runSession: (id) => this.runSession(id),
         isSessionRunning: (id) => this.runningSessions.has(id), cancelSession: (id) => this.cancelSession(id),
@@ -619,18 +693,33 @@ export class RawAgentRuntime {
       cancelSession: (id) => this.cancelSession(id)
     }));
     this.tools.push(createGoalCheckpointTool(this.store));
+    this.tools.push(createGoalSelfHealTool({store:this.store,selfHeal:this.selfHeal}));
+    this.tools.push(createGoalFactoryDevelopmentTool({store:this.store,factory:this.factory}));
     this.tools.push(createRuntimeGoalDispatchTool({
       store: this.store, goalHost: this.goalRuntimeHost(), deps: () => toolLoopDepsFrom(this.l5()),
       filePolicy: () => this.mergedFilePolicy(),
-      authorizedTools: context => filterToolsForSession({env:process.env,tools:this.tools,agent:context.agent,session:context.session,settingsStore:this.store}).tools,
+      authorizedTools: (context,request) => {
+        const kind=request?.workKind ?? goalWorkKind(request?.task ?? '');
+        const taskRunMode=kind==='research'?'deep_research':kind==='browser'?'browser':kind==='computer'?'computer':kind==='batch'||request?.preferredStrategy==='ptc'?'dynamic_workflow':'auto';
+        const session=request?{...context.session,metadata:{...context.session.metadata,taskRunMode,orchestrationEngine:taskRunMode==='dynamic_workflow'?'ptc':'legacy'}}:context.session;
+        const executionTools=this.toolsForGoal(context.agent,session);
+        // Execution profiles constrain workers, not the Bot's ability to dispatch those workers.
+        const coordinator={...context.session,metadata:{...context.session.metadata,taskRunMode:'auto',orchestrationEngine:'legacy'}};
+        const controls=new Set(['spawn_subagent','bot_delegate','lab_team_plan_create','lab_team_plan_start','lab_swarm_run_create','lab_swarm_run_start']);
+        const controlTools=this.toolsForGoal(context.agent,coordinator).filter(tool=>controls.has(tool.name));
+        return [...new Map([...executionTools,...controlTools].map(tool=>[tool.name,tool])).values()];
+      },
       runWorker: async (context, request) => {
         const scope=goalScope(this.store,context.session);
         if(!scope)return {status:'blocked',content:'Goal scope is unavailable'};
         const goal=scope.service.get(scope.botId,request.goalId);
         const execution=scope.service.executions(scope.botId,request.goalId).find(item=>item.id===request.executionId);
         if(!goal||goal.status!=='running'||goal.activeExecutionId!==execution?.id||goal.revision!==request.revision||!execution||execution.status!=='running'||execution.goalRevision!==request.revision||execution.sessionId!==context.session.id||execution.leaseUntil<=Date.now())return {status:'blocked',content:'Goal execution changed before worker creation'};
-        const child=this.store.createSession({title:request.task.slice(0,100),mode:'subagent',agentId:context.agent.id,parentSessionId:context.session.id,background:true,
-          metadata:{...inheritBotAllowlists(context.session.metadata,{agentAllowedTools:context.agent.allowedTools}),...inheritModelOverride(context.session.metadata),
+        const workerAgentId = request.role ?? context.agent.id;
+        const workerAgent = this.store.getAgent(workerAgentId);
+        if (!workerAgent) return {status:'blocked',content:`Specialist ${workerAgentId} is unavailable`};
+        const child=this.store.createSession({title:request.task.slice(0,100),mode:'subagent',agentId:workerAgentId,parentSessionId:context.session.id,background:true,
+          metadata:{...inheritBotAllowlists(context.session.metadata,{agentAllowedTools:workerAgent.allowedTools}),...inheritModelOverride(context.session.metadata),
             ...inheritBotIdentityMetadata(context.session,this.store),...inheritForkRetrievalMetadata(context.session.metadata),permissionMode:childPermissionMode(context.session.metadata),
             botId:scope.botId,botGoalId:request.goalId,botGoalScopeSessionId:scope.sessionId,botGoalWorker:true,
             botGoalWorkerRevision:request.revision,botGoalWorkerExecutionId:request.executionId,botGoalWorkerFence:execution.fence,
@@ -1600,6 +1689,15 @@ export class RawAgentRuntime {
     }
   }
 
+  private toolsForGoal(agent:AgentSpec,session:SessionRecord) {
+    const input={env:process.env,tools:this.tools,agent,session,settingsStore:this.store};
+    return [...filterToolsForSession(input).tools,...hiddenDeferredToolsForSession(input)];
+  }
+
+  private goalSpecialtyHost() {
+    return {store:this.store,selfHeal:this.selfHeal,factory:this.factory,cancelSession:(id:string)=>this.cancelSession(id),isRunning:(id:string)=>this.runningSessions.has(id)};
+  }
+
   goalRuntimeHost(): GoalRuntimeHost {
     return {
       store: this.store,
@@ -1607,14 +1705,16 @@ export class RawAgentRuntime {
       cancel: id => this.cancelSession(id),
       run: id => this.runSession(id),
       judge: this.modelAdapter.completeText?.bind(this.modelAdapter),
+      inspectSpecialty: (parent,goal) => specialtyStatus(this.goalSpecialtyHost(),parent,goal),
+      cancelSpecialty: (parent,goal) => cancelSpecialty(this.goalSpecialtyHost(),parent,goal),
       capabilities: (session, goal) => {
         const agent = this.store.getAgent(session.agentId);
         const preference = goalScope(this.store, session)?.service.readSettings().preferredStrategy;
-        const candidate = goalWorkKind(goal.objective) === 'batch' || preference === 'ptc'
+        const candidate = goalWorkKind(goalExecutionTask(goal)) === 'batch' || preference === 'ptc'
           ? { ...session, metadata: { ...session.metadata, taskRunMode: 'dynamic_workflow', orchestrationEngine: 'ptc' } } : session;
-        const selected = agent ? filterToolsForSession({ env: process.env, tools: this.tools, agent, session: candidate, settingsStore: this.store }).tools : [];
+        const selected = agent ? this.toolsForGoal(agent,candidate) : [];
         return { registeredTools: this.tools.map(t => t.name), allowedTools: selected.map(t => t.name),
-          enabledStrategies: ['direct','subagent','bot_delegate','ptc','team_dag','swarm'],
+          enabledStrategies: ['direct','subagent','bot_delegate','ptc','team_dag','swarm','orchestrator','self_heal','factory'],
           ptcEnabled: selected.some(t => t.name === 'ptc_exec'), hasWorkspace: Boolean(session.workspaceId || this.repoRoot),
           budgetRemaining: goal.budgetUsd - goal.costUsd };
       }
@@ -1624,7 +1724,11 @@ export class RawAgentRuntime {
   /** Explicit human run request; subsystem runs keep their own original result promise. */
   runHumanSession(sessionId: string, options?: Parameters<RawAgentRuntime['runSession']>[1]): Promise<SessionRecord> {
     requestHumanRun(this.store, sessionId);
-    return this.runSession(sessionId, options);
+    return runAnsweredHumanSession({
+      store: this.store,
+      isRunning: (id) => this.runningSessions.has(id),
+      runSession: (id, runOptions) => this.runSession(id, runOptions)
+    }, sessionId, options);
   }
 
   private drainHumanContinuations(): Promise<void> {

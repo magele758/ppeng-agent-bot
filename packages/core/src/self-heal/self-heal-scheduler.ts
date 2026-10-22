@@ -7,6 +7,7 @@
  */
 
 import { createLogger } from '../logger.js';
+import { BotGoalService } from '../bots/goals/service.js';
 import { errorMessage } from '../errors.js';
 import {
   gitCheckoutBranch,
@@ -114,6 +115,8 @@ export class SelfHealScheduler {
   constructor(private readonly ctx: SelfHealContext) {}
 
   // ── Public API ──
+
+  isRunInFlight(id: string): boolean { return this.inFlight.has(id); }
 
   startRun(policy?: Partial<SelfHealPolicy>): SelfHealRunRecord {
     const active = this.ctx.store.listActiveSelfHealRuns();
@@ -344,9 +347,23 @@ export class SelfHealScheduler {
 
   // ── State machine ──
 
+  private canAdvanceRun(id:string):boolean {
+    const run=this.ctx.store.getSelfHealRun(id);
+    if(!run||run.stopped)return false;
+    const owner=this.ctx.store.getDaemonControl<{metadata:Record<string,unknown>}>(`bot.goal-self-heal-owner:${id}`);
+    if(!owner)return true;
+    const meta=owner.metadata;
+    const goal=new BotGoalService(this.ctx.store,Date.now,String(meta.botGoalScopeSessionId)).get(String(meta.botId),String(meta.botGoalId));
+    const current=goal && goal.revision===meta.botGoalWorkerRevision && (
+      goal.status==='running' && goal.activeExecutionId===meta.botGoalWorkerExecutionId ||
+      goal.status==='waiting' && goal.wait?.source==='self_heal' && goal.wait.correlationId===id);
+    if(!current)this.stopRun(id);
+    return Boolean(current);
+  }
+
   private async advanceRun(run: SelfHealRunRecord): Promise<void> {
     const r = this.ctx.store.getSelfHealRun(run.id);
-    if (!r || r.stopped) return;
+    if (!r || !this.canAdvanceRun(r.id)) return;
     const policy = r.policy;
 
     if (r.status === 'restart_pending') {
@@ -389,7 +406,8 @@ export class SelfHealScheduler {
 
   private async advancePending(r: SelfHealRunRecord, policy: SelfHealPolicy): Promise<void> {
     const externalAiToolNames = ['claude_code', 'codex_exec', 'cursor_agent'];
-    const sessionMeta: Record<string, unknown> = { selfHealControlled: true, selfHealRunId: r.id };
+    const owner = this.ctx.store.getDaemonControl<{parentSessionId:string;objective:string;constraints:string[];metadata:Record<string,unknown>}>(`bot.goal-self-heal-owner:${r.id}`);
+    const sessionMeta: Record<string, unknown> = { ...owner?.metadata, selfHealControlled: true, selfHealRunId: r.id };
     if (policy.allowExternalAiTools) {
       sessionMeta.approvalPolicy = {
         rules: externalAiToolNames.map((name) => ({ toolPattern: name, match: 'exact', when: 'auto' })),
@@ -400,6 +418,7 @@ export class SelfHealScheduler {
       description: `Automated self-heal. Policy: ${JSON.stringify(policy)}`,
       message: [
         `Self-heal run ${r.id}.`,
+        ...(owner ? [`Goal: ${owner.objective}`, `Constraints: ${JSON.stringify(owner.constraints)}`] : []),
         'Tests run automatically in this task workspace (git worktree).',
         'STACK: backend = packages/core + apps/daemon (TypeScript); frontend = apps/web-console (Next.js 15 App Router, entry: app/page.tsx → components/AgentLabApp.tsx, helpers in lib/). E2E Playwright tests hit the Next origin; /api/* is proxied to daemon via DAEMON_PROXY_TARGET.',
         policy.allowExternalAiTools
@@ -412,6 +431,7 @@ export class SelfHealScheduler {
       background: true,
       metadata: sessionMeta,
     });
+    if (owner) this.ctx.store.updateSession(session.id,{parentSessionId:owner.parentSessionId});
     this.ctx.store.updateTask(task.id, { status: 'in_progress' });
     this.ctx.store.updateSelfHealRun(r.id, { status: 'running_tests', taskId: task.id, sessionId: session.id });
     this.ctx.store.appendSelfHealEvent({ runId: r.id, kind: 'task_created', payload: { taskId: task.id, sessionId: session.id } });
@@ -425,6 +445,7 @@ export class SelfHealScheduler {
     taskId: string,
   ): Promise<void> {
     const wsRoot = await this.ctx.bindWorkspaceForTask(taskId);
+    if (!this.canAdvanceRun(r.id)) return;
     if (!wsRoot) {
       this.ctx.store.updateSelfHealRun(r.id, { status: 'blocked', blockReason: 'no workspace root' });
       return;
@@ -432,6 +453,7 @@ export class SelfHealScheduler {
     const task = this.ctx.store.getTask(taskId);
     const ws = task?.workspaceId ? this.ctx.store.getWorkspace(task.workspaceId) : undefined;
     const branch = await gitResolveBranch(wsRoot);
+    if (!this.canAdvanceRun(r.id)) return;
     if (branch) {
       this.ctx.store.updateSelfHealRun(r.id, { worktreeBranch: branch });
     }
@@ -446,6 +468,7 @@ export class SelfHealScheduler {
     this.logRun(r.id, `running pnpm run ${npmScript} (worktree ${ws?.mode ?? '?'}) …`);
 
     const { ok, output } = await runSelfHealNpmTest(wsRoot, policy);
+    if (!this.canAdvanceRun(r.id)) return;
     const trimmedOut = output.slice(0, 120_000);
     this.ctx.store.updateSelfHealRun(r.id, { lastTestOutput: trimmedOut });
     this.ctx.store.appendSelfHealEvent({
@@ -499,6 +522,7 @@ export class SelfHealScheduler {
 
     this.logRun(r.id, `self-healer turn (fix wave, iteration ${r.fixIteration + 1}) …`);
     await this.ctx.runSession(sessionId);
+    if (!this.canAdvanceRun(r.id)) return;
 
     const after = this.ctx.store.getSession(sessionId);
     if (after?.status === 'waiting_approval') {

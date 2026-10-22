@@ -24,6 +24,7 @@ async function admissionRace(variant, { initial = true, fresh = 'pending', rejec
   });
   try {
     const store = runtime.store;
+    store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
     store.setDaemonControl('loop_settings', { kernelVariant: variant });
     const session = runtime.createChatSession({ message: 'continue' });
     function checkpoint(wave, status) {

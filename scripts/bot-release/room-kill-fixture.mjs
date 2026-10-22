@@ -9,7 +9,7 @@ const executableHash=readExecutableFingerprint().hash;
 // Intentionally killed by the parent after committed receive and an unconfirmed effect.
 const store=new SqliteStateStore(process.argv[2]);
 const facade={store,runImageRetention:async()=>{},wakeAllAutonomousSessions(){},wakeAgentSessions(){}};
-const bot=createBot(facade,{name:'KillWorker'}),principal=resolveBotPrincipal(store);
+const bot=createBot(facade,{name:'KillWorker'}),peer=createBot(facade,{name:'KillPeer'}),principal=resolveBotPrincipal(store);
 let markStarted;
 const started=new Promise(resolve=>markStarted=resolve);
 const rooms=new BotRoomService({store,createChatSession:input=>createChatSession(facade,input),cancelSession(){},runSession(id){
@@ -17,7 +17,7 @@ const rooms=new BotRoomService({store,createChatSession:input=>createChatSession
   store.setDaemonControl('room.kill.sideEffects',(store.getDaemonControl('room.kill.sideEffects')??0)+1);
   markStarted(id);return new Promise(()=>{});
 }});
-const room=rooms.create(principal,{title:'Kill recovery',botIds:[bot.id]});
+const room=rooms.create(principal,{title:'Kill recovery',botIds:[bot.id,peer.id],hostBotId:bot.id});
 rooms.send(principal,room.id,{text:'first effect'});
 void rooms.tick();
 const runningSessionId=await started;

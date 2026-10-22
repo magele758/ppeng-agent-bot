@@ -1,10 +1,18 @@
 import {test,expect} from '@playwright/test';
 
+const createdBotIds: string[] = [];
+test.afterEach(async ({ request }) => {
+  for (const id of createdBotIds.splice(0)) await request.patch(`/api/bots/${id}`, { data: { hidden: true } });
+});
+
 test('completed task becomes a persisted routine with inputs, destination, timezone and notification rules [AC:bot-product-p2#AC-7]',async({page,request})=>{
  const {bot}=await(await request.post('/api/bots',{data:{name:`Routine source ${crypto.randomUUID()}`}})).json();
+ createdBotIds.push(bot.id);
  const {task}=await(await request.post('/api/bot-work/tasks',{data:{targetBotId:bot.id,input:'Summarize project progress'}})).json();
  await expect.poll(async()=> (await(await request.get(`/api/bot-work/tasks/${task.id}`)).json()).task.status).toBe('completed');
- const {room}=await(await request.post('/api/bot-rooms',{data:{title:'Report destination',botIds:[bot.id]}})).json();
+ const {bot:peer}=await(await request.post('/api/bots',{data:{name:`Routine peer ${crypto.randomUUID()}`}})).json();
+ createdBotIds.push(peer.id);
+ const {room}=await(await request.post('/api/bot-rooms',{data:{title:'Report destination',botIds:[bot.id,peer.id],hostBotId:bot.id}})).json();
  await page.goto('/#/tasks/bots');
  const panel=page.getByTestId('bot-team-work');
  const open=async()=>{await panel.locator('article').filter({hasText:bot.name}).getByRole('button',{name:'详情',exact:true}).click();await panel.getByRole('button',{name:'保存为例行任务',exact:true}).click();};
@@ -33,7 +41,7 @@ test('completed task becomes a persisted routine with inputs, destination, timez
 });
 
 test('delegated members appear under one goal with collected deliveries [AC:bot-product-p2#AC-5]',async({page,request})=>{
- const create=async(name:string)=>(await(await request.post('/api/bots',{data:{name:`${name} ${crypto.randomUUID()}`}})).json()).bot;
+ const create=async(name:string)=>{const bot=(await(await request.post('/api/bots',{data:{name:`${name} ${crypto.randomUUID()}`}})).json()).bot;createdBotIds.push(bot.id);return bot;};
  const boss=await create('Coordinator'),worker=await create('Member');
  const goal=`Unified launch report ${crypto.randomUUID()}`;
  const root=(await(await request.post('/api/bot-work/tasks',{data:{targetBotId:boss.id,input:goal}})).json()).task;
@@ -64,9 +72,12 @@ test('blocked collaboration exposes partial output and only retries the affected
 
 test('routine report can be reviewed and approved without re-executing the task [AC:bot-product-p2#AC-7]',async({page,request})=>{
  const {bot}=await(await request.post('/api/bots',{data:{name:`Publish report ${crypto.randomUUID()}`}})).json();
+ createdBotIds.push(bot.id);
  const {task}=await(await request.post('/api/bot-work/tasks',{data:{targetBotId:bot.id,input:'Prepare report'}})).json();
  await expect.poll(async()=> (await(await request.get(`/api/bot-work/tasks/${task.id}`)).json()).task.status).toBe('completed');
- const {room}=await(await request.post('/api/bot-rooms',{data:{title:'Approved report destination',botIds:[bot.id]}})).json();
+ const {bot:peer}=await(await request.post('/api/bots',{data:{name:`Publish peer ${crypto.randomUUID()}`}})).json();
+ createdBotIds.push(peer.id);
+ const {room}=await(await request.post('/api/bot-rooms',{data:{title:'Approved report destination',botIds:[bot.id,peer.id],hostBotId:bot.id}})).json();
  const {job}=await(await request.post('/api/cron/jobs',{data:{botId:bot.id,name:'Review publication',prompt:'Reply with a report',onceAt:new Date(Date.now()+1000).toISOString(),roomId:room.id,deliveryPolicy:{inputSources:'Current project',changesOnly:true,failureThreshold:2,approvalBeforeSend:true}}})).json();
  let runId='';await expect.poll(async()=>{const {runs}=await(await request.get(`/api/cron/jobs/${job.id}/runs`)).json();runId=runs[0]?.id??'';return runs[0]?.publication;},{timeout:20000}).toBe('pending');
  expect((await(await request.get(`/api/bot-rooms/${room.id}/messages`)).json()).messages).toHaveLength(0);

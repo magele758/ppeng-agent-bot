@@ -181,7 +181,8 @@ async function hydrateResolveTurnTools(
   const names = await applyJevToolSelect(
     host.store,
     query,
-    selectedTools.turnTools.map((t) => ({ name: t.name, description: t.description }))
+    selectedTools.turnTools.map((t) => ({ name: t.name, description: t.description })),
+    { preserveExposure: true }
   );
   if (names) {
     const keep = new Set(names);

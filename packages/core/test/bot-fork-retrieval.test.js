@@ -27,11 +27,13 @@ class ScriptedAdapter {
 }
 
 function runtimeWith(adapter) {
-  return new RawAgentRuntime({
+  const runtime = new RawAgentRuntime({
     repoRoot: mkdtempSync(join(tmpdir(), 'fork-retrieval-repo-')),
     stateDir: mkdtempSync(join(tmpdir(), 'fork-retrieval-state-')),
     modelAdapter: adapter
   });
+  runtime.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
+  return runtime;
 }
 
 function idleRuntime() {

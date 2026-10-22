@@ -14,10 +14,11 @@ test('routine persists sources and notification rules, approves exact output onc
  const stateDir=mkdtempSync(join(tmpdir(),'product-routine-'));let store=new SqliteStateStore(join(stateDir,'state.db'));
  let reply='Daily report';let failure=false;let executions=0;
  const host={store,stateDir,setCronStore(s){this.cronStore=s;},runImageRetention:async()=>{},wakeAllAutonomousSessions(){},wakeAgentSessions(){},log:{warn(){},info(){}},async runSession(id){executions++;if(failure)throw new Error('provider unavailable');store.appendMessage(id,'assistant',[{type:'text',text:reply}]);}};
- const bot=createBot(host,{name:'Reporter'});const principal={userId:'alice'};
+ const bot=createBot(host,{name:'Reporter'});const peer=createBot(host,{name:'ReportPeer'});const principal={userId:'alice'};
  store.updateSession(bot.canonicalSessionId,{metadata:{...store.getSession(bot.canonicalSessionId).metadata,...principal}});
+ store.updateSession(peer.canonicalSessionId,{metadata:{...store.getSession(peer.canonicalSessionId).metadata,...principal}});
  let rooms=new BotRoomService({store,createChatSession(){},async runSession(){},cancelSession(){}});
- const room=rooms.create(principal,{title:'Reports',botIds:[bot.id]});
+ const room=rooms.create(principal,{title:'Reports',botIds:[bot.id,peer.id],hostBotId:bot.id});
  try{
  const policy={inputSources:'Read the project changelog',changesOnly:true,failureThreshold:2,approvalBeforeSend:true};
  const job=createCronJob(host,{botId:bot.id,userId:'alice',name:'Daily',prompt:'Summarize project',cron:'0 9 * * *',timezone:'Asia/Shanghai',roomId:room.id,deliveryPolicy:policy});

@@ -122,9 +122,13 @@ function machine(workerId, extra = {}) {
 }
 
 function seedOther(f, principal, botId) {
+  const facade = { store: f.store, runImageRetention: async () => {}, wakeAllAutonomousSessions() {}, wakeAgentSessions() {} };
+  const peer = createBot(facade, { name: "Other peer" });
+  const peerSession = f.store.getSession(peer.canonicalSessionId);
+  f.store.updateSession(peer.canonicalSessionId, { metadata: { ...peerSession.metadata, ...principal } });
   const room = f.rooms.create(principal, {
     title: "Other",
-    botIds: [botId],
+    botIds: [botId, peer.id],
     hostBotId: botId,
   });
   f.service.saveSettings(principal, {
@@ -221,9 +225,11 @@ test("preparing a factory with no room creates one that contains Super Bot [AC:s
 
 test("omitted coordinator is Super Bot and Super Bot is a room member [AC:superbot-factory-setup#AC-4]", async (t) => {
   const f = await fixture(t);
+  const facade = { store: f.store, runImageRetention: async () => {}, wakeAllAutonomousSessions() {}, wakeAgentSessions() {} };
+  const peer = createBot(facade, { name: "Peer" });
   const room = f.rooms.create(f.principal, {
     title: "Workers",
-    botIds: [f.worker.id],
+    botIds: [f.worker.id, peer.id],
     hostBotId: f.worker.id,
   });
   assert.equal(room.botIds.includes(f.superBot.id), false);
@@ -391,12 +397,14 @@ test("factory_list_repos calls listGitCheckouts for the saved alias and does not
 
 test("specified coordinator and dispatch list are stored as given", async (t) => {
   const f = await fixture(t);
+  const facade = { store: f.store, runImageRetention: async () => {}, wakeAllAutonomousSessions() {}, wakeAgentSessions() {} };
+  const peer = createBot(facade, { name: "Dispatch peer" });
   const save = tool(createFactoryTools(f.store, f.rooms, f.service), "factory_settings_save");
   const result = await save.execute(
     { session: f.session },
     {
       coordinatorBotId: f.worker.id,
-      machines: [machine(f.worker.id, { allowedUserIds: ["alice", "carol"] })],
+      machines: [machine(f.worker.id, { allowedUserIds: ["alice", "carol"], botIds: [f.worker.id, peer.id] })],
     },
   );
   assert.equal(result.ok, true, result.content);

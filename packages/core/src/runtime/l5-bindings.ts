@@ -954,7 +954,8 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
       const names = await applyJevToolSelect(
         rt.store,
         query,
-        turnTools.map((t) => ({ name: t.name, description: t.description }))
+        turnTools.map((t) => ({ name: t.name, description: t.description })),
+    { preserveExposure: true }
       );
       if (names) {
         const keep = new Set(names);

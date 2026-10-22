@@ -1,6 +1,41 @@
-import type { Messages } from '../types.ts';
+import type {
+ Messages } from '../types.ts';
 
 export const settingsEntries = {
+  toolExposure: {
+  "title": "Tool delivery",
+  "keywords": "tools full progressive tiers search load",
+  "desc": "Daily tools stay available; other capabilities load on demand. Full mode provides all permitted and configured business tools.",
+  "mode": "Tool delivery",
+  "progressive": "Progressive loading",
+  "full": "All available tools",
+  "discoveryHint": "External service discovery controls network service discovery separately. Turning it off does not change tool delivery.",
+  "agent": "Agent for pinned groups",
+  "pins": "Pinned capability groups (permissions unchanged)",
+  "session": "Inspect session",
+  "preview": "New session preview",
+  "viewMode": "Current delivery mode",
+  "registered": "Registered",
+  "available": "Available",
+  "provided": "Provided",
+  "pending": "Pending load",
+  "unavailable": "Unavailable",
+  "details": "Tools and availability reasons",
+  "tool": "Tool",
+  "tier": "Tier",
+  "state": "Status or reason",
+  "not_configured": "Not configured",
+  "disabled": "Disabled",
+  "not_allowed": "Excluded by allowlist",
+  "policy": "Policy restriction",
+  "not_loaded": "Not loaded",
+  "clear": "Clear temporary session loads",
+  "refresh": "Refresh",
+  "saved": "Saved; applies to the next model request",
+  "error": "Operation failed. Please try again.",
+  "modeReason": "Not applicable in this mode"
+},
+
   computerUse: {"title": "Local computer use (LCU)", "desc": "Let agents use local desktop apps. Requires LCU and ChatGPT; you decide app access.", "keywords": "LCU desktop computer use screenshot TextEdit", "enabled": "Enable local computer use", "hint": "Disabling hides desktop tools. Conversations have independent approvals; desktop turns are queued. Browser and audio are not enabled."},
   appControl: {"title": "macOS app control", "desc": "Let an agent activate a named Mac app, type into the front app, or send a small set of keys. macOS only.", "keywords": "macOS app control Apple Events Automation keystroke", "enabled": "Enable macOS app control", "hint": "Off by default. The agent can only activate an app, type text, or send return, tab, escape, arrows, copy, and paste. Each action still needs Lab approval. The first use can show the normal macOS permission dialog; this switch does not grant that permission. Other operating systems report that the actions are unavailable."},
   common: {
@@ -251,11 +286,11 @@ export const settingsEntries = {
     }
   },
   discovery: {
-    title: 'Capability discovery',
+    title: 'External service discovery',
     keywords: 'discovery probe allowlist tailscale active scan lan network scan port devices',
     desc: 'Let the agent discover external capabilities on your network (for example services on Tailscale devices). The master switch is on by default; reading the device list and active scanning stay off by default.',
     fields: {
-      enabled: { label: 'Enable capability discovery', hint: 'Master switch, on by default. When off, the other options have no effect.' },
+      enabled: { label: 'Enable external service discovery', hint: 'Controls external discovery only, on by default. Local tool search and tool delivery mode are independent.' },
       tailscale: { label: 'Read the Tailscale device list', hint: 'Fetch devices from the local Tailscale to find usable services.' },
       activeScan: { label: 'Allow active scanning', hint: 'Actively send probe requests to allowlisted hosts and ports.' },
       hosts: { label: 'Hosts allowed to be probed', hint: 'Comma separated, e.g. api.example.com.' },
@@ -339,7 +374,7 @@ export const settingsEntries = {
         compact: 'Compaction: trim long successful tool output',
         route: 'Routing: more tools needed, done, or retry',
         contextSelect: 'Context selection: pick early snippets before compaction',
-        toolSelect: 'Tool selection: shorten the tool list within what is allowed',
+        toolSelect: 'Tool selection: legacy integration point; local chat respects tool delivery without a second reduction',
         skillSelect: 'Skill selection: filter the candidate skills again',
         sagaGate: 'Saga gate: helper only; the main loop does not ask once ticked',
         memorySelect: 'Memory selection: filter by relevance before injection',

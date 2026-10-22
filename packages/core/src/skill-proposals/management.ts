@@ -54,6 +54,251 @@ interface Deps {
   requestKey?(session: string): string;
   listBots?(): Array<{ id: string; name: string }>;
 }
+const SKILL_ACTIONS: SkillAction[] = [
+  "create",
+  "update",
+  "share",
+  "unshare",
+  "set_sharing",
+  "delete",
+];
+const SHARING_ACTIONS: SkillAction[] = ["share", "unshare", "set_sharing"];
+const CAPTURE_ACTIONS: SkillAction[] = ["create", "update"];
+
+function assertSkillOperationBounds(input: SkillManagementInput): void {
+  if ("body" in input) throw Error("Submit intent only, not a skill body");
+  if (JSON.stringify(input).length > 6000)
+    throw Error("Skill operation is too large");
+  if (findSecretLikeContent(JSON.stringify(input)))
+    throw Error("Possible secret in skill operation");
+}
+
+function assertSkillOperationAction(input: SkillManagementInput): void {
+  if (!SKILL_ACTIONS.includes(input.action))
+    throw Error("Unknown skill operation");
+  if (input.action === "create" && !isValidSkillProposalName(input.name))
+    throw Error("Invalid skill name");
+}
+
+function openSkillOperation(row: SkillOperation): boolean {
+  return row.status === "pending" || row.status === "processing";
+}
+
+function savedForSameRequest(row: SkillOperation, requestKey?: string): boolean {
+  return !!requestKey && row.requestKey === requestKey && row.status === "saved";
+}
+
+function sameSkillOperation(
+  row: SkillOperation,
+  input: SkillManagementInput,
+  requestKey?: string,
+): boolean {
+  if (JSON.stringify(row.input) !== JSON.stringify(input)) return false;
+  return openSkillOperation(row) || savedForSameRequest(row, requestKey);
+}
+
+function assertSharingIds(
+  owner: string,
+  input: SkillManagementInput,
+  validate: Deps["validateSharing"],
+): void {
+  if (!SHARING_ACTIONS.includes(input.action)) return;
+  if (
+    !Array.isArray(input.botIds) ||
+    input.botIds.some((id) => typeof id !== "string")
+  )
+    throw Error("Explicit recipient IDs required");
+  validate(owner, input.botIds);
+}
+
+function assertCaptureIntent(input: SkillManagementInput): void {
+  if (!CAPTURE_ACTIONS.includes(input.action)) return;
+  if (!input.summary || !input.reason || !input.description)
+    throw Error("Description, reason and summary required");
+}
+
+function skillRevisionMatches(
+  input: SkillManagementInput,
+  skill?: SkillSpec,
+): boolean {
+  return !input.revision || input.revision === skillRevision(skill);
+}
+
+async function userAuthorizedSkillOperation(
+  deps: Deps,
+  session: string,
+  input: SkillManagementInput,
+  skill: SkillSpec | undefined,
+  authorization?: "user",
+): Promise<boolean> {
+  if (authorization === "user") return true;
+  return deps.authorize(session, { ...input, name: skill?.name ?? input.name });
+}
+
+function requestStillCurrent(
+  verified: boolean,
+  requestKey: string | undefined,
+  current: string | undefined,
+): boolean {
+  return verified && (!requestKey || requestKey === current);
+}
+
+async function adoptPendingOperation(
+  deps: Deps,
+  session: string,
+  previous: SkillOperation,
+  requestKey: string | undefined,
+  input: SkillManagementInput,
+): Promise<boolean> {
+  if (
+    previous.status !== "pending" ||
+    !requestKey ||
+    previous.requestKey === requestKey
+  )
+    return false;
+  const allowed = await deps.authorize(session, {
+    ...input,
+    name: previous.name,
+  });
+  return !!allowed && requestKey === deps.requestKey?.(session);
+}
+
+function savedCaptureFor(deps: Deps, row: SkillOperation) {
+  if (!row.captureId) return undefined;
+  return deps.captures
+    .list(row.sessionId)
+    .find(
+      (capture) => capture.id === row.captureId && capture.status === "saved",
+    );
+}
+
+function ownedProposals(store: SkillProposalStore, row: SkillOperation) {
+  return store
+    .list()
+    .filter(
+      (proposal) =>
+        proposal.ownerBotId === row.ownerBotId && proposal.name === row.name,
+    );
+}
+
+function installedOwned(
+  store: SkillProposalStore,
+  own: ReturnType<SkillProposalStore["list"]>,
+) {
+  return own.find(
+    (proposal) =>
+      proposal.status === "approved" && store.isInstalled(proposal),
+  );
+}
+
+function deleteAlreadyApplied(
+  row: SkillOperation,
+  installed: ReturnType<SkillProposalStore["list"]>[number] | undefined,
+  own: ReturnType<SkillProposalStore["list"]>,
+): boolean {
+  return (
+    row.input.action === "delete" &&
+    !installed &&
+    own.some((proposal) => proposal.status === "revoked")
+  );
+}
+
+function sameShareIds(current: string[] | undefined, ids: string[]): boolean {
+  return (
+    JSON.stringify([...(current ?? [])].sort()) ===
+    JSON.stringify([...ids].sort())
+  );
+}
+
+function memberShareApplied(
+  action: string,
+  ids: string[],
+  shared: string[] | undefined,
+): boolean {
+  if (action === "share")
+    return ids.every((id) => shared?.includes(id));
+  if (action === "unshare")
+    return ids.every((id) => !shared?.includes(id));
+  return false;
+}
+
+function shareAlreadyApplied(
+  row: SkillOperation,
+  installed: ReturnType<SkillProposalStore["list"]>[number] | undefined,
+): boolean {
+  if (!installed) return false;
+  const ids = row.input.botIds ?? [];
+  if (row.input.action === "set_sharing")
+    return sameShareIds(installed.sharedBotIds, ids);
+  return memberShareApplied(row.input.action, ids, installed.sharedBotIds);
+}
+
+function operationAlreadyApplied(
+  row: SkillOperation,
+  savedCapture: { id: string } | undefined,
+  installed: ReturnType<SkillProposalStore["list"]>[number] | undefined,
+  own: ReturnType<SkillProposalStore["list"]>,
+): boolean {
+  if (savedCapture) return true;
+  if (deleteAlreadyApplied(row, installed, own)) return true;
+  return shareAlreadyApplied(row, installed);
+}
+
+function pendingSkillOperation(input: {
+  session: string;
+  agent: string;
+  owner: string;
+  input: SkillManagementInput;
+  skill?: SkillSpec;
+  allowed: boolean;
+  requestKey?: string;
+}): SkillOperation {
+  const skill = input.skill;
+  return {
+    id: createId("sm"),
+    sessionId: input.session,
+    agentId: input.agent,
+    ownerBotId: input.owner,
+    input: input.input,
+    name: skill?.name ?? input.input.name!,
+    affectedBotIds: [
+      input.owner,
+      ...new Set([
+        ...(skill?.sharedBotIds ?? []),
+        ...(input.input.botIds ?? []),
+      ]),
+    ],
+    revision: skillRevision(skill),
+    status: "pending",
+    authorization: input.allowed ? "user" : "pending",
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+    requestKey: input.requestKey,
+  };
+}
+
+function settleInterruptedSkillOperation(
+  deps: Deps,
+  row: SkillOperation,
+): SkillOperation {
+  const proposals = new SkillProposalStore(deps.stateDir);
+  const own = ownedProposals(proposals, row);
+  const applied = operationAlreadyApplied(
+    row,
+    savedCaptureFor(deps, row),
+    installedOwned(proposals, own),
+    own,
+  );
+  return {
+    ...row,
+    status: applied ? "saved" : "failed",
+    updatedAt: nowIso(),
+    error: applied
+      ? undefined
+      : "Operation interrupted; inspect current state before retrying",
+  };
+}
+
 export function skillRevision(skill?: SkillSpec): string {
   return createHash("sha256")
     .update(
@@ -72,42 +317,8 @@ export class SkillManagementService {
   private locked = new Set<string>();
   constructor(private deps: Deps) {
     this.directory = join(deps.stateDir, "skill-operations");
-    for (const row of this.records().filter((r) => r.status === "processing")) {
-      const captures = deps.captures.list(row.sessionId);
-      const savedCapture =
-        row.captureId &&
-        captures.find((c) => c.id === row.captureId && c.status === "saved");
-      const proposals = new SkillProposalStore(deps.stateDir);
-      const own = proposals
-        .list()
-        .filter((p) => p.ownerBotId === row.ownerBotId && p.name === row.name);
-      const installed = own.find(
-        (p) => p.status === "approved" && proposals.isInstalled(p),
-      );
-      const ids = row.input.botIds ?? [];
-      const applied =
-        !!savedCapture ||
-        (row.input.action === "delete" &&
-          !installed &&
-          own.some((p) => p.status === "revoked")) ||
-        (!!installed &&
-          row.input.action === "share" &&
-          ids.every((id) => installed.sharedBotIds?.includes(id))) ||
-        (!!installed &&
-          row.input.action === "unshare" &&
-          ids.every((id) => !installed.sharedBotIds?.includes(id))) ||
-        (!!installed &&
-          row.input.action === "set_sharing" &&
-          JSON.stringify([...(installed.sharedBotIds ?? [])].sort()) ===
-            JSON.stringify([...ids].sort()));
-      this.write({
-        ...row,
-        status: applied ? "saved" : "failed",
-        updatedAt: nowIso(),
-        error: applied
-          ? undefined
-          : "Operation interrupted; inspect current state before retrying",
-      });
+    for (const row of this.records().filter((row) => row.status === "processing")) {
+      this.write(settleInterruptedSkillOperation(deps, row));
     }
   }
   private write(row: SkillOperation) {
@@ -195,78 +406,72 @@ export class SkillManagementService {
     this.requests.set(key, pending);
     return pending;
   }
+  private async reuseSkillOperation(
+    session: string,
+    previous: SkillOperation | undefined,
+    requestKey: string | undefined,
+    input: SkillManagementInput,
+  ): Promise<SkillOperation | undefined> {
+    if (!previous) return undefined;
+    if (
+      await adoptPendingOperation(
+        this.deps,
+        session,
+        previous,
+        requestKey,
+        input,
+      )
+    )
+      return this.confirm(session, previous.id, "user");
+    return previous;
+  }
   private async requestInner(
     session: string,
     agent: string,
     input: SkillManagementInput,
     authorization?: "user",
   ): Promise<SkillOperation> {
-    validateManagementInput(input);
+    assertSkillOperationBounds(input);
+    assertSkillOperationAction(input);
     const owner = this.deps.getBotId(session);
     if (!owner) throw Error("A Bot context is required");
     const requestKey = this.deps.requestKey?.(session);
-    const previous = this.list(session).find(
-      (r) =>
-        JSON.stringify(r.input) === JSON.stringify(input) &&
-        (r.status === "pending" ||
-          r.status === "processing" ||
-          (!!requestKey &&
-            r.requestKey === requestKey &&
-            r.status === "saved")),
+    const previous = this.list(session).find((row) =>
+      sameSkillOperation(row, input, requestKey),
     );
-    if (previous) {
-      if (
-        previous.status === "pending" &&
-        requestKey &&
-        previous.requestKey !== requestKey &&
-        (await this.deps.authorize(session, { ...input, name: previous.name })) && requestKey === this.deps.requestKey?.(session)
-      )
-        return this.confirm(session, previous.id, "user");
-      return previous;
-    }
-    const skill = await this.target(session, input);
-    if (input.revision && input.revision !== skillRevision(skill))
-      throw Error("Skill changed; refresh before editing");
-    if (["share", "unshare", "set_sharing"].includes(input.action)) {
-      if (
-        !Array.isArray(input.botIds) ||
-        input.botIds.some((id) => typeof id !== "string")
-      )
-        throw Error("Explicit recipient IDs required");
-      this.deps.validateSharing(owner, input.botIds);
-    }
-    if (
-      ["create", "update"].includes(input.action) &&
-      (!input.summary || !input.reason || !input.description)
-    )
-      throw Error("Description, reason and summary required");
-    const verified =
-      authorization === "user" ||
-      (await this.deps.authorize(session, {
-        ...input,
-        name: skill?.name ?? input.name,
-      }));
-    const allowed =
-      verified &&
-      (!requestKey || requestKey === this.deps.requestKey?.(session));
-    const row: SkillOperation = {
-      id: createId("sm"),
-      sessionId: session,
-      agentId: agent,
-      ownerBotId: owner,
-      input,
-      name: skill?.name ?? input.name!,
-      affectedBotIds: [
-        owner,
-        ...new Set([...(skill?.sharedBotIds ?? []), ...(input.botIds ?? [])]),
-      ],
-      revision: skillRevision(skill),
-      status: "pending",
-      authorization: allowed ? "user" : "pending",
-      createdAt: nowIso(),
-      updatedAt: nowIso(),
+    const reused = await this.reuseSkillOperation(
+      session,
+      previous,
       requestKey,
-    };
+      input,
+    );
+    if (reused) return reused;
+    const skill = await this.target(session, input);
+    if (!skillRevisionMatches(input, skill))
+      throw Error("Skill changed; refresh before editing");
+    assertSharingIds(owner, input, this.deps.validateSharing);
+    assertCaptureIntent(input);
+    const verified = await userAuthorizedSkillOperation(
+      this.deps,
+      session,
+      input,
+      skill,
+      authorization,
+    );
+    const allowed = requestStillCurrent(
+      verified,
+      requestKey,
+      this.deps.requestKey?.(session),
+    );
+    const row = pendingSkillOperation({
+      session,
+      agent,
+      owner,
+      input,
+      skill,
+      allowed,
+      requestKey,
+    });
     this.write(row);
     return allowed ? this.confirm(session, row.id, "user") : row;
   }
@@ -469,25 +674,4 @@ export function createSkillManageTool(
       }
     },
   };
-}
-
-function validateManagementInput(input:SkillManagementInput):void {
-    if ("body" in input) throw Error("Submit intent only, not a skill body");
-    if (JSON.stringify(input).length > 6000)
-      throw Error("Skill operation is too large");
-    if (findSecretLikeContent(JSON.stringify(input)))
-      throw Error("Possible secret in skill operation");
-    if (input.action === "create" && !isValidSkillProposalName(input.name))
-      throw Error("Invalid skill name");
-    if (
-      ![
-        "create",
-        "update",
-        "share",
-        "unshare",
-        "set_sharing",
-        "delete",
-      ].includes(input.action)
-    )
-      throw Error("Unknown skill operation");
 }

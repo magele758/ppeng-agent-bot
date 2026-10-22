@@ -12,10 +12,13 @@ async function configure(t) {
         name: "Delivery coordinator",
       })
     ).body.bot,
+    peer = (
+      await f.call("alice", "POST", "/api/bots", { name: "Delivery peer" })
+    ).body.bot,
     room = (
       await f.call("alice", "POST", "/api/bot-rooms", {
         title: "Delivery",
-        botIds: [bot.id],
+        botIds: [bot.id, peer.id],
         hostBotId: bot.id,
       })
     ).body.room;

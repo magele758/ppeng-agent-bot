@@ -157,29 +157,72 @@ function notificationAllowed(host:RoutineRuntimeHost,runs:RoutineRunStore,run:Ro
  }
  return true;
 }
-function summarize(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):void {
- if(run.status==='failed'&&!run.failureClass)run=runs.update(run.id,{failureClass:classifyRoutineFailure(run.error)});
- new RoutineHealthStore(host.store).observe(run);
- if(run.notificationSent)return;
- if(run.status==='silent'){runs.update(run.id,{notificationSent:true});return;}
- if(!notificationAllowed(host,runs,run))return;
+function routineSummaryText(run:RoutineRun):string {
+ return run.result||run.error||run.status;
+}
+function routineRunLink(run:RoutineRun):string {
+ return run.sessionId?` · /api/sessions/${run.sessionId}`:'';
+}
+function finishRoutineTransaction(store:SqliteStateStore,own:boolean,sql:string):void {
+ if(own)store.db.exec(sql);
+}
+function deliverRoutineWithoutSession(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):void {
+ const roomDelivery=postRoomResult(host,run);
+ if(roomDelivery?.status==='delivered')host.store.setDaemonControl(`routine.last-published:${run.routineId}`,run.result?.trim()??'');
+ runs.update(run.id,{notificationSent:true,...(roomDelivery?{roomDelivery}:{})});
+}
+function rememberPublishedResult(host:RoutineRuntimeHost,run:RoutineRun,roomDelivery:RoutineRoomDelivery|undefined):void {
+ if(run.status!=='completed')return;
+ if(routineRoomId(run)&&roomDelivery?.status!=='delivered')return;
+ host.store.setDaemonControl(`routine.last-published:${run.routineId}`,run.result?.trim()??'');
+}
+function summaryRun(fresh:RoutineRun|undefined,run:RoutineRun):RoutineRun { return fresh??run; }
+function roomDeliveryPatch(roomDelivery:RoutineRoomDelivery|undefined):{roomDelivery?:RoutineRoomDelivery} {
+ return roomDelivery?{roomDelivery}:{};
+}
+function linkRoutineSummary(host:RoutineRuntimeHost,run:RoutineRun,messageId:string):void {
+ if(!run.sessionId)return;
+ host.store.db.prepare('INSERT INTO bot_routine_summary_links(message_id,main_session_id,working_session_id,run_id) VALUES(?,?,?,?)').run(messageId,run.mainSessionId,run.sessionId,run.id);
+}
+function publishRoutineSummary(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):void {
+ const description=routineSummaryText(run);
+ const ownTransaction=!host.store.db.isTransaction;
+ finishRoutineTransaction(host.store,ownTransaction,'BEGIN IMMEDIATE');
+ // Insert the summary and notification marker atomically. No user instruction or private run transcript.
+ try { const fresh=runs.get(run.id);if(fresh?.notificationSent){finishRoutineTransaction(host.store,ownTransaction,'COMMIT');return;}
+ const summary=host.store.appendMessage(run.mainSessionId,'assistant',[textPart(`[routine:${run.job.name}] ${run.status}\n${description.slice(0,2000)}\nRun: ${run.id}${routineRunLink(run)}`)],{key:`routine-result:${run.id}`} );
+ linkRoutineSummary(host,run,summary.id);
+ const roomDelivery=postRoomResult(host,summaryRun(fresh,run));
+ rememberPublishedResult(host,run,roomDelivery);
+ runs.update(run.id,{notificationSent:true,summaryMessageId:summary.id,...roomDeliveryPatch(roomDelivery)});
+ finishRoutineTransaction(host.store,ownTransaction,'COMMIT');
+ }catch(error){finishRoutineTransaction(host.store,ownTransaction,'ROLLBACK');throw error;}
+}
+function routineSummaryParent(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):SessionRecord|undefined {
  const parent=host.store.getSession(run.mainSessionId)??repairRoutineOwnerSession(host,run.job);
  if(parent&&parent.id!==run.mainSessionId){runs.update(run.id,{mainSessionId:parent.id});run.mainSessionId=parent.id;}
- if(!parent){const roomDelivery=postRoomResult(host,run);if(roomDelivery?.status==='delivered')host.store.setDaemonControl(`routine.last-published:${run.routineId}`,run.result?.trim()??'');runs.update(run.id,{notificationSent:true,...(roomDelivery?{roomDelivery}:{})});return;}
- if(parent.status==='running'||parent.status==='waiting_approval'||host.isSessionRunning?.(parent.id))return;
- appendRoutineSummary(host,runs,run);
+ return parent;
 }
-function appendRoutineSummary(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):void {
- const description=run.result||run.error||run.status;
- // Insert the summary and notification marker atomically. No user instruction or private run transcript.
- const ownTransaction=!host.store.db.isTransaction;if(ownTransaction)host.store.db.exec('BEGIN IMMEDIATE');
- try { const fresh=runs.get(run.id);if(fresh?.notificationSent){if(ownTransaction)host.store.db.exec('COMMIT');return;}
- const summary=host.store.appendMessage(run.mainSessionId,'assistant',[textPart(`[routine:${run.job.name}] ${run.status}\n${description.slice(0,2000)}\nRun: ${run.id}${run.sessionId?` · /api/sessions/${run.sessionId}`:''}`)],{key:`routine-result:${run.id}`} );
- if(run.sessionId)host.store.db.prepare('INSERT INTO bot_routine_summary_links(message_id,main_session_id,working_session_id,run_id) VALUES(?,?,?,?)').run(summary.id,run.mainSessionId,run.sessionId,run.id);
- const roomDelivery=postRoomResult(host,fresh??run);
- if(run.status==='completed'&&(!routineRoomId(run)||roomDelivery?.status==='delivered'))host.store.setDaemonControl(`routine.last-published:${run.routineId}`,run.result?.trim()??'');
- runs.update(run.id,{notificationSent:true,summaryMessageId:summary.id,...(roomDelivery?{roomDelivery:roomDelivery}:{})});if(ownTransaction)host.store.db.exec('COMMIT');
- }catch(error){if(ownTransaction)host.store.db.exec('ROLLBACK');throw error;}
+function classifyMissingFailure(runs:RoutineRunStore,run:RoutineRun):RoutineRun {
+ if(run.status==='failed'&&!run.failureClass)return runs.update(run.id,{failureClass:classifyRoutineFailure(run.error)});
+ return run;
+}
+function routineCanNotify(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):boolean {
+ if(run.notificationSent)return false;
+ if(run.status==='silent'){runs.update(run.id,{notificationSent:true});return false;}
+ return notificationAllowed(host,runs,run);
+}
+function routineParentBusy(host:RoutineRuntimeHost,parent:SessionRecord):boolean {
+ return parent.status==='running'||parent.status==='waiting_approval'||!!host.isSessionRunning?.(parent.id);
+}
+function summarize(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):void {
+ run=classifyMissingFailure(runs,run);
+ new RoutineHealthStore(host.store).observe(run);
+ if(!routineCanNotify(host,runs,run))return;
+ const parent=routineSummaryParent(host,runs,run);
+ if(!parent){deliverRoutineWithoutSession(host,runs,run);return;}
+ if(routineParentBusy(host,parent))return;
+ publishRoutineSummary(host,runs,run);
 }
 function sharedBotRun(host:RoutineRuntimeHost,run:RoutineRun):boolean {
  if(!run.sessionId||run.sessionId!==run.mainSessionId||!run.startedAt)return false;
