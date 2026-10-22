@@ -50,10 +50,10 @@ test('mentioned members speak first and everyone else still gets a restrained tu
   for (const id of f.runs) assert.ok(!JSON.stringify(f.store.listMessages(id)).includes('PRIVATE_SECRET'));
   assert.equal(f.store.listMessages(f.a.canonicalSessionId).length, 1);
   const defaultTurn = f.rooms.send(f.principal, room.id, { text: 'ordinary question' }).turn;
-  assert.deepEqual(defaultTurn.botIds, [f.a.id]);
+  assert.deepEqual(defaultTurn.botIds, []);
   assert.equal(defaultTurn.mentionedBotIds, undefined);
   const email = f.rooms.send(f.principal,room.id,{text:'email owner@example.com'}).turn;
-  assert.deepEqual(email.botIds,[f.a.id]);
+  assert.deepEqual(email.botIds,[]);
   assert.equal(email.mentionedBotIds, undefined);
   const unknown = f.rooms.send(f.principal,room.id,{text:'@NoSuchMember do work'}).turn;
   assert.deepEqual(unknown.botIds,[]);
@@ -78,7 +78,7 @@ test('a spaced display name is one mention and does not add outsiders [AC:bot-ro
   assert.deepEqual(outsider.botIds, [superBot.id]);
   assert.deepEqual(outsider.mentionedBotIds, [superBot.id]);
   const everyone = f.rooms.send(f.principal, room.id, { text: 'all of you' }).turn;
-  assert.deepEqual(everyone.botIds, [f.a.id]);
+  assert.deepEqual(everyone.botIds, []);
   assert.equal(everyone.mentionedBotIds, undefined);
 });
 
@@ -112,7 +112,7 @@ test('concurrent input is durable; restart distinguishes queued and unconfirmed 
   const room = f.rooms.create(f.principal, { title: 'Reliable', botIds: [f.a.id, f.b.id] });
   let release;
   f.host.runSession = id => new Promise(resolve => { release = () => { f.store.appendMessage(id, 'assistant', [{type:'text',text:'done'}]); f.store.updateSession(id, { status: 'idle' }); resolve(); }; });
-  f.rooms.send(f.principal, room.id, { text: 'first', idempotencyKey: 'one' });
+  f.rooms.send(f.principal, room.id, { text: 'first', idempotencyKey: 'one', mentions: [f.a.id] });
   const running = f.rooms.tick();
   await new Promise(resolve => setImmediate(resolve));
   const second = f.rooms.send(f.principal, room.id, { text: 'second', idempotencyKey: 'two' });
@@ -197,7 +197,7 @@ test('stopping an in-flight member cancels and fences its late reply [AC:bot-roo
   let finish;const cancelled=[];
   f.host.runSession=id=>new Promise(resolve=>{finish=()=>{f.store.appendMessage(id,'assistant',[{type:'text',text:'late'}]);resolve();};});
   f.host.cancelSession=id=>cancelled.push(id);
-  f.rooms.send(f.principal,room.id,{text:'work'});
+  f.rooms.send(f.principal,room.id,{text:'work',mentions:[f.a.id]});
   const pending=f.rooms.tick();
   await new Promise(resolve=>setImmediate(resolve));
   f.rooms.stop(f.principal,room.id);
@@ -220,7 +220,7 @@ test('real Agent runtime executes isolated Room contexts and returns shared repl
     const imageAttachment=await rt.ingestAttachmentBase64(bot.canonicalSessionId,{fileName:'shared.png',mimeType:'image/png',dataBase64:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aLl0AAAAASUVORK5CYII='});
     const rooms=rt.rooms??new BotRoomService({store:rt.store,createChatSession:input=>rt.createChatSession(input),runSession:id=>rt.runSession(id),cancelSession:id=>rt.cancelSession(id)});
     const room=rooms.create(principal,{title:'Real runtime',botIds:[bot.id,peer.id],hostBotId:bot.id});
-    rooms.send(principal,room.id,{text:'Please answer in the Room',attachmentIds:[textAttachment.attachment.id,imageAttachment.attachment.id]});
+    rooms.send(principal,room.id,{text:'Please answer in the Room',mentions:[bot.id],attachmentIds:[textAttachment.attachment.id,imageAttachment.attachment.id]});
     await rooms.tick();
     assert.equal(rooms.turns(principal,room.id)[0].status,'completed');
     assert.equal(rooms.messages(principal,room.id).messages.at(-1).text,'Actual runtime Room result');
@@ -244,7 +244,7 @@ test('tool and cost limits stop before further member tool execution [AC:bot-roo
     f.store.updateSession(id,{status:'idle'});
   };
   const room=f.rooms.create(f.principal,{title:'Tools',botIds:[f.a.id,f.b.id],maxToolCalls:1});
-  f.rooms.send(f.principal,room.id,{text:'tools'});await f.rooms.tick();
+  f.rooms.send(f.principal,room.id,{text:'tools',mentions:[f.a.id]});await f.rooms.tick();
   assert.equal(cancelled,1);
   assert.equal(f.rooms.turns(f.principal,room.id)[0].terminationReason,'tool_budget');
   f.host.runSession=async(id,options)=>{
@@ -252,7 +252,7 @@ test('tool and cost limits stop before further member tool execution [AC:bot-roo
     await options.onEvent({type:'model_done',stopReason:'end',assistant:{parts:[{type:'text',text:'cost'}]}});
     f.store.updateSession(id,{status:'idle'});
   };
-  f.rooms.send(f.principal,room.id,{text:'cost'});await f.rooms.tick();
+  f.rooms.send(f.principal,room.id,{text:'cost',mentions:[f.a.id]});await f.rooms.tick();
   assert.equal(cancelled,2);
   assert.equal(f.rooms.turns(f.principal,room.id).at(-1).terminationReason,'cost_budget');
 });
@@ -261,13 +261,13 @@ test('aborted partial output is not success and reused Room contexts refresh can
   const f=fixture(),seen=[];
   const room=f.rooms.create(f.principal,{title:'Live policy',botIds:[f.a.id,f.b.id]});
   f.host.runSession=async id=>{seen.push(f.store.getSession(id).metadata.permissionMode);f.store.appendMessage(id,'assistant',[{type:'text',text:'partial'}]);f.store.updateSession(id,{status:'idle',metadata:{...f.store.getSession(id).metadata,outcome:{kind:'aborted',reason:'user_abort'}}});};
-  f.rooms.send(f.principal,room.id,{text:'first'});await f.rooms.tick();
+  f.rooms.send(f.principal,room.id,{text:'first',mentions:[f.a.id]});await f.rooms.tick();
   assert.equal(f.rooms.turns(f.principal,room.id)[0].status,'cancelled');
   assert.equal(f.rooms.messages(f.principal,room.id).messages.filter(message=>message.sender.type==='bot').length,0);
   const canonical=f.store.getSession(f.a.canonicalSessionId);
   f.store.updateSession(canonical.id,{metadata:{...canonical.metadata,permissionMode:'plan',allowedTools:['read_file'],allowedSkills:['limited-skill'],modelOverride:{providerId:'p',modelId:'m'}}});
   f.host.runSession=async id=>{const metadata=f.store.getSession(id).metadata;seen.push(metadata.permissionMode);assert.deepEqual(metadata.allowedTools,['read_file']);assert.deepEqual(metadata.allowedSkills,['limited-skill']);assert.deepEqual(metadata.modelOverride,{providerId:'p',modelId:'m'});f.store.appendMessage(id,'assistant',[{type:'text',text:'safe new result'}]);};
-  f.rooms.send(f.principal,room.id,{text:'second'});await f.rooms.tick();
+  f.rooms.send(f.principal,room.id,{text:'second',mentions:[f.a.id]});await f.rooms.tick();
   assert.deepEqual(seen,['auto','plan']);
   assert.equal(f.rooms.turns(f.principal,room.id).at(-1).status,'completed');
 });
@@ -275,7 +275,7 @@ test('aborted partial output is not success and reused Room contexts refresh can
 test('unconfirmed software effects override assistant success and preserve the partial evidence [AC:bot-rooms#AC-5]',async()=>{
   const f=fixture();const room=f.rooms.create(f.principal,{title:'Unconfirmed effects',botIds:[f.a.id,f.b.id]});
   const checks=[];f.host.hasUnconfirmedEffects=(id,startedAt)=>{checks.push({id,startedAt});return true;};
-  f.rooms.send(f.principal,room.id,{text:'write to software'});await f.rooms.tick();
+  f.rooms.send(f.principal,room.id,{text:'write to software',mentions:[f.a.id]});await f.rooms.tick();
   const turn=f.rooms.turns(f.principal,room.id)[0];
   assert.equal(turn.status,'unknown');assert.equal(turn.terminationReason,'external_effect_unconfirmed');
   assert.ok(turn.partialResult.includes('reply:'));assert.ok(f.store.listMessages(turn.currentSessionId).some(message=>message.role==='assistant'));
@@ -286,7 +286,7 @@ test('unconfirmed software effects override assistant success and preserve the p
 test('Bot background pause and disable apply to Room work and preserve pending input [AC:bot-rooms#AC-4] [AC:bot-rooms#AC-5]',async()=>{
   const f=fixture(),room=f.rooms.create(f.principal,{title:'Controlled',botIds:[f.a.id,f.b.id]});
   setBotWorkControl(f.host,f.principal,f.a.id,{paused:true,disabled:true});
-  f.rooms.send(f.principal,room.id,{text:'keep pending'});await f.rooms.tick();
+  f.rooms.send(f.principal,room.id,{text:'keep pending',mentions:[f.a.id]});await f.rooms.tick();
   assert.equal(f.runs.length,0);assert.equal(f.rooms.turns(f.principal,room.id)[0].status,'queued');assert.equal(f.rooms.turns(f.principal,room.id)[0].terminationReason,'bot_disabled');
   setBotWorkControl(f.host,f.principal,f.a.id,{paused:false,disabled:false});await f.rooms.tick();
   assert.equal(f.runs.length,1);assert.equal(f.rooms.turns(f.principal,room.id)[0].status,'completed');
@@ -298,7 +298,7 @@ test('approving the handed-off step in the private chat does not rerun it in the
   rt.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
   try {
     const bot=rt.createBot({name:'ApprovalMember'}),peer=rt.createBot({name:'ApprovalPeer'}),principal=resolveBotPrincipal(rt.store),room=rt.rooms.create(principal,{title:'Actual approval',botIds:[bot.id,peer.id]});
-    rt.rooms.send(principal,room.id,{text:'Run the approved action'});await rt.rooms.tick();
+    rt.rooms.send(principal,room.id,{text:'Run the approved action',mentions:[bot.id]});await rt.rooms.tick();
     const turn=rt.rooms.turns(principal,room.id)[0];
     assert.equal(turn.status,'completed');assert.deepEqual(turn.handedOffBotIds,[bot.id]);assert.notEqual(turn.status,'failed');assert.equal(executions,0);
     const roomText=rt.rooms.messages(principal,room.id).messages.map(message=>message.text).join('\n');
@@ -334,7 +334,7 @@ test('a busy private chat keeps the step in the room until it is idle, then runs
     const bot=rt.createBot({name:'BusyMember'}),peer=rt.createBot({name:'BusyPeer'}),principal=resolveBotPrincipal(rt.store);
     rt.store.updateSession(bot.canonicalSessionId,{status:'running'});
     const room=rt.rooms.create(principal,{title:'Busy approval',botIds:[bot.id,peer.id],hostBotId:bot.id});
-    rt.rooms.send(principal,room.id,{text:'Run the approved action'});
+    rt.rooms.send(principal,room.id,{text:'Run the approved action',mentions:[bot.id]});
     await rt.rooms.tick();
     const waiting=rt.rooms.turns(principal,room.id)[0];
     assert.equal(waiting.status,'waiting_approval');
@@ -374,7 +374,7 @@ test('a mixed assistant message keeps the paired call and moves only the pending
     f.store.createApproval({ sessionId: id, toolName: 'write_file', reason: 'needs a person', args: { path: 'secret.env' } });
     f.store.updateSession(id, { status: 'waiting_approval', metadata: { ...session.metadata, interrupt: { kind: 'waiting_approval', approvalIds: ['x'] }, outcome: { kind: 'waiting_approval' } } });
   };
-  f.rooms.send(f.principal, room.id, { text: 'needs a person' });
+  f.rooms.send(f.principal, room.id, { text: 'needs a person', mentions: [f.a.id] });
   await f.rooms.tick();
   const turn = f.rooms.turns(f.principal, room.id)[0];
   assert.equal(turn.status, 'completed');
@@ -394,7 +394,7 @@ test('a mixed assistant message keeps the paired call and moves only the pending
   assert.equal(approval.sessionId, f.a.canonicalSessionId);
   assert.deepEqual(f.store.getSession(f.a.canonicalSessionId).metadata.interrupt.approvalIds, [approval.id]);
   f.host.runSession = async id => { f.store.appendMessage(id, 'assistant', [{ type: 'text', text: 'second room turn' }]); f.store.updateSession(id, { status: 'idle' }); };
-  f.rooms.send(f.principal, room.id, { text: 'continue after the hand-off' });
+  f.rooms.send(f.principal, room.id, { text: 'continue after the hand-off', mentions: [f.a.id] });
   await f.rooms.tick();
   assert.equal(f.rooms.turns(f.principal, room.id).at(-1).status, 'completed');
   assert.equal(f.rooms.messages(f.principal, room.id).messages.at(-1).text, 'second room turn');
@@ -517,7 +517,7 @@ test('a failed hand-off commit leaves the in-memory turn recoverable on the next
     f.store.updateSession(id, { status: 'waiting_approval', metadata: { ...session.metadata, interrupt: { kind: 'waiting_approval', approvalIds: ['x'] }, outcome: { kind: 'waiting_approval' } } });
     failCommit = true;
   };
-  f.rooms.send(f.principal, room.id, { text: 'needs a person' });
+  f.rooms.send(f.principal, room.id, { text: 'needs a person', mentions: [f.a.id] });
   await f.rooms.tick();
   const turn = f.rooms.turns(f.principal, room.id)[0];
   assert.equal(turn.status, 'waiting_approval');
@@ -554,7 +554,7 @@ test('room hand-off to private chat still advances the member read position like
     f.store.createApproval({ sessionId: id, toolName: 'write_file', reason: 'needs a person', args: { path: 'out.txt' } });
     f.store.updateSession(id, { status: 'waiting_approval', metadata: { ...session.metadata, interrupt: { kind: 'waiting_approval' }, outcome: { kind: 'waiting_approval' } } });
   };
-  f.rooms.send(f.principal, room.id, { text: 'SEEN_BEFORE_HANDOFF' });
+  f.rooms.send(f.principal, room.id, { text: 'SEEN_BEFORE_HANDOFF', mentions: [f.a.id] });
   await f.rooms.tick();
   const turn = f.rooms.turns(f.principal, room.id)[0];
   assert.equal(turn.status, 'completed');
@@ -579,7 +579,7 @@ test('room hand-off to private chat still advances the member read position like
     f.store.updateSession(id, { status: 'waiting_approval', metadata: { ...session.metadata, interrupt: { kind: 'waiting_approval' }, outcome: { kind: 'waiting_approval' } } });
     failCommit = true;
   };
-  f.rooms.send(f.principal, room.id, { text: 'SEEN_THEN_ROLLED_BACK' });
+  f.rooms.send(f.principal, room.id, { text: 'SEEN_THEN_ROLLED_BACK', mentions: [f.a.id] });
   await f.rooms.tick();
   const waiting = f.rooms.turns(f.principal, room.id).at(-1);
   assert.equal(waiting.status, 'waiting_approval');
@@ -609,7 +609,7 @@ test('room hand-off to private chat still advances the member read position like
     f.store.appendMessage(id, 'assistant', [{ type: 'text', text: 'now I speak' }]);
     f.store.updateSession(id, { status: 'idle' });
   };
-  f.rooms.send(f.principal, room.id, { text: 'AFTER_HANDOFF' });
+  f.rooms.send(f.principal, room.id, { text: 'AFTER_HANDOFF', mentions: [f.a.id] });
   await f.rooms.tick();
   const next = historyOf(prompts.at(-1));
   assert.ok(next.some(message => message.text === 'SEEN_BEFORE_HANDOFF'));
@@ -816,7 +816,7 @@ test('a failed or aborted member still fails the round [AC:bot-rooms#AC-2]', asy
     f.store.appendMessage(id, 'assistant', [{ type: 'text', text: 'partial' }]);
     f.store.updateSession(id, { status: 'idle', metadata: { ...f.store.getSession(id).metadata, outcome: { kind: 'aborted', reason: 'user_abort' } } });
   });
-  f.rooms.send(f.principal, room.id, { text: 'go' });
+  f.rooms.send(f.principal, room.id, { text: 'go', mentions: [f.a.id] });
   await f.rooms.tick();
   const aborted = f.rooms.turns(f.principal, room.id)[0];
   assert.equal(aborted.status, 'cancelled');
@@ -825,7 +825,7 @@ test('a failed or aborted member still fails the round [AC:bot-rooms#AC-2]', asy
   assert.equal(f.rooms.messages(f.principal, room.id).messages.filter(message => message.sender.type === 'bot').length, 0);
 
   recordingRun(f, async id => { f.store.updateSession(id, { status: 'failed' }); });
-  f.rooms.send(f.principal, room.id, { text: 'again' });
+  f.rooms.send(f.principal, room.id, { text: 'again', mentions: [f.a.id] });
   await f.rooms.tick();
   const failed = f.rooms.turns(f.principal, room.id).at(-1);
   assert.equal(failed.status, 'failed');
@@ -837,39 +837,36 @@ test('a failed room turn allows the next message to complete [AC:bot-chat-image-
   const f = fixture();
   const room = f.rooms.create(f.principal, { title: 'Retry', botIds: [f.a.id, f.b.id] });
   recordingRun(f, async id => { f.store.updateSession(id, { status: 'failed', metadata: { ...f.store.getSession(id).metadata, outcome: { kind: 'failed', reason: 'model_error' } } }); });
-  f.rooms.send(f.principal, room.id, { text: 'first' });
+  f.rooms.send(f.principal, room.id, { text: 'first', mentions: [f.a.id] });
   await f.rooms.tick();
   assert.equal(f.rooms.turns(f.principal, room.id).at(-1).status, 'failed');
   recordingRun(f, async id => {
     f.store.appendMessage(id, 'assistant', [{ type: 'text', text: 'Recovered' }]);
     f.store.updateSession(id, { status: 'idle', metadata: { ...f.store.getSession(id).metadata, outcome: { kind: 'idle', reason: 'end' } } });
   });
-  f.rooms.send(f.principal, room.id, { text: 'try again' });
+  f.rooms.send(f.principal, room.id, { text: 'try again', mentions: [f.a.id] });
   await f.rooms.tick();
   assert.equal(f.rooms.turns(f.principal, room.id).at(-1).status, 'completed');
   assert.equal(f.rooms.messages(f.principal, room.id).messages.filter(m => m.sender.type === 'bot').length, 1);
   assert.match(f.rooms.messages(f.principal, room.id).messages.map(m => m.text).join('\n'), /Recovered/);
 });
 
-test('a large room where the host stays silent posts nothing [AC:bot-room-sparse-routing#AC-4]', async () => {
+test('a large room where nobody matches posts nothing [AC:bot-room-sparse-routing#AC-4] [AC:bot-room-speaker-pick#AC-5]', async () => {
   const f = fixture();
   const c = createBot(f.facade, { name: 'QuietGamma' });
   const d = createBot(f.facade, { name: 'QuietDelta' });
   for (const bot of [c, d]) f.store.updateSession(bot.canonicalSessionId, { metadata: { ...f.store.getSession(bot.canonicalSessionId).metadata, ...f.principal } });
   const room = f.rooms.create(f.principal, { title: 'All quiet', botIds: [f.a.id, f.b.id, c.id, d.id], hostBotId: f.a.id });
-  recordingRun(f, async id => {
-    f.store.appendMessage(id, 'assistant', [{ type: 'text', text: '[SILENT]' }]);
-    f.store.updateSession(id, { status: 'idle' });
-  });
   f.rooms.send(f.principal, room.id, { text: 'anyone?' });
   await f.rooms.tick();
   const turn = f.rooms.turns(f.principal, room.id)[0];
   assert.equal(turn.status, 'completed');
   assert.equal(turn.terminationReason, 'members_completed');
   assert.equal(turn.botTurns, 0);
-  assert.deepEqual(turn.silentBotIds, [f.a.id]);
-  assert.equal(f.runs.length, 1);
+  assert.equal(turn.silentBotIds, undefined);
+  assert.equal(f.runs.length, 0);
   assert.equal(f.rooms.messages(f.principal, room.id).messages.filter(message => message.sender.type === 'bot').length, 0);
+  assert.equal(f.rooms.messages(f.principal, room.id).messages.some(message => message.text.includes('我先接住')), false);
 });
 
 test('Hello @Beta schedules only Beta [AC:bot-rooms#AC-2] [AC:bot-room-sparse-routing#AC-2]', async () => {
@@ -904,16 +901,14 @@ test('an unmentioned member is not run [AC:bot-rooms#AC-2]', async () => {
   assert.ok(!f.runs.some(id => f.store.getSession(id).agentId === f.a.id));
 });
 
-test('a message without @ schedules only the host [AC:bot-rooms#AC-2] [AC:bot-room-sparse-routing#AC-4]', async () => {
+test('a message without @ that matches nobody schedules nobody [AC:bot-rooms#AC-2] [AC:bot-room-sparse-routing#AC-4]', async () => {
   const f = fixture();
   const room = f.rooms.create(f.principal, { title: 'Open floor', botIds: [f.a.id, f.b.id], hostBotId: f.a.id });
   const sent = f.rooms.send(f.principal, room.id, { text: 'ordinary question' });
-  assert.deepEqual(sent.turn.botIds, [f.a.id]);
+  assert.deepEqual(sent.turn.botIds, []);
   assert.equal(sent.turn.mentionedBotIds, undefined);
   await f.rooms.tick();
-  assert.equal(f.runs.length, 1);
-  assert.equal(f.store.getSession(f.runs[0]).agentId, f.a.id);
-  assert.ok(!userPrompts(f.store, f.runs[0]).at(-1).includes('not @-mentioned'));
+  assert.equal(f.runs.length, 0);
 });
 
 test('an @ that matches nobody posts a notice and runs nobody [AC:bot-rooms#AC-2] [AC:bot-room-sparse-routing#AC-3]', async () => {
@@ -1003,7 +998,7 @@ test('deleted approval context becomes unknown without blocking or replaying lat
   const f=fixture(),room=f.rooms.create(f.principal,{title:'Missing context',botIds:[f.a.id,f.b.id]});let calls=0;
   let release;
   f.host.runSession=id=>new Promise(resolve=>{calls++;release=()=>{f.store.appendMessage(id,'assistant',[{type:'text',text:'late'}]);f.store.updateSession(id,{status:'idle'});resolve();};});
-  f.rooms.send(f.principal,room.id,{text:'UNCONFIRMED_OLD_WORK'});
+  f.rooms.send(f.principal,room.id,{text:'UNCONFIRMED_OLD_WORK',mentions:[f.a.id]});
   const running=f.rooms.tick();
   await new Promise(resolve=>setImmediate(resolve));
   const old=f.rooms.turns(f.principal,room.id)[0];assert.equal(old.status,'running');
@@ -1015,7 +1010,7 @@ test('deleted approval context becomes unknown without blocking or replaying lat
   const restarted=new BotRoomService(f.host);
   assert.equal(restarted.turns(f.principal,room.id)[0].status,'unknown');
   f.host.runSession=async id=>{calls++;const text=f.store.listMessages(id).flatMap(message=>message.parts).map(part=>part.text??'').join('');assert.ok(text.includes('UNCONFIRMED effects'));f.store.appendMessage(id,'assistant',[{type:'text',text:'only new work completed'}]);};
-  restarted.send(f.principal,room.id,{text:'NEW_SEPARATE_WORK'});await restarted.tick();
+  restarted.send(f.principal,room.id,{text:'NEW_SEPARATE_WORK',mentions:[f.a.id]});await restarted.tick();
   assert.equal(calls,2);assert.equal(restarted.turns(f.principal,room.id)[0].status,'unknown');assert.equal(restarted.turns(f.principal,room.id)[1].status,'completed');
   assert.equal(restarted.turns(f.principal,room.id)[0].terminationReason,'execution_context_missing');
 });
@@ -1120,7 +1115,7 @@ test('a Room private message still stops at three hops and a full tool budget bl
     const bots = names.map(name => rt.createBot({ name }));
     const principal = resolveBotPrincipal(rt.store);
     const room = rt.rooms.create(principal, { title: 'Hop room', botIds: [bots[0].id, bots[1].id], hostBotId: bots[0].id });
-    rt.rooms.send(principal, room.id, { text: 'start a chain' });
+    rt.rooms.send(principal, room.id, { text: 'start a chain', mentions: [bots[0].id] });
     await rt.rooms.tick();
     await waitFor(async () => {
       const row = rt.store.db.prepare("SELECT hop, status FROM bot_work_messages WHERE target_bot=? ORDER BY seq DESC LIMIT 1").get(bots[3].id);
@@ -1168,7 +1163,7 @@ test('a Room turn that has used its tool budget cannot send another private mess
     const beta = rt.createBot({ name: 'Beta' });
     const principal = resolveBotPrincipal(rt.store);
     const room = rt.rooms.create(principal, { title: 'Tight budget', botIds: [alpha.id, beta.id], hostBotId: alpha.id, maxToolCalls: 1 });
-    rt.rooms.send(principal, room.id, { text: 'one tool only' });
+    rt.rooms.send(principal, room.id, { text: 'one tool only', mentions: [alpha.id] });
     await rt.rooms.tick();
     assert.equal(rt.rooms.turns(principal, room.id)[0].terminationReason, 'tool_budget');
     const bodies = rt.store.db.prepare('SELECT body FROM bot_work_messages').all().map(row => row.body);
@@ -1277,7 +1272,7 @@ test('a [SILENT] reply posts nothing, does not use a speaking slot, and the rece
     f.store.appendMessage(id, 'assistant', [{ type: 'text', text: '[SILENT]' }]);
     f.store.updateSession(id, { status: 'idle' });
   };
-  f.rooms.send(f.principal, room.id, { text: 'SEEN_WHILE_SILENT' });
+  f.rooms.send(f.principal, room.id, { text: 'SEEN_WHILE_SILENT', mentions: [f.a.id] });
   await f.rooms.tick();
   const turn = f.rooms.turns(f.principal, room.id)[0];
   assert.equal(turn.status, 'completed');
@@ -1293,7 +1288,7 @@ test('a [SILENT] reply posts nothing, does not use a speaking slot, and the rece
     f.store.appendMessage(id, 'assistant', [{ type: 'text', text: 'now I speak' }]);
     f.store.updateSession(id, { status: 'idle' });
   };
-  f.rooms.send(f.principal, room.id, { text: 'AFTER_SILENCE' });
+  f.rooms.send(f.principal, room.id, { text: 'AFTER_SILENCE', mentions: [f.a.id] });
   await f.rooms.tick();
   const next = historyOf(prompts[1]);
   assert.ok(next.some(message => message.text === 'SEEN_WHILE_SILENT'), 'the silent turn stays in the recent window');
@@ -1309,9 +1304,9 @@ test('a later turn of the same bot still sees the recent room window [AC:bot-roo
     prompts.push(promptTexts(f.store, id).at(-1));
     f.store.appendMessage(id, 'assistant', [{ type: 'text', text: `reply:${prompts.length}` }]);
   };
-  f.rooms.send(f.principal, room.id, { text: 'OLD_TOPIC' });
+  f.rooms.send(f.principal, room.id, { text: 'OLD_TOPIC', mentions: [f.a.id] });
   await f.rooms.tick();
-  f.rooms.send(f.principal, room.id, { text: 'NEW_TOPIC' });
+  f.rooms.send(f.principal, room.id, { text: 'NEW_TOPIC', mentions: [f.a.id] });
   await f.rooms.tick();
   const first = historyOf(prompts[0]);
   const second = historyOf(prompts[1]);
@@ -1411,11 +1406,11 @@ test('a fresh, new-member, or replaced context session gets the recent window ag
   const room = f.rooms.create(f.principal, { title: 'Fresh window', botIds: [f.a.id, f.b.id] });
   const seen = [];
   f.host.runSession = async id => { seen.push({ sessionId: id, text: promptTexts(f.store, id).at(-1) }); f.store.appendMessage(id, 'assistant', [{ type: 'text', text: 'kept' }]); };
-  f.rooms.send(f.principal, room.id, { text: 'FIRST_WINDOW' });
+  f.rooms.send(f.principal, room.id, { text: 'FIRST_WINDOW', mentions: [f.a.id] });
   await f.rooms.tick();
   const contextId = f.store.db.prepare('SELECT session_id FROM bot_room_contexts WHERE room_id=? AND bot_id=?').get(room.id, f.a.id).session_id;
   f.store.updateSession(contextId, { status: 'unknown' });
-  f.rooms.send(f.principal, room.id, { text: 'AFTER_REPLACE' });
+  f.rooms.send(f.principal, room.id, { text: 'AFTER_REPLACE', mentions: [f.a.id] });
   await f.rooms.tick();
   const replaced = seen.at(-1).text;
   assert.match(replaced, /Recent Room history \(first turn in this Room context\)/);
@@ -1495,14 +1490,14 @@ test('an already delivered unknown turn still warns on the next turn [AC:bot-roo
   const f = fixture();
   const room = f.rooms.create(f.principal, { title: 'Still unknown', botIds: [f.a.id, f.b.id] });
   f.host.hasUnconfirmedEffects = () => true;
-  f.rooms.send(f.principal, room.id, { text: 'RISKY_OLD' });
+  f.rooms.send(f.principal, room.id, { text: 'RISKY_OLD', mentions: [f.a.id] });
   await f.rooms.tick();
   const unknown = f.rooms.turns(f.principal, room.id)[0];
   assert.equal(unknown.status, 'unknown');
   delete f.host.hasUnconfirmedEffects;
   let prompt = '';
   f.host.runSession = async id => { prompt = promptTexts(f.store, id).at(-1); f.store.appendMessage(id, 'assistant', [{ type: 'text', text: 'careful' }]); };
-  f.rooms.send(f.principal, room.id, { text: 'NEXT_AFTER_UNKNOWN' });
+  f.rooms.send(f.principal, room.id, { text: 'NEXT_AFTER_UNKNOWN', mentions: [f.a.id] });
   await f.rooms.tick();
   assert.match(prompt, /UNCONFIRMED effects/);
   assert.ok(prompt.includes(unknown.id));
@@ -1558,11 +1553,11 @@ test('a message that arrives while the bot is running is delivered on its next t
       resolve();
     };
   });
-  f.rooms.send(f.principal, room.id, { text: 'TRIGGER_ONE' });
+  f.rooms.send(f.principal, room.id, { text: 'TRIGGER_ONE', mentions: [f.a.id] });
   const running = f.rooms.tick();
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(prompts.length, 1, 'the prompt is built before the run returns');
-  f.rooms.send(f.principal, room.id, { text: 'ARRIVED_WHILE_RUNNING' });
+  f.rooms.send(f.principal, room.id, { text: 'ARRIVED_WHILE_RUNNING', mentions: [f.a.id] });
   assert.ok(!historyOf(prompts[0]).some(message => message.text === 'ARRIVED_WHILE_RUNNING'));
   const sessionId = f.store.db.prepare('SELECT session_id FROM bot_room_contexts WHERE room_id=? AND bot_id=?').get(room.id, f.a.id).session_id;
   const built = f.store.getSession(sessionId).metadata.roomDelivery;

@@ -63,7 +63,7 @@ test('selected members appear in completion order and a large unnamed room stays
   f.runs.length = 0;
   f.rooms.send(f.principal, room.id, { text: 'unnamed large room' });
   await f.rooms.tick();
-  assert.deepEqual(f.runs, [alpha.id]);
+  assert.deepEqual(f.runs, []);
   assert.ok(!f.runs.includes(gamma.id) && !f.runs.includes(delta.id));
 });
 
@@ -102,7 +102,7 @@ test('a member posts once, and the host may summarize after the others [AC:bot-r
     }
     f.store.updateSession(id, { status: 'idle' });
   };
-  f.rooms.send(f.principal, room.id, { text: 'ordinary' });
+  f.rooms.send(f.principal, room.id, { text: 'ordinary', mentions: [alpha.id] });
   await f.rooms.tick();
   const second = botPosts(f.rooms, f.principal, room.id).slice(first.length);
   assert.equal(second.filter(message => message.text === 'opening').length, 1);
@@ -202,7 +202,7 @@ test('a host list drops outsiders and anyone past the cap, and says why [AC:bot-
     f.store.appendMessage(id, 'assistant', [{ type: 'text', text: `reply:${agentId}` }]);
     f.store.updateSession(id, { status: 'idle' });
   };
-  f.rooms.send(f.principal, room.id, { text: 'choose' });
+  f.rooms.send(f.principal, room.id, { text: 'choose', mentions: [alpha.id] });
   await f.rooms.tick();
   assert.deepEqual(f.runs, [alpha.id, beta.id]);
   const notice = botPosts(f.rooms, f.principal, room.id).map(message => message.text).join('\n');

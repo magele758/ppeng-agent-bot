@@ -52,7 +52,7 @@ test('actual model requests receive current shared facts on both kernels without
   service.setShared(principal,{scope:'room',id:unrelated.id},{unrelated:'OTHER_ROOM_ONLY'});
   for (const kernel of ['ppeng','agent-loop']) {
    rt.store.setDaemonControl('loop_settings',{kernelVariant:kernel});
-   rt.rooms.send(principal,room.id,{text:'Check current shared facts'});await rt.rooms.tick();
+   rt.rooms.send(principal,room.id,{text:'Check current shared facts',mentions:[a.id]});await rt.rooms.tick();
    const input=calls.at(-1),serialized=JSON.stringify(input.messages);
    assert.match(serialized,/ROOM/);assert.match(serialized,/GROUP_ONLY/);assert.match(serialized,/FALLBACK/);
    assert.ok(!serialized.includes('OTHER_ROOM_ONLY'));
@@ -60,7 +60,7 @@ test('actual model requests receive current shared facts on both kernels without
    assert.ok(!JSON.stringify(rt.store.listMessages(input.sessionId)).includes('GROUP_ONLY'),'facts are model view only');
   }
   service.move(principal,a.id,null);
-  rt.rooms.send(principal,room.id,{text:'Check after leaving functional group'});await rt.rooms.tick();
+  rt.rooms.send(principal,room.id,{text:'Check after leaving functional group',mentions:[a.id]});await rt.rooms.tick();
   assert.ok(!JSON.stringify(calls.at(-1).messages).includes('GROUP_ONLY'));
  } finally {rt.destroy();}
 });
