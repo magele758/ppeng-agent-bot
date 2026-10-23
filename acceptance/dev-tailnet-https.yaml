@@ -1,0 +1,23 @@
+id: dev-tailnet-https
+title: 本地启动自动同步 Tailnet HTTPS
+status: implemented
+requirement: |
+  把 HTTPS 和 Tailscale 访问整合到项目启动流程里，以后 pnpm run dev 启动就能直接访问，端口变化也自动更新转发地址。别泄露隐私
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 本机已启用 HTTPS 且 Tailscale 在线
+    when: 启动项目且控制台就绪
+    then: HTTPS 自动指向本次控制台实际端口，重启端口变化后自动更新
+  - id: AC-2
+    given: 本机已有其他 Tailscale 服务或公网转发
+    when: 启动项目
+    then: 不覆盖其他服务、不通过公网入口发布控制台，冲突时保留本地 HTTP
+  - id: AC-3
+    given: Tailscale 不可用、未登录、配置错误或控制台尚未就绪
+    when: 启动项目
+    then: 不发布错误地址，不影响本地 HTTP，停止启动时不再更新转发
+  - id: AC-4
+    given: 本机含设备域名、账户信息及凭证
+    when: 启动并记录 HTTPS 状态
+    then: 仅将访问地址存入 Git 忽略的私有本地文件，日志不输出原始状态或凭证，未配置的克隆不会自动发布
