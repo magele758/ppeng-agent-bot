@@ -1,3 +1,4 @@
+import { BOT_DEFAULT_MAX_TURNS } from '../bots/types.js';
 import { readRoomGoals, writeRoomGoals } from './room-goals.js';
 import { startCollaboration, collaborationBoard, recordCollaborationReply, settleCollaboration } from './task-collaboration.js';
 import type { RoomRouteOptions } from './host-route.js';
@@ -503,7 +504,7 @@ export class BotRoomService {
     const mine=this.store.listSessions().find(session=>session.metadata?.canonicalBotChat===true && session.metadata?.botId===botId && sameBotPrincipal(room.principal,principalFromSession(this.store,session)));
     const canonical=this.store.getSession(bot.canonicalSessionId);
     const prior=mine??canonical;
-    const metadata:Record<string,unknown>={roomId:room.id,botId,userId:room.principal.userId,...(room.principal.tenantId?{tenantId:room.principal.tenantId}:{}),permissionMode:prior?.metadata?.permissionMode??'auto',maxTurns:prior?.metadata?.maxTurns??24};
+    const metadata:Record<string,unknown>={roomId:room.id,botId,userId:room.principal.userId,...(room.principal.tenantId?{tenantId:room.principal.tenantId}:{}),permissionMode:prior?.metadata?.permissionMode??'auto',maxTurns:prior?.metadata?.maxTurns??BOT_DEFAULT_MAX_TURNS};
     for(const key of ['allowedTools','allowedSkills','modelOverride']) if(prior?.metadata?.[key]!==undefined) metadata[key]=prior.metadata[key];
     const session=this.host.createChatSession({title:`Room · ${room.title} · ${bot.name}`,agentId:botId,background:true,metadata});
     this.store.db.prepare('INSERT INTO bot_room_contexts(room_id,bot_id,session_id) VALUES(?,?,?) ON CONFLICT(room_id,bot_id) DO UPDATE SET session_id=excluded.session_id').run(room.id,botId,session.id);
@@ -517,7 +518,7 @@ export class BotRoomService {
       if(prior?.metadata?.[key]!==undefined)metadata[key]=prior.metadata[key];
       else delete metadata[key];
     }
-    metadata.permissionMode??='auto';metadata.maxTurns??=24;
+    metadata.permissionMode??='auto';metadata.maxTurns??=BOT_DEFAULT_MAX_TURNS;
     return this.store.updateSession(session.id,{metadata});
   }
   private applyOutcome(turn:BotRoomTurn,session:SessionRecord,botId:string):boolean {

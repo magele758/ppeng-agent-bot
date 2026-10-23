@@ -16,6 +16,7 @@ import {
   runLifecycleHook
 } from '../hooks/lifecycle-hooks.js';
 import {
+  resolveTurnCap,
   isRepetitionAbort,
   loadReasoningSpinWatchdogConfig,
   ReasoningSpinWatchdog,
@@ -558,7 +559,7 @@ async function runSessionKernel(
   }
   riskEngine?.noteUserIntervention(0);
 
-  const maxTurnsPerRun = resolveSessionMaxTurns(session.metadata, host.maxTurnsPerRun);
+  const maxTurnsPerRun = resolveTurnCap(resolveSessionMaxTurns(session.metadata, host.maxTurnsPerRun));
 
   try {
     await host.mcpManager.ensureLoaded(sid);

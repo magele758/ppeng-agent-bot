@@ -35,7 +35,7 @@ export interface UpdateBotInput {
   title?: string;
   description?: string;
   hidden?: boolean;
-  /** 24, 48, or 96. Written onto this bot's canonical chats. */
+  /** 0 (unlimited), 24, 48, or 96. Written onto this bot's canonical chats. */
   maxTurns?: unknown;
   /** Empty array clears the allowlist (full catalog). Unknown names are rejected. */
   allowedTools?: unknown;
@@ -72,4 +72,4 @@ export const CANONICAL_BOT_CHAT_META = 'canonicalBotChat';
 export const SESSION_CUT_META = 'sessionCut';
 /** New Bot chats default to auto. Existing modes are left alone on open. */
 export const BOT_DEFAULT_PERMISSION_MODE = 'auto' as const;
-export const BOT_DEFAULT_MAX_TURNS = 24;
+export const BOT_DEFAULT_MAX_TURNS = 0;

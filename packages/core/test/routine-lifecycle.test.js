@@ -331,3 +331,13 @@ test('dialog run_now queues serial work through approval and runs queries enforc
  enabled=false;assert.equal((await now.execute(ctx,{id:job.id})).ok,false);assert.equal((await query.execute(ctx,{id:job.id})).ok,false);
  store.db.close();
 });
+
+test('routine working sessions default to unlimited execution steps [AC:unlimited-execution-steps#AC-1]', async () => {
+ const {store,session,host}=fixture();
+ try {
+  const job=createCronJob(host,{sessionId:session.id,name:'unlimited',prompt:'work',intervalMs:60000});
+  const runs=new RoutineRunStore(store),run=runs.enqueue(job,new Date().toISOString());
+  await drainRoutineRuns(host);await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(store.getSession(runs.get(run.id).sessionId).metadata.maxTurns,0);
+ } finally {store.db.close();}
+});

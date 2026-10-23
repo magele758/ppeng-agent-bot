@@ -240,3 +240,24 @@ test.describe('Bot permission settings', () => {
     expect(after.metadata.permissionMode).toBe('auto');
   });
 });
+
+test('execution steps default to unlimited and both finite and unlimited selections persist [AC:unlimited-execution-steps#AC-3]', async ({ page, request }) => {
+  const name = `E2E Unlimited ${Date.now()}`;
+  const created = await request.post('/api/bots', { data: { name } });
+  expect(created.status()).toBe(201);
+  const { bot } = await created.json();
+  await openBotSettings(page, name);
+  const select = page.getByLabel('Bot 单次执行步数上限');
+  await expect(select).toHaveValue('0');
+  await expect(select.getByRole('option', { name: '无上限', exact: true })).toHaveCount(1);
+  for (const value of ['48', '0']) {
+    await select.selectOption(value);
+    await expect.poll(async () => {
+      const res = await request.get(`/api/sessions/${bot.canonicalSessionId}`);
+      return (await res.json()).session.metadata.maxTurns;
+    }).toBe(Number(value));
+    await page.reload();
+    await openBotSettings(page, name);
+    await expect(select).toHaveValue(value);
+  }
+});

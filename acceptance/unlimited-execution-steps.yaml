@@ -1,0 +1,18 @@
+id: unlimited-execution-steps
+title: 默认不限单次执行步数
+status: implemented
+requirement: 那就这个配置可以保留，直接改成默认无上限轮数限制，你刚改功能名字的事儿也可以，去做吧
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 用户未设置执行步数上限
+    when: 任务需要超过原有默认的24步
+    then: 默认继续执行直到正常结束或被停止，不因旧默认上限强制收尾
+  - id: AC-2
+    given: 用户选择不限步数或已有明确保存的有限上限
+    when: 保存配置并执行任务
+    then: 不限步数及24、48、96均可使用，已有有限配置保留，非法值被拒绝
+  - id: AC-3
+    given: 用户打开Bot设置
+    when: 查看和修改执行步数配置后刷新
+    then: 显示单次执行步数上限和无上限选项，默认无上限且选择可持久保存

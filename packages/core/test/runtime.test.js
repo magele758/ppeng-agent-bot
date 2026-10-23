@@ -1006,3 +1006,59 @@ test('destroy() cleans up without errors', async () => {
   // Should not throw
   await runtime.destroy();
 });
+
+test('both execution kernels run past the old default cap and finish normally [AC:unlimited-execution-steps#AC-1]', async () => {
+  const prior = process.env.RAW_AGENT_MAX_TURNS;
+  delete process.env.RAW_AGENT_MAX_TURNS;
+  try {
+    for (const kernelVariant of ['agent-loop', 'ppeng']) {
+      let calls = 0;
+      const runtime = new RawAgentRuntime({
+        repoRoot: mkdtempSync(join(tmpdir(), 'unlimited-steps-repo-')),
+        stateDir: mkdtempSync(join(tmpdir(), 'unlimited-steps-state-')),
+        modelAdapter: new ScriptedAdapter(() => {
+          calls++;
+          return calls <= 30
+            ? { stopReason: 'tool_use', assistantParts: [{ type: 'tool_call', toolCallId: `step-${calls}`, name: 'progress_probe', input: { step: calls } }] }
+            : { stopReason: 'end', assistantParts: [{ type: 'text', text: 'Completed thirty steps.' }] };
+        }),
+        extraTools: [{ name: 'progress_probe', description: 'Progress probe', inputSchema: { type: 'object' }, approvalMode: 'never', sideEffectLevel: 'none', execute: async (_context, input) => ({ ok: true, content: `Evidence for step ${input.step}` }) }]
+      });
+      try {
+        runtime.store.setDaemonControl('loop_settings', { kernelVariant });
+        runtime.store.setDaemonControl('tool_exposure_settings', { mode: 'full', pinnedGroups: {} });
+        const session = runtime.createChatSession({ title: 'Thirty steps', message: 'Complete all thirty steps.' });
+        await runtime.runSession(session.id);
+        assert.equal(calls, 31, kernelVariant);
+        assert.equal(runtime.getLatestAssistantText(session.id), 'Completed thirty steps.');
+      } finally { runtime.destroy(); }
+    }
+  } finally {
+    if (prior === undefined) delete process.env.RAW_AGENT_MAX_TURNS;
+    else process.env.RAW_AGENT_MAX_TURNS = prior;
+  }
+});
+
+test('explicit unlimited execution remains cancellable in both kernels [AC:unlimited-execution-steps#AC-2]', { timeout: 5000 }, async () => {
+  for (const kernelVariant of ['agent-loop', 'ppeng']) {
+    let started;
+    const ready = new Promise(resolve => { started = resolve; });
+    const runtime = runtimeWithAdapter(new ScriptedAdapter(async input => {
+      started();
+      await new Promise(resolve => {
+        if (input.signal.aborted) resolve();
+        else input.signal.addEventListener('abort', resolve, { once: true });
+      });
+      return { stopReason: 'end', assistantParts: [{ type: 'text', text: 'cancelled' }] };
+    }));
+    try {
+      runtime.store.setDaemonControl('loop_settings', { kernelVariant });
+      const session = runtime.createChatSession({ title: 'Cancel unlimited', message: 'Work', metadata: { maxTurns: 0 } });
+      const running = runtime.runSession(session.id);
+      await ready;
+      runtime.cancelSession(session.id);
+      await running;
+      assert.notEqual(runtime.getSession(session.id).status, 'running');
+    } finally { runtime.destroy(); }
+  }
+});
