@@ -17,8 +17,7 @@ interface AuthorizedWait { goalId: string; source: string; correlationId: string
 
 function delegatedChildSettled(host: GoalRuntimeHost, parent: SessionRecord, taskId: string): boolean {
  return host.store.listSessions().some(session => {
-  if (session.metadata.botWorkTaskId !== taskId || host.isRunning(session.id)) return false;
-  if (session.metadata.botGoalScopeSessionId === parent.id) return false;
+  if (session.metadata.botWorkTaskId !== taskId || session.metadata.canonicalBotChat === true || host.isRunning(session.id)) return false;
   const outcome = session.metadata.outcome as {kind?: string} | undefined;
   if (outcome?.kind === 'completed' || outcome?.kind === 'failed' || session.status === 'completed' || session.status === 'failed') return true;
   if (session.status !== 'idle') return false;
