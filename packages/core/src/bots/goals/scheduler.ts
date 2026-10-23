@@ -8,7 +8,7 @@ import { inheritBotIdentityMetadata } from '../../memory/bot-memory-scope.js';
 import { childPermissionMode, inheritBotAllowlists, inheritModelOverride } from '../../runtime/spawn-policy.js';
 import { inheritForkRetrievalMetadata, forkOpeningMessage } from '../fork-inheritance.js';
 import { childSessionTrace } from '../../stores/trace-visible.js';
-import { announceGoalState, bindGoalExecution, goalScope, settleGoalExecution, type GoalRuntimeHost } from './runtime-host.js';
+import { announceGoalState, bindGoalExecution, goalAlreadyHandled, goalScope, settleGoalExecution, type GoalRuntimeHost } from './runtime-host.js';
 import type { BotGoal, GoalExecution } from './types.js';
 
 const ticking = new WeakSet<object>();
@@ -266,6 +266,7 @@ function atConcurrencyCap(service: GoalService, botId: string): boolean {
  return service.list(botId).filter(g => g.activeExecutionId).length >= service.readSettings().maxConcurrent;
 }
 function tickQueued(host: GoalRuntimeHost, parent: SessionRecord, service: GoalService, botId: string, goal: BotGoal): boolean {
+ if (goalAlreadyHandled(host, parent, goal)) return false;
  if (skipFreshQueued(host, parent, goal)) return false;
  if (atConcurrencyCap(service, botId)) return true;
  spawnContinuation(host, parent, goal);

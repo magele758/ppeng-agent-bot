@@ -162,6 +162,16 @@ function hasImperativeWork(text: string): boolean {
   return /(?:请|帮我|麻烦)[\s\S]{0,16}(?:分析|实现|添加|修复|编写|设计|检查|调查|改成|做完|搬到|迁移到|开发)/.test(stripped)
     || /^(?:请|帮我|麻烦)?\s*(?:分析|实现|添加|修复|编写|设计|检查|调查|改成|做完|搬到|迁移到|开发)/.test(stripped);
 }
+const deliveryWork = /完成结果(?:是|为)|验收(?:标准|条件)|交付物|(?:修复|修改|改成|实现|添加|开发|编写|部署|迁移|重构|写好|做完|提交|发布)|\b(?:fix|implement|build|deploy|migrate|refactor)\b/i;
+const isolatedHandoff = /拆成子任务|拆成并行|并行处理|分别交给|交给(?:规划|实现|验收|评估)|子代理/;
+const selfContainedWork = /分析|说明|解释|看看|看下|检查|查看|总结|梳理|对比|\b(?:analy[sz]e|explain|inspect|summarize)\b/i;
+
+/** Analysis, explanation, or inspection the current Bot can finish in this chat. A stated delivery still stays a goal. */
+export function isSelfContainedBotWork(text: string): boolean {
+  if (hasStatedOutcome(text) || deliveryWork.test(text) || isolatedHandoff.test(text)) return false;
+  if (/设计方案|制定[\s\S]{0,12}规划|开发功能/.test(text)) return false;
+  return selfContainedWork.test(text);
+}
 /** Asking, discussing, or checking memory without a stated deliverable. Shared room classification stays unchanged. */
 export function isUndirectedInquiry(text: string): boolean {
   if (hasStatedOutcome(text) || hasImperativeWork(text)) return false;
@@ -170,6 +180,11 @@ export function isUndirectedInquiry(text: string): boolean {
 export function releaseOpenInquiry(intent: GoalIntentProposal): GoalIntentProposal {
   if (intent.kind === 'query' || intent.kind === 'chat' || intent.kind === 'pause' || intent.kind === 'resume' || intent.kind === 'cancel') return intent;
   return isUndirectedInquiry(intent.text) ? { kind: 'chat', text: intent.text } : intent;
+}
+/** Bot chat only. A new goal the current Bot can finish itself stays a chat turn. Room intake does not use this. */
+export function releaseSelfContainedBotWork(intent: GoalIntentProposal): GoalIntentProposal {
+  if (intent.kind !== 'new_goal') return intent;
+  return isSelfContainedBotWork(intent.text) ? { kind: 'chat', text: intent.text } : intent;
 }
 
 /** Judge proposals are untrusted. Callers still validate scoped target ownership and goal revision. */
