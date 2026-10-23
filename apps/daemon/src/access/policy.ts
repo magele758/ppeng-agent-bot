@@ -447,6 +447,7 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
     // global settings: everyone reads the public view, admins write
     ['GET /api/ingestion/settings', AUTHENTICATED],
     ['PATCH /api/ingestion/settings', ADMIN],
+    ['POST /api/library/pick-folder', ADMIN],
     ['GET /api/browser/settings', AUTHENTICATED],
     ['PATCH /api/browser/settings', ADMIN],
     ['GET /api/web/settings', AUTHENTICATED],

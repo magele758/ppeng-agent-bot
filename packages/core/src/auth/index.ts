@@ -1,6 +1,7 @@
 export {
   AUTH_OAUTH_STATE_COOKIE,
   AUTH_SESSION_COOKIE,
+  LAB_BROWSER_HOST_HEADER,
   LAB_PROXY_HEADER
 } from './types.js';
 export type {

@@ -21,5 +21,22 @@ export const knowledge = {
     browserSaved: 'Browser settings saved. New sessions load the browser tools',
     webSearchSaved: 'Search template saved, effective immediately',
     loadFailed: 'Failed to load ingestion settings: {error}'
+  },
+  library: {
+    title: 'Local document folders',
+    desc: 'Add folders you keep collecting into the knowledge base. Choose Folder picks them on this computer, and you can add more than one. Saving indexes immediately, and the index follows file changes. Chat can search those documents. No .env change and no restart.',
+    choose: 'Choose folder',
+    choosing: 'Opening the folder picker…',
+    remove: 'Remove',
+    empty: 'No folders yet. Only folders you add are indexed.',
+    saved: 'Folder added to the knowledge base and indexed',
+    removed: 'Folder removed. Its documents are no longer searchable',
+    duplicate: 'That folder is already in the list',
+    cancelled: 'Selection cancelled. Nothing was added',
+    unavailable: 'The folder picker could not open on this computer',
+    rejected: 'That folder cannot be added to the knowledge base',
+    saveFailed: 'Could not save this folder: {error}',
+    loadFailed: 'Failed to load document folders: {error}',
+    pickFailed: 'Could not open the folder picker: {error}'
   }
 };

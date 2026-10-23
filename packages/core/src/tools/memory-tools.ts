@@ -26,7 +26,7 @@ const AGENT_SCOPE_MAP: Record<string, MemoryScope> = {
   project: 'project.memory'
 };
 
-export type MemoryToolScope = 'scratch' | 'long' | 'user' | 'team' | 'project';
+export type MemoryToolScope = 'scratch' | 'long' | 'user' | 'team' | 'project' | 'library';
 
 export interface ExtendedMemoryToolServices extends MemoryToolServices {
   /** Optional multi-layer AgentMemoryStore path (user/team/project). */
@@ -183,7 +183,7 @@ function resolveSearchLimit(raw: unknown): number {
 }
 
 function toolScopeOf(raw: unknown, fallback: MemoryToolScope): MemoryToolScope {
-  if (raw === 'scratch' || raw === 'long' || raw === 'user' || raw === 'team' || raw === 'project') return raw;
+  if (raw === 'scratch' || raw === 'long' || raw === 'user' || raw === 'team' || raw === 'project' || raw === 'library') return raw;
   if (raw === 'session.scratch') return 'scratch';
   if (raw === 'session.long') return 'long';
   if (raw === 'user.memory') return 'user';
@@ -210,6 +210,7 @@ function readSearchItem(row: unknown, fallback: MemoryToolScope): MemorySearchIt
 }
 
 function agentScopeOf(scope: MemoryToolScope): MemoryScope {
+  if (scope === 'library') return 'library';
   const mapped = AGENT_SCOPE_MAP[scope];
   if (!mapped) throw new Error(`Unknown scope ${scope}`);
   return mapped;
@@ -484,12 +485,12 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
   const memorySearchTool: ToolContract<{ query: string; scope?: MemoryToolScope; limit?: number }> = {
     name: 'memory_search',
     description:
-      'Search memories and return the top matching keys with short excerpts. scope: scratch|long|user|team|project; omit to search every scope visible to this session. A bot sub-agent also searches the parent bot\'s notes, team and project memory, and the parent working log. No match is an explicit empty result and does not fall back to other bots or the shared pool. Does not dump the memory store. Excerpts keep existing «external …» «end external» fences intact.',
+      'Search memories and return the top matching keys with short excerpts. scope: scratch|long|user|team|project|library; omit to search every scope visible to this session, including the document library indexed from folders saved in Knowledge. A bot sub-agent also searches the parent bot\'s notes, team and project memory, and the parent working log. No match is an explicit empty result and does not fall back to other bots or the shared pool. Does not dump the memory store. Excerpts keep existing «external …» «end external» fences intact. Library hits use scope library; open one with memory_read.',
     inputSchema: {
       type: 'object',
       properties: {
         query: { type: 'string', description: 'What to look for in memory keys and values' },
-        scope: { type: 'string', enum: ['scratch', 'long', 'user', 'team', 'project'] },
+        scope: { type: 'string', enum: ['scratch', 'long', 'user', 'team', 'project', 'library'] },
         limit: { type: 'number', description: 'Maximum hits to return (default 5, max 20)' }
       },
       required: ['query']
@@ -506,7 +507,7 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
       const query = typeof args.query === 'string' ? args.query.trim() : '';
       if (!query) return { ok: false, content: 'query is required' };
       const requested = args.scope;
-      if (requested !== undefined && !AGENT_SCOPE_MAP[requested]) {
+      if (requested !== undefined && requested !== 'library' && !AGENT_SCOPE_MAP[requested]) {
         return { ok: false, content: `Unknown scope ${requested}` };
       }
       if (requested && !SESSION_SCOPES.has(requested) && !services.listAgentMemory) {
@@ -515,7 +516,7 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
       const limit = resolveSearchLimit(args.limit);
       const scopes: MemoryToolScope[] = requested
         ? [requested]
-        : ['scratch', 'long', 'user', 'team', 'project'];
+        : ['scratch', 'long', 'user', 'team', 'project', 'library'];
       const items: MemorySearchItem[] = [];
       const seen = new Set<string>();
       const pushRows = (rows: unknown[], scope: MemoryToolScope, fallbackSessionId?: string) => {
@@ -529,6 +530,16 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
       };
       const sessionIds = subagentMemorySessionIds(context.session, services.botLookup);
       for (const scope of scopes) {
+        if (scope === 'library') {
+          if (!services.listAgentMemory) continue;
+          const rows = await services.listAgentMemory({
+            scope: 'library',
+            query,
+            limit: Math.max(limit * 4, 24)
+          });
+          pushRows(rows, 'library');
+          continue;
+        }
         if (SESSION_SCOPES.has(scope)) {
           for (const sessionId of sessionIds) {
             const rows = await services.listSessionMemory(sessionId, scope as 'scratch' | 'long');
@@ -593,11 +604,16 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
         if (!fresh) return unavailable;
         context = { ...context, session: { ...context.session, ...fresh } as typeof context.session };
       }
-      const match = typeof args.ref === 'string' ? /^memory:(scratch|long|user|team|project):(.+)$/.exec(args.ref) : null;
+      const match = typeof args.ref === 'string' ? /^memory:(scratch|long|user|team|project|library):(.+)$/.exec(args.ref) : null;
       if (!match) return unavailable;
       const scope = match[1] as MemoryToolScope;
       let id: string;
       try { id = decodeURIComponent(match[2]!); } catch { return unavailable; }
+      if (scope === 'library') {
+        const row = services.getAgentMemoryById ? await services.getAgentMemoryById(id) : null;
+        if (!row || row.scope !== 'library') return unavailable;
+        return { ok: true, content: JSON.stringify({ ref: args.ref, scope, key: row.key, ...sourcePage(row.value, args.offset, args.limit) }) };
+      }
       let item: MemorySearchItem | undefined;
       if (scope === 'long' && id.startsWith('working-log:')) {
         const sessionId = id.slice('working-log:'.length);

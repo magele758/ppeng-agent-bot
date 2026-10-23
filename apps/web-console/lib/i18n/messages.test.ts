@@ -27,6 +27,38 @@ test('play create menu names for a bot and a group do not overlap', () => {
   }
 });
 
+test('知识库目录文案中英文使用同一套条目 [AC:knowledge-library-dirs#AC-5]', () => {
+  const keys = [
+    'title',
+    'desc',
+    'choose',
+    'choosing',
+    'remove',
+    'empty',
+    'saved',
+    'removed',
+    'duplicate',
+    'cancelled',
+    'unavailable',
+    'rejected',
+    'saveFailed',
+    'loadFailed',
+    'pickFailed'
+  ] as const;
+  for (const key of keys) {
+    assert.equal(typeof zh.knowledge.library[key], 'string');
+    assert.equal(typeof en.knowledge.library[key], 'string');
+    assert.ok(zh.knowledge.library[key].length > 0);
+    assert.ok(en.knowledge.library[key].length > 0);
+  }
+  assert.deepEqual(Object.keys(zh.knowledge.library).sort(), Object.keys(en.knowledge.library).sort());
+  assert.deepEqual(Object.keys(zh.knowledge.library).sort(), [...keys].sort());
+  assert.equal(zh.knowledge.library.choose, '选择文件夹');
+  assert.equal(en.knowledge.library.choose, 'Choose folder');
+  assert.equal(Object.hasOwn(zh.knowledge.library, 'path'), false);
+  assert.equal(Object.hasOwn(en.knowledge.library, 'pathPh'), false);
+});
+
 test('en and zh leaf key sets are identical', () => {
   const zhKeys = collectLeafKeys(zh);
   const enKeys = collectLeafKeys(en);

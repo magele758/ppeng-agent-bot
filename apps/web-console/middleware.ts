@@ -4,6 +4,7 @@ import {
   copyProxyResponseHeaders,
   daemonProxyErrorMessage,
   LAB_PROXY_HEADER,
+  LAB_BROWSER_HOST_HEADER,
   sanitizeProxyHeaders,
   stripHumanReleaseHeader
 } from './lib/daemon-proxy.ts';
@@ -23,9 +24,12 @@ function appendDaemonBearerIfConfigured(headers: Headers): void {
 
 function appendLabForwarding(request: NextRequest, headers: Headers): void {
   headers.set(LAB_PROXY_HEADER, '1');
-  // fetch() to the daemon replaces Host. Forward the browser host so a loopback
-  // Lab keeps its own port as the OAuth callback. The daemon accepts this only
-  // when it is loopback; a public host is rejected unless public origin is set.
+  // nextUrl.host is the bind address (0.0.0.0) when Lab listens on all interfaces.
+  // The picker needs the browser Host so a page opened on another machine is refused.
+  const browserHost = request.headers.get('host');
+  if (browserHost) headers.set(LAB_BROWSER_HOST_HEADER, browserHost);
+  else headers.delete(LAB_BROWSER_HOST_HEADER);
+  // OAuth callback origin. On this Lab nextUrl.host is the bind address, not the browser.
   headers.set('x-forwarded-host', request.nextUrl.host);
   headers.set('x-forwarded-proto', request.nextUrl.protocol.replace(/:$/, '') || 'http');
 }

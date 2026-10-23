@@ -3,7 +3,10 @@
  * Lab UI is the control plane; no new RAW_AGENT_* env switches.
  */
 
+import { homedir } from 'node:os';
+import { ValidationError } from '../errors.js';
 import { nowIso } from '../id.js';
+import { prepareLibraryDirs, storedLibraryDirs } from './library-paths.js';
 
 export const INGESTION_SETTINGS_KEY = 'ingestion_settings';
 
@@ -23,6 +26,8 @@ export interface IngestionSettings {
   gbkFallback: boolean;
   /** Tool results longer than this become paged artifacts (retrieve still works). */
   toolResultArchiveChars: number;
+  /** Absolute folders the user added. Documents there are indexed for chat search. */
+  libraryDirs: string[];
   updatedAt: string;
 }
 
@@ -34,6 +39,7 @@ export interface IngestionSettingsPatch {
   pageSizeChars?: number;
   gbkFallback?: boolean;
   toolResultArchiveChars?: number;
+  libraryDirs?: string[];
 }
 
 export interface IngestionSettingsStore {
@@ -50,6 +56,7 @@ export function defaultIngestionSettings(): IngestionSettings {
     pageSizeChars: DEFAULT_PAGE_SIZE_CHARS,
     gbkFallback: true,
     toolResultArchiveChars: DEFAULT_TOOL_RESULT_ARCHIVE_CHARS,
+    libraryDirs: [],
     updatedAt: nowIso()
   };
 }
@@ -61,7 +68,8 @@ function clampInt(v: unknown, fallback: number, min: number, max: number): numbe
 }
 
 export function normalizeIngestionSettings(
-  raw: Partial<IngestionSettings> | null | undefined
+  raw: Partial<IngestionSettings> | null | undefined,
+  home = homedir()
 ): IngestionSettings {
   const base = defaultIngestionSettings();
   if (!raw || typeof raw !== 'object') return base;
@@ -78,6 +86,7 @@ export function normalizeIngestionSettings(
       2000,
       500_000
     ),
+    libraryDirs: storedLibraryDirs(raw.libraryDirs, home),
     updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : base.updatedAt
   };
 }
@@ -90,14 +99,25 @@ export function readIngestionSettings(store: IngestionSettingsStore): IngestionS
 
 export function writeIngestionSettings(
   store: IngestionSettingsStore,
-  patch: IngestionSettingsPatch
+  patch: IngestionSettingsPatch,
+  home = homedir()
 ): IngestionSettings {
   const current = readIngestionSettings(store);
-  const next = normalizeIngestionSettings({
-    ...current,
-    ...patch,
-    updatedAt: nowIso()
-  });
+  let libraryDirs = current.libraryDirs;
+  if (patch.libraryDirs !== undefined) {
+    const prepared = prepareLibraryDirs(patch.libraryDirs, home);
+    if (!prepared.ok) throw new ValidationError(prepared.error);
+    libraryDirs = prepared.dirs;
+  }
+  const next = normalizeIngestionSettings(
+    {
+      ...current,
+      ...patch,
+      libraryDirs,
+      updatedAt: nowIso()
+    },
+    home
+  );
   store.setDaemonControl(INGESTION_SETTINGS_KEY, next);
   return next;
 }

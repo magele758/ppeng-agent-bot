@@ -22,6 +22,19 @@ export {
   writeIngestionSettings
 } from './settings.js';
 export type { IngestionSettings, IngestionSettingsPatch, IngestionSettingsStore } from './settings.js';
+export { syncLibraryIndex, LibraryIndexWatcher } from './library-index.js';
+export type { LibraryIndexStore, LibrarySyncStats } from './library-index.js';
+export { checkLibraryDir, prepareLibraryDirs, storedLibraryDirs, LIBRARY_DIR_LIMIT } from './library-paths.js';
+export type { LibraryDirCheck } from './library-paths.js';
+export {
+  LIBRARY_FOLDER_PICK_ARGS,
+  LIBRARY_FOLDER_PICK_COMMAND,
+  libraryFolderPickAllowed,
+  libraryPickBodyAllowed,
+  libraryPickQueryAllowed,
+  pickLibraryFolder
+} from './folder-picker.js';
+export type { FolderPickResult, PickLibraryFolderDeps } from './folder-picker.js';
 export type {
   AttachmentKind,
   AttachmentSource,

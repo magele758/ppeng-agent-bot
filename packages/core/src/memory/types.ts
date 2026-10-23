@@ -3,7 +3,8 @@ export type MemoryScope =
   | 'session.long'
   | 'user.memory'
   | 'team.memory'
-  | 'project.memory';
+  | 'project.memory'
+  | 'library';
 
 export type MemoryConfidence = 'low' | 'medium' | 'high';
 

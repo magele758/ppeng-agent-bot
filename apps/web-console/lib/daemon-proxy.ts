@@ -1,6 +1,8 @@
 /** Shared helpers for Next → daemon `/api/*` proxy (middleware). */
 
 export const LAB_PROXY_HEADER = 'x-ppeng-lab';
+/** Must match `@ppeng/agent-core` `LAB_BROWSER_HOST_HEADER`. The real browser Host, not Next's bind address. */
+export const LAB_BROWSER_HOST_HEADER = 'x-ppeng-browser-host';
 
 /**
  * Former release-secret header. The proxy strips it and never sets it.

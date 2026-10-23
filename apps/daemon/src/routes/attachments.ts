@@ -50,6 +50,7 @@ export function attachmentRoutes(runtime: RawAgentRuntime): RouteSpec[] {
       handler: async ({ readBody, response }) => {
         const body = (await readBody()) as IngestionSettingsPatch;
         const settings = writeIngestionSettings(runtime.store, body ?? {});
+        if (body && 'libraryDirs' in body) runtime.refreshLibraryIndex();
         json(response, 200, { settings, effective: { ...settings, source: 'ui' } });
       }
     },

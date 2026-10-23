@@ -21,5 +21,22 @@ export const knowledge = {
     browserSaved: '浏览器设置已保存。新会话会加载浏览器工具',
     webSearchSaved: '搜索模板已保存，立即生效',
     loadFailed: '加载摄取设置失败：{error}'
+  },
+  library: {
+    title: '本地资料目录',
+    desc: '把持续收集资料的文件夹加进知识库。点「选择文件夹」从这台电脑挑选，可以添加多个。保存后立即索引，目录里的文件有变动时索引会跟上，对话里可以检索到。不必改 .env，也不必重启。',
+    choose: '选择文件夹',
+    choosing: '正在打开文件夹选择…',
+    remove: '移除',
+    empty: '还没有添加目录。只索引你明确添加的文件夹。',
+    saved: '目录已加入知识库，索引已更新',
+    removed: '已移除该目录，其中的文档不再被检索',
+    duplicate: '这个文件夹已经在列表里',
+    cancelled: '已取消选择，没有添加文件夹',
+    unavailable: '这台电脑上打不开文件夹选择对话框',
+    rejected: '这个文件夹不能加入知识库',
+    saveFailed: '没能保存这个目录：{error}',
+    loadFailed: '加载资料目录失败：{error}',
+    pickFailed: '没能打开文件夹选择：{error}'
   }
 };
