@@ -1,5 +1,28 @@
 /** Play / Chat 界面文案。不要加 as const。 */
 export const play = {
+  systemNotice: {
+    "recovery": "执行恢复",
+    "stopped": "执行已停止",
+    "fallback": "模型切换",
+    "goal": "目标检查",
+    "compact": "上下文整理",
+    "hook": "扩展通知",
+    "collaboration": "协作消息",
+    "access": "权限与边界",
+    "context": "上下文补充",
+    "generic": "系统通知",
+    "recoveryHint": "记录自动恢复、重试或待核实的执行信息。",
+    "stoppedHint": "运行时已停止本次执行，具体原因见下方详情。",
+    "fallbackHint": "记录模型回退或替换信息。",
+    "goalHint": "本条记录目标检查或协调信息，不代表当前目标的实时状态。",
+    "compactHint": "记录会话压缩与上下文整理过程。",
+    "hookHint": "来自执行钩子或扩展的运行信息。",
+    "collaborationHint": "来自子任务、协作助手或任务编排的更新。",
+    "accessHint": "记录命令、沙箱或共享范围的限制与变更。",
+    "contextHint": "提供本次执行所需的背景或操作提示。",
+    "genericHint": "运行时或扩展提供的补充信息。",
+    "details": "原始详情"
+},
   systemContext: {
     "summaryTitle": "会话摘要",
     "jevTitle": "Jev 评估",

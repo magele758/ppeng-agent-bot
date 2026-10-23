@@ -1,5 +1,28 @@
 /** Play / Chat copy. Do not add as const. */
 export const play = {
+  systemNotice: {
+    "recovery": "Execution recovery",
+    "stopped": "Execution stopped",
+    "fallback": "Model switch",
+    "goal": "Goal check",
+    "compact": "Context maintenance",
+    "hook": "Extension notice",
+    "collaboration": "Collaboration update",
+    "access": "Access and boundaries",
+    "context": "Additional context",
+    "generic": "System notice",
+    "recoveryHint": "Automatic recovery, retries, or execution details awaiting verification.",
+    "stoppedHint": "The runtime stopped this execution. See the details for the reason.",
+    "fallbackHint": "Model fallback or replacement information.",
+    "goalHint": "A goal check or coordination record, not the goal’s current live status.",
+    "compactHint": "Conversation compaction and context maintenance information.",
+    "hookHint": "Runtime information from an execution hook or extension.",
+    "collaborationHint": "Updates from subtasks, helpers, or task orchestration.",
+    "accessHint": "Command, sandbox, or sharing restrictions and changes.",
+    "contextHint": "Background or guidance for this execution.",
+    "genericHint": "Additional information supplied by the runtime or an extension.",
+    "details": "Original details"
+},
   systemContext: {
     "summaryTitle": "Conversation summary",
     "jevTitle": "Jev evaluation",

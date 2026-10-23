@@ -93,6 +93,7 @@ function requireId(fromFile: string, id: string): unknown {
 
 const ui = loadFile(path.join(here, 'ChatTurns.tsx')) as {
   ChatTurnPlain: React.ComponentType<Record<string, unknown>>;
+  ChatTurnFromMessage: React.ComponentType<Record<string, unknown>>;
 };
 
 function renderTurns(turns: readonly Turn[], conversationId: string): string {
@@ -135,12 +136,12 @@ const blockedNotice = goalUpdateText({
 test('目标更新不再显示花括号原文和英文叮嘱 [AC:goal-update-presentation#AC-1]', () => {
   const html = renderTurns([{ role: 'system', text: blockedNotice, sessionId: CURRENT }], CURRENT);
   assert.equal(cards(html).length, 1);
-  assert.equal(html.includes('[goal update]'), false);
-  assert.equal(html.includes(NUDGE_TELL), false);
-  assert.equal(html.includes(NUDGE_RESTART), false);
-  assert.equal(html.includes('{"id"'), false);
-  assert.equal(html.includes('probe-progress-9f3a'), false);
-  assert.equal(html.includes('probe-next-step-9f3a'), false);
+  assert.equal(cards(html).join('').includes('[goal update]'), false);
+  assert.equal(cards(html).join('').includes(NUDGE_TELL), false);
+  assert.equal(cards(html).join('').includes(NUDGE_RESTART), false);
+  assert.equal(cards(html).join('').includes('{"id"'), false);
+  assert.equal(cards(html).join('').includes('probe-progress-9f3a'), false);
+  assert.equal(cards(html).join('').includes('probe-next-step-9f3a'), false);
   assert.match(html, /可以考虑让bo/);
 });
 
@@ -170,8 +171,8 @@ test('目标更新显示为带标题、可读状态和人话原因的状态卡 [
     assert.equal(textOf(html, 'goal-update-status'), item.label);
     assert.match(html, new RegExp(`data-status="${item.status}"`));
     assert.equal(textOf(html, 'goal-update-reason'), '证据已经对齐');
-    assert.equal(html.includes(GOAL_ID), false);
-    assert.equal(html.includes('probe-progress-9f3a'), false);
+    assert.equal(cards(html).join('').includes(GOAL_ID), false);
+    assert.equal(cards(html).join('').includes('probe-progress-9f3a'), false);
   }
 
   const untitled = renderTurns(
@@ -189,7 +190,7 @@ test('目标更新显示为带标题、可读状态和人话原因的状态卡 [
   );
   const fallbackTitle = textOf(untitled, 'goal-update-title');
   assert.equal(fallbackTitle, '目标有更新');
-  assert.equal(untitled.includes('goal_aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'), false);
+  assert.equal(cards(untitled).join('').includes('goal_aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'), false);
 
   const unknown = renderTurns(
     [{
@@ -206,16 +207,16 @@ test('目标更新显示为带标题、可读状态和人话原因的状态卡 [
   );
   assert.equal(textOf(unknown, 'goal-update-status'), '进行中');
   assert.equal(textOf(unknown, 'goal-update-reason'), '这次变化已记下，细节留待查看');
-  assert.equal(unknown.includes('worker lease expired before verification'), false);
+  assert.equal(cards(unknown).join('').includes('worker lease expired before verification'), false);
 });
 
 test('受阻原因写成完成核验不可用、证据留着待查 [AC:goal-update-presentation#AC-3]', () => {
   const html = renderTurns([{ role: 'system', text: blockedNotice, sessionId: CURRENT }], CURRENT);
   assert.equal(textOf(html, 'goal-update-status'), '受阻');
   assert.equal(textOf(html, 'goal-update-reason'), '完成核验不可用、证据留着待查');
-  assert.equal(html.includes(VERIFY_REASON), false);
-  assert.equal(html.includes('Completion verification unavailable'), false);
-  assert.equal(html.includes('evidence retained for review'), false);
+  assert.equal(cards(html).join('').includes(VERIFY_REASON), false);
+  assert.equal(cards(html).join('').includes('Completion verification unavailable'), false);
+  assert.equal(cards(html).join('').includes('evidence retained for review'), false);
 });
 
 test('没有目标更新时不出现空的目标状态卡 [AC:goal-update-presentation#AC-4]', () => {
@@ -313,4 +314,28 @@ test('不属于当前对话的目标更新不出现 [AC:goal-update-presentation
   assert.equal(other.includes('可以考虑让bo'), false);
   assert.equal(other.includes(GOAL_ID), false);
   assert.equal(other.includes(VERIFY_REASON), false);
+});
+
+
+test('system cards cover immediate, historical, mixed and model-view text [AC:system-message-ui#AC-1] [AC:system-message-ui#AC-3]', () => {
+  const text = '[recovery] Stopped: test-only';
+  const immediate = renderTurns([{ role: 'system', text, sessionId: CURRENT }], CURRENT);
+  assert.match(immediate, /data-kind="stopped"/);
+  const message = { role: 'system', parts: [{ type: 'text', text }] };
+  const render = (m: unknown, modelView = false) => renderToStaticMarkup(React.createElement(ui.ChatTurnFromMessage, { m, sessionId: CURRENT, modelView }));
+  assert.match(render(message), /data-kind="stopped"/);
+  assert.doesNotMatch(render(message, true), /data-testid="system-notice-card"/);
+  assert.match(render(message, true), /chat-bubble__pre/);
+  const mixed = render({ role: 'system', parts: [{ type: 'text', text }, { type: 'tool_result', toolCallId: 'synthetic-call', name: 'example', content: 'PRESERVED_TOOL_RESULT', isError: false }] });
+  assert.match(mixed, /data-kind="stopped"/);
+  assert.match(mixed, /PRESERVED_TOOL_RESULT/);
+  assert.doesNotMatch(renderTurns([{ role: 'user', text }], CURRENT), /data-testid="system-notice-card"/);
+});
+
+test('raw goal-update details remain available in a closed disclosure [AC:system-message-ui#AC-2]', () => {
+  const html = renderTurns([{ role: 'system', text: blockedNotice, sessionId: CURRENT }], CURRENT);
+  assert.match(html, /<details><summary>原始详情<\/summary><pre>/);
+  assert.doesNotMatch(html, /<details[^>]*\bopen/);
+  assert.match(html, /probe-progress-9f3a/);
+  assert.match(html, /Briefly tell the user/);
 });

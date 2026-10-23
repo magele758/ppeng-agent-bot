@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { SystemMessageContent } from './SystemMessageContent';
 import { ModelRetryStatus } from './ModelRetryStatus';
 import type { RetryProgress } from '@/lib/model-retry';
 import type { StreamSegment } from '@/lib/stream-segments';
@@ -15,11 +16,6 @@ import {
 } from '@/lib/chat-utils';
 import { parseCronUserPrompt } from '@/lib/cron';
 import { presentGoalUpdate, readMessageSessionId } from '@/lib/goal-update-notice';
-import { parseRiskAdvisory } from '@/lib/risk-advisory';
-import { parseSystemContextNotice } from '@/lib/system-context-notice';
-import { SystemContextCard } from './SystemContextCard';
-import { RiskAdvisoryCard } from './RiskAdvisoryCard';
-import { GoalUpdateCard } from './GoalUpdateCard';
 import { A2uiSurface } from './a2ui/A2uiSurface';
 import { ReadableMessage } from './ReadableMessage';
 import { MarkdownHtml, StaticHtml } from './MarkdownHtml';
@@ -363,12 +359,8 @@ function StructuredBubble({
     const joined = textBuf.join('\n').trim();
     textBuf.length = 0;
     if (!joined) return;
-    const advisory = role === 'system' && !modelView ? parseRiskAdvisory(joined) : null;
-    const contextNotice = role === 'system' && !modelView ? parseSystemContextNotice(joined) : null;
-    if (contextNotice) {
-      nodes.push(<SystemContextCard key={nodes.length} notice={contextNotice} />);
-    } else if (advisory) {
-      nodes.push(<RiskAdvisoryCard key={nodes.length} notice={advisory} />);
+    if (role === 'system' && !modelView) {
+      nodes.push(<SystemMessageContent key={nodes.length} text={joined} scope={{ conversationId: sessionId }} />);
     } else if (usePre) {
       nodes.push(
         <pre key={nodes.length} className="chat-bubble__pre">
@@ -495,15 +487,11 @@ export function ChatTurnFromMessage({
   ) {
     return null;
   }
-  const goalCard = presented.kind === 'card' ? <GoalUpdateCard notice={presented.notice} /> : null;
-  const advisory = r === 'system' && !modelView && !messageHasStructuredParts(m.parts)
-    ? parseRiskAdvisory(msgPartsToText(m.parts)) : null;
-  const contextNotice = r === 'system' && !modelView && !messageHasStructuredParts(m.parts)
-    ? parseSystemContextNotice(msgPartsToText(m.parts)) : null;
+  const goalCard = presented.kind === 'card' && !modelView;
   const bubble =
-    (contextNotice ? <SystemContextCard notice={contextNotice} /> : null) ??
-    (advisory ? <RiskAdvisoryCard notice={advisory} /> : null) ??
-    goalCard ??
+    (r === 'system' && !modelView && !messageHasStructuredParts(m.parts) ? (
+      <SystemMessageContent text={msgPartsToText(m.parts)} scope={{ messageSessionId: readMessageSessionId(m as { sessionId?: unknown }), conversationId: sessionId }} />
+    ) : null) ??
     (messageHasStructuredParts(m.parts) && m.parts ? (
       <div className="chat-bubble--stream-blocks">
         <StructuredBubble
@@ -602,8 +590,6 @@ export function ChatTurnPlain({
   const av = avatarText(role === 'stream' ? 'assistant' : role, t('play.me'), stream);
   const label = labelOverride ?? (stream ? t('play.role.streaming') : roleLabel(role, t));
   const goalCard = presented.kind === 'card';
-  const advisory = role === 'system' ? parseRiskAdvisory(text) : null;
-  const contextNotice = role === 'system' ? parseSystemContextNotice(text) : null;
   const usePre = (role === 'tool' || role === 'system') && !goalCard;
   const noAvatar =
     role === 'tool' || role === 'system' || role === 'assistant' || role === 'stream';
@@ -614,12 +600,8 @@ export function ChatTurnPlain({
         <div className="chat-turn__label">{label}</div>
         <div className="chat-bubble">
           {role === 'user' ? <MessageReplyQuote replyTo={replyTo} botName={replyBotName} /> : null}
-          {contextNotice ? (
-            <SystemContextCard notice={contextNotice} />
-          ) : advisory ? (
-            <RiskAdvisoryCard notice={advisory} />
-          ) : presented.kind === 'card' ? (
-            <GoalUpdateCard notice={presented.notice} />
+          {role === 'system' ? (
+            <SystemMessageContent text={text} scope={{ messageSessionId, conversationId }} />
           ) : usePre ? (
             <pre className="chat-bubble__pre">{text}</pre>
           ) : (
