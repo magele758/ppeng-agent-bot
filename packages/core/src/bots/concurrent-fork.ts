@@ -10,6 +10,7 @@ import { inheritBotIdentityMetadata } from '../memory/bot-memory-scope.js';
 import { childPermissionMode, inheritBotAllowlists, inheritModelOverride } from '../runtime/spawn-policy.js';
 import { forkOpeningMessage, inheritForkRetrievalMetadata, visibleTaskText } from './fork-inheritance.js';
 import { childSessionTrace } from '../stores/trace-visible.js';
+import { settleGoalExecution, type GoalRuntimeHost } from './goals/runtime-host.js';
 
 export interface WorkPiece {
   id: string;
@@ -175,6 +176,8 @@ export interface ConcurrentForkHost {
   runSession(sessionId: string): Promise<unknown>;
   log: { warn(message: string, details?: unknown): void };
   emitTrace?(sessionId: string, event: { kind: 'child_session'; payload: Record<string, unknown> }): void;
+  /** Settle a forked child that carries a durable goal. Absent hosts only deliver the note. */
+  goalHost?(): GoalRuntimeHost;
 }
 
 export function applyConcurrentBotForks(host: ConcurrentForkHost, sessionId: string, inFlight: boolean): string[] {
@@ -205,16 +208,29 @@ export function applyConcurrentBotForks(host: ConcurrentForkHost, sessionId: str
         const summary = latestAssistant(host.store, childId) || '子代理没有留下文字结果。';
         deliverNote(host.store, sessionId, `bot-fork-result:${childId}`, `【子代理完成】${childId}\n${summary.slice(0, 4000)}`);
         finishFork(host.store, sessionId, childId, 'idle');
+        return settleForkedGoal(host, childId);
       },
       (error: unknown) => {
         deliverNote(host.store, sessionId, `bot-fork-result:${childId}`, `【子代理失败】${childId}\n${String(error).slice(0, 500)}`);
         finishFork(host.store, sessionId, childId, 'failed');
         host.log.warn('Concurrent bot sub-agent failed', { sessionId, childId, error: String(error) });
+        return settleForkedGoal(host, childId, error);
       }
     );
   }
   if (created.length > 0) writeForks(host.store, sessionId, [...known, ...created]);
   return created.map((fork) => fork.childSessionId);
+}
+
+/** A fork that owns a durable goal must settle it; the coordinator note is not the result. */
+async function settleForkedGoal(host: ConcurrentForkHost, childId: string, error?: unknown): Promise<void> {
+  const goalHost = host.goalHost?.();
+  if (!goalHost) return;
+  try {
+    await settleGoalExecution(goalHost, childId, error);
+  } catch (settleError) {
+    host.log.warn('Concurrent bot fork settlement failed', { childId, error: String(settleError) });
+  }
 }
 
 function finishFork(

@@ -55,7 +55,7 @@ export function createRuntimeGoalDispatchTool(host: RuntimeGoalDispatchHost): To
       if(!isCurrent(toolContext,request))return {ok:false,content:'Goal revision or execution changed before dispatch; reconcile before proceeding'};
       return worker?worker(toolContext,toolArgs):tool.execute(toolContext,toolArgs);
     }} : tool);
-    return invokeGoalTool({deps:nestedDeps,context:fresh,tools,filePolicy:await host.filePolicy(),name,args,callId:`${request.executionId}:${name}`});
+    return invokeGoalTool({deps:{...nestedDeps,tools},context:fresh,tools,filePolicy:await host.filePolicy(),name,args,callId:`${request.executionId}:${name}`});
   };
   return createGoalDispatchTool({
     resolveRequest(context) {
@@ -101,7 +101,8 @@ export function createRuntimeGoalDispatchTool(host: RuntimeGoalDispatchHost): To
           if(worker && ['progress','waiting','blocked','candidate_completed','failed','cancelled'].includes(worker.status) && typeof worker.content==='string') return worker;
         } catch { /* Normal gateway refusals and unknown outcomes remain blocked below. */ }
       }
-      return {status:result.waitingApproval?'waiting':result.ok?'candidate_completed':'blocked',waitingApproval:result.waitingApproval,content:result.content};
+      const childSessionId = typeof result.metadata?.childSessionId === 'string' ? result.metadata.childSessionId : undefined;
+      return {status:result.waitingApproval?'waiting':result.ok?'candidate_completed':'blocked',waitingApproval:result.waitingApproval,content:result.content,...(childSessionId?{reference:`session:${childSessionId}`}:{})};
     },
     invokeAuthorizedTool:invoke,
     onResult(context,request,result) {

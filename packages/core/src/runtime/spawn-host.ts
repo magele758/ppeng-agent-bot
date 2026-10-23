@@ -159,6 +159,20 @@ function withChildSession(
   return { ...outcome, metadata: { ...outcome.metadata, [key]: childSessionId } };
 }
 
+/** Goal scope stays on this bot's own children. A delegated task id is the only link back. */
+function inheritedExecutionMetadata(metadata: Record<string, unknown> | undefined, sessionId: string): Record<string, unknown> {
+  const inherited: Record<string, unknown> = {};
+  const goalId = metadata?.botGoalId;
+  if (typeof goalId === 'string' && goalId) {
+    inherited.botGoalId = goalId;
+    const scope = metadata?.botGoalScopeSessionId;
+    inherited.botGoalScopeSessionId = typeof scope === 'string' && scope ? scope : metadata?.canonicalBotChat === true ? sessionId : undefined;
+  }
+  const taskId = metadata?.botWorkTaskId;
+  if (typeof taskId === 'string' && taskId) inherited.botWorkTaskId = taskId;
+  return inherited;
+}
+
 /** Text form for callers that only need a string (PTC cells, dyn tools). */
 export async function spawnSubagent(
   host: SpawnHost,
@@ -260,6 +274,8 @@ export async function spawnSubagentOutcome(
   }
   Object.assign(childMeta, inheritForkRetrievalMetadata(context.session.metadata));
   Object.assign(childMeta, inheritBotIdentityMetadata(context.session, host.store));
+  const liveParent = host.store.getSession(context.session.id) ?? context.session;
+  Object.assign(childMeta, inheritedExecutionMetadata(liveParent.metadata, liveParent.id));
 
   const subagent = host.store.createSession({
     title: `Subagent: ${role ?? parentAgent.role}`,
@@ -352,7 +368,8 @@ export async function spawnTeammateOutcome(
       ...inheritBotAllowlists(context.session.metadata, {
         agentAllowedTools: host.store.getAgent(input.name)?.allowedTools
       }),
-      ...inheritBotIdentityMetadata(context.session, host.store)
+      ...inheritBotIdentityMetadata(context.session, host.store),
+      ...inheritedExecutionMetadata(context.session.metadata, context.session.id)
     }
   });
   if (copyScratchOnSpawn(context.session.metadata, undefined) === 'all') {
