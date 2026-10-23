@@ -1,5 +1,25 @@
 /** Play / Chat 界面文案。不要加 as const。 */
 export const play = {
+  systemContext: {
+    "summaryTitle": "会话摘要",
+    "jevTitle": "Jev 评估",
+    "history": "历史上下文",
+    "assessment": "路由建议",
+    "summaryHint": "用于续接上下文的历史摘要，不代表当前目标的实时状态。",
+    "expand": "展开摘要",
+    "raw": "原始详情",
+    "goal": "目标",
+    "constraints": "约束",
+    "progress": "进展",
+    "decisions": "已作决定",
+    "files": "相关文件",
+    "nextSteps": "下一步",
+    "need_tools": "建议继续调用工具",
+    "retry": "建议调整后重试",
+    "done": "评估建议结束本轮（不等于目标已完成）",
+    "unknown": "评估补充信息，请查看原始详情",
+    "score": "评估分值 {score} · 非完成率"
+},
   riskAdvisory: {
     "title": "运行提醒",
     "warning": "执行异常提醒",

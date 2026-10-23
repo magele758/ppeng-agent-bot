@@ -1,0 +1,27 @@
+id: system-context-cards
+title: 会话摘要与 Jev 提示卡片
+status: implemented
+requirement: |
+  这种给他加个ui吧，这种裸的太丑了
+  这种goal的，给他加个ui吧
+  这种jev的也加个ui吧
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  Goal/Constraints 等是历史压缩摘要，明确区别于当前目标状态；仅改变展示。
+criteria:
+  - id: AC-1
+    given: 系统消息是 Goal、Constraints 等分区的会话摘要
+    when: 查看聊天记录或即时消息
+    then: 显示带目标预览的会话摘要卡，默认收起长内容，展开后按本地化分区渲染 Markdown，并可查看完整原文
+  - id: AC-2
+    given: 系统消息包含 Jev 路由建议
+    when: 查看消息
+    then: 显示继续调用工具、重试或建议结束的可读结论及有效评估分值，不把建议结束当作目标已完成，未知内容仍可查阅
+  - id: AC-3
+    given: 用户引用相同文本、模型视图或包含未知内容的混合消息
+    when: 渲染消息
+    then: 用户引用和模型视图保持原样，未知内容和同消息中的其他内容不丢失
+  - id: AC-4
+    given: 窄屏或英文界面
+    when: 查看和展开卡片
+    then: 标题和说明随语言切换，长文本不会撑出卡片
