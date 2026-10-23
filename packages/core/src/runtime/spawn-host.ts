@@ -266,6 +266,9 @@ export async function spawnSubagentOutcome(
     childMeta.botGoalId = parentGoalId;
     childMeta.botGoalScopeSessionId = parentGoalScope;
   }
+  if (typeof context.session.metadata.botWorkTaskId === 'string') {
+    childMeta.botWorkTaskId = context.session.metadata.botWorkTaskId;
+  }
 
   const subagent = host.store.createSession({
     title: `Subagent: ${role ?? parentAgent.role}`,
