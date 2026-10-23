@@ -2,6 +2,7 @@
 @import '../styles/tokens.css';
 @import '../styles/shell.css';
 @import '../styles/primitives.css';
+@import '../styles/mobile.css';
 
 /* Keep rem typography at the browser's normal reading size. */
 html {

@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
 import { I18nProvider } from '@/lib/i18n/I18nProvider';
 import './globals.css';
@@ -9,6 +9,8 @@ const reactGrabDisabled =
   process.env.NEXT_PUBLIC_REACT_GRAB === '0' || process.env.NEXT_PUBLIC_REACT_GRAB === 'false';
 const loadReactGrab =
   process.env.NODE_ENV === 'development' && !reactGrabDisabled;
+
+export const viewport: Viewport = { width: 'device-width', initialScale: 1, viewportFit: 'cover', interactiveWidget: 'resizes-content' };
 
 export const metadata: Metadata = {
   title: 'Agent Home',
@@ -28,7 +30,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           />
         ) : null}
         <meta name="color-scheme" content="dark light" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <script
           dangerouslySetInnerHTML={{
             __html: `

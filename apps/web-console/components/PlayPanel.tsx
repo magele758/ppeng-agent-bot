@@ -286,6 +286,8 @@ export function PlayPanel({
   catalogSessions
 }: PlayPanelProps) {
   const { t, locale } = useI18n();
+  const [mobileSessionsOpen, setMobileSessionsOpen] = useState(false);
+  useEffect(() => { setMobileSessionsOpen(false); }, [selectedSessionId, playSurface, active]);
   const [attachOpen, setAttachOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
@@ -843,6 +845,7 @@ export function PlayPanel({
 
   const openCreateChat = () => {
     setCreateMenuOpen(false);
+    setMobileSessionsOpen(false);
     if (playSurface !== 'chat') onPlaySurfaceChange('chat');
     onNewSession();
   };
@@ -897,6 +900,7 @@ export function PlayPanel({
         }
         onOpen={() => {
           setOpenGroupId(null);
+          setMobileSessionsOpen(false);
           onSelectSession(s.id);
         }}
         onToggleChecked={(next) => toggleChecked(s.id, next)}
@@ -914,8 +918,14 @@ export function PlayPanel({
   return (
     <section className={`panel ${active ? 'active' : ''}`} id="panel-play">
       {renderCreateDialog()}
-      <div className={`play-layout play-layout--rail${railCollapsed ? ' is-rail-collapsed' : ''}`}>
-        <aside className="play-sidebar">
+      <div className="mobile-chat-bar">
+        <button type="button" className="btn btn-ghost" data-testid="mobile-sessions-toggle" aria-expanded={mobileSessionsOpen} aria-controls="mobile-session-list" onClick={() => setMobileSessionsOpen(v => !v)}>
+          <span aria-hidden="true">{mobileSessionsOpen ? "←" : "☰"}</span>
+          {t(mobileSessionsOpen ? 'mobile.back' : 'mobile.sessions')}
+        </button>
+      </div>
+      <div className={`play-layout play-layout--rail${railCollapsed ? ' is-rail-collapsed' : ''}${mobileSessionsOpen ? ' mobile-sessions-open' : ''}`}>
+        <aside className="play-sidebar" id="mobile-session-list">
           <div className="play-sidebar__head" data-testid="session-toolbar" role="toolbar" aria-label={t('polish.toolbar')}>
             <div className="create-menu" ref={createMenuRef} onMouseEnter={openCreateMenu} onMouseLeave={scheduleCreateMenuClose} onKeyDown={(event) => {
               if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
@@ -1028,6 +1038,7 @@ export function PlayPanel({
                 renderSession={renderSession}
                 onOpenSession={(sessionId) => {
                   setOpenGroupId(null);
+                  setMobileSessionsOpen(false);
                   onSelectSession(sessionId);
                 }}
               />
@@ -1036,7 +1047,7 @@ export function PlayPanel({
                 bots={botRoster}
                 selectedId={openGroupId}
                 filter={sessionFilter}
-                onOpen={setOpenGroupId}
+                onOpen={(id) => { setOpenGroupId(id); setMobileSessionsOpen(false); }}
                 onCount={setGroupCount}
                 onDeleted={(id) => setOpenGroupId((current) => current === id ? null : current)}
               />

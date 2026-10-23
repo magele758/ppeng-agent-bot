@@ -1,0 +1,23 @@
+id: mobile-console
+title: 控制台移动端布局
+status: implemented
+requirement: |
+  当前项目的移动端适配完全不行，帮我设计、优化一下移动端的展示
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 手机宽度为 360 至 430 像素
+    when: 打开对话页或切换主导航
+    then: 六个导航入口完整可见，正文使用全宽，页面不横向溢出
+  - id: AC-2
+    given: 手机正在查看对话
+    when: 打开会话列表后返回对话
+    then: 列表与对话分屏切换，返回后保留未发送草稿，输入区仍可见
+  - id: AC-3
+    given: 手机打开设置或外观与账户工具
+    when: 浏览设置分类或打开工具面板
+    then: 分类可横向滚动，表单不超出屏幕，工具面板可关闭
+  - id: AC-4
+    given: 桌面宽度为 1280 像素
+    when: 打开对话页
+    then: 会话列表与对话保持并排显示，手机专用切换入口隐藏
