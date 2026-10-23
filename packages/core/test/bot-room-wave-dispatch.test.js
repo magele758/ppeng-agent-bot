@@ -244,3 +244,159 @@ test('a short substantive reply is still posted [AC:bot-room-wave-dispatch#AC-7]
   await f.rooms.tick();
   assert.equal(botPosts(f.rooms, f.principal, room.id).some(message => message.text === '是'), true);
 });
+
+test('task collaboration persists and starts one owner with explicit mention boundary [AC:room-task-collaboration#AC-1]', async () => {
+  const f = fixture();
+  const [alpha, beta] = f.bots;
+  const room = f.rooms.create(f.principal, { title: 'Tasks', botIds: f.bots.map(bot => bot.id), hostBotId: alpha.id });
+  f.rooms.patch(f.principal, room.id, { replyMode: 'task-collaboration' });
+  assert.equal(f.rooms.get(f.principal, room.id).replyMode, 'task-collaboration');
+  const first = f.rooms.send(f.principal, room.id, { text: 'Please solve this' });
+  assert.deepEqual(first.turn.botIds, [alpha.id]);
+  assert.equal(first.turn.ownerBotId, alpha.id);
+  const named = f.rooms.send(f.principal, room.id, { text: 'Please solve this', mentions: [beta.id] });
+  assert.equal(named.turn.ownerBotId, beta.id);
+  assert.deepEqual(f.rooms.send(f.principal, room.id, { text: '@outsider please' }).turn.botIds, []);
+});
+
+test('task collaboration requires scoped assignments and retains evidence for owner close [AC:room-task-collaboration#AC-2] [AC:room-task-collaboration#AC-3]', async () => {
+  const f = fixture();
+  const [alpha, beta, gamma] = f.bots;
+  const room = f.rooms.create(f.principal, { title: 'Tasks', botIds: f.bots.map(bot => bot.id), hostBotId: alpha.id });
+  f.rooms.patch(f.principal, room.id, { replyMode: 'task-collaboration' });
+  let ownerRuns = 0;
+  f.host.runSession = async id => {
+    const botId = f.store.getSession(id).metadata.botId;
+    f.runs.push(botId);
+    if (botId === beta.id && ownerRuns++ === 0) {
+      assert.throws(() => f.rooms.routeTurn(id, [], { completeGoal: true }), /evidence/i);
+      assert.throws(() => f.rooms.routeTurn(id, [gamma.id]), /task|evidence/i);
+      assert.throws(() => f.rooms.routeTurn(id, ['outsider'], { assignments: [{ botId: 'outsider', task: 'Inspect', evidence: 'report' }] }), /member/i);
+      assert.deepEqual(f.rooms.routeTurn(id, [gamma.id], { assignments: [{ botId: gamma.id, task: 'Inspect fixture', evidence: 'Report observed result' }] }), [gamma.id]);
+    } else if (botId === beta.id) {
+      const board = f.store.getDaemonControl(`bot.room-goals:${room.id}`);
+      assert.equal(board.tasks[0].status, 'waiting_approval');
+      f.rooms.routeTurn(id, [], { reviewedTaskIds: [board.tasks[0].id], completeGoal: true, verificationSummary: 'Reviewed inspection against requested report', evidenceMessageIds: board.tasks[0].materialIds });
+    } else if (botId === gamma.id) {
+      assert.throws(() => f.rooms.routeTurn(id, [alpha.id]), /owner|host/i);
+      const prompt = JSON.stringify(f.store.listMessages(id));
+      assert.match(prompt, /Inspect fixture/);
+      assert.match(prompt, /Report observed result/);
+    }
+    f.store.appendMessage(id, 'assistant', [{ type: 'text', text: `evidence:${botId}` }]);
+    f.store.updateSession(id, { status: 'idle' });
+  };
+  const sent = f.rooms.send(f.principal, room.id, { text: 'Inspect and report', mentions: [beta.id] });
+  await f.rooms.tick();
+  assert.deepEqual(f.runs, [beta.id, gamma.id, beta.id]);
+  const board = f.store.getDaemonControl(`bot.room-goals:${room.id}`);
+  const goal = board.goals.find(g => g.id === sent.turn.goalId);
+  assert.equal(goal.ownerBotId, beta.id);
+  assert.equal(goal.status, 'completed');
+  assert.equal(board.tasks.length, 1);
+  assert.equal(board.tasks[0].status, 'completed');
+  assert.ok(board.tasks[0].materialIds.length > 0);
+  assert.match(board.tasks[0].summary, /evidence:/);
+});
+
+test('unreviewed and cancelled collaboration never claims completion or accepts late results [AC:room-task-collaboration#AC-3]', async () => {
+  const f = fixture();
+  const room = f.rooms.create(f.principal, { title: 'Tasks', botIds: f.bots.map(bot => bot.id) });
+  f.rooms.patch(f.principal, room.id, { replyMode: 'task-collaboration' });
+  const sent = f.rooms.send(f.principal, room.id, { text: 'Unverified answer' });
+  await f.rooms.tick();
+  assert.equal(f.rooms.turns(f.principal, room.id).find(t => t.id === sent.turn.id).collaboration.goal.status, 'paused');
+  const next = f.rooms.send(f.principal, room.id, { text: 'Cancel in flight' });
+  let release;
+  let started;
+  const ready = new Promise(resolve => { started = resolve; });
+  f.host.runSession = async id => {
+    started();
+    await new Promise(resolve => { release = resolve; });
+    f.store.appendMessage(id, 'assistant', [{ type: 'text', text: 'late evidence' }]);
+    f.store.updateSession(id, { status: 'idle' });
+  };
+  const running = f.rooms.tick();
+  await ready;
+  f.rooms.stop(f.principal, room.id);
+  release();
+  await running;
+  const turn = f.rooms.turns(f.principal, room.id).find(t => t.id === next.turn.id);
+  assert.equal(turn.collaboration.goal.status, 'cancelled');
+  assert.ok(!f.rooms.messages(f.principal, room.id).messages.some(m => m.text === 'late evidence'));
+});
+
+test('solo owner publishes delivery before explicit evidence verification and retains final receipt [AC:room-task-collaboration#AC-3]', async () => {
+  const f = fixture();
+  const room = f.rooms.create(f.principal, { title: 'Solo', botIds: f.bots.map(bot => bot.id) });
+  f.rooms.patch(f.principal, room.id, { replyMode: 'task-collaboration' });
+  let passes = 0;
+  f.host.runSession = async id => {
+    passes++;
+    if (passes === 2) {
+      const messages = f.rooms.messages(f.principal, room.id).messages.filter(m => m.sender.type === 'bot');
+      assert.equal(messages.length, 1);
+      f.rooms.routeTurn(id, [], { completeGoal: true, evidenceMessageIds: [messages[0].id], verificationSummary: 'Answer includes the requested result.' });
+    }
+    f.store.appendMessage(id, 'assistant', [{ type: 'text', text: passes === 1 ? 'Requested result' : 'Verified delivery' }]);
+    f.store.updateSession(id, { status: 'idle' });
+  };
+  f.rooms.send(f.principal, room.id, { text: 'Give a result' });
+  await f.rooms.tick();
+  assert.equal(passes, 2);
+  const goal = f.rooms.turns(f.principal, room.id)[0].collaboration.goal;
+  assert.equal(goal.status, 'completed');
+  assert.equal(goal.deliveryMessageIds.length, 2);
+  assert.equal(goal.evidenceMessageIds.length, 1);
+});
+
+test('removing a collaborator preserves cancelled task and rejects completion [AC:room-task-collaboration#AC-2] [AC:room-task-collaboration#AC-3]', async () => {
+  const f = fixture();
+  const [owner, peer] = f.bots;
+  const room = f.rooms.create(f.principal, { title: 'Member leaves', botIds: f.bots.map(bot => bot.id) });
+  f.rooms.patch(f.principal, room.id, { replyMode: 'task-collaboration' });
+  let passes = 0;
+  f.host.runSession = async id => {
+    passes++;
+    if (passes === 1) {
+      f.rooms.routeTurn(id, [peer.id], { assignments: [{ botId: peer.id, task: 'Check result', evidence: 'Actual observation' }] });
+      f.rooms.removeMember(f.principal, room.id, peer.id);
+    } else {
+      assert.equal(f.store.getSession(id).metadata.botId, owner.id);
+      assert.throws(() => f.rooms.routeTurn(id, [], { completeGoal: true }), /reviewed evidence/);
+    }
+    f.store.appendMessage(id, 'assistant', [{ type: 'text', text: 'Still missing peer evidence' }]);
+    f.store.updateSession(id, { status: 'idle' });
+  };
+  f.rooms.send(f.principal, room.id, { text: 'Check the result' });
+  await f.rooms.tick();
+  const board = f.rooms.turns(f.principal, room.id)[0].collaboration;
+  assert.equal(board.tasks[0].status, 'cancelled');
+  assert.equal(board.goal.status, 'paused');
+});
+
+test('owner removal cancels running execution and wrap cannot exceed one-turn budget [AC:room-task-collaboration#AC-3]', async () => {
+  const f = fixture();
+  const room = f.rooms.create(f.principal, { title: 'Budget', botIds: f.bots.map(bot => bot.id), maxBotTurns: 1 });
+  f.rooms.patch(f.principal, room.id, { replyMode: 'task-collaboration' });
+  f.host.runSession = async id => {
+    f.runs.push(id);
+    f.rooms.routeTurn(id, [], { summarize: true });
+    f.store.appendMessage(id, 'assistant', [{ type: 'text', text: 'One delivery' }]);
+    f.store.updateSession(id, { status: 'idle' });
+  };
+  f.rooms.send(f.principal, room.id, { text: 'Budget check' });
+  await f.rooms.tick();
+  assert.equal(f.runs.length, 1);
+  const cancelled = [];
+  f.host.cancelSession = id => { cancelled.push(id); f.store.updateSession(id, { status: 'idle' }); };
+  f.host.runSession = async id => {
+    f.rooms.removeMember(f.principal, room.id, f.store.getSession(id).metadata.botId);
+    assert.ok(cancelled.includes(id));
+    f.store.appendMessage(id, 'assistant', [{ type: 'text', text: 'Must not publish' }]);
+  };
+  f.rooms.send(f.principal, room.id, { text: 'Remove owner while running' });
+  await f.rooms.tick();
+  assert.ok(!f.rooms.messages(f.principal, room.id).messages.some(message => message.text === 'Must not publish'));
+  assert.equal(f.rooms.turns(f.principal, room.id).at(-1).collaboration.goal.status, 'cancelled');
+});

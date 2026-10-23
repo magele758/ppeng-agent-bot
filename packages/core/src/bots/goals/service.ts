@@ -219,7 +219,7 @@ export class BotGoalService {
   else if(result.kind==='progress')goal.status='queued';
  }
  private markBlockedReport(goal:BotGoal,result:GoalReport):void {
-  goal.status='blocked';
+  goal.status=result.kind==='failed'?'failed':'blocked';
   goal.blockedReason=result.summary||(result.kind==='failed'?'Execution failed':'Execution blocked');
   if(result.kind==='blocked'&&result.wait){goal.wait=result.wait;goal.draining=true;}
  }

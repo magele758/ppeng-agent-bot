@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { isLiveSessionGoal } from '@/lib/bot-goals';
 import { api } from '@/lib/api';
 import { useI18n, type MessageKey } from '@/lib/i18n';
 
 interface GoalWire {
   goalId: string;
+  source?: string;
   status: string;
   closeReason?: string;
   condition: string;
@@ -16,6 +18,7 @@ interface GoalWire {
 }
 
 const GOAL_STATUS_KEY: Record<string, MessageKey> = {
+  queued: 'goals.status.queued', running: 'goals.status.running', waiting: 'goals.status.waiting', blocked: 'goals.status.blocked', paused: 'goals.status.paused',
   deriving: 'play.goalCard.statusDeriving',
   active: 'play.goalCard.statusActive',
   waiting_user: 'play.goalCard.statusWaiting',
@@ -66,6 +69,8 @@ export function GoalStatusCard({ sessionId }: { sessionId: string | null }) {
     );
   }
 
+  if (!isLiveSessionGoal(goal.status)) return null;
+
   const tone = goal.status === 'achieved' ? 'is-ok' : goal.status === 'unmet_closed' ? 'is-warn' : '';
   const statusKey = GOAL_STATUS_KEY[goal.status];
 
@@ -77,9 +82,9 @@ export function GoalStatusCard({ sessionId }: { sessionId: string | null }) {
       {goal.closeReason ? <span className="muted"> · {goal.closeReason}</span> : null}
       <span className="muted">
         {' '}
-        · {goal.turnsUsed}/{goal.maxTurns}
+        · {goal.source === 'bot' ? t('goals.attemptUsage', { used: goal.turnsUsed, max: goal.maxTurns }) : `${goal.turnsUsed}/${goal.maxTurns}`}
       </span>
-      {goal.spec?.verify?.kind ? (
+      {goal.source === 'bot' ? <span className="muted">{t('goals.durableVerification')}</span> : goal.spec?.verify?.kind ? (
         <span className="muted">{t('play.goalCard.verify', { kind: goal.spec.verify.kind })}</span>
       ) : (
         <span className="muted">{t('play.goalCard.softGate')}</span>

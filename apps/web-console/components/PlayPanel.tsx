@@ -39,6 +39,7 @@ import {
   shouldRequestComposerHint,
 } from '@/lib/composer-next-hint';
 import { ApprovalBanner } from './ApprovalBanner';
+import { GoalHistory } from './GoalHistory';
 import { GoalStatusCard } from './GoalStatusCard';
 import { TrajectoryPanel } from './TrajectoryPanel';
 import { ContextStackPanel } from './ContextStackPanel';
@@ -1108,7 +1109,7 @@ export function PlayPanel({
                         {tokens != null ? ` · ${tokens} tok` : ''}
                       </span>
                     ) : null}
-                    {chrome?.goalEnabled || chrome?.goalCondition ? (
+                    {!headerBotId && (chrome?.goalEnabled || chrome?.goalCondition) ? (
                       <span
                         className={`session-chrome__chip${goalMet === true ? ' is-ok' : goalMet === false ? ' is-warn' : ''}`}
                         title={chrome?.goalCondition || t('play.chrome.noGoal')}
@@ -1123,6 +1124,7 @@ export function PlayPanel({
                 ) : null}
               </div>
               <div className="chat-panel-header__actions play-toolbar">
+                <GoalHistory key={selectedSessionId} sessionId={selectedSessionId} botId={headerBotId ?? undefined} />
                 <button type="button" className="btn btn-ghost rail-toggle" aria-label={t(railCollapsed ? 'polish.expandRail' : 'polish.collapseRail')} title={t(railCollapsed ? 'polish.expandRail' : 'polish.collapseRail')} aria-expanded={!railCollapsed} onClick={() => {
                   const feed = chat.playMessagesRef.current;
                   const anchor = readFeedAnchor(feed);

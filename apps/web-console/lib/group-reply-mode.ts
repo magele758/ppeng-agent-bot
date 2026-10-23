@@ -4,9 +4,9 @@ export function groupReplyRoomPath(roomId: string): string {
   return `/api/bot-rooms/${encodeURIComponent(roomId)}`;
 }
 
-export type GroupReplyMode = 'coordinator' | 'all-members';
+export type GroupReplyMode = 'coordinator' | 'all-members' | 'task-collaboration';
 
-const MODES = new Set<GroupReplyMode>(['coordinator', 'all-members']);
+const MODES = new Set<GroupReplyMode>(['coordinator', 'all-members', 'task-collaboration']);
 
 function isGroupReplyMode(value: unknown): value is GroupReplyMode {
   return typeof value === 'string' && MODES.has(value as GroupReplyMode);

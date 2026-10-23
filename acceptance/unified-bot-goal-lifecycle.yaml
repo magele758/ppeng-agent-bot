@@ -1,0 +1,22 @@
+id: unified-bot-goal-lifecycle
+title: 统一 Bot 目标生命周期与归档展示
+status: implemented
+requirement: |
+  按你说的方向改吧，先把目标的两套状态和展示统一起来，完成或失败的保留历史但别一直挂底部，再把重复调用检测改成看有没有实际进展。Jev我已经恢复了，不用管了。群聊组织模式，可以按你说的再新增一种模式，我对比看看执行效果。
+  分多个agent去推进
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  保留 bot-goals-panel-rules 的多目标进行中面板规则；历史另设折叠入口，不计入进行中列表。
+criteria:
+  - id: AC-1
+    given: Bot 会话执行已关联的持久目标
+    when: 目标推进或终结
+    then: 状态展示来自同一个持久目标，旧会话完成条件不另行决定成功；普通会话仍保留原目标能力
+  - id: AC-2
+    given: 已有目标明确报告失败
+    when: 查询目标历史
+    then: 显示失败原因和证据，不再把失败误作可恢复的阻塞
+  - id: AC-3
+    given: 会话目标已完成或关闭，或 Bot 目标已有终态
+    when: 查看对话
+    then: 底部不展示终态提醒，历史可按需展开查看结果和证据

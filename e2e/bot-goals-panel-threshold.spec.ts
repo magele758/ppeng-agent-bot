@@ -421,3 +421,35 @@ test('goals from another chat of the same Bot stay out of this panel [AC:bot-goa
   expect(requested.length).toBeGreaterThan(0);
   expect(requested.every((sessionId) => sessionId === bot.sessionId)).toBe(true);
 });
+
+test('finished goals move to on-demand header history while live states stay visible [AC:unified-bot-goal-lifecycle#AC-3]', async ({ page }) => {
+  const bot = fixture('unified-goal-history', 'Goal history');
+  const board: GoalBoard = { goals: [
+    { ...goal('done', 'Shipped artifact', 'completed'), evidence: ['artifact checks passed'] },
+    { ...goal('failed', 'Rejected upload', 'failed'), progress: 'Server rejected the upload' },
+  ], fail: false };
+  await installLab(page, [bot]);
+  await installGoals(page, bot.id, board);
+  await page.route((url) => url.pathname === '/api/goals' && url.searchParams.get('sessionId') === bot.sessionId, route => route.fulfill({ json: { goals: board.goals } }));
+  let status = 'completed';
+  await page.route((url) => url.pathname === `/api/sessions/${bot.sessionId}/goal`, route => route.fulfill({ json: {
+    goal: { goalId: 'done', status, condition: 'Shipped artifact', turnsUsed: 1, maxTurns: 8, source: 'bot' }
+  } }));
+  await page.goto('/#/bot');
+  await openBot(page, bot);
+  await expect(page.locator('.goal-status-card')).toHaveCount(0);
+  await expect(page.locator('.chat-composer-outer')).not.toContainText('Shipped artifact');
+  const history = page.getByTestId('goal-history');
+  await expect(history.locator('article')).toHaveCount(0);
+  await history.locator('summary').click();
+  await expect(history).toContainText('Shipped artifact');
+  await expect(history).toContainText('artifact checks passed');
+  await expect(history).toContainText('Rejected upload');
+  await history.locator('summary').click();
+  status = 'running';
+  await expect(page.locator('.goal-status-card')).toContainText('执行中', { timeout: 8000 });
+  status = 'blocked';
+  await expect(page.locator('.goal-status-card')).toContainText('已阻塞', { timeout: 8000 });
+  status = 'failed';
+  await expect(page.locator('.goal-status-card')).toHaveCount(0, { timeout: 8000 });
+});

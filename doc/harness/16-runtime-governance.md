@@ -106,8 +106,8 @@ Idempotency：同工具名+参数 hash 的已批准记录可复用（见 [03](03
 | 信号 | 默认阈值 | env |
 |------|----------|-----|
 | 同工具连续失败 | 3 | `RAW_AGENT_RECOVERY_TOOL_FAIL_STREAK` |
-| 连续工具轮整轮 `(name + 规范化参数)` 序列相同 | 5 | `RAW_AGENT_RECOVERY_SAME_TOOL_STREAK` |
-| 指纹重复比（窗口内） | window=8，ratio≥0.75，且 n≥4 | `RAW_AGENT_RECOVERY_REPEAT_*` |
+| 相同调用反复出现且没有新成功结果（包括交替调用；剔除明确观测噪声） | 5 | `RAW_AGENT_RECOVERY_SAME_TOOL_STREAK` |
+| 无工具调用的助手内容指纹重复比（工具轮在结果后判断） | window=8，ratio≥0.75，且 n≥4 | `RAW_AGENT_RECOVERY_REPEAT_*` |
 
 总开关：`RAW_AGENT_RECOVERY_POLICY`（默认开）。
 

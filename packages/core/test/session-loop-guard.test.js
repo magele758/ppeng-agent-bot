@@ -65,7 +65,7 @@ test('afterToolRound aborts when the same tool-call content repeats', () => {
   assert.doesNotMatch(t.reason, /first tool/);
 });
 
-test('afterToolRound fingerprints the full tool-call sequence', () => {
+test('afterToolRound retains each full sequence without new successful evidence [AC:tool-progress-guard#AC-2]', () => {
   const g = new SessionLoopGuard({
     RAW_AGENT_RECOVERY_SAME_TOOL_STREAK: '3',
     RAW_AGENT_RECOVERY_TOOL_FAIL_STREAK: '99'
@@ -90,7 +90,7 @@ test('afterToolRound fingerprints the full tool-call sequence', () => {
   assert.equal(g.afterToolRound(seqB, ok).abort, false);
   assert.equal(g.afterToolRound(seqSwapped, ok).abort, false);
   assert.equal(g.afterToolRound(seqA, ok).abort, false);
-  assert.equal(g.afterToolRound(seqA, ok).abort, false);
+  // Other call sequences without result content do not prove progress on seqA.
   const hit = g.afterToolRound(seqA, ok);
   assert.equal(hit.abort, true);
   assert.match(hit.reason, /same tool-call content/);

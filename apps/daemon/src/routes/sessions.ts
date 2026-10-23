@@ -1,3 +1,4 @@
+import { goalScope } from '@ppeng/agent-core';
 import { readFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
@@ -674,6 +675,23 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
       handler: async ({ requireParam, readBody, response }) => {
         const id = requireParam('id');
         const body = (await readBody()) as Record<string, unknown>;
+        const goalPatch: Record<string, unknown> = {};
+        if (typeof body.goalCondition === 'string') {
+          const cond = body.goalCondition.trim();
+          goalPatch.goalCondition = cond;
+          goalPatch.goalEnabled = cond.length > 0;
+        }
+        if (typeof body.goalEnabled === 'boolean') {
+          goalPatch.goalEnabled = body.goalEnabled;
+          if (!body.goalEnabled) goalPatch.goalCondition = '';
+        }
+        if (typeof body.goalMaxTurns === 'number' && Number.isFinite(body.goalMaxTurns)) {
+          goalPatch.goalMaxTurns = Math.max(1, Math.min(100, Math.floor(body.goalMaxTurns)));
+        }
+        if (Object.keys(goalPatch).length > 0 && goalScope(runtime.store, runtime.getSession(id)!)) {
+          throw new ConflictError('Bot goals are managed through Bot messages and goal actions');
+        }
+
         if (body.permissionMode === null) {
           throw new ValidationError('permissionMode cannot be cleared; set one of plan|ask|acceptEdits|auto|bypass');
         }
@@ -700,19 +718,6 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
           }
           const { taskRunMode: _ignored, ...rest } = ptcPatch;
           runtime.mergeSessionMetadata(id, { ...rest, ...bind.patch });
-        }
-        const goalPatch: Record<string, unknown> = {};
-        if (typeof body.goalCondition === 'string') {
-          const cond = body.goalCondition.trim();
-          goalPatch.goalCondition = cond;
-          goalPatch.goalEnabled = cond.length > 0;
-        }
-        if (typeof body.goalEnabled === 'boolean') {
-          goalPatch.goalEnabled = body.goalEnabled;
-          if (!body.goalEnabled) goalPatch.goalCondition = '';
-        }
-        if (typeof body.goalMaxTurns === 'number' && Number.isFinite(body.goalMaxTurns)) {
-          goalPatch.goalMaxTurns = Math.max(1, Math.min(100, Math.floor(body.goalMaxTurns)));
         }
         if (Object.keys(goalPatch).length > 0) {
           runtime.mergeSessionMetadata(id, goalPatch);

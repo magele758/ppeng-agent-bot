@@ -106,3 +106,20 @@ test('goal intake coordinates queries, ambiguous references and controls of acti
   assert.equal(service.list(bot.id).length,1);
  }finally{await runtime.destroy();}
 });
+
+test('a legacy session condition cannot override the durable Bot verdict [AC:unified-bot-goal-lifecycle#AC-1]', async () => {
+ let turns=0;const judgements=[];
+ const runtime=new RawAgentRuntime({repoRoot:mkdtempSync(join(tmpdir(),'goal-single-repo-')),stateDir:mkdtempSync(join(tmpdir(),'goal-single-state-')),modelAdapter:{
+  name:'goal-single',async runTurn(){turns++;return {stopReason:'end',assistantParts:[{type:'text',text:'Verified answer: 4'}]};},
+  async completeText(input){judgements.push(input.system);if(input.system.startsWith('Evaluate'))return JSON.stringify({met:true,advanced:true,reason:'Checked',evidence:['4']});return JSON.stringify({met:false,reason:'Old contradictory condition'});},async summarizeMessages(){return '';}
+ }});
+ try {
+  const bot=runtime.createBot({name:'Single verdict'});const sid=runtime.openBot(bot.id).sessionId;
+  runtime.mergeSessionMetadata(sid,{goalEnabled:true,goalCondition:'An obsolete unrelated condition',goalMaxTurns:2});
+  runtime.sendUserMessage(sid,'Calculate two plus two');await runtime.runHumanSession(sid);
+  const goals=new BotGoalService(runtime.store,Date.now,sid).list(bot.id);
+  assert.equal(goals[0].status,'completed');assert.equal(turns,1);
+  assert.equal(judgements.filter(system=>system.startsWith('Evaluate')).length,1);
+  assert.equal(runtime.store.goal().findLatestBySession(sid),null);
+ }finally{await runtime.destroy();}
+});

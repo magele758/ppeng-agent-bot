@@ -79,8 +79,10 @@ streak ≥ N 时 finalize。
 | 信号 | 检测逻辑 | 默认阈值 | env |
 |------|----------|----------|-----|
 | 工具连续失败 | 同一工具连续 fail | 3 | `RAW_AGENT_RECOVERY_TOOL_FAIL_STREAK` |
-| 相同调用内容 streak | 连续工具轮的整轮 `(name + 规范化参数)` 序列指纹相同（同名不同参会打断） | 5 | `RAW_AGENT_RECOVERY_SAME_TOOL_STREAK` |
-| 内容指纹重复 | assistant parts 的 sha256 前 32 位 | 窗口 8、ratio≥0.75 且 n≥4 | `RAW_AGENT_RECOVERY_REPEAT_WINDOW` / `_RATIO` |
+| 调用无进展 streak | 相同调用再次出现且没有新的完整成功结果；交替调用也保留有界历史，新的结果证据重置停滞 | 5 | `RAW_AGENT_RECOVERY_SAME_TOOL_STREAK` |
+| 内容指纹重复 | 不含工具调用的 assistant parts 指纹；工具轮等结果返回后判断 | 窗口 8、ratio≥0.75 且 n≥4 | `RAW_AGENT_RECOVERY_REPEAT_WINDOW` / `_RATIO` |
+
+LoopGuard 与 RiskEngine 使用同一结果停滞计数。结构化结果中的观测时间、请求 ID、耗时等明确噪声字段不算进展；业务状态、计数和正文保留。失败、缺失或空结果不会证明进展。这是有界结果差异检测，不替代目标验收；不变的轮询结果仍受停滞阈值约束，纯文本噪声尚不能可靠识别。
 
 总开关：`RAW_AGENT_RECOVERY_POLICY`（默认开）。
 

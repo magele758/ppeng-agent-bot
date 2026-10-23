@@ -523,8 +523,7 @@ async function runSessionKernel(
       })
     : null;
   const recoveryState = createTurnRecoveryState();
-  let sameToolStreak = 0;
-  let lastToolRoundKey = '';
+  const progressGuard = loopGuard ?? new SessionLoopGuard(env);
 
   const packTurn = async (input: {
     workspaceRoot?: string;
@@ -1518,12 +1517,11 @@ async function runSessionKernel(
         }
       }
 
-      // Risk engine
-      const toolRoundKey = toolCalls
-        .map((tc) => `${tc.name}:${JSON.stringify(tc.input ?? {})}`)
-        .join('|');
-      sameToolStreak = toolRoundKey === lastToolRoundKey ? sameToolStreak + 1 : 1;
-      lastToolRoundKey = toolRoundKey;
+      const progressDecision = progressGuard.afterToolRound(
+        toolCalls,
+        results
+      );
+      // Risk and recovery consume the same result-aware stagnation counter.
       if (riskEngine) {
         for (const r of results) {
           riskEngine.observeTool({ toolName: r.name, success: r.ok, errorMessage: r.ok ? undefined : r.content });
@@ -1536,8 +1534,8 @@ async function runSessionKernel(
           iterationLimit: maxTurns,
           usedTokens: usageTotals?.totalTokens,
           budgetTokens: loopConfig.budgetTokens,
-          sameToolStreak,
-          sameToolThreshold: loopGuard?.sameToolThreshold ?? 5,
+          sameToolStreak: progressGuard.sameToolStreak,
+          sameToolThreshold: progressGuard.sameToolThreshold,
         });
         if (tick.shouldAdvise) {
           const draft = advisoryQueue.enqueue(formatRiskAdvisory(tick.signals), 'risk');
@@ -1549,10 +1547,7 @@ async function runSessionKernel(
       }
 
       // Loop guard after tool round
-      const toolRep = loopGuard?.afterToolRound(
-        toolCalls.map((tc) => ({ name: tc.name, input: tc.input })),
-        results.map((r) => ({ name: r.name, ok: r.ok }))
-      ) ?? { abort: false as const };
+      const toolRep = loopGuard ? progressDecision : { abort: false as const };
       const live = host.store.getSession(sid) ?? session;
       const adapter = adapterOf(live);
       const guarded = applyRepeatGuard({

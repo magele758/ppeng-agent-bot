@@ -1,4 +1,6 @@
 export const goals = {
+  attemptUsage: 'Attempts {used}/{max}', durableVerification: 'Verified against goal evidence',
+  history: 'Goal history', historyEmpty: 'No finished goals yet', historyError: 'Could not load goal history',
   title: 'Goals and progress', empty: 'No goals yet. Progress appears here when you request a task.', loading: 'Loading goals…',
   settings: 'Goal settings', concurrency: 'Maximum concurrent goals', budget: 'Default budget per goal (USD)',
   attempts: 'Maximum execution attempts', noProgress: 'Consecutive no-progress limit', preference: 'Execution preference', save: 'Save goal settings',

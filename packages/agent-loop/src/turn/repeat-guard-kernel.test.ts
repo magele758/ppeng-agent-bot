@@ -266,3 +266,40 @@ describe('repeat guard in the agent loop', () => {
     expect(out.waves).toBe(2);
   });
 });
+
+describe('result-aware risk and recovery wiring', () => {
+  async function observe(progress: boolean) {
+    const { host, store, session, calls } = createHarness();
+    const risks: unknown[] = [];
+    store.getDaemonControl = key => key === 'loop_settings' ? { repeatGuard: 'all' } : undefined;
+    host.env = { RAW_AGENT_RECOVERY_SAME_TOOL_STREAK: '3', RAW_AGENT_RECOVERY_ADVISORY_GRACE_BUDGET: '0' };
+    host.loopConfig = { forceAnswerOnLastTurn: false, compactEveryTurn: false, spinWatchdog: false, hitlLatch: false };
+    host.maxTurnsPerRun = 12;
+    host.emitTrace = (_id, event) => { if (event.kind === 'risk_advisory') risks.push(event.data); };
+    host.modelAdapter.runTurn = async () => calls.execute === 8
+      ? { stopReason: 'end', assistantParts: [{ type: 'text', text: 'done' }] }
+      : { stopReason: 'tool_use', assistantParts: [
+          { type: 'text', text: 'Checking progress.' },
+          { type: 'tool_call', toolCallId: `poll-${calls.execute}`, name: 'read_file', input: { path: 'job.json' } },
+        ] };
+    host.executeToolCalls = async toolCalls => {
+      calls.execute++;
+      return toolCalls.map(c => ({ name: c.name, toolCallId: c.toolCallId, ok: true,
+        content: JSON.stringify({ completed: progress ? calls.execute : 0, timestamp: calls.execute }) }));
+    };
+    await runSessionKernel(host, session.id);
+    return { waves: calls.execute, risks, reason: outcomeOf(store, session.id).reason };
+  }
+  it('keeps progressing identical requests running without duplicate risk warnings [AC:tool-progress-guard#AC-1]', async () => {
+    const out = await observe(true);
+    expect(out.waves).toBe(8);
+    expect(out.risks).toEqual([]);
+    expect(out.reason).not.toBe('repeat_detection');
+  });
+  it('shares no-progress detection between warnings and recovery [AC:tool-progress-guard#AC-2]', async () => {
+    const out = await observe(false);
+    expect(out.waves).toBe(3);
+    expect(out.reason).toBe('repeat_detection');
+    expect(JSON.stringify(out.risks)).toContain('tool_repeat');
+  });
+});

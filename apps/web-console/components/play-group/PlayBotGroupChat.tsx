@@ -1,5 +1,7 @@
 'use client';
 
+import { RoomCollaborationHistory, type CollaborationTurn } from './RoomCollaborationHistory';
+
 import { useEffect, useRef, useState } from 'react';
 import type { BotInfo } from '@/lib/types';
 import { api } from '@/lib/api';
@@ -67,7 +69,7 @@ type RoomMessage = {
   sender: { type: 'user' | 'bot'; id: string; name: string };
 };
 
-type RoomTurn = { id: string; status: string; botIds?: string[]; mentionedBotIds?: string[]; cursor?: number; terminationReason?: string };
+type RoomTurn = CollaborationTurn & { id: string; status: string; botIds?: string[]; mentionedBotIds?: string[]; cursor?: number; terminationReason?: string };
 
 function RoomReplyFailure({ turn }: { turn?: RoomTurn }) {
   const { t } = useI18n();
@@ -655,6 +657,7 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
         {room ? <RoomSharedContextEditor roomId={room.id} /> : null}
       </div>
       )}
+      <RoomCollaborationHistory turns={turns} names={new Map(bots.map(bot => [bot.id, bot.name]))} />
       <div className="chat-panel-body">
         <div className="chat-feed-shell">
           <div className="chat-feed" role="log" ref={feedRef} aria-label={t('play.group.transcript')}>
