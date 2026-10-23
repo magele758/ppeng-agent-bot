@@ -17,7 +17,7 @@ import {
   steerPrefixCount,
   type FeedScrollIntent
 } from '@/lib/feed-window';
-import { prependHistoryPage } from '@/lib/history-window';
+import { prependHistoryPage, unpersistedAssistantText } from '@/lib/history-window';
 import { api } from '@/lib/api';
 import { loadSessionPanelResource, transcriptModelView } from '@/lib/session-panel-resource';
 import { readRetryProgress, type RetryProgress } from '@/lib/model-retry';
@@ -59,7 +59,6 @@ import {
   steerResponseApplies,
   UNBOUND_LIVE_TURN,
   streamSessionAllowed,
-  tickIfPersisted,
   visibleLiveOverlay,
 } from '@/lib/live-turn-session';
 import { userPreviewText } from '@/lib/chat-utils';
@@ -307,6 +306,8 @@ export function usePlayChat(deps: PlayChatDeps) {
   const feedScrollIntentRef = useRef<FeedScrollIntent | null>(null);
   const [feedRevision, setFeedRevision] = useState(0);
   const [sessionMessages, setSessionMessages] = useState<ChatMessage[]>([]);
+  const [heldAssistantText, setHeldAssistantText] = useState('');
+  const heldSegmentsRef = useRef<Array<{ kind: string; raw?: string }> | null>(null);
   const historyMessagesRef=useRef<ChatMessage[]>([]);
   historyMessagesRef.current=sessionMessages;
   const [playTitle, setPlayTitle] = useState(t('play.empty.selectOrCreateSession'));
@@ -500,6 +501,22 @@ export function usePlayChat(deps: PlayChatDeps) {
       holdOpen: modelShotOpenRef.current
     });
   };
+  const snapshotStreamText = () =>
+    streamSegmentsRef.current.flatMap((segment) =>
+      segment.kind === 'text' ? [{ kind: 'text', raw: segment.raw }] : []
+    );
+  const clearHeldAssistant = () => {
+    heldSegmentsRef.current = null;
+    setHeldAssistantText('');
+  };
+  const settleHeld = (
+    segments: Array<{ kind: string; raw?: string }>,
+    messages: readonly ChatMessage[] = historyMessagesRef.current
+  ) => {
+    const pending = unpersistedAssistantText(messages, segments);
+    heldSegmentsRef.current = pending ? segments : null;
+    setHeldAssistantText(pending);
+  };
   const clearStreamingShell = () => {
     if (!pendingSteerTextRef.current) {
       setOptimisticUser(null);
@@ -616,6 +633,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     liveOwnerRef.current = detached.liveSessionId;
     pendingSteerTextRef.current = null;
     pendingSteerSessionRef.current = null;
+    clearHeldAssistant();
     clearStreamingShell();
     setPlaySending(false);
   }, [selectedSessionId]);
@@ -1017,6 +1035,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     [selectedSessionRef]
   );
 
+  const appliedTranscriptRef = useRef<ChatMessage[] | null>(null);
   const refreshPlayPanel = useCallback(async () => {
     const sid = selectedSessionRef.current;
     if (!sid) {
@@ -1039,6 +1058,7 @@ export function usePlayChat(deps: PlayChatDeps) {
       setWorkspaceAvailability(emptyWorkspaceAvailability());
       setBotModelOverride(null);
       loadedPinRef.current = { sid: '', pinned: false };
+      appliedTranscriptRef.current = null;
       return;
     }
     const epoch = ++feedEpochRef.current;
@@ -1098,6 +1118,7 @@ export function usePlayChat(deps: PlayChatDeps) {
       const switching = historySessionRef.current !== sid;
       if (switching) historyAutoBlockedRef.current = false;
       const incoming = (data.messages ?? []) as Array<ChatMessage & { id: string; seq?: number }>;
+      if (switching) clearHeldAssistant();
       const planned = nextTranscriptWindow({
         sameSession: !switching,
         previous: historyMessagesRef.current as Array<ChatMessage & { id: string; seq?: number }>,
@@ -1112,7 +1133,15 @@ export function usePlayChat(deps: PlayChatDeps) {
       playStickToBottomRef.current = planned.stick;
       showLatestWhenStuck(planned.stick, setShowJumpToLatest);
       feedScrollIntentRef.current = planned.intent;
-      setSessionMessages(stampReplyQuotes(planned.messages, replyMemoryRef.current));
+      const stamped = stampReplyQuotes(planned.messages, replyMemoryRef.current);
+      appliedTranscriptRef.current = stamped;
+      historyMessagesRef.current = stamped;
+      if (!switching && heldSegmentsRef.current) {
+        const pending = unpersistedAssistantText(stamped, heldSegmentsRef.current);
+        heldSegmentsRef.current = pending ? heldSegmentsRef.current : null;
+        setHeldAssistantText(pending);
+      }
+      setSessionMessages(stamped);
       setHistoryCursor(planned.cursor);
       setFeedRevision((revision) => revision + 1);
       setSteerInbox(mapSteerInboxItems(data.inbox));
@@ -1165,6 +1194,7 @@ export function usePlayChat(deps: PlayChatDeps) {
       setModelViewPayload(null);
       setSessionFileArtifacts([]);
       setSteerInbox([]);
+      appliedTranscriptRef.current = null;
     }
   }, [playSurface, selectedSessionRef, showModelView, t]);
 
@@ -1523,6 +1553,7 @@ export function usePlayChat(deps: PlayChatDeps) {
       liveOwnerRef.current = null;
       pendingSteerTextRef.current = null;
       pendingSteerSessionRef.current = null;
+      clearHeldAssistant();
       clearStreamingShell();
       setPlaySending(false);
       if (!id) {
@@ -1763,10 +1794,15 @@ export function usePlayChat(deps: PlayChatDeps) {
     if (liveFollowRef.current?.controller !== controller) return;
     liveFollowRef.current = null;
     if (!liveTurnCurrent(generation)) return;
+    const segments = snapshotStreamText();
+    if (shouldTickLiveArm(true, controller.signal.aborted)) {
+      await refreshPlayPanel();
+    }
+    if (!liveTurnCurrent(generation)) return;
+    settleHeld(segments, appliedTranscriptRef.current ?? historyMessagesRef.current);
     clearStreamingShell();
     if (claimedHere) liveOwnerRef.current = null;
     if (!controller.signal.aborted) {
-      await tick({ includePlayPanel: true });
       const sid = selectedSessionRef.current;
       if (
         sid &&
@@ -2074,6 +2110,7 @@ export function usePlayChat(deps: PlayChatDeps) {
       if (playSurface === 'bot') noteBotFirstTaskSent();
       acknowledgeLocalSendCommitted();
       requestScrollPlayToBottom();
+      clearHeldAssistant();
       setOptimisticUser(preview);
       setOptimisticContext(contextLabels);
       consumeQuote(true);
@@ -2084,6 +2121,7 @@ export function usePlayChat(deps: PlayChatDeps) {
       if (playSurface === 'bot') noteBotFirstTaskSent();
       acknowledgeLocalSendCommitted();
       requestScrollPlayToBottom();
+      clearHeldAssistant();
       setOptimisticUser(preview);
       setOptimisticContext(contextLabels);
       consumeQuote(true);
@@ -2094,6 +2132,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     try {
       const activeBotId = playSurface === 'bot' ? botIdRef.current : '';
       const hadSession = Boolean(selectedSessionRef.current);
+      let streamed = false;
       let sid = selectedSessionId;
       if (!sid && activeBotId) {
         const opened = await openBotSession(activeBotId, { liveGen: generation });
@@ -2102,6 +2141,7 @@ export function usePlayChat(deps: PlayChatDeps) {
       assertLiveTurn(generation);
       if (sid) {
         if (useStream) {
+          streamed = true;
           beginStreamTurn();
           await readSseFetch(
             `/api/sessions/${sid}/stream`,
@@ -2138,7 +2178,7 @@ export function usePlayChat(deps: PlayChatDeps) {
           });
         }
         assertLiveTurn(generation);
-        finishLiveTurn(generation);
+        if (!useStream) finishLiveTurn(generation);
         setPlayStatus({ text: t('play.status.sent'), ok: true });
         if (
           shouldRefreshSuggestion({
@@ -2155,6 +2195,7 @@ export function usePlayChat(deps: PlayChatDeps) {
         throw new Error(t('play.status.openBotFailed'));
       } else if (mode === 'chat') {
         if (useStream) {
+          streamed = true;
           beginStreamTurn();
           await readSseFetch('/api/chat/stream', {
             message: text || '(attachment)',
@@ -2170,7 +2211,6 @@ export function usePlayChat(deps: PlayChatDeps) {
             ...workspaceBindingBody(workspaceBinding),
           }, undefined, { liveGen: generation });
           assertLiveTurn(generation);
-          finishLiveTurn(generation);
           setPlayStatus({ text: t('play.status.streamDone'), ok: true });
         } else {
           beginWaitTurn();
@@ -2236,7 +2276,17 @@ export function usePlayChat(deps: PlayChatDeps) {
         await persistPendingStrategy(selectedSessionRef.current);
       }
       sessionListStickTopRef.current = true;
-      await tick({ includePlayPanel: true });
+      const segments = snapshotStreamText();
+      if (streamed && liveTurnCurrent(generation)) {
+        await refreshPlayPanel();
+        if (liveTurnCurrent(generation)) {
+          settleHeld(segments, appliedTranscriptRef.current ?? historyMessagesRef.current);
+          finishLiveTurn(generation);
+        }
+        await tick({ includePlayPanel: false });
+      } else {
+        await tick({ includePlayPanel: true });
+      }
     } catch (e) {
       await runIf(ownsLiveTurn(e, liveTurnOnScreen(generation)), async () => {
         setPlayStatus({ text: modelErrorText(e instanceof Error ? e.message : String(e), t), err: true });
@@ -2250,8 +2300,12 @@ export function usePlayChat(deps: PlayChatDeps) {
           setOptimisticReply(null);
           setReplyQuote(quoteSnapshot);
         });
-        finishLiveTurn(generation);
-        await tickIfPersisted(persisted, () => tick({ includePlayPanel: true }));
+        const segments = snapshotStreamText();
+        await refreshPlayPanel();
+        if (liveTurnCurrent(generation)) {
+          settleHeld(segments, appliedTranscriptRef.current ?? historyMessagesRef.current);
+          finishLiveTurn(generation);
+        }
       });
     } finally {
       releaseIfCurrent(liveTurnCurrent(generation), () => setPlaySending(false));
@@ -2357,6 +2411,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     stopLiveTurn: () => {
       liveGenRef.current += 1;
       liveOwnerRef.current = null;
+      clearHeldAssistant();
       clearStreamingShell();
       setPlaySending(false);
       setPlayStatus({ text: t('play.retry.stopped') });
@@ -2429,6 +2484,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     replyQuote,
     quoteReply,
     cancelReplyQuote,
+    heldAssistantText: screen.bound ? heldAssistantText : '',
     streamOverlay: visibleStream(screen.hasStream, streamOverlay),
     waitTyping: screen.waitTyping,
     playSending: screen.playSending,

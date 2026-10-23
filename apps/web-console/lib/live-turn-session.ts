@@ -252,8 +252,10 @@ export function releaseArmOwner(current: boolean, claimedHere: boolean, ownerIsS
   return current && claimedHere && ownerIsSession;
 }
 
+/** A dropped follow socket is not a user stop. Still load the saved transcript. */
 export function shouldTickLiveArm(current: boolean, aborted: boolean): boolean {
-  return current && !aborted;
+  void aborted;
+  return current;
 }
 
 export function applyWhen(cond: boolean, effect: () => void): void {
