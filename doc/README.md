@@ -6,6 +6,7 @@
 
 | 目标 / Goal | 推荐顺序 / Route |
 |-------------|------------------|
+| 审阅产品功能 / Review product | [Bot 完整功能说明](bot/00-functional-guide.md) → [分章规则与状态](bot/README.md) |
 | 第一次使用 / Run locally | [README 快速开始](../README.zh.md#快速开始) → [Lab 接入](harness/from-zero/09-web-console.md) → [测试与排障](TESTING.md) |
 | 学习 Agent 原理 / Learn the runtime | [Harness 地图](harness/README.md) → [从零教程](harness/from-zero/README.md) → 按问题查 00–20 专题 |
 | 嵌入循环 / Embed the loop | [Agent Loop 包](../packages/agent-loop/README.md) → [SDK 指南](../skills/agent-loop/SKILL.md) → [装配模块与端口](../skills/agent-loop/references/modules-and-ports.md) |
@@ -43,7 +44,7 @@
 | [`MUTATION_TESTING.md`](MUTATION_TESTING.md) | 关键模块变异测试门禁：变异算子、内存注入、分数棘轮、CI（只观察）与存活变异体处理 |
 | [`ROADMAP.md`](ROADMAP.md) | 长期路线（P0–P4）；与实现以代码为准 |
 | [`CAPABILITY_DISCOVERY_PLAN.md`](CAPABILITY_DISCOVERY_PLAN.md) | 自主探针 / Capability Discovery（含 Tailscale 设备池）开发计划（Draft） |
-| [`bot/README.md`](bot/README.md) | Bot 模式产品目录：当前行为、对象、规则，以及每份规格的状态。改 Bot 行为时同步更新 |
+| [`bot/README.md`](bot/README.md) | Bot 统一入口产品说明：完整功能审阅稿、分章规则与每份规格的状态。改 Bot 行为时同步更新 |
 | [`BOT_CAPABILITY_PLAN.md`](BOT_CAPABILITY_PLAN.md) | Bot 名册 + canonical 对话；`/new` 压缩、`/stop`、`/model` |
 | [`BOT_MULTI_GOAL_DESIGN.md`](BOT_MULTI_GOAL_DESIGN.md) | 多目标持久化、插话归属、自动执行路由、等待恢复与 Lab 目标面板 |
 | [`BOT_ROOM_MOE_PLAN.md`](BOT_ROOM_MOE_PLAN.md) | 大规模群聊 Agentic Sparse MoE；稀疏调度、群内找回和触达记忆已实现，子任务、群目标、群内审批和百人群界面仍是已批准 |
