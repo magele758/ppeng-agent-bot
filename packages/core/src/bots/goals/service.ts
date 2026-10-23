@@ -105,6 +105,7 @@ export class BotGoalService {
   });
  }
  updateExecution(botId:string,id:string,patch:{runRef?:string;sessionId?:string;safeToRetry?:boolean;leaseUntil?:number}):void {mutateGoalSnapshot(this.store,botId,s=>{const e=s.executions.find(x=>x.id===id);if(!e)throw new Error('Execution not found');this.find(s,e.goalId);if(e.status!=='running'||e.leaseUntil<=this.clock())throw new Error('Execution lease expired');Object.assign(e,patch);});}
+ renewRunningLease(botId:string,id:string,leaseUntil:number):void {mutateGoalSnapshot(this.store,botId,s=>{const e=s.executions.find(x=>x.id===id);if(!e)throw new Error('Execution not found');const goal=this.find(s,e.goalId);if(e.status!=='running'||goal.status!=='running'||goal.activeExecutionId!==e.id)throw new Error('Execution lease expired');e.leaseUntil=leaseUntil;});}
  private limit(g:BotGoal,settings:GoalSettings):boolean {
   const reason=g.costUsd>=g.budgetUsd?'Goal budget exhausted':g.attempts>=settings.maxAttempts?'Attempt limit reached':g.noProgress>=settings.maxNoProgress?'No progress limit reached':undefined;
   if(reason){g.status='blocked';g.blockedReason=reason;g.nextStep='User review required';return true;}return false;

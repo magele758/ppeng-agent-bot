@@ -1,0 +1,37 @@
+id: bot-goal-result-return
+title: 子执行结果回到原目标并收口
+status: implemented
+requirement: |
+  按「结果能不能回到父目标并正确收口」排序。依据是 grok 写在 .grok-reviews/bot-goal-conclusion.md 里的结论。
+
+  子会话身份写不回父目标。 spawnSubagentOutcome 不复制 botGoalId / botGoalScopeSessionId（spawn-host.ts:235-271）。dispatch 丢掉 childSessionId，runRef 仍指向父执行会话（runtime-dispatch.ts:104、128）。收成 source: 'session' 的等待后，完成会被判 unauthorized，目标 blocked（scheduler.ts:33-39、240-243）。后面的回收都依赖这个关联。
+
+  子会话结束不等于目标结算。 并发 fork 跑完只 deliverNote，不调用 settleGoalExecution（concurrent-fork.ts:203-214）。调度器对已经不在 running / waiting_approval 的 execution 不 report（scheduler.ts:214-235）。审批到达时租约过期会直接返回，恢复和 block 都跳过（scheduler.ts:189、233-234）。目标停在 running，结果留在子会话。
+
+  bot_delegate 的对方子会话回不到原目标。 适配器只记下对方一个 bot_task id（adapters.ts:62-66）。调度器只读这个 task 的 status / result（scheduler.ts:41-43、103-106）。对方内部再建的子会话没有原目标的 botGoalId。status 不在终态集合里就一直 waiting；requesterBotId 对不上就 block。
+
+  Team / Swarm 扇出后，父目标可能一直 waiting，也可能被误唤醒。 Team 只 enqueueSchedulerWake，不 runSession，也没有任务失败分支（teams/executor.ts:311-328、464）。Swarm 把 idle 计入队友上限，空任务列表也不会把 run 收成终态（swarm/executor.ts:135-158）。launchTeammate 失败不把任务标失败（swarm/executor.ts:51-53）。run 记录缺失被当成 unknown 并 wake（scheduler.ts:49、256）。
+
+  完成判定会把已经走完的回合收成 blocked。 candidate_completed 再交给 verifyCompletion，judge 抛错时报告变成 blocked（runtime-host.ts:327-337、345-350）。self_heal | factory | evolution 没有 inspectSpecialty 时是 unsupported 并 block（scheduler.ts:50、240-243）。factory / evolution 会话不在 externalWorkers 里，文本刮不进 evidence（scheduler.ts:54-63）。 这几个问题解决了吗？如果没解决就去解决掉
+notes: "assumedApproval: standing-order-2026-10-22"
+criteria:
+  - id: AC-1
+    given: 一个正在进行的目标通过子会话去做
+    when: 子会话结束并留下结果
+    then: 原目标认这是自己的子会话，结果回到原目标，目标离开「等待授权失败」
+  - id: AC-2
+    given: 一个进行中的目标已经开出子会话，或者审批决定迟到、执行租约已过期
+    when: 子会话结束，或迟到的审批被拒绝、通过
+    then: 原目标按这个结果收口；拒绝变成受阻，通过则在同一条执行上继续，不会停在进行中却只把结果留在子会话
+  - id: AC-3
+    given: 原目标把工作委派给另一个 Bot
+    when: 对方完成，或对方再开的子会话留下结果，或委派记录对不上原目标
+    then: 对方和它的子会话结果回到原目标；对不上时原目标受阻，而不是一直等待
+  - id: AC-4
+    given: 原目标扇出团队任务图或 Swarm
+    when: 队友失败、任务列表为空、队友启动失败，或对应的 run 记录缺失
+    then: 父目标按失败收口；缺失记录不会被当成完成去唤醒
+  - id: AC-5
+    given: 一个回合已经走完并留下完成证据，或目标在等自愈、工厂、演进
+    when: 完成复核暂时不可用，或这些外部执行没有专门检查器但留下了结果
+    then: 原目标保留已有结果并继续，外部结果进入证据；只有确实不支持的执行才受阻

@@ -260,6 +260,12 @@ export async function spawnSubagentOutcome(
   }
   Object.assign(childMeta, inheritForkRetrievalMetadata(context.session.metadata));
   Object.assign(childMeta, inheritBotIdentityMetadata(context.session, host.store));
+  const parentGoalId = context.session.metadata.botGoalId;
+  const parentGoalScope = context.session.metadata.botGoalScopeSessionId ?? (context.session.metadata.canonicalBotChat === true ? context.session.id : undefined);
+  if (typeof parentGoalId === 'string' && typeof parentGoalScope === 'string') {
+    childMeta.botGoalId = parentGoalId;
+    childMeta.botGoalScopeSessionId = parentGoalScope;
+  }
 
   const subagent = host.store.createSession({
     title: `Subagent: ${role ?? parentAgent.role}`,

@@ -85,6 +85,7 @@
 | `low-interference-onboarding-goals` | 03 |
 | `unowned-legacy-bot` | 02 |
 | `loop-guard-model-switch` | 09。全局对话设置，Bot 和普通对话同一条规则 |
+| `bot-goal-result-return` | 05。子会话、委派、团队、Swarm、工厂和演进的结果回到原目标并收口 |
 
 ## 已批准，还没标成已实现
 

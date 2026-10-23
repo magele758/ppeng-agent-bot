@@ -15,6 +15,17 @@ const ticking = new WeakSet<object>();
 const ended = new Set(['completed', 'failed', 'cancelled', 'unknown', 'expired', 'rejected', 'timed_out']);
 interface AuthorizedWait { goalId: string; source: string; correlationId: string }
 
+function delegatedChildSettled(host: GoalRuntimeHost, parent: SessionRecord, taskId: string): boolean {
+ return host.store.listSessions().some(session => {
+  if (session.metadata.botWorkTaskId !== taskId || host.isRunning(session.id)) return false;
+  if (session.metadata.botGoalScopeSessionId === parent.id) return false;
+  const outcome = session.metadata.outcome as {kind?: string} | undefined;
+  if (outcome?.kind === 'completed' || outcome?.kind === 'failed' || session.status === 'completed' || session.status === 'failed') return true;
+  if (session.status !== 'idle') return false;
+  return host.store.foldMessages(session.id).some(message => message.role === 'assistant' && message.parts.some(part => part.type === 'text' && part.text.trim().length > 0));
+ });
+}
+
 function authorizedWait(host: GoalRuntimeHost, goal: BotGoal, executions: GoalExecution[]): boolean {
  const wait = goal.wait;
  if (!wait) return false;
@@ -40,14 +51,20 @@ function waitStatus(host: GoalRuntimeHost, parent: SessionRecord, goal: BotGoal,
  }
  if (wait.source === 'bot_task') {
   const task = getBotTask(host.store, principalFromSession(host.store, parent), wait.correlationId);
-  return task?.requesterBotId === goal.botId ? task.status : 'unauthorized';
+  if (task?.requesterBotId !== goal.botId) return 'unauthorized';
+  const childSettled = delegatedChildSettled(host, parent, wait.correlationId);
+  if (task.status === 'queued' || task.status === 'running' || task.status === 'waiting_approval') return childSettled ? 'completed' : task.status;
+  return task.status;
  }
  if (wait.source === 'team_dag') {
   const plan = new TeamPlanStore(host.store.db).get(wait.correlationId);
   return plan?.sessionId && ownedSessions.has(plan.sessionId) ? plan.status : 'unauthorized';
  }
- if (wait.source === 'swarm') return host.store.swarm().getRun(wait.correlationId)?.status ?? 'unknown';
- if (wait.source === 'self_heal' || wait.source === 'factory' || wait.source === 'evolution') return host.inspectSpecialty?.(parent,goal).status ?? 'unsupported';
+ if (wait.source === 'swarm') {
+  const run = host.store.swarm().getRun(wait.correlationId);
+  return run ? run.status : 'missing';
+ }
+ if (wait.source === 'self_heal' || wait.source === 'factory' || wait.source === 'evolution') return specialtyWaitStatus(host, parent, goal);
  return 'unsupported';
 }
 
@@ -59,7 +76,19 @@ function externalWorkers(host: GoalRuntimeHost, goal: BotGoal): SessionRecord[] 
   wait.source === 'swarm' ? session.metadata.swarmRunId === wait.correlationId :
   wait.source === 'team_dag' ? session.metadata.teamPlanId === wait.correlationId :
   wait.source === 'self_heal' ? session.metadata.selfHealRunId === wait.correlationId :
-  wait.source === 'bot_task' ? session.metadata.botWorkTaskId === wait.correlationId : false);
+  wait.source === 'bot_task' ? session.metadata.botWorkTaskId === wait.correlationId || (session.metadata.botGoalId === goal.id && session.id !== goal.sessionId) :
+  wait.source === 'factory' ? session.metadata.factoryRunId === wait.correlationId :
+  wait.source === 'evolution' ? session.metadata.evolutionRunId === wait.correlationId : false);
+}
+function specialtyWaitStatus(host: GoalRuntimeHost, parent: SessionRecord, goal: BotGoal): string {
+ const inspected = host.inspectSpecialty?.(parent, goal).status;
+ if (inspected && inspected !== 'unsupported') return inspected;
+ if (goal.wait?.source === 'self_heal') return 'unsupported';
+ const workers = externalWorkers(host, goal);
+ if (!workers.length) return 'unsupported';
+ if (workers.some(worker => host.isRunning(worker.id) || worker.status === 'waiting_approval')) return 'running';
+ if (workers.some(worker => worker.status === 'failed' || (worker.metadata.outcome as {kind?: string} | undefined)?.kind === 'failed')) return 'failed';
+ return 'completed';
 }
 
 async function drainExternal(host: GoalRuntimeHost, parent: SessionRecord, goal: BotGoal, executions: GoalExecution[]): Promise<void> {
@@ -178,6 +207,10 @@ function resumeApprovedDispatch(host: GoalRuntimeHost, session: SessionRecord, g
   if(execution.leaseUntil>Date.now())scope.service.updateExecution(goal.botId,execution.id,{leaseUntil:Date.now()+scope.service.readSettings().leaseMs});
   return true;
  }
+ const renewUntil=Date.now()+scope.service.readSettings().leaseMs;
+ const liveExecution=scope.service.executions(goal.botId,goal.id).find(item=>item.id===execution.id);
+ if(!liveExecution||liveExecution.status!=='running')return false;
+ if(liveExecution.leaseUntil<=Date.now())scope.service.renewRunningLease(goal.botId,execution.id,renewUntil);
  if(decisions.some(d=>d?.status==='rejected')) {
   if(host.isRunning(session.id)){host.cancel(session.id);return true;}
   scope.service.report(goal.botId,execution.id,{kind:'blocked',summary:'Goal execution approval was rejected',owner:execution.owner,fence:execution.fence});
@@ -186,8 +219,6 @@ function resumeApprovedDispatch(host: GoalRuntimeHost, session: SessionRecord, g
  if(host.isRunning(session.id))return false;
  const key=decisions.map(d=>`${d!.id}:${d!.updatedAt}`).sort().join('|');
  if(session.metadata.botGoalApprovalResume===key)return true;
- if(execution.leaseUntil<=Date.now())return true;
- scope.service.updateExecution(goal.botId,execution.id,{leaseUntil:Date.now()+scope.service.readSettings().leaseMs});
  host.store.updateSession(session.id,{status:'idle',metadata:{...session.metadata,botGoalApprovalResume:key}});
  const request=dispatch.request??{};
  const args=Object.fromEntries(['preferredStrategy','workKind','delegateBotId','tasks','role','factory'].filter(k=>request[k]!==undefined).map(k=>[k,request[k]]));
@@ -219,9 +250,25 @@ function renewOrExpireLease(host: GoalRuntimeHost, service: GoalService, botId: 
  if (execution.leaseUntil > Date.now()) service.updateExecution(botId, execution.id, {leaseUntil:Date.now()+service.readSettings().leaseMs});
  else { host.cancel(session.id); service.block(botId, goal.id, 'Execution lease expired; stopping before recovery'); }
 }
+function sessionOutcomeText(host: GoalRuntimeHost, session: SessionRecord): string {
+ return host.store.foldMessages(session.id).filter(message => message.role === 'assistant').flatMap(message => message.parts.filter(part => part.type === 'text').map(part => part.text)).join('\n').slice(-2000);
+}
+function finishedExecutionReport(host: GoalRuntimeHost, session: SessionRecord): {kind:'candidate_completed'|'failed'|'cancelled';summary:string;evidence?:string[]} | undefined {
+ const outcome = session.metadata.outcome as {kind?: string; reason?: string} | undefined;
+ const text = sessionOutcomeText(host, session);
+ if (session.status === 'failed' || outcome?.kind === 'failed') return {kind:'failed', summary:outcome?.reason || text || 'Execution failed', ...(text ? {evidence:[text]} : {})};
+ if (outcome?.kind === 'aborted' || outcome?.kind === 'cancelled') return {kind:'cancelled', summary:outcome.reason || 'Execution stopped'};
+ if (outcome?.kind === 'completed' || session.status === 'completed') return {kind:'candidate_completed', summary:text || 'Execution finished', ...(text ? {evidence:[text]} : {})};
+ return undefined;
+}
 function settleRunningLease(host: GoalRuntimeHost, service: GoalService, botId: string, session: SessionRecord | undefined, goal: BotGoal, execution: GoalExecution, running: boolean): void {
- if (!session || !(running || session.status === 'waiting_approval')) return;
- renewOrExpireLease(host, service, botId, session, goal, execution);
+ if (!session) return;
+ if (running || session.status === 'waiting_approval') {
+  renewOrExpireLease(host, service, botId, session, goal, execution);
+  return;
+ }
+ const report = finishedExecutionReport(host, session);
+ if (report) service.report(botId, execution.id, {...report, owner:execution.owner, fence:execution.fence});
 }
 function controlOrLease(host: GoalRuntimeHost, service: GoalService, botId: string, session: SessionRecord | undefined, goal: BotGoal, execution: GoalExecution, running: boolean): void {
  if (goal.status === 'paused' || goal.status === 'cancelled') stopControlledExecution(host, service, botId, session, execution, running);
@@ -238,6 +285,10 @@ async function tickRunningGoal(host: GoalRuntimeHost, service: GoalService, botI
  for (const execution of service.executions(botId, goal.id).filter(e => e.status === 'running')) settleRunningExecution(host, service, botId, goal, execution);
 }
 function blockUnauthorizedWait(service: GoalService, botId: string, goal: BotGoal, status: string | undefined): boolean {
+ if (status === 'missing') {
+  service.block(botId, goal.id, 'External execution record is missing');
+  return true;
+ }
  if (status !== 'unauthorized' && status !== 'unsupported') return false;
  service.block(botId, goal.id, 'Wait reference is not an authorized supported execution');
  return true;

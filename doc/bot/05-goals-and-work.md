@@ -2,7 +2,7 @@
 
 一句话可以变成一件还要继续做的事。Bot 把它记成目标，自己选一种已经授权的做法去推进，并留下证据。人不用先选「任务模式」。
 
-规格：`bot-multi-goal-coordination`、`bot-autonomous-execution-coverage`、`bot-concurrent-subagents`、`bot-task-permission-inheritance`、`bot-fork-retrievable-inheritance`、`bot-product-p0`、`bot-product-p1`、`bot-product-p2`。面板什么时候出现见 [03 工作台](03-workspace.md)。
+规格：`bot-multi-goal-coordination`、`bot-autonomous-execution-coverage`、`bot-concurrent-subagents`、`bot-task-permission-inheritance`、`bot-fork-retrievable-inheritance`、`bot-goal-result-return`、`bot-product-p0`、`bot-product-p1`、`bot-product-p2`。面板什么时候出现见 [03 工作台](03-workspace.md)。
 
 ## 三层不要混
 
@@ -14,7 +14,9 @@
 
 目标的状态是：排队、进行中、等待、受阻、暂停、完成、失败、取消。等待必须说清什么会把它叫醒。受阻必须说清原因，以及怎样才算解开。
 
-完成只能来自一次独立的核对。模型说做完了、判官暂时不可用、证据不够，都不能算完成。能用构建结果或文件是否存在来核对时，优先用这些，模型判断只是补充。
+完成只能来自一次独立的核对。模型说做完了、判官暂时不可用、证据不够，都不能算完成。能用构建结果或文件是否存在来核对时，优先用这些，模型判断只是补充。判官暂时不可用时，已经走完的回合保留已有结果并继续，不把目标收成受阻。
+
+子会话、委派给另一只 Bot、团队任务图、Swarm、工厂和演进的结果都会回到原来那件目标。子会话结束会结算这次执行。对方 Bot 再开的子会话也带着原目标。队友启动失败、任务列表为空、外部记录缺失，会把目标收成失败或受阻，不会一直等待，也不会把缺失记录当成完成。
 
 Bot 持久目标是状态与最终核验的唯一来源；旧会话目标不会再另外决定 Bot 是否完成。普通非 Bot 会话仍支持会话目标。明确失败的执行报告会把目标记为失败；等待核验、预算耗尽等需要处理后才能恢复的情况仍记为受阻。
 
