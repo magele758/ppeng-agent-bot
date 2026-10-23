@@ -1,5 +1,8 @@
 import {
   canAccessSession,
+  resolveSessionBotGoal,
+  goalScope,
+  BotGoalService,
   goalWirePayload,
   readGoalSettings,
   resumeGoalOnUserReply,
@@ -47,7 +50,11 @@ export function goalRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         const status = url.searchParams.get('status') as GoalStatusValue | null;
         if (sessionId) {
           guardSession(runtime, sessionId, auth);
-          json(response, 200, { goals: store.listBySession(sessionId) });
+          const scope = goalScope(runtime.store, runtime.getSession(sessionId)!);
+          if (scope) guardSession(runtime, scope.sessionId, auth);
+          const legacy = store.listBySession(sessionId);
+          const goals = scope ? [...scope.service.list(scope.botId), ...legacy.filter(goal => goal.status === 'achieved' || goal.status === 'unmet_closed').map(goal => goalWirePayload(goal))] : legacy.map(goal => goalWirePayload(goal));
+          json(response, 200, { goals });
           return;
         }
         const goals = store.list({ status: status ?? undefined, limit: 50 }).filter((goal) => {
@@ -70,6 +77,10 @@ export function goalRoutes(runtime: RawAgentRuntime): RouteSpec[] {
           return;
         }
         guardSession(runtime, sessionId, auth);
+        if (goalScope(runtime.store, runtime.getSession(sessionId)!)) {
+          json(response, 409, { error: 'Bot goals are managed through Bot messages and goal actions' });
+          return;
+        }
         const rec = upsertGoalFromApi(runtime.store.goal(), {
           sessionId,
           condition,
@@ -101,10 +112,25 @@ export function goalRoutes(runtime: RawAgentRuntime): RouteSpec[] {
     {
       method: 'GET',
       pattern: '/api/sessions/:id/goal',
-      handler: ({ requireParam, response }) => {
+      handler: ({ requireParam, response, auth }) => {
         const id = requireParam('id');
         if (!runtime.getSession(id)) {
           json(response, 404, { error: 'Session not found' });
+          return;
+        }
+        const scope = goalScope(runtime.store, runtime.getSession(id)!);
+        if (scope) guardSession(runtime, scope.sessionId, auth);
+        const durable = resolveSessionBotGoal(runtime.store, runtime.getSession(id)!);
+        if (durable) {
+          json(response, 200, { goal: {
+            goalId: durable.id, status: durable.status, source: 'bot', condition: durable.objective,
+            closeReason: durable.blockedReason, progress: durable.progress, evidence: durable.evidence,
+            turnsUsed: durable.attempts, maxTurns: new BotGoalService(runtime.store, Date.now, durable.sessionId).readSettings().maxAttempts
+          } });
+          return;
+        }
+        if (goalScope(runtime.store, runtime.getSession(id)!)) {
+          json(response, 200, { goal: null });
           return;
         }
         const rec = runtime.store.goal().findLatestBySession(id);

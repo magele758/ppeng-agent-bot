@@ -92,3 +92,10 @@ test('targeted intent receipts apply controls once and retain amended constraint
  }
  assert.deepEqual(s.get('b',goal.id).constraints,['Keep existing data']);
 });
+
+test('explicit failure is terminal and retains the attempted path [AC:unified-bot-goal-lifecycle#AC-2]',t=>{
+ const {s}=fixture(t);const goal=create(s);const execution=s.claim('b',goal.id,{strategy:'direct'});
+ s.report('b',execution.id,{kind:'failed',summary:'Provider rejected the artifact',evidence:['attempted upload; response 422']});
+ const saved=s.get('b',goal.id);assert.equal(saved.status,'failed');assert.match(saved.blockedReason,/rejected/);assert.deepEqual(saved.evidence,['attempted upload; response 422']);assert.equal(s.list('b').length,1);
+ assert.throws(()=>s.control('b',goal.id,'resume'),/terminal/);
+});

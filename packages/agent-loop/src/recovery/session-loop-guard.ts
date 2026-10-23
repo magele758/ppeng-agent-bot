@@ -9,6 +9,7 @@ export function recoveryPolicyEnabled(env: Record<string, string | undefined>): 
 export type LoopGuardToolCall = {
   name: string;
   input?: unknown;
+  toolCallId?: string;
 };
 
 function sortKeysDeep(value: unknown): unknown {
@@ -50,13 +51,30 @@ function stableJsonForFingerprint(input: unknown): string {
  *
  * We do not use the first tool name alone — that aborted varied bash work
  * (`ls` / `cat` / `grep`) as if it were a dead loop. The whole-round sequence
- * is the unit: a different command, a different tool set, or a different order
- * (`[bash, read_file]` ≠ `[read_file, bash]`) is a new fingerprint and resets
- * the content streak. Key order in args is normalized so `{a,b}` equals `{b,a}`.
+ * is the unit: a different command, tool set or order has its own observation
+ * history. Key order in args is normalized so `{a,b}` equals `{b,a}`.
  */
 function fingerprintToolRound(toolCalls: LoopGuardToolCall[]): string {
   const chunks = toolCalls.map((tc) => `${tc.name}:${stableJsonForFingerprint(tc.input ?? {})}`);
   return fingerprintHash(chunks.join('\n'));
+}
+
+// Only transport/observation fields are noise; domain status, counters and evidence remain.
+const OBSERVATION_NOISE = /^(timestamp|observedAt|fetchedAt|checkedAt|requestId|traceId|durationMs|elapsedMs)$/i;
+function normalizeEvidence(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(normalizeEvidence);
+  if (value && typeof value === 'object') return Object.fromEntries(
+    Object.entries(value).filter(([key]) => !OBSERVATION_NOISE.test(key)).map(([key, item]) => [key, normalizeEvidence(item)])
+  );
+  return value;
+}
+function evidenceFingerprint(results: { name: string; content?: string }[]): string | undefined {
+  if (results.some(r => typeof r.content !== 'string' || !r.content.trim())) return undefined;
+  return fingerprintHash(stableJsonForFingerprint(results.map(r => {
+    let content: unknown = r.content;
+    try { content = JSON.parse(r.content!); } catch { /* Plain-text tool output. */ }
+    return { name: r.name, content: normalizeEvidence(content) };
+  })));
 }
 
 function summarizeToolRound(toolCalls: LoopGuardToolCall[]): string {
@@ -76,8 +94,8 @@ function repeatRatioFromEnv(env: Record<string, string | undefined>): number {
  */
 export class SessionLoopGuard {
   private readonly toolFailStreak = new Map<string, number>();
-  private lastToolRoundFingerprint = '';
   private sameCallStreak = 0;
+  private readonly rounds = new Map<string, { seen: Set<string>; streak: number }>();
   private readonly contentHashes: string[] = [];
 
   private readonly failStreakMax: number;
@@ -94,6 +112,8 @@ export class SessionLoopGuard {
 
   /** After model returns; updates repetition window. */
   checkAssistantRepetition(assistantParts: MessagePart[]): { abort: true; reason: string } | { abort: false } {
+    // Tool requests cannot be judged until their observations arrive.
+    if (assistantParts.some(p => p.type === 'tool_call')) return { abort: false };
     const fp = fingerprintAssistant(assistantParts);
     this.contentHashes.push(fp);
     if (this.contentHashes.length > this.repeatWindow) {
@@ -121,7 +141,7 @@ export class SessionLoopGuard {
   /** After tool results are known; updates failure and same-call-content streaks. */
   afterToolRound(
     toolCalls: LoopGuardToolCall[],
-    results: { name: string; ok: boolean }[]
+    results: { name: string; ok: boolean; content?: string; toolCallId?: string }[]
   ): { abort: true; reason: string } | { abort: false } {
     for (const r of results) {
       if (!r.ok) {
@@ -130,23 +150,40 @@ export class SessionLoopGuard {
         this.toolFailStreak.set(r.name, 0);
       }
     }
-    for (const [name, streak] of this.toolFailStreak) {
-      if (streak >= this.failStreakMax) {
-        return { abort: true, reason: `tool "${name}" failed ${streak} times in a row` };
-      }
-    }
-
     // Empty rounds do not touch the content streak (same as the old "if first name" skip).
     if (toolCalls.length === 0) {
       return { abort: false };
     }
 
     const fp = fingerprintToolRound(toolCalls);
-    if (fp === this.lastToolRoundFingerprint) {
-      this.sameCallStreak += 1;
-    } else {
-      this.lastToolRoundFingerprint = fp;
-      this.sameCallStreak = 1;
+    const state = this.rounds.get(fp) ?? { seen: new Set<string>(), streak: 0 };
+    state.streak++;
+    this.rounds.delete(fp);
+    this.rounds.set(fp, state);
+    if (this.rounds.size > 128) this.rounds.delete(this.rounds.keys().next().value!);
+
+    // Match by call ID when available; concurrent execution can reorder results.
+    const remaining = [...results];
+    const paired = toolCalls.map(call => {
+      const index = remaining.findIndex(r => call.toolCallId ? r.toolCallId === call.toolCallId : r.name === call.name);
+      return index < 0 ? undefined : remaining.splice(index, 1)[0];
+    });
+    const complete = results.length === toolCalls.length && paired.every((r, i) => r?.ok && r.name === toolCalls[i]?.name);
+    const evidence = complete ? evidenceFingerprint(paired as typeof results) : undefined;
+    if (evidence && !state.seen.has(evidence)) {
+      // New evidence anywhere breaks a stagnant cycle, including interleaved calls.
+      for (const round of this.rounds.values()) round.streak = 0;
+      state.streak = 1;
+      this.contentHashes.length = 0;
+      state.seen.add(evidence);
+      if (state.seen.size > 256) state.seen.delete(state.seen.values().next().value!);
+    }
+    this.sameCallStreak = state.streak;
+
+    for (const [name, streak] of this.toolFailStreak) {
+      if (streak >= this.failStreakMax) {
+        return { abort: true, reason: `tool "${name}" failed ${streak} times in a row` };
+      }
     }
 
     if (this.sameCallStreak >= this.sameToolStreakMax) {
@@ -155,7 +192,7 @@ export class SessionLoopGuard {
       // when repeatGuard is off, or the model is strong under the default `weak` mode.
       return {
         abort: true,
-        reason: `repeat detection: same tool-call content in ${this.sameToolStreakMax} consecutive tool rounds (${label})`
+        reason: `repeat detection: same tool-call content in ${this.sameToolStreakMax} repeated tool rounds without new successful evidence (${label})`
       };
     }
     return { abort: false };

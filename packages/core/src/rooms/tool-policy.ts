@@ -14,7 +14,7 @@ const DENIED = new Set([
 export function filterRoomTools<T extends { name: string }>(
   session: { metadata?: Record<string, unknown> }, tools: readonly T[]
 ): T[] {
-  if (typeof session.metadata?.roomId !== 'string') return tools as T[];
+  if (typeof session.metadata?.roomId !== 'string') return tools.filter(tool => tool.name !== 'room_route_turn');
   return tools.filter(tool =>
     !DENIED.has(tool.name) &&
     !isDelegatedProductAdminTool(tool.name) &&

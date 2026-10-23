@@ -1,0 +1,5 @@
+
+.goal-history { position: relative; font-size: 12px; }
+.goal-history > summary { cursor: pointer; white-space: nowrap; }
+.goal-history__body { position: absolute; z-index: 40; right: 0; top: 100%; width: min(420px, 80vw); max-height: 50vh; overflow: auto; padding: 12px; background: var(--ui-surface); color: var(--ui-text); border: 1px solid var(--ui-border); border-radius: 8px; box-shadow: 0 8px 24px #0002; }
+.goal-history__body article + article { border-top: 1px solid var(--ui-border); padding-top: 12px; margin-top: 12px; }

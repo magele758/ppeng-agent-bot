@@ -20,6 +20,7 @@ export type RoomTaskStatus = 'queued' | 'running' | 'waiting_approval' | 'comple
 export type RoomTaskSettlement = '待核对' | '仍在收尾';
 
 export interface RoomSubTask {
+  expectedEvidence?: string;
   id: string;
   goalId: string;
   goalRevision: number;

@@ -33,7 +33,19 @@ test('full means all authorized tools, without search meta tools [AC:tool-exposu
 test('revocation and whitelist remain effective after disclosure [AC:tool-exposure-tiers#AC-8]', async (t) => { const h = fixture(t); await h.search('bot_create'); h.agent.allowedTools = ['read_file']; assert.ok(!h.visible().includes('bot_create')); assert.equal((await h.load('bot_create')).ok, false); assert.ok(!(await h.search('bot_create')).content.includes('"name": "bot_create"')); });
 test('external discovery off does not disable local search [AC:tool-exposure-tiers#AC-9]', async (t) => { const h = fixture(t); h.store.setDaemonControl('discovery_settings', { enabled: false }); await h.search('bot_create'); assert.ok(h.visible().includes('bot_create')); assert.equal(h.store.getDaemonControl('discovery_settings').enabled, false); });
 test('mode changes affect next selection without replay [AC:tool-exposure-tiers#AC-11]', t => { const h = fixture(t); h.store.appendMessage(h.session.id, 'user', [{ type: 'text', text: 'retain history' }]); const before = h.store.foldMessages(h.session.id); h.store.setDaemonControl(settingsKey, { mode: 'full', pinnedGroups: {} }); assert.ok(h.visible().includes('bot_create')); h.store.setDaemonControl(settingsKey, { mode: 'progressive', pinnedGroups: {} }); assert.ok(!h.visible().includes('bot_create')); assert.deepEqual(h.store.foldMessages(h.session.id), before); });
-test('exact approved classification and unknown extension [AC:tool-exposure-tiers#AC-14]', async (t) => { const h = fixture(t); const mod = await import('../dist/tools/tool-exposure.js'); const groups = mod.TOOL_GROUPS; assert.deepEqual([1, 2, 3].map(n => groups.filter(g => g.tier === n && !g.extension).reduce((s, g) => s + g.tools.length, 0)), [50, 23, 68]); const names = groups.flatMap(g => g.tools); assert.equal(names.length, new Set(names).size); assert.ok(!h.visible().includes('extension_tool')); await h.search('extension_tool'); assert.ok(h.visible().includes('extension_tool')); });
+test('exact approved baseline plus room planning tool and unknown extension [AC:tool-exposure-tiers#AC-14] [AC:room-task-collaboration#AC-2]', async (t) => {
+    const h = fixture(t);
+    const { TOOL_GROUPS: groups } = await import('../dist/tools/tool-exposure.js');
+    const counts = excludeRoom => [1, 2, 3].map(tier => groups.filter(g => g.tier === tier && !g.extension).reduce((sum, group) => sum + group.tools.filter(name => !excludeRoom || name !== 'room_route_turn').length, 0));
+    assert.deepEqual(counts(true), [50, 23, 68], 'the original classified inventory stays unchanged');
+    assert.deepEqual(counts(false), [51, 23, 68]);
+    assert.equal(groups.find(group => group.tools.includes('room_route_turn')).tier, 1);
+    const names = groups.flatMap(group => group.tools);
+    assert.equal(names.length, new Set(names).size);
+    assert.ok(!h.visible().includes('extension_tool'));
+    await h.search('extension_tool');
+    assert.ok(h.visible().includes('extension_tool'));
+});
 test('direct load and clear preserve transcript [AC:tool-exposure-tiers#AC-15]', async (t) => { const h = fixture(t); await h.load('bot_create'); assert.ok(h.visible().includes('bot_create')); const before = h.store.foldMessages(h.session.id); const mod = await import('../dist/tools/tool-exposure.js'); mod.clearToolExposure(h.store, h.session.id); assert.ok(!h.visible().includes('bot_create')); assert.deepEqual(h.store.foldMessages(h.session.id), before); });
 test('real agent loop searches then executes without a separate load [AC:tool-exposure-tiers#AC-3]', async (t) => {
     const { RawAgentRuntime } = await import('../dist/runtime.js');

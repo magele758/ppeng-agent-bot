@@ -1,3 +1,4 @@
+import { usesDurableBotGoals } from '../bots/goals/runtime-host.js';
 import { observeModelRequests } from './request-metrics.js';
 import {
   commitPrepareSnapshot,
@@ -982,7 +983,7 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
     },
     beforeModelTurn: async ({ session, hasPendingToolCalls }) => {
       if (hasPendingToolCalls) return 'proceed';
-      const gate = createGoalGateFromMetadata(session.metadata, process.env);
+      const gate = usesDurableBotGoals(rt.store, session) ? undefined : createGoalGateFromMetadata(session.metadata, process.env);
       const hasGoal = Boolean(gate?.isActive());
       const taskText =
         typeof session.metadata?.goalCondition === 'string'
@@ -1009,7 +1010,7 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
         };
       }
 
-      const gate = createGoalGateFromMetadata(session.metadata, process.env);
+      const gate = usesDurableBotGoals(rt.store, session) ? undefined : createGoalGateFromMetadata(session.metadata, process.env);
       if (!gate?.isActive()) return { met: true };
 
       // route.done only fires when goalGate point is off (see applyJevRoute).

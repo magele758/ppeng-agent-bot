@@ -25,3 +25,7 @@ export function goalActions(status: GoalStatus): Array<'pause' | 'resume' | 'can
   if (['completed', 'failed', 'cancelled'].includes(status)) return [];
   return [status === 'paused' || status === 'blocked' ? 'resume' : 'pause', 'cancel'];
 }
+
+export function isLiveSessionGoal(status: string): boolean {
+  return !['achieved', 'unmet_closed', 'completed', 'failed', 'cancelled'].includes(status);
+}

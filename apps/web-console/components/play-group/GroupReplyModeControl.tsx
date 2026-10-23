@@ -12,6 +12,7 @@ import './play-group.css';
 
 const OPTIONS: readonly { mode: GroupReplyMode; labelKey: MessageKey; hintKey: MessageKey }[] = [
   { mode: 'coordinator', labelKey: 'play.groupSettings.coordinator', hintKey: 'play.groupSettings.coordinatorHint' },
+  { mode: 'task-collaboration', labelKey: 'play.groupSettings.taskCollaboration', hintKey: 'play.groupSettings.taskCollaborationHint' },
   { mode: 'all-members', labelKey: 'play.groupSettings.allMembers', hintKey: 'play.groupSettings.allMembersHint' }
 ];
 

@@ -22,6 +22,9 @@ import type { RoomSubTask } from './room-tasks.js';
 export type RoomGoalStatus = 'queued' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
 
 export interface RoomGoal {
+  ownerBotId?: string;
+  evidenceMessageIds?: string[];
+  deliveryMessageIds?: string[];
   id: string;
   roomId: string;
   title: string;

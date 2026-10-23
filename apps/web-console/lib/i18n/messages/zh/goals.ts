@@ -1,4 +1,6 @@
 export const goals = {
+  attemptUsage: '执行 {used}/{max} 次', durableVerification: '按目标证据核验',
+  history: '目标历史', historyEmpty: '暂无已结束的目标', historyError: '无法加载目标历史',
   title: '目标与进展', empty: '暂时没有目标。提出任务后，进展会显示在这里。', loading: '正在加载目标…',
   settings: '目标设置', concurrency: '同时执行的目标上限', budget: '每个目标默认预算（美元）',
   attempts: '最多执行次数', noProgress: '连续无进展上限', preference: '执行偏好', save: '保存目标设置',

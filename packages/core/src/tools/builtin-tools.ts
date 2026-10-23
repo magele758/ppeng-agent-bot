@@ -1,3 +1,4 @@
+import { createRoomRouteTool } from '../rooms/route-tool.js';
 import { createHistoryTools } from './history-tools.js';
 import type { HistoryStore } from '../session/history-retrieval.js';
 import { spawn } from 'node:child_process';
@@ -1770,6 +1771,7 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
     ...createHistoryTools(services),
     ...createPlanTools(),
     ...createInteractionTools(),
+    createRoomRouteTool(),
     writeFileTool,
     editFileTool,
     todoWriteTool,

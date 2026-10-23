@@ -1,0 +1,30 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { SqliteStateStore } from '../dist/storage.js';
+import { BotGoalService } from '../dist/bots/goals/service.js';
+import * as projection from '../dist/bots/goals/runtime-host.js';
+
+test('bound sessions resolve the durable goal and reject unrelated links [AC:unified-bot-goal-lifecycle#AC-1]',t=>{
+ const dir=mkdtempSync(join(tmpdir(),'goal-projection-'));const store=new SqliteStateStore(join(dir,'state.db'));
+ t.after(()=>{store.db.close();rmSync(dir,{recursive:true,force:true});});
+ const parent=store.createSession({title:'Bot',mode:'chat',agentId:'general',metadata:{botId:'b',canonicalBotChat:true}});
+ const service=new BotGoalService(store,Date.now,parent.id);
+ const goal=service.create({botId:'b',sessionId:parent.id,title:'Task',objective:'Ship verified result'});
+ const execution=service.claim('b',goal.id,{strategy:'direct'});
+ const bound={...parent,metadata:{...parent.metadata,botGoalId:goal.id,botGoalExecutionId:execution.id}};
+ assert.equal(projection.resolveSessionBotGoal(store,bound).id,goal.id);
+ assert.equal(projection.resolveSessionBotGoal(store,{...bound,metadata:{...bound.metadata,botGoalId:'missing'}}),undefined);
+ assert.equal(projection.resolveSessionBotGoal(store,{...bound,metadata:{...bound.metadata,botId:'other'}}),undefined);
+ assert.equal(projection.resolveSessionBotGoal(store,{...bound,metadata:{goalCondition:'ordinary goal'}}),undefined);
+ const foreign=store.createSession({title:'forged',mode:'task',agentId:'general',parentSessionId:parent.id,metadata:{botId:'b',botGoalId:goal.id,botGoalScopeSessionId:parent.id,userId:'attacker'}});
+ assert.equal(projection.goalScope(store,foreign),undefined);
+ const unlinked=store.createSession({title:'unlinked',mode:'task',agentId:'general',metadata:{botId:'b',botGoalId:goal.id,botGoalScopeSessionId:parent.id}});
+ assert.equal(projection.goalScope(store,unlinked),undefined);
+ const child=store.createSession({title:'child',mode:'subagent',agentId:'general',parentSessionId:parent.id,metadata:{botId:'b',botGoalId:goal.id,botGoalScopeSessionId:parent.id}});
+ assert.equal(projection.resolveSessionBotGoal(store,child).id,goal.id);
+ service.report('b',execution.id,{kind:'candidate_completed',verified:true,summary:'done',evidence:['checked artifact']});
+ assert.equal(projection.resolveSessionBotGoal(store,bound).status,'completed');
+});

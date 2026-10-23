@@ -14,3 +14,9 @@ test('completed and cancelled goals cannot accidentally be resumed from the pane
   assert.deepEqual(goalActions('paused'), ['resume', 'cancel']);
   assert.deepEqual(goalActions('waiting'), ['pause', 'cancel']);
 });
+
+test('terminal goal cards are archived instead of pinned [AC:unified-bot-goal-lifecycle#AC-3]', async () => {
+ const { isLiveSessionGoal } = await import('./bot-goals.ts');
+ for (const status of ['achieved','unmet_closed','completed','failed','cancelled']) assert.equal(isLiveSessionGoal(status),false);
+ for (const status of ['active','waiting_user','queued','running','blocked']) assert.equal(isLiveSessionGoal(status),true);
+});

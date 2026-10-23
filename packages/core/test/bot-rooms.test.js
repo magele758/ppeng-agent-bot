@@ -1576,3 +1576,50 @@ test('a message that arrives while the bot is running is delivered on its next t
   assert.equal(f.rooms.messages(f.principal, room.id).messages.filter(message => message.sender.type === 'bot').at(-1).text, 'second-reply');
   assert.equal(f.rooms.turns(f.principal, room.id).length, 2);
 });
+
+test('runtime exposes and executes owner delegation and evidence verification tools [AC:room-task-collaboration#AC-2] [AC:room-task-collaboration#AC-3]', async () => {
+  let owner;
+  let peer;
+  let room;
+  let principal;
+  let ownerCalls = 0;
+  const rt = new RawAgentRuntime({
+    repoRoot: mkdtempSync(join(tmpdir(), 'room-task-runtime-repo-')),
+    stateDir: mkdtempSync(join(tmpdir(), 'room-task-runtime-state-')),
+    modelAdapter: {
+      name: 'task-runtime',
+      async runTurn(input) {
+        assert.ok(input.tools.some(tool => tool.name === 'room_route_turn'), 'actual model must see the routing tool');
+        const botId = rt.store.getSession(input.sessionId).metadata.botId;
+        if (botId === peer.id) return { stopReason: 'end', assistantParts: [{ type: 'text', text: 'Observed fixture result: passed' }] };
+        ownerCalls++;
+        if (ownerCalls === 1) return { stopReason: 'tool_use', assistantParts: [{ type: 'tool_call', toolCallId: 'assign', name: 'room_route_turn', input: { botIds: [peer.id], mode: 'assign_tasks', assignments: [{ botId: peer.id, task: 'Check fixture', evidence: 'Observed fixture result' }] } }] };
+        if (ownerCalls === 3) {
+          const board = rt.rooms.turns(principal, room.id)[0].collaboration;
+          assert.equal(board.tasks[0].status, 'waiting_approval');
+          return { stopReason: 'tool_use', assistantParts: [{ type: 'tool_call', toolCallId: 'verify', name: 'room_route_turn', input: { botIds: [], reviewedTaskIds: [board.tasks[0].id], completeGoal: true, verificationSummary: 'Observed result matches the required fixture outcome', evidenceMessageIds: board.tasks[0].materialIds } }] };
+        }
+        const results = input.messages.flatMap(message => message.parts).filter(part => part.type === 'tool_result' && part.name === 'room_route_turn');
+        assert.ok(results.length > 0);
+        assert.ok(results.every(result => result.ok !== false), JSON.stringify(results));
+        if (ownerCalls === 4) assert.equal(rt.rooms.turns(principal, room.id)[0].collaboration.goal.status, 'completed');
+        return { stopReason: 'end', assistantParts: [{ type: 'text', text: ownerCalls === 2 ? 'Assigned fixture inspection' : 'Verified fixture result' }] };
+      },
+      async summarizeMessages() { return ''; }
+    }
+  });
+  try {
+    owner = rt.createBot({ name: 'TaskOwner' });
+    peer = rt.createBot({ name: 'TaskPeer' });
+    principal = resolveBotPrincipal(rt.store);
+    room = rt.rooms.create(principal, { title: 'Runtime tasks', botIds: [owner.id, peer.id], hostBotId: owner.id });
+    rt.rooms.patch(principal, room.id, { replyMode: 'task-collaboration' });
+    rt.rooms.send(principal, room.id, { text: 'Inspect fixture and verify result' });
+    await rt.rooms.tick();
+    const turn = rt.rooms.turns(principal, room.id)[0];
+    assert.equal(turn.status, 'completed');
+    assert.equal(turn.collaboration.goal.status, 'completed');
+    assert.equal(turn.collaboration.tasks[0].status, 'completed');
+    assert.equal(ownerCalls, 4);
+  } finally { rt.destroy(); }
+});

@@ -159,7 +159,8 @@ function spawnContinuation(host: GoalRuntimeHost, parent: SessionRecord, goal: B
 function resumeApprovedDispatch(host: GoalRuntimeHost, session: SessionRecord, goal: BotGoal, execution: GoalExecution): boolean {
  const dispatch=session.metadata.botGoalDispatch as {executionId?:string;request?:Record<string,unknown>;result?:{waitingApproval?:boolean}}|undefined;
  if(dispatch?.executionId!==execution.id||!dispatch.result?.waitingApproval)return false;
- const scope=goalScope(host.store,session)!;
+ const scope=goalScope(host.store,session);
+ if(!scope)return false;
  const ledger=host.store.getDaemonControl<{parts:MessagePart[]}[]>(`bot.goal-tool-ledger:${session.id}:${execution.id}`)??[];
  const calls=new Map<string,Extract<MessagePart,{type:'tool_call'}>>();
  const results=new Map<string,Extract<MessagePart,{type:'tool_result'}>>();

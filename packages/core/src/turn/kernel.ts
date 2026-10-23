@@ -1,3 +1,4 @@
+import { usesDurableBotGoals } from '../bots/goals/runtime-host.js';
 /**
  * L3 turn kernel: one session run (prepare → model → recovery → tools).
  * Behavior-preserving move of RawAgentRuntime._runSessionInner.
@@ -524,6 +525,7 @@ async function runSessionKernel(
     }
   };
   const loopGuard = recoveryPolicyEnabled(process.env) ? new SessionLoopGuard(process.env) : null;
+  const progressGuard = loopGuard ?? new SessionLoopGuard(process.env);
   const advisoryGrace =
     loopGuard && advisoryGraceEnabled(process.env)
       ? new AdvisoryGrace(advisoryGraceBudget(process.env))
@@ -534,7 +536,7 @@ async function runSessionKernel(
     : null;
   const adapterOf = (sess: SessionRecord) =>
     host.resolveModelAdapter?.(sess) ?? host.modelAdapter;
-  const goalGate: GoalGate | null = createGoalGateFromMetadata(session.metadata, process.env);
+  const goalGate: GoalGate | null = usesDurableBotGoals(host.store, session) ? null : createGoalGateFromMetadata(session.metadata, process.env);
   const goalStore = tryGoalStore(host.store);
   if (goalGate?.isActive() && goalStore) {
     try {
@@ -1444,6 +1446,10 @@ async function runSessionKernel(
       });
       saveClosedStep(turn, 'step-end');
 
+      const progressDecision = progressGuard.afterToolRound(
+        validToolCalls,
+        results
+      );
       if (riskEngine) {
         for (const r of results) {
           riskEngine.observeTool({
@@ -1460,7 +1466,9 @@ async function runSessionKernel(
           iteration: turn,
           iterationLimit: maxTurnsPerRun,
           usedTokens: usageTotals?.totalTokens,
-          budgetTokens: budgetTokens > 0 ? budgetTokens : undefined
+          budgetTokens: budgetTokens > 0 ? budgetTokens : undefined,
+          sameToolStreak: progressGuard.sameToolStreak,
+          sameToolThreshold: progressGuard.sameToolThreshold
         });
         if (tick.shouldAdvise) {
           const draft = advisoryQueue.enqueue(formatRiskAdvisory(tick.signals), 'risk');
@@ -1472,10 +1480,7 @@ async function runSessionKernel(
       }
 
       if (loopGuard) {
-        const ar = loopGuard.afterToolRound(
-          validToolCalls.map((tc) => ({ name: tc.name, input: tc.input })),
-          results.map((r) => ({ name: r.name, ok: r.ok }))
-        );
+        const ar = progressDecision;
         const live = host.store.getSession(session.id) ?? session;
         const adapter = adapterOf(live);
         const guarded = applyRepeatGuard({

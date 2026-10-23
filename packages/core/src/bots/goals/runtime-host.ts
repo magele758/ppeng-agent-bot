@@ -31,13 +31,35 @@ export function announceGoalState(host:GoalRuntimeHost,goal:BotGoal):void {
   host.store.enqueueSchedulerWake(goal.sessionId,'bot.goal.notice');
  });
 }
-export function goalScope(store:SqliteStateStore,session:SessionRecord):{botId:string;sessionId:string;service:BotGoalService}|undefined {
+export function usesDurableBotGoals(store:Pick<SqliteStateStore,'getSession'>,session:SessionRecord):boolean {
  const botId=session.metadata?.botId;
  const sessionId=session.metadata?.canonicalBotChat===true?session.id:session.metadata?.botGoalScopeSessionId;
- if(typeof botId!=='string'||typeof sessionId!=='string')return undefined;
+ if(typeof botId!=='string'||typeof sessionId!=='string')return false;
  const parent=store.getSession(sessionId);
- if(!parent||parent.metadata?.botId!==botId||parent.metadata?.canonicalBotChat!==true)return undefined;
+ if(!parent||parent.metadata?.botId!==botId||parent.metadata?.canonicalBotChat!==true)return false;
+ if(parent.metadata.userId!==session.metadata.userId||parent.metadata.tenantId!==session.metadata.tenantId)return false;
+ if(session.id===parent.id)return true;
+ const visited=new Set<string>();
+ let ancestor=session.parentSessionId;
+ while(ancestor&&!visited.has(ancestor)) {
+  if(ancestor===parent.id)return true;
+  visited.add(ancestor);
+  ancestor=store.getSession(ancestor)?.parentSessionId;
+ }
+ return false;
+}
+export function goalScope(store:SqliteStateStore,session:SessionRecord):{botId:string;sessionId:string;service:BotGoalService}|undefined {
+ if(!usesDurableBotGoals(store,session))return undefined;
+ const botId=session.metadata.botId as string;
+ const sessionId=(session.metadata.canonicalBotChat===true?session.id:session.metadata.botGoalScopeSessionId) as string;
  return {botId,sessionId,service:new BotGoalService(store,Date.now,sessionId)};
+}
+/** Durable Bot goals own completion; session goals remain available for ordinary chats. */
+export function resolveSessionBotGoal(store:SqliteStateStore,session:SessionRecord):BotGoal|undefined {
+ const scope=goalScope(store,session);
+ const id=session.metadata.botGoalId;
+ if(!scope||typeof id!=='string')return undefined;
+ return scope.service.get(scope.botId,id);
 }
 export { goalWorkKind };
 export function goalExecutionTask(goal:BotGoal):string {
