@@ -84,10 +84,15 @@ export interface JevSettings {
    */
   modules: JevModuleFlags;
   /**
-   * Legacy: derived from profile. True iff profile !== 'off' (and baseUrl set).
-   * Prefer `profile` + `activePoints`.
+   * Legacy: derived. True iff the master switch is on, profile !== 'off', and baseUrl is set.
+   * Prefer `armed` + `profile` + `activePoints`.
    */
   enabled: boolean;
+  /**
+   * Master switch on the 实验特性 row. Off never calls Jev and does not rewrite `profile`.
+   * Missing on old KV means on iff profile !== 'off'.
+   */
+  armed: boolean;
   updatedAt: string;
 }
 
@@ -100,6 +105,10 @@ export interface JevSettingsPatch {
   profile?: JevProfile;
   /** Partial custom points; only applied when present. */
   points?: Partial<JevPoints>;
+  /**
+   * Master switch. Off keeps the saved profile. On while profile is `off` lands on `normal` (标准).
+   */
+  armed?: boolean;
   /** @deprecated Prefer `profile` / `points`. Mapped onto custom + points. */
   enabled?: boolean;
   /** @deprecated Prefer `points`. Merged into points/modules. */
@@ -117,7 +126,9 @@ export interface JevSettingsPublic {
   activePoints: JevPointId[];
   /** configured && activePoints.length > 0 */
   chained: boolean;
-  /** Legacy: profile !== 'off' && configured */
+  /** Master switch. Off means Jev is not called. */
+  armed: boolean;
+  /** Legacy: armed && profile !== 'off' && configured */
   enabled: boolean;
   modules: JevModuleFlags;
   active: JevModuleFlags;
@@ -164,6 +175,7 @@ export function defaultJevSettings(): JevSettings {
     points: { ...EMPTY_POINTS },
     modules: { ...EMPTY_POINTS },
     enabled: false,
+    armed: false,
     updatedAt: new Date(0).toISOString()
   };
 }
@@ -238,7 +250,10 @@ function flagsToPointList(flags: JevPoints): JevPointId[] {
  * No baseUrl ⇒ always []. `off` / `mini` ⇒ [].
  * Presets ignore custom checkboxes; `custom` uses only `points`.
  */
-export function activePoints(settings: Pick<JevSettings, 'baseUrl' | 'profile' | 'points'>): JevPointId[] {
+export function activePoints(
+  settings: Pick<JevSettings, 'baseUrl' | 'profile' | 'points'> & { armed?: boolean }
+): JevPointId[] {
+  if (settings.armed === false) return [];
   if (!settings.baseUrl) return [];
   const profile = settings.profile;
   if (profile === 'off') return [];
@@ -267,8 +282,12 @@ export function normalizeJevSettings(raw: Partial<JevSettings> | null | undefine
   const base = defaultJevSettings();
   if (!raw || typeof raw !== 'object') return base;
   const baseUrl = cleanUrl(raw.baseUrl);
-  const { profile, points } = migrateProfile(raw);
-  const enabled = baseUrl.length > 0 && profile !== 'off';
+  const migrated = migrateProfile(raw);
+  let profile = migrated.profile;
+  const points = migrated.points;
+  let armed = typeof raw.armed === 'boolean' ? raw.armed : profile !== 'off';
+  if (armed && profile === 'off') profile = 'normal';
+  const enabled = baseUrl.length > 0 && armed && profile !== 'off';
   return {
     baseUrl,
     apiKey: typeof raw.apiKey === 'string' ? raw.apiKey.trim() : '',
@@ -277,6 +296,7 @@ export function normalizeJevSettings(raw: Partial<JevSettings> | null | undefine
     points,
     modules: { ...points },
     enabled,
+    armed,
     updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : base.updatedAt
   };
 }
@@ -291,11 +311,18 @@ export function writeJevSettings(store: JevSettingsStore, patch: JevSettingsPatc
   const current = readJevSettings(store);
 
   let profile = current.profile;
+  let armed = current.armed;
   if (isProfile(patch.profile)) {
     profile = patch.profile;
-  } else if (typeof patch.enabled === 'boolean') {
+    armed = profile !== 'off';
+  } else if (typeof patch.enabled === 'boolean' && typeof patch.armed !== 'boolean') {
     // Legacy PATCH: enabled false → off; enabled true without profile → custom.
     profile = patch.enabled ? (profile === 'off' ? 'custom' : profile) : 'off';
+    armed = profile !== 'off';
+  }
+  if (typeof patch.armed === 'boolean') {
+    armed = patch.armed;
+    if (armed && profile === 'off') profile = 'normal';
   }
 
   const mergedPoints = normalizePoints(
@@ -308,6 +335,7 @@ export function writeJevSettings(store: JevSettingsStore, patch: JevSettingsPatc
     ...('baseUrl' in patch ? { baseUrl: patch.baseUrl } : {}),
     ...('model' in patch ? { model: patch.model } : {}),
     profile,
+    armed,
     points: mergedPoints,
     modules: mergedPoints,
     apiKey: patch.clearApiKey
@@ -334,6 +362,7 @@ export function publicJevSettings(
     apiKeySet: Boolean(settings.apiKey) || (configured && Boolean(envApiKey(env))),
     model: settings.model,
     profile: settings.profile,
+    armed: settings.armed,
     points: settings.points,
     activePoints: active,
     chained: active.length > 0,

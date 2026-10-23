@@ -5,6 +5,7 @@ import {
   daemonProxyErrorMessage,
   HUMAN_RELEASE_HEADER,
   LAB_PROXY_HEADER,
+  LAB_BROWSER_HOST_HEADER,
   sanitizeProxyHeaders,
   stripHumanReleaseHeader
 } from './daemon-proxy.ts';
@@ -39,6 +40,7 @@ test('copyProxyResponseHeaders keeps set-cookie list', () => {
 
 test('LAB_PROXY_HEADER is the daemon isolation marker', () => {
   assert.equal(LAB_PROXY_HEADER, 'x-ppeng-lab');
+  assert.equal(LAB_BROWSER_HOST_HEADER, 'x-ppeng-browser-host');
 });
 
 test('forged Sec-Fetch-Site does not attach a release secret, and a client header is stripped', () => {

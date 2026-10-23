@@ -27,12 +27,18 @@ export interface CompactSettings {
   policy: MicroCompactPolicy;
   /** Verbatim tool results kept under `keep_recent`. Ignored by after_* policies. */
   keepRecent: number;
+  /**
+   * Master switch. When set, overrides `RAW_AGENT_MICRO_COMPACT`.
+   * Absent means the env flag still decides, so older saves do not change behavior.
+   */
+  enabled?: boolean;
   updatedAt: string;
 }
 
 export interface CompactSettingsPatch {
   policy?: MicroCompactPolicy;
   keepRecent?: number;
+  enabled?: boolean;
 }
 
 export interface CompactSettingsStore {
@@ -71,9 +77,11 @@ export function normalizeCompactSettings(
 ): CompactSettings {
   const base = defaultCompactSettings();
   if (!raw || typeof raw !== 'object') return base;
+  const enabled = typeof raw.enabled === 'boolean' ? raw.enabled : undefined;
   return {
     policy: parseCompactPolicy(raw.policy) ?? base.policy,
     keepRecent: parseKeepRecent(raw.keepRecent) ?? base.keepRecent,
+    ...(enabled === undefined ? {} : { enabled }),
     updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : base.updatedAt
   };
 }
@@ -130,6 +138,7 @@ export function resolveMicroCompactConfig(input: {
   return {
     ...envCfg,
     policy: saved.policy,
-    keepRecent: saved.keepRecent
+    keepRecent: saved.keepRecent,
+    ...(typeof saved.enabled === 'boolean' ? { enabled: saved.enabled } : {})
   };
 }

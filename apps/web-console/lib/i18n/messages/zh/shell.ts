@@ -19,7 +19,7 @@ export const shell = {
     tasks: '任务队列、编排运行、审批与收件箱。',
     knowledge: '查看与管理 Agent 的长期记忆与摄取配置。',
     ops: '会话轨迹、系统健康与诊断。',
-    settings: '常用项在前，高级项默认收起；可用搜索快速定位。'
+    settings: '常用项在前；实验特性单独成组。仍有少量分组需打开「显示高级」。可用搜索快速定位。'
   },
   sub: {
     agents: { agents: 'Agents', bots: 'Bots', teams: 'Teams', skills: '技能' },

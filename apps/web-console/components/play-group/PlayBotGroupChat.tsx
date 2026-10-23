@@ -19,7 +19,7 @@ import { MarkdownHtml } from '../MarkdownHtml';
 import { BotFace } from '../BotFace';
 import { useBotWorkStates } from '../bot-work/BotWorkState';
 import { MODEL_PROVIDERS_CHANGED_EVENT } from '@/lib/model-providers';
-import { groupComposerCommand, runGroupComposerCommand, groupMessageMood, roomComposerDisabled, roomDefaultModelLabel, roomMemberModelLabel, roomHistoryUrl } from '@/lib/group-chat-view';
+import { groupComposerCommand, runGroupComposerCommand, groupMessageMood, roomComposerDisabled, roomMemberModelLabel, roomHistoryUrl } from '@/lib/group-chat-view';
 import type { RoomModelConfiguration } from '@/lib/room-models';
 import { RoomSharedContextEditor } from './RoomSharedContextEditor';
 import { RoomGoalBar } from './RoomGoalBar';
@@ -327,10 +327,6 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
   }, [messages.length, roomId]);
 
   const nameOf = (id: string) => bots.find((bot) => bot.id === id)?.name ?? id;
-  const descriptionOf = (id: string) => {
-    const raw = bots.find((bot) => bot.id === id)?.description;
-    return typeof raw === 'string' ? raw.replace(/\s+/g, ' ').trim() : '';
-  };
   const known = new Set(bots.map((bot) => bot.id));
   const memberIds = uniqueMemberIds(room?.botIds ?? []);
   const crowded = room ? !tileMembersInHeader(memberIds.length) : false;
@@ -551,13 +547,9 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
       <header className="chat-panel-header">
         <div className="chat-panel-header__text">
           <h2 className="chat-panel-title">{room?.title ?? t('play.group.badge')}</h2>
-          <div className="play-group-model-default" data-testid="room-default-model">
-            <span>{t('play.groupModel.defaultLabel')}: {roomDefaultModelLabel(models, t)}</span>
-            <a href="#/settings/models">{t('play.groupModel.settings')}</a>
-          </div>
-          <p className="play-group-model-hint">{t('play.groupModel.priorityHint')}</p>
         </div>
         <div className="play-group-header-actions">
+          <a className="btn btn-ghost btn-sm" href="#/settings/models" data-testid="room-default-model">{t('play.groupModel.settings')}</a>
           {crowded ? (
             <button
               type="button"
@@ -619,20 +611,17 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
         <div className="play-group-member-row">
           <span className="play-group-badge">{t('play.group.badge')}</span>
           {memberIds.map((id) => {
-            const description = descriptionOf(id);
+            const modelName = roomMemberModelLabel(models, id);
             return (
               <span key={id} className="play-group-member">
                 <BotFace name={nameOf(id)} mood={workStates[id]>0?'thinking':'idle'} size="sm" testId={`room-member-face-${id}`} />
                 <span className="play-group-member__identity">
                   <span>{nameOf(id)}</span>
-                  {description ? (
-                    <span className="play-group-member__desc" title={description}>
-                      {description}
+                  {modelName ? (
+                    <span className="play-group-member__model" data-testid={`room-member-model-${id}`}>
+                      {modelName}
                     </span>
                   ) : null}
-                  <span className="play-group-member__model" data-testid={`room-member-model-${id}`}>
-                    {roomMemberModelLabel(models, id, t)}
-                  </span>
                 </span>
                 <button
                   type="button"

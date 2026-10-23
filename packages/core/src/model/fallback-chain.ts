@@ -3,8 +3,10 @@
  * (after the regular in-adapter retries), finish the SAME turn on the next
  * configured model instead of failing the run.
  *
- * Persisted in daemon_control KV (Lab "模型备选" card). Empty chain = feature off:
- * the runtime then keeps the legacy implicit routing untouched.
+ * Persisted in daemon_control KV (Lab "模型备选" card). Empty chain, or `enabled: false`,
+ * means the feature is off: the runtime then keeps the legacy implicit routing untouched.
+ * `enabled: false` keeps the saved chain so turning the switch back on restores it.
+ * A missing `enabled` still means on whenever the chain is non-empty.
  * The session's modelRef / modelOverride is never rewritten — the next turn
  * starts on the primary model again.
  */
@@ -38,11 +40,17 @@ const log = createLogger('model-fallback');
 
 export interface ModelFallbackSettings {
   chain: ModelRef[];
+  /**
+   * Master switch. `false` keeps `chain` but the runtime does not use it.
+   * Absent means on when the chain is non-empty (older saves).
+   */
+  enabled?: boolean;
   updatedAt: string;
 }
 
 export interface ModelFallbackSettingsPatch {
   chain?: ModelRef[];
+  enabled?: boolean;
 }
 
 export function defaultModelFallbackSettings(): ModelFallbackSettings {
@@ -68,7 +76,12 @@ export function normalizeModelFallbackSettings(raw: unknown): ModelFallbackSetti
       if (chain.length >= MODEL_FALLBACK_MAX_CHAIN) break;
     }
   }
-  return { chain, updatedAt: typeof value.updatedAt === 'string' ? value.updatedAt : base.updatedAt };
+  const enabled = typeof value.enabled === 'boolean' ? value.enabled : undefined;
+  return {
+    chain,
+    ...(enabled === undefined ? {} : { enabled }),
+    updatedAt: typeof value.updatedAt === 'string' ? value.updatedAt : base.updatedAt
+  };
 }
 
 let warnedCorruptSettings = false;
@@ -145,7 +158,12 @@ export function writeModelFallbackSettings(
     patch.chain !== undefined
       ? validateModelFallbackChain(patch.chain, pickerOptions(readModelCatalog(store), env))
       : current.chain;
-  const next: ModelFallbackSettings = { chain, updatedAt: nowIso() };
+  const enabled = typeof patch.enabled === 'boolean' ? patch.enabled : current.enabled;
+  const next: ModelFallbackSettings = {
+    chain,
+    ...(typeof enabled === 'boolean' ? { enabled } : {}),
+    updatedAt: nowIso()
+  };
   store.setDaemonControl(MODEL_FALLBACK_SETTINGS_KEY, next);
   return next;
 }
@@ -222,8 +240,8 @@ export function planModelFallback(input: {
   warn?: (message: string) => void;
 }): FallbackPlan | undefined {
   const env = input.env ?? process.env;
-  const { chain } = readModelFallbackSettings(input.store);
-  if (chain.length === 0) return undefined;
+  const { chain, enabled } = readModelFallbackSettings(input.store);
+  if (enabled === false || chain.length === 0) return undefined;
 
   const warned = input.warned ?? warnedGlobal;
   const warn = input.warn ?? ((m: string) => log.warn(m));

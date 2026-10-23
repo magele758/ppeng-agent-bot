@@ -1,4 +1,6 @@
 export const LAB_PROXY_HEADER = 'x-ppeng-lab';
+/** Browser Host forwarded by the Lab proxy. Next's own host is the bind address (0.0.0.0). */
+export const LAB_BROWSER_HOST_HEADER = 'x-ppeng-browser-host';
 export const AUTH_SESSION_COOKIE = 'ppeng_lab_session';
 export const AUTH_OAUTH_STATE_COOKIE = 'ppeng_oauth_state';
 

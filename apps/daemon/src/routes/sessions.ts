@@ -39,7 +39,7 @@ import { cancelInputSuggestion } from './input-suggestion.js';
 import type { RouteSpec } from '../routing.js';
 import { etagFromState, json, sendIfNotModified, sseInit, sseSend } from '../http-utils.js';
 import { steerHttpFromCoreAck } from '../steer-ack.js';
-import { readLoopSettings } from '../loop-settings.js';
+import { appliedLoopEngine, readLoopSettings } from '../loop-settings.js';
 import { assertWorkspaceBindingRefs } from './workspace.js';
 import { guardSession, listedSessions, wrapSessionIdRoutes } from '../session-guard.js';
 import { resolveSessionImagePath } from '../session-image.js';
@@ -329,7 +329,7 @@ async function streamRun(
   try {
     await runtime.runHumanSession(sessionId, {
       onModelStreamChunk: (chunk: ModelStreamChunk) => sseSend(response, 'model', chunk),
-      steerDrainPolicy: readLoopSettings(runtime.store).steerDrainPolicy
+      steerDrainPolicy: appliedLoopEngine(readLoopSettings(runtime.store)).steerDrainPolicy
     });
     sseSend(response, 'result', {
       session: runtime.getSession(sessionId),
@@ -854,7 +854,7 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
       handler: async ({ requireParam, response }) => {
         const id = requireParam('id');
         const session = await runtime.runHumanSession(id, {
-          steerDrainPolicy: readLoopSettings(runtime.store).steerDrainPolicy
+          steerDrainPolicy: appliedLoopEngine(readLoopSettings(runtime.store)).steerDrainPolicy
         });
         json(response, 200, {
           session,

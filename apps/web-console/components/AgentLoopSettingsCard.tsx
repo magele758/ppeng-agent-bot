@@ -5,7 +5,7 @@ import { useI18n, type MessageKey } from '@/lib/i18n';
 import { parseIntInRange } from '@/lib/settings-fields';
 import { ConfigGroup, FieldLabel } from './ConfigGroup';
 import { SKILL_SCOPE_OPTIONS, TASK_MODE_OPTIONS } from './TaskModePicker';
-import { SettingsGroup } from './ui';
+import { ExperimentRow, SettingsGroup } from './ui';
 import {
   LoadGate,
   SaveBar,
@@ -44,6 +44,7 @@ interface LoopSettings {
   kernelVariant: KernelVariant;
   assemblyPreset: AssemblyPreset;
   repeatGuard: RepeatGuardMode;
+  engineEnabled?: boolean;
   updatedAt: string;
 }
 
@@ -334,13 +335,17 @@ export function AgentLoopEngineSettingsCard() {
   };
 
   return (
-    <SettingsGroup
-      id="card-agent-loop-engine"
-      title={t(`${base}.title` as MessageKey)}
-      description={label('desc')}
-    >
-      <LoadGate ready={s !== null} error={r.loadError} onRetry={() => void r.reload()}>
-        {s ? (
+    <LoadGate ready={s !== null} error={r.loadError} onRetry={() => void r.reload()}>
+      {s ? (
+        <ExperimentRow
+          id="card-agent-loop-engine"
+          switchId="agentLoopEngine"
+          title={t(`${base}.title` as MessageKey)}
+          description={label('desc')}
+          on={s.engineEnabled !== false}
+          busy={r.busy}
+          onChange={(engineEnabled) => void r.save({ engineEnabled })}
+        >
           <>
             <ToggleField
               id="field-steerDrain"
@@ -397,11 +402,11 @@ export function AgentLoopEngineSettingsCard() {
             />
             <SaveBar dirty={form.dirty} busy={r.busy} onSave={() => void submit()} onReset={form.reset} />
           </>
-        ) : null}
-        <StatusLine status={r.status} />
-        {r.effective ? <SourceBadge source={r.effective.source} /> : null}
-      </LoadGate>
-    </SettingsGroup>
+        </ExperimentRow>
+      ) : null}
+      <StatusLine status={r.status} />
+      {r.effective ? <SourceBadge source={r.effective.source} /> : null}
+    </LoadGate>
   );
 }
 

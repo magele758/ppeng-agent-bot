@@ -249,7 +249,7 @@ function transcriptView(
 
 function feedIsEmpty(chat: Chat): boolean {
   if (chat.transcriptReady === false) return false;
-  return !chat.optimisticUser && chat.sessionMessages.length === 0 && !chat.streamOverlay && !chat.waitTyping;
+  return !chat.optimisticUser && chat.sessionMessages.length === 0 && !chat.streamOverlay && !chat.waitTyping && !chat.heldAssistantText;
 }
 
 function toolSites(segments: ReadonlyArray<{ kind: string; name?: string; toolCallId?: string; args?: string }> | undefined) {
@@ -271,6 +271,7 @@ function slotsFor(messages: ChatMessage[], lines: Array<string | null>, chat: Ch
     turns: turns.map((slice, turnIndex) => turnSlot(slice.endIndex, turnIndex, lines, turns.length, chat)),
     approvalIndexes: [...anchors.afterMessage.keys()],
     optimistic: Boolean(chat.optimisticUser),
+    held: Boolean(chat.heldAssistantText),
     stream,
     streamApproval: anchors.afterStream.length > 0,
     typing: chat.waitTyping,
@@ -332,6 +333,11 @@ function renderLiveSlot(slot: FeedSlot, view: TranscriptModel, chat: Chat, sessi
 }
 
 function renderOptimisticOrStream(slot: FeedSlot, view: TranscriptModel, chat: Chat, sessionId: string): ReactNode {
+  if (slot.kind === 'held') {
+    const text = chat.heldAssistantText;
+    if (!text) return null;
+    return <ChatTurnPlain role="assistant" text={text} />;
+  }
   if (slot.kind === 'optimistic') {
     const reply = chat.optimisticReply;
     return (

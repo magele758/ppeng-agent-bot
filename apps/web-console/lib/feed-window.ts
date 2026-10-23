@@ -8,7 +8,7 @@ export const FEED_OVERSCAN_PX = 480;
 export const FEED_FALLBACK_ROWS = 24;
 export const FEED_NEAR_TOP_PX = 64;
 
-export type FeedSlotKind = 'message' | 'approval' | 'stats' | 'optimistic' | 'stream' | 'typing' | 'trail' | 'child-task';
+export type FeedSlotKind = 'message' | 'approval' | 'stats' | 'optimistic' | 'stream' | 'typing' | 'trail' | 'child-task' | 'held';
 
 export interface FeedSlot {
   key: string;
@@ -90,6 +90,8 @@ export function buildFeedSlots(args: {
   streamApproval: boolean;
   typing: boolean;
   trail: boolean;
+  /** Streamed assistant prose not in the saved page yet. Sits with the turn, not as a new request. */
+  held?: boolean;
   /**
    * Set while a steer is on screen. The in-flight shot stays above that row;
    * later live rows stay under it, where the saved user message will sit.
@@ -99,10 +101,12 @@ export function buildFeedSlots(args: {
   const slots: FeedSlot[] = [];
   const turnByEnd = new Map(args.turns.map((turn) => [turn.endIndex, turn]));
   const approvals = new Set(args.approvalIndexes);
+  const last = args.messages.length - 1;
   for (let index = 0; index < args.messages.length; index += 1) {
     const id = feedMessageKey(args.messages[index] ?? {}, index);
     slots.push({ key: `m:${id}`, kind: 'message', messageIndex: index });
     if (approvals.has(index)) slots.push({ key: `apr:${id}`, kind: 'approval', messageIndex: index });
+    if (args.held && index === last) slots.push({ key: 'held-assistant', kind: 'held' });
     const turn = turnByEnd.get(index);
     if (turn?.stats) {
       slots.push({
@@ -113,6 +117,7 @@ export function buildFeedSlots(args: {
       });
     }
   }
+  if (args.held && args.messages.length === 0) slots.push({ key: 'held-assistant', kind: 'held' });
   const steer = args.optimistic ? args.steerStream : undefined;
   const prefixStream = Boolean(steer?.prefix && args.stream);
   if (prefixStream) slots.push({ key: 'stream', kind: 'stream', pin: true, streamPart: 'prefix' });

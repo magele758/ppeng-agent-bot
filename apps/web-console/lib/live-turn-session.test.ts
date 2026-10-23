@@ -426,10 +426,14 @@ test('切走后旧回合不能继续绘制、也不能把选中会话拽回去 [
   assert.equal(releaseArmOwner(true, true, false), false);
   assert.equal(releaseArmOwner(true, true, true), true);
   assert.equal(shouldTickLiveArm(false, false), false);
-  assert.equal(shouldTickLiveArm(true, true), false);
   assert.equal(shouldTickLiveArm(true, false), true);
   let effects = 0;
   applyWhen(false, () => effects++);
   applyWhen(true, () => effects++);
   assert.equal(effects, 1);
+});
+
+test('跟随被中断时仍读取已保存的对话，不把用户的话再发一次 [AC:chat-tail-kept#AC-4]', () => {
+  assert.equal(shouldTickLiveArm(true, true), true);
+  assert.equal(shouldTickLiveArm(false, true), false);
 });

@@ -68,8 +68,12 @@ export function resolveSteerDrainPolicy(input: {
   if (fromSession) return fromSession;
   const saved = input.store?.getDaemonControl?.(AGENT_LOOP_SETTINGS_KEY);
   if (saved && typeof saved === 'object') {
-    const fromKv = parseSteerDrainPolicy((saved as Record<string, unknown>).steerDrainPolicy);
-    if (fromKv) return fromKv;
+    const rec = saved as Record<string, unknown>;
+    // Lab 实验特性 master switch. Missing means on so existing KV keeps its tier.
+    if (rec.engineEnabled !== false) {
+      const fromKv = parseSteerDrainPolicy(rec.steerDrainPolicy);
+      if (fromKv) return fromKv;
+    }
   }
   return DEFAULT_STEER_DRAIN_POLICY;
 }

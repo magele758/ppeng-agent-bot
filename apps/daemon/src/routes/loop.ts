@@ -128,6 +128,12 @@ export function loopRoutes(runtime: RawAgentRuntime): RouteSpec[] {
           }
           patch.repeatGuard = parsed;
         }
+        if (body && 'engineEnabled' in body) {
+          if (typeof body.engineEnabled !== 'boolean') {
+            throw new ValidationError('engineEnabled must be a boolean');
+          }
+          patch.engineEnabled = body.engineEnabled;
+        }
         const settings = writeLoopSettings(runtime.store, patch);
         json(response, 200, {
           settings,

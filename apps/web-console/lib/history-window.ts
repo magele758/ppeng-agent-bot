@@ -70,12 +70,94 @@ export function loadEarlierCursorAfterReset(
   return hasMore ? nextCursor : null;
 }
 
+type RowBody = { text?: unknown; parts?: unknown };
+
+function rowBody(message: RowBody): string {
+  if (typeof message.text === 'string') return message.text;
+  if (!Array.isArray(message.parts)) return '';
+  let body = '';
+  for (const part of message.parts) {
+    if (!part || typeof part !== 'object') continue;
+    const row = part as { type?: unknown; text?: unknown };
+    if (row.type === 'text' && typeof row.text === 'string') body += row.text;
+  }
+  return body;
+}
+
+/** A refresh with no prose must not wipe a body already on screen. */
+function keepLoadedBody<T extends { id: string }>(current: T | undefined, incoming: T): T {
+  if (!current) return incoming;
+  const previousBody = rowBody(current as RowBody).trim();
+  const incomingBody = rowBody(incoming as RowBody).trim();
+  if (previousBody && !incomingBody) return current;
+  return incoming;
+}
+
+function mergeById<T extends { id: string; seq?: number }>(previous: readonly T[], incoming: readonly T[]): T[] {
+  const map = new Map<string, T>();
+  for (const message of previous) map.set(message.id, message);
+  for (const message of incoming) map.set(message.id, keepLoadedBody(map.get(message.id), message));
+  return Array.from(map.values()).sort((a, b) => a.seq != null && b.seq != null ? a.seq - b.seq : 0);
+}
+
 export function mergeHistoryWindow<T extends {id:string;seq?:number}>(previous:T[],incoming:T[],sameSession:boolean):{messages:T[];reset:boolean} {
  if(!sameSession||!previous.length)return {messages:incoming,reset:true};
  const ids=new Set(previous.map(message=>message.id));
  const overlap=incoming.some(message=>ids.has(message.id));
  const maxPrevious=previous.at(-1)?.seq;const minIncoming=incoming[0]?.seq;
  // A disjoint refresh must retain the new cursor, otherwise intermediate pages become unreachable.
- if(!overlap&&incoming.length&&!(maxPrevious!=null&&minIncoming!=null&&minIncoming<=maxPrevious+1))return {messages:incoming,reset:true};
- return {messages:Array.from(new Map([...previous,...incoming].map(message=>[message.id,message])).values()),reset:false};
+ const disjoint=!overlap&&incoming.length>0&&!(maxPrevious!=null&&minIncoming!=null&&minIncoming<=maxPrevious+1);
+ if(disjoint){
+  const maxIncoming=incoming.reduce<number|null>((max,message)=>message.seq!=null&&(max==null||message.seq>max)?message.seq:max,null);
+  const newer=maxIncoming==null?[]:previous.filter(message=>message.seq!=null&&message.seq>maxIncoming);
+  if(newer.length)return {messages:mergeById(newer,incoming),reset:false};
+  return {messages:incoming,reset:true};
+ }
+ return {messages:mergeById(previous,incoming),reset:false};
+}
+
+export type StreamTextPiece = { kind: string; raw?: string };
+
+/** Assistant prose that was streamed but is not in the saved transcript yet. */
+export function unpersistedAssistantText(
+  messages: ReadonlyArray<{ role?: string; text?: string; parts?: ReadonlyArray<{ type?: string; text?: string }> }>,
+  segments: ReadonlyArray<StreamTextPiece>
+): string {
+  const lastUser = messages.findLastIndex(message => message.role === 'user');
+  const saved = messages.slice(lastUser + 1)
+    .filter((message) => message.role === 'assistant')
+    .map((message) => rowBody(message).trim())
+    .filter(Boolean);
+  const pending: string[] = [];
+  for (const segment of segments) {
+    if (segment.kind !== 'text') continue;
+    const raw = (segment.raw ?? '').trim();
+    if (!raw) continue;
+    if (saved.some((body) => body.includes(raw))) continue;
+    const prefix = saved.filter((body) => raw.startsWith(body) && body.length >= 12).sort((a, b) => b.length - a.length)[0];
+    if (prefix) {
+      const rest = raw.slice(prefix.length).trim();
+      if (rest) pending.push(rest);
+      continue;
+    }
+    pending.push(raw);
+  }
+  return pending.join('\n\n');
+}
+
+/**
+ * Apply one saved page, then keep streamed prose only when that page does not
+ * contain it yet. Nothing here sends the user message again.
+ */
+export function settleFinishedTurn<T extends { id: string; seq?: number; role?: string; text?: string; parts?: ReadonlyArray<{ type?: string; text?: string }> }>(input: {
+  previous: T[];
+  incoming: T[];
+  sameSession: boolean;
+  segments: ReadonlyArray<StreamTextPiece>;
+}): { messages: T[]; heldText: string } {
+  const merged = mergeHistoryWindow(input.previous, input.incoming, input.sameSession);
+  return {
+    messages: merged.messages,
+    heldText: unpersistedAssistantText(merged.messages, input.segments)
+  };
 }

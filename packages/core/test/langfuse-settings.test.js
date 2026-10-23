@@ -24,7 +24,7 @@ function kvStore() {
   };
 }
 
-test('no baseUrl → resolve null even with env keys; enabled cannot open alone', () => {
+test('no baseUrl → resolve null even with env keys; enabled wish is kept', () => {
   const store = kvStore();
   assert.equal(defaultLangfuseSettings().enabled, false);
   assert.equal(resolveLangfuseChain(store, {
@@ -35,7 +35,7 @@ test('no baseUrl → resolve null even with env keys; enabled cannot open alone'
   writeLangfuseSettings(store, { enabled: true });
   const saved = readLangfuseSettings(store);
   assert.equal(saved.baseUrl, '');
-  assert.equal(saved.enabled, false);
+  assert.equal(saved.enabled, true);
   assert.equal(
     resolveLangfuseChain(store, {
       LANGFUSE_PUBLIC_KEY: 'pk',

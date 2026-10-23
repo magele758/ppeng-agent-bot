@@ -107,10 +107,12 @@ test.describe('Agent Lab console', () => {
     await expect(page.getByLabel('消息内容')).toHaveValue('keep this draft');
   });
 
-  test('settings hide advanced items by default and search reveals them [AC:console-settings#AC-1] [AC:console-settings#AC-2] [AC:console-settings#AC-3] [AC:console-settings#AC-4]', async ({ page }) => {
+  test('settings hide remaining advanced groups by default and search reveals experimental items [AC:console-settings#AC-1] [AC:console-settings#AC-2] [AC:console-settings#AC-3] [AC:console-settings#AC-4]', async ({ page }) => {
     await page.goto('/#/settings/integrations');
     const settings = page.locator('#section-settings');
     await expect(settings.getByRole('heading', { name: '设置', level: 1 })).toBeVisible();
+    await expect(page.locator('#gw-feishu-token')).toBeVisible();
+    await expect(page.locator('#gw-webhook-senders')).toHaveCount(0);
     await expect(page.locator('#setting-langfuse')).toHaveCount(0);
 
     await page.locator('#settingsSearch').fill('langfuse');
@@ -122,10 +124,11 @@ test.describe('Agent Lab console', () => {
 
     await page.locator('#settingsSearch').fill('');
     await page.getByTestId('advanced-toggle').check();
-    await expect(page.locator('#setting-langfuse')).toBeVisible();
+    await expect(page.locator('#gw-webhook-senders')).toBeVisible();
+    await expect(page.locator('#setting-langfuse')).toHaveCount(0);
     await page.reload();
     await expect(page.getByTestId('advanced-toggle')).toBeChecked();
-    await expect(page.locator('#setting-langfuse')).toBeVisible();
+    await expect(page.locator('#gw-webhook-senders')).toBeVisible();
   });
 
   test('playground send shows user bubble after run [AC:chat-basics#AC-1]', async ({ page }) => {

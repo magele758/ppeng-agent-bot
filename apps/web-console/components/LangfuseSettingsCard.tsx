@@ -4,13 +4,12 @@ import { useMemo } from 'react';
 import { api } from '@/lib/api';
 import { useI18n, type MessageKey } from '@/lib/i18n';
 import { buildPatch } from '@/lib/settings-fields';
-import { SettingsGroup } from './ui';
+import { ExperimentRow } from './ui';
 import {
   LoadGate,
   SaveBar,
   StatusLine,
-  TextField,
-  ToggleField
+  TextField
 } from './sections/settings/categories/kit/fields';
 import { useSettingsResource } from './sections/settings/categories/kit/settings-store';
 import { useDraftForm } from './sections/settings/categories/kit/useDraftForm';
@@ -24,8 +23,8 @@ interface LangfuseSettings {
   chained: boolean;
 }
 
-const KEYS = ['baseUrl', 'publicKey', 'secretKey', 'enabled'] as const;
-const EMPTY_FORM = { baseUrl: '', publicKey: '', secretKey: '', enabled: false };
+const KEYS = ['baseUrl', 'publicKey', 'secretKey'] as const;
+const EMPTY_FORM = { baseUrl: '', publicKey: '', secretKey: '' };
 
 export function LangfuseSettingsCard() {
   const { t } = useI18n();
@@ -33,10 +32,9 @@ export function LangfuseSettingsCard() {
   const s = r.settings;
   const base = 'settingsEntries.langfuse';
   const label = (path: string) => t(`${base}.${path}` as MessageKey);
-  const onOff = (v: boolean) => t(v ? 'settingsEntries.common.on' : 'settingsEntries.common.off');
 
   const saved = useMemo(
-    () => (s ? { baseUrl: s.baseUrl, publicKey: '', secretKey: '', enabled: s.enabled } : null),
+    () => (s ? { baseUrl: s.baseUrl, publicKey: '', secretKey: '' } : null),
     [s]
   );
   const form = useDraftForm(saved, EMPTY_FORM);
@@ -67,9 +65,17 @@ export function LangfuseSettingsCard() {
     );
 
   return (
-    <SettingsGroup id="card-langfuse" title={label('title')} description={label('desc')}>
-      <LoadGate ready={s !== null} error={r.loadError} onRetry={() => void r.reload()}>
-        {s ? (
+    <LoadGate ready={s !== null} error={r.loadError} onRetry={() => void r.reload()}>
+      {s ? (
+        <ExperimentRow
+          id="card-langfuse"
+          switchId="langfuse"
+          title={label('title')}
+          description={label('desc')}
+          on={s.enabled}
+          busy={r.busy}
+          onChange={(enabled) => void r.save({ enabled })}
+        >
           <>
             <TextField
               id="field-langfuseBaseUrl"
@@ -104,17 +110,6 @@ export function LangfuseSettingsCard() {
               disabled={r.busy}
               onChange={(v) => form.set('secretKey', v)}
             />
-            <ToggleField
-              id="field-langfuseEnabled"
-              label={label('fields.enabled.label')}
-              hint={label('fields.enabled.hint')}
-              checked={draft.enabled}
-              disabled={r.busy}
-              defaultText={onOff(false)}
-              isDefault={!draft.enabled}
-              onRestore={() => form.set('enabled', false)}
-              onChange={(v) => form.set('enabled', v)}
-            />
             <SaveBar dirty={form.dirty} busy={r.busy} onSave={() => void submit()} onReset={form.reset}>
               <button
                 type="button"
@@ -127,9 +122,9 @@ export function LangfuseSettingsCard() {
             </SaveBar>
             <p className="muted small">{s.configured ? label('configured') : label('unconfigured')}</p>
           </>
-        ) : null}
-        <StatusLine status={r.status} />
-      </LoadGate>
-    </SettingsGroup>
+        </ExperimentRow>
+      ) : null}
+      <StatusLine status={r.status} />
+    </LoadGate>
   );
 }

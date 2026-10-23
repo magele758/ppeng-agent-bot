@@ -19,7 +19,7 @@ export const shell = {
     tasks: 'Task queue, orchestration runs, approvals and inbox.',
     knowledge: 'Browse and manage long-term agent memory and ingestion.',
     ops: 'Session trajectory, system health and diagnostics.',
-    settings: 'Common options first; advanced ones are collapsed. Use search to jump.'
+    settings: 'Common options come first; experimental options have their own group. A few groups still need Show advanced. Use search to jump.'
   },
   sub: {
     agents: { agents: 'Agents', bots: 'Bots', teams: 'Teams', skills: 'Skills' },

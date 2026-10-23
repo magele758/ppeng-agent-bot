@@ -4,6 +4,7 @@ import { IngestionSettingsCard } from '../../IngestionSettingsCard';
 import { MemoryPanel } from '../../MemoryPanel';
 import { AdvancedToggle } from '../../ui';
 import { SectionFrame } from '../SectionFrame';
+import { LibraryDirsCard } from './LibraryDirsCard';
 
 export function KnowledgeSection({ active }: { active: boolean }) {
   return (
@@ -14,7 +15,12 @@ export function KnowledgeSection({ active }: { active: boolean }) {
       renderSub={(sub) => {
         switch (sub) {
           case 'memory':
-            return <MemoryPanel />;
+            return (
+              <>
+                <LibraryDirsCard />
+                <MemoryPanel />
+              </>
+            );
           case 'ingestion':
             return <IngestionSettingsCard />;
           default:

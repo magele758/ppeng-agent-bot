@@ -30,6 +30,26 @@ import {
 const page = (from: number, to: number) =>
   Array.from({ length: to - from + 1 }, (_, index) => ({ id: `m${from + index}`, seq: from + index }));
 
+test('结束后尚未落进记录的助手正文排在工具过程后面 [AC:chat-tail-kept#AC-1]', () => {
+  const slots = buildFeedSlots({
+    messages: [{ id: 'tool' }],
+    turns: [{ endIndex: 0, turnIndex: 0, stats: true, live: false }],
+    approvalIndexes: [],
+    optimistic: false,
+    stream: false,
+    streamApproval: false,
+    typing: false,
+    trail: false,
+    held: true
+  });
+  const heldAt = slots.findIndex((slot) => slot.kind === 'held');
+  const toolAt = slots.findIndex((slot) => slot.kind === 'message');
+  const statsAt = slots.findIndex((slot) => slot.kind === 'stats');
+  assert.ok(heldAt > toolAt);
+  assert.ok(statsAt > heldAt);
+  assert.equal(slots[heldAt]?.pin, undefined);
+});
+
 test('opening and refreshing a session requests one bounded page [AC:play-feed-window#AC-1] [AC:play-feed-window#AC-4]', () => {
   const open = new URLSearchParams(sessionFeedSearch());
   assert.equal(open.get('messageLimit'), '40');

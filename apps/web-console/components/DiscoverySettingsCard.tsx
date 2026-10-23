@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { api } from '@/lib/api';
 import { useI18n, type MessageKey } from '@/lib/i18n';
 import { buildPatch, formatListInput, parseListInput } from '@/lib/settings-fields';
-import { SettingsGroup } from './ui';
+import { ExperimentRow, SettingsGroup } from './ui';
 import {
   LoadGate,
   RiskNotice,
@@ -95,11 +95,17 @@ export function DiscoverySettingsCard() {
 
   return (
     <div className="settings-stack" id="card-discovery">
-      <SettingsGroup title={label('title')} description={label('desc')}>
-        <LoadGate ready={s !== null} error={r.loadError} onRetry={() => void r.reload()}>
-          {s ? (
+      <LoadGate ready={s !== null} error={r.loadError} onRetry={() => void r.reload()}>
+        {s ? (
+          <ExperimentRow
+            switchId="discovery"
+            title={label('title')}
+            description={label('desc')}
+            on={s.enabled}
+            busy={r.busy}
+            onChange={(enabled) => void r.save({ enabled })}
+          >
             <>
-              {toggle('enabled', 'field-discoveryEnabled', 'enabled', false)}
               {toggle('tailscaleEnabled', 'field-discoveryTailscale', 'tailscale', true)}
               {toggle('activeScanEnabled', 'field-discoveryActiveScan', 'activeScan', true)}
               {s.activeScanEnabled ? <RiskNotice>{label('risk.activeScan')}</RiskNotice> : null}
@@ -116,14 +122,7 @@ export function DiscoverySettingsCard() {
                   {t('settingsEntries.common.refresh')}
                 </button>
               </div>
-            </>
-          ) : null}
-          <StatusLine status={r.status} />
-          {r.effective ? <SourceBadge source={r.effective.source} /> : null}
-        </LoadGate>
-      </SettingsGroup>
-      {s ? (
-        <SettingsGroup
+              <SettingsGroup
           id="card-discovery-allowlist"
           title={label('allowlist.title')}
           description={label('allowlist.desc')}
@@ -154,7 +153,12 @@ export function DiscoverySettingsCard() {
           />
           <SaveBar dirty={form.dirty} busy={r.busy} onSave={() => void submitLists()} onReset={form.reset} />
         </SettingsGroup>
-      ) : null}
+            </>
+          </ExperimentRow>
+        ) : null}
+        <StatusLine status={r.status} />
+        {r.effective ? <SourceBadge source={r.effective.source} /> : null}
+      </LoadGate>
     </div>
   );
 }

@@ -14,9 +14,11 @@ export const settings = {
     safety: '安全与沙箱',
     tools: '工具与技能',
     integrations: '集成与可观测',
+    experimental: '实验特性',
     ops: '运维'
   },
   categoriesLabel: '设置分类',
+  experimentalSwitch: '启用{name}',
   searchPlaceholder: '搜索设置（如：模型、API Key、飞书、主题）',
   searchCount: '找到 {count} 项设置',
   searchClear: '清除搜索',

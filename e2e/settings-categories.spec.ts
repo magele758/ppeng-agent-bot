@@ -25,7 +25,7 @@ test.describe('Settings categories: behavior / safety / tools / integrations', (
     await resetSettings(request);
   });
 
-  test('each category shows common settings with descriptions; expert ones need Advanced [AC:settings-categories#AC-1]', async ({
+  test('each category shows common settings; expert cards live in experimental [AC:settings-categories#AC-1]', async ({
     page
   }) => {
     const common: Array<[string, string]> = [
@@ -34,30 +34,20 @@ test.describe('Settings categories: behavior / safety / tools / integrations', (
       ['tools', 'skills'],
       ['integrations', 'eventLog']
     ];
-    const expert: Array<[string, string[]]> = [
-      ['behavior', ['agentLoopEngine', 'compact', 'goalVerify']],
-      ['safety', ['sandboxCloudflare']],
-      ['tools', ['dynTools', 'discovery']],
-      ['integrations', ['langfuse', 'jev']]
-    ];
+    const expert = ['agentLoopEngine', 'compact', 'goalVerify', 'sandboxCloudflare', 'dynTools', 'discovery', 'langfuse', 'jev'];
     for (const [category, id] of common) {
       await page.goto(`/#/settings/${category}`);
       const entry = page.locator(`#setting-${id}`);
       await expect(entry).toBeVisible();
       await expect(entry.locator('.ui-group__desc').first()).toBeVisible();
+      for (const hidden of expert) await expect(page.locator(`#setting-${hidden}`)).toHaveCount(0);
     }
-    for (const [category, ids] of expert) {
-      await page.goto(`/#/settings/${category}`);
-      await expect(page.locator('.settings-entries .settings-entry').first()).toBeVisible();
-      for (const id of ids) await expect(page.locator(`#setting-${id}`)).toHaveCount(0);
-    }
-    await page.getByTestId('advanced-toggle').check();
-    for (const [category, ids] of expert) {
-      await page.locator(`#settings-cat-${category}`).click();
-      for (const id of ids) {
-        await expect(page.locator(`#setting-${id}`)).toBeVisible();
-        await expect(page.locator(`#setting-${id} .ui-group__desc`).first()).toBeVisible();
-      }
+    await expect(page.getByTestId('advanced-toggle')).not.toBeChecked();
+    await page.locator('#settings-cat-experimental').click();
+    await expect(page).toHaveURL(/#\/settings\/experimental$/);
+    for (const id of expert) {
+      await expect(page.locator(`#setting-${id}`)).toBeVisible();
+      await expect(page.locator(`#setting-${id} .ui-group__desc`).first()).toBeVisible();
     }
   });
 
@@ -136,8 +126,7 @@ test.describe('Settings categories: behavior / safety / tools / integrations', (
     await expect(sandbox.getByRole('alert')).toHaveCount(0);
 
     await request.patch('/api/capabilities/settings', { data: { enabled: true } });
-    await page.goto('/#/settings/tools');
-    await page.getByTestId('advanced-toggle').check();
+    await page.goto('/#/settings/experimental');
     const discovery = page.locator('#setting-discovery');
     await expect(discovery.getByRole('alert')).toHaveCount(0);
     await page.locator('#field-discoveryActiveScan').check();

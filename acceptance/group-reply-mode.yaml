@@ -1,0 +1,35 @@
+id: group-reply-mode
+title: 群聊回复模式
+status: implemented
+requirement: |
+  用户要做一个可实验的群聊回复模式开关，放在群聊设置里。群聊里现在几乎只有 Super Bot 在发言（把别人的工作日报整段转述进 GroupTurn）。用户担心这样只剩协调者在说话，群聊应该是信息同步和激发成员参与。他要对比现有模式和「全成员各自回复」，先实验再决定方向。输入框占位已经写着「用 @ 点名成员；不点名则全体回复」，先查清现在不点名到底是谁在回。
+  持久化在该群聊房间自己的设置上（沿用现有群聊/房间 settings，不要新增 RAW_AGENT_* 环境变量）。
+  字段名 replyMode，取值 "coordinator" | "all-members"。
+  缺省 "coordinator"：与今天线上行为一致，不要顺手改现有协调路径。
+  "all-members"：用户在群里发一条消息且没有把回复范围收窄时，当前每个群成员（含 Super Bot）各自产生一条可见的群聊回合，归属到该成员，不要再由 Super Bot 代写别人。某个成员失败不掉其余成员的回合，失败要能在该成员的回合里看出来。若现有 @ 点名已经能限定成员，两种模式都继续遵守：点了名就只有被点到的成员回复。不要新造一套 @ 解析。
+  读写走现有群聊设置 API。若还没有，在现有房间/群聊资源上加 replyMode，不要另开一套无关路由。响应里字段就叫 replyMode。
+criteria:
+  - id: AC-1
+    given: 一个没有改过回复模式的群，里面有多名成员
+    when: 用户不点名，直接发一条消息
+    then: 回复模式是 coordinator。这一轮仍按现在的协调方式决定谁开口，不会给每个当前成员各发一条可见回复
+  - id: AC-2
+    given: 这个群的回复模式是 all-members，里面有多名成员，其中一名这一轮会失败
+    when: 用户发一条没有点名、也没有把回复收窄到个别人的消息
+    then: 每个当前成员各有一条可见回复，并且归在该成员自己名下。失败只出现在失败成员的回合里，其他成员的回复还在
+  - id: AC-3
+    given: 群的回复模式是 coordinator，或者是 all-members
+    when: 用户用现有的 @ 点名其中一名成员
+    then: 只有被点到的成员回复
+  - id: AC-4
+    given: 两个群，用户把其中一个的回复模式改成 all-members
+    when: 重新读取这两个群的设置，即使进程环境里写了回复模式
+    then: 改过的群仍是 all-members，另一个群仍是 coordinator。回复模式不来自环境变量
+  - id: AC-5
+    given: 一个群
+    when: 通过这个群自己的设置在 coordinator 和 all-members 之间切换
+    then: 每次读回来都是刚写入的 replyMode
+    notes: 群聊设置里的开关立即写入该房间的 replyMode。
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  未点名的现有行为是按贴题程度挑选发言成员，必要时由群主再做一次短收尾，不是全员各回一条。coordinator 保持这条路径。

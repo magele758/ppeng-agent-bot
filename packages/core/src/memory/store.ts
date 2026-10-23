@@ -22,7 +22,8 @@ const DEFAULT_LIMITS: Record<MemoryScope, number> = {
   'session.long': 500,
   'user.memory': 5000,
   'team.memory': 2000,
-  'project.memory': 5000
+  'project.memory': 5000,
+  library: 20000
 };
 
 // ── Row mappers ──

@@ -11,15 +11,18 @@ export const play = {
   },
 
   imageUnsupported: '当前模型不支持图片。请选择支持图片的模型，或移除本次图片后发送纯文本。',
-  groupSettings: { title: '群聊设置' },
+  groupSettings: {
+    title: '群聊设置',
+    replyMode: '回复方式',
+    coordinator: '现有模式（协调者发言）',
+    coordinatorHint: '由协调者发言',
+    allMembers: '全员各自回复',
+    allMembersHint: '每位成员各自回复',
+    saveFailed: '回复方式没有保存',
+  },
   entry: { new: '新建', remove: '移除', removeBot: '移除 Bot「{name}」', removeBotConfirm: '移除 Bot「{name}」？它将从 Bot 列表隐藏，已有对话、群聊和任务会保留；这不会删除会话。', removeFailed: '移除失败：{error}' },
   groupModel: {
-    defaultLabel: "全局默认模型",
-    unconfigured: "尚未配置可用模型",
-    settings: "设置全局默认模型",
-    priorityHint: "群成员优先使用 Bot 专属模型，未指定时跟随全局默认。这里展示普通文本模型配置。",
-    botSource: "Bot 专属",
-    globalSource: "全局默认",
+    settings: "默认模型",
   },
   faceMotion: { working: "工作中" },
   functionalGroups: {

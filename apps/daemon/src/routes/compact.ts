@@ -58,6 +58,10 @@ export function compactRoutes(runtime: RawAgentRuntime): RouteSpec[] {
           }
           patch.keepRecent = parsed;
         }
+        if (body && 'enabled' in body) {
+          if (typeof body.enabled !== 'boolean') throw new ValidationError('enabled must be a boolean');
+          patch.enabled = body.enabled;
+        }
         const settings = writeCompactSettings(runtime.store, patch);
         const effective = resolveMicroCompactConfig({ store: runtime.store, env: process.env });
         json(response, 200, {

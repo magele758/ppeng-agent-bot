@@ -1,17 +1,14 @@
 import type { RoomModelConfiguration } from './room-models';
 
-type Translate = (key: 'common.loading' | 'play.groupModel.unconfigured' | 'play.groupModel.botSource' | 'play.groupModel.globalSource') => string;
-export function roomDefaultModelLabel(models: RoomModelConfiguration | null, t: Translate): string {
-  if (!models) return t('common.loading');
-  if (!models.defaultModel) return t('play.groupModel.unconfigured');
-  return `${models.defaultModel.providerName} / ${models.defaultModel.modelId}`;
-}
-export function roomMemberModelLabel(models: RoomModelConfiguration | null, botId: string, t: Translate): string {
-  if (!models) return t('common.loading');
+/** Model name only when this bot's own model differs from the global default. */
+export function roomMemberModelLabel(models: RoomModelConfiguration | null, botId: string): string | null {
+  if (!models) return null;
   const member = models.members.find(item => item.botId === botId);
-  if (!member?.model) return t('play.groupModel.unconfigured');
-  const source = member.source === 'bot' ? 'play.groupModel.botSource' : 'play.groupModel.globalSource';
-  return `${t(source)} · ${member.model.providerName} / ${member.model.modelId}`;
+  if (!member?.model || member.source !== 'bot') return null;
+  const fallback = models.defaultModel;
+  if (fallback && fallback.providerId === member.model.providerId && fallback.modelId === member.model.modelId) return null;
+  const name = member.model.modelId.trim();
+  return name.length > 0 ? name : null;
 }
 export function roomHistoryUrl(roomId: string, older: boolean, cursor: number | null): string {
   const suffix = older && cursor ? `&beforeSeq=${cursor}` : '';

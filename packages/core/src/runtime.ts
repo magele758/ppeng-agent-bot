@@ -20,6 +20,7 @@ import { observeGoalBudget } from './bots/goals/budget.js';
  */
 
 import { join } from 'node:path';
+import { LibraryIndexWatcher } from './ingestion/library-index.js';
 import { acquireRuntimeProcessOwnership, recoverInterruptedSessions } from './runtime/restart-recovery.js';
 import { randomUUID } from 'node:crypto';
 import { LcuComputerUseProvider, type LcuDeps } from './computer-use/lcu-provider.js';
@@ -334,6 +335,7 @@ export class RawAgentRuntime {
   tools: ToolContract<any>[];
   readonly connectors: ConnectorRegistry;
   readonly rooms: BotRoomService;
+  private libraryIndex?: LibraryIndexWatcher;
   readonly factory: FactoryService;
   private loadedPlugins: LoadedPlugin[] = [];
   private connectorToolNames = new Set<string>();
@@ -748,6 +750,17 @@ export class RawAgentRuntime {
       enabled: () => readAppControlSettings(this.store).enabled,
       approvals: this.store
     }));
+    this.libraryIndex = new LibraryIndexWatcher(this.store);
+    this.refreshLibraryIndex();
+  }
+
+  /** Reindex saved knowledge folders and watch them. Safe to call after a settings save. */
+  refreshLibraryIndex(): void {
+    try {
+      this.libraryIndex?.start();
+    } catch (error) {
+      this.log.warn('library index refresh failed', { error: error instanceof Error ? error.message : String(error) });
+    }
   }
 
   /** Tick due cron jobs: append prompt to owning session and enqueue a run. */
@@ -1824,9 +1837,11 @@ export class RawAgentRuntime {
       const loopKv = this.store.getDaemonControl<{
         kernelVariant?: string;
         assemblyPreset?: string;
+        engineEnabled?: boolean;
       }>('loop_settings');
-      const kernelVariant = loopKv?.kernelVariant ?? 'agent-loop';
-      const assemblyPreset: LoopPreset = parseLoopPreset(loopKv?.assemblyPreset) ?? 'max';
+      const engineOn = loopKv?.engineEnabled !== false;
+      const kernelVariant = engineOn ? (loopKv?.kernelVariant ?? 'agent-loop') : 'agent-loop';
+      const assemblyPreset: LoopPreset = engineOn ? (parseLoopPreset(loopKv?.assemblyPreset) ?? 'max') : 'max';
       this.log.info(`runSession kernel=${kernelVariant} assembly=${assemblyPreset}`);
       const runController = new AbortController();
       this.sessionAbortControllers.set(sessionId, runController);
@@ -1936,6 +1951,7 @@ export class RawAgentRuntime {
 
   /** Gracefully shut down all in-flight work, MCP sessions, and release SQLite. */
   async destroy(): Promise<void> {
+    this.libraryIndex?.stop();
     await this.skillCaptures.close();
     await this.skillManagement.close();
     await this.factory.close();

@@ -80,8 +80,11 @@ export function resolveInboxOverflowCap(input: {
   if (fromSession !== undefined) return fromSession;
   const saved = input.store?.getDaemonControl?.(LOOP_SETTINGS_KV_KEY);
   if (saved && typeof saved === 'object') {
-    const fromKv = parseInboxOverflowCap((saved as Record<string, unknown>).inboxOverflowCap);
-    if (fromKv !== undefined) return fromKv;
+    const rec = saved as Record<string, unknown>;
+    if (rec.engineEnabled !== false) {
+      const fromKv = parseInboxOverflowCap(rec.inboxOverflowCap);
+      if (fromKv !== undefined) return fromKv;
+    }
   }
   return DEFAULT_INBOX_OVERFLOW_CAP;
 }

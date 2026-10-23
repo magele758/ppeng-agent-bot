@@ -103,7 +103,6 @@ export function RoomMemberDrawer({
             {section.members.map((member) => (
               <li key={member.id}>
                 <span>{member.name}</span>
-                {member.duty ? <span className="play-group-member__desc">{member.duty}</span> : null}
                 {member.host ? <span className="play-group-badge">{t('play.group.hostBadge')}</span> : null}
                 {member.speaking ? <span className="play-group-badge">{t('play.group.speakingBadge')}</span> : null}
                 <button
