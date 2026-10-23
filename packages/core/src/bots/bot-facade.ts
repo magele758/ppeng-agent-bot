@@ -126,7 +126,7 @@ export function syncBotAgentSpecs(store: SqliteStateStore): void {
 
 function savedMaxTurns(metadata: Record<string, unknown> | undefined): number | undefined {
   const raw = metadata?.maxTurns;
-  if (raw === 24 || raw === 48 || raw === 96) return raw;
+  if (raw === 0 || raw === 24 || raw === 48 || raw === 96) return raw;
   return undefined;
 }
 

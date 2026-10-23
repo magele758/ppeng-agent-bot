@@ -153,8 +153,8 @@ test('non-bot spawn still inherits bypass and copies scratch', async () => {
   store.db.close();
 });
 
-test('maxTurns rejects illegal writes; the kernel resolver adopts 24, 48, 96 and falls back on bad stored values', () => {
-  for (const bad of [0, -24, 10, 25, 100, 9999, 'nope', 24.5, true, null, []]) {
+test('maxTurns rejects illegal writes and keeps finite choices and fallback [AC:unlimited-execution-steps#AC-2]', () => {
+  for (const bad of [-24, 10, 25, 100, 9999, 'nope', 24.5, true, null, []]) {
     assert.throws(() => parseSessionMaxTurns(bad), ValidationError);
     assert.equal(resolveSessionMaxTurns({ maxTurns: bad }, 24), 24);
     assert.equal(resolveSessionMaxTurns({ maxTurns: bad }, 7), 7);
@@ -225,7 +225,7 @@ test('updateBot rejects an illegal maxTurns before writing it', () => {
   const host = facadeHost(store);
   const bot = createBot(host, { name: 'Cap' });
   assert.throws(() => updateBot(host, bot.id, { maxTurns: 12 }), ValidationError);
-  assert.equal(store.getSession(bot.canonicalSessionId).metadata.maxTurns, 24);
+  assert.equal(store.getSession(bot.canonicalSessionId).metadata.maxTurns, 0);
   store.db.close();
 });
 
@@ -922,4 +922,29 @@ test('nested Bot subagents preserve scoped tools skills memory and permission [A
       assert.deepEqual(scratchKeys(store, child.id), []);
     }
   } finally { store.db.close(); }
+});
+
+test('unlimited execution steps accept explicit zero while keeping finite choices [AC:unlimited-execution-steps#AC-2]', () => {
+  assert.equal(parseSessionMaxTurns(0), 0);
+  assert.equal(parseSessionMaxTurns('0'), 0);
+  assert.equal(resolveSessionMaxTurns({ maxTurns: 0 }, 24), 0);
+  for (const cap of [24, 48, 96]) assert.equal(resolveSessionMaxTurns({ maxTurns: cap }, 0), cap);
+});
+
+test('new Bot chats default to unlimited and preserve a saved unlimited choice [AC:unlimited-execution-steps#AC-1] [AC:unlimited-execution-steps#AC-2]', () => {
+  const store = tempStore();
+  try {
+    const host = facadeHost(store);
+    const bot = createBot(host, { name: 'Unlimited' });
+    assert.equal(store.getSession(bot.canonicalSessionId).metadata.maxTurns, 0);
+    updateBot(host, bot.id, { maxTurns: 0 });
+    assert.equal(store.getSession(bot.canonicalSessionId).metadata.maxTurns, 0);
+  } finally { store.db.close(); }
+});
+
+test('legacy Bot chats without a saved step limit default to unlimited independently of environment [AC:unlimited-execution-steps#AC-1] [AC:unlimited-execution-steps#AC-2]', () => {
+  assert.equal(resolveSessionMaxTurns({ botId: 'saved-bot' }, 24), 0);
+  assert.equal(resolveSessionMaxTurns({ botId: 'saved-bot', maxTurns: 'invalid' }, 24), 0);
+  assert.equal(resolveSessionMaxTurns({ botId: 'saved-bot', maxTurns: 24 }, 0), 24);
+  assert.equal(resolveSessionMaxTurns({}, 48), 48);
 });

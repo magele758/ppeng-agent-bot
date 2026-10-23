@@ -338,7 +338,7 @@ flowchart TD
 - **Generator**：一次一个 sprint/功能；实现前用 `harness_write_spec(kind=sprint_contract)` 写可验收的 sprint 合约；实现后优先 `spawn_subagent(role=evaluator)` 做外部质检。
 - **Evaluator**：独立、偏怀疑的 QA；`harness_write_spec(kind=evaluator_feedback)` 记录结论。
 - **上下文**：仍依赖现有 `autoCompact` + `session.summary`；结构化 Markdown 作为跨压缩/子会话 handoff 的补充。
-- **环境**：`RAW_AGENT_MAX_TURNS` 可提高单轮 `runSession` 的 turn 上限（长 sprint）。
+- **环境**：默认单次执行不限步数；Bot 界面的「单次执行步数上限」可保存无上限（0）或 24 / 48 / 96。已有显式上限保留；`RAW_AGENT_MAX_TURNS` 仅作为未保存普通会话设置时的进程级回退，Bot 缺省固定为无上限。嵌入 API 和 SDK 装配档位的独立默认值不变。
 
 ## 7. 内置工具（基础挂载 51 个，另有条件挂载工具）
 
@@ -491,7 +491,7 @@ MailRecord (mailbox 表)
 | `RAW_AGENT_BASE_URL` | OpenAI 兼容 API 地址 | - |
 | `RAW_AGENT_ANTHROPIC_URL` | Anthropic API 地址 | - |
 | `RAW_AGENT_USE_JSON_MODE` | 第三方 API 不支持 response_format 时设为 `0` | - |
-| `RAW_AGENT_MAX_TURNS` | 单次 `runSession` 最大模型轮数（长 sprint 可调大） | `24` |
+| `RAW_AGENT_MAX_TURNS` | 未保存普通会话设置时的执行步数回退；0 表示无上限 | `0` |
 
 ## 10. 数据流
 

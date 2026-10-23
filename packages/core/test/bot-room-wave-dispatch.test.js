@@ -400,3 +400,21 @@ test('owner removal cancels running execution and wrap cannot exceed one-turn bu
   assert.ok(!f.rooms.messages(f.principal, room.id).messages.some(message => message.text === 'Must not publish'));
   assert.equal(f.rooms.turns(f.principal, room.id).at(-1).collaboration.goal.status, 'cancelled');
 });
+
+test('room contexts inherit unlimited fallback without changing the room turn budget [AC:unlimited-execution-steps#AC-1]', async () => {
+  const f = fixture();
+  try {
+    for (const bot of f.bots) {
+      const metadata = { ...f.store.getSession(bot.canonicalSessionId).metadata };
+      delete metadata.maxTurns;
+      f.store.updateSession(bot.canonicalSessionId, { metadata });
+    }
+    const room = f.rooms.create(f.principal, { title: 'Unlimited context', botIds: f.bots.map(bot => bot.id), maxBotTurns: 1 });
+    for (let iteration = 0; iteration < 2; iteration++) {
+      f.rooms.send(f.principal, room.id, { text: `Run ${iteration}`, mentions: [f.bots[0].id] });
+      await f.rooms.tick();
+      assert.equal(f.store.getSession(f.runs.at(-1)).metadata.maxTurns, 0);
+    }
+    assert.equal(f.rooms.get(f.principal, room.id).maxBotTurns, 1);
+  } finally { f.store.db.close(); }
+});

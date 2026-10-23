@@ -1,3 +1,4 @@
+import { BOT_DEFAULT_MAX_TURNS } from '../bots/types.js';
 import { type RoutineDeliveryPolicy } from './routine-delivery-policy.js';
 import { RoutineHealthStore, classifyRoutineFailure, isGovernedRoutine, type RoutineFailureClass } from './routine-health.js';
 /** Durable occurrence ledger. Configuration and individual execution have independent lifecycles. */
@@ -430,7 +431,7 @@ function routinePermissionMode(metadata: Record<string, unknown> | undefined): s
   return childPermissionMode(metadata) ?? 'ask';
 }
 function routineWorkMetadata(host:RoutineRuntimeHost,parent:SessionRecord,run:RoutineRun):Record<string,unknown>{
- return {...principalFromSession(host.store,parent),...inheritBotAllowlists(parent.metadata),...inheritModelOverride(parent.metadata),permissionMode:routinePermissionMode(parent.metadata),maxTurns:parent.metadata?.maxTurns??32,...(typeof parent.metadata?.botId==='string'?{botId:parent.metadata.botId}:{}),...(typeof parent.metadata?.workspaceId==='string'?{workspaceId:parent.metadata.workspaceId}:{}),canonicalBotChat:false,routineRunId:run.id,routineId:run.routineId,routineParentSessionId:parent.id};
+ return {...principalFromSession(host.store,parent),...inheritBotAllowlists(parent.metadata),...inheritModelOverride(parent.metadata),permissionMode:routinePermissionMode(parent.metadata),maxTurns:parent.metadata?.maxTurns??BOT_DEFAULT_MAX_TURNS,...(typeof parent.metadata?.botId==='string'?{botId:parent.metadata.botId}:{}),...(typeof parent.metadata?.workspaceId==='string'?{workspaceId:parent.metadata.workspaceId}:{}),canonicalBotChat:false,routineRunId:run.id,routineId:run.routineId,routineParentSessionId:parent.id};
 }
 /** Bot routines run in the canonical chat. Ordinary chats keep a separate working session. */
 function isBotMainSession(session:SessionRecord):boolean {

@@ -380,7 +380,7 @@ export const play = {
 
   botPolicy: {
     title: 'Bot 设置',
-    tip: '轮数和允许名单写在这条 Bot 会话上。不选表示使用全部。',
+    tip: '执行步数上限和允许名单写在这条 Bot 会话上。不选表示使用全部。',
     permission: '权限档',
     permissionTip: '这条 Bot 会话的审批档位，保存在会话上，重新打开 Bot 不会改动。',
     permissionAria: 'Bot 权限档',
@@ -409,8 +409,9 @@ export const play = {
     warningsFailed: '无法加载该 Bot 的策略警告。请刷新重试；当前不显示警告并不代表没有问题。',
     removeStale: '一键移除失效项',
     removeStaleEmpties: '移除后名单会变空，空名单表示允许全部工具。',
-    maxTurns: '轮数上限',
-    maxTurnsAria: 'Bot 轮数上限',
+    maxTurns: '单次执行步数上限',
+    unlimitedTurns: '无上限',
+    maxTurnsAria: 'Bot 单次执行步数上限',
     allowedTools: '工具允许名单',
     allowedToolsHint: '不选任何工具表示允许全部。选了之后，MCP 工具和动态工具也只能用名单里的。保存时会拒绝不在工具目录里的名字（mcp_ 开头的 MCP 工具名和已保存的动态工具除外）。',
     allowedToolsAria: '允许使用的工具',

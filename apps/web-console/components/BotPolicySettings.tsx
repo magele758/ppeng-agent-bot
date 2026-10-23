@@ -13,7 +13,7 @@ import { BotBypassRevert, BotPolicyWarnings } from './BotPolicyFollowups';
 import { ConfigGroup, FieldLabel } from './ConfigGroup';
 import { Disclosure } from './sections/agents/Disclosure';
 
-const TURN_CHOICES = [24, 48, 96] as const;
+const TURN_CHOICES = [0, 24, 48, 96] as const;
 
 export function BotPolicySettings({
   botId,
@@ -94,7 +94,7 @@ export function BotPolicySettings({
     };
   }, [t]);
 
-  const turnValue = maxTurns === 48 || maxTurns === 96 ? maxTurns : 24;
+  const turnValue = maxTurns === 24 || maxTurns === 48 || maxTurns === 96 ? maxTurns : 0;
   const optionNames = [...new Set([...catalog, ...draft])];
   const skillOptionNames = [...new Set([...skillCatalog, ...skillDraft])];
 
@@ -281,7 +281,7 @@ export function BotPolicySettings({
         >
           {TURN_CHOICES.map((choice) => (
             <option key={choice} value={choice}>
-              {choice}
+              {choice === 0 ? t('play.botPolicy.unlimitedTurns') : choice}
             </option>
           ))}
         </select>

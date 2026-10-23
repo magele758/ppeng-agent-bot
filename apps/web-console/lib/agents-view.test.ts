@@ -96,7 +96,7 @@ describe('bot name validation', () => {
 describe('bot settings snapshot', () => {
   test('defaults match the daemon when nothing is stored [AC:agents-management#AC-6]', () => {
     assert.deepEqual(readBotSettings(undefined), {
-      maxTurns: 24,
+      maxTurns: 0,
       allowedTools: [],
       allowedSkills: [],
       permissionMode: 'auto',
@@ -121,7 +121,7 @@ describe('bot settings snapshot', () => {
 
   test('unknown permission or turn values fall back to defaults [AC:agents-management#AC-6]', () => {
     const got = readBotSettings({ maxTurns: 7, permissionMode: 'root' });
-    assert.equal(got.maxTurns, 24);
+    assert.equal(got.maxTurns, 0);
     assert.equal(got.permissionMode, 'auto');
   });
 });

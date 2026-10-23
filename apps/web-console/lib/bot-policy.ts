@@ -20,7 +20,7 @@ function nameList(raw: unknown): string[] {
 export function readBotSettings(metadata: Record<string, unknown> | undefined): BotSettingsSnapshot {
   const raw = metadata?.maxTurns;
   return {
-    maxTurns: raw === 48 || raw === 96 ? raw : 24,
+    maxTurns: raw === 24 || raw === 48 || raw === 96 ? raw : 0,
     allowedTools: nameList(metadata?.allowedTools),
     allowedSkills: nameList(metadata?.allowedSkills),
     permissionMode: parseBotPermissionMode(metadata?.permissionMode),
