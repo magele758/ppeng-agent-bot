@@ -15,6 +15,17 @@
 
 | 规格 | 写在 |
 |------|------|
+| `turn-stats-end-time` | 03。轮次结束时间，替代旧文档中不存在的发送时间草稿引用 |
+| `bot-activity-open-session` | 00、03 |
+| `bot-child-task-chip-fill` | 03。子任务入口布局 |
+| `bot-composer-next-hint` | 00、04 |
+| `bot-input-suggestion-cache` | 00、04 |
+| `bot-human-continuation` | 00、04 |
+| `bot-sidebar-child-sessions` | 00、03 |
+| `bot-room-speaker-pick` | 00、07。替代旧版未点名依赖群主及小群必须回复的描述 |
+| `superbot-factory-setup` | 00、08 |
+| `room-task-collaboration` | 00、07。临时负责人协作切片，完整群子任务规格仍待收口 |
+| `unified-bot-goal-lifecycle` | 05。统一目标核验与终态历史 |
 | `bots` | 01、02、06、08、09 |
 | `bot-autonomous-execution-coverage` | 01、05 |
 | `bot-chat-header` | 02 |
@@ -88,7 +99,7 @@
 | `bot-room-console` | 人多的群，对话区仍然看得清 | 百人群界面已经交付 |
 | `bot-room-goal-intake` | 群有自己的目标，中途插话能归到那件目标 | 群目标已经能用 |
 | `bot-room-inline-approval` | 人可以在群里原地批准，只挂起那个成员 | 默认已经是群内批准 |
-| `bot-room-tasks` | 群子任务和成员接力 | 群里已经能派子任务 |
+| `bot-room-tasks` | 群子任务和成员接力 | 完整群子任务生命周期已经验收；临时负责人协作切片另见 `room-task-collaboration` |
 | `bot-routine-lifecycle` | 例行任务的错过、补跑、未知结果和租约有完整产品语义 | 生命周期已经全部验收 |
 | `bot-software-execution` | 软件调用以真实回执为准 | 软件执行验收已经通过 |
 | `bot-steer-visible` | 插话马上出现在对话流里 | 实时出现已经验收 |
@@ -104,7 +115,10 @@
 | `bot-detail-routine-switch` | 定时任务用拨动开关，时间显示本地钟点；持续盯着的事走定时任务 |
 | `bot-group-members-off-canvas` | 群成员管理离开主聊天区 |
 | `bot-user-bubble-color` | 用户气泡用这只 Bot 的主题色，不跟系统深浅走 |
-| `turn-stats-sent-time` | 用量行补上这条消息的发送钟点 |
+
+## 统一入口的文档方向与界面差异
+
+2026-10-23 用户明确整个产品以 Bot 模式作为统一入口，已据此更新 00、01 和目录。当前 `lib/nav.ts`、`shell/Rail.tsx` 仍保留 Bot / Chat 等并列导航，默认位置仍为 Chat。本次仅整理文档，没有变更验收标准或运行行为，也不把导航收敛标成已实现。
 
 ## 代码从哪读
 
