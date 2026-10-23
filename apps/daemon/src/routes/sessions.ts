@@ -358,6 +358,9 @@ async function followSessionStream(
   const detach = runtime.subscribeModelStream(sessionId, (chunk: ModelStreamChunk) => {
     sseSend(response, 'model', chunk);
   });
+  const detachView = runtime.subscribeSessionView(sessionId, (view) => {
+    sseSend(response, 'session', view);
+  });
   sseSend(response, 'ready', { ok: true });
   const clientGone = new AbortController();
   const onClose = () => {
@@ -381,6 +384,7 @@ async function followSessionStream(
     }
   } finally {
     detach();
+    detachView();
     response.removeListener('close', onClose);
     endSse(response);
   }

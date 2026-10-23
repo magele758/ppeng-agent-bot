@@ -354,6 +354,7 @@ export class RawAgentRuntime {
   private readonly pendingTraceWrites = new Map<string, Set<Promise<void>>>();
   /** Late subscribers (Lab follow after ask_user) receive chunks from the in-flight run. */
   private readonly modelStreamListeners = new Map<string, Set<(chunk: ModelStreamChunk) => void>>();
+  private readonly sessionViewListeners = new Map<string, Set<(view: { session: SessionRecord }) => void>>();
   private readonly sessionRunWaiters = new Map<string, Set<(run: Promise<SessionRecord>) => void>>();
   /**
    * Last turn's system-prompt size and tool count per session, used to derive the
@@ -1593,6 +1594,50 @@ export class RawAgentRuntime {
   }
 
   /**
+   * Page-state fan-out for every open view of one session.
+   * A view that arrives while the session is running gets the current page once,
+   * then later changes. Closing one view does not affect the others.
+   */
+  subscribeSessionView(
+    sessionId: string,
+    listener: (view: { session: SessionRecord }) => void
+  ): () => void {
+    const set = this.sessionViewListeners.get(sessionId) ?? new Set<(view: { session: SessionRecord }) => void>();
+    set.add(listener);
+    this.sessionViewListeners.set(sessionId, set);
+    const current = this.store.getSession(sessionId);
+    if (current?.status === 'running') {
+      try { listener({ session: current }); } catch { /* one closed page must not stop the others */ }
+    }
+    return () => {
+      set.delete(listener);
+      if (set.size === 0) this.sessionViewListeners.delete(sessionId);
+    };
+  }
+
+  /** Apply a visible session change and tell every open page. Does not start a run. */
+  patchSessionView(
+    sessionId: string,
+    patch: Partial<Pick<SessionRecord, 'title' | 'status'>>
+  ): SessionRecord | undefined {
+    const existing = this.store.getSession(sessionId);
+    if (!existing) return undefined;
+    const next = this.store.updateSession(sessionId, patch);
+    this.publishSessionView(sessionId);
+    return next;
+  }
+
+  private publishSessionView(sessionId: string): void {
+    const session = this.store.getSession(sessionId);
+    const listeners = this.sessionViewListeners.get(sessionId);
+    if (!session || !listeners) return;
+    for (const listener of [...listeners]) {
+      try { listener({ session }); }
+      catch (error) { this.log.warn('session view listener failed', { sessionId, error: String(error) }); }
+    }
+  }
+
+  /**
    * Settle when the in-flight run ends, or when the next run starts and then ends.
    * Does not start a run. Aborting `signal` stops waiting and leaves the run going.
    */
@@ -1910,6 +1955,7 @@ export class RawAgentRuntime {
         this.runningSessions.delete(sessionId);
         clearActiveWorkPiece(sessionId);
         releaseHumanModelInput(this.store, sessionId);
+        this.publishSessionView(sessionId);
         this.scheduleHumanContinuations();
       });
       this.runningSessions.set(sessionId, promise);

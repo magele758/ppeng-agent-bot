@@ -83,6 +83,7 @@ export function ChatSection({ active }: { active: boolean }) {
     writeStoredPlaySurface(next);
   }, []);
 
+  const sharedSessionStatus = sessions.find((session) => session.id === selectedSessionId)?.status;
   const chat = usePlayChat({
     selectedSessionId,
     setSelectedSessionId,
@@ -93,7 +94,8 @@ export function ChatSection({ active }: { active: boolean }) {
     upsertBot,
     playSurface,
     onPlaySurfaceChange: setPlaySurface,
-    tick
+    tick,
+    sharedSessionStatus
   });
 
   const defaultBotGuardRef = useRef<ReturnType<typeof createDefaultBotLoadGuard> | null>(null);

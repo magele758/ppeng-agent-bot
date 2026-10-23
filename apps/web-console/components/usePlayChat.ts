@@ -27,7 +27,7 @@ import { renderMarkdown } from '@/lib/markdown';
 import { rollbackToCheckpoint, streamCheckpoint, type StreamSegment } from '@/lib/stream-segments';
 import { feedSseBuffer } from '@/lib/sse';
 import { liveSessionFollowRequest, type LiveStreamArm } from '@/lib/live-stream-attach';
-import { shouldResumeRunningTurn } from '@/lib/run-leave';
+import { shouldRefreshOpenSession, shouldResumeRunningTurn } from '@/lib/run-leave';
 import {
   applyWhen,
   assertSameSession,
@@ -270,6 +270,8 @@ export interface PlayChatDeps {
   playSurface: PlaySurface;
   onPlaySurfaceChange?: (surface: PlaySurface) => void;
   tick: (opts?: { includePlayPanel?: boolean }) => Promise<void>;
+  /** Status from the shared session list, so a page that did not send can still follow. */
+  sharedSessionStatus?: string;
 }
 
 function activeFollowMatches(follow: { sessionId: string; controller: AbortController; ready: Promise<void> } | null,
@@ -292,6 +294,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     playSurface,
     onPlaySurfaceChange,
     tick,
+    sharedSessionStatus
   } = deps;
   const { t } = useI18n();
 
@@ -1208,8 +1211,6 @@ export function usePlayChat(deps: PlayChatDeps) {
   }, [playSurface, selectedSessionRef, showModelView, t]);
 
   useEffect(() => {
-    const live = playSending || Boolean(streamOverlay) || waitTyping;
-    if (!live) return;
     const sid = selectedSessionRef.current;
     if (!sid) return;
     let cancelled = false;
@@ -1217,6 +1218,7 @@ export function usePlayChat(deps: PlayChatDeps) {
       try {
         const data = (await api(`/api/sessions/${sid}?includeMessages=false`)) as {
           session: {
+            title?: string;
             status: string;
             createdAt?: string;
             updatedAt?: string;
@@ -1224,16 +1226,22 @@ export function usePlayChat(deps: PlayChatDeps) {
           };
           inbox?: SteerInboxItem[];
         };
-        if (cancelled) return;
-        setSessionChrome(
-          parseSessionChrome(data.session.metadata, data.session.status, {
-            createdAt: data.session.createdAt,
-            updatedAt: data.session.updatedAt
-          })
-        );
+        if (cancelled || selectedSessionRef.current !== sid) return;
+        if (data.session.title) {
+          setPlayTitle((prev) => (prev === data.session.title ? prev : data.session.title!));
+        }
+        const nextChrome = parseSessionChrome(data.session.metadata, data.session.status, {
+          createdAt: data.session.createdAt,
+          updatedAt: data.session.updatedAt
+        });
+        setSessionChrome((prev) => (
+          prev?.status === nextChrome.status && prev.updatedAt === nextChrome.updatedAt && prev.usageCostUsd === nextChrome.usageCostUsd
+            ? prev
+            : nextChrome
+        ));
         setSteerInbox(mapSteerInboxItems(data.inbox));
       } catch {
-        /* live chrome pull is best-effort */
+        /* open-page chrome pull is best-effort */
       }
     };
     void pullChrome();
@@ -1242,7 +1250,7 @@ export function usePlayChat(deps: PlayChatDeps) {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [playSending, streamOverlay, waitTyping, selectedSessionId, selectedSessionRef]);
+  }, [selectedSessionId, selectedSessionRef]);
 
   useEffect(() => {
     publishImmediateSteer();
@@ -1679,11 +1687,23 @@ export function usePlayChat(deps: PlayChatDeps) {
           argumentsFragment?: string;
           surfaceId?: string;
           envelope?: Record<string, unknown>;
-          session?: { id: string };
+          session?: { id: string; title?: string; status?: string; metadata?: Record<string, unknown>; createdAt?: string; updatedAt?: string };
         };
         if (!liveTurnOnScreen(streamGeneration)) return;
         if (event === 'ready') {
           opts?.onReady?.();
+        }
+        if (event === 'session' && p.session && typeof p.session === 'object') {
+          const view = p.session as { id?: string; title?: string; status?: string; metadata?: Record<string, unknown>; createdAt?: string; updatedAt?: string };
+          if (view.id && selectedSessionRef.current === view.id) {
+            if (view.title) setPlayTitle(view.title);
+            if (view.status) {
+              setSessionChrome(parseSessionChrome(view.metadata, view.status, {
+                createdAt: view.createdAt,
+                updatedAt: view.updatedAt
+              }));
+            }
+          }
         }
         if (event === 'error') {
           const raw = typeof p.message === 'string' && p.message.trim() ? p.message.trim() : 'stream error';
@@ -1875,7 +1895,11 @@ export function usePlayChat(deps: PlayChatDeps) {
   useEffect(() => {
     const sid = selectedSessionId;
     if (!sid || chromeSessionId !== sid) return;
-    if (!shouldResumeRunningTurn({ status: sessionChrome?.status, locallySending: playSendingLiveRef.current })) {
+    if (!shouldResumeRunningTurn({
+      status: sessionChrome?.status,
+      locallySending: playSendingLiveRef.current,
+      sharedStatus: sharedSessionStatus
+    })) {
       return;
     }
     const armed = armLiveSessionStreamRef.current(sid);
@@ -1883,7 +1907,7 @@ export function usePlayChat(deps: PlayChatDeps) {
       // Stop watching only. Closing this follow socket does not cancel the server run.
       armed.cancel();
     };
-  }, [selectedSessionId, chromeSessionId, sessionChrome?.status]);
+  }, [selectedSessionId, chromeSessionId, sessionChrome?.status, sharedSessionStatus]);
 
   const ensurePlaySessionForImages = async (): Promise<string> => {
     if (selectedSessionRef.current) return selectedSessionRef.current;

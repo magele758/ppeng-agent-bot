@@ -27,6 +27,7 @@ import {
 } from '@/lib/nav';
 import type { ModelProvidersResponse } from '@/lib/model-providers';
 import { fetchList, idleLabListState, settleList, type LabListKey, type LabListState, type ListFetch } from '@/lib/list-load';
+import { shouldRefreshOpenSession } from '@/lib/run-leave';
 import { sameData } from '@/lib/same-data';
 import type {
   AgentInfo,
@@ -372,7 +373,15 @@ export function LabProvider({ children }: { children: ReactNode }) {
     if (tickTimerRef.current) clearInterval(tickTimerRef.current);
     tickTimerRef.current = null;
     if (autoRefresh) {
-      tickTimerRef.current = setInterval(() => void tick({ includePlayPanel: false }), 2800);
+      tickTimerRef.current = setInterval(() => {
+        const selected = sessionsRef.current.find((session) => session.id === selectedSessionRef.current);
+        const includePlayPanel = shouldRefreshOpenSession({
+          openSessionId: selectedSessionRef.current,
+          selectedSessionId: selected?.id,
+          selectedStatus: selected?.status
+        });
+        void tick({ includePlayPanel });
+      }, 2800);
     }
     return () => {
       if (tickTimerRef.current) clearInterval(tickTimerRef.current);
