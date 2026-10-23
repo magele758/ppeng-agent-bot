@@ -15,6 +15,8 @@ import {
 } from '@/lib/chat-utils';
 import { parseCronUserPrompt } from '@/lib/cron';
 import { presentGoalUpdate, readMessageSessionId } from '@/lib/goal-update-notice';
+import { parseRiskAdvisory } from '@/lib/risk-advisory';
+import { RiskAdvisoryCard } from './RiskAdvisoryCard';
 import { GoalUpdateCard } from './GoalUpdateCard';
 import { A2uiSurface } from './a2ui/A2uiSurface';
 import { ReadableMessage } from './ReadableMessage';
@@ -359,7 +361,10 @@ function StructuredBubble({
     const joined = textBuf.join('\n').trim();
     textBuf.length = 0;
     if (!joined) return;
-    if (usePre) {
+    const advisory = role === 'system' && !modelView ? parseRiskAdvisory(joined) : null;
+    if (advisory) {
+      nodes.push(<RiskAdvisoryCard key={nodes.length} notice={advisory} />);
+    } else if (usePre) {
       nodes.push(
         <pre key={nodes.length} className="chat-bubble__pre">
           {joined}
@@ -486,7 +491,10 @@ export function ChatTurnFromMessage({
     return null;
   }
   const goalCard = presented.kind === 'card' ? <GoalUpdateCard notice={presented.notice} /> : null;
+  const advisory = r === 'system' && !modelView && !messageHasStructuredParts(m.parts)
+    ? parseRiskAdvisory(msgPartsToText(m.parts)) : null;
   const bubble =
+    (advisory ? <RiskAdvisoryCard notice={advisory} /> : null) ??
     goalCard ??
     (messageHasStructuredParts(m.parts) && m.parts ? (
       <div className="chat-bubble--stream-blocks">
@@ -586,6 +594,7 @@ export function ChatTurnPlain({
   const av = avatarText(role === 'stream' ? 'assistant' : role, t('play.me'), stream);
   const label = labelOverride ?? (stream ? t('play.role.streaming') : roleLabel(role, t));
   const goalCard = presented.kind === 'card';
+  const advisory = role === 'system' ? parseRiskAdvisory(text) : null;
   const usePre = (role === 'tool' || role === 'system') && !goalCard;
   const noAvatar =
     role === 'tool' || role === 'system' || role === 'assistant' || role === 'stream';
@@ -596,7 +605,9 @@ export function ChatTurnPlain({
         <div className="chat-turn__label">{label}</div>
         <div className="chat-bubble">
           {role === 'user' ? <MessageReplyQuote replyTo={replyTo} botName={replyBotName} /> : null}
-          {presented.kind === 'card' ? (
+          {advisory ? (
+            <RiskAdvisoryCard notice={advisory} />
+          ) : presented.kind === 'card' ? (
             <GoalUpdateCard notice={presented.notice} />
           ) : usePre ? (
             <pre className="chat-bubble__pre">{text}</pre>

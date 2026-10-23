@@ -1,0 +1,16 @@
+.card {
+  border-inline-start: 3px solid var(--accent, #5c7866);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: var(--surface-subtle, rgba(100, 120, 110, 0.06));
+  font-size: 0.875rem;
+  line-height: 1.6;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.warning { border-inline-start-color: #b98228; }
+.heading { display: flex; gap: 8px; align-items: baseline; }
+.card ul { margin: 6px 0; padding-inline-start: 20px; }
+.card p { margin: 6px 0; opacity: 0.75; }
+.card summary { cursor: pointer; }
+.card pre { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; font-size: 0.75rem; margin: 8px 0 0; }

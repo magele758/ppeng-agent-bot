@@ -1,5 +1,17 @@
 /** Play / Chat 界面文案。不要加 as const。 */
 export const play = {
+  riskAdvisory: {
+    "title": "运行提醒",
+    "warning": "执行异常提醒",
+    "iteration_near_limit": "本次执行接近迭代上限，建议优先整理已有结果。",
+    "budget_high": "用量接近设定预算，建议控制后续调用。",
+    "tool_error_streak": "工具连续失败，建议检查错误原因后再尝试。",
+    "tool_repeat": "连续重复相同工具调用，建议检查是否取得进展。",
+    "output_repeat": "输出出现重复，建议调整处理方式。",
+    "unknown": "检测到运行策略提示，请查看原始详情。",
+    "explanation": "这是给 Agent 的策略提示，本身不表示危险操作，也不会直接中止执行。",
+    "details": "原始详情"
+},
   retry: {
     waiting: '{model} · 重试 {retry}/{max} · {seconds} 秒后重试',
     requesting: '{model} · 正在重试 {retry}/{max}',
