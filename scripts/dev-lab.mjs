@@ -5,6 +5,7 @@
  * 用法：pnpm run dev
  */
 import dotenv from 'dotenv';
+import { devWebHost, syncDevHttps } from './dev-tailnet-https.mjs';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -79,11 +80,10 @@ const daemon = spawn(process.execPath, ['apps/daemon/dist/server.js'], {
   env: childEnv
 });
 
-// Bind IPv4 0.0.0.0 so Cloud Agent port detection (typically /proc/net/tcp)
-// can see Lab. Default `next dev` only appears on tcp6 `:::port`.
+// HTTPS-enabled checkouts use loopback; ordinary cloud dev keeps IPv4 discovery.
 const web = spawn(
   resolveBin('pnpm'),
-  ['--filter', '@ppeng/agent-lab-web', 'run', 'dev', '-p', String(webPort), '-H', '0.0.0.0'],
+  ['--filter', '@ppeng/agent-lab-web', 'run', 'dev', '-p', String(webPort), '-H', devWebHost(root)],
   {
     cwd: root,
     stdio: 'inherit',
@@ -93,8 +93,10 @@ const web = spawn(
 );
 
 let shuttingDown = false;
+const httpsAbort = new AbortController();
 
 function killBoth() {
+  httpsAbort.abort();
   try {
     daemon.kill('SIGTERM');
   } catch {
@@ -133,3 +135,6 @@ process.on('SIGTERM', () => {
   killBoth();
   process.exit(0);
 });
+
+// HTTPS follows the actual selected web port, after Next is ready.
+void syncDevHttps({ root, webPort, signal: httpsAbort.signal });

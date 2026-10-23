@@ -21,6 +21,8 @@
 
 依赖安装、工作区命令、容器和历史验证的 pnpm 迁移说明见 [PNPM_MIGRATION.md](PNPM_MIGRATION.md)。
 
+本地开发的 HTTPS 与 Tailscale 自动转发见 [DEV_HTTPS.md](DEV_HTTPS.md)。
+
 ## Start here / 从这里读
 
 | Document | 中文说明 |
