@@ -377,7 +377,7 @@ export function LabProvider({ children }: { children: ReactNode }) {
         const selected = sessionsRef.current.find((session) => session.id === selectedSessionRef.current);
         const includePlayPanel = shouldRefreshOpenSession({
           openSessionId: selectedSessionRef.current,
-          selectedSessionId: selected?.id,
+          selectedSessionId: selected?.id ?? null,
           selectedStatus: selected?.status
         });
         void tick({ includePlayPanel });
