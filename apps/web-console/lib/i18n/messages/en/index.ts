@@ -1,3 +1,4 @@
+import { mobile } from './mobile.ts';
 import { goals } from './goals.ts';
 import { polish } from './polish.ts';
 import { factory } from './factory.ts';
@@ -23,6 +24,7 @@ import { skillProposals } from './skillProposals.ts';
 import { teams } from './teams.ts';
 
 export const en = {
+  mobile,
   goals,
   polish,
   factory,

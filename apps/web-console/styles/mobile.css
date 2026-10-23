@@ -1,0 +1,162 @@
+.mobile-chat-bar,
+.mobile-tools-toggle {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  html, body { min-height: 100%; }
+  .app.lab-shell {
+    position: relative;
+    height: 100dvh;
+    min-height: 0;
+    padding-top: env(safe-area-inset-top);
+    padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
+  }
+  .lab-shell .lab-main { min-width: 0; }
+  .lab-shell .lab-rail,
+  .lab-shell .lab-rail.is-collapsed {
+    overflow: visible;
+    padding: 4px 4px max(4px, env(safe-area-inset-bottom));
+    gap: 0;
+  }
+  .lab-shell .lab-rail__top { display: none; }
+  .lab-shell .lab-rail__nav {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    width: 100%;
+    gap: 2px;
+  }
+  .lab-shell .lab-rail__link {
+    min-width: 0;
+    min-height: 56px;
+    padding: 5px 2px;
+    position: relative;
+    justify-content: flex-start;
+    font-size: 11px;
+    text-align: center;
+    gap: 4px;
+  }
+  .lab-shell .lab-rail .lab-rail__label {
+    position: static;
+    clip: auto;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    white-space: normal;
+    line-height: 1.15;
+    flex: none;
+  }
+  .lab-shell .lab-rail__badge { position: absolute; top: 0; right: 0; }
+  .lab-shell .mobile-tools-toggle {
+    display: flex;
+    position: absolute;
+    top: env(safe-area-inset-top);
+    right: max(8px, env(safe-area-inset-right));
+    width: 44px;
+    height: 44px;
+    z-index: var(--ui-z-toolbar);
+    align-items: center;
+    justify-content: center;
+  }
+  .lab-shell .lab-toolbar { padding-right: 60px; min-height: 44px; }
+  .mobile-chat-bar {
+    display: flex;
+    flex: 0 0 44px;
+    align-items: center;
+    padding: 0 60px 0 8px;
+    border-bottom: 1px solid var(--ui-border);
+  }
+  .mobile-chat-bar button { min-height: 44px; gap: 8px; }
+  .lab-shell .play-layout.play-layout--rail {
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+  }
+  .lab-shell .play-layout > .play-sidebar { display: none; }
+  .lab-shell .play-layout.mobile-sessions-open > .play-sidebar { display: flex; border: 0; }
+  .lab-shell .play-layout.mobile-sessions-open > :not(.play-sidebar) { display: none; }
+  .lab-shell .play-layout > .play-rail { display: none; }
+  .lab-shell .chat-panel-header { padding: 8px 12px; height: auto; min-height: 48px; flex-wrap: wrap; }
+  .lab-shell .chat-panel-header__text { flex: 1; min-width: 0; }
+  .lab-shell .chat-panel-header__actions { flex-shrink: 0; }
+  .lab-shell .chat-feed { padding-inline: 12px; }
+  .lab-shell .chat-bubble { max-width: 100%; overflow-wrap: anywhere; }
+  .lab-shell .chat-bubble pre { max-width: 100%; overflow-x: auto; }
+  .lab-shell .chat-composer-outer { padding: 8px 12px; }
+  .lab-shell .chat-composer-input { font-size: 16px; max-height: min(160px, 25dvh); }
+  .lab-shell .chat-composer-dock__left { min-width: 0; max-width: 100%; }
+  .lab-shell .chat-composer-dock__pickers { width: 100%; gap: 4px; }
+  .lab-shell .chat-composer-dock__pickers > * { min-width: 0; max-width: 100%; }
+  .lab-shell .chat-composer-dock__pickers .composer-model-trigger { max-width: 100%; }
+  .lab-shell .chat-composer-dock__pickers .composer-model-panel,
+  .lab-shell .chat-composer-dock__pickers .workspace-picker__panel {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    max-height: 60dvh;
+    overflow-y: auto;
+    z-index: var(--ui-z-overlay);
+  }
+  .lab-shell :is(input:not([type='checkbox']):not([type='radio']), select, textarea) {
+    min-width: 0;
+    max-width: 100%;
+    font-size: 16px;
+  }
+  .lab-shell :is(.btn, .btn-icon, .settings-nav__item, .ui-tabs__tab, .composer-config-summary, .workspace-picker__summary, .composer-model-trigger) { min-height: 44px; }
+  .lab-shell .settings-layout { min-width: 0; }
+  .lab-shell .settings-nav { width: 100%; min-width: 0; flex-wrap: nowrap; }
+  .lab-shell .settings-nav__item { flex: 0 0 auto; white-space: nowrap; }
+  .lab-shell .settings-search input { min-width: 0; }
+  .lab-shell .settings-search__hint { display: none; }
+  .lab-shell .lab-page { overflow-x: hidden; overflow-wrap: anywhere; }
+  .lab-shell .session-settings__fields { grid-template-columns: minmax(0, 1fr); }
+  .lab-shell .session-item__delete { opacity: 1; }
+  .mobile-tools-dialog {
+    width: calc(100% - 24px);
+    max-width: 420px;
+    max-height: 80dvh;
+    padding: 0;
+    border: 1px solid var(--ui-border);
+    border-radius: 16px;
+    background: var(--ui-bg);
+    color: var(--ui-text);
+    margin: auto;
+    overflow-y: auto;
+  }
+  .mobile-tools-dialog::backdrop { background: rgb(0 0 0 / 40%); }
+  .mobile-tools-dialog__body { padding: 16px; }
+  .mobile-tools-dialog header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .mobile-tools-dialog h2 { font-size: 18px; margin: 0; }
+  .mobile-tools-dialog__actions { display: flex; flex-direction: column; align-items: stretch; gap: 12px; padding-top: 16px; }
+  .mobile-tools-dialog button { min-height: 44px; }
+}
+
+@media (max-width: 760px) {
+  .lab-shell .lab-toolbar { flex-wrap: nowrap; overflow-x: auto; gap: 8px; flex: 0 0 44px; }
+  .lab-shell .lab-toolbar > span:not(.meta-quiet--warn) { display: none; }
+  .lab-shell .lab-toolbar > * { flex-shrink: 0; white-space: nowrap; }
+  .lab-shell .ui-section__head { flex-direction: column; gap: 12px; }
+  .lab-shell .ui-section__actions { width: 100%; }
+  .lab-shell .ui-subtabs__tab { min-height: 44px; }
+  .lab-shell .chat-panel-header { max-height: none; }
+  .lab-shell .chat-panel-header .rail-toggle { display: none; }
+  .lab-shell .chat-panel-header__title-row { flex-wrap: wrap; }
+  .lab-shell .chat-panel-header__title-row .chat-panel-title { flex-basis: 100%; }
+  .lab-shell .chat-composer-dock__pickers .workspace-picker__summary { min-height: 44px; }
+}
+
+@media (max-width: 760px) {
+  .lab-shell .mobile-tools-dialog .account-menu__name {
+    position: static;
+    clip: auto;
+    width: auto;
+    height: auto;
+    margin: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
