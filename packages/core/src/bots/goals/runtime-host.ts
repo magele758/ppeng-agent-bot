@@ -1,8 +1,8 @@
 import type { SqliteStateStore } from '../../storage.js';
 import type { SessionRecord, ToolContract, ModelAdapter } from '../../types.js';
 import { BotGoalService } from './service.js';
-import { classifyGoalIntents, releaseOpenInquiry, type GoalIntentProposal } from './intake.js';
-import { selectGoalRoute, goalWorkKind, type GoalCapabilities, type GoalStrategy, type GoalWorkKind } from './routing.js';
+import { classifyGoalIntents, isSelfContainedBotWork, releaseOpenInquiry, releaseSelfContainedBotWork, type GoalIntentProposal } from './intake.js';
+import { selectGoalRoute, goalNeedsIsolatedExecutor, goalSpecialist, goalWorkKind, type GoalCapabilities, type GoalStrategy, type GoalWorkKind } from './routing.js';
 import type { BotGoal, GoalReport } from './types.js';
 import { listPendingHumanWork } from '../../session/human-continuation.js';
 import { preserveGoalBudgetReport } from './budget.js';
@@ -143,7 +143,7 @@ async function ingestReceipt(host:GoalRuntimeHost,session:SessionRecord,service:
  const message=messages.get(receipt.id);
  const text=message?.parts.filter(part=>part.type==='text').map(part=>part.text).join('\n')??'';
  if(!text.trim())return;
- const intents=(await classifyGoalIntents(text,service.list(botId),intakeJudge(host))).map(releaseOpenInquiry);
+ const intents=(await classifyGoalIntents(text,service.list(botId),intakeJudge(host))).map(releaseOpenInquiry).map(releaseSelfContainedBotWork);
  known[receipt.id]='chat';
  for(const [index,intent] of intents.entries())await applyIntakeIntent(host,session,service,botId,known,receipt.id,intent,index);
 }
@@ -164,6 +164,22 @@ async function applyGoalIntake(host:GoalRuntimeHost,session:SessionRecord):Promi
 
 function currentGoalOf(service:BotGoalService,botId:string,session:SessionRecord):BotGoal|undefined {
  return typeof session.metadata?.botGoalId==='string'?service.get(botId,session.metadata.botGoalId):undefined;
+}
+function substantiveText(part:{type:string;text?:string}):boolean {
+ return part.type==='text'&&!!part.text?.trim()&&part.text.trim()!=='…';
+}
+function answeredInChat(host:GoalRuntimeHost,session:SessionRecord,goal:BotGoal):boolean {
+ const messages=host.store.foldMessages(session.id);
+ const sourceAt=goal.sourceMessageId?messages.find(message=>message.id===goal.sourceMessageId)?.createdAt:undefined;
+ return messages.some(message=>message.role==='assistant'&&message.parts.some(substantiveText)&&(!sourceAt||message.createdAt>=sourceAt));
+}
+/** A goal the current chat already answered, with no unfinished next step and no request for another executor. */
+export function goalAlreadyHandled(host:GoalRuntimeHost,session:SessionRecord,goal:BotGoal):boolean {
+ if(session.metadata?.canonicalBotChat!==true||goal.attempts>0||goal.evidence.length>0)return false;
+ if(goal.nextStep?.trim()||goal.resumeRequested)return false;
+ const task=goalExecutionTask(goal);
+ if(goalWorkKind(task)!=='general'||!isSelfContainedBotWork(task)||goalNeedsIsolatedExecutor(task)||goalSpecialist(task))return false;
+ return answeredInChat(host,session,goal);
 }
 function executionStillRunning(service:BotGoalService,botId:string,session:SessionRecord,goal:BotGoal,currentId:string):boolean {
  const active=service.executions(botId,goal.id).find(execution=>execution.id===currentId);
@@ -188,9 +204,10 @@ function unforkedQueued(host:GoalRuntimeHost,session:SessionRecord,service:BotGo
  return service.list(botId).find(goal=>queuedFromPending(goal,pending,forked));
 }
 function queuedGoal(host:GoalRuntimeHost,session:SessionRecord,service:BotGoalService,botId:string,currentGoal:BotGoal|undefined):BotGoal|undefined {
- if(currentGoal?.status==='queued')return currentGoal;
+ if(currentGoal?.status==='queued')return goalAlreadyHandled(host,session,currentGoal)?undefined:currentGoal;
  if(session.metadata?.canonicalBotChat!==true)return undefined;
- return unforkedQueued(host,session,service,botId);
+ const queued=unforkedQueued(host,session,service,botId);
+ return queued&&goalAlreadyHandled(host,session,queued)?undefined:queued;
 }
 function modePreferenceOf(strategy:string):GoalWorkKind|undefined {
  if(strategy==='deep_research')return 'research';
@@ -304,7 +321,8 @@ function judgeEvidence(parsed:{evidence?:unknown}):string[] {
  return Array.isArray(parsed.evidence)?parsed.evidence.filter((e):e is string=>typeof e==='string'&&!!e.trim()):[];
 }
 function judgedReport(parsed:{met?:boolean;advanced?:boolean;reason?:string},assistant:string,evidence:string[]):GoalReport {
- return {kind:parsed.met===true?'candidate_completed':'progress',verified:parsed.met===true&&evidence.length>0,summary:parsed.reason??assistant,evidence,advanced:parsed.advanced===true};
+ const met=parsed.met===true;
+ return {kind:met?'candidate_completed':'progress',verified:met&&evidence.length>0,summary:parsed.reason??assistant,evidence,advanced:parsed.advanced===true,...(met?{}:{nextStep:'Continue the remaining work from the recorded evidence.'})};
 }
 async function verifyCompletion(host:GoalRuntimeHost,goal:BotGoal,tail:ReturnType<GoalRuntimeHost['store']['foldMessages']>,assistant:string,report:GoalReport):Promise<GoalReport> {
  if(!(host.judge&&assistant))return report;

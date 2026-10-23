@@ -127,8 +127,8 @@ test('room intake still classifies an open question as work; only the bot chat d
 
 test('a stated task is still admitted, and failed verification can still block it', async (t) => {
   const { service, say } = openChat(t);
-  await say('检查日志');
-  await say('顺便帮我分析一下报错日志');
+  await say('请修复登录超时');
+  await say('把退出按钮移到右上角，完成结果是按钮在右上角');
   const goals = service.list('b');
   assert.equal(goals.length, 2);
   for (const goal of goals) assert.equal(goal.status, 'queued');

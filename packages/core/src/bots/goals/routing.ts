@@ -51,6 +51,10 @@ export function goalSpecialty(text: string): GoalStrategy | undefined {
   if (/^(?:请)?编排|\b(?:orchestrate|start orchestrator)\b|规划.*开发.*验证/i.test(text)) return 'orchestrator';
   return undefined;
 }
+/** The user asked to split, parallelize, or hand the work to another role. */
+export function goalNeedsIsolatedExecutor(text: string): boolean {
+  return /拆成子任务|拆成并行|并行处理|分别交给|交给(?:规划|实现|验收|评估)|子代理/.test(text);
+}
 export function goalSpecialist(text: string): GoalRouteRequest['role'] {
   if (/\b(evaluate|review)\b|^(?:请|请帮我)?(?:验收|评估|审查|验证结果)/i.test(text.trim())) return 'evaluator';
   if (/\b(plan|planner|specification)\b|制定.*规划|设计方案|规划方案/i.test(text)) return 'planner';
@@ -83,7 +87,7 @@ export function selectGoalRoute(request: GoalRouteRequest, capabilities: GoalCap
   const rejected: GoalRoute['rejected'] = [];
   if (capabilities.budgetRemaining !== undefined && (!Number.isFinite(capabilities.budgetRemaining) || capabilities.budgetRemaining <= 0)) return { taskMode, blocked: true, reason: 'Goal budget is exhausted', rejected };
   const requiredSpecialty = goalSpecialty(request.task);
-  const inferred: GoalStrategy = requiredSpecialty ?? (request.delegateBotId ? 'bot_delegate' : request.workKind === 'batch' ? 'ptc' : request.workKind === 'dependency_plan' ? 'team_dag' : request.workKind === 'role_pipeline' ? 'swarm' : request.independentWork || request.role || goalSpecialist(request.task) ? 'subagent' : 'direct');
+  const inferred: GoalStrategy = requiredSpecialty ?? (request.delegateBotId ? 'bot_delegate' : request.workKind === 'batch' ? 'ptc' : request.workKind === 'dependency_plan' ? 'team_dag' : request.workKind === 'role_pipeline' ? 'swarm' : request.independentWork || request.role || goalSpecialist(request.task) || goalNeedsIsolatedExecutor(request.task) ? 'subagent' : 'direct');
   const requestedSpecialty = requiredSpecialty ?? (request.preferredStrategy && specialties.has(request.preferredStrategy) ? request.preferredStrategy : undefined);
   const candidates = requestedSpecialty ? [requestedSpecialty] : [...new Set([request.preferredStrategy ?? inferred, inferred, request.independentWork ? 'subagent' as const : 'direct' as const])];
   for (const strategy of candidates) {
