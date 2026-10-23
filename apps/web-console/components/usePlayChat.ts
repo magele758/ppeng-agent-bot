@@ -427,7 +427,13 @@ export function usePlayChat(deps: PlayChatDeps) {
     }, 240);
   }, []);
 
-  const clearInputSuggestion = () => setInputGhost(emptyGhost());
+  const clearInputSuggestion = () => {
+    suggestionAbortRef.current?.abort();
+    suggestionAbortRef.current = null;
+    suggestionReqRef.current += 1;
+    suggestionTurnRef.current += 1;
+    setInputGhost(emptyGhost());
+  };
 
   const clearComposerOnly = () => {
     setPlayInput('');
@@ -760,7 +766,10 @@ export function usePlayChat(deps: PlayChatDeps) {
     suggestionTurnRef.current += 1;
     suggestionSessionRef.current = selectedSessionId;
     setInputGhost(emptyGhost());
-  }, [selectedSessionId]);
+    if (selectedSessionId && playSurface === 'bot' && suggestionEnabled) {
+      void requestInputSuggestionRef.current(selectedSessionId);
+    }
+  }, [selectedSessionId, playSurface, suggestionEnabled]);
 
   const queryExecModeRef = useRef(queryExecMode);
   queryExecModeRef.current = queryExecMode;

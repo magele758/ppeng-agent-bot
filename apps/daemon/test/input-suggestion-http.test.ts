@@ -37,7 +37,7 @@ function dispatchSuggestion(
     });
 }
 
-test('回复结束后才生成下一句建议，关闭开关后不再生成，后到的旧请求不能覆盖新请求 [AC:bot-input-suggestion#AC-2] [AC:bot-input-suggestion#AC-4]', async () => {
+test('回复结束后复用同轮建议，关闭和无权限不能调用模型 [AC:bot-input-suggestion#AC-2] [AC:bot-input-suggestion-cache#AC-1] [AC:bot-input-suggestion-cache#AC-4]', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'input-suggestion-http-'));
   const calls: string[] = [];
   const aborted: boolean[] = [];
@@ -65,14 +65,13 @@ test('回复结束后才生成下一句建议，关闭开关后不再生成，�
             if (signal.aborted) resolve();
             else signal.addEventListener('abort', () => resolve(), { once: true });
           });
-        // suggest(1) is superseded by suggest(2); suggest(4) is cancelled mid-flight.
-        // Both must stay parked on the signal until abort, or the handler returns a suggestion.
-        if (n === 1 || n === 3) {
+        // The first generation is shared; the next reply is cancelled mid-flight.
+        if (n === 1 || n === 2) {
           if (n === 1) await Promise.race([secondGate, waitForAbort()]);
           else await waitForAbort();
           aborted.push(Boolean(signal?.aborted));
           if (signal?.aborted) throw new DOMException('aborted', 'AbortError');
-          return JSON.stringify({ suggestions: ['旧建议，不应显示'] });
+          return JSON.stringify({ suggestions: ['把失败原因再说细一点', '换成查数据库'] });
         }
         return JSON.stringify({ suggestions: ['把失败原因再说细一点', '换成查数据库'] });
       }
@@ -160,8 +159,9 @@ test('回复结束后才生成下一句建议，关闭开关后不再生成，�
     assert.ok(winner && loser, JSON.stringify(bodies));
     assert.equal(winner.suggestion?.primary, '把失败原因再说细一点');
     assert.deepEqual(winner.suggestion?.alternatives, ['换成查数据库']);
-    assert.equal(loser.suggestion, null, '被新请求覆盖的旧响应不再带建议');
-    assert.equal(aborted[0], true, '新请求会取消同一会话上还在跑的旧调用');
+    assert.deepEqual(loser.suggestion, winner.suggestion, '同轮请求共享结果');
+    assert.equal(aborted[0], false, '同轮重复请求不取消已有生成');
+    assert.equal(calls.length, 1);
 
     const plain = runtime.createChatSession({ title: 'not a bot', agentId: 'general' });
     runtime.store.appendMessage(plain.id, 'assistant', [{ type: 'text', text: 'hello' }]);
@@ -195,19 +195,22 @@ test('回复结束后才生成下一句建议，关闭开关后不再生成，�
     const strangerBody = (await stranger.json()) as { error?: string; suggestion?: unknown };
     assert.equal(strangerBody.suggestion, undefined);
     assert.match(strangerBody.error ?? '', /not found/i);
-    assert.equal(calls.length, 2, '被拒绝的请求不能打到模型');
+    assert.equal(calls.length, 1, '被拒绝的请求不能打到模型');
 
     writeInputSuggestionSettings(runtime.store, { enabled: true });
+    runtime.store.appendMessage(sessionId, 'user', [{ type: 'text', text: '继续排查' }]);
+    runtime.store.appendMessage(sessionId, 'assistant', [{ type: 'text', text: '检查配置。' }]);
     const pending = suggest(4);
     await new Promise((resolve) => setTimeout(resolve, 20));
-    assert.equal(calls.length, 3, '会话还在时会发起建议调用');
+    assert.equal(calls.length, 2, '新回复轮可以生成一次');
     cancelInputSuggestion(sessionId);
     const cancelled = await pending;
     assert.equal(cancelled.suggestion, null, '会话结束后不再返回这次建议');
     assert.equal(aborted.at(-1), true, '会话结束后进行中的建议调用被取消');
     cancelInputSuggestion(sessionId);
     const quiet = await suggest(5);
-    assert.equal(quiet.suggestion?.primary, '把失败原因再说细一点', '取消后槽位已清，同会话可以再请求');
+    assert.equal(quiet.suggestion, null, '取消后的同轮不会重新调用');
+    assert.equal(calls.length, 2);
   } finally {
     releaseSecond();
     server.closeAllConnections();
