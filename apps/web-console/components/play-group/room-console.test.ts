@@ -33,6 +33,25 @@ const groups = [
   { id: 'data', name: '数据组', botIds: ['orion'] }
 ];
 
+test('成员卡不铺职责长文，标题栏只留短的模型设置入口 [AC:group-member-quiet#AC-1] [AC:group-member-quiet#AC-4] [AC:group-member-quiet#AC-5] [AC:global-default-model-clarity#AC-4] [AC:global-default-model-clarity#AC-5]', () => {
+  assert.doesNotMatch(chat, /descriptionOf|play-group-member__desc|play\.groupModel\.priorityHint|play\.groupModel\.defaultLabel|play-group-model-hint|play\.groupModel\.unconfigured/);
+  assert.doesNotMatch(chat, /全局默认模型|这里展示普通文本模型配置|Bot 专属|全局默认/);
+  assert.doesNotMatch(drawer, /play-group-member__desc/);
+  assert.match(chat, /href="#\/settings\/models"/);
+  assert.match(chat, /data-testid="room-default-model"/);
+  assert.match(chat, /play\.groupModel\.settings/);
+  assert.match(chat, /RoomSharedContextEditor/);
+  assert.match(chat, /play\.group\.addMember/);
+  assert.match(chat, /onClick=\{\(\) => void addMember\(\)\}/);
+  assert.match(chat, /onClick=\{\(\) => void removeMember\(id\)\}/);
+  assert.equal(zh.play.groupModel.settings, '默认模型');
+  assert.equal(en.play.groupModel.settings, 'Default model');
+  assert.equal('priorityHint' in zh.play.groupModel, false);
+  assert.equal('defaultLabel' in zh.play.groupModel, false);
+  assert.equal('priorityHint' in en.play.groupModel, false);
+  assert.equal('defaultLabel' in en.play.groupModel, false);
+});
+
 test('超过 6 人时主聊天区不铺成员卡，打开后可搜索并整组加入或移出 [AC:bot-room-console#AC-1]', () => {
   assert.equal(tileMembersInHeader(6), true);
   assert.equal(tileMembersInHeader(7), false);

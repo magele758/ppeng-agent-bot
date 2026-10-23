@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { groupComposerCommand, groupMessageMood, roomComposerDisabled, roomDefaultModelLabel, roomHistoryUrl, roomMemberModelLabel, runGroupComposerCommand } from './group-chat-view.ts';
+import { groupComposerCommand, groupMessageMood, roomComposerDisabled, roomHistoryUrl, roomMemberModelLabel, runGroupComposerCommand } from './group-chat-view.ts';
 import type { RoomModelConfiguration } from './room-models';
 
 const model = { providerId: 'local', providerName: 'Local', modelId: 'chat' };
@@ -9,16 +9,18 @@ const models: RoomModelConfiguration = { defaultModel: model, members: [
   { botId: 'pinned', model: { ...model, modelId: 'special' }, source: 'bot' },
   { botId: 'missing', model: null, source: 'unconfigured' }
 ] };
-const t = (key: string) => key;
 
-test('room labels distinguish loading, missing configuration, pinned and global models', () => {
-  assert.equal(roomDefaultModelLabel(null, t), 'common.loading');
-  assert.equal(roomDefaultModelLabel({ ...models, defaultModel: null }, t), 'play.groupModel.unconfigured');
-  assert.equal(roomDefaultModelLabel(models, t), 'Local / chat');
-  assert.equal(roomMemberModelLabel(null, 'inherited', t), 'common.loading');
-  assert.equal(roomMemberModelLabel(models, 'inherited', t), 'play.groupModel.globalSource · Local / chat');
-  assert.equal(roomMemberModelLabel(models, 'pinned', t), 'play.groupModel.botSource · Local / special');
-  for (const id of ['missing', 'unknown']) assert.equal(roomMemberModelLabel(models, id, t), 'play.groupModel.unconfigured');
+test('跟随全局默认的成员不显示模型路径，专属且不同才显示模型名 [AC:group-member-quiet#AC-2] [AC:group-member-quiet#AC-3] [AC:global-default-model-clarity#AC-4]', () => {
+  assert.equal(roomMemberModelLabel(null, 'inherited'), null);
+  assert.equal(roomMemberModelLabel(models, 'inherited'), null);
+  assert.equal(roomMemberModelLabel(models, 'pinned'), 'special');
+  for (const id of ['missing', 'unknown']) assert.equal(roomMemberModelLabel(models, id), null);
+  const sameAsDefault: RoomModelConfiguration = {
+    defaultModel: model,
+    members: [{ botId: 'pinned-same', model, source: 'bot' }]
+  };
+  assert.equal(roomMemberModelLabel(sameAsDefault, 'pinned-same'), null);
+  assert.equal(roomMemberModelLabel({ ...models, defaultModel: null }, 'pinned'), 'special');
 });
 
 test('room history sends a cursor only for an explicitly requested older page', () => {

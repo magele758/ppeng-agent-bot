@@ -67,7 +67,7 @@ test('deleting a running room cancels its work and fences late replies [AC:bot-f
   };
   f.host.cancelSession = id => cancelled.push(id);
   try {
-    f.rooms.send(f.principal, f.room.id, { text: 'Start work' });
+    f.rooms.send(f.principal, f.room.id, { text: 'Start work', mentions: [f.bots[0].id] });
     const tick = f.rooms.tick();
     await ready;
     f.rooms.delete(f.principal, f.room.id);

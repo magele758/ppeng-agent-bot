@@ -4,6 +4,7 @@ import { useI18n, type MessageKey } from "@/lib/i18n";
 import { applyHistoryPage, historyBeforeQuery, historyPollStale, historyWindowAnchor, loadEarlierCursorAfterReset, mergeHistoryWindow, olderHistoryPageStale } from "@/lib/history-window";
 import { sameData } from "@/lib/same-data";
 import type { BotInfo } from "@/lib/types";
+import { GroupReplyModeControl } from "../play-group/GroupReplyModeControl";
 import { api, json, useAction, Feedback, Result, Status } from "./shared";
 type Room = {
   id: string;
@@ -139,6 +140,7 @@ export function BotRooms({ bots, selectedRoomId, memberEditor = true }: { bots: 
     <section className="ag-panel" data-testid="bot-rooms">
       <h3>{t("botWork.rooms")}</h3>
       <Feedback {...action} />
+      {selectedRoomId ? <GroupReplyModeControl roomId={selectedRoomId} /> : null}
       {!selectedRoomId && <>
       <form
         onSubmit={(e) => {

@@ -11,15 +11,18 @@ export const play = {
   },
 
   imageUnsupported: 'The current model does not support images. Select an image-capable model, or remove the current images and send text only.',
-  groupSettings: { title: 'Group chat settings' },
+  groupSettings: {
+    title: 'Group chat settings',
+    replyMode: 'Reply mode',
+    coordinator: 'Coordinator speaks',
+    coordinatorHint: 'The coordinator speaks',
+    allMembers: 'All members reply',
+    allMembersHint: 'Each member replies',
+    saveFailed: 'Reply mode was not saved',
+  },
   entry: { new: 'New', remove: 'Remove', removeBot: 'Remove Bot “{name}”', removeBotConfirm: 'Remove Bot “{name}”? It will be hidden from the Bot list. Existing conversations, group chats and tasks are kept; this does not delete conversations.', removeFailed: 'Removal failed: {error}' },
   groupModel: {
-    defaultLabel: "Global default model",
-    unconfigured: "No usable model configured",
-    settings: "Set global default model",
-    priorityHint: "Members use their Bot model when pinned; otherwise they follow the global default. These are text model settings.",
-    botSource: "Bot model",
-    globalSource: "Global default",
+    settings: "Default model",
   },
   faceMotion: { working: "Working" },
   functionalGroups: {
