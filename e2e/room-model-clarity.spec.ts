@@ -23,7 +23,7 @@ test('room keeps a short model settings link and shows only a different member m
  await expect(panel.getByText(/群成员优先使用/)).toHaveCount(0);
  await expect(panel.locator('.play-group-member__desc')).toHaveCount(0);
  await expect(panel.getByTestId(`room-member-model-${room.botIds[0]}`)).toHaveCount(0);
- const pinned=panel.locator('.play-group-member').filter({has:panel.getByTestId(`room-member-model-${room.botIds[1]}`)});
+ const pinned=panel.locator('.play-group-member').filter({has:page.getByTestId(`room-member-model-${room.botIds[1]}`)});
  await expect(pinned.getByTestId(`room-member-model-${room.botIds[1]}`)).toHaveText('Pinned-text-model');
  await expect(pinned).not.toContainText('全局默认');
  await expect(pinned).not.toContainText('Bot 专属');
