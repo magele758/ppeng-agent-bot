@@ -19,7 +19,7 @@
 | `tasks` | 任务 | 子页：`queue`（任务队列/定时发布/后台任务）· `runs`（Orchestration/Swarm 运行）· `inbox`（审批、邮件撰写、Workspaces） |
 | `knowledge` | 知识与记忆 | 子页：`memory`（MemoryPanel）· `ingestion`（附件与浏览器/摄取） |
 | `ops` | 运维 | 子页：`trajectory`（会话轨迹/Trace）· `health`（系统状态、自愈/Evolution、有效配置 EffectiveConfig） |
-| `settings` | 设置 | 分类左栏 + 全局搜索 + 「显示高级」开关（只收起卡片内分组，如网关 Webhook、知识库高级项）。分类：`general` 通用（语言/主题）· `models` 模型 · `behavior` Agent 行为 · `safety` 安全与沙箱 · `tools` 工具与技能 · `integrations` 集成与可观测 · `experimental` 实验特性（原整项 advanced：模型回退、压缩、目标校验、循环内核、Cloudflare 沙箱、动态工具、能力发现、Langfuse、Jev） |
+| `settings` | 设置 | 分类左栏 + 全局搜索 + 「显示高级」开关（只收起卡片内分组，如网关 Webhook、知识库高级项）。分类：`general` 通用（语言/主题）· `models` 模型（提供商与 Jev 评估，Jev 关闭时仍可配置连接）· `behavior` Agent 行为 · `safety` 安全与沙箱 · `tools` 工具与技能 · `integrations` 集成与可观测 · `experimental` 实验特性（原整项 advanced：模型回退、压缩、目标校验、循环内核、Cloudflare 沙箱、动态工具、能力发现、Langfuse） |
 
 路由：URL hash `#/<section>[/<sub>]`（`lib/nav.ts`，纯函数、有单测）。不新增 Next 路由，保证 Chat 状态不被卸载。
 

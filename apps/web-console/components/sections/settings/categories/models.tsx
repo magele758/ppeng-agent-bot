@@ -1,4 +1,5 @@
 import { ModelProvidersCard } from '../../../ModelProvidersCard';
+import { JevSettingsCard } from '../../../JevSettingsCard';
 import type { SettingsEntry } from '../registry';
 
 export const modelsEntries: SettingsEntry[] = [
@@ -8,5 +9,12 @@ export const modelsEntries: SettingsEntry[] = [
     titleKey: 'settings.entries.modelProviders.title',
     keywordsKey: 'settings.entries.modelProviders.keywords',
     render: () => <ModelProvidersCard />
+  },
+  {
+    id: 'jev',
+    category: 'models',
+    titleKey: 'settingsEntries.jev.title',
+    keywordsKey: 'settingsEntries.jev.keywords',
+    render: () => <JevSettingsCard />
   }
 ];

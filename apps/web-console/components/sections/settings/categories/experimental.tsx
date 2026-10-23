@@ -3,7 +3,6 @@ import { CompactSettingsCard } from '../../../CompactSettingsCard';
 import { DiscoverySettingsCard } from '../../../DiscoverySettingsCard';
 import { DynToolsSettingsCard } from '../../../DynToolsSettingsCard';
 import { GoalVerifySettingsCard } from '../../../GoalSettingsCard';
-import { JevSettingsCard } from '../../../JevSettingsCard';
 import { LangfuseSettingsCard } from '../../../LangfuseSettingsCard';
 import { ModelFallbackCard } from '../../../ModelFallbackCard';
 import { SandboxCloudflareSettingsCard } from '../../../SandboxSettingsCard';
@@ -66,12 +65,5 @@ export const experimentalEntries: SettingsEntry[] = [
     titleKey: 'settingsEntries.langfuse.title',
     keywordsKey: 'settingsEntries.langfuse.keywords',
     render: () => <LangfuseSettingsCard />
-  },
-  {
-    id: 'jev',
-    category: 'experimental',
-    titleKey: 'settingsEntries.jev.title',
-    keywordsKey: 'settingsEntries.jev.keywords',
-    render: () => <JevSettingsCard />
   }
 ];

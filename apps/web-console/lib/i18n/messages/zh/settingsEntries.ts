@@ -349,6 +349,11 @@ export const settingsEntries = {
     unconfigured: '尚未配置连接信息。'
   },
   jev: {
+    enabledLabel: '启用评估',
+    stateOff: '已关闭，不调用评估模型',
+    stateNeedsConnection: '已开启，等待配置连接',
+    stateNoPoints: '已开启，尚未选择评估环节',
+    stateActive: '已接入评估',
     title: 'Jev 评估',
     keywords: '评估 eval jev 判官 第二意见 目标门 工具闸 切入点 审查 评审模型',
     desc: '接入独立的评估模型（Jev），在关键环节（判断目标是否完成、审查危险命令等）给出第二意见。',
