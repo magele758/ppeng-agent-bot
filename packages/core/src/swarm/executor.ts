@@ -49,6 +49,8 @@ export class SwarmExecutor {
         if (status === 'running' || status === 'planning') return this.deps.runSession(sessionId);
       })
       .catch(() => {
+        const taskId = this.taskIdForSession(sessionId);
+        if (taskId) this.deps.store.updateTask(taskId, { status: 'failed' });
         this.deps.enqueueSchedulerWake(sessionId, 'swarm.task');
       })
       .finally(() => {
@@ -133,7 +135,7 @@ export class SwarmExecutor {
       (s) => (s.metadata as { swarmRunId?: string })?.swarmRunId === run.id
     );
     let activeCount = sessions.filter(
-      (s) => s.status === 'running' || s.status === 'idle' || s.status === 'waiting_approval'
+      (s) => s.status === 'running' || s.status === 'waiting_approval'
     ).length;
 
     for (const task of tasks) {
@@ -153,7 +155,11 @@ export class SwarmExecutor {
 
     if (!this.isDispatchable(run.id)) return;
     const refreshed = this.deps.store.listTasks(run.id);
-    if (refreshed.length > 0 && refreshed.every((t) => TERMINAL_TASK.includes(t.status))) {
+    if (refreshed.length === 0) {
+      this.deps.store.updateRunStatus(run.id, 'failed');
+      return;
+    }
+    if (refreshed.every((t) => TERMINAL_TASK.includes(t.status))) {
       const failed = refreshed.some((t) => t.status === 'failed');
       this.deps.store.updateRunStatus(run.id, failed ? 'failed' : 'completed');
     }
@@ -165,6 +171,12 @@ export class SwarmExecutor {
       const dep = all.find((t) => t.id === depId);
       return dep?.status === 'done';
     });
+  }
+
+  private taskIdForSession(sessionId: string): string | undefined {
+    const session = this.deps.getSession(sessionId);
+    const taskId = session?.metadata?.swarmTaskId;
+    return typeof taskId === 'string' ? taskId : undefined;
   }
 
   private sessionIdFromTask(task: SwarmTask): string | undefined {
@@ -188,17 +200,23 @@ export class SwarmExecutor {
       .filter(Boolean)
       .join('\n\n');
 
-    const session = this.deps.createTeammateSession({
-      name: `swarm-${task.id.slice(-6)}`,
-      role: task.requiredRole,
-      prompt,
-      background: true,
-      metadata: {
-        swarmRunId: run.id,
-        swarmTaskId: task.id,
-        autoRun: true
-      }
-    });
+    let session: SessionRecord;
+    try {
+      session = this.deps.createTeammateSession({
+        name: `swarm-${task.id.slice(-6)}`,
+        role: task.requiredRole,
+        prompt,
+        background: true,
+        metadata: {
+          swarmRunId: run.id,
+          swarmTaskId: task.id,
+          autoRun: true
+        }
+      });
+    } catch {
+      this.deps.store.updateTask(task.id, { status: 'failed' });
+      return;
+    }
 
     const artifacts = [...task.artifacts, `session:${session.id}`];
     this.deps.store.updateTask(task.id, {

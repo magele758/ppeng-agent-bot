@@ -312,6 +312,12 @@ export class TeamDagExecutor {
     for (const task of tasks) {
       if (this.deps.store.get(plan.id)?.status !== 'running') return;
       if (task.status !== 'running' || !task.sessionId) continue;
+      const session = this.deps.getSession(task.sessionId);
+      if (session?.status === 'failed') {
+        task.status = 'failed';
+        task.error = 'Teammate session failed';
+        continue;
+      }
       if (!this.deps.sessionTeammateFinished(task.sessionId)) continue;
       if (task.workspacePath) {
         try {
@@ -462,6 +468,13 @@ export class TeamDagExecutor {
     });
     if (this.deps.store.get(plan.id)?.status !== 'running') return;
     this.deps.enqueueSchedulerWake(session.id, 'teams.dag.task');
+    void this.deps.runSession(session.id).catch(() => {
+      const current = this.deps.store.get(plan.id);
+      if (!current) return;
+      const tasks = current.tasks.map(item => item.id === task.id ? { ...item, status: 'failed' as const, error: 'Teammate session failed to start' } : item);
+      const failed = tasks.some(item => item.status === 'failed');
+      this.deps.store.upsert({ ...current, tasks, status: failed && tasks.every(item => item.status === 'done' || item.status === 'failed' || item.status === 'cancelled') ? 'failed' : current.status });
+    });
   }
 
   private async postMail(

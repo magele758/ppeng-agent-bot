@@ -91,16 +91,23 @@ export function createRuntimeGoalDispatchTool(host: RuntimeGoalDispatchHost): To
         if (!host.runWorker) return {status:'blocked',content:'No isolated PTC worker adapter is available'};
         return host.runWorker(freshContext(context),request);
       }
-      const result = await invoke(context,'spawn_subagent',{prompt:request.task,...(request.role?{role:request.role}:{})},request,host.runWorker ? async workerContext => {
-        const worker = await host.runWorker!(freshContext(workerContext),request);
-        return {ok:worker.status!=='failed'&&worker.status!=='blocked',content:JSON.stringify({goalWorker:worker})};
-      } : undefined);
+      let spawnedChildId: string | undefined;
+      const result = await invoke(context,'spawn_subagent',{prompt:request.task,...(request.role?{role:request.role}:{})},request,async (workerContext, toolArgs) => {
+        if (host.runWorker) {
+          const worker = await host.runWorker(freshContext(workerContext),request);
+          return {ok:worker.status!=='failed'&&worker.status!=='blocked',content:JSON.stringify({goalWorker:worker})};
+        }
+        const spawned = await host.deps().tools.find(tool => tool.name === 'spawn_subagent')?.execute(workerContext, toolArgs);
+        if (typeof spawned?.metadata?.childSessionId === 'string') spawnedChildId = spawned.metadata.childSessionId;
+        return spawned ?? {ok:false,content:'spawn_subagent is unavailable'};
+      });
       if(host.runWorker && !result.waitingApproval) {
         try {
           const worker = JSON.parse(result.content)?.goalWorker as GoalAdapterResult | undefined;
           if(worker && ['progress','waiting','blocked','candidate_completed','failed','cancelled'].includes(worker.status) && typeof worker.content==='string') return worker;
         } catch { /* Normal gateway refusals and unknown outcomes remain blocked below. */ }
       }
+      if (spawnedChildId) return {status:'waiting',reference:`session:${spawnedChildId}`,content:result.content,waitingApproval:result.waitingApproval};
       return {status:result.waitingApproval?'waiting':result.ok?'candidate_completed':'blocked',waitingApproval:result.waitingApproval,content:result.content};
     },
     invokeAuthorizedTool:invoke,
