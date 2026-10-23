@@ -1,5 +1,17 @@
 /** Play / Chat copy. Do not add as const. */
 export const play = {
+  riskAdvisory: {
+    "title": "Run advisory",
+    "warning": "Execution warning",
+    "iteration_near_limit": "This run is approaching its iteration limit. Prioritize summarizing existing results.",
+    "budget_high": "Usage is approaching the configured budget. Limit further calls.",
+    "tool_error_streak": "Tools have failed consecutively. Check the errors before retrying.",
+    "tool_repeat": "Identical tool calls are repeating. Check whether progress is being made.",
+    "output_repeat": "Output is repeating. Consider a different approach.",
+    "unknown": "A runtime advisory was detected. Review the original details.",
+    "explanation": "This is guidance for the Agent. It does not itself indicate a dangerous action or stop execution.",
+    "details": "Original details"
+},
   retry: {
     waiting: '{model} · Retry {retry}/{max} · Retrying in {seconds}s',
     requesting: '{model} · Retrying {retry}/{max}',
