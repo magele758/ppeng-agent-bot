@@ -11,7 +11,7 @@ export const SUB_PAGES = {
   agents: ['agents', 'bots', 'teams', 'skills'],
   tasks: ['queue', 'bots', 'runs', 'inbox'],
   knowledge: ['memory', 'ingestion'],
-  settings: ['general', 'models', 'behavior', 'safety', 'tools', 'integrations', 'ops']
+  settings: ['general', 'models', 'behavior', 'safety', 'tools', 'integrations', 'experimental', 'ops']
 } as const satisfies Record<SectionId, readonly string[]>;
 
 export type SubPageId<S extends SectionId = SectionId> = (typeof SUB_PAGES)[S][number];

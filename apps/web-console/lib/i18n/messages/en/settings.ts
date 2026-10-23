@@ -14,9 +14,11 @@ export const settings = {
     safety: 'Safety & sandbox',
     tools: 'Tools & skills',
     integrations: 'Integrations & observability',
+    experimental: 'Experimental',
     ops: 'Ops'
   },
   categoriesLabel: 'Settings categories',
+  experimentalSwitch: 'Enable {name}',
   searchPlaceholder: 'Search settings (e.g. model, API key, Feishu, theme)',
   searchCount: '{count} settings found',
   searchClear: 'Clear search',

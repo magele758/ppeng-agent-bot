@@ -59,6 +59,12 @@ export interface LoopSettings {
    * `weak` (default) constrains weak models only; `all` constrains every model; `off` constrains none.
    */
   repeatGuard: RepeatGuardMode;
+  /**
+   * Master switch for kernel, assembly, steer drain, and inbox cap.
+   * `false` keeps the saved values but a run uses the defaults.
+   * Missing means on, so existing labs stay on.
+   */
+  engineEnabled: boolean;
   updatedAt: string;
 }
 
@@ -71,6 +77,7 @@ export interface LoopSettingsPatch {
   kernelVariant?: KernelVariant;
   assemblyPreset?: AssemblyPreset;
   repeatGuard?: RepeatGuardMode;
+  engineEnabled?: boolean;
 }
 
 export interface LoopSettingsStore {
@@ -88,6 +95,7 @@ export function defaultLoopSettings(): LoopSettings {
     kernelVariant: 'agent-loop',
     assemblyPreset: 'max',
     repeatGuard: 'weak',
+    engineEnabled: true,
     updatedAt: new Date().toISOString()
   };
 }
@@ -110,6 +118,7 @@ export function normalizeLoopSettings(raw: Partial<LoopSettings> | null | undefi
     kernelVariant: parseKernelVariant(raw.kernelVariant) ?? base.kernelVariant,
     assemblyPreset: parseAssemblyPreset(raw.assemblyPreset) ?? base.assemblyPreset,
     repeatGuard: parseRepeatGuardMode(raw.repeatGuard) ?? base.repeatGuard,
+    engineEnabled: raw.engineEnabled === false ? false : true,
     updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : base.updatedAt
   };
 }
@@ -153,6 +162,30 @@ export function hasPersistedLoopSettings(store: LoopSettingsStore): boolean {
   return store.getDaemonControl(LOOP_SETTINGS_KEY) != null;
 }
 
+/** Saved engine fields, or the defaults when the master switch is off. */
+export function appliedLoopEngine(settings: LoopSettings): {
+  steerDrainPolicy: SteerDrainPolicy;
+  inboxOverflowCap: number | null;
+  kernelVariant: KernelVariant;
+  assemblyPreset: AssemblyPreset;
+} {
+  if (settings.engineEnabled === false) {
+    const base = defaultLoopSettings();
+    return {
+      steerDrainPolicy: base.steerDrainPolicy,
+      inboxOverflowCap: base.inboxOverflowCap,
+      kernelVariant: base.kernelVariant,
+      assemblyPreset: base.assemblyPreset
+    };
+  }
+  return {
+    steerDrainPolicy: settings.steerDrainPolicy,
+    inboxOverflowCap: settings.inboxOverflowCap,
+    kernelVariant: settings.kernelVariant,
+    assemblyPreset: settings.assemblyPreset
+  };
+}
+
 /** Explicit runSession option; kernel also reads the same KV as fallback. */
 export function loopSettingsAsRuntimeHint(settings: LoopSettings): {
   steerDrainPolicy: SteerDrainPolicy;
@@ -161,9 +194,10 @@ export function loopSettingsAsRuntimeHint(settings: LoopSettings): {
   defaultSkillScope: SkillScope;
   steerInterruptPolicy: SteerInterruptPolicy;
 } {
+  const effective = appliedLoopEngine(settings);
   return {
-    steerDrainPolicy: settings.steerDrainPolicy,
-    inboxOverflowCap: settings.inboxOverflowCap,
+    steerDrainPolicy: effective.steerDrainPolicy,
+    inboxOverflowCap: effective.inboxOverflowCap,
     defaultTaskMode: settings.defaultTaskMode,
     defaultSkillScope: settings.defaultSkillScope,
     steerInterruptPolicy: settings.steerInterruptPolicy

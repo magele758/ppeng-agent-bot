@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { MessageKey } from '@/lib/i18n';
 import type { SUB_PAGES } from '@/lib/nav';
 import { behaviorEntries } from './categories/behavior';
+import { experimentalEntries } from './categories/experimental';
 import { gatewayEntries } from './categories/gateway';
 import { generalEntries } from './categories/general';
 import { integrationsEntries } from './categories/integrations';
@@ -22,7 +23,7 @@ export interface SettingsEntry {
   titleKey: MessageKey;
   /** 额外搜索关键词（i18n，空格分隔多个同义词） */
   keywordsKey?: MessageKey;
-  /** 高级项：默认隐藏，开启「显示高级」或搜索命中时显示 */
+  /** 仍由「显示高级」整项收起。实验特性里的条目不要再标这个。 */
   advanced?: boolean;
   render: (ctx: SettingsRenderContext) => ReactNode;
 }
@@ -35,5 +36,6 @@ export const SETTINGS_ENTRIES: readonly SettingsEntry[] = [
   ...safetyEntries,
   ...toolsEntries,
   ...gatewayEntries,
-  ...integrationsEntries
+  ...integrationsEntries,
+  ...experimentalEntries
 ];

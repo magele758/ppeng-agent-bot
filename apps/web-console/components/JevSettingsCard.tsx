@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { api } from '@/lib/api';
 import { useI18n, type MessageKey } from '@/lib/i18n';
 import { buildPatch } from '@/lib/settings-fields';
-import { SettingsGroup } from './ui';
+import { ExperimentRow, SettingsGroup } from './ui';
 import {
   LoadGate,
   RiskNotice,
@@ -38,6 +38,7 @@ interface JevSettings {
   apiKeySet: boolean;
   model: string;
   profile: JevProfile;
+  armed: boolean;
   points: Partial<Record<JevPointId, boolean>>;
   activePoints: JevPointId[];
   chained: boolean;
@@ -97,9 +98,16 @@ export function JevSettingsCard() {
 
   return (
     <div className="settings-stack" id="card-jev">
-      <SettingsGroup title={label('title')} description={label('desc')}>
-        <LoadGate ready={s !== null} error={r.loadError} onRetry={() => void r.reload()}>
-          {s ? (
+      <LoadGate ready={s !== null} error={r.loadError} onRetry={() => void r.reload()}>
+        {s ? (
+          <ExperimentRow
+            switchId="jev"
+            title={label('title')}
+            description={label('desc')}
+            on={s.armed}
+            busy={r.busy}
+            onChange={(armed) => void r.save({ armed })}
+          >
             <>
               <p className="muted small">{label('connection.desc')}</p>
               <TextField
@@ -147,13 +155,7 @@ export function JevSettingsCard() {
                 </button>
               </SaveBar>
               <p className="muted small">{entryOk ? label('configured') : label('unconfigured')}</p>
-            </>
-          ) : null}
-          <StatusLine status={r.status} />
-        </LoadGate>
-      </SettingsGroup>
-      {s ? (
-        <SettingsGroup id="card-jev-stages" title={label('stages.title')} description={label('stages.desc')}>
+              <SettingsGroup id="card-jev-stages" title={label('stages.title')} description={label('stages.desc')}>
           {!entryOk ? <RiskNotice>{label('needsEntry')}</RiskNotice> : null}
           <SelectField
             id="field-jevProfile"
@@ -199,7 +201,11 @@ export function JevSettingsCard() {
             <p className="muted small">{t(`${base}.stages.active` as MessageKey, { points: s.activePoints.join(', ') })}</p>
           ) : null}
         </SettingsGroup>
-      ) : null}
+            </>
+          </ExperimentRow>
+        ) : null}
+        <StatusLine status={r.status} />
+      </LoadGate>
     </div>
   );
 }

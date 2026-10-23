@@ -29,6 +29,12 @@ export interface SandboxSettings {
   cfBackend: CloudflareComputerBackend;
   /** SecretVault entry name. Value is never persisted here. */
   cfTokenSecretName: string;
+  /**
+   * Master switch for the Cloudflare connection. `false` keeps the saved endpoint
+   * but resolve ignores it and does not fall through to CLOUDFLARE_COMPUTER_ENDPOINT.
+   * Absent: on when an endpoint is saved or the env fallback is in use.
+   */
+  cfEnabled?: boolean;
   updatedAt: string;
 }
 
@@ -40,6 +46,7 @@ export interface SandboxSettingsPatch {
   cfTimeoutMs?: number;
   cfBackend?: string;
   cfTokenSecretName?: string;
+  cfEnabled?: boolean;
 }
 
 export interface SandboxSettingsStore {
@@ -129,6 +136,7 @@ export function normalizeSandboxSettings(raw: Partial<SandboxSettings> | null | 
     cfTimeoutMs: clampTimeout(raw.cfTimeoutMs, base.cfTimeoutMs),
     cfBackend: parseBackend(raw.cfBackend),
     cfTokenSecretName: typeof raw.cfTokenSecretName === 'string' ? raw.cfTokenSecretName.trim() : '',
+    ...(typeof raw.cfEnabled === 'boolean' ? { cfEnabled: raw.cfEnabled } : {}),
     updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : base.updatedAt
   };
 }
@@ -162,6 +170,7 @@ export function writeSandboxSettings(store: SandboxSettingsStore, patch: Sandbox
     cfBackend: patch.cfBackend !== undefined ? parseBackend(patch.cfBackend) : current.cfBackend,
     cfTokenSecretName: patch.cfTokenSecretName ?? current.cfTokenSecretName,
     mode: patch.mode !== undefined ? (parseSandboxMode(patch.mode) ?? current.mode) : current.mode,
+    cfEnabled: typeof patch.cfEnabled === 'boolean' ? patch.cfEnabled : current.cfEnabled,
     updatedAt: nowIso()
   });
   store.setDaemonControl(SANDBOX_SETTINGS_KEY, next);
@@ -187,10 +196,13 @@ export function resolveCloudflareComputerConfig(
   store: SandboxSettingsStore | undefined,
   env: NodeJS.ProcessEnv = process.env
 ): Omit<CloudflareComputerResolved, 'tokenPresent' | 'tokenSource'> {
-  const saved = isStore(store) && hasPersistedSandboxSettings(store) ? readSandboxSettings(store) : defaultSandboxSettings();
+  const persisted = isStore(store) && hasPersistedSandboxSettings(store);
+  const saved = persisted ? readSandboxSettings(store) : defaultSandboxSettings();
   const endpoint =
-    saved.cfEndpoint ||
-    String(env.CLOUDFLARE_COMPUTER_ENDPOINT ?? '').trim().replace(/\/+$/, '');
+    persisted && saved.cfEnabled === false
+      ? ''
+      : saved.cfEndpoint ||
+        String(env.CLOUDFLARE_COMPUTER_ENDPOINT ?? '').trim().replace(/\/+$/, '');
   return {
     endpoint,
     workspaceName: saved.cfWorkspaceName || 'default',

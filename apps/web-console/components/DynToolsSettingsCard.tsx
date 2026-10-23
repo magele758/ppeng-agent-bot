@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 import { useI18n, type MessageKey } from '@/lib/i18n';
 import { buildPatch, parseIntInRange } from '@/lib/settings-fields';
-import { EmptyState, SettingsGroup } from './ui';
+import { EmptyState, ExperimentRow, SettingsGroup } from './ui';
 import {
   LoadGate,
   SaveBar,
@@ -137,32 +137,21 @@ export function DynToolsSettingsCard({ sessionId }: { sessionId?: string }) {
 
   return (
     <div className="settings-stack" id="card-dyn-tools">
-      <SettingsGroup title={label('title')} description={label('desc')}>
-        <LoadGate ready={s !== null} error={r.loadError} onRetry={() => void r.reload()}>
-          {s ? (
+      <LoadGate ready={s !== null} error={r.loadError} onRetry={() => void r.reload()}>
+        {s ? (
+          <ExperimentRow
+            switchId="dynTools"
+            title={label('title')}
+            description={label('desc')}
+            on={s.enabled}
+            busy={r.busy}
+            onChange={(enabled) => void r.save({ enabled })}
+          >
             <>
-              <ToggleField
-                id="field-dynToolsEnabled"
-                label={label('fields.enabled.label')}
-                hint={label('fields.enabled.hint')}
-                checked={s.enabled}
-                disabled={r.busy}
-                defaultText={onOff(DEFAULTS.enabled)}
-                isDefault={s.enabled === DEFAULTS.enabled}
-                onRestore={() => void r.save({ enabled: DEFAULTS.enabled })}
-                onChange={(enabled) => void r.save({ enabled })}
-              />
               {toggle('allowSave', 'field-dynToolsAllowSave', 'allowSave')}
               {toggle('allowPropose', 'field-dynToolsAllowPropose', 'allowPropose')}
               {toggle('allowProjectPromote', 'field-dynToolsAllowPromote', 'allowPromote')}
-            </>
-          ) : null}
-          <StatusLine status={r.status} />
-          {r.effective ? <SourceBadge source={r.effective.source} /> : null}
-        </LoadGate>
-      </SettingsGroup>
-      {s ? (
-        <SettingsGroup
+              <SettingsGroup
           id="card-dyn-tools-tuning"
           title={label('tuning.title')}
           description={label('tuning.desc')}
@@ -199,8 +188,7 @@ export function DynToolsSettingsCard({ sessionId }: { sessionId?: string }) {
           />
           <SaveBar dirty={form.dirty} busy={r.busy} onSave={() => void submitTuning()} onReset={form.reset} />
         </SettingsGroup>
-      ) : null}
-      <SettingsGroup id="card-dyn-tools-session" title={label('session.title')} description={label('session.desc')}>
+        <SettingsGroup id="card-dyn-tools-session" title={label('session.title')} description={label('session.desc')}>
         {!sessionId ? (
           <EmptyState title={label('session.noSession')} />
         ) : tools.length === 0 ? (
@@ -242,6 +230,12 @@ export function DynToolsSettingsCard({ sessionId }: { sessionId?: string }) {
           ))
         )}
       </SettingsGroup>
+            </>
+          </ExperimentRow>
+        ) : null}
+        <StatusLine status={r.status} />
+        {r.effective ? <SourceBadge source={r.effective.source} /> : null}
+      </LoadGate>
     </div>
   );
 }

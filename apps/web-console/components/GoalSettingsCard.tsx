@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { useI18n } from '@/lib/i18n';
 import { parseIntInRange } from '@/lib/settings-fields';
-import { SettingsGroup } from './ui';
+import { ExperimentRow, SettingsGroup } from './ui';
 import { LoadGate, SaveBar, StatusLine, TextField, ToggleField } from './sections/settings/categories/kit/fields';
 import { useSettingsResource } from './sections/settings/categories/kit/settings-store';
 import { useDraftForm } from './sections/settings/categories/kit/useDraftForm';
@@ -83,30 +83,23 @@ export function GoalSettingsCard() {
 export function GoalVerifySettingsCard() {
   const { t } = useI18n();
   const r = useSettingsResource<GoalSettings>('/api/goals/settings');
-  const onOff = (v: boolean) => t(v ? 'settingsEntries.common.on' : 'settingsEntries.common.off');
 
   return (
-    <SettingsGroup
-      id="card-goal-verify"
-      title={t('settingsEntries.goalVerify.title')}
-      description={t('settingsEntries.goalVerify.desc')}
-    >
-      <LoadGate ready={r.settings !== null} error={r.loadError} onRetry={() => void r.reload()}>
-        {r.settings ? (
-          <ToggleField
-            id="field-goalHttpVerify"
-            label={t('settingsEntries.goalVerify.fields.http.label')}
-            hint={t('settingsEntries.goalVerify.fields.http.hint')}
-            checked={r.settings.allowHttpVerify}
-            disabled={r.busy}
-            defaultText={onOff(DEFAULTS.allowHttpVerify)}
-            isDefault={r.settings.allowHttpVerify === DEFAULTS.allowHttpVerify}
-            onRestore={() => void r.save({ allowHttpVerify: DEFAULTS.allowHttpVerify })}
-            onChange={(allowHttpVerify) => void r.save({ allowHttpVerify })}
-          />
-        ) : null}
-        <StatusLine status={r.status} />
-      </LoadGate>
-    </SettingsGroup>
+    <LoadGate ready={r.settings !== null} error={r.loadError} onRetry={() => void r.reload()}>
+      {r.settings ? (
+        <ExperimentRow
+          id="card-goal-verify"
+          switchId="goalVerify"
+          title={t('settingsEntries.goalVerify.title')}
+          description={t('settingsEntries.goalVerify.desc')}
+          on={r.settings.allowHttpVerify}
+          busy={r.busy}
+          onChange={(allowHttpVerify) => void r.save({ allowHttpVerify })}
+        >
+          <p className="ui-group__desc">{t('settingsEntries.goalVerify.fields.http.hint')}</p>
+        </ExperimentRow>
+      ) : null}
+      <StatusLine status={r.status} />
+    </LoadGate>
   );
 }

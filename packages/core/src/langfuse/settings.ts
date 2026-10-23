@@ -81,7 +81,9 @@ export function normalizeLangfuseSettings(
   const base = defaultLangfuseSettings();
   if (!raw || typeof raw !== 'object') return base;
   const baseUrl = cleanUrl(raw.baseUrl);
-  const enabled = baseUrl.length > 0 && raw.enabled === true;
+  // The row switch is the wish to trace. A missing URL still keeps it on so the form can appear;
+  // resolveLangfuseChain stays null until the URL and both keys exist.
+  const enabled = raw.enabled === true;
   return {
     baseUrl,
     publicKey: typeof raw.publicKey === 'string' ? raw.publicKey.trim() : '',

@@ -4,10 +4,9 @@ import { useMemo } from 'react';
 import { useI18n, type MessageKey } from '@/lib/i18n';
 import { parseIntInRange } from '@/lib/settings-fields';
 import { ConfigGroup, FieldLabel } from './ConfigGroup';
-import { SettingsGroup } from './ui';
+import { ExperimentRow } from './ui';
 import {
   LoadGate,
-  RiskNotice,
   SaveBar,
   SelectField,
   SourceBadge,
@@ -22,6 +21,7 @@ export type CompactPolicy = 'keep_recent' | 'after_any_assistant' | 'after_text_
 interface CompactSettings {
   policy: CompactPolicy;
   keepRecent: number;
+  enabled?: boolean;
   updatedAt: string;
 }
 
@@ -145,12 +145,21 @@ function CompactSettingsPanel({ sessionStats }: { sessionStats?: { collapsed: nu
     await r.save({ keepRecent: parsed.value });
   };
 
+  const armed = s ? (typeof s.enabled === 'boolean' ? s.enabled : Boolean(r.effective?.enabled)) : false;
+
   return (
-    <SettingsGroup id="card-compact" title={label('title')} description={label('desc')}>
-      <LoadGate ready={s !== null} error={r.loadError} onRetry={() => void r.reload()}>
-        {s ? (
+    <LoadGate ready={s !== null} error={r.loadError} onRetry={() => void r.reload()}>
+      {s ? (
+        <ExperimentRow
+          id="card-compact"
+          switchId="compact"
+          title={label('title')}
+          description={label('desc')}
+          on={armed}
+          busy={r.busy}
+          onChange={(enabled) => void r.save({ enabled })}
+        >
           <>
-            {r.effective && !r.effective.enabled ? <RiskNotice>{label('globalOff')}</RiskNotice> : null}
             <SelectField
               id="field-compactPolicy"
               label={label('fields.policy.label')}
@@ -185,11 +194,11 @@ function CompactSettingsPanel({ sessionStats }: { sessionStats?: { collapsed: nu
             <SaveBar dirty={form.dirty} busy={r.busy} onSave={() => void submit()} onReset={form.reset} />
             <SessionStatsLine stats={sessionStats} />
           </>
-        ) : null}
-        <StatusLine status={r.status} />
-        {r.effective ? <SourceBadge source={r.effective.source} /> : null}
-      </LoadGate>
-    </SettingsGroup>
+        </ExperimentRow>
+      ) : null}
+      <StatusLine status={r.status} />
+      {r.effective ? <SourceBadge source={r.effective.source} /> : null}
+    </LoadGate>
   );
 }
 

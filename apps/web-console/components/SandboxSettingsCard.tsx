@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { useI18n, type MessageKey } from '@/lib/i18n';
 import { buildPatch, parseIntInRange } from '@/lib/settings-fields';
-import { SettingsGroup } from './ui';
+import { ExperimentRow, SettingsGroup } from './ui';
 import {
   LoadGate,
   RiskNotice,
@@ -27,13 +27,21 @@ interface SandboxSettings {
   cfTimeoutMs: number;
   cfBackend: CfBackend;
   cfTokenSecretName: string;
+  cfEnabled?: boolean;
 }
 
 interface SandboxEffective {
   mode: SandboxMode;
   source: string;
+  cfEndpoint?: string;
   tokenPresent: boolean;
   tokenSource: string;
+}
+
+function cloudflareOn(settings: SandboxSettings, effectiveEndpoint?: string): boolean {
+  if (settings.cfEnabled === false) return false;
+  if (settings.cfEnabled === true) return true;
+  return settings.cfEndpoint.length > 0 || Boolean(effectiveEndpoint);
 }
 
 const SANDBOX_PATH = '/api/sandbox/settings';
@@ -130,9 +138,17 @@ export function SandboxCloudflareSettingsCard() {
   });
 
   return (
-    <SettingsGroup id="card-sandbox-cloudflare" title={label('title')} description={label('desc')}>
-      <LoadGate ready={s !== null} error={r.loadError} onRetry={() => void r.reload()}>
-        {s ? (
+    <LoadGate ready={s !== null} error={r.loadError} onRetry={() => void r.reload()}>
+      {s ? (
+        <ExperimentRow
+          id="card-sandbox-cloudflare"
+          switchId="sandboxCloudflare"
+          title={label('title')}
+          description={label('desc')}
+          on={cloudflareOn(s, r.effective?.cfEndpoint)}
+          busy={r.busy}
+          onChange={(cfEnabled) => void r.save({ cfEnabled })}
+        >
           <>
             <TextField
               id="field-cfEndpoint"
@@ -197,9 +213,9 @@ export function SandboxCloudflareSettingsCard() {
             />
             <SaveBar dirty={form.dirty} busy={r.busy} onSave={() => void submit()} onReset={form.reset} />
           </>
-        ) : null}
-        <StatusLine status={r.status} />
-      </LoadGate>
-    </SettingsGroup>
+        </ExperimentRow>
+      ) : null}
+      <StatusLine status={r.status} />
+    </LoadGate>
   );
 }

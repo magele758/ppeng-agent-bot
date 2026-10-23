@@ -1824,9 +1824,11 @@ export class RawAgentRuntime {
       const loopKv = this.store.getDaemonControl<{
         kernelVariant?: string;
         assemblyPreset?: string;
+        engineEnabled?: boolean;
       }>('loop_settings');
-      const kernelVariant = loopKv?.kernelVariant ?? 'agent-loop';
-      const assemblyPreset: LoopPreset = parseLoopPreset(loopKv?.assemblyPreset) ?? 'max';
+      const engineOn = loopKv?.engineEnabled !== false;
+      const kernelVariant = engineOn ? (loopKv?.kernelVariant ?? 'agent-loop') : 'agent-loop';
+      const assemblyPreset: LoopPreset = engineOn ? (parseLoopPreset(loopKv?.assemblyPreset) ?? 'max') : 'max';
       this.log.info(`runSession kernel=${kernelVariant} assembly=${assemblyPreset}`);
       const runController = new AbortController();
       this.sessionAbortControllers.set(sessionId, runController);

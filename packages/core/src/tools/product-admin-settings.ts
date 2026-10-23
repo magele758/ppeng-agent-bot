@@ -102,7 +102,7 @@ const HANDLERS: Record<string, Handler> = {
     info: {
       area: 'ingestion',
       description: 'Attachment ingestion limits',
-      fields: ['enabled', 'maxBytes', 'inlineTextMaxBytes', 'archivePreviewChars', 'pageSizeChars', 'gbkFallback', 'toolResultArchiveChars']
+      fields: ['enabled', 'maxBytes', 'inlineTextMaxBytes', 'archivePreviewChars', 'pageSizeChars', 'gbkFallback', 'toolResultArchiveChars', 'libraryDirs']
     },
     read: (store) => readIngestionSettings(store),
     write: (store, patch) => writeIngestionSettings(store, patch)

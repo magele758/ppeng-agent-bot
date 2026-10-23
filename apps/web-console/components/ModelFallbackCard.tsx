@@ -5,7 +5,7 @@ import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { MODEL_PROVIDERS_CHANGED_EVENT, type ModelRef } from '@/lib/model-providers';
 import { SaveStatus, type SaveState } from './sections/settings/SaveStatus';
-import { SettingsGroup } from './ui';
+import { ExperimentRow } from './ui';
 import './sections/settings/settings.css';
 
 interface FallbackOption extends ModelRef {
@@ -19,7 +19,7 @@ interface FallbackEntryStatus extends ModelRef {
 }
 
 interface FallbackResponse {
-  settings: { chain: ModelRef[]; updatedAt: string };
+  settings: { chain: ModelRef[]; enabled?: boolean; updatedAt: string };
   options: FallbackOption[];
   chainStatus: FallbackEntryStatus[];
   effective: { enabled: boolean; source: 'ui' | 'default' };
@@ -28,6 +28,12 @@ interface FallbackResponse {
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
 const refKey = (ref: ModelRef) => `${ref.providerId}::${ref.modelId}`;
+
+function modelFallbackArmed(settings: { enabled?: boolean; chain: ModelRef[] }): boolean {
+  if (settings.enabled === false) return false;
+  if (settings.enabled === true) return true;
+  return settings.chain.length > 0;
+}
 
 function sameChain(a: ModelRef[], b: ModelRef[]): boolean {
   return a.length === b.length && a.every((ref, i) => refKey(ref) === refKey(b[i]!));
@@ -89,12 +95,38 @@ export function ModelFallbackCard() {
     };
   }, [refresh]);
 
+  const setArmed = async (enabled: boolean) => {
+    setBusy(true);
+    setJustSaved(false);
+    setErr(null);
+    try {
+      apply(
+        (await api('/api/model-fallback/settings', {
+          method: 'PATCH',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({ enabled })
+        })) as FallbackResponse
+      );
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (!data) {
     return (
       <div className="card" id="card-model-fallback">
-        <SettingsGroup title={t('modelFallback.title')}>
+        <ExperimentRow
+          switchId="modelFallback"
+          title={t('modelFallback.title')}
+          description={t('modelFallback.desc')}
+          on={false}
+          busy
+          onChange={() => undefined}
+        >
           <div className="empty-hint">{err ?? t('common.loading')}</div>
-        </SettingsGroup>
+        </ExperimentRow>
       </div>
     );
   }
@@ -149,7 +181,14 @@ export function ModelFallbackCard() {
 
   return (
     <div className="card" id="card-model-fallback">
-      <SettingsGroup title={t('modelFallback.title')} description={t('modelFallback.desc')}>
+      <ExperimentRow
+        switchId="modelFallback"
+        title={t('modelFallback.title')}
+        description={t('modelFallback.desc')}
+        on={modelFallbackArmed(data.settings)}
+        busy={busy}
+        onChange={(enabled) => void setArmed(enabled)}
+      >
       <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
         <span className="badge">{data.effective.source === 'ui' ? t('more.sourceUi') : t('more.sourceDefault')}</span>
         <span className="badge">{t('modelFallback.effectiveCount', { count: usableCount })}</span>
@@ -241,7 +280,7 @@ export function ModelFallbackCard() {
           <SaveStatus state={saveState} error={err} />
         </div>
       </div>
-      </SettingsGroup>
+      </ExperimentRow>
     </div>
   );
 }
