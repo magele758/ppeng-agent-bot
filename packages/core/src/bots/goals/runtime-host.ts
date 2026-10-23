@@ -308,7 +308,7 @@ function assistantTranscript(messages:ReturnType<GoalRuntimeHost['store']['foldM
 function baseReport(checkpoint:GoalReport|undefined,assistant:string,goal:BotGoal):GoalReport {
  if(checkpoint)return {...checkpoint,advanced:false};
  if(assistant.trim())return {kind:'candidate_completed',summary:assistant,evidence:[assistant],advanced:false};
- if(goal.evidence.length)return {kind:'progress',summary:goal.progress||'Recorded result kept for review',evidence:goal.evidence.slice(-20),advanced:false,nextStep:goal.nextStep};
+ if(goal.evidence.length)return {kind:'progress',summary:goal.progress||'Recorded result kept for review',evidence:[],advanced:false,nextStep:goal.nextStep};
  return {kind:'candidate_completed',summary:'Execution returned without completion evidence',evidence:[],advanced:false};
 }
 function interruptedReport(error:unknown,status:string):GoalReport|undefined {

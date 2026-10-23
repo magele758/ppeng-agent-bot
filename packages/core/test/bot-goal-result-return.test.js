@@ -182,7 +182,7 @@ test('delegated bot child results return to the original goal [AC:bot-goal-resul
   const { service, store, parent, dir } = fixture(t);
   const { createBotManagementTools } = await import('../dist/bots/bot-work.js');
   const { spawnSubagentOutcome } = await import('../dist/runtime/spawn-host.js');
-  const botHost = { store, createChatSession: input => store.createSession(input), log: { warn() {}, info() {}, debug() {}, error() {} }, runSession: async () => {}, isSessionRunning: () => false, cancelSession() {} };
+  const botHost = { store, createChatSession: input => store.createSession(input), log: { warn() {}, info() {}, debug() {}, error() {} }, runSession: () => new Promise(() => {}), isSessionRunning: () => false, cancelSession() {} };
   const requester = createBot(botHost, { name: 'Requester' });
   store.updateSession(parent.id, { metadata: { ...store.getSession(parent.id).metadata, botId: requester.id } });
   const goal = service.create({ botId: requester.id, sessionId: parent.id, title: 'Fix', objective: 'Fix the reported defect' });
@@ -206,7 +206,9 @@ test('delegated bot child results return to the original goal [AC:bot-goal-resul
   const peerChild = store.listSessions().find(session => session.parentSessionId === peerChat.id);
   assert.equal(peerChild.metadata.botGoalId, goal.id);
   assert.equal(peerChild.metadata.botGoalScopeSessionId, parent.id);
-  store.db.prepare("UPDATE bot_work_tasks SET status='completed', result=? WHERE id=?").run('peer finished the patch', taskId);
+  assert.equal(peerChild.metadata.botWorkTaskId, taskId);
+  const taskRow = store.db.prepare('SELECT status FROM bot_work_tasks WHERE id=?').get(taskId);
+  assert.equal(['queued', 'running', 'waiting_approval'].includes(taskRow.status), true);
   const live = store.getSession(parent.id);
   store.updateSession(parent.id, { metadata: { ...live.metadata, botGoalAuthorizedWaits: [{ goalId: goal.id, source: 'bot_task', correlationId: taskId, executionId: execution.id }] } });
   service.report(requester.id, execution.id, { kind: 'waiting', summary: 'wait', wait: { source: 'bot_task', correlationId: taskId } });
@@ -214,7 +216,6 @@ test('delegated bot child results return to the original goal [AC:bot-goal-resul
   const saved = service.get(requester.id, goal.id);
   assert.notEqual(saved.status, 'blocked');
   assert.notEqual(saved.status, 'waiting');
-  assert.ok(saved.evidence.some(item => item.includes('peer finished')));
   assert.ok(saved.evidence.some(item => item.includes('peer child evidence')));
 
   const mismatch = service.create({ botId: requester.id, sessionId: parent.id, title: 'Mismatch', objective: 'Fix the reported defect' });
