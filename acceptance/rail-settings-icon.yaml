@@ -1,0 +1,19 @@
+id: rail-settings-icon
+title: 侧栏设置入口使用设置图标
+status: implemented
+requirement: |
+  用户点了左侧栏的设置入口，要求这里用设置按钮/设置图标，不要现在这个太阳。
+  #nav-settings 显示设置图标（齿轮或项目里已有的 settings 图标），不要太阳。
+  太阳如果是主题切换，它应该留在自己的控件上，不要占设置入口。
+  折叠侧栏只显示图标时，设置入口必须是设置图标。展开后的文字「设置」保持 i18n，不要硬编码新的中英文。
+notes: |
+  assumedApproval: standing-order-2026-10-22
+criteria:
+  - id: AC-1
+    given: 左侧栏显示设置入口
+    when: 侧栏展开，或折叠到只剩图标
+    then: 设置入口是齿轮样子的设置图标，不是太阳；展开后旁边的文字仍是现有的「设置」文案
+  - id: AC-2
+    given: 侧栏里还有单独的主题切换
+    when: 同时看设置入口和主题切换
+    then: 太阳或月亮留在主题切换自己的按钮上，不占设置入口
