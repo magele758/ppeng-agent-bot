@@ -1,5 +1,25 @@
 /** Play / Chat copy. Do not add as const. */
 export const play = {
+  systemContext: {
+    "summaryTitle": "Conversation summary",
+    "jevTitle": "Jev evaluation",
+    "history": "Historical context",
+    "assessment": "Routing advice",
+    "summaryHint": "Saved context for continuation, not the current goal’s live status.",
+    "expand": "Expand summary",
+    "raw": "Original details",
+    "goal": "Goal",
+    "constraints": "Constraints",
+    "progress": "Progress",
+    "decisions": "Decisions",
+    "files": "Related files",
+    "nextSteps": "Next steps",
+    "need_tools": "Continue using tools",
+    "retry": "Revise and retry",
+    "done": "Consider ending this run (does not mark the goal complete)",
+    "unknown": "Additional evaluation information. See the original details.",
+    "score": "Evaluation score {score} · Not a completion percentage"
+},
   riskAdvisory: {
     "title": "Run advisory",
     "warning": "Execution warning",
