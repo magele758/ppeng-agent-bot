@@ -4,13 +4,15 @@ status: implemented
 requirement: |
   [goal update] {"id":"goal_84377e09-043c-4a93-86de-3e834e1678be","title":"可以考虑让bo”: 这种要么不展示，要么补个UI来展示，不要搞裸的
 notes: |
+  assumedApproval: standing-order-2026-10-22
+  system-message-ui 按用户新要求补充默认折叠的原文入口，主卡片仍不裸露机器信息。
   选择补一块紧凑的目标状态卡，而不是把这类通知整个藏起来。
   卡片只放用户能读的目标标题、状态和一句原因，并且只出现在这条通知所属的对话里。
 criteria:
   - id: AC-1
     given: 当前这段 Bot 对话里有一条目标更新通知，里面带有目标标题、状态、原因，以及给模型看的英文叮嘱
     when: 我打开或刷新这段对话
-    then: 这条通知不再显示成以 [goal update] 开头的花括号原文，对话里也看不到 Briefly tell the user this meaningful change. 和 Do not restart this goal or treat this notification as a new user task.
+    then: 这条通知不再显示成以 [goal update] 开头的花括号原文，默认收起时也看不到 Briefly tell the user this meaningful change. 和 Do not restart this goal or treat this notification as a new user task.；用户可主动展开原始详情查看完整内容
   - id: AC-2
     given: 这段对话里有一条目标更新通知
     when: 我查看这条通知
