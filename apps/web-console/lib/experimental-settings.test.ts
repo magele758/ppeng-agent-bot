@@ -22,8 +22,7 @@ const EXPERIMENTAL_IDS = [
   'sandboxCloudflare',
   'dynTools',
   'discovery',
-  'langfuse',
-  'jev'
+  'langfuse'
 ] as const;
 
 interface EntryFact {
@@ -81,7 +80,7 @@ test('未开显示高级也能从设置进入实验特性 [AC:experimental-setti
   );
 });
 
-test('实验特性里有 Jev 评估和其余原高级项 [AC:experimental-settings#AC-2]', () => {
+test('实验特性里有其余原高级项，Jev 独立归入模型 [AC:experimental-settings#AC-2]', () => {
   const listed = allEntries().filter((entry) => entry.category === 'experimental');
   assert.deepEqual(
     listed.map((entry) => entry.id),
@@ -99,7 +98,7 @@ test('原分类不再重复这些项，显示高级仍只管其余分组 [AC:exp
     if (entry.category === 'experimental') continue;
     assert.equal(experimental.has(entry.id as (typeof EXPERIMENTAL_IDS)[number]), false, entry.id);
   }
-  assert.equal(entries.filter((entry) => entry.id === 'jev').length, 1);
+  assert.deepEqual(entries.filter((entry) => entry.id === 'jev').map(entry => entry.category), ['models']);
   const gateway = readFileSync(gatewayCardPath, 'utf8');
   assert.match(gateway, /SettingsGroup advanced title=\{t\('settings\.gateway\.webhook\.title'\)\}/);
   const section = readFileSync(settingsSectionPath, 'utf8');
@@ -114,8 +113,7 @@ const SWITCH_CARDS: Record<(typeof EXPERIMENTAL_IDS)[number], string> = {
   sandboxCloudflare: 'components/SandboxSettingsCard.tsx',
   dynTools: 'components/DynToolsSettingsCard.tsx',
   discovery: 'components/DiscoverySettingsCard.tsx',
-  langfuse: 'components/LangfuseSettingsCard.tsx',
-  jev: 'components/JevSettingsCard.tsx'
+  langfuse: 'components/LangfuseSettingsCard.tsx'
 };
 
 test('每一项都有名称、说明和开关 [AC:experimental-settings#AC-4]', () => {

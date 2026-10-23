@@ -8,8 +8,7 @@ const EXPERIMENTAL = [
   'sandboxCloudflare',
   'dynTools',
   'discovery',
-  'langfuse',
-  'jev'
+  'langfuse'
 ] as const;
 
 test('experimental menu is visible without show-advanced [AC:experimental-settings#AC-1] [AC:experimental-settings#AC-2] [AC:experimental-settings#AC-3]', async ({
@@ -28,7 +27,6 @@ test('experimental menu is visible without show-advanced [AC:experimental-settin
   for (const id of EXPERIMENTAL) {
     await expect(page.locator(`#setting-${id}`)).toBeVisible();
   }
-  await expect(page.locator('#setting-jev').getByRole('heading', { name: 'Jev 评估' })).toBeVisible();
   for (const id of EXPERIMENTAL) {
     const rowSwitch = page.getByTestId(`experiment-switch-${id}`);
     await expect(rowSwitch).toBeVisible();

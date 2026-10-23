@@ -352,6 +352,11 @@ export const settingsEntries = {
     unconfigured: 'Connection details are not configured yet.'
   },
   jev: {
+    enabledLabel: 'Enable evaluation',
+    stateOff: 'Off — evaluation model is not called',
+    stateNeedsConnection: 'On — connection setup required',
+    stateNoPoints: 'On — no evaluation stages selected',
+    stateActive: 'Evaluation connected',
     title: 'Jev evaluation',
     keywords: 'evaluation eval jev judge second opinion goal gate tool gate hook points review model',
     desc: 'Plug in an independent evaluation model (Jev) that gives a second opinion at key moments, such as deciding whether a goal is met or reviewing risky commands.',

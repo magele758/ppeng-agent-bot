@@ -34,7 +34,7 @@ test.describe('Settings categories: behavior / safety / tools / integrations', (
       ['tools', 'skills'],
       ['integrations', 'eventLog']
     ];
-    const expert = ['agentLoopEngine', 'compact', 'goalVerify', 'sandboxCloudflare', 'dynTools', 'discovery', 'langfuse', 'jev'];
+    const expert = ['agentLoopEngine', 'compact', 'goalVerify', 'sandboxCloudflare', 'dynTools', 'discovery', 'langfuse'];
     for (const [category, id] of common) {
       await page.goto(`/#/settings/${category}`);
       const entry = page.locator(`#setting-${id}`);

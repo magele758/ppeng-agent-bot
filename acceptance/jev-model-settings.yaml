@@ -1,0 +1,21 @@
+id: jev-model-settings
+title: 在模型设置中配置 Jev 评估
+status: implemented
+requirement: |
+  这个开启了也没办法配置了，这个应该放到模型配置里吧？
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  Jev 从实验特性移到模型分类，关闭时也能配置连接。取代 experimental-settings 中 Jev 的位置和折叠要求，其余实验项保持原样。
+criteria:
+  - id: AC-1
+    given: 用户未开启显示高级，且 Jev 关闭
+    when: 进入模型设置或搜索 Jev
+    then: 能找到唯一的 Jev 配置入口并直接编辑地址、密钥和模型，实验特性中不再重复出现
+  - id: AC-2
+    given: 用户填写评估模型连接信息
+    when: 保存、刷新页面、测试连接或切换启用状态
+    then: 配置保留且密钥不回显，关闭时仍可编辑和测试连接，测试不会自动启用评估
+  - id: AC-3
+    given: 用户启用 Jev 或保存失败
+    when: 查看开关及生效状态
+    then: 开关与文字一致，区分关闭、缺少连接、未选择环节和已接入；保存失败显示错误并恢复原状态
