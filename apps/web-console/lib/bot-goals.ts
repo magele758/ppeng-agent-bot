@@ -4,7 +4,7 @@ export interface BotGoalView {
   id: string; title: string; status: GoalStatus; progress: string; nextStep?: string;
   blockedReason?: string; wait?: { description?: string; source: string; correlationId: string };
   strategy?: GoalStrategy; strategyReason?: string; evidence: string[]; priority: number;
-  budgetUsd: number; costUsd: number; attempts: number; draining?: boolean;
+  budgetUsd: number; extraAttempts?: number; costUsd: number; attempts: number; draining?: boolean;
 }
 export interface BotGoalSettings {
   maxConcurrent: number; defaultBudgetUsd: number; maxAttempts: number;

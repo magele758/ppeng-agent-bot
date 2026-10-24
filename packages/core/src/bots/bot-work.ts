@@ -530,7 +530,7 @@ function persistProcessingResult(host:BotWorkHost,row:Record<string,unknown>,con
       publishBotTaskResult(host,row,context.taskId,status,result,failure);
     }
     const fresh=host.store.getSession(String(row.session_id));
-    if(fresh&&fresh.metadata?.botWorkTaskId===context.taskId)host.store.updateSession(fresh.id,{metadata:{...fresh.metadata,botWorkTaskId:undefined}});
+    if(fresh&&fresh.metadata?.botWorkTaskId===context.taskId)host.store.updateSession(fresh.id,{metadata:{...fresh.metadata,botWorkTaskId:undefined,botWorkTaskAttempt:undefined,botDelegatedGoal:undefined}});
     releaseBotSession(host.store,String(row.session_id),owner,fence);
     host.store.db.exec('COMMIT');if(context.taskId)clearBotTaskDeadline(host.store,context.taskId);
   }catch(error){host.store.db.exec('ROLLBACK');throw error;}
@@ -574,7 +574,7 @@ function claimPendingMessage(host:BotWorkHost,session:SessionRecord,row:Record<s
     row.message_ref=written.id;row.updated_at=nowIso();
     const prior={...(host.store.getSession(session.id)!.metadata??{})};
     delete prior.sourceRoomId;
-    host.store.updateSession(session.id,{metadata:{...prior,relayHop:Number(row.hop),relayHopMessageId:written.id,botWorkTaskId:taskId,outcome:undefined,botWorkStartBarrier:undefined}});
+    host.store.updateSession(session.id,{metadata:{...prior,relayHop:Number(row.hop),relayHopMessageId:written.id,botWorkTaskId:taskId,botWorkTaskAttempt:taskId?Number((host.store.db.prepare('SELECT attempt FROM bot_work_tasks WHERE id=?').get(taskId) as {attempt:number}).attempt)+1:undefined,botDelegatedGoal:taskId?host.store.getDaemonControl(`bot.delegated-goal:${taskId}`):undefined,outcome:undefined,botWorkStartBarrier:undefined}});
     host.store.db.prepare("UPDATE bot_work_messages SET status=?,message_ref=?,attempt=attempt+1,updated_at=? WHERE id=? AND status='pending'").run(row.wake?'processing':'processed',written.id,nowIso(),String(row.id));
     if(taskId)host.store.db.prepare("UPDATE bot_work_tasks SET status='running',attempt=attempt+1,updated_at=? WHERE id=? AND status='queued'").run(nowIso(),taskId);
     if(taskId) {
@@ -773,20 +773,19 @@ export function ensureSuperBot(host:BotWorkHost,principal:BotPrincipal):{bot:Ret
  if(!bot){const name=host.store.getBotByName('Super Bot')?'Super Bot (builtin)':'Super Bot';bot=createBot(facade(host),{name,title:'Team coordinator',description:'Coordinate authorized bots. Use bot_team_status, bot_delegate and bot_task_results. You can also create and update bots, group chats, and saved Lab settings with create_bot, create_room, bot_create, bot_update, bot_room_create, bot_room_update, and lab_settings_update. Do not claim you lack that ability. Track task ids, report failures and unfinished work accurately. Never bypass another bot permission or approve for the user.'},{builtin:true});host.store.setDaemonControl(key,bot.id);}
  const opened=openBot(facade(host),bot.id,principal);return {...opened,bot};
 }
-function stampDelegatedGoal(store:SqliteStateStore,session:SessionRecord,targetBotId:string,taskId:string):void {
- const goalId=session.metadata.botGoalId;
- const scopeId=session.metadata.botGoalScopeSessionId ?? (session.metadata.canonicalBotChat === true ? session.id : undefined);
- if (typeof goalId !== 'string' || typeof scopeId !== 'string') return;
- const chats=store.listSessions().filter(item => item.metadata.botId === targetBotId && item.metadata.canonicalBotChat === true);
- for (const chat of chats) {
-  store.updateSession(chat.id,{metadata:{...chat.metadata,botGoalId:goalId,botGoalScopeSessionId:scopeId,botWorkTaskId:taskId}});
- }
+function stampDelegatedGoal(store:SqliteStateStore,session:SessionRecord,taskId:string):void {
+ const origin=session.metadata.botWorkTaskId?session.metadata.botDelegatedGoal as {id?:string;sessionId?:string;botId?:string}|undefined:undefined;
+ const goalId=session.metadata.botWorkTaskId?origin?.id:session.metadata.botGoalId;
+ const scopeId=session.metadata.botWorkTaskId?origin?.sessionId:session.metadata.botGoalScopeSessionId ?? (session.metadata.canonicalBotChat === true ? session.id : undefined);
+ if(typeof goalId!=='string'||typeof scopeId!=='string')return;
+ const key=`bot.delegated-goal:${taskId}`;
+ if(!store.getDaemonControl(key))store.setDaemonControl(key,{id:goalId,sessionId:scopeId,botId:origin?.botId??session.metadata.botId});
 }
 export function createBotManagementTools(host:BotWorkHost):ToolContract<any>[] {
  const schema={type:'object',properties:{}};
  return [
  {name:'bot_team_status',description:'List authorized bots, current session and delegated task statuses. Includes hidden bots.',inputSchema:schema,approvalMode:'never',sideEffectLevel:'none',async execute(ctx){return {ok:true,content:JSON.stringify(botWorkStatus(host,principalFromSession(host.store,ctx.session)))};}},
- {name:'bot_delegate',description:'Persist and track a task for an authorized bot, even while it is busy. Returns task ID and queued status; does not mean completed.',inputSchema:{type:'object',properties:{target:{type:'string'},input:{type:'string'},idempotencyKey:{type:'string'},deadline:{type:'string'}},required:['target','input','idempotencyKey']},approvalMode:'never',sideEffectLevel:'none',async execute(ctx,args){try{if(ctx.session.metadata?.permissionMode==='plan')throw new ValidationError('Delegation is blocked in plan mode');const target=host.store.listBots({includeHidden:true}).find(b=>b.id===args.target||b.name===args.target);if(!target)throw new ValidationError('Unknown bot');const task=dispatchBotTask(host,{principal:principalFromSession(host.store,ctx.session),requesterBotId:String(ctx.session.metadata?.botId??ctx.agent.id),targetBotId:target.id,input:String(args.input??''),idempotencyKey:String(args.idempotencyKey??''),deadline:args.deadline,...delegationContext(host.store,ctx.session)});stampDelegatedGoal(host.store,ctx.session,target.id,task.id);void tickBotWork(host);return {ok:true,content:JSON.stringify(task)};}catch(err){return {ok:false,content:JSON.stringify({error:String(err),...(err instanceof BotQueueCapacityError?{accepted:false,retryable:true,error_code:err.code,usage:err.usage,limits:err.limits}:{})})};}}},
+ {name:'bot_delegate',description:'Persist and track a task for an authorized bot, even while it is busy. Returns task ID and queued status; does not mean completed.',inputSchema:{type:'object',properties:{target:{type:'string'},input:{type:'string'},idempotencyKey:{type:'string'},deadline:{type:'string'}},required:['target','input','idempotencyKey']},approvalMode:'never',sideEffectLevel:'none',async execute(ctx,args){try{if(ctx.session.metadata?.permissionMode==='plan')throw new ValidationError('Delegation is blocked in plan mode');const target=host.store.listBots({includeHidden:true}).find(b=>b.id===args.target||b.name===args.target);if(!target)throw new ValidationError('Unknown bot');const task=dispatchBotTask(host,{principal:principalFromSession(host.store,ctx.session),requesterBotId:String(ctx.session.metadata?.botId??ctx.agent.id),targetBotId:target.id,input:String(args.input??''),idempotencyKey:String(args.idempotencyKey??''),deadline:args.deadline,...delegationContext(host.store,ctx.session)});stampDelegatedGoal(host.store,ctx.session,task.id);void tickBotWork(host);return {ok:true,content:JSON.stringify(task)};}catch(err){return {ok:false,content:JSON.stringify({error:String(err),...(err instanceof BotQueueCapacityError?{accepted:false,retryable:true,error_code:err.code,usage:err.usage,limits:err.limits}:{})})};}}},
  {name:'bot_task_results',description:'Query all unresolved tasks plus a paged terminal history. Follow nextCursor to inspect older results. Never infer completion from dispatch.',inputSchema:{type:'object',properties:{cursor:{type:'string'},limit:{type:'number'}}},approvalMode:'never',sideEffectLevel:'none',async execute(ctx,args){try{return {ok:true,content:JSON.stringify({...botTaskPage(host.store,principalFromSession(host.store,ctx.session),{cursor:args?.cursor,limit:args?.limit}),collaborations:botCollaborations(host.store,principalFromSession(host.store,ctx.session))})};}catch(error){return {ok:false,content:JSON.stringify({error:String(error)})};}}}
  ];
 }

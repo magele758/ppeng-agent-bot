@@ -255,3 +255,11 @@ test('pending review can accept or send the completion back', async () => {
     React.useEffect = realUseEffect;
   }
 });
+
+test('a single review or blocked goal has an independent actionable card [AC:bot-goal-lifecycle-boundaries#AC-3]', () => {
+ const html=render([goal('review','Review result','pending_review')]);
+ assert.match(html,/bot-goal-attention/);assert.match(html,/bot-goal-verify-review/);assert.match(html,/bot-goal-reject-review/);
+ assert.doesNotMatch(html,/data-testid="bot-goals"/);
+ assert.match(render([goal('blocked','Budget stop','blocked')]),/bot-goal-extend-blocked/);
+ assert.doesNotMatch(render([goal('running','Work','running')]),/bot-goal-attention/);
+});

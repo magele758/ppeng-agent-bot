@@ -16,3 +16,19 @@ test('goal endpoints enforce session isolation and persist live settings [AC:bot
  assert.equal(new BotGoalService(store,Date.now,'s').readSettings().maxConcurrent,2);
  await assert.rejects(async()=>routes.find(r=>r.method==='GET')!.handler({...ctx,url:new URL('http://local/api/bots/b/goals?sessionId=other')} as never));
 });
+
+test('goal funding and recovery reject another user and preserve waiting execution [AC:bot-goal-lifecycle-boundaries#AC-6] [AC:bot-goal-lifecycle-boundaries#AC-7]', async () => {
+ const values=new Map();const store={getDaemonControl:(key:string)=>structuredClone(values.get(key)),setDaemonControl:(key:string,value:unknown)=>values.set(key,structuredClone(value))};
+ const session={id:'s',metadata:{canonicalBotChat:true,botId:'b',userId:'alice',tenantId:'tenant-a'}};
+ const runtime={store,getSession:(id:string)=>id==='s'?session:undefined,cancelSession(){}};
+ const service=new BotGoalService(store,Date.now,'s');const goal=service.create({botId:'b',sessionId:'s',title:'work',objective:'work'});
+ const execution=service.claim('b',goal.id,{strategy:'subagent'})!;service.report('b',execution.id,{kind:'waiting',summary:'running',wait:{source:'session',correlationId:'worker'}});
+ const action=botGoalsRoutes(runtime as never).find(r=>r.method==='POST')!;
+ const context={requireParam:(key:string)=>key==='id'?'b':goal.id,url:new URL('http://local/'),auth:{isolate:true,userId:'bob',tenantId:'tenant-b'},response:{setHeader(){},end(){}},readBody:async()=>({sessionId:'s',action:'extend',additionalBudgetUsd:2})};
+ await assert.rejects(()=>action.handler(context as never),/access denied/i);
+ assert.equal(service.get('b',goal.id)!.budgetUsd,10);
+ await assert.rejects(()=>action.handler({...context,auth:{isolate:false},readBody:async()=>({sessionId:'s',action:'resume'})} as never),/waiting/i);
+ assert.equal(service.get('b',goal.id)!.wait!.correlationId,'worker');
+ await action.handler({...context,auth:{isolate:false}} as never);
+ assert.equal(service.get('b',goal.id)!.budgetUsd,12);assert.equal(service.get('b',goal.id)!.status,'waiting');
+});

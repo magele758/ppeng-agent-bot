@@ -9,7 +9,7 @@ import { Router } from '../dist/routing.js';
 import { buildRoutePolicy } from '../dist/access/policy.js';
 import { botGoalsRoutes } from '../dist/routes/bot-goals.js';
 
-test('Lab goal HTTP contract saves preferences and controls only the selected goal [AC:bot-multi-goal-coordination#AC-14]', async () => {
+test('Lab goal HTTP contract saves preferences and controls only the selected goal [AC:bot-multi-goal-coordination#AC-14] [AC:bot-goal-lifecycle-boundaries#AC-4] [AC:bot-goal-lifecycle-boundaries#AC-7]', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'bot-goals-http-'));
   const runtime = new RawAgentRuntime({ repoRoot: dir, stateDir: join(dir, 'state'), modelAdapter: {
     name: 'http-goals-test', async runTurn() { return { stopReason: 'end', assistantParts: [] }; }, async summarizeMessages() { return ''; }
@@ -53,6 +53,22 @@ test('Lab goal HTTP contract saves preferences and controls only the selected go
       assert.equal(service.get(bot.id, second.id)?.status, 'queued');
     }
     assert.equal((await fetch(base)).status, 400);
+    const review=service.create({botId:bot.id,sessionId,title:'Review',objective:'Deliver result'});
+    const execution=service.claim(bot.id,review.id,{strategy:'direct'})!;
+    service.report(bot.id,execution.id,{kind:'candidate_completed',summary:'Final output',evidence:['receipt'],costUsd:12});
+    assert.equal(service.get(bot.id,review.id)?.status,'pending_review');
+    const act=async(body:Record<string,unknown>)=>fetch(`${base}/${review.id}/actions`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({sessionId,...body})});
+    assert.equal((await act({action:'verify'})).status,400);
+    assert.equal(service.get(bot.id,review.id)?.status,'pending_review');
+    assert.equal((await act({action:'verify',accepted:false,reason:'One more check'})).status,200);
+    assert.equal(service.claim(bot.id,review.id,{strategy:'direct'}),undefined);
+    assert.equal((await act({action:'extend',additionalBudgetUsd:3,additionalAttempts:1})).status,200);
+    assert.equal((await act({action:'resume'})).status,200);
+    assert.ok(service.claim(bot.id,review.id,{strategy:'direct'}));
+    assert.equal(service.get(bot.id,review.id)?.costUsd,12);
+    assert.equal(service.get(bot.id,review.id)?.budgetUsd,15);
+    assert.deepEqual(service.get(bot.id,review.id)?.evidence,['receipt']);
+    assert.equal(service.get(bot.id,third.id)?.budgetUsd,12);
   } finally {
     server.closeAllConnections();
     await new Promise<void>(resolve => server.close(() => resolve()));

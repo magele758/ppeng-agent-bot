@@ -1,4 +1,5 @@
 export const goals = {
+  attention: '目标需要你处理', addBudget: '为此目标追加预算（美元）', addAttempts: '批准额外尝试次数', extend: '增加此目标额度', extendHint: '保留历史用量和结果。准备好后再恢复；待验收结果仍需接受或退回。',
   attemptUsage: '执行 {used}/{max} 次', durableVerification: '按目标证据核验',
   history: '目标历史', historyEmpty: '暂无已结束的目标', historyError: '无法加载目标历史',
   title: '目标与进展', empty: '暂时没有目标。提出任务后，进展会显示在这里。', loading: '正在加载目标…',

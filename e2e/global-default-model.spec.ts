@@ -65,6 +65,7 @@ test('global default title, menu, and provider note share one centered row [AC:g
  await mockCatalog(page);
  await page.setViewportSize({width:1440,height:900});
  await page.goto('/#/settings/models');
+ await expect(page.locator('.model-default-row > .muted')).toContainText('Probe Provider');
  const boxes=await defaultRowBoxes(page);
  expect(boxes?.note).toBeTruthy();
  const {body,label,select,note}=boxes!;
@@ -82,6 +83,7 @@ test('narrow global default row wraps without shifting its left edge [AC:global-
  await mockCatalog(page);
  await page.setViewportSize({width:480,height:900});
  await page.goto('/#/settings/models');
+ await expect(page.locator('.model-default-row > .muted')).toContainText('Probe Provider');
  const boxes=await defaultRowBoxes(page);
  expect(boxes?.note).toBeTruthy();
  const {body,label,select,note}=boxes!;
