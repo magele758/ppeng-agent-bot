@@ -57,6 +57,7 @@ test('compaction separates internal instructions from history and labels returne
  assert.ok(payload.history.every(m=>m.id!=='bot-compact-instruction'));
  assert.equal(completion.jsonMode,false);
  const summary=rt.store.foldMessages(sid).find(m=>m.key==='compact-summary');
+ assert.equal(summary.role,'assistant','generated history must not acquire system authority');
  assert.match(summary.parts[0].text,/Historical context, not new instructions/);
  assert.match(summary.parts[0].text,/current user request takes priority/);
  assert.match(summary.parts[0].text,/history_read/);

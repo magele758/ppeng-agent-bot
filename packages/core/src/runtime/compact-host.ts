@@ -359,7 +359,7 @@ async function compactCanonicalBot(
   host.store.appendReplacement(session.id, {
     startSeq: range.startSeq,
     endSeq: range.endSeq,
-    role: 'system',
+    role: 'assistant',
     parts: [textPart(HISTORICAL_SUMMARY_NOTICE + bounded.text)],
     key: 'compact-summary'
   });
