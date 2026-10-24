@@ -10,6 +10,8 @@ import { config as loadDotenv } from 'dotenv';
 import { sanitizeScriptEnv } from '../spawn-utils.mjs';
 import { hash, validateSuite, gradeTask, compareQuality } from './quality.mjs';
 import { buildBotSuite, summarizeBaseline } from './bot-quality.mjs';
+import { buildReliabilitySuite } from './bot-reliability.mjs';
+import { runPairedTasks } from './paired-runner.mjs';
 import { configuredModel } from './configured-model.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -23,9 +25,11 @@ for (let i = 2; i < process.argv.length; i++) {
 }
 if (!options.config) throw new Error('Usage: compare.mjs --config experiment.json [--simulation] [--out directory] [--baseline-root path] [--candidate-root path] [--trials N]');
 const experiment = JSON.parse(readFileSync(resolve(options.config), 'utf8'));
-const suite = validateSuite(experiment.suite==='builtin:bot-p0'?buildBotSuite():JSON.parse(readFileSync(resolve(root, experiment.suite), 'utf8')));
+const suite = validateSuite(experiment.suite==='builtin:bot-reliability'?buildReliabilitySuite():experiment.suite==='builtin:bot-p0'?buildBotSuite():JSON.parse(readFileSync(resolve(root, experiment.suite), 'utf8')));
 const trials = Number(options.trials ?? experiment.trials ?? 3);
 if (!Number.isInteger(trials) || trials < 1 || trials > 20) throw new Error('trials must be 1..20');
+const concurrency=experiment.concurrency??1;
+if(!Number.isInteger(concurrency)||concurrency<1||concurrency>4)throw Error('concurrency must be 1..4');
 const limits = { timeoutMs: 90_000, maxModelCalls: 6, maxOutputTokens: 2048, maxInputChars: 100_000, maxTotalCalls: 500, ...experiment.limits };
 for (const [key, value] of Object.entries(limits)) if (!Number.isInteger(value) || value <= 0) throw new Error(`invalid limit ${key}`);
 if (suite.length * trials * (options.baselineOnly?1:2) * limits.maxModelCalls > limits.maxTotalCalls) throw new Error('planned calls exceed maxTotalCalls; reduce cases/trials or explicitly budget the experiment');
@@ -87,11 +91,11 @@ const out = resolve(options.out ?? join(root, 'test-results', `harness-quality-$
 mkdirSync(dirname(out), { recursive: true }); mkdirSync(out); // Never overwrite an existing run.
 const workspace = mkdtempSync(join(tmpdir(), 'ppeng-quality-'));
 const records = [];
-const driverHash=()=>hash(['compare.mjs','quality.mjs','quality-worker.mjs','bot-quality.mjs','configured-model.mjs'].map(file=>readFileSync(join(root,'scripts/agent-eval',file),'utf8')));
+const driverHash=()=>hash(['compare.mjs','quality.mjs','quality-worker.mjs','bot-quality.mjs','configured-model.mjs','bot-reliability.mjs','paired-runner.mjs'].map(file=>readFileSync(join(root,'scripts/agent-eval',file),'utf8')));
 const manifest = { schemaVersion: 1, startedAt: new Date().toISOString(), node: process.version, simulation: Boolean(options.simulation),
   mode:options.baselineOnly?'baseline':'compare', selection:configured?.selection,
   suiteHash: hash(suite), experimentHash: hash(experiment), driverHash: driverHash(),
-  trials, limits, identities, variants, model, tasks: suite.map(({ id, category, critical }) => ({ id, category, critical: Boolean(critical) })) };
+  trials, concurrency, limits, identities, variants, model, tasks: suite.map(({ id, category, critical }) => ({ id, category, critical: Boolean(critical) })) };
 writeFileSync(join(out, 'manifest.json'), JSON.stringify(manifest, null, 2), { mode: 0o600 });
 writeFileSync(join(out,'suite.json'),JSON.stringify(suite,null,2),{mode:0o600});
 
@@ -126,11 +130,7 @@ async function run(task, trial, label) {
 }
 
 try {
-  // Alternate AB/BA within each task and repeat; neither variant always benefits from running second.
-  for (let trial = 0; trial < trials; trial++) for (let i = 0; i < suite.length; i++) {
-    const labels = options.baselineOnly?['baseline']:(trial + i) % 2 ? ['candidate', 'baseline'] : ['baseline', 'candidate'];
-    for (const label of labels) await run(suite[i], trial, label);
-  }
+  await runPairedTasks(suite,{trials,concurrency,baselineOnly:options.baselineOnly},run);
   const report = options.baselineOnly?summarizeBaseline(suite,records,{trials,simulation:Boolean(options.simulation)}):compareQuality(suite, records, { trials, policy: experiment.policy, simulation: Boolean(options.simulation) });
   const interventions = label => ({ systemAppendix: variants[label].systemAppendix ?? '', daemonControl: variants[label].daemonControl ?? {}, simulationFault: variants[label].simulationFault });
   report.control = identities.baseline.buildHash === identities.candidate.buildHash && hash(interventions('baseline')) === hash(interventions('candidate'));

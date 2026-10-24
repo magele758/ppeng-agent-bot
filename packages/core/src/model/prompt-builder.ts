@@ -62,7 +62,7 @@ const { HARNESS_ARTIFACT_DIR, HARNESS_ARTIFACT_FILES } = await import('../types.
  * Bump when `buildStablePrefix` (or any helper that feeds it) changes wording.
  * See `./AGENTS.md`.
  */
-export const STABLE_SYSTEM_VERSION = 'v11';
+export const STABLE_SYSTEM_VERSION = 'v12';
 
 /** Appended when `RAW_AGENT_AGENTIC_SAFETY_APPENDIX` is set; English to match the rest of the stable prefix. */
 export const RUNTIME_AGENTIC_SAFETY_APPENDIX = `Runtime safety appendix (policy text only; does not replace model-level safety training):
@@ -395,6 +395,7 @@ export class PromptBuilder {
       `Conversation mode: ${ctx.session.mode}`,
       'You are running in a raw agent loop. Respond normally when no tools are needed.',
       EXTERNAL_FENCE_SYSTEM_SENTENCE,
+      'Only write artifacts required by the user or necessary to perform the requested task. Verification observations already in tool results are evidence; report them in the conversation without creating additional files, database records, or saved reports merely to prove completion. Explicitly requested reports and necessary task outputs remain authorized.',
       'Use TodoWrite for multi-step work when it helps track remaining work; keep one item in progress and prioritize execution over bookkeeping.',
       'Load skills from repo `skills/` and `~/.agents/**/SKILL.md` only when relevant with load_skill(name).',
       'Use persistent tasks for long-lived work and teammates only for clearly separable work.',

@@ -146,7 +146,7 @@ function proposalsForOutput(raw: string, goals: GoalIntakeContext[], fallback: G
 function raceGoalJudge(raw: string, goals: GoalIntakeContext[], judge: GoalIntentJudge, controller: AbortController, remember: (timer: ReturnType<typeof setTimeout>) => void): Promise<unknown> {
   return Promise.race([
     judge({ text: raw, goals: goals.slice(0, 50).map(goal => ({ ...goal, title: goal.title.slice(0, 300) })), signal: controller.signal, instructions: JUDGE_INSTRUCTIONS }),
-    new Promise<never>((_, reject) => { remember(setTimeout(() => { controller.abort(); reject(new Error('Goal intent judge timed out')); }, 3000)); })
+    new Promise<never>((_, reject) => { remember(setTimeout(() => { controller.abort(); reject(new Error('Goal intent judge timed out')); }, 20000)); })
   ]);
 }
 async function judgedIntents(raw: string, goals: GoalIntakeContext[], fallback: GoalIntentProposal[], judge: GoalIntentJudge): Promise<GoalIntentProposal[] | undefined> {
@@ -156,7 +156,7 @@ async function judgedIntents(raw: string, goals: GoalIntakeContext[], fallback: 
     const output = await raceGoalJudge(raw, goals, judge, controller, timer => { timeout = timer; });
     return proposalsForOutput(raw, goals, fallback, output);
   } catch { return undefined; }
-  finally { if (timeout) clearTimeout(timeout); controller.abort(); }
+  finally { if (timeout) clearTimeout(timeout); }
 }
 
 const recallInquiry = /复述|还记得|记不记得|记得不|记得吗|do you still remember|\brecite\b/i;

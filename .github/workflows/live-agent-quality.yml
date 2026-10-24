@@ -51,7 +51,7 @@ jobs:
           RAW_AGENT_BASE_URL: ${{ secrets.RAW_AGENT_BASE_URL }}
           RAW_AGENT_MODEL_NAME: ${{ secrets.RAW_AGENT_MODEL_NAME }}
         run: |
-          pnpm run agent:quality:compare --baseline-root "$RUNNER_TEMP/quality-stable" --candidate-root "$GITHUB_WORKSPACE" --out test-results/live-quality
+          pnpm run agent:quality:compare --config scripts/agent-eval/experiments/bot-reliability.json --baseline-root "$RUNNER_TEMP/quality-stable" --candidate-root "$GITHUB_WORKSPACE" --out test-results/live-quality
           pnpm run agent:quality:gate --run test-results/live-quality --baseline-sha "$QUALITY_BASELINE_SHA" --candidate-sha "$GITHUB_SHA"
       - uses: actions/upload-artifact@v4
         if: always()

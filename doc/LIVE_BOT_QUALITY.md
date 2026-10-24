@@ -49,3 +49,11 @@ GitHub 的 Live Agent quality gate 支持手动运行和 workflow_call，使用�
 manifest.json 记录源码、构建、lockfile、驱动、模型、任务和预算指纹；suite.json 固定当次考题；每次执行的 JSON 包含原始轨迹、真实工具结果、产物、判定、用量与错误；report.json/report.md 汇总；evidence-index.json 用于完整性校验。模型版本名可能是供应商可变别名，无法证明其后端权重不变，应定期重跑相同基线。
 
 线上失败经脱敏进入新任务集。先分析是产品缺陷、任务歧义、验收器误判还是服务故障，再版本化更新，不删除失败样本或选择性重跑后覆盖原记录。
+
+## 32 题重复对照
+
+`experiments/bot-reliability.json` 保留原 16 题，增加平方/费用计算、中位数、分组总和、加权均值、库存核对、最新事件、区间交集、CSV、依赖排序、零值回退、重试后组合、错误状态核验和两类压缩取证，共 32 题。默认每版每题三次、最多四条执行通道，同题 AB/BA 顺序不变，每轮完成后才进入下一轮。
+
+    pnpm run agent:quality:compare --config scripts/agent-eval/experiments/bot-reliability.json --baseline-root /absolute/stable --candidate-root /absolute/candidate --settings-root /absolute/running/repo --bot ppeng-agent-core --out test-results/bot-ab-unique
+
+最大规划请求数为 2304（32 × 3 × 2 × 12），总预算上限为 3000；每题与统计门禁标准均未降低。32 题仍不保证各类别统计区间足够窄；旧版取消请求的未知用量保留为未知，不能补零让门禁通过。新增任务覆盖不同运算与失败合同，仍限于夹具分布，不是广泛通用能力认证。
