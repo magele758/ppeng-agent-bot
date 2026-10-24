@@ -319,9 +319,18 @@ test('完成判官抛错时已完成回合保持待核对而不阻塞 [AC:bot-go
     await rt.runHumanSession(parentId);
     const service = new BotGoalService(rt.store, Date.now, parentId);
     const goal = service.list(bot.id)[0];
-    assert.notEqual(goal.status, 'blocked');
-    assert.equal(goal.status, 'queued');
+    assert.equal(goal.status, 'blocked');
+    assert.match(goal.blockedReason, /verification/i);
+    assert.equal(goal.activeExecutionId, undefined);
+    const stalled = goal.noProgress;
     assert.ok(goal.evidence.some((item) => item.includes('Observed result')) || goal.progress.includes('Observed result'));
+    const runs = [];
+    await tickBotGoals({ ...rt.goalRuntimeHost(), isRunning: () => false, run: async (id) => { runs.push(id); } });
+    const held = service.get(bot.id, goal.id);
+    assert.equal(held.status, 'blocked');
+    assert.match(held.blockedReason, /verification/i);
+    assert.equal(held.noProgress, stalled);
+    assert.deepEqual(runs, []);
   } finally {
     await rt.destroy();
   }

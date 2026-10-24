@@ -249,8 +249,9 @@ function childEnded(child: SessionRecord): boolean {
 function childSettlement(childId: string, status: string, output: string, judged?: GoalReport): GoalReport {
  if (status === 'failed' || status === 'unknown') return {kind:'blocked', summary:output || `Child session ${childId} ${status}`, evidence:output ? [output] : [`session ${childId} ${status}`]};
  const base: GoalReport = {kind:'candidate_completed', summary:output || `Child session ${childId} finished`, evidence:output ? [output] : [`session ${childId} ${status}`], verified:false};
- // No judge, or a judge that did not return a verdict, cannot turn assistant text into a completion.
- if (!judged) return {...base, kind:'progress', summary:output || 'Child finished without a completion verdict', nextStep:'Retry completion verification before treating this result as finished'};
+ // No judge, or a judge that threw, leaves the pending completion. Progress would clear the
+ // execution and dispatch a new child instead of keeping this result for review.
+ if (!judged) return base;
  if (judged.kind !== 'candidate_completed' && judged.kind !== 'progress') return base;
  return {...base, kind:judged.kind, summary:judged.summary || base.summary, verified:judged.verified === true, nextStep:judged.nextStep};
 }
