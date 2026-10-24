@@ -537,8 +537,10 @@ jobs:
         env:
           RAW_AGENT_MODEL_PROVIDER: heuristic
       - name: Install Playwright Chromium
+        if: ${{ !cancelled() }}
         run: pnpm run test:e2e:install
       - name: E2E (Agent Lab)
+        if: ${{ !cancelled() }}
         run: pnpm run test:e2e:full --reporter=dot,junit
         env:
           RAW_AGENT_MODEL_PROVIDER: heuristic

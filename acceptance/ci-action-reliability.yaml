@@ -1,0 +1,22 @@
+id: ci-action-reliability
+title: Actions 长短验证可靠性
+status: implemented
+requirement: 去修复一下这个项目的Action，看看怎么改造合适，现在长任务一直失败，短任务好像也没完全卡住bug
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: Bot 配置或目标回流出现回归
+    when: 运行快速门禁
+    then: 执行真实的 Bot 配置、目标回流和 HTTP 集成测试，失败阻止通过且仍遵守两分钟预算
+  - id: AC-2
+    given: 目标等待的团队或群体执行记录不存在
+    when: 调度器检查等待状态
+    then: 明确标记阻塞且不启动重复工作
+  - id: AC-3
+    given: 需要在任意修复分支验证完整候选
+    when: PR 添加 full-validation 标签或更新带此标签的版本
+    then: 完整验证可执行且普通未标记 PR 不自动运行全量验证
+  - id: AC-4
+    given: HTTP 集成检查失败
+    when: 完整验证继续收集结果
+    then: 浏览器测试仍执行并保留独立证据，原失败不能变成通过
