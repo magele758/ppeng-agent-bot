@@ -5,7 +5,7 @@ export interface BotGoal {
  sourceMessageId?: string; parentGoalId?: string; constraints: string[]; completionCriteria: string[];
  resources: string[]; priority: number; revision: number; status: GoalStatus;
  progress: string; nextStep?: string; blockedReason?: string; wait?: GoalWait; evidence: string[];
- budgetUsd: number; costUsd: number; attempts: number; noProgress: number;
+ budgetUsd: number; extraAttempts?: number; costUsd: number; attempts: number; noProgress: number;
  strategy?: string; strategyReason?: string; activeExecutionId?: string; draining?: boolean; resumeRequested?: boolean; createdAt: string; updatedAt: string;
 }
 export interface GoalExecution {
@@ -23,7 +23,7 @@ export interface GoalIntent {
  goalId?: string; text?: string; sourceMessageId?: string; sessionId?: string;
 }
 export interface GoalEvent { id: string; type: string; goalId?: string; at: string; detail?: string }
-export interface GoalSnapshot { goals: BotGoal[]; executions: GoalExecution[]; events: GoalEvent[]; processed: string[]; wakeEvents?: { goalId?: string; summary?: string; evidence?: string[]; costUsd?: number; eventId: string; source: string; correlationId: string; sessionId?: string; consumedBy: string[] }[]; fence: number }
+export interface GoalSnapshot { goals: BotGoal[]; executions: GoalExecution[]; events: GoalEvent[]; processed: string[]; wakeEvents?: { completionCandidate?: boolean; goalId?: string; summary?: string; evidence?: string[]; costUsd?: number; eventId: string; source: string; correlationId: string; sessionId?: string; consumedBy: string[] }[]; fence: number }
 export interface GoalSettings { maxConcurrent: number; defaultBudgetUsd: number; maxAttempts: number; maxNoProgress: number; leaseMs: number; preferredStrategy: string }
 export interface GoalStore {
  getDaemonControl<T>(key: string): T | undefined;

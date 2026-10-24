@@ -18,7 +18,7 @@ interface GoalWire {
 }
 
 const GOAL_STATUS_KEY: Record<string, MessageKey> = {
-  queued: 'goals.status.queued', running: 'goals.status.running', waiting: 'goals.status.waiting', blocked: 'goals.status.blocked', paused: 'goals.status.paused',
+  pending_review: 'goals.status.pending_review', queued: 'goals.status.queued', running: 'goals.status.running', waiting: 'goals.status.waiting', blocked: 'goals.status.blocked', paused: 'goals.status.paused',
   deriving: 'play.goalCard.statusDeriving',
   active: 'play.goalCard.statusActive',
   waiting_user: 'play.goalCard.statusWaiting',

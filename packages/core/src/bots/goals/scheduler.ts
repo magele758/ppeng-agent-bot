@@ -3,7 +3,7 @@ import { createLogger } from '../../logger.js';
 import { stableJsonHash } from '../../runtime/helpers.js';
 import { TeamPlanStore } from '../../teams/store.js';
 import { getBotTask, cancelBotTask } from '../bot-work.js';
-import { principalFromSession } from '../bot-identity.js';
+import { sameBotPrincipal, principalFromSession } from '../bot-identity.js';
 import { inheritBotIdentityMetadata } from '../../memory/bot-memory-scope.js';
 import { childPermissionMode, inheritBotAllowlists, inheritModelOverride } from '../../runtime/spawn-policy.js';
 import { inheritForkRetrievalMetadata, forkOpeningMessage } from '../fork-inheritance.js';
@@ -11,18 +11,22 @@ import { childSessionTrace } from '../../stores/trace-visible.js';
 import { announceGoalState, bindGoalExecution, goalAlreadyHandled, goalScope, judgeChildCompletion, settleGoalExecution, type GoalRuntimeHost } from './runtime-host.js';
 import type { BotGoal, GoalExecution, GoalReport } from './types.js';
 
+import { occupiesGoalCapacity } from './service.js';
 const ticking = new WeakSet<object>();
 const ended = new Set(['completed', 'failed', 'cancelled', 'unknown', 'expired', 'rejected', 'timed_out']);
 interface AuthorizedWait { goalId: string; source: string; correlationId: string }
 
-function delegatedChildSettled(host: GoalRuntimeHost, parent: SessionRecord, taskId: string): boolean {
- return host.store.listSessions().some(session => {
-  if (session.metadata.botWorkTaskId !== taskId || session.metadata.canonicalBotChat === true || host.isRunning(session.id)) return false;
-  const outcome = session.metadata.outcome as {kind?: string} | undefined;
-  if (outcome?.kind === 'completed' || outcome?.kind === 'failed' || session.status === 'completed' || session.status === 'failed') return true;
-  if (session.status !== 'idle') return false;
-  return host.store.foldMessages(session.id).some(message => message.role === 'assistant' && message.parts.some(part => part.type === 'text' && part.text.trim().length > 0));
- });
+function delegatedWorkers(host:GoalRuntimeHost,parent:SessionRecord,taskId:string,includeCoordinator=false):SessionRecord[] {
+ const principal=principalFromSession(host.store,parent);
+ const task=getBotTask(host.store,principal,taskId);
+ if(!task)return [];
+ return host.store.listSessions().filter(session=>session.metadata.botWorkTaskId===taskId
+  &&(includeCoordinator||session.metadata.canonicalBotChat!==true)&&sameBotPrincipal(principalFromSession(host.store,session),principal)
+  &&(session.metadata.botWorkTaskAttempt===task.attempt||(task.attempt<=1&&session.metadata.botWorkTaskAttempt===undefined)));
+}
+function delegatedChildSettled(host:GoalRuntimeHost,parent:SessionRecord,taskId:string):boolean {
+ const workers=delegatedWorkers(host,parent,taskId);
+ return workers.length>0&&workers.every(child=>!host.isRunning(child.id)&&childEnded(child));
 }
 
 function authorizedWait(host: GoalRuntimeHost, goal: BotGoal, executions: GoalExecution[]): boolean {
@@ -46,7 +50,9 @@ function waitStatus(host: GoalRuntimeHost, parent: SessionRecord, goal: BotGoal,
   if (host.isRunning(session.id) || session.status === 'waiting_approval') return 'running';
   const outcome = session.metadata.outcome as {kind?: string} | undefined;
   if (session.status === 'failed' || session.status === 'unknown') return session.status;
-  return outcome?.kind === 'completed' || outcome?.kind === 'idle' || session.status === 'idle' ? 'completed' : undefined;
+  if(outcome?.kind==='aborted'||outcome?.kind==='cancelled')return 'cancelled';
+  if(outcome?.kind==='failed')return 'failed';
+  return childEnded(session) ? 'completed' : undefined;
  }
  if (wait.source === 'bot_task') {
   const task = getBotTask(host.store, principalFromSession(host.store, parent), wait.correlationId);
@@ -71,12 +77,12 @@ function waitStatus(host: GoalRuntimeHost, parent: SessionRecord, goal: BotGoal,
 function externalWorkers(host: GoalRuntimeHost, goal: BotGoal): SessionRecord[] {
  const wait = goal.wait;
  if (!wait) return [];
+ if(wait.source==='bot_task'){const parent=host.store.getSession(goal.sessionId);return parent?delegatedWorkers(host,parent,wait.correlationId,true):[];}
  return host.store.listSessions().filter(session =>
   wait.source === 'session' ? session.id === wait.correlationId :
   wait.source === 'swarm' ? session.metadata.swarmRunId === wait.correlationId :
   wait.source === 'team_dag' ? session.metadata.teamPlanId === wait.correlationId :
   wait.source === 'self_heal' ? session.metadata.selfHealRunId === wait.correlationId :
-  wait.source === 'bot_task' ? session.metadata.botWorkTaskId === wait.correlationId || (session.metadata.botGoalId === goal.id && session.id !== goal.sessionId) :
   wait.source === 'factory' ? session.metadata.factoryRunId === wait.correlationId :
   wait.source === 'evolution' ? session.metadata.evolutionRunId === wait.correlationId : false);
 }
@@ -136,6 +142,7 @@ function waitEvidence(host: GoalRuntimeHost, parent: SessionRecord, goal: BotGoa
  if(wait.source==='self_heal'||wait.source==='factory'||wait.source==='evolution') evidence.push(...(host.inspectSpecialty?.(parent,goal).evidence ?? []).map(item=>item.slice(-16000)));
  let costUsd=0;
  for(const worker of externalWorkers(host,goal)) {
+  if(wait.source==='bot_task'&&worker.metadata.canonicalBotChat===true)continue;
   const output=host.store.foldMessages(worker.id).filter(m=>m.role==='assistant').flatMap(m=>m.parts.filter(p=>p.type==='text').map(p=>p.text)).join('\n').slice(-8000);
   if(output)evidence.push(`Session ${worker.id}: ${output}`);
   // Executions already settled into this Goal own their own cost accounting.
@@ -279,10 +286,12 @@ function childRunRef(execution: GoalExecution, parentSessionId: string | undefin
 function childEnded(child: SessionRecord): boolean {
  const outcome = child.metadata.outcome as {kind?: string} | undefined;
  if (child.status === 'failed' || child.status === 'unknown' || child.status === 'completed') return true;
+ if(child.status==='idle'&&(outcome?.kind==='aborted'||outcome?.kind==='cancelled'))return true;
  // Subagent turns finish as idle. The outcome is what distinguishes that from a session that has not run.
  return child.status === 'idle' && (outcome?.kind === 'completed' || outcome?.kind === 'idle' || outcome?.kind === 'failed');
 }
 function childSettlement(childId: string, status: string, output: string, judged?: GoalReport): GoalReport {
+ if(status==='cancelled')return {kind:'cancelled',summary:output||'Child execution cancelled',evidence:output?[output]:[]};
  if (status === 'failed' || status === 'unknown') return {kind:'blocked', summary:output || `Child session ${childId} ${status}`, evidence:output ? [output] : [`session ${childId} ${status}`]};
  const base: GoalReport = {kind:'candidate_completed', summary:output || `Child session ${childId} finished`, evidence:output ? [output] : [`session ${childId} ${status}`], verified:false};
  // No judge, or a judge that threw, leaves the pending completion. Progress would clear the
@@ -300,8 +309,10 @@ async function settleFinishedChild(host: GoalRuntimeHost, service: GoalService, 
  const child = host.store.getSession(childId);
  if (!child || !childEnded(child)) return false;
  const output = host.store.foldMessages(childId).filter(m => m.role === 'assistant').flatMap(m => m.parts.filter(p => p.type === 'text').map(p => p.text)).join('\n').slice(-8000);
- const judged = child.status === 'failed' || child.status === 'unknown' ? undefined : await judgeChildCompletion(host, goal, childId, output);
- service.report(botId, execution.id, {...childSettlement(childId, child.status, output, judged), owner:execution.owner, fence:execution.fence});
+ const outcome=child.metadata.outcome as {kind?:string}|undefined;
+ const status=outcome?.kind==='failed'?'failed':outcome?.kind==='aborted'||outcome?.kind==='cancelled'?'cancelled':child.status;
+ const judged=['failed','unknown','cancelled'].includes(status)?undefined:await judgeChildCompletion(host,goal,childId,output);
+ service.report(botId, execution.id, {...childSettlement(childId, status, output, judged), owner:execution.owner, fence:execution.fence});
  return true;
 }
 async function settleRunningExecution(host: GoalRuntimeHost, service: GoalService, botId: string, goal: BotGoal, execution: GoalExecution): Promise<void> {
@@ -335,7 +346,7 @@ function wakeFinishedWait(host: GoalRuntimeHost, parent: SessionRecord, service:
  const status = waitStatus(host, parent, goal, executions);
  if (blockSpecialtyWait(host, parent, service, botId, goal, status)) return;
  if (blockUnauthorizedWait(service, botId, goal, status)) return;
- if (status && ended.has(status)) service.wake(botId, {goalId:goal.id, eventId:`${goal.wait!.source}:${goal.wait!.correlationId}:${status}:${goal.attempts}`, source:goal.wait!.source, correlationId:goal.wait!.correlationId, ...waitEvidence(host, parent, goal, status, executions)});
+ if (status && ended.has(status)) service.wake(botId, {goalId:goal.id, completionCandidate:status==='completed', eventId:`${goal.wait!.source}:${goal.wait!.correlationId}:${status}:${goal.attempts}`, source:goal.wait!.source, correlationId:goal.wait!.correlationId, ...waitEvidence(host, parent, goal, status, executions)});
 }
 function deferredContinuation(host: GoalRuntimeHost, parent: SessionRecord, goal: BotGoal): SessionRecord | undefined {
  return host.store.listSessions().find(s => s.parentSessionId === parent.id && s.metadata.botGoalId === goal.id && s.metadata.botGoalScopeSessionId === parent.id && !host.isRunning(s.id));
@@ -345,7 +356,7 @@ function skipFreshQueued(host: GoalRuntimeHost, parent: SessionRecord, goal: Bot
  return !deferredContinuation(host, parent, goal) && !goal.resumeRequested;
 }
 function atConcurrencyCap(service: GoalService, botId: string): boolean {
- return service.list(botId).filter(g => g.activeExecutionId).length >= service.readSettings().maxConcurrent;
+ return service.list(botId).filter(occupiesGoalCapacity).length >= service.readSettings().maxConcurrent;
 }
 function tickQueued(host: GoalRuntimeHost, parent: SessionRecord, service: GoalService, botId: string, goal: BotGoal): boolean {
  if (goalAlreadyHandled(host, parent, goal)) return false;

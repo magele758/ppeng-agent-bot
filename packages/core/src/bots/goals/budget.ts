@@ -81,6 +81,7 @@ function enforceGoalBudget(host: GoalRuntimeHost, scope: NonNullable<ReturnType<
   stopBudgetSessions(host, sessions.keys(), marker);
 }
 function chargeableGoal(host: GoalRuntimeHost, session: NonNullable<ReturnType<GoalRuntimeHost['store']['getSession']>>) {
+  if(session.metadata.botWorkTaskId)return undefined;
   const scope = goalScope(host.store, session);
   const goalId = session.metadata.botGoalId;
   if (!scope || typeof goalId !== 'string') return undefined;

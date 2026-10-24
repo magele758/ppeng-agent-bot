@@ -60,13 +60,14 @@ export function BotGoals({ botId, sessionId, selectedGoalId, onSelectGoal, initi
   useEffect(() => {
     if (snapshot && selectedGoalId && !snapshot.goals.some(goal => goal.id === selectedGoalId && goalActions(goal.status).length > 0)) onSelectGoal?.(null);
   }, [snapshot, selectedGoalId, onSelectGoal]);
+  const attention = !panel.show && panel.items.length === 1 && ['pending_review','blocked','paused'].includes(panel.items[0].status);
   const selectedTitle = panel.items.find(goal => goal.id === selectedGoalId)?.title;
-  if (listFailed || !snapshot || !panel.show) return null;
-  return <details className="bot-goals" data-testid="bot-goals">
-    <summary>{t('goals.title')} ({panel.count}){selectedTitle ? ` · ${selectedTitle}` : ''}</summary>
+  if (listFailed || !snapshot || (!panel.show && !attention)) return null;
+  return <details className="bot-goals" data-testid={attention ? "bot-goal-attention" : "bot-goals"} open={attention || undefined}>
+    <summary>{attention ? t('goals.attention') : `${t('goals.title')} (${panel.count})`}{selectedTitle ? ` · ${selectedTitle}` : ''}</summary>
     <div className="bot-goals__body">
       {error && <p role="alert">{t('goals.error', { error })}</p>}
-      {onSelectGoal && <label>{t('goals.target')}<select value={selectedGoalId ?? ''} onChange={e => onSelectGoal(e.target.value || null)}>
+      {onSelectGoal && !attention && <label>{t('goals.target')}<select value={selectedGoalId ?? ''} onChange={e => onSelectGoal(e.target.value || null)}>
         <option value="">{t('goals.automatic')}</option>
         {panel.items.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}
       </select></label>}
@@ -90,11 +91,20 @@ export function BotGoals({ botId, sessionId, selectedGoalId, onSelectGoal, initi
             <button className="btn btn-sm" type="button" disabled={busy} onClick={() => setRejectingId(null)}>{t('goals.rejectDismiss')}</button>
           </form>
           : <button className="btn btn-sm" type="button" disabled={busy} data-testid={`bot-goal-reject-${goal.id}`} onClick={() => setRejectingId(goal.id)}>{t('goals.reject')}</button>)}
-        {goalActions(goal.status).length > 0 && <form onSubmit={e => { e.preventDefault(); const data = new FormData(e.currentTarget); void mutate(`${base}/${encodeURIComponent(goal.id)}/actions`, 'POST', { action: 'reprioritize', priority: Number(data.get('priority')) }); }}>
+        {['blocked','paused','pending_review'].includes(goal.status) && <form data-testid={`bot-goal-extend-${goal.id}`} onSubmit={e => {
+          e.preventDefault(); const data = new FormData(e.currentTarget);
+          void mutate(`${base}/${encodeURIComponent(goal.id)}/actions`, 'POST', {action:'extend',additionalBudgetUsd:Number(data.get('budget')),additionalAttempts:Number(data.get('attempts'))});
+        }}>
+          <label>{t('goals.addBudget')}<input name="budget" type="number" min="0" step="0.01" defaultValue="0" required /></label>
+          <label>{t('goals.addAttempts')}<input name="attempts" type="number" min="0" step="1" defaultValue="0" required /></label>
+          <button className="btn btn-sm" type="submit" disabled={busy}>{t('goals.extend')}</button>
+          <p>{t('goals.extendHint')}</p>
+        </form>}
+        {goalActions(goal.status).length > 0 && !attention && <form onSubmit={e => { e.preventDefault(); const data = new FormData(e.currentTarget); void mutate(`${base}/${encodeURIComponent(goal.id)}/actions`, 'POST', { action: 'reprioritize', priority: Number(data.get('priority')) }); }}>
           <label>{t('goals.priority')}<input key={goal.priority} name="priority" type="number" min={-100} max={100} required defaultValue={goal.priority}/></label><button className="btn btn-sm" disabled={busy}>{t('goals.setPriority')}</button>
         </form>}</div>
       </article>)}</div>
-      {draft && <details><summary>{t('goals.settings')}</summary><form className="bot-goals__settings" onSubmit={e => { e.preventDefault(); void mutate(`${base}/settings`, 'PATCH', { ...draft }); }}>
+      {draft && !attention && <details><summary>{t('goals.settings')}</summary><form className="bot-goals__settings" onSubmit={e => { e.preventDefault(); void mutate(`${base}/settings`, 'PATCH', { ...draft }); }}>
         {(['maxConcurrent', 'defaultBudgetUsd', 'maxAttempts', 'maxNoProgress'] as const).map((key, index) => <label key={key}>{t((['goals.concurrency', 'goals.budget', 'goals.attempts', 'goals.noProgress'] as const)[index])}<input type="number" min={key === 'defaultBudgetUsd' ? 0.01 : 1} max={key === 'maxConcurrent' ? 32 : undefined} step={key === 'defaultBudgetUsd' ? 0.01 : 1} required value={draft[key]} onChange={e => { setSaved(false); setDraft({ ...draft, [key]: Number(e.target.value) }); }}/></label>)}
         <label>{t('goals.preference')}<select value={draft.preferredStrategy} onChange={e => { setSaved(false); setDraft({ ...draft, preferredStrategy: e.target.value as GoalStrategy }); }}>{(['auto', 'direct', 'subagent', 'bot_delegate', 'ptc', 'team_dag', 'swarm', 'browser', 'computer', 'deep_research'] as const).map(strategy => <option key={strategy} value={strategy}>{t(`goals.strategy.${strategy}`)}</option>)}</select></label>
         <button className="btn btn-sm" disabled={busy}>{t('goals.save')}</button>

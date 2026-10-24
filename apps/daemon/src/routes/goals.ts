@@ -125,7 +125,7 @@ export function goalRoutes(runtime: RawAgentRuntime): RouteSpec[] {
           json(response, 200, { goal: {
             goalId: durable.id, status: durable.status, source: 'bot', condition: durable.objective,
             closeReason: durable.blockedReason, progress: durable.progress, evidence: durable.evidence,
-            turnsUsed: durable.attempts, maxTurns: new BotGoalService(runtime.store, Date.now, durable.sessionId).readSettings().maxAttempts
+            turnsUsed: durable.attempts, maxTurns: new BotGoalService(runtime.store, Date.now, durable.sessionId).readSettings().maxAttempts + (durable.extraAttempts ?? 0)
           } });
           return;
         }

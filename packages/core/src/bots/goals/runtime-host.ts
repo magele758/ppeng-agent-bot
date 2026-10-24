@@ -89,9 +89,8 @@ function newGoalSource(known:Record<string,string>,receiptId:string,sourceId:str
  return known[receiptId]?.startsWith('goal_')?sourceId:receiptId;
 }
 function applyNewGoal(service:BotGoalService,session:SessionRecord,botId:string,intent:{text:string},known:Record<string,string>,receiptId:string,sourceId:string) {
- const goal=service.create({botId,sessionId:session.id,title:intent.text.slice(0,120),objective:intent.text,sourceMessageId:newGoalSource(known,receiptId,sourceId),resources:workspaceResources(session,intent.text)});
- if(known[receiptId]?.startsWith('goal_'))service.control(botId,goal.id,'resume');
- else known[receiptId]=goal.id;
+ const goal=service.create({botId,sessionId:session.id,title:intent.text.slice(0,120),objective:intent.text,sourceMessageId:newGoalSource(known,receiptId,sourceId),resources:workspaceResources(session,intent.text),resumeRequested:known[receiptId]?.startsWith('goal_')});
+ if(!known[receiptId]?.startsWith('goal_'))known[receiptId]=goal.id;
  return goal;
 }
 function steerRunningIntent(host:GoalRuntimeHost,sessionId:string,executionSessionId:string,intentKind:string,revision:number,constraints:unknown,receiptId:string):void {
@@ -136,7 +135,12 @@ async function applyIntakeIntent(host:GoalRuntimeHost,session:SessionRecord,serv
   else askPriority(host,session.id,sourceId);
   return;
  }
- announceIntake(host,session,sourceId,receiptId,intent,intentResult(service,session,botId,intent,known,receiptId,sourceId),service,botId);
+ try {
+  announceIntake(host,session,sourceId,receiptId,intent,intentResult(service,session,botId,intent,known,receiptId,sourceId),service,botId);
+ } catch(error) {
+  if(!['resume','pause','cancel','amend_goal'].includes(intent.kind))throw error;
+  host.store.enqueueSteer(session.id,`[goal control not applied] ${String(error)}. Explain the current state and available next action; preserve the existing execution and do not create replacement work.`,{role:'system',key:`goal-control-refused:${sourceId}`});
+ }
 }
 async function ingestReceipt(host:GoalRuntimeHost,session:SessionRecord,service:BotGoalService,botId:string,messages:Map<string,{parts:{type:string;text?:string}[]}>,known:Record<string,string>,receipt:{id:string}):Promise<void> {
  if(known[receipt.id])return;
@@ -251,6 +255,7 @@ function answerCanonicalChat(session:SessionRecord,bound:boolean):boolean {
  return bound||session.metadata.canonicalBotChat===true;
 }
 export function bindGoalExecution(host:GoalRuntimeHost,session:SessionRecord):boolean {
+ if(session.metadata.botWorkTaskId)return true;
  const scope=goalScope(host.store,session);
  if(!scope)return true;
  if(session.metadata.botGoalWorker===true)return isGoalWorkerCurrent(host.store,session);
@@ -283,7 +288,7 @@ function runningGoalExecution(service:BotGoalService,botId:string,metadata:Sessi
 function settleContext(host:GoalRuntimeHost,sessionId:string,error?:unknown) {
  if(error instanceof WriterClaimError)return undefined;
  const loaded=loadedSettleSession(host,sessionId);
- if(!loaded)return undefined;
+ if(!loaded||loaded.session.metadata.botWorkTaskId)return undefined;
  const running=runningGoalExecution(loaded.scope.service,loaded.scope.botId,loaded.session.metadata);
  if(!running)return undefined;
  return {...loaded,...running};
@@ -394,6 +399,7 @@ export async function settleGoalExecution(host:GoalRuntimeHost,sessionId:string,
 }
 
 function assignedCheckpointGoal(store:SqliteStateStore,session:SessionRecord):{goalId:string}|undefined {
+ if(session.metadata.botWorkTaskId)return undefined;
  const scope=goalScope(store,session);
  const goalId=session.metadata.botGoalId;
  if(!scope||typeof goalId!=='string'||!scope.service.get(scope.botId,goalId))return undefined;

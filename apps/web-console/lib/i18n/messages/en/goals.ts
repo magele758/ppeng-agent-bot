@@ -1,4 +1,5 @@
 export const goals = {
+  attention: 'Goal needs your attention', addBudget: 'Add budget to this goal (USD)', addAttempts: 'Approve additional attempts', extend: 'Extend this goal’s limits', extendHint: 'Keeps past usage and results. Resume when ready; pending results still need acceptance or send-back.',
   attemptUsage: 'Attempts {used}/{max}', durableVerification: 'Verified against goal evidence',
   history: 'Goal history', historyEmpty: 'No finished goals yet', historyError: 'Could not load goal history',
   title: 'Goals and progress', empty: 'No goals yet. Progress appears here when you request a task.', loading: 'Loading goals…',
