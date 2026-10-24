@@ -1,6 +1,6 @@
 id: bot-completion-reliability
 title: 完成验证可追溯与任务收尾可靠性
-status: approved
+status: implemented
 requirement: |
   继续修复目标已完成却停在 queued、CSV 未保存和严格输出格式的问题，补齐完成判官的原始证据，不降低门禁标准，用当前 Grok 重跑新旧版本对照，通过测试和 review 后再合并 PR #251。
 notes: |
