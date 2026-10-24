@@ -1772,6 +1772,10 @@ export class RawAgentRuntime {
       cancel: id => this.cancelSession(id),
       run: id => this.runSession(id),
       judge: this.modelAdapter.completeText?.bind(this.modelAdapter),
+      judgeForSession: session => {
+        const adapter = resolveSessionModelAdapter(this.store, session, process.env, this.modelAdapter);
+        return adapter.completeText?.bind(adapter);
+      },
       emitTrace: (sessionId, event) => this.emitTrace(sessionId, event),
       inspectSpecialty: (parent,goal) => specialtyStatus(this.goalSpecialtyHost(),parent,goal),
       cancelSpecialty: (parent,goal) => cancelSpecialty(this.goalSpecialtyHost(),parent,goal),

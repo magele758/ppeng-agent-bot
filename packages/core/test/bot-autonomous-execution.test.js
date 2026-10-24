@@ -34,7 +34,7 @@ test('professional work selects original specialist and carries prior progress [
   const seen=[];
   const adapters=createGoalExecutionAdapters({getCapabilities:()=>capabilities,runSessionExecution:async req=>{seen.push(req);return {status:'waiting',reference:'session:child',content:'started'}},invokeAuthorizedTool:async()=>{throw Error('not expected')}});
   for(const [task,role] of [['制定产品规划','planner'],['实现功能','generator'],['验收测试结果','evaluator']]) {
-    await adapters.start({goalId:'same-goal',revision:2,executionId:role,task,progress:'研究已完成',evidence:['研究结论'],constraints:['不发布']});
+    await adapters.start({goalId:'same-goal',revision:2,executionId:role,task,preferredStrategy:'subagent',progress:'研究已完成',evidence:['研究结论'],constraints:['不发布']});
     assert.equal(seen.at(-1).role,role);assert.equal(seen.at(-1).goalId,'same-goal');
     assert.match(seen.at(-1).task,/研究已完成/);assert.match(seen.at(-1).task,/不发布/);
   }
@@ -48,5 +48,5 @@ test('cancellation targets actual specialized executor [AC:bot-autonomous-execut
 });
 test('self-heal chooses the requested test workflow without a mode form [AC:bot-autonomous-execution-coverage#AC-1]',()=>{
   for(const [task,preset] of [['启动自愈修复端到端测试','e2e'],['运行自愈修复回归测试','regression'],['start self-heal for CI failures','ci'],['启动自愈修复构建','build'],['启动自愈修复测试','unit']]) assert.equal(selfHealPresetForTask(task),preset);
-  assert.equal(selectGoalRoute({task:'实现 factory 状态展示'},capabilities).strategy,'subagent');
+  assert.equal(selectGoalRoute({task:'实现 factory 状态展示'},capabilities).strategy,'direct');
 });

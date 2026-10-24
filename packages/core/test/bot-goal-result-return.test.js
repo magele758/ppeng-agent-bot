@@ -28,7 +28,7 @@ function fixture(t) {
     store,
     isRunning: id => running.has(id),
     cancel: id => { running.delete(id); },
-    run: id => { runs.push(id); running.add(id); return Promise.resolve(); },
+    run: id => { runs.push(id); running.add(id); return new Promise(() => {}); },
     capabilities: () => ({ registeredTools: ['spawn_subagent', 'read_file'], enabledStrategies: ['direct', 'subagent'] })
   };
   const create = (extra = {}) => service.create({ botId: 'b', sessionId: parent.id, title: 'Fix', objective: 'Fix the reported defect', ...extra });
@@ -232,7 +232,7 @@ test('delegated bot child results return to the original goal [AC:bot-goal-resul
   assert.equal(service.get(requester.id, mismatch.id).status, 'blocked');
 });
 
-test('team and swarm fan-out close the parent goal on failure and missing runs do not wake [AC:bot-goal-result-return#AC-4]', async t => {
+test('team and swarm fan-out close the parent goal on failure and missing runs do not wake [AC:bot-goal-result-return#AC-4] [AC:bot-execution-p0#AC-5]', async t => {
   const { host, create, service, store, parent, dir, runs } = fixture(t);
   const sessions = [];
   const swarm = new SwarmExecutor({
@@ -282,10 +282,13 @@ test('team and swarm fan-out close the parent goal on failure and missing runs d
   assert.equal(store.teams().get(created.plan.id).status, 'failed');
   assert.equal(store.teams().get(created.plan.id).tasks[0].status, 'failed');
 
-  const missing = create({ title: 'Missing swarm' });
-  waitOn(service, store, parent, missing, 'swarm', 'missing-run');
-  await tickBotGoals(host);
-  assert.equal(service.get('b', missing.id).status, 'blocked');
+  for (const source of ['swarm', 'team_dag']) {
+    const missing = create({ title: `Missing ${source}` });
+    waitOn(service, store, parent, missing, source, 'missing-run');
+    await tickBotGoals(host);
+    assert.equal(service.get('b', missing.id).status, 'blocked');
+    assert.match(service.get('b', missing.id).blockedReason, /missing/);
+  }
   assert.equal(runs.length, 0);
 });
 

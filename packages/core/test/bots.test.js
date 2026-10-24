@@ -76,7 +76,7 @@ test('createBot: agent 1:1 + canonical session [AC:bots#AC-1]', () => {
   assert.equal(session.metadata.canonicalBotChat, true);
   assert.equal(session.metadata.sessionCut, true);
   assert.equal(session.metadata.permissionMode, 'auto');
-  assert.equal(session.metadata.maxTurns, 24);
+  assert.equal(session.metadata.maxTurns, 0);
   assert.equal(agent.autonomous, true);
   assert.ok(agent.capabilities.includes('task-management'));
   assert.ok(agent.capabilities.includes('orchestration'));
@@ -261,8 +261,9 @@ test('openBot: a per-user chat inherits the saved turn budget only when it is a 
     [48, 48],
     [96, 96],
     [24, 24],
-    [50, 24],
-    ['48', 24]
+    [0, 0],
+    [50, 0],
+    ['48', 0]
   ];
   cases.forEach(([saved, expected], i) => {
     const bot = createBot(h, { name: `Budget${i}` });

@@ -112,5 +112,5 @@ test('unfinished work and an explicit handoff still continue [AC:bot-goal-only-w
   const capabilities = { registeredTools: ['spawn_subagent'], enabledStrategies: ['direct', 'subagent'] };
   assert.equal(selectGoalRoute({ task: '分析一下报错日志' }, capabilities).strategy, 'direct');
   assert.equal(selectGoalRoute({ task: '把这个分析拆成子任务并行做' }, capabilities).strategy, 'subagent');
-  assert.equal(selectGoalRoute({ task: '实现登录失败的中文提示' }, capabilities).strategy, 'subagent');
+  assert.equal(selectGoalRoute({ task: '实现登录失败的中文提示' }, capabilities).strategy, 'direct');
 });

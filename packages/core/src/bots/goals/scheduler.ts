@@ -57,13 +57,12 @@ function waitStatus(host: GoalRuntimeHost, parent: SessionRecord, goal: BotGoal,
  }
  if (wait.source === 'team_dag') {
   const plan = new TeamPlanStore(host.store.db).get(wait.correlationId);
-  // A missing plan is not a finished run. Waking on "unknown" restarts the parent.
-  if (!plan) return undefined;
+  // Missing execution evidence requires reconciliation, never another dispatch.
+  if (!plan) return 'missing';
   return plan.sessionId && ownedSessions.has(plan.sessionId) ? plan.status : 'unauthorized';
  }
  if (wait.source === 'swarm') {
-  // Same rule: a correlation id with no run stays unresolved instead of waking the parent.
-  return host.store.swarm().getRun(wait.correlationId)?.status;
+  return host.store.swarm().getRun(wait.correlationId)?.status ?? 'missing';
  }
  if (wait.source === 'self_heal' || wait.source === 'factory' || wait.source === 'evolution') return specialtyWaitStatus(host, parent, goal);
  return 'unsupported';
