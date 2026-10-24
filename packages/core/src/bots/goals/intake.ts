@@ -16,6 +16,13 @@ export interface GoalIntentJudgeInput {
 export type GoalIntentJudge = (input: GoalIntentJudgeInput) => Promise<unknown>;
 
 const targetPattern = /^\s*\[goal:([^\]\s]+)\]\s*/;
+const courtesyRequest = /^(?:(?:可以|能不能|能否|可不可以)(?:请|帮我|麻烦)|(?:can|could|would|will)\s+you\b)/i;
+const workRequest = /(?:请|帮我|麻烦)[\s\S]{0,24}(?:修复|实现|修改|添加|开发|部署|编写|研究|调查)|^(?:修复|实现|修改|添加|开发|部署|编写)|^(?:(?:please|can you|could you|would you|will you)\s+)?(?:fix|implement|build|deploy|write|investigate|research)\b/i;
+function requestsWork(text: string): boolean {
+  if (/^(?:部署|开发|修复|实现)?(?:进度|状态)|^(?:deploy(?:ment)?|build|fix)\s+(?:status|progress)\b/i.test(text)) return false;
+  return workRequest.test(text) || courtesyRequest.test(text);
+}
+const informationalQuestion = /^(?:为什么|什么是|请解释|解释一下|如何|怎么|what is\b|why\b|how\b|explain\b)/i;
 const controlQuestion = /(?:取消|暂停|停止|继续|恢复|cancel|pause|stop|resume)/i;
 function isControlDiscussion(text: string): boolean {
   return controlQuestion.test(text) && (/[?？吗么]/.test(text)
@@ -29,10 +36,10 @@ export function classifyGoalMessage(raw: string): GoalMessageIntent {
   const base = { ...(target ? { goalId: target[1]! } : {}), text };
   if (!text || /^(谢谢|多谢|好的|收到|你好|thanks?|thank you|hello|hi)[！!。.\s]*$/i.test(text)) return { kind: 'chat', ...base };
   if (/(进度|进展|做到哪|怎么样了|状态如何|完成了吗|完成了没|跑完了没|还没好|status|progress|how.*going)/i.test(text)
-    && !/(帮我.*(实现|开发)|implement|build)/i.test(text)) return { kind: 'query', ...base };
-  if (isControlDiscussion(text)) return { kind: 'chat', ...base };
-  const workVerb = text.search(/实现|开发|添加|分析|研究|检查|调查|说明|编写|设计|\b(?:add|build|implement|analy[sz]e|investigate)\b/i);
+    && !requestsWork(text)) return { kind: 'query', ...base };
+  const workVerb = text.search(/修复|修改|实现|开发|添加|分析|研究|检查|调查|说明|编写|设计|\b(?:fix|modify|add|build|implement|analy[sz]e|investigate)\b/i);
   const controlVerb = text.search(controlQuestion);
+  if (isControlDiscussion(text) && !(requestsWork(text) && workVerb >= 0 && controlVerb > workVerb)) return { kind: 'chat', ...base };
   if (workVerb >= 0 && controlVerb > workVerb) return { kind: target ? 'amend_goal' : 'new_goal', ...base };
   if (/(取消|不用做了|别做了)/.test(text) && !/(取消按钮|取消功能)/.test(text)
     || /^(?:please\s+)?cancel\b/i.test(text)) return { kind: 'cancel', ...base };
@@ -42,6 +49,7 @@ export function classifyGoalMessage(raw: string): GoalMessageIntent {
   if (target || /(刚才|那个|这项|原来).*(不要|别|改|增加|保持)|别改|不要改|追加约束|\b(instead|keep unchanged|don't change|do not change)\b/i.test(text)) {
     return { kind: 'amend_goal', ...base };
   }
+  if (requestsWork(text)) return { kind: 'new_goal', ...base };
   if (/^(为什么|什么是|请解释|解释一下|what is|why\b|explain\b)/i.test(text) || /[?？]$/.test(text)) return { kind: 'chat', ...base };
   return { kind: 'new_goal', ...base };
 }
@@ -67,10 +75,10 @@ function fallbackIntents(raw: string, goals: GoalIntakeContext[]): GoalIntentPro
 }
 
 const JUDGE_KINDS = new Set(['new_goal', 'amend_goal', 'query', 'pause', 'resume', 'cancel', 'reprioritize', 'chat']);
-const JUDGE_INSTRUCTIONS = 'Return JSON {intents:[{kind,goalId?,text,priority?}]}. kinds: new_goal, amend_goal, query, pause, resume, cancel, reprioritize, chat. Split independent intents; text must be an exact nonempty excerpt of the message. Queries and discussion of controls are never control requests. Preserve explicit [goal:id] targeting. Use only supplied goal IDs; omit goalId when ambiguous. Do not infer cancellation or completion. priority must be an integer for reprioritize.';
+const JUDGE_INSTRUCTIONS = 'Return JSON {intents:[{kind,goalId?,text,priority?}]}. kinds: new_goal, amend_goal, query, pause, resume, cancel, reprioritize, chat. Split independent intents; preserve the full deliverable of combined investigate-and-fix requests. Polite requests and question marks do not make actionable work a chat; text must be an exact nonempty excerpt of the message. Queries and discussion of controls are never control requests. Preserve explicit [goal:id] targeting. Use only supplied goal IDs; omit goalId when ambiguous. Do not infer cancellation or completion. priority must be an integer for reprioritize.';
 
 function judgeSkipped(judge: GoalIntentJudge | undefined, raw: string, fallback: GoalIntentProposal[]): boolean {
-  return !judge || raw.length > 12000 || fallback.every(intent => intent.kind === 'query' || intent.kind === 'chat');
+  return !judge || raw.length > 12000 || fallback.every(intent => intent.kind === 'query' || (intent.kind === 'chat' && (!/[?？]/.test(intent.text) || isControlDiscussion(intent.text) || informationalQuestion.test(intent.text))));
 }
 function outputTooLarge(output: unknown): boolean {
   return typeof output === 'string' && output.length > 16000;
@@ -92,7 +100,8 @@ function intentGoalOk(item: { goalId?: unknown }, goals: GoalIntakeContext[]): b
   return typeof item.goalId === 'string' && goals.some(goal => goal.id === item.goalId);
 }
 function intentKindOk(item: { kind: string }, baseline: GoalMessageIntent): boolean {
-  if (['query', 'chat'].includes(baseline.kind) && item.kind !== baseline.kind) return false;
+  if (baseline.kind === 'query' && item.kind !== 'query') return false;
+  if (baseline.kind === 'chat' && item.kind !== 'chat' && (isControlDiscussion(baseline.text) || informationalQuestion.test(baseline.text) || !/[?？]/.test(baseline.text) || !['new_goal', 'amend_goal'].includes(item.kind))) return false;
   return !['pause', 'cancel', 'resume'].includes(item.kind) || baseline.kind === item.kind;
 }
 function priorityOk(item: { kind: string; priority?: number }): boolean {

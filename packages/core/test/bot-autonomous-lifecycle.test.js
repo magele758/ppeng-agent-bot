@@ -73,7 +73,7 @@ test('actual Bot dispatch selects the original specialist and keeps Bot identity
     if(input.sessionId!==sid)workers.push(input.sessionId);
     return {stopReason:'end',assistantParts:[{type:'text',text:'Planning evidence'}]};
   },async summarizeMessages(){return 'summary'}});sid=f.sid;
-  f.runtime.sendUserMessage(sid,'制定产品规划',{autoRun:true});await f.runtime.runHumanSession(sid);
+  f.runtime.sendUserMessage(sid,'交给规划子代理制定产品规划',{autoRun:true});await f.runtime.runHumanSession(sid);
   const dispatch=f.store.getSession(sid).metadata.botGoalDispatch;
   assert.equal(dispatch.result.status,'waiting');
   const worker=f.store.getSession(dispatch.result.reference.slice(8));
@@ -115,7 +115,7 @@ test('a cancelled goal cannot be restarted by resuming its underlying self-heal 
 test('research profile belongs to the worker and cannot disable Bot dispatch [AC:bot-autonomous-execution-coverage#AC-2]',async t=>{
   let sid,dispatched=false;
   const f=fixture(t,{name:'research-script',async runTurn(input){
-    if(input.sessionId===sid&&!dispatched){dispatched=true;return {stopReason:'tool',assistantParts:[{type:'tool_call',toolCallId:'research',name:'goal_dispatch',input:{workKind:'research'}}]};}
+    if(input.sessionId===sid&&!dispatched){dispatched=true;return {stopReason:'tool',assistantParts:[{type:'tool_call',toolCallId:'research',name:'goal_dispatch',input:{workKind:'research',preferredStrategy:'subagent'}}]};}
     return {stopReason:'end',assistantParts:[{type:'text',text:'Research evidence'}]};
   },async summarizeMessages(){return 'summary'}});sid=f.sid;
   f.runtime.sendUserMessage(sid,'调研可用部署方案',{autoRun:true});await f.runtime.runHumanSession(sid);
@@ -139,7 +139,7 @@ test('authorized on-demand browser tools count as available without prior disclo
 });
 test('a selected specialist is not reported completed without an actual dispatch [AC:bot-autonomous-execution-coverage#AC-4]',async t=>{
  const f=fixture(t,{name:'ignores-dispatch',async runTurn(){return {stopReason:'end',assistantParts:[{type:'text',text:'Here is the finished product plan.'}]}},async completeText(){return JSON.stringify({met:true,advanced:true,reason:'Plan written',evidence:['Plan text']})},async summarizeMessages(){return ''}});
- f.runtime.sendUserMessage(f.sid,'制定产品规划',{autoRun:true});await f.runtime.runHumanSession(f.sid);
+ f.runtime.sendUserMessage(f.sid,'交给规划子代理制定产品规划',{autoRun:true});await f.runtime.runHumanSession(f.sid);
  const [goal]=f.service.list(f.bot.id);
  assert.notEqual(goal.status,'completed');
  assert.match(goal.nextStep,/goal_dispatch/);

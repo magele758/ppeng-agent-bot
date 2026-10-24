@@ -35,11 +35,13 @@ const toolsByStrategy: Record<GoalStrategy, string[]> = {
 };
 const specialties = new Set<GoalStrategy>(['orchestrator', 'self_heal', 'evolution', 'factory']);
 export function goalWorkKind(text: string): GoalWorkKind {
+  if (/(?:^(?:请|帮我|please\s+)?(?:修复|修改|实现|开发|fix\b|implement\b|build\b|refactor\b))/i.test(text)) return 'general';
   if (/\b(swarm|pipeline)\b|角色流水线/i.test(text)) return 'role_pipeline';
   if (/\b(dag|dependency)\b|依赖关系|任务图/i.test(text)) return 'dependency_plan';
   if (/\b(batch|ptc)\b|批量|汇总.*数据/i.test(text)) return 'batch';
   if (/\b(browser|webpage)\b|浏览器|网页操作/i.test(text)) return 'browser';
   if (/\b(desktop|computer)\b|桌面操作|电脑|操作.*桌面/i.test(text)) return 'computer';
+  if (/修复|修改|实现|开发|(?:并|然后|再)部署|\b(fix|implement|build|refactor)\b|(?:and|then)\s+deploy\b/i.test(text)) return 'general';
   if (/\b(research|investigate)\b|调研|研究/i.test(text)) return 'research';
   return 'general';
 }
@@ -48,17 +50,17 @@ export function goalSpecialty(text: string): GoalStrategy | undefined {
   if (/^(?:请)?自愈|(?:启动|运行|执行|开启|使用).{0,12}自愈|\b(?:start|run|launch|execute)\b.{0,16}\bself[-_ ]?heal\b/i.test(text)) return 'self_heal';
   if (/(?:启动|运行|执行|开启).{0,16}(?:evolution|演进|进化)|\b(?:start|run|launch|execute)\b.{0,16}\bevolution\b/i.test(text)) return 'evolution';
   if (/^(?:请)?工厂|(?:启动|运行|执行|使用).{0,12}工厂|\b(?:start|run|launch|execute|use)\b.{0,16}\bfactory\b/i.test(text)) return 'factory';
-  if (/^(?:请)?编排|\b(?:orchestrate|start orchestrator)\b|规划.*开发.*验证/i.test(text)) return 'orchestrator';
+  if (/^(?:请)?编排|\b(?:orchestrate|start orchestrator)\b/i.test(text)) return 'orchestrator';
   return undefined;
 }
 /** The user asked to split, parallelize, or hand the work to another role. */
 export function goalNeedsIsolatedExecutor(text: string): boolean {
-  return /拆成子任务|拆成并行|并行处理|分别交给|交给(?:规划|实现|验收|评估)|子代理/.test(text);
+  return /拆成子任务|拆成并行|并行处理|分别交给|交给(?:规划|实现|验收|评估)|子代理|\b(?:use|spawn|delegate to)\s+(?:a\s+)?subagents?\b|\bin parallel\b/i.test(text);
 }
 export function goalSpecialist(text: string): GoalRouteRequest['role'] {
   if (/\b(evaluate|review)\b|^(?:请|请帮我)?(?:验收|评估|审查|验证结果)/i.test(text.trim())) return 'evaluator';
   if (/\b(plan|planner|specification)\b|制定.*规划|设计方案|规划方案/i.test(text)) return 'planner';
-  if (/\b(implement|generate|build)\b|实现|开发功能/i.test(text)) return 'generator';
+  if (/\b(fix|refactor|implement|generate|build)\b|修复|修改|实现|开发功能/i.test(text)) return 'generator';
   if (goalWorkKind(text) === 'research') return 'researcher';
   return undefined;
 }
@@ -69,7 +71,7 @@ export function availableGoalTools(capabilities: GoalCapabilities): Set<string> 
 export function goalStrategyUnavailable(strategy: GoalStrategy, request: GoalRouteRequest, capabilities: GoalCapabilities): string | undefined {
   if (!capabilities.enabledStrategies.includes(strategy)) return 'Execution strategy is not enabled';
   if (capabilities.healthyStrategies && !capabilities.healthyStrategies.includes(strategy)) return 'Execution adapter is unavailable';
-  if (request.independentWork && strategy === 'direct') return 'An independent concurrent task needs an isolated executor';
+  if ((request.independentWork || goalNeedsIsolatedExecutor(request.task) || request.delegateBotId) && strategy === 'direct') return 'An independent concurrent task needs an isolated executor';
   if (strategy === 'ptc' && !capabilities.ptcEnabled) return 'PTC is not enabled for this execution';
   if (strategy === 'team_dag' && !capabilities.hasWorkspace) return 'Team execution requires a workspace';
   if (strategy === 'bot_delegate' && !request.delegateBotId) return 'No authorized destination Bot was selected';
@@ -87,7 +89,7 @@ export function selectGoalRoute(request: GoalRouteRequest, capabilities: GoalCap
   const rejected: GoalRoute['rejected'] = [];
   if (capabilities.budgetRemaining !== undefined && (!Number.isFinite(capabilities.budgetRemaining) || capabilities.budgetRemaining <= 0)) return { taskMode, blocked: true, reason: 'Goal budget is exhausted', rejected };
   const requiredSpecialty = goalSpecialty(request.task);
-  const inferred: GoalStrategy = requiredSpecialty ?? (request.delegateBotId ? 'bot_delegate' : request.workKind === 'batch' ? 'ptc' : request.workKind === 'dependency_plan' ? 'team_dag' : request.workKind === 'role_pipeline' ? 'swarm' : request.independentWork || request.role || goalSpecialist(request.task) || goalNeedsIsolatedExecutor(request.task) ? 'subagent' : 'direct');
+  const inferred: GoalStrategy = requiredSpecialty ?? (request.delegateBotId ? 'bot_delegate' : request.workKind === 'batch' ? 'ptc' : request.workKind === 'dependency_plan' ? 'team_dag' : request.workKind === 'role_pipeline' ? 'swarm' : request.independentWork || request.role || goalNeedsIsolatedExecutor(request.task) ? 'subagent' : 'direct');
   const requestedSpecialty = requiredSpecialty ?? (request.preferredStrategy && specialties.has(request.preferredStrategy) ? request.preferredStrategy : undefined);
   const candidates = requestedSpecialty ? [requestedSpecialty] : [...new Set([request.preferredStrategy ?? inferred, inferred, request.independentWork ? 'subagent' as const : 'direct' as const])];
   for (const strategy of candidates) {

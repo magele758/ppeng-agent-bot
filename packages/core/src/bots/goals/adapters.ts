@@ -42,7 +42,7 @@ export function createGoalExecutionAdapters(host: GoalExecutionAdapterHost) {
       const strategy = route.strategy;
       if (route.blocked || !strategy) return {status:'blocked',content:route.reason,route};
       const routeRequest = request;
-      const role = strategy === 'orchestrator' ? 'main' : request.role ?? goalSpecialist(request.task);
+      const role = strategy === 'orchestrator' ? 'main' : request.role ?? (strategy === 'subagent' ? goalSpecialist(request.task) : undefined);
       request = {...request,task:[request.task, request.progress ? `Previous progress: ${request.progress}` : '', request.evidence?.length ? `Evidence: ${JSON.stringify(request.evidence)}` : '', request.constraints?.length ? `Constraints: ${JSON.stringify(request.constraints)}` : ''].filter(Boolean).join('\n')};
       let knownReference: string | undefined;
       try {
