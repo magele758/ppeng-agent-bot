@@ -4,6 +4,7 @@
  * Ratios are constants: no new RAW_AGENT_* switch.
  */
 
+import { toolEvidencePreview } from './tool-evidence-preview.js';
 import { contextSourceNavigation } from './context-sources.js';
 import { CANONICAL_BOT_CHAT_META } from '../bots/types.js';
 import type { SessionMessage } from '../types.js';
@@ -92,10 +93,9 @@ export function pruneLargeToolOutputs(messages: readonly SessionMessage[]): Sess
     const parts = message.parts.map((part) => {
       if (part.type !== 'tool_result' || part.content.length < BOT_TOOL_PRUNE_MIN_CHARS) return part;
       changed = true;
-      const dropped = part.content.length - BOT_TOOL_PRUNE_KEEP_CHARS;
       return {
         ...part,
-        content: `${part.content.slice(0, BOT_TOOL_PRUNE_KEEP_CHARS)}\n…[pruned ${dropped} chars]\n${contextSourceNavigation([message])}`
+        content: `${toolEvidencePreview(part.content, BOT_TOOL_PRUNE_KEEP_CHARS)}\n${contextSourceNavigation([message])}`
       };
     });
     return changed ? { ...message, parts } : message;

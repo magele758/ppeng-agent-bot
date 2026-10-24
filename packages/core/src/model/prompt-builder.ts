@@ -62,7 +62,7 @@ const { HARNESS_ARTIFACT_DIR, HARNESS_ARTIFACT_FILES } = await import('../types.
  * Bump when `buildStablePrefix` (or any helper that feeds it) changes wording.
  * See `./AGENTS.md`.
  */
-export const STABLE_SYSTEM_VERSION = 'v10';
+export const STABLE_SYSTEM_VERSION = 'v11';
 
 /** Appended when `RAW_AGENT_AGENTIC_SAFETY_APPENDIX` is set; English to match the rest of the stable prefix. */
 export const RUNTIME_AGENTIC_SAFETY_APPENDIX = `Runtime safety appendix (policy text only; does not replace model-level safety training):
@@ -380,7 +380,7 @@ export class PromptBuilder {
         'Harness role: EVALUATOR — skeptical QA; probe edge cases; document findings in evaluator_feedback.md. Do not rubber-stamp generator output.',
       );
     }
-    if (ctx.agent.id === 'main' || ctx.agent.capabilities.includes('orchestration')) {
+    if (ctx.agent.id === 'main' || (ctx.agent.capabilities.includes('orchestration') && !ctx.agent.capabilities.includes('bot'))) {
       harnessLines.push(
         `Long-running harness: orchestrate planner → generator sprints → evaluator; structured files under ${HARNESS_ARTIFACT_DIR}/ (${HARNESS_ARTIFACT_FILES.productSpec}, ${HARNESS_ARTIFACT_FILES.requirementsBacklog}, ${HARNESS_ARTIFACT_FILES.sprintContract}, ${HARNESS_ARTIFACT_FILES.evaluatorFeedback}).`,
       );
@@ -395,7 +395,7 @@ export class PromptBuilder {
       `Conversation mode: ${ctx.session.mode}`,
       'You are running in a raw agent loop. Respond normally when no tools are needed.',
       EXTERNAL_FENCE_SYSTEM_SENTENCE,
-      'For multi-step work, call TodoWrite before broad execution and keep exactly one item in progress.',
+      'Use TodoWrite for multi-step work when it helps track remaining work; keep one item in progress and prioritize execution over bookkeeping.',
       'Load skills from repo `skills/` and `~/.agents/**/SKILL.md` only when relevant with load_skill(name).',
       'Use persistent tasks for long-lived work and teammates only for clearly separable work.',
       'For large builds: load_skill(Long-running harness) and use harness_write_spec for cross-session handoffs.',
