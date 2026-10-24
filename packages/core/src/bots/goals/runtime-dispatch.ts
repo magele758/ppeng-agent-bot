@@ -60,6 +60,7 @@ export function createRuntimeGoalDispatchTool(host: RuntimeGoalDispatchHost): To
   return createGoalDispatchTool({
     resolveRequest(context) {
       const fresh = freshContext(context);
+      if(fresh.session.metadata.botWorkTaskId)return undefined;
       const scope = goalScope(host.store,fresh.session);
       const goalId = fresh.session.metadata.botGoalId;
       const executionId = fresh.session.metadata.botGoalExecutionId;

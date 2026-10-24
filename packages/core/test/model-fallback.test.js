@@ -1127,3 +1127,23 @@ test('runtime: cancelling a backoff prevents retry and fallback [AC:model-retry-
     });
   } finally { primary.close(); backup.close(); }
 });
+
+test('fallback enable switch survives persistence and chain-only edits and suppresses planning when off', () => {
+  for (const enabled of [true, false]) assert.equal(normalizeModelFallbackSettings({chain:[B],enabled}).enabled, enabled);
+  for (const enabled of [undefined,null,'false',0]) assert.equal(Object.hasOwn(normalizeModelFallbackSettings({chain:[B],enabled}),'enabled'),false);
+  const store=tempStore();
+  try {
+    seedProviders(store);
+    assert.equal(writeModelFallbackSettings(store,{chain:[B],enabled:false},{}).enabled,false);
+    assert.equal(readModelFallbackSettings(store).enabled,false);
+    assert.deepEqual(readModelFallbackSettings(store).chain,[B]);
+    assert.equal(planModelFallback({store,primary:{name:'primary'},primaryRef:A,env:{}}),undefined);
+    assert.equal(writeModelFallbackSettings(store,{chain:[B]},{}).enabled,false);
+    assert.equal(writeModelFallbackSettings(store,{enabled:true},{}).enabled,true);
+    assert.ok(planModelFallback({store,primary:{name:'primary'},primaryRef:A,env:{}}));
+    assert.equal(writeModelFallbackSettings(store,{chain:[B]},{}).enabled,true);
+    assert.equal(writeModelFallbackSettings(store,{enabled:'false'},{}).enabled,true);
+    assert.equal(writeModelFallbackSettings(store,{enabled:false},{}).enabled,false);
+    assert.equal(planModelFallback({store,primary:{name:'primary'},primaryRef:A,env:{}}),undefined);
+  } finally {store.db.close();}
+});

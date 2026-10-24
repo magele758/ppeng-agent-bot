@@ -169,7 +169,12 @@ function inheritedExecutionMetadata(metadata: Record<string, unknown> | undefine
     inherited.botGoalScopeSessionId = typeof scope === 'string' && scope ? scope : metadata?.canonicalBotChat === true ? sessionId : undefined;
   }
   const taskId = metadata?.botWorkTaskId;
-  if (typeof taskId === 'string' && taskId) inherited.botWorkTaskId = taskId;
+  if (typeof taskId === 'string' && taskId) {
+    delete inherited.botGoalId;delete inherited.botGoalScopeSessionId;
+    inherited.botWorkTaskId = taskId;
+    inherited.botWorkTaskAttempt = metadata?.botWorkTaskAttempt;
+    inherited.botDelegatedGoal = metadata?.botDelegatedGoal;
+  }
   return inherited;
 }
 

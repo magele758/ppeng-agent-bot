@@ -453,3 +453,36 @@ test('finished goals move to on-demand header history while live states stay vis
   status = 'failed';
   await expect(page.locator('.goal-status-card')).toHaveCount(0, { timeout: 8000 });
 });
+
+test('single result can be sent back, funded, resumed and accepted [AC:bot-goal-lifecycle-boundaries#AC-3] [AC:bot-goal-lifecycle-boundaries#AC-7]', async ({ page }) => {
+ const bot=fixture('single-review','Single review');
+ await installLab(page,[bot]);
+ const board:GoalBoard={goals:[{...goal('review','检查交付','pending_review'),evidence:['交付回执']}],fail:false};
+ await installGoals(page,bot.id,board);
+ const actions:Record<string,unknown>[]=[];
+ await page.route(url=>url.pathname===`/api/bots/${bot.id}/goals/review/actions`,async route=>{
+  const body=route.request().postDataJSON();actions.push(body);
+  const current=board.goals[0];
+  if(body.action==='verify')current.status=body.accepted?'completed':'blocked';
+  if(body.action==='extend')current.budgetUsd+=body.additionalBudgetUsd;
+  if(body.action==='resume')current.status='running';
+  await route.fulfill({json:{goal:current}});
+ });
+ await page.goto('/#/bot');await openBot(page,bot);
+ const card=page.getByTestId('bot-goal-attention');await expect(card).toBeVisible();await expect(page.getByTestId('bot-goals')).toHaveCount(0);
+ await expect(card).toContainText('待核对');
+ await page.getByTestId('bot-goal-reject-review').click();
+ await page.getByTestId('bot-goal-reject-form-review').locator('input').fill('补齐最后一个检查');
+ await page.getByTestId('bot-goal-reject-submit-review').click();
+ await expect(card).toContainText('已阻塞');
+ const funding=page.getByTestId('bot-goal-extend-review');await funding.locator('[name=budget]').fill('3');await funding.locator('[name=attempts]').fill('1');
+ await funding.getByRole('button',{name:'增加此目标额度'}).click();await expect(card).toContainText('13');
+ await card.getByRole('button',{name:'恢复',exact:true}).click();await expect(card).toHaveCount(0);
+ expect(actions).toEqual([
+  {sessionId:bot.sessionId,action:'verify',accepted:false,reason:'补齐最后一个检查'},
+  {sessionId:bot.sessionId,action:'extend',additionalBudgetUsd:3,additionalAttempts:1},
+  {sessionId:bot.sessionId,action:'resume'}
+ ]);
+ board.goals[0].status='pending_review';await expect(card).toBeVisible();
+ await page.getByTestId('bot-goal-verify-review').click();await expect(card).toHaveCount(0);expect(actions.at(-1)?.accepted).toBe(true);
+});

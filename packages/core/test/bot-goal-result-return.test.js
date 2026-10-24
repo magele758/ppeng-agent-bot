@@ -158,7 +158,7 @@ test('a late approval decision still resumes or blocks the same execution [AC:bo
   for (const decision of ['approved', 'rejected']) {
     const goal = create();
     const child = store.createSession({ title: 'approval', mode: 'subagent', agentId: 'general', parentSessionId: parent.id, metadata: { userId: parent.metadata.userId, botId: 'b', botGoalId: goal.id, botGoalScopeSessionId: parent.id } });
-    const execution = service.claim('b', goal.id, { strategy: 'swarm', leaseMs: 10000 });
+    const execution = service.claim('b', goal.id, { strategy: 'swarm', leaseMs: 60000 });
     service.updateExecution('b', execution.id, { sessionId: child.id });
     const snapshot = store.getDaemonControl(`bot_goals:b`);
     const row = snapshot.executions.find(item => item.id === execution.id);
@@ -194,9 +194,10 @@ test('delegated bot child results return to the original goal [AC:bot-goal-resul
   const delegated = await delegate.execute({ session: store.getSession(parent.id), agent: { id: requester.id } }, { target: target.id, input: 'do the work', idempotencyKey: execution.id });
   assert.equal(delegated.ok, true);
   const taskId = JSON.parse(delegated.content).id;
-  const peerChat = store.listSessions().find(session => session.metadata?.botId === target.id && session.metadata?.canonicalBotChat === true);
-  assert.equal(peerChat.metadata.botGoalId, goal.id);
-  assert.equal(peerChat.metadata.botGoalScopeSessionId, parent.id);
+  const peerChat = store.listSessions().find(session => session.metadata?.botId === target.id && session.metadata?.botWorkTaskId === taskId && session.metadata?.canonicalBotChat === true);
+  assert.equal(peerChat.metadata.botGoalId, undefined);
+  assert.equal(peerChat.metadata.botDelegatedGoal.id, goal.id);
+  assert.equal(peerChat.metadata.botDelegatedGoal.sessionId, parent.id);
   const spawnHost = { store, repoRoot: dir, stateDir: dir, workspaceManager: {}, sandbox: undefined, setSandbox() {}, backgroundJobAborts: new Map(), async runSession(id) {
     store.appendMessage(id, 'assistant', [{ type: 'text', text: 'peer child evidence' }]);
     store.updateSession(id, { status: 'idle', metadata: { ...store.getSession(id).metadata, outcome: { kind: 'completed' } } });
@@ -204,8 +205,9 @@ test('delegated bot child results return to the original goal [AC:bot-goal-resul
   } };
   await spawnSubagentOutcome(spawnHost, { repoRoot: dir, stateDir: dir, session: peerChat, agent: { id: 'general', role: 'general' } }, 'Finish the delegated work');
   const peerChild = store.listSessions().find(session => session.parentSessionId === peerChat.id);
-  assert.equal(peerChild.metadata.botGoalId, goal.id);
-  assert.equal(peerChild.metadata.botGoalScopeSessionId, parent.id);
+  assert.equal(peerChild.metadata.botGoalId, undefined);
+  assert.equal(peerChild.metadata.botDelegatedGoal.id, goal.id);
+  assert.equal(peerChild.metadata.botDelegatedGoal.sessionId, parent.id);
   assert.equal(peerChild.metadata.botWorkTaskId, taskId);
   const taskRow = store.db.prepare('SELECT status FROM bot_work_tasks WHERE id=?').get(taskId);
   assert.equal(['queued', 'running', 'waiting_approval'].includes(taskRow.status), true);
