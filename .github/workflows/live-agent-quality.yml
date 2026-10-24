@@ -1,0 +1,62 @@
+name: Live Agent quality gate
+on:
+  workflow_dispatch:
+    inputs:
+      baseline_ref:
+        description: Stable source SHA or ref to compare with this workflow revision
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      baseline_ref:
+        required: true
+        type: string
+    secrets:
+      RAW_AGENT_API_KEY:
+        required: true
+      RAW_AGENT_BASE_URL:
+        required: true
+      RAW_AGENT_MODEL_NAME:
+        required: true
+permissions:
+  contents: read
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build candidate and independent Stable checkout
+        env:
+          BASELINE_REF: ${{ inputs.baseline_ref }}
+        run: |
+          node scripts/build-workspace.mjs
+          stable_sha=$(git rev-parse --verify --end-of-options "${BASELINE_REF}^{commit}")
+          git worktree add --detach "$RUNNER_TEMP/quality-stable" "$stable_sha"
+          pnpm --dir "$RUNNER_TEMP/quality-stable" install --frozen-lockfile
+          (cd "$RUNNER_TEMP/quality-stable" && node scripts/build-workspace.mjs)
+          echo "QUALITY_BASELINE_SHA=$stable_sha" >> "$GITHUB_ENV"
+      - name: Run real model comparison and reject inconclusive evidence
+        env:
+          RAW_AGENT_API_KEY: ${{ secrets.RAW_AGENT_API_KEY }}
+          RAW_AGENT_BASE_URL: ${{ secrets.RAW_AGENT_BASE_URL }}
+          RAW_AGENT_MODEL_NAME: ${{ secrets.RAW_AGENT_MODEL_NAME }}
+        run: |
+          pnpm run agent:quality:compare --baseline-root "$RUNNER_TEMP/quality-stable" --candidate-root "$GITHUB_WORKSPACE" --out test-results/live-quality
+          pnpm run agent:quality:gate --run test-results/live-quality --baseline-sha "$QUALITY_BASELINE_SHA" --candidate-sha "$GITHUB_SHA"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: live-quality-evidence
+          path: test-results/live-quality
+          if-no-files-found: error
+          retention-days: 30

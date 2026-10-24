@@ -89,7 +89,10 @@
     "test:restart": "node scripts/formal/run-restart-verification.mjs",
     "test:concurrency": "node scripts/formal/run-concurrency-verification.mjs",
     "test:acceptance:deployment": "node scripts/acceptance/acceptance-gate.mjs --stage all --out coverage/acceptance-deployment",
-    "test:bot:soak:performance": "node scripts/bot-release/soak-performance.mjs"
+    "test:bot:soak:performance": "node scripts/bot-release/soak-performance.mjs",
+    "agent:quality:baseline": "node scripts/agent-eval/compare.mjs --config scripts/agent-eval/experiments/bot-p0.json --baseline-only",
+    "agent:quality:compare": "node scripts/agent-eval/compare.mjs --config scripts/agent-eval/experiments/bot-p0.json",
+    "agent:quality:gate": "node scripts/agent-eval/quality-gate.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
