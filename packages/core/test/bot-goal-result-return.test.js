@@ -234,7 +234,7 @@ test('delegated bot child results return to the original goal [AC:bot-goal-resul
   assert.equal(service.get(requester.id, mismatch.id).status, 'blocked');
 });
 
-test('team and swarm fan-out close the parent goal on failure and missing runs do not wake [AC:bot-goal-result-return#AC-4] [AC:ci-action-reliability#AC-2]', async t => {
+test('team and swarm fan-out close the parent goal on failure and missing runs do not wake [AC:bot-goal-result-return#AC-4] [AC:ci-action-reliability#AC-2] [AC:bot-execution-p0#AC-5]', async t => {
   const { host, create, service, store, parent, dir, runs } = fixture(t);
   const sessions = [];
   const swarm = new SwarmExecutor({
