@@ -78,3 +78,14 @@ test('format review preserves conditional, quoted and ordinary requests and neve
  messages.push({id:'user-2',role:'user',parts:[{type:'text',text:'请详细解释报告。'}]},{id:'assistant-2',role:'assistant',parts:[{type:'text',text:'详细解释\n报告内容。'}]});assert.equal(reviewQueryOutput(store,'s'),undefined,'new ordinary user instruction replaces the previous strict requirement');
  clearQueryOutputReview(store,'s');messages.splice(2);assert.equal(reviewQueryOutput(store,'s').action,'continue','a new execution can repair the request again');
 });
+
+test('historical deployment-result queries do not create execution goals, but mixed work still does [AC:bot-completion-reliability#AC-9]',async t=>{
+ const {isSelfContainedBotWork}=await import('../dist/bots/goals/intake.js');
+ const prompt='根据已经执行的检查，返回实际部署版本，只输出版本号。必要时读取原始证据。';
+ assert.equal(isSelfContainedBotWork(prompt),true);
+ assert.equal(isSelfContainedBotWork('From the existing check output, return the deployed version only.'),true);
+ for(const work of [prompt+'然后部署新版本。',prompt+'并升级数据库。',prompt+'保存到 result。','From the existing check output, return the deployed version then deploy v3.','From the existing check output, return the deployed version and save it.'])assert.equal(isSelfContainedBotWork(work),false,work);
+ const root=mkdtempSync(join(tmpdir(),'historical-query-'));let judges=0;
+ const rt=new RawAgentRuntime({repoRoot:root,stateDir:join(root,'state'),modelAdapter:{name:'historical-query',async summarizeMessages(){return '';},async runTurn(){return{stopReason:'end',assistantParts:[{type:'text',text:'v2.8.4'}]};},async completeText(input){if(input.system.startsWith('Evaluate')){judges++;return '{"met":false,"reason":"no new execution evidence","missing":["run deployment"]}';}return JSON.stringify({intents:[{kind:'new_goal',text:prompt}]});}}});
+ t.after(async()=>{await rt.destroy();rmSync(root,{recursive:true,force:true});});const bot=rt.createBot({name:'historical-query'}),sid=rt.openBot(bot.id).sessionId;rt.mergeSessionMetadata(sid,{allowedTools:[],allowedSkillNames:[]});rt.store.appendMessage(sid,'assistant',[{type:'tool_call',toolCallId:'earlier-check',name:'check_project',input:{}}]);rt.store.appendMessage(sid,'tool',[{type:'tool_result',toolCallId:'earlier-check',name:'check_project',ok:false,content:'ACTUALLY DEPLOYED: v2.8.4; rollback completed'}]);rt.sendUserMessage(sid,prompt);await rt.runHumanSession(sid);assert.equal(rt.store.getDaemonControl('bot_goals:'+bot.id)?.goals?.length??0,0);assert.equal(judges,0);
+});

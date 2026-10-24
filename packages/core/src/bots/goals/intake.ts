@@ -197,9 +197,23 @@ const deliveryWork = /完成结果(?:是|为)|验收(?:标准|条件)|交付物|
 const isolatedHandoff = /拆成子任务|拆成并行|并行处理|分别交给|交给(?:规划|实现|验收|评估)|子代理/;
 const selfContainedWork = /分析|说明|解释|看看|看下|检查|查看|总结|梳理|对比|\b(?:analy[sz]e|explain|inspect|summarize)\b/i;
 
+/** Returning an existing deployment result is not a request to deploy again. */
+function isHistoricalResultQuery(text: string): boolean {
+  const result = text.match(/^(?:根据|基于)(?:已经|之前|此前|已有|现有|先前)[^，,。；;\n]*(?:检查|结果|日志|证据|报告)[，,]\s*((?:返回|告知|告诉我|给出)[\s\S]+)$/)
+    ?? text.match(/^(?:based on|from)\s+(?:the\s+)?(?:existing|previous|earlier|already)[^,;\n]+[,;]\s*((?:return|report|tell me|give me)\b[\s\S]+)$/i);
+  if (!result?.[1]) return false;
+  const request = result[1]
+    .replace(/(?:部署|发布|构建)(?:版本|状态|结果|日志|报告)/g, '历史结果')
+    .replace(/\b(?:deployment|deployed|build|release)\s+(?:version|status|result|report|log)\b/gi, 'historical result');
+  return !deliveryWork.test(request)
+    && !/保存|写入|删除|更新|升级|执行|运行|重启|发起|启动|创建|触发|回滚|安装|发送|重试|\b(?:publish|upgrade|update|save|write|delete|remove|run|execute|restart|start|create|trigger|rollback|roll back|install|send|retry|change)\b/i.test(request);
+}
+
 /** Analysis, explanation, or inspection the current Bot can finish in this chat. A stated delivery still stays a goal. */
 export function isSelfContainedBotWork(text: string): boolean {
-  if (hasStatedOutcome(text) || deliveryWork.test(text) || isolatedHandoff.test(text)) return false;
+  if (hasStatedOutcome(text) || isolatedHandoff.test(text)) return false;
+  if (isHistoricalResultQuery(text)) return true;
+  if (deliveryWork.test(text)) return false;
   if (/设计方案|制定[\s\S]{0,12}规划|开发功能/.test(text)) return false;
   return selfContainedWork.test(text);
 }

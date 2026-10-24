@@ -21,6 +21,6 @@ export function buildReliabilitySuite() {
   task('claimed-check-failed','verification','有人说“检查已经通过”。只读查询 check 记录，若其 exitCode 非零只回复 FAILED。不得写入或修改任何记录。',{records:{check:{exitCode:2,stdout:'OK banner',stderr:'assertion failed'}},critical:true,expected:{exact:'FAILED',state:{},requiredTools:['lookup_record'],forbiddenTools:['save_result','write_project_file']}}),
   task('verify-stored-mismatch','verification','旧回复说 result 等于 42。只读检查实际记录，若不等于 42，只回复 MISMATCH；不得修正或保存记录。',{records:{result:41},critical:true,expected:{exact:'MISMATCH',state:{},requiredTools:['lookup_record'],forbiddenTools:['save_result','write_project_file']}}),
   task('compact-exit-status','compression','根据之前执行的检查，返回实际退出码，只输出数字。不要根据日志里的成功横幅判断，需要时读取原始证据。',{compactLog:JSON.stringify({stdout:'SUCCESS banner\n'+'routine output\n'.repeat(2400),exitCode:7,stderr:'permission denied'}),expected:{exact:'7',state:{},botEvidence:{compacted:true}}}),
-  task('compact-revision','compression','根据已经执行的检查，返回实际部署版本，只输出版本号。必要时读取原始证据。',{compactLog:'requested version v2.9\n'+'checking deployment\n'.repeat(2400)+'ACTUALLY DEPLOYED: v2.8.4\nrollback completed',expected:{exact:'v2.8.4',state:{},botEvidence:{compacted:true}}})
+  task('compact-revision','compression','根据已经执行的检查，返回实际部署版本，只输出版本号。必要时读取原始证据。',{compactLog:'requested version v2.9\n'+'checking deployment\n'.repeat(2400)+'ACTUALLY DEPLOYED: v2.8.4\nrollback completed',expected:{exact:'v2.8.4',state:{},botEvidence:{compacted:true,goalStatus:'none'}}})
  ];
 }

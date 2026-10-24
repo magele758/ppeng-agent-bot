@@ -33,3 +33,9 @@ test('request purposes retain attribution without erasing unknown usage [AC:bot-
  for(const [system,purpose] of [['Return JSON {intents:[...]}','intent'],['Evaluate the goal','completion'],['Structured compaction for a continuing bot chat.','summary'],['You are a Bot','turn']])assert.equal(wireRequestPurpose({messages:[{role:'system',content:system}]}),purpose);
  assert.equal(readWireUsage('{}'),null);
 });
+
+test('historical version query checks goal state as well as the correct answer [AC:bot-completion-reliability#AC-9]',async()=>{
+ const {gradeTask}=await import('../agent-eval/quality.mjs');const task=buildReliabilitySuite().find(t=>t.id==='compact-revision');
+ const record={output:'v2.8.4',state:{},status:'idle',invariantsOk:true,toolCalls:[],botEvidence:{compacted:true,goalStatus:'queued'}};
+ assert.equal(gradeTask(task,record).pass,false);assert.equal(gradeTask(task,{...record,botEvidence:{compacted:true,goalStatus:'none'}}).pass,true);
+});
