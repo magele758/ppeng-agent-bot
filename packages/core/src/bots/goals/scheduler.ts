@@ -253,7 +253,9 @@ function childSettlement(childId: string, status: string, output: string, judged
  // execution and dispatch a new child instead of keeping this result for review.
  if (!judged) return base;
  if (judged.kind !== 'candidate_completed' && judged.kind !== 'progress') return base;
- return {...base, kind:judged.kind, summary:judged.summary || base.summary, verified:judged.verified === true, nextStep:judged.nextStep};
+ const evidence = [...(judged.evidence ?? [])];
+ for (const item of base.evidence ?? []) if (item && !evidence.includes(item)) evidence.push(item);
+ return {...base, kind:judged.kind, summary:judged.summary || base.summary, evidence: evidence.length ? evidence : base.evidence, verified:judged.verified === true, nextStep:judged.nextStep};
 }
 /** A finished child is the execution result. The parent turn staying idle must not keep the goal running. */
 async function settleFinishedChild(host: GoalRuntimeHost, service: GoalService, botId: string, goal: BotGoal, execution: GoalExecution): Promise<boolean> {

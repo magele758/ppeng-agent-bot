@@ -1,4 +1,4 @@
-export type GoalStatus = 'queued' | 'running' | 'waiting' | 'blocked' | 'paused' | 'completed' | 'failed' | 'cancelled';
+export type GoalStatus = 'queued' | 'running' | 'waiting' | 'blocked' | 'paused' | 'pending_review' | 'completed' | 'failed' | 'cancelled';
 export interface GoalWait { source: string; correlationId: string; deadline?: number; description?: string }
 export interface BotGoal {
  id: string; botId: string; sessionId: string; title: string; objective: string;

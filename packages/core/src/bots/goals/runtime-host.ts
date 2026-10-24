@@ -21,13 +21,13 @@ export interface GoalRuntimeHost {
  emitTrace?(sessionId: string, event: { kind: 'child_session'; payload: Record<string, unknown> }): void;
 }
 export function announceGoalState(host:GoalRuntimeHost,goal:BotGoal):void {
- if(!['completed','blocked','failed'].includes(goal.status))return;
+ if(!['completed','blocked','failed','pending_review'].includes(goal.status))return;
  const key=`bot.goal-notice:${goal.id}`;
  const version=`${goal.revision}:${goal.status}:${goal.blockedReason??''}`;
  if(host.store.getDaemonControl<string>(key)===version)return;
  host.store.transaction(()=>{
   host.store.setDaemonControl(key,version);
-  host.store.enqueueSteer(goal.sessionId,`[goal update] ${JSON.stringify({id:goal.id,title:goal.title,status:goal.status,progress:goal.progress,reason:goal.blockedReason,nextStep:goal.nextStep})}\nBriefly tell the user this meaningful change. Do not restart this goal or treat this notification as a new user task.`,{role:'system',key:`goal-notice:${goal.id}`});
+  host.store.enqueueSteer(goal.sessionId,`[goal update] ${JSON.stringify({id:goal.id,title:goal.title,status:goal.status,progress:goal.progress,reason:goal.blockedReason,nextStep:goal.nextStep})}\nBriefly tell the user this meaningful change. A pending review keeps its recorded evidence until it is verified or rejected; do not restart it or treat this notification as a new user task.`,{role:'system',key:`goal-notice:${goal.id}`});
   host.store.enqueueSchedulerWake(goal.sessionId,'bot.goal.notice');
  });
 }

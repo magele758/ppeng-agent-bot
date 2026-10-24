@@ -319,7 +319,8 @@ test('完成判官抛错时已完成回合保持待核对而不阻塞 [AC:bot-go
     await rt.runHumanSession(parentId);
     const service = new BotGoalService(rt.store, Date.now, parentId);
     const goal = service.list(bot.id)[0];
-    assert.equal(goal.status, 'blocked');
+    assert.equal(goal.status, 'pending_review');
+    assert.notEqual(goal.status, 'blocked');
     assert.match(goal.blockedReason, /verification/i);
     assert.equal(goal.activeExecutionId, undefined);
     const stalled = goal.noProgress;
@@ -327,10 +328,15 @@ test('完成判官抛错时已完成回合保持待核对而不阻塞 [AC:bot-go
     const runs = [];
     await tickBotGoals({ ...rt.goalRuntimeHost(), isRunning: () => false, run: async (id) => { runs.push(id); } });
     const held = service.get(bot.id, goal.id);
-    assert.equal(held.status, 'blocked');
+    assert.equal(held.status, 'pending_review');
     assert.match(held.blockedReason, /verification/i);
     assert.equal(held.noProgress, stalled);
     assert.deepEqual(runs, []);
+    assert.throws(() => service.control(bot.id, goal.id, 'resume'), /pending verification/);
+    assert.equal(service.get(bot.id, goal.id).status, 'pending_review');
+    const accepted = service.control(bot.id, goal.id, 'verify', { accepted: true });
+    assert.equal(accepted.status, 'completed');
+    assert.ok(accepted.evidence.length > 0);
   } finally {
     await rt.destroy();
   }

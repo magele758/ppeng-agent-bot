@@ -81,7 +81,7 @@ export function BotGoals({ botId, sessionId, selectedGoalId, onSelectGoal, initi
         </dl>
         <p>{t('goals.usage', { cost: (goal.costUsd ?? 0).toFixed(2), budget: goal.budgetUsd ?? 0 })}</p>
         {goal.draining && <p>{t('goals.draining')}</p>}
-        <div className="bot-goals__actions">{goalActions(goal.status).map(action => <button className="btn btn-sm" key={action} type="button" disabled={busy} onClick={() => void mutate(`${base}/${encodeURIComponent(goal.id)}/actions`, 'POST', { action })}>{t(`goals.${action}`)}</button>)}
+        <div className="bot-goals__actions">{goalActions(goal.status).map(action => <button className="btn btn-sm" key={action} type="button" disabled={busy} onClick={() => void mutate(`${base}/${encodeURIComponent(goal.id)}/actions`, 'POST', action === 'verify' ? { action, accepted: true } : { action })}>{t(`goals.${action}`)}</button>)}
         {goalActions(goal.status).length > 0 && <form onSubmit={e => { e.preventDefault(); const data = new FormData(e.currentTarget); void mutate(`${base}/${encodeURIComponent(goal.id)}/actions`, 'POST', { action: 'reprioritize', priority: Number(data.get('priority')) }); }}>
           <label>{t('goals.priority')}<input key={goal.priority} name="priority" type="number" min={-100} max={100} required defaultValue={goal.priority}/></label><button className="btn btn-sm" disabled={busy}>{t('goals.setPriority')}</button>
         </form>}</div>

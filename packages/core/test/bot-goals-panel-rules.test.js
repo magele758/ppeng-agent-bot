@@ -16,7 +16,7 @@ const PARAPHRASES = [
   '讨论一下 bot room 新增特性有什么可以借鉴',
 ];
 const MULTI = '请同时做完两件独立的事：把登录失败提示改成中文，完成结果是用户看到中文错误；把退出按钮移到页面右上角，完成结果是按钮出现在右上角。';
-const IN_PROGRESS = new Set(['queued', 'running', 'waiting', 'blocked', 'paused']);
+const IN_PROGRESS = new Set(['queued', 'running', 'waiting', 'blocked', 'paused', 'pending_review']);
 
 function openChat(t, judge) {
   const dir = mkdtempSync(join(tmpdir(), 'goal-panel-rules-'));
@@ -134,7 +134,7 @@ test('a stated task is still admitted, and failed verification can still block i
   for (const goal of goals) assert.equal(goal.status, 'queued');
   const execution = service.claim('b', goals[0].id, { strategy: 'direct' });
   service.report('b', execution.id, { kind: 'candidate_completed', summary: 'done', verified: false, evidence: [] });
-  assert.equal(service.get('b', goals[0].id).status, 'blocked');
+  assert.equal(service.get('b', goals[0].id).status, 'pending_review');
   assert.equal(service.get('b', goals[1].id).status, 'queued');
 });
 
