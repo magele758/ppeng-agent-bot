@@ -1,3 +1,4 @@
+import { GOAL_JUDGE_TIMEOUT_MS } from './judge-budget.js';
 import { visibleTaskText } from '../fork-inheritance.js';
 
 export interface GoalMessageIntent {
@@ -146,7 +147,7 @@ function proposalsForOutput(raw: string, goals: GoalIntakeContext[], fallback: G
 function raceGoalJudge(raw: string, goals: GoalIntakeContext[], judge: GoalIntentJudge, controller: AbortController, remember: (timer: ReturnType<typeof setTimeout>) => void): Promise<unknown> {
   return Promise.race([
     judge({ text: raw, goals: goals.slice(0, 50).map(goal => ({ ...goal, title: goal.title.slice(0, 300) })), signal: controller.signal, instructions: JUDGE_INSTRUCTIONS }),
-    new Promise<never>((_, reject) => { remember(setTimeout(() => { controller.abort(); reject(new Error('Goal intent judge timed out')); }, 20000)); })
+    new Promise<never>((_, reject) => { remember(setTimeout(() => { controller.abort(); reject(new Error('Goal intent judge timed out')); }, GOAL_JUDGE_TIMEOUT_MS)); })
   ]);
 }
 async function judgedIntents(raw: string, goals: GoalIntakeContext[], fallback: GoalIntentProposal[], judge: GoalIntentJudge): Promise<GoalIntentProposal[] | undefined> {

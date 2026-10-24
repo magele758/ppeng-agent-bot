@@ -27,3 +27,9 @@ test('old missing usage remains unknown and cannot authorize release [AC:bot-qua
  const suite=buildReliabilitySuite();const rows=suite.flatMap(t=>Array.from({length:3},(_,trial)=>['baseline','candidate'].map(variant=>({caseId:t.id,trial,variant,pass:true,tokens:variant==='baseline'?null:100,durationMs:100})))).flat();
  const report=compareQuality(suite,rows,{trials:3});assert.equal(report.promotionEligible,false);assert.equal(report.metrics.tokens.available,false);assert.ok(report.uncertain.includes('missing tokens telemetry'));assert.deepEqual(report.policy,DEFAULT_POLICY);
 });
+
+test('request purposes retain attribution without erasing unknown usage [AC:bot-quality-reliability#AC-4]',async()=>{
+ const {wireRequestPurpose,readWireUsage}=await import('../agent-eval/bot-quality.mjs');
+ for(const [system,purpose] of [['Return JSON {intents:[...]}','intent'],['Evaluate the goal','completion'],['Structured compaction for a continuing bot chat.','summary'],['You are a Bot','turn']])assert.equal(wireRequestPurpose({messages:[{role:'system',content:system}]}),purpose);
+ assert.equal(readWireUsage('{}'),null);
+});

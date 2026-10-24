@@ -1,3 +1,4 @@
+import { GOAL_JUDGE_TIMEOUT_MS } from './judge-budget.js';
 import { buildCompletionEvidence, completionReport, COMPLETION_JUDGE_PROMPT } from './completion-evidence.js';
 import type { SqliteStateStore } from '../../storage.js';
 import type { SessionRecord, ToolContract, ModelAdapter } from '../../types.js';
@@ -336,7 +337,7 @@ async function verifyCompletion(host:GoalRuntimeHost,goal:BotGoal,tail:ReturnTyp
  if(!judge)return {...report,verified:false};
  try {
   const packet=buildCompletionEvidence(goal,tail,assistant);
-  const result=await judge({system:COMPLETION_JUDGE_PROMPT,user:JSON.stringify(packet),jsonMode:true,signal:AbortSignal.timeout(20000)});
+  const result=await judge({system:COMPLETION_JUDGE_PROMPT,user:JSON.stringify(packet),jsonMode:true,signal:AbortSignal.timeout(GOAL_JUDGE_TIMEOUT_MS)});
   return completionReport(JSON.parse(result),packet,goal);
  }catch{
   return {...report,kind:'candidate_completed',verified:false,summary:report.summary||assistant||'Completion verification unavailable; recorded result kept for review',evidence:report.evidence?.length?report.evidence:[assistant].filter(Boolean)};

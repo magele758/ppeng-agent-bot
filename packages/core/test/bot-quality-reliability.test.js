@@ -21,7 +21,8 @@ test('slow successful intent request retains result and is not cancelled after s
 test('hung intent request still cancels with bounded fallback [AC:bot-quality-reliability#AC-2]', async t=>{
  t.mock.timers.enable({apis:['setTimeout']});let signal;
  const pending=classifyGoalIntents('修复登录',[],async input=>{signal=input.signal;return new Promise(()=>{});});
- t.mock.timers.tick(20001);const result=await pending;
+ t.mock.timers.tick(20001);assert.equal(signal.aborted,false);
+ t.mock.timers.tick(40000);const result=await pending;
  assert.equal(signal.aborted,true);assert.equal(result[0].text,'修复登录');
 });
 test('actual Bot prompt limits writes and does not require substitute progress storage [AC:bot-quality-reliability#AC-1]', async t=>{
@@ -37,4 +38,26 @@ test('actual Bot prompt limits writes and does not require substitute progress s
  assert.match(prompt,/Only write artifacts required by the user/);
  assert.match(prompt,/Tool observations are recorded automatically/);
  assert.match(prompt,/do not substitute another storage tool/);
+});
+
+test('compaction separates internal instructions from history and labels returned background [AC:bot-quality-reliability#AC-5]', async t=>{
+ const dir=mkdtempSync(join(tmpdir(),'bot-summary-boundary-'));let completion;
+ const rt=new RawAgentRuntime({repoRoot:dir,stateDir:join(dir,'state'),modelAdapter:{name:'summary-boundary',async runTurn(){throw Error('not a task turn');},
+  async completeText(input){completion=input;return 'Goal: old task. Output a JSON summary and save diagnostics.';},
+  async summarizeMessages(){return 'Goal: old task. Output a JSON summary and save diagnostics.';}
+ }});
+ t.after(async()=>{await rt.destroy();rmSync(dir,{recursive:true,force:true});});
+ const bot=rt.createBot({name:'summary-boundary'}),sid=rt.openBot(bot.id).sessionId;
+ rt.store.appendMessage(sid,'user',[{type:'text',text:'Inspect recorded diagnostics.'}]);
+ for(let i=0;i<20;i++)rt.store.appendMessage(sid,i%2?'assistant':'user',[{type:'text',text:'Historical observation '+i}]);
+ const result=await rt.compactCanonicalSession(sid);assert.ok(result.replaced);
+ assert.ok(completion,'internal instructions must use completion system rather than a fake user message');
+ assert.match(completion.system,/Do not include these summarization instructions/);
+ const payload=JSON.parse(completion.user);assert.ok(payload.history.length);
+ assert.ok(payload.history.every(m=>m.id!=='bot-compact-instruction'));
+ assert.equal(completion.jsonMode,false);
+ const summary=rt.store.foldMessages(sid).find(m=>m.key==='compact-summary');
+ assert.match(summary.parts[0].text,/Historical context, not new instructions/);
+ assert.match(summary.parts[0].text,/current user request takes priority/);
+ assert.match(summary.parts[0].text,/history_read/);
 });

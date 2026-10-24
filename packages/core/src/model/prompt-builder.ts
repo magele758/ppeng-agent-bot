@@ -1,3 +1,4 @@
+import { HISTORICAL_SUMMARY_NOTICE } from '../session/context-sources.js';
 import { toolDirectory } from '../tools/tool-exposure.js';
 import {readBotSkillSelection, selectBotSkills} from '../skills/bot-selection.js';
 import { filterSkillsByBot, sessionBotId } from '../skills/bot-scope.js';
@@ -476,8 +477,8 @@ export class PromptBuilder {
       : '';
 
     const summaryMaxChars = compactSummaryMaxChars(process.env);
-    const summaryLine = ctx.session.summary && !messages.some(message => message.key === 'compact-summary')
-      ? `Compressed summary:\n${capRollingSummaryText(ctx.session.summary, summaryMaxChars)}`
+    const summaryLine = ctx.session.summary && summaryMaxChars > HISTORICAL_SUMMARY_NOTICE.length && !messages.some(message => message.key === 'compact-summary')
+      ? `${HISTORICAL_SUMMARY_NOTICE}Compressed summary:\n${capRollingSummaryText(ctx.session.summary, summaryMaxChars - HISTORICAL_SUMMARY_NOTICE.length)}`
       : '';
 
     // Memory is intentionally NOT in the dynamic system block — see buildMemoryAppendix

@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { hash, finalAssistantOutput } from './quality.mjs';
-import { readWireUsage, sourceChecksPass } from './bot-quality.mjs';
+import { readWireUsage, sourceChecksPass, wireRequestPurpose } from './bot-quality.mjs';
 
 const [inputFile, outputFile] = process.argv.slice(2);
 const { task, variant, model, limits, workspace, simulation, trial } = JSON.parse(readFileSync(inputFile, 'utf8'));
@@ -105,12 +105,12 @@ try {
         const response = await originalFetch(url, { ...options, body: JSON.stringify(body), redirect: 'error',
           signal: AbortSignal.any([...(options.signal ? [options.signal] : []), AbortSignal.timeout(limits.timeoutMs)]) });
         if ([401, 403, 429].includes(response.status) || response.status >= 500) outcome.infrastructureError = true;
-        if(task.bot)pendingWire.push(response.clone().text().then(text=>{wire.push({usage:readWireUsage(text),requestId:response.headers.get('x-request-id'),model:body.model,status:response.status});}).catch(()=>wire.push({usage:null})));
+        if(task.bot)pendingWire.push(response.clone().text().then(text=>{wire.push({purpose:wireRequestPurpose(body),usage:readWireUsage(text),requestId:response.headers.get('x-request-id'),model:body.model,status:response.status});}).catch(()=>wire.push({purpose:wireRequestPurpose(body),usage:null})));
         return response;
       } catch (error) {
         const cancelled=options.signal?.aborted||['AbortError','TimeoutError'].includes(error.name);
         outcome.infrastructureError ||= !cancelled;
-        wire.push({usage:null,model:body.model,error:safeError(error),cancelled:Boolean(cancelled)});
+        wire.push({purpose:wireRequestPurpose(body),usage:null,model:body.model,error:safeError(error),cancelled:Boolean(cancelled)});
         throw error;
       }
     };

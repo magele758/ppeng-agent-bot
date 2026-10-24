@@ -57,3 +57,9 @@ manifest.json 记录源码、构建、lockfile、驱动、模型、任务和预�
     pnpm run agent:quality:compare --config scripts/agent-eval/experiments/bot-reliability.json --baseline-root /absolute/stable --candidate-root /absolute/candidate --settings-root /absolute/running/repo --bot ppeng-agent-core --out test-results/bot-ab-unique
 
 最大规划请求数为 2304（32 × 3 × 2 × 12），总预算上限为 3000；每题与统计门禁标准均未降低。32 题仍不保证各类别统计区间足够窄；旧版取消请求的未知用量保留为未知，不能补零让门禁通过。新增任务覆盖不同运算与失败合同，仍限于夹具分布，不是广泛通用能力认证。
+
+### 执行可靠性修复
+
+Bot 不再把“保留证据”解释成额外保存业务记录：工具观测已自动留存，只有任务需要的产物可以写入；未提供 goal_checkpoint 时不能拿其他存储工具替代。意图与完成判官使用统一 60 秒有界预算，成功后不再额外 abort；真正超时仍回退或保持未验证，缺失用量不能补零。每次模型请求记录 intent / completion / summary / turn 用途，便于区分问题来源。
+
+Bot 压缩优先把摘要指令放在 completeText 的 system 参数，把历史和旧摘要单独序列化为数据，避免生成摘要时的格式要求成为下一轮任务。兼容仅提供 summarizeMessages 的适配器时，将内部指令明确标记为 system 指令而非用户历史。回流摘要及摘要后备注入均标记为历史背景，当前用户要求优先；提示与导航一起计入既有摘要字符预算。此处不扩大写入权限，也不改变证据验收规则。
