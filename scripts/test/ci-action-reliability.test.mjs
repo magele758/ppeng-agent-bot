@@ -15,7 +15,7 @@ test('mutation modules run independently and retain complete failure-gated basel
 });
 test('quick gate executes Bot contracts and HTTP integration within its budget [AC:ci-action-reliability#AC-1]', () => {
  const source = readFileSync('scripts/ci/quick-gate.mjs', 'utf8');
- for (const file of ['bots.test.js', 'bot-goal-result-return.test.js', 'scripts/integration-test.mjs', 'ci-action-reliability.test.mjs']) assert.ok(source.includes(file), file);
+ for (const file of ['bots.test.js', 'bot-goal-result-return.test.js', 'scripts/integration-test.mjs', 'ci-action-reliability.test.mjs', 'feed-window.test.ts']) assert.ok(source.includes(file), file);
  assert.match(source, /budgetMs=90000/);
 });
 test('full PR validation is opt-in on every branch and responds to labeling [AC:ci-action-reliability#AC-3]', () => {

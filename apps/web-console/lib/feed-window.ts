@@ -457,7 +457,7 @@ export function captureFeedAnchor(root: HTMLElement): { key: string; offset: num
   const rows = root.querySelectorAll<HTMLElement>('[data-feed-key]');
   for (const row of rows) {
     const box = row.getBoundingClientRect();
-    if (box.bottom <= rootBox.top) continue;
+    if (box.bottom <= rootBox.top + 1) continue;
     const key = row.dataset.feedKey ?? '';
     if (!key) continue;
     return { key, offset: box.top - rootBox.top };
