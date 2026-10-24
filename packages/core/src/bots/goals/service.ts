@@ -239,6 +239,17 @@ export class BotGoalService {
   if(wake)this.consumeWake(s,goal,wake);
   else {goal.status='waiting';goal.wait=result.wait;}
  }
+ /** Waiting stays waiting. The visible next step says which approval is holding it. */
+ noteApprovalWait(botId:string,goalId:string,nextStep:string):BotGoal|undefined {
+  return mutateGoalSnapshot(this.store,botId,s=>{
+   const goal=s.goals.find(item=>item.id===goalId&&this.visible(item));
+   if(!goal||goal.status!=='waiting')return undefined;
+   if(goal.nextStep===nextStep)return goal;
+   goal.nextStep=nextStep;
+   this.event(s,'approval_wait',goal,nextStep);
+   return goal;
+  });
+ }
  private consumeWake(s:GoalSnapshot,goal:BotGoal,wake:{source:string;correlationId:string;consumedBy:string[];completionCandidate?:boolean;summary?:string;evidence?:string[];costUsd?:number}):void {
   wake.consumedBy.push(goal.id);
   goal.status='queued';
@@ -263,9 +274,19 @@ export class BotGoalService {
   const goals=s.goals.filter(g=>this.visible(g)&&(!event.goalId||event.goalId===g.id)&&g.status==='waiting'&&g.wait?.source===event.source&&g.wait.correlationId===event.correlationId);
   for(const g of goals){wake.consumedBy.push(g.id);g.status='queued';g.nextStep=`Inspect authorized ${event.source} result ${event.correlationId} before continuing`;g.wait=undefined;this.applyWakeData(s,g,event);this.event(s,'awakened',g);}return goals;
  });}
- recover(botId:string):BotGoal[]{return mutateGoalSnapshot(this.store,botId,s=>{
+ recoverInterruptedExecution(botId:string,executionId:string):BotGoal|undefined{return mutateGoalSnapshot(this.store,botId,s=>{
+  const execution=s.executions.find(item=>item.id===executionId&&item.status==='running');
+  if(!execution)return undefined;
+  const goal=s.goals.find(item=>item.id===execution.goalId&&this.visible(item));
+  if(!goal)return undefined;
+  execution.status='interrupted';execution.endedAt=this.date();
+  if(goal.activeExecutionId===execution.id){goal.activeExecutionId=undefined;goal.draining=false;}
+  if(!terminal.has(goal.status)&&goal.status!=='paused'){goal.status=execution.safeToRetry?'queued':'blocked';goal.blockedReason=execution.safeToRetry?undefined:'Execution interrupted; verify external effects before retry';}
+  this.event(s,'recovered',goal);return goal;
+ });}
+ recover(botId:string,heldExecutionIds?:ReadonlySet<string>):BotGoal[]{return mutateGoalSnapshot(this.store,botId,s=>{
   const changed:BotGoal[]=[];
-  for(const e of s.executions){const g=s.goals.find(x=>x.id===e.goalId&&this.visible(x));if(!g||e.status!=='running'||e.leaseUntil>this.clock())continue;
+  for(const e of s.executions){const g=s.goals.find(x=>x.id===e.goalId&&this.visible(x));if(!g||e.status!=='running'||e.leaseUntil>this.clock()||heldExecutionIds?.has(e.id))continue;
    e.status='interrupted';e.endedAt=this.date();g.activeExecutionId=undefined;g.draining=false;
    if(!terminal.has(g.status)&&g.status!=='paused'){g.status=e.safeToRetry?'queued':'blocked';g.blockedReason=e.safeToRetry?undefined:'Execution interrupted; verify external effects before retry';}
    this.event(s,'recovered',g);changed.push(g);

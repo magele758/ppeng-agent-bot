@@ -58,6 +58,24 @@ test('judge input is bounded and a hanging judge falls back without losing work'
   assert.equal(signal.aborted, true);
 });
 
+test('coordination wording stays attached to the deliverables [AC:bot-multi-goal-coordination#AC-1]', async () => {
+  const { classifyGoalIntents } = await import('../dist/bots/goals/intake.js');
+  const text = '请同时完成两件互相独立的事。\n第一件：创建 alpha.json。\n第二件：创建 beta.json。\n两件事并行推进。不要把两件事收成一个目标。';
+  const intents = await classifyGoalIntents(text, []);
+  assert.deepEqual(intents.filter(intent => intent.kind === 'new_goal').map(intent => intent.text), ['第一件：创建 alpha.json。', '第二件：创建 beta.json。']);
+});
+
+test('an explicit goal id keeps an added requirement on that goal [AC:bot-multi-goal-coordination#AC-3]', async () => {
+  const { classifyGoalIntents } = await import('../dist/bots/goals/intake.js');
+  const goals = [{ id: 'goal_alpha', title: '创建 alpha.json', status: 'paused' }, { id: 'goal_beta', title: '创建 beta.json', status: 'running' }];
+  const text = '追加要求：目标 goal_alpha 的结果 JSON 必须额外包含 "extra":"live"。已完成的写入不要重做，只补上这个字段并重新核对。';
+  const intents = await classifyGoalIntents(text, goals);
+  assert.equal(intents.length, 1);
+  assert.equal(intents[0].kind, 'amend_goal');
+  assert.equal(intents[0].goalId, 'goal_alpha');
+  assert.match(intents[0].text, /extra/);
+});
+
 test('dragged file bodies are not separate goals', async () => {
   const { classifyGoalIntents } = await import('../dist/bots/goals/intake.js');
   const fenced = [
