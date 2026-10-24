@@ -39,11 +39,11 @@ async function setup(page: Page, long = false) {
         .includes("/" + b.id + "/"),
     )!;
     return r.fulfill({
-      json: { bot: b, session: { id: b.canonicalSessionId } },
+      json: { bot: b, session: { id: b.canonicalSessionId, agentId: b.agentId, mode: "chat", status: "idle", metadata: {botId: b.id, canonicalBotChat: true} } },
     });
   });
   await page.route(/\/api\/sessions\/s[ab](?:\?|$)/, (r) =>
-    r.fulfill({ json: { session: { metadata: {} }, messages: [] } }),
+    r.fulfill({ json: { session: { id: r.request().url().includes('/sa') ? 'sa' : 'sb', agentId: 'general', mode: 'chat', status: 'idle', metadata: {botId: r.request().url().includes('/sa') ? 'a' : 'b', canonicalBotChat: true} }, messages: [] } }),
   );
   await page.route(/\/api\/bots\/[ab]\/skills$/, async (r) => {
     if (r.request().method() === "PATCH")
@@ -212,7 +212,8 @@ test("chat detail exposes and manages current Bot skills [AC:bot-detail-skill-ma
   await page.reload();
   await page.getByRole('button', { name: /^Bot A/ }).first().click();
   const sidebar = page.getByTestId('bot-detail-panel');
-  if (!(await sidebar.isVisible())) await page.getByTestId('bot-detail-toggle').click();
+  await page.getByTestId('bot-detail-toggle').click();
+  await expect(sidebar).toBeVisible();
   await sidebar.getByRole('tab', { name: '技能', exact: true }).click({ timeout: 5000 });
   await expect(sidebar.getByTestId('skill-row-own')).toBeVisible();
   await expect(sidebar.getByTestId('skill-row-shared')).toContainText('只读');
@@ -230,7 +231,8 @@ test('chat detail close icon works on narrow screens [AC:bot-detail-menu#AC-7]',
   await page.reload();
   await page.getByRole('button', { name: /^Bot A/ }).first().click();
   const sidebar = page.getByTestId('bot-detail-panel');
-  if (!(await sidebar.isVisible())) await page.getByTestId('bot-detail-toggle').click();
+  await page.getByTestId('bot-detail-toggle').click();
+  await expect(sidebar).toBeVisible();
   await sidebar.getByTestId('bot-detail-close').click({ timeout: 5000 });
   await expect(sidebar).toHaveCount(0);
   await page.getByTestId('bot-detail-toggle').click();
@@ -242,7 +244,7 @@ for (const width of [1280, 820]) test(`skills controls stay grouped at every fon
   const {policy}=await setup(page, true);
   await page.route('**/api/sessions',r=>r.fulfill({json:{sessions:bots.map(b=>({id:b.canonicalSessionId,title:b.name,agentId:b.agentId,status:'idle',mode:'chat',metadata:{botId:b.id}}))}}));
   await page.goto('/#/bot'); await page.reload();await page.getByRole('button',{name:/^Bot A/}).first().click();
-  const drawer=page.getByTestId('bot-detail-panel');await expect(drawer.or(page.getByTestId('bot-detail-toggle')).first()).toBeVisible();if(!await drawer.isVisible()) await page.getByTestId('bot-detail-toggle').click();
+  const drawer=page.getByTestId('bot-detail-panel');await page.getByTestId('bot-detail-toggle').click();await expect(drawer).toBeVisible();
   await drawer.getByRole('tab',{name:'技能',exact:true}).click();
   const panel=drawer.getByTestId('bot-detail-skills');
   for(const size of [13,14,15,16,18]){

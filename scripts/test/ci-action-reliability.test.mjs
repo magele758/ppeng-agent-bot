@@ -2,6 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parse } from 'yaml';
+test('mutation modules run independently and retain complete failure-gated baseline coverage [AC:ci-action-reliability#AC-6]', () => {
+ const w = parse(readFileSync('.github/workflows/mutation.yml', 'utf8'));
+ const config = JSON.parse(readFileSync('scripts/mutation/mutation.config.json', 'utf8'));
+ const entries = w.jobs.mutate.strategy.matrix.include;
+ const modules = entries.map(entry => entry.args.match(/--module (\S+)/)[1]);
+ assert.ok(modules.every(module => !module.includes(',')), 'each module must be independently retryable');
+ assert.deepEqual([...new Set(modules)].sort(), Object.keys(config.modules).sort());
+ assert.equal(w.jobs.mutate.strategy['fail-fast'], false);
+ assert.ok(w.jobs.gate.steps.some(step => step.run === 'test "$SHARDS" = success'));
+ assert.ok(w.jobs.gate.steps.some(step => step.run?.includes('--merge coverage/mutation-shards') && !step.run.includes('--no-gate')));
+});
 test('quick gate executes Bot contracts and HTTP integration within its budget [AC:ci-action-reliability#AC-1]', () => {
  const source = readFileSync('scripts/ci/quick-gate.mjs', 'utf8');
  for (const file of ['bots.test.js', 'bot-goal-result-return.test.js', 'scripts/integration-test.mjs', 'ci-action-reliability.test.mjs']) assert.ok(source.includes(file), file);

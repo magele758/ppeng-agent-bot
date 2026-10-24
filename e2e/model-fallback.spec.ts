@@ -20,10 +20,11 @@ test.describe('Model fallback card', () => {
     });
     expect(res.status()).toBe(201);
     providerId = ((await res.json()) as { provider: { id: string } }).provider.id;
+    expect((await request.patch('/api/model-fallback/settings', {data:{chain:[],enabled:true}})).ok()).toBeTruthy();
   });
 
   test.afterAll(async ({ request }) => {
-    await request.patch('/api/model-fallback/settings', { data: { chain: [], enabled: true } });
+    await request.patch('/api/model-fallback/settings', { data: { chain: [], enabled: false } });
     if (providerId) await request.delete(`/api/model-providers/${providerId}`);
   });
 
