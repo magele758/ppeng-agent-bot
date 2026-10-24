@@ -1,4 +1,5 @@
 import type { SqliteStateStore } from '../storage.js';
+import type { SessionMessage } from '../types.js';
 
 type OutputFormat = 'path' | 'number' | 'version' | 'json';
 
@@ -31,6 +32,27 @@ const attempts = new WeakMap<object, Map<string, string>>();
 
 export function clearQueryOutputReview(store: object, sessionId: string): void {
   attempts.get(store)?.delete(sessionId);
+}
+
+/** A send-only view: keep private reasoning out of strict answers and make
+ * correction a fresh request even when an adapter hoists system notices. */
+export function completionModelView(messages: SessionMessage[]): SessionMessage[] {
+  const text = (message: SessionMessage) => message.parts.filter(part => part.type === 'text').map(part => part.text).join('\n');
+  const user = messages.findLast(message => message.role === 'user');
+  const feedbackIndex = messages.findLastIndex(message => message.role === 'system' && /^\[(?:output format|completion review)\]/.test(text(message)));
+  const feedback = feedbackIndex >= 0 && !messages.slice(feedbackIndex + 1).some(message => message.role !== 'system') ? messages[feedbackIndex] : undefined;
+  if (!feedback && (!user || !strictOutputFormat(text(user)))) return messages;
+  const view = messages.flatMap(message => {
+    if (message.role !== 'assistant') return [message];
+    const parts = message.parts.filter(part => part.type !== 'reasoning');
+    return parts.length ? [{...message, parts}] : [];
+  });
+  if (feedback) view.push({
+    id: `completion-continuation-${feedback.id}`, sessionId: feedback.sessionId,
+    createdAt: feedback.createdAt, role: 'user',
+    parts: [{type: 'text', text: '[runtime continuation of the same request] Answer the latest user request again using existing observations and the completion feedback in system instructions. Produce a fresh final answer, not a continuation of prior assistant text. Do not repeat completed actions.'}]
+  });
+  return view;
 }
 
 /** One repair per user request; no answer rewriting and no extra tool authority. */

@@ -1,5 +1,5 @@
 import { usesDurableBotGoals, reviewDirectGoalBeforeEnd, type GoalRuntimeHost } from '../bots/goals/runtime-host.js';
-import { reviewQueryOutput } from '../bots/strict-output.js';
+import { completionModelView, reviewQueryOutput } from '../bots/strict-output.js';
 import { observeModelRequests } from './request-metrics.js';
 import {
   commitPrepareSnapshot,
@@ -324,7 +324,7 @@ async function invokeContextModel(
   try {
     const shape = {systemPromptChars: input.systemPrompt.length, toolSchemaTokens: Math.ceil(JSON.stringify(input.tools.map(tool=>({name:tool.name,description:tool.description,inputSchema:tool.inputSchema}))).length/4)};
     const budget = resolveBotWindowBudget(rt.store, adapter, shape);
-    let messages = input.messages;
+    let messages = completionModelView(input.messages);
     let compacted = false;
     const estimated = estimateMessageTokens(messages);
     // Overhead can put the send ceiling under the 50% tier. Compact first, then apply it.
@@ -336,7 +336,7 @@ async function invokeContextModel(
         const prepared = await host.prepareMessagesForModel(session, rt.store.foldMessages(session.id));
         // Preserve turn-local user memory/image parts when the original message survived.
         const oldById = new Map(messages.filter(message=>message.role==='user').map(message=>[message.id,message]));
-        messages = prepared.map(message => oldById.get(message.id) ?? message);
+        messages = completionModelView(prepared.map(message => oldById.get(message.id) ?? message));
       }
     }
     if (estimateMessageTokens(messages) > budget.historyTokens) {
