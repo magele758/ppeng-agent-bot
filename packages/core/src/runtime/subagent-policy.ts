@@ -47,6 +47,7 @@ type SubagentRecoveryStore = {
     sessionId: string,
     patch: Partial<Omit<SessionRecord, 'id' | 'createdAt'>>
   ): SessionRecord;
+  releaseWriter?(sessionId: string, runId: string): void;
 };
 
 /**
@@ -59,15 +60,15 @@ export function markInterruptedSubagentsUnknown(store: SubagentRecoveryStore): S
   for (const session of store.listSessions()) {
     if (session.mode !== 'subagent' || session.status !== 'running') continue;
     if (store.isSessionWriterLive?.(session.id)) continue;
-    marked.push(
-      store.updateSession(session.id, {
-        status: 'unknown',
-        metadata: {
-          ...(session.metadata ?? {}),
-          subagentDisposition: 'unknown'
-        }
-      })
-    );
+    if (session.activeWriterRunId) store.releaseWriter?.(session.id, session.activeWriterRunId);
+    const updated = store.updateSession(session.id, {
+      status: 'unknown',
+      metadata: {
+        ...(session.metadata ?? {}),
+        subagentDisposition: 'unknown'
+      }
+    });
+    marked.push(updated);
   }
   return marked;
   };

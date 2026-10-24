@@ -56,6 +56,7 @@
 | `bot-group-drag-only` | 03 |
 | `bot-immediate-steer` | 04 |
 | `bot-list-idle-motion` | 02 |
+| `bot-goal-nested-approval` | 05 |
 | `bot-multi-goal-coordination` | 05 |
 | `bot-panel-reset` | 03 |
 | `bot-pin-area` | 03 |

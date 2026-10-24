@@ -23,9 +23,17 @@ export function recoverInterruptedSessions(store: SqliteStateStore): void {
   store.db.exec('BEGIN IMMEDIATE');
   try {
     for (const session of store.listSessions()) {
-      // Bot queue and delegated child recovery retain their existing protocols.
-      if (!['chat', 'task'].includes(session.mode) || isCanonicalBotChat(session)
-        || typeof session.metadata?.botId === 'string') continue;
+      // Delegated children and bot-work rows keep their own recovery.
+      // A canonical bot chat always carries botId, so release its dead WAL claim
+      // before that skip. Otherwise the goal notice cannot write the main transcript.
+      if (!['chat', 'task'].includes(session.mode)) continue;
+      if (isCanonicalBotChat(session)) {
+        if (!store.isSessionWriterLive(session.id) && session.activeWriterRunId) {
+          store.releaseWriter(session.id, session.activeWriterRunId);
+        }
+        continue;
+      }
+      if (typeof session.metadata?.botId === 'string') continue;
       if (store.isSessionWriterLive(session.id)) continue;
       const interrupt = parseRunInterrupt(session.metadata);
       const resumableApproval = interrupt?.kind === 'waiting_approval'

@@ -49,7 +49,7 @@ function waitStatus(host: GoalRuntimeHost, parent: SessionRecord, goal: BotGoal,
  if (wait.source === 'session') {
   const session = host.store.getSession(wait.correlationId);
   if (!session || session.metadata.botGoalScopeSessionId !== parent.id || session.metadata.botGoalId !== goal.id) return 'unauthorized';
-  if (host.isRunning(session.id) || session.status === 'waiting_approval') return 'running';
+  if (host.isRunning(session.id) || session.status === 'waiting_approval' || descendantAwaitingApproval(host, parent, goal, session.id)) return 'running';
   const outcome = session.metadata.outcome as {kind?: string} | undefined;
   if (session.status === 'failed' || session.status === 'unknown') return session.status;
   if(outcome?.kind==='aborted'||outcome?.kind==='cancelled')return 'cancelled';
@@ -273,7 +273,56 @@ function finishedExecutionReport(host: GoalRuntimeHost, session: SessionRecord):
  if (outcome?.kind === 'completed' || session.status === 'completed') return {kind:'candidate_completed', summary:text || 'Execution finished', ...(text ? {evidence:[text]} : {})};
  return undefined;
 }
+function deadRunningExecution(host: GoalRuntimeHost, session: SessionRecord | undefined, execution: GoalExecution): boolean {
+ const targetId = childRunRef(execution, execution.sessionId) ?? session?.id;
+ if (!targetId || host.isRunning(targetId)) return false;
+ if (host.executionInterrupted?.(targetId) === true) return true;
+ // Boot recovery marks the execution session itself unknown before the first
+ // goal tick. runRef then names that same session, so it is not a separate child.
+ const target = host.store.getSession(targetId);
+ return target?.status === 'unknown';
+}
+function recoverDeadExecution(service: GoalService, botId: string, goal: BotGoal, execution: GoalExecution): void {
+ service.recoverInterruptedExecution(botId, execution.id);
+}
+function ownedGoalSession(host: GoalRuntimeHost, parent: SessionRecord, goal: BotGoal, sessionId: string): SessionRecord | undefined {
+ const session = host.store.getSession(sessionId);
+ if (!session || session.metadata.botGoalScopeSessionId !== parent.id || session.metadata.botGoalId !== goal.id) return undefined;
+ return session;
+}
+/** A child of the waited session still parked on a pending approval. The parent turn may already be idle. */
+function descendantAwaitingApproval(host: GoalRuntimeHost, parent: SessionRecord, goal: BotGoal, rootId: string): boolean {
+ const children = new Map<string, string[]>();
+ for (const session of host.store.listSessions()) {
+  const parentId = session.parentSessionId;
+  if (!parentId) continue;
+  const list = children.get(parentId) ?? [];
+  list.push(session.id);
+  children.set(parentId, list);
+ }
+ const seen = new Set<string>([rootId]);
+ const queue = [...(children.get(rootId) ?? [])];
+ while (queue.length) {
+  const id = queue.shift()!;
+  if (seen.has(id)) continue;
+  seen.add(id);
+  const session = ownedGoalSession(host, parent, goal, id);
+  if (!session) continue;
+  if (session.status === 'waiting_approval' && host.store.listApprovals({ status: 'pending' }).some(item => item.sessionId === session.id)) return true;
+  queue.push(...(children.get(session.id) ?? []));
+ }
+ return false;
+}
+function heldForApproval(host: GoalRuntimeHost, parent: SessionRecord | undefined, goal: BotGoal): boolean {
+ if (!parent || goal.wait?.source !== 'session' || !goal.wait.correlationId) return false;
+ const waited = host.store.getSession(goal.wait.correlationId);
+ if (waited?.status === 'waiting_approval') return true;
+ return descendantAwaitingApproval(host, parent, goal, goal.wait.correlationId);
+}
 function settleRunningLease(host: GoalRuntimeHost, service: GoalService, botId: string, session: SessionRecord | undefined, goal: BotGoal, execution: GoalExecution, running: boolean): void {
+ const parent = host.store.getSession(goal.sessionId);
+ if (heldForApproval(host, parent, goal)) return;
+ if (deadRunningExecution(host, session, execution)) { recoverDeadExecution(service, botId, goal, execution); return; }
  if (!session) return;
  if (running || session.status === 'waiting_approval') {
   renewOrExpireLease(host, service, botId, session, goal, execution);
@@ -303,7 +352,8 @@ function childEnded(child: SessionRecord): boolean {
 }
 function childSettlement(childId: string, status: string, output: string, judged?: GoalReport): GoalReport {
  if(status==='cancelled')return {kind:'cancelled',summary:output||'Child execution cancelled',evidence:output?[output]:[]};
- if (status === 'failed' || status === 'unknown') return {kind:'blocked', summary:output || `Child session ${childId} ${status}`, evidence:output ? [output] : [`session ${childId} ${status}`]};
+ if (status === 'unknown') return {kind:'blocked', summary:output || `Child session ${childId} ended unknown; reconcile its effects before retrying`, evidence:output ? [output] : [`session ${childId} unknown`]};
+ if (status === 'failed') return {kind:'progress', summary:output || `Child session ${childId} failed`, evidence:output ? [output] : [`session ${childId} failed`], nextStep:'Retry the failed child work once. Do not repeat a step whose result is already recorded.'};
  const base: GoalReport = {kind:'candidate_completed', summary:output || `Child session ${childId} finished`, evidence:output ? [output] : [`session ${childId} ${status}`], verified:false};
  // No judge, or a judge that threw, leaves the pending completion. Progress would clear the
  // execution and dispatch a new child instead of keeping this result for review.
@@ -352,11 +402,30 @@ function blockSpecialtyWait(host: GoalRuntimeHost, parent: SessionRecord, servic
  service.block(botId, goal.id, evidence || 'External execution is blocked');
  return true;
 }
+function approvalWaitStep(toolName: string): string {
+ return `Waiting for approval of ${toolName} in this chat. The goal continues after that decision.`;
+}
+function pendingApprovalTool(host: GoalRuntimeHost, parent: SessionRecord, goal: BotGoal, sessionId: string): string | undefined {
+ const session = ownedGoalSession(host, parent, goal, sessionId);
+ if (!session || session.status !== 'waiting_approval') return undefined;
+ return host.store.listApprovals({ status: 'pending' }).find(item => item.sessionId === session.id)?.toolName;
+}
+/** The waited session or its descendant is parked on approval. Say so on the goal; do not treat it as finished work. */
+function notePendingApprovalWait(host: GoalRuntimeHost, parent: SessionRecord, service: GoalService, botId: string, goal: BotGoal): boolean {
+ const wait = goal.wait;
+ if (!wait || wait.source !== 'session') return false;
+ const own = pendingApprovalTool(host, parent, goal, wait.correlationId);
+ if (!own && !descendantAwaitingApproval(host, parent, goal, wait.correlationId)) return false;
+ const toolName = own ?? host.store.listApprovals({ status: 'pending' }).find(item => pendingApprovalTool(host, parent, goal, item.sessionId))?.toolName ?? 'tool';
+ service.noteApprovalWait(botId, goal.id, approvalWaitStep(toolName));
+ return true;
+}
 function wakeFinishedWait(host: GoalRuntimeHost, parent: SessionRecord, service: GoalService, botId: string, goal: BotGoal): void {
  const executions = service.executions(botId, goal.id);
  const status = waitStatus(host, parent, goal, executions);
  if (blockSpecialtyWait(host, parent, service, botId, goal, status)) return;
  if (blockUnauthorizedWait(service, botId, goal, status)) return;
+ if (status === 'running' && notePendingApprovalWait(host, parent, service, botId, goal)) return;
  if (status && ended.has(status)) service.wake(botId, {goalId:goal.id, completionCandidate:status==='completed', eventId:`${goal.wait!.source}:${goal.wait!.correlationId}:${status}:${goal.attempts}`, source:goal.wait!.source, correlationId:goal.wait!.correlationId, ...waitEvidence(host, parent, goal, status, executions)});
 }
 function deferredContinuation(host: GoalRuntimeHost, parent: SessionRecord, goal: BotGoal): SessionRecord | undefined {
@@ -391,8 +460,9 @@ async function tickParent(host: GoalRuntimeHost, parent: SessionRecord): Promise
  const scope = goalScope(host.store, parent);
  if (!scope) return;
  const {service, botId} = scope;
+ const held = new Set(service.list(botId).filter(goal => heldForApproval(host, parent, goal)).flatMap(goal => service.executions(botId, goal.id).filter(execution => execution.status === 'running').map(execution => execution.id)));
  for (const goal of service.list(botId)) await tickRunningGoal(host, service, botId, parent, goal);
- service.recover(botId);
+ service.recover(botId, held);
  tickWaitingGoals(host, parent, service, botId);
  tickQueuedGoals(host, parent, service, botId);
  announceGoals(host, service, botId);
