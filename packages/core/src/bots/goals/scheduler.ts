@@ -8,8 +8,8 @@ import { inheritBotIdentityMetadata } from '../../memory/bot-memory-scope.js';
 import { childPermissionMode, inheritBotAllowlists, inheritModelOverride } from '../../runtime/spawn-policy.js';
 import { inheritForkRetrievalMetadata, forkOpeningMessage } from '../fork-inheritance.js';
 import { childSessionTrace } from '../../stores/trace-visible.js';
-import { announceGoalState, bindGoalExecution, goalScope, settleGoalExecution, type GoalRuntimeHost } from './runtime-host.js';
-import type { BotGoal, GoalExecution } from './types.js';
+import { announceGoalState, bindGoalExecution, goalScope, judgeChildCompletion, settleGoalExecution, type GoalRuntimeHost } from './runtime-host.js';
+import type { BotGoal, GoalExecution, GoalReport } from './types.js';
 
 const ticking = new WeakSet<object>();
 const ended = new Set(['completed', 'failed', 'cancelled', 'unknown', 'expired', 'rejected', 'timed_out']);
@@ -239,34 +239,42 @@ function childRunRef(execution: GoalExecution, parentSessionId: string | undefin
  if (!childId || childId === parentSessionId) return undefined;
  return childId;
 }
+/** A brand-new child is idle too. Only an ended turn, or a failed/unknown child, is a result. */
+function childEnded(child: SessionRecord): boolean {
+ const outcome = child.metadata.outcome as {kind?: string} | undefined;
+ if (child.status === 'failed' || child.status === 'unknown' || child.status === 'completed') return true;
+ // Subagent turns finish as idle. The outcome is what distinguishes that from a session that has not run.
+ return child.status === 'idle' && (outcome?.kind === 'completed' || outcome?.kind === 'idle' || outcome?.kind === 'failed');
+}
+function childSettlement(childId: string, status: string, output: string, judged?: GoalReport): GoalReport {
+ if (status === 'failed' || status === 'unknown') return {kind:'blocked', summary:output || `Child session ${childId} ${status}`, evidence:output ? [output] : [`session ${childId} ${status}`]};
+ const base: GoalReport = {kind:'candidate_completed', summary:output || `Child session ${childId} finished`, evidence:output ? [output] : [`session ${childId} ${status}`], verified:false};
+ // No judge, or a judge that did not return a verdict, cannot turn assistant text into a completion.
+ if (!judged) return {...base, kind:'progress', summary:output || 'Child finished without a completion verdict', nextStep:'Retry completion verification before treating this result as finished'};
+ if (judged.kind !== 'candidate_completed' && judged.kind !== 'progress') return base;
+ return {...base, kind:judged.kind, summary:judged.summary || base.summary, verified:judged.verified === true, nextStep:judged.nextStep};
+}
 /** A finished child is the execution result. The parent turn staying idle must not keep the goal running. */
-function settleFinishedChild(host: GoalRuntimeHost, service: GoalService, botId: string, execution: GoalExecution): boolean {
+async function settleFinishedChild(host: GoalRuntimeHost, service: GoalService, botId: string, goal: BotGoal, execution: GoalExecution): Promise<boolean> {
  const childId = childRunRef(execution, execution.sessionId);
  if (!childId || host.isRunning(childId)) return false;
  const child = host.store.getSession(childId);
- if (!child || child.status === 'waiting_approval' || child.status === 'running') return false;
+ if (!child || !childEnded(child)) return false;
  const output = host.store.foldMessages(childId).filter(m => m.role === 'assistant').flatMap(m => m.parts.filter(p => p.type === 'text').map(p => p.text)).join('\n').slice(-8000);
- const failed = child.status === 'failed' || child.status === 'unknown';
- service.report(botId, execution.id, {
-  kind: failed ? 'blocked' : 'candidate_completed',
-  summary: output || `Child session ${childId} ${failed ? child.status : 'finished'}`,
-  evidence: output ? [output] : [`session ${childId} ${child.status}`],
-  verified: !failed && !!output,
-  owner: execution.owner,
-  fence: execution.fence
- });
+ const judged = child.status === 'failed' || child.status === 'unknown' ? undefined : await judgeChildCompletion(host, goal, childId, output);
+ service.report(botId, execution.id, {...childSettlement(childId, child.status, output, judged), owner:execution.owner, fence:execution.fence});
  return true;
 }
-function settleRunningExecution(host: GoalRuntimeHost, service: GoalService, botId: string, goal: BotGoal, execution: GoalExecution): void {
+async function settleRunningExecution(host: GoalRuntimeHost, service: GoalService, botId: string, goal: BotGoal, execution: GoalExecution): Promise<void> {
  const session = executionSession(host, execution);
  const running = sessionRunning(host, session);
  if (resumeIfApproved(host, session, goal, execution)) return;
- if (!running && settleFinishedChild(host, service, botId, execution)) return;
+ if (!running && await settleFinishedChild(host, service, botId, goal, execution)) return;
  controlOrLease(host, service, botId, session, goal, execution, running);
 }
 async function tickRunningGoal(host: GoalRuntimeHost, service: GoalService, botId: string, parent: SessionRecord, goal: BotGoal): Promise<void> {
  if (goal.wait && goal.draining) await drainExternal(host, parent, goal, service.executions(botId, goal.id));
- for (const execution of service.executions(botId, goal.id).filter(e => e.status === 'running')) settleRunningExecution(host, service, botId, goal, execution);
+ for (const execution of service.executions(botId, goal.id).filter(e => e.status === 'running')) await settleRunningExecution(host, service, botId, goal, execution);
 }
 function blockUnauthorizedWait(service: GoalService, botId: string, goal: BotGoal, status: string | undefined): boolean {
  if (status !== 'unauthorized' && status !== 'unsupported') return false;

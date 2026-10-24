@@ -318,6 +318,15 @@ async function maybeVerify(host:GoalRuntimeHost,goal:BotGoal,tail:ReturnType<Goa
  if(report.kind!=='candidate_completed'&&report.kind!=='progress')return report;
  return verifyCompletion(host,goal,tail,assistant,{...report,verified:false});
 }
+/** Child-session completion uses the same judge as a direct turn. Assistant text alone is not verification. */
+export async function judgeChildCompletion(host:GoalRuntimeHost,goal:BotGoal,childId:string,assistant:string):Promise<GoalReport|undefined> {
+ if(!assistant.trim())return undefined;
+ const transcript=[
+  {role:'user' as const,parts:[{type:'text' as const,text:`Objective: ${goal.objective}\nConstraints: ${JSON.stringify(goal.constraints)}\nCompletion conditions: ${JSON.stringify(goal.completionCriteria)}`}]},
+  ...host.store.foldMessages(childId).slice(-20)
+ ];
+ return verifyCompletion(host,goal,transcript as ReturnType<GoalRuntimeHost['store']['foldMessages']>,assistant,{kind:'candidate_completed',summary:assistant,evidence:[assistant],verified:false});
+}
 function unlaunchedExecutor(session:SessionRecord,execution:{strategy:string;id:string},goal:BotGoal):GoalReport|undefined {
  const dispatch=session.metadata.botGoalDispatch as {executionId?:string}|undefined;
  if(session.metadata.botGoalWorker||session.mode==='subagent'||execution.strategy==='direct'||goal.evidence.length)return undefined;

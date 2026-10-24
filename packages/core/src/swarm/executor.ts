@@ -134,8 +134,9 @@ export class SwarmExecutor {
     const sessions = this.deps.listSessions().filter(
       (s) => (s.metadata as { swarmRunId?: string })?.swarmRunId === run.id
     );
+    // Idle teammates still occupy a slot until their task finishes. Dropping them lets the next tick over-dispatch.
     let activeCount = sessions.filter(
-      (s) => s.status === 'running' || s.status === 'waiting_approval'
+      (s) => s.status === 'running' || s.status === 'idle' || s.status === 'waiting_approval'
     ).length;
 
     for (const task of tasks) {

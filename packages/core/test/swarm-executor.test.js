@@ -116,3 +116,42 @@ test('SwarmExecutor: idle teammate without output does not mark task done', asyn
 
   sqlite.db.close();
 });
+
+test('SwarmExecutor: an unfinished idle teammate keeps its maxTeammates slot', async () => {
+  const stateDir = mkdtempSync(join(tmpdir(), 'swarm-quota-'));
+  const sqlite = new SqliteStateStore(join(stateDir, 'state.db'));
+  const store = new SwarmStore(sqlite.db);
+  const sessions = [];
+  const runId = createSwarmId('srun');
+  const executor = new SwarmExecutor({
+    store,
+    listSessions: () => sessions,
+    getSession: (id) => sessions.find((s) => s.id === id),
+    createTeammateSession: () => {
+      const rec = { id: `sess_${sessions.length + 1}`, agentId: 'general', status: 'idle', mode: 'teammate', metadata: { swarmRunId: runId } };
+      sessions.push(rec);
+      return rec;
+    },
+    runSession: async () => {},
+    enqueueSchedulerWake: () => {},
+    sessionTeammateFinished: () => false
+  });
+  store.createRun({
+    id: runId, goal: 'quota', status: 'running', strategy: 'pipeline',
+    budget: { maxTeammates: 1, maxTurnsPerAgent: 5, maxDurationMs: 60_000 },
+    qualityGate: [], createdAt: nowIso(), updatedAt: nowIso()
+  });
+  for (const title of ['First', 'Second']) {
+    store.createTask({
+      id: createSwarmId('stask'), swarmRunId: runId, title, status: 'pending', requiredRole: 'implementer',
+      capabilityTags: [], acceptanceCriteria: [], artifacts: [], blockedBy: [], createdAt: nowIso(), updatedAt: nowIso()
+    });
+  }
+  await executor.tick();
+  await executor.tick();
+  const tasks = store.listTasks(runId);
+  assert.equal(tasks.filter((task) => task.status === 'in_progress').length, 1);
+  assert.equal(tasks.filter((task) => task.status === 'pending').length, 1);
+  assert.equal(sessions.length, 1);
+  sqlite.db.close();
+});

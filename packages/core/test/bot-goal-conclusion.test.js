@@ -113,16 +113,16 @@ test('子会话结束后等待指向子会话且能读到结果 [AC:bot-goal-con
     assert.equal(saved.runRef, `session:${childId}`);
     const waits = rt.getSession(parentId).metadata.botGoalAuthorizedWaits;
     assert.ok(waits.some((wait) => wait.source === 'session' && wait.correlationId === childId));
+    const runtimeHost = rt.goalRuntimeHost();
     const hostForTick = {
-      store: rt.store,
+      ...runtimeHost,
       isRunning: () => false,
-      cancel: () => {},
-      run: async () => {},
+      judge: runtimeHost.judge,
       capabilities: () => ({ registeredTools: ['spawn_subagent'], enabledStrategies: ['direct', 'subagent'] })
     };
     await tickBotGoals(hostForTick);
     const settled = service.get(bot.id, goal.id);
-    assert.notEqual(settled.status, 'blocked');
+    assert.notEqual(settled.status, 'blocked', JSON.stringify({status:settled.status,progress:settled.progress,reason:settled.blockedReason,evidence:settled.evidence}));
     assert.ok(settled.evidence.some((item) => item.includes('Child observed')) || settled.progress.includes(childId));
   } finally {
     await rt.destroy();
