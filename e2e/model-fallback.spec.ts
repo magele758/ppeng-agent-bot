@@ -20,16 +20,17 @@ test.describe('Model fallback card', () => {
     });
     expect(res.status()).toBe(201);
     providerId = ((await res.json()) as { provider: { id: string } }).provider.id;
+    expect((await request.patch('/api/model-fallback/settings', {data:{chain:[],enabled:true}})).ok()).toBeTruthy();
   });
 
   test.afterAll(async ({ request }) => {
-    await request.patch('/api/model-fallback/settings', { data: { chain: [] } });
+    await request.patch('/api/model-fallback/settings', { data: { chain: [], enabled: false } });
     if (providerId) await request.delete(`/api/model-providers/${providerId}`);
   });
 
   test('build an ordered chain, save, and keep it after reload [AC:model-fallback#AC-1]', async ({ page, request }) => {
     await page.addInitScript(() => window.localStorage.setItem('lab.settings.advanced', '1'));
-    await page.goto('/#/settings/models');
+    await page.goto('/#/settings/experimental');
     const card = page.locator('#card-model-fallback');
     await expect(card.getByRole('heading', { name: '模型备选' })).toBeVisible({ timeout: 15_000 });
     await expect(card.getByText('未配置备选模型，当前不会回退')).toBeVisible();

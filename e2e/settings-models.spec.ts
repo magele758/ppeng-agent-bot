@@ -239,7 +239,7 @@ test.describe('Settings: search, saved states, gateway, theme', () => {
     await page.addInitScript(() => window.localStorage.setItem('lab.settings.advanced', '1'));
     let chain: Array<{ providerId: string; modelId: string }> = [];
     const view = () => ({
-      settings: { chain, updatedAt: NOW },
+      settings: { chain, enabled: true, updatedAt: NOW },
       options: [{ providerId: 'p1', providerName: 'Prov', modelId: 'm1', kind: 'openai-compatible' }],
       chainStatus: chain.map((c) => ({ ...c, usable: true })),
       effective: { enabled: chain.length > 0, source: chain.length ? 'ui' : 'default' }
@@ -251,7 +251,7 @@ test.describe('Settings: search, saved states, gateway, theme', () => {
       await fulfillJson(route, view());
     });
     await mockModelCatalog(page);
-    await page.goto('/#/settings/models');
+    await page.goto('/#/settings/experimental');
     const card = page.locator('#card-model-fallback');
     await expect(card.getByRole('button', { name: '保存备选链' })).toBeDisabled({ timeout: 15_000 });
     await expect(card.getByText('有未保存的修改')).toHaveCount(0);

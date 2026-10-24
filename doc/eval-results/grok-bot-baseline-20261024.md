@@ -29,7 +29,7 @@
 
 正式认证还要求独立新旧版本、重复试验、足够多独立任务及类别不劣统计、完整用量；当前默认 16 题不足以认证。
 
-评估源版本：`0ace559ba0e7e4d1572e8ced7166dc181763e0a2`。完整指纹和逐题指标见 [JSON](grok-bot-baseline-20261024.json)。实现之后的提交只涉及发布参数传递、审查记录和报告；本轮驱动及 runtime 构建指纹未变。
+评估源版本：`0ace559ba0e7e4d1572e8ced7166dc181763e0a2`。完整指纹和逐题指标见 [JSON](grok-bot-baseline-20261024.json)。采样期间驱动及 runtime 构建指纹未变。采样完成后合入同期主分支 PR #247；该主分支包含 runtime 改动。本报告只代表上述冻结版本，不冒充合并后候选版本的真实模型结果；候选发布仍须重新做绑定版本的 A/B 准入。
 
 [完整原始证据归档](grok-bot-baseline-20261024-evidence.tar.gz) 同时包含校准轮与正式轮；各目录有 manifest、suite、逐次轨迹、report 和 evidence-index。正式目录为 live-bot-baseline-final-20261024。归档已检查不含当前模型 API Key。
 

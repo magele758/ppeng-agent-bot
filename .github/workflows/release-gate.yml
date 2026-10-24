@@ -508,6 +508,10 @@ jobs:
     name: Browser and HTTP regression
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -537,9 +541,11 @@ jobs:
         env:
           RAW_AGENT_MODEL_PROVIDER: heuristic
       - name: Install Playwright Chromium
+        if: ${{ !cancelled() }}
         run: pnpm run test:e2e:install
       - name: E2E (Agent Lab)
-        run: pnpm run test:e2e:full --reporter=dot,junit
+        if: ${{ !cancelled() }}
+        run: pnpm run test:e2e:full --file-shard ${{ matrix.shard }}/4 --reporter=dot,junit
         env:
           RAW_AGENT_MODEL_PROVIDER: heuristic
           PLAYWRIGHT_JUNIT_OUTPUT_FILE: ${{ runner.temp }}/acceptance-results/e2e.xml
@@ -547,7 +553,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: acceptance-results-e2e
+          name: acceptance-results-e2e-${{ matrix.shard }}
           path: ${{ runner.temp }}/acceptance-results/
           if-no-files-found: ignore
           retention-days: 7
@@ -555,7 +561,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: browser-test-evidence
+          name: browser-test-evidence-${{ matrix.shard }}
           path: |
             test-results/
             playwright-report/

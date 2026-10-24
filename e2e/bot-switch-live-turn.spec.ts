@@ -13,6 +13,9 @@ test.beforeAll(async ({ request }) => {
 test.beforeEach(async ({ request }) => {
   for (const selected of pair) await request.patch(`/api/bots/${selected.id}`, { data: { hidden: false } });
 });
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: 'wait' });
+});
 async function select(page: Page, selected: Bot) {
   await page.getByTestId('functional-group-ungrouped').locator(`[data-bot-id="${selected.id}"]`).getByRole('button').first().click();
   await expect(page.locator('#playTitle')).toContainText(selected.name);

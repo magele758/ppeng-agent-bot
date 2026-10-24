@@ -231,12 +231,14 @@ async function runBotPolicyFlow(baseUrl, failures) {
   const meta = async () => (await getJson(`${baseUrl}/api/sessions/${sessionId}`)).data?.session?.metadata ?? {};
   let m = await meta();
   if (m.permissionMode !== 'auto') failures.push(`bot session permissionMode: expected auto got ${m.permissionMode}`);
-  if (m.maxTurns !== 24) failures.push(`bot session maxTurns: expected 24 got ${m.maxTurns}`);
+  if (m.maxTurns !== 0) failures.push(`bot session maxTurns: expected 0 got ${m.maxTurns}`);
 
-  for (const bad of [0, 25, -24, 100000, 'abc']) {
+  for (const bad of [25, -24, 100000, 'abc']) {
     const r = await patchJson(`${baseUrl}/api/bots/${botId}`, { maxTurns: bad });
     if (r.status !== 400) failures.push(`bot PATCH maxTurns=${JSON.stringify(bad)}: expected 400 got ${r.status}`);
   }
+  const unlimited = await patchJson(`${baseUrl}/api/bots/${botId}`, { maxTurns: 0 });
+  if (!unlimited.ok || (await meta()).maxTurns !== 0) failures.push('bot PATCH maxTurns=0 must persist unlimited steps');
   const okTurns = await patchJson(`${baseUrl}/api/bots/${botId}`, { maxTurns: 48 });
   if (!okTurns.ok) failures.push(`bot PATCH maxTurns=48: HTTP ${okTurns.status}`);
 

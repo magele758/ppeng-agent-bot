@@ -238,3 +238,18 @@ test('a new room goal keeps the previous room goal and the bot private goal [AC:
   assert.deepEqual(store.getDaemonControl('bot_work_tasks'), { rows: ['leave-me'] });
   assert.equal(JSON.stringify(saved).includes('单聊做到一半'), false);
 });
+
+test('pausing and cancelling a whole goal retains terminal tasks and records unrecallable work', async () => {
+ for (const verb of ['暂停', '取消']) {
+  const store=memoryStore();
+  const tasks=[task('active','g-api','执行','beta','进行中'),task('stuck','g-api','请求','beta','已发出'),task('other','g-doc','文档','gamma','进行中'),...['completed','failed','cancelled'].map(status=>({...task(status,'g-api',status,'beta','已结束'),status}))];
+  writeRoomGoals(store,roomId,{goals:[goal('g-api','部署接口','进行中'),goal('g-doc','写手册','进行中')],tasks,actions:[action('a','g-api','stuck','beta','外部请求',false),action('b','g-api','active','beta','可撤回',true)],stoppedBotIds:[]});
+  const effect=await intakeRoomMessage(store,{roomId,text:`${verb}部署接口`,members});
+  assert.equal(effect.kind,verb==='取消'?'cancel':'pause');
+  const saved=readRoomGoals(store,roomId);
+  assert.equal(saved.tasks.find(t=>t.id==='active').status,verb==='取消'?'cancelled':'running');
+  assert.equal(saved.tasks.find(t=>t.id==='stuck').settlement,'仍在收尾');
+  assert.equal(saved.tasks.find(t=>t.id==='other').status,'running');
+  for(const status of ['completed','failed','cancelled'])assert.equal(saved.tasks.find(t=>t.id===status).status,status);
+ }
+});
