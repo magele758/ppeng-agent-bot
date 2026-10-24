@@ -31,6 +31,15 @@ import {
 const page = (from: number, to: number) =>
   Array.from({ length: to - from + 1 }, (_, index) => ({ id: `m${from + index}`, seq: from + index }));
 
+test('reading anchor ignores a clipped pixel from the preceding row [AC:ci-action-reliability#AC-7] [AC:bot-workspace-interaction-polish#AC-17]', () => {
+  const row = (key: string, top: number, bottom: number) => ({ dataset: { feedKey: key }, getBoundingClientRect: () => ({ top, bottom }) });
+  const root = {
+    getBoundingClientRect: () => ({ top: 100 }),
+    querySelectorAll: () => [row('previous', -40, 100.75), row('reading', 100.75, 240)]
+  } as unknown as HTMLElement;
+  assert.deepEqual(captureFeedAnchor(root), { key: 'reading', offset: 0.75 });
+});
+
 test('结束后尚未落进记录的助手正文排在工具过程后面 [AC:chat-tail-kept#AC-1]', () => {
   const slots = buildFeedSlots({
     messages: [{ id: 'tool' }],

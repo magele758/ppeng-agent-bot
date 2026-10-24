@@ -10,6 +10,20 @@ async function sendAndWait(page: Page, text: string) {
 }
 
 test.describe('Chat experience', () => {
+  test('hover-open create menu leaves its trigger clickable [AC:ci-action-reliability#AC-8]', async ({ page }) => {
+    await page.goto('/');
+    const trigger = page.getByRole('button', { name: '新增', exact: true });
+    await trigger.hover();
+    await expect(page.locator('#playCreateMenu')).toBeVisible();
+    expect(await trigger.evaluate(el => {
+      const box = el.getBoundingClientRect();
+      return el.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
+    })).toBe(true);
+    await trigger.click({ timeout: 3000 });
+    await page.getByRole('menuitem', { name: /新建会话/ }).click();
+    await expect(page.locator('#playCreateMenu')).toHaveCount(0);
+    await expect(page.getByLabel('消息内容')).toBeVisible();
+  });
   test('the composer shows only the essentials; secondary options sit behind one session-settings entry [AC:chat-experience#AC-1]', async ({
     page
   }) => {

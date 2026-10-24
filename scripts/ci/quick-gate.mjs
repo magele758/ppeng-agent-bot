@@ -19,7 +19,7 @@ try{
   run(['scripts/build-workspace.mjs']);
   run(['node_modules/typescript/bin/tsc','-p','apps/web-console','--noEmit']);
   run(['--experimental-strip-types','--test','packages/core/test/domain-stores.test.js','packages/core/test/session-fork.test.js','packages/core/test/bot-reply-quote.test.js',
-    'packages/core/test/bots.test.js','packages/core/test/bot-goal-result-return.test.js','scripts/test/ci-action-reliability.test.mjs','scripts/test/settings-route-contracts.test.mjs','scripts/test/e2e-suite.test.mjs',
+    'packages/core/test/bots.test.js','packages/core/test/bot-goal-result-return.test.js','scripts/test/ci-action-reliability.test.mjs','scripts/test/settings-route-contracts.test.mjs','scripts/test/e2e-suite.test.mjs','apps/web-console/lib/feed-window.test.ts',
     'scripts/test/ci-parallel-validation.test.mjs','packages/core/test/approval-policy.test.js','packages/core/test/permission-mode.test.js',
     'scripts/test/ci-fast-bihourly.test.mjs','scripts/test/ci-audit.test.mjs','scripts/test/ci-verification-evidence.test.mjs',
     'scripts/test/ci-evidence-review-drift.test.mjs','scripts/test/ci-performance-clock.test.mjs','scripts/test/ci-gate-measurements.test.mjs',
