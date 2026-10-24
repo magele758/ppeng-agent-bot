@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { GOAL_JUDGE_TIMEOUT_MS } from './judge-budget.js';
-import { buildCompletionEvidence, completionReport, COMPLETION_JUDGE_PROMPT } from './completion-evidence.js';
+import { evidenceTranscript, goalExecutionEvidence } from './execution-evidence.js';
+import { buildCompletionEvidence, completionReport, COMPLETION_JUDGE_PROMPT, type CompletionEvidence } from './completion-evidence.js';
 import type { SqliteStateStore } from '../../storage.js';
 import type { SessionRecord, ToolContract, ModelAdapter } from '../../types.js';
 import { BotGoalService } from './service.js';
@@ -25,14 +26,14 @@ export interface GoalRuntimeHost {
  emitTrace?(sessionId: string, event: { kind: 'child_session'; payload: Record<string, unknown> }): void;
 }
 export function announceGoalState(host:GoalRuntimeHost,goal:BotGoal):void {
+ host.store.transaction(()=>{
+ goal=new BotGoalService(host.store,Date.now,goal.sessionId).get(goal.botId,goal.id)??goal;
  if(!['completed','blocked','failed','pending_review'].includes(goal.status))return;
  const key=`bot.goal-notice:${goal.id}`;
  const version=`${goal.revision}:${goal.status}:${goal.blockedReason??''}`;
  if(host.store.getDaemonControl<string>(key)===version)return;
- host.store.transaction(()=>{
   host.store.setDaemonControl(key,version);
-  host.store.enqueueSteer(goal.sessionId,`[goal update] ${JSON.stringify({id:goal.id,title:goal.title,status:goal.status,progress:goal.progress,reason:goal.blockedReason,nextStep:goal.nextStep})}\nBriefly tell the user this meaningful change. A pending review keeps its recorded evidence until it is verified or rejected; do not restart it or treat this notification as a new user task.`,{role:'system',key:`goal-notice:${goal.id}`});
-  host.store.enqueueSchedulerWake(goal.sessionId,'bot.goal.notice');
+  host.store.appendMessage(goal.sessionId,'system',[{type:'text',text:`[goal update] ${JSON.stringify({id:goal.id,title:goal.title,status:goal.status,progress:goal.progress,reason:goal.blockedReason,nextStep:goal.nextStep})}`}],{key:`goal-notice:${goal.id}:${version}`});
  });
 }
 export function usesDurableBotGoals(store:Pick<SqliteStateStore,'getSession'>,session:SessionRecord):boolean {
@@ -253,7 +254,7 @@ function startBoundGoal(host:GoalRuntimeHost,session:SessionRecord,scope:NonNull
  if(route.blocked){announceGoalState(host,scope.service.block(scope.botId,goal.id,route.reason));return false;}
  const execution=scope.service.claim(scope.botId,goal.id,{strategy:claimStrategy(session,route.strategy),strategyReason:route.reason,safeToRetry:false});
  if(!execution)return false;
- scope.service.updateExecution(scope.botId,execution.id,{sessionId:session.id,runRef:`session:${session.id}`});
+ scope.service.updateExecution(scope.botId,execution.id,{sessionId:session.id,messageStartSeq:host.store.listSurfaceNodes(session.id).at(-1)?.seq??0,runRef:`session:${session.id}`});
  host.store.updateSession(session.id,{metadata:{...session.metadata,botGoalId:goal.id,botGoalExecutionId:execution.id,botGoalScopeSessionId:scope.sessionId,botGoalCostStart:Number(session.metadata.usageCostUsd??0),botGoalCheckpoint:undefined,botGoalOriginalProfile:originalProfile(session.metadata),taskRunMode:route.strategy==='direct'?route.taskMode:'auto',orchestrationEngine:'legacy'}});
  host.store.enqueueSteer(session.id,goalInstructions(goal,route.strategy!,route.reason),{role:'system',key:`goal-execution:${execution.id}`});
  return true;
@@ -312,12 +313,6 @@ function holdForApproval(host:GoalRuntimeHost,sessionId:string,session:SessionRe
  const outcome=session.metadata.outcome as {kind?:string;reason?:string}|undefined;
  return alreadyWaiting(session,outcome);
 }
-/** Compaction archives remain evidence; explicit retractions and non-compaction replacements do not. */
-function evidenceTranscript(host:GoalRuntimeHost,sessionId:string) {
- const nodes=host.store.listSurfaceNodes(sessionId);
- const retractions=nodes.filter(node=>node.surfaceOp==='hide'||(node.surfaceOp==='replace'&&node.key!=='compact-summary'));
- return nodes.filter(node=>node.surfaceOp!=='hide'&&!retractions.some(retraction=>node.seq>=retraction.replacesStart!&&node.seq<=retraction.replacesEnd!));
-}
 function assistantTranscript(messages:ReturnType<GoalRuntimeHost['store']['foldMessages']>,startedAt:string) {
  const tail=messages.filter(m=>Date.parse(m.createdAt)>=Date.parse(startedAt));
  const final=tail.findLast(m=>m.role==='assistant'&&m.parts.some(p=>p.type==='text'));
@@ -338,12 +333,12 @@ function abortedReport(outcome:{kind?:string}|undefined):GoalReport|undefined {
  if(outcome?.kind!=='aborted')return undefined;
  return {kind:'blocked',summary:'Execution was interrupted; review progress before resuming'};
 }
-async function verifyCompletion(host:GoalRuntimeHost,goal:BotGoal,tail:ReturnType<GoalRuntimeHost['store']['foldMessages']>,assistant:string,report:GoalReport,sessionId=goal.sessionId,signal?:AbortSignal):Promise<GoalReport> {
+async function verifyCompletion(host:GoalRuntimeHost,goal:BotGoal,tail:ReturnType<GoalRuntimeHost['store']['foldMessages']>,assistant:string,report:GoalReport,sessionId=goal.sessionId,signal?:AbortSignal,prepared?:CompletionEvidence):Promise<GoalReport> {
  const session=host.store.getSession(sessionId);
  const judge=session ? sessionJudge(host,session) : host.judge;
  if(!judge)return {...report,verified:false};
  try {
-  const packet=buildCompletionEvidence(goal,tail,assistant);
+  const packet=prepared??verificationPacket(host,goal,assistant);
   const result=await judge({system:COMPLETION_JUDGE_PROMPT,user:JSON.stringify(packet),jsonMode:true,signal:signal?AbortSignal.any([signal,AbortSignal.timeout(GOAL_JUDGE_TIMEOUT_MS)]):AbortSignal.timeout(GOAL_JUDGE_TIMEOUT_MS)});
   return completionReport(JSON.parse(result),packet,goal);
  }catch{
@@ -356,14 +351,17 @@ const completionReviews = new WeakMap<SqliteStateStore,Map<string,CompletionRevi
 function reviewCache(host:GoalRuntimeHost):Map<string,CompletionReview> {
  let cache=completionReviews.get(host.store);if(!cache){cache=new Map();completionReviews.set(host.store,cache);}return cache;
 }
-function completionFingerprint(goal:BotGoal,tail:ReturnType<GoalRuntimeHost['store']['foldMessages']>,assistant:string):string {
- return createHash('sha256').update(JSON.stringify(buildCompletionEvidence(goal,tail,assistant))).digest('hex');
+function verificationPacket(host:GoalRuntimeHost,goal:BotGoal,assistant:string):CompletionEvidence {
+ return buildCompletionEvidence(goal,goalExecutionEvidence(host.store,goal),assistant);
+}
+function completionFingerprint(packet:CompletionEvidence):string {
+ return createHash('sha256').update(JSON.stringify(packet)).digest('hex');
 }
 function cachedCompletion(host:GoalRuntimeHost,goal:BotGoal,tail:ReturnType<GoalRuntimeHost['store']['foldMessages']>,assistant:string,sessionId:string):GoalReport|undefined {
  const session=host.store.getSession(sessionId);
  const cached=reviewCache(host).get(sessionId);
  if(!cached?.report||cached.executionId!==executionIds(session!.metadata)?.executionId||cached.revision!==goal.revision)return undefined;
- try{return cached.fingerprint===completionFingerprint(goal,tail,assistant)?cached.report:undefined;}catch{return undefined;}
+ try{return cached.fingerprint===completionFingerprint(verificationPacket(host,goal,assistant))?cached.report:undefined;}catch{return undefined;}
 }
 /** One corrective continuation per direct execution; settlement remains the only state writer. */
 export async function reviewDirectGoalBeforeEnd(host:GoalRuntimeHost,sessionId:string,signal?:AbortSignal):Promise<{met:boolean;action?:'continue';systemMessage?:string}|undefined> {
@@ -375,11 +373,12 @@ export async function reviewDirectGoalBeforeEnd(host:GoalRuntimeHost,sessionId:s
  if(!prior&&cache.size>=512)return undefined;
  if(prior?.executionId===ctx.ids.executionId&&prior.revision===goal.revision)return {met:true};
  cache.set(sessionId,{executionId:ctx.ids.executionId,revision:goal.revision});
- const {tail,assistant}=assistantTranscript(evidenceTranscript(host,sessionId),ctx.execution.startedAt);
- const report=await verifyCompletion(host,goal,tail,assistant,baseReport(undefined,assistant,goal),sessionId,signal);
+ const {tail,assistant}=assistantTranscript(evidenceTranscript(host.store,sessionId),ctx.execution.startedAt);
+ let packet:CompletionEvidence;try{packet=verificationPacket(host,goal,assistant);}catch{return undefined;}
+ const fingerprint=completionFingerprint(packet);
+ const report=await verifyCompletion(host,goal,tail,assistant,baseReport(undefined,assistant,goal),sessionId,signal,packet);
  const live=settleContext(host,sessionId);
  if(!live||live.ids.executionId!==ctx.ids.executionId||signal?.aborted||live.scope.service.get(live.scope.botId,goal.id)?.revision!==goal.revision)return {met:true};
- let fingerprint:string|undefined;try{fingerprint=completionFingerprint(goal,tail,assistant);}catch{/* Oversized contracts remain unverified. */}
  cache.set(sessionId,{executionId:ctx.ids.executionId,revision:goal.revision,fingerprint,report});
  if(report.kind!=='progress'||!report.nextStep)return {met:true};
  return {met:false,action:'continue',systemMessage:`[completion review] The requested outcome is not complete: ${report.nextStep}\nYou have one corrective continuation within the existing turn budget. Complete only this remaining work using existing observations. Do not replay confirmed side effects or create extra records just to preserve evidence. Honor the current user's exact output requirements. If a required action is blocked, report the remaining gap honestly.`};
@@ -391,7 +390,7 @@ async function maybeVerify(host:GoalRuntimeHost,goal:BotGoal,tail:ReturnType<Goa
 /** Child-session completion uses the same judge as a direct turn. Assistant text alone is not verification. */
 export async function judgeChildCompletion(host:GoalRuntimeHost,goal:BotGoal,childId:string,assistant:string):Promise<GoalReport|undefined> {
  if(!assistant.trim())return undefined;
- const transcript=evidenceTranscript(host,childId);
+ const transcript=evidenceTranscript(host.store,childId);
  return verifyCompletion(host,goal,transcript,assistant,{kind:'candidate_completed',summary:assistant,evidence:[assistant],verified:false},childId);
 }
 function unlaunchedExecutor(session:SessionRecord,execution:{strategy:string;id:string},goal:BotGoal):GoalReport|undefined {
@@ -420,8 +419,9 @@ function restoreOriginalProfile(host:GoalRuntimeHost,sessionId:string):void {
  host.store.updateSession(sessionId,{metadata:{...live.metadata,taskRunMode:profile.taskRunMode??undefined,orchestrationEngine:profile.orchestrationEngine??undefined,botGoalOriginalProfile:undefined}});
 }
 async function finishSettlement(host:GoalRuntimeHost,sessionId:string,ctx:NonNullable<ReturnType<typeof settleContext>>,error?:unknown):Promise<void> {
+ if(ctx.execution.leaseUntil>Date.now())ctx.scope.service.updateExecution(ctx.scope.botId,ctx.execution.id,{messageEndSeq:host.store.listSurfaceNodes(sessionId).at(-1)?.seq??0});
  const checkpoint=ctx.session.metadata.botGoalCheckpoint as GoalReport|undefined;
- const {tail,assistant}=assistantTranscript(evidenceTranscript(host,sessionId),ctx.execution.startedAt);
+ const {tail,assistant}=assistantTranscript(evidenceTranscript(host.store,sessionId),ctx.execution.startedAt);
  const outcome=ctx.session.metadata.outcome as {kind?:string;reason?:string}|undefined;
  const goal=ctx.scope.service.get(ctx.scope.botId,ctx.ids.goalId)!;
  const report=await settledReport(host,goal,tail,assistant,checkpoint,error,ctx.session.status,outcome,ctx.session,ctx.execution);
@@ -440,7 +440,12 @@ function assignedCheckpointGoal(store:SqliteStateStore,session:SessionRecord):{g
  if(session.metadata.botWorkTaskId)return undefined;
  const scope=goalScope(store,session);
  const goalId=session.metadata.botGoalId;
- if(!scope||typeof goalId!=='string'||!scope.service.get(scope.botId,goalId))return undefined;
+ if(!scope||typeof goalId!=='string')return undefined;
+ const goal=scope.service.get(scope.botId,goalId);
+ if(!goal||!['running','waiting'].includes(goal.status))return undefined;
+ if(session.metadata.botGoalWorker===true) {
+  if(!isGoalWorkerCurrent(store,session))return undefined;
+ } else if(!activeExecutionDecision(scope.service,scope.botId,session))return undefined;
  return {goalId};
 }
 function checkpointKind(kind:string):string|undefined {
@@ -456,7 +461,7 @@ function checkpointRecord(args:{summary?:unknown;evidence?:unknown;nextStep?:unk
 }
 export function createGoalCheckpointTool(store:SqliteStateStore):ToolContract {
  return {name:'goal_checkpoint',description:'Save progress for the current assigned goal. kind: progress, waiting, blocked, candidate_completed. Waiting requires source and correlationId of an authorized session, bot_task, team_dag, or swarm run. Completion is independently verified.',inputSchema:{type:'object',properties:{kind:{type:'string',enum:['progress','waiting','blocked','candidate_completed']},summary:{type:'string'},evidence:{type:'array',items:{type:'string'}},nextStep:{type:'string'},wait:{type:'object',properties:{source:{type:'string'},correlationId:{type:'string'},description:{type:'string'},deadline:{type:'number'}}}},required:['kind','summary']},approvalMode:'never',sideEffectLevel:'none',async execute(ctx,args){
-  const assigned=assignedCheckpointGoal(store,ctx.session);
+  const assigned=assignedCheckpointGoal(store,store.getSession(ctx.session.id)??ctx.session);
   if(!assigned)return {ok:false,content:'No goal is assigned to this execution'};
   const kind=checkpointKind(String(args.kind));
   if(!kind)return {ok:false,content:'Invalid checkpoint kind'};

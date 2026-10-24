@@ -67,6 +67,10 @@ function evidenceFixture(t, objective = '修复登录问题并运行测试') {
   const parent = store.createSession({ title: 'Bot', mode: 'chat', agentId: 'general', metadata: { botId: 'b', canonicalBotChat: true } });
   const child = store.createSession({ title: 'Work', mode: 'subagent', agentId: 'general', parentSessionId: parent.id });
   const goal = new BotGoalService(store, Date.now, parent.id).create({ botId: 'b', sessionId: parent.id, title: objective, objective });
+  const service = new BotGoalService(store, Date.now, parent.id);
+  const execution = service.claim('b', goal.id, {strategy:'subagent'});
+  service.updateExecution('b', execution.id, {sessionId:parent.id,runRef:`session:${child.id}`});
+  store.updateSession(child.id,{metadata:{...child.metadata,botId:'b',botGoalId:goal.id,botGoalScopeSessionId:parent.id}});
   const append = (role, parts) => store.appendMessage(child.id, role, parts);
   const tool = (id, content, ok = true) => {
     append('assistant', [{ type: 'tool_call', toolCallId: id, name: 'bash', input: { command: 'pnpm test' } }]);

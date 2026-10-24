@@ -581,6 +581,7 @@ function claimPendingMessage(host:BotWorkHost,session:SessionRecord,row:Record<s
       const task=host.store.db.prepare('SELECT attempt FROM bot_work_tasks WHERE id=?').get(taskId) as {attempt:number};
       beginBotDelivery(host.store,taskId,session.id,task.attempt);
     }
+    if(taskId)host.store.enqueueSteer(session.id,'[delegated executor] You are the designated recipient of this delegated task. The request to delegate to this Bot has already been fulfilled by this delivery. Perform and verify the concrete deliverable; do not send the same objective back to yourself or the requester. Report actual results and preserve the supplied constraints.',{role:'system',key:`bot-task-role:${taskId}`});
     if(row.wake)stampSessionWake(host.store,session.id,{kind:'unattended',source:taskId?'delegation':'bot-message'});
     else releaseBotSession(host.store,session.id,owner,fence);
     host.store.db.exec('COMMIT');return fence;

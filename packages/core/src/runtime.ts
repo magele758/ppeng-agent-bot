@@ -730,6 +730,7 @@ export class RawAgentRuntime {
             botGoalWorkerRevision:request.revision,botGoalWorkerExecutionId:request.executionId,botGoalWorkerFence:execution.fence,
             taskRunMode:request.taskMode,...(request.strategy==='ptc'?{orchestrationEngine:'ptc'}:{})}});
         this.store.appendMessage(child.id,'user',forkOpeningMessage({store:this.store,parentSessionId:context.session.id,childSessionId:child.id,taskText:request.task}));
+        this.store.enqueueSteer(child.id,'[goal worker] You are the isolated executor already launched for this objective. The parent has fulfilled the request to delegate to an independent subtask. Perform the concrete deliverable and verify it yourself; do not delegate the same objective again. Preserve every artifact, constraint and completion condition in the task.',{role:'system',key:'goal-worker-role'});
         this.emitTrace(context.session.id, childSessionTrace(child.id, 'bot-goal-worker'));
         void this.runSession(child.id).catch(error=>this.log.warn('Goal worker failed',{sessionId:child.id,error:String(error)}));
         return {status:'waiting',reference:`session:${child.id}`,content:'Isolated execution started; await and verify its result.'};

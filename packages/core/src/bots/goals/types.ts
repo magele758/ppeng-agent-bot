@@ -11,6 +11,7 @@ export interface BotGoal {
 export interface GoalExecution {
  id: string; goalId: string; goalRevision: number; strategy: string; owner: string; fence: number;
  leaseUntil: number; safeToRetry: boolean; status: 'running' | 'finished' | 'interrupted';
+ messageStartSeq?: number; messageEndSeq?: number;
  runRef?: string; sessionId?: string; summary?: string; startedAt: string; endedAt?: string;
 }
 export interface GoalReport {

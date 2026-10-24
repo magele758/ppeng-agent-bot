@@ -194,3 +194,14 @@ test('未开启动态工具时不能搜出或加载 save_as_tool [AC:necessary-t
   assert.equal(JSON.stringify(fresh.metadata).includes('save_as_tool'), false);
   assert.equal(visibleNames(env, store, catalog, agent, fresh).includes('save_as_tool'), false);
 });
+
+test('plus-prefixed exact tool search loads authorized tools only [AC:bot-goal-live-chain#AC-3]',async t=>{
+ const {dir,store,session,agent}=fixture(t);
+ const dispatch=shell('goal_dispatch','Launch a goal executor',async()=>({ok:true,content:'launched'}));
+ const {search}=wire(store,dir,[dispatch]);
+ const result=await search.execute(context(dir,session,agent),{query:'+goal_dispatch'});
+ assert.deepEqual(searchedNames(result),['goal_dispatch']);
+ assert.deepEqual(JSON.parse(result.content).loaded,['goal_dispatch']);
+ const denied={...session,metadata:{...session.metadata,allowedTools:['read_file']}};
+ assert.deepEqual(searchedNames(await search.execute(context(dir,denied,agent),{query:'+goal_dispatch'})),[]);
+});

@@ -67,7 +67,9 @@ test('goal checkpoints validate assignment and authorized waits before preservin
   const tool=createGoalCheckpointTool(runtime.store);
   const invoke=args=>tool.execute({session:runtime.getSession(sid)},args);
   assert.equal((await invoke({kind:'progress',summary:'no assignment'})).ok,false);
-  runtime.store.updateSession(sid,{metadata:{...runtime.getSession(sid).metadata,botGoalId:goal.id}});
+  const execution=service.claim(bot.id,goal.id,{strategy:'direct'});
+  service.updateExecution(bot.id,execution.id,{sessionId:sid});
+  runtime.store.updateSession(sid,{metadata:{...runtime.getSession(sid).metadata,botGoalId:goal.id,botGoalExecutionId:execution.id}});
   assert.equal((await invoke({kind:'invalid',summary:'invalid'})).ok,false);
   assert.equal((await invoke({kind:'progress',summary:'Measured result',evidence:['proof',123],nextStep:'Verify'})).ok,true);
   const checkpoint=runtime.getSession(sid).metadata.botGoalCheckpoint;
@@ -77,7 +79,7 @@ test('goal checkpoints validate assignment and authorized waits before preservin
   runtime.store.updateSession(sid,{metadata:{...runtime.getSession(sid).metadata,botGoalAuthorizedWaits:[{goalId:goal.id,source:'session',correlationId:'worker'}]}});
   assert.equal((await invoke({kind:'waiting',summary:'Waiting for worker',wait:{source:'session',correlationId:'worker'}})).ok,true);
   assert.deepEqual(runtime.getSession(sid).metadata.botGoalCheckpoint.wait,{source:'session',correlationId:'worker'});
-  assert.equal(service.get(bot.id,goal.id).status,'queued','a checkpoint alone never completes a goal');
+  assert.equal(service.get(bot.id,goal.id).status,'running','a checkpoint alone never completes a goal');
  }finally{await runtime.destroy();}
 });
 
