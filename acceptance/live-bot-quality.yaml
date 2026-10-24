@@ -1,6 +1,6 @@
 id: live-bot-quality
 title: 真实 Bot 任务评估与版本准入
-status: approved
+status: implemented
 requirement: |
   那就直接落地这套真实模型任务评估和新旧版本对照门禁，先把这次 P0 问题和常见任务做成评估集，用当前配置的 Grok 模型跑一轮基线，做好测试和 review 后提交合并。
 notes: |
