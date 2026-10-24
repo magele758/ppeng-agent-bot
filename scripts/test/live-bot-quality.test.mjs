@@ -90,6 +90,7 @@ test('production CLI forwards mandatory evidence to the non-bypassable promotion
  const cli=readFileSync('scripts/release-orchestrator.mjs','utf8');
  assert.match(cli,/await promoteWithQuality\(/);assert.doesNotMatch(cli,/await promoteWithSmoke\(/);
  assert.match(cli,/evidenceDir: args.evidenceDir/);
+ assert.match(cli,/cmdPromote\(\{ \.\.\.args, runId: report.release_run_id \}\)/);
 });
 
 test('negative observations prove absence without pretending a failed lookup succeeded [AC:live-bot-quality#AC-1]',()=>{
