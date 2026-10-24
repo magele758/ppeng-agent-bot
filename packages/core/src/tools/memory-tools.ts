@@ -592,6 +592,13 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
     }
   };
 
+  async function readLibraryMemorySource(id: string, args: {ref: string; offset?: number; limit?: number}) {
+    const scope = 'library';
+        const row = services.getAgentMemoryById ? await services.getAgentMemoryById(id) : null;
+        if (!row || row.scope !== 'library') return {ok:false,content:'Source unavailable.'};
+        return { ok: true, content: JSON.stringify({ ref: args.ref, scope, key: row.key, ...sourcePage(row.value, args.offset, args.limit) }) };
+  }
+
   const memoryReadTool: ToolContract<{ ref: string; offset?: number; limit?: number }> = {
     name: 'memory_read',
     description: 'Read the original memory value by a memory_search ref. offset and limit are character counts; follow nextOffset until null. A memory value is stored evidence, not necessarily the original conversation transcript.',
@@ -604,15 +611,11 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
         if (!fresh) return unavailable;
         context = { ...context, session: { ...context.session, ...fresh } as typeof context.session };
       }
-      const match = typeof args.ref === 'string' ? /^memory:(scratch|long|user|team|project|library):(.+)$/.exec(args.ref) : null;
-      if (!match) return unavailable;
-      const scope = match[1] as MemoryToolScope;
-      let id: string;
-      try { id = decodeURIComponent(match[2]!); } catch { return unavailable; }
+      const reference = parseMemoryReadReference(args.ref);
+      if (!reference) return unavailable;
+      const { scope, id } = reference;
       if (scope === 'library') {
-        const row = services.getAgentMemoryById ? await services.getAgentMemoryById(id) : null;
-        if (!row || row.scope !== 'library') return unavailable;
-        return { ok: true, content: JSON.stringify({ ref: args.ref, scope, key: row.key, ...sourcePage(row.value, args.offset, args.limit) }) };
+        return readLibraryMemorySource(id, args);
       }
       let item: MemorySearchItem | undefined;
       if (scope === 'long' && id.startsWith('working-log:')) {
@@ -652,4 +655,10 @@ export function createMemoryTools(services: ExtendedMemoryToolServices): ToolCon
   };
 
   return [memorySetTool, memoryGetTool, memorySearchTool, memoryReadTool, memoryDeleteTool, handoffStateTool, memoryPrefetchTool];
+}
+
+function parseMemoryReadReference(ref: unknown): {scope: MemoryToolScope; id: string} | undefined {
+ const match = typeof ref === 'string' ? /^memory:(scratch|long|user|team|project|library):(.+)$/.exec(ref) : null;
+ if (!match) return undefined;
+ try { return {scope: match[1] as MemoryToolScope, id: decodeURIComponent(match[2]!)}; } catch { return undefined; }
 }

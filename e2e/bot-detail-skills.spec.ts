@@ -242,7 +242,7 @@ for (const width of [1280, 820]) test(`skills controls stay grouped at every fon
   const {policy}=await setup(page, true);
   await page.route('**/api/sessions',r=>r.fulfill({json:{sessions:bots.map(b=>({id:b.canonicalSessionId,title:b.name,agentId:b.agentId,status:'idle',mode:'chat',metadata:{botId:b.id}}))}}));
   await page.goto('/#/bot'); await page.reload();await page.getByRole('button',{name:/^Bot A/}).first().click();
-  const drawer=page.getByTestId('bot-detail-panel');if(!await drawer.isVisible()) await page.getByTestId('bot-detail-toggle').click();
+  const drawer=page.getByTestId('bot-detail-panel');await expect(drawer.or(page.getByTestId('bot-detail-toggle')).first()).toBeVisible();if(!await drawer.isVisible()) await page.getByTestId('bot-detail-toggle').click();
   await drawer.getByRole('tab',{name:'技能',exact:true}).click();
   const panel=drawer.getByTestId('bot-detail-skills');
   for(const size of [13,14,15,16,18]){

@@ -111,28 +111,7 @@ function walk(
     if (!state.complete) return;
     const abs = resolve(realDir, entry.name);
     if (entry.isSymbolicLink()) {
-      let real: string;
-      try {
-        real = realpathSync(abs);
-      } catch {
-        continue;
-      }
-      if (!isInside(root, real) || sensitiveReadRefusal(real, home)) continue;
-      let linked;
-      try {
-        linked = statSync(real);
-      } catch {
-        continue;
-      }
-      if (linked.isDirectory()) walk(root, real, depth + 1, home, visited, state, visit);
-      else if (linked.isFile()) {
-        state.files += 1;
-        if (state.files > MAX_FILES) {
-          state.complete = false;
-          return;
-        }
-        visit(real);
-      }
+      walkSymlink(root, abs, depth, home, visited, state, visit);
       continue;
     }
     if (entry.isDirectory()) {
@@ -303,4 +282,29 @@ export class LibraryIndexWatcher {
     timer.unref?.();
     this.timer = timer;
   }
+}
+
+function walkSymlink(root: string, abs: string, depth: number, home: string, visited: Set<string>, state: WalkState, visit: (file: string) => void): void {
+      let real: string;
+      try {
+        real = realpathSync(abs);
+      } catch {
+        return;
+      }
+      if (!isInside(root, real) || sensitiveReadRefusal(real, home)) return;
+      let linked;
+      try {
+        linked = statSync(real);
+      } catch {
+        return;
+      }
+      if (linked.isDirectory()) walk(root, real, depth + 1, home, visited, state, visit);
+      else if (linked.isFile()) {
+        state.files += 1;
+        if (state.files > MAX_FILES) {
+          state.complete = false;
+          return;
+        }
+        visit(real);
+      }
 }

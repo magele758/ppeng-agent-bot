@@ -24,6 +24,7 @@
   flex: 0 0 auto;
   align-items: center;
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
 }
 
@@ -31,12 +32,14 @@
 .list-item--group:focus-within > .play-group-menu,
 .play-group-menu:focus-within {
   opacity: 1;
+  visibility: visible;
   pointer-events: auto;
 }
 
 @media (hover: none), (pointer: coarse) {
   .play-group-menu {
     opacity: 1;
+  visibility: visible;
     pointer-events: auto;
   }
 }

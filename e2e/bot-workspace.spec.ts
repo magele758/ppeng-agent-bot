@@ -393,7 +393,7 @@ for (const routing of ['everyone', 'text-mention'] as const) {
     expect((await sent).postDataJSON()).not.toHaveProperty('mentions');
     const log = panel.getByRole('log');
     if (routing === 'everyone') {
-      await expect(log.getByText(host.name, { exact: true })).toBeVisible({ timeout: 30000 });
+      await expect(log.getByText(host.name, { exact: true })).toHaveCount(0);
       await expect(log.getByText(member.name, { exact: true })).toHaveCount(0);
     } else {
       await expect(log.getByText(member.name, { exact: true })).toBeVisible({ timeout: 30000 });
@@ -401,7 +401,7 @@ for (const routing of ['everyone', 'text-mention'] as const) {
     await expect.poll(async () => {
       const { turns } = await (await request.get(`/api/bot-rooms/${room.id}/turns`)).json();
       return turns[0]?.botIds;
-    }, { timeout: 30000 }).toEqual(routing === 'everyone' ? [host.id] : [member.id]);
+    }, { timeout: 30000 }).toEqual(routing === 'everyone' ? [] : [member.id]);
     if (routing === 'text-mention') {
       const { turns } = await (await request.get(`/api/bot-rooms/${room.id}/turns`)).json();
       expect(turns[0].mentionedBotIds).toEqual([member.id]);
@@ -475,7 +475,7 @@ test('switching Rooms clears the previous room draft, mentions and attachments [
   await expect(panel.getByLabel('群消息', { exact: true })).toHaveValue('');
   await expect(panel.getByLabel('提及成员（可多选）')).toHaveValues([]);
   await expect(panel.getByLabel('附件引用（逗号分隔）')).toHaveValue('');
-  await panel.getByLabel('群消息', { exact: true }).fill('Reply ready.');
+  await panel.getByLabel('群消息', { exact: true }).fill(`@${rooms[1].bot.id} Reply ready.`);
   await panel.getByRole('button', { name: '发送', exact: true }).click();
   await expect(panel.getByRole('log').getByText(rooms[1].bot.name, { exact: true })).toBeVisible({ timeout: 30000 });
 });

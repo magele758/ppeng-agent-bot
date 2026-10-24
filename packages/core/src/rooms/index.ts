@@ -1080,6 +1080,15 @@ export class BotRoomService {
     try {
       ok = await this.executeMember(latest, turn, botId, session, closing);
     } catch (error) {
+      return this.handleMemberFailure(turn, botId, session.id, error);
+    }
+    const after = this.turnById(turn.id);
+    this.adopt(turn, after);
+    if (this.isTerminal(after.status)) return 'stop';
+    if (!ok && (after.status === 'waiting_approval' || after.status === 'queued')) return 'blocked';
+    return 'continue';
+  }
+  private handleMemberFailure(turn: BotRoomTurn, botId: string, sessionId: string, error: unknown): 'continue' | 'stop' {
       const current = this.turnById(turn.id);
       if (current.replyMode !== 'all-members') throw error;
       if (this.isTerminal(current.status)) return 'stop';
@@ -1087,17 +1096,11 @@ export class BotRoomService {
       this.adopt(turn, this.mergeTurn(turn.id, item => {
         if ((item.postedBotIds ?? []).includes(botId)) return;
         this.noteSettled(item, botId);
-        this.noteMember(item, { botId, sessionId: session.id, status: 'failed' });
+        this.noteMember(item, { botId, sessionId, status: 'failed' });
         this.syncCursor(item);
         this.publishMemberFailure(item, botId, reason);
       }));
       return 'continue';
-    }
-    const after = this.turnById(turn.id);
-    this.adopt(turn, after);
-    if (this.isTerminal(after.status)) return 'stop';
-    if (!ok && (after.status === 'waiting_approval' || after.status === 'queued')) return 'blocked';
-    return 'continue';
   }
   private async runWrap(room: BotRoom, turn: BotRoomTurn): Promise<void> {
     const latest = this.turnById(turn.id);

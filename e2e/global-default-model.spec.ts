@@ -44,6 +44,7 @@ function linesOf(items:Box[]){
  return groups;
 }
 async function defaultRowBoxes(page:Page){
+ await expect(page.getByLabel('全局默认模型',{exact:true})).toBeVisible();
  return page.evaluate(()=>{
   const body=document.querySelector('#card-model-providers .ui-group__body');
   const row=document.querySelector('.model-default-row');

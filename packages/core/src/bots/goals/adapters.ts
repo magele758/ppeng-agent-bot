@@ -51,20 +51,8 @@ export function createGoalExecutionAdapters(host: GoalExecutionAdapterHost) {
           const result = await host.runSessionExecution({...request,strategy,taskMode:route.taskMode,metadata:{goalId:request.goalId,goalRevision:request.revision,goalExecutionId:request.executionId,taskRunMode:route.taskMode,...(strategy === 'ptc' ? {orchestrationEngine:'ptc'} : {})}});
           return {...result,route};
         }
-        if (strategy === 'self_heal' || strategy === 'evolution' || strategy === 'factory') {
-          if (strategy === 'factory' && !request.factory) return {status:'blocked',content:'Discover the authorized machine and repository with factory_status, then supply factory task details. Do not guess a target or substitute ordinary execution.',route};
-          const name = strategy === 'factory' ? request.factory?.operation === 'develop' ? 'goal_factory_develop' : 'factory_dispatch' : strategy === 'self_heal' ? 'goal_self_heal_start' : 'goal_evolution_start';
-          const result = await host.invokeAuthorizedTool(name,strategy === 'factory' ? {...request.factory} : {},request);
-          if (result.waitingApproval) return {status:'waiting',waitingApproval:true,content:result.content,route};
-          const reference = result.ok ? referenceFrom(result.content) ?? referenceFrom(result.content,'run') : undefined;
-          return {status:reference ? 'waiting' : 'blocked',reference,content:result.content,route};
-        }
-        if (strategy === 'bot_delegate') {
-          const result = await host.invokeAuthorizedTool('bot_delegate',{target:request.delegateBotId,input:request.task,idempotencyKey:request.executionId},request);
-          if (result.waitingApproval) return {status:'waiting',waitingApproval:true,content:result.content,route};
-          const reference = result.ok ? referenceFrom(result.content) : undefined;
-          return {status:reference ? 'waiting' : 'blocked',reference,content:result.content,route};
-        }
+        const external = await startExternalExecution(host, request, route, strategy);
+        if (external) return external;
         const team = strategy === 'team_dag';
         const createName = team ? 'lab_team_plan_create' : 'lab_swarm_run_create';
         const createArgs = team ? {objective:request.task,sessionId:request.sessionId,tasks:request.tasks} : {goal:request.task,strategy:'pipeline'};
@@ -89,4 +77,22 @@ export function createGoalExecutionAdapters(host: GoalExecutionAdapterHost) {
     async cancel(reference: string, strategy: GoalStrategy): Promise<boolean> { return host.cancelExecution ? host.cancelExecution(reference,strategy) : false; },
     async steer(reference: string, strategy: GoalStrategy, task: string): Promise<boolean> { return host.steerExecution ? host.steerExecution(reference,strategy,task) : false; }
   };
+}
+
+async function startExternalExecution(host: GoalExecutionAdapterHost, request: GoalExecutionRequest, route: GoalRoute, strategy: GoalStrategy): Promise<GoalAdapterResult | undefined> {
+        if (strategy === 'self_heal' || strategy === 'evolution' || strategy === 'factory') {
+          if (strategy === 'factory' && !request.factory) return {status:'blocked',content:'Discover the authorized machine and repository with factory_status, then supply factory task details. Do not guess a target or substitute ordinary execution.',route};
+          const name = strategy === 'factory' ? request.factory?.operation === 'develop' ? 'goal_factory_develop' : 'factory_dispatch' : strategy === 'self_heal' ? 'goal_self_heal_start' : 'goal_evolution_start';
+          const result = await host.invokeAuthorizedTool(name,strategy === 'factory' ? {...request.factory} : {},request);
+          if (result.waitingApproval) return {status:'waiting',waitingApproval:true,content:result.content,route};
+          const reference = result.ok ? referenceFrom(result.content) ?? referenceFrom(result.content,'run') : undefined;
+          return {status:reference ? 'waiting' : 'blocked',reference,content:result.content,route};
+        }
+        if (strategy === 'bot_delegate') {
+          const result = await host.invokeAuthorizedTool('bot_delegate',{target:request.delegateBotId,input:request.task,idempotencyKey:request.executionId},request);
+          if (result.waitingApproval) return {status:'waiting',waitingApproval:true,content:result.content,route};
+          const reference = result.ok ? referenceFrom(result.content) : undefined;
+          return {status:reference ? 'waiting' : 'blocked',reference,content:result.content,route};
+        }
+  return undefined;
 }

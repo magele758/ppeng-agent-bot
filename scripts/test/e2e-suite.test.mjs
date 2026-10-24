@@ -12,3 +12,13 @@ test('every browser file gets a separate invocation and evidence path; failures 
 test('an empty browser suite cannot pass',async()=>{
  await assert.rejects(()=>runIsolatedFiles([],{run:async()=>0}),/empty/);
 });
+
+test('browser shards cover every file once and reject invalid partitions [AC:ci-action-reliability#AC-5]', async () => {
+ const {selectFileShard}=await import('../e2e-suite.mjs');
+ const files=Array.from({length:81},(_,i)=>`e2e/${i}.spec.ts`);
+ const shards=[1,2,3,4].map(i=>selectFileShard(files,`${i}/4`));
+ assert.deepEqual(shards.flat().sort(),files.slice().sort());
+ assert.equal(new Set(shards.flat()).size,files.length);
+ for(const shard of shards)assert.ok(shard.length>=20&&shard.length<=21);
+ for(const invalid of ['0/4','5/4','1/0','1.5/4','bad'])assert.throws(()=>selectFileShard(files,invalid));
+});

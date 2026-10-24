@@ -101,13 +101,7 @@ async function drainExternal(host: GoalRuntimeHost, parent: SessionRecord, goal:
   scope.service.setDraining(goal.botId,goal.id,true,'External execution cancellation is unavailable; reconciliation is required');
   return;
  }
- if (wait.source === 'self_heal' || wait.source === 'factory' || wait.source === 'evolution') {
-  let stopped=false;
-  try { stopped=await host.cancelSpecialty?.(parent,goal)===true; } catch { /* Preserve draining until the external outcome can be reconciled. */ }
-  if(stopped&&goal.status==='queued')scope.service.finishAmendDrain(goal.botId,goal.id,waitEvidence(host,parent,goal,'stopped after constraints changed',executions));
-  else scope.service.setDraining(goal.botId,goal.id,!stopped,stopped?undefined:'External execution is stopping or awaiting reconciliation; no new work will be dispatched');
-  return;
- }
+ if (await drainSpecialty(host, parent, goal, executions)) return;
  // Persist terminal dispatch state first; only then interrupt already-running workers.
  if (wait.source === 'swarm' && !ended.has(state ?? '')) host.store.swarm().updateRunStatus(wait.correlationId,'cancelled');
  else if (wait.source === 'team_dag' && !ended.has(state ?? '')) new TeamPlanStore(host.store.db).updateStatus(wait.correlationId,'cancelled');
@@ -387,4 +381,17 @@ export async function tickBotGoals(host: GoalRuntimeHost): Promise<void> {
  try {
   for (const parent of canonicalParents(host)) await tickParent(host, parent);
  } finally { ticking.delete(host.store); }
+}
+
+async function drainSpecialty(host: GoalRuntimeHost, parent: SessionRecord, goal: BotGoal, executions: GoalExecution[]): Promise<boolean> {
+ const scope = goalScope(host.store, parent)!;
+ const wait = goal.wait!;
+ if (wait.source === 'self_heal' || wait.source === 'factory' || wait.source === 'evolution') {
+  let stopped=false;
+  try { stopped=await host.cancelSpecialty?.(parent,goal)===true; } catch { /* Preserve draining until the external outcome can be reconciled. */ }
+  if(stopped&&goal.status==='queued')scope.service.finishAmendDrain(goal.botId,goal.id,waitEvidence(host,parent,goal,'stopped after constraints changed',executions));
+  else scope.service.setDraining(goal.botId,goal.id,!stopped,stopped?undefined:'External execution is stopping or awaiting reconciliation; no new work will be dispatched');
+  return true;
+ }
+ return false;
 }
