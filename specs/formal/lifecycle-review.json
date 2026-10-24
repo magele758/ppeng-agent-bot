@@ -249,7 +249,7 @@
     }
   ],
   "sha256": {
-    "packages/core/src/runtime.ts": "edc96b26adffb1eca133479e8f6483c3ba3ff682fde3a8e5bd492f3c0c670111",
+    "packages/core/src/runtime.ts": "46a05c6209ee716f0087351d3d6a2c96f2edeb3fe50cd5d025a08e9b5d3123da",
     "packages/core/src/runtime/session-control.ts": "8f42a13096811dd960ed726e7d9685350fa041e08c57960e9e2f57cf7c5d55b4",
     "packages/core/src/runtime/session-facade.ts": "446b5d01582f4deb5dcd567929c2c05c39ca1b7b3cdfd0678e65329c5e2b29ac",
     "packages/core/src/runtime/session-complete.ts": "dc1ac19365583096d95892d5f424293ab5ef2e0e3494665451a2ed951fc7f6e5",
@@ -263,7 +263,7 @@
     "packages/agent-loop/src/assembly/normal-host.ts": "da1277222a77d1817b2c92bf926b2525d9fb54d015f28dd49f998bccd97942bb",
     "packages/agent-loop/src/assembly/full-host.ts": "bdcef2a93867179250eee752111985bebf56f5d9ee0603b2c2584252514f337e",
     "packages/agent-loop/src/assembly/max-host.ts": "8c6e91a60b4864e085fa4d14d72cb58176feff5bd04100aced4cbfabbae27c56",
-    "packages/core/src/runtime/l5-bindings.ts": "b681ff624d4c49a36a9220c31cb78404e87c01a73ff6a94dbd337eec623fbf94",
+    "packages/core/src/runtime/l5-bindings.ts": "089f464d4fa583de90c16ab30e360119c449e4fc324e0b68194e2f7f0ff9e1e8",
     "scripts/formal/lifecycle-model.mjs": "fa7e31c20b10016e13a081789a16a4cd459b8425b719ed2f0bc165245faf7b66",
     "scripts/formal/lifecycle-runtime.mjs": "70d8259d67252077f872dd800ae5fbed9108ffa21d392c74f02f5a987b15b670",
     "scripts/formal/lifecycle-verifier.mjs": "3555385ae003dbf6ac4e6e54021e1b6cbc4979be7f43c25ba3573ad32f8e1195",
@@ -343,7 +343,7 @@
     "packages/core/src/runtime/spawn-policy.ts": "4889022804d3797796d018abfbe084a2373f1bf630098c6470d932a0c67ebabd",
     "packages/core/src/memory/bot-memory-scope.ts": "bffdcf6cf3e848ea1f2fcc5059b54345d3ee9d49ff98b3a57e917e88593d50c9",
     "packages/core/src/tools/product-admin-tools.ts": "ddef87ff7f3e889597f7f6b51448105cebe617e69059590d11fb588d240ebe46",
-    "packages/core/src/bots/goals/runtime-host.ts": "ecc8d6fcf3f8bccf6776a7dbd1c1463c7b04328b4c22dad748730e3bc7b87c81",
+    "packages/core/src/bots/goals/runtime-host.ts": "86c87b4c464eb2e5fe5c918791d3ed23cc1bf1b2039ea1dc072ece4e9b2251ad",
     "packages/core/src/bots/goals/runtime-dispatch.ts": "7391c68c41193b8b63e33ab5961a6847ac99c5b6e7ed1953fada2eefffec4c62",
     "packages/core/src/bots/goals/tool-gateway.ts": "713852550276157a250c8c26670f1fffbdc4d996e34ecfa16acf46fb74e96921",
     "packages/core/src/bots/goals/worker-fence.ts": "e34934141e7b243b46db304bfbde8a5895302e86149965f7a2049496a117a808",
@@ -373,5 +373,5 @@
     "packages/core/test/tool-exposure-tiers.test.js": "a3c5acdb494419b3662ecdd310f3cf385631609924074beaff2e8c6a75ecc744",
     "packages/core/src/bots/goals/specialty-services.ts": "d053af00ba055c2547965009cfc6fa709388e652bc0678199e020be839a9f098"
   },
-  "notes": " PR202 vertical/security review: quote pointers validated at host admission and retained by durable/memory inbox, all drain paths and compaction continuation; quoted subagent admission/promotion rejects explicitly. Both kernels resolve only visible same-session assistant sources at model view. Room binds the source author and uses explicit empty recipients for departed authors. Quoted inputs remain outside lossy overflow summaries. Real runtime, route, SQLite, SDK and UI regressions supplement existing bounded probes without expanding their proof claims. No acceptance criteria or thresholds weakened. PR204 independent vertical/security review: quoted WAL fork copies now remap source IDs in SQLite and portable memory stores. Child history inherits revoked constraints and closes active/pending exposure at its copied boundary, without changing parent scope or blocking fresh private turns. A host unable to persist required constraints rejects before child creation. Fail-first SQLite/memory and both-kernel quote/privacy regressions cover this boundary; existing bounded source/process scope, criteria and thresholds unchanged. Completion follow-up review: assistantTranscript now puts only the last assistant text message in finalResponse, while retaining the entire execution tail as paired tool evidence. No writer, approval, retry, cancellation, settlement fence or goal completion threshold changes. Tests retain initial failed observations and require later successful grounded evidence; unsupported verdicts remain unverified. This input-separation review does not certify model judgements."
+  "notes": " PR202 vertical/security review: quote pointers validated at host admission and retained by durable/memory inbox, all drain paths and compaction continuation; quoted subagent admission/promotion rejects explicitly. Both kernels resolve only visible same-session assistant sources at model view. Room binds the source author and uses explicit empty recipients for departed authors. Quoted inputs remain outside lossy overflow summaries. Real runtime, route, SQLite, SDK and UI regressions supplement existing bounded probes without expanding their proof claims. No acceptance criteria or thresholds weakened. PR204 independent vertical/security review: quoted WAL fork copies now remap source IDs in SQLite and portable memory stores. Child history inherits revoked constraints and closes active/pending exposure at its copied boundary, without changing parent scope or blocking fresh private turns. A host unable to persist required constraints rejects before child creation. Fail-first SQLite/memory and both-kernel quote/privacy regressions cover this boundary; existing bounded source/process scope, criteria and thresholds unchanged. Completion follow-up review: assistantTranscript now puts only the last assistant text message in finalResponse, while retaining the entire execution tail as paired tool evidence. No writer, approval, retry, cancellation, settlement fence or goal completion threshold changes. Tests retain initial failed observations and require later successful grounded evidence; unsupported verdicts remain unverified. This input-separation review does not certify model judgements. Bounded pre-completion review: the existing core goal-gate host now checks a direct Bot execution before clean end and may return one corrective continuation. Kernel turn/request budgets and LoopGuard remain unchanged. Settlement still owns durable goal transitions. Process-local report reuse requires matching execution, revision and evidence fingerprint; no caller metadata can supply verification. Cancellation reaches the preflight judge, changed evidence forces re-verification, and approved side effects are not replayed by the runtime. New tests cover one correction, repeated rejection, cancellation and stale evidence. SDK interfaces and implementation are unchanged."
 }

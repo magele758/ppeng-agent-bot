@@ -2062,6 +2062,7 @@ export class RawAgentRuntime {
 
   private l5(): L5Bindable {
     return {
+      goalRuntimeHost: () => this.goalRuntimeHost(),
       store: this.store,
       repoRoot: this.repoRoot,
       stateDir: this.stateDir,

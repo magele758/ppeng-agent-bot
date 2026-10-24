@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { GOAL_JUDGE_TIMEOUT_MS } from './judge-budget.js';
 import { buildCompletionEvidence, completionReport, COMPLETION_JUDGE_PROMPT } from './completion-evidence.js';
 import type { SqliteStateStore } from '../../storage.js';
@@ -337,21 +338,55 @@ function abortedReport(outcome:{kind?:string}|undefined):GoalReport|undefined {
  if(outcome?.kind!=='aborted')return undefined;
  return {kind:'blocked',summary:'Execution was interrupted; review progress before resuming'};
 }
-async function verifyCompletion(host:GoalRuntimeHost,goal:BotGoal,tail:ReturnType<GoalRuntimeHost['store']['foldMessages']>,assistant:string,report:GoalReport,sessionId=goal.sessionId):Promise<GoalReport> {
+async function verifyCompletion(host:GoalRuntimeHost,goal:BotGoal,tail:ReturnType<GoalRuntimeHost['store']['foldMessages']>,assistant:string,report:GoalReport,sessionId=goal.sessionId,signal?:AbortSignal):Promise<GoalReport> {
  const session=host.store.getSession(sessionId);
  const judge=session ? sessionJudge(host,session) : host.judge;
  if(!judge)return {...report,verified:false};
  try {
   const packet=buildCompletionEvidence(goal,tail,assistant);
-  const result=await judge({system:COMPLETION_JUDGE_PROMPT,user:JSON.stringify(packet),jsonMode:true,signal:AbortSignal.timeout(GOAL_JUDGE_TIMEOUT_MS)});
+  const result=await judge({system:COMPLETION_JUDGE_PROMPT,user:JSON.stringify(packet),jsonMode:true,signal:signal?AbortSignal.any([signal,AbortSignal.timeout(GOAL_JUDGE_TIMEOUT_MS)]):AbortSignal.timeout(GOAL_JUDGE_TIMEOUT_MS)});
   return completionReport(JSON.parse(result),packet,goal);
  }catch{
   return {...report,kind:'candidate_completed',verified:false,summary:report.summary||assistant||'Completion verification unavailable; recorded result kept for review',evidence:report.evidence?.length?report.evidence:[assistant].filter(Boolean)};
  }
 }
+type CompletionReview = { executionId:string; revision:number; fingerprint?:string; report?:GoalReport };
+// Verified reports are process-local, never accepted from caller-editable metadata.
+const completionReviews = new WeakMap<SqliteStateStore,Map<string,CompletionReview>>();
+function reviewCache(host:GoalRuntimeHost):Map<string,CompletionReview> {
+ let cache=completionReviews.get(host.store);if(!cache){cache=new Map();completionReviews.set(host.store,cache);}return cache;
+}
+function completionFingerprint(goal:BotGoal,tail:ReturnType<GoalRuntimeHost['store']['foldMessages']>,assistant:string):string {
+ return createHash('sha256').update(JSON.stringify(buildCompletionEvidence(goal,tail,assistant))).digest('hex');
+}
+function cachedCompletion(host:GoalRuntimeHost,goal:BotGoal,tail:ReturnType<GoalRuntimeHost['store']['foldMessages']>,assistant:string,sessionId:string):GoalReport|undefined {
+ const session=host.store.getSession(sessionId);
+ const cached=reviewCache(host).get(sessionId);
+ if(!cached?.report||cached.executionId!==executionIds(session!.metadata)?.executionId||cached.revision!==goal.revision)return undefined;
+ try{return cached.fingerprint===completionFingerprint(goal,tail,assistant)?cached.report:undefined;}catch{return undefined;}
+}
+/** One corrective continuation per direct execution; settlement remains the only state writer. */
+export async function reviewDirectGoalBeforeEnd(host:GoalRuntimeHost,sessionId:string,signal?:AbortSignal):Promise<{met:boolean;action?:'continue';systemMessage?:string}|undefined> {
+ const ctx=settleContext(host,sessionId);
+ if(!ctx||ctx.execution.strategy!=='direct'||holdForApproval(host,sessionId,ctx.session,ctx.ids.executionId)||signal?.aborted)return undefined;
+ const goal=ctx.scope.service.get(ctx.scope.botId,ctx.ids.goalId)!;
+ const cache=reviewCache(host);
+ const prior=cache.get(sessionId);
+ if(!prior&&cache.size>=512)return undefined;
+ if(prior?.executionId===ctx.ids.executionId&&prior.revision===goal.revision)return {met:true};
+ cache.set(sessionId,{executionId:ctx.ids.executionId,revision:goal.revision});
+ const {tail,assistant}=assistantTranscript(evidenceTranscript(host,sessionId),ctx.execution.startedAt);
+ const report=await verifyCompletion(host,goal,tail,assistant,baseReport(undefined,assistant,goal),sessionId,signal);
+ const live=settleContext(host,sessionId);
+ if(!live||live.ids.executionId!==ctx.ids.executionId||signal?.aborted||live.scope.service.get(live.scope.botId,goal.id)?.revision!==goal.revision)return {met:true};
+ let fingerprint:string|undefined;try{fingerprint=completionFingerprint(goal,tail,assistant);}catch{/* Oversized contracts remain unverified. */}
+ cache.set(sessionId,{executionId:ctx.ids.executionId,revision:goal.revision,fingerprint,report});
+ if(report.kind!=='progress'||!report.nextStep)return {met:true};
+ return {met:false,action:'continue',systemMessage:`[completion review] The requested outcome is not complete: ${report.nextStep}\nYou have one corrective continuation within the existing turn budget. Complete only this remaining work using existing observations. Do not replay confirmed side effects or create extra records just to preserve evidence. Honor the current user's exact output requirements. If a required action is blocked, report the remaining gap honestly.`};
+}
 async function maybeVerify(host:GoalRuntimeHost,goal:BotGoal,tail:ReturnType<GoalRuntimeHost['store']['foldMessages']>,assistant:string,report:GoalReport,sessionId:string):Promise<GoalReport> {
  if(report.kind!=='candidate_completed'&&report.kind!=='progress')return report;
- return verifyCompletion(host,goal,tail,assistant,{...report,verified:false},sessionId);
+ return cachedCompletion(host,goal,tail,assistant,sessionId)??verifyCompletion(host,goal,tail,assistant,{...report,verified:false},sessionId);
 }
 /** Child-session completion uses the same judge as a direct turn. Assistant text alone is not verification. */
 export async function judgeChildCompletion(host:GoalRuntimeHost,goal:BotGoal,childId:string,assistant:string):Promise<GoalReport|undefined> {
@@ -398,7 +433,7 @@ export async function settleGoalExecution(host:GoalRuntimeHost,sessionId:string,
  const ctx=settleContext(host,sessionId,error);
  if(!ctx)return;
  if(holdForApproval(host,sessionId,ctx.session,ctx.ids.executionId))return;
- await finishSettlement(host,sessionId,ctx,error);
+ try{await finishSettlement(host,sessionId,ctx,error);}finally{reviewCache(host).delete(sessionId);}
 }
 
 function assignedCheckpointGoal(store:SqliteStateStore,session:SessionRecord):{goalId:string}|undefined {
