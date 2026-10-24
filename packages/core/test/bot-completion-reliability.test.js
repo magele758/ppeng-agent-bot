@@ -9,7 +9,7 @@ test('real execution prompt requires source recovery, saving outputs and exact r
  const rt=new RawAgentRuntime({repoRoot:root,stateDir:join(root,'state'),modelAdapter:{name:'contract',async runTurn(input){prompt=input.systemPrompt;return{stopReason:'end',assistantParts:[{type:'text',text:'DONE'}]};},async completeText(){return '{"intents":[]}';},async summarizeMessages(){return '';}}});
  t.after(async()=>{await rt.destroy();rmSync(root,{recursive:true,force:true});});const bot=rt.createBot({name:'contract'});const sid=rt.openBot(bot.id).sessionId;
  rt.mergeSessionMetadata(sid,{allowedTools:[],allowedSkillNames:[]});rt.sendUserMessage(sid,'读取数据并保存结果，只输出 DONE');await rt.runHumanSession(sid);
- assert.match(prompt,/Do not repeatedly guess filenames/);assert.match(prompt,/complete the requested transformation and persistence/);assert.match(prompt,/exact output format/);assert.match(prompt,/without explanations, headings, or verification reports/);
+ assert.match(prompt,/Resolve bare data identifiers with an exact-key lookup/);assert.match(prompt,/Do not repeatedly guess filenames/);assert.match(prompt,/complete the requested transformation and persistence/);assert.match(prompt,/exact output format/);assert.match(prompt,/without explanations, headings, or verification reports/);
 });
 
 test('completion sees final deliverable separately from planning and retains earlier failed evidence [AC:bot-completion-reliability#AC-2]',async t=>{
