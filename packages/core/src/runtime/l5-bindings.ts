@@ -1016,20 +1016,7 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
       // route.done only fires when goalGate point is off (see applyJevRoute).
       // Skip another deep-model completeText round for completion.
       if (route.kind === 'done') {
-        const achievedGoal = tryGoalStore(rt.store)?.findLatestBySession(session.id);
-        void rt.emitTrace(session.id, {
-          kind: 'goal_eval',
-          payload: attachGoalText({
-            met: true,
-            reason: route.reason,
-            source: 'jev-route',
-            decision: 'achieved',
-            turnsUsed: gate.getTurnsUsed()
-          }, {
-            goal: resolveGoalCondition(session.metadata) ?? achievedGoal?.condition,
-            title: achievedGoal?.spec.goal
-          })
-        });
+        recordJevAchievement(rt, session, route.reason, gate.getTurnsUsed());
         return {
           met: true,
           action: 'achieved',
@@ -1411,4 +1398,21 @@ export function l5ToAssembledIo(rt: L5Bindable, sessionId?: string): AssembledLo
     },
     runAfterToolExtension: toolDeps.runAfterToolExtension
   };
+}
+
+function recordJevAchievement(rt: L5Bindable, session: SessionRecord, reason: string, turnsUsed: number): void {
+        const achievedGoal = tryGoalStore(rt.store)?.findLatestBySession(session.id);
+        void rt.emitTrace(session.id, {
+          kind: 'goal_eval',
+          payload: attachGoalText({
+            met: true,
+            reason: reason,
+            source: 'jev-route',
+            decision: 'achieved',
+            turnsUsed: turnsUsed
+          }, {
+            goal: resolveGoalCondition(session.metadata) ?? achievedGoal?.condition,
+            title: achievedGoal?.spec.goal
+          })
+        });
 }

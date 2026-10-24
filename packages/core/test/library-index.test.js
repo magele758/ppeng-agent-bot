@@ -168,6 +168,34 @@ test('密钥文件、未添加目录和禁止访问的路径不会进入检索 [
   }
 });
 
+test('library symlinks index canonical in-root documents once and tolerate cycles and dangling links [AC:knowledge-library-dirs#AC-2] [AC:knowledge-library-dirs#AC-4]', async () => {
+  const env = openStore();
+  const dir = folder(env.dir);
+  const nested = join(dir, 'notes');
+  mkdirSync(nested);
+  writeFileSync(join(nested, 'document.md'), 'symlinkquartzbeacon visible');
+  symlinkSync(join(nested, 'document.md'), join(dir, 'file-alias.md'));
+  symlinkSync(nested, join(dir, 'directory-alias'));
+  symlinkSync(dir, join(nested, 'cycle'));
+  symlinkSync(join(dir, 'missing.md'), join(dir, 'dangling.md'));
+  const outside = join(env.dir, 'outside.md');
+  writeFileSync(outside, 'outsidelinkquartzbeacon hidden');
+  symlinkSync(outside, join(dir, 'outside-link.md'));
+  try {
+    writeIngestionSettings(env.store, { libraryDirs: [dir] });
+    syncLibraryIndex(env.store);
+    const found = await search(env.store, 'symlinkquartzbeacon');
+    assert.equal(found.matches.length, 1);
+    assert.equal(found.matches[0].key, 'notes/document.md');
+    assert.equal((await search(env.store, 'outsidelinkquartzbeacon')).matches.length, 0);
+    unlinkSync(join(nested, 'document.md'));
+    syncLibraryIndex(env.store);
+    assert.equal((await search(env.store, 'symlinkquartzbeacon')).matches.length, 0);
+  } finally {
+    env.close();
+  }
+});
+
 async function waitFor(predicate) {
   const start = Date.now();
   while (Date.now() - start < 3000) {

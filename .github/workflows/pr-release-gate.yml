@@ -1,9 +1,10 @@
 # The GitHub App cannot workflow_dispatch. pull_request still can start Actions,
 # so this pull request runs the same release-gate jobs as Full validation.
-# Only this head ref starts the gate; every other PR stays on the quick gate (AC-4).
+# Opt in with a label; ordinary PRs retain the bounded quick gate.
 name: PR release gate
 on:
-  pull_request: null
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
 permissions:
   contents: read
 concurrency:
@@ -12,6 +13,6 @@ concurrency:
 jobs:
   full:
     name: Release gate
-    if: github.head_ref == 'cursor/fix-full-validation-repeat'
+    if: contains(github.event.pull_request.labels.*.name, 'full-validation')
     uses: ./.github/workflows/release-gate.yml
     secrets: inherit

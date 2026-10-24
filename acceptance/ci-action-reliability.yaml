@@ -1,0 +1,38 @@
+id: ci-action-reliability
+title: Actions 长短验证可靠性
+status: implemented
+requirement: 去修复一下这个项目的Action，看看怎么改造合适，现在长任务一直失败，短任务好像也没完全卡住bug
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: Bot 配置或目标回流出现回归
+    when: 运行快速门禁
+    then: 执行真实的 Bot 配置、目标回流和 HTTP 集成测试，失败阻止通过且仍遵守两分钟预算
+  - id: AC-2
+    given: 目标等待的团队或群体执行记录不存在
+    when: 调度器检查等待状态
+    then: 明确标记阻塞且不启动重复工作
+  - id: AC-3
+    given: 需要在任意修复分支验证完整候选
+    when: PR 添加 full-validation 标签或更新带此标签的版本
+    then: 完整验证可执行且普通未标记 PR 不自动运行全量验证
+  - id: AC-4
+    given: HTTP 集成检查失败
+    when: 完整验证继续收集结果
+    then: 浏览器测试仍执行并保留独立证据，原失败不能变成通过
+  - id: AC-5
+    given: 完整浏览器套件超过单个任务可承受时长
+    when: 运行完整验证
+    then: 每个测试文件恰好在一个独立分片执行，分片失败仍阻止通过且验收证据互不覆盖
+  - id: AC-6
+    given: 完整变异测试包含多个独立模块
+    when: 运行完整验证
+    then: 各模块可独立执行和重试，汇总必须覆盖全部模块并遵守原基线，任一任务失败仍阻止通过
+  - id: AC-7
+    given: 长会话顶部仅露出上一条消息不足一像素的残余
+    when: 用户收起侧栏改变消息宽度
+    then: 保持当前可读消息的位置，短门禁覆盖此锚点选择回归
+  - id: AC-8
+    given: 新增菜单已因悬停而展开
+    when: 用户点击新增按钮
+    then: 菜单的透明区域不遮挡按钮，仍可正常进入新建会话

@@ -158,7 +158,7 @@ test('a late approval decision still resumes or blocks the same execution [AC:bo
   for (const decision of ['approved', 'rejected']) {
     const goal = create();
     const child = store.createSession({ title: 'approval', mode: 'subagent', agentId: 'general', parentSessionId: parent.id, metadata: { userId: parent.metadata.userId, botId: 'b', botGoalId: goal.id, botGoalScopeSessionId: parent.id } });
-    const execution = service.claim('b', goal.id, { strategy: 'swarm', leaseMs: 1 });
+    const execution = service.claim('b', goal.id, { strategy: 'swarm', leaseMs: 10000 });
     service.updateExecution('b', execution.id, { sessionId: child.id });
     const snapshot = store.getDaemonControl(`bot_goals:b`);
     const row = snapshot.executions.find(item => item.id === execution.id);
@@ -232,7 +232,7 @@ test('delegated bot child results return to the original goal [AC:bot-goal-resul
   assert.equal(service.get(requester.id, mismatch.id).status, 'blocked');
 });
 
-test('team and swarm fan-out close the parent goal on failure and missing runs do not wake [AC:bot-goal-result-return#AC-4] [AC:bot-execution-p0#AC-5]', async t => {
+test('team and swarm fan-out close the parent goal on failure and missing runs do not wake [AC:bot-goal-result-return#AC-4] [AC:ci-action-reliability#AC-2] [AC:bot-execution-p0#AC-5]', async t => {
   const { host, create, service, store, parent, dir, runs } = fixture(t);
   const sessions = [];
   const swarm = new SwarmExecutor({

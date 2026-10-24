@@ -148,32 +148,7 @@ export function authorizeToolsForSession(input: {
   }
 
   checkpoint(tools,'not_configured');
-  const dynSettings = readDynToolSettings(input.settingsStore);
-  const meta = new Set<string>(DYN_META_TOOL_NAMES);
-  if (!dynSettings.enabled) {
-    tools = tools.filter((t) => !meta.has(t.name));
-  } else {
-    const allowSave = dynSettings.allowSave || isPtcSession(input.session);
-    const needSearch = searchDynToolsNeeded(input.settingsStore, input.session.id, dynSettings);
-    const have = new Set(tools.map((t) => t.name));
-    for (const t of assembled) {
-      if (!meta.has(t.name) || have.has(t.name)) continue;
-      if (t.name === 'save_as_tool' && !allowSave) continue;
-      if (t.name === 'propose_tool' && !dynSettings.allowPropose) continue;
-      if (t.name === SEARCH_DYN_TOOLS_NAME && !needSearch) continue;
-      tools.push(t);
-      have.add(t.name);
-    }
-    if (!allowSave) {
-      tools = tools.filter((t) => t.name !== 'save_as_tool');
-    }
-    if (!dynSettings.allowPropose) {
-      tools = tools.filter((t) => t.name !== 'propose_tool');
-    }
-    if (!needSearch) {
-      tools = tools.filter((t) => t.name !== SEARCH_DYN_TOOLS_NAME);
-    }
-  }
+  tools = applyDynamicToolSettings(input, tools, assembled);
   if (!readSkillProposalSettings(input.settingsStore).enabled) {
     tools = tools.filter((t) => t.name !== SKILL_PROPOSE_TOOL_NAME);
   }
@@ -329,4 +304,34 @@ export function inspectToolExposure(input: Parameters<typeof filterToolsForSessi
     reason:provided.has(t.name)?'provided':reasons.get(t.name)??(mode==='full'&&['tool_search','load_capability_tool'].includes(t.name)?'mode':'not_loaded')}));
   const count=(state:string)=>items.filter(t=>t.state===state).length;
   return {mode,items,counts:{registered:items.length,available:count('provided')+count('pending'),provided:count('provided'),pending:count('pending'),unavailable:count('unavailable')}};
+}
+
+function applyDynamicToolSettings(input: Parameters<typeof authorizeToolsForSession>[0], tools: ToolContract<any>[], assembled: ToolContract<any>[]): ToolContract<any>[] {
+  const dynSettings = readDynToolSettings(input.settingsStore);
+  const meta = new Set<string>(DYN_META_TOOL_NAMES);
+  if (!dynSettings.enabled) {
+    tools = tools.filter((t) => !meta.has(t.name));
+  } else {
+    const allowSave = dynSettings.allowSave || isPtcSession(input.session);
+    const needSearch = searchDynToolsNeeded(input.settingsStore, input.session.id, dynSettings);
+    const have = new Set(tools.map((t) => t.name));
+    for (const t of assembled) {
+      if (!meta.has(t.name) || have.has(t.name)) continue;
+      if (t.name === 'save_as_tool' && !allowSave) continue;
+      if (t.name === 'propose_tool' && !dynSettings.allowPropose) continue;
+      if (t.name === SEARCH_DYN_TOOLS_NAME && !needSearch) continue;
+      tools.push(t);
+      have.add(t.name);
+    }
+    if (!allowSave) {
+      tools = tools.filter((t) => t.name !== 'save_as_tool');
+    }
+    if (!dynSettings.allowPropose) {
+      tools = tools.filter((t) => t.name !== 'propose_tool');
+    }
+    if (!needSearch) {
+      tools = tools.filter((t) => t.name !== SEARCH_DYN_TOOLS_NAME);
+    }
+  }
+  return tools;
 }

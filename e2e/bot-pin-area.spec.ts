@@ -31,7 +31,7 @@ test('置顶区在左侧功能分组和未分组上方，群聊不在其中 [AC:
   const boss = await superBot(request);
   const member = await createBot(request, `Pin member ${stamp()}`);
   const group = await createGroup(request, `Pin group ${stamp()}`);
-  const room = await createRoom(request, `Pin room ${stamp()}`, [member.id]);
+  const room = await createRoom(request, `Pin room ${stamp()}`, [boss.id, member.id]);
   try {
     await openBotPage(page);
     const area = pinArea(page);
@@ -174,7 +174,8 @@ test('拖出置顶区后刷新不回来，原分组保留，Super Bot 也可以�
 test('点击置顶项打开原来的对话且可以继续发消息 [AC:bot-pin-area#AC-5]', async ({ page, request }) => {
   test.setTimeout(180_000);
   const boss = await superBot(request);
-  const room = await createRoom(request, `Pin chat ${stamp()}`, [boss.id]);
+  const peer = await createBot(request, `Pin peer ${stamp()}`);
+  const room = await createRoom(request, `Pin chat ${stamp()}`, [boss.id, peer.id]);
   const first = `pin-origin-${stamp()}`;
   const second = `pin-follow-${stamp()}`;
   try {
@@ -206,6 +207,7 @@ test('点击置顶项打开原来的对话且可以继续发消息 [AC:bot-pin-a
     expect(again.id).toBe(boss.id);
   } finally {
     await request.delete(`/api/bot-rooms/${room.id}`);
+    await hideBot(request, peer);
   }
 });
 

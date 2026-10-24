@@ -162,7 +162,7 @@ test.describe('Bots page', () => {
 
     await permission.selectOption('ask');
     await expect.poll(async () => (await sessionMeta()).permissionMode).toBe('ask');
-    await detail.getByLabel('Bot 轮数上限').selectOption('48');
+    await detail.getByLabel('Bot 单次执行步数上限').selectOption('48');
     await expect.poll(async () => (await sessionMeta()).maxTurns).toBe(48);
 
     await detail.getByRole('tab', { name: '任务与自动化', exact: true }).click();
@@ -173,7 +173,7 @@ test.describe('Bots page', () => {
     const again = page.getByTestId('bot-detail');
     await again.getByRole('tab', { name: '能力与权限', exact: true }).click();
     await expect(again.getByLabel('Bot 权限档')).toHaveValue('ask');
-    await expect(again.getByLabel('Bot 轮数上限')).toHaveValue('48');
+    await expect(again.getByLabel('Bot 单次执行步数上限')).toHaveValue('48');
   });
 
   test('Open chat lands on the Bot own conversation [AC:agents-management#AC-7]', async ({ page, request }) => {

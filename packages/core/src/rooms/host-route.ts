@@ -59,60 +59,10 @@ function applyHostRouteInner(
   const collaboration = turn.replyMode === 'task-collaboration';
   if (!collaboration && (options?.mode === 'assign_tasks' || options?.assignments?.length || options?.reviewedTaskIds?.length || options?.completeGoal)) throw new ValidationError('Assigning tasks is not available in this round.');
   let board = collaboration ? readRoomGoals(store, roomId) : undefined;
-  if (board) {
-    const goal = board.goals.find(item => item.id === turn.goalId);
-    if (!goal || goal.status !== 'running') throw new ValidationError('Task goal is no longer running');
-    for (const id of requested) {
-      if (!room.botIds.includes(id)) throw new ValidationError('Collaborator must be a room member');
-      if (turn.botIds.includes(id)) continue;
-      const assignment = options?.assignments?.find(item => item.botId === id);
-      if (!assignment?.task?.trim() || !assignment?.evidence?.trim()) throw new ValidationError('Each collaborator requires a concrete task and expected evidence');
-    }
-    for (const taskId of options?.reviewedTaskIds ?? []) {
-      const task = board.tasks.find(item => item.id === taskId && item.goalId === turn.goalId);
-      if (!task || task.status !== 'waiting_approval' || !task.materialIds.length || !task.summary.trim()) throw new ValidationError('Task has no submitted evidence to review');
-      task.status = 'completed';
-    }
-    if (options?.completeGoal) {
-      if (board.tasks.some(task => task.goalId === turn.goalId && task.status !== 'completed')) throw new ValidationError('All assigned tasks must have reviewed evidence');
-      if (requested.some(id => !turn.botIds.includes(id))) throw new ValidationError('Cannot complete while assigning new tasks');
-      if (!options.verificationSummary?.trim() || !options.evidenceMessageIds?.length) throw new ValidationError('Goal completion requires evidence and a verification summary');
-      const sharedMessages = store.db.prepare('SELECT data FROM bot_room_messages WHERE room_id=?').all(roomId) as { data: string }[];
-      const validIds = new Set(sharedMessages.map(row => JSON.parse(row.data) as { id: string; turnId?: string; sender: { type: string }; text: string }).filter(message => message.turnId === turn.id && message.sender.type === 'bot' && message.text.trim()).map(message => message.id));
-      if (options.evidenceMessageIds.some(id => !validIds.has(id))) throw new ValidationError('Completion evidence must reference this turn’s published bot results');
-      goal.status = 'completed';
-      goal.progress = options.verificationSummary.trim();
-      goal.evidenceMessageIds = [...options.evidenceMessageIds];
-    }
-  }
-  const cap = Math.min(readRoomSettings(store).maxWaveSpeakers, collaboration ? Math.max(1, (turn.maxBotTurns ?? 1) - 1) : Infinity);
-  const accepted: string[] = [];
-  const dropped: { id: string; reason: 'not_member' | 'over_cap' }[] = [];
-  const scheduled = turn.botIds.slice();
-  for (const id of requested) {
-    if (typeof id !== 'string' || !id.trim()) continue;
-    if (!room.botIds.includes(id)) {
-      dropped.push({ id, reason: 'not_member' });
-      continue;
-    }
-    if (scheduled.includes(id)) continue;
-    if (scheduled.length >= cap) {
-      dropped.push({ id, reason: 'over_cap' });
-      continue;
-    }
-    scheduled.push(id);
-    accepted.push(id);
-  }
-  if (board && turn.goalId) {
-    for (const id of accepted) {
-      const assignment = options!.assignments!.find(item => item.botId === id)!;
-      const assigned: AssignRoomTaskResult<RoomGoalSnapshot> = assignRoomTask(board!, { actorBotId: speaker, hostBotId: owner, assigneeBotId: id, roomBotIds: room.botIds, title: assignment.task.trim(), goalId: turn.goalId });
-      if (!assigned.ok) throw new ValidationError(assigned.reason);
-      board = assigned.snapshot;
-      board!.tasks.find(task => task.id === assigned.task.id)!.expectedEvidence = assignment.evidence.trim();
-    }
-    writeRoomGoals(store, roomId, board!);
-  }
+  if (board) reviewCollaborationBoard(store, roomId, turn, board, requested, room.botIds, options);
+  const cap = speakerCap(store, turn, collaboration);
+  const {accepted, dropped, scheduled} = scheduleSpeakers(turn, requested, room.botIds, cap);
+  if (board && turn.goalId) assignAcceptedCollaborators(store, roomId, board, turn.goalId, accepted, speaker, owner, room.botIds, options);
   const summarize = options?.summarize === true || (collaboration && accepted.length > 0);
   if (accepted.length === 0 && dropped.length === 0 && !summarize) return [];
   turn.botIds = scheduled;
@@ -145,4 +95,70 @@ export function roomTaskRouteReceipt(sessionId: string): string | undefined {
   if (!turn?.goalId) return undefined;
   const board = readRoomGoals(boundStore, roomId);
   return JSON.stringify({ goal: board.goals.find(goal => goal.id === turn.goalId), tasks: board.tasks.filter(task => task.goalId === turn.goalId) });
+}
+
+function reviewCollaborationBoard(store: SqliteStateStore, roomId: string, turn: RoutedTurn, board: RoomGoalSnapshot, requested: readonly string[], memberIds: string[], options?: RoomRouteOptions): void {
+    const goal = board.goals.find(item => item.id === turn.goalId);
+    if (!goal || goal.status !== 'running') throw new ValidationError('Task goal is no longer running');
+    for (const id of requested) {
+      if (!memberIds.includes(id)) throw new ValidationError('Collaborator must be a room member');
+      if (turn.botIds.includes(id)) continue;
+      const assignment = options?.assignments?.find(item => item.botId === id);
+      if (!assignment?.task?.trim() || !assignment?.evidence?.trim()) throw new ValidationError('Each collaborator requires a concrete task and expected evidence');
+    }
+    for (const taskId of options?.reviewedTaskIds ?? []) {
+      const task = board.tasks.find(item => item.id === taskId && item.goalId === turn.goalId);
+      if (!task || task.status !== 'waiting_approval' || !task.materialIds.length || !task.summary.trim()) throw new ValidationError('Task has no submitted evidence to review');
+      task.status = 'completed';
+    }
+    if (options?.completeGoal) completeCollaborationGoal(store, roomId, turn, board, goal, requested, options);
+}
+
+function completeCollaborationGoal(store: SqliteStateStore, roomId: string, turn: RoutedTurn, board: RoomGoalSnapshot, goal: RoomGoalSnapshot['goals'][number], requested: readonly string[], options: RoomRouteOptions): void {
+      if (board.tasks.some(task => task.goalId === turn.goalId && task.status !== 'completed')) throw new ValidationError('All assigned tasks must have reviewed evidence');
+      if (requested.some(id => !turn.botIds.includes(id))) throw new ValidationError('Cannot complete while assigning new tasks');
+      if (!options.verificationSummary?.trim() || !options.evidenceMessageIds?.length) throw new ValidationError('Goal completion requires evidence and a verification summary');
+      const sharedMessages = store.db.prepare('SELECT data FROM bot_room_messages WHERE room_id=?').all(roomId) as { data: string }[];
+      const validIds = new Set(sharedMessages.map(row => JSON.parse(row.data) as { id: string; turnId?: string; sender: { type: string }; text: string }).filter(message => message.turnId === turn.id && message.sender.type === 'bot' && message.text.trim()).map(message => message.id));
+      if (options.evidenceMessageIds.some(id => !validIds.has(id))) throw new ValidationError('Completion evidence must reference this turn’s published bot results');
+      goal.status = 'completed';
+      goal.progress = options.verificationSummary.trim();
+      goal.evidenceMessageIds = [...options.evidenceMessageIds];
+}
+
+
+function scheduleSpeakers(turn: RoutedTurn, requested: readonly string[], memberIds: string[], cap: number) {
+  const accepted: string[] = [];
+  const dropped: { id: string; reason: 'not_member' | 'over_cap' }[] = [];
+  const scheduled = turn.botIds.slice();
+  for (const id of requested) {
+    if (typeof id !== 'string' || !id.trim()) continue;
+    if (!memberIds.includes(id)) {
+      dropped.push({ id, reason: 'not_member' });
+      continue;
+    }
+    if (scheduled.includes(id)) continue;
+    if (scheduled.length >= cap) {
+      dropped.push({ id, reason: 'over_cap' });
+      continue;
+    }
+    scheduled.push(id);
+    accepted.push(id);
+  }
+  return {accepted, dropped, scheduled};
+}
+
+function assignAcceptedCollaborators(store: SqliteStateStore, roomId: string, board: RoomGoalSnapshot, goalId: string, accepted: string[], speaker: string, owner: string, memberIds: string[], options?: RoomRouteOptions): void {
+    for (const id of accepted) {
+      const assignment = options!.assignments!.find(item => item.botId === id)!;
+      const assigned: AssignRoomTaskResult<RoomGoalSnapshot> = assignRoomTask(board!, { actorBotId: speaker, hostBotId: owner, assigneeBotId: id, roomBotIds: memberIds, title: assignment.task.trim(), goalId: goalId });
+      if (!assigned.ok) throw new ValidationError(assigned.reason);
+      board = assigned.snapshot;
+      board!.tasks.find(task => task.id === assigned.task.id)!.expectedEvidence = assignment.evidence.trim();
+    }
+    writeRoomGoals(store, roomId, board!);
+}
+
+function speakerCap(store: SqliteStateStore, turn: RoutedTurn, collaboration: boolean): number {
+  return Math.min(readRoomSettings(store).maxWaveSpeakers, collaboration ? Math.max(1, (turn.maxBotTurns ?? 1) - 1) : Infinity);
 }

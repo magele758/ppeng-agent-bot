@@ -443,6 +443,24 @@ export class SelfHealScheduler {
     this.logRun(r.id, 'task + session created; next tick will run tests in worktree');
   }
 
+  private finishPassedTests(r: SelfHealRunRecord, policy: SelfHealPolicy, workspaceMode: string | undefined, branch: string | undefined): void {
+      this.logRun(r.id, 'tests passed');
+      if (policy.autoMerge) {
+        if (workspaceMode === 'directory-copy' || !branch) {
+          this.logRun(r.id, 'blocked: autoMerge needs git worktree with a branch (not directory-copy)');
+          this.ctx.store.updateSelfHealRun(r.id, {
+            status: 'blocked',
+            blockReason: 'autoMerge requires git worktree with a named branch; directory-copy workspace cannot auto-merge',
+          });
+          return;
+        }
+        this.ctx.store.updateSelfHealRun(r.id, { status: 'merging', lastErrorSummary: undefined });
+      } else {
+        this.logRun(r.id, 'done (autoMerge off)');
+        this.ctx.store.updateSelfHealRun(r.id, { status: 'completed', lastErrorSummary: undefined });
+      }
+  }
+
   private async advanceRunningTests(
     r: SelfHealRunRecord,
     policy: SelfHealPolicy,
@@ -483,21 +501,7 @@ export class SelfHealScheduler {
     });
 
     if (ok) {
-      this.logRun(r.id, 'tests passed');
-      if (policy.autoMerge) {
-        if (ws?.mode === 'directory-copy' || !branch) {
-          this.logRun(r.id, 'blocked: autoMerge needs git worktree with a branch (not directory-copy)');
-          this.ctx.store.updateSelfHealRun(r.id, {
-            status: 'blocked',
-            blockReason: 'autoMerge requires git worktree with a named branch; directory-copy workspace cannot auto-merge',
-          });
-          return;
-        }
-        this.ctx.store.updateSelfHealRun(r.id, { status: 'merging', lastErrorSummary: undefined });
-      } else {
-        this.logRun(r.id, 'done (autoMerge off)');
-        this.ctx.store.updateSelfHealRun(r.id, { status: 'completed', lastErrorSummary: undefined });
-      }
+      this.finishPassedTests(r, policy, ws?.mode, branch);
       return;
     }
 

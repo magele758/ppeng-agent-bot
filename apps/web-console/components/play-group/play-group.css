@@ -24,6 +24,7 @@
   flex: 0 0 auto;
   align-items: center;
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
 }
 
@@ -31,12 +32,14 @@
 .list-item--group:focus-within > .play-group-menu,
 .play-group-menu:focus-within {
   opacity: 1;
+  visibility: visible;
   pointer-events: auto;
 }
 
 @media (hover: none), (pointer: coarse) {
   .play-group-menu {
     opacity: 1;
+  visibility: visible;
     pointer-events: auto;
   }
 }
@@ -347,4 +350,4 @@
 .play-group-reply-mode__hint { grid-column: 2; color: var(--text-muted, var(--ui-text-muted)); font-size: 12px; }
 .play-group-reply-mode__error { margin: 0; color: var(--ui-danger, #c2410c); font-size: 12px; }
 
-.create-menu__pop::before { content: ""; position: absolute; left: -12px; right: -12px; top: -20px; height: 24px; }
+.create-menu__pop::before { content: ""; position: absolute; left: -12px; right: -12px; top: -4px; height: 4px; }
