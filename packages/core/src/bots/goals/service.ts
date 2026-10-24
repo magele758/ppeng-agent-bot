@@ -133,7 +133,7 @@ export class BotGoalService {
    s.executions.push(e);g.activeExecutionId=e.id;g.status='running';g.resumeRequested=false;g.strategy=options.strategy;g.strategyReason=options.strategyReason;g.attempts++;g.blockedReason=undefined;this.event(s,'claimed',g);return e;
   });
  }
- updateExecution(botId:string,id:string,patch:{runRef?:string;sessionId?:string;safeToRetry?:boolean;leaseUntil?:number}):void {mutateGoalSnapshot(this.store,botId,s=>{const e=s.executions.find(x=>x.id===id);if(!e)throw new Error('Execution not found');this.find(s,e.goalId);if(e.status!=='running'||e.leaseUntil<=this.clock())throw new Error('Execution lease expired');Object.assign(e,patch);});}
+ updateExecution(botId:string,id:string,patch:{runRef?:string;sessionId?:string;safeToRetry?:boolean;leaseUntil?:number;messageStartSeq?:number;messageEndSeq?:number}):void {mutateGoalSnapshot(this.store,botId,s=>{const e=s.executions.find(x=>x.id===id);if(!e)throw new Error('Execution not found');this.find(s,e.goalId);if(e.status!=='running'||e.leaseUntil<=this.clock())throw new Error('Execution lease expired');Object.assign(e,patch);});}
  renewRunningLease(botId:string,id:string,leaseUntil:number):void {mutateGoalSnapshot(this.store,botId,s=>{const e=s.executions.find(x=>x.id===id);if(!e)throw new Error('Execution not found');const goal=this.find(s,e.goalId);if(e.status!=='running'||goal.status!=='running'||goal.activeExecutionId!==e.id)throw new Error('Execution lease expired');e.leaseUntil=leaseUntil;});}
  private limit(g:BotGoal,settings:GoalSettings,waiting=false):boolean {
   if(terminal.has(g.status)||g.status==='pending_review')return false;

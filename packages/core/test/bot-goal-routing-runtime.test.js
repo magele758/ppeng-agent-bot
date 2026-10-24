@@ -40,7 +40,7 @@ test('nested dispatch keeps tool audit pairs out of the outer model transcript',
  const audit=f.store.getDaemonControl(`bot.goal-tool-ledger:${f.session.id}:${f.execution.id}`);
  assert.deepEqual(audit.map(m=>m.role),['assistant','tool','assistant','tool']);
 });
-test('real Runtime subagent dispatch preserves valid outer model tool pairing [AC:ops-session-trace-repair#AC-4]',async t=>{
+test('real Runtime subagent dispatch preserves valid outer model tool pairing [AC:ops-session-trace-repair#AC-4] [AC:bot-goal-live-chain#AC-3]',async t=>{
  const {RawAgentRuntime}=await import('../dist/runtime.js');
  const dir=mkdtempSync(join(tmpdir(),'goal-route-real-'));let mainSession,dispatched=false,checked=false;
  const runtime=new RawAgentRuntime({repoRoot:dir,stateDir:join(dir,'state'),modelAdapter:{name:'goal-dispatch-script',async runTurn(input){
@@ -49,10 +49,10 @@ test('real Runtime subagent dispatch preserves valid outer model tool pairing [A
    const messages=runtime.store.foldMessages(mainSession);const toolParts=messages.flatMap(m=>m.parts).filter(p=>p.type==='tool_call'||p.type==='tool_result');
    assert.deepEqual(toolParts.map(p=>p.type),['tool_call','tool_result']);assert.ok(toolParts.every(p=>p.toolCallId==='outer-dispatch'));checked=true;
   }
+  if(input.sessionId!==mainSession)assert.match(JSON.stringify(input),/already launched for this objective/);
   return {stopReason:'end',assistantParts:[{type:'text',text:'Analysis evidence returned.'}]};
  },async summarizeMessages(){return 'summary';}}});
  t.after(async()=>{await runtime.destroy();rmSync(dir,{recursive:true,force:true})});
- runtime.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});
  const bot=runtime.createBot({name:'Dispatch review'});mainSession=runtime.openBot(bot.id).sessionId;
  runtime.sendUserMessage(mainSession,'实现一个简单功能',{autoRun:true});await runtime.runHumanSession(mainSession);
  assert.equal(dispatched,true);assert.equal(checked,true);
