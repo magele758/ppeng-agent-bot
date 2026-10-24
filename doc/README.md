@@ -138,6 +138,7 @@
 |----------|----------|
 | [`DEPLOYMENT.md`](DEPLOYMENT.md) | Docker / Compose / Helm、发布冒烟 |
 | [`K8S_CLOUD_RUNTIME.md`](K8S_CLOUD_RUNTIME.md) | K8s / 云上运行时规划 |
+| [`LIVE_BOT_QUALITY.md`](LIVE_BOT_QUALITY.md) | 真实 Grok/Bot 基线、版本对照和发布能力门禁 |
 | [`HARNESS_EVAL.md`](HARNESS_EVAL.md) | `pnpm run agent:eval`、fast/nightly cases |
 | [`IM_AGENT_INTEGRATION.md`](IM_AGENT_INTEGRATION.md) | 飞书 / 企微 / Webhook、静默回复、投递账本、例行预检 |
 

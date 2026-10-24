@@ -9,23 +9,26 @@ import { randomUUID } from 'node:crypto';
 import { config as loadDotenv } from 'dotenv';
 import { sanitizeScriptEnv } from '../spawn-utils.mjs';
 import { hash, validateSuite, gradeTask, compareQuality } from './quality.mjs';
+import { buildBotSuite, summarizeBaseline } from './bot-quality.mjs';
+import { configuredModel } from './configured-model.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const options = {};
 for (let i = 2; i < process.argv.length; i++) {
   const arg = process.argv[i];
   if (arg === '--simulation') options.simulation = true;
-  else if (['--config', '--out', '--baseline-root', '--candidate-root', '--trials'].includes(arg) && process.argv[i + 1]) options[arg.slice(2)] = process.argv[++i];
+  else if(arg === '--baseline-only') options.baselineOnly=true;
+  else if (['--config', '--out', '--baseline-root', '--candidate-root', '--trials','--settings-root','--bot'].includes(arg) && process.argv[i + 1]) options[arg.slice(2)] = process.argv[++i];
   else throw new Error(`Unknown/incomplete option ${arg}`);
 }
 if (!options.config) throw new Error('Usage: compare.mjs --config experiment.json [--simulation] [--out directory] [--baseline-root path] [--candidate-root path] [--trials N]');
 const experiment = JSON.parse(readFileSync(resolve(options.config), 'utf8'));
-const suite = validateSuite(JSON.parse(readFileSync(resolve(root, experiment.suite), 'utf8')));
+const suite = validateSuite(experiment.suite==='builtin:bot-p0'?buildBotSuite():JSON.parse(readFileSync(resolve(root, experiment.suite), 'utf8')));
 const trials = Number(options.trials ?? experiment.trials ?? 3);
 if (!Number.isInteger(trials) || trials < 1 || trials > 20) throw new Error('trials must be 1..20');
 const limits = { timeoutMs: 90_000, maxModelCalls: 6, maxOutputTokens: 2048, maxInputChars: 100_000, maxTotalCalls: 500, ...experiment.limits };
 for (const [key, value] of Object.entries(limits)) if (!Number.isInteger(value) || value <= 0) throw new Error(`invalid limit ${key}`);
-if (suite.length * trials * 2 * limits.maxModelCalls > limits.maxTotalCalls) throw new Error('planned calls exceed maxTotalCalls; reduce cases/trials or explicitly budget the experiment');
+if (suite.length * trials * (options.baselineOnly?1:2) * limits.maxModelCalls > limits.maxTotalCalls) throw new Error('planned calls exceed maxTotalCalls; reduce cases/trials or explicitly budget the experiment');
 if (limits.timeoutMs > 600_000 || limits.maxTotalCalls > 10_000 || limits.maxOutputTokens > 16_384) throw new Error('experiment exceeds hard safety limits');
 const variants = {};
 for (const label of ['baseline', 'candidate']) {
@@ -40,8 +43,10 @@ for (const label of ['baseline', 'candidate']) {
   if (!options.simulation && v.simulationFault) throw new Error('simulationFault is forbidden in live eval');
   for (const key of Object.keys(v)) if (!['repoRoot', 'systemAppendix', 'daemonControl', 'simulationFault'].includes(key)) throw new Error(`unknown variant option ${key}`);
 }
-const model = experiment.model ?? { provider: 'openai-compatible' };
-for (const key of Object.keys(model)) if (!['provider', 'apiKeyEnv', 'baseUrlEnv', 'nameEnv', 'name', 'baseUrl', 'httpKind', 'temperature'].includes(key)) throw new Error(`unknown model option ${key}; secrets must use env references`);
+let model = experiment.model ?? { provider: 'openai-compatible' };
+const configured=options['settings-root']&&!options.simulation?await configuredModel(options['settings-root'],options.bot??'ppeng-agent-core',root):undefined;
+if(configured){model=configured.model;Object.assign(process.env,configured.env);console.log('Configured model: '+JSON.stringify(configured.selection));}
+for (const key of Object.keys(model)) if (!['provider', 'apiKeyEnv', 'baseUrlEnv', 'nameEnv', 'name', 'baseUrl', 'httpKind', 'temperature','useJsonMode'].includes(key)) throw new Error(`unknown model option ${key}; secrets must use env references`);
 if (model.temperature != null && (!Number.isFinite(model.temperature) || model.temperature < 0 || model.temperature > 2)) throw new Error('invalid temperature');
 // Validate all policy fields before spending any model calls.
 compareQuality(suite, [], { trials, policy: experiment.policy, simulation: Boolean(options.simulation) });
@@ -82,10 +87,13 @@ const out = resolve(options.out ?? join(root, 'test-results', `harness-quality-$
 mkdirSync(dirname(out), { recursive: true }); mkdirSync(out); // Never overwrite an existing run.
 const workspace = mkdtempSync(join(tmpdir(), 'ppeng-quality-'));
 const records = [];
+const driverHash=()=>hash(['compare.mjs','quality.mjs','quality-worker.mjs','bot-quality.mjs','configured-model.mjs'].map(file=>readFileSync(join(root,'scripts/agent-eval',file),'utf8')));
 const manifest = { schemaVersion: 1, startedAt: new Date().toISOString(), node: process.version, simulation: Boolean(options.simulation),
-  suiteHash: hash(suite), experimentHash: hash(experiment), driverHash: hash(['compare.mjs', 'quality.mjs', 'quality-worker.mjs'].map(file => readFileSync(join(root, 'scripts/agent-eval', file), 'utf8'))),
+  mode:options.baselineOnly?'baseline':'compare', selection:configured?.selection,
+  suiteHash: hash(suite), experimentHash: hash(experiment), driverHash: driverHash(),
   trials, limits, identities, variants, model, tasks: suite.map(({ id, category, critical }) => ({ id, category, critical: Boolean(critical) })) };
 writeFileSync(join(out, 'manifest.json'), JSON.stringify(manifest, null, 2), { mode: 0o600 });
+writeFileSync(join(out,'suite.json'),JSON.stringify(suite,null,2),{mode:0o600});
 
 async function run(task, trial, label) {
   const name = `${task.id}-${trial}-${label}`, trialWorkspace = join(workspace, name);
@@ -105,8 +113,8 @@ async function run(task, trial, label) {
   });
   let result;
   try {
-    if (execution.code !== 0 || execution.timedOut) throw new Error(execution.timedOut ? 'trial timed out' : 'worker failed');
     result = JSON.parse(readFileSync(resultFile, 'utf8'));
+    if (execution.code !== 0 || execution.timedOut) result={...result,error:execution.timedOut?'trial timed out':'worker failed',infrastructureError:true,status:'error'};
   } catch (error) {
     result = { error: error.message, infrastructureError: true, status: 'error', durationMs: limits.timeoutMs, tokens: null };
   }
@@ -120,13 +128,14 @@ async function run(task, trial, label) {
 try {
   // Alternate AB/BA within each task and repeat; neither variant always benefits from running second.
   for (let trial = 0; trial < trials; trial++) for (let i = 0; i < suite.length; i++) {
-    const labels = (trial + i) % 2 ? ['candidate', 'baseline'] : ['baseline', 'candidate'];
+    const labels = options.baselineOnly?['baseline']:(trial + i) % 2 ? ['candidate', 'baseline'] : ['baseline', 'candidate'];
     for (const label of labels) await run(suite[i], trial, label);
   }
-  const report = compareQuality(suite, records, { trials, policy: experiment.policy, simulation: Boolean(options.simulation) });
+  const report = options.baselineOnly?summarizeBaseline(suite,records,{trials,simulation:Boolean(options.simulation)}):compareQuality(suite, records, { trials, policy: experiment.policy, simulation: Boolean(options.simulation) });
   const interventions = label => ({ systemAppendix: variants[label].systemAppendix ?? '', daemonControl: variants[label].daemonControl ?? {}, simulationFault: variants[label].simulationFault });
   report.control = identities.baseline.buildHash === identities.candidate.buildHash && hash(interventions('baseline')) === hash(interventions('candidate'));
   if (report.control) report.promotionEligible = false; // A/A calibrates noise; it cannot certify a new intervention.
+  if(driverHash()!==manifest.driverHash){report.invalid.push('evaluation driver changed during run');report.verdict='invalid';report.promotionEligible=false;}
   for (const [label, variant] of Object.entries(variants)) if (identity(variant.repoRoot).buildHash !== identities[label].buildHash) {
     report.invalid.push(`${label} build changed while evaluation was running`); report.verdict = 'invalid'; report.promotionEligible = false;
   }
@@ -135,6 +144,7 @@ try {
     report.invalid.push('missing or inconsistent model identity'); report.verdict = 'invalid'; report.promotionEligible = false;
   }
   writeFileSync(join(out, 'report.json'), JSON.stringify(report, null, 2));
+  writeFileSync(join(out,'evidence-index.json'),JSON.stringify(Object.fromEntries(readdirSync(out).filter(f=>f.endsWith('.json')).map(f=>[f,hash(readFileSync(join(out,f),'utf8'))])),null,2));
   const md = [ '# Harness quality comparison', '', `Verdict: **${report.verdict}**; promotion eligible: **${report.promotionEligible}**.`,
     `Evaluation: ${report.evaluationKind}. Distinct tasks: ${suite.length}; trials per variant: ${trials}.`, '',
     '| Category | Baseline pass | Candidate pass | All-trials reliability delta interval |', '|---|---:|---:|---|',
@@ -142,9 +152,9 @@ try {
     '', '## Gate reasons', '', ...[...report.invalid, ...report.regressions, ...report.blockers, ...report.uncertain].map(reason => `- ${reason}`), '',
     'Repeated trials measure stability; they do not multiply the number of independent tasks. Intervals are approximate and apply only to this task distribution.',
     'Simulation verifies the evaluator and harness wiring only. It never establishes model quality or authorizes promotion.', '' ].join('\n');
-  writeFileSync(join(out, 'report.md'), md);
+  writeFileSync(join(out, 'report.md'), md + (options.baselineOnly ? '\nBaseline: '+report.passed+'/'+report.samples+' passed; infrastructure failures: '+report.infrastructureFailures+'; trials missing usage: '+report.missingUsageTrials+'.\n\n'+report.cases.map(r=>'- '+r.caseId+': '+(r.pass?'PASS':'FAIL')+'; '+r.failures.join('; ')).join('\n')+'\n' : ''));
   console.log(`\n${report.verdict}: ${out}/report.md`);
-  process.exitCode = options.simulation ? (report.invalid.length || report.regressions.length || report.blockers.length ? 1 : 0)
+  process.exitCode = options.baselineOnly ? (report.invalid.length?2:report.failed?1:0) : options.simulation ? (report.invalid.length || report.regressions.length || report.blockers.length ? 1 : 0)
     : report.promotionEligible ? 0 : ['regressed', 'blocked'].includes(report.verdict) ? 1 : 2;
 } finally {
   rmSync(workspace, { recursive: true, force: true });
