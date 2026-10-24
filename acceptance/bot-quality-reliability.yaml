@@ -1,6 +1,6 @@
 id: bot-quality-reliability
 title: 限定写入范围与辅助判断可靠性及重复对照
-status: approved
+status: implemented
 requirement: |
   继续把这次基线暴露的额外保存和辅助请求取消导致用量缺失的问题修好，扩充评估集并用当前 Grok 跑新旧版本重复对照，别降低门禁标准，做好测试和 review 后提交合并。
 notes: |
