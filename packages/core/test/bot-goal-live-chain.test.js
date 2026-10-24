@@ -190,3 +190,17 @@ test('meaningful state notifications stay deterministic across terminal and revi
  assert.deepEqual(store.dequeueSchedulerWakes(),[]);
  assert.deepEqual(store.listUnclaimedInbox(parent.id),[]);
 });
+
+test('notice reads latest state inside its write transaction [AC:bot-goal-live-chain#AC-4]',t=>{
+ const {store,parent,service,goal,ex}=fixture(t);
+ const pending=service.report('b',ex.id,{kind:'candidate_completed',summary:'result',evidence:['result']});
+ const transaction=store.transaction.bind(store);
+ let switched=false;
+ store.transaction=fn=>transaction(()=>{
+  if(!switched){switched=true;service.control('b',goal.id,'verify',{accepted:true});}
+  return fn();
+ });
+ announceGoalState({store},pending);
+ const notice=store.foldMessages(parent.id).at(-1);
+ assert.match(notice.parts[0].text,/"status":"completed"/);
+});

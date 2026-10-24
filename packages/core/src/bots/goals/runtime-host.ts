@@ -24,12 +24,12 @@ export interface GoalRuntimeHost {
  emitTrace?(sessionId: string, event: { kind: 'child_session'; payload: Record<string, unknown> }): void;
 }
 export function announceGoalState(host:GoalRuntimeHost,goal:BotGoal):void {
+ host.store.transaction(()=>{
  goal=new BotGoalService(host.store,Date.now,goal.sessionId).get(goal.botId,goal.id)??goal;
  if(!['completed','blocked','failed','pending_review'].includes(goal.status))return;
  const key=`bot.goal-notice:${goal.id}`;
  const version=`${goal.revision}:${goal.status}:${goal.blockedReason??''}`;
  if(host.store.getDaemonControl<string>(key)===version)return;
- host.store.transaction(()=>{
   host.store.setDaemonControl(key,version);
   host.store.appendMessage(goal.sessionId,'system',[{type:'text',text:`[goal update] ${JSON.stringify({id:goal.id,title:goal.title,status:goal.status,progress:goal.progress,reason:goal.blockedReason,nextStep:goal.nextStep})}`}],{key:`goal-notice:${goal.id}:${version}`});
  });
