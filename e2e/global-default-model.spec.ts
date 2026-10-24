@@ -43,8 +43,12 @@ function linesOf(items:Box[]){
  }
  return groups;
 }
-async function defaultRowBoxes(page:Page){
+async function defaultRowBoxes(page:Page,empty=false){
  await expect(page.getByLabel('全局默认模型',{exact:true})).toBeVisible();
+ if(!empty){
+  await expect(page.getByLabel('全局默认模型',{exact:true})).toHaveValue(`${provider.id}::enabled-first`);
+  await expect(page.locator('.model-default-row > .muted')).toBeVisible();
+ }
  return page.evaluate(()=>{
   const body=document.querySelector('#card-model-providers .ui-group__body');
   const row=document.querySelector('.model-default-row');
@@ -98,7 +102,7 @@ test('empty global default row stays centered on the card edge [AC:global-defaul
  await mockCatalog(page,true);
  await page.setViewportSize({width:1440,height:900});
  await page.goto('/#/settings/models');
- const boxes=await defaultRowBoxes(page);
+ const boxes=await defaultRowBoxes(page,true);
  expect(boxes).toBeTruthy();
  expect(boxes!.note).toBeNull();
  const {body,label,select}=boxes!;
