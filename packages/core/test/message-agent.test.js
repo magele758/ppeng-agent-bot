@@ -7,7 +7,7 @@ import { SqliteStateStore } from '../dist/storage.js';
 import { RawAgentRuntime } from '../dist/runtime.js';
 import { waitFor } from './helpers/settle.js';
 import { createBot, updateBot } from '../dist/bots/index.js';
-import { filterToolsForSession, resolveTurnTools } from '../dist/turn/resolve-turn-tools.js';
+import { authorizeToolsForSession, filterToolsForSession, resolveTurnTools } from '../dist/turn/resolve-turn-tools.js';
 import {
   createMessageAgentTool,
   effectiveRelayHop,
@@ -26,6 +26,18 @@ function tempStore() {
   const store = new SqliteStateStore(join(dir, 'state.db'));
   return { dir, store };
 }
+
+test('room retrieval extends session allowlists while agent restrictions remain authoritative [AC:bot-room-recall#AC-2] [AC:bot-room-recall#AC-3]', () => {
+  const retrieval = ['room_history_search', 'room_history_read', 'room_material_list', 'room_material_read'];
+  const tools = ['read_file', 'bash', ...retrieval].map(name => ({ name, description: name, inputSchema: {}, approvalMode: 'never', sideEffectLevel: 'none', execute: async () => ({ ok: true, content: '' }) }));
+  const agent = { id: 'general', name: 'General', role: 'assistant', instructions: '', capabilities: [] };
+  const session = { id: 'room-member', mode: 'chat', agentId: agent.id, metadata: { roomId: 'room', allowedTools: ['read_file'] } };
+  const names = (selectedAgent, selectedSession) => authorizeToolsForSession({ env: {}, tools, agent: selectedAgent, session: selectedSession }).tools.map(tool => tool.name);
+  assert.deepEqual(names(agent, session), ['read_file', ...retrieval]);
+  assert.deepEqual(names(agent, { ...session, metadata: { allowedTools: ['read_file'] } }), ['read_file']);
+  assert.deepEqual(names({ ...agent, allowedTools: ['read_file', 'room_history_read'] }, session), ['read_file', 'room_history_read']);
+  assert.deepEqual(session.metadata.allowedTools, ['read_file']);
+});
 
 function facadeHost(store) {
   return {

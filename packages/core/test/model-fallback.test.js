@@ -65,6 +65,30 @@ const A = { providerId: 'prov-a', modelId: 'alpha-1' };
 const B = { providerId: 'prov-b', modelId: 'beta-1' };
 const C = { providerId: 'prov-c', modelId: 'gamma-1' };
 
+test('saved fallback toggle retains its chain and immediately controls planning [AC:model-fallback#AC-1]', () => {
+  const store = tempStore();
+  try {
+    seedProviders(store);
+    const plan = () => planModelFallback({ store, primary: { name: 'primary' }, primaryRef: A, env: {} });
+    assert.equal(writeModelFallbackSettings(store, { chain: [B], enabled: false }, {}).enabled, false);
+    assert.equal(readModelFallbackSettings(store).enabled, false);
+    assert.deepEqual(readModelFallbackSettings(store).chain, [B]);
+    assert.equal(plan(), undefined);
+    assert.equal(modelFallbackPayload(store, {}).settings.enabled, false);
+    assert.equal(writeModelFallbackSettings(store, { enabled: true }, {}).enabled, true);
+    assert.equal(readModelFallbackSettings(store).enabled, true);
+    assert.ok(plan());
+    writeModelFallbackSettings(store, { chain: [C] }, {});
+    assert.equal(readModelFallbackSettings(store).enabled, true);
+    assert.deepEqual(readModelFallbackSettings(store).chain, [C]);
+    assert.equal(writeModelFallbackSettings(store, { enabled: false }, {}).enabled, false);
+    assert.equal(plan(), undefined);
+    const legacy = normalizeModelFallbackSettings({ chain: [B], enabled: 'false' });
+    assert.equal(Object.hasOwn(legacy, 'enabled'), false);
+    assert.deepEqual(legacy.chain, [B]);
+  } finally { store.db.close(); }
+});
+
 const cand = (name, ref) => ({ adapter: { name }, ref, label: name });
 const ok = (text) => ({ stopReason: 'end', assistantParts: [{ type: 'text', text }] });
 
