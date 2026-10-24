@@ -9,6 +9,7 @@
 .bot-goals ul { padding-left: 18px; margin: 0; }
 .bot-goals label { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .bot-goals input { width: 90px; }
+.bot-goals__actions input[name="reason"] { width: min(220px, 100%); }
 .bot-goals select { max-width: 220px; }
 .bot-goals__actions, .bot-goals__actions form { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 .bot-goals__settings { display: grid; gap: 10px; }

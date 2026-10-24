@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
-import { goalActions, goalsPanelState, type BotGoalsSnapshot, type BotGoalSettings, type GoalStrategy } from '@/lib/bot-goals';
+import { goalActions, goalVerifyRequest, goalsPanelState, type BotGoalsSnapshot, type BotGoalSettings, type GoalStrategy } from '@/lib/bot-goals';
 import './bot-goals.css';
 
 export function BotGoals({ botId, sessionId, selectedGoalId, onSelectGoal, initialSnapshot = null }: {
@@ -16,6 +16,7 @@ export function BotGoals({ botId, sessionId, selectedGoalId, onSelectGoal, initi
   const [listFailed, setListFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
   const alive = useRef(true);
   const revision = useRef(0);
   const base = `/api/bots/${encodeURIComponent(botId)}/goals`;
@@ -81,7 +82,14 @@ export function BotGoals({ botId, sessionId, selectedGoalId, onSelectGoal, initi
         </dl>
         <p>{t('goals.usage', { cost: (goal.costUsd ?? 0).toFixed(2), budget: goal.budgetUsd ?? 0 })}</p>
         {goal.draining && <p>{t('goals.draining')}</p>}
-        <div className="bot-goals__actions">{goalActions(goal.status).map(action => <button className="btn btn-sm" key={action} type="button" disabled={busy} onClick={() => void mutate(`${base}/${encodeURIComponent(goal.id)}/actions`, 'POST', action === 'verify' ? { action, accepted: true } : { action })}>{t(`goals.${action}`)}</button>)}
+        <div className="bot-goals__actions">{goalActions(goal.status).map(action => <button className="btn btn-sm" key={action} type="button" disabled={busy} data-testid={action === 'verify' ? `bot-goal-verify-${goal.id}` : undefined} onClick={() => void mutate(`${base}/${encodeURIComponent(goal.id)}/actions`, 'POST', action === 'verify' ? goalVerifyRequest(true) : { action })}>{t(`goals.${action}`)}</button>)}
+        {goal.status === 'pending_review' && (rejectingId === goal.id
+          ? <form data-testid={`bot-goal-reject-form-${goal.id}`} onSubmit={e => { e.preventDefault(); const reason = (e.currentTarget.elements.namedItem('reason') as { value?: string } | null)?.value ?? ''; void mutate(`${base}/${encodeURIComponent(goal.id)}/actions`, 'POST', goalVerifyRequest(false, reason)).then(() => { if (alive.current) setRejectingId(current => current === goal.id ? null : current); }); }}>
+            <label>{t('goals.rejectReason')}<input name="reason" type="text" maxLength={500} placeholder={t('goals.rejectReasonPlaceholder')} /></label>
+            <button className="btn btn-sm" type="submit" disabled={busy} data-testid={`bot-goal-reject-submit-${goal.id}`}>{t('goals.rejectSubmit')}</button>
+            <button className="btn btn-sm" type="button" disabled={busy} onClick={() => setRejectingId(null)}>{t('goals.rejectDismiss')}</button>
+          </form>
+          : <button className="btn btn-sm" type="button" disabled={busy} data-testid={`bot-goal-reject-${goal.id}`} onClick={() => setRejectingId(goal.id)}>{t('goals.reject')}</button>)}
         {goalActions(goal.status).length > 0 && <form onSubmit={e => { e.preventDefault(); const data = new FormData(e.currentTarget); void mutate(`${base}/${encodeURIComponent(goal.id)}/actions`, 'POST', { action: 'reprioritize', priority: Number(data.get('priority')) }); }}>
           <label>{t('goals.priority')}<input key={goal.priority} name="priority" type="number" min={-100} max={100} required defaultValue={goal.priority}/></label><button className="btn btn-sm" disabled={busy}>{t('goals.setPriority')}</button>
         </form>}</div>

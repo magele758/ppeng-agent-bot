@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { goalMessage, goalActions } from './bot-goals.ts';
+import { goalMessage, goalActions, goalVerifyRequest } from './bot-goals.ts';
 
 test('explicit goal selection associates an interruption without replacing a command', () => {
   assert.equal(goalMessage('Keep the existing styles', 'g-login'), '[goal:g-login] Keep the existing styles');
@@ -14,6 +14,12 @@ test('completed and cancelled goals cannot accidentally be resumed from the pane
   assert.deepEqual(goalActions('paused'), ['resume', 'cancel']);
   assert.deepEqual(goalActions('waiting'), ['pause', 'cancel']);
   assert.deepEqual(goalActions('pending_review'), ['verify', 'cancel']);
+});
+test('accept keeps accepted true; send-back posts accepted false and drops a blank reason', () => {
+  assert.deepEqual(goalVerifyRequest(true), { action: 'verify', accepted: true });
+  assert.deepEqual(goalVerifyRequest(false, '  还差最后一项核对  '), { action: 'verify', accepted: false, reason: '还差最后一项核对' });
+  assert.deepEqual(goalVerifyRequest(false, '   '), { action: 'verify', accepted: false });
+  assert.deepEqual(goalVerifyRequest(false), { action: 'verify', accepted: false });
 });
 
 test('terminal goal cards are archived instead of pinned [AC:unified-bot-goal-lifecycle#AC-3]', async () => {

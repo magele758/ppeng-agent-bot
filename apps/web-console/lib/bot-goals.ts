@@ -21,6 +21,11 @@ export function goalsPanelState<T extends { status: string }>(goals: readonly T[
   return { show: items.length >= 2, count: items.length, items };
 }
 
+export function goalVerifyRequest(accepted: boolean, reason?: string): { action: 'verify'; accepted: boolean; reason?: string } {
+  const trimmed = reason?.trim();
+  return { action: 'verify', accepted, ...(trimmed ? { reason: trimmed } : {}) };
+}
+
 export function goalActions(status: GoalStatus): Array<'pause' | 'resume' | 'cancel' | 'verify'> {
   if (['completed', 'failed', 'cancelled'].includes(status)) return [];
   if (status === 'pending_review') return ['verify', 'cancel'];

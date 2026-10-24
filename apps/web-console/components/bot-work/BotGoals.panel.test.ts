@@ -48,6 +48,8 @@ function translate(key: string, vars?: Record<string, string>) {
   return text;
 }
 
+const posted: Array<{ path: string; body: Record<string, unknown> }> = [];
+
 function loadPanel() {
   const source = readFileSync(new URL('./BotGoals.tsx', import.meta.url), 'utf8');
   const compiled = ts.transpileModule(source, {
@@ -61,9 +63,12 @@ function loadPanel() {
   const mod = { exports: {} as { BotGoals?: React.ComponentType<Record<string, unknown>> } };
   const requireComponent = (id: string) => {
     if (id.endsWith('.css')) return {};
-    if (id === 'react') return React;
+    if (id === 'react') return new Proxy(React, { get: (target, key) => (React as unknown as Record<PropertyKey, unknown>)[key] ?? (target as unknown as Record<PropertyKey, unknown>)[key] });
     if (id === '@/lib/i18n') return { useI18n: () => ({ t: translate }) };
-    if (id === '@/lib/api') return { api: async () => ({}) };
+    if (id === '@/lib/api') return { api: async (path: string, init?: { method?: string; body?: string }) => {
+      if (init?.method === 'POST') posted.push({ path, body: JSON.parse(init.body ?? '{}') as Record<string, unknown> });
+      return {};
+    } };
     if (id === '@/lib/bot-goals') return localRequire('../../lib/bot-goals.ts');
     return localRequire(id);
   };
@@ -71,7 +76,7 @@ function loadPanel() {
   return mod.exports.BotGoals!;
 }
 
-const BotGoals = loadPanel();
+let BotGoals = loadPanel();
 
 function render(goals: ReturnType<typeof goal>[]) {
   return renderToStaticMarkup(React.createElement(BotGoals, {
@@ -159,4 +164,94 @@ test('the panel follows the in-progress count without a reload [AC:bot-goals-pan
   assert.equal(render([done, queued]), '');
   assert.match(render([running, queued]), /目标与进展 \(2\)/);
   assert.equal(render([running]), '');
+});
+
+const slots: Array<{ value: unknown }> = [];
+const realUseState = React.useState;
+const realUseRef = React.useRef;
+const realUseEffect = React.useEffect;
+let replay = false;
+
+function memoryUseState<T,>(initial: T): [T, (action: T | ((value: T) => T)) => void] {
+  const slot = replay ? slots[memoryUseState.cursor++]! : (() => { const created = { value: initial as unknown }; slots.push(created); return created; })();
+  const set = (action: T | ((value: T) => T)) => {
+    slot.value = typeof action === 'function' ? (action as (value: T) => T)(slot.value as T) : action;
+  };
+  return [slot.value as T, set];
+}
+memoryUseState.cursor = 0;
+
+function installMemoryState() {
+  slots.length = 0;
+  replay = false;
+  React.useState = memoryUseState as typeof React.useState;
+  React.useRef = ((initial: unknown) => ({ current: initial })) as typeof React.useRef;
+  React.useEffect = (() => undefined) as typeof React.useEffect;
+}
+
+function renderReview(): React.ReactElement {
+  memoryUseState.cursor = 0;
+  if (slots.length === 0) replay = false;
+  React.useState = memoryUseState as typeof React.useState;
+  const element = (BotGoals as unknown as (props: Record<string, unknown>) => React.ReactElement)({
+    botId: 'bot-a',
+    sessionId: 'sess-current',
+    initialSnapshot: {
+      goals: [goal('g-review', 'Check the report', 'pending_review'), goal('g-run', 'Keep watching', 'running')],
+      settings,
+    },
+  });
+  replay = true;
+  return element;
+}
+
+type SubmitEvent = { preventDefault(): void; currentTarget: { elements: { namedItem(name: string): { value?: string } | null } } };
+
+function controls(node: React.ReactNode, found: { accept?: () => void | Promise<void>; openReject?: () => void; submit?: (event: SubmitEvent) => void | Promise<void> } = {}): typeof found {
+  if (!React.isValidElement(node)) return found;
+  const element = node as React.ReactElement<{ 'data-testid'?: string; onClick?: () => void; onSubmit?: (event: SubmitEvent) => void; children?: React.ReactNode }>;
+  const id = element.props['data-testid'];
+  if (id === 'bot-goal-verify-g-review' && element.props.onClick) found.accept = element.props.onClick;
+  if (id === 'bot-goal-reject-g-review' && element.props.onClick) found.openReject = element.props.onClick;
+  if (id === 'bot-goal-reject-form-g-review' && element.props.onSubmit) found.submit = element.props.onSubmit;
+  React.Children.forEach(element.props.children, child => controls(child, found));
+  return found;
+}
+
+test('pending review can accept or send the completion back', async () => {
+  const html = render([
+    goal('g-review', 'Check the report', 'pending_review'),
+    goal('g-run', 'Keep watching', 'running'),
+  ]);
+  assert.match(html, /核对完成/);
+  assert.match(html, /打回/);
+  assert.equal(html.includes('bot-goal-reject-g-run'), false);
+  posted.length = 0;
+  installMemoryState();
+  BotGoals = loadPanel();
+  try {
+    const first = controls(renderReview());
+    assert.equal(typeof first.openReject, 'function');
+    assert.equal(first.submit, undefined);
+    await first.accept!();
+    assert.deepEqual(posted.at(-1), {
+      path: '/api/bots/bot-a/goals/g-review/actions',
+      body: { sessionId: 'sess-current', action: 'verify', accepted: true },
+    });
+    first.openReject!();
+    const opened = controls(renderReview());
+    assert.equal(typeof opened.submit, 'function');
+    await opened.submit!({
+      preventDefault() {},
+      currentTarget: { elements: { namedItem: (name: string) => name === 'reason' ? { value: '还差最后一项核对' } : null } },
+    });
+    assert.deepEqual(posted.at(-1), {
+      path: '/api/bots/bot-a/goals/g-review/actions',
+      body: { sessionId: 'sess-current', action: 'verify', accepted: false, reason: '还差最后一项核对' },
+    });
+  } finally {
+    React.useState = realUseState;
+    React.useRef = realUseRef;
+    React.useEffect = realUseEffect;
+  }
 });
