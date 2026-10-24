@@ -97,7 +97,8 @@ export function createRuntimeGoalDispatchTool(host: RuntimeGoalDispatchHost): To
           const worker = await host.runWorker(freshContext(workerContext),request);
           return {ok:worker.status!=='failed'&&worker.status!=='blocked',content:JSON.stringify({goalWorker:worker})};
         }
-        const spawned = (host.authorizedTools(freshContext(workerContext), request).find(tool => tool.name === 'spawn_subagent') ?? host.deps().tools.find(tool => tool.name === 'spawn_subagent'))?.execute(workerContext, toolArgs);
+        const spawnTool = host.authorizedTools(freshContext(workerContext), request).find(tool => tool.name === 'spawn_subagent') ?? host.deps().tools.find(tool => tool.name === 'spawn_subagent');
+        const spawned = spawnTool ? await spawnTool.execute(workerContext, toolArgs) : undefined;
         if (typeof spawned?.metadata?.childSessionId === 'string') spawnedChildId = spawned.metadata.childSessionId;
         return spawned ?? {ok:false,content:'spawn_subagent is unavailable'};
       });
@@ -108,7 +109,8 @@ export function createRuntimeGoalDispatchTool(host: RuntimeGoalDispatchHost): To
         } catch { /* Normal gateway refusals and unknown outcomes remain blocked below. */ }
       }
       const childSessionId = spawnedChildId ?? (typeof result.metadata?.childSessionId === 'string' ? result.metadata.childSessionId : undefined);
-      return {status:result.waitingApproval?'waiting':result.ok?'candidate_completed':'blocked',waitingApproval:result.waitingApproval,content:result.content,...(childSessionId?{reference:`session:${childSessionId}`}:{})};
+      if (childSessionId) return {status:'waiting',reference:`session:${childSessionId}`,content:result.content,waitingApproval:result.waitingApproval};
+      return {status:result.waitingApproval?'waiting':result.ok?'candidate_completed':'blocked',waitingApproval:result.waitingApproval,content:result.content};
     },
     invokeAuthorizedTool:invoke,
     onResult(context,request,result) {
