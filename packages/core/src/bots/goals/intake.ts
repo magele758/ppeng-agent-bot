@@ -51,7 +51,13 @@ export function classifyGoalMessage(raw: string): GoalMessageIntent {
   }
   if (requestsWork(text)) return { kind: 'new_goal', ...base };
   if (/^(为什么|什么是|请解释|解释一下|what is|why\b|explain\b)/i.test(text) || /[?？]$/.test(text)) return { kind: 'chat', ...base };
+  if (isCoordinationInstruction(text)) return { kind: 'chat', ...base };
   return { kind: 'new_goal', ...base };
+}
+function isCoordinationInstruction(text: string): boolean {
+  if (/(?:创建|写入|修复|实现|修改|添加|开发|部署|编写)/.test(text)) return false;
+  return /(?:并行推进|不要把[\s\S]{0,16}收成一个目标|各自保留真实文件)/.test(text)
+    || /^(?:请)?同时完成[\s\S]{0,16}独立的事[。.!！]?$/.test(text.trim());
 }
 
 function independentClause(text:string,piece:string):boolean {
@@ -75,7 +81,15 @@ function fallbackClauses(text:string):string[] {
   return clauses;
 }
 
+function explicitGoalAmend(raw: string, goals: GoalIntakeContext[]): GoalIntentProposal | undefined {
+  const named = goals.filter(goal => raw.includes(goal.id));
+  if (named.length !== 1) return undefined;
+  if (!/(追加要求|补充要求|补充约束|必须额外|不要重做)/.test(raw)) return undefined;
+  return { kind: 'amend_goal', goalId: named[0]!.id, text: raw.trim() };
+}
 function fallbackIntents(raw: string, goals: GoalIntakeContext[]): GoalIntentProposal[] {
+  const namedAmend = explicitGoalAmend(raw, goals);
+  if (namedAmend) return [namedAmend];
   const explicit = raw.match(targetPattern);
   const text = (explicit ? raw.slice(explicit[0].length) : raw).trim();
   const clauses = fallbackClauses(text);

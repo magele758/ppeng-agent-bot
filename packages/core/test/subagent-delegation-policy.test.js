@@ -319,6 +319,23 @@ test('restart marks an in-flight subagent unknown and does not replay it as succ
   });
   const runningChat = first.createChatSession({ title: 'chat', message: 'still going' });
   first.store.updateSession(runningChat.id, { status: 'running' });
+  const botParent = first.store.createSession({
+    title: 'Bot Chat',
+    mode: 'chat',
+    agentId: 'general',
+    metadata: { botId: 'bot-1', canonicalBotChat: true }
+  });
+  first.store.claimWriter(botParent.id, 'run_dead_bot_chat');
+  first.store.updateSession(botParent.id, { status: 'running' });
+  const botChild = first.store.createSession({
+    title: 'goal child',
+    mode: 'subagent',
+    agentId: 'general',
+    parentSessionId: botParent.id,
+    metadata: { botId: 'bot-1' }
+  });
+  first.store.claimWriter(botChild.id, 'run_dead_bot_child');
+  first.store.updateSession(botChild.id, { status: 'running' });
   await first.destroy();
 
   let calls = 0;
@@ -341,17 +358,44 @@ test('restart marks an in-flight subagent unknown and does not replay it as succ
   assert.notEqual(interruptedChat?.status, 'unknown');
   assert.equal(interruptedChat?.status, 'failed');
   assert.equal(interruptedChat?.metadata?.outcome?.reason, 'process_interrupted');
+  await second.destroy();
 
-  const replayed = await second.runSession(runningChild.id);
+  const resumed = new RawAgentRuntime({
+    repoRoot,
+    stateDir,
+    modelAdapter: new ScriptedAdapter(() => ({
+      stopReason: 'end',
+      assistantParts: [{ type: 'text', text: 'unused' }]
+    }))
+  });
+  const resumedParent = resumed.getSession(botParent.id);
+  const resumedChild = resumed.getSession(botChild.id);
+  assert.equal(resumedParent?.status, 'running');
+  assert.equal(resumedParent?.activeWriterRunId, undefined);
+  assert.equal(resumedChild?.status, 'unknown');
+  assert.equal(resumedChild?.activeWriterRunId, undefined);
+  resumed.store.appendMessage(botParent.id, 'system', [{ type: 'text', text: '[goal update] resumed' }]);
+  assert.match(JSON.stringify(resumed.getSessionMessages(botParent.id)), /resumed/);
+  await resumed.destroy();
+
+  const checker = new RawAgentRuntime({
+    repoRoot,
+    stateDir,
+    modelAdapter: new ScriptedAdapter(() => ({
+      stopReason: 'end',
+      assistantParts: [{ type: 'text', text: 'unused' }]
+    }))
+  });
+  const replayed = await checker.runSession(runningChild.id);
   assert.equal(replayed.status, 'unknown');
   assert.equal(calls, 0);
-  const transcript = JSON.stringify(second.getSessionMessages(runningChild.id));
+  const transcript = JSON.stringify(checker.getSessionMessages(runningChild.id));
   assert.equal(transcript.includes('replayed-as-success'), false);
   assert.deepEqual(
     decideSteerAdmission({ text: 'keep going', session: replayed }),
     { admit: false, reason: 'session_ended' }
   );
-  await second.destroy();
+  await checker.destroy();
 });
 
 test('steering a subagent also starts clean and without the denied tools [AC:subagent-delegation#AC-1] [AC:subagent-delegation#AC-2]', async () => {

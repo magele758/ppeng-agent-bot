@@ -22,6 +22,8 @@ export interface GoalRuntimeHost {
  judge?: ModelAdapter['completeText'];
  judgeForSession?(session: SessionRecord): ModelAdapter['completeText'];
  emitTrace?(sessionId: string, event: { kind: 'child_session'; payload: Record<string, unknown> }): void;
+ /** True when this process no longer owns the execution, including after a restart. */
+ executionInterrupted?(sessionId: string): boolean;
 }
 export function announceGoalState(host:GoalRuntimeHost,goal:BotGoal):void {
  host.store.transaction(()=>{

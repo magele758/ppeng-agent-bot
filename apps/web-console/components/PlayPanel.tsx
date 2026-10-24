@@ -74,6 +74,7 @@ import { BotEntryDialog } from './BotEntryDialog';
 import { BotCreateForm } from './sections/agents/BotCreateForm';
 import { BotGroupCreateForm } from './sections/agents/BotGroupCreateForm';
 import { useLab } from './shell/LabProvider';
+import { approvalsForChat } from '@/lib/goal-chat-approvals';
 
 function isCoreExecAgent(id: string): boolean {
   return id === 'general' || id === 'main';
@@ -627,11 +628,8 @@ export function PlayPanel({
     : '';
 
   const sessionApprovals = useMemo(
-    () =>
-      approvals.filter(
-        (a) => a.sessionId === selectedSessionId && (!a.status || a.status === 'pending')
-      ),
-    [approvals, selectedSessionId]
+    () => approvalsForChat(selectedSessionId, approvals, catalogSessions ?? sessions),
+    [approvals, catalogSessions, selectedSessionId, sessions]
   );
 
   const activityItems = useMemo(
