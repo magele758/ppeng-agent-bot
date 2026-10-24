@@ -91,7 +91,7 @@ const out = resolve(options.out ?? join(root, 'test-results', `harness-quality-$
 mkdirSync(dirname(out), { recursive: true }); mkdirSync(out); // Never overwrite an existing run.
 const workspace = mkdtempSync(join(tmpdir(), 'ppeng-quality-'));
 const records = [];
-const driverHash=()=>hash(['compare.mjs','quality.mjs','quality-worker.mjs','bot-quality.mjs','configured-model.mjs','bot-reliability.mjs','paired-runner.mjs'].map(file=>readFileSync(join(root,'scripts/agent-eval',file),'utf8')));
+const driverHash=()=>hash(['compare.mjs','quality.mjs','quality-worker.mjs','bot-quality.mjs','configured-model.mjs','bot-reliability.mjs','paired-runner.mjs','completion-audit.mjs'].map(file=>readFileSync(join(root,'scripts/agent-eval',file),'utf8')));
 const manifest = { schemaVersion: 1, startedAt: new Date().toISOString(), node: process.version, simulation: Boolean(options.simulation),
   mode:options.baselineOnly?'baseline':'compare', selection:configured?.selection,
   suiteHash: hash(suite), experimentHash: hash(experiment), driverHash: driverHash(),

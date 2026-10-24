@@ -319,7 +319,8 @@ function evidenceTranscript(host:GoalRuntimeHost,sessionId:string) {
 }
 function assistantTranscript(messages:ReturnType<GoalRuntimeHost['store']['foldMessages']>,startedAt:string) {
  const tail=messages.filter(m=>Date.parse(m.createdAt)>=Date.parse(startedAt));
- const assistant=tail.filter(m=>m.role==='assistant').flatMap(m=>m.parts.filter(p=>p.type==='text').map(p=>p.text)).join('\n').slice(-6000);
+ const final=tail.findLast(m=>m.role==='assistant'&&m.parts.some(p=>p.type==='text'));
+ const assistant=(final?.parts.filter(p=>p.type==='text').map(p=>p.text).join('\n')??'').slice(-6000);
  return {tail,assistant};
 }
 function baseReport(checkpoint:GoalReport|undefined,assistant:string,goal:BotGoal):GoalReport {

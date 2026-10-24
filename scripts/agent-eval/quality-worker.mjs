@@ -4,17 +4,18 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { hash, finalAssistantOutput } from './quality.mjs';
 import { readWireUsage, sourceChecksPass, wireRequestPurpose } from './bot-quality.mjs';
+import { observeTextCompletion, serializeEvidence } from './completion-audit.mjs';
 
 const [inputFile, outputFile] = process.argv.slice(2);
 const { task, variant, model, limits, workspace, simulation, trial } = JSON.parse(readFileSync(inputFile, 'utf8'));
 const outcome = { output: '', status: 'error', state: {}, toolCalls: [], promptShapes: [], modelCalls: 0,
-  tokens: null, invariantsOk: false, infrastructureError: false, modelErrors: [] };
+  tokens: null, invariantsOk: false, infrastructureError: false, modelErrors: [], auxiliaryRequests: [] };
 const started = Date.now();
 const wire=[]; const pendingWire=[]; let networkCalls=0;
 const checkpoint=()=>writeFileSync(outputFile,safeJson({...outcome,durationMs:Date.now()-started}),{mode:0o600});
 const secret = process.env[model.apiKeyEnv ?? 'RAW_AGENT_API_KEY'];
 const safeError = error => String(error?.message ?? error).replaceAll(secret || '\0', '[REDACTED]').slice(0, 1000);
-const safeJson=value=>JSON.stringify(value,null,2).replaceAll(secret?JSON.stringify(secret).slice(1,-1):'\0','[REDACTED]');
+const safeJson=value=>serializeEvidence(value,secret);
 
 try {
   const core = await import(pathToFileURL(join(variant.repoRoot, 'packages/core/dist/exports/public.js')).href);
@@ -146,7 +147,7 @@ try {
     runTurn: input => turn(input), runTurnStream: (input, stream) => turn(input, stream),
     async summarizeMessages(input) { usageComplete = false; return adapter.summarizeMessages(input); }
   };
-  if (adapter.completeText) measured.completeText = async input => { usageComplete = false; return adapter.completeText(input); };
+  if (adapter.completeText) measured.completeText = observeTextCompletion(async input => { usageComplete = false; return adapter.completeText(input); }, outcome.auxiliaryRequests, checkpoint);
   const general = core.builtinAgents.find(a => a.id === 'general');
   const runtime = new core.RawAgentRuntime({ repoRoot, stateDir, modelAdapter: measured,
     agents: [{ ...general, allowedTools: task.contextSeed ? ['history_search', 'history_read', 'retrieve_tool_result'] : tools.map(t => t.name) }],
@@ -230,7 +231,7 @@ try {
   outcome.tokens = usageComplete ? tokens : null;
   if(task.bot){
     const goals=runtime.store.getDaemonControl('bot_goals:'+session.metadata.botId)?.goals??[];
-    outcome.botEvidence={...outcome.botEvidence,goalStatus:goals.at(-1)?.status??'none',strategy:goals.at(-1)?.strategy??'none',...(task.files?.['calculate.js']?{source:readFileSync(join(repoRoot,'calculate.js'),'utf8')}:{})};
+    outcome.botEvidence={...outcome.botEvidence,goals:goals.map(({id,status,progress,nextStep,evidence})=>({id,status,progress,nextStep,evidence})),goalStatus:goals.at(-1)?.status??'none',strategy:goals.at(-1)?.strategy??'none',...(task.files?.['calculate.js']?{source:readFileSync(join(repoRoot,'calculate.js'),'utf8')}:{})};
     outcome.state=existsSync(artifact)?JSON.parse(readFileSync(artifact,'utf8')):{};
   }
   outcome.transcript = transcript;

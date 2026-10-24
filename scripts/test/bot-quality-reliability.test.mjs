@@ -6,7 +6,7 @@ import { runPairedTasks } from '../agent-eval/paired-runner.mjs';
 import { DEFAULT_POLICY, compareQuality } from '../agent-eval/quality.mjs';
 import { readFileSync } from 'node:fs';
 
-test('expanded tasks preserve original cases and strict policy without duplicate prompts [AC:bot-quality-reliability#AC-3] [AC:bot-quality-reliability#AC-4]',()=>{
+test('expanded tasks preserve original cases and strict policy without duplicate prompts [AC:bot-completion-reliability#AC-5] [AC:bot-quality-reliability#AC-3] [AC:bot-quality-reliability#AC-4]',()=>{
  const suite=buildReliabilitySuite();assert.ok(suite.length>=30);assert.deepEqual(suite.slice(0,16),buildBotSuite());
  assert.equal(new Set(suite.map(t=>t.turns.join('\n'))).size,suite.length);
  const cfg=JSON.parse(readFileSync('scripts/agent-eval/experiments/bot-reliability.json'));
