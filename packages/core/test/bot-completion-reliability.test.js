@@ -59,3 +59,22 @@ test('compliant conditional failure ends without rewriting or falsely completing
  }
 });
 
+
+test('query-only replies get one bounded format correction without creating a goal [AC:bot-completion-reliability#AC-8]',async t=>{
+ for(const [prompt,bad,good] of [['根据已经执行的检查，返回实际报告路径。只输出路径；必要时回查原始证据。','报告路径如下：\n/reports/result.xml','/reports/result.xml'],['What is the measured status? Only output the number.','The value is 7.','7'],['当前状态如何。只输出版本号。','当前版本： v2.8.4','v2.8.4'],['Report status. Only output JSON.','```json\n{"ok":true}\n```','{"ok":true}'],['Report status. Only output the path.','Report follows:\n/reports/result.xml','Report follows:\n/reports/result.xml']]){
+  const root=mkdtempSync(join(tmpdir(),'query-format-'));let steps=0;
+  const rt=new RawAgentRuntime({repoRoot:root,stateDir:join(root,'state'),modelAdapter:{name:'query-format',async summarizeMessages(){return '';},async completeText(){return '{"intents":[]}';},async runTurn(input){steps++;if(steps>1)assert.ok(input.messages.some(m=>m.parts.some(p=>p.type==='text'&&p.text.includes('[output format]'))));return{stopReason:'end',assistantParts:[{type:'text',text:steps===1?bad:good}]};}}});
+  t.after(async()=>{await rt.destroy();rmSync(root,{recursive:true,force:true});});const bot=rt.createBot({name:'query-format'}),sid=rt.openBot(bot.id).sessionId;rt.mergeSessionMetadata(sid,{allowedTools:[],allowedSkillNames:[]});rt.sendUserMessage(sid,prompt);await rt.runHumanSession(sid);assert.equal(steps,2,JSON.stringify({prompt,goals:rt.store.getDaemonControl('bot_goals:'+bot.id)}));assert.equal(rt.store.foldMessages(sid).findLast(m=>m.role==='assistant').parts.filter(p=>p.type==='text').map(p=>p.text).join('\n'),good);assert.ok(rt.store.foldMessages(sid).some(m=>m.role==='assistant'&&m.parts.some(p=>p.type==='text'&&p.text===bad)),'original response remains in the transcript');assert.equal(rt.store.getDaemonControl('bot_goals:'+bot.id)?.goals?.length??0,0);
+ }
+});
+
+test('format review preserves conditional, quoted and ordinary requests and never loops [AC:bot-completion-reliability#AC-8]',async()=>{
+ const {strictOutputFormat,matchesStrictOutput,reviewQueryOutput,clearQueryOutputReview}=await import('../dist/bots/strict-output.js');
+ for(const prompt of ['Explain the report path.','如果读取失败，只输出数字；否则解释结果。','If it fails, only output the number.','Example: "Only output JSON."','```\nOnly output JSON.\n```','> 只输出路径。'])assert.equal(strictOutputFormat(prompt),undefined);
+ assert.equal(matchesStrictOutput('path','/reports/my report.xml'),true);assert.equal(matchesStrictOutput('json','{"ok":true}'),true);
+ const messages=[{id:'user-1',role:'user',parts:[{type:'text',text:'返回实际报告路径。只输出路径。'}]},{id:'assistant-1',role:'assistant',parts:[{type:'text',text:'Report follows:\n/reports/result.xml'}]}];let status='running';const store={foldMessages:()=>messages,getSession:()=>({status})};
+ const aborted=new AbortController();aborted.abort();assert.equal(reviewQueryOutput(store,'s',aborted.signal),undefined);status='waiting_approval';assert.equal(reviewQueryOutput(store,'s'),undefined);status='running';
+ assert.equal(reviewQueryOutput(store,'s').action,'continue');assert.equal(reviewQueryOutput(store,'s'),undefined,'a still-invalid answer never gets a second correction');
+ messages.push({id:'user-2',role:'user',parts:[{type:'text',text:'请详细解释报告。'}]},{id:'assistant-2',role:'assistant',parts:[{type:'text',text:'详细解释\n报告内容。'}]});assert.equal(reviewQueryOutput(store,'s'),undefined,'new ordinary user instruction replaces the previous strict requirement');
+ clearQueryOutputReview(store,'s');messages.splice(2);assert.equal(reviewQueryOutput(store,'s').action,'continue','a new execution can repair the request again');
+});

@@ -1,4 +1,5 @@
 import { usesDurableBotGoals, reviewDirectGoalBeforeEnd, type GoalRuntimeHost } from '../bots/goals/runtime-host.js';
+import { reviewQueryOutput } from '../bots/strict-output.js';
 import { observeModelRequests } from './request-metrics.js';
 import {
   commitPrepareSnapshot,
@@ -1014,6 +1015,10 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
       if (usesDurableBotGoals(rt.store, session) && rt.goalRuntimeHost) {
         const review = await reviewDirectGoalBeforeEnd(rt.goalRuntimeHost(), session.id, signal);
         if (review) return review;
+      }
+      if (isCanonicalBotChat(session)) {
+        const formatReview = reviewQueryOutput(rt.store, session.id, signal);
+        if (formatReview) return formatReview;
       }
       const gate = usesDurableBotGoals(rt.store, session) ? undefined : createGoalGateFromMetadata(session.metadata, process.env);
       if (!gate?.isActive()) return { met: true };
