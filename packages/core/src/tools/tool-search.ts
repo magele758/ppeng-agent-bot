@@ -113,7 +113,7 @@ function hiddenOnDemandTools(
 }
 
 function deferredQueryMatches(tool: { name: string; description?: string }, query: string): boolean {
-  const tokens = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  const tokens = query.toLowerCase().trim().split(/\s+/).map(token => token.replace(/^\+/, '')).filter(Boolean);
   if (tokens.length === 0) return true;
   const group=toolGroup(tool.name);
   const hay = `${tool.name} ${tool.description ?? ''} ${group.id} ${group.labelEn} ${group.labelZh}`.toLowerCase();

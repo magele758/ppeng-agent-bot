@@ -1,3 +1,4 @@
+import type { GoalSnapshot } from '../bots/goals/types.js';
 import { filterFactoryTools } from '../factory/tool-policy.js';
 import { filterRoomTools } from '../rooms/tool-policy.js';
 import { ROOM_RETRIEVAL_TOOL_NAMES } from '../rooms/room-retrieval-tools.js';
@@ -167,6 +168,18 @@ export function authorizeToolsForSession(input: {
   return {allowExternalAiTools,tools:finalTools};
 }
 
+function goalEntryTools(session: SessionRecord, store?: WebSettingsReadStore): Set<string> {
+  const {botId, botGoalId, botGoalExecutionId, botWorkTaskId} = session.metadata;
+  if (botWorkTaskId || typeof botId !== 'string' || typeof botGoalId !== 'string') return new Set();
+  const snapshot = store?.getDaemonControl?.(`bot_goals:${botId}`) as GoalSnapshot | undefined;
+  const goal = snapshot?.goals.find(item => item.id === botGoalId);
+  const execution = snapshot?.executions.find(item => item.id === botGoalExecutionId);
+  if (!goal || !execution || goal.status !== 'running' || goal.activeExecutionId !== execution.id
+    || execution.goalId !== goal.id || execution.goalRevision !== goal.revision
+    || execution.sessionId !== session.id || execution.status !== 'running' || execution.leaseUntil <= Date.now()) return new Set();
+  return new Set(['goal_dispatch', 'goal_checkpoint']);
+}
+
 function partitionDeferred(
   agent: AgentSpec,
   session: SessionRecord,
@@ -175,9 +188,10 @@ function partitionDeferred(
 ) {
   const settings=readToolExposure(settingsStore);
   if(settings.mode==='full') return {visible:tools.filter(t=>!['tool_search','load_capability_tool'].includes(t.name)),hidden:[]};
+  const entries=goalEntryTools(session,settingsStore);
   const pinned=new Set(Object.hasOwn(settings.pinnedGroups,agent.id) ? settings.pinnedGroups[agent.id] : []);
   return splitDeferredTools({
-    tools: tools.map(tool => toolGroup(tool.name).tier > 1 && !pinned.has(toolGroup(tool.name).id) ? {...tool,disclosure:'on_demand'} : {...tool,disclosure:undefined}),
+    tools: tools.map(tool => toolGroup(tool.name).tier > 1 && !entries.has(tool.name) && !pinned.has(toolGroup(tool.name).id) ? {...tool,disclosure:'on_demand'} : {...tool,disclosure:undefined}),
     disclosedNames: readDisclosedToolNames(session.metadata)
   });
 }

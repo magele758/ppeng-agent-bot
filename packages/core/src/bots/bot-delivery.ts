@@ -5,6 +5,7 @@ export interface BotDelivery {
   sessionId: string;
   attempt: number;
   createdAt: string;
+  transcriptRange?: { start: number; end: number };
   executionStatus: string;
   report: string;
   failureReason: string | null;
@@ -22,6 +23,7 @@ const deliveryKey = (taskId: string, attempt: number) => `bot.delivery:${taskId}
 
 export function beginBotDelivery(store: SqliteStateStore, taskId: string, sessionId: string, attempt: number): void {
   store.setDaemonControl(baselineKey(taskId, attempt), {
+    startSeq: store.listSurfaceNodes(sessionId).at(-1)?.seq ?? 0,
     artifactIds: store.listArtifactsForSession(sessionId).map(artifact => artifact.id),
     startedAt: new Date().toISOString(),
   });
@@ -32,7 +34,7 @@ export function finishBotDelivery(store: SqliteStateStore, input: {
   taskId: string; sessionId: string; attempt: number; executionStatus: string; report: string; failureReason: string | null;
 }): void {
   if (readBotDelivery(store, input.taskId, input.attempt)) return;
-  const baseline = store.getDaemonControl<{ artifactIds: string[]; startedAt: string }>(baselineKey(input.taskId, input.attempt));
+  const baseline = store.getDaemonControl<{ artifactIds: string[]; startedAt: string; startSeq?: number }>(baselineKey(input.taskId, input.attempt));
   const receipts: BotDelivery['receipts'] = [];
   if (baseline && store.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='software_invocations'").get()) {
     const rows = store.db.prepare('SELECT payload FROM software_invocations WHERE task_id=? AND session_id=? AND started_at>=? ORDER BY seq')
@@ -56,6 +58,7 @@ export function finishBotDelivery(store: SqliteStateStore, input: {
       id: artifact.id, fileName: artifact.fileName ?? artifact.id, mimeType: artifact.mimeType, totalBytes: artifact.totalBytes,
     })) : [],
     receipts,
+    ...(baseline?.startSeq !== undefined ? {transcriptRange:{start:baseline.startSeq,end:store.listSurfaceNodes(input.sessionId).at(-1)?.seq ?? baseline.startSeq}} : {}),
   };
   store.setDaemonControl(deliveryKey(input.taskId, input.attempt), delivery);
 }

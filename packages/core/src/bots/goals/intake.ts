@@ -54,10 +54,31 @@ export function classifyGoalMessage(raw: string): GoalMessageIntent {
   return { kind: 'new_goal', ...base };
 }
 
+function independentClause(text:string,piece:string):boolean {
+  return /(?:独立的事|独立任务|independent tasks)/i.test(text)
+    && !/^(?:然后|再|必须|不要|then\b|verify\b|do not\b)/i.test(piece.trim());
+}
+function fallbackClauses(text:string):string[] {
+  const pieces = text.split(/(?:[；;\n]+|[，,]\s*(?=另外|顺便|然后|先|再|暂停|取消|恢复|继续)|\s+and\s+(?=then\b|pause\b|cancel\b|resume\b|also\b))/i).filter(Boolean);
+  const clauses: string[] = [];
+  for (const piece of pieces) {
+    const previous = clauses.at(-1);
+    const separate = independentClause(text,piece) || /^(?:另外|顺便|also\b)/i.test(piece.trim())
+      || ['pause', 'cancel', 'resume', 'query'].includes(classifyGoalMessage(piece).kind)
+      || (previous && ['pause', 'cancel', 'resume', 'query'].includes(classifyGoalMessage(previous).kind));
+    if (!previous || separate) clauses.push(piece);
+    else {
+      const start = text.indexOf(previous);
+      clauses[clauses.length - 1] = text.slice(start, text.indexOf(piece, start + previous.length) + piece.length);
+    }
+  }
+  return clauses;
+}
+
 function fallbackIntents(raw: string, goals: GoalIntakeContext[]): GoalIntentProposal[] {
   const explicit = raw.match(targetPattern);
   const text = (explicit ? raw.slice(explicit[0].length) : raw).trim();
-  const clauses = text.split(/(?:[；;\n]+|[，,]\s*(?=另外|顺便|然后|先|再|暂停|取消|恢复|继续)|\s+and\s+(?=then\b|pause\b|cancel\b|resume\b|also\b))/i).filter(Boolean);
+  const clauses = fallbackClauses(text);
   // Overly complex messages stay intact for semantic interpretation instead of losing clauses.
   if (clauses.length > 8) return [classifyGoalMessage(raw)];
   return (clauses.length ? clauses : ['']).map(clause => {
@@ -75,7 +96,7 @@ function fallbackIntents(raw: string, goals: GoalIntakeContext[]): GoalIntentPro
 }
 
 const JUDGE_KINDS = new Set(['new_goal', 'amend_goal', 'query', 'pause', 'resume', 'cancel', 'reprioritize', 'chat']);
-const JUDGE_INSTRUCTIONS = 'Return JSON {intents:[{kind,goalId?,text,priority?}]}. kinds: new_goal, amend_goal, query, pause, resume, cancel, reprioritize, chat. Split independent intents; preserve the full deliverable of combined investigate-and-fix requests. Polite requests and question marks do not make actionable work a chat; text must be an exact nonempty excerpt of the message. Queries and discussion of controls are never control requests. Preserve explicit [goal:id] targeting. Use only supplied goal IDs; omit goalId when ambiguous. Do not infer cancellation or completion. priority must be an integer for reprioritize.';
+const JUDGE_INSTRUCTIONS = 'Return JSON {intents:[{kind,goalId?,text,priority?}]}. kinds: new_goal, amend_goal, query, pause, resume, cancel, reprioritize, chat. Split only independent deliverables or explicit controls; keep sequential steps, verification and constraints together with their antecedents. Preserve the full deliverable of combined investigate-and-fix requests. Polite requests and question marks do not make actionable work a chat; text must be an exact nonempty excerpt of the message. Queries and discussion of controls are never control requests. Preserve explicit [goal:id] targeting. Use only supplied goal IDs; omit goalId when ambiguous. Do not infer cancellation or completion. priority must be an integer for reprioritize.';
 
 function judgeSkipped(judge: GoalIntentJudge | undefined, raw: string, fallback: GoalIntentProposal[]): boolean {
   return !judge || raw.length > 12000 || fallback.every(intent => intent.kind === 'query' || (intent.kind === 'chat' && (!/[?？]/.test(intent.text) || isControlDiscussion(intent.text) || informationalQuestion.test(intent.text))));
@@ -132,7 +153,7 @@ function collectJudgeProposals(intents: unknown[], raw: string, goals: GoalIntak
   return proposals;
 }
 function keepsFallbackClauses(fallback: GoalIntentProposal[], proposals: GoalIntentProposal[]): boolean {
-  if (fallback.length <= 1) return true;
+  if (fallback.length <= 1 && fallback[0]?.kind !== 'new_goal') return true;
   return !fallback.some(intent => !proposals.some(proposal => proposal.text.includes(intent.text)));
 }
 function proposalsForOutput(raw: string, goals: GoalIntakeContext[], fallback: GoalIntentProposal[], output: unknown): GoalIntentProposal[] | undefined {
