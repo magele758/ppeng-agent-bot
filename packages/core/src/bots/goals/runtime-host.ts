@@ -380,8 +380,8 @@ export async function reviewDirectGoalBeforeEnd(host:GoalRuntimeHost,sessionId:s
  const live=settleContext(host,sessionId);
  if(!live||live.ids.executionId!==ctx.ids.executionId||signal?.aborted||live.scope.service.get(live.scope.botId,goal.id)?.revision!==goal.revision)return {met:true};
  cache.set(sessionId,{executionId:ctx.ids.executionId,revision:goal.revision,fingerprint,report});
- if(report.kind!=='progress'||!report.nextStep)return {met:true};
- return {met:false,action:'continue',systemMessage:`[completion review] The requested outcome is not complete: ${report.nextStep}\nYou have one corrective continuation within the existing turn budget. Complete only this remaining work using existing observations. Do not replay confirmed side effects or create extra records just to preserve evidence. Honor the current user's exact output requirements. If a required action is blocked, report the remaining gap honestly.`};
+ if(report.kind!=='progress'||!report.nextStep||report.correctionNeeded===false)return {met:true};
+ return {met:false,action:'continue',systemMessage:`[completion review] The requested outcome is not complete: ${report.nextStep}\nYou have one corrective continuation within the existing turn budget. Complete only this remaining work using existing observations. Do not replay confirmed side effects or create extra records just to preserve evidence. Honor the current user's exact output requirements. If a required action is blocked, honor any user-specified failure reply or stop condition exactly, without extra explanation; otherwise report the remaining gap honestly.`};
 }
 async function maybeVerify(host:GoalRuntimeHost,goal:BotGoal,tail:ReturnType<GoalRuntimeHost['store']['foldMessages']>,assistant:string,report:GoalReport,sessionId:string):Promise<GoalReport> {
  if(report.kind!=='candidate_completed'&&report.kind!=='progress')return report;
