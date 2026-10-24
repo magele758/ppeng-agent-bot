@@ -157,7 +157,7 @@ test('shared information persists and failed saves retain edits for retry [AC:bo
   await expect(shared.locator('input').nth(1)).toHaveValue('English');
 });
 
-test('large history stays responsive across scroll and rail resize [AC:bot-workspace-interaction-polish#AC-16] [AC:bot-workspace-interaction-polish#AC-17]', async ({ page }) => {
+test('large history stays responsive across scroll and rail resize [AC:feed-reading-anchor-boundary#AC-1] [AC:bot-workspace-interaction-polish#AC-16] [AC:bot-workspace-interaction-polish#AC-17]', async ({ page }) => {
   const messages = Array.from({length: 2000}, (_, i) => message(`m${i + 1}`, i === 1999 ? '长消息'.repeat(34000) : `第 ${i + 1} 条消息\n` + '上下文测试内容。'.repeat(12)));
   await setup(page, messages);
   const feed = page.locator('#playMessages');

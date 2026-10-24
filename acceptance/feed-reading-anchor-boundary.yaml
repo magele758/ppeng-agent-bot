@@ -1,0 +1,13 @@
+id: feed-reading-anchor-boundary
+title: 对话侧栏调整保留实际阅读位置
+status: implemented
+requirement: |
+  按你分析的优先级，把这七个问题完整修掉，补齐跨状态、跨执行入口和跨用户的回归测试，再审查一遍整个链路，没问题就提交 PR 合并。
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  完整发布门禁发现既有 AC:bot-workspace-interaction-polish#AC-17 的边界失败；保持原有小于两像素的位置断言，不放宽验收。
+criteria:
+  - id: AC-1
+    given: 用户阅读长对话，上一条消息仅剩不足或等于一像素的尾部可见
+    when: 收起或展开信息侧栏导致消息重新换行
+    then: 保留下一条实际可读消息的位置，不以几乎不可见的上一条消息为锚点

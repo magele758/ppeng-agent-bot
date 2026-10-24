@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { prependHistoryPage } from './history-window.ts';
 import {
   FEED_ROW_ESTIMATE_PX,
+  captureFeedAnchor,
   canRequestOlderPage,
   feedRange,
   historyWindow,
@@ -275,3 +276,13 @@ test('a refresh keeps the scroll offset unless the reader is already on the tail
   assert.equal(preservedScrollTop(480, 500, 200), 300);
   assert.equal(preservedScrollTop(40, 500, 200), 40);
 });
+
+ test('ignore a clipped preceding pixel when preserving the reading anchor [AC:feed-reading-anchor-boundary#AC-1]', () => {
+  for (const bottom of [100,100.25,101]) {
+   const root={getBoundingClientRect:()=>({top:100}),querySelectorAll:()=>[
+    {dataset:{feedKey:'previous'},getBoundingClientRect:()=>({top:-100,bottom})},
+    {dataset:{feedKey:'reading'},getBoundingClientRect:()=>({top:bottom,bottom:300})}
+   ]} as unknown as HTMLElement;
+   assert.deepEqual(captureFeedAnchor(root),{key:'reading',offset:bottom-100});
+  }
+ });
