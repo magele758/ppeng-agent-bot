@@ -24,9 +24,9 @@ export function botGoalsRoutes(runtime:RawAgentRuntime):RouteSpec[] {
    const input=await ctx.readBody() as Record<string,unknown>;const {id,service}=scope(ctx,input);const gid=ctx.requireParam('goalId');
    if(!service.get(id,gid))throw new ValidationError('Goal not found');
    const action=input.action;
-   if(action!=='pause'&&action!=='resume'&&action!=='cancel'&&action!=='reprioritize')throw new ValidationError('Invalid goal action');
+   if(action!=='pause'&&action!=='resume'&&action!=='cancel'&&action!=='reprioritize'&&action!=='verify')throw new ValidationError('Invalid goal action');
    try{
-    const goal=action==='reprioritize'?service.reprioritize(id,gid,Number(input.priority)):service.control(id,gid,action);
+    const goal=action==='reprioritize'?service.reprioritize(id,gid,Number(input.priority)):action==='verify'?service.control(id,gid,'verify',{accepted:input.accepted===true,reason:typeof input.reason==='string'?input.reason:undefined}):service.control(id,gid,action);
     if(action==='pause'||action==='cancel')for(const execution of service.executions(id,gid))if(execution.status==='running'&&execution.sessionId)runtime.cancelSession(execution.sessionId);
     json(ctx.response,200,{goal});
    }catch(error){throw new ValidationError(String(error));}

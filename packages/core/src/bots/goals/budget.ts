@@ -85,7 +85,7 @@ function chargeableGoal(host: GoalRuntimeHost, session: NonNullable<ReturnType<G
   const goalId = session.metadata.botGoalId;
   if (!scope || typeof goalId !== 'string') return undefined;
   const goal = scope.service.get(scope.botId, goalId);
-  if (!goal || ['completed', 'cancelled', 'failed', 'paused'].includes(goal.status)) return undefined;
+  if (!goal || ['completed', 'cancelled', 'failed', 'paused', 'pending_review'].includes(goal.status)) return undefined;
   return { scope, goal };
 }
 function chargeGoalBudget(host: GoalRuntimeHost, sessionId: string): void {

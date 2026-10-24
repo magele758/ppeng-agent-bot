@@ -14,7 +14,7 @@ export interface GoalToolInvocation {
   callId: string;
   allowExternalAiTools?: boolean;
 }
-export interface GoalToolInvocationResult { ok: boolean; content: string; waitingApproval?: boolean }
+export interface GoalToolInvocationResult { ok: boolean; content: string; waitingApproval?: boolean; metadata?: Record<string, unknown> }
 const waitMarker = 'goal_dispatch_waiting_approval';
 function isWaiting(content: string): boolean {
   try { return JSON.parse(content)?.status === waitMarker; } catch { return false; }
@@ -53,7 +53,7 @@ export async function invokeGoalTool(input: GoalToolInvocation): Promise<GoalToo
     if (!results.length) return settle({ok:false,content:'Tool execution was interrupted before dispatch'});
     processToolResults(deps,results,valid,context.session,undefined,sessionId);
     const result = results[0]!;
-    return {ok:result.ok,content:result.content};
+    return {ok:result.ok,content:result.content,...(result.metadata?{metadata:result.metadata}:{})};
   } catch (error) {
     return settle({ok:false,content:`Tool outcome requires reconciliation: ${error instanceof Error ? error.message : String(error)}`});
   }

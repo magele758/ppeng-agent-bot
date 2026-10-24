@@ -1745,7 +1745,8 @@ export class RawAgentRuntime {
           store: this.store,
           runSession: (id) => this.runSession(id),
           log: this.log,
-          emitTrace: (sessionId, event) => this.emitTrace(sessionId, event)
+          emitTrace: (sessionId, event) => this.emitTrace(sessionId, event),
+          goalHost: () => this.goalRuntimeHost()
         },
         session.id,
         inFlight

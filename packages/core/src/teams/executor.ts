@@ -312,8 +312,10 @@ export class TeamDagExecutor {
     for (const task of tasks) {
       if (this.deps.store.get(plan.id)?.status !== 'running') return;
       if (task.status !== 'running' || !task.sessionId) continue;
-      const session = this.deps.getSession(task.sessionId);
-      if (session?.status === 'failed') {
+      const member = this.deps.getSession(task.sessionId);
+      // Failed members fail the task even when the host also reports them finished.
+      // Idle or completed members stay on the success path below.
+      if (member?.status === 'failed') {
         task.status = 'failed';
         task.error = 'Teammate session failed';
         continue;

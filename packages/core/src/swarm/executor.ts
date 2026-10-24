@@ -50,7 +50,10 @@ export class SwarmExecutor {
       })
       .catch(() => {
         const taskId = this.taskIdForSession(sessionId);
-        if (taskId) this.deps.store.updateTask(taskId, { status: 'failed' });
+        const task = taskId
+          ? this.deps.store.listTasks(runId).find((item) => item.id === taskId)
+          : this.deps.store.listTasks(runId).find((item) => item.artifacts.includes(`session:${sessionId}`));
+        if (task && task.status === 'in_progress') this.deps.store.updateTask(task.id, { status: 'failed' });
         this.deps.enqueueSchedulerWake(sessionId, 'swarm.task');
       })
       .finally(() => {
@@ -134,8 +137,10 @@ export class SwarmExecutor {
     const sessions = this.deps.listSessions().filter(
       (s) => (s.metadata as { swarmRunId?: string })?.swarmRunId === run.id
     );
+    // Idle teammates still occupy a slot until their task finishes. Dropping them lets the next tick over-dispatch.
+    // Idle teammates still occupy a slot until their task finishes. Dropping them lets the next tick over-dispatch.
     let activeCount = sessions.filter(
-      (s) => s.status === 'running' || s.status === 'waiting_approval'
+      (s) => s.status === 'running' || s.status === 'idle' || s.status === 'waiting_approval'
     ).length;
 
     for (const task of tasks) {
@@ -155,11 +160,12 @@ export class SwarmExecutor {
 
     if (!this.isDispatchable(run.id)) return;
     const refreshed = this.deps.store.listTasks(run.id);
-    if (refreshed.length === 0) {
+    const stored = this.deps.store.getRun(run.id);
+    if (stored?.status === 'running' && refreshed.length === 0) {
       this.deps.store.updateRunStatus(run.id, 'failed');
       return;
     }
-    if (refreshed.every((t) => TERMINAL_TASK.includes(t.status))) {
+    if (refreshed.length > 0 && refreshed.every((t) => TERMINAL_TASK.includes(t.status))) {
       const failed = refreshed.some((t) => t.status === 'failed');
       this.deps.store.updateRunStatus(run.id, failed ? 'failed' : 'completed');
     }

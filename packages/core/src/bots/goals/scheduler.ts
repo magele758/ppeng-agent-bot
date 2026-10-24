@@ -8,8 +8,8 @@ import { inheritBotIdentityMetadata } from '../../memory/bot-memory-scope.js';
 import { childPermissionMode, inheritBotAllowlists, inheritModelOverride } from '../../runtime/spawn-policy.js';
 import { inheritForkRetrievalMetadata, forkOpeningMessage } from '../fork-inheritance.js';
 import { childSessionTrace } from '../../stores/trace-visible.js';
-import { announceGoalState, bindGoalExecution, goalAlreadyHandled, goalScope, settleGoalExecution, type GoalRuntimeHost } from './runtime-host.js';
-import type { BotGoal, GoalExecution } from './types.js';
+import { announceGoalState, bindGoalExecution, goalAlreadyHandled, goalScope, judgeChildCompletion, settleGoalExecution, type GoalRuntimeHost } from './runtime-host.js';
+import type { BotGoal, GoalExecution, GoalReport } from './types.js';
 
 const ticking = new WeakSet<object>();
 const ended = new Set(['completed', 'failed', 'cancelled', 'unknown', 'expired', 'rejected', 'timed_out']);
@@ -57,11 +57,13 @@ function waitStatus(host: GoalRuntimeHost, parent: SessionRecord, goal: BotGoal,
  }
  if (wait.source === 'team_dag') {
   const plan = new TeamPlanStore(host.store.db).get(wait.correlationId);
-  return plan?.sessionId && ownedSessions.has(plan.sessionId) ? plan.status : 'unauthorized';
+  // A missing plan is not a finished run. Waking on "unknown" restarts the parent.
+  if (!plan) return undefined;
+  return plan.sessionId && ownedSessions.has(plan.sessionId) ? plan.status : 'unauthorized';
  }
  if (wait.source === 'swarm') {
-  const run = host.store.swarm().getRun(wait.correlationId);
-  return run ? run.status : 'missing';
+  // Same rule: a correlation id with no run stays unresolved instead of waking the parent.
+  return host.store.swarm().getRun(wait.correlationId)?.status;
  }
  if (wait.source === 'self_heal' || wait.source === 'factory' || wait.source === 'evolution') return specialtyWaitStatus(host, parent, goal);
  return 'unsupported';
@@ -273,15 +275,52 @@ function controlOrLease(host: GoalRuntimeHost, service: GoalService, botId: stri
  if (goal.status === 'paused' || goal.status === 'cancelled') stopControlledExecution(host, service, botId, session, execution, running);
  else settleRunningLease(host, service, botId, session, goal, execution, running);
 }
-function settleRunningExecution(host: GoalRuntimeHost, service: GoalService, botId: string, goal: BotGoal, execution: GoalExecution): void {
+function childRunRef(execution: GoalExecution, parentSessionId: string | undefined): string | undefined {
+ const ref = execution.runRef;
+ if (!ref?.startsWith('session:')) return undefined;
+ const childId = ref.slice('session:'.length);
+ if (!childId || childId === parentSessionId) return undefined;
+ return childId;
+}
+/** A brand-new child is idle too. Only an ended turn, or a failed/unknown child, is a result. */
+function childEnded(child: SessionRecord): boolean {
+ const outcome = child.metadata.outcome as {kind?: string} | undefined;
+ if (child.status === 'failed' || child.status === 'unknown' || child.status === 'completed') return true;
+ // Subagent turns finish as idle. The outcome is what distinguishes that from a session that has not run.
+ return child.status === 'idle' && (outcome?.kind === 'completed' || outcome?.kind === 'idle' || outcome?.kind === 'failed');
+}
+function childSettlement(childId: string, status: string, output: string, judged?: GoalReport): GoalReport {
+ if (status === 'failed' || status === 'unknown') return {kind:'blocked', summary:output || `Child session ${childId} ${status}`, evidence:output ? [output] : [`session ${childId} ${status}`]};
+ const base: GoalReport = {kind:'candidate_completed', summary:output || `Child session ${childId} finished`, evidence:output ? [output] : [`session ${childId} ${status}`], verified:false};
+ // No judge, or a judge that threw, leaves the pending completion. Progress would clear the
+ // execution and dispatch a new child instead of keeping this result for review.
+ if (!judged) return base;
+ if (judged.kind !== 'candidate_completed' && judged.kind !== 'progress') return base;
+ const evidence = [...(judged.evidence ?? [])];
+ for (const item of base.evidence ?? []) if (item && !evidence.includes(item)) evidence.push(item);
+ return {...base, kind:judged.kind, summary:judged.summary || base.summary, evidence: evidence.length ? evidence : base.evidence, verified:judged.verified === true, nextStep:judged.nextStep};
+}
+/** A finished child is the execution result. The parent turn staying idle must not keep the goal running. */
+async function settleFinishedChild(host: GoalRuntimeHost, service: GoalService, botId: string, goal: BotGoal, execution: GoalExecution): Promise<boolean> {
+ const childId = childRunRef(execution, execution.sessionId);
+ if (!childId || host.isRunning(childId)) return false;
+ const child = host.store.getSession(childId);
+ if (!child || !childEnded(child)) return false;
+ const output = host.store.foldMessages(childId).filter(m => m.role === 'assistant').flatMap(m => m.parts.filter(p => p.type === 'text').map(p => p.text)).join('\n').slice(-8000);
+ const judged = child.status === 'failed' || child.status === 'unknown' ? undefined : await judgeChildCompletion(host, goal, childId, output);
+ service.report(botId, execution.id, {...childSettlement(childId, child.status, output, judged), owner:execution.owner, fence:execution.fence});
+ return true;
+}
+async function settleRunningExecution(host: GoalRuntimeHost, service: GoalService, botId: string, goal: BotGoal, execution: GoalExecution): Promise<void> {
  const session = executionSession(host, execution);
  const running = sessionRunning(host, session);
  if (resumeIfApproved(host, session, goal, execution)) return;
+ if (!running && await settleFinishedChild(host, service, botId, goal, execution)) return;
  controlOrLease(host, service, botId, session, goal, execution, running);
 }
 async function tickRunningGoal(host: GoalRuntimeHost, service: GoalService, botId: string, parent: SessionRecord, goal: BotGoal): Promise<void> {
  if (goal.wait && goal.draining) await drainExternal(host, parent, goal, service.executions(botId, goal.id));
- for (const execution of service.executions(botId, goal.id).filter(e => e.status === 'running')) settleRunningExecution(host, service, botId, goal, execution);
+ for (const execution of service.executions(botId, goal.id).filter(e => e.status === 'running')) await settleRunningExecution(host, service, botId, goal, execution);
 }
 function blockUnauthorizedWait(service: GoalService, botId: string, goal: BotGoal, status: string | undefined): boolean {
  if (status === 'missing') {

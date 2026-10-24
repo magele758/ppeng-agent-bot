@@ -3,6 +3,7 @@ import type { BotGoal, GoalExecution, GoalIntent, GoalReport, GoalSettings, Goal
 import { mutateGoalSnapshot, readGoalSnapshot } from './store.js';
 import { readGoalSettings, writeGoalSettings } from './settings.js';
 const terminal = new Set(['completed', 'cancelled', 'failed']);
+const PENDING_REVIEW = 'Completion evidence requires verification';
 function finiteReportCost(value: number | undefined): number {
   return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, value) : 0;
 }
@@ -78,20 +79,26 @@ export class BotGoalService {
   if (terminal.has(g.status)) throw new Error('Cannot amend terminal goal');
   g.constraints.push(constraint);g.revision++;g.nextStep='Apply updated constraints; reconcile previous actions';
   if (g.activeExecutionId) { g.draining=true;g.blockedReason='Constraints changed; current execution must reconcile at a safe boundary'; }
-  else if (g.status !== 'paused') {g.status='queued';if(g.wait){g.draining=true;g.blockedReason='Constraints changed; previous external execution must stop before applying the new revision';}}this.event(s,'amended',g,constraint);
+  else if (g.status !== 'paused' && g.status !== 'pending_review') {g.status='queued';if(g.wait){g.draining=true;g.blockedReason='Constraints changed; previous external execution must stop before applying the new revision';}}this.event(s,'amended',g,constraint);
  }
  amend(botId:string,id:string,constraint:string): BotGoal { return mutateGoalSnapshot(this.store,botId,s=>{const g=this.find(s,id);this.amendState(s,g,constraint);return g;}); }
  private controlState(s:GoalSnapshot,g:BotGoal,action:'pause'|'resume'|'cancel'): void {
   if (terminal.has(g.status)) throw new Error('Cannot control terminal goal');
-  if(action==='resume'){if(g.activeExecutionId||g.draining)throw new Error('Execution still draining');g.status='queued';g.blockedReason=undefined;g.wait=undefined;g.resumeRequested=true;}
+  if(action==='resume'){if(g.status==='pending_review')throw new Error('Completion is pending verification');if(g.activeExecutionId||g.draining)throw new Error('Execution still draining');g.status='queued';g.blockedReason=undefined;g.wait=undefined;g.resumeRequested=true;}
   else {g.status=action==='pause'?'paused':'cancelled';g.revision++;g.draining=Boolean(g.activeExecutionId||g.wait);}
   this.event(s,action,g);
  }
- control(botId:string,id:string,action:'pause'|'resume'|'cancel'):BotGoal{return mutateGoalSnapshot(this.store,botId,s=>{const g=this.find(s,id);this.controlState(s,g,action);return g;});}
+ control(botId:string,id:string,action:'pause'|'resume'|'cancel'|'verify',decision?:{accepted:boolean;reason?:string}):BotGoal{return mutateGoalSnapshot(this.store,botId,s=>{const g=this.find(s,id);if(action==='verify'){this.verifyState(s,g,decision);return g;}this.controlState(s,g,action);return g;});}
+ private verifyState(s:GoalSnapshot,g:BotGoal,decision?:{accepted:boolean;reason?:string}):void {
+  if(g.status!=='pending_review')throw new Error('Goal is not pending verification');
+  if(decision?.accepted!==true&&decision?.accepted!==false)throw new Error('Verification decision required');
+  if(decision.accepted){if(!g.evidence.length)throw new Error('Completion evidence required');g.status='completed';g.blockedReason=undefined;this.event(s,'verified',g,decision.reason);return;}
+  g.status='queued';g.blockedReason=undefined;g.resumeRequested=true;g.nextStep=decision.reason?.trim()||'Recorded completion was rejected; continue the remaining work without repeating confirmed effects';this.event(s,'verification_rejected',g,decision.reason);
+ }
  setDraining(botId:string,id:string,draining:boolean,reason?:string):BotGoal{return mutateGoalSnapshot(this.store,botId,s=>{const g=this.find(s,id);g.draining=draining;g.blockedReason=reason;this.event(s,'draining',g,reason);return g;});}
  finishAmendDrain(botId:string,id:string,result:{summary:string;evidence:string[];costUsd:number}):void{mutateGoalSnapshot(this.store,botId,s=>{const g=this.find(s,id);if(g.status!=='queued'||!g.wait)return;g.draining=false;g.wait=undefined;g.blockedReason=undefined;g.nextStep='Reconcile partial previous actions against the updated constraints before continuing';this.applyWakeData(s,g,result);this.event(s,'revision_drained',g);});}
  reprioritize(botId:string,id:string,priority:number):BotGoal{if(!Number.isSafeInteger(priority))throw new Error('Priority must be an integer');return mutateGoalSnapshot(this.store,botId,s=>{const g=this.find(s,id);g.priority=priority;this.event(s,'reprioritized',g);return g;});}
- block(botId:string,id:string,reason:string):BotGoal{return mutateGoalSnapshot(this.store,botId,s=>{const g=this.find(s,id);if(!terminal.has(g.status)&&g.status!=='paused'){g.status='blocked';g.blockedReason=reason;this.event(s,'blocked',g,reason);}return g;});}
+ block(botId:string,id:string,reason:string):BotGoal{return mutateGoalSnapshot(this.store,botId,s=>{const g=this.find(s,id);if(!terminal.has(g.status)&&g.status!=='paused'&&g.status!=='pending_review'){g.status='blocked';g.blockedReason=reason;this.event(s,'blocked',g,reason);}return g;});}
  claim(botId:string,id:string,options:{strategy:string;strategyReason?:string;owner?:string;leaseMs?:number;safeToRetry?:boolean}):GoalExecution|undefined {
   return mutateGoalSnapshot(this.store,botId,s=>{
    const g=this.find(s,id);if(g.status!=='queued'||g.activeExecutionId||g.draining)return undefined;
@@ -186,7 +193,7 @@ export class BotGoalService {
   return true;
  }
  private recordReportProgress(goal:BotGoal,result:GoalReport):void {
-  goal.noProgress=reportAdvanced(result,goal)?0:goal.noProgress+1;
+  goal.noProgress=result.kind==='candidate_completed'&&result.verified!==true?0:reportAdvanced(result,goal)?0:goal.noProgress+1;
   goal.progress=result.summary;goal.nextStep=result.nextStep;goal.blockedReason=undefined;
  }
  private applyReportKind(s:GoalSnapshot,goal:BotGoal,result:GoalReport):void {
@@ -198,8 +205,10 @@ export class BotGoalService {
   else this.markWaiting(s,goal,result);
  }
  private markCandidateCompleted(goal:BotGoal,result:GoalReport):void {
-  goal.status=result.verified&&Boolean(result.evidence?.length)?'completed':'blocked';
-  if(goal.status==='blocked')goal.blockedReason='Completion evidence requires verification';
+  if(result.verified&&Boolean(result.evidence?.length)){goal.status='completed';goal.blockedReason=undefined;return;}
+  goal.status='pending_review';
+  goal.blockedReason=PENDING_REVIEW;
+  goal.noProgress=0;
  }
  private markWaiting(s:GoalSnapshot,goal:BotGoal,result:GoalReport):void {
   if(!result.wait?.source||!result.wait.correlationId){goal.status='blocked';goal.blockedReason='Missing durable wait condition';return;}

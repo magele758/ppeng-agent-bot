@@ -1,4 +1,4 @@
-export type GoalStatus = 'queued' | 'running' | 'waiting' | 'blocked' | 'paused' | 'completed' | 'failed' | 'cancelled';
+export type GoalStatus = 'queued' | 'running' | 'waiting' | 'blocked' | 'paused' | 'pending_review' | 'completed' | 'failed' | 'cancelled';
 export type GoalStrategy = 'auto' | 'direct' | 'subagent' | 'bot_delegate' | 'ptc' | 'team_dag' | 'swarm' | 'browser' | 'computer' | 'deep_research';
 export interface BotGoalView {
   id: string; title: string; status: GoalStatus; progress: string; nextStep?: string;
@@ -14,15 +14,21 @@ export interface BotGoalsSnapshot { goals: BotGoalView[]; settings: BotGoalSetti
 export function goalMessage(text: string, goalId: string | null): string {
   return goalId && text.trim() && !text.trim().startsWith('/') ? `[goal:${goalId}] ${text}` : text;
 }
-const IN_PROGRESS_GOAL_STATUSES = new Set<GoalStatus>(['queued', 'running', 'waiting', 'blocked', 'paused']);
+const IN_PROGRESS_GOAL_STATUSES = new Set<GoalStatus>(['queued', 'running', 'waiting', 'blocked', 'paused', 'pending_review']);
 
 export function goalsPanelState<T extends { status: string }>(goals: readonly T[]): { show: boolean; count: number; items: T[] } {
   const items = goals.filter(goal => IN_PROGRESS_GOAL_STATUSES.has(goal.status as GoalStatus));
   return { show: items.length >= 2, count: items.length, items };
 }
 
-export function goalActions(status: GoalStatus): Array<'pause' | 'resume' | 'cancel'> {
+export function goalVerifyRequest(accepted: boolean, reason?: string): { action: 'verify'; accepted: boolean; reason?: string } {
+  const trimmed = reason?.trim();
+  return { action: 'verify', accepted, ...(trimmed ? { reason: trimmed } : {}) };
+}
+
+export function goalActions(status: GoalStatus): Array<'pause' | 'resume' | 'cancel' | 'verify'> {
   if (['completed', 'failed', 'cancelled'].includes(status)) return [];
+  if (status === 'pending_review') return ['verify', 'cancel'];
   return [status === 'paused' || status === 'blocked' ? 'resume' : 'pause', 'cancel'];
 }
 

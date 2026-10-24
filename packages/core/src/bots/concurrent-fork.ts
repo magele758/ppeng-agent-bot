@@ -176,6 +176,8 @@ export interface ConcurrentForkHost {
   runSession(sessionId: string): Promise<unknown>;
   log: { warn(message: string, details?: unknown): void };
   emitTrace?(sessionId: string, event: { kind: 'child_session'; payload: Record<string, unknown> }): void;
+  /** Settle a forked child that carries a durable goal. Absent hosts only deliver the note. */
+  goalHost?(): GoalRuntimeHost;
 }
 
 export function applyConcurrentBotForks(host: ConcurrentForkHost, sessionId: string, inFlight: boolean): string[] {
@@ -206,13 +208,13 @@ export function applyConcurrentBotForks(host: ConcurrentForkHost, sessionId: str
         const summary = latestAssistant(host.store, childId) || '子代理没有留下文字结果。';
         deliverNote(host.store, sessionId, `bot-fork-result:${childId}`, `【子代理完成】${childId}\n${summary.slice(0, 4000)}`);
         finishFork(host.store, sessionId, childId, 'idle');
-        await settleForkGoal(host, childId);
+        return settleForkGoal(host, childId);
       },
       async (error: unknown) => {
         deliverNote(host.store, sessionId, `bot-fork-result:${childId}`, `【子代理失败】${childId}\n${String(error).slice(0, 500)}`);
         finishFork(host.store, sessionId, childId, 'failed');
         host.log.warn('Concurrent bot sub-agent failed', { sessionId, childId, error: String(error) });
-        await settleForkGoal(host, childId, error);
+        return settleForkGoal(host, childId, error);
       }
     );
   }
@@ -220,18 +222,23 @@ export function applyConcurrentBotForks(host: ConcurrentForkHost, sessionId: str
   return created.map((fork) => fork.childSessionId);
 }
 
+/** A fork that owns a durable goal must settle it; the coordinator note is not the result. */
 async function settleForkGoal(host: ConcurrentForkHost, childId: string, error?: unknown): Promise<void> {
   const child = host.store.getSession(childId);
   if (!child || !goalScope(host.store, child)) return;
-  const runtime: GoalRuntimeHost = {
+  const goalHost = host.goalHost?.();
+  const runtime: GoalRuntimeHost = goalHost ?? {
     store: host.store,
     isRunning: () => false,
     cancel: () => undefined,
     run: async () => undefined,
     capabilities: () => ({ registeredTools: [], enabledStrategies: [] })
   };
-  try { await settleGoalExecution(runtime, childId, error); }
-  catch (settleError) { host.log.warn('Concurrent bot fork did not settle its goal', { childId, error: String(settleError) }); }
+  try {
+    await settleGoalExecution(runtime, childId, error);
+  } catch (settleError) {
+    host.log.warn('Concurrent bot fork did not settle its goal', { childId, error: String(settleError) });
+  }
 }
 
 function finishFork(

@@ -55,7 +55,7 @@ export function createRuntimeGoalDispatchTool(host: RuntimeGoalDispatchHost): To
       if(!isCurrent(toolContext,request))return {ok:false,content:'Goal revision or execution changed before dispatch; reconcile before proceeding'};
       return worker?worker(toolContext,toolArgs):tool.execute(toolContext,toolArgs);
     }} : tool);
-    return invokeGoalTool({deps:nestedDeps,context:fresh,tools,filePolicy:await host.filePolicy(),name,args,callId:`${request.executionId}:${name}`});
+    return invokeGoalTool({deps:{...nestedDeps,tools},context:fresh,tools,filePolicy:await host.filePolicy(),name,args,callId:`${request.executionId}:${name}`});
   };
   return createGoalDispatchTool({
     resolveRequest(context) {
@@ -97,7 +97,7 @@ export function createRuntimeGoalDispatchTool(host: RuntimeGoalDispatchHost): To
           const worker = await host.runWorker(freshContext(workerContext),request);
           return {ok:worker.status!=='failed'&&worker.status!=='blocked',content:JSON.stringify({goalWorker:worker})};
         }
-        const spawned = await host.deps().tools.find(tool => tool.name === 'spawn_subagent')?.execute(workerContext, toolArgs);
+        const spawned = (host.authorizedTools(freshContext(workerContext), request).find(tool => tool.name === 'spawn_subagent') ?? host.deps().tools.find(tool => tool.name === 'spawn_subagent'))?.execute(workerContext, toolArgs);
         if (typeof spawned?.metadata?.childSessionId === 'string') spawnedChildId = spawned.metadata.childSessionId;
         return spawned ?? {ok:false,content:'spawn_subagent is unavailable'};
       });
@@ -107,8 +107,8 @@ export function createRuntimeGoalDispatchTool(host: RuntimeGoalDispatchHost): To
           if(worker && ['progress','waiting','blocked','candidate_completed','failed','cancelled'].includes(worker.status) && typeof worker.content==='string') return worker;
         } catch { /* Normal gateway refusals and unknown outcomes remain blocked below. */ }
       }
-      if (spawnedChildId) return {status:'waiting',reference:`session:${spawnedChildId}`,content:result.content,waitingApproval:result.waitingApproval};
-      return {status:result.waitingApproval?'waiting':result.ok?'candidate_completed':'blocked',waitingApproval:result.waitingApproval,content:result.content};
+      const childSessionId = spawnedChildId ?? (typeof result.metadata?.childSessionId === 'string' ? result.metadata.childSessionId : undefined);
+      return {status:result.waitingApproval?'waiting':result.ok?'candidate_completed':'blocked',waitingApproval:result.waitingApproval,content:result.content,...(childSessionId?{reference:`session:${childSessionId}`}:{})};
     },
     invokeAuthorizedTool:invoke,
     onResult(context,request,result) {

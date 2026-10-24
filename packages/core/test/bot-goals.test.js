@@ -22,7 +22,7 @@ test('old constraints and missing evidence cannot complete a goal [AC:bot-multi-
  const {s}=fixture(t);const a=create(s);const e=s.claim('b',a.id,{strategy:'direct'});
  s.amend('b',a.id,'Keep styling');s.report('b',e.id,{kind:'candidate_completed',summary:'done',verified:true,evidence:['tests passed']});
  assert.notEqual(s.get('b',a.id).status,'completed');const e2=s.claim('b',a.id,{strategy:'direct'});
- s.report('b',e2.id,{kind:'candidate_completed',summary:'done'});assert.equal(s.get('b',a.id).status,'blocked');
+ s.report('b',e2.id,{kind:'candidate_completed',summary:'done'});assert.equal(s.get('b',a.id).status,'pending_review');
 });
 test('waiting survives chat and duplicate wake/result delivery [AC:bot-multi-goal-coordination#AC-8] [AC:bot-multi-goal-coordination#AC-10]',t=>{
  const {s}=fixture(t);const a=create(s);const e=s.claim('b',a.id,{strategy:'direct'});
@@ -98,4 +98,21 @@ test('explicit failure is terminal and retains the attempted path [AC:unified-bo
  s.report('b',execution.id,{kind:'failed',summary:'Provider rejected the artifact',evidence:['attempted upload; response 422']});
  const saved=s.get('b',goal.id);assert.equal(saved.status,'failed');assert.match(saved.blockedReason,/rejected/);assert.deepEqual(saved.evidence,['attempted upload; response 422']);assert.equal(s.list('b').length,1);
  assert.throws(()=>s.control('b',goal.id,'resume'),/terminal/);
+});
+
+test('unverified completion stays reviewable and is consumed only by verification [AC:bot-goal-conclusion#AC-5]',t=>{
+ const {s}=fixture(t);const goal=create(s);const execution=s.claim('b',goal.id,{strategy:'direct'});
+ s.report('b',execution.id,{kind:'candidate_completed',summary:'Observed result: done',evidence:['Observed result: done'],verified:false});
+ const pending=s.get('b',goal.id);
+ assert.equal(pending.status,'pending_review');assert.notEqual(pending.status,'blocked');
+ assert.deepEqual(pending.evidence,['Observed result: done']);assert.equal(pending.noProgress,0);
+ assert.throws(()=>s.control('b',goal.id,'resume'),/pending verification/);
+ assert.equal(s.get('b',goal.id).status,'pending_review');assert.equal(s.get('b',goal.id).blockedReason,'Completion evidence requires verification');
+ const accepted=s.control('b',goal.id,'verify',{accepted:true});
+ assert.equal(accepted.status,'completed');assert.equal(accepted.blockedReason,undefined);assert.deepEqual(accepted.evidence,['Observed result: done']);
+ const again=create(s,'Second');const second=s.claim('b',again.id,{strategy:'direct'});
+ s.report('b',second.id,{kind:'candidate_completed',summary:'partial',evidence:['partial note']});
+ const rejected=s.control('b',again.id,'verify',{accepted:false,reason:'Missing the last check'});
+ assert.equal(rejected.status,'queued');assert.equal(rejected.resumeRequested,true);assert.match(rejected.nextStep,/Missing the last check/);
+ assert.deepEqual(rejected.evidence,['partial note']);assert.ok(s.claim('b',again.id,{strategy:'direct'}));
 });
