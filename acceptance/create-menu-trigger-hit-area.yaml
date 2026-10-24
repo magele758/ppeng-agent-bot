@@ -1,0 +1,13 @@
+id: create-menu-trigger-hit-area
+title: 新增菜单展开后按钮仍可点击
+status: implemented
+requirement: |
+  按你分析的优先级，把这七个问题完整修掉，补齐跨状态、跨执行入口和跨用户的回归测试，再审查一遍整个链路，没问题就提交 PR 合并。
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  完整浏览器门禁发现悬停展开的新增菜单遮挡触发按钮；保留既有跨间隙移动与创建功能标准。
+criteria:
+  - id: AC-1
+    given: 新增菜单已因鼠标悬停而展开
+    when: 用户点击新增按钮或从按钮移入菜单
+    then: 菜单不遮挡按钮点击，移入菜单仍保持打开且可以选择新建 Bot

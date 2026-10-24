@@ -243,3 +243,17 @@ test('new menu remains usable when crossing from its icon to an item [AC:bot-wor
   await item.click({timeout:2000});
   await expect(page.getByRole('dialog')).toBeVisible();
 });
+
+test('hovered creation menu keeps its trigger clickable [AC:create-menu-trigger-hit-area#AC-1]', async ({page}) => {
+  await setup(page);
+  const trigger=page.locator('#btnPlayCreate');
+  await trigger.hover();
+  await expect(page.locator('#playCreateMenu')).toBeVisible();
+  await expect.poll(()=>trigger.evaluate(el=>{
+    const box=el.getBoundingClientRect();
+    return document.elementFromPoint(box.x+box.width/2,box.y+box.height/2)?.closest('button')?.id;
+  })).toBe('btnPlayCreate');
+  await trigger.click();
+  await page.getByRole('menuitem',{name:'新建 Bot',exact:true}).click();
+  await expect(page.getByRole('form',{name:'新建 Bot'})).toBeVisible();
+});

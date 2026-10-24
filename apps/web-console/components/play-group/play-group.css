@@ -350,4 +350,4 @@
 .play-group-reply-mode__hint { grid-column: 2; color: var(--text-muted, var(--ui-text-muted)); font-size: 12px; }
 .play-group-reply-mode__error { margin: 0; color: var(--ui-danger, #c2410c); font-size: 12px; }
 
-.create-menu__pop::before { content: ""; position: absolute; left: -12px; right: -12px; top: -20px; height: 24px; }
+.create-menu__pop::before { content: ""; position: absolute; left: -12px; right: -12px; top: -6px; height: 6px; }
