@@ -4,6 +4,7 @@ status: implemented
 requirement: |
   那就按你建议的顺序直接改，先把 P0 的分类路由、压缩丢证据、完成验证和执行提示修好，参考 grok-build 的实现，做好测试和 review 后提交合并。
 notes: |
+  复用 PR247 的缺失 team/swarm 运行修复与回归夹具修正：缺失引用进入 blocked，不自动重派。默认轮数测试对齐既有 unlimited 标准。
   assumedApproval: standing-order-2026-10-22
   默认当前 Bot 完整执行；显式并行、委托、权限、预算和隔离约束仍生效。保留分析类请求不创建冗余目标的既有标准。
 criteria:

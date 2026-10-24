@@ -38,6 +38,7 @@ test('controls stay safe and explicit isolated work cannot fall back to direct [
     assert.equal(selectGoalRoute({ task: text }, capabilities).strategy, 'subagent');
     assert.equal(selectGoalRoute({ task: text }, { ...capabilities, allowedTools: [] }).blocked, true);
   }
+  for (const task of ['Do not use subagents to fix login', '不要使用子代理修复登录']) assert.equal(selectGoalRoute({ task }, capabilities).strategy, 'direct');
   assert.equal(selectGoalRoute({ task: 'Fix login' }, { ...capabilities, budgetRemaining: 0 }).blocked, true);
 });
 

@@ -55,6 +55,7 @@ export function goalSpecialty(text: string): GoalStrategy | undefined {
 }
 /** The user asked to split, parallelize, or hand the work to another role. */
 export function goalNeedsIsolatedExecutor(text: string): boolean {
+  text = text.replace(/(?:不要|禁止|无需|不必|别)(?:使用|用)?(?:子代理|并行处理)|\b(?:do not|don't|never)\s+(?:(?:use|spawn|run|work|delegate to)\s+)?(?:subagents?|in parallel)\b/gi, '');
   return /拆成子任务|拆成并行|并行处理|分别交给|交给(?:规划|实现|验收|评估)|子代理|\b(?:use|spawn|delegate to)\s+(?:a\s+)?subagents?\b|\bin parallel\b/i.test(text);
 }
 export function goalSpecialist(text: string): GoalRouteRequest['role'] {
