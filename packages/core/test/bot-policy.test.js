@@ -22,7 +22,7 @@ import { resolveSkillLoad, resolveSkillSearch } from '../dist/runtime/skill-load
 import { normalizeAllowedSkillNames } from '../dist/skills/skill-allowlist.js';
 import { parseSessionMaxTurns, resolveSessionMaxTurns } from '../dist/runtime/session-max-turns.js';
 import { isMcpToolName, normalizeAllowedToolNames, readPositiveAllowedTools } from '../dist/bots/bot-policy.js';
-import { filterToolsForSession, resolveTurnTools } from '../dist/turn/resolve-turn-tools.js';
+import { authorizeToolsForSession, filterToolsForSession, resolveTurnTools } from '../dist/turn/resolve-turn-tools.js';
 
 function tempStore() {
   const dir = mkdtempSync(join(tmpdir(), 'bot-policy-'));
@@ -947,4 +947,15 @@ test('legacy Bot chats without a saved step limit default to unlimited independe
   assert.equal(resolveSessionMaxTurns({ botId: 'saved-bot', maxTurns: 'invalid' }, 24), 0);
   assert.equal(resolveSessionMaxTurns({ botId: 'saved-bot', maxTurns: 24 }, 0), 24);
   assert.equal(resolveSessionMaxTurns({}, 48), 48);
+});
+
+test('room retrieval augments the session allowlist while retaining agent restrictions and ordinary-session isolation', () => {
+  const names=['read_file','bash','room_history_search','room_history_read','room_material_list','room_material_read'];
+  const session={id:'room-member',mode:'chat',metadata:{roomId:'room-a',allowedTools:['read_file','room_history_read']}};
+  const agent={id:'member',name:'Member',role:'general',instructions:'',capabilities:[]};
+  const visible=(current,allowed)=>authorizeToolsForSession({env:{},tools:names.map(name=>({name})),agent:{...agent,allowedTools:allowed},session:current}).tools.map(t=>t.name);
+  assert.deepEqual(visible(session,undefined),names.filter(name=>name!=='bash'));
+  assert.deepEqual(visible(session,['read_file','room_history_read']),['read_file','room_history_read']);
+  assert.deepEqual(visible({...session,metadata:{...session.metadata,roomId:undefined}},undefined),['read_file']);
+  assert.deepEqual(session.metadata.allowedTools,['read_file','room_history_read']);
 });
