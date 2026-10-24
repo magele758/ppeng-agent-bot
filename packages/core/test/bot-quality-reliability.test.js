@@ -62,3 +62,17 @@ test('compaction separates internal instructions from history and labels returne
  assert.match(summary.parts[0].text,/current user request takes priority/);
  assert.match(summary.parts[0].text,/history_read/);
 });
+
+test('long tool chains retain the current user request across history selection [AC:bot-quality-reliability#AC-6]', async()=>{
+ const {selectEpisodicMessages,selectEpisodicMessagesWithCognitiveState}=await import('../dist/model/episodic-selection.js');
+ const msg=(id,role,parts)=>({id,role,parts,sessionId:'s',createdAt:'2026-10-24T00:00:00Z'});
+ for(const tool of ['history_read','write_file']) {
+  const messages=[msg('old','assistant',[{type:'text',text:'Historical goal: save diagnostics.'}]),msg('current','user',[{type:'text',text:'Only return the failure code. Do not save anything.'}])];
+  for(let i=0;i<12;i++)messages.push(msg('call'+i,'assistant',[{type:'tool_call',toolCallId:'c'+i,name:tool,input:{}}]),msg('result'+i,'tool',[{type:'tool_result',toolCallId:'c'+i,name:tool,ok:true,content:'observed '+i}]));
+  for(const budget of [1,100000])for(const selected of [selectEpisodicMessages(messages,budget),selectEpisodicMessagesWithCognitiveState(messages,budget).selected]) {
+   if(budget===100000)assert.deepEqual(selected,messages,'fitting history must not be tail-truncated');
+   assert.ok(selected.some(m=>m.id==='current'),'latest user instruction must survive');
+   assert.deepEqual(selected.filter(m=>m.id!=='old').map(m=>m.id),messages.slice(1).map(m=>m.id));
+  }
+ }
+});
