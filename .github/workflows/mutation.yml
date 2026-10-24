@@ -23,8 +23,20 @@ jobs:
             args: --module command-hardline --shard 2/3
           - name: hardline-3
             args: --module command-hardline --shard 3/3
-          - name: others
-            args: --module bot-policy,bot-permission,model-fallback-chain,model-error-class,memory-namespace,skill-proposal-validate,message-agent
+          - name: bot-policy
+            args: --module bot-policy
+          - name: bot-permission
+            args: --module bot-permission
+          - name: model-fallback-chain
+            args: --module model-fallback-chain
+          - name: model-error-class
+            args: --module model-error-class
+          - name: memory-namespace
+            args: --module memory-namespace
+          - name: skill-proposal-validate
+            args: --module skill-proposal-validate
+          - name: message-agent
+            args: --module message-agent
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

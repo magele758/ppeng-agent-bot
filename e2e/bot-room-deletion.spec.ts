@@ -40,19 +40,16 @@ test('group row hides the delete word until hover or keyboard focus [AC:play-gro
   await expect(button).toBeFocused();
 });
 
+test.describe('touch browser', () => {
+  test.use({ hasTouch: true });
 test('touch devices show the group delete icon without hover [AC:play-group-delete-menu#AC-2]', async ({ page }) => {
-  const client = await page.context().newCDPSession(page);
-  await client.send('Emulation.setEmulatedMedia', {
-    features: [
-      { name: 'hover', value: 'none' },
-      { name: 'pointer', value: 'coarse' }
-    ]
-  });
   await mockRoom(page);
   const button = page.getByTestId('play-group-row').filter({ hasText: 'Deletion test room' }).getByTestId('play-group-delete');
   await expect(button).toBeVisible();
   await expect(button.locator('svg')).toBeVisible();
   await expect(button).toHaveAttribute('aria-label', '删除群聊 Deletion test room');
+});
+
 });
 
 test('confirming deletion removes a room after refresh [AC:bot-functional-groups#AC-1] [AC:bot-entry-simplification#AC-7] [AC:play-group-delete-menu#AC-3]', async ({ page }) => {
