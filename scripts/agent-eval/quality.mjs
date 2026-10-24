@@ -1,6 +1,7 @@
 /** Objective graders and paired, per-task reliability comparisons. No LLM self-grading. */
 import { isDeepStrictEqual } from 'node:util';
 import { createHash } from 'node:crypto';
+import { gradeBotEvidence } from './bot-quality.mjs';
 
 export const hash = value => createHash('sha256').update(typeof value === 'string' ? value : JSON.stringify(value)).digest('hex');
 export const DEFAULT_POLICY = {
@@ -18,7 +19,7 @@ export function validateSuite(suite) {
     if (!c.category || !Array.isArray(c.turns) || !c.turns.length || c.turns.some(x => typeof x !== 'string' || !x.trim())) throw new Error(`invalid task: ${c.id}`);
     if (!c.expected || !['exact', 'json', 'state'].some(key => Object.hasOwn(c.expected, key))) throw new Error(`case has no outcome grader: ${c.id}`);
     for (const key of Object.keys(c.expected)) {
-      if (!['exact', 'json', 'state', 'requiredTools', 'forbiddenTools', 'maxToolCalls', 'status'].includes(key)) throw new Error(`unknown grader ${key}`);
+      if (!['exact', 'json', 'state', 'requiredTools', 'forbiddenTools', 'maxToolCalls', 'status', 'botEvidence','observedTools'].includes(key)) throw new Error(`unknown grader ${key}`);
     }
     if (c.expected.exact != null && typeof c.expected.exact !== 'string') throw new Error(`exact grader must be text: ${c.id}`);
   }
@@ -35,6 +36,7 @@ export function gradeTask(task, trial) {
   const failures = [];
   const e = task.expected;
   if (trial.error) failures.push(`execution: ${trial.error}`);
+  if (trial.infrastructureError) failures.push('infrastructure failure');
   if (trial.status !== (e.status ?? 'idle')) failures.push(`terminal status: ${trial.status}`);
   if (trial.invariantsOk !== true) failures.push('transcript invariants');
   if (Object.hasOwn(e, 'exact') && trial.output?.trim() !== e.exact) failures.push('exact final answer');
@@ -44,9 +46,11 @@ export function gradeTask(task, trial) {
   }
   if (Object.hasOwn(e, 'state') && !isDeepStrictEqual(trial.state, e.state)) failures.push('actual tool side effects');
   const calls = trial.toolCalls ?? [];
+  for(const observation of e.observedTools??[])if(!calls.some(call=>Object.entries(observation).every(([key,value])=>isDeepStrictEqual(call[key],value))))failures.push('missing recorded observation: '+observation.name);
   for (const name of e.requiredTools ?? []) if (!calls.some(c => c.name === name && c.ok === true)) failures.push(`missing successful tool: ${name}`);
   for (const name of e.forbiddenTools ?? []) if (calls.some(c => c.name === name)) failures.push(`forbidden tool: ${name}`);
   if (e.maxToolCalls != null && calls.length > e.maxToolCalls) failures.push('tool call budget');
+  if(e.botEvidence) failures.push(...gradeBotEvidence(e.botEvidence,trial.botEvidence).failures);
   return { pass: failures.length === 0, failures };
 }
 

@@ -28,7 +28,8 @@ import { runG0, runG1, runG2, runG3, bakeElapsedHours } from './release/gates.mj
 import { runCodingAgent } from './release/coding-agent.mjs';
 import * as composeBackend from './release/deploy-backend-compose.mjs';
 import * as helmBackend from './release/deploy-backend-helm.mjs';
-import { promoteWithSmoke, verifyCandidate } from './release/deploy-smoke-step.mjs';
+import { verifyCandidate } from './release/deploy-smoke-step.mjs';
+import { promoteWithQuality } from './release/quality-promotion.mjs';
 import { sanitizeScriptEnv } from './spawn-utils.mjs';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -42,6 +43,8 @@ function parseArgs(argv) {
   const out = { cmd: argv[0] ?? 'help', runId: null, force: false };
   for (let i = 1; i < argv.length; i++) {
     if (argv[i] === '--run-id' && argv[i + 1]) out.runId = argv[++i];
+    else if (argv[i] === '--quality-evidence' && argv[i+1]) out.evidenceDir = argv[++i];
+    else if (argv[i] === '--baseline-sha' && argv[i+1]) out.baselineSha = argv[++i];
     else if (argv[i] === '--force') out.force = true;
   }
   return out;
@@ -166,7 +169,7 @@ async function cmdStart(args) {
   }
 
   if (cfg.autoPromote) {
-    await cmdPromote({ runId: report.release_run_id });
+    await cmdPromote({ ...args, runId: report.release_run_id });
   } else {
     console.log('release-orchestrator: G2 pass — manual promote with: pnpm run release:promote --run-id', report.release_run_id);
   }
@@ -246,7 +249,8 @@ async function cmdPromote(args) {
   }
   setPhase(report, 'promote');
   const tags = report.candidate.image_tags;
-  const res = await promoteWithSmoke({
+  const res = await promoteWithQuality({
+    evidenceDir: args.evidenceDir, baselineSha: args.baselineSha ?? report.stable?.git_sha,
     cfg,
     report,
     backend: backend(cfg),
@@ -366,7 +370,7 @@ async function main() {
       break;
     }
     default:
-      console.log(`Usage: node scripts/release-orchestrator.mjs <start|git-sync|gate-g0|gate-g1|gate-g2|gate-g3|deploy-candidate|fix|promote|rollback|observe|status> [--run-id ID] [--force]`);
+      console.log(`Usage: node scripts/release-orchestrator.mjs <start|git-sync|gate-g0|gate-g1|gate-g2|gate-g3|deploy-candidate|fix|promote|rollback|observe|status> [--run-id ID] [--force] [--quality-evidence DIR --baseline-sha SHA]`);
       process.exit(args.cmd === 'help' ? 0 : 1);
   }
 }
