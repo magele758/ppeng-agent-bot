@@ -1,0 +1,19 @@
+id: chat-inline-history
+title: 单行附件入口与自动加载聊天历史
+status: implemented
+requirement: |
+  把对话框添加文件的加号也和对话框融合到一行里吧，这个目前还是占了两行，还有“加载更早记录”这个挺蠢的，不能改成滚动自动加载吗？我看现在好像也没什么用
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 手机或桌面打开 Bot 对话
+    when: 查看输入区并点击添加文件
+    then: 加号与输入框和发送按钮在同一行，附件选择仍可用且页面无横向溢出
+  - id: AC-2
+    given: 对话存在多页历史
+    when: 用户连续向上滚动
+    then: 自动加载更早记录，保留阅读位置，无常驻加载按钮，不重复请求同一页，历史耗尽后停止请求
+  - id: AC-3
+    given: 加载更早记录时网络失败
+    when: 用户查看失败提示并重试
+    then: 显示可重试入口，失败期间不持续自动请求，重试成功后继续展示历史

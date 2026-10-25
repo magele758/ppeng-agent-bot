@@ -1,5 +1,7 @@
 /** Play / Chat 界面文案。不要加 as const。 */
 export const play = {
+  history: { loading: '正在加载更早记录…', failed: '更早记录加载失败', retry: '重试' },
+
   systemNotice: {
     "recovery": "执行恢复",
     "stopped": "执行已停止",

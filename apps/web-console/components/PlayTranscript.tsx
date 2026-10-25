@@ -84,7 +84,7 @@ function FeedHeader(props: {
   return (
     <>
       <ModelBanner chat={props.chat} />
-      <OlderButton chat={props.chat} />
+      <HistoryStatus chat={props.chat} />
       <TranscriptEmpty {...props} />
     </>
   );
@@ -107,20 +107,18 @@ function bannerStats(t: ReturnType<typeof useI18n>['t'], collapsed?: number, sav
   return t('play.chrome.modelViewStats', { collapsed, saved });
 }
 
-function OlderButton({ chat }: { chat: Chat }) {
+function HistoryStatus({ chat }: { chat: Chat }) {
   const { t } = useI18n();
-  if (chat.historyCursor == null) return null;
+  if (chat.historyCursor == null || (!chat.historyLoading && !chat.historyError)) return null;
   return (
-    <div className="chat-feed__older">
-      <button
-        type="button"
-        className="btn btn-ghost btn-sm"
-        data-testid="feed-load-older"
-        disabled={chat.historyLoading}
-        onClick={() => void chat.loadOlderHistory('scroll')}
-      >
-        {t('botWork.older')}
-      </button>
+    <div className="chat-feed__older" role="status">
+      {chat.historyLoading ? t('play.history.loading') : <>
+        <span>{t('play.history.failed')}</span>
+        <button type="button" className="btn btn-ghost btn-sm" data-testid="feed-retry-older"
+          onClick={() => void chat.loadOlderHistory('scroll')}>
+          {t('play.history.retry')}
+        </button>
+      </>}
     </div>
   );
 }

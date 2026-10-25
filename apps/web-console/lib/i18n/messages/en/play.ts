@@ -1,5 +1,7 @@
 /** Play / Chat copy. Do not add as const. */
 export const play = {
+  history: { loading: 'Loading earlier messages…', failed: 'Could not load earlier messages', retry: 'Retry' },
+
   systemNotice: {
     "recovery": "Execution recovery",
     "stopped": "Execution stopped",

@@ -8,7 +8,7 @@
   width: 100%;
 }
 
-/* Stay on-screen while the windowed track is scrolled to the tail. */
+/* Only loading and recoverable failure status occupy this space. */
 .chat-feed__older {
   display: flex;
   justify-content: center;
@@ -436,3 +436,13 @@
   outline: var(--ui-focus);
   outline-offset: 2px;
 }
+
+.chat-composer-outer .chat-composer__attach {
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  align-self: flex-end;
+  font-size: 24px;
+}
+.chat-composer-outer .chat-composer-dock--empty { display: none; }
+.chat-composer-outer:has(.chat-composer-dock--empty) { min-height: 0; }
