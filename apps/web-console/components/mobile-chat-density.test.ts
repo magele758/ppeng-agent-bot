@@ -225,7 +225,7 @@ test('窄屏刚进入对话时 Bot 信息和目标收成一行，对话区吃掉
 test('点开窄屏摘要后权限、详情、目标历史、状态、费用、Trace 和目标全文仍可操作 [AC:mobile-chat-density#AC-2]', async () => {
   assert.match(narrow, /\.chat-panel-header\.is-mobile-open \.chat-panel-header__details,\s*\.lab-shell \.chat-panel-header\.is-mobile-open \.chat-panel-header__actions \{\s*display:\s*flex;/);
   assert.match(narrow, /\.chat-panel-header\.is-mobile-open \.chat-panel-header__title-row \.chat-panel-header__permissions,\s*\.lab-shell \.chat-panel-header\.is-mobile-open \.chat-panel-header__title-row \.chat-panel-header__detail \{\s*display:\s*inline-flex;/);
-  assert.match(narrow, /\.goal-status-card\.is-expanded \.goal-status-card__body \{ display:\s*block; \}/);
+  assert.match(narrow, /\.goal-status-card\.is-expanded \.goal-status-card__body \{ display:\s*block;[^}]*\}/);
   assert.match(botDetailMenu, /className="chat-panel-header__permissions"/);
   assert.match(botDetailMenu, /className="chat-panel-header__detail"/);
   assert.match(playPanel, /<GoalHistory /);
@@ -278,18 +278,21 @@ test('窄屏的目标与进展默认收起，点开后仍能看到目标列表 [
     const closed = find(view.tree, (props) => props['data-testid'] === 'bot-goals');
     assert.ok(closed);
     assert.equal(closed.open, false);
-    const button = find(view.tree, (props) => props.className === 'bot-goals__phone');
+    assert.match(view.html, /<details[^>]*><summary/);
+    const button = find(view.tree, (props) => props.onClick && props['aria-expanded'] === false);
     assert.ok(button);
     assert.equal(button['aria-expanded'], false);
     assert.match(view.html, /目标与进展 \(2\)/);
     assert.match(view.html, /问完项目经历/);
     assert.match(view.html, /给出评分/);
     assert.match(narrow, /\.chat-composer-outer \.bot-goals:not\(\[open\]\) \.bot-goals__body \{ display:\s*none; \}/);
-    (button.onClick as () => void)();
+    let prevented = false;
+    (button.onClick as (event: {preventDefault():void}) => void)({preventDefault(){prevented=true;}});
+    assert.equal(prevented,true);
     const openedHtml = view.redraw();
     const opened = find(view.tree, (props) => props['data-testid'] === 'bot-goals');
     assert.equal(opened?.open, true);
-    assert.equal(find(view.tree, (props) => props.className === 'bot-goals__phone')?.['aria-expanded'], true);
+    assert.equal(find(view.tree, (props) => props.onClick && props['aria-expanded'] === true)?.['aria-expanded'], true);
     assert.match(openedHtml, /问完项目经历/);
     assert.match(openedHtml, /给出评分/);
   } finally {

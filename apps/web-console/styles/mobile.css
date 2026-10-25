@@ -101,12 +101,12 @@
     align-items: flex-start;
   }
   .lab-shell .chat-panel-header.is-mobile-open .chat-panel-header__details,
+  .lab-shell .chat-panel-header.is-mobile-open .chat-panel-header__actions {
+    display: flex;
+  }
   .lab-shell .chat-panel-header.is-mobile-open .chat-panel-header__details {
     flex-direction: column;
     gap: 4px;
-  }
-  .lab-shell .chat-panel-header.is-mobile-open .chat-panel-header__actions {
-    display: flex;
   }
   .lab-shell .chat-panel-header.is-mobile-open .chat-panel-header__actions {
     width: 100%;
