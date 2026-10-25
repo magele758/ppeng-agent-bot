@@ -1,4 +1,5 @@
-import { usesDurableBotGoals } from '../bots/goals/runtime-host.js';
+import { usesDurableBotGoals, reviewDirectGoalBeforeEnd, type GoalRuntimeHost } from '../bots/goals/runtime-host.js';
+import { completionModelView, reviewQueryOutput } from '../bots/strict-output.js';
 import { observeModelRequests } from './request-metrics.js';
 import {
   commitPrepareSnapshot,
@@ -153,6 +154,7 @@ import type { SessionCompleteHost } from './session-complete.js';
 import type { SchedulerTickHost } from './scheduler-host.js';
 
 export interface L5Bindable {
+  goalRuntimeHost?(): GoalRuntimeHost;
   store: SqliteStateStore;
   repoRoot: string;
   stateDir: string;
@@ -322,7 +324,7 @@ async function invokeContextModel(
   try {
     const shape = {systemPromptChars: input.systemPrompt.length, toolSchemaTokens: Math.ceil(JSON.stringify(input.tools.map(tool=>({name:tool.name,description:tool.description,inputSchema:tool.inputSchema}))).length/4)};
     const budget = resolveBotWindowBudget(rt.store, adapter, shape);
-    let messages = input.messages;
+    let messages = completionModelView(input.messages);
     let compacted = false;
     const estimated = estimateMessageTokens(messages);
     // Overhead can put the send ceiling under the 50% tier. Compact first, then apply it.
@@ -334,7 +336,7 @@ async function invokeContextModel(
         const prepared = await host.prepareMessagesForModel(session, rt.store.foldMessages(session.id));
         // Preserve turn-local user memory/image parts when the original message survived.
         const oldById = new Map(messages.filter(message=>message.role==='user').map(message=>[message.id,message]));
-        messages = prepared.map(message => oldById.get(message.id) ?? message);
+        messages = completionModelView(prepared.map(message => oldById.get(message.id) ?? message));
       }
     }
     if (estimateMessageTokens(messages) > budget.historyTokens) {
@@ -1010,6 +1012,14 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
         };
       }
 
+      if (usesDurableBotGoals(rt.store, session) && rt.goalRuntimeHost) {
+        const review = await reviewDirectGoalBeforeEnd(rt.goalRuntimeHost(), session.id, signal);
+        if (review) return review;
+      }
+      if (isCanonicalBotChat(session)) {
+        const formatReview = reviewQueryOutput(rt.store, session.id, signal);
+        if (formatReview) return formatReview;
+      }
       const gate = usesDurableBotGoals(rt.store, session) ? undefined : createGoalGateFromMetadata(session.metadata, process.env);
       if (!gate?.isActive()) return { met: true };
 

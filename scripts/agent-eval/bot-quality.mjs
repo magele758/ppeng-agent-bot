@@ -74,3 +74,12 @@ export function summarizeBaseline(suite,records,{trials,simulation}) {
   categories:Object.fromEntries(categories.map(c=>{const rs=rows.filter(r=>r.category===c);return [c,{samples:rs.length,passed:rs.filter(r=>r.pass&&!r.infrastructureError).length}];})),
   cases:rows.map(r=>({caseId:r.caseId,trial:r.trial,pass:r.pass,failures:r.failures,durationMs:r.durationMs,tokens:r.tokens,modelCalls:r.modelCalls}))};
 }
+
+export function wireRequestPurpose(body) {
+ const first=body.messages?.find(m=>m.role==='system')?.content??body.system??body.instructions??'';
+ const text=typeof first==='string'?first:JSON.stringify(first);
+ if(text.includes('Return JSON {intents:'))return 'intent';
+ if(text.startsWith('Evaluate'))return 'completion';
+ if(/Summarize the conversation|Structured compaction|Session hygiene compaction/.test(text))return 'summary';
+ return 'turn';
+}

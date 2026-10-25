@@ -17,7 +17,7 @@ export interface GoalExecution {
 export interface GoalReport {
  kind: 'progress' | 'waiting' | 'blocked' | 'candidate_completed' | 'failed' | 'cancelled';
  summary: string; evidence?: string[]; verified?: boolean; wait?: GoalWait; costUsd?: number;
- eventId?: string; nextStep?: string; advanced?: boolean; owner?: string; fence?: number;
+ eventId?: string; nextStep?: string; advanced?: boolean; correctionNeeded?: boolean; owner?: string; fence?: number;
 }
 export interface GoalIntent {
  kind: 'new_goal' | 'amend_goal' | 'query' | 'pause' | 'resume' | 'cancel';

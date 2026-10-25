@@ -189,6 +189,22 @@ export function selectEpisodicMessages(
     includeInitialContext?: boolean;
   }
 ): SessionMessage[] {
+  if (estimateMessageTokens(messages) <= maxTokens) return messages;
+  const selected = selectHistoricalEpisodes(messages, maxTokens, options);
+  const latestUser = messages.findLastIndex(message => message.role === 'user');
+  if (latestUser < 0) return selected;
+  // The history budget may evict old episodes, never the active request or its
+  // tool waves. Compaction, not an arbitrary tail slice, bounds an active turn.
+  const ids = new Set(selected.map(message => message.id));
+  for (const message of messages.slice(latestUser)) ids.add(message.id);
+  return messages.filter(message => ids.has(message.id));
+}
+
+function selectHistoricalEpisodes(
+  messages: SessionMessage[],
+  maxTokens: number,
+  options?: Parameters<typeof selectEpisodicMessages>[2]
+): SessionMessage[] {
   if (messages.length === 0) return [];
 
   const minRecent = options?.minRecentMessages ?? 8;

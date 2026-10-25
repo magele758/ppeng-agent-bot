@@ -49,3 +49,21 @@ GitHub 的 Live Agent quality gate 支持手动运行和 workflow_call，使用�
 manifest.json 记录源码、构建、lockfile、驱动、模型、任务和预算指纹；suite.json 固定当次考题；每次执行的 JSON 包含原始轨迹、真实工具结果、产物、判定、用量与错误；report.json/report.md 汇总；evidence-index.json 用于完整性校验。模型版本名可能是供应商可变别名，无法证明其后端权重不变，应定期重跑相同基线。
 
 线上失败经脱敏进入新任务集。先分析是产品缺陷、任务歧义、验收器误判还是服务故障，再版本化更新，不删除失败样本或选择性重跑后覆盖原记录。
+
+## 32 题重复对照
+
+`experiments/bot-reliability.json` 保留原 16 题，增加平方/费用计算、中位数、分组总和、加权均值、库存核对、最新事件、区间交集、CSV、依赖排序、零值回退、重试后组合、错误状态核验和两类压缩取证，共 32 题。默认每版每题三次、最多四条执行通道，同题 AB/BA 顺序不变，每轮完成后才进入下一轮。
+
+    pnpm run agent:quality:compare --config scripts/agent-eval/experiments/bot-reliability.json --baseline-root /absolute/stable --candidate-root /absolute/candidate --settings-root /absolute/running/repo --bot ppeng-agent-core --out test-results/bot-ab-unique
+
+最大规划请求数为 2304（32 × 3 × 2 × 12），总预算上限为 3000；每题与统计门禁标准均未降低。32 题仍不保证各类别统计区间足够窄；旧版取消请求的未知用量保留为未知，不能补零让门禁通过。新增任务覆盖不同运算与失败合同，仍限于夹具分布，不是广泛通用能力认证。
+
+### 执行可靠性修复
+
+Bot 不再把“保留证据”解释成额外保存业务记录：工具观测已自动留存，只有任务需要的产物可以写入；未提供 goal_checkpoint 时不能拿其他存储工具替代。意图与完成判官使用统一 60 秒有界预算，成功后不再额外 abort；真正超时仍回退或保持未验证，缺失用量不能补零。每次模型请求记录 intent / completion / summary / turn 用途，便于区分问题来源。
+
+Bot 压缩优先把摘要指令放在 completeText 的 system 参数，把历史和旧摘要单独序列化为数据，避免生成摘要时的格式要求成为下一轮任务。兼容仅提供 summarizeMessages 的适配器时，将内部指令明确标记为 system 指令而非用户历史。回流摘要使用历史助手角色，摘要后备注入仍标记为历史背景，当前用户要求优先；提示与导航一起计入既有摘要字符预算。此处不扩大写入权限，也不改变证据验收规则。
+
+历史选择器保留当前用户请求及之后的执行轨迹；预算足够时不裁剪单片段历史，避免多轮工具调用后当前目标被尾部截断。
+
+2026-10-24 的三轮 Grok 对照及所有中间失败记录见 [可靠性报告](eval-results/2026-10-24-bot-reliability.md)。本次候选仍被严格门禁判为 regressed，不能作为发布认证。

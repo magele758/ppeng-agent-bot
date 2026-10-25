@@ -1,3 +1,4 @@
+import { HISTORICAL_SUMMARY_NOTICE } from '../session/context-sources.js';
 import { toolDirectory } from '../tools/tool-exposure.js';
 import {readBotSkillSelection, selectBotSkills} from '../skills/bot-selection.js';
 import { filterSkillsByBot, sessionBotId } from '../skills/bot-scope.js';
@@ -62,7 +63,7 @@ const { HARNESS_ARTIFACT_DIR, HARNESS_ARTIFACT_FILES } = await import('../types.
  * Bump when `buildStablePrefix` (or any helper that feeds it) changes wording.
  * See `./AGENTS.md`.
  */
-export const STABLE_SYSTEM_VERSION = 'v11';
+export const STABLE_SYSTEM_VERSION = 'v14';
 
 /** Appended when `RAW_AGENT_AGENTIC_SAFETY_APPENDIX` is set; English to match the rest of the stable prefix. */
 export const RUNTIME_AGENTIC_SAFETY_APPENDIX = `Runtime safety appendix (policy text only; does not replace model-level safety training):
@@ -395,6 +396,9 @@ export class PromptBuilder {
       `Conversation mode: ${ctx.session.mode}`,
       'You are running in a raw agent loop. Respond normally when no tools are needed.',
       EXTERNAL_FENCE_SYSTEM_SENTENCE,
+      'Only write artifacts required by the user or necessary to perform the requested task. Verification observations already in tool results are evidence; report them in the conversation without creating additional files, database records, or saved reports merely to prove completion. Explicitly requested reports and necessary task outputs remain authorized.',
+      'Choose tools by their actual data source and capability. Resolve bare data identifiers with an exact-key lookup when available before assuming a filesystem path or searching conversation history. Use file tools for explicit file references or files established by discovery. Do not repeatedly guess filenames after a missing-file result; use an authorized lookup or discovery tool to locate the requested data. Once the input is available, complete the requested transformation and persistence, and verify the saved artifact before ending. Finding input or announcing the next action is not task completion.',
+      'When the user specifies an exact output format or asks for only a value, return that format without explanations, headings, or verification reports. Perform necessary tools and checks, but keep progress narration out of a strict-format response.',
       'Use TodoWrite for multi-step work when it helps track remaining work; keep one item in progress and prioritize execution over bookkeeping.',
       'Load skills from repo `skills/` and `~/.agents/**/SKILL.md` only when relevant with load_skill(name).',
       'Use persistent tasks for long-lived work and teammates only for clearly separable work.',
@@ -475,8 +479,8 @@ export class PromptBuilder {
       : '';
 
     const summaryMaxChars = compactSummaryMaxChars(process.env);
-    const summaryLine = ctx.session.summary && !messages.some(message => message.key === 'compact-summary')
-      ? `Compressed summary:\n${capRollingSummaryText(ctx.session.summary, summaryMaxChars)}`
+    const summaryLine = ctx.session.summary && summaryMaxChars > HISTORICAL_SUMMARY_NOTICE.length && !messages.some(message => message.key === 'compact-summary')
+      ? `${HISTORICAL_SUMMARY_NOTICE}Compressed summary:\n${capRollingSummaryText(ctx.session.summary, summaryMaxChars - HISTORICAL_SUMMARY_NOTICE.length)}`
       : '';
 
     // Memory is intentionally NOT in the dynamic system block — see buildMemoryAppendix

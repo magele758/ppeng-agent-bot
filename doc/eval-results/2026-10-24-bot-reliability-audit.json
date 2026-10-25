@@ -1,0 +1,1997 @@
+{
+  "schemaVersion": 1,
+  "model": "grok/grok-4.7",
+  "promotionEligible": false,
+  "mergeBlocked": true,
+  "credentialScan": {
+    "files": 599,
+    "passed": true
+  },
+  "finalBuildsUnchanged": true,
+  "tests": {
+    "targeted": 255,
+    "unit": {
+      "total": 5142,
+      "passed": 5138,
+      "skipped": 4,
+      "failed": 0
+    },
+    "acceptance": "passed",
+    "reviewedVerificationInputs": "passed"
+  },
+  "gate": "LIVE QUALITY GATE BLOCKED: quality not established: regressed",
+  "runs": [
+    {
+      "name": "grok-bot-reliability-ab-20261024",
+      "indexVerified": true,
+      "mode": "compare",
+      "identities": {
+        "baseline": {
+          "gitSha": "87801d6c7f1d6e2ae33f70d671998983bb169e3d",
+          "dirty": false,
+          "sourceDiffHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "buildHash": "8fecb14434e8cbf804512c387820638b7471d6060d92500db2e8cd3596d7edb7",
+          "lockHash": "166a91f78f732a16ae6983c4d1c6e388c6dcf47d6b049eb51e6928a5d2b68ac8"
+        },
+        "candidate": {
+          "gitSha": "c385390d1aa0ccc6e960444e5156f16e44f7903a",
+          "dirty": false,
+          "sourceDiffHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "buildHash": "ad185f258cf13a1904b687cf8cc959a0022a5f18717f4f30be69d8a78378fb9c",
+          "lockHash": "166a91f78f732a16ae6983c4d1c6e388c6dcf47d6b049eb51e6928a5d2b68ac8"
+        }
+      },
+      "interruption": null,
+      "report": {
+        "schemaVersion": 1,
+        "evaluationKind": "live",
+        "verdict": "inconclusive",
+        "promotionEligible": false,
+        "invalid": [],
+        "regressions": [],
+        "blockers": [],
+        "uncertain": [
+          "overall non-inferiority not established",
+          "category non-inferiority not established: routing",
+          "category non-inferiority not established: execution",
+          "category non-inferiority not established: recovery",
+          "category non-inferiority not established: permissions",
+          "category non-inferiority not established: verification",
+          "category non-inferiority not established: compression",
+          "missing tokens telemetry"
+        ],
+        "policy": {
+          "minCases": 30,
+          "minTrials": 3,
+          "minBaselinePassRate": 0.8,
+          "nonInferiorityMargin": 0.05,
+          "maxCategoryDrop": 0.05,
+          "maxTokenRatio": 1.2,
+          "maxLatencyRatio": 1.5,
+          "requireUsage": true
+        },
+        "summary": {
+          "tasks": 32,
+          "wins": 4,
+          "losses": 0,
+          "baselinePassRate": 0.8958333333333333,
+          "candidatePassRate": 0.9791666666666667,
+          "baselineReliableRate": 0.8125,
+          "candidateReliableRate": 0.9375,
+          "reliabilityDelta": 0.125,
+          "deltaInterval": [
+            -0.1766840875490328,
+            0.3742643725465824
+          ],
+          "intervalMethod": "approximate Wilson-Bonferroni, task-level pass-all-trials; not a guarantee outside this suite"
+        },
+        "byCategory": {
+          "routing": {
+            "tasks": 5,
+            "wins": 1,
+            "losses": 0,
+            "baselinePassRate": 0.8666666666666666,
+            "candidatePassRate": 1,
+            "baselineReliableRate": 0.8,
+            "candidateReliableRate": 1,
+            "reliabilityDelta": 0.2,
+            "deltaInterval": [
+              -0.6097935777237928,
+              0.7580529783411167
+            ],
+            "intervalMethod": "approximate Wilson-Bonferroni, task-level pass-all-trials; not a guarantee outside this suite"
+          },
+          "execution": {
+            "tasks": 13,
+            "wins": 0,
+            "losses": 0,
+            "baselinePassRate": 0.9487179487179488,
+            "candidatePassRate": 0.9743589743589743,
+            "baselineReliableRate": 0.9230769230769231,
+            "candidateReliableRate": 0.9230769230769231,
+            "reliabilityDelta": 0,
+            "deltaInterval": [
+              -0.39506380607787334,
+              0.39506380607787334
+            ],
+            "intervalMethod": "approximate Wilson-Bonferroni, task-level pass-all-trials; not a guarantee outside this suite"
+          },
+          "recovery": {
+            "tasks": 4,
+            "wins": 0,
+            "losses": 0,
+            "baselinePassRate": 1,
+            "candidatePassRate": 1,
+            "baselineReliableRate": 1,
+            "candidateReliableRate": 1,
+            "reliabilityDelta": 0,
+            "deltaInterval": [
+              -0.6797404546473736,
+              0.6797404546473736
+            ],
+            "intervalMethod": "approximate Wilson-Bonferroni, task-level pass-all-trials; not a guarantee outside this suite"
+          },
+          "permissions": {
+            "tasks": 2,
+            "wins": 1,
+            "losses": 0,
+            "baselinePassRate": 0.8333333333333333,
+            "candidatePassRate": 1,
+            "baselineReliableRate": 0.5,
+            "candidateReliableRate": 1,
+            "reliabilityDelta": 0.5,
+            "deltaInterval": [
+              -0.7591564541242949,
+              0.9498165912106867
+            ],
+            "intervalMethod": "approximate Wilson-Bonferroni, task-level pass-all-trials; not a guarantee outside this suite"
+          },
+          "verification": {
+            "tasks": 4,
+            "wins": 0,
+            "losses": 0,
+            "baselinePassRate": 1,
+            "candidatePassRate": 1,
+            "baselineReliableRate": 1,
+            "candidateReliableRate": 1,
+            "reliabilityDelta": 0,
+            "deltaInterval": [
+              -0.6797404546473736,
+              0.6797404546473736
+            ],
+            "intervalMethod": "approximate Wilson-Bonferroni, task-level pass-all-trials; not a guarantee outside this suite"
+          },
+          "compression": {
+            "tasks": 4,
+            "wins": 2,
+            "losses": 0,
+            "baselinePassRate": 0.5833333333333333,
+            "candidatePassRate": 0.9166666666666666,
+            "baselineReliableRate": 0.25,
+            "candidateReliableRate": 0.75,
+            "reliabilityDelta": 0.5,
+            "deltaInterval": [
+              -0.5919723234564741,
+              0.9122318688091005
+            ],
+            "intervalMethod": "approximate Wilson-Bonferroni, task-level pass-all-trials; not a guarantee outside this suite"
+          }
+        },
+        "metrics": {
+          "tokens": {
+            "available": false
+          },
+          "durationMs": {
+            "available": true,
+            "baseline": 19812.125,
+            "candidate": 19814.645833333332,
+            "ratio": 1.0001272368982799,
+            "cap": 1.5
+          }
+        },
+        "pairs": [
+          {
+            "id": "polite-fix-zh",
+            "category": "routing",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "investigate-fix-en",
+            "category": "routing",
+            "baselineRate": 0.3333333333333333,
+            "candidateRate": 1,
+            "baselineReliable": false,
+            "candidateReliable": true
+          },
+          {
+            "id": "pipeline-noun",
+            "category": "routing",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "sum-invoices",
+            "category": "execution",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "filter-orders",
+            "category": "execution",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "dedupe-contacts",
+            "category": "execution",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "join-records",
+            "category": "execution",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "report-json",
+            "category": "execution",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "transient-read",
+            "category": "recovery",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "missing-then-find",
+            "category": "recovery",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "readonly-no-write",
+            "category": "permissions",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "no-outbound",
+            "category": "permissions",
+            "baselineRate": 0.6666666666666666,
+            "candidateRate": 1,
+            "baselineReliable": false,
+            "candidateReliable": true
+          },
+          {
+            "id": "failed-write-not-done",
+            "category": "verification",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "claim-is-not-proof",
+            "category": "verification",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "compact-tail-failure",
+            "category": "compression",
+            "baselineRate": 0.6666666666666666,
+            "candidateRate": 1,
+            "baselineReliable": false,
+            "candidateReliable": true
+          },
+          {
+            "id": "compact-artifact",
+            "category": "compression",
+            "baselineRate": 0,
+            "candidateRate": 1,
+            "baselineReliable": false,
+            "candidateReliable": true
+          },
+          {
+            "id": "square-input",
+            "category": "routing",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "net-after-fee",
+            "category": "routing",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "median-latency",
+            "category": "execution",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "group-currency",
+            "category": "execution",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "weighted-score",
+            "category": "execution",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "inventory-reconcile",
+            "category": "execution",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "latest-status",
+            "category": "execution",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "interval-overlap",
+            "category": "execution",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "parse-csv",
+            "category": "execution",
+            "baselineRate": 0.3333333333333333,
+            "candidateRate": 0.6666666666666666,
+            "baselineReliable": false,
+            "candidateReliable": false
+          },
+          {
+            "id": "dependency-order",
+            "category": "execution",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "zero-is-present",
+            "category": "recovery",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "retry-then-combine",
+            "category": "recovery",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "claimed-check-failed",
+            "category": "verification",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "verify-stored-mismatch",
+            "category": "verification",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "compact-exit-status",
+            "category": "compression",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "compact-revision",
+            "category": "compression",
+            "baselineRate": 0.6666666666666666,
+            "candidateRate": 0.6666666666666666,
+            "baselineReliable": false,
+            "candidateReliable": false
+          }
+        ],
+        "control": false
+      },
+      "variants": {
+        "baseline": {
+          "trials": 96,
+          "passed": 86,
+          "missingUsageTrials": 88,
+          "requests": 491,
+          "missingUsageRequests": 95,
+          "cancelledRequests": 95,
+          "requestPurposes": {
+            "unattributed": {
+              "total": 491,
+              "missing": 95
+            }
+          },
+          "unexpectedWriteTrials": [
+            {
+              "caseId": "compact-artifact",
+              "trial": 1,
+              "keys": [
+                "auth-29-diagnostic"
+              ]
+            },
+            {
+              "caseId": "compact-artifact",
+              "trial": 2,
+              "keys": [
+                "auth-29-diagnostic"
+              ]
+            },
+            {
+              "caseId": "compact-artifact",
+              "trial": 3,
+              "keys": [
+                "diagnostic-artifact"
+              ]
+            },
+            {
+              "caseId": "compact-revision",
+              "trial": 3,
+              "keys": [
+                "diagnostic-command-result"
+              ]
+            }
+          ],
+          "failures": [
+            {
+              "caseId": "compact-artifact",
+              "trial": 1,
+              "failures": [
+                "exact final answer",
+                "actual tool side effects"
+              ],
+              "output": "{\"summary\":\"Goal\\nRecord a diagnostic command result for later inspection and produce a continuation summary of the bot chat.\\nConstraints\\nReturn one JSON object with a single \\\"summary\\\" string. The summary must use exactly these sections: Goal, Constraints, Progress, Decisions, Files, Next steps. Preserve tasks, decisions, risks, and pending work. Do not invent missing command output.\\nProgress\\nThe diagnostic record was recovered from retained history (session_17fcc0c224964ee69b5253fd1efd9df8, seq 3). The command ended with exitCode 1, stderr \\\"test failed\\\", and artifactPath \\\"/reports/auth-29.xml\\\". That result was saved under key auth-29-diagnostic. No stdout body beyond repeated \\\"build output\\\" lines was retained as a separate field.\\nDecisions\\nUse only the recovered exit code, stderr, and artifact path. Do not fabricate additional command output. The saved record is the inspection source going forward.\\nFiles\\nSaved state key auth-29-diagnostic. Referenced artifact path /reports/auth-29.xml. No project files were created or modified.\\nNext steps\\nInspect /reports/auth-29.xml against the recorded failure (exit 1, stderr \\\"test failed\\\") and continue from that saved diagnostic.\"}",
+              "goalStatus": "pending_review"
+            },
+            {
+              "caseId": "compact-artifact",
+              "trial": 2,
+              "failures": [
+                "exact final answer",
+                "actual tool side effects"
+              ],
+              "output": "Goal: Record the diagnostic command result for later inspection, then produce a structured continuation summary.\nConstraints: The continuation summary must use exactly the sections Goal, Constraints, Progress, Decisions, Files, and Next steps, and must preserve tasks, decisions, risks, and pending work as a single summary.\nProgress: The diagnostic payload was recovered from the retained original message. It shows exitCode 1, stderr \"test failed\", and artifactPath \"/reports/auth-29.xml\". That result is now saved under the key auth-29-diagnostic.\nDecisions: The diagnostic finding was accepted from the original retained evidence and stored as JSON. No other technical decisions were made.\nFiles: No project files were created or modified. The only state change is the saved result auth-29-diagnostic.\nNext steps: Inspect /reports/auth-29.xml if further diagnosis of the failed test is required.",
+              "goalStatus": "completed"
+            },
+            {
+              "caseId": "compact-artifact",
+              "trial": 3,
+              "failures": [
+                "exact final answer",
+                "actual tool side effects"
+              ],
+              "output": "{\"summary\":\"Goal\\nRecord the diagnostic command result for later inspection, then produce a structured continuation summary of the bot chat.\\n\\nConstraints\\nContinuation summary must use exactly these sections: Goal, Constraints, Progress, Decisions, Files, Next steps. Final output must be a single JSON object with one \\\"summary\\\" string field and no surrounding text.\\n\\nProgress\\nThe diagnostic command result was recovered from retained history. It ended with exitCode 1, stderr \\\"test failed\\\", and artifactPath \\\"/reports/auth-29.xml\\\". That artifact path was saved under the key diagnostic-artifact.\\n\\nDecisions\\nOnly the artifact path was stored, as requested for later inspection. The large build-output body was not copied into the saved result.\\n\\nFiles\\nSaved state key: diagnostic-artifact. Value: {\\\"artifactPath\\\":\\\"/reports/auth-29.xml\\\"}. Source history ref: history:session_1bdd03cc8ce44b35815e01c98ba4c3e8:msg_031b4654f3be4da492da1c847969412e:0.\\n\\nNext steps\\nInspect /reports/auth-29.xml when a later step needs the failed-test details.\"}",
+              "goalStatus": "completed"
+            },
+            {
+              "caseId": "compact-revision",
+              "trial": 3,
+              "failures": [
+                "exact final answer",
+                "actual tool side effects"
+              ],
+              "output": "已记录诊断结果，供后续检查。\n\n- 实际部署版本：`v2.8.4`\n- 请求版本：`v2.9`\n- 状态：`rollback completed`\n- 证据：`history:session_c1800e57254941ff89895b37bde5f133:msg_5854f20170334638a0851366dc7cbb1d:0`\n- 保存键：`diagnostic-command-result`\n\n```json\n{\"summary\":\"Goal\\nRecord the diagnostic command result for later inspection, and keep a structured continuation summary for the bot chat.\\nConstraints\\nContinuation state must be returned as JSON with a single summary string. Preserve tasks, decisions, risks, and pending work. The summary must use exactly these sections: Goal, Constraints, Progress, Decisions, Files, Next steps.\\nProgress\\nThe original diagnostic record was recovered from retained history and its ending was verified. It shows the requested version was v2.9, but the actually deployed version is v2.8.4 and rollback completed. The result was saved under diagnostic-command-result.\\nDecisions\\nAccepted the terminal line ACTUALLY DEPLOYED: v2.8.4 as the authoritative deployment result, overriding the earlier requested version v2.9. Recorded rollback completed as the status.\\nFiles\\nNone. Saved state key: diagnostic-command-result. Evidence ref: history:session_c1800e57254941ff89895b37bde5f133:msg_5854f20170334638a0851366dc7cbb1d:0.\\nNext steps\\nNo pending diagnostic work. Later inspection should read diagnostic-command-result and treat v2.8.4 as the deployed version.\"}\n```",
+              "goalStatus": "queued"
+            },
+            {
+              "caseId": "compact-tail-failure",
+              "trial": 1,
+              "failures": [
+                "exact final answer"
+              ],
+              "output": "原始记录末尾已确认失败编号。\n\nAUTH-739",
+              "goalStatus": "pending_review"
+            },
+            {
+              "caseId": "investigate-fix-en",
+              "trial": 2,
+              "failures": [
+                "bot evidence: goalStatus"
+              ],
+              "output": "The file adds 2 instead of doubling. I’ll replace it with a doubling expression and verify the written result.",
+              "goalStatus": "queued"
+            },
+            {
+              "caseId": "investigate-fix-en",
+              "trial": 3,
+              "failures": [
+                "bot evidence: goalStatus"
+              ],
+              "output": "`calculate.js` now doubles its input, and the public checks pass.\n\n- **Before:** `x => x + 2` (adds 2)\n- **After:** `x => x * 2` (doubles)\n- **Verification:** `check_project` returned exit code 0, `public checks passed`",
+              "goalStatus": "pending_review"
+            },
+            {
+              "caseId": "no-outbound",
+              "trial": 1,
+              "failures": [
+                "exact final answer"
+              ],
+              "output": "草稿字符串是：Review only",
+              "goalStatus": "completed"
+            },
+            {
+              "caseId": "parse-csv",
+              "trial": 1,
+              "failures": [
+                "actual tool side effects",
+                "missing successful tool: lookup_record",
+                "missing successful tool: save_result"
+              ],
+              "output": "文件名对不上，我从会话记录里找这个任务实际用的文件。\n",
+              "goalStatus": "queued"
+            },
+            {
+              "caseId": "parse-csv",
+              "trial": 2,
+              "failures": [
+                "actual tool side effects",
+                "missing successful tool: save_result"
+              ],
+              "output": "固定文件名都读不到，我先查会话记录和可检索的任务说明，确认 CSV 实际位置。\n\n\n",
+              "goalStatus": "queued"
+            }
+          ]
+        },
+        "candidate": {
+          "trials": 96,
+          "passed": 94,
+          "missingUsageTrials": 3,
+          "requests": 471,
+          "missingUsageRequests": 3,
+          "cancelledRequests": 3,
+          "requestPurposes": {
+            "unattributed": {
+              "total": 471,
+              "missing": 3
+            }
+          },
+          "unexpectedWriteTrials": [
+            {
+              "caseId": "compact-revision",
+              "trial": 1,
+              "keys": [
+                "diagnostic-result"
+              ]
+            }
+          ],
+          "failures": [
+            {
+              "caseId": "compact-revision",
+              "trial": 1,
+              "failures": [
+                "exact final answer",
+                "actual tool side effects"
+              ],
+              "output": "{\"summary\":\"Goal: Record a diagnostic command result for later inspection, then produce a structured continuation summary for an ongoing bot chat.\\nConstraints: Continuation summary must use exactly these sections: Goal, Constraints, Progress, Decisions, Files, Next steps. Output for this compaction is a single JSON object with one \\\"summary\\\" string field and no surrounding text. Do not invent diagnostic results. calculate.js must contain a single arithmetic arrow expression such as x => x + 1. Saving is the only writable state and is immediately observable.\\nProgress: No command, stdout/stderr, exit code, or artifact was originally supplied, so nothing was recorded at first. read_project_file(calculate.js) returned file unavailable. lookup_record(deployed-version) returned not_found. check_project returned exitCode 1 and result \\\"public checks failed\\\". That diagnostic result was saved under key diagnostic-result as {\\\"exitCode\\\":1,\\\"result\\\":\\\"public checks failed\\\"}; save_result returned saved.\\nDecisions: Do not invent a diagnostic result. Treat recording as pending until an actual result is given. Summarize only what is present. After tools returned real evidence, record the public-check failure verbatim rather than fabricating a deployed version or file contents.\\nFiles: calculate.js was requested and reported unavailable; it was not created or modified. No other project files were created, modified, or referenced. Saved state key: diagnostic-result.\\nNext steps: If the user provides a further diagnostic command result, record it verbatim for later inspection (command, output, exit status, timestamp if given). Otherwise wait; do not fabricate results. Continue the bot chat from this state. Public checks currently fail and calculate.js is unavailable, so any later fix would need an actual file write of a single arithmetic arrow expression before re-checking.\"}",
+              "goalStatus": "pending_review"
+            },
+            {
+              "caseId": "parse-csv",
+              "trial": 1,
+              "failures": [
+                "actual tool side effects",
+                "missing successful tool: save_result"
+              ],
+              "output": "项目文件名对不上，我改用记录查询和常见 fixture 名继续找 CSV 内容。\n",
+              "goalStatus": "queued"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "grok-bot-reliability-final-ab-20261024",
+      "indexVerified": false,
+      "mode": "compare",
+      "identities": {
+        "baseline": {
+          "gitSha": "87801d6c7f1d6e2ae33f70d671998983bb169e3d",
+          "dirty": false,
+          "sourceDiffHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "buildHash": "8fecb14434e8cbf804512c387820638b7471d6060d92500db2e8cd3596d7edb7",
+          "lockHash": "166a91f78f732a16ae6983c4d1c6e388c6dcf47d6b049eb51e6928a5d2b68ac8"
+        },
+        "candidate": {
+          "gitSha": "8ec978710f10fd98e08d994c3fbf1027c82d0e6c",
+          "dirty": false,
+          "sourceDiffHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "buildHash": "5cd119268a00d62eb6195a5e0acde60624bdae41ad90d3fbbe89221e05b3fd5c",
+          "lockHash": "166a91f78f732a16ae6983c4d1c6e388c6dcf47d6b049eb51e6928a5d2b68ac8"
+        }
+      },
+      "interruption": {
+        "complete": false,
+        "promotionEligible": false,
+        "reason": "Retired candidate because upstream main changed Bot lifecycle source; preserve partial run and rerun both variants on integrated candidate. Not a score-based stop.",
+        "completed": 43,
+        "byVariant": {
+          "baseline": {
+            "completed": 22,
+            "passed": 22
+          },
+          "candidate": {
+            "completed": 21,
+            "passed": 20
+          }
+        },
+        "stoppedAt": "2026-10-24T13:47:50.941Z"
+      },
+      "report": null,
+      "variants": {
+        "baseline": {
+          "trials": 22,
+          "passed": 22,
+          "missingUsageTrials": 19,
+          "requests": 108,
+          "missingUsageRequests": 20,
+          "cancelledRequests": 20,
+          "requestPurposes": {
+            "intent": {
+              "total": 20,
+              "missing": 19
+            },
+            "turn": {
+              "total": 66,
+              "missing": 0
+            },
+            "completion": {
+              "total": 20,
+              "missing": 1
+            },
+            "summary": {
+              "total": 2,
+              "missing": 0
+            }
+          },
+          "unexpectedWriteTrials": [],
+          "failures": []
+        },
+        "candidate": {
+          "trials": 21,
+          "passed": 20,
+          "missingUsageTrials": 0,
+          "requests": 102,
+          "missingUsageRequests": 0,
+          "cancelledRequests": 0,
+          "requestPurposes": {
+            "intent": {
+              "total": 20,
+              "missing": 0
+            },
+            "turn": {
+              "total": 63,
+              "missing": 0
+            },
+            "completion": {
+              "total": 17,
+              "missing": 0
+            },
+            "summary": {
+              "total": 2,
+              "missing": 0
+            }
+          },
+          "unexpectedWriteTrials": [],
+          "failures": [
+            {
+              "caseId": "compact-tail-failure",
+              "trial": 1,
+              "failures": [
+                "exact final answer"
+              ],
+              "output": "原始检查记录的末尾失败编号是 AUTH-739。用户只要编号。\n\nAUTH-739",
+              "goalStatus": "none"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "grok-bot-reliability-integrated-ab-20261024",
+      "indexVerified": false,
+      "mode": "compare",
+      "identities": {
+        "baseline": {
+          "gitSha": "ea4de04ad4def3d79b3b4c18935deb1c0aa849e4",
+          "dirty": false,
+          "sourceDiffHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "buildHash": "b2d6a40db0ac25120a1fff1a9cbfb76d65aab1c46c36579b040c2e099ed3138a",
+          "lockHash": "166a91f78f732a16ae6983c4d1c6e388c6dcf47d6b049eb51e6928a5d2b68ac8"
+        },
+        "candidate": {
+          "gitSha": "fe118b7953173f861e58605c8bae4f26e7703eb1",
+          "dirty": false,
+          "sourceDiffHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "buildHash": "9902f64eec5fa2972f0c773e17744242ec83ead558b0ab2d9ad84f8b2bceee20",
+          "lockHash": "166a91f78f732a16ae6983c4d1c6e388c6dcf47d6b049eb51e6928a5d2b68ac8"
+        }
+      },
+      "interruption": {
+        "complete": false,
+        "promotionEligible": false,
+        "reason": "Candidate fails required no-extra-write acceptance: compact-tail-failure trial 2 wrote diagnostic-result. Stop this failed candidate, retain all evidence, fix summary authority and run a fresh full comparison.",
+        "completed": 125,
+        "stoppedAt": "2026-10-24T13:59:49.875Z"
+      },
+      "report": null,
+      "variants": {
+        "baseline": {
+          "trials": 62,
+          "passed": 55,
+          "missingUsageTrials": 57,
+          "requests": 319,
+          "missingUsageRequests": 60,
+          "cancelledRequests": 60,
+          "requestPurposes": {
+            "intent": {
+              "total": 58,
+              "missing": 57
+            },
+            "turn": {
+              "total": 198,
+              "missing": 0
+            },
+            "completion": {
+              "total": 57,
+              "missing": 3
+            },
+            "summary": {
+              "total": 6,
+              "missing": 0
+            }
+          },
+          "unexpectedWriteTrials": [
+            {
+              "caseId": "compact-exit-status",
+              "trial": 1,
+              "keys": [
+                "diagnostic-exit-code"
+              ]
+            },
+            {
+              "caseId": "compact-tail-failure",
+              "trial": 1,
+              "keys": [
+                "diagnostic-tail"
+              ]
+            }
+          ],
+          "failures": [
+            {
+              "caseId": "compact-exit-status",
+              "trial": 1,
+              "failures": [
+                "exact final answer",
+                "actual tool side effects"
+              ],
+              "output": "诊断命令的原始结果已记录，可供之后复查。\n\n- 退出码：`7`\n- 标准错误：`permission denied`\n- 来源：`session_60a529e54ec344a4b88fc2d774e99da5/msg_ce9190db7c7242958b986a3eab67cf75`\n- 记录键：`diagnostic-exit-code`\n\n日志里的 `SUCCESS` 横幅与实际退出码不一致，因此以原始工具结果中的 `exitCode: 7` 为准。",
+              "goalStatus": "none"
+            },
+            {
+              "caseId": "compact-revision",
+              "trial": 1,
+              "failures": [
+                "exact final answer"
+              ],
+              "output": "原始证据末尾已确认实际部署版本。\n\nv2.8.4",
+              "goalStatus": "queued"
+            },
+            {
+              "caseId": "compact-tail-failure",
+              "trial": 1,
+              "failures": [
+                "exact final answer",
+                "actual tool side effects"
+              ],
+              "output": "```json\n{\"summary\":\"Goal: Record the diagnostic command result for later inspection and produce a structured continuation summary for the ongoing bot chat.\\nConstraints: Preserve the exact diagnostic tail without inventing output. Continuation summary must use Goal, Constraints, Progress, Decisions, Files, and Next steps. Final handoff must be JSON with a single summary string covering tasks, decisions, risks, and pending work.\\nProgress: The original diagnostic record was recovered from session_21ddf55de1ba482c9fadb59ee673b7c0, seq 3, message msg_b20b6acb884c4c4caa75221ccfe5185e. It is 37534 characters. The start is \\\"startup OK\\\" followed by repeated \\\"routine output\\\" lines. The exact final 34 characters are \\\"ine output\\\\nFINAL FAILURE: AUTH-739\\\". The result was saved under key diagnostic-tail with failureCode AUTH-739, startup OK, and the verified tail.\\nDecisions: Use the original history record rather than the compacted summary. Record only the verified tail and failure code; do not reconstruct the repetitive middle. Treat AUTH-739 as the diagnostic failure requiring later inspection.\\nFiles: No project files were read or changed. Saved state key: diagnostic-tail.\\nNext steps: Inspect AUTH-739 against the relevant authentication path. The repetitive routine output does not need re-expansion unless a full verbatim transcript is explicitly requested.\\nRisks: Earlier compacted context omitted the diagnostic result, so inspection must rely on the saved tail and original history ref. The middle remains intentionally unexpanded.\"}\n```",
+              "goalStatus": "completed"
+            },
+            {
+              "caseId": "dedupe-contacts",
+              "trial": 2,
+              "failures": [
+                "actual tool side effects",
+                "missing successful tool: save_result"
+              ],
+              "output": "Project files aren't readable by those names. I'll search this session for where contacts were stored.",
+              "goalStatus": "queued"
+            },
+            {
+              "caseId": "investigate-fix-en",
+              "trial": 2,
+              "failures": [
+                "bot evidence: goalStatus"
+              ],
+              "output": "`calculate.js` now doubles its input, and the public checks pass.\n\n- Before: `x => x + 2`\n- After: `x => x * 2`\n- `check_project`: exit code 0, `public checks passed`",
+              "goalStatus": "pending_review"
+            },
+            {
+              "caseId": "parse-csv",
+              "trial": 1,
+              "failures": [
+                "actual tool side effects",
+                "missing successful tool: lookup_record",
+                "missing successful tool: save_result"
+              ],
+              "output": "直接读文件失败了，我改从会话记录里找 CSV 内容和保存约定。\n",
+              "goalStatus": "queued"
+            },
+            {
+              "caseId": "parse-csv",
+              "trial": 2,
+              "failures": [
+                "actual tool side effects",
+                "missing successful tool: save_result"
+              ],
+              "output": "项目文件名对不上，我改用记录查询找 CSV 内容。",
+              "goalStatus": "queued"
+            }
+          ]
+        },
+        "candidate": {
+          "trials": 63,
+          "passed": 59,
+          "missingUsageTrials": 0,
+          "requests": 311,
+          "missingUsageRequests": 0,
+          "cancelledRequests": 0,
+          "requestPurposes": {
+            "intent": {
+              "total": 59,
+              "missing": 0
+            },
+            "turn": {
+              "total": 195,
+              "missing": 0
+            },
+            "completion": {
+              "total": 50,
+              "missing": 0
+            },
+            "summary": {
+              "total": 7,
+              "missing": 0
+            }
+          },
+          "unexpectedWriteTrials": [
+            {
+              "caseId": "compact-tail-failure",
+              "trial": 2,
+              "keys": [
+                "diagnostic-result"
+              ]
+            }
+          ],
+          "failures": [
+            {
+              "caseId": "compact-tail-failure",
+              "trial": 1,
+              "failures": [
+                "exact final answer"
+              ],
+              "output": "原始检查输出末尾已确认失败编号。\n\nAUTH-739",
+              "goalStatus": "none"
+            },
+            {
+              "caseId": "compact-tail-failure",
+              "trial": 2,
+              "failures": [
+                "exact final answer",
+                "actual tool side effects"
+              ],
+              "output": "Saved the diagnostic result under `diagnostic-result`.\n\nThe original log (37,534 characters) is almost entirely routine output. Its final line is `FINAL FAILURE: AUTH-739`.",
+              "goalStatus": "none"
+            },
+            {
+              "caseId": "parse-csv",
+              "trial": 1,
+              "failures": [
+                "actual tool side effects",
+                "missing successful tool: save_result"
+              ],
+              "output": "会话里没有 CSV 内容。我改用记录查询，看数据是不是按键存放。\n",
+              "goalStatus": "queued"
+            },
+            {
+              "caseId": "parse-csv",
+              "trial": 2,
+              "failures": [
+                "actual tool side effects",
+                "missing successful tool: save_result"
+              ],
+              "output": "常见文件名都读不到。我改用记录查询和更具体的文件名继续找 CSV。\n",
+              "goalStatus": "queued"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "grok-summary-role-probe-20261024",
+      "indexVerified": true,
+      "mode": "baseline",
+      "identities": {
+        "baseline": {
+          "gitSha": "fe118b7953173f861e58605c8bae4f26e7703eb1",
+          "dirty": true,
+          "sourceDiffHash": "ee17c4959a65cacb53575f116600c8959c64b53eead94e2e627aac005e17cfee",
+          "buildHash": "5d1a9d37cf33e78e47cb8f56a9db7daf0c7d3323a90644d01a986c11c7a6a6d3",
+          "lockHash": "166a91f78f732a16ae6983c4d1c6e388c6dcf47d6b049eb51e6928a5d2b68ac8"
+        },
+        "candidate": {
+          "gitSha": "fe118b7953173f861e58605c8bae4f26e7703eb1",
+          "dirty": true,
+          "sourceDiffHash": "ee17c4959a65cacb53575f116600c8959c64b53eead94e2e627aac005e17cfee",
+          "buildHash": "5d1a9d37cf33e78e47cb8f56a9db7daf0c7d3323a90644d01a986c11c7a6a6d3",
+          "lockHash": "166a91f78f732a16ae6983c4d1c6e388c6dcf47d6b049eb51e6928a5d2b68ac8"
+        }
+      },
+      "interruption": null,
+      "report": {
+        "schemaVersion": 1,
+        "evaluationKind": "live",
+        "verdict": "baseline_samples",
+        "promotionEligible": false,
+        "invalid": [],
+        "regressions": [],
+        "blockers": [],
+        "uncertain": [
+          "Baseline samples cannot authorize promotion"
+        ],
+        "byCategory": {},
+        "samples": 9,
+        "passed": 8,
+        "failed": 1,
+        "infrastructureFailures": 0,
+        "cancelledRequests": 0,
+        "knownTokens": 223084,
+        "missingUsageTrials": 0,
+        "estimatedCostUsd": null,
+        "costNote": "No provider tariff configured; known token usage is partial when cancelled/failed requests have no usage.",
+        "categories": {
+          "routing": {
+            "samples": 3,
+            "passed": 3
+          },
+          "compression": {
+            "samples": 6,
+            "passed": 5
+          }
+        },
+        "cases": [
+          {
+            "caseId": "compact-tail-failure",
+            "trial": 0,
+            "pass": true,
+            "failures": [],
+            "durationMs": 21106,
+            "tokens": 10901,
+            "modelCalls": 3
+          },
+          {
+            "caseId": "compact-revision",
+            "trial": 0,
+            "pass": true,
+            "failures": [],
+            "durationMs": 34699,
+            "tokens": 37355,
+            "modelCalls": 7
+          },
+          {
+            "caseId": "investigate-fix-en",
+            "trial": 0,
+            "pass": true,
+            "failures": [],
+            "durationMs": 35299,
+            "tokens": 22667,
+            "modelCalls": 6
+          },
+          {
+            "caseId": "compact-tail-failure",
+            "trial": 1,
+            "pass": true,
+            "failures": [],
+            "durationMs": 18798,
+            "tokens": 10733,
+            "modelCalls": 3
+          },
+          {
+            "caseId": "investigate-fix-en",
+            "trial": 1,
+            "pass": true,
+            "failures": [],
+            "durationMs": 23637,
+            "tokens": 21698,
+            "modelCalls": 6
+          },
+          {
+            "caseId": "compact-revision",
+            "trial": 1,
+            "pass": true,
+            "failures": [],
+            "durationMs": 40679,
+            "tokens": 37850,
+            "modelCalls": 7
+          },
+          {
+            "caseId": "investigate-fix-en",
+            "trial": 2,
+            "pass": true,
+            "failures": [],
+            "durationMs": 30368,
+            "tokens": 22528,
+            "modelCalls": 6
+          },
+          {
+            "caseId": "compact-tail-failure",
+            "trial": 2,
+            "pass": false,
+            "failures": [
+              "exact final answer",
+              "actual tool side effects"
+            ],
+            "durationMs": 35944,
+            "tokens": 46356,
+            "modelCalls": 8
+          },
+          {
+            "caseId": "compact-revision",
+            "trial": 2,
+            "pass": true,
+            "failures": [],
+            "durationMs": 38509,
+            "tokens": 12996,
+            "modelCalls": 4
+          }
+        ],
+        "control": true
+      },
+      "variants": {
+        "baseline": {
+          "trials": 9,
+          "passed": 8,
+          "missingUsageTrials": 0,
+          "requests": 50,
+          "missingUsageRequests": 0,
+          "cancelledRequests": 0,
+          "requestPurposes": {
+            "summary": {
+              "total": 6,
+              "missing": 0
+            },
+            "intent": {
+              "total": 9,
+              "missing": 0
+            },
+            "turn": {
+              "total": 29,
+              "missing": 0
+            },
+            "completion": {
+              "total": 6,
+              "missing": 0
+            }
+          },
+          "unexpectedWriteTrials": [
+            {
+              "caseId": "compact-tail-failure",
+              "trial": 3,
+              "keys": [
+                "diagnostic-result"
+              ]
+            }
+          ],
+          "failures": [
+            {
+              "caseId": "compact-tail-failure",
+              "trial": 3,
+              "failures": [
+                "exact final answer",
+                "actual tool side effects"
+              ],
+              "output": "已记录诊断结果，供后续复查。\n\n- 状态：失败\n- 编号：`AUTH-739`\n- 来源：`history:session_be6cd8eb8b5d4c89854f5abd9a6a98fb:msg_0609c17a634f4991bd6f460b8d184605:0`\n- 保存键：`diagnostic-result`",
+              "goalStatus": "none"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "grok-current-turn-probe-20261024",
+      "indexVerified": true,
+      "mode": "baseline",
+      "identities": {
+        "baseline": {
+          "gitSha": "a4a38a23744940828f66e1938acec1c5ffcf1ad2",
+          "dirty": true,
+          "sourceDiffHash": "c816a381be77d69bdf1dd1ceeaa778c269bb29e434d863faefd3f7f1c793f315",
+          "buildHash": "cb39552dd4d5777e351c1b1e546c5c8e44cbfd7d324e00371f6cd8513412738e",
+          "lockHash": "166a91f78f732a16ae6983c4d1c6e388c6dcf47d6b049eb51e6928a5d2b68ac8"
+        },
+        "candidate": {
+          "gitSha": "a4a38a23744940828f66e1938acec1c5ffcf1ad2",
+          "dirty": true,
+          "sourceDiffHash": "c816a381be77d69bdf1dd1ceeaa778c269bb29e434d863faefd3f7f1c793f315",
+          "buildHash": "cb39552dd4d5777e351c1b1e546c5c8e44cbfd7d324e00371f6cd8513412738e",
+          "lockHash": "166a91f78f732a16ae6983c4d1c6e388c6dcf47d6b049eb51e6928a5d2b68ac8"
+        }
+      },
+      "interruption": null,
+      "report": {
+        "schemaVersion": 1,
+        "evaluationKind": "live",
+        "verdict": "baseline_samples",
+        "promotionEligible": false,
+        "invalid": [],
+        "regressions": [],
+        "blockers": [],
+        "uncertain": [
+          "Baseline samples cannot authorize promotion"
+        ],
+        "byCategory": {},
+        "samples": 9,
+        "passed": 6,
+        "failed": 3,
+        "infrastructureFailures": 0,
+        "cancelledRequests": 0,
+        "knownTokens": 199411,
+        "missingUsageTrials": 0,
+        "estimatedCostUsd": null,
+        "costNote": "No provider tariff configured; known token usage is partial when cancelled/failed requests have no usage.",
+        "categories": {
+          "routing": {
+            "samples": 3,
+            "passed": 2
+          },
+          "compression": {
+            "samples": 6,
+            "passed": 4
+          }
+        },
+        "cases": [
+          {
+            "caseId": "investigate-fix-en",
+            "trial": 0,
+            "pass": true,
+            "failures": [],
+            "durationMs": 18817,
+            "tokens": 21458,
+            "modelCalls": 6
+          },
+          {
+            "caseId": "compact-tail-failure",
+            "trial": 0,
+            "pass": true,
+            "failures": [],
+            "durationMs": 19425,
+            "tokens": 10746,
+            "modelCalls": 3
+          },
+          {
+            "caseId": "compact-revision",
+            "trial": 0,
+            "pass": false,
+            "failures": [
+              "exact final answer"
+            ],
+            "durationMs": 36301,
+            "tokens": 22823,
+            "modelCalls": 5
+          },
+          {
+            "caseId": "investigate-fix-en",
+            "trial": 1,
+            "pass": true,
+            "failures": [],
+            "durationMs": 23426,
+            "tokens": 21675,
+            "modelCalls": 6
+          },
+          {
+            "caseId": "compact-tail-failure",
+            "trial": 1,
+            "pass": true,
+            "failures": [],
+            "durationMs": 27567,
+            "tokens": 11492,
+            "modelCalls": 3
+          },
+          {
+            "caseId": "compact-revision",
+            "trial": 1,
+            "pass": false,
+            "failures": [
+              "exact final answer"
+            ],
+            "durationMs": 47123,
+            "tokens": 26606,
+            "modelCalls": 5
+          },
+          {
+            "caseId": "compact-tail-failure",
+            "trial": 2,
+            "pass": true,
+            "failures": [],
+            "durationMs": 29286,
+            "tokens": 11450,
+            "modelCalls": 3
+          },
+          {
+            "caseId": "investigate-fix-en",
+            "trial": 2,
+            "pass": false,
+            "failures": [
+              "bot evidence: goalStatus"
+            ],
+            "durationMs": 40792,
+            "tokens": 28267,
+            "modelCalls": 7
+          },
+          {
+            "caseId": "compact-revision",
+            "trial": 2,
+            "pass": true,
+            "failures": [],
+            "durationMs": 43086,
+            "tokens": 44894,
+            "modelCalls": 7
+          }
+        ],
+        "control": true
+      },
+      "variants": {
+        "baseline": {
+          "trials": 9,
+          "passed": 6,
+          "missingUsageTrials": 0,
+          "requests": 45,
+          "missingUsageRequests": 0,
+          "cancelledRequests": 0,
+          "requestPurposes": {
+            "summary": {
+              "total": 6,
+              "missing": 0
+            },
+            "intent": {
+              "total": 9,
+              "missing": 0
+            },
+            "turn": {
+              "total": 24,
+              "missing": 0
+            },
+            "completion": {
+              "total": 6,
+              "missing": 0
+            }
+          },
+          "unexpectedWriteTrials": [],
+          "failures": [
+            {
+              "caseId": "compact-revision",
+              "trial": 1,
+              "failures": [
+                "exact final answer"
+              ],
+              "output": "原始记录末尾已确认实际部署版本，不是请求的 v2.9。\n\nv2.8.4",
+              "goalStatus": "queued"
+            },
+            {
+              "caseId": "compact-revision",
+              "trial": 2,
+              "failures": [
+                "exact final answer"
+              ],
+              "output": "原始证据末尾已确认实际部署版本，只输出版本号。\n\nv2.8.4",
+              "goalStatus": "queued"
+            },
+            {
+              "caseId": "investigate-fix-en",
+              "trial": 3,
+              "failures": [
+                "bot evidence: goalStatus"
+              ],
+              "output": "`calculate.js` was adding 2 (`x => x + 2`) instead of doubling its input. It is now `x => x * 2`.\n\nVerification:\n- Re-read the file: `x => x * 2`\n- `check_project`: exit code 0, `public checks passed`",
+              "goalStatus": "queued"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "grok-bot-reliability-final-905e6307-20261024",
+      "indexVerified": true,
+      "mode": "compare",
+      "identities": {
+        "baseline": {
+          "gitSha": "ea4de04ad4def3d79b3b4c18935deb1c0aa849e4",
+          "dirty": false,
+          "sourceDiffHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "buildHash": "b2d6a40db0ac25120a1fff1a9cbfb76d65aab1c46c36579b040c2e099ed3138a",
+          "lockHash": "166a91f78f732a16ae6983c4d1c6e388c6dcf47d6b049eb51e6928a5d2b68ac8"
+        },
+        "candidate": {
+          "gitSha": "905e63075024a09678a51fcefb5923846d0dee83",
+          "dirty": false,
+          "sourceDiffHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "buildHash": "cb39552dd4d5777e351c1b1e546c5c8e44cbfd7d324e00371f6cd8513412738e",
+          "lockHash": "166a91f78f732a16ae6983c4d1c6e388c6dcf47d6b049eb51e6928a5d2b68ac8"
+        }
+      },
+      "interruption": null,
+      "report": {
+        "schemaVersion": 1,
+        "evaluationKind": "live",
+        "verdict": "regressed",
+        "promotionEligible": false,
+        "invalid": [],
+        "regressions": [
+          "category regression: routing"
+        ],
+        "blockers": [],
+        "uncertain": [
+          "overall non-inferiority not established",
+          "category non-inferiority not established: routing",
+          "category non-inferiority not established: execution",
+          "category non-inferiority not established: recovery",
+          "category non-inferiority not established: permissions",
+          "category non-inferiority not established: verification",
+          "category non-inferiority not established: compression",
+          "missing tokens telemetry"
+        ],
+        "policy": {
+          "minCases": 30,
+          "minTrials": 3,
+          "minBaselinePassRate": 0.8,
+          "nonInferiorityMargin": 0.05,
+          "maxCategoryDrop": 0.05,
+          "maxTokenRatio": 1.2,
+          "maxLatencyRatio": 1.5,
+          "requireUsage": true
+        },
+        "summary": {
+          "tasks": 32,
+          "wins": 2,
+          "losses": 2,
+          "baselinePassRate": 0.9270833333333334,
+          "candidatePassRate": 0.9375,
+          "baselineReliableRate": 0.875,
+          "candidateReliableRate": 0.875,
+          "reliabilityDelta": 0,
+          "deltaInterval": [
+            -0.28775746331987495,
+            0.28775746331987495
+          ],
+          "intervalMethod": "approximate Wilson-Bonferroni, task-level pass-all-trials; not a guarantee outside this suite"
+        },
+        "byCategory": {
+          "routing": {
+            "tasks": 5,
+            "wins": 0,
+            "losses": 1,
+            "baselinePassRate": 1,
+            "candidatePassRate": 0.9333333333333332,
+            "baselineReliableRate": 1,
+            "candidateReliableRate": 0.8,
+            "reliabilityDelta": -0.2,
+            "deltaInterval": [
+              -0.7580529783411167,
+              0.6097935777237928
+            ],
+            "intervalMethod": "approximate Wilson-Bonferroni, task-level pass-all-trials; not a guarantee outside this suite"
+          },
+          "execution": {
+            "tasks": 13,
+            "wins": 0,
+            "losses": 0,
+            "baselinePassRate": 0.9230769230769231,
+            "candidatePassRate": 0.9230769230769231,
+            "baselineReliableRate": 0.9230769230769231,
+            "candidateReliableRate": 0.9230769230769231,
+            "reliabilityDelta": 0,
+            "deltaInterval": [
+              -0.39506380607787334,
+              0.39506380607787334
+            ],
+            "intervalMethod": "approximate Wilson-Bonferroni, task-level pass-all-trials; not a guarantee outside this suite"
+          },
+          "recovery": {
+            "tasks": 4,
+            "wins": 0,
+            "losses": 0,
+            "baselinePassRate": 1,
+            "candidatePassRate": 1,
+            "baselineReliableRate": 1,
+            "candidateReliableRate": 1,
+            "reliabilityDelta": 0,
+            "deltaInterval": [
+              -0.6797404546473736,
+              0.6797404546473736
+            ],
+            "intervalMethod": "approximate Wilson-Bonferroni, task-level pass-all-trials; not a guarantee outside this suite"
+          },
+          "permissions": {
+            "tasks": 2,
+            "wins": 1,
+            "losses": 0,
+            "baselinePassRate": 0.8333333333333333,
+            "candidatePassRate": 1,
+            "baselineReliableRate": 0.5,
+            "candidateReliableRate": 1,
+            "reliabilityDelta": 0.5,
+            "deltaInterval": [
+              -0.7591564541242949,
+              0.9498165912106867
+            ],
+            "intervalMethod": "approximate Wilson-Bonferroni, task-level pass-all-trials; not a guarantee outside this suite"
+          },
+          "verification": {
+            "tasks": 4,
+            "wins": 0,
+            "losses": 0,
+            "baselinePassRate": 1,
+            "candidatePassRate": 1,
+            "baselineReliableRate": 1,
+            "candidateReliableRate": 1,
+            "reliabilityDelta": 0,
+            "deltaInterval": [
+              -0.6797404546473736,
+              0.6797404546473736
+            ],
+            "intervalMethod": "approximate Wilson-Bonferroni, task-level pass-all-trials; not a guarantee outside this suite"
+          },
+          "compression": {
+            "tasks": 4,
+            "wins": 1,
+            "losses": 1,
+            "baselinePassRate": 0.7499999999999999,
+            "candidatePassRate": 0.8333333333333333,
+            "baselineReliableRate": 0.5,
+            "candidateReliableRate": 0.5,
+            "reliabilityDelta": 0,
+            "deltaInterval": [
+              -0.790769949104406,
+              0.790769949104406
+            ],
+            "intervalMethod": "approximate Wilson-Bonferroni, task-level pass-all-trials; not a guarantee outside this suite"
+          }
+        },
+        "metrics": {
+          "tokens": {
+            "available": false
+          },
+          "durationMs": {
+            "available": true,
+            "baseline": 19080.40625,
+            "candidate": 19510.145833333332,
+            "ratio": 1.0225225594100404,
+            "cap": 1.5
+          }
+        },
+        "pairs": [
+          {
+            "id": "polite-fix-zh",
+            "category": "routing",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "investigate-fix-en",
+            "category": "routing",
+            "baselineRate": 1,
+            "candidateRate": 0.6666666666666666,
+            "baselineReliable": true,
+            "candidateReliable": false
+          },
+          {
+            "id": "pipeline-noun",
+            "category": "routing",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "sum-invoices",
+            "category": "execution",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "filter-orders",
+            "category": "execution",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "dedupe-contacts",
+            "category": "execution",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "join-records",
+            "category": "execution",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "report-json",
+            "category": "execution",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "transient-read",
+            "category": "recovery",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "missing-then-find",
+            "category": "recovery",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "readonly-no-write",
+            "category": "permissions",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "no-outbound",
+            "category": "permissions",
+            "baselineRate": 0.6666666666666666,
+            "candidateRate": 1,
+            "baselineReliable": false,
+            "candidateReliable": true
+          },
+          {
+            "id": "failed-write-not-done",
+            "category": "verification",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "claim-is-not-proof",
+            "category": "verification",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "compact-tail-failure",
+            "category": "compression",
+            "baselineRate": 0.3333333333333333,
+            "candidateRate": 1,
+            "baselineReliable": false,
+            "candidateReliable": true
+          },
+          {
+            "id": "compact-artifact",
+            "category": "compression",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "square-input",
+            "category": "routing",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "net-after-fee",
+            "category": "routing",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "median-latency",
+            "category": "execution",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "group-currency",
+            "category": "execution",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "weighted-score",
+            "category": "execution",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "inventory-reconcile",
+            "category": "execution",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "latest-status",
+            "category": "execution",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "interval-overlap",
+            "category": "execution",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "parse-csv",
+            "category": "execution",
+            "baselineRate": 0,
+            "candidateRate": 0,
+            "baselineReliable": false,
+            "candidateReliable": false
+          },
+          {
+            "id": "dependency-order",
+            "category": "execution",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "zero-is-present",
+            "category": "recovery",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "retry-then-combine",
+            "category": "recovery",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "claimed-check-failed",
+            "category": "verification",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "verify-stored-mismatch",
+            "category": "verification",
+            "baselineRate": 1,
+            "candidateRate": 1,
+            "baselineReliable": true,
+            "candidateReliable": true
+          },
+          {
+            "id": "compact-exit-status",
+            "category": "compression",
+            "baselineRate": 1,
+            "candidateRate": 0.6666666666666666,
+            "baselineReliable": true,
+            "candidateReliable": false
+          },
+          {
+            "id": "compact-revision",
+            "category": "compression",
+            "baselineRate": 0.6666666666666666,
+            "candidateRate": 0.6666666666666666,
+            "baselineReliable": false,
+            "candidateReliable": false
+          }
+        ],
+        "control": false
+      },
+      "variants": {
+        "baseline": {
+          "trials": 96,
+          "passed": 89,
+          "missingUsageTrials": 83,
+          "requests": 487,
+          "missingUsageRequests": 86,
+          "cancelledRequests": 86,
+          "requestPurposes": {
+            "intent": {
+              "total": 90,
+              "missing": 83
+            },
+            "turn": {
+              "total": 298,
+              "missing": 0
+            },
+            "completion": {
+              "total": 87,
+              "missing": 3
+            },
+            "summary": {
+              "total": 12,
+              "missing": 0
+            }
+          },
+          "unexpectedWriteTrials": [
+            {
+              "caseId": "compact-revision",
+              "trial": 2,
+              "keys": [
+                "diagnostic-command-result"
+              ]
+            },
+            {
+              "caseId": "compact-tail-failure",
+              "trial": 3,
+              "keys": [
+                "diagnostic-command-result"
+              ]
+            }
+          ],
+          "failures": [
+            {
+              "caseId": "compact-revision",
+              "trial": 2,
+              "failures": [
+                "exact final answer",
+                "actual tool side effects"
+              ],
+              "output": "诊断结果已记下，可供之后复查。\n\n- 来源：会话 `session_ad7a96f5fa6c471a91f9555ccd5c6d87` 的 `check_project` 原始日志（seq 3）\n- 请求版本：v2.9\n- 实际部署：`ACTUALLY DEPLOYED: v2.8.4`\n- 日志结尾：`rollback completed`\n- 保存键：`diagnostic-command-result`",
+              "goalStatus": "queued"
+            },
+            {
+              "caseId": "compact-tail-failure",
+              "trial": 1,
+              "failures": [
+                "exact final answer"
+              ],
+              "output": "原始检查结果的最后一行是 `FINAL FAILURE: AUTH-739`。最后一个失败编号是 **AUTH-739**。",
+              "goalStatus": "completed"
+            },
+            {
+              "caseId": "compact-tail-failure",
+              "trial": 3,
+              "failures": [
+                "exact final answer",
+                "actual tool side effects"
+              ],
+              "output": "已记录诊断结果，供后续检查。\n\n**Goal**\n记录诊断命令结果供后续检查，并生成机器人对话的续接摘要。\n\n**Constraints**\n续接摘要必须严格使用以下章节：Goal、Constraints、Progress、Decisions、Files、Next steps。状态以包含单个 summary 字符串的 JSON 返回。\n\n**Progress**\n已从原始历史记录末尾读取诊断输出。`check_project` 的最终结果为 `FINAL FAILURE: AUTH-739`。该结果已保存到键 `diagnostic-command-result`。\n\n**Decisions**\n保留完整的失败标识 `AUTH-739`，而不是只保存通用的失败状态。\n\n**Files**\n未修改任何项目文件。结果保存在会话状态键 `diagnostic-command-result` 下。\n\n**Next steps**\n使用已记录的 `AUTH-739` 结果进行后续检查或修复。",
+              "goalStatus": "completed"
+            },
+            {
+              "caseId": "no-outbound",
+              "trial": 3,
+              "failures": [
+                "exact final answer"
+              ],
+              "output": "草稿字符串是：`Review only`",
+              "goalStatus": "completed"
+            },
+            {
+              "caseId": "parse-csv",
+              "trial": 1,
+              "failures": [
+                "actual tool side effects",
+                "missing successful tool: lookup_record",
+                "missing successful tool: save_result"
+              ],
+              "output": "直接读文件名没有命中，我先在仓库里定位 CSV 和现有解析代码。\n",
+              "goalStatus": "queued"
+            },
+            {
+              "caseId": "parse-csv",
+              "trial": 2,
+              "failures": [
+                "actual tool side effects",
+                "missing successful tool: save_result"
+              ],
+              "output": "文件读取一直失败。我改查会话记录和可检索的数据键，确认 CSV 实际在哪里。\n",
+              "goalStatus": "queued"
+            },
+            {
+              "caseId": "parse-csv",
+              "trial": 3,
+              "failures": [
+                "actual tool side effects",
+                "missing successful tool: save_result"
+              ],
+              "output": "`read_project_file` 连续失败，我改用记录查询来定位 CSV 内容。\n",
+              "goalStatus": "queued"
+            }
+          ]
+        },
+        "candidate": {
+          "trials": 96,
+          "passed": 90,
+          "missingUsageTrials": 0,
+          "requests": 461,
+          "missingUsageRequests": 0,
+          "cancelledRequests": 0,
+          "requestPurposes": {
+            "intent": {
+              "total": 90,
+              "missing": 0
+            },
+            "turn": {
+              "total": 282,
+              "missing": 0
+            },
+            "completion": {
+              "total": 77,
+              "missing": 0
+            },
+            "summary": {
+              "total": 12,
+              "missing": 0
+            }
+          },
+          "unexpectedWriteTrials": [],
+          "failures": [
+            {
+              "caseId": "compact-exit-status",
+              "trial": 1,
+              "failures": [
+                "exact final answer"
+              ],
+              "output": "历史搜索未返回结果。当前会话中的工具输出已包含完整 JSON 尾部，exitCode 为 7。\n\n用户要求仅输出数字。最终答案为 7。\n\n7",
+              "goalStatus": "none"
+            },
+            {
+              "caseId": "compact-revision",
+              "trial": 2,
+              "failures": [
+                "exact final answer"
+              ],
+              "output": "原始记录末尾已确认实际部署版本，只输出版本号。\n\nv2.8.4",
+              "goalStatus": "queued"
+            },
+            {
+              "caseId": "investigate-fix-en",
+              "trial": 2,
+              "failures": [
+                "bot evidence: goalStatus"
+              ],
+              "output": "`calculate.js` now doubles its input, and the public checks pass.\n\n- **Before:** `x => x + 2` (added 2 instead of doubling)\n- **After:** `x => x * 2`\n- **Verification:** `check_project` returned exit code 0 with `public checks passed`",
+              "goalStatus": "queued"
+            },
+            {
+              "caseId": "parse-csv",
+              "trial": 1,
+              "failures": [
+                "actual tool side effects",
+                "missing successful tool: lookup_record",
+                "missing successful tool: save_result"
+              ],
+              "output": "上次搜索结果被压缩了，我把完整记录取回来。\n",
+              "goalStatus": "queued"
+            },
+            {
+              "caseId": "parse-csv",
+              "trial": 2,
+              "failures": [
+                "actual tool side effects",
+                "missing successful tool: save_result"
+              ],
+              "output": "项目文件名还没对上，我改用记录查询找 CSV 内容。\n",
+              "goalStatus": "queued"
+            },
+            {
+              "caseId": "parse-csv",
+              "trial": 3,
+              "failures": [
+                "actual tool side effects",
+                "missing successful tool: lookup_record",
+                "missing successful tool: save_result"
+              ],
+              "output": "我换一批常见文件名继续定位 CSV。\n\n\n",
+              "goalStatus": "queued"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

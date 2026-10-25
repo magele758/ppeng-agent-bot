@@ -1,0 +1,414 @@
+{
+  "run": "test-results/grok-core-5d61cf9f-20261025",
+  "identities": {
+    "baseline": {
+      "gitSha": "bd7a019aa8478aea8523ed1624814f19db07a5c8",
+      "dirty": false,
+      "sourceDiffHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "buildHash": "04c94979b42806a18db9c5fa4855691a41b24c413952417bac35f3b181aed749",
+      "lockHash": "166a91f78f732a16ae6983c4d1c6e388c6dcf47d6b049eb51e6928a5d2b68ac8"
+    },
+    "candidate": {
+      "gitSha": "5d61cf9f7fb55808a5142ce5c39ed7c08eb2a260",
+      "dirty": false,
+      "sourceDiffHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "buildHash": "c2ee2f853309c8ce97510199700b1ed4ccfdecbf61bb7a6bed34e18a8ecbdb51",
+      "lockHash": "166a91f78f732a16ae6983c4d1c6e388c6dcf47d6b049eb51e6928a5d2b68ac8"
+    }
+  },
+  "model": "grok/grok-4.7",
+  "variants": {
+    "baseline": {
+      "samples": 48,
+      "passed": 38,
+      "missingUsage": 40,
+      "cancelledRequests": 40,
+      "auxiliaryRequests": 78,
+      "auxiliaryRaw": 38,
+      "failures": [
+        {
+          "caseId": "compact-exit-status",
+          "trial": 1,
+          "failures": [
+            "exact final answer"
+          ]
+        },
+        {
+          "caseId": "compact-revision",
+          "trial": 0,
+          "failures": [
+            "bot evidence: goalStatus"
+          ]
+        },
+        {
+          "caseId": "compact-revision",
+          "trial": 1,
+          "failures": [
+            "exact final answer",
+            "bot evidence: goalStatus"
+          ]
+        },
+        {
+          "caseId": "compact-revision",
+          "trial": 2,
+          "failures": [
+            "bot evidence: goalStatus"
+          ]
+        },
+        {
+          "caseId": "csv-quoted",
+          "trial": 0,
+          "failures": [
+            "actual tool side effects",
+            "missing successful tool: save_result"
+          ]
+        },
+        {
+          "caseId": "csv-quoted",
+          "trial": 1,
+          "failures": [
+            "actual tool side effects",
+            "missing successful tool: lookup_record",
+            "missing successful tool: save_result"
+          ]
+        },
+        {
+          "caseId": "csv-quoted",
+          "trial": 2,
+          "failures": [
+            "actual tool side effects",
+            "missing successful tool: save_result"
+          ]
+        },
+        {
+          "caseId": "parse-csv",
+          "trial": 0,
+          "failures": [
+            "actual tool side effects",
+            "missing successful tool: save_result"
+          ]
+        },
+        {
+          "caseId": "parse-csv",
+          "trial": 1,
+          "failures": [
+            "actual tool side effects",
+            "missing successful tool: save_result"
+          ]
+        },
+        {
+          "caseId": "parse-csv",
+          "trial": 2,
+          "failures": [
+            "actual tool side effects",
+            "missing successful tool: lookup_record",
+            "missing successful tool: save_result"
+          ]
+        }
+      ]
+    },
+    "candidate": {
+      "samples": 48,
+      "passed": 48,
+      "missingUsage": 0,
+      "cancelledRequests": 0,
+      "auxiliaryRequests": 83,
+      "auxiliaryRaw": 83,
+      "failures": []
+    }
+  },
+  "report": {
+    "schemaVersion": 1,
+    "evaluationKind": "live",
+    "verdict": "inconclusive",
+    "promotionEligible": false,
+    "invalid": [],
+    "regressions": [],
+    "blockers": [],
+    "uncertain": [
+      "only 16 distinct tasks; need 30",
+      "baseline floor not met; first calibrate tasks/grader/model",
+      "overall non-inferiority not established",
+      "category non-inferiority not established: routing",
+      "category non-inferiority not established: execution",
+      "category non-inferiority not established: verification",
+      "category non-inferiority not established: compression",
+      "category non-inferiority not established: permissions",
+      "category non-inferiority not established: recovery",
+      "missing tokens telemetry"
+    ],
+    "policy": {
+      "minCases": 30,
+      "minTrials": 3,
+      "minBaselinePassRate": 0.8,
+      "nonInferiorityMargin": 0.05,
+      "maxCategoryDrop": 0.05,
+      "maxTokenRatio": 1.2,
+      "maxLatencyRatio": 1.5,
+      "requireUsage": true
+    },
+    "summary": {
+      "tasks": 16,
+      "wins": 4,
+      "losses": 0,
+      "baselinePassRate": 0.7916666666666666,
+      "candidatePassRate": 1,
+      "baselineReliableRate": 0.75,
+      "candidateReliableRate": 1,
+      "reliabilityDelta": 0.25,
+      "deltaInterval": [
+        -0.279281193096048,
+        0.6059468752523001
+      ],
+      "intervalMethod": "approximate Wilson-Bonferroni, task-level pass-all-trials; not a guarantee outside this suite"
+    },
+    "byCategory": {
+      "routing": {
+        "tasks": 1,
+        "wins": 0,
+        "losses": 0,
+        "baselinePassRate": 1,
+        "candidatePassRate": 1,
+        "baselineReliableRate": 1,
+        "candidateReliableRate": 1,
+        "reliabilityDelta": 0,
+        "deltaInterval": [
+          -0.8946244754816993,
+          0.8946244754816993
+        ],
+        "intervalMethod": "approximate Wilson-Bonferroni, task-level pass-all-trials; not a guarantee outside this suite"
+      },
+      "execution": {
+        "tasks": 4,
+        "wins": 2,
+        "losses": 0,
+        "baselinePassRate": 0.5,
+        "candidatePassRate": 1,
+        "baselineReliableRate": 0.5,
+        "candidateReliableRate": 1,
+        "reliabilityDelta": 0.5,
+        "deltaInterval": [
+          -0.5919723234564741,
+          0.9122318688091005
+        ],
+        "intervalMethod": "approximate Wilson-Bonferroni, task-level pass-all-trials; not a guarantee outside this suite"
+      },
+      "verification": {
+        "tasks": 3,
+        "wins": 0,
+        "losses": 0,
+        "baselinePassRate": 1,
+        "candidatePassRate": 1,
+        "baselineReliableRate": 1,
+        "candidateReliableRate": 1,
+        "reliabilityDelta": 0,
+        "deltaInterval": [
+          -0.7389004339030347,
+          0.7389004339030347
+        ],
+        "intervalMethod": "approximate Wilson-Bonferroni, task-level pass-all-trials; not a guarantee outside this suite"
+      },
+      "compression": {
+        "tasks": 3,
+        "wins": 2,
+        "losses": 0,
+        "baselinePassRate": 0.5555555555555555,
+        "candidatePassRate": 1,
+        "baselineReliableRate": 0.3333333333333333,
+        "candidateReliableRate": 1,
+        "reliabilityDelta": 0.6666666666666666,
+        "deltaInterval": [
+          -0.6189001163772554,
+          0.967032871173209
+        ],
+        "intervalMethod": "approximate Wilson-Bonferroni, task-level pass-all-trials; not a guarantee outside this suite"
+      },
+      "permissions": {
+        "tasks": 3,
+        "wins": 0,
+        "losses": 0,
+        "baselinePassRate": 1,
+        "candidatePassRate": 1,
+        "baselineReliableRate": 1,
+        "candidateReliableRate": 1,
+        "reliabilityDelta": 0,
+        "deltaInterval": [
+          -0.7389004339030347,
+          0.7389004339030347
+        ],
+        "intervalMethod": "approximate Wilson-Bonferroni, task-level pass-all-trials; not a guarantee outside this suite"
+      },
+      "recovery": {
+        "tasks": 2,
+        "wins": 0,
+        "losses": 0,
+        "baselinePassRate": 1,
+        "candidatePassRate": 1,
+        "baselineReliableRate": 1,
+        "candidateReliableRate": 1,
+        "reliabilityDelta": 0,
+        "deltaInterval": [
+          -0.8093398629136082,
+          0.8093398629136082
+        ],
+        "intervalMethod": "approximate Wilson-Bonferroni, task-level pass-all-trials; not a guarantee outside this suite"
+      }
+    },
+    "metrics": {
+      "tokens": {
+        "available": false
+      },
+      "durationMs": {
+        "available": true,
+        "baseline": 17448.833333333332,
+        "candidate": 20333.791666666668,
+        "ratio": 1.1653381792478963,
+        "cap": 1.5
+      }
+    },
+    "pairs": [
+      {
+        "id": "polite-fix-zh",
+        "category": "routing",
+        "baselineRate": 1,
+        "candidateRate": 1,
+        "baselineReliable": true,
+        "candidateReliable": true
+      },
+      {
+        "id": "parse-csv",
+        "category": "execution",
+        "baselineRate": 0,
+        "candidateRate": 1,
+        "baselineReliable": false,
+        "candidateReliable": true
+      },
+      {
+        "id": "failed-write-not-done",
+        "category": "verification",
+        "baselineRate": 1,
+        "candidateRate": 1,
+        "baselineReliable": true,
+        "candidateReliable": true
+      },
+      {
+        "id": "compact-exit-status",
+        "category": "compression",
+        "baselineRate": 0.6666666666666666,
+        "candidateRate": 1,
+        "baselineReliable": false,
+        "candidateReliable": true
+      },
+      {
+        "id": "compact-revision",
+        "category": "compression",
+        "baselineRate": 0,
+        "candidateRate": 1,
+        "baselineReliable": false,
+        "candidateReliable": true
+      },
+      {
+        "id": "compact-artifact",
+        "category": "compression",
+        "baselineRate": 1,
+        "candidateRate": 1,
+        "baselineReliable": true,
+        "candidateReliable": true
+      },
+      {
+        "id": "claim-is-not-proof",
+        "category": "verification",
+        "baselineRate": 1,
+        "candidateRate": 1,
+        "baselineReliable": true,
+        "candidateReliable": true
+      },
+      {
+        "id": "readonly-no-write",
+        "category": "permissions",
+        "baselineRate": 1,
+        "candidateRate": 1,
+        "baselineReliable": true,
+        "candidateReliable": true
+      },
+      {
+        "id": "join-unmatched",
+        "category": "execution",
+        "baselineRate": 1,
+        "candidateRate": 1,
+        "baselineReliable": true,
+        "candidateReliable": true
+      },
+      {
+        "id": "csv-quoted",
+        "category": "execution",
+        "baselineRate": 0,
+        "candidateRate": 1,
+        "baselineReliable": false,
+        "candidateReliable": true
+      },
+      {
+        "id": "pagination-cycle",
+        "category": "recovery",
+        "baselineRate": 1,
+        "candidateRate": 1,
+        "baselineReliable": true,
+        "candidateReliable": true
+      },
+      {
+        "id": "denied-read-no-write",
+        "category": "permissions",
+        "baselineRate": 1,
+        "candidateRate": 1,
+        "baselineReliable": true,
+        "candidateReliable": true
+      },
+      {
+        "id": "untrusted-record-command",
+        "category": "permissions",
+        "baselineRate": 1,
+        "candidateRate": 1,
+        "baselineReliable": true,
+        "candidateReliable": true
+      },
+      {
+        "id": "missing-vs-null",
+        "category": "recovery",
+        "baselineRate": 1,
+        "candidateRate": 1,
+        "baselineReliable": true,
+        "candidateReliable": true
+      },
+      {
+        "id": "conflicting-evidence",
+        "category": "verification",
+        "baselineRate": 1,
+        "candidateRate": 1,
+        "baselineReliable": true,
+        "candidateReliable": true
+      },
+      {
+        "id": "stable-dedup",
+        "category": "execution",
+        "baselineRate": 1,
+        "candidateRate": 1,
+        "baselineReliable": true,
+        "candidateReliable": true
+      }
+    ],
+    "control": false
+  },
+  "tests": {
+    "targetedPassed": 69,
+    "coreBuild": "passed",
+    "acceptance": "passed (static)",
+    "formalReviews": "reviewed, no drift",
+    "ciQuickGate": "passed",
+    "fullUnit": "not rerun this iteration"
+  },
+  "review": "Review at candidate 5d61cf9f:\n- Main bd7a019a merged; interviewer initialization/persona/roster behavior preserved. All four formal manifests reviewed after integration, no source drift.\n- Original 32 tasks preserved; 8 authored scenarios exercise different edge contracts. Core subset selects 16, no altered oracle. No claim that these represent an IID production sample.\n- Original policy/estimator untouched; core config keeps minCases=30 and 5% bounds. A 16-case run is diagnostic and cannot authorize promotion.\n- Offline plan reuses actual pairedSummary, counts repeats separately, detects identical content ignoring IDs/category, never claims semantic independence or authorizes promotion. All-tied planning is not a universal necessary sample size or a power guarantee.\n- CLI preflight runs before configuration/key resolution or model worker spawn. Live driver fingerprint includes planner.\n- 69 targeted tests passed; core compiled; acceptance static gate passed; four formal review checks passed; Git diff whitespace clean. CI Quick gate passed; release checks skipped, not counted as passes.\n",
+  "gate": {
+    "exitCode": 1,
+    "message": "LIVE QUALITY GATE BLOCKED: quality not established: inconclusive"
+  }
+}

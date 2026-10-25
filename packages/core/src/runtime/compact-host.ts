@@ -42,7 +42,7 @@ import {
   compactSummaryMaxChars
 } from '../turn/prepare-view.js';
 import { textPart } from './session-facade.js';
-import { boundedSourceSummary, continuationSummaryInstruction } from '../session/context-sources.js';
+import { boundedSourceSummary, continuationSummaryInstruction, HISTORICAL_SUMMARY_NOTICE } from '../session/context-sources.js';
 
 const log = createLogger('compact-host');
 
@@ -321,11 +321,17 @@ async function compactCanonicalBot(
   const adapter = actualAdapter;
   let summary: string;
   try {
-    summary = await adapter.summarizeMessages({
-      agent: context.agent,
-      messages: [...pruned, instructionMessage(session.id, instruction)],
-      reason: `bot ${tier} compact session ${session.id}`
-    });
+    summary = adapter.completeText
+      ? await adapter.completeText({
+        system: botCompactInstruction(tier) + '\nSummarize only the supplied history and still-valid previous summary. Do not include these summarization instructions, their output format, or this internal request as a user goal or constraint. Return the summary text only.',
+        user: JSON.stringify({ previousSummary: prior, history: pruned }),
+        jsonMode: false
+      })
+      : await adapter.summarizeMessages({
+        agent: context.agent,
+        messages: [...pruned, instructionMessage(session.id, instruction)],
+        reason: `bot ${tier} compact session ${session.id}`
+      });
   } catch (error) {
     persistBotCompactLong(host, context, range.older);
     void host.emitTrace(session.id, { kind: 'compact_skipped', payload: { reason: 'summary_failed', tier, message: error instanceof Error ? error.message : String(error) } });
@@ -342,7 +348,8 @@ async function compactCanonicalBot(
     return {};
   }
 
-  const bounded = boundedSourceSummary(trimmed, range.older, compactSummaryMaxChars(process.env, thresholds.structuredTokens));
+  const summaryLimit = compactSummaryMaxChars(process.env, thresholds.structuredTokens);
+  const bounded = boundedSourceSummary(trimmed, range.older, Math.max(0, summaryLimit - HISTORICAL_SUMMARY_NOTICE.length));
   const capped = bounded.summary;
   if (!capped.trim()) {
     void host.emitTrace(session.id, { kind: 'compact_skipped', payload: { reason: 'empty_summary', tier } });
@@ -352,8 +359,8 @@ async function compactCanonicalBot(
   host.store.appendReplacement(session.id, {
     startSeq: range.startSeq,
     endSeq: range.endSeq,
-    role: 'system',
-    parts: [textPart(bounded.text)],
+    role: 'assistant',
+    parts: [textPart(HISTORICAL_SUMMARY_NOTICE + bounded.text)],
     key: 'compact-summary'
   });
   host.store.updateSession(session.id, { summary: capped });
@@ -366,8 +373,8 @@ function instructionMessage(sessionId: string, text: string): SessionMessage {
   return {
     id: 'bot-compact-instruction',
     sessionId,
-    role: 'user',
-    parts: [textPart(text)],
+    role: 'system',
+    parts: [textPart('Internal summarization instruction, not conversation history or a user request. Do not include this instruction in the summary.\n' + text)],
     createdAt: new Date(0).toISOString()
   };
 }

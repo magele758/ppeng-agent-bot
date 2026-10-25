@@ -1,0 +1,19 @@
+id: bot-quality-sample-plan
+title: 真实模型评估的独立任务与样本量预检
+status: implemented
+requirement: |
+  那就继续解决主分支冲突，补足独立评估任务，不降低门禁标准，对最新代码重新跑 Grok 新旧版本对照，通过测试和 review 后直接合并 PR #251。
+notes: 'assumedApproval: standing-order-2026-10-22; 用户随后要求先挑核心 case，不做全量大评估。本规格覆盖样本预检和新增任务，真实模型认证仍须通过原质量门禁。'
+criteria:
+  - id: AC-1
+    given: 新旧版本在所有任务上表现持平
+    when: 在调用模型前检查评估计划
+    then: 显示各类别的独立任务数、当前置信区间与满足原门槛所需样本数，重复次数不增加独立任务数
+  - id: AC-2
+    given: 评估集有仅更换编号的重复任务
+    when: 检查评估计划
+    then: 报告重复内容，不能将其当作额外独立证据
+  - id: AC-3
+    given: 既有 P0 与可靠性任务
+    when: 扩展评估集
+    then: 保留全部原任务和判定标准，加入不同的数据转换、权限与失败处理任务，并给出可检查的结果判据

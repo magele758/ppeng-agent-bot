@@ -1,0 +1,281 @@
+{
+  "schemaVersion": 1,
+  "model": "grok/grok-4.7",
+  "provider": "openai-compatible",
+  "evaluationKind": "live",
+  "simulation": false,
+  "mode": "compare",
+  "promotionEligible": false,
+  "mergeBlocked": true,
+  "reason": "Wilson-Bonferroni interval on 32 independent tasks is wider than the 5% non-inferiority margin. Candidate 96/96 and zero regressions do not establish non-inferiority. Merging origin/main after the sample does not recertify this SHA.",
+  "gate": "LIVE QUALITY GATE BLOCKED: quality not established: inconclusive",
+  "gateCommand": "node scripts/agent-eval/quality-gate.mjs --run test-results/grok-completion-wire-ab-d73c9f1a-20261025 --candidate-sha d73c9f1a68d61f114629469189f1cb525298384f --baseline-sha 2fa16dd62a2313ab25b300330c8c095f155a1ea5",
+  "sample": {
+    "directory": "test-results/grok-completion-wire-ab-d73c9f1a-20261025",
+    "startedAt": "2026-10-24T16:37:33.023Z",
+    "suiteHash": "9a576f71f62440be7c4728129ac7a9eb623b757b16fad6eee158666fb2115caf",
+    "experimentHash": "a2863bde345eca90d7bf6e545345f916ca3cf5c7a4d3f4c111a6e7204589c625",
+    "driverHash": "634169d056757530dc57bb7332b5d1d7bf9be9c179239cbdc323d78e5855856e",
+    "trials": 3,
+    "tasks": 32,
+    "identities": {
+      "baseline": {
+        "gitSha": "2fa16dd62a2313ab25b300330c8c095f155a1ea5",
+        "dirty": false,
+        "sourceDiffHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "buildHash": "fbaadc091c70b503022970463df89ea59367eeef0dc1c186d9c67da76372d375",
+        "lockHash": "166a91f78f732a16ae6983c4d1c6e388c6dcf47d6b049eb51e6928a5d2b68ac8"
+      },
+      "candidate": {
+        "gitSha": "d73c9f1a68d61f114629469189f1cb525298384f",
+        "dirty": false,
+        "sourceDiffHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "buildHash": "01d04a320c97271001ae8c27f2196d7f9a854fad9e9dbe14b185b698e05a3341",
+        "lockHash": "166a91f78f732a16ae6983c4d1c6e388c6dcf47d6b049eb51e6928a5d2b68ac8"
+      }
+    },
+    "variants": {
+      "baseline": {
+        "repoRoot": "/Users/penglei/.codex/worktrees/bot-quality-stable/ppeng-agent-core"
+      },
+      "candidate": {
+        "repoRoot": "/Users/penglei/.codex/worktrees/bot-execution-p0/ppeng-agent-core"
+      }
+    }
+  },
+  "policy": {
+    "minCases": 30,
+    "minTrials": 3,
+    "minBaselinePassRate": 0.8,
+    "nonInferiorityMargin": 0.05,
+    "maxCategoryDrop": 0.05,
+    "maxTokenRatio": 1.2,
+    "maxLatencyRatio": 1.5,
+    "requireUsage": true
+  },
+  "verdict": "inconclusive",
+  "summary": {
+    "tasks": 32,
+    "wins": 2,
+    "losses": 0,
+    "baselinePassRate": 0.9375,
+    "candidatePassRate": 1,
+    "baselineReliableRate": 0.9375,
+    "candidateReliableRate": 1,
+    "reliabilityDelta": 0.0625,
+    "deltaInterval": [
+      -0.19932309041545082,
+      0.29811323291422565
+    ],
+    "intervalMethod": "approximate Wilson-Bonferroni, task-level pass-all-trials; not a guarantee outside this suite"
+  },
+  "metrics": {
+    "tokens": {
+      "available": true,
+      "baseline": 18182.1875,
+      "candidate": 18000.447916666668,
+      "ratio": 0.9900045259497334,
+      "cap": 1.2
+    },
+    "durationMs": {
+      "available": true,
+      "baseline": 18263.552083333332,
+      "candidate": 17417,
+      "ratio": 0.953648004535445,
+      "cap": 1.5
+    }
+  },
+  "uncertain": [
+    "overall non-inferiority not established",
+    "category non-inferiority not established: routing",
+    "category non-inferiority not established: execution",
+    "category non-inferiority not established: recovery",
+    "category non-inferiority not established: permissions",
+    "category non-inferiority not established: verification",
+    "category non-inferiority not established: compression"
+  ],
+  "regressions": [],
+  "byCategory": {
+    "routing": {
+      "tasks": 5,
+      "wins": 0,
+      "losses": 0,
+      "baselinePassRate": 1,
+      "candidatePassRate": 1,
+      "baselineReliableRate": 1,
+      "candidateReliableRate": 1,
+      "reliabilityDelta": 0,
+      "deltaInterval": [
+        -0.6293514984566903,
+        0.6293514984566903
+      ],
+      "intervalMethod": "approximate Wilson-Bonferroni, task-level pass-all-trials; not a guarantee outside this suite"
+    },
+    "execution": {
+      "tasks": 13,
+      "wins": 1,
+      "losses": 0,
+      "baselinePassRate": 0.9230769230769231,
+      "candidatePassRate": 1,
+      "baselineReliableRate": 0.9230769230769231,
+      "candidateReliableRate": 1,
+      "reliabilityDelta": 0.07692307692307693,
+      "deltaInterval": [
+        -0.3876171209153933,
+        0.4806842276726435
+      ],
+      "intervalMethod": "approximate Wilson-Bonferroni, task-level pass-all-trials; not a guarantee outside this suite"
+    },
+    "recovery": {
+      "tasks": 4,
+      "wins": 0,
+      "losses": 0,
+      "baselinePassRate": 1,
+      "candidatePassRate": 1,
+      "baselineReliableRate": 1,
+      "candidateReliableRate": 1,
+      "reliabilityDelta": 0,
+      "deltaInterval": [
+        -0.6797404546473736,
+        0.6797404546473736
+      ],
+      "intervalMethod": "approximate Wilson-Bonferroni, task-level pass-all-trials; not a guarantee outside this suite"
+    },
+    "permissions": {
+      "tasks": 2,
+      "wins": 0,
+      "losses": 0,
+      "baselinePassRate": 1,
+      "candidatePassRate": 1,
+      "baselineReliableRate": 1,
+      "candidateReliableRate": 1,
+      "reliabilityDelta": 0,
+      "deltaInterval": [
+        -0.8093398629136082,
+        0.8093398629136082
+      ],
+      "intervalMethod": "approximate Wilson-Bonferroni, task-level pass-all-trials; not a guarantee outside this suite"
+    },
+    "verification": {
+      "tasks": 4,
+      "wins": 0,
+      "losses": 0,
+      "baselinePassRate": 1,
+      "candidatePassRate": 1,
+      "baselineReliableRate": 1,
+      "candidateReliableRate": 1,
+      "reliabilityDelta": 0,
+      "deltaInterval": [
+        -0.6797404546473736,
+        0.6797404546473736
+      ],
+      "intervalMethod": "approximate Wilson-Bonferroni, task-level pass-all-trials; not a guarantee outside this suite"
+    },
+    "compression": {
+      "tasks": 4,
+      "wins": 1,
+      "losses": 0,
+      "baselinePassRate": 0.75,
+      "candidatePassRate": 1,
+      "baselineReliableRate": 0.75,
+      "candidateReliableRate": 1,
+      "reliabilityDelta": 0.25,
+      "deltaInterval": [
+        -0.6551903155377332,
+        0.8153200882140464
+      ],
+      "intervalMethod": "approximate Wilson-Bonferroni, task-level pass-all-trials; not a guarantee outside this suite"
+    }
+  },
+  "executions": {
+    "baseline": {
+      "executions": 96,
+      "passed": 90,
+      "missingUsage": 0,
+      "failures": [
+        {
+          "caseId": "compact-revision",
+          "trial": 1,
+          "reasons": [
+            "exact final answer",
+            "bot evidence: goalStatus"
+          ]
+        },
+        {
+          "caseId": "compact-revision",
+          "trial": 2,
+          "reasons": [
+            "bot evidence: goalStatus"
+          ]
+        },
+        {
+          "caseId": "compact-revision",
+          "trial": 3,
+          "reasons": [
+            "bot evidence: goalStatus"
+          ]
+        },
+        {
+          "caseId": "parse-csv",
+          "trial": 1,
+          "reasons": [
+            "actual tool side effects",
+            "missing successful tool: lookup_record",
+            "missing successful tool: save_result"
+          ]
+        },
+        {
+          "caseId": "parse-csv",
+          "trial": 2,
+          "reasons": [
+            "actual tool side effects",
+            "missing successful tool: save_result"
+          ]
+        },
+        {
+          "caseId": "parse-csv",
+          "trial": 3,
+          "reasons": [
+            "actual tool side effects",
+            "missing successful tool: lookup_record",
+            "missing successful tool: save_result"
+          ]
+        }
+      ]
+    },
+    "candidate": {
+      "executions": 96,
+      "passed": 96,
+      "missingUsage": 0,
+      "failures": []
+    }
+  },
+  "credentialScan": {
+    "files": 197,
+    "bytes": 6692480,
+    "passed": true
+  },
+  "evidenceIndexMatchesStored": true,
+  "evidenceIndexUnhashedCompanions": ["evidence-index.json", "report.md"],
+  "note": "Raw traces stay gitignored under test-results/. This audit republishes report, manifest identity, per-execution pass/fail, and the stored evidence-index hashes. The earlier 2026-10-24-bot-reliability-audit.json and evidence tar describe the prior regressed sample (ea4de04a vs 905e6307) and do not certify d73c9f1a.",
+  "priorSample": {
+    "document": "doc/eval-results/2026-10-24-bot-reliability.md",
+    "historicalVerdict": "regressed",
+    "baselineSha": "ea4de04ad4def3d79b3b4c18935deb1c0aa849e4",
+    "candidateSha": "905e63075024a09678a51fcefb5923846d0dee83"
+  },
+  "testsThisSession": {
+    "targeted": 59,
+    "targetedResult": "pass",
+    "acceptance": "passed static 1267/1267 after marking bot-completion-reliability implemented",
+    "coreTsc": "pass",
+    "fullUnit": "not rerun this session; previous handoff reported about 5165 pass / 0 fail / 4 skip",
+    "formalReview": "concurrency, lifecycle, pairing, restart status reviewed, changed []"
+  },
+  "integration": {
+    "mergeCommit": "1c573a38b756c761589de77036ea611143f58b87",
+    "mergedMain": "8238b2108f414613cf16c8d0ec51179647e101ab",
+    "sampledCandidate": "d73c9f1a68d61f114629469189f1cb525298384f",
+    "recertifiesLiveSample": false
+  }
+}

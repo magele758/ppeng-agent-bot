@@ -11,6 +11,7 @@ import { createHistoryTools } from './session/history/tools.js';
 import { createRoomRetrievalTools } from './rooms/room-retrieval-tools.js';
 import { recordRetrieved } from './rooms/touched-memory.js';
 import { prepareGoalIntake, goalExecutionTask, bindGoalExecution, settleGoalExecution, createGoalCheckpointTool, goalScope, goalWorkKind, type GoalRuntimeHost } from './bots/goals/runtime-host.js';
+import { clearQueryOutputReview } from './bots/strict-output.js';
 import { tickBotGoals } from './bots/goals/scheduler.js';
 import { createRuntimeGoalDispatchTool } from './bots/goals/runtime-dispatch.js';
 import { observeGoalBudget } from './bots/goals/budget.js';
@@ -1960,7 +1961,10 @@ export class RawAgentRuntime {
         })
         .finally(() => {
         unlinkCallerSignal();
-        if (this.sessionAbortControllers.get(sessionId) === runController) this.sessionAbortControllers.delete(sessionId);
+        if (this.sessionAbortControllers.get(sessionId) === runController) {
+          this.sessionAbortControllers.delete(sessionId);
+          clearQueryOutputReview(this.store, sessionId);
+        }
         this.runningSessions.delete(sessionId);
         clearActiveWorkPiece(sessionId);
         releaseHumanModelInput(this.store, sessionId);
@@ -2066,6 +2070,7 @@ export class RawAgentRuntime {
 
   private l5(): L5Bindable {
     return {
+      goalRuntimeHost: () => this.goalRuntimeHost(),
       store: this.store,
       repoRoot: this.repoRoot,
       stateDir: this.stateDir,
