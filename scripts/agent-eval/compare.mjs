@@ -10,22 +10,24 @@ import { config as loadDotenv } from 'dotenv';
 import { sanitizeScriptEnv } from '../spawn-utils.mjs';
 import { hash, validateSuite, gradeTask, compareQuality } from './quality.mjs';
 import { buildBotSuite, summarizeBaseline } from './bot-quality.mjs';
-import { buildReliabilitySuite } from './bot-reliability.mjs';
+import { buildReliabilitySuite, buildCoreSuite } from './bot-reliability.mjs';
 import { runPairedTasks } from './paired-runner.mjs';
+import { planQuality } from './sample-plan.mjs';
 import { configuredModel } from './configured-model.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const options = {};
 for (let i = 2; i < process.argv.length; i++) {
   const arg = process.argv[i];
-  if (arg === '--simulation') options.simulation = true;
+  if (arg === '--preflight') options.preflight = true;
+  else if (arg === '--simulation') options.simulation = true;
   else if(arg === '--baseline-only') options.baselineOnly=true;
   else if (['--config', '--out', '--baseline-root', '--candidate-root', '--trials','--settings-root','--bot'].includes(arg) && process.argv[i + 1]) options[arg.slice(2)] = process.argv[++i];
   else throw new Error(`Unknown/incomplete option ${arg}`);
 }
 if (!options.config) throw new Error('Usage: compare.mjs --config experiment.json [--simulation] [--out directory] [--baseline-root path] [--candidate-root path] [--trials N]');
 const experiment = JSON.parse(readFileSync(resolve(options.config), 'utf8'));
-const suite = validateSuite(experiment.suite==='builtin:bot-reliability'?buildReliabilitySuite():experiment.suite==='builtin:bot-p0'?buildBotSuite():JSON.parse(readFileSync(resolve(root, experiment.suite), 'utf8')));
+const suite = validateSuite(experiment.suite==='builtin:bot-core'?buildCoreSuite():experiment.suite==='builtin:bot-reliability'?buildReliabilitySuite():experiment.suite==='builtin:bot-p0'?buildBotSuite():JSON.parse(readFileSync(resolve(root, experiment.suite), 'utf8')));
 const trials = Number(options.trials ?? experiment.trials ?? 3);
 if (!Number.isInteger(trials) || trials < 1 || trials > 20) throw new Error('trials must be 1..20');
 const concurrency=experiment.concurrency??1;
@@ -34,6 +36,7 @@ const limits = { timeoutMs: 90_000, maxModelCalls: 6, maxOutputTokens: 2048, max
 for (const [key, value] of Object.entries(limits)) if (!Number.isInteger(value) || value <= 0) throw new Error(`invalid limit ${key}`);
 if (suite.length * trials * (options.baselineOnly?1:2) * limits.maxModelCalls > limits.maxTotalCalls) throw new Error('planned calls exceed maxTotalCalls; reduce cases/trials or explicitly budget the experiment');
 if (limits.timeoutMs > 600_000 || limits.maxTotalCalls > 10_000 || limits.maxOutputTokens > 16_384) throw new Error('experiment exceeds hard safety limits');
+if(options.preflight){console.log(JSON.stringify(planQuality(suite,{trials,policy:experiment.policy}),null,2));process.exit(0);}
 const variants = {};
 for (const label of ['baseline', 'candidate']) {
   const v = experiment[label];
@@ -91,7 +94,7 @@ const out = resolve(options.out ?? join(root, 'test-results', `harness-quality-$
 mkdirSync(dirname(out), { recursive: true }); mkdirSync(out); // Never overwrite an existing run.
 const workspace = mkdtempSync(join(tmpdir(), 'ppeng-quality-'));
 const records = [];
-const driverHash=()=>hash(['compare.mjs','quality.mjs','quality-worker.mjs','bot-quality.mjs','configured-model.mjs','bot-reliability.mjs','paired-runner.mjs','completion-audit.mjs'].map(file=>readFileSync(join(root,'scripts/agent-eval',file),'utf8')));
+const driverHash=()=>hash(['compare.mjs','quality.mjs','quality-worker.mjs','bot-quality.mjs','configured-model.mjs','bot-reliability.mjs','paired-runner.mjs','completion-audit.mjs','sample-plan.mjs'].map(file=>readFileSync(join(root,'scripts/agent-eval',file),'utf8')));
 const manifest = { schemaVersion: 1, startedAt: new Date().toISOString(), node: process.version, simulation: Boolean(options.simulation),
   mode:options.baselineOnly?'baseline':'compare', selection:configured?.selection,
   suiteHash: hash(suite), experimentHash: hash(experiment), driverHash: driverHash(),
