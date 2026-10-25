@@ -302,6 +302,7 @@ export function usePlayChat(deps: PlayChatDeps) {
   const historyCursorRef = useRef<number | null>(null);
   historyCursorRef.current = historyCursor;
   const [historyLoading,setHistoryLoading]=useState(false);
+  const [historyError,setHistoryError]=useState(false);
   const historySessionRef=useRef('');
   const historyLoadingRef = useRef(false);
   const historyAutoBlockedRef = useRef(false);
@@ -1054,6 +1055,7 @@ export function usePlayChat(deps: PlayChatDeps) {
       setChromeSessionId(null);
       historySessionRef.current='';
       historyAutoBlockedRef.current = false;
+      setHistoryError(false);
       setHistoryCursor(null);
       rememberCanonicalBotChat(null);
       setPlayTitle(t('play.empty.selectOrCreateSession'));
@@ -1128,7 +1130,7 @@ export function usePlayChat(deps: PlayChatDeps) {
       setAutonomyDraft(permissionToAutonomy(chrome.permissionMode));
       setBotModelOverride(parseBotModelOverride(data.session.metadata));
       const switching = historySessionRef.current !== sid;
-      if (switching) historyAutoBlockedRef.current = false;
+      if (switching) { historyAutoBlockedRef.current = false; setHistoryError(false); }
       const incoming = (data.messages ?? []) as Array<ChatMessage & { id: string; seq?: number }>;
       if (switching) clearHeldAssistant();
       const planned = nextTranscriptWindow({
@@ -1499,6 +1501,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     const epoch = feedEpochRef.current;
     historyLoadingRef.current = true;
     setHistoryLoading(true);
+    setHistoryError(false);
     try {
       const data = (await api(`/api/sessions/${sid}?${sessionFeedSearch(cursor)}`)) as {
         messages: ChatMessage[];
@@ -1517,9 +1520,10 @@ export function usePlayChat(deps: PlayChatDeps) {
       setHistoryCursor(data.hasMore ? data.nextCursor : null);
       historyAutoBlockedRef.current = false;
       setFeedRevision((revision) => revision + 1);
-    } catch (error) {
+    } catch {
+      if (!pageEpochCurrent(selectedSessionRef.current, sid!, epoch, feedEpochRef.current, historySessionRef.current)) return;
       historyAutoBlockedRef.current = true;
-      setPlayStatus({ text: String(error), err: true });
+      setHistoryError(true);
     } finally {
       historyLoadingRef.current = false;
       setHistoryLoading(false);
@@ -2449,7 +2453,7 @@ export function usePlayChat(deps: PlayChatDeps) {
       setPlaySending(false);
       setPlayStatus({ text: t('play.retry.stopped') });
     },
-    historyCursor,historyLoading,loadOlderHistory,
+    historyCursor,historyLoading,historyError,loadOlderHistory,
     transcriptReady: screen.bound,
     loadedTranscriptSessionId: historySessionRef.current,
     // State

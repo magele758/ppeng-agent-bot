@@ -168,7 +168,7 @@ export function ChatFeedWindow({
     const nearTop = top < FEED_NEAR_TOP_PX;
     const enteredTop = nearTop && !nearTopRef.current;
     nearTopRef.current = nearTop;
-    if (enteredTop && !stickToBottomRef.current) onRequestOlderRef.current('scroll');
+    if (enteredTop && hasOlder && !olderLoading && !stickToBottomRef.current) onRequestOlderRef.current('scroll');
   };
 
   const visible = history.slice(range.start, range.end);

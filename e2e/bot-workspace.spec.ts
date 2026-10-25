@@ -324,9 +324,10 @@ test("Bot chat opens a bounded history page and loads older messages [AC:bot-his
       .locator("#playMessages")
       .getByText("Paged conversational item 0", { exact: true }),
   ).toHaveCount(0);
+  await expect(page.locator("#playMessages").getByText("Paged conversational item 54", { exact: true })).toBeVisible();
   const older = page.waitForResponse((res) => res.url().includes("beforeSeq="));
-  // Sticky older control stays clickable while the windowed feed is stuck to the tail.
-  await page.locator("#playMessages").getByTestId("feed-load-older").click();
+  // Earlier history loads when the reader scrolls to the top.
+  await page.locator("#playMessages").evaluate(el => { el.scrollTop = 0; });
   await older;
   await expect
     .poll(async () => {

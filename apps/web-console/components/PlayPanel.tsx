@@ -1303,6 +1303,17 @@ export function PlayPanel({
                       className="chat-composer__bot-face"
                     />
                   ) : null}
+                  <button
+                    type="button"
+                    className={`btn btn-ghost btn-icon btn-sm chat-composer__attach${attachOpen ? ' is-open' : ''}`}
+                    aria-expanded={attachOpen}
+                    aria-controls="composerAttachPanel"
+                    title={t('play.attach')}
+                    aria-label={t('play.attach')}
+                    onClick={() => setAttachOpen((v) => !v)}
+                  >
+                    +
+                  </button>
                   <div className="chat-composer-field">
                   <textarea
                     ref={chat.playInputRef}
@@ -1401,19 +1412,8 @@ export function PlayPanel({
                   </button>
                 </div>
 
-                <div className="chat-composer-dock">
+                <div className={`chat-composer-dock${botSurface && !composerStatusText ? ' chat-composer-dock--empty' : ''}`}>
                   <div className="chat-composer-dock__left">
-                    <button
-                      type="button"
-                      className={`btn btn-ghost btn-icon btn-sm${attachOpen ? ' is-open' : ''}`}
-                      aria-expanded={attachOpen}
-                      aria-controls="composerAttachPanel"
-                      title={t('play.attach')}
-                      aria-label={t('play.attach')}
-                      onClick={() => setAttachOpen((v) => !v)}
-                    >
-                      +
-                    </button>
                     {!botSurface ? <>
                     <button
                       type="button"
