@@ -1,0 +1,19 @@
+id: bot-readonly-api
+title: Bot 正文 API 与显式只读路由
+status: implemented
+requirement: |
+  继续把 API 混入 reasoning 和只读消息误建目标这两个问题修好，补上针对性的回归测试，不扩大评估。测试和 review 通过后直接提交合并，再更新本地、构建重启 daemon，用当前 Bot 验证到通过。
+notes: 'assumedApproval: standing-order-2026-10-22; 仅针对已复现问题，不扩大真实模型评估集。'
+criteria:
+  - id: AC-1
+    given: 助手消息同时包含推理和正文，或只有推理
+    when: 客户端获取最新助手答案
+    then: 答案只含正文且不会回退到推理或旧答案，原始消息仍保留各类内容
+  - id: AC-2
+    given: 用户明确要求只读计算或查询且没有交付或目标控制要求
+    when: 当前 Bot 完成消息
+    then: 返回答案并回到空闲，不创建目标，也不调用目标完成判官
+  - id: AC-3
+    given: 消息引用只读字样但实际要求修改，或同时要求保存结果，或明确指定目标操作
+    when: 系统识别请求
+    then: 保留实际交付或目标控制语义，不因只读关键词而吞掉工作

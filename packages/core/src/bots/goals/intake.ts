@@ -30,12 +30,24 @@ function isControlDiscussion(text: string): boolean {
     || /^(?:为什么|如何|怎么|解释|请解释|能否|是否|can\b|could\b|would\b|should\b|how\b|why\b|what\b|explain\b)/i.test(text)
     || /(?:不要|别|不能|无需|不必)\s*(?:取消|暂停|停止)|\b(?:don't|do not|never)\s+(?:cancel|pause|stop)/i.test(text));
 }
+/** An explicit read-only boundary is authoritative only without a positive work/control clause. */
+function isExplicitReadOnlyRequest(raw: string): boolean {
+  const text = raw.replace(/```[\s\S]*?```|`[^`]*`|“[^”]*”|「[^」]*」|"[^"\n]*"/g, '').replace(/^\s*>.*$/gm, '');
+  const positive = text
+    .replace(/(?:不要|不得|禁止|不必|无需|不能|别|不)(?:执行|运行|读写|读取|写|创建|推进|修改|更改|保存|新增|更新|删除|部署|发布|重启)(?:(?!但|然后|另外|并|同时|再|而是)[^，,。；;\n])*/g, '')
+    .replace(/\b(?:do not|don't|never|must not)\b(?:(?!\b(?:but|then|also|instead|and)\b)[^.,;\n])*/gi, '')
+    .replace(/(?:更新|部署|发布|构建)(?:后的|前的|版本|状态|结果|记录|日志)/g, '已有信息');
+  if (!/只读|\bread[- ]only\b/i.test(positive)) return false;
+  return !/(?:不要|不得|禁止|别|不)只读|\bnot\s+(?:a\s+)?read[- ]only\b|追加要求|补充要求|补充约束|优先级|保存|写入|写文件|读写|创建|推进|更新|修改|修复|实现|添加|开发|编写|部署|迁移|重构|提交|发布|删除|安装|重启|发送|暂停|取消|恢复|继续|\b(?:priority|persist|edit|change|upgrade|stop|save|write|create|update|modify|fix|implement|add|build|deploy|migrate|refactor|commit|publish|delete|remove|install|restart|send|pause|cancel|resume)\b/i.test(positive);
+}
+
 /** Explicit targeting wins; unresolved references are left for the service to clarify. */
 export function classifyGoalMessage(raw: string): GoalMessageIntent {
   const target = raw.match(targetPattern);
   const text = (target ? raw.slice(target[0].length) : raw).trim();
   const base = { ...(target ? { goalId: target[1]! } : {}), text };
   if (!text || /^(谢谢|多谢|好的|收到|你好|thanks?|thank you|hello|hi)[！!。.\s]*$/i.test(text)) return { kind: 'chat', ...base };
+  if (!target && isExplicitReadOnlyRequest(text)) return { kind: 'query', ...base };
   if (/(进度|进展|做到哪|怎么样了|状态如何|完成了吗|完成了没|跑完了没|还没好|status|progress|how.*going)/i.test(text)
     && !requestsWork(text)) return { kind: 'query', ...base };
   const workVerb = text.search(/修复|修改|实现|开发|添加|分析|研究|检查|调查|说明|编写|设计|\b(?:fix|modify|add|build|implement|analy[sz]e|investigate)\b/i);
@@ -91,6 +103,7 @@ function explicitGoalAmend(raw: string, goals: GoalIntakeContext[]): GoalIntentP
 function fallbackIntents(raw: string, goals: GoalIntakeContext[]): GoalIntentProposal[] {
   const namedAmend = explicitGoalAmend(raw, goals);
   if (namedAmend) return [namedAmend];
+  if (!targetPattern.test(raw) && isExplicitReadOnlyRequest(raw)) return [classifyGoalMessage(raw)];
   const explicit = raw.match(targetPattern);
   const text = (explicit ? raw.slice(explicit[0].length) : raw).trim();
   const clauses = fallbackClauses(text);
