@@ -415,6 +415,8 @@ body,
   gap: 8px;
   min-width: 0;
 }
+.chat-panel-header__mobile-toggle { display: none; }
+.chat-panel-header__details { min-width: 0; }
 .chat-panel-header--bot .chat-panel-title {
   flex: 1 1 auto;
 }
@@ -558,6 +560,9 @@ body,
   border-radius: var(--radius-xs);
   font-size: 12px;
   background: var(--color-surface-strong);
+}
+.goal-status-card__toggle {
+  display: none;
 }
 .goal-status-card.is-ok { border-color: color-mix(in srgb, #3d9a6a 55%, var(--color-border-strong)); }
 .goal-status-card.is-warn { border-color: color-mix(in srgb, #c9a227 55%, var(--color-border-strong)); }

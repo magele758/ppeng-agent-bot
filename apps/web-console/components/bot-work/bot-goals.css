@@ -1,4 +1,18 @@
 .bot-goals { border: 1px solid var(--border, #ddd); border-radius: 10px; margin: 8px 0; font-size: 13px; background: var(--surface, transparent); }
+.bot-goals:not([open]) > .bot-goals__body { display: none; }
+.bot-goals__phone {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 6px 10px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
 .bot-goals summary { cursor: pointer; padding: 10px 12px; font-weight: 600; }
 .bot-goals__body { padding: 0 12px 12px; max-height: 45vh; overflow: auto; overflow-anchor: none; }
 .bot-goals__list article { border-top: 1px solid var(--border, #ddd); padding: 12px 0; }

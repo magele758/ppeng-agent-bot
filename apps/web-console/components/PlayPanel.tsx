@@ -289,6 +289,8 @@ export function PlayPanel({
 }: PlayPanelProps) {
   const { t, locale } = useI18n();
   const [mobileSessionsOpen, setMobileSessionsOpen] = useState(false);
+  const [mobileBotBarOpen, setMobileBotBarOpen] = useState(false);
+  useEffect(() => { setMobileBotBarOpen(false); }, [selectedSessionId]);
   useEffect(() => { setMobileSessionsOpen(false); }, [selectedSessionId, playSurface, active]);
   const [attachOpen, setAttachOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
@@ -1071,7 +1073,7 @@ export function PlayPanel({
         <div className={botDetailMainClass(botDetailVisible)}>
           {botSurface && openGroupId ? <PlayBotGroupChat key={openGroupId} roomId={openGroupId} bots={botRoster} /> : null}
           <div className="play-main chat-panel" hidden={botSurface && openGroupId != null}>
-            <header className={`chat-panel-header${headerBotName ? ' chat-panel-header--bot' : ''}`}>
+            <header className={`chat-panel-header${headerBotName ? ' chat-panel-header--bot' : ''}${mobileBotBarOpen ? ' is-mobile-open' : ''}`}>
               <div className="chat-panel-header__text">
                 <div className="chat-panel-header__title-row">
                   {headerBotName ? (
@@ -1086,9 +1088,20 @@ export function PlayPanel({
                   <h2 className="chat-panel-title" id="playTitle">
                     {headerTitle}
                   </h2>
+                  <button
+                    type="button"
+                    className="chat-panel-header__mobile-toggle"
+                    data-testid="mobile-bot-bar-toggle"
+                    aria-expanded={mobileBotBarOpen}
+                    aria-controls="playMeta"
+                    onClick={() => setMobileBotBarOpen(open => !open)}
+                  >
+                    {t(mobileBotBarOpen ? 'mobile.botBarCollapse' : 'mobile.botBarExpand')}
+                  </button>
                   <BotPermissionsLink botId={headerBotId} botName={headerBotName || headerTitle} />
                   <BotDetailToggle botId={headerBotId} open={botDetailOpen} onToggle={() => setBotDetailOpen(open => !open)} />
                 </div>
+                <div className="chat-panel-header__details" id="chatHeaderDetails">
                 {headerBotId && <BotWorkSummary botId={headerBotId} />}
                 {selectedSessionId ? (
                   <div className="session-chrome" id="playMeta">
@@ -1120,6 +1133,7 @@ export function PlayPanel({
                     ) : null}
                   </div>
                 ) : null}
+                </div>
               </div>
               <div className="chat-panel-header__actions play-toolbar">
                 <GoalHistory key={selectedSessionId} sessionId={selectedSessionId} botId={headerBotId ?? undefined} />
