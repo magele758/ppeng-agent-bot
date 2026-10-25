@@ -1,6 +1,6 @@
 id: mobile-chat-density
 title: 窄屏对话区优先展示聊天记录
-status: approved
+status: implemented
 requirement: |
   竖屏对话页被固定区占满，中间聊天记录只剩一条窄带：
   1. 顶栏「会话列表」

@@ -68,9 +68,11 @@ export function BotGoals({ botId, sessionId, selectedGoalId, onSelectGoal, initi
   if (hideGoalPanel(listFailed, snapshot, panel.show, attention)) return null;
   const phoneLabel = `${attention ? t('goals.attention') : `${t('goals.title')} (${panel.count})`}${selectedTitle ? ` · ${selectedTitle}` : ''}`;
   return <details className={`bot-goals${narrow && narrowOpen ? ' is-open' : ''}`} data-testid={shell.testId} open={narrow ? narrowOpen : shell.open}>
-    {narrow
-      ? <button type="button" className="bot-goals__phone" aria-expanded={narrowOpen} onClick={() => setNarrowOpen(value => !value)}>{phoneLabel}</button>
-      : <summary>{attention ? t('goals.attention') : `${t('goals.title')} (${panel.count})`}{selectedTitle ? ` · ${selectedTitle}` : ''}</summary>}
+    <summary aria-expanded={narrow ? narrowOpen : undefined} onClick={event => {
+      if (!narrow) return;
+      event.preventDefault();
+      setNarrowOpen(value => !value);
+    }}>{phoneLabel}</summary>
     <div className="bot-goals__body">
       {error && <p role="alert">{t('goals.error', { error })}</p>}
       {onSelectGoal && !attention && <label>{t('goals.target')}<select value={selectedGoalId ?? ''} onChange={e => onSelectGoal(e.target.value || null)}>
