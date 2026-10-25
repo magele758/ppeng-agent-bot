@@ -1093,7 +1093,7 @@ export function PlayPanel({
                     className="chat-panel-header__mobile-toggle"
                     data-testid="mobile-bot-bar-toggle"
                     aria-expanded={mobileBotBarOpen}
-                    aria-controls="playMeta"
+                    aria-controls="chatHeaderDetails"
                     onClick={() => setMobileBotBarOpen(open => !open)}
                   >
                     {t(mobileBotBarOpen ? 'mobile.botBarCollapse' : 'mobile.botBarExpand')}

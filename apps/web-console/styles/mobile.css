@@ -104,6 +104,10 @@
   .lab-shell .chat-panel-header.is-mobile-open .chat-panel-header__actions {
     display: flex;
   }
+  .lab-shell .chat-panel-header.is-mobile-open .chat-panel-header__details {
+    flex-direction: column;
+    gap: 4px;
+  }
   .lab-shell .chat-panel-header.is-mobile-open .chat-panel-header__actions {
     width: 100%;
     flex-wrap: wrap;
@@ -159,7 +163,8 @@
     padding: 6px 8px;
   }
   .lab-shell .goal-status-card.is-expanded .goal-status-card__peek { display: none; }
-  .lab-shell .goal-status-card.is-expanded .goal-status-card__body { display: block; }
+  .lab-shell .goal-status-card.is-expanded .goal-status-card__body { display: block; max-height: 40dvh; overflow: auto; }
+  .lab-shell .goal-status-card.is-expanded .goal-status-card__cond { white-space: normal; overflow-wrap: anywhere; }
   .lab-shell .chat-panel-body { flex: 1 1 auto; min-height: 0; }
   .lab-shell .chat-feed-shell { flex: 1 1 auto; min-height: 0; }
   .lab-shell .chat-composer-outer { flex: 0 0 auto; }
