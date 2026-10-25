@@ -56,6 +56,7 @@
 | `bot-group-drag-only` | 03 |
 | `bot-immediate-steer` | 04 |
 | `bot-list-idle-motion` | 02 |
+| `bot-mock-interview` | 02。内置模拟面试官按指定信息出题、评分并给改进建议 |
 | `bot-goal-nested-approval` | 05 |
 | `bot-multi-goal-coordination` | 05 |
 | `bot-panel-reset` | 03 |

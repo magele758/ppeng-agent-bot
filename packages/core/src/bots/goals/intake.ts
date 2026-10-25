@@ -209,7 +209,7 @@ function hasImperativeWork(text: string): boolean {
 }
 const deliveryWork = /完成结果(?:是|为)|验收(?:标准|条件)|交付物|(?:修复|修改|改成|实现|添加|开发|编写|部署|迁移|重构|写好|做完|提交|发布)|\b(?:fix|implement|build|deploy|migrate|refactor)\b/i;
 const isolatedHandoff = /拆成子任务|拆成并行|并行处理|分别交给|交给(?:规划|实现|验收|评估)|子代理/;
-const selfContainedWork = /分析|说明|解释|看看|看下|检查|查看|总结|梳理|对比|\b(?:analy[sz]e|explain|inspect|summarize)\b/i;
+const selfContainedWork = /分析|说明|解释|看看|看下|检查|查看|总结|梳理|对比|模拟面试|出题|评分|改进建议|\b(?:analy[sz]e|explain|inspect|summarize|interview|quiz)\b/i;
 
 /** Returning an existing deployment result is not a request to deploy again. */
 function isHistoricalResultQuery(text: string): boolean {

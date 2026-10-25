@@ -46,6 +46,28 @@ export function canonicalBotChatTitle(name: string): string {
   return `Bot Chat · ${name}`;
 }
 
+export const INTERVIEW_BOT_CONTROL_KEY = 'bot.interviewBotId';
+export const INTERVIEW_BOT_NAME = '模拟面试官';
+export const INTERVIEW_BOT_TITLE = '模拟面试官';
+export const INTERVIEW_BOT_DESCRIPTION =
+  '根据你指定的岗位、简历或考察范围出题面试，问完后给出评分和改进建议。题目只来自你提供的信息。';
+/** Session persona. The product-facing rules also live in skills/mock-interview. */
+export const INTERVIEW_BOT_PERSONA = [
+  '你是模拟面试官。只根据用户在这场对话里指定的岗位、简历或考察范围出题。',
+  '材料不够时，先问缺的是岗位、简历要点还是考察范围，不要先出题。',
+  '一次只问一道题，等对方答完再给下一题。',
+  '题目必须能指回用户给过的材料。用户没提供的技术、项目或年限，直接说没有依据，不要编造。',
+  '用户要求结束或评分时，停止出题，在同一条回复里给出评分和改进建议，并写明评分依据的是哪几条回答。',
+  '还没回答过的部分不要打分。'
+].join('\n');
+
+const ROSTER_EXEMPT_KEYS = ['bot.superBotId', INTERVIEW_BOT_CONTROL_KEY];
+
+function rosterExempt(store: SqliteStateStore, bot: BotRecord | undefined): boolean {
+  if (!bot || bot.hidden) return false;
+  return ROSTER_EXEMPT_KEYS.some((key) => store.getDaemonControl<string>(key) === bot.id);
+}
+
 export function botInstructions(input: { name: string; title: string; description: string; persona?: string }): string {
   const bits = [
     `You are ${input.name}${input.title && input.title !== input.name ? ` (${input.title})` : ''}.`,
@@ -228,11 +250,9 @@ export function createBot(host: SessionFacadeHost, input: CreateBotInput, option
   if (host.store.getBotByName(name)) {
     throw new ConflictError(`Bot name already exists: ${name}`);
   }
-  const builtinId = host.store.getDaemonControl<string>('bot.superBotId');
-  const builtin = builtinId ? host.store.getBot(builtinId) : undefined;
   // Removed (hidden) bots leave the visible roster, so a user can create another.
-  // The saved roster cap still blocks another visible ordinary bot. The built-in Super Bot is not ordinary.
-  const ordinaryCount = host.store.countBots({ includeHidden: false }) - (builtin && !builtin.hidden ? 1 : 0);
+  // The saved roster cap still blocks another visible ordinary bot. Built-in Super Bot and 模拟面试官 are not ordinary.
+  const ordinaryCount = host.store.listBots({ includeHidden: false }).filter((bot) => !rosterExempt(host.store, bot)).length;
   const rosterCap = readRoomSettings(host.store).rosterCap;
   if (!options?.builtin && ordinaryCount >= rosterCap) {
     throw new ValidationError(`Bot roster cap reached (${rosterCap})`);
@@ -264,6 +284,31 @@ export function createBot(host: SessionFacadeHost, input: CreateBotInput, option
   });
   setBotDefinitionOwner(host.store,id,resolveBotPrincipal(host.store));
   return created;
+}
+
+/** One built-in interviewer. A later start reuses the same bot and does not overwrite a saved persona. */
+export function ensureInterviewBot(host: SessionFacadeHost): BotRecord {
+  const savedId = host.store.getDaemonControl<string>(INTERVIEW_BOT_CONTROL_KEY);
+  let bot = savedId ? host.store.getBot(savedId) : undefined;
+  if (!bot) {
+    const name = host.store.getBotByName(INTERVIEW_BOT_NAME) ? `${INTERVIEW_BOT_NAME}（内置）` : INTERVIEW_BOT_NAME;
+    bot = createBot(
+      host,
+      { name, title: INTERVIEW_BOT_TITLE, description: INTERVIEW_BOT_DESCRIPTION },
+      { builtin: true }
+    );
+    host.store.setDaemonControl(INTERVIEW_BOT_CONTROL_KEY, bot.id);
+  }
+  const session = host.store.getSession(bot.canonicalSessionId);
+  const persona = session?.metadata?.persona;
+  if (session && !(typeof persona === 'string' && persona.trim())) {
+    host.store.updateSession(session.id, {
+      metadata: { ...session.metadata, persona: INTERVIEW_BOT_PERSONA }
+    });
+  }
+  const ready = getBot(host.store, bot.id);
+  refreshBotAgent(host, ready);
+  return ready;
 }
 
 export function updateBot(

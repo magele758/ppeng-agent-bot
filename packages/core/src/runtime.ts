@@ -172,6 +172,7 @@ import {
   getBot as getBotFn,
   listBots as listBotsFn,
   openBot as openBotFn,
+  ensureInterviewBot,
   syncBotAgentSpecs,
   updateBot as updateBotFn
 } from './bots/bot-facade.js';
@@ -737,6 +738,7 @@ export class RawAgentRuntime {
         return {status:'waiting',reference:`session:${child.id}`,content:'Isolated execution started; await and verify its result.'};
       }
     }));
+    ensureInterviewBot(sessionFacadeFrom(this.l5()));
     syncBotAgentSpecs(this.store);
     this.computerUse = new LcuComputerUseProvider({
       clientFactory: options.computerUseClientFactory,

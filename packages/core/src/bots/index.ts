@@ -49,6 +49,7 @@ export {
   botInstructions,
   canonicalBotChatTitle,
   createBot,
+  ensureInterviewBot,
   getBot,
   listBots,
   openBot,
