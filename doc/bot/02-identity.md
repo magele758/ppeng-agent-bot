@@ -2,7 +2,7 @@
 
 一只 Bot 是名册里的一行，加上一条谁也替不了的固定主对话。同名不能再建第二只。
 
-规格：`bots`、`bot-face-first-creation`、`bot-face-readable-shapes`、`bot-robot-faces`、`bot-create-named-tools`、`bot-chat-header`、`bot-session-row`、`unowned-legacy-bot`、`default-super-bot`（派工汇总还没收口）。
+规格：`bots`、`bot-face-first-creation`、`bot-face-readable-shapes`、`bot-robot-faces`、`bot-create-named-tools`、`bot-chat-header`、`bot-session-row`、`unowned-legacy-bot`、`bot-mock-interview`、`default-super-bot`（派工汇总还没收口）。
 
 ## 创建
 
@@ -39,6 +39,14 @@
 老版本里没有主人的 Bot，第一次被谁打开，都不会因此变成这个人的 Bot，也不会让这个人拿着它的工具白名单开出自己的一条主对话。已经有主人的 Bot 保持原主人。另一个用户开不出来。
 
 老版本里被默认设成「完全放行」的 Bot，打开设置时会看到警告，可以一键确认改成自动。系统不擅自改档位。用户自己选过的档位不显示这条警告。
+
+## 模拟面试官
+
+名册里一直有一只「模拟面试官」，不用先新建。打开它自己的固定对话，说出岗位、简历或考察范围，它当场出题，一次一道。
+
+结束时，同一条回复里给出评分和改进建议，并写明依据的是哪几条回答。没有岗位、简历或考察范围时，它先说明缺什么。材料里没有的经历，它直接说没有依据。
+
+这场面试就在当前对话里进行，不另开目标和子任务。重启后再打开，仍是原来那一只，已经进行的面试还在。
 
 ## 默认 Super Bot
 
