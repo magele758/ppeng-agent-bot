@@ -62,10 +62,15 @@ export function BotGoals({ botId, sessionId, selectedGoalId, onSelectGoal, initi
   }, [snapshot, selectedGoalId, onSelectGoal]);
   const attention = needsGoalAttention(panel);
   const shell = goalPanelShell(attention);
+  const narrow = useNarrowChat();
+  const [narrowOpen, setNarrowOpen] = useState(false);
   const selectedTitle = panel.items.find(goal => goal.id === selectedGoalId)?.title;
   if (hideGoalPanel(listFailed, snapshot, panel.show, attention)) return null;
-  return <details className="bot-goals" data-testid={shell.testId} open={shell.open}>
-    <GoalPanelHeading attention={attention} count={panel.count} selectedTitle={selectedTitle} />
+  const phoneLabel = `${attention ? t('goals.attention') : `${t('goals.title')} (${panel.count})`}${selectedTitle ? ` · ${selectedTitle}` : ''}`;
+  return <details className={`bot-goals${narrow && narrowOpen ? ' is-open' : ''}`} data-testid={shell.testId} open={narrow ? narrowOpen : shell.open}>
+    {narrow
+      ? <button type="button" className="bot-goals__phone" aria-expanded={narrowOpen} onClick={() => setNarrowOpen(value => !value)}>{phoneLabel}</button>
+      : <summary>{attention ? t('goals.attention') : `${t('goals.title')} (${panel.count})`}{selectedTitle ? ` · ${selectedTitle}` : ''}</summary>}
     <div className="bot-goals__body">
       {error && <p role="alert">{t('goals.error', { error })}</p>}
       {onSelectGoal && !attention && <label>{t('goals.target')}<select value={selectedGoalId ?? ''} onChange={e => onSelectGoal(e.target.value || null)}>
@@ -113,9 +118,17 @@ function hideGoalPanel(failed:boolean,snapshot:BotGoalsSnapshot|null,multiple:bo
 function goalPanelShell(attention:boolean) {
   return {testId:attention?'bot-goal-attention':'bot-goals',open:attention||undefined};
 }
-function GoalPanelHeading({attention,count,selectedTitle}:{attention:boolean;count:number;selectedTitle?:string}) {
-  const {t}=useI18n();
-  return <summary>{attention?t('goals.attention'):`${t('goals.title')} (${count})`}{selectedTitle?` · ${selectedTitle}`:''}</summary>;
+/** False until mount, so the desktop markup stays a native details element. */
+function useNarrowChat(): boolean {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 760px)');
+    const apply = () => setNarrow(media.matches);
+    apply();
+    media.addEventListener('change', apply);
+    return () => media.removeEventListener('change', apply);
+  }, []);
+  return narrow;
 }
 function GoalLimits({goal,busy,attention,onAction}:{goal:BotGoalView;busy:boolean;attention:boolean;onAction:(body:Record<string,unknown>)=>Promise<void>}) {
   const {t}=useI18n();

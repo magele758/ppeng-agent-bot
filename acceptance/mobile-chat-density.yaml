@@ -1,0 +1,32 @@
+id: mobile-chat-density
+title: 窄屏对话区优先展示聊天记录
+status: approved
+requirement: |
+  竖屏对话页被固定区占满，中间聊天记录只剩一条窄带：
+  1. 顶栏「会话列表」
+  2. Bot 信息条（头像/权限/详情/目标历史/空闲·全自动/费用·token/Trace）
+  3. 大块「目标 待核对」卡片
+  4. 底部「目标与进展」折叠条 + 输入框 + 主导航（Bot/对话/…）
+  窄屏（≤760px，已有 apps/web-console/styles/mobile.css）优先展示对话内容。固定区默认更矮/折叠/可展开；桌面宽屏尽量保持现状。不改业务逻辑、不降功能可达性。
+  建议改动方向（可自研更好方案）
+  - apps/web-console/styles/mobile.css、PlayPanel.tsx、BotFace.tsx、shell/*、相关 css
+  - 手机默认：BotFace/目标卡收成一行摘要；「目标与进展」默认收起；减少 sticky 堆叠高度
+  - 对话 feed 用 flex:1; min-height:0 吃掉剩余视口
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 手机宽度不超过 760 像素，打开一只 Bot 的对话，头部有名字、权限、详情、目标历史、状态、费用和 Trace，上方还有一条待核对的目标
+    when: 刚进入这场对话，没有再点开头部或目标
+    then: Bot 信息收成一行摘要，目标收成一行摘要，对话记录占据剩余画面的主要高度，而不是被固定区挤成一条窄带
+  - id: AC-2
+    given: 同一场窄屏对话，Bot 信息和目标都收成一行
+    when: 分别点开 Bot 信息和目标摘要
+    then: 权限、详情、目标历史、状态、费用、Trace 以及目标全文都还能看到并操作
+  - id: AC-3
+    given: 窄屏对话底部有「目标与进展」
+    when: 刚进入这场对话
+    then: 「目标与进展」默认收起，点开后仍能看到目标列表
+  - id: AC-4
+    given: 桌面宽度超过 760 像素
+    when: 打开同一场 Bot 对话
+    then: Bot 信息、目标卡片和「目标与进展」仍按宽屏原来的方式展开，不套用手机上的收起

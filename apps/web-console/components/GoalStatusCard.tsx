@@ -30,12 +30,14 @@ export function GoalStatusCard({ sessionId }: { sessionId: string | null }) {
   const { t } = useI18n();
   const [goal, setGoal] = useState<GoalWire | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setGoal(null);
     setLoadError(false);
     if (!sessionId) return;
+    setExpanded(false);
 
     const pull = async () => {
       try {
@@ -74,26 +76,40 @@ export function GoalStatusCard({ sessionId }: { sessionId: string | null }) {
   const tone = goal.status === 'achieved' ? 'is-ok' : goal.status === 'unmet_closed' ? 'is-warn' : '';
   const statusKey = GOAL_STATUS_KEY[goal.status];
 
+  const summary = `${t('play.goalCard.title')} ${statusKey ? t(statusKey) : goal.status}`;
+
   return (
-    <div className={`goal-status-card ${tone}`} role="status">
-      {loadError ? <div role="alert">{t('play.goalCard.loadFailed')}</div> : null}
-      <span className="goal-status-card__label">{t('play.goalCard.title')}</span>
-      <strong>{statusKey ? t(statusKey) : goal.status}</strong>
-      {goal.closeReason ? <span className="muted"> · {goal.closeReason}</span> : null}
-      <span className="muted">
-        {' '}
-        · {goal.source === 'bot' ? t('goals.attemptUsage', { used: goal.turnsUsed, max: goal.maxTurns }) : `${goal.turnsUsed}/${goal.maxTurns}`}
-      </span>
-      {goal.source === 'bot' ? <span className="muted">{t('goals.durableVerification')}</span> : goal.spec?.verify?.kind ? (
-        <span className="muted">{t('play.goalCard.verify', { kind: goal.spec.verify.kind })}</span>
-      ) : (
-        <span className="muted">{t('play.goalCard.softGate')}</span>
-      )}
-      {goal.condition ? (
-        <div className="goal-status-card__cond" title={goal.condition}>
-          {goal.condition}
-        </div>
-      ) : null}
+    <div className={`goal-status-card ${tone}${expanded ? ' is-expanded' : ''}`} role="status">
+      <button
+        type="button"
+        className="goal-status-card__toggle"
+        data-testid="mobile-goal-card-toggle"
+        aria-expanded={expanded}
+        onClick={() => setExpanded(open => !open)}
+      >
+        <span className="goal-status-card__summary">{summary}</span>
+        {goal.condition ? <span className="goal-status-card__peek">{goal.condition}</span> : null}
+      </button>
+      <div className="goal-status-card__body">
+        {loadError ? <div role="alert">{t('play.goalCard.loadFailed')}</div> : null}
+        <span className="goal-status-card__label">{t('play.goalCard.title')}</span>
+        <strong>{statusKey ? t(statusKey) : goal.status}</strong>
+        {goal.closeReason ? <span className="muted"> · {goal.closeReason}</span> : null}
+        <span className="muted">
+          {' '}
+          · {goal.source === 'bot' ? t('goals.attemptUsage', { used: goal.turnsUsed, max: goal.maxTurns }) : `${goal.turnsUsed}/${goal.maxTurns}`}
+        </span>
+        {goal.source === 'bot' ? <span className="muted">{t('goals.durableVerification')}</span> : goal.spec?.verify?.kind ? (
+          <span className="muted">{t('play.goalCard.verify', { kind: goal.spec.verify.kind })}</span>
+        ) : (
+          <span className="muted">{t('play.goalCard.softGate')}</span>
+        )}
+        {goal.condition ? (
+          <div className="goal-status-card__cond" title={goal.condition}>
+            {goal.condition}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
