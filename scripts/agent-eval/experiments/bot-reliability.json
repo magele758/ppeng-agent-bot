@@ -1,0 +1,32 @@
+{
+  "suite": "builtin:bot-reliability",
+  "trials": 3,
+  "baseline": {
+    "repoRoot": "."
+  },
+  "candidate": {
+    "repoRoot": "."
+  },
+  "model": {
+    "provider": "openai-compatible",
+    "temperature": 0
+  },
+  "limits": {
+    "timeoutMs": 180000,
+    "maxModelCalls": 12,
+    "maxOutputTokens": 2048,
+    "maxInputChars": 250000,
+    "maxTotalCalls": 3000
+  },
+  "policy": {
+    "minCases": 30,
+    "minTrials": 3,
+    "minBaselinePassRate": 0.8,
+    "nonInferiorityMargin": 0.05,
+    "maxCategoryDrop": 0.05,
+    "maxTokenRatio": 1.2,
+    "maxLatencyRatio": 1.5,
+    "requireUsage": true
+  },
+  "concurrency": 4
+}

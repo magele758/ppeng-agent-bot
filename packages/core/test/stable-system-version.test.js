@@ -6,5 +6,5 @@ test('STABLE_SYSTEM_VERSION is a non-empty fingerprint string', () => {
   assert.equal(typeof STABLE_SYSTEM_VERSION, 'string');
   assert.ok(STABLE_SYSTEM_VERSION.length > 0);
   // Contract: bump when buildStablePrefix wording changes (see model/AGENTS.md).
-  assert.equal(STABLE_SYSTEM_VERSION, 'v11');
+  assert.equal(STABLE_SYSTEM_VERSION, 'v14');
 });

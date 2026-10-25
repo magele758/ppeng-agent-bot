@@ -1,5 +1,7 @@
+import { createHash } from 'node:crypto';
+import { GOAL_JUDGE_TIMEOUT_MS } from './judge-budget.js';
 import { evidenceTranscript, goalExecutionEvidence } from './execution-evidence.js';
-import { buildCompletionEvidence, completionReport, COMPLETION_JUDGE_PROMPT } from './completion-evidence.js';
+import { buildCompletionEvidence, completionReport, COMPLETION_JUDGE_PROMPT, type CompletionEvidence } from './completion-evidence.js';
 import type { SqliteStateStore } from '../../storage.js';
 import type { SessionRecord, ToolContract, ModelAdapter } from '../../types.js';
 import { BotGoalService } from './service.js';
@@ -272,7 +274,7 @@ export function bindGoalExecution(host:GoalRuntimeHost,session:SessionRecord):bo
  return answerCanonicalChat(session,bound);
 }
 function goalInstructions(goal:BotGoal,strategy:string,reason:string):string {
- return `[goal ${goal.id} revision ${goal.revision}] Objective: ${goal.objective}\nConstraints: ${JSON.stringify(goal.constraints)}\nCompletion conditions: ${JSON.stringify(goal.completionCriteria)}\nExecution: ${strategy}. ${reason}\nPrevious progress: ${goal.progress}\nEvidence: ${JSON.stringify(goal.evidence)}\nNext step: ${goal.nextStep??''}\nUse goal_checkpoint to preserve concrete progress, evidence, or a durable wait condition before returning. Returning a response does not complete the goal. When Execution is not direct, your first action must be goal_dispatch to launch that executor (factory may first discover targets). A direct answer does not fulfill a selected specialist execution. For subagent/orchestrator/self_heal/factory/team_dag/swarm/bot_delegate use goal_dispatch to launch the selected executor. For PTC use goal_dispatch to create an isolated dynamic-workflow worker. Select the next workKind and specialist role yourself from the task and existing evidence; never ask the user to configure modes. When goal_dispatch returns waiting, end this turn immediately; the scheduler will resume with actual results. Do not poll worker history or sleep. Inspect existing results before launching another phase; do not repeat completed or unconfirmed external actions. For factory discover authorized targets through factory_status, then pass factory details to goal_dispatch.`;
+ return `[goal ${goal.id} revision ${goal.revision}] Objective: ${goal.objective}\nConstraints: ${JSON.stringify(goal.constraints)}\nCompletion conditions: ${JSON.stringify(goal.completionCriteria)}\nExecution: ${strategy}. ${reason}\nPrevious progress: ${goal.progress}\nEvidence: ${JSON.stringify(goal.evidence)}\nNext step: ${goal.nextStep??''}\nTool observations are recorded automatically. Use goal_checkpoint only when available to preserve concrete progress or a durable wait condition; do not substitute another storage tool or create extra files just to record verification evidence. Report verification results in your response. Returning a response does not complete the goal. When Execution is not direct, your first action must be goal_dispatch to launch that executor (factory may first discover targets). A direct answer does not fulfill a selected specialist execution. For subagent/orchestrator/self_heal/factory/team_dag/swarm/bot_delegate use goal_dispatch to launch the selected executor. For PTC use goal_dispatch to create an isolated dynamic-workflow worker. Select the next workKind and specialist role yourself from the task and existing evidence; never ask the user to configure modes. When goal_dispatch returns waiting, end this turn immediately; the scheduler will resume with actual results. Do not poll worker history or sleep. Inspect existing results before launching another phase; do not repeat completed or unconfirmed external actions. For factory discover authorized targets through factory_status, then pass factory details to goal_dispatch.`;
 }
 
 function executionIds(metadata:SessionRecord['metadata']):{goalId:string;executionId:string}|undefined {
@@ -315,7 +317,8 @@ function holdForApproval(host:GoalRuntimeHost,sessionId:string,session:SessionRe
 }
 function assistantTranscript(messages:ReturnType<GoalRuntimeHost['store']['foldMessages']>,startedAt:string) {
  const tail=messages.filter(m=>Date.parse(m.createdAt)>=Date.parse(startedAt));
- const assistant=tail.filter(m=>m.role==='assistant').flatMap(m=>m.parts.filter(p=>p.type==='text').map(p=>p.text)).join('\n').slice(-6000);
+ const final=tail.findLast(m=>m.role==='assistant'&&m.parts.some(p=>p.type==='text'));
+ const assistant=(final?.parts.filter(p=>p.type==='text').map(p=>p.text).join('\n')??'').slice(-6000);
  return {tail,assistant};
 }
 function baseReport(checkpoint:GoalReport|undefined,assistant:string,goal:BotGoal):GoalReport {
@@ -332,21 +335,59 @@ function abortedReport(outcome:{kind?:string}|undefined):GoalReport|undefined {
  if(outcome?.kind!=='aborted')return undefined;
  return {kind:'blocked',summary:'Execution was interrupted; review progress before resuming'};
 }
-async function verifyCompletion(host:GoalRuntimeHost,goal:BotGoal,tail:ReturnType<GoalRuntimeHost['store']['foldMessages']>,assistant:string,report:GoalReport,sessionId=goal.sessionId):Promise<GoalReport> {
+async function verifyCompletion(host:GoalRuntimeHost,goal:BotGoal,tail:ReturnType<GoalRuntimeHost['store']['foldMessages']>,assistant:string,report:GoalReport,sessionId=goal.sessionId,signal?:AbortSignal,prepared?:CompletionEvidence):Promise<GoalReport> {
  const session=host.store.getSession(sessionId);
  const judge=session ? sessionJudge(host,session) : host.judge;
  if(!judge)return {...report,verified:false};
  try {
-  const packet=buildCompletionEvidence(goal,goalExecutionEvidence(host.store,goal),assistant);
-  const result=await judge({system:COMPLETION_JUDGE_PROMPT,user:JSON.stringify(packet),jsonMode:true,signal:AbortSignal.timeout(60000)});
+  const packet=prepared??verificationPacket(host,goal,assistant);
+  const result=await judge({system:COMPLETION_JUDGE_PROMPT,user:JSON.stringify(packet),jsonMode:true,signal:signal?AbortSignal.any([signal,AbortSignal.timeout(GOAL_JUDGE_TIMEOUT_MS)]):AbortSignal.timeout(GOAL_JUDGE_TIMEOUT_MS)});
   return completionReport(JSON.parse(result),packet,goal);
  }catch{
   return {...report,kind:'candidate_completed',verified:false,summary:report.summary||assistant||'Completion verification unavailable; recorded result kept for review',evidence:report.evidence?.length?report.evidence:[assistant].filter(Boolean)};
  }
 }
+type CompletionReview = { executionId:string; revision:number; fingerprint?:string; report?:GoalReport };
+// Verified reports are process-local, never accepted from caller-editable metadata.
+const completionReviews = new WeakMap<SqliteStateStore,Map<string,CompletionReview>>();
+function reviewCache(host:GoalRuntimeHost):Map<string,CompletionReview> {
+ let cache=completionReviews.get(host.store);if(!cache){cache=new Map();completionReviews.set(host.store,cache);}return cache;
+}
+function verificationPacket(host:GoalRuntimeHost,goal:BotGoal,assistant:string):CompletionEvidence {
+ return buildCompletionEvidence(goal,goalExecutionEvidence(host.store,goal),assistant);
+}
+function completionFingerprint(packet:CompletionEvidence):string {
+ return createHash('sha256').update(JSON.stringify(packet)).digest('hex');
+}
+function cachedCompletion(host:GoalRuntimeHost,goal:BotGoal,tail:ReturnType<GoalRuntimeHost['store']['foldMessages']>,assistant:string,sessionId:string):GoalReport|undefined {
+ const session=host.store.getSession(sessionId);
+ const cached=reviewCache(host).get(sessionId);
+ if(!cached?.report||cached.executionId!==executionIds(session!.metadata)?.executionId||cached.revision!==goal.revision)return undefined;
+ try{return cached.fingerprint===completionFingerprint(verificationPacket(host,goal,assistant))?cached.report:undefined;}catch{return undefined;}
+}
+/** One corrective continuation per direct execution; settlement remains the only state writer. */
+export async function reviewDirectGoalBeforeEnd(host:GoalRuntimeHost,sessionId:string,signal?:AbortSignal):Promise<{met:boolean;action?:'continue';systemMessage?:string}|undefined> {
+ const ctx=settleContext(host,sessionId);
+ if(!ctx||ctx.execution.strategy!=='direct'||holdForApproval(host,sessionId,ctx.session,ctx.ids.executionId)||signal?.aborted)return undefined;
+ const goal=ctx.scope.service.get(ctx.scope.botId,ctx.ids.goalId)!;
+ const cache=reviewCache(host);
+ const prior=cache.get(sessionId);
+ if(!prior&&cache.size>=512)return undefined;
+ if(prior?.executionId===ctx.ids.executionId&&prior.revision===goal.revision)return {met:true};
+ cache.set(sessionId,{executionId:ctx.ids.executionId,revision:goal.revision});
+ const {tail,assistant}=assistantTranscript(evidenceTranscript(host.store,sessionId),ctx.execution.startedAt);
+ let packet:CompletionEvidence;try{packet=verificationPacket(host,goal,assistant);}catch{return undefined;}
+ const fingerprint=completionFingerprint(packet);
+ const report=await verifyCompletion(host,goal,tail,assistant,baseReport(undefined,assistant,goal),sessionId,signal,packet);
+ const live=settleContext(host,sessionId);
+ if(!live||live.ids.executionId!==ctx.ids.executionId||signal?.aborted||live.scope.service.get(live.scope.botId,goal.id)?.revision!==goal.revision)return {met:true};
+ cache.set(sessionId,{executionId:ctx.ids.executionId,revision:goal.revision,fingerprint,report});
+ if(report.kind!=='progress'||!report.nextStep||report.correctionNeeded===false)return {met:true};
+ return {met:false,action:'continue',systemMessage:`[completion review] The requested outcome is not complete: ${report.nextStep}\nYou have one corrective continuation within the existing turn budget. Complete only this remaining work using existing observations. Do not replay confirmed side effects or create extra records just to preserve evidence. Honor the current user's exact output requirements. If a required action is blocked, honor any user-specified failure reply or stop condition exactly, without extra explanation; otherwise report the remaining gap honestly.`};
+}
 async function maybeVerify(host:GoalRuntimeHost,goal:BotGoal,tail:ReturnType<GoalRuntimeHost['store']['foldMessages']>,assistant:string,report:GoalReport,sessionId:string):Promise<GoalReport> {
  if(report.kind!=='candidate_completed'&&report.kind!=='progress')return report;
- return verifyCompletion(host,goal,tail,assistant,{...report,verified:false},sessionId);
+ return cachedCompletion(host,goal,tail,assistant,sessionId)??verifyCompletion(host,goal,tail,assistant,{...report,verified:false},sessionId);
 }
 /** Child-session completion uses the same judge as a direct turn. Assistant text alone is not verification. */
 export async function judgeChildCompletion(host:GoalRuntimeHost,goal:BotGoal,childId:string,assistant:string):Promise<GoalReport|undefined> {
@@ -394,7 +435,7 @@ export async function settleGoalExecution(host:GoalRuntimeHost,sessionId:string,
  const ctx=settleContext(host,sessionId,error);
  if(!ctx)return;
  if(holdForApproval(host,sessionId,ctx.session,ctx.ids.executionId))return;
- await finishSettlement(host,sessionId,ctx,error);
+ try{await finishSettlement(host,sessionId,ctx,error);}finally{reviewCache(host).delete(sessionId);}
 }
 
 function assignedCheckpointGoal(store:SqliteStateStore,session:SessionRecord):{goalId:string}|undefined {

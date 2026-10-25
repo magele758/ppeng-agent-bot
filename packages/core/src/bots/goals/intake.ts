@@ -1,3 +1,4 @@
+import { GOAL_JUDGE_TIMEOUT_MS } from './judge-budget.js';
 import { visibleTaskText } from '../fork-inheritance.js';
 
 export interface GoalMessageIntent {
@@ -181,7 +182,7 @@ function proposalsForOutput(raw: string, goals: GoalIntakeContext[], fallback: G
 function raceGoalJudge(raw: string, goals: GoalIntakeContext[], judge: GoalIntentJudge, controller: AbortController, remember: (timer: ReturnType<typeof setTimeout>) => void): Promise<unknown> {
   return Promise.race([
     judge({ text: raw, goals: goals.slice(0, 50).map(goal => ({ ...goal, title: goal.title.slice(0, 300) })), signal: controller.signal, instructions: JUDGE_INSTRUCTIONS }),
-    new Promise<never>((_, reject) => { remember(setTimeout(() => { controller.abort(); reject(new Error('Goal intent judge timed out')); }, 3000)); })
+    new Promise<never>((_, reject) => { remember(setTimeout(() => { controller.abort(); reject(new Error('Goal intent judge timed out')); }, GOAL_JUDGE_TIMEOUT_MS)); })
   ]);
 }
 async function judgedIntents(raw: string, goals: GoalIntakeContext[], fallback: GoalIntentProposal[], judge: GoalIntentJudge): Promise<GoalIntentProposal[] | undefined> {
@@ -191,7 +192,7 @@ async function judgedIntents(raw: string, goals: GoalIntakeContext[], fallback: 
     const output = await raceGoalJudge(raw, goals, judge, controller, timer => { timeout = timer; });
     return proposalsForOutput(raw, goals, fallback, output);
   } catch { return undefined; }
-  finally { if (timeout) clearTimeout(timeout); controller.abort(); }
+  finally { if (timeout) clearTimeout(timeout); }
 }
 
 const recallInquiry = /复述|还记得|记不记得|记得不|记得吗|do you still remember|\brecite\b/i;
@@ -210,9 +211,23 @@ const deliveryWork = /完成结果(?:是|为)|验收(?:标准|条件)|交付物|
 const isolatedHandoff = /拆成子任务|拆成并行|并行处理|分别交给|交给(?:规划|实现|验收|评估)|子代理/;
 const selfContainedWork = /分析|说明|解释|看看|看下|检查|查看|总结|梳理|对比|模拟面试|出题|评分|改进建议|\b(?:analy[sz]e|explain|inspect|summarize|interview|quiz)\b/i;
 
+/** Returning an existing deployment result is not a request to deploy again. */
+function isHistoricalResultQuery(text: string): boolean {
+  const result = text.match(/^(?:根据|基于)(?:已经|之前|此前|已有|现有|先前)[^，,。；;\n]*(?:检查|结果|日志|证据|报告)[，,]\s*((?:返回|告知|告诉我|给出)[\s\S]+)$/)
+    ?? text.match(/^(?:based on|from)\s+(?:the\s+)?(?:existing|previous|earlier|already)[^,;\n]+[,;]\s*((?:return|report|tell me|give me)\b[\s\S]+)$/i);
+  if (!result?.[1]) return false;
+  const request = result[1]
+    .replace(/(?:部署|发布|构建)(?:版本|状态|结果|日志|报告)/g, '历史结果')
+    .replace(/\b(?:deployment|deployed|build|release)\s+(?:version|status|result|report|log)\b/gi, 'historical result');
+  return !deliveryWork.test(request)
+    && !/保存|写入|删除|更新|升级|执行|运行|重启|发起|启动|创建|触发|回滚|安装|发送|重试|\b(?:publish|upgrade|update|save|write|delete|remove|run|execute|restart|start|create|trigger|rollback|roll back|install|send|retry|change)\b/i.test(request);
+}
+
 /** Analysis, explanation, or inspection the current Bot can finish in this chat. A stated delivery still stays a goal. */
 export function isSelfContainedBotWork(text: string): boolean {
-  if (hasStatedOutcome(text) || deliveryWork.test(text) || isolatedHandoff.test(text)) return false;
+  if (hasStatedOutcome(text) || isolatedHandoff.test(text)) return false;
+  if (isHistoricalResultQuery(text)) return true;
+  if (deliveryWork.test(text)) return false;
   if (/设计方案|制定[\s\S]{0,12}规划|开发功能/.test(text)) return false;
   return selfContainedWork.test(text);
 }

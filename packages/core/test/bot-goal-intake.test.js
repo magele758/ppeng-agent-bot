@@ -41,16 +41,19 @@ test('semantic proposals cannot invent targets, rewrite explicit targets, or con
 });
 
 
-test('judge input is bounded and a hanging judge falls back without losing work', async () => {
+test('judge input is bounded and a hanging judge falls back without losing work', async t => {
+  t.mock.timers.enable({apis:['setTimeout']});
   const { classifyGoalIntents } = await import('../dist/bots/goals/intake.js');
   const goals = Array.from({ length: 70 }, (_, i) => ({ id: `g-${i}`, title: 'x'.repeat(500), status: 'running' }));
   let signal;
-  const result = await classifyGoalIntents('检查日志', goals, async input => {
+  const pending = classifyGoalIntents('检查日志', goals, async input => {
     assert.equal(input.goals.length, 50);
     assert.equal(input.goals[0].title.length, 300);
     signal = input.signal;
     return new Promise(() => {});
   });
+  t.mock.timers.tick(60001);
+  const result=await pending;
   assert.equal(result[0].kind, 'new_goal');
   assert.equal(signal.aborted, true);
 });

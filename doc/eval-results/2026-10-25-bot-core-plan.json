@@ -1,0 +1,64 @@
+{
+  "scope": "User requested a lightweight core-case run rather than full expansion.",
+  "source": "8 existing P0/reliability scenarios + 8 manually authored edge-case contracts; no private production transcripts or numeric/paraphrase variants used.",
+  "independenceCertified": false,
+  "duplicateGroups": [],
+  "categories": {
+    "routing": {
+      "distinctTasks": 1,
+      "tiedInterval": [
+        -0.8946244754816993,
+        0.8946244754816993
+      ],
+      "requiredTiedTasks": 162
+    },
+    "execution": {
+      "distinctTasks": 4,
+      "tiedInterval": [
+        -0.6797404546473736,
+        0.6797404546473736
+      ],
+      "requiredTiedTasks": 162
+    },
+    "verification": {
+      "distinctTasks": 3,
+      "tiedInterval": [
+        -0.7389004339030347,
+        0.7389004339030347
+      ],
+      "requiredTiedTasks": 162
+    },
+    "compression": {
+      "distinctTasks": 3,
+      "tiedInterval": [
+        -0.7389004339030347,
+        0.7389004339030347
+      ],
+      "requiredTiedTasks": 162
+    },
+    "permissions": {
+      "distinctTasks": 3,
+      "tiedInterval": [
+        -0.7389004339030347,
+        0.7389004339030347
+      ],
+      "requiredTiedTasks": 162
+    },
+    "recovery": {
+      "distinctTasks": 2,
+      "tiedInterval": [
+        -0.8093398629136082,
+        0.8093398629136082
+      ],
+      "requiredTiedTasks": 162
+    }
+  },
+  "distinctTasks": 16,
+  "minimumWorkerRuns": 96,
+  "tiedPromotionEstablished": false,
+  "overallTiedInterval": [
+    -0.34666863568749573,
+    0.34666863568749573
+  ],
+  "note": "Planning only: all-tied sample size is not a power guarantee. Exact-content duplicates are detected; distinct content still requires semantic independence review. No promotion authorization."
+}
