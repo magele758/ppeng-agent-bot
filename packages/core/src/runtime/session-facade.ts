@@ -393,7 +393,7 @@ export function getLatestAssistantText(
 ): string | undefined {
   const messages = store.foldMessages(sessionId);
   const assistant = [...messages].reverse().find((message) => message.role === 'assistant');
-  return assistant ? textFromMessage(assistant) : undefined;
+  return assistant ? assistant.parts.filter(part => part.type === 'text').map(part => part.text).join('\n') : undefined;
 }
 
 export async function approve(
