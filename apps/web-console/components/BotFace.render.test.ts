@@ -333,3 +333,15 @@ test('干活时头像连续侧看和点头，空闲列表仍是慢动作 [AC:bot
     cleanups.forEach(cleanup => { if (typeof cleanup === 'function') cleanup(); });
   } finally { Object.assign(globals, originals); }
 });
+
+test('soft style receives live mood and exposes animated face parts [AC:bot-soft-motion#AC-2]', () => {
+  for (const mood of ['idle', 'thinking', 'speaking', 'tool'] as const) {
+    const markup = renderToStaticMarkup(React.createElement(BotFace, { name: '111', faceStyle: 'soft', softSilhouette: 'pebble', softColor: 'coral', softExpression: 'happy', mood }));
+    assert.match(markup, new RegExp(`data-face-mood="${mood}"`));
+    assert.match(markup, new RegExp(`data-face-working="${mood !== 'idle'}"`));
+    assert.match(markup, /data-soft-bot-face="pebble"/);
+    assert.match(markup, /data-soft-bot-color="coral"/);
+    for (const part of ['data-bob', 'data-look', 'data-eye', 'data-soft-mouth']) assert.ok(markup.includes(part));
+    if (mood !== 'idle') assert.match(markup, /工作中/);
+  }
+});
