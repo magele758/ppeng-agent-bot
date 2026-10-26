@@ -121,3 +121,15 @@ test('an EPERM probe distinguishes vanished or zombie groups from live protected
  assert.throws(()=>groupExists({pid:501},{kill,listGroups:()=> {throw Error('ps failed');}}),error=>error===denied);
  assert.throws(()=>groupExists({pid:501},{kill,listGroups:()=> 'unparseable'}),error=>error===denied);
 });
+
+test('exit probes retry transient permission errors but preserve persistent failures [AC:dev-lab-process-cleanup#AC-3]', async () => {
+ const { waitForGroupExit } = await import('../dev-lab-processes.mjs');
+ const denied=Object.assign(new Error('exit race'),{code:'EPERM'});
+ let calls=0;
+ assert.equal(await waitForGroupExit({pid:501},100,()=>{if(++calls===1)throw denied;return false;}),true);
+ assert.ok(calls>=2);
+ await assert.rejects(waitForGroupExit({pid:501},30,()=>{throw denied;}),error=>error===denied);
+ assert.equal(await waitForGroupExit({pid:501},30,()=>true),false);
+ const other=Object.assign(new Error('unexpected failure'),{code:'EINVAL'});
+ await assert.rejects(waitForGroupExit({pid:501},100,()=>{throw other;}),error=>error===other);
+});
