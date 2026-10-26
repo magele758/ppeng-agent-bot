@@ -2,7 +2,17 @@ import type { DatabaseSync } from 'node:sqlite';
 import { NotFoundError } from '../errors.js';
 import { nowIso } from '../id.js';
 import { boolToInt, intToBool } from '../stores/storage-helpers.js';
-import { normalizeBotAvatar, readBotFaceColor, readBotFaceShape } from './bot-appearance.js';
+import {
+  normalizeBotAvatar,
+  normalizeFaceColorForStyle,
+  normalizeFaceShapeForStyle,
+  readBotFaceColor,
+  readBotFaceShape,
+  normalizeBotFaceStyle,
+  normalizeFaceExpressionForStyle,
+  readBotFaceExpression,
+  readBotFaceStyle
+} from './bot-appearance.js';
 import type { BotRecord, ListBotsOptions, UpdateBotInput } from './types.js';
 
 export class BotStore {
@@ -14,8 +24,8 @@ export class BotStore {
         `
         INSERT INTO bots (
           id, name, title, description, agent_id, canonical_session_id,
-          hidden, face_shape, face_color, avatar, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          hidden, face_shape, face_color, face_style, face_expression, avatar, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
       )
       .run(
@@ -28,6 +38,8 @@ export class BotStore {
         boolToInt(bot.hidden),
         bot.faceShape ?? null,
         bot.faceColor ?? null,
+        bot.faceStyle ?? null,
+        bot.faceExpression ?? null,
         bot.avatar ?? null,
         bot.createdAt,
         bot.updatedAt
@@ -75,14 +87,27 @@ export class BotStore {
   update(id: string, patch: UpdateBotInput & { canonicalSessionId?: string }): BotRecord {
     const current = this.get(id);
     if (!current) throw new NotFoundError('Bot', id);
+    const faceStyle = patch.faceStyle !== undefined ? normalizeBotFaceStyle(patch.faceStyle) : current.faceStyle;
+    const styleChanged = patch.faceStyle !== undefined && (faceStyle === 'soft') !== (current.faceStyle === 'soft');
     const next: BotRecord = {
       ...current,
       name: patch.name !== undefined ? patch.name : current.name,
       title: patch.title !== undefined ? patch.title : current.title,
       description: patch.description !== undefined ? patch.description : current.description,
       hidden: patch.hidden !== undefined ? patch.hidden : current.hidden,
-      faceShape: patch.faceShape !== undefined ? readBotFaceShape(patch.faceShape) : current.faceShape,
-      faceColor: patch.faceColor !== undefined ? readBotFaceColor(patch.faceColor) : current.faceColor,
+      faceShape:
+        patch.faceShape !== undefined || styleChanged
+          ? normalizeFaceShapeForStyle(styleChanged && patch.faceShape === undefined ? null : patch.faceShape, faceStyle)
+          : current.faceShape,
+      faceColor:
+        patch.faceColor !== undefined || styleChanged
+          ? normalizeFaceColorForStyle(styleChanged && patch.faceColor === undefined ? null : patch.faceColor, faceStyle)
+          : current.faceColor,
+      faceStyle,
+      faceExpression:
+        patch.faceExpression !== undefined || (styleChanged && faceStyle !== 'soft')
+          ? normalizeFaceExpressionForStyle(styleChanged && faceStyle !== 'soft' ? null : patch.faceExpression, faceStyle)
+          : current.faceExpression,
       avatar: patch.avatar !== undefined ? normalizeBotAvatar(patch.avatar) : current.avatar,
       canonicalSessionId: patch.canonicalSessionId ?? current.canonicalSessionId,
       updatedAt: nowIso()
@@ -92,7 +117,7 @@ export class BotStore {
         `
         UPDATE bots SET
           name = ?, title = ?, description = ?, canonical_session_id = ?,
-          hidden = ?, face_shape = ?, face_color = ?, avatar = ?, updated_at = ?
+          hidden = ?, face_shape = ?, face_color = ?, face_style = ?, face_expression = ?, avatar = ?, updated_at = ?
         WHERE id = ?
       `
       )
@@ -104,6 +129,8 @@ export class BotStore {
         boolToInt(next.hidden),
         next.faceShape,
         next.faceColor,
+        next.faceStyle,
+        next.faceExpression,
         next.avatar,
         next.updatedAt,
         id
@@ -122,6 +149,8 @@ export class BotStore {
       hidden: intToBool(row.hidden),
       faceShape: readBotFaceShape(row.face_shape),
       faceColor: readBotFaceColor(row.face_color),
+      faceStyle: readBotFaceStyle(row.face_style),
+      faceExpression: readBotFaceExpression(row.face_expression),
       avatar: row.avatar == null || row.avatar === '' ? null : String(row.avatar),
       createdAt: String(row.created_at),
       updatedAt: String(row.updated_at)

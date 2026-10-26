@@ -77,7 +77,45 @@ export const agents = {
     faceEmpty: '机器人头像',
     faceShapeLabel: '脸型',
     faceColorLabel: '颜色',
+    faceStyleLabel: '风格',
     faceHint: '不选就按名字决定。保存后，选择器、会话和群里都用这张脸。',
+    faceStyle: {
+      classic: '经典',
+      soft: '软萌机器人'
+    },
+    softExpressionLabel: '表情',
+    softShape: {
+      pebble: '鹅卵石',
+      squish: '软方块',
+      capsule: '胶囊',
+      cloud: '云朵',
+      drop: '水滴',
+      bean: '豆豆',
+      nub: '小团',
+      pillow: '抱枕'
+    },
+    softColor: {
+      butter: '奶油黄',
+      peach: '蜜桃',
+      coral: '珊瑚',
+      blush: '腮红',
+      lilac: '丁香',
+      sky: '天空蓝',
+      mint: '薄荷',
+      sage: '鼠尾草',
+      sand: '沙色',
+      ink: '墨色'
+    },
+    softExpression: {
+      neutral: '平静',
+      happy: '开心',
+      curious: '好奇',
+      sleepy: '困倦',
+      wink: '眨眼',
+      content: '满足',
+      wide: '睁大',
+      shy: '害羞'
+    },
     faceSaveFailed: '没能保存外观：{error}',
     faceShape: {
       circle: '圆形',

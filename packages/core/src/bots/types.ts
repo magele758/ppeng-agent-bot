@@ -1,4 +1,4 @@
-import type { BotFaceColor, BotFaceShape } from './bot-appearance.js';
+import type { BotFaceStyle, SoftBotExpression, StoredFaceColor, StoredFaceShape } from './bot-appearance.js';
 
 export interface BotRecord {
   id: string;
@@ -8,10 +8,14 @@ export interface BotRecord {
   agentId: string;
   canonicalSessionId: string;
   hidden: boolean;
-  /** Saved silhouette. Null keeps the name-based shape. */
-  faceShape: BotFaceShape | null;
-  /** Saved swatch. Null keeps the name-based color. */
-  faceColor: BotFaceColor | null;
+  /** Saved silhouette. Classic ids, or a soft id when faceStyle is soft. Null keeps the seed. */
+  faceShape: StoredFaceShape | null;
+  /** Saved swatch. Classic ids, or a soft pastel when faceStyle is soft. Null keeps the seed. */
+  faceColor: StoredFaceColor | null;
+  /** Saved icon set. Null or classic keeps the geometric face. Soft draws the blob set. */
+  faceStyle: BotFaceStyle | null;
+  /** Soft resting look. Null keeps the seed. Classic rows do not store one. */
+  faceExpression: SoftBotExpression | null;
   /** Optional emoji or image URL drawn instead of the geometric face. Null keeps the face. */
   avatar: string | null;
   createdAt: string;
@@ -26,6 +30,10 @@ export interface CreateBotInput {
   faceShape?: unknown;
   /** Omitted or null keeps the name-based color. */
   faceColor?: unknown;
+  /** Omitted, blank, or classic keeps the geometric face. `soft` selects the blob set. */
+  faceStyle?: unknown;
+  /** Soft look. Omitted or blank keeps the seed. Only valid when faceStyle is soft. */
+  faceExpression?: unknown;
   /** Emoji or http(s) image URL. Omitted or blank keeps the geometric face. */
   avatar?: unknown;
 }
@@ -47,6 +55,10 @@ export interface UpdateBotInput {
   faceShape?: unknown;
   /** `null` clears the saved color. Omitted leaves it unchanged. */
   faceColor?: unknown;
+  /** `null` or blank clears the saved style (classic). Omitted leaves it unchanged. */
+  faceStyle?: unknown;
+  /** `null` or blank clears the soft look. Leaving soft clears it. Omitted leaves it unchanged. */
+  faceExpression?: unknown;
   /** `null` or blank clears the emoji / image. Omitted leaves it unchanged. */
   avatar?: unknown;
 }
