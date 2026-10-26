@@ -1,0 +1,16 @@
+id: bot-soft-create-runtime
+title: 软萌头像可正常创建和保存
+status: implemented
+requirement: |
+  修复这个问题
+  我本来想让他参考这个 https://github.com/jeremy-prt/bloub 实现的，好像现在是自己做的svg？我是想参考 https://github.com/nightly-labs/openbot 的效果的，先修复好，看看要么再加一套
+notes: 'assumedApproval: standing-order-2026-10-22；修复实际运行版本，补真实接口回归；新增风格本轮仅核对参考效果。'
+criteria:
+  - id: AC-1
+    given: 用户选择软萌机器人风格
+    when: 选择任一可用脸型创建 Bot
+    then: 创建成功，重新读取后脸型、颜色、风格与表情保持一致
+  - id: AC-2
+    given: 用户在新建表单选择软萌风格
+    when: 提交并重新加载页面
+    then: 不再出现经典脸型枚举报错，名单中显示与预览一致的软萌头像
