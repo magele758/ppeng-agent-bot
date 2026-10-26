@@ -342,7 +342,7 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
     return { id, name: bot?.name ?? id, title: bot?.title ?? '', description: bot?.description ?? '' };
   });
   const mention = activeMentionQuery(text, caret);
-  const mentionOptions = mention ? mentionChoices(mentionRoster, groups, mention.query, new Set(memberIds)) : [];
+  const mentionOptions = mention ? mentionChoices(mentionRoster, [], mention.query, new Set(memberIds)) : [];
   const goal = readRoomGoal(room);
   const approveVisible = showInlineApprove(approvalMode, memberNeedsPerson(turns));
   const mentionKey = mention ? `${mention.start}:${mention.query}` : '';
@@ -601,7 +601,7 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
           onRemoveGroup={(groupId) => void removeFunctionalGroup(groupId)}
         />
       ) : null}
-      {showSettings && <div className="play-group-settings" data-testid="room-settings"><BotRooms key={roomId} bots={[...bots]} selectedRoomId={roomId} memberEditor={!crowded} /></div>}
+      {showSettings && <div className="play-group-settings" data-testid="room-settings"><BotRooms key={roomId} bots={[...bots]} selectedRoomId={roomId} memberEditor={false} /></div>}
       {crowded ? (
         <div className="play-group-members" data-testid="play-group-member-summary">
           {error && !membersOpen ? <p className="play-group-error">{error}</p> : null}

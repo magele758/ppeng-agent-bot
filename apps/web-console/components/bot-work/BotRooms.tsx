@@ -164,10 +164,9 @@ export function BotRooms({ bots, selectedRoomId, memberEditor = true }: { bots: 
     setRoom(next);
   };
   return (
-    <section className="ag-panel" data-testid="bot-rooms">
+    <section className={`ag-panel${selectedRoomId ? " room-settings-panel" : ""}`} data-testid="bot-rooms">
       {selectedRoomId ? null : <h3>{t("botWork.rooms")}</h3>}
       <Feedback {...action} />
-      {selectedRoomId ? <GroupReplyModeControl roomId={selectedRoomId} /> : null}
       {!selectedRoomId && <>
       <form
         onSubmit={(e) => {
@@ -294,14 +293,16 @@ export function BotRooms({ bots, selectedRoomId, memberEditor = true }: { bots: 
               void action.run(saveSettings);
             }}
           >
+            <fieldset className="room-settings-basic">
+              <legend>{t('play.groupSettings.basic')}</legend>
             <label>{t('botWork.title')}<input data-testid="room-settings-title" value={room.title} onChange={e=>editRoom({...room,title:e.target.value})}/></label>
             <label>{t('botWork.host')}<select value={room.hostBotId} onChange={e=>editRoom({...room,hostBotId:e.target.value})}>{room.botIds.map(id=><option key={id} value={id}>{bots.find(b=>b.id===id)?.name??id}</option>)}</select></label>
-            <div className="play-group-settings-save">
-              <button type="submit" data-testid="room-save" disabled={action.busy}>
-                {t("common.save")}
-              </button>
-              {saved ? <p role="status">{t("play.groupSettings.saved")}</p> : null}
-            </div>
+            </fieldset>
+            {selectedRoomId ? <GroupReplyModeControl roomId={selectedRoomId} /> : null}
+            <details className="room-settings-limits">
+              <summary>{t('play.groupSettings.limits')}</summary>
+              <p>{t('play.groupSettings.limitsHint')}</p>
+              <div className="room-settings-grid">
             <label>
               {t("botWork.budget")}
               <input
@@ -339,7 +340,18 @@ export function BotRooms({ bots, selectedRoomId, memberEditor = true }: { bots: 
                 }
               />
             </label>
+              </div>
+            </details>
+            <div className="play-group-settings-save">
+              <button type="submit" data-testid="room-save" disabled={action.busy}>
+                {t("common.save")}
+              </button>
+              {saved ? <p role="status">{t("play.groupSettings.saved")}</p> : null}
+            </div>
           </form>
+          <details className="room-settings-activity">
+            <summary>{t('play.groupSettings.activity')}</summary>
+            <div className="room-settings-actions">
           <p data-testid="room-status">
             <Status value={room.status} />
           </p>
@@ -369,6 +381,9 @@ export function BotRooms({ bots, selectedRoomId, memberEditor = true }: { bots: 
           >
             {t("botWork.resume")}
           </button>
+            </div>
+          </details>
+          {!selectedRoomId && <>
           {memberEditor ? <>
           <ul>
             {room.botIds.map((id) => (
@@ -500,6 +515,7 @@ export function BotRooms({ bots, selectedRoomId, memberEditor = true }: { bots: 
           </form>
           <h4>{t("botWork.queue")}</h4>
           {turns.map(turn=><article key={turn.id}><Status value={turn.status}/><p>{t('botWork.turnProgress')}: {turn.botTurns}/{turn.maxBotTurns}</p><p>{turn.costStatus==='estimated'?`${t('botWork.costEstimate')}: ${turn.costUsd??0}`:t('botWork.costUnknown')}</p>{turn.terminationReason&&<p>{t('botWork.termination')}: {['members_completed','budget','tool_budget','cost_budget','external_effect_unconfirmed','interrupted_requires_review','user_abort','member_execution_failed'].includes(turn.terminationReason)?t(`botWork.reasons.${turn.terminationReason}` as MessageKey):t('botWork.states.unknown')}</p>}<Result value={turn.partialResult}/></article>)}
+          </>}
         </div>
       )}
     </section>
