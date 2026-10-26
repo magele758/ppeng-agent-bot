@@ -314,6 +314,7 @@ export function BotRooms({ bots, selectedRoomId, memberEditor = true }: { bots: 
                   editRoom({ ...room, maxBotTurns: Number(e.target.value) })
                 }
               />
+            <small>{t('play.groupSettings.turnsHelp')}</small>
             </label>
             <label>
               {t("botWork.maxToolCalls")}
@@ -326,6 +327,7 @@ export function BotRooms({ bots, selectedRoomId, memberEditor = true }: { bots: 
                   editRoom({ ...room, maxToolCalls: Number(e.target.value) })
                 }
               />
+            <small>{t('play.groupSettings.toolsHelp')}</small>
             </label>
             <label>
               {t("botWork.maxCostUsd")}
@@ -339,8 +341,10 @@ export function BotRooms({ bots, selectedRoomId, memberEditor = true }: { bots: 
                   editRoom({ ...room, maxCostUsd: Number(e.target.value) })
                 }
               />
+            <small>{t('play.groupSettings.costHelp')}</small>
             </label>
               </div>
+              <p>{t('play.groupSettings.limitsException')}</p>
             </details>
             <div className="play-group-settings-save">
               <button type="submit" data-testid="room-save" disabled={action.busy}>

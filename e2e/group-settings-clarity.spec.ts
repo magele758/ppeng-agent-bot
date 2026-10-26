@@ -33,8 +33,9 @@ test('settings are divided and still save [AC:group-settings-clarity#AC-2] [AC:g
   await all.check();
   await expect(all).toBeChecked();
   await expect(all.locator('..')).toHaveClass(/is-selected/);
+  await expect(all).toBeEnabled();
   state.fail = true;
-  await settings.getByTestId('group-reply-mode-coordinator').check();
+  await settings.getByTestId('group-reply-mode-coordinator').click();
   await expect(all).toBeChecked();
   await expect(settings.getByTestId('group-reply-mode-error')).toBeVisible();
   await page.screenshot({ path: 'test-results/group-settings-clarity-desktop.png' });
