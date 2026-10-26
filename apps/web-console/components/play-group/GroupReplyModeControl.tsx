@@ -10,10 +10,10 @@ import {
 import { useI18n, type MessageKey } from '@/lib/i18n';
 import './play-group.css';
 
-const OPTIONS: readonly { mode: GroupReplyMode; labelKey: MessageKey; hintKey: MessageKey }[] = [
-  { mode: 'coordinator', labelKey: 'play.groupSettings.coordinator', hintKey: 'play.groupSettings.coordinatorHint' },
-  { mode: 'task-collaboration', labelKey: 'play.groupSettings.taskCollaboration', hintKey: 'play.groupSettings.taskCollaborationHint' },
-  { mode: 'all-members', labelKey: 'play.groupSettings.allMembers', hintKey: 'play.groupSettings.allMembersHint' }
+const OPTIONS: readonly { mode: GroupReplyMode; labelKey: MessageKey; hintKey: MessageKey; flowKey: MessageKey; useKey: MessageKey }[] = [
+  { mode: 'coordinator', labelKey: 'play.groupSettings.coordinator', hintKey: 'play.groupSettings.coordinatorHint', flowKey: 'play.groupSettings.coordinatorFlow', useKey: 'play.groupSettings.coordinatorUse' },
+  { mode: 'task-collaboration', labelKey: 'play.groupSettings.taskCollaboration', hintKey: 'play.groupSettings.taskCollaborationHint', flowKey: 'play.groupSettings.collaborationFlow', useKey: 'play.groupSettings.collaborationUse' },
+  { mode: 'all-members', labelKey: 'play.groupSettings.allMembers', hintKey: 'play.groupSettings.allMembersHint', flowKey: 'play.groupSettings.allMembersFlow', useKey: 'play.groupSettings.allMembersUse' }
 ];
 
 export function GroupReplyModeControl({ roomId }: { roomId: string }) {
@@ -72,6 +72,17 @@ export function GroupReplyModeControl({ roomId }: { roomId: string }) {
           </label>
         ))}
       </div>
+      <details className="play-group-mode-guide" data-testid="group-mode-guide">
+        <summary>{t('play.groupSettings.guideTitle')}</summary>
+        {OPTIONS.map(option => (
+          <section key={option.mode}>
+            <h4>{t(option.labelKey)}</h4>
+            <p>{t(option.flowKey)}</p>
+            <p className="play-group-mode-guide__use">{t(option.useKey)}</p>
+          </section>
+        ))}
+        <p>{t('play.groupSettings.mentionRules')}</p>
+      </details>
       {error ? <p role="alert" className="play-group-reply-mode__error" data-testid="group-reply-mode-error">{error}</p> : null}
     </fieldset>
   );

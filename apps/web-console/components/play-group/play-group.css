@@ -400,3 +400,10 @@
   .play-group-settings .room-settings-panel { padding: 12px; }
   .room-settings-basic, .room-settings-grid { grid-template-columns: 1fr; }
 }
+
+.play-group-mode-guide { font-size: 13px; line-height: 1.7; }
+.play-group-mode-guide summary { cursor: pointer; color: var(--text-muted); font-weight: 500; }
+.play-group-mode-guide section { padding-block: 14px; border-bottom: 1px solid var(--ui-border); }
+.play-group-mode-guide h4 { font-size: 13px; margin: 0 0 6px; }
+.play-group-mode-guide p { margin: 6px 0; }
+.play-group-mode-guide__use, .room-settings-grid small { color: var(--text-muted); font-size: 12px; line-height: 1.6; }

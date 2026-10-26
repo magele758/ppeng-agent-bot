@@ -1,0 +1,30 @@
+import { test, expect } from '@playwright/test';
+
+test('mode and budget guidance explains actual behavior without saving [AC:group-mode-explanations#AC-1] [AC:group-mode-explanations#AC-2]', async ({ page }) => {
+  await page.setViewportSize({ width: 857, height: 804 });
+  const room = { id: 'mode-guide', title: 'Mode guide', botIds: ['a', 'b'], hostBotId: 'a', status: 'active', replyMode: 'coordinator', maxBotTurns: 6, maxToolCalls: 100, maxCostUsd: 1 };
+  let writes = 0;
+  await page.route('**/api/bot-rooms', r => r.fulfill({ json: { rooms: [room] } }));
+  await page.route('**/api/bot-rooms/mode-guide', r => { if (r.request().method() !== 'GET') writes++; return r.fulfill({ json: { room } }); });
+  await page.route('**/api/bot-rooms/mode-guide/messages*', r => r.fulfill({ json: { messages: [], hasMore: false, nextCursor: null } }));
+  await page.route('**/api/bot-rooms/mode-guide/turns', r => r.fulfill({ json: { turns: [] } }));
+  await page.goto('/#/bot');
+  await page.getByRole('button', { name: '打开群聊 Mode guide', exact: true }).click();
+  await page.getByRole('button', { name: '群聊设置', exact: true }).click();
+  const settings = page.getByTestId('room-settings');
+  await settings.getByText('详细流程与适用场景', { exact: true }).click();
+  const guide = settings.getByTestId('group-mode-guide');
+  await expect(guide).toContainText('不保证主持先说话');
+  await expect(guide).toContainText('临时负责人');
+  await expect(guide).toContainText('不自动安排协调者总结');
+  await expect(guide).toContainText('@');
+  await guide.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'test-results/group-mode-guide.png' });
+  await settings.getByText('运行限制', { exact: true }).click();
+  const limits = settings.locator('.room-settings-limits');
+  await expect(limits).toContainText('一条消息');
+  await expect(limits).toContainText('不是账户扣费硬上限');
+  await expect(limits).toContainText('至少覆盖全体成员');
+  await expect(limits.getByRole('spinbutton')).toHaveCount(3);
+  expect(writes).toBe(0);
+});
