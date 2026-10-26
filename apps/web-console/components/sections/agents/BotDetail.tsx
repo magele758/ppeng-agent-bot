@@ -220,9 +220,18 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
   const saveFace = useCallback(
     async (kind: FaceSaveKind) => {
       const botId = bot.id;
-      const turn = faceSave.current(kind, (patch) => {
-        if (botIdRef.current !== botId) return Promise.resolve();
-        return patchBot(patch());
+      const turn = faceSave.current(kind, async (patch) => {
+        if (botIdRef.current !== botId) return;
+        const body = patch();
+        const result = (await api(`/api/bots/${encodeURIComponent(botId)}`, {
+          method: 'PATCH',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(body)
+        })) as { bot?: BotInfo; warnings?: unknown };
+        if (botIdRef.current !== botId) return;
+        if (result.bot) upsertBot(result.bot);
+        await load();
+        return result;
       });
       setError(null);
       try {
@@ -234,12 +243,9 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
         throw err;
       }
     },
-    [bot.id, patchBot, t]
+    [bot.id, load, upsertBot, t]
   );
 
-  useEffect(() => {
-    faceSave.current = createFaceSaveQueue(() => faceNow.current);
-  }, [bot.id]);
 
   const savePermission = useCallback(
     async (mode: BotPermissionMode, opts?: { confirmBypass?: boolean }) => {

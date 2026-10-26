@@ -75,3 +75,44 @@ test('切换 Bot 后已入队的保存不再发出 [AC:bot-face-soft-style#AC-4]
   await Promise.all([first, second]);
   assert.deepEqual(sent, []);
 });
+
+test('同一队列在切换 Bot 后仍串行，慢的前一次不会与新队列并发 [AC:bot-face-soft-style#AC-4]', async () => {
+  let open = 'bot-a';
+  let face: FaceDraft = { ...EMPTY, style: 'soft', softShape: 'pebble' };
+  const save = createFaceSaveQueue(() => face);
+  let releaseFirst: () => void = () => {};
+  const gate = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+  const started: string[] = [];
+  const bodies: Array<Record<string, string | null>> = [];
+  const first = save('style', async (patch) => {
+    const clicked = 'bot-a';
+    started.push('first');
+    if (open !== clicked) return;
+    const body = patch();
+    await gate;
+    bodies.push(body);
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(started, ['first']);
+  open = 'bot-b';
+  face = { ...EMPTY, style: 'soft', softShape: 'capsule' };
+  const second = save('soft-shape', async (patch) => {
+    const clicked = 'bot-b';
+    started.push('second');
+    if (open !== clicked) return;
+    bodies.push(patch());
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(started, ['first']);
+  assert.equal(bodies.length, 0);
+  releaseFirst();
+  await first;
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await second;
+  assert.deepEqual(started, ['first', 'second']);
+  assert.equal(bodies.length, 2);
+  assert.equal(bodies[0]?.faceShape, 'pebble');
+  assert.equal(bodies[1]?.faceShape, 'capsule');
+});
