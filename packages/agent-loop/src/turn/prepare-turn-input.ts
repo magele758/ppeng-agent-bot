@@ -1,3 +1,4 @@
+import { applyClaimedInbox as applyInbox } from '../session/apply-claimed-inbox.js';
 /**
  * Unique packing seam for one model shot.
  *
@@ -124,15 +125,7 @@ export function applyClaimedInbox(
   sessionId: string,
   items: ClaimedInboxItem[]
 ): void {
-  for (const item of items) {
-    if (item.key) store.hideByKey?.(sessionId, item.key);
-    store.appendMessage(
-      sessionId,
-      item.role,
-      [textPart(item.text), ...(item.contextParts ?? [])],
-      { ...(item.key ? { key: item.key } : {}), ...(item.replyTo ? { replyTo: item.replyTo } : {}) }
-    );
-  }
+  applyInbox(store, sessionId, items);
 }
 
 export async function prepareTurnInput(

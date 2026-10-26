@@ -948,3 +948,22 @@ describe('session trace tool_end payload', () => {
     ).rejects.toMatchObject({ sample: repeated });
   });
 });
+
+describe('selective steer cancellation', () => {
+  it('does not compensate successful siblings and releases all scopes [AC:steer-tool-continuity#AC-3]', async () => {
+    const parent = new AbortController(), cancelled = new AbortController();
+    const release = vi.fn(), compensate = vi.fn(async () => undefined);
+    const h = host({ compensate, toolExecutionScope: (tc, context) => ({
+      context: { ...context, abortSignal: tc.name === 'download' ? cancelled.signal : parent.signal }, release
+    }) });
+    const download = tool('download', async () => { cancelled.abort({ code: 'TOOL_CANCELLED_BY_STEER' }); throw new Error('operation aborted'); });
+    const write = tool('write_file', async () => ({ ok: true, content: 'saved' }));
+    const results = await executeToolCalls(h, [download, write], [call('download', {}), call('write_file', {})], { ...ctx, abortSignal: parent.signal }, false, 's1', 2);
+    expect(results[0]?.metadata?.cancelledBySteer).toBe(true);
+    expect(results[0]?.content).toContain('do not retry');
+    expect(results[1]?.ok).toBe(true);
+    expect(parent.signal.aborted).toBe(false);
+    expect(compensate).not.toHaveBeenCalled();
+    expect(release).toHaveBeenCalledTimes(2);
+  });
+});

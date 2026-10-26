@@ -115,8 +115,8 @@ export const settingsEntries = {
     desc: 'Low-level scheduling options. Most people never need them; a wrong value can make interrupts and tool execution behave unpredictably.',
     fields: {
       drain: {
-        label: 'Skip not-yet-started tools on interrupt',
-        hint: 'When on, sequential tools that have not started yet are skipped when you interrupt, so the model sees your message sooner. Tools already running are unaffected.'
+        label: 'Receive interjections before tools start',
+        hint: 'Consume pending interjections before tools start while keeping tools running. Only an explicit stop or a direct conflict with your new request cancels the affected tools; the conversation continues.'
       },
       kernel: {
         label: 'Loop kernel',

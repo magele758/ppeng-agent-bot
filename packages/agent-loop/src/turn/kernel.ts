@@ -74,7 +74,6 @@ import {
 } from '../session/steer-drain.js';
 import {
   closeOpenToolWave,
-  TOOL_WAVE_SKIPPED_STEER_CONTENT,
 } from '../session/tool-wave-close.js';
 import { rollbackReasonOf } from '../session/step-tx.js';
 import { applyRunProfileToTools } from '../runtime/run-profile.js';
@@ -1447,24 +1446,13 @@ async function runSessionKernel(
         store: host.store,
       });
       if (typeof host.store.claimInbox === 'function' && typeof host.store.hideByKey === 'function') {
-        const drain = drainSteerAtToolLaunch({
+        drainSteerAtToolLaunch({
           store: host.store as unknown as SteerDrainClaimStore,
           sessionId: sid,
           toolCallIds: toolCalls.map((c) => c.toolCallId),
           policy: drainPolicy,
           expectedWriterRunId: writerRunId,
         });
-        if (drain.drained) {
-          await emitStep({
-            type: 'tools_done',
-            results: drain.skippedIds.map((id) => ({
-              ok: false,
-              content: TOOL_WAVE_SKIPPED_STEER_CONTENT,
-              name: toolCalls.find((c) => c.toolCallId === id)?.name,
-            })),
-          });
-          continue;
-        }
       }
 
       const executable = selectExecutableToolCalls(toolCalls, closedByGate, () =>

@@ -70,7 +70,6 @@ import {
 import { runGoalVerify } from '../goal/run-verify.js';
 import { readGoalSettings } from '../goal/settings.js';
 import { tryGoalStore } from '../goal/goal-store.js';
-import { resolveSteerInterruptPolicy } from '../session/steer-interrupt.js';
 import {
   createKernelHookRegistry,
   createStreamResetTracker,
@@ -855,18 +854,6 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
     noteGoalWaitingUser: (sessionId, toolCalls) => {
       if (!toolCalls.some((c) => c.name === 'ask_user')) return;
       markGoalWaitingUser(tryGoalStore(rt.store), sessionId);
-    },
-    shouldLatchBeforeTools: ({ session }) => {
-      const policy = resolveSteerInterruptPolicy({
-        sessionMetadata: session.metadata,
-        store: rt.store
-      });
-      if (policy !== 'steer') return 'proceed';
-      const pending =
-        typeof rt.store.listUnclaimedInbox === 'function'
-          ? rt.store.listUnclaimedInbox(session.id)
-          : [];
-      return pending.some((item) => item.target === 'next-step') ? 'steer' : 'proceed';
     },
     mergedFilePolicy: () => rt.mergedFilePolicy(),
     autoCompact: (context, opts) => autoCompactSession(compactFrom(rt), context, opts),

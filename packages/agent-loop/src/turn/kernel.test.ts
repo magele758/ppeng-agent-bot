@@ -259,7 +259,7 @@ describe('runSessionKernel wiring', () => {
     expect(surface.listUnclaimedInbox(session.id)).toEqual([]);
   });
 
-  it('drains steer before opening a tool wave', async () => {
+  it('tool-launch steer preserves planned tools [AC:steer-tool-continuity#AC-2]', async () => {
     let executed = 0;
     const { host, session, surface } = createHarness({
       model: () => toolResult('echo'),
@@ -272,14 +272,14 @@ describe('runSessionKernel wiring', () => {
     });
     const orig = host.runTurnWithRetries;
     host.runTurnWithRetries = async (input, onStream) => {
-      surface.enqueueSteer(session.id, 'stop and listen', { target: 'next-step' });
+      surface.enqueueSteer(session.id, 'also include a summary', { target: 'next-step' });
       return orig(input, onStream);
     };
     host.store.updateSession(session.id, {
       metadata: { ...(host.store.getSession(session.id)?.metadata ?? {}), steerDrainPolicy: 'tool_launch' },
     });
     await runSessionKernel(host, session.id, { steerDrainPolicy: 'tool_launch' });
-    expect(executed).toBe(0);
+    expect(executed).toBeGreaterThan(0);
     const folded = host.store.foldMessages(session.id);
     expect(unmatchedToolCallIds(folded)).toEqual([]);
   });
