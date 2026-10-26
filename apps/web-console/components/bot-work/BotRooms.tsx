@@ -45,6 +45,7 @@ export function BotRooms({ bots, selectedRoomId, memberEditor = true }: { bots: 
   const cursorRef = useRef<number | null>(null);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [newMember, setNewMember] = useState("");
+  const [saved, setSaved] = useState(false);
   const historyEpoch = useRef(0);
   const rememberCursor = (next: number | null) => {
     cursorRef.current = next;
@@ -88,7 +89,9 @@ export function BotRooms({ bots, selectedRoomId, memberEditor = true }: { bots: 
     void action.run(async () => {
       if (selectedRoomId) {
         const data = await api(`/api/bot-rooms/${encodeURIComponent(selectedRoomId)}`) as { room: Room };
-        await open(data.room);
+        setRoom(data.room);
+        setSaved(false);
+        void open(data.room).catch(() => {});
       } else await load();
     });
   }, [selectedRoomId]);
@@ -133,12 +136,36 @@ export function BotRooms({ bots, selectedRoomId, memberEditor = true }: { bots: 
     const data = (await api(`/api/bot-rooms/${room.id}${path}`, init)) as {
       room: Room;
     };
-    await open(data.room);
-    await load();
+    setRoom(data.room);
+    if (!selectedRoomId) {
+      await open(data.room);
+      await load();
+    }
+  };
+  const saveSettings = async () => {
+    if (!room) return;
+    await modify(
+      "",
+      json(
+        {
+          title: room.title,
+          hostBotId: room.hostBotId,
+          maxBotTurns: room.maxBotTurns,
+          maxToolCalls: room.maxToolCalls,
+          maxCostUsd: room.maxCostUsd,
+        },
+        "PATCH",
+      ),
+    );
+    setSaved(true);
+  };
+  const editRoom = (next: Room) => {
+    setSaved(false);
+    setRoom(next);
   };
   return (
     <section className="ag-panel" data-testid="bot-rooms">
-      <h3>{t("botWork.rooms")}</h3>
+      {selectedRoomId ? null : <h3>{t("botWork.rooms")}</h3>}
       <Feedback {...action} />
       {selectedRoomId ? <GroupReplyModeControl roomId={selectedRoomId} /> : null}
       {!selectedRoomId && <>
@@ -259,19 +286,72 @@ export function BotRooms({ bots, selectedRoomId, memberEditor = true }: { bots: 
       </>}
       {room && (
         <div>
-          <h4 data-testid="room-selected-title">{room.title}</h4>
-          <label>{t('botWork.title')}<input value={room.title} onChange={e=>setRoom({...room,title:e.target.value})}/></label>
-          <label>{t('botWork.host')}<select value={room.hostBotId} onChange={e=>setRoom({...room,hostBotId:e.target.value})}>{room.botIds.map(id=><option key={id} value={id}>{bots.find(b=>b.id===id)?.name??id}</option>)}</select></label>
+          {selectedRoomId ? null : <h4 data-testid="room-selected-title">{room.title}</h4>}
+          <form
+            data-testid="room-settings-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void action.run(saveSettings);
+            }}
+          >
+            <label>{t('botWork.title')}<input data-testid="room-settings-title" value={room.title} onChange={e=>editRoom({...room,title:e.target.value})}/></label>
+            <label>{t('botWork.host')}<select value={room.hostBotId} onChange={e=>editRoom({...room,hostBotId:e.target.value})}>{room.botIds.map(id=><option key={id} value={id}>{bots.find(b=>b.id===id)?.name??id}</option>)}</select></label>
+            <div className="play-group-settings-save">
+              <button type="submit" data-testid="room-save" disabled={action.busy}>
+                {t("common.save")}
+              </button>
+              {saved ? <p role="status">{t("play.groupSettings.saved")}</p> : null}
+            </div>
+            <label>
+              {t("botWork.budget")}
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={room.maxBotTurns}
+                onChange={(e) =>
+                  editRoom({ ...room, maxBotTurns: Number(e.target.value) })
+                }
+              />
+            </label>
+            <label>
+              {t("botWork.maxToolCalls")}
+              <input
+                type="number"
+                min={1}
+                max={10000}
+                value={room.maxToolCalls ?? 100}
+                onChange={(e) =>
+                  editRoom({ ...room, maxToolCalls: Number(e.target.value) })
+                }
+              />
+            </label>
+            <label>
+              {t("botWork.maxCostUsd")}
+              <input
+                type="number"
+                min={0.001}
+                max={1000}
+                step="any"
+                value={room.maxCostUsd ?? 1}
+                onChange={(e) =>
+                  editRoom({ ...room, maxCostUsd: Number(e.target.value) })
+                }
+              />
+            </label>
+          </form>
           <p data-testid="room-status">
             <Status value={room.status} />
           </p>
           <button
+            type="button"
             disabled={action.busy}
             onClick={() => void action.run(() => open(room))}
           >
             {t("botWork.refresh")}
           </button>
           <button
+            type="button"
             data-testid="room-stop"
             disabled={action.busy}
             onClick={() =>
@@ -281,6 +361,7 @@ export function BotRooms({ bots, selectedRoomId, memberEditor = true }: { bots: 
             {t("botWork.stop")}
           </button>
           <button
+            type="button"
             disabled={action.busy}
             onClick={() =>
               void action.run(() => modify("/resume", { method: "POST" }))
@@ -288,63 +369,6 @@ export function BotRooms({ bots, selectedRoomId, memberEditor = true }: { bots: 
           >
             {t("botWork.resume")}
           </button>
-          <label>
-            {t("botWork.budget")}
-            <input
-              type="number"
-              min={1}
-              max={20}
-              value={room.maxBotTurns}
-              onChange={(e) =>
-                setRoom({ ...room, maxBotTurns: Number(e.target.value) })
-              }
-            />
-          </label>
-          <button
-            disabled={action.busy}
-            onClick={() =>
-              void action.run(() =>
-                modify(
-                  "",
-                  json(
-                    {
-                      title:room.title,hostBotId:room.hostBotId,maxBotTurns: room.maxBotTurns,
-                      maxToolCalls: room.maxToolCalls,
-                      maxCostUsd: room.maxCostUsd,
-                    },
-                    "PATCH",
-                  ),
-                ),
-              )
-            }
-          >
-            {t("botWork.save")}
-          </button>
-          <label>
-            {t("botWork.maxToolCalls")}
-            <input
-              type="number"
-              min={1}
-              max={10000}
-              value={room.maxToolCalls ?? 100}
-              onChange={(e) =>
-                setRoom({ ...room, maxToolCalls: Number(e.target.value) })
-              }
-            />
-          </label>
-          <label>
-            {t("botWork.maxCostUsd")}
-            <input
-              type="number"
-              min={0.001}
-              max={1000}
-              step="any"
-              value={room.maxCostUsd ?? 1}
-              onChange={(e) =>
-                setRoom({ ...room, maxCostUsd: Number(e.target.value) })
-              }
-            />
-          </label>
           {memberEditor ? <>
           <ul>
             {room.botIds.map((id) => (
@@ -380,6 +404,7 @@ export function BotRooms({ bots, selectedRoomId, memberEditor = true }: { bots: 
               ))}
           </select>
           <button
+            type="button"
             disabled={action.busy || !newMember}
             onClick={() =>
               void action.run(() =>
@@ -387,7 +412,7 @@ export function BotRooms({ bots, selectedRoomId, memberEditor = true }: { bots: 
               )
             }
           >
-            {t("botWork.save")}
+            {t("play.group.add")}
           </button>
           </> : null}
           {cursor != null && (
