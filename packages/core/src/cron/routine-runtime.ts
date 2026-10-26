@@ -1,3 +1,4 @@
+import {SourceLedger} from '../learning/sources.js';
 import { factFingerprint, notificationDecision, localNotificationDay } from './notification-decision.js';
 import { latestCheckpoint } from '../session/checkpoint.js';
 import { decideRecovery } from '../session/durable-recovery.js';
@@ -513,7 +514,7 @@ function claimBotMainSession(host:RoutineRuntimeHost,runs:RoutineRunStore,run:Ro
  host.store.db.exec('BEGIN IMMEDIATE');
  try{
   if(!lease.renew() || (run.attempt===1&&!new RoutineHealthStore(host.store).allows(run.job))){host.store.db.exec('ROLLBACK');return undefined;}
-  if(append){host.store.appendMessage(parent.id,'user',[textPart(routinePromptText(run))],{key:`routine:${run.id}`});stampSessionWake(host.store,parent.id,{kind:'unattended',source:'routine'});}
+  if(append){const message=host.store.appendMessage(parent.id,'user',[textPart(routinePromptText(run))],{key:`routine:${run.id}`});new SourceLedger(host.store).record(parent.id,{kind:run.job.scheduleKind==='event'?'event':'routine',ref:run.id,messageId:message.id,label:run.job.name});stampSessionWake(host.store,parent.id,{kind:'unattended',source:'routine'});}
   if(!runs.claim(run.id,parent.id)){host.store.db.exec('ROLLBACK');return undefined;}
   host.store.db.exec('COMMIT');return parent;
  }catch(error){host.store.db.exec('ROLLBACK');throw error;}
@@ -524,8 +525,8 @@ function dispatchBotMain(host:RoutineRuntimeHost,runs:RoutineRunStore,run:Routin
  if(botSessionTalking(host,parent,reserved)){
   const key=run.steerKey??`routine:${run.id}`;
   if(!run.steerKey){
-   const ack=enqueueSteer(host.store,parent.id,routinePromptText(run),{key,role:'user'});
-   if(ack.status!=='not_submitted')runs.update(run.id,{steerKey:key});
+   const ack=enqueueSteer(host.store,parent.id,routinePromptText(run),{key,role:'user',source:run.job.scheduleKind==='event'?'event':'routine'});
+   if(ack.status!=='not_submitted')runs.update(run.id,{steerKey:ack.item.key??key});
   }
   return 'parked';
  }
@@ -550,7 +551,7 @@ function claimRoutineSession(host:RoutineRuntimeHost,runs:RoutineRunStore,run:Ro
   if(!lease.renew() || (run.attempt===1&&!new RoutineHealthStore(host.store).allows(run.job))){host.store.db.exec('ROLLBACK');return undefined;}
   const session=host.store.createSession({title:`Routine: ${run.job.name}`,mode:'chat',agentId:parent.agentId,background:false,metadata:routineWorkMetadata(host,parent,run)});
   if(!runs.claim(run.id,session.id)){host.store.db.exec('ROLLBACK');return undefined;}
-  host.store.appendMessage(session.id,'user',[textPart(routinePromptText(run))]);stampSessionWake(host.store,session.id,{kind:'unattended',source:'routine'});host.store.db.exec('COMMIT');return session;
+  const message=host.store.appendMessage(session.id,'user',[textPart(routinePromptText(run))]);new SourceLedger(host.store).record(session.id,{kind:run.job.scheduleKind==='event'?'event':'routine',ref:run.id,messageId:message.id,label:run.job.name});stampSessionWake(host.store,session.id,{kind:'unattended',source:'routine'});host.store.db.exec('COMMIT');return session;
  }catch(error){host.store.db.exec('ROLLBACK');throw error;}
 }
 function busyRoutines(runs:RoutineRunStore,all:RoutineRun[],executing:Set<string>):Set<string>{

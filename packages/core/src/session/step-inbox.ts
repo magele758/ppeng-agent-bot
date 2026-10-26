@@ -3,6 +3,7 @@ import type { TextPart } from '@ppeng/api-types';
 import { DatabaseSync } from 'node:sqlite';
 import { createId, nowIso } from '../id.js';
 import { applyInboxOverflow, resolveInboxOverflowCap } from './inbox-overflow.js';
+import { ValidationError } from '../errors.js';
 import type { SteerInterruptPolicy } from './steer-interrupt.js';
 
 export type InboxTarget = 'next-step' | 'next-run';
@@ -17,6 +18,7 @@ export interface InboxItem {
   contextParts?: TextPart[];
   replyTo?: MessageReplyTo;
   key?: string;
+  source?: 'user' | 'event' | 'routine' | 'subagent';
   createdAt: string;
   claimedAt?: string;
 }
@@ -29,6 +31,7 @@ export interface EnqueueSteerOptions {
   replyTo?: MessageReplyTo;
   target?: InboxTarget;
   key?: string;
+  source?: 'user' | 'event' | 'routine' | 'subagent';
   role?: InboxRole;
   /** prompt = inbox only (default). subagent = spawn parallel child. */
   steerMode?: SteerMode;
@@ -49,7 +52,7 @@ export class StepInboxStore {
 
   private ensureContextColumn(): void {
     if (this.contextColumnReady) return;
-    for (const column of ['context_parts_json','reply_to_json']) {
+    for (const column of ['context_parts_json','reply_to_json','source','decision','merged_into']) {
       const hasColumn = () => (this.db.prepare('PRAGMA table_info(session_inbox)').all() as Array<{ name: string }>).some(item => item.name === column);
       if (!hasColumn()) {
         try { this.db.exec(`ALTER TABLE session_inbox ADD COLUMN ${column} TEXT`); }
@@ -87,6 +90,7 @@ export class StepInboxStore {
    * without being applied.
    */
   claim(sessionId: string, target: InboxTarget): InboxItem[] {
+    this.ensureContextColumn();
     const rows = this.db
       .prepare(
         `SELECT * FROM session_inbox
@@ -104,15 +108,19 @@ export class StepInboxStore {
         unkeyed.push(item);
         continue;
       }
-      const prev = latestByKey.get(item.key);
+      const prev = latestByKey.get((item.source??'user')+':'+item.key);
       if (prev) keyedSkipped.push(prev);
-      latestByKey.set(item.key, item);
+      latestByKey.set((item.source??'user')+':'+item.key, item);
     }
 
     const claimedAt = nowIso();
-    const apply = [...unkeyed, ...latestByKey.values()].sort(
-      (a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id)
-    );
+    const config=this.settings(sessionId);
+    const scoreAt=Date.now();
+    const score=(i:InboxItem)=>(i.source==='user'?100:20)+Math.floor(Math.max(0,scoreAt-Date.parse(i.createdAt))/config.agingSeconds/1000)*10;
+    const ordered = [...unkeyed, ...latestByKey.values()].sort((a,b)=>score(b)-score(a)||a.createdAt.localeCompare(b.createdAt));
+    const apply = ordered.filter(item=>score(item)===score(ordered[0]!)).slice(0,config.batchSize);
+    for(const item of keyedSkipped)this.db.prepare('UPDATE session_inbox SET decision=?,merged_into=? WHERE id=?').run('coalesced',latestByKey.get((item.source??'user')+':'+item.key)!.id,item.id);
+    for(const item of apply)this.db.prepare('UPDATE session_inbox SET decision=? WHERE id=?').run('applied',item.id);
     const mark = this.db.prepare(`UPDATE session_inbox SET claimed_at = ? WHERE id = ?`);
     for (const item of [...apply, ...keyedSkipped]) {
       mark.run(claimedAt, item.id);
@@ -122,6 +130,7 @@ export class StepInboxStore {
   }
 
   listUnclaimed(sessionId: string): InboxItem[] {
+    this.ensureContextColumn();
     const rows = this.db
       .prepare(
         `SELECT * FROM session_inbox
@@ -171,13 +180,14 @@ export class StepInboxStore {
       text,
       contextParts: opts.contextParts,
       replyTo: opts.replyTo,
-      key: opts.key,
+      key: opts.key&&opts.source&&opts.source!=='user'?`source:${opts.source}:${opts.key}`:opts.key,
+      source: opts.source??'user',
       createdAt: nowIso()
     };
     this.db
       .prepare(
-        `INSERT INTO session_inbox (id, session_id, target, role, text, key, created_at, context_parts_json, reply_to_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO session_inbox (id, session_id, target, role, text, key, created_at, context_parts_json, reply_to_json, source)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         item.id,
@@ -188,10 +198,15 @@ export class StepInboxStore {
         item.key ?? null,
         item.createdAt,
         item.contextParts?.length ? JSON.stringify(item.contextParts) : null,
-        item.replyTo ? JSON.stringify(item.replyTo) : null
+        item.replyTo ? JSON.stringify(item.replyTo) : null,
+        item.source??'user'
       );
     return item;
   }
+
+  settings(sessionId:string):{batchSize:number;agingSeconds:number}{return this.controlStore().getDaemonControl('queue-policy:'+sessionId) as {batchSize:number;agingSeconds:number}??{batchSize:32,agingSeconds:60};}
+  configure(sessionId:string,raw:Record<string,unknown>){const {batchSize,agingSeconds}=raw;if(!Number.isInteger(batchSize)||Number(batchSize)<1||Number(batchSize)>100||!Number.isInteger(agingSeconds)||Number(agingSeconds)<1||Number(agingSeconds)>3600)throw new ValidationError('Invalid queue settings');this.db.prepare('INSERT INTO daemon_control(key,value_json,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json,updated_at=excluded.updated_at').run('queue-policy:'+sessionId,JSON.stringify({batchSize,agingSeconds}),nowIso());return this.settings(sessionId);}
+  history(sessionId:string){this.ensureContextColumn();return this.db.prepare('SELECT * FROM session_inbox WHERE session_id=? ORDER BY rowid DESC LIMIT 100').all(sessionId).map(row=>({...mapInboxRow(row),decision:row.decision??'pending',mergedInto:row.merged_into??null,reason:row.source==='user'||!row.source?'direct_input':'background_with_aging'}));}
 
   /** Best-effort read of daemon_control KV (missing table → unlimited cap). */
   private controlStore(): { getDaemonControl(key: string): unknown } {
@@ -223,6 +238,7 @@ function mapInboxRow(row: Record<string, unknown>): InboxItem {
     replyTo: row.reply_to_json ? JSON.parse(String(row.reply_to_json)) as MessageReplyTo : undefined,
     text: String(row.text),
     key,
+    source: (row.source??'user') as InboxItem['source'],
     createdAt: String(row.created_at),
     claimedAt
   };
