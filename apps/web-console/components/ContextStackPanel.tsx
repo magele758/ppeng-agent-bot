@@ -1,4 +1,5 @@
 'use client';
+import {LearningWorkbench} from './LearningWorkbench';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SessionReliability } from './SessionReliability';
@@ -560,6 +561,7 @@ export function ContextStackPanel({
   return (
     <div className="context-stack">
       {sessionId&&<SessionReliability key={sessionId} sessionId={sessionId}/>}
+      {sessionId&&<LearningWorkbench key={`learning-${sessionId}`} sessionId={sessionId}/>}
       <div className="context-stack__head">
         <p className="context-stack__hint">{t('play.contextStack.hint')}</p>
         <button type="button" className="btn btn-ghost btn-sm" onClick={() => void load()} disabled={!sessionId || loading}>

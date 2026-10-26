@@ -1,4 +1,5 @@
 'use client';
+import {CorrectionCapture} from './LearningWorkbench';
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { SystemMessageContent } from './SystemMessageContent';
@@ -526,6 +527,7 @@ export function ChatTurnFromMessage({
       <div className="chat-turn__content">
         <div className="chat-turn__label">
           {roleLabel(r, t)}
+          {r==='assistant'&&sessionId&&replyMessageId(m)&&<CorrectionCapture sessionId={sessionId} messageId={replyMessageId(m)}/>}
           {onQuote && quoteBot ? (
             <BotReplyQuoteAction
               reply={{

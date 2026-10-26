@@ -164,3 +164,5 @@
 - 改 SDK 契约：同步 `skills/agent-loop/SKILL.md`；以源码、类型与对应测试核验，不能把计划中的功能直接标为已实现。
 
 - [工厂独立合入 App 配置](FACTORY_MERGE_APP_SETUP.md)：单仓最小权限、服务端目标限制与原机凭据引用。
+
+- [纠错评测、技能验证与来源治理](AGENT_LEARNING_GOVERNANCE.md) — Lab 学习面板、隔离回放、版本恢复和优先级输入队列。

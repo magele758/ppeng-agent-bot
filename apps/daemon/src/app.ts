@@ -1,3 +1,4 @@
+import {learningRoutes} from './routes/learning.js';
 import { toolExposureRoutes } from './routes/tool-exposure.js';
 import { factoryRoutes } from './routes/factory.js';
 import { botRoomsRoutes } from './routes/bot-rooms.js';
@@ -106,6 +107,7 @@ export function buildDaemonRouter(deps: DaemonAppDeps): Router {
     .addAll(loopRoutes(runtime))
     .addAll(inputSuggestionRoutes(runtime))
     .addAll(compactRoutes(runtime))
+    .addAll(learningRoutes(runtime))
     .addAll(gatewaySettingsRoutes(runtime))
     .addAll(tasksRoutes(runtime))
     .addAll(externalAgentRoutes(runtime))

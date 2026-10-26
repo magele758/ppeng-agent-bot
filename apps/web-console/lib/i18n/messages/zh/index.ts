@@ -1,3 +1,4 @@
+import { learning } from './learning.ts';
 import { mobile } from './mobile.ts';
 import { goals } from './goals.ts';
 import { polish } from './polish.ts';
@@ -23,6 +24,7 @@ import { skillProposals } from './skillProposals.ts';
 import { teams } from './teams.ts';
 
 export const zh = {
+  learning,
   mobile,
   goals,
   polish,
