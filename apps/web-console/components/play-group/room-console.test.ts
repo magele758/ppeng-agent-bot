@@ -83,7 +83,7 @@ test('超过 6 人时主聊天区不铺成员卡，打开后可搜索并整组�
   assert.match(chat, /data-testid="play-group-member-summary"/);
   assert.match(chat, /data-testid="play-group-members-open"/);
   assert.match(chat, /data-testid="play-group-speaking"/);
-  assert.match(chat, /memberEditor=\{!crowded\}/);
+  assert.match(chat, /memberEditor=\{false\}/);
   const summaryAt = chat.indexOf('data-testid="play-group-member-summary"');
   const tileAt = chat.indexOf('className="play-group-member"');
   assert.ok(summaryAt > 0 && tileAt > summaryAt);
@@ -94,18 +94,18 @@ test('超过 6 人时主聊天区不铺成员卡，打开后可搜索并整组�
   assert.match(drawer, /play-group-remove-group-/);
 });
 
-test('输入 @ 能看到职能组，并按职责或头衔找到名字不同的 Bot [AC:bot-room-console#AC-2]', () => {
+test('输入 @ 只显示群成员，并按职责或头衔找到名字不同的 Bot [AC:bot-room-console#AC-2]', () => {
   const inRoom = new Set(bots.map((bot) => bot.id));
-  const open = mentionChoices(bots, groups, '', inRoom);
-  assert.equal(open[0]?.kind, 'group');
-  assert.equal(open.some((item) => item.kind === 'group' && item.name === '架构组'), true);
-  assert.equal(open.find((item) => item.id === 'arch')?.insert, 'Ada @Cee');
-  const byDuty = mentionChoices(bots, groups, '数据库', inRoom);
+  const open = mentionChoices(bots, [], '', inRoom);
+  assert.equal(open.every((item) => item.kind === 'bot'), true);
+  assert.equal(open.some((item) => item.name === '架构组'), false);
+  assert.match(chat, /mentionChoices\(mentionRoster, \[\], mention.query/);
+  const byDuty = mentionChoices(bots, [], '数据库', inRoom);
   const found = byDuty.find((item) => item.id === 'orion');
   assert.equal(found?.kind, 'bot');
   assert.equal(found?.name, 'Orion');
   assert.equal(found?.name.includes('数据库'), false);
-  const byTitle = mentionChoices(bots, groups, 'dba', inRoom);
+  const byTitle = mentionChoices(bots, [], 'dba', inRoom);
   assert.equal(byTitle.some((item) => item.id === 'orion'), true);
   assert.match(chat, /mentionChoices/);
   assert.match(chat, /option\.insert/);
