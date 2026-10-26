@@ -26,11 +26,12 @@ test('actual work switches list idle motion to continuous work and back across r
  await expect(page.locator('.chat-panel-header--bot [data-face-mood]')).toHaveAttribute('data-face-working','false');
  await page.reload();await expect(face(a.name)).toHaveAttribute('data-face-working','true');
  await page.getByRole('button',{name:'打开群聊 Working state probe',exact:true}).click();
- await expect(page.getByTestId(`room-member-face-${a.id}`)).toHaveAttribute('data-face-working','true');
- await expect(page.getByTestId(`room-member-face-${b.id}`)).toHaveAttribute('data-face-working','false');
+ await expect(page.getByTestId(`room-working-face-${a.id}`)).toHaveAttribute('data-face-working','true');
+ await expect(page.getByTestId(`room-working-face-${b.id}`)).toHaveCount(0);
  counts={};await expect(face(a.name)).toHaveAttribute('data-face-working','false');
- await expect(page.getByTestId(`room-member-face-${a.id}`)).toHaveAttribute('data-face-working','false');
+ await expect(page.getByTestId('room-working-members')).toHaveCount(0);
  await expect(bob).toHaveCSS('animation-name','bot-face-idle-body');
+ await page.getByRole('button', { name: '群聊设置', exact: true }).click();
  const member=page.getByTestId(`room-member-face-${a.id}`).locator('[data-bob]');
  const stillA=await member.getAttribute('transform');await page.waitForTimeout(420);expect(await member.getAttribute('transform')).toEqual(stillA);
  await expect(member).toHaveCSS('animation-name','none');

@@ -407,3 +407,12 @@
 .play-group-mode-guide h4 { font-size: 13px; margin: 0 0 6px; }
 .play-group-mode-guide p { margin: 6px 0; }
 .play-group-mode-guide__use, .room-settings-grid small { color: var(--text-muted); font-size: 12px; line-height: 1.6; }
+
+.play-group-working { display: flex; flex: 0 0 auto; align-items: center; gap: 14px; padding: 6px 16px; overflow-x: auto; border-bottom: 1px solid var(--ui-border); }
+.play-group-working__member { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; min-width: 0; font-size: 12px; color: var(--text-muted); }
+.play-group-working__member > .bot-face { width: 22px; height: 22px; flex: 0 0 22px; }
+.play-group-working__name { max-width: 100px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.play-group-settings-members { padding: 16px 20px; border-top: 1px solid var(--ui-border); }
+.play-group-settings-members > h3 { margin: 0 0 12px; font-size: 14px; }
+.play-group-settings-members .play-group-members, .play-group-settings-members .play-group-drawer { padding: 0; border: 0; max-height: none; overflow: visible; }
+.play-group-settings-members > [data-testid="room-shared-context"] { margin-top: 16px; }

@@ -5,6 +5,7 @@ owner: user
 requirement: |
   最好加个特性，如果bot在干活，他就表情和动作一直在动，如果没干活再静止
 notes: |
+  2026-10-26 群聊顶部按 group-active-header 仅展示工作中成员；空闲头像仍可在设置内成员列表查看。assumedApproval: standing-order-2026-10-22。
   按已批准 bot-list-idle-motion 更新：列表待机播放轻动作，其他位置空闲静止，以真实工作状态决定工作动画。
   思考、生成回复、执行工具和等待工具结果均属于工作中；仅排队、暂停或等待人工审批不算正在执行。
   用户切换会话不改变 Bot 的实际工作状态。

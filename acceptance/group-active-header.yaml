@@ -1,0 +1,19 @@
+id: group-active-header
+title: 群聊顶部仅显示工作中的成员
+status: implemented
+requirement: |
+  这里还是太重了，添加、移除和成员列表放到群聊设置里，顶部只显示正在working的bot的icon和小名称即可
+notes: 'assumedApproval: standing-order-2026-10-22；成员管理与共享信息迁入群聊设置；更新此前的成员展示位置标准。'
+criteria:
+  - id: AC-1
+    given: 群聊含工作中和空闲成员
+    when: 设置关闭且成员工作状态变化
+    then: 顶部仅显示工作中群成员的小头像和短名称，空闲及群外成员不显示，全部空闲时不占位
+  - id: AC-2
+    given: 用户打开群聊设置
+    when: 查看成员或执行添加与移除
+    then: 完整名单、添加、移除及共享信息都在设置内，操作成功后名单刷新，至少保留两名成员，失败时显示错误
+  - id: AC-3
+    given: 群聊超过六名成员
+    when: 查看顶部并打开群聊设置
+    then: 顶部仍不铺名单，设置内可搜索和按功能分组管理成员

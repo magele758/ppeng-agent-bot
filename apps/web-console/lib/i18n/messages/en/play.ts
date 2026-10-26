@@ -273,6 +273,7 @@ export const play = {
     older: 'Older messages',
     attachmentCount: '{count} attachments',
     memberCount: '{count} members',
+    workingMembers: 'Working group members',
     manageMembers: 'Members',
     membersDrawer: 'Group members',
     membersSearch: 'Search members or functional groups',
