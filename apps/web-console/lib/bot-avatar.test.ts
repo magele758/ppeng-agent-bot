@@ -66,6 +66,45 @@ test('create payload omits blank optional fields and prefers the image', () => {
   }).faceStyle, 'soft');
 });
 
+test('未手选的软萌项按名字预览写入，保存后换 bot id 也不会改脸 [AC:bot-face-soft-style#AC-2]', async () => {
+  const { softBotFaceFromSeed } = await import('./soft-bot-face.ts');
+  const preview = softBotFaceFromSeed('Ada');
+  assert.deepEqual(
+    buildBotCreatePayload({
+      name: '  Ada  ',
+      title: '',
+      description: '',
+      emoji: '',
+      imageUrl: '',
+      face: { shape: null, color: null, style: 'soft', expression: null }
+    }),
+    {
+      name: 'Ada',
+      faceShape: preview.silhouette,
+      faceColor: preview.color,
+      faceStyle: 'soft',
+      faceExpression: preview.expression
+    }
+  );
+  const partial = buildBotCreatePayload({
+    name: 'Ada',
+    title: '',
+    description: '',
+    emoji: '',
+    imageUrl: '',
+    face: { shape: 'capsule', color: null, style: 'soft', expression: null }
+  });
+  assert.equal(partial.faceShape, 'capsule');
+  assert.equal(partial.faceColor, softBotFaceFromSeed('Ada', { silhouette: 'capsule' }).color);
+  assert.equal(partial.faceExpression, softBotFaceFromSeed('Ada').expression);
+  assert.equal(
+    buildBotCreatePayload({
+      name: 'Ada', title: '', description: '', emoji: '', imageUrl: '', face: { shape: null, color: 'red', style: 'classic' }
+    }).faceShape,
+    undefined
+  );
+});
+
 test('create form blocks on the first problem and unwraps either response shape', () => {
   assert.equal(botCreateBlock('empty', null), 'name-empty');
   assert.equal(botCreateBlock('taken', 'invalid'), 'name-taken');

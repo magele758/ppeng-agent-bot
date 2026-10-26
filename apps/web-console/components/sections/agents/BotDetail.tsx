@@ -5,6 +5,7 @@ import { BotDetailSkills } from '../../BotDetailSkills';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { detailFaceProps, isBotFaceColor, isBotFaceShape, readBotFaceStyle, type BotFaceColor, type BotFaceShape, type BotFaceStyle } from '@/lib/bot-face';
+import { createFaceSaveQueue, type FaceSaveKind } from '@/lib/bot-face-save';
 import {
   isSoftBotColor,
   isSoftBotExpression,
@@ -62,6 +63,7 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
   const [softExpression, setSoftExpression] = useState<SoftBotExpression | null>(
     isSoftBotExpression(bot.faceExpression) ? bot.faceExpression : null
   );
+  const faceNow = useRef({ shape, color, style, softShape, softColor, softExpression });
   const generations = useRef(createGenerationGuard());
   const [activeBotId, setActiveBotId] = useState(bot.id);
   const [sessionId, setSessionId] = useState(() => selectionForBot(bot).sessionId);
@@ -146,12 +148,21 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
   );
 
   useEffect(() => {
-    setShape(isBotFaceShape(bot.faceShape) ? bot.faceShape : null);
-    setColor(isBotFaceColor(bot.faceColor) ? bot.faceColor : null);
-    setStyle(readBotFaceStyle(bot.faceStyle));
-    setSoftShape(isSoftBotSilhouette(bot.faceShape) ? bot.faceShape : null);
-    setSoftColor(isSoftBotColor(bot.faceColor) ? bot.faceColor : null);
-    setSoftExpression(isSoftBotExpression(bot.faceExpression) ? bot.faceExpression : null);
+    const next = {
+      shape: isBotFaceShape(bot.faceShape) ? bot.faceShape : null,
+      color: isBotFaceColor(bot.faceColor) ? bot.faceColor : null,
+      style: readBotFaceStyle(bot.faceStyle),
+      softShape: isSoftBotSilhouette(bot.faceShape) ? bot.faceShape : null,
+      softColor: isSoftBotColor(bot.faceColor) ? bot.faceColor : null,
+      softExpression: isSoftBotExpression(bot.faceExpression) ? bot.faceExpression : null
+    };
+    setShape(next.shape);
+    setColor(next.color);
+    setStyle(next.style);
+    setSoftShape(next.softShape);
+    setSoftColor(next.softColor);
+    setSoftExpression(next.softExpression);
+    faceNow.current = next;
   }, [bot.id, bot.faceColor, bot.faceExpression, bot.faceShape, bot.faceStyle]);
 
   useEffect(() => {
@@ -205,16 +216,13 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
     [bot.id, load, upsertBot]
   );
 
+  const faceSave = useRef(createFaceSaveQueue(() => faceNow.current));
   const saveFace = useCallback(
-    async (patch: {
-      faceShape?: string | null;
-      faceColor?: string | null;
-      faceStyle?: BotFaceStyle | null;
-      faceExpression?: SoftBotExpression | null;
-    }) => {
+    async (kind: FaceSaveKind) => {
+      const turn = faceSave.current(kind, (patch) => patchBot(patch()));
       setError(null);
       try {
-        await patchBot(patch);
+        await turn;
       } catch (err) {
         setError(
           t('agents.bots.faceSaveFailed', { error: err instanceof Error ? err.message : String(err) })
@@ -299,43 +307,57 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
         softColor={softColor}
         softExpression={softExpression}
         onStyle={(next) => {
-          const previous = style;
-          const saved = next === 'classic' ? null : 'soft';
+          const previous = faceNow.current.style;
+          const saved: BotFaceStyle | null = next === 'classic' ? null : 'soft';
+          const snap = { ...faceNow.current, style: saved };
+          faceNow.current = snap;
           setStyle(saved);
-          void saveFace({
-            faceStyle: saved,
-            ...(saved === 'soft'
-              ? { faceShape: softShape, faceColor: softColor, faceExpression: softExpression }
-              : { faceShape: shape, faceColor: color, faceExpression: null })
-          }).catch(() => setStyle(previous));
+          void saveFace('style').catch(() => {
+            if (faceNow.current.style === saved) setStyle(previous);
+          });
         }}
         onShape={(next) => {
-          const previous = shape;
+          const previous = faceNow.current.shape;
+          faceNow.current = { ...faceNow.current, shape: next };
           setShape(next);
-          void saveFace({ faceShape: next, faceStyle: 'classic' }).catch(() => setShape(previous));
+          void saveFace('shape').catch(() => {
+            if (faceNow.current.shape === next) setShape(previous);
+          });
         }}
         onColor={(next) => {
-          const previous = color;
+          const previous = faceNow.current.color;
+          faceNow.current = { ...faceNow.current, color: next };
           setColor(next);
-          void saveFace({ faceColor: next, faceStyle: 'classic' }).catch(() => setColor(previous));
+          void saveFace('color').catch(() => {
+            if (faceNow.current.color === next) setColor(previous);
+          });
         }}
         onSoftSilhouette={(next) => {
-          const previous = softShape;
+          const previous = faceNow.current.softShape;
+          faceNow.current = { ...faceNow.current, softShape: next, style: 'soft' };
           setSoftShape(next);
           setStyle('soft');
-          void saveFace({ faceStyle: 'soft', faceShape: next }).catch(() => setSoftShape(previous));
+          void saveFace('soft-shape').catch(() => {
+            if (faceNow.current.softShape === next) setSoftShape(previous);
+          });
         }}
         onSoftColor={(next) => {
-          const previous = softColor;
+          const previous = faceNow.current.softColor;
+          faceNow.current = { ...faceNow.current, softColor: next, style: 'soft' };
           setSoftColor(next);
           setStyle('soft');
-          void saveFace({ faceStyle: 'soft', faceColor: next }).catch(() => setSoftColor(previous));
+          void saveFace('soft-color').catch(() => {
+            if (faceNow.current.softColor === next) setSoftColor(previous);
+          });
         }}
         onSoftExpression={(next) => {
-          const previous = softExpression;
+          const previous = faceNow.current.softExpression;
+          faceNow.current = { ...faceNow.current, softExpression: next, style: 'soft' };
           setSoftExpression(next);
           setStyle('soft');
-          void saveFace({ faceStyle: 'soft', faceExpression: next }).catch(() => setSoftExpression(previous));
+          void saveFace('soft-expression').catch(() => {
+            if (faceNow.current.softExpression === next) setSoftExpression(previous);
+          });
         }}
       />
 

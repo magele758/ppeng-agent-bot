@@ -3,6 +3,8 @@
  * Blank means "keep the geometric face". The daemon repeats this check.
  */
 
+import { isSoftBotColor, isSoftBotExpression, isSoftBotSilhouette, softBotFaceFromSeed } from './soft-bot-face.ts';
+
 export const BOT_AVATAR_EMOJIS = [
   '🤖',
   '✨',
@@ -96,15 +98,34 @@ function withOptional<T extends object>(body: T, key: string, value: string | nu
   return { ...body, [key]: value };
 }
 
-/** Body for POST /api/bots. Blank optional fields are omitted. */
+/**
+ * Body for POST /api/bots. Blank optional fields are omitted.
+ * A soft face with a blank axis stores the look the name preview already showed,
+ * so the saved bot id cannot redraw that axis later.
+ */
 export function buildBotCreatePayload(fields: BotCreateFields): BotCreatePayload {
   const named = withOptional({ name: fields.name.trim() }, 'title', optionalText(fields.title));
   const described = withOptional(named, 'description', optionalText(fields.description));
-  const faced = withOptional(described, 'faceShape', fields.face.shape);
-  const colored = withOptional(faced, 'faceColor', fields.face.color);
-  const styled = withOptional(colored, 'faceStyle', fields.face.style === 'soft' ? 'soft' : null);
-  const expressed = withOptional(styled, 'faceExpression', fields.face.style === 'soft' ? fields.face.expression : null);
+  const face = fields.face.style === 'soft' ? softCreateFace(fields.name, fields.face) : fields.face;
+  const faced = withOptional(described, 'faceShape', face.shape);
+  const colored = withOptional(faced, 'faceColor', face.color);
+  const styled = withOptional(colored, 'faceStyle', face.style === 'soft' ? 'soft' : null);
+  const expressed = withOptional(styled, 'faceExpression', face.style === 'soft' ? face.expression : null);
   return withOptional(expressed, 'avatar', botAvatarValue(fields.emoji, fields.imageUrl));
+}
+
+function softCreateFace(name: string, face: BotCreateFace): BotCreateFace {
+  const seeded = softBotFaceFromSeed(name.trim(), {
+    silhouette: isSoftBotSilhouette(face.shape) ? face.shape : null,
+    color: isSoftBotColor(face.color) ? face.color : null,
+    expression: isSoftBotExpression(face.expression) ? face.expression : null
+  });
+  return {
+    shape: face.shape || seeded.silhouette,
+    color: face.color || seeded.color,
+    style: 'soft',
+    expression: face.expression || seeded.expression
+  };
 }
 
 /** The daemon may return `{ bot }` or the bot itself. */

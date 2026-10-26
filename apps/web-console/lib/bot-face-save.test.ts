@@ -1,0 +1,55 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { createFaceSaveQueue, facePatch, type FaceDraft } from './bot-face-save.ts';
+
+const EMPTY: FaceDraft = {
+  shape: null,
+  color: null,
+  style: null,
+  softShape: null,
+  softColor: null,
+  softExpression: null
+};
+
+test('切换风格时带上当时的整套脸，单轴修改不带其它轴 [AC:bot-face-soft-style#AC-4]', () => {
+  const soft: FaceDraft = { ...EMPTY, style: 'soft', softShape: 'pebble', softColor: 'lilac', softExpression: 'wink' };
+  assert.deepEqual(facePatch('style', soft), {
+    faceStyle: 'soft',
+    faceShape: 'pebble',
+    faceColor: 'lilac',
+    faceExpression: 'wink'
+  });
+  assert.deepEqual(facePatch('style', { ...EMPTY, style: null, shape: 'star', color: 'red' }), {
+    faceStyle: null,
+    faceShape: 'star',
+    faceColor: 'red',
+    faceExpression: null
+  });
+  assert.deepEqual(facePatch('soft-shape', soft), { faceStyle: 'soft', faceShape: 'pebble' });
+  assert.deepEqual(facePatch('shape', { ...EMPTY, shape: 'circle' }), { faceShape: 'circle', faceStyle: 'classic' });
+});
+
+test('后一次脸保存会等前一次结束，并带上等待期间已选的轮廓 [AC:bot-face-soft-style#AC-4]', async () => {
+  let face: FaceDraft = { ...EMPTY, style: 'soft' };
+  const save = createFaceSaveQueue(() => face);
+  let releaseFirst: () => void = () => {};
+  const gate = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+  const order: string[] = [];
+  const first = save('style', async () => {
+    order.push('style-start');
+    await gate;
+    order.push('style-end');
+  });
+  face = { ...face, softShape: 'capsule' };
+  const second = save('soft-shape', async (patch) => {
+    order.push('shape');
+    assert.equal(patch().faceShape, 'capsule');
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(order, ['style-start']);
+  releaseFirst();
+  await Promise.all([first, second]);
+  assert.deepEqual(order, ['style-start', 'style-end', 'shape']);
+});
