@@ -89,6 +89,7 @@ export const play = {
     allMembers: '全员各自回复',
     allMembersHint: '每位成员各自回复',
     saveFailed: '回复方式没有保存',
+    saved: '已保存',
   },
   entry: { new: '新建', remove: '移除', removeBot: '移除 Bot「{name}」', removeBotConfirm: '移除 Bot「{name}」？它将从 Bot 列表隐藏，已有对话、群聊和任务会保留；这不会删除会话。', removeFailed: '移除失败：{error}' },
   groupModel: {
