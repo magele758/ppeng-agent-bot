@@ -1,6 +1,8 @@
 import {test,expect} from './helpers/bot-pair';
 
-test('actual work switches list idle motion to continuous work and back across refresh [AC:bot-list-idle-motion#AC-2] [AC:bot-working-animation#AC-1] [AC:bot-working-animation#AC-2] [AC:bot-working-animation#AC-3] [AC:bot-working-animation#AC-4]',async({page,botPair:bots})=>{
+test('classic actual work switches list idle motion to continuous work and back across refresh [AC:bot-list-idle-motion#AC-2] [AC:bot-working-animation#AC-1] [AC:bot-working-animation#AC-2] [AC:bot-working-animation#AC-3] [AC:bot-working-animation#AC-4]',async({page,botPair:originalBots})=>{
+ const bots=originalBots.map(bot=>({...bot,faceStyle:'classic',faceShape:'circle',faceColor:'purple',faceExpression:null,avatar:null}));
+ await page.route('**/api/bots',r=>r.fulfill({json:{bots}}));
  expect(bots.length).toBeGreaterThan(1);
  const [a,b]=bots;let counts:Record<string,number>={};let observed=-1;
  await page.route('**/api/bot-work/status',r=>{observed=counts[a.id]??0;return r.fulfill({json:{bots:bots.map((bot:{id:string})=>({bot,activeWorkCount:counts[bot.id]??0}))}});});

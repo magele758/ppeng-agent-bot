@@ -1,0 +1,19 @@
+id: bot-soft-motion
+title: 软萌头像跟随实际工作状态动起来
+status: implemented
+requirement: |
+  这种新的表情，没我原来的icon活泼，而且有动作的时候完全没动画，修复一下这个问题
+notes: 'assumedApproval: standing-order-2026-10-22；现场 Bot 111 使用 soft 风格；本次取代 bot-face-soft-style 原始需求中的静态限制，保留已选外观。'
+criteria:
+  - id: AC-1
+    given: 列表中显示空闲的软萌 Bot
+    when: 用户查看列表且未启用减少动态效果
+    then: 头像有轻微摆动、张望和眨眼，已保存脸型配色不变
+  - id: AC-2
+    given: Bot 使用软萌头像
+    when: 实际工作开始、持续、结束或页面刷新
+    then: 列表、会话顶部及群聊工作栏正确显示工作状态，工作动作持续播放，完成后恢复空闲
+  - id: AC-3
+    given: 用户启用减少动态效果或头像在后台、屏幕外
+    when: 动画显示条件变化
+    then: 减少动态效果时停止动作并保留工作提示，后台和屏幕外暂停，回到可见位置后恢复

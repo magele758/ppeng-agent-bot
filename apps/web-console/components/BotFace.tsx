@@ -387,7 +387,7 @@ export function BotFace({
     const BlobFace = faceStyle === 'bloub' ? BloubFace : SoftBotFace;
     return (
       <BlobFace
-        {...(faceStyle === 'bloub' ? { mood } : {})}
+        mood={mood}
         id={botId}
         name={name}
         silhouette={softSilhouette !== undefined ? softSilhouette : savedSoftSilhouette}

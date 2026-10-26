@@ -3,6 +3,7 @@ title: 软萌机器人脸与经典脸并存
 status: implemented
 notes: |
   assumedApproval: standing-order-2026-10-22
+  2026-10-26 用户反馈软萌头像不活泼、工作时不动；原始静态限制由 bot-soft-motion 取代，外观与风格兼容标准不变。
 requirement: |
   Add a parallel soft robot-face icon set. Do not change or replace the existing classic BotFace geometric icons, emoji, or image avatar behavior. Default must stay classic.
   Persist faceStyle as classic or soft. Null, absent, or unknown means classic.
