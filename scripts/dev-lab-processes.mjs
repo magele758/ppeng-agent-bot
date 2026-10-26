@@ -50,17 +50,33 @@ function signalGroup(child, signal) {
   }
 }
 
+export async function waitForGroupExit(child, timeoutMs, probe = groupExists) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    let denied;
+    try { if (!probe(child)) return true; }
+    catch (error) {
+      // A group can still appear in ps while macOS refuses probes during exit.
+      // Give that race the same bounded grace; persistent EPERM remains an error.
+      if (error.code !== 'EPERM') throw error;
+      denied = error;
+    }
+    if (Date.now() >= deadline) {
+      if (denied) throw denied;
+      return false;
+    }
+    await delay(Math.min(25, Math.max(1, deadline - Date.now())));
+  }
+}
+
 async function stopGroup(entry, graceMs) {
   const { child } = entry;
   if (!child.pid) return;
   // The wrapper exiting does not mean its process group is empty.
   signalGroup(child, 'SIGTERM');
-  const deadline = Date.now() + graceMs;
-  while (groupExists(child) && Date.now() < deadline) await delay(25);
-  if (groupExists(child)) {
+  if (!(await waitForGroupExit(child, graceMs))) {
     signalGroup(child, 'SIGKILL');
-    const killedDeadline = Date.now() + 1000;
-    while (groupExists(child) && Date.now() < killedDeadline) await delay(25);
+    await waitForGroupExit(child, 1000);
     // Linux may retain orphan zombies until PID 1 reaps them; they hold no ports.
   }
   await entry.done;
