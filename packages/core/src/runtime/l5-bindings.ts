@@ -1,3 +1,5 @@
+import { restoreTaskContract, type TaskContract } from '../session/task-contract.js';
+import { diagnosePrompt, type CacheDiagnostic } from '../session/cache-diagnostics.js';
 import { usesDurableBotGoals, reviewDirectGoalBeforeEnd, type GoalRuntimeHost } from '../bots/goals/runtime-host.js';
 import { completionModelView, reviewQueryOutput } from '../bots/strict-output.js';
 import { observeModelRequests } from './request-metrics.js';
@@ -679,6 +681,12 @@ function fitProductModelRequest(
   const adapter = session
     ? resolveSessionModelAdapter(rt.store, session, process.env, rt.modelAdapter)
     : rt.modelAdapter;
+  const contract = session?.metadata?.taskContract as TaskContract|undefined;
+  if(contract){
+    const restored=restoreTaskContract(input.messages,contract);
+    input={...input,messages:restored.messages};
+    try {rt.store.updateSession(session!.id,{metadata:{...session!.metadata,taskContractAudit:restored.audit}});}catch { /* The contract is still present in this request. */ }
+  }
   let slot: PrepareSlot | undefined;
   if (session) {
     try {
@@ -732,7 +740,19 @@ function runTurnWithNormalRequestBudget(
   onStream: Parameters<ModelTurnCall>[1],
   deliver: ModelTurnCall
 ): Promise<ModelTurnResult> {
-  return fitProductModelRequest(rt, input).then((fitted) => deliver(fitted, onStream));
+  return fitProductModelRequest(rt, input).then(async (fitted) => {
+    const result=await deliver(fitted,onStream);
+    try { if(fitted.sessionId){
+      const session=rt.store.getSession(fitted.sessionId);
+      if(session){
+        const history=(Array.isArray(session.metadata?.cacheDiagnostics)?session.metadata.cacheDiagnostics:[]) as CacheDiagnostic[];
+        const record=diagnosePrompt(history.at(-1),{system:fitted.systemPrompt,tools:fitted.tools.map(t=>({name:t.name,description:t.description,inputSchema:t.inputSchema})),stable:JSON.stringify({model:session.metadata?.modelOverride??null,messages:fitted.messages.filter(m=>m.role==='system').map(m=>m.parts)})},result.usage?.cachedInputTokens,result.usage?.inputTokens);
+        rt.store.updateSession(session.id,{metadata:{...session.metadata,cacheDiagnostics:[...history.slice(-29),record]}});
+      }
+    }
+    } catch { /* Observability must not turn a successful provider response into a retry. */ }
+    return result;
+  });
 }
 
 /**

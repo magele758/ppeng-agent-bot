@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { SessionReliability } from './SessionReliability';
 import { api } from '@/lib/api';
 import {
   contextStackLegend,
@@ -558,6 +559,7 @@ export function ContextStackPanel({
 
   return (
     <div className="context-stack">
+      {sessionId&&<SessionReliability key={sessionId} sessionId={sessionId}/>}
       <div className="context-stack__head">
         <p className="context-stack__hint">{t('play.contextStack.hint')}</p>
         <button type="button" className="btn btn-ghost btn-sm" onClick={() => void load()} disabled={!sessionId || loading}>
