@@ -10,7 +10,14 @@ import type { AgentSpec, SessionRecord } from '../types.js';
 import type { SqliteStateStore } from '../storage.js';
 import { normalizeAllowedSkillNames, readAllowedSkillNames } from '../skills/skill-allowlist.js';
 import { normalizeAllowedToolNames, readPositiveAllowedTools } from './bot-policy.js';
-import { faceUpdatePatch, normalizeBotAvatar, normalizeBotFaceColor, normalizeBotFaceShape } from './bot-appearance.js';
+import {
+  faceUpdatePatch,
+  normalizeBotAvatar,
+  normalizeBotFaceStyle,
+  normalizeFaceColorForStyle,
+  normalizeFaceExpressionForStyle,
+  normalizeFaceShapeForStyle
+} from './bot-appearance.js';
 import {
   BOT_MODEL_OVERRIDE_META,
   normalizeBotModelOverride,
@@ -241,8 +248,10 @@ export function getBot(store: SqliteStateStore, id: string): BotRecord {
 }
 
 export function createBot(host: SessionFacadeHost, input: CreateBotInput, options?: { builtin?: boolean }): BotRecord {
-  const faceShape = normalizeBotFaceShape(input.faceShape);
-  const faceColor = normalizeBotFaceColor(input.faceColor);
+  const faceStyle = normalizeBotFaceStyle(input.faceStyle);
+  const faceShape = normalizeFaceShapeForStyle(input.faceShape, faceStyle);
+  const faceColor = normalizeFaceColorForStyle(input.faceColor, faceStyle);
+  const faceExpression = normalizeFaceExpressionForStyle(input.faceExpression, faceStyle);
   const avatar = normalizeBotAvatar(input.avatar);
   const name = normalizeName(input.name);
   const title = normalizeTitle(input.title, name);
@@ -278,6 +287,8 @@ export function createBot(host: SessionFacadeHost, input: CreateBotInput, option
     hidden: false,
     faceShape,
     faceColor,
+    faceStyle,
+    faceExpression,
     avatar,
     createdAt: now,
     updatedAt: now
@@ -362,7 +373,7 @@ export function updateBot(
     title,
     description,
     hidden: patch.hidden,
-    ...faceUpdatePatch(patch)
+    ...faceUpdatePatch(patch, current)
   });
   if (name !== current.name || title !== current.title) {
     for (const session of listBotChats(host.store, next)) {

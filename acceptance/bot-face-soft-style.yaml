@@ -1,0 +1,33 @@
+id: bot-face-soft-style
+title: 软萌机器人脸与经典脸并存
+status: implemented
+notes: |
+  assumedApproval: standing-order-2026-10-22
+requirement: |
+  Add a parallel soft robot-face icon set. Do not change or replace the existing classic BotFace geometric icons, emoji, or image avatar behavior. Default must stay classic.
+  Persist faceStyle as classic or soft. Null, absent, or unknown means classic.
+  Soft faces are an original rounded blob set: silhouette, color, and expression chosen deterministically from a seed. Same seed stays the same; different seeds can differ.
+  Emoji and image avatars still win over either face style.
+  The create and edit picker has a Classic | Soft robot toggle. Classic keeps the current shape and color grids. Soft shows soft silhouette, color, and optional expression picks, with a soft preview.
+  Soft faces render as static SVG. Do not animate every list row.
+criteria:
+  - id: AC-1
+    given: 新建 Bot，或已有 Bot 没有保存脸风格
+    when: 用户查看头像，或保存的风格是 classic、空白、无法识别的值
+    then: 仍显示原来的经典几何脸，不会变成软萌脸
+  - id: AC-2
+    given: 用户在创建或编辑时选了软萌机器人
+    when: 保存后再打开选择器、会话或列表
+    then: 显示软萌圆润脸，同一只 Bot 每次轮廓、颜色和表情都一样；另一只 Bot 可以不同
+  - id: AC-3
+    given: Bot 已保存表情包或图片头像
+    when: 用户查看这只 Bot，无论风格是经典还是软萌
+    then: 仍显示表情包或图片，不显示几何脸或软萌脸
+  - id: AC-4
+    given: 用户打开创建或编辑 Bot 的脸
+    when: 在经典和软萌之间切换
+    then: 经典页仍是原来的脸型和颜色；软萌页能选轮廓和颜色，预览是软萌脸；没选风格时按经典保存
+  - id: AC-5
+    given: 用户把风格留空，或填了无法识别的值
+    when: 创建或更新 Bot
+    then: 空白按未设置处理，无法识别的值被拒绝，不会写成软萌脸

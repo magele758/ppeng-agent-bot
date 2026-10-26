@@ -93,7 +93,7 @@ export function SessionListRow({
       ) : null}
       {bot ? (
         <span className="session-item__face" data-bot-face-slot="" style={{ '--bot-face-idle-delay': botFaceIdleDelay(faceName) } as CSSProperties}>
-          <BotFace name={faceName} mood={mood} />
+          <BotFace name={faceName} botId={botId} mood={mood} />
         </span>
       ) : null}
       <div className="session-item__body">

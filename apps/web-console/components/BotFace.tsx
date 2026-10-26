@@ -25,12 +25,18 @@ import {
   talkingMouthAmount,
   stepBlinkClock,
   turnFinishHappyUntil,
+  readBotFaceStyle,
+  isBotFaceColor,
+  isBotFaceShape,
   type BotFaceColor,
   type BotFaceShape,
+  type BotFaceStyle,
   type LivingFaceMood,
   type MouthKind
 } from '@/lib/bot-face';
+import { isSoftBotColor, isSoftBotExpression, isSoftBotSilhouette, type SoftBotColor, type SoftBotExpression, type SoftBotSilhouette } from '@/lib/soft-bot-face';
 import { useSavedFace } from './BotFaceCatalog';
+import { SoftBotFace } from './SoftBotFace';
 import { useI18n } from '@/lib/i18n';
 import './bot-face.css';
 
@@ -50,6 +56,16 @@ export interface BotFaceProps {
   shape?: BotFaceShape | null;
   /** Explicit swatch. Same rules as `shape`. */
   color?: BotFaceColor | null;
+  /**
+   * Icon set. `undefined` uses a saved choice. `soft` draws the blob face.
+   * Anything else, including null, keeps the classic geometric face.
+   */
+  faceStyle?: BotFaceStyle | null;
+  /** Bot id, preferred as the soft-face seed when the style is soft. */
+  botId?: string | null;
+  softSilhouette?: SoftBotSilhouette | null;
+  softColor?: SoftBotColor | null;
+  softExpression?: SoftBotExpression | null;
 }
 
 const DOTS = [-3.2, 0, 3.2] as const;
@@ -244,7 +260,12 @@ export function BotFace({
   className,
   mood = 'idle',
   shape: shapeProp,
-  color: colorProp
+  color: colorProp,
+  faceStyle: faceStyleProp,
+  botId,
+  softSilhouette,
+  softColor,
+  softExpression
 }: BotFaceProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const { t } = useI18n();
@@ -260,6 +281,10 @@ export function BotFace({
   const avatar = avatarWhenNoFaceOverride(shapeProp, colorProp, saved.avatar);
   const standIn = avatarStandIn({ avatar, size, className, label });
   const showAvatar = standIn !== null;
+  const faceStyle = readBotFaceStyle(faceStyleProp !== undefined ? faceStyleProp : saved.style);
+  const savedExpression = isSoftBotExpression(saved.expression) ? saved.expression : null;
+  const savedSoftSilhouette = faceStyle === 'soft' && isSoftBotSilhouette(saved.shape) ? saved.shape : null;
+  const savedSoftColor = faceStyle === 'soft' && isSoftBotColor(saved.color) ? saved.color : null;
 
   useEffect(() => {
     const until = turnFinishHappyUntil(prevMoodRef.current, mood, performance.now());
@@ -357,7 +382,31 @@ export function BotFace({
   }, [showAvatar, mood]);
 
   if (standIn) return <AvatarFace standIn={standIn} working={working} size={size} workLabel={workLabel} mood={mood} testId={testId} />;
-  const view = drawnFaceView({ name, shape: shapeProp, color: colorProp, saved, mood });
+  if (faceStyle === 'soft') {
+    return (
+      <SoftBotFace
+        id={botId}
+        name={name}
+        silhouette={softSilhouette !== undefined ? softSilhouette : savedSoftSilhouette}
+        color={softColor !== undefined ? softColor : savedSoftColor}
+        expression={softExpression !== undefined ? softExpression : savedExpression}
+        label={label}
+        testId={testId}
+        size={size}
+        className={className}
+      />
+    );
+  }
+  const view = drawnFaceView({
+    name,
+    shape: shapeProp,
+    color: colorProp,
+    saved: {
+      shape: isBotFaceShape(saved.shape) ? saved.shape : null,
+      color: isBotFaceColor(saved.color) ? saved.color : null
+    },
+    mood
+  });
   const layout = view.layout;
   const maskId = `bot-face-${reactId}`;
   const classes = botFaceClassName({ size, className, empty: view.empty });

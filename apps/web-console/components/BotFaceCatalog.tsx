@@ -5,7 +5,7 @@ import { indexSavedFaces, type FaceCatalogBot, type SavedFaceEntry } from '@/lib
 
 export type SavedFace = SavedFaceEntry;
 
-const EMPTY: SavedFace = { shape: null, color: null, avatar: null };
+const EMPTY: SavedFace = { shape: null, color: null, style: null, expression: null, avatar: null };
 
 const CatalogContext = createContext<ReadonlyMap<string, SavedFace>>(new Map());
 

@@ -14,19 +14,26 @@ import { zh } from '../lib/i18n/messages/zh/index.ts';
 // server renderer while resolving the app alias and ignoring its CSS import.
 const localRequire = createRequire(import.meta.url);
 let savedTestAvatar: string | null = null;
+const loadedComponents = new Map<string, { exports: Record<string, unknown> }>();
 function loadComponent(file: string, effects?: Array<() => unknown>, root?: any): any {
+  const cached = loadedComponents.get(file);
+  if (cached && !effects && !root) return cached.exports;
   let refs = 0;
   const source = readFileSync(new URL(file, import.meta.url), 'utf8');
   const compiled = ts.transpileModule(source, { compilerOptions: {
     target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true
   } }).outputText;
-  const mod = { exports: {} };
+  const mod = { exports: {} as Record<string, unknown> };
+  if (!effects && !root) loadedComponents.set(file, mod);
   const requireComponent = (id: string) => {
     if (id.endsWith('.css')) return {};
     if (id === 'react' && effects) return { ...React, useEffect: (effect: () => unknown) => effects.push(effect), ...(root ? { useRef: (value: unknown) => ({ current: refs++ === 0 ? root : value }) } : {}) };
-    if (id === '@/lib/i18n') return { useI18n: () => ({ t: (key: string) => key === 'play.faceMotion.working' ? '工作中' : '空闲' }) };
+    if (id === '@/lib/i18n') return { useI18n: () => ({ t: (key: string) => key === 'play.faceMotion.working' ? '工作中' : key }) };
     if (id === '@/lib/bot-face') return localRequire('../lib/bot-face.ts');
-    if (id === './BotFaceCatalog') return { useSavedFace: () => ({ shape: null, color: null, avatar: savedTestAvatar }) };
+    if (id === './BotFaceCatalog') return { useSavedFace: () => ({ shape: null, color: null, style: null, expression: null, avatar: savedTestAvatar }) };
+    if (id === '@/lib/soft-bot-face') return localRequire('../lib/soft-bot-face.ts');
+    if (id === './SoftBotFace') return loadComponent('./SoftBotFace.tsx');
+    if (id === './BotFace') return loadComponent('./BotFace.tsx');
     return localRequire(id);
   };
   new Function('require', 'module', 'exports', compiled)(requireComponent, mod, mod.exports);
@@ -246,6 +253,42 @@ test('尖角星和尖顶房子换成圆润脸，选择器和列表用同一张 [
     assert.ok(face.mouthInk > 0, `${shape} mouth stays inside the silhouette`);
     assert.ok(face.widthNearTop >= 16, `${shape} is rounded, top width ${face.widthNearTop}`);
   }
+});
+
+test('经典和软萌可以切换，没选风格时仍是经典脸 [AC:bot-face-soft-style#AC-4]', () => {
+  const { BotFaceChoice } = loadComponent('./BotFaceChoice.tsx');
+  const base = {
+    name: 'Ada',
+    shape: 'star',
+    color: 'red',
+    onShape: () => {},
+    onColor: () => {},
+    onStyle: () => {},
+    onSoftSilhouette: () => {},
+    onSoftColor: () => {}
+  };
+  const classic = renderToStaticMarkup(React.createElement(BotFaceChoice, { ...base, style: null }));
+  assert.match(classic, /data-face-style="classic"/);
+  assert.match(classic, /data-testid="bot-face-style-classic"[^>]*aria-pressed="true"/);
+  assert.match(classic, /data-testid="bot-face-choice-preview"[^>]*data-bot-shape="star"/);
+  assert.doesNotMatch(classic, /data-soft-bot-face=/);
+  assert.match(classic, /data-bot-shape="circle"/);
+  assert.match(classic, /aria-label="agents\.bots\.faceShape\.circle"/);
+
+  const soft = renderToStaticMarkup(
+    React.createElement(BotFaceChoice, {
+      ...base,
+      style: 'soft',
+      softSilhouette: 'pebble',
+      softColor: 'lilac'
+    })
+  );
+  assert.match(soft, /data-face-style="soft"/);
+  assert.match(soft, /data-testid="bot-face-style-soft"[^>]*aria-pressed="true"/);
+  assert.match(soft, /data-testid="bot-face-choice-preview"[^>]*data-soft-bot-face="pebble"/);
+  assert.match(soft, /data-soft-bot-color="lilac"/);
+  assert.match(soft, /agents\.bots\.softShape\.capsule/);
+  assert.doesNotMatch(soft, /data-bot-shape=/);
 });
 
 test('云朵在列表尺寸下嘴巴可见 [AC:bot-face-readable-shapes#AC-3]', async () => {

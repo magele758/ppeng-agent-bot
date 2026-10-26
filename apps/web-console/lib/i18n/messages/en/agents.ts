@@ -77,7 +77,45 @@ export const agents = {
     faceEmpty: 'Robot avatar',
     faceShapeLabel: 'Shape',
     faceColorLabel: 'Color',
+    faceStyleLabel: 'Look',
     faceHint: 'Leave these unset to follow the name. After you save, the picker, sessions and groups use this face.',
+    faceStyle: {
+      classic: 'Classic',
+      soft: 'Soft robot'
+    },
+    softExpressionLabel: 'Expression',
+    softShape: {
+      pebble: 'Pebble',
+      squish: 'Squish',
+      capsule: 'Capsule',
+      cloud: 'Cloud',
+      drop: 'Drop',
+      bean: 'Bean',
+      nub: 'Nub',
+      pillow: 'Pillow'
+    },
+    softColor: {
+      butter: 'Butter',
+      peach: 'Peach',
+      coral: 'Coral',
+      blush: 'Blush',
+      lilac: 'Lilac',
+      sky: 'Sky',
+      mint: 'Mint',
+      sage: 'Sage',
+      sand: 'Sand',
+      ink: 'Ink'
+    },
+    softExpression: {
+      neutral: 'Neutral',
+      happy: 'Happy',
+      curious: 'Curious',
+      sleepy: 'Sleepy',
+      wink: 'Wink',
+      content: 'Content',
+      wide: 'Wide',
+      shy: 'Shy'
+    },
     faceSaveFailed: 'Could not save the look: {error}',
     faceShape: {
       circle: 'Circle',

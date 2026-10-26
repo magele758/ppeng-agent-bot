@@ -491,6 +491,7 @@ test('create_bot stores profile fields and only a model reference [AC:bot-create
     modelOverride: { providerId: provider.body.provider.id, modelId: 'lab-model' },
     faceShape: 'star',
     faceColor: 'blue',
+    faceStyle: 'classic',
     avatar: '📚',
     maxTurns: 48
   });
@@ -504,6 +505,7 @@ test('create_bot stores profile fields and only a model reference [AC:bot-create
   assert.deepEqual(created.body.bot.modelOverride, { providerId: provider.body.provider.id, modelId: 'lab-model' });
   assert.equal(created.body.bot.faceShape, 'star');
   assert.equal(created.body.bot.faceColor, 'blue');
+  assert.equal(created.body.bot.faceStyle, 'classic');
   assert.equal(created.body.bot.avatar, '📚');
   assert.equal(created.body.bot.maxTurns, 48);
   const session = fx.store.getSession(created.body.bot.canonicalSessionId);

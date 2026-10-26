@@ -202,12 +202,28 @@ test('saved faces index by trimmed name and skip blanks', () => {
     { name: 'Pic', avatar: ' https://cdn.example/a.png ' },
     { name: 'ShapeOnly', faceShape: 'heart' }
   ]);
-  assert.deepEqual(map.get('Ada'), { shape: 'bean', color: 'mint', avatar: '🤖' });
+  assert.deepEqual(map.get('Ada'), { shape: 'bean', color: 'mint', style: null, expression: null, avatar: '🤖' });
   assert.equal(map.has(''), false);
   assert.equal(map.has('NoSave'), false);
-  assert.deepEqual(map.get('Pic'), { shape: null, color: null, avatar: 'https://cdn.example/a.png' });
-  assert.deepEqual(map.get('ShapeOnly'), { shape: 'heart', color: null, avatar: null });
+  assert.deepEqual(map.get('Pic'), { shape: null, color: null, style: null, expression: null, avatar: 'https://cdn.example/a.png' });
+  assert.deepEqual(map.get('ShapeOnly'), { shape: 'heart', color: null, style: null, expression: null, avatar: null });
   assert.equal(indexSavedFaces([{ name: 'Num', avatar: 3 as unknown as string }]).size, 0);
+  assert.deepEqual(
+    indexSavedFaces([{ name: 'Pebble', faceStyle: 'soft', faceShape: 'pebble', faceColor: 'lilac', faceExpression: 'wink' }]).get('Pebble'),
+    { shape: 'pebble', color: 'lilac', style: 'soft', expression: 'wink', avatar: null }
+  );
+  assert.deepEqual(
+    indexSavedFaces([{ name: 'Starry', faceStyle: 'classic', faceShape: 'star', faceColor: 'red' }]).get('Starry'),
+    { shape: 'star', color: 'red', style: 'classic', expression: null, avatar: null }
+  );
+});
+
+test('表情包或图片盖过经典脸和软萌脸 [AC:bot-face-soft-style#AC-3]', () => {
+  assert.equal(avatarWhenNoFaceOverride(undefined, undefined, '🤖'), '🤖');
+  assert.equal(avatarWhenNoFaceOverride(undefined, undefined, 'https://cdn.example/a.png'), 'https://cdn.example/a.png');
+  assert.equal(isAvatarImageUrl('https://cdn.example/a.png'), true);
+  assert.equal(avatarStandIn({ avatar: '🤖', size: 'sm' })?.kind, 'emoji');
+  assert.equal(avatarStandIn({ avatar: 'https://cdn.example/a.png', size: 'sm' })?.kind, 'image');
 });
 
 test('an avatar stands in only when no face override was passed', () => {

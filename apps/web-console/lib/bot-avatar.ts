@@ -60,7 +60,12 @@ export function botAvatarIssue(emoji: string, imageUrl: string): BotAvatarIssue 
   return emojiIssue(emoji);
 }
 
-export type BotCreateFace = { shape: string | null; color: string | null };
+export type BotCreateFace = {
+  shape: string | null;
+  color: string | null;
+  style?: 'classic' | 'soft' | null;
+  expression?: string | null;
+};
 
 export type BotCreateFields = {
   name: string;
@@ -77,6 +82,8 @@ export type BotCreatePayload = {
   description?: string;
   faceShape?: string;
   faceColor?: string;
+  faceStyle?: 'classic' | 'soft';
+  faceExpression?: string;
   avatar?: string;
 };
 
@@ -95,7 +102,9 @@ export function buildBotCreatePayload(fields: BotCreateFields): BotCreatePayload
   const described = withOptional(named, 'description', optionalText(fields.description));
   const faced = withOptional(described, 'faceShape', fields.face.shape);
   const colored = withOptional(faced, 'faceColor', fields.face.color);
-  return withOptional(colored, 'avatar', botAvatarValue(fields.emoji, fields.imageUrl));
+  const styled = withOptional(colored, 'faceStyle', fields.face.style === 'soft' ? 'soft' : null);
+  const expressed = withOptional(styled, 'faceExpression', fields.face.style === 'soft' ? fields.face.expression : null);
+  return withOptional(expressed, 'avatar', botAvatarValue(fields.emoji, fields.imageUrl));
 }
 
 /** The daemon may return `{ bot }` or the bot itself. */

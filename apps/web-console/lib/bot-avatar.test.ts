@@ -42,7 +42,7 @@ test('create payload omits blank optional fields and prefers the image', () => {
       description: 'notes',
       emoji: '🤖',
       imageUrl: ' https://cdn.example/a.png ',
-      face: { shape: 'bean', color: 'mint' }
+      face: { shape: 'bean', color: 'mint', style: 'soft', expression: 'wink' }
     }),
     {
       name: 'Ada',
@@ -50,12 +50,20 @@ test('create payload omits blank optional fields and prefers the image', () => {
       description: 'notes',
       faceShape: 'bean',
       faceColor: 'mint',
+      faceStyle: 'soft',
+      faceExpression: 'wink',
       avatar: 'https://cdn.example/a.png'
     }
   );
   assert.equal(buildBotCreatePayload({
     name: 'Ada', title: '', description: '', emoji: '🤖', imageUrl: '', face: { shape: 'star', color: null }
   }).faceShape, 'star');
+  assert.equal(buildBotCreatePayload({
+    name: 'Ada', title: '', description: '', emoji: '', imageUrl: '', face: { shape: null, color: null, style: 'classic' }
+  }).faceStyle, undefined);
+  assert.equal(buildBotCreatePayload({
+    name: 'Ada', title: '', description: '', emoji: '', imageUrl: '', face: { shape: 'pebble', color: 'lilac', style: 'soft' }
+  }).faceStyle, 'soft');
 });
 
 test('create form blocks on the first problem and unwraps either response shape', () => {

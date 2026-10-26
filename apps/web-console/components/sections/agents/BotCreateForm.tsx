@@ -9,7 +9,8 @@ import {
   buildBotCreatePayload,
   unwrapCreatedBot
 } from '@/lib/bot-avatar';
-import type { BotFaceColor, BotFaceShape } from '@/lib/bot-face';
+import type { BotFaceColor, BotFaceShape, BotFaceStyle } from '@/lib/bot-face';
+import type { SoftBotColor, SoftBotExpression, SoftBotSilhouette } from '@/lib/soft-bot-face';
 import { useI18n } from '@/lib/i18n';
 import type { BotInfo } from '@/lib/types';
 import { BotFaceChoice } from '../../BotFaceChoice';
@@ -20,7 +21,23 @@ interface BotCreateFormProps {
   onCancel: () => void;
 }
 
-const EMPTY_FACE: { shape: BotFaceShape | null; color: BotFaceColor | null } = { shape: null, color: null };
+type CreateFace = {
+  shape: BotFaceShape | null;
+  color: BotFaceColor | null;
+  style: BotFaceStyle | null;
+  softSilhouette: SoftBotSilhouette | null;
+  softColor: SoftBotColor | null;
+  softExpression: SoftBotExpression | null;
+};
+
+const EMPTY_FACE: CreateFace = {
+  shape: null,
+  color: null,
+  style: null,
+  softSilhouette: null,
+  softColor: null,
+  softExpression: null
+};
 
 function CreateFieldErrors({
   nameProblem,
@@ -65,7 +82,24 @@ export function BotCreateForm({ existingNames, onCreated, onCancel }: BotCreateF
     try {
       const bot = (await api('/api/bots', {
         method: 'POST',
-        body: JSON.stringify(buildBotCreatePayload({ name, title, description, emoji: '', imageUrl: '', face }))
+        body: JSON.stringify(
+          buildBotCreatePayload({
+            name,
+            title,
+            description,
+            emoji: '',
+            imageUrl: '',
+            face:
+              face.style === 'soft'
+                ? {
+                    shape: face.softSilhouette,
+                    color: face.softColor,
+                    style: 'soft',
+                    expression: face.softExpression
+                  }
+                : { shape: face.shape, color: face.color, style: face.style }
+          })
+        )
       })) as { bot?: BotInfo } | BotInfo;
       onCreated(unwrapCreatedBot(bot));
     } catch (err) {
@@ -155,9 +189,19 @@ export function BotCreateForm({ existingNames, onCreated, onCancel }: BotCreateF
           name={name.trim()}
           shape={face.shape}
           color={face.color}
+          style={face.style}
+          softSilhouette={face.softSilhouette}
+          softColor={face.softColor}
+          softExpression={face.softExpression}
           disabled={busy}
+          onStyle={(style) =>
+            setFace((current) => ({ ...current, style: style === 'classic' ? null : style }))
+          }
           onShape={(shape) => setFace((current) => ({ ...current, shape }))}
           onColor={(color) => setFace((current) => ({ ...current, color }))}
+          onSoftSilhouette={(softSilhouette) => setFace((current) => ({ ...current, style: 'soft', softSilhouette }))}
+          onSoftColor={(softColor) => setFace((current) => ({ ...current, style: 'soft', softColor }))}
+          onSoftExpression={(softExpression) => setFace((current) => ({ ...current, style: 'soft', softExpression }))}
         />
 
         </div>

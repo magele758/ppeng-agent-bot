@@ -6,6 +6,8 @@
  * The name hash is case-sensitive on purpose so "Ada" and "ada" can differ.
  */
 
+import { isSoftBotColor, isSoftBotSilhouette } from './soft-bot-face.ts';
+
 export const BOT_FACE_COUNT = 8;
 
 const FACE_INDEXES = [0, 1, 2, 3, 4, 5, 6, 7] as const;
@@ -122,16 +124,31 @@ export function previewFaceChoice(
   };
 }
 
+export const BOT_FACE_STYLES = ['classic', 'soft'] as const;
+
+export type BotFaceStyle = (typeof BOT_FACE_STYLES)[number];
+
+/** Null, blank, and unknown stay on the classic geometric face. */
+export function readBotFaceStyle(raw: unknown): BotFaceStyle | null {
+  if (raw === null || raw === undefined || raw === '') return null;
+  return raw === 'classic' || raw === 'soft' ? raw : null;
+}
+
 export type SavedFaceEntry = {
-  shape: BotFaceShape | null;
-  color: BotFaceColor | null;
+  shape: string | null;
+  color: string | null;
+  style: BotFaceStyle | null;
+  expression: string | null;
   avatar: string | null;
 };
 
 export type FaceCatalogBot = {
   name: string;
+  id?: string | null;
   faceShape?: string | null;
   faceColor?: string | null;
+  faceStyle?: string | null;
+  faceExpression?: string | null;
   avatar?: string | null;
 };
 
@@ -140,15 +157,18 @@ function savedAvatarText(avatar: unknown): string | null {
 }
 
 function faceHasSave(face: SavedFaceEntry): boolean {
-  return Boolean(face.shape || face.color || face.avatar);
+  return Boolean(face.shape || face.color || face.style || face.expression || face.avatar);
 }
 
 function savedFaceEntry(bot: FaceCatalogBot): { key: string; face: SavedFaceEntry } | null {
   const key = bot.name.trim();
   if (!key) return null;
+  const style = readBotFaceStyle(bot.faceStyle);
   const face = {
-    shape: isBotFaceShape(bot.faceShape) ? bot.faceShape : null,
-    color: isBotFaceColor(bot.faceColor) ? bot.faceColor : null,
+    shape: style === 'soft' ? (isSoftBotSilhouette(bot.faceShape) ? bot.faceShape : null) : (isBotFaceShape(bot.faceShape) ? bot.faceShape : null),
+    color: style === 'soft' ? (isSoftBotColor(bot.faceColor) ? bot.faceColor : null) : (isBotFaceColor(bot.faceColor) ? bot.faceColor : null),
+    style,
+    expression: typeof bot.faceExpression === 'string' && bot.faceExpression.trim() ? bot.faceExpression.trim() : null,
     avatar: savedAvatarText(bot.avatar)
   };
   if (!faceHasSave(face)) return null;

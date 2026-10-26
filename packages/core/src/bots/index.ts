@@ -33,15 +33,34 @@ export {
   BOT_AVATAR_EMOJIS,
   BOT_FACE_COLORS,
   BOT_FACE_SHAPES,
+  BOT_FACE_STYLES,
+  SOFT_BOT_COLORS,
+  SOFT_BOT_EXPRESSIONS,
+  SOFT_BOT_SILHOUETTES,
   faceUpdatePatch,
   normalizeBotAvatar,
   normalizeBotFaceColor,
   normalizeBotFaceShape,
+  normalizeBotFaceStyle,
+  normalizeFaceColorForStyle,
+  normalizeFaceExpressionForStyle,
+  normalizeFaceShapeForStyle,
   readBotFaceColor,
+  readBotFaceExpression,
   readBotFaceShape,
+  readBotFaceStyle,
   readFaceInput
 } from './bot-appearance.js';
-export type { BotFaceColor, BotFaceShape } from './bot-appearance.js';
+export type {
+  BotFaceColor,
+  BotFaceShape,
+  BotFaceStyle,
+  SoftBotColor,
+  SoftBotExpression,
+  SoftBotSilhouette,
+  StoredFaceColor,
+  StoredFaceShape
+} from './bot-appearance.js';
 export { BotStore } from './bot-store.js';
 export { BotFunctionalGroupService } from './functional-groups.js';
 export type { BotFunctionalGroup, BotSharedScope } from './functional-groups.js';

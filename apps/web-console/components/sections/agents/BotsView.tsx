@@ -213,7 +213,7 @@ function BotRosterCard({
       onClick={onOpen}
     >
       <span className="ag-card__identity">
-        <BotFace name={bot.name} testId={`bot-face-${bot.id}`} />
+        <BotFace name={bot.name} botId={bot.id} testId={`bot-face-${bot.id}`} />
         <span className="ag-card__title">{bot.name}</span>
       </span>
       {subtitle ? <span className="ag-card__sub">{subtitle}</span> : null}

@@ -12,6 +12,7 @@ import {
   faceUpdatePatch,
   getBot,
   listBots,
+  normalizeBotFaceStyle,
   openBot,
   readFaceInput,
   slugifyBotName,
@@ -198,6 +199,107 @@ test('face input keeps only present fields and rejects an unknown choice', () =>
     faceColor: 'mint'
   });
   assert.throws(() => faceUpdatePatch({ faceColor: 'gold' }), ValidationError);
+});
+
+test('face style accepts classic or soft, blank clears, garbage is rejected [AC:bot-face-soft-style#AC-5]', () => {
+  assert.equal(normalizeBotFaceStyle(undefined), null);
+  assert.equal(normalizeBotFaceStyle(null), null);
+  assert.equal(normalizeBotFaceStyle(''), null);
+  assert.equal(normalizeBotFaceStyle('  '), null);
+  assert.equal(normalizeBotFaceStyle('classic'), 'classic');
+  assert.equal(normalizeBotFaceStyle('soft'), 'soft');
+  assert.throws(() => normalizeBotFaceStyle('blob'), ValidationError);
+  assert.throws(() => normalizeBotFaceStyle('SOFT'), ValidationError);
+  assert.deepEqual(readFaceInput({ faceStyle: 'soft' }), { faceStyle: 'soft' });
+  assert.deepEqual(readFaceInput({ name: 'A' }), {});
+  assert.deepEqual(faceUpdatePatch({ faceStyle: 'soft' }), { faceStyle: 'soft' });
+  assert.deepEqual(faceUpdatePatch({ faceStyle: '' }), { faceStyle: null });
+  assert.deepEqual(faceUpdatePatch({ faceStyle: '  ' }), { faceStyle: null });
+  assert.deepEqual(faceUpdatePatch({}), {});
+  assert.throws(() => faceUpdatePatch({ faceExpression: 'wink' }), ValidationError);
+  assert.deepEqual(faceUpdatePatch({ faceStyle: 'soft', faceExpression: 'wink' }), {
+    faceStyle: 'soft',
+    faceExpression: 'wink'
+  });
+  assert.deepEqual(faceUpdatePatch({ faceStyle: 'classic' }, { faceStyle: 'soft', faceShape: 'pebble', faceColor: 'lilac' }), {
+    faceStyle: 'classic',
+    faceShape: null,
+    faceColor: null,
+    faceExpression: null
+  });
+  assert.deepEqual(faceUpdatePatch({ faceStyle: 'classic' }, { faceStyle: 'soft', faceShape: 'bean', faceColor: 'mint' }), {
+    faceStyle: 'classic',
+    faceShape: null,
+    faceColor: null,
+    faceExpression: null
+  });
+  assert.deepEqual(
+    faceUpdatePatch({ faceStyle: 'classic', faceShape: 'bean', faceColor: 'mint' }, { faceStyle: 'soft', faceShape: 'bean', faceColor: 'mint' }),
+    { faceStyle: 'classic', faceShape: 'bean', faceColor: 'mint', faceExpression: null }
+  );
+  assert.deepEqual(faceUpdatePatch({ faceStyle: 'soft' }, { faceStyle: 'classic', faceShape: 'star', faceColor: 'red' }), {
+    faceStyle: 'soft',
+    faceShape: null,
+    faceColor: null
+  });
+  assert.deepEqual(faceUpdatePatch({ faceStyle: 'soft', faceShape: 'bean', faceColor: 'mint' }, { faceStyle: null, faceShape: 'bean', faceColor: 'mint' }), {
+    faceStyle: 'soft',
+    faceShape: 'bean',
+    faceColor: 'mint'
+  });
+  assert.deepEqual(faceUpdatePatch({ faceStyle: 'classic', faceShape: 'star' }, { faceStyle: null, faceShape: 'circle', faceColor: 'red' }), {
+    faceStyle: 'classic',
+    faceShape: 'star'
+  });
+});
+
+test('createBot stores soft style and a blank style stays classic [AC:bot-face-soft-style#AC-1] [AC:bot-face-soft-style#AC-5]', () => {
+  const store = tempStore();
+  const h = host(store);
+  const plain = createBot(h, { name: 'PlainStyle' });
+  assert.equal(plain.faceStyle, null);
+  assert.equal(getBot(store, plain.id).faceStyle, null);
+  const soft = createBot(h, {
+    name: 'SoftBot',
+    faceStyle: 'soft',
+    faceShape: 'pebble',
+    faceColor: 'lilac',
+    faceExpression: 'wink'
+  });
+  assert.equal(soft.faceStyle, 'soft');
+  assert.equal(soft.faceExpression, 'wink');
+  assert.equal(getBot(store, soft.id).faceStyle, 'soft');
+  assert.equal(getBot(store, soft.id).faceExpression, 'wink');
+  const kept = updateBot(h, soft.id, { title: 'Still soft' });
+  assert.equal(kept.faceStyle, 'soft');
+  assert.equal(kept.faceExpression, 'wink');
+  const shared = createBot(h, { name: 'SharedLook', faceStyle: 'soft', faceShape: 'bean', faceColor: 'mint', faceExpression: 'shy' });
+  const keptShared = updateBot(h, shared.id, { faceStyle: 'classic', faceShape: 'bean', faceColor: 'mint' });
+  assert.equal(keptShared.faceStyle, 'classic');
+  assert.equal(keptShared.faceShape, 'bean');
+  assert.equal(keptShared.faceColor, 'mint');
+  assert.equal(keptShared.faceExpression, null);
+  const dropped = updateBot(h, shared.id, { faceStyle: 'soft' });
+  assert.equal(dropped.faceStyle, 'soft');
+  assert.equal(dropped.faceShape, null);
+  assert.equal(dropped.faceColor, null);
+  const classicBot = createBot(h, { name: 'ClassicLook', faceShape: 'star', faceColor: 'red' });
+  const recolored = updateBot(h, classicBot.id, { faceStyle: 'classic', faceShape: 'circle' });
+  assert.equal(recolored.faceStyle, 'classic');
+  assert.equal(recolored.faceShape, 'circle');
+  assert.equal(recolored.faceColor, 'red');
+  const classic = updateBot(h, soft.id, { faceStyle: 'classic' });
+  assert.equal(classic.faceStyle, 'classic');
+  assert.equal(classic.faceShape, null);
+  assert.equal(classic.faceColor, null);
+  assert.equal(classic.faceExpression, null);
+  const cleared = updateBot(h, soft.id, { faceStyle: null });
+  assert.equal(cleared.faceStyle, null);
+  assert.equal(cleared.faceExpression, null);
+  assert.throws(() => createBot(h, { name: 'LookOnClassic', faceExpression: 'wink' }), ValidationError);
+  assert.throws(() => createBot(h, { name: 'BadStyle', faceStyle: 'sparkle' }), ValidationError);
+  assert.throws(() => updateBot(h, plain.id, { faceStyle: 'round' }), ValidationError);
+  store.db.close();
 });
 
 test('createBot stores a face choice and update can clear it', () => {

@@ -1017,7 +1017,20 @@ export const MIGRATIONS: Migration[] = [
       if (!hasColumn(db, 'session_inbox', 'reply_to_json')) db.exec('ALTER TABLE session_inbox ADD COLUMN reply_to_json TEXT');
     }
   },
-  { version: 33, description: 'durable memory deletion suppression', up: ensureMemorySuppressionSchema }
+  { version: 33, description: 'durable memory deletion suppression', up: ensureMemorySuppressionSchema },
+  {
+    version: 34,
+    description: 'bots.face_style selects classic or soft; face_expression stores a soft look; null stays classic',
+    up: (db) => {
+      if (!hasTable(db, 'bots')) return;
+      if (!hasColumn(db, 'bots', 'face_style')) {
+        db.exec(`ALTER TABLE bots ADD COLUMN face_style TEXT`);
+      }
+      if (!hasColumn(db, 'bots', 'face_expression')) {
+        db.exec(`ALTER TABLE bots ADD COLUMN face_expression TEXT`);
+      }
+    }
+  }
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;
