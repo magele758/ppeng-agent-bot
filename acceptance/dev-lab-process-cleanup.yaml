@@ -1,0 +1,23 @@
+id: dev-lab-process-cleanup
+title: 开发启动器退出时完整清理子进程
+status: implemented
+requirement: |
+  之前开发启动器退出后残留 Next 子进程、重启端口漂移的问题修好了吗？没修好的话继续修，补上回归测试，review 通过后合并，再验证本地重启。
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 开发服务运行且存在多层子进程
+    when: 关闭启动器并再次启动
+    then: 旧子进程退出，原端口可立即重用，其他服务不受影响
+  - id: AC-2
+    given: 一个服务异常退出或无法启动
+    when: 启动器结束
+    then: 保留失败退出状态并清理其他服务及已脱离父进程的后代
+  - id: AC-3
+    given: 子进程拒绝正常退出
+    when: 关闭启动器或重复发送退出信号
+    then: 在有限等待后强制清理，不提前退出留下占用端口的进程
+  - id: AC-4
+    given: 正在编译或编译失败
+    when: 关闭启动器或编译返回失败
+    then: 清理编译进程树，且不启动 daemon 或网页服务

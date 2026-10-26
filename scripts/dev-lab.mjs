@@ -6,7 +6,7 @@
  */
 import dotenv from 'dotenv';
 import { devWebHost, syncDevHttps } from './dev-tailnet-https.mjs';
-import { spawn, spawnSync } from 'node:child_process';
+import { runDevProcesses } from './dev-lab-processes.mjs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { resolveBin, sanitizeScriptEnv } from './spawn-utils.mjs';
@@ -20,16 +20,6 @@ dotenv.config({ path: join(root, '.env') });
 const DAEMON_PORT_PREFERRED = Number(process.env.RAW_AGENT_DAEMON_PORT ?? 27070);
 const WEB_PORT_PREFERRED = Number(process.env.RAW_AGENT_WEB_PORT ?? process.env.PORT ?? 23000);
 const PORT_SPAN = Math.max(1, Number(process.env.RAW_AGENT_PORT_SPAN ?? 20));
-
-function runTsc() {
-  const r = spawnSync(resolveBin('pnpm'), ['exec', 'tsc', '-b', 'packages/core', 'apps/daemon'], {
-    cwd: root,
-    stdio: 'inherit',
-    env: sanitizeScriptEnv(),
-    shell: false
-  });
-  if (r.status !== 0) process.exit(r.status ?? 1);
-}
 
 const daemonPort = await pickPort(DAEMON_PORT_PREFERRED, PORT_SPAN);
 let webPort = await pickPort(WEB_PORT_PREFERRED, PORT_SPAN);
@@ -65,8 +55,6 @@ console.log(`[dev-lab] ports file → .agent-state/dev-lab.ports.json`);
 console.log('[dev-lab] ────────────────────────────────────────');
 console.log('');
 
-runTsc();
-
 const childEnv = sanitizeScriptEnv({
   ...process.env,
   RAW_AGENT_DAEMON_PORT: String(daemonPort),
@@ -74,67 +62,18 @@ const childEnv = sanitizeScriptEnv({
   PORT: String(webPort)
 });
 
-const daemon = spawn(process.execPath, ['apps/daemon/dist/server.js'], {
-  cwd: root,
-  stdio: 'inherit',
-  env: childEnv
-});
-
-// HTTPS-enabled checkouts use loopback; ordinary cloud dev keeps IPv4 discovery.
-const web = spawn(
-  resolveBin('pnpm'),
-  ['--filter', '@ppeng/agent-lab-web', 'run', 'dev', '-p', String(webPort), '-H', devWebHost(root)],
-  {
-    cwd: root,
-    stdio: 'inherit',
-    shell: false,
-    env: childEnv
-  }
-);
-
-let shuttingDown = false;
 const httpsAbort = new AbortController();
-
-function killBoth() {
-  httpsAbort.abort();
-  try {
-    daemon.kill('SIGTERM');
-  } catch {
-    /* ignore */
-  }
-  try {
-    web.kill('SIGTERM');
-  } catch {
-    /* ignore */
-  }
-}
-
-function onExit(code, from) {
-  if (shuttingDown) return;
-  shuttingDown = true;
-  if (from === 'daemon' && code !== 0 && code !== null) {
-    console.error(`[dev-lab] daemon exited with ${code}`);
-  }
-  if (from === 'web' && code !== 0 && code !== null) {
-    console.error(`[dev-lab] web exited with ${code}`);
-  }
-  killBoth();
-  process.exit(typeof code === 'number' ? code : 0);
-}
-
-daemon.on('exit', (code) => onExit(code ?? 0, 'daemon'));
-web.on('exit', (code) => onExit(code ?? 0, 'web'));
-
-process.on('SIGINT', () => {
-  shuttingDown = true;
-  killBoth();
-  process.exit(0);
+process.exitCode = await runDevProcesses({
+  cwd: root,
+  build: { name: 'compile', command: resolveBin('pnpm'), args: ['exec', 'tsc', '-b', 'packages/core', 'apps/daemon'] },
+  services: [
+    { name: 'daemon', command: process.execPath, args: ['apps/daemon/dist/server.js'], env: childEnv },
+    {
+      name: 'web', command: resolveBin('pnpm'),
+      args: ['--filter', '@ppeng/agent-lab-web', 'run', 'dev', '-p', String(webPort), '-H', devWebHost(root)],
+      env: childEnv
+    }
+  ],
+  onReady: () => { void syncDevHttps({ root, webPort, signal: httpsAbort.signal }); },
+  onStop: () => httpsAbort.abort()
 });
-process.on('SIGTERM', () => {
-  shuttingDown = true;
-  killBoth();
-  process.exit(0);
-});
-
-// HTTPS follows the actual selected web port, after Next is ready.
-void syncDevHttps({ root, webPort, signal: httpsAbort.signal });

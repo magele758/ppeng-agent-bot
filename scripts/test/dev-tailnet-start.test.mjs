@@ -23,7 +23,7 @@ test('dev entrypoint waits for web and synchronizes occupied-port restarts witho
   };
   t.after(async()=>{await stop();blocker.close();rmSync(root,{recursive:true,force:true});});
   for(const dir of ['scripts','apps/daemon/dist','bin','.agent-state']) mkdirSync(join(root,dir),{recursive:true});
-  for(const file of ['dev-lab.mjs','dev-tailnet-https.mjs','spawn-utils.mjs','port-utils.mjs']) copyFileSync(join(source,'scripts',file),join(root,'scripts',file));
+  for(const file of ['dev-lab.mjs','dev-lab-processes.mjs','dev-tailnet-https.mjs','spawn-utils.mjs','port-utils.mjs']) copyFileSync(join(source,'scripts',file),join(root,'scripts',file));
   symlinkSync(join(source,'node_modules'),join(root,'node_modules'),'dir');
   writeFileSync(join(root,'apps/daemon/dist/server.js'),'setInterval(()=>{},1000);');
   const executable=(name,body)=>writeFileSync(join(root,'bin',name),`#!${process.execPath}\n${body}`,{mode:0o755});

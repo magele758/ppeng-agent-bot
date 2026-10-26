@@ -80,7 +80,7 @@ pnpm run dev
 
 打开**终端打印的 Agent Lab 地址**，在对话区「配置模型」填写服务商 Base URL / API Key，发现模型并选择后发送消息。采用界面配置时，不需要先复制 `.env`。
 
-开发启动器会选择可用端口并自动连接代理，实际地址也写入 `.agent-state/dev-lab.ports.json`。没有覆盖配置时，首选端口是 Lab 23000、daemon 27070；冲突时自动后移，不要照搬旧示例的固定端口。
+开发启动器会选择可用端口并自动连接代理，实际地址也写入 `.agent-state/dev-lab.ports.json`。没有覆盖配置时，首选端口是 Lab 23000、daemon 27070；冲突时自动后移，不要照搬旧示例的固定端口。 在 macOS/Linux 上，关闭启动器（Ctrl+C、SIGTERM 或 SIGHUP）会一并清理其编译器、daemon 和 Next 进程组；最多等待三秒后强制停止残留后代，使重启可复用原端口，不影响其他工作目录的服务。
 
 不接真实模型也可以在构建后验证 HTTP 能力：
 
