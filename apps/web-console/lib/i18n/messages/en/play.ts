@@ -89,6 +89,7 @@ export const play = {
     allMembers: 'All members reply',
     allMembersHint: 'Each member replies',
     saveFailed: 'Reply mode was not saved',
+    saved: 'Saved',
   },
   entry: { new: 'New', remove: 'Remove', removeBot: 'Remove Bot “{name}”', removeBotConfirm: 'Remove Bot “{name}”? It will be hidden from the Bot list. Existing conversations, group chats and tasks are kept; this does not delete conversations.', removeFailed: 'Removal failed: {error}' },
   groupModel: {

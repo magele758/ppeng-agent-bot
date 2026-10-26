@@ -1,0 +1,20 @@
+id: group-chat-settings-save
+title: 群聊设置改完可以保存
+status: implemented
+requirement: |
+  现在群聊的配置无法修改之后保存，修复一下这个问题
+criteria:
+  - id: AC-1
+    given: 打开一个已有群聊的设置
+    when: 修改群名称并保存，然后关掉设置再打开
+    then: 名称仍是刚保存的那条
+  - id: AC-2
+    given: 打开一个已有群聊的设置
+    when: 群消息历史还在加载或尚未出现
+    then: 仍能修改名称或回复方式并保存，不必等历史出现
+  - id: AC-3
+    given: 打开群聊设置
+    when: 要保存刚改的名称、主持人或预算
+    then: 保存就在这些字段旁边，能直接点到，不必先翻到群消息
+notes: |
+  assumedApproval: standing-order-2026-10-22
