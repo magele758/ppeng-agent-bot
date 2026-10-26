@@ -111,7 +111,7 @@ test('a web spawn error returns failure and cleans the already spawned daemon [A
  const f=await fixture(t,'spawn-fail');const {done}=f.start();assert.equal((await done).code,1);await f.gone();await bind(f.daemonPort);await bind(f.webPort);
 });
 
-test('an EPERM probe distinguishes vanished or zombie groups from live protected members [AC:dev-lab-process-cleanup#AC-3]', async () => {
+test('an EPERM probe distinguishes vanished or zombie groups from live protected members [AC:dev-lab-process-cleanup#AC-3]', {skip:!posix}, async () => {
  const { groupExists } = await import('../dev-lab-processes.mjs');
  const denied = Object.assign(new Error('kill EPERM'),{code:'EPERM'});
  const kill = () => {throw denied;};
