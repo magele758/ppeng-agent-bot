@@ -32,6 +32,8 @@ function loadComponent(file: string, effects?: Array<() => unknown>, root?: any)
     if (id === '@/lib/bot-face') return localRequire('../lib/bot-face.ts');
     if (id === './BotFaceCatalog') return { useSavedFace: () => ({ shape: null, color: null, style: null, expression: null, avatar: savedTestAvatar }) };
     if (id === '@/lib/soft-bot-face') return localRequire('../lib/soft-bot-face.ts');
+    if (id === '@/lib/bloub-motion') return localRequire('../lib/bloub-motion.ts');
+    if (id === './BloubFace') return loadComponent('./BloubFace.tsx');
     if (id === './SoftBotFace') return loadComponent('./SoftBotFace.tsx');
     if (id === './BotFace') return loadComponent('./BotFace.tsx');
     return localRequire(id);

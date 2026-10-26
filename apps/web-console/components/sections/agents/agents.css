@@ -551,7 +551,7 @@
 .bot-face-choice__style,
 .bot-face-choice__expression {
   border: 2px solid transparent;
-  background: var(--ui-bg-muted, #f3f4f6);
+  background: var(--ui-surface);
   color: var(--ui-text);
   border-radius: 999px;
   padding: 4px 12px;
@@ -561,7 +561,7 @@
 
 .bot-face-choice__style[aria-pressed='true'],
 .bot-face-choice__expression[aria-pressed='true'] {
-  border-color: #c5c8d0;
+  border-color: var(--ui-text-muted);
 }
 
 .bot-face-choice__style:focus-visible,
@@ -628,7 +628,7 @@
 
 .bot-face-choice__shape[aria-pressed='true'],
 .bot-face-choice__color[aria-pressed='true'] {
-  border-color: #c5c8d0;
+  border-color: var(--ui-text-muted);
 }
 
 .bot-face-choice__shape:focus-visible,

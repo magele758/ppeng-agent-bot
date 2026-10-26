@@ -335,7 +335,7 @@ export function createProductAdminTools(host: ProductAdminHost): ToolContract<Re
     },
     {
       name: 'bot_create',
-      description: 'Create a bot in this product. You can do this. Same capability as create_bot. Required: name. Optional: title, description, persona, allowedTools, allowedSkills, modelOverride {providerId, modelId} for a model already configured in the lab, faceShape, faceColor, faceStyle (classic|soft), faceExpression (soft look), avatar, maxTurns (0 unlimited|24|48|96, single-execution step limit). Ordinary bots stop at the saved roster cap (default 50). Raising that cap is a saved room setting and applies without an environment variable or a restart. Do not send API keys, tokens, secrets, or passwords.',
+      description: 'Create a bot in this product. You can do this. Same capability as create_bot. Required: name. Optional: title, description, persona, allowedTools, allowedSkills, modelOverride {providerId, modelId} for a model already configured in the lab, faceShape, faceColor, faceStyle (classic|soft|bloub), faceExpression (soft look), avatar, maxTurns (0 unlimited|24|48|96, single-execution step limit). Ordinary bots stop at the saved roster cap (default 50). Raising that cap is a saved room setting and applies without an environment variable or a restart. Do not send API keys, tokens, secrets, or passwords.',
       properties: {
         name: { type: 'string' },
         title: { type: 'string' },
@@ -1290,7 +1290,7 @@ export function createProductAdminTools(host: ProductAdminHost): ToolContract<Re
       return [spec, {
         ...spec,
         name: 'create_bot',
-        description: 'Create a bot. You can do this; the tool name is create_bot. Required: name. Optional: title, description, persona, allowedTools, allowedSkills, modelOverride {providerId, modelId} for a model already configured in the lab, faceShape, faceColor, faceStyle (classic|soft), faceExpression (soft look), avatar, maxTurns (0 unlimited|24|48|96, single-execution step limit). Ordinary bots stop at the saved roster cap (default 50). Raising that cap is a saved room setting and applies without an environment variable or a restart. Do not send API keys, tokens, secrets, or passwords.'
+        description: 'Create a bot. You can do this; the tool name is create_bot. Required: name. Optional: title, description, persona, allowedTools, allowedSkills, modelOverride {providerId, modelId} for a model already configured in the lab, faceShape, faceColor, faceStyle (classic|soft|bloub), faceExpression (soft look), avatar, maxTurns (0 unlimited|24|48|96, single-execution step limit). Ordinary bots stop at the saved roster cap (default 50). Raising that cap is a saved room setting and applies without an environment variable or a restart. Do not send API keys, tokens, secrets, or passwords.'
       }];
     }
     if (spec.name === 'bot_room_create') {

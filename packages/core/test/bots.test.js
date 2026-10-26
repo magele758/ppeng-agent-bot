@@ -414,3 +414,18 @@ test('openBot: reopening a per-user chat repairs a blank permission mode and the
   assert.equal(repaired.metadata.sessionCut, true);
   store.db.close();
 });
+
+test('Bloub appearance persists without altering existing styles [AC:bot-bloub-dynamic#AC-1]', () => {
+  const store = tempStore();
+  try {
+    const appearance = { faceStyle: 'bloub', faceShape: 'pebble', faceColor: 'peach', faceExpression: 'happy' };
+    const bot = createBot(host(store), { name: 'Dynamic Bloub', ...appearance });
+    assert.equal(getBot(store, bot.id).faceStyle, 'bloub');
+    for (const [key, value] of Object.entries(appearance)) assert.equal(getBot(store, bot.id)[key], value);
+    const soft = updateBot(host(store), bot.id, { ...appearance, faceStyle: 'soft' });
+    assert.equal(soft.faceStyle, 'soft');
+    const classic = updateBot(host(store), bot.id, { faceStyle: 'classic' });
+    assert.equal(classic.faceShape, null);
+    assert.equal(classic.faceExpression, null);
+  } finally { store.db.close(); }
+});

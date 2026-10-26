@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-10-26T09:51:11.417Z",
-  "reviewNote": "Soft-face PR #266 exception review: refreshed sha256 after face_style/face_expression schema + product-admin faceStyle wiring; migrations additive only; classic default unchanged.",
+  "reviewedAt": "2026-10-26T12:27:27.886Z",
+  "reviewNote": "PR #271 review: product-admin-tools.ts changes only two tool descriptions from classic|soft to classic|soft|bloub. No executable tool, approval, pairing, lifecycle, restart or concurrency behavior changed; their source mappings remain unchanged.",
   "mapping": [
     {
       "step": "Production startup, persistence, writer claims and graceful shutdown (HTTP drain not exercised)",
@@ -396,7 +396,7 @@
     "packages/core/src/skill-proposals/management.ts": "e8812054dd996203a6da64e9e6aef2c4f1a4fc3391408cce7f7927973d1e7e8a",
     "packages/core/src/runtime/spawn-policy.ts": "4889022804d3797796d018abfbe084a2373f1bf630098c6470d932a0c67ebabd",
     "packages/core/src/memory/bot-memory-scope.ts": "bffdcf6cf3e848ea1f2fcc5059b54345d3ee9d49ff98b3a57e917e88593d50c9",
-    "packages/core/src/tools/product-admin-tools.ts": "8f131e4c5437178d0449947f0be939de60109b39d8b0bf5f43c07739dd1e151d",
+    "packages/core/src/tools/product-admin-tools.ts": "7589adbe3997cf67c767c5add9da6a06127fb1698c81b9ad6b2a0a5aaef8a117",
     "packages/core/src/bots/goals/runtime-host.ts": "62d2b675d7c6185686388583fe4081e634c47e01a917e95b929ad7c84a325d97",
     "packages/core/src/bots/goals/runtime-dispatch.ts": "7391c68c41193b8b63e33ab5961a6847ac99c5b6e7ed1953fada2eefffec4c62",
     "packages/core/src/bots/goals/tool-gateway.ts": "713852550276157a250c8c26670f1fffbdc4d996e34ecfa16acf46fb74e96921",

@@ -29,6 +29,7 @@ import {
 import { useI18n } from '@/lib/i18n';
 import { BotFace } from './BotFace';
 import { SoftBotFace } from './SoftBotFace';
+import { BloubFace } from './BloubFace';
 
 export function BotFaceChoice({
   name,
@@ -73,10 +74,11 @@ export function BotFaceChoice({
   const colorLabelId = useId();
   const expressionLabelId = useId();
   const faceStyle = readBotFaceStyle(style) ?? 'classic';
+  const BlobFace = faceStyle === 'bloub' ? BloubFace : SoftBotFace;
   const shown = resolveBotFaceAppearance({ name, savedShape: shape, savedColor: color });
   const previewColor = shown.color ?? 'red';
   const previewFace = previewFaceChoice(shape, color, shown);
-  const seed = softBotFaceSeed({ id: botId, name });
+  const seed = softBotFaceSeed({ id: faceStyle === 'bloub' ? null : botId, name });
   const soft = softBotFaceFromSeed(seed, {
     silhouette: softSilhouette,
     color: softColor,
@@ -91,7 +93,7 @@ export function BotFaceChoice({
         <span className="sr-only" id={styleLabelId}>
           {t('agents.bots.faceStyleLabel')}
         </span>
-        {(['classic', 'soft'] as const).map((id) => (
+        {(['classic', 'soft', 'bloub'] as const).map((id) => (
           <button
             key={id}
             type="button"
@@ -105,8 +107,8 @@ export function BotFaceChoice({
         ))}
       </div>
       <div className="bot-face-choice__preview">
-        {faceStyle === 'soft' ? (
-          <SoftBotFace
+        {(faceStyle === 'soft' || faceStyle === 'bloub') ? (
+          <BlobFace
             seed={seed}
             silhouette={softSilhouette}
             color={softColor}
@@ -128,7 +130,7 @@ export function BotFaceChoice({
         )}
       </div>
       {children}
-      {faceStyle === 'soft' ? (
+      {(faceStyle === 'soft' || faceStyle === 'bloub') ? (
         <>
           <div className="bot-face-choice__group">
             <span className={showLabels ? 'ag-field__label' : 'sr-only'} id={shapeLabelId}>
@@ -141,10 +143,10 @@ export function BotFaceChoice({
                   type="button"
                   className="bot-face-choice__shape"
                   aria-pressed={softShape === id}
-                  aria-label={t(`agents.bots.softShape.${id}`)}
+                  aria-label={t(`agents.bots.${faceStyle === 'bloub' ? 'bloubShape' : 'softShape'}.${id}`)}
                   onClick={() => onSoftSilhouette?.(id)}
                 >
-                  <SoftBotFace seed={seed} silhouette={id} color={softSwatch} expression={softLook} />
+                  <BlobFace seed={seed} silhouette={id} color={softSwatch} expression={softLook} />
                 </button>
               ))}
             </div>
@@ -227,7 +229,7 @@ export function BotFaceChoice({
           </div>
         </>
       )}
-      <p className="ag-field__hint">{t('agents.bots.faceHint')}</p>
+      <p className="ag-field__hint">{t(faceStyle === 'bloub' ? 'agents.bots.bloubHint' : 'agents.bots.faceHint')}</p>
     </fieldset>
   );
 }

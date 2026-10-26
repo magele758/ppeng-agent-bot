@@ -124,14 +124,14 @@ export function previewFaceChoice(
   };
 }
 
-export const BOT_FACE_STYLES = ['classic', 'soft'] as const;
+export const BOT_FACE_STYLES = ['classic', 'soft', 'bloub'] as const;
 
 export type BotFaceStyle = (typeof BOT_FACE_STYLES)[number];
 
 /** Null, blank, and unknown stay on the classic geometric face. */
 export function readBotFaceStyle(raw: unknown): BotFaceStyle | null {
   if (raw === null || raw === undefined || raw === '') return null;
-  return raw === 'classic' || raw === 'soft' ? raw : null;
+  return raw === 'classic' || raw === 'soft' || raw === 'bloub' ? raw : null;
 }
 
 export type SavedFaceEntry = {
@@ -165,8 +165,8 @@ function savedFaceEntry(bot: FaceCatalogBot): { key: string; face: SavedFaceEntr
   if (!key) return null;
   const style = readBotFaceStyle(bot.faceStyle);
   const face = {
-    shape: style === 'soft' ? (isSoftBotSilhouette(bot.faceShape) ? bot.faceShape : null) : (isBotFaceShape(bot.faceShape) ? bot.faceShape : null),
-    color: style === 'soft' ? (isSoftBotColor(bot.faceColor) ? bot.faceColor : null) : (isBotFaceColor(bot.faceColor) ? bot.faceColor : null),
+    shape: (style === 'soft' || style === 'bloub') ? (isSoftBotSilhouette(bot.faceShape) ? bot.faceShape : null) : (isBotFaceShape(bot.faceShape) ? bot.faceShape : null),
+    color: (style === 'soft' || style === 'bloub') ? (isSoftBotColor(bot.faceColor) ? bot.faceColor : null) : (isBotFaceColor(bot.faceColor) ? bot.faceColor : null),
     style,
     expression: typeof bot.faceExpression === 'string' && bot.faceExpression.trim() ? bot.faceExpression.trim() : null,
     avatar: savedAvatarText(bot.avatar)
