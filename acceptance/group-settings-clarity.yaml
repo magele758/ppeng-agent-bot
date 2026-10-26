@@ -4,7 +4,7 @@ status: implemented
 requirement: |
   上面的几个是什么？是默认的分组？怎么会有这个东西的？完全没用吧？
   这个设置页面帮我改的好看点，现在完全一锅粥
-notes: 'assumedApproval: standing-order-2026-10-22'
+notes: 'assumedApproval: standing-order-2026-10-22；2026-10-26 按最新要求将成员管理移入设置，更新 AC-2。'
 criteria:
   - id: AC-1
     given: 群聊存在成员且侧栏存在功能分组
@@ -13,7 +13,7 @@ criteria:
   - id: AC-2
     given: 用户打开群聊设置
     when: 查看并修改设置
-    then: 基本信息、回复方式与默认折叠的运行限制分区展示，设置区不重复显示聊天表单和成员列表，名称和预算仍能保存
+    then: 基本信息、回复方式与默认折叠的运行限制分区展示，设置区不重复显示聊天表单，完整成员列表仅在设置内展示，名称和预算仍能保存
   - id: AC-3
     given: 用户查看群聊回复方式
     when: 切换方式或保存失败

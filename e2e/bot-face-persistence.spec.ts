@@ -47,6 +47,7 @@ test('created Bot appearance and optional fields persist across reload, picker, 
     expect(roomResult.ok()).toBeTruthy();
     await page.reload();
     await page.getByRole('button', { name: `打开群聊 Face room ${bot.id}`, exact: true }).click();
+    await page.getByRole('button', { name: '群聊设置', exact: true }).click();
     await verify(page.getByTestId(`room-member-face-${bot.id}`));
   }
 });

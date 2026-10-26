@@ -198,17 +198,12 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
   const { t } = useI18n();
   const workStates = useBotWorkStates();
   const [showSettings, setShowSettings] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [membersClosed, setMembersClosed] = useState(false);
   const [groups, setGroups] = useState<FunctionalGroupRef[]>([]);
   const [approvalMode, setApprovalMode] = useState<RoomApprovalMode>('private');
   const [goalBusy, setGoalBusy] = useState(false);
   useEffect(() => {
     setShowSettings(false);
-    setDrawerOpen(false);
-    setMembersClosed(false);
   }, [roomId]);
-  useEffect(() => setMembersClosed(false), [showSettings]);
   const [models,setModels] = useState<RoomModelConfiguration|null>(null);
   const [room, setRoom] = useState<Room | null>(null);
   const [messages, setMessages] = useState<RoomMessage[]>([]);
@@ -332,7 +327,7 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
   const known = new Set(bots.map((bot) => bot.id));
   const memberIds = uniqueMemberIds(room?.botIds ?? []);
   const crowded = room ? !tileMembersInHeader(memberIds.length) : false;
-  const membersOpen = crowded && (drawerOpen || showSettings) && !membersClosed;
+  const workingIds = memberIds.filter(id => workStates[id] > 0);
   const speaking = turns.some((turn) => turn.status === 'queued' || turn.status === 'running' || turn.status === 'waiting_approval');
   const speakingIds = speakingBotIds(turns);
   const speakingNames = speakingIds.map(nameOf).join(t('play.group.nameSeparator'));
@@ -552,26 +547,6 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
         </div>
         <div className="play-group-header-actions">
           <a className="btn btn-ghost btn-sm" href="#/settings/models" data-testid="room-default-model">{t('play.groupModel.settings')}</a>
-          {crowded ? (
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              data-testid="play-group-members-open"
-              aria-label={t('play.group.manageMembers')}
-              aria-expanded={membersOpen}
-              onClick={() => {
-                if (membersOpen) {
-                  setDrawerOpen(false);
-                  setMembersClosed(true);
-                  return;
-                }
-                setMembersClosed(false);
-                setDrawerOpen(true);
-              }}
-            >
-              {t('play.group.memberCount', { count: memberIds.length })}
-            </button>
-          ) : null}
           <button type="button" className="btn btn-ghost btn-sm" aria-expanded={showSettings} onClick={() => setShowSettings(value => !value)}>{t('play.groupSettings.title')}</button>
         </div>
       </header>
@@ -582,81 +557,88 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
         onCancel={() => void runGoalAction('cancel')}
         onAmend={(constraint) => void runGoalAction('amend', constraint)}
       />
-      {membersOpen && room ? (
-        <RoomMemberDrawer
-          memberIds={memberIds}
-          bots={[...bots]}
-          groups={groups}
-          hostId={room.hostBotId}
-          speakingIds={speakingIds}
-          busy={busy}
-          error={error}
-          onClose={() => {
-            setDrawerOpen(false);
-            setMembersClosed(true);
-          }}
-          onAddMember={(botId) => void addMember(botId)}
-          onRemoveMember={(botId) => void removeMember(botId)}
-          onAddGroup={(groupId) => void addFunctionalGroup(groupId)}
-          onRemoveGroup={(groupId) => void removeFunctionalGroup(groupId)}
-        />
+      {workingIds.length > 0 ? (
+        <div className="play-group-working" data-testid="room-working-members" aria-label={t('play.group.workingMembers')}>
+          {workingIds.map(id => (
+            <span key={id} className="play-group-working__member" title={nameOf(id)}>
+              <BotFace name={nameOf(id)} mood="thinking" size="sm" testId={`room-working-face-${id}`} />
+              <span className="play-group-working__name">{nameOf(id)}</span>
+            </span>
+          ))}
+        </div>
       ) : null}
-      {showSettings && <div className="play-group-settings" data-testid="room-settings"><BotRooms key={roomId} bots={[...bots]} selectedRoomId={roomId} memberEditor={false} /></div>}
-      {crowded ? (
-        <div className="play-group-members" data-testid="play-group-member-summary">
-          {error && !membersOpen ? <p className="play-group-error">{error}</p> : null}
-          <RoomReplyFailure turn={turns.at(-1)} />
-          {room ? <RoomSharedContextEditor roomId={room.id} /> : null}
+      {showSettings ? (
+        <div className="play-group-settings" data-testid="room-settings">
+          <BotRooms key={roomId} bots={[...bots]} selectedRoomId={roomId} memberEditor={false} />
+          {room ? <section className="play-group-settings-members" aria-label={t('play.group.membersDrawer')}>
+            <h3>{t('play.group.membersDrawer')}</h3>
+            {crowded ? (
+              <RoomMemberDrawer
+                memberIds={memberIds}
+                bots={[...bots]}
+                groups={groups}
+                hostId={room.hostBotId}
+                speakingIds={speakingIds}
+                busy={busy}
+                error={error}
+                onAddMember={(botId) => void addMember(botId)}
+                onRemoveMember={(botId) => void removeMember(botId)}
+                onAddGroup={(groupId) => void addFunctionalGroup(groupId)}
+                onRemoveGroup={(groupId) => void removeFunctionalGroup(groupId)}
+              />
+            ) : (
+              <div className="play-group-members">
+                <div className="play-group-member-row">
+                  <span className="play-group-badge">{t('play.group.badge')}</span>
+                  {memberIds.map((id) => {
+                    const modelName = roomMemberModelLabel(models, id);
+                    return (
+                      <span key={id} className="play-group-member">
+                        <BotFace name={nameOf(id)} mood={workStates[id]>0?'thinking':'idle'} size="sm" testId={`room-member-face-${id}`} />
+                        <span className="play-group-member__identity">
+                          <span>{nameOf(id)}</span>
+                          {modelName ? (
+                            <span className="play-group-member__model" data-testid={`room-member-model-${id}`}>
+                              {modelName}
+                            </span>
+                          ) : null}
+                        </span>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          disabled={busy || !room || memberIds.length <= 2}
+                          aria-label={t('play.group.removeAria', { name: nameOf(id) })}
+                          onClick={() => void removeMember(id)}
+                        >
+                          {t('play.group.remove')}
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+                <div className="play-group-add">
+                  <select aria-label={t('play.group.addMember')} value={addId} onChange={(event) => setAddId(event.target.value)}>
+                    <option value="">{t('play.group.addMember')}</option>
+                    {available.map((bot) => (
+                      <option key={bot.id} value={bot.id}>
+                        {bot.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button type="button" className="btn btn-secondary btn-sm" disabled={busy || !addId} onClick={() => void addMember()}>
+                    {t('play.group.add')}
+                  </button>
+                </div>
+                {room && memberIds.length <= 2 ? <p className="play-group-hint">{t('play.group.keepTwo')}</p> : null}
+                {error ? <p className="play-group-error">{error}</p> : null}
+              </div>
+            )}
+            <RoomSharedContextEditor roomId={room.id} />
+          </section> : null}
         </div>
-      ) : (
-      <div className="play-group-members">
-        <div className="play-group-member-row">
-          <span className="play-group-badge">{t('play.group.badge')}</span>
-          {memberIds.map((id) => {
-            const modelName = roomMemberModelLabel(models, id);
-            return (
-              <span key={id} className="play-group-member">
-                <BotFace name={nameOf(id)} mood={workStates[id]>0?'thinking':'idle'} size="sm" testId={`room-member-face-${id}`} />
-                <span className="play-group-member__identity">
-                  <span>{nameOf(id)}</span>
-                  {modelName ? (
-                    <span className="play-group-member__model" data-testid={`room-member-model-${id}`}>
-                      {modelName}
-                    </span>
-                  ) : null}
-                </span>
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  disabled={busy || !room || memberIds.length <= 2}
-                  aria-label={t('play.group.removeAria', { name: nameOf(id) })}
-                  onClick={() => void removeMember(id)}
-                >
-                  {t('play.group.remove')}
-                </button>
-              </span>
-            );
-          })}
-        </div>
-        <div className="play-group-add">
-          <select aria-label={t('play.group.addMember')} value={addId} onChange={(event) => setAddId(event.target.value)}>
-            <option value="">{t('play.group.addMember')}</option>
-            {available.map((bot) => (
-              <option key={bot.id} value={bot.id}>
-                {bot.name}
-              </option>
-            ))}
-          </select>
-          <button type="button" className="btn btn-secondary btn-sm" disabled={busy || !addId} onClick={() => void addMember()}>
-            {t('play.group.add')}
-          </button>
-        </div>
-        {room && memberIds.length <= 2 ? <p className="play-group-hint">{t('play.group.keepTwo')}</p> : null}
-        {error ? <p className="play-group-error">{error}</p> : null}
-        <RoomReplyFailure turn={turns.at(-1)} />
-        {room ? <RoomSharedContextEditor roomId={room.id} /> : null}
-      </div>
-      )}
+      ) : null}
+      {!showSettings && error ? <p className="play-group-error">{error}</p> : null}
+      <RoomReplyFailure turn={turns.at(-1)} />
       <RoomCollaborationHistory turns={turns} names={new Map(bots.map(bot => [bot.id, bot.name]))} />
       <div className="chat-panel-body">
         <div className="chat-feed-shell">

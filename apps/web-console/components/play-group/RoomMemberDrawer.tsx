@@ -26,7 +26,7 @@ export function RoomMemberDrawer({
   speakingIds: readonly string[];
   busy: boolean;
   error: string;
-  onClose: () => void;
+  onClose?: () => void;
   onAddMember: (botId: string) => void;
   onRemoveMember: (botId: string) => void;
   onAddGroup: (groupId: string) => void;
@@ -60,7 +60,7 @@ export function RoomMemberDrawer({
       <div className="play-group-drawer__bar">
         <p data-testid="play-group-host">{t('play.group.hostLine', { name: hostName })}</p>
         {speakingNames ? <p data-testid="play-group-drawer-speaking">{t('play.group.speakingNow', { names: speakingNames })}</p> : null}
-        <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}>{t('play.group.closeMembers')}</button>
+        {onClose ? <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}>{t('play.group.closeMembers')}</button> : null}
       </div>
       <input
         data-testid="play-group-member-search"

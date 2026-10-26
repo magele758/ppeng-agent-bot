@@ -18,7 +18,7 @@ test('settings are divided and still save [AC:group-settings-clarity#AC-2] [AC:g
   const settings = page.getByTestId('room-settings');
   await expect(settings.getByRole('group', { name: '基本信息' })).toBeVisible();
   await expect(settings.locator('textarea')).toHaveCount(0);
-  await expect(settings.getByRole('button', { name: '移出', exact: true })).toHaveCount(0);
+  await expect(settings.getByRole('button', { name: /^把 .* 移出群聊$/ })).toHaveCount(2);
   const limits = settings.locator('details').filter({ hasText: '运行限制' });
   await expect(limits).not.toHaveAttribute('open', '');
   await limits.locator('summary').click();

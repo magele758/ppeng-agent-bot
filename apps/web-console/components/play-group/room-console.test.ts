@@ -80,14 +80,14 @@ test('超过 6 人时主聊天区不铺成员卡，打开后可搜索并整组�
   assert.equal(speakingBotIds([{ status: 'running', members: [{ botId: 'orion', status: 'running' }] }])[0], 'orion');
 
   assert.match(chat, /tileMembersInHeader/);
-  assert.match(chat, /data-testid="play-group-member-summary"/);
-  assert.match(chat, /data-testid="play-group-members-open"/);
+  assert.match(chat, /data-testid="room-working-members"/);
+  assert.doesNotMatch(chat, /data-testid="play-group-members-open"/);
   assert.match(chat, /data-testid="play-group-speaking"/);
   assert.match(chat, /memberEditor=\{false\}/);
-  const summaryAt = chat.indexOf('data-testid="play-group-member-summary"');
+  const settingsAt = chat.indexOf('data-testid="room-settings"');
   const tileAt = chat.indexOf('className="play-group-member"');
-  assert.ok(summaryAt > 0 && tileAt > summaryAt);
-  assert.doesNotMatch(chat.slice(summaryAt, tileAt), /play\.group\.remove|play-group-add/);
+  assert.ok(settingsAt > 0 && tileAt > settingsAt);
+  assert.match(chat, /memberIds.filter\(id => workStates\[id\] > 0\)/);
   assert.match(drawer, /data-testid="play-group-member-search"/);
   assert.match(drawer, /data-testid="play-group-host"/);
   assert.match(drawer, /play-group-add-group-/);

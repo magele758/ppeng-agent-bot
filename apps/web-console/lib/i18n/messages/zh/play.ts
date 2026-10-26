@@ -273,6 +273,7 @@ export const play = {
     older: '更早的消息',
     attachmentCount: '{count} 个附件',
     memberCount: '{count} 名成员',
+    workingMembers: '正在工作的群成员',
     manageMembers: '成员',
     membersDrawer: '群成员',
     membersSearch: '搜索成员或职能组',
