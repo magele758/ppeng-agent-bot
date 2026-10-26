@@ -110,3 +110,14 @@ test('compile failures preserve status and never start services [AC:dev-lab-proc
 test('a web spawn error returns failure and cleans the already spawned daemon [AC:dev-lab-process-cleanup#AC-2]',{skip:!posix,timeout:15000},async t=>{
  const f=await fixture(t,'spawn-fail');const {done}=f.start();assert.equal((await done).code,1);await f.gone();await bind(f.daemonPort);await bind(f.webPort);
 });
+
+test('an EPERM probe distinguishes vanished or zombie groups from live protected members [AC:dev-lab-process-cleanup#AC-3]', {skip:!posix}, async () => {
+ const { groupExists } = await import('../dev-lab-processes.mjs');
+ const denied = Object.assign(new Error('kill EPERM'),{code:'EPERM'});
+ const kill = () => {throw denied;};
+ assert.equal(groupExists({pid:501},{kill,listGroups:()=>''}),false);
+ assert.equal(groupExists({pid:501},{kill,listGroups:()=> '12 501 Z\n13 502 S'}),false);
+ assert.throws(()=>groupExists({pid:501},{kill,listGroups:()=> '12 501 S'}),error=>error===denied);
+ assert.throws(()=>groupExists({pid:501},{kill,listGroups:()=> {throw Error('ps failed');}}),error=>error===denied);
+ assert.throws(()=>groupExists({pid:501},{kill,listGroups:()=> 'unparseable'}),error=>error===denied);
+});
