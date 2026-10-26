@@ -81,7 +81,7 @@ pnpm run dev
 
 Open the **Agent Lab URL printed in the terminal**. Configure a provider (Base URL / API Key) in chat's model settings, discover models, then select one and send a message. No `.env` copy is required for this UI-first setup.
 
-The dev launcher selects available ports and wires the proxy automatically; chosen addresses are also saved to `.agent-state/dev-lab.ports.json`. Without overrides, preferred ports are 23000 (Lab) and 27070 (daemon), with fallback on conflicts. Do not assume a fixed port from an older example.
+The dev launcher selects available ports and wires the proxy automatically; chosen addresses are also saved to `.agent-state/dev-lab.ports.json`. Without overrides, preferred ports are 23000 (Lab) and 27070 (daemon), with fallback on conflicts. Do not assume a fixed port from an older example. On macOS/Linux, stopping the launcher (Ctrl+C, SIGTERM, or SIGHUP) also stops its compiler, daemon, and Next process groups. It waits up to three seconds before force-stopping remaining descendants, so a restart can reuse the same ports without touching other checkouts.
 
 For a no-key smoke check, use the isolated heuristic eval after building:
 
