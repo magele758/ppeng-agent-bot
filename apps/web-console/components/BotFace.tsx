@@ -37,6 +37,7 @@ import {
 import { isSoftBotColor, isSoftBotExpression, isSoftBotSilhouette, type SoftBotColor, type SoftBotExpression, type SoftBotSilhouette } from '@/lib/soft-bot-face';
 import { useSavedFace } from './BotFaceCatalog';
 import { SoftBotFace } from './SoftBotFace';
+import { BloubFace } from './BloubFace';
 import { useI18n } from '@/lib/i18n';
 import './bot-face.css';
 
@@ -57,8 +58,8 @@ export interface BotFaceProps {
   /** Explicit swatch. Same rules as `shape`. */
   color?: BotFaceColor | null;
   /**
-   * Icon set. `undefined` uses a saved choice. `soft` draws the blob face.
-   * Anything else, including null, keeps the classic geometric face.
+   * Icon set. `undefined` uses a saved choice. `soft` draws static blobs and
+   * `bloub` uses the Bloub engine. Null keeps the classic geometric face.
    */
   faceStyle?: BotFaceStyle | null;
   /** Bot id, preferred as the soft-face seed when the style is soft. */
@@ -283,8 +284,8 @@ export function BotFace({
   const showAvatar = standIn !== null;
   const faceStyle = readBotFaceStyle(faceStyleProp !== undefined ? faceStyleProp : saved.style);
   const savedExpression = isSoftBotExpression(saved.expression) ? saved.expression : null;
-  const savedSoftSilhouette = faceStyle === 'soft' && isSoftBotSilhouette(saved.shape) ? saved.shape : null;
-  const savedSoftColor = faceStyle === 'soft' && isSoftBotColor(saved.color) ? saved.color : null;
+  const savedSoftSilhouette = (faceStyle === 'soft' || faceStyle === 'bloub') && isSoftBotSilhouette(saved.shape) ? saved.shape : null;
+  const savedSoftColor = (faceStyle === 'soft' || faceStyle === 'bloub') && isSoftBotColor(saved.color) ? saved.color : null;
 
   useEffect(() => {
     const until = turnFinishHappyUntil(prevMoodRef.current, mood, performance.now());
@@ -293,7 +294,7 @@ export function BotFace({
   }, [mood]);
 
   useEffect(() => {
-    if (showAvatar) return;
+    if (showAvatar || faceStyle === 'soft' || faceStyle === 'bloub') return;
     if (mood === 'idle') {
       // An active turn may have moved these nodes imperatively. Returning to
       // idle must reset that pose as well as stop its animation subscription.
@@ -379,12 +380,14 @@ export function BotFace({
         dot.setAttribute('transform', `translate(${cx} ${cy}) scale(${scale.toFixed(3)}) translate(${-cx} ${-cy})`);
       }
     });
-  }, [showAvatar, mood]);
+  }, [showAvatar, mood, faceStyle]);
 
   if (standIn) return <AvatarFace standIn={standIn} working={working} size={size} workLabel={workLabel} mood={mood} testId={testId} />;
-  if (faceStyle === 'soft') {
+  if (faceStyle === 'soft' || faceStyle === 'bloub') {
+    const BlobFace = faceStyle === 'bloub' ? BloubFace : SoftBotFace;
     return (
-      <SoftBotFace
+      <BlobFace
+        {...(faceStyle === 'bloub' ? { mood } : {})}
         id={botId}
         name={name}
         silhouette={softSilhouette !== undefined ? softSilhouette : savedSoftSilhouette}

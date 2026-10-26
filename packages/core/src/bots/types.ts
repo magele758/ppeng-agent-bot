@@ -8,11 +8,11 @@ export interface BotRecord {
   agentId: string;
   canonicalSessionId: string;
   hidden: boolean;
-  /** Saved silhouette. Classic ids, or a soft id when faceStyle is soft. Null keeps the seed. */
+  /** Saved silhouette. Classic ids, or a soft id when faceStyle is soft or bloub. Null keeps the seed. */
   faceShape: StoredFaceShape | null;
-  /** Saved swatch. Classic ids, or a soft pastel when faceStyle is soft. Null keeps the seed. */
+  /** Saved swatch. Classic ids, or a soft pastel when faceStyle is soft or bloub. Null keeps the seed. */
   faceColor: StoredFaceColor | null;
-  /** Saved icon set. Null or classic keeps the geometric face. Soft draws the blob set. */
+  /** Saved icon set. Null or classic keeps the geometric face. Soft draws static blobs; bloub uses the Bloub engine. */
   faceStyle: BotFaceStyle | null;
   /** Soft resting look. Null keeps the seed. Classic rows do not store one. */
   faceExpression: SoftBotExpression | null;
@@ -30,9 +30,9 @@ export interface CreateBotInput {
   faceShape?: unknown;
   /** Omitted or null keeps the name-based color. */
   faceColor?: unknown;
-  /** Omitted, blank, or classic keeps the geometric face. `soft` selects the blob set. */
+  /** Omitted, blank, or classic keeps the geometric face. `soft` selects static blobs; `bloub` selects animated Bloub. */
   faceStyle?: unknown;
-  /** Soft look. Omitted or blank keeps the seed. Only valid when faceStyle is soft. */
+  /** Soft look. Omitted or blank keeps the seed. Only valid when faceStyle is soft or bloub. */
   faceExpression?: unknown;
   /** Emoji or http(s) image URL. Omitted or blank keeps the geometric face. */
   avatar?: unknown;

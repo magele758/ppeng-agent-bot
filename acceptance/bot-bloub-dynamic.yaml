@@ -1,0 +1,19 @@
+id: bot-bloub-dynamic
+title: Bloub 动态头像风格
+status: implemented
+requirement: |
+  另加一套 “Bloub 动态”
+notes: 'assumedApproval: standing-order-2026-10-22；采用真实 Bloub 动画库，保留经典和软萌风格。'
+criteria:
+  - id: AC-1
+    given: 用户新建或编辑 Bot
+    when: 选择 Bloub 动态并保存
+    then: 新风格与原有两种风格并列可选，刷新后保留风格和外观
+  - id: AC-2
+    given: Bot 使用 Bloub 动态
+    when: 工作状态开始或结束
+    then: 显示真实 Bloub 头像，工作时持续运动，结束后回到空闲状态，保留身份外观
+  - id: AC-3
+    given: 用户偏好减少动态效果或头像离开页面
+    when: 显示或卸载 Bloub 头像
+    then: 减少动态效果时保持静态外观，卸载后停止动画，不影响原有头像风格

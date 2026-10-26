@@ -90,11 +90,11 @@ export function BotCreateForm({ existingNames, onCreated, onCancel }: BotCreateF
             emoji: '',
             imageUrl: '',
             face:
-              face.style === 'soft'
+              (face.style === 'soft' || face.style === 'bloub')
                 ? {
                     shape: face.softSilhouette,
                     color: face.softColor,
-                    style: 'soft',
+                    style: face.style,
                     expression: face.softExpression
                   }
                 : { shape: face.shape, color: face.color, style: face.style }
@@ -199,9 +199,9 @@ export function BotCreateForm({ existingNames, onCreated, onCancel }: BotCreateF
           }
           onShape={(shape) => setFace((current) => ({ ...current, shape }))}
           onColor={(color) => setFace((current) => ({ ...current, color }))}
-          onSoftSilhouette={(softSilhouette) => setFace((current) => ({ ...current, style: 'soft', softSilhouette }))}
-          onSoftColor={(softColor) => setFace((current) => ({ ...current, style: 'soft', softColor }))}
-          onSoftExpression={(softExpression) => setFace((current) => ({ ...current, style: 'soft', softExpression }))}
+          onSoftSilhouette={(softSilhouette) => setFace((current) => ({ ...current, style: face.style, softSilhouette }))}
+          onSoftColor={(softColor) => setFace((current) => ({ ...current, style: face.style, softColor }))}
+          onSoftExpression={(softExpression) => setFace((current) => ({ ...current, style: face.style, softExpression }))}
         />
 
         </div>

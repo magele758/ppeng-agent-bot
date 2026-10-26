@@ -88,7 +88,7 @@ export class BotStore {
     const current = this.get(id);
     if (!current) throw new NotFoundError('Bot', id);
     const faceStyle = patch.faceStyle !== undefined ? normalizeBotFaceStyle(patch.faceStyle) : current.faceStyle;
-    const styleChanged = patch.faceStyle !== undefined && (faceStyle === 'soft') !== (current.faceStyle === 'soft');
+    const styleChanged = patch.faceStyle !== undefined && (faceStyle === 'soft' || faceStyle === 'bloub') !== (current.faceStyle === 'soft' || current.faceStyle === 'bloub');
     const next: BotRecord = {
       ...current,
       name: patch.name !== undefined ? patch.name : current.name,
@@ -105,8 +105,8 @@ export class BotStore {
           : current.faceColor,
       faceStyle,
       faceExpression:
-        patch.faceExpression !== undefined || (styleChanged && faceStyle !== 'soft')
-          ? normalizeFaceExpressionForStyle(styleChanged && faceStyle !== 'soft' ? null : patch.faceExpression, faceStyle)
+        patch.faceExpression !== undefined || (styleChanged && (faceStyle !== 'soft' && faceStyle !== 'bloub'))
+          ? normalizeFaceExpressionForStyle(styleChanged && (faceStyle !== 'soft' && faceStyle !== 'bloub') ? null : patch.faceExpression, faceStyle)
           : current.faceExpression,
       avatar: patch.avatar !== undefined ? normalizeBotAvatar(patch.avatar) : current.avatar,
       canonicalSessionId: patch.canonicalSessionId ?? current.canonicalSessionId,

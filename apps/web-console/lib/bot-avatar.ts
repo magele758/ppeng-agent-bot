@@ -65,7 +65,7 @@ export function botAvatarIssue(emoji: string, imageUrl: string): BotAvatarIssue 
 export type BotCreateFace = {
   shape: string | null;
   color: string | null;
-  style?: 'classic' | 'soft' | null;
+  style?: 'classic' | 'soft' | 'bloub' | null;
   expression?: string | null;
 };
 
@@ -84,7 +84,7 @@ export type BotCreatePayload = {
   description?: string;
   faceShape?: string;
   faceColor?: string;
-  faceStyle?: 'classic' | 'soft';
+  faceStyle?: 'classic' | 'soft' | 'bloub';
   faceExpression?: string;
   avatar?: string;
 };
@@ -106,11 +106,11 @@ function withOptional<T extends object>(body: T, key: string, value: string | nu
 export function buildBotCreatePayload(fields: BotCreateFields): BotCreatePayload {
   const named = withOptional({ name: fields.name.trim() }, 'title', optionalText(fields.title));
   const described = withOptional(named, 'description', optionalText(fields.description));
-  const face = fields.face.style === 'soft' ? softCreateFace(fields.name, fields.face) : fields.face;
+  const face = (fields.face.style === 'soft' || fields.face.style === 'bloub') ? softCreateFace(fields.name, fields.face) : fields.face;
   const faced = withOptional(described, 'faceShape', face.shape);
   const colored = withOptional(faced, 'faceColor', face.color);
-  const styled = withOptional(colored, 'faceStyle', face.style === 'soft' ? 'soft' : null);
-  const expressed = withOptional(styled, 'faceExpression', face.style === 'soft' ? face.expression : null);
+  const styled = withOptional(colored, 'faceStyle', (face.style === 'soft' || face.style === 'bloub') ? face.style : null);
+  const expressed = withOptional(styled, 'faceExpression', (face.style === 'soft' || face.style === 'bloub') ? face.expression : null);
   return withOptional(expressed, 'avatar', botAvatarValue(fields.emoji, fields.imageUrl));
 }
 
@@ -123,7 +123,7 @@ function softCreateFace(name: string, face: BotCreateFace): BotCreateFace {
   return {
     shape: face.shape || seeded.silhouette,
     color: face.color || seeded.color,
-    style: 'soft',
+    style: face.style,
     expression: face.expression || seeded.expression
   };
 }

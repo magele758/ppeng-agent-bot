@@ -70,7 +70,7 @@ export type ApiBotInfo = {
     | 'nub'
     | 'pillow'
     | null;
-  /** Saved swatch. Absent or null keeps the name-based color. Soft pastels are valid when faceStyle is soft. */
+  /** Saved swatch. Absent or null keeps the name-based color. Soft pastels are valid when faceStyle is soft or bloub. */
   faceColor?:
     | 'black'
     | 'brown'
@@ -96,7 +96,7 @@ export type ApiBotInfo = {
     | 'ink'
     | null;
   /** Saved icon set. Absent, null, or classic keeps the geometric face. */
-  faceStyle?: 'classic' | 'soft' | null;
+  faceStyle?: 'classic' | 'soft' | 'bloub' | null;
   /** Soft resting look. Absent or null keeps the seed. Classic rows do not store one. */
   faceExpression?: 'neutral' | 'happy' | 'curious' | 'sleepy' | 'wink' | 'content' | 'wide' | 'shy' | null;
   /** Emoji or http(s) image URL. Absent or null keeps the geometric face. */

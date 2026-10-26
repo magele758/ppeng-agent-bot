@@ -79,11 +79,23 @@ export const agents = {
     faceColorLabel: 'Color',
     faceStyleLabel: 'Look',
     faceHint: 'Leave these unset to follow the name. After you save, the picker, sessions and groups use this face.',
+    bloubHint: 'Animates while working; hover to interact when idle. Respects your system’s reduced-motion preference.',
     faceStyle: {
+      bloub: 'Bloub animated',
       classic: 'Classic',
       soft: 'Soft robot'
     },
     softExpressionLabel: 'Expression',
+    bloubShape: {
+      pebble: 'Circle',
+      squish: 'Squircle',
+      capsule: 'Capsule',
+      cloud: 'Cloud',
+      drop: 'Drop',
+      bean: 'Pebble',
+      nub: 'Triangle',
+      pillow: 'Hexagon',
+    },
     softShape: {
       pebble: 'Pebble',
       squish: 'Squish',

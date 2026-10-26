@@ -19,13 +19,14 @@ export type FacePatch = Record<string, string | null>;
 
 /** The body for one click. A style click sends the whole set that is current now. */
 export function facePatch(kind: FaceSaveKind, face: FaceDraft): FacePatch {
+  const blobStyle = face.style === 'bloub' ? 'bloub' : 'soft';
   if (kind === 'shape') return { faceShape: face.shape, faceStyle: 'classic' };
   if (kind === 'color') return { faceColor: face.color, faceStyle: 'classic' };
-  if (kind === 'soft-shape') return { faceStyle: 'soft', faceShape: face.softShape };
-  if (kind === 'soft-color') return { faceStyle: 'soft', faceColor: face.softColor };
-  if (kind === 'soft-expression') return { faceStyle: 'soft', faceExpression: face.softExpression };
-  return face.style === 'soft'
-    ? { faceStyle: 'soft', faceShape: face.softShape, faceColor: face.softColor, faceExpression: face.softExpression }
+  if (kind === 'soft-shape') return { faceStyle: blobStyle, faceShape: face.softShape };
+  if (kind === 'soft-color') return { faceStyle: blobStyle, faceColor: face.softColor };
+  if (kind === 'soft-expression') return { faceStyle: blobStyle, faceExpression: face.softExpression };
+  return (face.style === 'soft' || face.style === 'bloub')
+    ? { faceStyle: blobStyle, faceShape: face.softShape, faceColor: face.softColor, faceExpression: face.softExpression }
     : { faceStyle: null, faceShape: face.shape, faceColor: face.color, faceExpression: null };
 }
 

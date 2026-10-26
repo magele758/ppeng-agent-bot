@@ -79,11 +79,23 @@ export const agents = {
     faceColorLabel: '颜色',
     faceStyleLabel: '风格',
     faceHint: '不选就按名字决定。保存后，选择器、会话和群里都用这张脸。',
+    bloubHint: '工作时持续运动，空闲时悬停可互动。遵循系统的“减少动态效果”设置。',
     faceStyle: {
+      bloub: 'Bloub 动态',
       classic: '经典',
       soft: '软萌机器人'
     },
     softExpressionLabel: '表情',
+    bloubShape: {
+      pebble: '圆形',
+      squish: '圆角方形',
+      capsule: '胶囊',
+      cloud: '云朵',
+      drop: '水滴',
+      bean: '鹅卵石',
+      nub: '三角形',
+      pillow: '六边形',
+    },
     softShape: {
       pebble: '鹅卵石',
       squish: '软方块',

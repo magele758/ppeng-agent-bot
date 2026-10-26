@@ -116,3 +116,10 @@ test('同一队列在切换 Bot 后仍串行，慢的前一次不会与新队列
   assert.equal(bodies[0]?.faceShape, 'pebble');
   assert.equal(bodies[1]?.faceShape, 'capsule');
 });
+
+test('Bloub edits preserve the selected style for every appearance axis [AC:bot-bloub-dynamic#AC-1]', () => {
+  const face = { ...EMPTY, style: 'bloub', softShape: 'pebble', softColor: 'peach', softExpression: 'happy' };
+  for (const kind of ['style', 'soft-shape', 'soft-color', 'soft-expression'] as const) {
+    assert.equal(facePatch(kind, face).faceStyle, 'bloub');
+  }
+});

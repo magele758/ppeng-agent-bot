@@ -39,7 +39,7 @@ export const BOT_FACE_COLORS = [
 export type BotFaceColor = (typeof BOT_FACE_COLORS)[number];
 
 /** Which icon set a bot draws. Absent, blank, or unknown stays on the classic face. */
-export const BOT_FACE_STYLES = ['classic', 'soft'] as const;
+export const BOT_FACE_STYLES = ['classic', 'soft', 'bloub'] as const;
 
 export type BotFaceStyle = (typeof BOT_FACE_STYLES)[number];
 
@@ -125,19 +125,19 @@ export function readBotFaceStyle(raw: unknown): BotFaceStyle | null {
   return readChoice(raw, BOT_FACE_STYLES);
 }
 
-/** Blank clears the column (classic). Anything else must be classic or soft. */
+/** Blank clears the column (classic). Anything else must be classic, soft or bloub. */
 export function normalizeBotFaceStyle(raw: unknown): BotFaceStyle | null {
   return requireChoice('faceStyle', raw, BOT_FACE_STYLES);
 }
 
 /** Classic rows keep the geometric ids. A soft row may only store a soft id. */
 export function normalizeFaceShapeForStyle(raw: unknown, style: BotFaceStyle | null): StoredFaceShape | null {
-  if (style === 'soft') return requireChoice('faceShape', raw, SOFT_BOT_SILHOUETTES);
+  if ((style === 'soft' || style === 'bloub')) return requireChoice('faceShape', raw, SOFT_BOT_SILHOUETTES);
   return normalizeBotFaceShape(raw);
 }
 
 export function normalizeFaceColorForStyle(raw: unknown, style: BotFaceStyle | null): StoredFaceColor | null {
-  if (style === 'soft') return requireChoice('faceColor', raw, SOFT_BOT_COLORS);
+  if ((style === 'soft' || style === 'bloub')) return requireChoice('faceColor', raw, SOFT_BOT_COLORS);
   return normalizeBotFaceColor(raw);
 }
 
@@ -147,10 +147,10 @@ export function readBotFaceExpression(raw: unknown): SoftBotExpression | null {
 
 /** Blank clears it. A classic row never stores one. Anything else must be a soft look. */
 export function normalizeFaceExpressionForStyle(raw: unknown, style: BotFaceStyle | null): SoftBotExpression | null {
-  if (style !== 'soft') {
+  if ((style !== 'soft' && style !== 'bloub')) {
     if (raw === undefined || raw === null) return null;
     if (typeof raw === 'string' && raw.trim() === '') return null;
-    throw new ValidationError('faceExpression is only saved for a soft face');
+    throw new ValidationError('faceExpression is only saved for a soft or bloub face');
   }
   return requireChoice('faceExpression', raw, SOFT_BOT_EXPRESSIONS);
 }
@@ -243,8 +243,8 @@ export function faceUpdatePatch(
   avatar?: string | null;
 } {
   const faceStyle = patch.faceStyle !== undefined ? normalizeBotFaceStyle(patch.faceStyle) : current?.faceStyle ?? null;
-  // Null and classic are the same geometric face. Only a real soft/classic change drops the other set.
-  const styleChanged = current !== undefined && patch.faceStyle !== undefined && (faceStyle === 'soft') !== (current.faceStyle === 'soft');
+  // Null and classic are the same geometric face. Only a blob/classic change drops the other set.
+  const styleChanged = current !== undefined && patch.faceStyle !== undefined && (faceStyle === 'soft' || faceStyle === 'bloub') !== (current.faceStyle === 'soft' || current.faceStyle === 'bloub');
   return {
     ...(patch.faceShape !== undefined || styleChanged
       ? { faceShape: normalizeFaceShapeForStyle(styleChanged && patch.faceShape === undefined ? null : patch.faceShape, faceStyle) }
@@ -253,10 +253,10 @@ export function faceUpdatePatch(
       ? { faceColor: normalizeFaceColorForStyle(styleChanged && patch.faceColor === undefined ? null : patch.faceColor, faceStyle) }
       : {}),
     ...(patch.faceStyle !== undefined ? { faceStyle } : {}),
-    ...(patch.faceExpression !== undefined || (styleChanged && faceStyle !== 'soft')
+    ...(patch.faceExpression !== undefined || (styleChanged && (faceStyle !== 'soft' && faceStyle !== 'bloub'))
       ? {
           faceExpression: normalizeFaceExpressionForStyle(
-            styleChanged && faceStyle !== 'soft' ? null : patch.faceExpression,
+            styleChanged && (faceStyle !== 'soft' && faceStyle !== 'bloub') ? null : patch.faceExpression,
             faceStyle
           )
         }
