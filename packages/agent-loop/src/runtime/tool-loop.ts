@@ -88,6 +88,8 @@ export interface CompletedWaveItem {
 // ============================================================================
 
 export interface ToolLoopHost {
+  /** Optional per-call cancellation scope. It must never abort the session. */
+  toolExecutionScope?(call: ToolCallPart, context: RunContext): { context: RunContext; release(): void };
   /** Reject a revoked execution before dispatching another tool. */
   assertSessionWritable?(sessionId: string): void;
   /** Injected env; replaces direct process.env reads. */
@@ -644,6 +646,20 @@ async function captureToolSnapshot(
 }
 
 async function executeSingleToolWithApprovals(
+  host: ToolLoopHost, tools: ToolContract<Record<string, unknown>>[], toolCall: ToolCallPart,
+  context: RunContext, allowExternalAiTools: boolean, sessionId: string,
+  completed: CompletedWaveItem[] | undefined, approvalFor: (key: string) => ApprovalRecord | undefined
+): Promise<ToolLoopResult> {
+  const scope = host.toolExecutionScope?.(toolCall, context);
+  try { return await executeScopedTool(host, tools, toolCall, scope?.context ?? context, allowExternalAiTools, sessionId, completed, approvalFor); }
+  finally { scope?.release(); }
+}
+
+function cancelledBySteer(context: RunContext): boolean {
+  return context.abortSignal?.aborted === true && context.abortSignal.reason?.code === 'TOOL_CANCELLED_BY_STEER';
+}
+
+async function executeScopedTool(
   host: ToolLoopHost,
   tools: ToolContract<Record<string, unknown>>[],
   toolCall: ToolCallPart,
@@ -761,13 +777,18 @@ async function executeSingleToolWithApprovals(
   };
 
   try {
-    if (context.abortSignal?.aborted) throw new Error('Session aborted before tool dispatch');
+    if (context.abortSignal?.aborted) throw new Error(cancelledBySteer(context) ? 'Tool cancelled by user interjection before dispatch' : 'Session aborted before tool dispatch');
     host.assertSessionWritable?.(sessionId);
     let result = await tool.execute(context, execInput as Record<string, unknown>);
     if (completed) {
       completed.push({ tool, toolCallId: toolCall.toolCallId, args: (execInput ?? {}) as Record<string, unknown>, snapshot, context });
     }
 
+    if (cancelledBySteer(context)) result = {
+      ...result, ok: false,
+      content: result.content + '\nTool cancelled by user interjection. Partial effects may remain; do not retry unless the user requests it.',
+      metadata: { ...result.metadata, cancelledBySteer: true }
+    };
     result = { ...result, content: prepareToolResultContent(host, sessionId, tool.name, result.content) };
     exportSpan(result.ok);
 
@@ -809,7 +830,8 @@ async function executeSingleToolWithApprovals(
     if (completed) {
       completed.push({ tool, toolCallId: toolCall.toolCallId, args: (execInput ?? {}) as Record<string, unknown>, snapshot, context });
     }
-    const content = scrubToolContent(host, error instanceof Error ? error.message : String(error));
+    const detail = error instanceof Error ? error.message : String(error);
+    const content = scrubToolContent(host, cancelledBySteer(context) ? `Tool cancelled by user interjection. Partial effects may remain; do not retry unless requested. ${detail}` : detail);
     exportSpan(false);
     if (host.runLifecycleHook) {
       await host.runLifecycleHook({ phase: 'post_tool_use', tool: tool.name, sessionId, input: execInput, ok: false, content });
@@ -820,7 +842,8 @@ async function executeSingleToolWithApprovals(
       ok: false,
       content,
       isExternal: tool.isExternal,
-      problem: toolInfraProblem(tool.name, toolCall.toolCallId, 'TOOL_UNHANDLED_EXCEPTION', content, {
+      metadata: cancelledBySteer(context) ? { cancelledBySteer: true } : undefined,
+      problem: toolInfraProblem(tool.name, toolCall.toolCallId, cancelledBySteer(context) ? 'TOOL_CANCELLED_BY_STEER' : 'TOOL_UNHANDLED_EXCEPTION', content, {
         title: 'Tool raised an exception',
         status: 500,
       }),
@@ -829,7 +852,7 @@ async function executeSingleToolWithApprovals(
 }
 
 function resultCountsAsWaveFailure(result: ToolLoopResult): boolean {
-  return !result.ok && result.hold !== 'approval';
+  return !result.ok && result.hold !== 'approval' && result.metadata?.cancelledBySteer !== true;
 }
 
 /** A hook hold is not a failed write, so it must not roll the rest of the wave back. */

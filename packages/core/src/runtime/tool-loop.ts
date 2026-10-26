@@ -1,3 +1,4 @@
+import { registerSteerToolWave } from './steer-tools.js';
 /**
  * Product adapter: ToolLoopDeps → A's ToolLoopHost.
  * Agent semantics (filter / approve / execute / persist / retry) live in A.
@@ -413,9 +414,10 @@ export async function executeToolCalls(
   const vault = getBoundSecretVault();
   const secretValues = vault ? vault.resolveNamed(parseSecretRefs(context.session.metadata)) : {};
   const tx = createCompensationTx();
+  const wave = registerSteerToolWave(deps.store, sessionId, validToolCalls, context);
   const run = () =>
     executeToolCallsA(
-      hostFromDeps(execDeps),
+      { ...hostFromDeps(execDeps), toolExecutionScope: call => wave.scope(call) },
       toolsForTurn(execDeps),
       validToolCalls,
       context,
@@ -423,7 +425,8 @@ export async function executeToolCalls(
       sessionId,
       deps.maxParallelToolCalls
     );
-  return runWithSecretRefs(secretValues, () => runWithCompensation(tx, run));
+  try { return await runWithSecretRefs(secretValues, () => runWithCompensation(tx, run)); }
+  finally { wave.close(); }
 }
 
 export function processToolResults(

@@ -144,7 +144,7 @@ test('drain next_shot_only: inbox stays unclaimed and tools are not skipped', ()
   assert.deepEqual(unmatchedToolCallIds(store.foldMessages(session.id)), ['c1']);
 });
 
-test('drain tool_launch: claims next-step, skips unstarted tools, fold is paired', () => {
+test('drain tool_launch: claims input without skipping tools [AC:steer-tool-continuity#AC-2]', () => {
   const store = createMemorySurfaceStore();
   const session = store.createSession({ title: 'drain-on', mode: 'chat', agentId: 'general' });
   store.appendMessage(session.id, 'user', [{ type: 'text', text: 'go' }]);
@@ -160,22 +160,22 @@ test('drain tool_launch: claims next-step, skips unstarted tools, fold is paired
     policy: 'tool_launch'
   });
   assert.equal(drain.drained, true);
-  assert.deepEqual(drain.skippedIds.sort(), ['c1', 'c2']);
+  assert.deepEqual(drain.skippedIds, []);
   assert.equal(store.listUnclaimedInbox(session.id).length, 0);
   const folded = store.foldMessages(session.id);
-  assert.deepEqual(unmatchedToolCallIds(folded), []);
+  assert.deepEqual(unmatchedToolCallIds(folded), ['c1', 'c2']);
   assert.ok(
     folded.some((m) => m.parts.some((p) => p.type === 'text' && p.text.includes('STOP-TOOLS')))
   );
   assert.ok(
-    folded.some((m) =>
+    !folded.some((m) =>
       m.parts.some((p) => p.type === 'tool_result' && String(p.content).includes('skipped_due_to_steer'))
     )
   );
   void TOOL_WAVE_SKIPPED_STEER_CONTENT;
 });
 
-test('runtime: default drain still executes parallel tools; tool_launch skips after steer', async () => {
+test('runtime: both drain settings preserve parallel tools after ordinary steer [AC:steer-tool-continuity#AC-2]', async () => {
   const makeAdapter = () =>
     new ScriptedAdapter((input) => {
       const results = input.messages
@@ -213,18 +213,19 @@ test('runtime: default drain still executes parallel tools; tool_launch skips af
   const s2 = runtimeLaunch.createChatSession({
     title: 'par-launch',
     message: 'read both',
-    metadata: { steerDrainPolicy: 'tool_launch' }
+    metadata: { steerDrainPolicy: 'tool_launch', steerInterruptPolicy: 'steer' }
   });
   const loop = runtimeLaunch.createAgentLoop(s2.id, { steerDrainPolicy: 'tool_launch' });
   assert.equal((await loop.step()).type, 'turn_prepared');
   assert.equal((await loop.step()).type, 'model_done');
-  await loop.steer('STOP-NOW');
+  await loop.steer('also summarize the files');
   const tools = await loop.step();
   assert.equal(tools.type, 'tools_done');
-  assert.ok(tools.results.every((r) => r.ok === false));
+  assert.ok(tools.results.every((r) => r.ok === true));
   const skipped = runtimeLaunch.store
     .foldMessages(s2.id)
     .flatMap((m) => m.parts)
     .filter((p) => p.type === 'tool_result');
-  assert.ok(skipped.some((p) => String(p.content).includes('skipped_due_to_steer')));
+  assert.equal(skipped.length, 2);
+  assert.ok(skipped.every(p => p.ok));
 });

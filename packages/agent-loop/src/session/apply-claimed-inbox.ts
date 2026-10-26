@@ -22,6 +22,7 @@ export interface ApplyClaimedInboxOpts {
 }
 
 export interface ApplyClaimedInboxStore {
+  foldMessages?(sessionId: string): SessionMessage[];
   hideByKey?(sessionId: string, key: string, opts?: { expectedWriterRunId?: string }): number;
   appendMessage(
     sessionId: string,
@@ -43,6 +44,11 @@ export function applyClaimedInbox(
   opts?: ApplyClaimedInboxOpts
 ): void {
   for (const item of items) {
+    // Product intake may already have materialized this receipt. Preserve its ID/position.
+    if (item.key && store.foldMessages?.(sessionId).some(message =>
+      message.key === item.key && message.role === item.role &&
+      JSON.stringify(message.parts) === JSON.stringify([textPart(item.text), ...(item.contextParts ?? [])]) &&
+      JSON.stringify(message.replyTo) === JSON.stringify(item.replyTo))) continue;
     if (item.key) {
       store.hideByKey?.(sessionId, item.key, opts);
     }

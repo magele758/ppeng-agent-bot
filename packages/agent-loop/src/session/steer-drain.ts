@@ -4,8 +4,8 @@
  *
  * When `tool_launch` is set (options / session.metadata / daemon_control KV
  * `loop_settings`): after approvals, before executeToolCalls, claim next-step.
- * If anything is waiting, skip unstarted tools with synthetic results (whole
- * parallel batch is one gate). Does not mutate in-flight model HTTP.
+ * Materialize waiting inputs without skipping any tools. Cancellation is a
+ * separate per-tool host decision. Does not mutate in-flight model HTTP.
  *
  * No RAW_AGENT_* env vars.
  */
@@ -13,7 +13,7 @@
 import type { MessageReplyTo } from '../types.js';
 import type { InboxItem, InboxTarget } from './step-inbox.js';
 import type { SteerInterruptPolicy } from './steer-interrupt.js';
-import { closeOpenToolWave } from './tool-wave-close.js';
+import { applyClaimedInbox } from './apply-claimed-inbox.js';
 import type { SessionMessage } from '../types.js';
 
 export type SteerDrainPolicy = 'next_shot_only' | 'tool_launch';
@@ -116,20 +116,8 @@ export function drainSteerAtToolLaunch(input: {
   if (items.length === 0) {
     return { drained: false, items: [], skippedIds: [] };
   }
-  for (const item of items) {
-    if (item.key) input.store.hideByKey(input.sessionId, item.key);
-    input.store.appendMessage(
-      input.sessionId,
-      item.role,
-      [{ type: 'text', text: item.text }, ...(item.contextParts ?? [])],
-      { ...(item.key ? { key: item.key } : {}), expectedWriterRunId: input.expectedWriterRunId, ...(item.replyTo ? { replyTo: item.replyTo } : {}) }
-    );
-  }
-  const closed = closeOpenToolWave(input.store, input.sessionId, 'skipped_due_to_steer', {
-    onlyToolCallIds: input.toolCallIds,
-    expectedWriterRunId: input.expectedWriterRunId
-  });
-  return { drained: true, items, skippedIds: closed.closedIds };
+  applyClaimedInbox(input.store, input.sessionId, items, { expectedWriterRunId: input.expectedWriterRunId });
+  return { drained: true, items, skippedIds: [] };
 }
 
 export {

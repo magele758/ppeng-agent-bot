@@ -1,3 +1,4 @@
+import { invalidateSteerToolDecision, steerRunningTools } from './runtime/steer-tools.js';
 import { createGoalFactoryDevelopmentTool, createGoalSelfHealTool, specialtyStatus, cancelSpecialty } from './bots/goals/specialty-services.js';
 import { FactoryService } from './factory/service.js';
 import { createFactoryTools } from './factory/tools.js';
@@ -1265,7 +1266,15 @@ export class RawAgentRuntime {
     }
     const admit = () => {
       const ack = enqueueSteerFn(this.store, sessionId, text, opts);
-      if (ack.status !== 'not_submitted' && opts?.steerMode !== 'subagent') requestSteerContinuation(this.store, sessionId, ack.item);
+      if (ack.status !== 'not_submitted' && opts?.steerMode !== 'subagent') {
+        requestSteerContinuation(this.store, sessionId, ack.item);
+        if (ack.item.target === 'next-step') {
+          if (ack.item.key) this.store.hideByKey(sessionId, ack.item.key);
+          this.store.appendMessage(sessionId, ack.item.role,
+            [{ type: 'text', text: ack.item.text }, ...(ack.item.contextParts ?? [])],
+            { key: ack.item.key, replyTo: ack.item.replyTo });
+        }
+      }
       return ack;
     };
     const session = this.store.getSession(sessionId);
@@ -1279,23 +1288,48 @@ export class RawAgentRuntime {
       // SubAgent is a parallel child — do not also drain the same text as a parent steer.
       this.store.removeUnclaimedInbox(sessionId, ack.item.id);
     }
-    if (ack.status !== 'not_submitted' && opts?.steerMode !== 'subagent') this.scheduleHumanContinuations();
+    if (ack.status !== 'not_submitted' && opts?.steerMode !== 'subagent') {
+      if (ack.item.target === 'next-step' && ack.item.role === 'user') {
+        steerRunningTools({ owner: this.store, sessionId, text: ack.item.text,
+          messages: this.store.foldMessages(sessionId),
+          model: () => resolveSessionModelAdapter(this.store, this.store.getSession(sessionId)!, process.env, this.modelAdapter),
+          trace: event => { void this.emitTrace(sessionId, event as Parameters<RawAgentRuntime['emitTrace']>[1]); } });
+      }
+      this.publishSessionView(sessionId);
+      this.scheduleHumanContinuations();
+    }
     return ack;
   }
 
   updateSteerItem(sessionId: string, itemId: string, text: string) {
     const next = text.trim();
     if (!next) throw new ValidationError('Missing steer text');
-    const item = this.store.updateUnclaimedInbox(sessionId, itemId, next);
-    if (!item) throw new NotFoundError('Steer', itemId);
-    requestSteerContinuation(this.store, sessionId, item);
-    return item;
+    return this.store.transaction(() => {
+      const item = this.store.updateUnclaimedInbox(sessionId, itemId, next);
+      if (!item) throw new NotFoundError('Steer', itemId);
+      requestSteerContinuation(this.store, sessionId, item);
+      invalidateSteerToolDecision(this.store, sessionId);
+      if (item.target === 'next-step') {
+        if (item.key) this.store.hideByKey(sessionId, item.key);
+        this.store.appendMessage(sessionId, item.role,
+          [{ type: 'text', text: item.text }, ...(item.contextParts ?? [])],
+          { key: item.key, replyTo: item.replyTo });
+      }
+      return item;
+    });
   }
 
   dropSteerItem(sessionId: string, itemId: string): boolean {
-    const removed = this.store.removeUnclaimedInbox(sessionId, itemId);
-    if (removed) dropHumanSteerContinuation(this.store, sessionId, itemId);
-    return removed;
+    return this.store.transaction(() => {
+      const item = this.store.getUnclaimedInbox(sessionId, itemId);
+      const removed = this.store.removeUnclaimedInbox(sessionId, itemId);
+      if (removed) {
+        dropHumanSteerContinuation(this.store, sessionId, itemId);
+        invalidateSteerToolDecision(this.store, sessionId);
+        if (item?.target === 'next-step' && item.key) this.store.hideByKey(sessionId, item.key);
+      }
+      return removed;
+    });
   }
 
   /** Spawn a queued inbox item as a steering subagent and drop it from the parent inbox. */
