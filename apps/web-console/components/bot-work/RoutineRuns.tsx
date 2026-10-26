@@ -1,9 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useI18n } from "@/lib/i18n";
+import { useI18n, type MessageKey } from "@/lib/i18n";
 import { useLab } from "../shell/LabProvider";
 import { api, json, useAction, Feedback, Result, Status } from "./shared";
 type Run = {
+  recovery?:{resume:boolean;reason:string;checkpointSeq?:number};
   id: string;
   status: string;
   precheckOutcome?: string;
@@ -22,6 +23,7 @@ export function RoutineRuns({ jobId }: { jobId: string }) {
   const { t } = useI18n();
   const lab = useLab();
   const action = useAction();
+  const recoveryDetail=(reason:string)=>['approval_rejected','session_not_resumable','missing_checkpoint','checkpoint_not_retained','effects_unverified','unsafe_tail','open_tool_wave'].includes(reason)?t(`botWork.recoveryReasons.${reason}` as MessageKey):'';
   const [runs, setRuns] = useState<Run[]>([]);
   const [cursor, setCursor] = useState<number | undefined>();
   const [paged, setPaged] = useState(false);
@@ -75,7 +77,8 @@ export function RoutineRuns({ jobId }: { jobId: string }) {
             <Result value={r.result}/>
             {[true,false].map(approved=><button key={String(approved)} type="button" disabled={action.busy} onClick={()=>void action.run(async()=>{await api(`/api/cron/runs/${r.id}/publication`,json({approved}));await load();})}>{t(approved?'botWork.routinePublish':'botWork.routineReject')}</button>)}
           </div>}
-          {r.notificationReason&&<p>{t(r.notificationReason==='unchanged'?'botWork.routineUnchanged':r.notificationReason==='rejected'?'botWork.routineRejected':'botWork.routineBelowThreshold')}</p>}
+          {r.recovery&&<p>{t(r.recovery.resume?'botWork.recoveryResumed':'botWork.recoveryBlocked')} · {recoveryDetail(r.recovery.reason)}{r.recovery.checkpointSeq!==undefined?' · '+t('botWork.recoveryCheckpoint',{seq:r.recovery.checkpointSeq}):''}</p>}
+          {r.notificationReason&&<p>{t(['quiet_hours','budget'].includes(r.notificationReason)?'botWork.attentionDeferred':r.notificationReason==='merged'?'botWork.attentionMerged':r.notificationReason==='unchanged'?'botWork.routineUnchanged':r.notificationReason==='rejected'?'botWork.routineRejected':'botWork.routineBelowThreshold')}</p>}
           {r.failureClass&&<span>{r.failureClass==='transient'?t('botWork.failureTransient'):t('botWork.failureHard')}</span>}
           <button
             type="button"

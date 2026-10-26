@@ -70,7 +70,7 @@ export function BotCronPanel({
   const [name, setName] = useState('');
   const [prompt, setPrompt] = useState(taskTemplate?.prompt??'');
   const [sourceDelivery,setSourceDelivery]=useState(taskTemplate?{taskId:taskTemplate.taskId,attempt:taskTemplate.attempt}:undefined);
-  const [deliveryPolicy,setDeliveryPolicy]=useState({inputSources:'',changesOnly:false,failureThreshold:1,approvalBeforeSend:false});
+  const [deliveryPolicy,setDeliveryPolicy]=useState<{inputSources:string;changesOnly:boolean;failureThreshold:number;approvalBeforeSend:boolean;comparison?:'text'|'facts';quietStart?:number;quietEnd?:number;dailyBudget?:number}>({inputSources:'',changesOnly:false,failureThreshold:1,approvalBeforeSend:false});
   const [roomId,setRoomId]=useState('');
   const [rooms,setRooms]=useState<{id:string;title:string;botIds:string[]}[]>([]);
   const [preset, setPreset] = useState<CronPreset>('daily');
@@ -238,6 +238,14 @@ export function BotCronPanel({
         <label><input type="checkbox" checked={deliveryPolicy.changesOnly} onChange={e=>setDeliveryPolicy({...deliveryPolicy,changesOnly:e.target.checked})}/>{t('botWork.routineChangesOnly')}</label>
         <label className="field field--stack"><span>{t('botWork.routineFailureThreshold')}</span><input type="number" min={1} max={100} required value={deliveryPolicy.failureThreshold} onChange={e=>setDeliveryPolicy({...deliveryPolicy,failureThreshold:Number(e.target.value)})}/></label>
         <label><input type="checkbox" checked={deliveryPolicy.approvalBeforeSend} onChange={e=>setDeliveryPolicy({...deliveryPolicy,approvalBeforeSend:e.target.checked})}/>{t('botWork.routineApprovalBeforeSend')}</label>
+        <label><input type="checkbox" checked={deliveryPolicy.comparison==='facts'} onChange={e=>setDeliveryPolicy({...deliveryPolicy,comparison:e.target.checked?'facts':'text'})}/>{t('botWork.attentionFacts')}</label>
+        <p>{t('botWork.attentionFactsHint')}</p>
+        <label><input type="checkbox" checked={deliveryPolicy.quietStart!==undefined} onChange={e=>setDeliveryPolicy({...deliveryPolicy,quietStart:e.target.checked?22:undefined,quietEnd:e.target.checked?8:undefined})}/>{t('botWork.attentionQuiet')}</label>
+        {deliveryPolicy.quietStart!==undefined&&<div>
+          <label>{t('botWork.attentionStart')}<input type="number" min={0} max={23} value={deliveryPolicy.quietStart} onChange={e=>setDeliveryPolicy({...deliveryPolicy,quietStart:Number(e.target.value)})}/></label>
+          <label>{t('botWork.attentionEnd')}<input type="number" min={0} max={23} value={deliveryPolicy.quietEnd} onChange={e=>setDeliveryPolicy({...deliveryPolicy,quietEnd:Number(e.target.value)})}/></label>
+        </div>}
+        <label>{t('botWork.attentionBudget')}<input type="number" min={0} max={1000} value={deliveryPolicy.dailyBudget??0} onChange={e=>setDeliveryPolicy({...deliveryPolicy,dailyBudget:Number(e.target.value)||undefined})}/></label>
         <p>{t('botWork.routineNotificationNote')}</p>
         <label className="field field--stack"><span>{t('botWork.timezone')}</span><input required value={timezone} onChange={e=>setTimezone(e.target.value)}/></label>
         <label className="field field--stack"><span>{t('botWork.missed')}</span><select value={missedPolicy} onChange={e=>setMissedPolicy(e.target.value)}><option value="coalesce">{t('botWork.coalesce')}</option><option value="skip">{t('botWork.skip')}</option><option value="catch_up">{t('botWork.catchUp')}</option></select></label>

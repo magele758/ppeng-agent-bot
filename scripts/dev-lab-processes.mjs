@@ -5,11 +5,31 @@ import { sanitizeScriptEnv } from './spawn-utils.mjs';
 const POSIX = process.platform !== 'win32';
 const EXIT_SIGNALS = { SIGINT: 130, SIGTERM: 143, SIGHUP: 129 };
 
-function groupExists(child) {
+function listProcessGroups() {
+  const result = spawnSync('ps', ['-axo', 'pid=,pgid=,stat='], {
+    encoding: 'utf8', env: sanitizeScriptEnv(), timeout: 1000, maxBuffer: 2 * 1024 * 1024
+  });
+  if (result.error || result.status !== 0) throw result.error ?? new Error('Unable to inspect process groups');
+  return result.stdout;
+}
+
+export function groupExists(child, { kill = process.kill, listGroups = listProcessGroups } = {}) {
   if (!child.pid) return false;
   if (!POSIX) return child.exitCode === null && child.signalCode === null;
-  try { process.kill(-child.pid, 0); return true; }
-  catch (error) { if (error.code === 'ESRCH') return false; throw error; }
+  try { kill(-child.pid, 0); return true; }
+  catch (error) {
+    if (error.code === 'ESRCH') return false;
+    if (error.code === 'EPERM') {
+      // macOS can report EPERM while the last group member is being reaped.
+      // Do not hide real permission failures: only accept a verified empty or zombie-only group.
+      try {
+        const members = listGroups().trim().split('\n').filter(Boolean).map(line => line.trim().split(/\s+/));
+        if (members.some(([pid, pgid, state]) => !/^\d+$/.test(pid) || !/^\d+$/.test(pgid) || !state)) throw new Error('Invalid process group listing');
+        if (!members.some(([, pgid, state]) => Number(pgid) === child.pid && !state?.startsWith('Z'))) return false;
+      } catch { /* An inconclusive inspection must retain the original error. */ }
+    }
+    throw error;
+  }
 }
 function signalGroup(child, signal) {
   if (!child.pid) return;
@@ -24,7 +44,10 @@ function signalGroup(child, signal) {
       if (result.error) throw result.error;
       if (result.status !== 0 && groupExists(child)) throw new Error(`taskkill failed for ${child.pid}`);
     }
-  } catch (error) { if (error.code !== 'ESRCH') throw error; }
+  } catch (error) {
+    if (error.code === 'ESRCH' || (error.code === 'EPERM' && !groupExists(child))) return;
+    throw error;
+  }
 }
 
 async function stopGroup(entry, graceMs) {

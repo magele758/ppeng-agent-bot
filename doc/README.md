@@ -18,6 +18,8 @@
 
 ---
 
+常驻任务恢复、重要变化通知、时间快进评测、缓存诊断与压缩任务契约见 [ALWAYS_ON_RELIABILITY.md](ALWAYS_ON_RELIABILITY.md)。
+
 第一批记忆与调度可靠性能力的操作入口、边界和接口见 [FIRST_BATCH_RELIABILITY.md](FIRST_BATCH_RELIABILITY.md)。
 
 依赖安装、工作区命令、容器和历史验证的 pnpm 迁移说明见 [PNPM_MIGRATION.md](PNPM_MIGRATION.md)。

@@ -5,7 +5,8 @@
 
 import type { RawAgentRuntime } from '@ppeng/agent-core';
 import {
-  ValidationError,
+  ValidationError, ConflictError,
+  updateTaskContract, type TaskContract,
   hasPersistedCompactSettings,
   parseCompactPolicy,
   parseKeepRecent,
@@ -74,6 +75,20 @@ export function compactRoutes(runtime: RawAgentRuntime): RouteSpec[] {
           }
         });
       }
-    }
+    },
+    {method:'GET',pattern:'/api/sessions/:id/reliability',handler:({requireParam,response})=>{
+      const session=runtime.getSession(requireParam('id'));
+      if(!session)throw new ValidationError('Session not found');
+      json(response,200,{contract:session?.metadata?.taskContract??null,cacheDiagnostics:session?.metadata?.cacheDiagnostics??[],contractAudit:session?.metadata?.taskContractAudit??null});
+    }},
+    {method:'PATCH',pattern:'/api/sessions/:id/reliability',handler:async({requireParam,readBody,response})=>{
+      const id=requireParam('id');const body=await readBody() as Record<string,unknown>;
+      if(!body||typeof body!=='object'||Array.isArray(body))throw new ValidationError('Invalid reliability request');
+      const session=runtime.getSession(id);
+      if(!session)throw new ValidationError('Session not found');
+      if(body.version!==(session.metadata?.taskContract as TaskContract|undefined)?.version&&!(body.version===0&&!session.metadata?.taskContract))throw new ConflictError('Task contract changed; reload before saving');
+      const contract=updateTaskContract(session.metadata?.taskContract as TaskContract|undefined,body.contract,'user');
+      runtime.mergeSessionMetadata(id,{taskContract:contract});json(response,200,{contract});
+    }},
   ];
 }
