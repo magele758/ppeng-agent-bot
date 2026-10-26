@@ -219,7 +219,11 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
   const faceSave = useRef(createFaceSaveQueue(() => faceNow.current));
   const saveFace = useCallback(
     async (kind: FaceSaveKind) => {
-      const turn = faceSave.current(kind, (patch) => patchBot(patch()));
+      const botId = bot.id;
+      const turn = faceSave.current(kind, (patch) => {
+        if (botIdRef.current !== botId) return Promise.resolve();
+        return patchBot(patch());
+      });
       setError(null);
       try {
         await turn;
@@ -230,8 +234,12 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
         throw err;
       }
     },
-    [patchBot, t]
+    [bot.id, patchBot, t]
   );
+
+  useEffect(() => {
+    faceSave.current = createFaceSaveQueue(() => faceNow.current);
+  }, [bot.id]);
 
   const savePermission = useCallback(
     async (mode: BotPermissionMode, opts?: { confirmBypass?: boolean }) => {

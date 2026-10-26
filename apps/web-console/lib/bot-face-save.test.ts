@@ -53,3 +53,25 @@ test('后一次脸保存会等前一次结束，并带上等待期间已选的�
   await Promise.all([first, second]);
   assert.deepEqual(order, ['style-start', 'style-end', 'shape']);
 });
+
+test('切换 Bot 后已入队的保存不再发出 [AC:bot-face-soft-style#AC-4]', async () => {
+  let open = 'bot-a';
+  const save = createFaceSaveQueue(() => EMPTY);
+  let releaseFirst: () => void = () => {};
+  const gate = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+  const sent: string[] = [];
+  const clicked = 'bot-a';
+  const first = save('style', async () => {
+    await gate;
+  });
+  open = 'bot-b';
+  const second = save('soft-shape', async () => {
+    if (open !== clicked) return;
+    sent.push(open);
+  });
+  releaseFirst();
+  await Promise.all([first, second]);
+  assert.deepEqual(sent, []);
+});
