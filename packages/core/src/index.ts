@@ -17,3 +17,7 @@ export { BotGoalService } from './bots/goals/service.js';
 export type { BotGoal, GoalSettings, GoalReport } from './bots/goals/types.js';
 
 export { updateTaskContract, contractAppendix, type TaskContract } from './session/task-contract.js';
+
+export {LearningService} from './learning/service.js';
+export {SourceLedger} from './learning/sources.js';
+export {StepInboxStore} from './session/step-inbox.js';

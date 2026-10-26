@@ -1,3 +1,4 @@
+import {SourceLedger} from './learning/sources.js';
 /**
  * Persistent state for single-node / dev: SQLite + same-process stores.
  * Multi-replica cloud routing: use `storage/provider-config.ts` + `repository-factory.ts` (PG event buffer,
@@ -446,6 +447,7 @@ export class SqliteStateStore {
 
   createSession(input: CreateSessionInput): SessionRecord {
     const r = this.sessions.createSession(input);
+    if(r.parentSessionId||r.metadata?.routineParentSessionId)new SourceLedger(this).inherit(r.id);
     this.bumpVersion();
     return r;
   }

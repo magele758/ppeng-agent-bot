@@ -1,3 +1,6 @@
+import {SourceLedger} from '../learning/sources.js';
+import type {SqliteStateStore} from '../storage.js';
+import {stableJson} from '../cron/notification-decision.js';
 import { registerSteerToolWave } from './steer-tools.js';
 /**
  * Product adapter: ToolLoopDeps → A's ToolLoopHost.
@@ -99,6 +102,7 @@ export interface ToolLoopStore {
 }
 
 export interface ToolLoopDeps {
+  governanceStore?: SqliteStateStore;
   tools: ToolContract<any>[];
   store: ToolLoopStore;
   envApprovalPolicy: import('../approval/approval-policy.js').ApprovalPolicy | undefined;
@@ -126,7 +130,18 @@ export interface ToolLoopDeps {
 }
 
 function toolsForTurn(deps: ToolLoopDeps, turnTools?: ToolContract<any>[]): ToolContract<Record<string, unknown>>[] {
-  return (turnTools ?? deps.tools) as ToolContract<Record<string, unknown>>[];
+  const tools=(turnTools ?? deps.tools) as ToolContract<Record<string, unknown>>[];
+  if(!deps.governanceStore)return tools;
+  const ledger=new SourceLedger(deps.governanceStore);
+  return tools.map(tool=>({...tool,execute:async(context,args)=>{
+    ledger.observe(context.session.id);
+    const latest=deps.store.listApprovals().filter(a=>a.sessionId===context.session.id&&a.toolName===tool.name&&stableJson(a.args)===stableJson(args)).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)||b.updatedAt.localeCompare(a.updatedAt))[0];
+    const approved=latest?.status==='approved'&&latest.createdAt>=ledger.approvalFloor(context.session.id);
+    if(!ledger.allowed(context.session.id,tool.name,tool.sideEffectLevel)&&!approved)return {ok:false,content:JSON.stringify({error:'source_scope_denied',tool:tool.name,reason:'External or delegated input cannot authorize this effect. Save an explicit scope in Lab or approve this exact call.'})};
+    const result=await tool.execute(context,args);
+    if(result.content.includes('«external'))ledger.record(context.session.id,{kind:'tool',ref:tool.name+':'+Date.now(),label:tool.name});
+    return result;
+  }}));
 }
 
 function adaptFilePolicy(policy: FileApprovalPolicy | undefined): LoopFilePolicy | undefined {

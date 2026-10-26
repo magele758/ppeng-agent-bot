@@ -1,0 +1,21 @@
+import { test, expect } from './helpers/bot-pair';
+test('learning scope and queue controls persist through Lab [AC:agent-learning-governance#AC-8]', async ({ page, request, botPair }) => {
+    const bot = botPair[0];
+    await page.goto('/#/bot');
+    await page.locator(`#sessionListMini [data-bot-id="${bot.id}"] .list-item--session`).click();
+    await page.getByRole('tab', { name: '上下文', exact: true }).click();
+    await page.getByText('学习与治理', { exact: true }).click();
+    const panel = page.locator('details').filter({ has: page.locator('summary').filter({ hasText: /^学习与治理$/ }) }).first();
+    await panel.getByLabel('接触外部内容后允许的工具（每行一个精确名称）').fill('write_file');
+    await panel.getByRole('button', { name: '保存', exact: true }).first().click();
+    await expect.poll(async () => ((await (await request.get(`/api/sessions/${bot.canonicalSessionId}/learning`)).json()).scope.allowedEffects)).toEqual(['write_file']);
+    await panel.getByLabel('每次取出上限').fill('3');
+    await panel.getByLabel('等待优先级每增加 10 分的秒数').fill('30');
+    await panel.getByRole('button', { name: '保存', exact: true }).last().click();
+    await expect.poll(async () => ((await (await request.get(`/api/sessions/${bot.canonicalSessionId}/learning`)).json()).queueSettings)).toEqual({ batchSize: 3, agingSeconds: 30 });
+    await page.reload();
+    await page.getByRole('tab', { name: '上下文', exact: true }).click();
+    await page.getByText('学习与治理', { exact: true }).click();
+    await expect(page.getByLabel('每次取出上限')).toHaveValue('3');
+    await expect(page.getByLabel('接触外部内容后允许的工具（每行一个精确名称）')).toHaveValue('write_file');
+});

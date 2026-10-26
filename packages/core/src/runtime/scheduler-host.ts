@@ -1,3 +1,4 @@
+import {SourceLedger} from '../learning/sources.js';
 /**
  * Scheduler / cron / mailbox-wake host extracted from RawAgentRuntime.
  */
@@ -151,7 +152,8 @@ export async function ingestMailbox(store: SqliteStateStore, session: SessionRec
     .map((mail) => `[${mail.type}] from ${mail.fromAgentId}${mail.correlationId ? ` (${mail.correlationId})` : ''}: ${mail.content}`)
     .join('\n');
 
-  store.appendMessage(session.id, 'user', [textPart(`Inbox:\n${text}`)]);
+  const message=store.appendMessage(session.id, 'user', [textPart(`Inbox:\n${text}`)]);
+  new SourceLedger(store).record(session.id,{kind:'event',ref:delivered.map(m=>m.id).join(','),messageId:message.id,label:'agent mailbox'});
 }
 
 export async function autoClaimTask(store: SqliteStateStore, session: SessionRecord): Promise<void> {

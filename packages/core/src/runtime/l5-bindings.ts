@@ -1,3 +1,4 @@
+import {SourceLedger} from '../learning/sources.js';
 import { restoreTaskContract, type TaskContract } from '../session/task-contract.js';
 import { diagnosePrompt, type CacheDiagnostic } from '../session/cache-diagnostics.js';
 import { usesDurableBotGoals, reviewDirectGoalBeforeEnd, type GoalRuntimeHost } from '../bots/goals/runtime-host.js';
@@ -391,6 +392,7 @@ export function toolLoopDepsFrom(rt: L5Bindable): ToolLoopDeps {
   return {
     tools: rt.tools,
     store: rt.store,
+    governanceStore: rt.store,
     envApprovalPolicy: rt.envApprovalPolicy,
     maxParallelToolCalls: rt.maxParallelToolCalls,
     modelAdapter: rt.modelAdapter,
@@ -680,6 +682,7 @@ function fitProductModelRequest(
   const adapter = session
     ? resolveSessionModelAdapter(rt.store, session, process.env, rt.modelAdapter)
     : rt.modelAdapter;
+  if(session){const ledger=new SourceLedger(rt.store);ledger.observe(session.id);const appendix=ledger.appendix(session.id);if(appendix){const messages=[...input.messages];const index=messages.findLastIndex(m=>m.role==='user');if(index>=0)messages[index]={...messages[index]!,parts:[...messages[index]!.parts,{type:'text',text:appendix}]};input={...input,messages};}}
   const contract = session?.metadata?.taskContract as TaskContract|undefined;
   if(contract){
     const restored=restoreTaskContract(input.messages,contract);

@@ -1,3 +1,4 @@
+import {SourceLedger} from '../learning/sources.js';
 /**
  * Session / task / mailbox façade extracted from RawAgentRuntime.
  * Create, send, permission, and latest-assistant helpers — no turn loop.
@@ -166,7 +167,7 @@ export function createChatSession(
   const ids = input.imageAssetIds?.filter(Boolean) ?? [];
   const msg = input.message?.trim() ?? '';
   if (msg || ids.length > 0) {
-    host.store.appendMessage(session.id, 'user', userMessageParts(msg || '(image)', ids, host.store));
+    { const admitted=host.store.appendMessage(session.id, 'user', userMessageParts(msg || '(image)', ids, host.store));new SourceLedger(host.store).record(session.id,{kind:'user',ref:admitted.id,messageId:admitted.id,label:'direct user input'}); }
     void host.runImageRetention(session.id);
   }
 
@@ -210,7 +211,7 @@ export function createTaskSession(
   const ids = input.imageAssetIds?.filter(Boolean) ?? [];
   if (input.message?.trim() || ids.length > 0) {
     const msg = input.message?.trim() ?? (ids.length ? '(image)' : '');
-    host.store.appendMessage(session.id, 'user', userMessageParts(msg, ids, host.store));
+    { const admitted=host.store.appendMessage(session.id, 'user', userMessageParts(msg, ids, host.store));new SourceLedger(host.store).record(session.id,{kind:'user',ref:admitted.id,messageId:admitted.id,label:'direct user input'}); }
     void host.runImageRetention(session.id);
   } else {
     host.store.appendMessage(
@@ -311,7 +312,7 @@ export function sendUserMessage(
   const context = routineReplyContext(host.store, session, routineReplyId);
   const parts = applyContextSources(userMessageParts(text || (ids.length ? '(image)' : ''), ids, host.store), sources);
   if (context) parts.unshift(textPart(context));
-  host.store.appendMessage(session.id, 'user', parts, { ...(quote ? { replyTo: quote } : {}), ...(context ? { key: `routine-context:${routineReplyId ?? 'latest'}` } : {}) });
+  { const admitted=host.store.appendMessage(session.id, 'user', parts, { ...(quote ? { replyTo: quote } : {}), ...(context ? { key: `routine-context:${routineReplyId ?? 'latest'}` } : {}) });new SourceLedger(host.store).record(session.id,{kind:'user',ref:admitted.id,messageId:admitted.id,label:'direct user input'}); }
   mergeSessionMetadata(host.store, session.id, {
     [APPROVAL_WAKE_KEY]: { kind: 'human', source: 'lab-chat' }
   });
