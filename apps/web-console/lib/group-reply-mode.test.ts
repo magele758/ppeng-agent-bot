@@ -69,7 +69,7 @@ test('群聊设置能在两种模式间切换并把 replyMode 交给现有保存
   assert.equal(unconfirmed.mode, 'coordinator');
   assert.equal(unconfirmed.error, 'not-confirmed');
 
-  assert.equal(zh.play.groupSettings.coordinator, '现有模式（协调者发言）');
+  assert.equal(zh.play.groupSettings.coordinator, '协调者回复');
   assert.equal(en.play.groupSettings.coordinator, 'Coordinator speaks');
   assert.equal(zh.play.groupSettings.allMembers, '全员各自回复');
   assert.equal(en.play.groupSettings.allMembers, 'All members reply');

@@ -1,10 +1,9 @@
 import { test, expect, type APIRequestContext, type Page } from "@playwright/test";
 
-async function openRoomSettings(page: Page, title: string) {
+async function openRoomChat(page: Page, title: string) {
   await page.goto('/#/bot');
   await page.getByRole('button', { name: `打开群聊 ${title}`, exact: true }).click();
-  await page.getByRole('button', { name: '群聊设置', exact: true }).click();
-  return page.getByTestId('bot-rooms');
+  return page.getByTestId('play-group-chat');
 }
 
 test("team work, history, rooms and software have real product entry points [AC:default-super-bot#AC-3] [AC:bot-history-memory#AC-1] [AC:bot-rooms#AC-1] [AC:bot-software-execution#AC-3]", async ({
@@ -57,6 +56,7 @@ test("create and reopen a room with persistent membership [AC:bot-rooms#AC-1] [A
   await page.getByRole('button', { name: `打开群聊 Room ${bot.id}`, exact: true }).click();
   const rooms = page.getByTestId('bot-rooms');
   await page.getByText('群聊设置', { exact: true }).click();
+  await rooms.getByText('群聊运行状态', { exact: true }).click();
   await rooms.getByTestId('room-stop').click();
   await expect(rooms.getByTestId('room-status')).toHaveText(/已暂停/);
   await page.reload();
@@ -279,14 +279,13 @@ test("group reply is shown automatically and stays out of private chat [AC:bot-r
       },
     })
   ).json();
-  const panel = await openRoomSettings(page, room.title);
+  const panel = await openRoomChat(page, room.title);
   await panel
-    .getByLabel("群消息", { exact: true })
-    .fill("Group-only anchor 93371. Reply ready.");
-  await panel.getByLabel("提及成员（可多选）").selectOption([bot.id]);
+    .locator('textarea')
+    .fill(`@${bot.id} Group-only anchor 93371. Reply ready.`);
   await panel.getByRole("button", { name: "发送", exact: true }).click();
   await expect(
-    panel.getByRole("log").getByText(bot.name, { exact: true }),
+    panel.getByRole("log").getByRole("button", { name: `引用 ${bot.name} 的这条回复`, exact: true }),
   ).toBeVisible();
   const history = await (
     await request.get(
@@ -387,17 +386,17 @@ for (const routing of ['everyone', 'text-mention'] as const) {
     const host = await ensureReviewBot(request, `E2E Review Host ${routing}`);
     const member = await ensureReviewBot(request, `E2E Review Member ${routing}`);
     const { room } = await (await request.post('/api/bot-rooms', { data: { title: `Routing ${routing} ${suffix}`, botIds: [host.id, member.id], hostBotId: host.id } })).json();
-    const panel = await openRoomSettings(page, room.title);
-    await panel.getByLabel('群消息', { exact: true }).fill(routing === 'everyone' ? 'Reply ready.' : `@${member.id} Reply ready.`);
+    const panel = await openRoomChat(page, room.title);
+    await panel.locator('textarea').fill(routing === 'everyone' ? 'Reply ready.' : `@${member.id} Reply ready.`);
     const sent = page.waitForRequest(req => req.method() === 'POST' && req.url().endsWith(`/api/bot-rooms/${room.id}/messages`));
     await panel.getByRole('button', { name: '发送', exact: true }).click();
     expect((await sent).postDataJSON()).not.toHaveProperty('mentions');
     const log = panel.getByRole('log');
     if (routing === 'everyone') {
-      await expect(log.getByText(host.name, { exact: true })).toHaveCount(0);
-      await expect(log.getByText(member.name, { exact: true })).toHaveCount(0);
+      await expect(log.getByRole("button", { name: `引用 ${host.name} 的这条回复`, exact: true })).toHaveCount(0);
+      await expect(log.getByRole("button", { name: `引用 ${member.name} 的这条回复`, exact: true })).toHaveCount(0);
     } else {
-      await expect(log.getByText(member.name, { exact: true })).toBeVisible({ timeout: 30000 });
+      await expect(log.getByRole("button", { name: `引用 ${member.name} 的这条回复`, exact: true })).toBeVisible({ timeout: 30000 });
     }
     await expect.poll(async () => {
       const { turns } = await (await request.get(`/api/bot-rooms/${room.id}/turns`)).json();
@@ -439,7 +438,7 @@ test('Room polling preserves access to messages across a missed page [AC:bot-roo
   // Pause so the burst stays user rows. A speaking member would insert replies and push item 1 past one older page.
   expect((await request.post(`/api/bot-rooms/${room.id}/stop`)).ok()).toBeTruthy();
   await request.post(`/api/bot-rooms/${room.id}/messages`, { data: { text: 'Room gap initial' } });
-  const panel = await openRoomSettings(page, room.title);
+  const panel = await openRoomChat(page, room.title);
   await expect(panel.getByRole('log')).toContainText('Room gap initial');
   let release!: () => void;
   const held = new Promise<void>(resolve => { release = resolve; });
@@ -452,13 +451,13 @@ test('Room polling preserves access to messages across a missed page [AC:bot-roo
   } finally { release(); }
   await expect(panel.getByRole('log')).toContainText('Room gap item 100', { timeout: 30000 });
   await expect(panel.getByRole('log').getByText('Room gap item 1', { exact: true })).toHaveCount(0);
-  const older = panel.getByRole('button', { name: '加载更早记录', exact: true });
+  const older = panel.getByRole('button', { name: '更早的消息', exact: true });
   await expect.poll(async () => older.count(), { timeout: 30000 }).toBeGreaterThan(0);
   await older.click();
   await expect(panel.getByRole('log').getByText('Room gap item 1', { exact: true })).toBeVisible({ timeout: 30000 });
 });
 
-test('switching Rooms clears the previous room draft, mentions and attachments [AC:bot-rooms#AC-3]', async ({ page, request }) => {
+test('switching Rooms clears the previous room draft and textual mentions without exposing retired attachment controls [AC:bot-rooms#AC-3]', async ({ page, request }) => {
   const rooms = [];
   for (const suffix of ['A', 'B']) {
     const bot = await ensureReviewBot(request, `E2E Review Scope ${suffix}`);
@@ -466,17 +465,14 @@ test('switching Rooms clears the previous room draft, mentions and attachments [
     const { room } = await (await request.post('/api/bot-rooms', { data: { title: `Scope ${bot.id} ${Date.now()}`, botIds: [bot.id, peer.id], hostBotId: bot.id } })).json();
     rooms.push({ bot, room });
   }
-  const panel = await openRoomSettings(page, rooms[0].room.title);
-  await panel.getByLabel('群消息', { exact: true }).fill('Draft for room A only');
-  await panel.getByLabel('提及成员（可多选）').selectOption([rooms[0].bot.id]);
-  // The existing attachment-reference field has a translated accessible name.
-  await panel.getByLabel('附件引用（逗号分隔）').fill('room-a-attachment');
+  const panel = await openRoomChat(page, rooms[0].room.title);
+  await panel.locator('textarea').fill(`@${rooms[0].bot.id} Draft for room A only`);
+  await expect(panel.getByLabel('附件引用（逗号分隔）')).toHaveCount(0);
   await page.getByRole('button', { name: `打开群聊 ${rooms[1].room.title}`, exact: true }).click();
-  await page.getByRole('button', { name: '群聊设置', exact: true }).click();
-  await expect(panel.getByLabel('群消息', { exact: true })).toHaveValue('');
-  await expect(panel.getByLabel('提及成员（可多选）')).toHaveValues([]);
-  await expect(panel.getByLabel('附件引用（逗号分隔）')).toHaveValue('');
-  await panel.getByLabel('群消息', { exact: true }).fill(`@${rooms[1].bot.id} Reply ready.`);
+  await expect(panel.locator('textarea')).toHaveValue('');
+  await expect(panel.getByRole('listbox', { name: '选择要 @ 的成员' })).toHaveCount(0);
+  await expect(panel.getByLabel('附件引用（逗号分隔）')).toHaveCount(0);
+  await panel.locator('textarea').fill(`@${rooms[1].bot.id} Reply ready.`);
   await panel.getByRole('button', { name: '发送', exact: true }).click();
-  await expect(panel.getByRole('log').getByText(rooms[1].bot.name, { exact: true })).toBeVisible({ timeout: 30000 });
+  await expect(panel.getByRole("log").getByRole("button", { name: `引用 ${rooms[1].bot.name} 的这条回复`, exact: true })).toBeVisible({ timeout: 30000 });
 });

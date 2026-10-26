@@ -5,7 +5,7 @@ import { RoomCollaborationHistory, type CollaborationTurn } from './RoomCollabor
 import { useEffect, useRef, useState } from 'react';
 import type { BotInfo } from '@/lib/types';
 import { api } from '@/lib/api';
-import { mergeHistoryWindow } from '@/lib/history-window';
+import { mergeHistoryWindow, loadEarlierCursorAfterReset, prependHistoryPage } from '@/lib/history-window';
 import { useI18n, type MessageKey } from '@/lib/i18n';
 import { sameData } from '@/lib/same-data';
 import {
@@ -251,11 +251,11 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
     older: boolean
   ) => {
     const firstLoad = messagesRef.current.length === 0;
-    const next = older
-      ? [...page.messages, ...messagesRef.current]
-      : mergeHistoryWindow(messagesRef.current, page.messages, true).messages;
+    const merged = older ? null : mergeHistoryWindow(messagesRef.current, page.messages, true);
+    const next = merged?.messages ?? prependHistoryPage(messagesRef.current, page.messages);
     commitMessages(keepLocalReplyTo(messagesRef.current, next));
-    if (older || firstLoad) setCursor(page.hasMore ? page.nextCursor : null);
+    if (merged?.reset) setCursor(loadEarlierCursorAfterReset(next, page.hasMore, page.nextCursor));
+    else if (older || firstLoad) setCursor(page.hasMore ? page.nextCursor : null);
   };
 
   const loadRoom = async (older = false) => {
@@ -342,7 +342,7 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
     return { id, name: bot?.name ?? id, title: bot?.title ?? '', description: bot?.description ?? '' };
   });
   const mention = activeMentionQuery(text, caret);
-  const mentionOptions = mention ? mentionChoices(mentionRoster, groups, mention.query, new Set(memberIds)) : [];
+  const mentionOptions = mention ? mentionChoices(mentionRoster, [], mention.query, new Set(memberIds)) : [];
   const goal = readRoomGoal(room);
   const approveVisible = showInlineApprove(approvalMode, memberNeedsPerson(turns));
   const mentionKey = mention ? `${mention.start}:${mention.query}` : '';
@@ -601,7 +601,7 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
           onRemoveGroup={(groupId) => void removeFunctionalGroup(groupId)}
         />
       ) : null}
-      {showSettings && <div className="play-group-settings" data-testid="room-settings"><BotRooms key={roomId} bots={[...bots]} selectedRoomId={roomId} memberEditor={!crowded} /></div>}
+      {showSettings && <div className="play-group-settings" data-testid="room-settings"><BotRooms key={roomId} bots={[...bots]} selectedRoomId={roomId} memberEditor={false} /></div>}
       {crowded ? (
         <div className="play-group-members" data-testid="play-group-member-summary">
           {error && !membersOpen ? <p className="play-group-error">{error}</p> : null}

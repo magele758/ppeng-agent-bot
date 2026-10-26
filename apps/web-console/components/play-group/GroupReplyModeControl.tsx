@@ -54,9 +54,10 @@ export function GroupReplyModeControl({ roomId }: { roomId: string }) {
   return (
     <fieldset className="play-group-reply-mode" data-testid="group-reply-mode">
       <legend>{t('play.groupSettings.replyMode')}</legend>
+      <p className="play-group-reply-mode__note">{t('play.groupSettings.instantHint')}</p>
       <div className="play-group-reply-mode__options" role="radiogroup" aria-label={t('play.groupSettings.replyMode')}>
         {OPTIONS.map((option) => (
-          <label key={option.mode} className="play-group-reply-mode__option">
+          <label key={option.mode} className={`play-group-reply-mode__option${mode === option.mode ? " is-selected" : ""}`}>
             <input
               type="radio"
               name="group-reply-mode"

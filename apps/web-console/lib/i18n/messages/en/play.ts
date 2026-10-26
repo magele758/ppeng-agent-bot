@@ -70,6 +70,11 @@ export const play = {
 
   imageUnsupported: 'The current model does not support images. Select an image-capable model, or remove the current images and send text only.',
   groupSettings: {
+    basic: 'Basic information',
+    limits: 'Run limits',
+    limitsHint: 'Maximum usage per group task. Work stops when any limit is reached.',
+    activity: 'Room activity',
+    instantHint: 'Changes apply immediately',
     title: 'Group chat settings',
     replyMode: 'Reply mode',
     taskCollaboration: 'Task collaboration',
@@ -85,9 +90,9 @@ export const play = {
     taskCancelled: 'Cancelled',
     taskStatus: 'Status: {status}',
     coordinator: 'Coordinator speaks',
-    coordinatorHint: 'The coordinator speaks',
+    coordinatorHint: 'The coordinator organizes and responds',
     allMembers: 'All members reply',
-    allMembersHint: 'Each member replies',
+    allMembersHint: 'Each member answers the current message independently',
     saveFailed: 'Reply mode was not saved',
     saved: 'Saved',
   },
