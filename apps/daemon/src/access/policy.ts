@@ -220,6 +220,8 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
     ['GET /api/sessions/:id/activity', session],
     ['GET /api/sessions/:id/model-view', session],
     ['GET /api/sessions/:id/context-stack', session],
+    ['GET /api/sessions/:id/reliability', session],
+    ['PATCH /api/sessions/:id/reliability', session],
     ['GET /api/sessions/:id/context-snapshots', session],
     ['GET /api/sessions/:id/history', session],
     ['GET /api/sessions/:id/history/:seq', session],

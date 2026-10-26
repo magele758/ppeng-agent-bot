@@ -1,3 +1,6 @@
+import { factFingerprint, notificationDecision, localNotificationDay } from './notification-decision.js';
+import { latestCheckpoint } from '../session/checkpoint.js';
+import { decideRecovery } from '../session/durable-recovery.js';
 import { BOT_DEFAULT_MAX_TURNS } from '../bots/types.js';
 import { type RoutineDeliveryPolicy } from './routine-delivery-policy.js';
 import { RoutineHealthStore, classifyRoutineFailure, isGovernedRoutine, type RoutineFailureClass } from './routine-health.js';
@@ -31,7 +34,8 @@ export type RoutineRunStatus = 'queued'|'running'|'waiting_approval'|'completed'
 export interface RoutineRoomDelivery { status:'delivered'|'skipped'; roomId:string; messageId?:string; reason?:string }
 export interface RoutineAttempt { number:number;sessionId:string;startedAt:string;finishedAt?:string;status:RoutineRunStatus;result?:string;error?:string }
 export interface RoutineRun {
- publication?:'pending'|'approved'|'rejected'; publicationDecidedAt?:string; notificationReason?:'unchanged'|'below_failure_threshold'|'rejected';
+ recovery?:{resume:boolean;reason:string;checkpointSeq?:number;at:string};
+ publication?:'pending'|'approved'|'rejected'; publicationDecidedAt?:string; notificationReason?:'unchanged'|'below_failure_threshold'|'rejected'|'quiet_hours'|'budget'|'merged'; notificationPublishedAt?:string; notificationFingerprint?:string; digestRunIds?:string[];
  id:string; routineId:string; scheduledAt:string; timezone:string; status:RoutineRunStatus;
  approvalIds?:string[];resumeStartedAt?:string; attempts?:RoutineAttempt[]; sessionId?:string; mainSessionId:string; attempt:number; result?:string; error?:string;
  failureClass?:RoutineFailureClass; precheckOutcome?:'ready'|'no_change'|'failed'; precheckState?:unknown; precheckChecked?:boolean; missedCount:number; createdAt:string; updatedAt:string; startedAt?:string; finishedAt?:string; ownerPid?:number;
@@ -140,7 +144,7 @@ function consecutiveFailedOccurrences(store:SqliteStateStore,run:RoutineRun):num
  let count=0;for(const row of rows){if(row.status!=='failed')break;count++;}return count;
 }
 function notificationAllowed(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):boolean {
- const policy=run.job.metadata.deliveryPolicy as RoutineDeliveryPolicy|undefined;
+ const policy=(new CronJobStore(host.stateDir).get(run.routineId)?.metadata.deliveryPolicy??run.job.metadata.deliveryPolicy) as RoutineDeliveryPolicy|undefined;
  if(!policy)return true;
  // The decision is durable per attempt; scheduler retries do not change its meaning.
  if(run.publication==='pending'||run.publication==='rejected')return false;
@@ -149,17 +153,39 @@ function notificationAllowed(host:RoutineRuntimeHost,runs:RoutineRunStore,run:Ro
  }
  if(run.status==='completed'){
   const key=`routine.last-published:${run.routineId}`;
-  if(!run.publication&&policy.changesOnly&&host.store.getDaemonControl<string>(key)===run.result?.trim()){
+  const fingerprint=notificationFingerprint(run,policy);
+  runs.update(run.id,{notificationFingerprint:fingerprint});
+  run.notificationFingerprint=fingerprint;
+  if(!run.publication&&policy.changesOnly&&fingerprint!==undefined&&host.store.getDaemonControl<string>(key)===fingerprint){
    runs.update(run.id,{notificationSent:true,notificationReason:'unchanged'});return false;
   }
+  const sent=host.store.db.prepare("SELECT payload FROM bot_routine_runs WHERE routine_id=? AND json_extract(payload,'$.notificationPublishedAt')>=?").all(run.routineId,new Date(Date.now()-172800000).toISOString());
+  const today=localNotificationDay(Date.now(),run.timezone);
+  const count=sent.filter(row=>localNotificationDay(Date.parse(JSON.parse(String(row.payload)).notificationPublishedAt),run.timezone)===today).length;
+  const decision=notificationDecision({policy,now:Date.now(),timezone:run.timezone,sentToday:count,changed:true});
+  if(decision.action==='digest'){
+   runs.update(run.id,{notificationReason:decision.reason as 'quiet_hours'|'budget'});return false;
+  }
+  const pending=runs.pending();
+  const deferred=pending.filter(other=>other.routineId===run.routineId&&other.status==='completed'&&!other.notificationSent&&other.id!==run.id&&other.publication!=='pending'&&other.publication!=='rejected'&&['quiet_hours','budget'].includes(other.notificationReason??''));
+  const newer=deferred.some(other=>pending.findIndex(item=>item.id===other.id)>pending.findIndex(item=>item.id===run.id));
+  if(newer)return false;
+  if(deferred.length){run.digestRunIds=deferred.map(other=>other.id);runs.update(run.id,{digestRunIds:run.digestRunIds});}
   if(policy.approvalBeforeSend&&run.publication!=='approved'){
    runs.update(run.id,{publication:'pending'});return false;
   }
  }
  return true;
 }
+function notificationFingerprint(run:RoutineRun,policy:RoutineDeliveryPolicy):string|undefined {
+ if(policy.comparison!=='facts')return run.result?.trim();
+ if(run.precheckState!==undefined)return 'facts:'+factFingerprint(run.precheckState);
+ try {const body=JSON.parse(run.result??'');if(body&&typeof body==='object'&&'facts' in body)return 'facts:'+factFingerprint(body.facts);}catch{}
+ // Missing facts cannot prove unchanged. Publish normally rather than hide new information.
+ return undefined;
+}
 function routineSummaryText(run:RoutineRun):string {
- return run.result||run.error||run.status;
+ return (run.digestRunIds?.length?`[digest: ${run.digestRunIds.length+1} runs; latest result]\n`:'')+(run.result||run.error||run.status);
 }
 function routineRunLink(run:RoutineRun):string {
  return run.sessionId?` · /api/sessions/${run.sessionId}`:'';
@@ -169,13 +195,13 @@ function finishRoutineTransaction(store:SqliteStateStore,own:boolean,sql:string)
 }
 function deliverRoutineWithoutSession(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):void {
  const roomDelivery=postRoomResult(host,run);
- if(roomDelivery?.status==='delivered')host.store.setDaemonControl(`routine.last-published:${run.routineId}`,run.result?.trim()??'');
+ if(roomDelivery?.status==='delivered')host.store.setDaemonControl(`routine.last-published:${run.routineId}`,run.notificationFingerprint??run.result?.trim()??'');
  runs.update(run.id,{notificationSent:true,...(roomDelivery?{roomDelivery}:{})});
 }
 function rememberPublishedResult(host:RoutineRuntimeHost,run:RoutineRun,roomDelivery:RoutineRoomDelivery|undefined):void {
  if(run.status!=='completed')return;
  if(routineRoomId(run)&&roomDelivery?.status!=='delivered')return;
- host.store.setDaemonControl(`routine.last-published:${run.routineId}`,run.result?.trim()??'');
+ host.store.setDaemonControl(`routine.last-published:${run.routineId}`,run.notificationFingerprint??run.result?.trim()??'');
 }
 function summaryRun(fresh:RoutineRun|undefined,run:RoutineRun):RoutineRun { return fresh??run; }
 function roomDeliveryPatch(roomDelivery:RoutineRoomDelivery|undefined):{roomDelivery?:RoutineRoomDelivery} {
@@ -195,7 +221,8 @@ function publishRoutineSummary(host:RoutineRuntimeHost,runs:RoutineRunStore,run:
  linkRoutineSummary(host,run,summary.id);
  const roomDelivery=postRoomResult(host,summaryRun(fresh,run));
  rememberPublishedResult(host,run,roomDelivery);
- runs.update(run.id,{notificationSent:true,summaryMessageId:summary.id,...roomDeliveryPatch(roomDelivery)});
+ runs.update(run.id,{notificationSent:true,notificationPublishedAt:nowIso(),summaryMessageId:summary.id,...roomDeliveryPatch(roomDelivery)});
+ for(const id of run.digestRunIds??[]){const deferred=runs.get(id);if(deferred&&!deferred.notificationSent&&deferred.publication!=='pending'&&deferred.publication!=='rejected')runs.update(id,{notificationSent:true,notificationReason:'merged',summaryMessageId:summary.id});}
  finishRoutineTransaction(host.store,ownTransaction,'COMMIT');
  }catch(error){finishRoutineTransaction(host.store,ownTransaction,'ROLLBACK');throw error;}
 }
@@ -217,6 +244,9 @@ function routineParentBusy(host:RoutineRuntimeHost,parent:SessionRecord):boolean
  return parent.status==='running'||parent.status==='waiting_approval'||!!host.isSessionRunning?.(parent.id);
 }
 function summarize(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):void {
+ host.store.transaction(()=>summarizeOwned(host,runs,run));
+}
+function summarizeOwned(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):void {
  run=classifyMissingFailure(runs,run);
  new RoutineHealthStore(host.store).observe(run);
  if(!routineCanNotify(host,runs,run))return;
@@ -358,7 +388,24 @@ function recoverRoutineRuns(host:RoutineRuntimeHost,runs:RoutineRunStore,executi
   let handedOff=false;
   try{
    const run=runs.get(candidate.id);if(!run)continue;
-   if(run.status==='running')lease.whileOwned(()=>{const fresh=runs.get(run.id);if(fresh?.status==='running')recoverInterruptedRoutine(host,runs,fresh);});
+   if(run.status==='running'){
+    lease.whileOwned(()=>{
+     const fresh=runs.get(run.id);if(fresh?.status!=='running'||!fresh.sessionId)return;
+     if(host.isSessionRunning?.(fresh.sessionId)||host.store.isSessionWriterLive(fresh.sessionId))return;
+     const session=host.store.getSession(fresh.sessionId);
+     const outcome=parseRunOutcome(session?.metadata?.outcome);
+     const interrupted=outcome?.kind==='failed'&&outcome.reason==='process_interrupted';
+     if(session&&!interrupted&&(session.status==='completed'||session.status==='failed'||outcome?.kind==='aborted'||outcome?.kind==='failed')){finish(host,runs,fresh.id,session.id);return;}
+     const decision=decideRecovery({checkpoint:latestCheckpoint(session?.metadata),messages:host.store.foldMessages(fresh.sessionId),hasUnconfirmedEffects:host.hasUnconfirmedEffects?.(fresh.sessionId,fresh.startedAt??fresh.createdAt)});
+     if(decision.resume&&approvalsForSession(host,fresh).some(a=>a.status==='rejected')){decision.resume=false;decision.reason='approval_rejected';}
+     if(decision.resume&&(!session||(!interrupted&&!['idle','running'].includes(session.status)))){decision.resume=false;decision.reason='session_not_resumable';}
+     runs.update(fresh.id,{recovery:{...decision,at:nowIso()}});
+     if(decision.resume&&session){
+      host.store.updateSession(session.id,{status:'idle',...(interrupted?{metadata:{...session.metadata,outcome:undefined}}:{})});
+      launchRoutineSession(host,runs,runs.get(fresh.id)!,session.id,lease);handedOff=true;
+     }else recoverInterruptedRoutine(host,runs,runs.get(fresh.id)!);
+    });
+   }
    else if(run.status==='waiting_approval'){
     const outcome=resumeRoutineAfterDecision(host,runs,run,executing,lease);
     // Keep the lease only when a continuation was actually launched. 'handled' from finish/quarantine

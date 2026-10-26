@@ -1,5 +1,6 @@
 /** Play / Chat 界面文案。不要加 as const。 */
 export const play = {
+  reliability: {"title":"长期任务与缓存诊断","hint":"任务契约独立保存，压缩后自动补入模型上下文。每行填写一项；修改要求后请同步更新契约。较新的直接指令优先。","objective":"目标","constraints":"约束与授权边界","todos":"未完成事项","evidence":"证据引用（消息或文件）","save":"保存任务契约","version":"契约版本 {version}","cache":"提示词缓存诊断","refresh":"刷新诊断","cacheHint":"片段变化不等于缓存未命中。缓存 token 仅显示上游返回值；未知不代表零。","unknown":"未知","changed":"变化片段","none":"无变化或首次请求","cached":"缓存输入 / 总输入 token","system":"系统提示","tools":"工具定义","stable":"稳定上下文"},
   history: { loading: '正在加载更早记录…', failed: '更早记录加载失败', retry: '重试' },
 
   systemNotice: {
