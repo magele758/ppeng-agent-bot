@@ -10,6 +10,7 @@ import {
   groupMatchesQuery,
 } from '@/lib/bot-group';
 import { displayPinnedRoomIds, type OrderRegion } from '@/lib/bot-pin';
+import type { BotSidebarRow } from '@/lib/sidebar-order';
 import {
   arrangeSidebarRows,
   beginSidebarDrag,
@@ -181,8 +182,9 @@ export function PlayBotGroupList({
   const loose = placementReady ? looseRooms(rooms, placementGroups, pinnedRoomIds) : [];
   const visible = loose.filter((room) => groupMatchesQuery(room, filter, nameOf));
   const looseRegion: OrderRegion = { type: 'looseRooms' };
+  const botRows: readonly BotSidebarRow<never>[] = [];
   const arranged = arrangeSidebarRows(
-    [],
+    botRows,
     loose.map((room) => ({ kind: 'room' as const, id: room.id, value: room })),
     savedRegionRefs(pinState, looseRegion)
   );

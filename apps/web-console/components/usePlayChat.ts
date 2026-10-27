@@ -1716,11 +1716,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     if (!reader) return;
     const dec = new TextDecoder();
     let buf = '';
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf = feedSseBuffer(buf, value, dec, (event, payload) => {
-        const p = payload as {
+        type SseEventPayload = {
           type?: string;
           text?: string;
           message?: string;
@@ -1731,7 +1727,8 @@ export function usePlayChat(deps: PlayChatDeps) {
           envelope?: Record<string, unknown>;
           session?: { id: string; title?: string; status?: string; metadata?: Record<string, unknown>; createdAt?: string; updatedAt?: string };
         };
-        if (!liveTurnOnScreen(streamGeneration)) return;
+
+    const applySseControl = (event: string, p: SseEventPayload) => {
         if (event === 'ready') {
           opts?.onReady?.();
         }
@@ -1758,6 +1755,8 @@ export function usePlayChat(deps: PlayChatDeps) {
               : t('play.status.runFailed', { error: modelErrorText(raw, t) });
           throw new PlayStreamError(message);
         }
+    };
+    const applySseModelText = (event: string, p: SseEventPayload) => {
         if (event === 'model' && p.type === 'model_retry') {
           const progress = readRetryProgress(p);
           if (progress) {
@@ -1803,6 +1802,8 @@ export function usePlayChat(deps: PlayChatDeps) {
           }
           sync();
         }
+    };
+    const applySseModelTools = (event: string, p: SseEventPayload) => {
         if (event === 'model' && p.type === 'tool_call_start') {
           const toolCallId = p.toolCallId ?? nextId();
           segments.push({ kind: 'tool', id: nextId(), toolCallId, name: p.name ?? 'unknown', args: '' });
@@ -1847,6 +1848,17 @@ export function usePlayChat(deps: PlayChatDeps) {
           selectedSessionRef.current = sid;
           setSelectedSessionId(sid);
         }
+    };
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf = feedSseBuffer(buf, value, dec, (event, payload) => {
+        const p = payload as SseEventPayload;
+        if (!liveTurnOnScreen(streamGeneration)) return;
+        applySseControl(event, p);
+        applySseModelText(event, p);
+        applySseModelTools(event, p);
       });
     }
   };

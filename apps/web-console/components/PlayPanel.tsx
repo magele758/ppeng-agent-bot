@@ -433,6 +433,7 @@ export function PlayPanel({
   const supportAgents = useMemo(() => supportAgentsOf(flatAgents), [flatAgents]);
   const supportByDomain = useMemo(() => groupAgentsByDomain(supportAgents), [supportAgents]);
   const execPreset = execPresetOf(chat.agentId, chat.mode);
+  const readComposerRunCopy = () => {
   const agentSelectValue = isCoreExecAgent(chat.agentId) || !chat.agentId ? '' : chat.agentId;
   const chatRunning = chat.playSending || Boolean(chat.streamOverlay) || chat.waitTyping;
   const immediateSteer = chat.immediateSteer;
@@ -455,6 +456,9 @@ export function PlayPanel({
       : chat.steerInterruptPolicy === 'queue'
         ? t('play.composer.runningQueue')
         : t('play.composer.runningSteer');
+    return { agentSelectValue, chatRunning, immediateSteer, steerDisabled, composerStatusText, runningPlaceholder };
+  };
+  const { agentSelectValue, chatRunning, immediateSteer, steerDisabled, composerStatusText, runningPlaceholder } = readComposerRunCopy();
 
   const compositionActiveRef = useRef(false);
   const compositionJustEndedRef = useRef(false);
@@ -581,6 +585,7 @@ export function PlayPanel({
     () => botRoster.find((b) => b.id === chat.botId) ?? bots.find((b) => b.id === chat.botId) ?? null,
     [botRoster, bots, chat.botId]
   );
+  const readHeaderBot = () => {
   const botLocked = playSurface === 'bot' && Boolean(chat.botId);
   const botSurface = playSurface === 'bot';
   const headerBotChat = botSurface && Boolean(selectedSessionId);
@@ -593,6 +598,9 @@ export function PlayPanel({
     sessionTitle: chat.playTitle
   });
   const headerBotId = headerBotChat ? chat.botId || selectedBot?.id || '' : '';
+    return { botLocked, botSurface, headerBotChat, headerBotName, headerTitle, headerBotId };
+  };
+  const { botLocked, botSurface, headerBotChat, headerBotName, headerTitle, headerBotId } = readHeaderBot();
   const detailChildTasks = useMemo(() => {
     if (!headerBotId) return [];
     return childTasksForBot(catalogSessions ?? sessions, {
@@ -611,6 +619,7 @@ export function PlayPanel({
       current
     });
   }, [playSurface, headerBotId, catalogSessions, sessions, selectedSessionId, selectedBot?.canonicalSessionId]);
+  const readFirstTaskConversation = () => {
   const transcriptSettled = Boolean(selectedSessionId) && chat.loadedTranscriptSessionId === selectedSessionId;
   const firstTaskConversation: BotFirstTaskConversation = !headerBotId
     ? 'absent'
@@ -619,6 +628,9 @@ export function PlayPanel({
       : chat.historyCursor == null && !chat.sessionMessages.some((message) => message.role !== 'system')
         ? 'empty'
         : 'started';
+    return { transcriptSettled, firstTaskConversation };
+  };
+  const { transcriptSettled, firstTaskConversation } = readFirstTaskConversation();
   const firstTask = useBotFirstTask({
     botId: headerBotId,
     conversation: firstTaskConversation,
@@ -638,17 +650,22 @@ export function PlayPanel({
     () => sessions.find((s) => s.id === selectedSessionId) ?? null,
     [sessions, selectedSessionId]
   );
+  const readSessionBusy = () => {
   const sessionBusy =
     selectedSession?.status === 'running' ||
     selectedSession?.status === 'waiting_approval' ||
     chat.playSending ||
     Boolean(chat.streamOverlay) ||
     chat.waitTyping;
+    return sessionBusy;
+  };
+  const sessionBusy = readSessionBusy();
+  const recapIsGenerating = () => chatRunning || selectedSession?.status === 'running';
   const sessionRecap = useSessionRecap({
     sessionId: selectedSessionId,
     messages: chat.sessionMessages,
     sessionUpdatedAt: selectedSession?.updatedAt,
-    generating: chatRunning || selectedSession?.status === 'running',
+    generating: recapIsGenerating(),
     draft: chat.playInput,
     locale,
     commandNonce: chat.recapNonce,
@@ -660,10 +677,7 @@ export function PlayPanel({
     status: sessionRecap.status,
     hint: sessionRecap.hint,
   });
-  const nextHint = usePlayComposerHint({
-    sessionId: selectedSessionId,
-    messages: chat.sessionMessages,
-    draft: chat.playInput,
+  const readComposerHintRequest = () => ({
     providedHint: recapHint.useBundle ? recapHint.hint : undefined,
     enabled: shouldRequestComposerHint({
       surface: playSurface,
@@ -674,7 +688,16 @@ export function PlayPanel({
       hasAssistantReply: lastCompletedTurn(chat.sessionMessages) != null,
     }) && !recapHint.useBundle,
   });
+  const hintRequest = readComposerHintRequest();
+  const nextHint = usePlayComposerHint({
+    sessionId: selectedSessionId,
+    messages: chat.sessionMessages,
+    draft: chat.playInput,
+    providedHint: hintRequest.providedHint,
+    enabled: hintRequest.enabled,
+  });
   nextHintRef.current = nextHint;
+  const readComposerHintView = () => {
   const hintView = composerHintPresentation({
     draft: chat.playInput,
     hint: nextHint,
@@ -697,6 +720,9 @@ export function PlayPanel({
       ? t('play.composer.suggestionCycle', { count: chat.inputGhost.items.length - 1 })
       : t('play.composer.suggestion')
     : '';
+    return { hintView, showGhost, suggestionHint };
+  };
+  const { hintView, showGhost, suggestionHint } = readComposerHintView();
 
   const sessionApprovals = useMemo(
     () => approvalsForChat(selectedSessionId, approvals, catalogSessions ?? sessions),
@@ -768,6 +794,7 @@ export function PlayPanel({
   );
 
   const chrome = chat.sessionChrome;
+  const readHeaderStats = () => {
   const headerStatus = chrome?.status ?? selectedSession?.status ?? '';
   const headerStatusKey = sessionStatusLabelKey(headerStatus);
   const headerStatusText = headerStatusKey ? t(headerStatusKey) : headerStatus;
@@ -777,9 +804,16 @@ export function PlayPanel({
     (chrome?.usageTotals
       ? (chrome.usageTotals.inputTokens ?? 0) + (chrome.usageTotals.outputTokens ?? 0)
       : undefined);
+    return { headerStatus, headerStatusKey, headerStatusText, goalMet, tokens };
+  };
+  const { headerStatus, headerStatusKey, headerStatusText, goalMet, tokens } = readHeaderStats();
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [feedTraces, setFeedTraces] = useState<TurnFeedTraceEvent[]>([]);
+  const readStatsLive = () => {
   const statsLive = chatRunning || chrome?.status === 'running' || selectedSession?.status === 'running';
+    return statsLive;
+  };
+  const statsLive = readStatsLive();
   useEffect(() => {
     if (!statsLive) return;
     setNowMs(Date.now());
@@ -825,11 +859,15 @@ export function PlayPanel({
     }
     prevSteerCountRef.current = n;
   }, [chat.steerInbox.length, immediateSteer]);
+  const readFeedHasTurns = () => {
   const feedHasTurns =
     chat.sessionMessages.length > 0 ||
     Boolean(chat.optimisticUser) ||
     Boolean(chat.streamOverlay) ||
     chat.waitTyping;
+    return feedHasTurns;
+  };
+  const feedHasTurns = readFeedHasTurns();
   const turnStatsLabels = useMemo(
     () => ({
       elapsed: t('play.stats.elapsed'),
@@ -985,16 +1023,16 @@ export function PlayPanel({
       </BotEntryDialog> : null
   );
 
-  return (
-    <section className={`panel ${active ? 'active' : ''}`} id="panel-play">
-      {renderCreateDialog()}
+  const renderMobileBar = () => (
       <div className="mobile-chat-bar">
         <button type="button" className="btn btn-ghost" data-testid="mobile-sessions-toggle" aria-expanded={mobileSessionsOpen} aria-controls="mobile-session-list" onClick={() => setMobileSessionsOpen(v => !v)}>
           <span aria-hidden="true">{mobileSessionsOpen ? "←" : "☰"}</span>
           {t(mobileSessionsOpen ? 'mobile.back' : 'mobile.sessions')}
         </button>
       </div>
-      <div className={`play-layout play-layout--rail${railCollapsed ? ' is-rail-collapsed' : ''}${sidebarCollapsed && !mobileSessionsOpen ? ' is-sidebar-collapsed' : ''}${mobileSessionsOpen ? ' mobile-sessions-open' : ''}`}>
+  );
+
+  const renderPlaySidebar = () => (
         <aside className="play-sidebar" id="mobile-session-list" hidden={sidebarCollapsed && !mobileSessionsOpen}>
           <div className="play-sidebar__head" data-testid="session-toolbar" role="toolbar" aria-label={t('polish.toolbar')}>
             <div className="create-menu" ref={createMenuRef} onMouseEnter={openCreateMenu} onMouseLeave={scheduleCreateMenuClose} onKeyDown={(event) => {
@@ -1155,12 +1193,19 @@ export function PlayPanel({
             ) : null}
           </div>
         </aside>
+  );
 
-        <div className={botDetailMainClass(botDetailVisible)}>
-          {botSurface && openGroupId ? <PlayBotGroupChat key={openGroupId} roomId={openGroupId} bots={botRoster} /> : null}
-          <div className="play-main chat-panel" hidden={botSurface && openGroupId != null}>
+  const renderChatHeader = () => (
             <header className={`chat-panel-header${headerBotName ? ' chat-panel-header--bot' : ''}${mobileBotBarOpen ? ' is-mobile-open' : ''}`}>
-              <div className="chat-panel-header__text">
+      <div className="chat-panel-header__text">
+        {renderTitleRow()}
+        {renderHeaderDetails()}
+      </div>
+      {renderHeaderActions()}
+    </header>
+  );
+
+  const renderTitleRow = () => (
                 <div className="chat-panel-header__title-row">
                   {sidebarCollapsed ? <PlaySidebarToggle collapsed onToggle={togglePlaySidebar} /> : null}
                   {headerBotName ? (
@@ -1188,6 +1233,9 @@ export function PlayPanel({
                   <BotPermissionsLink botId={headerBotId} botName={headerBotName || headerTitle} />
                   <BotDetailToggle botId={headerBotId} open={botDetailOpen} onToggle={() => setBotDetailOpen(open => !open)} />
                 </div>
+  );
+
+  const renderHeaderDetails = () => (
                 <div className="chat-panel-header__details" id="chatHeaderDetails">
                 {headerBotId && <BotWorkSummary botId={headerBotId} />}
                 {selectedSessionId ? (
@@ -1221,7 +1269,9 @@ export function PlayPanel({
                   </div>
                 ) : null}
                 </div>
-              </div>
+  );
+
+  const renderHeaderActions = () => (
               <div className="chat-panel-header__actions play-toolbar">
                 <GoalHistory key={selectedSessionId} sessionId={selectedSessionId} botId={headerBotId ?? undefined} />
                 <button type="button" className="btn btn-ghost rail-toggle" aria-label={t(railCollapsed ? 'polish.expandRail' : 'polish.collapseRail')} title={t(railCollapsed ? 'polish.expandRail' : 'polish.collapseRail')} aria-expanded={!railCollapsed} onClick={() => {
@@ -1301,11 +1351,9 @@ export function PlayPanel({
                   ) : null}
                 </div>
               </div>
-            </header>
+  );
 
-            <GoalStatusCard sessionId={selectedSessionId} />
-
-            <div className="chat-panel-body">
+  const renderFeedShell = () => (
               <div className="chat-feed-shell">
                 <PlayTranscript
                   layoutKey={railCollapsed ? 'collapsed' : 'expanded'}
@@ -1352,7 +1400,10 @@ export function PlayPanel({
                   </button>
                 ) : null}
               </div>
-              <div className="chat-composer-outer">
+  );
+
+  const renderComposerLead = () => (
+    <>
                 {headerBotId && selectedSessionId && <BotGoals key={`${headerBotId}:${selectedSessionId}`} botId={headerBotId} sessionId={selectedSessionId} selectedGoalId={chat.selectedGoalId} onSelectGoal={chat.setSelectedGoalId} />}
                 {(firstTask.phase === 'visible' || firstTask.storageFailed) && headerBotId &&
                   <BotFirstTask key={headerBotId} storageFailed={firstTask.storageFailed} onDismiss={() => { firstTask.dismiss(); chat.playInputRef.current?.focus({ preventScroll: true }); }} botId={headerBotId} needsModel={chat.needsModelSetup} onChoose={chat.setPlayInput} onConfigureModel={onOpenModelSetup} />}
@@ -1390,26 +1441,11 @@ export function PlayPanel({
                     )}
                   </div>
                 ) : null}
+    </>
+  );
 
-                <div className="composer-preview-row">
-                  <ComposerReplyQuote
-                    quote={botSurface ? chat.replyQuote : null}
-                    surface="direct"
-                    onCancel={chat.cancelReplyQuote}
-                  />
-                </div>
-                <label className="sr-only" htmlFor="playInput">
-                  {t('play.messageContent')}
-                </label>
-                <div
-                  className={composerClassName('chat-composer', chat.composerAckFlash)}
-                  data-testid="composer-drop-target"
-                  data-surface={botSurface ? 'bot' : 'chat'}
-                  data-first-task={headerBotId ? firstTask.phase : undefined}
-                  onDragOver={ignoreComposerDrop}
-                  onDrop={ignoreComposerDrop}
-                >
-                  <ComposerContextChips items={chat.pendingContext} onRemove={chat.removePendingContext} />
+  const renderComposerFace = () => (
+    <>
                   {botSurface && (selectedBot?.name || headerBotName) ? (
                     <BotFace
                       name={selectedBot?.name || headerBotName}
@@ -1418,6 +1454,10 @@ export function PlayPanel({
                       className="chat-composer__bot-face"
                     />
                   ) : null}
+    </>
+  );
+
+  const renderAttachButton = () => (
                   <button
                     type="button"
                     className={`btn btn-ghost btn-icon btn-sm chat-composer__attach${attachOpen ? ' is-open' : ''}`}
@@ -1429,6 +1469,9 @@ export function PlayPanel({
                   >
                     +
                   </button>
+  );
+
+  const renderComposerField = () => (
                   <div className="chat-composer-field">
                   <textarea
                     ref={chat.playInputRef}
@@ -1467,6 +1510,10 @@ export function PlayPanel({
                     </span>
                   ) : null}
                   </div>
+  );
+
+  const renderMicButton = () => (
+    <>
                   {chat.speechDictationAvailable ? (
                     <button
                       type="button"
@@ -1483,6 +1530,11 @@ export function PlayPanel({
                       </svg>
                     </button>
                   ) : null}
+    </>
+  );
+
+  const renderStopButton = () => (
+    <>
                   {(chat.playSending || Boolean(chat.streamOverlay) || chat.waitTyping) ? (
                     <button
                       type="button"
@@ -1498,6 +1550,10 @@ export function PlayPanel({
                       <span>{t('play.stop')}</span>
                     </button>
                   ) : null}
+    </>
+  );
+
+  const renderSendButton = () => (
                   <button
                     type="button"
                     className={`chat-send-btn${chatRunning && !steerDisabled ? ' chat-send-btn--steer' : ''}`}
@@ -1525,8 +1581,40 @@ export function PlayPanel({
                       </svg>
                     )}
                   </button>
-                </div>
+  );
 
+  const renderComposerShell = () => (
+    <>
+                <div className="composer-preview-row">
+                  <ComposerReplyQuote
+                    quote={botSurface ? chat.replyQuote : null}
+                    surface="direct"
+                    onCancel={chat.cancelReplyQuote}
+                  />
+                </div>
+                <label className="sr-only" htmlFor="playInput">
+                  {t('play.messageContent')}
+                </label>
+                <div
+                  className={composerClassName('chat-composer', chat.composerAckFlash)}
+                  data-testid="composer-drop-target"
+                  data-surface={botSurface ? 'bot' : 'chat'}
+                  data-first-task={headerBotId ? firstTask.phase : undefined}
+                  onDragOver={ignoreComposerDrop}
+                  onDrop={ignoreComposerDrop}
+                >
+                  <ComposerContextChips items={chat.pendingContext} onRemove={chat.removePendingContext} />
+      {renderComposerFace()}
+      {renderAttachButton()}
+      {renderComposerField()}
+      {renderMicButton()}
+      {renderStopButton()}
+      {renderSendButton()}
+                </div>
+    </>
+  );
+
+  const renderComposerDock = () => (
                 <div className={`chat-composer-dock${botSurface && !composerStatusText ? ' chat-composer-dock--empty' : ''}`}>
                   <div className="chat-composer-dock__left">
                     {!botSurface ? <>
@@ -1581,7 +1669,10 @@ export function PlayPanel({
                     {composerStatusText}
                   </p>
                 </div>
+  );
 
+  const renderAttachPanel = () => (
+    <>
                 {attachOpen ? (
                   <div id="composerAttachPanel" className="composer-attach-panel">
                     <input
@@ -1618,7 +1709,11 @@ export function PlayPanel({
                     </button>
                   </div>
                 ) : null}
+    </>
+  );
 
+  const renderConfigPanel = () => (
+    <>
                 {configOpen && !botSurface ? (
                   <SessionSettingsPanel
                     panelRef={configPanelRef}
@@ -1636,7 +1731,10 @@ export function PlayPanel({
                     onNavigate={() => setConfigOpen(false)}
                   />
                 ) : null}
+    </>
+  );
 
+  const renderPendingImages = () => (
                 <div id="pendingImages" className="pending-images" aria-label={t('play.composer.pendingAria')}>
                   {chat.pendingImageAssetIds.map((id) => (
                     <span key={id} className="pending-img-row">
@@ -1667,15 +1765,38 @@ export function PlayPanel({
                     </span>
                   ))}
                 </div>
-              </div>
-            </div>
+  );
+
+  const renderChatBody = () => (
+    <div className="chat-panel-body">
+      {renderFeedShell()}
+      <div className="chat-composer-outer">
+        {renderComposerLead()}
+        {renderComposerShell()}
+        {renderComposerDock()}
+        {renderAttachPanel()}
+        {renderConfigPanel()}
+        {renderPendingImages()}
+      </div>
+    </div>
+  );
+
+  const renderPlayMain = () => (
+        <div className={botDetailMainClass(botDetailVisible)}>
+          {botSurface && openGroupId ? <PlayBotGroupChat key={openGroupId} roomId={openGroupId} bots={botRoster} /> : null}
+          <div className="play-main chat-panel" hidden={botSurface && openGroupId != null}>
+      {renderChatHeader()}
+            <GoalStatusCard sessionId={selectedSessionId} />
+      {renderChatBody()}
           </div>
           <BotDetailPane onClose={() => setBotDetailOpen(false)} visible={botDetailVisible} botId={headerBotId} botName={headerBotName} agentId={selectedBot?.agentId} childTasks={detailChildTasks} onOpenChildTask={(sessionId) => {
             setOpenGroupId(null);
             onSelectSession(sessionId);
           }} />
-        </div>
+    </div>
+  );
 
+  const renderPlayRail = () => (
         <aside className="play-rail" hidden={railCollapsed}>
           <div className="play-rail__tabs" role="tablist" aria-label={t('play.rail.aria')}>
             <button
@@ -1748,6 +1869,16 @@ export function PlayPanel({
             )}
           </div>
         </aside>
+  );
+
+  return (
+    <section className={`panel ${active ? 'active' : ''}`} id="panel-play">
+      {renderCreateDialog()}
+      {renderMobileBar()}
+      <div className={`play-layout play-layout--rail${railCollapsed ? ' is-rail-collapsed' : ''}${sidebarCollapsed && !mobileSessionsOpen ? ' is-sidebar-collapsed' : ''}${mobileSessionsOpen ? ' mobile-sessions-open' : ''}`}>
+        {renderPlaySidebar()}
+        {renderPlayMain()}
+        {renderPlayRail()}
       </div>
     </section>
   );
