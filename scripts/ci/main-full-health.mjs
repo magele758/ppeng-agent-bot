@@ -38,7 +38,7 @@ function main() {
   const repo = process.env.GITHUB_REPOSITORY;
   const sha = process.env.GITHUB_SHA;
   if (!repo || !sha) throw new Error('GITHUB_REPOSITORY and GITHUB_SHA are required');
-  const fields = 'databaseId,headSha,conclusion,status,event,htmlUrl';
+  const fields = 'databaseId,headSha,conclusion,status,event,url';
   const onMain = runs(['run', 'list', '--repo', repo, '--workflow', 'full-validation.yml', '--branch', 'main', '--limit', '30', '--json', fields]);
   const onHead = runs(['run', 'list', '--repo', repo, '--workflow', 'full-validation.yml', '--commit', sha, '--limit', '10', '--json', fields]);
   const decision = mergeDecision(onMain, onHead);
