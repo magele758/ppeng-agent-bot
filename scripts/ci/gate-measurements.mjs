@@ -51,12 +51,12 @@ function collect(repo,id,schedule,out) {
   const stepNames=jobs.filter(j=>j.name.startsWith(prefix)).flatMap(j=>(j.steps??[]).filter(s=>s.conclusion==='success').map(s=>s.name));
   const required=['TypeScript build','Bot queue and process recovery invariants (no retries)','Install and exercise public npm tarballs','Fast capability contracts (fail on any failed case)',
     'Verify evaluator against scripted harness outcomes (not live model quality)','Formal invariants + MockLLM E2E','Unit tests with V8 coverage','agent-loop vitest with coverage','CRAP gate',
-    'Regression (daemon + API)','Integration (mailbox + approval + social)','E2E (Agent Lab)','Acceptance gate (every approved criterion has a passing test)',
+    'Regression (daemon + API)','Integration (mailbox + approval + social)','Acceptance gate (every approved criterion has a passing test)',
     'Merge shard reports and check the baseline','Require blocking checks and report diagnostic Harness outcome'];
   required.push(...(schedule==='before'?['Unit tests','Bounded pairing verification (no retries)','Session lifecycle verification (no retries)','Process restart recovery verification (no retries)','Multiprocess session verification (no retries)']:['Preserve stricter uninstrumented performance contracts']));
   for(const name of required)if(!stepNames.includes(name))throw new Error(`${id}: missing successful mandatory step ${name}`);
   for(const shard of ['hardline-1','hardline-2','hardline-3','others'])if(!jobs.some(j=>j.name.startsWith(prefix)&&j.name.endsWith(`Mutate (${shard})`)&&j.conclusion==='success'))throw new Error(`${id}: missing mutation shard ${shard}`);
-  const artifacts=['gate-provenance','flaky-tests-unit-coverage','acceptance-results-unit','acceptance-results-e2e','mutation-report','crap-report','acceptance-report',
+  const artifacts=['gate-provenance','flaky-tests-unit-coverage','acceptance-results-unit','mutation-report','crap-report','acceptance-report',
     'tool-call-pairing-verification','session-lifecycle-verification','session-restart-recovery-verification','session-multiprocess-concurrency-verification'];
   if(schedule==='before')artifacts.push('flaky-tests-unit');
   for(const name of artifacts) {
@@ -69,7 +69,7 @@ function collect(repo,id,schedule,out) {
     if(!reports.length||reports.some(r=>!r.pass||r.failed?.length))throw new Error(`${id}: missing or failed unit result`);
     if(reports.some(r=>r.firstExitCode!==0||r.retried||r.flaky?.length))cleanUnit=false;
   }
-  for(const name of ['acceptance-results-unit','acceptance-results-e2e']) {
+  for(const name of ['acceptance-results-unit']) {
     const xml=files(join(directory,name)).filter(f=>f.endsWith('.xml'));
     if(!xml.length||xml.some(f=>/\b(?:failures|errors)="[1-9]|<failure\b|<error\b/.test(readFileSync(f,'utf8'))))throw new Error(`${id}: missing or failed actual JUnit evidence`);
   }

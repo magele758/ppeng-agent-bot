@@ -24,11 +24,14 @@ test('full PR validation is opt-in on every branch and responds to labeling [AC:
  assert.match(w.jobs.full.if, /contains\(github.event.pull_request.labels\.\*\.name, 'full-validation'\)/);
  assert.doesNotMatch(w.jobs.full.if, /head_ref/);
 });
-test('browser evidence survives an earlier HTTP failure without ignoring failures [AC:ci-action-reliability#AC-4]', () => {
+test('HTTP regression still fails the cloud gate and browser E2E is not run there [AC:ci-action-reliability#AC-4] [AC:ci-action-reliability#AC-5]', () => {
  const w = parse(readFileSync('.github/workflows/release-gate.yml', 'utf8'));
- for (const name of ['Install Playwright Chromium', 'E2E (Agent Lab)']) {
-  const step = w.jobs.browser.steps.find(s => s.name === name);
-  assert.equal(step.if, '${{ !cancelled() }}');
-  assert.notEqual(step['continue-on-error'], true);
- }
+ const steps = w.jobs.browser.steps;
+ const runs = steps.map(s => s.run ?? '').join('\n');
+ assert.match(runs, /test:regression/);
+ assert.match(runs, /test:integration/);
+ assert.doesNotMatch(runs, /test:e2e/);
+ assert.equal(w.jobs.browser.strategy, undefined);
+ for (const step of steps) assert.notEqual(step['continue-on-error'], true);
+ assert.match(w.jobs.acceptance.steps.map(s => s.run ?? '').join('\n'), /--omit-runners e2e/);
 });

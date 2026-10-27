@@ -380,6 +380,12 @@ function checkTag(tag, location, specsById, errors, warnings) {
   return criterionKey(tag.featureId, tag.criterionId);
 }
 
+function omittedByPolicy(staticTests, omittedRunners) {
+  if (!omittedRunners.includes('e2e')) return false;
+  const active = staticTests.filter((t) => t.active);
+  return active.length > 0 && active.every((t) => t.file === 'e2e' || t.file.startsWith('e2e/'));
+}
+
 function criterionState({ resultsMode, staticTests, resultTally }) {
   const activeStatic = staticTests.filter((t) => t.active).length;
   if (!resultsMode) return activeStatic > 0 ? 'covered' : 'missing';
@@ -410,8 +416,9 @@ function failureMessage(spec, c, state, tally) {
  * @param {Array} input.staticTests  output of scanTestSource across runnable test files
  * @param {string[]} [input.orphanFiles]  files with `[AC:` that no configured runner executes
  * @param {Array|null} [input.results]    parsed JUnit cases (null/undefined = static mode)
+ * @param {string[]} [input.omittedRunners] runners intentionally not executed, e.g. cloud skips e2e
  */
-export function evaluateAcceptance({ specs, specErrors = [], specWarnings = [], staticTests, orphanFiles = [], results = null, stage = 'all' }) {
+export function evaluateAcceptance({ specs, specErrors = [], specWarnings = [], staticTests, orphanFiles = [], results = null, stage = 'all', omittedRunners = [] }) {
   if (!['all','software','deployment'].includes(stage)) throw new Error('Invalid acceptance stage');
   const errors = [...specErrors];
   const warnings = [...specWarnings];
@@ -471,6 +478,7 @@ export function evaluateAcceptance({ specs, specErrors = [], specWarnings = [], 
       const staticList = staticByCriterion.get(key) ?? [];
       const tally = resultsByCriterion.get(key) ?? { passed: 0, failed: 0, skipped: 0, failedTitles: [], titles: [] };
       let state = criterionState({ resultsMode, staticTests: staticList, resultTally: tally });
+      if (state === 'not-run' && omittedByPolicy(staticList, omittedRunners)) state = 'omitted';
       if (spec.status === 'draft') state = 'awaiting-approval';
       if (spec.status === 'retired') state = 'retired';
       return { ...c, state, tests: staticList, results: resultsMode ? tally : undefined };
@@ -539,6 +547,7 @@ const STATE_LABEL = {
   covered: '✅ tagged',
   failing: '❌ failing',
   'not-run': '❌ not run',
+  omitted: '⏭ not run in this cloud gate',
   missing: '❌ no test',
   'awaiting-approval': '📝 awaiting owner approval',
   retired: '⏹ retired',

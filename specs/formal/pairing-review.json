@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-10-27T08:10:00.000Z",
-  "reviewNote": "Quick gate now rejects a touched function whose cyclomatic complexity exceeds 30 before the existing checks. Overflow summary lineage, tool refusal order, and wait decisions are unchanged. Tool pairing, approval, lifecycle, restart and concurrency control flow are unchanged.",
+  "reviewedAt": "2026-10-27T08:40:00.000Z",
+  "reviewNote": "Cloud full validation no longer runs Playwright. HTTP regression and integration remain blocking. Quick gate still rejects a touched function over complexity 30. Tool pairing, approval, lifecycle, restart and concurrency control flow are unchanged.",
   "mapping": [
     {
       "step": "Execute/approval/result persistence and fold recovery; real source component probes (not a full kernel proof)",
@@ -261,7 +261,7 @@
     "scripts/test/tool-call-pairing-verification.test.mjs": "03d587f3bf39d4cc0ad09ff37f84292649206f7181d7db974cf15faebf17f2dd",
     "skills/verify-tool-call-pairing/SKILL.md": "217f27b3b894754e3863dfcf46c60c084bcc9965be0f0acdd2af68884660f9f1",
     "scripts/formal/run-formal-regression.mjs": "f6a9d8e8a45d372115a9e81ca0ab800ff32bac727a349ae73ca6bb35dcd1076d",
-    ".github/workflows/release-gate.yml": "654498498989e252bf8fcb29b22ce8a2477d9f1deb97aa2dbae794bb36ea9efe",
+    ".github/workflows/release-gate.yml": "73ce281fd699f93512631da45f5fa5ffcc71a48024da25a9a735586d0efe35e4",
     "packages/agent-loop/src/runtime/tool-loop.test.ts": "9b7d84c3218628f0be48c272db8394b85149aa2e6f865211291d9ecd66bce5e6",
     "skills/agent-loop/SKILL.md": "4a85cd1b0ae9f4b14a748143d86ec2db99f8a6ef48da114f52b0827afb571133",
     "packages/agent-loop/src/turn/host.ts": "f89c043474dbf310d21d48207593d1be4a19063184654a5c63a5e752a6eb90ba",
@@ -298,11 +298,11 @@
     "packages/agent-loop/src/session/fork-quote.test.ts": "5691846bf0b8d1c8c840996ad31cc28383cd24ece2178b4766d47c32f4e06f2e",
     "scripts/ci/release-results.mjs": "0510504936683689e82475a8b7111a89575d14eed06c4e9112e9ca2d4bbc2186",
     "scripts/ci/test-partition.mjs": "d6018aebae05ebc907ddd0de10c6905ee68e0c1ab2406057a7f09bb21b8ed28e",
-    "scripts/test/release-workflow-policy.test.mjs": "c0c9b7557041aa881a03d6848a801ad9a3b6846a77dfc80335c57980a059c51d",
+    "scripts/test/release-workflow-policy.test.mjs": "508f5919f39c9fa6ac208f7e82b50ee48b5ed2c5cba457555eb0b8ee7573fd9a",
     "scripts/ci/quick-gate.mjs": "5243836461a001d3b82f8fda39aaf2581e639c4cc691bff0301ab53714786f9c",
     "scripts/ci/validation-artifacts.mjs": "47472f7b9586a1bfe9f64381975d99e017e191c833d4678ee74a2b82e5c05518",
     "scripts/test/ci-audit.test.mjs": "c355ce76ff525786fbaa2e7c520bf7b4507427b135bd5508deedd14d6e00d07f",
-    "scripts/test/ci-speedup-workflow.test.mjs": "26d52b7cd1cfb903935ed1bbdd91c46487c2693d7d0e8625750582cfd6b1ec29",
+    "scripts/test/ci-speedup-workflow.test.mjs": "cc42b1ca9acc2ea36b7355cae7be9d17c76afec40524a200ccbb1476a7ea8044",
     "scripts/test/ci-parallel-validation.test.mjs": "65242e6058a1263594f4e2ca47115061eafdba12fc20f35cac3d4bdb4170469d",
     "scripts/ci/retry-failed-tests.mjs": "48fb79b3392941919d46a76a227769d1f61bf1f8bce79206c33b6e1130c9de4a",
     "scripts/ci/validation-lane.mjs": "4bd43ff55f1c6708f6acc7c135a27693d4eb2ab00c26f988de84845c6af653be",

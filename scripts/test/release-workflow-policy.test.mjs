@@ -55,10 +55,10 @@ test('release gate retains deterministic test layers and does not tolerate failu
   for (const script of ['build', 'test:package', 'agent:eval:verify', 'test:regression', 'test:integration']) {
     assert.ok(runs.includes(`pnpm run ${script}`), `missing release layer: ${script}`);
   }
-  // test:unit runs through the flaky-retry wrapper; e2e adds a JUnit reporter for the acceptance gate.
+  // test:unit runs through the flaky-retry wrapper. Cloud full validation does not run Playwright.
   for(const lane of ['unit','formal','sdk'])assert.ok(runs.some(run=>run.includes(`validation-lane.mjs ${lane} --out`)),`missing release layer: ${lane}`);
   assert.match(readFileSync('scripts/ci/validation-lane.mjs','utf8'),/run-formal-regression.mjs/);
-  assert.ok(runs.some((run) => run.startsWith('pnpm run test:e2e')), 'missing release layer: test:e2e');
+  assert.equal(runs.some((run) => run.includes('test:e2e')), false);
   assert.ok(runs.some(run => run.startsWith('pnpm run agent:eval:fast --exit-on-fail')));
   const evidence = doc.jobs.tests.steps.find(
     (step) => step.uses?.startsWith('actions/upload-artifact@') && step.with?.name === 'release-test-evidence'

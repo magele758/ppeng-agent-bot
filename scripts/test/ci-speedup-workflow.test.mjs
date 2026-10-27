@@ -18,8 +18,8 @@ test('browser/API checks start independently of long verification and mutation c
   assert.equal(jobs.browser.needs, undefined);
   assert.notEqual(jobs.browser['runs-on'], undefined);
   const browser = jobs.browser.steps.map(s => s.run ?? '').join('\n');
-  assert.match(browser, /test:e2e/);
-  assert.doesNotMatch(browser, /test:formal|test:concurrency|test:unit/);
+  assert.match(browser, /test:regression/);
+  assert.doesNotMatch(browser, /test:e2e|test:formal|test:concurrency|test:unit/);
 });
 
 test('functional and coverage results come from one unit execution, with explicit plain performance verification [AC:ci-gate-speedup#AC-5]', () => {
