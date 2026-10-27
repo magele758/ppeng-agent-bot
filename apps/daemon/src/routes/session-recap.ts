@@ -20,7 +20,6 @@ import {
   readSessionRecapCache,
   recapAnchorId,
   recapLocale,
-  resolveConversationTimezone,
   type RecapLocale
 } from '../session-recap-text.js';
 
@@ -111,14 +110,12 @@ async function composeAndStore(
   messages: ReturnType<RawAgentRuntime['store']['foldMessages']>
 ): Promise<{ text: string | null; anchorId: string | null }> {
   const complete = runtime.modelAdapter.completeText;
-  const session = runtime.getSession(sessionId);
-  const cached = readSessionRecapCache(session?.metadata);
+  const cached = readSessionRecapCache(runtime.getSession(sessionId)?.metadata);
   if (!complete) return { text: null, anchorId: recapAnchorId(messages) };
   const result = await composeSessionRecap({
     messages,
     locale,
     cached,
-    clock: { nowMs: Date.now(), timezone: resolveConversationTimezone(session?.metadata) },
     signal: AbortSignal.timeout(RECAP_WAIT_MS),
     completeText: (request) => complete.call(runtime.modelAdapter, request)
   });
