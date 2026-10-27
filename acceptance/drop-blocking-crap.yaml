@@ -1,0 +1,17 @@
+id: drop-blocking-crap
+title: 复杂度门禁不再卡住合并
+status: implemented
+requirement: |
+  这次修完了，再深度检查下，非必要的验证，还有那种一直失败的case，就不要了，这个完全变成累赘了，深度检查下
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  最近完整验证在功能、Formal、SDK、浏览器和验收都通过后，仍因复杂度身份校验失败而整轮变红，并拦住合并。该评分不再作为发布或合并的必须项。
+criteria:
+  - id: AC-1
+    given: 完整验证的功能、Formal、SDK、浏览器和验收都已通过
+    when: 复杂度评分缺失或失败
+    then: 不因此把完整验证或合并判为失败
+  - id: AC-2
+    given: 发布工作流汇总各项检查
+    when: 查看会阻塞发布的任务
+    then: 其中不再包含复杂度评分任务
