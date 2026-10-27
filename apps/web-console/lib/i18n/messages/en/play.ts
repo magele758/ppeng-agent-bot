@@ -677,6 +677,7 @@ export const play = {
     toolObservation: 'Screenshots returned by tools, not a new user instruction.',
     processNote: 'Folded {count} process rows',
     processNoteTitle: 'Open this process. Click again to fold it.',
+    toolShotAlt: 'Tool screenshot',
     enlargeImage: 'Enlarge screenshot',
     osSandbox: {
       savedOs: 'This command still used the OS sandbox: the saved isolation mode is OS-level, and it was not switched to a direct run. Key folders stay unreadable.',
