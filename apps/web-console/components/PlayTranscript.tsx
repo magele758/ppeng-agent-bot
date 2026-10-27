@@ -6,6 +6,8 @@ import { anchorApprovals } from '@/lib/approval-feed';
 import { messageHasStructuredParts, msgPartsToText, normalizedRole } from '@/lib/chat-utils';
 import { readMessageSessionId } from '@/lib/goal-update-notice';
 import { buildFeedSlots, steerStreamPlacement, type FeedSlot } from '@/lib/feed-window';
+import { rowsForSessionBrief } from '@/lib/session-brief';
+import { SessionBriefDisclosure } from './SessionBriefDisclosure';
 import { formatHash } from '@/lib/nav';
 import { useI18n } from '@/lib/i18n';
 import type { ReplyQuote } from '@/lib/reply-quote';
@@ -41,15 +43,20 @@ export function PlayTranscript(props: {
   onQuoteReply?: (quote: ReplyQuote) => void;
   childTaskEntries?: readonly ChildTaskStreamEntry[];
   onOpenChildTask?: (sessionId: string) => void;
+  sessionBrief?: boolean;
 }) {
   const view = transcriptView(props.chat, props.sessionApprovals, props.turnFeedStatLines, Boolean(props.selectedSessionId), props.childTaskEntries ?? []);
+  const brief = Boolean(props.sessionBrief) && !props.chat.showModelView;
+  const slots = rowsForSessionBrief(brief, view.slots, view.messages).map((row) =>
+    row.type === 'slot' ? row.slot : { key: row.key, kind: 'brief-note' as const, briefCount: row.count, folded: row.slots }
+  );
   return (
     <SurfaceContextProvider messages={props.chat.displayMessages}>
       <ChatFeedWindow
         layoutKey={props.layoutKey}
         scrollerRef={props.chat.playMessagesRef}
-        slots={view.slots}
-        renderSlot={(slot) => renderTranscriptSlot(slot, view, props)}
+        slots={slots}
+        renderSlot={(slot) => renderTranscriptSlot(slot, view, props, brief)}
         stickToBottomRef={props.chat.playStickToBottomRef}
         scrollIntentRef={props.chat.feedScrollIntentRef}
         revision={props.chat.feedRevision}
@@ -57,7 +64,7 @@ export function PlayTranscript(props: {
         olderLoading={props.chat.historyLoading}
         onStickScroll={props.chat.handlePlayMessagesScroll}
         onRequestOlder={(reason) => void props.chat.loadOlderHistory(reason)}
-        header={<FeedHeader view={view} {...props} />}
+        header={<>{brief ? <BriefBanner /> : null}<FeedHeader view={view} {...props} /></>}
         footer={<>{props.selectedSessionId ? <SkillCaptureCards
           key={props.selectedSessionId}
           sessionId={props.selectedSessionId}
@@ -87,6 +94,24 @@ function FeedHeader(props: {
       <HistoryStatus chat={props.chat} />
       <TranscriptEmpty {...props} />
     </>
+  );
+}
+
+function BriefBanner() {
+  const { t } = useI18n();
+  return <p className="chat-process-note" role="status">{t('play.chrome.sessionBriefBanner')}</p>;
+}
+
+function ProcessNote({ slot, view, props }: { slot: FeedSlot; view: TranscriptModel; props: Parameters<typeof renderTranscriptSlot>[2] }) {
+  const { t } = useI18n();
+  const folded = slot.folded ?? [];
+  if (folded.length === 0) return null;
+  return (
+    <SessionBriefDisclosure noteKey={slot.key} label={t('play.turns.processNote', { count: folded.length })} title={t('play.turns.processNoteTitle')}>
+      {folded.map((foldedSlot) => (
+        <div key={foldedSlot.key}>{renderTranscriptSlot(foldedSlot, view, props, false)}</div>
+      ))}
+    </SessionBriefDisclosure>
   );
 }
 
@@ -313,24 +338,25 @@ function renderTranscriptSlot(slot: FeedSlot, view: TranscriptModel, props: {
   replyQuoteBot?: { id: string; name: string } | null;
   onQuoteReply?: (quote: ReplyQuote) => void;
   onOpenChildTask?: (sessionId: string) => void;
-}): ReactNode {
+}, brief = false): ReactNode {
+  if (slot.kind === 'brief-note') return <ProcessNote slot={slot} view={view} props={props} />;
   if (slot.kind === 'child-task') {
     const group = view.childTaskGroups.get(slot.messageIndex ?? -1) ?? [];
     return <BotChildTaskStreamEntry entries={group} onOpen={props.onOpenChildTask} />;
   }
   const sessionId = props.selectedSessionId ?? '';
-  const live = renderLiveSlot(slot, view, props.chat, sessionId, props.onApprovalsChanged, props.onAttachStream);
+  const live = renderLiveSlot(slot, view, props.chat, sessionId, props.onApprovalsChanged, props.onAttachStream, brief);
   if (live) return live;
-  return renderStoredSlot(slot, view, sessionId, props.chat.showModelView, props.onApprovalsChanged, props.onAttachStream, props.replyQuoteBot ?? null, props.onQuoteReply);
+  return renderStoredSlot(slot, view, sessionId, props.chat.showModelView, props.onApprovalsChanged, props.onAttachStream, props.replyQuoteBot ?? null, props.onQuoteReply, brief);
 }
 
-function renderLiveSlot(slot: FeedSlot, view: TranscriptModel, chat: Chat, sessionId: string, onDone: () => void, onAttach?: (sessionId: string) => { ready: Promise<void>; cancel: () => void }): ReactNode {
-  const early = renderOptimisticOrStream(slot, view, chat, sessionId);
+function renderLiveSlot(slot: FeedSlot, view: TranscriptModel, chat: Chat, sessionId: string, onDone: () => void, onAttach: ((sessionId: string) => { ready: Promise<void>; cancel: () => void }) | undefined, brief: boolean): ReactNode {
+  const early = renderOptimisticOrStream(slot, view, chat, sessionId, brief);
   if (early) return early;
   return renderTypingOrTrail(slot, view, onDone, onAttach);
 }
 
-function renderOptimisticOrStream(slot: FeedSlot, view: TranscriptModel, chat: Chat, sessionId: string): ReactNode {
+function renderOptimisticOrStream(slot: FeedSlot, view: TranscriptModel, chat: Chat, sessionId: string, brief: boolean): ReactNode {
   if (slot.kind === 'held') {
     const text = chat.heldAssistantText;
     if (!text) return null;
@@ -349,7 +375,7 @@ function renderOptimisticOrStream(slot: FeedSlot, view: TranscriptModel, chat: C
     );
   }
   if (slot.kind !== 'stream') return null;
-  return <ChatTurnStreaming retry={slot.streamPart === 'prefix' ? undefined : chat.streamOverlay?.retry} segments={streamSegmentsFor(slot, chat)} sessionId={sessionId} resolvedCallIds={view.resolved} />;
+  return <ChatTurnStreaming retry={slot.streamPart === 'prefix' ? undefined : chat.streamOverlay?.retry} segments={streamSegmentsFor(slot, chat)} sessionId={sessionId} resolvedCallIds={view.resolved} brief={brief} />;
 }
 
 function streamSegmentsFor(slot: FeedSlot, chat: Chat) {
@@ -374,9 +400,10 @@ function renderStoredSlot(
   onDone: () => void,
   onAttach: ((sessionId: string) => { ready: Promise<void>; cancel: () => void }) | undefined,
   quoteBot: { id: string; name: string } | null,
-  onQuote?: (quote: ReplyQuote) => void
+  onQuote?: (quote: ReplyQuote) => void,
+  brief = false
 ): ReactNode {
-  if (slot.kind === 'message') return messageSlot(view, sessionId, slotIndex(slot), modelView, quoteBot, onQuote);
+  if (slot.kind === 'message') return messageSlot(view, sessionId, slotIndex(slot), modelView, quoteBot, onQuote, brief);
   if (slot.kind === 'stats') return statsLine(view.lines, slot.turnIndex);
   if (slot.kind === 'approval') return approvalSlot(slot, view, onDone, onAttach);
   return null;
@@ -393,13 +420,14 @@ function messageSlot(
   index: number,
   modelView: boolean,
   quoteBot: { id: string; name: string } | null,
-  onQuote?: (quote: ReplyQuote) => void
+  onQuote?: (quote: ReplyQuote) => void,
+  brief = false
 ): ReactNode {
   const message = view.messages[index];
   if (!message) return null;
   const replyNames = quoteBot ? { [quoteBot.id]: quoteBot.name } : undefined;
   if (messageHasStructuredParts(message.parts)) {
-    return <ChatTurnFromMessage m={message} sessionId={sessionId} msgIndex={index} modelView={modelView} toolCallsById={view.calls} resolvedCallIds={view.resolved} quoteBot={quoteBot} onQuote={onQuote} replyNames={replyNames} />;
+    return <ChatTurnFromMessage m={message} sessionId={sessionId} msgIndex={index} modelView={modelView} toolCallsById={view.calls} resolvedCallIds={view.resolved} quoteBot={quoteBot} onQuote={onQuote} replyNames={replyNames} brief={brief} />;
   }
   const role = normalizedRole(message);
   if (role === 'tool' || role === 'system') {
@@ -412,7 +440,7 @@ function messageSlot(
       />
     );
   }
-  return <ChatTurnFromMessage m={message} sessionId={sessionId} msgIndex={index} modelView={modelView} toolCallsById={view.calls} resolvedCallIds={view.resolved} quoteBot={quoteBot} onQuote={onQuote} replyNames={replyNames} />;
+  return <ChatTurnFromMessage m={message} sessionId={sessionId} msgIndex={index} modelView={modelView} toolCallsById={view.calls} resolvedCallIds={view.resolved} quoteBot={quoteBot} onQuote={onQuote} replyNames={replyNames} brief={brief} />;
 }
 
 function approvalSlot(slot: FeedSlot, view: TranscriptModel, onDone: () => void, onAttach?: (sessionId: string) => { ready: Promise<void>; cancel: () => void }): ReactNode {
