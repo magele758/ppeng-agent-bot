@@ -33,7 +33,7 @@
 | `bot-child-task-chat-entry` | 03 |
 | `bot-child-task-stream-entry` | 03 |
 | `bot-input-suggestion` | 04 |
-| `session-recap` | 04。离开再回来时由模型写一行最近进展，也可当场回顾 |
+| `session-recap` | 04。离开再回来时由模型写一行最近进展，也可当场回顾。整段可以关掉 |
 | `bot-concurrent-subagents` | 05 |
 | `bot-console-selection` | 03 |
 | `bot-create-named-tools` | 02、07 |

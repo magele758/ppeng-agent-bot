@@ -6,11 +6,13 @@ import { LoadGate, StatusLine, ToggleField } from './sections/settings/categorie
 import { useSettingsResource } from './sections/settings/categories/kit/settings-store';
 
 interface SessionRecapSettings {
+  active: boolean;
   enabled: boolean;
   updatedAt: string;
 }
 
 interface SessionRecapEffective {
+  active: boolean;
   enabled: boolean;
   source: string;
 }
@@ -29,6 +31,17 @@ export function SessionRecapSettingsCard() {
         {settings ? (
           <>
             <ToggleField
+              id="field-sessionRecapActive"
+              label={label('fields.active.label')}
+              hint={label('fields.active.hint')}
+              defaultText={t('settingsEntries.common.on')}
+              isDefault={settings.active !== false}
+              onRestore={() => void resource.save({ active: true })}
+              checked={settings.active !== false}
+              disabled={resource.busy}
+              onChange={(active) => void resource.save({ active })}
+            />
+            <ToggleField
               id="field-sessionRecapEnabled"
               label={label('fields.enabled.label')}
               hint={label('fields.enabled.hint')}
@@ -36,7 +49,7 @@ export function SessionRecapSettingsCard() {
               isDefault={settings.enabled}
               onRestore={() => void resource.save({ enabled: true })}
               checked={settings.enabled}
-              disabled={resource.busy}
+              disabled={resource.busy || settings.active === false}
               onChange={(enabled) => void resource.save({ enabled })}
             />
             <StatusLine status={resource.status} />

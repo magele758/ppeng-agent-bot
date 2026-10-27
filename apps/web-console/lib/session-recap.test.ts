@@ -279,3 +279,39 @@ test('关掉自动回顾后回来不出现，当场回顾仍可用，没保存�
   assert.equal(parseActivityRecord(JSON.stringify({ anchorId: 'a3', at: NOW - AWAY }), 'a3'), NOW - AWAY);
   assert.equal(parseActivityRecord(JSON.stringify({ anchorId: 'other', at: NOW }), 'a3'), null);
 });
+
+test('关掉整段回顾后不出现，命令会发出去，自动选择还留着 [AC:session-recap#AC-5]', () => {
+  const recap = buildSessionRecap(session());
+  assert.ok(recap);
+  const hidden = presentSessionRecap({
+    active: false,
+    enabled: true,
+    recap,
+    armed: true,
+    manual: true,
+    generating: false,
+    draft: '',
+    seenAnchorId: null,
+    line: '刚刚写完签名校验，过期测试还没补。'
+  });
+  assert.equal(hidden.show, false);
+  assert.equal(hidden.text, '');
+  assert.equal(hidden.markSeen, false);
+  assert.equal(recapCommandShouldSend('/recap', false, false), true);
+  assert.equal(recapCommandShouldSend('  /回顾  ', false, false), true);
+  assert.equal(recapCommandShouldSend('/recap', false, true), false);
+
+  const manualStill = presentSessionRecap({
+    active: true,
+    enabled: false,
+    recap,
+    armed: false,
+    manual: true,
+    generating: false,
+    draft: '',
+    seenAnchorId: null,
+    line: '刚刚写完签名校验，过期测试还没补。'
+  });
+  assert.equal(manualStill.show, true);
+  assert.equal(manualStill.text, '刚刚写完签名校验，过期测试还没补。');
+});

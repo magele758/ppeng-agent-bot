@@ -36,6 +36,7 @@ export function useSessionRecap(input: {
   failedText: string;
 }) {
   const [autoEnabled, setAutoEnabled] = useState<boolean | null>(null);
+  const [featureActive, setFeatureActive] = useState<boolean | null>(null);
   const [armed, setArmed] = useState(false);
   const [manual, setManual] = useState(false);
   const [seenAnchorId, setSeenAnchorId] = useState<string | null>(null);
@@ -59,16 +60,30 @@ export function useSessionRecap(input: {
 
   useEffect(() => {
     let cancelled = false;
-    void (async () => {
+    let generation = 0;
+    const load = async () => {
+      const ticket = ++generation;
       try {
-        const data = (await api('/api/session-recap/settings')) as { settings?: { enabled?: boolean } };
-        if (!cancelled) setAutoEnabled(data.settings?.enabled === false ? false : true);
+        const data = (await api('/api/session-recap/settings')) as {
+          settings?: { enabled?: boolean; active?: boolean };
+        };
+        if (cancelled || ticket !== generation) return;
+        setAutoEnabled(data.settings?.enabled === false ? false : true);
+        setFeatureActive(data.settings?.active === false ? false : true);
       } catch {
-        if (!cancelled) setAutoEnabled(true);
+        if (cancelled || ticket !== generation) return;
+        setAutoEnabled(true);
+        setFeatureActive(true);
       }
-    })();
+    };
+    void load();
+    const onHash = () => {
+      void load();
+    };
+    window.addEventListener('hashchange', onHash);
     return () => {
       cancelled = true;
+      window.removeEventListener('hashchange', onHash);
     };
   }, []);
 
@@ -104,8 +119,8 @@ export function useSessionRecap(input: {
       setArmed(false);
     }
     prevRef.current = { sessionId, anchorId };
-    if (!recap || autoEnabled == null) return;
-    if (!autoEnabled) {
+    if (!recap || autoEnabled == null || featureActive == null) return;
+    if (!autoEnabled || !featureActive) {
       arrivalPendingRef.current = false;
       return;
     }
@@ -131,7 +146,7 @@ export function useSessionRecap(input: {
     ) {
       setArmed(true);
     }
-  }, [input.sessionId, input.sessionUpdatedAt, autoEnabled, recap]);
+  }, [input.sessionId, input.sessionUpdatedAt, autoEnabled, featureActive, recap]);
 
   useEffect(() => {
     const onVisibility = () => {
@@ -142,7 +157,7 @@ export function useSessionRecap(input: {
       const awayStartedMs = hiddenAtRef.current;
       hiddenAtRef.current = null;
       const sessionId = input.sessionId;
-      if (awayStartedMs == null || !sessionId || autoEnabled !== true || !recap) return;
+      if (awayStartedMs == null || !sessionId || autoEnabled !== true || featureActive !== true || !recap) return;
       const observed = parseActivityRecord(window.localStorage.getItem(activityRecordKey(sessionId)), recap.anchorId);
       const lastActivityMs = resolveLastActivityMs({
         messageAt: recap.lastActivityAt,
@@ -166,7 +181,7 @@ export function useSessionRecap(input: {
     };
     document.addEventListener('visibilitychange', onVisibility);
     return () => document.removeEventListener('visibilitychange', onVisibility);
-  }, [input.sessionId, input.sessionUpdatedAt, autoEnabled, recap]);
+  }, [input.sessionId, input.sessionUpdatedAt, autoEnabled, featureActive, recap]);
 
   const match =
     fetched &&
@@ -177,6 +192,7 @@ export function useSessionRecap(input: {
       ? fetched
       : null;
   const view = presentSessionRecap({
+    active: featureActive === true,
     enabled: autoEnabled === true,
     recap,
     armed,
@@ -255,7 +271,7 @@ export function useSessionRecap(input: {
   return {
     shown: view.show,
     text,
-    canManual: Boolean(recap && recap.completedTurns >= 1 && !input.generating),
+    canManual: Boolean(featureActive === true && recap && recap.completedTurns >= 1 && !input.generating),
     requestManual: () => {
       setManual(true);
       setAttempt((n) => n + 1);
