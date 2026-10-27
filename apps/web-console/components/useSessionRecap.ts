@@ -11,6 +11,7 @@ import {
   resolveLastActivityMs,
   resolveSeenAnchor,
   seenRecordKey,
+  shouldRefreshShownRecap,
   type RecapLocale,
   type RecapMessage
 } from '@/lib/session-recap';
@@ -43,6 +44,8 @@ export function useSessionRecap(input: {
   const [attempt, setAttempt] = useState(0);
   const [fetched, setFetched] = useState<FetchedRecap | null>(null);
   const seenRef = useRef<string | null>(null);
+  const manualRef = useRef(false);
+  manualRef.current = manual;
   const prevRef = useRef<{ sessionId: string | null; anchorId: string | null }>({
     sessionId: null,
     anchorId: null
@@ -117,6 +120,14 @@ export function useSessionRecap(input: {
       const at = Date.now();
       window.localStorage.setItem(activityRecordKey(sessionId), JSON.stringify({ anchorId, at }));
       setArmed(false);
+      if (shouldRefreshShownRecap({
+        manual: manualRef.current,
+        dismissed: false,
+        previousAnchor: prev.anchorId,
+        nextAnchor: anchorId
+      })) {
+        setAttempt((n) => n + 1);
+      }
     }
     prevRef.current = { sessionId, anchorId };
     if (!recap || autoEnabled == null || featureActive == null) return;
@@ -267,10 +278,19 @@ export function useSessionRecap(input: {
       : match?.status === 'failed'
         ? input.failedText
         : input.pendingText;
+  const status: 'hidden' | 'loading' | 'done' | 'failed' = !view.show
+    ? 'hidden'
+    : match?.status === 'done'
+      ? 'done'
+      : match?.status === 'failed'
+        ? 'failed'
+        : 'loading';
 
   return {
     shown: view.show,
     text,
+    status,
+    modelText: status === 'done' ? text : '',
     canManual: Boolean(featureActive === true && recap && recap.completedTurns >= 1 && !input.generating),
     requestManual: () => {
       setManual(true);

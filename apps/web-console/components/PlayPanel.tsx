@@ -32,6 +32,7 @@ import { composerModelLocked } from '@/lib/bot-model';
 import { COMPOSITION_ENTER_GUARD_MS, IME_COMPOSITION_KEY_CODE, decideComposerEnter } from '@/lib/composer-enter';
 import {
   composerDraftFromTyping,
+  composerHintAfterRecap,
   composerHintKey,
   composerHintPresentation,
   isBotMainComposerSession,
@@ -604,16 +605,22 @@ export function PlayPanel({
     pendingText: t('play.sessionRecap.pending'),
     failedText: t('play.sessionRecap.failed')
   });
+  const recapHint = composerHintAfterRecap({
+    shown: sessionRecap.shown,
+    status: sessionRecap.status,
+    text: sessionRecap.modelText,
+  });
   const nextHint = usePlayComposerHint({
     sessionId: selectedSessionId,
     messages: chat.sessionMessages,
     draft: chat.playInput,
+    recapText: recapHint.recap,
     enabled: shouldRequestComposerHint({
       surface: playSurface,
       botMain: isBotMainComposerSession(selectedSession),
       groupOpen: openGroupId != null,
       draft: chat.playInput,
-      generating: sessionBusy,
+      generating: sessionBusy || recapHint.wait,
       hasAssistantReply: lastCompletedTurn(chat.sessionMessages) != null,
     }),
   });

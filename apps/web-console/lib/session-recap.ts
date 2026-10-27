@@ -124,6 +124,18 @@ export function armAutomaticRecap(input: {
   return input.awayStartedMs != null && input.now - input.awayStartedMs >= SESSION_RECAP_AWAY_MS;
 }
 
+/** A shown manual recap follows a newly finished turn. The same turn is not fetched again. */
+export function shouldRefreshShownRecap(input: {
+  manual: boolean;
+  dismissed: boolean;
+  previousAnchor: string | null;
+  nextAnchor: string | null;
+}): boolean {
+  if (!input.manual || input.dismissed) return false;
+  if (!input.previousAnchor || !input.nextAnchor) return false;
+  return input.previousAnchor !== input.nextAnchor;
+}
+
 export function presentSessionRecap(input: {
   /** Whole recap. False hides the line even when someone asks for it. Default on. */
   active?: boolean;

@@ -16,10 +16,11 @@ export function usePlayComposerHint(opts: {
   messages: readonly ComposerHintMessage[];
   draft: string;
   enabled: boolean;
+  recapText?: string;
 }): string {
-  const { sessionId, messages, draft, enabled } = opts;
+  const { sessionId, messages, draft, enabled, recapText = '' } = opts;
   const turn = lastCompletedTurn(messages);
-  const turnKey = turn && sessionId ? `${sessionId}\n${turn.userText}\n${turn.assistantText}` : '';
+  const turnKey = turn && sessionId ? `${sessionId}\n${turn.userText}\n${turn.assistantText}\n${recapText}` : '';
   const [hintState, setHintState] = useState<{ key: string; hint: string }>({ key: '', hint: '' });
 
   useEffect(() => {
@@ -34,7 +35,7 @@ export function usePlayComposerHint(opts: {
         const id = window.setTimeout(fn, ms);
         return () => window.clearTimeout(id);
       },
-      load: () => loadComposerHint(sessionId, controller.signal),
+      load: () => loadComposerHint(sessionId, controller.signal, fetch, recapText),
       publish: (hint) => {
         if (!controller.signal.aborted) setHintState({ key: turnKey, hint });
       },

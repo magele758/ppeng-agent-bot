@@ -55,8 +55,20 @@ export function shouldRequestComposerHint(input: {
   return true;
 }
 
-export function composerHintRequestBody(sessionId: string): { sessionId: string } {
-  return { sessionId };
+/** Recap still writing: wait. Recap done: pass that line. No recap: keep the old hint path. */
+export function composerHintAfterRecap(input: {
+  shown: boolean;
+  status: 'hidden' | 'loading' | 'done' | 'failed';
+  text: string;
+}): { wait: boolean; recap: string } {
+  if (!input.shown || input.status === 'hidden' || input.status === 'failed') return { wait: false, recap: '' };
+  if (input.status !== 'done') return { wait: true, recap: '' };
+  return { wait: false, recap: input.text.trim() };
+}
+
+export function composerHintRequestBody(sessionId: string, recap = ''): { sessionId: string; recap?: string } {
+  const line = recap.trim();
+  return line ? { sessionId, recap: line } : { sessionId };
 }
 
 export function readComposerHintBody(status: number, body: unknown): string {
@@ -145,13 +157,14 @@ export function armComposerHint(input: {
 export async function loadComposerHint(
   sessionId: string,
   signal?: AbortSignal,
-  fetchImpl: (url: string, init: RequestInit) => Promise<Response> = fetch
+  fetchImpl: (url: string, init: RequestInit) => Promise<Response> = fetch,
+  recap = ''
 ): Promise<string> {
   try {
     const response = await fetchImpl('/api/lab/composer-hint', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(composerHintRequestBody(sessionId)),
+      body: JSON.stringify(composerHintRequestBody(sessionId, recap)),
       signal,
     });
     const payload: unknown = await response.json().catch(() => null);
