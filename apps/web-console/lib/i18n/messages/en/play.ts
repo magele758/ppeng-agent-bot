@@ -404,6 +404,11 @@ export const play = {
     suggestionCycle: '{count} more. Tab again to switch'
   },
 
+  sessionRecap: {
+    manual: 'Recap this session',
+    dismiss: 'Dismiss recap'
+  },
+
   replyQuote: {
     action: 'Quote',
     actionAria: 'Quote this reply from {name}',

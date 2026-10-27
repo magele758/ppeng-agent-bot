@@ -1,6 +1,7 @@
 'use client';
 import { goalMessage } from '@/lib/bot-goals';
 import { composerMessageToSend } from '@/lib/composer-next-hint';
+import { recapCommandShouldSend } from '@/lib/session-recap';
 import { noteBotFirstTaskSent } from '@/lib/bot-first-task';
 
 import { botComposerStatusText, planBotComposerSend } from '@/lib/bot-chat-commands';
@@ -320,6 +321,7 @@ export function usePlayChat(deps: PlayChatDeps) {
   const [goalDraft, setGoalDraft] = useState('');
   const [autonomyDraft, setAutonomyDraft] = useState<AutonomyLevel>('balanced');
   const [playInput, setPlayInput] = useState('');
+  const [recapNonce, setRecapNonce] = useState(0);
   const [inputGhost, setInputGhost] = useState<GhostState>(emptyGhost);
   const [suggestionEnabled, setSuggestionEnabled] = useState(true);
   const suggestionReqRef = useRef(0);
@@ -2010,6 +2012,11 @@ export function usePlayChat(deps: PlayChatDeps) {
     const contextFields = contextSourcesBody(contextSources);
     const contextLabels = contextLabelsOf(contextSources);
     const hasAttachments = composerHasAttachments(imageAssetIds, attachmentIds, contextSources);
+    if (!recapCommandShouldSend(composerMessageToSend(playInput), hasAttachments)) {
+      clearComposerOnly();
+      setRecapNonce((n) => n + 1);
+      return;
+    }
     const submission = contextSubmission(text, contextSources);
     const commandBotId = playSurface === 'bot' ? botIdRef.current : '';
     if (
@@ -2592,6 +2599,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     refreshPlayPanel,
     requestScrollPlayToBottom,
     sendPlayMessage,
+    recapNonce,
     armLiveSessionStream,
     handleFileUpload,
     handleUrlFetch,

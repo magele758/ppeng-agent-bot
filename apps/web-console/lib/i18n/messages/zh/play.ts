@@ -404,6 +404,11 @@ export const play = {
     suggestionCycle: '还有 {count} 条备选，再按 Tab 切换'
   },
 
+  sessionRecap: {
+    manual: '回顾这段会话',
+    dismiss: '收起回顾'
+  },
+
   replyQuote: {
     action: '引用',
     actionAria: '引用 {name} 的这条回复',

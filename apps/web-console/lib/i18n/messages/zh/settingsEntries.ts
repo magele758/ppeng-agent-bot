@@ -148,6 +148,17 @@ export const settingsEntries = {
       inboxCap: '不限制'
     }
   },
+  sessionRecap: {
+    title: '会话回顾',
+    keywords: '回顾 recap 离开 回来 摘要 进度 做到哪 会话末尾',
+    desc: '离开这场会话至少三分钟再回来时，输入框上方用一行字说明做到哪了：在做什么、改过哪些文件、还缺什么。这行只给你看，不会发给助手。关掉后不再自动出现，仍可以当场回顾。',
+    fields: {
+      enabled: {
+        label: '离开后再回来时自动回顾',
+        hint: '默认开启。会话至少进行三轮，且同一段进展不会连着回顾两次。正在打字或助手还在回复时不会打断。'
+      }
+    }
+  },
   inputSuggestion: {
     title: '下一句建议',
     keywords: '输入建议 ghost text Tab 补全 下一句 淡色 输入框 bot',
