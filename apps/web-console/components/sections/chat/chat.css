@@ -446,3 +446,60 @@
 }
 .chat-composer-outer .chat-composer-dock--empty { display: none; }
 .chat-composer-outer:has(.chat-composer-dock--empty) { min-height: 0; }
+
+.session-recap-bar {
+  margin: 0 0 var(--ui-space-2);
+}
+
+.session-recap {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ui-space-2);
+  margin: 0;
+  padding: var(--ui-space-2) var(--ui-space-3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+}
+
+.session-recap__text {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  line-height: var(--ui-leading-normal);
+}
+
+.session-recap__dismiss,
+.session-recap__manual {
+  border: 0;
+  background: transparent;
+  color: var(--ui-text-muted);
+  cursor: pointer;
+  font: inherit;
+}
+
+.session-recap__dismiss {
+  flex: 0 0 auto;
+  font-size: var(--ui-text-lg);
+  line-height: 1;
+  padding: 0;
+}
+
+.session-recap__manual {
+  font-size: var(--ui-text-xs);
+  line-height: var(--ui-leading-tight);
+  padding: 0;
+}
+
+.session-recap__manual:hover,
+.session-recap__dismiss:hover {
+  color: var(--ui-text);
+}
+
+.session-recap__manual:focus-visible,
+.session-recap__dismiss:focus-visible {
+  outline: var(--ui-focus);
+  outline-offset: 2px;
+}

@@ -33,6 +33,7 @@
 | `bot-child-task-chat-entry` | 03 |
 | `bot-child-task-stream-entry` | 03 |
 | `bot-input-suggestion` | 04 |
+| `session-recap` | 04。离开再回来时的一行回顾，也可当场回顾 |
 | `bot-concurrent-subagents` | 05 |
 | `bot-console-selection` | 03 |
 | `bot-create-named-tools` | 02、07 |
@@ -134,6 +135,7 @@
 | 群 | `packages/core/src/rooms/` |
 | 定时任务 | `packages/core/src` 里的 cron / routine，以及 `doc/BOT_ROUTINES.md` |
 | 下一句建议 | `packages/core/src/session/input-suggestion.ts`。产品规则以 `bot-input-suggestion` 为准 |
+| 会话回顾 | `apps/web-console/lib/session-recap.ts`。产品规则以 `session-recap` 为准 |
 | Lab 界面 | `apps/web-console/components/` 里的 `PlayPanel`、`BotDetailMenu`、`bot-work/`、`SessionListRow` |
 | HTTP | `apps/daemon/src/routes/` 下的 bots、rooms、cron、goals |
 

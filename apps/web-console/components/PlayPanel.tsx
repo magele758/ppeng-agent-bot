@@ -65,6 +65,7 @@ import { BotWorkSummary } from './bot-work/BotWorkSummary';
 import { BotFirstTask } from './bot-work/BotFirstTask';
 import { useBotFirstTask } from './bot-work/useBotFirstTask';
 import { usePlayComposerHint } from './usePlayComposerHint';
+import { useSessionRecap } from './useSessionRecap';
 import type { BotFirstTaskConversation } from '@/lib/bot-first-task';
 import { BotFunctionalGroups } from './BotFunctionalGroups';
 import { BotPinArea } from './BotPinArea';
@@ -592,6 +593,15 @@ export function PlayPanel({
     chat.playSending ||
     Boolean(chat.streamOverlay) ||
     chat.waitTyping;
+  const sessionRecap = useSessionRecap({
+    sessionId: selectedSessionId,
+    messages: chat.sessionMessages,
+    sessionUpdatedAt: selectedSession?.updatedAt,
+    generating: chatRunning || selectedSession?.status === 'running',
+    draft: chat.playInput,
+    locale,
+    commandNonce: chat.recapNonce
+  });
   const nextHint = usePlayComposerHint({
     sessionId: selectedSessionId,
     messages: chat.sessionMessages,
@@ -1273,6 +1283,32 @@ export function PlayPanel({
                     <button type="button" className="btn btn-primary btn-sm" onClick={onOpenModelSetup}>
                       {t('play.empty.setupCta')}
                     </button>
+                  </div>
+                ) : null}
+                {selectedSessionId && (sessionRecap.shown || sessionRecap.canManual) ? (
+                  <div className="session-recap-bar">
+                    {sessionRecap.shown ? (
+                      <div className="session-recap" role="status" data-testid="session-recap">
+                        <p className="session-recap__text">{sessionRecap.text}</p>
+                        <button
+                          type="button"
+                          className="session-recap__dismiss"
+                          aria-label={t('play.sessionRecap.dismiss')}
+                          onClick={sessionRecap.dismiss}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="session-recap__manual"
+                        data-testid="session-recap-manual"
+                        onClick={sessionRecap.requestManual}
+                      >
+                        {t('play.sessionRecap.manual')}
+                      </button>
+                    )}
                   </div>
                 ) : null}
 
