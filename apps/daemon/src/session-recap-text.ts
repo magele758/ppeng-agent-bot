@@ -4,6 +4,14 @@
  * local splice of the user's message.
  */
 
+import {
+  formatWrittenAt,
+  resolveConversationTimezone,
+  zonedClock
+} from '../../../packages/core/src/session/conversation-clock.ts';
+
+export { resolveConversationTimezone };
+
 export const SESSION_RECAP_MAX_CHARS = 400;
 export const SESSION_RECAP_RECENT_TURNS = 4;
 export const SESSION_RECAP_CACHE_KEY = 'sessionRecap';
@@ -15,6 +23,7 @@ export type RecapCache = {
   anchorId: string;
   locale: RecapLocale;
   text: string;
+  asOfDate: string;
 };
 
 export type RecapCompleteInput = {
@@ -37,6 +46,7 @@ export type RecapSourceMessage = {
   id?: string;
   role?: string;
   hidden?: boolean;
+  createdAt?: string;
   parts?: readonly RecapSourcePart[] | null;
 };
 
@@ -45,6 +55,7 @@ type Turn = {
   assistantText: string;
   assistantId: string;
   files: string[];
+  createdAt?: string;
 };
 
 const FILE_TOOLS = new Set(['write_file', 'edit_file']);
@@ -62,7 +73,8 @@ export function readSessionRecapCache(metadata: Record<string, unknown> | null |
   if (typeof record.anchorId !== 'string' || !record.anchorId) return null;
   if (record.locale !== 'zh' && record.locale !== 'en') return null;
   if (typeof record.text !== 'string' || !record.text.trim()) return null;
-  return { anchorId: record.anchorId, locale: record.locale, text: record.text };
+  if (typeof record.asOfDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(record.asOfDate)) return null;
+  return { anchorId: record.anchorId, locale: record.locale, text: record.text, asOfDate: record.asOfDate };
 }
 
 /** Same anchor as the Lab: the assistant message that closed the latest turn. */
@@ -75,15 +87,20 @@ export function recapAnchorId(messages: readonly RecapSourceMessage[]): string |
 
 export function buildRecapRequest(
   messages: readonly RecapSourceMessage[],
-  locale: RecapLocale
+  locale: RecapLocale,
+  clock?: { nowMs: number; timezone: string }
 ): { system: string; user: string; anchorId: string } | null {
   const turns = completedTurns(messages);
   const latest = turns[turns.length - 1];
-  if (!latest) return null;
+  const zone = {
+    nowMs: clock?.nowMs ?? Date.now(),
+    timezone: clock?.timezone || resolveConversationTimezone(undefined)
+  };
+  const today = zonedClock(zone.nowMs, zone.timezone);
   const recent = turns.slice(-SESSION_RECAP_RECENT_TURNS);
   return {
-    system: systemPrompt(locale),
-    user: recent.map((turn) => turnBlock(turn, locale)).join('\n\n'),
+    system: systemPrompt(locale, today.date, today.timezone),
+    user: recent.map((turn) => turnBlock(turn, locale, zone.timezone)).join('\n\n'),
     anchorId: latest.assistantId || stableId(latest.assistantText)
   };
 }
@@ -110,13 +127,24 @@ export async function composeSessionRecap(input: {
   completeText: (request: RecapCompleteInput) => Promise<string>;
   cached?: RecapCache | null;
   signal?: AbortSignal;
+  clock?: { nowMs: number; timezone: string };
 }): Promise<{ text: string | null; anchorId: string | null; cache: RecapCache | null }> {
-  const request = buildRecapRequest(input.messages, input.locale);
+  const zone = {
+    nowMs: input.clock?.nowMs ?? Date.now(),
+    timezone: input.clock?.timezone || resolveConversationTimezone(undefined)
+  };
+  const asOfDate = zonedClock(zone.nowMs, zone.timezone).date;
+  const request = buildRecapRequest(input.messages, input.locale, zone);
   if (!request) return { text: null, anchorId: null, cache: null };
   const cached = input.cached;
-  if (cached && cached.anchorId === request.anchorId && cached.locale === input.locale) {
+  if (
+    cached &&
+    cached.asOfDate === asOfDate &&
+    cached.anchorId === request.anchorId &&
+    cached.locale === input.locale
+  ) {
     const text = normalizeRecapLine(cached.text);
-    if (text) return { text, anchorId: request.anchorId, cache: { ...cached, text } };
+    if (text) return { text, anchorId: request.anchorId, cache: { ...cached, text, asOfDate } };
   }
   let raw = '';
   try {
@@ -134,19 +162,24 @@ export async function composeSessionRecap(input: {
   return {
     text,
     anchorId: request.anchorId,
-    cache: { anchorId: request.anchorId, locale: input.locale, text }
+    cache: { anchorId: request.anchorId, locale: input.locale, text, asOfDate }
   };
 }
 
-function systemPrompt(locale: RecapLocale): string {
+function systemPrompt(locale: RecapLocale, today: string, timezone: string): string {
+  const dated = locale === 'en'
+    ? `Today's calendar date is ${today} (${timezone}). Do not call an older turn's today or 今天 "now".`
+    : `今天的日历日是 ${today}（${timezone}）。不要把更早一轮里的「今天」当成现在。`;
   if (locale === 'en') {
-    return 'Write one recap line for someone who just returned to this conversation. Use only the latest turns below and say where things just got to. You may mention what is still open. Do not title the line with the user\'s raw message, do not start with "Recap: you were", and do not count how many files changed. No JSON, no Markdown, no line breaks. At most 400 characters. If the latest turns show no progress, reply with an empty line.';
+    return `${dated} Write one recap line for someone who just returned to this conversation. Use only the latest turns below and say where things just got to. You may mention what is still open. Do not title the line with the user's raw message, do not start with "Recap: you were", and do not count how many files changed. No JSON, no Markdown, no line breaks. At most 400 characters. If the latest turns show no progress, reply with an empty line.`;
   }
-  return '你在给刚回到这场对话的人写一行回顾。只根据下面最近几轮，用一句话说明刚刚做到哪了。可以提到还没做完的事。不要把用户原话当成标题，不要以「回顾：你在」开头，不要写改了几个文件。不要 JSON，不要 Markdown，不要换行。不超过 400 字。看不出进展时只回复空行。';
+  return `${dated} 你在给刚回到这场对话的人写一行回顾。只根据下面最近几轮，用一句话说明刚刚做到哪了。可以提到还没做完的事。不要把用户原话当成标题，不要以「回顾：你在」开头，不要写改了几个文件。不要 JSON，不要 Markdown，不要换行。不超过 400 字。看不出进展时只回复空行。`;
 }
 
-function turnBlock(turn: Turn, locale: RecapLocale): string {
+function turnBlock(turn: Turn, locale: RecapLocale, timezone: string): string {
+  const written = turn.createdAt ? formatWrittenAt(turn.createdAt, timezone) : undefined;
   const lines = [
+    ...(written ? [`${locale === 'zh' ? '写下时间' : 'written'}: ${written}`] : []),
     `${locale === 'zh' ? '用户' : 'user'}: ${clip(turn.userText, CLIP_CHARS)}`,
     `${locale === 'zh' ? '助手' : 'assistant'}: ${clip(turn.assistantText, CLIP_CHARS)}`
   ];
@@ -160,6 +193,7 @@ function completedTurns(messages: readonly RecapSourceMessage[]): Turn[] {
   const failed = failedToolIds(messages);
   const turns: Turn[] = [];
   let pendingUser: string | null = null;
+  let pendingCreatedAt: string | undefined;
   let files: string[] = [];
   for (const message of messages) {
     if (message.hidden) continue;
@@ -167,6 +201,7 @@ function completedTurns(messages: readonly RecapSourceMessage[]): Turn[] {
       const text = messageText(message);
       if (text) {
         pendingUser = text;
+        pendingCreatedAt = message.createdAt;
         files = [];
       }
       continue;
@@ -179,9 +214,11 @@ function completedTurns(messages: readonly RecapSourceMessage[]): Turn[] {
         userText: pendingUser,
         assistantText: text,
         assistantId: typeof message.id === 'string' ? message.id : '',
-        files
+        files,
+        createdAt: pendingCreatedAt ?? message.createdAt
       });
       pendingUser = null;
+      pendingCreatedAt = undefined;
       files = [];
     }
   }

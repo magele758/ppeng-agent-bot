@@ -14,6 +14,7 @@ import { resolveBotWindowBudget } from '../session/history/window.js';
 import { BotFunctionalGroupService } from '../bots/functional-groups.js';
 import { hasRevokedSharedContext } from '../bots/shared-context-isolation.js';
 import { noteHumanModelInput } from '../session/human-continuation.js';
+import { appendClockNotice, resolveConversationTimezone, stampWrittenAt } from '../session/conversation-clock.js';
 import { isCanonicalBotChat } from '../session/bot-compact-policy.js';
 import { estimateMessageTokens } from '../model/token-estimate.js';
 /**
@@ -709,6 +710,8 @@ function fitProductModelRequest(
       /* Replay history must not change the turn or write a summary. */
     }
   }
+  const timezone = resolveConversationTimezone(session?.metadata);
+  input = { ...input, messages: stampWrittenAt(input.messages, timezone) };
   return applyNormalSessionRequestBudget(input, {
     session,
     store: rt.store,
@@ -728,6 +731,7 @@ function fitProductModelRequest(
         reason: `compact session ${input.sessionId ?? session?.id ?? ''}`
       })
   }).then(fitted => {
+    fitted.messages = appendClockNotice(fitted.messages, Date.now(), timezone);
     if (fitted.sessionId) noteHumanModelInput(rt.store, fitted.sessionId, fitted.messages);
     if (slot && fitted.sessionId && fitted.messages) {
       linkPrepareSlot(rt.store, fitted.sessionId, fitted.messages, slot);
