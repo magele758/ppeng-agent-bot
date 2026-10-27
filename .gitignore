@@ -75,3 +75,20 @@ apps/desktop/assets/trayTemplate@2x.png
 
 # Local agent harness scripts
 /.raw-agent-harness/
+
+# 本地评审草稿、交接笔记、一次性任务 prompt（含内网路径，不进主仓）
+.grok-reviews/
+.handoff-quota-stop.md
+/*.prompt.md
+
+# 本地宣传片工程、成片与会话抓取（体积大，不进主仓）
+/launch-30s/
+/launch-30s-*/
+/videos/
+
+# 投资人 deck 的本地构建目录；已入库的是 doc/bot/investor-deck/output/
+doc/bot/investor-deck/.build/
+
+# 本地高管讲稿 HTML 草稿（正式材料在 doc/bot/investor-deck/）
+/doc/agent_executive_deck.html
+/doc/agent_executive_pitch.html
