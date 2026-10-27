@@ -24,6 +24,8 @@ import { nextMenuIndex } from '@/lib/entry-navigation';
 import { formatHash } from '@/lib/nav';
 import { useI18n, type MessageKey } from '@/lib/i18n';
 import { PlayTranscript } from './PlayTranscript';
+import { SessionBriefToggle } from './SessionBriefToggle';
+import { readSessionBrief, SESSION_BRIEF_CHANGED_EVENT } from '@/lib/session-brief';
 import type { usePlayChat } from './usePlayChat';
 import { ActivityPanel } from './ActivityPanel';
 import { ArtifactRail } from './ArtifactRail';
@@ -32,6 +34,7 @@ import { composerModelLocked } from '@/lib/bot-model';
 import { COMPOSITION_ENTER_GUARD_MS, IME_COMPOSITION_KEY_CODE, decideComposerEnter } from '@/lib/composer-enter';
 import {
   composerDraftFromTyping,
+  composerHintAfterRecap,
   composerHintKey,
   composerHintPresentation,
   isBotMainComposerSession,
@@ -296,6 +299,13 @@ export function PlayPanel({
   const [attachOpen, setAttachOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [sessionBrief, setSessionBrief] = useState(true);
+  useEffect(() => {
+    const sync = () => setSessionBrief(readSessionBrief());
+    sync();
+    window.addEventListener(SESSION_BRIEF_CHANGED_EVENT, sync);
+    return () => window.removeEventListener(SESSION_BRIEF_CHANGED_EVENT, sync);
+  }, []);
   const moreMenuRef = useRef<HTMLDivElement>(null);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [createKind, setCreateKind] = useState<'bot' | 'room' | null>(null);
@@ -600,20 +610,28 @@ export function PlayPanel({
     generating: chatRunning || selectedSession?.status === 'running',
     draft: chat.playInput,
     locale,
-    commandNonce: chat.recapNonce
+    commandNonce: chat.recapNonce,
+    pendingText: t('play.sessionRecap.pending'),
+    failedText: t('play.sessionRecap.failed')
+  });
+  const recapHint = composerHintAfterRecap({
+    shown: sessionRecap.shown,
+    status: sessionRecap.status,
+    hint: sessionRecap.hint,
   });
   const nextHint = usePlayComposerHint({
     sessionId: selectedSessionId,
     messages: chat.sessionMessages,
     draft: chat.playInput,
+    providedHint: recapHint.useBundle ? recapHint.hint : undefined,
     enabled: shouldRequestComposerHint({
       surface: playSurface,
       botMain: isBotMainComposerSession(selectedSession),
       groupOpen: openGroupId != null,
       draft: chat.playInput,
-      generating: sessionBusy,
+      generating: sessionBusy || recapHint.wait,
       hasAssistantReply: lastCompletedTurn(chat.sessionMessages) != null,
-    }),
+    }) && !recapHint.useBundle,
   });
   nextHintRef.current = nextHint;
   const hintView = composerHintPresentation({
@@ -1192,6 +1210,7 @@ export function PlayPanel({
                   </button>
                   {moreMenuOpen ? (
                     <div className="more-menu__pop" role="menu">
+                      <SessionBriefToggle compact />
                       <label
                         className="toggle toggle--compact more-menu__item"
                         title={t('play.chrome.modelViewTitle')}
@@ -1252,6 +1271,7 @@ export function PlayPanel({
                     setOpenGroupId(null);
                     onSelectSession(sessionId);
                   }}
+                  sessionBrief={sessionBrief}
                 />
                 {chat.showJumpToLatest ? (
                   <button

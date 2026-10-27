@@ -29,6 +29,7 @@ export const settings = {
   entries: {
     language: { title: 'Language', keywords: 'ui language locale 中文 English' },
     theme: { title: 'Theme', keywords: 'appearance theme dark light night follow system' },
+    sessionBrief: { title: 'Session display', keywords: 'brief key information fold tools process long compact' },
     modelProviders: {
       title: 'Model providers',
       keywords: 'API key secret base url model provider openai anthropic deepseek ollama wizard test connection default model'
@@ -61,6 +62,22 @@ export const settings = {
     light: 'Light',
     dark: 'Dark',
     system: 'Follow system'
+  },
+  sessionBrief: {
+    title: 'Session display',
+    description: 'Key info only is the default: what you said, the assistant reply, images, goal updates, and pending confirmations. Tool process, reasoning, system traces, and stats fold into one line. Turn it off to see the full transcript. Stored messages and what the model sees stay unchanged.'
+  },
+  skin: {
+    label: 'Appearance',
+    desc: 'Switch any time. This does not change light, dark, or follow system.',
+    classic: 'Classic',
+    sanctum: 'Sanctum',
+    cyberpunk: 'Cyberpunk',
+    demon: "Demon's gathering",
+    'robot-stage': 'Robot stage',
+    pixel: 'Pixel',
+    kindergarten: 'Kindergarten',
+    minimal: 'Minimal'
   },
   model: {
     globalDefault: {

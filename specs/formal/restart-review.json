@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-10-27T08:40:00.000Z",
-  "reviewNote": "Cloud full validation no longer runs Playwright. HTTP regression and integration remain blocking. Quick gate still rejects a touched function over complexity 30. Tool pairing, approval, lifecycle, restart and concurrency control flow are unchanged.",
+  "reviewedAt": "2026-10-27T08:45:00.000Z",
+  "reviewNote": "Merged main: conversation clock stamps writtenAt before budgeting and labels room history in the prompt only. Cloud full validation no longer runs Playwright; HTTP regression and integration remain blocking. Quick gate rejects a touched function over complexity 30, compared with the merge commit's first parent. Tool pairing, approval, lifecycle, restart and concurrency control flow are unchanged.",
   "mapping": [
     {
       "step": "Production startup, persistence, writer claims and graceful shutdown (HTTP drain not exercised)",
@@ -310,7 +310,7 @@
     "packages/core/src/runtime/tool-loop.ts": "fd718b2b71795eba4ae15ce22886d4f645b6758f38c12ed8fdd71dbdd3cec99c",
     "packages/core/src/session/tool-wave-close.ts": "ee706916e65e394883004418482916671b2dd095c01336289d660c2d86a3f568",
     "packages/core/src/session/context-stack.ts": "7925b38665b3584c68c373184b0efb616180753cc91fc19e5509d1c19a1f1f99",
-    "packages/core/src/runtime/l5-bindings.ts": "964f8ba1660db9e720a38d43b6041d22adc7ec73e44277ae80caf35d3784a2ee",
+    "packages/core/src/runtime/l5-bindings.ts": "b075c81ea8d3caaf3f5e9151bf8274e74d13c51e754428877f919b246a4f76ef",
     "packages/agent-loop/src/assembly/create-assembled-loop.ts": "acae47516f5b679639849351381b4d7a746ddcd07e1a1a2e3ddf52373b87eaf9",
     "packages/agent-loop/src/assembly/max-host.ts": "8c6e91a60b4864e085fa4d14d72cb58176feff5bd04100aced4cbfabbae27c56",
     "packages/core/src/session/writer-claim.ts": "48dbe681713d9049fc19510b61bbd99774170c7da79e496dc994ee80ac11efff",
@@ -367,7 +367,7 @@
     "packages/core/test/superbot-factory-setup.test.js": "a2d5a5f3efe63ae668a1cc147e6e077ee06245081b619db64d61bf17a95e941b",
     "packages/core/src/reply-quote.ts": "e3551eb81ae046f631824c896a67b231052314068ef84c7d472c7a5069084234",
     "packages/core/src/session/reply-quote.ts": "945f595cb0004dac6b35d66b820a5cd6ba865d41bc86f1363ecdde5dc9c42b27",
-    "packages/core/src/rooms/index.ts": "9dab2241ff807f803f196688cf95d4ea709c1215cabd8a0b84a4d9ec8d321e93",
+    "packages/core/src/rooms/index.ts": "f3d3280576d9673ee4e89129f0feae70d3ee5796a22756bd980d6533ded0e584",
     "packages/core/src/session/human-continuation.ts": "68fa532461283cdc8b8555ed82c26933efd4f3542414d6e17ca8e03316a89dcf",
     "packages/core/test/bot-reply-quote.test.js": "6c3eb4dcbb1fae159d2c51979e9f2caf7c2ffff964e201ac76079dbcb5dd219a",
     "packages/core/test/human-continuation.test.js": "e0965f312d1929432e1a72f3964db311f3976aeaa105ad7b9a58fac0b42c3888",

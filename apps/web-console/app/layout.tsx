@@ -3,6 +3,7 @@ import Script from 'next/script';
 import { I18nProvider } from '@/lib/i18n/I18nProvider';
 import './globals.css';
 import { FONT_SIZE_BOOTSTRAP } from '@/lib/font-size';
+import { SKIN_BOOTSTRAP } from '@/lib/skin';
 
 /** 设为 `0` / `false` 可跳过加载（如 e2e/无外网 环境） */
 const reactGrabDisabled =
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="zh-CN" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: FONT_SIZE_BOOTSTRAP }} />
+        <script dangerouslySetInnerHTML={{ __html: SKIN_BOOTSTRAP }} />
         {loadReactGrab ? (
           <Script
             src="https://unpkg.com/react-grab/dist/index.global.js"

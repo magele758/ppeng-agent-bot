@@ -1,0 +1,189 @@
+/* Minimal skin. Paper white, black ink, no grid, no monospace. Classic tokens stay on :root. */
+
+html[data-skin="minimal"] {
+  --color-text-primary: #111111;
+  --color-text-secondary: #555555;
+  --color-text-inverse: #ffffff;
+  --color-surface-base: #f7f7f7;
+  --color-surface-strong: #ffffff;
+  --color-surface-raised: #111111;
+  --color-border-strong: #111111;
+  --color-danger: #111111;
+  --color-warn: #555555;
+  --color-ok: #111111;
+  --bg-void: #f7f7f7;
+  --bg-deep: #f7f7f7;
+  --bg-raised: #ffffff;
+  --bg-inset: #eeeeee;
+  --border: #111111;
+  --border-strong: #111111;
+  --stroke: #111111;
+  --text: #111111;
+  --muted: #555555;
+  --muted-2: #555555;
+  --accent: #111111;
+  --accent-bright: #333333;
+  --accent-glow: transparent;
+  --accent-soft: rgba(17, 17, 17, 0.08);
+  --accent-text: #ffffff;
+  --brand-coral-bright: #111111;
+  --brand-coral-deep: #555555;
+  --brand-logo-shadow: transparent;
+  --teal: #111111;
+  --teal-soft: rgba(17, 17, 17, 0.08);
+  --violet: #555555;
+  --warn: #555555;
+  --danger: #111111;
+  --chat-bg: #f7f7f7;
+  --chat-surface: #ffffff;
+  --chat-border: #111111;
+  --chat-user-bubble: #ffffff;
+  --chat-assistant-bg: transparent;
+  --chat-tool-bg: rgba(17, 17, 17, 0.06);
+  --chat-composer-bg: #ffffff;
+  --chat-send: #111111;
+  --chat-send-hover: #333333;
+  --chat-send-disabled: #aaaaaa;
+  --ui-bg: #f7f7f7;
+  --ui-surface: #ffffff;
+  --ui-border: #111111;
+  --ui-text: #111111;
+  --ui-text-muted: #555555;
+  --ui-accent: #111111;
+  --ui-accent-contrast: #ffffff;
+  --ui-danger: #111111;
+  --ui-warn: #555555;
+  --ui-ok: #111111;
+  --ui-focus: 2px solid #111111;
+  --ui-shadow-sm: none;
+  --ui-shadow-md: none;
+  --shadow-card: none;
+  --font-family-stack: -apple-system, "PingFang SC", sans-serif;
+  --font-display: -apple-system, "PingFang SC", sans-serif;
+  --font-body: -apple-system, "PingFang SC", sans-serif;
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius-pill: 0;
+  --radius-control: 0;
+  --radius-chat: 0;
+  --radius: 0;
+  --ui-radius-sm: 0;
+  --ui-radius-md: 0;
+  --ui-radius-lg: 0;
+  background: #f7f7f7;
+  color: #111111;
+  accent-color: #111111;
+  color-scheme: light;
+  font-family: -apple-system, "PingFang SC", sans-serif;
+}
+
+html[data-skin="minimal"] body {
+  background: #f7f7f7;
+  color: #111111;
+  font-family: -apple-system, "PingFang SC", sans-serif;
+}
+
+html[data-skin="minimal"] :is(*, *::before, *::after) {
+  border-radius: 0;
+}
+
+html[data-skin="minimal"] :focus-visible {
+  outline-color: #111111;
+}
+
+html[data-skin="minimal"] .lab-rail {
+  position: relative;
+  background: #ffffff;
+  color: #111111;
+  border-right: 1px solid #111111;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+
+
+html[data-skin="minimal"] .lab-rail__link {
+  color: #555555;
+  background: transparent;
+  border-color: transparent;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html[data-skin="minimal"] .lab-rail__link:hover {
+  color: #111111;
+  background: transparent;
+  border-color: transparent;
+}
+
+html[data-skin="minimal"] .lab-rail__link[aria-current="page"] {
+  color: #111111;
+  background: transparent;
+  border-color: transparent;
+  border-left: 1px solid #111111;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html[data-skin="minimal"] .lab-rail__link[aria-current="page"] .lab-rail__icon {
+  color: #111111;
+}
+
+html[data-skin="minimal"] .lab-main {
+  background: #f7f7f7;
+  color: #111111;
+}
+
+html[data-skin="minimal"] .btn-primary,
+html[data-skin="minimal"] .chat-send-btn {
+  background: #111111;
+  color: #ffffff;
+  border-color: #111111;
+  border-radius: 0;
+  box-shadow: none;
+  filter: none;
+}
+
+html[data-skin="minimal"] .btn-primary:hover:not(:disabled):not(.is-loading),
+html[data-skin="minimal"] .chat-send-btn:hover:not(:disabled) {
+  background: #333333;
+  color: #ffffff;
+  border-color: #333333;
+  filter: none;
+}
+
+html[data-skin="minimal"] .chat-send-btn.chat-send-btn--steer,
+html[data-skin="minimal"] .chat-send-btn.chat-send-btn--steer:hover,
+html[data-skin="minimal"] .chat-send-btn.is-error {
+  background: #ffffff;
+  color: #111111;
+  border: 1px solid #111111;
+  box-shadow: none;
+  filter: none;
+}
+
+html[data-skin="minimal"] .chat-turn--user .chat-bubble {
+  background: transparent;
+  color: #111111;
+  border: 0;
+  border-left: 1px solid #111111;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html[data-skin="minimal"] .chat-turn__label {
+  color: #555555;
+  font-family: -apple-system, "PingFang SC", sans-serif;
+}
+
+html[data-skin="minimal"] .ui-section__title {
+  color: #111111;
+  font-family: -apple-system, "PingFang SC", sans-serif;
+}
+
+html[data-skin="minimal"] .seg-option.is-on {
+  background: #111111;
+  color: #ffffff;
+  border-radius: 0;
+}
+

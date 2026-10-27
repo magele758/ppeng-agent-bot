@@ -29,6 +29,7 @@ export const settings = {
   entries: {
     language: { title: '语言', keywords: '界面语言 language locale 中文 English' },
     theme: { title: '主题', keywords: '外观 theme dark light 深色 浅色 暗色 夜间 跟随系统' },
+    sessionBrief: { title: '会话显示', keywords: '简化 关键信息 会话 折叠 工具 过程 太长 解读 brief' },
     modelProviders: {
       title: '模型服务商',
       keywords: 'API Key 密钥 Base URL 模型 provider openai anthropic deepseek ollama 向导 测试连接 默认模型'
@@ -61,6 +62,22 @@ export const settings = {
     light: '浅色',
     dark: '深色',
     system: '跟随系统'
+  },
+  sessionBrief: {
+    title: '会话显示',
+    description: '默认只看关键信息：你说的话、助手的回答、图片、目标进展，以及还没处理的确认。工具过程、推理、系统流水和统计收成一行。关掉后才展开全文。不改对话记录，也不改模型看到的内容。'
+  },
+  skin: {
+    label: '外观',
+    desc: '可随时切换，不改变深色、浅色或跟随系统。',
+    classic: '经典',
+    sanctum: '圣所',
+    cyberpunk: '赛博朋克',
+    demon: '恶魔的聚会',
+    'robot-stage': '机器人大舞台',
+    pixel: '像素',
+    kindergarten: '童趣幼儿园',
+    minimal: '极简黑白'
   },
   model: {
     globalDefault: {

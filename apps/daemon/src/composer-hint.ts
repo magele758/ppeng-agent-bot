@@ -3,7 +3,7 @@ import type { RawAgentRuntime, SessionMessage } from '@ppeng/agent-core';
 const HINT_MAX_CHARS = 500;
 const MODEL_WAIT_MS = 4000;
 const SYSTEM =
-  '你在替用户起草下一步要发出去的行动指南。只能依据下面已经说过的内容，用刚出现的具体事物说明下一步做什么。不超过500字。禁止「继续」「好的」「那…呢」，禁止把助手上一句改写成问句。不要 JSON，不要 Markdown。如果没有可执行的下一步，只回复空行。';
+  '你在替用户起草下一步要发出去的行动指南。只能依据下面已经说过的内容，用刚出现的具体事物说明下一步做什么。若给出回顾，下一步必须接着这行回顾，不要重做已经做完的事。不超过500字。禁止「继续」「好的」「那…呢」，禁止把助手上一句改写成问句。不要 JSON，不要 Markdown。如果没有可执行的下一步，只回复空行。';
 const GENERIC_HINT = /^(继续|继续吧|好的|好|嗯+|然后呢|接下来呢|还有呢|还有吗|那呢|下一步|下一步呢|然后|接着)[。！？!?]?$/;
 const REWRITE_HINT = /^那.+呢[？?]?$/;
 
@@ -28,7 +28,7 @@ export async function suggestComposerHint(runtime: RawAgentRuntime, body: unknow
     if (!session || !isCanonicalBotMainChat(session) || assistantStillReplying(session.status)) return '';
     const turn = completedTurnText(runtime.store.listMessages(sessionId));
     if (!turn) return '';
-    const asked = await askModel(runtime.modelAdapter, turn);
+    const asked = await askModel(runtime.modelAdapter, turn, readRecap(body));
     if (!asked.ok) return '';
     const line = modelNextAction(asked.text);
     if (!usableModelAction(line, turn)) return '';
@@ -59,6 +59,12 @@ function readSessionId(body: unknown): string {
   if (!body || typeof body !== 'object') return '';
   const sessionId = (body as { sessionId?: unknown }).sessionId;
   return typeof sessionId === 'string' ? sessionId.trim() : '';
+}
+
+function readRecap(body: unknown): string {
+  if (!body || typeof body !== 'object' || !('recap' in body)) return '';
+  const recap = body.recap;
+  return typeof recap === 'string' ? recap.trim().slice(0, 400) : '';
 }
 
 function completedTurnText(messages: readonly SessionMessage[]): HintTurn | null {
@@ -137,10 +143,15 @@ function isAssistantRestatement(hint: string, assistantText: string): boolean {
 
 async function askModel(
   adapter: RawAgentRuntime['modelAdapter'],
-  turn: HintTurn
+  turn: HintTurn,
+  recap = ''
 ): Promise<{ ok: true; text: string } | { ok: false }> {
   if (typeof adapter.completeText !== 'function') return { ok: true, text: '' };
-  const user = `user: ${clip(turn.userText, 2000)}\nassistant: ${clip(turn.assistantText, 2000)}`;
+  const user = [
+    recap ? `回顾：${clip(recap, 400)}` : '',
+    `user: ${clip(turn.userText, 2000)}`,
+    `assistant: ${clip(turn.assistantText, 2000)}`
+  ].filter(Boolean).join('\n');
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), MODEL_WAIT_MS);
   // Swallow a late model rejection. The race may already have settled on timeout,

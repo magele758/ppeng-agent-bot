@@ -1,0 +1,46 @@
+/* demon motion: wine haze drifts, send button breathes ember light */
+
+html[data-skin="demon"] .lab-main::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(ellipse 52% 44% at 26% 34%, color-mix(in srgb, #e25822 22%, transparent), transparent 70%),
+    radial-gradient(ellipse 60% 50% at 74% 68%, color-mix(in srgb, #6b1d2a 28%, transparent), transparent 72%);
+  background-repeat: no-repeat;
+  background-size: 160% 160%, 170% 170%;
+  background-position: 6% 16%, 94% 84%;
+  animation: demon-smoke 18s ease-in-out infinite alternate;
+}
+
+html[data-skin="demon"] .chat-send-btn {
+  animation: demon-ember 2.8s ease-in-out infinite;
+}
+
+@keyframes demon-smoke {
+  from {
+    background-position: 6% 16%, 94% 84%;
+  }
+  to {
+    background-position: 36% 64%, 52% 22%;
+  }
+}
+
+@keyframes demon-ember {
+  0%,
+  100% {
+    box-shadow: 0 0 12px rgba(226, 88, 34, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 22px rgba(226, 88, 34, 0.7);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-skin="demon"] .lab-main::after,
+  html[data-skin="demon"] .chat-send-btn {
+    animation: none;
+  }
+}

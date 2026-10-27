@@ -503,3 +503,16 @@
   outline: var(--ui-focus);
   outline-offset: 2px;
 }
+.chat-process-note {
+  margin: 4px 0;
+  color: var(--ui-text-muted);
+  font-size: var(--ui-text-xs);
+  line-height: var(--ui-leading-normal);
+}
+
+.chat-process-note > summary {
+  cursor: pointer;
+}
+.chat-process-note__body {
+  margin-top: 6px;
+}

@@ -153,12 +153,16 @@ export const settingsEntries = {
   },
   sessionRecap: {
     title: 'Session recap',
-    keywords: 'recap away return summary progress where I left off end of session',
-    desc: 'When you leave a session for at least three minutes and come back, one line above the composer says where you left off: what you were doing, which files changed, and what is still open. It is only for you and is not sent to the assistant. Turning this off stops the automatic line. You can still recap on demand.',
+    keywords: 'recap away return summary progress where I left off end of session switch',
+    desc: 'One line above the composer recaps the latest progress. The model writes that line from the most recent turns. It is only for you and is not sent to the assistant. You can turn the whole recap off, or turn off only the automatic line when you come back.',
     fields: {
+      active: {
+        label: 'Use session recap',
+        hint: 'On by default. Off means no recap line and no model call to write one. /recap and its Chinese alias are sent as ordinary messages.'
+      },
       enabled: {
         label: 'Recap automatically when you come back',
-        hint: 'On by default. The session needs at least three turns, and the same progress is not recapped twice in a row. It stays hidden while you are typing or a reply is still generating.'
+        hint: 'On by default. The session needs at least three turns, and the same progress is not recapped twice in a row. It stays hidden while you are typing or a reply is still generating. That choice stays when the whole recap is off.'
       }
     }
   },

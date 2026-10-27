@@ -6,6 +6,8 @@ export const common = {
   theme: '主题',
   themeToLight: '切换到浅色模式',
   themeToDark: '切换到深色模式',
+  skinToSanctum: '切换到圣所外观',
+  skinToClassic: '切回经典外观',
   refresh: '刷新',
   save: '保存',
   close: '关闭',

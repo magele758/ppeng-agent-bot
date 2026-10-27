@@ -1,0 +1,25 @@
+/* A blinking block beside the brand. No full-screen grid over the text. */
+html[data-skin="pixel"] .lab-rail__brand {
+  position: relative;
+}
+
+html[data-skin="pixel"] .lab-rail__brand::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  margin-left: 6px;
+  background: #fff;
+  pointer-events: none;
+  animation: pixel-blink 1.2s steps(2) infinite;
+}
+
+@keyframes pixel-blink {
+  0% { opacity: 1; }
+  50%, 100% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-skin="pixel"] .lab-rail__brand::after {
+    animation: none;
+  }
+}

@@ -322,6 +322,9 @@ export function usePlayChat(deps: PlayChatDeps) {
   const [autonomyDraft, setAutonomyDraft] = useState<AutonomyLevel>('balanced');
   const [playInput, setPlayInput] = useState('');
   const [recapNonce, setRecapNonce] = useState(0);
+  const [recapActive, setRecapActive] = useState<boolean | null>(null);
+  const recapActiveRef = useRef<boolean | null>(null);
+  recapActiveRef.current = recapActive;
   const [inputGhost, setInputGhost] = useState<GhostState>(emptyGhost);
   const [suggestionEnabled, setSuggestionEnabled] = useState(true);
   const suggestionReqRef = useRef(0);
@@ -722,6 +725,30 @@ export function usePlayChat(deps: PlayChatDeps) {
     })();
     return () => {
       cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    let generation = 0;
+    const load = async () => {
+      const ticket = ++generation;
+      try {
+        const data = (await api('/api/session-recap/settings')) as { settings?: { active?: boolean } };
+        if (cancelled || ticket !== generation) return;
+        setRecapActive(data.settings?.active === false ? false : true);
+      } catch {
+        if (!cancelled && ticket === generation) setRecapActive(true);
+      }
+    };
+    void load();
+    const onHash = () => {
+      void load();
+    };
+    window.addEventListener('hashchange', onHash);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('hashchange', onHash);
     };
   }, []);
 
@@ -2012,7 +2039,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     const contextFields = contextSourcesBody(contextSources);
     const contextLabels = contextLabelsOf(contextSources);
     const hasAttachments = composerHasAttachments(imageAssetIds, attachmentIds, contextSources);
-    if (!recapCommandShouldSend(composerMessageToSend(playInput), hasAttachments)) {
+    if (!recapCommandShouldSend(composerMessageToSend(playInput), hasAttachments, recapActiveRef.current !== false)) {
       clearComposerOnly();
       setRecapNonce((n) => n + 1);
       return;

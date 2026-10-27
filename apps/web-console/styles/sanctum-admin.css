@@ -1,0 +1,123 @@
+/* Settings, tasks, knowledge, and bot-list surfaces. html[data-skin="sanctum"] only. */
+
+html[data-skin="sanctum"] :is(#section-settings, #section-knowledge, #section-tasks) .ui-group,
+html[data-skin="sanctum"] :is(#section-settings, #section-knowledge, #section-tasks) .ui-group--advanced {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+html[data-skin="sanctum"] :is(#section-settings, #section-knowledge, #section-tasks) .ui-group + .ui-group {
+  border-top: 1px solid #303a32;
+  border-radius: 0;
+}
+
+html[data-skin="sanctum"] :is(.ui-group__title, .ag-panel__title, .ag-card__title) {
+  font-family: var(--font-display);
+  font-weight: 500;
+  color: #eee4cb;
+}
+
+html[data-skin="sanctum"] .settings-nav__item.is-active {
+  border: 0;
+  border-left: 2px solid #c3aa77;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  color: #eee4cb;
+}
+
+html[data-skin="sanctum"] #section-settings .settings-nav__item.is-active {
+  color: #f0dbad;
+}
+html[data-skin="sanctum"] .ag-card {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  color: #e5dfd1;
+}
+
+html[data-skin="sanctum"] .ag-card:hover {
+  border: 0;
+  background: #111916;
+}
+
+html[data-skin="sanctum"] .ag-card.is-selected {
+  border: 0;
+  border-left: 2px solid #c3aa77;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+html[data-skin="sanctum"] .ag-card.is-selected:hover {
+  background: #111916;
+  box-shadow: none;
+}
+
+html[data-skin="sanctum"] .seg-group,
+html[data-skin="sanctum"] .seg-option {
+  border-radius: 0;
+}
+
+html[data-skin="sanctum"] .seg-option.is-on {
+  background: #c3aa77;
+  color: #11170f;
+  border-radius: 0;
+}
+
+html[data-skin="sanctum"] .btn-danger {
+  background: #ce8870;
+  color: #1a120f;
+  border-color: #ce8870;
+  border-radius: 0;
+}
+
+html[data-skin="sanctum"] .settings-risk {
+  border: 0;
+  border-left: 2px solid #ce8870;
+  border-radius: 0;
+  box-shadow: none;
+  color: #ce8870;
+  background: transparent;
+}
+
+html[data-skin="sanctum"] .list-item:hover {
+  background: color-mix(in srgb, #e5dfd1 8%, #111916);
+  border-color: transparent;
+}
+
+html[data-skin="sanctum"] .graph-wrap--honeycomb,
+html[data-skin="sanctum"] .graph-wrap--mood-low,
+html[data-skin="sanctum"] .graph-wrap--mood-mid,
+html[data-skin="sanctum"] .graph-wrap--mood-hot {
+  background: #0a100f;
+  border-color: #303a32;
+  border-radius: 0;
+}
+
+html[data-skin="sanctum"] .team-graph-aurora {
+  display: none;
+}
+
+html[data-skin="sanctum"] :is(#section-settings, #section-knowledge, #section-tasks, .ag-panel, .ag-grid) {
+  color: #e5dfd1;
+}
+
+html[data-skin="sanctum"] :is(#section-settings, #section-knowledge, #section-tasks) :is(.ui-group__desc, .settings-field__hint, .settings-nav__item) {
+  color: #aaa99e;
+}
+
+html[data-skin="sanctum"] .ag-panel {
+  background: #111916;
+  border-color: #303a32;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html[data-skin="sanctum"] .ag-card__sub,
+html[data-skin="sanctum"] .ag-card__desc {
+  color: #aaa99e;
+}

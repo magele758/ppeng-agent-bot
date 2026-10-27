@@ -1,0 +1,206 @@
+html[data-skin="robot-stage"] {
+  --color-text-primary: #d7dde8;
+  --color-text-secondary: #ffb000;
+  --color-text-inverse: #07080c;
+  --color-surface-base: #07080c;
+  --color-surface-strong: #141820;
+  --color-surface-raised: #ffb000;
+  --color-border-strong: #323848;
+  --color-danger: #e36d7a;
+  --color-warn: #e0a24a;
+  --color-ok: #7dbe96;
+  --bg-inset: #0c0e14;
+  --muted: #9aa3b2;
+  --accent: #ffb000;
+  --chat-bg: #07080c;
+  --chat-surface: #141820;
+  --chat-border: #323848;
+  --chat-send: #ffb000;
+  --chat-send-hover: #ffc44d;
+  --ui-bg: #07080c;
+  --ui-surface: #141820;
+  --ui-border: #323848;
+  --ui-text: #d7dde8;
+  --ui-text-muted: #9aa3b2;
+  --ui-accent: #ffb000;
+  --ui-accent-contrast: #07080c;
+  --ui-focus: 2px solid #ffb000;
+  --font-family-stack: "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-display: Georgia, "Songti SC", serif;
+  --text: #d7dde8;
+  --muted-2: #9aa3b2;
+  --bg-void: #07080c;
+  --bg-deep: #07080c;
+  --bg-raised: #141820;
+  --border: #323848;
+  --border-strong: #323848;
+  --stroke: #323848;
+  --accent-bright: #ffc44d;
+  --accent-soft: rgba(255, 176, 0, 0.16);
+  --accent-text: #07080c;
+  --chat-user-bubble: #141820;
+  --chat-assistant-bg: transparent;
+  --chat-tool-bg: rgba(255, 176, 0, 0.08);
+  --chat-composer-bg: #141820;
+  --chat-send-disabled: rgba(255, 176, 0, 0.35);
+  --ui-danger: #e36d7a;
+  --ui-warn: #e0a24a;
+  --ui-ok: #7dbe96;
+  background: #07080c;
+  color: #d7dde8;
+  font-family: var(--font-family-stack);
+}
+
+html[data-skin="robot-stage"] body {
+  background: #07080c;
+  color: #d7dde8;
+  font-family: var(--font-family-stack);
+}
+
+html[data-skin="robot-stage"] :focus-visible {
+  outline-color: #ffb000;
+}
+
+html[data-skin="robot-stage"] .lab-rail {
+  position: relative;
+  background-color: #141820;
+  color: #d7dde8;
+  border-right-color: #323848;
+  box-shadow: inset 3px 0 0 #8b1e3f;
+}
+
+html[data-skin="robot-stage"] .lab-rail::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  right: 0;
+  bottom: 0;
+  height: 8px;
+  z-index: 2;
+  pointer-events: none;
+  background-image: radial-gradient(circle, #ffb000 1.5px, transparent 2.4px);
+  background-size: 14px 8px;
+  background-repeat: repeat-x;
+  background-position: center bottom;
+}
+
+html[data-skin="robot-stage"] .lab-rail__link {
+  color: #9aa3b2;
+  background: transparent;
+  border-color: transparent;
+}
+
+html[data-skin="robot-stage"] .lab-rail__link:hover {
+  color: #d7dde8;
+  background: #1c2330;
+  border-color: transparent;
+}
+
+html[data-skin="robot-stage"] .lab-rail__link[aria-current="page"] {
+  color: var(--color-text-inverse);
+  background: #ffb000;
+  border-color: #ffb000;
+}
+
+html[data-skin="robot-stage"] .lab-rail__link[aria-current="page"] .lab-rail__icon {
+  color: var(--color-text-inverse);
+}
+
+html[data-skin="robot-stage"] .lab-main {
+  position: relative;
+  background: #07080c;
+  color: #d7dde8;
+}
+
+html[data-skin="robot-stage"] .lab-main::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.28;
+  background: radial-gradient(
+    ellipse 64% 40% at 50% 0%,
+    rgba(255, 255, 255, 0.85),
+    rgba(255, 176, 0, 0.5) 32%,
+    transparent 70%
+  );
+}
+
+html[data-skin="robot-stage"] .btn-primary {
+  background: #ffb000;
+  color: var(--color-text-inverse);
+  border-color: #ffb000;
+}
+
+html[data-skin="robot-stage"] .btn-primary:hover:not(:disabled):not(.is-loading) {
+  background: #ffc44d;
+  color: var(--color-text-inverse);
+  filter: none;
+}
+
+html[data-skin="robot-stage"] .chat-send-btn {
+  background: #ffb000;
+  color: var(--color-text-inverse);
+}
+
+html[data-skin="robot-stage"] .chat-send-btn:hover:not(:disabled) {
+  background: #ffc44d;
+  color: var(--color-text-inverse);
+}
+
+html[data-skin="robot-stage"] .chat-turn--user .chat-bubble {
+  background: #141820;
+  color: #d7dde8;
+  border-color: #3a4458;
+  box-shadow: inset 3px 0 0 #ffb000;
+}
+
+html[data-skin="robot-stage"] .chat-turn__label {
+  color: #ffb000;
+  font-family: Georgia, "Songti SC", serif;
+  letter-spacing: 0.12em;
+}
+
+html[data-skin="robot-stage"] .chat-tool-fold {
+  background: #10141c;
+  color: #d7dde8;
+  border-color: #323848;
+}
+
+html[data-skin="robot-stage"] .chat-tool-fold__pill--subagent {
+  color: #ffb000;
+  background: rgba(255, 176, 0, 0.12);
+  border-color: rgba(255, 176, 0, 0.45);
+}
+
+html[data-skin="robot-stage"] .chat-tool-fold__pill--subagent-role {
+  color: #d7dde8;
+  background: rgba(215, 221, 232, 0.1);
+  border-color: rgba(215, 221, 232, 0.35);
+}
+
+html[data-skin="robot-stage"] .chat-tool-fold__pill--team {
+  color: #7dbe96;
+  background: rgba(125, 190, 150, 0.12);
+  border-color: rgba(125, 190, 150, 0.4);
+}
+
+html[data-skin="robot-stage"] .ui-section__title {
+  color: #ffb000;
+  font-family: Georgia, "Songti SC", serif;
+  font-size: calc(var(--ui-text-2xl) + 6px);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+html[data-skin="robot-stage"] .seg-option.is-on {
+  background: #ffb000;
+  color: var(--color-text-inverse);
+}
+
+html[data-skin="robot-stage"] .list-item:hover {
+  background: #1c2330;
+  color: #d7dde8;
+  border-color: #3a4458;
+}
