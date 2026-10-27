@@ -2,6 +2,7 @@
 
 import { memo } from 'react';
 import { renderMarkdown } from '@/lib/markdown';
+import { stripVisibleClockMarks } from '@/lib/visible-clock';
 
 /**
  * Memoized HTML host. React compares `dangerouslySetInnerHTML` with ===, so a new
@@ -25,5 +26,5 @@ export const MarkdownHtml = memo(function MarkdownHtml({
   text: string;
   className?: string;
 }) {
-  return <StaticHtml className={className} html={renderMarkdown(text)} />;
+  return <StaticHtml className={className} html={renderMarkdown(stripVisibleClockMarks(text))} />;
 });
