@@ -7,11 +7,168 @@ import { readRailCollapsed, writeRailCollapsed } from '@/lib/rail-collapsed';
 import { SectionIcon } from './icons';
 import { useLab } from './LabProvider';
 
+const FOOT_MENU_CLOSE_MS = 160;
+
+type FootBox = { bottom: number; left: number; width: number };
+
+function readFootBox(node: HTMLElement | null): FootBox | null {
+  if (!node || typeof node.getBoundingClientRect !== 'function' || typeof window === 'undefined') return null;
+  const rect = node.getBoundingClientRect();
+  if (rect.width <= 0 && rect.height <= 0) return null;
+  return {
+    bottom: Math.max(0, window.innerHeight - rect.top - 4),
+    left: rect.left,
+    width: rect.width < 160 ? 196 : rect.width
+  };
+}
+
 function RailToggleIcon({ collapsed }: { collapsed: boolean }) {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       {collapsed ? <path d="m9 6 6 6-6 6" /> : <path d="m15 6-6 6 6 6" />}
     </svg>
+  );
+}
+
+function useRailFoot(children: ReactNode) {
+  const { t } = useI18n();
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [box, setBox] = useState<FootBox | null>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const alive = useRef(true);
+  const scheduleCloseRef = useRef<(event?: { relatedTarget?: EventTarget | null }) => void>(() => {});
+  const clearCloseRef = useRef<() => void>(() => {});
+  const pointerInsideRef = useRef<(next: EventTarget | null) => boolean>(() => false);
+  const open = hovered || focused;
+
+  const clearClose = () => {
+    if (closeTimer.current == null) return;
+    clearTimeout(closeTimer.current);
+    closeTimer.current = null;
+  };
+
+  const place = () => {
+    const next = readFootBox(rootRef.current);
+    if (next) setBox(next);
+  };
+
+  const pointerStillInside = (next: EventTarget | null) => {
+    if (!next || typeof (next as Node).nodeType !== 'number') return false;
+    const node = next as Node;
+    return Boolean(rootRef.current?.contains(node) || menuRef.current?.contains(node));
+  };
+
+  const arm = () => {
+    clearClose();
+    setHovered(true);
+    place();
+  };
+
+  const armFocus = () => {
+    setFocused(true);
+    place();
+  };
+
+  const scheduleClose = (event?: { relatedTarget?: EventTarget | null }) => {
+    if (pointerStillInside(event?.relatedTarget ?? null)) return;
+    clearClose();
+    closeTimer.current = setTimeout(() => {
+      closeTimer.current = null;
+      if (!alive.current) return;
+      setHovered(false);
+    }, FOOT_MENU_CLOSE_MS);
+  };
+  scheduleCloseRef.current = scheduleClose;
+  clearCloseRef.current = clearClose;
+  pointerInsideRef.current = pointerStillInside;
+
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+      if (closeTimer.current != null) clearTimeout(closeTimer.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!open || typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
+    const update = () => {
+      const next = readFootBox(rootRef.current);
+      if (next) setBox(next);
+    };
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
+    const onMove = (event: MouseEvent) => {
+      const target = event.target;
+      if (target && pointerInsideRef.current(target)) {
+        clearCloseRef.current();
+        return;
+      }
+      scheduleCloseRef.current();
+    };
+    window.addEventListener('mousemove', onMove);
+    return () => window.removeEventListener('mousemove', onMove);
+  }, [open]);
+
+  if (!children) return null;
+
+  return (
+    <div
+      className="lab-rail__foot"
+      ref={rootRef}
+      onMouseEnter={arm}
+      onMouseLeave={scheduleClose}
+      onFocus={armFocus}
+      onBlur={(event) => {
+        const next = event.relatedTarget;
+        if (next && (event.currentTarget.contains(next as Node) || menuRef.current?.contains(next as Node))) return;
+        setFocused(false);
+      }}
+    >
+      <button
+        type="button"
+        className="lab-rail__foot-trigger"
+        data-testid="rail-foot-trigger"
+        aria-label={t('shell.nav.footMenu')}
+        title={t('shell.nav.footMenu')}
+        aria-haspopup="true"
+        aria-expanded={open}
+        aria-controls="lab-rail-foot-menu"
+        onFocus={armFocus}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <circle cx="12" cy="5" r="1.5" />
+          <circle cx="12" cy="12" r="1.5" />
+          <circle cx="12" cy="19" r="1.5" />
+        </svg>
+      </button>
+      <div
+        id="lab-rail-foot-menu"
+        ref={menuRef}
+        className="lab-rail__foot-menu"
+        role="group"
+        aria-label={t('shell.nav.footMenu')}
+        hidden={!open}
+        onMouseEnter={arm}
+        onMouseLeave={scheduleClose}
+        onFocus={armFocus}
+        style={box ? { position: 'fixed', right: 'auto', bottom: box.bottom, left: box.left, width: box.width } : undefined}
+      >
+        {children}
+      </div>
+    </div>
   );
 }
 
@@ -46,7 +203,8 @@ export function Rail({ footer }: { footer?: ReactNode | ((collapsed: boolean) =>
   };
 
   const badgeFor = (id: SectionId): number => (id === 'tasks' ? approvals.length : 0);
-  const foot = typeof footer === 'function' ? footer(collapsed) : footer;
+  const foot = footer != null && !toolsOpen ? (typeof footer === 'function' ? footer(false) : footer) : null;
+  const footNode = useRailFoot(foot);
 
   return (
     <aside className={collapsed ? 'lab-rail is-collapsed' : 'lab-rail'} aria-label={t('shell.nav.label')}>
@@ -104,7 +262,7 @@ export function Rail({ footer }: { footer?: ReactNode | ((collapsed: boolean) =>
           );
         })}
       </nav>
-      {foot && !toolsOpen ? <div className="lab-rail__foot">{foot}</div> : null}
+      {footNode}
       <button type="button" className="mobile-tools-toggle btn btn-ghost" data-testid="mobile-tools-toggle" aria-label={t('mobile.tools')} aria-haspopup="dialog" onClick={() => setToolsOpen(true)}>•••</button>
       {toolsOpen ? <dialog ref={dialogRef} className="mobile-tools-dialog" aria-labelledby="mobile-tools-title" onClose={() => setToolsOpen(false)} onClick={e => { if (e.target === e.currentTarget) dialogRef.current?.close(); }}>
         <div className="mobile-tools-dialog__body">

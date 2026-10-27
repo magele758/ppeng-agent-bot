@@ -68,6 +68,21 @@ html[data-skin="sanctum"] .lab-rail__foot {
   border-top: 1px solid rgba(195, 170, 119, 0.28);
 }
 
+html[data-skin="sanctum"] .lab-rail__foot-trigger {
+  color: #aaa99e;
+}
+
+html[data-skin="sanctum"] .lab-rail__foot-trigger:hover,
+html[data-skin="sanctum"] .lab-rail__foot-trigger[aria-expanded='true'] {
+  color: #eee4cb;
+  background: rgba(195, 170, 119, 0.1);
+}
+
+html[data-skin="sanctum"] .lab-rail__foot-menu {
+  border-color: rgba(195, 170, 119, 0.28);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 45%);
+}
+
 html[data-skin="sanctum"] .lab-main {
   background: #0a100f;
 }
