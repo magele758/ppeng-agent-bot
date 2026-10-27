@@ -41,37 +41,41 @@ function authorizedWait(host: GoalRuntimeHost, goal: BotGoal, executions: GoalEx
  });
 }
 
+function sessionWaitStatus(host: GoalRuntimeHost, parent: SessionRecord, goal: BotGoal, correlationId: string): string | undefined {
+ const session = host.store.getSession(correlationId);
+ if (!session || session.metadata.botGoalScopeSessionId !== parent.id || session.metadata.botGoalId !== goal.id) return 'unauthorized';
+ if (host.isRunning(session.id) || session.status === 'waiting_approval' || descendantAwaitingApproval(host, parent, goal, session.id)) return 'running';
+ const outcome = session.metadata.outcome as {kind?: string} | undefined;
+ if (session.status === 'failed' || session.status === 'unknown') return session.status;
+ if(outcome?.kind==='aborted'||outcome?.kind==='cancelled')return 'cancelled';
+ if(outcome?.kind==='failed')return 'failed';
+ return childEnded(session) ? 'completed' : undefined;
+}
+
+function botTaskWaitStatus(host: GoalRuntimeHost, parent: SessionRecord, goal: BotGoal, correlationId: string): string | undefined {
+ const task = getBotTask(host.store, principalFromSession(host.store, parent), correlationId);
+ if (task?.requesterBotId !== goal.botId) return 'unauthorized';
+ const childSettled = delegatedChildSettled(host, parent, correlationId);
+ if (task.status === 'queued' || task.status === 'running' || task.status === 'waiting_approval') return childSettled ? 'completed' : task.status;
+ return task.status;
+}
+
+function teamPlanWaitStatus(host: GoalRuntimeHost, correlationId: string, ownedSessions: ReadonlySet<string>): string {
+ const plan = new TeamPlanStore(host.store.db).get(correlationId);
+ // Missing execution evidence requires reconciliation, never another dispatch.
+ if (!plan) return 'missing';
+ return plan.sessionId && ownedSessions.has(plan.sessionId) ? plan.status : 'unauthorized';
+}
+
 /** Reads only an execution reference actually returned by the authorized dispatch gateway. */
 function waitStatus(host: GoalRuntimeHost, parent: SessionRecord, goal: BotGoal, executions: GoalExecution[]): string | undefined {
  const wait = goal.wait;
  if (!wait || !authorizedWait(host, goal, executions)) return 'unauthorized';
  const ownedSessions = new Set(executions.flatMap(e => e.sessionId ? [e.sessionId] : []));
- if (wait.source === 'session') {
-  const session = host.store.getSession(wait.correlationId);
-  if (!session || session.metadata.botGoalScopeSessionId !== parent.id || session.metadata.botGoalId !== goal.id) return 'unauthorized';
-  if (host.isRunning(session.id) || session.status === 'waiting_approval' || descendantAwaitingApproval(host, parent, goal, session.id)) return 'running';
-  const outcome = session.metadata.outcome as {kind?: string} | undefined;
-  if (session.status === 'failed' || session.status === 'unknown') return session.status;
-  if(outcome?.kind==='aborted'||outcome?.kind==='cancelled')return 'cancelled';
-  if(outcome?.kind==='failed')return 'failed';
-  return childEnded(session) ? 'completed' : undefined;
- }
- if (wait.source === 'bot_task') {
-  const task = getBotTask(host.store, principalFromSession(host.store, parent), wait.correlationId);
-  if (task?.requesterBotId !== goal.botId) return 'unauthorized';
-  const childSettled = delegatedChildSettled(host, parent, wait.correlationId);
-  if (task.status === 'queued' || task.status === 'running' || task.status === 'waiting_approval') return childSettled ? 'completed' : task.status;
-  return task.status;
- }
- if (wait.source === 'team_dag') {
-  const plan = new TeamPlanStore(host.store.db).get(wait.correlationId);
-  // Missing execution evidence requires reconciliation, never another dispatch.
-  if (!plan) return 'missing';
-  return plan.sessionId && ownedSessions.has(plan.sessionId) ? plan.status : 'unauthorized';
- }
- if (wait.source === 'swarm') {
-  return host.store.swarm().getRun(wait.correlationId)?.status ?? 'missing';
- }
+ if (wait.source === 'session') return sessionWaitStatus(host, parent, goal, wait.correlationId);
+ if (wait.source === 'bot_task') return botTaskWaitStatus(host, parent, goal, wait.correlationId);
+ if (wait.source === 'team_dag') return teamPlanWaitStatus(host, wait.correlationId, ownedSessions);
+ if (wait.source === 'swarm') return host.store.swarm().getRun(wait.correlationId)?.status ?? 'missing';
  if (wait.source === 'self_heal' || wait.source === 'factory' || wait.source === 'evolution') return specialtyWaitStatus(host, parent, goal);
  return 'unsupported';
 }
