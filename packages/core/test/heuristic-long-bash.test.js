@@ -42,6 +42,21 @@ test('heuristic lists files even when working-log appendix repeats 你好', asyn
   assert.equal(result.assistantParts[0].name, 'read_file');
 });
 
+test('heuristic lists files when a conversation clock tails the user message', async () => {
+  const adapter = new HeuristicModelAdapter();
+  const result = await adapter.runTurn({
+    agent: { id: 'general', role: 'assistant', name: 'general' },
+    systemPrompt: '',
+    messages: [msg('u', 'user', [
+      { type: 'text', text: '列出文件' },
+      { type: 'text', text: '[conversation-clock] Current time: 2026-10-27 16:00 Monday (UTC).' }
+    ])],
+    tools: []
+  });
+  assert.equal(result.stopReason, 'tool_use');
+  assert.equal(result.assistantParts[0].name, 'read_file');
+});
+
 test('heuristic session: 列出文件 after 你好 stores a tool_result', async () => {
   const runtime = new RawAgentRuntime({
     repoRoot: mkdtempSync(join(tmpdir(), 'heuristic-ls-repo-')),

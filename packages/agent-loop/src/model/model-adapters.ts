@@ -162,7 +162,7 @@ function lastUserUtterance(messages: SessionMessage[]): string {
   const texts = message.parts
     .filter((part): part is Extract<MessagePart, { type: 'text' }> => part.type === 'text')
     .map((part) => part.text.trim())
-    .filter(Boolean);
+    .filter((text) => text && !text.includes('[conversation-clock]'));
   return texts.at(-1) ?? '';
 }
 
