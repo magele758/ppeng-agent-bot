@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
+import './correction-capture.css';
 const lines = (s: string) => s.split('\n').map(x => x.trim()).filter(Boolean);
 async function action(sid: string, body: Record<string, unknown>) { return api(`/api/sessions/${sid}/learning`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); }
 export function CorrectionCapture({ sessionId, messageId }: {
@@ -12,7 +13,7 @@ export function CorrectionCapture({ sessionId, messageId }: {
     const [open, setOpen] = useState(false), [busy, setBusy] = useState(false), [status, setStatus] = useState('');
     const [draft, setDraft] = useState({ expected: '', forbiddenText: '', forbiddenTools: '', prompt: '', kind: 'regression' });
     if (!open)
-        return <button className="btn btn-ghost btn-sm" onClick={() => setOpen(true)}>{t('learning.capture')}</button>;
+        return <button type="button" className="correction-capture__trigger btn btn-ghost btn-icon btn-sm" aria-label={t('learning.capture')} onClick={() => setOpen(true)}><svg className="correction-capture__icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12.7 1.3a1 1 0 0 1 1.4 0l.6.6a1 1 0 0 1 0 1.4L6.2 12.8 3 13.2l.4-3.2 9.3-8.7zM4.2 10.6l-.2 1.4 1.4-.2 7.2-7.2-1.2-1.2-7.2 7.2z" /></svg></button>;
     return <details open><summary onClick={e => { e.preventDefault(); setOpen(false); }}>{t('learning.capture')}</summary><p>{t('learning.captureHint')}</p>
  {(['expected', 'forbiddenText', 'forbiddenTools', 'prompt'] as const).map(key => <label className="field field--stack" key={key}>{t(`learning.${key}`)}<textarea value={draft[key]} onChange={e => setDraft({ ...draft, [key]: e.target.value })}/></label>)}
  <select aria-label={t('learning.kind')} value={draft.kind} onChange={e => setDraft({ ...draft, kind: e.target.value })}><option value="regression">{t('learning.regression')}</option><option value="counterexample">{t('learning.counterexample')}</option></select>
