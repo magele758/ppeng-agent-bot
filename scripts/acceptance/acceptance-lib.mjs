@@ -418,18 +418,7 @@ function failureMessage(spec, c, state, tally) {
  * @param {Array|null} [input.results]    parsed JUnit cases (null/undefined = static mode)
  * @param {string[]} [input.omittedRunners] runners intentionally not executed, e.g. cloud skips e2e
  */
-export function evaluateAcceptance({ specs, specErrors = [], specWarnings = [], staticTests, orphanFiles = [], results = null, stage = 'all', omittedRunners = [] }) {
-  if (!['all','software','deployment'].includes(stage)) throw new Error('Invalid acceptance stage');
-  const errors = [...specErrors];
-  const warnings = [...specWarnings];
-  const notices = [];
-  const resultsMode = Array.isArray(results);
-  const specsById = new Map(specs.map((s) => [s.id, s]));
-
-  for (const f of orphanFiles) {
-    errors.push(`${f}: contains acceptance tags but is not executed by any configured test runner (test:unit / agent-loop vitest / Playwright)`);
-  }
-
+function indexStaticTests(staticTests, specsById, errors, warnings) {
   const staticByCriterion = new Map();
   const rejectedTags = new Set();
   for (const t of staticTests) {
@@ -443,63 +432,83 @@ export function evaluateAcceptance({ specs, specErrors = [], specWarnings = [], 
       staticByCriterion.get(key).push({ file: t.file, line: t.line, title: t.title, active: t.active });
     }
   }
+  return { staticByCriterion, rejectedTags };
+}
 
+function indexResultTests(deduped, staticTests, specsById, rejectedTags, errors, warnings) {
   const resultsByCriterion = new Map();
-  const deduped = resultsMode ? dedupeResults(results) : [];
-  if (resultsMode) {
-    for (const r of deduped) {
-      if (r.mixedResults) {
-        const matches = staticTests.filter(t => t.title === r.name || t.title === r.title);
-        const allowed = r.retryRecovered && matches.length === 1 && isKnownFlaky(matches[0].file, r.name);
-        warnings.push('Failed then passed on retry' + (allowed ? ' (known flaky exception)' : ' (not a clean pass)') + ': ' + r.title);
-        if (allowed) r.outcome = 'passed';
+  for (const r of deduped) {
+    if (r.mixedResults) {
+      const matches = staticTests.filter(t => t.title === r.name || t.title === r.title);
+      const allowed = r.retryRecovered && matches.length === 1 && isKnownFlaky(matches[0].file, r.name);
+      warnings.push('Failed then passed on retry' + (allowed ? ' (known flaky exception)' : ' (not a clean pass)') + ': ' + r.title);
+      if (allowed) r.outcome = 'passed';
+    }
+    for (const tag of extractTags(r.title)) {
+      // Rejected tags are reported once; results only add ones the static scan could not see (dynamic titles).
+      const sink = rejectedTags.has(tag.raw) ? [] : errors;
+      const key = checkTag(tag, `result "${r.title}"`, specsById, sink, []);
+      if (!key) {
+        rejectedTags.add(tag.raw);
+        continue;
       }
-      for (const tag of extractTags(r.title)) {
-        // Rejected tags are reported once; results only add ones the static scan could not see (dynamic titles).
-        const sink = rejectedTags.has(tag.raw) ? [] : errors;
-        const key = checkTag(tag, `result "${r.title}"`, specsById, sink, []);
-        if (!key) {
-          rejectedTags.add(tag.raw);
-          continue;
-        }
-        if (!resultsByCriterion.has(key)) resultsByCriterion.set(key, { passed: 0, failed: 0, skipped: 0, failedTitles: [], titles: [] });
-        const tally = resultsByCriterion.get(key);
-        tally[r.outcome] += 1;
-        tally.titles.push({ title: r.title, outcome: r.outcome, source: r.source });
-        if (r.outcome === 'failed') tally.failedTitles.push(r.title);
-      }
+      if (!resultsByCriterion.has(key)) resultsByCriterion.set(key, { passed: 0, failed: 0, skipped: 0, failedTitles: [], titles: [] });
+      const tally = resultsByCriterion.get(key);
+      tally[r.outcome] += 1;
+      tally.titles.push({ title: r.title, outcome: r.outcome, source: r.source });
+      if (r.outcome === 'failed') tally.failedTitles.push(r.title);
     }
   }
+  return resultsByCriterion;
+}
+
+function reportSpec(spec, ctx) {
+  const criteria = spec.criteria.map((c) => {
+    const key = criterionKey(spec.id, c.id);
+    const staticList = ctx.staticByCriterion.get(key) ?? [];
+    const tally = ctx.resultsByCriterion.get(key) ?? { passed: 0, failed: 0, skipped: 0, failedTitles: [], titles: [] };
+    let state = criterionState({ resultsMode: ctx.resultsMode, staticTests: staticList, resultTally: tally });
+    if (state === 'not-run' && omittedByPolicy(staticList, ctx.omittedRunners)) state = 'omitted';
+    if (spec.status === 'draft') state = 'awaiting-approval';
+    if (spec.status === 'retired') state = 'retired';
+    return { ...c, state, tests: staticList, results: ctx.resultsMode ? tally : undefined };
+  });
+  const applicable = ctx.stage === 'all' || (spec.verificationStage ?? 'software') === ctx.stage;
+  if (!applicable) ctx.notices.push(`${spec.file}: ${spec.verificationStage} acceptance remains ${spec.status}; not certified by the ${ctx.stage} gate`);
+  if (GATED_STATUSES.has(spec.status) && applicable) {
+    for (const c of criteria) {
+      if (FAILING_STATES.has(c.state)) ctx.errors.push(failureMessage(spec, c, c.state, c.results ?? { failedTitles: [] }));
+    }
+    const allGood = criteria.every((c) => !FAILING_STATES.has(c.state));
+    if (spec.status === 'approved' && allGood) {
+      ctx.notices.push(`${spec.file}: every criterion is ${ctx.resultsMode ? 'passing' : 'covered'}; set \`status: implemented\` once the owner has seen it work`);
+    }
+  } else if (spec.status === 'draft') {
+    ctx.notices.push(`${spec.file}: draft — ${spec.criteria.length} criteria awaiting owner approval`);
+  }
+  const ok = !GATED_STATUSES.has(spec.status) || criteria.every((c) => !FAILING_STATES.has(c.state));
+  return { applicable, verificationStage: spec.verificationStage ?? 'software', id: spec.id, title: spec.title, status: spec.status, file: spec.file, retiredReason: spec.retiredReason, ok, criteria };
+}
+
+export function evaluateAcceptance({ specs, specErrors = [], specWarnings = [], staticTests, orphanFiles = [], results = null, stage = 'all', omittedRunners = [] }) {
+  if (!['all','software','deployment'].includes(stage)) throw new Error('Invalid acceptance stage');
+  const errors = [...specErrors];
+  const warnings = [...specWarnings];
+  const notices = [];
+  const resultsMode = Array.isArray(results);
+  const specsById = new Map(specs.map((s) => [s.id, s]));
+
+  for (const f of orphanFiles) {
+    errors.push(`${f}: contains acceptance tags but is not executed by any configured test runner (test:unit / agent-loop vitest / Playwright)`);
+  }
+
+  const { staticByCriterion, rejectedTags } = indexStaticTests(staticTests, specsById, errors, warnings);
+  const deduped = resultsMode ? dedupeResults(results) : [];
+  const resultsByCriterion = resultsMode ? indexResultTests(deduped, staticTests, specsById, rejectedTags, errors, warnings) : new Map();
 
   const specReports = [];
   for (const spec of [...specs].sort((a, b) => a.id.localeCompare(b.id))) {
-    const criteria = spec.criteria.map((c) => {
-      const key = criterionKey(spec.id, c.id);
-      const staticList = staticByCriterion.get(key) ?? [];
-      const tally = resultsByCriterion.get(key) ?? { passed: 0, failed: 0, skipped: 0, failedTitles: [], titles: [] };
-      let state = criterionState({ resultsMode, staticTests: staticList, resultTally: tally });
-      if (state === 'not-run' && omittedByPolicy(staticList, omittedRunners)) state = 'omitted';
-      if (spec.status === 'draft') state = 'awaiting-approval';
-      if (spec.status === 'retired') state = 'retired';
-      return { ...c, state, tests: staticList, results: resultsMode ? tally : undefined };
-    });
-
-    const applicable = stage === 'all' || (spec.verificationStage ?? 'software') === stage;
-    if (!applicable) notices.push(`${spec.file}: ${spec.verificationStage} acceptance remains ${spec.status}; not certified by the ${stage} gate`);
-    if (GATED_STATUSES.has(spec.status) && applicable) {
-      for (const c of criteria) {
-        if (FAILING_STATES.has(c.state)) errors.push(failureMessage(spec, c, c.state, c.results ?? { failedTitles: [] }));
-      }
-      const allGood = criteria.every((c) => !FAILING_STATES.has(c.state));
-      if (spec.status === 'approved' && allGood) {
-        notices.push(`${spec.file}: every criterion is ${resultsMode ? 'passing' : 'covered'}; set \`status: implemented\` once the owner has seen it work`);
-      }
-    } else if (spec.status === 'draft') {
-      notices.push(`${spec.file}: draft — ${criteria.length} criteria awaiting owner approval`);
-    }
-
-    const ok = !GATED_STATUSES.has(spec.status) || criteria.every((c) => !FAILING_STATES.has(c.state));
-    specReports.push({ applicable, verificationStage: spec.verificationStage ?? 'software', id: spec.id, title: spec.title, status: spec.status, file: spec.file, retiredReason: spec.retiredReason, ok, criteria });
+    specReports.push(reportSpec(spec, { staticByCriterion, resultsByCriterion, resultsMode, omittedRunners, stage, errors, notices }));
   }
 
   const resultSources = resultsMode
