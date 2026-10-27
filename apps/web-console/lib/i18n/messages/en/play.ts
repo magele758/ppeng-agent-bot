@@ -406,7 +406,9 @@ export const play = {
 
   sessionRecap: {
     manual: 'Recap this session',
-    dismiss: 'Dismiss recap'
+    dismiss: 'Dismiss recap',
+    pending: 'Recapping the latest progress…',
+    failed: 'The recap did not come through'
   },
 
   replyQuote: {

@@ -406,7 +406,9 @@ export const play = {
 
   sessionRecap: {
     manual: '回顾这段会话',
-    dismiss: '收起回顾'
+    dismiss: '收起回顾',
+    pending: '正在回顾最近的进展…',
+    failed: '这次没回顾成'
   },
 
   replyQuote: {
