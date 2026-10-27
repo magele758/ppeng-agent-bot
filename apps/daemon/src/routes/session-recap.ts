@@ -10,6 +10,7 @@ import { json } from '../http-utils.js';
 import {
   hasPersistedSessionRecapSettings,
   readSessionRecapSettings,
+  recapFeatureEnabled,
   writeSessionRecapSettings,
   type SessionRecapSettingsPatch
 } from '../session-recap-settings.js';
@@ -30,6 +31,7 @@ function payload(runtime: RawAgentRuntime) {
   return {
     settings,
     effective: {
+      active: settings.active,
       enabled: settings.enabled,
       source: hasPersistedSessionRecapSettings(runtime.store) ? 'ui' : 'default'
     }
@@ -51,6 +53,10 @@ export function sessionRecapRoutes(runtime: RawAgentRuntime): RouteSpec[] {
       handler: async ({ readBody, response }) => {
         const body = (await readBody()) as SessionRecapSettingsPatch & Record<string, unknown>;
         const patch: SessionRecapSettingsPatch = {};
+        if (body && typeof body === 'object' && 'active' in body) {
+          if (typeof body.active !== 'boolean') throw new ValidationError('active must be a boolean');
+          patch.active = body.active;
+        }
         if (body && typeof body === 'object' && 'enabled' in body) {
           if (typeof body.enabled !== 'boolean') throw new ValidationError('enabled must be a boolean');
           patch.enabled = body.enabled;
@@ -63,6 +69,10 @@ export function sessionRecapRoutes(runtime: RawAgentRuntime): RouteSpec[] {
       method: 'POST',
       pattern: '/api/sessions/:id/recap',
       handler: async ({ requireParam, readBody, response }) => {
+        if (!recapFeatureEnabled(readSessionRecapSettings(runtime.store))) {
+          json(response, 200, { text: null, anchorId: null });
+          return;
+        }
         const sessionId = requireParam('id');
         const session = runtime.getSession(sessionId);
         if (!session) throw new NotFoundError('session', sessionId);

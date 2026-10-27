@@ -55,8 +55,16 @@ export function isRecapCommand(text: string): boolean {
   return /^\/recap$/i.test(trimmed) || /^\/回顾$/.test(trimmed);
 }
 
-/** False means the composer should show a recap instead of sending. */
-export function recapCommandShouldSend(text: string, hasAttachments: boolean): boolean {
+/**
+ * False means the composer should show a recap instead of sending.
+ * When the whole recap is off, the command is an ordinary message.
+ */
+export function recapCommandShouldSend(
+  text: string,
+  hasAttachments: boolean,
+  featureActive = true
+): boolean {
+  if (featureActive === false) return true;
   if (hasAttachments) return true;
   return !isRecapCommand(text);
 }
@@ -117,6 +125,8 @@ export function armAutomaticRecap(input: {
 }
 
 export function presentSessionRecap(input: {
+  /** Whole recap. False hides the line even when someone asks for it. Default on. */
+  active?: boolean;
   enabled: boolean;
   recap: SessionRecap | null;
   armed: boolean;
@@ -127,6 +137,7 @@ export function presentSessionRecap(input: {
   /** Model line. Empty while it is still being written or the call failed. */
   line: string;
 }): { show: boolean; markSeen: boolean; text: string } {
+  if (input.active === false) return { show: false, markSeen: false, text: '' };
   const recap = input.recap;
   const manualShow = Boolean(input.manual && recap && recap.completedTurns >= 1 && !input.generating);
   const autoShow = Boolean(

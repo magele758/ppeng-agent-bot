@@ -1,17 +1,21 @@
 /**
- * Automatic session-recap switch. Lab UI persists it in daemon_control.
- * No RAW_AGENT_* flag. Manual recap stays available when this is off.
+ * Session-recap switches. Lab UI persists them in daemon_control.
+ * No RAW_AGENT_* flag.
+ * `active` turns the whole recap off. `enabled` only skips the automatic return.
  */
 
 export const SESSION_RECAP_SETTINGS_KEY = 'session_recap_settings';
 
 export interface SessionRecapSettings {
+  /** When false, recap is off: no line, no button, no model call. Default on. */
+  active: boolean;
   /** When false, returning to a session does not show a recap. Default on. */
   enabled: boolean;
   updatedAt: string;
 }
 
 export interface SessionRecapSettingsPatch {
+  active?: boolean;
   enabled?: boolean;
 }
 
@@ -21,7 +25,12 @@ export interface SessionRecapSettingsStore {
 }
 
 export function defaultSessionRecapSettings(now = new Date().toISOString()): SessionRecapSettings {
-  return { enabled: true, updatedAt: now };
+  return { active: true, enabled: true, updatedAt: now };
+}
+
+/** False means the model must not be asked to write a recap. */
+export function recapFeatureEnabled(settings: Pick<SessionRecapSettings, 'active'>): boolean {
+  return settings.active !== false;
 }
 
 export function normalizeSessionRecapSettings(
@@ -31,6 +40,7 @@ export function normalizeSessionRecapSettings(
   const base = defaultSessionRecapSettings(now);
   if (!raw || typeof raw !== 'object') return base;
   return {
+    active: raw.active === false ? false : true,
     enabled: raw.enabled === false ? false : true,
     updatedAt: typeof raw.updatedAt === 'string' && raw.updatedAt ? raw.updatedAt : base.updatedAt
   };
