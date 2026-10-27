@@ -20,11 +20,12 @@ import {
   readSessionRecapCache,
   recapAnchorId,
   recapLocale,
+  resolveConversationTimezone,
   type RecapLocale
 } from '../session-recap-text.js';
 
 const RECAP_WAIT_MS = 20_000;
-const recapFlights = new Map<string, Promise<{ text: string | null; anchorId: string | null }>>();
+const recapFlights = new Map<string, Promise<{ text: string | null; anchorId: string | null; hint: string }>>();
 
 function payload(runtime: RawAgentRuntime) {
   const settings = readSessionRecapSettings(runtime.store);
@@ -70,7 +71,7 @@ export function sessionRecapRoutes(runtime: RawAgentRuntime): RouteSpec[] {
       pattern: '/api/sessions/:id/recap',
       handler: async ({ requireParam, readBody, response }) => {
         if (!recapFeatureEnabled(readSessionRecapSettings(runtime.store))) {
-          json(response, 200, { text: null, anchorId: null });
+          json(response, 200, { text: null, anchorId: null, hint: '' });
           return;
         }
         const sessionId = requireParam('id');
@@ -89,10 +90,10 @@ async function recapForSession(
   runtime: RawAgentRuntime,
   sessionId: string,
   locale: RecapLocale
-): Promise<{ text: string | null; anchorId: string | null }> {
+): Promise<{ text: string | null; anchorId: string | null; hint: string }> {
   const messages = runtime.store.foldMessages(sessionId);
   const anchorId = recapAnchorId(messages);
-  if (!anchorId) return { text: null, anchorId: null };
+  if (!anchorId) return { text: null, anchorId: null, hint: '' };
   const key = `${sessionId}\0${anchorId}\0${locale}`;
   const existing = recapFlights.get(key);
   if (existing) return existing;
@@ -108,14 +109,16 @@ async function composeAndStore(
   sessionId: string,
   locale: RecapLocale,
   messages: ReturnType<RawAgentRuntime['store']['foldMessages']>
-): Promise<{ text: string | null; anchorId: string | null }> {
+): Promise<{ text: string | null; anchorId: string | null; hint: string }> {
   const complete = runtime.modelAdapter.completeText;
-  const cached = readSessionRecapCache(runtime.getSession(sessionId)?.metadata);
-  if (!complete) return { text: null, anchorId: recapAnchorId(messages) };
+  const session = runtime.getSession(sessionId);
+  const cached = readSessionRecapCache(session?.metadata);
+  if (!complete) return { text: null, anchorId: recapAnchorId(messages), hint: '' };
   const result = await composeSessionRecap({
     messages,
     locale,
     cached,
+    clock: { nowMs: Date.now(), timezone: resolveConversationTimezone(session?.metadata) },
     signal: AbortSignal.timeout(RECAP_WAIT_MS),
     completeText: (request) => complete.call(runtime.modelAdapter, request)
   });
@@ -129,5 +132,5 @@ async function composeAndStore(
       });
     });
   }
-  return { text: result.text, anchorId: result.anchorId };
+  return { text: result.text, anchorId: result.anchorId, hint: result.hint };
 }

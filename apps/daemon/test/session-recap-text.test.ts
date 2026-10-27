@@ -184,3 +184,41 @@ test('回顾带写下日期，隔日不复用缓存，也不要求存当前时�
 
   assert.equal(readSessionRecapCache({ sessionRecap: { anchorId: 'a1', locale: 'zh', text: '旧缓存' } }), null);
 });
+
+test('一次模型调用同时给出回顾和下一步，缓存不再打第二次 [AC:recap-next-action#AC-1] [AC:recap-next-action#AC-2]', async () => {
+  const messages: RecapSourceMessage[] = [
+    { id: 'u1', role: 'user', parts: [{ type: 'text', text: '紫藤花蜜怎么保存' }] },
+    { id: 'a1', role: 'assistant', parts: [{ type: 'text', text: '要放在阴凉处' }] }
+  ];
+  let calls = 0;
+  const first = await composeSessionRecap({
+    messages,
+    locale: 'zh',
+    completeText: async () => {
+      calls += 1;
+      return '刚刚说到紫藤花蜜要放阴凉处，瓶身日期还没写\n把紫藤花蜜的开封日期写在瓶身';
+    }
+  });
+  assert.equal(calls, 1);
+  assert.equal(first.text, '刚刚说到紫藤花蜜要放阴凉处，瓶身日期还没写');
+  assert.equal(first.hint, '把紫藤花蜜的开封日期写在瓶身');
+  assert.equal(first.cache?.hint, first.hint);
+  const again = await composeSessionRecap({
+    messages,
+    locale: 'zh',
+    cached: first.cache,
+    completeText: async () => {
+      calls += 1;
+      return '不该再调用';
+    }
+  });
+  assert.equal(calls, 1);
+  assert.equal(again.hint, first.hint);
+  const emptyAction = await composeSessionRecap({
+    messages,
+    locale: 'en',
+    completeText: async () => 'Left the honey in the shade.\n继续'
+  });
+  assert.equal(emptyAction.text, 'Left the honey in the shade.');
+  assert.equal(emptyAction.hint, '');
+});

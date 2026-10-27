@@ -55,15 +55,15 @@ export function shouldRequestComposerHint(input: {
   return true;
 }
 
-/** Recap still writing: wait. Recap done: pass that line. No recap: keep the old hint path. */
+/** A shown recap already carries the next action from the same model call. */
 export function composerHintAfterRecap(input: {
   shown: boolean;
   status: 'hidden' | 'loading' | 'done' | 'failed';
-  text: string;
-}): { wait: boolean; recap: string } {
-  if (!input.shown || input.status === 'hidden' || input.status === 'failed') return { wait: false, recap: '' };
-  if (input.status !== 'done') return { wait: true, recap: '' };
-  return { wait: false, recap: input.text.trim() };
+  hint: string;
+}): { wait: boolean; useBundle: boolean; hint: string } {
+  if (!input.shown || input.status === 'hidden') return { wait: false, useBundle: false, hint: '' };
+  if (input.status === 'loading') return { wait: true, useBundle: false, hint: '' };
+  return { wait: false, useBundle: true, hint: input.status === 'done' ? input.hint.trim() : '' };
 }
 
 export function composerHintRequestBody(sessionId: string, recap = ''): { sessionId: string; recap?: string } {

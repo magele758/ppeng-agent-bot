@@ -3,10 +3,9 @@ title: 回顾之后推荐下一步行动
 status: implemented
 requirement: |
   还有个问题，在recap的后续，其实可以把之前自动建议下一步行动的那个功能串联上，让模型给出下一步的的行动建议推荐
-owner: user
 notes: |
   assumedApproval: standing-order-2026-10-22
-  选了回顾完成后，用已有的输入框下一步行动建议接上。建议仍是提示，不写进对话，也不改回顾那一行。
+  选了回顾和建议同一次模型调用。建议仍是输入框提示，不写进对话。没有回顾时，原来的下一步建议仍单独请求。
 criteria:
   - id: AC-1
     given: 一场已经结束过的 Bot 主对话，输入框是空的，上方正在出现一行回顾

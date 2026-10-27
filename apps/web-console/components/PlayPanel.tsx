@@ -608,13 +608,13 @@ export function PlayPanel({
   const recapHint = composerHintAfterRecap({
     shown: sessionRecap.shown,
     status: sessionRecap.status,
-    text: sessionRecap.modelText,
+    hint: sessionRecap.hint,
   });
   const nextHint = usePlayComposerHint({
     sessionId: selectedSessionId,
     messages: chat.sessionMessages,
     draft: chat.playInput,
-    recapText: recapHint.recap,
+    providedHint: recapHint.useBundle ? recapHint.hint : undefined,
     enabled: shouldRequestComposerHint({
       surface: playSurface,
       botMain: isBotMainComposerSession(selectedSession),
@@ -622,7 +622,7 @@ export function PlayPanel({
       draft: chat.playInput,
       generating: sessionBusy || recapHint.wait,
       hasAssistantReply: lastCompletedTurn(chat.sessionMessages) != null,
-    }),
+    }) && !recapHint.useBundle,
   });
   nextHintRef.current = nextHint;
   const hintView = composerHintPresentation({

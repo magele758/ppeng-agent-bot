@@ -203,22 +203,17 @@ test('没按 Tab 发出去的是用户真正输入的内容，空输入不会把
   assert.match(chat, /composerMessageToSend\(playInput\)/);
 });
 
-test('回顾写成后才请求下一步，请求带上这行回顾 [AC:recap-next-action#AC-1] [AC:recap-next-action#AC-5]', async () => {
-  assert.deepEqual(composerHintAfterRecap({ shown: true, status: 'loading', text: '' }), { wait: true, recap: '' });
+test('回顾写成后用同一次结果里的下一步，不再另请求 [AC:recap-next-action#AC-1] [AC:recap-next-action#AC-5]', () => {
+  assert.deepEqual(composerHintAfterRecap({ shown: true, status: 'loading', hint: '' }), { wait: true, useBundle: false, hint: '' });
   assert.equal(shouldRequestComposerHint({
     surface: 'bot', botMain: true, draft: '', generating: true, hasAssistantReply: true
   }), false);
-  const done = composerHintAfterRecap({ shown: true, status: 'done', text: '瓶身日期还没写' });
-  assert.deepEqual(done, { wait: false, recap: '瓶身日期还没写' });
-  assert.deepEqual(composerHintRequestBody('sess-bot', done.recap), { sessionId: 'sess-bot', recap: '瓶身日期还没写' });
-  assert.deepEqual(composerHintAfterRecap({ shown: false, status: 'hidden', text: '' }), { wait: false, recap: '' });
+  assert.deepEqual(
+    composerHintAfterRecap({ shown: true, status: 'done', hint: '把开封日期写在瓶身' }),
+    { wait: false, useBundle: true, hint: '把开封日期写在瓶身' }
+  );
+  assert.deepEqual(composerHintAfterRecap({ shown: false, status: 'hidden', hint: '' }), { wait: false, useBundle: false, hint: '' });
   assert.deepEqual(composerHintRequestBody('sess-bot'), { sessionId: 'sess-bot' });
-  let sent = '';
-  await loadComposerHint('sess-bot', undefined, async (_url, init) => {
-    sent = String(init?.body ?? '');
-    return new Response(JSON.stringify({ hint: '把开封日期写在瓶身' }), { status: 200 });
-  }, done.recap);
-  assert.deepEqual(JSON.parse(sent), { sessionId: 'sess-bot', recap: '瓶身日期还没写' });
 });
 
 test('回顾后的建议仍是提示，失败回顾不挡住输入 [AC:recap-next-action#AC-3] [AC:recap-next-action#AC-4]', () => {
@@ -238,6 +233,6 @@ test('回顾后的建议仍是提示，失败回顾不挡住输入 [AC:recap-nex
   const typed = composerDraftFromTyping('我自己的字', hint);
   assert.equal(typed.draft, '我自己的字');
   assert.equal(typed.draft.includes(hint), false);
-  assert.deepEqual(composerHintAfterRecap({ shown: true, status: 'failed', text: '这次没回顾成' }), { wait: false, recap: '' });
-  assert.equal(composerHintRequestBody('sess-bot', '').recap, undefined);
+  assert.deepEqual(composerHintAfterRecap({ shown: true, status: 'failed', hint: '这次没回顾成' }), { wait: false, useBundle: true, hint: '' });
+  assert.equal(composerHintRequestBody('sess-bot').recap, undefined);
 });

@@ -24,6 +24,7 @@ export type RecapCache = {
   locale: RecapLocale;
   text: string;
   asOfDate: string;
+  hint?: string;
 };
 
 export type RecapCompleteInput = {
@@ -74,7 +75,8 @@ export function readSessionRecapCache(metadata: Record<string, unknown> | null |
   if (record.locale !== 'zh' && record.locale !== 'en') return null;
   if (typeof record.text !== 'string' || !record.text.trim()) return null;
   if (typeof record.asOfDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(record.asOfDate)) return null;
-  return { anchorId: record.anchorId, locale: record.locale, text: record.text, asOfDate: record.asOfDate };
+  const hint = typeof record.hint === 'string' ? record.hint : '';
+  return { anchorId: record.anchorId, locale: record.locale, text: record.text, asOfDate: record.asOfDate, ...(hint ? { hint } : {}) };
 }
 
 /** Same anchor as the Lab: the assistant message that closed the latest turn. */
@@ -121,6 +123,32 @@ export function normalizeRecapLine(raw: string): string {
   return `${chars.slice(0, SESSION_RECAP_MAX_CHARS - 1).join('').trimEnd()}…`;
 }
 
+const GENERIC_ACTION = /^(继续|继续吧|好的|好|嗯+|然后呢|接下来呢|还有呢|还有吗|那呢|下一步|下一步呢|然后|接着)[。！？!?]?$/;
+const REWRITE_ACTION = /^那.+呢[？?]?$/;
+
+function cleanNextAction(raw: string): string {
+  let line = raw.trim();
+  if (
+    (line.startsWith('"') && line.endsWith('"') && line.length >= 2) ||
+    (line.startsWith('「') && line.endsWith('」') && Array.from(line).length >= 2)
+  ) {
+    line = line.slice(1, -1).trim();
+  }
+  line = line.replace(/\s+/g, ' ').trim();
+  const compact = line.replace(/\s+/g, '');
+  if (!line || line.startsWith('{') || line.startsWith('[') || line.startsWith('```')) return '';
+  if (GENERIC_ACTION.test(compact) || REWRITE_ACTION.test(compact)) return '';
+  const chars = Array.from(line);
+  if (chars.length < 2) return '';
+  return chars.slice(0, 500).join('');
+}
+
+export function parseRecapBundle(raw: string): { text: string; hint: string } {
+  const lines = raw.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const text = normalizeRecapLine(lines[0] ?? '');
+  return { text, hint: text ? cleanNextAction(lines[1] ?? '') : '' };
+}
+
 export async function composeSessionRecap(input: {
   messages: readonly RecapSourceMessage[];
   locale: RecapLocale;
@@ -128,14 +156,14 @@ export async function composeSessionRecap(input: {
   cached?: RecapCache | null;
   signal?: AbortSignal;
   clock?: { nowMs: number; timezone: string };
-}): Promise<{ text: string | null; anchorId: string | null; cache: RecapCache | null }> {
+}): Promise<{ text: string | null; hint: string; anchorId: string | null; cache: RecapCache | null }> {
   const zone = {
     nowMs: input.clock?.nowMs ?? Date.now(),
     timezone: input.clock?.timezone || resolveConversationTimezone(undefined)
   };
   const asOfDate = zonedClock(zone.nowMs, zone.timezone).date;
   const request = buildRecapRequest(input.messages, input.locale, zone);
-  if (!request) return { text: null, anchorId: null, cache: null };
+  if (!request) return { text: null, hint: '', anchorId: null, cache: null };
   const cached = input.cached;
   if (
     cached &&
@@ -144,7 +172,7 @@ export async function composeSessionRecap(input: {
     cached.locale === input.locale
   ) {
     const text = normalizeRecapLine(cached.text);
-    if (text) return { text, anchorId: request.anchorId, cache: { ...cached, text, asOfDate } };
+    if (text) return { text, hint: cached.hint ?? '', anchorId: request.anchorId, cache: { ...cached, text, asOfDate, hint: cached.hint ?? '' } };
   }
   let raw = '';
   try {
@@ -155,14 +183,15 @@ export async function composeSessionRecap(input: {
       jsonMode: false
     });
   } catch {
-    return { text: null, anchorId: request.anchorId, cache: null };
+    return { text: null, hint: '', anchorId: request.anchorId, cache: null };
   }
-  const text = normalizeRecapLine(typeof raw === 'string' ? raw : '');
-  if (!text) return { text: null, anchorId: request.anchorId, cache: null };
+  const bundle = parseRecapBundle(typeof raw === 'string' ? raw : '');
+  if (!bundle.text) return { text: null, hint: '', anchorId: request.anchorId, cache: null };
   return {
-    text,
+    text: bundle.text,
+    hint: bundle.hint,
     anchorId: request.anchorId,
-    cache: { anchorId: request.anchorId, locale: input.locale, text, asOfDate }
+    cache: { anchorId: request.anchorId, locale: input.locale, text: bundle.text, asOfDate, hint: bundle.hint }
   };
 }
 
@@ -171,9 +200,9 @@ function systemPrompt(locale: RecapLocale, today: string, timezone: string): str
     ? `Today's calendar date is ${today} (${timezone}). Do not call an older turn's today or 今天 "now".`
     : `今天的日历日是 ${today}（${timezone}）。不要把更早一轮里的「今天」当成现在。`;
   if (locale === 'en') {
-    return `${dated} Write one recap line for someone who just returned to this conversation. Use only the latest turns below and say where things just got to. You may mention what is still open. Do not title the line with the user's raw message, do not start with "Recap: you were", and do not count how many files changed. No JSON, no Markdown, no line breaks. At most 400 characters. If the latest turns show no progress, reply with an empty line.`;
+    return `${dated} Reply with exactly two lines and no JSON or Markdown. Line 1 is one recap for someone who just returned. Use only the latest turns and say where things just got to. You may mention what is still open. Do not title it with the user's raw message, do not start with "Recap: you were", and do not count how many files changed. At most 400 characters. If the latest turns show no progress, leave line 1 empty. Line 2 is the next action the user can send, using a concrete thing from line 1. If there is no executable next step, leave line 2 empty. Do not write continue, ok, or "what about ...?".`;
   }
-  return `${dated} 你在给刚回到这场对话的人写一行回顾。只根据下面最近几轮，用一句话说明刚刚做到哪了。可以提到还没做完的事。不要把用户原话当成标题，不要以「回顾：你在」开头，不要写改了几个文件。不要 JSON，不要 Markdown，不要换行。不超过 400 字。看不出进展时只回复空行。`;
+  return `${dated} 只回复两行，不要 JSON，不要 Markdown。第一行是给刚回到这场对话的人的一行回顾。只根据下面最近几轮，说明刚刚做到哪了。可以提到还没做完的事。不要把用户原话当成标题，不要以「回顾：你在」开头，不要写改了几个文件。不超过 400 字。看不出进展时第一行留空。第二行是用户可以发出去的下一步行动，用到第一行里的具体事情。没有可执行的下一步时第二行留空。禁止「继续」「好的」「那…呢」，禁止把助手上一句改成问句。`;
 }
 
 function turnBlock(turn: Turn, locale: RecapLocale, timezone: string): string {
