@@ -122,9 +122,9 @@ export const play = {
     renameShort: "改名",
     delete: "删除功能分组",
     deleteShort: "删除",
-    deleteConfirm: "删除功能分组“{name}”？Bot 将回到未分组，Bot 和对话会保留。",
+    deleteConfirm: "删除功能分组“{name}”？Bot 将回到未分组，群聊也会回到原来的列表，Bot、群聊和对话会保留。",
     ungrouped: "未分组",
-    dropHint: "拖拽 Bot 到这里",
+    dropHint: "拖拽 Bot 或群聊到这里",
     moveBot: "移动 {name} 到功能分组",
     failed: "操作失败：{error}",
     retry: "重试",
@@ -143,8 +143,8 @@ export const play = {
   },
   pin: {
     title: "置顶",
-    empty: "把 Bot 拖到这里置顶",
-    hint: "把 Bot 拖出此区域可取消置顶"
+    empty: "把 Bot 或群聊拖到这里置顶",
+    hint: "把 Bot 或群聊拖出此区域可取消置顶"
   },
   send: '发送',
   add: '新增',
@@ -219,7 +219,10 @@ export const play = {
     deleteConfirmMany: '删除选中的 {count} 个会话？此操作不可撤销。',
     deleteFailed: '删除失败：{detail}',
     checkboxAria: '选中会话 {title}',
-    noQuestion: '还没提问'
+    noQuestion: '还没提问',
+    collapse: '收起会话列表',
+    expand: '展开会话列表',
+    reorder: '拖拽调整顺序'
   },
 
   group: {
@@ -277,6 +280,8 @@ export const play = {
     workingMembers: '正在工作的群成员',
     manageMembers: '成员',
     membersDrawer: '群成员',
+    currentMembers: '已在群里',
+    addMembers: '添加成员',
     membersSearch: '搜索成员或职能组',
     membersSearchPlaceholder: '名字、职责、头衔或职能组',
     hostBadge: '群主',
@@ -286,6 +291,9 @@ export const play = {
     nameSeparator: '、',
     ungrouped: '未分组',
     addGroup: '加入整组',
+    addGroupRow: '{name} · 加入整组',
+    addAria: '把 {name} 加入群聊',
+    addEmpty: '没有可加入的 Bot 或职能组',
     removeGroup: '移出整组',
     addGroupAria: '把职能组「{name}」加入群聊',
     removeGroupAria: '把职能组「{name}」移出群聊',

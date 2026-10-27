@@ -122,9 +122,9 @@ export const play = {
     renameShort: "Rename",
     delete: "Delete functional group",
     deleteShort: "Delete",
-    deleteConfirm: "Delete “{name}”? Bots return to Ungrouped. Bots and conversations are kept.",
+    deleteConfirm: "Delete “{name}”? Bots return to Ungrouped. Group chats return to the list. Bots, group chats, and conversations are kept.",
     ungrouped: "Ungrouped",
-    dropHint: "Drag Bots here",
+    dropHint: "Drag Bots or group chats here",
     moveBot: "Move {name} to functional group",
     failed: "Operation failed: {error}",
     retry: "Retry",
@@ -143,8 +143,8 @@ export const play = {
   },
   pin: {
     title: "Pinned",
-    empty: "Drag a Bot here to pin it",
-    hint: "Drag a Bot out of this area to unpin it"
+    empty: "Drag a Bot or group chat here to pin it",
+    hint: "Drag a Bot or group chat out of this area to unpin it"
   },
   send: 'Send',
   add: 'New',
@@ -219,7 +219,10 @@ export const play = {
     deleteConfirmMany: 'Delete {count} selected sessions? This cannot be undone.',
     deleteFailed: 'Could not delete: {detail}',
     checkboxAria: 'Select session {title}',
-    noQuestion: 'No question yet'
+    noQuestion: 'No question yet',
+    collapse: 'Collapse session list',
+    expand: 'Expand session list',
+    reorder: 'Drag to reorder'
   },
 
   group: {
@@ -277,6 +280,8 @@ export const play = {
     workingMembers: 'Working group members',
     manageMembers: 'Members',
     membersDrawer: 'Group members',
+    currentMembers: 'In this group',
+    addMembers: 'Add members',
     membersSearch: 'Search members or functional groups',
     membersSearchPlaceholder: 'Name, duty, title, or functional group',
     hostBadge: 'Host',
@@ -286,6 +291,9 @@ export const play = {
     nameSeparator: ', ',
     ungrouped: 'Ungrouped',
     addGroup: 'Add group',
+    addGroupRow: '{name} · Add group',
+    addAria: 'Add {name} to the group chat',
+    addEmpty: 'No bots or functional groups to add',
     removeGroup: 'Remove group',
     addGroupAria: 'Add functional group “{name}” to this chat',
     removeGroupAria: 'Remove functional group “{name}” from this chat',

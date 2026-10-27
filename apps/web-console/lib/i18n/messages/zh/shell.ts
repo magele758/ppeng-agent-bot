@@ -12,7 +12,8 @@ export const shell = {
     tasks: '任务',
     knowledge: '知识与记忆',
     ops: '运维',
-    settings: '设置'
+    settings: '设置',
+    footMenu: '模型与外观'
   },
   desc: {
     agents: '管理 Agent、Bot、团队协作与技能。',

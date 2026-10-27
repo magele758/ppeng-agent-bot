@@ -30,22 +30,20 @@ export type DrawerMember = {
   duty: string;
   host: boolean;
   speaking: boolean;
+  removable: boolean;
 };
 
-export type DrawerSection = {
+export type AddGroupAction = {
   id: string;
   name: string;
-  members: DrawerMember[];
-  canAdd: boolean;
-  canRemove: boolean;
-  /** True when removing this group would leave fewer than two members. */
-  removeBlocked: boolean;
 };
 
 export type MemberDrawer = {
   host: DrawerMember | null;
   speaking: DrawerMember[];
-  sections: DrawerSection[];
+  current: DrawerMember[];
+  addBots: DrawerMember[];
+  addGroups: AddGroupAction[];
 };
 
 export type RoomGoalView = {
@@ -193,14 +191,21 @@ function botMatches(bot: RoomBot, query: string): boolean {
   return haystack.includes(query);
 }
 
-function toMember(id: string, bots: readonly RoomBot[], hostId: string, speakingIds: ReadonlySet<string>): DrawerMember {
+function toMember(
+  id: string,
+  bots: readonly RoomBot[],
+  hostId: string,
+  speakingIds: ReadonlySet<string>,
+  removable: boolean
+): DrawerMember {
   const bot = bots.find((item) => item.id === id);
   return {
     id,
     name: bot?.name ?? id,
     duty: dutyOf(bot, ''),
     host: id === hostId,
-    speaking: speakingIds.has(id)
+    speaking: speakingIds.has(id),
+    removable
   };
 }
 
@@ -211,51 +216,31 @@ export function memberDrawer(input: {
   hostId: string;
   speakingIds: readonly string[];
   query: string;
-  ungroupedLabel: string;
 }): MemberDrawer {
   const memberIds = uniqueMemberIds(input.memberIds);
   const known = new Set(input.bots.map((bot) => bot.id));
+  const inside = new Set(memberIds);
   const speakingIds = new Set(input.speakingIds);
   const query = input.query.trim().toLowerCase();
-  const placed = new Set<string>();
-  const sections: DrawerSection[] = [];
-
+  const current = memberIds.map((id) => toMember(id, input.bots, input.hostId, speakingIds, id !== input.hostId));
+  const addGroups: AddGroupAction[] = [];
+  const covered = new Set<string>();
   for (const group of input.groups) {
-    const inRoom = uniqueMemberIds(group.botIds).filter((id) => memberIds.includes(id) && !placed.has(id));
-    const nameMatches = !query || group.name.toLowerCase().includes(query);
-    const members = inRoom
-      .filter((id) => {
-        if (nameMatches) return true;
-        const bot = input.bots.find((item) => item.id === id);
-        return bot ? botMatches(bot, query) : id.toLowerCase().includes(query);
-      })
-      .map((id) => toMember(id, input.bots, input.hostId, speakingIds));
-    const canAdd = groupCanAdd(memberIds, group.botIds, known);
-    const removal = groupRemovalPlan(memberIds, inRoom);
-    const canRemove = removal.ok && removal.remove.length > 0;
-    if (!nameMatches && members.length === 0) continue;
-    if (members.length === 0 && !canAdd && !nameMatches) continue;
-    if (query && !nameMatches && members.length === 0) continue;
-    for (const member of members) placed.add(member.id);
-    if (members.length === 0 && !canAdd) continue;
-    sections.push({ id: group.id, name: group.name, members, canAdd, canRemove, removeBlocked: !removal.ok });
+    if (!groupCanAdd(memberIds, group.botIds, known)) continue;
+    if (query && !group.name.toLowerCase().includes(query)) continue;
+    addGroups.push({ id: group.id, name: group.name });
+    for (const id of group.botIds) {
+      if (!inside.has(id)) covered.add(id);
+    }
   }
-
-  const ungrouped = memberIds
-    .filter((id) => !placed.has(id))
-    .filter((id) => {
-      if (!query) return true;
-      const bot = input.bots.find((item) => item.id === id);
-      return bot ? botMatches(bot, query) : id.toLowerCase().includes(query);
-    })
-    .map((id) => toMember(id, input.bots, input.hostId, speakingIds));
-  if (ungrouped.length > 0) {
-    sections.push({ id: 'ungrouped', name: input.ungroupedLabel, members: ungrouped, canAdd: false, canRemove: false, removeBlocked: false });
-  }
-
-  const host = input.hostId ? toMember(input.hostId, input.bots, input.hostId, speakingIds) : null;
-  const speaking = input.speakingIds.filter((id) => memberIds.includes(id)).map((id) => toMember(id, input.bots, input.hostId, speakingIds));
-  return { host, speaking, sections };
+  const addBots = input.bots
+    .filter((bot) => !inside.has(bot.id) && !covered.has(bot.id) && (!query || botMatches(bot, query)))
+    .map((bot) => toMember(bot.id, input.bots, input.hostId, speakingIds, false));
+  const host = input.hostId ? toMember(input.hostId, input.bots, input.hostId, speakingIds, false) : null;
+  const speaking = input.speakingIds
+    .filter((id) => inside.has(id))
+    .map((id) => toMember(id, input.bots, input.hostId, speakingIds, id !== input.hostId));
+  return { host, speaking, current, addBots, addGroups };
 }
 
 function groupInsert(group: FunctionalGroupRef, members: readonly RoomBot[], inRoom: ReadonlySet<string>): string {

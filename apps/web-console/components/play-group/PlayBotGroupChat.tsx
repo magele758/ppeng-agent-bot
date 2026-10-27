@@ -17,17 +17,17 @@ import {
   removeGroupMember,
   type GroupMemberCode
 } from '@/lib/bot-group';
+import { stripVisibleClockMarks } from '@/lib/visible-clock';
 import { MarkdownHtml } from '../MarkdownHtml';
 import { BotFace } from '../BotFace';
 import { useBotWorkStates } from '../bot-work/BotWorkState';
 import { MODEL_PROVIDERS_CHANGED_EVENT } from '@/lib/model-providers';
-import { groupComposerCommand, runGroupComposerCommand, groupMessageMood, roomComposerDisabled, roomMemberModelLabel, roomHistoryUrl } from '@/lib/group-chat-view';
+import { groupComposerCommand, runGroupComposerCommand, groupMessageMood, roomComposerDisabled, roomHistoryUrl } from '@/lib/group-chat-view';
 import type { RoomModelConfiguration } from '@/lib/room-models';
 import { RoomSharedContextEditor } from './RoomSharedContextEditor';
 import { RoomGoalBar } from './RoomGoalBar';
 import { RoomMemberDrawer } from './RoomMemberDrawer';
 import {
-  groupRemovalPlan,
   memberNeedsPerson,
   mentionChoices,
   normalizeFunctionalGroups,
@@ -36,7 +36,6 @@ import {
   roomApprovalMode,
   showInlineApprove,
   speakingBotIds,
-  tileMembersInHeader,
   uniqueMemberIds,
   type FunctionalGroupRef,
   type MentionChoice,
@@ -155,7 +154,7 @@ function GroupTurn({
               messageId: message.id,
               botId: message.sender.id,
               botName: name,
-              text: message.text,
+              text: stripVisibleClockMarks(message.text),
               author: user ? 'user' : 'bot'
             }}
             onQuote={onQuote}
@@ -216,7 +215,6 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
   const [mentionIndex, setMentionIndex] = useState(0);
   const [mentionDismissed, setMentionDismissed] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [addId, setAddId] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [contextNotice, setContextNotice] = useState('');
@@ -297,7 +295,6 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
     setText('');
     setPendingContext([]);
     setContextNotice('');
-    setAddId('');
     setError('');
     let active = true;
     const refresh = (older = false) => {
@@ -326,12 +323,10 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
   const nameOf = (id: string) => bots.find((bot) => bot.id === id)?.name ?? id;
   const known = new Set(bots.map((bot) => bot.id));
   const memberIds = uniqueMemberIds(room?.botIds ?? []);
-  const crowded = room ? !tileMembersInHeader(memberIds.length) : false;
   const workingIds = memberIds.filter(id => workStates[id] > 0);
   const speaking = turns.some((turn) => turn.status === 'queued' || turn.status === 'running' || turn.status === 'waiting_approval');
   const speakingIds = speakingBotIds(turns);
   const speakingNames = speakingIds.map(nameOf).join(t('play.group.nameSeparator'));
-  const available = bots.filter((bot) => room && !memberIds.includes(bot.id));
   const mentionRoster = memberIds.map((id) => {
     const bot = bots.find((item) => item.id === id);
     return { id, name: bot?.name ?? id, title: bot?.title ?? '', description: bot?.description ?? '' };
@@ -378,11 +373,10 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
   const changeMembers = async (nextRoom: Room) => {
     const synced = await ensureBudget(nextRoom);
     setRoom(synced);
-    setAddId('');
     window.dispatchEvent(new Event(BOT_GROUPS_CHANGED_EVENT));
   };
 
-  const addMember = async (botId = addId) => {
+  const addMember = async (botId: string) => {
     if (!room || !botId) return;
     const check = addGroupMember(room.botIds, botId, known);
     if (!check.ok) {
@@ -402,7 +396,7 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
   };
 
   const removeMember = async (botId: string) => {
-    if (!room) return;
+    if (!room || !botId || botId === room.hostBotId) return;
     const check = removeGroupMember(room.botIds, botId);
     if (!check.ok) {
       setError(t(issueKey(check.code)));
@@ -429,31 +423,6 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
     try {
       const data = (await api(`/api/bot-rooms/${room.id}/members`, jsonBody({ groupId }))) as { room: Room };
       await changeMembers(data.room);
-    } catch {
-      setError(t('play.group.saveFailed'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const removeFunctionalGroup = async (groupId: string) => {
-    if (!room) return;
-    const group = groups.find((item) => item.id === groupId);
-    if (!group) return;
-    const plan = groupRemovalPlan(room.botIds, group.botIds);
-    if (!plan.ok) {
-      setError(t(issueKey(plan.code)));
-      return;
-    }
-    setBusy(true);
-    setError('');
-    try {
-      let next = room;
-      for (const botId of plan.remove) {
-        const data = (await api(`/api/bot-rooms/${room.id}/members/${encodeURIComponent(botId)}`, { method: 'DELETE' })) as { room: Room };
-        next = data.room;
-      }
-      await changeMembers(next);
     } catch {
       setError(t('play.group.saveFailed'));
     } finally {
@@ -572,67 +541,20 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
           <BotRooms key={roomId} bots={[...bots]} selectedRoomId={roomId} memberEditor={false} />
           {room ? <section className="play-group-settings-members" aria-label={t('play.group.membersDrawer')}>
             <h3>{t('play.group.membersDrawer')}</h3>
-            {crowded ? (
-              <RoomMemberDrawer
-                memberIds={memberIds}
-                bots={[...bots]}
-                groups={groups}
-                hostId={room.hostBotId}
-                speakingIds={speakingIds}
-                busy={busy}
-                error={error}
-                onAddMember={(botId) => void addMember(botId)}
-                onRemoveMember={(botId) => void removeMember(botId)}
-                onAddGroup={(groupId) => void addFunctionalGroup(groupId)}
-                onRemoveGroup={(groupId) => void removeFunctionalGroup(groupId)}
-              />
-            ) : (
-              <div className="play-group-members">
-                <div className="play-group-member-row">
-                  <span className="play-group-badge">{t('play.group.badge')}</span>
-                  {memberIds.map((id) => {
-                    const modelName = roomMemberModelLabel(models, id);
-                    return (
-                      <span key={id} className="play-group-member">
-                        <BotFace name={nameOf(id)} mood={workStates[id]>0?'thinking':'idle'} size="sm" testId={`room-member-face-${id}`} />
-                        <span className="play-group-member__identity">
-                          <span>{nameOf(id)}</span>
-                          {modelName ? (
-                            <span className="play-group-member__model" data-testid={`room-member-model-${id}`}>
-                              {modelName}
-                            </span>
-                          ) : null}
-                        </span>
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-sm"
-                          disabled={busy || !room || memberIds.length <= 2}
-                          aria-label={t('play.group.removeAria', { name: nameOf(id) })}
-                          onClick={() => void removeMember(id)}
-                        >
-                          {t('play.group.remove')}
-                        </button>
-                      </span>
-                    );
-                  })}
-                </div>
-                <div className="play-group-add">
-                  <select aria-label={t('play.group.addMember')} value={addId} onChange={(event) => setAddId(event.target.value)}>
-                    <option value="">{t('play.group.addMember')}</option>
-                    {available.map((bot) => (
-                      <option key={bot.id} value={bot.id}>
-                        {bot.name}
-                      </option>
-                    ))}
-                  </select>
-                  <button type="button" className="btn btn-secondary btn-sm" disabled={busy || !addId} onClick={() => void addMember()}>
-                    {t('play.group.add')}
-                  </button>
-                </div>
-                {room && memberIds.length <= 2 ? <p className="play-group-hint">{t('play.group.keepTwo')}</p> : null}
-                {error ? <p className="play-group-error">{error}</p> : null}
-              </div>
-            )}
+            <RoomMemberDrawer
+              memberIds={memberIds}
+              bots={[...bots]}
+              groups={groups}
+              hostId={room.hostBotId}
+              speakingIds={speakingIds}
+              models={models}
+              faceMood={(id) => (workStates[id] > 0 ? 'thinking' : 'idle')}
+              busy={busy}
+              error={error}
+              onAddMember={(botId) => void addMember(botId)}
+              onRemoveMember={(botId) => void removeMember(botId)}
+              onAddGroup={(groupId) => void addFunctionalGroup(groupId)}
+            />
             <RoomSharedContextEditor roomId={room.id} />
           </section> : null}
         </div>

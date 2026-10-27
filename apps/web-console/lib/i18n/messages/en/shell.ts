@@ -12,7 +12,8 @@ export const shell = {
     tasks: 'Tasks',
     knowledge: 'Knowledge & Memory',
     ops: 'Ops',
-    settings: 'Settings'
+    settings: 'Settings',
+    footMenu: 'Model and appearance'
   },
   desc: {
     agents: 'Manage agents, bots, team collaboration and skills.',

@@ -41,9 +41,10 @@ test('成员卡不铺职责长文，标题栏只留短的模型设置入口 [AC:
   assert.match(chat, /data-testid="room-default-model"/);
   assert.match(chat, /play\.groupModel\.settings/);
   assert.match(chat, /RoomSharedContextEditor/);
-  assert.match(chat, /play\.group\.addMember/);
-  assert.match(chat, /onClick=\{\(\) => void addMember\(\)\}/);
-  assert.match(chat, /onClick=\{\(\) => void removeMember\(id\)\}/);
+  assert.match(chat, /onAddMember=\{\(botId\) => void addMember\(botId\)\}/);
+  assert.match(chat, /onRemoveMember=\{\(botId\) => void removeMember\(botId\)\}/);
+  assert.match(drawer, /t\('play\.group\.add'\)/);
+  assert.match(drawer, /room-member-model-/);
   assert.equal(zh.play.groupModel.settings, '默认模型');
   assert.equal(en.play.groupModel.settings, 'Default model');
   assert.equal('priorityHint' in zh.play.groupModel, false);
@@ -64,34 +65,36 @@ test('超过 6 人时主聊天区不铺成员卡，打开后可搜索并整组�
   assert.equal(groupCanAdd(['ada', 'orion'], ['ada', 'orion'], new Set(['ada', 'orion'])), false);
 
   const view = memberDrawer({
-    memberIds: bots.map((bot) => bot.id),
+    memberIds: bots.map((bot) => bot.id).filter((id) => id !== 'orion'),
     bots,
     groups,
     hostId: 'ada',
-    speakingIds: ['orion'],
-    query: '数据库',
-    ungroupedLabel: '未分组'
+    speakingIds: ['ada'],
+    query: '数据库'
   });
   assert.equal(view.host?.id, 'ada');
-  assert.deepEqual(view.speaking.map((member) => member.id), ['orion']);
-  const data = view.sections.find((section) => section.id === 'data');
-  assert.equal(data?.members.some((member) => member.id === 'orion'), true);
-  assert.equal(view.sections.some((section) => section.members.some((member) => member.name === 'Gee')), false);
+  assert.equal(view.host?.removable, false);
+  assert.deepEqual(view.speaking.map((member) => member.id), ['ada']);
+  assert.equal(view.current.some((member) => member.id === 'orion'), false);
+  assert.equal(view.current.some((member) => member.name === 'Gee'), true);
+  assert.deepEqual(view.addBots.map((member) => member.id), ['orion']);
+  assert.equal(view.addGroups.some((group) => group.id === 'data'), false);
   assert.equal(speakingBotIds([{ status: 'running', members: [{ botId: 'orion', status: 'running' }] }])[0], 'orion');
 
-  assert.match(chat, /tileMembersInHeader/);
   assert.match(chat, /data-testid="room-working-members"/);
   assert.doesNotMatch(chat, /data-testid="play-group-members-open"/);
   assert.match(chat, /data-testid="play-group-speaking"/);
   assert.match(chat, /memberEditor=\{false\}/);
   const settingsAt = chat.indexOf('data-testid="room-settings"');
-  const tileAt = chat.indexOf('className="play-group-member"');
-  assert.ok(settingsAt > 0 && tileAt > settingsAt);
+  const drawerAt = chat.indexOf('<RoomMemberDrawer');
+  assert.ok(settingsAt > 0 && drawerAt > settingsAt);
+  assert.doesNotMatch(chat, /className="play-group-member"/);
   assert.match(chat, /memberIds.filter\(id => workStates\[id\] > 0\)/);
+  assert.match(drawer, /className="play-group-member"/);
   assert.match(drawer, /data-testid="play-group-member-search"/);
   assert.match(drawer, /data-testid="play-group-host"/);
   assert.match(drawer, /play-group-add-group-/);
-  assert.match(drawer, /play-group-remove-group-/);
+  assert.doesNotMatch(drawer, /play-group-remove-group-/);
 });
 
 test('输入 @ 只显示群成员，并按职责或头衔找到名字不同的 Bot [AC:bot-room-console#AC-2]', () => {
@@ -160,9 +163,129 @@ test('人数上限仍在原设置里保存，群聊不新占一级导航 [AC:bot
   assert.match(capacity, /\/api\/bot-rooms\/settings/);
   assert.match(capacity, /method: 'PATCH'/);
   assert.match(general, /RoomCapacitySettingsCard/);
-  assert.deepEqual(Object.keys(zh.shell.nav), ['label', 'primary', 'subPages', 'pending', 'collapse', 'expand', 'bot', 'chat', 'agents', 'tasks', 'knowledge', 'ops', 'settings']);
+  assert.deepEqual(Object.keys(zh.shell.nav), ['label', 'primary', 'subPages', 'pending', 'collapse', 'expand', 'bot', 'chat', 'agents', 'tasks', 'knowledge', 'ops', 'settings', 'footMenu']);
   assert.deepEqual(Object.keys(en.shell.nav), Object.keys(zh.shell.nav));
   assert.equal(normalizeFunctionalGroups({ groups: [{ id: 'arch', name: '架构组', botIds: ['ada', 1] }, { name: '坏' }] }).length, 1);
+});
+
+test('已在群里只出现当前成员且群主无移出 [AC:group-member-sections#AC-1]', () => {
+  const view = memberDrawer({
+    memberIds: ['ada', 'orion', 'c', 'g'],
+    bots,
+    groups,
+    hostId: 'ada',
+    speakingIds: [],
+    query: '架构'
+  });
+  assert.deepEqual(view.current.map((member) => member.id), ['ada', 'orion', 'c', 'g']);
+  const host = view.current.find((member) => member.id === 'ada');
+  assert.equal(host?.host, true);
+  assert.equal(host?.removable, false);
+  assert.equal(view.current.filter((member) => member.id !== 'ada').every((member) => member.removable), true);
+  assert.equal(view.current.some((member) => member.id === 'd'), false);
+  assert.equal(JSON.stringify(view).includes('未分组'), false);
+  assert.match(drawer, /data-testid="play-group-current-members"/);
+  assert.doesNotMatch(drawer, /play\.group\.ungrouped|未分组/);
+  const currentBlock = drawer.slice(drawer.indexOf('play-group-current-members'), drawer.indexOf('play-group-add-members'));
+  assert.doesNotMatch(currentBlock, /play-group-add-group-|play-group-member-search|play\.group\.addGroup/);
+  assert.match(drawer, /member\.removable \?/);
+  assert.equal(zh.play.group.currentMembers, '已在群里');
+  assert.notEqual(zh.play.group.currentMembers, en.play.group.currentMembers);
+});
+
+test('添加区才有搜索和加入整组 [AC:group-member-sections#AC-2]', () => {
+  const open = memberDrawer({
+    memberIds: ['ada', 'orion'],
+    bots,
+    groups,
+    hostId: 'ada',
+    speakingIds: [],
+    query: ''
+  });
+  assert.deepEqual(open.addGroups.map((group) => group.id), ['arch']);
+  assert.equal('members' in (open.addGroups[0] ?? {}), false);
+  assert.equal(open.addBots.some((bot) => bot.id === 'c'), false);
+  assert.equal(open.addBots.some((bot) => bot.id === 'd'), true);
+  assert.equal(open.addBots.some((bot) => bot.id === 'ada' || bot.id === 'orion'), false);
+  assert.deepEqual(open.current.map((member) => member.id), ['ada', 'orion']);
+
+  const byDuty = memberDrawer({
+    memberIds: ['ada', 'c', 'd', 'e', 'f', 'g'],
+    bots,
+    groups,
+    hostId: 'ada',
+    speakingIds: [],
+    query: '数据库'
+  });
+  assert.deepEqual(byDuty.addBots.map((bot) => bot.id), ['orion']);
+  assert.equal(byDuty.current.some((member) => member.id === 'g'), true);
+  assert.equal(byDuty.addGroups.length, 0);
+
+  const byTitle = memberDrawer({
+    memberIds: ['ada'],
+    bots,
+    groups,
+    hostId: 'ada',
+    speakingIds: [],
+    query: 'dba'
+  });
+  assert.deepEqual(byTitle.addBots.map((bot) => bot.id), ['orion']);
+
+  const byGroup = memberDrawer({
+    memberIds: ['ada'],
+    bots,
+    groups,
+    hostId: 'ada',
+    speakingIds: [],
+    query: '架构'
+  });
+  assert.deepEqual(byGroup.addGroups.map((group) => group.id), ['arch']);
+  assert.equal(byGroup.addBots.some((bot) => bot.id === 'c'), false);
+  assert.deepEqual(byGroup.current.map((member) => member.id), ['ada']);
+
+  const full = memberDrawer({
+    memberIds: ['ada', 'c', 'orion'],
+    bots,
+    groups,
+    hostId: 'ada',
+    speakingIds: [],
+    query: '架构'
+  });
+  assert.deepEqual(full.addGroups, []);
+
+  const currentAt = drawer.indexOf('data-testid="play-group-current-members"');
+  const addAt = drawer.indexOf('data-testid="play-group-add-members"');
+  const searchAt = drawer.indexOf('data-testid="play-group-member-search"');
+  const groupAt = drawer.indexOf('play-group-add-group-');
+  assert.ok(currentAt >= 0 && addAt > currentAt && searchAt > addAt && groupAt > searchAt);
+  assert.equal(zh.play.group.addMembers, '添加成员');
+  assert.equal(zh.play.group.addGroupRow, '{name} · 加入整组');
+  assert.notEqual(zh.play.group.addMembers, en.play.group.addMembers);
+  assert.notEqual(zh.play.group.addGroupRow, en.play.group.addGroupRow);
+  assert.match(drawer, /play\.group\.addGroupRow/);
+  assert.match(drawer, /play\.group\.membersSearch/);
+});
+
+test('同一职能组不会同时出现加入整组和移出整组 [AC:group-member-sections#AC-3]', () => {
+  const view = memberDrawer({
+    memberIds: ['ada', 'orion', 'e'],
+    bots,
+    groups,
+    hostId: 'ada',
+    speakingIds: [],
+    query: ''
+  });
+  assert.equal(view.addGroups.some((group) => group.id === 'arch'), true);
+  assert.equal(view.addGroups.some((group) => group.id === 'data'), false);
+  for (const group of view.addGroups) {
+    assert.equal('canRemove' in group, false);
+    assert.equal('canAdd' in group, false);
+    assert.equal('members' in group, false);
+  }
+  assert.doesNotMatch(drawer, /play-group-remove-group-|onRemoveGroup|play\.group\.removeGroup/);
+  assert.match(drawer, /play-group-add-group-/);
+  assert.match(drawer, /onAddGroup/);
+  assert.equal(chat.includes('removeFunctionalGroup') || chat.includes('onRemoveGroup'), false);
 });
 
 test('审批策略不是群内处理时，群里不出现批准按钮 [AC:bot-room-console#AC-6]', () => {
