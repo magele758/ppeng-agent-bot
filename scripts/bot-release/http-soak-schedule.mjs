@@ -8,5 +8,8 @@ export function offeredWriteSlots(warmupSeconds,measurementSeconds,everySeconds,
 export function expectedWorkload(configuration){
  const counts={warmup:0,measurement:0,burst:0,hot:0,kinds:{human:0,routine:0,dispatch:0,room:0}};let time=0,index=0,end=(configuration.warmupSeconds+configuration.measurementSeconds)*1000;
  while(time<end){const elapsed=time/1000-configuration.warmupSeconds,burst=elapsed>=configuration.burstEverySeconds&&(elapsed%configuration.burstEverySeconds)<configuration.burstDurationSeconds,phase=elapsed>=0?'measurement':'warmup';counts[phase]++;if(phase==='measurement'){const kind=['human','human','human','human','routine','routine','dispatch','dispatch','room','room'][index%10];counts.kinds[kind]++;if(burst){counts.burst++;if(index%2===0)counts.hot++;}}index++;time+=burst?50:500;}
- return {...counts,readWarmup:configuration.warmupSeconds*40,readMeasurement:configuration.measurementSeconds*40};
+ const readEveryMs=configuration.readEveryMs??25;
+ if(!Number.isInteger(readEveryMs)||readEveryMs<25||1000%readEveryMs!==0)throw new Error('readEveryMs must be an integer divisor of 1000 and at least 25');
+ const readsPerSecond=1000/readEveryMs;
+ return {...counts,readWarmup:configuration.warmupSeconds*readsPerSecond,readMeasurement:configuration.measurementSeconds*readsPerSecond};
 }

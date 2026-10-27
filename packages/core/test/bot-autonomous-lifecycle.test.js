@@ -45,7 +45,7 @@ test('self-heal creates a real durable run with inherited restrictions [AC:bot-a
   assert.equal(f.runtime.goalRuntimeHost().inspectSpecialty(f.store.getSession(f.sid),f.service.get(f.bot.id,goal.id)).status,'running_tests');
 });
 test('cancel stops the real self-heal lifecycle and late completion cannot restart it [AC:bot-autonomous-execution-coverage#AC-7]',async t=>{
-  const f=fixture(t);const {goal,run}=await startHeal(f);
+  const f=fixture(t);const before=f.store.listSessions().map(session=>session.id).sort();const {goal,run}=await startHeal(f);
   f.service.control(f.bot.id,goal.id,'cancel');
   await tickBotGoals(f.runtime.goalRuntimeHost());
   assert.equal(f.runtime.getSelfHealRun(run.id).stopped,true);
@@ -53,7 +53,7 @@ test('cancel stops the real self-heal lifecycle and late completion cannot resta
   f.store.updateSelfHealRun(run.id,{status:'completed'});
   await tickBotGoals(f.runtime.goalRuntimeHost());
   assert.equal(f.service.get(f.bot.id,goal.id).status,'cancelled');
-  assert.equal(f.store.listSessions().length,1);
+  assert.deepEqual(f.store.listSessions().map(session=>session.id).sort(),before);
 });
 test('amending a self-heal goal drains old work before a continuation [AC:bot-autonomous-execution-coverage#AC-5] [AC:bot-autonomous-execution-coverage#AC-7]',async t=>{
   const f=fixture(t);const {goal,run}=await startHeal(f);const runs=[];
