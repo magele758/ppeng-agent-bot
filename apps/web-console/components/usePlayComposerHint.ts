@@ -16,15 +16,18 @@ export function usePlayComposerHint(opts: {
   messages: readonly ComposerHintMessage[];
   draft: string;
   enabled: boolean;
+  providedHint?: string;
 }): string {
-  const { sessionId, messages, draft, enabled } = opts;
+  const { sessionId, messages, draft, enabled, providedHint } = opts;
   const turn = lastCompletedTurn(messages);
   const turnKey = turn && sessionId ? `${sessionId}\n${turn.userText}\n${turn.assistantText}` : '';
   const [hintState, setHintState] = useState<{ key: string; hint: string }>({ key: '', hint: '' });
 
   useEffect(() => {
-    if (!enabled || draft.trim() || !turnKey || !sessionId) {
-      setHintState((current) => (current.hint === '' && current.key === turnKey ? current : { key: turnKey, hint: '' }));
+    if (providedHint !== undefined || !enabled || draft.trim() || !turnKey || !sessionId) {
+      if (providedHint === undefined) {
+        setHintState((current) => (current.hint === '' && current.key === turnKey ? current : { key: turnKey, hint: '' }));
+      }
       return;
     }
     const controller = new AbortController();
@@ -43,8 +46,9 @@ export function usePlayComposerHint(opts: {
       controller.abort();
       cancel();
     };
-  }, [draft, enabled, sessionId, turnKey]);
+  }, [draft, enabled, providedHint, sessionId, turnKey]);
 
+  if (providedHint !== undefined) return draft.trim() ? '' : providedHint;
   if (!enabled || draft.trim()) return '';
   return hintState.key === turnKey ? hintState.hint : '';
 }

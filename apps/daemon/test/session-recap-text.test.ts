@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { readSessionRecapCache } from '../src/session-recap-text.ts';
 import {
   SESSION_RECAP_MAX_CHARS,
   composeSessionRecap,
@@ -129,4 +130,95 @@ test('回顾由模型根据最近几轮写成，失败时不拼用户原话 [AC:
   const route = readFileSync(new URL('../src/routes/session-recap.ts', import.meta.url), 'utf8');
   assert.match(route, /composeSessionRecap/);
   assert.match(route, /foldMessages/);
+});
+
+test('回顾带写下日期，隔日不复用缓存，也不要求存当前时钟 [AC:conversation-date-clock#AC-7]', async () => {
+  const clock = { nowMs: Date.parse('2026-10-26T16:30:00.000Z'), timezone: 'Asia/Shanghai' };
+  const messages: RecapSourceMessage[] = [
+    { id: 'u1', role: 'user', createdAt: '2026-10-20T01:14:00.000Z', parts: [{ type: 'text', text: '今天改了支付' }] },
+    { id: 'a1', role: 'assistant', parts: [{ type: 'text', text: '支付改动已提交' }] }
+  ];
+  let seen = '';
+  const first = await composeSessionRecap({
+    messages,
+    locale: 'zh',
+    clock,
+    completeText: async (request) => {
+      seen = `${request.system}\n${request.user}`;
+      return '10月20日改了支付，还没上线。';
+    }
+  });
+  assert.match(seen, /2026-10-20/);
+  assert.match(seen, /2026-10-27/);
+  assert.equal(seen.includes('[conversation-clock]'), false);
+  assert.equal(first.cache?.asOfDate, '2026-10-27');
+  assert.equal(JSON.stringify(first.cache).includes('[conversation-clock]'), false);
+
+  let calls = 0;
+  const stale = await composeSessionRecap({
+    messages,
+    locale: 'zh',
+    clock,
+    cached: { anchorId: 'a1', locale: 'zh', text: '旧日回顾', asOfDate: '2026-10-20' },
+    completeText: async () => {
+      calls += 1;
+      return '隔日重写';
+    }
+  });
+  assert.equal(calls, 1);
+  assert.equal(stale.text, '隔日重写');
+  assert.equal(stale.cache?.asOfDate, '2026-10-27');
+
+  const sameDay = await composeSessionRecap({
+    messages,
+    locale: 'zh',
+    clock,
+    cached: first.cache,
+    completeText: async () => {
+      calls += 1;
+      return '不该再写';
+    }
+  });
+  assert.equal(calls, 1);
+  assert.equal(sameDay.text, first.text);
+
+  assert.equal(readSessionRecapCache({ sessionRecap: { anchorId: 'a1', locale: 'zh', text: '旧缓存' } }), null);
+});
+
+test('一次模型调用同时给出回顾和下一步，缓存不再打第二次 [AC:recap-next-action#AC-1] [AC:recap-next-action#AC-2]', async () => {
+  const messages: RecapSourceMessage[] = [
+    { id: 'u1', role: 'user', parts: [{ type: 'text', text: '紫藤花蜜怎么保存' }] },
+    { id: 'a1', role: 'assistant', parts: [{ type: 'text', text: '要放在阴凉处' }] }
+  ];
+  let calls = 0;
+  const first = await composeSessionRecap({
+    messages,
+    locale: 'zh',
+    completeText: async () => {
+      calls += 1;
+      return '刚刚说到紫藤花蜜要放阴凉处，瓶身日期还没写\n把紫藤花蜜的开封日期写在瓶身';
+    }
+  });
+  assert.equal(calls, 1);
+  assert.equal(first.text, '刚刚说到紫藤花蜜要放阴凉处，瓶身日期还没写');
+  assert.equal(first.hint, '把紫藤花蜜的开封日期写在瓶身');
+  assert.equal(first.cache?.hint, first.hint);
+  const again = await composeSessionRecap({
+    messages,
+    locale: 'zh',
+    cached: first.cache,
+    completeText: async () => {
+      calls += 1;
+      return '不该再调用';
+    }
+  });
+  assert.equal(calls, 1);
+  assert.equal(again.hint, first.hint);
+  const emptyAction = await composeSessionRecap({
+    messages,
+    locale: 'en',
+    completeText: async () => 'Left the honey in the shade.\n继续'
+  });
+  assert.equal(emptyAction.text, 'Left the honey in the shade.');
+  assert.equal(emptyAction.hint, '');
 });

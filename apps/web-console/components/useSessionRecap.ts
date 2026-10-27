@@ -11,6 +11,7 @@ import {
   resolveLastActivityMs,
   resolveSeenAnchor,
   seenRecordKey,
+  shouldRefreshShownRecap,
   type RecapLocale,
   type RecapMessage
 } from '@/lib/session-recap';
@@ -22,6 +23,7 @@ type FetchedRecap = {
   attempt: number;
   status: 'loading' | 'done' | 'failed';
   text: string;
+  hint: string;
 };
 
 export function useSessionRecap(input: {
@@ -43,6 +45,8 @@ export function useSessionRecap(input: {
   const [attempt, setAttempt] = useState(0);
   const [fetched, setFetched] = useState<FetchedRecap | null>(null);
   const seenRef = useRef<string | null>(null);
+  const manualRef = useRef(false);
+  manualRef.current = manual;
   const prevRef = useRef<{ sessionId: string | null; anchorId: string | null }>({
     sessionId: null,
     anchorId: null
@@ -117,6 +121,14 @@ export function useSessionRecap(input: {
       const at = Date.now();
       window.localStorage.setItem(activityRecordKey(sessionId), JSON.stringify({ anchorId, at }));
       setArmed(false);
+      if (shouldRefreshShownRecap({
+        manual: manualRef.current,
+        dismissed: false,
+        previousAnchor: prev.anchorId,
+        nextAnchor: anchorId
+      })) {
+        setAttempt((n) => n + 1);
+      }
     }
     prevRef.current = { sessionId, anchorId };
     if (!recap || autoEnabled == null || featureActive == null) return;
@@ -225,7 +237,7 @@ export function useSessionRecap(input: {
     const thisAttempt = attempt;
     let cancelled = false;
     const controller = new AbortController();
-    setFetched({ sessionId, anchorId, locale, attempt: thisAttempt, status: 'loading', text: '' });
+    setFetched({ sessionId, anchorId, locale, attempt: thisAttempt, status: 'loading', text: '', hint: '' });
     void (async () => {
       try {
         const data = (await api(`/api/sessions/${sessionId}/recap`, {
@@ -233,17 +245,18 @@ export function useSessionRecap(input: {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ locale }),
           signal: controller.signal
-        })) as { text?: unknown; anchorId?: unknown };
+        })) as { text?: unknown; anchorId?: unknown; hint?: unknown };
         if (cancelled) return;
         const text = typeof data.text === 'string' ? data.text.trim() : '';
         const returnedAnchor = typeof data.anchorId === 'string' ? data.anchorId : '';
+        const hint = typeof data.hint === 'string' ? data.hint.trim() : '';
         if (!text || (returnedAnchor && returnedAnchor !== anchorId)) {
-          setFetched({ sessionId, anchorId, locale, attempt: thisAttempt, status: 'failed', text: '' });
+          setFetched({ sessionId, anchorId, locale, attempt: thisAttempt, status: 'failed', text: '', hint: '' });
           return;
         }
-        setFetched({ sessionId, anchorId, locale, attempt: thisAttempt, status: 'done', text });
+        setFetched({ sessionId, anchorId, locale, attempt: thisAttempt, status: 'done', text, hint });
       } catch {
-        if (!cancelled) setFetched({ sessionId, anchorId, locale, attempt: thisAttempt, status: 'failed', text: '' });
+        if (!cancelled) setFetched({ sessionId, anchorId, locale, attempt: thisAttempt, status: 'failed', text: '', hint: '' });
       }
     })();
     return () => {
@@ -267,10 +280,20 @@ export function useSessionRecap(input: {
       : match?.status === 'failed'
         ? input.failedText
         : input.pendingText;
+  const status: 'hidden' | 'loading' | 'done' | 'failed' = !view.show
+    ? 'hidden'
+    : match?.status === 'done'
+      ? 'done'
+      : match?.status === 'failed'
+        ? 'failed'
+        : 'loading';
 
   return {
     shown: view.show,
     text,
+    status,
+    modelText: status === 'done' ? text : '',
+    hint: status === 'done' ? (match?.hint ?? '') : '',
     canManual: Boolean(featureActive === true && recap && recap.completedTurns >= 1 && !input.generating),
     requestManual: () => {
       setManual(true);

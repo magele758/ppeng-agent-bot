@@ -124,6 +124,36 @@ export function textSummaryFromParts(parts: MessagePart[]): string {
   return lines.join('\n').trim();
 }
 
+/**
+ * Must stay equal to `ABSOLUTE_DATE_SUMMARY_RULE` in
+ * packages/core/src/session/conversation-clock.ts.
+ * agent-loop must not import @ppeng/agent-core.
+ */
+export const ABSOLUTE_DATE_SUMMARY_RULE =
+  'Write every date as an absolute YYYY-MM-DD. Never write today, tomorrow, yesterday, or this week, and never write 今天, 明天, 昨天, 后天, 本周, or 下周. If a source message uses those words, resolve them against that message\'s writtenAt timestamp, not against the moment you are summarizing.';
+
+export function summaryMessagePayload(message: {
+  role: string;
+  parts: MessagePart[];
+  createdAt?: string;
+}): { role: string; text: string; writtenAt?: string } {
+  const row: { role: string; text: string; writtenAt?: string } = {
+    role: message.role,
+    text: textSummaryFromParts(message.parts)
+  };
+  if (typeof message.createdAt === 'string' && message.createdAt.length > 0) {
+    row.writtenAt = message.createdAt;
+  }
+  return row;
+}
+
+export function summarizeContinuationInstruction(json: boolean): string {
+  const base = json
+    ? 'Summarize the conversation state for continuation. Return JSON with a single "summary" string field. Preserve tasks, decisions, risks, and pending work.'
+    : 'Summarize the conversation state for continuation. Preserve tasks, decisions, risks, and pending work.';
+  return `${base} ${ABSOLUTE_DATE_SUMMARY_RULE}`;
+}
+
 /** Last user-authored text part (appendix / working-log is prepended as an earlier part). */
 function lastUserUtterance(messages: SessionMessage[]): string {
   const reversed = [...messages].reverse();
@@ -1343,7 +1373,11 @@ export class HeuristicModelAdapter implements ModelAdapter {
   async summarizeMessages(input: SummaryInput): Promise<string> {
     const recent = input.messages
       .slice(-8)
-      .map((message) => `${message.role}: ${textSummaryFromParts(message.parts)}`);
+      .map((message) => {
+        const row = summaryMessagePayload(message);
+        const stamp = row.writtenAt ? ` writtenAt=${row.writtenAt}` : '';
+        return `${row.role}${stamp}: ${row.text}`;
+      });
     return `Summary for ${input.reason}: ${recent.join(' | ')}`.slice(0, 4000);
   }
 }
@@ -1624,18 +1658,11 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
     const summMessages = [
       {
         role: 'system',
-        content: useJsonFormat
-          ? 'Summarize the conversation state for continuation. Return JSON with a single "summary" string field. Preserve tasks, decisions, risks, and pending work.'
-          : 'Summarize the conversation state for continuation. Preserve tasks, decisions, risks, and pending work.'
+        content: summarizeContinuationInstruction(useJsonFormat)
       },
       {
         role: 'user',
-        content: JSON.stringify(
-          input.messages.map((message) => ({
-            role: message.role,
-            text: textSummaryFromParts(message.parts)
-          }))
-        )
+        content: JSON.stringify(input.messages.map((message) => summaryMessagePayload(message)))
       }
     ];
 
@@ -2114,16 +2141,11 @@ export class AnthropicMessagesAdapter implements ModelAdapter {
       {
         model: this.options.model,
         max_tokens: 1000,
-        system: 'Summarize the conversation state for continuation. Preserve tasks, decisions, risks, and pending work.',
+        system: summarizeContinuationInstruction(false),
         messages: [
           {
             role: 'user',
-            content: JSON.stringify(
-              input.messages.map((message) => ({
-                role: message.role,
-                text: textSummaryFromParts(message.parts)
-              }))
-            )
+            content: JSON.stringify(input.messages.map((message) => summaryMessagePayload(message)))
           }
         ]
       },

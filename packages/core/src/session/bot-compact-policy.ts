@@ -6,6 +6,7 @@
 
 import { toolEvidencePreview } from './tool-evidence-preview.js';
 import { contextSourceNavigation } from './context-sources.js';
+import { ABSOLUTE_DATE_SUMMARY_RULE } from './conversation-clock.js';
 import { CANONICAL_BOT_CHAT_META } from '../bots/types.js';
 import type { SessionMessage } from '../types.js';
 
@@ -77,9 +78,10 @@ export function botCompactInstruction(tier: BotCompactTier, priorSummary?: strin
       return unreachable;
     }
   }
-  if (!prior) return head;
+  const dated = `${head}\n${ABSOLUTE_DATE_SUMMARY_RULE}`;
+  if (!prior) return dated;
   return [
-    head,
+    dated,
     'A summary already exists. Update it incrementally. Do not rewrite the full history from scratch.',
     'Existing summary:',
     prior

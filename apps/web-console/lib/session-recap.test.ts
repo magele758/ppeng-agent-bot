@@ -10,6 +10,7 @@ import {
   recapCommandShouldSend,
   resolveLastActivityMs,
   resolveSeenAnchor,
+  shouldRefreshShownRecap,
   type RecapMessage
 } from './session-recap.ts';
 
@@ -314,4 +315,61 @@ test('关掉整段回顾后不出现，命令会发出去，自动选择还留�
   });
   assert.equal(manualStill.show, true);
   assert.equal(manualStill.text, '刚刚写完签名校验，过期测试还没补。');
+});
+
+test('点过回顾后新的一轮结束会刷新，生成中和收起后不沿用旧句 [AC:session-recap#AC-6]', () => {
+  const before = buildSessionRecap(session());
+  assert.ok(before);
+  const after = buildSessionRecap([
+    ...session(),
+    user('再补过期测试'),
+    ...assistant('过期测试补上了。', 'a6')
+  ]);
+  assert.ok(after);
+  assert.notEqual(after.anchorId, before.anchorId);
+  assert.equal(shouldRefreshShownRecap({
+    manual: true,
+    dismissed: false,
+    previousAnchor: before.anchorId,
+    nextAnchor: after.anchorId
+  }), true);
+  assert.equal(shouldRefreshShownRecap({
+    manual: true,
+    dismissed: false,
+    previousAnchor: before.anchorId,
+    nextAnchor: before.anchorId
+  }), false);
+  assert.equal(shouldRefreshShownRecap({
+    manual: false,
+    dismissed: true,
+    previousAnchor: before.anchorId,
+    nextAnchor: after.anchorId
+  }), false);
+
+  const generating = presentSessionRecap({
+    enabled: true,
+    recap: after,
+    armed: false,
+    manual: true,
+    generating: true,
+    draft: '',
+    seenAnchorId: before.anchorId,
+    line: '刚刚写完签名校验，过期测试还没补。'
+  });
+  assert.equal(generating.show, false);
+  assert.equal(generating.text.includes('过期测试补上了'), false);
+
+  const refreshed = presentSessionRecap({
+    enabled: true,
+    recap: after,
+    armed: false,
+    manual: true,
+    generating: false,
+    draft: '',
+    seenAnchorId: before.anchorId,
+    line: '过期测试补上了。'
+  });
+  assert.equal(refreshed.show, true);
+  assert.equal(refreshed.text, '过期测试补上了。');
+  assert.equal(refreshed.text.includes('签名校验'), false);
 });

@@ -386,3 +386,45 @@ test('调用建议接口不会把建议写成用户消息 [AC:bot-composer-next-
     assert.notEqual(userText && userText.type === 'text' ? userText.text : '', result.body.hint);
   });
 });
+
+test('回顾写成后建议接着回顾里的具体事情，且不写进会话 [AC:recap-next-action#AC-1] [AC:recap-next-action#AC-2] [AC:recap-next-action#AC-3]', async () => {
+  let seen = '';
+  await withRuntime(scriptedAdapter((user) => {
+    seen = user;
+    return user.includes('瓶身日期') ? '把紫藤花蜜的开封日期写在瓶身' : '继续';
+  }), async (runtime) => {
+    const sessionId = seed(runtime, '回顾后续', '我想做紫藤花蜜', '紫藤花蜜要放在阴凉处');
+    const before = runtime.store.listMessages(sessionId).length;
+    const recap = '刚刚说到紫藤花蜜要放阴凉处，瓶身日期还没写';
+    const result = await composerHintHttpResult(runtime, { sessionId, recap });
+    assert.match(seen, /回顾：刚刚说到紫藤花蜜要放阴凉处，瓶身日期还没写/);
+    assert.equal(result.body.hint, '把紫藤花蜜的开封日期写在瓶身');
+    assert.equal(result.body.hint.includes('继续'), false);
+    assert.equal(runtime.store.listMessages(sessionId).length, before);
+    assert.notEqual(runtime.store.listMessages(sessionId).map((message) => message.role).join(','), 'user,assistant,user');
+  });
+});
+
+test('回顾没写成或没有下一步时不插入建议 [AC:recap-next-action#AC-4]', async () => {
+  await withRuntime(scriptedAdapter(() => ''), async (runtime) => {
+    const sessionId = seed(runtime, '没有下一步', '我想做紫藤花蜜', '紫藤花蜜要放在阴凉处');
+    assert.equal((await composerHintHttpResult(runtime, { sessionId, recap: '瓶身日期还没写' })).body.hint, '');
+  });
+  await withRuntime(scriptedAdapter(() => '继续'), async (runtime) => {
+    const sessionId = seed(runtime, '空话', '我想做紫藤花蜜', '紫藤花蜜要放在阴凉处');
+    assert.equal((await composerHintHttpResult(runtime, { sessionId, recap: '瓶身日期还没写' })).body.hint, '');
+  });
+});
+
+test('没有回顾时仍按原对话给出下一步 [AC:recap-next-action#AC-5]', async () => {
+  let seen = '';
+  await withRuntime(scriptedAdapter((user) => {
+    seen = user;
+    return '再核对紫藤花蜜放在阴凉处能不能久放';
+  }), async (runtime) => {
+    const sessionId = seed(runtime, '无回顾', '我想做紫藤花蜜', '紫藤花蜜要放在阴凉处');
+    const hint = (await composerHintHttpResult(runtime, { sessionId })).body.hint;
+    assert.equal(seen.includes('回顾：'), false);
+    assert.match(hint, /紫藤花蜜/);
+  });
+});
