@@ -6,6 +6,8 @@ export const common = {
   theme: 'Theme',
   themeToLight: 'Switch to light mode',
   themeToDark: 'Switch to dark mode',
+  skinToSanctum: 'Switch to Sanctum',
+  skinToClassic: 'Switch back to Classic',
   refresh: 'Refresh',
   save: 'Save',
   close: 'Close',

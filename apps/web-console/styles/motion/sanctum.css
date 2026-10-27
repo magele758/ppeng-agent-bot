@@ -1,0 +1,43 @@
+/* Gold rings clipped to the right edge. They do not cover the transcript. */
+html[data-skin="sanctum"] .lab-shell::before,
+html[data-skin="sanctum"] .lab-shell::after {
+  content: "";
+  position: fixed;
+  top: 20vh;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 1;
+  border: 1px solid rgba(195, 170, 119, 0.4);
+}
+
+html[data-skin="sanctum"] .lab-shell::before {
+  right: -200px;
+  width: min(320px, 36vw);
+  height: min(320px, 36vw);
+  animation: sanctum-orbit 36s linear infinite;
+}
+
+html[data-skin="sanctum"] .lab-shell::after {
+  right: -110px;
+  width: min(200px, 24vw);
+  height: min(200px, 24vw);
+  border-color: rgba(240, 219, 173, 0.35);
+  animation: sanctum-orbit-back 28s linear infinite;
+}
+
+@keyframes sanctum-orbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes sanctum-orbit-back {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-skin="sanctum"] .lab-shell::before,
+  html[data-skin="sanctum"] .lab-shell::after {
+    animation: none;
+  }
+}

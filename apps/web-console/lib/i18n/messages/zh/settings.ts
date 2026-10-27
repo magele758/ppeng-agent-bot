@@ -62,6 +62,18 @@ export const settings = {
     dark: '深色',
     system: '跟随系统'
   },
+  skin: {
+    label: '外观',
+    desc: '可随时切换，不改变深色、浅色或跟随系统。',
+    classic: '经典',
+    sanctum: '圣所',
+    cyberpunk: '赛博朋克',
+    demon: '恶魔的聚会',
+    'robot-stage': '机器人大舞台',
+    pixel: '像素',
+    kindergarten: '童趣幼儿园',
+    minimal: '极简黑白'
+  },
   model: {
     globalDefault: {
       title: '全局默认模型',

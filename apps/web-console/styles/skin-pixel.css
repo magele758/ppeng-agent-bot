@@ -1,0 +1,317 @@
+/* Pixel skin. Black, white, and gray only. Classic tokens stay on :root. */
+html[data-skin="pixel"] {
+  --color-text-primary: #fff;
+  --color-text-secondary: #aaa;
+  --color-text-inverse: #000;
+  --color-surface-base: #000;
+  --color-surface-strong: #111;
+  --color-surface-raised: #fff;
+  --color-border-strong: #fff;
+  --color-danger: #fff;
+  --color-warn: #ccc;
+  --color-ok: #aaa;
+  --bg-void: #000;
+  --bg-deep: #000;
+  --bg-raised: #111;
+  --bg-inset: #000;
+  --border: #fff;
+  --border-strong: #fff;
+  --stroke: #fff;
+  --text: #fff;
+  --muted: #aaa;
+  --muted-2: #aaa;
+  --accent: #fff;
+  --accent-bright: #fff;
+  --accent-glow: transparent;
+  --accent-soft: rgba(255, 255, 255, 0.12);
+  --accent-text: #000;
+  --brand-coral-bright: #fff;
+  --brand-coral-deep: #aaa;
+  --brand-logo-shadow: transparent;
+  --teal: #fff;
+  --teal-soft: rgba(255, 255, 255, 0.12);
+  --violet: #aaa;
+  --warn: #ccc;
+  --danger: #fff;
+  --chat-bg: #000;
+  --chat-surface: #111;
+  --chat-border: #fff;
+  --chat-user-bubble: #fff;
+  --chat-assistant-bg: transparent;
+  --chat-tool-bg: rgba(255, 255, 255, 0.06);
+  --chat-composer-bg: #111;
+  --chat-send: #fff;
+  --chat-send-hover: #ddd;
+  --chat-send-disabled: #888;
+  --ui-bg: #000;
+  --ui-surface: #111;
+  --ui-border: #fff;
+  --ui-text: #fff;
+  --ui-text-muted: #aaa;
+  --ui-accent: #fff;
+  --ui-accent-contrast: #000;
+  --ui-danger: #fff;
+  --ui-warn: #ccc;
+  --ui-ok: #aaa;
+  --ui-focus: 2px solid #fff;
+  --ui-shadow-sm: none;
+  --ui-shadow-md: none;
+  --shadow-card: none;
+  --font-family-stack: "Pixel UI", "PingFang SC", sans-serif;
+  --font-display: "Pixel UI", "PingFang SC", sans-serif;
+  --font-body: ui-monospace, "PingFang SC", monospace;
+  --mono: ui-monospace, "PingFang SC", monospace;
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius-pill: 0;
+  --radius-control: 0;
+  --radius-chat: 0;
+  --radius: 0;
+  --ui-radius-sm: 0;
+  --ui-radius-md: 0;
+  --ui-radius-lg: 0;
+  background: #000;
+  color: #fff;
+  accent-color: #fff;
+  color-scheme: dark;
+  -webkit-font-smoothing: auto;
+}
+
+html[data-skin="pixel"] body {
+  background: #000;
+  color: #fff;
+  font-family: "Pixel UI", "PingFang SC", sans-serif;
+  -webkit-font-smoothing: auto;
+}
+
+html[data-skin="pixel"] :is(*, *::before, *::after) {
+  border-radius: 0;
+}
+
+@font-face {
+  font-family: "Pixel UI";
+  src: url("/fonts/pixel/PressStart2P-Regular.ttf") format("truetype");
+  font-display: swap;
+}
+
+html[data-skin="pixel"] :focus-visible {
+  outline-color: #fff;
+}
+
+html[data-skin="pixel"] .lab-rail {
+  background: #000;
+  color: #fff;
+  border-right: 1px solid #fff;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html[data-skin="pixel"] .lab-rail__link {
+  color: #aaa;
+  background: transparent;
+  border-color: transparent;
+  border-radius: 0;
+}
+
+html[data-skin="pixel"] .lab-rail__link:hover {
+  color: #fff;
+  background: #111;
+  border-color: #fff;
+}
+
+html[data-skin="pixel"] .lab-rail__link[aria-current="page"] {
+  color: #000;
+  background: #fff;
+  border-color: #fff;
+  box-shadow: none;
+}
+
+html[data-skin="pixel"] .lab-rail__link[aria-current="page"] .lab-rail__icon {
+  color: #000;
+}
+
+html[data-skin="pixel"] .lab-main {
+  position: relative;
+  background: #000;
+  color: #fff;
+}
+
+html[data-skin="pixel"] .lab-rail__label,
+html[data-skin="pixel"] .ui-section__title,
+html[data-skin="pixel"] .btn {
+  font-family: "Pixel UI", "PingFang SC", sans-serif;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+html[data-skin="pixel"] :is(input, textarea, .chat-bubble__body, .chat-composer-input) {
+  font-family: "PingFang SC", sans-serif;
+  color: #fff;
+  font-size: var(--reading-size, 14px);
+}
+
+html[data-skin="pixel"] :is(.btn, .btn-primary):hover:not(:disabled):not(.is-loading) {
+  filter: none;
+}
+
+html[data-skin="pixel"] :is(.btn-primary, .chat-send-btn) {
+  background: #fff;
+  color: var(--color-text-inverse);
+  border-color: #fff;
+  border-radius: 0;
+  box-shadow: 2px 2px 0 #888;
+  filter: none;
+}
+
+html[data-skin="pixel"] .btn-primary:hover:not(:disabled):not(.is-loading),
+html[data-skin="pixel"] .chat-send-btn:hover:not(:disabled) {
+  background: #ddd;
+  color: var(--color-text-inverse);
+  filter: none;
+  box-shadow: 2px 2px 0 #fff;
+}
+
+html[data-skin="pixel"] .chat-send-btn:disabled,
+html[data-skin="pixel"] .chat-send-btn.is-loading {
+  background: #888;
+  color: var(--color-text-inverse);
+  box-shadow: none;
+  filter: none;
+}
+
+html[data-skin="pixel"] .chat-send-btn.is-error,
+html[data-skin="pixel"] .chat-send-btn.chat-send-btn--steer {
+  background: #000;
+  color: #fff;
+  border: 1px solid #fff;
+  box-shadow: none;
+  filter: none;
+}
+
+html[data-skin="pixel"] .chat-turn--user .chat-bubble,
+html[data-skin="pixel"] .chat-turn--user .chat-bubble * {
+  color: #000;
+}
+
+html[data-skin="pixel"] .chat-turn--user .chat-bubble {
+  background: #fff;
+  border: 1px solid #fff;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html[data-skin="pixel"] .chat-turn--user .chat-bubble code {
+  background: #eee;
+  color: #000;
+}
+
+html[data-skin="pixel"] .chat-turn__label {
+  color: #aaa;
+  font-family: ui-monospace, "PingFang SC", monospace;
+}
+
+html[data-skin="pixel"] .chat-tool-fold,
+html[data-skin="pixel"] .chat-tool-fold--call,
+html[data-skin="pixel"] .chat-tool-fold--result,
+html[data-skin="pixel"] .chat-tool-fold--result.chat-tool-fold--success,
+html[data-skin="pixel"] .chat-tool-fold--result.chat-tool-fold--error,
+html[data-skin="pixel"] .chat-tool-fold--blocked,
+html[data-skin="pixel"] .chat-tool-fold--compact {
+  background: #111;
+  color: #fff;
+  border-color: #fff;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html[data-skin="pixel"] .chat-tool-fold__pill--subagent,
+html[data-skin="pixel"] .chat-tool-fold__pill--subagent-role,
+html[data-skin="pixel"] .chat-tool-fold__pill--team,
+html[data-skin="pixel"] .chat-tool-fold__pill--call,
+html[data-skin="pixel"] .chat-tool-fold__pill--ok,
+html[data-skin="pixel"] .chat-tool-fold__pill--err,
+html[data-skin="pixel"] .chat-tool-fold__pill--steer,
+html[data-skin="pixel"] .chat-tool-fold__pill--blocked {
+  border-radius: 0;
+  box-shadow: none;
+  filter: none;
+}
+
+html[data-skin="pixel"] .chat-tool-fold__pill--subagent {
+  color: #fff;
+  background: #000;
+  border: 1px solid #fff;
+}
+
+html[data-skin="pixel"] .chat-tool-fold__pill--subagent-role {
+  color: #000;
+  background: #aaa;
+  border: 1px solid #aaa;
+}
+
+html[data-skin="pixel"] .chat-tool-fold__pill--team {
+  color: #000;
+  background: #fff;
+  border: 1px solid #fff;
+}
+
+html[data-skin="pixel"] .chat-tool-fold__pill--call,
+html[data-skin="pixel"] .chat-tool-fold__pill--steer,
+html[data-skin="pixel"] .chat-tool-fold__pill--blocked {
+  color: #fff;
+  background: #111;
+  border: 1px solid #ccc;
+}
+
+html[data-skin="pixel"] .chat-tool-fold__pill--ok {
+  color: #000;
+  background: #ccc;
+  border: 1px solid #ccc;
+}
+
+html[data-skin="pixel"] .chat-tool-fold__pill--err {
+  color: #fff;
+  background: #000;
+  border: 1px solid #fff;
+}
+
+html[data-skin="pixel"] .ui-section__title {
+  color: #fff;
+  font-family: var(--font-display);
+}
+
+html[data-skin="pixel"] .seg-option.is-on {
+  background: #fff;
+  color: var(--color-text-inverse);
+  border-radius: 0;
+}
+
+html[data-skin="pixel"] .list-item:hover {
+  background: #222;
+  color: #fff;
+  border-color: #fff;
+}
+
+html[data-skin="pixel"] .session-chrome__chip.is-ok,
+html[data-skin="pixel"] .session-chrome__chip.is-warn,
+html[data-skin="pixel"] .approval-banner,
+html[data-skin="pixel"] .spawn-blocked,
+html[data-skin="pixel"] :is(.graph-wrap, .graph-wrap--honeycomb, .graph-wrap--mood-low, .graph-wrap--mood-mid, .graph-wrap--mood-hot) {
+  background: #111;
+  color: #fff;
+  border-color: #fff;
+  box-shadow: none;
+}
+
+html[data-skin="pixel"] :is(.graph-wrap, .graph-wrap--mood-low, .graph-wrap--mood-mid, .graph-wrap--mood-hot) {
+  --team-veil-a: rgba(255, 255, 255, 0.08);
+  --team-veil-b: rgba(255, 255, 255, 0.06);
+  --team-veil-c: rgba(255, 255, 255, 0.04);
+  --team-ribbon: rgba(255, 255, 255, 0.1);
+  --team-meteor-1: #fff;
+  --team-meteor-2: #aaa;
+  --team-meteor-3: #666;
+  --team-aurora-1: rgba(255, 255, 255, 0.08);
+  --team-aurora-2: rgba(255, 255, 255, 0.06);
+  --team-aurora-3: rgba(255, 255, 255, 0.04);
+}

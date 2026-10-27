@@ -1,0 +1,31 @@
+html[data-skin="sanctum"] .lab-main {
+  position: relative;
+}
+html[data-skin="sanctum"] .lab-main::before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  width: min(240px, 34vw);
+  height: 150px;
+  pointer-events: none;
+  opacity: 0.28;
+  background: url("/skins/sanctum-geometry.svg") right top / contain no-repeat;
+  z-index: 0;
+}
+html[data-skin="sanctum"] .lab-view,
+html[data-skin="sanctum"] .lab-page {
+  position: relative;
+  z-index: 1;
+}
+html[data-skin="sanctum"] .lab-rail__brand::before {
+  content: "✦";
+  color: #c3aa77;
+  font-family: var(--font-display);
+  font-size: 18px;
+  line-height: 1;
+}
+html[data-skin="sanctum"] .lab-rail__brand {
+  border-bottom: 1px solid rgba(195, 170, 119, 0.28);
+  padding-bottom: 8px;
+}

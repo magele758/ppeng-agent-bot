@@ -1,0 +1,206 @@
+/* Kindergarten: bright paper, dark ink, crayon yellow on controls. */
+html[data-skin="kindergarten"] {
+  --color-text-primary: #2b2a28;
+  --color-text-secondary: #3aa0d8;
+  --color-text-inverse: #2b2a28;
+  --color-surface-base: #fff6e8;
+  --color-surface-strong: #fff;
+  --color-surface-raised: #f5b400;
+  --color-border-strong: #e8d4b5;
+  --color-danger: #d64545;
+  --color-warn: #c46a0a;
+  --color-ok: #3c9a5a;
+  --bg-inset: #f4e4cc;
+  --muted: #6e675f;
+  --accent: #f5b400;
+  --chat-bg: #fff6e8;
+  --chat-surface: #fff;
+  --chat-border: #e8d4b5;
+  --chat-send: #f5b400;
+  --chat-send-hover: #e0a200;
+  --ui-bg: #fff6e8;
+  --ui-surface: #fff;
+  --ui-border: #e8d4b5;
+  --ui-text: #2b2a28;
+  --ui-text-muted: #6e675f;
+  --ui-accent: #f5b400;
+  --ui-accent-contrast: #2b2a28;
+  --ui-focus: 2px solid #3aa0d8;
+  --font-family-stack: "Yuanti SC", "PingFang SC", sans-serif;
+  --font-display: "Yuanti SC", "PingFang SC", sans-serif;
+  --ui-radius-md: 16px;
+  --radius-control: 16px;
+
+  --text: #2b2a28;
+  --muted-2: #6e675f;
+  --bg-void: #fff6e8;
+  --bg-deep: #fff6e8;
+  --bg-raised: #fff;
+  --border: #e8d4b5;
+  --border-strong: #e8d4b5;
+  --stroke: #e8d4b5;
+  --accent-text: #2b2a28;
+  --accent-soft: rgba(245, 180, 0, 0.18);
+  --chat-user-bubble: #fff;
+  --chat-composer-bg: #fff;
+  --chat-send-disabled: rgba(245, 180, 0, 0.4);
+  --ui-danger: #d64545;
+  --ui-warn: #c46a0a;
+  --ui-ok: #3c9a5a;
+  color-scheme: light;
+  background: #fff6e8;
+  color: #2b2a28;
+  font-family: "Yuanti SC", "PingFang SC", sans-serif;
+}
+
+html[data-skin="kindergarten"] body {
+  background: #fff6e8;
+  color: #2b2a28;
+  font-family: var(--font-family-stack);
+}
+
+html[data-skin="kindergarten"] .lab-rail {
+  background: #fff;
+  color: #2b2a28;
+  border-right-color: #e8d4b5;
+}
+
+html[data-skin="kindergarten"] .lab-rail__link {
+  color: #2b2a28;
+  background: transparent;
+  border-color: transparent;
+}
+
+html[data-skin="kindergarten"] .lab-rail__link:hover {
+  color: #2b2a28;
+  background: #fff3cc;
+}
+
+html[data-skin="kindergarten"] .lab-rail__link[aria-current="page"] {
+  background: #f5b400;
+  color: var(--color-text-inverse);
+  border-color: #f5b400;
+}
+
+html[data-skin="kindergarten"] .lab-rail__link[aria-current="page"] .lab-rail__icon {
+  color: var(--color-text-inverse);
+}
+
+html[data-skin="kindergarten"] .lab-main {
+  position: relative;
+  background: #fff6e8;
+  color: #2b2a28;
+}
+
+html[data-skin="kindergarten"] .lab-main::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.38;
+  background:
+    radial-gradient(circle at 7% 12%, #f5b400 0 8px, transparent 9px),
+    radial-gradient(circle at 18% 74%, #3aa0d8 0 6px, transparent 7px),
+    radial-gradient(circle at 91% 16%, #3c9a5a 0 7px, transparent 8px),
+    radial-gradient(circle at 84% 78%, #f5b400 0 5px, transparent 6px),
+    radial-gradient(circle at 62% 8%, #3aa0d8 0 4px, transparent 5px),
+    radial-gradient(circle at 36% 90%, #3c9a5a 0 5px, transparent 6px);
+}
+
+html[data-skin="kindergarten"] .lab-view,
+html[data-skin="kindergarten"] .lab-page {
+  position: relative;
+  z-index: 1;
+}
+
+html[data-skin="kindergarten"] .btn-primary,
+html[data-skin="kindergarten"] .chat-send-btn {
+  background: #f5b400;
+  color: var(--color-text-inverse);
+  border-color: #f5b400;
+}
+
+html[data-skin="kindergarten"] .btn-primary:hover:not(:disabled):not(.is-loading),
+html[data-skin="kindergarten"] .chat-send-btn:hover:not(:disabled) {
+  background: #e0a200;
+  color: var(--color-text-inverse);
+  border-color: #e0a200;
+}
+
+html[data-skin="kindergarten"] .chat-send-btn.chat-send-btn--steer,
+html[data-skin="kindergarten"] .chat-send-btn.chat-send-btn--steer:hover {
+  background: #e07a1f;
+  border-color: #e07a1f;
+  color: var(--color-text-inverse);
+}
+
+html[data-skin="kindergarten"] .chat-turn--user .chat-bubble {
+  background: #fff;
+  color: #2b2a28;
+  border: 1px solid #e8d4b5;
+}
+
+html[data-skin="kindergarten"] .chat-turn__label {
+  color: #6e675f;
+  font-family: var(--font-display);
+}
+
+html[data-skin="kindergarten"] .chat-tool-fold {
+  background: #fff;
+  color: #2b2a28;
+  border-color: #e8d4b5;
+}
+
+html[data-skin="kindergarten"] .chat-tool-fold__pill--subagent {
+  color: #1d6f9c;
+  background: color-mix(in srgb, #3aa0d8 16%, #fff);
+  border-color: #3aa0d8;
+}
+
+html[data-skin="kindergarten"] .chat-tool-fold__pill--subagent-role {
+  color: #6b4c9a;
+  background: color-mix(in srgb, #6b4c9a 12%, #fff);
+  border-color: #cbb6e4;
+}
+
+html[data-skin="kindergarten"] .chat-tool-fold__pill--team {
+  color: #2d7a46;
+  background: color-mix(in srgb, #3c9a5a 14%, #fff);
+  border-color: #3c9a5a;
+}
+
+html[data-skin="kindergarten"] .ui-section__title {
+  color: #2b2a28;
+  font-family: var(--font-display);
+}
+
+html[data-skin="kindergarten"] .seg-option.is-on {
+  background: #f5b400;
+  color: var(--color-text-inverse);
+}
+
+html[data-skin="kindergarten"] .list-item:hover {
+  background: #fff3cc;
+  color: #2b2a28;
+  border-color: transparent;
+}
+
+html[data-skin="kindergarten"] :is(
+  .a2ui-badge--ok,
+  .a2ui-badge--running,
+  .meta-quiet--run,
+  .chat-tool-fold__pill--ok,
+  .tab.active .tab-icon,
+  .ev-wt-branch,
+  .ev-branch-cell,
+  .ev-badge--success,
+  .ev-count-chip--success,
+  .ev-merged
+) {
+  color: #2b2a28;
+}
+
+html[data-skin="kindergarten"] .chat-tool-fold--error .chat-tool-fold__body {
+  color: #2b2a28;
+}

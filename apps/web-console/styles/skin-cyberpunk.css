@@ -1,0 +1,233 @@
+/* Cyberpunk skin. Original near-black / acid-yellow palette. No marks, no characters. */
+
+html[data-skin="cyberpunk"] {
+  --color-text-primary: #e8ebf2;
+  --color-text-secondary: #00f0ff;
+  --color-text-inverse: #07080c;
+  --color-surface-base: #07080c;
+  --color-surface-strong: #12141c;
+  --color-surface-raised: #fcee0a;
+  --color-border-strong: #32384a;
+  --color-danger: #ff2a6d;
+  --color-warn: #ff9a2e;
+  --color-ok: #3dff9a;
+  --bg-inset: #05060a;
+  --muted: #a3abba;
+  --accent: #fcee0a;
+  --chat-bg: #07080c;
+  --chat-surface: #12141c;
+  --chat-border: #32384a;
+  --chat-send: #fcee0a;
+  --chat-send-hover: #fff34d;
+  --ui-bg: #07080c;
+  --ui-surface: #12141c;
+  --ui-border: #32384a;
+  --ui-text: #e8ebf2;
+  --ui-text-muted: #a3abba;
+  --ui-accent: #fcee0a;
+  --ui-accent-contrast: #07080c;
+  --ui-focus: 2px solid #00f0ff;
+  --font-family-stack: ui-monospace, "PingFang SC", sans-serif;
+  --font-display: ui-monospace, "PingFang SC", sans-serif;
+  --text: #e8ebf2;
+  --muted-2: #a3abba;
+  --bg-void: #07080c;
+  --bg-deep: #07080c;
+  --bg-raised: #12141c;
+  --border: #32384a;
+  --border-strong: #32384a;
+  --accent-bright: #fff34d;
+  --accent-soft: rgba(252, 238, 10, 0.14);
+  --accent-text: #07080c;
+  --chat-user-bubble: #12141c;
+  --chat-tool-bg: rgba(252, 238, 10, 0.06);
+  --chat-composer-bg: #12141c;
+  --chat-send-disabled: rgba(252, 238, 10, 0.35);
+  --ui-danger: #ff2a6d;
+  --ui-warn: #ff9a2e;
+  --ui-ok: #3dff9a;
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius-control: 0;
+  --radius-pill: 0;
+  --radius: 0;
+  --radius-chat: 0;
+  --ui-radius-sm: 0;
+  --ui-radius-md: 0;
+  --ui-radius-lg: 0;
+  background: #07080c;
+  color: #e8ebf2;
+  font-family: ui-monospace, "PingFang SC", sans-serif;
+}
+
+html[data-skin="cyberpunk"] body {
+  background: #07080c;
+  color: #e8ebf2;
+  font-family: ui-monospace, "PingFang SC", sans-serif;
+}
+
+html[data-skin="cyberpunk"] :focus-visible {
+  outline-color: #00f0ff;
+}
+
+html[data-skin="cyberpunk"] .lab-rail {
+  background: #12141c;
+  color: #e8ebf2;
+  border-right-color: #32384a;
+  border-radius: 0;
+}
+
+html[data-skin="cyberpunk"] .lab-rail__link {
+  color: #a3abba;
+  background: transparent;
+  border-color: transparent;
+  border-radius: 0;
+}
+
+html[data-skin="cyberpunk"] .lab-rail__link:hover {
+  color: #e8ebf2;
+  background: #1b1f2c;
+  border-color: transparent;
+}
+
+html[data-skin="cyberpunk"] .lab-rail__link[aria-current="page"] {
+  color: var(--color-text-inverse);
+  background: #fcee0a;
+  border-color: #fcee0a;
+  border-radius: 0;
+}
+
+html[data-skin="cyberpunk"] .lab-rail__link[aria-current="page"] .lab-rail__icon {
+  color: var(--color-text-inverse);
+}
+
+html[data-skin="cyberpunk"] .lab-main {
+  position: relative;
+  background: #07080c;
+  color: #e8ebf2;
+}
+
+html[data-skin="cyberpunk"] .lab-main::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.12;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(252, 238, 10, 0.4) 0,
+    rgba(252, 238, 10, 0.4) 1px,
+    transparent 1px,
+    transparent 4px
+  );
+}
+
+html[data-skin="cyberpunk"] .btn-primary {
+  background: #fcee0a;
+  color: var(--color-text-inverse);
+  border-color: #fcee0a;
+  border-radius: 0;
+}
+
+html[data-skin="cyberpunk"] .btn-primary:hover:not(:disabled):not(.is-loading) {
+  background: #fff34d;
+  color: var(--color-text-inverse);
+  filter: none;
+}
+
+html[data-skin="cyberpunk"] .chat-send-btn {
+  background: #fcee0a;
+  color: var(--color-text-inverse);
+  border-radius: 0;
+}
+
+html[data-skin="cyberpunk"] .chat-send-btn:hover:not(:disabled) {
+  background: #fff34d;
+  color: var(--color-text-inverse);
+}
+
+html[data-skin="cyberpunk"] .chat-send-btn.is-error {
+  background: #ff2a6d;
+  color: var(--color-text-inverse);
+}
+
+html[data-skin="cyberpunk"] .chat-turn--user .chat-bubble {
+  background: #12141c;
+  color: #e8ebf2;
+  border: 1px solid #fcee0a;
+  border-radius: 0;
+}
+
+html[data-skin="cyberpunk"] .chat-turn__label {
+  color: #fcee0a;
+  font-family: ui-monospace, "PingFang SC", sans-serif;
+}
+
+html[data-skin="cyberpunk"] .chat-tool-fold {
+  background: #12141c;
+  color: #e8ebf2;
+  border-color: #32384a;
+  border-radius: 0;
+}
+
+html[data-skin="cyberpunk"] .chat-tool-fold--call,
+html[data-skin="cyberpunk"] .chat-tool-fold--result,
+html[data-skin="cyberpunk"] .chat-tool-fold--result.chat-tool-fold--success,
+html[data-skin="cyberpunk"] .chat-tool-fold--result.chat-tool-fold--error,
+html[data-skin="cyberpunk"] .chat-tool-fold--blocked,
+html[data-skin="cyberpunk"] .chat-tool-fold--compact {
+  background: #12141c;
+  border-radius: 0;
+}
+
+html[data-skin="cyberpunk"] .chat-tool-fold--result.chat-tool-fold--success {
+  border-color: #3dff9a;
+}
+
+html[data-skin="cyberpunk"] .chat-tool-fold--result.chat-tool-fold--error {
+  border-color: #ff2a6d;
+}
+
+html[data-skin="cyberpunk"] .chat-tool-fold__pill--subagent {
+  color: #fcee0a;
+  background: rgba(252, 238, 10, 0.12);
+  border-color: rgba(252, 238, 10, 0.45);
+  border-radius: 0;
+}
+
+html[data-skin="cyberpunk"] .chat-tool-fold__pill--subagent-role {
+  color: #ff9a2e;
+  background: rgba(255, 154, 46, 0.12);
+  border-color: rgba(255, 154, 46, 0.45);
+  border-radius: 0;
+}
+
+html[data-skin="cyberpunk"] .chat-tool-fold__pill--team {
+  color: #3dff9a;
+  background: rgba(61, 255, 154, 0.1);
+  border-color: rgba(61, 255, 154, 0.4);
+  border-radius: 0;
+}
+
+html[data-skin="cyberpunk"] .ui-section__title {
+  color: #fcee0a;
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+}
+
+html[data-skin="cyberpunk"] .seg-option,
+html[data-skin="cyberpunk"] .seg-group {
+  border-radius: 0;
+}
+
+html[data-skin="cyberpunk"] .seg-option.is-on {
+  background: #fcee0a;
+  color: var(--color-text-inverse);
+  border-radius: 0;
+}
+
+html[data-skin="cyberpunk"] .list-item:hover {
+  background: #1b1f2c;
+  border-color: transparent;
+}
