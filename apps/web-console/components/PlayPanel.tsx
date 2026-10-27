@@ -24,6 +24,8 @@ import { nextMenuIndex } from '@/lib/entry-navigation';
 import { formatHash } from '@/lib/nav';
 import { useI18n, type MessageKey } from '@/lib/i18n';
 import { PlayTranscript } from './PlayTranscript';
+import { SessionBriefToggle } from './SessionBriefToggle';
+import { readSessionBrief, SESSION_BRIEF_CHANGED_EVENT } from '@/lib/session-brief';
 import type { usePlayChat } from './usePlayChat';
 import { ActivityPanel } from './ActivityPanel';
 import { ArtifactRail } from './ArtifactRail';
@@ -296,6 +298,13 @@ export function PlayPanel({
   const [attachOpen, setAttachOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [sessionBrief, setSessionBrief] = useState(true);
+  useEffect(() => {
+    const sync = () => setSessionBrief(readSessionBrief());
+    sync();
+    window.addEventListener(SESSION_BRIEF_CHANGED_EVENT, sync);
+    return () => window.removeEventListener(SESSION_BRIEF_CHANGED_EVENT, sync);
+  }, []);
   const moreMenuRef = useRef<HTMLDivElement>(null);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [createKind, setCreateKind] = useState<'bot' | 'room' | null>(null);
@@ -1194,6 +1203,7 @@ export function PlayPanel({
                   </button>
                   {moreMenuOpen ? (
                     <div className="more-menu__pop" role="menu">
+                      <SessionBriefToggle compact />
                       <label
                         className="toggle toggle--compact more-menu__item"
                         title={t('play.chrome.modelViewTitle')}
@@ -1254,6 +1264,7 @@ export function PlayPanel({
                     setOpenGroupId(null);
                     onSelectSession(sessionId);
                   }}
+                  sessionBrief={sessionBrief}
                 />
                 {chat.showJumpToLatest ? (
                   <button

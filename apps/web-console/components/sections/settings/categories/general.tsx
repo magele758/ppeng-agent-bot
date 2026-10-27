@@ -1,6 +1,7 @@
 import { FontSizeSettingsCard } from '../../../FontSizeSettingsCard';
 import { LanguageSettingsCard } from '../../../LanguageSettingsCard';
 import { RoomCapacitySettingsCard } from '../../../RoomCapacitySettingsCard';
+import { SessionBriefSettingsCard } from '../../../SessionBriefSettingsCard';
 import { ThemeSettingsCard } from '../../../ThemeSettingsCard';
 import type { SettingsEntry } from '../registry';
 
@@ -19,6 +20,13 @@ export const generalEntries: SettingsEntry[] = [
     titleKey: 'settings.entries.theme.title',
     keywordsKey: 'settings.entries.theme.keywords',
     render: () => <ThemeSettingsCard />
+  },
+  {
+    id: 'session-brief',
+    category: 'general',
+    titleKey: 'settings.entries.sessionBrief.title',
+    keywordsKey: 'settings.entries.sessionBrief.keywords',
+    render: () => <SessionBriefSettingsCard />
   },
   {
     id: 'room-capacity',

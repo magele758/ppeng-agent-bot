@@ -15,6 +15,8 @@ import {
   msgPartsToText,
   normalizedRole
 } from '@/lib/chat-utils';
+import { briefStreamSegments, visibleBriefParts } from '@/lib/session-brief';
+import { SessionBriefDisclosure } from './SessionBriefDisclosure';
 import { parseCronUserPrompt } from '@/lib/cron';
 import { presentGoalUpdate, readMessageSessionId } from '@/lib/goal-update-notice';
 import { A2uiSurface } from './a2ui/A2uiSurface';
@@ -456,7 +458,8 @@ export function ChatTurnFromMessage({
   resolvedCallIds,
   quoteBot = null,
   onQuote,
-  replyNames
+  replyNames,
+  brief = false
 }: {
   m: ChatMessage;
   sessionId?: string;
@@ -467,36 +470,38 @@ export function ChatTurnFromMessage({
   quoteBot?: { id: string; name: string } | null;
   onQuote?: (quote: ReplyQuote) => void;
   replyNames?: Readonly<Record<string, string>>;
+  brief?: boolean;
 }) {
   const { t } = useI18n();
+  const shown = brief ? { ...m, parts: visibleBriefParts(m.parts) } : m;
   const r = normalizedRole(m);
   const storedReply = r === 'user' ? readStoredReplyTo(m) : null;
   /** 与流式行一致：助手侧（含「调用工具」等结构化气泡）统一不占左侧头像列 */
   const noAvatar = r === 'tool' || r === 'system' || r === 'assistant';
   const presented =
     r === 'system'
-      ? presentGoalUpdate(msgPartsToText(m.parts), {
+      ? presentGoalUpdate(msgPartsToText(shown.parts), {
           messageSessionId: readMessageSessionId(m as { sessionId?: unknown }),
           conversationId: sessionId
         })
       : { kind: 'absent' as const };
   if (presented.kind === 'hidden') return null;
   if (
-    messageHasStructuredParts(m.parts) &&
+    messageHasStructuredParts(shown.parts) &&
     resolvedCallIds &&
-    !hasVisibleStructuredParts(m.parts, resolvedCallIds)
+    !hasVisibleStructuredParts(shown.parts, resolvedCallIds)
   ) {
     return null;
   }
   const goalCard = presented.kind === 'card' && !modelView;
   const bubble =
-    (r === 'system' && !modelView && !messageHasStructuredParts(m.parts) ? (
-      <SystemMessageContent text={msgPartsToText(m.parts)} scope={{ messageSessionId: readMessageSessionId(m as { sessionId?: unknown }), conversationId: sessionId }} />
+    (r === 'system' && !modelView && !messageHasStructuredParts(shown.parts) ? (
+      <SystemMessageContent text={msgPartsToText(shown.parts)} scope={{ messageSessionId: readMessageSessionId(m as { sessionId?: unknown }), conversationId: sessionId }} />
     ) : null) ??
-    (messageHasStructuredParts(m.parts) && m.parts ? (
+    (messageHasStructuredParts(shown.parts) && shown.parts ? (
       <div className="chat-bubble--stream-blocks">
         <StructuredBubble
-          parts={m.parts}
+          parts={shown.parts}
           role={r}
           sessionId={sessionId}
           msgIndex={msgIndex}
@@ -506,9 +511,9 @@ export function ChatTurnFromMessage({
         />
       </div>
     ) : r === 'tool' || r === 'system' ? (
-      <pre className="chat-bubble__pre">{msgPartsToText(m.parts)}</pre>
+      <pre className="chat-bubble__pre">{msgPartsToText(shown.parts)}</pre>
     ) : (
-      <ReadableMessage text={msgPartsToText(m.parts)} role={r} messageKey={(m as { key?: string }).key} />
+      <ReadableMessage text={msgPartsToText(shown.parts)} role={r} messageKey={(m as { key?: string }).key} />
     ));
   const artifactBubble = r === 'tool' || r === 'system';
   const isSteerMessage =
@@ -516,9 +521,9 @@ export function ChatTurnFromMessage({
     ((m as { key?: unknown }).key === 'steer' ||
       (typeof (m as { key?: unknown }).key === 'string' &&
         ((m as { key?: string }).key!.includes('steer') || (m as { key?: string }).key!.includes('note'))));
-  const cronPrompt = r === 'user' ? parseCronUserPrompt(msgPartsToText(m.parts)) : null;
+  const cronPrompt = r === 'user' ? parseCronUserPrompt(msgPartsToText(shown.parts)) : null;
   const cronBubble =
-    cronPrompt && !(messageHasStructuredParts(m.parts) && m.parts) ? (
+    cronPrompt && !(messageHasStructuredParts(shown.parts) && shown.parts) ? (
       <MarkdownHtml className="chat-bubble__body chat-bubble__md" text={cronPrompt.body || cronPrompt.name} />
     ) : bubble;
   return (
@@ -534,7 +539,7 @@ export function ChatTurnFromMessage({
                 messageId: replyMessageId(m),
                 botId: quoteBot.id,
                 botName: quoteBot.name,
-                text: replySourceText(m.parts),
+                text: replySourceText(shown.parts),
                 author: r === 'assistant' ? 'bot' : 'user'
               }}
               onQuote={onQuote}
@@ -621,15 +626,50 @@ export function ChatTurnStreaming({
   retry,
   typing,
   sessionId = '',
-  resolvedCallIds
+  resolvedCallIds,
+  brief = false
 }: {
   segments: StreamSegment[];
   retry?: RetryProgress;
   typing?: boolean;
   sessionId?: string;
   resolvedCallIds?: ReadonlySet<string>;
+  brief?: boolean;
 }) {
   const { t } = useI18n();
+  const shown = brief ? briefStreamSegments(segments) : { segments, hidden: [] as StreamSegment[] };
+  const renderSeg = (seg: StreamSegment) => {
+    if (seg.kind === 'reasoning') {
+      return <ReasoningFold key={seg.id} text={seg.text} streaming />;
+    }
+    if (seg.kind === 'tool') {
+      if (resolvedCallIds?.has(seg.toolCallId)) return null;
+      const args = formatStreamToolArgs(seg.args);
+      return (
+        <details key={seg.id} className="chat-tool-fold chat-tool-fold--call chat-tool-fold--compact">
+          <summary className="chat-tool-fold__summary">
+            <span className="chat-tool-fold__pill chat-tool-fold__pill--call">{t('play.call')}</span>
+            <span className="chat-tool-fold__name">{seg.name || 'unknown'}</span>
+            {args && args !== '…' ? <span className="chat-tool-fold__preview">{args.replace(/\s+/g, ' ')}</span> : null}
+          </summary>
+          <ToolIoBlocks input={args} />
+        </details>
+      );
+    }
+    if (seg.kind === 'a2ui') {
+      const map = foldA2uiMessages(seg.envelopes as A2uiMessage[]);
+      const state: SurfaceState | undefined = map.get(seg.surfaceId);
+      if (!state) return null;
+      return <A2uiSurface key={seg.id} state={state} sessionId={sessionId} />;
+    }
+    return (
+      <StaticHtml
+        key={seg.id}
+        className="chat-bubble__body chat-bubble__md chat-stream-fold__text"
+        html={seg.html}
+      />
+    );
+  };
   return (
     <div
       className={`chat-turn chat-turn--streaming chat-turn--no-avatar${typing ? ' chat-turn--typing' : ''}`}
@@ -638,41 +678,15 @@ export function ChatTurnStreaming({
         <div className="chat-turn__label">{t('play.role.streaming')}</div>
         <div className="chat-bubble chat-bubble--stream-blocks">
           {retry ? <ModelRetryStatus progress={retry} /> : null}
-          {segments.length === 0 ? (
-            <div className="chat-stream-placeholder muted">…</div>
+          {shown.hidden.length > 0 ? (
+            <SessionBriefDisclosure label={t('play.turns.processNote', { count: shown.hidden.length })} title={t('play.turns.processNoteTitle')}>
+              {shown.hidden.map(renderSeg)}
+            </SessionBriefDisclosure>
+          ) : null}
+          {shown.segments.length === 0 ? (
+            shown.hidden.length > 0 ? null : <div className="chat-stream-placeholder muted">…</div>
           ) : (
-            segments.map((seg) => {
-              if (seg.kind === 'reasoning') {
-                return <ReasoningFold key={seg.id} text={seg.text} streaming />;
-              }
-              if (seg.kind === 'tool') {
-                if (resolvedCallIds?.has(seg.toolCallId)) return null;
-                const args = formatStreamToolArgs(seg.args);
-                return (
-                  <details key={seg.id} className="chat-tool-fold chat-tool-fold--call chat-tool-fold--compact">
-                    <summary className="chat-tool-fold__summary">
-                      <span className="chat-tool-fold__pill chat-tool-fold__pill--call">{t('play.call')}</span>
-                      <span className="chat-tool-fold__name">{seg.name || 'unknown'}</span>
-                      {args && args !== '…' ? <span className="chat-tool-fold__preview">{args.replace(/\s+/g, ' ')}</span> : null}
-                    </summary>
-                    <ToolIoBlocks input={args} />
-                  </details>
-                );
-              }
-              if (seg.kind === 'a2ui') {
-                const map = foldA2uiMessages(seg.envelopes as A2uiMessage[]);
-                const state: SurfaceState | undefined = map.get(seg.surfaceId);
-                if (!state) return null;
-                return <A2uiSurface key={seg.id} state={state} sessionId={sessionId} />;
-              }
-              return (
-                <StaticHtml
-                  key={seg.id}
-                  className="chat-bubble__body chat-bubble__md chat-stream-fold__text"
-                  html={seg.html}
-                />
-              );
-            })
+            shown.segments.map(renderSeg)
           )}
         </div>
       </div>
