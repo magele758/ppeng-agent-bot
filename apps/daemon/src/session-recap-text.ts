@@ -8,7 +8,7 @@ import {
   formatWrittenAt,
   resolveConversationTimezone,
   zonedClock
-} from '../../../packages/core/src/session/conversation-clock.ts';
+} from '@ppeng/agent-core/session';
 
 export { resolveConversationTimezone };
 
@@ -94,6 +94,7 @@ export function buildRecapRequest(
 ): { system: string; user: string; anchorId: string } | null {
   const turns = completedTurns(messages);
   const latest = turns[turns.length - 1];
+  if (!latest) return null;
   const zone = {
     nowMs: clock?.nowMs ?? Date.now(),
     timezone: clock?.timezone || resolveConversationTimezone(undefined)
