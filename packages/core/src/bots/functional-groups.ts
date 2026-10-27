@@ -5,7 +5,7 @@ import type { SessionRecord } from '../types.js';
 import { sharedExposureKey, sharedExposureState } from './shared-context-isolation.js';
 import { botDefinitionOwner, botPrincipalKey, principalFromSession, resolveBotPrincipal, sameBotPrincipal, type BotPrincipal } from './bot-identity.js';
 
-export interface BotFunctionalGroup { id: string; name: string; botIds: string[] }
+export interface BotFunctionalGroup { id: string; name: string; botIds: string[]; roomIds: string[] }
 export interface BotSharedScope { scope: 'global' | 'group' | 'room'; id?: string }
 
 /** User-owned organization and explicit shared facts. Never copies private history or memory. */
@@ -16,6 +16,8 @@ export class BotFunctionalGroupService {
       CREATE TABLE IF NOT EXISTS bot_functional_members(principal_id TEXT NOT NULL,bot_id TEXT NOT NULL,group_id TEXT NOT NULL,PRIMARY KEY(principal_id,bot_id));
       CREATE INDEX IF NOT EXISTS bot_functional_members_group ON bot_functional_members(group_id);
       CREATE TABLE IF NOT EXISTS bot_shared_context(principal_id TEXT NOT NULL,scope TEXT NOT NULL,scope_id TEXT NOT NULL,entries TEXT NOT NULL,PRIMARY KEY(principal_id,scope,scope_id));
+      CREATE TABLE IF NOT EXISTS bot_functional_room_members(principal_id TEXT NOT NULL,room_id TEXT NOT NULL,group_id TEXT NOT NULL,PRIMARY KEY(principal_id,room_id));
+      CREATE INDEX IF NOT EXISTS bot_functional_room_members_group ON bot_functional_room_members(group_id);
     `);
   }
 
@@ -33,7 +35,7 @@ export class BotFunctionalGroupService {
   }
   list(principal: BotPrincipal): BotFunctionalGroup[] {
     const rows = this.store.db.prepare('SELECT id,name FROM bot_functional_groups WHERE principal_id=? ORDER BY created_at,id').all(botPrincipalKey(principal)) as {id:string;name:string}[];
-    return rows.map(row => ({...row,botIds: this.store.db.prepare('SELECT bot_id FROM bot_functional_members WHERE group_id=? AND principal_id=? ORDER BY bot_id').all(row.id,botPrincipalKey(principal)).map(item => String(item.bot_id))}));
+    return rows.map(row => ({...row,botIds: this.store.db.prepare('SELECT bot_id FROM bot_functional_members WHERE group_id=? AND principal_id=? ORDER BY bot_id').all(row.id,botPrincipalKey(principal)).map(item => String(item.bot_id)),roomIds: this.roomIdsFor(principal,row.id)}));
   }
   get(principal: BotPrincipal, id: string): BotFunctionalGroup {
     const group = this.list(principal).find(item => item.id === id);
@@ -58,6 +60,7 @@ export class BotFunctionalGroupService {
     try {
       for(const botId of group.botIds)this.revokeExposure(principal,botId,id);
       this.store.db.prepare('DELETE FROM bot_functional_members WHERE group_id=? AND principal_id=?').run(id,botPrincipalKey(principal));
+      this.store.db.prepare('DELETE FROM bot_functional_room_members WHERE group_id=? AND principal_id=?').run(id,botPrincipalKey(principal));
       this.store.db.prepare("DELETE FROM bot_shared_context WHERE principal_id=? AND scope='group' AND scope_id=?").run(botPrincipalKey(principal),id);
       this.store.db.prepare('DELETE FROM bot_functional_groups WHERE id=? AND principal_id=?').run(id,botPrincipalKey(principal));
       this.store.db.exec('COMMIT');
@@ -77,6 +80,30 @@ export class BotFunctionalGroupService {
     if (groupId === null) this.store.db.prepare('DELETE FROM bot_functional_members WHERE principal_id=? AND bot_id=?').run(botPrincipalKey(principal),botId);
     else this.store.db.prepare('INSERT INTO bot_functional_members VALUES(?,?,?) ON CONFLICT(principal_id,bot_id) DO UPDATE SET group_id=excluded.group_id').run(botPrincipalKey(principal),botId,groupId);
     this.store.setDaemonControl('bot.functionalGroups.updatedAt', nowIso());
+  }
+  groupIdForRoom(principal: BotPrincipal, roomId: string): string | null {
+    const row=this.store.db.prepare('SELECT m.group_id FROM bot_functional_room_members m JOIN bot_functional_groups g ON g.id=m.group_id AND g.principal_id=m.principal_id WHERE m.principal_id=? AND m.room_id=?').get(botPrincipalKey(principal),roomId);
+    return row ? String(row.group_id) : null;
+  }
+  /** Sidebar placement only. Does not change room members, replies, or shared-fact priority. */
+  moveRoom(principal: BotPrincipal, roomId: string, groupId: string | null): void {
+    this.checkRoom(principal, roomId);
+    if (groupId !== null) this.get(principal, groupId);
+    const previous=this.groupIdForRoom(principal, roomId);
+    if (previous===groupId) return;
+    const key=botPrincipalKey(principal);
+    if (groupId === null) this.store.db.prepare('DELETE FROM bot_functional_room_members WHERE principal_id=? AND room_id=?').run(key, roomId);
+    else this.store.db.prepare('INSERT INTO bot_functional_room_members VALUES(?,?,?) ON CONFLICT(principal_id,room_id) DO UPDATE SET group_id=excluded.group_id').run(key, roomId, groupId);
+    this.store.setDaemonControl('bot.functionalGroups.updatedAt', nowIso());
+  }
+  private roomIdsFor(principal: BotPrincipal, groupId: string): string[] {
+    return this.store.db.prepare('SELECT room_id FROM bot_functional_room_members WHERE group_id=? AND principal_id=? ORDER BY room_id').all(groupId, botPrincipalKey(principal)).map(item => String(item.room_id));
+  }
+  private checkRoom(principal: BotPrincipal, roomId: string): void {
+    if (!roomId) throw new NotFoundError('Room', roomId);
+    const exists=this.store.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='bot_rooms'").get();
+    const row=exists ? this.store.db.prepare('SELECT principal_id FROM bot_rooms WHERE id=?').get(roomId) as { principal_id?: string } | undefined : undefined;
+    if (!row || row.principal_id !== botPrincipalKey(principal)) throw new NotFoundError('Room', roomId);
   }
   private revokeExposure(principal: BotPrincipal,botId: string,groupId: string): void {
     for(const session of this.store.listSessions()) {

@@ -26,6 +26,7 @@ import { useI18n, type MessageKey } from '@/lib/i18n';
 import { PlayTranscript } from './PlayTranscript';
 import { SessionBriefToggle } from './SessionBriefToggle';
 import { readSessionBrief, SESSION_BRIEF_CHANGED_EVENT } from '@/lib/session-brief';
+import { readPlaySidebarCollapsed, writePlaySidebarCollapsed } from '@/lib/play-sidebar-collapsed';
 import type { usePlayChat } from './usePlayChat';
 import { ActivityPanel } from './ActivityPanel';
 import { ArtifactRail } from './ArtifactRail';
@@ -61,7 +62,7 @@ import { composerClassName, composerSendDisabled } from '@/lib/composer-context'
 import { ComposerModelPicker } from './ComposerModelPicker';
 import { SessionSettingsPanel, type ExecPreset } from './sections/chat/SessionSettingsPanel';
 import { PlayBotGroupChat } from './play-group/PlayBotGroupChat';
-import { PlayBotGroupList } from './play-group/PlayBotGroupList';
+import { PlayBotGroupList, type SidebarRoom } from './play-group/PlayBotGroupList';
 import { SessionListRow } from './SessionListRow';
 import { BotGoals } from './bot-work/BotGoals';
 import { BotWorkSummary } from './bot-work/BotWorkSummary';
@@ -267,6 +268,33 @@ function sessionGroupDisplay(
   }
 }
 
+function PlaySidebarToggleIcon({ collapsed }: { collapsed: boolean }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {collapsed ? <path d="m9 6 6 6-6 6" /> : <path d="m15 6-6 6 6 6" />}
+    </svg>
+  );
+}
+
+function PlaySidebarToggle({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
+  const { t } = useI18n();
+  const label = t(collapsed ? 'play.sidebar.expand' : 'play.sidebar.collapse');
+  return (
+    <button
+      type="button"
+      className="play-sidebar-toggle"
+      data-testid="play-sidebar-toggle"
+      aria-expanded={!collapsed}
+      aria-controls="mobile-session-list"
+      aria-label={label}
+      title={label}
+      onClick={onToggle}
+    >
+      <PlaySidebarToggleIcon collapsed={collapsed} />
+    </button>
+  );
+}
+
 export function PlayPanel({
   active,
   sessions,
@@ -318,6 +346,7 @@ export function PlayPanel({
   const [deleting, setDeleting] = useState(false);
   const [openGroupId, setOpenGroupId] = useState<string | null>(null);
   const [groupCount, setGroupCount] = useState(0);
+  const [sidebarRooms, setSidebarRooms] = useState<SidebarRoom[]>([]);
   const botQuestions = useBotSessionQuestions({
     sessions,
     bots,
@@ -345,6 +374,18 @@ export function PlayPanel({
   const configPanelRef = useRef<HTMLDivElement>(null);
   const prevSteerCountRef = useRef(0);
   const [railCollapsed, setRailCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  useEffect(() => {
+    setSidebarCollapsed(readPlaySidebarCollapsed());
+  }, []);
+  const togglePlaySidebar = () => {
+    setSidebarCollapsed((current) => {
+      const next = !current;
+      writePlaySidebarCollapsed(next);
+      return next;
+    });
+    setMobileSessionsOpen(false);
+  };
   useLayoutEffect(() => {
     const feed = chat.playMessagesRef.current;
     if (!feed || chat.feedScrollIntentRef.current?.kind !== 'viewport') return;
@@ -953,8 +994,8 @@ export function PlayPanel({
           {t(mobileSessionsOpen ? 'mobile.back' : 'mobile.sessions')}
         </button>
       </div>
-      <div className={`play-layout play-layout--rail${railCollapsed ? ' is-rail-collapsed' : ''}${mobileSessionsOpen ? ' mobile-sessions-open' : ''}`}>
-        <aside className="play-sidebar" id="mobile-session-list">
+      <div className={`play-layout play-layout--rail${railCollapsed ? ' is-rail-collapsed' : ''}${sidebarCollapsed && !mobileSessionsOpen ? ' is-sidebar-collapsed' : ''}${mobileSessionsOpen ? ' mobile-sessions-open' : ''}`}>
+        <aside className="play-sidebar" id="mobile-session-list" hidden={sidebarCollapsed && !mobileSessionsOpen}>
           <div className="play-sidebar__head" data-testid="session-toolbar" role="toolbar" aria-label={t('polish.toolbar')}>
             <div className="create-menu" ref={createMenuRef} onMouseEnter={openCreateMenu} onMouseLeave={scheduleCreateMenuClose} onKeyDown={(event) => {
               if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
@@ -988,6 +1029,7 @@ export function PlayPanel({
               ) : null}
             </div>
             <button type="button" className="btn btn-ghost" aria-label={t('play.sidebar.filterSessions')} title={t('play.sidebar.filterSessions')} aria-expanded={filterOpen} onClick={() => setFilterOpen(value => !value)}><WorkspaceIcon kind="search" /></button>
+            <div className="play-sidebar__end">
           {onDeleteSessions && sessions.length ? (
             <div
               className={`play-sidebar__batch${selectMode ? ' is-selecting' : ''}`}
@@ -1039,6 +1081,8 @@ export function PlayPanel({
               )}
             </div>
           ) : null}
+              {sidebarCollapsed ? null : <PlaySidebarToggle collapsed={false} onToggle={togglePlaySidebar} />}
+            </div>
           </div>
           {botRemoveError ? <p role="alert" className="play-group-error">{botRemoveError}</p> : null}
           <div className="play-sidebar__tools" hidden={!filterOpen && !sessionFilter}>
@@ -1064,12 +1108,16 @@ export function PlayPanel({
                 active={botSurface}
                 bots={botRoster}
                 sessions={sessions}
+                rooms={sidebarRooms}
+                selectedRoomId={openGroupId}
                 renderSession={renderSession}
                 onOpenSession={(sessionId) => {
                   setOpenGroupId(null);
                   setMobileSessionsOpen(false);
                   onSelectSession(sessionId);
                 }}
+                onOpenRoom={(id) => { setOpenGroupId(id); setMobileSessionsOpen(false); }}
+                onRoomDeleted={(id) => setOpenGroupId((current) => current === id ? null : current)}
               />
             {botSurface ? (
               <PlayBotGroupList
@@ -1078,11 +1126,21 @@ export function PlayPanel({
                 filter={sessionFilter}
                 onOpen={(id) => { setOpenGroupId(id); setMobileSessionsOpen(false); }}
                 onCount={setGroupCount}
+                onRooms={setSidebarRooms}
                 onDeleted={(id) => setOpenGroupId((current) => current === id ? null : current)}
               />
             ) : null}
             {botSurface ? (
-              <BotFunctionalGroups bots={botRoster} sessions={sessions} renderSession={renderSession} createRequest={functionalCreate} />
+              <BotFunctionalGroups
+                bots={botRoster}
+                sessions={sessions}
+                rooms={sidebarRooms}
+                selectedRoomId={openGroupId}
+                renderSession={renderSession}
+                createRequest={functionalCreate}
+                onOpenRoom={(id) => { setOpenGroupId(id); setMobileSessionsOpen(false); }}
+                onRoomDeleted={(id) => setOpenGroupId((current) => current === id ? null : current)}
+              />
             ) : !sessions.length ? (
               <div className="empty-hint">{botSurface ? t('play.sidebar.noBots') : t('play.sidebar.noSessions')}</div>
             ) : sessions.length ? (
@@ -1104,6 +1162,7 @@ export function PlayPanel({
             <header className={`chat-panel-header${headerBotName ? ' chat-panel-header--bot' : ''}${mobileBotBarOpen ? ' is-mobile-open' : ''}`}>
               <div className="chat-panel-header__text">
                 <div className="chat-panel-header__title-row">
+                  {sidebarCollapsed ? <PlaySidebarToggle collapsed onToggle={togglePlaySidebar} /> : null}
                   {headerBotName ? (
                     <BotFace
                       name={headerBotName}

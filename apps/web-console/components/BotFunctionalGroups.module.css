@@ -11,6 +11,8 @@
 .empty { padding: 8px 12px 12px; font-size: var(--ui-text-xs); color: var(--ui-text-muted); }
 .draggable { position: relative; }
 .draggable[draggable=true] { cursor: grab; }
+.insertBefore { box-shadow: inset 0 2px 0 var(--accent, #587b62); }
+.insertAfter { box-shadow: inset 0 -2px 0 var(--accent, #587b62); }
 .editor { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px; }
 .editor label { width: 100%; font-size: 12px; }
 .editor input { display: block; width: 100%; box-sizing: border-box; margin-top: 5px; }

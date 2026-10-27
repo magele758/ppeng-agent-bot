@@ -1,0 +1,30 @@
+id: play-sidebar-collapse
+title: 对话页会话列表可收起
+status: implemented
+requirement: |
+  用户指着对话页左侧的会话/Bot 列表（aside#mobile-session-list.play-sidebar，在 PlayPanel 里），说这个列表也要能收起。附图是现在展开的 220px 侧栏：置顶、功能分组、Bot 和群聊。
+
+  要做成：
+  - 有一个明显的收起/展开控制。收起后列表不再占对话旁边的宽度，对话区变宽；再点可以展开。不要把最左侧的图标轨（lab-rail）和这个列表混为一谈。
+  - 收起状态记在本机界面偏好里（localStorage 即可，和语言偏好一样），刷新还在。不要新增 RAW_AGENT_*，也不必进 daemon。
+  - 文案走 i18n，zh 与 en 同一套 key。按钮要有可访问名称。
+  - 收起时不要丢掉当前会话，展开后列表和选中项还在。置顶、分组、拖拽取消置顶的行为不要改。
+notes: |
+  assumedApproval: standing-order-2026-10-22
+criteria:
+  - id: AC-1
+    given: 对话页左侧的会话列表在对话旁边展开
+    when: 用户点收起控制
+    then: 会话列表收起，这个控制有可访问名称，能说明现在是收起还是展开
+  - id: AC-2
+    given: 会话列表已经收起
+    when: 查看对话页
+    then: 列表不再占对话旁边的宽度，对话区变宽；最左侧图标轨还在，不受这次收起影响
+  - id: AC-3
+    given: 会话列表已收起，并且当前有选中的会话
+    when: 用户再点展开
+    then: 列表回到对话旁边，刚才的选中项还在
+  - id: AC-4
+    given: 用户把会话列表收起或展开
+    when: 刷新页面
+    then: 还是刚才的收起或展开状态

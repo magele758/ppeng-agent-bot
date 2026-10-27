@@ -331,6 +331,7 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
     ['PATCH /api/bot-functional-groups/:id', selfFiltered('bot-functional-group')],
     ['DELETE /api/bot-functional-groups/:id', selfFiltered('bot-functional-group')],
     ['PUT /api/bots/:id/functional-group', selfFiltered('bot-functional-group')],
+    ['PUT /api/bot-rooms/:id/functional-group', selfFiltered('bot-functional-group')],
     ['GET /api/bot-shared-context', selfFiltered('bot-shared-context')],
     ['PUT /api/bot-shared-context', selfFiltered('bot-shared-context')],
     ['POST /api/bots', selfFiltered('bot')],

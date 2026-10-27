@@ -24,6 +24,13 @@ export function botFunctionalGroupRoutes(runtime: RawAgentRuntime): RouteSpec[] 
     service.move(owner,id,input.groupId as string|null);
     json(ctx.response,200,{bot:{...runtime.getBot(id),functionalGroupId:service.groupIdForBot(owner,id)}});
   }},
+  {method:'PUT',pattern:'/api/bot-rooms/:id/functional-group',handler:async ctx=>{
+    const input=await body(ctx);
+    if(input.groupId!==null&&typeof input.groupId!=='string')throw new ValidationError('groupId must be a group id or null');
+    const id=ctx.requireParam('id'),owner=principal(ctx);
+    service.moveRoom(owner,id,input.groupId as string|null);
+    json(ctx.response,200,{roomId:id,groupId:service.groupIdForRoom(owner,id)});
+  }},
   {method:'GET',pattern:'/api/bot-shared-context',handler:ctx=>json(ctx.response,200,{entries:service.getShared(principal(ctx),target(ctx))})},
   {method:'PUT',pattern:'/api/bot-shared-context',handler:async ctx=>{const input=await body(ctx);json(ctx.response,200,{entries:service.setShared(principal(ctx),target(ctx),input.entries)});}}
  ];
