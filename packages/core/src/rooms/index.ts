@@ -515,10 +515,12 @@ export class BotRoomService {
     const bot=this.store.getBot(botId)!;
     const prior=this.store.listSessions().find(candidate=>candidate.metadata?.canonicalBotChat===true&&candidate.metadata?.botId===botId&&sameBotPrincipal(room.principal,principalFromSession(this.store,candidate)))??this.store.getSession(bot.canonicalSessionId);
     const metadata={...session.metadata};
-    for(const key of ['permissionMode','maxTurns','allowedTools','allowedSkills','modelOverride']) {
+    for(const key of ['permissionMode','allowedTools','allowedSkills','modelOverride']) {
       if(prior?.metadata?.[key]!==undefined)metadata[key]=prior.metadata[key];
       else delete metadata[key];
     }
+    // Absent maxTurns is the unlimited default. Refresh must keep that 0, not drop it.
+    metadata.maxTurns=prior?.metadata?.maxTurns??BOT_DEFAULT_MAX_TURNS;
     if(typeof prior?.metadata?.timezone==='string')metadata.timezone=prior.metadata.timezone;
     return this.store.updateSession(session.id,{metadata});
   }
