@@ -195,6 +195,60 @@ test('被拒绝的插话离开对话流并回到输入框 [AC:bot-steer-visible#
   assert.equal(kept.composer, null);
 });
 
+test('回答过程中已经落库的用户消息不再多画一条 [AC:chat-tail-kept#AC-5]', () => {
+  const asked = '查一下他们的会话列表，看看今天都干了什么帮我总结一下';
+  const history = [
+    { id: 'old-user', role: 'user', text: '上一问' },
+    { id: 'old-assistant', role: 'assistant', text: '上一答' },
+    { id: 'new-user', role: 'user', text: asked },
+  ];
+  const screen = screenLiveTurn({
+    selectedSessionId: 'session-a',
+    loadedSessionId: 'session-a',
+    messages: history,
+    liveSessionId: 'session-a',
+    optimisticUser: asked,
+    hasStream: true,
+    waitTyping: false,
+    playSending: true,
+  });
+  assert.equal(screen.optimisticUser, null);
+  assert.equal(screen.hasStream, true);
+  assert.deepEqual(screen.messages.map((message) => message.id), ['old-user', 'old-assistant', 'new-user']);
+  const slots = buildFeedSlots({
+    messages: screen.messages.map((message) => ({ id: message.id })),
+    turns: [],
+    approvalIndexes: [],
+    optimistic: Boolean(screen.optimisticUser),
+    stream: screen.hasStream,
+    streamApproval: false,
+    typing: false,
+    trail: false,
+  });
+  assert.equal(slots.filter((slot) => slot.kind === 'optimistic').length, 0);
+  assert.equal(slots.filter((slot) => slot.key === 'm:new-user').length, 1);
+});
+
+test('新消息还没落库时只先显示一条，更早的对话还在 [AC:chat-tail-kept#AC-5]', () => {
+  const asked = '查一下他们的会话列表，看看今天都干了什么帮我总结一下';
+  const history = [
+    { id: 'old-user', role: 'user', text: '上一问' },
+    { id: 'old-assistant', role: 'assistant', text: '上一答' },
+  ];
+  const screen = screenLiveTurn({
+    selectedSessionId: 'session-a',
+    loadedSessionId: 'session-a',
+    messages: history,
+    liveSessionId: 'session-a',
+    optimisticUser: asked,
+    hasStream: true,
+    waitTyping: false,
+    playSending: true,
+  });
+  assert.equal(screen.optimisticUser, asked);
+  assert.deepEqual(screen.messages.map((message) => message.text), ['上一问', '上一答']);
+});
+
 test('留在当前会话时继续显示这场进行中的回合 [AC:bot-switch-live-turn#AC-3]', () => {
   const historyA = [{ id: 'a-user', role: 'user', text: 'A 的问题' }];
   const screen = screenLiveTurn({

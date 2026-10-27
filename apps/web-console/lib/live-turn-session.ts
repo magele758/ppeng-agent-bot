@@ -1,3 +1,5 @@
+import { optimisticUserLanded } from './history-window.ts';
+
 /** Live composer turn that has not been bound to a saved session yet. */
 export const UNBOUND_LIVE_TURN = '*unbound-live-turn*';
 
@@ -84,10 +86,11 @@ export function screenLiveTurn<T extends readonly unknown[]>(input: {
     && input.pendingSteerSessionId != null
     && input.pendingSteerSessionId === input.selectedSessionId
     && Boolean(input.optimisticUser);
+  const landed = input.steerLanded === true || optimisticUserLanded(input.messages, input.optimisticUser);
   return {
     messages: bound ? input.messages : [],
     bound,
-    optimisticUser: input.steerLanded ? null : (show || holdSteer ? input.optimisticUser : null),
+    optimisticUser: landed ? null : (show || holdSteer ? input.optimisticUser : null),
     hasStream: show && input.hasStream,
     waitTyping: show && input.waitTyping,
     playSending: show && input.playSending,

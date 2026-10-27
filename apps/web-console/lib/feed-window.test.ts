@@ -206,6 +206,32 @@ test('loaded rows stay windowed and the tail stays mounted while following the b
   assert.deepEqual(split.pinned.map((slot) => slot.kind), ['stream']);
 });
 
+test('回答过程中刷新短窗口仍留下更早的会话 [AC:chat-tail-kept#AC-5]', () => {
+  const asked = '查一下他们的会话列表，看看今天都干了什么帮我总结一下';
+  const earlier = [
+    { id: 'u0', seq: 10, role: 'user', parts: [{ type: 'text', text: '上一问' }] },
+    { id: 'a0', seq: 11, role: 'assistant', parts: [{ type: 'text', text: '上一答已经写好了' }] }
+  ];
+  const incoming = [
+    { id: 'p1', seq: 40, role: 'tool', parts: [{ type: 'tool_result', text: '' }] },
+    { id: 'u1', seq: 41, role: 'user', parts: [{ type: 'text', text: asked }] }
+  ];
+  const planned = nextTranscriptWindow({
+    sameSession: true,
+    previous: earlier,
+    incoming,
+    hasMore: true,
+    nextCursor: 40,
+    previousCursor: 10,
+    stick: true,
+    anchor: { top: 0, height: 100 }
+  });
+  assert.equal(planned.cursor, 10);
+  assert.match(JSON.stringify(planned.messages), /上一问/);
+  assert.match(JSON.stringify(planned.messages), /上一答已经写好了/);
+  assert.equal(planned.messages.filter((message) => JSON.stringify(message).includes(asked)).length, 1);
+});
+
 test('scroll intent keeps an anchor row and a short page can auto-load [AC:play-feed-window#AC-2] [AC:play-feed-window#AC-5]', () => {
   const anchor = { top: 12, height: 400, key: 'm:1', offset: 20 };
   const el = {
