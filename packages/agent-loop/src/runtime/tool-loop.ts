@@ -659,21 +659,18 @@ function cancelledBySteer(context: RunContext): boolean {
   return context.abortSignal?.aborted === true && context.abortSignal.reason?.code === 'TOOL_CANCELLED_BY_STEER';
 }
 
-async function executeScopedTool(
+function refuseBeforeDispatch(
   host: ToolLoopHost,
   tools: ToolContract<Record<string, unknown>>[],
   toolCall: ToolCallPart,
-  context: RunContext,
   allowExternalAiTools: boolean,
-  sessionId: string,
-  completed: CompletedWaveItem[] | undefined,
-  approvalFor: (key: string) => ApprovalRecord | undefined
-): Promise<ToolLoopResult> {
+  sessionId: string
+): { tool: ToolContract<Record<string, unknown>> } | { refused: ToolLoopResult } {
   const tool = findToolByName(tools, toolCall.name);
   if (!tool) {
     const available = tools.map((t) => t.name);
     const content = buildUnknownToolResultContent(toolCall.name, available);
-    return {
+    return { refused: {
       toolCallId: toolCall.toolCallId,
       name: toolCall.name,
       ok: false,
@@ -685,13 +682,13 @@ async function executeScopedTool(
         `No tool definition matches name ${toolCall.name}.`,
         { title: 'Unknown tool', status: 404 }
       ),
-    };
+    } };
   }
 
   if (host.gateDirtyInput !== false) {
     const gated = gateDirtyToolInput(toolCall.input);
     if (!gated.ok) {
-      return {
+      return { refused: {
         toolCallId: toolCall.toolCallId,
         name: tool.name,
         ok: false,
@@ -700,12 +697,12 @@ async function executeScopedTool(
           title: 'Invalid tool arguments',
           status: 400,
         }),
-      };
+      } };
     }
   }
 
   if (tool.isExternal && !allowExternalAiTools) {
-    return {
+    return { refused: {
       toolCallId: toolCall.toolCallId,
       name: tool.name,
       ok: false,
@@ -718,11 +715,27 @@ async function executeScopedTool(
         `Tool ${tool.name} is not enabled for this session.`,
         { title: 'Tool not available in session', status: 403 }
       ),
-    };
+    } };
   }
 
   const pinFailure = checkToolCapabilityPin(host, tool, toolCall, sessionId);
-  if (pinFailure) return pinFailure;
+  if (pinFailure) return { refused: pinFailure };
+  return { tool };
+}
+
+async function executeScopedTool(
+  host: ToolLoopHost,
+  tools: ToolContract<Record<string, unknown>>[],
+  toolCall: ToolCallPart,
+  context: RunContext,
+  allowExternalAiTools: boolean,
+  sessionId: string,
+  completed: CompletedWaveItem[] | undefined,
+  approvalFor: (key: string) => ApprovalRecord | undefined
+): Promise<ToolLoopResult> {
+  const admitted = refuseBeforeDispatch(host, tools, toolCall, allowExternalAiTools, sessionId);
+  if ('refused' in admitted) return admitted.refused;
+  const { tool } = admitted;
 
   host.emitTrace(sessionId, { kind: 'tool_start', payload: { name: tool.name } });
 
@@ -827,28 +840,43 @@ async function executeScopedTool(
       metadata: result.metadata,
     };
   } catch (error) {
-    if (completed) {
-      completed.push({ tool, toolCallId: toolCall.toolCallId, args: (execInput ?? {}) as Record<string, unknown>, snapshot, context });
-    }
-    const detail = error instanceof Error ? error.message : String(error);
-    const content = scrubToolContent(host, cancelledBySteer(context) ? `Tool cancelled by user interjection. Partial effects may remain; do not retry unless requested. ${detail}` : detail);
-    exportSpan(false);
-    if (host.runLifecycleHook) {
-      await host.runLifecycleHook({ phase: 'post_tool_use', tool: tool.name, sessionId, input: execInput, ok: false, content });
-    }
-    return {
-      toolCallId: toolCall.toolCallId,
-      name: tool.name,
-      ok: false,
-      content,
-      isExternal: tool.isExternal,
-      metadata: cancelledBySteer(context) ? { cancelledBySteer: true } : undefined,
-      problem: toolInfraProblem(tool.name, toolCall.toolCallId, cancelledBySteer(context) ? 'TOOL_CANCELLED_BY_STEER' : 'TOOL_UNHANDLED_EXCEPTION', content, {
-        title: 'Tool raised an exception',
-        status: 500,
-      }),
-    };
+    return toolExceptionResult(host, tool, toolCall, context, sessionId, execInput, snapshot, completed, exportSpan, error);
   }
+}
+
+async function toolExceptionResult(
+  host: ToolLoopHost,
+  tool: ToolContract<Record<string, unknown>>,
+  toolCall: ToolCallPart,
+  context: RunContext,
+  sessionId: string,
+  execInput: unknown,
+  snapshot: unknown,
+  completed: CompletedWaveItem[] | undefined,
+  exportSpan: (ok: boolean) => void,
+  error: unknown
+): Promise<ToolLoopResult> {
+  if (completed) {
+    completed.push({ tool, toolCallId: toolCall.toolCallId, args: (execInput ?? {}) as Record<string, unknown>, snapshot, context });
+  }
+  const detail = error instanceof Error ? error.message : String(error);
+  const content = scrubToolContent(host, cancelledBySteer(context) ? `Tool cancelled by user interjection. Partial effects may remain; do not retry unless requested. ${detail}` : detail);
+  exportSpan(false);
+  if (host.runLifecycleHook) {
+    await host.runLifecycleHook({ phase: 'post_tool_use', tool: tool.name, sessionId, input: execInput, ok: false, content });
+  }
+  return {
+    toolCallId: toolCall.toolCallId,
+    name: tool.name,
+    ok: false,
+    content,
+    isExternal: tool.isExternal,
+    metadata: cancelledBySteer(context) ? { cancelledBySteer: true } : undefined,
+    problem: toolInfraProblem(tool.name, toolCall.toolCallId, cancelledBySteer(context) ? 'TOOL_CANCELLED_BY_STEER' : 'TOOL_UNHANDLED_EXCEPTION', content, {
+      title: 'Tool raised an exception',
+      status: 500,
+    }),
+  };
 }
 
 function resultCountsAsWaveFailure(result: ToolLoopResult): boolean {
