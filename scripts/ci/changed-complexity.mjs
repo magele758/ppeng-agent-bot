@@ -50,8 +50,17 @@ function sourcePaths(root, base) {
   return names.filter((name) => SOURCE.test(name) && !name.includes('/dist/') && !name.includes('/node_modules/') && !name.endsWith('.d.ts'));
 }
 
+/** First parent of a merge commit is the base that was actually merged. */
+export function comparisonBase(root, env = process.env) {
+  try {
+    const parents = git(root, ['rev-list', '--parents', '-n', '1', 'HEAD']).split(/\s+/).slice(1);
+    if (parents.length >= 2) return parents[0];
+  } catch { /* A normal commit uses the event base. */ }
+  return baseRevision(root, env);
+}
+
 export function overComplexChanges(root, env = process.env, limit = COMPLEXITY_LIMIT) {
-  const base = baseRevision(root, env);
+  const base = comparisonBase(root, env);
   if (!base) return [];
   const found = [];
   for (const file of sourcePaths(root, base)) {
