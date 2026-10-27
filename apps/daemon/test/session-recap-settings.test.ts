@@ -8,7 +8,8 @@ import {
   recapFeatureEnabled,
   writeSessionRecapSettings,
   type SessionRecapSettingsStore
-} from '../src/session-recap-settings.ts';
+ } from '../src/session-recap-settings.ts';
+import { sessionRecapRoutes } from '../dist/routes/session-recap.js';
 
 function memoryStore(): SessionRecapSettingsStore & { values: Map<string, unknown> } {
   const values = new Map<string, unknown>();
@@ -78,3 +79,29 @@ test('整段回顾默认开着，关掉后不写回顾，自动选择还在 [AC:
   assert.ok(guard > 0 && compose > guard);
   assert.match(route, /active must be a boolean/);
 });
+
+test('设置接口能关掉自动回顾和整段回顾，非法值被拒绝 [AC:session-recap#AC-4] [AC:session-recap#AC-5]', async () => {
+   const store = memoryStore();
+   const routes = sessionRecapRoutes({ store } as never);
+   const get = routes.find((route) => route.method === 'GET' && route.pattern === '/api/session-recap/settings')!;
+   const patch = routes.find((route) => route.method === 'PATCH' && route.pattern === '/api/session-recap/settings')!;
+   let body: { settings: { active: boolean; enabled: boolean }; effective: { source: string } };
+   const response = { setHeader() {}, end(text: string) { body = JSON.parse(text); } };
+   await get.handler({ response } as never);
+   assert.equal(body!.effective.source, 'default');
+   assert.equal(body!.settings.enabled, true);
+   assert.equal(body!.settings.active, true);
+   await patch.handler({ response, readBody: async () => ({ enabled: false }) } as never);
+   assert.equal(body!.settings.enabled, false);
+   assert.equal(body!.settings.active, true);
+   assert.equal(body!.effective.source, 'ui');
+   assert.equal(readSessionRecapSettings(store).enabled, false);
+   await patch.handler({ response, readBody: async () => ({ active: false }) } as never);
+   assert.equal(body!.settings.active, false);
+   assert.equal(body!.settings.enabled, false);
+   await assert.rejects(() => patch.handler({ response, readBody: async () => ({ active: 'no' }) } as never), /active must be a boolean/);
+   await assert.rejects(() => patch.handler({ response, readBody: async () => ({ enabled: 1 }) } as never), /enabled must be a boolean/);
+   await patch.handler({ response, readBody: async () => null } as never);
+   assert.equal(readSessionRecapSettings(store).active, false);
+   assert.equal(body!.settings.active, false);
+ });

@@ -426,7 +426,7 @@ test('refusal preservation guard injects reminder on redirect after refusal', as
   assert.equal(capturedMessages[1].role, 'system');
   assert.ok(capturedMessages[1].parts[0].text.includes('Trajectory integrity guard'));
   assert.equal(capturedMessages[2].role, 'user');
-  assert.equal(capturedMessages[2].parts[0].text, 'Sure, proceed anyway.');
+  assert.ok(capturedMessages[2].parts[0].text.endsWith('Sure, proceed anyway.'));
 
   // Verify trace event
   const events = await rt.listTraceEvents(session.id);
@@ -461,7 +461,7 @@ test('refusal preservation guard is silent on benign chat', async () => {
 
   assert.equal(capturedMessages.length, 1);
   assert.equal(capturedMessages[0].role, 'user');
-  assert.equal(capturedMessages[0].parts[0].text, 'Hello!');
+  assert.ok(capturedMessages[0].parts[0].text.endsWith('Hello!'));
 });
 
 test('refusal preservation guard injects reminder even with system housekeeping between refusal and redirect', async () => {

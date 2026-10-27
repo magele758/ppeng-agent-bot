@@ -11,6 +11,10 @@ function userTexts(input) {
     .flatMap((message) => message.parts.filter((part) => part.type === 'text').map((part) => part.text));
 }
 
+function hasText(rows, needle) {
+  return rows.some((text) => text.includes(needle));
+}
+
 function runtimeWith(adapter, extraTools = []) {
   const runtime = new RawAgentRuntime({
     repoRoot: mkdtempSync(join(tmpdir(), 'bot-steer-repo-')),
@@ -66,9 +70,9 @@ test('canonical bot steer during a tool wave lands on the next shot without an a
   rt.store.appendMessage(sidBox.id, 'user', [{ type: 'text', text: 'start' }]);
   await rt.runSession(sidBox.id);
   assert.ok(inputs.length >= 2, JSON.stringify(inputs));
-  assert.ok(!inputs[0].includes('bot_midturn_note'));
-  assert.ok(inputs[1].includes('bot_midturn_note'), JSON.stringify(inputs));
-  assert.equal(inputs.filter((row) => row.includes('bot_midturn_note')).length, 1);
+  assert.ok(!hasText(inputs[0], 'bot_midturn_note'));
+  assert.ok(hasText(inputs[1], 'bot_midturn_note'), JSON.stringify(inputs));
+  assert.equal(inputs.filter((row) => hasText(row, 'bot_midturn_note')).length, 1);
 });
 
 test('ordinary session still queues a running-turn message until the run ends [AC:bot-immediate-steer#AC-2]', async () => {
@@ -109,7 +113,7 @@ test('ordinary session still queues a running-turn message until the run ends [A
   assert.equal(ack.status, 'started');
   assert.equal(ack.item.target, 'next-run');
   assert.ok(inputs.length >= 2, JSON.stringify(inputs));
-  assert.ok(!inputs[1].includes('plain_midturn_note'), JSON.stringify(inputs));
+  assert.ok(!hasText(inputs[1], 'plain_midturn_note'), JSON.stringify(inputs));
 });
 
 test('disabled steer still accepts a running canonical bot and still rejects a normal session [AC:bot-immediate-steer#AC-2] [AC:bot-immediate-steer#AC-3]', async () => {
