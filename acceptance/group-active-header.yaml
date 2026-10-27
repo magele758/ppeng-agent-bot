@@ -3,7 +3,10 @@ title: 群聊顶部仅显示工作中的成员
 status: implemented
 requirement: |
   这里还是太重了，添加、移除和成员列表放到群聊设置里，顶部只显示正在working的bot的icon和小名称即可
-notes: 'assumedApproval: standing-order-2026-10-22；成员管理与共享信息迁入群聊设置；更新此前的成员展示位置标准。'
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  成员管理与共享信息迁入群聊设置；更新此前的成员展示位置标准。
+  2026-10-27 更新 AC-3：设置内不再按职能组拆开已在群里的人，搜索和加入整组放在添加成员。标准没有删。
 criteria:
   - id: AC-1
     given: 群聊含工作中和空闲成员
@@ -16,4 +19,4 @@ criteria:
   - id: AC-3
     given: 群聊超过六名成员
     when: 查看顶部并打开群聊设置
-    then: 顶部仍不铺名单，设置内可搜索和按功能分组管理成员
+    then: 顶部仍不铺名单。设置里已在群里的人单独成一份名单；搜索和尚未全员进群的加入整组在添加成员里，不按职能组把已在群里的人拆开

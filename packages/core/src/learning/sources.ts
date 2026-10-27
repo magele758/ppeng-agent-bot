@@ -1,5 +1,6 @@
 import type { SqliteStateStore } from '../storage.js';
 import { ValidationError } from '../errors.js';
+import { readApprovalWake } from '../approval/unattended-approval.js';
 export interface SourceEntry {
     kind: 'user' | 'routine' | 'event' | 'tool' | 'subagent';
     ref: string;
@@ -47,11 +48,48 @@ export class SourceLedger {
         const chain = this.chain(sid);
         if (chain.length < 2)
             return;
-        const constraints = [...new Set(chain.slice(1).flatMap(id => [...(this.store.getDaemonControl<string[]>('source-inherited:' + id) ?? []), ...((['event', 'routine'].includes(this.authority(id)?.kind ?? '') || this.exposed(id)) ? [id] : [])]))];
+        const constraints = [...new Set(chain.slice(1).flatMap(id => [...(this.store.getDaemonControl<string[]>('source-inherited:' + id) ?? []), ...((this.bindsExternal(id) || this.exposed(id)) ? [id] : [])]))];
         this.store.setDaemonControl('source-inherited:' + sid, constraints);
     }
     entries(sid: string): SourceEntry[] { return this.chain(sid).flatMap(id => { const entries = this.local(id), authority = this.authority(id); return authority && !entries.some(e => e.ref === authority.ref && e.kind === authority.kind) ? [authority, ...entries] : entries; }); }
+    /** A bot speaking in a group. The room wake is an approval fail-safe, not a new external event. */
+    private roomSpeak(sid: string): boolean {
+        const session = this.store.getSession(sid);
+        const roomId = session?.metadata?.roomId;
+        if (!session || typeof roomId !== 'string' || !roomId.trim()) return false;
+        return readApprovalWake(session.metadata)?.source === 'room';
+    }
+    /** True when this event was recorded from an inbox, a routine, or an explicit external ref. */
+    private explicitExternal(sid: string, entry: SourceEntry): boolean {
+        if (entry.kind !== 'event') return entry.kind === 'routine';
+        if (!entry.messageId || entry.ref !== entry.messageId) return true;
+        const message = this.store.listMessages(sid).find(item => item.id === entry.messageId);
+        if (!message) return true;
+        if (message.key?.startsWith('routine:')) return true;
+        const text = message.parts.find(part => part.type === 'text')?.text ?? '';
+        const inbox = this.store.db.prepare('SELECT * FROM session_inbox WHERE session_id=? AND ((? IS NOT NULL AND key=?) OR (key IS NULL AND text=?)) ORDER BY rowid DESC LIMIT 1').get(sid, message.key ?? null, message.key ?? null, text) as { source?: string } | undefined;
+        return inbox?.source === 'event' || inbox?.source === 'routine';
+    }
+    /**
+     * A previous group turn was stored as an event only because the room wake is unattended.
+     * Put that authority back to direct user input. Real events, routines, and fetched pages stay binding.
+     */
+    private releaseRoomTurn(sid: string): void {
+        if (!this.roomSpeak(sid)) return;
+        const prior = this.authority(sid);
+        if (!prior || prior.kind !== 'event' || this.explicitExternal(sid, prior)) return;
+        const healed: SourceEntry = { ...prior, kind: 'user', label: 'direct user input' };
+        this.store.setDaemonControl('source-authority:' + sid, healed);
+        const entries = this.local(sid).map(entry => entry.kind === 'event' && entry.ref === prior.ref ? { ...entry, kind: 'user' as const, label: 'direct user input' } : entry);
+        this.store.setDaemonControl('source-ledger:' + sid, entries);
+    }
+    private bindsExternal(sid: string): boolean {
+        this.releaseRoomTurn(sid);
+        const entry = this.authority(sid);
+        return entry?.kind === 'event' || entry?.kind === 'routine';
+    }
     observe(sid: string): void {
+        this.releaseRoomTurn(sid);
         const last = this.store.listMessages(sid).findLast(m => m.role === 'user');
         if (!last)
             return;
@@ -60,11 +98,13 @@ export class SourceLedger {
         // Inbox keys are host assigned and never derived from external body text.
         const inbox = this.store.db.prepare('SELECT * FROM session_inbox WHERE session_id=? AND ((? IS NOT NULL AND key=?) OR (key IS NULL AND text=?)) ORDER BY rowid DESC LIMIT 1').get(sid,last.key??null,last.key??null,last.parts.find(p=>p.type==='text')?.text??'');
         const prior = this.authority(sid);
-        if(prior&&!inbox&&!last.key?.startsWith('routine:')){this.record(sid,{kind:'subagent',ref:last.id,messageId:last.id,label:'generated continuation',dataOnly:true});exposure();return;}
-        const wake = this.store.getSession(sid)?.metadata?.approvalWake as {
-            kind?: string;
-        } | undefined;
-        const kind = inbox?.source === 'event' ? 'event' : last.key?.startsWith('routine:') || inbox?.source === 'routine' ? 'routine' : inbox?.source === 'user' ? 'user' : this.chain(sid).length > 1 ? 'subagent' : prior?.kind ?? (wake?.kind === 'unattended' ? 'event' : 'user');
+        if(prior&&!inbox&&!last.key?.startsWith('routine:')){
+            if(this.roomSpeak(sid)&&prior.kind==='user'){this.record(sid,{kind:'user',ref:last.id,messageId:last.id,label:'user'});exposure();return;}
+            this.record(sid,{kind:'subagent',ref:last.id,messageId:last.id,label:'generated continuation',dataOnly:true});exposure();return;
+        }
+        const wake = readApprovalWake(this.store.getSession(sid)?.metadata);
+        const roomTurn = this.roomSpeak(sid);
+        const kind = inbox?.source === 'event' ? 'event' : last.key?.startsWith('routine:') || inbox?.source === 'routine' ? 'routine' : inbox?.source === 'user' ? 'user' : this.chain(sid).length > 1 ? 'subagent' : prior?.kind ?? (wake?.kind === 'unattended' && !roomTurn ? 'event' : 'user');
         this.record(sid, { kind, ref: last.id, messageId: last.id, label: kind });
         exposure();
     }
@@ -81,11 +121,11 @@ export class SourceLedger {
         // retroactively turn a running delegated event into a direct user request.
         let inherited = this.store.getDaemonControl<string[]>('source-inherited:' + sid);
         if (inherited === undefined && chain.length > 1) {
-            inherited = chain.slice(1).filter(id => { const e = this.authority(id); return e?.kind === 'event' || e?.kind === 'routine'; });
+            inherited = chain.slice(1).filter(id => this.bindsExternal(id));
             this.store.setDaemonControl('source-inherited:' + sid, inherited);
         }
         const exposed = chain.filter(id => this.exposed(id));
-        const constrained = [...new Set([...exposed, ...(inherited ?? []), ...chain.filter(id => { const e = this.authority(id); return e?.kind === 'event' || e?.kind === 'routine'; })])];
+        const constrained = [...new Set([...exposed, ...(inherited ?? []), ...chain.filter(id => this.bindsExternal(id))])];
         if (!constrained.length)
             return true;
         // Local child policy can narrow an inherited grant, never widen it.

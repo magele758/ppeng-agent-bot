@@ -32,6 +32,7 @@ function loadComponent(messages: Record<string, string>, clientStore: boolean) {
     if (id === '@/lib/i18n') return { useI18n: () => ({ t: (key: string) => messages[key] ?? key }) };
     if (id === '@/lib/bots') return localRequire('../lib/bots.ts');
     if (id === '@/lib/bot-pin-area') return localRequire('../lib/bot-pin-area.ts');
+    if (id.includes('PlayBotGroupList')) return { PlayGroupRow: () => null, deletePlayRoom: async () => 'cancelled' };
     return localRequire(id);
   };
   new Function('require', 'module', 'exports', compiled)(requireComponent, mod, mod.exports);

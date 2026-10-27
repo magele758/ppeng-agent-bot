@@ -15,7 +15,7 @@ import {
   resultOfPinAreaDrop,
   visiblePinnedBots
 } from './bot-pin-area.ts';
-import { BOT_PIN_STORAGE_KEY, displayPinnedIds, loadBotPinState, type BotPinState } from './bot-pin.ts';
+import { BOT_PIN_STORAGE_KEY, displayPinnedIds, displayPinnedRoomIds, loadBotPinState, type BotPinState } from './bot-pin.ts';
 import { functionalGroupRows } from './functional-group-view.ts';
 import type { BotInfo, SessionSummary } from './types.ts';
 
@@ -39,17 +39,18 @@ function memoryStorage() {
   };
 }
 
-test('pin area stays above functional groups and does not accept a room [AC:bot-pin-area#AC-1]', () => {
+test('pin area stays above functional groups and leaves an unpinned room out [AC:bot-pin-area#AC-1]', () => {
   const play = readFileSync(new URL('../components/PlayPanel.tsx', import.meta.url), 'utf8');
   const pin = play.indexOf('<BotPinArea');
   const rooms = play.indexOf('<PlayBotGroupList');
   const groups = play.indexOf('<BotFunctionalGroups');
   assert.ok(pin > 0 && rooms > pin && groups > rooms);
   const groupList = readFileSync(new URL('../components/play-group/PlayBotGroupList.tsx', import.meta.url), 'utf8');
-  assert.match(groupList, /draggable=\{false\}/);
-  const names = visiblePinnedBots(bots, { customized: true, ids: ['room-1', 'super'] }).map((bot) => bot.name);
+  assert.equal(groupList.includes('draggable={false}'), false);
+  const names = visiblePinnedBots(bots, { customized: true, ids: ['room-1', 'super'], roomIds: [] }).map((bot) => bot.name);
   assert.deepEqual(names, ['Super Bot']);
   assert.equal(names.includes('room-1'), false);
+  assert.deepEqual(displayPinnedRoomIds([{ id: 'room-1', title: 'Jarvis' }], { customized: false, ids: [], roomIds: [] }), []);
 });
 
 test('dragging a bot in keeps Super Bot, skips duplicates, and reloads in the same groups [AC:bot-pin-area#AC-2]', () => {

@@ -1,0 +1,22 @@
+id: goal-history-toolbar-align
+title: 目标历史与标题栏按钮垂直居中
+status: implemented
+requirement: |
+  聊天标题栏里的「目标历史」没居中对齐。
+  选中节点：header.chat-panel-header.chat-panel-header--bot 里的 details.goal-history，data-testid=goal-history，组件 GoalHistory，在 PlayPanel 的 play-toolbar。visible_text=目标历史。bounds 高 32px。附图里「目标历史」和右边那个方框图标不在同一垂直中线，文字/三角看起来偏了。
+  只做对齐：
+  - 「目标历史」这一项（summary 的三角和文字）在工具条里与相邻按钮垂直居中，左右不要单独上移或下移。
+  - 展开三角和「目标历史」四个字彼此垂直居中。
+  - 不要改目标历史的数据和展开行为，不要改文案。
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  只对齐标题栏里的「目标历史」，不改展开后的列表，也不单独上移或下移这一项。
+criteria:
+  - id: AC-1
+    given: 打开带「目标历史」的 Bot 对话，标题栏工具条里它和旁边的按钮在一起
+    when: 看「目标历史」这一项和相邻按钮
+    then: 展开三角和「目标历史」作为一项，与相邻按钮在同一条垂直中线上，没有被单独上移或下移
+  - id: AC-2
+    given: 标题栏显示「目标历史」
+    when: 看展开三角和「目标历史」四个字
+    then: 三角和这四个字彼此垂直居中

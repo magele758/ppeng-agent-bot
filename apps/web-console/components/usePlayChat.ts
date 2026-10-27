@@ -25,6 +25,7 @@ import { readRetryProgress, type RetryProgress } from '@/lib/model-retry';
 import { modelErrorText } from '@/lib/model-errors';
 import { getSpeechRecognitionCtor, type SpeechRecognitionLike } from '@/lib/speech-dictation';
 import { renderMarkdown } from '@/lib/markdown';
+import { stripVisibleClockMarks } from '@/lib/visible-clock';
 import { rollbackToCheckpoint, streamCheckpoint, type StreamSegment } from '@/lib/stream-segments';
 import { feedSseBuffer } from '@/lib/sse';
 import { liveSessionFollowRequest, type LiveStreamArm } from '@/lib/live-stream-attach';
@@ -122,6 +123,8 @@ import {
   type SteerInterruptPolicy
 } from '@/lib/query-queue';
 import { decideRunningTurnSend, isCanonicalBotChatMetadata, planRunningTurnDelivery } from '@/lib/running-turn-send';
+import { composerRunSelection, savedSteerPolicy } from '@/lib/loop-composer-defaults';
+import { useSettingsResource } from './sections/settings/categories/kit/settings-store';
 import {
   applyGhostKey,
   emptyGhost,
@@ -385,7 +388,13 @@ export function usePlayChat(deps: PlayChatDeps) {
   const [showModelView, setShowModelView] = useState(false);
   const [modelViewPayload, setModelViewPayload] = useState<SessionModelViewPayload | null>(null);
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
-  const [steerInterruptPolicy, setSteerInterruptPolicyState] = useState<SteerInterruptPolicy>('queue');
+  const loopSettings = useSettingsResource<{
+    defaultTaskMode?: string;
+    defaultSkillScope?: string;
+    steerInterruptPolicy?: string;
+  }>('/api/loop/settings');
+  const steerInterruptPolicy = savedSteerPolicy(loopSettings.settings?.steerInterruptPolicy);
+  const newChatTouched = useRef(false);
   const [immediateSteer, setImmediateSteer] = useState(false);
   const immediateSteerRef = useRef(false);
   const canonicalBotChatRef = useRef(false);
@@ -690,24 +699,24 @@ export function usePlayChat(deps: PlayChatDeps) {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const data = (await api('/api/loop/settings')) as {
-          settings?: { steerInterruptPolicy?: string };
-        };
-        const next = data.settings?.steerInterruptPolicy;
-        if (!cancelled && (next === 'queue' || next === 'steer' || next === 'disabled')) {
-          setSteerInterruptPolicyState(next);
-        }
-      } catch {
-        /* keep default */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    if (selectedSessionId) {
+      newChatTouched.current = false;
+      return;
+    }
+    if (newChatTouched.current || !loopSettings.settings) return;
+    const next = composerRunSelection({
+      hasSession: false,
+      touched: false,
+      currentTaskMode: 'auto',
+      currentSkillScope: 'full',
+      currentEngine: 'legacy',
+      savedTaskMode: loopSettings.settings.defaultTaskMode,
+      savedSkillScope: loopSettings.settings.defaultSkillScope
+    });
+    setTaskMode(next.taskMode);
+    setSkillScope(next.skillScope);
+    setOrchestrationEngine(next.orchestrationEngine);
+  }, [selectedSessionId, loopSettings.settings]);
 
   useEffect(() => {
     let cancelled = false;
@@ -874,21 +883,18 @@ export function usePlayChat(deps: PlayChatDeps) {
   const saveSteerInterruptPolicy = useCallback(async (next: SteerInterruptPolicy) => {
     setSteerPolicyBusy(true);
     try {
-      const data = (await api('/api/loop/settings', {
+      await api('/api/loop/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ steerInterruptPolicy: next })
-      })) as { settings?: { steerInterruptPolicy?: string } };
-      const saved = data.settings?.steerInterruptPolicy;
-      setSteerInterruptPolicyState(
-        saved === 'queue' || saved === 'steer' || saved === 'disabled' ? saved : next
-      );
+      });
+      await loopSettings.reload();
     } catch (err) {
       setPlayStatus({ text: err instanceof Error ? err.message : String(err), err: true });
     } finally {
       setSteerPolicyBusy(false);
     }
-  }, []);
+  }, [loopSettings]);
 
   const applyModelCatalog = useCallback((data: ModelProvidersResponse) => {
     setModelCatalog(data);
@@ -1389,6 +1395,7 @@ export function usePlayChat(deps: PlayChatDeps) {
 
   const saveTaskMode = useCallback(
     async (next: LabTaskMode) => {
+      if (!selectedSessionRef.current) newChatTouched.current = true;
       const previousMode = taskMode;
       const previousEngine = orchestrationEngine;
       setTaskMode(next);
@@ -1435,6 +1442,7 @@ export function usePlayChat(deps: PlayChatDeps) {
 
   const saveSkillScope = useCallback(
     async (next: LabSkillScope) => {
+      if (!selectedSessionRef.current) newChatTouched.current = true;
       const previous = skillScope;
       setSkillScope(next);
       const sid = selectedSessionRef.current;
@@ -1456,6 +1464,7 @@ export function usePlayChat(deps: PlayChatDeps) {
 
   const saveOrchestrationEngine = useCallback(
     async (engine: OrchestrationEngine) => {
+      if (!selectedSessionRef.current) newChatTouched.current = true;
       const previousEngine = orchestrationEngine;
       const previousMode = taskMode;
       setOrchestrationEngine(engine);
@@ -1707,11 +1716,7 @@ export function usePlayChat(deps: PlayChatDeps) {
     if (!reader) return;
     const dec = new TextDecoder();
     let buf = '';
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf = feedSseBuffer(buf, value, dec, (event, payload) => {
-        const p = payload as {
+        type SseEventPayload = {
           type?: string;
           text?: string;
           message?: string;
@@ -1722,7 +1727,8 @@ export function usePlayChat(deps: PlayChatDeps) {
           envelope?: Record<string, unknown>;
           session?: { id: string; title?: string; status?: string; metadata?: Record<string, unknown>; createdAt?: string; updatedAt?: string };
         };
-        if (!liveTurnOnScreen(streamGeneration)) return;
+
+    const applySseControl = (event: string, p: SseEventPayload) => {
         if (event === 'ready') {
           opts?.onReady?.();
         }
@@ -1749,6 +1755,8 @@ export function usePlayChat(deps: PlayChatDeps) {
               : t('play.status.runFailed', { error: modelErrorText(raw, t) });
           throw new PlayStreamError(message);
         }
+    };
+    const applySseModelText = (event: string, p: SseEventPayload) => {
         if (event === 'model' && p.type === 'model_retry') {
           const progress = readRetryProgress(p);
           if (progress) {
@@ -1778,9 +1786,9 @@ export function usePlayChat(deps: PlayChatDeps) {
           const last = segments[segments.length - 1];
           if (last?.kind === 'text') {
             last.raw += delta;
-            last.html = renderMarkdown(last.raw || '…');
+            last.html = renderMarkdown(stripVisibleClockMarks(last.raw) || '…');
           } else {
-            segments.push({ kind: 'text', id: nextId(), raw: delta, html: renderMarkdown(delta || '…') });
+            segments.push({ kind: 'text', id: nextId(), raw: delta, html: renderMarkdown(stripVisibleClockMarks(delta) || '…') });
           }
           sync();
         }
@@ -1794,6 +1802,8 @@ export function usePlayChat(deps: PlayChatDeps) {
           }
           sync();
         }
+    };
+    const applySseModelTools = (event: string, p: SseEventPayload) => {
         if (event === 'model' && p.type === 'tool_call_start') {
           const toolCallId = p.toolCallId ?? nextId();
           segments.push({ kind: 'tool', id: nextId(), toolCallId, name: p.name ?? 'unknown', args: '' });
@@ -1838,6 +1848,17 @@ export function usePlayChat(deps: PlayChatDeps) {
           selectedSessionRef.current = sid;
           setSelectedSessionId(sid);
         }
+    };
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf = feedSseBuffer(buf, value, dec, (event, payload) => {
+        const p = payload as SseEventPayload;
+        if (!liveTurnOnScreen(streamGeneration)) return;
+        applySseControl(event, p);
+        applySseModelText(event, p);
+        applySseModelTools(event, p);
       });
     }
   };
@@ -1942,6 +1963,21 @@ export function usePlayChat(deps: PlayChatDeps) {
     };
   }, [selectedSessionId, chromeSessionId, sessionChrome?.status, sharedSessionStatus]);
 
+  const bodyForSend = () => {
+    const selection = composerRunSelection({
+      hasSession: Boolean(selectedSessionRef.current),
+      touched: newChatTouched.current,
+      currentTaskMode: taskMode,
+      currentSkillScope: skillScope,
+      currentEngine: orchestrationEngine,
+      savedTaskMode: loopSettings.settings?.defaultTaskMode,
+      savedSkillScope: loopSettings.settings?.defaultSkillScope,
+      settingsLoaded: loopSettings.settings != null
+    });
+    if (selection.deferred) return {};
+    return orchestrationBody(selection.taskMode, selection.orchestrationEngine, selection.skillScope);
+  };
+
   const ensurePlaySessionForImages = async (): Promise<string> => {
     if (selectedSessionRef.current) return selectedSessionRef.current;
     const activeBotId = playSurface === 'bot' ? botIdRef.current : '';
@@ -1962,7 +1998,7 @@ export function usePlayChat(deps: PlayChatDeps) {
         autoRun: false,
         background: false,
         ...optionalGroupsBody(optionalToolGroupsFeature, enabledOptionalGroupIds),
-        ...orchestrationBody(taskMode, orchestrationEngine, skillScope),
+        ...bodyForSend(),
         ...modelRefBody(modelRefForSend),
         ...workspaceBindingBody(workspaceBinding),
       }),
@@ -2223,7 +2259,7 @@ export function usePlayChat(deps: PlayChatDeps) {
               ...contextFields,
               ...replyFields,
               ...optionalGroupsBody(optionalToolGroupsFeature, enabledOptionalGroupIds),
-              ...orchestrationBody(taskMode, orchestrationEngine, skillScope),
+              ...bodyForSend(),
               ...modelRefBody(modelRefForSend),
               ...workspaceBindingBody(workspaceBinding),
             },
@@ -2242,7 +2278,7 @@ export function usePlayChat(deps: PlayChatDeps) {
               ...contextFields,
               ...replyFields,
               ...optionalGroupsBody(optionalToolGroupsFeature, enabledOptionalGroupIds),
-              ...orchestrationBody(taskMode, orchestrationEngine, skillScope),
+              ...bodyForSend(),
               ...modelRefBody(modelRefForSend),
               ...workspaceBindingBody(workspaceBinding),
             }),
@@ -2277,7 +2313,7 @@ export function usePlayChat(deps: PlayChatDeps) {
             ...contextFields,
             ...replyFields,
             ...optionalGroupsBody(optionalToolGroupsFeature, enabledOptionalGroupIds),
-            ...orchestrationBody(taskMode, orchestrationEngine, skillScope),
+            ...bodyForSend(),
             ...modelRefBody(modelRefForSend),
             ...workspaceBindingBody(workspaceBinding),
           }, undefined, { liveGen: generation });
@@ -2297,7 +2333,7 @@ export function usePlayChat(deps: PlayChatDeps) {
               ...contextFields,
               ...replyFields,
               ...optionalGroupsBody(optionalToolGroupsFeature, enabledOptionalGroupIds),
-              ...orchestrationBody(taskMode, orchestrationEngine, skillScope),
+              ...bodyForSend(),
               ...modelRefBody(modelRefForSend),
               ...workspaceBindingBody(workspaceBinding),
             }),
@@ -2328,7 +2364,7 @@ export function usePlayChat(deps: PlayChatDeps) {
             autoRun: true,
             background: true,
             ...optionalGroupsBody(optionalToolGroupsFeature, enabledOptionalGroupIds),
-            ...orchestrationBody(taskMode, orchestrationEngine, skillScope),
+            ...bodyForSend(),
             ...modelRefBody(modelRefForSend),
             ...workspaceBindingBody(workspaceBinding),
           }),

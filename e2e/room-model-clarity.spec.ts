@@ -34,6 +34,7 @@ test('room keeps a short model settings link and shows only a different member m
   if (desc.length>0) await expect(panel.locator('.play-group-member').filter({hasText:bot.name})).not.toContainText(desc.slice(0,40));
  }
  await expect(panel.getByRole('button',{name:'移出'}).first()).toBeVisible();
- await expect(panel.getByLabel('加入 Bot')).toBeVisible();
+ await expect(panel.getByTestId('play-group-add-members')).toBeVisible();
+ await expect(panel.getByRole('button',{name:`把 ${bots[0].name} 移出群聊`,exact:true})).toHaveCount(0);
  await expect(panel.getByTestId('room-shared-context')).toBeVisible();
 });

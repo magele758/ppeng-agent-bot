@@ -111,7 +111,7 @@ describe('repeat guard model tier', () => {
     expect(repeatLimitsActive('off', 'weak')).toBe(false);
   });
 
-  it('still aborts a tool-failure streak when repeat detection is off', () => {
+  it('still aborts a tool-failure streak when repeat detection is off [AC:conversation-loop-defaults#AC-6]', () => {
     const decision = applyRepeatGuard({
       store: {
         getDaemonControl: () => ({ repeatGuard: 'off' }),

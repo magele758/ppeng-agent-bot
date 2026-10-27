@@ -1,3 +1,5 @@
+import { stripVisibleClockMarks } from './visible-clock.ts';
+
 export const REPLY_EXCERPT_MAX = 120;
 
 export type ReplyTo = {
@@ -224,5 +226,5 @@ function textFromParts(parts: ReadonlyArray<{ type?: string; text?: string }> | 
   for (const part of parts) {
     if (part.type === 'text' && typeof part.text === 'string' && part.text.trim()) lines.push(part.text);
   }
-  return lines.join('\n');
+  return stripVisibleClockMarks(lines.join('\n'));
 }

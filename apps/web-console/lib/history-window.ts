@@ -93,6 +93,25 @@ function keepLoadedBody<T extends { id: string }>(current: T | undefined, incomi
   return incoming;
 }
 
+/**
+ * The latest saved user line is already this send.
+ * The optimistic bubble must not be drawn again, and nothing here sends the message.
+ */
+export function optimisticUserLanded(messages: readonly unknown[], optimistic: string | null): boolean {
+  const wanted = optimistic?.trim() ?? '';
+  if (!wanted) return false;
+  const lead = wanted.split('\n').map((line) => line.trim()).find(Boolean) ?? wanted;
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (!message || typeof message !== 'object') continue;
+    const row = message as { role?: string; text?: string; parts?: ReadonlyArray<{ type?: string; text?: string }> };
+    if (row.role !== 'user') continue;
+    const body = rowBody(row).trim();
+    return Boolean(body) && body.includes(lead);
+  }
+  return false;
+}
+
 function mergeById<T extends { id: string; seq?: number }>(previous: readonly T[], incoming: readonly T[]): T[] {
   const map = new Map<string, T>();
   for (const message of previous) map.set(message.id, message);
@@ -100,20 +119,42 @@ function mergeById<T extends { id: string; seq?: number }>(previous: readonly T[
   return Array.from(map.values()).sort((a, b) => a.seq != null && b.seq != null ? a.seq - b.seq : 0);
 }
 
-export function mergeHistoryWindow<T extends {id:string;seq?:number}>(previous:T[],incoming:T[],sameSession:boolean):{messages:T[];reset:boolean} {
- if(!sameSession||!previous.length)return {messages:incoming,reset:true};
- const ids=new Set(previous.map(message=>message.id));
- const overlap=incoming.some(message=>ids.has(message.id));
- const maxPrevious=previous.at(-1)?.seq;const minIncoming=incoming[0]?.seq;
- // A disjoint refresh must retain the new cursor, otherwise intermediate pages become unreachable.
- const disjoint=!overlap&&incoming.length>0&&!(maxPrevious!=null&&minIncoming!=null&&minIncoming<=maxPrevious+1);
- if(disjoint){
-  const maxIncoming=incoming.reduce<number|null>((max,message)=>message.seq!=null&&(max==null||message.seq>max)?message.seq:max,null);
-  const newer=maxIncoming==null?[]:previous.filter(message=>message.seq!=null&&message.seq>maxIncoming);
-  if(newer.length)return {messages:mergeById(newer,incoming),reset:false};
-  return {messages:incoming,reset:true};
- }
- return {messages:mergeById(previous,incoming),reset:false};
+/** One Lab page. A shorter refresh is a tail snapshot and must not drop loaded history. */
+const FULL_HISTORY_PAGE = 40;
+
+function maxSeq(messages: ReadonlyArray<{ seq?: number }>): number | undefined {
+  let max: number | undefined;
+  for (const message of messages) {
+    if (message.seq == null || !Number.isFinite(message.seq)) continue;
+    if (max == null || message.seq > max) max = message.seq;
+  }
+  return max;
+}
+
+export function mergeHistoryWindow<T extends { id: string; seq?: number }>(
+  previous: T[],
+  incoming: T[],
+  sameSession: boolean
+): { messages: T[]; reset: boolean } {
+  if (!sameSession || !previous.length) return { messages: incoming, reset: true };
+  const ids = new Set(previous.map((message) => message.id));
+  const overlap = incoming.some((message) => ids.has(message.id));
+  const maxPrevious = maxSeq(previous);
+  const minIncoming = incoming[0]?.seq;
+  const adjacent = maxPrevious != null && minIncoming != null && minIncoming <= maxPrevious + 1;
+  const disjoint = !overlap && incoming.length > 0 && !adjacent;
+  // More than one page ahead must keep the new cursor, or the skipped span cannot be loaded.
+  // One page or a shorter tail is the refresh during an answer. Stitch it; do not replace the feed.
+  if (disjoint && incoming.length > FULL_HISTORY_PAGE) {
+    const maxIncoming = incoming.reduce<number | null>(
+      (max, message) => (message.seq != null && (max == null || message.seq > max) ? message.seq : max),
+      null
+    );
+    const newer = maxIncoming == null ? [] : previous.filter((message) => message.seq != null && message.seq > maxIncoming);
+    if (newer.length) return { messages: mergeById(newer, incoming), reset: false };
+    return { messages: incoming, reset: true };
+  }
+  return { messages: mergeById(previous, incoming), reset: false };
 }
 
 export type StreamTextPiece = { kind: string; raw?: string };

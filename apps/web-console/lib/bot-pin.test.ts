@@ -39,7 +39,7 @@ test('a new visitor sees Super Bot pinned and only that bot [AC:bot-pin-area#AC-
   const storage = memoryStorage();
   const state = loadBotPinState(storage);
 
-  assert.deepEqual(state, { customized: false, ids: [] });
+  assert.deepEqual(state, { customized: false, ids: [], roomIds: [] });
   assert.equal(superBotId(bots), 'super');
   assert.deepEqual(displayPinnedIds(bots, state), ['super']);
   assert.deepEqual(names(bots, displayPinnedIds(bots, state)), ['Super Bot']);
@@ -138,7 +138,7 @@ test('missing or corrupt pin storage is treated as never customized [AC:bot-pin-
 
   for (const storage of samples) {
     const state = loadBotPinState(storage);
-    assert.deepEqual(state, { customized: false, ids: [] });
+    assert.deepEqual(state, { customized: false, ids: [], roomIds: [] });
     assert.deepEqual(displayPinnedIds(bots, state), ['super']);
   }
 

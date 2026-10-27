@@ -1,0 +1,33 @@
+.chat-turn__content:has(.correction-capture__trigger) {
+  position: relative;
+}
+
+.chat-turn .correction-capture__trigger.btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  min-height: 22px;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+  color: var(--muted);
+  transition: none;
+}
+
+.chat-turn:hover .correction-capture__trigger.btn,
+.chat-turn:focus-within .correction-capture__trigger.btn,
+.correction-capture__trigger.btn:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.correction-capture__icon {
+  display: block;
+  width: 14px;
+  height: 14px;
+}

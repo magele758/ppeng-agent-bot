@@ -2,15 +2,41 @@ import { botForCanonicalSession } from './bots.ts';
 import {
   BOT_PIN_STORAGE_KEY,
   displayPinnedIds,
+  displayPinnedRoomIds,
   loadBotPinState,
   pinBot,
+  pinStatesEqual,
+  roomIdsOf,
   saveBotPinState,
   unpinBot,
-  type BotPinState
+  withPinMembership,
+  withRegionOrder,
+  savedRegionRefs,
+  forgetRegionRef,
+  type BotPinState,
+  type OrderRegion,
+  type SidebarRef
 } from './bot-pin.ts';
+export { forgetRegionRef, savedRegionRefs };
+export type { OrderRegion, SidebarRef };
+export {
+  arrangeSidebarRows,
+  beginSidebarDrag,
+  currentSidebarDrag,
+  dropPlace,
+  endSidebarDrag,
+  moveSidebarItem,
+  orderRegionKey,
+  regionRefs,
+  sameOrderRegion,
+  sortBotRows
+} from './sidebar-order.ts';
+export type { SidebarDrag, SidebarRow } from './sidebar-order.ts';
 
 export const BOT_DRAG_MIME = 'application/x-agent-home-bot';
 export const BOT_PIN_DRAG_MIME = 'application/x-agent-home-bot-pin';
+export const ROOM_DRAG_MIME = 'application/x-agent-home-room';
+export const ROOM_PIN_DRAG_MIME = 'application/x-agent-home-room-pin';
 
 export type PinRosterBot = {
   id: string;
@@ -20,7 +46,9 @@ export type PinRosterBot = {
   canonicalSessionId?: string;
 };
 
-export type PinDragKind = 'bot' | 'pin' | 'foreign' | 'ignore';
+export type PinRoom = { id: string; title: string };
+
+export type PinDragKind = 'bot' | 'room' | 'pin' | 'foreign' | 'ignore';
 
 export type PinAreaDropResult = {
   accept: boolean;
@@ -28,23 +56,18 @@ export type PinAreaDropResult = {
   next: BotPinState | null;
 };
 
-const UNTOUCHED: BotPinState = { customized: false, ids: [] };
+const UNTOUCHED: BotPinState = { customized: false, ids: [], roomIds: [] };
 
 const listeners = new Set<() => void>();
 let cachedState: BotPinState = UNTOUCHED;
 
 function samePinState(a: BotPinState, b: BotPinState): boolean {
-  if (a.customized !== b.customized || a.ids.length !== b.ids.length) return false;
-  for (let index = 0; index < a.ids.length; index += 1) {
-    if (a.ids[index] !== b.ids[index]) return false;
-  }
-  return true;
+  return pinStatesEqual(a, b);
 }
 
 function remember(state: BotPinState): BotPinState {
-  cachedState = !state.customized && state.ids.length === 0
-    ? UNTOUCHED
-    : { customized: state.customized, ids: state.ids.slice() };
+  const next = withPinMembership(state, state.customized, state.ids, roomIdsOf(state), state.orders);
+  cachedState = pinStatesEqual(next, UNTOUCHED) ? UNTOUCHED : next;
   return cachedState;
 }
 
@@ -72,12 +95,18 @@ export function getBotPinSnapshot(): BotPinState {
   return remember(next);
 }
 
+export function commitRegionOrder(state: BotPinState, region: OrderRegion, refs: readonly SidebarRef[]): BotPinState {
+  const next = withRegionOrder(state, region, refs);
+  commitBotPinState(next);
+  return next;
+}
+
 export function getBotPinServerSnapshot(): BotPinState {
   return UNTOUCHED;
 }
 
 export function commitBotPinState(state: BotPinState): void {
-  const next = { customized: state.customized, ids: state.ids.slice() };
+  const next = withPinMembership(state, state.customized, state.ids, roomIdsOf(state), state.orders);
   saveBotPinState(next);
   remember(next);
   emit();
@@ -111,6 +140,54 @@ export function groupRowsWithoutPinnedBots<T extends { id: string; metadata?: Re
   });
 }
 
+export function visiblePinnedRooms<T extends PinRoom>(rooms: readonly T[], state: BotPinState): T[] {
+  const byId = new Map(rooms.filter((room) => room.title.trim().length > 0).map((room) => [room.id, room]));
+  return displayPinnedRoomIds(rooms, state).flatMap((id) => {
+    const room = byId.get(id);
+    return room ? [room] : [];
+  });
+}
+
+/** Pin a group chat beside the bots already shown. Membership in a functional group stays put. */
+export function nextStateAfterRoomPinDrop(
+  state: BotPinState,
+  bots: readonly PinRosterBot[],
+  rooms: readonly PinRoom[],
+  roomId: string
+): BotPinState | null {
+  const id = roomId.trim();
+  if (!id || !rooms.some((room) => room.id === id && room.title.trim().length > 0)) return null;
+  const ids = displayPinnedIds(pinRoster(bots), state);
+  const roomIds = displayPinnedRoomIds(rooms, { ...state, customized: true, ids, roomIds: roomIdsOf(state) });
+  if (!roomIds.includes(id)) roomIds.push(id);
+  return withPinMembership(state, true, ids, roomIds);
+}
+
+export function nextStateAfterRoomUnpin(
+  state: BotPinState,
+  bots: readonly PinRosterBot[],
+  rooms: readonly PinRoom[],
+  roomId: string
+): BotPinState {
+  const ids = displayPinnedIds(pinRoster(bots), state);
+  const roomIds = displayPinnedRoomIds(rooms, { ...state, customized: true, ids, roomIds: roomIdsOf(state) }).filter((id) => id !== roomId);
+  const orders = state.orders?.pin?.length
+    ? { ...state.orders, pin: state.orders.pin.filter((item) => item.kind !== 'room' || item.id !== roomId) }
+    : state.orders;
+  return withPinMembership(state, true, ids, roomIds, orders);
+}
+
+export function nextStateAfterRoomPinDragEnd(
+  state: BotPinState,
+  bots: readonly PinRosterBot[],
+  rooms: readonly PinRoom[],
+  roomId: string,
+  landedInside: boolean
+): BotPinState | null {
+  if (landedInside) return null;
+  return nextStateAfterRoomUnpin(state, bots, rooms, roomId);
+}
+
 /** Pin onto the bots already shown, so default Super Bot stays until dragged out. */
 export function nextStateAfterPinDrop(state: BotPinState, bots: readonly PinRosterBot[], botId: string): BotPinState | null {
   const id = botId.trim();
@@ -137,7 +214,8 @@ export function nextStateAfterPinDragEnd(
 export function pinDragKind(types: Iterable<string>): PinDragKind {
   const list = new Set(Array.from(types));
   if (list.has('Files')) return 'foreign';
-  if (list.has(BOT_PIN_DRAG_MIME)) return 'pin';
+  if (list.has(BOT_PIN_DRAG_MIME) || list.has(ROOM_PIN_DRAG_MIME)) return 'pin';
+  if (list.has(ROOM_DRAG_MIME)) return 'room';
   if (list.has(BOT_DRAG_MIME)) return 'bot';
   if (list.size > 0) return 'foreign';
   return 'ignore';
@@ -147,7 +225,9 @@ export function resultOfPinAreaDrop(
   state: BotPinState,
   bots: readonly PinRosterBot[],
   types: Iterable<string>,
-  botId: string
+  botId: string,
+  rooms: readonly PinRoom[] = [],
+  roomId = ''
 ): PinAreaDropResult {
   const kind = pinDragKind(types);
   switch (kind) {
@@ -159,6 +239,8 @@ export function resultOfPinAreaDrop(
       return { accept: true, landedInside: true, next: null };
     case 'bot':
       return { accept: true, landedInside: false, next: nextStateAfterPinDrop(state, bots, botId) };
+    case 'room':
+      return { accept: true, landedInside: false, next: nextStateAfterRoomPinDrop(state, bots, rooms, roomId) };
     default: {
       const leftover: never = kind;
       return leftover;

@@ -1,0 +1,23 @@
+id: group-command-same-as-dm
+title: 群里的命令跟该 Bot 单聊同一套放行
+status: implemented
+requirement: |
+  单独问 Super Bot 时 gh 可以执行，群里却 source_scope_denied。要改成一致。
+  某个 Bot 在群里说话时，命令 / scope / gh 的放行跟它自己的单聊一样。不要因为「这是群会话」就额外 source_scope_denied。
+  每个 Bot 仍用自己的权限。不要把群里其他 Bot 提升成 Super Bot。
+  单聊要审批的，群里走同一条审批，不要直接拒绝且不给批。单聊拒绝的，群里也拒绝。
+  沙箱、敏感路径、密钥目录不要放开。
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 同一个 Bot 在自己的单聊里可以执行一条只读 gh
+    when: 这个 Bot 在群会话里执行同一条只读 gh
+    then: 命令按单聊同样的方式执行，不会仅因为这是群会话就被拒绝
+  - id: AC-2
+    given: 同一个 Bot 在单聊里会拒绝某条命令，且群里另一个 Bot 没有这条放行
+    when: 在群会话里执行
+    then: 群里给出和单聊相同的拒绝，另一个 Bot 也不会因此被放行
+  - id: AC-3
+    given: 同一个 Bot 在单聊里执行某条命令前需要审批
+    when: 这个 Bot 在群会话里执行同一条命令
+    then: 群里进入同一条待审批，而不是直接拒绝且不给批

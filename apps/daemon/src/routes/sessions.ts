@@ -41,6 +41,7 @@ import type { RouteSpec } from '../routing.js';
 import { etagFromState, json, sendIfNotModified, sseInit, sseSend } from '../http-utils.js';
 import { steerHttpFromCoreAck } from '../steer-ack.js';
 import { appliedLoopEngine, readLoopSettings } from '../loop-settings.js';
+import { steerRequestOptions } from '../steer-request.js';
 import { assertWorkspaceBindingRefs } from './workspace.js';
 import { guardSession, listedSessions, wrapSessionIdRoutes } from '../session-guard.js';
 import { resolveSessionImagePath } from '../session-image.js';
@@ -948,17 +949,9 @@ export function sessionsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         const text = String(body.text ?? body.message ?? '').trim() || (sources.length ? '(attachment)' : '');
         if (!text) throw new ValidationError('Missing steer text');
         const contextParts = applyContextSources([], sources) as import('@ppeng/api-types').TextPart[];
-        const target = body.target === 'next-run' ? 'next-run' : 'next-step';
-        const key = typeof body.key === 'string' && body.key.trim() ? body.key.trim() : undefined;
-        const role = body.role === 'system' ? 'system' : 'user';
-        const steerMode = body.mode === 'subagent' || body.steerMode === 'subagent' ? 'subagent' : undefined;
-        const subagentRole =
-          typeof body.subagentRole === 'string' && body.subagentRole.trim()
-            ? body.subagentRole.trim()
-            : undefined;
         const replyTo = replyToFromBody(body);
         if (typeof replyTo === 'string') throw new ValidationError('Quoted steering requires a message pointer');
-        const ack = runtime.enqueueSteer(id, text, { target, key, role, steerMode, subagentRole, contextParts, replyTo });
+        const ack = runtime.enqueueSteer(id, text, { ...steerRequestOptions(body), contextParts, replyTo });
         json(response, 200, steerHttpFromCoreAck(ack, runtime.getSession(id)));
       }
     },

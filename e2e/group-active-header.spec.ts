@@ -36,28 +36,36 @@ for (const size of [3, 7]) {
     await expect(strip.locator('.play-group-working__name')).toHaveText('Member 1');
     await panel.getByRole('button', { name: '群聊设置', exact: true }).click();
     const settings = panel.getByTestId('room-settings');
-    await expect(settings.getByLabel('加入 Bot')).toBeVisible();
+    const members = settings.locator('.play-group-settings-members');
+    await expect(members.getByRole('heading', { name: '已在群里', exact: true })).toBeVisible();
+    await expect(members.getByRole('heading', { name: '添加成员', exact: true })).toBeVisible();
+    await expect(members.getByTestId('play-group-member-search')).toBeVisible();
+    await expect(members.getByRole('heading', { name: '未分组', exact: true })).toHaveCount(0);
+    await expect(members.getByRole('button', { name: /移出整组/ })).toHaveCount(0);
     await expect(settings.getByTestId('room-shared-context')).toBeVisible();
+    await expect(settings.getByRole('button', { name: '把 Member 0 移出群聊', exact: true })).toHaveCount(0);
+    await expect(settings.getByRole('button', { name: '把 Member 1 移出群聊', exact: true })).toBeVisible();
     if (size === 7) {
       const search = settings.getByTestId('play-group-member-search');
-      await search.fill('Member 0');
-      await expect(settings.getByRole('button', { name: '把 Member 0 移出群聊', exact: true })).toBeVisible();
-      await expect(settings.getByRole('button', { name: '把 Member 1 移出群聊', exact: true })).toHaveCount(0);
+      await search.fill('Member 8');
+      await expect(settings.getByRole('button', { name: '把 Member 8 加入群聊', exact: true })).toBeVisible();
+      await expect(settings.getByRole('button', { name: '把 Member 7 加入群聊', exact: true })).toHaveCount(0);
+      await expect(settings.getByRole('button', { name: '把 Member 1 移出群聊', exact: true })).toBeVisible();
+      await expect(settings.getByTestId('play-group-add-group-dev')).toHaveCount(0);
       await search.fill('');
     }
-    await settings.getByLabel('加入 Bot').selectOption('member7');
-    await settings.getByRole('button', { name: '加入', exact: true }).click();
+    await settings.getByRole('button', { name: '把 Member 7 加入群聊', exact: true }).click();
     await expect(settings.getByRole('button', { name: '把 Member 7 移出群聊', exact: true })).toBeVisible();
     await settings.getByRole('button', { name: '把 Member 7 移出群聊', exact: true }).click();
     await expect(settings.getByRole('button', { name: '把 Member 7 移出群聊', exact: true })).toHaveCount(0);
     fail = true;
-    await settings.getByLabel('加入 Bot').selectOption('member7');
-    await settings.getByRole('button', { name: '加入', exact: true }).click();
+    await settings.getByRole('button', { name: '把 Member 7 加入群聊', exact: true }).click();
     await expect(settings).toContainText('没能更新群成员');
     fail = false;
     if (size === 3) {
       await settings.getByRole('button', { name: '把 Member 2 移出群聊', exact: true }).click();
-      await expect(settings.getByRole('button', { name: '把 Member 0 移出群聊', exact: true })).toBeDisabled();
+      await expect(settings.getByRole('button', { name: '把 Member 0 移出群聊', exact: true })).toHaveCount(0);
+      await expect(settings.getByRole('button', { name: '把 Member 1 移出群聊', exact: true })).toBeDisabled();
     }
     await panel.getByRole('button', { name: '群聊设置', exact: true }).click();
     await expect(settings).toHaveCount(0);
