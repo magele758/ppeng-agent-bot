@@ -17,12 +17,28 @@ export function decisive(runs) {
 }
 
 export const HEAD_GATE_CHECK = 'Release gate / Main release gate';
+const FULL_VALIDATION_WORKFLOW = 'full-validation.yml';
 
 /** The pull-request token can read check-runs on this commit when run list --commit is empty. */
 export function headRunsFromChecks(checkRuns, sha) {
   const gate = (checkRuns ?? []).find((run) => run.name === HEAD_GATE_CHECK);
   if (!gate) return [];
   return [{ conclusion: gate.conclusion, status: gate.status, headSha: sha }];
+}
+
+/** workflow_dispatch Full validation is an Actions run. A PR token may omit its check-run. */
+export function headRunsFromActions(runs, sha) {
+  const found = [];
+  for (const run of runs ?? []) {
+    const head = run.headSha ?? run.head_sha;
+    if (head && head !== sha) continue;
+    const path = String(run.path ?? '');
+    const name = String(run.name ?? '');
+    const full = path.endsWith(FULL_VALIDATION_WORKFLOW) || name === 'Full validation' || name === HEAD_GATE_CHECK;
+    if (!full) continue;
+    found.push({ conclusion: run.conclusion, status: run.status, headSha: sha, id: run.id });
+  }
+  return found;
 }
 
 export function mergeDecision(runsOnMain, headRuns) {
@@ -47,9 +63,20 @@ function runs(args) {
   return JSON.parse(gh(args) || '[]');
 }
 
+function jsonLines(text) {
+  return text.split('\n').map((line) => line.trim()).filter(Boolean).flatMap((line) => {
+    try { return [JSON.parse(line)]; } catch { return []; }
+  });
+}
+
 function checkRuns(repo, sha) {
-  const text = gh(['api', '--paginate', `repos/${repo}/commits/${sha}/check-runs`, '--jq', '.check_runs[] | {name,conclusion,status}']);
-  return text.split('\n').filter(Boolean).map((line) => JSON.parse(line));
+  const text = gh(['api', '--paginate', `repos/${repo}/commits/${sha}/check-runs?per_page=100`, '--jq', '.check_runs[] | {name,conclusion,status}']);
+  return jsonLines(text);
+}
+
+function actionRuns(repo, sha) {
+  const text = gh(['api', '--paginate', `repos/${repo}/actions/workflows/${FULL_VALIDATION_WORKFLOW}/runs?head_sha=${sha}&per_page=20`, '--jq', '.workflow_runs[] | {name,path,event,conclusion,status,head_sha,id}']);
+  return jsonLines(text);
 }
 
 function main() {
@@ -57,10 +84,12 @@ function main() {
   const sha = process.env.GITHUB_SHA;
   if (!repo || !sha) throw new Error('GITHUB_REPOSITORY and GITHUB_SHA are required');
   const fields = 'databaseId,headSha,conclusion,status,event,url';
-  const onMain = runs(['run', 'list', '--repo', repo, '--workflow', 'full-validation.yml', '--branch', 'main', '--limit', '30', '--json', fields]);
-  const onHead = headRunsFromChecks(checkRuns(repo, sha), sha);
-  const decision = mergeDecision(onMain, onHead);
+  const onMain = runs(['run', 'list', '--repo', repo, '--workflow', FULL_VALIDATION_WORKFLOW, '--branch', 'main', '--limit', '30', '--json', fields]);
+  const fromChecks = headRunsFromChecks(checkRuns(repo, sha), sha);
+  const fromActions = headRunsFromActions(actionRuns(repo, sha), sha);
+  const decision = mergeDecision(onMain, [...fromActions, ...fromChecks]);
   console.log(`[main-full-health] ${decision.ok ? 'pass' : 'fail'}: ${decision.reason}`);
+  if (!decision.ok) console.log(`[main-full-health] head ${sha}: check-runs=${fromChecks.length} action-runs=${fromActions.length}`);
   if (!decision.ok) process.exitCode = 1;
 }
 
