@@ -848,6 +848,7 @@ export class BotRoomService {
     this.store.updateSession(session.id, { status: 'idle', metadata });
     // A Room turn has no person sitting in the chat. Stamp it before tools run so a private
     // message cannot wake the recipient as if a human had authorized the action.
+    // The stamp only arms the approval fail-safe. This bot's command scope stays the same as its own chat.
     stampSessionWake(this.store, session.id, { kind: 'unattended', source: 'room' });
     await this.host.runSession(session.id, { onEvent: this.budgetHookForSession(session.id) });
     return this.settleMember(room, turn, botId, session.id, closing);
