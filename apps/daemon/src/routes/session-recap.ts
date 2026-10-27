@@ -1,9 +1,10 @@
 /**
  * GET/PATCH /api/session-recap/settings — automatic away recap.
- * The one-line text is built in the Lab from the transcript already on screen.
+ * POST /api/sessions/:id/recap — one line from the model about the latest turns.
+ * An empty or failed completion is not cached.
  */
 
-import { ValidationError, type RawAgentRuntime } from '@ppeng/agent-core';
+import { NotFoundError, ValidationError, type RawAgentRuntime } from '@ppeng/agent-core';
 import type { RouteSpec } from '../routing.js';
 import { json } from '../http-utils.js';
 import {
@@ -12,6 +13,17 @@ import {
   writeSessionRecapSettings,
   type SessionRecapSettingsPatch
 } from '../session-recap-settings.js';
+import {
+  SESSION_RECAP_CACHE_KEY,
+  composeSessionRecap,
+  readSessionRecapCache,
+  recapAnchorId,
+  recapLocale,
+  type RecapLocale
+} from '../session-recap-text.js';
+
+const RECAP_WAIT_MS = 20_000;
+const recapFlights = new Map<string, Promise<{ text: string | null; anchorId: string | null }>>();
 
 function payload(runtime: RawAgentRuntime) {
   const settings = readSessionRecapSettings(runtime.store);
@@ -46,6 +58,66 @@ export function sessionRecapRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         writeSessionRecapSettings(runtime.store, patch);
         json(response, 200, payload(runtime));
       }
+    },
+    {
+      method: 'POST',
+      pattern: '/api/sessions/:id/recap',
+      handler: async ({ requireParam, readBody, response }) => {
+        const sessionId = requireParam('id');
+        const session = runtime.getSession(sessionId);
+        if (!session) throw new NotFoundError('session', sessionId);
+        const body = (await readBody().catch(() => ({}))) as { locale?: unknown };
+        const locale = recapLocale(body?.locale);
+        if (!locale) throw new ValidationError('locale must be zh or en');
+        json(response, 200, await recapForSession(runtime, sessionId, locale));
+      }
     }
   ];
+}
+
+async function recapForSession(
+  runtime: RawAgentRuntime,
+  sessionId: string,
+  locale: RecapLocale
+): Promise<{ text: string | null; anchorId: string | null }> {
+  const messages = runtime.store.foldMessages(sessionId);
+  const anchorId = recapAnchorId(messages);
+  if (!anchorId) return { text: null, anchorId: null };
+  const key = `${sessionId}\0${anchorId}\0${locale}`;
+  const existing = recapFlights.get(key);
+  if (existing) return existing;
+  const pending = composeAndStore(runtime, sessionId, locale, messages).finally(() => {
+    if (recapFlights.get(key) === pending) recapFlights.delete(key);
+  });
+  recapFlights.set(key, pending);
+  return pending;
+}
+
+async function composeAndStore(
+  runtime: RawAgentRuntime,
+  sessionId: string,
+  locale: RecapLocale,
+  messages: ReturnType<RawAgentRuntime['store']['foldMessages']>
+): Promise<{ text: string | null; anchorId: string | null }> {
+  const complete = runtime.modelAdapter.completeText;
+  const cached = readSessionRecapCache(runtime.getSession(sessionId)?.metadata);
+  if (!complete) return { text: null, anchorId: recapAnchorId(messages) };
+  const result = await composeSessionRecap({
+    messages,
+    locale,
+    cached,
+    signal: AbortSignal.timeout(RECAP_WAIT_MS),
+    completeText: (request) => complete.call(runtime.modelAdapter, request)
+  });
+  if (result.cache) {
+    runtime.store.transaction(() => {
+      const current = runtime.getSession(sessionId);
+      if (!current) return;
+      if (recapAnchorId(runtime.store.foldMessages(sessionId)) !== result.anchorId) return;
+      runtime.store.updateSession(sessionId, {
+        metadata: { ...current.metadata, [SESSION_RECAP_CACHE_KEY]: result.cache }
+      });
+    });
+  }
+  return { text: result.text, anchorId: result.anchorId };
 }

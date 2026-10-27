@@ -15,6 +15,15 @@ import {
   type RecapMessage
 } from '@/lib/session-recap';
 
+type FetchedRecap = {
+  sessionId: string;
+  anchorId: string;
+  locale: RecapLocale;
+  attempt: number;
+  status: 'loading' | 'done' | 'failed';
+  text: string;
+};
+
 export function useSessionRecap(input: {
   sessionId: string | null;
   messages: readonly RecapMessage[];
@@ -23,11 +32,15 @@ export function useSessionRecap(input: {
   draft: string;
   locale: RecapLocale;
   commandNonce: number;
+  pendingText: string;
+  failedText: string;
 }) {
   const [autoEnabled, setAutoEnabled] = useState<boolean | null>(null);
   const [armed, setArmed] = useState(false);
   const [manual, setManual] = useState(false);
   const [seenAnchorId, setSeenAnchorId] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const [fetched, setFetched] = useState<FetchedRecap | null>(null);
   const seenRef = useRef<string | null>(null);
   const prevRef = useRef<{ sessionId: string | null; anchorId: string | null }>({
     sessionId: null,
@@ -36,7 +49,10 @@ export function useSessionRecap(input: {
   const hiddenAtRef = useRef<number | null>(null);
   const commandSeenRef = useRef(0);
   const arrivalPendingRef = useRef(false);
-  const recap = useMemo(() => buildSessionRecap(input.messages, input.locale), [input.messages, input.locale]);
+  const fetchedRef = useRef<FetchedRecap | null>(null);
+  const flightRef = useRef<string | null>(null);
+  const recap = useMemo(() => buildSessionRecap(input.messages), [input.messages]);
+  fetchedRef.current = fetched;
 
   const seenNow = (sessionId: string) =>
     resolveSeenAnchor(window.localStorage.getItem(seenRecordKey(sessionId)), seenRef.current);
@@ -60,6 +76,7 @@ export function useSessionRecap(input: {
     if (input.commandNonce === 0 || input.commandNonce === commandSeenRef.current) return;
     commandSeenRef.current = input.commandNonce;
     setManual(true);
+    setAttempt((n) => n + 1);
   }, [input.commandNonce]);
 
   useEffect(() => {
@@ -151,6 +168,14 @@ export function useSessionRecap(input: {
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, [input.sessionId, input.sessionUpdatedAt, autoEnabled, recap]);
 
+  const match =
+    fetched &&
+    fetched.sessionId === input.sessionId &&
+    fetched.anchorId === recap?.anchorId &&
+    fetched.locale === input.locale &&
+    fetched.attempt === attempt
+      ? fetched
+      : null;
   const view = presentSessionRecap({
     enabled: autoEnabled === true,
     recap,
@@ -158,8 +183,59 @@ export function useSessionRecap(input: {
     manual,
     generating: input.generating,
     draft: input.draft,
-    seenAnchorId
+    seenAnchorId,
+    line: match?.status === 'done' ? match.text : ''
   });
+
+  useEffect(() => {
+    const sessionId = input.sessionId;
+    const anchorId = recap?.anchorId ?? null;
+    if (!view.show || !sessionId || !anchorId) return;
+    const key = `${sessionId}\n${anchorId}\n${input.locale}\n${attempt}`;
+    const current = fetchedRef.current;
+    if (
+      current &&
+      current.sessionId === sessionId &&
+      current.anchorId === anchorId &&
+      current.locale === input.locale &&
+      current.attempt === attempt &&
+      (current.status === 'done' || current.status === 'failed')
+    ) {
+      return;
+    }
+    if (flightRef.current === key) return;
+    flightRef.current = key;
+    const locale = input.locale;
+    const thisAttempt = attempt;
+    let cancelled = false;
+    const controller = new AbortController();
+    setFetched({ sessionId, anchorId, locale, attempt: thisAttempt, status: 'loading', text: '' });
+    void (async () => {
+      try {
+        const data = (await api(`/api/sessions/${sessionId}/recap`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ locale }),
+          signal: controller.signal
+        })) as { text?: unknown; anchorId?: unknown };
+        if (cancelled) return;
+        const text = typeof data.text === 'string' ? data.text.trim() : '';
+        const returnedAnchor = typeof data.anchorId === 'string' ? data.anchorId : '';
+        if (!text || (returnedAnchor && returnedAnchor !== anchorId)) {
+          setFetched({ sessionId, anchorId, locale, attempt: thisAttempt, status: 'failed', text: '' });
+          return;
+        }
+        setFetched({ sessionId, anchorId, locale, attempt: thisAttempt, status: 'done', text });
+      } catch {
+        if (!cancelled) setFetched({ sessionId, anchorId, locale, attempt: thisAttempt, status: 'failed', text: '' });
+      }
+    })();
+    return () => {
+      cancelled = true;
+      controller.abort();
+      if (flightRef.current === key) flightRef.current = null;
+    };
+  }, [view.show, input.sessionId, recap?.anchorId, input.locale, attempt]);
 
   useEffect(() => {
     if (!view.markSeen || !input.sessionId || !recap) return;
@@ -168,11 +244,22 @@ export function useSessionRecap(input: {
     setSeenAnchorId(recap.anchorId);
   }, [view.markSeen, input.sessionId, recap]);
 
+  const text = !view.show
+    ? ''
+    : match?.status === 'done'
+      ? view.text
+      : match?.status === 'failed'
+        ? input.failedText
+        : input.pendingText;
+
   return {
     shown: view.show,
-    text: view.text,
+    text,
     canManual: Boolean(recap && recap.completedTurns >= 1 && !input.generating),
-    requestManual: () => setManual(true),
+    requestManual: () => {
+      setManual(true);
+      setAttempt((n) => n + 1);
+    },
     dismiss: () => {
       setManual(false);
       setArmed(false);

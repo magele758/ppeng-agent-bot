@@ -154,7 +154,7 @@ export const settingsEntries = {
   sessionRecap: {
     title: 'Session recap',
     keywords: 'recap away return summary progress where I left off end of session',
-    desc: 'When you leave a session for at least three minutes and come back, one line above the composer says where you left off: what you were doing, which files changed, and what is still open. It is only for you and is not sent to the assistant. Turning this off stops the automatic line. You can still recap on demand.',
+    desc: 'When you leave a session for at least three minutes and come back, one line above the composer recaps the latest progress. The model writes that line from the most recent turns. It is only for you and is not sent to the assistant. Turning this off stops the automatic line. You can still recap on demand.',
     fields: {
       enabled: {
         label: 'Recap automatically when you come back',

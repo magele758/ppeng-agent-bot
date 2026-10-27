@@ -600,7 +600,9 @@ export function PlayPanel({
     generating: chatRunning || selectedSession?.status === 'running',
     draft: chat.playInput,
     locale,
-    commandNonce: chat.recapNonce
+    commandNonce: chat.recapNonce,
+    pendingText: t('play.sessionRecap.pending'),
+    failedText: t('play.sessionRecap.failed')
   });
   const nextHint = usePlayComposerHint({
     sessionId: selectedSessionId,

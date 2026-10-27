@@ -49,38 +49,65 @@ function session(): RecapMessage[] {
   ];
 }
 
-test('回到会话时一行回顾写出在做什么、改过的文件和还缺什么，且不写入对话 [AC:session-recap#AC-1]', () => {
+const MODEL_LINE = '刚刚写完签名校验，过期测试还没补。';
+
+test('回到会话时展示模型写成的一行最近进展，且不写入对话 [AC:session-recap#AC-1]', () => {
   const messages = session();
   const before = messages.length;
-  const recap = buildSessionRecap(messages, 'zh');
+  const recap = buildSessionRecap(messages);
   assert.ok(recap);
   assert.equal(messages.length, before);
   assert.equal(messages.some((message) => message.role === 'recap'), false);
-  assert.match(recap.text, /^回顾：/);
-  assert.match(recap.text, /补上过期校验/);
-  assert.match(recap.text, /改了 4 个文件/);
-  assert.match(recap.text, /过期测试还没补/);
-  assert.ok(Array.from(recap.text).length <= SESSION_RECAP_MAX_CHARS);
-  assert.equal(recap.text.includes('\n'), false);
-  assert.deepEqual(recap.files, [
-    'src/auth/middleware.ts',
-    'src/auth/token.ts',
-    'src/auth/expiry.ts',
-    'src/auth/expiry.test.ts'
-  ]);
+  assert.equal('text' in recap, false);
 
-  const huge = '过期测试还没补。' + '细节'.repeat(500);
-  const long = buildSessionRecap(
-    [user('迁移认证'), ...assistant(huge, 'a-long', ['src/' + 'p'.repeat(500) + '.ts'])],
-    'zh'
-  );
-  assert.ok(long);
+  const shown = presentSessionRecap({
+    enabled: true,
+    recap,
+    armed: true,
+    manual: false,
+    generating: false,
+    draft: '',
+    seenAnchorId: null,
+    line: MODEL_LINE
+  });
+  assert.equal(shown.show, true);
+  assert.equal(shown.text, MODEL_LINE);
+  assert.equal(shown.text.startsWith('回顾：你在'), false);
+  assert.equal(shown.text.includes('改了'), false);
+  assert.equal(shown.text.includes('\n'), false);
+  assert.ok(Array.from(shown.text).length <= SESSION_RECAP_MAX_CHARS);
+
+  const waiting = presentSessionRecap({
+    enabled: true,
+    recap,
+    armed: true,
+    manual: false,
+    generating: false,
+    draft: '',
+    seenAnchorId: null,
+    line: ''
+  });
+  assert.equal(waiting.show, true);
+  assert.equal(waiting.text, '');
+  assert.equal(waiting.markSeen, false);
+
+  const long = presentSessionRecap({
+    enabled: true,
+    recap,
+    armed: true,
+    manual: false,
+    generating: false,
+    draft: '',
+    seenAnchorId: null,
+    line: `进展${'细节'.repeat(500)}`
+  });
   assert.ok(Array.from(long.text).length <= SESSION_RECAP_MAX_CHARS);
-  assert.match(long.text, /改了 1 个文件/);
+  assert.equal(long.text.includes('改了'), false);
+  assert.equal(long.text.startsWith('回顾：你在'), false);
 });
 
 test('不满三轮、已经回顾过、正在打字或还在生成时不自动回顾 [AC:session-recap#AC-2]', () => {
-  const recap = buildSessionRecap(session(), 'zh');
+  const recap = buildSessionRecap(session());
   assert.ok(recap);
   const ready = {
     enabled: true,
@@ -106,7 +133,8 @@ test('不满三轮、已经回顾过、正在打字或还在生成时不自动�
     manual: false,
     generating: false,
     draft: '',
-    seenAnchorId: null
+    seenAnchorId: null,
+    line: MODEL_LINE
   });
   assert.equal(shown.show, true);
   assert.equal(shown.markSeen, true);
@@ -118,7 +146,8 @@ test('不满三轮、已经回顾过、正在打字或还在生成时不自动�
       manual: false,
       generating: false,
       draft: '还没发送',
-      seenAnchorId: null
+      seenAnchorId: null,
+      line: MODEL_LINE
     }).show,
     false
   );
@@ -130,7 +159,8 @@ test('不满三轮、已经回顾过、正在打字或还在生成时不自动�
       manual: false,
       generating: true,
       draft: '',
-      seenAnchorId: null
+      seenAnchorId: null,
+      line: MODEL_LINE
     }).show,
     false
   );
@@ -142,7 +172,8 @@ test('不满三轮、已经回顾过、正在打字或还在生成时不自动�
       manual: false,
       generating: false,
       draft: '',
-      seenAnchorId: recap.anchorId
+      seenAnchorId: recap.anchorId,
+      line: MODEL_LINE
     }).show,
     false
   );
@@ -155,7 +186,7 @@ test('不满三轮、已经回顾过、正在打字或还在生成时不自动�
 
 test('发送 /recap 或 /回顾会立刻回顾，并且不会把这句话发给助手 [AC:session-recap#AC-3]', () => {
   const oneTurn = [user('解释这个函数'), ...assistant('它按过期时间淘汰。', 'only')];
-  const recap = buildSessionRecap(oneTurn, 'zh');
+  const recap = buildSessionRecap(oneTurn);
   assert.ok(recap);
   assert.equal(recap.completedTurns, 1);
   assert.equal(armAutomaticRecap({
@@ -176,17 +207,19 @@ test('发送 /recap 或 /回顾会立刻回顾，并且不会把这句话发给�
     manual: true,
     generating: false,
     draft: '',
-    seenAnchorId: null
+    seenAnchorId: null,
+    line: '它按过期时间淘汰。'
   });
   assert.equal(manual.show, true);
-  assert.match(manual.text, /解释这个函数/);
+  assert.equal(manual.text, '它按过期时间淘汰。');
+  assert.equal(manual.text.includes('解释这个函数'), false);
   assert.equal(recapCommandShouldSend('/recap', false), false);
   assert.equal(recapCommandShouldSend('  /回顾  ', false), false);
   assert.equal(recapCommandShouldSend('/RECAP', false), false);
   assert.equal(recapCommandShouldSend('/recap 一下', false), true);
   assert.equal(recapCommandShouldSend('/recap', true), true);
   assert.equal(recapCommandShouldSend('继续写测试', false), true);
-  assert.equal(buildSessionRecap([], 'zh'), null);
+  assert.equal(buildSessionRecap([]), null);
   assert.equal(
     presentSessionRecap({
       enabled: true,
@@ -195,17 +228,16 @@ test('发送 /recap 或 /回顾会立刻回顾，并且不会把这句话发给�
       manual: true,
       generating: false,
       draft: '',
-      seenAnchorId: null
+      seenAnchorId: null,
+      line: '它按过期时间淘汰。'
     }).show,
     false
   );
 });
 
 test('关掉自动回顾后回来不出现，当场回顾仍可用，没保存过则默认开 [AC:session-recap#AC-4]', () => {
-  const recap = buildSessionRecap(session(), 'en');
+  const recap = buildSessionRecap(session());
   assert.ok(recap);
-  assert.match(recap.text, /^Recap:/);
-  assert.match(recap.text, /Edited 4 files/);
   const hidden = presentSessionRecap({
     enabled: false,
     recap,
@@ -213,7 +245,8 @@ test('关掉自动回顾后回来不出现，当场回顾仍可用，没保存�
     manual: false,
     generating: false,
     draft: '',
-    seenAnchorId: null
+    seenAnchorId: null,
+    line: 'Expiration checks are in, and the tests are still open.'
   });
   assert.equal(hidden.show, false);
   const manual = presentSessionRecap({
@@ -223,8 +256,10 @@ test('关掉自动回顾后回来不出现，当场回顾仍可用，没保存�
     manual: true,
     generating: false,
     draft: '',
-    seenAnchorId: null
+    seenAnchorId: null,
+    line: 'Expiration checks are in, and the tests are still open.'
   });
+  assert.equal(manual.text.startsWith('Recap:'), false);
   assert.equal(manual.show, true);
   assert.equal(
     armAutomaticRecap({
