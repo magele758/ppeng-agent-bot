@@ -70,6 +70,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Build workspace packages
         run: node scripts/build-workspace.mjs
+      - name: Allow precheck network namespaces
+        run: |
+          if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
       - name: Core unit tests without coverage
         run: node scripts/ci/core-unit.mjs
   main-health:
