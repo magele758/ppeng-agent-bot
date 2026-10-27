@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parse } from 'yaml';
-import { decisive, mergeDecision } from '../ci/main-full-health.mjs';
+import { decisive, headRunsFromChecks, mergeDecision } from '../ci/main-full-health.mjs';
 
 const fail = { status: 'completed', conclusion: 'failure', headSha: 'red' };
 const pass = { status: 'completed', conclusion: 'success', headSha: 'green' };
@@ -11,6 +11,8 @@ test('a red main blocks merge unless this head already passed full validation [A
   assert.equal(mergeDecision([fail], []).ok, false);
   assert.equal(mergeDecision([pass], []).ok, true);
   assert.equal(mergeDecision([fail], [pass]).ok, true);
+  assert.equal(mergeDecision([fail], headRunsFromChecks([{ name: 'Release gate / Main release gate', status: 'completed', conclusion: 'success' }], 'head')).ok, true);
+  assert.equal(headRunsFromChecks([{ name: 'Quick gate', status: 'completed', conclusion: 'success' }], 'head').length, 0);
   assert.equal(decisive([{ status: 'completed', conclusion: 'cancelled' }, fail]).conclusion, 'failure');
   assert.equal(mergeDecision([], []).ok, false);
   const job = parse(readFileSync('.github/workflows/ci.yml', 'utf8')).jobs['main-health'];

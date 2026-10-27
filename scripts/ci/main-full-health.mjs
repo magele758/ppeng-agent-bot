@@ -16,6 +16,15 @@ export function decisive(runs) {
   return null;
 }
 
+export const HEAD_GATE_CHECK = 'Release gate / Main release gate';
+
+/** The pull-request token can read check-runs on this commit when run list --commit is empty. */
+export function headRunsFromChecks(checkRuns, sha) {
+  const gate = (checkRuns ?? []).find((run) => run.name === HEAD_GATE_CHECK);
+  if (!gate) return [];
+  return [{ conclusion: gate.conclusion, status: gate.status, headSha: sha }];
+}
+
 export function mergeDecision(runsOnMain, headRuns) {
   const head = decisive(headRuns);
   if (head?.conclusion === 'success') return { ok: true, reason: '这个版本自己的完整验证已经通过' };
@@ -28,10 +37,19 @@ export function mergeDecision(runsOnMain, headRuns) {
   };
 }
 
-function runs(args) {
+function gh(args) {
   const result = spawnSync('gh', args, { encoding: 'utf8', env: sanitizeScriptEnv() });
-  if (result.status !== 0) throw new Error(result.stderr.trim() || `gh ${args[2] ?? ''} failed`);
-  return JSON.parse(result.stdout || '[]');
+  if (result.status !== 0) throw new Error(result.stderr.trim() || `gh ${args[0]} failed`);
+  return result.stdout;
+}
+
+function runs(args) {
+  return JSON.parse(gh(args) || '[]');
+}
+
+function checkRuns(repo, sha) {
+  const text = gh(['api', '--paginate', `repos/${repo}/commits/${sha}/check-runs`, '--jq', '.check_runs[] | {name,conclusion,status}']);
+  return text.split('\n').filter(Boolean).map((line) => JSON.parse(line));
 }
 
 function main() {
@@ -40,7 +58,7 @@ function main() {
   if (!repo || !sha) throw new Error('GITHUB_REPOSITORY and GITHUB_SHA are required');
   const fields = 'databaseId,headSha,conclusion,status,event,url';
   const onMain = runs(['run', 'list', '--repo', repo, '--workflow', 'full-validation.yml', '--branch', 'main', '--limit', '30', '--json', fields]);
-  const onHead = runs(['run', 'list', '--repo', repo, '--workflow', 'full-validation.yml', '--commit', sha, '--limit', '10', '--json', fields]);
+  const onHead = headRunsFromChecks(checkRuns(repo, sha), sha);
   const decision = mergeDecision(onMain, onHead);
   console.log(`[main-full-health] ${decision.ok ? 'pass' : 'fail'}: ${decision.reason}`);
   if (!decision.ok) process.exitCode = 1;
