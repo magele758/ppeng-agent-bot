@@ -61,7 +61,7 @@ gate 只卡发布；要让**合并**也被卡住，需要仓库管理员在 GitH
 2. **Branch protection rules** → **Add rule**（已有则 **Edit**），**Branch name pattern** 填 `main`。
 3. 勾选 **Require status checks to pass before merging**。
 4. 勾选 **Require branches to be up to date before merging**。
-5. 在搜索框输入 `Main release gate`，选中 **`Release gate / Main release gate`**（列表只显示近期跑过的检查；搜不到先让任一 PR 跑一次 CI）。
+5. 在搜索框分别选中 **`Quick gate`**、**`Core unit tests`**、**`Main full health`**（列表只显示近期跑过的检查；搜不到先让任一 PR 跑一次 CI）。`Release gate / Main release gate` 仍是发布证据，不代替这三项合并条件。
 6. （建议）勾选 **Do not allow bypassing the above settings**，保存 **Create / Save changes**。
 
 配置后 `pnpm run ci:gate-health` 的 `Branch protection` 一行会显示 `required: yes`。未配置时 CI 失败只是红叉，不会阻止合并。

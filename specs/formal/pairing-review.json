@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-10-27T04:55:00.000Z",
-  "reviewNote": "Overflow receipts echoed into the transcript before the overflow claim still record summaryId. Turn-applied and coalesced deliveries stay on their own message. executeScopedTool and waitStatus were split so each function stays at or below complexity 30. Refusal still happens before tool_start. Wait decisions are unchanged. Tool pairing, approval, lifecycle, restart and concurrency control flow are unchanged.",
+  "reviewedAt": "2026-10-27T08:10:00.000Z",
+  "reviewNote": "Quick gate now rejects a touched function whose cyclomatic complexity exceeds 30 before the existing checks. Overflow summary lineage, tool refusal order, and wait decisions are unchanged. Tool pairing, approval, lifecycle, restart and concurrency control flow are unchanged.",
   "mapping": [
     {
       "step": "Execute/approval/result persistence and fold recovery; real source component probes (not a full kernel proof)",
@@ -299,7 +299,7 @@
     "scripts/ci/release-results.mjs": "0510504936683689e82475a8b7111a89575d14eed06c4e9112e9ca2d4bbc2186",
     "scripts/ci/test-partition.mjs": "d6018aebae05ebc907ddd0de10c6905ee68e0c1ab2406057a7f09bb21b8ed28e",
     "scripts/test/release-workflow-policy.test.mjs": "c0c9b7557041aa881a03d6848a801ad9a3b6846a77dfc80335c57980a059c51d",
-    "scripts/ci/quick-gate.mjs": "263fa6f428a24c9eaf8961fbbd354ad7c59a984b0d47eb2ce00a4083322ca8f6",
+    "scripts/ci/quick-gate.mjs": "5243836461a001d3b82f8fda39aaf2581e639c4cc691bff0301ab53714786f9c",
     "scripts/ci/validation-artifacts.mjs": "47472f7b9586a1bfe9f64381975d99e017e191c833d4678ee74a2b82e5c05518",
     "scripts/test/ci-audit.test.mjs": "c355ce76ff525786fbaa2e7c520bf7b4507427b135bd5508deedd14d6e00d07f",
     "scripts/test/ci-speedup-workflow.test.mjs": "26d52b7cd1cfb903935ed1bbdd91c46487c2693d7d0e8625750582cfd6b1ec29",
