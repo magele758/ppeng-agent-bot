@@ -1,0 +1,122 @@
+/* Sanctum skin. Only html[data-skin="sanctum"]. Classic tokens stay on :root. */
+@font-face {
+  font-family: "Sanctum Serif";
+  src: url("/fonts/sanctum/cormorant-garamond-500.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Sanctum Serif";
+  src: url("/fonts/sanctum/cormorant-garamond-600.woff2") format("woff2");
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Sanctum Han";
+  src: url("/fonts/sanctum/noto-serif-sc-500.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Sanctum Sans";
+  src: url("/fonts/sanctum/outfit-400.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Sanctum Sans";
+  src: url("/fonts/sanctum/outfit-500.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Sanctum Sans Han";
+  src: url("/fonts/sanctum/noto-sans-sc-400.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+
+html[data-skin="sanctum"] {
+  --color-text-primary: #e5dfd1;
+  --color-text-secondary: #c3aa77;
+  --color-text-inverse: #11170f;
+  --color-surface-base: #0a100f;
+  --color-surface-strong: #111916;
+  --color-surface-raised: #c3aa77;
+  --color-border-strong: #303a32;
+  --color-danger: #ce8870;
+  --color-warn: #d0b279;
+  --color-ok: #bec79c;
+  --bg-void: #0a100f;
+  --bg-deep: #0a100f;
+  --bg-raised: #111916;
+  --bg-inset: #0c1411;
+  --border: #303a32;
+  --border-strong: #303a32;
+  --stroke: #303a32;
+  --text: #e5dfd1;
+  --muted: #aaa99e;
+  --muted-2: #aaa99e;
+  --accent: #c3aa77;
+  --accent-bright: #e4c892;
+  --accent-soft: rgba(195, 170, 119, 0.16);
+  --accent-text: #11170f;
+  --chat-bg: #0a100f;
+  --chat-surface: #111916;
+  --chat-border: #303a32;
+  --chat-user-bubble: #17211c;
+  --chat-assistant-bg: transparent;
+  --chat-tool-bg: rgba(195, 170, 119, 0.08);
+  --chat-composer-bg: #0c1411;
+  --chat-send: #c3aa77;
+  --chat-send-hover: #e4c892;
+  --chat-send-disabled: rgba(195, 170, 119, 0.35);
+  --ui-bg: #0a100f;
+  --ui-surface: #111916;
+  --ui-border: #303a32;
+  --ui-text: #e5dfd1;
+  --ui-text-muted: #aaa99e;
+  --ui-accent: #c3aa77;
+  --ui-accent-contrast: #11170f;
+  --ui-danger: #ce8870;
+  --ui-warn: #d0b279;
+  --ui-ok: #bec79c;
+  --ui-focus: 2px solid #c3aa77;
+  --font-family-stack: "Sanctum Sans", "Sanctum Sans Han", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-display: "Sanctum Serif", "Sanctum Han", "Songti SC", "STSong", serif;
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius-control: 0;
+  --radius: 0;
+  --ui-radius-sm: 0;
+  --ui-radius-md: 0;
+  --ui-radius-lg: 0;
+  background:
+    radial-gradient(ellipse at 92% 0%, rgba(195, 170, 119, 0.14), transparent 42%),
+    #0a100f;
+  color: #e5dfd1;
+}
+
+html[data-skin="sanctum"] body {
+  background: transparent;
+  color: #e5dfd1;
+  font-family: var(--font-family-stack);
+}
+
+html[data-skin="sanctum"] :is(.ui-section__title, .ag-panel__title, .chat-panel-title, .login-card__title) {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: #eee4cb;
+}
+
+html[data-skin="sanctum"] :is(.btn-primary, .chat-send-btn, .a2ui-button--primary) {
+  border-radius: 0;
+  background: #c3aa77;
+  color: #11170f;
+  border-color: #c3aa77;
+}
+
+html[data-skin="sanctum"] :focus-visible {
+  outline-color: #c3aa77;
+}

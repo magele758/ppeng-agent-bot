@@ -1,0 +1,172 @@
+html[data-skin="demon"] {
+  --color-text-primary: #f4ead8;
+  --color-text-secondary: #e6b15a;
+  --color-text-inverse: #1a0c0e;
+  --color-surface-base: #12080c;
+  --color-surface-strong: #1c1014;
+  --color-surface-raised: #e25822;
+  --color-border-strong: #6b1d2a;
+  --color-danger: #e25822;
+  --color-warn: #d4a04a;
+  --color-ok: #b7c49a;
+  --bg-inset: #0c0608;
+  --muted: #c4b09a;
+  --accent: #e25822;
+  --chat-bg: #12080c;
+  --chat-surface: #1c1014;
+  --chat-border: #6b1d2a;
+  --chat-send: #e25822;
+  --chat-send-hover: #f0713a;
+  --ui-bg: #12080c;
+  --ui-surface: #1c1014;
+  --ui-border: #6b1d2a;
+  --ui-text: #f4ead8;
+  --ui-text-muted: #c4b09a;
+  --ui-accent: #e25822;
+  --ui-accent-contrast: #1a0c0e;
+  --ui-focus: 2px solid #e6b15a;
+  --font-family-stack: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --font-display: Georgia, "Songti SC", serif;
+  --text: #f4ead8;
+  --muted-2: #c4b09a;
+  --bg-void: #12080c;
+  --bg-deep: #12080c;
+  --bg-raised: #1c1014;
+  --border: #6b1d2a;
+  --border-strong: #6b1d2a;
+  --accent-text: #1a0c0e;
+  --accent-bright: #f0713a;
+  --chat-user-bubble: #2a141c;
+  --chat-composer-bg: #1c1014;
+  --chat-send-disabled: rgba(226, 88, 34, 0.35);
+  --ui-danger: #e25822;
+  --ui-warn: #d4a04a;
+  --ui-ok: #b7c49a;
+  background: #12080c;
+  color: #f4ead8;
+}
+
+html[data-skin="demon"] body {
+  background: #12080c;
+  color: #f4ead8;
+  font-family: var(--font-family-stack);
+}
+
+html[data-skin="demon"] .lab-rail {
+  background:
+    linear-gradient(180deg, rgba(107, 29, 42, 0.55), rgba(28, 16, 20, 0) 32%),
+    #1c1014;
+  border-right-color: #6b1d2a;
+  color: #f4ead8;
+}
+
+html[data-skin="demon"] .lab-rail__link {
+  color: #e6b15a;
+  background: transparent;
+  border-color: transparent;
+}
+
+html[data-skin="demon"] .lab-rail__link:hover {
+  color: #f4ead8;
+  background: rgba(107, 29, 42, 0.42);
+  border-color: transparent;
+}
+
+html[data-skin="demon"] .lab-rail__link[aria-current="page"] {
+  color: var(--color-text-inverse);
+  background: #e25822;
+  border-color: #e25822;
+}
+
+html[data-skin="demon"] .lab-rail__link[aria-current="page"] .lab-rail__icon {
+  color: var(--color-text-inverse);
+}
+
+html[data-skin="demon"] .lab-main {
+  position: relative;
+  isolation: isolate;
+  background: #12080c;
+  color: #f4ead8;
+}
+
+html[data-skin="demon"] .lab-main::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 130% 100% at 50% 46%, transparent 34%, rgba(107, 29, 42, 0.34) 68%, rgba(88, 22, 34, 0.58) 100%),
+    radial-gradient(circle at 14% 0%, rgba(230, 177, 90, 0.16), transparent 26%),
+    radial-gradient(circle at 86% 8%, rgba(226, 88, 34, 0.12), transparent 22%);
+}
+
+html[data-skin="demon"] .btn-primary,
+html[data-skin="demon"] .chat-send-btn {
+  background: #e25822;
+  color: var(--color-text-inverse);
+  border-color: #e25822;
+}
+
+html[data-skin="demon"] .btn-primary:hover:not(:disabled):not(.is-loading),
+html[data-skin="demon"] .chat-send-btn:hover:not(:disabled) {
+  background: #f0713a;
+  color: var(--color-text-inverse);
+  border-color: #f0713a;
+}
+
+html[data-skin="demon"] .chat-send-btn.chat-send-btn--steer,
+html[data-skin="demon"] .chat-send-btn.chat-send-btn--steer:hover {
+  background: #6b1d2a;
+  border-color: #e6b15a;
+  color: #e6b15a;
+}
+
+html[data-skin="demon"] .chat-turn--user .chat-bubble {
+  background: #2a141c;
+  border-color: #6b1d2a;
+  color: #f4ead8;
+}
+
+html[data-skin="demon"] .chat-turn__label {
+  color: #e6b15a;
+}
+
+html[data-skin="demon"] .chat-tool-fold {
+  background: #1c1014;
+  border-color: #6b1d2a;
+  color: #f4ead8;
+}
+
+html[data-skin="demon"] .chat-tool-fold__pill--subagent {
+  color: #e25822;
+  background: rgba(226, 88, 34, 0.14);
+  border-color: rgba(226, 88, 34, 0.45);
+}
+
+html[data-skin="demon"] .chat-tool-fold__pill--subagent-role {
+  color: #e6b15a;
+  background: rgba(230, 177, 90, 0.12);
+  border-color: rgba(230, 177, 90, 0.4);
+}
+
+html[data-skin="demon"] .chat-tool-fold__pill--team {
+  color: #f4ead8;
+  background: rgba(107, 29, 42, 0.55);
+  border-color: #6b1d2a;
+}
+
+html[data-skin="demon"] .ui-section__title {
+  font-family: var(--font-display);
+  color: #e6b15a;
+}
+
+html[data-skin="demon"] .seg-option.is-on {
+  background: #e25822;
+  color: var(--color-text-inverse);
+}
+
+html[data-skin="demon"] .list-item:hover {
+  background: #2a141c;
+  border-color: #6b1d2a;
+}

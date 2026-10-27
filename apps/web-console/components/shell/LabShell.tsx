@@ -6,6 +6,7 @@ import type { AuthUser } from '@/lib/auth';
 import { AccountMenu } from '../AccountMenu';
 import { LanguageToggle } from '../LanguageToggle';
 import { ModelSettingsDialog } from '../ModelSettingsDialog';
+import { SkinToggle } from '../SkinToggle';
 import { ThemeToggle } from '../ThemeToggle';
 import { AgentsSection } from '../sections/agents/AgentsSection';
 import { ChatSection } from '../sections/chat/ChatSection';
@@ -52,6 +53,7 @@ export function LabShell({ authUser }: { authUser: AuthUser | null }) {
                 <span className="lab-rail__label">{t('nav.configureModel')}</span>
               </button>
               <LanguageToggle compact={collapsed} />
+              <SkinToggle />
               <ThemeToggle />
               {authUser ? <AccountMenu user={authUser} compact={collapsed} /> : null}
             </>

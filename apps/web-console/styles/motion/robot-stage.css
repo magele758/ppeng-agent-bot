@@ -1,0 +1,67 @@
+/* robot-stage: follow-spot sweep and amber marquee */
+
+html[data-skin="robot-stage"] .lab-main::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 38%;
+  z-index: 0;
+  pointer-events: none;
+  background-image: radial-gradient(
+    ellipse 48% 100% at 50% 0%,
+    rgba(255, 248, 230, 0.92) 0%,
+    rgba(255, 176, 0, 0.62) 28%,
+    rgba(255, 176, 0, 0.2) 52%,
+    transparent 74%
+  );
+  background-repeat: no-repeat;
+  background-size: 42% 100%;
+  background-position: 50% 0;
+  mix-blend-mode: screen;
+  animation: stage-spot 8s ease-in-out infinite alternate;
+}
+
+html[data-skin="robot-stage"] .lab-rail::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  z-index: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle, #ffb000 1px, transparent 1.05px);
+  background-repeat: repeat-x;
+  background-size: 12px 2px;
+  background-position: 0 100%;
+  animation: stage-marquee 2.4s linear infinite;
+}
+
+@keyframes stage-spot {
+  from {
+    background-position: 10% 0;
+  }
+
+  to {
+    background-position: 90% 0;
+  }
+}
+
+@keyframes stage-marquee {
+  from {
+    background-position: 0 100%;
+  }
+
+  to {
+    background-position: 12px 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-skin="robot-stage"] .lab-main::after,
+  html[data-skin="robot-stage"] .lab-rail::after {
+    animation: none;
+  }
+}

@@ -1,0 +1,18 @@
+html[data-skin] .chat-feed {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-skin] .lab-main::before,
+  html[data-skin] .lab-main::after,
+  html[data-skin] .lab-rail::before,
+  html[data-skin] .lab-rail::after,
+  html[data-skin] .lab-shell::before,
+  html[data-skin] .lab-shell::after,
+  html[data-skin] .chat-send-btn,
+  html[data-skin] .btn-primary {
+    animation: none !important;
+  }
+}

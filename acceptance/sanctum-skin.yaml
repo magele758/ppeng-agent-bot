@@ -1,0 +1,25 @@
+id: sanctum-skin
+title: 圣所外观可切换且不覆盖原主题
+status: implemented
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  外观与深浅色分开存。默认经典。圣所只在选中时生效，切回经典后深色、浅色、跟随系统仍是切换前的选择。
+requirement: |
+  加个主题切换能力，能动态切换，免得我怕你搞烂了，然后就可以分多个Agent去先搞一版，我看看效果
+criteria:
+  - id: AC-1
+    given: 用户打开设置里的主题区域
+    when: 在经典和圣所之间切换
+    then: 页面立刻换成对应外观，刷新后仍保持刚才的选择
+  - id: AC-2
+    given: 用户已经选了深色、浅色或跟随系统
+    when: 打开圣所再切回经典
+    then: 深浅色选择没有被圣所改掉，切回后仍是原来的深浅色
+  - id: AC-3
+    given: 用户选了圣所
+    when: 查看页面
+    then: 底色是炭绿而不是纯黑，强调色是旧金而不是链接蓝，标题使用衬线
+  - id: AC-4
+    given: 这台浏览器没有选过外观
+    when: 打开控制台
+    then: 仍是经典外观，不会一打开就变成圣所

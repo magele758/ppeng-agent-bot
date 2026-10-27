@@ -62,6 +62,18 @@ export const settings = {
     dark: 'Dark',
     system: 'Follow system'
   },
+  skin: {
+    label: 'Appearance',
+    desc: 'Switch any time. This does not change light, dark, or follow system.',
+    classic: 'Classic',
+    sanctum: 'Sanctum',
+    cyberpunk: 'Cyberpunk',
+    demon: "Demon's gathering",
+    'robot-stage': 'Robot stage',
+    pixel: 'Pixel',
+    kindergarten: 'Kindergarten',
+    minimal: 'Minimal'
+  },
   model: {
     globalDefault: {
       title: 'Global default model',

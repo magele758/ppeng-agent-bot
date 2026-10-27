@@ -3,7 +3,25 @@
 @import '../styles/shell.css';
 @import '../styles/primitives.css';
 @import '../styles/mobile.css';
-
+@import '../styles/sanctum-tokens.css';
+@import '../styles/sanctum-shell.css';
+@import '../styles/sanctum-chat.css';
+@import '../styles/sanctum-admin.css';
+@import '../styles/sanctum-ornament.css';
+@import '../styles/skin-menu.css';
+@import '../styles/skin-cyberpunk.css';
+@import '../styles/skin-demon.css';
+@import '../styles/skin-robot-stage.css';
+@import '../styles/skin-pixel.css';
+@import '../styles/skin-kindergarten.css';
+@import '../styles/skin-minimal.css';
+@import '../styles/motion/sanctum.css';
+@import '../styles/motion/cyberpunk.css';
+@import '../styles/motion/demon.css';
+@import '../styles/motion/robot-stage.css';
+@import '../styles/motion/pixel.css';
+@import '../styles/motion/kindergarten.css';
+@import '../styles/skin-motion-guard.css';
 /* Keep rem typography at the browser's normal reading size. */
 html {
   font-size: 100%;
