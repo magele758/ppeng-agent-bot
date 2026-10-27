@@ -179,6 +179,27 @@ test('scanTestSource reads the title of table-driven .each(...)(title) tests', (
   ]);
 });
 
+test('cloud results do not fail criteria that only have browser tests [AC:ci-fast-and-bihourly-gates#AC-3] [AC:ci-action-reliability#AC-5]', () => {
+  const s = spec({ status: 'implemented' });
+  const e2eOnly = scanTestSource(`test('browser ${tag('demo', 'AC-1')}', () => {});`, 'e2e/demo.spec.ts');
+  const unit = scanTestSource(`test('unit ${tag('demo', 'AC-2')}', () => {});`, 'packages/core/test/demo.test.js');
+  const report = evaluateAcceptance({
+    specs: [s],
+    staticTests: [...e2eOnly, ...unit],
+    results: [result(`unit ${tag('demo', 'AC-2')}`, 'passed', 'unit.xml')],
+    omittedRunners: ['e2e'],
+  });
+  assert.equal(report.ok, true);
+  assert.equal(report.specs[0].criteria.find((c) => c.id === 'AC-1').state, 'omitted');
+  assert.equal(report.specs[0].criteria.find((c) => c.id === 'AC-2').state, 'passing');
+  const required = evaluateAcceptance({
+    specs: [s],
+    staticTests: [...e2eOnly, ...unit],
+    results: [result(`unit ${tag('demo', 'AC-2')}`, 'passed', 'unit.xml')],
+  });
+  assert.equal(required.ok, false);
+});
+
 test('skip / todo / fixme tests do not count as coverage statically [AC:acceptance-gate#AC-2]', () => {
   const t1 = tag('demo', 'AC-1');
   const src = `test.skip('a ${t1}', () => {});\nit.todo('b ${t1}');\ntest.fixme('c ${t1}', () => {});\ntest.only('d ${t1}', () => {});`;

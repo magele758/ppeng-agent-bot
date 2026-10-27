@@ -1,4 +1,5 @@
-# Frequent feedback is bounded; full checks remain manually available and run every two hours.
+# Frequent feedback stays inside two minutes. Core unit tests run beside it.
+# Full validation starts when main updates and still runs every two hours.
 name: CI
 on:
   push:
@@ -54,3 +55,44 @@ jobs:
           path: test-results/quick-gate.json
           if-no-files-found: error
           retention-days: 30
+  core:
+    name: Core unit tests
+    if: ${{ github.event_name != 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build workspace packages
+        run: node scripts/build-workspace.mjs
+      - name: Allow precheck network namespaces
+        run: |
+          if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+      - name: Core unit tests without coverage
+        run: node scripts/ci/core-unit.mjs
+  main-health:
+    name: Main full health
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Block merge while main full validation is red
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/ci/main-full-health.mjs

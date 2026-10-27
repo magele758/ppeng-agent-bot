@@ -90,10 +90,19 @@ test('scroll prepends history without a button or jumping [AC:chat-inline-histor
 test('failed history offers retry without an automatic request loop [AC:chat-inline-history#AC-3]', async ({page}) => {
   const fixture = historyFixture(true);
   await openChat(page,390,fixture.handler);
-  // The first page has to be on screen before scrolling. Scrolling an empty feed
-  // leaves the reader stuck to the bottom, so the failed older page never starts.
-  await expect(page.locator('#playMessages').getByText('History row 150', { exact: true })).toBeVisible();
-  await top(page);
+  const feed = page.locator('#playMessages');
+  await expect(feed.getByText('History row 150', { exact: true })).toBeVisible();
+  // One jump to the top can be swallowed while the feed is still stuck to the
+  // bottom. Leave the bottom and enter the top until the failed page starts.
+  await expect.poll(async () => {
+    await feed.evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+      el.dispatchEvent(new Event('scroll', { bubbles: true }));
+      el.scrollTop = 0;
+      el.dispatchEvent(new Event('scroll', { bubbles: true }));
+    });
+    return fixture.requests.length;
+  }).toBe(1);
   const retry = page.getByTestId('feed-retry-older');
   await expect(retry).toBeVisible();
   await page.waitForTimeout(600);

@@ -54,7 +54,7 @@ const TESTISH_RE = /(?:\.(?:test|spec)\.[cm]?[jt]sx?$)|(?:(?:^|\/)(?:test|tests|
 class UsageError extends Error {}
 
 function parseArgs(argv) {
-  const args = { root: REPO_ROOT, out: null, results: [], collect: null, stage: 'software' };
+  const args = { root: REPO_ROOT, out: null, results: [], collect: null, stage: 'software', omittedRunners: [] };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const next = () => {
@@ -63,6 +63,10 @@ function parseArgs(argv) {
     };
     if (a === '--stage') { args.stage = next(); if (!['software','deployment','all'].includes(args.stage)) throw new UsageError('Invalid acceptance stage'); }
     else if (a === '--results') args.results.push(next());
+    else if (a === '--omit-runners') {
+      args.omittedRunners.push(...next().split(',').map((s) => s.trim()).filter(Boolean));
+      for (const r of args.omittedRunners) if (!RUNNERS.includes(r)) throw new UsageError(`--omit-runners: unknown runner "${r}"`);
+    }
     else if (a === '--out') args.out = next();
     else if (a === '--root') args.root = path.resolve(next());
     else if (a === '--collect') {
@@ -227,7 +231,7 @@ function main() {
   }
   const { staticTests, orphanFiles, runnableCount } = scanTests(args.root);
   const results = args.results.length ? loadResults(args.results, args.root) : null;
-  const report = evaluateAcceptance({ specs, specErrors, specWarnings, staticTests, orphanFiles, results, stage: args.stage });
+  const report = evaluateAcceptance({ specs, specErrors, specWarnings, staticTests, orphanFiles, results, stage: args.stage, omittedRunners: args.omittedRunners });
 
   const md = renderMarkdown(report);
   fs.mkdirSync(args.out, { recursive: true });
