@@ -159,6 +159,8 @@ test(' /model 切换、拒绝未知或重名，并能改回默认 [AC:bot-foreve
   });
   setCatalogDefaultRef(rt.store, { providerId: 'prov-a', modelId: 'alpha-1' });
   assert.equal(rt.getSession(sid).metadata.modelOverride, undefined);
+  const sessionIds = () => rt.listSessions().map((session) => session.id).sort();
+  const beforeModel = sessionIds();
 
   const switched = await rt.handleBotChatCommand(sid, '/model beta-1');
   assert.equal(switched?.code, 'model_set');
@@ -166,7 +168,7 @@ test(' /model 切换、拒绝未知或重名，并能改回默认 [AC:bot-foreve
   assert.deepEqual(rt.getSession(sid).metadata.modelOverride, { providerId: 'prov-b', modelId: 'beta-1' });
   const adapted = resolveSessionModelAdapter(rt.store, rt.getSession(sid), {}, rt.modelAdapter);
   assert.equal(adapted.options?.model, 'beta-1');
-  assert.equal(rt.listSessions().length, 1);
+  assert.deepEqual(sessionIds(), beforeModel);
 
   const unknown = await rt.handleBotChatCommand(sid, '/model nope');
   assert.equal(unknown?.code, 'model_unknown');

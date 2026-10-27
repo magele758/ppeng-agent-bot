@@ -41,11 +41,14 @@ function mapOverflowSources(store:SqliteStateStore,sessionId:string,pending:Huma
  const summary=store.listUnclaimedInbox(sessionId).find(item=>item.key===INBOX_OVERFLOW_KEY);if(!summary)return pending;
  return pending.map(request=>{
   if(request.kind!=='steer')return request;
-  const receipt=store.db.prepare('SELECT claimed_at FROM session_inbox WHERE id=?').get(request.id) as {claimed_at:string|null}|undefined;
+  const receipt=store.db.prepare('SELECT claimed_at, decision FROM session_inbox WHERE id=?').get(request.id) as {claimed_at:string|null;decision:string|null}|undefined;
   if(!receipt?.claimed_at)return request;
+  // Enqueue echoes a next-step steer into the transcript before overflow claims it.
+  // That echo is not model delivery. Only a turn claim, or a summary already written, is.
+  const echoedBeforeOverflow=!request.summaryId&&receipt.decision!=='applied'&&receipt.decision!=='coalesced';
   const sourceKey=request.summaryId?INBOX_OVERFLOW_KEY:request.key;
   const floor=request.summarySeqFloor??request.seq;
-  if(store.db.prepare('SELECT 1 FROM session_messages WHERE session_id=? AND key=? AND seq>? LIMIT 1').get(sessionId,sourceKey??'',floor))return request;
+  if(!echoedBeforeOverflow&&store.db.prepare('SELECT 1 FROM session_messages WHERE session_id=? AND key=? AND seq>? LIMIT 1').get(sessionId,sourceKey??'',floor))return request;
   return {...request,summaryId:summary.id,summarySeqFloor:seq};
  });
 }

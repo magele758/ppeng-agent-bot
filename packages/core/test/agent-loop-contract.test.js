@@ -78,8 +78,8 @@ test('kernel-lock: fold() is read-only and does not claim inbox', async () => {
   assert.ok(Array.isArray(view));
   assert.ok(view.some((m) => m.parts.some((p) => p.type === 'text' && p.text === 'hello')));
   assert.ok(
-    !view.some((m) => m.parts.some((p) => p.type === 'text' && String(p.text).includes('PENDING-STEER'))),
-    'unclaimed steer must not appear in fold'
+    view.some((m) => m.parts.some((p) => p.type === 'text' && String(p.text).includes('PENDING-STEER'))),
+    'next-step steer is echoed into the transcript so the running turn can see it'
   );
   const after = runtime.store.listUnclaimedInbox(session.id);
   assert.equal(after.length, 1);

@@ -16,9 +16,9 @@ test('BotFace runs both effects before the avatar return so hook order stays sta
 test('BotFace keeps the living face subscribed when an avatar is removed', () => {
   const motionEffect = body.lastIndexOf('useEffect(() => {', body.indexOf("matchMedia('(prefers-reduced-motion: reduce)')"));
   const subscribe = body.indexOf('return subscribeFace(', motionEffect);
-  const end = body.indexOf('}, [showAvatar, mood])', motionEffect);
+  const end = body.indexOf('}, [showAvatar, mood, faceStyle]);', motionEffect);
   assert.ok(motionEffect > 0 && subscribe > motionEffect && end > subscribe);
   const effect = body.slice(motionEffect, end);
   assert.equal(effect.includes('if (!svg) return'), false);
-  assert.match(effect, /if \(showAvatar\) return/);
+  assert.match(effect, /if \(showAvatar \|\| faceStyle === 'soft' \|\| faceStyle === 'bloub'\) return/);
 });

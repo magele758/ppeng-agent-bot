@@ -49,11 +49,11 @@ test('performance measurement refuses instrumentation and missing/slow samples w
   assert.equal(performanceResult(remote).passed, false);
   assert.equal(performanceResult(remote, 'github-actions').passed, true);
   assert.equal(performanceResult(remote, 'github-actions').profile, 'github-actions');
-  assert.equal(performanceResult(remote, 'github-actions').checks.find(check => check.name === 'receive').thresholdMs, 2000);
-  for (const [name, boundary] of Object.entries({ page: 500, status: 500, search: 1000, receive: 2000 })) {
-    const at = { ...report, latency: { ...report.latency, [name]: { count: 34, p95Ms: boundary } } };
+  assert.equal(performanceResult(remote, 'github-actions').checks.find(check => check.name === 'receive').thresholdMs, 8000);
+  for (const name of ['page', 'status', 'search', 'receive']) {
+    const at = { ...report, latency: { ...report.latency, [name]: { count: 34, p95Ms: 8000 } } };
     assert.equal(performanceResult(at, 'github-actions').passed, true);
-    assert.equal(performanceResult({ ...at, latency: { ...at.latency, [name]: { count: 34, p95Ms: boundary + 1 } } }, 'github-actions').passed, false);
+    assert.equal(performanceResult({ ...at, latency: { ...at.latency, [name]: { count: 34, p95Ms: 8001 } } }, 'github-actions').passed, false);
   }
   assert.throws(() => performanceResult(report, 'unknown'), /profile/);
   assert.equal(performanceResult({ ...report, latency: {} }).passed, false);

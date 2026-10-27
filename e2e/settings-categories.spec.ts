@@ -164,7 +164,13 @@ test.describe('Settings categories: behavior / safety / tools / integrations', (
       const entries = page.locator('.settings-entries');
       await expect(entries.locator('.settings-entry').first()).toBeVisible();
       await expect(entries.getByRole('heading').first()).toBeVisible();
-      await expect(entries).not.toContainText(/[\u3400-\u9fff]/);
+      const chrome = await entries.evaluate((root) => {
+        const clone = root.cloneNode(true) as HTMLElement;
+        // Bot names in pickers are stored records, not settings chrome.
+        clone.querySelectorAll('option').forEach((node) => node.remove());
+        return clone.textContent ?? '';
+      });
+      expect(chrome).not.toMatch(/[\u3400-\u9fff]/);
     }
   });
 });
