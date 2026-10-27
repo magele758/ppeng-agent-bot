@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-10-27T08:45:00.000Z",
-  "reviewNote": "Merged main: conversation clock stamps writtenAt before budgeting and labels room history in the prompt only. Cloud full validation no longer runs Playwright; HTTP regression and integration remain blocking. Quick gate rejects a touched function over complexity 30, compared with the merge commit's first parent. Tool pairing, approval, lifecycle, restart and concurrency control flow are unchanged.",
+  "reviewedAt": "2026-10-27T09:20:00.000Z",
+  "reviewNote": "Room context refresh keeps the unlimited step default when the canonical chat omits maxTurns. Continuation delivery assertions accept the written-at prefix and still require the original text. Tool pairing, approval, lifecycle, restart and concurrency control flow are unchanged.",
   "mapping": [
     {
       "step": "Public runtime, cancellation, approvals and completion; exercised through RawAgentRuntime with SQLite",
@@ -353,11 +353,11 @@
     "packages/core/test/superbot-factory-setup.test.js": "a2d5a5f3efe63ae668a1cc147e6e077ee06245081b619db64d61bf17a95e941b",
     "packages/core/src/reply-quote.ts": "e3551eb81ae046f631824c896a67b231052314068ef84c7d472c7a5069084234",
     "packages/core/src/session/reply-quote.ts": "945f595cb0004dac6b35d66b820a5cd6ba865d41bc86f1363ecdde5dc9c42b27",
-    "packages/core/src/rooms/index.ts": "f3d3280576d9673ee4e89129f0feae70d3ee5796a22756bd980d6533ded0e584",
+    "packages/core/src/rooms/index.ts": "797c46686865621ade0c0ad376379f4233afcf2f7c1c99db325a81fabca03123",
     "packages/core/src/session/human-continuation.ts": "68fa532461283cdc8b8555ed82c26933efd4f3542414d6e17ca8e03316a89dcf",
     "packages/core/src/turn/prepare-view.ts": "f1d838020309ea069f9b9fae8242d870c2a07389f78f62313e0c471178d4f901",
     "packages/core/test/bot-reply-quote.test.js": "6c3eb4dcbb1fae159d2c51979e9f2caf7c2ffff964e201ac76079dbcb5dd219a",
-    "packages/core/test/human-continuation.test.js": "e0965f312d1929432e1a72f3964db311f3976aeaa105ad7b9a58fac0b42c3888",
+    "packages/core/test/human-continuation.test.js": "aa7c22e3cfae700ce93f743e764b0393644450b833fadfd866c5fe0b0421ad8a",
     "packages/agent-loop/src/session/step-inbox-context.test.ts": "3c6ab63684e0cff31ea32a1eef6408afee2a208ab74355f2e9c1f001876a84b4",
     "packages/agent-loop/src/session/apply-claimed-inbox.test.ts": "15cc1445fc4c8ebf53ac8d4c056567287249908a90cce4b91afe0e49645979c2",
     "apps/daemon/src/routes/sessions.ts": "ce2b94b0481d402f4cf5c4728c7a5a3d7b19c97710f4001cc34c3aa5afb91f96",
