@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-10-28T18:42:01.000Z",
-  "reviewNote": "Host-parks durable wait for owned bg_run; stopAt includes bg_run so agent-loop ends the turn without touching runSessionKernel (CRAP). Pairing/lifecycle/restart/concurrency control-flow unchanged.",
+  "reviewedAt": "2026-10-28T19:00:09.000Z",
+  "reviewNote": "Quieter terminal goal notices (Done/Failed/Blocked/Needs review) replace JSON dumps in chat; Lab still holds full state. Merged origin/main after #315 host-park bg_run. Pairing/lifecycle/restart/concurrency control-flow unchanged.",
   "mapping": [
     {
       "step": "Public runtime, cancellation, approvals and completion; exercised through RawAgentRuntime with SQLite",
@@ -408,7 +408,7 @@
     "packages/core/src/runtime/spawn-policy.ts": "4889022804d3797796d018abfbe084a2373f1bf630098c6470d932a0c67ebabd",
     "packages/core/src/memory/bot-memory-scope.ts": "bffdcf6cf3e848ea1f2fcc5059b54345d3ee9d49ff98b3a57e917e88593d50c9",
     "packages/core/src/tools/product-admin-tools.ts": "7589adbe3997cf67c767c5add9da6a06127fb1698c81b9ad6b2a0a5aaef8a117",
-    "packages/core/src/bots/goals/runtime-host.ts": "e961139f38e1414bad10e01a7cce94fc7dc1baf13c9b7d8a0cb2e94b97df075c",
+    "packages/core/src/bots/goals/runtime-host.ts": "4fbccb7cb8047c34705fd6dd30ff1eb147ac6fa19e0ab17c16ab5c7d4bd2f9e4",
     "packages/core/src/bots/goals/runtime-dispatch.ts": "a4c764dd437033a9363bbf96e1354bc391450f36294d171f3441d55f5ef655c1",
     "packages/core/src/bots/goals/tool-gateway.ts": "713852550276157a250c8c26670f1fffbdc4d996e34ecfa16acf46fb74e96921",
     "packages/core/src/bots/goals/worker-fence.ts": "e34934141e7b243b46db304bfbde8a5895302e86149965f7a2049496a117a808",
@@ -437,7 +437,7 @@
     "packages/core/src/jev/apply.ts": "8574ad0574a301d6c388e0fc0ae5a4f231b2ae816e722df880441db02ed5ed95",
     "packages/core/test/tool-exposure-tiers.test.js": "ea194b26771f656e7346e69c6130bbac1351c08c2ce505128902e9de245f7056",
     "packages/core/src/bots/goals/specialty-services.ts": "07e77b8093de317102181338d40fe618b3326f5fd6d5d8f6ddc0a2b46138b024",
-    "packages/core/test/bot-goal-live-chain.test.js": "f9b2b5f90420e6f7ea074c9b02c05a2643d8303e319bf6ca9e5c0e3af45833f5",
+    "packages/core/test/bot-goal-live-chain.test.js": "271841078d93907f28048dd208f35ebb723189ba559b8b5779c81979af322b8e",
     "packages/core/src/bots/goals/execution-evidence.ts": "f95731115cb04567e85175ac74b2473ed444bca11c964f08288ed805a3cad1c1",
     "packages/core/src/bots/goals/types.ts": "7f7384c9c08de2b6c08a1ab76a71e99313d0df71fedf9f82e1185f8a20acd216",
     "scripts/agent-eval/goal-chain-live.mjs": "cea87ee0ef29a7ebfdc7c35d219aa944416e04eeb5fc8331eb6a2bd357f51a9a",

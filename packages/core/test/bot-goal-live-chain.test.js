@@ -58,7 +58,7 @@ test('active goal tools visible by default but never bypass allowlist [AC:bot-go
  assert.ok(!filterToolsForSession({...input,session:{...input.session,metadata:{...input.session.metadata,allowedTools:['read_file']}}}).tools.some(t=>t.name==='goal_dispatch'));
 });
 
-test('terminal notice is durable without scheduling a new turn; stale checkpoint refused [AC:bot-goal-live-chain#AC-4]',async t=>{
+test('terminal notice is durable without scheduling a new turn; stale checkpoint refused [AC:bot-goal-live-chain#AC-4] [AC:quiet-goal-notice#AC-2]',async t=>{
  const {store,parent,service,ex}=fixture(t);
  const ended=service.report('b',ex.id,{kind:'candidate_completed',summary:'verified result',verified:true});
  const wakes=[];store.enqueueSchedulerWake=(...args)=>wakes.push(args);
@@ -147,7 +147,7 @@ test('non-running and foreign executions cannot disclose or checkpoint; notice p
  announceGoalState({store},pending);
  const notices=store.foldMessages(parent.id).filter(m=>m.parts.some(p=>p.text?.startsWith('[goal update]')));
  assert.equal(notices.length,2);
- assert.match(notices.at(-1).parts[0].text,/"status":"completed"/);
+ assert.match(notices.at(-1).parts[0].text,/^\[goal update\] Done:/);
  assert.ok(store.foldMessages(parent.id).some(m=>m.id===newMessage.id));
  assert.ok(!names(store.getSession(parent.id)).includes('goal_dispatch'));
  assert.equal((await createGoalCheckpointTool(store).execute({session:stale},{kind:'progress',summary:'stale'})).ok,false);
@@ -202,5 +202,5 @@ test('notice reads latest state inside its write transaction [AC:bot-goal-live-c
  });
  announceGoalState({store},pending);
  const notice=store.foldMessages(parent.id).at(-1);
- assert.match(notice.parts[0].text,/"status":"completed"/);
+ assert.match(notice.parts[0].text,/^\[goal update\] Done:/);
 });

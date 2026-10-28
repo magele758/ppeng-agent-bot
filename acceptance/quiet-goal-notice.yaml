@@ -1,0 +1,16 @@
+id: quiet-goal-notice
+title: Quieter goal completion notices in chat
+status: implemented
+requirement: |
+  Terminal goal notices in the main chat should be a short Done/Failed/Blocked/Needs review
+  line instead of a JSON dump of progress/nextStep. Lab still holds full state.
+notes: 'Muse polish / quiet-complete; Machine: 4090'
+criteria:
+  - id: AC-1
+    given: A goal reaches completed, failed, blocked, or pending_review
+    when: announceGoalState runs
+    then: The system message is a short [goal update] line without a JSON object dump
+  - id: AC-2
+    given: The same terminal version is announced twice
+    when: announceGoalState runs again
+    then: Only one notice is stored (existing dedupe preserved)
