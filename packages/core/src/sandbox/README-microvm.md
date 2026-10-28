@@ -20,6 +20,7 @@ runtime is installed and its HTTP adapter is listening, use:
 - or point the URL at any compatible adapter
 
 `RAW_AGENT_AGENT_SANDBOX_KIND=microvm` (or `agent-sandbox-microvm`) uses this remote path.
+That kind does not fall back to a generic `RAW_AGENT_SANDBOX_REMOTE_URL` unless the backend is also marked microvm.
 If the URL is missing, `/exec` is unreachable, or the body has no numeric `code`, the command fails and is not run on the host.
 
 This keeps the mergeable interface + tests green without requiring virt on CI.

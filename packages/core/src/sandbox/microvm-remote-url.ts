@@ -25,10 +25,23 @@ export function resolveMicrovmRemoteUrl(env: NodeJS.ProcessEnv = process.env): s
   return undefined;
 }
 
-/** Prefer microvm URL, else generic remote URL (existing RemoteVm behavior). */
+const MICROVM_KINDS = new Set(['microvm', 'agent-sandbox-microvm']);
+
+/** True when the operator asked for microVM rather than a generic remote adapter. */
+export function demandsMicrovmIsolation(env: NodeJS.ProcessEnv = process.env): boolean {
+  const kind = (env.RAW_AGENT_AGENT_SANDBOX_KIND ?? '').trim().toLowerCase();
+  const backend = (env.RAW_AGENT_SANDBOX_REMOTE_BACKEND ?? '').trim().toLowerCase();
+  return MICROVM_KINDS.has(kind) || MICROVM_KINDS.has(backend);
+}
+
+/**
+ * MicroVM requests only use a microVM URL. A generic remote URL is not a fallback.
+ * Other remote_vm requests may still use RAW_AGENT_SANDBOX_REMOTE_URL.
+ */
 export function resolveRemoteVmExecBaseUrl(env: NodeJS.ProcessEnv = process.env): string | undefined {
   const micro = resolveMicrovmRemoteUrl(env);
   if (micro) return micro;
+  if (demandsMicrovmIsolation(env)) return undefined;
   const remote = (env.RAW_AGENT_SANDBOX_REMOTE_URL ?? '').trim().replace(/\/$/, '');
   return remote || undefined;
 }

@@ -17,3 +17,7 @@ criteria:
     given: 有一个按约定应答的 microVM 执行接口
     when: 命令发到该接口
     then: 返回的标准输出和退出码来自该接口
+  - id: AC-4
+    given: 执行后端被指定为 microVM，只配置了普通远程地址，没有 microVM 地址
+    when: 高权限命令请求运行
+    then: 命令失败，不会改走那个普通远程地址，也不会在宿主机上执行

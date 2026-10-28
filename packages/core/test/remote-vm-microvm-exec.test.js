@@ -113,6 +113,42 @@ test('microvm kind does not run on the host when /exec is missing or down [AC:re
   }
 });
 
+test('microvm kind does not fall back to a generic remote URL or the host [AC:remotevm-no-host-downgrade#AC-4]', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'microvm-generic-'));
+  const marker = join(dir, 'host-ran');
+  let hits = 0;
+  const server = http.createServer((req, res) => {
+    if (req.method === 'POST' && req.url === '/exec') {
+      hits += 1;
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ stdout: 'generic', stderr: '', code: 0 }));
+      return;
+    }
+    res.writeHead(404);
+    res.end();
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address();
+  try {
+    const sandbox = createAgentSandboxFromEnv({
+      RAW_AGENT_AGENT_SANDBOX_KIND: 'microvm',
+      RAW_AGENT_SANDBOX_REMOTE_URL: `http://127.0.0.1:${port}`
+    });
+    const result = await sandbox.execute({
+      command: `touch ${JSON.stringify(marker)}`,
+      cwd: dir,
+      workspace: dir
+    });
+    assert.equal(result.code, 127);
+    assert.equal(result.kind, 'remote_vm');
+    assert.equal(hits, 0);
+    assert.equal(existsSync(marker), false);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('microvm /exec without a numeric code is not a success [AC:remotevm-no-host-downgrade#AC-2]', async () => {
   const server = http.createServer((req, res) => {
     if (req.method === 'POST' && req.url === '/exec') {
