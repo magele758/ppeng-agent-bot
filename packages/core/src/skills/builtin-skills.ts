@@ -6,6 +6,7 @@ import {
   mergeSkillsByName,
   parseSkillFrontmatter
 } from './skill-registry.js';
+import { PLANNING_SKILL_MANIFEST } from './skill-manifest.js';
 
 export { loadAgentsDirSkills, loadStateDirSkills, loadWorkspaceSkills, mergeSkillsByName, parseSkillFrontmatter };
 
@@ -13,6 +14,7 @@ export const builtinSkills: SkillSpec[] = [
   {
     id: 'planning',
     name: 'Planning',
+    manifest: PLANNING_SKILL_MANIFEST,
     description: 'Use TodoWrite for multi-step work and keep exactly one item in progress.',
     content:
       'Use this when the task has multiple concrete steps.\n\n' +
