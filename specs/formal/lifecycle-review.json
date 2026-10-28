@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-10-28T18:08:13.000Z",
-  "reviewNote": "Durable wait is the default Goal/Routine park path. Merged origin/main (UserDeliveryPort). Pairing/lifecycle/restart/concurrency control-flow unchanged.",
+  "reviewedAt": "2026-10-28T18:42:01.000Z",
+  "reviewNote": "Host-parks durable wait for owned bg_run; stopAt includes bg_run so agent-loop ends the turn without touching runSessionKernel (CRAP). Pairing/lifecycle/restart/concurrency control-flow unchanged.",
   "mapping": [
     {
       "step": "Public runtime, cancellation, approvals and completion; exercised through RawAgentRuntime with SQLite",
@@ -328,7 +328,7 @@
     "packages/agent-loop/src/assembly/normal-host.ts": "da1277222a77d1817b2c92bf926b2525d9fb54d015f28dd49f998bccd97942bb",
     "packages/agent-loop/src/assembly/full-host.ts": "bdcef2a93867179250eee752111985bebf56f5d9ee0603b2c2584252514f337e",
     "packages/agent-loop/src/assembly/max-host.ts": "8c6e91a60b4864e085fa4d14d72cb58176feff5bd04100aced4cbfabbae27c56",
-    "packages/core/src/runtime/l5-bindings.ts": "1de7be94ecdb33271689cd8bda883e3730b0e35260bb8acf94e68c8626bec2a0",
+    "packages/core/src/runtime/l5-bindings.ts": "fe89df65ea79aac923318a5a8ba70291b66c3875288a50729005ecabfaf8c784",
     "scripts/formal/lifecycle-model.mjs": "fa7e31c20b10016e13a081789a16a4cd459b8425b719ed2f0bc165245faf7b66",
     "scripts/formal/lifecycle-runtime.mjs": "70d8259d67252077f872dd800ae5fbed9108ffa21d392c74f02f5a987b15b670",
     "scripts/formal/lifecycle-verifier.mjs": "3555385ae003dbf6ac4e6e54021e1b6cbc4979be7f43c25ba3573ad32f8e1195",
@@ -467,7 +467,7 @@
     "packages/core/src/config/runtime-capabilities.ts": "9c06c675c59cdeb435ae21c392a074d1337c69e4b091cf304f01058d807f693f",
     "packages/core/src/learning/source-policy.ts": "d834396817d6711eeeed193aac873eadcdf7b46dae0550c809ae5922659b61d0",
     "packages/core/src/cron/routine-result.ts": "353fb3bdf156bcfb08d362508d6e35daebbf30aed10cc1b626baf3ef43c56c16",
-    "packages/core/src/waits/background-source.ts": "1a9bc05df657b7a03737df6782a896fa8619c68287cbb8ea117196839ec6d05a",
+    "packages/core/src/waits/background-source.ts": "46a7bb5b7e5e6c4bcbad7eccbf22f170e5d11f4e5d718bf4fb9317757fb64530",
     "packages/core/src/cron/routine-work-link.ts": "bcfbe9b0252cfb342a8d48abd726139340f3a24a44981b0adad80ceb96b2aaf2",
     "packages/core/src/safety/external-content.ts": "24354f84ea272a7103fd580caf57ec0c607c330dcf1ffda67dd64cf050d56ad5",
     "packages/core/src/bots/bot-status-snapshot.ts": "4523d208fb5fd580ee833126da3bd2e7afcd6e02991f21dcc9d37ea69306ad67",
