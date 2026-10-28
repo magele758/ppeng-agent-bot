@@ -30,5 +30,10 @@ criteria:
     when: 启动本地开发服务并随后停止
     then: 编译和服务实际启动，退出时清理其子进程，编译失败保留失败状态
 
+  - id: AC-7
+    given: 手机首次打开默认 Bot 且已有未发送草稿
+    when: 切换会话列表或键盘弹起使屏幕高度缩短
+    then: 草稿保留且输入框完整可见，首次任务引导仍可滚动查看和操作
+
 links:
   - doc/SINGLE_HOST_COMPLETION.md

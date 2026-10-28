@@ -1,5 +1,10 @@
 import { test, expect } from '@playwright/test';
 
+// Inspect individual notice cards in full transcript; brief grouping has its own coverage.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('lab.sessionBrief', '0'));
+});
+
 const BLOCKED_TEAMMATE = JSON.stringify({
   spawned: true,
   blocked: true,

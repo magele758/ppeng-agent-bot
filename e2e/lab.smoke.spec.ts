@@ -39,12 +39,14 @@ test.describe('Agent Lab console', () => {
     const form = page.getByRole('form', { name: '新建 Bot' });
     await expect(form).toBeVisible();
     await expect(form.getByLabel('名称')).toBeVisible();
+    await form.locator('summary').click();
     await expect(form.getByLabel('显示标题')).toBeVisible();
-    await expect(form.getByLabel('描述')).toBeVisible();
+    await expect(form.getByLabel('希望它做什么？', { exact: true })).toBeVisible();
   });
 
   test('model setup dialog opens from the rail', async ({ page }) => {
     await page.goto('/');
+    await page.getByRole('button', { name: '模型与外观', exact: true }).hover();
     await page.locator('#btnModelSetup').click();
     const dialog = page.getByRole('dialog', { name: '配置模型' });
     await expect(dialog).toBeVisible();
