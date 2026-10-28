@@ -12,6 +12,7 @@ import {
 } from '../workspace/index.js';
 import { resolvePermissionMode } from '../approval/permission-mode.js';
 import { commandHardlineToolResult } from '../sandbox/command-hardline.js';
+import { evaluateDefaultDenyPolicy } from '../safety/default-deny-policy.js';
 import { sanitizeSpawnEnv } from '../sandbox/env-sanitizer.js';
 import { redactToolContent } from '../sandbox/result-redaction.js';
 import { createAgentSandboxFromEnv } from '../sandbox/create-agent-sandbox.js';
@@ -845,6 +846,16 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
     async execute(context, args) {
       const denied = commandHardlineToolResult(String(args.command ?? ''));
       if (denied) return denied;
+      const deny = evaluateDefaultDenyPolicy({
+        tool: 'bash',
+        cwd: primaryWorkspacePath(context),
+        workspaceRoots: sandboxWorkspaceRoots(context),
+        cwdUntrusted: Boolean((context.session.metadata as Record<string, unknown> | undefined)?.cwdUntrusted),
+        inductionText: String(args.command ?? '')
+      });
+      if (!deny.allow) {
+        return { ok: false, content: deny.reason ?? '[default-deny] blocked' };
+      }
       const gated = gateShell(context, 'bash', args);
       if (!gated.ok) return { ok: false, content: gated.content };
       const envDefault = Number(process.env.RAW_AGENT_BASH_TIMEOUT_MS);
@@ -1429,6 +1440,16 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
     async execute(context, args) {
       const denied = commandHardlineToolResult(String(args.command ?? ''));
       if (denied) return denied;
+      const deny = evaluateDefaultDenyPolicy({
+        tool: 'bg_run',
+        cwd: primaryWorkspacePath(context),
+        workspaceRoots: sandboxWorkspaceRoots(context),
+        cwdUntrusted: Boolean((context.session.metadata as Record<string, unknown> | undefined)?.cwdUntrusted),
+        inductionText: String(args.command ?? '')
+      });
+      if (!deny.allow) {
+        return { ok: false, content: deny.reason ?? '[default-deny] blocked' };
+      }
       const gated = gateShell(context, 'bg_run', args);
       if (!gated.ok) return { ok: false, content: gated.content };
       const job = await services.startBackgroundJob(context.session.id, args.command, { isolation: args.isolation });
