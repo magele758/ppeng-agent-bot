@@ -1,6 +1,6 @@
 # Agent 持久化等待
 
-Goal / Routine 执行中调用 `wait_for`，登记来源、引用、条件与继续执行的摘要。登记及工具结果写入后，执行器结束本次模型回合。现有调度器读取轻量状态，只有条件满足才恢复原 Goal 或同一次 Routine occurrence。
+持久化等待是 Goal / Routine 挂起已有可观测依赖的默认方式，不是需要另行打开的专门模式。`goal_dispatch` 或子工作返回 waiting、Routine 已经启动且仍在运行的子会话，由宿主直接登记 `waiting_condition` 并结束本轮；模型不需要再为这次依赖调用 `wait_for`，也不要用 cron、sleep 或反复查历史代替。其它已拥有的可观测依赖仍由执行中的 `wait_for` 登记来源、引用、条件与继续摘要。登记及工具结果写入后，执行器结束本次模型回合。现有调度器读取轻量状态，只有条件满足才恢复原 Goal 或同一次 Routine occurrence，且只恢复一次。
 
 ```json
 {
@@ -29,7 +29,7 @@ Goal / Routine 执行中调用 `wait_for`，登记来源、引用、条件与继
 
 宿主经公开的 `registerWaitSource(store, name, adapter)` 注册通用来源，声明 `fields` 并实现同步 `observe(context, ref)`，返回 `available + facts`、`unavailable` 或 `unauthorized`。适配器必须每次鉴权、不得调用模型，并在宿主重启后重新注册。工具描述自动列出已注册来源的字段。适配器是宿主能力，模型不能注册任意代码。
 
-本阶段读取本地结构化状态，沿用现有调度 tick，尚未接入远端 webhook，也不把任意 shell / 网页轮询自动转换成被动订阅。后续外部连接器可把事件落入本地观测存储，复用条件判断与恢复链路；无需为具体任务另写调度分支。既有 Routine 不会自动迁移，新执行在调用 `wait_for` 后进入此模式。
+本阶段读取本地结构化状态，沿用现有调度 tick，尚未接入远端 webhook，也不把任意 shell / 网页轮询自动转换成被动订阅。后续外部连接器可把事件落入本地观测存储，复用条件判断与恢复链路；无需为具体任务另写调度分支。新的 Goal / Routine 执行默认走这条等待：dispatch 或子工作返回 waiting 时宿主登记并挂起，其它已拥有的依赖由 `wait_for` 登记。既有的、尚未产生等待的执行不会被追溯改写。
 
 ## 验证与真实日志回放
 

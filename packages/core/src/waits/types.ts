@@ -17,5 +17,5 @@ export interface WaitSource {
 export interface DurableWait {
  id:string;owner:WaitOwner;principal:string;spec:WaitSpec;
  status:'waiting'|'blocked'|'ready'|'consumed'|'expired'|'cancelled';
- baseline?:Record<string,Fact>;observation?:Observation;reason?:string;checks:number;createdAt:number;updatedAt:number;
+ baseline?:Record<string,Fact>;observation?:Observation;reason?:string;checks:number;createdAt:number;updatedAt:number;/** Host registered without a wait_for tool wave. */hostRegistered?:boolean;
 }
