@@ -150,3 +150,24 @@ test('a successor writer cannot inherit the previous routine attribution [AC:bot
  assert.deepEqual(f.store.messageIdsForSource(f.sid,'routine-owner'),[first.id]);
  assert.ok(second.id);
 });
+
+test('an already consumed routine steer is re-anchored before its owned continuation [AC:bot-runtime-log-regressions#AC-2]',async t=>{
+ const f=fixture(t,(store,id)=>{
+  const latest=store.listMessages(id).filter(message=>message.role==='user').at(-1);
+  assert.match(JSON.stringify(latest.parts),/CURRENT_CHECK/);
+  assert.match(JSON.stringify(latest.parts),/do not repeat/i);
+  store.appendMessage(id,'assistant',text('CURRENT_CHECK_CONFIRMED'));
+ });
+ f.store.updateSession(f.sid,{status:'running'});
+ const job=createCronJob(f.host,{botId:f.bot.id,name:'new routine',prompt:'CURRENT_CHECK',intervalMs:60000});
+ const runs=new RoutineRunStore(f.store),run=runs.enqueue(job,new Date().toISOString());
+ await drainRoutineRuns(f.host);
+ const inbox=f.store.listUnclaimedInbox(f.sid)[0];
+ f.store.appendMessage(f.sid,'user',text(inbox.text),{key:inbox.key});
+ f.store.db.prepare('UPDATE session_inbox SET claimed_at=? WHERE id=?').run(new Date().toISOString(),inbox.id);
+ f.store.appendMessage(f.sid,'assistant',text('A different active run answered'));
+ f.store.appendMessage(f.sid,'user',text('previous operation'));
+ f.store.updateSession(f.sid,{status:'idle'});
+ await drainRoutineRuns(f.host);await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(runs.get(run.id).result,'CURRENT_CHECK_CONFIRMED');
+});

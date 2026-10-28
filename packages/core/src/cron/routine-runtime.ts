@@ -518,7 +518,13 @@ function claimBotMainSession(host:RoutineRuntimeHost,runs:RoutineRunStore,run:Ro
  host.store.db.exec('BEGIN IMMEDIATE');
  try{
   if(!lease.renew() || (run.attempt===1&&!new RoutineHealthStore(host.store).allows(run.job))){host.store.db.exec('ROLLBACK');return undefined;}
-  if(append){const message=host.store.appendMessage(parent.id,'user',[textPart(routinePromptText(run))],{key:`routine:${run.id}`});new SourceLedger(host.store).record(parent.id,{kind:run.job.scheduleKind==='event'?'event':'routine',ref:run.id,messageId:message.id,label:run.job.name});stampSessionWake(host.store,parent.id,{kind:'unattended',source:'routine'});}
+  const consumed=!append&&!!run.steerKey&&!!steeredUserMessage(host,parent.id,run.steerKey);
+  if(append||consumed){
+   const continuation=consumed?'\nContinue this routine from existing evidence. Do not repeat completed external actions. Confirm this routine’s result, not the previous request’s answer.':'';
+   const message=host.store.appendMessage(parent.id,'user',[textPart(routinePromptText(run)+continuation)],{key:consumed?`routine:${run.id}:resume:${run.attempt}`:`routine:${run.id}`});
+   new SourceLedger(host.store).record(parent.id,{kind:run.job.scheduleKind==='event'?'event':'routine',ref:run.id,messageId:message.id,label:run.job.name});
+   stampSessionWake(host.store,parent.id,{kind:'unattended',source:'routine'});
+  }
   if(!runs.claim(run.id,parent.id)){host.store.db.exec('ROLLBACK');return undefined;}
   runs.update(run.id,{startSeq:host.store.listSurfaceNodes(parent.id).at(-1)?.seq??0});
   host.store.db.exec('COMMIT');return parent;

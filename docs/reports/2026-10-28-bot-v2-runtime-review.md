@@ -39,3 +39,5 @@ Saved source policy now supports complete argument-exact tool calls through the 
 ## Remaining v2 work
 
 Work/watcher lifecycle binding, current workflow references, supervisor evidence freshness and correlated replies, durable group intake and cross-context work continuity remain subsequent slices. No production state or running services were changed by this implementation review.
+
+Additional fail-first consumed-steer counterexample: an already consumed routine prompt followed by another user request now re-anchors the same routine before its owned continuation. Its result must refer to this routine, while completed side effects remain in history and are not replayed. Dedicated 16 tests pass; the genuine mixed HTTP soak normal fixture passes with zero duplicate software keys (43s). Failure-injection cases remain part of the same harness.
