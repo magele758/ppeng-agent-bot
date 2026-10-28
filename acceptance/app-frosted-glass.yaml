@@ -1,0 +1,21 @@
+id: app-frosted-glass
+title: 整个应用是毛玻璃
+status: implemented
+requirement: |
+  我要整个应用是毛玻璃效果
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  面板、侧栏、卡片、弹层、输入区用半透明底加 backdrop-filter。文字颜色不动。减弱透明度时退回实底。macOS 桌面窗口打开系统磨砂。
+criteria:
+  - id: AC-1
+    given: 打开 Lab，无论当前皮肤
+    when: 看侧栏、主面板、卡片、弹层和输入区
+    then: 这些表面是半透明的，并且有 backdrop-filter 模糊，能透出后面的颜色
+  - id: AC-2
+    given: 系统开启减弱透明度
+    when: 打开同一界面
+    then: 不再使用模糊，表面退回不透明底，文字仍然可读
+  - id: AC-3
+    given: macOS 桌面客户端
+    when: 创建主窗口
+    then: 窗口透明并使用系统 vibrancy，页面标记 desktop-glass，底色不再挡住桌面

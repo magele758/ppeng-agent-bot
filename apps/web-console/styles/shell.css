@@ -11,7 +11,10 @@
   gap: var(--ui-space-3);
   padding: var(--ui-space-3) var(--ui-space-2);
   border-right: 1px solid var(--ui-border);
-  background: var(--ui-bg);
+  background: var(--glass-fill);
+  backdrop-filter: var(--glass-filter);
+  -webkit-backdrop-filter: var(--glass-filter);
+  border-color: var(--glass-edge);
   z-index: var(--ui-z-rail);
   overflow-y: auto;
 }
@@ -244,7 +247,10 @@
   padding: var(--ui-space-2);
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-md);
-  background: inherit;
+  background: var(--glass-fill);
+  backdrop-filter: var(--glass-filter);
+  -webkit-backdrop-filter: var(--glass-filter);
+  border-color: var(--glass-edge);
   color: inherit;
   box-shadow: 0 8px 24px rgb(0 0 0 / 28%);
 }
@@ -293,6 +299,10 @@
   min-height: var(--ui-toolbar-height);
   padding: 0 var(--ui-space-4);
   border-bottom: 1px solid var(--ui-border);
+  background: var(--glass-fill);
+  backdrop-filter: var(--glass-filter);
+  -webkit-backdrop-filter: var(--glass-filter);
+  border-color: var(--glass-edge);
   font-size: var(--ui-text-xs);
   color: var(--ui-text-muted);
   z-index: var(--ui-z-toolbar);

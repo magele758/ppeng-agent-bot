@@ -77,7 +77,9 @@
   padding: var(--ui-space-3) var(--ui-space-4);
   border: 1px solid var(--ui-warn);
   border-radius: var(--ui-radius-lg);
-  background: color-mix(in srgb, var(--ui-warn) 10%, var(--ui-surface));
+  background: var(--glass-fill);
+  backdrop-filter: var(--glass-filter);
+  -webkit-backdrop-filter: var(--glass-filter);
 }
 .onboarding-banner__text {
   flex: 1 1 320px;

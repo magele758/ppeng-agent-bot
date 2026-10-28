@@ -88,7 +88,9 @@
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-md);
   padding: var(--ui-space-4);
-  background: var(--ui-surface);
+  background: var(--glass-fill);
+  backdrop-filter: var(--glass-filter);
+  -webkit-backdrop-filter: var(--glass-filter);
 }
 
 .ui-group--advanced {
@@ -184,12 +186,16 @@
 
 .settings-nav__item:hover {
   color: var(--ui-text);
-  background: var(--ui-surface);
+  background: var(--glass-fill);
+  backdrop-filter: var(--glass-filter);
+  -webkit-backdrop-filter: var(--glass-filter);
 }
 
 .settings-nav__item.is-active {
   color: var(--ui-text);
-  background: var(--ui-surface);
+  background: var(--glass-fill);
+  backdrop-filter: var(--glass-filter);
+  -webkit-backdrop-filter: var(--glass-filter);
   border-color: var(--ui-border);
   font-weight: 600;
 }
