@@ -23,11 +23,11 @@ export function selfHealPresetForTask(task:string):SelfHealTestPreset {
   if (/\bbuild\b|编译|构建/i.test(task)) return 'build';
   return 'unit';
 }
-function recordStart(store:SqliteStateStore,session:SessionRecord,goalId:string,executionId:string,source:string,reference:string):void {
+function recordStart(store:SqliteStateStore,session:SessionRecord,goalId:string,executionId:string,source:string,reference:string,work?:{revision:number;fence:number}):void {
   const live=store.getSession(session.id)!;
   const waits=Array.isArray(live.metadata.botGoalAuthorizedWaits)?live.metadata.botGoalAuthorizedWaits:[];
   store.updateSession(live.id,{metadata:{...live.metadata,
-    botGoalAuthorizedWaits:[...waits.filter(wait=>wait.executionId!==executionId),{goalId,executionId,source,correlationId:reference}],
+    botGoalAuthorizedWaits:[...waits.filter(wait=>wait.executionId!==executionId),{goalId,executionId,source,correlationId:reference,...(work?{revision:work.revision,fence:work.fence}:{})}],
     botGoalCheckpoint:{kind:'waiting',summary:`${source} ${reference} started; verify the result before completing`,wait:{source,correlationId:reference}}
   }});
   const scope=goalScope(store,live)!;
@@ -51,7 +51,7 @@ export function createGoalFactoryDevelopmentTool(host: Pick<SpecialtyServices,'s
         const submitted=host.factory.development.submit(principal,{machineId:args.machineId,repositoryId:args.repositoryId,baseline:args.baseline,
           requirement:`${goal.objective}\nConstraints: ${JSON.stringify(goal.constraints)}\nCompletion conditions: ${JSON.stringify(goal.completionCriteria)}\nPrevious progress: ${goal.progress}\nEvidence: ${JSON.stringify(goal.evidence)}`,
           requestKey:`goal:${execution.id}`,roomId:settings.roomId});
-        recordStart(host.store,session,goal.id,execution.id,'factory',submitted.id);
+        recordStart(host.store,session,goal.id,execution.id,'factory',submitted.id,{revision:goal.revision,fence:execution.fence});
         return submitted;
       });
       return {ok:true,content:JSON.stringify(task)};
@@ -82,7 +82,7 @@ export function createGoalSelfHealTool(host: Pick<SpecialtyServices, 'store' | '
             permissionMode:childPermissionMode(session.metadata),botId:scope.botId,botGoalId:goal.id,botGoalScopeSessionId:scope.sessionId,
             botGoalWorker:true,botGoalWorkerRevision:goal.revision,botGoalWorkerExecutionId:execution.id,botGoalWorkerFence:execution.fence}
         });
-        recordStart(host.store,session,goal.id,execution.id,'self_heal',run.id);
+        recordStart(host.store,session,goal.id,execution.id,'self_heal',run.id,{revision:goal.revision,fence:execution.fence});
         return run;
       });
       return {ok:true,content:JSON.stringify(run)};
