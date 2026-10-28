@@ -367,11 +367,13 @@ export class ExternalAgentConnections {
         throw new ValidationError(`Remote Agent HTTP ${response.status}`);
       }
       const raw = await readHttpResponse(response, 1000000);
-      const parsed: unknown = JSON.parse(raw, (_key, value: unknown) =>
-        typeof value === "string"
-          ? value.replaceAll(secret, "[REDACTED]")
-          : value,
-      );
+      const parsed: unknown = JSON.parse(raw, (_key, value: unknown) => {
+        if (typeof value === "string") return value.replaceAll(secret, "[REDACTED]");
+        if (value && typeof value === "object" && !Array.isArray(value)) {
+          return Object.fromEntries(Object.entries(value).map(([key, item]) => [key.replaceAll(secret, "[REDACTED]"), item]));
+        }
+        return value;
+      });
       return taskResponse(parsed);
     } catch (error) {
       if (error instanceof ValidationError) throw error;

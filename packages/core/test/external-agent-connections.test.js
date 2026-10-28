@@ -100,3 +100,10 @@ test('remote credential survives an unrelated Lab vault edit [AC:external-agent-
  d.runtime.secretVault.set('UNRELATED_LAB_SECRET','another-private-value');
  const row=await d.runtime.externalAgents.delegate(d.ctx,{connectionId:'peer',idempotencyKey:'after-secret-edit',goal:'Report'});assert.equal(row.remoteTaskId,'r');
 });
+
+test('remote credential is redacted in JSON object keys as well as values [AC:external-agent-bots#AC-6]',async t=>{
+ const d=await setup(t,async(q,r)=>r.end(JSON.stringify({task:{id:'r',status:'completed',artifacts:[{[token]:token}]}})));
+ d.runtime.externalAgents.configure({connections:[d.config]},d.principal);
+ const row=await d.runtime.externalAgents.delegate(d.ctx,{connectionId:'peer',idempotencyKey:'key-redaction',goal:'Report'});
+ assert.equal(JSON.stringify(row).includes(token),false);
+});
