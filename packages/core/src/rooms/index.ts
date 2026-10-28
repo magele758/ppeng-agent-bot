@@ -617,7 +617,15 @@ export class BotRoomService {
   }
   private completeBudget(turn: BotRoomTurn): boolean {
     if (turn.terminationReason !== 'tool_budget' && turn.terminationReason !== 'cost_budget') return false;
-    turn.status = 'completed'; this.saveTurn(turn); return true;
+    turn.status = 'failed';
+    for (const member of turn.members ?? []) {
+      if (member.status !== 'running' && member.status !== 'waiting_approval') continue;
+      member.status = 'failed';
+      this.noteSettled(turn, member.botId);
+    }
+    delete turn.currentSessionId;
+    this.syncCursor(turn);
+    this.saveTurn(turn); return true;
   }
   private turnOwnsSession(turn: BotRoomTurn, sessionId: string): boolean {
     return turn.currentSessionId === sessionId || (turn.members ?? []).some(member => member.sessionId === sessionId && (member.status === 'running' || member.status === 'waiting_approval'));

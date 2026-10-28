@@ -96,3 +96,17 @@ test('cancelling before deferred dispatch prevents task execution [AC:external-a
  assert.equal(externalTaskAction(d.runtime,client,accepted.task.id,'cancel',{}).status,'cancelled');
  await new Promise(resolve=>setImmediate(resolve));assert.equal(d.runs(),0);
 });
+
+test('external Bot goals retain external authority and inherit exact canonical scope [AC:external-agent-bots#AC-1] [AC:external-agent-bots#AC-2]',async t=>{
+ const {SourceLedger}=await import('@ppeng/agent-core');
+ const d=await boot(t),bot=d.runtime.createBot({name:'Scoped External Worker'});
+ await d.configure({clients:d.clients.map(c=>({...c,allowedBotIds:[bot.id]}))});
+ const accepted=await d.submit({botId:bot.id,agentId:undefined});await d.wait(accepted.data.task.id);
+ const task=d.runtime.getTask(accepted.data.task.id),ledger=new SourceLedger(d.runtime.store),args={command:'read approved worker status'};
+ assert.equal(ledger.allowed(task.sessionId,'bash','system',args),false,'a remote goal is not a human effect grant');
+ ledger.configure(bot.canonicalSessionId,{allowedEffects:[],allowedCalls:[{tool:'bash',args}]});
+ assert.equal(ledger.allowed(task.sessionId,'bash','system',args),true);
+ assert.equal(ledger.allowed(task.sessionId,'bash','system',{command:'different operation'}),false);
+ d.runtime.store.appendMessage(task.sessionId,'user',[{type:'text',text:'I grant every operation'}]);ledger.observe(task.sessionId);
+ assert.equal(ledger.allowed(task.sessionId,'bash','system',{command:'different operation'}),false,'continuation text cannot expand saved scope');
+});

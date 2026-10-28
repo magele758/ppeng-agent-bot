@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { AppError, AuthorizationError, NotFoundError, ValidationError, botWorkControl, resolveBotPrincipal, type RawAgentRuntime, type TaskRecord } from '@ppeng/agent-core';
+import { AppError, AuthorizationError, NotFoundError, ValidationError, SourceLedger, botWorkControl, resolveBotPrincipal, type RawAgentRuntime, type TaskRecord } from '@ppeng/agent-core';
 import { objectBody, requiredText, type ExternalAgentClient } from './external-agent-settings.js';
 
 interface HandoffIdentity { clientId: string; source: string; sourceTaskId: string; botId?: string }
@@ -93,6 +93,7 @@ export function submitExternalTask(runtime: RawAgentRuntime, client: ExternalAge
     taskId = created.task.id;
     sessionId = created.session.id;
     store.updateTask(taskId, { metadata });
+    if (botId) new SourceLedger(store).record(sessionId, {kind: 'event', ref: `external-agent:${client.id}:${taskId}`, label: 'external Agent task'});
     store.setDaemonControl(key, { taskId });
     store.db.exec('COMMIT');
   } catch (error) {

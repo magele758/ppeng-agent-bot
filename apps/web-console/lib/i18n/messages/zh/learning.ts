@@ -31,6 +31,8 @@ export const learning = {
   "sources": "来源记录",
   "scope": "接触外部内容后允许的工具（每行一个精确名称）",
   "scopeHint": "此授权允许读取网页等外部内容后的回合、外部事件与委派任务使用列出的有副作用工具；已有审批和沙箱限制仍生效。留空表示不额外授权。",
+  "exactCalls": "只授权指定操作（高级）",
+  "exactCallsHint": "填写 JSON 数组，每项包含 tool 和完整 args，例如 [{\"tool\":\"bash\",\"args\":{\"command\":\"ssh worker status\"}}]。只匹配完整参数，不允许其他命令。Bot 主对话保存后，其合法子任务和同用户的群执行可复用，删除后立即撤销。工具名单中的授权仍覆盖该工具全部参数；需要限定操作时请从上方名单移除该工具。",
   "queue": "输入队列",
   "batchSize": "每次取出上限",
   "agingSeconds": "等待优先级每增加 10 分的秒数",
