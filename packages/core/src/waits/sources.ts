@@ -1,3 +1,4 @@
+import {backgroundJobWaitSource} from './background-source.js';
 import type {SqliteStateStore} from '../storage.js';
 import {botPrincipalKey,principalFromSession} from '../bots/bot-identity.js';
 import {getBotTask} from '../bots/bot-work.js';
@@ -6,6 +7,7 @@ const registries=new WeakMap<SqliteStateStore,Map<string,WaitSource>>();
 const denied=():Observation=>({availability:'unauthorized',reason:'Resource is not authorized for this execution'});
 const unavailable=():Observation=>({availability:'unavailable',reason:'Resource is unavailable'});
 function builtins():Map<string,WaitSource>{return new Map([
+ ['background_job',backgroundJobWaitSource],
  ['session',{fields:['status','version'],observe({store,owner,scope},ref){
   const target=store.getSession(ref);if(!target)return unavailable();
   if(ref===owner.sessionId||botPrincipalKey(principalFromSession(store,target))!==botPrincipalKey(principalFromSession(store,scope))||target.metadata.botId!==scope.metadata.botId)return denied();

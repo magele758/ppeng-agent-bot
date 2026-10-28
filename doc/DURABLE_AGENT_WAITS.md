@@ -45,3 +45,7 @@ pnpm run test:acceptance
 回放分“不可用”和“持续不变”两组，各按 826 次真实调度节奏检查，中途关闭/重开数据库。两组在注入完成前恢复次数均为 0；对一个来源注入完成后，该 owner 恢复 1 次，其他 owner 和重复检查均为 0。这里的观测是明确标注的合成输入：原日志没有足够的外部观测，不能证明历史任务已完成或健康，也不能据此声称实际节省了多少账单。真实内核集成测试另行验证等待前后模型调用次数与工具配对。
 
 当前停止边界复用默认 `agent-loop` 内核的 `stopAtToolNames`，不修改 SDK。实验性 `ppeng` 旧内核缺少该能力，工具在登记前明确拒绝；可通过 Lab 现有 Loop 设置切换到 `agent-loop`，避免登记后继续空转。
+
+### 后台执行来源
+
+`bg_run` 在当前宿主确认的 Goal/Routine 执行内返回 `waitFor` 时，可将其 source/ref/condition 传入 `wait_for`，再补充当前工作的继续摘要。`background_job` 来源暴露 `status/version/startedAt/sessionId`，只接受该次实际执行获得的任务；每次观察和消费都重验主体、Bot 与持久任务的启动身份。读取旧 PID、另一项工作的任务 ID 或模型生成的引用都不会获得恢复权限。状态变化只是继续检查的触发，不是 Goal 完成证据；输出仍需通过 `bg_check` 获取并核验。

@@ -1,7 +1,9 @@
+import {fenceExternalContent} from '../safety/external-content.js';
 import {hasWaitReceipt} from '../waits/receipt.js';
 import {DurableWaitStore} from '../waits/store.js';
+import {resolveRoutineWorkLink,linkedRoutinePrompt,type RoutineWorkSnapshot} from './routine-work-link.js';
 import {SourceLedger} from '../learning/sources.js';
-import { routineAnswerMessages, routineSourceRefusal } from './routine-result.js';
+import { routineExecutionMessages, routineAnswerMessages, routineSourceRefusal } from './routine-result.js';
 import { factFingerprint, notificationDecision, localNotificationDay } from './notification-decision.js';
 import { latestCheckpoint } from '../session/checkpoint.js';
 import { decideRecovery } from '../session/durable-recovery.js';
@@ -44,10 +46,11 @@ export interface RoutineRun {
  id:string; routineId:string; scheduledAt:string; timezone:string; status:RoutineRunStatus;
  approvalIds?:string[];resumeStartedAt?:string; attempts?:RoutineAttempt[]; sessionId?:string; mainSessionId:string; attempt:number; result?:string; error?:string;
  failureClass?:RoutineFailureClass; precheckOutcome?:'ready'|'no_change'|'failed'; precheckState?:unknown; precheckChecked?:boolean; missedCount:number; createdAt:string; updatedAt:string; startedAt?:string; finishedAt?:string; ownerPid?:number;
- messageSourceId?:string; startSeq?:number; summaryMessageId?:string; eventBody?:string; notificationSent?:boolean; requiresEffectVerification?:boolean; roomDelivery?:RoutineRoomDelivery; steerKey?:string; job:CronJobRecord;
+ workSnapshot?:RoutineWorkSnapshot; messageSourceId?:string; startSeq?:number; summaryMessageId?:string; eventBody?:string; notificationSent?:boolean; requiresEffectVerification?:boolean; roomDelivery?:RoutineRoomDelivery; steerKey?:string; job:CronJobRecord;
 }
 export interface RoutineRuntimeHost {
  store:SqliteStateStore; stateDir:string; log:Pick<Logger,'warn'|'info'>;
+ loadRoutineSkill?(name:string,sessionId:string):Promise<{content?:string;error?:string}>;
  runSession(sessionId:string):Promise<unknown>;
  isSessionRunning?(sessionId:string):boolean;
  hasUnconfirmedEffects?(sessionId:string,startedAt:string):boolean;
@@ -298,11 +301,23 @@ function completionError(session:SessionRecord|undefined,denied:boolean,result:s
  if(outcome?.reason)return `Execution stopped: ${outcome.reason}`;
  return result.trim()?'Session did not complete':'Execution ended without a result';
 }
+function linkedObservation(host:RoutineRuntimeHost,run:RoutineRun,result:string):Partial<RoutineRun>|undefined {
+ if(!run.workSnapshot||!routineQuiet(result))return undefined;
+ if(run.workSnapshot.externalJob?.status==='error')return {status:'failed',result,error:'Linked external job failed; delivery is unverified'};
+ const observation=routineExecutionMessages(host.store,run).reverse().find(message=>message.parts.some(part=>part.type==='tool_result'&&/^(?:bash|bg_check|read_file|grep_files|list_files|glob_files|http_request|fetch_url|prom_query|loki_query|k8s_get)$/.test(part.name)));
+ if(observation?.parts.some(part=>part.type==='tool_result'&&part.ok===false))return {status:'failed',result,error:'Current observation failed; work status is unverified'};
+ const observed=observation?.createdAt??run.workSnapshot.observedAt;
+ const current=observed&&Date.parse(observed)>=Date.parse(run.startedAt??run.createdAt);
+ if(!current)return {status:'failed',result,error:'No successful current observation; work status is unverified'};
+ if(observation)new RoutineRunStore(host.store).update(run.id,{workSnapshot:{...run.workSnapshot,observedAt:observation.createdAt}});
+ return undefined;
+}
 function completionResult(host:RoutineRuntimeHost,run:RoutineRun,session:SessionRecord|undefined,approvals:ApprovalRecord[]):Partial<RoutineRun>{
  const result=resultText(host,run);
  if(unknownEffects(host,run))return {status:'unknown',result,error:'External effects are unconfirmed; verify before retry'};
  const refusal=routineSourceRefusal(host.store,run);
  if(refusal)return {status:'failed',result,error:refusal,failureClass:'hard'};
+ const observation=linkedObservation(host,run,result);if(observation)return observation;
  const denied=approvals.some(approval=>approval.status==='rejected');const outcome=parseRunOutcome(session?.metadata?.outcome);
  const stopped=outcome?.kind==='aborted'||outcome?.kind==='failed'||(outcome?.kind==='idle'&&outcome.reason!=='end');
  const failed=stopped||!session||!['idle','completed'].includes(session.status)||denied||!result.trim();
@@ -567,8 +582,9 @@ function claimBotMainSession(host:RoutineRuntimeHost,runs:RoutineRunStore,run:Ro
  host.store.db.exec('BEGIN IMMEDIATE');
  try{
   if(!lease.renew() || (run.attempt===1&&!new RoutineHealthStore(host.store).allows(run.job))){host.store.db.exec('ROLLBACK');return undefined;}
-  const consumed=!append&&!!run.steerKey&&!!steeredUserMessage(host,parent.id,run.steerKey);
+  const consumed=!append&&!!run.steerKey&&(!!run.workSnapshot||!!steeredUserMessage(host,parent.id,run.steerKey));
   if(append||consumed){
+   if(consumed)dropBotSteer(host,parent.id,run.steerKey);
    const continuation=consumed?'\nContinue this routine from existing evidence. Do not repeat completed external actions. Confirm this routine’s result, not the previous request’s answer.':'';
    const message=host.store.appendMessage(parent.id,'user',[textPart(routinePromptText(run)+continuation)],{key:consumed?`routine:${run.id}:resume:${run.attempt}`:`routine:${run.id}`});
    new SourceLedger(host.store).record(parent.id,{kind:run.job.scheduleKind==='event'?'event':'routine',ref:run.id,messageId:message.id,label:run.job.name});
@@ -618,6 +634,34 @@ function busyRoutines(runs:RoutineRunStore,all:RoutineRun[],executing:Set<string
  const busy=new Set(all.filter(run=>['running','waiting_condition','waiting_approval','unknown'].includes(run.status)).map(run=>run.routineId));
  for(const id of executing){const current=runs.get(id);if(current)busy.add(current.routineId);}return busy;
 }
+function linkedEventPrompt(run:RoutineRun,prompt:string):string {
+ if(run.eventBody===undefined)return prompt;
+ const body=run.eventBody.length>6000?`${run.eventBody.slice(0,6000)}\n…[truncated]`:run.eventBody;
+ return `${prompt}\n\n${fenceExternalContent({source:'event',label:run.job.scheduleValue,body:`Occurrence: ${run.id}\n${body}`})}`;
+}
+async function prepareLinkedRoutine(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):Promise<RoutineRun|undefined> {
+ const current=new CronJobStore(host.stateDir).get(run.routineId);
+ const raw=current?current.metadata.workLink:run.job.metadata.workLink;
+ if(!raw){
+  if(!run.job.metadata.workLink&&!run.workSnapshot)return run;
+  dropBotSteer(host,run.mainSessionId,run.steerKey);
+  return runs.update(run.id,{job:current?{...current,prompt:linkedEventPrompt(run,current.prompt)}:run.job,workSnapshot:undefined,steerKey:undefined});
+ }
+ try{
+  const work=resolveRoutineWorkLink(host.store,run.mainSessionId,raw);
+  if(['completed','cancelled'].includes(work.goal.status)){
+   if(current)new CronJobStore(host.stateDir).update(current.id,{enabled:false,metadata:{...current.metadata,workLinkStop:{goalId:work.goal.id,revision:work.goal.revision,status:work.goal.status,at:nowIso()}}});
+   summarize(host,runs,runs.update(run.id,{status:'skipped',error:`Linked work ${work.goal.status}; temporary watcher stopped`,finishedAt:nowIso()}));return undefined;
+  }
+  const prepared=await linkedRoutinePrompt(work,host.loadRoutineSkill);
+  const latest=new CronJobStore(host.stateDir).get(run.routineId);
+  if(JSON.stringify(current)!==JSON.stringify(latest))return undefined;
+  const fresh=resolveRoutineWorkLink(host.store,run.mainSessionId,raw);
+  if(JSON.stringify(fresh.goal)!==JSON.stringify(work.goal))return undefined;
+  const prompt=work.link.sopSkill?prepared.prompt:`${current?.prompt??run.job.prompt}\n${prepared.prompt}`;
+  return runs.update(run.id,{job:{...(current??run.job),prompt:linkedEventPrompt(run,prompt)},workSnapshot:prepared.snapshot});
+ }catch(error){summarize(host,runs,runs.update(run.id,{status:'failed',error:String(error),finishedAt:nowIso()}));return undefined;}
+}
 async function dispatchRoutineQueue(host:RoutineRuntimeHost,runs:RoutineRunStore,executing:Set<string>):Promise<void>{
  const all=runs.pending(),busy=busyRoutines(runs,all,executing),reserved=new Set<string>();
  for(const candidate of all.filter(item=>item.status==='queued')){
@@ -625,12 +669,13 @@ async function dispatchRoutineQueue(host:RoutineRuntimeHost,runs:RoutineRunStore
   const lease=RoutineLease.acquire(host.store,candidate.id);if(!lease)continue;
   let handedOff=false;const stop=lease.heartbeat(()=>{});
   try{
-   const run=runs.get(candidate.id);if(!run||run.status!=='queued')continue;
+   let run=runs.get(candidate.id);if(!run||run.status!=='queued')continue;
    const health=new RoutineHealthStore(host.store);if(run.attempt===1&&!health.allows(run.job))continue;
    const resumeAfter=health.get(run.routineId).resumeAfter;
    if(run.attempt===1&&isGovernedRoutine(run.job)&&resumeAfter!==undefined&&Date.parse(run.scheduledAt)<=resumeAfter){const skipped=runs.update(run.id,{status:'skipped',error:'Missed occurrence discarded on explicit resume',finishedAt:nowIso()});summarize(host,runs,skipped);continue;}
    const parent=routineParent(host,runs,run);if(!parent)continue;
    if(isBotMainSession(parent)&&botJobRemoved(host,run)){cancelRemovedBotRun(host,runs,run,parent.id);continue;}
+   run=await prepareLinkedRoutine(host,runs,run);if(!run)continue;
    if(!await precheckAllowsRun(host,runs,run,lease))continue;
    if(isBotMainSession(parent)){
     const outcome=dispatchBotMain(host,runs,runs.get(run.id)??run,parent,lease,reserved);

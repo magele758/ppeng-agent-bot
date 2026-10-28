@@ -12,7 +12,7 @@ import { visibleCronJobs, sessionVisible } from '../access/visibility.js';
 function publicRun(run:RoutineRun):Omit<RoutineRun,'eventBody'>{const {eventBody: _internalEventBody,...visible}=run;return visible;}
 
 export function cronRoutes(runtime: RawAgentRuntime): RouteSpec[] {
-  const host = {store:runtime.store,stateDir:runtime.stateDir,log:{warn:console.warn,info:console.info},runSession:(id:string)=>runtime.runSession(id),cancelSession:(id:string)=>runtime.cancelSession(id),isSessionRunning:(id:string)=>runtime.isSessionRunning(id),hasUnconfirmedEffects:(id:string,startedAt:string)=>runtime.connectors.software.unconfirmedForSession(id,startedAt).length>0};
+  const host = {loadRoutineSkill:(name:string,id:string)=>runtime.loadRoutineSkill(name,id),store:runtime.store,stateDir:runtime.stateDir,log:{warn:console.warn,info:console.info},runSession:(id:string)=>runtime.runSession(id),cancelSession:(id:string)=>runtime.cancelSession(id),isSessionRunning:(id:string)=>runtime.isSessionRunning(id),hasUnconfirmedEffects:(id:string,startedAt:string)=>runtime.connectors.software.unconfirmedForSession(id,startedAt).length>0};
   const readRun = (id:string,auth:RequestAuth):RoutineRun | undefined => {const run=new RoutineRunStore(runtime.store).get(id);return run && sessionVisible(runtime,run.mainSessionId,auth)?run:undefined};
   return [
     {method:'POST',pattern:'/api/cron/runs/:id/publication',handler:async({requireParam,response,auth,readBody})=>{const run=readRun(requireParam('id'),auth);if(!run){json(response,404,{error:'Run not found'});return;}const body=await readBody() as {approved?:boolean};if(typeof body.approved!=='boolean')throw new ValidationError('approved must be boolean');json(response,200,{run:publicRun(decideRoutinePublication(host,run.id,body.approved))});}},
@@ -64,6 +64,7 @@ export function cronRoutes(runtime: RawAgentRuntime): RouteSpec[] {
           ...(typeof body.intervalMs === 'number' ? {intervalMs:body.intervalMs}:{}),
           ...(typeof body.timezone === 'string' ? {timezone:body.timezone}:{}),
           ...(typeof body.missedPolicy === 'string' ? {missedPolicy:body.missedPolicy as 'coalesce'|'skip'|'catch_up'}:{}),
+          ...('workLink' in body ? {workLink:body.workLink}:{}),
           ...('deliveryPolicy' in body ? {deliveryPolicy:body.deliveryPolicy}:{}),
           ...('sourceDelivery' in body ? {sourceDelivery:body.sourceDelivery as {taskId:string;attempt:number}}:{}),
           name: typeof body.name === 'string' ? body.name : '',
@@ -95,6 +96,7 @@ export function cronRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         const body = (await readBody()) as Record<string, unknown>;
         if ('expiresAt' in body && body.expiresAt !== null && typeof body.expiresAt !== 'string') throw new ValidationError('expiresAt must be an ISO timestamp or null');
         const patch: UpdateCronJobInput = {};
+        if ('workLink' in body) patch.workLink=body.workLink;
         if ('deliveryPolicy' in body) patch.deliveryPolicy=body.deliveryPolicy;
         if ('expiresAt' in body) patch.expiresAt=body.expiresAt as string|null;
         if (typeof body.name === 'string') patch.name = body.name;

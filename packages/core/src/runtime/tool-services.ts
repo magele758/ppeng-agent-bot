@@ -1,3 +1,4 @@
+import {recordBackgroundWaitSource} from '../waits/background-source.js';
 /**
  * Build RuntimeToolServices for builtin tools — extracted from RawAgentRuntime.
  */
@@ -132,7 +133,11 @@ export function createToolServices(host: ToolServicesHost): RuntimeToolServices 
       const messages = host.store.listMailbox(agentId, true);
       return messages.map((message) => host.store.markMailRead(message.id));
     },
-    startBackgroundJob: async (sessionId, command, options) => host.startBackgroundJob(sessionId, command, options),
+    startBackgroundJob: async (sessionId, command, options) => {
+      const job=await host.startBackgroundJob(sessionId,command,options);
+      const waitFor=recordBackgroundWaitSource(host.store,sessionId,job);
+      return {...job,...(waitFor?{waitFor}:{})};
+    },
     directIsolationApproved: (sessionId, toolName, args) =>
       approvalGrantsDirectIsolation(host.store.listApprovals(), sessionId, toolName, args),
     getBackgroundJob: async (jobId) => host.store.getBackgroundJob(jobId),
