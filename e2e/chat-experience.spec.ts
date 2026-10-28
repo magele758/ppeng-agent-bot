@@ -91,6 +91,9 @@ test.describe('Chat experience', () => {
     await page.locator(".composer-config-summary").click();
     await sendAndWait(page, LONG_BASH_PROMPT);
 
+    const processNotes = page.locator('#playMessages .chat-process-note > summary');
+    await expect(processNotes.first()).toBeVisible();
+    for (const note of await processNotes.all()) await note.click();
     const folds = page.locator('#playMessages .chat-tool-fold');
     await expect(folds.first()).toBeVisible({ timeout: 30_000 });
     const count = await folds.count();

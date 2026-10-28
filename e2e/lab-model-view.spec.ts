@@ -23,6 +23,7 @@ test.describe('Lab 模型所见', () => {
     await page.getByLabel('消息内容').fill(LONG_BASH_PROMPT);
     await page.getByRole('button', { name: '发送', exact: true }).click();
 
+    await page.locator('#playMessages .chat-process-note > summary').first().click();
     const resultFold = page.locator('#playMessages .chat-tool-fold--result').first();
     await expect(resultFold).toBeVisible({ timeout: 60_000 });
     if (!(await resultFold.evaluate((el) => el instanceof HTMLDetailsElement && el.open))) {
@@ -92,6 +93,7 @@ test.describe('Lab 模型所见', () => {
     });
     release();
 
+    await page.locator('#playMessages .chat-process-note > summary').first().click();
     const resultFold = page.locator('#playMessages .chat-tool-fold--result').first();
     await expect(resultFold).toBeVisible({ timeout: 60_000 });
     if (!(await resultFold.evaluate((el) => el instanceof HTMLDetailsElement && el.open))) {
