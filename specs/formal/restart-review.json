@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-10-28T18:08:13.000Z",
-  "reviewNote": "Durable wait is the default Goal/Routine park path. Merged origin/main (UserDeliveryPort). Pairing/lifecycle/restart/concurrency control-flow unchanged.",
+  "reviewedAt": "2026-10-28T18:42:33.000Z",
+  "reviewNote": "Quieter terminal goal notices (Done/Failed/Blocked/Needs review) replace JSON dumps in chat; Lab still holds full state. Pairing/lifecycle/restart/concurrency control-flow unchanged.",
   "mapping": [
     {
       "step": "Production startup, persistence, writer claims and graceful shutdown (HTTP drain not exercised)",
@@ -420,7 +420,7 @@
     "packages/core/src/runtime/spawn-policy.ts": "4889022804d3797796d018abfbe084a2373f1bf630098c6470d932a0c67ebabd",
     "packages/core/src/memory/bot-memory-scope.ts": "bffdcf6cf3e848ea1f2fcc5059b54345d3ee9d49ff98b3a57e917e88593d50c9",
     "packages/core/src/tools/product-admin-tools.ts": "7589adbe3997cf67c767c5add9da6a06127fb1698c81b9ad6b2a0a5aaef8a117",
-    "packages/core/src/bots/goals/runtime-host.ts": "e961139f38e1414bad10e01a7cce94fc7dc1baf13c9b7d8a0cb2e94b97df075c",
+    "packages/core/src/bots/goals/runtime-host.ts": "4fbccb7cb8047c34705fd6dd30ff1eb147ac6fa19e0ab17c16ab5c7d4bd2f9e4",
     "packages/core/src/bots/goals/runtime-dispatch.ts": "a4c764dd437033a9363bbf96e1354bc391450f36294d171f3441d55f5ef655c1",
     "packages/core/src/bots/goals/tool-gateway.ts": "713852550276157a250c8c26670f1fffbdc4d996e34ecfa16acf46fb74e96921",
     "packages/core/src/bots/goals/worker-fence.ts": "e34934141e7b243b46db304bfbde8a5895302e86149965f7a2049496a117a808",
@@ -451,7 +451,7 @@
     "packages/core/src/bots/goals/specialty-services.ts": "07e77b8093de317102181338d40fe618b3326f5fd6d5d8f6ddc0a2b46138b024",
     "scripts/formal/independent-scenarios.mjs": "feb45c7dd30ab4ca6af8dd75f6761d48019961b7264d6d1f6238473056652291",
     "scripts/test/independent-scenarios.test.mjs": "288d5bf9ad3907ede684a3d9f617a014865f2d5e078cc3f7c4482aa90ca22ef7",
-    "packages/core/test/bot-goal-live-chain.test.js": "f9b2b5f90420e6f7ea074c9b02c05a2643d8303e319bf6ca9e5c0e3af45833f5",
+    "packages/core/test/bot-goal-live-chain.test.js": "6f99a4926773ec0656165998ac8682ec7fd5013404480d70ff10f4b065a8eeda",
     "packages/core/src/bots/goals/execution-evidence.ts": "f95731115cb04567e85175ac74b2473ed444bca11c964f08288ed805a3cad1c1",
     "packages/core/src/bots/goals/types.ts": "7f7384c9c08de2b6c08a1ab76a71e99313d0df71fedf9f82e1185f8a20acd216",
     "scripts/agent-eval/goal-chain-live.mjs": "cea87ee0ef29a7ebfdc7c35d219aa944416e04eeb5fc8331eb6a2bd357f51a9a",
