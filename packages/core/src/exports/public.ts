@@ -850,3 +850,11 @@ export type {
   SkillCapabilityCheck
 } from '../skills/skill-manifest.js';
 
+export {
+  evaluateDefaultDenyPolicy,
+  isDangerousCwd,
+  detectUntrustedInduction,
+  isHighPrivilegeTool
+} from '../safety/default-deny-policy.js';
+export type { DefaultDenyInput, DefaultDenyDecision } from '../safety/default-deny-policy.js';
+
