@@ -17,6 +17,29 @@ import {
 import type { RouteSpec } from '../routing.js';
 import { json } from '../http-utils.js';
 
+function settingsObject(raw: unknown): Record<string, unknown> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new ValidationError('Expected a settings object');
+  }
+  return raw as Record<string, unknown>;
+}
+
+function disclosurePatch(body: Record<string, unknown>): SkillSettingsPatch {
+  if (!('disclosureMode' in body)) return {};
+  const disclosureMode = parseSkillDisclosureMode(body.disclosureMode);
+  if (!disclosureMode) throw new ValidationError('disclosureMode must be shortlist, lazy, or full');
+  return { disclosureMode };
+}
+
+function settingsPatch(raw: unknown): SkillSettingsPatch {
+  const body = settingsObject(raw);
+  const patch = disclosurePatch(body);
+  for (const key of ['routingMode', 'topK', 'strictLoad', 'fusion'] as const) {
+    if (key in body) Object.assign(patch, { [key]: body[key] });
+  }
+  return patch;
+}
+
 export function skillSettingsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
   return [
     {
@@ -43,17 +66,7 @@ export function skillSettingsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
       method: 'PATCH',
       pattern: '/api/skills/settings',
       handler: async ({ readBody, response }) => {
-        const body = (await readBody()) as SkillSettingsPatch & Record<string, unknown>;
-        if (!body || typeof body !== 'object' || Array.isArray(body)) throw new ValidationError('Expected a settings object');
-        const patch: SkillSettingsPatch = {};
-        for (const key of ['routingMode','topK','strictLoad','fusion'] as const) if (key in body) Object.assign(patch,{[key]:body[key]});
-        if (body && 'disclosureMode' in body) {
-          const parsed = parseSkillDisclosureMode(body.disclosureMode);
-          if (!parsed) {
-            throw new ValidationError('disclosureMode must be shortlist, lazy, or full');
-          }
-          patch.disclosureMode = parsed;
-        }
+        const patch = settingsPatch(await readBody());
         const settings = writeSkillSettings(runtime.store, patch);
         json(response, 200, {
           settings,

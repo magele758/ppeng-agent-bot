@@ -39,3 +39,33 @@ test('capability panel persists enable/disable and rejects unknown domains [AC:b
  await assert.rejects(patch.handler({response,readBody:async()=>({domains:['missing']})} as never),/Unknown domain/);
  assert.deepEqual(readRuntimeCapabilities(store),{domains:['stock'],a2uiEnabled:true});
 });
+
+import { skillSettingsRoutes } from '../dist/routes/skill-settings.js';
+
+test('skill settings API preserves partial saves and rejects invalid requests atomically [AC:bot-settings-flow#AC-8]', async () => {
+  const values = new Map<string, unknown>();
+  const store = {
+    getDaemonControl: (key: string) => values.get(key),
+    setDaemonControl: (key: string, value: unknown) => values.set(key, value)
+  };
+  const routes = skillSettingsRoutes({store} as never);
+  let data: any;
+  const response = {setHeader() {}, end(text: string) { data = JSON.parse(text); }};
+  const patch = routes.find(route => route.method === 'PATCH')!;
+  const get = routes.find(route => route.method === 'GET')!;
+  const save = (body: unknown) => patch.handler({response, readBody: async () => body} as never);
+  await get.handler({response} as never);
+  assert.equal(data.effective.source, 'default');
+  await save({disclosureMode: 'lazy', routingMode: 'lexical', topK: 3, strictLoad: true, fusion: true});
+  await save({topK: 5, ignored: 'field'});
+  await get.handler({response} as never);
+  assert.deepEqual({...data.effective}, {
+    disclosureMode: 'lazy', routingMode: 'lexical', topK: 5, strictLoad: true, fusion: true,
+    applyAt: 'next-step', source: 'ui'
+  });
+  const saved = structuredClone(values.get('skill_settings'));
+  for (const invalid of [null, [], 'text', {disclosureMode: 'bad'}, {routingMode: 'bad'}, {topK: 0}, {strictLoad: 1}, {fusion: 'yes'}]) {
+    await assert.rejects(save(invalid));
+    assert.deepEqual(values.get('skill_settings'), saved);
+  }
+});
