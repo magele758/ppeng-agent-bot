@@ -376,10 +376,10 @@ function renderOptimisticOrStream(slot: FeedSlot, view: TranscriptModel, chat: C
     );
   }
   if (slot.kind !== 'stream') return null;
-  return renderUnsavedStream(slot, view, chat, sessionId, brief);
+  return renderStreamSlot(slot, view, chat, sessionId, brief);
 }
 
-function renderUnsavedStream(slot: FeedSlot, view: TranscriptModel, chat: Chat, sessionId: string, brief: boolean): ReactNode {
+function renderStreamSlot(slot: FeedSlot, view: TranscriptModel, chat: Chat, sessionId: string, brief: boolean): ReactNode {
   const raw = rawStreamSegments(slot, chat);
   const segments = omitStreamTextSavedOnTurn(chat.displayMessages, raw);
   if (raw.length > 0 && segments.length === 0) return null;
