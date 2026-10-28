@@ -1449,7 +1449,7 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
   const bgRunTool: ToolContract<{ command: string; isolation?: string }> = {
     name: 'bg_run',
     description:
-      'Run a long command in the background. When waitFor is returned, call wait_for alone with those source/ref/condition fields and a continuation summary. The existing Goal or Routine resumes with its observed status; process exit is not verified delivery. Optional isolation is honored when the saved mode is Auto; omit it to follow the saved mode. Auto uses the strongest available.',
+      'Run a long command in the background. Under an active Goal or Routine, the host parks a durable wait when the job starts (hostParked/waitId in the result) and ends this tool turn — do not call wait_for again for that job, and do not cron/sleep/poll. Outside Goal/Routine, wait yourself with bg_check. Process exit is not verified delivery. Optional isolation is honored when the saved mode is Auto; omit it to follow the saved mode. Auto uses the strongest available.',
     inputSchema: {
       type: 'object',
       properties: {

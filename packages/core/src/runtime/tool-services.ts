@@ -1,4 +1,4 @@
-import {recordBackgroundWaitSource} from '../waits/background-source.js';
+import {parkBackgroundDurableWait} from '../waits/background-source.js';
 /**
  * Build RuntimeToolServices for builtin tools — extracted from RawAgentRuntime.
  */
@@ -144,8 +144,8 @@ export function createToolServices(host: ToolServicesHost): RuntimeToolServices 
     },
     startBackgroundJob: async (sessionId, command, options) => {
       const job=await host.startBackgroundJob(sessionId,command,options);
-      const waitFor=recordBackgroundWaitSource(host.store,sessionId,job);
-      return {...job,...(waitFor?{waitFor}:{})};
+      const parked=parkBackgroundDurableWait(host.store,sessionId,job);
+      return {...job,...(parked?{waitFor:parked.waitFor,waitId:parked.waitId,hostParked:true}:{})};
     },
     directIsolationApproved: (sessionId, toolName, args) =>
       approvalGrantsDirectIsolation(host.store.listApprovals(), sessionId, toolName, args),
