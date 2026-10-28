@@ -47,6 +47,9 @@ export function classifyGoalMessage(raw: string): GoalMessageIntent {
   const text = (target ? raw.slice(target[0].length) : raw).trim();
   const base = { ...(target ? { goalId: target[1]! } : {}), text };
   if (!text || /^(谢谢|多谢|好的|收到|你好|thanks?|thank you|hello|hi)[！!。.\s]*$/i.test(text)) return { kind: 'chat', ...base };
+  if (!target && /^(?:(?:这个|这件事|事情|任务|现在|都|已经|到底|你|目前)\s*)*(?:好了吗|好了没|搞完了没|搞完了吗|做完了没|做完了吗|干完了没|干完了吗|在干嘛|还差什么|还有什么没做完的)[？?！!。.\s]*$/.test(text)) return { kind: 'query', ...base };
+  if (!target && /^(?:回复|回答|说)(?:再|请)?(?:简单|简短|简洁|短|清楚)[\s\S]{0,100}$/.test(text) && !requestsWork(text)
+    && !/新增|添加|再加|修改|修复|开发|实现|生成|创建|保存|提交|删除|运行|部署|发送|\b(?:add|fix|build|save|send|run|create)\b/i.test(text)) return { kind: 'chat', ...base };
   if (!target && isExplicitReadOnlyRequest(text)) return { kind: 'query', ...base };
   if (/(进度|进展|做到哪|怎么样了|状态如何|完成了吗|完成了没|跑完了没|还没好|status|progress|how.*going)/i.test(text)
     && !requestsWork(text)) return { kind: 'query', ...base };

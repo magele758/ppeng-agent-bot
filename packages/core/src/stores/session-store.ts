@@ -70,6 +70,7 @@ export class SessionStore {
   private historyFts: boolean | undefined;
 
   private readonly writerScope = new AsyncLocalStorage<{ sessionId: string; runId: string }>();
+  private readonly messageSource = new AsyncLocalStorage<{ sessionId: string; sourceId: string; writerRunId?: string }>();
   private readonly writerLocks = new Map<string, { runId: string; held: HeldFdLock }>();
   constructor(private readonly db: DatabaseSync, private readonly dbPath?: string) {}
 
@@ -81,6 +82,17 @@ export class SessionStore {
 
   /** Control-plane operations must validate current persisted state, not inherit a finished turn. */
   runWithoutWriterScope<T>(fn: () => T): T { return this.writerScope.exit(fn); }
+
+  runWithMessageSource<T>(sessionId: string, sourceId: string, fn: () => Promise<T>): Promise<T> {
+    return this.messageSource.run({ sessionId, sourceId }, fn);
+  }
+
+  runWithoutMessageSource<T>(fn: () => T): T { return this.messageSource.exit(fn); }
+
+  messageIdsForSource(sessionId: string, sourceId: string): string[] {
+    if (!this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='session_message_sources'").get()) return [];
+    return this.db.prepare('SELECT message_id FROM session_message_sources WHERE session_id=? AND source_id=?').all(sessionId,sourceId).map(row=>String(row.message_id));
+  }
 
   isWriterCurrent(sessionId: string, runId: string): boolean {
     return this.getSession(sessionId)?.activeWriterRunId === runId;
@@ -349,6 +361,12 @@ export class SessionStore {
     parts: SessionMessage['parts'],
     opts?: SurfaceWriteOpts
   ): SessionMessage {
+    return this.messageSource.getStore()?.sessionId === sessionId
+      ? this.transaction(() => this.appendScopedMessage(sessionId,role,parts,opts))
+      : this.appendScopedMessage(sessionId,role,parts,opts);
+  }
+
+  private appendScopedMessage(sessionId: string, role: MessageRole, parts: SessionMessage['parts'], opts?: SurfaceWriteOpts): SessionMessage {
     const replyTo = this.quoteForAppend(sessionId, role, opts?.replyTo);
     const node = this.insertSurfaceNode({
       sessionId,
@@ -360,6 +378,13 @@ export class SessionStore {
       replyTo
     });
     const message = this.surfaceToMessage(node);
+    const source = this.messageSource.getStore();
+    const writer = this.writerScope.getStore();
+    if (source?.sessionId === sessionId && writer?.sessionId === sessionId && !source.writerRunId) source.writerRunId = writer.runId;
+    const sameWriter = !source?.writerRunId || source.writerRunId === writer?.runId;
+    if (source?.sessionId === sessionId && sameWriter && (role === 'assistant' || role === 'tool')) {
+      this.db.prepare('INSERT INTO session_message_sources VALUES(?,?,?)').run(message.id,sessionId,source.sourceId);
+    }
     const session = this.getSession(sessionId);
     if (session) {
       const metadata = captureTaskContext(session, message);

@@ -137,7 +137,7 @@ function toolsForTurn(deps: ToolLoopDeps, turnTools?: ToolContract<any>[]): Tool
     ledger.observe(context.session.id);
     const latest=deps.store.listApprovals().filter(a=>a.sessionId===context.session.id&&a.toolName===tool.name&&stableJson(a.args)===stableJson(args)).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)||b.updatedAt.localeCompare(a.updatedAt))[0];
     const approved=latest?.status==='approved'&&latest.createdAt>=ledger.approvalFloor(context.session.id);
-    if(!ledger.allowed(context.session.id,tool.name,tool.sideEffectLevel)&&!approved)return {ok:false,content:JSON.stringify({error:'source_scope_denied',tool:tool.name,reason:'External or delegated input cannot authorize this effect. Save an explicit scope in Lab or approve this exact call.'})};
+    if(!ledger.allowed(context.session.id,tool.name,tool.sideEffectLevel,args)&&!approved)return {ok:false,content:JSON.stringify({error:'source_scope_denied',tool:tool.name,reason:'External or delegated input cannot authorize this effect. Save an explicit scope in Lab or approve this exact call.'})};
     const result=await tool.execute(context,args);
     if(result.content.includes('«external'))ledger.record(context.session.id,{kind:'tool',ref:tool.name+':'+Date.now(),label:tool.name});
     return result;

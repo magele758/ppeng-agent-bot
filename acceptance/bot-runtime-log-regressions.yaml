@@ -1,0 +1,27 @@
+id: bot-runtime-log-regressions
+title: Bot 实际运行日志回归
+status: implemented
+requirement: |
+  那就按v2计划开始改，先把日志里这些真实问题复现成测试，再逐项修好，验收通过后review、提交PR并合并，不要停下来等我确认。
+notes: "assumedApproval: standing-order-2026-10-22；v2 R0 首批纵向回归：状态追问、结果边界、无检查与授权拒绝、群预算收口。"
+criteria:
+  - id: AC-1
+    given: 一件工作已有进展，用户只追问是否完成或调整回复格式
+    when: Bot 理解这条消息
+    then: 不另建无关持久目标，明确的新增开发要求仍被保留
+  - id: AC-2
+    given: 定时任务在 Bot 主会话执行，期间存在旧摘要、回顾和另一条用户消息
+    when: 采集本次运行结果
+    then: 只保留本次任务的回答，不把旧摘要或另一条用户消息的回复当成本次结果
+  - id: AC-3
+    given: 定时任务已经在 Bot 主会话留下结果
+    when: 保存运行记录与通知
+    then: 主会话不再追加一份重复的相同结果，非 Bot 独立工作会话仍向主会话投递摘要
+  - id: AC-4
+    given: 定时检查的工具操作被来源策略拒绝，但模型回答没有新情况
+    when: 本轮执行收口
+    then: 运行记录呈现具体授权失败，不把未执行的检查算成成功静默
+  - id: AC-5
+    given: 群成员因本轮预算限制停止
+    when: 群回合结束
+    then: 成员运行状态得到收口，群显示具体受阻原因，不以完成状态掩盖未完成工作
