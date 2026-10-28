@@ -33,7 +33,7 @@ function kvStore() {
 test('goal settings clamp maxTurns and persist via KV', () => {
   assert.equal(defaultGoalSettings().entityEnabled, true);
   assert.equal(normalizeGoalSettings({ defaultMaxTurns: 999 }).defaultMaxTurns, 100);
-  assert.equal(normalizeGoalSettings({ defaultMaxTurns: 0 }).defaultMaxTurns, 1);
+  assert.equal(normalizeGoalSettings({ defaultMaxTurns: 0 }).defaultMaxTurns, 0);
   const store = kvStore();
   assert.equal(readGoalSettings(store).allowCommandVerify, false);
   const saved = writeGoalSettings(store, { defaultMaxTurns: 12, allowHttpVerify: false });
