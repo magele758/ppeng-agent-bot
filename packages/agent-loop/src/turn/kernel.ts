@@ -1496,18 +1496,7 @@ async function runSessionKernel(
       await host.stepTx?.commitStep?.(toolsStep);
 
       if (stopAt.size > 0) {
-        const hit = results.find((r) => {
-          if (!r.ok) return false;
-          if (stopAt.has(r.name)) return true;
-          if (r.name === 'bg_run') {
-            try {
-              return JSON.parse(String(r.content ?? '')).hostParked === true;
-            } catch {
-              return false;
-            }
-          }
-          return false;
-        });
+        const hit = results.find((r) => r.ok && stopAt.has(r.name));
         if (hit) {
           return await finishEnded(
             host.store.updateSession(session.id, { status: 'idle' }),
