@@ -1,4 +1,5 @@
 import {SourceLedger} from '../learning/sources.js';
+import { runWithSkillManifest } from '../skills/skill-manifest-gate.js';
 import type {SqliteStateStore} from '../storage.js';
 import {stableJson} from '../cron/notification-decision.js';
 import { registerSteerToolWave } from './steer-tools.js';
@@ -129,8 +130,17 @@ export interface ToolLoopDeps {
   armUnattendedApproval?: (approval: ApprovalRecord) => void;
 }
 
+function wrapSkillManifestTools(
+  tools: ToolContract<Record<string, unknown>>[]
+): ToolContract<Record<string, unknown>>[] {
+  return tools.map((tool) => ({
+    ...tool,
+    execute: (context, args) => runWithSkillManifest(context, tool.name, args, () => tool.execute(context, args))
+  }));
+}
+
 function toolsForTurn(deps: ToolLoopDeps, turnTools?: ToolContract<any>[]): ToolContract<Record<string, unknown>>[] {
-  const tools=(turnTools ?? deps.tools) as ToolContract<Record<string, unknown>>[];
+  const tools=wrapSkillManifestTools((turnTools ?? deps.tools) as ToolContract<Record<string, unknown>>[]);
   if(!deps.governanceStore)return tools;
   const ledger=new SourceLedger(deps.governanceStore);
   return tools.map(tool=>({...tool,execute:async(context,args)=>{

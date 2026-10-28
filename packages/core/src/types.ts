@@ -11,6 +11,7 @@
  */
 
 import type { ImageRetentionTier } from '@ppeng/api-types';
+import type { SkillManifest } from './skills/skill-manifest.js';
 
 // Wire-format message parts and loop-layer records — single source of truth.
 export type {
@@ -75,6 +76,8 @@ export interface SkillSpec {
   /** Alternate names accepted by load_skill and considered during routing. */
   aliases?: string[];
   triggerWords?: string[];
+  /** Optional capability-boundary Manifest (tools/paths/network/secrets). */
+  manifest?: SkillManifest;
 }
 
 export interface ImageAssetRecord {
