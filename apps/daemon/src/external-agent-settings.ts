@@ -10,6 +10,7 @@ export interface ExternalAgentClient {
   enabled: boolean;
   allowedAgentIds: string[];
   defaultAgentId: string;
+  allowedBotIds?: string[];
   tokenHash: string;
   ownerMetadata: Record<string, unknown>;
 }
@@ -68,15 +69,21 @@ export function writeExternalAgentSettings(runtime: RawAgentRuntime, value: unkn
       seenIds.add(id);
       const old = previous.clients.find(client => client.id === id);
       const name = requiredText(raw.name, 'name', 160);
-      if (!Array.isArray(raw.allowedAgentIds) || raw.allowedAgentIds.length === 0 || raw.allowedAgentIds.length > 100) {
-        throw new ValidationError('allowedAgentIds must contain between 1 and 100 executor IDs');
+      if (!Array.isArray(raw.allowedAgentIds) || raw.allowedAgentIds.length > 100) {
+        throw new ValidationError('allowedAgentIds must contain at most 100 executor IDs');
       }
       const allowedAgentIds = [...new Set(raw.allowedAgentIds.map(id => requiredText(id, 'allowedAgentIds', 160)))];
       for (const id of allowedAgentIds) {
-        if (!runtime.store.getAgent(id)) throw new ValidationError(`Unknown executor: ${id}`);
+        if (!runtime.store.getAgent(id) || runtime.store.getBot(id)) throw new ValidationError(`Unknown executor: ${id}`);
       }
-      const defaultAgentId = requiredText(raw.defaultAgentId, 'defaultAgentId', 160);
-      if (!allowedAgentIds.includes(defaultAgentId)) throw new ValidationError('defaultAgentId must be an allowed executor');
+      const defaultAgentId = raw.defaultAgentId === '' && allowedAgentIds.length === 0 ? '' : requiredText(raw.defaultAgentId, 'defaultAgentId', 160);
+      if (allowedAgentIds.length && !allowedAgentIds.includes(defaultAgentId)) throw new ValidationError('defaultAgentId must be an allowed executor');
+      const allowedBotIds = raw.allowedBotIds === undefined ? [] : raw.allowedBotIds;
+      if (!Array.isArray(allowedBotIds) || allowedBotIds.length > 100) throw new ValidationError('allowedBotIds must be an array of at most 100 Bot IDs');
+      const botIds = [...new Set(allowedBotIds.map(id => requiredText(id, 'allowedBotIds', 160)))];
+      if (!botIds.length && !allowedAgentIds.length) throw new ValidationError('Allow at least one Bot or executor');
+      const ownerMetadata = old?.ownerMetadata ?? stampOwnerMetadata({}, auth);
+      for (const botId of botIds) runtime.openBot(botId, { userId: typeof ownerMetadata.userId === 'string' ? ownerMetadata.userId : undefined, tenantId: typeof ownerMetadata.tenantId === 'string' ? ownerMetadata.tenantId : undefined });
       let tokenHash = old?.tokenHash ?? '';
       if (raw.token !== undefined) {
         const token = requiredText(raw.token, 'token', 512);
@@ -85,7 +92,7 @@ export function writeExternalAgentSettings(runtime: RawAgentRuntime, value: unkn
       }
       if (!tokenHash || seenHashes.has(tokenHash)) throw new ValidationError('Each client needs a unique credential');
       seenHashes.add(tokenHash);
-      return { id, name, enabled: booleanValue(raw.enabled, true, 'client.enabled'), allowedAgentIds, defaultAgentId, tokenHash,
+      return { id, name, enabled: booleanValue(raw.enabled, true, 'client.enabled'), allowedAgentIds, defaultAgentId, allowedBotIds: botIds, tokenHash,
         ownerMetadata: old?.ownerMetadata ?? stampOwnerMetadata({}, auth) };
     });
   }
@@ -107,5 +114,5 @@ export function authenticateExternalAgent(runtime: RawAgentRuntime, request: Inc
 
 /** This exact namespace alone uses scoped external credentials instead of Lab login. */
 export function isExternalAgentTaskPath(pathname: string): boolean {
-  return /^\/api\/external-agent\/v1\/tasks(?:\/[^/]+)?$/.test(pathname);
+  return /^\/api\/external-agent\/v1\/tasks(?:\/[^/]+(?:\/(?:cancel|input))?)?$/.test(pathname);
 }

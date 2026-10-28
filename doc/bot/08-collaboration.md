@@ -66,3 +66,11 @@ Bot 主对话保留执行过程。任务页不取代对话。
 旧报告中的 observedAt/sample/checked 时间不会因重新读取而变新。成功读取近期有效的工作快照可用于无变化检查，但保存的采样时间保持原值；没有观察的“健康”自述和失败检查都会记录为未核验。进程状态与监督回报都不能代替原 Goal 的完成核验。
 
 `bot_task_results` 默认返回摘要与历史游标，完整结果按 `taskId` 读取，或显式选择 `includeResults`。用户汇报应采用简短列表，列出当前工作、阻塞和下一步。
+## 与其他应用的 Agent 协作
+
+「设置 → 集成与可观测」提供两个入口：
+
+- **外部 Agent 任务交接**：按接入方授权允许的 Bot，外部请求使用 `botId`。Bot 以自己的权限执行独立任务，调用方只查询此任务的结果，不获得主对话历史。可以仅授权 Bot，不授予通用执行者。
+- **外部 Agent 连接**：保存远端地址、凭证、目标 Bot/执行者和允许使用连接的本地 Bot。授权 Bot 使用 `external_agent_list`、`external_agent_delegate`、`external_agent_status`、`external_agent_cancel`、`external_agent_input` 完成派工与跟踪。
+
+连接保存立即生效，凭证不回显。对方需要支持本项目的 HTTP 任务交接协议，或部署转换适配器。接收状态不等于完成；接收结果不明时保留原派工标识重试。具体配置、接口、撤销和恢复方式见[外部 Agent 任务交接](../EXTERNAL_AGENT_HANDOFF.md)。

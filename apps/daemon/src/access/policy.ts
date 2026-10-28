@@ -291,6 +291,10 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
       )
     ],
     ['GET /api/tasks', selfFiltered('task')],
+    ['GET /api/external-agents/connections', ADMIN],
+    ['PATCH /api/external-agents/connections', ADMIN],
+    ['POST /api/external-agent/v1/tasks/:id/cancel', { kind: 'external-agent', authenticate: ctx => { authenticateExternalAgent(l.runtime, ctx.request); } }],
+    ['POST /api/external-agent/v1/tasks/:id/input', { kind: 'external-agent', authenticate: ctx => { authenticateExternalAgent(l.runtime, ctx.request); } }],
     ['GET /api/external-agents/settings', ADMIN],
     ['PATCH /api/external-agents/settings', ADMIN],
     ['POST /api/external-agent/v1/tasks', { kind: 'external-agent', authenticate: ctx => { authenticateExternalAgent(l.runtime, ctx.request); } }],

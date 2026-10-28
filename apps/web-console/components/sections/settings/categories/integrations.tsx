@@ -1,3 +1,4 @@
+import { ExternalAgentConnectionsCard } from '../../../ExternalAgentConnectionsCard';
 import { EventLogSettingsCard } from '../../../EventLogSettingsCard';
 import { ExternalAgentSettingsCard } from '../../../ExternalAgentSettingsCard';
 import type { SettingsEntry } from '../registry';
@@ -8,7 +9,7 @@ export const integrationsEntries: SettingsEntry[] = [
     category: 'integrations',
     titleKey: 'externalAgents.title',
     keywordsKey: 'externalAgents.keywords',
-    render: () => <ExternalAgentSettingsCard />
+    render: () => <><ExternalAgentSettingsCard /><ExternalAgentConnectionsCard /></>
   },
   {
     id: 'eventLog',
