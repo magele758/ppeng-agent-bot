@@ -19,7 +19,7 @@ function fixture(t) {
   return { store, dir };
 }
 
-test('parkBackgroundDurableWait host-registers background_job wait without wait_for', (t) => {
+test('parkBackgroundDurableWait host-registers background_job wait without wait_for [AC:bg-run-host-park#AC-1]', (t) => {
   const { store } = fixture(t);
   const parent = store.createSession({
     title: 'scope',
@@ -64,7 +64,7 @@ test('parkBackgroundDurableWait host-registers background_job wait without wait_
   assert.equal(again?.ref, job.id);
 });
 
-test('parkBackgroundDurableWait is a no-op without active Goal/Routine owner', (t) => {
+test('parkBackgroundDurableWait is a no-op without active Goal/Routine owner [AC:bg-run-host-park#AC-2]', (t) => {
   const { store } = fixture(t);
   const session = store.createSession({
     title: 'free',
