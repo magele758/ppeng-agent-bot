@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-10-28T17:35:06.000Z",
-  "reviewNote": "UserDeliveryPort wraps user-facing drafts; deliverChannelText always drafts then human Confirm→Send. Merged origin/main (child-wake). Pairing/lifecycle/restart/concurrency control-flow unchanged.",
+  "reviewedAt": "2026-10-28T17:49:17.000Z",
+  "reviewNote": "UserDeliveryPort wraps user-facing drafts; deliverChannelText always drafts then human Confirm→Send. Merged origin/main (agent-as-folder). Pairing/lifecycle/restart/concurrency control-flow unchanged.",
   "mapping": [
     {
       "step": "Public runtime, cancellation, approvals and completion; exercised through RawAgentRuntime with SQLite",

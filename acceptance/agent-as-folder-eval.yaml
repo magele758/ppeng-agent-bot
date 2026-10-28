@@ -1,0 +1,21 @@
+id: agent-as-folder-eval
+title: Agent-as-folder path + eval default-on
+status: implemented
+requirement: |
+  Agent-as-folder + eval default-on minimal mergeable PR from origin/main.
+criteria:
+  - id: AC-1
+    given: "Plugin agents dir has a subdirectory with valid agent.json"
+    when: "The plugin is loaded"
+    then: "The folder-shaped Agent is discovered alongside flat agents json files"
+  - id: AC-2
+    given: "agent.json omits the eval field"
+    when: "That Agent-as-folder is loaded"
+    then: "eval is treated as enabled (default on)"
+  - id: AC-3
+    given: "agent.json explicitly sets eval to false"
+    when: "That Agent-as-folder is loaded"
+    then: "eval is treated as disabled and the default-on list excludes it"
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  Final acceptance by lei pending.

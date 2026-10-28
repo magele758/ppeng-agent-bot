@@ -7,6 +7,7 @@ import type { SoftwareExecutor } from '../connectors/software-execution.js';
 import { existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
 import type { AgentSpec, SkillSpec, ToolContract } from '../types.js';
+import { discoverAgentFolders } from '../agents/agent-as-folder.js';
 
 export type PluginAuthKind = 'none' | 'bearer' | 'oauth' | 'header';
 
@@ -249,6 +250,27 @@ function loadToolDecls(root: string, manifest: PluginManifest): PluginToolDecl[]
   return decls;
 }
 
+
+/** Manifest agents + agents/*.json + agents/<slug>/ folders (eval default-on). */
+function loadPluginAgents(root: string, manifest: { agents?: string[] }): AgentSpec[] {
+  const agents: AgentSpec[] = [];
+  for (const rel of manifest.agents ?? []) {
+    const a = loadAgentFile(join(root, rel));
+    if (a) agents.push(a);
+  }
+  const agentsDir = join(root, 'agents');
+  if (!existsSync(agentsDir)) return agents;
+  for (const f of readdirSync(agentsDir)) {
+    if (!f.endsWith('.json')) continue;
+    const a = loadAgentFile(join(agentsDir, f));
+    if (a && !agents.some((x) => x.id === a.id)) agents.push(a);
+  }
+  for (const folder of discoverAgentFolders(agentsDir)) {
+    if (!agents.some((x) => x.id === folder.agent.id)) agents.push(folder.agent);
+  }
+  return agents;
+}
+
 export function loadPluginFromDir(root: string): LoadedPlugin | undefined {
   const manifestPath = join(root, 'plugin.json');
   const alt = join(root, '.ppeng-plugin', 'plugin.json');
@@ -257,20 +279,7 @@ export function loadPluginFromDir(root: string): LoadedPlugin | undefined {
   const manifest = readJson<PluginManifest>(path);
   if (!manifest?.id || !manifest.name) return undefined;
 
-  const agents: AgentSpec[] = [];
-  for (const rel of manifest.agents ?? []) {
-    const a = loadAgentFile(join(root, rel));
-    if (a) agents.push(a);
-  }
-  // Auto-discover agents/*.json
-  const agentsDir = join(root, 'agents');
-  if (existsSync(agentsDir)) {
-    for (const f of readdirSync(agentsDir)) {
-      if (!f.endsWith('.json')) continue;
-      const a = loadAgentFile(join(agentsDir, f));
-      if (a && !agents.some((x) => x.id === a.id)) agents.push(a);
-    }
-  }
+  const agents = loadPluginAgents(root, manifest);
 
   const skills: SkillSpec[] = [];
   for (const rel of manifest.skills ?? []) {
