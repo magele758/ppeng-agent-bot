@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { dragSessionRow } from './helpers/drag-session-row';
 
 type Group = { id: string; name: string; botIds: string[] };
 async function fixture(page: Page) {
@@ -61,7 +62,7 @@ test('create rename delete groups persists without deleting Bots or conversation
     await page.getByLabel('功能分组名称', { exact: true }).fill('Writing');
     await page.getByRole('button', { name: '保存功能分组', exact: true }).click();
     await expect(group).toContainText('Writing');
-    await page.getByTestId('functional-group-ungrouped').getByRole('button').filter({ hasText: f.name }).dragTo(group.locator('h3'));
+    await dragSessionRow(page, page.getByTestId('functional-group-ungrouped').getByRole('button').filter({ hasText: f.name }), group.locator('h3'));
     await expect.poll(() => f.groups[0]?.botIds).toContain(f.bot.id);
     page.once('dialog', (dialog) => dialog.accept());
     await group.getByRole('button', { name: '删除功能分组' }).click();
@@ -77,13 +78,13 @@ test('drag moves immediately persists and rolls back on failure [AC:bot-function
     await create(page, 'Research');
     const group = page.getByTestId('functional-group-group-0');
     const ungrouped = page.getByTestId('functional-group-ungrouped');
-    await ungrouped.getByRole('button').filter({ hasText: f.name }).dragTo(group.locator('h3'));
+    await dragSessionRow(page, ungrouped.getByRole('button').filter({ hasText: f.name }), group.locator('h3'));
     await expect(group).toContainText(f.name);
     await expect.poll(() => f.groups[0]?.botIds).toContain(f.bot.id);
     await page.reload();
     await expect(group).toContainText(f.name);
     f.fail();
-    await group.getByRole('button').filter({ hasText: f.name }).dragTo(ungrouped.locator('h3'));
+    await dragSessionRow(page, group.getByRole('button').filter({ hasText: f.name }), ungrouped.locator('h3'));
     await expect(page.getByRole('alert').filter({ hasText: 'Move unavailable' })).toBeVisible();
     await expect(group).toContainText(f.name);
   } finally { await page.request.patch(`/api/bots/${f.bot.id}`, { data: { hidden: true } }); await page.request.delete(`/api/sessions/${f.bot.canonicalSessionId}`); }

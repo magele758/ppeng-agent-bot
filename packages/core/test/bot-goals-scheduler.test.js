@@ -214,7 +214,7 @@ test('scheduler block announces one meaningful change without repeated wakes',as
  const {host,create,service,store,parent}=fixture(t);const g=create();const e=service.claim('b',g.id,{strategy:'direct'});service.report('b',e.id,{kind:'waiting',summary:'waiting unknown source',wait:{source:'unsupported',correlationId:'external'}});await tickBotGoals(host);assert.equal(service.get('b',g.id).status,'blocked');assert.deepEqual(store.dequeueSchedulerWakes(),[]);assert.equal(store.foldMessages(parent.id).filter(m=>m.parts.some(p=>p.text?.startsWith('[goal update]'))).length,1);await tickBotGoals(host);assert.deepEqual(store.dequeueSchedulerWakes(),[]);
 });
 
-test('an authorized background job wakes the original work once, with identity-checked evidence [AC:bot-linked-watchers#AC-7]',async t=>{
+test('an authorized background job wakes the original work once, with identity-checked evidence [AC:bot-linked-watchers#AC-7] [AC:bot-watch-work-continuity#AC-2] [AC:bot-watch-work-continuity#AC-8]',async t=>{
  const {host,service,store,parent,runs}=fixture(t);
  const g=service.create({botId:'b',sessionId:parent.id,title:'Develop then review',objective:'Develop then review and merge'}),e=service.claim('b',g.id,{strategy:'direct'});
  service.updateExecution('b',e.id,{sessionId:parent.id});
@@ -230,7 +230,7 @@ test('an authorized background job wakes the original work once, with identity-c
  await tickBotGoals(host);assert.equal(runs.length,1);
 });
 
-test('background waits cannot borrow another job or revive cancelled work [AC:bot-linked-watchers#AC-1] [AC:bot-linked-watchers#AC-7]',async t=>{
+test('background waits cannot borrow another job or revive cancelled work [AC:bot-linked-watchers#AC-1] [AC:bot-linked-watchers#AC-7] [AC:bot-watch-work-continuity#AC-2] [AC:bot-watch-work-continuity#AC-8]',async t=>{
  const {host,service,store,parent,runs}=fixture(t),{recordBackgroundWaitSource}=await import('../dist/waits/background-source.js');const {createWaitForTool}=await import('../dist/waits/tool.js');
  const g=service.create({botId:'b',sessionId:parent.id,title:'Background work',objective:'Ship'}),e=service.claim('b',g.id,{strategy:'direct'});service.updateExecution('b',e.id,{sessionId:parent.id});store.updateSession(parent.id,{metadata:{...parent.metadata,botGoalId:g.id,botGoalExecutionId:e.id}});
  const foreign=store.createSession({title:'foreign',mode:'chat',agentId:'general',metadata:{userId:'else'}}),job=store.createBackgroundJob({sessionId:foreign.id,command:'foreign',status:'completed'});
@@ -239,7 +239,7 @@ test('background waits cannot borrow another job or revive cancelled work [AC:bo
  await tickBotGoals(host);assert.equal(service.get('b',g.id).draining,true);assert.equal(runs.length,0);
  store.updateBackgroundJob(owned.id,'completed','done');await tickBotGoals(host);assert.equal(service.get('b',g.id).status,'cancelled');assert.equal(service.get('b',g.id).draining,false);assert.equal(runs.length,0);
 });
-test('changed background execution identity stays blocked across a durable-wait check [AC:bot-linked-watchers#AC-1] [AC:bot-linked-watchers#AC-7]',async t=>{
+test('changed background execution identity stays blocked across a durable-wait check [AC:bot-linked-watchers#AC-1] [AC:bot-linked-watchers#AC-7] [AC:bot-watch-work-continuity#AC-2] [AC:bot-watch-work-continuity#AC-8]',async t=>{
  const {host,service,store,parent,runs}=fixture(t),{recordBackgroundWaitSource}=await import('../dist/waits/background-source.js'),{createWaitForTool}=await import('../dist/waits/tool.js');
  const goal=service.create({botId:'b',sessionId:parent.id,title:'Original',objective:'deliver'}),e=service.claim('b',goal.id,{strategy:'direct'});service.updateExecution('b',e.id,{sessionId:parent.id});store.updateSession(parent.id,{metadata:{...parent.metadata,botGoalId:goal.id,botGoalExecutionId:e.id}});
  const job=store.createBackgroundJob({sessionId:parent.id,command:'build',status:'running'}),spec=recordBackgroundWaitSource(store,parent.id,job),registered=await createWaitForTool(store).execute({session:store.getSession(parent.id)},{...spec,summary:'review after build'});

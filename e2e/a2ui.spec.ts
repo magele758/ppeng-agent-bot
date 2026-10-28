@@ -32,7 +32,7 @@ async function createChatSession(page: Page): Promise<string> {
 
 test.describe('A2UI', () => {
   test('action endpoint accepts a synthetic click from the browser', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/#/chat');
     const sessionId = await createChatSession(page);
 
     // Drive the action POST exactly like A2uiSurface.postAction would.
@@ -58,7 +58,7 @@ test.describe('A2UI', () => {
   });
 
   test('rejects malformed action payloads', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/#/chat');
     const sessionId = await createChatSession(page);
     const baseUrl = page.context()._options.baseURL ?? 'http://127.0.0.1:33815';
     const res = await page.request.post(
@@ -127,9 +127,12 @@ test.describe('A2UI', () => {
       });
     });
 
-    await page.goto('/');
+    await page.goto('/#/chat');
     // Click into the (intercepted) session in the sidebar
     await page.getByRole('button', { name: /a2ui-render/ }).first().click();
+
+    await page.locator('summary').filter({ hasText: '已收起 1 条过程' }).click();
+    await page.locator('summary.chat-tool-fold__summary').filter({ hasText: 'a2ui_render' }).click();
 
     // The Text "Hello A2UI!" comes from the data model via { path: '/greeting' }.
     await expect(page.locator('.a2ui-surface').first()).toBeVisible({ timeout: 10_000 });

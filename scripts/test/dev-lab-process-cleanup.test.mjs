@@ -79,7 +79,7 @@ async function bind(port) {
   await new Promise(resolve=>server.close(resolve));
 }
 
-test('launcher signals clean descendants and allow the same ports on restart [AC:dev-lab-process-cleanup#AC-1]',{skip:!posix,timeout:30000},async t=>{
+test('launcher signals clean descendants and allow the same ports on restart [AC:dev-lab-process-cleanup#AC-1] [AC:single-host-bot-completion#AC-6]',{skip:!posix,timeout:30000},async t=>{
   const f=await fixture(t);
   const sentinel=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{env:sanitizeScriptEnv(),stdio:'ignore'});
   t.after(()=>sentinel.kill());

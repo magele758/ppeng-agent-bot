@@ -26,7 +26,9 @@ test('list idle faces blink, peek and sway out of phase without moving rows [AC:
   expect(result[0].phase).not.toEqual(result[1].phase);
 });
 
-test('reduced motion stops idle animation and retains working cues [AC:bot-list-idle-motion#AC-3]', async ({ page, botPair: bots }) => {
+test('reduced motion stops idle animation and retains working cues [AC:bot-list-idle-motion#AC-3]', async ({ page, botPair }) => {
+  const bots = botPair.filter(bot => !bot.hidden).slice(0, 2).map(bot => ({ ...bot, faceStyle: 'classic', avatar: null }));
+  await page.route('**/api/bots', route => route.fulfill({ json: { bots } }));
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.route('**/api/bot-work/status', r => r.fulfill({ json: { bots: bots.map((bot: { id: string }, i: number) => ({ bot, activeWorkCount: i === 0 ? 1 : 0 })) } }));
   await page.goto('/#/bot');

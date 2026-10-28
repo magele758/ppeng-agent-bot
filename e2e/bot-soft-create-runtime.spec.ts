@@ -19,6 +19,7 @@ test('soft creation preview survives submit and reload [AC:bot-soft-create-runti
   await page.getByTestId('bot-create-open').click();
   const form = page.getByRole('form', { name: '新建 Bot', exact: true });
   await form.getByTestId('bot-create-name').fill(`Soft UI ${Date.now()}`);
+  await form.locator('summary').click();
   await form.getByRole('button', { name: '软萌机器人', exact: true }).click();
   const preview = form.locator('[data-soft-bot-face]').first();
   const shape = await preview.getAttribute('data-soft-bot-face');

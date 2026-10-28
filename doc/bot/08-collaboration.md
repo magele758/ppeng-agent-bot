@@ -2,7 +2,7 @@
 
 Bot 可以请另一只 Bot 做事，也可以去调用已经接上的软件。两件事都带着身份和权限，不能借对方的名义扩大自己能做的范围。
 
-规格：`bots`、`bot-product-admin`、`bot-product-p0`、`bot-product-p1`、`bot-product-p2`、`bot-software-execution`（软件执行的验收规格还没标成已实现）。
+规格：`bots`、`bot-product-admin`、`bot-product-p0`、`bot-product-p1`、`bot-product-p2`、`bot-software-execution`、`bot-reliable-messaging`、`default-super-bot`。
 
 ## Bot 之间
 
@@ -14,9 +14,9 @@ Bot 可以请另一只 Bot 做事，也可以去调用已经接上的软件。�
 
 ## 默认 Super Bot 的派工
 
-意图是用进来就有的那只 Super Bot 查看其他人的状态、把工作派出去、收回成果和失败原因。被派的 Bot 自己的权限仍然有效，Super Bot 不代替人批准。
+默认 Super Bot 可以查看有权访问的 Bot 状态、把工作派出去、收回成果和失败原因。被派的 Bot 自己的权限仍然有效，Super Bot 不代替人批准。
 
-规格 `default-super-bot` 还没标成已实现。在它收口之前，派工以已经落地的 Bot 互发和委派为准。
+`default-super-bot` 与 `bot-reliable-messaging` 已通过软件验收。待处理消息和委派保留身份与幂等键，重启后仍可查询；收到或派发不等于完成。
 
 ## Super Bot 配置多机软件工厂
 
@@ -39,7 +39,7 @@ Bot 可以请另一只 Bot 做事，也可以去调用已经接上的软件。�
 
 第一次使用时有连接引导。可以用表单接 HTTP 或 MCP，也可以导入 OpenAPI，并滤成只读范围。高级的接口导入仍留着。创建时如果冲突或格式不对，不覆盖已经保存的连接。
 
-`bot-software-execution` 把「真的执行并返回结果、不把一句声明当成成功」收成验收标准，目前还是已批准。上面这些是 P0/P1 已经落地的连接和回执行为。
+`bot-software-execution` 已通过受支持 HTTP/OpenAPI 与 MCP 执行器的软件验收；依据真实回执记录成功、失败或未知，不承诺支持任意未接入软件。
 
 ## 产品与配置
 

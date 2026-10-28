@@ -1,0 +1,39 @@
+id: single-host-bot-completion
+title: 单机 Bot 工作收尾与默认入口
+status: implemented
+requirement: |
+  那就按你说的干，把需要补齐的补齐，太长期的可以先不做，短期也是单机部署
+notes: 'assumedApproval: standing-order-2026-10-22；排除 self-heal、多机现场部署及长期分布式扩展；既有标准保持有效。'
+criteria:
+  - id: AC-1
+    given: 盯梢关联一个具体外部执行
+    when: 检查了其他执行、关联身份变化或本轮未检查该执行
+    then: 显示未核验或失败，不把无关观察当成当前工作的新鲜证据
+  - id: AC-2
+    given: 盯梢本轮成功检查了身份一致的关联执行
+    when: 执行状态未变化或检查期间执行失败
+    then: 未变化可按静默策略处理，失败明确报告，不把进程结束当作目标已完成
+  - id: AC-3
+    given: 同一 Bot 对话包含多个定时执行、历史摘要及用户插话
+    when: 收集本次结果并重复处理通知
+    then: 只保留本次执行的正文和证据，不混入其他执行或历史摘要，也不重复发布
+  - id: AC-4
+    given: 用户在单机控制台打开首页或无效地址
+    when: 页面加载完成
+    then: 默认进入 Bot 工作台；明确打开旧对话和其它有效地址仍能访问原功能
+  - id: AC-5
+    given: 旧版例行任务没有保存工作关联等附加设置
+    when: 用户打开 Bot 的自动化面板
+    then: 面板正常展示并支持编辑，不因缺失附加设置导致页面崩溃
+  - id: AC-6
+    given: 单机项目的启动路径包含符号链接
+    when: 启动本地开发服务并随后停止
+    then: 编译和服务实际启动，退出时清理其子进程，编译失败保留失败状态
+
+  - id: AC-7
+    given: 手机首次打开默认 Bot 且已有未发送草稿
+    when: 切换会话列表或键盘弹起使屏幕高度缩短
+    then: 草稿保留且输入框完整可见，首次任务引导仍可滚动查看和操作
+
+links:
+  - doc/SINGLE_HOST_COMPLETION.md

@@ -5,7 +5,7 @@ import type { RoutineRun } from './routine-runtime.js';
 /** A run owns its sequence range, not every later reply in the shared chat. */
 export function routineExecutionMessages(store: SqliteStateStore, run: RoutineRun): SessionMessage[] {
   if (!run.sessionId) return [];
-  const all = store.listMessages(run.sessionId);
+  const all = store.listMessages(run.sessionId).filter(message => withinFinishedRun(message, run));
   if (run.messageSourceId) {
     const owned = new Set(store.messageIdsForSource(run.sessionId,run.messageSourceId));
     return all.filter(message=>owned.has(message.id));
@@ -15,6 +15,11 @@ export function routineExecutionMessages(store: SqliteStateStore, run: RoutineRu
   const candidates = all.filter(m => start !== undefined ? (m.seq ?? 0) > start : Date.parse(m.createdAt) >= Date.parse(run.startedAt ?? run.createdAt));
   const boundary = candidates.find(m => m.role === 'user');
   return boundary ? candidates.filter(m => (m.seq ?? 0) < (boundary.seq ?? 0)) : candidates;
+}
+
+function withinFinishedRun(message: SessionMessage, run: RoutineRun): boolean {
+  if (!run.finishedAt) return true;
+  return Date.parse(message.createdAt) <= Date.parse(run.finishedAt);
 }
 
 export function routineAnswerMessages(store: SqliteStateStore, run: RoutineRun): SessionMessage[] {

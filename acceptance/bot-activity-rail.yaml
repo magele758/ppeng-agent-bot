@@ -1,6 +1,6 @@
 id: bot-activity-rail
 title: Lab activity rail 展示 Bot 在途工作，并按 owner 隔离
-status: approved
+status: implemented
 notes: |
   final acceptance by lei pending.
   负责人要求本轮直接实现并合并；验收标准按该说明视为已批准。
@@ -35,3 +35,6 @@ criteria:
     given: 活动栏 listSessionBotActivity 被调用，存储里有 running routine 和 background job
     when: 通过 store 直接调用（单元测试场景）
     then: 返回包含这两条记录的列表，status 均为 running，botName 正确；HTTP 层 401 鉴权属于集成测试范畴，不在本 AC 覆盖范围内
+
+links:
+  - doc/SINGLE_HOST_COMPLETION.md

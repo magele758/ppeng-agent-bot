@@ -5,6 +5,7 @@ import {DurableWaitStore} from '../waits/store.js';
 import {resolveRoutineWorkLink,linkedRoutinePrompt,type RoutineWorkSnapshot} from './routine-work-link.js';
 import {SourceLedger} from '../learning/sources.js';
 import { routineExecutionMessages, routineAnswerMessages, routineSourceRefusal } from './routine-result.js';
+import { linkedJobObservation } from './linked-job-observation.js';
 import { factFingerprint, notificationDecision, localNotificationDay } from './notification-decision.js';
 import { latestCheckpoint } from '../session/checkpoint.js';
 import { decideRecovery } from '../session/durable-recovery.js';
@@ -304,7 +305,7 @@ function completionError(session:SessionRecord|undefined,denied:boolean,result:s
 }
 function linkedObservation(host:RoutineRuntimeHost,run:RoutineRun,result:string):Partial<RoutineRun>|undefined {
  if(!run.workSnapshot)return undefined;
- if(run.workSnapshot.externalJob?.status==='error')return {status:'failed',result,error:'Linked external job failed; delivery is unverified'};
+ if(run.workSnapshot.externalJob)return observeLinkedJob(host,run,result);
  const observation=routineExecutionMessages(host.store,run).reverse().find(message=>message.parts.some(part=>part.type==='tool_result'&&statusObservationTool.test(part.name)));
  if(observation?.parts.some(part=>part.type==='tool_result'&&part.ok===false))return {status:'failed',result,error:'Current observation failed; work status is unverified'};
  const sample=observation?statusObservation(observation):undefined;
@@ -313,6 +314,11 @@ function linkedObservation(host:RoutineRuntimeHost,run:RoutineRun,result:string)
  if(!current)return {status:'failed',result,error:'No successful current observation; work status is unverified'};
  if(observation)new RoutineRunStore(host.store).update(run.id,{workSnapshot:{...run.workSnapshot,observedAt:sample?.at??observation.createdAt}});
  return undefined;
+}
+function observeLinkedJob(host:RoutineRuntimeHost,run:RoutineRun,result:string):Partial<RoutineRun>|undefined {
+ const patch=linkedJobObservation(host.store,run,routineExecutionMessages(host.store,run));
+ if(patch.workSnapshot)new RoutineRunStore(host.store).update(run.id,{workSnapshot:patch.workSnapshot});
+ return patch.status?{...patch,result}:undefined;
 }
 function completionResult(host:RoutineRuntimeHost,run:RoutineRun,session:SessionRecord|undefined,approvals:ApprovalRecord[]):Partial<RoutineRun>{
  const result=resultText(host,run);
