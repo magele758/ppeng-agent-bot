@@ -1,3 +1,4 @@
+import type {RoomWorkRef} from './work-handoff.js';
 /**
  * Room goals, stored only under `bot.room-goals:${roomId}`.
  * Private bot goals stay on their own key. This module never writes them,
@@ -22,6 +23,7 @@ import type { RoomSubTask } from './room-tasks.js';
 export type RoomGoalStatus = 'queued' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
 
 export interface RoomGoal {
+  workRef?: RoomWorkRef;
   ownerBotId?: string;
   evidenceMessageIds?: string[];
   deliveryMessageIds?: string[];

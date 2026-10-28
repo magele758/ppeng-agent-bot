@@ -6,6 +6,7 @@ import { sameData } from "@/lib/same-data";
 import type { BotInfo } from "@/lib/types";
 import { GroupReplyModeControl } from "../play-group/GroupReplyModeControl";
 import { api, json, useAction, Feedback, Result, Status } from "./shared";
+import {RoomWorkReceipt,type RoomWorkReceiptData} from '../play-group/RoomWorkReceipt';
 type Room = {
   id: string;
   title: string;
@@ -16,15 +17,20 @@ type Room = {
   maxCostUsd: number;
   status: string;
 };
-type Turn={id:string;status:string;botTurns:number;maxBotTurns:number;toolCalls?:number;costUsd?:number;costStatus?:string;terminationReason?:string;partialResult?:unknown};
+type Turn={workRef?:RoomWorkReceiptData;id:string;status:string;botTurns:number;maxBotTurns:number;toolCalls?:number;costUsd?:number;costStatus?:string;terminationReason?:string;partialResult?:unknown};
 type Message = {
+  workReceipt?:RoomWorkReceiptData;
   id: string;
   seq: number;
   sender: { name: string };
   text: string;
   attachmentIds: string[];
 };
-export function BotRooms({ bots, selectedRoomId, memberEditor = true }: { bots: BotInfo[]; selectedRoomId?: string; memberEditor?: boolean }) {
+function TurnWorkStatus({turn,onOpenWork}:{turn:Turn;onOpenWork?:(id:string)=>void}){
+  if(turn.workRef)return <RoomWorkReceipt receipt={{...turn.workRef,kind:'state'}} onOpen={onOpenWork}/>;
+  return <Status value={turn.status}/>;
+}
+export function BotRooms({ bots, selectedRoomId, memberEditor = true, onOpenWork }: { bots: BotInfo[]; selectedRoomId?: string; memberEditor?: boolean; onOpenWork?:(id:string)=>void }) {
   const { t } = useI18n();
   const action = useAction();
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -446,7 +452,7 @@ export function BotRooms({ bots, selectedRoomId, memberEditor = true }: { bots: 
             {messages.map((m) => (
               <article key={m.id}>
                 <strong>{m.sender.name}</strong>
-                <p style={{ whiteSpace: "pre-wrap" }}>{m.text}</p>
+                {m.workReceipt?<RoomWorkReceipt receipt={m.workReceipt} onOpen={onOpenWork}/>:<p style={{ whiteSpace: "pre-wrap" }}>{m.text}</p>}
                 {m.attachmentIds?.length > 0 && (
                   <Result value={m.attachmentIds} />
                 )}
@@ -518,7 +524,7 @@ export function BotRooms({ bots, selectedRoomId, memberEditor = true }: { bots: 
             </button>
           </form>
           <h4>{t("botWork.queue")}</h4>
-          {turns.map(turn=><article key={turn.id}><Status value={turn.status}/><p>{t('botWork.turnProgress')}: {turn.botTurns}/{turn.maxBotTurns}</p><p>{turn.costStatus==='estimated'?`${t('botWork.costEstimate')}: ${turn.costUsd??0}`:t('botWork.costUnknown')}</p>{turn.terminationReason&&<p>{t('botWork.termination')}: {['members_completed','budget','tool_budget','cost_budget','external_effect_unconfirmed','interrupted_requires_review','user_abort','member_execution_failed'].includes(turn.terminationReason)?t(`botWork.reasons.${turn.terminationReason}` as MessageKey):t('botWork.states.unknown')}</p>}<Result value={turn.partialResult}/></article>)}
+          {turns.map(turn=><article key={turn.id}><TurnWorkStatus turn={turn} onOpenWork={onOpenWork}/><p>{t('botWork.turnProgress')}: {turn.botTurns}/{turn.maxBotTurns}</p><p>{turn.costStatus==='estimated'?`${t('botWork.costEstimate')}: ${turn.costUsd??0}`:t('botWork.costUnknown')}</p>{turn.terminationReason&&<p>{t('botWork.termination')}: {['members_completed','budget','tool_budget','cost_budget','external_effect_unconfirmed','interrupted_requires_review','user_abort','member_execution_failed'].includes(turn.terminationReason)?t(`botWork.reasons.${turn.terminationReason}` as MessageKey):t('botWork.states.unknown')}</p>}<Result value={turn.partialResult}/></article>)}
           </>}
         </div>
       )}

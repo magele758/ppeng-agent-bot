@@ -1,3 +1,4 @@
+import {acceptHumanRoomWork,synchronizeRoomWork,handleHumanRoomFollowup,assignedRoomWork,roomHumanIntent,roomRoutingHash,type RoomWorkRef,type RoomWorkReceipt} from './work-handoff.js';
 import { BOT_DEFAULT_MAX_TURNS } from '../bots/types.js';
 import { readRoomGoals, writeRoomGoals } from './room-goals.js';
 import { startCollaboration, collaborationBoard, recordCollaborationReply, settleCollaboration } from './task-collaboration.js';
@@ -41,6 +42,7 @@ export interface BotRoom {
   createdAt: string; updatedAt: string;
 }
 export interface BotRoomMessage {
+  workReceipt?:RoomWorkReceipt;
   id: string; roomId: string; seq: number; sender: { type: 'user' | 'bot'; id: string; name: string };
   text: string; attachmentIds: string[]; contextSources?: ContextSource[]; turnId?: string; createdAt: string;
   /** Short quote pointer. The full bot reply stays on the original message. */
@@ -59,6 +61,7 @@ export interface RoomMemberRun {
   status: RoomMemberRunStatus;
 }
 export interface BotRoomTurn {
+  workRef?:RoomWorkRef; humanWorkHandled?:boolean; humanRoutingHash?:string;
   id: string; roomId: string; messageId: string; status: RoomTurnStatus; botIds: string[];
   /** Present only when the triggering message named members. Empty means an @ matched nobody. The full named list is kept; botIds is the capped speaking order. */
   mentionedBotIds?: string[];
@@ -327,7 +330,7 @@ export class BotRoomService {
     const messages = rows.slice(0,limit).map(row => decode<BotRoomMessage>(row)!).reverse();
     return { messages, nextCursor: hasMore ? messages[0]!.seq : null, hasMore };
   }
-  turns(principal: BotPrincipal, id: string): BotRoomTurn[] { this.get(principal,id); return this.rawTurns(id).map(turn => turn.goalId ? { ...turn, collaboration: collaborationBoard(this.store, id, turn.goalId) } : turn); }
+  turns(principal: BotPrincipal, id: string): BotRoomTurn[] { this.get(principal,id); return this.rawTurns(id).map(turn => {const collaboration=turn.goalId?collaborationBoard(this.store,id,turn.goalId):undefined;return {...turn,...(collaboration?{collaboration}:{}),...(collaboration?.goal?.workRef?{workRef:collaboration.goal.workRef}:{})};}); }
   private rawTurns(id: string): BotRoomTurn[] {
     return this.store.db.prepare('SELECT data,status FROM bot_room_turns WHERE room_id=? ORDER BY rowid').all(id).map(row => ({ ...decode<BotRoomTurn>(row)!, status: (row as {status:RoomTurnStatus}).status }));
   }
@@ -341,7 +344,7 @@ export class BotRoomService {
   }
   private saveTurn(turn: BotRoomTurn): void {
     turn.updatedAt = nowIso();
-    if (turn.goalId) settleCollaboration(this.store, turn.roomId, turn.goalId, turn.status);
+    if (turn.goalId&&!turn.workRef) settleCollaboration(this.store, turn.roomId, turn.goalId, turn.status);
     this.store.db.prepare('UPDATE bot_room_turns SET status=?,data=? WHERE id=?').run(turn.status,JSON.stringify(turn),turn.id);
   }
   private append(roomId: string, sender: BotRoomMessage['sender'], text: string, attachmentIds: string[], turnId?: string, idem?: string, contextSources?: ContextSource[], replyTo?: MessageReplyTo): BotRoomMessage {
@@ -427,7 +430,7 @@ export class BotRoomService {
     // No @ leaves mentions unset so everyone speaks normally. An @ that names nobody stays empty and does not pull in non-members.
     return sawMention ? ids : undefined;
   }
-  send(principal: BotPrincipal, id: string, input: BotRoomMessageInput): { message: BotRoomMessage; turn: BotRoomTurn } {
+  send(principal: BotPrincipal, id: string, input: BotRoomMessageInput, internal?:{skipCollaboration?:boolean}): { message: BotRoomMessage; turn: BotRoomTurn } {
     const room = this.get(principal, id);
     const { text, attachments, contextSources } = this.validateMessageInput(input);
     const duplicate = this.duplicateReceipt(id, input, text, attachments, contextSources);
@@ -459,7 +462,7 @@ export class BotRoomService {
       const message = this.append(id, { type: 'user', id: principal.userId, name: principal.userId }, text, attachments, turnId, input.idempotencyKey, contextSources, quote);
       const now = nowIso();
       const turn: BotRoomTurn = { id: turnId, roomId: id, messageId: message.id, status: 'queued', botIds: schedule.botIds, ...(schedule.mentionedBotIds !== undefined ? { mentionedBotIds: schedule.mentionedBotIds } : {}), ...(fanOut ? { replyMode: 'all-members' } : {}), ...(schedule.speakerScores ? { speakerScores: schedule.speakerScores } : {}), ...(quote ? { replyToMessageId: quote.messageId } : {}), maxBotTurns: speakerBudget, botTurns: 0, toolCalls: 0, costUsd: 0, costStatus: 'unknown', cursor: 0, createdAt: now, updatedAt: now };
-      if (room.replyMode === 'task-collaboration' && schedule.botIds[0]) {
+      if (!internal?.skipCollaboration&&room.replyMode === 'task-collaboration' && schedule.botIds[0]) {
         turn.replyMode = 'task-collaboration';
         turn.ownerBotId = schedule.botIds[0];
         turn.hostWrapUp = speakerBudget > 1;
@@ -468,6 +471,28 @@ export class BotRoomService {
       this.store.db.prepare('INSERT INTO bot_room_turns(id,room_id,status,data) VALUES(?,?,?,?)').run(turn.id, id, turn.status, JSON.stringify(turn));
       return { message, turn };
     });
+  }
+  /** Only authenticated human ingress calls this. Bot post tools keep send(). */
+  sendHumanWork(principal:BotPrincipal,id:string,input:BotRoomMessageInput):{message:BotRoomMessage;turn:BotRoomTurn} {
+    const room=this.get(principal,id);if(room.replyMode!=='task-collaboration')return this.send(principal,id,input);
+    const assigned=assignedRoomWork(input.text),intent=roomHumanIntent(input.text);let interrupts:string[]=[];
+    const result=this.tx(()=>{
+      const result=this.send(principal,id,input,{skipCollaboration:!assigned}),turn=result.turn;
+      if(turn.humanWorkHandled){if(turn.humanRoutingHash!==roomRoutingHash(input))throw new ConflictError('Idempotency key used for different routing');return result;}
+      if(assigned){turn.workRef=acceptHumanRoomWork(this.store,this.get(principal,id),turn,result.message,input,(item,data,key)=>this.appendWorkReceipt(item,data,key));turn.status='completed';turn.terminationReason='work_accepted';}
+      else if(intent.kind==='query'||['pause','resume','cancel','amend_goal'].includes(intent.kind)){
+        interrupts=handleHumanRoomFollowup(this.store,this.get(principal,id),turn,input.text,input.mentions,(item,data,key)=>this.appendWorkReceipt(item,data,key));turn.status='completed';turn.terminationReason='handled_command';
+      }
+      turn.humanWorkHandled=true;turn.humanRoutingHash=roomRoutingHash(input);this.saveTurn(turn);return result;
+    });
+    for(const sessionId of interrupts)this.host.cancelSession(sessionId);
+    return result;
+  }
+  private appendWorkReceipt(turn:BotRoomTurn,data:RoomWorkReceipt,key:string):BotRoomMessage {
+    const botId=data.botId??this.rawRoom(turn.roomId).hostBotId,bot=this.store.getBot(botId);
+    const message=this.append(turn.roomId,{type:'bot',id:botId,name:bot?.name??botId},`[room work] ${JSON.stringify(data)}`,[],turn.id,key);
+    if(!message.workReceipt){message.workReceipt=data;this.store.db.prepare('UPDATE bot_room_messages SET data=? WHERE id=?').run(JSON.stringify(message),message.id);}
+    return message;
   }
   /** A built-in command is recorded as human input without running a model round. */
   sendHandled(principal: BotPrincipal, id: string, input: BotRoomMessageInput) {
@@ -599,6 +624,7 @@ export class BotRoomService {
   /** Invoke at startup, scheduler tick and after approval/run completion. */
   async tick():Promise<void> {
     const rooms=this.store.db.prepare('SELECT data FROM bot_rooms ORDER BY rowid').all().map(row=>decode<BotRoom>(row)!);
+    for(const room of rooms.filter(item=>item.status==='active'))this.tx(()=>synchronizeRoomWork(this.store,room,(turn,data,key)=>this.appendWorkReceipt(turn,data,key)));
     await Promise.all(rooms.filter(room=>room.status==='active'&&!this.active.has(room.id)).map(room=>this.process(room)));
   }
   private claimTurn(roomId: string): BotRoomTurn | undefined {

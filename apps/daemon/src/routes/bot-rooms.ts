@@ -38,7 +38,7 @@ export function botRoomsRoutes(runtime: RawAgentRuntime & { rooms: BotRoomServic
    if(task){runtime.factory.acknowledge(task,roomId+':'+result.message.id);void runtime.factory.tick().catch(()=>{});}
    json(ctx.response,202,{...result,task});return;
  }
- const result=rooms.send(owner,roomId,messageInput);
+ const result=rooms.sendHumanWork(owner,roomId,messageInput);
  json(ctx.response,202,result);wake();}catch(error){if(error instanceof BotQueueCapacityError){json(ctx.response,429,{error:error.message,error_code:error.code,accepted:false,retryable:true,usage:error.usage,limits:error.limits});return;}throw error;}}},
     {method:'GET',pattern:'/api/bot-rooms/:id/turns',handler:ctx=>{json(ctx.response,200,{turns:rooms.turns(principal(ctx),ctx.requireParam('id'))});}},
     {method:'POST',pattern:'/api/bot-rooms/:id/stop',handler:ctx=>{json(ctx.response,200,{room:rooms.stop(principal(ctx),ctx.requireParam('id'))});}},

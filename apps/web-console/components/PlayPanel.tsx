@@ -1783,7 +1783,7 @@ export function PlayPanel({
 
   const renderPlayMain = () => (
         <div className={botDetailMainClass(botDetailVisible)}>
-          {botSurface && openGroupId ? <PlayBotGroupChat key={openGroupId} roomId={openGroupId} bots={botRoster} /> : null}
+          {botSurface && openGroupId ? <PlayBotGroupChat key={openGroupId} roomId={openGroupId} bots={botRoster} onOpenWork={id=>{setOpenGroupId(null);onSelectSession(id);}} /> : null}
           <div className="play-main chat-panel" hidden={botSurface && openGroupId != null}>
       {renderChatHeader()}
             <GoalStatusCard sessionId={selectedSessionId} />
