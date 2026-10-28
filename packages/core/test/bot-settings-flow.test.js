@@ -79,6 +79,12 @@ test('capabilities toggle on the same runtime including dispatch and skills [AC:
     const savedTool = rt.tools.find(tool=>tool.name==='domain_check');
     assert.equal((await savedTool.execute({},{})).ok,false);
     assert.equal(calls,0);
+    const peer = new RawAgentRuntime({repoRoot:root,stateDir:join(root,'state'),modelAdapter:{name:'peer'}});
+    try {
+      assert.equal((await savedTool.execute({},{})).ok,false,'a peer must not erase this runtime domain ownership');
+      assert.ok(!rt.availableTools().some(tool=>tool.name==='domain_check'));
+      assert.ok(!(await rt.promptBuilder.skillsForSession('test')).some(skill=>skill.id==='domain-skill'));
+    } finally { await peer.destroy(); }
     writeRuntimeCapabilities(rt.store,{domains:['test-domain'],a2uiEnabled:true});
     assert.ok(rt.availableTools().some(tool=>tool.name==='a2ui_render'));
     assert.ok(rt.availableTools().some(tool=>tool.name==='domain_check'));

@@ -4,7 +4,6 @@ import type { DomainBundle } from '../domain.js';
 import type { ToolContract } from '../types.js';
 
 export const RUNTIME_CAPABILITIES_KEY = 'runtime_capabilities';
-export const DOMAIN_CATALOG_KEY = 'runtime_domain_catalog';
 interface Store {
   getDaemonControl?(key: string): unknown;
   setDaemonControl?(key: string, value: unknown): void;
@@ -19,8 +18,12 @@ export interface DomainCapability {
 export interface RuntimeCapabilities { a2uiEnabled: boolean; domains: string[] }
 type CapabilityKind = 'tools' | 'skills' | 'agents';
 
+// Installed code belongs to a runtime, while user settings belong to the shared store.
+// A peer with a different bundle set must not rewrite another runtime's tool ownership.
+const catalogs = new WeakMap<Store, DomainCapability[]>();
+
 export function registerDomainCatalog(store: Store, bundles: DomainBundle[]) {
-  store.setDaemonControl?.(DOMAIN_CATALOG_KEY, bundles.map(bundle => ({
+  catalogs.set(store, bundles.map(bundle => ({
     id: bundle.id,
     label: bundle.label,
     tools: bundle.tools.map(tool => tool.name),
@@ -30,7 +33,7 @@ export function registerDomainCatalog(store: Store, bundles: DomainBundle[]) {
 }
 
 export function domainCatalog(store: Store): DomainCapability[] {
-  return (store.getDaemonControl?.(DOMAIN_CATALOG_KEY) as DomainCapability[] | undefined) ?? [];
+  return catalogs.get(store) ?? [];
 }
 
 export function readRuntimeCapabilities(store: Store, env: NodeJS.ProcessEnv = process.env): RuntimeCapabilities {
