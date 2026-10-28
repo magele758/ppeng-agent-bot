@@ -80,6 +80,8 @@ apps/desktop/assets/trayTemplate@2x.png
 .grok-reviews/
 .handoff-quota-stop.md
 /*.prompt.md
+/tmp-*.sh
+/apps/web-console/.design/
 
 # 本地宣传片工程、成片与会话抓取（体积大，不进主仓）
 /launch-30s/
