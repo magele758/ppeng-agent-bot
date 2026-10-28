@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-10-28T01:20:00.000Z",
-  "reviewNote": "Reviewed the coverage-transfer diff. currentIdentity records the .nvmrc release (22) instead of the runner patch, because hosted images float 22.23.3 and 22.23.4 and that alone was rejecting a same-SHA bundle. Source, dist bytes, git candidate, tree, run id and attempt stay exact; a different major still fails. Pairing, lifecycle, restart and concurrency product code is unchanged. No checks removed and no thresholds changed.",
+  "reviewedAt": "2026-10-28T03:37:47.592Z",
+  "reviewNote": "Reviewed the routine silence change. A successful result that starts or ends with [NO_UPDATE] is silent and is not posted to the main chat. A conclusion that only mentions the token in the middle is still delivered. Tool pairing, writer admission, cancellation, restart recovery, and concurrency locks are unchanged.",
   "mapping": [
     {
       "step": "Execute/approval/result persistence and fold recovery; real source component probes (not a full kernel proof)",
@@ -349,7 +349,7 @@
     "packages/core/src/runtime/steer-tools.ts": "ee3ac8ce03aed1a3fd236421c5e01fcc5ca062e9ac20b2c662821bc88dde17a2",
     "packages/core/test/steer-tool-continuity.test.js": "a96f5f02b662e644497657712a1e71c7ce07adfc78192f80a26e9bd40aa82bc2",
     "packages/core/src/learning/sources.ts": "312a4511776ec8907c1e85650f320f6c7fe7dc2e07902cfa36ee45978087805f",
-    "packages/core/src/cron/routine-runtime.ts": "438f0b87eb018548d526d6048120cfa48020298f2e463e1cbb64c2102be739b2",
+    "packages/core/src/cron/routine-runtime.ts": "7f4bcacccd451dac0f7fed07f006d2dc1d39d92642d1cb0e547203f09546d79e",
     "packages/core/src/runtime/scheduler-host.ts": "01b0e6b0bfdf8c983dc6f9427d360e5c87cc77f876bc318ae48700026853ef02",
     "packages/core/test/learning-governance.test.js": "1a0ef47f940a92c1b0dad745c7f8e4a7665930347b2d909940039fb59d6d309d",
     "packages/core/src/tools/product-admin-tools.ts": "7589adbe3997cf67c767c5add9da6a06127fb1698c81b9ad6b2a0a5aaef8a117"

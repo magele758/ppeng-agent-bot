@@ -5,6 +5,7 @@ import type { ApprovalItem, ChatMessage } from '@/lib/types';
 import { anchorApprovals } from '@/lib/approval-feed';
 import { messageHasStructuredParts, msgPartsToText, normalizedRole } from '@/lib/chat-utils';
 import { readMessageSessionId } from '@/lib/goal-update-notice';
+import { omitStreamTextSavedOnTurn } from '@/lib/history-window';
 import { buildFeedSlots, steerStreamPlacement, type FeedSlot } from '@/lib/feed-window';
 import { rowsForSessionBrief } from '@/lib/session-brief';
 import { SessionBriefDisclosure } from './SessionBriefDisclosure';
@@ -17,7 +18,7 @@ import { placeChildTaskEntries, type ChildTaskStreamEntry } from '@/lib/bot-chil
 import { ApprovalBanner } from './ApprovalBanner';
 import { BotChildTaskStreamEntry } from './BotChildTaskStreamEntry';
 import { ChatFeedWindow } from './ChatFeedWindow';
-import { ChatTurnFromMessage, ChatTurnPlain, ChatTurnStreaming } from './ChatTurns';
+import { ChatTurnIfVisible, ChatTurnPlain, ChatTurnStreaming } from './ChatTurns';
 import { SurfaceContextProvider } from './a2ui/SurfaceContext';
 import { SkillOperationCards } from './SkillOperationCards';
 import { SkillCaptureCards } from './SkillCaptureCards';
@@ -375,10 +376,13 @@ function renderOptimisticOrStream(slot: FeedSlot, view: TranscriptModel, chat: C
     );
   }
   if (slot.kind !== 'stream') return null;
-  return <ChatTurnStreaming retry={slot.streamPart === 'prefix' ? undefined : chat.streamOverlay?.retry} segments={streamSegmentsFor(slot, chat)} sessionId={sessionId} resolvedCallIds={view.resolved} brief={brief} />;
+  const raw = rawStreamSegments(slot, chat);
+  const segments = omitStreamTextSavedOnTurn(chat.displayMessages, raw);
+  if (raw.length > 0 && segments.length === 0) return null;
+  return <ChatTurnStreaming retry={slot.streamPart === 'prefix' ? undefined : chat.streamOverlay?.retry} segments={segments} sessionId={sessionId} resolvedCallIds={view.resolved} brief={brief} />;
 }
 
-function streamSegmentsFor(slot: FeedSlot, chat: Chat) {
+function rawStreamSegments(slot: FeedSlot, chat: Chat) {
   const all = chat.streamOverlay?.segments ?? [];
   const prefix = chat.steerStreamPrefix;
   if (prefix == null || slot.streamPart == null) return all;
@@ -427,7 +431,7 @@ function messageSlot(
   if (!message) return null;
   const replyNames = quoteBot ? { [quoteBot.id]: quoteBot.name } : undefined;
   if (messageHasStructuredParts(message.parts)) {
-    return <ChatTurnFromMessage m={message} sessionId={sessionId} msgIndex={index} modelView={modelView} toolCallsById={view.calls} resolvedCallIds={view.resolved} quoteBot={quoteBot} onQuote={onQuote} replyNames={replyNames} brief={brief} />;
+    return <ChatTurnIfVisible m={message} sessionId={sessionId} msgIndex={index} modelView={modelView} toolCallsById={view.calls} resolvedCallIds={view.resolved} quoteBot={quoteBot} onQuote={onQuote} replyNames={replyNames} brief={brief} />;
   }
   const role = normalizedRole(message);
   if (role === 'tool' || role === 'system') {
@@ -440,7 +444,7 @@ function messageSlot(
       />
     );
   }
-  return <ChatTurnFromMessage m={message} sessionId={sessionId} msgIndex={index} modelView={modelView} toolCallsById={view.calls} resolvedCallIds={view.resolved} quoteBot={quoteBot} onQuote={onQuote} replyNames={replyNames} brief={brief} />;
+  return <ChatTurnIfVisible m={message} sessionId={sessionId} msgIndex={index} modelView={modelView} toolCallsById={view.calls} resolvedCallIds={view.resolved} quoteBot={quoteBot} onQuote={onQuote} replyNames={replyNames} brief={brief} />;
 }
 
 function approvalSlot(slot: FeedSlot, view: TranscriptModel, onDone: () => void, onAttach?: (sessionId: string) => { ready: Promise<void>; cancel: () => void }): ReactNode {

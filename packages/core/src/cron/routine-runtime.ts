@@ -29,7 +29,7 @@ import { CronJobStore, type CronJobRecord } from './cron-store.js';
 import { type PrecheckResult, evaluateRoutinePrecheck, readStoredPrecheck } from './routine-precheck.js';
 import { nextZonedCronRunAt, skippedZonedCronMinutes } from './cron-next.js';
 import { deliverBotRoomMessage } from '../rooms/index.js';
-import { isSilenceToken } from '../bots/silence.js';
+import { isNoUpdateReply, isSilenceToken } from '../bots/silence.js';
 import type { BotPrincipal } from '../bots/bot-identity.js';
 export type RoutineRunStatus = 'queued'|'running'|'waiting_approval'|'completed'|'failed'|'cancelled'|'unknown'|'skipped'|'silent';
 export interface RoutineRoomDelivery { status:'delivered'|'skipped'; roomId:string; messageId?:string; reason?:string }
@@ -291,7 +291,7 @@ function isWaitingForDecision(session:SessionRecord|undefined,approvals:Approval
  return outcome?.kind==='waiting_approval'&&approvals.some(approval=>approval.status==='pending'||approval.status==='approved');
 }
 function routineQuiet(result:string):boolean {
- return result.trim().startsWith('[NO_UPDATE]')||isSilenceToken(result);
+ return isNoUpdateReply(result)||isSilenceToken(result);
 }
 function completionError(session:SessionRecord|undefined,denied:boolean,result:string):string {
  if(denied)return 'Approval denied or expired';const outcome=parseRunOutcome(session?.metadata?.outcome);

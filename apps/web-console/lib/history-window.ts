@@ -1,3 +1,5 @@
+import { stripVisibleClockMarks } from './visible-clock.ts';
+
 /** Prepend an older page. Ids already loaded keep the loaded copy, so a cursor overlap cannot duplicate a row. */
 export function prependHistoryPage<T extends { id: string }>(loaded: T[], older: T[]): T[] {
   const loadedIds = new Set(loaded.map((message) => message.id));
@@ -184,6 +186,82 @@ export function unpersistedAssistantText(
     pending.push(raw);
   }
   return pending.join('\n\n');
+}
+
+type TranscriptRow = { role?: string; text?: string; parts?: ReadonlyArray<{ type?: string; text?: string }> };
+
+function currentTurnSavedBodies(messages: ReadonlyArray<TranscriptRow>): string[] {
+  const lastUser = messages.findLastIndex((message) => message.role === 'user');
+  return messages
+    .slice(lastUser + 1)
+    .filter((message) => message.role === 'assistant')
+    .map((message) => stripVisibleClockMarks(rowBody(message)).trim())
+    .filter(Boolean);
+}
+
+/** Text still streaming, or null when this piece is already in the current turn's saved reply. */
+function unsavedStreamText(raw: string, saved: readonly string[]): string | null {
+  let visible = stripVisibleClockMarks(raw).trim();
+  if (!visible) return raw;
+  const original = visible;
+  while (visible) {
+    if (saved.some((body) => body === visible)) return null;
+    const prefix = saved
+      .filter((body) => body.length >= 12 && visible.startsWith(body) && visible.length > body.length)
+      .sort((a, b) => b.length - a.length)[0];
+    if (!prefix) break;
+    visible = visible.slice(prefix.length).trim();
+  }
+  if (!visible || saved.some((body) => body === visible)) return null;
+  return visible === original ? raw : visible;
+}
+
+/**
+ * Drop live text that the current turn already saved. Older replies are not rewritten,
+ * and the caller's segment objects stay intact so later deltas still append.
+ */
+export function omitStreamTextSavedOnTurn<T extends { kind: string; raw?: string; html?: string }>(
+  messages: ReadonlyArray<TranscriptRow>,
+  segments: readonly T[]
+): T[] {
+  const saved = currentTurnSavedBodies(messages);
+  if (saved.length === 0) return segments.slice();
+  const out: T[] = [];
+  for (const segment of segments) {
+    if (segment.kind !== 'text') {
+      out.push(segment);
+      continue;
+    }
+    const next = unsavedStreamText(segment.raw ?? '', saved);
+    if (next == null) continue;
+    if (next === segment.raw) {
+      out.push(segment);
+      continue;
+    }
+    out.push({
+      ...segment,
+      raw: next,
+      html: next.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    });
+  }
+  return out;
+}
+
+/** True when a live text piece is still the same as a reply already saved on this turn. */
+export function liveAnswerRepeated(
+  messages: ReadonlyArray<TranscriptRow>,
+  segments: ReadonlyArray<{ kind: string; raw?: string }>
+): boolean {
+  const saved = currentTurnSavedBodies(messages);
+  if (saved.length === 0) return false;
+  for (const segment of omitStreamTextSavedOnTurn(messages, segments)) {
+    if (segment.kind !== 'text') continue;
+    const visible = stripVisibleClockMarks(segment.raw ?? '').trim();
+    if (!visible) continue;
+    if (saved.some((body) => body === visible)) return true;
+    if (saved.some((body) => body.length >= 12 && visible.startsWith(body) && visible.length > body.length)) return true;
+  }
+  return false;
 }
 
 /**
