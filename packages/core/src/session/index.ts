@@ -107,6 +107,30 @@ export {
   writeCompactSettings
 } from './compact-settings.js';
 export type { CompactSettings, CompactSettingsPatch, CompactSettingsStore } from './compact-settings.js';
+
+export {
+  assertCompactInvariant,
+  assertRepeatGuardInvariant,
+  assertStablePrefixInvariant,
+  assertStartupInvariants,
+  hashStablePrefix,
+  parseStartupRepeatGuardMode,
+  stablePrefixHashOf,
+  stablePrefixIdentitySegment,
+  StartupInvariantError
+} from './startup-invariants.js';
+export type {
+  CompactInvariant,
+  RepeatGuardInvariant,
+  StablePrefixIdentity,
+  StablePrefixInvariant,
+  StartupCompactPolicy,
+  StartupCompactSettings,
+  StartupInvariantLog,
+  StartupInvariantStore,
+  StartupInvariants,
+  StartupRepeatGuardMode
+} from './startup-invariants.js';
 export {
   INPUT_SUGGESTION_SETTINGS_KEY,
   INPUT_SUGGESTION_MAX,
