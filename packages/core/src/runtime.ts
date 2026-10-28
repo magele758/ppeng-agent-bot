@@ -1,3 +1,4 @@
+import {createWaitForTool} from './waits/tool.js';
 import { invalidateSteerToolDecision, steerRunningTools } from './runtime/steer-tools.js';
 import { createGoalFactoryDevelopmentTool, createGoalSelfHealTool, specialtyStatus, cancelSpecialty } from './bots/goals/specialty-services.js';
 import { FactoryService } from './factory/service.js';
@@ -701,6 +702,7 @@ export class RawAgentRuntime {
       cancelSession: (id) => this.cancelSession(id)
     }));
     this.tools.push(createGoalCheckpointTool(this.store));
+    this.tools.push(createWaitForTool(this.store));
     this.tools.push(createGoalSelfHealTool({store:this.store,selfHeal:this.selfHeal}));
     this.tools.push(createGoalFactoryDevelopmentTool({store:this.store,factory:this.factory}));
     this.tools.push(createRuntimeGoalDispatchTool({

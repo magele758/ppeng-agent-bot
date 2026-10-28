@@ -823,3 +823,6 @@ export type {SkillManagementInput} from '../skill-proposals/management.js';
 
 export { TOOL_GROUPS, readToolExposure, writeToolExposure, clearToolExposure } from '../tools/tool-exposure.js';
 export { inspectToolExposure } from '../turn/resolve-turn-tools.js';
+
+export {DurableWaitStore,registerWaitSource} from '../waits/index.js';
+export type {WaitSpec,WaitCondition,WaitSource,Observation} from '../waits/index.js';

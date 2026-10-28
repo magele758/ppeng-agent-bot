@@ -177,7 +177,7 @@ function goalEntryTools(session: SessionRecord, store?: WebSettingsReadStore): S
   if (!goal || !execution || goal.status !== 'running' || goal.activeExecutionId !== execution.id
     || execution.goalId !== goal.id || execution.goalRevision !== goal.revision
     || execution.sessionId !== session.id || execution.status !== 'running' || execution.leaseUntil <= Date.now()) return new Set();
-  return new Set(['goal_dispatch', 'goal_checkpoint']);
+  return new Set(['goal_dispatch', 'goal_checkpoint', 'wait_for']);
 }
 
 function partitionDeferred(

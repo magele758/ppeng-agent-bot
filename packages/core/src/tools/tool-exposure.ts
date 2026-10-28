@@ -90,6 +90,7 @@ export const TOOL_GROUPS: ToolGroup[] = [
             "task_update",
             "task_list",
             "goal_checkpoint",
+            "wait_for",
             "room_route_turn"
         ]
     },

@@ -342,12 +342,12 @@ function loadRoutines(store: SqliteStateStore): RoutineRun[] {
   if (!table) return [];
   const active = store.db
     .prepare(
-      "SELECT payload FROM bot_routine_runs WHERE status IN ('queued','running','waiting_approval','unknown')"
+      "SELECT payload FROM bot_routine_runs WHERE status IN ('queued','running','waiting_condition','waiting_approval','unknown')"
     )
     .all() as Array<{ payload: string }>;
   const recent = store.db
     .prepare(
-      "SELECT payload FROM bot_routine_runs WHERE status NOT IN ('queued','running','waiting_approval','unknown') ORDER BY rowid DESC LIMIT 200"
+      "SELECT payload FROM bot_routine_runs WHERE status NOT IN ('queued','running','waiting_condition','waiting_approval','unknown') ORDER BY rowid DESC LIMIT 200"
     )
     .all() as Array<{ payload: string }>;
   return parseRuns([...active, ...recent]);
