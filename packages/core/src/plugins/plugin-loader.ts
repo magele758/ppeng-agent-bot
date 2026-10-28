@@ -250,6 +250,14 @@ function loadToolDecls(root: string, manifest: PluginManifest): PluginToolDecl[]
   return decls;
 }
 
+
+/** Prefer folder agents; skip ids already loaded from flat json. */
+function appendFolderAgents(agentsDir: string, agents: AgentSpec[]): void {
+  for (const folder of discoverAgentFolders(agentsDir)) {
+    if (!agents.some((x) => x.id === folder.agent.id)) agents.push(folder.agent);
+  }
+}
+
 export function loadPluginFromDir(root: string): LoadedPlugin | undefined {
   const manifestPath = join(root, 'plugin.json');
   const alt = join(root, '.ppeng-plugin', 'plugin.json');
@@ -271,11 +279,7 @@ export function loadPluginFromDir(root: string): LoadedPlugin | undefined {
       const a = loadAgentFile(join(agentsDir, f));
       if (a && !agents.some((x) => x.id === a.id)) agents.push(a);
     }
-    // Agent-as-folder path (preferred): agents/<slug>/agent.json (+ optional AGENT.md).
-    // Eval defaults ON for folder agents unless agent.json sets eval:false.
-    for (const folder of discoverAgentFolders(agentsDir)) {
-      if (!agents.some((x) => x.id === folder.agent.id)) agents.push(folder.agent);
-    }
+    appendFolderAgents(agentsDir, agents);
   }
 
   const skills: SkillSpec[] = [];
