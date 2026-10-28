@@ -858,3 +858,11 @@ export {
 } from '../safety/default-deny-policy.js';
 export type { DefaultDenyInput, DefaultDenyDecision } from '../safety/default-deny-policy.js';
 
+
+export {
+  agentEvalDefaultOn,
+  agentsWithEvalDefaultOn,
+  discoverAgentFolders,
+  loadAgentFromFolder
+} from '../agents/agent-as-folder.js';
+export type { AgentAsFolder, AgentFolderRaw } from '../agents/agent-as-folder.js';

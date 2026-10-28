@@ -7,6 +7,7 @@ import type { SoftwareExecutor } from '../connectors/software-execution.js';
 import { existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
 import type { AgentSpec, SkillSpec, ToolContract } from '../types.js';
+import { discoverAgentFolders } from '../agents/agent-as-folder.js';
 
 export type PluginAuthKind = 'none' | 'bearer' | 'oauth' | 'header';
 
@@ -269,6 +270,11 @@ export function loadPluginFromDir(root: string): LoadedPlugin | undefined {
       if (!f.endsWith('.json')) continue;
       const a = loadAgentFile(join(agentsDir, f));
       if (a && !agents.some((x) => x.id === a.id)) agents.push(a);
+    }
+    // Agent-as-folder path (preferred): agents/<slug>/agent.json (+ optional AGENT.md).
+    // Eval defaults ON for folder agents unless agent.json sets eval:false.
+    for (const folder of discoverAgentFolders(agentsDir)) {
+      if (!agents.some((x) => x.id === folder.agent.id)) agents.push(folder.agent);
     }
   }
 
