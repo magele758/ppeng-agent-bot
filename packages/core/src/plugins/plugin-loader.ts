@@ -251,11 +251,24 @@ function loadToolDecls(root: string, manifest: PluginManifest): PluginToolDecl[]
 }
 
 
-/** Prefer folder agents; skip ids already loaded from flat json. */
-function appendFolderAgents(agentsDir: string, agents: AgentSpec[]): void {
+/** Manifest agents + agents/*.json + agents/<slug>/ folders (eval default-on). */
+function loadPluginAgents(root: string, manifest: { agents?: string[] }): AgentSpec[] {
+  const agents: AgentSpec[] = [];
+  for (const rel of manifest.agents ?? []) {
+    const a = loadAgentFile(join(root, rel));
+    if (a) agents.push(a);
+  }
+  const agentsDir = join(root, 'agents');
+  if (!existsSync(agentsDir)) return agents;
+  for (const f of readdirSync(agentsDir)) {
+    if (!f.endsWith('.json')) continue;
+    const a = loadAgentFile(join(agentsDir, f));
+    if (a && !agents.some((x) => x.id === a.id)) agents.push(a);
+  }
   for (const folder of discoverAgentFolders(agentsDir)) {
     if (!agents.some((x) => x.id === folder.agent.id)) agents.push(folder.agent);
   }
+  return agents;
 }
 
 export function loadPluginFromDir(root: string): LoadedPlugin | undefined {
@@ -266,21 +279,7 @@ export function loadPluginFromDir(root: string): LoadedPlugin | undefined {
   const manifest = readJson<PluginManifest>(path);
   if (!manifest?.id || !manifest.name) return undefined;
 
-  const agents: AgentSpec[] = [];
-  for (const rel of manifest.agents ?? []) {
-    const a = loadAgentFile(join(root, rel));
-    if (a) agents.push(a);
-  }
-  // Auto-discover agents/*.json
-  const agentsDir = join(root, 'agents');
-  if (existsSync(agentsDir)) {
-    for (const f of readdirSync(agentsDir)) {
-      if (!f.endsWith('.json')) continue;
-      const a = loadAgentFile(join(agentsDir, f));
-      if (a && !agents.some((x) => x.id === a.id)) agents.push(a);
-    }
-    appendFolderAgents(agentsDir, agents);
-  }
+  const agents = loadPluginAgents(root, manifest);
 
   const skills: SkillSpec[] = [];
   for (const rel of manifest.skills ?? []) {
