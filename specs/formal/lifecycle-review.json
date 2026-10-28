@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-10-27T14:25:00.000Z",
-  "reviewNote": "Reviewed the group-command diff. A group turn is no longer source_scope_denied only because its unattended wake is stamped source=room; real external events, other bots, approval, sandbox, and secret paths still reject. rooms/index.ts only notes that the existing unattended stamp remains an approval fail-safe and this bot's command scope stays the same as its own chat. The steer route no longer lets a stale client target override the saved interrupt policy; admission, quote checks, role, key, and subagent options are unchanged. Writer admission, tool pairing, approval decisions, and restart recovery are unchanged. No checks removed and no thresholds changed.",
+  "reviewedAt": "2026-10-28T01:20:00.000Z",
+  "reviewNote": "Reviewed the coverage-transfer diff. currentIdentity records the .nvmrc release (22) instead of the runner patch, because hosted images float 22.23.3 and 22.23.4 and that alone was rejecting a same-SHA bundle. Source, dist bytes, git candidate, tree, run id and attempt stay exact; a different major still fails. Pairing, lifecycle, restart and concurrency product code is unchanged. No checks removed and no thresholds changed.",
   "mapping": [
     {
       "step": "Public runtime, cancellation, approvals and completion; exercised through RawAgentRuntime with SQLite",
@@ -367,14 +367,14 @@
     "packages/core/test/session-fork.test.js": "037e264ccf09c5e33c281f9fdc0334d127abf7f90835e754765515c92c4c0c75",
     "packages/agent-loop/src/session/fork-quote.test.ts": "5691846bf0b8d1c8c840996ad31cc28383cd24ece2178b4766d47c32f4e06f2e",
     "scripts/test/release-workflow-policy.test.mjs": "508f5919f39c9fa6ac208f7e82b50ee48b5ed2c5cba457555eb0b8ee7573fd9a",
-    "scripts/ci/validation-artifacts.mjs": "47472f7b9586a1bfe9f64381975d99e017e191c833d4678ee74a2b82e5c05518",
+    "scripts/ci/validation-artifacts.mjs": "d0da148d709c698ad29e21cf769a84b4a5def4e82e2d636e52d994185ae82b6f",
     "scripts/test/ci-audit.test.mjs": "c355ce76ff525786fbaa2e7c520bf7b4507427b135bd5508deedd14d6e00d07f",
     "scripts/ci/validation-lane.mjs": "4bd43ff55f1c6708f6acc7c135a27693d4eb2ab00c26f988de84845c6af653be",
     "scripts/ci/release-results.mjs": "0510504936683689e82475a8b7111a89575d14eed06c4e9112e9ca2d4bbc2186",
     "scripts/ci/test-partition.mjs": "d6018aebae05ebc907ddd0de10c6905ee68e0c1ab2406057a7f09bb21b8ed28e",
     "scripts/ci/quick-gate.mjs": "5243836461a001d3b82f8fda39aaf2581e639c4cc691bff0301ab53714786f9c",
     "scripts/test/ci-speedup-workflow.test.mjs": "cc42b1ca9acc2ea36b7355cae7be9d17c76afec40524a200ccbb1476a7ea8044",
-    "scripts/test/ci-parallel-validation.test.mjs": "65242e6058a1263594f4e2ca47115061eafdba12fc20f35cac3d4bdb4170469d",
+    "scripts/test/ci-parallel-validation.test.mjs": "5aeedc687662d680826cfb68833cd8ea4e0f7c604626dedbd10581830f2e2c89",
     "scripts/ci/retry-failed-tests.mjs": "48fb79b3392941919d46a76a227769d1f61bf1f8bce79206c33b6e1130c9de4a",
     "scripts/test/release-gate-workflows.test.mjs": "c3d062f19e1932b8a4ef9c0be9ab8b82db4d817a7fe1946f7e47bc2939ffedc8",
     "packages/core/src/memory/deletion-suppression.ts": "06c0cd4ae0edfe9f1586d78cf6826a5b13d5d189bb9d0eee9a91ed57b3bd1633",
