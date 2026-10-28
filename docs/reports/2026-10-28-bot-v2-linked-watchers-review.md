@@ -16,3 +16,5 @@ Validation on the merged durable-wait base:
 - Changed functions were inspected against the existing complexity limit; reviewed-source fingerprints cover the changed boundaries and the two new helpers.
 
 The earlier full formal run passed before integration with main's generic wait module. Final formal verification is rerun on the committed integrated source; that final result must be checked before merging. This is bounded verification, not an unbounded or production-load proof. No live bot state, remote development process or local credentials were changed.
+
+Final integrated verification completed successfully: the full formal regression passed pairing, lifecycle, process restart and concurrent-process probes, mutation controls, and 25 invariant/property/mock-loop checks. Quick gate also passed its existing complexity, fingerprint, build, regression, integration and acceptance checks. These results apply to the committed generic-wait integration; no criterion or model bound was relaxed.
