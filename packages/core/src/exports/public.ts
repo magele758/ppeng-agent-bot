@@ -833,7 +833,8 @@ export * from '../config/runtime-capabilities.js';
 export {
   resolveMicrovmRemoteUrl,
   resolveRemoteVmExecBaseUrl,
-  postMicrovmExec
+  postMicrovmExec,
+  remoteExecRejection
 } from '../sandbox/microvm-remote-url.js';
 export type { MicrovmExecRequestBody, MicrovmExecResponseBody } from '../sandbox/microvm-remote-url.js';
 

@@ -1,0 +1,19 @@
+id: remotevm-no-host-downgrade
+title: microVM 命令不会悄悄改在宿主机上跑
+status: implemented
+requirement: |
+  Fill gaps so enforcement is fail-closed (no silent host downgrade for high-risk tools; no skill tools/paths/network beyond Manifest; untrusted tool/web content cannot induce cwd/eval escape).
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 执行后端被指定为 microVM，但没有可用的执行地址
+    when: 高权限命令请求运行
+    then: 命令失败，并且不会在宿主机上留下执行痕迹
+  - id: AC-2
+    given: microVM 执行地址连不上，或返回的结果没有数字退出码
+    when: 高权限命令请求运行
+    then: 命令按失败处理，不会被当成已经在宿主机上成功执行
+  - id: AC-3
+    given: 有一个按约定应答的 microVM 执行接口
+    when: 命令发到该接口
+    then: 返回的标准输出和退出码来自该接口

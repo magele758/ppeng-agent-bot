@@ -19,6 +19,9 @@ runtime is installed and its HTTP adapter is listening, use:
 - a mock `/exec` server (see `packages/core/test/remote-vm-microvm-exec.test.js`)
 - or point the URL at any compatible adapter
 
+`RAW_AGENT_AGENT_SANDBOX_KIND=microvm` (or `agent-sandbox-microvm`) uses this remote path.
+If the URL is missing, `/exec` is unreachable, or the body has no numeric `code`, the command fails and is not run on the host.
+
 This keeps the mergeable interface + tests green without requiring virt on CI.
 
 Final acceptance by lei pending.

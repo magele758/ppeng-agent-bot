@@ -2,7 +2,7 @@ import { createLogger } from '../logger.js';
 import type { AgentSandbox, AgentSandboxExecRequest, AgentSandboxExecResult } from './agent-sandbox-types.js';
 import { commandHardlineSandboxResult } from './command-hardline.js';
 import { explicitNetworkAllowed } from './os-sandbox.js';
-import { postMicrovmExec, resolveRemoteVmExecBaseUrl } from './microvm-remote-url.js';
+import { postMicrovmExec, remoteExecRejection, resolveRemoteVmExecBaseUrl } from './microvm-remote-url.js';
 
 const log = createLogger('sandbox-remote-vm');
 
@@ -62,10 +62,11 @@ export class RemoteVmAgentSandbox implements AgentSandbox {
         },
         { signal: controller.signal }
       );
-      if (!ok) {
+      const rejection = remoteExecRejection(ok, status, raw, parsed);
+      if (rejection) {
         return {
           stdout: '',
-          stderr: raw.slice(0, 8000) || `HTTP ${status}`,
+          stderr: rejection,
           code: 1,
           signal: null,
           kind: 'remote_vm',
@@ -75,7 +76,7 @@ export class RemoteVmAgentSandbox implements AgentSandbox {
       return {
         stdout: String(parsed.stdout ?? ''),
         stderr: String(parsed.stderr ?? ''),
-        code: typeof parsed.code === 'number' ? parsed.code : 0,
+        code: parsed.code ?? 1,
         signal: null,
         kind: 'remote_vm',
         backend

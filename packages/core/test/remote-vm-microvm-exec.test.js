@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { RemoteVmAgentSandbox } from '../dist/sandbox/remote-vm-agent-sandbox.js';
+import { createAgentSandboxFromEnv } from '../dist/sandbox/create-agent-sandbox.js';
 import {
   resolveMicrovmRemoteUrl,
   resolveRemoteVmExecBaseUrl,
@@ -22,7 +26,7 @@ test('resolveMicrovmRemoteUrl prefers MICROVM_URL', () => {
   );
 });
 
-test('e2e mock agent-sandbox-microvm /exec returns exit code + controlled output', async () => {
+test('e2e mock agent-sandbox-microvm /exec returns exit code + controlled output [AC:remotevm-no-host-downgrade#AC-3]', async () => {
   const server = http.createServer((req, res) => {
     if (req.method === 'POST' && req.url === '/exec') {
       let body = '';
@@ -73,6 +77,62 @@ test('e2e mock agent-sandbox-microvm /exec returns exit code + controlled output
     assert.equal(result.backend, 'remote_vm-microvm');
   } finally {
     await new Promise((r) => server.close(r));
+  }
+});
+
+test('microvm kind does not run on the host when /exec is missing or down [AC:remotevm-no-host-downgrade#AC-1] [AC:remotevm-no-host-downgrade#AC-2]', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'microvm-host-'));
+  const marker = join(dir, 'host-ran');
+  try {
+    const unconfigured = createAgentSandboxFromEnv({ RAW_AGENT_AGENT_SANDBOX_KIND: 'microvm' });
+    assert.equal(unconfigured.kind, 'remote_vm');
+    const missing = await unconfigured.execute({
+      command: `touch ${JSON.stringify(marker)}`,
+      cwd: dir,
+      workspace: dir
+    });
+    assert.equal(missing.code, 127);
+    assert.equal(missing.kind, 'remote_vm');
+    assert.equal(existsSync(marker), false);
+
+    const down = new RemoteVmAgentSandbox({
+      RAW_AGENT_SANDBOX_MICROVM_URL: 'http://127.0.0.1:1',
+      RAW_AGENT_AGENT_SANDBOX_KIND: 'agent-sandbox-microvm'
+    });
+    const failed = await down.execute({
+      command: `touch ${JSON.stringify(marker)}`,
+      cwd: dir,
+      workspace: dir,
+      timeoutMs: 2_000
+    });
+    assert.notEqual(failed.code, 0);
+    assert.equal(failed.kind, 'remote_vm');
+    assert.equal(existsSync(marker), false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('microvm /exec without a numeric code is not a success [AC:remotevm-no-host-downgrade#AC-2]', async () => {
+  const server = http.createServer((req, res) => {
+    if (req.method === 'POST' && req.url === '/exec') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ stdout: 'should-not-count' }));
+      return;
+    }
+    res.writeHead(404);
+    res.end();
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address();
+  try {
+    const sandbox = new RemoteVmAgentSandbox({ RAW_AGENT_SANDBOX_MICROVM_URL: `http://127.0.0.1:${port}` });
+    const result = await sandbox.execute({ command: 'true', cwd: '/workspace', workspace: '/workspace' });
+    assert.equal(result.code, 1);
+    assert.equal(result.stdout, '');
+    assert.match(result.stderr, /numeric code/);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
   }
 });
 

@@ -72,3 +72,17 @@ export async function postMicrovmExec(
   }
   return { ok: res.ok, status: res.status, raw, parsed };
 }
+
+/** Missing numeric exit code is a failed exec, not a silent success. */
+export function remoteExecRejection(
+  ok: boolean,
+  status: number,
+  raw: string,
+  parsed: { code?: number }
+): string | undefined {
+  if (!ok) return raw.slice(0, 8000) || `HTTP ${status}`;
+  if (typeof parsed.code !== 'number') {
+    return '[sandbox:remote_vm] /exec response missing numeric code; command was not treated as success';
+  }
+  return undefined;
+}
