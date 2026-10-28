@@ -2,19 +2,15 @@ import { createLogger } from '../logger.js';
 import type { AgentSandbox, AgentSandboxExecRequest, AgentSandboxExecResult } from './agent-sandbox-types.js';
 import { commandHardlineSandboxResult } from './command-hardline.js';
 import { explicitNetworkAllowed } from './os-sandbox.js';
+import { postMicrovmExec, resolveRemoteVmExecBaseUrl } from './microvm-remote-url.js';
 
 const log = createLogger('sandbox-remote-vm');
 
 /**
- * E2B-like sandbox: run commands in an ephemeral remote environment.
+ * E2B-like / in-house microVM sandbox: run commands via HTTP POST /exec.
  *
- * Extension points (not implemented — wire your vendor SDK or HTTP here):
- * - `RAW_AGENT_SANDBOX_REMOTE_URL` — base URL for a small adapter service, or
- * - vendor-specific env (E2B_API_KEY, etc.) if you call SDK from this process.
- *
- * Expected adapter contract (suggested): `POST /exec` JSON body
- * `{ command, cwd, workspace, timeoutMs, allowNetwork, sessionId }` →
- * `{ stdout, stderr, code }`.
+ * URL resolution prefers agent-sandbox-microvm (`RAW_AGENT_SANDBOX_MICROVM_URL`)
+ * then generic `RAW_AGENT_SANDBOX_REMOTE_URL`. See README-microvm.md.
  */
 export class RemoteVmAgentSandbox implements AgentSandbox {
   readonly kind = 'remote_vm' as const;
@@ -24,14 +20,14 @@ export class RemoteVmAgentSandbox implements AgentSandbox {
   async execute(req: AgentSandboxExecRequest): Promise<AgentSandboxExecResult> {
     const denied = commandHardlineSandboxResult(req.command, 'remote_vm');
     if (denied) return denied;
-    const base = (this.env.RAW_AGENT_SANDBOX_REMOTE_URL ?? '').trim().replace(/\/$/, '');
+    const base = resolveRemoteVmExecBaseUrl(this.env);
     if (!base) {
-      log.warn('RAW_AGENT_SANDBOX_REMOTE_URL unset; remote_vm sandbox returns synthetic failure');
+      log.warn('remote/microvm URL unset; remote_vm sandbox returns synthetic failure');
       return {
         stdout: '',
         stderr:
-          '[sandbox:remote_vm] RAW_AGENT_SANDBOX_REMOTE_URL is not configured. ' +
-          'Point it at an E2B-like adapter or implement vendor SDK in RemoteVmAgentSandbox.',
+          '[sandbox:remote_vm] RAW_AGENT_SANDBOX_MICROVM_URL / RAW_AGENT_SANDBOX_REMOTE_URL is not configured. ' +
+          'Point it at agent-sandbox-microvm /exec or an E2B-like adapter (see packages/core/src/sandbox/README-microvm.md).',
         code: 127,
         signal: null,
         kind: 'remote_vm',
@@ -47,35 +43,33 @@ export class RemoteVmAgentSandbox implements AgentSandbox {
       else req.signal.addEventListener('abort', onAbort, { once: true });
     }
 
+    const backend =
+      (this.env.RAW_AGENT_SANDBOX_REMOTE_BACKEND ?? '').trim().toLowerCase().includes('microvm') ||
+      Boolean((this.env.RAW_AGENT_SANDBOX_MICROVM_URL ?? '').trim())
+        ? 'remote_vm-microvm'
+        : 'remote_vm-http';
+
     try {
-      const res = await fetch(`${base}/exec`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
+      const { ok, status, raw, parsed } = await postMicrovmExec(
+        base,
+        {
           command: req.command,
           cwd: req.cwd,
           workspace: req.workspace,
           timeoutMs: req.timeoutMs,
           allowNetwork: explicitNetworkAllowed(req.allowNetwork),
           sessionId: req.sessionId
-        }),
-        signal: controller.signal
-      });
-      const raw = await res.text();
-      let parsed: { stdout?: string; stderr?: string; code?: number } = {};
-      try {
-        parsed = JSON.parse(raw) as typeof parsed;
-      } catch {
-        /* ignore */
-      }
-      if (!res.ok) {
+        },
+        { signal: controller.signal }
+      );
+      if (!ok) {
         return {
           stdout: '',
-          stderr: raw.slice(0, 8000) || `HTTP ${res.status}`,
+          stderr: raw.slice(0, 8000) || `HTTP ${status}`,
           code: 1,
           signal: null,
           kind: 'remote_vm',
-          backend: 'remote_vm-http'
+          backend
         };
       }
       return {
@@ -84,7 +78,7 @@ export class RemoteVmAgentSandbox implements AgentSandbox {
         code: typeof parsed.code === 'number' ? parsed.code : 0,
         signal: null,
         kind: 'remote_vm',
-        backend: 'remote_vm-http'
+        backend
       };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -94,7 +88,7 @@ export class RemoteVmAgentSandbox implements AgentSandbox {
         code: 1,
         signal: null,
         kind: 'remote_vm',
-        backend: 'remote_vm-http'
+        backend
       };
     } finally {
       if (t) clearTimeout(t);

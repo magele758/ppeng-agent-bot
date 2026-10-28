@@ -829,3 +829,11 @@ export type {WaitSpec,WaitCondition,WaitSource,Observation} from '../waits/index
 export { resolveSkillRoutingSettings } from '../skills/skill-settings.js';
 
 export * from '../config/runtime-capabilities.js';
+
+export {
+  resolveMicrovmRemoteUrl,
+  resolveRemoteVmExecBaseUrl,
+  postMicrovmExec
+} from '../sandbox/microvm-remote-url.js';
+export type { MicrovmExecRequestBody, MicrovmExecResponseBody } from '../sandbox/microvm-remote-url.js';
+
