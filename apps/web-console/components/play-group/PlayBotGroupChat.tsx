@@ -111,6 +111,11 @@ function jsonBody(body: unknown, method = 'POST'): RequestInit {
   };
 }
 
+function GroupMessageBody({message,onOpenWork}:{message:RoomMessage;onOpenWork?:(id:string)=>void}){
+  if(message.workReceipt)return <RoomWorkReceipt receipt={message.workReceipt} onOpen={onOpenWork}/>;
+  return <MarkdownHtml className="chat-bubble__body chat-bubble__md" text={message.text}/>;
+}
+
 function GroupTurn({
   message,
   name,
@@ -166,7 +171,7 @@ function GroupTurn({
         </div>
         <div className="chat-bubble">
           {user ? <MessageReplyQuote replyTo={readStoredReplyTo(message)} botName={quotedName} /> : null}
-          {message.workReceipt ? <RoomWorkReceipt receipt={message.workReceipt} onOpen={onOpenWork} /> : <MarkdownHtml className="chat-bubble__body chat-bubble__md" text={message.text} />}
+          <GroupMessageBody message={message} onOpenWork={onOpenWork}/>
           <ComposerMessageContext role={kind} message={message} />
         </div>
         {attachmentLabel ? <p className="play-group-hint">{attachmentLabel}</p> : null}
