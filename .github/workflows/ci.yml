@@ -94,5 +94,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: node scripts/ci/main-full-health.mjs

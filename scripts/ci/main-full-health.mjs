@@ -41,6 +41,11 @@ export function headRunsFromActions(runs, sha) {
   return found;
 }
 
+/** Actions refuses to override GITHUB_SHA, so a pull request passes its head explicitly. */
+export function resolveHeadSha(env = process.env) {
+  return env.PR_HEAD_SHA || env.GITHUB_SHA || '';
+}
+
 export function mergeDecision(runsOnMain, headRuns) {
   const head = decisive(headRuns);
   if (head?.conclusion === 'success') return { ok: true, reason: '这个版本自己的完整验证已经通过' };
@@ -81,8 +86,8 @@ function actionRuns(repo, sha) {
 
 function main() {
   const repo = process.env.GITHUB_REPOSITORY;
-  const sha = process.env.GITHUB_SHA;
-  if (!repo || !sha) throw new Error('GITHUB_REPOSITORY and GITHUB_SHA are required');
+  const sha = resolveHeadSha();
+  if (!repo || !sha) throw new Error('GITHUB_REPOSITORY and PR_HEAD_SHA (or GITHUB_SHA) are required');
   const fields = 'databaseId,headSha,conclusion,status,event,url';
   const onMain = runs(['run', 'list', '--repo', repo, '--workflow', FULL_VALIDATION_WORKFLOW, '--branch', 'main', '--limit', '30', '--json', fields]);
   const fromChecks = headRunsFromChecks(checkRuns(repo, sha), sha);

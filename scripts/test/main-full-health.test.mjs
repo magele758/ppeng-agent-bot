@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parse } from 'yaml';
-import { decisive, headRunsFromActions, headRunsFromChecks, mergeDecision } from '../ci/main-full-health.mjs';
+import { decisive, headRunsFromActions, headRunsFromChecks, mergeDecision, resolveHeadSha } from '../ci/main-full-health.mjs';
 
 const fail = { status: 'completed', conclusion: 'failure', headSha: 'red' };
 const pass = { status: 'completed', conclusion: 'success', headSha: 'green' };
@@ -42,4 +42,14 @@ test('manual Full validation still unblocks a red main when check-runs omit the 
   assert.equal(headRunsFromActions([{ name: 'CI', path: '.github/workflows/ci.yml', status: 'completed', conclusion: 'success', head_sha: 'head' }], 'head').length, 0);
   const source = readFileSync(new URL('../ci/main-full-health.mjs', import.meta.url), 'utf8');
   assert.match(source, /workflows\/\$\{FULL_VALIDATION_WORKFLOW\}\/runs\?head_sha=/);
+});
+
+test('full health binds the pull request head, because Actions will not override GITHUB_SHA [AC:ci-fast-and-bihourly-gates#AC-12]', () => {
+  assert.equal(resolveHeadSha({ PR_HEAD_SHA: 'head', GITHUB_SHA: 'merge' }), 'head');
+  assert.equal(resolveHeadSha({ GITHUB_SHA: 'local' }), 'local');
+  assert.equal(resolveHeadSha({}), '');
+  const job = parse(readFileSync('.github/workflows/ci.yml', 'utf8')).jobs['main-health'];
+  const step = job.steps.find((item) => String(item.run ?? '').includes('main-full-health'));
+  assert.equal(step.env.PR_HEAD_SHA, '${{ github.event.pull_request.head.sha }}');
+  assert.equal(Object.hasOwn(step.env, 'GITHUB_SHA'), false);
 });
