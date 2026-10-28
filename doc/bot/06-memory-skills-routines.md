@@ -2,7 +2,7 @@
 
 这三样都挂在一只 Bot 上，并且分得清是谁的。普通对话仍可以读写共享的用户记忆。
 
-规格：`bots`、`bot-scoped-skill-sharing`、`bot-detail-skill-management`、`bot-skill-panel-layout`、`bot-routine-main-session`、`bot-gateway-delivery`、`bot-product-p2`、`bot-workspace-interaction-polish`。例行任务的完整生命周期规格 `bot-routine-lifecycle` 还没标成已实现，下面「定时任务」写的是已经落地的规则。
+规格：`bots`、`bot-scoped-skill-sharing`、`bot-detail-skill-management`、`bot-skill-panel-layout`、`bot-routine-main-session`、`bot-gateway-delivery`、`bot-product-p2`、`bot-workspace-interaction-polish`。`bot-routine-lifecycle` 已通过单机软件验收，错过补跑、未知结果和租约恢复遵循同一套持久运行记录。
 
 ## 记忆
 
@@ -16,7 +16,7 @@
 
 密钥和 token 的原文不在界面上显示。
 
-`bot-history-memory` 和 `bot-identity-continuity` 仍是已批准、未标成已实现。长期历史能不能撑住「一直聊」、身份会不会在压缩和重启之后断掉，以那两份规格收口为准，这里不把它们写成已经验收通过。
+`bot-history-memory` 和 `bot-identity-continuity` 已通过软件验收：历史分页、原文来源与权限、记忆纠错删除、压缩预算和重启后的身份连续性均有自动化回归。真实模型的长期召回质量另行验证，不承诺无限长对话。
 
 ## 技能
 

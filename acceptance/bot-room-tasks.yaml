@@ -1,6 +1,6 @@
 id: bot-room-tasks
 title: 群子任务与成员接力
-status: approved
+status: implemented
 owner: user
 requirement: |
   bot-room-tasks：子任务、接力；审批仍默认私聊。
@@ -28,3 +28,6 @@ notes: |
   不改写 bot-multi-goal-coordination。群子任务不是该 Bot 的单聊目标。
   不替代 bot-rooms AC-7。
   待用户批准本规格后，才在旧标准说明里写上「AC-8 继续有效」。本次不修改 bot-rooms.yaml 的状态和正文，也不把任何已批准条目标为 retired。
+
+links:
+  - doc/SINGLE_HOST_COMPLETION.md

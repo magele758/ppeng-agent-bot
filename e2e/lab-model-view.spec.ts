@@ -17,7 +17,7 @@ test.describe('Lab 模型所见', () => {
       data: { policy: 'after_text_assistant' }
     });
     expect(saved.ok()).toBeTruthy();
-    await page.goto('/');
+    await page.goto('/#/chat');
     await expect(page.locator('#panel-play')).toBeVisible();
 
     await page.getByLabel('消息内容').fill(LONG_BASH_PROMPT);
@@ -75,7 +75,7 @@ test.describe('Lab 模型所见', () => {
       agentIds.push(body.agentId);
     });
 
-    await page.goto('/');
+    await page.goto('/#/chat');
     await expect(page.locator('#panel-play')).toBeVisible();
     await page.getByLabel('消息内容').fill(LONG_BASH_PROMPT);
     await page.locator('.composer-config-summary').click();

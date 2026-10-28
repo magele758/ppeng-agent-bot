@@ -1,6 +1,6 @@
 id: bot-identity-continuity
 title: Bot可靠工作与身份连续性
-status: approved
+status: implemented
 requirement: |
   分多个agent补齐所有缺失直到评估完成
 notes: 用户明确授权按已审阅开发计划实施，无需重复确认。
@@ -13,3 +13,6 @@ criteria:
     given: 未开启登录的安装
     when: 重新启动
     then: 本地身份保持不变
+
+links:
+  - doc/SINGLE_HOST_COMPLETION.md

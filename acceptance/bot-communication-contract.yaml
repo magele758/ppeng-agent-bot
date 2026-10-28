@@ -1,0 +1,31 @@
+id: bot-communication-contract
+title: "Bot 通信关联与可靠接收"
+status: draft
+requirement: |
+  那先帮我制订一个详细的改造和提升的开发计划
+notes: "用户明确要求先制定计划，本轮仅为 P1 编写验收草稿，不代表实施或验收通过。方案见 doc/BOT_COMMUNICATION_UPGRADE_PLAN.md。实施该阶段时按 acceptance-first 改 approved 并加入 standing-order notes，逐条写失败测试再实现；既有标准保持有效。"
+criteria:
+  - id: AC-1
+    given: "用户向另一只 Bot 委派一项工作"
+    when: "接收方完成并返回结果"
+    then: "结果能定位原来的委派和发起对话，不混入其他工作"
+  - id: AC-2
+    given: "同一项委派已经被接收"
+    when: "发送方因未收到确认重复提交相同请求"
+    then: "只保留一项工作，重复提交返回原来的接收结果"
+  - id: AC-3
+    given: "一个重试标识已经对应某项工作"
+    when: "发送方使用该标识提交不同内容或不同接收者"
+    then: "新请求被明确拒绝，原工作不被覆盖"
+  - id: AC-4
+    given: "请求声称来自另一用户或要求回复到无权访问的位置"
+    when: "系统接收这条请求"
+    then: "请求被拒绝，任何无权访问的对话都不会收到内容"
+  - id: AC-5
+    given: "结果已被接收但发送方尚未得到确认"
+    when: "服务中断并恢复后再次投递"
+    then: "原工作不会被重复执行或重复结算，结果仍可查询"
+  - id: AC-6
+    given: "升级前有尚未处理的委派"
+    when: "升级后继续处理"
+    then: "原工作保留原有身份与权限并能完成，无法确认的关联明确显示，历史不被猜测改写"

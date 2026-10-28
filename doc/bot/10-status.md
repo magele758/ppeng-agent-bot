@@ -24,7 +24,7 @@
 | `bot-sidebar-child-sessions` | 00、03 |
 | `bot-room-speaker-pick` | 00、07。替代旧版未点名依赖群主及小群必须回复的描述 |
 | `superbot-factory-setup` | 00、08 |
-| `room-task-collaboration` | 00、07。临时负责人协作切片，完整群子任务规格仍待收口 |
+| `room-task-collaboration` | 00、07。临时负责人协作切片，与群子任务专项共同验收 |
 | `unified-bot-goal-lifecycle` | 05。统一目标核验与终态历史 |
 | `bots` | 01、02、06、08、09 |
 | `bot-autonomous-execution-coverage` | 01、05 |
@@ -89,25 +89,27 @@
 | `unowned-legacy-bot` | 02 |
 | `loop-guard-model-switch` | 09。全局对话设置，Bot 和普通对话同一条规则 |
 | `bot-goal-result-return` | 05。子会话、委派、团队、Swarm、工厂和演进的结果回到原目标并收口 |
+| `bot-activity-rail` | 03。2026-10-28 软件验收收尾 |
+| `bot-history-memory` | 06。2026-10-28 软件验收收尾 |
+| `bot-identity-continuity` | 02、06。2026-10-28 软件验收收尾 |
+| `bot-list-face-plate` | 02、03。2026-10-28 软件验收收尾 |
+| `bot-reliable-messaging` | 08。2026-10-28 软件验收收尾 |
+| `bot-room-console` | 07。2026-10-28 软件验收收尾 |
+| `bot-room-goal-intake` | 07。2026-10-28 软件验收收尾 |
+| `bot-room-inline-approval` | 07。2026-10-28 软件验收收尾 |
+| `bot-room-tasks` | 07。2026-10-28 软件验收收尾 |
+| `bot-routine-lifecycle` | 06。2026-10-28 软件验收收尾 |
+| `bot-software-execution` | 08。2026-10-28 软件验收收尾 |
+| `bot-steer-visible` | 04。2026-10-28 软件验收收尾 |
+| `default-super-bot` | 02、08。2026-10-28 软件验收收尾 |
 
 ## 已批准，还没标成已实现
 
 | 规格 | 意图 | 先不要写成 |
 |------|------|------------|
-| `bot-activity-rail` | 活动栏只显示这个主人的在途工作 | 已经按用户隔离验收通过 |
-| `bot-history-memory` | 长期对话的历史和记忆足够继续用 | 压缩和召回已经按这份标准收口 |
-| `bot-identity-continuity` | 重启和压缩之后仍是同一只 Bot | 身份连续性已经验收 |
-| `bot-list-face-plate` | 侧栏的脸保持原形，不套外框、不拉变形 | 列表脸的底板已经按这份改完 |
 | `bot-release-readiness` | 完整工作流可以按发布标准验收 | 已经达到发布验收 |
-| `bot-reliable-messaging` | 消息接收和身份在失败后仍可靠 | 可靠消息已经单独收口 |
-| `bot-room-console` | 人多的群，对话区仍然看得清 | 百人群界面已经交付 |
-| `bot-room-goal-intake` | 群有自己的目标，中途插话能归到那件目标 | 群目标已经能用 |
-| `bot-room-inline-approval` | 人可以在群里原地批准，只挂起那个成员 | 默认已经是群内批准 |
-| `bot-room-tasks` | 群子任务和成员接力 | 完整群子任务生命周期已经验收；临时负责人协作切片另见 `room-task-collaboration` |
-| `bot-routine-lifecycle` | 例行任务的错过、补跑、未知结果和租约有完整产品语义 | 生命周期已经全部验收 |
-| `bot-software-execution` | 软件调用以真实回执为准 | 软件执行验收已经通过 |
-| `bot-steer-visible` | 插话马上出现在对话流里 | 实时出现已经验收 |
-| `default-super-bot` | 默认 Super Bot 查看、派工、汇总 | 派工汇总已经是默认体验 |
+
+`bot-watch-work-continuity` 已补齐本机观察与结果隔离，跨机器/工作区/提交证据的组合验收仍待完成。具体范围见 [单机收尾](../SINGLE_HOST_COMPLETION.md)。
 
 ## 草稿
 
@@ -122,7 +124,7 @@
 
 ## 统一入口的文档方向与界面差异
 
-2026-10-23 用户明确整个产品以 Bot 模式作为统一入口，已据此更新 00、01 和目录。当前 `lib/nav.ts`、`shell/Rail.tsx` 仍保留 Bot / Chat 等并列导航，默认位置仍为 Chat。本次仅整理文档，没有变更验收标准或运行行为，也不把导航收敛标成已实现。
+2026-10-28 首页和无效地址默认进入 Bot。`lib/nav.ts`、`shell/Rail.tsx` 仍保留 Bot / Chat 等有效导航；已有普通对话和子任务继续可达。本轮范围和证据见 [单机收尾](../SINGLE_HOST_COMPLETION.md)。
 
 ## 代码从哪读
 

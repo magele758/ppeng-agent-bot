@@ -58,7 +58,7 @@ test('pending approval sits in the transcript beside the waiting tool [AC:chat-a
     void route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
   });
 
-  await page.goto('/');
+  await page.goto('/#/chat');
   await page.getByRole('button', { name: /approval-inline/ }).first().click();
 
   const feed = page.locator('#playMessages');

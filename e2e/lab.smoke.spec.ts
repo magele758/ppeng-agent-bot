@@ -1,20 +1,20 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Agent Lab console', () => {
-  test('loads home and title [AC:console-navigation#AC-1]', async ({ page }) => {
+  test('loads home and title [AC:console-navigation#AC-1] [AC:single-host-bot-completion#AC-4]', async ({ page }) => {
     await page.goto('/');
     await expect(page).toHaveTitle(/Agent Home/i);
-    // 默认落在对话页；左侧主导航恰好六项
+    // 默认落在 Bot 页；左侧主导航恰好六项
     await expect(page.locator('#panel-play')).toBeVisible();
     await expect(page.getByRole('button', { name: '工作台' })).toHaveCount(0);
     const nav = page.getByRole('navigation', { name: '一级导航' });
     await expect(nav.getByRole('link')).toHaveText(['Bot', '对话', 'Bots 与 Agents', '任务', '知识与记忆', '设置']);
-    await expect(nav.getByRole('link', { name: '对话' })).toHaveAttribute('aria-current', 'page');
+    await expect(nav.getByRole('link', { name: 'Bot', exact: true })).toHaveAttribute('aria-current', 'page');
     await expect(nav.getByRole('link', { name: '运维' })).toHaveCount(0);
   });
 
   test('chat and bot surfaces coexist with the default coordinator [AC:default-super-bot#AC-1]', async ({ page, request }) => {
-    await page.goto('/');
+    await page.goto('/#/chat');
     await expect(page.locator('#nav-chat')).toHaveAttribute('aria-current', 'page');
     await expect(page.getByTestId('composer-bot-face')).toHaveCount(0);
     await expect(page.getByRole('button', { name: '新增' })).toBeVisible();
@@ -99,7 +99,7 @@ test.describe('Agent Lab console', () => {
   });
 
   test('draft in chat survives visiting another section [AC:console-navigation#AC-4]', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/#/chat');
     await page.getByLabel('消息内容').fill('keep this draft');
     await page.getByRole('link', { name: '设置' }).click();
     await expect(page.locator('#section-settings')).toBeVisible();
@@ -132,7 +132,7 @@ test.describe('Agent Lab console', () => {
   });
 
   test('playground send shows user bubble after run [AC:chat-basics#AC-1]', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/#/chat');
     const content = `e2e ${Date.now()}`;
     await page.getByLabel('消息内容').fill(content);
     await page.getByRole('button', { name: '发送' }).click();

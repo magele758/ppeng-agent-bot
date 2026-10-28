@@ -82,11 +82,11 @@ test.describe('Agent Home routes', () => {
     }
   });
 
-  test('an unknown hash falls back to chat [AC:console-navigation#AC-2]', async ({ page }) => {
+  test('an unknown hash falls back to Bot [AC:console-navigation#AC-2]', async ({ page }) => {
     await mockHome(page);
     await page.goto('/#/definitely-not-a-route');
     await expect(page.locator('#panel-play')).toBeVisible();
-    await expect(page.locator('#nav-chat')).toHaveAttribute('aria-current', 'page');
+    await expect(page.locator('#nav-bot')).toHaveAttribute('aria-current', 'page');
   });
 });
 
@@ -268,14 +268,14 @@ test.describe('Settings language and theme', () => {
     const nav = page.getByRole('navigation', { name: '一级导航' });
     await expect(nav.getByRole('link')).toHaveText(['Bot', '对话', 'Bots 与 Agents', '任务', '知识与记忆', '设置']);
 
-    await page.getByTestId('language-toggle').first().getByRole('button', { name: 'English' }).click();
+    await page.locator('[data-testid="language-toggle"]:visible').first().getByRole('button', { name: 'English' }).click();
     await expect(page.locator('html')).toHaveAttribute('lang', /^en/);
     await expect(page.getByRole('navigation', { name: /primary|navigation/i }).getByRole('link').nth(1)).toHaveText('Chat');
 
     await page.reload();
     await expect(page.locator('html')).toHaveAttribute('lang', /^en/);
 
-    await page.getByTestId('language-toggle').first().getByRole('button', { name: '中文' }).click();
+    await page.locator('[data-testid="language-toggle"]:visible').first().getByRole('button', { name: '中文' }).click();
     await expect(page.locator('html')).toHaveAttribute('lang', /^zh/);
     await expect(nav.getByRole('link').nth(1)).toHaveText('对话');
   });

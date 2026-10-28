@@ -1,6 +1,6 @@
 id: default-super-bot
 title: 默认 Super Bot 的状态查看、派工与结果汇总
-status: approved
+status: implemented
 requirement: |
   我觉得有几个关键点，你补充分析一下：一个bot是可以持续一直对话的，他的记忆和历史会话管理，现在是否能满足，定时任务，以及跟其他bot的通信的模式，组群会话的能力是否能支持，以及调用各种其他软件的能力，这几个点先补充一下，然后bot模式可以先默认加一个super bot，作为老大，他可以管理以及和任意的bot通信，分多个agent去完成这个分析
 owner: user
@@ -50,3 +50,6 @@ criteria:
     given: 某个 Bot 的工作需要用户批准
     when: Super Bot 给它派工或接收回报
     then: 该 Bot 仍遵循自己的权限设置，Super Bot 不会代替用户批准操作
+
+links:
+  - doc/SINGLE_HOST_COMPLETION.md

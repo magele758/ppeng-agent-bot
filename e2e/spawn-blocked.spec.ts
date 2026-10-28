@@ -39,7 +39,7 @@ test.describe('Blocked teammate result', () => {
       });
     });
 
-    await page.goto('/');
+    await page.goto('/#/chat');
     await page.getByRole('button', { name: /spawn-blocked/ }).first().click();
 
     await expect(page.locator('.chat-tool-fold__pill--blocked')).toHaveCount(1);
