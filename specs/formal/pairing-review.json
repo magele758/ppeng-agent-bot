@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "reviewedAt": "2026-10-28T03:37:47.592Z",
-  "reviewNote": "Reviewed the routine silence change. A successful result that starts or ends with [NO_UPDATE] is silent and is not posted to the main chat. A conclusion that only mentions the token in the middle is still delivered. Tool pairing, writer admission, cancellation, restart recovery, and concurrency locks are unchanged.\n2026-10-28 durable waits: reviewed registration ownership, condition validation, closed-wave receipt, same-transaction consumption and existing Goal wake/Routine lease continuation. Reuses agent-loop stopAtToolNames without SDK/kernel changes; legacy ppeng rejects registration. Source unavailable and authorization loss never complete. Unchanged original model bounds and negative controls. Added tests are supplemental; formal probes must still pass.",
+  "reviewNote": "Reviewed the routine silence change. A successful result that starts or ends with [NO_UPDATE] is silent and is not posted to the main chat. A conclusion that only mentions the token in the middle is still delivered. Tool pairing, writer admission, cancellation, restart recovery, and concurrency locks are unchanged.\n2026-10-28 durable waits: reviewed registration ownership, condition validation, closed-wave receipt, same-transaction consumption and existing Goal wake/Routine lease continuation. Reuses agent-loop stopAtToolNames without SDK/kernel changes; legacy ppeng rejects registration. Source unavailable and authorization loss never complete. Unchanged original model bounds and negative controls. Added tests are supplemental; formal probes must still pass.\n2026-10-28 follow-up: preserved the frozen default tool inventory. wait_for is authorized and directly disclosed only for a current Goal execution or exactly one running Routine session; full mode and loaded tools do not bypass this scope or existing allowlists. Existing inventory tests and actual kernel continuation tests pass.",
   "mapping": [
     {
       "step": "Execute/approval/result persistence and fold recovery; real source component probes (not a full kernel proof)",
@@ -343,13 +343,13 @@
     "packages/core/test/bot-goals-scheduler.test.js": "1d62668e81b2631c78d6a70df360f97bb80e180dd98c4ccc487c602d797f600b",
     "packages/core/test/bot-goals-budget.test.js": "95f0470da406f57a94c9881c736b1705c0692695549d110d825af6166995ca7d",
     "packages/core/src/runtime/tool-assembly.ts": "32ca51b75b8f71ab2c27082569d5b12fd1a9afab7e40d34b190b23c85b5a89dc",
-    "packages/core/src/turn/resolve-turn-tools.ts": "ef9e79910619afd3cd2643829bad899c622ccfb4b12301a4af324b78863e2a13",
+    "packages/core/src/turn/resolve-turn-tools.ts": "926dbd708ec342db39136a174e3c02b03e950bfa515d71f4abd6d9fa3601147e",
     "packages/core/src/tools/tool-search.ts": "f7c47d89de136788e9bc1fe78b7f284b0385350e6efde35ed30a2642f148c552",
     "packages/core/src/tools/deferred-disclosure.ts": "dfeaba53ab769bad9c8b6bbabfe5fb9cf8728b8dad23efef061d34e1c3b591ca",
     "packages/core/test/necessary-tool-injection.test.js": "a25570dc9cb0a0d63fb594f187a634eb0dfe234adb39c798ae11407e1c35341a",
     "packages/core/test/deferred-tool-load.test.js": "5a8e4b6a4a4979be226d90b8782f0a1ac4eed47076df5e9e898e9a474b91883c",
     "packages/agent-loop/src/model/error-class.ts": "a7632c1f16a9aa1c89896d1f30078f630c2373ec0211bb9a032c2d18ea241ca7",
-    "packages/core/src/tools/tool-exposure.ts": "b6e41e1db74c7761fd3b59113c1d56349c791b8a5e44fd4f2f5c08e00b251403",
+    "packages/core/src/tools/tool-exposure.ts": "6e88ba019cdd75af10b7df45334bb5e7755d829dc0ef4309650723765322bc7e",
     "packages/core/src/jev/apply.ts": "8574ad0574a301d6c388e0fc0ae5a4f231b2ae816e722df880441db02ed5ed95",
     "packages/core/test/tool-exposure-tiers.test.js": "a3c5acdb494419b3662ecdd310f3cf385631609924074beaff2e8c6a75ecc744",
     "packages/core/src/bots/goals/specialty-services.ts": "d053af00ba055c2547965009cfc6fa709388e652bc0678199e020be839a9f098",
@@ -377,7 +377,7 @@
     "packages/core/src/waits/receipt.ts": "323a84f85b23ea905eb236f7f0a2266403442252dced1f212db72fde14d37e74",
     "packages/core/src/waits/goal.ts": "8c3f6f479a147a921d48a8f2213318347805f056d077c906affebd5462092a0a",
     "packages/core/test/durable-agent-waits.test.js": "6737ec526a70a7f19116c31f3d68680f24fee8dd7b825a00a3a535f8bb5f59ab",
-    "packages/core/test/durable-wait-chain.test.js": "48eb215cf42ed1ab10ff24d4dc4637004c678846500da28b94043909a20e10f6",
+    "packages/core/test/durable-wait-chain.test.js": "d07f768c79ed03ea4b3c3fb20bb7b1156e3331b86168d1e30cf87dfe3409b858",
     "packages/core/test/durable-wait-replay.test.js": "5fd86b51a5dfc265c4e89e73438536e8192e5ef47fc5a0e468784d07a66d5a63",
     "scripts/replay-agent-waits.mjs": "04e9b9f9af0b2045f43e0726de4b7d171f657c3c10b0e2c5f387ac2859a70418"
   },

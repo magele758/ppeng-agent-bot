@@ -58,3 +58,11 @@ test('legacy kernel rejects wait registration instead of silently polling the mo
  const out=await createWaitForTool(f.store).execute({session:f.store.getSession(f.parent.id)},args(f));
  assert.equal(out.ok,false);assert.match(out.content,/agent-loop kernel/);assert.equal(f.store.getSession(f.parent.id).metadata.agentWaitId,undefined);
 });
+test('wait capability is scoped to an active execution and never bypasses allowlists [AC:durable-agent-waits#AC-3] [AC:durable-agent-waits#AC-6]',async t=>{
+ const {filterToolsForSession}=await import('../dist/turn/resolve-turn-tools.js');const f=fixture(t),tool=createWaitForTool(f.store);
+ const visible=agent=>filterToolsForSession({env:{},tools:[tool],agent:agent??{id:'general'},session:f.store.getSession(f.parent.id),settingsStore:f.store}).tools.map(t=>t.name);
+ assert.deepEqual(visible(),[]);f.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});assert.deepEqual(visible(),[]);
+ const job=new CronJobStore(f.dir).create({sessionId:f.parent.id,agentId:'general',name:'Wait',prompt:'Wait',scheduleKind:'every_ms',scheduleValue:'60000',metadata:{botId:'b'}}),runs=new RoutineRunStore(f.store),run=runs.enqueue(job,new Date().toISOString());
+ runs.claim(run.id,f.parent.id);assert.deepEqual(visible(),['wait_for']);assert.deepEqual(visible({id:'general',allowedTools:['read_file']}),[]);
+ runs.update(run.id,{status:'waiting_condition'});assert.deepEqual(visible(),[]);
+});
