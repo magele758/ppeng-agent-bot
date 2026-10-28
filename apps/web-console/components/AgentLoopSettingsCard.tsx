@@ -218,7 +218,7 @@ function AgentLoopCompactFields() {
       </label>
       {r.status?.kind === 'ok' ? (
         <p className="muted" style={{ fontSize: '0.75rem', margin: '4px 0 0' }}>
-          {t('more.savedNoRestart')}
+          {t('botSettings.loopHint')}
         </p>
       ) : null}
       {r.status?.kind === 'err' ? (

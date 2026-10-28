@@ -4,7 +4,7 @@ This project ships an opt-in implementation of Google's [A2UI v0.9](https://a2ui
 
 ## Quick start
 
-1. Set `RAW_AGENT_A2UI_ENABLED=1` in `.env` and restart the daemon.
+1. Open Lab → Settings → Tools → Interactive cards & domain capabilities and enable interactive cards. The next execution step sees the tools without a daemon restart. `RAW_AGENT_A2UI_ENABLED` is only a fallback until this field has been saved in Lab.
 2. From the chat panel, ask the agent something like _"render a confirmation card"_ or _"show my pending tasks as cards"_.
 3. The agent calls `a2ui_render` and the surface is rendered inline.
 4. When the user clicks a button (or submits a form), the renderer POSTs to `/api/sessions/:id/a2ui/action` and the agent sees the action as a synthetic user message in the next turn.

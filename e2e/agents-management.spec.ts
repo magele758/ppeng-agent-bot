@@ -75,7 +75,7 @@ test.describe('Bots page', () => {
     await expect(page.getByRole('form', { name: '新建 Bot' })).toBeVisible();
   });
 
-  test('creating a Bot needs only a name; face fields are visible; duplicates are refused [AC:agents-management#AC-4]', async ({
+  test('creating a Bot needs only a name; appearance is optional; duplicates are refused [AC:agents-management#AC-4]', async ({
     page,
     request
   }) => {
@@ -85,25 +85,27 @@ test.describe('Bots page', () => {
     const form = page.getByRole('form', { name: '新建 Bot' });
     await expect(form).toBeVisible();
 
-    const submit = form.getByRole('button', { name: '创建 Bot' });
+    const submit = form.getByRole('button', { name: '创建并开始对话' });
     await expect(submit).toBeDisabled();
-    await expect(form.getByLabel('显示标题')).toBeVisible();
-    await expect(form.getByLabel('描述')).toBeVisible();
+    await expect(form.getByLabel('显示标题')).not.toBeVisible();
+    await expect(form.getByTestId('bot-create-description')).toBeVisible();
 
     await form.getByRole('textbox', { name: '名称', exact: true }).fill(name);
     await expect(submit).toBeEnabled();
     await submit.click();
 
+    await expect(page.locator('#playTitle')).toContainText(name);
+    await openBotsPage(page);
     const card = page.getByRole('listitem').filter({ hasText: name });
     await expect(card).toHaveCount(1);
+    await card.click();
     await expect(page.getByTestId('bot-detail').getByRole('heading', { name })).toBeVisible();
-    await expect(page.getByText(`已创建 Bot「${name}」`)).toBeVisible();
 
     await page.getByRole('button', { name: '新建 Bot', exact: true }).first().click();
     const again = page.getByRole('form', { name: '新建 Bot' });
     await again.getByRole('textbox', { name: '名称', exact: true }).fill(name);
     // A taken name is refused before submit, so the create button never runs.
-    await expect(again.getByRole('button', { name: '创建 Bot' })).toBeDisabled();
+    await expect(again.getByRole('button', { name: '创建并开始对话' })).toBeDisabled();
     await expect(again.getByRole('alert')).toContainText('已经有同名的 Bot');
 
     const list = (await (await request.get('/api/bots')).json()) as { bots: { name: string }[] };
@@ -137,7 +139,7 @@ test.describe('Bots page', () => {
     await expect(page.getByTestId(`bot-card-${other.id}`)).toBeVisible();
   });
 
-  test('one detail panel holds permission, turns, schedule and a folded allowlist, and values survive a reload [AC:agents-management#AC-6]', async ({
+  test('one detail panel holds permission, turns, schedule and tool scope, and values survive a reload [AC:agents-management#AC-6]', async ({
     page,
     request
   }) => {
@@ -150,28 +152,29 @@ test.describe('Bots page', () => {
     await openBotsPage(page);
     await page.getByTestId(`bot-card-${bot.id}`).click();
     const detail = page.getByTestId('bot-detail');
-    await detail.getByRole('tab', { name: '能力与权限', exact: true }).click();
+    await detail.getByRole('tab', { name: '基本设置', exact: true }).click();
     const permission = detail.getByLabel('Bot 权限档');
     await expect(permission).toBeEnabled();
     await expect(permission).toHaveValue('auto');
     await expect(detail.getByLabel('Bot 使用的模型')).toBeEnabled();
 
-    await expect(detail.getByLabel('允许使用的工具')).toHaveCount(0);
-    await detail.getByRole('button', { name: '工具与技能名单' }).click();
+    await expect(detail.getByLabel('允许使用的工具')).not.toBeVisible();
+    await detail.getByRole('tab', { name: '能力与权限', exact: true }).click();
     await expect(detail.getByLabel('允许使用的工具')).toBeVisible();
 
+    await detail.getByRole('tab', { name: '基本设置', exact: true }).click();
     await permission.selectOption('ask');
     await expect.poll(async () => (await sessionMeta()).permissionMode).toBe('ask');
     await detail.getByLabel('Bot 单次执行步数上限').selectOption('48');
     await expect.poll(async () => (await sessionMeta()).maxTurns).toBe(48);
 
-    await detail.getByRole('tab', { name: '任务与自动化', exact: true }).click();
+    await detail.getByRole('tab', { name: '自动化', exact: true }).click();
     await expect(detail.getByRole('button', { name: '添加定时任务' })).toBeVisible();
 
     await page.reload();
     await page.getByTestId(`bot-card-${bot.id}`).click();
     const again = page.getByTestId('bot-detail');
-    await again.getByRole('tab', { name: '能力与权限', exact: true }).click();
+    await again.getByRole('tab', { name: '基本设置', exact: true }).click();
     await expect(again.getByLabel('Bot 权限档')).toHaveValue('ask');
     await expect(again.getByLabel('Bot 单次执行步数上限')).toHaveValue('48');
   });

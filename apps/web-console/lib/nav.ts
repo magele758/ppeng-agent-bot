@@ -8,7 +8,7 @@ export const DEFAULT_OPS_PANE: OpsPane = 'trajectory';
 export const SUB_PAGES = {
   bot: [],
   chat: [],
-  agents: ['agents', 'bots', 'teams', 'skills'],
+  agents: ['bots', 'agents', 'teams', 'skills'],
   tasks: ['queue', 'bots', 'runs', 'inbox'],
   knowledge: ['memory', 'ingestion'],
   settings: ['general', 'models', 'behavior', 'safety', 'tools', 'integrations', 'experimental', 'ops']

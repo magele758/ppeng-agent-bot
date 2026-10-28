@@ -60,6 +60,7 @@ export interface EffectiveConfigInput {
   stateDir?: string;
   lab?: {
     webSearch?: { persisted: boolean; template: string };
+    runtimeCapabilities?: { a2uiEnabled?: boolean; domains?: string[] };
     memory?: { persisted: boolean; embeddingRecallMode: MemoryEmbeddingMode };
     browser?: { persisted: boolean; enabled: boolean };
     discovery?: { persisted: boolean; enabled: boolean };
@@ -598,7 +599,11 @@ function resolveEmbedding(input: EffectiveConfigInput): EffectiveItem {
 
 function resolveDomains(input: EffectiveConfigInput): EffectiveItem {
   const sel = resolveDomainSelection(input.env);
-  const mounted = input.runtime?.domainsMounted ?? sel.ids;
+  const mounted = input.runtime?.domainsMounted ?? input.lab?.runtimeCapabilities?.domains ?? sel.ids;
+  if (input.lab?.runtimeCapabilities?.domains !== undefined) {
+    return item('capability.domains', 'capability', mounted.length > 0, mounted.join(',') || 'none', 'lab',
+      mounted.length ? 'lab_on' : 'lab_off', 'Set in Lab.', { params: { ids: mounted.join(',') } });
+  }
   if (sel.source === 'explicit-env') {
     return item('capability.domains', 'capability', mounted.length > 0, mounted.join(',') || 'none', 'explicit-env',
       'explicit_domains', 'RAW_AGENT_DOMAINS is set and takes precedence.', { params: { ids: mounted.join(',') } });
@@ -635,6 +640,18 @@ function envFlag(env: NodeJS.ProcessEnv, key: string): { set: boolean; on: boole
   return { set: raw !== '', on: ['1', 'true', 'yes', 'on'].includes(raw) };
 }
 
+function resolveA2ui(input: EffectiveConfigInput): EffectiveItem {
+  const savedA2ui = input.lab?.runtimeCapabilities?.a2uiEnabled;
+  if (savedA2ui !== undefined) {
+    return item('manual.a2ui', 'manual', savedA2ui, savedA2ui ? 'on' : 'off', 'lab', savedA2ui ? 'lab_on' : 'lab_off', 'Set in Lab.');
+  } else {
+  const a2ui = envFlag(input.env, 'RAW_AGENT_A2UI_ENABLED');
+  return item('manual.a2ui', 'manual', a2ui.on, a2ui.on ? 'on' : 'off', a2ui.set ? 'explicit-env' : 'local-fallback',
+    a2ui.set ? (a2ui.on ? 'explicit_on' : 'explicit_off') : 'manual_only', 'A2UI rendering tools are opt-in.');
+  }
+
+}
+
 function resolveManual(input: EffectiveConfigInput): EffectiveItem[] {
   const env = input.env;
   const out: EffectiveItem[] = [];
@@ -666,9 +683,7 @@ function resolveManual(input: EffectiveConfigInput): EffectiveItem[] {
   out.push(item('manual.cron', 'manual', cron.on, cron.on ? 'on' : 'off', cron.set ? 'explicit-env' : 'local-fallback',
     cron.set ? (cron.on ? 'explicit_on' : 'explicit_off') : 'manual_only', 'Scheduled jobs are opt-in.'));
 
-  const a2ui = envFlag(env, 'RAW_AGENT_A2UI_ENABLED');
-  out.push(item('manual.a2ui', 'manual', a2ui.on, a2ui.on ? 'on' : 'off', a2ui.set ? 'explicit-env' : 'local-fallback',
-    a2ui.set ? (a2ui.on ? 'explicit_on' : 'explicit_off') : 'manual_only', 'A2UI rendering tools are opt-in.'));
+  out.push(resolveA2ui(input));
 
   const disc = input.lab?.discovery;
   if (disc?.persisted) {

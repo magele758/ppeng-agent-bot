@@ -40,6 +40,8 @@ function loadMenu() {
       new Function('require', 'module', 'exports', routine)(requireComponent, module, module.exports);
       return module.exports;
     }
+    if (id === './sections/agents/BotDetail') return {BotDetail:()=>null};
+    if (id === './shell/LabProvider') return {useLab:()=>({bots:[]})};
     if (id === './BotDetailSkills') return { BotDetailSkills: () => null };
     if (id === 'react') return React;
     if (id === '@/lib/i18n') return { useI18n: () => ({ t: (key: string, vars?: Record<string, string>) => {

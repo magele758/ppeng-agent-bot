@@ -83,17 +83,27 @@ export function skillProposalRoutes(runtime: RawAgentRuntime): RouteSpec[] {
     const skills = await runtime.skillManagement.catalog(sid);
     const effective = await runtime.promptBuilder.skillsForSession(sid);
     const allowed = runtime.promptBuilder.getAllowedSkills(sid);
+    const selection = readBotSkillSelection(runtime.store,id);
+    const policy = allowed?.length ? {mode:'selected',ids:skills.filter(s=>(selection.mode==='all'||selection.ids.includes(s.id))&&allowed.some(a=>a.toLowerCase()===s.name.toLowerCase()||a===s.id)).map(s=>s.id)} : selection;
+    const legacy = runtime.listSessions().filter(s=>s.id===sid||(s.metadata?.botId===id&&s.metadata?.canonicalBotChat===true)).map(s=>[s.id,s.metadata?.allowedSkills??null]);
     const operations = runtime.skillManagement.listForBot(id);
     const captures = runtime.listSessions().filter(s=>s.metadata?.botId===id).flatMap(s=>runtime.skillCaptures.list(s.id)).filter(c=>!operations.some(o=>o.captureId===c.id)).map(c=>({id:c.id,name:c.name,ownerBotId:id,input:{action:c.kind==='new'?'create':'update'},authorization:c.status==='pending'||c.status==='rejected'?'pending':'confirmation',status:c.status,updatedAt:c.updatedAt,error:c.error}));
-    return { skills: await Promise.all(skills.map(async s => ({...s, enabled: effective.some(e => e.id === s.id) && (!allowed?.length || allowed.some(a => [s.name,s.id].includes(a))), blockedBotIds: await blockedBots(s.name,s.sharedBotIds ?? [],s.id)}))), policy: readBotSkillSelection(runtime.store,id), operations: [...operations,...captures].sort((a,b)=>a.updatedAt.localeCompare(b.updatedAt)), revision: JSON.stringify([readBotSkillSelection(runtime.store,id),skills.map(s=>[s.id,s.revision])]) };
+    return { skills: await Promise.all(skills.map(async s => ({...s, enabled: effective.some(e => e.id === s.id) && (!allowed?.length || allowed.some(a => [s.name,s.id].includes(a))), blockedBotIds: await blockedBots(s.name,s.sharedBotIds ?? [],s.id)}))), policy, operations: [...operations,...captures].sort((a,b)=>a.updatedAt.localeCompare(b.updatedAt)), revision: JSON.stringify([readBotSkillSelection(runtime.store,id),skills.map(s=>[s.id,s.revision]),legacy,allowed??null]) };
   };
   return [
     {method:'GET',pattern:'/api/bots/:id/skills',handler:async({requireParam,response})=>json(response,200,await catalog(requireParam('id')))},
     {method:'PATCH',pattern:'/api/bots/:id/skills',handler:async({requireParam,readBody,response})=>{
-      const id=requireParam('id');const current=await catalog(id);const body=await readBody() as {policy:{mode:string;ids:string[]};revision:string};
+      const id=requireParam('id');const body=await readBody() as {policy:{mode:string;ids:string[]};revision:string};const current=await catalog(id);
       if(body.revision!==current.revision)throw new ConflictError('Skill settings changed; refresh before saving');
       if(!body.policy||!['all','selected'].includes(body.policy.mode)||!Array.isArray(body.policy.ids)||body.policy.ids.some(id=>typeof id!=='string'||!current.skills.some(s=>s.id===id)))throw new ValidationError('Invalid skill selection');
-      runtime.store.setDaemonControl(botSkillSelectionKey(id),{mode:body.policy.mode,ids:body.policy.mode==='all'?[]:[...new Set(body.policy.ids)]});json(response,200,await catalog(id));
+      const save = () => {
+        for (const session of runtime.listSessions()) if (session.id===botSession(id)||(session.metadata?.botId===id&&session.metadata?.canonicalBotChat===true)) {
+          runtime.store.updateSession(session.id,{metadata:{...session.metadata,allowedSkills:[]}});
+        }
+        runtime.store.setDaemonControl(botSkillSelectionKey(id),{mode:body.policy.mode,ids:body.policy.mode==='all'?[]:[...new Set(body.policy.ids)]});
+      };
+      if (runtime.store.transaction) runtime.store.transaction(save); else save();
+      json(response,200,await catalog(id));
     }},
     {method:'POST',pattern:'/api/bots/:id/skills/manage',handler:async({requireParam,readBody,response})=>{
       const sid=botSession(requireParam('id'));const input=await readBody() as SkillManagementInput;

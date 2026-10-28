@@ -107,8 +107,8 @@ export function loadDomainBundles(env: NodeJS.ProcessEnv): LoadedDomains {
 }
 
 /**
- * Rows for the connector registry. Does not mount or unmount bundles —
- * `loadDomainBundles` remains the only mount path.
+ * Connector rows for callers using explicit environment-based bootstrap.
+ * The daemon registers installedDomainBundles and controls availability through Lab.
  */
 export function describeDomainConnectors(loaded: LoadedDomains): Array<{
   id: string;
@@ -128,3 +128,5 @@ export function describeDomainConnectors(loaded: LoadedDomains): Array<{
 export function availableDomainIds(): string[] {
   return [...KNOWN_DOMAINS];
 }
+
+export function installedDomainBundles(): DomainBundle[] { return KNOWN_DOMAINS.map(id=>REGISTRY[id]!); }
