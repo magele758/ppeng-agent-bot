@@ -6,6 +6,7 @@ import type { SqliteStateStore } from '../../storage.js';
 import type { SessionRecord, ToolContract, ModelAdapter } from '../../types.js';
 import { BotGoalService } from './service.js';
 import { classifyGoalIntents, isSelfContainedBotWork, releaseOpenInquiry, releaseSelfContainedBotWork, type GoalIntentProposal } from './intake.js';
+import { GOAL_INTAKE_BUSY_WAIT_MS, withSqliteBusyWait } from './store.js';
 import { selectGoalRoute, goalNeedsIsolatedExecutor, goalSpecialist, goalWorkKind, type GoalCapabilities, type GoalStrategy, type GoalWorkKind } from './routing.js';
 import type { BotGoal, GoalReport } from './types.js';
 import { listPendingHumanWork } from '../../session/human-continuation.js';
@@ -86,11 +87,6 @@ export async function prepareGoalIntake(host:GoalRuntimeHost,session:SessionReco
 function sessionJudge(host:GoalRuntimeHost,session:SessionRecord) {
  return host.judgeForSession ? host.judgeForSession(session) : host.judge;
 }
-function intakeJudge(host:GoalRuntimeHost,session:SessionRecord) {
- const judge=sessionJudge(host,session);
- if(!judge)return undefined;
- return (input:{instructions:string;text:string;goals:unknown;signal:AbortSignal})=>judge({system:input.instructions,user:JSON.stringify({text:input.text,goals:input.goals}),jsonMode:true,signal:input.signal});
-}
 function workspaceResources(session:SessionRecord,text:string):string[] {
  if(!/(修复|修改|实现|部署|删除|写入|\b(fix|implement|deploy|delete|write|modify)\b)/i.test(text))return [];
  return [`workspace:${session.workspaceId??'default'}`];
@@ -137,7 +133,7 @@ function announceIntake(host:GoalRuntimeHost,session:SessionRecord,sourceId:stri
  if(intent.kind==='query'){announceQuery(host,session,receiptId,result.goals);return;}
  if(result.goal&&intent.kind!=='new_goal')followRunningIntents(host,botId,result.goal.id,intent.kind,result.goal.revision,result.goal.constraints,receiptId,service);
 }
-async function applyIntakeIntent(host:GoalRuntimeHost,session:SessionRecord,service:BotGoalService,botId:string,known:Record<string,string>,receiptId:string,intent:GoalIntentProposal,index:number):Promise<void> {
+function applyIntakeIntent(host:GoalRuntimeHost,session:SessionRecord,service:BotGoalService,botId:string,known:Record<string,string>,receiptId:string,intent:GoalIntentProposal,index:number):void {
  const sourceId=index===0?receiptId:`${receiptId}:${index}`;
  if(intent.kind==='chat')return;
  if(intent.kind==='reprioritize'){
@@ -152,28 +148,39 @@ async function applyIntakeIntent(host:GoalRuntimeHost,session:SessionRecord,serv
   host.store.enqueueSteer(session.id,`[goal control not applied] ${String(error)}. Explain the current state and available next action; preserve the existing execution and do not create replacement work.`,{role:'system',key:`goal-control-refused:${sourceId}`});
  }
 }
-async function ingestReceipt(host:GoalRuntimeHost,session:SessionRecord,service:BotGoalService,botId:string,messages:Map<string,{parts:{type:string;text?:string}[]}>,known:Record<string,string>,receipt:{id:string}):Promise<void> {
+async function classifyReceipt(service:BotGoalService,botId:string,messages:Map<string,{parts:{type:string;text?:string}[]}>,known:Record<string,string>,receipt:{id:string}):Promise<GoalIntentProposal[]|undefined> {
  if(known[receipt.id])return;
  const message=messages.get(receipt.id);
  const text=message?.parts.filter(part=>part.type==='text').map(part=>part.text).join('\n')??'';
  if(!text.trim())return;
- const intents=(await classifyGoalIntents(text,service.list(botId),intakeJudge(host,session))).map(releaseOpenInquiry).map(releaseSelfContainedBotWork);
- known[receipt.id]='chat';
- for(const [index,intent] of intents.entries())await applyIntakeIntent(host,session,service,botId,known,receipt.id,intent,index);
+ return (await classifyGoalIntents(text,service.list(botId))).map(releaseOpenInquiry).map(releaseSelfContainedBotWork);
 }
-async function ingestPending(host:GoalRuntimeHost,session:SessionRecord,scope:NonNullable<ReturnType<typeof goalScope>>):Promise<void> {
+async function ingestPending(host:GoalRuntimeHost,session:SessionRecord,scope:{botId:string;sessionId:string;service:BotGoalService}):Promise<void> {
  const pending=listPendingHumanWork(host.store,session.id);
  if(!pending.length)return;
  const messages=new Map(host.store.foldMessages(session.id).map(message=>[message.id,message]));
  const known=host.store.getDaemonControl<Record<string,string>>(`bot.goal-intake:${session.id}`)??{};
- for(const receipt of pending)await ingestReceipt(host,session,scope.service,scope.botId,messages,known,receipt);
- host.store.setDaemonControl(`bot.goal-intake:${session.id}`,known);
+ const classified:Array<{id:string;intents:GoalIntentProposal[]}>=[];
+ for(const receipt of pending){
+  const intents=await classifyReceipt(scope.service,scope.botId,messages,known,receipt);
+  if(!intents)continue;
+  known[receipt.id]='chat';
+  classified.push({id:receipt.id,intents});
+ }
+ withSqliteBusyWait(host.store.db,GOAL_INTAKE_BUSY_WAIT_MS,()=>{
+  for(const item of classified){
+   for(const [index,intent] of item.intents.entries())applyIntakeIntent(host,session,scope.service,scope.botId,known,item.id,intent,index);
+  }
+  host.store.setDaemonControl(`bot.goal-intake:${session.id}`,known);
+ });
 }
 async function applyGoalIntake(host:GoalRuntimeHost,session:SessionRecord):Promise<void> {
- if(session.metadata?.canonicalBotChat!==true)return;
- const scope=goalScope(host.store,session);
- if(!scope)return;
- await ingestPending(host,session,scope);
+ try {
+  if(session.metadata?.canonicalBotChat!==true)return;
+  const scope=goalScope(host.store,session);
+  if(!scope)return;
+  await ingestPending(host,session,scope);
+ } catch { return; }
 }
 
 function currentGoalOf(service:BotGoalService,botId:string,session:SessionRecord):BotGoal|undefined {

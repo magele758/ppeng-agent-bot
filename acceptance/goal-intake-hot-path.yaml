@@ -1,0 +1,20 @@
+id: goal-intake-hot-path
+title: 开轮不再等待目标判定和数据库锁
+status: implemented
+notes: 'assumedApproval: standing-order-2026-10-22'
+requirement: |
+  执行 27s · 启动 780ms · 最慢 准入 11s · 目标接入 11s · 系统提示词 271ms
+  看来是前面goal的问题？搞完了吗？问题修复好了吗？分多个Agent去快速开发完成
+criteria:
+  - id: AC-1
+    given: 一只 Bot 开始一轮，目标判定模型很慢或一直不返回
+    when: 这一轮开始
+    then: 不等那个模型，用本地判断继续，目标接入远短于 1 秒
+  - id: AC-2
+    given: 数据库被别的进程锁着
+    when: 这一轮开始并要写目标
+    then: 不会等满 5 秒锁超时，也不会再重试一次又等 5 秒；这一轮仍然开始
+  - id: AC-3
+    given: 数据库空闲，用户只是普通对话
+    when: 这一轮开始
+    then: 消息没有丢，目标接入失败也不会让这一轮失败
