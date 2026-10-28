@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-10-28T17:06:59.000Z",
-  "reviewNote": "Child wake enqueues a WorkItem so the parent resumes after fork completion. Pairing, approval, lifecycle, restart, and concurrency control-flow contracts are unchanged; only the wake/work-item enqueue path was wired.",
+  "reviewedAt": "2026-10-28T17:22:26.000Z",
+  "reviewNote": "Child-agent wake preserves WorkItem identity (executionId/revision/fence). Merged origin/main (startup invariants). Pairing/lifecycle/restart/concurrency control-flow unchanged.",
   "mapping": [
     {
       "step": "Production startup, persistence, writer claims and graceful shutdown (HTTP drain not exercised)",
@@ -317,7 +317,7 @@
     }
   ],
   "sha256": {
-    "packages/core/src/runtime.ts": "c8353d2459c6789266b69cf9c1a81b3384cfb35e645d4184cd8d598e1651b4f6",
+    "packages/core/src/runtime.ts": "7abca069c6311d50df3d837849e6106444aa0b49d6cb003aa018678297e47147",
     "packages/core/src/storage.ts": "015625520fdb9036dade420b528f03c7c85b6926159e71879ac675790a25498a",
     "packages/core/src/stores/session-store.ts": "b5e3444614a0fef3bcd6ac9aecb374c4d470486a4c64fd8678251efee723a470",
     "packages/core/src/bots/bot-work.ts": "21c2f429a20ff1b45782a9f618611ddc6446996132f32918bc4379868ce9b583",
