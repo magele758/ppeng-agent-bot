@@ -1,3 +1,4 @@
+import { emitStartupPhase } from '../observability/startup-phase.js';
 import { BOT_DEFAULT_MAX_TURNS } from '../bots/types.js';
 import { readRoomGoals, writeRoomGoals } from './room-goals.js';
 import { startCollaboration, collaborationBoard, recordCollaborationReply, settleCollaboration } from './task-collaboration.js';
@@ -33,7 +34,7 @@ export type RoomReplyMode = 'coordinator' | 'all-members' | 'task-collaboration'
 
 export interface BotRoom {
   id: string; title: string; principalId: string; principal: BotPrincipal;
-  status: 'active' | 'paused'; hostBotId: string; maxBotTurns: number; maxToolCalls: number; maxCostUsd: number; botIds: string[];
+  status: 'active' | 'paused'; hostBotId: string; maxBotTurns: number; turnCapEnabled?: boolean; maxToolCalls: number; toolCapEnabled?: boolean; maxCostUsd: number; costCapEnabled?: boolean; botIds: string[];
   /** Per-room experiment. Missing stored values are presented as coordinator. */
   replyMode?: RoomReplyMode;
   /** Visible member reply timestamps inside the current minute, used by the saved reply cap. */
@@ -108,11 +109,22 @@ export interface BotRoomHost {
 type DataRow = { data: string };
 function decode<T>(row: unknown): T | undefined { return row ? JSON.parse((row as DataRow).data) as T : undefined; }
 function budget(value: unknown): number {
-  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 20) throw new ValidationError('Room budget must be an integer from 1 to 20');
+  if (value === 0) return 0;
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 20) throw new ValidationError('Room budget must be an integer from 1 to 20, or 0 for unlimited');
   return value;
 }
+function conversationCap(room: { turnCapEnabled?: boolean; maxBotTurns: number }, turn?: { maxBotTurns: number }): number {
+  if (room.turnCapEnabled !== true) return 0;
+  const n = turn && turn.maxBotTurns > 0 ? turn.maxBotTurns : room.maxBotTurns;
+  return n > 0 ? n : 0;
+}
+function conversationCapHit(room: { turnCapEnabled?: boolean; maxBotTurns: number }, turn: { maxBotTurns: number; botTurns: number }): boolean {
+  const cap = conversationCap(room, turn);
+  return cap > 0 && turn.botTurns >= cap;
+}
 function positiveLimit(value:unknown,max:number,label:string,integer=false):number {
-  if(typeof value!=='number'||!Number.isFinite(value)||value<=0||value>max||(integer&&!Number.isInteger(value)))throw new ValidationError(`Invalid Room ${label} budget`);
+  if (value === 0) return 0;
+  if(typeof value!=='number'||!Number.isFinite(value)||value<0||value>max||(integer&&!Number.isInteger(value)))throw new ValidationError(`Invalid Room ${label} budget`);
   return value;
 }
 function roomReplyMode(room: { replyMode?: unknown }): RoomReplyMode {
@@ -244,17 +256,20 @@ export class BotRoomService {
     const hostBotId = input.hostBotId ?? botIds[0]!;
     if (!botIds.includes(hostBotId)) throw new ValidationError('Host must be a Room member');
     const now = nowIso();
-    const room: BotRoom = { id: createId('room'), title, principalId: botPrincipalKey(principal), principal, botIds, hostBotId, maxBotTurns: budget(input.maxBotTurns ?? 8), maxToolCalls:positiveLimit(input.maxToolCalls??100,10000,'tool',true),maxCostUsd:positiveLimit(input.maxCostUsd??1,1000,'cost'),status: 'active', createdAt: now, updatedAt: now };
+    const room: BotRoom = { id: createId('room'), title, principalId: botPrincipalKey(principal), principal, botIds, hostBotId, maxBotTurns: budget(input.maxBotTurns ?? 0), turnCapEnabled: (input.maxBotTurns ?? 0) > 0, maxToolCalls:positiveLimit(input.maxToolCalls??0,10000,'tool',true), toolCapEnabled: (input.maxToolCalls ?? 0) > 0, maxCostUsd:positiveLimit(input.maxCostUsd??0,1000,'cost'), costCapEnabled: (input.maxCostUsd ?? 0) > 0, status: 'active', createdAt: now, updatedAt: now };
     this.store.db.prepare('INSERT INTO bot_rooms(id,principal_id,data) VALUES(?,?,?)').run(room.id, room.principalId, JSON.stringify(room));
     return withReplyMode(room);
   }
-  patch(principal: BotPrincipal, id: string, input: { title?: string; hostBotId?: string; maxBotTurns?: number; maxToolCalls?:number;maxCostUsd?:number; status?: 'active' | 'paused'; replyMode?: RoomReplyMode }): BotRoom {
+  patch(principal: BotPrincipal, id: string, input: { title?: string; hostBotId?: string; maxBotTurns?: number; turnCapEnabled?: boolean; maxToolCalls?:number; toolCapEnabled?: boolean; maxCostUsd?:number; costCapEnabled?: boolean; status?: 'active' | 'paused'; replyMode?: RoomReplyMode }): BotRoom {
     const room = this.get(principal, id);
     if (input.title !== undefined) { const title = typeof input.title==='string'?input.title.trim():''; if (!title || title.length > 120) throw new ValidationError('Invalid Room title'); room.title = title; }
     if (input.hostBotId !== undefined) { if (!room.botIds.includes(input.hostBotId)) throw new ValidationError('Host must be a Room member'); room.hostBotId = input.hostBotId; }
-    if (input.maxBotTurns !== undefined) room.maxBotTurns = budget(input.maxBotTurns);
-    if(input.maxToolCalls!==undefined)room.maxToolCalls=positiveLimit(input.maxToolCalls,10000,'tool',true);
-    if(input.maxCostUsd!==undefined)room.maxCostUsd=positiveLimit(input.maxCostUsd,1000,'cost');
+    if (input.maxBotTurns !== undefined) { room.maxBotTurns = budget(input.maxBotTurns); if (input.turnCapEnabled === undefined) room.turnCapEnabled = input.maxBotTurns > 0; }
+    if (input.turnCapEnabled !== undefined) room.turnCapEnabled = input.turnCapEnabled === true;
+    if(input.maxToolCalls!==undefined){ room.maxToolCalls=positiveLimit(input.maxToolCalls,10000,'tool',true); if (input.toolCapEnabled === undefined) room.toolCapEnabled = input.maxToolCalls > 0; }
+    if (input.toolCapEnabled !== undefined) room.toolCapEnabled = input.toolCapEnabled === true;
+    if(input.maxCostUsd!==undefined){ room.maxCostUsd=positiveLimit(input.maxCostUsd,1000,'cost'); if (input.costCapEnabled === undefined) room.costCapEnabled = input.maxCostUsd > 0; }
+    if (input.costCapEnabled !== undefined) room.costCapEnabled = input.costCapEnabled === true;
     if (input.status !== undefined) { if (!['active','paused'].includes(input.status)) throw new ValidationError('Invalid Room status'); room.status = input.status; }
     if (input.replyMode !== undefined) {
       if (input.replyMode !== 'coordinator' && input.replyMode !== 'all-members' && input.replyMode !== 'task-collaboration') throw new ValidationError('replyMode must be coordinator, all-members or task-collaboration');
@@ -448,7 +463,7 @@ export class BotRoomService {
           cards: addressed === undefined ? this.speakerCards(room) : undefined
         });
     if (room.replyMode === 'task-collaboration') schedule.botIds = (schedule.botIds.length ? schedule.botIds : addressed === undefined ? [room.hostBotId] : []).slice(0, 1);
-    const speakerBudget = fanOut ? Math.max(room.maxBotTurns, schedule.botIds.length) : room.maxBotTurns;
+    const speakerBudget = conversationCap(room) > 0 ? (fanOut ? Math.max(room.maxBotTurns, schedule.botIds.length) : room.maxBotTurns) : 0;
     return this.tx(() => {
       const existing = this.duplicateReceipt(id, input, text, attachments, contextSources);
       if (existing) return existing;
@@ -576,7 +591,7 @@ export class BotRoomService {
       }
     }
   }
-  /** Attach to resumed approval runs too; limits cannot disappear when a run parks. */
+  /** Count tool calls after each model step, including a run resumed from approval. Cost and tool caps do not cancel the session. */
   budgetHookForSession(sessionId:string):KernelHookListener|undefined {
     const session=this.store.getSession(sessionId);const roomId=session?.metadata?.roomId;
     if(typeof roomId!=='string')return undefined;
@@ -585,14 +600,9 @@ export class BotRoomService {
     return event=>{
       if(event.type!=='model_done')return;
       const turn=this.turnById(active.id);if(!['running','waiting_approval'].includes(turn.status))return;
-      const room=this.rawRoom(roomId);
       const requested=event.assistant?.parts.filter(part=>part.type==='tool_call').length??0;
       const currentCost=this.store.getSession(sessionId)?.metadata?.usageCostUsd;
-      const slot = turn.members?.find(member => member.sessionId === sessionId);
-      const spent=typeof currentCost==='number'?Math.max(0,currentCost-(slot?.startCostUsd ?? turn.startCostUsd ?? 0)):0;
       if(typeof currentCost==='number')turn.costStatus='estimated';
-      const reason=turn.toolCalls+requested>room.maxToolCalls?'tool_budget':turn.costUsd+spent>=room.maxCostUsd?'cost_budget':undefined;
-      if(reason){turn.terminationReason=reason;this.saveTurn(turn);this.host.cancelSession(sessionId);return;}
       turn.toolCalls+=requested;this.saveTurn(turn);
     };
   }
@@ -614,10 +624,6 @@ export class BotRoomService {
   }
   private contextMissing(turn: BotRoomTurn): void {
     turn.status = 'unknown'; turn.terminationReason = 'execution_context_missing'; this.saveTurn(turn);
-  }
-  private completeBudget(turn: BotRoomTurn): boolean {
-    if (turn.terminationReason !== 'tool_budget' && turn.terminationReason !== 'cost_budget') return false;
-    turn.status = 'completed'; this.saveTurn(turn); return true;
   }
   private turnOwnsSession(turn: BotRoomTurn, sessionId: string): boolean {
     return turn.currentSessionId === sessionId || (turn.members ?? []).some(member => member.sessionId === sessionId && (member.status === 'running' || member.status === 'waiting_approval'));
@@ -674,7 +680,7 @@ export class BotRoomService {
       if (latest.currentSessionId === session.id) delete latest.currentSessionId;
       delete latest.startSeq;
       this.syncCursor(latest);
-      const more = latest.cursor < latest.botIds.length && latest.botTurns < latest.maxBotTurns;
+      const more = latest.cursor < latest.botIds.length && !conversationCapHit(room, latest);
       latest.status = more ? 'running' : 'completed';
       if (latest.status === 'completed') latest.terminationReason = latest.cursor < latest.botIds.length ? 'budget' : 'members_completed';
       this.saveTurn(latest);
@@ -723,7 +729,7 @@ export class BotRoomService {
     if (hasPendingSessionWake(this.store, session.id)) return false;
     const resumed = resumeApprovedBotSession({ store: this.store, runSession: id => this.host.runSession(id, { onEvent: this.budgetHookForSession(id) }), isSessionRunning: this.host.isSessionRunning }, session.id, turn.startedAt ?? turn.createdAt);
     if (resumed || (session.metadata?.outcome as { kind?: string } | undefined)?.kind === 'waiting_approval') return false;
-    if (this.applyUnconfirmedEffects(turn, session) || this.completeBudget(turn)) return false;
+    if (this.applyUnconfirmedEffects(turn, session)) return false;
     if (this.applyOutcome(turn, session, speaker) || this.sessionFailed(turn, session, speaker)) return !this.isTerminal(this.turnById(turn.id).status);
     if (typeof session.metadata?.usageCostUsd === 'number') {
       this.mergeTurn(turn.id, latest => {
@@ -838,6 +844,7 @@ export class BotRoomService {
       if (closing) item.wrapDone = true;
     });
     this.adopt(turn, latest);
+    const contextStarted = Date.now();
     const view = await prepareRoomContextView({ store: this.store, roomId: room.id, botId, session });
     const history = this.historyForTurn(room, turn, session, botId, closing, roomContextStoredText(view.text));
     this.store.appendMessage(session.id, 'user', history.parts);
@@ -850,6 +857,7 @@ export class BotRoomService {
     // message cannot wake the recipient as if a human had authorized the action.
     // The stamp only arms the approval fail-safe. This bot's command scope stays the same as its own chat.
     stampSessionWake(this.store, session.id, { kind: 'unattended', source: 'room' });
+    emitStartupPhase(session.id, { phase: 'room_context', scope: 'wake', durationMs: Date.now() - contextStarted });
     await this.host.runSession(session.id, { onEvent: this.budgetHookForSession(session.id) });
     return this.settleMember(room, turn, botId, session.id, closing);
   }
@@ -871,10 +879,6 @@ export class BotRoomService {
         item.partialResult = this.resultText(sessionId, startSeq).slice(-12000);
       });
       this.adopt(turn, saved);
-      return false;
-    }
-    if (after.terminationReason === 'tool_budget' || after.terminationReason === 'cost_budget') {
-      this.completeBudget(this.turnById(turn.id));
       return false;
     }
     if (this.applyOutcome(turn, current, botId)) return !this.isTerminal(this.turnById(turn.id).status);
@@ -987,7 +991,7 @@ export class BotRoomService {
     const hostId = this.roomHostId(room);
     if (!hostId || (latest.postedBotIds ?? []).includes(hostId) || (latest.settledBotIds ?? []).includes(hostId)) return;
     if (!(latest.postedBotIds ?? []).some(id => id !== hostId)) return;
-    if (latest.botTurns >= latest.maxBotTurns) return;
+    if (conversationCapHit(room, latest)) return;
     this.adopt(turn, this.mergeTurn(turn.id, item => { item.hostWrapUp = true; }));
   }
   /** At most one unspoken member who is clearly more on-topic than the host. */
@@ -995,7 +999,7 @@ export class BotRoomService {
     const latest = this.turnById(turn.id);
     if (latest.mentionedBotIds !== undefined || latest.followUpDone || latest.status !== 'running') return;
     const hostId = this.roomHostId(room);
-    if (!hostId || !(latest.postedBotIds ?? []).includes(hostId) || latest.botTurns >= latest.maxBotTurns) return;
+    if (!hostId || !(latest.postedBotIds ?? []).includes(hostId) || conversationCapHit(room, latest)) return;
     const next = selectFollowUpSpeaker({
       scores: latest.speakerScores ?? [],
       hostBotId: hostId,
@@ -1026,8 +1030,8 @@ export class BotRoomService {
   }
   private takeBatch(room: BotRoom, turn: BotRoomTurn, pending: string[]): string[] | 'halt' | 'park' {
     const latestRoom = this.rawRoom(room.id);
-    const remaining = turn.maxBotTurns - turn.botTurns;
-    if (remaining <= 0) return [];
+    const turnRemaining = conversationCap(room, turn) > 0 ? conversationCap(room, turn) - turn.botTurns : Number.POSITIVE_INFINITY;
+    if (turnRemaining <= 0) return [];
     const cap = readRoomSettings(this.store).maxRepliesPerMinute;
     const times = latestRoom.recentReplyAts ?? [];
     const batch: string[] = [];
@@ -1047,7 +1051,7 @@ export class BotRoomService {
         this.adopt(turn, saved);
         return 'halt';
       }
-      if (batch.length >= remaining) break;
+      if (batch.length >= turnRemaining) break;
       if (!rateLimitDecision(times, cap, Date.now(), batch.length).allow) return batch.length > 0 ? batch : 'park';
       batch.push(id);
     }
@@ -1061,12 +1065,7 @@ export class BotRoomService {
       this.adopt(turn, this.mergeTurn(turn.id, item => { item.status = 'queued'; }));
       return 'stop';
     }
-    if (closing && stored.botTurns >= stored.maxBotTurns) { stored.terminationReason = 'budget'; this.completeBudget(stored); return 'stop'; }
-    if (stored.toolCalls >= latest.maxToolCalls || stored.costUsd >= latest.maxCostUsd) {
-      stored.terminationReason = stored.toolCalls >= latest.maxToolCalls ? 'tool_budget' : 'cost_budget';
-      this.completeBudget(stored);
-      return 'stop';
-    }
+    if (closing && conversationCapHit(room, stored)) { stored.terminationReason = 'budget'; return 'stop'; }
     if (!latest.botIds.includes(botId)) {
       this.adopt(turn, this.mergeTurn(turn.id, item => { this.noteSettled(item, botId); this.noteMember(item, { botId, status: 'skipped' }); this.syncCursor(item); }));
       return 'continue';

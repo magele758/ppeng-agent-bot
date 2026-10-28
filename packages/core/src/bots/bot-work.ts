@@ -1,3 +1,4 @@
+import { emitStartupPhase } from '../observability/startup-phase.js';
 import { stampSessionWake, withApprovalWake } from '../approval/unattended-approval.js';
 import { mergeOutcomeMetadata, parseRunOutcome, runOutcomeFromEnd } from '../session/run-outcome.js';
 import { assistantTextsFromFold } from '../session/visible-assistant.js';
@@ -301,7 +302,7 @@ export function botQueueUsage(store:SqliteStateStore,principal:BotPrincipal):{to
  if(exists('bot_room_turns')&&exists('bot_rooms')){
   for(const row of store.db.prepare(`WITH remaining AS (
     SELECT member.value AS bot_id,ROW_NUMBER() OVER (PARTITION BY t.id ORDER BY CAST(member.key AS INTEGER)) AS rank,
-      COALESCE(json_extract(t.data,'$.maxBotTurns'),8)-COALESCE(json_extract(t.data,'$.botTurns'),0) AS budget
+      CASE WHEN json_extract(r.data,'$.turnCapEnabled') = 1 AND COALESCE(json_extract(t.data,'$.maxBotTurns'),0) > 0 THEN COALESCE(json_extract(t.data,'$.maxBotTurns'),0)-COALESCE(json_extract(t.data,'$.botTurns'),0) ELSE 1000000 END AS budget
     FROM bot_room_turns t JOIN bot_rooms r ON r.id=t.room_id
       JOIN json_each(json_extract(t.data,'$.botIds')) member
       JOIN json_each(json_extract(r.data,'$.botIds')) roster ON roster.value=member.value
@@ -598,6 +599,8 @@ function armBotTaskDeadline(host:BotWorkHost,row:Record<string,unknown>):ReturnT
   timer.unref();return timer;
 }
 function startClaimedBotRun(host:BotWorkHost,session:SessionRecord,row:Record<string,unknown>,owner:string,fence:number):void {
+  const createdAt = typeof row.created_at === 'string' ? Date.parse(row.created_at) : Number.NaN;
+  emitStartupPhase(session.id, { phase: 'queue_wait', scope: 'wake', durationMs: Number.isFinite(createdAt) ? Math.max(0, Date.now() - createdAt) : 0 });
   if(session.status==='failed'||session.status==='completed')host.store.updateSession(session.id,{status:'idle'});
   active(host.store).add(session.id);
   const deadline=armBotTaskDeadline(host,row);
