@@ -186,6 +186,7 @@ recoveryCheckpoint:"Checkpoint {seq}",
   states: {
     queued: "Queued",
     running: "Running",
+    waiting_condition: "Awaiting condition",
     waiting_approval: "Awaiting approval",
     completed: "Completed",
     failed: "Failed",
