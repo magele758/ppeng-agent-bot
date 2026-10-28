@@ -1,3 +1,4 @@
+import {createWaitForTool} from './waits/tool.js';
 import { mergeDomainBundles, type DomainBundle } from './domain.js';
 import { registerDomainCatalog, domainCatalog, readRuntimeCapabilities, runtimeCapabilityCheck, guardRuntimeCapability } from './config/runtime-capabilities.js';
 import { ExternalAgentConnections } from './external-agents/connections.js';
@@ -715,6 +716,7 @@ export class RawAgentRuntime {
       cancelSession: (id) => this.cancelSession(id)
     }));
     this.tools.push(createGoalCheckpointTool(this.store));
+    this.tools.push(createWaitForTool(this.store));
     this.tools.push(createGoalSelfHealTool({store:this.store,selfHeal:this.selfHeal}));
     this.tools.push(createGoalFactoryDevelopmentTool({store:this.store,factory:this.factory}));
     this.tools.push(createRuntimeGoalDispatchTool({

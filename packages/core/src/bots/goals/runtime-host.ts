@@ -1,3 +1,5 @@
+import {hasWaitReceipt} from '../../waits/receipt.js';
+import {DurableWaitStore} from '../../waits/store.js';
 import { createHash } from 'node:crypto';
 import { GOAL_JUDGE_TIMEOUT_MS } from './judge-budget.js';
 import { evidenceTranscript, goalExecutionEvidence } from './execution-evidence.js';
@@ -274,7 +276,7 @@ export function bindGoalExecution(host:GoalRuntimeHost,session:SessionRecord):bo
  return answerCanonicalChat(session,bound);
 }
 function goalInstructions(goal:BotGoal,strategy:string,reason:string):string {
- return `[goal ${goal.id} revision ${goal.revision}] Objective: ${goal.objective}\nConstraints: ${JSON.stringify(goal.constraints)}\nCompletion conditions: ${JSON.stringify(goal.completionCriteria)}\nExecution: ${strategy}. ${reason}\nPrevious progress: ${goal.progress}\nEvidence: ${JSON.stringify(goal.evidence)}\nNext step: ${goal.nextStep??''}\nTool observations are recorded automatically. Use goal_checkpoint only when available to preserve concrete progress or a durable wait condition; do not substitute another storage tool or create extra files just to record verification evidence. Report verification results in your response. Returning a response does not complete the goal. When Execution is not direct, your first action must be goal_dispatch to launch that executor (factory may first discover targets). A direct answer does not fulfill a selected specialist execution. For subagent/orchestrator/self_heal/factory/team_dag/swarm/bot_delegate use goal_dispatch to launch the selected executor. For PTC use goal_dispatch to create an isolated dynamic-workflow worker. Select the next workKind and specialist role yourself from the task and existing evidence; never ask the user to configure modes. When goal_dispatch returns waiting, end this turn immediately; the scheduler will resume with actual results. Do not poll worker history or sleep. Inspect existing results before launching another phase; do not repeat completed or unconfirmed external actions. For factory discover authorized targets through factory_status, then pass factory details to goal_dispatch.`;
+ return `[goal ${goal.id} revision ${goal.revision}] Objective: ${goal.objective}\nConstraints: ${JSON.stringify(goal.constraints)}\nCompletion conditions: ${JSON.stringify(goal.completionCriteria)}\nExecution: ${strategy}. ${reason}\nPrevious progress: ${goal.progress}\nEvidence: ${JSON.stringify(goal.evidence)}\nNext step: ${goal.nextStep??''}\nTool observations are recorded automatically. Use goal_checkpoint only when available to preserve concrete progress or a durable wait condition; do not substitute another storage tool or create extra files just to record verification evidence. Report verification results in your response. Returning a response does not complete the goal. When Execution is not direct, your first action must be goal_dispatch to launch that executor (factory may first discover targets). A direct answer does not fulfill a selected specialist execution. For subagent/orchestrator/self_heal/factory/team_dag/swarm/bot_delegate use goal_dispatch to launch the selected executor. For PTC use goal_dispatch to create an isolated dynamic-workflow worker. Select the next workKind and specialist role yourself from the task and existing evidence; never ask the user to configure modes. When goal_dispatch returns waiting, end this turn immediately; the scheduler will resume with actual results. Do not poll worker history or sleep. For other owned observable dependencies use wait_for with a structured condition; it persists the checkpoint and ends this tool turn until fresh evidence is ready. Inspect existing results before launching another phase; do not repeat completed or unconfirmed external actions. For factory discover authorized targets through factory_status, then pass factory details to goal_dispatch.`;
 }
 
 function executionIds(metadata:SessionRecord['metadata']):{goalId:string;executionId:string}|undefined {
@@ -404,6 +406,12 @@ function unlaunchedExecutor(session:SessionRecord,execution:{strategy:string;id:
 async function settledReport(host:GoalRuntimeHost,goal:BotGoal,tail:ReturnType<GoalRuntimeHost['store']['foldMessages']>,assistant:string,checkpoint:GoalReport|undefined,error:unknown,status:string,outcome:{kind?:string}|undefined,session:SessionRecord,execution:{strategy:string;id:string}):Promise<GoalReport> {
  const failed=interruptedReport(error,status)??abortedReport(outcome);
  if(failed)return failed;
+ if(checkpoint?.kind==='waiting'&&checkpoint.wait?.source==='durable_wait'){
+  const wait=new DurableWaitStore(host.store).get(checkpoint.wait.correlationId);
+  if(wait?.owner.id===goal.id&&wait.owner.executionId===execution.id&&wait.owner.revision===goal.revision&&hasWaitReceipt(host.store,session.id,wait.id))return checkpoint;
+  if(wait?.owner.id===goal.id)new DurableWaitStore(host.store).cancel(wait.id,'Wait tool wave did not close');
+  return {kind:'blocked',summary:'Wait registration lacks a complete tool checkpoint; verify effects before continuing'};
+ }
  const unlaunched=unlaunchedExecutor(session,execution,goal);
  if(unlaunched)return unlaunched;
  return maybeVerify(host,goal,tail,assistant,baseReport(checkpoint,assistant,goal),session.id);

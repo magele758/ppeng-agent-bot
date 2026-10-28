@@ -44,7 +44,7 @@ export function RoutineRuns({ jobId }: { jobId: string }) {
         .then((data) => {
           if (active) {
             const page = data as {runs:Run[];nextCursor?:number};
-            setRuns(prev => paged ? Array.from(new Map([...prev.filter(x => !["queued", "running", "waiting_approval", "unknown"].includes(x.status)), ...page.runs.filter(x => ["queued", "running", "waiting_approval", "unknown"].includes(x.status) || prev.some(p => p.id === x.id))].map(x=>[x.id,x])).values()) : page.runs);
+            setRuns(prev => paged ? Array.from(new Map([...prev.filter(x => !["queued", "running", "waiting_condition", "waiting_approval", "unknown"].includes(x.status)), ...page.runs.filter(x => ["queued", "running", "waiting_condition", "waiting_approval", "unknown"].includes(x.status) || prev.some(p => p.id === x.id))].map(x=>[x.id,x])).values()) : page.runs);
             if (!paged) setCursor(page.nextCursor);
           }
         })
@@ -124,7 +124,7 @@ export function RoutineRuns({ jobId }: { jobId: string }) {
               {t("botWork.retry")}
             </button>
           )}
-          {["queued", "running", "waiting_approval"].includes(r.status) && (
+          {["queued", "running", "waiting_condition", "waiting_approval"].includes(r.status) && (
             <button
               type="button"
               disabled={action.busy}
