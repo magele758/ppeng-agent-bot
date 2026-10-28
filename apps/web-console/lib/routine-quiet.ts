@@ -10,10 +10,13 @@ export function isNoUpdateReply(text: string): boolean {
   return trimmed.startsWith(NO_UPDATE) || trimmed.endsWith(NO_UPDATE);
 }
 
-/** A stored routine receipt whose result is only a no-update. Real conclusions stay visible. */
+/** A routine receipt, or the routine's own reply, when it only says nothing changed. */
 export function quietRoutineResult(role: string, messageKey: string | undefined, text: string): boolean {
-  if (role !== 'assistant' || !messageKey?.startsWith('routine-result:')) return false;
-  const matched = ROUTINE_RESULT.exec(stripVisibleClockMarks(text));
-  if (!matched?.[3]) return false;
-  return isNoUpdateReply(matched[3]);
+  if (role !== 'assistant') return false;
+  const body = stripVisibleClockMarks(text);
+  if (messageKey?.startsWith('routine-result:')) {
+    const matched = ROUTINE_RESULT.exec(body);
+    if (matched?.[3]) return isNoUpdateReply(matched[3]);
+  }
+  return isNoUpdateReply(body);
 }
