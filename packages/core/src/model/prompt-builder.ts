@@ -34,6 +34,7 @@ import {
 } from '../skills/skill-settings.js';
 import type { SqliteStateStore } from '../storage.js';
 import { compileTurnAppendix, compileTurnAppendixAsync } from '../session/context-compiler.js';
+import { emitStartupPhase } from '../observability/startup-phase.js';
 import { applyJevSkillSelect } from '../jev/apply.js';
 import { chainHas, resolveJevChain } from '../jev/settings.js';
 import { isPtcSession, orchestrationReplayFromSession } from '../ptc/mode.js';
@@ -56,6 +57,19 @@ import type {
 } from '../types.js';
 
 const { HARNESS_ARTIFACT_DIR, HARNESS_ARTIFACT_FILES } = await import('../types.js');
+function timePromptSlice<T>(sessionId: string, phase: string, run: () => T, extra?: { skillCount?: number }): T {
+  const started = Date.now();
+  try {
+    return run();
+  } finally {
+    emitStartupPhase(sessionId, {
+      phase,
+      scope: 'prompt',
+      durationMs: Date.now() - started,
+      ...extra
+    });
+  }
+}
 
 /**
  * Observability fingerprint for the stable system prefix.
@@ -304,10 +318,23 @@ export class PromptBuilder {
    * (legacy routing is listing-only and would make search useless).
    */
   async skillsForSession(sessionId: string): Promise<SkillSpec[]> {
-    const session = typeof this.deps.store.getSession === 'function' ? this.deps.store.getSession(sessionId) : undefined;
-    const botId = sessionBotId(session?.metadata);
-    const visible = selectBotSkills(filterSkillsByBot(await this.allSkills(), botId), readBotSkillSelection(this.deps.store, botId));
-    return session ? filterSkillsByScope(visible, runProfileFromSession(session).skillScope, requestedSkillNames(session.metadata)) : visible;
+    const started = Date.now();
+    let skillCount = 0;
+    try {
+      const session = typeof this.deps.store.getSession === 'function' ? this.deps.store.getSession(sessionId) : undefined;
+      const botId = sessionBotId(session?.metadata);
+      const visible = selectBotSkills(filterSkillsByBot(await this.allSkills(), botId), readBotSkillSelection(this.deps.store, botId));
+      const skills = session ? filterSkillsByScope(visible, runProfileFromSession(session).skillScope, requestedSkillNames(session.metadata)) : visible;
+      skillCount = skills.length;
+      return skills;
+    } finally {
+      emitStartupPhase(sessionId, {
+        phase: 'skill_catalog',
+        scope: 'prompt',
+        durationMs: Date.now() - started,
+        skillCount
+      });
+    }
   }
 
   async searchSkills(query: string, sessionId: string, limit?: number): Promise<SkillSearchHit[]> {
@@ -367,6 +394,10 @@ export class PromptBuilder {
    * Substantive wording changes must bump {@link STABLE_SYSTEM_VERSION}.
    */
   buildStablePrefix(ctx: PromptContext): string {
+    return timePromptSlice(ctx.session.id, 'stable_prefix', () => this.composeStablePrefix(ctx));
+  }
+
+  private composeStablePrefix(ctx: PromptContext): string {
     const harnessLines: string[] = [];
     if (ctx.agent.harnessRole === 'planner') {
       harnessLines.push(
@@ -424,6 +455,8 @@ export class PromptBuilder {
 
   /** Build the dynamic per-turn block (todos, task, memory, skills). */
   async buildDynamicContext(ctx: PromptContext, messages: SessionMessage[]): Promise<string> {
+    const started = Date.now();
+    try {
     const profile = runProfileFromSession(ctx.session);
     const skills = filterSkillsByAllowlist(
       filterSkillsByScope(
@@ -437,29 +470,40 @@ export class PromptBuilder {
     const userText = textFromMessage(lastUser ?? { parts: [], role: 'user', id: '', sessionId: '', createdAt: '' });
     const mode = skillRoutingModeFromEnv(process.env);
     const topK = skillRoutingTopKFromEnv(process.env);
-    let routing = await buildSkillRoutingCooperative(userText, skills, { mode, topK });
-    const shortlistCandidates = [
-      ...routing.routed.map((r) => ({
-        id: r.skill.id,
-        ownerBotId: r.skill.ownerBotId,
-        name: r.skill.name,
-        description: r.skill.description
-      })),
-      ...routing.keywordMatched
-        .filter((s) => !routing.shortlistNames.includes(s.name))
-        .map((s) => ({ name: s.name, description: s.description }))
-    ];
-    if (shortlistCandidates.length > 0) {
-      const kept = await applyJevSkillSelect(this.deps.store, userText, shortlistCandidates);
-      if (kept) {
-        const keep = new Set(kept);
-        routing = {
-          ...routing,
-          routed: routing.routed.filter((r) => keep.has(r.skill.name)),
-          keywordMatched: routing.keywordMatched.filter((s) => keep.has(s.name)),
-          shortlistNames: routing.shortlistNames.filter((n) => keep.has(n))
-        };
+    const routeStarted = Date.now();
+    let routing: SkillRoutingResult;
+    try {
+      routing = await buildSkillRoutingCooperative(userText, skills, { mode, topK });
+      const shortlistCandidates = [
+        ...routing.routed.map((r) => ({
+          id: r.skill.id,
+          ownerBotId: r.skill.ownerBotId,
+          name: r.skill.name,
+          description: r.skill.description
+        })),
+        ...routing.keywordMatched
+          .filter((s) => !routing.shortlistNames.includes(s.name))
+          .map((s) => ({ name: s.name, description: s.description }))
+      ];
+      if (shortlistCandidates.length > 0) {
+        const kept = await applyJevSkillSelect(this.deps.store, userText, shortlistCandidates);
+        if (kept) {
+          const keep = new Set(kept);
+          routing = {
+            ...routing,
+            routed: routing.routed.filter((r) => keep.has(r.skill.name)),
+            keywordMatched: routing.keywordMatched.filter((s) => keep.has(s.name)),
+            shortlistNames: routing.shortlistNames.filter((n) => keep.has(n))
+          };
+        }
       }
+    } finally {
+      emitStartupPhase(ctx.session.id, {
+        phase: 'skill_route',
+        scope: 'prompt',
+        durationMs: Date.now() - routeStarted,
+        skillCount: skills.length
+      });
     }
     this.routingBySession.set(ctx.session.id, routing);
     const skillBlock = buildSkillCatalogBlock(
@@ -505,6 +549,13 @@ export class PromptBuilder {
     return [taskLine, buildTaskContext(ctx.session, ctx.task), `Todos: ${todoLine}`, cognitiveLine, summaryLine, ptcBlock, replayBlock, dynToolsBlock, skillBlock]
       .filter(Boolean)
       .join('\n\n');
+    } finally {
+      emitStartupPhase(ctx.session.id, {
+        phase: 'dynamic_context',
+        scope: 'prompt',
+        durationMs: Date.now() - started
+      });
+    }
   }
 
   /**
@@ -537,9 +588,18 @@ export class PromptBuilder {
 
   /** Full system prompt = stable prefix + dynamic context (memory excluded). */
   async buildSystemPrompt(ctx: PromptContext, messages: SessionMessage[]): Promise<string> {
-    const stablePrefix = this.buildStablePrefix(ctx);
-    const dynamicContext = await this.buildDynamicContext(ctx, messages);
-    return [stablePrefix, dynamicContext, this.deps.runtimeInstructions?.(ctx.session.id)].filter(Boolean).join('\n\n---\n\n');
+    const started = Date.now();
+    try {
+      const stablePrefix = this.buildStablePrefix(ctx);
+      const dynamicContext = await this.buildDynamicContext(ctx, messages);
+      return [stablePrefix, dynamicContext, this.deps.runtimeInstructions?.(ctx.session.id)].filter(Boolean).join('\n\n---\n\n');
+    } finally {
+      emitStartupPhase(ctx.session.id, {
+        phase: 'system_prompt',
+        scope: 'prompt',
+        durationMs: Date.now() - started
+      });
+    }
   }
 
   async allSkills(): Promise<SkillSpec[]> {

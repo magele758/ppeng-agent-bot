@@ -1,3 +1,4 @@
+import { emitStartupPhase } from '../observability/startup-phase.js';
 import type { ToolContract } from '../types.js';
 import {
   annotateUntrustedField,
@@ -129,38 +130,73 @@ export class McpManager {
   }
 
   private async performMcpExpansion(sessionId: string): Promise<void> {
+    const started = Date.now();
     const env = this.deps.env as NodeJS.ProcessEnv;
     const endpoints = parseMcpHttpEndpoints(env);
     const stdioConfigs = parseMcpStdioConfigs(env);
     const expandStdio = envBool(env, 'RAW_AGENT_MCP_EXPAND_STDIO', true);
     const expandHttp = envBool(env, 'RAW_AGENT_MCP_EXPAND_HTTP', false);
-
-    if (endpoints.length === 0 && stdioConfigs.length === 0) {
-      this.mcpExpansionDone = true;
-      return;
-    }
-
+    const endpointCount = endpoints.length + stdioConfigs.length;
     try {
-      this.warnShortCredentials(endpoints);
-      this.httpSessions = endpoints.map(
-        (endpoint, index) =>
-          new McpHttpSession(index, endpoint, {
-            env,
-            stateDir: this.deps.stateDir,
-            onTransportFallback: (info) => {
-              this.deps.log.warn(
-                `MCP HTTP server ${index} fell back from streamable-http to SSE after HTTP ${info.status} (${info.url})`
-              );
-            }
-          })
-      );
-      this.registerHttpTools(endpoints);
-      if (expandHttp) await this.connectHttp();
-      if (expandHttp) await this.expandListedHttpTools();
-      await this.connectStdioMcpServers(stdioConfigs, expandStdio, sessionId);
-      this.registerResourceTools();
+      if (endpoints.length === 0 && stdioConfigs.length === 0) {
+        this.mcpExpansionDone = true;
+        return;
+      }
+
+      try {
+        this.warnShortCredentials(endpoints);
+        this.httpSessions = endpoints.map(
+          (endpoint, index) =>
+            new McpHttpSession(index, endpoint, {
+              env,
+              stateDir: this.deps.stateDir,
+              onTransportFallback: (info) => {
+                this.deps.log.warn(
+                  `MCP HTTP server ${index} fell back from streamable-http to SSE after HTTP ${info.status} (${info.url})`
+                );
+              }
+            })
+        );
+        this.registerHttpTools(endpoints);
+        await this.timeMcpSlice(sessionId, 'mcp_http_connect', endpoints.length, async () => {
+          if (expandHttp) await this.connectHttp();
+        });
+        await this.timeMcpSlice(sessionId, 'mcp_http_list', endpoints.length, async () => {
+          if (expandHttp) await this.expandListedHttpTools();
+        });
+        await this.timeMcpSlice(sessionId, 'mcp_stdio', stdioConfigs.length, async () => {
+          await this.connectStdioMcpServers(stdioConfigs, expandStdio, sessionId);
+        });
+        this.registerResourceTools();
+      } finally {
+        this.mcpExpansionDone = true;
+      }
     } finally {
-      this.mcpExpansionDone = true;
+      emitStartupPhase(sessionId, {
+        phase: 'mcp_expand',
+        scope: 'mcp',
+        durationMs: Date.now() - started,
+        endpointCount
+      });
+    }
+  }
+
+  private async timeMcpSlice(
+    sessionId: string,
+    phase: string,
+    endpointCount: number,
+    run: () => Promise<void>
+  ): Promise<void> {
+    const started = Date.now();
+    try {
+      await run();
+    } finally {
+      emitStartupPhase(sessionId, {
+        phase,
+        scope: 'mcp',
+        durationMs: Date.now() - started,
+        endpointCount
+      });
     }
   }
 

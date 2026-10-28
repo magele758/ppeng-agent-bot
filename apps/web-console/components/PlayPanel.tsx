@@ -874,7 +874,9 @@ export function PlayPanel({
       input: t('play.stats.input'),
       output: t('play.stats.output'),
       ended: t('play.stats.ended'),
-      sessionEnded: t('play.stats.sessionEnded')
+      sessionEnded: t('play.stats.sessionEnded'),
+      startup: t('play.stats.startup'),
+      slowest: t('play.stats.slowest')
     }),
     [t]
   );

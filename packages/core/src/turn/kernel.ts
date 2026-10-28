@@ -135,6 +135,120 @@ function redactForTrace(text: string): string {
   return redactToolContent(text, process.env);
 }
 
+const KERNEL_STARTUP_PHASES = [
+  'writer_claim',
+  'ensure_mcp',
+  'resolve_file_policy',
+  'ingest_mailbox',
+  'auto_claim_task',
+  'claim_next_run',
+  'ensure_workspace',
+  'resolve_workspace',
+  'pack_turn',
+  'build_system_prompt',
+  'before_turn_hook',
+  'pick_turn_tools',
+  'before_model'
+] as const;
+
+interface KernelStartupTrace {
+  startedAt: number;
+  phases: Record<string, number>;
+  ready: boolean;
+  turn?: number;
+}
+
+function emitKernelStartupPhase(
+  host: TurnKernelHost,
+  sessionId: string,
+  payload: {
+    phase: string;
+    durationMs: number;
+    turn?: number;
+    slowest?: string;
+    slowestMs?: number;
+    phases?: Record<string, number>;
+  }
+): void {
+  try {
+    host.emitTrace(sessionId, {
+      kind: 'startup_phase',
+      payload: { scope: 'kernel', ...payload }
+    });
+  } catch {
+    /* tracing must not fail the turn */
+  }
+}
+
+function noteKernelPhase(
+  host: TurnKernelHost,
+  sessionId: string,
+  trace: KernelStartupTrace,
+  phase: string,
+  durationMs: number
+): void {
+  if (trace.ready || trace.phases[phase] !== undefined) return;
+  trace.phases[phase] = durationMs;
+  emitKernelStartupPhase(host, sessionId, {
+    phase,
+    durationMs,
+    ...(trace.turn !== undefined ? { turn: trace.turn } : {})
+  });
+}
+
+async function timeKernelPhase<T>(
+  host: TurnKernelHost,
+  sessionId: string,
+  trace: KernelStartupTrace,
+  phase: string,
+  run: () => Promise<T> | T
+): Promise<T> {
+  if (trace.ready || trace.phases[phase] !== undefined) return await run();
+  const started = Date.now();
+  try {
+    return await run();
+  } finally {
+    noteKernelPhase(host, sessionId, trace, phase, Date.now() - started);
+  }
+}
+
+function emitKernelReady(host: TurnKernelHost, sessionId: string, trace: KernelStartupTrace): void {
+  if (trace.ready) return;
+  trace.ready = true;
+  const phases: Record<string, number> = {};
+  for (const name of KERNEL_STARTUP_PHASES) {
+    const known = trace.phases[name];
+    if (known === undefined) {
+      phases[name] = 0;
+      trace.phases[name] = 0;
+      emitKernelStartupPhase(host, sessionId, {
+        phase: name,
+        durationMs: 0,
+        ...(trace.turn !== undefined ? { turn: trace.turn } : {})
+      });
+    } else {
+      phases[name] = known;
+    }
+  }
+  let slowest = '';
+  let slowestMs = -1;
+  for (const [name, ms] of Object.entries(trace.phases)) {
+    if (ms > slowestMs) {
+      slowest = name;
+      slowestMs = ms;
+    }
+  }
+  if (!slowest) slowest = KERNEL_STARTUP_PHASES[0];
+  emitKernelStartupPhase(host, sessionId, {
+    phase: 'ready',
+    durationMs: Date.now() - trace.startedAt,
+    slowest,
+    slowestMs,
+    phases: { ...trace.phases },
+    ...(trace.turn !== undefined ? { turn: trace.turn } : {})
+  });
+}
+
 function hasWorkspaceStores(store: unknown): store is WorkspaceStoreHost {
   return (
     !!store &&
@@ -369,61 +483,70 @@ async function runSessionKernelWithWriterScope(
   sessionId: string,
   options?: KernelRunOptions
 ): Promise<SessionRecord> {
-  const session: SessionRecord = host.store.getSession(sessionId)!;
-  if (!session) {
-    throw new NotFoundError('Session', sessionId);
-  }
+  const startup: KernelStartupTrace = { startedAt: Date.now(), phases: {}, ready: false };
+  try {
+    const session: SessionRecord = host.store.getSession(sessionId)!;
+    if (!session) {
+      throw new NotFoundError('Session', sessionId);
+    }
 
-  const pendingApprovalIds = host.store
-    .listApprovals({ status: 'pending' })
-    .filter((a) => a.sessionId === sessionId)
-    .map((a) => a.id);
-  const resumeDecision = decideInterruptResume({ session, pendingApprovalIds });
+    const pendingApprovalIds = host.store
+      .listApprovals({ status: 'pending' })
+      .filter((a) => a.sessionId === sessionId)
+      .map((a) => a.id);
+    const resumeDecision = decideInterruptResume({ session, pendingApprovalIds });
 
-  const existingController = host.sessionAbortControllers.get(sessionId);
-  const controller = existingController ?? new AbortController();
-  host.sessionAbortControllers.set(sessionId, controller);
-  const sid = session.id;
-  const writerRunId = createId('run');
-  try { host.store.claimWriter(sessionId, writerRunId); }
-  catch (error) {
-    if (!existingController && host.sessionAbortControllers?.get(sessionId) === controller) host.sessionAbortControllers.delete(sessionId);
-    throw error;
-  }
-  const settle = async (): Promise<SessionRecord> => {
+    const existingController = host.sessionAbortControllers.get(sessionId);
+    const controller = existingController ?? new AbortController();
+    host.sessionAbortControllers.set(sessionId, controller);
+    const sid = session.id;
+    const writerRunId = createId('run');
     try {
-      // Admission may follow another executor completing or replacing this pause.
-      // Recompute from persisted state while writes are bound to our new claim.
-      const admittedSession = host.store.getSession(sid);
-      if (!admittedSession) throw new NotFoundError('Session', sid);
-      const decision = decideInterruptResume({
-        session: admittedSession,
-        pendingApprovalIds: host.store.listApprovals({ status: 'pending' }).filter(a => a.sessionId === sid).map(a => a.id)
+      await timeKernelPhase(host, sessionId, startup, 'writer_claim', () => {
+        host.store.claimWriter(sessionId, writerRunId);
       });
-      if (decision.action === 'yield_waiting') {
-        const parked = sessionParkedForApproval(host.store, admittedSession);
-        await options?.latch?.emit({ type: 'waiting_approval', approvalIds: decision.interrupt.approvalIds, interrupt: decision.interrupt });
-        return parked;
+    } catch (error) {
+      if (!existingController && host.sessionAbortControllers?.get(sessionId) === controller) host.sessionAbortControllers.delete(sessionId);
+      throw error;
+    }
+    const settle = async (): Promise<SessionRecord> => {
+      try {
+        // Admission may follow another executor completing or replacing this pause.
+        // Recompute from persisted state while writes are bound to our new claim.
+        const admittedSession = host.store.getSession(sid);
+        if (!admittedSession) throw new NotFoundError('Session', sid);
+        const decision = decideInterruptResume({
+          session: admittedSession,
+          pendingApprovalIds: host.store.listApprovals({ status: 'pending' }).filter(a => a.sessionId === sid).map(a => a.id)
+        });
+        if (decision.action === 'yield_waiting') {
+          const parked = sessionParkedForApproval(host.store, admittedSession);
+          await options?.latch?.emit({ type: 'waiting_approval', approvalIds: decision.interrupt.approvalIds, interrupt: decision.interrupt });
+          return parked;
+        }
+        if (resumeDecision.action !== 'none' && decision.action === 'none') return admittedSession;
+        const agent = host.store.getAgent(admittedSession.agentId);
+        if (!agent) throw new NotFoundError('Agent', admittedSession.agentId);
+        const resumeFromInterrupt = decision.action === 'resume_tools' ? decision.interrupt : undefined;
+        return await runSessionKernel(host, sessionId, { session: admittedSession, agent, controller, writerRunId, resumeFromInterrupt }, options, startup);
       }
-      if (resumeDecision.action !== 'none' && decision.action === 'none') return admittedSession;
-      const agent = host.store.getAgent(admittedSession.agentId);
-      if (!agent) throw new NotFoundError('Agent', admittedSession.agentId);
-      const resumeFromInterrupt = decision.action === 'resume_tools' ? decision.interrupt : undefined;
-      return await runSessionKernel(host, sessionId, { session: admittedSession, agent, controller, writerRunId, resumeFromInterrupt }, options);
-    }
-    finally {
-      if (host.sessionAbortControllers?.get(sid) === controller) host.sessionAbortControllers.delete(sid);
-      host.store.releaseWriter(sid, writerRunId);
-    }
-  };
-  return host.store.runWithWriter ? host.store.runWithWriter(sid, writerRunId, settle) : settle();
+      finally {
+        if (host.sessionAbortControllers?.get(sid) === controller) host.sessionAbortControllers.delete(sid);
+        host.store.releaseWriter(sid, writerRunId);
+      }
+    };
+    return await (host.store.runWithWriter ? host.store.runWithWriter(sid, writerRunId, settle) : settle());
+  } finally {
+    emitKernelReady(host, sessionId, startup);
+  }
 }
 
 async function runSessionKernel(
   host: TurnKernelHost,
   sessionId: string,
   execution: KernelExecution,
-  options?: KernelRunOptions
+  options: KernelRunOptions | undefined,
+  startup: KernelStartupTrace
 ): Promise<SessionRecord> {
   let { session, resumeFromInterrupt } = execution;
   const { agent, controller, writerRunId } = execution;
@@ -562,17 +685,18 @@ async function runSessionKernel(
   const maxTurnsPerRun = resolveTurnCap(resolveSessionMaxTurns(session.metadata, host.maxTurnsPerRun));
 
   try {
-    await host.mcpManager.ensureLoaded(sid);
-    const filePolicy = await host.mergedFilePolicy();
+    await timeKernelPhase(host, sid, startup, 'ensure_mcp', () => host.mcpManager.ensureLoaded(sid));
+    const filePolicy = await timeKernelPhase(host, sid, startup, 'resolve_file_policy', () => host.mergedFilePolicy());
     session = host.store.updateSession(session.id, { status: 'running' });
-    await host.ingestMailbox(session);
-    await host.autoClaimTask(session);
-    const nextRunItems = host.store.claimInbox(sid, 'next-run');
+    await timeKernelPhase(host, sid, startup, 'ingest_mailbox', () => host.ingestMailbox(session));
+    await timeKernelPhase(host, sid, startup, 'auto_claim_task', () => host.autoClaimTask(session));
+    const nextRunItems = await timeKernelPhase(host, sid, startup, 'claim_next_run', () => host.store.claimInbox(sid, 'next-run'));
     if (nextRunItems.length > 0) {
       applyClaimedInbox(host.store, sid, nextRunItems);
     }
 
     for (let turn = 0; turn < maxTurnsPerRun; turn += 1) {
+      if (!startup.ready) startup.turn = turn;
       if (signal.aborted) {
         closeWaveIfOpen();
         return await finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'abort');
@@ -580,20 +704,29 @@ async function runSessionKernel(
 
       const refreshedSession = host.store.getSession(session.id) as SessionRecord;
       const task = refreshedSession.taskId ? host.store.getTask(refreshedSession.taskId) : undefined;
-      const workspaceRoot = await host.ensureWorkspaceRoot(refreshedSession, task);
+      const workspaceRoot = await timeKernelPhase(host, sid, startup, 'ensure_workspace', () =>
+        host.ensureWorkspaceRoot(refreshedSession, task)
+      );
       let workspaceRoots = defaultWorkspaceRoots(workspaceRoot, host.repoRoot);
       if (hasWorkspaceStores(host.store)) {
+        const workspaceStore = host.store;
         const binding = workspaceBindingFromMetadata(refreshedSession.metadata);
         if (binding.kind !== 'default') {
-          const effective = await resolveEffectiveWorkspace({
-            store: host.store,
-            session: refreshedSession,
-            repoRoot: host.repoRoot,
-            stateDir: host.stateDir,
-            isolatedWorkspaceRoot: workspaceRoot
-          });
+          const effective = await timeKernelPhase(host, sid, startup, 'resolve_workspace', () =>
+            resolveEffectiveWorkspace({
+              store: workspaceStore,
+              session: refreshedSession,
+              repoRoot: host.repoRoot,
+              stateDir: host.stateDir,
+              isolatedWorkspaceRoot: workspaceRoot
+            })
+          );
           workspaceRoots = effective.workspaceRoots;
+        } else {
+          noteKernelPhase(host, sid, startup, 'resolve_workspace', 0);
         }
+      } else {
+        noteKernelPhase(host, sid, startup, 'resolve_workspace', 0);
       }
       let context: RunContext = {
         repoRoot: host.repoRoot,
@@ -644,7 +777,7 @@ async function runSessionKernel(
         continue;
       }
 
-      const packed = await prepareTurnInput(sid, {
+      const packed = await timeKernelPhase(host, sid, startup, 'pack_turn', () => prepareTurnInput(sid, {
         store: host.store,
         autoCompact: async () => {
           await host.autoCompact(context);
@@ -672,8 +805,15 @@ async function runSessionKernel(
           if (compiled.trim()) return withReminder(compiled);
           return withReminder(readWorkingLogAppendix(host.stateDir, sid, process.env));
         },
-        applyFoldBudget: (sess, foldedMsgs) => host.applyOptionalFoldBudget(sess, foldedMsgs)
-      });
+        applyFoldBudget: (sess, foldedMsgs) => host.applyOptionalFoldBudget(sess, foldedMsgs),
+        emitTrace: (sessionId, event) => {
+          try {
+            void host.emitTrace(sessionId, event as Parameters<typeof host.emitTrace>[1]);
+          } catch {
+            /* tracing must not fail the turn */
+          }
+        }
+      }));
       context = { ...context, session: packed.session };
       const visibleMessages = packed.messages;
       const rawVisible = packed.viewMessages;
@@ -687,7 +827,9 @@ async function runSessionKernel(
       if (drainedAdvisory) {
         host.store.appendMessage(sid, 'system', [textPart(drainedAdvisory)]);
       }
-      const systemPrompt = await host.promptBuilder.buildSystemPrompt(promptCtx, rawVisible);
+      const systemPrompt = await timeKernelPhase(host, sid, startup, 'build_system_prompt', () =>
+        host.promptBuilder.buildSystemPrompt(promptCtx, rawVisible)
+      );
       const stablePrefixHash = createHash('sha256')
         .update(host.promptBuilder.buildStablePrefix(promptCtx))
         .digest('hex')
@@ -713,13 +855,15 @@ async function runSessionKernel(
         return host.resolveImageDataUrl(assetId, context.session.id);
       };
 
-      const { dynHydrated, selectedTools } = await hydrateResolveTurnTools(
-        host,
-        context.session,
-        agent,
-        sid,
-        queryForDynHydrate(visibleMessages),
-        systemPrompt.length
+      const { dynHydrated, selectedTools } = await timeKernelPhase(host, sid, startup, 'pick_turn_tools', () =>
+        hydrateResolveTurnTools(
+          host,
+          context.session,
+          agent,
+          sid,
+          queryForDynHydrate(visibleMessages),
+          systemPrompt.length
+        )
       );
       emitDynHydrateTrace(host, sid, dynHydrated);
       const allowExternalAiTools = selectedTools.allowExternalAiTools;
@@ -740,33 +884,37 @@ async function runSessionKernel(
       }
 
       if (turn === 0) {
-        const startHook = await runLifecycleHook(process.env, {
-          phase: 'session_start',
-          sessionId: sid,
-          context: { agentId: agent.id, mode: context.session.mode }
+        await timeKernelPhase(host, sid, startup, 'session_start_hook', async () => {
+          const startHook = await runLifecycleHook(process.env, {
+            phase: 'session_start',
+            sessionId: sid,
+            context: { agentId: agent.id, mode: context.session.mode }
+          });
+          if (startHook.systemMessage || startHook.message) {
+            host.store.appendMessage(sid, 'system', [
+              textPart(startHook.systemMessage ?? startHook.message ?? '')
+            ]);
+          }
+          const startExt = await host.extensionRegistry.run('session_start', {
+            sessionId: sid,
+            agentId: agent.id,
+            meta: { mode: context.session.mode }
+          });
+          if (startExt.systemMessage || startExt.message) {
+            host.store.appendMessage(sid, 'system', [
+              textPart(startExt.systemMessage ?? startExt.message ?? '')
+            ]);
+          }
         });
-        if (startHook.systemMessage || startHook.message) {
-          host.store.appendMessage(sid, 'system', [
-            textPart(startHook.systemMessage ?? startHook.message ?? '')
-          ]);
-        }
-        const startExt = await host.extensionRegistry.run('session_start', {
-          sessionId: sid,
-          agentId: agent.id,
-          meta: { mode: context.session.mode }
-        });
-        if (startExt.systemMessage || startExt.message) {
-          host.store.appendMessage(sid, 'system', [
-            textPart(startExt.systemMessage ?? startExt.message ?? '')
-          ]);
-        }
       }
 
-      const beforeTurn = await host.extensionRegistry.run('before_turn', {
-        sessionId: sid,
-        agentId: agent.id,
-        meta: { turn }
-      });
+      const beforeTurn = await timeKernelPhase(host, sid, startup, 'before_turn_hook', () =>
+        host.extensionRegistry.run('before_turn', {
+          sessionId: sid,
+          agentId: agent.id,
+          meta: { turn }
+        })
+      );
       if (beforeTurn.block) {
         host.store.appendMessage(sid, 'system', [
           textPart(beforeTurn.message ?? beforeTurn.systemMessage ?? 'blocked by before_turn extension')
@@ -791,26 +939,23 @@ async function runSessionKernel(
           : {})
       };
 
-      {
-        const hasGoal = Boolean(goalGate?.isActive());
-        const pre = await applyJevPreTurn(
-          host.store,
-          queryForDynHydrate(visibleMessages),
-          hasGoal
-        );
-        if (pre === 'skip_done' && hasGoal) {
-          host.store.appendMessage(sid, 'system', [
-            textPart('[jev-pre-turn] Goal assumed met; skipping deep model turn.')
-          ]);
-          if (host.waitSteeringChildrenIdle) {
-            await host.waitSteeringChildrenIdle(sid);
-          } else {
-            await waitSteeringChildrenIdle(sid);
-          }
-          return await host.handleTurnCompletion(session, agent, task).then((completed) =>
-            finishEnded(completed, 'end')
-          );
+      const hasGoal = Boolean(goalGate?.isActive());
+      const pre = await timeKernelPhase(host, sid, startup, 'before_model', () =>
+        applyJevPreTurn(host.store, queryForDynHydrate(visibleMessages), hasGoal)
+      );
+      emitKernelReady(host, sid, startup);
+      if (pre === 'skip_done' && hasGoal) {
+        host.store.appendMessage(sid, 'system', [
+          textPart('[jev-pre-turn] Goal assumed met; skipping deep model turn.')
+        ]);
+        if (host.waitSteeringChildrenIdle) {
+          await host.waitSteeringChildrenIdle(sid);
+        } else {
+          await waitSteeringChildrenIdle(sid);
         }
+        return await host.handleTurnCompletion(session, agent, task).then((completed) =>
+          finishEnded(completed, 'end')
+        );
       }
 
       let turnResult: ModelTurnResult;
@@ -868,7 +1013,14 @@ async function runSessionKernel(
             claimNextStep: () => host.store.claimInbox(sid, 'next-step'),
             prepareView: (sess, msgs) => host.prepareMessagesForModel(sess, msgs),
             buildAppendix: () => '',
-            applyFoldBudget: (sess, foldedMsgs) => host.applyOptionalFoldBudget(sess, foldedMsgs)
+            applyFoldBudget: (sess, foldedMsgs) => host.applyOptionalFoldBudget(sess, foldedMsgs),
+            emitTrace: (sessionId, event) => {
+              try {
+                void host.emitTrace(sessionId, event as Parameters<typeof host.emitTrace>[1]);
+              } catch {
+                /* tracing must not fail the turn */
+              }
+            }
           });
           turnInput = { ...turnInput, messages: packedRetry.messages };
           turnResult = await host.runTurnWithRetries(turnInput, options?.onModelStreamChunk);
@@ -1141,8 +1293,19 @@ async function runSessionKernel(
 
       let pendingRecoveryAdvisory: string | undefined;
       if (loopGuard) {
-        const rep = loopGuard.checkAssistantRepetition(turnResult.assistantParts);
-        const graceOut = advisoryGrace ? advisoryGrace.apply(rep) : rep.abort
+        const rawRep = loopGuard.checkAssistantRepetition(turnResult.assistantParts);
+        const repSession = host.store.getSession(session.id) ?? session;
+        const repAdapter = adapterOf(repSession);
+        const rep = applyRepeatGuard({
+          store: host.store,
+          identity: modelIdentity({
+            modelName: repAdapter.modelName,
+            adapterName: repAdapter.name,
+            metadata: repSession.metadata,
+          }),
+          decision: rawRep,
+        });
+        const graceOut = advisoryGrace ? advisoryGrace.apply(rep.abort ? { abort: true, reason: rep.reason } : { abort: false }) : rep.abort
           ? { action: 'abort' as const, reason: rep.reason }
           : { action: 'continue' as const };
         if (graceOut.action === 'advise') {
@@ -1448,7 +1611,7 @@ async function runSessionKernel(
       saveClosedStep(turn, 'step-end');
 
       const progressDecision = progressGuard.afterToolRound(
-        validToolCalls,
+        executable,
         results
       );
       if (riskEngine) {

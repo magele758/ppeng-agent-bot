@@ -58,6 +58,11 @@ export interface PrepareTurnInputDeps {
    * statically import `node:fs`. Called only when `buildAppendix` is empty.
    */
   readWorkingLogTail?: (sessionId: string) => string;
+  /** Counts and durationMs only — never message text or secrets. */
+  emitTrace?: (
+    sessionId: string,
+    event: { kind: string; payload: Record<string, unknown>; data?: Record<string, unknown> }
+  ) => void;
 }
 
 export interface PreparedTurnInput {
@@ -120,6 +125,18 @@ function textPart(text: string): SessionMessage['parts'][number] {
   return { type: 'text', text };
 }
 
+function traceStartup(
+  deps: PrepareTurnInputDeps,
+  sessionId: string,
+  payload: Record<string, unknown>
+): void {
+  try {
+    deps.emitTrace?.(sessionId, { kind: 'startup_phase', payload, data: payload });
+  } catch {
+    /* tracing must not fail the turn */
+  }
+}
+
 export function applyClaimedInbox(
   store: PrepareTurnInputStore,
   sessionId: string,
@@ -132,21 +149,54 @@ export async function prepareTurnInput(
   sessionId: string,
   deps: PrepareTurnInputDeps
 ): Promise<PreparedTurnInput> {
+  const turnStarted = Date.now();
   const session = deps.store.getSession(sessionId);
   if (!session) {
     throw new Error(`Session ${sessionId} not found`);
   }
 
+  const compactStarted = Date.now();
   await deps.autoCompact(session);
+  traceStartup(deps, sessionId, {
+    phase: 'auto_compact',
+    scope: 'prepare',
+    durationMs: Date.now() - compactStarted
+  });
 
   const claimedInbox = deps.claimNextStep(sessionId);
   if (claimedInbox.length > 0) {
     applyClaimedInbox(deps.store, sessionId, claimedInbox);
   }
 
+  const foldStarted = Date.now();
   const folded = deps.store.foldMessages(sessionId);
+  const seqs = folded.map((m) => m.seq).filter((s): s is number => typeof s === 'number');
+  traceStartup(deps, sessionId, {
+    phase: 'fold_messages',
+    scope: 'prepare',
+    durationMs: Date.now() - foldStarted,
+    messageCount: folded.length,
+    ...(seqs.length > 0
+      ? { hiddenCount: Math.max(...seqs) - Math.min(...seqs) + 1 - folded.length }
+      : {})
+  });
+  const budgetStarted = Date.now();
   const budgeted = deps.applyFoldBudget ? deps.applyFoldBudget(session, folded) : folded;
+  traceStartup(deps, sessionId, {
+    phase: 'fold_budget',
+    scope: 'prepare',
+    durationMs: Date.now() - budgetStarted,
+    messageCount: budgeted.length
+  });
+  const viewStarted = Date.now();
   const prepared = await deps.prepareView(session, budgeted);
+  traceStartup(deps, sessionId, {
+    phase: 'prepare_view',
+    scope: 'prepare',
+    durationMs: Date.now() - viewStarted,
+    messageCount: prepared.length
+  });
+  const appendixStarted = Date.now();
   const query = lastUserQueryFromMessages(prepared);
   const compiled = await Promise.resolve(
     deps.buildAppendix(session, { query, viewMessages: prepared })
@@ -154,8 +204,21 @@ export async function prepareTurnInput(
   const workingLogTail =
     !compiled.trim() && deps.readWorkingLogTail ? deps.readWorkingLogTail(sessionId) : '';
   const appendix = resolvePackedAppendix(compiled, workingLogTail);
+  traceStartup(deps, sessionId, {
+    phase: 'memory_appendix',
+    scope: 'prepare',
+    durationMs: Date.now() - appendixStarted,
+    messageCount: prepared.length
+  });
   const messages = applyMemoryAppendixToMessages(prepared, appendix);
   const foldSeqs = folded.map((m) => m.seq).filter((s): s is number => typeof s === 'number');
+
+  traceStartup(deps, sessionId, {
+    phase: 'prepare_turn',
+    scope: 'prepare',
+    durationMs: Date.now() - turnStarted,
+    messageCount: messages.length
+  });
 
   return {
     session: deps.store.getSession(sessionId) ?? session,

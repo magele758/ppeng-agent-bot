@@ -31,6 +31,8 @@ import { readLcuSettings } from './computer-use/settings.js';
 import { createAppControlTools } from './app-control/tools.js';
 import { readAppControlSettings } from './app-control/settings.js';
 import { createLogger } from './logger.js';
+import { emitAdmitPhase } from './observability/admit-trace.js';
+import { logStartupPhase, setStartupPhaseEmitter, startupPhaseFromRecord } from './observability/startup-phase.js';
 import { NotFoundError, ValidationError } from './errors.js';
 import type { AgentSandbox } from './sandbox/agent-sandbox-types.js';
 import { SelfHealScheduler } from './self-heal/self-heal-scheduler.js';
@@ -396,6 +398,8 @@ export class RawAgentRuntime {
   } | undefined;
 
   private releaseProcessOwnership: () => void = () => {};
+  private ownsRuntimeLock = false;
+  private loggedUnownedScheduler = false;
 
   private desktopUpdateSuspended = false;
   private pendingSessionAdmissions = 0;
@@ -408,6 +412,9 @@ export class RawAgentRuntime {
   resumeAfterDesktopUpdateCancelled(): void { this.desktopUpdateSuspended = false; }
 
   constructor(options: RuntimeOptions) {
+    setStartupPhaseEmitter((sessionId, event) => {
+      this.emitTrace(sessionId, { kind: event.kind, payload: { ...event.payload } });
+    });
     this.desktopUpdateSuspended = options.updateValidation === true;
     this.repoRoot = options.repoRoot;
     this.stateDir = options.stateDir;
@@ -420,20 +427,31 @@ export class RawAgentRuntime {
           userId: defaultUserIdFromEnv(process.env),
         }
       : undefined;
-    this.store = new SqliteStateStore(join(this.stateDir, 'runtime.sqlite'));
-    let interruptedSubagents: SessionRecord[] = [];
+    const sqliteStarted = Date.now();
     try {
-      const ownership = acquireRuntimeProcessOwnership(this.store);
-      if (ownership) {
-        this.releaseProcessOwnership = ownership.release;
-        recoverInterruptedSessions(this.store);
-        recoverBotWork(this.store);
-        interruptedSubagents = markInterruptedSubagentsUnknown(this.store);
+      this.store = new SqliteStateStore(join(this.stateDir, 'runtime.sqlite'));
+    } finally {
+      logStartupPhase(undefined, { phase: 'sqlite_open', scope: 'boot', durationMs: Date.now() - sqliteStarted });
+    }
+    let interruptedSubagents: SessionRecord[] = [];
+    const ownershipStarted = Date.now();
+    try {
+      try {
+        const ownership = acquireRuntimeProcessOwnership(this.store);
+        if (ownership) {
+          this.ownsRuntimeLock = true;
+          this.releaseProcessOwnership = ownership.release;
+          recoverInterruptedSessions(this.store);
+          recoverBotWork(this.store);
+          interruptedSubagents = markInterruptedSubagentsUnknown(this.store);
+        }
+      } catch (error) {
+        this.releaseProcessOwnership();
+        this.store.db.close();
+        throw error;
       }
-    } catch (error) {
-      this.releaseProcessOwnership();
-      this.store.db.close();
-      throw error;
+    } finally {
+      logStartupPhase(undefined, { phase: 'ownership_recover', scope: 'boot', durationMs: Date.now() - ownershipStarted });
     }
     if (interruptedSubagents.length > 0) {
       this.log.warn('in-flight subagents marked unknown after restart', {
@@ -449,11 +467,13 @@ export class RawAgentRuntime {
     this.envApprovalPolicy = runtimeEnv.approvalPolicy;
     this.extensionRegistry = createExtensionRegistry(options.extensions);
 
+    const pluginStarted = Date.now();
     this.loadedPlugins = discoverPlugins(pluginDirsFromEnv(process.env));
     const mergedPlugins = mergePlugins(this.loadedPlugins);
     for (const [k, v] of Object.entries(mergedPlugins.hookEnv)) {
       if (!process.env[k]?.trim()) process.env[k] = v;
     }
+    logStartupPhase(undefined, { phase: 'plugin_discover', scope: 'boot', durationMs: Date.now() - pluginStarted });
     this.connectors = new ConnectorRegistry({
       store: this.store,
       getPlugins: () => this.loadedPlugins,
@@ -511,6 +531,7 @@ export class RawAgentRuntime {
     this.secretVault = new SecretVault(this.store);
     bindSecretVault(this.secretVault);
     bindSandboxSettingsStore(this.store);
+    const toolAssembleStarted = Date.now();
     const toolServices = createRuntimeToolServices(this.l5());
     const baseTools = attachFileCompensation(
       options.tools ?? createBuiltinTools(toolServices)
@@ -756,6 +777,7 @@ export class RawAgentRuntime {
       enabled: () => readAppControlSettings(this.store).enabled,
       approvals: this.store
     }));
+    logStartupPhase(undefined, { phase: 'tool_assemble', scope: 'boot', durationMs: Date.now() - toolAssembleStarted });
     this.libraryIndex = new LibraryIndexWatcher(this.store);
     this.refreshLibraryIndex();
   }
@@ -1508,6 +1530,13 @@ export class RawAgentRuntime {
 
   async runScheduler(): Promise<void> {
     if (this.desktopUpdateSuspended) return;
+    if (!this.ownsRuntimeLock) {
+      if (!this.loggedUnownedScheduler) {
+        this.loggedUnownedScheduler = true;
+        this.log.warn('scheduler skipped; another runtime owns this state directory');
+      }
+      return;
+    }
     await this.factory.tick().catch(error => this.log.warn('Factory scheduler failed', {error:String(error)}));
     await tickBotWork(this.botWorkRuntimeHost());
     await tickBotGoals(this.goalRuntimeHost());
@@ -1853,6 +1882,11 @@ export class RawAgentRuntime {
     setImmediate(() => { if (!this.store.db.isOpen) return; void this.drainHumanContinuations().catch(error => this.log.warn('Human continuation scheduler failed', { error: String(error) })); });
   }
 
+  /** Session trace only. `emitTrace` logs `startup_phase` once. */
+  private traceAdmit(sessionId: string, phase: string, started: number): void {
+    emitAdmitPhase((event) => this.emitTrace(sessionId, event), phase, started);
+  }
+
   async runSession(
     sessionId: string,
     options?: {
@@ -1870,9 +1904,15 @@ export class RawAgentRuntime {
     }
   ): Promise<SessionRecord> {
     if (this.desktopUpdateSuspended) throw new ValidationError("Desktop update in progress");
+    const admitStarted = Date.now();
     this.pendingSessionAdmissions++;
     try {
-      expireOverdueBotWork(this.botWorkRuntimeHost(), sessionId);
+      const expireStarted = Date.now();
+      try {
+        expireOverdueBotWork(this.botWorkRuntimeHost(), sessionId);
+      } finally {
+        this.traceAdmit(sessionId, 'expire_bot_work', expireStarted);
+      }
       if (isBotWorkSessionBlocked(this.store, sessionId)) {
         const stopped = this.store.getSession(sessionId);
         if (!stopped) throw new NotFoundError('Session', sessionId);
@@ -1880,7 +1920,12 @@ export class RawAgentRuntime {
       }
       const parked = this.store.getSession(sessionId);
       if (typeof parked?.metadata?.roomId === 'string') {
-        this.rooms.prepareSession(sessionId);
+        const roomStarted = Date.now();
+        try {
+          this.rooms.prepareSession(sessionId);
+        } finally {
+          this.traceAdmit(sessionId, 'prepare_room', roomStarted);
+        }
       }
       if (typeof parked?.metadata?.roomId === 'string' && !options?.onEvent) {
         const budgetHook = this.rooms.budgetHookForSession(sessionId);
@@ -1889,7 +1934,14 @@ export class RawAgentRuntime {
       if (parked?.mode === 'subagent' && parked.status === 'unknown') {
         return parked;
       }
-      if (parked?.metadata.canonicalBotChat === true) await prepareGoalIntake(this.goalRuntimeHost(), parked);
+      if (parked?.metadata.canonicalBotChat === true) {
+        const intakeStarted = Date.now();
+        try {
+          await prepareGoalIntake(this.goalRuntimeHost(), parked);
+        } finally {
+          this.traceAdmit(sessionId, 'goal_intake', intakeStarted);
+        }
+      }
       const existing = this.runningSessions.get(sessionId);
       if (existing && !options?.latch) {
         this.forkConcurrentBotWork(parked, true);
@@ -1904,7 +1956,16 @@ export class RawAgentRuntime {
         await existing.catch(() => undefined);
       }
       const goalSession = this.store.getSession(sessionId);
-      if (goalSession && !bindGoalExecution(this.goalRuntimeHost(), goalSession)) return goalSession;
+      if (goalSession) {
+        const bindStarted = Date.now();
+        let bound = true;
+        try {
+          bound = bindGoalExecution(this.goalRuntimeHost(), goalSession);
+        } finally {
+          this.traceAdmit(sessionId, 'bind_goal', bindStarted);
+        }
+        if (!bound) return goalSession;
+      }
       this.forkConcurrentBotWork(parked, false);
       const observeHuman = createHumanContinuationObserver(this.store, sessionId);
       const observeBudget = observeGoalBudget(this.goalRuntimeHost(), sessionId);
@@ -1962,19 +2023,35 @@ export class RawAgentRuntime {
         () =>
           (async () => {
             try {
-              await this.computerUse.beginTurn(sessionId, randomUUID());
+              const computerStarted = Date.now();
+              try {
+                await this.computerUse.beginTurn(sessionId, randomUUID());
+              } finally {
+                this.traceAdmit(sessionId, 'computer_use_begin', computerStarted);
+              }
               for (const tool of this.computerUse.tools()) {
                 const index = this.tools.findIndex(item => item.name === tool.name);
                 if (index >= 0) this.tools[index] = tool; else this.tools.push(tool);
               }
-              return await (kernelVariant === 'ppeng'
-            ? runSessionKernelPpeng(coreHost, sessionId, ppengOptions)
-            : createAssembledLoop({
-                preset: assemblyPreset,
-                io: l5ToAssembledIo(this.l5(), sessionId),
-                hooks,
-                config: coreHost.loopConfig
-              }).then((assembled) => assembled.run(sessionId, agentLoopOptions)));
+              if (kernelVariant === 'ppeng') {
+                this.traceAdmit(sessionId, 'admit', admitStarted);
+                return await runSessionKernelPpeng(coreHost, sessionId, ppengOptions);
+              }
+              const assembleStarted = Date.now();
+              const assembled = await (async () => {
+                try {
+                  return await createAssembledLoop({
+                    preset: assemblyPreset,
+                    io: l5ToAssembledIo(this.l5(), sessionId),
+                    hooks,
+                    config: coreHost.loopConfig
+                  });
+                } finally {
+                  this.traceAdmit(sessionId, 'assemble_loop', assembleStarted);
+                }
+              })();
+              this.traceAdmit(sessionId, 'admit', admitStarted);
+              return await assembled.run(sessionId, agentLoopOptions);
             } finally {
               await this.computerUse.endTurn(sessionId, this.sessionAbortControllers.get(sessionId)?.signal.aborted ? 'Interrupt' : 'Stop');
             }
@@ -2069,6 +2146,10 @@ export class RawAgentRuntime {
 
   /** Trace JSONL on disk; optional PG fan-out when `EVENT_BUFFER_PROVIDER=redis_postgres`. */
   private emitTrace(sessionId: string, rawEvent: Omit<TraceEvent, 'ts' | 'sessionId'>): void {
+    if (rawEvent.kind === 'startup_phase' && rawEvent.payload) {
+      const startup = startupPhaseFromRecord(rawEvent.payload);
+      if (startup) logStartupPhase(sessionId, startup);
+    }
     const event = attachServedByToTrace(sessionId, rawEvent);
     const write = appendTraceEvent(this.stateDir, sessionId, event, this.traceCloudOptions);
     const pending = this.pendingTraceWrites.get(sessionId) ?? new Set<Promise<void>>();

@@ -293,7 +293,17 @@ async function compactCanonicalBot(
   opts?: { force?: boolean }
 ): Promise<{ replaced?: { startSeq: number; endSeq: number } }> {
   const session = host.store.getSession(context.session.id) ?? context.session;
+  const foldStarted = Date.now();
   const folded = host.store.foldMessages(session.id);
+  void host.emitTrace(session.id, {
+    kind: 'startup_phase',
+    payload: {
+      phase: 'compact_fold',
+      durationMs: Date.now() - foldStarted,
+      messageCount: folded.length,
+      tier: 'bot'
+    }
+  });
   if (isToolWaveOpen(folded)) {
     void host.emitTrace(session.id, {
       kind: 'compact_skipped',

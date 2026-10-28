@@ -41,6 +41,7 @@ export interface PrepareTurnInputDeps {
     pack?: { query: string; viewMessages: SessionMessage[] }
   ) => string | Promise<string>;
   applyFoldBudget?: (session: SessionRecord, folded: SessionMessage[]) => SessionMessage[];
+  emitTrace?: (sessionId: string, event: { kind: string; payload: Record<string, unknown> }) => void;
 }
 
 export interface PreparedTurnInput {
@@ -90,6 +91,18 @@ function textPart(text: string): SessionMessage['parts'][number] {
   return { type: 'text', text };
 }
 
+function traceStartup(
+  deps: PrepareTurnInputDeps,
+  sessionId: string,
+  payload: Record<string, unknown>
+): void {
+  try {
+    void deps.emitTrace?.(sessionId, { kind: 'startup_phase', payload });
+  } catch {
+    /* tracing must not fail the turn */
+  }
+}
+
 export function applyClaimedInbox(
   store: PrepareTurnInputStore,
   sessionId: string,
@@ -105,32 +118,93 @@ export async function prepareTurnInput(
   sessionId: string,
   deps: PrepareTurnInputDeps
 ): Promise<PreparedTurnInput> {
+  const started = Date.now();
   const session = deps.store.getSession(sessionId);
   if (!session) {
     throw new Error(`Session ${sessionId} not found`);
   }
 
+  const compactStarted = Date.now();
   await deps.autoCompact(session);
+  traceStartup(deps, sessionId, {
+    phase: 'auto_compact',
+    scope: 'prepare',
+    durationMs: Date.now() - compactStarted
+  });
 
   const claimedInbox = deps.claimNextStep(sessionId);
   if (claimedInbox.length > 0) {
     applyClaimedInbox(deps.store, sessionId, claimedInbox);
   }
 
+  const foldStarted = Date.now();
   const raw = deps.store.foldMessages(sessionId);
+  const foldDurationMs = Date.now() - foldStarted;
+  const sealStarted = Date.now();
   sealSharedExposure(deps.store, sessionId, raw);
+  traceStartup(deps, sessionId, {
+    phase: 'seal_exposure',
+    scope: 'prepare',
+    durationMs: Date.now() - sealStarted,
+    messageCount: raw.length
+  });
+  const embedStarted = Date.now();
   const folded = embedReplyQuotes(raw.filter(message => sharedMessageVisible(deps.store, sessionId, message)), (messageId) => {
     const original = deps.store.readHistoryById?.(sessionId, messageId);
     return original && sharedMessageVisible(deps.store, sessionId, original) ? original : undefined;
   });
+  traceStartup(deps, sessionId, {
+    phase: 'embed_quotes',
+    scope: 'prepare',
+    durationMs: Date.now() - embedStarted,
+    messageCount: folded.length
+  });
+  const foldSeqs = folded.map((m) => m.seq).filter((s): s is number => typeof s === 'number');
+  const foldPayload: Record<string, unknown> = {
+    phase: 'fold_messages',
+    scope: 'prepare',
+    durationMs: foldDurationMs,
+    messageCount: folded.length
+  };
+  if (foldSeqs.length > 0) {
+    foldPayload.hiddenCount = Math.max(...foldSeqs) - Math.min(...foldSeqs) + 1 - folded.length;
+  }
+  traceStartup(deps, sessionId, foldPayload);
+  const budgetStarted = Date.now();
   const budgeted = deps.applyFoldBudget ? deps.applyFoldBudget(session, folded) : folded;
+  traceStartup(deps, sessionId, {
+    phase: 'fold_budget',
+    scope: 'prepare',
+    durationMs: Date.now() - budgetStarted,
+    messageCount: budgeted.length
+  });
+  const viewStarted = Date.now();
   const prepared = await deps.prepareView(session, budgeted);
+  traceStartup(deps, sessionId, {
+    phase: 'prepare_view',
+    scope: 'prepare',
+    durationMs: Date.now() - viewStarted,
+    messageCount: prepared.length
+  });
   const query = lastUserQueryFromMessages(prepared);
+  const appendixStarted = Date.now();
   const appendix = await Promise.resolve(
     deps.buildAppendix(session, { query, viewMessages: prepared })
   );
+  traceStartup(deps, sessionId, {
+    phase: 'memory_appendix',
+    scope: 'prepare',
+    durationMs: Date.now() - appendixStarted,
+    messageCount: prepared.length
+  });
   const messages = applyMemoryAppendixToMessages(prepared, appendix);
-  const foldSeqs = folded.map((m) => m.seq).filter((s): s is number => typeof s === 'number');
+
+  traceStartup(deps, sessionId, {
+    phase: 'prepare_turn',
+    scope: 'prepare',
+    durationMs: Date.now() - started,
+    messageCount: messages.length
+  });
 
   return {
     session: deps.store.getSession(sessionId) ?? session,

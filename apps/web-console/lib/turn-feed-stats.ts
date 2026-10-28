@@ -6,6 +6,7 @@
 
 import {
   formatChatFeedStatsLine,
+  formatElapsedMs,
   hasRealUsageTotals,
   parseTimeMs,
   parseUsageTotals,
@@ -42,6 +43,15 @@ export type TurnFeedStat = {
   endedAtMs?: number;
   /** Last turn of a session that has finished. Its endedAtMs is when the session ended. */
   sessionEnded?: boolean;
+  /** Pre-model startup for this user turn. Durations only; no message text. */
+  startup?: StartupTiming;
+};
+
+export type StartupTiming = {
+  totalMs?: number;
+  slowest: string;
+  slowestMs: number;
+  phases: Array<{ phase: string; durationMs: number }>;
 };
 
 function isUserRole(role: unknown): boolean {
@@ -177,9 +187,186 @@ function latestReplyMs(messages: TurnFeedStatMessage[], slice: ConversationTurnS
   return end;
 }
 
+const PHASE_LABELS: Record<'zh' | 'en', Record<string, string>> = {
+  zh: {
+    writer_claim: '写入占用',
+    ensure_mcp: 'MCP 加载',
+    resolve_file_policy: '文件策略',
+    ingest_mailbox: '邮箱',
+    auto_claim_task: '领取任务',
+    claim_next_run: '领取下轮',
+    ensure_workspace: '工作区',
+    resolve_workspace: '工作区路径',
+    pack_turn: '打包消息',
+    build_system_prompt: '系统提示词',
+    before_turn_hook: '开轮钩子',
+    pick_turn_tools: '工具选择',
+    before_model: '模型前检查',
+    session_start_hook: '会话开始钩子',
+    fit_model_request: '请求适配',
+    auto_compact: '自动压缩',
+    fold_messages: '折叠消息',
+    fold_budget: '折叠预算',
+    prepare_view: '准备视图',
+    memory_appendix: '记忆附录',
+    prepare_turn: '打包总耗时',
+    seal_exposure: '共享曝光',
+    embed_quotes: '引用嵌入',
+    compact_fold: '压缩折叠',
+    skill_catalog: '技能目录',
+    skill_route: '技能路由',
+    stable_prefix: '稳定前缀',
+    dynamic_context: '动态上下文',
+    system_prompt: '系统提示词合计',
+    mcp_expand: 'MCP 展开',
+    mcp_http_connect: 'MCP 连接',
+    mcp_http_list: 'MCP 工具列表',
+    mcp_stdio: 'MCP 本地进程',
+    expire_bot_work: '过期工作',
+    prepare_room: '房间准备',
+    goal_intake: '目标接入',
+    bind_goal: '绑定目标',
+    assemble_loop: '组装循环',
+    computer_use_begin: '计算机使用',
+    admit: '准入'
+  },
+  en: {
+    writer_claim: 'Writer claim',
+    ensure_mcp: 'MCP load',
+    resolve_file_policy: 'File policy',
+    ingest_mailbox: 'Mailbox',
+    auto_claim_task: 'Claim task',
+    claim_next_run: 'Claim next run',
+    ensure_workspace: 'Workspace',
+    resolve_workspace: 'Workspace path',
+    pack_turn: 'Pack messages',
+    build_system_prompt: 'System prompt',
+    before_turn_hook: 'Before-turn hook',
+    pick_turn_tools: 'Tool selection',
+    before_model: 'Pre-model check',
+    session_start_hook: 'Session-start hook',
+    fit_model_request: 'Request fit',
+    auto_compact: 'Auto compact',
+    fold_messages: 'Fold messages',
+    fold_budget: 'Fold budget',
+    prepare_view: 'Prepare view',
+    memory_appendix: 'Memory appendix',
+    prepare_turn: 'Pack total',
+    seal_exposure: 'Shared exposure',
+    embed_quotes: 'Embed quotes',
+    compact_fold: 'Compact fold',
+    skill_catalog: 'Skill catalog',
+    skill_route: 'Skill routing',
+    stable_prefix: 'Stable prefix',
+    dynamic_context: 'Dynamic context',
+    system_prompt: 'System prompt total',
+    mcp_expand: 'MCP expansion',
+    mcp_http_connect: 'MCP connect',
+    mcp_http_list: 'MCP tool list',
+    mcp_stdio: 'MCP local process',
+    expire_bot_work: 'Expire work',
+    prepare_room: 'Room prep',
+    goal_intake: 'Goal intake',
+    bind_goal: 'Bind goal',
+    assemble_loop: 'Assemble loop',
+    computer_use_begin: 'Computer use',
+    admit: 'Admission'
+  }
+};
+
+function startupLang(locale?: string): 'zh' | 'en' {
+  return locale?.toLowerCase().startsWith('en') ? 'en' : 'zh';
+}
+
+function formatStartupMs(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) return '—';
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  if (ms < 10_000) {
+    const sec = ms / 1000;
+    return `${sec.toFixed(1).replace(/\.0$/, '')}s`;
+  }
+  if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
+  return formatElapsedMs(ms);
+}
+
+function phaseLabel(phase: string, locale?: string): string {
+  return PHASE_LABELS[startupLang(locale)][phase] ?? phase;
+}
+
+function readTracePayload(event: TurnFeedTraceEvent): Record<string, unknown> | undefined {
+  const payload = event.payload;
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return undefined;
+  return payload as Record<string, unknown>;
+}
+
+function startupInWindow(
+  events: TurnFeedTraceEvent[],
+  startMs: number | undefined,
+  endMsExclusive: number | undefined
+): StartupTiming | undefined {
+  if (startMs == null) return undefined;
+  const phases = new Map<string, number>();
+  let totalMs: number | undefined;
+  let namedSlowest: string | undefined;
+  let namedSlowestMs = -1;
+  for (const event of events) {
+    if (event.kind !== 'startup_phase') continue;
+    const ts = parseTimeMs(event.ts);
+    if (ts == null || ts < startMs) continue;
+    if (endMsExclusive != null && ts >= endMsExclusive) continue;
+    const payload = readTracePayload(event);
+    if (!payload || typeof payload.phase !== 'string' || !/^[a-z0-9_]+$/.test(payload.phase)) continue;
+    if (payload.phase === 'ready') {
+      if (typeof payload.durationMs === 'number' && Number.isFinite(payload.durationMs)) totalMs = payload.durationMs;
+      if (typeof payload.slowest === 'string' && /^[a-z0-9_]+$/.test(payload.slowest)) namedSlowest = payload.slowest;
+      if (typeof payload.slowestMs === 'number' && Number.isFinite(payload.slowestMs)) namedSlowestMs = payload.slowestMs;
+      const map = payload.phases;
+      if (map && typeof map === 'object' && !Array.isArray(map)) {
+        for (const [name, ms] of Object.entries(map)) {
+          if (/^[a-z0-9_]+$/.test(name) && typeof ms === 'number' && Number.isFinite(ms) && ms > 0) phases.set(name, ms);
+        }
+      }
+      continue;
+    }
+    if (typeof payload.durationMs === 'number' && Number.isFinite(payload.durationMs) && payload.durationMs > 0) {
+      phases.set(payload.phase, payload.durationMs);
+    }
+  }
+  let slowest = namedSlowest;
+  let slowestMs = namedSlowestMs;
+  for (const [name, ms] of phases) {
+    if (!slowest || ms > slowestMs) {
+      slowest = name;
+      slowestMs = ms;
+    }
+  }
+  if (!slowest || slowestMs < 0) return undefined;
+  if (slowestMs <= 0 && (totalMs ?? 0) <= 0) return undefined;
+  const listed = [...phases.entries()]
+    .filter(([name, ms]) => name !== 'ready' && ms > 0)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 6)
+    .map(([phase, durationMs]) => ({ phase, durationMs }));
+  return { ...(typeof totalMs === 'number' ? { totalMs } : {}), slowest, slowestMs, phases: listed };
+}
+
+export function formatStartupClause(timing: StartupTiming, locale?: string, labels?: { startup?: string; slowest?: string }): string {
+  const startup = labels?.startup ?? (startupLang(locale) === 'en' ? 'Startup' : '启动');
+  const slowestLabel = labels?.slowest ?? (startupLang(locale) === 'en' ? 'Slowest' : '最慢');
+  const parts = [
+    typeof timing.totalMs === 'number' ? `${startup} ${formatStartupMs(timing.totalMs)}` : startup,
+    `${slowestLabel} ${phaseLabel(timing.slowest, locale)} ${formatStartupMs(timing.slowestMs)}`
+  ];
+  for (const phase of timing.phases) {
+    if (phase.phase === timing.slowest) continue;
+    parts.push(`${phaseLabel(phase.phase, locale)} ${formatStartupMs(phase.durationMs)}`);
+  }
+  return parts.join(' · ');
+}
+
 /**
  * Build one stats object per conversation turn. Returns null entries when that
- * turn has neither elapsed, real usage/cost, nor an end time.
+ * turn has neither elapsed, real usage/cost, an end time, nor startup timing.
  */
 export function buildTurnFeedStats(input: {
   messages: TurnFeedStatMessage[];
@@ -253,11 +440,15 @@ export function buildTurnFeedStats(input: {
       }
     }
 
+    const startup = startupInWindow(input.traces ?? [], bounds.startMs, bounds.endMsExclusive);
+    if (startup) stat.startup = startup;
+
     const hasAnything =
       stat.elapsedMs != null ||
       hasRealUsageTotals(stat.usageTotals) ||
       (typeof stat.usageCostUsd === 'number' && stat.usageCostUsd > 0) ||
-      stat.endedAtMs != null;
+      stat.endedAtMs != null ||
+      stat.startup != null;
     out.push(hasAnything ? stat : null);
   }
 
@@ -266,11 +457,11 @@ export function buildTurnFeedStats(input: {
 
 export function formatTurnFeedStatsLine(
   stat: TurnFeedStat | null | undefined,
-  labels?: ChatFeedStatsLabels,
+  labels?: ChatFeedStatsLabels & { startup?: string; slowest?: string },
   locale?: string
 ): string | null {
   if (!stat) return null;
-  return formatChatFeedStatsLine({
+  const base = formatChatFeedStatsLine({
     elapsedMs: stat.elapsedMs,
     usageTotals: stat.usageTotals,
     usageCostUsd: stat.usageCostUsd,
@@ -279,4 +470,6 @@ export function formatTurnFeedStatsLine(
     labels,
     locale
   });
+  const startup = stat.startup ? formatStartupClause(stat.startup, locale, labels) : null;
+  return [base, startup].filter(Boolean).join(' · ') || null;
 }

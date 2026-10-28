@@ -66,6 +66,7 @@ import { promoteAssistantReasoning } from '../model/promote-reasoning.js';
 import { defaultPrepareView } from './default-view.js';
 import type { KernelHookListener, KernelHookRegistry } from './hooks.js';
 import { prepareTurnInput } from './prepare-turn-input.js';
+import { createKernelStartupTrace, emitKernelReady, timeKernelPhase, timeOptionalKernelPhase, type KernelStartupTrace } from './startup-phase.js';
 import {
   drainSteerAtToolLaunch,
   resolveSteerDrainPolicy,
@@ -305,8 +306,18 @@ async function runSessionKernelWithWriterScope(
   host.sessionAbortControllers?.set(sessionId, controller);
   const sid = session.id;
   const writerRunId = createId('run');
-  try { host.store.claimWriter(sessionId, writerRunId); }
-  catch (error) {
+  const emitTrace: TurnKernelHost['emitTrace'] = (id, event) => {
+    try { host.emitTrace(id, event); }
+    catch { /* tracing must not fail the turn */ }
+  };
+  const tracedHost: TurnKernelHost = { ...host, emitTrace };
+  const startup = createKernelStartupTrace(sid, emitTrace);
+  try {
+    await timeKernelPhase(startup, 'writer_claim', () => {
+      host.store.claimWriter(sessionId, writerRunId);
+    });
+  } catch (error) {
+    emitKernelReady(startup);
     if (!existingController && host.sessionAbortControllers?.get(sessionId) === controller) host.sessionAbortControllers.delete(sessionId);
     throw error;
   }
@@ -315,7 +326,10 @@ async function runSessionKernelWithWriterScope(
       // Admission may follow another executor completing or replacing this pause.
       // Recompute from persisted state while writes are bound to our new claim.
       const admittedSession = host.store.getSession(sid);
-      if (!admittedSession) throw new NotFoundError(`Session not found: ${sid}`);
+      if (!admittedSession) {
+        emitKernelReady(startup);
+        throw new NotFoundError(`Session not found: ${sid}`);
+      }
       const decision = decideInterruptResume({
         session: admittedSession,
         pendingApprovalIds: host.store.listApprovals({ status: 'pending' }).filter(a => a.sessionId === sid).map(a => a.id)
@@ -323,13 +337,20 @@ async function runSessionKernelWithWriterScope(
       if (decision.action === 'yield_waiting') {
         const parked = sessionParkedForApproval(host.store, admittedSession);
         await options?.latch?.emit({ type: 'waiting_approval', approvalIds: decision.interrupt.approvalIds });
+        emitKernelReady(startup);
         return parked;
       }
-      if (resumeDecision.action !== 'none' && decision.action === 'none') return admittedSession;
+      if (resumeDecision.action !== 'none' && decision.action === 'none') {
+        emitKernelReady(startup);
+        return admittedSession;
+      }
       const agent = host.store.getAgent(admittedSession.agentId);
-      if (!agent) throw new NotFoundError(`Agent not found: ${admittedSession.agentId}`);
+      if (!agent) {
+        emitKernelReady(startup);
+        throw new NotFoundError(`Agent not found: ${admittedSession.agentId}`);
+      }
       const resumeFromInterrupt = decision.action === 'resume_tools' ? decision.interrupt : undefined;
-      return await runSessionKernel(host, sessionId, { session: admittedSession, agent, controller, writerRunId, resumeFromInterrupt }, options);
+      return await runSessionKernel(tracedHost, sessionId, { session: admittedSession, agent, controller, writerRunId, resumeFromInterrupt }, options, startup);
     }
     finally {
       if (host.sessionAbortControllers?.get(sid) === controller) host.sessionAbortControllers.delete(sid);
@@ -343,7 +364,8 @@ async function runSessionKernel(
   host: TurnKernelHost,
   sessionId: string,
   execution: KernelExecution,
-  options?: TurnKernelOptions
+  options: TurnKernelOptions | undefined,
+  startup: KernelStartupTrace
 ): Promise<SessionRecord> {
   let { session, resumeFromInterrupt } = execution;
   const { agent, controller, writerRunId } = execution;
@@ -423,6 +445,7 @@ async function runSessionKernel(
   };
 
   const finishFailed = async (record: SessionRecord, reason: string) => {
+    emitKernelReady(startup);
     const rewind = await rewindUncommitted(reason);
     await endRunTx(reason);
     const current = host.store.getSession(sid) ?? record;
@@ -439,6 +462,7 @@ async function runSessionKernel(
   };
 
   const finishEnded = async (record: SessionRecord, reason: string) => {
+    emitKernelReady(startup);
     await endRunTx(reason);
     const { record: next, outcome } = persistOutcome(record, reason);
     void host.emitTrace(next.id, {
@@ -592,6 +616,7 @@ async function runSessionKernel(
         skipMemory || !host.readWorkingLogAppendix
           ? undefined
           : (id) => host.readWorkingLogAppendix!(id),
+      emitTrace: (id, event) => host.emitTrace?.(id, event),
     });
   };
 
@@ -631,7 +656,11 @@ async function runSessionKernel(
   };
 
   const runModelTurn: TurnKernelHost['runTurnWithRetries'] = async (turnInput, onStream) => {
-    const fitted = host.fitModelRequest ? await host.fitModelRequest(turnInput) : turnInput;
+    const fitted = host.fitModelRequest
+      ? await timeKernelPhase(startup, 'fit_model_request', () => host.fitModelRequest!(turnInput))
+      : turnInput;
+    if (!host.fitModelRequest) await timeOptionalKernelPhase(startup, 'fit_model_request', undefined);
+    emitKernelReady(startup);
     return host.runTurnWithRetries(fitted, onStream);
   };
 
@@ -647,12 +676,14 @@ async function runSessionKernel(
   };
 
   try {
-    await host.ensureMcpLoaded?.(sid);
-    const filePolicy = await host.resolveFilePolicy?.();
+    await timeOptionalKernelPhase(startup, 'ensure_mcp', host.ensureMcpLoaded ? () => host.ensureMcpLoaded!(sid) : undefined);
+    const filePolicy = await timeOptionalKernelPhase(startup, 'resolve_file_policy', host.resolveFilePolicy ? () => host.resolveFilePolicy!() : undefined);
     session = host.store.updateSession(session.id, { status: 'running' });
-    await host.ingestMailbox?.(session);
-    await host.autoClaimTask?.(session);
-    claimAndApplyInbox(host.store, sid, 'next-run', { expectedWriterRunId: writerRunId });
+    await timeOptionalKernelPhase(startup, 'ingest_mailbox', host.ingestMailbox ? () => host.ingestMailbox!(session) : undefined);
+    await timeOptionalKernelPhase(startup, 'auto_claim_task', host.autoClaimTask ? () => host.autoClaimTask!(session) : undefined);
+    await timeKernelPhase(startup, 'claim_next_run', () => {
+      claimAndApplyInbox(host.store, sid, 'next-run', { expectedWriterRunId: writerRunId });
+    });
 
     for (let turn = 0; turn < maxTurns; turn += 1) {
       if (signal.aborted) {
@@ -665,10 +696,17 @@ async function runSessionKernel(
       const task =
         host.resolveTask?.(refreshedSession) ??
         (refreshedSession.taskId ? host.store.getTask?.(refreshedSession.taskId) : undefined);
-      const workspaceRoot = await host.ensureWorkspaceRoot?.(refreshedSession, task);
-      const workspaceRoots =
-        (await host.resolveWorkspaceRoots?.(refreshedSession)) ??
-        defaultWorkspaceRoots(workspaceRoot, host.repoRoot);
+      const workspaceRoot = await timeOptionalKernelPhase(
+        startup,
+        'ensure_workspace',
+        host.ensureWorkspaceRoot ? () => host.ensureWorkspaceRoot!(refreshedSession, task) : undefined
+      );
+      const resolvedRoots = await timeOptionalKernelPhase(
+        startup,
+        'resolve_workspace',
+        host.resolveWorkspaceRoots ? () => host.resolveWorkspaceRoots!(refreshedSession) : undefined
+      );
+      const workspaceRoots = resolvedRoots ?? defaultWorkspaceRoots(workspaceRoot, host.repoRoot);
 
       let context: RunContext = {
         repoRoot: host.repoRoot,
@@ -708,7 +746,10 @@ async function runSessionKernel(
             emitStep,
             onModelStreamChunk: options?.onModelStreamChunk,
           });
-          if (parked) return parked;
+          if (parked) {
+            emitKernelReady(startup);
+            return parked;
+          }
         }
 
         const afterResume = host.store.getSession(sid);
@@ -723,7 +764,7 @@ async function runSessionKernel(
         appendMessage: (role, parts) => host.store.appendMessage(sid, role, parts),
       });
 
-      const packed = await packTurn({ workspaceRoot });
+      const packed = await timeKernelPhase(startup, 'pack_turn', () => packTurn({ workspaceRoot }));
       context = { ...context, session: packed.session };
       const visibleMessages = packed.messages;
       const rawVisible = packed.viewMessages;
@@ -748,19 +789,28 @@ async function runSessionKernel(
         host.store.appendMessage(sid, 'system', [textPart(drainedAdvisory)]);
       }
 
-      const systemPrompt = await host.promptBuilder.buildSystemPrompt(promptCtx, rawVisible);
+      const systemPrompt = await timeKernelPhase(startup, 'build_system_prompt', () =>
+        host.promptBuilder.buildSystemPrompt(promptCtx, rawVisible)
+      );
 
       // ── session_start hook (turn 0 only) ────────────────────────────────
       if (turn === 0) {
-        const startHook = await host.runLifecycleHook?.({
-          phase: 'session_start',
-          sessionId: sid,
-          agentId: agent.id,
-          turn: 0,
-        });
+        const startHook = await timeOptionalKernelPhase(
+          startup,
+          'session_start_hook',
+          host.runLifecycleHook
+            ? () => host.runLifecycleHook!({
+                phase: 'session_start',
+                sessionId: sid,
+                agentId: agent.id,
+                turn: 0,
+              })
+            : undefined
+        );
         if (startHook?.block) {
           const msg = startHook.message ?? startHook.systemMessage ?? 'blocked by session_start hook';
           host.store.appendMessage(sid, 'system', [textPart(msg)]);
+          emitKernelReady(startup);
           return await finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'session_start_blocked');
         }
         if (startHook?.systemMessage) {
@@ -769,12 +819,18 @@ async function runSessionKernel(
       }
 
       // ── before_turn hook (every turn) ───────────────────────────────────
-      const beforeHook = await host.runLifecycleHook?.({
-        phase: 'before_turn',
-        sessionId: sid,
-        agentId: agent.id,
-        turn,
-      });
+      const beforeHook = await timeOptionalKernelPhase(
+        startup,
+        'before_turn_hook',
+        host.runLifecycleHook
+          ? () => host.runLifecycleHook!({
+              phase: 'before_turn',
+              sessionId: sid,
+              agentId: agent.id,
+              turn,
+            })
+          : undefined
+      );
       if (beforeHook?.block) {
         const msg = beforeHook.message ?? beforeHook.systemMessage ?? 'blocked by before_turn hook';
         host.store.appendMessage(sid, 'system', [textPart(msg)]);
@@ -785,12 +841,12 @@ async function runSessionKernel(
       }
 
       const lastTurn = isLastAnswerTurn(turn, maxTurns, loopConfig.forceAnswerOnLastTurn);
-      const picked = await pickTurnTools(
+      const picked = await timeKernelPhase(startup, 'pick_turn_tools', () => pickTurnTools(
         context.session,
         visibleMessages,
         systemPrompt.length,
         lastTurn
-      );
+      ));
       const allowExternalAiTools = picked.allowExternalAiTools;
       const resolvedTools = picked.resolvedTools;
       const turnTools = picked.turnTools;
@@ -822,11 +878,18 @@ async function runSessionKernel(
         ...(promptCacheKey ? { promptCacheKey } : {}),
       };
 
-      const preTurn = await host.beforeModelTurn?.({
-        session: context.session,
-        messages: visibleMessages,
-        hasPendingToolCalls: false,
-      });
+      const preTurn = await timeOptionalKernelPhase(
+        startup,
+        'before_model',
+        host.beforeModelTurn
+          ? () => host.beforeModelTurn!({
+              session: context.session,
+              messages: visibleMessages,
+              hasPendingToolCalls: false,
+            })
+          : undefined
+      );
+      if (preTurn === 'skip_goal_done') emitKernelReady(startup);
       if (preTurn === 'skip_goal_done') {
         host.store.appendMessage(sid, 'system', [
           textPart('[jev-pre-turn] Goal assumed met; skipping deep model turn.'),
@@ -1220,8 +1283,19 @@ async function runSessionKernel(
 
       // Repetition guard (assistant output)
       let pendingRecoveryAdvisory: string | undefined;
-      const rep = loopGuard?.checkAssistantRepetition(turnResult.assistantParts) ?? { abort: false as const };
-      const graceOut = advisoryGrace.apply(rep);
+      const rawRep = loopGuard?.checkAssistantRepetition(turnResult.assistantParts) ?? { abort: false as const };
+      const repSession = host.store.getSession(sid) ?? session;
+      const repAdapter = adapterOf(repSession);
+      const rep = applyRepeatGuard({
+        store: host.store,
+        identity: modelIdentity({
+          modelName: repAdapter.modelName,
+          adapterName: repAdapter.name,
+          metadata: repSession.metadata,
+        }),
+        decision: rawRep,
+      });
+      const graceOut = advisoryGrace.apply(rep.abort ? { abort: true, reason: rep.reason } : { abort: false });
       if (graceOut.action === 'advise' || graceOut.action === 'abort') {
         const guardChoice = await maybeChooseRecovery(
           `loop_guard_repetition:${graceOut.reason}`,
@@ -1506,7 +1580,7 @@ async function runSessionKernel(
       }
 
       const progressDecision = progressGuard.afterToolRound(
-        toolCalls,
+        executable,
         results
       );
       // Risk and recovery consume the same result-aware stagnation counter.
@@ -1606,6 +1680,7 @@ async function runSessionKernel(
       'max_turns'
     );
   } catch (err) {
+    emitKernelReady(startup);
     if (host.store.isWriterCurrent && !host.store.isWriterCurrent(sid, writerRunId)) {
       host.emitTrace(sid, { kind: 'stale_writer_rejected', payload: { writerRunId } });
       return host.store.getSession(sid) ?? session;
@@ -1625,6 +1700,7 @@ async function runSessionKernel(
         rewind
       );
     }
+    emitKernelReady(startup);
     throw err;
   }
 }
