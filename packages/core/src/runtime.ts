@@ -1,5 +1,6 @@
 import { mergeDomainBundles, type DomainBundle } from './domain.js';
 import { registerDomainCatalog, domainCatalog, readRuntimeCapabilities, runtimeCapabilityCheck, guardRuntimeCapability } from './config/runtime-capabilities.js';
+import { ExternalAgentConnections } from './external-agents/connections.js';
 import { invalidateSteerToolDecision, steerRunningTools } from './runtime/steer-tools.js';
 import { createGoalFactoryDevelopmentTool, createGoalSelfHealTool, specialtyStatus, cancelSpecialty } from './bots/goals/specialty-services.js';
 import { FactoryService } from './factory/service.js';
@@ -341,6 +342,7 @@ export class RawAgentRuntime {
   readonly skillManagement: SkillManagementService;
   tools: ToolContract<any>[];
   readonly connectors: ConnectorRegistry;
+  readonly externalAgents: ExternalAgentConnections;
   readonly rooms: BotRoomService;
   private libraryIndex?: LibraryIndexWatcher;
   readonly factory: FactoryService;
@@ -543,6 +545,7 @@ export class RawAgentRuntime {
       },
       getCatalog: () => catalog
     });
+    this.externalAgents = new ExternalAgentConnections(this.store, (id, principal) => { this.openBot(id, principal); }, this.secretVault);
     const messageAgentTool = createMessageAgentTool({
       store: this.store,
       runSession: (sessionId) => this.runSession(sessionId),
@@ -553,6 +556,7 @@ export class RawAgentRuntime {
       ...baseTools.filter(tool => tool.name !== 'history_search' && tool.name !== 'history_read'),
       ...optionalExtras,
       messageAgentTool,
+      ...this.externalAgents.tools(),
       ...createHistoryTools(this.store),
       ...createRoomRetrievalTools(this.store).map(tool => withRoomRetrievalTouch(this.store, tool)),
       createSubagentHelpTool(this.store),

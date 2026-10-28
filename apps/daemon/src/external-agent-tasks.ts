@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
-import { AppError, AuthorizationError, NotFoundError, ValidationError, type RawAgentRuntime, type TaskRecord } from '@ppeng/agent-core';
+import { AppError, AuthorizationError, NotFoundError, ValidationError, botWorkControl, resolveBotPrincipal, type RawAgentRuntime, type TaskRecord } from '@ppeng/agent-core';
 import { objectBody, requiredText, type ExternalAgentClient } from './external-agent-settings.js';
 
-interface HandoffIdentity { clientId: string; source: string; sourceTaskId: string }
+interface HandoffIdentity { clientId: string; source: string; sourceTaskId: string; botId?: string }
 
 function identity(task: TaskRecord): HandoffIdentity | undefined {
   return task.metadata.externalAgent as HandoffIdentity | undefined;
@@ -25,6 +25,7 @@ function waitingForInput(status: string, pending: unknown): boolean {
 export function externalTaskView(runtime: RawAgentRuntime, client: ExternalAgentClient, id: string) {
   const task = runtime.getTask(id);
   if (!task || identity(task)?.clientId !== client.id) throw new NotFoundError('Task');
+  if (identity(task)?.botId && !client.allowedBotIds?.includes(identity(task)!.botId!)) throw new NotFoundError('Task');
   const session = task.sessionId ? runtime.getSession(task.sessionId) : undefined;
   const outcome = session?.metadata.outcome as { kind?: string; reason?: string } | undefined;
   const pendingInput = session?.metadata.askUserPending;
@@ -39,7 +40,7 @@ export function externalTaskView(runtime: RawAgentRuntime, client: ExternalAgent
   const reason = taskStateReason(status, outcome);
   return {
     id: task.id, title: task.title, agentId: task.ownerAgentId,
-    source: identity(task)!.source, sourceTaskId: identity(task)!.sourceTaskId,
+    botId: identity(task)!.botId, source: identity(task)!.source, sourceTaskId: identity(task)!.sourceTaskId,
     status, reason, result: session ? runtime.getLatestAssistantText(session.id) ?? null : null,
     progress: session?.todo ?? [], artifacts: task.artifacts,
     createdAt: task.createdAt, updatedAt: session && session.updatedAt > task.updatedAt ? session.updatedAt : task.updatedAt
@@ -52,8 +53,24 @@ export function submitExternalTask(runtime: RawAgentRuntime, client: ExternalAge
   const sourceTaskId = requiredText(body.sourceTaskId, 'sourceTaskId', 256);
   const goal = requiredText(body.goal, 'goal', 32000);
   const context = body.context === undefined ? '' : requiredText(body.context, 'context', 64000);
-  const agentId = body.agentId === undefined ? client.defaultAgentId : requiredText(body.agentId, 'agentId', 160);
-  if (!client.allowedAgentIds.includes(agentId)) throw new AuthorizationError('Executor is not allowed for this client');
+  const botId = body.botId === undefined ? undefined : requiredText(body.botId, 'botId', 160);
+  if (botId && body.agentId !== undefined) throw new ValidationError('Choose botId or agentId');
+  if (botId && !client.allowedBotIds?.includes(botId)) throw new AuthorizationError('Bot is not allowed for this client');
+  let botMetadata: Record<string, unknown> = {};
+  if (botId) {
+    const opened = runtime.openBot(botId, { userId: typeof client.ownerMetadata.userId === 'string' ? client.ownerMetadata.userId : undefined, tenantId: typeof client.ownerMetadata.tenantId === 'string' ? client.ownerMetadata.tenantId : undefined });
+    const saved = runtime.getSession(opened.sessionId)!.metadata;
+    // Copy execution policy only. Canonical chat flags, history, secret refs, wake state and outcomes are private.
+    for (const field of ['userId', 'tenantId', 'permissionMode', 'allowedTools', 'allowedSkills', 'maxTurns', 'modelOverride', 'workspaceBinding', 'workspaceBindingBound', 'workspaceId', 'persona', 'enabledOptionalToolGroups']) {
+      if (saved[field] !== undefined) botMetadata[field] = saved[field];
+    }
+    const control = botWorkControl(runtime.store, resolveBotPrincipal(runtime.store, {userId: typeof saved.userId === 'string' ? saved.userId : undefined, tenantId: typeof saved.tenantId === 'string' ? saved.tenantId : undefined}), botId);
+    if (control.paused || control.disabled) throw new AuthorizationError('Bot is paused or disabled');
+    botMetadata.botId = botId;
+  }
+  const agentId = botId ?? (body.agentId === undefined ? client.defaultAgentId : requiredText(body.agentId, 'agentId', 160));
+  if (!botId && !client.allowedAgentIds.includes(agentId)) throw new AuthorizationError('Executor is not allowed for this client');
+  if (!botId && runtime.store.getBot(agentId)) throw new AuthorizationError('Use an explicit authorized botId for Bot tasks');
   if (!runtime.store.getAgent(agentId)) throw new ValidationError('Executor is no longer available');
   const title = body.title === undefined ? goal.slice(0, 160) : requiredText(body.title, 'title', 160);
   const key = 'external_agent_task:' + createHash('sha256').update(JSON.stringify([client.id, source, sourceTaskId])).digest('hex');
@@ -69,8 +86,8 @@ export function submitExternalTask(runtime: RawAgentRuntime, client: ExternalAge
       store.db.exec('COMMIT');
       return { task: externalTaskView(runtime, client, existing.taskId), duplicate: true };
     }
-    const externalAgent = { clientId: client.id, source, sourceTaskId };
-    const metadata = { ...client.ownerMetadata, externalAgent };
+    const externalAgent = { clientId: client.id, source, sourceTaskId, ...(botId ? {botId} : {}) };
+    const metadata = { ...client.ownerMetadata, ...botMetadata, externalAgent, approvalWake: {kind: 'unattended', source: 'external-agent'} };
     const created = runtime.createTaskSession({ title, description: goal, agentId, background: true,
       message: context ? `${goal}\n\nContext supplied by the delegating Agent:\n${context}` : goal, metadata });
     taskId = created.task.id;
@@ -86,7 +103,7 @@ export function submitExternalTask(runtime: RawAgentRuntime, client: ExternalAge
   // A broken client connection cannot cancel accepted work. The existing scheduler
   // also sees persisted background task sessions after a daemon restart.
   setImmediate(() => {
-    if (!store.db.isOpen) return;
+    if (!store.db.isOpen || runtime.getTask(taskId)?.status === 'cancelled') return;
     void runtime.runSession(sessionId).catch(() => {
       if (!store.db.isOpen) return;
       const current = runtime.getSession(sessionId);
@@ -97,4 +114,39 @@ export function submitExternalTask(runtime: RawAgentRuntime, client: ExternalAge
     });
   });
   return { task, duplicate: false };
+}
+
+/** Scoped continuation supplies data only; it cannot grant a pending tool approval. */
+export function externalTaskAction(runtime: RawAgentRuntime, client: ExternalAgentClient, id: string, action: 'cancel' | 'input', input: unknown) {
+  const current = externalTaskView(runtime, client, id);
+  const task = runtime.getTask(id)!;
+  if (!task.sessionId) throw new ValidationError('Task execution unavailable');
+  if (action === 'cancel') {
+    if (!['completed','failed','cancelled'].includes(current.status)) {
+      runtime.cancelSession(task.sessionId);
+      runtime.store.updateTask(id, {status: 'cancelled'});
+    }
+    return externalTaskView(runtime, client, id);
+  }
+  const body = objectBody(input);
+  const message = requiredText(body.message, 'message', 32000);
+  const inputId = requiredText(body.inputId, 'inputId', 256);
+  const key = 'external_agent_input:' + createHash('sha256').update(JSON.stringify([client.id, id, inputId])).digest('hex');
+  runtime.store.db.exec('BEGIN IMMEDIATE');
+  try {
+    const previous = runtime.store.getDaemonControl<{message: string}>(key);
+    if (previous) {
+      if (previous.message !== message) throw new ValidationError('inputId already used with different input');
+      runtime.store.db.exec('COMMIT');
+      return externalTaskView(runtime, client, id);
+    }
+    if (current.status !== 'waiting_input') throw new ValidationError('Task is not waiting for input');
+    const session = runtime.getSession(task.sessionId)!;
+    runtime.store.appendMessage(session.id, 'user', [{type: 'text', text: message}]);
+    runtime.mergeSessionMetadata(session.id, {askUserReply: message, askUserPending: false, approvalWake: {kind:'unattended',source:'external-agent'}});
+    runtime.store.setDaemonControl(key, {message});
+    runtime.store.db.exec('COMMIT');
+  } catch (error) {runtime.store.db.exec('ROLLBACK'); throw error;}
+  setImmediate(() => { if (runtime.store.db.isOpen && runtime.getTask(id)?.status !== 'cancelled') void runtime.runSession(task.sessionId!).catch(() => {}); });
+  return externalTaskView(runtime, client, id);
 }
