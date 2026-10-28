@@ -6,6 +6,7 @@
  * content (fenced external markdown, PR body markers, etc.).
  */
 
+import { realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 export type HighPrivilegeTool =
@@ -69,6 +70,24 @@ function isInsideRoot(candidate: string, root: string): boolean {
   return a === b || a.startsWith(b.endsWith('/') ? b : `${b}/`);
 }
 
+function lexicalOrReal(path: string): string {
+  try {
+    return realpathSync(path);
+  } catch {
+    return path;
+  }
+}
+
+function pathInsideRoots(abs: string, roots: string[]): boolean {
+  const real = lexicalOrReal(abs);
+  return roots.filter(Boolean).some((root) => isInsideRoot(real, lexicalOrReal(resolve(root))));
+}
+
+function symlinkCwdDecision(abs: string, roots: string[]): { dangerous: boolean; reason?: string } {
+  if (pathInsideRoots(abs, roots)) return { dangerous: false };
+  return { dangerous: true, reason: 'cwd symlink leaves workspace' };
+}
+
 /** Dangerous when cwd is missing, outside workspace, or flagged untrusted. */
 export function isDangerousCwd(
   cwd: string | undefined,
@@ -102,7 +121,7 @@ export function isDangerousCwd(
   if (inTmp && !roots.some((r) => abs === resolve(r) || abs.startsWith(resolve(r) + '/'))) {
     return { dangerous: true, reason: 'cwd in shared temp without workspace trust' };
   }
-  return { dangerous: false };
+  return symlinkCwdDecision(abs, roots);
 }
 
 export function detectUntrustedInduction(text: string | undefined): { induced: boolean; marker?: string } {
@@ -122,21 +141,21 @@ export function isHighPrivilegeTool(tool: string): boolean {
 
 const EVAL_ESCAPE =
   /(?:^|[\s;&|`(])(?:eval\s|node(?:\s+--eval|\s+-e\b)|python3?\s+-c\b|perl\s+-e\b|ruby\s+-e\b|php\s+-r\b)|(?:\bFunction\s*\(|child_process|os\.system\s*\()/i;
+const PIPE_SHELL = /\|\s*(?:ba)?sh\b|\|\s*(?:z|da)sh\b|\bbase64\s+(?:-d|--decode)\b|\b(?:ba)?sh\s+-c\b/i;
 
 function isParentEscape(target: string): boolean {
   return target === '..' || target.startsWith('../') || target.includes('/../');
 }
 
-function absoluteTargetOutside(target: string, cwd: string, roots: string[]): boolean {
-  if (!(target.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(target))) return false;
-  const abs = resolve(cwd || '.', target);
-  return !roots.filter(Boolean).some((root) => isInsideRoot(abs, root));
+function targetOutsideWorkspace(target: string, cwd: string, roots: string[]): boolean {
+  return !pathInsideRoots(resolve(cwd || '.', target), roots);
 }
 
 function cdTargetEscapes(raw: string, cwd: string, roots: string[]): boolean {
   const target = raw.replace(/^['"]|['"]$/g, '');
   if (!target || target === '.') return false;
-  return isParentEscape(target) || absoluteTargetOutside(target, cwd, roots);
+  if (isParentEscape(target) || target === '-') return true;
+  return targetOutsideWorkspace(target, cwd, roots);
 }
 
 /** `cd` / `pushd` / `chdir` that leaves every trusted root, including `..`. */
@@ -151,7 +170,7 @@ export function commandLeavesWorkspace(command: string, cwd: string, roots: stri
 }
 
 export function commandEvaluatesCode(command: string): boolean {
-  return EVAL_ESCAPE.test(command);
+  return EVAL_ESCAPE.test(command) || PIPE_SHELL.test(command);
 }
 
 function partText(part: unknown): string {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createBuiltinTools } from '../dist/tools/builtin-tools.js';
@@ -68,6 +68,26 @@ test('untrusted web content cannot induce eval or a background cwd escape [AC:un
     assert.doesNotMatch(verified.content, /PWNED_EVAL/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('symlink cd and pipe-to-shell from untrusted text do not run [AC:untrusted-cwd-default-deny#AC-1] [AC:untrusted-cwd-default-deny#AC-2]', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'deny-link-'));
+  const outside = mkdtempSync(join(tmpdir(), 'deny-outside-'));
+  try {
+    symlinkSync(outside, join(dir, 'escape'));
+    const bash = createBuiltinTools(withCorpus()).find((tool) => tool.name === 'bash');
+    const ctx = context(dir);
+    const linked = await bash.execute(ctx, { command: 'cd escape && touch pwned-link' });
+    assert.equal(linked.ok, false);
+    assert.match(linked.content, /cwd escape/);
+    assert.equal(existsSync(join(outside, 'pwned-link')), false);
+    const piped = await bash.execute(ctx, { command: "echo hi | bash" });
+    assert.equal(piped.ok, false);
+    assert.match(piped.content, /eval escape/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
   }
 });
 
