@@ -48,6 +48,10 @@ export interface DefaultDenyInput {
   workspaceRoots?: string[];
   /** Raw tool args / surrounding prompt snippets to scan for induction. */
   inductionText?: string;
+  /** Shell text checked for cwd / eval escape. Defaults to inductionText. */
+  command?: string;
+  /** Prior tool or web text. Fenced untrusted content blocks eval escape. */
+  untrustedCorpus?: string;
   /** Explicit session/metadata flag that cwd is untrusted. */
   cwdUntrusted?: boolean;
 }
@@ -116,6 +120,78 @@ export function isHighPrivilegeTool(tool: string): boolean {
   return HIGH_PRIVILEGE.has(tool.trim().toLowerCase());
 }
 
+const EVAL_ESCAPE =
+  /(?:^|[\s;&|`(])(?:eval\s|node(?:\s+--eval|\s+-e\b)|python3?\s+-c\b|perl\s+-e\b|ruby\s+-e\b|php\s+-r\b)|(?:\bFunction\s*\(|child_process|os\.system\s*\()/i;
+
+function isParentEscape(target: string): boolean {
+  return target === '..' || target.startsWith('../') || target.includes('/../');
+}
+
+function absoluteTargetOutside(target: string, cwd: string, roots: string[]): boolean {
+  if (!(target.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(target))) return false;
+  const abs = resolve(cwd || '.', target);
+  return !roots.filter(Boolean).some((root) => isInsideRoot(abs, root));
+}
+
+function cdTargetEscapes(raw: string, cwd: string, roots: string[]): boolean {
+  const target = raw.replace(/^['"]|['"]$/g, '');
+  if (!target || target === '.') return false;
+  return isParentEscape(target) || absoluteTargetOutside(target, cwd, roots);
+}
+
+/** `cd` / `pushd` / `chdir` that leaves every trusted root, including `..`. */
+export function commandLeavesWorkspace(command: string, cwd: string, roots: string[]): boolean {
+  const re = /\b(?:cd|pushd|chdir)\s+([^\s;|&]+)/gi;
+  let match: RegExpExecArray | null = re.exec(command);
+  while (match) {
+    if (cdTargetEscapes(match[1] ?? '', cwd, roots)) return true;
+    match = re.exec(command);
+  }
+  return false;
+}
+
+export function commandEvaluatesCode(command: string): boolean {
+  return EVAL_ESCAPE.test(command);
+}
+
+function partText(part: unknown): string {
+  if (typeof part === 'string') return part;
+  if (!part || typeof part !== 'object') return '';
+  const record = part as Record<string, unknown>;
+  if (typeof record.text === 'string') return record.text;
+  if (typeof record.content === 'string') return record.content;
+  return '';
+}
+
+function isUntrustedChunk(text: string): boolean {
+  return text.includes('«external') || text.includes('[untrusted') || text.includes('BEGIN PR BODY') || text.includes('BEGIN UNTRUSTED');
+}
+
+/** Keep only fenced / marked untrusted tool and web text. */
+export function untrustedCorpusFromMessages(
+  messages: ReadonlyArray<{ parts?: readonly unknown[] }> | undefined
+): string {
+  if (!messages) return '';
+  const chunks: string[] = [];
+  for (const message of messages) {
+    for (const part of message.parts ?? []) chunks.push(partText(part));
+  }
+  return chunks.filter(isUntrustedChunk).join('\n').slice(0, 20_000);
+}
+
+export function untrustedEscapeReason(
+  command: string,
+  corpus: string | undefined,
+  cwd: string,
+  roots: string[]
+): string | undefined {
+  if (commandLeavesWorkspace(command, cwd, roots)) return 'cwd escape';
+  if (corpus && detectUntrustedInduction(corpus).induced && commandEvaluatesCode(command)) {
+    return 'eval escape induced by untrusted content';
+  }
+  return undefined;
+}
+
 /**
  * Default-FAIL gate for PreToolUse / bash entry.
  * High-privilege tools are blocked when cwd is dangerous or induction is untrusted.
@@ -137,6 +213,19 @@ export function evaluateDefaultDenyPolicy(input: DefaultDenyInput): DefaultDenyD
     return {
       allow: false,
       reason: `[default-deny] high-privilege tool "${input.tool}" blocked: untrusted induction (${induction.marker})`,
+      defaultFail: true
+    };
+  }
+  const escape = untrustedEscapeReason(
+    input.command ?? input.inductionText ?? '',
+    input.untrustedCorpus,
+    input.cwd ?? '',
+    input.workspaceRoots ?? []
+  );
+  if (escape) {
+    return {
+      allow: false,
+      reason: `[default-deny] high-privilege tool "${input.tool}" blocked: ${escape}`,
       defaultFail: true
     };
   }

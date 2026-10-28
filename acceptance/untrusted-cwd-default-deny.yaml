@@ -1,0 +1,19 @@
+id: untrusted-cwd-default-deny
+title: 不可信内容不能带出工作目录或执行动态代码
+status: implemented
+requirement: |
+  Fill gaps so enforcement is fail-closed (no silent host downgrade for high-risk tools; no skill tools/paths/network beyond Manifest; untrusted tool/web content cannot induce cwd/eval escape).
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 高权限命令的工作目录在受信任工作区之外，或命令本身要跳到工作区之外
+    when: 代理运行 shell、后台命令或工作证据命令
+    then: 命令被拒绝，不会真的执行
+  - id: AC-2
+    given: 之前的网页或工具结果被标成不可信，并试图让代理执行动态代码或离开工作目录
+    when: 接下来的高权限命令要 eval，或要跳到工作区之外
+    then: 命令被拒绝，不会真的执行
+  - id: AC-3
+    given: 工作目录受信任，不可信网页还在上下文里
+    when: 代理运行一条普通的、不离开目录也不做动态求值的命令
+    then: 这条命令仍然可以执行
