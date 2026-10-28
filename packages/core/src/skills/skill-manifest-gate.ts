@@ -10,6 +10,7 @@ import { enforceSkillManifest, networkHostFromInput } from './skill-manifest.js'
 const noted = new Map<string, SkillManifest[]>();
 
 const PATH_TOOLS = new Set(['read_file', 'write_file', 'edit_file', 'grep', 'glob', 'delete_file', 'apply_patch']);
+const SHELL_TOOLS = new Set(['bash', 'bg_run', 'shell', 'work_evidence']);
 const NET_HINT = /\b(?:curl|wget|nc|ncat|ssh|scp)\b|https?:\/\//i;
 
 export function resetActiveSkillManifests(sessionId?: string): void {
@@ -91,11 +92,16 @@ function hostFromCommand(command: string): string {
   return networkHostFromInput(match[1]) ?? '';
 }
 
+function shellNetworkHost(record: Record<string, unknown>): string {
+  const command = firstString(record, ['command', 'verify_command']) ?? '';
+  if (!NET_HINT.test(command)) return '';
+  return hostFromCommand(command);
+}
+
 function networkHostFor(tool: string, record: Record<string, unknown>): string | undefined {
   const url = firstString(record, ['url']);
   if (url) return networkHostFromInput(url) ?? '';
-  const command = firstString(record, ['command', 'verify_command']);
-  if (command && NET_HINT.test(command)) return hostFromCommand(command);
+  if (SHELL_TOOLS.has(tool)) return shellNetworkHost(record);
   if (tool === 'web_fetch' || tool === 'web_search') return '';
   return undefined;
 }
@@ -128,6 +134,42 @@ export function gateActiveSkillManifests(
     if (!decision.ok) return decision;
   }
   return { ok: true };
+}
+
+export function splitSkillLoads<T extends { name: string }>(calls: readonly T[]): { loads: T[]; rest: T[] } {
+  const loads: T[] = [];
+  const rest: T[] = [];
+  for (const call of calls) {
+    if (call.name === 'load_skill') loads.push(call);
+    else rest.push(call);
+  }
+  return { loads, rest };
+}
+
+export function stitchToolResults<T extends { toolCallId: string }>(
+  calls: readonly { toolCallId: string }[],
+  results: readonly T[]
+): T[] {
+  const byId = new Map(results.map((result) => [result.toolCallId, result]));
+  const ordered: T[] = [];
+  for (const call of calls) {
+    const found = byId.get(call.toolCallId);
+    if (found) ordered.push(found);
+  }
+  return ordered;
+}
+
+/** Finish load_skill before other tools in the same wave, so a new Manifest cannot lose the race. */
+export async function executeLoadsBeforeEffects<C extends { name: string; toolCallId: string }, R extends { toolCallId: string }>(
+  calls: readonly C[],
+  runBatch: (batch: C[]) => Promise<R[]>
+): Promise<R[]> {
+  const { loads, rest } = splitSkillLoads(calls);
+  if (loads.length === 0) return runBatch([...calls]);
+  const loaded = await runBatch(loads);
+  if (rest.length === 0) return loaded;
+  const followed = await runBatch(rest);
+  return stitchToolResults(calls, [...loaded, ...followed]);
 }
 
 export async function runWithSkillManifest<T extends { ok: boolean; content: string }>(

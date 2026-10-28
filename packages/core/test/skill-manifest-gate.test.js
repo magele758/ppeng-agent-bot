@@ -8,9 +8,10 @@ import { PLANNING_SKILL_MANIFEST } from '../dist/skills/skill-manifest.js';
 import { loadWorkspaceSkills } from '../dist/skills/skill-registry.js';
 import {
   gateActiveSkillManifests,
+  noteActiveSkillManifest,
   resetActiveSkillManifests
 } from '../dist/skills/skill-manifest-gate.js';
-import { executeSingleTool } from '../dist/runtime/tool-loop.js';
+import { executeSingleTool, executeToolCalls } from '../dist/runtime/tool-loop.js';
 import { SqliteStateStore } from '../dist/storage.js';
 
 const adapter = {
@@ -134,6 +135,80 @@ test('path escape is refused before the file tool runs [AC:skill-manifest-bounda
   assert.match(escaped.content, /allowPaths|denied by skill manifest/);
   const allowed = gateActiveSkillManifests([manifest], 'read_file', { path: '/workspace/src/a.ts' });
   assert.equal(allowed.ok, true);
+});
+
+test('shell without a listed host is refused, and load_skill wins the same wave [AC:skill-manifest-boundary#AC-4]', async (t) => {
+  const offline = {
+    version: '1',
+    allowTools: ['load_skill', 'bash'],
+    network: { mode: 'none' }
+  };
+  assert.equal(gateActiveSkillManifests([offline], 'bash', { command: 'echo hi' }).ok, false);
+  const listed = {
+    version: '1',
+    allowTools: ['bash'],
+    network: { mode: 'allowlist', hosts: ['example.com'] }
+  };
+  assert.equal(gateActiveSkillManifests([listed], 'bash', { command: 'curl https://api.example.com/x' }).ok, true);
+  assert.equal(gateActiveSkillManifests([listed], 'bash', { command: 'python -c "print(1)"' }).ok, false);
+
+  const { dir, store, session } = sessionFixture(t);
+  const order = [];
+  const load = {
+    name: 'load_skill',
+    description: 'load',
+    inputSchema: { type: 'object' },
+    approvalMode: 'never',
+    sideEffectLevel: 'none',
+    execute: async (ctx) => {
+      order.push('load');
+      noteActiveSkillManifest(ctx.session.id, offline);
+      ctx.session.metadata = { ...(ctx.session.metadata ?? {}), activeSkillManifests: [offline] };
+      return { ok: true, content: 'loaded' };
+    }
+  };
+  const bash = {
+    name: 'bash',
+    description: 'bash',
+    inputSchema: { type: 'object' },
+    approvalMode: 'never',
+    sideEffectLevel: 'workspace',
+    execute: async () => {
+      order.push('bash');
+      return { ok: true, content: 'PWNED_NET' };
+    }
+  };
+  const deps = {
+    store,
+    stateDir: dir,
+    tools: [load, bash],
+    modelAdapter: adapter,
+    maxParallelToolCalls: 4,
+    emitTrace() {}
+  };
+  const context = {
+    session,
+    repoRoot: dir,
+    stateDir: dir,
+    agent: { id: 'general', role: 'assistant', instructions: '', capabilities: [] }
+  };
+  const results = await executeToolCalls(
+    deps,
+    [
+      { type: 'tool_call', toolCallId: 'bash-1', name: 'bash', input: { command: 'echo hi' } },
+      { type: 'tool_call', toolCallId: 'load-1', name: 'load_skill', input: { name: 'Net' } }
+    ],
+    context,
+    false,
+    session.id
+  );
+  assert.deepEqual(order, ['load']);
+  assert.equal(results[0].toolCallId, 'bash-1');
+  assert.equal(results[0].ok, false);
+  assert.match(results[0].content, /network|skill manifest/);
+  assert.doesNotMatch(results[0].content, /PWNED_NET/);
+  assert.equal(results[1].toolCallId, 'load-1');
+  assert.equal(results[1].ok, true);
 });
 
 test('broken sibling manifest does not load the skill unconstrained [AC:skill-manifest-boundary#AC-3]', async () => {
