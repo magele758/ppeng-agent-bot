@@ -1,3 +1,4 @@
+import type {SqliteStateStore} from '../storage.js';
 import { runtimeCapabilityCheck } from '../config/runtime-capabilities.js';
 import type { GoalSnapshot } from '../bots/goals/types.js';
 import { filterFactoryTools } from '../factory/tool-policy.js';
@@ -177,7 +178,7 @@ export function authorizeToolsForSession(input: {
     tools = tools.filter((tool) => !roomOnly.has(tool.name));
   }
   checkpoint(tools,'mode');
-  const finalTools=filterFactoryTools(input.session, filterRoomTools(input.session, stripSubagentDeniedTools(input.session, tools)), input.settingsStore);
+  const finalTools=filterWaitTools(input.session,filterFactoryTools(input.session, filterRoomTools(input.session, stripSubagentDeniedTools(input.session, tools)), input.settingsStore),input.settingsStore);
   checkpoint(finalTools,'policy');
   return {allowExternalAiTools,tools:finalTools};
 }
@@ -191,7 +192,20 @@ function goalEntryTools(session: SessionRecord, store?: WebSettingsReadStore): S
   if (!goal || !execution || goal.status !== 'running' || goal.activeExecutionId !== execution.id
     || execution.goalId !== goal.id || execution.goalRevision !== goal.revision
     || execution.sessionId !== session.id || execution.status !== 'running' || execution.leaseUntil <= Date.now()) return new Set();
-  return new Set(['goal_dispatch', 'goal_checkpoint']);
+  return new Set(['goal_dispatch', 'goal_checkpoint', 'wait_for']);
+}
+
+function executionEntryTools(session:SessionRecord,store?:WebSettingsReadStore):Set<string>{
+ const entries=goalEntryTools(session,store);
+ const db=(store as Partial<SqliteStateStore>|undefined)?.db;
+ if(!db||!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='bot_routine_runs'").get())return entries;
+ const runs=db.prepare("SELECT id FROM bot_routine_runs WHERE status='running' AND json_extract(payload,'$.sessionId')=? LIMIT 2").all(session.id);
+ if(runs.length===1)entries.add('wait_for');
+ return entries;
+}
+function filterWaitTools(session:SessionRecord,tools:ToolContract<any>[],store?:WebSettingsReadStore):ToolContract<any>[] {
+ if(executionEntryTools(session,store).has('wait_for'))return tools;
+ return tools.filter(tool=>tool.name!=='wait_for');
 }
 
 function partitionDeferred(
@@ -202,7 +216,7 @@ function partitionDeferred(
 ) {
   const settings=readToolExposure(settingsStore);
   if(settings.mode==='full') return {visible:tools.filter(t=>!['tool_search','load_capability_tool'].includes(t.name)),hidden:[]};
-  const entries=goalEntryTools(session,settingsStore);
+  const entries=executionEntryTools(session,settingsStore);
   const pinned=new Set(Object.hasOwn(settings.pinnedGroups,agent.id) ? settings.pinnedGroups[agent.id] : []);
   return splitDeferredTools({
     tools: tools.map(tool => toolGroup(tool.name).tier > 1 && !entries.has(tool.name) && !pinned.has(toolGroup(tool.name).id) ? {...tool,disclosure:'on_demand'} : {...tool,disclosure:undefined}),

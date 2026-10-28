@@ -836,6 +836,7 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
     applyFoldBudget: (session, folded) =>
       applyOptionalFoldBudgetView(prepareViewFrom(rt), session, folded),
     loopConfig: {
+      stopAtToolNames: ['wait_for'],
       maxTurns: rt.maxTurnsPerRun,
       compactEveryTurn: true,
       foldBudgetClamp: true,

@@ -1,3 +1,4 @@
+import {tickDurableGoalWait,drainDurableGoalWait} from '../../waits/goal.js';
 import { goalExecutionEvidence } from './execution-evidence.js';
 import { buildCompletionEvidence } from './completion-evidence.js';
 import type { MessagePart, SessionRecord } from '../../types.js';
@@ -107,6 +108,7 @@ async function drainExternal(host: GoalRuntimeHost, parent: SessionRecord, goal:
  const scope = goalScope(host.store, parent)!;
  const wait = goal.wait;
  if (!wait) return;
+ if(drainDurableGoalWait(host,scope.service,goal))return;
  const state = waitStatus(host, parent, goal, executions);
  if (state === 'unauthorized' || state === 'unsupported') {
   if(goal.status==='queued')scope.service.block(goal.botId,goal.id,'External execution cancellation is unavailable; reconciliation is required');
@@ -426,6 +428,7 @@ function notePendingApprovalWait(host: GoalRuntimeHost, parent: SessionRecord, s
 }
 function wakeFinishedWait(host: GoalRuntimeHost, parent: SessionRecord, service: GoalService, botId: string, goal: BotGoal): void {
  const executions = service.executions(botId, goal.id);
+ if(tickDurableGoalWait(host,service,goal))return;
  const status = waitStatus(host, parent, goal, executions);
  if (blockSpecialtyWait(host, parent, service, botId, goal, status)) return;
  if (blockUnauthorizedWait(service, botId, goal, status)) return;
