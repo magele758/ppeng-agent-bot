@@ -89,7 +89,7 @@ test('full scope, baselines, two-hour cadence and release artifact requirements 
 
 test('Quick keeps the whole-job two-minute limit and adds cheap storage/fork regression [AC:ci-parallel-validation#AC-9] [AC:ci-parallel-validation#AC-10]',()=>{
   const job=workflow('ci').jobs.quick;assert.equal(job['timeout-minutes'],2);assert.notEqual(job['continue-on-error'],true);
-  const source=readFileSync('scripts/ci/quick-gate.mjs','utf8');for(const file of ['domain-stores.test.js','session-fork.test.js','bot-reply-quote.test.js'])assert.ok(source.includes(file),`missing ${file}`);
+  const source=readFileSync('scripts/ci/quick-gate.mjs','utf8');for(const file of ['domain-stores.test.js','session-fork.test.js','bot-reply-quote.test.js','schema-snapshot-freshness.test.mjs'])assert.ok(source.includes(file),`missing ${file}`);
   assert.match(source,/budgetMs=90000/);assert.match(source,/process.exitCode=1/);
 });
 

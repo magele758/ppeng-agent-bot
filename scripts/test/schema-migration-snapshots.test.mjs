@@ -43,12 +43,22 @@ function memoryKeys(rows) {
   return rows.map((row) => row.key).sort();
 }
 
-test('snapshots cover the last schema versions, including the one right before latest [AC:schema-upgrade-safety#AC-1]', () => {
+test('snapshots cover the last schema versions, including the one right before latest [AC:schema-upgrade-safety#AC-1]', async () => {
   const versions = SNAPSHOTS.map((s) => s.ids.version);
   assert.ok(versions.length >= 4, `expected >= 4 snapshots, got ${versions.join(',')}`);
   assert.ok(versions.includes(20), 'v20 (before agent_memory.agent_id) is covered');
   assert.ok(versions.includes(LATEST_SCHEMA_VERSION - 1), 'the version right before latest is covered');
   for (const snapshot of SNAPSHOTS) assert.equal(Number(snapshot.file.slice(1, -4)), snapshot.ids.version);
+  const { SNAPSHOT_REVISIONS } = await import('../migration-fixtures/generate.mjs');
+  const registered = SNAPSHOT_REVISIONS.map((r) => r.version);
+  assert.equal(
+    Math.max(...registered),
+    LATEST_SCHEMA_VERSION - 1,
+    'SNAPSHOT_REVISIONS must include the version right before LATEST (regenerate before bumping schema)'
+  );
+  for (const version of registered) {
+    assert.ok(versions.includes(version), `SNAPSHOT_REVISIONS v${version} lacks an on-disk snapshot`);
+  }
 });
 
 for (const snapshot of SNAPSHOTS) {
