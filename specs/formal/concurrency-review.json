@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-10-28T16:23:22.000Z",
-  "reviewNote": "Skill Manifest fail-closed gate records loaded manifests and rejects out-of-bound tools/paths/network after load_skill inside the core tool-loop. Pairing, approval, lifecycle, restart and concurrency control-flow contracts are unchanged; only an additional enforcement callback path was wired.",
+  "reviewedAt": "2026-10-28T16:45:33.000Z",
+  "reviewNote": "Same-wave load_skill finishes before the other tools, then results are stitched back by toolCallId so pairing order matches the original wave. Compensation, secret-ref scope, steer wave scope, and wave close are unchanged. A shell command that does not name an allow-listed host is an extra Manifest refusal, not a change to approval, lifecycle, restart, or concurrency control flow.",
   "mapping": [
     {
       "step": "Production runtime startup and writer surfaces, cancellation and approval decisions; actual OS process probes",
@@ -380,7 +380,7 @@
     "packages/agent-loop/src/session/surface-store.ts": "b49bf08ee2fff9e3d92f340ea2933315cebb4d7a6ab01f4d693a234416275fd4",
     "packages/core/src/turn/host.ts": "c12a4c8865357f5b91565be5a25e40a4f40bc866e070646f5a3ceab81105de39",
     "packages/core/src/turn/kernel.ts": "afe8ad8357efe042630bb407cebe9fa5c6e801e526c57ad10ab4640cdb8850de",
-    "packages/core/src/runtime/tool-loop.ts": "f9f803a02a9e01bf910ad22f2f1cc2f3c88425dcf32d8a34c4acad3b199d3ca2",
+    "packages/core/src/runtime/tool-loop.ts": "043c2a0fad2f5c02ef33b3fe43de458f524a842f136496f51f9f2b777e6331fc",
     "packages/core/src/stores/trace.ts": "bd4c3bf31d4fda1a11e7f96f7cf8da5c323dc77f9d235b191f03bf5ffe4cee2e",
     "skills/agent-loop/SKILL.md": "4a85cd1b0ae9f4b14a748143d86ec2db99f8a6ef48da114f52b0827afb571133",
     "packages/agent-loop/SKILL.md": "4a85cd1b0ae9f4b14a748143d86ec2db99f8a6ef48da114f52b0827afb571133",
