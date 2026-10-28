@@ -42,7 +42,8 @@ export const SNAPSHOT_REVISIONS = [
   { version: 30, ref: 'decf8cfca70fabf81d22994f939594ae53664c0a', note: 'room work provenance, before queued steer attachment context (v31)' },
   { version: 31, ref: '831290374f1e5189b16084e14dc497a4230b5fa0', note: 'queued steer attachment context, before bot reply quote pointer (v32)' },
   { version: 32, ref: 'a0d12d79803dd7cb0a1a066ee2fc780b9f85f1c1', note: 'bot reply quote pointer, before durable memory deletion suppression (v33)' },
-  { version: 33, ref: '71b7cf4a994a6b1c963419837e8638e53c09209b', note: 'durable memory deletion suppression, before bot face style and expression (v34)' }
+  { version: 33, ref: '71b7cf4a994a6b1c963419837e8638e53c09209b', note: 'durable memory deletion suppression, before bot face style and expression (v34)' },
+  { version: 34, ref: '11afdca52697d8e963fad9cdc09d704e46ff6269', note: 'bot face style and expression, before host-owned message provenance (v35)' }
 ];
 
 function run(cmd, args, cwd) {
