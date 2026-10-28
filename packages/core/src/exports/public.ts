@@ -863,7 +863,9 @@ export {
   evaluateDefaultDenyPolicy,
   isDangerousCwd,
   detectUntrustedInduction,
-  isHighPrivilegeTool
+  isHighPrivilegeTool,
+  commandLeavesWorkspace,
+  untrustedCorpusFromMessages
 } from '../safety/default-deny-policy.js';
 export type { DefaultDenyInput, DefaultDenyDecision } from '../safety/default-deny-policy.js';
 
