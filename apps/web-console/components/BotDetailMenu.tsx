@@ -1,4 +1,6 @@
 'use client';
+import { BotDetail } from './sections/agents/BotDetail';
+import { useLab } from './shell/LabProvider';
 
 import { useEffect, useState } from 'react';
 import { BotDetailSkills } from './BotDetailSkills';
@@ -197,6 +199,11 @@ function DetailBody({ onSaved, section, loading, sectionError, jobs, files, memo
       </div>);
 }
 
+function detailMenuLayout(recordsOnly: boolean) {
+  if (recordsOnly) return {attributes: {'data-testid': 'bot-records-panel'}, sections: ['tasks','files','memory'] as const};
+  return {attributes: {id: 'bot-detail-panel', 'data-testid': 'bot-detail-panel'}, sections: DETAIL_SECTIONS};
+}
+
 export function BotDetailMenu({
   botId,
   botName,
@@ -204,6 +211,7 @@ export function BotDetailMenu({
   open = true,
   onClose,
   initialSection = 'routines',
+  recordsOnly = false,
   preview,
   showToggleError = false,
   childTasks = [],
@@ -215,6 +223,7 @@ export function BotDetailMenu({
   open?: boolean;
   onClose?: () => void;
   initialSection?: Section;
+  recordsOnly?: boolean;
   preview?: BotDetailPreview;
   showToggleError?: boolean;
   childTasks?: ReadonlyArray<{ id: string; title: string }>;
@@ -315,9 +324,8 @@ export function BotDetailMenu({
 
   return (
     <aside
-      id="bot-detail-panel"
+      {...detailMenuLayout(recordsOnly).attributes}
       className={`bot-detail-menu ${styles.panel}`}
-      data-testid="bot-detail-panel"
       data-bot-id={botId}
       aria-label={t('play.botDetail.aria')}
     >
@@ -326,7 +334,7 @@ export function BotDetailMenu({
         {onClose && <button type="button" className={styles.close} data-testid="bot-detail-close" aria-label={t('play.botDetail.close')} title={t('play.botDetail.close')} onClick={onClose}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>}
       </div>
       <div className={styles.tabs} role="tablist" aria-label={t('play.botDetail.aria')}>
-        {DETAIL_SECTIONS.map((id) => (
+        {detailMenuLayout(recordsOnly).sections.map((id) => (
           <button
             key={id}
             type="button"
@@ -368,8 +376,16 @@ export function BotDetailPane({ visible, botId, botName, agentId, onClose, child
   childTasks?: ReadonlyArray<{ id: string; title: string }>;
   onOpenChildTask?: (sessionId: string) => void;
 }) {
-  if (!visible) return null;
-  return <BotDetailMenu key={botId} botId={botId} botName={botName || botId} agentId={agentId || botId} onClose={onClose} childTasks={childTasks} onOpenChildTask={onOpenChildTask} />;
+  const {bots} = useLab();
+  const {t} = useI18n();
+  const bot = bots.find(bot=>bot.id===botId);
+  if (!visible || !bot) return null;
+  return <aside id="bot-detail-panel" className={`bot-detail-menu ${styles.panel}`} data-testid="bot-detail-panel" data-bot-id={botId}>
+    <div className={styles.head}><h3>{t('botSettings.settings')}</h3><button className={styles.close} data-testid="bot-detail-close" aria-label={t('play.botDetail.close')} onClick={onClose}>×</button></div>
+    <div className={styles.body} data-testid="bot-detail-scroll">
+      <BotDetail key={botId} bot={bot} embedded records={<BotDetailMenu recordsOnly botId={botId} botName={botName} agentId={agentId} initialSection="files" childTasks={childTasks} onOpenChildTask={onOpenChildTask}/>}/>
+    </div>
+  </aside>;
 }
 
 export function BotPermissionsLink({ botId, botName }: { botId: string; botName: string }) {

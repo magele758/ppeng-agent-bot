@@ -11,9 +11,12 @@ This project ships two reference bundles:
 
 ## Quick start
 
+Enable installed bundles in **Lab → Settings → Tools → Interactive cards & domain capabilities**. Changes persist and apply to subsequent steps without restarting. Disabled bundles are removed from available agents, skills and tools; already-held tool references also refuse new calls. Installing new bundle code or changing upstream credentials still requires deployment/restart.
+
+
 ```
 # .env
-RAW_AGENT_DOMAINS=sre,stock
+RAW_AGENT_DOMAINS=sre,stock  # fallback only before domains are saved in Lab
 
 # SRE config
 SRE_PROM_URL=http://prometheus:9090
@@ -26,7 +29,7 @@ STOCK_QUOTE_PROVIDER=yahoo  # yahoo | alphavantage | mock
 STOCK_API_KEY=...           # required when provider=alphavantage
 ```
 
-Restart the daemon. New personas appear under their domain group in the Agent Lab agent selector.
+Restart only after changing upstream connection environment values. Domain selection itself is controlled live in Lab.
 
 ## Architecture
 
@@ -40,9 +43,9 @@ RawAgentRuntime (core)
 
 apps/daemon
   └── domain-loader.ts
-        ├─ reads RAW_AGENT_DOMAINS=sre,stock
+        ├─ registers installed bundles; saved Lab selection wins over env
         ├─ static-imports each bundle
-        └─ mergeDomainBundles() → extraAgents/extraTools/extraSkills
+        └─ RuntimeOptions.domainBundles → live authorization and catalog filters
 ```
 
 Per-turn tool filtering happens inside `RawAgentRuntime._runSessionInner`:

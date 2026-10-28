@@ -1,6 +1,7 @@
 id: bot-face-first-creation
 title: Bot 创建以机器人脸型和颜色为主
-status: implemented
+status: retired
+retiredReason: 用户要求简化 Bot 操作，外观改为可选展开，由 bot-settings-flow AC-5/AC-10/AC-11/AC-12 替代；原预览、持久化、失败重试标准继续验收。
 owner: user
 requirement: |
   不用搞这种bot的头像

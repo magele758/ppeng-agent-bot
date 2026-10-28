@@ -25,7 +25,7 @@ import {
   OAUTH_PUBLIC_ORIGIN_STARTUP_WARNING,
   type CoreStorageContext,
 } from '@ppeng/agent-core';
-import { availableDomainIds, describeDomainConnectors, loadDomainBundles } from './domain-loader.js';
+import { availableDomainIds, installedDomainBundles, loadDomainBundles } from './domain-loader.js';
 import { json } from './http-utils.js';
 import {
   clientKeyFromRequest,
@@ -165,7 +165,7 @@ if (domains.ids.length > 0) {
           .map(([id, keys]) => `${id} via ${keys.join('/')}`)
           .join('; ')})`
       : '';
-  log.info(`domain bundles mounted: ${domains.ids.join(', ')}${how}`);
+  log.info(`domain environment fallback: ${domains.ids.join(', ')}${how}`);
 }
 if (domains.unknown.length > 0) {
   log.warn(
@@ -177,14 +177,12 @@ const runtime = new RawAgentRuntime({
   repoRoot,
   stateDir,
   updateValidation: desktopValidation,
-  extraAgents: domains.merged.agents,
-  extraTools: domains.merged.tools,
-  extraSkills: domains.merged.skills,
+  domainBundles: installedDomainBundles(),
   eventBufferRepository: storageCtx.eventBuffer,
   cloudSkillsLoader: storageCtx.cloudSkillsLoader,
   tieredAssetStorage: storageCtx.tieredAssets,
 });
-runtime.connectors.setDomains(describeDomainConnectors(domains));
+
 
 const loopOn = writeLoopSettings(runtime.store, {
   kernelVariant: 'agent-loop',

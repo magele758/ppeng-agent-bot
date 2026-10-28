@@ -36,12 +36,17 @@ function errorText(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
-/** 只对原始值字段做乐观更新（开关立即翻转）；嵌套对象等待服务端结果 */
+function optimisticValue(value: unknown): boolean {
+  return value === null || ['string', 'number', 'boolean'].includes(typeof value) ||
+    (Array.isArray(value) && value.every(item => ['string', 'number', 'boolean'].includes(typeof item)));
+}
+
+/** 对原始值与原始值数组做乐观更新（开关立即翻转）；嵌套对象等待服务端结果 */
 function optimisticPatch(current: unknown, patch: Record<string, unknown>): Record<string, unknown> | null {
   if (!current || typeof current !== 'object') return null;
   const flat: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(patch)) {
-    if (v === null || ['string', 'number', 'boolean'].includes(typeof v)) flat[k] = v;
+    if (optimisticValue(v)) flat[k] = Array.isArray(v) ? [...v] : v;
   }
   return Object.keys(flat).length > 0 ? { ...(current as Record<string, unknown>), ...flat } : null;
 }
@@ -117,6 +122,7 @@ export function useSettingsResource<S, E = unknown>(path: string): SettingsResou
       const before = store.snapshot;
       const optimistic = optimisticPatch(before.settings, patch);
       if (optimistic) publish(store, { ...before, settings: optimistic });
+      let applyAt: unknown;
       const result = await run(
         async () => {
           const data = (await api(path, {
@@ -124,6 +130,7 @@ export function useSettingsResource<S, E = unknown>(path: string): SettingsResou
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(patch)
           })) as { settings: unknown; effective?: unknown };
+          applyAt = (data.effective as {applyAt?:string}|undefined)?.applyAt;
           publish(store, {
             settings: data.settings,
             effective: data.effective ?? store.snapshot.effective,
@@ -131,7 +138,7 @@ export function useSettingsResource<S, E = unknown>(path: string): SettingsResou
           });
           return true;
         },
-        () => t('settingsEntries.common.saved')
+        () => t(path === '/api/loop/settings' ? 'botSettings.loopHint' : applyAt === 'next-step' ? 'botSettings.nextStep' : applyAt === 'next-run' ? 'botSettings.nextRun' : 'settingsEntries.common.saved')
       );
       if (result !== true && store.snapshot.settings === optimistic) publish(store, before);
       return result === true;

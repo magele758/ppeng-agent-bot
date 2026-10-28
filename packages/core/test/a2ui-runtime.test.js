@@ -119,13 +119,13 @@ test('a2ui_render produces SSE chunks and SurfaceUpdatePart on the tool message'
   }
 });
 
-test('a2ui tools are absent from the tool list when feature flag is off', () => {
+test('a2ui tools are absent from the available tool list when disabled', () => {
   const prev = process.env[ENV_KEY];
   delete process.env[ENV_KEY];
   try {
     const { repoRoot, stateDir } = makeDirs();
     const rt = new RawAgentRuntime({ repoRoot, stateDir, modelAdapter: new TwoCallA2uiAdapter() });
-    const names = rt.tools.map((t) => t.name);
+    const names = rt.availableTools().map((t) => t.name);
     assert.ok(!names.includes('a2ui_render'));
     assert.ok(!names.includes('a2ui_delete_surface'));
   } finally {

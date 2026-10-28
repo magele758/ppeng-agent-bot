@@ -1,5 +1,7 @@
 # Skill 路由基线（改造前后对照）
 
+当前配置入口：Lab「设置 → 工具 → 技能」。路由模式、候选数、严格加载和融合策略保存到 `skill_settings`，后续步骤无需重启即可采用。每个未保存字段独立回退到既有环境配置。显示策略与排序策略分别设置；hybrid 会在排序候选之外合并关键词命中。详见 [Bot 设置与生效范围](BOT_SETTINGS_FLOW.md)。
+
 **改造前（`RAW_AGENT_SKILL_ROUTING_MODE=legacy`）**
 
 - `buildSystemPrompt` 动态块中列出**全部** skill 的 name + description；`matchSkills` 仅对内置 `triggerWords` 做子串匹配，workspace `SKILL.md` 几乎不参与自动命中。
