@@ -1,10 +1,10 @@
 import { test as base, expect } from '@playwright/test';
 import type { BotInfo } from '../../apps/web-console/lib/types';
 
-/** Avatar and room UI checks must also work alone on a newly initialized daemon. */
+/** Each check owns two visible Bots; earlier specs may hide or restyle their roster. */
 export const test = base.extend<{ botPair: BotInfo[] }>({
   botPair: async ({ request }, use) => {
-    const bots: BotInfo[] = (await (await request.get('/api/bots')).json()).bots;
+    const bots: BotInfo[] = [];
     const created: string[] = [];
     try {
       while (bots.length < 2) {

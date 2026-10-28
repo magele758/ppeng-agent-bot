@@ -13,7 +13,7 @@ test.describe('Chat basics', () => {
       await route.continue();
     });
 
-    await page.goto('/');
+    await page.goto('/#/chat');
     const content = `e2e optimistic ${Date.now()}`;
     await page.getByLabel('消息内容').fill(content);
     await page.getByRole('button', { name: '发送' }).click();
@@ -28,7 +28,7 @@ test.describe('Chat basics', () => {
   });
 
   test('the reply comes back over the event stream and stays in the conversation once done [AC:chat-basics#AC-2]', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/#/chat');
     const content = `e2e stream ${Date.now()}`;
     const streamed = page.waitForResponse((res) => res.url().includes('/api/chat/stream'));
     await page.getByLabel('消息内容').fill(content);
@@ -47,7 +47,7 @@ test.describe('Chat basics', () => {
   test('a new conversation shows up in the session list and its history survives a reload [AC:chat-basics#AC-3] [AC:chat-basics#AC-4]', async ({
     page
   }) => {
-    await page.goto('/');
+    await page.goto('/#/chat');
     const content = `e2e history ${Date.now()}`;
     await page.getByLabel('消息内容').fill(content);
     await page.getByRole('button', { name: '发送' }).click();

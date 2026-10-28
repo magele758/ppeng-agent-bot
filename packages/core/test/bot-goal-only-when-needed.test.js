@@ -114,3 +114,10 @@ test('unfinished work and an explicit handoff still continue [AC:bot-goal-only-w
   assert.equal(selectGoalRoute({ task: '把这个分析拆成子任务并行做' }, capabilities).strategy, 'subagent');
   assert.equal(selectGoalRoute({ task: '实现登录失败的中文提示' }, capabilities).strategy, 'direct');
 });
+
+test('status and response preferences keep the existing work [AC:bot-watch-work-continuity#AC-1]',async t=>{
+ const chat=openChat(t);
+ const goal=chat.service.create({botId:'b',sessionId:chat.session.id,title:'修登录',objective:'修复登录超时并完成测试'});
+ for(const text of ['好了吗？','进度怎么样？','回复简短一点，只说结论','以后用中文回答'])await chat.say(text);
+ assert.deepEqual(chat.service.list('b').map(g=>g.id),[goal.id]);
+});

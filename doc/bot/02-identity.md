@@ -2,7 +2,7 @@
 
 一只 Bot 是名册里的一行，加上一条谁也替不了的固定主对话。同名不能再建第二只。
 
-规格：`bots`、`bot-face-first-creation`、`bot-face-readable-shapes`、`bot-robot-faces`、`bot-create-named-tools`、`bot-chat-header`、`bot-session-row`、`unowned-legacy-bot`、`bot-mock-interview`、`default-super-bot`（派工汇总还没收口）。
+规格：`bots`、`bot-face-first-creation`、`bot-face-readable-shapes`、`bot-robot-faces`、`bot-create-named-tools`、`bot-chat-header`、`bot-session-row`、`unowned-legacy-bot`、`bot-mock-interview`、`default-super-bot`。
 
 ## 创建
 
@@ -54,4 +54,4 @@
 
 它应该能列出当前用户有权看到的 Bot、各自状态和关联任务，把一件工作交给指定的 Bot，并在之后按原来的委派收回结果。汇总要分开写成果、没做完的和失败原因。被派到的 Bot 仍用自己的权限，Super Bot 不代替用户点批准。
 
-这套派工和汇总的规格 `default-super-bot` 还是已批准、未标成已实现。上面这段是目标行为，不是已经验收通过的承诺。
+`default-super-bot` 的默认选择、持久身份、授权派工和结果汇总已通过单机软件验收。真实模型的长期工作质量仍需按具体场景验证。

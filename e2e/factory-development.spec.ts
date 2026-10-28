@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 const machines = [{ id: 'u0', name: 'Ubuntu', sshAlias: 'ubuntu', capacity: 1, botIds: ['bot'], allowedUserIds: ['owner'], repositories: [{ id: 'core', path: '/repo' }] }, { id: 'u1', name: 'Second', sshAlias: 'second', capacity: 1, botIds: ['bot'], allowedUserIds: ['owner'], repositories: [{ id: 'core', path: '/repo' }] }];
 async function setup(page: Page, enabled = true) {
-    await page.route('**/api/bot-rooms', r => r.fulfill({ json: { rooms: [{ id: 'room', title: 'Factory' }] } }));
+    await page.route('**/api/bot-rooms', r => r.fulfill({ json: { rooms: [{ id: 'room', title: 'Factory', botIds: [] }] } }));
     await page.route('**/api/bots', r => r.fulfill({ json: { bots: [{ id: 'bot', name: 'Coordinator' }] } }));
     await page.route('**/api/factory/settings', r => r.fulfill({ json: { settings: { owner: { userId: 'owner' }, roomId: 'room', coordinatorBotId: 'bot', patrol: { enabled: false, timezone: 'Asia/Shanghai' }, machines } } }));
     await page.route('**/api/factory/board', r => r.fulfill({ json: { tasks: [], machines: [] } }));

@@ -42,7 +42,7 @@ test("factory Lab saves configuration, probes and shows unified task progress [A
     await route.fulfill({ json: body });
   });
   await page.route("**/api/bot-rooms", (route) =>
-    route.fulfill({ json: { rooms: [{ id: "room", title: "Factory Room" }] } }),
+    route.fulfill({ json: { rooms: [{ id: "room", title: "Factory Room", botIds: [] }] } }),
   );
   await page.route("**/api/bots", (route) =>
     route.fulfill({ json: { bots: [{ id: "bot", name: "Coordinator" }] } }),
@@ -89,7 +89,7 @@ async function mockConfiguredFactory(page: import("@playwright/test").Page, boar
     return route.fulfill({ json: { settings: { enabled: patrol(), timezone: "Asia/Shanghai" }, state: { checks: {}, notified: {} } } });
   });
   await page.route("**/api/bots", route => route.fulfill({ json: { bots: [{ id: "bot", name: "Coordinator" }] } }));
-  await page.route("**/api/bot-rooms", route => route.fulfill({ json: { rooms: [{ id: "room", title: "Factory Room" }, { id: "other", title: "Other Room" }] } }));
+  await page.route("**/api/bot-rooms", route => route.fulfill({ json: { rooms: [{ id: "room", title: "Factory Room", botIds: [] }, { id: "other", title: "Other Room", botIds: [] }] } }));
   await page.goto("/#/settings/ops/factory");
   await expect(page.getByTestId("factory-machine-name")).toHaveValue("Ubuntu1");
 }

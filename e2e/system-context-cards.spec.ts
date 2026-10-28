@@ -1,5 +1,10 @@
 import { test, expect } from './helpers/bot-pair';
 
+// Inspect individual notice cards in full transcript; brief grouping has its own coverage.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('lab.sessionBrief', '0'));
+});
+
 const summary = 'Goal\n- **Publish the demo**\n\nConstraints\n- Keep local settings private\n\nProgress\n- Tests pass\n\nDecisions\n- Use the existing renderer\n\nFiles\n- `demo.ts`\n\nNext steps\n1. Review the change\n\nHistory source: retained original messages 1-10.';
 const jev = '[jev-route] jev-route need_tools noul 0.77. Continue working.';
 

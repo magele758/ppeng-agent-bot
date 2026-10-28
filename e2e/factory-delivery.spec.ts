@@ -36,7 +36,7 @@ async function setup(page: Page, tasks: unknown[] = []) {
     r.fulfill({ json: { bots: [{ id: "bot", name: "Coordinator" }] } }),
   );
   await page.route("**/api/bot-rooms", (r) =>
-    r.fulfill({ json: { rooms: [{ id: "room", title: "Factory" }] } }),
+    r.fulfill({ json: { rooms: [{ id: "room", title: "Factory", botIds: [] }] } }),
   );
   await page.route("**/api/factory/settings", (r) =>
     r.fulfill({

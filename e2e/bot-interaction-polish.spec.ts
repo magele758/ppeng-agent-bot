@@ -75,7 +75,7 @@ test('sidebar actions share a toolbar and groups use legible secondary text [AC:
   expect(await heading.evaluate(el => getComputedStyle(el).color)).not.toBe(await page.locator('.session-item__title').evaluate(el => getComputedStyle(el).color));
 });
 
-test('schedule details distinguish schedule kinds and persist edits without executing [AC:bot-workspace-interaction-polish#AC-11] [AC:bot-workspace-interaction-polish#AC-12]', async ({ page }) => {
+test('schedule details distinguish schedule kinds and persist edits without executing [AC:bot-workspace-interaction-polish#AC-11] [AC:bot-workspace-interaction-polish#AC-12] [AC:single-host-bot-completion#AC-5]', async ({ page }) => {
   let job = { id: 'cron-test', name: '每小时提醒', enabled: true, scheduleKind: 'cron5', scheduleValue: '0 * * * *', timezone: 'Asia/Shanghai' };
   await page.route('**/api/cron/jobs?botId=polish-bot', r => r.fulfill({ json: { jobs: [job, { ...job, id: 'once', name: '一次提醒', scheduleKind: 'once_at', enabled: false, scheduleValue: '2026-10-20T00:00:00Z' }] } }));
   await page.route('**/api/cron/jobs/cron-test', r => { const data = r.request().postDataJSON(); job = { ...job, scheduleValue: data.cron, timezone: data.timezone }; return r.fulfill({ json: { job } }); });

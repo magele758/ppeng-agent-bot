@@ -1,6 +1,6 @@
 id: bot-software-execution
 title: Bot 软件连接与可靠执行
-status: approved
+status: implemented
 requirement: |
   一个bot是可以持续一直对话的，他的记忆和历史会话管理，现在是否能满足，定时任务，以及跟其他bot的通信的模式，组群会话的能力是否能支持，以及调用各种其他软件的能力
 notes: 用户已授权完整开发计划实施，范围为受支持的 HTTP/OpenAPI 与 MCP 执行器。
@@ -25,3 +25,6 @@ criteria:
     given: 写操作结果未确认或进程中断
     when: 再次查询或重复请求
     then: 保留未知状态，不盲目重做，提供核对记录
+
+links:
+  - doc/SINGLE_HOST_COMPLETION.md
