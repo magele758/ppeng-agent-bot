@@ -1,3 +1,4 @@
+import {fenceExternalContent} from '../safety/external-content.js';
 import {hasWaitReceipt} from '../waits/receipt.js';
 import {DurableWaitStore} from '../waits/store.js';
 import {resolveRoutineWorkLink,linkedRoutinePrompt,type RoutineWorkSnapshot} from './routine-work-link.js';
@@ -633,10 +634,19 @@ function busyRoutines(runs:RoutineRunStore,all:RoutineRun[],executing:Set<string
  const busy=new Set(all.filter(run=>['running','waiting_condition','waiting_approval','unknown'].includes(run.status)).map(run=>run.routineId));
  for(const id of executing){const current=runs.get(id);if(current)busy.add(current.routineId);}return busy;
 }
+function linkedEventPrompt(run:RoutineRun,prompt:string):string {
+ if(run.eventBody===undefined)return prompt;
+ const body=run.eventBody.length>6000?`${run.eventBody.slice(0,6000)}\n…[truncated]`:run.eventBody;
+ return `${prompt}\n\n${fenceExternalContent({source:'event',label:run.job.scheduleValue,body:`Occurrence: ${run.id}\n${body}`})}`;
+}
 async function prepareLinkedRoutine(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):Promise<RoutineRun|undefined> {
  const current=new CronJobStore(host.stateDir).get(run.routineId);
  const raw=current?current.metadata.workLink:run.job.metadata.workLink;
- if(!raw)return runs.update(run.id,{job:current??run.job,workSnapshot:undefined});
+ if(!raw){
+  if(!run.job.metadata.workLink&&!run.workSnapshot)return run;
+  dropBotSteer(host,run.mainSessionId,run.steerKey);
+  return runs.update(run.id,{job:current?{...current,prompt:linkedEventPrompt(run,current.prompt)}:run.job,workSnapshot:undefined,steerKey:undefined});
+ }
  try{
   const work=resolveRoutineWorkLink(host.store,run.mainSessionId,raw);
   if(['completed','cancelled'].includes(work.goal.status)){
@@ -649,7 +659,7 @@ async function prepareLinkedRoutine(host:RoutineRuntimeHost,runs:RoutineRunStore
   const fresh=resolveRoutineWorkLink(host.store,run.mainSessionId,raw);
   if(JSON.stringify(fresh.goal)!==JSON.stringify(work.goal))return undefined;
   const prompt=work.link.sopSkill?prepared.prompt:`${current?.prompt??run.job.prompt}\n${prepared.prompt}`;
-  return runs.update(run.id,{job:{...(current??run.job),prompt},workSnapshot:prepared.snapshot});
+  return runs.update(run.id,{job:{...(current??run.job),prompt:linkedEventPrompt(run,prompt)},workSnapshot:prepared.snapshot});
  }catch(error){summarize(host,runs,runs.update(run.id,{status:'failed',error:String(error),finishedAt:nowIso()}));return undefined;}
 }
 async function dispatchRoutineQueue(host:RoutineRuntimeHost,runs:RoutineRunStore,executing:Set<string>):Promise<void>{
