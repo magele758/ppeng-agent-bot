@@ -57,6 +57,15 @@ Bot 可以请另一只 Bot 做事，也可以去调用已经接上的软件。�
 
 Bot 主对话保留执行过程。任务页不取代对话。
 
+### 监督先读快照，再按需刷新
+
+`bot_team_status` 默认只返回当前活跃工作的精简卡片，可按 `botIds`、`changedSince`、`activeOnly` 筛选。`sessionStatus` 与 `externalWorkerStatus` 分开；会话空闲不代表外部执行停止。`observedAt` 是证据采样时间，`reportedAt` 是读取快照的时间；缺失或过期的观察明确标记 stale。
+
+需要新状态时，调用 `bot_request_status`，提供目标 Bot、幂等键和可选期限。它先读取已授权快照，仍在有效期内则直接返回；过期才创建带 requestId 的刷新请求。接收方用 `bot_status_report` 回报该 requestId、简短摘要和真实工具观察消息 ID。送达/确认收到、等待观察、旧证据和超时分别可见。只有有权的目标 Bot 或其真实后代会话能回报，助手自述与无关消息不能充当观察证据。相同新鲜回报只回送一次；排队过期的刷新不会再启动模型。
+
+旧报告中的 observedAt/sample/checked 时间不会因重新读取而变新。成功读取近期有效的工作快照可用于无变化检查，但保存的采样时间保持原值；没有观察的“健康”自述和失败检查都会记录为未核验。进程状态与监督回报都不能代替原 Goal 的完成核验。
+
+`bot_task_results` 默认返回摘要与历史游标，完整结果按 `taskId` 读取，或显式选择 `includeResults`。用户汇报应采用简短列表，列出当前工作、阻塞和下一步。
 ## 与其他应用的 Agent 协作
 
 「设置 → 集成与可观测」提供两个入口：

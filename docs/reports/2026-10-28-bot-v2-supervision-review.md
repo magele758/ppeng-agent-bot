@@ -1,0 +1,11 @@
+# Bot v2 supervision: review and evidence
+
+The supervision tools now project compact authorized work snapshots, separating chat status, external worker state, evidence time and query time. Full task details remain explicit reads. Refresh requests read current state first and only contact a stale target. A host-owned request ID, original principal, actual Bot ancestry, deadline and idempotency key bind the reply. Actual successful tool observations are required; acknowledgement, self-authored text, old report reads, delivery and timeout are distinct states.
+
+Review checked ownership/principal revocation, real ancestry, actual tool-result identity, stale/future sample times, 180k report handling, duplicate replies, expired-message admission and peer expiry races. Only host-bound requests expire; a request-looking message body cannot cancel work. Existing Bot leases and writer admission still own execution. The protocol changes no goal completion state and grants no shell, source or approval authority. A fresh reply is idempotently sent through the existing Bot message path; its delivery state is separate from observation freshness.
+
+Linked watchers now reject unobserved health claims as well as ungrounded quiet tokens. A successful fresh snapshot check retains the underlying evidence sample time. Existing event fences and watcher unlink fixes from the previous slice are retained.
+
+Fail-first tests reproduced compact-output/freshness gaps, a 180k old-report reread, delayed expired wakeups and a second claimant after peer expiry. A real controlled Bot kernel performs one read-only observation and one correlated report, without manufacturing a new goal. Source observations are bounded; the system does not certify arbitrary free-form reports as verified delivery.
+
+Validation before commit: core+daemon build; 118 affected unit/kernel/state regressions (before the two subsequent event integration cases), 10 protocol counterexamples, 12 authenticated HTTP/history/load/failure-injection cases; acceptance gate and complexity inspection pass. The integrated event/source/wait suite is also rerun. Final formal verification and PR CI must pass before merge. No production Bot state, remote process, SDK source or environment configuration changed.
