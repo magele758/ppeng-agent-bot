@@ -18,6 +18,7 @@ import {
 import { briefStreamSegments, visibleBriefParts } from '@/lib/session-brief';
 import { SessionBriefDisclosure } from './SessionBriefDisclosure';
 import { parseCronUserPrompt } from '@/lib/cron';
+import { quietRoutineResult } from '@/lib/routine-quiet';
 import { presentGoalUpdate, readMessageSessionId } from '@/lib/goal-update-notice';
 import { A2uiSurface } from './a2ui/A2uiSurface';
 import { ReadableMessage } from './ReadableMessage';
@@ -475,6 +476,7 @@ export function ChatTurnFromMessage({
   const { t } = useI18n();
   const shown = brief ? { ...m, parts: visibleBriefParts(m.parts) } : m;
   const r = normalizedRole(m);
+  if (quietRoutineResult(r, (m as { key?: string }).key, msgPartsToText(m.parts))) return null;
   const storedReply = r === 'user' ? readStoredReplyTo(m) : null;
   /** 与流式行一致：助手侧（含「调用工具」等结构化气泡）统一不占左侧头像列 */
   const noAvatar = r === 'tool' || r === 'system' || r === 'assistant';
