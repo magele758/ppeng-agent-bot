@@ -64,6 +64,8 @@ export type {
 export { BotStore } from './bot-store.js';
 export { BotFunctionalGroupService } from './functional-groups.js';
 export type { BotFunctionalGroup, BotSharedScope } from './functional-groups.js';
+export { createSharedMemoryPort } from './shared-memory-port.js';
+export type { SharedMemoryPort } from './shared-memory-port.js';
 export {
   botInstructions,
   canonicalBotChatTitle,

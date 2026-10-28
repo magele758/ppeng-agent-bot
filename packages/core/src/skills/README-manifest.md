@@ -9,6 +9,8 @@ They are orthogonal. A skill can be progressively disclosed **and** constrained 
 A missing manifest leaves the skill unrestricted. A present manifest is a ceiling: omitted tool or path allow-lists deny, and network defaults to none.
 A broken sibling manifest skips that skill instead of loading it with no ceiling. Other skills in the tree still load.
 After `load_skill`, the tool loop refuses later calls that exceed any active manifest (tools, paths, and network).
+`load_skill` in a tool wave finishes before the other calls in that wave.
+Shell tools are network-capable: with network `none` or an allow-list, a command is refused unless its host is on that list.
 
 Sources (sibling JSON preferred when present; else frontmatter):
 
