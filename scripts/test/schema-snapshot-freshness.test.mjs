@@ -2,9 +2,10 @@
  * Fail fast when LATEST_SCHEMA_VERSION advances without a prior-version snapshot.
  *
  * Full validation's unit coverage lane already catches this via
- * schema-migration-snapshots.test.mjs, but only after ~15 minutes. Keep the
- * registry (SNAPSHOT_REVISIONS), on-disk vN.sql, and LATEST in lockstep so
- * Quick gate / Core unit reject the drift before Full validation burns a run.
+ * schema-migration-snapshots.test.mjs, but the failure is buried after ~15
+ * minutes of other tests. Keep the registry (SNAPSHOT_REVISIONS), on-disk
+ * vN.sql, and LATEST in lockstep so the dedicated check fails immediately
+ * when the unit lane starts (and so operators can run it alone before bumping).
  *
  * [AC:schema-upgrade-safety#AC-1]
  */

@@ -26,11 +26,16 @@ Subsequent main Full validation runs after that commit went green.
 ## Stabilization in this change
 1. Fast `scripts/test/schema-snapshot-freshness.test.mjs` keeps
    `SNAPSHOT_REVISIONS`, on-disk `vN.sql`, and `LATEST` locked together.
-2. Quick gate runs that test right after `build-workspace` so drift fails in
-   seconds, not after the ~15m unit coverage lane.
-3. Rollback test no longer hardcodes `35`; it requires
+   It runs in the Full validation unit coverage lane (`scripts/**/*.test.mjs`)
+   and can be run alone before bumping schema.
+2. Rollback test no longer hardcodes `35`; it requires
    `max(SNAPSHOT_REVISIONS) === LATEST - 1`.
-4. Full snapshot suite also asserts the registry matches on-disk files.
+3. Full snapshot suite also asserts the registry matches on-disk files.
+4. Quick gate was **not** wired: `scripts/ci/quick-gate.mjs` is covered by
+   formal review fingerprints (`specs/formal/*-review.json`). Changing it
+   without refreshing those fingerprints fails Quick gate with
+   `needs-review`. Prefer refreshing fingerprints in a dedicated formal
+   follow-up if fail-fast-on-PR is required.
 
 ## Operator checklist when bumping schema
 1. Land the migration that raises `LATEST_SCHEMA_VERSION` to N.

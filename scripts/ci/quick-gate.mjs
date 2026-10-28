@@ -18,8 +18,6 @@ try{
   run(['scripts/ci/changed-complexity.mjs']);
   run(['scripts/ci/reviewed-verification-inputs.mjs']);
   run(['scripts/build-workspace.mjs']);
-  // Schema snapshot drift used to burn a full validation unit lane (~15m).
-  run(['--test','scripts/test/schema-snapshot-freshness.test.mjs']);
   run(['node_modules/typescript/bin/tsc','-p','apps/web-console','--noEmit']);
   run(['--experimental-strip-types','--test','packages/core/test/domain-stores.test.js','packages/core/test/session-fork.test.js','packages/core/test/bot-reply-quote.test.js',
     'packages/core/test/bots.test.js','packages/core/test/bot-goal-result-return.test.js','scripts/test/ci-action-reliability.test.mjs','scripts/test/settings-route-contracts.test.mjs','scripts/test/e2e-suite.test.mjs','apps/web-console/lib/feed-window.test.ts',
