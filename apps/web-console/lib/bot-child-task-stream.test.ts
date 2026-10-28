@@ -152,3 +152,36 @@ test('普通聊天和正在看的子任务本身不出现这块入口', () => {
   assert.equal(botIds.includes('child-a'), false);
   assert.equal(botIds.includes('sess-researcher'), true);
 });
+
+test('正在执行的子任务把 status 传到入口，其他状态也传但不表示要停 [AC:bot-child-task-stream-entry#AC-9]', () => {
+  const running = {
+    id: 'child-running',
+    title: '正在整理纪要',
+    status: 'running',
+    metadata: { botId: 'researcher', spawnSource: 'concurrent-bot-work', parentSessionId: 'sess-researcher' }
+  };
+  const idle = {
+    id: 'child-idle',
+    title: '已经整理完',
+    status: 'idle',
+    metadata: { botId: 'researcher', spawnSource: 'concurrent-bot-work', parentSessionId: 'sess-researcher' }
+  };
+  const failed = {
+    id: 'child-failed',
+    title: '整理失败了',
+    status: 'failed',
+    metadata: { botId: 'researcher', spawnSource: 'concurrent-bot-work', parentSessionId: 'sess-researcher' }
+  };
+  const entries = streamChildTaskEntries({
+    surface: 'bot',
+    sessions: [sessions[0]!, running, idle, failed],
+    bot: researcher,
+    current: sessions[0]
+  });
+  assert.deepEqual(entries.map((entry) => [entry.id, entry.status]), [
+    ['child-running', 'running'],
+    ['child-idle', 'idle'],
+    ['child-failed', 'failed']
+  ]);
+  assert.equal(entries.length, 3);
+});

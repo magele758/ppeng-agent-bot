@@ -13,6 +13,8 @@ export type ChildTaskStreamEntry = {
   sourceMessageId?: string;
   /** When the child session was created. */
   createdAt?: string;
+  /** Session status. Running is the only status the stream renders. */
+  status?: string;
 };
 
 export type ChildTaskFeedMessage = {
@@ -85,7 +87,7 @@ function anchorIndex(
   return last >= 0 ? last : undefined;
 }
 
-export function streamChildTaskEntries<T extends { id: string; title: string; createdAt?: string; metadata?: Record<string, unknown> }>(input: {
+export function streamChildTaskEntries<T extends { id: string; title: string; createdAt?: string; status?: string; metadata?: Record<string, unknown> }>(input: {
   surface: 'chat' | 'bot';
   sessions: readonly T[];
   bot: { id: string; canonicalSessionId?: string | null } | null | undefined;
@@ -103,7 +105,8 @@ export function streamChildTaskEntries<T extends { id: string; title: string; cr
       excerpt,
       title: stripBotChatPrefix(task.title).replace(/\s+/g, ' ').trim(),
       ...(typeof source === 'string' && source ? { sourceMessageId: source } : {}),
-      ...(typeof createdAt === 'string' && createdAt ? { createdAt } : {})
+      ...(typeof createdAt === 'string' && createdAt ? { createdAt } : {}),
+      ...(typeof task.status === 'string' ? { status: task.status } : {})
     });
   }
   return entries;
