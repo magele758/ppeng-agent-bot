@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-10-28T16:45:33.000Z",
-  "reviewNote": "Same-wave load_skill finishes before the other tools, then results are stitched back by toolCallId so pairing order matches the original wave. Compensation, secret-ref scope, steer wave scope, and wave close are unchanged. A shell command that does not name an allow-listed host is an extra Manifest refusal, not a change to approval, lifecycle, restart, or concurrency control flow.",
+  "reviewedAt": "2026-10-28T17:06:52.000Z",
+  "reviewNote": "UserDeliveryPort wraps user-facing drafts; deliverChannelText always drafts then human Confirm→Send. Pairing, approval, lifecycle, restart, and concurrency control-flow contracts are unchanged.",
   "mapping": [
     {
       "step": "Public runtime, cancellation, approvals and completion; exercised through RawAgentRuntime with SQLite",
