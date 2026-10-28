@@ -421,7 +421,7 @@ function parkOutstandingRoutine(host:RoutineRuntimeHost,runs:RoutineRunStore,run
  const session=host.store.getSession(run.sessionId);
  if(!session)return false;
  const noted=typeof session.metadata.routineChildSessionId==='string'?session.metadata.routineChildSessionId:undefined;
- const childId=noted??outstandingRoutineChildId(host.store,session.id);
+ const childId=noted??outstandingRoutineChildId(host.store,session.id,run.id);
  if(!childId)return false;
  const child=host.store.getSession(childId);
  if(!child||['completed','failed','cancelled','unknown'].includes(child.status))return false;

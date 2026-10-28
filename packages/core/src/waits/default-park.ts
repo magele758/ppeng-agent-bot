@@ -114,14 +114,18 @@ export function parkGoalDurableWait(
   }
 }
 
-/** Still-running direct children of this occurrence session. */
-export function outstandingRoutineChildId(store: SqliteStateStore, sessionId: string): string | undefined {
+/** A child this occurrence spawned and that is still running. Other sessions are not this wait. */
+export function outstandingRoutineChildId(store: SqliteStateStore, sessionId: string, runId: string): string | undefined {
   const terminal = new Set(['completed', 'failed', 'cancelled', 'unknown']);
   const rows = store.db
-    .prepare(`SELECT id, status FROM sessions WHERE parent_session_id=? ORDER BY rowid DESC LIMIT 32`)
-    .all(sessionId) as Array<{ id: string; status: string }>;
+    .prepare(`SELECT id, status, metadata_json FROM sessions WHERE parent_session_id=? ORDER BY rowid DESC LIMIT 32`)
+    .all(sessionId) as Array<{ id: string; status: string; metadata_json: string }>;
   for (const row of rows) {
-    if (!terminal.has(row.status)) return row.id;
+    if (terminal.has(row.status)) continue;
+    let metadata: { spawnSource?: unknown; routineRunId?: unknown } = {};
+    try { metadata = JSON.parse(row.metadata_json) as typeof metadata; } catch { continue; }
+    if (metadata.spawnSource !== 'subagent' && metadata.routineRunId !== runId) continue;
+    return row.id;
   }
   return undefined;
 }

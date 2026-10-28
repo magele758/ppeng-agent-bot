@@ -23,7 +23,7 @@ function fixture(t) {
   return { store, dir };
 }
 
-test('observableDispatchWait accepts only durable-backed sources [AC:durable-wait-default#AC-5]', () => {
+test('observableDispatchWait accepts only durable-backed sources [AC:durable-wait-default#AC-1]', () => {
   assert.deepEqual(observableDispatchWait({ source: 'session', correlationId: 'c1' }), {
     source: 'session',
     ref: 'c1',
@@ -37,7 +37,7 @@ test('observableDispatchWait accepts only durable-backed sources [AC:durable-wai
   assert.equal(observableDispatchWait(undefined), undefined);
 });
 
-test('terminalObservableCondition is status-only for sessions [AC:durable-wait-default#AC-5]', () => {
+test('terminalObservableCondition is status-only for sessions [AC:durable-wait-default#AC-1]', () => {
   assert.deepEqual(terminalObservableCondition('session'), {
     op: 'in',
     field: 'status',
@@ -47,7 +47,7 @@ test('terminalObservableCondition is status-only for sessions [AC:durable-wait-d
   assert.equal(other.op, 'all');
 });
 
-test('parkGoalDurableWait host-registers without wait_for receipt [AC:durable-wait-default#AC-1]', (t) => {
+test('parkGoalDurableWait host-registers without wait_for receipt [AC:durable-wait-default#AC-2]', (t) => {
   const { store } = fixture(t);
   const scope = store.createSession({
     title: 'scope',
@@ -93,7 +93,7 @@ test('parkGoalDurableWait host-registers without wait_for receipt [AC:durable-wa
   assert.match(DURABLE_WAIT_DEFAULT, /default way to suspend/);
 });
 
-test('outstandingRoutineChildId returns non-terminal child [AC:durable-wait-default#AC-2]', (t) => {
+test('outstandingRoutineChildId returns non-terminal child [AC:durable-wait-default#AC-3]', (t) => {
   const { store } = fixture(t);
   const parent = store.createSession({
     title: 'routine',
@@ -101,16 +101,25 @@ test('outstandingRoutineChildId returns non-terminal child [AC:durable-wait-defa
     agentId: 'general',
     metadata: { userId: 'alice', botId: 'b' },
   });
-  assert.equal(outstandingRoutineChildId(store, parent.id), undefined);
+  assert.equal(outstandingRoutineChildId(store, parent.id, 'run-1'), undefined);
+  const unrelated = store.createSession({
+    title: 'other',
+    mode: 'chat',
+    agentId: 'general',
+    parentSessionId: parent.id,
+    metadata: { userId: 'alice', botId: 'b' },
+  });
+  store.updateSession(unrelated.id, { status: 'running' });
+  assert.equal(outstandingRoutineChildId(store, parent.id, 'run-1'), undefined);
   const child = store.createSession({
     title: 'child',
     mode: 'subagent',
     agentId: 'general',
     parentSessionId: parent.id,
-    metadata: { userId: 'alice', botId: 'b' },
+    metadata: { userId: 'alice', botId: 'b', spawnSource: 'subagent' },
   });
   store.updateSession(child.id, { status: 'running' });
-  assert.equal(outstandingRoutineChildId(store, parent.id), child.id);
+  assert.equal(outstandingRoutineChildId(store, parent.id, 'run-1'), child.id);
   store.updateSession(child.id, { status: 'completed' });
-  assert.equal(outstandingRoutineChildId(store, parent.id), undefined);
+  assert.equal(outstandingRoutineChildId(store, parent.id, 'run-1'), undefined);
 });
