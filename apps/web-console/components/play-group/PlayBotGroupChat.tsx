@@ -25,6 +25,7 @@ import { MODEL_PROVIDERS_CHANGED_EVENT } from '@/lib/model-providers';
 import { groupComposerCommand, runGroupComposerCommand, groupMessageMood, roomComposerDisabled, roomHistoryUrl } from '@/lib/group-chat-view';
 import type { RoomModelConfiguration } from '@/lib/room-models';
 import { RoomSharedContextEditor } from './RoomSharedContextEditor';
+import { RoomWorkReceipt, type RoomWorkReceiptData } from './RoomWorkReceipt';
 import { RoomGoalBar } from './RoomGoalBar';
 import { RoomMemberDrawer } from './RoomMemberDrawer';
 import {
@@ -59,6 +60,7 @@ type Room = {
 };
 
 type RoomMessage = {
+  workReceipt?: RoomWorkReceiptData;
   id: string;
   seq: number;
   text: string;
@@ -115,7 +117,8 @@ function GroupTurn({
   mood,
   attachmentLabel,
   onQuote,
-  quotedName
+  quotedName,
+  onOpenWork
 }: {
   message: RoomMessage;
   name: string;
@@ -123,6 +126,7 @@ function GroupTurn({
   attachmentLabel?: string;
   onQuote: (quote: ReplyQuote) => void;
   quotedName: string;
+  onOpenWork?: (id:string)=>void;
 }) {
   const kind = message.sender.type;
   switch (kind) {
@@ -162,7 +166,7 @@ function GroupTurn({
         </div>
         <div className="chat-bubble">
           {user ? <MessageReplyQuote replyTo={readStoredReplyTo(message)} botName={quotedName} /> : null}
-          <MarkdownHtml className="chat-bubble__body chat-bubble__md" text={message.text} />
+          {message.workReceipt ? <RoomWorkReceipt receipt={message.workReceipt} onOpen={onOpenWork} /> : <MarkdownHtml className="chat-bubble__body chat-bubble__md" text={message.text} />}
           <ComposerMessageContext role={kind} message={message} />
         </div>
         {attachmentLabel ? <p className="play-group-hint">{attachmentLabel}</p> : null}
@@ -193,7 +197,7 @@ function mentionDetail(option: MentionChoice, groupCount: (count: number) => str
   }
 }
 
-export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: readonly BotInfo[] }) {
+export function PlayBotGroupChat({ roomId, bots, onOpenWork }: { roomId: string; bots: readonly BotInfo[]; onOpenWork?: (id:string)=>void }) {
   const { t } = useI18n();
   const workStates = useBotWorkStates();
   const [showSettings, setShowSettings] = useState(false);
@@ -538,7 +542,7 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
       ) : null}
       {showSettings ? (
         <div className="play-group-settings" data-testid="room-settings">
-          <BotRooms key={roomId} bots={[...bots]} selectedRoomId={roomId} memberEditor={false} />
+          <BotRooms key={roomId} bots={[...bots]} selectedRoomId={roomId} memberEditor={false} onOpenWork={onOpenWork} />
           {room ? <section className="play-group-settings-members" aria-label={t('play.group.membersDrawer')}>
             <h3>{t('play.group.membersDrawer')}</h3>
             <RoomMemberDrawer
@@ -578,6 +582,7 @@ export function PlayBotGroupChat({ roomId, bots }: { roomId: string; bots: reado
                   : '';
                 return (
                   <GroupTurn
+                    onOpenWork={onOpenWork}
                     key={message.id}
                     message={message}
                     name={name}
