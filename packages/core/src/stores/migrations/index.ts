@@ -1030,6 +1030,13 @@ export const MIGRATIONS: Migration[] = [
         db.exec(`ALTER TABLE bots ADD COLUMN face_expression TEXT`);
       }
     }
+  },
+  {
+  version: 35,
+  description: 'Host-owned execution provenance for shared-session messages',
+  up(db) {
+    db.exec('CREATE TABLE IF NOT EXISTS session_message_sources(message_id TEXT PRIMARY KEY REFERENCES session_messages(id) ON DELETE CASCADE, session_id TEXT NOT NULL, source_id TEXT NOT NULL); CREATE INDEX IF NOT EXISTS idx_message_source ON session_message_sources(session_id,source_id)');
+  }
   }
 ];
 
