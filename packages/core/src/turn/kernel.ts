@@ -4,7 +4,7 @@ import { usesDurableBotGoals } from '../bots/goals/runtime-host.js';
  * Behavior-preserving move of RawAgentRuntime._runSessionInner.
  */
 
-import { hashStablePrefix } from '../session/startup-invariants.js';
+import { createHash } from 'node:crypto';
 import { NotFoundError } from '../errors.js';
 import { resolveSessionMaxTurns } from '../runtime/session-max-turns.js';
 import { envBool, envInt } from '../env.js';
@@ -688,11 +688,10 @@ async function runSessionKernel(
         host.store.appendMessage(sid, 'system', [textPart(drainedAdvisory)]);
       }
       const systemPrompt = await host.promptBuilder.buildSystemPrompt(promptCtx, rawVisible);
-      const stablePrefix = host.promptBuilder.buildStablePrefix(promptCtx);
-      if (!stablePrefix.trim()) {
-        throw new Error('stable prefix is empty; refusing to start the turn');
-      }
-      const stablePrefixHash = hashStablePrefix(stablePrefix);
+      const stablePrefixHash = createHash('sha256')
+        .update(host.promptBuilder.buildStablePrefix(promptCtx))
+        .digest('hex')
+        .slice(0, 16);
       const routing = host.promptBuilder.getRouting(sid);
       void host.emitTrace(sid, {
         kind: 'turn_start',
