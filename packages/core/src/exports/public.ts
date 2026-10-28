@@ -829,3 +829,12 @@ export type {WaitSpec,WaitCondition,WaitSource,Observation} from '../waits/index
 export { resolveSkillRoutingSettings } from '../skills/skill-settings.js';
 
 export * from '../config/runtime-capabilities.js';
+
+export {
+  evaluateDefaultDenyPolicy,
+  isDangerousCwd,
+  detectUntrustedInduction,
+  isHighPrivilegeTool
+} from '../safety/default-deny-policy.js';
+export type { DefaultDenyInput, DefaultDenyDecision } from '../safety/default-deny-policy.js';
+
