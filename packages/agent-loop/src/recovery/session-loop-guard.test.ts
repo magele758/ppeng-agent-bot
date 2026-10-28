@@ -69,6 +69,16 @@ describe('recovery/session-loop-guard', () => {
       expect(result.abort).toBe(true);
     });
 
+    it('does not fuse different arguments of the same tool [AC:tool-loop-same-call#AC-1]', () => {
+      const guard = new SessionLoopGuard({ RAW_AGENT_RECOVERY_TOOL_FAIL_STREAK: '3', RAW_AGENT_RECOVERY_SAME_TOOL_STREAK: '99' });
+      const commands = ['ls', 'cat', 'grep'];
+      const decisions = commands.map((command) => guard.afterToolRound(
+        [{ name: 'bash', input: { command } }],
+        [{ name: 'bash', ok: false, content: command }],
+      ));
+      expect(decisions.every((decision) => decision.abort === false)).toBe(true);
+    });
+
     it('detects same call content streak', () => {
       const guard = new SessionLoopGuard({ RAW_AGENT_RECOVERY_SAME_TOOL_STREAK: '3' });
       const sameCall = [{ name: 'bash', input: { cmd: 'git status' } }];

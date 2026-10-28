@@ -98,7 +98,7 @@ test('afterToolRound retains each full sequence without new successful evidence 
   assert.match(hit.reason, /read_file/);
 });
 
-test('afterToolRound fail streak is independent of call-content streak', () => {
+test('different arguments of the same tool do not share a failure streak [AC:tool-loop-same-call#AC-1]', () => {
   const g = new SessionLoopGuard({
     RAW_AGENT_RECOVERY_TOOL_FAIL_STREAK: '3',
     RAW_AGENT_RECOVERY_SAME_TOOL_STREAK: '99'
@@ -115,8 +115,7 @@ test('afterToolRound fail streak is independent of call-content streak', () => {
     [{ name: 'bash', input: { command: 'grep' } }],
     [{ name: 'bash', ok: false }]
   );
-  assert.equal(third.abort, true);
-  assert.match(third.reason, /failed 3 times/);
+  assert.equal(third.abort, false);
 });
 
 test('checkAssistantRepetition preserves nested tool arguments in fingerprint', () => {
