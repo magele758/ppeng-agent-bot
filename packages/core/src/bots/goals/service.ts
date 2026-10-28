@@ -124,7 +124,7 @@ export class BotGoalService {
  claim(botId:string,id:string,options:{strategy:string;strategyReason?:string;owner?:string;leaseMs?:number;safeToRetry?:boolean}):GoalExecution|undefined {
   return mutateGoalSnapshot(this.store,botId,s=>{
    const g=this.find(s,id);if(g.status!=='queued'||g.activeExecutionId||g.draining)return undefined;
-   const settings=this.readSettings();if(this.limit(g,settings))return undefined;
+   const settings=this.readSettings();
    const active=s.goals.filter(other=>other.sessionId===g.sessionId&&occupiesGoalCapacity(other));
    if(active.length>=settings.maxConcurrent){g.blockedReason='Waiting for concurrency capacity';return undefined;}
    const conflicts=s.goals.find(other=>other.id!==id&&(other.activeExecutionId||(other.wait&&(other.status==='waiting'||other.draining)))&&other.resources.some(r=>g.resources.includes(r)));
@@ -135,11 +135,6 @@ export class BotGoalService {
  }
  updateExecution(botId:string,id:string,patch:{runRef?:string;sessionId?:string;safeToRetry?:boolean;leaseUntil?:number;messageStartSeq?:number;messageEndSeq?:number}):void {mutateGoalSnapshot(this.store,botId,s=>{const e=s.executions.find(x=>x.id===id);if(!e)throw new Error('Execution not found');this.find(s,e.goalId);if(e.status!=='running'||e.leaseUntil<=this.clock())throw new Error('Execution lease expired');Object.assign(e,patch);});}
  renewRunningLease(botId:string,id:string,leaseUntil:number):void {mutateGoalSnapshot(this.store,botId,s=>{const e=s.executions.find(x=>x.id===id);if(!e)throw new Error('Execution not found');const goal=this.find(s,e.goalId);if(e.status!=='running'||goal.status!=='running'||goal.activeExecutionId!==e.id)throw new Error('Execution lease expired');e.leaseUntil=leaseUntil;});}
- private limit(g:BotGoal,settings:GoalSettings,waiting=false):boolean {
-  if(terminal.has(g.status)||g.status==='pending_review')return false;
-  const reason=g.costUsd>=g.budgetUsd?'Goal budget exhausted':!waiting&&g.attempts>=settings.maxAttempts+(g.extraAttempts??0)?'Attempt limit reached':!waiting&&g.noProgress>=settings.maxNoProgress+(g.extraAttempts??0)?'No progress limit reached':undefined;
-  if(reason){g.status='blocked';if(g.wait)g.draining=true;g.blockedReason=reason;g.nextStep='User review required';return true;}return false;
- }
  report(botId:string,id:string,result:GoalReport):BotGoal {
   return mutateGoalSnapshot(this.store,botId,s => this.applyReport(s,id,result));
  }
@@ -148,7 +143,6 @@ export class BotGoalService {
   if(opened.stopped)return opened.goal;
   this.recordReportProgress(opened.goal,result);
   this.applyReportKind(s,opened.goal,result);
-  if(!terminal.has(opened.goal.status)&&opened.goal.status!=='pending_review')this.limit(opened.goal,this.readSettings(),opened.goal.status==='waiting');
   this.event(s,'result',opened.goal,result.summary);
   return opened.goal;
  }
@@ -186,7 +180,6 @@ export class BotGoalService {
  private chargeParent(s:GoalSnapshot,parentGoalId:string,cost:number):void {
   const parent=this.find(s,parentGoalId);
   parent.costUsd+=cost;
-  this.limit(parent,this.readSettings());
  }
  private settleReportGuards(s:GoalSnapshot,execution:GoalExecution,goal:BotGoal,result:GoalReport):{goal:BotGoal;stopped:boolean} {
   if(this.lateReport(s,goal,result))return {goal,stopped:true};
@@ -267,7 +260,7 @@ export class BotGoalService {
   goal.blockedReason=result.summary||(result.kind==='failed'?'Execution failed':'Execution blocked');
   if(result.kind==='blocked'&&result.wait){goal.wait=result.wait;goal.draining=true;}
  }
- private applyWakeData(s:GoalSnapshot,g:BotGoal,event:{summary?:string;evidence?:string[];costUsd?:number;completionCandidate?:boolean}):void{if(event.summary)g.progress=event.summary;g.evidence.push(...(event.evidence??[]));const cost=Number.isFinite(event.costUsd)?Math.max(0,event.costUsd!):0;g.costUsd+=cost;if(g.parentGoalId){const parent=this.find(s,g.parentGoalId);parent.costUsd+=cost;this.limit(parent,this.readSettings());}if(this.limit(g,this.readSettings())&&event.completionCandidate){g.status='pending_review';g.blockedReason=PENDING_REVIEW;g.noProgress=0;}}
+ private applyWakeData(s:GoalSnapshot,g:BotGoal,event:{summary?:string;evidence?:string[];costUsd?:number}):void{if(event.summary)g.progress=event.summary;g.evidence.push(...(event.evidence??[]));const cost=Number.isFinite(event.costUsd)?Math.max(0,event.costUsd!):0;g.costUsd+=cost;if(g.parentGoalId){const parent=this.find(s,g.parentGoalId);parent.costUsd+=cost;}}
  wake(botId:string,event:{completionCandidate?:boolean;goalId?:string;eventId:string;source:string;correlationId:string;summary?:string;evidence?:string[];costUsd?:number}):BotGoal[]{return mutateGoalSnapshot(this.store,botId,s=>{
   const key=`wake:${this.scopeSessionId??'*'}:${event.goalId??'*'}:${event.source}:${event.eventId}`;if(s.processed.includes(key))return [];s.processed.push(key);
   const wake={...event,sessionId:this.scopeSessionId,consumedBy:[] as string[]};(s.wakeEvents??=[]).push(wake);

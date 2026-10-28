@@ -90,13 +90,14 @@ test('explicit per-goal funding and attempts preserve receipts and isolate owner
  const f=fixture(t);f.service.updateSettings({defaultBudgetUsd:1,maxAttempts:1,maxNoProgress:1});
  const g=f.create(),other=f.create(),e=f.service.claim('b',g.id,{strategy:'direct'});
  f.service.report('b',e.id,{kind:'progress',summary:'partial',advanced:false,evidence:['receipt'],costUsd:1});
+ assert.equal(f.service.get('b',g.id).status,'queued');assert.equal(f.service.get('b',g.id).blockedReason,undefined);
  f.service.updateSettings({defaultBudgetUsd:5});
  const foreign=new BotGoalService(f.store,Date.now,'foreign');assert.throws(()=>foreign.extendLimits('b',g.id,{additionalBudgetUsd:2}),/not found/i);
  for(const bad of [{additionalBudgetUsd:-1},{additionalBudgetUsd:Infinity},{additionalAttempts:1.2},{}])assert.throws(()=>f.service.extendLimits('b',g.id,bad));
  f.service.extendLimits('b',g.id,{additionalBudgetUsd:2,additionalAttempts:1});
  const saved=f.service.get('b',g.id);assert.equal(saved.budgetUsd,3);assert.equal(saved.costUsd,1);assert.equal(saved.attempts,1);assert.equal(saved.noProgress,1);assert.deepEqual(saved.evidence,['receipt']);
  assert.equal(f.service.get('b',other.id).budgetUsd,1);assert.equal(f.service.readSettings().defaultBudgetUsd,5);
- f.service.control('b',g.id,'resume');assert.ok(f.service.claim('b',g.id,{strategy:'direct'}));
+ assert.ok(f.service.claim('b',g.id,{strategy:'direct'}));
 });
 
 test('queued delegation never stamps other users or overwrites active recipient goals [AC:bot-goal-lifecycle-boundaries#AC-1]',async t=>{
@@ -162,13 +163,18 @@ test('cancelled and failed child outcomes settle both running and waiting entran
  }
 });
 
-test('last allowed external attempt remains waiting then becomes reviewable without redispatch [AC:bot-goal-lifecycle-boundaries#AC-4] [AC:bot-goal-lifecycle-boundaries#AC-5]',async t=>{
+test('attempt cap does not stop an external result or a later execution [AC:bot-goal-lifecycle-boundaries#AC-4] [AC:bot-multi-goal-coordination#AC-13]',async t=>{
  const f=fixture(t);f.service.updateSettings({maxAttempts:1,maxConcurrent:1});const g=f.create();
  const child=f.store.createSession({title:'last worker',mode:'subagent',agentId:'general',parentSessionId:f.parent.id,metadata:{botId:'b',botGoalId:g.id,botGoalScopeSessionId:f.parent.id,userId:'owner'}});
  waitFor(f,g,'session',child.id);assert.equal(f.service.get('b',g.id).status,'waiting');
  f.store.updateSession(child.id,{metadata:{...child.metadata,outcome:{kind:'completed'}}});f.store.appendMessage(child.id,'assistant',[{type:'text',text:'Final receipt'}]);
- await tickBotGoals(f.host);assert.equal(f.service.get('b',g.id).status,'pending_review');assert.equal(f.runs.length,0);assert.match(f.service.get('b',g.id).evidence.join('\n'),/Final receipt/);
- assert.equal(f.service.control('b',g.id,'verify',{accepted:true}).status,'completed');
+ await tickBotGoals(f.host);
+ const saved=f.service.get('b',g.id);
+ assert.match(saved.evidence.join('\n'),/Final receipt/);
+ assert.notEqual(saved.status,'blocked');
+ assert.notEqual(saved.blockedReason,'Attempt limit reached');
+ assert.ok(saved.status==='running'||saved.status==='queued');
+ assert.ok(saved.attempts>=1);
 });
 
 test('waiting resume message is answered without losing its receipt or retrying workers [AC:bot-goal-lifecycle-boundaries#AC-6]',async t=>{

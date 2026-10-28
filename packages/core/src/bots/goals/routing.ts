@@ -88,7 +88,6 @@ export function selectGoalRoute(request: GoalRouteRequest, capabilities: GoalCap
   request = {...request, workKind: request.workKind ?? goalWorkKind(request.task)};
   const taskMode = request.workKind === 'research' ? 'deep_research' : request.workKind === 'browser' ? 'browser' : request.workKind === 'computer' ? 'computer' : 'auto';
   const rejected: GoalRoute['rejected'] = [];
-  if (capabilities.budgetRemaining !== undefined && (!Number.isFinite(capabilities.budgetRemaining) || capabilities.budgetRemaining <= 0)) return { taskMode, blocked: true, reason: 'Goal budget is exhausted', rejected };
   const requiredSpecialty = goalSpecialty(request.task);
   const inferred: GoalStrategy = requiredSpecialty ?? (request.delegateBotId ? 'bot_delegate' : request.workKind === 'batch' ? 'ptc' : request.workKind === 'dependency_plan' ? 'team_dag' : request.workKind === 'role_pipeline' ? 'swarm' : request.independentWork || request.role || goalNeedsIsolatedExecutor(request.task) ? 'subagent' : 'direct');
   const requestedSpecialty = requiredSpecialty ?? (request.preferredStrategy && specialties.has(request.preferredStrategy) ? request.preferredStrategy : undefined);

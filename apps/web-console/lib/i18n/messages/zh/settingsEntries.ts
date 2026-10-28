@@ -208,7 +208,7 @@ export const settingsEntries = {
       },
       maxTurns: {
         label: '默认最多尝试轮数',
-        hint: '一个目标自动继续这么多轮仍未完成就停下，防止无限消耗。'
+        hint: '0 表示不限。填正数后，一个目标自动继续这么多轮仍未完成就停下。',
       }
     }
   },

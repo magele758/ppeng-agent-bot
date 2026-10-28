@@ -91,7 +91,8 @@ export function goalRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         runtime.mergeSessionMetadata(sessionId, {
           goalCondition: rec.condition,
           goalEnabled: true,
-          goalMaxTurns: rec.maxTurns
+          goalMaxTurns: rec.maxTurns,
+          goalTurnCapEnabled: rec.maxTurns > 0
         });
         json(response, 201, { goal: goalWirePayload(rec) });
       }

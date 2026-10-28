@@ -35,6 +35,26 @@ test('create and reopen a durable room with its members [AC:bot-rooms#AC-1]', ()
   assert.equal(reopened.list(f.principal).length, 1);
 });
 
+test('a new room does not stop conversation rounds when the cap switch is off [AC:unlimited-bot-rounds#AC-1]', async () => {
+  const f = fixture();
+  const room = f.rooms.create(f.principal, { title: 'Open', botIds: [f.a.id, f.b.id], hostBotId: f.a.id });
+  assert.equal(room.maxBotTurns, 0);
+  assert.equal(room.maxToolCalls, 0);
+  assert.equal(room.maxCostUsd, 0);
+  assert.notEqual(room.turnCapEnabled, true);
+  assert.notEqual(room.toolCapEnabled, true);
+  assert.notEqual(room.costCapEnabled, true);
+  const sent = f.rooms.send(f.principal, room.id, { text: 'keep going', mentions: [f.a.id, f.b.id] });
+  assert.equal(sent.turn.maxBotTurns, 0);
+  await f.rooms.tick();
+  assert.equal(f.runs.length, 2);
+  const capped = f.rooms.create(f.principal, { title: 'Capped', botIds: [f.a.id, f.b.id], maxBotTurns: 1 });
+  assert.equal(capped.turnCapEnabled, true);
+  f.rooms.send(f.principal, capped.id, { text: 'both', mentions: [f.a.id, f.b.id] });
+  await f.rooms.tick();
+  assert.equal(f.runs.length, 3);
+});
+
 test('mentioned members speak first and everyone else still gets a restrained turn [AC:bot-rooms#AC-2] [AC:bot-rooms#AC-3]', async () => {
   const f = fixture();
   f.store.appendMessage(f.a.canonicalSessionId, 'user', [{ type: 'text', text: 'PRIVATE_SECRET' }]);
@@ -236,25 +256,33 @@ test('real Agent runtime executes isolated Room contexts and returns shared repl
   } finally {rt.destroy();}
 });
 
-test('tool and cost limits stop before further member tool execution [AC:bot-rooms#AC-4]', async () => {
+test('tool and cost limits do not stop the room or cancel the session [AC:bot-rooms#AC-7]', async () => {
   const f=fixture();let cancelled=0;
   f.host.cancelSession=()=>cancelled++;
   f.host.runSession=async(id,options)=>{
     await options.onEvent({type:'model_done',stopReason:'tool_use',assistant:{parts:[{type:'tool_call',toolCallId:'x',name:'bash',input:{}},{type:'tool_call',toolCallId:'y',name:'bash',input:{}}]}});
+    f.store.appendMessage(id,'assistant',[{type:'text',text:'kept going'}]);
     f.store.updateSession(id,{status:'idle'});
   };
-  const room=f.rooms.create(f.principal,{title:'Tools',botIds:[f.a.id,f.b.id],maxToolCalls:1});
+  const room=f.rooms.create(f.principal,{title:'Tools',botIds:[f.a.id,f.b.id],maxToolCalls:1,maxCostUsd:1});
   f.rooms.send(f.principal,room.id,{text:'tools',mentions:[f.a.id]});await f.rooms.tick();
-  assert.equal(cancelled,1);
-  assert.equal(f.rooms.turns(f.principal,room.id)[0].terminationReason,'tool_budget');
+  assert.equal(cancelled,0);
+  const toolTurn=f.rooms.turns(f.principal,room.id)[0];
+  assert.notEqual(toolTurn.terminationReason,'tool_budget');
+  assert.equal(toolTurn.toolCalls,2);
+  assert.equal(f.rooms.get(f.principal,room.id).status,'active');
   f.host.runSession=async(id,options)=>{
     const session=f.store.getSession(id);f.store.updateSession(id,{metadata:{...session.metadata,usageCostUsd:2}});
     await options.onEvent({type:'model_done',stopReason:'end',assistant:{parts:[{type:'text',text:'cost'}]}});
-    f.store.updateSession(id,{status:'idle'});
+    f.store.appendMessage(id,'assistant',[{type:'text',text:'cost still running'}]);
+    f.store.updateSession(id,{status:'idle',metadata:{...f.store.getSession(id).metadata,usageCostUsd:2}});
   };
   f.rooms.send(f.principal,room.id,{text:'cost',mentions:[f.a.id]});await f.rooms.tick();
-  assert.equal(cancelled,2);
-  assert.equal(f.rooms.turns(f.principal,room.id).at(-1).terminationReason,'cost_budget');
+  assert.equal(cancelled,0);
+  const costTurn=f.rooms.turns(f.principal,room.id).at(-1);
+  assert.notEqual(costTurn.terminationReason,'cost_budget');
+  assert.ok(costTurn.costUsd>=2);
+  assert.equal(f.rooms.get(f.principal,room.id).status,'active');
 });
 
 test('aborted partial output is not success and reused Room contexts refresh canonical policy [AC:bot-rooms#AC-4] [AC:bot-rooms#AC-5]',async()=>{
@@ -1137,12 +1165,12 @@ test('a Room private message still stops at three hops and a full tool budget bl
   } finally { rt.destroy(); }
 });
 
-test('a Room turn that has used its tool budget cannot send another private message [AC:bot-rooms#AC-7]', async () => {
+test('a Room turn over its tool cap still sends the private message [AC:bot-rooms#AC-7]', async () => {
   const adapter = {
     name: 'room-budget',
     async runTurn(input) {
       const over = input.messages.some(message => message.parts.some(part => part.type === 'tool_result'));
-      if (over) return { stopReason: 'end', assistantParts: [{ type: 'text', text: 'should not get another turn' }] };
+      if (over) return { stopReason: 'end', assistantParts: [{ type: 'text', text: 'still going after tools' }] };
       return {
         stopReason: 'tool_use',
         assistantParts: [
@@ -1162,13 +1190,16 @@ test('a Room turn that has used its tool budget cannot send another private mess
     const alpha = rt.createBot({ name: 'Alpha' });
     const beta = rt.createBot({ name: 'Beta' });
     const principal = resolveBotPrincipal(rt.store);
-    const room = rt.rooms.create(principal, { title: 'Tight budget', botIds: [alpha.id, beta.id], hostBotId: alpha.id, maxToolCalls: 1 });
+    const room = rt.rooms.create(principal, { title: 'Tight budget', botIds: [alpha.id, beta.id], hostBotId: alpha.id, maxToolCalls: 1, maxCostUsd: 0.000001 });
     rt.rooms.send(principal, room.id, { text: 'one tool only', mentions: [alpha.id] });
     await rt.rooms.tick();
-    assert.equal(rt.rooms.turns(principal, room.id)[0].terminationReason, 'tool_budget');
+    const turn = rt.rooms.turns(principal, room.id)[0];
+    assert.notEqual(turn.terminationReason, 'tool_budget');
+    assert.notEqual(turn.terminationReason, 'cost_budget');
+    assert.equal(rt.rooms.get(principal, room.id).status, 'active');
     const bodies = rt.store.db.prepare('SELECT body FROM bot_work_messages').all().map(row => row.body);
-    assert.deepEqual(bodies, []);
-    assert.equal(rt.rooms.messages(principal, room.id).messages.some(message => String(message.text).includes('over budget')), false);
+    assert.ok(bodies.some(body => String(body).includes('over budget one')));
+    assert.ok(bodies.some(body => String(body).includes('over budget two')));
   } finally { rt.destroy(); }
 });
 
