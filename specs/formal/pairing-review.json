@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-10-28T03:12:27.037Z",
-  "reviewNote": "Reviewed startup tracing, goal-intake lock skip, non-owner scheduler skip, and unlimited turn caps. Tracing is additive and must not fail a turn. Tool-call pairing, approval decisions, writer admission, and cancellation are unchanged. A second runtime still must not write the shared scheduler database. A locked goal write on turn start is skipped instead of waiting out the 5s busy timeout. Turn caps stay off unless explicitly enabled.",
+  "reviewedAt": "2026-10-28T09:16:00.000Z",
+  "reviewNote": "Reviewed the prepare-view cache and context_budget predicate on top of the 2026-10-28 startup-trace review. prepareView and the memory appendix are skipped only when the folded message fingerprint, query, summary, and updatedAt are unchanged; autoCompact, inbox claim, fold, quote embed, and fold budget still run every turn. Tool-call pairing, approval, writer admission, cancellation, and restart/concurrency boundaries are unchanged. context_budget is recorded only when compact was required and did not replace history. Previous findings remain: tracing must not fail a turn; a second runtime must not write the shared scheduler database; a locked goal write on turn start is skipped; turn caps stay off unless explicitly enabled.",
   "mapping": [
     {
       "step": "Execute/approval/result persistence and fold recovery; real source component probes (not a full kernel proof)",
@@ -69,6 +69,8 @@
         "packages/agent-loop/src/session/steer-drain.ts",
         "packages/agent-loop/src/turn/prepare-turn-input.ts",
         "packages/core/src/turn/prepare-turn-input.ts",
+        "packages/agent-loop/src/turn/startup-input-cache.ts",
+        "packages/core/src/turn/startup-input-cache.ts",
         "packages/core/src/session/inbox-overflow.ts",
         "packages/agent-loop/src/session/inbox-overflow.ts",
         "packages/core/src/stores/migrations/index.ts"
@@ -273,8 +275,10 @@
     "packages/agent-loop/src/session/step-inbox.ts": "1d6168438b363a2f52edd2495f647e61fda236d3dc4b8e9e25e14760680f1e94",
     "packages/agent-loop/src/session/apply-claimed-inbox.ts": "c773fd3874248c99a578d4a20cbe24ee74e626f6f7bd07ea6cb4d89749e81e0b",
     "packages/agent-loop/src/session/steer-drain.ts": "d2ee45c0247345690f131bd0aa9ca081e923b3ff1437cf14021461e252fc9447",
-    "packages/agent-loop/src/turn/prepare-turn-input.ts": "9d0c45abea5ed9e2814a054fcbdb4a2db770883c2c7ba894aba38a06d9001ad9",
-    "packages/core/src/turn/prepare-turn-input.ts": "dd7fc22731c7000fe638f49c8db79a029035a3d63bd2bd4fc6aff3edbd7a3fc5",
+    "packages/agent-loop/src/turn/prepare-turn-input.ts": "7065c72e6c07b98b732a72ada932e350fea99010f6a13b8d93b0396178d79fac",
+    "packages/core/src/turn/prepare-turn-input.ts": "36a060ab59a8bda6d184cda2576aaba3ba0abdaa073538004faca667de6219d6",
+    "packages/agent-loop/src/turn/startup-input-cache.ts": "adbdeba663387aa06bb658b7f4c5780202a43b7333112c02a60f448610c2d8ac",
+    "packages/core/src/turn/startup-input-cache.ts": "adbdeba663387aa06bb658b7f4c5780202a43b7333112c02a60f448610c2d8ac",
     "packages/core/src/session/inbox-overflow.ts": "0b7b76fbe2dbd5c8cbcf80766dd44eefd3237673aa57d594ad200c41e8abfccc",
     "packages/agent-loop/src/session/inbox-overflow.ts": "031b689482934c60d94c79fcbcb199976e02af4a6580bf4be085fcbb1a37595a",
     "packages/core/src/stores/migrations/index.ts": "77e3791e7a5d2e68a43b59e044916c50cbf8d637323fd6fc80d5896afdfb59a2",
@@ -344,7 +348,7 @@
     "packages/core/src/bots/goals/intake.ts": "6a0228f31318042520a29cdd041758b68751add5aeab50b52326cbc527ae4da1",
     "packages/core/src/bots/goals/completion-evidence.ts": "133fdd6901cd06287e9cf5f9d673a3406652c572e6435e086c91aae9e14a36f8",
     "packages/core/src/runtime.ts": "27e5d65d5fc6ba159522c2ff69a06bc76f4af080d93cf4e63839514c58f4c397",
-    "packages/core/src/runtime/l5-bindings.ts": "b075c81ea8d3caaf3f5e9151bf8274e74d13c51e754428877f919b246a4f76ef",
+    "packages/core/src/runtime/l5-bindings.ts": "838f6362f5e540172d7b7cdb1d4d753b9e8c28bffcab0c4e1a4dfb6796cb6e2f",
     "packages/core/src/bots/strict-output.ts": "892f0f7347b6bf134c1f4d66d97e8f9a0677afaff69b5fc812d1ecf117d7aeb2",
     "packages/core/src/runtime/steer-tools.ts": "ee3ac8ce03aed1a3fd236421c5e01fcc5ca062e9ac20b2c662821bc88dde17a2",
     "packages/core/test/steer-tool-continuity.test.js": "a96f5f02b662e644497657712a1e71c7ce07adfc78192f80a26e9bd40aa82bc2",

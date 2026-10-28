@@ -10,6 +10,7 @@ import { applyClaimedInbox as applyInbox } from '../session/apply-claimed-inbox.
 import { createId } from '../helpers.js';
 import type { MessageReplyTo } from '../types.js';
 import type { SessionMessage, SessionRecord } from '../types.js';
+import { copyView, messageViewKey, readPrepareSlice, writePrepareSlice } from './startup-input-cache.js';
 
 export const WORKING_LOG_APPENDIX_HEAD =
   '[working log — durable trail across compaction; full transcripts at the referenced paths]';
@@ -188,28 +189,42 @@ export async function prepareTurnInput(
     durationMs: Date.now() - budgetStarted,
     messageCount: budgeted.length
   });
-  const viewStarted = Date.now();
-  const prepared = await deps.prepareView(session, budgeted);
-  traceStartup(deps, sessionId, {
-    phase: 'prepare_view',
-    scope: 'prepare',
-    durationMs: Date.now() - viewStarted,
-    messageCount: prepared.length
-  });
-  const appendixStarted = Date.now();
+  const viewKey = messageViewKey(budgeted);
+  const cached = readPrepareSlice(sessionId);
+  let prepared: SessionMessage[];
+  if (cached?.viewKey === viewKey) {
+    prepared = copyView(cached.view);
+  } else {
+    const viewStarted = Date.now();
+    prepared = await deps.prepareView(session, budgeted);
+    traceStartup(deps, sessionId, {
+      phase: 'prepare_view',
+      scope: 'prepare',
+      durationMs: Date.now() - viewStarted,
+      messageCount: prepared.length
+    });
+  }
   const query = lastUserQueryFromMessages(prepared);
-  const compiled = await Promise.resolve(
-    deps.buildAppendix(session, { query, viewMessages: prepared })
-  );
-  const workingLogTail =
-    !compiled.trim() && deps.readWorkingLogTail ? deps.readWorkingLogTail(sessionId) : '';
-  const appendix = resolvePackedAppendix(compiled, workingLogTail);
-  traceStartup(deps, sessionId, {
-    phase: 'memory_appendix',
-    scope: 'prepare',
-    durationMs: Date.now() - appendixStarted,
-    messageCount: prepared.length
-  });
+  const appendixKey = `${viewKey}\0${query}\0${session.summary ?? ''}\0${session.updatedAt}`;
+  let appendix: string;
+  if (cached?.appendixKey === appendixKey) {
+    appendix = cached.appendix;
+  } else {
+    const appendixStarted = Date.now();
+    const compiled = await Promise.resolve(
+      deps.buildAppendix(session, { query, viewMessages: prepared })
+    );
+    const workingLogTail =
+      !compiled.trim() && deps.readWorkingLogTail ? deps.readWorkingLogTail(sessionId) : '';
+    appendix = resolvePackedAppendix(compiled, workingLogTail);
+    traceStartup(deps, sessionId, {
+      phase: 'memory_appendix',
+      scope: 'prepare',
+      durationMs: Date.now() - appendixStarted,
+      messageCount: prepared.length
+    });
+  }
+  writePrepareSlice(sessionId, { viewKey, view: copyView(prepared), appendixKey, appendix });
   const messages = applyMemoryAppendixToMessages(prepared, appendix);
   const foldSeqs = folded.map((m) => m.seq).filter((s): s is number => typeof s === 'number');
 
