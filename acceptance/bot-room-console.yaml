@@ -1,6 +1,6 @@
 id: bot-room-console
 title: 大规模群的对话区界面
-status: approved
+status: implemented
 owner: user
 requirement: |
   成员很多时不要平铺所有人。可以按职能组查看，并整组加入或移出。群成员仍至少 2 人。
@@ -40,3 +40,6 @@ notes: |
   AC-6 不替代 bot-rooms AC-8，只锁住默认界面不出现批准按钮。群内批准卡片属于 bot-room-inline-approval，未单独批准前不做。
   目标条依赖 bot-room-goal-intake。人数效果依赖 bot-room-sparse-routing。
   待用户批准本规格后，才在旧标准说明里写上上述关系。本次不修改 play-bot-group.yaml 与 bot-rooms.yaml 的状态和正文，也不把它们标为 retired。
+
+links:
+  - doc/SINGLE_HOST_COMPLETION.md

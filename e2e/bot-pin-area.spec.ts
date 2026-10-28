@@ -257,7 +257,8 @@ test('中英文下置顶区标题、空状态和提示跟随界面语言 [AC:bot
   expect(hasHan(chinese.heading)).toBe(true);
   expect(hasHan(chinese.rest)).toBe(true);
 
-  await page.getByTestId('language-toggle').first().getByRole('button', { name: 'English', exact: true }).click();
+  await page.getByRole('button', { name: '模型与外观', exact: true }).hover();
+  await page.locator('[data-testid="language-toggle"]:visible').first().getByRole('button', { name: 'English', exact: true }).click();
   await expect(page.locator('html')).toHaveAttribute('lang', /^en/);
   const english = await pinChrome(page);
   expect(hasHan(english.heading)).toBe(false);
@@ -276,7 +277,8 @@ test('中英文下置顶区标题、空状态和提示跟随界面语言 [AC:bot
   await expect(pinArea(page).getByTestId('bot-pin-item')).toHaveCount(0);
   expect(await pinChrome(page)).toEqual(english);
 
-  await page.getByTestId('language-toggle').first().getByRole('button', { name: '中文', exact: true }).click();
+  await page.getByRole('button', { name: 'Model and appearance', exact: true }).hover();
+  await page.locator('[data-testid="language-toggle"]:visible').first().getByRole('button', { name: '中文', exact: true }).click();
   await expect(page.locator('html')).toHaveAttribute('lang', /^zh/);
   expect(await pinChrome(page)).toEqual(chinese);
 });

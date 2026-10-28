@@ -1,6 +1,6 @@
 id: bot-steer-visible
 title: Bot 对话里的实时插话马上出现在对话流
-status: approved
+status: implemented
 requirement: |
   我在bot对话流中，实时插话，没有立即显示在对话流的UI中，经常延迟很久，插话时机的逻辑不用改，这个ui调整一下
 criteria:
@@ -24,3 +24,6 @@ criteria:
     given: 这条插话被拒绝，没有进入对话
     when: 拒绝发生
     then: 对话流里的临时插话消失，文字回到输入框
+
+links:
+  - doc/SINGLE_HOST_COMPLETION.md

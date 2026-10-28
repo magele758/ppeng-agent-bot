@@ -155,3 +155,31 @@ test('closing the first-task guide keeps it off later empty Bots [AC:bot-first-t
     await second.release();
   }
 });
+
+
+test('mobile first-task guide preserves the draft and composer in a short viewport [AC:single-host-bot-completion#AC-7]', async ({ page, request }) => {
+  await presentAsNewBotUser(page);
+  const held = await allocateBot(request);
+  try {
+    await openFirstBot(page, held.bot.id);
+    await selectBot(page, held.bot.id);
+    await expect(guideOf(page)).toBeVisible();
+    await page.setViewportSize({ width: 390, height: 844 });
+    const input = page.locator('#playInput');
+    await input.fill('手机端未发送草稿');
+    const toggle = page.getByTestId('mobile-sessions-toggle');
+    await toggle.click();
+    await expect(input).toBeHidden();
+    await toggle.click();
+    await expect(input).toHaveValue('手机端未发送草稿');
+    await page.setViewportSize({ width: 390, height: 520 });
+    await expect(input).toBeInViewport({ ratio: 1 });
+    const connection = guideOf(page).getByRole('link', { name: '检查软件连接', exact: true });
+    await connection.scrollIntoViewIfNeeded();
+    await expect(connection).toBeInViewport({ ratio: 1 });
+    await expect(input).toBeInViewport({ ratio: 1 });
+    await expect(input).toHaveValue('手机端未发送草稿');
+  } finally {
+    await held.release();
+  }
+});

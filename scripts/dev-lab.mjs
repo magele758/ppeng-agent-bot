@@ -5,6 +5,7 @@
  * 用法：pnpm run dev
  */
 import dotenv from 'dotenv';
+import { realpathSync } from 'node:fs';
 import { devWebHost, syncDevHttps } from './dev-tailnet-https.mjs';
 import { runDevProcesses } from './dev-lab-processes.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -96,6 +97,6 @@ export async function launchDevLab({
   throw new Error(`No free port after ${span} stolen-port retries`);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   process.exitCode = await launchDevLab();
 }

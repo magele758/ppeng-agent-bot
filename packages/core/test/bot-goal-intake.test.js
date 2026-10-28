@@ -92,3 +92,10 @@ test('dragged file bodies are not separate goals', async () => {
   const onlyFence = fenced.slice(fenced.indexOf('«'));
   assert.equal((await classifyGoalIntents(onlyFence, []))[0].kind, 'chat');
 });
+
+test('language preference does not erase a real deliverable or an explicit target [AC:bot-watch-work-continuity#AC-1]',()=>{
+ for(const text of ['以后用中文回答','Please reply in English','Respond in Chinese from now on'])assert.equal(classifyGoalMessage(text).kind,'chat');
+ assert.equal(classifyGoalMessage('[goal:current] 以后用中文回答').kind,'amend_goal');
+ assert.equal(classifyGoalMessage('请实现中文回答功能').kind,'new_goal');
+ assert.equal(classifyGoalMessage('以后用中文回答，并修复登录错误').kind,'new_goal');
+});

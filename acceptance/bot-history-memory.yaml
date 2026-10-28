@@ -1,6 +1,6 @@
 id: bot-history-memory
 title: Bot 持续对话历史与记忆
-status: approved
+status: implemented
 requirement: |
   完整补齐前述 gap，从纵向切片完成开发计划，包括持续对话、历史、记忆与模型窗口。
 owner: user
@@ -30,3 +30,6 @@ criteria:
     given: Bot 持续经历多次压缩
     when: 用户继续未完成任务并查找过去事实
     then: 可验证的原始事实和来源仍可检索且长期记忆保持明确预算，不以短摘要冒充全部原文
+
+links:
+  - doc/SINGLE_HOST_COMPLETION.md

@@ -1,8 +1,11 @@
 # 每轮动态组上下文（Context Compiler）
 
+> 2026-10-28 源码核对：当前已有 `packages/core/src/session/context-compiler.ts`，调用 SDK 编包并接入按 query 的渐进召回、身份隔离、诊断及预览。下文“尚无编包器”等表述是 2026-09-02 的设计基线，不能作为当前缺口。跨所有历史/知识来源的统一预算与召回质量仍需按实际场景评估。
+
+
 | 字段 | 值 |
 |------|----|
-| 状态 | 结论已定；实现未开工 |
+| 状态 | 已有运行时实现；下文保留原设计，剩余范围以单机收尾记录为准 |
 | 日期 | 2026-09-02 |
 | 相关 | [harness/04-context-economics.md](harness/04-context-economics.md)、[harness/17-context-memory-compaction.md](harness/17-context-memory-compaction.md)、[PROMPT_CACHE.md](PROMPT_CACHE.md)、[MEMORY_MULTIUSER.md](MEMORY_MULTIUSER.md)、[harness/08-memory-and-evolving.md](harness/08-memory-and-evolving.md) |
 

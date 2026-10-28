@@ -29,7 +29,7 @@ test('watch links persist, reject foreign goals and can be cleared [AC:bot-linke
  assert.throws(()=>createCronJob(f.host,{botId:f.bot.id,name:'bad',prompt:'bad',intervalMs:60000,workLink:{goalId:foreign.id}}),/goal|work/i);
  assert.equal(updateCronJob(f.host,j.id,{workLink:null}).metadata.workLink,undefined);
 });
-test('verified terminal goals retire only their own watcher [AC:bot-linked-watchers#AC-2]',async t=>{
+test('verified terminal goals retire only their own watcher [AC:bot-linked-watchers#AC-2] [AC:bot-watch-work-continuity#AC-3]',async t=>{
  const f=fixture(t),j=f.job();const execution=f.goals.claim(f.bot.id,f.goal.id,{strategy:'direct'});
  f.goals.report(f.bot.id,execution.id,{kind:'candidate_completed',summary:'all verified',verified:true,evidence:['confirmed merge']});
  const health=createCronJob(f.host,{botId:f.bot.id,name:'health',prompt:'health',intervalMs:60000});
@@ -37,7 +37,7 @@ test('verified terminal goals retire only their own watcher [AC:bot-linked-watch
  assert.equal(f.host.cronStore.get(j.id).enabled,false);assert.equal(f.host.cronStore.get(health.id).enabled,true);
  assert.ok(new RoutineRunStore(f.store).get(r.id));
 });
-test('next execution uses live work revision and SOP with recorded fingerprint [AC:bot-linked-watchers#AC-3]',async t=>{
+test('next execution uses live work revision and SOP with recorded fingerprint [AC:bot-linked-watchers#AC-3] [AC:bot-watch-work-continuity#AC-4]',async t=>{
  const f=fixture(t,(store,id)=>{const prompt=store.listMessages(id).filter(m=>m.role==='user').at(-1).parts[0].text;assert.match(prompt,/CURRENT SOP V2/);assert.match(prompt,/new local constraint/);observe(store,id);answer(store,id,'checked');});
  const j=f.job();f.goals.amend(f.bot.id,f.goal.id,'new local constraint');f.sop('CURRENT SOP V2');
  const r=await f.run(j);assert.equal(r.status,'completed');assert.equal(r.workSnapshot.goalRevision,2);assert.match(r.workSnapshot.sopHash,/^[a-f0-9]{64}$/);
@@ -55,7 +55,7 @@ test('linked external job keeps identity and cannot complete the goal from idle 
  const r=await f.run(j);assert.equal(r.workSnapshot.externalJob.id,bg.id);assert.equal(r.workSnapshot.externalJob.createdAt,bg.createdAt);assert.equal(r.workSnapshot.externalJob.status,'running');assert.notEqual(f.goals.get(f.bot.id,f.goal.id).status,'completed');
  f.store.db.prepare('DELETE FROM background_jobs WHERE id=?').run(bg.id);const missing=await f.run(j);assert.equal(missing.status,'failed');assert.match(missing.error,/job/i);
 });
-test('parked watch refreshes its SOP before it gets the writer [AC:bot-linked-watchers#AC-3]',async t=>{
+test('parked watch refreshes its SOP before it gets the writer [AC:bot-linked-watchers#AC-3] [AC:bot-watch-work-continuity#AC-4]',async t=>{
  const f=fixture(t,(store,id)=>{const prompt=store.listMessages(id).filter(m=>m.role==='user').at(-1).parts[0].text;assert.match(prompt,/CURRENT SOP V3/);assert.equal(store.listUnclaimedInbox(id).length,0);observe(store,id);answer(store,id,'fresh');});
  const j=f.job(),runs=new RoutineRunStore(f.store),r=runs.enqueue(j,new Date().toISOString());
  f.store.updateSession(f.sid,{status:'running'});await drainRoutineRuns(f.host);assert.equal(f.store.listUnclaimedInbox(f.sid).length,1);
@@ -66,7 +66,7 @@ test('queued unlink is live and does not resurrect a copied work reference [AC:b
  updateCronJob(f.host,j.id,{workLink:null});f.host.loadRoutineSkill=async()=>{throw new Error('must not load removed SOP');};
  await drainRoutineRuns(f.host);await new Promise(resolve=>setImmediate(resolve));assert.equal(runs.get(r.id).status,'completed');assert.equal(runs.get(r.id).workSnapshot,undefined);
 });
-test('work edited while SOP is loading cannot launch an obsolete revision [AC:bot-linked-watchers#AC-3]',async t=>{
+test('work edited while SOP is loading cannot launch an obsolete revision [AC:bot-linked-watchers#AC-3] [AC:bot-watch-work-continuity#AC-4]',async t=>{
  const f=fixture(t,()=>assert.fail('obsolete work must not execute'));const j=f.job(),runs=new RoutineRunStore(f.store),r=runs.enqueue(j,new Date().toISOString());
  f.host.loadRoutineSkill=async()=>{f.goals.amend(f.bot.id,f.goal.id,'latest requirement');return {content:'current SOP'};};
  await drainRoutineRuns(f.host);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.turns(),0);assert.equal(runs.get(r.id).status,'queued');
@@ -103,4 +103,40 @@ test('an unobserved health claim and a reread old report remain unverified [AC:b
 test('a successful fresh snapshot check retains actual sample time for quiet monitoring [AC:bot-supervision-freshness#AC-6]',async t=>{
  const at=new Date(Date.now()-1000).toISOString();const f=fixture(t,(store,id)=>{store.appendMessage(id,'tool',[{type:'tool_result',name:'bot_team_status',toolCallId:'snapshot',ok:true,content:JSON.stringify([{observedAt:at,reportedAt:new Date().toISOString(),stale:false}])}]);answer(store,id,'[NO_UPDATE]');});
  const r=await f.run(f.job());assert.equal(r.status,'silent');assert.equal(r.workSnapshot.observedAt,at);
+});
+
+test('linked watcher rejects another jobs observation [AC:single-host-bot-completion#AC-1] [AC:bot-watch-work-continuity#AC-8]',async t=>{
+ const f=fixture(t,(store,id)=>{const other=store.createBackgroundJob({sessionId:id,command:'unrelated',status:'running'});store.appendMessage(id,'tool',[{type:'tool_result',name:'bg_check',toolCallId:'other',ok:true,content:JSON.stringify(other)}]);answer(store,id,'[NO_UPDATE]');});
+ const job=f.store.createBackgroundJob({sessionId:f.sid,command:'owned',status:'running'});
+ const j=createCronJob(f.host,{botId:f.bot.id,name:'watch',prompt:'check',intervalMs:60000,workLink:{goalId:f.goal.id,backgroundJobId:job.id}});
+ const r=await f.run(j);assert.equal(r.status,'failed');assert.match(r.error,/observation|identity|unverified/i);
+});
+
+test('old job records stay unverified; fresh same-status observations can be quiet and failures are visible [AC:single-host-bot-completion#AC-2]',async t=>{
+ let job,fail=false,refresh=false;const f=fixture(t,(store,id)=>{if(refresh)store.updateBackgroundJob(job.id,fail?'error':'running',fail?'build failed':'current worker observation');store.appendMessage(id,'tool',[{type:'tool_result',name:'bg_check',toolCallId:'owned',ok:true,content:JSON.stringify(store.getBackgroundJob(job.id))}]);answer(store,id,'[NO_UPDATE]');});
+ job=f.store.createBackgroundJob({sessionId:f.sid,command:'owned',status:'running'});
+ f.store.db.prepare('UPDATE background_jobs SET updated_at=? WHERE id=?').run('2020-01-01T00:00:00.000Z',job.id);
+ const j=createCronJob(f.host,{botId:f.bot.id,name:'watch',prompt:'check',intervalMs:60000,workLink:{goalId:f.goal.id,backgroundJobId:job.id}});
+ const old=await f.run(j);assert.equal(old.status,'failed');refresh=true;const checked=await f.run(j);assert.equal(checked.status,'silent');assert.ok(Date.parse(checked.workSnapshot.observedAt)>=Date.parse(checked.startedAt));
+ fail=true;const failed=await f.run(j);assert.equal(failed.status,'failed');assert.match(failed.error,/failed/i);assert.notEqual(f.goals.get(f.bot.id,f.goal.id).status,'completed');
+});
+
+test('newly registered job alone is not a current observation [AC:single-host-bot-completion#AC-1] [AC:bot-watch-work-continuity#AC-8]',async t=>{
+ const f=fixture(t,(store,id)=>answer(store,id,'[NO_UPDATE]')),job=f.store.createBackgroundJob({sessionId:f.sid,command:'owned',status:'running'});
+ const j=createCronJob(f.host,{botId:f.bot.id,name:'watch',prompt:'check',intervalMs:60000,workLink:{goalId:f.goal.id,backgroundJobId:job.id}});
+ const r=await f.run(j);assert.equal(r.status,'failed');
+});
+
+test('a later failed check cannot borrow an earlier success [AC:single-host-bot-completion#AC-1]',async t=>{
+ let job;const f=fixture(t,(store,id)=>{store.appendMessage(id,'tool',[{type:'tool_result',name:'bg_check',toolCallId:'ok',ok:true,content:JSON.stringify(store.getBackgroundJob(job.id))}]);observe(store,id,false);answer(store,id,'[NO_UPDATE]');});
+ job=f.store.createBackgroundJob({sessionId:f.sid,command:'owned',status:'running'});
+ const j=createCronJob(f.host,{botId:f.bot.id,name:'watch',prompt:'check',intervalMs:60000,workLink:{goalId:f.goal.id,backgroundJobId:job.id}});
+ assert.equal((await f.run(j)).status,'failed');
+});
+
+test('replaced job identity cannot certify current work [AC:single-host-bot-completion#AC-1]',async t=>{
+ let job;const f=fixture(t,(store,id)=>{store.db.prepare('UPDATE background_jobs SET created_at=? WHERE id=?').run('2000-01-01T00:00:00.000Z',job.id);store.appendMessage(id,'tool',[{type:'tool_result',name:'bg_check',toolCallId:'replaced',ok:true,content:JSON.stringify(store.getBackgroundJob(job.id))}]);answer(store,id,'[NO_UPDATE]');});
+ job=f.store.createBackgroundJob({sessionId:f.sid,command:'owned',status:'running'});
+ const j=createCronJob(f.host,{botId:f.bot.id,name:'watch',prompt:'check',intervalMs:60000,workLink:{goalId:f.goal.id,backgroundJobId:job.id}});
+ const r=await f.run(j);assert.equal(r.status,'failed');assert.match(r.error,/identity changed/);
 });

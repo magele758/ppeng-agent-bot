@@ -1,6 +1,6 @@
 id: bot-list-face-plate
 title: 侧栏 Bot 脸保持原形，不套外框也不拉变形
-status: approved
+status: implemented
 notes: |
   用户纠正了未提交的圆角横条底：列表头像不要外框，也不要把脸非等比拉成圆形的外接框。
   Super Bot 和定义 Bot 时可选的豆形是同一张较小横豆（git 里被青绿块换掉的那张），不是铺满的不规则块。
@@ -42,3 +42,6 @@ criteria:
     given: 脸上会有轻微的待机小动作
     when: 看着脸动一下
     then: 小动作不改变脸的宽和高；列表里没有一块底板跟着脸一起出现
+
+links:
+  - doc/SINGLE_HOST_COMPLETION.md
