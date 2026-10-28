@@ -14,6 +14,7 @@ import { sendFeishuTextMessage } from './feishu-api.js';
 import {
   appendOutboundDraft,
   claimOutboundDraft,
+  confirmOutboundDraft,
   OutboundDraftError,
   readOutboundDrafts,
   rejectOutboundDraft,
@@ -36,23 +37,21 @@ export async function deliverChannelText(opts: {
   text: string;
   event?: string;
   /**
-   * Model replies omit `approved` and stay drafts, including Feishu and WeCom.
-   * Slack, Telegram, and email stay drafts even when `approved` is passed.
-   * Other channels still send when a caller passes `approved`.
+   * User-facing outbound always drafts. `approval: 'approved'` does not send.
+   * Lifecycle: Draft → Confirm → Send via `releaseOutboundDraft` (confirm+send)
+   * or `confirmOutboundDraft` then claim/send. No silent send.
    */
   approval?: 'approved';
 }): Promise<void> {
-  if (opts.approval !== 'approved' || HUMAN_RELEASE_CHANNEL_TYPES.has(opts.channel.type)) {
-    // User-facing outbound goes through UserDeliveryPort only (no ad-hoc draft writes).
-    const port = createUserDeliveryPort({ gatewayDir: opts.gatewayDir, channels: [opts.channel] });
-    await port.draft({
-      channelId: opts.channel.id,
-      text: opts.text,
-      event: opts.event ?? 'gateway.im.reply'
-    });
-    return;
-  }
-  await sendApprovedChannel(opts);
+  // Always draft (Draft→Confirm→Send). Route through UserDeliveryPort only.
+  void opts.approval;
+  void HUMAN_RELEASE_CHANNEL_TYPES;
+  void appendOutboundDraft;
+  await createUserDeliveryPort({ gatewayDir: opts.gatewayDir, channels: [opts.channel] }).draft({
+    channelId: opts.channel.id,
+    text: opts.text,
+    event: opts.event ?? 'gateway.im.reply'
+  });
 }
 
 async function sendApprovedChannel(opts: {
@@ -111,6 +110,14 @@ export async function releaseOutboundDraft(input: {
   }
   let draft: OutboundDraft;
   try {
+    // Draft → Confirm → Send: confirm is mandatory before claim/send.
+    const current = (await readOutboundDrafts(input.gatewayDir)).find((item) => item.id === input.id);
+    if (!current) throw new OutboundDraftError('not_found', input.id, `draft ${input.id} not found`);
+    if (current.status === 'pending_approval' || current.status === 'failed') {
+      await confirmOutboundDraft(input.gatewayDir, input.id);
+    } else if (current.status !== 'confirmed') {
+      throw new OutboundDraftError('not_pending', input.id, `draft ${input.id} is ${current.status}`);
+    }
     draft = await claimOutboundDraft(input.gatewayDir, input.id);
   } catch (error) {
     rethrowDraft(error);

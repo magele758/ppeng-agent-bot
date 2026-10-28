@@ -20,13 +20,18 @@ import {
 import { protectModelSocialScheduleMetadata } from '../social-schedule.js';
 import { approvalGrantsDirectIsolation } from '../sandbox/model-isolation.js';
 import type { SqliteStateStore } from '../storage.js';
+import { persistActiveSkillManifest } from '../skills/skill-manifest-gate.js';
+import type { SkillManifest } from '../skills/skill-manifest.js';
 import { primaryWorkspacePath } from '../workspace/index.js';
 import { loadForkSiblingFileFacts, recordForkSiblingWrite } from '../bots/fork-sibling-isolation.js';
 
 export interface ToolServicesHost {
   store: SqliteStateStore;
   stateDir: string;
-  resolveSkillLoad: (name: string, sessionId: string) => Promise<{ content?: string; error?: string }>;
+  resolveSkillLoad: (
+    name: string,
+    sessionId: string
+  ) => Promise<{ content?: string; error?: string; manifest?: SkillManifest }>;
   resolveSkillSearch: (query: string, sessionId: string, limit?: number) => Promise<{ content: string }>;
   unblockDependentTasks: (taskId: string) => Promise<void>;
   spawnSubagent: (
@@ -73,7 +78,11 @@ export interface ToolServicesHost {
 
 export function createToolServices(host: ToolServicesHost): RuntimeToolServices {
   return {
-    loadSkill: (name, sessionId) => host.resolveSkillLoad(name, sessionId),
+    loadSkill: async (name, sessionId) => {
+      const result = await host.resolveSkillLoad(name, sessionId);
+      if (result.manifest) persistActiveSkillManifest(host.store, sessionId, result.manifest);
+      return result;
+    },
     searchSkills: (query, sessionId, limit) => host.resolveSkillSearch(query, sessionId, limit),
     updateTodo: async (sessionId, items) => {
       const session = host.store.getSession(sessionId);

@@ -1,4 +1,5 @@
 import {SourceLedger} from '../learning/sources.js';
+import { executeLoadsBeforeEffects, runWithSkillManifest } from '../skills/skill-manifest-gate.js';
 import type {SqliteStateStore} from '../storage.js';
 import {stableJson} from '../cron/notification-decision.js';
 import { registerSteerToolWave } from './steer-tools.js';
@@ -129,8 +130,17 @@ export interface ToolLoopDeps {
   armUnattendedApproval?: (approval: ApprovalRecord) => void;
 }
 
+function wrapSkillManifestTools(
+  tools: ToolContract<Record<string, unknown>>[]
+): ToolContract<Record<string, unknown>>[] {
+  return tools.map((tool) => ({
+    ...tool,
+    execute: (context, args) => runWithSkillManifest(context, tool.name, args, () => tool.execute(context, args))
+  }));
+}
+
 function toolsForTurn(deps: ToolLoopDeps, turnTools?: ToolContract<any>[]): ToolContract<Record<string, unknown>>[] {
-  const tools=(turnTools ?? deps.tools) as ToolContract<Record<string, unknown>>[];
+  const tools=wrapSkillManifestTools((turnTools ?? deps.tools) as ToolContract<Record<string, unknown>>[]);
   if(!deps.governanceStore)return tools;
   const ledger=new SourceLedger(deps.governanceStore);
   return tools.map(tool=>({...tool,execute:async(context,args)=>{
@@ -431,14 +441,16 @@ export async function executeToolCalls(
   const tx = createCompensationTx();
   const wave = registerSteerToolWave(deps.store, sessionId, validToolCalls, context);
   const run = () =>
-    executeToolCallsA(
-      { ...hostFromDeps(execDeps), toolExecutionScope: call => wave.scope(call) },
-      toolsForTurn(execDeps),
-      validToolCalls,
-      context,
-      allowExternalAiTools,
-      sessionId,
-      deps.maxParallelToolCalls
+    executeLoadsBeforeEffects(validToolCalls, (batch) =>
+      executeToolCallsA(
+        { ...hostFromDeps(execDeps), toolExecutionScope: call => wave.scope(call) },
+        toolsForTurn(execDeps),
+        batch,
+        context,
+        allowExternalAiTools,
+        sessionId,
+        deps.maxParallelToolCalls
+      )
     );
   try { return await runWithSecretRefs(secretValues, () => runWithCompensation(tx, run)); }
   finally { wave.close(); }

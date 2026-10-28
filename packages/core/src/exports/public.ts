@@ -831,10 +831,41 @@ export { resolveSkillRoutingSettings } from '../skills/skill-settings.js';
 export * from '../config/runtime-capabilities.js';
 
 export {
+  resolveMicrovmRemoteUrl,
+  resolveRemoteVmExecBaseUrl,
+  demandsMicrovmIsolation,
+  postMicrovmExec,
+  remoteExecRejection
+} from '../sandbox/microvm-remote-url.js';
+export type { MicrovmExecRequestBody, MicrovmExecResponseBody } from '../sandbox/microvm-remote-url.js';
+
+export {
+  validateSkillManifest,
+  enforceSkillManifest,
+  loadSkillManifestFromMeta,
+  manifestForSkillFile,
+  networkHostFromInput,
+  PLANNING_SKILL_MANIFEST
+} from '../skills/skill-manifest.js';
+export {
+  gateActiveSkillManifests,
+  noteActiveSkillManifest,
+  runWithSkillManifest
+} from '../skills/skill-manifest-gate.js';
+export type {
+  SkillManifest,
+  SkillNetworkPolicy,
+  SkillManifestValidation,
+  SkillCapabilityCheck
+} from '../skills/skill-manifest.js';
+
+export {
   evaluateDefaultDenyPolicy,
   isDangerousCwd,
   detectUntrustedInduction,
-  isHighPrivilegeTool
+  isHighPrivilegeTool,
+  commandLeavesWorkspace,
+  untrustedCorpusFromMessages
 } from '../safety/default-deny-policy.js';
 export type { DefaultDenyInput, DefaultDenyDecision } from '../safety/default-deny-policy.js';
 
