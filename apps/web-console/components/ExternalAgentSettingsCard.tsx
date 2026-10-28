@@ -12,15 +12,16 @@ interface Client {
   name: string;
   enabled: boolean;
   allowedAgentIds: string[];
+  allowedBotIds?: string[];
   defaultAgentId: string;
   tokenSet: boolean;
 }
 interface Settings { enabled: boolean; clients: Client[] }
-interface DraftClient extends Omit<Client, 'allowedAgentIds'> { allowedAgentIds: string; token: string; rowKey: string }
+interface DraftClient extends Omit<Client, 'allowedAgentIds' | 'allowedBotIds'> { allowedAgentIds: string; allowedBotIds: string; token: string; rowKey: string }
 const PATH = '/api/external-agents/settings';
-const toDraft = (client: Client): DraftClient => ({ ...client, allowedAgentIds: client.allowedAgentIds.join(', '), token: '', rowKey: client.id });
-const toPayload = ({ allowedAgentIds, token, rowKey: _rowKey, tokenSet: _tokenSet, ...client }: DraftClient) => ({
-  ...client, allowedAgentIds: allowedAgentIds.split(/[,\s]+/).filter(Boolean), ...(token.trim() ? { token: token.trim() } : {})
+const toDraft = (client: Client): DraftClient => ({ ...client, allowedAgentIds: client.allowedAgentIds.join(', '), allowedBotIds: (client.allowedBotIds ?? []).join(', '), token: '', rowKey: client.id });
+const toPayload = ({ allowedAgentIds, allowedBotIds, token, rowKey: _rowKey, tokenSet: _tokenSet, ...client }: DraftClient) => ({
+  ...client, allowedBotIds: allowedBotIds.split(/[,\s]+/).filter(Boolean), allowedAgentIds: allowedAgentIds.split(/[,\s]+/).filter(Boolean), ...(token.trim() ? { token: token.trim() } : {})
 });
 
 function ExecutorsHint({ agentIds }: { agentIds: string[] }) {
@@ -35,6 +36,7 @@ export function ExternalAgentSettingsCard() {
   const [enabled, setEnabled] = useState(false);
   const [clients, setClients] = useState<DraftClient[]>([]);
   const [agentIds, setAgentIds] = useState<string[]>([]);
+  const [botIds, setBotIds] = useState<string[]>([]);
   const reset = () => {
     if (!r.settings) return;
     setEnabled(r.settings.enabled);
@@ -47,6 +49,7 @@ export function ExternalAgentSettingsCard() {
   }, [r.settings]);
   useEffect(() => {
     let live = true;
+    void api('/api/bots').then(data => { if (live) setBotIds((data as {bots: {id: string}[]}).bots.map(bot => bot.id)); }).catch(() => {});
     void api('/api/agents').then(data => {
       if (live) setAgentIds((data as { agents: { id: string }[] }).agents.map(agent => agent.id));
     }).catch(() => {});
@@ -72,7 +75,8 @@ export function ExternalAgentSettingsCard() {
           <ToggleField id="external-agents-enabled" label={t('externalAgents.enabled')} hint={t('externalAgents.enabledHint')}
             checked={enabled} disabled={r.busy} onChange={setEnabled} />
           <p className="muted small">{t('externalAgents.endpoint', { path: '/api/external-agent/v1/tasks' })}</p>
-          <ExecutorsHint agentIds={agentIds} />
+          <ExecutorsHint agentIds={agentIds.filter(id => !botIds.includes(id))} />
+          <p className="muted small">{t('externalAgents.botsHint', {ids: botIds.join(', ')})}</p>
           {clients.map((client, index) => {
             const field = `external-agent-${index}`;
             return <fieldset key={client.rowKey} data-external-agent-client disabled={r.busy}>
@@ -88,6 +92,7 @@ export function ExternalAgentSettingsCard() {
                 disabled={r.busy} onChange={token => edit(client.rowKey, { token })} />
               <TextField id={`${field}-allowed`} label={t('externalAgents.allowedAgents')} hint={t('externalAgents.allowedAgentsHint')}
                 value={client.allowedAgentIds} disabled={r.busy} onChange={allowedAgentIds => edit(client.rowKey, { allowedAgentIds })} />
+              <TextField id={`${field}-bots`} label={t('externalAgents.allowedBots')} hint={t('externalAgents.allowedBotsHint')} value={client.allowedBotIds} disabled={r.busy} onChange={allowedBotIds => edit(client.rowKey, {allowedBotIds})} />
               <TextField id={`${field}-default`} label={t('externalAgents.defaultAgent')} hint={t('externalAgents.defaultAgentHint')}
                 value={client.defaultAgentId} disabled={r.busy} onChange={defaultAgentId => edit(client.rowKey, { defaultAgentId })} />
               <button type="button" className="btn btn-ghost btn-sm" disabled={r.busy}
@@ -97,7 +102,7 @@ export function ExternalAgentSettingsCard() {
           {clients.length === 0 ? <p className="muted">{t('externalAgents.empty')}</p> : null}
           <button type="button" className="btn btn-ghost btn-sm" disabled={r.busy} onClick={() => setClients(values => [...values, {
             rowKey: `new-${Date.now()}-${Math.random()}`, id: '', name: '', enabled: true, token: '', tokenSet: false,
-            allowedAgentIds: 'general', defaultAgentId: 'general'
+            allowedAgentIds: 'general', allowedBotIds: '', defaultAgentId: 'general'
           }])}>{t('externalAgents.add')}</button>
           <SaveBar dirty={dirty} busy={r.busy} onSave={() => void save()} onReset={reset} />
         </> : null}
