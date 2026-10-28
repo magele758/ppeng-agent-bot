@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-10-28T18:42:33.000Z",
+  "reviewedAt": "2026-10-28T18:46:37.000Z",
   "reviewNote": "Quieter terminal goal notices (Done/Failed/Blocked/Needs review) replace JSON dumps in chat; Lab still holds full state. Pairing/lifecycle/restart/concurrency control-flow unchanged.",
   "mapping": [
     {
@@ -471,7 +471,7 @@
     "packages/core/src/jev/apply.ts": "8574ad0574a301d6c388e0fc0ae5a4f231b2ae816e722df880441db02ed5ed95",
     "packages/core/test/tool-exposure-tiers.test.js": "ea194b26771f656e7346e69c6130bbac1351c08c2ce505128902e9de245f7056",
     "packages/core/src/bots/goals/specialty-services.ts": "07e77b8093de317102181338d40fe618b3326f5fd6d5d8f6ddc0a2b46138b024",
-    "packages/core/test/bot-goal-live-chain.test.js": "6f99a4926773ec0656165998ac8682ec7fd5013404480d70ff10f4b065a8eeda",
+    "packages/core/test/bot-goal-live-chain.test.js": "271841078d93907f28048dd208f35ebb723189ba559b8b5779c81979af322b8e",
     "packages/core/src/bots/goals/execution-evidence.ts": "f95731115cb04567e85175ac74b2473ed444bca11c964f08288ed805a3cad1c1",
     "packages/core/src/bots/goals/types.ts": "7f7384c9c08de2b6c08a1ab76a71e99313d0df71fedf9f82e1185f8a20acd216",
     "scripts/agent-eval/goal-chain-live.mjs": "cea87ee0ef29a7ebfdc7c35d219aa944416e04eeb5fc8331eb6a2bd357f51a9a",

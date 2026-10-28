@@ -58,7 +58,7 @@ test('active goal tools visible by default but never bypass allowlist [AC:bot-go
  assert.ok(!filterToolsForSession({...input,session:{...input.session,metadata:{...input.session.metadata,allowedTools:['read_file']}}}).tools.some(t=>t.name==='goal_dispatch'));
 });
 
-test('terminal notice is durable without scheduling a new turn; stale checkpoint refused [AC:bot-goal-live-chain#AC-4]',async t=>{
+test('terminal notice is durable without scheduling a new turn; stale checkpoint refused [AC:bot-goal-live-chain#AC-4] [AC:quiet-goal-notice#AC-2]',async t=>{
  const {store,parent,service,ex}=fixture(t);
  const ended=service.report('b',ex.id,{kind:'candidate_completed',summary:'verified result',verified:true});
  const wakes=[];store.enqueueSchedulerWake=(...args)=>wakes.push(args);

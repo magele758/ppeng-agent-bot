@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { formatQuietGoalNotice } from '../dist/bots/goals/runtime-host.js';
 
-test('formatQuietGoalNotice keeps short quiet completion copy', () => {
+test('formatQuietGoalNotice keeps short quiet completion copy [AC:quiet-goal-notice#AC-1]', () => {
   assert.equal(
     formatQuietGoalNotice({ id: 'g1', title: 'Ship polish', status: 'completed' }),
     '[goal update] Done: Ship polish'
@@ -14,5 +14,14 @@ test('formatQuietGoalNotice keeps short quiet completion copy', () => {
   assert.match(
     formatQuietGoalNotice({ id: 'g1', title: 'Ship polish', status: 'pending_review' }),
     /^\[goal update\] Needs review:/
+  );
+  assert.ok(
+    !formatQuietGoalNotice({
+      id: 'g1',
+      title: 'Ship polish',
+      status: 'completed',
+      progress: 1,
+      nextStep: 'x',
+    }).includes('{')
   );
 });
