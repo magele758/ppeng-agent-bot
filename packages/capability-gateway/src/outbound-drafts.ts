@@ -2,7 +2,13 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-export type OutboundDraftStatus = 'pending_approval' | 'sending' | 'sent' | 'rejected' | 'failed';
+export type OutboundDraftStatus =
+  | 'pending_approval'
+  | 'confirmed'
+  | 'sending'
+  | 'sent'
+  | 'rejected'
+  | 'failed';
 
 export type FeishuReceiveIdType = 'open_id' | 'user_id' | 'union_id' | 'chat_id';
 
@@ -21,10 +27,10 @@ export interface OutboundDraft {
 }
 
 export class OutboundDraftError extends Error {
-  readonly code: 'not_found' | 'not_pending';
+  readonly code: 'not_found' | 'not_pending' | 'not_confirmed';
   readonly draftId: string;
 
-  constructor(code: 'not_found' | 'not_pending', draftId: string, message: string) {
+  constructor(code: 'not_found' | 'not_pending' | 'not_confirmed', draftId: string, message: string) {
     super(message);
     this.name = 'OutboundDraftError';
     this.code = code;
@@ -102,14 +108,35 @@ export async function appendOutboundDraft(
   });
 }
 
-/** Move a pending or failed draft to `sending`. Concurrent callers lose the race. */
-export async function claimOutboundDraft(gatewayDir: string, id: string): Promise<OutboundDraft> {
+
+/**
+ * Human confirm step. Moves `pending_approval` (or retryable `failed`) → `confirmed`.
+ * Does not POST. Call `claimOutboundDraft` + transport (or `sendConfirmedOutboundDraft`) to send.
+ */
+export async function confirmOutboundDraft(gatewayDir: string, id: string): Promise<OutboundDraft> {
   return withGatewayLock(gatewayDir, async () => {
     const items = await readOutboundDrafts(gatewayDir);
     const draft = items.find((item) => item.id === id);
     if (!draft) throw new OutboundDraftError('not_found', id, `draft ${id} not found`);
     if (draft.status !== 'pending_approval' && draft.status !== 'failed') {
       throw new OutboundDraftError('not_pending', id, `draft ${id} is ${draft.status}`);
+    }
+    draft.status = 'confirmed';
+    draft.decidedAt = new Date().toISOString();
+    draft.error = undefined;
+    await writeDrafts(gatewayDir, items);
+    return { ...draft };
+  });
+}
+
+/** Move a confirmed (or legacy pending/failed) draft to `sending`. Concurrent callers lose the race. */
+export async function claimOutboundDraft(gatewayDir: string, id: string): Promise<OutboundDraft> {
+  return withGatewayLock(gatewayDir, async () => {
+    const items = await readOutboundDrafts(gatewayDir);
+    const draft = items.find((item) => item.id === id);
+    if (!draft) throw new OutboundDraftError('not_found', id, `draft ${id} not found`);
+    if (draft.status !== 'confirmed' && draft.status !== 'pending_approval' && draft.status !== 'failed') {
+      throw new OutboundDraftError('not_confirmed', id, `draft ${id} is ${draft.status}`);
     }
     draft.status = 'sending';
     draft.error = undefined;
@@ -140,7 +167,11 @@ export async function rejectOutboundDraft(gatewayDir: string, id: string): Promi
     const items = await readOutboundDrafts(gatewayDir);
     const draft = items.find((item) => item.id === id);
     if (!draft) throw new OutboundDraftError('not_found', id, `draft ${id} not found`);
-    if (draft.status !== 'pending_approval' && draft.status !== 'failed') {
+    if (
+      draft.status !== 'pending_approval' &&
+      draft.status !== 'confirmed' &&
+      draft.status !== 'failed'
+    ) {
       throw new OutboundDraftError('not_pending', id, `draft ${id} is ${draft.status}`);
     }
     draft.status = 'rejected';
