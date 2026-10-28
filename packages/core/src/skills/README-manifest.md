@@ -6,8 +6,9 @@
 | Capability boundary | `skill-manifest.ts` | What the skill may do: tools, paths, network, secret *names*. |
 
 They are orthogonal. A skill can be progressively disclosed **and** constrained by a Manifest.
-Invalid Manifest fails closed (skill load / registry parse rejects it).
-Enforcement helpers (`enforceSkillManifest`) are consulted when a skill is active.
+A missing manifest leaves the skill unrestricted. A present manifest is a ceiling: omitted tool or path allow-lists deny, and network defaults to none.
+A broken sibling manifest skips that skill instead of loading it with no ceiling. Other skills in the tree still load.
+After `load_skill`, the tool loop refuses later calls that exceed any active manifest (tools, paths, and network).
 
 Sources (sibling JSON preferred when present; else frontmatter):
 

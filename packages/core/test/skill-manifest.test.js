@@ -55,6 +55,40 @@ test('loadSkillManifestFromMeta reads frontmatter and sibling', () => {
   assert.equal(good.manifest.version, '2.0.0');
 });
 
+test('omitted allow-lists deny tools and paths [AC:skill-manifest-boundary#AC-1]', () => {
+  const m = validateSkillManifest({ version: '1', denyTools: ['bash'] });
+  assert.equal(m.ok, true);
+  if (!m.ok) return;
+  assert.equal(enforceSkillManifest(m.manifest, { tool: 'read_file' }).ok, false);
+  assert.equal(enforceSkillManifest(m.manifest, { path: 'src/a.ts' }).ok, false);
+});
+
+test('path traversal and prefix tricks stay outside allowPaths [AC:skill-manifest-boundary#AC-2]', () => {
+  const m = validateSkillManifest({
+    version: '1',
+    allowTools: ['read_file'],
+    allowPaths: ['/workspace']
+  });
+  assert.equal(m.ok, true);
+  if (!m.ok) return;
+  assert.equal(enforceSkillManifest(m.manifest, { path: '/workspace/../etc/passwd' }).ok, false);
+  assert.equal(enforceSkillManifest(m.manifest, { path: '/workspace-evil/secret' }).ok, false);
+  assert.equal(enforceSkillManifest(m.manifest, { path: '/workspace/src/a.ts' }).ok, true);
+});
+
+test('network allowlist rejects lookalike hosts [AC:skill-manifest-boundary#AC-1]', () => {
+  const m = validateSkillManifest({
+    version: '1',
+    allowTools: ['web_fetch'],
+    network: { mode: 'allowlist', hosts: ['example.com'] }
+  });
+  assert.equal(m.ok, true);
+  if (!m.ok) return;
+  assert.equal(enforceSkillManifest(m.manifest, { networkHost: 'example.com.evil.com' }).ok, false);
+  assert.equal(enforceSkillManifest(m.manifest, { networkHost: '' }).ok, false);
+  assert.equal(enforceSkillManifest(m.manifest, { networkHost: 'api.example.com' }).ok, true);
+});
+
 test('Planning builtin ships a Manifest (capability boundary example)', () => {
   const planning = builtinSkills.find((s) => s.id === 'planning');
   assert.ok(planning);

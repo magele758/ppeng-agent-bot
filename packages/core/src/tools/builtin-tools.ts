@@ -12,6 +12,8 @@ import {
 } from '../workspace/index.js';
 import { resolvePermissionMode } from '../approval/permission-mode.js';
 import { commandHardlineToolResult } from '../sandbox/command-hardline.js';
+import type { SkillManifest } from '../skills/skill-manifest.js';
+import { manifestsForSession, noteActiveSkillManifest } from '../skills/skill-manifest-gate.js';
 import { sanitizeSpawnEnv } from '../sandbox/env-sanitizer.js';
 import { redactToolContent } from '../sandbox/result-redaction.js';
 import { createAgentSandboxFromEnv } from '../sandbox/create-agent-sandbox.js';
@@ -85,7 +87,10 @@ import {
 
 export interface RuntimeToolServices {
   currentUserText?(sessionId: string): Promise<string>;
-  loadSkill: (name: string, sessionId: string) => Promise<{ content?: string; error?: string }>;
+  loadSkill: (
+    name: string,
+    sessionId: string
+  ) => Promise<{ content?: string; error?: string; manifest?: SkillManifest; skillId?: string }>;
   searchSkills: (
     query: string,
     sessionId: string,
@@ -1069,10 +1074,17 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
     sideEffectLevel: 'none',
     ptc: { kind: 'read' },
     async execute(context, args) {
-      const { content, error } = await services.loadSkill(args.name, context.session.id);
+      const result = await services.loadSkill(args.name, context.session.id);
+      if (result.manifest) {
+        noteActiveSkillManifest(context.session.id, result.manifest);
+        context.session.metadata = {
+          ...(context.session.metadata ?? {}),
+          activeSkillManifests: manifestsForSession(context.session.id, context.session.metadata)
+        };
+      }
       return {
-        ok: Boolean(content),
-        content: content ?? error ?? `Unknown skill ${args.name}`
+        ok: Boolean(result.content),
+        content: result.content ?? result.error ?? `Unknown skill ${args.name}`
       };
     }
   };

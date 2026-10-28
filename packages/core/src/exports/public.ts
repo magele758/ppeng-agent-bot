@@ -834,8 +834,15 @@ export {
   validateSkillManifest,
   enforceSkillManifest,
   loadSkillManifestFromMeta,
+  manifestForSkillFile,
+  networkHostFromInput,
   PLANNING_SKILL_MANIFEST
 } from '../skills/skill-manifest.js';
+export {
+  gateActiveSkillManifests,
+  noteActiveSkillManifest,
+  runWithSkillManifest
+} from '../skills/skill-manifest-gate.js';
 export type {
   SkillManifest,
   SkillNetworkPolicy,

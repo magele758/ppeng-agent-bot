@@ -1,3 +1,6 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 /**
  * Skill capability-boundary Manifest.
  *
@@ -15,7 +18,7 @@ export type SkillNetworkPolicy =
 export interface SkillManifest {
   /** Semver-ish or integer string; required. */
   version: string;
-  /** Tools the skill may invoke. Empty allow + empty deny ⇒ no tool restriction. */
+  /** Tools the skill may invoke. Omitted or empty denies every tool (fail closed). `*` allows the rest. */
   allowTools?: string[];
   /** Tools explicitly denied (wins over allow). */
   denyTools?: string[];
@@ -123,16 +126,107 @@ function matchTool(name: string, pattern: string): boolean {
   return false;
 }
 
+function pushPathPiece(stack: string[], piece: string): boolean {
+  if (piece === '' || piece === '.') return true;
+  if (piece === '..') {
+    if (stack.length === 0) return false;
+    stack.pop();
+    return true;
+  }
+  stack.push(piece);
+  return true;
+}
+
+/** Lexical path key. `..` that escapes the root is rejected. Does not touch the filesystem. */
+export function canonicalSkillPath(input: string): string | undefined {
+  const slash = input.replace(/\\/g, '/').trim();
+  if (!slash || slash.includes('\0') || slash.includes('://')) return undefined;
+  const absolute = slash.startsWith('/') || /^[a-zA-Z]:\//.test(slash);
+  const stack: string[] = [];
+  for (const piece of slash.split('/')) {
+    if (!pushPathPiece(stack, piece)) return undefined;
+  }
+  const body = stack.join('/');
+  if (absolute) return `/${body}`;
+  return body || '.';
+}
+
+function pathWithin(target: string, prefixRaw: string): boolean {
+  const prefix = canonicalSkillPath(prefixRaw);
+  if (!prefix) return false;
+  if (prefix === '.') return !target.startsWith('/');
+  return target === prefix || target.startsWith(`${prefix}/`);
+}
+
 function pathBlocked(target: string, allow: string[] | undefined, deny: string[] | undefined): string | undefined {
-  const t = target.replace(/\\/g, '/');
-  if (deny?.some((d) => t === d || t.startsWith(d.replace(/\/?$/, '/')))) {
+  const canonical = canonicalSkillPath(target);
+  if (!canonical) return `path "${target}" denied by skill manifest`;
+  if ((deny ?? []).some((item) => pathWithin(canonical, item))) {
     return `path "${target}" denied by skill manifest`;
   }
-  if (allow && allow.length > 0) {
-    const ok = allow.some((a) => t === a || t.startsWith(a.replace(/\/?$/, '/')));
-    if (!ok) return `path "${target}" not in skill manifest allowPaths`;
+  if (!(allow ?? []).some((item) => pathWithin(canonical, item))) {
+    return `path "${target}" not in skill manifest allowPaths`;
   }
   return undefined;
+}
+
+function toolDecision(manifest: SkillManifest, tool: string | undefined): SkillCapabilityCheck | undefined {
+  if (!tool) return undefined;
+  const name = tool.trim();
+  if (manifest.denyTools?.some((pattern) => matchTool(name, pattern))) {
+    return { ok: false, reason: `tool "${name}" denied by skill manifest` };
+  }
+  if (!(manifest.allowTools ?? []).some((pattern) => matchTool(name, pattern))) {
+    return { ok: false, reason: `tool "${name}" not in skill manifest allowTools` };
+  }
+  return undefined;
+}
+
+/** Hostname only. Empty, userinfo, and non-DNS text fail closed. */
+export function networkHostFromInput(raw: string): string | undefined {
+  const text = raw.trim();
+  if (!text) return undefined;
+  if (text.includes('://')) {
+    try {
+      return normalizeNetworkHost(new URL(text).hostname);
+    } catch {
+      return undefined;
+    }
+  }
+  return normalizeNetworkHost(text);
+}
+
+function normalizeNetworkHost(raw: string): string | undefined {
+  const text = raw.trim().toLowerCase().replace(/\.$/, '');
+  if (!text || text.includes('@') || text.includes('/') || text.includes(' ') || text.includes('..')) return undefined;
+  const host = text.includes(':') && !text.startsWith('[') ? (text.split(':')[0] ?? '') : text;
+  if (!host || !/^[a-z0-9.-]+$/.test(host)) return undefined;
+  return host;
+}
+
+function hostMatches(host: string, allowed: string): boolean {
+  const item = normalizeNetworkHost(allowed);
+  if (!item) return false;
+  return host === item || host.endsWith(`.${item}`);
+}
+
+function networkBlocked(net: SkillNetworkPolicy, host: string): SkillCapabilityCheck | undefined {
+  switch (net.mode) {
+    case 'none':
+    case 'deny':
+      return { ok: false, reason: `network blocked by skill manifest (mode=${net.mode})` };
+    case 'allowlist': {
+      const normalized = networkHostFromInput(host);
+      if (!normalized || !net.hosts.some((item) => hostMatches(normalized, item))) {
+        return { ok: false, reason: `host "${host}" not in skill manifest network allowlist` };
+      }
+      return undefined;
+    }
+    default: {
+      const neverMode: never = net;
+      return neverMode;
+    }
+  }
 }
 
 /** Enforce tool / path / network against an active Manifest. Fail closed. */
@@ -144,31 +238,15 @@ export function enforceSkillManifest(
     networkHost?: string;
   }
 ): SkillCapabilityCheck {
-  if (action.tool) {
-    const tool = action.tool.trim();
-    if (manifest.denyTools?.some((p) => matchTool(tool, p))) {
-      return { ok: false, reason: `tool "${tool}" denied by skill manifest` };
-    }
-    if (manifest.allowTools && manifest.allowTools.length > 0) {
-      if (!manifest.allowTools.some((p) => matchTool(tool, p))) {
-        return { ok: false, reason: `tool "${tool}" not in skill manifest allowTools` };
-      }
-    }
-  }
+  const tool = toolDecision(manifest, action.tool);
+  if (tool) return tool;
   if (action.path) {
     const reason = pathBlocked(action.path, manifest.allowPaths, manifest.denyPaths);
     if (reason) return { ok: false, reason };
   }
   if (action.networkHost !== undefined) {
-    const net = manifest.network ?? { mode: 'none' as const };
-    const host = action.networkHost.trim().toLowerCase();
-    if (net.mode === 'none' || net.mode === 'deny') {
-      return { ok: false, reason: `network blocked by skill manifest (mode=${net.mode})` };
-    }
-    if (net.mode === 'allowlist') {
-      const ok = net.hosts.some((h) => host === h.toLowerCase() || host.endsWith(`.${h.toLowerCase()}`));
-      if (!ok) return { ok: false, reason: `host "${action.networkHost}" not in skill manifest network allowlist` };
-    }
+    const blocked = networkBlocked(manifest.network ?? { mode: 'none' }, action.networkHost);
+    if (blocked) return blocked;
   }
   return { ok: true };
 }
@@ -191,6 +269,46 @@ export function loadSkillManifestFromMeta(
     }
   }
   return validateSkillManifest(raw);
+}
+
+const SIBLING_MANIFEST_FILES = ['skill.manifest.json', 'capability.json'] as const;
+
+function readSiblingJson(candidate: string, name: string): { ok: true; manifest: unknown } | { ok: false; error: string } {
+  let text: string;
+  try {
+    text = readFileSync(candidate, 'utf8');
+  } catch {
+    return { ok: false, error: `${name} is unreadable` };
+  }
+  try {
+    return { ok: true, manifest: JSON.parse(text) as unknown };
+  } catch {
+    return { ok: false, error: `${name} is not valid JSON` };
+  }
+}
+
+/** Sibling `skill.manifest.json` / `capability.json`. Missing is ok; broken JSON fails closed. */
+export function readSiblingSkillManifest(
+  skillDir: string
+): { ok: true; manifest: unknown | undefined } | { ok: false; error: string } {
+  for (const name of SIBLING_MANIFEST_FILES) {
+    const candidate = join(skillDir, name);
+    if (!existsSync(candidate)) continue;
+    return readSiblingJson(candidate, name);
+  }
+  return { ok: true, manifest: undefined };
+}
+
+/** Invalid sibling or frontmatter manifest fails the skill. Absent manifest stays unrestricted. */
+export function manifestForSkillFile(
+  skillDir: string,
+  meta: Record<string, unknown> | undefined
+): { ok: true; manifest: SkillManifest | undefined } | { ok: false; error: string } {
+  const sibling = readSiblingSkillManifest(skillDir);
+  if (!sibling.ok) return sibling;
+  const loaded = loadSkillManifestFromMeta(meta, sibling.manifest);
+  if (!loaded.ok) return loaded;
+  return { ok: true, manifest: loaded.manifest };
 }
 
 /** Planning builtin example Manifest — least privilege for todo planning. */

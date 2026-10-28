@@ -3,8 +3,7 @@ import { homedir } from 'node:os';
 import { basename, dirname, join, relative } from 'node:path';
 import { botSkillId } from './bot-scope.js';
 import type { SkillSpec } from '../types.js';
-import { loadSkillManifestFromMeta } from './skill-manifest.js';
-import { existsSync, readFileSync } from 'node:fs';
+import { manifestForSkillFile } from './skill-manifest.js';
 
 export type SkillFrontmatterValue = string | string[];
 
@@ -205,26 +204,8 @@ async function loadSkillsFromTree(
         repoRootForRelative && file.startsWith(repoRootForRelative)
           ? relative(repoRootForRelative, file)
           : undefined;
-      let siblingManifest: unknown;
-      try {
-        const skillDir = dirname(file);
-        for (const name of ['skill.manifest.json', 'capability.json'] as const) {
-          const candidate = join(skillDir, name);
-          if (existsSync(candidate)) {
-            siblingManifest = JSON.parse(readFileSync(candidate, 'utf8'));
-            break;
-          }
-        }
-      } catch {
-        siblingManifest = undefined;
-      }
-      const loadedManifest = loadSkillManifestFromMeta(
-        parsed.meta as Record<string, unknown>,
-        siblingManifest
-      );
-      if (!loadedManifest.ok) {
-        throw new Error(`Invalid skill manifest for ${file}: ${loadedManifest.error}`);
-      }
+      const loadedManifest = manifestForSkillFile(dirname(file), parsed.meta as Record<string, unknown>);
+      if (!loadedManifest.ok) continue;
       skills.push({
         id,
         ownerBotId,
