@@ -1,0 +1,24 @@
+id: child-wake-workitem
+title: 子代理完成唤醒继续同一项工作
+status: approved
+requirement: |
+  Feature (minimal mergeable slice OK): Child-agent wake carries/continues WorkItem (work association) properly.
+  When a child/subagent/fork finishes or emits a wake, the parent resume path preserves workRef/parentWorkRef (or equivalent goal/execution correlation) so the continued work is the same WorkItem, not a detached orphan session.
+  Wake payload / service.wake / wait evidence must continue the owning Goal/Routine execution fence (revision, correlationId, session scope) — no silent drop of work identity across child→parent wake.
+  Cover concurrent-fork and goal_dispatch child session waits: wake resumes the correct owner once with evidence; wrong owner/revision rejected.
+  Tests proving: child completion wake continues parent workRef; missing/mismatched work association fails closed; no double-wake.
+  No new WorkItem table/system. No RAW_AGENT_* flags.
+notes: 'assumedApproval: standing-order-2026-10-22; final acceptance by lei pending'
+criteria:
+  - id: AC-1
+    given: 父目标正在等待它派出的子代理或并发子任务
+    when: 该子任务完成并发出一次唤醒
+    then: 同一项工作继续，唤醒保留原目标、执行围栏、修订和所属会话，并带上这次结果证据，不另开无关会话
+  - id: AC-2
+    given: 一项等待中的工作收到缺少工作关联、或关联到其他目标、其他修订、其他执行围栏的唤醒
+    when: 系统尝试恢复
+    then: 恢复被拒绝，原等待保持不变，不把结果记到这项工作上
+  - id: AC-3
+    given: 同一子任务的完成唤醒已经恢复过它所属的工作
+    when: 同一唤醒再次到达，或另一项工作声称等待同一个子任务
+    then: 所属工作只恢复一次，其他工作不会被这次结果唤醒
