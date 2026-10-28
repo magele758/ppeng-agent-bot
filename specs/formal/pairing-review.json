@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-10-28T17:22:26.000Z",
-  "reviewNote": "Child-agent wake preserves WorkItem identity (executionId/revision/fence). Merged origin/main (startup invariants). Pairing/lifecycle/restart/concurrency control-flow unchanged.",
+  "reviewedAt": "2026-10-28T17:35:02.000Z",
+  "reviewNote": "Agent-as-folder layout + eval default-on. Merged origin/main (child-wake). Pairing/lifecycle/restart/concurrency control-flow unchanged.",
   "mapping": [
     {
       "step": "Execute/approval/result persistence and fold recovery; real source component probes (not a full kernel proof)",
