@@ -367,8 +367,12 @@ export function buildSkillRoutingWithToolQuality(
 export async function buildSkillRoutingCooperative(
   userText: string,
   allSkills: SkillSpec[],
-  options: { mode: SkillRoutingMode; topK: number }
+  options: SkillRoutingOptions
 ): Promise<SkillRoutingResult> {
+  if (options.useFusion) {
+    await yieldToIO();
+    return buildSkillRoutingWithFusion(userText, allSkills, options);
+  }
   const { mode, topK } = options;
   if (mode === 'legacy' || !userText.trim() || !Number.isFinite(topK) || topK < 1) {
     return buildSkillRouting(userText, allSkills, options);

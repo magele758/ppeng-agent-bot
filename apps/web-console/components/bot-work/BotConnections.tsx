@@ -63,7 +63,9 @@ export function BotConnections({ botId }: { botId: string }) {
     <section className="ag-panel" data-testid="bot-connections">
       <h3>{t("botWork.connections")}</h3>
       <p>{t("botWork.softwareHint")}</p>
+      <details><summary>{t('botSettings.addConnection')}</summary>
       <ConnectionWizard key={botId} botId={botId} ready={loadedBotId === botId} existingIds={visibleConnections.map(connection => connection.connectorId)} onSaved={() => load(botId)} />
+      </details>
       <details>
       <summary>{t("botWork.advancedConnection")}</summary>
       <form

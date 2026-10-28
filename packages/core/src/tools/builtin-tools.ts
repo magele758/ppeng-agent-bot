@@ -358,7 +358,7 @@ function parseTodoItems(raw: unknown): TodoItem[] {
   return parsed;
 }
 
-export function createBuiltinTools(services: RuntimeToolServices): ToolContract<any>[] {
+export function createBuiltinTools(services: RuntimeToolServices, options: { includeDormantCapabilities?: boolean } = {}): ToolContract<any>[] {
   const riskyShellTokens = ['rm ', 'git reset', 'git checkout', 'git clean', 'npm publish', 'sudo '];
 
   function gateShell(context: RunContext, toolName: string, args: { isolation?: unknown }) {
@@ -1804,9 +1804,7 @@ export function createBuiltinTools(services: RuntimeToolServices): ToolContract<
     tools.push(notebookEditTool);
   }
 
-  if (a2uiToolsEnabled()) {
-    tools.push(a2uiRenderTool, a2uiDeleteSurfaceTool);
-  }
+  if (options.includeDormantCapabilities || a2uiToolsEnabled()) tools.push(a2uiRenderTool, a2uiDeleteSurfaceTool);
 
   if (externalAiToolsEnabled()) {
     tools.push(...createExternalAiTools());

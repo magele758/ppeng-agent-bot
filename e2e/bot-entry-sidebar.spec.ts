@@ -189,6 +189,7 @@ test('create dialog keeps actions visible while content scrolls and backdrop dis
  };
  await open();
  const dialog = page.getByRole('dialog');
+ await dialog.getByText('可选资料与外观', { exact: true }).click();
  const actions = dialog.locator('.ag-form__actions');
  const before = await actions.boundingBox();
  expect(before).not.toBeNull();
@@ -237,7 +238,7 @@ test('pressing and cancelling a Bot row gesture preserves the current conversati
  await expect(title).toHaveText(other.name);
 });
 
-test('an explicit Bot click wins a delayed saved-default lookup [AC:bot-face-first-creation#AC-4]', async ({ page, request }) => {
+test('an explicit Bot click wins a delayed saved-default lookup [AC:bot-settings-flow#AC-12]', async ({ page, request }) => {
  const { bots } = await (await request.get('/api/bots')).json();
  const [saved, chosen] = bots.filter((bot: { hidden?: boolean }) => !bot.hidden);
  expect(saved).toBeTruthy(); expect(chosen).toBeTruthy();
@@ -277,7 +278,7 @@ test('an explicit Bot click wins a delayed saved-default lookup [AC:bot-face-fir
  }
 });
 
-test('sidebar Bot choice wins while the saved-default lookup is still pending [AC:bot-face-first-creation#AC-4]', async ({ page, request }) => {
+test('sidebar Bot choice wins while the saved-default lookup is still pending [AC:bot-settings-flow#AC-12]', async ({ page, request }) => {
  const { bots } = await (await request.get('/api/bots')).json();
  const [saved, chosen] = bots.filter((bot: { hidden?: boolean }) => !bot.hidden);
  expect(saved).toBeTruthy(); expect(chosen).toBeTruthy();

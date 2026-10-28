@@ -32,6 +32,7 @@ test('guided HTTP binding persists and reports an unsuccessful check honestly [A
     connection: { connectorId: 'guided-http', health: 'unavailable', healthReason: 'authorization_required', lastProbeAt: new Date().toISOString(), tools: [] },
   } }));
   await page.goto(`/#/agents/bots?bot=${encodeURIComponent(bot.id)}&focus=connections`);
+  await page.getByText('添加软件连接', { exact: true }).click();
   const wizard = page.getByTestId('bot-connection-wizard');
   await wizard.getByLabel('连接名称', { exact: true }).fill('guided-http');
   await wizard.getByLabel('操作名称', { exact: true }).fill('guided_http_read');
@@ -47,6 +48,8 @@ test('guided HTTP binding persists and reports an unsuccessful check honestly [A
   await expect(page.getByTestId('bot-connections')).toContainText('连接验证未通过');
   await page.reload();
   await expect(row).toContainText('Read project status');
+  await page.getByText('添加软件连接', { exact: true }).click();
+  await page.getByRole('button', { name: '模型与外观', exact: true }).hover();
   await page.getByRole('button', { name: 'English', exact: true }).click();
   await expect(wizard.getByRole('button', { name: 'Save connection', exact: true })).toBeVisible();
 });
@@ -98,6 +101,7 @@ test('separate guided connections never overwrite each other’s saved credentia
   await page.route(`**/api/bots/${bot.id}/connections/*`, route => route.request().method() === 'PUT'
     ? route.fulfill({ json: { connection: {} } }) : route.continue());
   await page.goto(`/#/agents/bots?bot=${bot.id}&focus=connections`);
+  await page.getByText('添加软件连接', { exact: true }).click();
   const wizard = page.getByTestId('bot-connection-wizard');
   for (const name of ['first', 'second']) {
     await wizard.getByLabel('连接名称', { exact: true }).fill(name);
@@ -116,6 +120,7 @@ test('OpenAPI file form grants only selected read scope without hand-written too
   const { bot } = await (await request.post('/api/bots', { data: { name: `File connection ${crypto.randomUUID()}` } })).json();
   createdBotIds.push(bot.id);
   await page.goto(`/#/agents/bots?bot=${bot.id}&focus=connections`);
+  await page.getByText('添加软件连接', { exact: true }).click();
   const wizard = page.getByTestId('bot-connection-wizard');
   await wizard.getByLabel('连接方式', { exact: true }).selectOption('openapi');
   await wizard.getByLabel('连接名称', { exact: true }).fill('file-api');

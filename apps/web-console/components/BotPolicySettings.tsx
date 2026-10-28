@@ -11,7 +11,6 @@ import {
 } from '@/lib/bot-permission';
 import { BotBypassRevert, BotPolicyWarnings } from './BotPolicyFollowups';
 import { ConfigGroup, FieldLabel } from './ConfigGroup';
-import { Disclosure } from './sections/agents/Disclosure';
 
 const TURN_CHOICES = [0, 24, 48, 96] as const;
 
@@ -20,8 +19,7 @@ export function BotPolicySettings({
   maxTurns,
   permissionMode,
   allowedTools,
-  allowedSkills,
-  allowlistsCollapsed = false,
+  onlyTools = false,
   onSavePermission,
   onSave
 }: {
@@ -30,37 +28,28 @@ export function BotPolicySettings({
   permissionMode: BotPermissionMode;
   onSavePermission: (mode: BotPermissionMode, opts?: { confirmBypass?: boolean }) => Promise<void>;
   allowedTools: string[];
-  allowedSkills: string[];
-  /** 把工具/技能名单收进「高级」折叠区（Bots 管理页使用） */
-  allowlistsCollapsed?: boolean;
+  onlyTools?: boolean;
   onSave: (patch: {
     maxTurns?: number;
     allowedTools?: string[];
-    allowedSkills?: string[];
   }) => Promise<{ warnings?: unknown } | void>;
 }) {
   const { t } = useI18n();
   const [catalog, setCatalog] = useState<string[]>([]);
   const [draft, setDraft] = useState<string[]>(allowedTools);
-  const [skillCatalog, setSkillCatalog] = useState<string[]>([]);
-  const [skillDraft, setSkillDraft] = useState<string[]>(allowedSkills);
   const [pendingBypass, setPendingBypass] = useState(false);
   const [warningsNonce, setWarningsNonce] = useState(0);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const toolsKey = allowedTools.join('\n');
-  const skillsKey = allowedSkills.join('\n');
 
   useEffect(() => {
     setDraft(toolsKey ? toolsKey.split('\n') : []);
   }, [toolsKey]);
 
   useEffect(() => {
-    setSkillDraft(skillsKey ? skillsKey.split('\n') : []);
-  }, [skillsKey]);
-
-  useEffect(() => {
+    if (!onlyTools) return;
     let cancelled = false;
     void api('/api/tools')
       .then((data) => {
@@ -76,27 +65,13 @@ export function BotPolicySettings({
       .catch(() => {
         if (!cancelled) setErr(t('play.botPolicy.catalogFailed'));
       });
-    void api('/api/skills')
-      .then((data) => {
-        if (cancelled) return;
-        const skills = (data as { skills?: Array<{ name?: string }> }).skills ?? [];
-        setSkillCatalog(
-          skills
-            .map((skill) => (typeof skill.name === 'string' ? skill.name : ''))
-            .filter((name) => name.length > 0)
-        );
-      })
-      .catch(() => {
-        if (!cancelled) setErr(t('play.botPolicy.skillCatalogFailed'));
-      });
     return () => {
       cancelled = true;
     };
-  }, [t]);
+  }, [t, onlyTools]);
 
   const turnValue = maxTurns === 24 || maxTurns === 48 || maxTurns === 96 ? maxTurns : 0;
   const optionNames = [...new Set([...catalog, ...draft])];
-  const skillOptionNames = [...new Set([...skillCatalog, ...skillDraft])];
 
   const saveTurns = async (next: number) => {
     if (!botId || busy) return;
@@ -157,7 +132,7 @@ export function BotPolicySettings({
     setBusy(true);
     setErr(null);
     try {
-      await onSave({ allowedTools: draft, allowedSkills: skillDraft });
+      await onSave({ allowedTools: draft });
       setWarningsNonce((n) => n + 1);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -188,37 +163,26 @@ export function BotPolicySettings({
         </select>
       </label>
       <p className="bot-cron-card__meta">{t('play.botPolicy.allowedToolsHint')}</p>
-      <label className="field field--inline field--grow">
-        <span>{t('play.botPolicy.allowedSkills')}</span>
-        <select
-          multiple
-          className="bot-policy-tools"
-          aria-label={t('play.botPolicy.allowedSkillsAria')}
-          value={skillDraft}
-          disabled={!botId || busy}
-          onChange={(e) => {
-            setSkillDraft(Array.from(e.target.selectedOptions).map((option) => option.value));
-          }}
-        >
-          {skillOptionNames.map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <p className="bot-cron-card__meta">{t('play.botPolicy.allowedSkillsHint')}</p>
       <button
         type="button"
         className="btn btn-secondary btn-sm"
         disabled={!botId || busy}
         onClick={() => void saveAllowlists()}
       >
-        {busy ? t('play.botPolicy.saving') : t('play.botPolicy.saveAllowlists')}
+        {busy ? t('play.botPolicy.saving') : t('botSettings.saveTools')}
       </button>
     </>
   );
 
+  if (onlyTools) return <ConfigGroup title={t('botSettings.tools')} tip={t('botSettings.toolsHint')}><p>{t('botSettings.toolsHint')}</p><ToolDraftStatus error={err} dirty={draft.join('\n')!==toolsKey}/>{allowlistFields}      <BotPolicyWarnings
+        botId={botId}
+        refreshKey={`${toolsKey}|${warningsNonce}`}
+        allowedTools={allowedTools}
+        disabled={!botId || busy}
+        onRemoveStale={removeStale}
+        onKeepBypass={() => savePermission('bypass', true)}
+      />
+</ConfigGroup>;
   return (
     <ConfigGroup title={t('play.botPolicy.title')} tip={t('play.botPolicy.tip')}>
       {err ? <p className="bot-cron-panel__err">{err}</p> : null}
@@ -286,22 +250,12 @@ export function BotPolicySettings({
           ))}
         </select>
       </label>
-      <BotPolicyWarnings
-        botId={botId}
-        refreshKey={`${toolsKey}|${warningsNonce}`}
-        allowedTools={allowedTools}
-        disabled={!botId || busy}
-        onRemoveStale={removeStale}
-        onKeepBypass={() => savePermission('bypass', true)}
-      />
-      {allowlistsCollapsed ? (
-        <Disclosure label={t('agents.bots.sectionAllowlists')}>
-          <p className="bot-cron-card__meta">{t('agents.bots.allowlistsHint')}</p>
-          {allowlistFields}
-        </Disclosure>
-      ) : (
-        allowlistFields
-      )}
+      <p>{t('botSettings.runHint')}</p>
     </ConfigGroup>
   );
+}
+
+function ToolDraftStatus({error, dirty}: {error: string | null; dirty: boolean}) {
+  const {t} = useI18n();
+  return <>{error && <p role="alert">{error}</p>}{dirty && <p>{t('botSettings.unsaved')}</p>}</>;
 }

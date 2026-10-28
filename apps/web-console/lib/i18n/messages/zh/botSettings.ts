@@ -1,0 +1,17 @@
+export const botSettings = {
+ basic: '基本设置', capabilities: '能力与权限', automation: '自动化', records: '记录',
+ name: 'Bot 名称', title: '职责', description: '用途与说明', saveBasics: '保存基本资料',
+ optional: '可选资料与外观', appearance: '外观', purpose: '希望它做什么？', create: '创建并开始对话', createHint: '起一个名字，描述希望它做什么，即可开始对话。',
+ scope: '模型和工具作用于此 Bot 的固定对话；权限作用于当前对话；技能作用于此 Bot 及其任务。已创建子任务的模型与会话权限保持原设置。',
+ nextStep: '已保存 · 下一执行步骤生效；已经发出的请求保持原配置。', nextRun: '已保存 · 下次执行生效；当前执行继续使用原设置。', immediate: '已保存 · 已生效',
+ runHint: '步数上限在下次执行生效。', stepHint: '保存后从下一执行步骤使用新配置，无需重启。', globalHint: '作用于全局。保存后从下一执行步骤生效，无需重启。',
+ loopHint: '已保存 · 内核与装配配置在下次执行生效；默认模式用于新建或未绑定会话。无需重启。',
+ unsaved: '有未保存的修改', tools: '允许的工具', toolsHint: '留空表示不限制工具。具体操作仍遵循权限与全局能力设置。', saveTools: '保存工具范围',
+ noSkills: '当前未选择任何技能，保存后关闭此 Bot 的全部技能。', disableSkills: '全部关闭',
+ routing: '技能路由模式', topK: '候选技能数量', strict: '仅允许加载本轮候选或已搜索的技能', fusion: '融合关联技能',
+ hybrid: '混合匹配', lexical: '词法匹配', legacy: '旧版排序',
+ runtimeTitle: '交互卡片与领域能力', runtimeKeywords: 'A2UI 卡片 领域 SRE 股票 家居 ERP 能力',
+ a2ui: '允许 Bot 渲染交互卡片', domains: '已安装的领域能力',
+ source: '来源：{source}', sourceUi: '面板', sourceFallback: '环境配置或默认值',
+ settings: 'Bot 设置', addConnection: '添加软件连接',
+};

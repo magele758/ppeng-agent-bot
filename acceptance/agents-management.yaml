@@ -3,7 +3,8 @@ title: Bots / Agents / Teams / Skills 管理页清晰易用
 status: implemented
 owner: ws2-agents
 notes: |
-  Bot 创建字段布局已由用户批准的 bot-face-first-creation AC-1 更新：标题、描述、脸型和颜色直接展示，仍仅名称必填。
+  assumedApproval: standing-order-2026-10-22
+  用户要求简化 Bot 操作；bot-settings-flow 取代旧的外观默认展开和创建后停留管理页布局，保留预览、持久化、重复校验及完整设置能力。
 requirement: |
   让创建/管理 bot、agent、team、skill 清晰、容易：卡片/列表总览加搜索，创建流程只要求最少必填字段并把其余放进「高级」，
   空状态要有清晰指引，team 图要易读。
@@ -23,7 +24,7 @@ criteria:
   - id: AC-4
     given: 用户在 Bots 页点击「新建 Bot」
     when: 只填写名称并提交
-    then: 表单仅要求名称，标题、描述、脸型和颜色直接展示且为可选；名称为空时不能提交；创建成功后新 Bot 出现在列表中并被选中；同名 Bot 再次创建会显示明确的错误，且不会多出一个 Bot
+    then: 表单仅要求名称，用途直接展示，标题与外观按需展开且为可选；名称为空时不能提交；创建成功后新 Bot 出现在列表中并直接进入其对话；同名 Bot 再次创建会显示明确的错误，且不会多出一个 Bot
   - id: AC-5
     given: 用户已有多个 Bot
     when: 在 Bots 页搜索框输入名称、标题或描述的一部分
@@ -31,7 +32,7 @@ criteria:
   - id: AC-6
     given: 用户在 Bots 页选中一个 Bot
     when: 查看和修改它的设置
-    then: 在同一个详情面板里可以改权限档位、模型、最大回合数和定时任务；允许工具/技能名单收在「高级」里；保存后刷新页面仍保留
+    then: 在同一个详情面板里可以改权限档位、模型、最大回合数和定时任务；允许工具及统一技能选择位于「能力与权限」；保存后刷新页面仍保留
   - id: AC-7
     given: 用户在 Bots 页选中一个 Bot
     when: 点击「打开对话」

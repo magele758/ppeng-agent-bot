@@ -1,20 +1,11 @@
 /**
- * Skill catalog disclosure Lab settings.
- * Persisted in daemon_control KV. UI / PATCH /api/skills/settings is the
- * control plane — no new RAW_AGENT_* switch for disclosure.
- *
- * Orthogonal to RAW_AGENT_SKILL_ROUTING_MODE (how to score). This setting
- * only controls what the prompt lists:
- *   shortlist — top-K name+description (default hybrid)
- *   lazy      — no catalog in prompt; search_skills then load_skill
- *   full      — list every skill name+description
- *
- * Env fallback only when the UI has never saved: routing `legacy` → full,
- * otherwise shortlist. Lazy is never implied by env.
+ * Persisted Lab disclosure and routing settings. Each unsaved routing field
+ * falls back to its existing environment/default value; no new env switches.
  */
 
 import { nowIso } from '../id.js';
-import { skillRoutingModeFromEnv } from './skill-router.js';
+import { skillRoutingModeFromEnv, skillRoutingTopKFromEnv, skillLoadStrictFromEnv, skillRoutingFusionFromEnv, type SkillRoutingMode } from './skill-router.js';
+import { ValidationError } from '../errors.js';
 
 export const SKILL_SETTINGS_KEY = 'skill_settings';
 
@@ -22,12 +13,19 @@ export const SKILL_DISCLOSURE_MODES = ['shortlist', 'lazy', 'full'] as const;
 
 export type SkillDisclosureMode = (typeof SKILL_DISCLOSURE_MODES)[number];
 
-export interface SkillSettings {
+export interface SkillRoutingSettings {
+  routingMode: SkillRoutingMode;
+  topK: number;
+  strictLoad: boolean;
+  fusion: boolean;
+}
+
+export interface SkillSettings extends Partial<SkillRoutingSettings> {
   disclosureMode: SkillDisclosureMode;
   updatedAt: string;
 }
 
-export interface SkillSettingsPatch {
+export interface SkillSettingsPatch extends Partial<SkillRoutingSettings> {
   disclosureMode?: SkillDisclosureMode;
 }
 
@@ -57,6 +55,7 @@ export function normalizeSkillSettings(
   if (!raw || typeof raw !== 'object') return base;
   return {
     disclosureMode: parseSkillDisclosureMode(raw.disclosureMode) ?? base.disclosureMode,
+    ...routingPatch(raw),
     updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : base.updatedAt
   };
 }
@@ -85,14 +84,16 @@ export function writeSkillSettings(
   if (typeof store.setDaemonControl !== 'function') {
     throw new Error('skill settings store cannot persist');
   }
-  const current = readSkillSettings(store);
-  const next = normalizeSkillSettings({
+  routingPatch(patch);
+  if (patch.disclosureMode !== undefined && !parseSkillDisclosureMode(patch.disclosureMode)) throw new ValidationError("Invalid disclosureMode");
+  const current = store.getDaemonControl(SKILL_SETTINGS_KEY) as Partial<SkillSettings> | undefined;
+  const next = {
     ...current,
     ...patch,
     updatedAt: nowIso()
-  });
+  };
   store.setDaemonControl(SKILL_SETTINGS_KEY, next);
-  return next;
+  return normalizeSkillSettings(next);
 }
 
 function disclosureFromEnv(env: NodeJS.ProcessEnv | undefined): SkillDisclosureMode {
@@ -107,7 +108,29 @@ export function resolveSkillDisclosureMode(input: {
   if (!hasPersistedSkillSettings(input.store) || !input.store?.getDaemonControl) {
     return disclosureFromEnv(input.env);
   }
-  return readSkillSettings({
-    getDaemonControl: (key) => input.store!.getDaemonControl!(key)
-  }).disclosureMode;
+  const saved = input.store.getDaemonControl(SKILL_SETTINGS_KEY) as Partial<SkillSettings>;
+  return parseSkillDisclosureMode(saved.disclosureMode) ?? disclosureFromEnv(input.env);
+}
+
+function routingPatch(raw: Partial<SkillRoutingSettings>): Partial<SkillRoutingSettings> {
+  const out: Partial<SkillRoutingSettings> = {};
+  if (raw.routingMode !== undefined) {
+    if (!['legacy','lexical','hybrid'].includes(raw.routingMode)) throw new ValidationError('Invalid routingMode');
+    out.routingMode = raw.routingMode;
+  }
+  if (raw.topK !== undefined) {
+    if (!Number.isInteger(raw.topK) || raw.topK < 1 || raw.topK > 50) throw new ValidationError('topK must be an integer from 1 to 50');
+    out.topK = raw.topK;
+  }
+  for (const key of ['strictLoad','fusion'] as const) if (raw[key] !== undefined) {
+    if (typeof raw[key] !== 'boolean') throw new ValidationError(key + ' must be boolean');
+    out[key] = raw[key];
+  }
+  return out;
+}
+
+export function resolveSkillRoutingSettings(input: {store?: {getDaemonControl?(key:string):unknown}; env?: NodeJS.ProcessEnv}): SkillRoutingSettings {
+  const env = input.env ?? process.env;
+  const saved = input.store?.getDaemonControl?.(SKILL_SETTINGS_KEY) as Partial<SkillSettings> | undefined;
+  return {routingMode: skillRoutingModeFromEnv(env), topK: skillRoutingTopKFromEnv(env), strictLoad: skillLoadStrictFromEnv(env), fusion: skillRoutingFusionFromEnv(env), ...routingPatch(saved ?? {})};
 }

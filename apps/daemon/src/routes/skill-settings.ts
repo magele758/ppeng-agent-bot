@@ -10,6 +10,7 @@ import {
   parseSkillDisclosureMode,
   readSkillSettings,
   resolveSkillDisclosureMode,
+  resolveSkillRoutingSettings,
   writeSkillSettings,
   type SkillSettingsPatch
 } from '@ppeng/agent-core';
@@ -31,6 +32,8 @@ export function skillSettingsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
           settings,
           effective: {
             disclosureMode,
+            ...resolveSkillRoutingSettings({store:runtime.store,env:process.env}),
+            applyAt: 'next-step',
             source: hasPersistedSkillSettings(runtime.store) ? 'ui' : 'default'
           }
         });
@@ -41,7 +44,9 @@ export function skillSettingsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
       pattern: '/api/skills/settings',
       handler: async ({ readBody, response }) => {
         const body = (await readBody()) as SkillSettingsPatch & Record<string, unknown>;
+        if (!body || typeof body !== 'object' || Array.isArray(body)) throw new ValidationError('Expected a settings object');
         const patch: SkillSettingsPatch = {};
+        for (const key of ['routingMode','topK','strictLoad','fusion'] as const) if (key in body) Object.assign(patch,{[key]:body[key]});
         if (body && 'disclosureMode' in body) {
           const parsed = parseSkillDisclosureMode(body.disclosureMode);
           if (!parsed) {
@@ -53,7 +58,9 @@ export function skillSettingsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         json(response, 200, {
           settings,
           effective: {
-            disclosureMode: settings.disclosureMode,
+            disclosureMode: resolveSkillDisclosureMode({store:runtime.store,env:process.env}),
+            ...resolveSkillRoutingSettings({store:runtime.store,env:process.env}),
+            applyAt: 'next-step',
             source: 'ui' as const
           }
         });
