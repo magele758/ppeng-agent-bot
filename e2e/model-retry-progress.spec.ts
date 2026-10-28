@@ -20,7 +20,7 @@ async function start(page: Page, locale = 'zh') {
       return original(input, init);
     };
   }, locale);
-  await page.goto('/');
+  await page.goto('/#/chat');
   await page.locator('#playInput').fill('retry acceptance message');
   await page.locator('#btnSend').click();
   await page.waitForFunction(() => typeof (window as any).retryEmit === 'function');

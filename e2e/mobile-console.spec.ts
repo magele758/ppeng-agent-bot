@@ -33,6 +33,7 @@ test('mobile sessions preserve draft [AC:mobile-console#AC-2]', async ({ page })
   await expect(input).toBeInViewport({ ratio: 1 });
   await page.setViewportSize({ width: 390, height: 520 });
   await expect(input).toBeInViewport({ ratio: 1 });
+  await expect(input).toHaveValue('手机端未发送草稿');
 });
 
 test('mobile settings and appearance tools [AC:mobile-console#AC-3]', async ({ page }) => {
@@ -68,7 +69,7 @@ test('mobile saved desktop collapse keeps labels and session selection works [AC
   await page.goto('/');
   await expect(page.locator('.lab-rail__label').filter({ hasText: 'Knowledge & Memory' })).toBeVisible();
   await page.getByTestId('mobile-sessions-toggle').click();
-  const row = page.locator('#sessionListMini .session-item__body').first();
+  const row = page.locator('#sessionListMini .session-item__body:visible').first();
   if (await row.count()) {
     await row.click();
     await expect(page.locator('.play-sidebar')).toBeHidden();

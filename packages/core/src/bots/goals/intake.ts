@@ -43,11 +43,17 @@ function isExplicitReadOnlyRequest(raw: string): boolean {
 
 function shortFollowupKind(text: string, targeted: boolean): 'query' | 'chat' | undefined {
   if (targeted) return undefined;
+  if (isResponseLanguagePreference(text)) return 'chat';
   if (/^(?:(?:这个|这件事|事情|任务|现在|都|已经|到底|你|目前)\s*)*(?:好了吗|好了没|搞完了没|搞完了吗|做完了没|做完了吗|干完了没|干完了吗|在干嘛|还差什么|还有什么没做完的)[？?！!。.\s]*$/.test(text)) return 'query';
   if (/^(?:回复|回答|说)(?:再|请)?(?:简单|简短|简洁|短|清楚)[\s\S]{0,100}$/.test(text) && !requestsWork(text)
     && !/新增|添加|再加|修改|修复|开发|实现|生成|创建|保存|提交|删除|运行|部署|发送|\b(?:add|fix|build|save|send|run|create)\b/i.test(text)) return 'chat';
   if (isExplicitReadOnlyRequest(text)) return 'query';
   return undefined;
+}
+
+function isResponseLanguagePreference(text: string): boolean {
+  return /^(?:(?:以后|今后|接下来|请|只|都)\s*)*(?:用|使用)(?:中文|英文|英语|汉语)(?:回复|回答|答复)(?:我)?[！!。.\s]*$/.test(text)
+    || /^(?:please\s+)?(?:always\s+)?(?:reply|respond|answer)\s+(?:to me\s+)?in\s+(?:chinese|english)(?:\s+from now on)?[!.\s]*$/i.test(text);
 }
 
 /** Explicit targeting wins; unresolved references are left for the service to clarify. */

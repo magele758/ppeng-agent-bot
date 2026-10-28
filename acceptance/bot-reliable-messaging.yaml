@@ -1,6 +1,6 @@
 id: bot-reliable-messaging
 title: Bot可靠工作与身份连续性
-status: approved
+status: implemented
 requirement: |
   分多个agent补齐所有缺失直到评估完成
 notes: 用户明确授权按已审阅开发计划实施，无需重复确认。
@@ -17,3 +17,6 @@ criteria:
     given: 处理中的进程中断
     when: 重新启动
     then: 未知执行明确显示且不自动重复副作用
+
+links:
+  - doc/SINGLE_HOST_COMPLETION.md

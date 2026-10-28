@@ -1,5 +1,10 @@
 import { test, expect } from './helpers/bot-pair';
 
+// Inspect individual notice cards in full transcript; brief grouping has its own coverage.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('lab.sessionBrief', '0'));
+});
+
 const info = '[risk-advisory]\nRisk signals detected:\n- iteration_near_limit (magnitude=2)\nChange strategy: try a different tool, smaller steps, or ask the user. Avoid repeating the failing pattern.';
 const warning = '[risk-advisory]\nRisk signals detected:\n- tool_error_streak (magnitude=3)';
 

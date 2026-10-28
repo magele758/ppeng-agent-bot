@@ -8,6 +8,7 @@ test('Bloub creation, edit, animation and reduced motion [AC:bot-bloub-dynamic#A
   const form = page.getByRole('form', { name: '新建 Bot', exact: true });
   const name = `Bloub test ${Date.now()}`;
   await form.getByTestId('bot-create-name').fill(name);
+  await form.locator('summary').click();
   await form.getByTestId('bot-face-style-bloub').click();
   const preview = form.getByTestId('bot-face-choice-preview');
   await expect(preview).toHaveAttribute('data-bloub-ready', 'true');
@@ -26,15 +27,18 @@ test('Bloub creation, edit, animation and reduced motion [AC:bot-bloub-dynamic#A
   await expect(card.locator('[data-bloub-face]')).toHaveAttribute('data-bloub-color', color!);
   await card.click();
   const detail = page.getByTestId('bot-detail');
+  await detail.locator('summary').filter({ hasText: '外观' }).click();
   await detail.getByRole('button', { name: '薄荷', exact: true }).click();
   await expect.poll(async () => (await (await request.get(`/api/bots/${bot.id}`)).json()).bot.faceColor).toBe('mint');
   await page.reload();
   await page.getByTestId(`bot-card-${bot.id}`).click();
+  await detail.locator('summary').filter({ hasText: '外观' }).click();
   await expect(detail.getByTestId('bot-face-style-bloub')).toHaveAttribute('aria-pressed', 'true');
   let active = 1;
   await page.route('**/api/bot-work/status', r => r.fulfill({ json: { bots: [{ bot, activeWorkCount: active }] } }));
   await detail.getByRole('button', { name: '打开对话', exact: true }).click();
   const row = page.locator('#sessionListMini .list-item--bot-chat').filter({ has: page.getByText(name, { exact: true }) });
+  await row.scrollIntoViewIfNeeded();
   const face = row.locator('[data-bloub-face]');
   await page.mouse.move(0, 0);
   await expect(face).toHaveAttribute('data-face-working', 'true');

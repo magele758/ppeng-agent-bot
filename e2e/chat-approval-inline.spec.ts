@@ -58,7 +58,7 @@ test('pending approval sits in the transcript beside the waiting tool [AC:chat-a
     void route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
   });
 
-  await page.goto('/');
+  await page.goto('/#/chat');
   await page.getByRole('button', { name: /approval-inline/ }).first().click();
 
   const feed = page.locator('#playMessages');
@@ -68,6 +68,7 @@ test('pending approval sits in the transcript beside the waiting tool [AC:chat-a
   await expect(banner).toHaveAttribute('aria-label', '待审批');
   await expect(banner.getByText(ASK_REASON, { exact: true })).toHaveCount(1);
 
+  await feed.locator('.chat-process-note > summary').click();
   const toolName = feed.locator('.chat-tool-fold__name', { hasText: 'ask_user' });
   await expect(toolName).toBeVisible();
   const toolBox = await toolName.boundingBox();

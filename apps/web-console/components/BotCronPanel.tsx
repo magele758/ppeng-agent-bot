@@ -47,11 +47,11 @@ function formatWhen(iso?: string): string {
 }
 
 function storedWorkLink(job:CronJobInfo):RoutineWorkLinkValue|null {
-  return (job.metadata.workLink as RoutineWorkLinkValue|undefined)??null;
+  return (job.metadata?.workLink as RoutineWorkLinkValue|undefined)??null;
 }
 function WorkLinkStopStatus({job}:{job:CronJobInfo}){
   const {t}=useI18n();
-  const status=(job.metadata.workLinkStop as {status?:string}|undefined)?.status;
+  const status=(job.metadata?.workLinkStop as {status?:string}|undefined)?.status;
   if(status==='completed')return <p>{t('play.cronPanel.workStopCompleted')}</p>;
   if(status==='cancelled')return <p>{t('play.cronPanel.workStopCancelled')}</p>;
   return null;

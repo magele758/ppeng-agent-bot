@@ -37,7 +37,7 @@ test('a cancelled routine with unconfirmed effects still requires explicit retry
   });
   await page.goto('/#/agents/bots');
   await page.getByTestId(`bot-card-${bot.id}`).click();
-  await page.locator('#bot-tab-automation').click();
+  await page.getByRole('tab', { name: '自动化', exact: true }).click();
   const panel = page.locator('.bot-cron-panel');
   await panel.getByRole('button', { name: '运行记录', exact: true }).click();
   await expect(panel.getByRole('button', { name: '重试', exact: true })).toBeDisabled();

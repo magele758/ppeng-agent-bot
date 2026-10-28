@@ -1,6 +1,6 @@
 id: bot-room-inline-approval
 title: 群内原位批准
-status: approved
+status: implemented
 owner: user
 requirement: |
   approval = private-default：默认仍转到该 Bot 私聊，结果不自动回群。群内原位批准只作为 Lab 里另行打开的策略，不进第一批实现。
@@ -29,3 +29,6 @@ notes: |
   不进第一批实现。用户确认其他群聊规格时，本规格仍保持 draft，直到用户单独书面批准群内原位审批。
   若日后批准，将替代 bot-rooms AC-8 中这些句子：「群里不等待，也不展示要真人操作的卡片或凭证细节」「结果只留在私聊，不会自动写回群，也不会让群把这一步再执行一遍」「该成员这一轮按已转私聊结束」。AC-8 里「私聊里的内容仍然不会进入群」在默认关闭时仍然成立；打开群内批准后，回到群里的是该步骤的最终文字，不是整段私聊记录。
   待用户单独批准后，才把 AC-8 的相应句子按规范处理。验收规范的 retired 作用于整份规格，不能把 bot-rooms 整份标为 retired，因为 AC-1 至 AC-7 仍然有效。本次不修改 bot-rooms.yaml 的状态和正文。
+
+links:
+  - doc/SINGLE_HOST_COMPLETION.md

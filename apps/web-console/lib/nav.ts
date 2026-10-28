@@ -23,7 +23,7 @@ export interface NavLocation {
   pane: string | null;
 }
 
-export const DEFAULT_LOCATION: NavLocation = { section: 'chat', sub: null, pane: null };
+export const DEFAULT_LOCATION: NavLocation = { section: 'bot', sub: null, pane: null };
 
 export function isSectionId(value: string): value is SectionId {
   return (SECTION_IDS as readonly string[]).includes(value);
