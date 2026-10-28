@@ -147,7 +147,7 @@ test('non-running and foreign executions cannot disclose or checkpoint; notice p
  announceGoalState({store},pending);
  const notices=store.foldMessages(parent.id).filter(m=>m.parts.some(p=>p.text?.startsWith('[goal update]')));
  assert.equal(notices.length,2);
- assert.match(notices.at(-1).parts[0].text,/"status":"completed"/);
+ assert.match(notices.at(-1).parts[0].text,/^\[goal update\] Done:/);
  assert.ok(store.foldMessages(parent.id).some(m=>m.id===newMessage.id));
  assert.ok(!names(store.getSession(parent.id)).includes('goal_dispatch'));
  assert.equal((await createGoalCheckpointTool(store).execute({session:stale},{kind:'progress',summary:'stale'})).ok,false);
@@ -202,5 +202,5 @@ test('notice reads latest state inside its write transaction [AC:bot-goal-live-c
  });
  announceGoalState({store},pending);
  const notice=store.foldMessages(parent.id).at(-1);
- assert.match(notice.parts[0].text,/"status":"completed"/);
+ assert.match(notice.parts[0].text,/^\[goal update\] Done:/);
 });

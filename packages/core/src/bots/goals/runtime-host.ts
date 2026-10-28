@@ -30,6 +30,16 @@ export interface GoalRuntimeHost {
  /** True when this process no longer owns the execution, including after a restart. */
  executionInterrupted?(sessionId: string): boolean;
 }
+/** Short terminal notice — keep the chat quiet; Lab surfaces still hold full state. */
+export function formatQuietGoalNotice(goal:BotGoal):string {
+ const title=(goal.title??'').trim()||goal.id;
+ const reason=(goal.blockedReason??'').trim();
+ if(goal.status==='completed')return `[goal update] Done: ${title}`;
+ if(goal.status==='failed')return `[goal update] Failed: ${title}${reason?` — ${reason}`:''}`;
+ if(goal.status==='blocked')return `[goal update] Blocked: ${title}${reason?` — ${reason}`:''}`;
+ if(goal.status==='pending_review')return `[goal update] Needs review: ${title}`;
+ return `[goal update] ${title}: ${goal.status}`;
+}
 export function announceGoalState(host:GoalRuntimeHost,goal:BotGoal):void {
  host.store.transaction(()=>{
  goal=new BotGoalService(host.store,Date.now,goal.sessionId).get(goal.botId,goal.id)??goal;
@@ -38,7 +48,7 @@ export function announceGoalState(host:GoalRuntimeHost,goal:BotGoal):void {
  const version=`${goal.revision}:${goal.status}:${goal.blockedReason??''}`;
  if(host.store.getDaemonControl<string>(key)===version)return;
   host.store.setDaemonControl(key,version);
-  host.store.appendMessage(goal.sessionId,'system',[{type:'text',text:`[goal update] ${JSON.stringify({id:goal.id,title:goal.title,status:goal.status,progress:goal.progress,reason:goal.blockedReason,nextStep:goal.nextStep})}`}],{key:`goal-notice:${goal.id}:${version}`});
+  host.store.appendMessage(goal.sessionId,'system',[{type:'text',text:formatQuietGoalNotice(goal)}],{key:`goal-notice:${goal.id}:${version}`});
  });
 }
 export function usesDurableBotGoals(store:Pick<SqliteStateStore,'getSession'>,session:SessionRecord):boolean {
