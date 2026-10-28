@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-10-28T17:07:07.000Z",
-  "reviewNote": "Durable wait is the default park path for goals that pause. Pairing, approval, lifecycle, restart, and concurrency control-flow contracts are unchanged; only the default park/wait wiring was added.",
+  "reviewedAt": "2026-10-28T17:11:03.000Z",
+  "reviewNote": "Durable wait is the default park path for goals and routines. outstandingRoutineChildId only returns a child this occurrence spawned. Pairing, approval, lifecycle, restart, and concurrency control-flow contracts are unchanged.",
   "mapping": [
     {
       "step": "Production runtime startup and writer surfaces, cancellation and approval decisions; actual OS process probes",
@@ -485,7 +485,7 @@
     "packages/core/src/runtime/steer-tools.ts": "ee3ac8ce03aed1a3fd236421c5e01fcc5ca062e9ac20b2c662821bc88dde17a2",
     "packages/core/test/steer-tool-continuity.test.js": "a96f5f02b662e644497657712a1e71c7ce07adfc78192f80a26e9bd40aa82bc2",
     "packages/core/src/learning/sources.ts": "eb463bb5956d8e95588e2b1409ea72d9caa688476a05d5c2d534b227b67e1ba9",
-    "packages/core/src/cron/routine-runtime.ts": "ce02c04ff186bd8a0b5cf0fa471b0678c32a4d55364e68e4bdf652e248c17a9a",
+    "packages/core/src/cron/routine-runtime.ts": "d290a33122422354c4db4da164e43d58001f275725de2ad3ce8f4e7506044e66",
     "packages/core/src/runtime/scheduler-host.ts": "2173ab9c09ce3ffd6bacd51ec3bb21786030ca98fe1b46824f8a185613997ce5",
     "packages/core/test/learning-governance.test.js": "1a0ef47f940a92c1b0dad745c7f8e4a7665930347b2d909940039fb59d6d309d",
     "packages/core/src/waits/types.ts": "f1b551a9308450d3f2ea68770e2c83e6bfb9bc7ff015a2907fb86ae04907a3d8",
