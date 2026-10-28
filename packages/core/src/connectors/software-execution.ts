@@ -170,7 +170,7 @@ function embeddedIpv4(ip: string): string | undefined {
   return [(value >>> 24) & 255, (value >>> 16) & 255, (value >>> 8) & 255, value & 255].join('.');
 }
 
-function privateAddress(ip: string): boolean {
+export function privateAddress(ip: string): boolean {
   const embedded = embeddedIpv4(ip);
   if (isPrivateOrReservedIp(embedded ?? ip)) return true;
   const s = ip.replace(/^\[|\]$/g, '').toLowerCase();
@@ -256,7 +256,7 @@ function prepareHttpRequest(ctx: RunContext, executor: HttpExecutor, args: Recor
   if (body) headers['content-type'] = 'application/json';
   return {url, headers, body, signal: executionSignal(ctx, executor.timeoutMs ?? 30000)};
 }
-async function readHttpResponse(response: Response, maxBytes: number): Promise<string> {
+export async function readHttpResponse(response: Response, maxBytes: number): Promise<string> {
   const reader = response.body?.getReader();
   const chunks: Uint8Array[] = [];
   let size = 0;

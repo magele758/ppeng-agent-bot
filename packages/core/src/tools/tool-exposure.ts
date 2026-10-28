@@ -151,7 +151,12 @@ export const TOOL_GROUPS: ToolGroup[] = [
             "read_inbox",
             "bot_team_status",
             "bot_delegate",
-            "bot_task_results"
+            "bot_task_results",
+            "external_agent_list",
+            "external_agent_delegate",
+            "external_agent_status",
+            "external_agent_cancel",
+            "external_agent_input"
         ]
     },
     {
