@@ -530,6 +530,7 @@ export class RawAgentRuntime {
     const optionalExtras = assembleOptionalTools({
       routineHost: {
         store:this.store, stateDir:this.stateDir, log:this.log,
+        loadRoutineSkill:(name,id)=>this.loadRoutineSkill(name,id),
         runSession:(id)=>this.runSession(id),
         isSessionRunning:(id)=>this.isSessionRunning(id),
         hasUnconfirmedEffects:(id,startedAt)=>this.connectors.software.unconfirmedForSession(id,startedAt).length>0,
@@ -1869,6 +1870,11 @@ export class RawAgentRuntime {
 
   private scheduleHumanContinuations(): void {
     setImmediate(() => { if (!this.store.db.isOpen) return; void this.drainHumanContinuations().catch(error => this.log.warn('Human continuation scheduler failed', { error: String(error) })); });
+  }
+
+  loadRoutineSkill(name:string,sessionId:string):Promise<{content?:string;error?:string}> {
+    this.promptBuilder.invalidateSkillsCache();
+    return createRuntimeToolServices(this.l5()).loadSkill(name,sessionId);
   }
 
   async runSession(

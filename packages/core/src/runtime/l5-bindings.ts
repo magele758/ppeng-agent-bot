@@ -273,6 +273,7 @@ export function cronFacadeFrom(rt: L5Bindable): CronFacadeHost {
 
 export function schedulerFrom(rt: L5Bindable): SchedulerTickHost {
   return {
+    loadRoutineSkill: (name,sessionId) => {rt.promptBuilder.invalidateSkillsCache();return resolveSkillLoad({promptBuilder:rt.promptBuilder,emitTrace:(sid,event)=>rt.emitTrace(sid,event)},name,sessionId);},
     store: rt.store,
     stateDir: rt.stateDir,
     log: rt.log,

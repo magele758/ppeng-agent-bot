@@ -6,7 +6,7 @@ import {DurableWaitStore} from './store.js';
 import {waitSources} from './sources.js';
 import {waitConditionSchema} from './conditions.js';
 import type {WaitOwner,WaitSpec} from './types.js';
-function activeOwner(store:SqliteStateStore,session:SessionRecord):WaitOwner|undefined {
+export function activeWaitOwner(store:SqliteStateStore,session:SessionRecord):WaitOwner|undefined {
  const runs=new RoutineRunStore(store).pending().filter(r=>r.sessionId===session.id&&r.status==='running');
  if(runs.length===1){const run=runs[0]!;return {kind:'routine',id:run.id,revision:run.attempt,sessionId:session.id,scopeSessionId:run.mainSessionId};}
  if(runs.length||session.metadata.botWorkTaskId||session.metadata.botGoalWorker)return undefined;
@@ -22,7 +22,7 @@ export function createWaitForTool(store:SqliteStateStore):ToolContract {
    const loop=store.getDaemonControl<{kernelVariant?:string;engineEnabled?:boolean}>('loop_settings');
    if(loop?.engineEnabled!==false&&loop?.kernelVariant==='ppeng')throw new Error('Durable waits require the agent-loop kernel; select it in Lab loop settings');
    const session=store.getSession(ctx.session.id);if(!session)throw new Error('Session unavailable');
-   const owner=activeOwner(store,session);if(!owner)throw new Error('No active owned Goal or Routine execution');
+   const owner=activeWaitOwner(store,session);if(!owner)throw new Error('No active owned Goal or Routine execution');
    if(typeof args.summary!=='string'||!args.summary.trim()||args.summary.length>4000)throw new Error('A concise continuation checkpoint is required');
    const {source,ref,condition,deadline,maxChecks}=args;
    const wait=new DurableWaitStore(store).register(owner,{source,ref,condition,deadline,maxChecks} as WaitSpec);

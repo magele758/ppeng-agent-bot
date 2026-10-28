@@ -821,6 +821,14 @@ export const play = {
   },
 
   cronPanel: {
+    workStopCompleted: '原工作已核验完成，临时盯梢已停用。',
+    workStopCancelled: '原工作已取消，临时盯梢已停用。',
+    workLink: '关联工作',
+    workLinkHint: '临时盯梢会读取当前工作要求与 SOP，工作核验完成或取消后停用。独立巡检请保持不关联。',
+    workGoal: '原工作目标',
+    workIndependent: '独立长期巡检',
+    workJob: '外部任务 ID（可选）',
+    workSop: '当前 SOP 技能名或 ID（可选）',
     aria: '定时任务',
     title: '定时任务',
     pickBot: '先选择一个 Bot，再为它配置定时任务。',

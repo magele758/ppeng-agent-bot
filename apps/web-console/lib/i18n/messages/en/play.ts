@@ -824,6 +824,14 @@ export const play = {
   },
 
   cronPanel: {
+    workStopCompleted: 'The original work is verified complete; this temporary watcher is stopped.',
+    workStopCancelled: 'The original work is cancelled; this temporary watcher is stopped.',
+    workLink: 'Linked work',
+    workLinkHint: 'A temporary watcher reads current requirements and SOP, then stops after verified completion or cancellation. Leave health checks independent.',
+    workGoal: 'Original work goal',
+    workIndependent: 'Independent health check',
+    workJob: 'External job ID (optional)',
+    workSop: 'Current SOP skill name or ID (optional)',
     aria: 'Scheduled jobs',
     title: 'Scheduled jobs',
     pickBot: 'Select a Bot first, then add scheduled jobs for it.',

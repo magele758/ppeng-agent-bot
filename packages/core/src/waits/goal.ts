@@ -1,3 +1,4 @@
+import {backgroundWaitStillRunning} from './background-source.js';
 import type {GoalRuntimeHost} from '../bots/goals/runtime-host.js';
 import type {BotGoal} from '../bots/goals/types.js';
 import type {BotGoalService} from '../bots/goals/service.js';
@@ -18,7 +19,11 @@ export function tickDurableGoalWait(host:GoalRuntimeHost,service:BotGoalService,
 }
 export function drainDurableGoalWait(host:GoalRuntimeHost,service:BotGoalService,goal:BotGoal):boolean {
  if(goal.wait?.source!=='durable_wait')return false;
- new DurableWaitStore(host.store).cancel(goal.wait.correlationId);
+ const waits=new DurableWaitStore(host.store),wait=waits.get(goal.wait.correlationId);
+ waits.cancel(goal.wait.correlationId);
+ if(wait?.owner.id===goal.id&&wait.owner.scopeSessionId===goal.sessionId&&wait.spec.source==='background_job'&&backgroundWaitStillRunning(host.store,wait)){
+  service.setDraining(goal.botId,goal.id,true,'Background execution is still running or unverified; reconcile it before continuing');return true;
+ }
  service.setDraining(goal.botId,goal.id,false,goal.status==='blocked'?goal.blockedReason:undefined);
  return true;
 }

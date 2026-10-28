@@ -24,6 +24,7 @@ export interface SchedulerTickHost {
   teamDagExecutor?: { tick(): Promise<unknown> };
   orchestrationEngine: { tick(): Promise<unknown> };
   autonomousScheduler: AutonomousScheduler;
+  loadRoutineSkill?(name:string,sessionId:string):Promise<{content?:string;error?:string}>;
   runSession(sessionId: string): Promise<SessionRecord>;
   cancelSession?(sessionId: string): unknown;
   isSessionRunning?(sessionId: string): boolean;
