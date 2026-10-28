@@ -5,6 +5,7 @@ import type { ApprovalItem, ChatMessage } from '@/lib/types';
 import { anchorApprovals } from '@/lib/approval-feed';
 import { messageHasStructuredParts, msgPartsToText, normalizedRole } from '@/lib/chat-utils';
 import { readMessageSessionId } from '@/lib/goal-update-notice';
+import { omitStreamTextSavedOnTurn } from '@/lib/history-window';
 import { buildFeedSlots, steerStreamPlacement, type FeedSlot } from '@/lib/feed-window';
 import { rowsForSessionBrief } from '@/lib/session-brief';
 import { SessionBriefDisclosure } from './SessionBriefDisclosure';
@@ -375,10 +376,13 @@ function renderOptimisticOrStream(slot: FeedSlot, view: TranscriptModel, chat: C
     );
   }
   if (slot.kind !== 'stream') return null;
-  return <ChatTurnStreaming retry={slot.streamPart === 'prefix' ? undefined : chat.streamOverlay?.retry} segments={streamSegmentsFor(slot, chat)} sessionId={sessionId} resolvedCallIds={view.resolved} brief={brief} />;
+  const raw = rawStreamSegments(slot, chat);
+  const segments = omitStreamTextSavedOnTurn(chat.displayMessages, raw);
+  if (raw.length > 0 && segments.length === 0) return null;
+  return <ChatTurnStreaming retry={slot.streamPart === 'prefix' ? undefined : chat.streamOverlay?.retry} segments={segments} sessionId={sessionId} resolvedCallIds={view.resolved} brief={brief} />;
 }
 
-function streamSegmentsFor(slot: FeedSlot, chat: Chat) {
+function rawStreamSegments(slot: FeedSlot, chat: Chat) {
   const all = chat.streamOverlay?.segments ?? [];
   const prefix = chat.steerStreamPrefix;
   if (prefix == null || slot.streamPart == null) return all;

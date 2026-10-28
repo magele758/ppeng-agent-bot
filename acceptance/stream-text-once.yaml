@@ -1,0 +1,30 @@
+id: stream-text-once
+title: 流式输出时助手文字只出现一次
+status: implemented
+requirement: |
+  你在仓库 /Users/penglei/developer/self-test-grounding/ppeng-agent-core 里排查并修复：对话流式输出时，经常出现重复的消息。直接改代码并跑相关测试。不要 commit，不要 push，不要重启 daemon。
+
+  现象：用户跟 bot 聊天，流式输出过程中，同一段助手文字会重复出现。不是偶发整页刷新，是流式过程中经常重复。
+
+  已知客户端拼接（先读再改，行号可能已变）：
+  - apps/web-console/components/usePlayChat.ts 里 applySseModelText：event===model 且 type===text_delta 时，把 p.text 追加到最后一个 text segment 的 raw。如果最后一个不是 text，就新开一段。reasoning_delta 同样追加。
+  - 同文件有 stream_reset：回滚到 turnCheckpoint。如果服务端先发了一段全文，又发 stream_reset 再发一遍，或 text_delta 里装的是累计全文而不是增量，界面就会重复。
+  - 不要假设只有这一处。也查：SSE 重连后把已播过的 delta 再播一遍；乐观消息和会话快照各渲染一次；同一 message id 插进列表两次；daemon 把 model delta 转发了两次。
+
+  要求：
+  1. 先定位重复是「delta 实际是累计全文」「同一 delta 发了两次」还是「同一条已完成消息又被列表渲染一次」。用代码路径说明，不要只猜。可以看 apps/daemon 的 SSE 转发和 packages/agent-loop 或 packages/core 里发出 text_delta 的地方。
+  2. 修到流式过程中同一段文字只出现一次。已完成的历史消息也不会因为快照再贴一遍正在流的内容。
+  3. 按仓库规则：先写 acceptance/<kebab-id>.yaml（status: approved）和带 [AC:<feature-id>#<criterion-id>] 的失败测试，再实现。只跑你改到的 node:test 文件。
+  4. 不要顺手改预算、回顾、子任务、启动 trace。工作区里已有这些未提交改动，保留它们，不要回滚，也不要在那些文件上再改，除非重复 bug 的根就在其中一个文件里。那样的话在 /tmp/omp-stream-dup/result.txt 里写明为什么必须改它。
+
+  跑完把：根因（文件和机制）、改了哪些文件、测试命令和退出码，写入 /tmp/omp-stream-dup/result.txt。
+notes: "assumedApproval: standing-order-2026-10-22"
+criteria:
+  - id: AC-1
+    given: 用户正在跟 Bot 聊天，助手这段文字已经出现在当前这一问的已保存记录里，流式气泡里也还有同一段
+    when: 流式输出还没结束，画面同时拿着这份记录和正在播的内容
+    then: 这段助手文字只出现一次，不会在已保存记录和流式气泡里各出现一遍
+  - id: AC-2
+    given: 对话里已经有更早写完的助手回复，当前这一问还在流式输出
+    when: 画面用一份会话快照刷新记录
+    then: 更早那条回复不会被贴上正在流的内容，正在流的这段文字仍然只出现一次
