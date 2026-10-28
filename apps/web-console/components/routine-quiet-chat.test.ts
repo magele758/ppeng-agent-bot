@@ -62,12 +62,12 @@ function requireId(fromFile: string, id: string): unknown {
 }
 
 const ui = loadFile(path.join(here, 'ChatTurns.tsx')) as {
-  ChatTurnFromMessage: React.ComponentType<Record<string, unknown>>;
+  ChatTurnIfVisible: React.ComponentType<Record<string, unknown>>;
 };
 
 function renderTurn(role: string, text: string, key?: string): string {
   return renderToStaticMarkup(
-    React.createElement(ui.ChatTurnFromMessage, {
+    React.createElement(ui.ChatTurnIfVisible, {
       m: { id: 'msg-routine', role, parts: [{ type: 'text', text }], ...(key ? { key } : {}) },
       sessionId: 'sess-routine'
     })
@@ -97,6 +97,9 @@ test('已写入主对话的无结论定时回执不再显示 [AC:routine-quiet-c
   const mention = renderTurn('assistant', '流式重复已经停了。说明里出现过 [NO_UPDATE] 这个词，但这次有结论。');
   assert.match(mention, /\[NO_UPDATE\]/);
   assert.match(mention, /这次有结论/);
+  const tokenOnly = renderTurn('assistant', '[NO_UPDATE]');
+  assert.equal(tokenOnly.includes('[NO_UPDATE]'), false);
+  assert.equal(tokenOnly.includes('chat-turn'), false);
   const lookalike = renderTurn('user', '[routine:我只是输入了这个字符串] completed Hello');
   assert.match(lookalike, /我只是输入了这个字符串/);
 });

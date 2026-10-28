@@ -18,7 +18,7 @@ import { placeChildTaskEntries, type ChildTaskStreamEntry } from '@/lib/bot-chil
 import { ApprovalBanner } from './ApprovalBanner';
 import { BotChildTaskStreamEntry } from './BotChildTaskStreamEntry';
 import { ChatFeedWindow } from './ChatFeedWindow';
-import { ChatTurnFromMessage, ChatTurnPlain, ChatTurnStreaming } from './ChatTurns';
+import { ChatTurnIfVisible, ChatTurnPlain, ChatTurnStreaming } from './ChatTurns';
 import { SurfaceContextProvider } from './a2ui/SurfaceContext';
 import { SkillOperationCards } from './SkillOperationCards';
 import { SkillCaptureCards } from './SkillCaptureCards';
@@ -431,7 +431,7 @@ function messageSlot(
   if (!message) return null;
   const replyNames = quoteBot ? { [quoteBot.id]: quoteBot.name } : undefined;
   if (messageHasStructuredParts(message.parts)) {
-    return <ChatTurnFromMessage m={message} sessionId={sessionId} msgIndex={index} modelView={modelView} toolCallsById={view.calls} resolvedCallIds={view.resolved} quoteBot={quoteBot} onQuote={onQuote} replyNames={replyNames} brief={brief} />;
+    return <ChatTurnIfVisible m={message} sessionId={sessionId} msgIndex={index} modelView={modelView} toolCallsById={view.calls} resolvedCallIds={view.resolved} quoteBot={quoteBot} onQuote={onQuote} replyNames={replyNames} brief={brief} />;
   }
   const role = normalizedRole(message);
   if (role === 'tool' || role === 'system') {
@@ -444,7 +444,7 @@ function messageSlot(
       />
     );
   }
-  return <ChatTurnFromMessage m={message} sessionId={sessionId} msgIndex={index} modelView={modelView} toolCallsById={view.calls} resolvedCallIds={view.resolved} quoteBot={quoteBot} onQuote={onQuote} replyNames={replyNames} brief={brief} />;
+  return <ChatTurnIfVisible m={message} sessionId={sessionId} msgIndex={index} modelView={modelView} toolCallsById={view.calls} resolvedCallIds={view.resolved} quoteBot={quoteBot} onQuote={onQuote} replyNames={replyNames} brief={brief} />;
 }
 
 function approvalSlot(slot: FeedSlot, view: TranscriptModel, onDone: () => void, onAttach?: (sessionId: string) => { ready: Promise<void>; cancel: () => void }): ReactNode {

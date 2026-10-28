@@ -476,7 +476,6 @@ export function ChatTurnFromMessage({
   const { t } = useI18n();
   const shown = brief ? { ...m, parts: visibleBriefParts(m.parts) } : m;
   const r = normalizedRole(m);
-  if (quietRoutineResult(r, (m as { key?: string }).key, msgPartsToText(m.parts))) return null;
   const storedReply = r === 'user' ? readStoredReplyTo(m) : null;
   /** 与流式行一致：助手侧（含「调用工具」等结构化气泡）统一不占左侧头像列 */
   const noAvatar = r === 'tool' || r === 'system' || r === 'assistant';
@@ -568,6 +567,17 @@ export function ChatTurnFromMessage({
       </div>
     </div>
   );
+}
+
+/** Hide a stored no-update receipt without adding branches to the turn renderer. */
+function storedMessageKey(message: object): string | undefined {
+  if (!('key' in message)) return undefined;
+  return typeof message.key === 'string' ? message.key : undefined;
+}
+export function ChatTurnIfVisible(props: Parameters<typeof ChatTurnFromMessage>[0]) {
+  const message = props.m;
+  if (quietRoutineResult(normalizedRole(message), storedMessageKey(message), msgPartsToText(message.parts))) return null;
+  return <ChatTurnFromMessage {...props} />;
 }
 
 export function ChatTurnPlain({
