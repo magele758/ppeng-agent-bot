@@ -10,13 +10,28 @@ import {
   tryBotChatCommand
 } from './im-handlers.js';
 import { handleEventIngress } from './event-ingress.js';
-import { appendOutboundDraft } from './outbound-drafts.js';
+import { createUserDeliveryPort } from './user-delivery-port.js';
 import { quarantineLegacyDraftLedger, reconcileSendingDrafts, recoverGatewayOutbound } from './outbound.js';
 import { resolveImOutbound } from './silent-reply.js';
 import { readGatewaySettings } from './gateway-settings.js';
 import { safeEqual } from './inbound-guard.js';
 import { readGatewayState } from './state.js';
 import type { GatewayEnvOptions, GatewayFileConfig } from './types.js';
+
+function portDraft(
+  gatewayDir: string,
+  input: {
+    channelId: string;
+    text: string;
+    event?: string;
+    receiveId?: string;
+    receiveIdType?: import('./outbound-drafts.js').FeishuReceiveIdType;
+  },
+  channels: import('./types.js').ChannelSpec[] = []
+) {
+  return createUserDeliveryPort({ gatewayDir, channels }).draft(input);
+}
+
 
 export interface GatewayHandleContext {
   runtime: RawAgentRuntime;
@@ -357,7 +372,7 @@ export async function handleGatewayHttp(
         channel.type === 'email'
       ) {
         try {
-          await appendOutboundDraft(gatewayDir, {
+          await portDraft(gatewayDir, {
             channelId: channel.id,
             text: decision.text,
             event: 'gateway.im.reply'

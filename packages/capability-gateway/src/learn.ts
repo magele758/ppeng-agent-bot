@@ -2,9 +2,24 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { RawAgentRuntime } from '@ppeng/agent-core';
 import { fetchFeedItems } from './feed.js';
-import { appendOutboundDraft } from './outbound-drafts.js';
+import { createUserDeliveryPort } from './user-delivery-port.js';
 import type { ChannelSpec, LearnConfig } from './types.js';
 import { readGatewayState, writeGatewayState, type GatewayPersistedState } from './state.js';
+
+function portDraft(
+  gatewayDir: string,
+  input: {
+    channelId: string;
+    text: string;
+    event?: string;
+    receiveId?: string;
+    receiveIdType?: import('./outbound-drafts.js').FeishuReceiveIdType;
+  },
+  channels: import('./types.js').ChannelSpec[] = []
+) {
+  return createUserDeliveryPort({ gatewayDir, channels }).draft(input);
+}
+
 
 const MAX_SEEN = 8000;
 const MAX_ROLLING = 300;
@@ -113,7 +128,7 @@ export async function runLearnCycle(input: {
 
   for (const ch of input.channels) {
     try {
-      await appendOutboundDraft(input.gatewayStateDir, {
+      await portDraft(input.gatewayStateDir, {
         channelId: ch.id,
         text,
         event: 'gateway.daily_learn'
