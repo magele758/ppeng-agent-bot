@@ -46,6 +46,17 @@ function formatWhen(iso?: string): string {
   return d.toLocaleString();
 }
 
+function storedWorkLink(job:CronJobInfo):RoutineWorkLinkValue|null {
+  return (job.metadata.workLink as RoutineWorkLinkValue|undefined)??null;
+}
+function WorkLinkStopStatus({job}:{job:CronJobInfo}){
+  const {t}=useI18n();
+  const status=(job.metadata.workLinkStop as {status?:string}|undefined)?.status;
+  if(status==='completed')return <p>{t('play.cronPanel.workStopCompleted')}</p>;
+  if(status==='cancelled')return <p>{t('play.cronPanel.workStopCancelled')}</p>;
+  return null;
+}
+
 export function BotCronPanel({
   botId,
   botName,
@@ -375,8 +386,7 @@ export function BotCronPanel({
 
               </div>
               <RoutineSchedule job={job} onSaved={refreshSchedule} />
-              {(job.metadata.workLinkStop as {status?:string}|undefined)?.status==='completed'&&<p>{t('play.cronPanel.workStopCompleted')}</p>}
-              {(job.metadata.workLinkStop as {status?:string}|undefined)?.status==='cancelled'&&<p>{t('play.cronPanel.workStopCancelled')}</p>}
+              <WorkLinkStopStatus job={job}/>
               <p className="bot-cron-card__prompt">{job.prompt}</p>
               {summary ? <p className="bot-cron-card__meta">{summary}</p> : null}
               <p className="bot-cron-card__meta">
@@ -385,7 +395,7 @@ export function BotCronPanel({
               </p>
               <p>{String(routineTimezone(job.timezone, timezone))}</p>
               {job.expiresAt&&<p className="bot-cron-card__meta">{t('botWork.expiresAt')}: {formatWhen(job.expiresAt)}</p>}
-              <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={()=>{setEditingId(job.id);setWorkLink((job.metadata.workLink as RoutineWorkLinkValue|undefined)??null);setSourceDelivery(job.metadata.sourceDelivery as {taskId:string;attempt:number}|undefined);setRoomId(String(job.metadata.roomId??''));setDeliveryPolicy((job.metadata.deliveryPolicy as typeof deliveryPolicy)??{inputSources:'',changesOnly:false,failureThreshold:1,approvalBeforeSend:false});setExpiresAt(job.expiresAt?zonedInstantToLocal(job.expiresAt,routineTimezone(job.timezone, timezone)):'');setName(job.name);setPrompt(job.prompt);setTimezone(String(routineTimezone(job.timezone, timezone)));setMissedPolicy(String(job.missedPolicy??'coalesce'));if(job.scheduleKind==='once_at'){setScheduleKind('once');setOnceAt(zonedInstantToLocal(job.scheduleValue,routineTimezone(job.timezone, timezone)));}else if(job.scheduleKind==='every_ms'){setScheduleKind('interval');setIntervalSeconds(Number(job.scheduleValue)/1000);}else if(job.scheduleKind==='event'){setScheduleKind('event');setEvent(job.scheduleValue);setEventSecret(String(job.metadata.secretEnv??''));setConclusions(Array.isArray(job.metadata.conclusions)?job.metadata.conclusions.join(', '):'');}else{setScheduleKind('cron');setPreset('custom');setCronDraft(job.scheduleValue);}const check=job.metadata.precheck as {kind?:'script'|'predicate';source?:string}|undefined;setPrecheckKind(check?.kind??'none');setPrecheckSource(check?.source??'');setPrecheckMode(job.metadata.precheckMode==='strict'?'strict':'compat');}}>{t('botWork.edit')}</button>
+              <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={()=>{setEditingId(job.id);setWorkLink(storedWorkLink(job));setSourceDelivery(job.metadata.sourceDelivery as {taskId:string;attempt:number}|undefined);setRoomId(String(job.metadata.roomId??''));setDeliveryPolicy((job.metadata.deliveryPolicy as typeof deliveryPolicy)??{inputSources:'',changesOnly:false,failureThreshold:1,approvalBeforeSend:false});setExpiresAt(job.expiresAt?zonedInstantToLocal(job.expiresAt,routineTimezone(job.timezone, timezone)):'');setName(job.name);setPrompt(job.prompt);setTimezone(String(routineTimezone(job.timezone, timezone)));setMissedPolicy(String(job.missedPolicy??'coalesce'));if(job.scheduleKind==='once_at'){setScheduleKind('once');setOnceAt(zonedInstantToLocal(job.scheduleValue,routineTimezone(job.timezone, timezone)));}else if(job.scheduleKind==='every_ms'){setScheduleKind('interval');setIntervalSeconds(Number(job.scheduleValue)/1000);}else if(job.scheduleKind==='event'){setScheduleKind('event');setEvent(job.scheduleValue);setEventSecret(String(job.metadata.secretEnv??''));setConclusions(Array.isArray(job.metadata.conclusions)?job.metadata.conclusions.join(', '):'');}else{setScheduleKind('cron');setPreset('custom');setCronDraft(job.scheduleValue);}const check=job.metadata.precheck as {kind?:'script'|'predicate';source?:string}|undefined;setPrecheckKind(check?.kind??'none');setPrecheckSource(check?.source??'');setPrecheckMode(job.metadata.precheckMode==='strict'?'strict':'compat');}}>{t('botWork.edit')}</button>
               <RoutineRuns jobId={job.id}/>
               <div className="bot-cron-card__actions">
                 <button
