@@ -64,6 +64,7 @@ export function BotsView() {
     setCreatingGroup(false);
     setQuery('');
     setNotice({ text: t('agents.bots.created', { name: bot.name }), err: false });
+    void openChat(bot);
   };
 
   const startCreate = () => {

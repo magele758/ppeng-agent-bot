@@ -61,7 +61,7 @@ async function setup(page: Page, long = false) {
   await page.getByText("Bot A", { exact: true }).first().click();
   await page
     .getByTestId("bot-detail")
-    .getByRole("tab", { name: "技能", exact: true })
+    .getByRole("tab", { name: "能力与权限", exact: true })
     .click();
   return { panel: page.getByTestId("bot-detail-skills"), policy: () => policy };
 }
@@ -91,7 +91,7 @@ test("selected empty is saved explicitly and survives reload [AC:bot-detail-skil
   await page.getByText("Bot A", { exact: true }).first().click();
   await page
     .getByTestId("bot-detail")
-    .getByRole("tab", { name: "技能", exact: true })
+    .getByRole("tab", { name: "能力与权限", exact: true })
     .click();
   await expect(panel.getByLabel("技能使用范围")).toHaveValue("selected");
 });
@@ -149,7 +149,7 @@ test("switching Bots does not carry drafts or save [AC:bot-detail-skill-manageme
   await page.locator(".ag-card").filter({ hasText: "Bot B" }).click();
   await page
     .getByTestId("bot-detail")
-    .getByRole("tab", { name: "技能", exact: true })
+    .getByRole("tab", { name: "能力与权限", exact: true })
     .click();
   await expect(panel.getByLabel("技能使用范围")).toHaveValue("all");
   expect(policy().mode).toBe("all");
@@ -214,7 +214,7 @@ test("chat detail exposes and manages current Bot skills [AC:bot-detail-skill-ma
   const sidebar = page.getByTestId('bot-detail-panel');
   await page.getByTestId('bot-detail-toggle').click();
   await expect(sidebar).toBeVisible();
-  await sidebar.getByRole('tab', { name: '技能', exact: true }).click({ timeout: 5000 });
+  await sidebar.getByRole('tab', { name: '能力与权限', exact: true }).click({ timeout: 5000 });
   await expect(sidebar.getByTestId('skill-row-own')).toBeVisible();
   await expect(sidebar.getByTestId('skill-row-shared')).toContainText('只读');
   await sidebar.getByLabel('技能使用范围').selectOption('selected');
@@ -245,7 +245,7 @@ for (const width of [1280, 820]) test(`skills controls stay grouped at every fon
   await page.route('**/api/sessions',r=>r.fulfill({json:{sessions:bots.map(b=>({id:b.canonicalSessionId,title:b.name,agentId:b.agentId,status:'idle',mode:'chat',metadata:{botId:b.id}}))}}));
   await page.goto('/#/bot'); await page.reload();await page.getByRole('button',{name:/^Bot A/}).first().click();
   const drawer=page.getByTestId('bot-detail-panel');await page.getByTestId('bot-detail-toggle').click();await expect(drawer).toBeVisible();
-  await drawer.getByRole('tab',{name:'技能',exact:true}).click();
+  await drawer.getByRole('tab',{name:'能力与权限',exact:true}).click();
   const panel=drawer.getByTestId('bot-detail-skills');
   for(const size of [13,14,15,16,18]){
     await page.evaluate(size=>document.documentElement.setAttribute('data-font-size',String(size)),size);
@@ -278,7 +278,7 @@ test('English skill controls preserve selection through search and save [AC:bot-
  await page.evaluate(()=>localStorage.setItem('lab.locale','en'));
  await page.addInitScript(()=>localStorage.setItem('lab.locale','en'));
  await page.reload();await page.getByText('Bot A',{exact:true}).first().click();
- await page.getByTestId('bot-detail').getByRole('tab',{name:'Skills',exact:true}).click();
+ await page.getByTestId('bot-detail').getByRole('tab',{name:'Capabilities & permissions',exact:true}).click();
  const select=panel.locator('select').first();await select.selectOption('selected');
  const own=panel.getByTestId('skill-row-own').getByRole('checkbox').first();await own.check();
  const search=panel.locator('input:not([type="checkbox"])').first();await search.fill('absent');

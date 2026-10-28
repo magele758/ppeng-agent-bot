@@ -1,4 +1,5 @@
 import type {SqliteStateStore} from '../storage.js';
+import { runtimeCapabilityCheck } from '../config/runtime-capabilities.js';
 import type { GoalSnapshot } from '../bots/goals/types.js';
 import { filterFactoryTools } from '../factory/tool-policy.js';
 import { filterRoomTools } from '../rooms/tool-policy.js';
@@ -86,6 +87,17 @@ function applyAllowlists<T extends { name: string }>(
   return tools.filter((t) => lists.every((allow) => allow.has(t.name)));
 }
 
+/** Canonical Bot policies are live; child agents retain their creation snapshot. */
+function currentToolPolicyAgent(
+  agent: AgentSpec,
+  session: SessionRecord,
+  store?: WebSettingsReadStore & { getAgent?(id: string): AgentSpec | undefined }
+): AgentSpec {
+  if (!isCanonicalBotChatSession(session)) return agent;
+  const current = store?.getAgent?.(session.agentId);
+  return current ? { ...agent, allowedTools: current.allowedTools } : agent;
+}
+
 export function authorizeToolsForSession(input: {
   env: NodeJS.ProcessEnv;
   tools: ToolContract<any>[];
@@ -98,11 +110,13 @@ export function authorizeToolsForSession(input: {
   const externalAiCapabilityGate = envBool(input.env, 'RAW_AGENT_EXTERNAL_AI_TOOLS', false);
   const sessionOptIn = input.session.metadata?.allowExternalAiTools === true;
   const allowExternalAiTools = externalAiCapabilityGate && sessionOptIn;
+  const enabled = runtimeCapabilityCheck(input.settingsStore, input.env);
+  const availableTools = input.tools.filter(tool => enabled('tools', tool.name));
   const externallyGated = allowExternalAiTools
-    ? input.tools
-    : input.tools.filter((t) => !t.isExternal);
+    ? availableTools
+    : availableTools.filter((t) => !t.isExternal);
   checkpoint(externallyGated,'disabled');
-  let tools = applyAllowlists(externallyGated, allowlistsFor(input.agent, input.session));
+  let tools = applyAllowlists(externallyGated, allowlistsFor(currentToolPolicyAgent(input.agent, input.session, input.settingsStore), input.session));
   checkpoint(tools,'not_allowed');
   if ((input.settingsStore?.getDaemonControl?.('computer_use_settings') as { enabled?: boolean } | undefined)?.enabled !== true) {
     tools = tools.filter(tool => !tool.name.startsWith('lcu_'));
@@ -279,7 +293,7 @@ export function resolveTurnTools(input: {
   const extras: ToolContract<any>[] = [];
   const dynAllowed = applyAllowlists(
     input.dynTools ?? [],
-    allowlistsFor(input.agent, input.session)
+    allowlistsFor(currentToolPolicyAgent(input.agent, input.session, input.settingsStore), input.session)
   );
   for (const tool of dynAllowed) {
     if (names.has(tool.name)) continue;

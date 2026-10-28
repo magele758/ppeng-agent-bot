@@ -46,7 +46,7 @@ test.describe('Bot model setting', () => {
       await page.goto('/#/agents/bots');
       await page.getByRole('listitem').filter({ hasText: name }).first().click();
       const detail = page.getByTestId('bot-detail');
-      await detail.getByRole('tab', { name: '能力与权限', exact: true }).click();
+      await detail.getByRole('tab', { name: '基本设置', exact: true }).click();
       await expect(detail.getByLabel('Bot 使用的模型')).toBeVisible();
     };
     const composerModelSelect = async () => {

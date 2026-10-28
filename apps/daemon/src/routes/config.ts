@@ -2,6 +2,10 @@ import { existsSync, statSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 import {
   gatewayConfigPath,
+  RUNTIME_CAPABILITIES_KEY,
+  readRuntimeCapabilities,
+  domainCatalog,
+  type RuntimeCapabilities,
   hasPersistedBrowserSettings,
   hasPersistedDiscoverySettings,
   hasPersistedMemorySettings,
@@ -54,6 +58,7 @@ export function buildEffectiveConfigInput(runtime: RawAgentRuntime, deps: Config
     env: deps.env,
     stateDir: runtime.stateDir,
     lab: {
+      runtimeCapabilities: store.getDaemonControl(RUNTIME_CAPABILITIES_KEY) as Partial<RuntimeCapabilities> | undefined,
       webSearch: {
         persisted: hasPersistedWebSettings(store),
         template: readWebSettings(store).searchUrl
@@ -80,7 +85,7 @@ export function buildEffectiveConfigInput(runtime: RawAgentRuntime, deps: Config
     },
     runtime: {
       storageFallbacks: deps.storageCtx.fallbacks,
-      domainsMounted: deps.domainsMounted,
+      domainsMounted: domainCatalog(store).length ? readRuntimeCapabilities(store, deps.env).domains.filter(id => domainCatalog(store).some(d => d.id === id)) : deps.domainsMounted,
       mcpHttpConnected: runtime.mcpHttpConnectedCount()
     }
   };

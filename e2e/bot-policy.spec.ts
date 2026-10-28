@@ -1,19 +1,17 @@
 import { test, expect, type Page } from '@playwright/test';
 
-/** Bot 设置在「Bots 与 Agents → Bots」详情面板里；工具/技能名单收在「高级」折叠区。 */
+/** Bot 设置在「Bots 与 Agents → Bots」详情面板里；常用权限在基本设置，工具在能力与权限。 */
 async function openBotSettings(page: Page, name: string) {
   await page.goto('/#/agents/bots');
   await page.getByRole('listitem').filter({ hasText: name }).first().click();
   const detail = page.getByTestId('bot-detail');
-  await detail.getByRole('tab', { name: '能力与权限', exact: true }).click();
+  await detail.getByRole('tab', { name: '基本设置', exact: true }).click();
   await expect(detail.getByLabel('Bot 权限档')).toBeVisible();
 }
 
 async function openAllowlists(page: Page) {
   const detail = page.getByTestId('bot-detail');
-  if ((await detail.getByLabel('允许使用的工具').count()) === 0) {
-    await detail.getByRole('button', { name: '工具与技能名单' }).click();
-  }
+  await detail.getByRole('tab', { name: '能力与权限', exact: true }).click();
 }
 
 test.describe('Bot permission settings', () => {
@@ -82,13 +80,14 @@ test.describe('Bot permission settings', () => {
     await expect(page.getByRole('alert').filter({ hasText: 'TodoWrite' })).toHaveCount(0);
     const list = page.getByLabel('允许使用的工具');
     await list.selectOption([narrow]);
-    await page.getByRole('button', { name: '保存允许名单' }).click();
+    await page.getByRole('button', { name: '保存工具范围' }).click();
     for (const tool of required) {
       await expect(page.getByRole('alert').filter({ hasText: tool })).toBeVisible();
     }
 
     await page.reload();
     await openBotSettings(page, name);
+    await openAllowlists(page);
     for (const tool of required) {
       await expect(page.getByRole('alert').filter({ hasText: tool })).toBeVisible();
     }
@@ -100,6 +99,7 @@ test.describe('Bot permission settings', () => {
     expect(cleared.ok()).toBe(true);
     await page.reload();
     await openBotSettings(page, name);
+    await openAllowlists(page);
     await expect(page.getByRole('alert').filter({ hasText: 'TodoWrite' })).toHaveCount(0);
   });
 
@@ -142,6 +142,7 @@ test.describe('Bot permission settings', () => {
     expect(live.warnings.map((w) => w.code)).toEqual(['missing_required_tools']);
 
     await openBotSettings(page, name);
+    await openAllowlists(page);
     await expect(page.getByRole('alert').filter({ hasText: '已经失效' })).toHaveCount(0);
     await expect(page.getByRole('alert').filter({ hasText: 'TodoWrite' })).toContainText('MCP 工具名');
 
@@ -149,6 +150,7 @@ test.describe('Bot permission settings', () => {
     expect(removed.ok()).toBe(true);
     await page.reload();
     await openBotSettings(page, name);
+    await openAllowlists(page);
     const stale = page.getByRole('alert').filter({ hasText: '已经失效' });
     await expect(stale).toBeVisible();
     await expect(stale).toContainText(dynName);

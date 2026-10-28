@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-10-28T03:37:47.592Z",
-  "reviewNote": "Reviewed the routine silence change. A successful result that starts or ends with [NO_UPDATE] is silent and is not posted to the main chat. A conclusion that only mentions the token in the middle is still delivered. Tool pairing, writer admission, cancellation, restart recovery, and concurrency locks are unchanged.\n2026-10-28 durable waits: reviewed registration ownership, condition validation, closed-wave receipt, same-transaction consumption and existing Goal wake/Routine lease continuation. Reuses agent-loop stopAtToolNames without SDK/kernel changes; legacy ppeng rejects registration. Source unavailable and authorization loss never complete. Unchanged original model bounds and negative controls. Added tests are supplemental; formal probes must still pass.\n2026-10-28 follow-up: preserved the frozen default tool inventory. wait_for is authorized and directly disclosed only for a current Goal execution or exactly one running Routine session; full mode and loaded tools do not bypass this scope or existing allowlists. Existing inventory tests and actual kernel continuation tests pass.",
+  "reviewedAt": "2026-10-28T07:46:10.882Z",
+  "reviewNote": "Reviewed the routine silence change. A successful result that starts or ends with [NO_UPDATE] is silent and is not posted to the main chat. A conclusion that only mentions the token in the middle is still delivered. Tool pairing, writer admission, cancellation, restart recovery, and concurrency locks are unchanged.\n2026-10-28 durable waits: reviewed registration ownership, condition validation, closed-wave receipt, same-transaction consumption and existing Goal wake/Routine lease continuation. Reuses agent-loop stopAtToolNames without SDK/kernel changes; legacy ppeng rejects registration. Source unavailable and authorization loss never complete. Unchanged original model bounds and negative controls. Added tests are supplemental; formal probes must still pass.\n2026-10-28 follow-up: preserved the frozen default tool inventory. wait_for is authorized and directly disclosed only for a current Goal execution or exactly one running Routine session; full mode and loaded tools do not bypass this scope or existing allowlists. Existing inventory tests and actual kernel continuation tests pass.\nReviewed Bot settings flow: canonical Bot tool authorization refreshes only allowedTools from the stored agent; child snapshots and identity remain intact. Runtime registers installed domain catalogs, filters exposure from one settings snapshot, and guards original tools before PTC/dynamic namespaces so revoked references return a paired non-success result. The daemon tools endpoint reads the filtered catalog; domain startup registration does not alter admission, writer ownership, cancellation, approval resume, recovery or shutdown ordering. KV writes are synchronous and do not span awaits. New live-capability dependency is mapped; dedicated two-kernel and same-runtime enable/disable tests supplement the bounded models. Existing model bounds and exclusions remain. Follow-up: installed domain ownership now resides in a WeakMap keyed by each runtime store, not shared daemon_control KV. A second runtime with no bundles cannot erase the first runtime’s disabled-tool classification. A failing real two-runtime regression reproduced the bypass before this change; user enable/disable settings remain persisted and shared. Registration now performs no shared KV write and does not affect recovery ownership, session claims, approvals or tool-result pairing. Bounds and exclusions unchanged.\n2026-10-28 integration: retained upstream live Bot capability checks alongside current-execution wait disclosure; both sets of exports and runtime tool registration remain.",
   "mapping": [
     {
       "step": "Production startup, persistence, writer claims and graceful shutdown (HTTP drain not exercised)",
@@ -229,30 +229,6 @@
       ]
     },
     {
-      "step": "Reviewed Bot goal lifecycle and nested dispatch dependencies; dedicated feature tests supplement unchanged bounded ordinary-session models",
-      "files": [
-        "packages/core/src/bots/goals/runtime-host.ts",
-        "packages/core/src/bots/goals/runtime-dispatch.ts",
-        "packages/core/src/bots/goals/tool-gateway.ts",
-        "packages/core/src/bots/goals/worker-fence.ts",
-        "packages/core/src/bots/goals/scheduler.ts",
-        "packages/core/src/bots/goals/service.ts",
-        "packages/core/src/bots/goals/store.ts",
-        "packages/core/src/bots/goals/budget.ts",
-        "packages/core/src/bots/goals/adapters.ts",
-        "packages/core/src/bots/goals/dispatch-tool.ts",
-        "packages/core/src/bots/fork-inheritance.ts",
-        "packages/core/src/swarm/executor.ts",
-        "packages/core/src/teams/executor.ts",
-        "packages/core/test/bot-goal-runtime.test.js",
-        "packages/core/test/bot-goal-routing-runtime.test.js",
-        "packages/core/test/bot-goal-routing-gateway.test.js",
-        "packages/core/test/bot-goals-scheduler.test.js",
-        "packages/core/test/bot-goals-budget.test.js",
-        "packages/core/src/bots/goals/specialty-services.ts"
-      ]
-    },
-    {
       "step": "Independent restart scenarios use separate state directories and bounded pairs; each scenario retains sequential generations, original checks and observation delays",
       "files": [
         "scripts/formal/independent-scenarios.mjs",
@@ -307,17 +283,23 @@
         "packages/core/test/durable-wait-replay.test.js",
         "scripts/replay-agent-waits.mjs"
       ]
+    },
+    {
+      "step": "Live capability exposure and guarded dispatch; config changes return normal tool results without changing session lifecycle boundaries",
+      "files": [
+        "packages/core/src/config/runtime-capabilities.ts"
+      ]
     }
   ],
   "sha256": {
-    "packages/core/src/runtime.ts": "71ce1dabb7b9d108f40be3743e0f12d42e2ff180f902dd7a7b178df3185be9fc",
+    "packages/core/src/runtime.ts": "9b868aec6b1d7ef1f75845541467a847cc7951af8a2ae8d3785f064a211dcdcc",
     "packages/core/src/storage.ts": "d98616d25ffe4072690ea20adba6ef4e689b513fc7548be360ea296ca6e5de53",
     "packages/core/src/stores/session-store.ts": "fbe877421acdc97a69fbe67d2e3be300d5ebd811c748d2d227aedddff2d38446",
     "packages/core/src/bots/bot-work.ts": "2860dd93a79f13a07514270541138b359cb7394ca3c879c054b9976b6bce98e5",
     "packages/core/src/runtime/subagent-policy.ts": "9d02a1c115e51b4e0bb02069439f4a4cf80aac673268178a12a5c28d0ac9d758",
     "packages/core/src/runtime/session-control.ts": "8f42a13096811dd960ed726e7d9685350fa041e08c57960e9e2f57cf7c5d55b4",
     "packages/core/src/runtime/session-facade.ts": "54d800b00dd14bcd9d1184da8c69c5ef1f2fffa9c2e1d6e2608b735e98ae7de0",
-    "apps/daemon/src/server.ts": "57d2fa117d7984de63231458ed5df9aa5b33d6240ea7b531e5c487656b36f68c",
+    "apps/daemon/src/server.ts": "98a06c0904d05253fe15486b65b04fbb6f405d140287aac59bd576eaf088414d",
     "packages/agent-loop/src/turn/kernel.ts": "a2c962a4f060fe5d006c5b1053b8d36e4bc2bd34a2dc4901e6e2422f9a0219ef",
     "packages/agent-loop/src/session/surface-store.ts": "b49bf08ee2fff9e3d92f340ea2933315cebb4d7a6ab01f4d693a234416275fd4",
     "packages/agent-loop/src/session/interrupt.ts": "1842240883d68a0ca20da065c9d2ba238a24a782bca5f9148f0da51026236f96",
@@ -432,7 +414,7 @@
     "packages/core/test/bot-goals-scheduler.test.js": "1d62668e81b2631c78d6a70df360f97bb80e180dd98c4ccc487c602d797f600b",
     "packages/core/test/bot-goals-budget.test.js": "95f0470da406f57a94c9881c736b1705c0692695549d110d825af6166995ca7d",
     "packages/core/src/runtime/tool-assembly.ts": "32ca51b75b8f71ab2c27082569d5b12fd1a9afab7e40d34b190b23c85b5a89dc",
-    "packages/core/src/turn/resolve-turn-tools.ts": "926dbd708ec342db39136a174e3c02b03e950bfa515d71f4abd6d9fa3601147e",
+    "packages/core/src/turn/resolve-turn-tools.ts": "4695a8dbe4fda6f1f0c73b77eadb34c7b9c7ace188881d92c86b26941047d933",
     "packages/core/src/tools/tool-search.ts": "f7c47d89de136788e9bc1fe78b7f284b0385350e6efde35ed30a2642f148c552",
     "packages/core/src/tools/deferred-disclosure.ts": "dfeaba53ab769bad9c8b6bbabfe5fb9cf8728b8dad23efef061d34e1c3b591ca",
     "packages/core/test/necessary-tool-injection.test.js": "a25570dc9cb0a0d63fb594f187a634eb0dfe234adb39c798ae11407e1c35341a",
@@ -467,7 +449,8 @@
     "packages/core/test/durable-agent-waits.test.js": "6737ec526a70a7f19116c31f3d68680f24fee8dd7b825a00a3a535f8bb5f59ab",
     "packages/core/test/durable-wait-chain.test.js": "d07f768c79ed03ea4b3c3fb20bb7b1156e3331b86168d1e30cf87dfe3409b858",
     "packages/core/test/durable-wait-replay.test.js": "5fd86b51a5dfc265c4e89e73438536e8192e5ef47fc5a0e468784d07a66d5a63",
-    "scripts/replay-agent-waits.mjs": "04e9b9f9af0b2045f43e0726de4b7d171f657c3c10b0e2c5f387ac2859a70418"
+    "scripts/replay-agent-waits.mjs": "04e9b9f9af0b2045f43e0726de4b7d171f657c3c10b0e2c5f387ac2859a70418",
+    "packages/core/src/config/runtime-capabilities.ts": "9c06c675c59cdeb435ae21c392a074d1337c69e4b091cf304f01058d807f693f"
   },
   "notes": " PR202 vertical/security review: quote pointers validated at host admission and retained by durable/memory inbox, all drain paths and compaction continuation; quoted subagent admission/promotion rejects explicitly. Both kernels resolve only visible same-session assistant sources at model view. Room binds the source author and uses explicit empty recipients for departed authors. Quoted inputs remain outside lossy overflow summaries. Real runtime, route, SQLite, SDK and UI regressions supplement existing bounded probes without expanding their proof claims. No acceptance criteria or thresholds weakened. PR204 independent vertical/security review: quoted WAL fork copies now remap source IDs in SQLite and portable memory stores. Child history inherits revoked constraints and closes active/pending exposure at its copied boundary, without changing parent scope or blocking fresh private turns. A host unable to persist required constraints rejects before child creation. Fail-first SQLite/memory and both-kernel quote/privacy regressions cover this boundary; existing bounded source/process scope, criteria and thresholds unchanged.  Completion follow-up review: assistantTranscript now puts only the last assistant text message in finalResponse, while retaining the entire execution tail as paired tool evidence. No writer, approval, retry, cancellation, settlement fence or goal completion threshold changes. Tests retain initial failed observations and require later successful grounded evidence; unsupported verdicts remain unverified. This input-separation review does not certify model judgements. Bounded pre-completion review: the existing core goal-gate host now checks a direct Bot execution before clean end and may return one corrective continuation. Kernel turn/request budgets and LoopGuard remain unchanged. Settlement still owns durable goal transitions. Process-local report reuse requires matching execution, revision and evidence fingerprint; no caller metadata can supply verification. Cancellation reaches the preflight judge, changed evidence forces re-verification, and approved side effects are not replayed by the runtime. New tests cover one correction, repeated rejection, cancellation and stale evidence. SDK interfaces and implementation are unchanged. Integration with PR252: pre-completion verification and its trusted cache use the same runtime-validated execution evidence packet, including source associations and sequence ranges. The packet fingerprint is captured before awaiting the judge, then recomputed at settlement; late evidence and revisions cannot inherit an older approval. Upstream checkpoint ownership, notices and worker guards remain intact. Intake integration retains PR252 full-objective preservation for sequential steps, alongside the already reviewed bounded judge deadline and no post-success abort. Reviewed failure-branch correction: correctionNeeded controls only one in-turn corrective continuation, never verified/met or settlement eligibility. A compliant requested failure reply can end while its unsuccessful goal remains queued. Missing legacy fields retain the existing correction behavior. Runtime regression proves one failed write, no extra model turn, one judge and no false completion; original evidence guards, execution fences and budgets remain unchanged. Reviewed query-only format guard after durable-goal review: explicit unconditional directives only, ignores fenced/quoted/conditional requests, reads latest persisted user/assistant text, one bounded corrective continuation without editing the original answer or grader. Process-local attempt tracking is bounded and released only by the owning runtime controller; cancellation and approval waits skip review. It does not grant evidence or completion state and keeps existing budgets. Runtime tests cover path/number/version/JSON, stubborn wrong responses, original transcript retention and no artificial goal creation; baseline runtime reproduces the regression. Reviewed historical-result query routing: only explicit return-from-existing-evidence requests are released as self-contained Bot chat; deployment/build/release result nouns alone do not request a new execution. Stated deliveries, isolation requests and mixed mutation/save/upgrade/deploy commands remain goals. No historical evidence is relabeled as a current execution and no completion proof guard is relaxed. Runtime regression forces the model to propose a new goal and still asserts no artificial goal for the read-only query. compact-revision now additionally requires goalStatus none; original answer/state/compaction assertions and all gate thresholds remain unchanged. Reviewed send-only completion view: strict-format turns omit historical reasoning from assistant replay while preserving text/tool calls/results and stored WAL; current system completion feedback gets one ephemeral user continuation anchor so chat adapters that hoist system notices cannot leave the request ending in old assistant text. New real-adapter HTTP test reproduced the assistant-ended payload before the fix, then verifies a user-ended request, no reasoning replay, unchanged stored reasoning and exactly one persisted user message. Stale/user-forged notices do not activate it, applying the view twice is idempotent, and repacking reapplies the view before the existing token budget check. No SDK source or grader logic changed. Reviewed integration of main bd7a019a: retain built-in interview roster/persona behavior and interview query routing alongside historical-result query routing, completion feedback, private-reasoning model view and owner-fenced cleanup. No gate threshold or evidence requirement changes. Reviewed the group-command diff: a group turn is no longer source_scope_denied only because the unattended room wake was recorded as an external event. Real external events, other bots, approval, sandbox, and secret paths still reject. rooms/index.ts only comments that the existing unattended stamp remains an approval fail-safe and this bot's command scope stays the same as its own chat. The steer route no longer lets a stale client target override the saved interrupt policy; admission, quote checks, role, key, and subagent options are unchanged. Writer admission, tool pairing, approval decisions, and restart recovery are unchanged. No checks removed and no thresholds changed."
 }

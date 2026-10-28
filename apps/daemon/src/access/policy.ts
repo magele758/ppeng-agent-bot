@@ -515,6 +515,8 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
     ['GET /api/mcp/oauth/callback', ADMIN],
     ['PUT /api/secrets/:name', ADMIN],
     ['DELETE /api/secrets/:name', ADMIN],
+    ['GET /api/runtime-capabilities', AUTHENTICATED],
+    ['PATCH /api/runtime-capabilities', ADMIN],
     ['GET /api/skills/settings', AUTHENTICATED],
     ['PATCH /api/skills/settings', ADMIN],
     ['GET /api/bots/:id/skills', owner('bot', byParam('id', (id) => botRef(l, id)), 'allow')],

@@ -114,7 +114,7 @@ export function BotCreateForm({ existingNames, onCreated, onCancel }: BotCreateF
       <header className="ag-panel__head">
         <div>
           <h3 className="ag-panel__title">{t('agents.bots.createTitle')}</h3>
-          <p className="ag-panel__lead">{t('agents.bots.createDesc')}</p>
+          <p className="ag-panel__lead">{t('botSettings.createHint')}</p>
         </div>
       </header>
       <form
@@ -148,6 +148,27 @@ export function BotCreateForm({ existingNames, onCreated, onCancel }: BotCreateF
           </span>
         </div>
 
+
+        <div className="ag-field">
+          <label className="ag-field__label" htmlFor="bot-create-description">
+            {t('botSettings.purpose')}
+          </label>
+          <textarea
+            id="bot-create-description"
+            className="ag-input"
+            data-testid="bot-create-description"
+            rows={3}
+            maxLength={2000}
+            value={description}
+            placeholder={t('agents.bots.descPh')}
+            aria-describedby="bot-create-description-hint"
+            onChange={(e) => setDescription(e.target.value)}
+          />
+          <span id="bot-create-description-hint" className="ag-field__hint">
+            {t('agents.bots.descHint')}
+          </span>
+        </div>
+        <details><summary>{t('botSettings.optional')}</summary>
         <div className="ag-field">
           <label className="ag-field__label" htmlFor="bot-create-title">
             {t('agents.bots.titleLabel')}
@@ -163,25 +184,6 @@ export function BotCreateForm({ existingNames, onCreated, onCancel }: BotCreateF
           />
           <span id="bot-create-title-hint" className="ag-field__hint">
             {t('agents.bots.titleHint')}
-          </span>
-        </div>
-        <div className="ag-field">
-          <label className="ag-field__label" htmlFor="bot-create-description">
-            {t('agents.bots.descLabel')}
-          </label>
-          <textarea
-            id="bot-create-description"
-            className="ag-input"
-            data-testid="bot-create-description"
-            rows={3}
-            maxLength={2000}
-            value={description}
-            placeholder={t('agents.bots.descPh')}
-            aria-describedby="bot-create-description-hint"
-            onChange={(e) => setDescription(e.target.value)}
-          />
-          <span id="bot-create-description-hint" className="ag-field__hint">
-            {t('agents.bots.descHint')}
           </span>
         </div>
         <BotFaceChoice
@@ -203,12 +205,13 @@ export function BotCreateForm({ existingNames, onCreated, onCancel }: BotCreateF
           onSoftColor={(softColor) => setFace((current) => ({ ...current, style: face.style, softColor }))}
           onSoftExpression={(softExpression) => setFace((current) => ({ ...current, style: face.style, softExpression }))}
         />
+        </details>
 
         </div>
         <CreateFieldErrors nameProblem={nameProblem} error={error} />
         <div className="ag-form__actions">
           <button type="submit" className="btn btn-primary btn-sm" data-testid="bot-create-submit" disabled={!botCreateReady(name, nameProblem, null, busy)}>
-            {busy ? t('agents.bots.submitting') : t('agents.bots.submit')}
+            {busy ? t('agents.bots.submitting') : t('botSettings.create')}
           </button>
           <button type="button" className="btn btn-sm" onClick={onCancel} disabled={busy}>
             {t('agents.bots.cancel')}

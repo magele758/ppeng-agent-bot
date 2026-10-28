@@ -105,7 +105,7 @@ function SkillPanel({ botId }: { botId: string }) {
       if (alive.current) {
         setData(next);
         setPolicy(next.policy);
-        setMessage(t("skillProposals.saved"));
+        setMessage(t("botSettings.nextStep"));
       }
     } catch (e) {
       if (alive.current) setError(e instanceof Error ? e.message : String(e));
@@ -146,6 +146,7 @@ function SkillPanel({ botId }: { botId: string }) {
           </button>
         </div>
       )}
+      <SkillScopeHint policy={policy} busy={busy} onDisable={()=>{setPolicy({mode:'selected',ids:[]});setMessage('');}} />
       {dirty && <p role="status">{t("skillProposals.unsaved")}</p>}
       {error && (
         <p role="alert">
@@ -385,4 +386,12 @@ function SkillActions({
       {message && <p role="status">{message}</p>}
     </>
   );
+}
+
+function SkillScopeHint({policy, busy, onDisable}: {policy?: Policy; busy: boolean; onDisable: () => void}) {
+  const {t} = useI18n();
+  return <><p>{t('botSettings.stepHint')}</p>
+    {policy?.mode === 'selected' && !policy.ids.length && <p>{t('botSettings.noSkills')}</p>}
+    <button type="button" className="btn btn-ghost btn-sm" disabled={busy||!policy} onClick={onDisable}>{t('botSettings.disableSkills')}</button>
+  </>;
 }

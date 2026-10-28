@@ -2,6 +2,8 @@
 
 本页为专题检索入口。项目介绍与启动步骤见 [English README](../README.md) / [中文 README](../README.zh.md)；代码约定见 [`AGENTS.md`](../AGENTS.md)。
 
+Bot 创建、统一设置面板、热配置的作用范围与生效时机见 [BOT_SETTINGS_FLOW.md](BOT_SETTINGS_FLOW.md)。
+
 ## Reading routes / 按目标选路线
 
 | 目标 / Goal | 推荐顺序 / Route |

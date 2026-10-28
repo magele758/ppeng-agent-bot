@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { RoutineSchedule } from './RoutineSchedule';
 import { RoutineRuns } from './bot-work/RoutineRuns';
 import { zonedLocalToIso, zonedInstantToLocal } from '@/lib/routine-time';
 import { api } from '@/lib/api';
@@ -179,6 +180,8 @@ export function BotCronPanel({
     }
   };
 
+  function refreshSchedule() { void load(); }
+
   if (!botId) {
     return (
       <div className="activity-panel" aria-label={t('play.cronPanel.aria')}>
@@ -356,20 +359,19 @@ export function BotCronPanel({
 
       {err ? <p className="bot-cron-panel__err">{err}</p> : null}
 
-      <div className="activity-panel__list">
+      <div className="activity-panel__list" data-testid="bot-detail-section-routines">
         {!jobs.length ? (
           <div className="empty-hint">{t('play.cronPanel.empty')}</div>
         ) : (
           jobs.map((job) => {
             const summary = precheckSummary(job, t);
             return (
-            <article key={job.id} className={`activity-card${job.enabled ? '' : ' is-off'}`}>
+            <article key={job.id} data-testid="bot-detail-routine" className={`activity-card${job.enabled ? '' : ' is-off'}`}>
               <div className="bot-cron-card__head">
                 <strong>{job.name}</strong>
-                <span className="bot-cron-card__when">
-                  {describeCron(job.scheduleValue)}
-                </span>
+
               </div>
+              <RoutineSchedule job={job} onSaved={refreshSchedule} />
               <p className="bot-cron-card__prompt">{job.prompt}</p>
               {summary ? <p className="bot-cron-card__meta">{summary}</p> : null}
               <p className="bot-cron-card__meta">

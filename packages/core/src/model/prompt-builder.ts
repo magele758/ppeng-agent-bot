@@ -1,3 +1,4 @@
+import { runtimeCapabilityCheck } from '../config/runtime-capabilities.js';
 import { HISTORICAL_SUMMARY_NOTICE } from '../session/context-sources.js';
 import { toolDirectory } from '../tools/tool-exposure.js';
 import {readBotSkillSelection, selectBotSkills} from '../skills/bot-selection.js';
@@ -21,15 +22,13 @@ import {
 } from '../skills/builtin-skills.js';
 import {
   buildSkillRoutingCooperative,
-  skillLoadStrictFromEnv,
-  skillRoutingModeFromEnv,
-  skillRoutingTopKFromEnv,
   type SkillRoutingMode,
   type SkillRoutingResult,
 } from '../skills/skill-router.js';
 import { filterSkillsByAllowlist, readAllowedSkillNames } from '../skills/skill-allowlist.js';
 import {
   resolveSkillDisclosureMode,
+  resolveSkillRoutingSettings,
   type SkillDisclosureMode
 } from '../skills/skill-settings.js';
 import type { SqliteStateStore } from '../storage.js';
@@ -194,7 +193,7 @@ function buildFullSkillBlock(skills: SkillSpec[], routing: SkillRoutingResult): 
   ].join('\n\n');
 }
 
-function buildShortlistSkillBlock(routing: SkillRoutingResult): string {
+function buildShortlistSkillBlock(routing: SkillRoutingResult, strict: boolean): string {
   const routedNames = new Set(routing.routed.map((r) => r.skill.id));
   const lines: string[] = [
     `Skill routing (${routing.mode}). Likely-relevant skills for this turn — call load_skill(name) for full SKILL.md:`,
@@ -216,7 +215,6 @@ function buildShortlistSkillBlock(routing: SkillRoutingResult): string {
     if (routedNames.has(s.id)) continue;
     lines.push(`- ${s.name}${s.ownerBotId ? ` (Bot ${s.ownerBotId}, id: ${s.id})` : ""}: ${s.description} [keyword hint]`);
   }
-  const strict = skillLoadStrictFromEnv(process.env);
   lines.push(
     strict
       ? 'Strict: only call load_skill for names listed above this turn.'
@@ -236,7 +234,8 @@ function buildLazySkillBlock(): string {
 function buildSkillCatalogBlock(
   disclosure: SkillDisclosureMode,
   skills: SkillSpec[],
-  routing: SkillRoutingResult
+  routing: SkillRoutingResult,
+  strict: boolean
 ): string {
   switch (disclosure) {
     case 'lazy':
@@ -244,7 +243,7 @@ function buildSkillCatalogBlock(
     case 'full':
       return buildFullSkillBlock(skills, routing);
     case 'shortlist':
-      return buildShortlistSkillBlock(routing);
+      return buildShortlistSkillBlock(routing, strict);
     default: {
       const _never: never = disclosure;
       return _never;
@@ -290,6 +289,10 @@ export class PromptBuilder {
     return readAllowedSkillNames(session?.metadata);
   }
 
+  getSkillRoutingSettings() {
+    return resolveSkillRoutingSettings({store:this.deps.store,env:process.env});
+  }
+
   getSkillDisclosure(): SkillDisclosureMode {
     return resolveSkillDisclosureMode({ store: this.deps.store, env: process.env });
   }
@@ -314,7 +317,7 @@ export class PromptBuilder {
     const topK =
       typeof limit === 'number' && Number.isFinite(limit)
         ? Math.min(20, Math.max(1, Math.floor(limit)))
-        : skillRoutingTopKFromEnv(process.env);
+        : this.getSkillRoutingSettings().topK;
     let skills = await this.skillsForSession(sessionId);
     const session =
       typeof this.deps.store.getSession === 'function'
@@ -328,7 +331,8 @@ export class PromptBuilder {
       );
     }
     const routing = await buildSkillRoutingCooperative(query.trim(), skills, {
-      mode: scoringModeForSearch(skillRoutingModeFromEnv(process.env)),
+      mode: scoringModeForSearch(this.getSkillRoutingSettings().routingMode),
+      useFusion: this.getSkillRoutingSettings().fusion,
       topK
     });
     const hits: SkillSearchHit[] = [];
@@ -435,9 +439,10 @@ export class PromptBuilder {
     );
     const lastUser = [...messages].reverse().find((m) => m.role === 'user');
     const userText = textFromMessage(lastUser ?? { parts: [], role: 'user', id: '', sessionId: '', createdAt: '' });
-    const mode = skillRoutingModeFromEnv(process.env);
-    const topK = skillRoutingTopKFromEnv(process.env);
-    let routing = await buildSkillRoutingCooperative(userText, skills, { mode, topK });
+    const config = this.getSkillRoutingSettings();
+    const mode = config.routingMode;
+    const topK = config.topK;
+    let routing = await buildSkillRoutingCooperative(userText, skills, { mode, topK, useFusion: config.fusion });
     const shortlistCandidates = [
       ...routing.routed.map((r) => ({
         id: r.skill.id,
@@ -465,7 +470,8 @@ export class PromptBuilder {
     const skillBlock = buildSkillCatalogBlock(
       resolveSkillDisclosureMode({ store: this.deps.store, env: process.env }),
       skills,
-      routing
+      routing,
+      config.strictLoad
     );
 
     const todoLine = ctx.session.todo.length > 0 ? JSON.stringify(ctx.session.todo) : 'No active todos.';
@@ -559,7 +565,8 @@ export class PromptBuilder {
       })();
     }
     const merged = await this.workspaceSkillsPromise;
-    return [...builtinSkills, ...merged, ...(this.deps.extraSkills ?? [])];
+    const enabled = runtimeCapabilityCheck(this.deps.store);
+    return [...builtinSkills, ...merged, ...(this.deps.extraSkills ?? [])].filter(skill => enabled('skills', skill.id));
   }
 
   /** Reset cached workspace skills (e.g. after runtime reloads them). */

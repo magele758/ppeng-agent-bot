@@ -1,4 +1,6 @@
 import {createWaitForTool} from './waits/tool.js';
+import { mergeDomainBundles, type DomainBundle } from './domain.js';
+import { registerDomainCatalog, domainCatalog, readRuntimeCapabilities, runtimeCapabilityCheck, guardRuntimeCapability } from './config/runtime-capabilities.js';
 import { invalidateSteerToolDecision, steerRunningTools } from './runtime/steer-tools.js';
 import { createGoalFactoryDevelopmentTool, createGoalSelfHealTool, specialtyStatus, cancelSpecialty } from './bots/goals/specialty-services.js';
 import { FactoryService } from './factory/service.js';
@@ -231,6 +233,8 @@ export interface RuntimeOptions {
    * replacing them. Use this to mount domain personas alongside the core.
    */
   extraAgents?: AgentSpec[];
+  /** Installed domain bundles, with availability controlled live through Lab settings. */
+  domainBundles?: DomainBundle[];
   /**
    * Append on top of the builtin tool set (or the explicit `tools` list)
    * without replacing it. Used to mount domain-specific tools.
@@ -409,6 +413,10 @@ export class RawAgentRuntime {
   resumeAfterDesktopUpdateCancelled(): void { this.desktopUpdateSuspended = false; }
 
   constructor(options: RuntimeOptions) {
+    if (options.domainBundles) {
+      const domains = mergeDomainBundles(options.domainBundles);
+      options = {...options, extraAgents:[...(options.extraAgents??[]),...domains.agents],extraTools:[...(options.extraTools??[]),...domains.tools],extraSkills:[...(options.extraSkills??[]),...domains.skills]};
+    }
     this.desktopUpdateSuspended = options.updateValidation === true;
     this.repoRoot = options.repoRoot;
     this.stateDir = options.stateDir;
@@ -422,6 +430,7 @@ export class RawAgentRuntime {
         }
       : undefined;
     this.store = new SqliteStateStore(join(this.stateDir, 'runtime.sqlite'));
+    registerDomainCatalog(this.store, options.domainBundles ?? []);
     let interruptedSubagents: SessionRecord[] = [];
     try {
       const ownership = acquireRuntimeProcessOwnership(this.store);
@@ -458,6 +467,7 @@ export class RawAgentRuntime {
     this.connectors = new ConnectorRegistry({
       store: this.store,
       getPlugins: () => this.loadedPlugins,
+      getDomains: () => domainCatalog(this.store).filter(d=>readRuntimeCapabilities(this.store).domains.includes(d.id)).map(d=>({id:d.id,title:d.label})),
       getCapabilities: () => this.store.capabilities().list({ limit: 500 })
     });
 
@@ -514,7 +524,7 @@ export class RawAgentRuntime {
     bindSandboxSettingsStore(this.store);
     const toolServices = createRuntimeToolServices(this.l5());
     const baseTools = attachFileCompensation(
-      options.tools ?? createBuiltinTools(toolServices)
+      options.tools ?? createBuiltinTools(toolServices, { includeDormantCapabilities: true })
     );
     let catalog: ToolContract<any>[] = [];
     const optionalExtras = assembleOptionalTools({
@@ -551,7 +561,7 @@ export class RawAgentRuntime {
         isSessionRunning: (id) => this.runningSessions.has(id), cancelSession: (id) => this.cancelSession(id),
         hasUnconfirmedEffects: (id, since) => this.hasUnconfirmedEffects(id, since), log: this.log }),
       ...(options.extraTools ?? [])
-    ];
+    ].map(tool => guardRuntimeCapability(this.store, tool));
     const ptcExec = createPtcExecTool({
       getAuthorizedTools: (context) =>
         filterToolsForSession({
@@ -821,8 +831,14 @@ export class RawAgentRuntime {
     return cancelAllSessionsFn(this.sessionControlHost(), allowedSessionIds);
   }
 
+  availableTools() {
+    const enabled = runtimeCapabilityCheck(this.store);
+    return this.tools.filter(tool => enabled('tools', tool.name));
+  }
+
   listAgents(): AgentSpec[] {
-    return this.store.listAgents();
+    const enabled = runtimeCapabilityCheck(this.store);
+    return this.store.listAgents().filter(agent => enabled('agents', agent.id));
   }
 
   /**

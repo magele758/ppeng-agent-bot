@@ -826,3 +826,6 @@ export { inspectToolExposure } from '../turn/resolve-turn-tools.js';
 
 export {DurableWaitStore,registerWaitSource} from '../waits/index.js';
 export type {WaitSpec,WaitCondition,WaitSource,Observation} from '../waits/index.js';
+export { resolveSkillRoutingSettings } from '../skills/skill-settings.js';
+
+export * from '../config/runtime-capabilities.js';

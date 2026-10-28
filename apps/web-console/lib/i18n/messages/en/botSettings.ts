@@ -1,0 +1,17 @@
+export const botSettings = {
+ basic: 'Basics', capabilities: 'Capabilities & permissions', automation: 'Automation', records: 'Records',
+ name: 'Bot name', title: 'Role', description: 'Purpose & instructions', saveBasics: 'Save basics',
+ optional: 'Optional details & appearance', appearance: 'Appearance', purpose: 'What should it do?', create: 'Create and start chatting', createHint: 'Name your Bot and describe what it should do, then start chatting.',
+ scope: 'Model and tools apply to this Bot’s canonical chats; permissions apply to this chat; skills apply to this Bot and its tasks. Existing child tasks keep their model and session permissions.',
+ nextStep: 'Saved · Applies at the next execution step; requests already sent keep their configuration.', nextRun: 'Saved · Applies to the next run; the current run keeps its original settings.', immediate: 'Saved · Applied',
+ runHint: 'The step limit applies to the next run.', stepHint: 'Saved settings apply at the next execution step without restarting.', globalHint: 'Applies globally at the next execution step without restarting.',
+ loopHint: 'Saved · Kernel and assembly settings apply to the next run; defaults apply to new or unbound chats. No restart needed.',
+ unsaved: 'Unsaved changes', tools: 'Allowed tools', toolsHint: 'An empty list allows all tools, subject to permissions and global capability settings.', saveTools: 'Save tool scope',
+ noSkills: 'No skills selected. Saving disables all skills for this Bot.', disableSkills: 'Disable all',
+ routing: 'Skill routing mode', topK: 'Candidate skill count', strict: 'Only load shortlisted or searched skills', fusion: 'Include related skills',
+ hybrid: 'Hybrid matching', lexical: 'Lexical matching', legacy: 'Legacy ordering',
+ runtimeTitle: 'Interactive cards & domain capabilities', runtimeKeywords: 'A2UI cards domains SRE stocks home ERP capabilities',
+ a2ui: 'Allow Bots to render interactive cards', domains: 'Installed domain capabilities',
+ source: 'Source: {source}', sourceUi: 'Panel', sourceFallback: 'Environment or default',
+ settings: 'Bot settings', addConnection: 'Add software connection',
+};

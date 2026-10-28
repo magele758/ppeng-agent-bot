@@ -116,7 +116,7 @@ test('default bot load runs again after the first pass is cancelled [AC:bot-cons
   stopSecond?.();
 });
 
-test('a click before the default Bot open starts keeps that chat [AC:bot-face-first-creation#AC-4]', async () => {
+test('a click before the default Bot open starts keeps that chat [AC:bot-settings-flow#AC-12]', async () => {
   let selected: string | null = null;
   const selectionAtStart = selected;
   const arrived = deferred<void>();

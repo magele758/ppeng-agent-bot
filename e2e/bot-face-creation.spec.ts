@@ -13,7 +13,7 @@ const test = base.extend<{ originalBot: { id: string; name: string } }>({
 
 for (const entry of ['chat', 'management'] as const) {
   test.describe(entry, () => {
-  test('face-first fields open immediately [AC:bot-face-first-creation#AC-1] [AC:bot-face-first-creation#AC-2]', async ({ page }) => {
+  test('optional appearance keeps previews and controls [AC:bot-settings-flow#AC-10]', async ({ page }) => {
     await page.goto(entry === 'chat' ? '/#/bot' : '/#/agents/bots');
     if (entry === 'chat') {
       await page.locator('#btnPlayCreate').click();
@@ -22,8 +22,10 @@ for (const entry of ['chat', 'management'] as const) {
       await page.getByRole('button', { name: '新建 Bot', exact: true }).first().click();
     }
     const form = page.getByRole('form', { name: '新建 Bot' });
+    await expect(form.getByLabel('显示标题', { exact: true })).not.toBeVisible();
+    await form.locator('summary').click();
     await expect(form.getByLabel('显示标题', { exact: true })).toBeVisible();
-    await expect(form.getByLabel('描述', { exact: true })).toBeVisible();
+    await expect(form.getByLabel('希望它做什么？', { exact: true })).toBeVisible();
     await expect(form.getByRole('group', { name: '脸型', exact: true })).toBeVisible();
     await expect(form.getByRole('group', { name: '颜色', exact: true })).toBeVisible();
     await expect(form.getByRole('radiogroup', { name: '表情图标' })).toHaveCount(0);
@@ -45,7 +47,7 @@ for (const entry of ['chat', 'management'] as const) {
   });
 }
 
-test('invalid names cannot submit; server failure preserves inputs for retry; cancel preserves chat [AC:bot-face-first-creation#AC-4]', async ({ page, request, originalBot }) => {
+test('invalid names cannot submit; server failure preserves inputs for retry; cancel preserves chat [AC:bot-settings-flow#AC-12]', async ({ page, request, originalBot }) => {
   const bots = (await (await request.get('/api/bots')).json()).bots as { name: string }[];
   let posts = 0;
   await page.route('**/api/bots', async route => {
@@ -68,7 +70,8 @@ test('invalid names cannot submit; server failure preserves inputs for retry; ca
   await expect(submit).toBeDisabled();
   await expect(form.getByRole('alert')).toContainText('已经有同名的 Bot');
   await form.getByTestId('bot-create-name').fill('Retry Face Bot');
-  await form.getByTestId('bot-create-title').fill('My title');
+  await form.locator('summary').click();
+      await form.getByTestId('bot-create-title').fill('My title');
   await form.getByTestId('bot-create-description').fill('My description');
   await form.getByRole('button', { name: '心形', exact: true }).click();
   await submit.click();
