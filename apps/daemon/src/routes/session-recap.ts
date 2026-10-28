@@ -4,6 +4,7 @@
  * An empty or failed completion is not cached.
  */
 
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import { NotFoundError, ValidationError, type RawAgentRuntime } from '@ppeng/agent-core';
 import type { RouteSpec } from '../routing.js';
 import { json } from '../http-utils.js';
@@ -25,7 +26,7 @@ import {
 } from '../session-recap-text.js';
 
 const RECAP_WAIT_MS = 20_000;
-const recapFlights = new Map<string, Promise<{ text: string | null; anchorId: string | null; hint: string }>>();
+const recapFlights = new Map<string, { promise: Promise<{ text: string | null; anchorId: string | null; hint: string }>; abort: () => void }>();
 
 function payload(runtime: RawAgentRuntime) {
   const settings = readSessionRecapSettings(runtime.store);
@@ -69,7 +70,7 @@ export function sessionRecapRoutes(runtime: RawAgentRuntime): RouteSpec[] {
     {
       method: 'POST',
       pattern: '/api/sessions/:id/recap',
-      handler: async ({ requireParam, readBody, response }) => {
+      handler: async ({ requireParam, readBody, request, response }) => {
         if (!recapFeatureEnabled(readSessionRecapSettings(runtime.store))) {
           json(response, 200, { text: null, anchorId: null, hint: '' });
           return;
@@ -77,30 +78,69 @@ export function sessionRecapRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         const sessionId = requireParam('id');
         const session = runtime.getSession(sessionId);
         if (!session) throw new NotFoundError('session', sessionId);
+        if (session.status === 'running') {
+          json(response, 200, storedRecapBody(session.metadata));
+          return;
+        }
         const body = (await readBody().catch(() => ({}))) as { locale?: unknown };
         const locale = recapLocale(body?.locale);
         if (!locale) throw new ValidationError('locale must be zh or en');
-        json(response, 200, await recapForSession(runtime, sessionId, locale));
+        json(response, 200, await recapForSession(runtime, sessionId, locale, clientAbortSignal(request, response)));
       }
     }
   ];
 }
 
+function storedRecapBody(metadata: Record<string, unknown> | null | undefined): { text: string; anchorId: string | null; hint: string } {
+  const cached = readSessionRecapCache(metadata);
+  if (!cached) return { text: '', anchorId: null, hint: '' };
+  return { text: cached.text, anchorId: cached.anchorId, hint: cached.hint ?? '' };
+}
+
+function clientAbortSignal(request: IncomingMessage, response: ServerResponse): AbortSignal {
+  const controller = new AbortController();
+  const abort = () => {
+    if (!controller.signal.aborted) controller.abort();
+  };
+  const onClose = () => {
+    if (!response.writableFinished) abort();
+  };
+  response.on('close', onClose);
+  request.on('aborted', abort);
+  request.socket?.on('close', onClose);
+  if (request.destroyed) abort();
+  return controller.signal;
+}
+
+function bindAbort(signal: AbortSignal, abort: () => void): void {
+  if (signal.aborted) abort();
+  else signal.addEventListener('abort', abort, { once: true });
+}
+
 async function recapForSession(
   runtime: RawAgentRuntime,
   sessionId: string,
-  locale: RecapLocale
+  locale: RecapLocale,
+  requestSignal: AbortSignal
 ): Promise<{ text: string | null; anchorId: string | null; hint: string }> {
   const messages = runtime.store.foldMessages(sessionId);
   const anchorId = recapAnchorId(messages);
   if (!anchorId) return { text: null, anchorId: null, hint: '' };
   const key = `${sessionId}\0${anchorId}\0${locale}`;
   const existing = recapFlights.get(key);
-  if (existing) return existing;
-  const pending = composeAndStore(runtime, sessionId, locale, messages).finally(() => {
-    if (recapFlights.get(key) === pending) recapFlights.delete(key);
+  if (existing) {
+    bindAbort(requestSignal, existing.abort);
+    return existing.promise;
+  }
+  const controller = new AbortController();
+  const abort = () => {
+    if (!controller.signal.aborted) controller.abort();
+  };
+  bindAbort(requestSignal, abort);
+  const pending = composeAndStore(runtime, sessionId, locale, messages, AbortSignal.any([controller.signal, AbortSignal.timeout(RECAP_WAIT_MS)])).finally(() => {
+    if (recapFlights.get(key)?.promise === pending) recapFlights.delete(key);
   });
-  recapFlights.set(key, pending);
+  recapFlights.set(key, { promise: pending, abort });
   return pending;
 }
 
@@ -108,7 +148,8 @@ async function composeAndStore(
   runtime: RawAgentRuntime,
   sessionId: string,
   locale: RecapLocale,
-  messages: ReturnType<RawAgentRuntime['store']['foldMessages']>
+  messages: ReturnType<RawAgentRuntime['store']['foldMessages']>,
+  signal: AbortSignal
 ): Promise<{ text: string | null; anchorId: string | null; hint: string }> {
   const complete = runtime.modelAdapter.completeText;
   const session = runtime.getSession(sessionId);
@@ -119,7 +160,7 @@ async function composeAndStore(
     locale,
     cached,
     clock: { nowMs: Date.now(), timezone: resolveConversationTimezone(session?.metadata) },
-    signal: AbortSignal.timeout(RECAP_WAIT_MS),
+    signal,
     completeText: (request) => complete.call(runtime.modelAdapter, request)
   });
   if (result.cache) {
