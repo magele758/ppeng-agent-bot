@@ -57,6 +57,14 @@ test('CRAP consumes verified coverage from every lane without launching tests [A
   assert.doesNotMatch(commands,/retry-failed-tests|vitest run|pnpm run test:unit|pnpm run test:formal|--update-baseline/);
 }));
 
+test('coverage identity follows .nvmrc, so a Node 22 patch drift is not a different candidate [AC:ci-parallel-validation#AC-6]',async()=>{
+  const {coverageNode}=await library();
+  assert.equal(coverageNode('v22.23.4','22'),'22');
+  assert.equal(coverageNode('v22.23.3','22'),coverageNode('v22.23.4','22'));
+  assert.throws(()=>coverageNode('v24.1.0','22'),/does not match \.nvmrc/);
+  assert.throws(()=>coverageNode('v22.23.4','22.24'),/does not match \.nvmrc/);
+});
+
 test('wrong candidate, attempt, inputs, omitted lane and corrupted evidence are rejected [AC:ci-parallel-validation#AC-6]',()=>fixtures(({lib,root,identity,expected})=>{
   for(const key of ['candidate','tree','runId','attempt','inputs','node','root'])assert.throws(()=>lib.readBundles({directory:root,identity:{...identity,[key]:'wrong'},expected}),/identity|inputs|mismatch/i);
   assert.throws(()=>lib.readBundles({directory:root,identity,expected:{...expected,unit:['missing.test.js']}}),/inventory|scope/i);

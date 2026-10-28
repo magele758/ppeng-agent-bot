@@ -239,6 +239,7 @@ function selfFilteredWriteCases(f) {
     'PATCH /api/bot-functional-groups/:id': { name: 'B replacement' },
     'DELETE /api/bot-functional-groups/:id': {},
     'PUT /api/bots/:id/functional-group': { groupId: null },
+    'PUT /api/bot-rooms/:id/functional-group': { groupId: null },
     'PUT /api/bot-shared-context': { entries: { note: 'B own scope' } },
     'DELETE /api/bot-rooms/:id': {},
     'PATCH /api/bot-rooms/settings': { maxWaveSpeakers: 4 },
@@ -477,6 +478,7 @@ test('functional groups and explicit global/group/room facts stay isolated acros
   assert.equal(room.status,201);
   const roomId=room.data.room.id;
   assert.equal((await d.call('A','PUT',`/api/bots/${botId}/functional-group`,{groupId})).status,200);
+  assert.equal((await d.call('A','PUT',`/api/bot-rooms/${roomId}/functional-group`,{groupId})).status,200);
   const scopes=[
     ['global','A_GLOBAL_SECRET'],
     [`group&id=${encodeURIComponent(groupId)}`,'A_GROUP_SECRET'],
@@ -507,7 +509,9 @@ test('functional groups and explicit global/group/room facts stay isolated acros
     ['PATCH',`/api/bot-functional-groups/${groupId}`,{name:'B takeover'}],
     ['DELETE',`/api/bot-functional-groups/${groupId}`],
     ['PUT',`/api/bots/${botId}/functional-group`,{groupId:null}],
-    ['PUT',`/api/bots/${botId}/functional-group`,{groupId:ownGroup.data.group.id}]
+    ['PUT',`/api/bots/${botId}/functional-group`,{groupId:ownGroup.data.group.id}],
+    ['PUT',`/api/bot-rooms/${roomId}/functional-group`,{groupId:null}],
+    ['PUT',`/api/bot-rooms/${roomId}/functional-group`,{groupId:ownGroup.data.group.id}]
   ]) {
     const response=await d.call('B',method,path,body);
     assert.ok([403,404].includes(response.status),`${method} ${path}: ${response.status} ${response.text}`);
@@ -518,7 +522,7 @@ test('functional groups and explicit global/group/room facts stay isolated acros
   assert.ok(!bList.text.includes('A private function'));
   const preservedGroups=await d.call('A','GET','/api/bot-functional-groups');
   assert.equal(preservedGroups.status,200);
-  assert.deepEqual(preservedGroups.data.groups,[{id:groupId,name:'A private function',botIds:[botId]}]);
+  assert.deepEqual(preservedGroups.data.groups,[{id:groupId,name:'A private function',botIds:[botId],roomIds:[roomId]}]);
   const preservedBot=await d.call('A','GET',`/api/bots/${botId}`);
   assert.equal(preservedBot.status,200);
   assert.equal(preservedBot.data.bot.id,botId);

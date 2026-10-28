@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parse } from 'yaml';
-import { decisive, headRunsFromActions, headRunsFromChecks, mergeDecision } from '../ci/main-full-health.mjs';
+import { decisive, headRunsFromActions, headRunsFromChecks, mergeDecision, resolveHeadSha, shouldKeepWaiting, validationActivity } from '../ci/main-full-health.mjs';
 
 const fail = { status: 'completed', conclusion: 'failure', headSha: 'red' };
 const pass = { status: 'completed', conclusion: 'success', headSha: 'green' };
@@ -37,9 +37,30 @@ test('manual Full validation still unblocks a red main when check-runs omit the 
   assert.equal(mergeDecision([red], seen).ok, true);
   assert.equal(mergeDecision([red], []).ok, false);
   assert.equal(mergeDecision([red], headRunsFromActions([{ ...manual, conclusion: 'failure' }], 'head')).ok, false);
-  assert.equal(mergeDecision([red], headRunsFromActions([{ ...manual, status: 'in_progress', conclusion: null }], 'head')).ok, false);
+  const running = mergeDecision([red], headRunsFromActions([{ ...manual, status: 'in_progress', conclusion: null }], 'head'));
+  assert.equal(running.ok, false);
+  assert.equal(running.pending, true);
+  assert.equal(mergeDecision([red], headRunsFromActions([{ ...manual, conclusion: 'failure' }], 'head')).pending, false);
   assert.equal(headRunsFromActions([{ ...manual, head_sha: 'other' }], 'head').length, 0);
   assert.equal(headRunsFromActions([{ name: 'CI', path: '.github/workflows/ci.yml', status: 'completed', conclusion: 'success', head_sha: 'head' }], 'head').length, 0);
   const source = readFileSync(new URL('../ci/main-full-health.mjs', import.meta.url), 'utf8');
-  assert.match(source, /workflows\/\$\{FULL_VALIDATION_WORKFLOW\}\/runs\?head_sha=/);
+  assert.match(source, /workflows\/\$\{workflow\}\/runs\?head_sha=/);
+  assert.match(source, /workflowRuns\(repo, sha, FULL_VALIDATION_WORKFLOW\)/);
+});
+
+test('full health binds the pull request head, because Actions will not override GITHUB_SHA [AC:ci-fast-and-bihourly-gates#AC-12]', () => {
+  assert.equal(resolveHeadSha({ PR_HEAD_SHA: 'head', GITHUB_SHA: 'merge' }), 'head');
+  assert.equal(resolveHeadSha({ GITHUB_SHA: 'local' }), 'local');
+  assert.equal(resolveHeadSha({}), '');
+  const job = parse(readFileSync('.github/workflows/ci.yml', 'utf8')).jobs['main-health'];
+  const step = job.steps.find((item) => String(item.run ?? '').includes('main-full-health'));
+  assert.equal(step.env.PR_HEAD_SHA, '${{ github.event.pull_request.head.sha }}');
+  assert.equal(Object.hasOwn(step.env, 'GITHUB_SHA'), false);
+  assert.ok(job['timeout-minutes'] >= 45);
+  assert.equal(validationActivity([{ name: 'Release gate / Functional unit tests + coverage', status: 'in_progress' }], []).length, 1);
+  assert.equal(validationActivity([{ name: 'Quick gate', status: 'in_progress' }, { name: 'Release gate / harness', status: 'completed', conclusion: 'skipped' }], []).length, 0);
+  assert.equal(shouldKeepWaiting({ ok: false, pending: true, sawActivity: true, elapsedMs: 999999, graceMs: 1 }), true);
+  assert.equal(shouldKeepWaiting({ ok: true, pending: true, sawActivity: true, elapsedMs: 0, graceMs: 1 }), false);
+  assert.equal(shouldKeepWaiting({ ok: false, pending: false, sawActivity: false, elapsedMs: 1000, graceMs: 120000 }), true);
+  assert.equal(shouldKeepWaiting({ ok: false, pending: false, sawActivity: true, elapsedMs: 1000, graceMs: 120000 }), false);
 });
