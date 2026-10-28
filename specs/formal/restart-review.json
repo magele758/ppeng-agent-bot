@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-10-28T17:34:58.000Z",
-  "reviewNote": "Durable wait is the default Goal/Routine park path. Merged origin/main (child-wake). Pairing/lifecycle/restart/concurrency control-flow unchanged.",
+  "reviewedAt": "2026-10-28T17:49:10.000Z",
+  "reviewNote": "Durable wait is the default Goal/Routine park path. Merged origin/main (agent-as-folder). Pairing/lifecycle/restart/concurrency control-flow unchanged.",
   "mapping": [
     {
       "step": "Production startup, persistence, writer claims and graceful shutdown (HTTP drain not exercised)",
