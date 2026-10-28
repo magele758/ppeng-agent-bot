@@ -829,3 +829,17 @@ export type {WaitSpec,WaitCondition,WaitSource,Observation} from '../waits/index
 export { resolveSkillRoutingSettings } from '../skills/skill-settings.js';
 
 export * from '../config/runtime-capabilities.js';
+
+export {
+  validateSkillManifest,
+  enforceSkillManifest,
+  loadSkillManifestFromMeta,
+  PLANNING_SKILL_MANIFEST
+} from '../skills/skill-manifest.js';
+export type {
+  SkillManifest,
+  SkillNetworkPolicy,
+  SkillManifestValidation,
+  SkillCapabilityCheck
+} from '../skills/skill-manifest.js';
+
