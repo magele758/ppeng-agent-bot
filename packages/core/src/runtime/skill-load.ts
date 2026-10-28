@@ -5,6 +5,7 @@
 import { envBool } from '../env.js';
 import type { PromptBuilder } from '../model/prompt-builder.js';
 import { isSkillAllowed } from '../skills/skill-allowlist.js';
+import type { SkillManifest } from '../skills/skill-manifest.js';
 import { discloseSkillBody, formatDisclosedSkillContent } from '../skills/skill-disclosure.js';
 import type { TraceEvent } from '../stores/trace.js';
 
@@ -62,7 +63,7 @@ export async function resolveSkillLoad(
   host: SkillLoadHost,
   name: string,
   sessionId: string
-): Promise<{ content?: string; error?: string }> {
+): Promise<{ content?: string; error?: string; manifest?: SkillManifest; skillId?: string }> {
   const skills = await host.promptBuilder.skillsForSession(sessionId);
   const normalizedName = name.trim().toLowerCase();
   const matches = skills.filter((skill) => {
@@ -170,5 +171,5 @@ export async function resolveSkillLoad(
   });
   const progressive = envBool(process.env, 'RAW_AGENT_SKILL_PROGRESSIVE', true);
   const disclosed = discloseSkillBody(found.content, { progressive });
-  return { content: formatDisclosedSkillContent(disclosed) };
+  return { content: formatDisclosedSkillContent(disclosed), manifest: found.manifest, skillId: found.id };
 }

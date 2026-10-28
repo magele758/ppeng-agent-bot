@@ -831,6 +831,26 @@ export { resolveSkillRoutingSettings } from '../skills/skill-settings.js';
 export * from '../config/runtime-capabilities.js';
 
 export {
+  validateSkillManifest,
+  enforceSkillManifest,
+  loadSkillManifestFromMeta,
+  manifestForSkillFile,
+  networkHostFromInput,
+  PLANNING_SKILL_MANIFEST
+} from '../skills/skill-manifest.js';
+export {
+  gateActiveSkillManifests,
+  noteActiveSkillManifest,
+  runWithSkillManifest
+} from '../skills/skill-manifest-gate.js';
+export type {
+  SkillManifest,
+  SkillNetworkPolicy,
+  SkillManifestValidation,
+  SkillCapabilityCheck
+} from '../skills/skill-manifest.js';
+
+export {
   evaluateDefaultDenyPolicy,
   isDangerousCwd,
   detectUntrustedInduction,
