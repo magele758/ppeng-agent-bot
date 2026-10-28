@@ -465,7 +465,7 @@
     "packages/core/src/bots/goals/execution-evidence.ts": "f95731115cb04567e85175ac74b2473ed444bca11c964f08288ed805a3cad1c1",
     "packages/core/src/bots/goals/types.ts": "5bae9e2d286c94a12f562879cb8bcf45fb947717e66f648f1ec41a6b2814a86d",
     "scripts/agent-eval/goal-chain-live.mjs": "cea87ee0ef29a7ebfdc7c35d219aa944416e04eeb5fc8331eb6a2bd357f51a9a",
-    "packages/core/src/bots/goals/intake.ts": "6db865c8c615acd20d05f88023f5526208449a3d949104ac57402ad2459cf9e5",
+    "packages/core/src/bots/goals/intake.ts": "a076301fa8c5a9ef0a6cc4440e64863530bcb2ec1e6c0821fc78fc9cebf72139",
     "packages/core/src/bots/goals/completion-evidence.ts": "133fdd6901cd06287e9cf5f9d673a3406652c572e6435e086c91aae9e14a36f8",
     "packages/core/src/runtime/l5-bindings.ts": "b075c81ea8d3caaf3f5e9151bf8274e74d13c51e754428877f919b246a4f76ef",
     "packages/core/src/bots/strict-output.ts": "892f0f7347b6bf134c1f4d66d97e8f9a0677afaff69b5fc812d1ecf117d7aeb2",
