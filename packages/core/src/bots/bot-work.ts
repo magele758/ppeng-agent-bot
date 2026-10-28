@@ -1,3 +1,5 @@
+import {botStatusSnapshots,compactTaskPage} from './bot-status-snapshot.js';
+import {createBotStatusRequestTools,expireQueuedStatusRequest} from './bot-status-requests.js';
 import { stampSessionWake, withApprovalWake } from '../approval/unattended-approval.js';
 import { mergeOutcomeMetadata, parseRunOutcome, runOutcomeFromEnd } from '../session/run-outcome.js';
 import { assistantTextsFromFold } from '../session/visible-assistant.js';
@@ -562,6 +564,7 @@ function pendingMessageCanRun(host:BotWorkHost,row:Record<string,unknown>):boole
   return false;
 }
 function claimPendingMessage(host:BotWorkHost,session:SessionRecord,row:Record<string,unknown>,owner:string):number|undefined {
+  if(expireQueuedStatusRequest(host,String(row.id)))return undefined;
   const taskId=row.kind==='task'?String(row.task_id):undefined;
   host.store.db.exec('BEGIN IMMEDIATE');
   try {
@@ -783,10 +786,10 @@ function stampDelegatedGoal(store:SqliteStateStore,session:SessionRecord,taskId:
  if(!store.getDaemonControl(key))store.setDaemonControl(key,{id:goalId,sessionId:scopeId,botId:origin?.botId??session.metadata.botId});
 }
 export function createBotManagementTools(host:BotWorkHost):ToolContract<any>[] {
- const schema={type:'object',properties:{}};
  return [
- {name:'bot_team_status',description:'List authorized bots, current session and delegated task statuses. Includes hidden bots.',inputSchema:schema,approvalMode:'never',sideEffectLevel:'none',async execute(ctx){return {ok:true,content:JSON.stringify(botWorkStatus(host,principalFromSession(host.store,ctx.session)))};}},
+ {name:'bot_team_status',description:'Read compact current work snapshots before asking Bots for updates. Supports selected botIds, activeOnly (default true), changedSince and maxAgeMs. observedAt is evidence time; reportedAt is this query time. Idle chat does not mean external work stopped. Query detailed tasks only when needed. Report current work, blockers and next steps to the user in a short bullet list.',inputSchema:{type:'object',properties:{botIds:{type:'array',items:{type:'string'}},activeOnly:{type:'boolean'},changedSince:{type:'string'},maxAgeMs:{type:'number'}}},approvalMode:'never',sideEffectLevel:'none',async execute(ctx,args){try{return {ok:true,content:JSON.stringify(botStatusSnapshots(host,principalFromSession(host.store,ctx.session),args))};}catch(e){return {ok:false,content:String(e)};}}},
+ ...createBotStatusRequestTools(host),
  {name:'bot_delegate',description:'Persist and track a task for an authorized bot, even while it is busy. Returns task ID and queued status; does not mean completed.',inputSchema:{type:'object',properties:{target:{type:'string'},input:{type:'string'},idempotencyKey:{type:'string'},deadline:{type:'string'}},required:['target','input','idempotencyKey']},approvalMode:'never',sideEffectLevel:'none',async execute(ctx,args){try{if(ctx.session.metadata?.permissionMode==='plan')throw new ValidationError('Delegation is blocked in plan mode');const target=host.store.listBots({includeHidden:true}).find(b=>b.id===args.target||b.name===args.target);if(!target)throw new ValidationError('Unknown bot');const task=dispatchBotTask(host,{principal:principalFromSession(host.store,ctx.session),requesterBotId:String(ctx.session.metadata?.botId??ctx.agent.id),targetBotId:target.id,input:String(args.input??''),idempotencyKey:String(args.idempotencyKey??''),deadline:args.deadline,...delegationContext(host.store,ctx.session)});stampDelegatedGoal(host.store,ctx.session,task.id);void tickBotWork(host);return {ok:true,content:JSON.stringify(task)};}catch(err){return {ok:false,content:JSON.stringify({error:String(err),...(err instanceof BotQueueCapacityError?{accepted:false,retryable:true,error_code:err.code,usage:err.usage,limits:err.limits}:{})})};}}},
- {name:'bot_task_results',description:'Query all unresolved tasks plus a paged terminal history. Follow nextCursor to inspect older results. Never infer completion from dispatch.',inputSchema:{type:'object',properties:{cursor:{type:'string'},limit:{type:'number'}}},approvalMode:'never',sideEffectLevel:'none',async execute(ctx,args){try{return {ok:true,content:JSON.stringify({...botTaskPage(host.store,principalFromSession(host.store,ctx.session),{cursor:args?.cursor,limit:args?.limit}),collaborations:botCollaborations(host.store,principalFromSession(host.store,ctx.session))})};}catch(error){return {ok:false,content:JSON.stringify({error:String(error)})};}}}
+ {name:'bot_task_results',description:'Query compact task summaries and paged history (default 10). Query taskId for one full task, or includeResults=true when full paged details are necessary. Follow nextCursor for older history; dispatch never means completion.',inputSchema:{type:'object',properties:{cursor:{type:'string'},limit:{type:'number'},taskId:{type:'string'},includeResults:{type:'boolean'}}},approvalMode:'never',sideEffectLevel:'none',async execute(ctx,args){try{const principal=principalFromSession(host.store,ctx.session);if(args?.taskId){const task=getBotTask(host.store,principal,args.taskId);return {ok:!!task,content:JSON.stringify(task??{error:'Task not found'})};}const page=botTaskPage(host.store,principal,{cursor:args?.cursor,limit:args?.limit??10});const projected=args?.includeResults?{...page,collaborations:botCollaborations(host.store,principal)}:compactTaskPage(page);return {ok:true,content:JSON.stringify(projected)};}catch(error){return {ok:false,content:JSON.stringify({error:String(error)})};}}}
  ];
 }

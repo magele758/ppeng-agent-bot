@@ -95,3 +95,12 @@ test('unlinking a parked watcher withdraws the old SOP steer [AC:bot-linked-watc
  f.store.updateSession(f.sid,{status:'running'});await drainRoutineRuns(f.host);assert.equal(f.store.listUnclaimedInbox(f.sid).length,1);
  updateCronJob(f.host,j.id,{workLink:null,prompt:'new independent prompt'});f.store.updateSession(f.sid,{status:'idle'});await drainRoutineRuns(f.host);await new Promise(resolve=>setImmediate(resolve));assert.equal(runs.get(r.id).result,'independent');
 });
+
+test('an unobserved health claim and a reread old report remain unverified [AC:bot-supervision-freshness#AC-6]',async t=>{
+ let oldReport=false;const f=fixture(t,(store,id)=>{if(oldReport)store.appendMessage(id,'tool',[{type:'tool_result',name:'read_file',toolCallId:'old-file',ok:true,content:JSON.stringify({observedAt:'2020-01-01T00:00:00.000Z',status:'healthy'})}]);answer(store,id,oldReport?'[NO_UPDATE]':'Everything is healthy');});const j=f.job();
+ assert.equal((await f.run(j)).status,'failed');oldReport=true;assert.equal((await f.run(j)).status,'failed');
+});
+test('a successful fresh snapshot check retains actual sample time for quiet monitoring [AC:bot-supervision-freshness#AC-6]',async t=>{
+ const at=new Date(Date.now()-1000).toISOString();const f=fixture(t,(store,id)=>{store.appendMessage(id,'tool',[{type:'tool_result',name:'bot_team_status',toolCallId:'snapshot',ok:true,content:JSON.stringify([{observedAt:at,reportedAt:new Date().toISOString(),stale:false}])}]);answer(store,id,'[NO_UPDATE]');});
+ const r=await f.run(f.job());assert.equal(r.status,'silent');assert.equal(r.workSnapshot.observedAt,at);
+});

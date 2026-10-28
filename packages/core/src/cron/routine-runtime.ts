@@ -1,4 +1,5 @@
 import {fenceExternalContent} from '../safety/external-content.js';
+import {statusObservation,statusObservationTool} from '../bots/status-observation.js';
 import {hasWaitReceipt} from '../waits/receipt.js';
 import {DurableWaitStore} from '../waits/store.js';
 import {resolveRoutineWorkLink,linkedRoutinePrompt,type RoutineWorkSnapshot} from './routine-work-link.js';
@@ -302,14 +303,15 @@ function completionError(session:SessionRecord|undefined,denied:boolean,result:s
  return result.trim()?'Session did not complete':'Execution ended without a result';
 }
 function linkedObservation(host:RoutineRuntimeHost,run:RoutineRun,result:string):Partial<RoutineRun>|undefined {
- if(!run.workSnapshot||!routineQuiet(result))return undefined;
+ if(!run.workSnapshot)return undefined;
  if(run.workSnapshot.externalJob?.status==='error')return {status:'failed',result,error:'Linked external job failed; delivery is unverified'};
- const observation=routineExecutionMessages(host.store,run).reverse().find(message=>message.parts.some(part=>part.type==='tool_result'&&/^(?:bash|bg_check|read_file|grep_files|list_files|glob_files|http_request|fetch_url|prom_query|loki_query|k8s_get)$/.test(part.name)));
+ const observation=routineExecutionMessages(host.store,run).reverse().find(message=>message.parts.some(part=>part.type==='tool_result'&&statusObservationTool.test(part.name)));
  if(observation?.parts.some(part=>part.type==='tool_result'&&part.ok===false))return {status:'failed',result,error:'Current observation failed; work status is unverified'};
- const observed=observation?.createdAt??run.workSnapshot.observedAt;
- const current=observed&&Date.parse(observed)>=Date.parse(run.startedAt??run.createdAt);
+ const sample=observation?statusObservation(observation):undefined;
+ const observed=sample?.at??run.workSnapshot.observedAt;
+ const current=observed&&(Date.parse(observed)>=Date.parse(run.startedAt??run.createdAt)||sample?.freshSnapshot===true);
  if(!current)return {status:'failed',result,error:'No successful current observation; work status is unverified'};
- if(observation)new RoutineRunStore(host.store).update(run.id,{workSnapshot:{...run.workSnapshot,observedAt:observation.createdAt}});
+ if(observation)new RoutineRunStore(host.store).update(run.id,{workSnapshot:{...run.workSnapshot,observedAt:sample?.at??observation.createdAt}});
  return undefined;
 }
 function completionResult(host:RoutineRuntimeHost,run:RoutineRun,session:SessionRecord|undefined,approvals:ApprovalRecord[]):Partial<RoutineRun>{
