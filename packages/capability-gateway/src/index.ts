@@ -37,6 +37,7 @@ export {
 } from './outbound.js';
 export {
   appendOutboundDraft,
+  confirmOutboundDraft,
   readOutboundDrafts,
   type OutboundDraft,
   type OutboundDraftStatus
