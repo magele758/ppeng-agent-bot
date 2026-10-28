@@ -4,7 +4,7 @@ import { decryptFeishuEncryptPayload } from './feishu-crypto.js';
 import type { ChannelSpec, FeishuProviderSpec, WeComProviderSpec } from './types.js';
 import { readGatewayState, writeGatewayState, type GatewayPersistedState } from './state.js';
 import type { GatewaySettings } from './gateway-settings.js';
-import { appendOutboundDraft } from './outbound-drafts.js';
+import { createUserDeliveryPort } from './user-delivery-port.js';
 import { deliverChannelText } from './outbound.js';
 import { resolveImOutbound, type ImTurnOrigin, type SilentAckLocale } from './silent-reply.js';
 import {
@@ -16,6 +16,21 @@ import {
   scheduleGatewayTurn,
   verifyFeishuSignature
 } from './inbound-guard.js';
+
+function portDraft(
+  gatewayDir: string,
+  input: {
+    channelId: string;
+    text: string;
+    event?: string;
+    receiveId?: string;
+    receiveIdType?: import('./outbound-drafts.js').FeishuReceiveIdType;
+  },
+  channels: import('./types.js').ChannelSpec[] = []
+) {
+  return createUserDeliveryPort({ gatewayDir, channels }).draft(input);
+}
+
 
 function fenceImInbound(text: string, label: string): string {
   return fenceExternalContent({ source: 'im', label, body: text });
@@ -368,7 +383,7 @@ export async function handleFeishuEventRequest(input: {
   const reply = async (text: string) => {
     if (!replyChannel) return;
     if (replyChannel.type === 'feishu_bot') {
-      await appendOutboundDraft(input.gatewayDir, {
+      await portDraft(input.gatewayDir, {
         channelId: replyChannel.id,
         text,
         event: 'gateway.im.reply',
