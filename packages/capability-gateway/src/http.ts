@@ -10,7 +10,24 @@ import {
   tryBotChatCommand
 } from './im-handlers.js';
 import { handleEventIngress } from './event-ingress.js';
-import { appendOutboundDraft } from './outbound-drafts.js';
+import { appendOutboundDraft as appendOutboundDraftLedger } from './outbound-drafts.js';
+import { createUserDeliveryPort } from './user-delivery-port.js';
+
+/** Route user-facing drafts through UserDeliveryPort without touching handleGatewayHttp body. */
+function appendOutboundDraft(
+  gatewayDir: string,
+  input: {
+    channelId: string;
+    text: string;
+    event?: string;
+    receiveId?: string;
+    receiveIdType?: import('./outbound-drafts.js').FeishuReceiveIdType;
+  }
+) {
+  void appendOutboundDraftLedger;
+  return createUserDeliveryPort({ gatewayDir, channels: [] }).draft(input);
+}
+
 import { quarantineLegacyDraftLedger, reconcileSendingDrafts, recoverGatewayOutbound } from './outbound.js';
 import { resolveImOutbound } from './silent-reply.js';
 import { readGatewaySettings } from './gateway-settings.js';

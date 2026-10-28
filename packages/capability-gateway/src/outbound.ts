@@ -22,6 +22,7 @@ import {
   type OutboundDraft
 } from './outbound-drafts.js';
 import type { ChannelSpec, ChannelType } from './types.js';
+import { createUserDeliveryPort } from './user-delivery-port.js';
 
 /**
  * Slack, Telegram, and email held here always become drafts.
@@ -42,9 +43,11 @@ export async function deliverChannelText(opts: {
    */
   approval?: 'approved';
 }): Promise<void> {
+  // Always draft (Draft→Confirm→Send). Route through UserDeliveryPort only.
   void opts.approval;
   void HUMAN_RELEASE_CHANNEL_TYPES;
-  await appendOutboundDraft(opts.gatewayDir, {
+  void appendOutboundDraft;
+  await createUserDeliveryPort({ gatewayDir: opts.gatewayDir, channels: [opts.channel] }).draft({
     channelId: opts.channel.id,
     text: opts.text,
     event: opts.event ?? 'gateway.im.reply'
