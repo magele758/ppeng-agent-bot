@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-10-29T00:24:14.000Z",
-  "reviewNote": "Quieter terminal goal notices (Done/Failed/Blocked/Needs review) replace JSON dumps in chat; Lab still holds full state. Merged origin/main after #315 host-park bg_run. Pairing/lifecycle/restart/concurrency control-flow unchanged. Schema snapshot Quick gate: reviewed the added freshness-test run after build-workspace and the contract assertion that keeps that filename in quick-gate.mjs. Acceptance criteria, CRAP thresholds, the 90s budget, and other mapped checks are unchanged.",
+  "reviewedAt": "2026-10-29T00:40:11.000Z",
+  "reviewNote": "UserVault reference-fill API typed apart from SecretVault; runtime binds userVault. Merged origin/main after #305 schema-snapshot freshness. Pairing/lifecycle/restart/concurrency control-flow unchanged.",
   "mapping": [
     {
       "step": "Execute/approval/result persistence and fold recovery; real source component probes (not a full kernel proof)",
@@ -366,7 +366,7 @@
     "scripts/agent-eval/goal-chain-live.mjs": "cea87ee0ef29a7ebfdc7c35d219aa944416e04eeb5fc8331eb6a2bd357f51a9a",
     "packages/core/src/bots/goals/intake.ts": "c5a6a60e675e37071e874e4747b0527990dbab301dce1b460a0a0ba81116a1c3",
     "packages/core/src/bots/goals/completion-evidence.ts": "133fdd6901cd06287e9cf5f9d673a3406652c572e6435e086c91aae9e14a36f8",
-    "packages/core/src/runtime.ts": "7abca069c6311d50df3d837849e6106444aa0b49d6cb003aa018678297e47147",
+    "packages/core/src/runtime.ts": "78c0e20321be84eb32fa2d1cebd0af4a26de255b1d6f992ce96c90faaa5f5dff",
     "packages/core/src/runtime/l5-bindings.ts": "fe89df65ea79aac923318a5a8ba70291b66c3875288a50729005ecabfaf8c784",
     "packages/core/src/bots/strict-output.ts": "892f0f7347b6bf134c1f4d66d97e8f9a0677afaff69b5fc812d1ecf117d7aeb2",
     "packages/core/src/runtime/steer-tools.ts": "ee3ac8ce03aed1a3fd236421c5e01fcc5ca062e9ac20b2c662821bc88dde17a2",

@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-10-29T00:24:14.000Z",
-  "reviewNote": "Quieter terminal goal notices (Done/Failed/Blocked/Needs review) replace JSON dumps in chat; Lab still holds full state. Merged origin/main after #315 host-park bg_run. Pairing/lifecycle/restart/concurrency control-flow unchanged. Schema snapshot Quick gate: reviewed the added freshness-test run after build-workspace and the contract assertion that keeps that filename in quick-gate.mjs. Acceptance criteria, CRAP thresholds, the 90s budget, and other mapped checks are unchanged.",
+  "reviewedAt": "2026-10-29T00:40:11.000Z",
+  "reviewNote": "UserVault reference-fill API typed apart from SecretVault; runtime binds userVault. Merged origin/main after #305 schema-snapshot freshness. Pairing/lifecycle/restart/concurrency control-flow unchanged.",
   "mapping": [
     {
       "step": "Production runtime startup and writer surfaces, cancellation and approval decisions; actual OS process probes",
@@ -334,7 +334,7 @@
     }
   ],
   "sha256": {
-    "packages/core/src/runtime.ts": "7abca069c6311d50df3d837849e6106444aa0b49d6cb003aa018678297e47147",
+    "packages/core/src/runtime.ts": "78c0e20321be84eb32fa2d1cebd0af4a26de255b1d6f992ce96c90faaa5f5dff",
     "packages/core/src/storage.ts": "015625520fdb9036dade420b528f03c7c85b6926159e71879ac675790a25498a",
     "packages/core/src/stores/session-store.ts": "b5e3444614a0fef3bcd6ac9aecb374c4d470486a4c64fd8678251efee723a470",
     "packages/core/src/stores/approval-store.ts": "64cef1660e4364ba5263fde5d7abe38334706970ab03266a141dd338027ba170",
