@@ -5,6 +5,7 @@
 import { createId, nowIso } from '../helpers.js';
 import { createMemorySurfaceStore, type MemorySurfaceStore } from '../session/surface-store.js';
 import type { TurnKernelStore } from '../turn/host.js';
+import { normalizeAuthorizedBy } from '../approval/authorized-by.js';
 import type { AgentSpec, ApprovalRecord, SessionRecord } from '../types.js';
 
 export const DEFAULT_EMBED_AGENT: AgentSpec = {
@@ -60,6 +61,26 @@ export function createDefaultMemoryStore(options?: AdaptStoreOptions): {
   return { surface, store: adaptMemoryStore(surface, options) };
 }
 
+function samePendingKey(
+  row: ApprovalRecord,
+  input: { sessionId: string; idempotencyKey?: string }
+): boolean {
+  return row.status === 'pending' && row.sessionId === input.sessionId && row.idempotencyKey === input.idempotencyKey;
+}
+
+function pendingApprovalForKey(
+  list: ApprovalRecord[],
+  input: { sessionId: string; idempotencyKey?: string }
+): ApprovalRecord | undefined {
+  if (!input.idempotencyKey) return undefined;
+  return list.find((row) => samePendingKey(row, input));
+}
+
+function fillAuthorizedBy(pending: ApprovalRecord, authorizedBy: string[] | undefined): ApprovalRecord {
+  if (authorizedBy && !pending.authorizedBy?.length) pending.authorizedBy = authorizedBy;
+  return pending;
+}
+
 export function createApprovalBag(): {
   list: ApprovalRecord[];
   listApprovals: TurnKernelStore['listApprovals'];
@@ -69,6 +90,7 @@ export function createApprovalBag(): {
     reason: string;
     args: Record<string, unknown>;
     idempotencyKey?: string;
+    authorizedBy?: string[];
   }) => ApprovalRecord;
   deleteApproval: (id: string) => void;
 } {
@@ -79,6 +101,9 @@ export function createApprovalBag(): {
       return filter?.status ? list.filter((a) => a.status === filter.status) : [...list];
     },
     createApproval(input) {
+      const authorizedBy = normalizeAuthorizedBy(input.authorizedBy);
+      const pending = pendingApprovalForKey(list, input);
+      if (pending) return fillAuthorizedBy(pending, authorizedBy);
       const rec: ApprovalRecord = {
         id: createId('appr'),
         sessionId: input.sessionId,
@@ -87,6 +112,7 @@ export function createApprovalBag(): {
         reason: input.reason,
         args: input.args,
         ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
+        ...(authorizedBy ? { authorizedBy } : {}),
         createdAt: nowIso(),
         updatedAt: nowIso(),
       };

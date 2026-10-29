@@ -95,6 +95,8 @@ export interface ToolLoopStore {
     reason: string;
     args: Record<string, unknown>;
     idempotencyKey?: string;
+    /** Audit citation copied onto the receipt. Omitted when the caller cited nothing. */
+    authorizedBy?: string[];
   }) => ApprovalRecord;
   deleteApproval: (id: string) => void;
   getTask: (taskId: string) => TaskRecord | undefined;

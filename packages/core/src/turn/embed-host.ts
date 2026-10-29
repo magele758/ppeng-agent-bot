@@ -7,6 +7,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ExtensionRegistry } from '../extensions/extension-registry.js';
+import { normalizeAuthorizedBy } from '../approval/authorized-by.js';
 import { createId, nowIso } from '../id.js';
 import type { PromptContext } from '../model/prompt-builder.js';
 import type { ToolLoopDeps, ToolLoopStore } from '../runtime/tool-loop.js';
@@ -160,6 +161,21 @@ export function adaptTurnKernelStore(
   return store;
 }
 
+function embedPendingApproval(
+  list: ApprovalRecord[],
+  input: { sessionId: string; idempotencyKey?: string }
+): ApprovalRecord | undefined {
+  if (!input.idempotencyKey) return undefined;
+  return list.find(
+    (row) => row.status === 'pending' && row.sessionId === input.sessionId && row.idempotencyKey === input.idempotencyKey
+  );
+}
+
+function fillEmbedAuthorizedBy(pending: ApprovalRecord, authorizedBy: string[] | undefined): ApprovalRecord {
+  if (authorizedBy && !pending.authorizedBy?.length) pending.authorizedBy = authorizedBy;
+  return pending;
+}
+
 function createEmbedApprovalBag(): {
   list: ApprovalRecord[];
   listApprovals: TurnKernelStore['listApprovals'];
@@ -174,6 +190,9 @@ function createEmbedApprovalBag(): {
       return [...filtered];
     },
     createApproval(input) {
+      const authorizedBy = normalizeAuthorizedBy(input.authorizedBy);
+      const pending = embedPendingApproval(list, input);
+      if (pending) return fillEmbedAuthorizedBy(pending, authorizedBy);
       const rec: ApprovalRecord = {
         id: createId('appr'),
         sessionId: input.sessionId,
@@ -182,6 +201,7 @@ function createEmbedApprovalBag(): {
         reason: input.reason,
         args: input.args,
         ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
+        ...(authorizedBy ? { authorizedBy } : {}),
         createdAt: nowIso(),
         updatedAt: nowIso()
       };

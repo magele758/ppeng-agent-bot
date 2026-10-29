@@ -5,14 +5,21 @@
  * 1) High-risk call without requestSmartModeApproval → default soft-block (no side effects).
  * 2) Same action + requestSmartModeApproval → native approval card (createApproval) and wait.
  * 3) Approve → same fingerprint proceeds; deny → terminal; no bypass via permissionMode=bypass.
+ *
+ * `authorizedBy` is an audit citation (owner message / answered-card ids), not a skip flag.
+ * It is stripped from the fingerprint the same way the escalate flags are.
  */
 
 const FLAG_KEY_SET = new Set<string>([
   'requestSmartModeApproval',
   'request_smart_mode_approval',
   'smartModeBlockReason',
-  'smart_mode_block_reason'
+  'smart_mode_block_reason',
+  'authorizedBy',
+  'authorized_by'
 ]);
+
+export { normalizeAuthorizedBy, readAuthorizedBy } from './authorized-by.js';
 
 const SHELL_SUBJECTS = new Set(['bash', 'bg_run', 'shell', 'work_evidence']);
 

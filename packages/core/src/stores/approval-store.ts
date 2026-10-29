@@ -5,10 +5,11 @@
  * Takes a DatabaseSync instance via constructor injection.
  */
 import type { DatabaseSync } from 'node:sqlite';
+import { authorizedByFromJson, normalizeAuthorizedBy } from '../approval/authorized-by.js';
 import { NotFoundError } from '../errors.js';
 import { createId, nowIso } from '../id.js';
-import { serializeJson, parseJson, optionalString } from './storage-helpers.js';
 import type { ApprovalRecord, ApprovalStatus } from '../types.js';
+import { serializeJson, parseJson, optionalString } from './storage-helpers.js';
 
 export class ApprovalStore {
   constructor(private readonly db: DatabaseSync) {}
@@ -16,17 +17,10 @@ export class ApprovalStore {
   createApproval(
     input: Omit<ApprovalRecord, 'id' | 'status' | 'createdAt' | 'updatedAt'> & { idempotencyKey?: string }
   ): ApprovalRecord {
-    if (input.idempotencyKey) {
-      const dup = this.db
-        .prepare(
-          `SELECT * FROM approvals WHERE session_id = ? AND idempotency_key = ? AND status = 'pending' LIMIT 1`
-        )
-        .get(input.sessionId, input.idempotencyKey) as Record<string, unknown> | undefined;
-      if (dup) {
-        return this.mapApprovalRow(dup);
-      }
-    }
+    const reused = this.reusePendingApproval(input);
+    if (reused) return reused;
 
+    const authorizedBy = normalizeAuthorizedBy(input.authorizedBy);
     const approval: ApprovalRecord = {
       id: createId('approval'),
       sessionId: input.sessionId,
@@ -38,16 +32,17 @@ export class ApprovalStore {
       createdAt: nowIso(),
       updatedAt: nowIso(),
       ...(input.expiresAt ? { expiresAt: input.expiresAt } : {}),
-      ...(input.wakeSource ? { wakeSource: input.wakeSource } : {})
+      ...(input.wakeSource ? { wakeSource: input.wakeSource } : {}),
+      ...(authorizedBy ? { authorizedBy } : {})
     };
 
     this.db
       .prepare(`
         INSERT INTO approvals (
           id, session_id, tool_name, status, reason, args_json, idempotency_key,
-          created_at, updated_at, expires_at, wake_source
+          created_at, updated_at, expires_at, wake_source, authorized_by_json
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
       .run(
         approval.id,
@@ -60,10 +55,34 @@ export class ApprovalStore {
         approval.createdAt,
         approval.updatedAt,
         approval.expiresAt ?? null,
-        approval.wakeSource ?? null
+        approval.wakeSource ?? null,
+        approval.authorizedBy ? serializeJson(approval.authorizedBy) : null
       );
 
     return approval;
+  }
+
+  /** Same pending key returns the existing receipt and fills a missing citation. */
+  private reusePendingApproval(
+    input: Omit<ApprovalRecord, 'id' | 'status' | 'createdAt' | 'updatedAt'> & { idempotencyKey?: string }
+  ): ApprovalRecord | undefined {
+    if (!input.idempotencyKey) return undefined;
+    const dup = this.db
+      .prepare(
+        `SELECT * FROM approvals WHERE session_id = ? AND idempotency_key = ? AND status = 'pending' LIMIT 1`
+      )
+      .get(input.sessionId, input.idempotencyKey) as Record<string, unknown> | undefined;
+    if (!dup) return undefined;
+    const existing = this.mapApprovalRow(dup);
+    const cited = normalizeAuthorizedBy(input.authorizedBy);
+    if (!cited || existing.authorizedBy?.length) return existing;
+    const updatedAt = nowIso();
+    this.db
+      .prepare(
+        `UPDATE approvals SET authorized_by_json = ?, updated_at = ? WHERE id = ? AND status = 'pending'`
+      )
+      .run(serializeJson(cited), updatedAt, existing.id);
+    return { ...existing, authorizedBy: cited, updatedAt };
   }
 
   listApprovals(filter?: { status?: ApprovalStatus }): ApprovalRecord[] {
@@ -126,6 +145,7 @@ export class ApprovalStore {
     const expiresAt = optionalString(row.expires_at);
     const expireReason = optionalString(row.expire_reason);
     const wakeSource = optionalString(row.wake_source);
+    const authorizedBy = authorizedByFromJson(row.authorized_by_json);
     return {
       id: String(row.id),
       sessionId: String(row.session_id),
@@ -138,7 +158,8 @@ export class ApprovalStore {
       updatedAt: String(row.updated_at),
       ...(expiresAt ? { expiresAt } : {}),
       ...(expireReason ? { expireReason } : {}),
-      ...(wakeSource ? { wakeSource } : {})
+      ...(wakeSource ? { wakeSource } : {}),
+      ...(authorizedBy ? { authorizedBy } : {})
     };
   }
 }

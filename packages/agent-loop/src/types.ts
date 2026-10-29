@@ -161,6 +161,12 @@ export interface ApprovalRecord {
   expireReason?: string;
   /** Wake that raised this approval (`cron`, `routine`, `mailbox`, …). */
   wakeSource?: string;
+  /**
+   * Owner message ids and answered-card ids cited for this receipt.
+   * Absent when the caller did not cite any. Audit only; it does not grant
+   * the approval.
+   */
+  authorizedBy?: string[];
 }
 
 export interface SessionMemoryEntry {

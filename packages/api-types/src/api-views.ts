@@ -141,6 +141,8 @@ export type ApiApprovalItem = {
   expireReason?: string;
   /** Unattended wake that raised this approval (`cron`, `routine`, …). */
   wakeSource?: string;
+  /** Owner message or answered-card ids cited on this receipt. Absent when none were cited. */
+  authorizedBy?: string[];
 };
 
 /** Subset of MailRecord for mail rendering. */
