@@ -369,12 +369,11 @@ function parseTodoItems(raw: unknown): TodoItem[] {
   return parsed;
 }
 
-export function createBuiltinTools(services: RuntimeToolServices, options: {
+export function createBuiltinTools(services: RuntimeToolServices, options: { includeDormantCapabilities?: boolean } = {}): ToolContract<any>[] {
   const registeredMachineTools =
     services.stateStore && services.registeredMachines
       ? createRegisteredMachineTools(services.stateStore, services.registeredMachines)
       : [];
- includeDormantCapabilities?: boolean } = {}): ToolContract<any>[] {
   const riskyShellTokens = ['rm ', 'git reset', 'git checkout', 'git clean', 'npm publish', 'sudo '];
 
   function shellCommandOf(args: { command?: string; verify_command?: string }): string {
