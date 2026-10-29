@@ -4,7 +4,9 @@
   flex-direction: column;
   gap: var(--ui-space-3);
   padding: var(--ui-space-6) var(--ui-space-5) var(--ui-space-5);
-  background: var(--ui-surface);
+  background: var(--glass-fill);
+  backdrop-filter: var(--glass-filter);
+  -webkit-backdrop-filter: var(--glass-filter);
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-lg);
   box-shadow: var(--ui-shadow-md);

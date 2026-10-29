@@ -57,6 +57,7 @@ type Room = {
   hostBotId: string;
   status: string;
   maxBotTurns: number;
+  turnCapEnabled?: boolean;
 };
 
 type RoomMessage = {
@@ -372,7 +373,7 @@ export function PlayBotGroupChat({ roomId, bots, onOpenWork }: { roomId: string;
 
   const ensureBudget = async (next: Room) => {
     const needed = groupSpeakBudget(next.botIds.length);
-    if (next.botIds.length >= 2 && next.maxBotTurns < needed) {
+    if (next.turnCapEnabled === true && next.maxBotTurns > 0 && next.maxBotTurns < needed) {
       const patched = (await api(`/api/bot-rooms/${next.id}`, jsonBody({ maxBotTurns: needed }, 'PATCH'))) as { room: Room };
       return patched.room;
     }

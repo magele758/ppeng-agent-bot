@@ -89,11 +89,11 @@ function repeatRatioFromEnv(env: Record<string, string | undefined>): number {
 }
 
 /**
- * Per-session loop detection: tool failure streaks, same tool-call *content*
- * streak across turns, repeated assistant fingerprints (cheap dead-loop signal).
+ * Per-session loop detection: same-call failure streaks, same tool-call
+ * content streak across turns, repeated assistant fingerprints.
  */
 export class SessionLoopGuard {
-  private readonly toolFailStreak = new Map<string, number>();
+  private readonly toolFailStreak = new Map<string, { name: string; streak: number }>();
   private sameCallStreak = 0;
   private readonly rounds = new Map<string, { seen: Set<string>; streak: number }>();
   private readonly contentHashes: string[] = [];
@@ -143,12 +143,23 @@ export class SessionLoopGuard {
     toolCalls: LoopGuardToolCall[],
     results: { name: string; ok: boolean; content?: string; toolCallId?: string }[]
   ): { abort: true; reason: string } | { abort: false } {
-    for (const r of results) {
-      if (!r.ok) {
-        this.toolFailStreak.set(r.name, (this.toolFailStreak.get(r.name) ?? 0) + 1);
-      } else {
-        this.toolFailStreak.set(r.name, 0);
-      }
+    // Match by call ID when available; concurrent execution can reorder results.
+    const remaining = [...results];
+    const paired = toolCalls.map(call => {
+      const index = remaining.findIndex(r => call.toolCallId ? r.toolCallId === call.toolCallId : r.name === call.name);
+      return index < 0 ? undefined : remaining.splice(index, 1)[0];
+    });
+    // A fuse is one call (name + args), not the tool name. Different commands
+    // of bash are not one loop. A missing result is not a success.
+    for (let i = 0; i < toolCalls.length; i++) {
+      const call = toolCalls[i]!;
+      const result = paired[i];
+      const key = fingerprintToolRound([call]);
+      const prev = this.toolFailStreak.get(key);
+      this.toolFailStreak.set(key, {
+        name: call.name,
+        streak: !result || !result.ok ? (prev?.streak ?? 0) + 1 : 0,
+      });
     }
     // Empty rounds do not touch the content streak (same as the old "if first name" skip).
     if (toolCalls.length === 0) {
@@ -162,12 +173,6 @@ export class SessionLoopGuard {
     this.rounds.set(fp, state);
     if (this.rounds.size > 128) this.rounds.delete(this.rounds.keys().next().value!);
 
-    // Match by call ID when available; concurrent execution can reorder results.
-    const remaining = [...results];
-    const paired = toolCalls.map(call => {
-      const index = remaining.findIndex(r => call.toolCallId ? r.toolCallId === call.toolCallId : r.name === call.name);
-      return index < 0 ? undefined : remaining.splice(index, 1)[0];
-    });
     const complete = results.length === toolCalls.length && paired.every((r, i) => r?.ok && r.name === toolCalls[i]?.name);
     const evidence = complete ? evidenceFingerprint(paired as typeof results) : undefined;
     if (evidence && !state.seen.has(evidence)) {
@@ -180,7 +185,7 @@ export class SessionLoopGuard {
     }
     this.sameCallStreak = state.streak;
 
-    for (const [name, streak] of this.toolFailStreak) {
+    for (const { name, streak } of this.toolFailStreak.values()) {
       if (streak >= this.failStreakMax) {
         return { abort: true, reason: `tool "${name}" failed ${streak} times in a row` };
       }

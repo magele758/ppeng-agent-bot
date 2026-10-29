@@ -35,6 +35,7 @@ import {
   rejectRateLimited
 } from './rate-limit.js';
 import { createDaemonApp } from './app.js';
+import { markListenReady, timeBootPhase } from './boot-timeline.js';
 import { writeLoopSettings } from './loop-settings.js';
 import { connectRedisWithTimeout, createBestEffortRedis, type BestEffortRedis } from '@ppeng/agent-core';
 
@@ -140,9 +141,10 @@ if (missingProviderEnv.length > 0) {
   process.exit(1);
 }
 
+const bootStartedAt = Date.now();
 let storageCtx: CoreStorageContext;
 try {
-  storageCtx = await createCoreStorageContext(env, { stateDir, log });
+  storageCtx = await timeBootPhase('storage_context', () => createCoreStorageContext(env, { stateDir, log }));
 } catch (e) {
   log.error('storage context init failed', errorMessage(e));
   process.exit(1);
@@ -174,7 +176,7 @@ if (domains.unknown.length > 0) {
   );
 }
 
-const runtime = new RawAgentRuntime({
+const runtime = await timeBootPhase('runtime_construct', () => new RawAgentRuntime({
   repoRoot,
   stateDir,
   updateValidation: desktopValidation,
@@ -182,8 +184,7 @@ const runtime = new RawAgentRuntime({
   eventBufferRepository: storageCtx.eventBuffer,
   cloudSkillsLoader: storageCtx.cloudSkillsLoader,
   tieredAssetStorage: storageCtx.tieredAssets,
-});
-
+}));
 
 const loopOn = writeLoopSettings(runtime.store, {
   kernelVariant: 'agent-loop',
@@ -191,7 +192,9 @@ const loopOn = writeLoopSettings(runtime.store, {
 });
 log.info(`loop kernel=${loopOn.kernelVariant} assembly=${loopOn.assemblyPreset}`);
 
-const gatewayCtx = desktopValidation ? undefined : await createGatewayContext(runtime, repoRoot, stateDir);
+const gatewayCtx = await timeBootPhase('gateway_context', () =>
+  desktopValidation ? undefined : createGatewayContext(runtime, repoRoot, stateDir)
+);
 if (!desktopValidation) {
   startDeliveryFlushTicker(runtime, repoRoot, (e) => log.error('delivery quiet-hours flush failed', e)).unref();
 }
@@ -405,7 +408,7 @@ function warnUnsetOauthPublicOrigin(): void {
 }
 
 server.listen(port, host, () => {
-  log.info(`listening on http://${host}:${port}`);
+  markListenReady(bootStartedAt);
   warnUnsetOauthPublicOrigin();
   if (desktopValidation) return;
   void runtime.warmMcp().catch((error) => {

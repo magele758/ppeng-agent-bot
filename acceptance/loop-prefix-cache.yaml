@@ -1,0 +1,30 @@
+id: loop-prefix-cache
+title: 稳定前缀和技能目录不在每轮重做
+status: implemented
+notes: 'assumedApproval: standing-order-2026-10-22'
+requirement: |
+  长会话每轮都重做 skill_catalog、system_prompt、prepare_view、memory_appendix，
+  pinnedTokens 经常到 15k–21k，把约 26k 的请求预算吃掉大半。
+  输入没变时不要重做稳定前缀和技能目录；任务模式要收窄列进提示词的技能，
+  避免固定前缀占满请求预算。不要改 loop_settings。
+criteria:
+  - id: AC-1
+    given: 同一只 Bot、同一批技能、同一段说明和同一条最新用户消息
+    when: 下一轮再次组装系统提示词
+    then: 技能目录、技能路由、稳定前缀和系统提示词不再各记一条新的启动耗时，提示词正文与上一轮相同
+  - id: AC-2
+    given: 任务模式是快速模式，目录里有大量无关技能
+    when: 组装系统提示词
+    then: 提示词不列出整份技能目录，并说明要先搜索技能再加载
+  - id: AC-3
+    given: 技能披露是完整列表，目录里有很多很长的技能说明
+    when: 组装系统提示词
+    then: 写进提示词的技能清单有长度上限，并说明其余技能要用搜索技能找到；只有一只技能时仍然列出它
+  - id: AC-4
+    given: 上一轮已经组装过提示词
+    when: 最新用户消息发生变化
+    then: 技能路由再次发生，新提示词反映新的用户消息
+  - id: AC-5
+    given: 同一会话、同一折叠视图和同一记忆附录输入
+    when: 下一轮再次打包
+    then: 不再重做视图准备和记忆附录，也不再为这两步记启动耗时；折叠本身仍然发生

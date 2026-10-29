@@ -26,7 +26,11 @@ export function goalGateEnabled(env: NodeJS.ProcessEnv): boolean {
 }
 
 export function defaultGoalMaxTurns(env: NodeJS.ProcessEnv): number {
-  return Math.max(1, Math.min(100, envInt(env, 'RAW_AGENT_GOAL_MAX_TURNS', 25)));
+  const raw = env.RAW_AGENT_GOAL_MAX_TURNS;
+  if (raw == null || String(raw).trim() === '') return 0;
+  const n = envInt(env, 'RAW_AGENT_GOAL_MAX_TURNS', 0);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.min(100, Math.floor(n));
 }
 
 export function resolveGoalCondition(metadata: Record<string, unknown> | undefined): string | undefined {
@@ -199,10 +203,11 @@ export function createGoalGateFromMetadata(
   if (!goalGateEnabled(env)) return null;
   const condition = resolveGoalCondition(metadata);
   if (!condition) return null;
+  const capOn = metadata?.goalTurnCapEnabled === true;
   const maxTurnsRaw = metadata?.[GOAL_MAX_TURNS_META];
   const maxTurns =
-    typeof maxTurnsRaw === 'number' && maxTurnsRaw > 0
-      ? Math.floor(maxTurnsRaw)
+    capOn && typeof maxTurnsRaw === 'number' && maxTurnsRaw > 0
+      ? Math.min(100, Math.floor(maxTurnsRaw))
       : defaultGoalMaxTurns(env);
   const turnsRaw = metadata?.[GOAL_TURNS_USED_META];
   const initialTurns = typeof turnsRaw === 'number' && turnsRaw >= 0 ? Math.floor(turnsRaw) : 0;

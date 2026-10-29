@@ -27,7 +27,7 @@ export interface GoalSettingsStore {
 export function defaultGoalSettings(): GoalSettings {
   return {
     entityEnabled: true,
-    defaultMaxTurns: 25,
+    defaultMaxTurns: 0,
     allowHttpVerify: true,
     allowCommandVerify: false,
     updatedAt: nowIso()
@@ -39,7 +39,9 @@ export function normalizeGoalSettings(raw: Partial<GoalSettings> | null | undefi
   if (!raw || typeof raw !== 'object') return base;
   const maxTurns =
     typeof raw.defaultMaxTurns === 'number' && Number.isFinite(raw.defaultMaxTurns)
-      ? Math.max(1, Math.min(100, Math.floor(raw.defaultMaxTurns)))
+      ? raw.defaultMaxTurns <= 0
+        ? 0
+        : Math.max(1, Math.min(100, Math.floor(raw.defaultMaxTurns)))
       : base.defaultMaxTurns;
   return {
     entityEnabled: raw.entityEnabled !== false,

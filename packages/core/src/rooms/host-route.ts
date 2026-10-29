@@ -160,5 +160,7 @@ function assignAcceptedCollaborators(store: SqliteStateStore, roomId: string, bo
 }
 
 function speakerCap(store: SqliteStateStore, turn: RoutedTurn, collaboration: boolean): number {
-  return Math.min(readRoomSettings(store).maxWaveSpeakers, collaboration ? Math.max(1, (turn.maxBotTurns ?? 1) - 1) : Infinity);
+  const wave = readRoomSettings(store).maxWaveSpeakers;
+  const budget = turn.maxBotTurns && turn.maxBotTurns > 0 ? turn.maxBotTurns : Number.POSITIVE_INFINITY;
+  return Math.min(wave, collaboration ? Math.max(1, budget - 1) : Infinity);
 }

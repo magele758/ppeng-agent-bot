@@ -28,6 +28,9 @@ export function BotChildTaskStreamEntry({
             >
               {entry.excerpt}
             </button>
+            {entry.status === 'running' ? (
+              <span className="child-task-stream__status" data-testid="bot-child-task-stream-status">{t('play.childTask.running')}</span>
+            ) : null}
           </li>
         ))}
       </ul>

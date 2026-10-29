@@ -1,4 +1,4 @@
-import { runtimeCapabilityCheck } from '../config/runtime-capabilities.js';
+import { RUNTIME_CAPABILITIES_KEY, runtimeCapabilityCheck } from '../config/runtime-capabilities.js';
 import { HISTORICAL_SUMMARY_NOTICE } from '../session/context-sources.js';
 import { toolDirectory } from '../tools/tool-exposure.js';
 import {readBotSkillSelection, selectBotSkills} from '../skills/bot-selection.js';
@@ -33,6 +33,7 @@ import {
 } from '../skills/skill-settings.js';
 import type { SqliteStateStore } from '../storage.js';
 import { compileTurnAppendix, compileTurnAppendixAsync } from '../session/context-compiler.js';
+import { emitStartupPhase } from '../observability/startup-phase.js';
 import { applyJevSkillSelect } from '../jev/apply.js';
 import { chainHas, resolveJevChain } from '../jev/settings.js';
 import { isPtcSession, orchestrationReplayFromSession } from '../ptc/mode.js';
@@ -42,7 +43,8 @@ import { normalizeSavedOrchestration } from '../ptc/orchestration.js';
 import {
   filterSkillsByScope,
   requestedSkillNames,
-  runProfileFromSession
+  runProfileFromSession,
+  type TaskMode
 } from '../runtime/run-profile.js';
 import { EXTERNAL_FENCE_SYSTEM_SENTENCE } from '../safety/external-content.js';
 import { textSummaryFromParts } from './model-adapters.js';
@@ -55,6 +57,19 @@ import type {
 } from '../types.js';
 
 const { HARNESS_ARTIFACT_DIR, HARNESS_ARTIFACT_FILES } = await import('../types.js');
+function timePromptSlice<T>(sessionId: string, phase: string, run: () => T, extra?: { skillCount?: number }): T {
+  const started = Date.now();
+  try {
+    return run();
+  } finally {
+    emitStartupPhase(sessionId, {
+      phase,
+      scope: 'prompt',
+      durationMs: Date.now() - started,
+      ...extra
+    });
+  }
+}
 
 /**
  * Observability fingerprint for the stable system prefix.
@@ -180,17 +195,64 @@ function scoringModeForSearch(mode: SkillRoutingMode): SkillRoutingMode {
   return mode === 'legacy' ? 'hybrid' : mode;
 }
 
+/** Full disclosure stays inside the pinned prefix instead of listing every description. */
+const SKILL_CATALOG_PROMPT_CHAR_CAP = 8000;
+
+function skillLine(skill: SkillSpec): string {
+  return `- ${skill.name}${skill.ownerBotId ? ` (Bot ${skill.ownerBotId}, id: ${skill.id})` : ''}: ${skill.description}`;
+}
+
 function buildFullSkillBlock(skills: SkillSpec[], routing: SkillRoutingResult): string {
-  const skillLines = skills.map((s) => `- ${s.name}${s.ownerBotId ? ` (Bot ${s.ownerBotId}, id: ${s.id})` : ""}: ${s.description}`).join('\n');
+  const listed: SkillSpec[] = [];
+  let used = 'Available skills:'.length;
+  for (const skill of skills) {
+    const line = skillLine(skill);
+    if (listed.length > 0 && used + line.length + 1 > SKILL_CATALOG_PROMPT_CHAR_CAP) break;
+    listed.push(skill);
+    used += line.length + 1;
+  }
+  const omitted = skills.length - listed.length;
+  const listedNames = new Set(listed.map((skill) => skill.name));
   const matchedLines = routing.keywordMatched
-    .map((s) => `- ${s.name}: ${s.promptFragment ?? s.description}`)
+    .filter((skill) => listedNames.has(skill.name))
+    .map((skill) => `- ${skill.name}: ${skill.promptFragment ?? skill.description}`)
     .join('\n');
   return [
     'Available skills:',
-    skillLines || '(none)',
-    routing.keywordMatched.length > 0 ? `Matched guidance:\n${matchedLines}` : 'No matched guidance.',
-    'Call load_skill(name) for full SKILL.md. You may also call search_skills(query) to rank the catalog.'
+    listed.map(skillLine).join('\n') || '(none)',
+    matchedLines ? `Matched guidance:\n${matchedLines}` : 'No matched guidance.',
+    omitted > 0
+      ? `${omitted} more skills are not listed. Call search_skills(query), then load_skill(name).`
+      : 'Call load_skill(name) for full SKILL.md. You may also call search_skills(query) to rank the catalog.'
   ].join('\n\n');
+}
+
+/** Fast turns do not list the catalog. Specialized modes do not dump full disclosure. */
+function disclosureForTaskMode(mode: TaskMode, saved: SkillDisclosureMode): SkillDisclosureMode {
+  if (mode === 'fast') return 'lazy';
+  if (
+    saved === 'full' &&
+    (mode === 'planner' || mode === 'browser' || mode === 'computer' || mode === 'deep_research' || mode === 'teams')
+  ) {
+    return 'shortlist';
+  }
+  return saved;
+}
+
+const MODE_SKILL_HINT: Partial<Record<TaskMode, RegExp>> = {
+  planner: /plan|todo|spec/i,
+  browser: /browser|web/i,
+  computer: /computer|desktop/i,
+  deep_research: /research|paper/i,
+  teams: /team|delegat/i
+};
+
+function skillsForPrompt(skills: SkillSpec[], mode: TaskMode): SkillSpec[] {
+  if (mode === 'fast') return [];
+  const hint = MODE_SKILL_HINT[mode];
+  if (!hint) return skills;
+  const matched = skills.filter((skill) => hint.test(`${skill.name}\n${skill.description}`));
+  return matched.length > 0 ? matched : skills.slice(0, 8);
 }
 
 function buildShortlistSkillBlock(routing: SkillRoutingResult, strict: boolean): string {
@@ -268,6 +330,10 @@ export interface PromptBuilderDeps {
 
 export class PromptBuilder {
   private workspaceSkillsPromise?: Promise<SkillSpec[]>;
+  private skillGeneration = 0;
+  private readonly sessionSkillCache = new Map<string, { key: string; skills: SkillSpec[] }>();
+  private readonly stablePrefixCache = new Map<string, { key: string; text: string }>();
+  private readonly assembledBySession = new Map<string, { key: string; text: string; routing?: SkillRoutingResult }>();
   private readonly routingBySession = new Map<string, SkillRoutingResult>();
   private readonly searchHitsBySession = new Map<string, string[]>();
   /** Exposes last cognitive phase info by session (set externally by runtime). */
@@ -309,8 +375,36 @@ export class PromptBuilder {
   async skillsForSession(sessionId: string): Promise<SkillSpec[]> {
     const session = typeof this.deps.store.getSession === 'function' ? this.deps.store.getSession(sessionId) : undefined;
     const botId = sessionBotId(session?.metadata);
-    const visible = selectBotSkills(filterSkillsByBot(await this.allSkills(), botId), readBotSkillSelection(this.deps.store, botId));
-    return session ? filterSkillsByScope(visible, runProfileFromSession(session).skillScope, requestedSkillNames(session.metadata)) : visible;
+    const profile = session ? runProfileFromSession(session) : undefined;
+    const key = [
+      String(this.skillGeneration),
+      botId ?? '',
+      JSON.stringify(readBotSkillSelection(this.deps.store, botId)),
+      profile?.skillScope ?? '',
+      (session ? requestedSkillNames(session.metadata) : []).join(','),
+      (this.deps.extraSkills ?? []).map((skill) => `${skill.id}:${skill.description}`).join('|'),
+      JSON.stringify(this.deps.store.getDaemonControl?.(RUNTIME_CAPABILITIES_KEY) ?? null)
+    ].join('\0');
+    const hit = this.sessionSkillCache.get(sessionId);
+    if (hit?.key === key && this.workspaceSkillsPromise) return hit.skills;
+    const started = Date.now();
+    let skillCount = 0;
+    try {
+      const visible = selectBotSkills(filterSkillsByBot(await this.allSkills(), botId), readBotSkillSelection(this.deps.store, botId));
+      const skills = session && profile
+        ? filterSkillsByScope(visible, profile.skillScope, requestedSkillNames(session.metadata))
+        : visible;
+      skillCount = skills.length;
+      this.sessionSkillCache.set(sessionId, { key, skills });
+      return skills;
+    } finally {
+      emitStartupPhase(sessionId, {
+        phase: 'skill_catalog',
+        scope: 'prompt',
+        durationMs: Date.now() - started,
+        skillCount
+      });
+    }
   }
 
   async searchSkills(query: string, sessionId: string, limit?: number): Promise<SkillSearchHit[]> {
@@ -371,6 +465,33 @@ export class PromptBuilder {
    * Substantive wording changes must bump {@link STABLE_SYSTEM_VERSION}.
    */
   buildStablePrefix(ctx: PromptContext): string {
+    const key = this.stablePrefixKey(ctx);
+    const hit = this.stablePrefixCache.get(ctx.session.id);
+    if (hit?.key === key) return hit.text;
+    const text = timePromptSlice(ctx.session.id, 'stable_prefix', () => this.composeStablePrefix(ctx));
+    this.stablePrefixCache.set(ctx.session.id, { key, text });
+    return text;
+  }
+
+  private stablePrefixKey(ctx: PromptContext): string {
+    return [
+      ctx.agent.id,
+      ctx.agent.name,
+      ctx.agent.role,
+      ctx.agent.instructions,
+      ctx.agent.harnessRole ?? '',
+      [...ctx.agent.capabilities].sort().join(','),
+      ctx.repoRoot,
+      ctx.workspaceRoot ?? '',
+      JSON.stringify(ctx.workspaceRoots ?? []),
+      ctx.session.mode,
+      String(resolveDiscoveryEnabled(this.deps.store, process.env)),
+      toolDirectory(this.deps.store),
+      agenticSafetyAppendixScope(process.env)
+    ].join('\0');
+  }
+
+  private composeStablePrefix(ctx: PromptContext): string {
     const harnessLines: string[] = [];
     if (ctx.agent.harnessRole === 'planner') {
       harnessLines.push(
@@ -428,51 +549,66 @@ export class PromptBuilder {
 
   /** Build the dynamic per-turn block (todos, task, memory, skills). */
   async buildDynamicContext(ctx: PromptContext, messages: SessionMessage[]): Promise<string> {
+    const started = Date.now();
+    try {
     const profile = runProfileFromSession(ctx.session);
-    const skills = filterSkillsByAllowlist(
-      filterSkillsByScope(
-        await this.skillsForSession(ctx.session.id),
-        profile.skillScope,
-        requestedSkillNames(ctx.session.metadata)
+    const skills = skillsForPrompt(
+      filterSkillsByAllowlist(
+        filterSkillsByScope(
+          await this.skillsForSession(ctx.session.id),
+          profile.skillScope,
+          requestedSkillNames(ctx.session.metadata)
+        ),
+        readAllowedSkillNames(ctx.session.metadata)
       ),
-      readAllowedSkillNames(ctx.session.metadata)
+      profile.mode
+    );
+    const disclosure = disclosureForTaskMode(
+      profile.mode,
+      resolveSkillDisclosureMode({ store: this.deps.store, env: process.env })
     );
     const lastUser = [...messages].reverse().find((m) => m.role === 'user');
     const userText = textFromMessage(lastUser ?? { parts: [], role: 'user', id: '', sessionId: '', createdAt: '' });
     const config = this.getSkillRoutingSettings();
     const mode = config.routingMode;
     const topK = config.topK;
-    let routing = await buildSkillRoutingCooperative(userText, skills, { mode, topK, useFusion: config.fusion });
-    const shortlistCandidates = [
-      ...routing.routed.map((r) => ({
-        id: r.skill.id,
-        ownerBotId: r.skill.ownerBotId,
-        name: r.skill.name,
-        description: r.skill.description
-      })),
-      ...routing.keywordMatched
-        .filter((s) => !routing.shortlistNames.includes(s.name))
-        .map((s) => ({ name: s.name, description: s.description }))
-    ];
-    if (shortlistCandidates.length > 0) {
-      const kept = await applyJevSkillSelect(this.deps.store, userText, shortlistCandidates);
-      if (kept) {
-        const keep = new Set(kept);
-        routing = {
-          ...routing,
-          routed: routing.routed.filter((r) => keep.has(r.skill.name)),
-          keywordMatched: routing.keywordMatched.filter((s) => keep.has(s.name)),
-          shortlistNames: routing.shortlistNames.filter((n) => keep.has(n))
-        };
+    const routeStarted = Date.now();
+    let routing!: SkillRoutingResult;
+    try {
+      routing = await buildSkillRoutingCooperative(userText, skills, { mode, topK, useFusion: config.fusion });
+      const shortlistCandidates = [
+        ...routing.routed.map((r) => ({
+          id: r.skill.id,
+          ownerBotId: r.skill.ownerBotId,
+          name: r.skill.name,
+          description: r.skill.description
+        })),
+        ...routing.keywordMatched
+          .filter((s) => !routing.shortlistNames.includes(s.name))
+          .map((s) => ({ name: s.name, description: s.description }))
+      ];
+      if (shortlistCandidates.length > 0) {
+        const kept = await applyJevSkillSelect(this.deps.store, userText, shortlistCandidates);
+        if (kept) {
+          const keep = new Set(kept);
+          routing = {
+            ...routing,
+            routed: routing.routed.filter((r) => keep.has(r.skill.name)),
+            keywordMatched: routing.keywordMatched.filter((s) => keep.has(s.name)),
+            shortlistNames: routing.shortlistNames.filter((n) => keep.has(n))
+          };
+        }
       }
+    } finally {
+      emitStartupPhase(ctx.session.id, {
+        phase: 'skill_route',
+        scope: 'prompt',
+        durationMs: Date.now() - routeStarted,
+        skillCount: skills.length
+      });
     }
     this.routingBySession.set(ctx.session.id, routing);
-    const skillBlock = buildSkillCatalogBlock(
-      resolveSkillDisclosureMode({ store: this.deps.store, env: process.env }),
-      skills,
-      routing,
-      config.strictLoad
-    );
+    const skillBlock = buildSkillCatalogBlock(disclosure, skills, routing, config.strictLoad);
 
     const todoLine = ctx.session.todo.length > 0 ? JSON.stringify(ctx.session.todo) : 'No active todos.';
     const taskLine = ctx.task
@@ -511,6 +647,13 @@ export class PromptBuilder {
     return [taskLine, buildTaskContext(ctx.session, ctx.task), `Todos: ${todoLine}`, cognitiveLine, summaryLine, ptcBlock, replayBlock, dynToolsBlock, skillBlock]
       .filter(Boolean)
       .join('\n\n');
+    } finally {
+      emitStartupPhase(ctx.session.id, {
+        phase: 'dynamic_context',
+        scope: 'prompt',
+        durationMs: Date.now() - started
+      });
+    }
   }
 
   /**
@@ -543,9 +686,72 @@ export class PromptBuilder {
 
   /** Full system prompt = stable prefix + dynamic context (memory excluded). */
   async buildSystemPrompt(ctx: PromptContext, messages: SessionMessage[]): Promise<string> {
-    const stablePrefix = this.buildStablePrefix(ctx);
-    const dynamicContext = await this.buildDynamicContext(ctx, messages);
-    return [stablePrefix, dynamicContext, this.deps.runtimeInstructions?.(ctx.session.id)].filter(Boolean).join('\n\n---\n\n');
+    const skillSelect = chainHas(resolveJevChain(this.deps.store), 'skillSelect');
+    const skills = await this.skillsForSession(ctx.session.id);
+    const key = skillSelect ? '' : this.assembledPromptKey(ctx, messages, skills);
+    const hit = skillSelect ? undefined : this.assembledBySession.get(ctx.session.id);
+    if (hit && hit.key === key) {
+      if (hit.routing) this.routingBySession.set(ctx.session.id, hit.routing);
+      return hit.text;
+    }
+    const started = Date.now();
+    try {
+      const stablePrefix = this.buildStablePrefix(ctx);
+      const dynamicContext = await this.buildDynamicContext(ctx, messages);
+      const text = [stablePrefix, dynamicContext, this.deps.runtimeInstructions?.(ctx.session.id)].filter(Boolean).join('\n\n---\n\n');
+      if (!skillSelect) {
+        this.assembledBySession.set(ctx.session.id, {
+          key,
+          text,
+          routing: this.routingBySession.get(ctx.session.id)
+        });
+      }
+      return text;
+    } finally {
+      emitStartupPhase(ctx.session.id, {
+        phase: 'system_prompt',
+        scope: 'prompt',
+        durationMs: Date.now() - started
+      });
+    }
+  }
+
+  private assembledPromptKey(ctx: PromptContext, messages: SessionMessage[], skills: SkillSpec[]): string {
+    const profile = runProfileFromSession(ctx.session);
+    const lastUser = [...messages].reverse().find((message) => message.role === 'user');
+    const cognitive = this.lastCognitivePhaseBySession.get(ctx.session.id);
+    return [
+      this.stablePrefixKey(ctx),
+      String(this.skillGeneration),
+      profile.mode,
+      profile.skillScope,
+      profile.orchestration,
+      profile.orchestrationReplay,
+      String(profile.persistentMemory),
+      resolveSkillDisclosureMode({ store: this.deps.store, env: process.env }),
+      this.getSkillRoutingSettings().routingMode,
+      String(this.getSkillRoutingSettings().topK),
+      String(this.getSkillRoutingSettings().fusion),
+      String(this.getSkillRoutingSettings().strictLoad),
+      (readAllowedSkillNames(ctx.session.metadata) ?? []).join(','),
+      skills.map((skill) => `${skill.id}:${skill.name}:${skill.description}`).join('|'),
+      lastUser ? textFromMessage(lastUser) : '',
+      JSON.stringify(ctx.session.todo),
+      JSON.stringify(ctx.session.metadata?.taskContext ?? null),
+      ctx.task?.description ?? '',
+      String(ctx.session.metadata?.goalCondition ?? ''),
+      ctx.session.taskId ?? '',
+      ctx.session.summary ?? '',
+      String(messages.some((message) => message.key === 'compact-summary')),
+      ctx.task ? `${ctx.task.id}|${ctx.task.title}|${ctx.task.status}|${ctx.task.blockedBy.join(',')}` : '',
+      cognitive ? `${cognitive.phase}:${cognitive.confidence}` : '',
+      JSON.stringify(ctx.session.metadata?.ptcOrchestration ?? null),
+      String(isPtcSession(ctx.session)),
+      String(chainHas(resolveJevChain(this.deps.store), 'ptcDecide')),
+      String(resolveDynToolsEnabled(this.deps.store)),
+      this.deps.runtimeInstructions?.(ctx.session.id) ?? '',
+      String(compactSummaryMaxChars(process.env))
+    ].join('\0');
   }
 
   async allSkills(): Promise<SkillSpec[]> {
@@ -572,5 +778,8 @@ export class PromptBuilder {
   /** Reset cached workspace skills (e.g. after runtime reloads them). */
   invalidateSkillsCache(): void {
     this.workspaceSkillsPromise = undefined;
+    this.skillGeneration += 1;
+    this.sessionSkillCache.clear();
+    this.assembledBySession.clear();
   }
 }

@@ -1,4 +1,11 @@
 import { resolveBotWindowBudget } from '../session/history/window.js';
+
+/** Long chats get an LLM summary even while still under the token threshold. */
+export const LONG_SESSION_COMPACT_MESSAGES = 56;
+
+function compactForce(opts: { force?: boolean } | undefined, messageCount: number): boolean {
+  return opts?.force === true || messageCount >= LONG_SESSION_COMPACT_MESSAGES;
+}
 /**
  * Auto-compact + transcript archive, extracted from RawAgentRuntime.
  */
@@ -215,8 +222,9 @@ export async function autoCompactSession(
   }
 
   const session = host.store.getSession(context.session.id) ?? context.session;
+  const force = compactForce(opts, host.store.foldMessages(session.id).length);
   if (isCanonicalBotChat(session)) {
-    return compactCanonicalBot(host, context, opts);
+    return compactCanonicalBot(host, context, { ...opts, force });
   }
 
   const tokenThreshold = resolveHistoryTokenBudget(
@@ -228,7 +236,7 @@ export async function autoCompactSession(
     session: host.store.getSession(context.session.id) ?? context.session,
     agent: context.agent,
     tokenThreshold,
-    force: opts?.force,
+    force,
     summarize: async (older) => {
       const adapter = host.resolveModelAdapter?.(context.session) ?? host.modelAdapter;
       let summary: string;
@@ -293,7 +301,17 @@ async function compactCanonicalBot(
   opts?: { force?: boolean }
 ): Promise<{ replaced?: { startSeq: number; endSeq: number } }> {
   const session = host.store.getSession(context.session.id) ?? context.session;
+  const foldStarted = Date.now();
   const folded = host.store.foldMessages(session.id);
+  void host.emitTrace(session.id, {
+    kind: 'startup_phase',
+    payload: {
+      phase: 'compact_fold',
+      durationMs: Date.now() - foldStarted,
+      messageCount: folded.length,
+      tier: 'bot'
+    }
+  });
   if (isToolWaveOpen(folded)) {
     void host.emitTrace(session.id, {
       kind: 'compact_skipped',

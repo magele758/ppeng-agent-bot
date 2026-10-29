@@ -13,11 +13,31 @@ type Room = {
   botIds: string[];
   hostBotId: string;
   maxBotTurns: number;
+  turnCapEnabled?: boolean;
   maxToolCalls: number;
+  toolCapEnabled?: boolean;
   maxCostUsd: number;
+  costCapEnabled?: boolean;
   status: string;
 };
 type Turn={workRef?:RoomWorkReceiptData;id:string;status:string;botTurns:number;maxBotTurns:number;toolCalls?:number;costUsd?:number;costStatus?:string;terminationReason?:string;partialResult?:unknown};
+
+function enabledCapValue(enabled: boolean | undefined, value: number): number {
+  return enabled === true ? value : 0;
+}
+
+function roomCapPatch(room: Room) {
+  return {
+    title: room.title,
+    hostBotId: room.hostBotId,
+    maxBotTurns: enabledCapValue(room.turnCapEnabled, room.maxBotTurns),
+    turnCapEnabled: room.turnCapEnabled === true,
+    maxToolCalls: enabledCapValue(room.toolCapEnabled, room.maxToolCalls),
+    toolCapEnabled: room.toolCapEnabled === true,
+    maxCostUsd: enabledCapValue(room.costCapEnabled, room.maxCostUsd),
+    costCapEnabled: room.costCapEnabled === true,
+  };
+}
 type Message = {
   workReceipt?:RoomWorkReceiptData;
   id: string;
@@ -38,9 +58,6 @@ export function BotRooms({ bots, selectedRoomId, memberEditor = true, onOpenWork
   const [title, setTitle] = useState("");
   const [members, setMembers] = useState<string[]>([]);
   const [host, setHost] = useState("");
-  const [budget, setBudget] = useState(8);
-  const [maxToolCalls, setMaxToolCalls] = useState(100);
-  const [maxCostUsd, setMaxCostUsd] = useState(1);
   const [text, setText] = useState("");
   const [mentions, setMentions] = useState<string[]>([]);
   const [attachments, setAttachments] = useState("");
@@ -153,13 +170,7 @@ export function BotRooms({ bots, selectedRoomId, memberEditor = true, onOpenWork
     await modify(
       "",
       json(
-        {
-          title: room.title,
-          hostBotId: room.hostBotId,
-          maxBotTurns: room.maxBotTurns,
-          maxToolCalls: room.maxToolCalls,
-          maxCostUsd: room.maxCostUsd,
-        },
+        roomCapPatch(room),
         "PATCH",
       ),
     );
@@ -184,9 +195,6 @@ export function BotRooms({ bots, selectedRoomId, memberEditor = true, onOpenWork
                 title,
                 botIds: members,
                 hostBotId: host || members[0],
-                maxBotTurns: budget,
-                maxToolCalls,
-                maxCostUsd,
               }),
             )) as { room: Room };
             await load();
@@ -237,37 +245,6 @@ export function BotRooms({ bots, selectedRoomId, memberEditor = true, onOpenWork
                 ))}
             </select>
           </label>
-          <label>
-            {t("botWork.budget")}
-            <input
-              type="number"
-              min={1}
-              max={20}
-              value={budget}
-              onChange={(e) => setBudget(Number(e.target.value))}
-            />
-          </label>
-          <label>
-            {t("botWork.maxToolCalls")}
-            <input
-              type="number"
-              min={1}
-              max={10000}
-              value={maxToolCalls}
-              onChange={(e) => setMaxToolCalls(Number(e.target.value))}
-            />
-          </label>
-          <label>
-            {t("botWork.maxCostUsd")}
-            <input
-              type="number"
-              min={0.001}
-              max={1000}
-              step="any"
-              value={maxCostUsd}
-              onChange={(e) => setMaxCostUsd(Number(e.target.value))}
-            />
-          </label>
         </details>
         <button
           data-testid="room-create"
@@ -312,12 +289,18 @@ export function BotRooms({ bots, selectedRoomId, memberEditor = true, onOpenWork
             <label>
               {t("botWork.budget")}
               <input
+                type="checkbox"
+                checked={room.turnCapEnabled === true}
+                onChange={(e) => editRoom({ ...room, turnCapEnabled: e.target.checked, maxBotTurns: e.target.checked ? Math.max(1, room.maxBotTurns || 8) : 0 })}
+              />
+              <input
                 type="number"
                 min={1}
                 max={20}
-                value={room.maxBotTurns}
+                disabled={room.turnCapEnabled !== true}
+                value={enabledCapValue(room.turnCapEnabled, room.maxBotTurns)}
                 onChange={(e) =>
-                  editRoom({ ...room, maxBotTurns: Number(e.target.value) })
+                  editRoom({ ...room, turnCapEnabled: true, maxBotTurns: Number(e.target.value) })
                 }
               />
             <small>{t('play.groupSettings.turnsHelp')}</small>
@@ -325,27 +308,35 @@ export function BotRooms({ bots, selectedRoomId, memberEditor = true, onOpenWork
             <label>
               {t("botWork.maxToolCalls")}
               <input
+                type="checkbox"
+                checked={room.toolCapEnabled === true}
+                onChange={(e) => editRoom({ ...room, toolCapEnabled: e.target.checked, maxToolCalls: e.target.checked ? Math.max(1, room.maxToolCalls || 100) : 0 })}
+              />
+              <input
                 type="number"
                 min={1}
                 max={10000}
-                value={room.maxToolCalls ?? 100}
-                onChange={(e) =>
-                  editRoom({ ...room, maxToolCalls: Number(e.target.value) })
-                }
+                disabled={room.toolCapEnabled !== true}
+                value={enabledCapValue(room.toolCapEnabled, room.maxToolCalls)}
+                onChange={(e) => editRoom({ ...room, toolCapEnabled: true, maxToolCalls: Number(e.target.value) })}
               />
             <small>{t('play.groupSettings.toolsHelp')}</small>
             </label>
             <label>
               {t("botWork.maxCostUsd")}
               <input
+                type="checkbox"
+                checked={room.costCapEnabled === true}
+                onChange={(e) => editRoom({ ...room, costCapEnabled: e.target.checked, maxCostUsd: e.target.checked ? Math.max(0.01, room.maxCostUsd || 1) : 0 })}
+              />
+              <input
                 type="number"
-                min={0.001}
+                min={0.01}
                 max={1000}
                 step="any"
-                value={room.maxCostUsd ?? 1}
-                onChange={(e) =>
-                  editRoom({ ...room, maxCostUsd: Number(e.target.value) })
-                }
+                disabled={room.costCapEnabled !== true}
+                value={enabledCapValue(room.costCapEnabled, room.maxCostUsd)}
+                onChange={(e) => editRoom({ ...room, costCapEnabled: true, maxCostUsd: Number(e.target.value) })}
               />
             <small>{t('play.groupSettings.costHelp')}</small>
             </label>

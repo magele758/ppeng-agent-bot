@@ -311,3 +311,92 @@ test('a turn with no end timestamp does not show an end time [AC:turn-stats-end-
   assert.equal(blank[0], null);
   assert.equal(formatTurnFeedStatsLine(blank[0], endTimeLabels, 'zh'), null);
 });
+
+const SECRET = 'PLANTED_STARTUP_BODY_not_for_the_footer';
+
+test('turn footer shows startup total, slowest phase, and other slices without message text [AC:lab-startup-timing#AC-1] [AC:lab-startup-timing#AC-2]', () => {
+  const stats = buildTurnFeedStats({
+    messages: [
+      { role: 'user', createdAt: '2026-10-28T01:00:00.000Z' },
+      { role: 'assistant', createdAt: '2026-10-28T01:00:04.000Z' }
+    ],
+    traces: [
+      { kind: 'turn_start', ts: '2026-10-28T01:00:01.000Z' },
+      {
+        kind: 'startup_phase',
+        ts: '2026-10-28T01:00:01.200Z',
+        payload: {
+          phase: 'ready',
+          scope: 'kernel',
+          durationMs: 1200,
+          slowest: 'build_system_prompt',
+          slowestMs: 820,
+          phases: { build_system_prompt: 820, pack_turn: 210, ensure_mcp: 90 },
+          note: SECRET
+        }
+      },
+      {
+        kind: 'startup_phase',
+        ts: '2026-10-28T01:00:01.100Z',
+        payload: { phase: 'skill_catalog', scope: 'prompt', durationMs: 180, query: SECRET }
+      },
+      {
+        kind: 'turn_end',
+        ts: '2026-10-28T01:00:04.000Z',
+        payload: { usage: { inputTokens: 100, outputTokens: 20, totalTokens: 120 } }
+      }
+    ]
+  });
+  const line = formatTurnFeedStatsLine(stats[0], { elapsed: '执行', input: '输入', output: '输出', startup: '启动', slowest: '最慢' }, 'zh') ?? '';
+  assert.match(line, /执行 /);
+  assert.match(line, /启动 1\.2s/);
+  assert.match(line, /最慢 系统提示词 820ms/);
+  assert.match(line, /打包消息 210ms/);
+  assert.match(line, /技能目录 180ms/);
+  assert.equal(line.includes(SECRET), false);
+});
+
+test('a turn without startup keeps the existing stats line [AC:lab-startup-timing#AC-3]', () => {
+  const stats = buildTurnFeedStats({
+    messages: [
+      { role: 'user', createdAt: '2026-10-22T08:46:56.000Z' },
+      { role: 'assistant', createdAt: '2026-10-22T08:47:00.000Z' }
+    ],
+    traces: [
+      { kind: 'turn_start', ts: '2026-10-22T08:46:56.000Z' },
+      {
+        kind: 'turn_end',
+        ts: '2026-10-22T08:47:00.000Z',
+        payload: { usage: { inputTokens: 20_500, outputTokens: 275, totalTokens: 20_775 }, costUsd: 0.05 }
+      }
+    ]
+  });
+  const line = formatTurnFeedStatsLine(stats[0], endTimeLabels, 'zh') ?? '';
+  assert.match(line, /^执行 4s · 输入 20\.5k · 输出 275 · \$0\.050 · 会话结束 /);
+  assert.equal(line.includes('启动'), false);
+});
+
+test('English session stats name startup and the slowest phase in English [AC:lab-startup-timing#AC-4]', () => {
+  const stats = buildTurnFeedStats({
+    messages: [
+      { role: 'user', createdAt: '2026-10-28T01:00:00.000Z' },
+      { role: 'assistant', createdAt: '2026-10-28T01:00:04.000Z' }
+    ],
+    traces: [{
+      kind: 'startup_phase',
+      ts: '2026-10-28T01:00:01.000Z',
+      payload: {
+        phase: 'ready',
+        durationMs: 900,
+        slowest: 'ensure_mcp',
+        slowestMs: 700,
+        phases: { ensure_mcp: 700 }
+      }
+    }]
+  });
+  const line = formatTurnFeedStatsLine(stats[0], { startup: 'Startup', slowest: 'Slowest' }, 'en') ?? '';
+  assert.match(line, /Startup 900ms/);
+  assert.match(line, /Slowest MCP load 700ms/);
+  assert.equal(line.includes('启动'), false);
+  assert.equal(line.includes('最慢'), false);
+});

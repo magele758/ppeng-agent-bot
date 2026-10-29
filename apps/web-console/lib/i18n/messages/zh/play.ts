@@ -79,10 +79,10 @@ export const play = {
     allMembersUse: "适合：征求多方意见、方案比较或逐个收集进度。例：请每位成员各自报告今天的进展。",
     mentionRules: "点名规则：显式 @ 会优先限定本次参与者，引用回复也可能指定对象。全员模式下点名不会再广播给全体；任务协作从候选中选一名负责人，负责人仍可按需分工。找不到对应成员的 @ 不会唤起全体。",
     limitsHint: "限制一条消息触发的本次群聊执行，用来避免连续发言、反复调用工具造成过量消耗。不是整个群的累计额度，也不是成员各自定时任务的预算；普通使用可以保持默认。",
-    turnsHelp: "本次执行累计的 Bot 发言额度，不是每个 Bot 各有一份。",
-    toolsHelp: "本次执行累计的工具调用额度，成员共享使用。",
-    costHelp: "按可获得的模型用量估算。缺失价格或用量时可能不完整，不是账户扣费硬上限。",
-    limitsException: "全员模式未点名时，发言额度会自动扩展到至少覆盖全体成员。达到工具或费用额度后仍会停止后续执行；已产生的消耗不会撤销。",
+    turnsHelp: "默认不限。打开后，本次执行累计的 Bot 发言达到这个数就停。",
+    toolsHelp: "默认不限。打开后，本次执行的工具调用达到这个数就停。",
+    costHelp: "默认不限。打开后，按可获得的模型用量估算，达到这个金额就停。",
+    limitsException: "这些上限默认关闭。打开之后才会计入本次执行；已产生的消耗不会撤销。",
     basic: '基本信息',
     limits: '运行限制',
     activity: '群聊运行状态',
@@ -348,7 +348,7 @@ export const play = {
   chrome: {
     goalMet: '目标已达成',
     goalOpen: '目标进行中',
-    feedStatsAria: '本轮执行时间、用量与结束时间',
+    feedStatsAria: '本轮执行时间、用量、结束时间与启动耗时',
     autonomyTitle: '自主度 / permissionMode',
     costTitle: '累计成本估算',
     noGoal: '未设置目标',
@@ -386,7 +386,7 @@ export const play = {
     repetition: '复读保护',
     reasoning_spin: '思考空转',
     loop_guard_critical: '循环保护',
-    tool_loop: '工具循环',
+    tool_loop: '同一调用连续失败',
     repeat_detection: '重复检测：同一批工具被反复调用',
     missing_assistant: '缺少助手回复',
     before_turn_blocked: '开轮被拦截',
@@ -399,7 +399,9 @@ export const play = {
     input: '输入',
     output: '输出',
     ended: '结束',
-    sessionEnded: '会话结束'
+    sessionEnded: '会话结束',
+    startup: '启动',
+    slowest: '最慢'
   },
 
   composer: {
@@ -984,7 +986,8 @@ export const play = {
   childTask: {
     owner: '属于{name}',
     streamLabel: '子任务',
-    streamOpen: '打开这条子任务：{excerpt}'
+    streamOpen: '打开这条子任务：{excerpt}',
+    running: '正在执行'
   },
 
   goalUpdate: {
