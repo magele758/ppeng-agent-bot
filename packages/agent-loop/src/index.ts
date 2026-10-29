@@ -455,6 +455,8 @@ export {
   hasRequestSmartModeApproval,
   isAutoReviewSubject,
   isHighRiskAutoReviewCall,
+  normalizeAuthorizedBy,
+  readAuthorizedBy,
   readSmartModeBlockReason,
   shellCommandIsHighRisk,
   stripAutoReviewFlags,

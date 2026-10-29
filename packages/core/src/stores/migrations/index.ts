@@ -1037,6 +1037,16 @@ export const MIGRATIONS: Migration[] = [
   up(db) {
     db.exec('CREATE TABLE IF NOT EXISTS session_message_sources(message_id TEXT PRIMARY KEY REFERENCES session_messages(id) ON DELETE CASCADE, session_id TEXT NOT NULL, source_id TEXT NOT NULL); CREATE INDEX IF NOT EXISTS idx_message_source ON session_message_sources(session_id,source_id)');
   }
+  },
+  {
+    version: 36,
+    description: 'approvals.authorized_by_json cites owner message or card ids on a receipt',
+    up: (db) => {
+      if (!hasTable(db, 'approvals')) return;
+      if (!hasColumn(db, 'approvals', 'authorized_by_json')) {
+        db.exec(`ALTER TABLE approvals ADD COLUMN authorized_by_json TEXT`);
+      }
+    }
   }
 ];
 

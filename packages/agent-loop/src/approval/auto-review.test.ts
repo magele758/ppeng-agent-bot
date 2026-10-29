@@ -4,6 +4,8 @@ import {
   evaluateAutoReview,
   hasRequestSmartModeApproval,
   isHighRiskAutoReviewCall,
+  normalizeAuthorizedBy,
+  readAuthorizedBy,
   stripAutoReviewFlags,
 } from './auto-review.js';
 import {
@@ -29,6 +31,17 @@ function host(overrides: Partial<ToolLoopHost> = {}): ToolLoopHost & {
     },
     listApprovals: () => approvals,
     createApproval: (input) => {
+      const pending = approvals.find(
+        (row) =>
+          row.status === 'pending' &&
+          row.sessionId === input.sessionId &&
+          Boolean(row.idempotencyKey) &&
+          row.idempotencyKey === input.idempotencyKey
+      );
+      if (pending) {
+        if (input.authorizedBy?.length && !pending.authorizedBy?.length) pending.authorizedBy = [...input.authorizedBy];
+        return pending;
+      }
       const row = {
         id: `ap-${approvals.length + 1}`,
         sessionId: input.sessionId,
@@ -39,6 +52,7 @@ function host(overrides: Partial<ToolLoopHost> = {}): ToolLoopHost & {
         idempotencyKey: input.idempotencyKey,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        ...(input.authorizedBy?.length ? { authorizedBy: [...input.authorizedBy] } : {}),
       } as ApprovalRecord;
       approvals.push(row);
       return row;
@@ -80,7 +94,13 @@ describe('auto-review classifier', () => {
     expect(isHighRiskAutoReviewCall('bash', { command: 'ls' })).toBe(false);
     expect(isHighRiskAutoReviewCall('mcp_invoke', { server: 0, tool: 'x' })).toBe(true);
     expect(hasRequestSmartModeApproval({ requestSmartModeApproval: true })).toBe(true);
-    expect(stripAutoReviewFlags({ command: 'rm -rf x', requestSmartModeApproval: true, smartModeBlockReason: 'prior' })).toEqual({
+    expect(stripAutoReviewFlags({
+      command: 'rm -rf x',
+      requestSmartModeApproval: true,
+      smartModeBlockReason: 'prior',
+      authorizedBy: ['tNu1'],
+      authorized_by: ['tNsM2'],
+    })).toEqual({
       command: 'rm -rf x',
     });
     const key = autoReviewIdempotencyKey('bash', { command: 'rm -rf x' }, (n, i) => `${n}:${JSON.stringify(i)}`);
@@ -210,6 +230,159 @@ describe('checkToolApprovals Auto-review gate', () => {
     expect(checkToolApprovals(h, tools, [flagged], ctx, undefined, session, undefined)).toBe('waiting');
     expect(h.approvals[0]?.reason).toContain('Auto-review (mcp)');
     expect(h.approvals[0]?.reason).toContain(decision.blockReason);
+  });
+
+  it('stores cited owner ids on the receipt and keeps them after approval [AC:auto-review-authorized-by#AC-1]', () => {
+    const h = host();
+    const flagged = call(
+      'bash',
+      {
+        command: 'rm -rf ./build',
+        requestSmartModeApproval: true,
+        authorizedBy: ['tNuowner', 'tNsMcard'],
+      },
+      'c-cite'
+    );
+    expect(checkToolApprovals(h, tools, [flagged], ctx, undefined, session, undefined)).toBe('waiting');
+    expect(h.approvals).toHaveLength(1);
+    expect(h.approvals[0]?.authorizedBy).toEqual(['tNuowner', 'tNsMcard']);
+    expect(h.approvals[0]?.args).toEqual({ command: 'rm -rf ./build' });
+    h.approvals[0]!.status = 'approved';
+    expect(h.approvals[0]?.authorizedBy).toEqual(['tNuowner', 'tNsMcard']);
+    expect(checkToolApprovals(h, tools, [flagged], ctx, undefined, session, undefined)).toBe('proceed');
+    expect(h.approvals).toHaveLength(1);
+  });
+
+  it('fills a pending receipt from a later authorized_by citation [AC:auto-review-authorized-by#AC-1]', () => {
+    const h = host();
+    const first = call(
+      'mcp_invoke',
+      { server: 0, tool: 'delete_all', requestSmartModeApproval: true },
+      'c-mcp-open'
+    );
+    expect(checkToolApprovals(h, tools, [first], ctx, undefined, session, undefined)).toBe('waiting');
+    expect(h.approvals[0]?.authorizedBy).toBeUndefined();
+    expect(checkToolApprovals(h, tools, [first], ctx, undefined, session, undefined)).toBe('waiting');
+    expect(h.approvals).toHaveLength(1);
+    expect(h.approvals[0]?.authorizedBy).toBeUndefined();
+    const cited = call(
+      'mcp_invoke',
+      {
+        server: 0,
+        tool: 'delete_all',
+        requestSmartModeApproval: true,
+        authorized_by: ['p-parent', 'tNuowner'],
+      },
+      'c-mcp-cite'
+    );
+    expect(checkToolApprovals(h, tools, [cited], ctx, undefined, session, undefined)).toBe('waiting');
+    expect(h.approvals).toHaveLength(1);
+    expect(h.approvals[0]?.authorizedBy).toEqual(['p-parent', 'tNuowner']);
+    expect(h.approvals[0]?.args).toEqual({ server: 0, tool: 'delete_all' });
+    const other = call(
+      'mcp_invoke',
+      {
+        server: 0,
+        tool: 'delete_all',
+        requestSmartModeApproval: true,
+        authorizedBy: ['tNuother'],
+      },
+      'c-mcp-other'
+    );
+    expect(checkToolApprovals(h, tools, [other], ctx, undefined, session, undefined)).toBe('waiting');
+    expect(h.approvals).toHaveLength(1);
+    expect(h.approvals[0]?.authorizedBy).toEqual(['p-parent', 'tNuowner']);
+  });
+
+  it('omits the citation when the call does not provide one [AC:auto-review-authorized-by#AC-2]', () => {
+    const h = host();
+    const flagged = call('bash', { command: 'rm -rf ./build', requestSmartModeApproval: true }, 'c-omit');
+    expect(checkToolApprovals(h, tools, [flagged], ctx, undefined, session, undefined)).toBe('waiting');
+    expect(h.approvals[0]?.authorizedBy).toBeUndefined();
+    h.approvals[0]!.status = 'approved';
+    expect(checkToolApprovals(h, tools, [flagged], ctx, undefined, session, undefined)).toBe('proceed');
+    expect(h.approvals).toHaveLength(1);
+    expect(h.approvals[0]?.authorizedBy).toBeUndefined();
+  });
+
+  it('keeps at most four unique stable ids in first-seen order [AC:auto-review-authorized-by#AC-3]', () => {
+    const h = host();
+    const flagged = call(
+      'bash',
+      {
+        command: 'rm -rf ./build',
+        requestSmartModeApproval: true,
+        authorizedBy: [' tNu1 ', '', 'tNu1', 'not an id', 2, 'tNsM2', 'p-3', 'tNu4', 'tNu5'],
+      },
+      'c-cap'
+    );
+    expect(checkToolApprovals(h, tools, [flagged], ctx, undefined, session, undefined)).toBe('waiting');
+    expect(h.approvals[0]?.authorizedBy).toEqual(['tNu1', 'tNsM2', 'p-3', 'tNu4']);
+    expect(h.approvals[0]?.args).toEqual({ command: 'rm -rf ./build' });
+    expect(normalizeAuthorizedBy(['', 'not an id'])).toBeUndefined();
+    expect(normalizeAuthorizedBy('tNu1')).toBeUndefined();
+    expect(normalizeAuthorizedBy([])).toBeUndefined();
+    expect(readAuthorizedBy(null)).toBeUndefined();
+    expect(readAuthorizedBy([])).toBeUndefined();
+    expect(readAuthorizedBy({ authorized_by: [' p-1 ', 'p-1', 'tNu2'] })).toEqual(['p-1', 'tNu2']);
+  });
+
+  it('ignores the citation when fingerprinting an approved receipt [AC:auto-review-authorized-by#AC-4]', () => {
+    const hash = (name: string, input: unknown) => `${name}:${JSON.stringify(input)}`;
+    const plain = evaluateAutoReview({
+      toolName: 'bash',
+      toolInput: { command: 'rm -rf ./build', requestSmartModeApproval: true },
+    });
+    const cited = evaluateAutoReview({
+      toolName: 'bash',
+      toolInput: { command: 'rm -rf ./build', requestSmartModeApproval: true, authorizedBy: ['tNu1'] },
+    });
+    expect(plain.action).toBe('require_card');
+    expect(cited.action).toBe('require_card');
+    if (plain.action !== 'require_card' || cited.action !== 'require_card') return;
+    expect(cited.fingerprintInput).toEqual(plain.fingerprintInput);
+    expect(cited.fingerprintInput).toEqual({ command: 'rm -rf ./build' });
+    expect(autoReviewIdempotencyKey('bash', cited.fingerprintInput, hash)).toBe(
+      autoReviewIdempotencyKey('bash', plain.fingerprintInput, hash)
+    );
+    expect(stripAutoReviewFlags({ command: 'rm -rf ./build', authorizedBy: ['tNu9'], authorized_by: ['p-x'] })).toEqual({
+      command: 'rm -rf ./build',
+    });
+    const h = host();
+    const flagged = call(
+      'bash',
+      { command: 'rm -rf ./build', requestSmartModeApproval: true, authorizedBy: ['tNu1'] },
+      'c-fp'
+    );
+    expect(checkToolApprovals(h, tools, [flagged], ctx, undefined, session, undefined)).toBe('waiting');
+    h.approvals[0]!.status = 'approved';
+    const other = call('bash', { command: 'rm -rf ./build', authorizedBy: ['tNsM9'] }, 'c-fp-2');
+    expect(checkToolApprovals(h, tools, [other], ctx, undefined, session, undefined)).toBe('proceed');
+    expect(h.approvals).toHaveLength(1);
+    expect(h.approvals[0]?.authorizedBy).toEqual(['tNu1']);
+  });
+
+  it('does not let a citation skip Auto-review [AC:auto-review-authorized-by#AC-5]', () => {
+    const h = host();
+    const citedOnly = call('bash', { command: 'rm -rf ./build', authorizedBy: ['tNu1'] }, 'c-nobypass');
+    expect(checkToolApprovals(h, tools, [citedOnly], ctx, undefined, session, undefined)).toBe('skip');
+    expect(h.approvals).toHaveLength(0);
+    const decision = evaluateAutoReview({
+      toolName: 'bash',
+      toolInput: { command: 'rm -rf ./build', authorizedBy: ['tNu1'] },
+    });
+    expect(decision.action).toBe('soft_block');
+    const bypass = { id: 's1', metadata: { permissionMode: 'bypass' } } as unknown as SessionRecord;
+    expect(checkToolApprovals(h, tools, [citedOnly], ctx, undefined, bypass, undefined)).toBe('skip');
+    expect(h.approvals).toHaveLength(0);
+    const flagged = call(
+      'bash',
+      { command: 'rm -rf ./build', requestSmartModeApproval: true, authorizedBy: ['tNu1'] },
+      'c-still-card'
+    );
+    expect(checkToolApprovals(h, tools, [flagged], ctx, undefined, bypass, undefined)).toBe('waiting');
+    expect(h.approvals).toHaveLength(1);
+    expect(h.approvals[0]?.status).toBe('pending');
   });
 
   it('does not let permissionMode=bypass skip Auto-review [AC:auto-review-shell-mcp#AC-5]', () => {

@@ -1,0 +1,32 @@
+id: auto-review-authorized-by
+title: Auto-review 批准回执记录授权引用
+status: implemented
+requirement: |
+  Persist authorizedBy: string[] on approval / Auto-review receipts (批准回执). When a high-risk tool call is escalated or approved under an owner authorization chain, the stored approval/receipt must record which owner message/card ids authorized it — Grok-aligned audit trail, not a UI clone.
+  Tools that mutate under owner authority accept optional authorizedBy: string[] (max 4): owner message ids (e.g. tNu…) and/or answered-card ids (e.g. tNsM…).
+  A helper/subagent may only cite p-prefixed ids it was given by its parent (do not invent or scrape chat history for ids).
+  When Auto-review creates / resolves an approval receipt for a high-risk Shell/MCP call, persist the cited authorizedBy on that receipt so later audit can answer "which owner messages authorized this?".
+  Missing authorizedBy must remain legal (omit / empty); do not break existing approve flows.
+  Do not treat authorizedBy as a bypass of Auto-review: soft-block → card → approve still required for high-risk calls. authorizedBy is an audit citation, not a skip-gate flag.
+notes: 'assumedApproval: standing-order-2026-10-22. Citation is stored on the receipt and ignored by the fingerprint. It does not skip soft-block or the approval card. Helpers are not given a history scrape; only ids present on the tool input are kept, including parent-supplied p-prefixed ids.'
+criteria:
+  - id: AC-1
+    given: 一次高危 Shell 或 MCP 调用带着审批升级标志，并引用了负责人消息或已回答卡片的 id
+    when: 运行时建立待审批回执，且之后该回执被批准
+    then: 待审批回执和批准后的回执都记下这些 id，再次读出审批仍能看到同一组引用
+  - id: AC-2
+    given: 一次高危调用带着审批升级标志，但没有给出授权引用
+    when: 运行时建立待审批回执并完成批准
+    then: 回执上不出现授权引用，原有的批准流程仍然可用
+  - id: AC-3
+    given: 调用给出的授权引用超过 4 条，或夹有空白、重复和非 id
+    when: 回执保存这次引用
+    then: 只留下至多 4 个去重后的稳定 id，顺序与首次出现一致
+  - id: AC-4
+    given: 两次高危调用的实质参数相同，只有授权引用不同或一边没有引用
+    when: 判断是否为同一次待审批动作，或在已批准后再次调用
+    then: 指纹不受引用影响，批准后仍按同一回执放行，不会因为引用不同另开一张卡
+  - id: AC-5
+    given: 高危调用带了授权引用，但没有审批升级标志，或会话权限模式为 bypass
+    when: 运行时做 Auto-review 门闩
+    then: 引用不能当成放行开关，仍然先拦住或出卡，不能跳过 Auto-review

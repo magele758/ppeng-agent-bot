@@ -162,6 +162,8 @@ Jev 不是 SDK 模块：未配置入口时宿主不调用它，SDK 接入参数�
 
 `ApprovalRecord`（`src/types.ts`）可带 `expiresAt` / `expireReason` / `wakeSource`。这三个字段只描述产品层的无人值守审批：cron、Bot routine、调度等唤醒会写入截止时间；人坐在 Lab 对话里提起的审批不写。到点后由产品层把审批拒绝并记上 `expireReason`，且不执行该工具。循环内核创建审批时只透传字段，不解释超时、也不因为超时改控制流。
 
+`ApprovalRecord.authorizedBy` 是可选字符串数组，最多 4 个。高危 Shell/MCP 出卡，或给一张还没有引用的待审批回执补记时，把工具输入里的 `authorizedBy` / `authorized_by` 规范化后写入回执：去掉空白、重复和非 id，保留首次出现顺序。没给就省略，不写成空数组。指纹参数仍不含这条引用，也不含升级标志。引用不是放行开关：没有 `requestSmartModeApproval` 时照旧 soft-block；`permissionMode=bypass` 也不能凭引用绕过。子代理只能提交父级已经交给它的、以 `p` 开头的 id；运行时不翻聊天记录，也不编造 id。批准之后这条引用留在回执上。`normalizeAuthorizedBy` / `readAuthorizedBy` 是这对行为的公开纯函数。
+
 ### 2.6 L4 句柄控制契约（`AgentLoopHandle`）
 - `handle.step()`：执行单个细粒度步骤（单步调试或受控推演）。
 - `handle.run()`：连续循环运行直到会话挂起（waiting_approval / ended / error）。

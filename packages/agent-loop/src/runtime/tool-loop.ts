@@ -45,6 +45,7 @@ import {
 import {
   autoReviewIdempotencyKey,
   evaluateAutoReview,
+  readAuthorizedBy,
 } from '../approval/auto-review.js';
 
 // ============================================================================
@@ -107,6 +108,8 @@ export interface ToolLoopHost {
     reason: string;
     args: Record<string, unknown>;
     idempotencyKey?: string;
+    /** Audit citation. Omitted when the caller did not cite any ids. */
+    authorizedBy?: string[];
   }): ApprovalRecord;
   deleteApproval(id: string): void;
   getTask(taskId: string): ToolTaskRecord | undefined;
@@ -342,6 +345,26 @@ export function filterValidToolCalls(
   return valid;
 }
 
+function approvalCitation(toolInput: unknown): { authorizedBy?: string[] } {
+  const authorizedBy = readAuthorizedBy(toolInput);
+  return authorizedBy ? { authorizedBy } : {};
+}
+
+/** Fill a pending receipt that was opened before the caller cited owner ids. */
+function citeAuthorizedBy(host: ToolLoopHost, existing: ApprovalRecord, toolInput: unknown): void {
+  const authorizedBy = readAuthorizedBy(toolInput);
+  if (!authorizedBy || existing.authorizedBy?.length || !existing.idempotencyKey) return;
+  const saved = host.createApproval({
+    sessionId: existing.sessionId,
+    toolName: existing.toolName,
+    reason: existing.reason,
+    args: existing.args,
+    idempotencyKey: existing.idempotencyKey,
+    authorizedBy,
+  });
+  if (saved.authorizedBy?.length) existing.authorizedBy = saved.authorizedBy;
+}
+
 // ============================================================================
 // Approval check
 // ============================================================================
@@ -464,6 +487,7 @@ export function checkToolApprovals(
       continue;
     }
     if (existing?.status === 'pending') {
+      citeAuthorizedBy(host, existing, tc.input);
       waiting = true;
       continue;
     }
@@ -475,6 +499,7 @@ export function checkToolApprovals(
         reason: decision.reason,
         args: decision.fingerprintInput,
         idempotencyKey: idemKey,
+        ...approvalCitation(tc.input),
       });
       waiting = true;
       continue;
