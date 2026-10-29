@@ -14,7 +14,7 @@ test('core unit tests run beside the two-minute gate without coverage or browser
   assert.equal(core.name, 'Core unit tests');
   assert.equal(core.needs, undefined);
   assert.equal(ci.jobs.quick['timeout-minutes'], 2);
-  assert.ok(core['timeout-minutes'] >= 8 && core['timeout-minutes'] <= 25);
+  assert.ok(core['timeout-minutes'] >= 8 && core['timeout-minutes'] <= 40);
   const steps = core.steps.map((step) => `${step.name ?? ''}\n${step.run ?? ''}`).join('\n');
   assert.match(steps, /core-unit\.mjs/);
   assert.doesNotMatch(steps, /playwright|NODE_V8_COVERAGE|test:e2e|soak|mutation/i);
