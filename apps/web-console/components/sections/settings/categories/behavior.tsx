@@ -2,6 +2,7 @@ import { AgentLoopSettingsCard } from '../../../AgentLoopSettingsCard';
 import { InputSuggestionSettingsCard } from '../../../InputSuggestionSettingsCard';
 import { SessionRecapSettingsCard } from '../../../SessionRecapSettingsCard';
 import { GoalSettingsCard } from '../../../GoalSettingsCard';
+import { DeliveryQuietHoursSettingsCard } from '../../../DeliveryQuietHoursSettingsCard';
 import { BotLimits } from '../../../bot-work/BotLimits';
 import type { SettingsEntry } from '../registry';
 
@@ -40,5 +41,12 @@ export const behaviorEntries: SettingsEntry[] = [
     titleKey: 'settingsEntries.goal.title',
     keywordsKey: 'settingsEntries.goal.keywords',
     render: () => <GoalSettingsCard />
+  },
+  {
+    id: 'deliveryQuietHours',
+    category: 'behavior',
+    titleKey: 'settingsEntries.deliveryQuietHours.title',
+    keywordsKey: 'settingsEntries.deliveryQuietHours.keywords',
+    render: () => <DeliveryQuietHoursSettingsCard />
   }
 ];

@@ -442,6 +442,30 @@ export const settingsEntries = {
       }
     }
   },
+  deliveryQuietHours: {
+    title: '静默时段',
+    keywords: '静默 免打扰 安静时段 quiet hours 外发 暂缓 夜间 不立刻发送',
+    desc: '开启后，在你设定的本地时段里，发给别人的内容先暂存，时段结束后再发出。关闭时，或在时段之外，仍会立即发送。',
+    fields: {
+      enabled: {
+        label: '启用静默时段',
+        hint: '关闭后，已批准的外发会立即发送。'
+      },
+      startHour: {
+        label: '开始小时',
+        hint: '按所选时区的整点，0 到 23。从这一小时开始暂存，不含结束的那一小时。'
+      },
+      endHour: {
+        label: '结束小时',
+        hint: '结束小时早于开始小时时，时段跨过午夜。两者相同则没有静默窗口。'
+      },
+      timezone: {
+        label: '时区',
+        hint: 'IANA 时区名，例如 Asia/Shanghai。',
+        invalid: '请填写时区'
+      }
+    }
+  },
   eventLog: {
     title: '事件日志（EventLog / Saga）',
     keywords: '事件日志 saga eventlog 审计 记录 回放 轨迹 追溯 audit',
