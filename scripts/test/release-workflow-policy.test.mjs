@@ -45,7 +45,7 @@ test('npm and Docker publication require a successful release gate, including fo
 
 test('release gate retains deterministic test layers and does not tolerate failures', () => {
   const doc = workflow('release-gate');
-  assert.deepEqual(needs(doc.jobs.gate).sort(), ['acceptance', 'browser', 'compact-ab', 'crap', 'formal', 'harness', 'mutation', 'remote-model-smoke', 'sdk', 'secrets-gate', 'soak-performance', 'tests', 'unit']);
+  assert.deepEqual(needs(doc.jobs.gate).sort(), ['acceptance', 'browser', 'compact-ab', 'formal', 'harness', 'mutation', 'remote-model-smoke', 'sdk', 'secrets-gate', 'soak-performance', 'tests', 'unit']);
   assert.equal(doc.jobs.gate.if, '${{ !cancelled() }}');
   for (const job of Object.values(doc.jobs)) {
     assert.notEqual(job['continue-on-error'], true);
@@ -69,16 +69,12 @@ test('release gate retains deterministic test layers and does not tolerate failu
   const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
   assert.ok(pkg.scripts.ci.includes('pnpm run agent:eval:fast --exit-on-fail'));
   assert.equal(readFileSync(new URL('../../.nvmrc', import.meta.url), 'utf8').trim(), '22');
-  for (const job of [doc.jobs.tests, doc.jobs.crap, doc.jobs.acceptance, workflow('publish-npm').jobs.publish]) {
+  for (const job of [doc.jobs.tests, doc.jobs.acceptance, workflow('publish-npm').jobs.publish]) {
     const node = job.steps.find((step) => step.uses?.startsWith('actions/setup-node@'));
     assert.equal(node.with['node-version-file'], '.nvmrc');
   }
-  const coverageRuns = doc.jobs.crap.steps.map((step) => step.run ?? '').join('\n');
-  assert.doesNotMatch(coverageRuns,/vitest run|test:unit|test:formal/);
-  assert.match(coverageRuns,/validation-artifacts.mjs/);
+  assert.equal(doc.jobs.crap, undefined);
   assert.match(readFileSync('scripts/ci/validation-lane.mjs','utf8'),/--coverage.enabled/);
-  assert.match(coverageRuns, /crap-gate\.mjs/);
-  assert.doesNotMatch(coverageRuns, /--update-baseline|\|\|\s*true/);
 });
 
 test('Docker images are loaded and smoke-tested as a pair before any push, with no rebuild on publication', () => {
@@ -132,7 +128,7 @@ test('actual gate summary script accepts only success/success/success; failure, 
           });
           assert.equal(child.error, undefined);
           assert.match(child.stdout, /Harness \(non-blocking\): failure/);
-          assert.equal(child.status, tests === 'success' && crap === 'success' && acceptance === 'success' ? 0 : 1,
+          assert.equal(child.status, tests === 'success' && acceptance === 'success' ? 0 : 1,
             `tests=${tests} crap=${crap} acceptance=${acceptance}: ${child.stderr}`);
         }
       }

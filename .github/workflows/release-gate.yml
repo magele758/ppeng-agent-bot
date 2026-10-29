@@ -1,4 +1,4 @@
-# Independent coverage lanes; CRAP consumes verified artifacts without rerunning tests.
+# Independent coverage lanes. Complexity scoring no longer blocks release.
 name: Release gate
 on:
   workflow_call:
@@ -281,67 +281,6 @@ jobs:
           path: ${{ runner.temp }}/validation/sdk/results
           if-no-files-found: error
           retention-days: 7
-  crap:
-    name: CRAP gate (verified coverage artifacts)
-    needs:
-      - unit
-      - formal
-      - sdk
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: pnpm/action-setup@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Verify coverage toolchain
-        run: pnpm run test:crap --preflight
-      - name: TypeScript build (workspace packages)
-        run: node scripts/build-workspace.mjs
-      - name: Download unit coverage
-        uses: actions/download-artifact@v4
-        with:
-          name: validation-unit
-          path: ${{ runner.temp }}/validation/unit
-      - name: Download formal coverage
-        uses: actions/download-artifact@v4
-        with:
-          name: validation-formal
-          path: ${{ runner.temp }}/validation/formal
-      - name: Download sdk coverage
-        uses: actions/download-artifact@v4
-        with:
-          name: validation-sdk
-          path: ${{ runner.temp }}/validation/sdk
-      - name: Validate and merge complete coverage
-        run: node scripts/ci/validation-artifacts.mjs "$RUNNER_TEMP/validation" "$RUNNER_TEMP/merged-coverage"
-      - name: CRAP gate
-        run: node scripts/crap/crap-gate.mjs --node-cov "$RUNNER_TEMP/merged-coverage/node" --vitest-cov
-          "$RUNNER_TEMP/merged-coverage/vitest.json"
-      - name: Preserve crap-report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: crap-report
-          path: coverage/crap/
-          if-no-files-found: error
-          retention-days: 14
-      - name: Preserve coverage-reuse-evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-reuse-evidence
-          path: ${{ runner.temp }}/merged-coverage/verified-inputs.json
-          if-no-files-found: error
-          retention-days: 30
   acceptance:
     name: Acceptance criteria gate
     if: ${{ !cancelled() }}
@@ -350,7 +289,6 @@ jobs:
       - unit
       - formal
       - sdk
-      - crap
       - browser
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -421,7 +359,6 @@ jobs:
     timeout-minutes: 10
     needs:
       - tests
-      - crap
       - browser
       - secrets-gate
     if: ${{ github.event.repository.fork == false && needs.secrets-gate.outputs.has-key == 'true' }}
@@ -457,7 +394,6 @@ jobs:
   harness:
     needs:
       - tests
-      - crap
       - browser
       - secrets-gate
     if: ${{ github.event.repository.fork == false && needs.secrets-gate.outputs.has-harness-key == 'true' }}
@@ -469,7 +405,6 @@ jobs:
   compact-ab:
     needs:
       - tests
-      - crap
       - browser
       - secrets-gate
     if: ${{ github.event.repository.fork == false && needs.secrets-gate.outputs.has-key == 'true' }}
@@ -482,7 +417,6 @@ jobs:
       - soak-performance
       - tests
       - browser
-      - crap
       - acceptance
       - mutation
       - secrets-gate

@@ -49,12 +49,9 @@ async function fixtures(fn){
   }finally{rmSync(root,{recursive:true,force:true});}
 }
 
-test('CRAP consumes verified coverage from every lane without launching tests [AC:ci-parallel-validation#AC-5] [AC:ci-parallel-validation#AC-8]',()=>fixtures(({lib,root,identity,expected})=>{
+test('coverage lanes still produce reusable bundles without a blocking complexity job [AC:ci-parallel-validation#AC-5] [AC:ci-parallel-validation#AC-8] [AC:drop-blocking-crap#AC-2]',()=>fixtures(({lib,root,identity,expected})=>{
   const bundles=lib.readBundles({directory:root,identity,expected});assert.deepEqual(Object.keys(bundles).sort(),['formal','sdk','unit']);
-  const job=workflow('release-gate').jobs.crap;
-  assert.deepEqual([...job.needs].sort(),['formal','sdk','unit']);
-  const commands=job.steps.map(s=>s.run??'').join('\n');assert.match(commands,/validation-artifacts.mjs/);
-  assert.doesNotMatch(commands,/retry-failed-tests|vitest run|pnpm run test:unit|pnpm run test:formal|--update-baseline/);
+  assert.equal(workflow('release-gate').jobs.crap, undefined);
 }));
 
 test('coverage identity follows .nvmrc, so a Node 22 patch drift is not a different candidate [AC:ci-parallel-validation#AC-6]',async()=>{
@@ -80,7 +77,7 @@ test('missing coverage and overlapping inventories cannot produce a green aggreg
 test('full scope, baselines, two-hour cadence and release artifact requirements remain [AC:ci-parallel-validation#AC-1] [AC:ci-parallel-validation#AC-11] [AC:ci-parallel-validation#AC-13]',()=>{
   assert.equal(workflow('full-validation').on.schedule[0].cron,'17 */2 * * *');
   const ci=workflow('ci');assert.match(ci.jobs['release-gate'].if,/workflow_dispatch/);
-  const jobs=workflow('release-gate').jobs;for(const name of ['tests','browser','acceptance','mutation','secrets-gate','unit','formal','sdk','crap'])assert.ok(jobs.gate.needs.includes(name));
+  const jobs=workflow('release-gate').jobs;for(const name of ['tests','browser','acceptance','mutation','secrets-gate','unit','formal','sdk'])assert.ok(jobs.gate.needs.includes(name));assert.equal(jobs.gate.needs.includes('crap'), false);
   assert.ok(jobs.mutation.uses.includes('mutation.yml'));
   for(const name of ['publish-npm','docker-nightly'])assert.equal(workflow(name).jobs['release-gate'].uses,'./.github/workflows/release-gate.yml');
   const onsite=parse(readFileSync('acceptance/multi-machine-production-readiness.yaml','utf8'));
