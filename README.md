@@ -91,16 +91,16 @@ pnpm run agent:eval:fast --exit-on-fail
 
 This verifies HTTP capabilities, not real-model answer quality. For CLI/HTTP walkthroughs, continue with the [from-zero tutorial](doc/harness/from-zero/README.md). To start Next separately, set `DAEMON_PROXY_TARGET` to the actual daemon address; production UI commands are `pnpm run build:web-console` and `pnpm run start:web-console`.
 
-### Desktop Client (macOS / Windows / Linux)
+### Desktop Client (macOS / Linux)
 
-Electron app that bundles daemon + Lab. Local pack matches this machine:
+Electron app that bundles daemon + Lab. Local pack matches this machine when it is macOS or Linux:
 
 ```bash
 pnpm run build:desktop
-# Output: apps/desktop/release/RawAgent-<version>-<os>-<arch>.{dmg,exe,AppImage}
+# Output: apps/desktop/release/RawAgent-<version>-<os>-<arch>.{dmg,AppImage}
 ```
 
-CI builds five artifacts (macOS arm64, plus Windows and Linux × x64/arm64) daily at 17:00 UTC (01:00 Beijing), via Actions → **Desktop artifacts**, a `desktop-v*` tag (no GitHub Release), or a `v*` tag. Intel Mac (darwin x64) is not built. See [`doc/CI.md`](doc/CI.md) and [`apps/desktop/README.md`](apps/desktop/README.md).
+CI builds three artifacts (macOS arm64, plus Linux × x64/arm64) daily at 17:00 UTC (01:00 Beijing), via Actions → **Desktop artifacts**, a `desktop-v*` tag (no GitHub Release), or a `v*` tag. Windows and Intel Mac (darwin x64) are not built. See [`doc/CI.md`](doc/CI.md) and [`apps/desktop/README.md`](apps/desktop/README.md).
 
 ---
 

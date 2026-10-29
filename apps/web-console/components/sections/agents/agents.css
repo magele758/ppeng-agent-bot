@@ -70,7 +70,9 @@
   padding: var(--ui-space-3) var(--ui-space-4);
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-lg);
-  background: var(--ui-surface);
+  background: var(--glass-fill);
+  backdrop-filter: var(--glass-filter);
+  -webkit-backdrop-filter: var(--glass-filter);
   color: var(--ui-text);
   font: inherit;
   text-align: left;
@@ -141,7 +143,9 @@
   padding: var(--ui-space-4);
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-lg);
-  background: var(--ui-surface);
+  background: var(--glass-fill);
+  backdrop-filter: var(--glass-filter);
+  -webkit-backdrop-filter: var(--glass-filter);
   min-width: 0;
 }
 
@@ -357,7 +361,9 @@
   padding: var(--ui-space-2) var(--ui-space-3);
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-md);
-  background: var(--ui-bg);
+  background: var(--glass-fill);
+  backdrop-filter: var(--glass-filter);
+  -webkit-backdrop-filter: var(--glass-filter);
   color: var(--ui-text);
   font: inherit;
   text-align: left;
@@ -393,7 +399,9 @@
   padding: var(--ui-space-2) var(--ui-space-3);
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-md);
-  background: var(--ui-bg);
+  background: var(--glass-fill);
+  backdrop-filter: var(--glass-filter);
+  -webkit-backdrop-filter: var(--glass-filter);
 }
 
 .ag-task__dot {
@@ -459,7 +467,9 @@
   padding: var(--ui-space-2) var(--ui-space-3);
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-md);
-  background: var(--ui-bg);
+  background: var(--glass-fill);
+  backdrop-filter: var(--glass-filter);
+  -webkit-backdrop-filter: var(--glass-filter);
   font-size: var(--ui-text-sm);
 }
 

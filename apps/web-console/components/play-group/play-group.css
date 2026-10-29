@@ -186,6 +186,10 @@
   align-items: flex-end;
   padding: 10px 14px 14px;
   border-top: 1px solid var(--color-border-strong);
+  background: var(--glass-fill);
+  backdrop-filter: var(--glass-filter);
+  -webkit-backdrop-filter: var(--glass-filter);
+  border-color: var(--glass-edge);
   flex-shrink: 0;
 }
 
@@ -200,7 +204,10 @@
   list-style: none;
   max-height: 220px;
   overflow: auto;
-  background: var(--color-surface-base, #fff);
+  background: var(--glass-fill);
+  backdrop-filter: var(--glass-filter);
+  -webkit-backdrop-filter: var(--glass-filter);
+  border-color: var(--glass-edge);
   border: 1px solid var(--color-border-strong);
   border-radius: 8px;
 }
@@ -382,7 +389,9 @@
   display: grid;
   gap: 6px;
   padding: 0 0 8px;
-  background: var(--color-surface-base, var(--panel-bg, #fff));
+  background: var(--glass-fill);
+  backdrop-filter: var(--glass-filter);
+  -webkit-backdrop-filter: var(--glass-filter);
 }
 .play-group-member__model { font-size: 10px; color: var(--text-muted); overflow-wrap: anywhere; }
 .play-group-member > .bot-face { flex: 0 0 auto; width: 28px; height: 28px; }
@@ -423,7 +432,7 @@
 .room-settings-limits summary, .room-settings-activity summary { cursor: pointer; font-size: 13px; font-weight: 600; }
 .room-settings-limits > p { font-size: 12px; color: var(--text-muted); margin: 12px 0; }
 .room-settings-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.room-settings-panel .play-group-settings-save { top: auto; bottom: 0; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 12px 0 0; background: var(--ui-surface); }
+.room-settings-panel .play-group-settings-save { top: auto; bottom: 0; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 12px 0 0; background: var(--glass-fill); backdrop-filter: var(--glass-filter); -webkit-backdrop-filter: var(--glass-filter); }
 .room-settings-panel .play-group-settings-save button { width: auto; min-width: 88px; background: var(--accent, #4e7056); color: white; border-color: transparent; }
 .room-settings-panel .play-group-settings-save p { margin: 0; font-size: 12px; color: var(--text-muted); order: -1; }
 .room-settings-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-top: 12px; }

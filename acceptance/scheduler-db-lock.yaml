@@ -1,0 +1,20 @@
+id: scheduler-db-lock
+title: 调度写目标时不再因数据库锁失败
+status: implemented
+notes: 'assumedApproval: standing-order-2026-10-22'
+requirement: |
+  [daemon] scheduler loop failed Error: database is locked
+  at MiscStore.setDaemonControl
+  at mutateGoalSnapshot
+  at BotGoalService.recover
+  at tickBotGoals
+  at RawAgentRuntime.runScheduler
+criteria:
+  - id: AC-1
+    given: 调度正在恢复目标，另一次写入刚提交，数据库报告锁或快照过期
+    when: 这次目标快照写入重试
+    then: 调度不因 database is locked 失败，快照仍然保存
+  - id: AC-2
+    given: 同一状态目录已经有一个运行时持有所有权
+    when: 第二个运行时的调度周期到来
+    then: 第二个运行时不写目标状态，也不把这次跳过报成调度失败

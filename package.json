@@ -9,7 +9,7 @@
   "scripts": {
     "build": "node scripts/build-workspace.mjs && pnpm run build:web-console",
     "test": "pnpm run build && pnpm run test:unit",
-    "test:unit": "node --experimental-strip-types --test --test-concurrency=1 \"packages/core/test/**/*.test.js\" \"packages/capability-gateway/test/**/*.test.js\" \"packages/agent-sre/test/**/*.test.js\" \"packages/agent-stock/test/**/*.test.js\" \"packages/agent-homeiot/test/**/*.test.js\" \"packages/agent-erp/test/**/*.test.js\" \"apps/web-console/lib/**/*.test.ts\" \"apps/web-console/components/**/*.test.ts\" \"apps/daemon/test/**/*.test.ts\" \"scripts/**/*.test.mjs\" \"apps/desktop/src/**/*.test.ts\"",
+    "test:unit": "node --experimental-strip-types --test --test-concurrency=1 \"packages/core/test/**/*.test.js\" \"packages/core/test/**/*.test.ts\" \"packages/capability-gateway/test/**/*.test.js\" \"packages/agent-sre/test/**/*.test.js\" \"packages/agent-stock/test/**/*.test.js\" \"packages/agent-homeiot/test/**/*.test.js\" \"packages/agent-erp/test/**/*.test.js\" \"apps/web-console/lib/**/*.test.ts\" \"apps/web-console/components/**/*.test.ts\" \"apps/web-console/styles/**/*.test.ts\" \"apps/daemon/test/**/*.test.ts\" \"scripts/**/*.test.mjs\" \"apps/desktop/src/**/*.test.ts\"",
     "test:always-on": "node --test --test-reporter=spec packages/core/test/always-on-reliability.test.js",
     "test:formal": "node scripts/formal/run-formal-regression.mjs",
     "test:pairing": "node scripts/formal/run-pairing-verification.mjs",

@@ -1065,7 +1065,8 @@ export function createProductAdminTools(host: ProductAdminHost): ToolContract<Re
             ...store.getSession(session.id)?.metadata,
             [GOAL_CONDITION_META]: rec.condition,
             [GOAL_ENABLED_META]: true,
-            [GOAL_MAX_TURNS_META]: rec.maxTurns
+            [GOAL_MAX_TURNS_META]: rec.maxTurns,
+            goalTurnCapEnabled: rec.maxTurns > 0
           }
         });
         return { goal: goalWirePayload(rec) };

@@ -214,7 +214,10 @@
     padding: 0;
     border: 1px solid var(--ui-border);
     border-radius: 16px;
-    background: var(--ui-bg);
+    background: var(--glass-fill);
+    backdrop-filter: var(--glass-filter);
+    -webkit-backdrop-filter: var(--glass-filter);
+    border-color: var(--glass-edge);
     color: var(--ui-text);
     margin: auto;
     overflow-y: auto;

@@ -15,7 +15,7 @@ import { BotFunctionalGroupService } from '../bots/functional-groups.js';
 import { hasRevokedSharedContext } from '../bots/shared-context-isolation.js';
 import { noteHumanModelInput } from '../session/human-continuation.js';
 import { appendClockNotice, resolveConversationTimezone, stampWrittenAt } from '../session/conversation-clock.js';
-import { isCanonicalBotChat } from '../session/bot-compact-policy.js';
+import { isCanonicalBotChat, shouldRecordContextBudgetSkip } from '../session/bot-compact-policy.js';
 import { estimateMessageTokens } from '../model/token-estimate.js';
 /**
  * L5 host adapters: session/scheduler/spawn/compact/kernel bindings for RawAgentRuntime.
@@ -347,7 +347,7 @@ async function invokeContextModel(
     if (estimateMessageTokens(messages) > budget.historyTokens) {
       throw new Error(`Context length exceeded: actual model window ${budget.contextTokens}, available history ${budget.historyTokens}. Closed tool waves cannot be truncated.`);
     }
-    if (!compacted) {
+    if (shouldRecordContextBudgetSkip(estimated, budget, compacted)) {
       rt.emitTrace(session.id,{kind:'compact_skipped',payload:{reason:'context_budget',...budget,adapter:adapter.name}});
     }
     noteHumanModelInput(rt.store, session.id, messages);

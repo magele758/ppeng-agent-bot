@@ -60,7 +60,7 @@ export type BotGroupCreateBody = {
   title: string;
   botIds: string[];
   hostBotId: string;
-  maxBotTurns: number;
+  maxBotTurns?: number;
 };
 
 /**
@@ -142,8 +142,7 @@ function buildBotGroupBody(title: string, members: GroupMembers): BotGroupCreate
   return {
     title: title.trim(),
     botIds: members.members,
-    hostBotId: members.members[0]!,
-    maxBotTurns: groupSpeakBudget(members.members.length)
+    hostBotId: members.members[0]!
   };
 }
 

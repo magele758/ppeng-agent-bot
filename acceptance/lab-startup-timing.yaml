@@ -1,0 +1,23 @@
+id: lab-startup-timing
+title: Lab 会话显示启动耗时
+status: implemented
+notes: 'assumedApproval: standing-order-2026-10-22'
+requirement: |
+  在 Lab 会话里显示启动耗时
+criteria:
+  - id: AC-1
+    given: 一轮对话的记录里有启动汇总，标出总毫秒数和最慢阶段
+    when: 在 Lab 会话里查看这一轮底下的统计
+    then: 能看到启动总耗时和最慢阶段的名称与耗时，且看不到消息正文
+  - id: AC-2
+    given: 同一轮还有其它已计时的启动分段
+    when: 查看同一处统计
+    then: 这些分段各自显示耗时，不只看到一个总数
+  - id: AC-3
+    given: 一轮对话没有启动记录
+    when: 查看这一轮底下的统计
+    then: 原有的执行时间、用量和结束时间保持不变
+  - id: AC-4
+    given: 界面语言是英文
+    when: 查看带启动记录的这一轮统计
+    then: 启动和最慢阶段使用英文说法，而不是中文

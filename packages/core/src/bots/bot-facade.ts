@@ -1,3 +1,4 @@
+import { emitStartupPhase } from '../observability/startup-phase.js';
 import { resolveBotPrincipal, principalFromSession, sameBotPrincipal, setBotDefinitionOwner, botDefinitionOwner } from './bot-identity.js';
 import { AuthorizationError, ConflictError, NotFoundError, ValidationError } from '../errors.js';
 import { PRIVATE_CHAT_GROUP_SPEAKER_RULE } from '../rooms/speaker-identity.js';
@@ -405,41 +406,56 @@ export function openBot(
   id: string,
   opts?: { userId?: string; tenantId?: string }
 ): OpenBotResult {
-  const bot = getBot(host.store, id);
-  refreshBotAgent(host, bot);
-  const principal = resolveBotPrincipal(host.store, opts);
-  const installation = resolveBotPrincipal(host.store);
-  const existing = host.store.getSession(bot.canonicalSessionId);
-  // Ownerless legacy chats stay unowned until an explicit claim. Opening one must
-  // not adopt the installer principal or clone its allowlist into another login's chat.
-  if (existing && !recordedCanonicalUserId(existing)) {
-    if (existing.agentId !== bot.id) throw new ValidationError('Invalid Bot canonical binding');
-    if (!sameBotPrincipal(principal, installation)) {
-      throw new AuthorizationError('Bot ownership is unknown for this principal');
+  const started = Date.now();
+  let sessionId: string | undefined;
+  try {
+    const bot = getBot(host.store, id);
+    refreshBotAgent(host, bot);
+    const principal = resolveBotPrincipal(host.store, opts);
+    const installation = resolveBotPrincipal(host.store);
+    const existing = host.store.getSession(bot.canonicalSessionId);
+    // Ownerless legacy chats stay unowned until an explicit claim. Opening one must
+    // not adopt the installer principal or clone its allowlist into another login's chat.
+    if (existing && !recordedCanonicalUserId(existing)) {
+      if (existing.agentId !== bot.id) throw new ValidationError('Invalid Bot canonical binding');
+      if (!sameBotPrincipal(principal, installation)) {
+        throw new AuthorizationError('Bot ownership is unknown for this principal');
+      }
+      ensureBotPermissionMode(host, existing.id);
+      ensureBotSessionCut(host, existing.id);
+      sessionId = existing.id;
+      return { bot, sessionId: existing.id, createdSession: false };
     }
-    ensureBotPermissionMode(host, existing.id);
-    ensureBotSessionCut(host, existing.id);
-    return { bot, sessionId: existing.id, createdSession: false };
+    const canonical = host.store.getSession(bot.canonicalSessionId);
+    const owner = canonical ? principalFromSession(host.store, canonical) : botDefinitionOwner(host.store,bot.id);
+    if(!canonical&&!owner&&!sameBotPrincipal(principal,installation))throw new AuthorizationError('Bot ownership is unknown for this principal');
+    if(owner && !sameBotPrincipal(owner,installation) && !sameBotPrincipal(owner,principal))throw new AuthorizationError('Bot belongs to another principal');
+    if(canonical && canonical.agentId !== bot.id) throw new ValidationError('Invalid Bot canonical binding');
+    if (canonical && !sameBotPrincipal(principalFromSession(host.store, canonical), installation) &&
+        !sameBotPrincipal(principalFromSession(host.store, canonical), principal)) {
+      throw new AuthorizationError('Bot belongs to another principal');
+    }
+    const scanStarted = Date.now();
+    let mine: SessionRecord | undefined;
+    try {
+      mine = host.store.listSessions().find(session =>
+        session.metadata?.botId === bot.id && session.metadata?.[CANONICAL_BOT_CHAT_META] === true &&
+        sameBotPrincipal(principalFromSession(host.store, session), principal));
+    } finally {
+      if (mine?.id) emitStartupPhase(mine.id, { phase: 'open_bot_scan', scope: 'wake', durationMs: Date.now() - scanStarted });
+    }
+    if (mine && (canonical || !sameBotPrincipal(principal, installation))) {
+      ensureBotPermissionMode(host, mine.id); ensureBotSessionCut(host, mine.id);
+      sessionId = mine.id;
+      return { bot, sessionId: mine.id, createdSession: false };
+    }
+    const session = createCanonicalSession(host, bot, principal);
+    sessionId = session.id;
+    if (sameBotPrincipal(principal, installation) || (owner && sameBotPrincipal(owner, principal))) host.store.updateBot(bot.id, { canonicalSessionId: session.id });
+    return { bot: host.store.getBot(bot.id)!, sessionId: session.id, createdSession: true };
+  } finally {
+    if (sessionId) emitStartupPhase(sessionId, { phase: 'open_bot', scope: 'wake', durationMs: Date.now() - started });
   }
-  const canonical = host.store.getSession(bot.canonicalSessionId);
-  const owner = canonical ? principalFromSession(host.store, canonical) : botDefinitionOwner(host.store,bot.id);
-  if(!canonical&&!owner&&!sameBotPrincipal(principal,installation))throw new AuthorizationError('Bot ownership is unknown for this principal');
-  if(owner && !sameBotPrincipal(owner,installation) && !sameBotPrincipal(owner,principal))throw new AuthorizationError('Bot belongs to another principal');
-  if(canonical && canonical.agentId !== bot.id) throw new ValidationError('Invalid Bot canonical binding');
-  if (canonical && !sameBotPrincipal(principalFromSession(host.store, canonical), installation) &&
-      !sameBotPrincipal(principalFromSession(host.store, canonical), principal)) {
-    throw new AuthorizationError('Bot belongs to another principal');
-  }
-  const mine = host.store.listSessions().find(session =>
-    session.metadata?.botId === bot.id && session.metadata?.[CANONICAL_BOT_CHAT_META] === true &&
-    sameBotPrincipal(principalFromSession(host.store, session), principal));
-  if (mine && (canonical || !sameBotPrincipal(principal, installation))) {
-    ensureBotPermissionMode(host, mine.id); ensureBotSessionCut(host, mine.id);
-    return { bot, sessionId: mine.id, createdSession: false };
-  }
-  const session = createCanonicalSession(host, bot, principal);
-  if (sameBotPrincipal(principal, installation) || (owner && sameBotPrincipal(owner, principal))) host.store.updateBot(bot.id, { canonicalSessionId: session.id });
-  return { bot: host.store.getBot(bot.id)!, sessionId: session.id, createdSession: true };
 }
 
 export function resolveBotIdFromBody(body: Record<string, unknown>): string | undefined {

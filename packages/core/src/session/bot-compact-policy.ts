@@ -48,12 +48,27 @@ export function botCompactTokenThresholds(maxContextTokens: number): {
 /** Highest tier that applies. Overflow force still compacts, using structured when under 85%. */
 export function selectBotCompactTier(
   estimatedTokens: number,
-  thresholds: { structuredTokens: number; hygieneTokens: number },
+  thresholds: { structuredTokens: number; hygieneTokens: number; historyTokens?: number },
   force = false
 ): BotCompactTier | null {
   if (estimatedTokens >= thresholds.hygieneTokens) return 'hygiene';
-  if (estimatedTokens >= thresholds.structuredTokens || force) return 'structured';
+  const overSendCeiling =
+    typeof thresholds.historyTokens === 'number' && estimatedTokens > thresholds.historyTokens;
+  if (estimatedTokens >= thresholds.structuredTokens || overSendCeiling || force) return 'structured';
   return null;
+}
+
+/**
+ * `context_budget` means a compact was required and did not land.
+ * A turn that fits the send ceiling must not record that skip.
+ */
+export function shouldRecordContextBudgetSkip(
+  estimatedTokens: number,
+  thresholds: { structuredTokens: number; historyTokens: number },
+  compacted: boolean
+): boolean {
+  if (compacted) return false;
+  return estimatedTokens >= thresholds.structuredTokens || estimatedTokens > thresholds.historyTokens;
 }
 
 export function botCompactInstruction(tier: BotCompactTier, priorSummary?: string): string {

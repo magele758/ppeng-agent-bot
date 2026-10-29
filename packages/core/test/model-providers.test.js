@@ -238,6 +238,24 @@ test('global default is hot, persistent, and explicit pins survive until cleared
     setCatalogDefaultRef(store, two, {});
     assert.deepEqual(resolveSessionPreferredRef(readModelCatalog(store), unpinned, {}).ref, two);
     assert.deepEqual(resolveSessionPreferredRef(readModelCatalog(store), pinned, {}).ref, one);
+    const unreachable = upsertProvider(store, {
+      name: 'Unreachable',
+      kind: 'openai-compatible',
+      baseUrl: 'http://10.1.20.68:3426/v1',
+      apiKey: 'test',
+      models: [{ id: 'grok-4.7-build-fast@500k', enabled: true }],
+      scanError: 'fetch failed'
+    });
+    const stuck = {
+      metadata: mergeModelRefMetadata(store, {}, {
+        modelRef: { providerId: unreachable.id, modelId: 'grok-4.7-build-fast@500k' }
+      }, {})
+    };
+    assert.deepEqual(
+      resolveSessionPreferredRef(readModelCatalog(store), stuck, {}).ref,
+      two,
+      'a pinned provider with scanError falls through to the default model'
+    );
     assert.deepEqual(resolveSessionPreferredRef(readModelCatalog(store), { metadata: { modelOverride: one } }, {}).ref, one);
     pinned.metadata = mergeModelRefMetadata(store, pinned.metadata, { modelRef: null }, {});
     assert.deepEqual(resolveSessionPreferredRef(readModelCatalog(store), pinned, {}).ref, two);

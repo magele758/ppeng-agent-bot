@@ -22,11 +22,11 @@ test('desktop-v tags select all or a single target without creating a release', 
   assert.equal(desktopTargetFromPackTag('desktop-v0.1.0-mac-arm64'), 'mac-arm64');
   assert.equal(desktopTargetFromPackTag('v0.1.0'), 'all');
   assert.equal(resolveDesktopCiTarget({ target: 'linux-x64', tagName: 'desktop-v1-mac-arm64' }), 'linux-x64');
-  assert.equal(resolveDesktopCiTarget({ target: 'all', tagName: 'desktop-v1-win-x64' }), 'win-x64');
+  assert.equal(resolveDesktopCiTarget({ target: 'all', tagName: 'desktop-v1-win-x64' }), 'all');
 });
 
 test('desktopCiMatrix filters workflow_dispatch target without job-level matrix if', () => {
-  assert.equal(desktopCiMatrix('all').length, 5);
+  assert.equal(desktopCiMatrix('all').length, 3);
   assert.deepEqual(desktopCiMatrix('linux-x64'), [
     { id: 'linux-x64', platform: 'linux', arch: 'x64', os: 'ubuntu-latest', node_arch: 'x64' }
   ]);
@@ -34,27 +34,29 @@ test('desktopCiMatrix filters workflow_dispatch target without job-level matrix 
   assert.throws(() => desktopCiMatrix('mac-x64'), /unknown desktop target/);
 });
 
-test('desktop matrix ships Apple Silicon macOS and keeps Linux and Windows', () => {
+test('desktop matrix ships Apple Silicon macOS and Linux, not Windows [AC:no-windows-desktop-pack#AC-1]', () => {
   assert.deepEqual(
     DESKTOP_TARGETS.map((row) => row.id).sort(),
-    ['linux-arm64', 'linux-x64', 'mac-arm64', 'win-arm64', 'win-x64']
+    ['linux-arm64', 'linux-x64', 'mac-arm64']
   );
   const mac = desktopCiMatrix('mac-arm64');
   assert.deepEqual(mac, [
     { id: 'mac-arm64', platform: 'mac', arch: 'arm64', os: 'macos-14', node_arch: 'arm64' }
   ]);
-  assert.equal(
-    desktopCiMatrix('all').some((row) => row.os === 'macos-13' || (row.platform === 'mac' && row.arch === 'x64')),
-    false
-  );
+  assert.equal(desktopCiMatrix('all').some((row) => row.platform === 'win'), false);
+  assert.throws(() => desktopCiMatrix('win-x64'), /unknown desktop target/);
+  assert.throws(() => desktopCiMatrix('win-arm64'), /unknown desktop target/);
 });
 
-test('desktop workflow does not schedule Intel Mac packs', () => {
+test('desktop workflow does not schedule Intel Mac or Windows packs [AC:no-windows-desktop-pack#AC-1]', () => {
   const workflow = readFileSync(join(repoRoot, '.github/workflows/desktop.yml'), 'utf8');
   assert.doesNotMatch(workflow, /^\s+- mac-x64\s*$/m);
+  assert.doesNotMatch(workflow, /^\s+- win-x64\s*$/m);
+  assert.doesNotMatch(workflow, /^\s+- win-arm64\s*$/m);
   assert.doesNotMatch(workflow, /^\s*(runs-on|os):\s*['"]?macos-13\b/m);
   assert.match(workflow, /darwin x64/);
   assert.match(workflow, /不要加回 mac-x64/);
+  assert.match(workflow, /不要加回 win-x64/);
   assert.match(workflow, /- mac-arm64/);
 });
 
@@ -62,12 +64,7 @@ test('parseDesktopTarget accepts amd64 alias and electron-builder flags', () => 
   const linuxAmd = parseDesktopTarget({ platform: 'linux', arch: 'amd64' });
   assert.deepEqual(linuxAmd, { id: 'linux-x64', platform: 'linux', arch: 'x64' });
   assert.deepEqual(electronBuilderArgs(linuxAmd), ['--linux', '--x64', '--publish', 'never']);
-  assert.deepEqual(electronBuilderArgs(parseDesktopTarget({ platform: 'windows', arch: 'aarch64' })), [
-    '--win',
-    '--arm64',
-    '--publish',
-    'never'
-  ]);
+  assert.throws(() => parseDesktopTarget({ platform: 'windows', arch: 'aarch64' }), /unknown desktop target win-arm64/);
   assert.throws(() => parseDesktopTarget({ platform: 'solaris', arch: 'x64' }), /unknown desktop platform/);
   assert.throws(() => parseDesktopTarget({ platform: 'mac', arch: 'x64' }), /mac-x64/);
 });

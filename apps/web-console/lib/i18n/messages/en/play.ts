@@ -79,10 +79,10 @@ export const play = {
     allMembersUse: "Use for gathering opinions, comparing proposals or individual progress reports. Example: ask each member to report today’s progress.",
     mentionRules: "Addressing: explicit @ mentions narrow the initial participants; quoting a reply may also select its author. Mentioning someone in all-members mode does not broadcast to everyone. Collaboration picks one owner from the candidates, who can still delegate. An unmatched @ does not wake everyone.",
     limitsHint: "Limits apply to the group run triggered by one message, preventing excessive replies and repeated tool calls. They are not lifetime room quotas or budgets for members’ own scheduled jobs. The defaults are suitable for ordinary use.",
-    turnsHelp: "Total Bot reply allowance for this run, shared across members.",
-    toolsHelp: "Total tool-call allowance for this run, shared across members.",
-    costHelp: "Estimated from available model usage. Missing prices or usage can make it incomplete; this is not a hard account billing cap.",
-    limitsException: "In all-members mode without mentions, the reply allowance expands to cover at least every member. Tool or cost limits can still stop further execution; costs already incurred are not reversed.",
+    turnsHelp: "Off by default. When on, this run stops after this many Bot replies in total.",
+    toolsHelp: "Off by default. When on, this run stops after this many tool calls.",
+    costHelp: "Off by default. When on, this run stops after the estimated model cost reaches this amount.",
+    limitsException: "These caps are off unless you turn them on. Costs already incurred are not reversed.",
     basic: 'Basic information',
     limits: 'Run limits',
     activity: 'Room activity',
@@ -348,7 +348,7 @@ export const play = {
   chrome: {
     goalMet: 'Goal met',
     goalOpen: 'Goal open',
-    feedStatsAria: 'This turn runtime, usage, and end time',
+    feedStatsAria: 'This turn runtime, usage, end time, and startup',
     autonomyTitle: 'Autonomy / permissionMode',
     costTitle: 'Estimated cumulative cost',
     noGoal: 'No goal set',
@@ -386,7 +386,7 @@ export const play = {
     repetition: 'Repetition guard',
     reasoning_spin: 'Reasoning spin',
     loop_guard_critical: 'Loop guard',
-    tool_loop: 'Tool loop',
+    tool_loop: 'Same call kept failing',
     repeat_detection: 'Repeat detection: the same tools were called again and again',
     missing_assistant: 'Missing assistant reply',
     before_turn_blocked: 'Turn blocked',
@@ -399,7 +399,9 @@ export const play = {
     input: 'In',
     output: 'Out',
     ended: 'Ended',
-    sessionEnded: 'Session ended'
+    sessionEnded: 'Session ended',
+    startup: 'Startup',
+    slowest: 'Slowest'
   },
 
   composer: {
@@ -987,7 +989,8 @@ export const play = {
   childTask: {
     owner: 'From {name}',
     streamLabel: 'Child tasks',
-    streamOpen: 'Open this child task: {excerpt}'
+    streamOpen: 'Open this child task: {excerpt}',
+    running: 'Running'
   },
 
   goalUpdate: {

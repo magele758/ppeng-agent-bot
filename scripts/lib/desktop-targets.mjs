@@ -1,6 +1,9 @@
 /**
- * Desktop pack targets shipped by CI: Apple Silicon macOS, plus Windows and
- * Linux × x64/arm64 (5 artifacts).
+ * Desktop pack targets shipped by CI: Apple Silicon macOS and Linux × x64/arm64.
+ *
+ * Windows is not packed. GitHub-hosted Windows runners cannot spawn pnpm.cmd
+ * from the pack script (EINVAL), so those jobs only fail the workflow.
+ * Do not add win-x64 or win-arm64 back without a new product decision.
  *
  * Intel Mac (darwin x64 / mac-x64) is intentionally absent. The audience is
  * too small, and the old job (macos-14 + Node x64 under Rosetta) was slow.
@@ -11,13 +14,11 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-export const DESKTOP_PLATFORMS = ['mac', 'win', 'linux'];
+export const DESKTOP_PLATFORMS = ['mac', 'linux'];
 export const DESKTOP_ARCHES = ['x64', 'arm64'];
 
 export const DESKTOP_TARGETS = [
   { id: 'mac-arm64', platform: 'mac', arch: 'arm64' },
-  { id: 'win-x64', platform: 'win', arch: 'x64' },
-  { id: 'win-arm64', platform: 'win', arch: 'arm64' },
   { id: 'linux-x64', platform: 'linux', arch: 'x64' },
   { id: 'linux-arm64', platform: 'linux', arch: 'arm64' }
 ];
@@ -25,8 +26,6 @@ export const DESKTOP_TARGETS = [
 /** GitHub-hosted runner + setup-node architecture for each pack target. */
 export const DESKTOP_CI_RUNNERS = {
   'mac-arm64': { os: 'macos-14', node_arch: 'arm64' },
-  'win-x64': { os: 'windows-latest', node_arch: 'x64' },
-  'win-arm64': { os: 'windows-11-arm', node_arch: 'arm64' },
   'linux-x64': { os: 'ubuntu-latest', node_arch: 'x64' },
   'linux-arm64': { os: 'ubuntu-24.04-arm', node_arch: 'arm64' }
 };
