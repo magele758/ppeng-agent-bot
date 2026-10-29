@@ -445,6 +445,30 @@ export const settingsEntries = {
       }
     }
   },
+  deliveryQuietHours: {
+    title: 'Quiet hours',
+    keywords: 'quiet hours do not disturb mute outbound hold overnight defer send later delivery',
+    desc: 'When this is on, messages to people are held during the local hours you set and sent after that window ends. Off, or outside the window, they still send immediately.',
+    fields: {
+      enabled: {
+        label: 'Enable quiet hours',
+        hint: 'When off, approved outbound messages send immediately.'
+      },
+      startHour: {
+        label: 'Start hour',
+        hint: 'A whole hour from 0 to 23 in the timezone below. Holding starts at this hour and does not include the end hour.'
+      },
+      endHour: {
+        label: 'End hour',
+        hint: 'If the end hour is earlier than the start hour, the window crosses midnight. The same hour for both means there is no quiet window.'
+      },
+      timezone: {
+        label: 'Timezone',
+        hint: 'An IANA timezone name, for example Asia/Shanghai.',
+        invalid: 'Enter a timezone'
+      }
+    }
+  },
   eventLog: {
     title: 'Event log (EventLog / Saga)',
     keywords: 'event log saga eventlog audit record replay trajectory trace back',

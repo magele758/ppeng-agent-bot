@@ -4,7 +4,10 @@ status: implemented
 requirement: |
   UserDeliveryPort 是用户可见外发的唯一出口。配置了全局静默时段后，窗口内不立即发送，
   而是暂存（保留人工批准），窗口结束后自动发出；窗口外与未启用时行为不变。
-notes: 'P1-A; assumedApproval: standing-order-2026-10-22. 配置面：GET/PATCH /api/delivery/quiet-hours（daemon_control KV，立即生效，无环境变量）。'
+  Add a Lab settings card for delivery quiet-hours, wired to the existing UserDeliveryPort quiet-hours API.
+  Lab UI shows a settings card where the user can view/edit quiet-hours (enable/disable, schedule/window as the API already supports).
+  Card reads/writes only through the existing quiet-hours API. i18n zh+en.
+notes: 'P1-A; AC-6..AC-9 Lab 设置卡。assumedApproval: standing-order-2026-10-22. 配置面：GET/PATCH /api/delivery/quiet-hours（daemon_control KV，立即生效，无环境变量）。'
 criteria:
   - id: AC-1
     given: 静默时段已启用且当前时间在窗口内（含跨午夜窗口）
@@ -26,3 +29,19 @@ criteria:
     given: 通过 Lab / API 配置静默时段
     when: PATCH 非法的小时或时区
     then: 返回校验错误且不改变已保存配置；合法配置立即影响后续批准
+  - id: AC-6
+    given: 用户打开 Lab 设置里的 Agent 行为，界面语言为中文或英文
+    when: 查看静默时段卡片
+    then: 能看到当前是否启用，以及开始小时、结束小时和时区；标题和字段使用当前语言
+  - id: AC-7
+    given: 卡片已显示已保存的静默时段
+    when: 用户打开或关闭静默，或保存一段合法的开始小时、结束小时和时区
+    then: 只把改动交给既有的静默时段设置，卡片随后显示刚保存的开关和窗口
+  - id: AC-8
+    given: 卡片已显示已保存的静默时段
+    when: 用户把小时改成不是 0 到 23 的整数，或把时区留空后保存
+    then: 卡片提示错误，已保存的窗口保持不变
+  - id: AC-9
+    given: 静默时段设置暂时读不出来
+    when: 用户打开静默时段卡片
+    then: 卡片说明读取失败并可以重试，不会显示一份假的窗口
