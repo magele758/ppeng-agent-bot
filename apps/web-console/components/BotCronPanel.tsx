@@ -89,7 +89,7 @@ export function BotCronPanel({
   const [roomId,setRoomId]=useState('');
   const [rooms,setRooms]=useState<{id:string;title:string;botIds:string[]}[]>([]);
   const [preset, setPreset] = useState<CronPreset>(defaultRoutineSchedule().preset);
-  const [time, setTime] = useState(defaultRoutineSchedule().time);
+  const [time, setTime] = useState<string>(defaultRoutineSchedule().time);
   const [weekday, setWeekday] = useState(1);
   const [cronDraft, setCronDraft] = useState(defaultRoutineSchedule().cron);
   const [precheckKind, setPrecheckKind] = useState<'none' | 'script' | 'predicate'>('none');
