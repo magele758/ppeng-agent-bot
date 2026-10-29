@@ -31,6 +31,7 @@ import {
 } from '../sandbox/model-isolation.js';
 import { createExternalAiTools } from './external-ai-tools.js';
 import { bashCommandNeedsApproval } from './bash-command-policy.js';
+import { createRegisteredMachineTools, executeOnRegisteredMachine } from '../registered-machines/tools.js';
 import { globWorkspaceFiles } from './glob-files.js';
 import { isVaultMetadataDirName } from './markdown-vault-noise.js';
 import { SENSITIVE_READ_REFUSAL, sensitiveReadRefusal } from '../workspace/sensitive-read.js';
@@ -217,6 +218,10 @@ export interface RuntimeToolServices {
   compactContext?: (context: RunContext, opts?: { force?: boolean }) => Promise<string>;
   /** Lab KV for web_search URL; env is CI fallback. */
   webSearchSettingsStore?: WebSettingsReadStore;
+  /** Personal registered machines (≠ Factory SSH). When set, bash/read_file honor machineId. */
+  registeredMachines?: import('../registered-machines/port.js').RegisteredMachinePort;
+  /** Store needed to resolve principal for machineId-gated bash/read_file. */
+  stateStore?: import('../storage.js').SqliteStateStore;
   /** Sibling-file facts for a sub-task read. Missing hook keeps the previous read behavior. */
   forkSiblingFileFacts?: (context: RunContext) => ForkSiblingFileFacts;
   /** Record a file this sub-task just created so siblings cannot read it. */
@@ -365,6 +370,10 @@ function parseTodoItems(raw: unknown): TodoItem[] {
 }
 
 export function createBuiltinTools(services: RuntimeToolServices, options: { includeDormantCapabilities?: boolean } = {}): ToolContract<any>[] {
+  const registeredMachineTools =
+    services.stateStore && services.registeredMachines
+      ? createRegisteredMachineTools(services.stateStore, services.registeredMachines)
+      : [];
   const riskyShellTokens = ['rm ', 'git reset', 'git checkout', 'git clean', 'npm publish', 'sudo '];
 
   function shellCommandOf(args: { command?: string; verify_command?: string }): string {
@@ -439,22 +448,38 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
     return lines;
   }
 
-  const readFileTool: ToolContract<{ path?: string; limit?: number; offset_line?: number }> = {
+  const readFileTool: ToolContract<{ path?: string; limit?: number; offset_line?: number; machineId?: string }> = {
     name: 'read_file',
     description:
-      'Read a file or list the current workspace directory. For large files use offset_line + limit to read a line window without loading the whole file. Directory listings omit Obsidian-style metadata folders (.obsidian, .trash).',
+      'Read a file or list the current workspace directory. For large files use offset_line + limit to read a line window without loading the whole file. Directory listings omit Obsidian-style metadata folders (.obsidian, .trash). Optional machineId (from list_machines) reads on a personal registered machine via RegisteredMachinePort — not Factory SSH.',
     inputSchema: {
       type: 'object',
       properties: {
         path: { type: 'string' },
         limit: { type: 'number' },
-        offset_line: { type: 'number', description: '0-based start line when reading a file' }
+        offset_line: { type: 'number', description: '0-based start line when reading a file' },
+        machineId: {
+          type: 'string',
+          description:
+            'Optional personal registered machine id from list_machines. When set, reads on that machine via RegisteredMachinePort (not Factory SSH).'
+        }
       }
     },
     approvalMode: 'never',
     sideEffectLevel: 'none',
     ptc: { kind: 'read' },
     async execute(context, args) {
+      {
+        const routed = await executeOnRegisteredMachine(
+          services.stateStore,
+          services.registeredMachines,
+          context.session,
+          args.machineId,
+          'read',
+          args as Record<string, unknown>
+        );
+        if (routed) return routed;
+      }
       const facts = forkFacts(context);
       if (!args.path) {
         const roots = context.workspaceRoots?.length
@@ -851,16 +876,21 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
     }
   };
 
-  const bashTool: ToolContract<{ command: string; timeout_ms?: number; isolation?: string }> = {
+  const bashTool: ToolContract<{ command: string; timeout_ms?: number; isolation?: string; machineId?: string }> = {
     name: 'bash',
     description:
-      'Run a shell command inside the workspace root. Optional timeout_ms (default from env RAW_AGENT_BASH_TIMEOUT_MS). Optional isolation is honored when the saved mode is Auto; omit it to follow the saved mode. Auto uses the strongest available.',
+      'Run a shell command inside the workspace root. Optional timeout_ms (default from env RAW_AGENT_BASH_TIMEOUT_MS). Optional isolation is honored when the saved mode is Auto; omit it to follow the saved mode. Auto uses the strongest available. Optional machineId (from list_machines) runs on a personal registered machine via RegisteredMachinePort — never Factory SSH.',
     inputSchema: {
       type: 'object',
       properties: {
         command: { type: 'string' },
         timeout_ms: { type: 'number' },
-        isolation: isolationInputSchema()
+        isolation: isolationInputSchema(),
+        machineId: {
+          type: 'string',
+          description:
+            'Optional personal registered machine id from list_machines. When set, command runs on that machine (RegisteredMachinePort), not local sandbox and not Factory SSH.'
+        }
       },
       required: ['command']
     },
@@ -873,6 +903,17 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
       );
     },
     async execute(context, args) {
+      {
+        const routed = await executeOnRegisteredMachine(
+          services.stateStore,
+          services.registeredMachines,
+          context.session,
+          args.machineId,
+          'shell',
+          args as Record<string, unknown>
+        );
+        if (routed) return routed;
+      }
       const denied = commandHardlineToolResult(String(args.command ?? ''));
       if (denied) return denied;
       const gated = gateShell(context, 'bash', args);
@@ -1795,6 +1836,7 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
 
   const tools: ToolContract<any>[] = [
     bashTool,
+    ...registeredMachineTools,
     workEvidenceTool,
     readFileTool,
     visionAnalyzeTool,

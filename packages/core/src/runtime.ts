@@ -154,6 +154,7 @@ import {
   resolveSubagentAgentId
 } from './session/steering-subagent.js';
 import { bindSecretVault, SecretVault } from './secrets/secret-vault.js';
+import { bindUserVault, UserVault } from './secrets/user-vault.js';
 import {
   bindSandboxSettingsStore,
   resolveCloudflareComputer,
@@ -354,6 +355,7 @@ export class RawAgentRuntime {
   private loadedPlugins: LoadedPlugin[] = [];
   private connectorToolNames = new Set<string>();
   readonly secretVault: SecretVault;
+  readonly userVault: UserVault;
   /** Product-facing kernel event registry. `runSession` always fans out here. */
   readonly hooks: KernelHookRegistry;
 
@@ -561,6 +563,8 @@ export class RawAgentRuntime {
 
     this.secretVault = new SecretVault(this.store);
     bindSecretVault(this.secretVault);
+    this.userVault = new UserVault(this.store);
+    bindUserVault(this.userVault);
     bindSandboxSettingsStore(this.store);
     const toolAssembleStarted = Date.now();
     const toolServices = createRuntimeToolServices(this.l5());
