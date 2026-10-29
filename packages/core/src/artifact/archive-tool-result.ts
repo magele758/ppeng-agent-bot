@@ -1,11 +1,6 @@
-import {
-  createPagedArtifact,
-  formatToolResultArchivePreview,
-  type PagedArtifactManifest
-} from './paged-artifact.js';
+import { createDurableArtifactPort } from './durable-artifact-port.js';
+import type { PagedArtifactManifest } from './paged-artifact.js';
 import { resolveIngestionSettings, type IngestionSettingsStore } from '../ingestion/settings.js';
-
-const SKIP_ARCHIVE_TOOLS = new Set(['read_artifact_page', 'search_artifact_content', 'retrieve_tool_result']);
 
 export function maybeArchiveToolResult(input: {
   stateDir: string;
@@ -15,22 +10,18 @@ export function maybeArchiveToolResult(input: {
   settingsStore?: IngestionSettingsStore;
   onCreated?: (manifest: PagedArtifactManifest) => void;
 }): string {
-  if (SKIP_ARCHIVE_TOOLS.has(input.toolName)) return input.content;
-  const settings = resolveIngestionSettings(input.settingsStore);
-  if (!settings.enabled) return input.content;
-  if (input.content.length <= settings.toolResultArchiveChars) return input.content;
   try {
-    const manifest = createPagedArtifact({
+    return createDurableArtifactPort({
       stateDir: input.stateDir,
+      settings: () => resolveIngestionSettings(input.settingsStore),
+      onRetained: input.onCreated
+    }).retain({
       sessionId: input.sessionId,
-      sourceTool: input.toolName,
+      source: input.toolName,
       content: input.content,
       mimeType: 'text/plain',
-      pageSizeChars: settings.pageSizeChars,
       fileName: `${input.toolName}.txt`
-    });
-    input.onCreated?.(manifest);
-    return formatToolResultArchivePreview(manifest, settings.archivePreviewChars, input.content);
+    }).text;
   } catch {
     return input.content;
   }

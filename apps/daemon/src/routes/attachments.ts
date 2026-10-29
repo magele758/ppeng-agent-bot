@@ -2,8 +2,6 @@
  * Attachment ingest + listing, and ingestion/browser Lab settings.
  */
 
-import { existsSync, readFileSync } from 'node:fs';
-import { basename, join } from 'node:path';
 import {
   AppError,
   errorMessage,
@@ -24,6 +22,7 @@ import {
   type RawAgentRuntime,
   type WebSettingsPatch
 } from '@ppeng/agent-core';
+import { openArtifactForDownload } from '../artifact-port.js';
 import type { RouteSpec } from '../routing.js';
 import { json } from '../http-utils.js';
 import { wrapSessionIdRoutes } from '../session-guard.js';
@@ -173,19 +172,11 @@ export function attachmentRoutes(runtime: RawAgentRuntime): RouteSpec[] {
       method: 'GET',
       pattern: '/api/artifact/:id/download',
       handler: ({ requireParam, response }) => {
-        const id = requireParam('id');
-        const row = runtime.getArtifactIndex(id);
-        if (!row) throw new NotFoundError('Artifact', id);
-        const abs = join(runtime.stateDir, row.localRelPath);
-        if (!existsSync(abs)) throw new NotFoundError('Artifact file', id);
-        const buf = readFileSync(abs);
+        const opened = openArtifactForDownload(runtime, requireParam('id'));
         response.statusCode = 200;
-        response.setHeader('content-type', row.mimeType || 'application/octet-stream');
-        response.setHeader(
-          'content-disposition',
-          `attachment; filename="${basename(row.fileName || row.localRelPath)}"`
-        );
-        response.end(buf);
+        response.setHeader('content-type', opened.mimeType);
+        response.setHeader('content-disposition', `attachment; filename="${opened.fileName}"`);
+        response.end(opened.bytes);
       }
     }
   ]);
