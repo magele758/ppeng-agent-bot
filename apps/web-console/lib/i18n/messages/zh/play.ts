@@ -741,7 +741,10 @@ export const play = {
     replyPlaceholder: '输入回复后批准继续',
     replyContinue: '回复并继续',
     approveContinue: '批准并继续',
-    reject: '拒绝'
+    reject: '拒绝',
+    kindShell: 'Shell',
+    kindMcp: 'MCP',
+    blockReasonLabel: '拦截原因'
   },
 
   model: {

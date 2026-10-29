@@ -6,7 +6,8 @@ requirement: |
   Lab already has approvals/Risk/approve; tree has NO AutoReview / request_smart_mode.
   Slice: high-risk spawn/Shell/MCP default-block → native approval card → same-action retry with approval flag; denial = final; no bypass routes.
   Accept: risky shell/MCP blocked by default, card shown, same-params retry after approve, deny terminal.
-notes: 'assumedApproval: standing-order-2026-10-22; Round-2 P0 #1 / r2-1; final acceptance by lei pending'
+  Auto-review approval cards must clearly show a kind badge (Shell vs MCP / tool kind) and the human-readable blockReason from the Auto-review gate, so the owner can decide without guessing why it blocked.
+notes: 'assumedApproval: standing-order-2026-10-22; Round-2 P0 #1 / r2-1; r4-2 card surface shows kind + blockReason. AC-1…AC-5 unchanged.'
 criteria:
   - id: AC-1
     given: 一次高危 Shell 或 MCP 工具调用尚未带审批升级标志，也没有未决/已批的 Auto-review 记录
@@ -28,3 +29,15 @@ criteria:
     given: 会话权限模式为 bypass
     when: 发起一次高危 Shell 或 MCP 调用
     then: Auto-review 仍生效，不能凭 bypass 绕过
+  - id: AC-6
+    given: 一次高危 Shell 调用已被 Auto-review 拦住，并弹出待审批卡
+    when: 负责人在 Lab 对话或待审批列表里看到这张卡
+    then: 卡上有 Shell 种类徽章，并写明门闩给出的人类可读拦截原因
+  - id: AC-7
+    given: 一次高危 MCP 调用已被 Auto-review 拦住，并弹出待审批卡
+    when: 负责人在 Lab 对话或待审批列表里看到这张卡
+    then: 卡上有与 Shell 不同的 MCP 种类徽章，并写明门闩给出的人类可读拦截原因
+  - id: AC-8
+    given: 一张与 Auto-review 无关的待审批卡，例如向用户提问
+    when: 负责人在 Lab 看到这张卡
+    then: 不出现 Shell 或 MCP 种类徽章，也不会把无关说明标成 Auto-review 拦截原因

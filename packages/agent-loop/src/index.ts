@@ -449,6 +449,8 @@ export type {
 export { decideHitlLatch, shouldParkBeforeTools } from './approval/hitl-latch.js';
 export {
   autoReviewIdempotencyKey,
+  autoReviewKind,
+  describeAutoReviewBlock,
   evaluateAutoReview,
   hasRequestSmartModeApproval,
   isAutoReviewSubject,
@@ -457,7 +459,7 @@ export {
   shellCommandIsHighRisk,
   stripAutoReviewFlags,
 } from './approval/auto-review.js';
-export type { AutoReviewDecision } from './approval/auto-review.js';
+export type { AutoReviewDecision, AutoReviewKind } from './approval/auto-review.js';
 
 export type {
   DecideHitlLatchInput,

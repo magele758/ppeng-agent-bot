@@ -11,6 +11,7 @@ import { ListFallback } from './ListFallback';
 import { OutboundDraftsPanel } from './OutboundDraftsPanel';
 import styles from './tasks.module.css';
 import { ApprovalActionPreview } from '../../ApprovalActionPreview';
+import { InboxApprovalReason } from '../../AutoReviewMarks';
 
 /** 待审批工具调用、站内邮件与工作区 */
 export function InboxView() {
@@ -75,7 +76,7 @@ export function InboxView() {
                     <strong>{a.toolName}</strong>
                   </div>
                   <div className={styles.rowMeta}>
-                    <span>{t('tasks.inbox.reason', { reason: a.reason || t('tasks.inbox.noReason') })}</span>
+                    <InboxApprovalReason approval={a} />
                     <span>{t('tasks.inbox.session', { id: a.sessionId })}</span>
                     {expiryNote ? <span>{expiryNote}</span> : null}
                   </div>

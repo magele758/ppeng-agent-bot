@@ -741,7 +741,10 @@ export const play = {
     replyPlaceholder: 'Type a reply, then approve to continue',
     replyContinue: 'Reply and continue',
     approveContinue: 'Approve and continue',
-    reject: 'Reject'
+    reject: 'Reject',
+    kindShell: 'Shell',
+    kindMcp: 'MCP',
+    blockReasonLabel: 'Blocked because'
   },
 
   model: {
