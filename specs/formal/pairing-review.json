@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-10-29T00:50:00.000Z",
-  "reviewNote": "2026-10-29 Round-2 P0 Auto-review (r2-1) + UserVault sync from main 382dacfd: checkToolApprovals owns high-risk Shell/spawn/MCP via evaluateAutoReview (soft-block default; requestSmartModeApproval native card; approve same-fingerprint proceed; deny terminal; permissionMode=bypass cannot skip). UserVault reference-fill remains typed apart from SecretVault. Pairing/lifecycle/restart/concurrency control-flow bounds unchanged; fingerprints refreshed.",
+  "reviewedAt": "2026-10-29T04:52:01.000Z",
+  "reviewNote": "2026-10-29 Auto-review CI fix: adapt legacy approval tests to soft-block+card; refresh fingerprints for model-sandbox-isolation.test.js",
   "mapping": [
     {
       "step": "Execute/approval/result persistence and fold recovery; real source component probes (not a full kernel proof)",
@@ -303,7 +303,7 @@
     "packages/core/src/stores/migrations/index.ts": "236a74f3b2b901d38d1ed20b00697bcd0104037a6d20cf767536549291e29fdb",
     "packages/core/src/sandbox/model-isolation.ts": "4b706b09281996636c2949b0881769fe0c516ca90a1a2bc54acf5ce9f78e7eae",
     "packages/core/src/runtime/spawn-host.ts": "121ce355d9784f89594125094689b12b230304e0c7ce120c778070bd34d6c136",
-    "packages/core/test/model-sandbox-isolation.test.js": "30dbdd4d9fd5630ac17a3973c0083dd6f3047912c1fe7931fd5c13387abd3e78",
+    "packages/core/test/model-sandbox-isolation.test.js": "250a17670c9f47c47bb057681fcde6cb77cb49bfd23fa32bc83e1d1c39659a83",
     "packages/core/src/reply-quote.ts": "e3551eb81ae046f631824c896a67b231052314068ef84c7d472c7a5069084234",
     "packages/core/src/session/reply-quote.ts": "945f595cb0004dac6b35d66b820a5cd6ba865d41bc86f1363ecdde5dc9c42b27",
     "packages/core/src/rooms/index.ts": "7d1cea96900980cf00ce1ca0954fee5d9f8b78da4bb203e73362d596718f231d",
