@@ -147,6 +147,71 @@ describe('checkToolApprovals Auto-review gate', () => {
     expect(parts.some((p) => p.problem?.code === 'AUTO_REVIEW_DENIED')).toBe(true);
   });
 
+  it('puts shell kind and the human blockReason on the card payload [AC:auto-review-shell-mcp#AC-6]', () => {
+    const decision = evaluateAutoReview({
+      toolName: 'bash',
+      toolInput: { command: 'rm -rf ./build', requestSmartModeApproval: true }
+    });
+    expect(decision.action).toBe('require_card');
+    if (decision.action !== 'require_card') return;
+    expect(decision.kind).toBe('shell');
+    expect(decision.blockReason).toMatch(/high-risk pattern/);
+    const h = host();
+    const flagged = call('bash', { command: 'rm -rf ./build', requestSmartModeApproval: true }, 'c-shell-face');
+    expect(checkToolApprovals(h, tools, [flagged], ctx, undefined, session, undefined)).toBe('waiting');
+    expect(h.approvals[0]?.reason).toContain(`Auto-review (${decision.kind})`);
+    expect(h.approvals[0]?.reason).toContain(decision.blockReason);
+    expect(h.approvals[0]?.args).toEqual({ command: 'rm -rf ./build' });
+  });
+
+  it('keeps a prior smart-mode note in the human blockReason [AC:auto-review-shell-mcp#AC-6]', () => {
+    const decision = evaluateAutoReview({
+      toolName: 'bash',
+      toolInput: {
+        command: 'sudo reboot',
+        requestSmartModeApproval: true,
+        smartModeBlockReason: 'disk is full'
+      }
+    });
+    expect(decision.action).toBe('require_card');
+    if (decision.action !== 'require_card') return;
+    expect(decision.kind).toBe('shell');
+    expect(decision.blockReason).toContain('high-risk pattern');
+    expect(decision.blockReason).toContain('Prior note: disk is full');
+  });
+
+  it('explains direct shell isolation on the card payload [AC:auto-review-shell-mcp#AC-6]', () => {
+    const decision = evaluateAutoReview({
+      toolName: 'bash',
+      toolInput: { command: 'printf ok', isolation: 'direct', requestSmartModeApproval: true }
+    });
+    expect(decision.action).toBe('require_card');
+    if (decision.action !== 'require_card') return;
+    expect(decision.kind).toBe('shell');
+    expect(decision.blockReason).toMatch(/isolation is direct/);
+  });
+
+  it('puts mcp kind and a different human blockReason on the card payload [AC:auto-review-shell-mcp#AC-7]', () => {
+    const decision = evaluateAutoReview({
+      toolName: 'mcp_invoke',
+      toolInput: { server: 0, tool: 'delete_all', requestSmartModeApproval: true }
+    });
+    expect(decision.action).toBe('require_card');
+    if (decision.action !== 'require_card') return;
+    expect(decision.kind).toBe('mcp');
+    expect(decision.blockReason).toMatch(/MCP tool call/);
+    expect(decision.blockReason).not.toMatch(/high-risk pattern/);
+    const h = host();
+    const flagged = call(
+      'mcp_invoke',
+      { server: 0, tool: 'delete_all', requestSmartModeApproval: true },
+      'c-mcp-face'
+    );
+    expect(checkToolApprovals(h, tools, [flagged], ctx, undefined, session, undefined)).toBe('waiting');
+    expect(h.approvals[0]?.reason).toContain('Auto-review (mcp)');
+    expect(h.approvals[0]?.reason).toContain(decision.blockReason);
+  });
+
   it('does not let permissionMode=bypass skip Auto-review [AC:auto-review-shell-mcp#AC-5]', () => {
     const bypass = { id: 's1', metadata: { permissionMode: 'bypass' } } as unknown as SessionRecord;
     const h = host();

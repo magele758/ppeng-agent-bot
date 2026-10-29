@@ -7,6 +7,7 @@ import { attachBeforeAskUserDecision, type LiveStreamArm } from '@/lib/live-stre
 import { useI18n } from '@/lib/i18n';
 import type { ApprovalItem } from '@/lib/types';
 import { ApprovalActionPreview } from './ApprovalActionPreview';
+import { ApprovalReasonLine } from './AutoReviewMarks';
 
 export function ApprovalBanner({
   approvals,
@@ -84,7 +85,7 @@ function ApprovalItemRow({
     <div className="approval-banner__item">
       <div className="approval-banner__row">
         <strong>{a.toolName}</strong>
-        {shown.reason ? <span className="muted small">{shown.reason}</span> : null}
+        <ApprovalReasonLine approval={a} fallback={shown.reason} />
       </div>
       {isAsk ? (
         shown.question ? <p className="approval-banner__q">{shown.question}</p> : null

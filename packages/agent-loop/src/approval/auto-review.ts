@@ -34,23 +34,33 @@ const RISKY_SHELL_SUBSTRINGS = [
   'passwd '
 ];
 
+export type AutoReviewKind = 'shell' | 'mcp';
+
+const AUTO_REVIEW_REMEDIATION =
+  'Retry the SAME tool with the same parameters and set requestSmartModeApproval=true ' +
+  '(optional smartModeBlockReason with the prior block text). Denial of the approval card is final; ' +
+  'do not bypass via another tool, encoding, or permissionMode=bypass.';
+
+type AutoReviewBlock = {
+  kind: AutoReviewKind;
+  /** Human-readable reason the owner sees on the approval card. */
+  blockReason: string;
+  reason: string;
+  remediation: string;
+  fingerprintInput: Record<string, unknown>;
+};
+
 export type AutoReviewDecision =
   | { action: 'allow' }
-  | {
-      action: 'soft_block';
-      code: 'AUTO_REVIEW_BLOCKED';
-      reason: string;
-      remediation: string;
-      fingerprintInput: Record<string, unknown>;
-    }
-  | {
-      action: 'require_card';
-      code: 'AUTO_REVIEW_CARD';
-      reason: string;
-      remediation: string;
-      fingerprintInput: Record<string, unknown>;
-      blockReason?: string;
-    };
+  | (AutoReviewBlock & { action: 'soft_block'; code: 'AUTO_REVIEW_BLOCKED' })
+  | (AutoReviewBlock & { action: 'require_card'; code: 'AUTO_REVIEW_CARD' });
+
+/** Shell subjects stay shell; every other Auto-review subject is MCP. */
+export function autoReviewKind(toolName: string): AutoReviewKind {
+  const n = toolName.trim().toLowerCase();
+  if (SHELL_SUBJECTS.has(n)) return 'shell';
+  return 'mcp';
+}
 
 export function isAutoReviewSubject(toolName: string): boolean {
   const n = toolName.trim().toLowerCase();
@@ -105,6 +115,32 @@ function isolationIsDirect(input: Record<string, unknown>): boolean {
   return raw.trim().toLowerCase() === 'direct';
 }
 
+function baseAutoReviewBlock(toolName: string, input: Record<string, unknown>): string {
+  if (autoReviewKind(toolName) === 'mcp') {
+    return 'MCP tool call can change external state and was blocked until you approve it.';
+  }
+  if (isolationIsDirect(input)) {
+    return 'Shell isolation is direct and was blocked until you approve it.';
+  }
+  return 'Shell command matches a high-risk pattern and was blocked until you approve it.';
+}
+
+/** Owner-facing block text. A prior smart-mode note is kept when it adds detail. */
+export function describeAutoReviewBlock(
+  toolName: string,
+  input: Record<string, unknown>,
+  prior?: string
+): string {
+  const base = baseAutoReviewBlock(toolName, input);
+  const note = prior?.trim() ?? '';
+  if (!note || base.includes(note)) return base;
+  return `${base} Prior note: ${note}`;
+}
+
+function autoReviewSummary(toolName: string, kind: AutoReviewKind, blockReason: string): string {
+  return `Auto-review (${kind}) blocked high-risk ${toolName}: ${blockReason}`;
+}
+
 export function shellCommandIsHighRisk(command: string): boolean {
   const lower = command.toLowerCase();
   if (!lower.trim()) return false;
@@ -147,30 +183,32 @@ export function evaluateAutoReview(input: {
   if (!isHighRiskAutoReviewCall(toolName, toolInput)) {
     return { action: 'allow' };
   }
-  const fingerprintInput = stripAutoReviewFlags(toolInput);
-  const prior = readSmartModeBlockReason(toolInput);
-  const reasonBase = `Auto-review blocked high-risk ${toolName}`;
-  const remediation =
-    'Retry the SAME tool with the same parameters and set requestSmartModeApproval=true ' +
-    '(optional smartModeBlockReason with the prior block text). Denial of the approval card is final; ' +
-    'do not bypass via another tool, encoding, or permissionMode=bypass.';
+  return blockedAutoReview(toolName, toolInput);
+}
 
+function blockedAutoReview(toolName: string, toolInput: unknown): Exclude<AutoReviewDecision, { action: 'allow' }> {
+  const fingerprintInput = stripAutoReviewFlags(toolInput);
+  const kind = autoReviewKind(toolName);
+  const blockReason = describeAutoReviewBlock(toolName, fingerprintInput, readSmartModeBlockReason(toolInput));
+  const summary = autoReviewSummary(toolName, kind, blockReason);
   if (hasRequestSmartModeApproval(toolInput)) {
     return {
       action: 'require_card',
       code: 'AUTO_REVIEW_CARD',
-      reason: prior ? `${reasonBase}: ${prior}` : `${reasonBase} (smart-mode approval requested)`,
-      remediation,
+      reason: summary,
+      remediation: AUTO_REVIEW_REMEDIATION,
       fingerprintInput,
-      blockReason: prior
+      blockReason,
+      kind
     };
   }
-
   return {
     action: 'soft_block',
     code: 'AUTO_REVIEW_BLOCKED',
-    reason: `${reasonBase}. Side effects were not executed.`,
-    remediation,
-    fingerprintInput
+    reason: `${summary} Side effects were not executed.`,
+    remediation: AUTO_REVIEW_REMEDIATION,
+    fingerprintInput,
+    blockReason,
+    kind
   };
 }

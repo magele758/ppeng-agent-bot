@@ -552,6 +552,24 @@ body,
 }
 .approval-banner__item + .approval-banner__item { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--color-border-strong); }
 .approval-banner__row { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+.approval-auto-review {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  color: var(--color-text-primary);
+}
+.approval-kind-badge {
+  display: inline-block;
+  padding: 0 6px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.6;
+}
+.approval-block-reason { overflow-wrap: anywhere; }
 .approval-banner__args {
   margin: 6px 0;
   max-height: 120px;
