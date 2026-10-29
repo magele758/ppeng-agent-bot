@@ -1,5 +1,5 @@
 import { env } from 'node:process';
-import { NotFoundError, ValidationError } from '@ppeng/agent-core';
+import { ConflictError, NotFoundError, ValidationError } from '@ppeng/agent-core';
 import { deliverToChannel } from './channels.js';
 import {
   abandonDraftDeliveries,
@@ -81,11 +81,10 @@ async function sendApprovedChannel(opts: {
 }
 
 function rethrowDraft(error: unknown): never {
-  if (error instanceof OutboundDraftError && error.code === 'not_found') {
-    throw new NotFoundError('OutboundDraft', error.draftId);
-  }
-  if (error instanceof OutboundDraftError) throw new ValidationError(error.message);
-  throw error;
+  if (!(error instanceof OutboundDraftError)) throw error;
+  if (error.code === 'not_found') throw new NotFoundError('OutboundDraft', error.draftId);
+  if (error.code === 'stale_revision') throw new ConflictError(error.message);
+  throw new ValidationError(error.message);
 }
 
 /**
@@ -97,6 +96,8 @@ export async function releaseOutboundDraft(input: {
   id: string;
   decision: 'approve' | 'reject';
   channels: ChannelSpec[];
+  /** Revision of the preview the human saw. A stale value fails closed instead of sending newer text. */
+  expectedRevision?: number;
 }): Promise<OutboundDraft> {
   if (input.decision === 'reject') {
     try {
@@ -114,7 +115,7 @@ export async function releaseOutboundDraft(input: {
     const current = (await readOutboundDrafts(input.gatewayDir)).find((item) => item.id === input.id);
     if (!current) throw new OutboundDraftError('not_found', input.id, `draft ${input.id} not found`);
     if (current.status === 'pending_approval' || current.status === 'failed') {
-      await confirmOutboundDraft(input.gatewayDir, input.id);
+      await confirmOutboundDraft(input.gatewayDir, input.id, { expectedRevision: input.expectedRevision });
     } else if (current.status !== 'confirmed') {
       throw new OutboundDraftError('not_pending', input.id, `draft ${input.id} is ${current.status}`);
     }

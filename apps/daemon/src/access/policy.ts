@@ -450,6 +450,7 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
     ['GET /api/social-post-schedules', ADMIN],
     ['POST /api/social-post-schedules/:taskId/action', ADMIN],
     ['GET /api/outbound-drafts', ADMIN],
+    ['PATCH /api/outbound-drafts/:id', ADMIN],
     ['POST /api/outbound-drafts/:id/approve', ADMIN],
     ['POST /api/outbound-drafts/:id/reject', ADMIN],
 

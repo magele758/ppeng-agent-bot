@@ -24,13 +24,30 @@ export interface OutboundDraft {
   receiveIdType?: FeishuReceiveIdType;
   decidedAt?: string;
   error?: string;
+  /** Bumped on every human edit. Absent means never edited (0). */
+  revision?: number;
+  /** Text as first drafted. Set on the first edit only. */
+  originalText?: string;
+  editedAt?: string;
 }
 
+export type OutboundDraftErrorCode =
+  | 'not_found'
+  | 'not_pending'
+  | 'not_confirmed'
+  | 'not_editable'
+  | 'empty_text'
+  | 'text_too_long'
+  | 'stale_revision';
+
+/** Upper bound for a human-edited preview. Larger than any channel's own limit. */
+export const OUTBOUND_DRAFT_MAX_TEXT = 20_000;
+
 export class OutboundDraftError extends Error {
-  readonly code: 'not_found' | 'not_pending' | 'not_confirmed';
+  readonly code: OutboundDraftErrorCode;
   readonly draftId: string;
 
-  constructor(code: 'not_found' | 'not_pending' | 'not_confirmed', draftId: string, message: string) {
+  constructor(code: OutboundDraftErrorCode, draftId: string, message: string) {
     super(message);
     this.name = 'OutboundDraftError';
     this.code = code;
@@ -109,11 +126,64 @@ export async function appendOutboundDraft(
 }
 
 
+export function draftRevision(draft: Pick<OutboundDraft, 'revision'>): number {
+  return draft.revision ?? 0;
+}
+
+/**
+ * Reject a confirm/send that was issued against an older preview than the stored text.
+ * `undefined` skips the check (legacy callers); the UI always passes the revision it showed.
+ */
+export function assertDraftRevision(draft: OutboundDraft, expected: number | undefined): void {
+  if (expected === undefined || expected === draftRevision(draft)) return;
+  throw new OutboundDraftError('stale_revision', draft.id, `draft ${draft.id} changed since it was previewed`);
+}
+
+function assertEditableText(id: string, text: string): void {
+  if (!text.trim()) throw new OutboundDraftError('empty_text', id, 'draft text must not be empty');
+  if (text.length > OUTBOUND_DRAFT_MAX_TEXT) {
+    throw new OutboundDraftError('text_too_long', id, `draft text exceeds ${OUTBOUND_DRAFT_MAX_TEXT} characters`);
+  }
+}
+
+/**
+ * Human edit of the preview text. Only `pending_approval` / `failed` drafts are editable;
+ * a confirmed or sending draft is already being released. Does not confirm and does not POST.
+ */
+export async function editOutboundDraft(
+  gatewayDir: string,
+  id: string,
+  input: { text: string; expectedRevision?: number }
+): Promise<OutboundDraft> {
+  return withGatewayLock(gatewayDir, async () => {
+    const items = await readOutboundDrafts(gatewayDir);
+    const draft = items.find((item) => item.id === id);
+    if (!draft) throw new OutboundDraftError('not_found', id, `draft ${id} not found`);
+    if (draft.status !== 'pending_approval' && draft.status !== 'failed') {
+      throw new OutboundDraftError('not_editable', id, `draft ${id} is ${draft.status}`);
+    }
+    assertDraftRevision(draft, input.expectedRevision);
+    assertEditableText(id, input.text);
+    if (input.text === draft.text) return { ...draft };
+    draft.originalText ??= draft.text;
+    draft.text = input.text;
+    draft.revision = draftRevision(draft) + 1;
+    draft.editedAt = new Date().toISOString();
+    draft.error = undefined;
+    await writeDrafts(gatewayDir, items);
+    return { ...draft };
+  });
+}
+
 /**
  * Human confirm step. Moves `pending_approval` (or retryable `failed`) → `confirmed`.
  * Does not POST. Call `claimOutboundDraft` + transport (or `sendConfirmedOutboundDraft`) to send.
  */
-export async function confirmOutboundDraft(gatewayDir: string, id: string): Promise<OutboundDraft> {
+export async function confirmOutboundDraft(
+  gatewayDir: string,
+  id: string,
+  opts: { expectedRevision?: number } = {}
+): Promise<OutboundDraft> {
   return withGatewayLock(gatewayDir, async () => {
     const items = await readOutboundDrafts(gatewayDir);
     const draft = items.find((item) => item.id === id);
@@ -121,6 +191,7 @@ export async function confirmOutboundDraft(gatewayDir: string, id: string): Prom
     if (draft.status !== 'pending_approval' && draft.status !== 'failed') {
       throw new OutboundDraftError('not_pending', id, `draft ${id} is ${draft.status}`);
     }
+    assertDraftRevision(draft, opts.expectedRevision);
     draft.status = 'confirmed';
     draft.decidedAt = new Date().toISOString();
     draft.error = undefined;

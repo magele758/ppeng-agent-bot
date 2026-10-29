@@ -38,10 +38,19 @@ export {
 export {
   appendOutboundDraft,
   confirmOutboundDraft,
+  editOutboundDraft,
+  OUTBOUND_DRAFT_MAX_TEXT,
   readOutboundDrafts,
   type OutboundDraft,
   type OutboundDraftStatus
 } from './outbound-drafts.js';
+export {
+  describeOutboundIdentity,
+  previewOutboundDraft,
+  type OutboundDraftPreview,
+  type OutboundIdentity,
+  type OutboundIdentityKind
+} from './outbound-identity.js';
 export { readGatewayState, writeGatewayState } from './state.js';
 export type { ChannelSpec, GatewayEnvOptions, GatewayFileConfig, LearnConfig, ParsedFeedItem } from './types.js';
 export {

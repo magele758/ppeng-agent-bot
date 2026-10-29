@@ -1,32 +1,41 @@
 import { join } from 'node:path';
-import type { RawAgentRuntime } from '@ppeng/agent-core';
+import { ValidationError, type RawAgentRuntime } from '@ppeng/agent-core';
 import {
+  createUserDeliveryPort,
   loadGatewayFileConfig,
   parseGatewayEnv,
-  readOutboundDrafts,
-  releaseOutboundDraft
+  type UserDeliveryPort
 } from '@ppeng/agent-capability-gateway';
 import { hasHumanRelease, humanReleaseDenied } from '../human-release.js';
 import { json } from '../http-utils.js';
 import type { RouteContext, RouteSpec } from '../routing.js';
 
+function parseRevision(body: unknown): number | undefined {
+  const raw = (body as { revision?: unknown } | null)?.revision;
+  if (raw === undefined) return undefined;
+  if (!Number.isInteger(raw) || (raw as number) < 0) throw new ValidationError('revision must be a non-negative integer');
+  return raw as number;
+}
+
+function parseEditText(body: unknown): string {
+  const text = (body as { text?: unknown } | null)?.text;
+  if (typeof text !== 'string') throw new ValidationError('text is required');
+  return text;
+}
+
 /**
  * Human release path for proactive outbound drafts (digest, webhook, model-initiated).
- * The decision is the URL verb. A request body cannot approve a draft.
- * Approve and reject require a Lab login session ({@link hasHumanRelease}).
+ * The decision is the URL verb. A request body cannot approve a draft; it may only carry the
+ * preview `revision` the human saw (stale → 409). Editing the preview text (PATCH) never confirms.
+ * Edit, approve and reject require a Lab login session ({@link hasHumanRelease}).
  * With login off, both fail closed with 403 `human_login_required` and the inbox asks the operator to enable it.
  */
 export function outboundDraftRoutes(runtime: RawAgentRuntime, repoRoot: string, env: NodeJS.ProcessEnv): RouteSpec[] {
   const gatewayDir = () => join(runtime.stateDir, 'gateway');
-  const decide = async (id: string, decision: 'approve' | 'reject') => {
+  const port = async (): Promise<UserDeliveryPort> => {
     const { configPath } = parseGatewayEnv(repoRoot);
     const cfg = configPath ? await loadGatewayFileConfig(configPath) : undefined;
-    return releaseOutboundDraft({
-      gatewayDir: gatewayDir(),
-      id,
-      decision,
-      channels: cfg?.channels ?? []
-    });
+    return createUserDeliveryPort({ gatewayDir: gatewayDir(), channels: cfg?.channels ?? [] });
   };
   const requireHuman = (ctx: RouteContext): boolean => {
     if (hasHumanRelease(ctx.request, env, ctx.auth)) return true;
@@ -39,13 +48,28 @@ export function outboundDraftRoutes(runtime: RawAgentRuntime, repoRoot: string, 
       method: 'GET',
       pattern: '/api/outbound-drafts',
       handler: async ({ response }) => {
+        // Each draft carries the identity it will send as, so the preview shows who it goes out as.
         // Do not reconcile here. An in-flight approve is `sending` until the POST
         // finishes; treating that as a crash marks a live send failed and the
         // human can release it a second time. Crash recovery runs at startup.
-        const drafts = (await readOutboundDrafts(gatewayDir())).filter(
+        const drafts = (await (await port()).listPreviews()).filter(
           (draft) => draft.status === 'pending_approval' || draft.status === 'failed' || draft.status === 'sending'
         );
         json(response, 200, { drafts });
+      }
+    },
+    {
+      method: 'PATCH',
+      pattern: '/api/outbound-drafts/:id',
+      handler: async (ctx) => {
+        if (!requireHuman(ctx)) return;
+        const body = await ctx.readBody();
+        const draft = await (await port()).edit({
+          id: ctx.requireParam('id'),
+          text: parseEditText(body),
+          expectedRevision: parseRevision(body)
+        });
+        json(ctx.response, 200, { draft });
       }
     },
     {
@@ -53,7 +77,8 @@ export function outboundDraftRoutes(runtime: RawAgentRuntime, repoRoot: string, 
       pattern: '/api/outbound-drafts/:id/approve',
       handler: async (ctx) => {
         if (!requireHuman(ctx)) return;
-        const draft = await decide(ctx.requireParam('id'), 'approve');
+        const expectedRevision = parseRevision(await ctx.readBody());
+        const draft = await (await port()).confirm({ id: ctx.requireParam('id'), decision: 'approve', expectedRevision });
         json(ctx.response, 200, { draft });
       }
     },
@@ -62,7 +87,7 @@ export function outboundDraftRoutes(runtime: RawAgentRuntime, repoRoot: string, 
       pattern: '/api/outbound-drafts/:id/reject',
       handler: async (ctx) => {
         if (!requireHuman(ctx)) return;
-        const draft = await decide(ctx.requireParam('id'), 'reject');
+        const draft = await (await port()).confirm({ id: ctx.requireParam('id'), decision: 'reject' });
         json(ctx.response, 200, { draft });
       }
     }

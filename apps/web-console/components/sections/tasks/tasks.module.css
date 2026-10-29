@@ -141,3 +141,46 @@
   margin: 0 0 var(--ui-space-3);
   color: var(--ui-text);
 }
+
+.identityBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-space-2) var(--ui-space-3);
+  padding: var(--ui-space-1) var(--ui-space-2);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface-muted, transparent);
+  font-size: var(--ui-text-sm);
+  overflow-wrap: anywhere;
+}
+
+.identityBar[data-resolved='false'] {
+  border-color: var(--ui-danger);
+}
+
+.identityWarn {
+  flex-basis: 100%;
+  color: var(--ui-danger);
+}
+
+.draftText {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.draftEditor {
+  width: 100%;
+  min-height: 8rem;
+  padding: var(--ui-space-2);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  resize: vertical;
+}
+
+.draftEditor:focus-visible {
+  outline: var(--ui-focus);
+}

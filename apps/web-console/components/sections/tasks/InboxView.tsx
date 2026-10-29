@@ -8,19 +8,18 @@ import { sortAgentsById } from '@/lib/sort-utils';
 import { EmptyState, SettingsGroup } from '../../ui';
 import { useLab } from '../../shell/LabProvider';
 import { ListFallback } from './ListFallback';
+import { OutboundDraftsPanel } from './OutboundDraftsPanel';
 import styles from './tasks.module.css';
 import { ApprovalActionPreview } from '../../ApprovalActionPreview';
 
 /** 待审批工具调用、站内邮件与工作区 */
 export function InboxView() {
   const { t } = useI18n();
-  const { approvals, outboundDrafts, workspaces, agents, mailAll, listState, tick, navigate, openSession } = useLab();
+  const { approvals, workspaces, agents, mailAll, listState, tick, navigate, openSession } = useLab();
   const [mailFrom, setMailFrom] = useState('');
   const [mailTo, setMailTo] = useState('');
   const [mailBody, setMailBody] = useState('');
-  const [draftLoginHint, setDraftLoginHint] = useState(false);
   const [approvalError, setApprovalError] = useState<string | null>(null);
-  const [draftError, setDraftError] = useState<string | null>(null);
   const [mailError, setMailError] = useState<string | null>(null);
   const agentsSorted = sortAgentsById(agents);
   const onRefresh = () => void tick();
@@ -29,18 +28,6 @@ export function InboxView() {
     setApprovalError(null);
     void api(`/api/approvals/${id}/${verdict}`, { method: 'POST' }).then(onRefresh, (error: unknown) => {
       setApprovalError(error instanceof Error ? error.message : String(error));
-    });
-  };
-
-  const decideDraft = (id: string, verdict: 'approve' | 'reject') => {
-    setDraftLoginHint(false);
-    setDraftError(null);
-    void api(`/api/outbound-drafts/${id}/${verdict}`, { method: 'POST' }).then(onRefresh, (error: unknown) => {
-      if (error instanceof Error && error.message === 'human_login_required') {
-        setDraftLoginHint(true);
-        return;
-      }
-      setDraftError(error instanceof Error ? error.message : String(error));
     });
   };
 
@@ -125,59 +112,7 @@ export function InboxView() {
         </ListFallback>
       </SettingsGroup>
 
-      <SettingsGroup title={t('tasks.inbox.draftsTitle')} description={t('tasks.inbox.draftsDesc')}>
-        {draftLoginHint ? (
-          <p id="outboundDraftLoginHint" className={styles.draftHint} role="alert">
-            {t('tasks.inbox.loginRequiredToSend')}
-          </p>
-        ) : null}
-        {draftError ? <p role="alert">{t('tasks.actionFailed', { error: draftError })}</p> : null}
-        <ListFallback
-          error={listState.outboundDrafts.error}
-          count={outboundDrafts.length}
-          empty={<EmptyState title={t('tasks.inbox.draftsEmptyTitle')} description={t('tasks.inbox.draftsEmptyDesc')} />}
-        >
-          <div id="listOutboundDrafts" className={styles.list}>
-            {outboundDrafts.map((draft) => (
-              <div key={draft.id} className={`list-item ${styles.row}`} data-draft-id={draft.id}>
-                <div className={styles.rowMain}>
-                  <strong>{draft.channelId}</strong>
-                  <span className={styles.status}>{draft.status}</span>
-                </div>
-                <div className={styles.rowMeta}>
-                  <span>{t('tasks.inbox.draftChannel', { channel: draft.channelId })}</span>
-                  {draft.event ? <span>{t('tasks.inbox.draftEvent', { event: draft.event })}</span> : null}
-                  {draft.receiveId ? <span>{t('tasks.inbox.draftRecipient', { id: draft.receiveId })}</span> : null}
-                  {draft.error ? <span>{draft.error}</span> : null}
-                </div>
-                <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{draft.text}</div>
-                <div className={styles.actions}>
-                  {draft.status === 'sending' ? null : (
-                    <>
-                      <button
-                        type="button"
-                        className="btn btn-primary btn-sm"
-                        aria-label={t('tasks.inbox.approveSendAria', { channel: draft.channelId })}
-                        onClick={() => decideDraft(draft.id, 'approve')}
-                      >
-                        {t('tasks.inbox.approveSend')}
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        aria-label={t('tasks.inbox.rejectDraftAria', { channel: draft.channelId })}
-                        onClick={() => decideDraft(draft.id, 'reject')}
-                      >
-                        {t('tasks.inbox.rejectDraft')}
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </ListFallback>
-      </SettingsGroup>
+      <OutboundDraftsPanel />
 
       <SettingsGroup title={t('tasks.inbox.mailTitle')} description={t('tasks.inbox.mailDesc')} collapsible defaultOpen={false}>
         {agentsSorted.length === 0 ? (
