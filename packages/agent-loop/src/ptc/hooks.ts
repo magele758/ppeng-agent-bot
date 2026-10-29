@@ -111,7 +111,18 @@ function readonlyToolHook(
 ): (raw?: unknown) => Promise<ToolExecutionResult> {
   return async (raw?: unknown) => {
     if (context.abortSignal?.aborted) throw new Error('PTC cell aborted');
-    const result = await tool.execute(context, normalizeToolArgs(tool.name, raw));
+    const args = normalizeToolArgs(tool.name, raw);
+    if (tool.needsApproval?.(context, args) === true) {
+      return {
+        ok: false,
+        content: JSON.stringify({
+          error: 'approval_required',
+          tool: tool.name,
+          message: 'This call needs approval; PTC cells cannot request it. Call the tool directly.'
+        })
+      };
+    }
+    const result = await tool.execute(context, args);
     onToolCall?.(tool.name, result);
     return result;
   };
