@@ -10,6 +10,16 @@ export { resolveSessionBotGoal, goalScope } from './bots/goals/runtime-host.js';
 export * from './exports/public.js';
 
 export { FactoryService } from './factory/service.js';
+export {
+  createRegisteredMachinePort,
+  createRegisteredMachineTools,
+  createDisconnectedBackend
+} from './registered-machines/index.js';
+export type {
+  RegisteredMachinePort,
+  RegisteredMachine,
+  RegisteredMachineBackend
+} from './registered-machines/index.js';
 export type { FactoryMachine, FactoryTask, FactorySettings, FactoryTransport } from './factory/types.js';
 
 export type { DevelopmentPolicy, DevelopmentSpec, DevelopmentState, DevelopmentPreflight } from './factory/development-types.js';

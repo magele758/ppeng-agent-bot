@@ -6,6 +6,7 @@ import { invalidateSteerToolDecision, steerRunningTools } from './runtime/steer-
 import { createGoalFactoryDevelopmentTool, createGoalSelfHealTool, specialtyStatus, cancelSpecialty } from './bots/goals/specialty-services.js';
 import { FactoryService } from './factory/service.js';
 import { createFactoryTools } from './factory/tools.js';
+import { createRegisteredMachinePort, createRegisteredMachineTools } from './registered-machines/index.js';
 import { createProductAdminTools } from './tools/product-admin-tools.js';
 import { BotRoomService } from './rooms/index.js';
 import { recoverBotWork, tickBotWork, createBotManagementTools, expireOverdueBotWork, isBotWorkSessionBlocked, type BotWorkHost } from './bots/bot-work.js';
@@ -349,6 +350,7 @@ export class RawAgentRuntime {
   readonly rooms: BotRoomService;
   private libraryIndex?: LibraryIndexWatcher;
   readonly factory: FactoryService;
+  readonly registeredMachines: import('./registered-machines/port.js').RegisteredMachinePort;
   private loadedPlugins: LoadedPlugin[] = [];
   private connectorToolNames = new Set<string>();
   readonly secretVault: SecretVault;
@@ -722,6 +724,8 @@ export class RawAgentRuntime {
       hasUnconfirmedEffects: (id, since) => this.hasUnconfirmedEffects(id, since) });
     this.factory = new FactoryService({store:this.store,rooms:this.rooms});
     this.tools.push(...createFactoryTools(this.store,this.rooms,this.factory));
+    this.registeredMachines = createRegisteredMachinePort(this.store);
+    this.tools.push(...createRegisteredMachineTools(this.store, this.registeredMachines));
     this.tools.push(...createProductAdminTools({
       store: this.store,
       facade: sessionFacadeFrom(this.l5()),

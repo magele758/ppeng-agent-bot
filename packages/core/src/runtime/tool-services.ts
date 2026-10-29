@@ -28,6 +28,7 @@ import { loadForkSiblingFileFacts, recordForkSiblingWrite } from '../bots/fork-s
 export interface ToolServicesHost {
   store: SqliteStateStore;
   stateDir: string;
+  registeredMachines?: import('../registered-machines/port.js').RegisteredMachinePort;
   resolveSkillLoad: (
     name: string,
     sessionId: string
@@ -78,6 +79,8 @@ export interface ToolServicesHost {
 
 export function createToolServices(host: ToolServicesHost): RuntimeToolServices {
   return {
+    stateStore: host.store,
+    registeredMachines: host.registeredMachines,
     loadSkill: async (name, sessionId) => {
       const result = await host.resolveSkillLoad(name, sessionId);
       if (result.manifest) persistActiveSkillManifest(host.store, sessionId, result.manifest);

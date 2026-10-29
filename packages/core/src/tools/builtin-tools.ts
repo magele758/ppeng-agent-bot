@@ -31,6 +31,7 @@ import {
 } from '../sandbox/model-isolation.js';
 import { createExternalAiTools } from './external-ai-tools.js';
 import { bashCommandNeedsApproval } from './bash-command-policy.js';
+import { executeOnRegisteredMachine } from '../registered-machines/tools.js';
 import { globWorkspaceFiles } from './glob-files.js';
 import { isVaultMetadataDirName } from './markdown-vault-noise.js';
 import { SENSITIVE_READ_REFUSAL, sensitiveReadRefusal } from '../workspace/sensitive-read.js';
@@ -217,6 +218,10 @@ export interface RuntimeToolServices {
   compactContext?: (context: RunContext, opts?: { force?: boolean }) => Promise<string>;
   /** Lab KV for web_search URL; env is CI fallback. */
   webSearchSettingsStore?: WebSettingsReadStore;
+  /** Personal registered machines (≠ Factory SSH). When set, bash/read_file honor machineId. */
+  registeredMachines?: import('../registered-machines/port.js').RegisteredMachinePort;
+  /** Store needed to resolve principal for machineId-gated bash/read_file. */
+  stateStore?: import('../storage.js').SqliteStateStore;
   /** Sibling-file facts for a sub-task read. Missing hook keeps the previous read behavior. */
   forkSiblingFileFacts?: (context: RunContext) => ForkSiblingFileFacts;
   /** Record a file this sub-task just created so siblings cannot read it. */
@@ -448,13 +453,38 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
       properties: {
         path: { type: 'string' },
         limit: { type: 'number' },
-        offset_line: { type: 'number', description: '0-based start line when reading a file' }
+        offset_line: { type: 'number', description: '0-based start line when reading a file' },
+        machineId: {
+          type: 'string',
+          description:
+            'Optional personal registered machine id from list_machines. When set, reads on that machine via RegisteredMachinePort (not Factory SSH).'
+        }
       }
     },
     approvalMode: 'never',
     sideEffectLevel: 'none',
     ptc: { kind: 'read' },
     async execute(context, args) {
+      if (args.machineId) {
+        if (!services.stateStore) {
+          return {
+            ok: false,
+            content: JSON.stringify({
+              error: 'registered_machines_unavailable',
+              message: 'RegisteredMachinePort store is not configured'
+            })
+          };
+        }
+        const routed = await executeOnRegisteredMachine(
+          services.stateStore,
+          services.registeredMachines,
+          context.session,
+          args.machineId,
+          'read',
+          args as Record<string, unknown>
+        );
+        if (routed) return routed;
+      }
       const facts = forkFacts(context);
       if (!args.path) {
         const roots = context.workspaceRoots?.length
@@ -851,16 +881,21 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
     }
   };
 
-  const bashTool: ToolContract<{ command: string; timeout_ms?: number; isolation?: string }> = {
+  const bashTool: ToolContract<{ command: string; timeout_ms?: number; isolation?: string; machineId?: string }> = {
     name: 'bash',
     description:
-      'Run a shell command inside the workspace root. Optional timeout_ms (default from env RAW_AGENT_BASH_TIMEOUT_MS). Optional isolation is honored when the saved mode is Auto; omit it to follow the saved mode. Auto uses the strongest available.',
+      'Run a shell command inside the workspace root. Optional timeout_ms (default from env RAW_AGENT_BASH_TIMEOUT_MS). Optional isolation is honored when the saved mode is Auto; omit it to follow the saved mode. Auto uses the strongest available. Optional machineId (from list_machines) runs on a personal registered machine via RegisteredMachinePort — never Factory SSH.',
     inputSchema: {
       type: 'object',
       properties: {
         command: { type: 'string' },
         timeout_ms: { type: 'number' },
-        isolation: isolationInputSchema()
+        isolation: isolationInputSchema(),
+        machineId: {
+          type: 'string',
+          description:
+            'Optional personal registered machine id from list_machines. When set, command runs on that machine (RegisteredMachinePort), not local sandbox and not Factory SSH.'
+        }
       },
       required: ['command']
     },
@@ -873,6 +908,26 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
       );
     },
     async execute(context, args) {
+      if (args.machineId) {
+        if (!services.stateStore) {
+          return {
+            ok: false,
+            content: JSON.stringify({
+              error: 'registered_machines_unavailable',
+              message: 'RegisteredMachinePort store is not configured'
+            })
+          };
+        }
+        const routed = await executeOnRegisteredMachine(
+          services.stateStore,
+          services.registeredMachines,
+          context.session,
+          args.machineId,
+          'shell',
+          args as Record<string, unknown>
+        );
+        if (routed) return routed;
+      }
       const denied = commandHardlineToolResult(String(args.command ?? ''));
       if (denied) return denied;
       const gated = gateShell(context, 'bash', args);

@@ -207,6 +207,18 @@ export const TOOL_GROUPS: ToolGroup[] = [
         ]
     },
     {
+        "id": "registered-machines",
+        "tier": 2,
+        "labelZh": "个人注册机器",
+        "labelEn": "Registered personal machines",
+        "tools": [
+            "list_machines",
+            "register_machine",
+            "copy_to_machine",
+            "copy_from_machine"
+        ]
+    },
+    {
         "id": "factory",
         "tier": 3,
         "labelZh": "工厂",
