@@ -35,6 +35,7 @@ import type { AutonomousScheduler } from '../services/autonomous-scheduler.js';
 import type { ImageIngestService } from '../services/image-ingest-service.js';
 import type { SqliteStateStore } from '../storage.js';
 import type { TraceEvent } from '../stores/trace.js';
+import { artifactIndexFromManifest } from '../artifact/durable-artifact-port.js';
 import { envInt } from '../env.js';
 import { checkToolBindingPin, markBindingNeedsReverify } from '../discovery/cbom.js';
 import { resolveDiscoveryEnabled } from '../discovery/settings.js';
@@ -424,19 +425,7 @@ export function toolLoopDepsFrom(rt: L5Bindable): ToolLoopDeps {
     },
     onArtifactCreated: (manifest) => {
       try {
-        rt.store.createArtifactIndex({
-          id: manifest.handle,
-          sessionId: manifest.sessionId,
-          sourceTool: manifest.sourceTool,
-          fileName: manifest.fileName,
-          mimeType: manifest.mimeType,
-          localRelPath: manifest.storageRelPath,
-          totalBytes: manifest.totalBytes,
-          totalChars: manifest.totalChars,
-          pageSizeChars: manifest.pageSizeChars,
-          totalPages: manifest.totalPages,
-          createdAt: manifest.createdAt
-        });
+        rt.store.createArtifactIndex(artifactIndexFromManifest(manifest));
       } catch {
         /* index is best-effort; files remain readable */
       }

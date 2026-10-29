@@ -1,0 +1,35 @@
+id: durable-artifact-port
+title: 大结果落盘并按页引用
+status: implemented
+requirement: |
+  implement a SMALL cut of DurableArtifactPort + Pages (paged artifact by-reference for large results).
+  Prefer the durable artifact port + paged-by-reference slice over full five-stage ingestion.
+  invent the DurableArtifactPort abstraction that persists artifacts and returns page/refs for large model-facing results instead of dumping full blobs into the loop.
+  Pages here means paged artifact by-reference (large tool/result paging), NOT a Cursor/Grok Bot Canvas UI clone.
+  Keep the cut small: port interface + persistence + by-reference paging + acceptance tests.
+notes: 'assumedApproval: standing-order-2026-10-22. 选择大结果按页引用的持久端口，不做五阶段 ingestion，也不做 Canvas/Pages UI。阈值沿用已保存的归档配置，无新环境变量。'
+criteria:
+  - id: AC-1
+    given: 已保存的归档长度有效，某次工具产出的正文超过该长度
+    when: 结果回到模型
+    then: 模型看到句柄、页数和短预览，看不到正文尾部；同一句柄能读回含该尾部的页
+  - id: AC-2
+    given: 大结果已按页落盘
+    when: 读取第一页，以及用另一个会话读取同一句柄
+    then: 第一页只有该页片段并标明还有下一页；另一会话读不到
+  - id: AC-3
+    given: 正文不超过已保存的归档长度，或归档已关闭
+    when: 结果回到模型
+    then: 正文原样保留，不产生句柄
+  - id: AC-4
+    given: 大结果已经落盘
+    when: 用同一状态目录重新打开后再按句柄翻页
+    then: 仍能读到原来的那一页
+  - id: AC-5
+    given: 翻页、检索或历史取回本身的返回很长
+    when: 这些返回再次进入结果归档
+    then: 不会再套一层归档，正文保持原样
+  - id: AC-6
+    given: 大结果已通过该入口落盘到某个会话
+    when: 列出该会话的产物并下载
+    then: 列表里有同一句柄，下载内容包含模型没看到的尾部

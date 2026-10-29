@@ -75,5 +75,5 @@
 - 前端展示 `usageCostUsd` / goal 状态 / working log
 - **`RunOutcome` 单一终态真值**（node `observability/run-outcome.ts`）：ppeng 终态目前散在
   各处 `updateSession(status)`，且无 `failureStage` 归因维度——完成率会系统性虚高
-- node 五阶段 ingestion 管线（附件输入）+ paged artifact by-reference 大结果
+- node 五阶段 ingestion 管线（附件输入）仍可选；大结果已由 DurableArtifactPort 落盘并按页引用（`acceptance/durable-artifact-port.yaml`）
 - 语义记忆 gate / curator / dreamer（node `memory/` 约 7.7k 行；ppeng 目前是五层 KV store）

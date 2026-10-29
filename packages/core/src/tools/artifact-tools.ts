@@ -1,9 +1,4 @@
-import {
-  readPagedArtifactLines,
-  readPagedArtifactPage,
-  readPagedArtifactSlice,
-  searchPagedArtifact
-} from '../artifact/paged-artifact.js';
+import { createDurableArtifactPort } from '../artifact/durable-artifact-port.js';
 import type { ToolContract } from '../types.js';
 
 export function createArtifactTools(): ToolContract<any>[] {
@@ -38,33 +33,15 @@ export function createArtifactTools(): ToolContract<any>[] {
       try {
         const handle = String(args.handle ?? '').trim();
         if (!handle) return { ok: false, content: 'handle 必填' };
-        let page;
-        if (typeof args.startOffset === 'number') {
-          page = readPagedArtifactSlice({
-            stateDir: context.stateDir,
-            sessionId: context.session.id,
-            handle,
-            startOffset: args.startOffset,
-            maxChars: args.maxChars
-          });
-        } else if (typeof args.lineStart === 'number') {
-          page = readPagedArtifactLines({
-            stateDir: context.stateDir,
-            sessionId: context.session.id,
-            handle,
-            lineStart: args.lineStart,
-            lineEnd: args.lineEnd ?? args.lineStart,
-            maxChars: args.maxChars
-          });
-        } else {
-          page = readPagedArtifactPage({
-            stateDir: context.stateDir,
-            sessionId: context.session.id,
-            handle,
-            page: args.page ?? 1,
-            maxChars: args.maxChars
-          });
-        }
+        const page = createDurableArtifactPort({ stateDir: context.stateDir }).readPage({
+          sessionId: context.session.id,
+          handle,
+          page: args.page,
+          startOffset: args.startOffset,
+          lineStart: args.lineStart,
+          lineEnd: args.lineEnd,
+          maxChars: args.maxChars
+        });
         return { ok: true, content: JSON.stringify({ success: true, content_mode: 'paged_artifact_page', ...page }, null, 2) };
       } catch (e) {
         return { ok: false, content: e instanceof Error ? e.message : String(e) };
@@ -101,8 +78,7 @@ export function createArtifactTools(): ToolContract<any>[] {
         const handle = String(args.handle ?? '').trim();
         const query = String(args.query ?? '');
         if (!handle || !query) return { ok: false, content: 'handle 与 query 必填' };
-        const result = searchPagedArtifact({
-          stateDir: context.stateDir,
+        const result = createDurableArtifactPort({ stateDir: context.stateDir }).search({
           sessionId: context.session.id,
           handle,
           query,
