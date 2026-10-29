@@ -1,4 +1,4 @@
-export type ExternalSource = 'web_fetch' | 'browser' | 'mcp' | 'http' | 'attachment' | 'im' | 'event';
+export type ExternalSource = 'web_fetch' | 'browser' | 'mcp' | 'http' | 'attachment' | 'im' | 'event' | 'shell';
 
 /** Fixed sentence in the stable system prefix. Bump STABLE_SYSTEM_VERSION when this wording changes. */
 export const EXTERNAL_FENCE_SYSTEM_SENTENCE =
@@ -154,4 +154,19 @@ export function fenceExternalContent(input: { source: ExternalSource; label: str
 
 export function isExternalFence(text: string): boolean {
   return text.includes(FENCE_START) && text.includes(FENCE_END);
+}
+
+/** True when the whole text is exactly one fence we produced (no stray markers around or inside it). */
+function isWholeSingleFence(text: string): boolean {
+  if (!text.startsWith(FENCE_START) || !text.endsWith(FENCE_END)) return false;
+  return text.split(FENCE_END).length === 2 && text.split(FENCE_START).length === 2;
+}
+
+/**
+ * Fence raw command stdout/stderr. Label is the command snippet. Empty text stays empty and a
+ * body that is already one whole fence is returned unchanged (no double fence).
+ */
+export function fenceShellOutput(command: string, body: string): string {
+  if (!body.trim() || isWholeSingleFence(body)) return body;
+  return fenceExternalContent({ source: 'shell', label: command.trim().slice(0, 80), body });
 }

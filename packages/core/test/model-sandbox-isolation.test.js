@@ -38,7 +38,10 @@ function pinSavedMode(mode) {
 }
 
 function commandBody(content) {
-  return String(content).split('\n[os-sandbox:')[0];
+  return String(content)
+    .split('\n[os-sandbox:')[0]
+    .replace(/^«external source=shell label=[^»]*»\n/, '')
+    .replace(/\n«end external»$/, '');
 }
 
 function ctx(dir) {
@@ -125,7 +128,7 @@ test('the model can pick os or an approved direct run when the saved mode is aut
     }
     const direct = await bash.execute(ctx(dir), { command: 'printf direct', isolation: 'direct' });
     assert.equal(direct.ok, true, direct.content);
-    assert.equal(direct.content, 'direct');
+    assert.equal(commandBody(direct.content), 'direct');
     assert.equal(direct.metadata.sandbox_backend, 'direct');
     assert.equal(String(direct.content).includes('[os-sandbox:'), false);
   } finally {

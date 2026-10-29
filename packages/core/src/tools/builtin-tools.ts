@@ -46,7 +46,7 @@ import { runWorkspaceGrep } from './grep-workspace.js';
 import { readFileLineRange, shouldStreamReadFile } from './read-file-range.js';
 import { lspSendRequest, parseLspConfigFromEnv } from './lsp-client.js';
 import { fetchUrlText, webFetchAllowsPrivate, webSearchFromEnv } from './web-fetch.js';
-import { fenceExternalContent } from '../safety/external-content.js';
+import { fenceExternalContent, fenceShellOutput } from '../safety/external-content.js';
 import { egressNeedsApproval } from '../safety/egress.js';
 import { resolveWebSearchTemplate, WEB_SEARCH_NOT_CONFIGURED, type WebSettingsReadStore } from './web-settings.js';
 import {
@@ -235,6 +235,12 @@ function getAgentSandbox(): AgentSandbox {
   return _agentSandbox;
 }
 
+/** Hardline refusals are host-authored JSON, not process output. Everything else the sandbox returns is untrusted. */
+function fenceSandboxOutput(backend: string | undefined, command: string, text: string): string {
+  if (backend === 'command-hardline') return text;
+  return fenceShellOutput(redactToolContent(command, process.env), redactToolContent(text, process.env));
+}
+
 function clipEvidenceText(text: string, maxChars: number): string {
   if (maxChars <= 0 || text.length <= maxChars) return text;
   return `${text.slice(0, maxChars)}\n… truncated (${text.length - maxChars} more chars)`;
@@ -289,14 +295,26 @@ function shellExecution(
       );
     }
     const combined = [result.stdout.trim(), result.stderr.trim()].filter(Boolean).join('\n');
-    const raw = combined || `(command exited with ${result.code ?? result.signal ?? 'unknown'} and no output)`;
     // P0 return-path redaction: injected/host secret values must not flow back to the model.
     const ok = result.code === 0 && result.signal === null;
+    const output = combined
+      ? fenceSandboxOutput(result.backend, command, combined)
+      : redactToolContent(`(command exited with ${result.code ?? result.signal ?? 'unknown'} and no output)`, process.env);
+    const trailer = ok ? '' : `\n[exit_code=${result.code ?? 'unknown'}; signal=${result.signal ?? 'none'}]`;
     return withOsSandboxNote(
-      {ok, content:redactToolContent(ok ? raw : `${raw}\n[exit_code=${result.code ?? 'unknown'}; signal=${result.signal ?? 'none'}]`, process.env), metadata:{exitCode:result.code, signal:result.signal, ...(result.backend ? { sandbox_backend: result.backend } : {})}},
+      {ok, content:`${output}${trailer}`, metadata:{exitCode:result.code, signal:result.signal, ...(result.backend ? { sandbox_backend: result.backend } : {})}},
       options?.osSandboxReason
     );
   });
+}
+
+/** Background job `result` is raw process output. Fence it; the rest of the record is host-authored. */
+function fenceJobResult<T extends { command?: string; result?: string }>(job: T): T {
+  if (!job.result) return job;
+  return {
+    ...job,
+    result: fenceShellOutput(redactToolContent(job.command ?? '', process.env), redactToolContent(job.result, process.env))
+  };
 }
 
 function repoPath(context: RunContext, path: string): string {
@@ -1050,8 +1068,8 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
           command: verifyCmd,
           exit_code: vr.code,
           signal: vr.signal,
-          stdout_clip: clipEvidenceText(vr.stdout.trim(), diffClip),
-          stderr_clip: clipEvidenceText(vr.stderr.trim(), diffClip),
+          stdout_clip: fenceSandboxOutput(vr.backend, verifyCmd, clipEvidenceText(vr.stdout.trim(), diffClip)),
+          stderr_clip: fenceSandboxOutput(vr.backend, verifyCmd, clipEvidenceText(vr.stderr.trim(), diffClip)),
           sandbox_backend: vr.backend
         };
       }
@@ -1517,7 +1535,7 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
         : job;
       return {
         ok: true,
-        content: JSON.stringify(payload, null, 2)
+        content: JSON.stringify(fenceJobResult(payload), null, 2)
       };
     }
   };
@@ -1539,14 +1557,14 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
         const job = await services.getBackgroundJob(args.jobId);
         return {
           ok: Boolean(job),
-          content: job ? JSON.stringify(job, null, 2) : `Background job ${args.jobId} not found`
+          content: job ? JSON.stringify(fenceJobResult(job), null, 2) : `Background job ${args.jobId} not found`
         };
       }
 
       const jobs = await services.listBackgroundJobs(context.session.id);
       return {
         ok: true,
-        content: jobs.length > 0 ? JSON.stringify(jobs, null, 2) : 'No background jobs.'
+        content: jobs.length > 0 ? JSON.stringify(jobs.map(fenceJobResult), null, 2) : 'No background jobs.'
       };
     }
   };
