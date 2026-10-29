@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-10-29T04:52:01.000Z",
-  "reviewNote": "2026-10-29 Auto-review CI fix: adapt legacy approval tests to soft-block+card; refresh fingerprints for model-sandbox-isolation.test.js",
+  "reviewedAt": "2026-10-29T06:20:00.000Z",
+  "reviewNote": "Registered machines live SSH backend; PTC read-tool bindings refuse calls that need approval (SKILL.md note only). Pairing/lifecycle/restart/concurrency control-flow unchanged.",
   "mapping": [
     {
       "step": "Production runtime startup and writer surfaces, cancellation and approval decisions; actual OS process probes",
@@ -382,8 +382,8 @@
     "packages/core/src/turn/kernel.ts": "afe8ad8357efe042630bb407cebe9fa5c6e801e526c57ad10ab4640cdb8850de",
     "packages/core/src/runtime/tool-loop.ts": "043c2a0fad2f5c02ef33b3fe43de458f524a842f136496f51f9f2b777e6331fc",
     "packages/core/src/stores/trace.ts": "bd4c3bf31d4fda1a11e7f96f7cf8da5c323dc77f9d235b191f03bf5ffe4cee2e",
-    "skills/agent-loop/SKILL.md": "4a85cd1b0ae9f4b14a748143d86ec2db99f8a6ef48da114f52b0827afb571133",
-    "packages/agent-loop/SKILL.md": "4a85cd1b0ae9f4b14a748143d86ec2db99f8a6ef48da114f52b0827afb571133",
+    "skills/agent-loop/SKILL.md": "2cc78e775b1667152f433cca792b6d150cc4398119f8db4bd629a9b3b91802e9",
+    "packages/agent-loop/SKILL.md": "2cc78e775b1667152f433cca792b6d150cc4398119f8db4bd629a9b3b91802e9",
     "scripts/test/session-multiprocess-state-consistency.test.mjs": "050990c7ddc41c4be1e61ed8ae9e5f9b170ab780e8c7ec3046d9b2c8f064718a",
     "acceptance/session-multiprocess-state-consistency.yaml": "f4006713194595ae4b03e8d16cbe45937ff9cb687e8d673e216fd4994940a1a8",
     "packages/core/test/writer-claim.test.js": "338a9772447852804bcdeb30edfe8d0710e52af90a94cc06c03883df2e03d6e7",

@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-10-29T04:52:01.000Z",
-  "reviewNote": "2026-10-29 Auto-review CI fix: adapt legacy approval tests to soft-block+card; refresh fingerprints for model-sandbox-isolation.test.js",
+  "reviewedAt": "2026-10-29T06:20:00.000Z",
+  "reviewNote": "Registered machines live SSH backend; PTC read-tool bindings refuse calls that need approval (SKILL.md note only). Pairing/lifecycle/restart/concurrency control-flow unchanged.",
   "mapping": [
     {
       "step": "Execute/approval/result persistence and fold recovery; real source component probes (not a full kernel proof)",
@@ -286,12 +286,12 @@
     "scripts/formal/run-formal-regression.mjs": "f6a9d8e8a45d372115a9e81ca0ab800ff32bac727a349ae73ca6bb35dcd1076d",
     ".github/workflows/release-gate.yml": "73ce281fd699f93512631da45f5fa5ffcc71a48024da25a9a735586d0efe35e4",
     "packages/agent-loop/src/runtime/tool-loop.test.ts": "9b7d84c3218628f0be48c272db8394b85149aa2e6f865211291d9ecd66bce5e6",
-    "skills/agent-loop/SKILL.md": "4a85cd1b0ae9f4b14a748143d86ec2db99f8a6ef48da114f52b0827afb571133",
+    "skills/agent-loop/SKILL.md": "2cc78e775b1667152f433cca792b6d150cc4398119f8db4bd629a9b3b91802e9",
     "packages/agent-loop/src/turn/host.ts": "f89c043474dbf310d21d48207593d1be4a19063184654a5c63a5e752a6eb90ba",
     "packages/agent-loop/src/session/writer-claim.ts": "349510a83419f13914d10d023d64f334abeb6484b4928746262e2fcc61e34876",
     "packages/core/src/stores/session-store.ts": "b5e3444614a0fef3bcd6ac9aecb374c4d470486a4c64fd8678251efee723a470",
     "packages/core/src/storage.ts": "015625520fdb9036dade420b528f03c7c85b6926159e71879ac675790a25498a",
-    "packages/agent-loop/SKILL.md": "4a85cd1b0ae9f4b14a748143d86ec2db99f8a6ef48da114f52b0827afb571133",
+    "packages/agent-loop/SKILL.md": "2cc78e775b1667152f433cca792b6d150cc4398119f8db4bd629a9b3b91802e9",
     "packages/core/src/session/step-inbox.ts": "34ed1835c457036cd69afc4326b48c9416104c8bce2d17793388d899e7652f01",
     "packages/agent-loop/src/session/step-inbox.ts": "1d6168438b363a2f52edd2495f647e61fda236d3dc4b8e9e25e14760680f1e94",
     "packages/agent-loop/src/session/apply-claimed-inbox.ts": "c773fd3874248c99a578d4a20cbe24ee74e626f6f7bd07ea6cb4d89749e81e0b",

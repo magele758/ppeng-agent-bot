@@ -137,6 +137,7 @@ const sessionRecord = await miniLoop.run('session-web-1');
 - `beforeModelTurn?`（mini 可不实现）：主模型调用前；返回 `skip_goal_done` 时跳过深模型并以目标已完成收尾（不伪造 assistant 正文）。
 - `chooseRecovery?`（mini 可不实现）：在内核已有的离散恢复动作中择一；返回 `null`/非法 id 则保持硬编码路径。
 - **PTC `resolveJevHooks?`（`createPtcExecTool` 依赖，仅 max/`node:vm` 路径）**：宿主可在每次 `ptc_exec` 时返回 `{ noul(instructions), choice(instructions, options) }`，注入到沙箱全局 `jev`；返回 `undefined` 则**完全不注入** `jev`。SDK **禁止**静态 import Jev HTTP 客户端（尤其 mini 链路）。产品侧仅在 Jev `profile=custom` 且勾选 `ptcDecide`、已保存 baseUrl 时由 `packages/core` 提供实现（复用 `askJev`）。
+- **PTC 只读工具与审批**：`ptc.kind==='read'` 的工具在 cell 内直接 `execute`，不走审批。若该调用的 `tool.needsApproval(context,args)` 为 true（例如 `read_file` 带 `machineId` 读远端机器），`buildPtcNamespace` 的绑定返回 `{ ok:false, error:'approval_required' }` 而不执行，模型需在 cell 外直接调用该工具。
 
 Jev 不是 SDK 模块：未配置入口时宿主不调用它，SDK 接入参数里也不出现 Jev 客户端。
 
