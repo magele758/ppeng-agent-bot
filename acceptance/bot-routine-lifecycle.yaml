@@ -1,6 +1,6 @@
 id: bot-routine-lifecycle
 title: Bot 可靠例行任务
-status: approved
+status: implemented
 requirement: |
   完整补齐前述 gap，按 Bot 模式多 Agent 协作开发计划实施。
 notes: |
@@ -63,3 +63,6 @@ criteria:
     given: Bot 拥有的例行任务配置了目标群，且该 Bot 是群成员
     when: 任务运行完成、静默、预检跳过或失败
     then: 只有有内容的完成结果以该 Bot 身份发到群里且只发一次，群里的真人和其他成员都能看到；静默、跳过、空结果和失败不在群里发任何内容，暂停的群、已移除的成员或他人的群不会收到投递
+
+links:
+  - doc/SINGLE_HOST_COMPLETION.md

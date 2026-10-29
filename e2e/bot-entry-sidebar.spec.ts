@@ -1,24 +1,6 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
 
-/** Center the row and press it before revealing the drop target. `dragTo` scrolls after mouse-down, so a partly visible row drags whichever neighbor sits under that point. */
-async function dragSessionRow(page: Page, row: Locator, target: Locator) {
-  await row.evaluate((element) => element.scrollIntoView({ block: 'center', inline: 'nearest' }));
-  const source = await row.boundingBox();
-  expect(source).toBeTruthy();
-  const start = { x: source!.x + 24, y: source!.y + source!.height / 2 };
-  expect(await row.evaluate((element, point) => {
-    const hit = document.elementFromPoint(point.x, point.y);
-    return !!hit && (hit === element || element.contains(hit));
-  }, start)).toBe(true);
-  await page.mouse.move(start.x, start.y);
-  await page.mouse.down();
-  await page.mouse.move(start.x + 12, start.y, { steps: 4 });
-  await target.scrollIntoViewIfNeeded();
-  const drop = await target.boundingBox();
-  expect(drop).toBeTruthy();
-  await page.mouse.move(drop!.x + Math.min(40, drop!.width / 2), drop!.y + Math.min(12, drop!.height / 2), { steps: 12 });
-  await page.mouse.up();
-}
+import { dragSessionRow } from './helpers/drag-session-row';
 
 test.beforeAll(async ({ request }) => {
  const { bots } = await (await request.get('/api/bots')).json();
@@ -189,6 +171,7 @@ test('create dialog keeps actions visible while content scrolls and backdrop dis
  };
  await open();
  const dialog = page.getByRole('dialog');
+ await dialog.getByText('可选资料与外观', { exact: true }).click();
  const actions = dialog.locator('.ag-form__actions');
  const before = await actions.boundingBox();
  expect(before).not.toBeNull();
@@ -237,7 +220,7 @@ test('pressing and cancelling a Bot row gesture preserves the current conversati
  await expect(title).toHaveText(other.name);
 });
 
-test('an explicit Bot click wins a delayed saved-default lookup [AC:bot-face-first-creation#AC-4]', async ({ page, request }) => {
+test('an explicit Bot click wins a delayed saved-default lookup [AC:bot-settings-flow#AC-12]', async ({ page, request }) => {
  const { bots } = await (await request.get('/api/bots')).json();
  const [saved, chosen] = bots.filter((bot: { hidden?: boolean }) => !bot.hidden);
  expect(saved).toBeTruthy(); expect(chosen).toBeTruthy();
@@ -277,7 +260,7 @@ test('an explicit Bot click wins a delayed saved-default lookup [AC:bot-face-fir
  }
 });
 
-test('sidebar Bot choice wins while the saved-default lookup is still pending [AC:bot-face-first-creation#AC-4]', async ({ page, request }) => {
+test('sidebar Bot choice wins while the saved-default lookup is still pending [AC:bot-settings-flow#AC-12]', async ({ page, request }) => {
  const { bots } = await (await request.get('/api/bots')).json();
  const [saved, chosen] = bots.filter((bot: { hidden?: boolean }) => !bot.hidden);
  expect(saved).toBeTruthy(); expect(chosen).toBeTruthy();

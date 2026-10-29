@@ -44,11 +44,11 @@ test('cancel keeps active work visible and ignores late results [AC:bot-multi-go
  const {s}=fixture(t);const a=create(s),b=create(s,'Other');const e=s.claim('b',a.id,{strategy:'direct'});s.control('b',a.id,'cancel');
  assert.equal(s.get('b',a.id).draining,true);s.report('b',e.id,{kind:'progress',summary:'late'});assert.equal(s.get('b',a.id).status,'cancelled');assert.equal(s.get('b',b.id).status,'queued');
 });
-test('budget attempts and no-progress stay recorded without stopping [AC:bot-multi-goal-coordination#AC-13]',t=>{
- const {s}=fixture(t);s.updateSettings({defaultBudgetUsd:1,maxNoProgress:2,maxAttempts:1});const a=create(s);let e=s.claim('b',a.id,{strategy:'direct'});
- s.report('b',e.id,{kind:'progress',summary:'step',costUsd:1});const spent=s.get('b',a.id);assert.equal(spent.costUsd,1);assert.equal(spent.attempts,1);assert.equal(spent.status,'queued');assert.equal(spent.blockedReason,undefined);assert.ok(s.claim('b',a.id,{strategy:'direct'}));
- const b=create(s,'Stuck');for(let i=0;i<3;i++){e=s.claim('b',b.id,{strategy:'direct'});s.report('b',e.id,{kind:'progress',summary:'same',advanced:false});}
- const stuck=s.get('b',b.id);assert.equal(stuck.noProgress,3);assert.equal(stuck.attempts,3);assert.equal(stuck.status,'queued');assert.ok(s.claim('b',b.id,{strategy:'direct'}));
+test('budget and no-progress limits accumulate across executors [AC:bot-multi-goal-coordination#AC-13]',t=>{
+ const {s}=fixture(t);s.updateSettings({defaultBudgetUsd:1,maxNoProgress:2});const a=create(s);let e=s.claim('b',a.id,{strategy:'direct'});
+ s.report('b',e.id,{kind:'progress',summary:'step',costUsd:1});assert.equal(s.get('b',a.id).status,'blocked');assert.match(s.get('b',a.id).blockedReason,/budget/);
+ const b=create(s,'Stuck');for(let i=0;i<2;i++){e=s.claim('b',b.id,{strategy:'subagent'});s.report('b',e.id,{kind:'progress',summary:'same'});}assert.equal(s.get('b',b.id).status,'queued');
+ e=s.claim('b',b.id,{strategy:'direct'});s.report('b',e.id,{kind:'progress',summary:'same'});assert.equal(s.get('b',b.id).status,'blocked');
 });
 test('scoped goals and preferences never expose another chat',t=>{
  const {store}=fixture(t);const a=new BotGoalService(store,Date.now,'a'),b=new BotGoalService(store,Date.now,'b');
@@ -71,10 +71,10 @@ test('expired and fenced attempts cannot complete or renew ownership',t=>{
  s.report('b',e.id,{kind:'candidate_completed',summary:'done',verified:true,evidence:['ok'],owner:'worker',fence:e.fence});
  assert.equal(s.get('b',g.id).status,'blocked');assert.match(s.get('b',g.id).blockedReason,/lease/);
 });
-test('unverified progress records the stall count without stopping',t=>{
+test('unverified progress cannot reset the stall limit with new summaries',t=>{
  const {s}=fixture(t);s.updateSettings({maxNoProgress:2});const g=create(s);
  for(const summary of ['I am looking','I am still looking']){const e=s.claim('b',g.id,{strategy:'direct'});s.report('b',e.id,{kind:'progress',summary,advanced:false});}
- const saved=s.get('b',g.id);assert.equal(saved.noProgress,2);assert.equal(saved.status,'queued');assert.ok(s.claim('b',g.id,{strategy:'direct'}));
+ assert.equal(s.get('b',g.id).status,'blocked');assert.match(s.get('b',g.id).blockedReason,/progress/);
 });
 test('external waiting and constraint-draining work keeps its resource reservation [AC:bot-multi-goal-coordination#AC-11]',t=>{
  const {s}=fixture(t);const a=create(s,'Deployment',{resources:['prod']}),b=create(s,'Other deployment',{resources:['prod']});const e=s.claim('b',a.id,{strategy:'swarm'});s.report('b',e.id,{kind:'waiting',summary:'deployment in progress',wait:{source:'swarm',correlationId:'run'}});assert.equal(s.claim('b',b.id,{strategy:'direct'}),undefined);s.amend('b',a.id,'Use staging instead');assert.equal(s.claim('b',b.id,{strategy:'direct'}),undefined);s.finishAmendDrain('b',a.id,{summary:'Old deployment stopped',evidence:['stopped'],costUsd:0});assert.ok(s.claim('b',b.id,{strategy:'direct'}));

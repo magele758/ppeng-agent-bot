@@ -299,6 +299,76 @@ function readTracePayload(event: TurnFeedTraceEvent): Record<string, unknown> | 
   return payload as Record<string, unknown>;
 }
 
+function phaseNameOk(phase: unknown): phase is string {
+  return typeof phase === 'string' && /^[a-z0-9_]+$/.test(phase);
+}
+
+function finiteMs(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function copyPositivePhases(map: unknown, phases: Map<string, number>): void {
+  if (!map || typeof map !== 'object' || Array.isArray(map)) return;
+  for (const [name, ms] of Object.entries(map as Record<string, unknown>)) {
+    const duration = finiteMs(ms);
+    if (phaseNameOk(name) && duration !== undefined && duration > 0) phases.set(name, duration);
+  }
+}
+
+function readReadyNote(payload: Record<string, unknown>, phases: Map<string, number>): { totalMs?: number; namedSlowest?: string; namedSlowestMs: number } {
+  const totalMs = finiteMs(payload.durationMs);
+  const namedSlowest = phaseNameOk(payload.slowest) ? payload.slowest : undefined;
+  copyPositivePhases(payload.phases, phases);
+  return { ...(totalMs === undefined ? {} : { totalMs }), ...(namedSlowest ? { namedSlowest } : {}), namedSlowestMs: finiteMs(payload.slowestMs) ?? -1 };
+}
+
+function payloadInStartupWindow(event: TurnFeedTraceEvent, startMs: number, endMsExclusive: number | undefined): Record<string, unknown> | undefined {
+  if (event.kind !== 'startup_phase') return undefined;
+  const ts = parseTimeMs(event.ts);
+  if (ts == null || ts < startMs || (endMsExclusive != null && ts >= endMsExclusive)) return undefined;
+  const payload = readTracePayload(event);
+  if (!payload || !phaseNameOk(payload.phase)) return undefined;
+  return payload;
+}
+
+function rememberPhase(payload: Record<string, unknown>, phases: Map<string, number>): void {
+  const durationMs = finiteMs(payload.durationMs);
+  if (phaseNameOk(payload.phase) && durationMs !== undefined && durationMs > 0) phases.set(payload.phase, durationMs);
+}
+
+function slowestPhase(phases: Map<string, number>, named: string | undefined, namedMs: number): { slowest?: string; slowestMs: number } {
+  let slowest = named;
+  let slowestMs = namedMs;
+  for (const [name, ms] of phases) {
+    if (!slowest || ms > slowestMs) {
+      slowest = name;
+      slowestMs = ms;
+    }
+  }
+  return { slowest, slowestMs };
+}
+
+function listedStartupPhases(phases: Map<string, number>): Array<{ phase: string; durationMs: number }> {
+  return [...phases.entries()]
+    .filter(([name, ms]) => name !== 'ready' && ms > 0)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 6)
+    .map(([phase, durationMs]) => ({ phase, durationMs }));
+}
+
+function absorbStartupEvent(event: TurnFeedTraceEvent, startMs: number, endMsExclusive: number | undefined, phases: Map<string, number>, acc: { totalMs?: number; namedSlowest?: string; namedSlowestMs: number }): void {
+  const payload = payloadInStartupWindow(event, startMs, endMsExclusive);
+  if (!payload) return;
+  if (payload.phase === 'ready') {
+    const ready = readReadyNote(payload, phases);
+    if (ready.totalMs !== undefined) acc.totalMs = ready.totalMs;
+    if (ready.namedSlowest) acc.namedSlowest = ready.namedSlowest;
+    acc.namedSlowestMs = ready.namedSlowestMs;
+    return;
+  }
+  rememberPhase(payload, phases);
+}
+
 function startupInWindow(
   events: TurnFeedTraceEvent[],
   startMs: number | undefined,
@@ -306,48 +376,13 @@ function startupInWindow(
 ): StartupTiming | undefined {
   if (startMs == null) return undefined;
   const phases = new Map<string, number>();
-  let totalMs: number | undefined;
-  let namedSlowest: string | undefined;
-  let namedSlowestMs = -1;
-  for (const event of events) {
-    if (event.kind !== 'startup_phase') continue;
-    const ts = parseTimeMs(event.ts);
-    if (ts == null || ts < startMs) continue;
-    if (endMsExclusive != null && ts >= endMsExclusive) continue;
-    const payload = readTracePayload(event);
-    if (!payload || typeof payload.phase !== 'string' || !/^[a-z0-9_]+$/.test(payload.phase)) continue;
-    if (payload.phase === 'ready') {
-      if (typeof payload.durationMs === 'number' && Number.isFinite(payload.durationMs)) totalMs = payload.durationMs;
-      if (typeof payload.slowest === 'string' && /^[a-z0-9_]+$/.test(payload.slowest)) namedSlowest = payload.slowest;
-      if (typeof payload.slowestMs === 'number' && Number.isFinite(payload.slowestMs)) namedSlowestMs = payload.slowestMs;
-      const map = payload.phases;
-      if (map && typeof map === 'object' && !Array.isArray(map)) {
-        for (const [name, ms] of Object.entries(map)) {
-          if (/^[a-z0-9_]+$/.test(name) && typeof ms === 'number' && Number.isFinite(ms) && ms > 0) phases.set(name, ms);
-        }
-      }
-      continue;
-    }
-    if (typeof payload.durationMs === 'number' && Number.isFinite(payload.durationMs) && payload.durationMs > 0) {
-      phases.set(payload.phase, payload.durationMs);
-    }
-  }
-  let slowest = namedSlowest;
-  let slowestMs = namedSlowestMs;
-  for (const [name, ms] of phases) {
-    if (!slowest || ms > slowestMs) {
-      slowest = name;
-      slowestMs = ms;
-    }
-  }
-  if (!slowest || slowestMs < 0) return undefined;
-  if (slowestMs <= 0 && (totalMs ?? 0) <= 0) return undefined;
-  const listed = [...phases.entries()]
-    .filter(([name, ms]) => name !== 'ready' && ms > 0)
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .slice(0, 6)
-    .map(([phase, durationMs]) => ({ phase, durationMs }));
-  return { ...(typeof totalMs === 'number' ? { totalMs } : {}), slowest, slowestMs, phases: listed };
+  const acc: { totalMs?: number; namedSlowest?: string; namedSlowestMs: number } = { namedSlowestMs: -1 };
+  for (const event of events) absorbStartupEvent(event, startMs, endMsExclusive, phases, acc);
+  const picked = slowestPhase(phases, acc.namedSlowest, acc.namedSlowestMs);
+  if (!picked.slowest || picked.slowestMs < 0) return undefined;
+  if (picked.slowestMs <= 0 && (acc.totalMs ?? 0) <= 0) return undefined;
+  const totalMs = acc.totalMs;
+  return { ...(typeof totalMs === 'number' ? { totalMs } : {}), slowest: picked.slowest, slowestMs: picked.slowestMs, phases: listedStartupPhases(phases) };
 }
 
 export function formatStartupClause(timing: StartupTiming, locale?: string, labels?: { startup?: string; slowest?: string }): string {
@@ -362,6 +397,81 @@ export function formatStartupClause(timing: StartupTiming, locale?: string, labe
     parts.push(`${phaseLabel(phase.phase, locale)} ${formatStartupMs(phase.durationMs)}`);
   }
   return parts.join(' · ');
+}
+
+type WindowFold = {
+  usage?: SessionUsageTotals;
+  costUsd: number;
+  hasCost: boolean;
+  firstModelStart?: number;
+  lastModelEnd?: number;
+  lastClosedEnd?: number;
+};
+
+function foldModelWindows(modelWindows: ModelTurnWindow[], bounds: { startMs?: number; endMsExclusive?: number }): WindowFold {
+  const fold: WindowFold = { costUsd: 0, hasCost: false };
+  for (const win of modelWindows) {
+    if (!windowOverlaps(win, bounds.startMs, bounds.endMsExclusive)) continue;
+    fold.usage = mergeUsageTotals(fold.usage, win.usage);
+    if (typeof win.costUsd === 'number') {
+      fold.costUsd += win.costUsd;
+      fold.hasCost = true;
+    }
+    fold.firstModelStart = fold.firstModelStart == null ? win.startMs : Math.min(fold.firstModelStart, win.startMs);
+    fold.lastModelEnd = fold.lastModelEnd == null ? win.endMs : Math.max(fold.lastModelEnd, win.endMs);
+    if (!win.open) fold.lastClosedEnd = fold.lastClosedEnd == null ? win.endMs : Math.max(fold.lastClosedEnd, win.endMs);
+  }
+  return fold;
+}
+
+function elapsedFromBounds(fold: WindowFold, bounds: { startMs?: number; lastMsgMs?: number }, isLiveTail: boolean, now: number): number | undefined {
+  if (fold.firstModelStart != null) {
+    const end = isLiveTail ? now : (fold.lastModelEnd ?? bounds.lastMsgMs ?? fold.firstModelStart);
+    if (end >= fold.firstModelStart) return end - fold.firstModelStart;
+    return undefined;
+  }
+  if (bounds.startMs == null) return undefined;
+  const endMs = isLiveTail ? now : bounds.lastMsgMs;
+  if (endMs != null && endMs >= bounds.startMs && (endMs > bounds.startMs || isLiveTail)) return endMs - bounds.startMs;
+  return undefined;
+}
+
+function statHasAnything(stat: TurnFeedStat): boolean {
+  return stat.elapsedMs != null
+    || hasRealUsageTotals(stat.usageTotals)
+    || (typeof stat.usageCostUsd === 'number' && stat.usageCostUsd > 0)
+    || stat.endedAtMs != null
+    || stat.startup != null;
+}
+
+function applyEndedAt(stat: TurnFeedStat, messages: TurnFeedStatMessage[], slice: ConversationTurnSlice, isOpenTail: boolean, sessionOpen: boolean, lastSlice: boolean, lastClosedEnd: number | undefined): void {
+  if (isOpenTail) return;
+  const endedAtMs = lastClosedEnd ?? latestReplyMs(messages, slice);
+  if (endedAtMs == null) return;
+  stat.endedAtMs = endedAtMs;
+  if (!sessionOpen && lastSlice) stat.sessionEnded = true;
+}
+
+function buildSliceStat(input: {
+  messages: TurnFeedStatMessage[];
+  traces?: TurnFeedTraceEvent[];
+  running?: boolean;
+  sessionOpen?: boolean;
+}, slice: ConversationTurnSlice, next: ConversationTurnSlice | undefined, index: number, sliceCount: number, now: number, modelWindows: ModelTurnWindow[]): TurnFeedStat | null {
+  const bounds = messageWindowBounds(input.messages, slice, next);
+  const sessionOpen = Boolean(input.running || input.sessionOpen);
+  const isLiveTail = Boolean(input.running) && index === sliceCount - 1;
+  const isOpenTail = sessionOpen && index === sliceCount - 1;
+  const fold = foldModelWindows(modelWindows, bounds);
+  const elapsedMs = elapsedFromBounds(fold, bounds, isLiveTail, now);
+  const stat: TurnFeedStat = {};
+  if (typeof elapsedMs === 'number' && Number.isFinite(elapsedMs) && elapsedMs >= 0) stat.elapsedMs = elapsedMs;
+  if (fold.usage) stat.usageTotals = fold.usage;
+  if (fold.hasCost && fold.costUsd > 0) stat.usageCostUsd = Math.round(fold.costUsd * 1e6) / 1e6;
+  applyEndedAt(stat, input.messages, slice, isOpenTail, sessionOpen, index === sliceCount - 1, fold.lastClosedEnd);
+  const startup = startupInWindow(input.traces ?? [], bounds.startMs, bounds.endMsExclusive);
+  if (startup) stat.startup = startup;
+  return statHasAnything(stat) ? stat : null;
 }
 
 /**
@@ -383,76 +493,7 @@ export function buildTurnFeedStats(input: {
   const modelWindows = extractModelTurnWindows(input.traces ?? [], {
     openEndMs: input.running ? now : undefined
   });
-  const out: Array<TurnFeedStat | null> = [];
-
-  for (let si = 0; si < slices.length; si += 1) {
-    const slice = slices[si]!;
-    const next = slices[si + 1];
-    const bounds = messageWindowBounds(input.messages, slice, next);
-    const sessionOpen = Boolean(input.running || input.sessionOpen);
-    const isLiveTail = Boolean(input.running) && si === slices.length - 1;
-    const isOpenTail = sessionOpen && si === slices.length - 1;
-
-    let usage: SessionUsageTotals | undefined;
-    let costUsd = 0;
-    let hasCost = false;
-    let firstModelStart: number | undefined;
-    let lastModelEnd: number | undefined;
-    let lastClosedEnd: number | undefined;
-
-    for (const win of modelWindows) {
-      if (!windowOverlaps(win, bounds.startMs, bounds.endMsExclusive)) continue;
-      usage = mergeUsageTotals(usage, win.usage);
-      if (typeof win.costUsd === 'number') {
-        costUsd += win.costUsd;
-        hasCost = true;
-      }
-      firstModelStart =
-        firstModelStart == null ? win.startMs : Math.min(firstModelStart, win.startMs);
-      lastModelEnd = lastModelEnd == null ? win.endMs : Math.max(lastModelEnd, win.endMs);
-      if (!win.open) {
-        lastClosedEnd = lastClosedEnd == null ? win.endMs : Math.max(lastClosedEnd, win.endMs);
-      }
-    }
-
-    let elapsedMs: number | undefined;
-    if (firstModelStart != null) {
-      const end = isLiveTail ? now : (lastModelEnd ?? bounds.lastMsgMs ?? firstModelStart);
-      if (end >= firstModelStart) elapsedMs = end - firstModelStart;
-    } else if (bounds.startMs != null) {
-      const endMs = isLiveTail ? now : bounds.lastMsgMs;
-      if (endMs != null && endMs >= bounds.startMs && (endMs > bounds.startMs || isLiveTail)) {
-        elapsedMs = endMs - bounds.startMs;
-      }
-    }
-
-    const stat: TurnFeedStat = {};
-    if (typeof elapsedMs === 'number' && Number.isFinite(elapsedMs) && elapsedMs >= 0) {
-      stat.elapsedMs = elapsedMs;
-    }
-    if (usage) stat.usageTotals = usage;
-    if (hasCost && costUsd > 0) stat.usageCostUsd = Math.round(costUsd * 1e6) / 1e6;
-    if (!isOpenTail) {
-      const endedAtMs = lastClosedEnd ?? latestReplyMs(input.messages, slice);
-      if (endedAtMs != null) {
-        stat.endedAtMs = endedAtMs;
-        if (!sessionOpen && si === slices.length - 1) stat.sessionEnded = true;
-      }
-    }
-
-    const startup = startupInWindow(input.traces ?? [], bounds.startMs, bounds.endMsExclusive);
-    if (startup) stat.startup = startup;
-
-    const hasAnything =
-      stat.elapsedMs != null ||
-      hasRealUsageTotals(stat.usageTotals) ||
-      (typeof stat.usageCostUsd === 'number' && stat.usageCostUsd > 0) ||
-      stat.endedAtMs != null ||
-      stat.startup != null;
-    out.push(hasAnything ? stat : null);
-  }
-
-  return out;
+  return slices.map((slice, index) => buildSliceStat(input, slice, slices[index + 1], index, slices.length, now, modelWindows));
 }
 
 export function formatTurnFeedStatsLine(

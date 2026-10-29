@@ -1,8 +1,11 @@
 # 工具结果占位：进度与分 Agent 开发计划
 
+> 2026-10-28 源码核对：当前已存在 `session/model-view.ts`、`tool-result-retrieve.ts`、SDK 存根实现、`e2e/lab-model-view.spec.ts`，`compact-ab-eval.mjs` 已使用真实命令输出种子。下文“页面没做”“玩具种子未替换”是历史记录，不能据此重建；真实模型 A/B 效果仍以具体运行报告为准。
+
+
 | 字段 | 值 |
 |------|----|
-| 状态 | 核心已合入；页面真测与评测种子未完 |
+| 状态 | 存根、模型视图、原文取回与真实命令种子已实现；下文为历史计划 |
 | 日期 | 2026-09-02 |
 | 已合入 | [#19](https://github.com/magele758/ppeng-agent-core/pull/19) `fe1fbaf` |
 | 对照 | [CONTEXT_COMPILER.md](CONTEXT_COMPILER.md) §7、[harness/04-context-economics.md](harness/04-context-economics.md) |

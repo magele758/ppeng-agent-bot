@@ -1021,7 +1021,7 @@ export function PlayPanel({
 
   const renderCreateDialog = () => (
     createKind ? <BotEntryDialog label={createKind === 'bot' ? t('play.newBot') : t('play.group.create')}>
-        {createKind === 'bot' ? <BotCreateForm existingNames={bots.map(bot => bot.name)} onCreated={bot => { upsertBot(bot); setCreateKind(null); void tick({ includePlayPanel: false }); }} onCancel={() => setCreateKind(null)} /> : <BotGroupCreateForm bots={botRoster} onCreated={() => setCreateKind(null)} onCancel={() => setCreateKind(null)} />}
+        {createKind === 'bot' ? <BotCreateForm existingNames={bots.map(bot => bot.name)} onCreated={bot => { upsertBot(bot); setCreateKind(null); void chat.selectBot(bot.id); void tick({ includePlayPanel: false }); }} onCancel={() => setCreateKind(null)} /> : <BotGroupCreateForm bots={botRoster} onCreated={() => setCreateKind(null)} onCancel={() => setCreateKind(null)} />}
       </BotEntryDialog> : null
   );
 
@@ -1785,7 +1785,7 @@ export function PlayPanel({
 
   const renderPlayMain = () => (
         <div className={botDetailMainClass(botDetailVisible)}>
-          {botSurface && openGroupId ? <PlayBotGroupChat key={openGroupId} roomId={openGroupId} bots={botRoster} /> : null}
+          {botSurface && openGroupId ? <PlayBotGroupChat key={openGroupId} roomId={openGroupId} bots={botRoster} onOpenWork={id=>{setOpenGroupId(null);onSelectSession(id);}} /> : null}
           <div className="play-main chat-panel" hidden={botSurface && openGroupId != null}>
       {renderChatHeader()}
             <GoalStatusCard sessionId={selectedSessionId} />

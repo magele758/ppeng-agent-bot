@@ -2,6 +2,10 @@
 
 本页为专题检索入口。项目介绍与启动步骤见 [English README](../README.md) / [中文 README](../README.zh.md)；代码约定见 [`AGENTS.md`](../AGENTS.md)。
 
+短期单机补齐、既有规格收尾与延后范围见 [SINGLE_HOST_COMPLETION.md](SINGLE_HOST_COMPLETION.md)。
+
+Bot 创建、统一设置面板、热配置的作用范围与生效时机见 [BOT_SETTINGS_FLOW.md](BOT_SETTINGS_FLOW.md)。
+
 ## Reading routes / 按目标选路线
 
 | 目标 / Goal | 推荐顺序 / Route |
@@ -79,8 +83,8 @@
 | [`A2UI.md`](A2UI.md) | Implemented | 对话内结构化 UI surface |
 | [`AGENTIC_SAFETY_RUNTIME.md`](AGENTIC_SAFETY_RUNTIME.md) | Optional appendix | 失范治理与运行时控件映射 |
 | [`PROMPT_CACHE.md`](PROMPT_CACHE.md) | Implemented | 稳定/动态 system 前缀与 KV 缓存 |
-| [`CONTEXT_COMPILER.md`](CONTEXT_COMPILER.md) | 结论已定；未实现 | 每轮动态组上下文：编包优于硬切；对照 Codex TokenBudget 与论文 |
-| [`TOOL_RESULT_STUB_PLAN.md`](TOOL_RESULT_STUB_PLAN.md) | #19 已合入；页面真测未完 | 工具结果占位进度 + 分 Agent 计划（送模视图 / A/B 种子 / 可寻址存根） |
+| [`CONTEXT_COMPILER.md`](CONTEXT_COMPILER.md) | 已有运行时实现；原设计待对齐 | 每轮动态组上下文：编包优于硬切；对照 Codex TokenBudget 与论文 |
+| [`TOOL_RESULT_STUB_PLAN.md`](TOOL_RESULT_STUB_PLAN.md) | 存根／模型视图／原文取回已实现 | 工具结果占位进度 + 分 Agent 计划（送模视图 / A/B 种子 / 可寻址存根） |
 | [`EXTERNAL_AI_CLI.md`](EXTERNAL_AI_CLI.md) | Optional | `claude_code` / `codex_exec` / `cursor_agent` |
 | [`skill-router-baseline.md`](skill-router-baseline.md) | Implemented | Skills 路由 baseline（legacy / hybrid） |
 

@@ -1,3 +1,7 @@
+import {createWaitForTool} from './waits/tool.js';
+import { mergeDomainBundles, type DomainBundle } from './domain.js';
+import { registerDomainCatalog, domainCatalog, readRuntimeCapabilities, runtimeCapabilityCheck, guardRuntimeCapability } from './config/runtime-capabilities.js';
+import { ExternalAgentConnections } from './external-agents/connections.js';
 import { invalidateSteerToolDecision, steerRunningTools } from './runtime/steer-tools.js';
 import { createGoalFactoryDevelopmentTool, createGoalSelfHealTool, specialtyStatus, cancelSpecialty } from './bots/goals/specialty-services.js';
 import { FactoryService } from './factory/service.js';
@@ -38,6 +42,8 @@ import type { AgentSandbox } from './sandbox/agent-sandbox-types.js';
 import { SelfHealScheduler } from './self-heal/self-heal-scheduler.js';
 import { attachServedByToTrace } from './model/fallback-chain.js';
 import { PromptBuilder } from './model/prompt-builder.js';
+import { normalizeCompactSettings, type CompactSettings } from './session/compact-settings.js';
+import { assertStartupInvariants } from './session/startup-invariants.js';
 import { previewSessionContextStack } from './session/context-stack.js';
 import type { ContextSnapshot } from './session/context-snapshots.js';
 import type { ApprovalPolicy } from './approval/approval-policy.js';
@@ -232,6 +238,8 @@ export interface RuntimeOptions {
    * replacing them. Use this to mount domain personas alongside the core.
    */
   extraAgents?: AgentSpec[];
+  /** Installed domain bundles, with availability controlled live through Lab settings. */
+  domainBundles?: DomainBundle[];
   /**
    * Append on top of the builtin tool set (or the explicit `tools` list)
    * without replacing it. Used to mount domain-specific tools.
@@ -339,6 +347,7 @@ export class RawAgentRuntime {
   readonly skillManagement: SkillManagementService;
   tools: ToolContract<any>[];
   readonly connectors: ConnectorRegistry;
+  readonly externalAgents: ExternalAgentConnections;
   readonly rooms: BotRoomService;
   private libraryIndex?: LibraryIndexWatcher;
   readonly factory: FactoryService;
@@ -412,6 +421,10 @@ export class RawAgentRuntime {
   resumeAfterDesktopUpdateCancelled(): void { this.desktopUpdateSuspended = false; }
 
   constructor(options: RuntimeOptions) {
+    if (options.domainBundles) {
+      const domains = mergeDomainBundles(options.domainBundles);
+      options = {...options, extraAgents:[...(options.extraAgents??[]),...domains.agents],extraTools:[...(options.extraTools??[]),...domains.tools],extraSkills:[...(options.extraSkills??[]),...domains.skills]};
+    }
     setStartupPhaseEmitter((sessionId, event) => {
       this.emitTrace(sessionId, { kind: event.kind, payload: { ...event.payload } });
     });
@@ -430,6 +443,7 @@ export class RawAgentRuntime {
     const sqliteStarted = Date.now();
     try {
       this.store = new SqliteStateStore(join(this.stateDir, 'runtime.sqlite'));
+      registerDomainCatalog(this.store, options.domainBundles ?? []);
     } finally {
       logStartupPhase(undefined, { phase: 'sqlite_open', scope: 'boot', durationMs: Date.now() - sqliteStarted });
     }
@@ -477,6 +491,7 @@ export class RawAgentRuntime {
     this.connectors = new ConnectorRegistry({
       store: this.store,
       getPlugins: () => this.loadedPlugins,
+      getDomains: () => domainCatalog(this.store).filter(d=>readRuntimeCapabilities(this.store).domains.includes(d.id)).map(d=>({id:d.id,title:d.label})),
       getCapabilities: () => this.store.capabilities().list({ limit: 500 })
     });
 
@@ -490,6 +505,22 @@ export class RawAgentRuntime {
         [this.computerUse?.instructionsForSession(sessionId) ?? '', this.connectors.instructionsForGranted(process.env)]
           .filter(Boolean)
           .join('\n\n'),
+    });
+    // Compact policy, stable prefix, and repeatGuard must be defined before
+    // the first tool round. Invalid persisted values are repaired and logged.
+    const builtin = (options.agents ?? builtinAgents).find(
+      (agent) => agent.name.trim() && agent.role.trim()
+    );
+    assertStartupInvariants({
+      store: this.store,
+      normalizeCompact: (raw) =>
+        normalizeCompactSettings(raw as Partial<CompactSettings> | null | undefined),
+      identity: {
+        agentName: builtin?.name ?? '',
+        agentRole: builtin?.role ?? '',
+        repoRoot: this.repoRoot
+      },
+      log: this.log
     });
 
     const collab = createRuntimeCollaborators({
@@ -534,12 +565,13 @@ export class RawAgentRuntime {
     const toolAssembleStarted = Date.now();
     const toolServices = createRuntimeToolServices(this.l5());
     const baseTools = attachFileCompensation(
-      options.tools ?? createBuiltinTools(toolServices)
+      options.tools ?? createBuiltinTools(toolServices, { includeDormantCapabilities: true })
     );
     let catalog: ToolContract<any>[] = [];
     const optionalExtras = assembleOptionalTools({
       routineHost: {
         store:this.store, stateDir:this.stateDir, log:this.log,
+        loadRoutineSkill:(name,id)=>this.loadRoutineSkill(name,id),
         runSession:(id)=>this.runSession(id),
         isSessionRunning:(id)=>this.isSessionRunning(id),
         hasUnconfirmedEffects:(id,startedAt)=>this.connectors.software.unconfirmedForSession(id,startedAt).length>0,
@@ -554,6 +586,7 @@ export class RawAgentRuntime {
       },
       getCatalog: () => catalog
     });
+    this.externalAgents = new ExternalAgentConnections(this.store, (id, principal) => { this.openBot(id, principal); }, this.secretVault);
     const messageAgentTool = createMessageAgentTool({
       store: this.store,
       runSession: (sessionId) => this.runSession(sessionId),
@@ -564,6 +597,7 @@ export class RawAgentRuntime {
       ...baseTools.filter(tool => tool.name !== 'history_search' && tool.name !== 'history_read'),
       ...optionalExtras,
       messageAgentTool,
+      ...this.externalAgents.tools(),
       ...createHistoryTools(this.store),
       ...createRoomRetrievalTools(this.store).map(tool => withRoomRetrievalTouch(this.store, tool)),
       createSubagentHelpTool(this.store),
@@ -571,7 +605,7 @@ export class RawAgentRuntime {
         isSessionRunning: (id) => this.runningSessions.has(id), cancelSession: (id) => this.cancelSession(id),
         hasUnconfirmedEffects: (id, since) => this.hasUnconfirmedEffects(id, since), log: this.log }),
       ...(options.extraTools ?? [])
-    ];
+    ].map(tool => guardRuntimeCapability(this.store, tool));
     const ptcExec = createPtcExecTool({
       getAuthorizedTools: (context) =>
         filterToolsForSession({
@@ -722,6 +756,7 @@ export class RawAgentRuntime {
       cancelSession: (id) => this.cancelSession(id)
     }));
     this.tools.push(createGoalCheckpointTool(this.store));
+    this.tools.push(createWaitForTool(this.store));
     this.tools.push(createGoalSelfHealTool({store:this.store,selfHeal:this.selfHeal}));
     this.tools.push(createGoalFactoryDevelopmentTool({store:this.store,factory:this.factory}));
     this.tools.push(createRuntimeGoalDispatchTool({
@@ -841,8 +876,14 @@ export class RawAgentRuntime {
     return cancelAllSessionsFn(this.sessionControlHost(), allowedSessionIds);
   }
 
+  availableTools() {
+    const enabled = runtimeCapabilityCheck(this.store);
+    return this.tools.filter(tool => enabled('tools', tool.name));
+  }
+
   listAgents(): AgentSpec[] {
-    return this.store.listAgents();
+    const enabled = runtimeCapabilityCheck(this.store);
+    return this.store.listAgents().filter(agent => enabled('agents', agent.id));
   }
 
   /**
@@ -1887,6 +1928,11 @@ export class RawAgentRuntime {
     emitAdmitPhase((event) => this.emitTrace(sessionId, event), phase, started);
   }
 
+  loadRoutineSkill(name:string,sessionId:string):Promise<{content?:string;error?:string}> {
+    this.promptBuilder.invalidateSkillsCache();
+    return createRuntimeToolServices(this.l5()).loadSkill(name,sessionId);
+  }
+
   async runSession(
     sessionId: string,
     options?: {
@@ -2230,3 +2276,5 @@ export class RawAgentRuntime {
     };
   }
 }
+
+/** Compact, stable prefix, and repeatGuard before the first tool round. */

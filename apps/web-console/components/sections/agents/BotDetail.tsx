@@ -1,8 +1,9 @@
 'use client';
+import { BotBasics } from '../../BotBasics';
 import { BotGoals } from '../../bot-work/BotGoals';
 import { BotDetailSkills } from '../../BotDetailSkills';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { api } from '@/lib/api';
 import { detailFaceProps, isBotFaceColor, isBotFaceShape, readBotFaceStyle, type BotFaceColor, type BotFaceShape, type BotFaceStyle } from '@/lib/bot-face';
 import { createFaceSaveQueue, type FaceSaveKind } from '@/lib/bot-face-save';
@@ -41,28 +42,51 @@ import { SettingsGroup } from '../../ui';
 
 interface BotDetailProps {
   bot: BotInfo;
-  onOpenChat: (bot: BotInfo) => void;
+  onOpenChat?: (bot: BotInfo) => void;
+  records?: ReactNode;
+  embedded?: boolean;
 }
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
-export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
+function savedFace(bot: BotInfo) {
+  return {
+    shape: isBotFaceShape(bot.faceShape) ? bot.faceShape : null,
+    color: isBotFaceColor(bot.faceColor) ? bot.faceColor : null,
+    style: readBotFaceStyle(bot.faceStyle),
+    ...savedSoftFace(bot)
+  };
+}
+
+function savedSoftFace(bot: BotInfo) {
+  return {
+    softShape: isSoftBotSilhouette(bot.faceShape) ? bot.faceShape : null,
+    softColor: isSoftBotColor(bot.faceColor) ? bot.faceColor : null,
+    softExpression: isSoftBotExpression(bot.faceExpression) ? bot.faceExpression : null
+  };
+}
+
+export function BotDetail({ bot, onOpenChat, records, embedded = false }: BotDetailProps) {
   const { t } = useI18n();
+  const panelId = useId();
+  const panelRef = useRef<HTMLElement>(null);
+  const face = savedFace(bot);
   const { upsertBot } = useLab();
   const [detailTab, setDetailTab] = useState('overview');
+  const [visitedCapabilities, setVisitedCapabilities] = useState(false);
+  const [saveEffect, setSaveEffect] = useState<'nextStep'|'nextRun'|'immediate'|null>(null);
+  useEffect(()=>{if(detailTab==='permissions')setVisitedCapabilities(true);},[detailTab]);
   useEffect(() => {
-    const sync = () => setDetailTab(/focus=(permissions|connections)/.test(window.location.hash) ? 'permissions' : 'overview');
+    const sync = () => setDetailTab(/focus=connections/.test(window.location.hash) ? 'permissions' : 'overview');
     sync(); window.addEventListener('hashchange', sync);
     return () => window.removeEventListener('hashchange', sync);
   }, [bot.id]);
-  const [shape, setShape] = useState<BotFaceShape | null>(isBotFaceShape(bot.faceShape) ? bot.faceShape : null);
-  const [color, setColor] = useState<BotFaceColor | null>(isBotFaceColor(bot.faceColor) ? bot.faceColor : null);
-  const [style, setStyle] = useState<BotFaceStyle | null>(readBotFaceStyle(bot.faceStyle));
-  const [softShape, setSoftShape] = useState<SoftBotSilhouette | null>(isSoftBotSilhouette(bot.faceShape) ? bot.faceShape : null);
-  const [softColor, setSoftColor] = useState<SoftBotColor | null>(isSoftBotColor(bot.faceColor) ? bot.faceColor : null);
-  const [softExpression, setSoftExpression] = useState<SoftBotExpression | null>(
-    isSoftBotExpression(bot.faceExpression) ? bot.faceExpression : null
-  );
+  const [shape, setShape] = useState<BotFaceShape | null>(face.shape);
+  const [color, setColor] = useState<BotFaceColor | null>(face.color);
+  const [style, setStyle] = useState<BotFaceStyle | null>(face.style);
+  const [softShape, setSoftShape] = useState<SoftBotSilhouette | null>(face.softShape);
+  const [softColor, setSoftColor] = useState<SoftBotColor | null>(face.softColor);
+  const [softExpression, setSoftExpression] = useState<SoftBotExpression | null>(face.softExpression);
   const faceNow = useRef({ shape, color, style, softShape, softColor, softExpression });
   const generations = useRef(createGenerationGuard());
   const [activeBotId, setActiveBotId] = useState(bot.id);
@@ -72,15 +96,16 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
   const [error, setError] = useState<string | null>(null);
   if (activeBotId !== bot.id) {
     setActiveBotId(bot.id);
+    setSaveEffect(null);
     setSessionId(selectionForBot(bot).sessionId);
     setSettings(null);
     setError(null);
-    setShape(isBotFaceShape(bot.faceShape) ? bot.faceShape : null);
-    setColor(isBotFaceColor(bot.faceColor) ? bot.faceColor : null);
-    setStyle(readBotFaceStyle(bot.faceStyle));
-    setSoftShape(isSoftBotSilhouette(bot.faceShape) ? bot.faceShape : null);
-    setSoftColor(isSoftBotColor(bot.faceColor) ? bot.faceColor : null);
-    setSoftExpression(isSoftBotExpression(bot.faceExpression) ? bot.faceExpression : null);
+    setShape(face.shape);
+    setColor(face.color);
+    setStyle(face.style);
+    setSoftShape(face.softShape);
+    setSoftColor(face.softColor);
+    setSoftExpression(face.softExpression);
   }
 
   const botIdRef = useRef(bot.id);
@@ -148,14 +173,7 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
   );
 
   useEffect(() => {
-    const next = {
-      shape: isBotFaceShape(bot.faceShape) ? bot.faceShape : null,
-      color: isBotFaceColor(bot.faceColor) ? bot.faceColor : null,
-      style: readBotFaceStyle(bot.faceStyle),
-      softShape: isSoftBotSilhouette(bot.faceShape) ? bot.faceShape : null,
-      softColor: isSoftBotColor(bot.faceColor) ? bot.faceColor : null,
-      softExpression: isSoftBotExpression(bot.faceExpression) ? bot.faceExpression : null
-    };
+    const next = savedFace(bot);
     setShape(next.shape);
     setColor(next.color);
     setStyle(next.style);
@@ -180,12 +198,12 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
   useEffect(() => {
     if (!settings) return;
     if (readBotConnectionsTarget(window.location.hash)?.botId === bot.id) {
-      document.getElementById('bot-connections')?.scrollIntoView({ block: 'start' });
+      panelRef.current?.querySelector('[data-bot-connections]')?.scrollIntoView({ block: 'start' });
       return;
     }
     const target = readBotPermissionsTarget(window.location.hash);
     if (!target || target.botId !== bot.id) return;
-    document.getElementById(BOT_PERMISSIONS_SECTION_ID)?.scrollIntoView({ block: 'start' });
+    panelRef.current?.querySelector('[data-testid=bot-permissions]')?.scrollIntoView({ block: 'start' });
   }, [settings, bot.id]);
 
   useEffect(() => {
@@ -204,6 +222,7 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
 
   const patchBot = useCallback(
     async (patch: Record<string, unknown>) => {
+      setSaveEffect(null);
       const result = (await api(`/api/bots/${encodeURIComponent(bot.id)}`, {
         method: 'PATCH',
         headers: JSON_HEADERS,
@@ -211,6 +230,7 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
       })) as { bot?: BotInfo; warnings?: unknown };
       if (result.bot) upsertBot(result.bot);
       await load();
+      setSaveEffect(['maxTurns','name','title','description'].some(key=>key in patch) ? 'nextRun' : 'nextStep');
       return result;
     },
     [bot.id, load, upsertBot]
@@ -219,6 +239,7 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
   const faceSave = useRef(createFaceSaveQueue(() => faceNow.current));
   const saveFace = useCallback(
     async (kind: FaceSaveKind) => {
+      setSaveEffect(null);
       const botId = bot.id;
       const turn = faceSave.current(kind, async (patch) => {
         if (botIdRef.current !== botId) return;
@@ -236,6 +257,7 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
       setError(null);
       try {
         await turn;
+        setSaveEffect('immediate');
       } catch (err) {
         setError(
           t('agents.bots.faceSaveFailed', { error: err instanceof Error ? err.message : String(err) })
@@ -249,6 +271,7 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
 
   const savePermission = useCallback(
     async (mode: BotPermissionMode, opts?: { confirmBypass?: boolean }) => {
+      setSaveEffect(null);
       await api(`/api/sessions/${encodeURIComponent(sessionId)}`, {
         method: 'PATCH',
         headers: JSON_HEADERS,
@@ -258,6 +281,7 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
         })
       });
       await load();
+      setSaveEffect('nextStep');
     },
     [sessionId, load]
   );
@@ -270,7 +294,7 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
   );
 
   return (
-    <section className="ag-panel" aria-label={t('agents.bots.detailTitle')} id="botDetail" data-testid="bot-detail">
+    <section ref={panelRef} className="ag-panel" aria-label={t('agents.bots.detailTitle')} id={embedded ? 'botDetailEmbedded' : 'botDetail'} data-testid={embedded ? "bot-detail-embedded" : "bot-detail"}>
       <div className="ag-panel__head">
         <div className="ag-panel__identity">
           <BotFace
@@ -291,9 +315,9 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
           </div>
         </div>
         <div className="ag-panel__actions">
-          <button type="button" className="btn btn-primary btn-sm" onClick={() => onOpenChat(bot)}>
+          {onOpenChat && <button type="button" className="btn btn-primary btn-sm" onClick={() => onOpenChat(bot)}>
             {t('agents.bots.openChat')}
-          </button>
+          </button>}
         </div>
       </div>
       <div className="ag-chips">
@@ -307,10 +331,29 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
       ) : null}
       {!settings && !error ? <p className="ag-panel__lead">{t('agents.bots.loadingSettings')}</p> : null}
       <div className="bot-settings-tabs" role="tablist" aria-label={t('polish.settingsTabs')}>
-        {(['overview', 'permissions', 'skills', 'automation', 'history'] as const).map(tab => <button key={tab} type="button" role="tab" id={`bot-tab-${tab}`} aria-controls={`bot-page-${tab}`} aria-selected={detailTab === tab} onClick={() => setDetailTab(tab)}>{t(tab === 'skills' ? 'skillProposals.detailTab' : `polish.${tab}`)}</button>)}
+        {(['overview', 'permissions', 'automation', 'history'] as const).map(tab => <button key={tab} type="button" role="tab" id={`${panelId}-tab-${tab}`} aria-controls={`${panelId}-page-${tab}`} aria-selected={detailTab === tab} onClick={() => setDetailTab(tab)}>{t(tab === 'overview' ? 'botSettings.basic' : tab === 'permissions' ? 'botSettings.capabilities' : tab === 'automation' ? 'botSettings.automation' : 'botSettings.records')}</button>)}
       </div>
-      <div role="tabpanel" id="bot-page-skills" aria-labelledby="bot-tab-skills" hidden={detailTab !== 'skills'}>{detailTab === 'skills' && <BotDetailSkills botId={bot.id}/>}</div>
-      <div role="tabpanel" id="bot-page-overview" aria-labelledby="bot-tab-overview" hidden={detailTab !== 'overview'}>
+      <p>{t('botSettings.scope')}</p>
+      {saveEffect && <p role="status" data-testid="bot-save-effect">{t(`botSettings.${saveEffect}`)}</p>}
+      <div role="tabpanel" id={`${panelId}-page-overview`} aria-labelledby={`${panelId}-tab-overview`} hidden={detailTab !== 'overview'}>
+      <BotBasics key={bot.id} bot={bot} onSave={patchBot} />
+      {settings && <>          <BotModelSetting
+            botId={bot.id}
+            pinned={settings.modelOverride}
+            options={catalogToPickerOptions(catalog)}
+            defaultRef={catalog?.catalog.defaultRef ?? null}
+            onSave={saveModel}
+          />          <div id={embedded ? `${panelId}-permissions` : BOT_PERMISSIONS_SECTION_ID} data-testid="bot-permissions">
+            <BotPolicySettings
+              botId={bot.id}
+              maxTurns={settings.maxTurns}
+              permissionMode={settings.permissionMode}
+              onSavePermission={savePermission}
+              allowedTools={settings.allowedTools}
+              onSave={patchBot}
+            />
+          </div></>}
+      <details><summary>{t('botSettings.appearance')}</summary>
       <BotFaceChoice
         name={bot.name}
         botId={bot.id}
@@ -375,40 +418,21 @@ export function BotDetail({ bot, onOpenChat }: BotDetailProps) {
         }}
       />
 
+      </details>
       {sessionId && <BotGoals key={`${bot.id}:${sessionId}`} botId={bot.id} sessionId={sessionId}/>}
       <BotRuntimeControl botId={bot.id}/>
       </div>
-      <div role="tabpanel" id="bot-page-history" aria-labelledby="bot-tab-history" hidden={detailTab !== 'history'}>
+      <div role="tabpanel" id={`${panelId}-page-history`} aria-labelledby={`${panelId}-tab-history`} hidden={detailTab !== 'history'}>
       <BotHistory sessionId={sessionId} />
       <BotMemory botId={bot.id} sessionId={sessionId}/>
+      {records}
       </div>
-      <div role="tabpanel" id="bot-page-permissions" aria-labelledby="bot-tab-permissions" hidden={detailTab !== 'permissions'}>
-      <div id="bot-connections"><BotConnections botId={bot.id} /></div>
-      {settings ? (
-        <>
-          <div id={BOT_PERMISSIONS_SECTION_ID} data-testid="bot-permissions">
-            <BotPolicySettings
-              botId={bot.id}
-              maxTurns={settings.maxTurns}
-              permissionMode={settings.permissionMode}
-              onSavePermission={savePermission}
-              allowedTools={settings.allowedTools}
-              allowedSkills={settings.allowedSkills}
-              allowlistsCollapsed
-              onSave={patchBot}
-            />
-          </div>
-          <BotModelSetting
-            botId={bot.id}
-            pinned={settings.modelOverride}
-            options={catalogToPickerOptions(catalog)}
-            defaultRef={catalog?.catalog.defaultRef ?? null}
-            onSave={saveModel}
-          />
-        </>
-      ) : null}
+      <div role="tabpanel" id={`${panelId}-page-permissions`} aria-labelledby={`${panelId}-tab-permissions`} hidden={detailTab !== 'permissions'}>
+      {settings && <BotPolicySettings onlyTools botId={bot.id} maxTurns={settings.maxTurns} permissionMode={settings.permissionMode} onSavePermission={savePermission} allowedTools={settings.allowedTools} onSave={patchBot} />}
+      {visitedCapabilities && <BotDetailSkills botId={bot.id}/>}
+      <div data-bot-connections id={embedded ? `${panelId}-connections` : "bot-connections"}><BotConnections botId={bot.id} /></div>
       </div>
-      <div role="tabpanel" id="bot-page-automation" aria-labelledby="bot-tab-automation" hidden={detailTab !== 'automation'}>
+      <div role="tabpanel" id={`${panelId}-page-automation`} aria-labelledby={`${panelId}-tab-automation`} hidden={detailTab !== 'automation'}>
           <SettingsGroup title={t('agents.bots.sectionSchedule')}>
             <BotCronPanel botId={bot.id} botName={bot.name} />
           </SettingsGroup>

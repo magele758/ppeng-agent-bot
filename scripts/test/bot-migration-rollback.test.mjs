@@ -58,7 +58,8 @@ test('real v24 ownerless Bot/cron upgrade is idempotent and rollback restores a 
   const beforeDir=join(temporary,'before-upgrade');const beforeManifest=stoppedSnapshot(stateDir,beforeDir);
 
   const current=new SqliteStateStore(dbFile);const currentHost=host(current,stateDir);
-  assert.equal(getCurrentSchemaVersion(current.db),LATEST_SCHEMA_VERSION);assert.equal(LATEST_SCHEMA_VERSION,34);
+  assert.equal(getCurrentSchemaVersion(current.db),LATEST_SCHEMA_VERSION);assert.equal(LATEST_SCHEMA_VERSION,35);
+  assert.deepEqual(current.db.prepare('PRAGMA table_info(session_message_sources)').all().map(column=>column.name),['message_id','session_id','source_id']);
   assert.ok(current.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='memory_suppressions'").get());
   assert.ok(current.db.prepare('PRAGMA table_info(session_inbox)').all().some(column=>column.name==='context_parts_json'));
   assert.ok(current.db.prepare('PRAGMA table_info(session_messages)').all().some(column=>column.name==='reply_to_json'));

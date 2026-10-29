@@ -213,3 +213,125 @@ test('pending completion is consumed by verification and is not resumed as a new
 test('scheduler block announces one meaningful change without repeated wakes',async t=>{
  const {host,create,service,store,parent}=fixture(t);const g=create();const e=service.claim('b',g.id,{strategy:'direct'});service.report('b',e.id,{kind:'waiting',summary:'waiting unknown source',wait:{source:'unsupported',correlationId:'external'}});await tickBotGoals(host);assert.equal(service.get('b',g.id).status,'blocked');assert.deepEqual(store.dequeueSchedulerWakes(),[]);assert.equal(store.foldMessages(parent.id).filter(m=>m.parts.some(p=>p.text?.startsWith('[goal update]'))).length,1);await tickBotGoals(host);assert.deepEqual(store.dequeueSchedulerWakes(),[]);
 });
+
+test('an authorized background job wakes the original work once, with identity-checked evidence [AC:bot-linked-watchers#AC-7] [AC:bot-watch-work-continuity#AC-2] [AC:bot-watch-work-continuity#AC-8]',async t=>{
+ const {host,service,store,parent,runs}=fixture(t);
+ const g=service.create({botId:'b',sessionId:parent.id,title:'Develop then review',objective:'Develop then review and merge'}),e=service.claim('b',g.id,{strategy:'direct'});
+ service.updateExecution('b',e.id,{sessionId:parent.id});
+ store.updateSession(parent.id,{metadata:{...parent.metadata,botGoalId:g.id,botGoalExecutionId:e.id,botGoalScopeSessionId:parent.id}});
+ const job=store.createBackgroundJob({sessionId:parent.id,command:'authorized background development',status:'running'});
+ const {recordBackgroundWaitSource}=await import('../dist/waits/background-source.js');const {createWaitForTool}=await import('../dist/waits/tool.js');
+ const spec=recordBackgroundWaitSource(store,parent.id,job);assert.equal(spec.ref,job.id);
+ const registered=await createWaitForTool(store).execute({session:store.getSession(parent.id)},{...spec,summary:'Continue review after development'});assert.equal(registered.ok,true,registered.content);const wait={source:'durable_wait',correlationId:JSON.parse(registered.content).waitId};
+ service.report('b',e.id,{kind:'waiting',summary:'development running',wait});
+ await tickBotGoals(host);assert.equal(service.get('b',g.id).status,'waiting');assert.equal(runs.length,0);
+ store.updateBackgroundJob(job.id,'completed','development result: commit abc123; review still required');
+ await tickBotGoals(host);const next=service.get('b',g.id);assert.equal(next.status,'running');assert.equal(runs.length,1);assert.ok(next.evidence.some(item=>item.includes(job.id)));assert.match(next.nextStep,/Inspect authorized durable_wait result/);
+ await tickBotGoals(host);assert.equal(runs.length,1);
+});
+
+test('background waits cannot borrow another job or revive cancelled work [AC:bot-linked-watchers#AC-1] [AC:bot-linked-watchers#AC-7] [AC:bot-watch-work-continuity#AC-2] [AC:bot-watch-work-continuity#AC-8]',async t=>{
+ const {host,service,store,parent,runs}=fixture(t),{recordBackgroundWaitSource}=await import('../dist/waits/background-source.js');const {createWaitForTool}=await import('../dist/waits/tool.js');
+ const g=service.create({botId:'b',sessionId:parent.id,title:'Background work',objective:'Ship'}),e=service.claim('b',g.id,{strategy:'direct'});service.updateExecution('b',e.id,{sessionId:parent.id});store.updateSession(parent.id,{metadata:{...parent.metadata,botGoalId:g.id,botGoalExecutionId:e.id}});
+ const foreign=store.createSession({title:'foreign',mode:'chat',agentId:'general',metadata:{userId:'else'}}),job=store.createBackgroundJob({sessionId:foreign.id,command:'foreign',status:'completed'});
+ assert.equal(recordBackgroundWaitSource(store,parent.id,job),undefined);
+ const owned=store.createBackgroundJob({sessionId:parent.id,command:'work',status:'running'}),spec=recordBackgroundWaitSource(store,parent.id,owned);const registered=await createWaitForTool(store).execute({session:store.getSession(parent.id)},{...spec,summary:'Continue after work'});assert.equal(registered.ok,true,registered.content);const wait={source:'durable_wait',correlationId:JSON.parse(registered.content).waitId};service.report('b',e.id,{kind:'waiting',summary:'running',wait});service.control('b',g.id,'cancel');
+ await tickBotGoals(host);assert.equal(service.get('b',g.id).draining,true);assert.equal(runs.length,0);
+ store.updateBackgroundJob(owned.id,'completed','done');await tickBotGoals(host);assert.equal(service.get('b',g.id).status,'cancelled');assert.equal(service.get('b',g.id).draining,false);assert.equal(runs.length,0);
+});
+test('changed background execution identity stays blocked across a durable-wait check [AC:bot-linked-watchers#AC-1] [AC:bot-linked-watchers#AC-7] [AC:bot-watch-work-continuity#AC-2] [AC:bot-watch-work-continuity#AC-8]',async t=>{
+ const {host,service,store,parent,runs}=fixture(t),{recordBackgroundWaitSource}=await import('../dist/waits/background-source.js'),{createWaitForTool}=await import('../dist/waits/tool.js');
+ const goal=service.create({botId:'b',sessionId:parent.id,title:'Original',objective:'deliver'}),e=service.claim('b',goal.id,{strategy:'direct'});service.updateExecution('b',e.id,{sessionId:parent.id});store.updateSession(parent.id,{metadata:{...parent.metadata,botGoalId:goal.id,botGoalExecutionId:e.id}});
+ const job=store.createBackgroundJob({sessionId:parent.id,command:'build',status:'running'}),spec=recordBackgroundWaitSource(store,parent.id,job),registered=await createWaitForTool(store).execute({session:store.getSession(parent.id)},{...spec,summary:'review after build'});
+ assert.equal(registered.ok,true);service.report('b',e.id,{kind:'waiting',summary:'wait',wait:{source:'durable_wait',correlationId:JSON.parse(registered.content).waitId}});
+ store.db.prepare("UPDATE background_jobs SET created_at=?,status='completed' WHERE id=?").run('2000-01-01T00:00:00.000Z',job.id);
+ await tickBotGoals(host);assert.equal(runs.length,0);assert.notEqual(service.get('b',goal.id).status,'completed');assert.equal(service.get('b',goal.id).status,'waiting');assert.match(service.get('b',goal.id).nextStep,/identity changed/);
+});
+
+function waitingChild(store, parent, goal, execution, text) {
+ const child = store.createSession({
+  title: 'dispatched child', mode: 'subagent', agentId: 'general', parentSessionId: parent.id,
+  metadata: {
+   userId: parent.metadata.userId, botId: 'b', botGoalId: goal.id, botGoalScopeSessionId: parent.id,
+   botGoalWorker: true, botGoalWorkerRevision: goal.revision, botGoalWorkerExecutionId: execution.id, botGoalWorkerFence: execution.fence
+  }
+ });
+ store.appendMessage(child.id, 'assistant', [{ type: 'text', text }]);
+ store.updateSession(child.id, { status: 'idle', metadata: { ...store.getSession(child.id).metadata, outcome: { kind: 'completed' } } });
+ return child;
+}
+function authorizeChildWait(store, parent, goal, execution, child) {
+ store.updateSession(parent.id, { metadata: { ...store.getSession(parent.id).metadata, botGoalAuthorizedWaits: [{ goalId: goal.id, executionId: execution.id, source: 'session', correlationId: child.id, revision: goal.revision, fence: execution.fence }] } });
+}
+
+test('child completion wake continues the same goal execution fence once [AC:child-wake-workitem#AC-1] [AC:child-wake-workitem#AC-3]', async t => {
+ const { host, create, service, store, parent, runs } = fixture(t);
+ const goal = create({ title: 'Ship the interface' });
+ const execution = service.claim('b', goal.id, { strategy: 'subagent' });
+ service.updateExecution('b', execution.id, { sessionId: parent.id, runRef: `session:${parent.id}` });
+ const child = waitingChild(store, parent, goal, execution, 'Observed interface result: delivered');
+ authorizeChildWait(store, parent, goal, execution, child);
+ service.report('b', execution.id, { kind: 'waiting', summary: 'child running', wait: { source: 'session', correlationId: child.id } });
+ await tickBotGoals(host);
+ const continued = service.get('b', goal.id);
+ assert.equal(continued.id, goal.id);
+ assert.equal(continued.revision, goal.revision);
+ assert.equal(continued.sessionId, parent.id);
+ assert.equal(continued.wait, undefined);
+ assert.notEqual(continued.status, 'waiting');
+ assert.ok(continued.evidence.some(item => item.includes('Observed interface result')));
+ assert.equal(runs.length, 1);
+ const resumed = store.getSession(runs[0]);
+ assert.equal(resumed.parentSessionId, parent.id);
+ assert.equal(resumed.metadata.botGoalId, goal.id);
+ assert.equal(resumed.metadata.botGoalScopeSessionId, parent.id);
+ assert.equal(resumed.metadata.spawnSource, 'bot-goal-continuation');
+ await tickBotGoals(host);
+ assert.equal(runs.length, 1);
+ assert.equal(service.get('b', goal.id).id, goal.id);
+ assert.equal(service.get('b', goal.id).evidence.filter(item => item.includes('Observed interface result')).length, 1);
+});
+
+test('a child wake with a missing or mismatched work fence does not resume the goal [AC:child-wake-workitem#AC-2] [AC:child-wake-workitem#AC-3]', async t => {
+ const { host, create, service, store, parent, runs } = fixture(t);
+ const goal = create({ title: 'Keep the original work' });
+ const other = create({ title: 'Different work' });
+ const execution = service.claim('b', goal.id, { strategy: 'subagent' });
+ service.updateExecution('b', execution.id, { sessionId: parent.id });
+ const otherExecution = service.claim('b', other.id, { strategy: 'direct' });
+ service.updateExecution('b', otherExecution.id, { sessionId: parent.id });
+ const child = waitingChild(store, parent, goal, execution, 'Result belongs to the first work');
+ const detached = store.createSession({ title: 'detached', mode: 'subagent', agentId: 'general', parentSessionId: parent.id, metadata: { botId: 'b', botGoalScopeSessionId: parent.id } });
+ store.appendMessage(detached.id, 'assistant', [{ type: 'text', text: 'orphan result' }]);
+ store.updateSession(detached.id, { status: 'idle', metadata: { ...store.getSession(detached.id).metadata, outcome: { kind: 'completed' } } });
+ store.updateSession(parent.id, { metadata: { ...parent.metadata, botGoalAuthorizedWaits: [
+  { goalId: goal.id, executionId: execution.id, source: 'session', correlationId: detached.id },
+  { goalId: other.id, executionId: otherExecution.id, source: 'session', correlationId: child.id, revision: other.revision, fence: otherExecution.fence }
+ ] } });
+ service.report('b', execution.id, { kind: 'waiting', summary: 'missing association', wait: { source: 'session', correlationId: detached.id } });
+ service.report('b', otherExecution.id, { kind: 'waiting', summary: 'wrong owner', wait: { source: 'session', correlationId: child.id } });
+ await tickBotGoals(host);
+ assert.equal(service.get('b', goal.id).status, 'blocked');
+ assert.match(service.get('b', goal.id).blockedReason, /authorized|association|owner|revision|fence/i);
+ assert.equal(service.get('b', other.id).status, 'blocked');
+ assert.equal(service.get('b', goal.id).evidence.some(item => item.includes('orphan result')), false);
+ assert.equal(service.get('b', other.id).evidence.some(item => item.includes('Result belongs to the first work')), false);
+ assert.equal(runs.length, 0);
+});
+
+test('a child wake stamped with a stale execution revision does not resume the goal [AC:child-wake-workitem#AC-2]', async t => {
+ const { host, create, service, store, parent, runs } = fixture(t);
+ const goal = create();
+ const execution = service.claim('b', goal.id, { strategy: 'subagent' });
+ service.updateExecution('b', execution.id, { sessionId: parent.id });
+ const child = waitingChild(store, parent, goal, execution, 'Stale child result');
+ store.updateSession(parent.id, { metadata: { ...parent.metadata, botGoalAuthorizedWaits: [{ goalId: goal.id, executionId: execution.id, source: 'session', correlationId: child.id, revision: goal.revision + 1, fence: execution.fence }] } });
+ service.report('b', execution.id, { kind: 'waiting', summary: 'child running', wait: { source: 'session', correlationId: child.id } });
+ await tickBotGoals(host);
+ const saved = service.get('b', goal.id);
+ assert.equal(saved.status, 'blocked');
+ assert.match(saved.blockedReason, /authorized|association|owner|revision|fence/i);
+ assert.equal(saved.evidence.some(item => item.includes('Stale child result')), false);
+ assert.equal(saved.wait?.correlationId, child.id);
+ assert.equal(runs.length, 0);
+});

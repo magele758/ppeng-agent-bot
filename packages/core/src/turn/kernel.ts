@@ -541,6 +541,20 @@ async function runSessionKernelWithWriterScope(
   }
 }
 
+
+const KERNEL_TURN: unique symbol = Symbol('kernel-turn');
+const KERNEL_TURN_STOPS = new Set<string>(['continue', 'break', 'return']);
+type KernelTurnFlow = { [KERNEL_TURN]: 'continue' | 'break' | 'return'; value?: unknown };
+
+function kernelTurnSignal(stop: 'continue' | 'break' | 'return', value?: unknown): KernelTurnFlow {
+  return { [KERNEL_TURN]: stop, value };
+}
+
+function kernelTurnStop(flow: unknown): 'continue' | 'break' | 'return' | undefined {
+  const stop = typeof flow === 'object' && flow ? (flow as KernelTurnFlow)[KERNEL_TURN] : undefined;
+  return typeof stop === 'string' && KERNEL_TURN_STOPS.has(stop) ? stop as 'continue' | 'break' | 'return' : undefined;
+}
+
 async function runSessionKernel(
   host: TurnKernelHost,
   sessionId: string,
@@ -695,20 +709,62 @@ async function runSessionKernel(
       applyClaimedInbox(host.store, sid, nextRunItems);
     }
 
-    for (let turn = 0; turn < maxTurnsPerRun; turn += 1) {
-      if (!startup.ready) startup.turn = turn;
-      if (signal.aborted) {
+    {
+const kernelFinished = await (async () => {
+for (let turn = 0; turn < maxTurnsPerRun; turn += 1) {
+let refreshedSession: any;
+let task: any;
+let workspaceRoot: any;
+let workspaceRoots: any;
+let context: any;
+let packed: any;
+let visibleMessages: any;
+let rawVisible: any;
+let promptCtx: any;
+let drainedAdvisory: any;
+let systemPrompt: any;
+let stablePrefixHash: any;
+let routing: any;
+let resolveImageDataUrl: any;
+let dynHydrated: any;
+let selectedTools: any;
+let allowExternalAiTools: any;
+let turnTools: any;
+let beforeTurn: any;
+let turnInput: any;
+let hasGoal: any;
+let pre: any;
+let turnResult: any;
+let turnCostUsd: any;
+let turnCostModel: any;
+let recovery: any;
+let spinReason: any;
+let pendingRecoveryAdvisory: any;
+let assistantMessage: any;
+let toolCalls: any;
+let validToolCalls: any;
+let closedByGate: any;
+let approvalResult: any;
+let drainPolicy: any;
+let drain: any;
+let executable: any;
+let results: any;
+let progressDecision: any;
+const kernelTurnFlow = await (async () => {
+const kernelSteps: Array<() => Promise<unknown>> = [
+async () => {
+if (!startup.ready) startup.turn = turn;
+if (signal.aborted) {
         closeWaveIfOpen();
-        return await finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'abort');
+        return kernelTurnSignal('return', await finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'abort'));
       }
-
-      const refreshedSession = host.store.getSession(session.id) as SessionRecord;
-      const task = refreshedSession.taskId ? host.store.getTask(refreshedSession.taskId) : undefined;
-      const workspaceRoot = await timeKernelPhase(host, sid, startup, 'ensure_workspace', () =>
+refreshedSession = host.store.getSession(session.id) as SessionRecord;
+task = refreshedSession.taskId ? host.store.getTask(refreshedSession.taskId) : undefined;
+workspaceRoot = await timeKernelPhase(host, sid, startup, 'ensure_workspace', () =>
         host.ensureWorkspaceRoot(refreshedSession, task)
       );
-      let workspaceRoots = defaultWorkspaceRoots(workspaceRoot, host.repoRoot);
-      if (hasWorkspaceStores(host.store)) {
+workspaceRoots = defaultWorkspaceRoots(workspaceRoot, host.repoRoot);
+if (hasWorkspaceStores(host.store)) {
         const workspaceStore = host.store;
         const binding = workspaceBindingFromMetadata(refreshedSession.metadata);
         if (binding.kind !== 'default') {
@@ -728,7 +784,7 @@ async function runSessionKernel(
       } else {
         noteKernelPhase(host, sid, startup, 'resolve_workspace', 0);
       }
-      let context: RunContext = {
+context = {
         repoRoot: host.repoRoot,
         stateDir: host.stateDir,
         session: host.store.getSession(session.id) as SessionRecord,
@@ -738,8 +794,7 @@ async function runSessionKernel(
         task,
         abortSignal: signal
       };
-
-      if (resumeFromInterrupt) {
+if (resumeFromInterrupt) {
         const interrupt = resumeFromInterrupt;
         resumeFromInterrupt = undefined;
         const claimed = host.store.claimInbox(sid, 'next-step');
@@ -768,16 +823,15 @@ async function runSessionKernel(
             onModelStreamChunk: options?.onModelStreamChunk,
             emitStep
           });
-          if (parked) return parked;
+          if (parked) return kernelTurnSignal('return', parked);
         }
         const after = host.store.getSession(sid);
         host.store.updateSession(sid, {
           metadata: mergeInterruptMetadata(after?.metadata ?? {}, null)
         });
-        continue;
+        return kernelTurnSignal('continue');
       }
-
-      const packed = await timeKernelPhase(host, sid, startup, 'pack_turn', () => prepareTurnInput(sid, {
+packed = await timeKernelPhase(host, sid, startup, 'pack_turn', () => prepareTurnInput(sid, {
         store: host.store,
         autoCompact: async () => {
           await host.autoCompact(context);
@@ -814,28 +868,28 @@ async function runSessionKernel(
           }
         }
       }));
-      context = { ...context, session: packed.session };
-      const visibleMessages = packed.messages;
-      const rawVisible = packed.viewMessages;
-      await emitStep({
+context = { ...context, session: packed.session };
+visibleMessages = packed.messages;
+rawVisible = packed.viewMessages;
+await emitStep({
         type: 'turn_prepared',
         messages: visibleMessages,
         foldSeqs: packed.foldSeqs
       });
-      const promptCtx: PromptContext = context;
-      const drainedAdvisory = advisoryQueue.drainCombined();
-      if (drainedAdvisory) {
+promptCtx = context;
+drainedAdvisory = advisoryQueue.drainCombined();
+if (drainedAdvisory) {
         host.store.appendMessage(sid, 'system', [textPart(drainedAdvisory)]);
       }
-      const systemPrompt = await timeKernelPhase(host, sid, startup, 'build_system_prompt', () =>
+systemPrompt = await timeKernelPhase(host, sid, startup, 'build_system_prompt', () =>
         host.promptBuilder.buildSystemPrompt(promptCtx, rawVisible)
       );
-      const stablePrefixHash = createHash('sha256')
+stablePrefixHash = createHash('sha256')
         .update(host.promptBuilder.buildStablePrefix(promptCtx))
         .digest('hex')
         .slice(0, 16);
-      const routing = host.promptBuilder.getRouting(sid);
-      void host.emitTrace(sid, {
+routing = host.promptBuilder.getRouting(sid);
+void host.emitTrace(sid, {
         kind: 'turn_start',
         payload: {
           turn,
@@ -850,12 +904,10 @@ async function runSessionKernel(
           ...turnTraceFields({ messages: rawVisible, redact: redactForTrace })
         }
       });
-
-      const resolveImageDataUrl = async (assetId: string, _sig?: AbortSignal) => {
+resolveImageDataUrl = async (assetId: string, _sig?: AbortSignal) => {
         return host.resolveImageDataUrl(assetId, context.session.id);
       };
-
-      const { dynHydrated, selectedTools } = await timeKernelPhase(host, sid, startup, 'pick_turn_tools', () =>
+({ dynHydrated, selectedTools } = await timeKernelPhase(host, sid, startup, 'pick_turn_tools', () =>
         hydrateResolveTurnTools(
           host,
           context.session,
@@ -864,26 +916,25 @@ async function runSessionKernel(
           queryForDynHydrate(visibleMessages),
           systemPrompt.length
         )
-      );
-      emitDynHydrateTrace(host, sid, dynHydrated);
-      const allowExternalAiTools = selectedTools.allowExternalAiTools;
-      const turnTools = selectedTools.turnTools;
-      host.turnShapeBySession.set(sid, selectedTools.turnShape);
-      if (Object.keys(selectedTools.metadataPatch).length > 0) {
+      ));
+emitDynHydrateTrace(host, sid, dynHydrated);
+allowExternalAiTools = selectedTools.allowExternalAiTools;
+turnTools = selectedTools.turnTools;
+host.turnShapeBySession.set(sid, selectedTools.turnShape);
+if (Object.keys(selectedTools.metadataPatch).length > 0) {
         host.mergeSessionMetadata(sid, selectedTools.metadataPatch);
         context = {
           ...context,
           session: host.store.getSession(sid) as SessionRecord
         };
       }
-      if (selectedTools.drifted) {
+if (selectedTools.drifted) {
         void host.emitTrace(sid, {
           kind: 'prompt_cache_bust',
           payload: { fingerprint: selectedTools.fingerprint, reason: 'toolset_drift' }
         });
       }
-
-      if (turn === 0) {
+if (turn === 0) {
         await timeKernelPhase(host, sid, startup, 'session_start_hook', async () => {
           const startHook = await runLifecycleHook(process.env, {
             phase: 'session_start',
@@ -907,25 +958,23 @@ async function runSessionKernel(
           }
         });
       }
-
-      const beforeTurn = await timeKernelPhase(host, sid, startup, 'before_turn_hook', () =>
+beforeTurn = await timeKernelPhase(host, sid, startup, 'before_turn_hook', () =>
         host.extensionRegistry.run('before_turn', {
           sessionId: sid,
           agentId: agent.id,
           meta: { turn }
         })
       );
-      if (beforeTurn.block) {
+if (beforeTurn.block) {
         host.store.appendMessage(sid, 'system', [
           textPart(beforeTurn.message ?? beforeTurn.systemMessage ?? 'blocked by before_turn extension')
         ]);
-        return await finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'before_turn_blocked');
+        return kernelTurnSignal('return', await finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'before_turn_blocked'));
       }
-      if (beforeTurn.systemMessage) {
+if (beforeTurn.systemMessage) {
         host.store.appendMessage(sid, 'system', [textPart(beforeTurn.systemMessage)]);
       }
-
-      let turnInput = {
+turnInput = {
         agent,
         systemPrompt,
         messages: visibleMessages,
@@ -938,13 +987,12 @@ async function runSessionKernel(
           ? { debugLlmContext: { stateDir: host.stateDir, sessionId: sid } }
           : {})
       };
-
-      const hasGoal = Boolean(goalGate?.isActive());
-      const pre = await timeKernelPhase(host, sid, startup, 'before_model', () =>
+hasGoal = Boolean(goalGate?.isActive());
+pre = await timeKernelPhase(host, sid, startup, 'before_model', () =>
         applyJevPreTurn(host.store, queryForDynHydrate(visibleMessages), hasGoal)
       );
-      emitKernelReady(host, sid, startup);
-      if (pre === 'skip_done' && hasGoal) {
+emitKernelReady(host, sid, startup);
+if (pre === 'skip_done' && hasGoal) {
         host.store.appendMessage(sid, 'system', [
           textPart('[jev-pre-turn] Goal assumed met; skipping deep model turn.')
         ]);
@@ -953,13 +1001,13 @@ async function runSessionKernel(
         } else {
           await waitSteeringChildrenIdle(sid);
         }
-        return await host.handleTurnCompletion(session, agent, task).then((completed) =>
+        return kernelTurnSignal('return', await host.handleTurnCompletion(session, agent, task).then((completed) =>
           finishEnded(completed, 'end')
-        );
+        ));
       }
-
-      let turnResult: ModelTurnResult;
-      try {
+},
+async () => {
+try {
         turnResult = await host.runTurnWithRetries(turnInput, options?.onModelStreamChunk);
       } catch (error) {
         // Degenerate repetition: the polluted partial was never persisted, so a
@@ -982,7 +1030,7 @@ async function runSessionKernel(
             host.store.appendMessage(sid, 'system', [
               textPart(`[recovery] Stopped: model output degenerated into repetition (${error.reason})`)
             ]);
-            return await finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'repetition');
+            return kernelTurnSignal('return', await finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'repetition'));
           }
           try {
             turnResult = await host.runTurnWithRetries(turnInput, options?.onModelStreamChunk);
@@ -996,7 +1044,7 @@ async function runSessionKernel(
             host.store.appendMessage(sid, 'system', [
               textPart(`[recovery] Stopped: model output degenerated into repetition (${reason})`)
             ]);
-            return await finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'repetition');
+            return kernelTurnSignal('return', await finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'repetition'));
           }
         } else if (isContextOverflowError(error)) {
           void host.emitTrace(sid, {
@@ -1026,7 +1074,7 @@ async function runSessionKernel(
           turnResult = await host.runTurnWithRetries(turnInput, options?.onModelStreamChunk);
         } else if (signal.aborted) {
           closeWaveIfOpen();
-          return await finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'abort');
+          return kernelTurnSignal('return', await finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'abort'));
         } else {
           void host.emitTrace(sid, {
             kind: 'model_error',
@@ -1035,10 +1083,7 @@ async function runSessionKernel(
           throw error;
         }
       }
-
-      // Parsed tool_calls win over a false finish_reason=stop (DSML / gateway).
-      // finishReason stays raw; only stopReason is corrected for the loop.
-      {
+{
         const parsedCalls = toolCallParts(turnResult.assistantParts).length;
         const corrected = resolveModelStopReason(turnResult.finishReason, parsedCalls);
         if (corrected === 'tool_use' && turnResult.stopReason !== 'tool_use' && parsedCalls > 0) {
@@ -1054,11 +1099,7 @@ async function runSessionKernel(
           turnResult = { ...turnResult, stopReason: 'tool_use' };
         }
       }
-
-      // Some gateways report prompt_tokens as a session running total. Left
-      // as-is that would be summed again every turn, inflating totals and cost
-      // quadratically. Normalize to this turn's share before anything consumes it.
-      if (turnResult.usage) {
+if (turnResult.usage) {
         const prev = host.cumulativeInputTokensBySession.get(sid);
         const split = splitCumulativePromptTokens(
           turnResult.usage.inputTokens,
@@ -1090,10 +1131,7 @@ async function runSessionKernel(
           });
         }
       }
-
-      let turnCostUsd: number | undefined;
-      let turnCostModel: string | undefined;
-      if (turnResult.usage) {
+if (turnResult.usage) {
         try {
           const cost = estimateUsageCostUsd(
             turnResult.usage,
@@ -1106,8 +1144,7 @@ async function runSessionKernel(
           /* ignore */
         }
       }
-
-      void host.emitTrace(sid, {
+void host.emitTrace(sid, {
         kind: 'turn_end',
         payload: {
           stopReason: turnResult.stopReason,
@@ -1124,9 +1161,9 @@ async function runSessionKernel(
           })
         }
       });
-
-      // Truncation is a control-flow event (see decideTurnRecovery), not a clean end.
-      if (turnResult.truncated) {
+},
+async () => {
+if (turnResult.truncated) {
         void host.emitTrace(sid, {
           kind: 'turn_truncated',
           payload: {
@@ -1141,9 +1178,7 @@ async function runSessionKernel(
           }
         });
       }
-
-      // Aggregate per-session token totals + USD cost estimate (best-effort).
-      if (turnResult.usage) {
+if (turnResult.usage) {
         try {
           const current = host.store.getSession(session.id);
           const prevTotals = (current?.metadata?.usageTotals ?? undefined) as
@@ -1168,8 +1203,7 @@ async function runSessionKernel(
           void err; // never let usage accounting break the turn
         }
       }
-
-      let recovery = decideTurnRecovery({
+recovery = decideTurnRecovery({
         stopReason: turnResult.stopReason,
         finishReason: turnResult.finishReason,
         truncated: turnResult.truncated,
@@ -1177,7 +1211,7 @@ async function runSessionKernel(
         state: recoveryState,
         userAborted: signal.aborted
       });
-      if (recovery.action !== 'continue' || turnResult.truncated || turnResult.assistantParts.length === 0) {
+if (recovery.action !== 'continue' || turnResult.truncated || turnResult.assistantParts.length === 0) {
         const recoveryOpts: Array<{ id: string; label: string }> = [
           { id: recovery.action, label: `Default: ${recovery.action}` }
         ];
@@ -1215,7 +1249,7 @@ async function runSessionKernel(
           }
         }
       }
-      if (discardedAssistant(recovery)) {
+if (discardedAssistant(recovery)) {
         void host.emitTrace(sid, {
           kind: 'recovery_advisory',
           payload: {
@@ -1228,24 +1262,26 @@ async function runSessionKernel(
           }
         });
       }
-      if (recovery.action === 'abort' && recovery.reason === 'user_abort') {
+},
+async () => {
+if (recovery.action === 'abort' && recovery.reason === 'user_abort') {
         closeWaveIfOpen();
-        return await finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'abort');
+        return kernelTurnSignal('return', await finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'abort'));
       }
-      if (recovery.action === 'retry-same-input') {
+if (recovery.action === 'retry-same-input') {
         host.store.appendMessage(sid, 'system', [
           textPart('[recovery] Truncated/incomplete tool_call discarded; retrying the same input.')
         ]);
-        continue;
+        return kernelTurnSignal('continue');
       }
-      if (recovery.action === 'retry-after-nudge') {
+if (recovery.action === 'retry-after-nudge') {
         if (!recovery.discardAssistant && turnResult.assistantParts.length > 0) {
           host.store.appendMessage(session.id, 'assistant', turnResult.assistantParts);
         }
         host.store.appendMessage(sid, 'system', [textPart(recovery.nudge)]);
-        continue;
+        return kernelTurnSignal('continue');
       }
-      if (recovery.action === 'abort') {
+if (recovery.action === 'abort') {
         const reason = recovery.reason;
         host.store.appendMessage(sid, 'system', [
           textPart(
@@ -1258,21 +1294,16 @@ async function runSessionKernel(
           kind: 'recovery_abort',
           payload: { reason, trigger: 'turn_recovery' }
         });
-        return await finishEnded(host.store.updateSession(session.id, { status: 'idle' }), reason);
+        return kernelTurnSignal('return', await finishEnded(host.store.updateSession(session.id, { status: 'idle' }), reason));
       }
-
-      if (turnResult.assistantParts.length === 0) {
+if (turnResult.assistantParts.length === 0) {
         host.store.appendMessage(sid, 'system', [
           textPart('[recovery] Stopped: model returned no assistant content after retries.')
         ]);
-        return await finishEnded(host.store.updateSession(session.id, { status: 'idle' }), 'empty_assistant');
+        return kernelTurnSignal('return', await finishEnded(host.store.updateSession(session.id, { status: 'idle' }), 'empty_assistant'));
       }
-
-      // Reasoning spin: several turns in a row with only reasoning / empty output.
-      // Deliberately no retry — a re-ask re-sends the full tool schemas for the
-      // same non-answer. Persist what we got, explain, and finalize.
-      const spinReason = spinWatchdog?.noteParts(turnResult.assistantParts);
-      if (spinReason) {
+spinReason = spinWatchdog?.noteParts(turnResult.assistantParts);
+if (spinReason) {
         host.store.appendMessage(session.id, 'assistant', turnResult.assistantParts);
         host.store.appendMessage(sid, 'system', [textPart(`[recovery] Stopped: ${spinReason}`)]);
         void host.emitTrace(sid, {
@@ -1288,11 +1319,9 @@ async function runSessionKernel(
             })
           }
         });
-        return await finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'reasoning_spin');
+        return kernelTurnSignal('return', await finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'reasoning_spin'));
       }
-
-      let pendingRecoveryAdvisory: string | undefined;
-      if (loopGuard) {
+if (loopGuard) {
         const rawRep = loopGuard.checkAssistantRepetition(turnResult.assistantParts);
         const repSession = host.store.getSession(session.id) ?? session;
         const repAdapter = adapterOf(repSession);
@@ -1315,8 +1344,8 @@ async function runSessionKernel(
             host.store.appendMessage(session.id, 'system', [
               textPart(`[recovery] Stopped: ${graceOut.reason} (critical strike)`)
             ]);
-            if (tryAutoFork('repetition-aborted')) continue;
-            return await finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'repetition');
+            if (tryAutoFork('repetition-aborted')) return kernelTurnSignal('continue');
+            return kernelTurnSignal('return', await finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'repetition'));
           }
           pendingRecoveryAdvisory = graceOut.advisory;
           void host.emitTrace(sid, {
@@ -1337,24 +1366,24 @@ async function runSessionKernel(
             outcome: 'failure',
             signals: { trigger: 'repetition', reason: graceOut.reason }
           });
-          if (tryAutoFork('repetition-aborted')) continue;
-          return await finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'repetition');
+          if (tryAutoFork('repetition-aborted')) return kernelTurnSignal('continue');
+          return kernelTurnSignal('return', await finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'repetition'));
         }
       }
-
-      const assistantMessage = host.store.appendMessage(session.id, 'assistant', turnResult.assistantParts);
-      if (pendingRecoveryAdvisory) {
+assistantMessage = host.store.appendMessage(session.id, 'assistant', turnResult.assistantParts);
+if (pendingRecoveryAdvisory) {
         host.store.appendMessage(session.id, 'system', [textPart(pendingRecoveryAdvisory)]);
       }
-      await emitStep({
+await emitStep({
         type: 'model_done',
         stopReason: turnResult.stopReason,
         finishReason: turnResult.finishReason,
         truncated: turnResult.truncated,
         assistant: { parts: turnResult.assistantParts }
       });
-
-      if (recovery.action !== 'continue') {
+},
+async () => {
+if (recovery.action !== 'continue') {
         const stopPhase = context.session.mode === 'subagent' ? 'subagent_stop' : 'stop';
         const stopHook = await runLifecycleHook(process.env, {
           phase: stopPhase,
@@ -1367,7 +1396,7 @@ async function runSessionKernel(
               `[stop-hook] ${stopHook.message ?? stopHook.systemMessage ?? 'stop blocked; continuing verification loop'}`
             )
           ]);
-          continue;
+          return kernelTurnSignal('continue');
         }
         if (stopHook.systemMessage) {
           host.store.appendMessage(sid, 'system', [textPart(stopHook.systemMessage)]);
@@ -1383,7 +1412,7 @@ async function runSessionKernel(
               `[stop-extension] ${stopExt.message ?? stopExt.systemMessage ?? 'stop blocked; continuing'}`
             )
           ]);
-          continue;
+          return kernelTurnSignal('continue');
         }
         if (stopExt.systemMessage) {
           host.store.appendMessage(sid, 'system', [textPart(stopExt.systemMessage)]);
@@ -1397,7 +1426,7 @@ async function runSessionKernel(
           host.store.appendMessage(sid, 'system', [
             textPart(`[jev-route] ${route.reason}. Continue working.`)
           ]);
-          continue;
+          return kernelTurnSignal('continue');
         }
         if (goalGate?.isActive()) {
           if (route.kind === 'done') {
@@ -1476,7 +1505,7 @@ async function runSessionKernel(
                 decision.unattendedInstruction ??
                 `[goal] Condition not met yet: ${evalResult.reason}. Continue working toward the goal.`;
               host.store.appendMessage(sid, 'system', [textPart(reason)]);
-              continue;
+              return kernelTurnSignal('continue');
             }
             if (decision.kind === 'close') {
               host.store.appendMessage(sid, 'system', [
@@ -1499,30 +1528,27 @@ async function runSessionKernel(
         const steeredNow = host.store.claimInbox(sid, 'next-step');
         if (steeredNow.length > 0) {
           applyClaimedInbox(host.store, sid, steeredNow);
-          continue;
+          return kernelTurnSignal('continue');
         }
-        return await host.handleTurnCompletion(session, agent, task).then((completed) =>
+        return kernelTurnSignal('return', await host.handleTurnCompletion(session, agent, task).then((completed) =>
           finishEnded(completed, 'end')
-        );
+        ));
       }
-
-      if (!assistantMessage) {
-        return await finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'missing_assistant');
+if (!assistantMessage) {
+        return kernelTurnSignal('return', await finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'missing_assistant'));
       }
-      type ToolCallPart = Extract<MessagePart, { type: 'tool_call' }>;
-      const toolCalls = assistantMessage.parts.filter(
-        (part): part is ToolCallPart => part.type === 'tool_call'
+type ToolCallPart = Extract<MessagePart, { type: 'tool_call' }>;
+toolCalls = assistantMessage.parts.filter(
+        (part: MessagePart): part is ToolCallPart => part.type === 'tool_call'
       );
-
-      const validToolCalls = host.filterValidToolCalls(
+validToolCalls = host.filterValidToolCalls(
         toolCalls,
         allowExternalAiTools,
         session.id,
         turnTools
       );
-
-      const closedByGate = { reported: false, ids: [] as string[] };
-      const approvalResult = await host.checkToolApprovals(
+closedByGate = { reported: false, ids: [] as string[] };
+approvalResult = await host.checkToolApprovals(
         validToolCalls,
         context,
         filePolicy,
@@ -1530,8 +1556,10 @@ async function runSessionKernel(
         turnTools,
         closedByGate
       );
-      if (approvalResult === 'waiting') {
-        if (validToolCalls.some((c) => c.name === 'ask_user')) {
+},
+async () => {
+if (approvalResult === 'waiting') {
+        if (validToolCalls.some((c: ToolCallPart) => c.name === 'ask_user')) {
           markGoalWaitingUser(goalStore, sid);
         }
         const approvalIds = host.store
@@ -1539,7 +1567,7 @@ async function runSessionKernel(
           .filter((a) => a.sessionId === sid)
           .map((a) => a.id);
         const interrupt = createWaitingApprovalInterrupt({
-          toolCallIds: validToolCalls.map((c) => c.toolCallId),
+          toolCallIds: validToolCalls.map((c: ToolCallPart) => c.toolCallId),
           approvalIds,
           writerRunId
         });
@@ -1556,65 +1584,61 @@ async function runSessionKernel(
           )
         });
         await emitStep({ type: 'waiting_approval', approvalIds, interrupt });
-        return updated;
+        return kernelTurnSignal('return', updated);
       }
-      if (approvalResult === 'skip') {
-        continue;
+if (approvalResult === 'skip') {
+        return kernelTurnSignal('continue');
       }
-
-      const drainPolicy = resolveSteerDrainPolicy({
+drainPolicy = resolveSteerDrainPolicy({
         option: options?.steerDrainPolicy,
         sessionMetadata: host.store.getSession(sid)?.metadata,
         store: host.store
       });
-      const drain = drainSteerAtToolLaunch({
+drain = drainSteerAtToolLaunch({
         store: host.store,
         sessionId: sid,
-        toolCallIds: validToolCalls.map((c) => c.toolCallId),
+        toolCallIds: validToolCalls.map((c: ToolCallPart) => c.toolCallId),
         policy: drainPolicy
       });
-      if (drain.drained) {
+if (drain.drained) {
         await emitStep({
           type: 'tools_done',
-          results: drain.skippedIds.map((id) => ({
+          results: drain.skippedIds.map((id: string) => ({
             ok: false,
             content: TOOL_WAVE_SKIPPED_STEER_CONTENT,
-            name: validToolCalls.find((c) => c.toolCallId === id)?.name
+            name: validToolCalls.find((c: ToolCallPart) => c.toolCallId === id)?.name
           }))
         });
-        continue;
+        return kernelTurnSignal('continue');
       }
-
-      const executable = selectExecutableToolCalls(validToolCalls, closedByGate, () =>
+executable = selectExecutableToolCalls(validToolCalls, closedByGate, () =>
         unmatchedToolCallsFromFold(
           host.store.foldMessages(sid),
-          validToolCalls.map((call) => call.toolCallId)
+          validToolCalls.map((call: ToolCallPart) => call.toolCallId)
         )
       );
-      if (executable.length === 0) {
-        continue;
+if (executable.length === 0) {
+        return kernelTurnSignal('continue');
       }
-
-      const results = await host.executeToolCalls(
+results = await host.executeToolCalls(
         executable,
         context,
         allowExternalAiTools,
         sid,
         turnTools
       );
-      host.processToolResults(results, executable, session, task, sid, options?.onModelStreamChunk);
-      recordDynToolUses(host, sid, turn, results, dynHydrated.names);
-      await emitStep({
+host.processToolResults(results, executable, session, task, sid, options?.onModelStreamChunk);
+recordDynToolUses(host, sid, turn, results, dynHydrated.names);
+await emitStep({
         type: 'tools_done',
-        results: results.map((r) => ({ ok: r.ok, content: r.content, name: r.name }))
+        results: results.map((r: { ok: boolean; content: string; name: string }) => ({ ok: r.ok, content: r.content, name: r.name }))
       });
-      saveClosedStep(turn, 'step-end');
-
-      const progressDecision = progressGuard.afterToolRound(
+saveClosedStep(turn, 'step-end');
+progressDecision = progressGuard.afterToolRound(
         executable,
         results
       );
-      if (riskEngine) {
+if (riskEngine) {
         for (const r of results) {
           riskEngine.observeTool({
             toolName: r.name,
@@ -1642,8 +1666,7 @@ async function runSessionKernel(
           });
         }
       }
-
-      if (loopGuard) {
+if (loopGuard) {
         const ar = progressDecision;
         const live = host.store.getSession(session.id) ?? session;
         const adapter = adapterOf(live);
@@ -1665,18 +1688,18 @@ async function runSessionKernel(
             host.store.appendMessage(session.id, 'system', [
               textPart(`[recovery] Stopped: ${graceOut.reason} (critical strike)`)
             ]);
-            if (tryAutoFork('deadloop-exhausted')) continue;
-            return await finishFailed(
+            if (tryAutoFork('deadloop-exhausted')) return kernelTurnSignal('continue');
+            return kernelTurnSignal('return', await finishFailed(
               host.store.updateSession(session.id, { status: 'idle' }),
               loopGuardStopReason(graceOut.reason)
-            );
+            ));
           }
           host.store.appendMessage(session.id, 'system', [textPart(graceOut.advisory)]);
           void host.emitTrace(sid, {
             kind: 'recovery_advisory',
             payload: { reason: graceOut.reason, trigger: 'tools' }
           });
-          continue;
+          return kernelTurnSignal('continue');
         }
         if (graceOut.action === 'abort') {
           const fresh = host.store.getSession(session.id) as SessionRecord;
@@ -1692,14 +1715,30 @@ async function runSessionKernel(
             outcome: 'failure',
             signals: { trigger: 'tools', reason: graceOut.reason }
           });
-          if (tryAutoFork('deadloop-exhausted')) continue;
-          return await finishFailed(
+          if (tryAutoFork('deadloop-exhausted')) return kernelTurnSignal('continue');
+          return kernelTurnSignal('return', await finishFailed(
             host.store.updateSession(session.id, { status: 'idle' }),
             loopGuardStopReason(graceOut.reason)
-          );
+          ));
         }
       }
-    }
+}
+];
+for (const kernelStep of kernelSteps) {
+const kernelFlow = await kernelStep();
+if (kernelTurnStop(kernelFlow)) return kernelFlow;
+}
+return undefined;
+})();
+const kernelStop = kernelTurnStop(kernelTurnFlow);
+if (kernelStop === 'continue') continue;
+if (kernelStop === 'break') break;
+if (kernelStop === 'return') return (kernelTurnFlow as KernelTurnFlow).value as SessionRecord;
+}
+return undefined;
+})();
+if (kernelFinished !== undefined) return kernelFinished as SessionRecord;
+}
 
     host.scheduleBackgroundCaseReview({
       sessionId: session.id,

@@ -1,3 +1,4 @@
+import { runtimeCapabilitiesRoutes } from './routes/runtime-capabilities.js';
 import {learningRoutes} from './routes/learning.js';
 import { toolExposureRoutes } from './routes/tool-exposure.js';
 import { factoryRoutes } from './routes/factory.js';
@@ -135,6 +136,7 @@ export function buildDaemonRouter(deps: DaemonAppDeps): Router {
     .addAll(mcpOAuthRoutes(runtime))
     .addAll(skillEvalRoutes(runtime))
     .addAll(skillSettingsRoutes(runtime))
+    .addAll(runtimeCapabilitiesRoutes(runtime))
     .addAll(skillProposalRoutes(runtime))
     .addAll(dynToolRoutes(runtime))
     .addAll(toolExposureRoutes(runtime))

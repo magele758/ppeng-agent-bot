@@ -290,13 +290,27 @@ test('expired routine retains unknown work until confirmed retry completes [AC:b
  }finally{store.db.close();}
 });
 test('model silence suppresses main-chat notification [AC:bot-routine-lifecycle#AC-7]',async()=>{
- for(const text of ['[NO_UPDATE]','  [NO_UPDATE] no changes  ','ordinary report','prefix [NO_UPDATE]']){
+ for(const text of ['[NO_UPDATE]','  [NO_UPDATE] no changes  ','ordinary report']){
  const {store,session,host}=fixture();host.runSession=async id=>{store.appendMessage(id,'assistant',[{type:'text',text}]);};
  const job=createCronJob(host,{sessionId:session.id,name:'silent',prompt:'check',intervalMs:60000});const runs=new RoutineRunStore(store);const run=runs.enqueue(job,new Date().toISOString());
  await drainRoutineRuns(host);await new Promise(r=>setImmediate(r));await drainRoutineRuns(host);
  const silent=text.trim().startsWith('[NO_UPDATE]');assert.equal(runs.get(run.id).status,silent?'silent':'completed');assert.equal(store.listMessages(session.id).length,silent?0:1);
  assert.ok(store.listMessages(runs.get(run.id).sessionId).some(m=>m.role==='user'&&JSON.stringify(m).includes('[NO_UPDATE]')));store.db.close();
  }
+});
+
+test('a sentence before [NO_UPDATE] stays out of the main chat [AC:routine-quiet-chat#AC-1]',async()=>{
+ for(const text of ['定时任务醒了。我只核对 omp 这两分钟有没有新结论。\n[NO_UPDATE]','定时任务醒了。我只核对 omp 这两分钟有没有新结论。 [NO_UPDATE]']){
+  const {store,session,host}=fixture();host.runSession=async id=>{store.appendMessage(id,'assistant',[{type:'text',text}]);};
+  const job=createCronJob(host,{sessionId:session.id,name:'盯流式重复修复',prompt:'check',intervalMs:60000});const runs=new RoutineRunStore(store);const run=runs.enqueue(job,new Date().toISOString());
+  await drainRoutineRuns(host);await new Promise(r=>setImmediate(r));await drainRoutineRuns(host);
+  assert.equal(runs.get(run.id).status,'silent');assert.equal(store.listMessages(session.id).some(m=>JSON.stringify(m).includes('[routine:')),false);store.db.close();
+ }
+ const report='流式重复已经停了。说明里出现过 [NO_UPDATE] 这个词，但这次有结论。';
+ const {store,session,host}=fixture();host.runSession=async id=>{store.appendMessage(id,'assistant',[{type:'text',text:report}]);};
+ const job=createCronJob(host,{sessionId:session.id,name:'盯流式重复修复',prompt:'check',intervalMs:60000});const runs=new RoutineRunStore(store);const run=runs.enqueue(job,new Date().toISOString());
+ await drainRoutineRuns(host);await new Promise(r=>setImmediate(r));await drainRoutineRuns(host);
+ assert.equal(runs.get(run.id).status,'completed');assert.equal(store.listMessages(session.id).some(m=>JSON.stringify(m).includes('这次有结论')),true);store.db.close();
 });
 
 test('expired disabled cron is removed on restart without catching up [AC:bot-routine-lifecycle#AC-6]',async()=>{

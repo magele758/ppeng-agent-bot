@@ -126,3 +126,9 @@
   font: inherit;
   cursor: pointer;
 }
+
+.panel :global(.ag-panel) { min-width: 0; padding: 12px; }
+.panel :global(.ag-input), .panel select, .panel textarea { max-width: 100%; box-sizing: border-box; }
+.panel :global(.bot-settings-tabs) { display: flex; flex-wrap: wrap; gap: 4px; }
+.panel :global(.ag-panel__head) { flex-wrap: wrap; }
+.panel :global(.ag-chips) { display: none; }

@@ -1,0 +1,16 @@
+id: bg-run-host-park
+title: Host parks durable wait for owned bg_run
+status: implemented
+requirement: |
+  Under an active Goal or Routine, bg_run should host-park a durable wait (hostParked)
+  so the model does not need a second wait_for round. Fewer watch loops; quieter complete.
+notes: 'Muse polish / quiet-complete; Machine: 4090'
+criteria:
+  - id: AC-1
+    given: An active Goal or Routine owns the session and bg_run starts a real job
+    when: startBackgroundJob returns
+    then: A durable wait is host-registered for background_job and agentWaitId is set
+  - id: AC-2
+    given: No active Goal or Routine owner
+    when: bg_run starts a job
+    then: No host park occurs; free chat may continue with bg_check

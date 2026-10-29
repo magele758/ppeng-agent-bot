@@ -1,3 +1,4 @@
+import {resolveRoutineWorkLink} from './routine-work-link.js';
 import { createCronRunTools, type CronToolOptions } from './cron-run-tools.js';
 import { normalizeCiConclusions, parseEventScheduleValue } from './event-routine.js';
 import { normalizeExpiresAt, routineExpired } from './routine-deadline.js';
@@ -172,6 +173,7 @@ export function createCronTools(getStore: () => CronJobStore, opts?: CronToolOpt
     secretEnv?: string;
     conclusions?: string[];
     roomId?: string;
+    workLink?: unknown;
   }> = {
     name: 'cron_create',
     description:
@@ -179,6 +181,7 @@ export function createCronTools(getStore: () => CronJobStore, opts?: CronToolOpt
     inputSchema: {
       type: 'object',
       properties: {
+        workLink:{type:'object',properties:{goalId:{type:'string'},backgroundJobId:{type:'string'},sopSkill:{type:'string'}},required:['goalId'],description:'Temporary watcher for an existing goal; reads the current SOP and stops when the goal is verified complete or cancelled.'},
         name: { type: 'string' },
         prompt: { type: 'string' },
         every_ms: { type: 'number', minimum: 60000 },
@@ -229,8 +232,11 @@ export function createCronTools(getStore: () => CronJobStore, opts?: CronToolOpt
         const botId = context.session.metadata?.botId;
         assertBotRoomTarget(opts.store, args.roomId.trim(), typeof botId === 'string' ? botId : undefined, principalFromSession(opts.store, context.session));
       }
+      if(args.workLink!==undefined&&!opts?.store)throw new ValidationError('Work link requires runtime storage');
+      const linked=args.workLink!==undefined?resolveRoutineWorkLink(opts!.store!,context.session.id,args.workLink):undefined;
+      const workLink=linked?.link;
       const job = getStore().create({
-        sessionId: context.session.id,
+        sessionId: linked?.session.id??context.session.id,
         agentId: context.agent.id,
         name: args.name,
         prompt: args.prompt,
@@ -242,6 +248,7 @@ export function createCronTools(getStore: () => CronJobStore, opts?: CronToolOpt
         missedPolicy:args.missedPolicy??'coalesce',
         ruleVersion:1,
         metadata: {
+          ...(workLink?{workLink}:{}),
           ...(args.conclusions!==undefined?{conclusions:normalizeCiConclusions(args.conclusions)}:{}),
           ...(opts?.store?{principal:principalFromSession(opts.store,context.session)}:{}),
           ...(args.secretEnv?{secretEnv:args.secretEnv,prompt:args.prompt}:{}),

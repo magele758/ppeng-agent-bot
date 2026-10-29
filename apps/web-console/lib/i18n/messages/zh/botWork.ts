@@ -186,6 +186,7 @@ recoveryCheckpoint:"检查点 {seq}",
   states: {
     queued: "排队中",
     running: "执行中",
+    waiting_condition: "等待条件",
     waiting_approval: "等待审批",
     completed: "已完成",
     failed: "失败",

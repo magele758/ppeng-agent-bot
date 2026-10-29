@@ -55,6 +55,7 @@ type Data = {
     }[];
     scope: {
         allowedEffects: string[];
+        allowedCalls?: { tool: string; args: Record<string, unknown> }[];
     };
     queue: {
         id: string;
@@ -74,12 +75,13 @@ export function LearningWorkbench({ sessionId }: {
 }) {
     const { t } = useI18n();
     const [data, setData] = useState<Data>(), [error, setError] = useState(''), [busy, setBusy] = useState(false), [selected, setSelected] = useState<string[]>([]);
-    const [draft, setDraft] = useState({ name: '', description: '', body: '' }), [scope, setScope] = useState(''), [queue, setQueue] = useState({ batchSize: 32, agingSeconds: 60 });
-    async function refresh() { const d = await api(`/api/sessions/${sessionId}/learning`) as Data; setData(d); setScope(d.scope.allowedEffects.join('\n')); setQueue(d.queueSettings); }
+    const [draft, setDraft] = useState({ name: '', description: '', body: '' }), [scope, setScope] = useState(''), [calls, setCalls] = useState('[]'), [queue, setQueue] = useState({ batchSize: 32, agingSeconds: 60 });
+    async function refresh() { const d = await api(`/api/sessions/${sessionId}/learning`) as Data; setData(d); setScope(d.scope.allowedEffects.join('\n')); setCalls(JSON.stringify(d.scope.allowedCalls ?? [], null, 2)); setQueue(d.queueSettings); }
     useEffect(() => { let active = true; void api(`/api/sessions/${sessionId}/learning`).then(value => { if (active) {
         const d = value as Data;
         setData(d);
         setScope(d.scope.allowedEffects.join('\n'));
+        setCalls(JSON.stringify(d.scope.allowedCalls ?? [], null, 2));
         setQueue(d.queueSettings);
     } }).catch(e => { if (active)
         setError(String(e)); }); return () => { active = false; }; }, [sessionId]);
@@ -93,6 +95,10 @@ export function LearningWorkbench({ sessionId }: {
     finally {
         setBusy(false);
     } }
+    async function saveScope() {
+        try { await run({ action: 'scope', allowedEffects: lines(scope), allowedCalls: JSON.parse(calls) }); }
+        catch (e) { setError(String(e)); }
+    }
     const score = (reports: Report[]) => `${reports.filter(r => r.passed).length}/${reports.length} · ${reports.reduce((n, r) => n + r.durationMs, 0)} ms · ${reports.every(r => r.inputTokens !== null) ? reports.reduce((n, r) => n + (r.inputTokens ?? 0), 0) : t('learning.unknown')}`;
     return <details><summary>{t('learning.title')}</summary><p>{t('learning.hint')}</p>{error && <p role="alert">{error}</p>}
  <button disabled={busy} onClick={() => void refresh().catch(e => setError(String(e)))}>{t('learning.refresh')}</button>
@@ -104,7 +110,8 @@ export function LearningWorkbench({ sessionId }: {
  <h4>{t('learning.versions')}</h4>{data?.versions.map(v => <p key={v.id}>{v.name} · {v.createdAt} <button onClick={() => void run({ action: 'rollback', id: v.id, expectedDigest: v.currentDigest })}>{t('learning.rollback')}</button></p>)}
  <h4>{t('learning.reports')}</h4>{data?.reports.slice(0, 12).map(r => <details key={r.id}><summary>{r.passed ? t('learning.pass') : t('learning.fail')} · {r.durationMs} ms</summary><pre>{r.failures.join('\n')}\n{r.output}</pre></details>)}
  <h4>{t('learning.sources')}</h4><ul>{data?.sources.map((s, i) => <li key={i}>{s.kind} · {s.label} · {s.ref}</li>)}</ul>
- <label className="field field--stack">{t('learning.scope')}<textarea value={scope} onChange={e => setScope(e.target.value)}/></label><p>{t('learning.scopeHint')}</p><button onClick={() => void run({ action: 'scope', allowedEffects: lines(scope) })}>{t('learning.save')}</button>
+ <label className="field field--stack">{t('learning.scope')}<textarea value={scope} onChange={e => setScope(e.target.value)}/></label><p>{t('learning.scopeHint')}</p>
+ <label className="field field--stack">{t('learning.exactCalls')}<textarea value={calls} onChange={e => setCalls(e.target.value)}/></label><p>{t('learning.exactCallsHint')}</p><button onClick={() => void saveScope()}>{t('learning.save')}</button>
  <h4>{t('learning.queue')}</h4>{(['batchSize', 'agingSeconds'] as const).map(key => <label className="field" key={key}>{t(`learning.${key}`)}<input type="number" min="1" max={key === 'batchSize' ? 100 : 3600} value={queue[key]} onChange={e => setQueue({ ...queue, [key]: Number(e.target.value) })}/></label>)}<button onClick={() => void run({ action: 'queue', ...queue })}>{t('learning.save')}</button>
  <ul>{data?.queue.map(q => <li key={q.id}>{q.source} · {q.decision === 'coalesced' ? t('learning.coalesced') : q.decision === 'applied' ? t('learning.applied') : t('learning.pending')} · {q.reason === 'direct_input' ? t('learning.direct') : t('learning.aging')} {q.mergedInto} <details><summary>{t('learning.evidence')}</summary>{q.text}</details></li>)}</ul>
  </fieldset></details>;

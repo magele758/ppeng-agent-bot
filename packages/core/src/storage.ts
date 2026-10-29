@@ -493,6 +493,9 @@ export class SqliteStateStore {
   getLocalWriterId(sessionId: string): string | undefined { return this.sessions.getLocalWriterId(sessionId); }
   runWithWriter<T>(sessionId: string, runId: string, fn: () => Promise<T>): Promise<T> { return this.sessions.runWithWriter(sessionId, runId, fn); }
   runWithoutWriterScope<T>(fn: () => T): T { return this.sessions.runWithoutWriterScope(fn); }
+  runWithMessageSource<T>(sessionId: string, sourceId: string, fn: () => Promise<T>): Promise<T> { return this.sessions.runWithMessageSource(sessionId,sourceId,fn); }
+  runWithoutMessageSource<T>(fn: () => T): T { return this.sessions.runWithoutMessageSource(fn); }
+  messageIdsForSource(sessionId: string, sourceId: string): string[] { return this.sessions.messageIdsForSource(sessionId,sourceId); }
   isWriterCurrent(sessionId: string, runId: string): boolean { return this.sessions.isWriterCurrent(sessionId, runId); }
   assertCurrentWriter(sessionId: string): void { this.sessions.assertCurrentWriter(sessionId); }
   isSessionWriterLive(sessionId: string): boolean { return this.sessions.isSessionWriterLive(sessionId); }

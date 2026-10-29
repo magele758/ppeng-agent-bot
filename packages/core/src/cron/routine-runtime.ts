@@ -1,4 +1,12 @@
+import {fenceExternalContent} from '../safety/external-content.js';
+import {statusObservation,statusObservationTool} from '../bots/status-observation.js';
+import {hasWaitReceipt} from '../waits/receipt.js';
+import {DurableWaitStore} from '../waits/store.js';
+import {DURABLE_WAIT_DEFAULT,outstandingRoutineChildId,parkRoutineDurableWait} from '../waits/default-park.js';
+import {resolveRoutineWorkLink,linkedRoutinePrompt,type RoutineWorkSnapshot} from './routine-work-link.js';
 import {SourceLedger} from '../learning/sources.js';
+import { routineExecutionMessages, routineAnswerMessages, routineSourceRefusal } from './routine-result.js';
+import { linkedJobObservation } from './linked-job-observation.js';
 import { factFingerprint, notificationDecision, localNotificationDay } from './notification-decision.js';
 import { latestCheckpoint } from '../session/checkpoint.js';
 import { decideRecovery } from '../session/durable-recovery.js';
@@ -29,21 +37,23 @@ import { CronJobStore, type CronJobRecord } from './cron-store.js';
 import { type PrecheckResult, evaluateRoutinePrecheck, readStoredPrecheck } from './routine-precheck.js';
 import { nextZonedCronRunAt, skippedZonedCronMinutes } from './cron-next.js';
 import { deliverBotRoomMessage } from '../rooms/index.js';
-import { isSilenceToken } from '../bots/silence.js';
+import { isNoUpdateReply, isSilenceToken } from '../bots/silence.js';
 import type { BotPrincipal } from '../bots/bot-identity.js';
-export type RoutineRunStatus = 'queued'|'running'|'waiting_approval'|'completed'|'failed'|'cancelled'|'unknown'|'skipped'|'silent';
+export type RoutineRunStatus = 'queued'|'running'|'waiting_condition'|'waiting_approval'|'completed'|'failed'|'cancelled'|'unknown'|'skipped'|'silent';
 export interface RoutineRoomDelivery { status:'delivered'|'skipped'; roomId:string; messageId?:string; reason?:string }
 export interface RoutineAttempt { number:number;sessionId:string;startedAt:string;finishedAt?:string;status:RoutineRunStatus;result?:string;error?:string }
 export interface RoutineRun {
+ waitId?:string;waitCheckpoint?:string;
  recovery?:{resume:boolean;reason:string;checkpointSeq?:number;at:string};
  publication?:'pending'|'approved'|'rejected'; publicationDecidedAt?:string; notificationReason?:'unchanged'|'below_failure_threshold'|'rejected'|'quiet_hours'|'budget'|'merged'; notificationPublishedAt?:string; notificationFingerprint?:string; digestRunIds?:string[];
  id:string; routineId:string; scheduledAt:string; timezone:string; status:RoutineRunStatus;
  approvalIds?:string[];resumeStartedAt?:string; attempts?:RoutineAttempt[]; sessionId?:string; mainSessionId:string; attempt:number; result?:string; error?:string;
  failureClass?:RoutineFailureClass; precheckOutcome?:'ready'|'no_change'|'failed'; precheckState?:unknown; precheckChecked?:boolean; missedCount:number; createdAt:string; updatedAt:string; startedAt?:string; finishedAt?:string; ownerPid?:number;
- summaryMessageId?:string; eventBody?:string; notificationSent?:boolean; requiresEffectVerification?:boolean; roomDelivery?:RoutineRoomDelivery; steerKey?:string; job:CronJobRecord;
+ workSnapshot?:RoutineWorkSnapshot; messageSourceId?:string; startSeq?:number; summaryMessageId?:string; eventBody?:string; notificationSent?:boolean; requiresEffectVerification?:boolean; roomDelivery?:RoutineRoomDelivery; steerKey?:string; job:CronJobRecord;
 }
 export interface RoutineRuntimeHost {
  store:SqliteStateStore; stateDir:string; log:Pick<Logger,'warn'|'info'>;
+ loadRoutineSkill?(name:string,sessionId:string):Promise<{content?:string;error?:string}>;
  runSession(sessionId:string):Promise<unknown>;
  isSessionRunning?(sessionId:string):boolean;
  hasUnconfirmedEffects?(sessionId:string,startedAt:string):boolean;
@@ -63,8 +73,8 @@ export function ensureRoutineSchema(store:Pick<SqliteStateStore,'db'>):void {
 export class RoutineRunStore {
  constructor(private store:SqliteStateStore){ensureRoutineSchema(store);}
  pending():RoutineRun[]{
- const activeRows=this.store.db.prepare("SELECT payload FROM bot_routine_runs WHERE status IN ('queued','running','waiting_approval','unknown') ORDER BY rowid").all();
- const notificationRows=this.store.db.prepare("SELECT payload FROM bot_routine_runs WHERE notified=0 AND status NOT IN ('queued','running','waiting_approval','unknown') ORDER BY rowid").all();
+ const activeRows=this.store.db.prepare("SELECT payload FROM bot_routine_runs WHERE status IN ('queued','running','waiting_condition','waiting_approval','unknown') ORDER BY rowid").all();
+ const notificationRows=this.store.db.prepare("SELECT payload FROM bot_routine_runs WHERE notified=0 AND status NOT IN ('queued','running','waiting_condition','waiting_approval','unknown') ORDER BY rowid").all();
  return [...activeRows,...notificationRows].map(r=>JSON.parse(String(r.payload)));
  }
  findByKey(key:string):RoutineRun|undefined{const row=this.store.db.prepare('SELECT payload FROM bot_routine_runs WHERE occurrence_key=?').get(key);return row?JSON.parse(String(row.payload)):undefined;}
@@ -73,7 +83,7 @@ export class RoutineRunStore {
   const limit=Math.min(500,Math.max(1,Math.floor(opts?.limit??100)));
   const rows=(opts?.before?this.store.db.prepare('SELECT rowid AS sequence,payload FROM bot_routine_runs WHERE routine_id=? AND rowid<? ORDER BY rowid DESC LIMIT ?').all(routineId,opts.before,limit+1):this.store.db.prepare('SELECT rowid AS sequence,payload FROM bot_routine_runs WHERE routine_id=? ORDER BY rowid DESC LIMIT ?').all(routineId,limit+1));
   const visible=rows.slice(0,limit);
-  const activeRows=this.store.db.prepare("SELECT rowid AS sequence,payload FROM bot_routine_runs WHERE routine_id=? AND (status IN ('queued','running','waiting_approval','unknown') OR json_extract(payload,'$.publication')='pending') ORDER BY rowid DESC").all(routineId);
+  const activeRows=this.store.db.prepare("SELECT rowid AS sequence,payload FROM bot_routine_runs WHERE routine_id=? AND (status IN ('queued','running','waiting_condition','waiting_approval','unknown') OR json_extract(payload,'$.publication')='pending') ORDER BY rowid DESC").all(routineId);
   const byId=new Map<string,RoutineRun>();for(const row of [...activeRows,...visible]){const run=JSON.parse(String(row.payload)) as RoutineRun;byId.set(run.id,run);}
   return {runs:[...byId.values()],...(rows.length>limit?{nextCursor:Number(visible.at(-1)!.sequence)}:{})};
  }
@@ -93,7 +103,7 @@ export class RoutineRunStore {
   }catch(error){if(ownTransaction)this.store.db.exec('ROLLBACK');throw error;}
  }
  update(id:string,patch:Partial<RoutineRun>):RoutineRun {const old=this.get(id);if(!old)throw new NotFoundError('RoutineRun',id);const next={...old,...patch,id,updatedAt:nowIso()};if(patch.status&&old.sessionId&&old.attempts?.length&&patch.status!=='queued'){next.attempts=old.attempts.map(a=>a.sessionId===old.sessionId?{...a,status:patch.status!,...(patch.result!==undefined?{result:patch.result}:{}),...(patch.error!==undefined?{error:patch.error}:{}),...(patch.finishedAt?{finishedAt:patch.finishedAt}:{})}:a);}this.store.db.prepare('UPDATE bot_routine_runs SET status=?,payload=?,notified=? WHERE id=?').run(next.status,JSON.stringify(next),next.notificationSent?1:0,id);return next;}
- claim(id:string,sessionId:string):RoutineRun|undefined { const current=this.get(id);if(!current||current.status!=='queued')return undefined;const startedAt=nowIso();const next={...current,status:'running' as const,sessionId,error:current.error?.startsWith('Bot is')?undefined:current.error,ownerPid:process.pid,startedAt,updatedAt:startedAt,attempts:[...(current.attempts??[]),{number:current.attempt,sessionId,startedAt,status:'running' as const}]};const result=this.store.db.prepare("UPDATE bot_routine_runs SET status='running',payload=? WHERE id=? AND status='queued' AND NOT EXISTS (SELECT 1 FROM bot_routine_runs other WHERE other.routine_id=? AND other.id<>? AND other.status IN ('running','waiting_approval','unknown'))").run(JSON.stringify(next),id,current.routineId,id);return result.changes?next:undefined; }
+ claim(id:string,sessionId:string):RoutineRun|undefined { const current=this.get(id);if(!current||current.status!=='queued')return undefined;const startedAt=nowIso();const next={...current,status:'running' as const,sessionId,error:current.error?.startsWith('Bot is')?undefined:current.error,ownerPid:process.pid,startedAt,updatedAt:startedAt,attempts:[...(current.attempts??[]),{number:current.attempt,sessionId,startedAt,status:'running' as const}]};const result=this.store.db.prepare("UPDATE bot_routine_runs SET status='running',payload=? WHERE id=? AND status='queued' AND NOT EXISTS (SELECT 1 FROM bot_routine_runs other WHERE other.routine_id=? AND other.id<>? AND other.status IN ('running','waiting_condition','waiting_approval','unknown'))").run(JSON.stringify(next),id,current.routineId,id);return result.changes?next:undefined; }
 }
 function routineRoomId(run:RoutineRun):string|undefined {
  const roomId=run.job.metadata.roomId;return typeof roomId==='string'&&roomId.trim()?roomId.trim():undefined;
@@ -218,7 +228,8 @@ function publishRoutineSummary(host:RoutineRuntimeHost,runs:RoutineRunStore,run:
  finishRoutineTransaction(host.store,ownTransaction,'BEGIN IMMEDIATE');
  // Insert the summary and notification marker atomically. No user instruction or private run transcript.
  try { const fresh=runs.get(run.id);if(fresh?.notificationSent){finishRoutineTransaction(host.store,ownTransaction,'COMMIT');return;}
- const summary=host.store.appendMessage(run.mainSessionId,'assistant',[textPart(`[routine:${run.job.name}] ${run.status}\n${description.slice(0,2000)}\nRun: ${run.id}${routineRunLink(run)}`)],{key:`routine-result:${run.id}`} );
+ const visible=sharedBotRun(host,run)&&run.status==='completed'?routineAnswerMessages(host.store,run).at(-1):undefined;
+ const summary=visible??host.store.appendMessage(run.mainSessionId,'assistant',[textPart(`[routine:${run.job.name}] ${run.status}\n${description.slice(0,2000)}\nRun: ${run.id}${routineRunLink(run)}`)],{key:`routine-result:${run.id}`} );
  linkRoutineSummary(host,run,summary.id);
  const roomDelivery=postRoomResult(host,summaryRun(fresh,run));
  rememberPublishedResult(host,run,roomDelivery);
@@ -264,12 +275,7 @@ function sharedBotRun(host:RoutineRuntimeHost,run:RoutineRun):boolean {
 function resultText(host:RoutineRuntimeHost,run:RoutineRun):string {
  if(!run.sessionId)return '';
  if(!sharedBotRun(host,run))return assistantTextsFromFold(host.store,run.sessionId).at(-1)?.trim().slice(0,16000)??'';
- const folded=host.store.foldMessages(run.sessionId);
- const key=run.steerKey??`routine:${run.id}`;
- const prompt=folded.find(message=>message.role==='user'&&message.key===key);
- const start=Date.parse(run.startedAt!);
- const afterId=prompt?.id??folded.filter(message=>Date.parse(message.createdAt)<start).at(-1)?.id;
- const texts=assistantTextsFromFold(host.store,run.sessionId,afterId).map(text=>text.trim()).filter(text=>text.length>0&&!text.startsWith('[routine:'));
+ const texts=routineAnswerMessages(host.store,run).map(message=>message.parts.filter(part=>part.type==='text').map(part=>part.text).join('').trim());
  return texts.join('\n').slice(0,16000);
 }
 function approvalsForSession(host:RoutineRuntimeHost,run:RoutineRun):ApprovalRecord[] {
@@ -291,16 +297,36 @@ function isWaitingForDecision(session:SessionRecord|undefined,approvals:Approval
  return outcome?.kind==='waiting_approval'&&approvals.some(approval=>approval.status==='pending'||approval.status==='approved');
 }
 function routineQuiet(result:string):boolean {
- return result.trim().startsWith('[NO_UPDATE]')||isSilenceToken(result);
+ return isNoUpdateReply(result)||isSilenceToken(result);
 }
 function completionError(session:SessionRecord|undefined,denied:boolean,result:string):string {
  if(denied)return 'Approval denied or expired';const outcome=parseRunOutcome(session?.metadata?.outcome);
  if(outcome?.reason)return `Execution stopped: ${outcome.reason}`;
  return result.trim()?'Session did not complete':'Execution ended without a result';
 }
+function linkedObservation(host:RoutineRuntimeHost,run:RoutineRun,result:string):Partial<RoutineRun>|undefined {
+ if(!run.workSnapshot)return undefined;
+ if(run.workSnapshot.externalJob)return observeLinkedJob(host,run,result);
+ const observation=routineExecutionMessages(host.store,run).reverse().find(message=>message.parts.some(part=>part.type==='tool_result'&&statusObservationTool.test(part.name)));
+ if(observation?.parts.some(part=>part.type==='tool_result'&&part.ok===false))return {status:'failed',result,error:'Current observation failed; work status is unverified'};
+ const sample=observation?statusObservation(observation):undefined;
+ const observed=sample?.at??run.workSnapshot.observedAt;
+ const current=observed&&(Date.parse(observed)>=Date.parse(run.startedAt??run.createdAt)||sample?.freshSnapshot===true);
+ if(!current)return {status:'failed',result,error:'No successful current observation; work status is unverified'};
+ if(observation)new RoutineRunStore(host.store).update(run.id,{workSnapshot:{...run.workSnapshot,observedAt:sample?.at??observation.createdAt}});
+ return undefined;
+}
+function observeLinkedJob(host:RoutineRuntimeHost,run:RoutineRun,result:string):Partial<RoutineRun>|undefined {
+ const patch=linkedJobObservation(host.store,run,routineExecutionMessages(host.store,run));
+ if(patch.workSnapshot)new RoutineRunStore(host.store).update(run.id,{workSnapshot:patch.workSnapshot});
+ return patch.status?{...patch,result}:undefined;
+}
 function completionResult(host:RoutineRuntimeHost,run:RoutineRun,session:SessionRecord|undefined,approvals:ApprovalRecord[]):Partial<RoutineRun>{
  const result=resultText(host,run);
  if(unknownEffects(host,run))return {status:'unknown',result,error:'External effects are unconfirmed; verify before retry'};
+ const refusal=routineSourceRefusal(host.store,run);
+ if(refusal)return {status:'failed',result,error:refusal,failureClass:'hard'};
+ const observation=linkedObservation(host,run,result);if(observation)return observation;
  const denied=approvals.some(approval=>approval.status==='rejected');const outcome=parseRunOutcome(session?.metadata?.outcome);
  const stopped=outcome?.kind==='aborted'||outcome?.kind==='failed'||(outcome?.kind==='idle'&&outcome.reason!=='end');
  const failed=stopped||!session||!['idle','completed'].includes(session.status)||denied||!result.trim();
@@ -314,6 +340,7 @@ function finish(host:RoutineRuntimeHost,runs:RoutineRunStore,id:string,expectedS
  const approvals=approvalsForSession(host,run);
  if(isWaitingForDecision(session,approvals)){runs.update(id,{status:'waiting_approval',approvalIds:approvalCheckpoint(approvals)});return;}
  if(session?.status==='running')return;
+ if(parkRoutineWait(host,runs,run))return;
  const completed=runs.update(id,{...completionResult(host,run,session,approvals),finishedAt:nowIso()});summarize(host,runs,completed);
 }
 function failRoutineExecution(host:RoutineRuntimeHost,runs:RoutineRunStore,id:string,sessionId:string,error:unknown):void {
@@ -323,11 +350,16 @@ function failRoutineExecution(host:RoutineRuntimeHost,runs:RoutineRunStore,id:st
  const reason=error instanceof Error?error.message:String(error);
  const failed=runs.update(id,{status:unconfirmed?'unknown':'failed',error:unconfirmed?'External effects are unconfirmed; verify before retry':reason,failureClass:classifyRoutineFailure(error),finishedAt:nowIso()});summarize(host,runs,failed);
 }
+function runOwnedRoutine(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun,sessionId:string):Promise<unknown> {
+ const sourceId=`${run.id}:${run.attempt}`;
+ runs.update(run.id,{messageSourceId:sourceId});
+ return host.store.runWithMessageSource(sessionId,sourceId,()=>Promise.resolve(host.runSession(sessionId)));
+}
 function launchRoutineSession(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun,sessionId:string,lease:RoutineLease):void {
  const executing=activeFor(host.store);executing.add(run.id);
  const stop=lease.heartbeat(()=>{host.cancelSession?.(sessionId);});
  const cleanup=()=>{stop();lease.release();executing.delete(run.id);removeExpiredRoutines(host);};
- try{void Promise.resolve(host.runSession(sessionId)).then(()=>{lease.whileOwned(()=>finish(host,runs,run.id,sessionId));}).catch(error=>{lease.whileOwned(()=>failRoutineExecution(host,runs,run.id,sessionId,error));}).finally(cleanup);}
+ try{void runOwnedRoutine(host,runs,run,sessionId).then(()=>{lease.whileOwned(()=>finish(host,runs,run.id,sessionId));}).catch(error=>{lease.whileOwned(()=>failRoutineExecution(host,runs,run.id,sessionId,error));}).finally(cleanup);}
  catch(error){try{lease.whileOwned(()=>failRoutineExecution(host,runs,run.id,sessionId,error));}finally{cleanup();}}
 }
 function recoverInterruptedRoutine(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):void {
@@ -374,7 +406,7 @@ function resumeRoutineAfterDecision(host:RoutineRuntimeHost,runs:RoutineRunStore
  const outcome=parseRunOutcome(session.metadata?.outcome);
  if(approved&&session.status==='idle'&&(!outcome||outcome.kind==='waiting_approval')){
   let stop:()=>void=()=>{};let launched=false;
-  const bridge={...host,runSession:(id:string)=>{launched=true;runs.update(run.id,{status:'running',ownerPid:process.pid,resumeStartedAt:nowIso(),approvalIds:undefined});executing.add(run.id);stop=lease.heartbeat(()=>{host.cancelSession?.(id);});return host.runSession(id);}};
+  const bridge={...host,runSession:(id:string)=>{launched=true;runs.update(run.id,{status:'running',ownerPid:process.pid,resumeStartedAt:nowIso(),approvalIds:undefined});executing.add(run.id);stop=lease.heartbeat(()=>{host.cancelSession?.(id);});return runOwnedRoutine(host,runs,run,id);}};
   if(resumeApprovedBotSession(bridge,session.id,run.startedAt??run.createdAt,()=>{try{lease.whileOwned(()=>finish(host,runs,run.id,session.id));}finally{stop();lease.release();executing.delete(run.id);}}))return launched?'handled':'busy';
  }
  // Rejection and any other terminal decision: record the outcome while this lease is held.
@@ -382,6 +414,61 @@ function resumeRoutineAfterDecision(host:RoutineRuntimeHost,runs:RoutineRunStore
  if(session.status!=='waiting_approval')lease.whileOwned(()=>finish(host,runs,run.id));
  return 'handled';
 }
+
+/** A still-running owned child parks the occurrence. The model does not have to call wait_for. */
+function parkOutstandingRoutine(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):boolean {
+ if(run.waitId||!run.sessionId)return false;
+ const session=host.store.getSession(run.sessionId);
+ if(!session)return false;
+ const noted=typeof session.metadata.routineChildSessionId==='string'?session.metadata.routineChildSessionId:undefined;
+ const childId=noted??outstandingRoutineChildId(host.store,session.id,run.id);
+ if(!childId)return false;
+ const child=host.store.getSession(childId);
+ if(!child||['completed','failed','cancelled','unknown'].includes(child.status))return false;
+ return parkRoutineDurableWait(host.store,runs,run,session,{source:'session',ref:childId},'Owned child is still running; resume once its status is terminal');
+}
+function parkRoutineWait(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):boolean {
+ if(parkOutstandingRoutine(host,runs,run))return true;
+ if(!run.waitId||!run.sessionId)return false;
+ const wait=new DurableWaitStore(host.store).get(run.waitId);
+ const outcome=parseRunOutcome(host.store.getSession(run.sessionId)?.metadata.outcome);
+ if(outcome?.kind==='failed'||outcome?.kind==='aborted')return false;
+ if(!wait||wait.owner.kind!=='routine'||wait.owner.id!==run.id||wait.owner.revision!==run.attempt||!['waiting','ready','blocked'].includes(wait.status))return false;
+ if(!wait.hostRegistered&&!hasWaitReceipt(host.store,run.sessionId,wait.id)){new DurableWaitStore(host.store).cancel(wait.id,'Wait tool wave did not close');runs.update(run.id,{status:'unknown',error:'Wait tool wave did not close; verify effects before retry',finishedAt:nowIso()});return true;}
+ runs.update(run.id,{status:'waiting_condition',result:run.waitCheckpoint,error:undefined});return true;
+}
+function resumeConditionWait(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun,lease:RoutineLease):boolean {
+ if(!run.waitId||!run.sessionId)return false;
+ const waits=new DurableWaitStore(host.store),record=waits.get(run.waitId);
+ if(!record||record.owner.kind!=='routine'||record.owner.id!==run.id||record.owner.revision!==run.attempt){
+  runs.update(run.id,{status:'failed',error:'Wait owner no longer matches this occurrence',finishedAt:nowIso()});return false;
+ }
+ const job=new CronJobStore(host.stateDir).get(run.routineId);
+ if(!job){waits.cancel(record.id,'Routine removed');runs.update(run.id,{status:'cancelled',finishedAt:nowIso(),notificationSent:true});return false;}
+ if(!job.enabled)return false;
+ const checked=waits.check(record.id);
+ if(checked.status==='expired'||checked.status==='cancelled'){
+  runs.update(run.id,{status:'failed',error:checked.reason??'Wait stopped',finishedAt:nowIso()});return false;
+ }
+ if(checked.status!=='ready'){if(run.error!==checked.reason)runs.update(run.id,{error:checked.reason});return false;}
+ const session=host.store.getSession(run.sessionId);
+ if(!session||session.status==='waiting_approval'||host.isSessionRunning?.(session.id)||host.store.isSessionWriterLive(session.id))return false;
+ let launched=false;
+ lease.whileOwned(()=>{
+  if(runs.get(run.id)?.status!=='waiting_condition')return;
+  launched=waits.consume(record.id,wait=>{
+   const key=`wait-resume:${wait.id}`;
+   const message=host.store.appendMessage(session.id,'user',[textPart('[wait resumed] '+JSON.stringify({checkpoint:run.waitCheckpoint,source:wait.spec.source,ref:wait.spec.ref,observation:wait.observation}))],{key});
+   new SourceLedger(host.store).record(session.id,{kind:'routine',ref:run.id,messageId:message.id,label:run.job.name});
+   stampSessionWake(host.store,session.id,{kind:'unattended',source:'routine'});
+   host.store.updateSession(session.id,{status:'idle',metadata:{...session.metadata,agentWaitId:undefined}});
+   runs.update(run.id,{status:'running',ownerPid:process.pid,resumeStartedAt:nowIso(),startedAt:nowIso(),steerKey:key,error:undefined,result:undefined});
+  });
+ });
+ if(launched)launchRoutineSession(host,runs,runs.get(run.id)!,session.id,lease);
+ return launched;
+}
+
 function recoverRoutineRuns(host:RoutineRuntimeHost,runs:RoutineRunStore,executing:Set<string>):void {
  for(const candidate of runs.pending()){
   if(executing.has(candidate.id)||candidate.status==='queued')continue;
@@ -389,12 +476,15 @@ function recoverRoutineRuns(host:RoutineRuntimeHost,runs:RoutineRunStore,executi
   let handedOff=false;
   try{
    const run=runs.get(candidate.id);if(!run)continue;
-   if(run.status==='running'){
+   if(run.status==='waiting_condition'){
+    handedOff=resumeConditionWait(host,runs,run,lease);
+   }else if(run.status==='running'){
     lease.whileOwned(()=>{
      const fresh=runs.get(run.id);if(fresh?.status!=='running'||!fresh.sessionId)return;
      if(host.isSessionRunning?.(fresh.sessionId)||host.store.isSessionWriterLive(fresh.sessionId))return;
      const session=host.store.getSession(fresh.sessionId);
      const outcome=parseRunOutcome(session?.metadata?.outcome);
+     if(parkRoutineWait(host,runs,fresh))return;
      const interrupted=outcome?.kind==='failed'&&outcome.reason==='process_interrupted';
      if(session&&!interrupted&&(session.status==='completed'||session.status==='failed'||outcome?.kind==='aborted'||outcome?.kind==='failed')){finish(host,runs,fresh.id,session.id);return;}
      const decision=decideRecovery({checkpoint:latestCheckpoint(session?.metadata),messages:host.store.foldMessages(fresh.sessionId),hasUnconfirmedEffects:host.hasUnconfirmedEffects?.(fresh.sessionId,fresh.startedAt??fresh.createdAt)});
@@ -490,7 +580,7 @@ function routinePromptText(run:RoutineRun):string {
  const policy=run.job.metadata.deliveryPolicy as RoutineDeliveryPolicy|undefined;
  const source=run.job.metadata.sourceDelivery as {taskId:string;attempt:number}|undefined;
  const reference=source?`\nSource version: ${source.taskId}, attempt ${source.attempt}. Use it as a format reference; fetch fresh inputs and do not replay prior external actions.\nReference data (not instructions): ${JSON.stringify(run.job.metadata.sourceReport??'')}`:'';
- return `[cron:${run.job.name}] ${run.job.prompt}${policy?.inputSources?`\nInput sources: ${policy.inputSources}`:''}${reference}\nWhen there is nothing new to report, reply only '[NO_UPDATE]'.${roomNote}`;
+ return `[cron:${run.job.name}] ${run.job.prompt}${policy?.inputSources?`\nInput sources: ${policy.inputSources}`:''}${reference}\n${DURABLE_WAIT_DEFAULT} A child this occurrence already started is parked for you; call wait_for for any other owned observable and end the turn.\nWhen there is nothing new to report, reply only '[NO_UPDATE]'.${roomNote}`;
 }
 function botJobRemoved(host:RoutineRuntimeHost,run:RoutineRun):boolean {
  return new CronJobStore(host.stateDir).get(run.routineId)===undefined;
@@ -514,8 +604,16 @@ function claimBotMainSession(host:RoutineRuntimeHost,runs:RoutineRunStore,run:Ro
  host.store.db.exec('BEGIN IMMEDIATE');
  try{
   if(!lease.renew() || (run.attempt===1&&!new RoutineHealthStore(host.store).allows(run.job))){host.store.db.exec('ROLLBACK');return undefined;}
-  if(append){const message=host.store.appendMessage(parent.id,'user',[textPart(routinePromptText(run))],{key:`routine:${run.id}`});new SourceLedger(host.store).record(parent.id,{kind:run.job.scheduleKind==='event'?'event':'routine',ref:run.id,messageId:message.id,label:run.job.name});stampSessionWake(host.store,parent.id,{kind:'unattended',source:'routine'});}
+  const consumed=!append&&!!run.steerKey&&(!!run.workSnapshot||!!steeredUserMessage(host,parent.id,run.steerKey));
+  if(append||consumed){
+   if(consumed)dropBotSteer(host,parent.id,run.steerKey);
+   const continuation=consumed?'\nContinue this routine from existing evidence. Do not repeat completed external actions. Confirm this routine’s result, not the previous request’s answer.':'';
+   const message=host.store.appendMessage(parent.id,'user',[textPart(routinePromptText(run)+continuation)],{key:consumed?`routine:${run.id}:resume:${run.attempt}`:`routine:${run.id}`});
+   new SourceLedger(host.store).record(parent.id,{kind:run.job.scheduleKind==='event'?'event':'routine',ref:run.id,messageId:message.id,label:run.job.name});
+   stampSessionWake(host.store,parent.id,{kind:'unattended',source:'routine'});
+  }
   if(!runs.claim(run.id,parent.id)){host.store.db.exec('ROLLBACK');return undefined;}
+  runs.update(run.id,{startSeq:host.store.listSurfaceNodes(parent.id).at(-1)?.seq??0});
   host.store.db.exec('COMMIT');return parent;
  }catch(error){host.store.db.exec('ROLLBACK');throw error;}
 }
@@ -555,8 +653,36 @@ function claimRoutineSession(host:RoutineRuntimeHost,runs:RoutineRunStore,run:Ro
  }catch(error){host.store.db.exec('ROLLBACK');throw error;}
 }
 function busyRoutines(runs:RoutineRunStore,all:RoutineRun[],executing:Set<string>):Set<string>{
- const busy=new Set(all.filter(run=>['running','waiting_approval','unknown'].includes(run.status)).map(run=>run.routineId));
+ const busy=new Set(all.filter(run=>['running','waiting_condition','waiting_approval','unknown'].includes(run.status)).map(run=>run.routineId));
  for(const id of executing){const current=runs.get(id);if(current)busy.add(current.routineId);}return busy;
+}
+function linkedEventPrompt(run:RoutineRun,prompt:string):string {
+ if(run.eventBody===undefined)return prompt;
+ const body=run.eventBody.length>6000?`${run.eventBody.slice(0,6000)}\n…[truncated]`:run.eventBody;
+ return `${prompt}\n\n${fenceExternalContent({source:'event',label:run.job.scheduleValue,body:`Occurrence: ${run.id}\n${body}`})}`;
+}
+async function prepareLinkedRoutine(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):Promise<RoutineRun|undefined> {
+ const current=new CronJobStore(host.stateDir).get(run.routineId);
+ const raw=current?current.metadata.workLink:run.job.metadata.workLink;
+ if(!raw){
+  if(!run.job.metadata.workLink&&!run.workSnapshot)return run;
+  dropBotSteer(host,run.mainSessionId,run.steerKey);
+  return runs.update(run.id,{job:current?{...current,prompt:linkedEventPrompt(run,current.prompt)}:run.job,workSnapshot:undefined,steerKey:undefined});
+ }
+ try{
+  const work=resolveRoutineWorkLink(host.store,run.mainSessionId,raw);
+  if(['completed','cancelled'].includes(work.goal.status)){
+   if(current)new CronJobStore(host.stateDir).update(current.id,{enabled:false,metadata:{...current.metadata,workLinkStop:{goalId:work.goal.id,revision:work.goal.revision,status:work.goal.status,at:nowIso()}}});
+   summarize(host,runs,runs.update(run.id,{status:'skipped',error:`Linked work ${work.goal.status}; temporary watcher stopped`,finishedAt:nowIso()}));return undefined;
+  }
+  const prepared=await linkedRoutinePrompt(work,host.loadRoutineSkill);
+  const latest=new CronJobStore(host.stateDir).get(run.routineId);
+  if(JSON.stringify(current)!==JSON.stringify(latest))return undefined;
+  const fresh=resolveRoutineWorkLink(host.store,run.mainSessionId,raw);
+  if(JSON.stringify(fresh.goal)!==JSON.stringify(work.goal))return undefined;
+  const prompt=work.link.sopSkill?prepared.prompt:`${current?.prompt??run.job.prompt}\n${prepared.prompt}`;
+  return runs.update(run.id,{job:{...(current??run.job),prompt:linkedEventPrompt(run,prompt)},workSnapshot:prepared.snapshot});
+ }catch(error){summarize(host,runs,runs.update(run.id,{status:'failed',error:String(error),finishedAt:nowIso()}));return undefined;}
 }
 async function dispatchRoutineQueue(host:RoutineRuntimeHost,runs:RoutineRunStore,executing:Set<string>):Promise<void>{
  const all=runs.pending(),busy=busyRoutines(runs,all,executing),reserved=new Set<string>();
@@ -565,12 +691,13 @@ async function dispatchRoutineQueue(host:RoutineRuntimeHost,runs:RoutineRunStore
   const lease=RoutineLease.acquire(host.store,candidate.id);if(!lease)continue;
   let handedOff=false;const stop=lease.heartbeat(()=>{});
   try{
-   const run=runs.get(candidate.id);if(!run||run.status!=='queued')continue;
+   let run=runs.get(candidate.id);if(!run||run.status!=='queued')continue;
    const health=new RoutineHealthStore(host.store);if(run.attempt===1&&!health.allows(run.job))continue;
    const resumeAfter=health.get(run.routineId).resumeAfter;
    if(run.attempt===1&&isGovernedRoutine(run.job)&&resumeAfter!==undefined&&Date.parse(run.scheduledAt)<=resumeAfter){const skipped=runs.update(run.id,{status:'skipped',error:'Missed occurrence discarded on explicit resume',finishedAt:nowIso()});summarize(host,runs,skipped);continue;}
    const parent=routineParent(host,runs,run);if(!parent)continue;
    if(isBotMainSession(parent)&&botJobRemoved(host,run)){cancelRemovedBotRun(host,runs,run,parent.id);continue;}
+   run=await prepareLinkedRoutine(host,runs,run);if(!run)continue;
    if(!await precheckAllowsRun(host,runs,run,lease))continue;
    if(isBotMainSession(parent)){
     const outcome=dispatchBotMain(host,runs,runs.get(run.id)??run,parent,lease,reserved);
@@ -610,7 +737,7 @@ export function resumeApprovalContinuation(
   const candidate = owned.find(r => r.status === 'waiting_approval');
   // An in-flight resume already owns this session. `not-routine` would let the
   // approval route start a second, unleased runSession.
-  if (!candidate) return owned.some(r => r.status === 'running') ? 'busy' : 'not-routine';
+  if (!candidate) return owned.some(r => r.status === 'running' || r.status === 'waiting_condition') ? 'busy' : 'not-routine';
   const lease = RoutineLease.acquire(host.store, candidate.id);
   if (!lease) return 'busy';
   let outcome: RoutineContinuation = 'busy';
@@ -631,7 +758,8 @@ export function resumeApprovalContinuation(
 export async function cancelRoutineRun(host:RoutineRuntimeHost,id:string):Promise<RoutineRun>{
  const runs=new RoutineRunStore(host.store);const run=runs.get(id);if(!run)throw new NotFoundError('RoutineRun',id);
  if(['completed','failed','skipped','silent','cancelled'].includes(run.status))return run;
- if(run.sessionId){host.cancelSession?.(run.sessionId);for(const approval of host.store.listApprovals({status:'pending'}).filter(a=>a.sessionId===run.sessionId))host.store.updateApproval(approval.id,'rejected');const session=host.store.getSession(run.sessionId);if(session?.status==='waiting_approval')host.store.updateSession(session.id,{status:'failed'});}
+ if(run.waitId)new DurableWaitStore(host.store).cancel(run.waitId,'Routine cancelled');
+ if(run.sessionId&&run.status!=='waiting_condition'){host.cancelSession?.(run.sessionId);for(const approval of host.store.listApprovals({status:'pending'}).filter(a=>a.sessionId===run.sessionId))host.store.updateApproval(approval.id,'rejected');const session=host.store.getSession(run.sessionId);if(session?.status==='waiting_approval')host.store.updateSession(session.id,{status:'failed'});}
  const cancelled=runs.update(id,{status:'cancelled',requiresEffectVerification:run.status==='unknown'||run.requiresEffectVerification===true,error:'Cancelled by user; already performed effects are not undone',finishedAt:nowIso()});summarize(host,runs,cancelled);return cancelled;
 }
 export function retryRoutineRun(host:RoutineRuntimeHost,id:string,opts?:{confirmUnknown?:boolean}):RoutineRun {
@@ -639,7 +767,7 @@ export function retryRoutineRun(host:RoutineRuntimeHost,id:string,opts?:{confirm
  if(run.sessionId&&host.hasUnconfirmedEffects?.(run.sessionId,run.startedAt??run.createdAt)&&['failed','cancelled'].includes(run.status))run=runs.update(id,{status:'unknown',error:'External effects are unconfirmed; verify before retry',notificationSent:false});
  if((run.status==='unknown'||run.requiresEffectVerification)&&!opts?.confirmUnknown)throw new ValidationError('Verify previously performed effects and confirmUnknown before retry');
  if(!['failed','cancelled','unknown'].includes(run.status)||activeFor(host.store).has(id))throw new ValidationError('Only stopped failed, cancelled or unknown runs can be retried');
- host.store.db.exec('BEGIN IMMEDIATE');try{if(host.store.db.prepare('SELECT 1 FROM bot_routine_leases WHERE run_id=? AND expires_at>?').get(id,Date.now()))throw new ValidationError('Routine worker still holds an active lease');const parent=host.store.getSession(run.mainSessionId);if(parent)checkBotWorkCapacity(host.store,principalFromSession(host.store,parent),String(run.job.metadata.botId??run.job.agentId));const queued=runs.update(id,{status:'queued',attempt:run.attempt+1,precheckChecked:false,precheckOutcome:undefined,precheckState:undefined,failureClass:undefined,sessionId:undefined,summaryMessageId:undefined,error:undefined,result:undefined,finishedAt:undefined,notificationSent:false,requiresEffectVerification:false,publication:undefined,publicationDecidedAt:undefined,notificationReason:undefined});host.store.db.exec('COMMIT');return queued;}catch(error){host.store.db.exec('ROLLBACK');throw error;}
+ host.store.db.exec('BEGIN IMMEDIATE');try{if(host.store.db.prepare('SELECT 1 FROM bot_routine_leases WHERE run_id=? AND expires_at>?').get(id,Date.now()))throw new ValidationError('Routine worker still holds an active lease');const parent=host.store.getSession(run.mainSessionId);if(parent)checkBotWorkCapacity(host.store,principalFromSession(host.store,parent),String(run.job.metadata.botId??run.job.agentId));const queued=runs.update(id,{status:'queued',attempt:run.attempt+1,waitId:undefined,waitCheckpoint:undefined,precheckChecked:false,precheckOutcome:undefined,precheckState:undefined,failureClass:undefined,sessionId:undefined,summaryMessageId:undefined,error:undefined,result:undefined,finishedAt:undefined,notificationSent:false,requiresEffectVerification:false,publication:undefined,publicationDecidedAt:undefined,notificationReason:undefined});host.store.db.exec('COMMIT');return queued;}catch(error){host.store.db.exec('ROLLBACK');throw error;}
 }
 export function routineSettings(store:SqliteStateStore,patch?:{dialogToolsEnabled?:boolean}):{dialogToolsEnabled:boolean}{
  const prior=store.getDaemonControl<{dialogToolsEnabled?:boolean}>('routine.settings');

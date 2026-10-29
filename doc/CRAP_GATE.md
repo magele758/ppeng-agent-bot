@@ -36,9 +36,8 @@ CRAP(m) = comp(m)² × (1 − cov(m))³ + comp(m)
 | `pnpm run test:unit`（node --test，跑 `dist/*.js`） | core / gateway / domain 包 / daemon / cli | `NODE_V8_COVERAGE` 原始 V8 块覆盖，按进程合并后经 `*.js.map` 映射回 `src/*.ts` 行 |
 | `packages/agent-loop` vitest | agent-loop 源码 | `@vitest/coverage-v8` 的 `coverage-final.json`（istanbul 语句） |
 
-两路按 TS 源码行取并集。范围：`packages/*/src`、`apps/daemon/src`、`apps/cli/src`（排除 `*.test.ts`、`*.d.ts`）。
-**不含** web-console（Next UI）、`test:regression` / `test:integration` / E2E 带来的覆盖：门禁只认单测，
-因为它衡量的是「改动能否被快速、确定地验证」。
+两路按 TS 源码行取并集。计分范围：`packages/*/src`、`apps/daemon/src`、`apps/cli/src`、`apps/web-console`（排除 `*.test.ts`、`*.spec.ts`、`*.d.ts`）。
+`test:regression` / `test:integration` / E2E 的执行不算覆盖。web-console 组件测试若用 `ts.transpileModule` 再 `new Function` 跑，V8 记在内存脚本上，映射不回 `.tsx`，这些函数覆盖率仍是 0。
 
 ## 棘轮基线
 
@@ -47,7 +46,7 @@ CRAP(m) = comp(m)² × (1 − cov(m))³ + comp(m)
 路由 handler 以 `METHOD /pattern` 命名）。门禁规则：
 
 1. **新增**（或原来 ≤ 30、现在 > 30）的函数 CRAP > 30 → 失败。
-2. 基线内函数 CRAP 超过 `基线 × 1.05 + 1` → 失败（容差吸收计时相关路径的覆盖抖动；实测两次全量运行 0 抖动）。
+2. 基线内函数 CRAP 超过允许值 → 失败。覆盖率 > 0 时允许值是 `基线 × 1.05 + 1`（吸收计时路径的覆盖抖动）。覆盖率是 0 时允许值就是基线本身，没有这点容差。`apps/web-console` 的基线由**基线提交**的源码按 0% 覆盖现算（`crap-gate.mjs` 里 bootstrap，不写进 json），往已超标函数里加分支会直接失败。
 3. 基线内函数变好或被删除 → 提示 `pnpm run test:crap --update-baseline` 锁定收益（不强制）。
 
 所以：存量可以慢慢还，但只能变少，不能变多。
@@ -75,7 +74,7 @@ JSON 增加 `metadata`（Node、平台、架构、测试工具版本、生成时
 ## 门禁失败怎么办
 
 - **新函数超标**：补单测提高覆盖，或拆小函数降低复杂度。别靠调阈值。
-- **基线函数变差**：通常是删了/改坏了覆盖它的测试，或往大函数里继续堆分支。
+- **基线函数变差**：通常是删了/改坏了覆盖它的测试，或往大函数里继续堆分支。web-console 覆盖率停在 0，补一个不执行源文件的组件测试降不了分；把新判断挪到复杂度 ≤ 5 的新函数。
 - **确实需要接受新债务**（少见）：`pnpm run test:crap:update` 并在 PR 描述里说明原因，review 时会看到基线 diff。
 
 ## 局限（与其它手段互补）

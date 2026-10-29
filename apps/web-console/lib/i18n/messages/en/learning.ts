@@ -31,6 +31,8 @@ export const learning = {
   "sources": "Source records",
   "scope": "Allowed tools after external input (one exact name per line)",
   "scopeHint": "This grants turns exposed to web content, external events and delegated tasks access to the listed effectful tools. Existing approval and sandbox rules still apply. Empty grants no additional authority.",
+  "exactCalls": "Authorize specific operations only (advanced)",
+  "exactCallsHint": "Enter a JSON array with tool and complete args, for example [{\"tool\":\"bash\",\"args\":{\"command\":\"ssh worker status\"}}]. Only the full arguments match. A Bot's saved main-chat grants apply to legitimate children and same-user group execution; removing them revokes access immediately. The tool list above still grants all arguments for a listed tool; remove it there to restrict it to specific operations.",
   "queue": "Input queue",
   "batchSize": "Maximum batch size",
   "agingSeconds": "Seconds per 10 aging priority points",

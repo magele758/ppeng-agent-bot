@@ -15,7 +15,7 @@ test('unavailable or forbidden routes fall back without widening permissions [AC
   assert.equal(route.strategy,'direct'); assert.match(route.reason,/ptc/);
   assert.equal(selectGoalRoute({task:'Work',requiredTools:['bash']},capabilities).blocked,true);
   assert.equal(selectGoalRoute({task:'Work',independentWork:true}, {...capabilities,allowedTools:[]}).blocked,true);
-  assert.equal(selectGoalRoute({task:'Work'}, {...capabilities,budgetRemaining:0}).blocked,false);
+  assert.equal(selectGoalRoute({task:'Work'}, {...capabilities,budgetRemaining:0}).blocked,true);
 });
 test('adapters dispatch real tool sequences and preserve run references [AC:bot-multi-goal-coordination#AC-5]',async()=>{
  const calls=[];

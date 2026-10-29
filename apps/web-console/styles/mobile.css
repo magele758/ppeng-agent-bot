@@ -168,6 +168,7 @@
   .lab-shell .chat-panel-body { flex: 1 1 auto; min-height: 0; }
   .lab-shell .chat-feed-shell { flex: 1 1 auto; min-height: 0; }
   .lab-shell .chat-composer-outer { flex: 0 0 auto; }
+  .lab-shell .bot-first-task { max-height: min(240px, 30dvh); overflow-y: auto; }
   .lab-shell .chat-composer-outer .bot-goals:not([open]) .bot-goals__body { display: none; }
   .lab-shell .chat-composer-outer .bot-goals summary { padding: 6px 10px; }
   .lab-shell .chat-feed { padding-inline: 12px; }

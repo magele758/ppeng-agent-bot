@@ -37,6 +37,7 @@ export {
 } from './outbound.js';
 export {
   appendOutboundDraft,
+  confirmOutboundDraft,
   readOutboundDrafts,
   type OutboundDraft,
   type OutboundDraftStatus
@@ -58,3 +59,10 @@ export type {
   GatewaySettingsView
 } from './gateway-settings.js';
 export { drainGatewayTurns, claimInboundEvent, InboundClaimTimeoutError } from './inbound-guard.js';
+
+export {
+  createUserDeliveryPort,
+  type UserDeliveryMessage,
+  type UserDeliveryPort,
+  type UserDeliveryPortOptions
+} from './user-delivery-port.js';

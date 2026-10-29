@@ -1,4 +1,5 @@
 import { emitStartupPhase } from '../observability/startup-phase.js';
+import {acceptHumanRoomWork,synchronizeRoomWork,handleHumanRoomFollowup,assignedRoomWork,roomHumanIntent,roomRoutingHash,type RoomWorkRef,type RoomWorkReceipt} from './work-handoff.js';
 import { BOT_DEFAULT_MAX_TURNS } from '../bots/types.js';
 import { readRoomGoals, writeRoomGoals } from './room-goals.js';
 import { startCollaboration, collaborationBoard, recordCollaborationReply, settleCollaboration } from './task-collaboration.js';
@@ -42,6 +43,7 @@ export interface BotRoom {
   createdAt: string; updatedAt: string;
 }
 export interface BotRoomMessage {
+  workReceipt?:RoomWorkReceipt;
   id: string; roomId: string; seq: number; sender: { type: 'user' | 'bot'; id: string; name: string };
   text: string; attachmentIds: string[]; contextSources?: ContextSource[]; turnId?: string; createdAt: string;
   /** Short quote pointer. The full bot reply stays on the original message. */
@@ -60,6 +62,7 @@ export interface RoomMemberRun {
   status: RoomMemberRunStatus;
 }
 export interface BotRoomTurn {
+  workRef?:RoomWorkRef; humanWorkHandled?:boolean; humanRoutingHash?:string;
   id: string; roomId: string; messageId: string; status: RoomTurnStatus; botIds: string[];
   /** Present only when the triggering message named members. Empty means an @ matched nobody. The full named list is kept; botIds is the capped speaking order. */
   mentionedBotIds?: string[];
@@ -113,10 +116,34 @@ function budget(value: unknown): number {
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 20) throw new ValidationError('Room budget must be an integer from 1 to 20, or 0 for unlimited');
   return value;
 }
+function conversationEnabled(room: { turnCapEnabled?: boolean; maxBotTurns: number }): boolean {
+  if (room.turnCapEnabled === false) return false;
+  return room.turnCapEnabled === true || room.maxBotTurns > 0;
+}
 function conversationCap(room: { turnCapEnabled?: boolean; maxBotTurns: number }, turn?: { maxBotTurns: number }): number {
-  if (room.turnCapEnabled !== true) return 0;
+  if (!conversationEnabled(room)) return 0;
   const n = turn && turn.maxBotTurns > 0 ? turn.maxBotTurns : room.maxBotTurns;
   return n > 0 ? n : 0;
+}
+function enforcedCeiling(enabled: boolean | undefined, limit: number): number {
+  if (enabled === false || !(limit > 0)) return Number.POSITIVE_INFINITY;
+  return limit;
+}
+function roomSpendWouldExceed(room: { toolCapEnabled?: boolean; maxToolCalls: number; costCapEnabled?: boolean; maxCostUsd: number }, toolCalls: number, requested: number, costUsd: number, spent: number): 'tool_budget' | 'cost_budget' | undefined {
+  if (toolCalls + requested > enforcedCeiling(room.toolCapEnabled, room.maxToolCalls)) return 'tool_budget';
+  if (costUsd + spent >= enforcedCeiling(room.costCapEnabled, room.maxCostUsd)) return 'cost_budget';
+  return undefined;
+}
+function roomSpendExceeded(room: { toolCapEnabled?: boolean; maxToolCalls: number; costCapEnabled?: boolean; maxCostUsd: number }, toolCalls: number, costUsd: number): 'tool_budget' | 'cost_budget' | undefined {
+  if (toolCalls >= enforcedCeiling(room.toolCapEnabled, room.maxToolCalls)) return 'tool_budget';
+  if (costUsd >= enforcedCeiling(room.costCapEnabled, room.maxCostUsd)) return 'cost_budget';
+  return undefined;
+}
+function roomCreateCaps(input: { maxBotTurns?: number; maxToolCalls?: number; maxCostUsd?: number }): Pick<BotRoom, 'maxBotTurns' | 'turnCapEnabled' | 'maxToolCalls' | 'toolCapEnabled' | 'maxCostUsd' | 'costCapEnabled'> {
+  const turns = input.maxBotTurns ?? 0;
+  const tools = input.maxToolCalls === undefined ? 100 : positiveLimit(input.maxToolCalls, 10000, 'tool', true);
+  const cost = input.maxCostUsd === undefined ? 1 : positiveLimit(input.maxCostUsd, 1000, 'cost');
+  return { maxBotTurns: budget(turns), turnCapEnabled: turns > 0, maxToolCalls: tools, toolCapEnabled: tools > 0, maxCostUsd: cost, costCapEnabled: cost > 0 };
 }
 function conversationCapHit(room: { turnCapEnabled?: boolean; maxBotTurns: number }, turn: { maxBotTurns: number; botTurns: number }): boolean {
   const cap = conversationCap(room, turn);
@@ -256,7 +283,7 @@ export class BotRoomService {
     const hostBotId = input.hostBotId ?? botIds[0]!;
     if (!botIds.includes(hostBotId)) throw new ValidationError('Host must be a Room member');
     const now = nowIso();
-    const room: BotRoom = { id: createId('room'), title, principalId: botPrincipalKey(principal), principal, botIds, hostBotId, maxBotTurns: budget(input.maxBotTurns ?? 0), turnCapEnabled: (input.maxBotTurns ?? 0) > 0, maxToolCalls:positiveLimit(input.maxToolCalls??0,10000,'tool',true), toolCapEnabled: (input.maxToolCalls ?? 0) > 0, maxCostUsd:positiveLimit(input.maxCostUsd??0,1000,'cost'), costCapEnabled: (input.maxCostUsd ?? 0) > 0, status: 'active', createdAt: now, updatedAt: now };
+    const room: BotRoom = { id: createId('room'), title, principalId: botPrincipalKey(principal), principal, botIds, hostBotId, ...roomCreateCaps(input), status: 'active', createdAt: now, updatedAt: now };
     this.store.db.prepare('INSERT INTO bot_rooms(id,principal_id,data) VALUES(?,?,?)').run(room.id, room.principalId, JSON.stringify(room));
     return withReplyMode(room);
   }
@@ -342,7 +369,7 @@ export class BotRoomService {
     const messages = rows.slice(0,limit).map(row => decode<BotRoomMessage>(row)!).reverse();
     return { messages, nextCursor: hasMore ? messages[0]!.seq : null, hasMore };
   }
-  turns(principal: BotPrincipal, id: string): BotRoomTurn[] { this.get(principal,id); return this.rawTurns(id).map(turn => turn.goalId ? { ...turn, collaboration: collaborationBoard(this.store, id, turn.goalId) } : turn); }
+  turns(principal: BotPrincipal, id: string): BotRoomTurn[] { this.get(principal,id); return this.rawTurns(id).map(turn => {const collaboration=turn.goalId?collaborationBoard(this.store,id,turn.goalId):undefined;return {...turn,...(collaboration?{collaboration}:{}),...(collaboration?.goal?.workRef?{workRef:collaboration.goal.workRef}:{})};}); }
   private rawTurns(id: string): BotRoomTurn[] {
     return this.store.db.prepare('SELECT data,status FROM bot_room_turns WHERE room_id=? ORDER BY rowid').all(id).map(row => ({ ...decode<BotRoomTurn>(row)!, status: (row as {status:RoomTurnStatus}).status }));
   }
@@ -356,7 +383,7 @@ export class BotRoomService {
   }
   private saveTurn(turn: BotRoomTurn): void {
     turn.updatedAt = nowIso();
-    if (turn.goalId) settleCollaboration(this.store, turn.roomId, turn.goalId, turn.status);
+    if (turn.goalId&&!turn.workRef) settleCollaboration(this.store, turn.roomId, turn.goalId, turn.status);
     this.store.db.prepare('UPDATE bot_room_turns SET status=?,data=? WHERE id=?').run(turn.status,JSON.stringify(turn),turn.id);
   }
   private append(roomId: string, sender: BotRoomMessage['sender'], text: string, attachmentIds: string[], turnId?: string, idem?: string, contextSources?: ContextSource[], replyTo?: MessageReplyTo): BotRoomMessage {
@@ -442,7 +469,7 @@ export class BotRoomService {
     // No @ leaves mentions unset so everyone speaks normally. An @ that names nobody stays empty and does not pull in non-members.
     return sawMention ? ids : undefined;
   }
-  send(principal: BotPrincipal, id: string, input: BotRoomMessageInput): { message: BotRoomMessage; turn: BotRoomTurn } {
+  send(principal: BotPrincipal, id: string, input: BotRoomMessageInput, internal?:{skipCollaboration?:boolean}): { message: BotRoomMessage; turn: BotRoomTurn } {
     const room = this.get(principal, id);
     const { text, attachments, contextSources } = this.validateMessageInput(input);
     const duplicate = this.duplicateReceipt(id, input, text, attachments, contextSources);
@@ -474,15 +501,37 @@ export class BotRoomService {
       const message = this.append(id, { type: 'user', id: principal.userId, name: principal.userId }, text, attachments, turnId, input.idempotencyKey, contextSources, quote);
       const now = nowIso();
       const turn: BotRoomTurn = { id: turnId, roomId: id, messageId: message.id, status: 'queued', botIds: schedule.botIds, ...(schedule.mentionedBotIds !== undefined ? { mentionedBotIds: schedule.mentionedBotIds } : {}), ...(fanOut ? { replyMode: 'all-members' } : {}), ...(schedule.speakerScores ? { speakerScores: schedule.speakerScores } : {}), ...(quote ? { replyToMessageId: quote.messageId } : {}), maxBotTurns: speakerBudget, botTurns: 0, toolCalls: 0, costUsd: 0, costStatus: 'unknown', cursor: 0, createdAt: now, updatedAt: now };
-      if (room.replyMode === 'task-collaboration' && schedule.botIds[0]) {
+      if (!internal?.skipCollaboration&&room.replyMode === 'task-collaboration' && schedule.botIds[0]) {
         turn.replyMode = 'task-collaboration';
         turn.ownerBotId = schedule.botIds[0];
-        turn.hostWrapUp = speakerBudget > 1;
+        turn.hostWrapUp = speakerBudget !== 1;
         turn.goalId = startCollaboration(this.store, id, turn.ownerBotId, text);
       }
       this.store.db.prepare('INSERT INTO bot_room_turns(id,room_id,status,data) VALUES(?,?,?,?)').run(turn.id, id, turn.status, JSON.stringify(turn));
       return { message, turn };
     });
+  }
+  /** Only authenticated human ingress calls this. Bot post tools keep send(). */
+  sendHumanWork(principal:BotPrincipal,id:string,input:BotRoomMessageInput):{message:BotRoomMessage;turn:BotRoomTurn} {
+    const room=this.get(principal,id);if(room.replyMode!=='task-collaboration')return this.send(principal,id,input);
+    const assigned=assignedRoomWork(input.text),intent=roomHumanIntent(input.text);let interrupts:string[]=[];
+    const result=this.tx(()=>{
+      const result=this.send(principal,id,input,{skipCollaboration:!assigned}),turn=result.turn;
+      if(turn.humanWorkHandled){if(turn.humanRoutingHash!==roomRoutingHash(input))throw new ConflictError('Idempotency key used for different routing');return result;}
+      if(assigned){turn.workRef=acceptHumanRoomWork(this.store,this.get(principal,id),turn,result.message,input,(item,data,key)=>this.appendWorkReceipt(item,data,key));turn.status='completed';turn.terminationReason='work_accepted';}
+      else if(intent.kind==='query'||['pause','resume','cancel','amend_goal'].includes(intent.kind)){
+        interrupts=handleHumanRoomFollowup(this.store,this.get(principal,id),turn,input.text,input.mentions,(item,data,key)=>this.appendWorkReceipt(item,data,key));turn.status='completed';turn.terminationReason='handled_command';
+      }
+      turn.humanWorkHandled=true;turn.humanRoutingHash=roomRoutingHash(input);this.saveTurn(turn);return result;
+    });
+    for(const sessionId of interrupts)this.host.cancelSession(sessionId);
+    return result;
+  }
+  private appendWorkReceipt(turn:BotRoomTurn,data:RoomWorkReceipt,key:string):BotRoomMessage {
+    const botId=data.botId??this.rawRoom(turn.roomId).hostBotId,bot=this.store.getBot(botId);
+    const message=this.append(turn.roomId,{type:'bot',id:botId,name:bot?.name??botId},`[room work] ${JSON.stringify(data)}`,[],turn.id,key);
+    if(!message.workReceipt){message.workReceipt=data;this.store.db.prepare('UPDATE bot_room_messages SET data=? WHERE id=?').run(JSON.stringify(message),message.id);}
+    return message;
   }
   /** A built-in command is recorded as human input without running a model round. */
   sendHandled(principal: BotPrincipal, id: string, input: BotRoomMessageInput) {
@@ -591,7 +640,7 @@ export class BotRoomService {
       }
     }
   }
-  /** Count tool calls after each model step, including a run resumed from approval. Cost and tool caps do not cancel the session. */
+  /** Count tool calls after each model step, including a run resumed from approval. Tool and cost caps cancel the session. */
   budgetHookForSession(sessionId:string):KernelHookListener|undefined {
     const session=this.store.getSession(sessionId);const roomId=session?.metadata?.roomId;
     if(typeof roomId!=='string')return undefined;
@@ -600,15 +649,21 @@ export class BotRoomService {
     return event=>{
       if(event.type!=='model_done')return;
       const turn=this.turnById(active.id);if(!['running','waiting_approval'].includes(turn.status))return;
+      const room=this.rawRoom(roomId);
       const requested=event.assistant?.parts.filter(part=>part.type==='tool_call').length??0;
       const currentCost=this.store.getSession(sessionId)?.metadata?.usageCostUsd;
+      const slot=turn.members?.find(member=>member.sessionId===sessionId);
+      const spent=typeof currentCost==='number'?Math.max(0,currentCost-(slot?.startCostUsd??turn.startCostUsd??0)):0;
       if(typeof currentCost==='number')turn.costStatus='estimated';
+      const reason=roomSpendWouldExceed(room,turn.toolCalls,requested,turn.costUsd,spent);
+      if(reason){turn.terminationReason=reason;this.saveTurn(turn);this.host.cancelSession(sessionId);return;}
       turn.toolCalls+=requested;this.saveTurn(turn);
     };
   }
   /** Invoke at startup, scheduler tick and after approval/run completion. */
   async tick():Promise<void> {
     const rooms=this.store.db.prepare('SELECT data FROM bot_rooms ORDER BY rowid').all().map(row=>decode<BotRoom>(row)!);
+    for(const room of rooms.filter(item=>item.status==='active'))this.tx(()=>synchronizeRoomWork(this.store,room,(turn,data,key)=>this.appendWorkReceipt(turn,data,key)));
     await Promise.all(rooms.filter(room=>room.status==='active'&&!this.active.has(room.id)).map(room=>this.process(room)));
   }
   private claimTurn(roomId: string): BotRoomTurn | undefined {
@@ -624,6 +679,18 @@ export class BotRoomService {
   }
   private contextMissing(turn: BotRoomTurn): void {
     turn.status = 'unknown'; turn.terminationReason = 'execution_context_missing'; this.saveTurn(turn);
+  }
+  private completeBudget(turn: BotRoomTurn): boolean {
+    if (turn.terminationReason !== 'tool_budget' && turn.terminationReason !== 'cost_budget') return false;
+    turn.status = 'failed';
+    for (const member of turn.members ?? []) {
+      if (member.status !== 'running' && member.status !== 'waiting_approval') continue;
+      member.status = 'failed';
+      this.noteSettled(turn, member.botId);
+    }
+    delete turn.currentSessionId;
+    this.syncCursor(turn);
+    this.saveTurn(turn); return true;
   }
   private turnOwnsSession(turn: BotRoomTurn, sessionId: string): boolean {
     return turn.currentSessionId === sessionId || (turn.members ?? []).some(member => member.sessionId === sessionId && (member.status === 'running' || member.status === 'waiting_approval'));
@@ -729,7 +796,7 @@ export class BotRoomService {
     if (hasPendingSessionWake(this.store, session.id)) return false;
     const resumed = resumeApprovedBotSession({ store: this.store, runSession: id => this.host.runSession(id, { onEvent: this.budgetHookForSession(id) }), isSessionRunning: this.host.isSessionRunning }, session.id, turn.startedAt ?? turn.createdAt);
     if (resumed || (session.metadata?.outcome as { kind?: string } | undefined)?.kind === 'waiting_approval') return false;
-    if (this.applyUnconfirmedEffects(turn, session)) return false;
+    if (this.applyUnconfirmedEffects(turn, session) || this.completeBudget(turn)) return false;
     if (this.applyOutcome(turn, session, speaker) || this.sessionFailed(turn, session, speaker)) return !this.isTerminal(this.turnById(turn.id).status);
     if (typeof session.metadata?.usageCostUsd === 'number') {
       this.mergeTurn(turn.id, latest => {
@@ -879,6 +946,10 @@ export class BotRoomService {
         item.partialResult = this.resultText(sessionId, startSeq).slice(-12000);
       });
       this.adopt(turn, saved);
+      return false;
+    }
+    if (after.terminationReason === 'tool_budget' || after.terminationReason === 'cost_budget') {
+      this.completeBudget(this.turnById(turn.id));
       return false;
     }
     if (this.applyOutcome(turn, current, botId)) return !this.isTerminal(this.turnById(turn.id).status);
@@ -1066,6 +1137,8 @@ export class BotRoomService {
       return 'stop';
     }
     if (closing && conversationCapHit(room, stored)) { stored.terminationReason = 'budget'; return 'stop'; }
+    const spentReason = roomSpendExceeded(latest, stored.toolCalls, stored.costUsd);
+    if (spentReason) { stored.terminationReason = spentReason; this.completeBudget(stored); return 'stop'; }
     if (!latest.botIds.includes(botId)) {
       this.adopt(turn, this.mergeTurn(turn.id, item => { this.noteSettled(item, botId); this.noteMember(item, { botId, status: 'skipped' }); this.syncCursor(item); }));
       return 'continue';

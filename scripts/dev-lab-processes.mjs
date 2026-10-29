@@ -83,7 +83,7 @@ async function stopGroup(entry, graceMs) {
 }
 
 /** Own only the process groups created here, including the build task. */
-export async function runDevProcesses({ cwd, build, services, onReady = () => {}, onStop = () => {} }, { graceMs = 3000 } = {}) {
+export async function runDevProcesses({ cwd, build, services, onReady = () => {}, onStop = () => {}, onOutput = () => {} }, { graceMs = 3000 } = {}) {
   const entries = new Set();
   let stopping = false;
   let finish;
@@ -97,8 +97,16 @@ export async function runDevProcesses({ cwd, build, services, onReady = () => {}
   for (const [signal, handler] of handlers) process.on(signal, handler);
   const start = spec => {
     const child = spawn(spec.command, spec.args, {
-      cwd, env: sanitizeScriptEnv(spec.env), stdio: 'inherit', shell: false, detached: POSIX
+      cwd, env: sanitizeScriptEnv(spec.env), stdio: ['ignore', 'pipe', 'pipe'], shell: false, detached: POSIX
     });
+    const forward = (stream, dest) => {
+      stream.on('data', (chunk) => {
+        dest.write(chunk);
+        onOutput(spec.name, chunk.toString());
+      });
+    };
+    forward(child.stdout, process.stdout);
+    forward(child.stderr, process.stderr);
     const entry = { child, done: new Promise(resolve => {
       child.once('error', error => { console.error(`[dev-lab] ${spec.name}: ${error.message}`); resolve(1); });
       child.once('exit', (code, signal) => resolve(code ?? EXIT_SIGNALS[signal] ?? 1));
@@ -107,12 +115,14 @@ export async function runDevProcesses({ cwd, build, services, onReady = () => {}
     return entry;
   };
   try {
-    const compiler = start(build);
-    const buildCode = await Promise.race([compiler.done, outcome]);
-    if (stopping || buildCode !== 0) return buildCode;
-    await stopGroup(compiler, graceMs);
-    entries.delete(compiler);
-    if (stopping) return await outcome;
+    if (build) {
+      const compiler = start(build);
+      const buildCode = await Promise.race([compiler.done, outcome]);
+      if (stopping || buildCode !== 0) return buildCode;
+      await stopGroup(compiler, graceMs);
+      entries.delete(compiler);
+      if (stopping) return await outcome;
+    }
     for (const spec of services) {
       const entry = start(spec);
       void entry.done.then(code => {

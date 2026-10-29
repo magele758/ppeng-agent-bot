@@ -41,13 +41,30 @@ function isExplicitReadOnlyRequest(raw: string): boolean {
   return !/(?:不要|不得|禁止|别|不)只读|\bnot\s+(?:a\s+)?read[- ]only\b|追加要求|补充要求|补充约束|优先级|保存|写入|写文件|读写|创建|推进|更新|修改|修复|实现|添加|开发|编写|部署|迁移|重构|提交|发布|删除|安装|重启|发送|暂停|取消|恢复|继续|\b(?:priority|persist|edit|change|upgrade|stop|save|write|create|update|modify|fix|implement|add|build|deploy|migrate|refactor|commit|publish|delete|remove|install|restart|send|pause|cancel|resume)\b/i.test(positive);
 }
 
+function shortFollowupKind(text: string, targeted: boolean): 'query' | 'chat' | undefined {
+  if (targeted) return undefined;
+  if (isResponseLanguagePreference(text)) return 'chat';
+  if (/^(?:(?:这个|这件事|事情|任务|现在|都|已经|到底|你|目前)\s*)*(?:好了吗|好了没|搞完了没|搞完了吗|做完了没|做完了吗|干完了没|干完了吗|在干嘛|还差什么|还有什么没做完的)[？?！!。.\s]*$/.test(text)) return 'query';
+  if (/^(?:回复|回答|说)(?:再|请)?(?:简单|简短|简洁|短|清楚)[\s\S]{0,100}$/.test(text) && !requestsWork(text)
+    && !/新增|添加|再加|修改|修复|开发|实现|生成|创建|保存|提交|删除|运行|部署|发送|\b(?:add|fix|build|save|send|run|create)\b/i.test(text)) return 'chat';
+  if (isExplicitReadOnlyRequest(text)) return 'query';
+  return undefined;
+}
+
+function isResponseLanguagePreference(text: string): boolean {
+  return /^(?:(?:以后|今后|接下来|请|只|都)\s*)*(?:用|使用)(?:中文|英文|英语|汉语)(?:回复|回答|答复)(?:我)?[！!。.\s]*$/.test(text)
+    || /^(?:please\s+)?(?:always\s+)?(?:reply|respond|answer)\s+(?:to me\s+)?in\s+(?:chinese|english)(?:\s+from now on)?[!.\s]*$/i.test(text);
+}
+
 /** Explicit targeting wins; unresolved references are left for the service to clarify. */
 export function classifyGoalMessage(raw: string): GoalMessageIntent {
   const target = raw.match(targetPattern);
   const text = (target ? raw.slice(target[0].length) : raw).trim();
   const base = { ...(target ? { goalId: target[1]! } : {}), text };
   if (!text || /^(谢谢|多谢|好的|收到|你好|thanks?|thank you|hello|hi)[！!。.\s]*$/i.test(text)) return { kind: 'chat', ...base };
-  if (!target && isExplicitReadOnlyRequest(text)) return { kind: 'query', ...base };
+  const followup = shortFollowupKind(text, !!target);
+  if (followup) return { kind: followup, ...base };
+
   if (/(进度|进展|做到哪|怎么样了|状态如何|完成了吗|完成了没|跑完了没|还没好|status|progress|how.*going)/i.test(text)
     && !requestsWork(text)) return { kind: 'query', ...base };
   const workVerb = text.search(/修复|修改|实现|开发|添加|分析|研究|检查|调查|说明|编写|设计|\b(?:fix|modify|add|build|implement|analy[sz]e|investigate)\b/i);

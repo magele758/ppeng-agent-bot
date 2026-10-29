@@ -24,7 +24,8 @@ export interface GoalIntent {
  goalId?: string; text?: string; sourceMessageId?: string; sessionId?: string;
 }
 export interface GoalEvent { id: string; type: string; goalId?: string; at: string; detail?: string }
-export interface GoalSnapshot { goals: BotGoal[]; executions: GoalExecution[]; events: GoalEvent[]; processed: string[]; wakeEvents?: { completionCandidate?: boolean; goalId?: string; summary?: string; evidence?: string[]; costUsd?: number; eventId: string; source: string; correlationId: string; sessionId?: string; consumedBy: string[] }[]; fence: number }
+export interface GoalWakeEvent { completionCandidate?: boolean; goalId?: string; executionId?: string; revision?: number; fence?: number; summary?: string; evidence?: string[]; costUsd?: number; eventId: string; source: string; correlationId: string; sessionId?: string; consumedBy: string[] }
+export interface GoalSnapshot { goals: BotGoal[]; executions: GoalExecution[]; events: GoalEvent[]; processed: string[]; wakeEvents?: GoalWakeEvent[]; fence: number }
 export interface GoalSettings { maxConcurrent: number; defaultBudgetUsd: number; maxAttempts: number; maxNoProgress: number; leaseMs: number; preferredStrategy: string }
 export interface GoalStore {
  getDaemonControl<T>(key: string): T | undefined;

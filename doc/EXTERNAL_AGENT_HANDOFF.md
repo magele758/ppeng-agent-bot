@@ -111,3 +111,56 @@ curl 'https://your-lab.example/api/external-agent/v1/tasks/task_...' \
 轮询到 completed 后读取 result；failed/cancelled 时读取 reason 并报告。
 waiting_approval/waiting_input 时提示用户在 Lab 处理，稍后继续查询。
 ```
+
+## 指定 Bot 的入站任务
+
+Lab 同一设置卡片中可填写接入方的「允许的 Bot」。外部请求使用 `botId`，与 `agentId` 二选一：
+
+```json
+{
+  "source": "other-app",
+  "sourceTaskId": "report-001",
+  "botId": "report-bot",
+  "goal": "生成本周报告",
+  "context": "报告范围和必要材料"
+}
+```
+
+任务以目标 Bot 身份在独立会话中执行，继承该授权主体的 Bot 权限模式、工具/技能范围、模型设置和工作区；不会把主对话历史复制给调用方。返回的 `task.botId` 表明 Bot 路由。暂停或禁用的 Bot 拒绝新任务。Bot 标识不能通过 `agentId` 绕过 Bot 白名单。
+
+仅授权 Bot 时，可以将「允许的执行者」和「默认执行者」同时留空；请求必须明确指定 `botId`。Bot 白名单撤销后，该接入方不能继续查询或控制该 Bot 的任务；关闭接入方或总开关则撤销全部任务接口访问。撤销访问不会自动取消已经接收的工作。
+
+新增两个任务操作，均使用原接入凭证且只允许操作该接入方自己的任务：
+
+- `POST /api/external-agent/v1/tasks/:id/cancel`，body `{}`。取消尚未结束的任务；已结束的任务返回已有状态。
+- `POST /api/external-agent/v1/tasks/:id/input`，body `{ "inputId": "reply-001", "message": "补充材料" }`。仅适用于 `waiting_input`；相同 `inputId` 重试只接收一次，同一标识不能换内容。补充信息不会批准工具；若仍有工具审批，需在 Lab 处理。
+
+## 本地 Bot 主动委派到远端
+
+在 **设置 → 集成与可观测 → 外部 Agent 连接** 添加连接：
+
+1. 设置连接标识、名称、服务根地址（例如 `https://peer.example.com`）。
+2. 填入远端在「外部 Agent 任务交接」中为本应用创建的接入凭证。
+3. 填写「允许调用的本地 Bot」；连接绑定保存者身份，其他用户不能借用。
+4. 选择远端目标类型（Bot / 执行者），填写远端目标标识。
+5. 本机或内网连接显式开启「允许访问私有网络」，保存即可使用。
+
+凭证进入现有密钥库，设置与工具结果不回显。网络请求固定在配置的服务地址，校验 DNS 并绑定实际连接地址，不跟随重定向；响应最多 1 MB，单次 HTTP 请求限时 30 秒。私有网络默认不允许。连接设置接口为管理员 `GET/PATCH /api/external-agents/connections`；保存立即生效，无需 `.env` 或重启。
+
+授权 Bot 使用以下统一工具；写操作沿用会话的工具审批策略，计划模式不能派工或改变远端任务：
+
+| 工具 | 输入与行为 |
+|------|------------|
+| `external_agent_list` | 列出此 Bot 可使用的连接和最近 100 个派工记录 |
+| `external_agent_delegate` | `{connectionId, idempotencyKey, goal, context?}`，返回本地跟踪记录 `id` 和 `remoteTaskId` |
+| `external_agent_status` | `{taskId}`；这里使用本地跟踪记录 `id`，查询远端状态与结果 |
+| `external_agent_cancel` | `{taskId}`，请求远端取消 |
+| `external_agent_input` | `{taskId, inputId, message}`，向等待输入的远端任务补充材料 |
+
+例如对 Bot 说：「用 peer-report 连接，让远端报告 Bot 分析这份材料。派工标识使用 report-20261028，查到完成后汇总结果。」Bot 应先查看连接，再派工、使用返回的本地 `id` 查询结果；`queued`、`running`、`unknown` 都不等于完成。
+
+同一本地身份、Bot、连接下的派工标识持久化去重。断线导致接收结果不明时返回 `unknown`，使用原 `idempotencyKey` 和原参数重试，将发送相同的远端任务身份；远端须遵守本项目协议的持久化幂等约定。不同应用需实现此 JSON HTTP 协议或做适配；不自动兼容任意 A2A/MCP Agent。取消与补充输入要求远端提供相应接口，旧版本仅支持提交和查询时会明确报错。
+
+禁用连接、撤销本地 Bot 授权或删除连接立即阻止后续调用。轮换凭证不改变任务关联；修改服务地址或远端目标后，旧任务禁止继续访问，避免操作到另一个服务的同名任务。需要继续旧任务时恢复原地址和目标；可重新添加同一标识的连接并保留原服务身份。
+
+Bot 入站任务保留“外部委派”的来源身份，不视为人在 Lab 直接输入的操作授权。Bot 已保存的来源策略（含精确工具与参数授权）通过同一主体的主会话解析；范围不足时需在 Lab 保存相应授权或批准具体调用。外部任务的正文和后续补充文本不能扩大该范围。

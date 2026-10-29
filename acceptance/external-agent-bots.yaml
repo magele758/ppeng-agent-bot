@@ -1,0 +1,31 @@
+id: external-agent-bots
+title: Bot 级外部 Agent 通信
+status: implemented
+requirement: |
+  那就先把前两项补齐：Bot 级入站授权和路由，以及统一的外部 Agent 连接与派工工具，配置走 Lab UI。按项目规范实现、测试、review，通过后提交 PR 并合并。
+notes: 'assumedApproval: standing-order-2026-10-22；入站 Bot 委派使用独立任务会话，继承目标 Bot 权限，不返回主对话内容。'
+criteria:
+  - id: AC-1
+    given: 外部接入方已获准联系指定 Bot
+    when: 提交指定 Bot 的任务
+    then: 由该 Bot 身份与已保存权限执行独立任务，结果只包含此任务产出，主对话保持独立
+  - id: AC-2
+    given: 接入方未获授权或授权已撤销
+    when: 请求未授权 Bot 或他人任务
+    then: 请求被拒绝且不创建任务、不泄露结果，旧执行者接入仍可使用
+  - id: AC-3
+    given: 管理员打开 Lab 外部 Agent 设置
+    when: 保存入站 Bot 白名单与远端连接的地址、凭证、可用 Bot
+    then: 配置立即生效并持久化，凭证不回显，中英文界面提供相同配置项
+  - id: AC-4
+    given: 本地 Bot 获准使用远端连接
+    when: 使用统一工具派工并查询结果
+    then: 真实调用远端任务服务并返回可追踪任务编号和状态，未授权 Bot 或用户不能借用连接
+  - id: AC-5
+    given: 派工遇到并发重试、网络结果不明或重启
+    when: 使用相同幂等标识重试
+    then: 不重复创建远端任务，保留可恢复的任务关联，失败不被当作完成
+  - id: AC-6
+    given: 远端连接禁用、地址不安全、响应错误或任务等待人工输入
+    when: 工具查询、取消或补充输入
+    then: 拒绝越权和不安全请求，真实呈现失败或等待状态，取消与输入只作用于授权任务且不泄露凭证

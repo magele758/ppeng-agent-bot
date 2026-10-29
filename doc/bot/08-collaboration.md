@@ -2,7 +2,7 @@
 
 Bot 可以请另一只 Bot 做事，也可以去调用已经接上的软件。两件事都带着身份和权限，不能借对方的名义扩大自己能做的范围。
 
-规格：`bots`、`bot-product-admin`、`bot-product-p0`、`bot-product-p1`、`bot-product-p2`、`bot-software-execution`（软件执行的验收规格还没标成已实现）。
+规格：`bots`、`bot-product-admin`、`bot-product-p0`、`bot-product-p1`、`bot-product-p2`、`bot-software-execution`、`bot-reliable-messaging`、`default-super-bot`。
 
 ## Bot 之间
 
@@ -14,9 +14,9 @@ Bot 可以请另一只 Bot 做事，也可以去调用已经接上的软件。�
 
 ## 默认 Super Bot 的派工
 
-意图是用进来就有的那只 Super Bot 查看其他人的状态、把工作派出去、收回成果和失败原因。被派的 Bot 自己的权限仍然有效，Super Bot 不代替人批准。
+默认 Super Bot 可以查看有权访问的 Bot 状态、把工作派出去、收回成果和失败原因。被派的 Bot 自己的权限仍然有效，Super Bot 不代替人批准。
 
-规格 `default-super-bot` 还没标成已实现。在它收口之前，派工以已经落地的 Bot 互发和委派为准。
+`default-super-bot` 与 `bot-reliable-messaging` 已通过软件验收。待处理消息和委派保留身份与幂等键，重启后仍可查询；收到或派发不等于完成。
 
 ## Super Bot 配置多机软件工厂
 
@@ -39,7 +39,7 @@ Bot 可以请另一只 Bot 做事，也可以去调用已经接上的软件。�
 
 第一次使用时有连接引导。可以用表单接 HTTP 或 MCP，也可以导入 OpenAPI，并滤成只读范围。高级的接口导入仍留着。创建时如果冲突或格式不对，不覆盖已经保存的连接。
 
-`bot-software-execution` 把「真的执行并返回结果、不把一句声明当成成功」收成验收标准，目前还是已批准。上面这些是 P0/P1 已经落地的连接和回执行为。
+`bot-software-execution` 已通过受支持 HTTP/OpenAPI 与 MCP 执行器的软件验收；依据真实回执记录成功、失败或未知，不承诺支持任意未接入软件。
 
 ## 产品与配置
 
@@ -56,3 +56,27 @@ Bot 可以请另一只 Bot 做事，也可以去调用已经接上的软件。�
 单只 Bot 的定时任务仍在它的详情里改。运行记录里核对待发的报告，再决定发不发。
 
 Bot 主对话保留执行过程。任务页不取代对话。
+
+### 监督先读快照，再按需刷新
+
+`bot_team_status` 默认只返回当前活跃工作的精简卡片，可按 `botIds`、`changedSince`、`activeOnly` 筛选。`sessionStatus` 与 `externalWorkerStatus` 分开；会话空闲不代表外部执行停止。`observedAt` 是证据采样时间，`reportedAt` 是读取快照的时间；缺失或过期的观察明确标记 stale。
+
+需要新状态时，调用 `bot_request_status`，提供目标 Bot、幂等键和可选期限。它先读取已授权快照，仍在有效期内则直接返回；过期才创建带 requestId 的刷新请求。接收方用 `bot_status_report` 回报该 requestId、简短摘要和真实工具观察消息 ID。送达/确认收到、等待观察、旧证据和超时分别可见。只有有权的目标 Bot 或其真实后代会话能回报，助手自述与无关消息不能充当观察证据。相同新鲜回报只回送一次；排队过期的刷新不会再启动模型。
+
+旧报告中的 observedAt/sample/checked 时间不会因重新读取而变新。成功读取近期有效的工作快照可用于无变化检查，但保存的采样时间保持原值；没有观察的“健康”自述和失败检查都会记录为未核验。进程状态与监督回报都不能代替原 Goal 的完成核验。
+
+`bot_task_results` 默认返回摘要与历史游标，完整结果按 `taskId` 读取，或显式选择 `includeResults`。用户汇报应采用简短列表，列出当前工作、阻塞和下一步。
+## 与其他应用的 Agent 协作
+
+「设置 → 集成与可观测」提供两个入口：
+
+- **外部 Agent 任务交接**：按接入方授权允许的 Bot，外部请求使用 `botId`。Bot 以自己的权限执行独立任务，调用方只查询此任务的结果，不获得主对话历史。可以仅授权 Bot，不授予通用执行者。
+- **外部 Agent 连接**：保存远端地址、凭证、目标 Bot/执行者和允许使用连接的本地 Bot。授权 Bot 使用 `external_agent_list`、`external_agent_delegate`、`external_agent_status`、`external_agent_cancel`、`external_agent_input` 完成派工与跟踪。
+
+连接保存立即生效，凭证不回显。对方需要支持本项目的 HTTP 任务交接协议，或部署转换适配器。接收状态不等于完成；接收结果不明时保留原派工标识重试。具体配置、接口、撤销和恢复方式见[外部 Agent 任务交接](../EXTERNAL_AGENT_HANDOFF.md)。
+
+## 任务协作群的持久承接
+
+真实用户在「任务协作」群明确点名成员派工时，群先返回接收回执，工作登记到该 Bot 原单聊的持久目标，由现有目标调度器继续执行。群讨论结束或讨论预算耗尽，不表示工作交付，也不要求重新派发。普通 Bot 自动投稿不能借消息文字取得这条人类授权。
+
+回执可打开原工作会话。群内的状态追问和带明确目标的暂停、取消、续跑只影响关联工作；目标不唯一时要求指定。完成仍以现有目标服务核验为准。核验完成、受阻、失败会向原群发布状态与工作入口，重复调度或恢复不重复发布同一状态；私聊正文和私有证据不会自动复制到群。成员退出或来源绑定失效后停止该公开投递，不回退到无关群。

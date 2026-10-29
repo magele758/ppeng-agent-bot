@@ -39,7 +39,7 @@ test('controls stay safe and explicit isolated work cannot fall back to direct [
     assert.equal(selectGoalRoute({ task: text }, { ...capabilities, allowedTools: [] }).blocked, true);
   }
   for (const task of ['Do not use subagents to fix login', '不要使用子代理修复登录']) assert.equal(selectGoalRoute({ task }, capabilities).strategy, 'direct');
-  const exhausted=selectGoalRoute({ task: 'Fix login' }, { ...capabilities, budgetRemaining: 0 });assert.equal(exhausted.blocked, false);assert.equal(exhausted.strategy, 'direct');
+  assert.equal(selectGoalRoute({ task: 'Fix login' }, { ...capabilities, budgetRemaining: 0 }).blocked, true);
 });
 
 test('compaction retains diagnostic tail and structured status without mutating evidence [AC:bot-execution-p0#AC-3]', () => {

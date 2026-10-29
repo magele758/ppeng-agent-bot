@@ -1,3 +1,4 @@
+import { botSettings } from './botSettings.ts';
 import { learning } from './learning.ts';
 import { mobile } from './mobile.ts';
 import { goals } from './goals.ts';
@@ -24,6 +25,7 @@ import { skillProposals } from './skillProposals.ts';
 import { teams } from './teams.ts';
 
 export const zh = {
+  botSettings,
   learning,
   mobile,
   goals,

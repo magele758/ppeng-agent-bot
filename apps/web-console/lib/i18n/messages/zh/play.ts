@@ -303,6 +303,27 @@ export const play = {
     approveAria: '在群里批准这一步',
     approveUnavailable: '这一步还不能在群里批准'
   },
+  roomWork: {
+    "accepted": "已接收工作",
+    "state": "工作状态",
+    "clarify": "请指定要查询或控制的工作",
+    "status": "工作状态：{status}",
+    "discussion": "讨论结束不代表工作已交付；工作由原 Bot 持续推进。",
+    "draining": "正在等待已启动的执行安全收尾。",
+    "open": "打开原工作",
+    "states": {
+        "queued": "待执行",
+        "running": "执行中",
+        "paused": "已暂停",
+        "waiting": "等待依赖",
+        "blocked": "受阻",
+        "pending_review": "等待核验",
+        "completed": "已核验完成",
+        "failed": "失败",
+        "cancelled": "已取消",
+        "unknown": "待核对"
+    }
+},
   roomGoal: {
     title: '进行中的目标',
     wave: '当前波次：{wave}',
@@ -823,6 +844,14 @@ export const play = {
   },
 
   cronPanel: {
+    workStopCompleted: '原工作已核验完成，临时盯梢已停用。',
+    workStopCancelled: '原工作已取消，临时盯梢已停用。',
+    workLink: '关联工作',
+    workLinkHint: '临时盯梢会读取当前工作要求与 SOP，工作核验完成或取消后停用。独立巡检请保持不关联。',
+    workGoal: '原工作目标',
+    workIndependent: '独立长期巡检',
+    workJob: '外部任务 ID（可选）',
+    workSop: '当前 SOP 技能名或 ID（可选）',
     aria: '定时任务',
     title: '定时任务',
     pickBot: '先选择一个 Bot，再为它配置定时任务。',

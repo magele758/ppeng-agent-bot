@@ -303,6 +303,27 @@ export const play = {
     approveAria: 'Approve this step in the group',
     approveUnavailable: 'This step cannot be approved in the group yet'
   },
+  roomWork: {
+    "accepted": "Work accepted",
+    "state": "Work status",
+    "clarify": "Select the work to inspect or control",
+    "status": "Work status: {status}",
+    "discussion": "Ending the discussion does not mean delivery is complete. The original Bot continues the work.",
+    "draining": "Waiting for the started execution to finish safely.",
+    "open": "Open original work",
+    "states": {
+        "queued": "Queued",
+        "running": "Running",
+        "paused": "Paused",
+        "waiting": "Waiting for dependency",
+        "blocked": "Blocked",
+        "pending_review": "Awaiting verification",
+        "completed": "Verified complete",
+        "failed": "Failed",
+        "cancelled": "Cancelled",
+        "unknown": "Needs review"
+    }
+},
   roomGoal: {
     title: 'Goal in progress',
     wave: 'Current wave: {wave}',
@@ -826,6 +847,14 @@ export const play = {
   },
 
   cronPanel: {
+    workStopCompleted: 'The original work is verified complete; this temporary watcher is stopped.',
+    workStopCancelled: 'The original work is cancelled; this temporary watcher is stopped.',
+    workLink: 'Linked work',
+    workLinkHint: 'A temporary watcher reads current requirements and SOP, then stops after verified completion or cancellation. Leave health checks independent.',
+    workGoal: 'Original work goal',
+    workIndependent: 'Independent health check',
+    workJob: 'External job ID (optional)',
+    workSop: 'Current SOP skill name or ID (optional)',
     aria: 'Scheduled jobs',
     title: 'Scheduled jobs',
     pickBot: 'Select a Bot first, then add scheduled jobs for it.',

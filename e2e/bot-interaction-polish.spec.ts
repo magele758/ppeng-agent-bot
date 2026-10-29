@@ -75,12 +75,13 @@ test('sidebar actions share a toolbar and groups use legible secondary text [AC:
   expect(await heading.evaluate(el => getComputedStyle(el).color)).not.toBe(await page.locator('.session-item__title').evaluate(el => getComputedStyle(el).color));
 });
 
-test('schedule details distinguish schedule kinds and persist edits without executing [AC:bot-workspace-interaction-polish#AC-11] [AC:bot-workspace-interaction-polish#AC-12]', async ({ page }) => {
+test('schedule details distinguish schedule kinds and persist edits without executing [AC:bot-workspace-interaction-polish#AC-11] [AC:bot-workspace-interaction-polish#AC-12] [AC:single-host-bot-completion#AC-5]', async ({ page }) => {
   let job = { id: 'cron-test', name: '每小时提醒', enabled: true, scheduleKind: 'cron5', scheduleValue: '0 * * * *', timezone: 'Asia/Shanghai' };
   await page.route('**/api/cron/jobs?botId=polish-bot', r => r.fulfill({ json: { jobs: [job, { ...job, id: 'once', name: '一次提醒', scheduleKind: 'once_at', enabled: false, scheduleValue: '2026-10-20T00:00:00Z' }] } }));
   await page.route('**/api/cron/jobs/cron-test', r => { const data = r.request().postDataJSON(); job = { ...job, scheduleValue: data.cron, timezone: data.timezone }; return r.fulfill({ json: { job } }); });
   await setup(page);
   await page.getByTestId('bot-detail-toggle').click();
+  await page.getByTestId('bot-detail-panel').getByRole('tab', { name: '自动化', exact: true }).click();
   await expect(page.getByTestId('bot-detail-section-routines')).toContainText('一次性');
   await page.getByTestId('bot-detail-routine').first().getByRole('button', { name: '编辑计划' }).click();
   await page.getByLabel('Cron 表达式', { exact: true }).fill('invalid');
@@ -99,8 +100,8 @@ test('Bot settings use tabs and memory content has collapsed sources [AC:bot-wor
   await setup(page);
   await page.goto('/#/agents/bots?bot=polish-bot&focus=permissions');
   const detail = page.getByTestId('bot-detail');
-  await expect(detail.getByRole('tab', { name: '能力与权限' })).toHaveAttribute('aria-selected', 'true');
-  await detail.getByRole('tab', { name: '历史与记忆' }).click();
+  await expect(detail.getByRole('tab', { name: '基本设置' })).toHaveAttribute('aria-selected', 'true');
+  await detail.getByRole('tab', { name: '记录' }).click();
   const memory = page.getByTestId('bot-memory');
   await expect(memory).toContainText('用户偏好使用中文回复');
   const sources = memory.getByTestId('memory-sources');
@@ -113,6 +114,7 @@ test('Bot settings use tabs and memory content has collapsed sources [AC:bot-wor
 test('new controls have translated names [AC:bot-workspace-interaction-polish#AC-18]', async ({ page }) => {
   await setup(page);
   await expect(page.getByRole('button', { name: '收起信息栏' })).toBeVisible();
+  await page.getByRole('button', { name: '模型与外观', exact: true }).hover();
   await page.getByRole('button', { name: 'English', exact: true }).first().click();
   await expect(page.getByRole('button', { name: 'Collapse information panel' })).toBeVisible();
 });
@@ -202,7 +204,7 @@ test('memory file sources preview registered files and report unavailable source
   await page.route('**/api/artifact/art1/download', r => available ? r.fulfill({ contentType:'text/plain',body:'真实文件内容' }) : r.fulfill({status:404}));
   await setup(page);
   await page.goto('/#/agents/bots?bot=polish-bot&focus=permissions');
-  await page.getByTestId('bot-detail').getByRole('tab', {name:'历史与记忆'}).click();
+  await page.getByTestId('bot-detail').getByRole('tab', {name:'记录'}).click();
   const memory = page.getByTestId('bot-memory');
   await memory.getByRole('button', {name:'查看来源文件'}).click();
   await expect(memory.getByTestId('memory-source-preview')).toContainText('真实文件内容');

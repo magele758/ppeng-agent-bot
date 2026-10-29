@@ -18,6 +18,13 @@ function files(directory){
   }}visit(directory);return result;
 }
 function git(args){const r=spawnSync('git',args,{cwd:ROOT,encoding:'utf8',env:sanitizeScriptEnv(),maxBuffer:32e6});if(r.error||r.status!==0)throw new Error('Cannot bind candidate inputs');return r.stdout.trim();}
+/** Hosted runners float the Node 22 patch. Identity follows .nvmrc; the input digest still binds every source and dist byte. */
+export function coverageNode(version=process.version,required=readFileSync(join(ROOT,'.nvmrc'),'utf8').trim()){
+  const actual=version.replace(/^v/,'').split('.');
+  const want=required.split('.').filter(Boolean);
+  if(!want.length||want.some((part,index)=>actual[index]!==part))throw new Error(`Node ${version} does not match .nvmrc ${required}`);
+  return want.join('.');
+}
 export function currentIdentity(){
   if(!process.env.GITHUB_RUN_ID||!process.env.GITHUB_RUN_ATTEMPT)throw new Error('Coverage reuse requires run and attempt identity');
   const names=git(['ls-files','-z','--cached','--others','--exclude-standard']).split('\0').filter(Boolean).sort();
@@ -29,7 +36,7 @@ export function currentIdentity(){
     if(stat.isDirectory())for(const name of files(dist))digest.update(relative(ROOT,join(dist,name))).update('\0').update(readFileSync(join(dist,name))).update('\0');
   }
   return {candidate:git(['rev-parse','HEAD']),tree:git(['rev-parse','HEAD^{tree}']),runId:process.env.GITHUB_RUN_ID,attempt:process.env.GITHUB_RUN_ATTEMPT,
-    inputs:digest.digest('hex'),root:resolve(ROOT),node:process.version,platform:process.platform,arch:process.arch};
+    inputs:digest.digest('hex'),root:resolve(ROOT),node:coverageNode(),platform:process.platform,arch:process.arch};
 }
 function validateContents(directory,lane,names){
   const result=`results/${lane}.xml`;if(!names.includes(result))throw new Error(`Missing ${lane} JUnit evidence`);

@@ -16,7 +16,7 @@ test.describe('Lab new surfaces', () => {
   });
 
   test('Teams tab shows DAG planner [AC:console-navigation#AC-3]', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/#/chat');
     await page.getByRole('link', { name: 'Bots 与 Agents' }).click();
     await page.getByRole('tab', { name: /^Teams$/ }).click();
     await expect(page.locator('#panel-teams')).toBeVisible();
@@ -24,7 +24,7 @@ test.describe('Lab new surfaces', () => {
   });
 
   test('composer execution mode and workspace picker are present', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/#/chat');
     await expect(page.getByLabel('工作区')).toBeVisible();
     await page.locator('.composer-config-summary').click();
     await expect(page.locator('#composerConfigPanel')).toBeVisible();
@@ -33,7 +33,7 @@ test.describe('Lab new surfaces', () => {
   });
 
   test('composer model picker does not show env fallback', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/#/chat');
     await page.keyboard.press('Escape');
     await page.getByRole('button', { name: '选择可用模型' }).click();
     const panel = page.getByRole('listbox', { name: '可用模型' });

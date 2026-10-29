@@ -1,6 +1,6 @@
 import { test, expect, type Locator } from '@playwright/test';
 
-test('created Bot appearance and optional fields persist across reload, picker, chat and room [AC:bot-face-first-creation#AC-3]', async ({ page, request }) => {
+test('created Bot appearance and optional fields persist across reload, picker, chat and room [AC:bot-settings-flow#AC-11]', async ({ page, request }) => {
   for (const custom of [true, false]) {
     const name = `Face persisted ${custom ? 'custom' : 'generated'} ${Date.now()}`;
     await page.goto('/#/agents/bots');
@@ -8,6 +8,7 @@ test('created Bot appearance and optional fields persist across reload, picker, 
     const form = page.getByRole('form', { name: '新建 Bot', exact: true });
     await form.getByTestId('bot-create-name').fill(name);
     if (custom) {
+      await form.locator('summary').click();
       await form.getByTestId('bot-create-title').fill('Persistent face title');
       await form.getByTestId('bot-create-description').fill('Persistent face description');
       await form.getByRole('button', { name: '六边形', exact: true }).click();
@@ -22,6 +23,8 @@ test('created Bot appearance and optional fields persist across reload, picker, 
     const response = await createdResponse; expect(response.status()).toBe(201);
     const { bot } = await response.json();
     await expect(form).toHaveCount(0);
+    await expect(page).toHaveURL(/#\/bot/);
+    await expect(page.locator('#playTitle')).toContainText(name);
     await page.reload();
     const { bots } = await (await request.get('/api/bots')).json();
     const saved = bots.find((item: { id: string }) => item.id === bot.id);
@@ -36,8 +39,7 @@ test('created Bot appearance and optional fields persist across reload, picker, 
       await expect(face).toHaveAttribute('data-bot-color', color!);
       await expect(face).toHaveAttribute('data-face-working', 'false');
     };
-    await page.getByTestId(`bot-card-${bot.id}`).click();
-    await page.getByTestId('bot-detail').getByRole('button', { name: '打开对话', exact: true }).click();
+    await expect(page.locator('#playTitle')).toContainText(name);
     const row = page.locator('#sessionListMini .list-item--bot-chat').filter({ has: page.locator('.session-item__title').getByText(name, { exact: true }) });
     await verify(row.locator('[data-bot-shape]').first());
     await verify(page.locator('.chat-panel-header--bot [data-bot-shape]'));

@@ -12,7 +12,7 @@ test('confirm intent once, show automatic save, keep composer usable [AC:skill-c
     confirmations++; capture.status = 'saved';
     await route.fulfill({ json: { capture } });
   });
-  await page.goto('/');
+  await page.goto('/#/chat');
   await page.getByRole('button', { name: /capture-ui-check/ }).first().click();
   const dialog = page.getByRole('dialog', { name: '技能沉淀建议' });
   await expect(dialog).toBeVisible();
@@ -44,7 +44,7 @@ test('reject persists across reload, failed capture is visible [AC:skill-capture
     captures[1].status = 'failed'; captures[1].error = 'Model unavailable';
     return route.fulfill({ json: { capture: captures[1] } });
   });
-  await page.goto('/');
+  await page.goto('/#/chat');
   await page.getByRole('button', { name: /capture-reject-check/ }).first().click();
   await page.getByTestId('skill-capture-sc_reject').getByRole('button', { name: '拒绝' }).click();
   await expect(page.getByTestId('skill-capture-sc_reject')).toContainText('已拒绝');

@@ -1,3 +1,5 @@
+import type {SqliteStateStore} from '../storage.js';
+import { runtimeCapabilityCheck } from '../config/runtime-capabilities.js';
 import type { GoalSnapshot } from '../bots/goals/types.js';
 import { filterFactoryTools } from '../factory/tool-policy.js';
 import { filterRoomTools } from '../rooms/tool-policy.js';
@@ -85,6 +87,17 @@ function applyAllowlists<T extends { name: string }>(
   return tools.filter((t) => lists.every((allow) => allow.has(t.name)));
 }
 
+/** Canonical Bot policies are live; child agents retain their creation snapshot. */
+function currentToolPolicyAgent(
+  agent: AgentSpec,
+  session: SessionRecord,
+  store?: WebSettingsReadStore & { getAgent?(id: string): AgentSpec | undefined }
+): AgentSpec {
+  if (!isCanonicalBotChatSession(session)) return agent;
+  const current = store?.getAgent?.(session.agentId);
+  return current ? { ...agent, allowedTools: current.allowedTools } : agent;
+}
+
 export function authorizeToolsForSession(input: {
   env: NodeJS.ProcessEnv;
   tools: ToolContract<any>[];
@@ -97,11 +110,13 @@ export function authorizeToolsForSession(input: {
   const externalAiCapabilityGate = envBool(input.env, 'RAW_AGENT_EXTERNAL_AI_TOOLS', false);
   const sessionOptIn = input.session.metadata?.allowExternalAiTools === true;
   const allowExternalAiTools = externalAiCapabilityGate && sessionOptIn;
+  const enabled = runtimeCapabilityCheck(input.settingsStore, input.env);
+  const availableTools = input.tools.filter(tool => enabled('tools', tool.name));
   const externallyGated = allowExternalAiTools
-    ? input.tools
-    : input.tools.filter((t) => !t.isExternal);
+    ? availableTools
+    : availableTools.filter((t) => !t.isExternal);
   checkpoint(externallyGated,'disabled');
-  let tools = applyAllowlists(externallyGated, allowlistsFor(input.agent, input.session));
+  let tools = applyAllowlists(externallyGated, allowlistsFor(currentToolPolicyAgent(input.agent, input.session, input.settingsStore), input.session));
   checkpoint(tools,'not_allowed');
   if ((input.settingsStore?.getDaemonControl?.('computer_use_settings') as { enabled?: boolean } | undefined)?.enabled !== true) {
     tools = tools.filter(tool => !tool.name.startsWith('lcu_'));
@@ -163,7 +178,7 @@ export function authorizeToolsForSession(input: {
     tools = tools.filter((tool) => !roomOnly.has(tool.name));
   }
   checkpoint(tools,'mode');
-  const finalTools=filterFactoryTools(input.session, filterRoomTools(input.session, stripSubagentDeniedTools(input.session, tools)), input.settingsStore);
+  const finalTools=filterWaitTools(input.session,filterFactoryTools(input.session, filterRoomTools(input.session, stripSubagentDeniedTools(input.session, tools)), input.settingsStore),input.settingsStore);
   checkpoint(finalTools,'policy');
   return {allowExternalAiTools,tools:finalTools};
 }
@@ -177,7 +192,20 @@ function goalEntryTools(session: SessionRecord, store?: WebSettingsReadStore): S
   if (!goal || !execution || goal.status !== 'running' || goal.activeExecutionId !== execution.id
     || execution.goalId !== goal.id || execution.goalRevision !== goal.revision
     || execution.sessionId !== session.id || execution.status !== 'running' || execution.leaseUntil <= Date.now()) return new Set();
-  return new Set(['goal_dispatch', 'goal_checkpoint']);
+  return new Set(['goal_dispatch', 'goal_checkpoint', 'wait_for']);
+}
+
+function executionEntryTools(session:SessionRecord,store?:WebSettingsReadStore):Set<string>{
+ const entries=goalEntryTools(session,store);
+ const db=(store as Partial<SqliteStateStore>|undefined)?.db;
+ if(!db||!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='bot_routine_runs'").get())return entries;
+ const runs=db.prepare("SELECT id FROM bot_routine_runs WHERE status='running' AND json_extract(payload,'$.sessionId')=? LIMIT 2").all(session.id);
+ if(runs.length===1)entries.add('wait_for');
+ return entries;
+}
+function filterWaitTools(session:SessionRecord,tools:ToolContract<any>[],store?:WebSettingsReadStore):ToolContract<any>[] {
+ if(executionEntryTools(session,store).has('wait_for'))return tools;
+ return tools.filter(tool=>tool.name!=='wait_for');
 }
 
 function partitionDeferred(
@@ -188,7 +216,7 @@ function partitionDeferred(
 ) {
   const settings=readToolExposure(settingsStore);
   if(settings.mode==='full') return {visible:tools.filter(t=>!['tool_search','load_capability_tool'].includes(t.name)),hidden:[]};
-  const entries=goalEntryTools(session,settingsStore);
+  const entries=executionEntryTools(session,settingsStore);
   const pinned=new Set(Object.hasOwn(settings.pinnedGroups,agent.id) ? settings.pinnedGroups[agent.id] : []);
   return splitDeferredTools({
     tools: tools.map(tool => toolGroup(tool.name).tier > 1 && !entries.has(tool.name) && !pinned.has(toolGroup(tool.name).id) ? {...tool,disclosure:'on_demand'} : {...tool,disclosure:undefined}),
@@ -265,7 +293,7 @@ export function resolveTurnTools(input: {
   const extras: ToolContract<any>[] = [];
   const dynAllowed = applyAllowlists(
     input.dynTools ?? [],
-    allowlistsFor(input.agent, input.session)
+    allowlistsFor(currentToolPolicyAgent(input.agent, input.session, input.settingsStore), input.session)
   );
   for (const tool of dynAllowed) {
     if (names.has(tool.name)) continue;

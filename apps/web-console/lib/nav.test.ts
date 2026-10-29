@@ -10,7 +10,7 @@ import {
 } from './nav.ts';
 import { parseRailCollapsed } from './rail-collapsed.ts';
 
-test('空 hash 与非法 hash 回落到对话 [AC:console-navigation#AC-1]', () => {
+test('空 hash 与非法 hash 回落到 Bot [AC:console-navigation#AC-1]', () => {
   assert.deepEqual(parseHash(''), DEFAULT_LOCATION);
   assert.deepEqual(parseHash('#/nope'), DEFAULT_LOCATION);
   assert.deepEqual(parseHash('#/nope/ops'), DEFAULT_LOCATION);
@@ -68,4 +68,11 @@ test('侧栏折叠偏好只认已保存的真值', () => {
   assert.equal(parseRailCollapsed('1'), true);
   assert.equal(parseRailCollapsed('true'), true);
   assert.equal(parseRailCollapsed('false'), false);
+});
+
+test('single host opens Bot by default and retains explicit conversation routes [AC:single-host-bot-completion#AC-4]',()=>{
+ assert.equal(parseHash('').section,'bot');
+ assert.equal(parseHash('#/invalid').section,'bot');
+ assert.equal(parseHash('#/chat').section,'chat');
+ assert.equal(parseHash('#/settings/models').section,'settings');
 });

@@ -110,7 +110,7 @@ export function miscRoutes(runtime: RawAgentRuntime, opts: MiscOptions): RouteSp
       pattern: '/api/tools',
       handler: ({ response }) => {
         json(response, 200, {
-          tools: runtime.tools.map((tool) => ({ name: tool.name }))
+          tools: runtime.availableTools().map((tool) => ({ name: tool.name }))
         });
       }
     },

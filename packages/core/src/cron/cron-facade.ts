@@ -1,3 +1,4 @@
+import {resolveRoutineWorkLink} from './routine-work-link.js';
 import { parseRoutineDeliveryPolicy } from './routine-delivery-policy.js';
 import { getBotTask, type BotDeliverySource } from '../bots/bot-work.js';
 import { createId } from '../id.js';
@@ -17,6 +18,7 @@ import type { RoutinePrecheck } from './routine-precheck.js';
 import { assertCredentialEnvName } from '../secrets/credential-env.js';
 
 export interface CreateCronJobInput {
+  workLink?: unknown;
   deliveryPolicy?: unknown;
   sourceDelivery?: BotDeliverySource;
   name: string;
@@ -49,6 +51,7 @@ export interface CreateCronJobInput {
 }
 
 export interface UpdateCronJobInput {
+  workLink?: unknown;
   deliveryPolicy?: unknown;
   name?: string;
   prompt?: string;
@@ -195,6 +198,7 @@ export function createCronJob(host:CronFacadeHost,input:CreateCronJobInput):Cron
  const roomId=input.roomId?.trim();
  if(roomId)assertBotRoomTarget(host.store,roomId,botId,principal);
  const metadata:Record<string,unknown>={principal};
+ if(input.workLink!=null)metadata.workLink=resolveRoutineWorkLink(host.store,session.id,input.workLink).link;
  if(input.deliveryPolicy!==undefined)metadata.deliveryPolicy=parseRoutineDeliveryPolicy(input.deliveryPolicy);
  if(input.sourceDelivery){
   if(typeof input.sourceDelivery.taskId!=='string'||!Number.isInteger(input.sourceDelivery.attempt))throw new ValidationError('Invalid source delivery');
@@ -230,6 +234,7 @@ function contentPatch(host:CronFacadeHost,current:CronJobRecord,patch:UpdateCron
  if(patch.prompt!==undefined)next.prompt=normalizePrompt(patch.prompt);
  if(patch.enabled!==undefined)next.enabled=patch.enabled;
  const metadata={...(next.metadata??current.metadata)};
+ if(patch.workLink!==undefined){delete metadata.workLinkStop;if(patch.workLink===null)delete metadata.workLink;else metadata.workLink=resolveRoutineWorkLink(host.store,current.sessionId,patch.workLink).link;}
  if(patch.deliveryPolicy!==undefined)metadata.deliveryPolicy=parseRoutineDeliveryPolicy(patch.deliveryPolicy);
  if(patch.conclusions!==undefined)metadata.conclusions=normalizeCiConclusions(patch.conclusions);
  if(patch.secretEnv!==undefined)metadata.secretEnv=normalizeSecretEnv(patch.secretEnv);

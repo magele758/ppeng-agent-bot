@@ -11,7 +11,7 @@ async function sendAndWait(page: Page, text: string) {
 
 test.describe('Chat experience', () => {
   test('hover-open create menu leaves its trigger clickable [AC:ci-action-reliability#AC-8]', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/#/chat');
     const trigger = page.getByRole('button', { name: '新增', exact: true });
     await trigger.hover();
     await expect(page.locator('#playCreateMenu')).toBeVisible();
@@ -27,7 +27,7 @@ test.describe('Chat experience', () => {
   test('the composer shows only the essentials; secondary options sit behind one session-settings entry [AC:chat-experience#AC-1]', async ({
     page
   }) => {
-    await page.goto('/');
+    await page.goto('/#/chat');
     const composer = page.locator('.chat-composer-outer');
     await expect(composer.getByLabel('消息内容')).toBeVisible();
     await expect(composer.getByRole('button', { name: '发送' })).toBeVisible();
@@ -45,7 +45,7 @@ test.describe('Chat experience', () => {
   test('common options are visible at once, the rest hides under a collapsed Advanced section [AC:chat-experience#AC-2]', async ({
     page
   }) => {
-    await page.goto('/');
+    await page.goto('/#/chat');
     await page.locator('.composer-config-summary').click();
     const panel = page.locator('#composerConfigPanel');
     await expect(panel).toBeVisible();
@@ -66,7 +66,7 @@ test.describe('Chat experience', () => {
   test('global loop / compaction settings are not duplicated in the panel and link to Settings [AC:chat-experience#AC-3]', async ({
     page
   }) => {
-    await page.goto('/');
+    await page.goto('/#/chat');
     await page.locator('.composer-config-summary').click();
     const panel = page.locator('#composerConfigPanel');
     await expect(panel).toBeVisible();
@@ -83,7 +83,7 @@ test.describe('Chat experience', () => {
   test('tool calls, results and thinking are collapsed by default and expand on click [AC:chat-experience#AC-4]', async ({
     page
   }) => {
-    await page.goto('/');
+    await page.goto('/#/chat');
     await page.getByRole("button", { name: "新增" }).click();
     await page.getByRole("menuitem", { name: /新建会话/ }).click();
     await page.locator(".composer-config-summary").click();
@@ -91,6 +91,9 @@ test.describe('Chat experience', () => {
     await page.locator(".composer-config-summary").click();
     await sendAndWait(page, LONG_BASH_PROMPT);
 
+    const processNotes = page.locator('#playMessages .chat-process-note > summary');
+    await expect(processNotes.first()).toBeVisible();
+    for (const note of await processNotes.all()) await note.click();
     const folds = page.locator('#playMessages .chat-tool-fold');
     await expect(folds.first()).toBeVisible({ timeout: 30_000 });
     const count = await folds.count();
@@ -109,7 +112,7 @@ test.describe('Chat experience', () => {
   test('the session list groups by date, only busy or failed sessions carry a status label, and it filters [AC:chat-experience#AC-5]', async ({
     page
   }) => {
-    await page.goto('/');
+    await page.goto('/#/chat');
     const title = `e2e list ${Date.now()}`;
     await sendAndWait(page, title);
 
@@ -130,7 +133,7 @@ test.describe('Chat experience', () => {
   });
 
   test('the Bot view points to Bots & Agents for managing bots [AC:chat-experience#AC-6]', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/#/chat');
     await page.locator('#nav-bot').click();
     await page.locator('#sessionListMini .list-item--bot-chat').first().click();
     await expect(page.getByTestId('bot-detail-toggle')).toHaveCount(1);

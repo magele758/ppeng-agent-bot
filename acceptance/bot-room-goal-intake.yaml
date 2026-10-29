@@ -1,6 +1,6 @@
 id: bot-room-goal-intake
 title: 群目标与中途插话
-status: approved
+status: implemented
 owner: user
 requirement: |
   群正在做事时，用户询问进度、补充约束或喊停，要马上得到对应处理，而不是等当前这轮全部跑完。
@@ -30,3 +30,6 @@ notes: |
   不改写、不替代 bot-multi-goal-coordination 的已批准标准。群目标与单聊目标分开。AC-4 与该规格 AC-4 的澄清行为一致，但是群里的另一份标准。
   不替代 bot-rooms AC-4、AC-5。待核对沿用 AC-5 的说法。
   待用户批准本规格后，才在旧标准说明里写上「单聊多目标规格保持原样」。本次不修改 bot-multi-goal-coordination.yaml 或 bot-rooms.yaml 的状态和正文，也不把它们标为 retired。
+
+links:
+  - doc/SINGLE_HOST_COMPLETION.md

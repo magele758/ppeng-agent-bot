@@ -1,5 +1,10 @@
 import { test, expect } from './helpers/bot-pair';
 
+// Inspect individual notice cards in full transcript; brief grouping has its own coverage.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('lab.sessionBrief', '0'));
+});
+
 const samples = [
   '[recovery] Stopped: empty_assistant',
   '[recovery-advisory] Try a smaller step.',

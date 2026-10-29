@@ -8,7 +8,7 @@ export const DEFAULT_OPS_PANE: OpsPane = 'trajectory';
 export const SUB_PAGES = {
   bot: [],
   chat: [],
-  agents: ['agents', 'bots', 'teams', 'skills'],
+  agents: ['bots', 'agents', 'teams', 'skills'],
   tasks: ['queue', 'bots', 'runs', 'inbox'],
   knowledge: ['memory', 'ingestion'],
   settings: ['general', 'models', 'behavior', 'safety', 'tools', 'integrations', 'experimental', 'ops']
@@ -23,7 +23,7 @@ export interface NavLocation {
   pane: string | null;
 }
 
-export const DEFAULT_LOCATION: NavLocation = { section: 'chat', sub: null, pane: null };
+export const DEFAULT_LOCATION: NavLocation = { section: 'bot', sub: null, pane: null };
 
 export function isSectionId(value: string): value is SectionId {
   return (SECTION_IDS as readonly string[]).includes(value);

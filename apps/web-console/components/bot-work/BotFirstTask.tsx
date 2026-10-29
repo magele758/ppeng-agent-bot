@@ -12,7 +12,7 @@ export function BotFirstTask({ botId, needsModel, onChoose, onConfigureModel, on
 }) {
   const { t } = useI18n();
   if (storageFailed) return <p role="status">{t('botWork.firstTaskDismissStorageError')}</p>;
-  return <section data-testid="bot-first-task" className="ag-panel">
+  return <section data-testid="bot-first-task" className="ag-panel bot-first-task">
     <div className="ag-panel__head">
       <h3>{t('botWork.firstTaskTitle')}</h3>
       <button type="button" className="btn btn-ghost btn-sm" onClick={onDismiss}>{t('botWork.firstTaskDismiss')}</button>

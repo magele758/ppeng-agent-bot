@@ -5,9 +5,10 @@
  * 用法：pnpm run dev
  */
 import dotenv from 'dotenv';
+import { realpathSync } from 'node:fs';
 import { devWebHost, syncDevHttps } from './dev-tailnet-https.mjs';
 import { runDevProcesses } from './dev-lab-processes.mjs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 import { resolveBin, sanitizeScriptEnv } from './spawn-utils.mjs';
 import { pickPort, writeDevLabPortsFile } from './port-utils.mjs';
@@ -17,63 +18,85 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 // Repo-root `.env`：与 daemon(dotenv/config)同源，便于 RAW_AGENT_AUTH_TOKEN 同时注入 Next middleware
 dotenv.config({ path: join(root, '.env') });
 
-const DAEMON_PORT_PREFERRED = Number(process.env.RAW_AGENT_DAEMON_PORT ?? 27070);
-const WEB_PORT_PREFERRED = Number(process.env.RAW_AGENT_WEB_PORT ?? process.env.PORT ?? 23000);
-const PORT_SPAN = Math.max(1, Number(process.env.RAW_AGENT_PORT_SPAN ?? 20));
+const SIGNAL_EXITS = new Set([129, 130, 143]);
 
-const daemonPort = await pickPort(DAEMON_PORT_PREFERRED, PORT_SPAN);
-let webPort = await pickPort(WEB_PORT_PREFERRED, PORT_SPAN);
-if (webPort === daemonPort) {
-  webPort = await pickPort(daemonPort + 1, PORT_SPAN);
+export function stolenPortFailure(output, code) {
+  return code !== 0 && !SIGNAL_EXITS.has(code) && String(output ?? '').includes('EADDRINUSE');
 }
 
-const proxyTarget = `http://127.0.0.1:${daemonPort}`;
-
-if (daemonPort !== DAEMON_PORT_PREFERRED) {
-  console.warn(`[dev-lab] daemon port ${DAEMON_PORT_PREFERRED} busy → backoff to ${daemonPort}`);
+async function pickAvoiding(pick, preferred, span, banned) {
+  let start = Number(preferred);
+  for (let i = 0; i < span; i += 1) {
+    const port = await pick(start, span);
+    if (!banned.has(port)) return port;
+    start = port + 1;
+  }
+  throw new Error(`No free port outside occupied set near ${preferred}`);
 }
-if (webPort !== WEB_PORT_PREFERRED) {
-  console.warn(`[dev-lab] web port ${WEB_PORT_PREFERRED} busy → backoff to ${webPort}`);
+
+export async function launchDevLab({
+  env = process.env,
+  run = runDevProcesses,
+  pick = pickPort,
+  log = console,
+  writePorts = writeDevLabPortsFile,
+  labRoot = root
+} = {}) {
+  const preferredDaemon = Number(env.RAW_AGENT_DAEMON_PORT ?? 27070);
+  const preferredWeb = Number(env.RAW_AGENT_WEB_PORT ?? env.PORT ?? 23000);
+  const span = Math.max(1, Number(env.RAW_AGENT_PORT_SPAN ?? 20));
+  const banned = new Set();
+  let compiled = false;
+  for (let attempt = 0; attempt < span; attempt += 1) {
+    const daemonPort = await pickAvoiding(pick, preferredDaemon, span, banned);
+    let webPort = await pickAvoiding(pick, preferredWeb, span, banned);
+    if (webPort === daemonPort) webPort = await pickAvoiding(pick, daemonPort + 1, span, banned);
+    const proxyTarget = `http://127.0.0.1:${daemonPort}`;
+    if (daemonPort !== preferredDaemon) log.warn(`[dev-lab] daemon port ${preferredDaemon} busy → backoff to ${daemonPort}`);
+    if (webPort !== preferredWeb) log.warn(`[dev-lab] web port ${preferredWeb} busy → backoff to ${webPort}`);
+    const portsInfo = {
+      daemonPort, webPort, proxyTarget,
+      labUrl: `http://127.0.0.1:${webPort}`,
+      daemonUrl: proxyTarget,
+      preferred: { daemon: preferredDaemon, web: preferredWeb },
+      at: new Date().toISOString()
+    };
+    writePorts(join(labRoot, '.agent-state', 'dev-lab.ports.json'), portsInfo);
+    log.log('');
+    log.log('[dev-lab] ────────────────────────────────────────');
+    log.log(`[dev-lab] Agent Lab  → ${portsInfo.labUrl}`);
+    log.log(`[dev-lab] Daemon API → ${portsInfo.daemonUrl}`);
+    log.log('[dev-lab] ports file → .agent-state/dev-lab.ports.json');
+    log.log('[dev-lab] ────────────────────────────────────────');
+    log.log('');
+    const childEnv = sanitizeScriptEnv({
+      ...env,
+      RAW_AGENT_DAEMON_PORT: String(daemonPort),
+      DAEMON_PROXY_TARGET: proxyTarget,
+      PORT: String(webPort)
+    });
+    const httpsAbort = new AbortController();
+    let output = '';
+    const code = await run({
+      cwd: labRoot,
+      build: compiled ? undefined : { name: 'compile', command: resolveBin('pnpm'), args: ['exec', 'tsc', '-b', 'packages/core', 'apps/daemon'] },
+      services: [
+        { name: 'daemon', command: process.execPath, args: ['apps/daemon/dist/server.js'], env: childEnv },
+        { name: 'web', command: resolveBin('pnpm'), args: ['--filter', '@ppeng/agent-lab-web', 'run', 'dev', '-p', String(webPort), '-H', devWebHost(labRoot)], env: childEnv }
+      ],
+      onReady: () => { void syncDevHttps({ root: labRoot, webPort, signal: httpsAbort.signal }); },
+      onStop: () => httpsAbort.abort(),
+      onOutput: (_name, chunk) => { output += chunk; }
+    });
+    compiled = true;
+    if (!stolenPortFailure(output, code)) return code ?? 0;
+    log.warn(`[dev-lab] port ${webPort} stolen after selection → retry`);
+    banned.add(daemonPort);
+    banned.add(webPort);
+  }
+  throw new Error(`No free port after ${span} stolen-port retries`);
 }
 
-const portsInfo = {
-  daemonPort,
-  webPort,
-  proxyTarget,
-  labUrl: `http://127.0.0.1:${webPort}`,
-  daemonUrl: proxyTarget,
-  preferred: { daemon: DAEMON_PORT_PREFERRED, web: WEB_PORT_PREFERRED },
-  at: new Date().toISOString()
-};
-writeDevLabPortsFile(join(root, '.agent-state', 'dev-lab.ports.json'), portsInfo);
-
-console.log('');
-console.log('[dev-lab] ────────────────────────────────────────');
-console.log(`[dev-lab] Agent Lab  → ${portsInfo.labUrl}`);
-console.log(`[dev-lab] Daemon API → ${portsInfo.daemonUrl}`);
-console.log(`[dev-lab] ports file → .agent-state/dev-lab.ports.json`);
-console.log('[dev-lab] ────────────────────────────────────────');
-console.log('');
-
-const childEnv = sanitizeScriptEnv({
-  ...process.env,
-  RAW_AGENT_DAEMON_PORT: String(daemonPort),
-  DAEMON_PROXY_TARGET: proxyTarget,
-  PORT: String(webPort)
-});
-
-const httpsAbort = new AbortController();
-process.exitCode = await runDevProcesses({
-  cwd: root,
-  build: { name: 'compile', command: resolveBin('pnpm'), args: ['exec', 'tsc', '-b', 'packages/core', 'apps/daemon'] },
-  services: [
-    { name: 'daemon', command: process.execPath, args: ['apps/daemon/dist/server.js'], env: childEnv },
-    {
-      name: 'web', command: resolveBin('pnpm'),
-      args: ['--filter', '@ppeng/agent-lab-web', 'run', 'dev', '-p', String(webPort), '-H', devWebHost(root)],
-      env: childEnv
-    }
-  ],
-  onReady: () => { void syncDevHttps({ root, webPort, signal: httpsAbort.signal }); },
-  onStop: () => httpsAbort.abort()
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
+  process.exitCode = await launchDevLab();
+}
