@@ -56,6 +56,6 @@ export function restraintHint(turn: { mentionedBotIds?: readonly string[] }, bot
 
 /** Members that will actually run this round, in speaking order, capped by the visible-reply budget. */
 export function budgetedSpeakers(botIds: readonly string[], maxBotTurns: number): string[] {
-  const limit = Number.isInteger(maxBotTurns) && maxBotTurns > 0 ? maxBotTurns : 0;
-  return botIds.slice(0, limit);
+  if (!Number.isInteger(maxBotTurns) || maxBotTurns <= 0) return [...botIds];
+  return botIds.slice(0, maxBotTurns);
 }

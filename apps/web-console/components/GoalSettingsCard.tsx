@@ -15,8 +15,8 @@ interface GoalSettings {
   allowCommandVerify: boolean;
 }
 
-const DEFAULTS = { entityEnabled: true, defaultMaxTurns: 25, allowHttpVerify: true } as const;
-const MAX_TURNS_RANGE = { min: 1, max: 100 } as const;
+const DEFAULTS = { entityEnabled: true, defaultMaxTurns: 0, allowHttpVerify: true } as const;
+const MAX_TURNS_RANGE = { min: 0, max: 100 } as const;
 const EMPTY_FORM = { maxTurns: '' };
 
 export function GoalSettingsCard() {

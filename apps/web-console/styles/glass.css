@@ -1,0 +1,106 @@
+/* Liquid glass: clear center, bright rim, light from above. Not a frost slab. */
+:root {
+  --glass-filter: blur(14px) saturate(1.8);
+  --glass-fill: color-mix(in srgb, var(--ui-surface, var(--color-surface-strong)) 18%, transparent);
+  --glass-fill-strong: color-mix(in srgb, var(--ui-bg, var(--color-surface-base)) 24%, transparent);
+  --glass-edge: color-mix(in srgb, white 58%, transparent);
+  --glass-sheen:
+    inset 0 1px 0 color-mix(in srgb, white 82%, transparent),
+    inset 1px 0 0 color-mix(in srgb, white 34%, transparent),
+    inset -1px 0 0 color-mix(in srgb, white 16%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, black 18%, transparent);
+  --glass-shadow: 0 12px 32px color-mix(in srgb, black 10%, transparent);
+  --glass-highlight: linear-gradient(180deg, color-mix(in srgb, white 46%, transparent), transparent 36%);
+}
+
+html,
+body {
+  background:
+    radial-gradient(900px 520px at 8% -10%, color-mix(in srgb, #7aa2ff 42%, transparent), transparent 62%),
+    radial-gradient(760px 480px at 100% 0%, color-mix(in srgb, #d7c4a3 34%, transparent), transparent 58%),
+    var(--ui-bg);
+  background-attachment: fixed;
+}
+
+html.desktop-glass,
+html.desktop-glass body {
+  background: transparent;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass-filter: none;
+    --glass-fill: var(--ui-surface);
+    --glass-fill-strong: var(--ui-bg);
+  }
+}
+
+.lab-shell,
+.lab-main,
+.lab-view {
+  background: transparent;
+}
+
+.lab-rail {
+  background: var(--glass-highlight), var(--glass-fill-strong);
+  backdrop-filter: var(--glass-filter);
+  -webkit-backdrop-filter: var(--glass-filter);
+  border-color: var(--glass-edge);
+  box-shadow: var(--glass-sheen), var(--glass-shadow);
+}
+
+.lab-toolbar,
+.card,
+.modal,
+.dialog,
+[role="dialog"],
+.popover,
+.menu,
+.drawer,
+.chat-composer,
+.chat-composer-outer,
+.settings-panel,
+.ag-panel,
+.bot-goals,
+.lab-rail__foot-menu {
+  background: var(--glass-highlight), var(--glass-fill);
+  backdrop-filter: var(--glass-filter);
+  -webkit-backdrop-filter: var(--glass-filter);
+  border-color: var(--glass-edge);
+  border-radius: 22px;
+  box-shadow: var(--glass-sheen), var(--glass-shadow);
+}
+
+/* Skin sheets use equal specificity and opaque fills. This file is imported last. */
+html[data-skin],
+html[data-skin] body {
+  background:
+    radial-gradient(1200px 640px at 12% -8%, color-mix(in srgb, var(--ui-text, white) 10%, transparent), transparent 58%),
+    radial-gradient(900px 520px at 100% 0%, color-mix(in srgb, var(--ui-text, white) 8%, transparent), transparent 52%),
+    color-mix(in srgb, var(--ui-bg, var(--color-surface-base)) 72%, transparent);
+  background-attachment: fixed;
+}
+
+html[data-skin] :is(.lab-rail, .lab-main, .lab-view, .lab-toolbar, .chat-composer, .chat-composer-outer, .card, .ag-panel, .settings-panel, .modal, .dialog, [role="dialog"], .drawer, .play-sidebar, .play-main.chat-panel, .chat-panel-header, .chat-panel-body) {
+  background: var(--glass-highlight), var(--glass-fill);
+  backdrop-filter: var(--glass-filter);
+  -webkit-backdrop-filter: var(--glass-filter);
+  border-color: var(--glass-edge);
+}
+.play-sidebar,
+.play-main.chat-panel,
+.chat-panel-header,
+.chat-panel-body,
+.play-rail {
+  background: var(--glass-highlight), var(--glass-fill);
+  backdrop-filter: var(--glass-filter);
+  -webkit-backdrop-filter: var(--glass-filter);
+  border-color: var(--glass-edge);
+}
+
+html.desktop-glass,
+html.desktop-glass body,
+html[data-skin].desktop-glass,
+html[data-skin].desktop-glass body {
+  background: transparent;
+}

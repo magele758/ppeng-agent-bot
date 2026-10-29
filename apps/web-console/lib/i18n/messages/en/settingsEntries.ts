@@ -211,7 +211,7 @@ export const settingsEntries = {
       },
       maxTurns: {
         label: 'Default max attempts',
-        hint: 'A goal stops after automatically continuing this many turns without finishing, to avoid endless spending.'
+        hint: '0 means unlimited. A positive number stops a goal after that many automatic turns.',
       }
     }
   },

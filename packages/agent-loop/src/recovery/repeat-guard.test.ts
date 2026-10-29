@@ -111,6 +111,15 @@ describe('repeat guard model tier', () => {
     expect(repeatLimitsActive('off', 'weak')).toBe(false);
   });
 
+  it('drops repeated assistant prose when repeat detection is off [AC:tool-loop-same-call#AC-3]', () => {
+    const decision = applyRepeatGuard({
+      store: { getDaemonControl: () => ({ repeatGuard: 'off' }) },
+      identity: { adapterName: 'heuristic' },
+      decision: { abort: true, reason: 'repeated model output (100% identical fingerprint in last 4 turns)' },
+    });
+    expect(decision).toEqual({ abort: false });
+  });
+
   it('still aborts a tool-failure streak when repeat detection is off [AC:conversation-loop-defaults#AC-6]', () => {
     const decision = applyRepeatGuard({
       store: {

@@ -1,0 +1,13 @@
+id: no-windows-desktop-pack
+title: 不再打 Windows 桌面安装包
+status: implemented
+requirement: |
+  修隔离测试，如果windows不能用，就不要打windows包了
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  Windows runner 上打包脚本无法启动 pnpm.cmd。定时、手动和 tag 打包装都不再包含 Windows。
+criteria:
+  - id: AC-1
+    given: 定时或手动打全部桌面安装包
+    when: 查看要打的目标
+    then: 没有 Windows x64 和 Windows arm64，仍有 Apple Silicon Mac 和 Linux 的 x64 与 arm64

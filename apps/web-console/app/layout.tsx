@@ -45,6 +45,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body>
+        <svg aria-hidden="true" width="0" height="0" style={{ position: 'absolute' }}>
+          <filter id="droplet" x="-15%" y="-15%" width="130%" height="130%" colorInterpolationFilters="sRGB">
+            <feTurbulence type="fractalNoise" baseFrequency="0.01" numOctaves="2" seed="4" result="noise"/>
+            <feGaussianBlur in="noise" stdDeviation="1.4" result="soft"/>
+            <feDisplacementMap in="SourceGraphic" in2="soft" scale="10" xChannelSelector="R" yChannelSelector="G"/>
+          </filter>
+        </svg>
+        <style>{`
+          .lab-rail,.lab-toolbar,.card,.modal,.dialog,[role="dialog"],.popover,.menu,.drawer,.chat-composer,.chat-composer-outer,.settings-panel,.ag-panel,.bot-goals,.lab-rail__foot-menu,.play-sidebar,.play-main.chat-panel,.chat-panel-header,.chat-panel-body,.play-rail{
+            backdrop-filter:var(--glass-filter, blur(14px) saturate(1.8));
+          }
+        `}</style>
         <I18nProvider>{children}</I18nProvider>
       </body>
     </html>

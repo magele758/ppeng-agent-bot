@@ -91,8 +91,7 @@ test('group create body hosts the first member and stops on a bad title or roste
   assert.deepEqual(buildBotGroupCreateBody(' 值班 ', ['ada', 'bob', 'cy'], known), {
     title: '值班',
     botIds: ['ada', 'bob', 'cy'],
-    hostBotId: 'ada',
-    maxBotTurns: 3
+    hostBotId: 'ada'
   });
   assert.equal(groupCreateReady('值班', ['ada', 'bob'], known), true);
   assert.equal(groupCreateReady('值班', ['ada'], known), false);

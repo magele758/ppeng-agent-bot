@@ -29,7 +29,7 @@ export function ensureGoalEntityFromMetadata(
   }
   const condition = resolveGoalCondition(metadata);
   if (!condition) return store.findLatestBySession(sessionId);
-  const maxTurns = defaultMaxTurns(metadata, settings?.defaultMaxTurns ?? 25);
+  const maxTurns = defaultMaxTurns(metadata, settings?.defaultMaxTurns ?? 0);
   const latest = store.findLatestBySession(sessionId);
   if (
     latest &&
@@ -178,6 +178,7 @@ export function sessionMetadataFromGoal(rec: GoalRecord): Record<string, unknown
   return {
     [GOAL_CONDITION_META]: rec.condition,
     [GOAL_ENABLED_META]: true,
-    [GOAL_MAX_TURNS_META]: rec.maxTurns
+    [GOAL_MAX_TURNS_META]: rec.maxTurns,
+    ...(rec.maxTurns > 0 ? { goalTurnCapEnabled: true } : {})
   };
 }
