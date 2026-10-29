@@ -759,6 +759,41 @@ let toolGraceOut: any;
 const kernelTurnFlow = await (async () => {
 const kernelSteps: Array<() => Promise<unknown>> = [
 async () => {
+async function __gate146() {
+let startHook: any;
+async function __gate144() {
+startHook = await timeOptionalKernelPhase(
+          startup,
+          'session_start_hook',
+          host.runLifecycleHook
+            ? () => host.runLifecycleHook!({
+                phase: 'session_start',
+                sessionId: sid,
+                agentId: agent.id,
+                turn: 0,
+              })
+            : undefined
+        );
+if (startHook?.block) {
+          const msg = startHook.message ?? startHook.systemMessage ?? 'blocked by session_start hook';
+          host.store.appendMessage(sid, 'system', [textPart(msg)]);
+          emitKernelReady(startup);
+          return kernelTurnSignal('return', await finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'session_start_blocked'));
+        }
+return undefined;
+}
+function __gate145() {
+if (startHook?.systemMessage) {
+          host.store.appendMessage(sid, 'system', [textPart(startHook.systemMessage)]);
+        }
+return undefined;
+}
+const __gateSignal = await (await __gate144() ?? __gate145());
+if (__gateSignal) return __gateSignal;
+return undefined;
+return undefined;
+}
+async function __gate147() {
 if (signal.aborted) {
         closeWaveIfOpen();
         await rollbackOpenStep('abort');
@@ -772,6 +807,9 @@ workspaceRoot = await timeOptionalKernelPhase(
         'ensure_workspace',
         host.ensureWorkspaceRoot ? () => host.ensureWorkspaceRoot!(refreshedSession, task) : undefined
       );
+return undefined;
+}
+async function __gate148() {
 resolvedRoots = await timeOptionalKernelPhase(
         startup,
         'resolve_workspace',
@@ -787,6 +825,9 @@ context = {
         workspaceRoots,
         abortSignal: signal,
       };
+return undefined;
+}
+async function __gate149() {
 if (resumeFromInterrupt) {
         const interrupt = resumeFromInterrupt;
         resumeFromInterrupt = undefined;
@@ -840,6 +881,9 @@ await emitStep({
         messages: visibleMessages,
         foldSeqs: packed.foldSeqs,
       });
+return undefined;
+}
+async function __gate150() {
 promptCtx = {
         sessionId: sid,
         agent,
@@ -855,28 +899,12 @@ systemPrompt = await timeKernelPhase(startup, 'build_system_prompt', () =>
         host.promptBuilder.buildSystemPrompt(promptCtx, rawVisible)
       );
 if (turn === 0) {
-        const startHook = await timeOptionalKernelPhase(
-          startup,
-          'session_start_hook',
-          host.runLifecycleHook
-            ? () => host.runLifecycleHook!({
-                phase: 'session_start',
-                sessionId: sid,
-                agentId: agent.id,
-                turn: 0,
-              })
-            : undefined
-        );
-        if (startHook?.block) {
-          const msg = startHook.message ?? startHook.systemMessage ?? 'blocked by session_start hook';
-          host.store.appendMessage(sid, 'system', [textPart(msg)]);
-          emitKernelReady(startup);
-          return kernelTurnSignal('return', await finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'session_start_blocked'));
-        }
-        if (startHook?.systemMessage) {
-          host.store.appendMessage(sid, 'system', [textPart(startHook.systemMessage)]);
-        }
-      }
+const __gateSignal = await __gate146();
+if (__gateSignal) return __gateSignal;
+}
+return undefined;
+}
+async function __gate151() {
 beforeHook = await timeOptionalKernelPhase(
         startup,
         'before_turn_hook',
@@ -894,6 +922,9 @@ if (beforeHook?.block) {
         host.store.appendMessage(sid, 'system', [textPart(msg)]);
         return kernelTurnSignal('return', await finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'before_turn_blocked'));
       }
+return undefined;
+}
+async function __gate152() {
 if (beforeHook?.systemMessage) {
         host.store.appendMessage(sid, 'system', [textPart(beforeHook.systemMessage)]);
       }
@@ -920,6 +951,9 @@ void host.emitTrace(sid, {
           ...(promptCacheKey ? { promptCacheKey } : {}),
         },
       });
+return undefined;
+}
+async function __gate153() {
 turnInput = {
         agent,
         systemPrompt: lastTurn ? `${systemPrompt}\n\n${loopConfig.lastTurnNudge}` : systemPrompt,
@@ -943,35 +977,37 @@ preTurn = await timeOptionalKernelPhase(
             })
           : undefined
       );
+return undefined;
+}
+async function __gateGrp154() {
+const __gateSignal = await (await __gate147() ?? await __gate148() ?? await __gate149() ?? await __gate150());
+if (__gateSignal) return __gateSignal;
+return undefined;
+}
+async function __gateGrp155() {
+const __gateSignal = await (await __gate151() ?? await __gate152() ?? await __gate153());
+if (__gateSignal) return __gateSignal;
+return undefined;
+}
+const __gateSignal = await (await __gateGrp154() ?? await __gateGrp155());
+if (__gateSignal) return __gateSignal;
+return undefined;
 },
 async () => {
-if (preTurn === 'skip_goal_done') emitKernelReady(startup);
-if (preTurn === 'skip_goal_done') {
-        host.store.appendMessage(sid, 'system', [
-          textPart('[jev-pre-turn] Goal assumed met; skipping deep model turn.'),
-        ]);
-        if (host.waitSteeringChildrenIdle) {
-          await host.waitSteeringChildrenIdle(sid);
-        }
-        host.onSessionOutcome?.({
-          sessionId: session.id,
-          agentId: agent.id,
-          outcome: 'success',
-          signals: { source: 'jev-pre-turn' },
-        });
-        return kernelTurnSignal('return', await host.handleTurnCompletion(session, agent).then((completed) =>
-          finishEnded(completed, 'end')
-        ));
-      }
-try {
-        turnResult = await runModelTurn(turnInput, options?.onModelStreamChunk);
-      } catch (error) {
-        if (error instanceof RepetitionLoopAbortError) {
-          void host.emitTrace(sid, {
+async function __gate133() {
+
+turnResult = await runModelTurn(turnInput, options?.onModelStreamChunk);
+return undefined;
+}
+async function __gate140(error: any) {
+async function __gate136() {
+let repChoice: any;
+async function __gate134() {
+void host.emitTrace(sid, {
             kind: 'repetition_abort',
             data: { reason: error.reason, retry: true },
           });
-          const repChoice = await maybeChooseRecovery(
+repChoice = await maybeChooseRecovery(
             `repetition_abort:${error.reason}`,
             [
               { id: 'retry', label: 'Retry the model turn once with a clean stream' },
@@ -979,7 +1015,7 @@ try {
             ],
             'retry'
           );
-          if (repChoice === 'stop') {
+if (repChoice === 'stop') {
             host.store.appendMessage(sid, 'system', [
               textPart(
                 `[recovery] Stopped: model output degenerated into repetition (${error.reason})`
@@ -991,7 +1027,10 @@ try {
               'repetition'
             ));
           }
-          try {
+return undefined;
+}
+async function __gate135() {
+try {
             turnResult = await runModelTurn(turnInput, options?.onModelStreamChunk);
           } catch (retryError) {
             const reason =
@@ -1011,19 +1050,29 @@ try {
               'repetition'
             ));
           }
-        } else if (isContextOverflowError(error)) {
-          void host.emitTrace(sid, {
+return undefined;
+}
+const __gateSignal = await (await __gate134() ?? await __gate135());
+if (__gateSignal) return __gateSignal;
+return undefined;
+return undefined;
+}
+async function __gate139() {
+async function __gate137() {
+let compacted: any;
+let packedRetry: any;
+void host.emitTrace(sid, {
             kind: 'model_error',
             data: {
               message: error instanceof Error ? error.message : String(error),
               overflow: true,
             },
           });
-          const compacted = await host.autoCompact(context, { force: true });
-          if (compacted.replaced) {
+compacted = await host.autoCompact(context, { force: true });
+if (compacted.replaced) {
             await emitStep({ type: 'compacted', replaced: compacted.replaced });
           }
-          const packedRetry = loopConfig.overflowReprepare
+packedRetry = loopConfig.overflowReprepare
             ? await packTurn({
                 workspaceRoot,
                 skipCompact: true,
@@ -1039,9 +1088,13 @@ try {
                       refusalPreservation: loopConfig.refusalPreservation,
                     }),
               };
-          turnInput = { ...turnInput, messages: packedRetry.messages };
-          turnResult = await runModelTurn(turnInput, options?.onModelStreamChunk);
-        } else if (signal.aborted) {
+turnInput = { ...turnInput, messages: packedRetry.messages };
+turnResult = await runModelTurn(turnInput, options?.onModelStreamChunk);
+return undefined;
+}
+async function __gate138() {
+
+if (signal.aborted) {
           closeWaveIfOpen();
           await rollbackOpenStep('abort');
           return kernelTurnSignal('return', await finishFailed(
@@ -1084,11 +1137,62 @@ try {
           if (txReason) await rollbackOpenStep(txReason);
           throw error;
         }
+return undefined;
+}
+if (isContextOverflowError(error)) {
+const __gateSignal = await __gate137();
+if (__gateSignal) return __gateSignal;
+} else {
+const __gateSignal = await __gate138();
+if (__gateSignal) return __gateSignal;
+}
+return undefined;
+}
+if (error instanceof RepetitionLoopAbortError) {
+const __gateSignal = await __gate136();
+if (__gateSignal) return __gateSignal;
+} else {
+const __gateSignal = await __gate139();
+if (__gateSignal) return __gateSignal;
+}
+return undefined;
+}
+async function __gate141() {
+if (preTurn === 'skip_goal_done') emitKernelReady(startup);
+if (preTurn === 'skip_goal_done') {
+        host.store.appendMessage(sid, 'system', [
+          textPart('[jev-pre-turn] Goal assumed met; skipping deep model turn.'),
+        ]);
+        if (host.waitSteeringChildrenIdle) {
+          await host.waitSteeringChildrenIdle(sid);
+        }
+        host.onSessionOutcome?.({
+          sessionId: session.id,
+          agentId: agent.id,
+          outcome: 'success',
+          signals: { source: 'jev-pre-turn' },
+        });
+        return kernelTurnSignal('return', await host.handleTurnCompletion(session, agent).then((completed) =>
+          finishEnded(completed, 'end')
+        ));
       }
+return undefined;
+}
+async function __gate142() {
+try {
+const __gateSignal = await __gate133();
+if (__gateSignal) return __gateSignal;
+} catch (error) {
+const __gateSignal = await __gate140(error);
+if (__gateSignal) return __gateSignal;
+}
 promoted = promoteAssistantReasoning(turnResult.assistantParts);
 if (promoted.promoted) {
         turnResult = { ...turnResult, assistantParts: promoted.parts };
       }
+return undefined;
+}
+function __gate143() {
 if (lastTurn) {
         const hadCalls = turnResult.assistantParts.some((p: MessagePart) => p.type === 'tool_call');
         const withoutCalls = turnResult.assistantParts.filter((p: MessagePart) => p.type !== 'tool_call');
@@ -1120,20 +1224,31 @@ if (stopFix.corrected) {
         });
         turnResult = { ...turnResult, stopReason: stopFix.stopReason as ModelTurnResult['stopReason'] };
       }
+return undefined;
+}
+const __gateSignal = await (await __gate141() ?? await __gate142() ?? __gate143());
+if (__gateSignal) return __gateSignal;
+return undefined;
 },
 async () => {
-if (turnResult.usage) {
-        const prev = usageBySession.get(sid);
-        const split = splitCumulativePromptTokens(
+async function __gate120() {
+let prev: any;
+let split: any;
+function __gate118() {
+prev = usageBySession.get(sid);
+split = splitCumulativePromptTokens(
           turnResult.usage.inputTokens,
           prev?.cumulative,
           prev?.sticky ?? false
         );
-        usageBySession.set(sid, {
+usageBySession.set(sid, {
           cumulative: split.cumulativeInputTokens,
           sticky: (prev?.sticky ?? false) || split.treatedAsCumulative,
         });
-        if (split.treatedAsCumulative) {
+return undefined;
+}
+function __gate119() {
+if (split.treatedAsCumulative) {
           const cached = Math.min(turnResult.usage.cachedInputTokens ?? 0, split.turnInputTokens);
           turnResult = {
             ...turnResult,
@@ -1152,7 +1267,80 @@ if (turnResult.usage) {
             },
           });
         }
-      }
+return undefined;
+}
+const __gateSignal = await (__gate118() ?? __gate119());
+if (__gateSignal) return __gateSignal;
+return undefined;
+return undefined;
+}
+function __gateExpr121() { return (turnCostUsd !== undefined ? { costUsd: turnCostUsd, costModel: turnCostModel } : {}); }
+function __gateExpr122() { return {
+          stopReason: turnResult.stopReason,
+          ...(turnResult.finishReason ? { finishReason: turnResult.finishReason } : {}),
+          ...(turnResult.usage ? { usage: turnResult.usage } : {}),
+          ...(turnResult.truncated ? { truncated: true } : {}),
+          ...(turnResult.requestId ? { requestId: turnResult.requestId } : {}),
+          ...__gateExpr121(),
+        }; }
+function __gateExpr123() { return {
+        kind: 'turn_end',
+        data: __gateExpr122(),
+      }; }
+function __gateExpr124() { return host.emitTrace(sid, __gateExpr123()); }
+async function __gate129() {
+async function __gate127() {
+let current: any;
+let prevTotals: any;
+let prevCostUsd: any;
+let merged: any;
+let usageCostUsd: any;
+function __gate125() {
+current = host.store.getSession(session.id);
+prevTotals = (current?.metadata?.usageTotals ?? undefined) as TokenUsage | undefined;
+merged = mergeUsage(prevTotals, turnResult.usage);
+prevCostUsd = typeof current?.metadata?.usageCostUsd === 'number'
+              ? (current.metadata.usageCostUsd as number)
+              : undefined;
+usageCostUsd = mergeCostUsd(prevCostUsd, turnCostUsd);
+return undefined;
+}
+function __gate126() {
+if (merged) {
+            host.store.updateSession(session.id, {
+              metadata: {
+                ...(current?.metadata ?? {}),
+                usageTotals: merged,
+                ...(usageCostUsd !== undefined ? { usageCostUsd } : {}),
+              },
+            });
+          }
+return undefined;
+}
+const __gateSignal = await (__gate125() ?? __gate126());
+if (__gateSignal) return __gateSignal;
+return undefined;
+return undefined;
+}
+function __gate128() {
+
+
+return undefined;
+}
+try {
+const __gateSignal = await __gate127();
+if (__gateSignal) return __gateSignal;
+} catch {
+const __gateSignal = __gate128();
+if (__gateSignal) return __gateSignal;
+}
+return undefined;
+}
+async function __gate130() {
+if (turnResult.usage) {
+const __gateSignal = await __gate120();
+if (__gateSignal) return __gateSignal;
+}
 if (turnResult.usage) {
         try {
           const cost = estimateUsageCostUsd(turnResult.usage, loopConfig.modelName);
@@ -1162,17 +1350,10 @@ if (turnResult.usage) {
           /* ignore */
         }
       }
-void host.emitTrace(sid, {
-        kind: 'turn_end',
-        data: {
-          stopReason: turnResult.stopReason,
-          ...(turnResult.finishReason ? { finishReason: turnResult.finishReason } : {}),
-          ...(turnResult.usage ? { usage: turnResult.usage } : {}),
-          ...(turnResult.truncated ? { truncated: true } : {}),
-          ...(turnResult.requestId ? { requestId: turnResult.requestId } : {}),
-          ...(turnCostUsd !== undefined ? { costUsd: turnCostUsd, costModel: turnCostModel } : {}),
-        },
-      });
+void __gateExpr124();
+return undefined;
+}
+function __gate131() {
 if (turnResult.truncated) {
         void host.emitTrace(sid, {
           kind: 'turn_truncated',
@@ -1182,29 +1363,13 @@ if (turnResult.truncated) {
           },
         });
       }
+return undefined;
+}
+async function __gate132() {
 if (turnResult.usage) {
-        try {
-          const current = host.store.getSession(session.id);
-          const prevTotals = (current?.metadata?.usageTotals ?? undefined) as TokenUsage | undefined;
-          const merged = mergeUsage(prevTotals, turnResult.usage);
-          const prevCostUsd =
-            typeof current?.metadata?.usageCostUsd === 'number'
-              ? (current.metadata.usageCostUsd as number)
-              : undefined;
-          const usageCostUsd = mergeCostUsd(prevCostUsd, turnCostUsd);
-          if (merged) {
-            host.store.updateSession(session.id, {
-              metadata: {
-                ...(current?.metadata ?? {}),
-                usageTotals: merged,
-                ...(usageCostUsd !== undefined ? { usageCostUsd } : {}),
-              },
-            });
-          }
-        } catch {
-          // never let usage accounting break the turn
-        }
-      }
+const __gateSignal = await __gate129();
+if (__gateSignal) return __gateSignal;
+}
 recovery = decideTurnRecovery({
         stopReason: turnResult.stopReason,
         finishReason: turnResult.finishReason,
@@ -1213,31 +1378,37 @@ recovery = decideTurnRecovery({
         state: recoveryState,
         userAborted: signal.aborted,
       });
+return undefined;
+}
+const __gateSignal = await (await __gate130() ?? __gate131() ?? await __gate132());
+if (__gateSignal) return __gateSignal;
+return undefined;
 },
 async () => {
-if (recovery.action !== 'continue' || turnResult.truncated || turnResult.assistantParts.length === 0) {
-        const recoveryOpts: Array<{ id: string; label: string }> = [
-          { id: recovery.action, label: `Default: ${recovery.action}` },
-        ];
-        if (recovery.action === 'retry-same-input' || recovery.action === 'retry-after-nudge') {
-          recoveryOpts.push({ id: 'abort', label: 'Stop instead of retrying' });
-          recoveryOpts.push({ id: 'end', label: 'End the turn without retry' });
-        } else if (recovery.action === 'abort') {
-          recoveryOpts.push({ id: 'retry-after-nudge', label: 'Nudge and retry once more' });
-          recoveryOpts.push({ id: 'end', label: 'End cleanly without abort label' });
-        } else if (recovery.action === 'end') {
-          recoveryOpts.push({ id: 'continue', label: 'Continue the loop' });
-        }
-        const chosen = await maybeChooseRecovery(
-          `turn_recovery:${turnResult.stopReason}:${turnResult.finishReason ?? ''}`,
-          recoveryOpts,
-          recovery.action
-        );
-        if (chosen !== recovery.action) {
-          if (chosen === 'continue') recovery = { action: 'continue' };
-          else if (chosen === 'end') recovery = { action: 'end' };
-          else if (chosen === 'retry-same-input') recovery = { action: 'retry-same-input' };
-          else if (chosen === 'retry-after-nudge') {
+async function __gate110() {
+let recoveryOpts: any;
+let chosen: any;
+function __gate107() {
+function __gate101() {
+
+recovery = { action: 'continue' };
+return undefined;
+}
+function __gate106() {
+function __gate102() {
+
+recovery = { action: 'end' };
+return undefined;
+}
+function __gate105() {
+function __gate103() {
+
+recovery = { action: 'retry-same-input' };
+return undefined;
+}
+function __gate104() {
+
+if (chosen === 'retry-after-nudge') {
             recovery = {
               action: 'retry-after-nudge',
               nudge:
@@ -1251,8 +1422,75 @@ if (recovery.action !== 'continue' || turnResult.truncated || turnResult.assista
               reason: recovery.action === 'abort' ? recovery.reason : 'jev_recovery_choice',
             };
           }
+return undefined;
+}
+if (chosen === 'retry-same-input') {
+const __gateSignal = __gate103();
+if (__gateSignal) return __gateSignal;
+} else {
+const __gateSignal = __gate104();
+if (__gateSignal) return __gateSignal;
+}
+return undefined;
+}
+if (chosen === 'end') {
+const __gateSignal = __gate102();
+if (__gateSignal) return __gateSignal;
+} else {
+const __gateSignal = __gate105();
+if (__gateSignal) return __gateSignal;
+}
+return undefined;
+}
+if (chosen === 'continue') {
+const __gateSignal = __gate101();
+if (__gateSignal) return __gateSignal;
+} else {
+const __gateSignal = __gate106();
+if (__gateSignal) return __gateSignal;
+}
+return undefined;
+}
+function __gate108() {
+recoveryOpts = [
+          { id: recovery.action, label: `Default: ${recovery.action}` },
+        ];
+if (recovery.action === 'retry-same-input' || recovery.action === 'retry-after-nudge') {
+          recoveryOpts.push({ id: 'abort', label: 'Stop instead of retrying' });
+          recoveryOpts.push({ id: 'end', label: 'End the turn without retry' });
+        } else if (recovery.action === 'abort') {
+          recoveryOpts.push({ id: 'retry-after-nudge', label: 'Nudge and retry once more' });
+          recoveryOpts.push({ id: 'end', label: 'End cleanly without abort label' });
+        } else if (recovery.action === 'end') {
+          recoveryOpts.push({ id: 'continue', label: 'Continue the loop' });
         }
-      }
+return undefined;
+}
+async function __gate109() {
+chosen = await maybeChooseRecovery(
+          `turn_recovery:${turnResult.stopReason}:${turnResult.finishReason ?? ''}`,
+          recoveryOpts,
+          recovery.action
+        );
+if (chosen !== recovery.action) {
+const __gateSignal = __gate107();
+if (__gateSignal) return __gateSignal;
+}
+return undefined;
+}
+const __gateSignal = await (__gate108() ?? await __gate109());
+if (__gateSignal) return __gateSignal;
+return undefined;
+return undefined;
+}
+async function __gate111() {
+if (recovery.action !== 'continue' || turnResult.truncated || turnResult.assistantParts.length === 0) {
+const __gateSignal = await __gate110();
+if (__gateSignal) return __gateSignal;
+}
+return undefined;
+}
+async function __gate112() {
 if (discardedAssistant(recovery)) {
         void host.emitTrace(sid, {
           kind: 'recovery_advisory',
@@ -1280,6 +1518,9 @@ if (recovery.action === 'retry-same-input') {
         ]);
         return kernelTurnSignal('continue');
       }
+return undefined;
+}
+function __gate113() {
 if (recovery.action === 'retry-after-nudge') {
         if (!recovery.discardAssistant && turnResult.assistantParts.length > 0) {
           host.store.appendMessage(session.id, 'assistant', turnResult.assistantParts);
@@ -1287,6 +1528,9 @@ if (recovery.action === 'retry-after-nudge') {
         host.store.appendMessage(sid, 'system', [textPart(recovery.nudge)]);
         return kernelTurnSignal('continue');
       }
+return undefined;
+}
+async function __gate114() {
 if (recovery.action === 'abort') {
         const reason = recovery.reason;
         host.store.appendMessage(sid, 'system', [
@@ -1326,6 +1570,9 @@ if (spinReason) {
           'reasoning_spin'
         ));
       }
+return undefined;
+}
+function __gate115() {
 rawRep = loopGuard?.checkAssistantRepetition(turnResult.assistantParts) ?? { abort: false as const };
 repSession = host.store.getSession(sid) ?? session;
 repAdapter = adapterOf(repSession);
@@ -1338,11 +1585,27 @@ rep = applyRepeatGuard({
         }),
         decision: rawRep,
       });
+return undefined;
+}
+async function __gateGrp116() {
+const __gateSignal = await (await __gate111() ?? await __gate112() ?? __gate113() ?? await __gate114());
+if (__gateSignal) return __gateSignal;
+return undefined;
+}
+function __gateGrp117() {
+const __gateSignal = __gate115();
+if (__gateSignal) return __gateSignal;
+return undefined;
+}
+const __gateSignal = await (await __gateGrp116() ?? __gateGrp117());
+if (__gateSignal) return __gateSignal;
+return undefined;
 },
 async () => {
-graceOut = advisoryGrace.apply(rep.abort ? { abort: true, reason: rep.reason } : { abort: false });
-if (graceOut.action === 'advise' || graceOut.action === 'abort') {
-        const guardChoice = await maybeChooseRecovery(
+async function __gate89() {
+let guardChoice: any;
+async function __gate87() {
+guardChoice = await maybeChooseRecovery(
           `loop_guard_repetition:${graceOut.reason}`,
           [
             { id: 'advise', label: 'Inject advisory and continue' },
@@ -1351,7 +1614,7 @@ if (graceOut.action === 'advise' || graceOut.action === 'abort') {
           ],
           graceOut.action
         );
-        if (guardChoice === 'abort') {
+if (guardChoice === 'abort') {
           host.store.appendMessage(session.id, 'assistant', turnResult.assistantParts);
           await host.injectRecoveryCoach?.({
             session,
@@ -1378,7 +1641,10 @@ if (graceOut.action === 'advise' || graceOut.action === 'abort') {
             'repetition'
           ));
         }
-        if (guardChoice === 'advise') {
+return undefined;
+}
+async function __gate88() {
+if (guardChoice === 'advise') {
           const strike = noteCriticalHit(recoveryState);
           if (strike.action === 'abort') {
             host.store.appendMessage(session.id, 'assistant', turnResult.assistantParts);
@@ -1400,8 +1666,100 @@ if (graceOut.action === 'advise' || graceOut.action === 'abort') {
             data: { reason: graceOut.reason, trigger: 'repetition' },
           });
         }
-        // guardChoice === 'continue' → fall through
-      }
+return undefined;
+}
+const __gateSignal = await (await __gate87() ?? await __gate88());
+if (__gateSignal) return __gateSignal;
+return undefined;
+return undefined;
+}
+async function __gate97() {
+let stopPhase: any;
+let stopHook: any;
+let goal: any;
+let steeredNow: any;
+async function __gate90() {
+stopPhase = context.session.mode === 'subagent' ? 'subagent_stop' : 'stop';
+stopHook = await host.runLifecycleHook?.({
+          phase: stopPhase,
+          sessionId: sid,
+          agentId: agent.id,
+          meta: { stopReason: turnResult.stopReason },
+        });
+if (stopHook?.block) {
+          const msg = stopHook.message ?? stopHook.systemMessage ?? 'stop blocked; continuing';
+          host.store.appendMessage(sid, 'system', [textPart(`[stop-hook] ${msg}`)]);
+          return kernelTurnSignal('continue');
+        }
+return undefined;
+}
+async function __gate91() {
+if (stopHook?.systemMessage) {
+          host.store.appendMessage(sid, 'system', [textPart(stopHook.systemMessage)]);
+        }
+goal = await host.evaluateGoalGate?.({
+          session: sessionForTurn(host, sid, session),
+          agent,
+          signal,
+          workspaceRoot: workspaceRoot ?? host.repoRoot,
+        });
+return undefined;
+}
+function __gate92() {
+if (goal?.systemMessage) {
+          host.store.appendMessage(sid, 'system', [textPart(goal.systemMessage)]);
+        } else if (goal && !goal.met) {
+          host.store.appendMessage(sid, 'system', [
+            textPart(`[goal] not yet met: ${goal.reason ?? 'continuing'}`),
+          ]);
+        }
+return undefined;
+}
+async function __gate93() {
+if (goal && (!goal.met || goal.action === 'continue')) {
+          return kernelTurnSignal('continue');
+        }
+if (host.waitSteeringChildrenIdle) {
+          await host.waitSteeringChildrenIdle(sid);
+        }
+steeredNow = claimAndApplyInbox(host.store, sid, 'next-step', {
+          expectedWriterRunId: writerRunId,
+        });
+return undefined;
+}
+async function __gate94() {
+if (steeredNow.length > 0) return kernelTurnSignal('continue');
+host.onSessionOutcome?.({
+          sessionId: session.id,
+          agentId: agent.id,
+          outcome: 'success',
+        });
+return kernelTurnSignal('return', await host.handleTurnCompletion(session, agent).then((completed) =>
+          finishEnded(completed, 'end')
+        ));
+return undefined;
+}
+async function __gateGrp95() {
+const __gateSignal = await (await __gate90() ?? await __gate91() ?? __gate92() ?? await __gate93());
+if (__gateSignal) return __gateSignal;
+return undefined;
+}
+async function __gateGrp96() {
+const __gateSignal = await (await __gate94());
+if (__gateSignal) return __gateSignal;
+return undefined;
+}
+const __gateSignal = await (await __gateGrp95() ?? await __gateGrp96());
+if (__gateSignal) return __gateSignal;
+return undefined;
+return undefined;
+}
+async function __gate98() {
+graceOut = advisoryGrace.apply(rep.abort ? { abort: true, reason: rep.reason } : { abort: false });
+if (graceOut.action === 'advise' || graceOut.action === 'abort') {
+const __gateSignal = await __gate89();
+if (__gateSignal) return __gateSignal;
+}
 modelStep = stepInfo(turn, 'model_done');
 await host.stepTx?.beginStep?.(modelStep);
 assistantMessage = host.store.appendMessage(
@@ -1409,6 +1767,9 @@ assistantMessage = host.store.appendMessage(
         'assistant',
         turnResult.assistantParts
       );
+return undefined;
+}
+async function __gate99() {
 if (pendingRecoveryAdvisory) {
         host.store.appendMessage(session.id, 'system', [textPart(pendingRecoveryAdvisory)]);
       }
@@ -1421,61 +1782,9 @@ await emitStep({
       });
 await host.stepTx?.commitStep?.(modelStep);
 if (recovery.action !== 'continue') {
-        const stopPhase = context.session.mode === 'subagent' ? 'subagent_stop' : 'stop';
-        const stopHook = await host.runLifecycleHook?.({
-          phase: stopPhase,
-          sessionId: sid,
-          agentId: agent.id,
-          meta: { stopReason: turnResult.stopReason },
-        });
-        if (stopHook?.block) {
-          const msg = stopHook.message ?? stopHook.systemMessage ?? 'stop blocked; continuing';
-          host.store.appendMessage(sid, 'system', [textPart(`[stop-hook] ${msg}`)]);
-          return kernelTurnSignal('continue');
-        }
-        if (stopHook?.systemMessage) {
-          host.store.appendMessage(sid, 'system', [textPart(stopHook.systemMessage)]);
-        }
-
-        const goal = await host.evaluateGoalGate?.({
-          session: sessionForTurn(host, sid, session),
-          agent,
-          signal,
-          workspaceRoot: workspaceRoot ?? host.repoRoot,
-        });
-        if (goal?.systemMessage) {
-          host.store.appendMessage(sid, 'system', [textPart(goal.systemMessage)]);
-        } else if (goal && !goal.met) {
-          host.store.appendMessage(sid, 'system', [
-            textPart(`[goal] not yet met: ${goal.reason ?? 'continuing'}`),
-          ]);
-        }
-        if (goal && (!goal.met || goal.action === 'continue')) {
-          return kernelTurnSignal('continue');
-        }
-
-        // ── steering: wait for child sessions before soft completion ───────
-        if (host.waitSteeringChildrenIdle) {
-          await host.waitSteeringChildrenIdle(sid);
-        }
-
-        // A steer that arrived during this shot must enter before the run closes.
-        // Otherwise it sits until a later run, which is the queue/next-run behavior.
-        const steeredNow = claimAndApplyInbox(host.store, sid, 'next-step', {
-          expectedWriterRunId: writerRunId,
-        });
-        if (steeredNow.length > 0) return kernelTurnSignal('continue');
-
-        host.onSessionOutcome?.({
-          sessionId: session.id,
-          agentId: agent.id,
-          outcome: 'success',
-        });
-
-        return kernelTurnSignal('return', await host.handleTurnCompletion(session, agent).then((completed) =>
-          finishEnded(completed, 'end')
-        ));
-      }
+const __gateSignal = await __gate97();
+if (__gateSignal) return __gateSignal;
+}
 type ToolCallPart = Extract<MessagePart, { type: 'tool_call' }>;
 rawToolCalls = assistantMessage.parts.filter(
         (part: MessagePart): part is ToolCallPart => part.type === 'tool_call'
@@ -1483,6 +1792,9 @@ rawToolCalls = assistantMessage.parts.filter(
 toolCalls = host.filterValidToolCalls
         ? host.filterValidToolCalls(rawToolCalls, allowExternalAiTools, sid, resolvedTools)
         : rawToolCalls;
+return undefined;
+}
+async function __gate100() {
 if (toolCalls.length === 0) {
         return kernelTurnSignal('continue');
       }
@@ -1492,8 +1804,14 @@ if (signal.aborted) {
         return kernelTurnSignal('return', await finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'abort'));
       }
 closedByGate = { reported: false, ids: [] as string[] };
+return undefined;
+}
+const __gateSignal = await (await __gate98() ?? await __gate99() ?? await __gate100());
+if (__gateSignal) return __gateSignal;
+return undefined;
 },
 async () => {
+async function __gate77() {
 approvalResult = (await host.checkToolApprovals?.(toolCalls, context, sessionForTurn(host, sid, session), {
           filePolicy,
           turnTools: resolvedTools,
@@ -1541,6 +1859,9 @@ if (latch.action === 'abort') {
 if (latch.action === 'waiting') {
         return kernelTurnSignal('return', await parkForApproval());
       }
+return undefined;
+}
+async function __gate78() {
 if (latch.action === 'skip') {
         return kernelTurnSignal('continue');
       }
@@ -1568,6 +1889,9 @@ executable = selectExecutableToolCalls(toolCalls, closedByGate, () =>
           toolCalls.map((call: { toolCallId: string }) => call.toolCallId)
         )
       );
+return undefined;
+}
+async function __gate79() {
 if (executable.length === 0) {
         return kernelTurnSignal('continue');
       }
@@ -1599,6 +1923,9 @@ await emitStep({
         results: results.map((r: { ok: boolean; content: string; name: string }) => ({ ok: r.ok, content: r.content, name: r.name })),
       });
 await host.stepTx?.commitStep?.(toolsStep);
+return undefined;
+}
+async function __gate80() {
 if (stopAt.size > 0) {
         const hit = results.find((r: { ok: boolean; name: string }) => r.ok && stopAt.has(r.name));
         if (hit) {
@@ -1612,6 +1939,9 @@ progressDecision = progressGuard.afterToolRound(
         executable,
         results
       );
+return undefined;
+}
+function __gate81() {
 if (riskEngine) {
         for (const r of results) {
           riskEngine.observeTool({ toolName: r.name, success: r.ok, errorMessage: r.ok ? undefined : r.content });
@@ -1635,6 +1965,9 @@ if (riskEngine) {
           });
         }
       }
+return undefined;
+}
+function __gate82() {
 toolRep = loopGuard ? progressDecision : { abort: false as const };
 live = host.store.getSession(sid) ?? session;
 adapter = adapterOf(live);
@@ -1651,6 +1984,9 @@ toolRepDecision = guarded.abort
         ? { abort: true, reason: guarded.reason }
         : { abort: false, reason: '' };
 toolGraceOut = advisoryGrace.apply(toolRepDecision);
+return undefined;
+}
+async function __gate83() {
 if (toolGraceOut.action === 'advise') {
         const strike = noteCriticalHit(recoveryState);
         if (strike.action === 'abort') {
@@ -1670,6 +2006,9 @@ if (toolGraceOut.action === 'advise') {
         });
         return kernelTurnSignal('continue');
       }
+return undefined;
+}
+async function __gate84() {
 if (toolGraceOut.action === 'abort') {
         await host.injectRecoveryCoach?.({
           session,
@@ -1690,6 +2029,21 @@ if (toolGraceOut.action === 'abort') {
           loopGuardStopReason(toolGraceOut.reason)
         ));
       }
+return undefined;
+}
+async function __gateGrp85() {
+const __gateSignal = await (await __gate77() ?? await __gate78() ?? await __gate79() ?? await __gate80());
+if (__gateSignal) return __gateSignal;
+return undefined;
+}
+async function __gateGrp86() {
+const __gateSignal = await (__gate81() ?? __gate82() ?? await __gate83() ?? await __gate84());
+if (__gateSignal) return __gateSignal;
+return undefined;
+}
+const __gateSignal = await (await __gateGrp85() ?? await __gateGrp86());
+if (__gateSignal) return __gateSignal;
+return undefined;
 }
 ];
 for (const kernelStep of kernelSteps) {

@@ -117,18 +117,25 @@ export async function timeOptionalKernelPhase<T>(
   return timeKernelPhase(trace, phase, run, extra);
 }
 
-/** One summary per run. Later calls are no-ops so model time is not included. */
-export function emitKernelReady(trace: KernelStartupTrace): void {
-  if (trace.readySent) return;
+function slowestKernelPhase(phases: Record<string, number>): { slowest?: string; slowestMs: number } {
   let slowest: string | undefined;
   let slowestMs = -1;
-  for (const [name, ms] of Object.entries(trace.phases)) {
+  for (const [name, ms] of Object.entries(phases)) {
     if (name === 'ready') continue;
     if (ms >= slowestMs) {
       slowest = name;
       slowestMs = ms;
     }
   }
+  return { slowest, slowestMs };
+}
+
+/** One summary per run. Later calls are no-ops so model time is not included. */
+export function emitKernelReady(trace: KernelStartupTrace): void {
+  if (trace.readySent) return;
+  const found = slowestKernelPhase(trace.phases);
+  const slowest = found.slowest;
+  const slowestMs = found.slowestMs;
   trace.readySent = true;
   emitKernelStartupPhase(trace, {
     phase: 'ready',

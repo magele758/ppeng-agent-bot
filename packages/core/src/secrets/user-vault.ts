@@ -124,6 +124,44 @@ function encrypt(key: Buffer, plaintext: string): EncryptedBlob {
   };
 }
 
+function decryptOrUndefined(key: Buffer, blob: EncryptedBlob | undefined): string | undefined {
+  if (!blob) return undefined;
+  try {
+    return decrypt(key, blob);
+  } catch {
+    return undefined;
+  }
+}
+
+function loginFillValue(row: LoginRecord, field: string, key: Buffer): string | undefined {
+  if (field === 'username') return row.username;
+  if (field === 'password') return decryptOrUndefined(key, row.passwordEnc);
+  return undefined;
+}
+
+function cardFillValue(row: CardRecord, field: string, key: Buffer): string | undefined {
+  if (field === 'holderName') return row.holderName;
+  if (field === 'expiry') return row.expiry;
+  if (field === 'cardNumber') return decryptOrUndefined(key, row.numberEnc);
+  if (field === 'cvv') return decryptOrUndefined(key, row.cvvEnc);
+  return undefined;
+}
+
+function contactFillValue(row: ContactRecord, field: string): string | undefined {
+  if (field === 'fullName') return row.fullName;
+  if (field === 'email') return row.email;
+  if (field === 'phone') return row.phone;
+  if (field === 'address') return row.address;
+  return undefined;
+}
+
+function fillValueForRow(row: UserVaultRecord, field: string, key: Buffer): string | undefined {
+  if (row.kind === 'login') return loginFillValue(row, field, key);
+  if (row.kind === 'card') return cardFillValue(row, field, key);
+  if (row.kind === 'contact') return contactFillValue(row, field);
+  return undefined;
+}
+
 function decrypt(key: Buffer, row: EncryptedBlob): string {
   const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(row.iv, 'hex'));
   decipher.setAuthTag(Buffer.from(row.tag, 'hex'));
@@ -342,44 +380,7 @@ export class UserVault {
     if (!parsed) return undefined;
     const row = this.memory.get(parsed.id);
     if (!row) return undefined;
-    const { field } = parsed;
-    if (row.kind === 'login') {
-      if (field === 'username') return row.username;
-      if (field === 'password' && row.passwordEnc) {
-        try {
-          return decrypt(this.key(), row.passwordEnc);
-        } catch {
-          return undefined;
-        }
-      }
-      return undefined;
-    }
-    if (row.kind === 'card') {
-      if (field === 'holderName') return row.holderName;
-      if (field === 'expiry') return row.expiry;
-      if (field === 'cardNumber' && row.numberEnc) {
-        try {
-          return decrypt(this.key(), row.numberEnc);
-        } catch {
-          return undefined;
-        }
-      }
-      if (field === 'cvv' && row.cvvEnc) {
-        try {
-          return decrypt(this.key(), row.cvvEnc);
-        } catch {
-          return undefined;
-        }
-      }
-      return undefined;
-    }
-    if (row.kind === 'contact') {
-      if (field === 'fullName') return row.fullName;
-      if (field === 'email') return row.email;
-      if (field === 'phone') return row.phone;
-      if (field === 'address') return row.address;
-    }
-    return undefined;
+    return fillValueForRow(row, parsed.field, this.key());
   }
 
   /** Collect every known secret plaintext (for leak tests / redaction). */

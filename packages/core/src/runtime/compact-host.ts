@@ -2,6 +2,10 @@ import { resolveBotWindowBudget } from '../session/history/window.js';
 
 /** Long chats get an LLM summary even while still under the token threshold. */
 export const LONG_SESSION_COMPACT_MESSAGES = 56;
+
+function compactForce(opts: { force?: boolean } | undefined, messageCount: number): boolean {
+  return opts?.force === true || messageCount >= LONG_SESSION_COMPACT_MESSAGES;
+}
 /**
  * Auto-compact + transcript archive, extracted from RawAgentRuntime.
  */
@@ -218,9 +222,7 @@ export async function autoCompactSession(
   }
 
   const session = host.store.getSession(context.session.id) ?? context.session;
-  const force =
-    opts?.force === true ||
-    host.store.foldMessages(session.id).length >= LONG_SESSION_COMPACT_MESSAGES;
+  const force = compactForce(opts, host.store.foldMessages(session.id).length);
   if (isCanonicalBotChat(session)) {
     return compactCanonicalBot(host, context, { ...opts, force });
   }

@@ -212,9 +212,11 @@ async function timeKernelPhase<T>(
   }
 }
 
-function emitKernelReady(host: TurnKernelHost, sessionId: string, trace: KernelStartupTrace): void {
-  if (trace.ready) return;
-  trace.ready = true;
+function fillMissingKernelPhases(
+  host: TurnKernelHost,
+  sessionId: string,
+  trace: KernelStartupTrace
+): Record<string, number> {
   const phases: Record<string, number> = {};
   for (const name of KERNEL_STARTUP_PHASES) {
     const known = trace.phases[name];
@@ -230,15 +232,27 @@ function emitKernelReady(host: TurnKernelHost, sessionId: string, trace: KernelS
       phases[name] = known;
     }
   }
+  return phases;
+}
+
+function slowestPhaseName(phases: Record<string, number>): { slowest: string; slowestMs: number } {
   let slowest = '';
   let slowestMs = -1;
-  for (const [name, ms] of Object.entries(trace.phases)) {
+  for (const [name, ms] of Object.entries(phases)) {
     if (ms > slowestMs) {
       slowest = name;
       slowestMs = ms;
     }
   }
-  if (!slowest) slowest = KERNEL_STARTUP_PHASES[0];
+  if (!slowest) slowest = KERNEL_STARTUP_PHASES[0] ?? '';
+  return { slowest, slowestMs };
+}
+
+function emitKernelReady(host: TurnKernelHost, sessionId: string, trace: KernelStartupTrace): void {
+  if (trace.ready) return;
+  trace.ready = true;
+  fillMissingKernelPhases(host, sessionId, trace);
+  const { slowest, slowestMs } = slowestPhaseName(trace.phases);
   emitKernelStartupPhase(host, sessionId, {
     phase: 'ready',
     durationMs: Date.now() - trace.startedAt,
@@ -753,6 +767,60 @@ let progressDecision: any;
 const kernelTurnFlow = await (async () => {
 const kernelSteps: Array<() => Promise<unknown>> = [
 async () => {
+async function __gate68() {
+let claimed: any;
+let interrupt: any;
+let sessionOptIn: any;
+let remaining: any;
+let allowExt: any;
+let after: any;
+async function __gate66() {
+interrupt = resumeFromInterrupt;
+resumeFromInterrupt = undefined;
+claimed = host.store.claimInbox(sid, 'next-step');
+if (claimed.length > 0) {
+          applyClaimedInbox(host.store, sid, claimed);
+        }
+remaining = unmatchedToolCallsFromFold(
+          host.store.foldMessages(sid),
+          interrupt.toolCallIds.filter((id: string) => !interrupt.executedToolCallIds.includes(id))
+        );
+sessionOptIn = context.session.metadata?.allowExternalAiTools === true;
+allowExt = envBool(process.env, 'RAW_AGENT_EXTERNAL_AI_TOOLS', false) && sessionOptIn;
+if (remaining.length > 0) {
+          const parked = await continueResumedToolWave({
+            host,
+            agent,
+            sessionId: sid,
+            turn,
+            remaining,
+            context,
+            filePolicy,
+            allowExternalAiTools: allowExt,
+            interrupt,
+            writerRunId,
+            session,
+            onModelStreamChunk: options?.onModelStreamChunk,
+            emitStep
+          });
+          if (parked) return kernelTurnSignal('return', parked);
+        }
+after = host.store.getSession(sid);
+return undefined;
+}
+function __gate67() {
+host.store.updateSession(sid, {
+          metadata: mergeInterruptMetadata(after?.metadata ?? {}, null)
+        });
+return kernelTurnSignal('continue');
+return undefined;
+}
+const __gateSignal = await (await __gate66() ?? __gate67());
+if (__gateSignal) return __gateSignal;
+return undefined;
+return undefined;
+}
+async function __gate69() {
 if (!startup.ready) startup.turn = turn;
 if (signal.aborted) {
         closeWaveIfOpen();
@@ -764,6 +832,9 @@ workspaceRoot = await timeKernelPhase(host, sid, startup, 'ensure_workspace', ()
         host.ensureWorkspaceRoot(refreshedSession, task)
       );
 workspaceRoots = defaultWorkspaceRoots(workspaceRoot, host.repoRoot);
+return undefined;
+}
+async function __gate70() {
 if (hasWorkspaceStores(host.store)) {
         const workspaceStore = host.store;
         const binding = workspaceBindingFromMetadata(refreshedSession.metadata);
@@ -795,42 +866,9 @@ context = {
         abortSignal: signal
       };
 if (resumeFromInterrupt) {
-        const interrupt = resumeFromInterrupt;
-        resumeFromInterrupt = undefined;
-        const claimed = host.store.claimInbox(sid, 'next-step');
-        if (claimed.length > 0) {
-          applyClaimedInbox(host.store, sid, claimed);
-        }
-        const remaining = unmatchedToolCallsFromFold(
-          host.store.foldMessages(sid),
-          interrupt.toolCallIds.filter((id) => !interrupt.executedToolCallIds.includes(id))
-        );
-        const sessionOptIn = context.session.metadata?.allowExternalAiTools === true;
-        const allowExt = envBool(process.env, 'RAW_AGENT_EXTERNAL_AI_TOOLS', false) && sessionOptIn;
-        if (remaining.length > 0) {
-          const parked = await continueResumedToolWave({
-            host,
-            agent,
-            sessionId: sid,
-            turn,
-            remaining,
-            context,
-            filePolicy,
-            allowExternalAiTools: allowExt,
-            interrupt,
-            writerRunId,
-            session,
-            onModelStreamChunk: options?.onModelStreamChunk,
-            emitStep
-          });
-          if (parked) return kernelTurnSignal('return', parked);
-        }
-        const after = host.store.getSession(sid);
-        host.store.updateSession(sid, {
-          metadata: mergeInterruptMetadata(after?.metadata ?? {}, null)
-        });
-        return kernelTurnSignal('continue');
-      }
+const __gateSignal = await __gate68();
+if (__gateSignal) return __gateSignal;
+}
 packed = await timeKernelPhase(host, sid, startup, 'pack_turn', () => prepareTurnInput(sid, {
         store: host.store,
         autoCompact: async () => {
@@ -878,6 +916,9 @@ await emitStep({
       });
 promptCtx = context;
 drainedAdvisory = advisoryQueue.drainCombined();
+return undefined;
+}
+async function __gate71() {
 if (drainedAdvisory) {
         host.store.appendMessage(sid, 'system', [textPart(drainedAdvisory)]);
       }
@@ -928,6 +969,9 @@ if (Object.keys(selectedTools.metadataPatch).length > 0) {
           session: host.store.getSession(sid) as SessionRecord
         };
       }
+return undefined;
+}
+async function __gate72() {
 if (selectedTools.drifted) {
         void host.emitTrace(sid, {
           kind: 'prompt_cache_bust',
@@ -936,27 +980,38 @@ if (selectedTools.drifted) {
       }
 if (turn === 0) {
         await timeKernelPhase(host, sid, startup, 'session_start_hook', async () => {
-          const startHook = await runLifecycleHook(process.env, {
+let startHook: any;
+let startExt: any;
+async function __gate1() {
+startHook = await runLifecycleHook(process.env, {
             phase: 'session_start',
             sessionId: sid,
             context: { agentId: agent.id, mode: context.session.mode }
           });
-          if (startHook.systemMessage || startHook.message) {
+if (startHook.systemMessage || startHook.message) {
             host.store.appendMessage(sid, 'system', [
               textPart(startHook.systemMessage ?? startHook.message ?? '')
             ]);
           }
-          const startExt = await host.extensionRegistry.run('session_start', {
+startExt = await host.extensionRegistry.run('session_start', {
             sessionId: sid,
             agentId: agent.id,
             meta: { mode: context.session.mode }
           });
-          if (startExt.systemMessage || startExt.message) {
+return undefined;
+}
+function __gate2() {
+if (startExt.systemMessage || startExt.message) {
             host.store.appendMessage(sid, 'system', [
               textPart(startExt.systemMessage ?? startExt.message ?? '')
             ]);
           }
-        });
+return undefined;
+}
+const __gateSignal = await (await __gate1() ?? __gate2());
+if (__gateSignal) return __gateSignal;
+return undefined;
+});
       }
 beforeTurn = await timeKernelPhase(host, sid, startup, 'before_turn_hook', () =>
         host.extensionRegistry.run('before_turn', {
@@ -965,6 +1020,9 @@ beforeTurn = await timeKernelPhase(host, sid, startup, 'before_turn_hook', () =>
           meta: { turn }
         })
       );
+return undefined;
+}
+async function __gate73() {
 if (beforeTurn.block) {
         host.store.appendMessage(sid, 'system', [
           textPart(beforeTurn.message ?? beforeTurn.systemMessage ?? 'blocked by before_turn extension')
@@ -974,6 +1032,9 @@ if (beforeTurn.block) {
 if (beforeTurn.systemMessage) {
         host.store.appendMessage(sid, 'system', [textPart(beforeTurn.systemMessage)]);
       }
+return undefined;
+}
+async function __gate74() {
 turnInput = {
         agent,
         systemPrompt,
@@ -1005,20 +1066,36 @@ if (pre === 'skip_done' && hasGoal) {
           finishEnded(completed, 'end')
         ));
       }
+return undefined;
+}
+async function __gateGrp75() {
+const __gateSignal = await (await __gate69() ?? await __gate70() ?? await __gate71() ?? await __gate72());
+if (__gateSignal) return __gateSignal;
+return undefined;
+}
+async function __gateGrp76() {
+const __gateSignal = await (await __gate73() ?? await __gate74());
+if (__gateSignal) return __gateSignal;
+return undefined;
+}
+const __gateSignal = await (await __gateGrp75() ?? await __gateGrp76());
+if (__gateSignal) return __gateSignal;
+return undefined;
 },
 async () => {
-try {
-        turnResult = await host.runTurnWithRetries(turnInput, options?.onModelStreamChunk);
-      } catch (error) {
-        // Degenerate repetition: the polluted partial was never persisted, so a
-        // single clean retry is safe. A second hit means the model is stuck —
-        // finalize gracefully instead of burning another full-tools prompt.
-        if (isRepetitionAbort(error)) {
-          void host.emitTrace(sid, {
+async function __gate50() {
+
+turnResult = await host.runTurnWithRetries(turnInput, options?.onModelStreamChunk);
+return undefined;
+}
+async function __gate55(error: any) {
+async function __gate51() {
+let repChoice: any;
+void host.emitTrace(sid, {
             kind: 'repetition_abort',
             payload: { reason: error.reason, retry: true, ...repetitionTraceFields(error.sample, redactForTrace) }
           });
-          const repChoice = await applyJevRecoveryChoice(
+repChoice = await applyJevRecoveryChoice(
             host.store,
             `repetition_abort:${error.reason}`,
             [
@@ -1026,13 +1103,13 @@ try {
               { id: 'stop', label: 'Stop the run after repetition' }
             ]
           );
-          if (repChoice === 'stop') {
+if (repChoice === 'stop') {
             host.store.appendMessage(sid, 'system', [
               textPart(`[recovery] Stopped: model output degenerated into repetition (${error.reason})`)
             ]);
             return kernelTurnSignal('return', await finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'repetition'));
           }
-          try {
+try {
             turnResult = await host.runTurnWithRetries(turnInput, options?.onModelStreamChunk);
           } catch (retryError) {
             const reason = isRepetitionAbort(retryError) ? retryError.reason : error.reason;
@@ -1046,16 +1123,21 @@ try {
             ]);
             return kernelTurnSignal('return', await finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'repetition'));
           }
-        } else if (isContextOverflowError(error)) {
-          void host.emitTrace(sid, {
+return undefined;
+}
+async function __gate54() {
+async function __gate52() {
+let compacted: any;
+let packedRetry: any;
+void host.emitTrace(sid, {
             kind: 'model_error',
             payload: { message: error instanceof Error ? error.message : String(error), overflow: true }
           });
-          const compacted = await host.autoCompact(context, { force: true });
-          if (compacted.replaced) {
+compacted = await host.autoCompact(context, { force: true });
+if (compacted.replaced) {
             await emitStep({ type: 'compacted', replaced: compacted.replaced });
           }
-          const packedRetry = await prepareTurnInput(sid, {
+packedRetry = await prepareTurnInput(sid, {
             store: host.store,
             autoCompact: async () => {},
             claimNextStep: () => host.store.claimInbox(sid, 'next-step'),
@@ -1070,9 +1152,13 @@ try {
               }
             }
           });
-          turnInput = { ...turnInput, messages: packedRetry.messages };
-          turnResult = await host.runTurnWithRetries(turnInput, options?.onModelStreamChunk);
-        } else if (signal.aborted) {
+turnInput = { ...turnInput, messages: packedRetry.messages };
+turnResult = await host.runTurnWithRetries(turnInput, options?.onModelStreamChunk);
+return undefined;
+}
+async function __gate53() {
+
+if (signal.aborted) {
           closeWaveIfOpen();
           return kernelTurnSignal('return', await finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'abort'));
         } else {
@@ -1082,36 +1168,45 @@ try {
           });
           throw error;
         }
-      }
-{
-        const parsedCalls = toolCallParts(turnResult.assistantParts).length;
-        const corrected = resolveModelStopReason(turnResult.finishReason, parsedCalls);
-        if (corrected === 'tool_use' && turnResult.stopReason !== 'tool_use' && parsedCalls > 0) {
-          void host.emitTrace(sid, {
-            kind: 'recovery_advisory',
-            payload: {
-              reason: 'wrong_stop_signal',
-              trigger: 'wrong_stop_signal',
-              finishReason: turnResult.finishReason,
-              stopReason: turnResult.stopReason
-            }
-          });
-          turnResult = { ...turnResult, stopReason: 'tool_use' };
-        }
-      }
-if (turnResult.usage) {
-        const prev = host.cumulativeInputTokensBySession.get(sid);
-        const split = splitCumulativePromptTokens(
+return undefined;
+}
+if (isContextOverflowError(error)) {
+const __gateSignal = await __gate52();
+if (__gateSignal) return __gateSignal;
+} else {
+const __gateSignal = await __gate53();
+if (__gateSignal) return __gateSignal;
+}
+return undefined;
+}
+if (isRepetitionAbort(error)) {
+const __gateSignal = await __gate51();
+if (__gateSignal) return __gateSignal;
+} else {
+const __gateSignal = await __gate54();
+if (__gateSignal) return __gateSignal;
+}
+return undefined;
+}
+async function __gate58() {
+let prev: any;
+let split: any;
+function __gate56() {
+prev = host.cumulativeInputTokensBySession.get(sid);
+split = splitCumulativePromptTokens(
           turnResult.usage.inputTokens,
           prev?.cumulative,
           prev?.sticky ?? false
         );
-        host.cumulativeInputTokensBySession.set(sid, {
+host.cumulativeInputTokensBySession.set(sid, {
           cumulative: split.cumulativeInputTokens,
           // Once classified cumulative the session stays that way; see usage.ts.
           sticky: (prev?.sticky ?? false) || split.treatedAsCumulative
         });
-        if (split.treatedAsCumulative) {
+return undefined;
+}
+function __gate57() {
+if (split.treatedAsCumulative) {
           const cached = Math.min(turnResult.usage.cachedInputTokens ?? 0, split.turnInputTokens);
           turnResult = {
             ...turnResult,
@@ -1130,7 +1225,67 @@ if (turnResult.usage) {
             }
           });
         }
+return undefined;
+}
+const __gateSignal = await (__gate56() ?? __gate57());
+if (__gateSignal) return __gateSignal;
+return undefined;
+return undefined;
+}
+function __gateExpr59() { return (turnCostUsd !== undefined ? { costUsd: turnCostUsd, costModel: turnCostModel } : {}); }
+function __gateExpr60() { return {
+          stopReason: turnResult.stopReason,
+          ...(turnResult.finishReason ? { finishReason: turnResult.finishReason } : {}),
+          ...(turnResult.usage ? { usage: turnResult.usage } : {}),
+          ...(turnResult.truncated ? { truncated: true } : {}),
+          ...(turnResult.requestId ? { requestId: turnResult.requestId } : {}),
+          ...__gateExpr59(),
+          stableSystemVersion: STABLE_SYSTEM_VERSION,
+          ...turnTraceFields({
+            messages: rawVisible,
+            assistantParts: turnResult.assistantParts,
+            redact: redactForTrace
+          })
+        }; }
+function __gateExpr61() { return {
+        kind: 'turn_end' as const,
+        payload: __gateExpr60()
+      }; }
+function __gateExpr62() { return host.emitTrace(sid, __gateExpr61()); }
+async function __gate63() {
+try {
+const __gateSignal = await __gate50();
+if (__gateSignal) return __gateSignal;
+} catch (error) {
+const __gateSignal = await __gate55(error);
+if (__gateSignal) return __gateSignal;
+}
+return undefined;
+}
+function __gate64() {
+{
+        const parsedCalls = toolCallParts(turnResult.assistantParts).length;
+        const corrected = resolveModelStopReason(turnResult.finishReason, parsedCalls);
+        if (corrected === 'tool_use' && turnResult.stopReason !== 'tool_use' && parsedCalls > 0) {
+          void host.emitTrace(sid, {
+            kind: 'recovery_advisory',
+            payload: {
+              reason: 'wrong_stop_signal',
+              trigger: 'wrong_stop_signal',
+              finishReason: turnResult.finishReason,
+              stopReason: turnResult.stopReason
+            }
+          });
+          turnResult = { ...turnResult, stopReason: 'tool_use' };
+        }
       }
+return undefined;
+}
+async function __gate65() {
+if (turnResult.usage) {
+const __gateSignal = await __gate58();
+if (__gateSignal) return __gateSignal;
+}
 if (turnResult.usage) {
         try {
           const cost = estimateUsageCostUsd(
@@ -1144,25 +1299,163 @@ if (turnResult.usage) {
           /* ignore */
         }
       }
-void host.emitTrace(sid, {
-        kind: 'turn_end',
-        payload: {
-          stopReason: turnResult.stopReason,
-          ...(turnResult.finishReason ? { finishReason: turnResult.finishReason } : {}),
-          ...(turnResult.usage ? { usage: turnResult.usage } : {}),
-          ...(turnResult.truncated ? { truncated: true } : {}),
-          ...(turnResult.requestId ? { requestId: turnResult.requestId } : {}),
-          ...(turnCostUsd !== undefined ? { costUsd: turnCostUsd, costModel: turnCostModel } : {}),
-          stableSystemVersion: STABLE_SYSTEM_VERSION,
-          ...turnTraceFields({
-            messages: rawVisible,
-            assistantParts: turnResult.assistantParts,
-            redact: redactForTrace
-          })
-        }
-      });
+void __gateExpr62();
+return undefined;
+}
+const __gateSignal = await (await __gate63() ?? __gate64() ?? await __gate65());
+if (__gateSignal) return __gateSignal;
+return undefined;
 },
 async () => {
+async function __gate35() {
+async function __gate33() {
+let current: any;
+let prevTotals: any;
+let prevCostUsd: any;
+let merged: any;
+let usageCostUsd: any;
+function __gate31() {
+current = host.store.getSession(session.id);
+prevTotals = (current?.metadata?.usageTotals ?? undefined) as
+            | TokenUsage
+            | undefined;
+merged = mergeUsage(prevTotals, turnResult.usage);
+prevCostUsd = typeof current?.metadata?.usageCostUsd === 'number'
+              ? (current.metadata.usageCostUsd as number)
+              : undefined;
+usageCostUsd = mergeCostUsd(prevCostUsd, turnCostUsd);
+return undefined;
+}
+function __gate32() {
+if (merged) {
+            host.store.updateSession(session.id, {
+              metadata: {
+                ...(current?.metadata ?? {}),
+                usageTotals: merged,
+                ...(usageCostUsd !== undefined ? { usageCostUsd } : {})
+              }
+            });
+          }
+return undefined;
+}
+const __gateSignal = await (__gate31() ?? __gate32());
+if (__gateSignal) return __gateSignal;
+return undefined;
+return undefined;
+}
+function __gate34(err: any) {
+
+void err;
+return undefined;
+}
+try {
+const __gateSignal = await __gate33();
+if (__gateSignal) return __gateSignal;
+} catch (err) {
+const __gateSignal = __gate34(err);
+if (__gateSignal) return __gateSignal;
+}
+return undefined;
+}
+async function __gate45() {
+let recoveryOpts: any;
+let chosen: any;
+function __gate42() {
+function __gate36() {
+
+recovery = { action: 'continue' };
+return undefined;
+}
+function __gate41() {
+function __gate37() {
+
+recovery = { action: 'end' };
+return undefined;
+}
+function __gate40() {
+function __gate38() {
+
+recovery = { action: 'retry-same-input' };
+return undefined;
+}
+function __gate39() {
+
+if (chosen === 'retry-after-nudge') {
+            recovery = {
+              action: 'retry-after-nudge',
+              nudge:
+                recovery.action === 'retry-after-nudge'
+                  ? recovery.nudge
+                  : '[recovery] Retry after Jev recovery choice.'
+            };
+          } else if (chosen === 'abort') {
+            recovery = {
+              action: 'abort',
+              reason: recovery.action === 'abort' ? recovery.reason : 'jev_recovery_choice'
+            };
+          }
+return undefined;
+}
+if (chosen === 'retry-same-input') {
+const __gateSignal = __gate38();
+if (__gateSignal) return __gateSignal;
+} else {
+const __gateSignal = __gate39();
+if (__gateSignal) return __gateSignal;
+}
+return undefined;
+}
+if (chosen === 'end') {
+const __gateSignal = __gate37();
+if (__gateSignal) return __gateSignal;
+} else {
+const __gateSignal = __gate40();
+if (__gateSignal) return __gateSignal;
+}
+return undefined;
+}
+if (chosen === 'continue') {
+const __gateSignal = __gate36();
+if (__gateSignal) return __gateSignal;
+} else {
+const __gateSignal = __gate41();
+if (__gateSignal) return __gateSignal;
+}
+return undefined;
+}
+function __gate43() {
+recoveryOpts = [
+          { id: recovery.action, label: `Default: ${recovery.action}` }
+        ];
+if (recovery.action === 'retry-same-input' || recovery.action === 'retry-after-nudge') {
+          recoveryOpts.push({ id: 'abort', label: 'Stop instead of retrying' });
+          recoveryOpts.push({ id: 'end', label: 'End the turn without retry' });
+        } else if (recovery.action === 'abort') {
+          recoveryOpts.push({ id: 'retry-after-nudge', label: 'Nudge and retry once more' });
+          recoveryOpts.push({ id: 'end', label: 'End cleanly without abort label' });
+        } else if (recovery.action === 'end') {
+          recoveryOpts.push({ id: 'continue', label: 'Continue the loop' });
+        }
+return undefined;
+}
+async function __gate44() {
+chosen = await applyJevRecoveryChoice(
+          host.store,
+          `turn_recovery:${turnResult.stopReason}:${turnResult.finishReason ?? ''}`,
+          recoveryOpts
+        );
+if (chosen && chosen !== recovery.action) {
+const __gateSignal = __gate42();
+if (__gateSignal) return __gateSignal;
+}
+return undefined;
+}
+const __gateSignal = await (__gate43() ?? await __gate44());
+if (__gateSignal) return __gateSignal;
+return undefined;
+return undefined;
+}
+function __gate46() {
 if (turnResult.truncated) {
         void host.emitTrace(sid, {
           kind: 'turn_truncated',
@@ -1178,31 +1471,13 @@ if (turnResult.truncated) {
           }
         });
       }
+return undefined;
+}
+async function __gate47() {
 if (turnResult.usage) {
-        try {
-          const current = host.store.getSession(session.id);
-          const prevTotals = (current?.metadata?.usageTotals ?? undefined) as
-            | TokenUsage
-            | undefined;
-          const merged = mergeUsage(prevTotals, turnResult.usage);
-          const prevCostUsd =
-            typeof current?.metadata?.usageCostUsd === 'number'
-              ? (current.metadata.usageCostUsd as number)
-              : undefined;
-          const usageCostUsd = mergeCostUsd(prevCostUsd, turnCostUsd);
-          if (merged) {
-            host.store.updateSession(session.id, {
-              metadata: {
-                ...(current?.metadata ?? {}),
-                usageTotals: merged,
-                ...(usageCostUsd !== undefined ? { usageCostUsd } : {})
-              }
-            });
-          }
-        } catch (err) {
-          void err; // never let usage accounting break the turn
-        }
-      }
+const __gateSignal = await __gate35();
+if (__gateSignal) return __gateSignal;
+}
 recovery = decideTurnRecovery({
         stopReason: turnResult.stopReason,
         finishReason: turnResult.finishReason,
@@ -1211,44 +1486,16 @@ recovery = decideTurnRecovery({
         state: recoveryState,
         userAborted: signal.aborted
       });
+return undefined;
+}
+async function __gate48() {
 if (recovery.action !== 'continue' || turnResult.truncated || turnResult.assistantParts.length === 0) {
-        const recoveryOpts: Array<{ id: string; label: string }> = [
-          { id: recovery.action, label: `Default: ${recovery.action}` }
-        ];
-        if (recovery.action === 'retry-same-input' || recovery.action === 'retry-after-nudge') {
-          recoveryOpts.push({ id: 'abort', label: 'Stop instead of retrying' });
-          recoveryOpts.push({ id: 'end', label: 'End the turn without retry' });
-        } else if (recovery.action === 'abort') {
-          recoveryOpts.push({ id: 'retry-after-nudge', label: 'Nudge and retry once more' });
-          recoveryOpts.push({ id: 'end', label: 'End cleanly without abort label' });
-        } else if (recovery.action === 'end') {
-          recoveryOpts.push({ id: 'continue', label: 'Continue the loop' });
-        }
-        const chosen = await applyJevRecoveryChoice(
-          host.store,
-          `turn_recovery:${turnResult.stopReason}:${turnResult.finishReason ?? ''}`,
-          recoveryOpts
-        );
-        if (chosen && chosen !== recovery.action) {
-          if (chosen === 'continue') recovery = { action: 'continue' };
-          else if (chosen === 'end') recovery = { action: 'end' };
-          else if (chosen === 'retry-same-input') recovery = { action: 'retry-same-input' };
-          else if (chosen === 'retry-after-nudge') {
-            recovery = {
-              action: 'retry-after-nudge',
-              nudge:
-                recovery.action === 'retry-after-nudge'
-                  ? recovery.nudge
-                  : '[recovery] Retry after Jev recovery choice.'
-            };
-          } else if (chosen === 'abort') {
-            recovery = {
-              action: 'abort',
-              reason: recovery.action === 'abort' ? recovery.reason : 'jev_recovery_choice'
-            };
-          }
-        }
-      }
+const __gateSignal = await __gate45();
+if (__gateSignal) return __gateSignal;
+}
+return undefined;
+}
+function __gate49() {
 if (discardedAssistant(recovery)) {
         void host.emitTrace(sid, {
           kind: 'recovery_advisory',
@@ -1262,8 +1509,92 @@ if (discardedAssistant(recovery)) {
           }
         });
       }
+return undefined;
+}
+const __gateSignal = await (__gate46() ?? await __gate47() ?? await __gate48() ?? __gate49());
+if (__gateSignal) return __gateSignal;
+return undefined;
 },
 async () => {
+async function __gate26() {
+let repSession: any;
+let repAdapter: any;
+let rawRep: any;
+let rep: any;
+let graceOut: any;
+async function __gate22() {
+let strike: any;
+strike = noteCriticalHit(recoveryState);
+if (strike.action === 'abort') {
+            host.store.appendMessage(session.id, 'assistant', turnResult.assistantParts);
+            host.store.appendMessage(session.id, 'system', [
+              textPart(`[recovery] Stopped: ${graceOut.reason} (critical strike)`)
+            ]);
+            if (tryAutoFork('repetition-aborted')) return kernelTurnSignal('continue');
+            return kernelTurnSignal('return', await finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'repetition'));
+          }
+pendingRecoveryAdvisory = graceOut.advisory;
+void host.emitTrace(sid, {
+            kind: 'recovery_advisory',
+            payload: { reason: graceOut.reason, trigger: 'repetition' }
+          });
+return undefined;
+}
+async function __gate23() {
+
+if (graceOut.action === 'abort') {
+          host.store.appendMessage(session.id, 'assistant', turnResult.assistantParts);
+          await host.injectEvolvingCoachBeforeRecovery(session, agent, 'repetition', graceOut.reason);
+          host.store.appendMessage(session.id, 'system', [textPart(`[recovery] Stopped: ${graceOut.reason}`)]);
+          void host.emitTrace(sid, {
+            kind: 'recovery_abort',
+            payload: { reason: graceOut.reason, trigger: 'repetition' }
+          });
+          host.scheduleBackgroundCaseReview({
+            sessionId: session.id,
+            agentId: agent.id,
+            outcome: 'failure',
+            signals: { trigger: 'repetition', reason: graceOut.reason }
+          });
+          if (tryAutoFork('repetition-aborted')) return kernelTurnSignal('continue');
+          return kernelTurnSignal('return', await finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'repetition'));
+        }
+return undefined;
+}
+function __gate24() {
+rawRep = loopGuard!.checkAssistantRepetition(turnResult.assistantParts);
+repSession = host.store.getSession(session.id) ?? session;
+repAdapter = adapterOf(repSession);
+rep = applyRepeatGuard({
+          store: host.store,
+          identity: modelIdentity({
+            modelName: repAdapter.modelName,
+            adapterName: repAdapter.name,
+            metadata: repSession.metadata,
+          }),
+          decision: rawRep,
+        });
+graceOut = advisoryGrace ? advisoryGrace.apply(rep.abort ? { abort: true, reason: rep.reason } : { abort: false }) : rep.abort
+          ? { action: 'abort' as const, reason: rep.reason }
+          : { action: 'continue' as const };
+return undefined;
+}
+async function __gate25() {
+if (graceOut.action === 'advise') {
+const __gateSignal = await __gate22();
+if (__gateSignal) return __gateSignal;
+} else {
+const __gateSignal = await __gate23();
+if (__gateSignal) return __gateSignal;
+}
+return undefined;
+}
+const __gateSignal = await (__gate24() ?? await __gate25());
+if (__gateSignal) return __gateSignal;
+return undefined;
+return undefined;
+}
+async function __gate27() {
 if (recovery.action === 'abort' && recovery.reason === 'user_abort') {
         closeWaveIfOpen();
         return kernelTurnSignal('return', await finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'abort'));
@@ -1274,6 +1605,9 @@ if (recovery.action === 'retry-same-input') {
         ]);
         return kernelTurnSignal('continue');
       }
+return undefined;
+}
+function __gate28() {
 if (recovery.action === 'retry-after-nudge') {
         if (!recovery.discardAssistant && turnResult.assistantParts.length > 0) {
           host.store.appendMessage(session.id, 'assistant', turnResult.assistantParts);
@@ -1281,6 +1615,9 @@ if (recovery.action === 'retry-after-nudge') {
         host.store.appendMessage(sid, 'system', [textPart(recovery.nudge)]);
         return kernelTurnSignal('continue');
       }
+return undefined;
+}
+async function __gate29() {
 if (recovery.action === 'abort') {
         const reason = recovery.reason;
         host.store.appendMessage(sid, 'system', [
@@ -1321,55 +1658,13 @@ if (spinReason) {
         });
         return kernelTurnSignal('return', await finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'reasoning_spin'));
       }
+return undefined;
+}
+async function __gate30() {
 if (loopGuard) {
-        const rawRep = loopGuard.checkAssistantRepetition(turnResult.assistantParts);
-        const repSession = host.store.getSession(session.id) ?? session;
-        const repAdapter = adapterOf(repSession);
-        const rep = applyRepeatGuard({
-          store: host.store,
-          identity: modelIdentity({
-            modelName: repAdapter.modelName,
-            adapterName: repAdapter.name,
-            metadata: repSession.metadata,
-          }),
-          decision: rawRep,
-        });
-        const graceOut = advisoryGrace ? advisoryGrace.apply(rep.abort ? { abort: true, reason: rep.reason } : { abort: false }) : rep.abort
-          ? { action: 'abort' as const, reason: rep.reason }
-          : { action: 'continue' as const };
-        if (graceOut.action === 'advise') {
-          const strike = noteCriticalHit(recoveryState);
-          if (strike.action === 'abort') {
-            host.store.appendMessage(session.id, 'assistant', turnResult.assistantParts);
-            host.store.appendMessage(session.id, 'system', [
-              textPart(`[recovery] Stopped: ${graceOut.reason} (critical strike)`)
-            ]);
-            if (tryAutoFork('repetition-aborted')) return kernelTurnSignal('continue');
-            return kernelTurnSignal('return', await finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'repetition'));
-          }
-          pendingRecoveryAdvisory = graceOut.advisory;
-          void host.emitTrace(sid, {
-            kind: 'recovery_advisory',
-            payload: { reason: graceOut.reason, trigger: 'repetition' }
-          });
-        } else if (graceOut.action === 'abort') {
-          host.store.appendMessage(session.id, 'assistant', turnResult.assistantParts);
-          await host.injectEvolvingCoachBeforeRecovery(session, agent, 'repetition', graceOut.reason);
-          host.store.appendMessage(session.id, 'system', [textPart(`[recovery] Stopped: ${graceOut.reason}`)]);
-          void host.emitTrace(sid, {
-            kind: 'recovery_abort',
-            payload: { reason: graceOut.reason, trigger: 'repetition' }
-          });
-          host.scheduleBackgroundCaseReview({
-            sessionId: session.id,
-            agentId: agent.id,
-            outcome: 'failure',
-            signals: { trigger: 'repetition', reason: graceOut.reason }
-          });
-          if (tryAutoFork('repetition-aborted')) return kernelTurnSignal('continue');
-          return kernelTurnSignal('return', await finishFailed(host.store.updateSession(session.id, { status: 'idle' }), 'repetition'));
-        }
-      }
+const __gateSignal = await __gate26();
+if (__gateSignal) return __gateSignal;
+}
 assistantMessage = host.store.appendMessage(session.id, 'assistant', turnResult.assistantParts);
 if (pendingRecoveryAdvisory) {
         host.store.appendMessage(session.id, 'system', [textPart(pendingRecoveryAdvisory)]);
@@ -1381,85 +1676,64 @@ await emitStep({
         truncated: turnResult.truncated,
         assistant: { parts: turnResult.assistantParts }
       });
+return undefined;
+}
+const __gateSignal = await (await __gate27() ?? __gate28() ?? await __gate29() ?? await __gate30());
+if (__gateSignal) return __gateSignal;
+return undefined;
 },
 async () => {
-if (recovery.action !== 'continue') {
-        const stopPhase = context.session.mode === 'subagent' ? 'subagent_stop' : 'stop';
-        const stopHook = await runLifecycleHook(process.env, {
-          phase: stopPhase,
-          sessionId: sid,
-          context: { stopReason: turnResult.stopReason, agentId: agent.id }
-        });
-        if (lifecycleBlocks(stopHook)) {
-          host.store.appendMessage(sid, 'system', [
-            textPart(
-              `[stop-hook] ${stopHook.message ?? stopHook.systemMessage ?? 'stop blocked; continuing verification loop'}`
-            )
-          ]);
-          return kernelTurnSignal('continue');
-        }
-        if (stopHook.systemMessage) {
-          host.store.appendMessage(sid, 'system', [textPart(stopHook.systemMessage)]);
-        }
-        const stopExt = await host.extensionRegistry.run('stop', {
-          sessionId: sid,
-          agentId: agent.id,
-          meta: { stopReason: turnResult.stopReason, mode: context.session.mode }
-        });
-        if (stopExt.block) {
-          host.store.appendMessage(sid, 'system', [
-            textPart(
-              `[stop-extension] ${stopExt.message ?? stopExt.systemMessage ?? 'stop blocked; continuing'}`
-            )
-          ]);
-          return kernelTurnSignal('continue');
-        }
-        if (stopExt.systemMessage) {
-          host.store.appendMessage(sid, 'system', [textPart(stopExt.systemMessage)]);
-        }
-
-        // Soft-stop boundary: Jev route fan-out, then optional soft goal gate.
-        // route.done only short-circuits deep-model judge when goalGate point is off.
-        const softSnapshot = foldGoalJudgeSnapshot(host.store, sid);
-        const route = await applyJevRoute(host.store, { state: softSnapshot, signal });
-        if (route.kind === 'continue') {
-          host.store.appendMessage(sid, 'system', [
-            textPart(`[jev-route] ${route.reason}. Continue working.`)
-          ]);
-          return kernelTurnSignal('continue');
-        }
-        if (goalGate?.isActive()) {
-          if (route.kind === 'done') {
-            host.store.appendMessage(sid, 'system', [
+async function __gate21() {
+let stopPhase: any;
+let stopHook: any;
+let stopExt: any;
+let softSnapshot: any;
+let route: any;
+let steeredNow: any;
+async function __gate16() {
+function __gate11() {
+let achievedGoal: any;
+host.store.appendMessage(sid, 'system', [
               textPart(`[jev-route] Achieved: ${route.reason}`)
             ]);
-            const achievedGoal = goalStore?.findLatestBySession(sid);
-            void host.emitTrace(sid, {
+achievedGoal = goalStore?.findLatestBySession(sid);
+void host.emitTrace(sid, {
               kind: 'goal_eval',
               payload: attachGoalText({
                 met: true,
                 reason: route.reason,
                 source: 'jev-route',
                 decision: 'achieved',
-                turnsUsed: goalGate.getTurnsUsed()
+                turnsUsed: goalGate!.getTurnsUsed()
               }, {
                 goal: resolveGoalCondition((host.store.getSession(sid) ?? session).metadata) ?? achievedGoal?.condition,
                 title: achievedGoal?.spec.goal
               })
             });
-          } else {
-            const snapshot = softSnapshot;
-            const gateAdapter = adapterOf(host.store.getSession(sid) ?? session);
-            const fallbackJudge =
-              typeof gateAdapter.completeText === 'function'
+return undefined;
+}
+async function __gate15() {
+let gateAdapter: any;
+let fallbackJudge: any;
+let rec: any;
+let snapshot: any;
+let judge: any;
+let verifySpec: any;
+let evalResult: any;
+let decision: any;
+let judgedSession: any;
+async function __gate12() {
+snapshot = softSnapshot;
+gateAdapter = adapterOf(host.store.getSession(sid) ?? session);
+fallbackJudge = typeof gateAdapter.completeText === 'function'
                 ? (input: { system: string; user: string; signal?: AbortSignal }) =>
                     gateAdapter.completeText!({ ...input, jsonMode: true })
                 : async () =>
                     JSON.stringify({ met: true, reason: 'no completeText; fail-open' });
-            const judge = selectGoalJudge(host.store, fallbackJudge);
-            const rec = goalStore?.findLatestBySession(sid);
-            const verifySpec = rec?.spec.verify;
-            const { evalResult, decision } = await goalGate.evaluate({
+judge = selectGoalJudge(host.store, fallbackJudge);
+rec = goalStore?.findLatestBySession(sid);
+verifySpec = rec?.spec.verify;
+({ evalResult, decision } = await goalGate!.evaluate({
               snapshot,
               judge,
               signal,
@@ -1474,40 +1748,46 @@ if (recovery.action !== 'continue') {
                       signal
                     })
                 : undefined
-            });
-            host.mergeSessionMetadata(sid, goalGate.metadataPatch());
-            if (goalStore) {
+            }));
+host.mergeSessionMetadata(sid, goalGate!.metadataPatch());
+return undefined;
+}
+function __gate13() {
+if (goalStore) {
               persistGoalAfterEval({
                 store: goalStore,
                 sessionId: sid,
                 metadata: host.store.getSession(sid)?.metadata ?? session.metadata,
                 evalResult,
                 decision,
-                gate: goalGate
+                gate: goalGate!
               });
             }
-            const judgedSession = host.store.getSession(sid) ?? session;
-            void host.emitTrace(sid, {
+judgedSession = host.store.getSession(sid) ?? session;
+void host.emitTrace(sid, {
               kind: 'goal_eval',
               payload: attachGoalText({
                 met: evalResult.met,
                 reason: evalResult.reason,
                 source: evalResult.source,
                 decision: decision.kind,
-                turnsUsed: goalGate.getTurnsUsed()
+                turnsUsed: goalGate!.getTurnsUsed()
               }, {
                 goal: resolveGoalCondition(judgedSession.metadata) ?? rec?.condition,
                 title: rec?.spec.goal
               })
             });
-            if (decision.kind === 'continue') {
+return undefined;
+}
+function __gate14() {
+if (decision.kind === 'continue') {
               const reason =
                 decision.unattendedInstruction ??
                 `[goal] Condition not met yet: ${evalResult.reason}. Continue working toward the goal.`;
               host.store.appendMessage(sid, 'system', [textPart(reason)]);
               return kernelTurnSignal('continue');
             }
-            if (decision.kind === 'close') {
+if (decision.kind === 'close') {
               host.store.appendMessage(sid, 'system', [
                 textPart(`[goal] Closed (${decision.event}): ${decision.reason}`)
               ]);
@@ -1516,24 +1796,102 @@ if (recovery.action !== 'continue') {
                 textPart(`[goal] Achieved: ${evalResult.reason}`)
               ]);
             }
-          }
+return undefined;
+}
+const __gateSignal = await (await __gate12() ?? __gate13() ?? __gate14());
+if (__gateSignal) return __gateSignal;
+return undefined;
+return undefined;
+}
+if (route.kind === 'done') {
+const __gateSignal = __gate11();
+if (__gateSignal) return __gateSignal;
+} else {
+const __gateSignal = await __gate15();
+if (__gateSignal) return __gateSignal;
+}
+return undefined;
+}
+async function __gate17() {
+stopPhase = context.session.mode === 'subagent' ? 'subagent_stop' : 'stop';
+stopHook = await runLifecycleHook(process.env, {
+          phase: stopPhase,
+          sessionId: sid,
+          context: { stopReason: turnResult.stopReason, agentId: agent.id }
+        });
+if (lifecycleBlocks(stopHook)) {
+          host.store.appendMessage(sid, 'system', [
+            textPart(
+              `[stop-hook] ${stopHook.message ?? stopHook.systemMessage ?? 'stop blocked; continuing verification loop'}`
+            )
+          ]);
+          return kernelTurnSignal('continue');
         }
-
-        saveClosedStep(turn, 'turn-end');
-        if (host.waitSteeringChildrenIdle) {
+return undefined;
+}
+async function __gate18() {
+if (stopHook.systemMessage) {
+          host.store.appendMessage(sid, 'system', [textPart(stopHook.systemMessage)]);
+        }
+stopExt = await host.extensionRegistry.run('stop', {
+          sessionId: sid,
+          agentId: agent.id,
+          meta: { stopReason: turnResult.stopReason, mode: context.session.mode }
+        });
+if (stopExt.block) {
+          host.store.appendMessage(sid, 'system', [
+            textPart(
+              `[stop-extension] ${stopExt.message ?? stopExt.systemMessage ?? 'stop blocked; continuing'}`
+            )
+          ]);
+          return kernelTurnSignal('continue');
+        }
+return undefined;
+}
+async function __gate19() {
+if (stopExt.systemMessage) {
+          host.store.appendMessage(sid, 'system', [textPart(stopExt.systemMessage)]);
+        }
+softSnapshot = foldGoalJudgeSnapshot(host.store, sid);
+route = await applyJevRoute(host.store, { state: softSnapshot, signal });
+if (route.kind === 'continue') {
+          host.store.appendMessage(sid, 'system', [
+            textPart(`[jev-route] ${route.reason}. Continue working.`)
+          ]);
+          return kernelTurnSignal('continue');
+        }
+if (goalGate?.isActive()) {
+const __gateSignal = await __gate16();
+if (__gateSignal) return __gateSignal;
+}
+saveClosedStep(turn, 'turn-end');
+return undefined;
+}
+async function __gate20() {
+if (host.waitSteeringChildrenIdle) {
           await host.waitSteeringChildrenIdle(sid);
         } else {
           await waitSteeringChildrenIdle(sid);
         }
-        const steeredNow = host.store.claimInbox(sid, 'next-step');
-        if (steeredNow.length > 0) {
+steeredNow = host.store.claimInbox(sid, 'next-step');
+if (steeredNow.length > 0) {
           applyClaimedInbox(host.store, sid, steeredNow);
           return kernelTurnSignal('continue');
         }
-        return kernelTurnSignal('return', await host.handleTurnCompletion(session, agent, task).then((completed) =>
+return kernelTurnSignal('return', await host.handleTurnCompletion(session, agent, task).then((completed) =>
           finishEnded(completed, 'end')
         ));
-      }
+return undefined;
+}
+const __gateSignal = await (await __gate17() ?? await __gate18() ?? await __gate19() ?? await __gate20());
+if (__gateSignal) return __gateSignal;
+return undefined;
+return undefined;
+}
+if (recovery.action !== 'continue') {
+const __gateSignal = await __gate21();
+if (__gateSignal) return __gateSignal;
+}
 if (!assistantMessage) {
         return kernelTurnSignal('return', await finishFailed(host.store.updateSession(session.id, { status: 'failed' }), 'missing_assistant'));
       }
@@ -1558,6 +1916,113 @@ approvalResult = await host.checkToolApprovals(
       );
 },
 async () => {
+function __gate3() {
+let usageTotals: any;
+let budgetTokens: any;
+let tick: any;
+for (const r of results) {
+          riskEngine!.observeTool({
+            toolName: r.name,
+            success: r.ok,
+            errorMessage: r.ok ? undefined : r.content
+          });
+        }
+usageTotals = host.store.getSession(sid)?.metadata?.usageTotals as
+          | TokenUsage
+          | undefined;
+budgetTokens = envInt(process.env, 'RAW_AGENT_TOKEN_BUDGET', 0);
+tick = riskEngine!.tick({
+          iteration: turn,
+          iterationLimit: maxTurnsPerRun,
+          usedTokens: usageTotals?.totalTokens,
+          budgetTokens: budgetTokens > 0 ? budgetTokens : undefined,
+          sameToolStreak: progressGuard.sameToolStreak,
+          sameToolThreshold: progressGuard.sameToolThreshold
+        });
+if (tick.shouldAdvise) {
+          const draft = advisoryQueue.enqueue(formatRiskAdvisory(tick.signals), 'risk');
+          void host.emitTrace(sid, {
+            kind: 'risk_advisory',
+            payload: { reason: tick.reason, signals: tick.signals, advisoryId: draft.id }
+          });
+        }
+return undefined;
+}
+async function __gate7() {
+let live: any;
+let adapter: any;
+let ar: any;
+let guarded: any;
+let graceOut: any;
+function __gate4() {
+ar = progressDecision;
+live = host.store.getSession(session.id) ?? session;
+adapter = adapterOf(live);
+guarded = applyRepeatGuard({
+          store: host.store,
+          identity: modelIdentity({
+            modelName: adapter.modelName,
+            adapterName: adapter.name,
+            metadata: live.metadata,
+          }),
+          decision: ar,
+        });
+graceOut = advisoryGrace ? advisoryGrace.apply(guarded) : guarded.abort
+          ? { action: 'abort' as const, reason: guarded.reason }
+          : { action: 'continue' as const };
+return undefined;
+}
+async function __gate5() {
+if (graceOut.action === 'advise') {
+          const strike = noteCriticalHit(recoveryState);
+          if (strike.action === 'abort') {
+            host.store.appendMessage(session.id, 'system', [
+              textPart(`[recovery] Stopped: ${graceOut.reason} (critical strike)`)
+            ]);
+            if (tryAutoFork('deadloop-exhausted')) return kernelTurnSignal('continue');
+            return kernelTurnSignal('return', await finishFailed(
+              host.store.updateSession(session.id, { status: 'idle' }),
+              loopGuardStopReason(graceOut.reason)
+            ));
+          }
+          host.store.appendMessage(session.id, 'system', [textPart(graceOut.advisory)]);
+          void host.emitTrace(sid, {
+            kind: 'recovery_advisory',
+            payload: { reason: graceOut.reason, trigger: 'tools' }
+          });
+          return kernelTurnSignal('continue');
+        }
+return undefined;
+}
+async function __gate6() {
+if (graceOut.action === 'abort') {
+          const fresh = host.store.getSession(session.id) as SessionRecord;
+          await host.injectEvolvingCoachBeforeRecovery(fresh, agent, 'tools', graceOut.reason);
+          host.store.appendMessage(session.id, 'system', [textPart(`[recovery] Stopped: ${graceOut.reason}`)]);
+          void host.emitTrace(sid, {
+            kind: 'recovery_abort',
+            payload: { reason: graceOut.reason, trigger: 'tools' }
+          });
+          host.scheduleBackgroundCaseReview({
+            sessionId: session.id,
+            agentId: agent.id,
+            outcome: 'failure',
+            signals: { trigger: 'tools', reason: graceOut.reason }
+          });
+          if (tryAutoFork('deadloop-exhausted')) return kernelTurnSignal('continue');
+          return kernelTurnSignal('return', await finishFailed(
+            host.store.updateSession(session.id, { status: 'idle' }),
+            loopGuardStopReason(graceOut.reason)
+          ));
+        }
+return undefined;
+}
+const __gateSignal = await (__gate4() ?? await __gate5() ?? await __gate6());
+if (__gateSignal) return __gateSignal;
+return undefined;
+return undefined;
+}
+async function __gate8() {
 if (approvalResult === 'waiting') {
         if (validToolCalls.some((c: ToolCallPart) => c.name === 'ask_user')) {
           markGoalWaitingUser(goalStore, sid);
@@ -1600,6 +2065,9 @@ drain = drainSteerAtToolLaunch({
         toolCallIds: validToolCalls.map((c: ToolCallPart) => c.toolCallId),
         policy: drainPolicy
       });
+return undefined;
+}
+async function __gate9() {
 if (drain.drained) {
         await emitStep({
           type: 'tools_done',
@@ -1639,89 +2107,21 @@ progressDecision = progressGuard.afterToolRound(
         results
       );
 if (riskEngine) {
-        for (const r of results) {
-          riskEngine.observeTool({
-            toolName: r.name,
-            success: r.ok,
-            errorMessage: r.ok ? undefined : r.content
-          });
-        }
-        const usageTotals = host.store.getSession(sid)?.metadata?.usageTotals as
-          | TokenUsage
-          | undefined;
-        const budgetTokens = envInt(process.env, 'RAW_AGENT_TOKEN_BUDGET', 0);
-        const tick = riskEngine.tick({
-          iteration: turn,
-          iterationLimit: maxTurnsPerRun,
-          usedTokens: usageTotals?.totalTokens,
-          budgetTokens: budgetTokens > 0 ? budgetTokens : undefined,
-          sameToolStreak: progressGuard.sameToolStreak,
-          sameToolThreshold: progressGuard.sameToolThreshold
-        });
-        if (tick.shouldAdvise) {
-          const draft = advisoryQueue.enqueue(formatRiskAdvisory(tick.signals), 'risk');
-          void host.emitTrace(sid, {
-            kind: 'risk_advisory',
-            payload: { reason: tick.reason, signals: tick.signals, advisoryId: draft.id }
-          });
-        }
-      }
+const __gateSignal = __gate3();
+if (__gateSignal) return __gateSignal;
+}
+return undefined;
+}
+async function __gate10() {
 if (loopGuard) {
-        const ar = progressDecision;
-        const live = host.store.getSession(session.id) ?? session;
-        const adapter = adapterOf(live);
-        const guarded = applyRepeatGuard({
-          store: host.store,
-          identity: modelIdentity({
-            modelName: adapter.modelName,
-            adapterName: adapter.name,
-            metadata: live.metadata,
-          }),
-          decision: ar,
-        });
-        const graceOut = advisoryGrace ? advisoryGrace.apply(guarded) : guarded.abort
-          ? { action: 'abort' as const, reason: guarded.reason }
-          : { action: 'continue' as const };
-        if (graceOut.action === 'advise') {
-          const strike = noteCriticalHit(recoveryState);
-          if (strike.action === 'abort') {
-            host.store.appendMessage(session.id, 'system', [
-              textPart(`[recovery] Stopped: ${graceOut.reason} (critical strike)`)
-            ]);
-            if (tryAutoFork('deadloop-exhausted')) return kernelTurnSignal('continue');
-            return kernelTurnSignal('return', await finishFailed(
-              host.store.updateSession(session.id, { status: 'idle' }),
-              loopGuardStopReason(graceOut.reason)
-            ));
-          }
-          host.store.appendMessage(session.id, 'system', [textPart(graceOut.advisory)]);
-          void host.emitTrace(sid, {
-            kind: 'recovery_advisory',
-            payload: { reason: graceOut.reason, trigger: 'tools' }
-          });
-          return kernelTurnSignal('continue');
-        }
-        if (graceOut.action === 'abort') {
-          const fresh = host.store.getSession(session.id) as SessionRecord;
-          await host.injectEvolvingCoachBeforeRecovery(fresh, agent, 'tools', graceOut.reason);
-          host.store.appendMessage(session.id, 'system', [textPart(`[recovery] Stopped: ${graceOut.reason}`)]);
-          void host.emitTrace(sid, {
-            kind: 'recovery_abort',
-            payload: { reason: graceOut.reason, trigger: 'tools' }
-          });
-          host.scheduleBackgroundCaseReview({
-            sessionId: session.id,
-            agentId: agent.id,
-            outcome: 'failure',
-            signals: { trigger: 'tools', reason: graceOut.reason }
-          });
-          if (tryAutoFork('deadloop-exhausted')) return kernelTurnSignal('continue');
-          return kernelTurnSignal('return', await finishFailed(
-            host.store.updateSession(session.id, { status: 'idle' }),
-            loopGuardStopReason(graceOut.reason)
-          ));
-        }
-      }
+const __gateSignal = await __gate7();
+if (__gateSignal) return __gateSignal;
+}
+return undefined;
+}
+const __gateSignal = await (await __gate8() ?? await __gate9() ?? await __gate10());
+if (__gateSignal) return __gateSignal;
+return undefined;
 }
 ];
 for (const kernelStep of kernelSteps) {

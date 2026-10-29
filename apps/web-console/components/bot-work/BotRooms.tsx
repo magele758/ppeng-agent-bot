@@ -21,6 +21,23 @@ type Room = {
   status: string;
 };
 type Turn={workRef?:RoomWorkReceiptData;id:string;status:string;botTurns:number;maxBotTurns:number;toolCalls?:number;costUsd?:number;costStatus?:string;terminationReason?:string;partialResult?:unknown};
+
+function enabledCapValue(enabled: boolean | undefined, value: number): number {
+  return enabled === true ? value : 0;
+}
+
+function roomCapPatch(room: Room) {
+  return {
+    title: room.title,
+    hostBotId: room.hostBotId,
+    maxBotTurns: enabledCapValue(room.turnCapEnabled, room.maxBotTurns),
+    turnCapEnabled: room.turnCapEnabled === true,
+    maxToolCalls: enabledCapValue(room.toolCapEnabled, room.maxToolCalls),
+    toolCapEnabled: room.toolCapEnabled === true,
+    maxCostUsd: enabledCapValue(room.costCapEnabled, room.maxCostUsd),
+    costCapEnabled: room.costCapEnabled === true,
+  };
+}
 type Message = {
   workReceipt?:RoomWorkReceiptData;
   id: string;
@@ -153,16 +170,7 @@ export function BotRooms({ bots, selectedRoomId, memberEditor = true, onOpenWork
     await modify(
       "",
       json(
-        {
-          title: room.title,
-          hostBotId: room.hostBotId,
-          maxBotTurns: room.turnCapEnabled === true ? room.maxBotTurns : 0,
-          turnCapEnabled: room.turnCapEnabled === true,
-          maxToolCalls: room.toolCapEnabled === true ? room.maxToolCalls : 0,
-          toolCapEnabled: room.toolCapEnabled === true,
-          maxCostUsd: room.costCapEnabled === true ? room.maxCostUsd : 0,
-          costCapEnabled: room.costCapEnabled === true,
-        },
+        roomCapPatch(room),
         "PATCH",
       ),
     );
@@ -290,7 +298,7 @@ export function BotRooms({ bots, selectedRoomId, memberEditor = true, onOpenWork
                 min={1}
                 max={20}
                 disabled={room.turnCapEnabled !== true}
-                value={room.turnCapEnabled === true ? room.maxBotTurns : 0}
+                value={enabledCapValue(room.turnCapEnabled, room.maxBotTurns)}
                 onChange={(e) =>
                   editRoom({ ...room, turnCapEnabled: true, maxBotTurns: Number(e.target.value) })
                 }
@@ -309,7 +317,7 @@ export function BotRooms({ bots, selectedRoomId, memberEditor = true, onOpenWork
                 min={1}
                 max={10000}
                 disabled={room.toolCapEnabled !== true}
-                value={room.toolCapEnabled === true ? room.maxToolCalls : 0}
+                value={enabledCapValue(room.toolCapEnabled, room.maxToolCalls)}
                 onChange={(e) => editRoom({ ...room, toolCapEnabled: true, maxToolCalls: Number(e.target.value) })}
               />
             <small>{t('play.groupSettings.toolsHelp')}</small>
@@ -327,7 +335,7 @@ export function BotRooms({ bots, selectedRoomId, memberEditor = true, onOpenWork
                 max={1000}
                 step="any"
                 disabled={room.costCapEnabled !== true}
-                value={room.costCapEnabled === true ? room.maxCostUsd : 0}
+                value={enabledCapValue(room.costCapEnabled, room.maxCostUsd)}
                 onChange={(e) => editRoom({ ...room, costCapEnabled: true, maxCostUsd: Number(e.target.value) })}
               />
             <small>{t('play.groupSettings.costHelp')}</small>
