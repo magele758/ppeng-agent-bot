@@ -444,10 +444,10 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
     return lines;
   }
 
-  const readFileTool: ToolContract<{ path?: string; limit?: number; offset_line?: number }> = {
+  const readFileTool: ToolContract<{ path?: string; limit?: number; offset_line?: number; machineId?: string }> = {
     name: 'read_file',
     description:
-      'Read a file or list the current workspace directory. For large files use offset_line + limit to read a line window without loading the whole file. Directory listings omit Obsidian-style metadata folders (.obsidian, .trash).',
+      'Read a file or list the current workspace directory. For large files use offset_line + limit to read a line window without loading the whole file. Directory listings omit Obsidian-style metadata folders (.obsidian, .trash). Optional machineId (from list_machines) reads on a personal registered machine via RegisteredMachinePort — not Factory SSH.',
     inputSchema: {
       type: 'object',
       properties: {
