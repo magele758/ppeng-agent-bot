@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   createMemorySecretVault,
   createMemoryUserVault,
+  UserVault,
   fillByReferences,
   assertModelFacingHasNoUserVaultSecrets,
   makeUserVaultFillRef,
@@ -96,4 +97,48 @@ test('fill refs parse round-trip; invalid ref fails closed', async () => {
   const vault = createMemoryUserVault();
   const bad = await fillByReferences(vault, ['not-a-ref'], async () => null);
   assert.equal(bad.ok, false);
+});
+
+test('resolveFillReference resolves every field kind and fails closed otherwise', () => {
+  const vault = createMemoryUserVault();
+  const login = vault.upsertLogin({ label: 'L', username: 'lei', password: 'pw-1' });
+  const bare = vault.upsertLogin({ label: 'NoPw', username: 'x' });
+  const card = vault.upsertCard({ label: 'C', holderName: 'Lei', expiry: '01/29', number: '4242424242424242', cvv: '321' });
+  const contact = vault.upsertContact({ label: 'K', fullName: 'Lei P', email: 'a@b.c', phone: '1', address: 'Addr' });
+  const r = (id, field) => vault.resolveFillReference(makeUserVaultFillRef(id, field));
+
+  assert.equal(r(login.id, 'username'), 'lei');
+  assert.equal(r(login.id, 'password'), 'pw-1');
+  assert.equal(r(login.id, 'cvv'), undefined);
+  assert.equal(r(bare.id, 'password'), undefined);
+  assert.equal(r(card.id, 'holderName'), 'Lei');
+  assert.equal(r(card.id, 'expiry'), '01/29');
+  assert.equal(r(card.id, 'cardNumber'), '4242424242424242');
+  assert.equal(r(card.id, 'cvv'), '321');
+  assert.equal(r(card.id, 'email'), undefined);
+  assert.equal(r(contact.id, 'fullName'), 'Lei P');
+  assert.equal(r(contact.id, 'email'), 'a@b.c');
+  assert.equal(r(contact.id, 'phone'), '1');
+  assert.equal(r(contact.id, 'address'), 'Addr');
+  assert.equal(r(contact.id, 'password'), undefined);
+  assert.equal(r('missing', 'password'), undefined);
+  assert.equal(vault.resolveFillReference('not-a-ref'), undefined);
+});
+
+test('resolveFillReference returns undefined when ciphertext cannot be decrypted', () => {
+  const kv = new Map();
+  const store = {
+    getDaemonControl: (k) => kv.get(k),
+    setDaemonControl: (k, v) => kv.set(k, structuredClone(v))
+  };
+  const first = new UserVault(store);
+  const login = first.upsertLogin({ label: 'L', password: 'pw' });
+  const card = first.upsertCard({ label: 'C', number: '4242424242424242', cvv: '321' });
+  const saved = kv.get(USER_VAULT_KEY);
+  saved.keyHex = '11'.repeat(32);
+  kv.set(USER_VAULT_KEY, saved);
+  const second = new UserVault(store);
+  for (const [id, field] of [[login.id, 'password'], [card.id, 'cardNumber'], [card.id, 'cvv']]) {
+    assert.equal(second.resolveFillReference(makeUserVaultFillRef(id, field)), undefined);
+  }
 });

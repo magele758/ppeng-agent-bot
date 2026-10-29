@@ -98,7 +98,8 @@ test('Lab Vault API: write-only secrets, uvref listing, toggle, delete, SecretVa
     assert.equal((await send(env.root, 'POST', '/api/user-vault/entries', { kind: 'login', label: '' })).status, 400);
 
     const listedRaw = await (await send(env.root, 'GET', '/api/user-vault')).text();
-    for (const secret of [PASSWORD, CARD, CVV]) assert.ok(!listedRaw.includes(secret));
+    // CVV is 3 digits and can collide with hex ids/timestamps; match the JSON string value only.
+    for (const secret of [PASSWORD, CARD, JSON.stringify(CVV)]) assert.ok(!listedRaw.includes(secret));
     const listed = JSON.parse(listedRaw) as { entries: VaultEntry[] };
     assert.equal(listed.entries.length, 2);
     assert.ok(entryFillRefs(listed.entries.find((e) => e.id === login.id)!).includes(`uvref:${login.id}:password`));

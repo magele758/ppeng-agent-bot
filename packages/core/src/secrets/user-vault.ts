@@ -154,6 +154,21 @@ export function parseUserVaultFillRef(
   return { id, field };
 }
 
+function resolveContactField(row: ContactRecord, field: UserVaultFillField): string | undefined {
+  switch (field) {
+    case 'fullName':
+      return row.fullName;
+    case 'email':
+      return row.email;
+    case 'phone':
+      return row.phone;
+    case 'address':
+      return row.address;
+    default:
+      return undefined;
+  }
+}
+
 let boundUserVault: UserVault | undefined;
 
 export function bindUserVault(vault: UserVault | undefined): void {
@@ -342,44 +357,57 @@ export class UserVault {
     if (!parsed) return undefined;
     const row = this.memory.get(parsed.id);
     if (!row) return undefined;
-    const { field } = parsed;
-    if (row.kind === 'login') {
-      if (field === 'username') return row.username;
-      if (field === 'password' && row.passwordEnc) {
-        try {
-          return decrypt(this.key(), row.passwordEnc);
-        } catch {
-          return undefined;
-        }
-      }
+    return this.resolveRowField(row, parsed.field);
+  }
+
+  private decryptOrUndefined(blob: EncryptedBlob | undefined): string | undefined {
+    if (!blob) return undefined;
+    try {
+      return decrypt(this.key(), blob);
+    } catch {
       return undefined;
     }
-    if (row.kind === 'card') {
-      if (field === 'holderName') return row.holderName;
-      if (field === 'expiry') return row.expiry;
-      if (field === 'cardNumber' && row.numberEnc) {
-        try {
-          return decrypt(this.key(), row.numberEnc);
-        } catch {
-          return undefined;
-        }
+  }
+
+  private resolveRowField(row: UserVaultRecord, field: UserVaultFillField): string | undefined {
+    switch (row.kind) {
+      case 'login':
+        return this.resolveLoginField(row, field);
+      case 'card':
+        return this.resolveCardField(row, field);
+      case 'contact':
+        return resolveContactField(row, field);
+      default: {
+        const unreachable: never = row;
+        return unreachable;
       }
-      if (field === 'cvv' && row.cvvEnc) {
-        try {
-          return decrypt(this.key(), row.cvvEnc);
-        } catch {
-          return undefined;
-        }
-      }
-      return undefined;
     }
-    if (row.kind === 'contact') {
-      if (field === 'fullName') return row.fullName;
-      if (field === 'email') return row.email;
-      if (field === 'phone') return row.phone;
-      if (field === 'address') return row.address;
+  }
+
+  private resolveLoginField(row: LoginRecord, field: UserVaultFillField): string | undefined {
+    switch (field) {
+      case 'username':
+        return row.username;
+      case 'password':
+        return this.decryptOrUndefined(row.passwordEnc);
+      default:
+        return undefined;
     }
-    return undefined;
+  }
+
+  private resolveCardField(row: CardRecord, field: UserVaultFillField): string | undefined {
+    switch (field) {
+      case 'holderName':
+        return row.holderName;
+      case 'expiry':
+        return row.expiry;
+      case 'cardNumber':
+        return this.decryptOrUndefined(row.numberEnc);
+      case 'cvv':
+        return this.decryptOrUndefined(row.cvvEnc);
+      default:
+        return undefined;
+    }
   }
 
   /** Collect every known secret plaintext (for leak tests / redaction). */
