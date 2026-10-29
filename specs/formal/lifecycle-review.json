@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-10-28T19:00:09.000Z",
-  "reviewNote": "Quieter terminal goal notices (Done/Failed/Blocked/Needs review) replace JSON dumps in chat; Lab still holds full state. Merged origin/main after #315 host-park bg_run. Pairing/lifecycle/restart/concurrency control-flow unchanged.",
+  "reviewedAt": "2026-10-29T00:21:53.000Z",
+  "reviewNote": "UserVault reference-fill API typed apart from SecretVault; runtime binds userVault. Password/card secrets stay off model-facing fill reports. Pairing/lifecycle/restart/concurrency control-flow unchanged.",
   "mapping": [
     {
       "step": "Public runtime, cancellation, approvals and completion; exercised through RawAgentRuntime with SQLite",
@@ -314,7 +314,7 @@
     }
   ],
   "sha256": {
-    "packages/core/src/runtime.ts": "7abca069c6311d50df3d837849e6106444aa0b49d6cb003aa018678297e47147",
+    "packages/core/src/runtime.ts": "78c0e20321be84eb32fa2d1cebd0af4a26de255b1d6f992ce96c90faaa5f5dff",
     "packages/core/src/runtime/session-control.ts": "8f42a13096811dd960ed726e7d9685350fa041e08c57960e9e2f57cf7c5d55b4",
     "packages/core/src/runtime/session-facade.ts": "54d800b00dd14bcd9d1184da8c69c5ef1f2fffa9c2e1d6e2608b735e98ae7de0",
     "packages/core/src/runtime/session-complete.ts": "dc1ac19365583096d95892d5f424293ab5ef2e0e3494665451a2ed951fc7f6e5",
