@@ -1,0 +1,22 @@
+id: routine-weekday-daytime-default
+title: 新建例行任务默认工作日白天
+status: implemented
+requirement: |
+  Make new routines default to a weekday daytime run window (工作日白天窗). When a user creates a routine without an explicit schedule/window, the defaults should prefer weekday daytime hours rather than firing overnight or on weekends by default.
+  Creating a routine (API / tool / Lab — whichever path(s) set defaults today) should default the schedule/timing window to weekday daytime (Mon–Fri daytime local hours, aligned with existing flexible timing / cron attention / quiet-hours semantics).
+  Explicit user-provided cron/schedule/timing must still win; only fill defaults when the user omitted them.
+  Existing routines must not be mass-rewritten; this is about new creates / default fields.
+notes: 'assumedApproval: standing-order-2026-10-22. 默认采用本地时区周一至周五 09:00（与 Lab 工作日预设、早晨 9 点，以及静默时段默认 22–8 的白天互补一致）。未改成白天每小时都跑。'
+criteria:
+  - id: AC-1
+    given: 用户新建一条例行任务，没有填写时间表或时间窗
+    when: 任务被保存
+    then: 它按该任务时区在工作日白天运行，默认不会在夜间或周末触发
+  - id: AC-2
+    given: 用户新建时写明了 cron、间隔、一次性时间或事件
+    when: 任务被保存
+    then: 采用用户写明的时间，包括夜间或周末
+  - id: AC-3
+    given: 已有例行任务使用夜间或周末时间
+    when: 再新建一条未填写时间的任务，或更新旧任务时不改时间
+    then: 旧任务的时间保持不变
