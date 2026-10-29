@@ -19,6 +19,7 @@
 - **直接增益（治理与工程控件）**  
   对齐 Anthropic 对高自主智能体的警示，本仓库已具备或可强化的包括：
   - **审批与人机闭环**：高风险工具调用走批准（例如外部 AI CLI 等）。
+  - **Auto-review（工具级）**：高危 Shell/spawn/MCP 默认拦；同参重试并带 `requestSmartModeApproval` 才出原生审批卡；拒绝为终局；`permissionMode=bypass` 不能绕过。见 `@ppeng/agent-loop` `evaluateAutoReview` / `checkToolApprovals`。
   - **最小权限**：`allowedTools`、`DomainBundle`、`RAW_AGENT_EXTERNAL_AI_TOOLS` 等按需暴露能力。
   - **沙箱与 spawn 卫生**：`sanitizeSpawnEnv`、`SandboxManager`（macOS `sandbox-exec` / Linux `bwrap`）降低凭证与环境注入面。
   - **审计与可追溯**：会话/工具 trace、日志；运营侧可据此做事后审查。

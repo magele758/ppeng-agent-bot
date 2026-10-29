@@ -42,6 +42,10 @@ import {
   applyPermissionModeGate,
   resolvePermissionMode,
 } from '../approval/permission-mode.js';
+import {
+  autoReviewIdempotencyKey,
+  evaluateAutoReview,
+} from '../approval/auto-review.js';
 
 // ============================================================================
 // Public types
@@ -425,12 +429,70 @@ export function checkToolApprovals(
   }
 
   let waiting = false;
+  let softBlocked = false;
   let sessionApprovals: Map<string, ApprovalRecord> | undefined;
   const approvalFor = (idemKey: string): ApprovalRecord | undefined => {
     sessionApprovals ??= approvalIndexForSession(host, sid);
     return sessionApprovals.get(idemKey);
   };
+
+  // Auto-review owns high-risk Shell/MCP. It is not skipped by permissionMode=bypass.
+  const autoReviewHandled = new Set<string>();
   for (const tc of validToolCalls) {
+    const tool = findToolByName(tools, tc.name);
+    if (!tool) continue;
+    const decision = evaluateAutoReview({ toolName: tool.name, toolInput: tc.input });
+    if (decision.action === 'allow') continue;
+
+    const idemKey = autoReviewIdempotencyKey(tool.name, decision.fingerprintInput, stableJsonHash);
+    const existing = approvalFor(idemKey);
+    autoReviewHandled.add(tc.toolCallId);
+
+    if (existing?.status === 'approved') {
+      continue;
+    }
+    if (existing?.status === 'rejected') {
+      closure?.ids.push(tc.toolCallId);
+      appendApprovalToolResult(
+        host,
+        sid,
+        tc,
+        `Auto-review for ${tool.name} was rejected. Denial is final; do not bypass.`,
+        { title: 'Auto-review denied', code: 'AUTO_REVIEW_DENIED', status: 403 }
+      );
+      softBlocked = true;
+      continue;
+    }
+    if (existing?.status === 'pending') {
+      waiting = true;
+      continue;
+    }
+
+    if (decision.action === 'require_card') {
+      host.createApproval({
+        sessionId: sid,
+        toolName: tool.name,
+        reason: decision.reason,
+        args: decision.fingerprintInput,
+        idempotencyKey: idemKey,
+      });
+      waiting = true;
+      continue;
+    }
+
+    // soft_block: default deny without card; remediation asks for same-action retry + flag
+    appendApprovalToolResult(
+      host,
+      sid,
+      tc,
+      `${decision.reason}\nremediation: ${decision.remediation}`,
+      { title: 'Blocked by Auto-review', code: decision.code, status: 403 }
+    );
+    softBlocked = true;
+  }
+
+  for (const tc of validToolCalls) {
+    if (autoReviewHandled.has(tc.toolCallId)) continue;
     const tool = findToolByName(tools, tc.name);
     if (!tool || !needsApproval(tool, tc)) continue;
     const idemKey = stableJsonHash(tool.name, tc.input);
@@ -460,7 +522,9 @@ export function checkToolApprovals(
     });
     waiting = true;
   }
-  return waiting ? 'waiting' : 'proceed';
+  if (waiting) return 'waiting';
+  if (softBlocked) return 'skip';
+  return 'proceed';
 }
 
 function appendApprovalToolResult(
