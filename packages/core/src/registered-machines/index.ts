@@ -11,6 +11,10 @@ export type {
 } from './types.js';
 export { createDisconnectedBackend } from './types.js';
 export {
+  createSshRegisteredMachineBackend,
+  type SshRegisteredMachineBackendOptions
+} from './ssh-backend.js';
+export {
   createRegisteredMachinePort,
   assertRegisteredMachineId,
   denyCrossRailFactoryUse,

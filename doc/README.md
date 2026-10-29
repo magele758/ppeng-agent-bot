@@ -26,6 +26,8 @@ Bot 创建、统一设置面板、热配置的作用范围与生效时机见 [BO
 
 第一批记忆与调度可靠性能力的操作入口、边界和接口见 [FIRST_BATCH_RELIABILITY.md](FIRST_BATCH_RELIABILITY.md)。
 
+个人注册机器（SSH 实机后端，≠ Factory SSH）见 [REGISTERED_MACHINES.md](REGISTERED_MACHINES.md)。
+
 依赖安装、工作区命令、容器和历史验证的 pnpm 迁移说明见 [PNPM_MIGRATION.md](PNPM_MIGRATION.md)。
 
 本地开发的 HTTPS 与 Tailscale 自动转发见 [DEV_HTTPS.md](DEV_HTTPS.md)。

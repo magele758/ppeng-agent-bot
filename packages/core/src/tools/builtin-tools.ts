@@ -465,9 +465,10 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
         }
       }
     },
-    approvalMode: 'never',
+    approvalMode: 'auto',
     sideEffectLevel: 'none',
     ptc: { kind: 'read' },
+    needsApproval: (_context, args) => Boolean(args?.machineId),
     async execute(context, args) {
       {
         const routed = await executeOnRegisteredMachine(
@@ -898,6 +899,7 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
     sideEffectLevel: 'workspace',
     needsApproval(_context, args) {
       return (
+        Boolean(args?.machineId) ||
         shellCallNeedsDirectApproval(args.isolation, shellIsolationAvailability(getAgentSandbox().kind)) ||
         bashCommandNeedsApproval(args.command)
       );

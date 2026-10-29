@@ -1,0 +1,26 @@
+id: registered-machine-live-backend
+title: Live SSH backend for personal registered machines (not Factory SSH)
+status: implemented
+requirement: |
+  Personal registered machines work end-to-end: register (with an ssh alias) -> list ->
+  shell/read/copy. Transport is the user's own ssh client config (BatchMode, strict host
+  keys) driven by a RegisteredMachineBackend that is separate from FactoryTransport.
+  Offline, unregistered, or alias-less machines fail closed. Remote ops need approval.
+notes: 'Round-3 P0; assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: A machine registered with an sshAlias on a reachable host
+    when: list_machines / shell / read / copy_to / copy_from run
+    then: connected=true and each op executes on that host through the SSH backend, content round-trips intact
+  - id: AC-2
+    given: A machine whose host is offline, or registered without an sshAlias, or never registered
+    when: list_machines / shell / read / copy run
+    then: connected=false, ops return machine_disconnected / unknown_machine and nothing is executed
+  - id: AC-3
+    given: Registered-machine ops and Factory settings in the same state store
+    when: register / shell / copy run
+    then: Factory settings and FactoryTransport are untouched, and the SSH backend never reads factory.* keys
+  - id: AC-4
+    given: Remote shell / read / copy / register-with-alias tool calls
+    when: the tool-loop asks whether approval is needed
+    then: approval is required; hardline commands, secret-named paths and path escapes are refused before any ssh spawn

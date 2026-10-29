@@ -18,6 +18,7 @@ import {
 
 const KINDS = new Set<RegisteredMachineKind>(['desktop', 'phone', 'other']);
 const ID = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$/;
+const SSH_ALIAS = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$/;
 
 /**
  * Sole application-facing port for personal registered machines.
@@ -33,9 +34,14 @@ export interface RegisteredMachinePort {
       machineId: string;
       label: string;
       kind: RegisteredMachineKind;
+      sshAlias?: string;
       deviceLocalTools?: DeviceLocalTool[];
     }
   ): RegisteredMachine;
+  /** Like `list`, but probes each machine so `connected` is live. */
+  listLive(principal: BotPrincipal): Promise<RegisteredMachine[]>;
+  /** Re-probe one registered machine (fails closed to connected=false). */
+  refresh(principal: BotPrincipal, machineId: string): Promise<RegisteredMachine>;
   unregister(principal: BotPrincipal, machineId: string): boolean;
   get(principal: BotPrincipal, machineId: string): RegisteredMachine | undefined;
   shell(
@@ -85,6 +91,14 @@ function parseLabel(value: unknown): string {
   return value.trim();
 }
 
+function parseSshAlias(value: unknown): string | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (typeof value !== 'string' || !SSH_ALIAS.test(value.trim())) {
+    throw new ValidationError('Invalid sshAlias');
+  }
+  return value.trim();
+}
+
 function parseDeviceTools(value: unknown): DeviceLocalTool[] | undefined {
   if (value === undefined) return undefined;
   if (!Array.isArray(value) || value.length > 50) throw new ValidationError('Invalid deviceLocalTools');
@@ -105,6 +119,7 @@ interface StoredRegistry {
     machineId: string;
     label: string;
     kind: RegisteredMachineKind;
+    sshAlias?: string;
     deviceLocalTools?: DeviceLocalTool[];
   }>;
 }
@@ -131,9 +146,41 @@ function hydrate(
     machineId: row.machineId,
     label: row.label,
     kind: row.kind,
-    connected: backend.isConnected(row.machineId),
+    connected: backend.isConnected(row.machineId, {
+      machineId: row.machineId,
+      label: row.label,
+      kind: row.kind,
+      connected: false,
+      ...(row.sshAlias ? { sshAlias: row.sshAlias } : {})
+    }),
+    ...(row.sshAlias ? { sshAlias: row.sshAlias } : {}),
     ...(row.deviceLocalTools ? { deviceLocalTools: row.deviceLocalTools } : {})
   };
+}
+
+function disconnectedResult(machine: RegisteredMachine): RegisteredMachineOpResult {
+  return {
+    ok: false,
+    content: JSON.stringify({
+      error: 'machine_disconnected',
+      machineId: machine.machineId,
+      message: 'Registered machine is not connected'
+    })
+  };
+}
+
+async function probeLive(
+  backend: RegisteredMachineBackend,
+  machine: RegisteredMachine
+): Promise<RegisteredMachine> {
+  if (!backend.probe) return machine;
+  let connected = false;
+  try {
+    connected = (await backend.probe(machine)) === true;
+  } catch {
+    connected = false;
+  }
+  return { ...machine, connected };
 }
 
 export function createRegisteredMachinePort(
@@ -152,16 +199,25 @@ export function createRegisteredMachinePort(
     list(principal) {
       return readRegistry(store, principal).machines.map((row) => hydrate(row, backend));
     },
+    async listLive(principal) {
+      const rows = readRegistry(store, principal).machines.map((row) => hydrate(row, backend));
+      return Promise.all(rows.map((machine) => probeLive(backend, machine)));
+    },
+    async refresh(principal, machineId) {
+      return probeLive(backend, requireOwned(principal, machineId));
+    },
     register(principal, input) {
       const machineId = parseId(input.machineId);
       const label = parseLabel(input.label);
       const kind = parseKind(input.kind);
+      const sshAlias = parseSshAlias(input.sshAlias);
       const deviceLocalTools = parseDeviceTools(input.deviceLocalTools);
       const reg = readRegistry(store, principal);
       const next = {
         machineId,
         label,
         kind,
+        ...(sshAlias ? { sshAlias } : {}),
         ...(deviceLocalTools ? { deviceLocalTools } : {})
       };
       const idx = reg.machines.findIndex((m) => m.machineId === machineId);
@@ -191,17 +247,8 @@ export function createRegisteredMachinePort(
       if (typeof input?.command !== 'string' || !input.command.trim()) {
         throw new ValidationError('command required');
       }
-      const machine = requireOwned(principal, machineId);
-      if (!machine.connected) {
-        return {
-          ok: false,
-          content: JSON.stringify({
-            error: 'machine_disconnected',
-            machineId: machine.machineId,
-            message: 'Registered machine is not connected'
-          })
-        };
-      }
+      const machine = await probeLive(backend, requireOwned(principal, machineId));
+      if (!machine.connected) return disconnectedResult(machine);
       return backend.shell(machine, {
         command: input.command,
         ...(input.cwd ? { cwd: input.cwd } : {}),
@@ -212,17 +259,8 @@ export function createRegisteredMachinePort(
       if (typeof input?.path !== 'string' || !input.path.trim()) {
         throw new ValidationError('path required');
       }
-      const machine = requireOwned(principal, machineId);
-      if (!machine.connected) {
-        return {
-          ok: false,
-          content: JSON.stringify({
-            error: 'machine_disconnected',
-            machineId: machine.machineId,
-            message: 'Registered machine is not connected'
-          })
-        };
-      }
+      const machine = await probeLive(backend, requireOwned(principal, machineId));
+      if (!machine.connected) return disconnectedResult(machine);
       return backend.read(machine, {
         path: input.path.trim(),
         ...(typeof input.offsetLine === 'number' ? { offsetLine: input.offsetLine } : {}),
@@ -239,17 +277,8 @@ export function createRegisteredMachinePort(
       if (typeof input.remotePath !== 'string' || !input.remotePath.trim()) {
         throw new ValidationError('remotePath required');
       }
-      const machine = requireOwned(principal, machineId);
-      if (!machine.connected) {
-        return {
-          ok: false,
-          content: JSON.stringify({
-            error: 'machine_disconnected',
-            machineId: machine.machineId,
-            message: 'Registered machine is not connected'
-          })
-        };
-      }
+      const machine = await probeLive(backend, requireOwned(principal, machineId));
+      if (!machine.connected) return disconnectedResult(machine);
       return backend.copy(machine, {
         direction: input.direction,
         localPath: input.localPath.trim(),

@@ -124,44 +124,6 @@ function encrypt(key: Buffer, plaintext: string): EncryptedBlob {
   };
 }
 
-function decryptOrUndefined(key: Buffer, blob: EncryptedBlob | undefined): string | undefined {
-  if (!blob) return undefined;
-  try {
-    return decrypt(key, blob);
-  } catch {
-    return undefined;
-  }
-}
-
-function loginFillValue(row: LoginRecord, field: string, key: Buffer): string | undefined {
-  if (field === 'username') return row.username;
-  if (field === 'password') return decryptOrUndefined(key, row.passwordEnc);
-  return undefined;
-}
-
-function cardFillValue(row: CardRecord, field: string, key: Buffer): string | undefined {
-  if (field === 'holderName') return row.holderName;
-  if (field === 'expiry') return row.expiry;
-  if (field === 'cardNumber') return decryptOrUndefined(key, row.numberEnc);
-  if (field === 'cvv') return decryptOrUndefined(key, row.cvvEnc);
-  return undefined;
-}
-
-function contactFillValue(row: ContactRecord, field: string): string | undefined {
-  if (field === 'fullName') return row.fullName;
-  if (field === 'email') return row.email;
-  if (field === 'phone') return row.phone;
-  if (field === 'address') return row.address;
-  return undefined;
-}
-
-function fillValueForRow(row: UserVaultRecord, field: string, key: Buffer): string | undefined {
-  if (row.kind === 'login') return loginFillValue(row, field, key);
-  if (row.kind === 'card') return cardFillValue(row, field, key);
-  if (row.kind === 'contact') return contactFillValue(row, field);
-  return undefined;
-}
-
 function decrypt(key: Buffer, row: EncryptedBlob): string {
   const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(row.iv, 'hex'));
   decipher.setAuthTag(Buffer.from(row.tag, 'hex'));
@@ -190,6 +152,21 @@ export function parseUserVaultFillRef(
   const field = body.slice(colon + 1) as UserVaultFillField;
   if (!id || !field) return undefined;
   return { id, field };
+}
+
+function resolveContactField(row: ContactRecord, field: UserVaultFillField): string | undefined {
+  switch (field) {
+    case 'fullName':
+      return row.fullName;
+    case 'email':
+      return row.email;
+    case 'phone':
+      return row.phone;
+    case 'address':
+      return row.address;
+    default:
+      return undefined;
+  }
 }
 
 let boundUserVault: UserVault | undefined;
@@ -380,7 +357,57 @@ export class UserVault {
     if (!parsed) return undefined;
     const row = this.memory.get(parsed.id);
     if (!row) return undefined;
-    return fillValueForRow(row, parsed.field, this.key());
+    return this.resolveRowField(row, parsed.field);
+  }
+
+  private decryptOrUndefined(blob: EncryptedBlob | undefined): string | undefined {
+    if (!blob) return undefined;
+    try {
+      return decrypt(this.key(), blob);
+    } catch {
+      return undefined;
+    }
+  }
+
+  private resolveRowField(row: UserVaultRecord, field: UserVaultFillField): string | undefined {
+    switch (row.kind) {
+      case 'login':
+        return this.resolveLoginField(row, field);
+      case 'card':
+        return this.resolveCardField(row, field);
+      case 'contact':
+        return resolveContactField(row, field);
+      default: {
+        const unreachable: never = row;
+        return unreachable;
+      }
+    }
+  }
+
+  private resolveLoginField(row: LoginRecord, field: UserVaultFillField): string | undefined {
+    switch (field) {
+      case 'username':
+        return row.username;
+      case 'password':
+        return this.decryptOrUndefined(row.passwordEnc);
+      default:
+        return undefined;
+    }
+  }
+
+  private resolveCardField(row: CardRecord, field: UserVaultFillField): string | undefined {
+    switch (field) {
+      case 'holderName':
+        return row.holderName;
+      case 'expiry':
+        return row.expiry;
+      case 'cardNumber':
+        return this.decryptOrUndefined(row.numberEnc);
+      case 'cvv':
+        return this.decryptOrUndefined(row.cvvEnc);
+      default:
+        return undefined;
+    }
   }
 
   /** Collect every known secret plaintext (for leak tests / redaction). */

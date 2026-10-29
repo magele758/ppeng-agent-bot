@@ -1,6 +1,8 @@
 import type { ToolContract, ToolExecutionResult } from '../types.js';
 import { AppError, AuthorizationError, NotFoundError, ValidationError } from '../errors.js';
 import { principalFromSession } from '../bots/bot-identity.js';
+import { commandHardlineToolResult } from '../sandbox/command-hardline.js';
+import { resolveWorkspacePath } from '../workspace/resolve.js';
 import type { SqliteStateStore } from '../storage.js';
 import {
   assertRegisteredMachineId,
@@ -29,14 +31,14 @@ export function createRegisteredMachineTools(
     {
       name: 'list_machines',
       description:
-        'List this user\'s personal registered machines (desktop/phone). Returns machineId, label, kind, connected, and optional deviceLocalTools. Not the Factory SSH software-factory machine list — use factory_status for that.',
+        'List this user\'s personal registered machines (desktop/phone). Returns machineId, label, kind, sshAlias, live connected status, and optional deviceLocalTools. Not the Factory SSH software-factory machine list — use factory_status for that.',
       approvalMode: 'never',
       sideEffectLevel: 'none',
       inputSchema: { type: 'object', properties: {} },
       async execute(ctx) {
         try {
           const principal = principalFromSession(store, ctx.session);
-          const machines = port.list(principal);
+          const machines = await port.listLive(principal);
           return { ok: true, content: JSON.stringify({ machines }) };
         } catch (error) {
           return failed(error);
@@ -46,15 +48,17 @@ export function createRegisteredMachineTools(
     {
       name: 'register_machine',
       description:
-        'Register or update a personal machine for this user (desktop/phone/other). Does not touch Factory SSH settings. After register, prefer list_machines and pass machineId to bash/read_file/copy_* tools.',
-      approvalMode: 'never',
+        'Register or update a personal machine for this user (desktop/phone/other). Pass sshAlias (a Host alias from the user\'s own ~/.ssh/config, key-based auth, host key already trusted) to make the machine reachable for bash/read_file/copy_* via machineId; registering with sshAlias needs approval. Without sshAlias the machine is listed but stays disconnected. Does not touch Factory SSH settings.',
+      approvalMode: 'auto',
       sideEffectLevel: 'none',
+      needsApproval: (_ctx, args) => Boolean(args?.sshAlias),
       inputSchema: {
         type: 'object',
         properties: {
           machineId: { type: 'string' },
           label: { type: 'string' },
           kind: { type: 'string', enum: ['desktop', 'phone', 'other'] },
+          sshAlias: { type: 'string', description: 'ssh Host alias from ~/.ssh/config (not user@host, not a Factory machine).' },
           deviceLocalTools: {
             type: 'array',
             items: {
@@ -79,11 +83,13 @@ export function createRegisteredMachineTools(
             machineId: assertRegisteredMachineId(args.machineId),
             label: String(args.label ?? ''),
             kind: args.kind as RegisteredMachineKind,
+            ...(args.sshAlias !== undefined ? { sshAlias: args.sshAlias } : {}),
             ...(args.deviceLocalTools !== undefined
               ? { deviceLocalTools: args.deviceLocalTools }
               : {})
           });
-          return { ok: true, content: JSON.stringify({ machine }) };
+          const live = await port.refresh(principal, machine.machineId);
+          return { ok: true, content: JSON.stringify({ machine: live }) };
         } catch (error) {
           return failed(error);
         }
@@ -95,6 +101,7 @@ export function createRegisteredMachineTools(
         'Copy a local workspace file to a personal registered machine. Requires machineId from list_machines. Never uses Factory SSH.',
       approvalMode: 'auto',
       sideEffectLevel: 'workspace',
+      needsApproval: () => true,
       inputSchema: {
         type: 'object',
         properties: {
@@ -110,7 +117,7 @@ export function createRegisteredMachineTools(
           const machineId = assertRegisteredMachineId(args.machineId);
           const result = await port.copy(principal, machineId, {
             direction: 'to',
-            localPath: String(args.localPath ?? ''),
+            localPath: resolveWorkspacePath(ctx, String(args.localPath ?? '')),
             remotePath: String(args.remotePath ?? '')
           });
           return { ok: result.ok, content: result.content };
@@ -124,6 +131,7 @@ export function createRegisteredMachineTools(
       description:
         'Copy a file from a personal registered machine into the local workspace. Requires machineId from list_machines. Never uses Factory SSH.',
       approvalMode: 'auto',
+      needsApproval: () => true,
       sideEffectLevel: 'workspace',
       inputSchema: {
         type: 'object',
@@ -140,7 +148,7 @@ export function createRegisteredMachineTools(
           const machineId = assertRegisteredMachineId(args.machineId);
           const result = await port.copy(principal, machineId, {
             direction: 'from',
-            localPath: String(args.localPath ?? ''),
+            localPath: resolveWorkspacePath(ctx, String(args.localPath ?? '')),
             remotePath: String(args.remotePath ?? '')
           });
           return { ok: result.ok, content: result.content };
@@ -175,6 +183,8 @@ export async function executeOnRegisteredMachine(
     const id = assertRegisteredMachineId(machineId);
     const principal = principalFromSession(store, session as any);
     if (op === 'shell') {
+      const denied = commandHardlineToolResult(String(input.command ?? ''));
+      if (denied) return denied;
       const result = await port.shell(principal, id, {
         command: String(input.command ?? ''),
         ...(typeof input.timeout_ms === 'number' ? { timeoutMs: input.timeout_ms } : {})

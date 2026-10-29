@@ -137,6 +137,26 @@ describe('hooks: namespace construction', () => {
     expect(seen).toEqual(['web_search', 'web_search']);
   });
 
+  it('refuses read-tool calls that need approval instead of bypassing it', async () => {
+    let executed = 0;
+    const gated = {
+      ...tool('read_file', { ptc: { kind: 'read' } }),
+      approvalMode: 'auto' as const,
+      needsApproval: (_c: RunContext, args: Record<string, unknown>) => Boolean(args.machineId),
+      execute: async () => {
+        executed += 1;
+        return { ok: true, content: 'read' };
+      },
+    };
+    const ns = buildPtcNamespace({ context: ctx, authorizedTools: [gated], agent: noop, scratchpad, verify: noop });
+    const read = ns.bindings.read_file as (raw?: unknown) => Promise<{ ok: boolean; content: string }>;
+    const blocked = await read({ path: 'x', machineId: 'desk' });
+    expect(blocked.ok).toBe(false);
+    expect(blocked.content).toContain('approval_required');
+    expect((await read({ path: 'x' })).ok).toBe(true);
+    expect(executed).toBe(1);
+  });
+
   it('refuses tool calls once the run is aborted', async () => {
     const ac = new AbortController();
     const ns = buildPtcNamespace({

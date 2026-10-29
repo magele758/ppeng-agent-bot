@@ -14,6 +14,8 @@ export interface RegisteredMachine {
   label: string;
   kind: RegisteredMachineKind;
   connected: boolean;
+  /** Host alias from the user's own ssh config. Required for the live SSH backend. */
+  sshAlias?: string;
   /** Optional phone/desktop local tools (stretch; listing only). */
   deviceLocalTools?: DeviceLocalTool[];
 }
@@ -47,7 +49,10 @@ export interface RegisteredMachineOpResult {
  * Must never be FactoryTransport / factory SSH.
  */
 export interface RegisteredMachineBackend {
-  isConnected(machineId: string): boolean;
+  /** Cached / best-effort state for sync listing. Use `probe` for a live answer. */
+  isConnected(machineId: string, machine?: RegisteredMachine): boolean;
+  /** Live reachability check. Must resolve false (never throw) when offline. */
+  probe?(machine: RegisteredMachine): Promise<boolean>;
   shell(
     machine: RegisteredMachine,
     input: RegisteredMachineShellInput

@@ -13,7 +13,8 @@ export { FactoryService } from './factory/service.js';
 export {
   createRegisteredMachinePort,
   createRegisteredMachineTools,
-  createDisconnectedBackend
+  createDisconnectedBackend,
+  createSshRegisteredMachineBackend
 } from './registered-machines/index.js';
 export type {
   RegisteredMachinePort,
