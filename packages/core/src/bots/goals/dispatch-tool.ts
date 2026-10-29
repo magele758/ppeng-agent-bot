@@ -1,3 +1,4 @@
+import { DURABLE_WAIT_DEFAULT } from '../../waits/default-park.js';
 import type { RunContext, ToolContract } from '../../types.js';
 import { createGoalExecutionAdapters, type GoalAdapterResult, type GoalExecutionAdapterHost, type GoalExecutionRequest } from './adapters.js';
 import type { GoalCapabilities, GoalStrategy, GoalWorkKind } from './routing.js';
@@ -24,7 +25,7 @@ const workKinds: GoalWorkKind[] = ['general','research','browser','computer','ba
 export function createGoalDispatchTool(host: GoalDispatchToolHost): ToolContract<GoalDispatchArgs> {
   return {
     name:'goal_dispatch',
-    description:'Choose and launch an authorized execution strategy for this session’s current persistent goal. Use for isolated subagents, Bot delegation, PTC, Team DAG, Swarm, original main/planner/generator/evaluator Agents, self-heal or factory work. Select automatically from the task; never ask the user to configure modes. Explain the returned route to the user. When dispatch returns waiting, briefly acknowledge and end this turn; the scheduler will resume you with actual results. Do not poll or sleep to wait for workers. A waiting or returned execution is not proof the goal is complete. No other goal or session can be selected.',
+    description:"Choose and launch an authorized execution strategy for this session’s current persistent goal. Use for isolated subagents, Bot delegation, PTC, Team DAG, Swarm, original main/planner/generator/evaluator Agents, self-heal or factory work. Select automatically from the task; never ask the user to configure modes. Explain the returned route to the user. When dispatch returns waiting, this goal parks on a durable wait by default and the turn ends; the scheduler resumes once with actual results. Do not poll, cron, or sleep to wait for workers. " + DURABLE_WAIT_DEFAULT + " A waiting or returned execution is not proof the goal is complete. No other goal or session can be selected.",
     inputSchema:{type:'object',properties:{preferredStrategy:{type:'string',enum:dispatchStrategies},workKind:{type:'string',enum:workKinds},delegateBotId:{type:'string'},tasks:{type:'array',items:{type:'object'}},role:{type:'string',enum:['planner','generator','evaluator','researcher','main']},factory:{type:'object',properties:{machineId:{type:'string'},repositoryId:{type:'string'},operation:{type:'string',enum:['snapshot','count-files','read-log','develop']},logId:{type:'string'},baseline:{type:'string'}},required:['machineId','repositoryId','operation'],additionalProperties:false}},additionalProperties:false},
     // Nested side effects are separately checked by the host's normal execution gateway.
     approvalMode:'never',sideEffectLevel:'none',

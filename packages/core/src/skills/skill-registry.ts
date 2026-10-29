@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import { basename, dirname, join, relative } from 'node:path';
 import { botSkillId } from './bot-scope.js';
 import type { SkillSpec } from '../types.js';
+import { manifestForSkillFile } from './skill-manifest.js';
 
 export type SkillFrontmatterValue = string | string[];
 
@@ -203,6 +204,8 @@ async function loadSkillsFromTree(
         repoRootForRelative && file.startsWith(repoRootForRelative)
           ? relative(repoRootForRelative, file)
           : undefined;
+      const loadedManifest = manifestForSkillFile(dirname(file), parsed.meta as Record<string, unknown>);
+      if (!loadedManifest.ok) continue;
       skills.push({
         id,
         ownerBotId,
@@ -214,7 +217,8 @@ async function loadSkillsFromTree(
         source,
         skillPath: relPath,
         aliases,
-        triggerWords
+        triggerWords,
+        manifest: loadedManifest.manifest
       });
     }
 

@@ -3,7 +3,9 @@ title: Agent 持久化条件等待与恢复
 status: implemented
 requirement: |
   按这个通用方案开始实现，复用现有 Goal、Routine 和执行器能力，不要针对具体 case 写特殊逻辑。先把持久化等待、条件触发和恢复执行这条链路跑通，再用我的真实日志做回归验证。
-notes: 'assumedApproval: standing-order-2026-10-22'
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  Goal and Routine now park on a durable wait by default when owned work is still outstanding. A waiting dispatch or a routine child registers the wait and the same execution resumes once. final acceptance by lei pending
 criteria:
   - id: AC-1
     given: Agent 已登记一个有效的外部执行等待条件

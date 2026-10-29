@@ -1,0 +1,21 @@
+id: durable-wait-default
+title: Durable wait is the default Goal/Routine park path
+status: implemented
+requirement: |
+  waiting_condition / wait_for is the default path for Goal and Routine when suspending
+  for an owned observable. Host parks waiting goal_dispatch results onto durable wait
+  without requiring the model to call wait_for. Cron/sleep/history-poll are not substitutes.
+notes: 'final acceptance by lei pending'
+criteria:
+  - id: AC-1
+    given: A Goal or Routine owns an observable dependency
+    when: Guidance or host parking chooses how to suspend
+    then: Durable wait is the default pattern and only durable-backed sources are auto-parked
+  - id: AC-2
+    given: goal_dispatch returns waiting with a session/bot_task/routine_run reference
+    when: The goal execution settles
+    then: The runtime host-registers a durable wait and keeps it without a wait_for tool receipt
+  - id: AC-3
+    given: A Routine occurrence has a still-running child session
+    when: The occurrence is considered for parking
+    then: The outstanding child is discovered and can be parked on waiting_condition

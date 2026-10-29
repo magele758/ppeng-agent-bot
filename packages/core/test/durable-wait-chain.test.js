@@ -58,6 +58,50 @@ test('legacy kernel rejects wait registration instead of silently polling the mo
  const out=await createWaitForTool(f.store).execute({session:f.store.getSession(f.parent.id)},args(f));
  assert.equal(out.ok,false);assert.match(out.content,/agent-loop kernel/);assert.equal(f.store.getSession(f.parent.id).metadata.agentWaitId,undefined);
 });
+test('a waiting goal dispatch parks on a durable wait and resumes once [AC:durable-agent-waits#AC-1]',async t=>{
+ const f=fixture(t),{service,g,e}=assigned(f),calls=[];
+ const checkpoint={kind:'waiting',summary:'Child is still running',wait:{source:'session',correlationId:f.child.id}};
+ f.store.updateSession(f.parent.id,{metadata:{...f.store.getSession(f.parent.id).metadata,botGoalCheckpoint:checkpoint,botGoalAuthorizedWaits:[{goalId:g.id,source:'session',correlationId:f.child.id,executionId:e.id}],botGoalDispatch:{executionId:e.id,result:{status:'waiting',reference:`session:${f.child.id}`}}}});
+ await settleGoalExecution(goalHost(f,calls),f.parent.id);
+ const parked=new BotGoalService(f.store,Date.now,f.parent.id).get('b',g.id);
+ assert.equal(parked.status,'waiting');
+ assert.equal(parked.wait.source,'durable_wait');
+ const record=new DurableWaitStore(f.store).get(parked.wait.correlationId);
+ assert.equal(record.spec.source,'session');
+ assert.equal(record.spec.ref,f.child.id);
+ assert.equal(record.owner.kind,'goal');
+ f.store.updateSession(f.child.id,{status:'completed',metadata:{...f.child.metadata,outcome:{kind:'completed'}}});
+ await tickBotGoals(goalHost(f,calls));
+ await tickBotGoals(goalHost(f,calls));
+ assert.equal(calls.length,1);
+ assert.equal(new DurableWaitStore(f.store).get(record.id).status,'consumed');
+ assert.equal(service.get('b',g.id).status!=='waiting',true);
+});
+test('a routine child still running parks the occurrence and resumes once [AC:durable-agent-waits#AC-2]',async t=>{
+ const f=fixture(t);
+ const job=new CronJobStore(f.dir).create({sessionId:f.parent.id,agentId:'general',name:'Child wait',prompt:'Start once',scheduleKind:'every_ms',scheduleValue:'60000',metadata:{botId:'b'}});
+ const r=new RoutineRunStore(f.store).enqueue(job,new Date().toISOString());
+ let calls=0;
+ const host=()=>({store:f.store,stateDir:f.dir,log:{warn(){},info(){}},isSessionRunning:()=>false,runSession:async id=>{
+  calls++;
+  if(calls===1)f.store.updateSession(id,{metadata:{...f.store.getSession(id).metadata,routineChildSessionId:f.child.id}});
+  else f.store.appendMessage(id,'assistant',[{type:'text',text:'Resumed once'}]);
+  return f.store.getSession(id);
+ }});
+ await drainRoutineRuns(host());await new Promise(setImmediate);
+ assert.equal(new RoutineRunStore(f.store).get(r.id).status,'waiting_condition');
+ const waitId=new RoutineRunStore(f.store).get(r.id).waitId;
+ assert.equal(new DurableWaitStore(f.store).get(waitId).spec.ref,f.child.id);
+ assert.equal(calls,1);
+ await drainRoutineRuns(host());
+ assert.equal(calls,1);
+ f.store.updateSession(f.child.id,{status:'completed',metadata:{...f.child.metadata,outcome:{kind:'completed'}}});
+ await drainRoutineRuns(host());await new Promise(setImmediate);await drainRoutineRuns(host());
+ assert.equal(calls,2);
+ assert.equal(new DurableWaitStore(f.store).get(waitId).status,'consumed');
+ const messages=f.store.listMessages(f.parent.id);
+ assert.equal(messages.filter(m=>m.parts.some(p=>p.text?.includes('Start once'))).length,1);
+});
 test('wait capability is scoped to an active execution and never bypasses allowlists [AC:durable-agent-waits#AC-3] [AC:durable-agent-waits#AC-6]',async t=>{
  const {filterToolsForSession}=await import('../dist/turn/resolve-turn-tools.js');const f=fixture(t),tool=createWaitForTool(f.store);
  const visible=agent=>filterToolsForSession({env:{},tools:[tool],agent:agent??{id:'general'},session:f.store.getSession(f.parent.id),settingsStore:f.store}).tools.map(t=>t.name);

@@ -1,0 +1,45 @@
+id: startup-invariants-compact
+title: 启动时校验压缩策略、稳定前缀与重复守卫
+status: implemented
+requirement: |
+  Feature (minimal mergeable slice OK): Startup invariants for compact + stable prefix + repeatGuard (align with Grok改造 / ppeng-side concepts similar to ain #297; implement on ppeng only).
+
+  Context: compact settings in apps/daemon/src/routes/compact.ts + core compact settings helpers; stablePrefix / stablePrefixHash in packages/core/src/model/prompt-builder.ts and turn/kernel.ts (doc/PROMPT_CACHE.md); repeatGuard in packages/agent-loop/src/recovery/repeat-guard.ts and loop_settings (default weak).
+
+  Required outcomes:
+  1) On daemon/runtime startup (or first loop assembly), assert/normalize invariants:
+     - compact settings parse to a valid effective policy (keep_recent/after_any_assistant/after_text_assistant) with sane keepRecent bounds; persisted UI settings preferred over defaults; no new RAW_AGENT_* switches.
+     - stable prefix builder produces a non-empty identity+repo stable segment; stablePrefixHash is computed consistently for turn_start diagnostics.
+     - repeatGuard resolves to weak|all|off (default weak) from loop_settings before the first tool round; invalid values fall back safely.
+  2) Fail closed or log+repair clearly if invariants are violated; do not silently run with undefined compact/prefix/guard state.
+  3) Unit tests for startup/invariant helpers (core and/or agent-loop). Keep slice small and mergeable.
+  4) No ain work. Avoid colliding #302-305. No force-push. Protect main.
+  5) Author magele758; every commit trailer Machine: 4090. Final acceptance by lei pending.
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  final acceptance by lei pending
+criteria:
+  - id: AC-1
+    given: 进程启动，且界面曾经保存过压缩设置
+    when: 启动校验运行
+    then: 生效的压缩策略是 keep_recent、after_any_assistant 或 after_text_assistant 之一，保留条数在允许范围内，并且以已保存的界面设置为准而不是内置默认
+  - id: AC-2
+    given: 进程启动，界面没有保存过压缩设置，或保存的策略、保留条数无法识别
+    when: 启动校验运行
+    then: 得到一份明确的有效策略（未保存时用内置默认；无法识别时修好并留下记录），不会带着未定义的策略继续跑
+  - id: AC-3
+    given: 启动时能确定助手身份和仓库根目录
+    when: 组装稳定前缀并计算其摘要
+    then: 身份加仓库这一段不是空的，且同一段文字每次得到同一个 turn_start 用的摘要
+  - id: AC-4
+    given: 助手名字、角色或仓库根目录是空的
+    when: 启动校验运行
+    then: 启动失败并说明稳定前缀为空，而不是带着空前缀继续
+  - id: AC-5
+    given: 界面保存的重复守卫是 weak、all、off 之一，或还没保存过
+    when: 第一轮工具调用之前解析重复守卫
+    then: 得到 weak、all 或 off；没保存过时是 weak
+  - id: AC-6
+    given: 已保存的重复守卫不是 weak、all、off
+    when: 启动校验运行
+    then: 安全退回 weak，并留下修好的记录，不会带着无法识别的值进入第一轮工具调用

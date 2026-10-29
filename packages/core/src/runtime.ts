@@ -40,6 +40,8 @@ import type { AgentSandbox } from './sandbox/agent-sandbox-types.js';
 import { SelfHealScheduler } from './self-heal/self-heal-scheduler.js';
 import { attachServedByToTrace } from './model/fallback-chain.js';
 import { PromptBuilder } from './model/prompt-builder.js';
+import { normalizeCompactSettings, type CompactSettings } from './session/compact-settings.js';
+import { assertStartupInvariants } from './session/startup-invariants.js';
 import { previewSessionContextStack } from './session/context-stack.js';
 import type { ContextSnapshot } from './session/context-snapshots.js';
 import type { ApprovalPolicy } from './approval/approval-policy.js';
@@ -483,6 +485,22 @@ export class RawAgentRuntime {
         [this.computerUse?.instructionsForSession(sessionId) ?? '', this.connectors.instructionsForGranted(process.env)]
           .filter(Boolean)
           .join('\n\n'),
+    });
+    // Compact policy, stable prefix, and repeatGuard must be defined before
+    // the first tool round. Invalid persisted values are repaired and logged.
+    const builtin = (options.agents ?? builtinAgents).find(
+      (agent) => agent.name.trim() && agent.role.trim()
+    );
+    assertStartupInvariants({
+      store: this.store,
+      normalizeCompact: (raw) =>
+        normalizeCompactSettings(raw as Partial<CompactSettings> | null | undefined),
+      identity: {
+        agentName: builtin?.name ?? '',
+        agentRole: builtin?.role ?? '',
+        repoRoot: this.repoRoot
+      },
+      log: this.log
     });
 
     const collab = createRuntimeCollaborators({
@@ -2177,3 +2195,5 @@ export class RawAgentRuntime {
     };
   }
 }
+
+/** Compact, stable prefix, and repeatGuard before the first tool round. */

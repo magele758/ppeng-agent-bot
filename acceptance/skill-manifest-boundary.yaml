@@ -1,0 +1,23 @@
+id: skill-manifest-boundary
+title: 技能能力边界
+status: implemented
+requirement: |
+  Fill gaps so enforcement is fail-closed (no silent host downgrade for high-risk tools; no skill tools/paths/network beyond Manifest; untrusted tool/web content cannot induce cwd/eval escape).
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 已加载的技能只声明了待办类工具，并且不允许访问网络
+    when: 代理接着调用 shell 或抓取任意网址
+    then: 调用被拒绝，shell 和抓取都不会真正执行
+  - id: AC-2
+    given: 技能只允许工作区目录下的路径
+    when: 代理用上层目录跳转去读工作区之外的文件
+    then: 读取被拒绝，文件内容不会返回
+  - id: AC-3
+    given: 某个技能目录里的能力声明文件不是合法 JSON，旁边还有一份声明完好的技能
+    when: 系统加载技能目录
+    then: 坏声明的技能不会以没有能力限制的形式出现，声明完好的技能仍然可以加载并保持其限制
+  - id: AC-4
+    given: 技能允许 shell，但声明不能访问网络
+    when: 代理在同一轮里同时加载该技能并运行 shell，即使命令里没有网址
+    then: 技能先加载完成，随后 shell 被拒绝，不会执行

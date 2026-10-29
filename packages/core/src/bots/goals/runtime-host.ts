@@ -1,5 +1,6 @@
 import {hasWaitReceipt} from '../../waits/receipt.js';
 import {DurableWaitStore} from '../../waits/store.js';
+import {DURABLE_WAIT_DEFAULT,parkGoalDurableWait} from '../../waits/default-park.js';
 import { createHash } from 'node:crypto';
 import { GOAL_JUDGE_TIMEOUT_MS } from './judge-budget.js';
 import { evidenceTranscript, goalExecutionEvidence } from './execution-evidence.js';
@@ -29,6 +30,16 @@ export interface GoalRuntimeHost {
  /** True when this process no longer owns the execution, including after a restart. */
  executionInterrupted?(sessionId: string): boolean;
 }
+/** Short terminal notice — keep the chat quiet; Lab surfaces still hold full state. */
+export function formatQuietGoalNotice(goal:BotGoal):string {
+ const title=(goal.title??'').trim()||goal.id;
+ const reason=(goal.blockedReason??'').trim();
+ if(goal.status==='completed')return `[goal update] Done: ${title}`;
+ if(goal.status==='failed')return `[goal update] Failed: ${title}${reason?` — ${reason}`:''}`;
+ if(goal.status==='blocked')return `[goal update] Blocked: ${title}${reason?` — ${reason}`:''}`;
+ if(goal.status==='pending_review')return `[goal update] Needs review: ${title}`;
+ return `[goal update] ${title}: ${goal.status}`;
+}
 export function announceGoalState(host:GoalRuntimeHost,goal:BotGoal):void {
  host.store.transaction(()=>{
  goal=new BotGoalService(host.store,Date.now,goal.sessionId).get(goal.botId,goal.id)??goal;
@@ -37,7 +48,7 @@ export function announceGoalState(host:GoalRuntimeHost,goal:BotGoal):void {
  const version=`${goal.revision}:${goal.status}:${goal.blockedReason??''}`;
  if(host.store.getDaemonControl<string>(key)===version)return;
   host.store.setDaemonControl(key,version);
-  host.store.appendMessage(goal.sessionId,'system',[{type:'text',text:`[goal update] ${JSON.stringify({id:goal.id,title:goal.title,status:goal.status,progress:goal.progress,reason:goal.blockedReason,nextStep:goal.nextStep})}`}],{key:`goal-notice:${goal.id}:${version}`});
+  host.store.appendMessage(goal.sessionId,'system',[{type:'text',text:formatQuietGoalNotice(goal)}],{key:`goal-notice:${goal.id}:${version}`});
  });
 }
 export function usesDurableBotGoals(store:Pick<SqliteStateStore,'getSession'>,session:SessionRecord):boolean {
@@ -276,7 +287,7 @@ export function bindGoalExecution(host:GoalRuntimeHost,session:SessionRecord):bo
  return answerCanonicalChat(session,bound);
 }
 function goalInstructions(goal:BotGoal,strategy:string,reason:string):string {
- return `[goal ${goal.id} revision ${goal.revision}] Objective: ${goal.objective}\nResources: ${JSON.stringify(goal.resources)}\nConstraints: ${JSON.stringify(goal.constraints)}\nCompletion conditions: ${JSON.stringify(goal.completionCriteria)}\nExecution: ${strategy}. ${reason}\nPrevious progress: ${goal.progress}\nEvidence: ${JSON.stringify(goal.evidence)}\nNext step: ${goal.nextStep??''}\nTool observations are recorded automatically. Use goal_checkpoint only when available to preserve concrete progress or a durable wait condition; do not substitute another storage tool or create extra files just to record verification evidence. Report verification results in your response. Returning a response does not complete the goal. When Execution is not direct, your first action must be goal_dispatch to launch that executor (factory may first discover targets). A direct answer does not fulfill a selected specialist execution. For subagent/orchestrator/self_heal/factory/team_dag/swarm/bot_delegate use goal_dispatch to launch the selected executor. For PTC use goal_dispatch to create an isolated dynamic-workflow worker. Select the next workKind and specialist role yourself from the task and existing evidence; never ask the user to configure modes. When goal_dispatch returns waiting, end this turn immediately; the scheduler will resume with actual results. Do not poll worker history or sleep. For other owned observable dependencies use wait_for with a structured condition; it persists the checkpoint and ends this tool turn until fresh evidence is ready. Inspect existing results before launching another phase; do not repeat completed or unconfirmed external actions. For factory discover authorized targets through factory_status, then pass factory details to goal_dispatch.`;
+ return `[goal ${goal.id} revision ${goal.revision}] Objective: ${goal.objective}\nResources: ${JSON.stringify(goal.resources)}\nConstraints: ${JSON.stringify(goal.constraints)}\nCompletion conditions: ${JSON.stringify(goal.completionCriteria)}\nExecution: ${strategy}. ${reason}\nPrevious progress: ${goal.progress}\nEvidence: ${JSON.stringify(goal.evidence)}\nNext step: ${goal.nextStep??''}\nTool observations are recorded automatically. Use goal_checkpoint only when available to preserve concrete progress or a durable wait condition; do not substitute another storage tool or create extra files just to record verification evidence. Report verification results in your response. Returning a response does not complete the goal. When Execution is not direct, your first action must be goal_dispatch to launch that executor (factory may first discover targets). A direct answer does not fulfill a selected specialist execution. For subagent/orchestrator/self_heal/factory/team_dag/swarm/bot_delegate use goal_dispatch to launch the selected executor. For PTC use goal_dispatch to create an isolated dynamic-workflow worker. Select the next workKind and specialist role yourself from the task and existing evidence; never ask the user to configure modes. When goal_dispatch returns waiting, the runtime parks this goal on a durable wait by default and ends the turn; the scheduler resumes once with actual results. Do not poll worker history, cron, or sleep. ${DURABLE_WAIT_DEFAULT} Call wait_for yourself for any other owned observable; it persists the checkpoint and ends this tool turn until fresh evidence is ready. Inspect existing results before launching another phase; do not repeat completed or unconfirmed external actions. For factory discover authorized targets through factory_status, then pass factory details to goal_dispatch.`;
 }
 
 function executionIds(metadata:SessionRecord['metadata']):{goalId:string;executionId:string}|undefined {
@@ -397,6 +408,11 @@ export async function judgeChildCompletion(host:GoalRuntimeHost,goal:BotGoal,chi
  const transcript=evidenceTranscript(host.store,childId);
  return verifyCompletion(host,goal,transcript,assistant,{kind:'candidate_completed',summary:assistant,evidence:[assistant],verified:false},childId);
 }
+/** A waiting dispatch becomes a durable wait. The model does not have to call wait_for for it. */
+function parkDispatchWait(host:GoalRuntimeHost,goal:BotGoal,checkpoint:GoalReport|undefined,session:SessionRecord,execution:{id:string}):GoalReport|undefined {
+ if(checkpoint?.kind!=='waiting'||checkpoint.wait?.source==='durable_wait')return undefined;
+ return parkGoalDurableWait(host.store,session,goal,execution.id,checkpoint.wait??{source:'',correlationId:''},checkpoint.summary);
+}
 function unlaunchedExecutor(session:SessionRecord,execution:{strategy:string;id:string},goal:BotGoal):GoalReport|undefined {
  const dispatch=session.metadata.botGoalDispatch as {executionId?:string}|undefined;
  if(session.metadata.botGoalWorker||session.mode==='subagent'||execution.strategy==='direct'||goal.evidence.length)return undefined;
@@ -406,10 +422,14 @@ function unlaunchedExecutor(session:SessionRecord,execution:{strategy:string;id:
 async function settledReport(host:GoalRuntimeHost,goal:BotGoal,tail:ReturnType<GoalRuntimeHost['store']['foldMessages']>,assistant:string,checkpoint:GoalReport|undefined,error:unknown,status:string,outcome:{kind?:string}|undefined,session:SessionRecord,execution:{strategy:string;id:string}):Promise<GoalReport> {
  const failed=interruptedReport(error,status)??abortedReport(outcome);
  if(failed)return failed;
+ const parked=parkDispatchWait(host,goal,checkpoint,session,execution);
+ if(parked)return parked;
  if(checkpoint?.kind==='waiting'&&checkpoint.wait?.source==='durable_wait'){
   const wait=new DurableWaitStore(host.store).get(checkpoint.wait.correlationId);
-  if(wait?.owner.id===goal.id&&wait.owner.executionId===execution.id&&wait.owner.revision===goal.revision&&hasWaitReceipt(host.store,session.id,wait.id))return checkpoint;
-  if(wait?.owner.id===goal.id)new DurableWaitStore(host.store).cancel(wait.id,'Wait tool wave did not close');
+  const receiptOk=!!wait&&(wait.hostRegistered===true||hasWaitReceipt(host.store,session.id,wait.id));
+  if(wait?.owner.id===goal.id&&wait.owner.executionId===execution.id&&wait.owner.revision===goal.revision&&receiptOk)return checkpoint;
+  if(wait?.owner.id===goal.id&&!wait.hostRegistered)new DurableWaitStore(host.store).cancel(wait.id,'Wait tool wave did not close');
+  if(wait?.owner.id===goal.id&&wait.hostRegistered)return checkpoint;
   return {kind:'blocked',summary:'Wait registration lacks a complete tool checkpoint; verify effects before continuing'};
  }
  const unlaunched=unlaunchedExecutor(session,execution,goal);
@@ -420,7 +440,8 @@ function reportCost(metadata:SessionRecord['metadata']):number {
  return Math.max(0,Number(metadata.usageCostUsd??0)-Number(metadata.botGoalCostStart??0));
 }
 function withCheckpointWait(report:GoalReport,checkpoint:GoalReport|undefined,costUsd:number):GoalReport {
- return {...report,...(checkpoint?.wait?{wait:checkpoint.wait}:{}),costUsd};
+ const wait=report.wait?.source==='durable_wait'?report.wait:checkpoint?.wait;
+ return {...report,...(wait?{wait}:{}),costUsd};
 }
 function restoreOriginalProfile(host:GoalRuntimeHost,sessionId:string):void {
  const live=host.store.getSession(sessionId);

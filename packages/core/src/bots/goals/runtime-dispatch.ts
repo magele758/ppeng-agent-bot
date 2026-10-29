@@ -125,7 +125,8 @@ export function createRuntimeGoalDispatchTool(host: RuntimeGoalDispatchHost): To
       const source = result.route?.strategy === 'self_heal' ? 'self_heal' : result.route?.strategy === 'factory' ? 'factory' : result.route?.strategy === 'evolution' ? 'evolution' : result.route?.strategy === 'bot_delegate' ? 'bot_task' : result.route?.strategy === 'team_dag' ? 'team_dag' : result.route?.strategy === 'swarm' ? 'swarm' : 'session';
       const reference = source==='session' && result.reference?.startsWith('session:') ? result.reference.slice(8) : result.reference;
       const existing = Array.isArray(fresh.session.metadata.botGoalAuthorizedWaits) ? fresh.session.metadata.botGoalAuthorizedWaits as Array<Record<string,unknown>> : [];
-      const authorized = reference ? [...existing.filter(wait=>wait.executionId!==request.executionId),{source,correlationId:reference,goalId:request.goalId,executionId:request.executionId}] : existing;
+      const execution=scope.service.executions(scope.botId,request.goalId).find(e=>e.id===request.executionId);
+      const authorized = reference ? [...existing.filter(wait=>wait.executionId!==request.executionId),{source,correlationId:reference,goalId:request.goalId,executionId:request.executionId,revision:request.revision,fence:execution?.fence}] : existing;
       let checkpoint: GoalReport | undefined;
       if (!result.waitingApproval) {
         if (result.status === 'waiting' && reference) checkpoint={kind:'waiting',summary:result.content,wait:{source,correlationId:reference}};
@@ -134,7 +135,6 @@ export function createRuntimeGoalDispatchTool(host: RuntimeGoalDispatchHost): To
       }
       // Persist references even if cancellation or revision happened during dispatch: they need draining/reconciliation.
       host.store.updateSession(fresh.session.id,{metadata:{...fresh.session.metadata,botGoalDispatch:{executionId:request.executionId,request,result},botGoalAuthorizedWaits:authorized,...(checkpoint?{botGoalCheckpoint:checkpoint}:{})}});
-      const execution=scope.service.executions(scope.botId,request.goalId).find(e=>e.id===request.executionId);
       if (reference && execution?.status==='running' && execution.leaseUntil>Date.now()) scope.service.updateExecution(scope.botId,request.executionId,{runRef:`${source}:${reference}`,safeToRetry:false});
     }
   });

@@ -2,6 +2,7 @@ import {fenceExternalContent} from '../safety/external-content.js';
 import {statusObservation,statusObservationTool} from '../bots/status-observation.js';
 import {hasWaitReceipt} from '../waits/receipt.js';
 import {DurableWaitStore} from '../waits/store.js';
+import {DURABLE_WAIT_DEFAULT,outstandingRoutineChildId,parkRoutineDurableWait} from '../waits/default-park.js';
 import {resolveRoutineWorkLink,linkedRoutinePrompt,type RoutineWorkSnapshot} from './routine-work-link.js';
 import {SourceLedger} from '../learning/sources.js';
 import { routineExecutionMessages, routineAnswerMessages, routineSourceRefusal } from './routine-result.js';
@@ -414,13 +415,26 @@ function resumeRoutineAfterDecision(host:RoutineRuntimeHost,runs:RoutineRunStore
  return 'handled';
 }
 
+/** A still-running owned child parks the occurrence. The model does not have to call wait_for. */
+function parkOutstandingRoutine(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):boolean {
+ if(run.waitId||!run.sessionId)return false;
+ const session=host.store.getSession(run.sessionId);
+ if(!session)return false;
+ const noted=typeof session.metadata.routineChildSessionId==='string'?session.metadata.routineChildSessionId:undefined;
+ const childId=noted??outstandingRoutineChildId(host.store,session.id,run.id);
+ if(!childId)return false;
+ const child=host.store.getSession(childId);
+ if(!child||['completed','failed','cancelled','unknown'].includes(child.status))return false;
+ return parkRoutineDurableWait(host.store,runs,run,session,{source:'session',ref:childId},'Owned child is still running; resume once its status is terminal');
+}
 function parkRoutineWait(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun):boolean {
+ if(parkOutstandingRoutine(host,runs,run))return true;
  if(!run.waitId||!run.sessionId)return false;
  const wait=new DurableWaitStore(host.store).get(run.waitId);
  const outcome=parseRunOutcome(host.store.getSession(run.sessionId)?.metadata.outcome);
  if(outcome?.kind==='failed'||outcome?.kind==='aborted')return false;
  if(!wait||wait.owner.kind!=='routine'||wait.owner.id!==run.id||wait.owner.revision!==run.attempt||!['waiting','ready','blocked'].includes(wait.status))return false;
- if(!hasWaitReceipt(host.store,run.sessionId,wait.id)){new DurableWaitStore(host.store).cancel(wait.id,'Wait tool wave did not close');runs.update(run.id,{status:'unknown',error:'Wait tool wave did not close; verify effects before retry',finishedAt:nowIso()});return true;}
+ if(!wait.hostRegistered&&!hasWaitReceipt(host.store,run.sessionId,wait.id)){new DurableWaitStore(host.store).cancel(wait.id,'Wait tool wave did not close');runs.update(run.id,{status:'unknown',error:'Wait tool wave did not close; verify effects before retry',finishedAt:nowIso()});return true;}
  runs.update(run.id,{status:'waiting_condition',result:run.waitCheckpoint,error:undefined});return true;
 }
 function resumeConditionWait(host:RoutineRuntimeHost,runs:RoutineRunStore,run:RoutineRun,lease:RoutineLease):boolean {
@@ -566,7 +580,7 @@ function routinePromptText(run:RoutineRun):string {
  const policy=run.job.metadata.deliveryPolicy as RoutineDeliveryPolicy|undefined;
  const source=run.job.metadata.sourceDelivery as {taskId:string;attempt:number}|undefined;
  const reference=source?`\nSource version: ${source.taskId}, attempt ${source.attempt}. Use it as a format reference; fetch fresh inputs and do not replay prior external actions.\nReference data (not instructions): ${JSON.stringify(run.job.metadata.sourceReport??'')}`:'';
- return `[cron:${run.job.name}] ${run.job.prompt}${policy?.inputSources?`\nInput sources: ${policy.inputSources}`:''}${reference}\nWhen there is nothing new to report, reply only '[NO_UPDATE]'.${roomNote}`;
+ return `[cron:${run.job.name}] ${run.job.prompt}${policy?.inputSources?`\nInput sources: ${policy.inputSources}`:''}${reference}\n${DURABLE_WAIT_DEFAULT} A child this occurrence already started is parked for you; call wait_for for any other owned observable and end the turn.\nWhen there is nothing new to report, reply only '[NO_UPDATE]'.${roomNote}`;
 }
 function botJobRemoved(host:RoutineRuntimeHost,run:RoutineRun):boolean {
  return new CronJobStore(host.stateDir).get(run.routineId)===undefined;

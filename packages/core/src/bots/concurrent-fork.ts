@@ -255,6 +255,18 @@ function finishFork(
   writeForks(store, sessionId, forks);
 }
 
+function forkGoalWork(host: ConcurrentForkHost, parent: SessionRecord, goalId: string | undefined): Record<string, unknown> {
+  if (!goalId?.startsWith('goal_')) return {};
+  const scope = goalScope(host.store, parent);
+  const goal = scope?.service.get(scope.botId, goalId);
+  const execution = goal ? scope?.service.executions(scope.botId, goalId).find(item => item.id === goal.activeExecutionId && item.status === 'running') : undefined;
+  if (!scope || !goal || !execution) return { botGoalId: goalId, botGoalScopeSessionId: parent.id };
+  return {
+    botGoalId: goalId, botGoalScopeSessionId: parent.id, botGoalWorker: true,
+    botGoalWorkerRevision: goal.revision, botGoalWorkerExecutionId: execution.id, botGoalWorkerFence: execution.fence
+  };
+}
+
 function spawnWorkChild(host: ConcurrentForkHost, parent: SessionRecord, piece: WorkPiece): SessionRecord {
   const botId = typeof parent.metadata?.botId === 'string' ? parent.metadata.botId : undefined;
   const permissionMode = childPermissionMode(parent.metadata);
@@ -267,7 +279,7 @@ function spawnWorkChild(host: ConcurrentForkHost, parent: SessionRecord, piece: 
     parentSessionId: parent.id,
     background: true,
     metadata: {
-      ...(goalId?.startsWith('goal_') ? { botGoalId: goalId, botGoalScopeSessionId: parent.id } : {}),
+      ...forkGoalWork(host, parent, goalId),
       parentSessionId: parent.id,
       spawnSource: 'concurrent-bot-work',
       sourceMessageId: piece.id,

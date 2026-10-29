@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { BotGoal, GoalExecution, GoalIntent, GoalReport, GoalSettings, GoalSnapshot, GoalStore } from './types.js';
+import type { BotGoal, GoalExecution, GoalIntent, GoalReport, GoalSettings, GoalSnapshot, GoalStore, GoalWakeEvent } from './types.js';
 import { mutateGoalSnapshot, readGoalSnapshot } from './store.js';
 import { readGoalSettings, writeGoalSettings } from './settings.js';
 const terminal = new Set(['completed', 'cancelled', 'failed']);
@@ -16,11 +16,31 @@ function reportAdvanced(result: GoalReport, goal: BotGoal): boolean {
 function sameWakeIdentity(event: { goalId?: string; source: string; correlationId: string }, goal: BotGoal, wait: { source: string; correlationId: string }): boolean {
   return (!event.goalId || event.goalId === goal.id) && event.source === wait.source && event.correlationId === wait.correlationId;
 }
+function finishedExecutionForWake(executions: GoalExecution[], goalId: string, executionId: string | undefined): GoalExecution | undefined {
+  const finished = executions.filter(item => item.goalId === goalId && item.status === 'finished');
+  if (executionId) return finished.find(item => item.id === executionId);
+  return finished[finished.length - 1];
+}
+function wakeNamesExecution(event: { fence?: number; executionId?: string }): boolean {
+  return event.fence !== undefined || event.executionId !== undefined;
+}
+function namedExecutionMatches(event: { fence?: number; executionId?: string }, execution: GoalExecution): boolean {
+  if (event.fence !== undefined && event.fence !== execution.fence) return false;
+  return event.executionId === undefined || event.executionId === execution.id;
+}
+function wakeFenceMatches(event: { revision?: number; fence?: number; executionId?: string }, goal: BotGoal, execution: GoalExecution | undefined): boolean {
+  if (event.revision !== undefined && event.revision !== goal.revision) return false;
+  if (!execution) return !wakeNamesExecution(event);
+  return namedExecutionMatches(event, execution);
+}
 function wakeSessionMatches(event: { sessionId?: string }, goal: BotGoal): boolean {
   return !event.sessionId || event.sessionId === goal.sessionId;
 }
-function wakeMatches(event: { goalId?: string; source: string; correlationId: string; sessionId?: string; consumedBy: string[] }, goal: BotGoal, wait: { source: string; correlationId: string }): boolean {
-  if (!sameWakeIdentity(event, goal, wait)) return false;
+function waitingForWake(goal: BotGoal, event: Omit<GoalWakeEvent, 'sessionId' | 'consumedBy'>, execution: GoalExecution | undefined): boolean {
+  return goal.status === 'waiting' && !!goal.wait && goal.wait.source === event.source && goal.wait.correlationId === event.correlationId && wakeFenceMatches(event, goal, execution);
+}
+function wakeMatches(event: GoalWakeEvent, goal: BotGoal, wait: { source: string; correlationId: string }, execution: GoalExecution | undefined): boolean {
+  if (!sameWakeIdentity(event, goal, wait) || !wakeFenceMatches(event, goal, execution)) return false;
   return wakeSessionMatches(event, goal) && !event.consumedBy.includes(goal.id);
 }
 export class BotGoalService {
@@ -147,7 +167,7 @@ export class BotGoalService {
   const opened=this.openReportedExecution(s,id,result);
   if(opened.stopped)return opened.goal;
   this.recordReportProgress(opened.goal,result);
-  this.applyReportKind(s,opened.goal,result);
+  this.applyReportKind(s,opened.goal,result,this.requireExecution(s,id));
   if(!terminal.has(opened.goal.status)&&opened.goal.status!=='pending_review')this.limit(opened.goal,this.readSettings(),opened.goal.status==='waiting');
   this.event(s,'result',opened.goal,result.summary);
   return opened.goal;
@@ -219,13 +239,13 @@ export class BotGoalService {
   goal.noProgress=result.kind==='candidate_completed'&&result.verified!==true?0:reportAdvanced(result,goal)?0:goal.noProgress+1;
   goal.progress=result.summary;goal.nextStep=result.nextStep;goal.blockedReason=undefined;
  }
- private applyReportKind(s:GoalSnapshot,goal:BotGoal,result:GoalReport):void {
-  if(result.kind==='candidate_completed'||result.kind==='waiting'){this.applyCompletionOrWait(s,goal,result);return;}
+ private applyReportKind(s:GoalSnapshot,goal:BotGoal,result:GoalReport,execution:GoalExecution):void {
+  if(result.kind==='candidate_completed'||result.kind==='waiting'){this.applyCompletionOrWait(s,goal,result,execution);return;}
   this.applyTerminalReportKind(goal,result);
  }
- private applyCompletionOrWait(s:GoalSnapshot,goal:BotGoal,result:GoalReport):void {
+ private applyCompletionOrWait(s:GoalSnapshot,goal:BotGoal,result:GoalReport,execution:GoalExecution|undefined):void {
   if(result.kind==='candidate_completed')this.markCandidateCompleted(goal,result);
-  else this.markWaiting(s,goal,result);
+  else this.markWaiting(s,goal,result,execution);
  }
  private markCandidateCompleted(goal:BotGoal,result:GoalReport):void {
   if(result.verified&&Boolean(result.evidence?.length)){goal.status='completed';goal.blockedReason=undefined;return;}
@@ -233,9 +253,9 @@ export class BotGoalService {
   goal.blockedReason=PENDING_REVIEW;
   goal.noProgress=0;
  }
- private markWaiting(s:GoalSnapshot,goal:BotGoal,result:GoalReport):void {
+ private markWaiting(s:GoalSnapshot,goal:BotGoal,result:GoalReport,execution:GoalExecution|undefined):void {
   if(!result.wait?.source||!result.wait.correlationId){goal.status='blocked';goal.blockedReason='Missing durable wait condition';return;}
-  const wake=s.wakeEvents?.find(event=>wakeMatches(event,goal,result.wait!));
+  const wake=s.wakeEvents?.find(event=>wakeMatches(event,goal,result.wait!,event.executionId?finishedExecutionForWake(s.executions,goal.id,event.executionId):execution));
   if(wake)this.consumeWake(s,goal,wake);
   else {goal.status='waiting';goal.wait=result.wait;}
  }
@@ -268,10 +288,10 @@ export class BotGoalService {
   if(result.kind==='blocked'&&result.wait){goal.wait=result.wait;goal.draining=true;}
  }
  private applyWakeData(s:GoalSnapshot,g:BotGoal,event:{summary?:string;evidence?:string[];costUsd?:number;completionCandidate?:boolean}):void{if(event.summary)g.progress=event.summary;g.evidence.push(...(event.evidence??[]));const cost=Number.isFinite(event.costUsd)?Math.max(0,event.costUsd!):0;g.costUsd+=cost;if(g.parentGoalId){const parent=this.find(s,g.parentGoalId);parent.costUsd+=cost;this.limit(parent,this.readSettings());}if(this.limit(g,this.readSettings())&&event.completionCandidate){g.status='pending_review';g.blockedReason=PENDING_REVIEW;g.noProgress=0;}}
- wake(botId:string,event:{completionCandidate?:boolean;goalId?:string;eventId:string;source:string;correlationId:string;summary?:string;evidence?:string[];costUsd?:number}):BotGoal[]{return mutateGoalSnapshot(this.store,botId,s=>{
-  const key=`wake:${this.scopeSessionId??'*'}:${event.goalId??'*'}:${event.source}:${event.eventId}`;if(s.processed.includes(key))return [];s.processed.push(key);
-  const wake={...event,sessionId:this.scopeSessionId,consumedBy:[] as string[]};(s.wakeEvents??=[]).push(wake);
-  const goals=s.goals.filter(g=>this.visible(g)&&(!event.goalId||event.goalId===g.id)&&g.status==='waiting'&&g.wait?.source===event.source&&g.wait.correlationId===event.correlationId);
+ wake(botId:string,event:Omit<GoalWakeEvent,'sessionId'|'consumedBy'>):BotGoal[]{return mutateGoalSnapshot(this.store,botId,s=>{
+  const key=`wake:${this.scopeSessionId??'*'}:${event.goalId??'*'}:${event.executionId??'*'}:${event.revision??'*'}:${event.fence??'*'}:${event.source}:${event.eventId}`;if(s.processed.includes(key))return [];s.processed.push(key);
+  const wake:GoalWakeEvent={...event,sessionId:this.scopeSessionId,consumedBy:[]};(s.wakeEvents??=[]).push(wake);
+  const goals=s.goals.filter(g=>this.visible(g)&&(!event.goalId||event.goalId===g.id)&&waitingForWake(g,event,finishedExecutionForWake(s.executions,g.id,event.executionId)));
   for(const g of goals){wake.consumedBy.push(g.id);g.status='queued';g.nextStep=`Inspect authorized ${event.source} result ${event.correlationId} before continuing`;g.wait=undefined;this.applyWakeData(s,g,event);this.event(s,'awakened',g);}return goals;
  });}
  recoverInterruptedExecution(botId:string,executionId:string):BotGoal|undefined{return mutateGoalSnapshot(this.store,botId,s=>{

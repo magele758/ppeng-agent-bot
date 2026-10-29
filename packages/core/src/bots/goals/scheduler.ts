@@ -17,7 +17,7 @@ import type { BotGoal, GoalExecution, GoalReport } from './types.js';
 import { occupiesGoalCapacity } from './service.js';
 const ticking = new WeakSet<object>();
 const ended = new Set(['completed', 'failed', 'cancelled', 'unknown', 'expired', 'rejected', 'timed_out']);
-interface AuthorizedWait { goalId: string; source: string; correlationId: string }
+interface AuthorizedWait { goalId: string; executionId?: string; source: string; correlationId: string; revision?: number; fence?: number }
 
 function delegatedWorkers(host:GoalRuntimeHost,parent:SessionRecord,taskId:string,includeCoordinator=false):SessionRecord[] {
  const principal=principalFromSession(host.store,parent);
@@ -32,14 +32,47 @@ function delegatedChildSettled(host:GoalRuntimeHost,parent:SessionRecord,taskId:
  return workers.length>0&&workers.every(child=>!host.isRunning(child.id)&&childEnded(child));
 }
 
+function sameWaitTarget(entry: AuthorizedWait, goal: BotGoal, wait: { source: string; correlationId: string }): boolean {
+ return entry?.goalId === goal.id && entry.source === wait.source && entry.correlationId === wait.correlationId;
+}
+function entryNamesFence(entry: AuthorizedWait): boolean {
+ return entry.revision !== undefined || entry.fence !== undefined;
+}
+function entryFenceMatches(entry: AuthorizedWait, goal: BotGoal, execution: GoalExecution): boolean {
+ if (entry.revision !== undefined && entry.revision !== goal.revision) return false;
+ if (entry.fence !== undefined && entry.fence !== execution.fence) return false;
+ return entry.executionId === undefined || entry.executionId === execution.id;
+}
+function childWorkerMatches(child: SessionRecord, goal: BotGoal, execution: GoalExecution): boolean {
+ return child.metadata.botGoalId === goal.id
+  && child.metadata.botGoalWorkerRevision === goal.revision
+  && child.metadata.botGoalWorkerExecutionId === execution.id
+  && child.metadata.botGoalWorkerFence === execution.fence;
+}
+/** A child wake names the execution it was launched for. A stale revision or another goal's fence cannot resume this one. */
+function childFenceMatches(entry: AuthorizedWait, goal: BotGoal, execution: GoalExecution, child: SessionRecord | undefined): boolean {
+ if (!entryNamesFence(entry) && !child?.metadata.botGoalWorker) return true;
+ if (!entryFenceMatches(entry, goal, execution)) return false;
+ if (!child?.metadata.botGoalWorker) return true;
+ return childWorkerMatches(child, goal, execution);
+}
+function matchingWaitExecution(host: GoalRuntimeHost, goal: BotGoal, wait: { source: string; correlationId: string }, execution: GoalExecution): boolean {
+ const session = execution.sessionId ? host.store.getSession(execution.sessionId) : undefined;
+ const entries = session?.metadata.botGoalAuthorizedWaits;
+ if (!Array.isArray(entries)) return false;
+ const child = wait.source === 'session' ? host.store.getSession(wait.correlationId) : undefined;
+ return (entries as AuthorizedWait[]).some(item => sameWaitTarget(item, goal, wait) && childFenceMatches(item, goal, execution, child));
+}
+function wakeWorkIdentity(host: GoalRuntimeHost, goal: BotGoal, executions: GoalExecution[]): { goalId: string; executionId?: string; revision?: number; fence?: number } {
+ const identity: { goalId: string; executionId?: string; revision?: number; fence?: number } = { goalId: goal.id };
+ const execution = goal.wait ? executions.find(item => matchingWaitExecution(host, goal, goal.wait!, item)) : undefined;
+ if (!execution) return identity;
+ return { goalId: goal.id, executionId: execution.id, revision: goal.revision, fence: execution.fence };
+}
 function authorizedWait(host: GoalRuntimeHost, goal: BotGoal, executions: GoalExecution[]): boolean {
  const wait = goal.wait;
  if (!wait) return false;
- return executions.some(execution => {
-  const session = execution.sessionId ? host.store.getSession(execution.sessionId) : undefined;
-  const entries = session?.metadata.botGoalAuthorizedWaits;
-  return Array.isArray(entries) && entries.some((entry: AuthorizedWait) => entry?.goalId === goal.id && entry.source === wait.source && entry.correlationId === wait.correlationId);
- });
+ return executions.some(execution => matchingWaitExecution(host, goal, wait, execution));
 }
 
 function sessionWaitStatus(host: GoalRuntimeHost, parent: SessionRecord, goal: BotGoal, correlationId: string): string | undefined {
@@ -433,7 +466,7 @@ function wakeFinishedWait(host: GoalRuntimeHost, parent: SessionRecord, service:
  if (blockSpecialtyWait(host, parent, service, botId, goal, status)) return;
  if (blockUnauthorizedWait(service, botId, goal, status)) return;
  if (status === 'running' && notePendingApprovalWait(host, parent, service, botId, goal)) return;
- if (status && ended.has(status)) service.wake(botId, {goalId:goal.id, completionCandidate:status==='completed', eventId:`${goal.wait!.source}:${goal.wait!.correlationId}:${status}:${goal.attempts}`, source:goal.wait!.source, correlationId:goal.wait!.correlationId, ...waitEvidence(host, parent, goal, status, executions)});
+ if (status && ended.has(status)) service.wake(botId, {...wakeWorkIdentity(host, goal, executions), completionCandidate:status==='completed', eventId:`${goal.wait!.source}:${goal.wait!.correlationId}:${status}:${goal.attempts}`, source:goal.wait!.source, correlationId:goal.wait!.correlationId, ...waitEvidence(host, parent, goal, status, executions)});
 }
 function deferredContinuation(host: GoalRuntimeHost, parent: SessionRecord, goal: BotGoal): SessionRecord | undefined {
  return host.store.listSessions().find(s => s.parentSessionId === parent.id && s.metadata.botGoalId === goal.id && s.metadata.botGoalScopeSessionId === parent.id && !host.isRunning(s.id));

@@ -125,6 +125,7 @@ import {
   selectGoalJudge
 } from '../jev/apply.js';
 import { chainHas, resolveJevChain } from '../jev/settings.js';
+import { noteRoutineChild } from '../waits/default-park.js';
 import { createToolServices as buildToolServices } from './tool-services.js';
 import {
   applyOptionalFoldBudget as applyOptionalFoldBudgetView,
@@ -837,7 +838,7 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
     applyFoldBudget: (session, folded) =>
       applyOptionalFoldBudgetView(prepareViewFrom(rt), session, folded),
     loopConfig: {
-      stopAtToolNames: ['wait_for'],
+      stopAtToolNames: ['wait_for', 'bg_run'],
       maxTurns: rt.maxTurnsPerRun,
       compactEveryTurn: true,
       foldBudgetClamp: true,
@@ -1212,7 +1213,7 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
         sessionId,
         turnTools
       ),
-    processToolResults: (results, validToolCalls, session, task, sessionId, onModelStreamChunk) =>
+    processToolResults: (results, validToolCalls, session, task, sessionId, onModelStreamChunk) => {
       toolLoopProcessResults(
         toolLoopDepsFrom(rt),
         results,
@@ -1221,7 +1222,11 @@ export function bindTurnKernelHost(rt: L5Bindable): TurnKernelHost {
         task,
         sessionId,
         onModelStreamChunk
-      ),
+      );
+      for (const result of results) {
+        if (result.name === 'spawn_subagent' && result.ok) noteRoutineChild(rt.store, sessionId, result.content, result.metadata);
+      }
+    },
     handleTurnCompletion: (session, agent, task) =>
       handleTurnCompletion(sessionCompleteFrom(rt), session, agent, task),
     injectEvolvingCoachBeforeRecovery: (session, agent, trigger, reason) =>

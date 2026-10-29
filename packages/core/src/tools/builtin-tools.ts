@@ -12,6 +12,9 @@ import {
 } from '../workspace/index.js';
 import { resolvePermissionMode } from '../approval/permission-mode.js';
 import { commandHardlineToolResult } from '../sandbox/command-hardline.js';
+import type { SkillManifest } from '../skills/skill-manifest.js';
+import { manifestsForSession, noteActiveSkillManifest } from '../skills/skill-manifest-gate.js';
+import { evaluateDefaultDenyPolicy, untrustedCorpusFromMessages } from '../safety/default-deny-policy.js';
 import { sanitizeSpawnEnv } from '../sandbox/env-sanitizer.js';
 import { redactToolContent } from '../sandbox/result-redaction.js';
 import { createAgentSandboxFromEnv } from '../sandbox/create-agent-sandbox.js';
@@ -85,7 +88,10 @@ import {
 
 export interface RuntimeToolServices {
   currentUserText?(sessionId: string): Promise<string>;
-  loadSkill: (name: string, sessionId: string) => Promise<{ content?: string; error?: string }>;
+  loadSkill: (
+    name: string,
+    sessionId: string
+  ) => Promise<{ content?: string; error?: string; manifest?: SkillManifest; skillId?: string }>;
   searchSkills: (
     query: string,
     sessionId: string,
@@ -361,7 +367,31 @@ function parseTodoItems(raw: unknown): TodoItem[] {
 export function createBuiltinTools(services: RuntimeToolServices, options: { includeDormantCapabilities?: boolean } = {}): ToolContract<any>[] {
   const riskyShellTokens = ['rm ', 'git reset', 'git checkout', 'git clean', 'npm publish', 'sudo '];
 
-  function gateShell(context: RunContext, toolName: string, args: { isolation?: unknown }) {
+  function shellCommandOf(args: { command?: string; verify_command?: string }): string {
+    return String(args.command ?? args.verify_command ?? '');
+  }
+
+  function defaultDenyContent(context: RunContext, toolName: string, command: string): string | undefined {
+    const decision = evaluateDefaultDenyPolicy({
+      tool: toolName,
+      cwd: primaryWorkspacePath(context),
+      workspaceRoots: sandboxWorkspaceRoots(context),
+      cwdUntrusted: Boolean((context.session.metadata as Record<string, unknown> | undefined)?.cwdUntrusted),
+      inductionText: command,
+      command,
+      untrustedCorpus: untrustedCorpusFromMessages(services.listSessionMessages?.(context.session.id))
+    });
+    if (decision.allow) return undefined;
+    return decision.reason ?? '[default-deny] blocked';
+  }
+
+  function gateShell(context: RunContext, toolName: string, args: { isolation?: unknown; command?: string; verify_command?: string }) {
+    const denied = defaultDenyContent(context, toolName, shellCommandOf(args));
+    if (denied) return { ok: false as const, content: denied };
+    return finishShellGate(context, toolName, args);
+  }
+
+  function finishShellGate(context: RunContext, toolName: string, args: { isolation?: unknown }) {
     const decision = decideShellIsolation(args.isolation, shellIsolationAvailability(getAgentSandbox().kind));
     if (!decision.ok) return { ok: false as const, content: decision.message };
     if (
@@ -1069,10 +1099,17 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
     sideEffectLevel: 'none',
     ptc: { kind: 'read' },
     async execute(context, args) {
-      const { content, error } = await services.loadSkill(args.name, context.session.id);
+      const result = await services.loadSkill(args.name, context.session.id);
+      if (result.manifest) {
+        noteActiveSkillManifest(context.session.id, result.manifest);
+        context.session.metadata = {
+          ...(context.session.metadata ?? {}),
+          activeSkillManifests: manifestsForSession(context.session.id, context.session.metadata)
+        };
+      }
       return {
-        ok: Boolean(content),
-        content: content ?? error ?? `Unknown skill ${args.name}`
+        ok: Boolean(result.content),
+        content: result.content ?? result.error ?? `Unknown skill ${args.name}`
       };
     }
   };
@@ -1412,7 +1449,7 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
   const bgRunTool: ToolContract<{ command: string; isolation?: string }> = {
     name: 'bg_run',
     description:
-      'Run a long command in the background. When waitFor is returned, call wait_for alone with those source/ref/condition fields and a continuation summary. The existing Goal or Routine resumes with its observed status; process exit is not verified delivery. Optional isolation is honored when the saved mode is Auto; omit it to follow the saved mode. Auto uses the strongest available.',
+      'Run a long command in the background. Under an active Goal or Routine, the host parks a durable wait when the job starts (hostParked/waitId in the result) and ends this tool turn — do not call wait_for again for that job, and do not cron/sleep/poll. Outside Goal/Routine, wait yourself with bg_check. Process exit is not verified delivery. Optional isolation is honored when the saved mode is Auto; omit it to follow the saved mode. Auto uses the strongest available.',
     inputSchema: {
       type: 'object',
       properties: {
