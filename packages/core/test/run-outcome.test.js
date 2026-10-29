@@ -123,11 +123,32 @@ test('waiting_approval interrupt is serializable and resume-decided', () => {
 
 test('waiting_approval event carries interrupt; approve then runSession resumes tools', async () => {
   const adapter = new ScriptedAdapter((input) => {
+    const sawSoftBlock = input.messages.some((m) =>
+      m.parts.some(
+        (p) =>
+          p.type === 'tool_result' &&
+          p.toolCallId === 'call_wait_soft' &&
+          String(p.content ?? '').includes('requestSmartModeApproval')
+      )
+    );
     const sawResult = input.messages.some((m) =>
       m.parts.some((p) => p.type === 'tool_result' && p.toolCallId === 'call_wait')
     );
     if (sawResult) {
       return { stopReason: 'end', assistantParts: [{ type: 'text', text: 'after-tools' }] };
+    }
+    if (!sawSoftBlock) {
+      return {
+        stopReason: 'tool_use',
+        assistantParts: [
+          {
+            type: 'tool_call',
+            toolCallId: 'call_wait_soft',
+            name: 'bash',
+            input: { command: 'rm -rf /tmp/example' }
+          }
+        ]
+      };
     }
     return {
       stopReason: 'tool_use',
@@ -136,7 +157,11 @@ test('waiting_approval event carries interrupt; approve then runSession resumes 
           type: 'tool_call',
           toolCallId: 'call_wait',
           name: 'bash',
-          input: { command: 'rm -rf /tmp/example' }
+          input: {
+            command: 'rm -rf /tmp/example',
+            requestSmartModeApproval: true,
+            smartModeBlockReason: 'Auto-review blocked high-risk bash'
+          }
         }
       ]
     };

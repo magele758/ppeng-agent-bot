@@ -182,7 +182,12 @@ test('direct isolation does not run until approval outside bypass [AC:model-sand
       };
       const decision = checkToolApprovals(
         deps,
-        [{ type: 'tool_call', toolCallId: 'c1', name: 'bash', input: { command, isolation: 'direct' } }],
+        [{
+          type: 'tool_call',
+          toolCallId: 'c1',
+          name: 'bash',
+          input: { command, isolation: 'direct', requestSmartModeApproval: true }
+        }],
         gateCtx,
         undefined,
         session,
@@ -193,6 +198,7 @@ test('direct isolation does not run until approval outside bypass [AC:model-sand
       assert.deepEqual(armed, approvals, `expiry armed in ${permissionMode}`);
       assert.equal(messages.length, 0, permissionMode);
       assert.equal(existsSync(marker), false);
+      assert.equal(approvals[0].args.requestSmartModeApproval, undefined);
     }
   } finally {
     restore();
@@ -200,7 +206,7 @@ test('direct isolation does not run until approval outside bypass [AC:model-sand
   }
 });
 
-test('bypass runs a direct command without creating an approval [AC:bypass-remote-shell#AC-1]', async () => {
+test('bypass still hits Auto-review for direct isolation, then proceeds after approve [AC:bypass-remote-shell#AC-1] [AC:auto-review-shell-mcp#AC-5]', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'iso-bypass-'));
   const marker = join(dir, 'ran.txt');
   const command = `printf ran > ${JSON.stringify(marker)}`;
@@ -229,7 +235,8 @@ test('bypass runs a direct command without creating an approval [AC:bypass-remot
       stateDir: dir,
       emitTrace() {}
     };
-    const decision = checkToolApprovals(
+    // Auto-review still gates isolation=direct under bypass (no side effects without the escalate flag).
+    const soft = checkToolApprovals(
       deps,
       [{ type: 'tool_call', toolCallId: 'c1', name: 'bash', input: { command, isolation: 'direct' } }],
       runCtx,
@@ -237,9 +244,34 @@ test('bypass runs a direct command without creating an approval [AC:bypass-remot
       session,
       deps.tools
     );
-    assert.equal(decision, 'proceed');
+    assert.equal(soft, 'skip');
     assert.equal(approvals.length, 0);
-    const ran = await bashTool().execute(runCtx, { command, isolation: 'direct' });
+    const flagged = checkToolApprovals(
+      deps,
+      [{
+        type: 'tool_call',
+        toolCallId: 'c2',
+        name: 'bash',
+        input: { command, isolation: 'direct', requestSmartModeApproval: true }
+      }],
+      runCtx,
+      undefined,
+      session,
+      deps.tools
+    );
+    assert.equal(flagged, 'waiting');
+    assert.equal(approvals.length, 1);
+    approvals[0].status = 'approved';
+    const decision = checkToolApprovals(
+      deps,
+      [{ type: 'tool_call', toolCallId: 'c3', name: 'bash', input: { command, isolation: 'direct' } }],
+      runCtx,
+      undefined,
+      session,
+      deps.tools
+    );
+    assert.equal(decision, 'proceed');
+    const ran = await bashTool({ directIsolationApproved: () => true }).execute(runCtx, { command, isolation: 'direct' });
     assert.equal(ran.ok, true, ran.content);
     assert.equal(existsSync(marker), true);
   } finally {
@@ -288,7 +320,8 @@ test('bypass direct still refuses destructive commands before they run [AC:bypas
       );
       assert.equal(decision, 'skip', command);
       assert.equal(approvals.length, 0, command);
-      assert.match(JSON.stringify(messages), /COMMAND_HARDLINE/, command);
+      // Auto-review soft-blocks first; hardline still refuses at execute time below.
+      assert.match(JSON.stringify(messages), /AUTO_REVIEW_BLOCKED|COMMAND_HARDLINE/, command);
       const refused = await bashTool().execute(runCtx, { command: `${command}; printf ran > ${JSON.stringify(marker)}`, isolation: 'direct' });
       assert.equal(refused.ok, false, command);
       assert.match(refused.content, /COMMAND_HARDLINE/);

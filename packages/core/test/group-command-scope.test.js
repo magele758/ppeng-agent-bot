@@ -207,7 +207,13 @@ test('a command that waits for approval in private chat waits for the same appro
   const room = openSession(store, { roomId: 'room-1', approvalWake: { kind: 'unattended', source: 'room' }, permissionMode: 'auto' });
   say(store, dm, '清理笔记');
   say(store, room, '清理笔记');
-  const toolCall = call('bash', { command }, 'rm');
+  // Auto-review soft-blocks high-risk bash without the escalate flag; both sides must match.
+  const soft = call('bash', { command }, 'rm-soft');
+  assert.equal(checkToolApprovals(host, [{ ...soft, toolCallId: 'dm-soft' }], context(store, dir, dm), undefined, store.getSession(dm.id)), 'skip');
+  assert.equal(checkToolApprovals(host, [{ ...soft, toolCallId: 'room-soft' }], context(store, dir, room), undefined, store.getSession(room.id)), 'skip');
+  assert.equal(store.listApprovals({ status: 'pending' }).length, 0);
+  // Same-action retry with requestSmartModeApproval opens a native card in DM and group alike.
+  const toolCall = call('bash', { command, requestSmartModeApproval: true }, 'rm');
   const dmDecision = checkToolApprovals(host, [{ ...toolCall, toolCallId: 'dm-rm' }], context(store, dir, dm), undefined, store.getSession(dm.id));
   const roomDecision = checkToolApprovals(host, [{ ...toolCall, toolCallId: 'room-rm' }], context(store, dir, room), undefined, store.getSession(room.id));
   assert.equal(dmDecision, 'waiting');
@@ -217,6 +223,7 @@ test('a command that waits for approval in private chat waits for the same appro
     assert.equal(pending.length, 1);
     assert.equal(pending[0].toolName, 'bash');
     assert.equal(pending[0].args.command, command);
+    assert.equal(pending[0].args.requestSmartModeApproval, undefined);
     assert.doesNotMatch(JSON.stringify(store.listMessages(session.id)), /source_scope_denied/);
   }
   assert.deepEqual(ran, []);

@@ -29,7 +29,11 @@ function makeRuntime(childBehavior) {
               type: 'tool_call',
               toolCallId: 'child_bash',
               name: 'bash',
-              input: { command: 'rm -rf /tmp/subagent-blocked-example' }
+              input: {
+                command: 'rm -rf /tmp/subagent-blocked-example',
+                requestSmartModeApproval: true,
+                smartModeBlockReason: 'Auto-review blocked high-risk bash'
+              }
             }
           ]
         };
@@ -168,7 +172,11 @@ test('teammate parked on approval stays visible through session status, outcome 
             type: 'tool_call',
             toolCallId: 'mate_bash',
             name: 'bash',
-            input: { command: 'rm -rf /tmp/subagent-blocked-example' }
+            input: {
+              command: 'rm -rf /tmp/subagent-blocked-example',
+              requestSmartModeApproval: true,
+              smartModeBlockReason: 'Auto-review blocked high-risk bash'
+            }
           }
         ]
       };
@@ -223,7 +231,11 @@ function makeTeammateRuntime(mateBehavior) {
               type: 'tool_call',
               toolCallId: 'mate_bash',
               name: 'bash',
-              input: { command: 'rm -rf /tmp/subagent-blocked-example' }
+              input: {
+                command: 'rm -rf /tmp/subagent-blocked-example',
+                requestSmartModeApproval: true,
+                smartModeBlockReason: 'Auto-review blocked high-risk bash'
+              }
             }
           ]
         };

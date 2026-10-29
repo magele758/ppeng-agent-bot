@@ -81,7 +81,11 @@ test('mock-llm e2e: approval latch then resume', async () => {
             type: 'tool_call',
             toolCallId: 'mock_rm',
             name: 'bash',
-            input: { command: 'rm -rf /tmp/formal-mock' }
+            input: {
+              command: 'rm -rf /tmp/formal-mock',
+              requestSmartModeApproval: true,
+              smartModeBlockReason: 'Auto-review blocked high-risk bash'
+            }
           }
         ]
       };

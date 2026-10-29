@@ -85,26 +85,51 @@ test('approval blocks the session until the user approves the tool call', async 
           message.role === 'user' &&
           message.parts.some((part) => part.type === 'text' && part.text.includes('Approval for bash was approved'))
       );
+      const sawSoftBlock = input.messages.some((message) =>
+        message.parts.some(
+          (part) =>
+            part.type === 'tool_result' &&
+            part.toolCallId === 'call_1_soft' &&
+            String(part.content ?? '').includes('requestSmartModeApproval')
+        )
+      );
 
-      if (!sawApprovalNote) {
+      if (sawApprovalNote) {
+        return {
+          stopReason: 'end',
+          assistantParts: [{ type: 'text', text: 'Continuing after approval.' }]
+        };
+      }
+
+      // Auto-review: first high-risk call soft-blocks; escalate with the same params + flag.
+      if (!sawSoftBlock) {
         return {
           stopReason: 'tool_use',
           assistantParts: [
             {
               type: 'tool_call',
-              toolCallId: 'call_1',
+              toolCallId: 'call_1_soft',
               name: 'bash',
-              input: {
-                command: 'rm -rf /tmp/example'
-              }
+              input: { command: 'rm -rf /tmp/example' }
             }
           ]
         };
       }
 
       return {
-        stopReason: 'end',
-        assistantParts: [{ type: 'text', text: 'Continuing after approval.' }]
+        stopReason: 'tool_use',
+        assistantParts: [
+          {
+            type: 'tool_call',
+            toolCallId: 'call_1',
+            name: 'bash',
+            input: {
+              command: 'rm -rf /tmp/example',
+              requestSmartModeApproval: true,
+              smartModeBlockReason: 'Auto-review blocked high-risk bash'
+            }
+          }
+        ]
       };
     })
   );
