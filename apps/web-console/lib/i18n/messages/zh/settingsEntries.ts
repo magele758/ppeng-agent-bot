@@ -338,6 +338,27 @@ export const settingsEntries = {
     probe: '立即探测 Tailscale',
     probeDone: '探测完成：发现 {count} 个，来源 {source}'
   },
+  userVault: {
+    title: '用户保险库（填表引用）',
+    keywords: '保险库 vault 密码 登录 银行卡 联系人 填表 uvref 引用',
+    desc: '保存登录、银行卡、联系人，让助手按引用在浏览器里填表。这不是连接器密钥库：连接器密钥走「密钥」，这里只给表单填写用。',
+    enabled: '允许助手使用保险库',
+    hint: '开启后助手可列出条目并通过 vault_fill 填写浏览器表单；每次填写需你批准，且需要先开启浏览器工具。助手只看到 uvref 引用，看不到密码和卡号。',
+    kind: '类型',
+    kinds: { login: '登录', card: '银行卡', contact: '联系人' },
+    fields: {
+      label: '名称', hint: '备注', username: '用户名', sites: '站点（空格或逗号分隔）', password: '密码（只写入）',
+      holderName: '持卡人', expiry: '有效期', number: '卡号（只写入）', cvv: 'CVV（只写入）',
+      fullName: '姓名', email: '邮箱', phone: '电话', address: '地址'
+    },
+    add: '添加条目',
+    delete: '删除',
+    pickToFill: '选择并填表',
+    pickHint: '把下面这句发给助手，它会用这些引用填写当前浏览器页面里的表单。',
+    fillInstruction: '请用 vault_fill，把我的保险库条目「{label}」填到当前浏览器表单里。引用：{refs}',
+    copy: '复制',
+    copied: '已复制'
+  },
   connectors: {
     title: '连接器授权',
     keywords: '连接器 connector 授权 grant 插件 领域 密钥',

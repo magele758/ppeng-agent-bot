@@ -350,6 +350,18 @@ export const TOOL_GROUPS: ToolGroup[] = [
         ]
     },
     {
+        "id": "vault",
+        "tier": 2,
+        "labelZh": "用户保险库填表",
+        "labelEn": "User Vault form fill",
+        "tools": [
+            "vault_list",
+            "vault_get",
+            "vault_fill"
+        ],
+        "extension": true
+    },
+    {
         "id": "browser",
         "tier": 2,
         "labelZh": "浏览器",
