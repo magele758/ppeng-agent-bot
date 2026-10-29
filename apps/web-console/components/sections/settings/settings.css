@@ -291,3 +291,10 @@
 .settings-search input[type='search']::-webkit-search-cancel-button {
   display: none;
 }
+
+.settings-vault-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.settings-vault-entry { display: grid; gap: 4px; }
+.settings-vault-instruction { display: grid; gap: 4px; }
+.settings-vault-instruction code { white-space: pre-wrap; word-break: break-word; }
+.settings-vault-form { display: grid; gap: 8px; }
+.settings-vault-field { display: grid; gap: 2px; }

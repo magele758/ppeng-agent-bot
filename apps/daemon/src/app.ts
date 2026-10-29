@@ -55,6 +55,7 @@ import { outboundDraftRoutes } from './routes/outbound-drafts.js';
 import { researchRoutes } from './routes/research.js';
 import { sandboxRoutes } from './routes/sandbox.js';
 import { secretsRoutes } from './routes/secrets.js';
+import { userVaultRoutes } from './routes/user-vault.js';
 import { selfHealRoutes } from './routes/self-heal.js';
 import { sessionsRoutes } from './routes/sessions.js';
 import { composerHintRoutes } from './routes/composer-hint.js';
@@ -133,6 +134,7 @@ export function buildDaemonRouter(deps: DaemonAppDeps): Router {
     .addAll(modelProviderRoutes(runtime))
     .addAll(modelFallbackRoutes(runtime))
     .addAll(secretsRoutes(runtime))
+    .addAll(userVaultRoutes(runtime))
     .addAll(mcpOAuthRoutes(runtime))
     .addAll(skillEvalRoutes(runtime))
     .addAll(skillSettingsRoutes(runtime))

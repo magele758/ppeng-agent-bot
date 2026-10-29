@@ -41,3 +41,11 @@ export type {
   UserVaultPersist,
   FillByRefModelReport
 } from './user-vault.js';
+export {
+  USER_VAULT_SETTINGS_KEY,
+  USER_VAULT_TOOL_NAMES,
+  readUserVaultSettings,
+  writeUserVaultSettings,
+  filterUserVaultTools
+} from './user-vault-settings.js';
+export type { UserVaultSettings } from './user-vault-settings.js';

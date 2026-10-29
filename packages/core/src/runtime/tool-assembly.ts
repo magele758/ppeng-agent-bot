@@ -7,6 +7,9 @@ import { CronJobStore, createCronTools } from '../cron/cron-store.js';
 import { CapabilityRegistry } from '../discovery/registry.js';
 import type { SqliteStateStore } from '../storage.js';
 import { createTailscaleTools } from '../tools/tailscale-tools.js';
+import { createVaultTools } from '../tools/vault-tools.js';
+import type { UserVault } from '../secrets/user-vault.js';
+import { readUserVaultSettings } from '../secrets/user-vault-settings.js';
 import {
   DISCLOSED_TOOL_NAMES_META,
   readDisclosedToolNames
@@ -35,6 +38,7 @@ export function assembleOptionalTools(input: {
   store: SqliteStateStore;
   stateDir: string;
   getCronStore: () => CronJobStore;
+  getUserVault: () => UserVault;
   routineHost?: RoutineRuntimeHost;
   /** Read when tool_search or load_capability_tool runs, not while assembling. */
   getCatalog?: () => ToolContract<any>[];
@@ -52,6 +56,15 @@ export function assembleOptionalTools(input: {
       })
     );
   }
+  optionalExtras.push(
+    ...createVaultTools({
+      getVault: input.getUserVault,
+      isEnabled: () => readUserVaultSettings(input.store).enabled,
+      isFillTargetAvailable: () => resolveBrowserToolsEnabled(input.store, input.env),
+      fillField: async (ctx, selector, value) =>
+        (await defaultBrowserAction(ctx, { kind: 'type', selector, text: value }, { env: input.env })).ok
+    })
+  );
   optionalExtras.push(...createCronTools(() => input.getCronStore(), {runtimeHost:input.routineHost,store:input.store,isEnabled:()=>routineSettings(input.store).dialogToolsEnabled}));
   {
     const getRegistry = () => new CapabilityRegistry(input.store.capabilities());

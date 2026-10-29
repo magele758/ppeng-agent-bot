@@ -313,7 +313,12 @@ export {
   parseUserVaultFillRef,
   fillByReferences,
   assertModelFacingHasNoUserVaultSecrets,
-  isUserVaultFillRef
+  isUserVaultFillRef,
+  USER_VAULT_SETTINGS_KEY,
+  USER_VAULT_TOOL_NAMES,
+  readUserVaultSettings,
+  writeUserVaultSettings,
+  filterUserVaultTools
 } from '../secrets/index.js';
 export type {
   SecretEntrySummary,
@@ -323,7 +328,8 @@ export type {
   UserVaultFillField,
   UserVaultFillRef,
   UserVaultEntrySummary,
-  FillByRefModelReport
+  FillByRefModelReport,
+  UserVaultSettings
 } from '../secrets/index.js';
 export {
   parseRemoteModelList,
