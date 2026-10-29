@@ -154,7 +154,7 @@ export function createRegisteredMachineTools(
 
 /** Route bash/read_file when machineId is set. Returns null when machineId absent (local path). */
 export async function executeOnRegisteredMachine(
-  store: SqliteStateStore,
+  store: SqliteStateStore | undefined,
   port: RegisteredMachinePort | undefined,
   session: { metadata?: Record<string, unknown> },
   machineId: unknown,
@@ -162,7 +162,7 @@ export async function executeOnRegisteredMachine(
   input: Record<string, unknown>
 ): Promise<ToolExecutionResult | null> {
   if (machineId === undefined || machineId === null || machineId === '') return null;
-  if (!port) {
+  if (!store || !port) {
     return {
       ok: false,
       content: JSON.stringify({

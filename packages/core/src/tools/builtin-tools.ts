@@ -465,16 +465,7 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
     sideEffectLevel: 'none',
     ptc: { kind: 'read' },
     async execute(context, args) {
-      if (args.machineId) {
-        if (!services.stateStore) {
-          return {
-            ok: false,
-            content: JSON.stringify({
-              error: 'registered_machines_unavailable',
-              message: 'RegisteredMachinePort store is not configured'
-            })
-          };
-        }
+      {
         const routed = await executeOnRegisteredMachine(
           services.stateStore,
           services.registeredMachines,
@@ -908,16 +899,7 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
       );
     },
     async execute(context, args) {
-      if (args.machineId) {
-        if (!services.stateStore) {
-          return {
-            ok: false,
-            content: JSON.stringify({
-              error: 'registered_machines_unavailable',
-              message: 'RegisteredMachinePort store is not configured'
-            })
-          };
-        }
+      {
         const routed = await executeOnRegisteredMachine(
           services.stateStore,
           services.registeredMachines,
