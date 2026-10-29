@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-10-29T05:30:00.000Z",
-  "reviewNote": "User Vault assistant tools (vault_list/get/fill) registered as optional tools and hidden unless the Lab toggle is on; runtime passes getUserVault. Tool-call pairing, lifecycle, restart and concurrency control-flow unchanged.",
+  "reviewedAt": "2026-10-29T08:40:00.000Z",
+  "reviewNote": "Global delivery quiet hours: server.ts only starts an unref'd, non-overlapping 60s timer that flushes quiet-hours-deferred outbound drafts (skipped under desktopValidation). Startup, persistence, writer claims and graceful shutdown unchanged; no runtime/session/kernel code touched.",
   "mapping": [
     {
       "step": "Production startup, persistence, writer claims and graceful shutdown (HTTP drain not exercised)",
@@ -324,7 +324,7 @@
     "packages/core/src/runtime/subagent-policy.ts": "9d02a1c115e51b4e0bb02069439f4a4cf80aac673268178a12a5c28d0ac9d758",
     "packages/core/src/runtime/session-control.ts": "8f42a13096811dd960ed726e7d9685350fa041e08c57960e9e2f57cf7c5d55b4",
     "packages/core/src/runtime/session-facade.ts": "54d800b00dd14bcd9d1184da8c69c5ef1f2fffa9c2e1d6e2608b735e98ae7de0",
-    "apps/daemon/src/server.ts": "98a06c0904d05253fe15486b65b04fbb6f405d140287aac59bd576eaf088414d",
+    "apps/daemon/src/server.ts": "44eaf01b9bd98c643a8c9acdf58773e21fe6151fd3faab4b0f4f0c5445a4be9e",
     "packages/agent-loop/src/turn/kernel.ts": "a2c962a4f060fe5d006c5b1053b8d36e4bc2bd34a2dc4901e6e2422f9a0219ef",
     "packages/agent-loop/src/session/surface-store.ts": "b49bf08ee2fff9e3d92f340ea2933315cebb4d7a6ab01f4d693a234416275fd4",
     "packages/agent-loop/src/session/interrupt.ts": "1842240883d68a0ca20da065c9d2ba238a24a782bca5f9148f0da51026236f96",

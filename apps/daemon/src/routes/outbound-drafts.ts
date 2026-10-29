@@ -1,14 +1,10 @@
-import { join } from 'node:path';
 import type { RawAgentRuntime } from '@ppeng/agent-core';
-import {
-  loadGatewayFileConfig,
-  parseGatewayEnv,
-  readOutboundDrafts,
-  releaseOutboundDraft
-} from '@ppeng/agent-capability-gateway';
+import { createDaemonDeliveryPort } from '../delivery-port.js';
 import { hasHumanRelease, humanReleaseDenied } from '../human-release.js';
 import { json } from '../http-utils.js';
 import type { RouteContext, RouteSpec } from '../routing.js';
+
+const LISTED_STATUSES = new Set<string>(['pending_approval', 'failed', 'sending', 'deferred']);
 
 /**
  * Human release path for proactive outbound drafts (digest, webhook, model-initiated).
@@ -17,16 +13,8 @@ import type { RouteContext, RouteSpec } from '../routing.js';
  * With login off, both fail closed with 403 `human_login_required` and the inbox asks the operator to enable it.
  */
 export function outboundDraftRoutes(runtime: RawAgentRuntime, repoRoot: string, env: NodeJS.ProcessEnv): RouteSpec[] {
-  const gatewayDir = () => join(runtime.stateDir, 'gateway');
   const decide = async (id: string, decision: 'approve' | 'reject') => {
-    const { configPath } = parseGatewayEnv(repoRoot);
-    const cfg = configPath ? await loadGatewayFileConfig(configPath) : undefined;
-    return releaseOutboundDraft({
-      gatewayDir: gatewayDir(),
-      id,
-      decision,
-      channels: cfg?.channels ?? []
-    });
+    return (await createDaemonDeliveryPort(runtime, repoRoot)).confirm({ id, decision });
   };
   const requireHuman = (ctx: RouteContext): boolean => {
     if (hasHumanRelease(ctx.request, env, ctx.auth)) return true;
@@ -42,8 +30,8 @@ export function outboundDraftRoutes(runtime: RawAgentRuntime, repoRoot: string, 
         // Do not reconcile here. An in-flight approve is `sending` until the POST
         // finishes; treating that as a crash marks a live send failed and the
         // human can release it a second time. Crash recovery runs at startup.
-        const drafts = (await readOutboundDrafts(gatewayDir())).filter(
-          (draft) => draft.status === 'pending_approval' || draft.status === 'failed' || draft.status === 'sending'
+        const drafts = (await (await createDaemonDeliveryPort(runtime, repoRoot)).list()).filter((draft) =>
+          LISTED_STATUSES.has(draft.status)
         );
         json(response, 200, { drafts });
       }

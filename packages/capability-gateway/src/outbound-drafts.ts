@@ -5,6 +5,7 @@ import { join } from 'node:path';
 export type OutboundDraftStatus =
   | 'pending_approval'
   | 'confirmed'
+  | 'deferred'
   | 'sending'
   | 'sent'
   | 'rejected'
@@ -24,6 +25,8 @@ export interface OutboundDraft {
   receiveIdType?: FeishuReceiveIdType;
   decidedAt?: string;
   error?: string;
+  /** Quiet hours: approved by a human, held until this ISO time (informational; release is by window state). */
+  deferredUntil?: string;
 }
 
 export class OutboundDraftError extends Error {
@@ -37,6 +40,8 @@ export class OutboundDraftError extends Error {
     this.draftId = draftId;
   }
 }
+
+const DEFERRABLE = new Set<OutboundDraftStatus>(['pending_approval', 'confirmed', 'failed', 'deferred']);
 
 const tails = new Map<string, Promise<unknown>>();
 
@@ -118,12 +123,13 @@ export async function confirmOutboundDraft(gatewayDir: string, id: string): Prom
     const items = await readOutboundDrafts(gatewayDir);
     const draft = items.find((item) => item.id === id);
     if (!draft) throw new OutboundDraftError('not_found', id, `draft ${id} not found`);
-    if (draft.status !== 'pending_approval' && draft.status !== 'failed') {
+    if (draft.status !== 'pending_approval' && draft.status !== 'failed' && draft.status !== 'deferred') {
       throw new OutboundDraftError('not_pending', id, `draft ${id} is ${draft.status}`);
     }
     draft.status = 'confirmed';
     draft.decidedAt = new Date().toISOString();
     draft.error = undefined;
+    draft.deferredUntil = undefined;
     await writeDrafts(gatewayDir, items);
     return { ...draft };
   });
@@ -162,6 +168,27 @@ export async function settleOutboundDraft(
   });
 }
 
+/**
+ * Quiet hours: a human approved, but the send waits for the window to end. Does not POST.
+ * Idempotent for an already-deferred draft (the hold time is refreshed).
+ */
+export async function deferOutboundDraft(gatewayDir: string, id: string, until?: string): Promise<OutboundDraft> {
+  return withGatewayLock(gatewayDir, async () => {
+    const items = await readOutboundDrafts(gatewayDir);
+    const draft = items.find((item) => item.id === id);
+    if (!draft) throw new OutboundDraftError('not_found', id, `draft ${id} not found`);
+    if (!DEFERRABLE.has(draft.status)) {
+      throw new OutboundDraftError('not_pending', id, `draft ${id} is ${draft.status}`);
+    }
+    draft.status = 'deferred';
+    draft.decidedAt = new Date().toISOString();
+    draft.deferredUntil = until;
+    draft.error = undefined;
+    await writeDrafts(gatewayDir, items);
+    return { ...draft };
+  });
+}
+
 export async function rejectOutboundDraft(gatewayDir: string, id: string): Promise<OutboundDraft> {
   return withGatewayLock(gatewayDir, async () => {
     const items = await readOutboundDrafts(gatewayDir);
@@ -170,6 +197,7 @@ export async function rejectOutboundDraft(gatewayDir: string, id: string): Promi
     if (
       draft.status !== 'pending_approval' &&
       draft.status !== 'confirmed' &&
+      draft.status !== 'deferred' &&
       draft.status !== 'failed'
     ) {
       throw new OutboundDraftError('not_pending', id, `draft ${id} is ${draft.status}`);
