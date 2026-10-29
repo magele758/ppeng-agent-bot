@@ -17,7 +17,7 @@ criteria:
   - id: AC-3
     given: 需要在任意修复分支验证完整候选
     when: PR 添加 full-validation 标签或更新带此标签的版本
-    then: 完整验证可执行且普通未标记 PR 不自动运行全量验证
+    then: 完整验证可执行；未标记且未触及核心路径的 PR 不自动运行全量验证（核心路径见 AC-9）
   - id: AC-4
     given: HTTP 集成检查失败
     when: 完整验证继续收集结果
@@ -38,3 +38,7 @@ criteria:
     given: 新增菜单已因悬停而展开
     when: 用户点击新增按钮
     then: 菜单的透明区域不遮挡按钮，仍可正常进入新建会话
+  - id: AC-9
+    given: PR 改动触及核心路径（packages/core、agent-loop、capability-gateway、api-types、apps/daemon、formal、crap 及验证相关 CI 脚本与工作流）
+    when: PR 打开或更新
+    then: 无需标签即自动运行与 full-validation 标签相同的 Release gate；仅改文档、领域包、web-console、desktop 的 PR 仍跳过，已有标签的 PR 不论路径照常运行，Main full health 与 CRAP 阈值不变

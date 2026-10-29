@@ -18,11 +18,18 @@ test('quick gate executes Bot contracts and HTTP integration within its budget [
  for (const file of ['bots.test.js', 'bot-goal-result-return.test.js', 'scripts/integration-test.mjs', 'ci-action-reliability.test.mjs', 'feed-window.test.ts']) assert.ok(source.includes(file), file);
  assert.match(source, /budgetMs=90000/);
 });
-test('full PR validation is opt-in on every branch and responds to labeling [AC:ci-action-reliability#AC-3]', () => {
+test('full PR validation stays label opt-in and also runs for core paths [AC:ci-action-reliability#AC-3] [AC:ci-action-reliability#AC-9]', () => {
  const w = parse(readFileSync('.github/workflows/pr-release-gate.yml', 'utf8'));
  assert.ok(w.on.pull_request.types.includes('labeled'));
  assert.match(w.jobs.full.if, /contains\(github.event.pull_request.labels\.\*\.name, 'full-validation'\)/);
+ assert.match(w.jobs.full.if, /needs\.detect\.outputs\.core == 'true'/);
+ assert.match(w.jobs.full.if, /\|\|/);
+ assert.equal(w.jobs.full.needs, 'detect');
+ assert.equal(w.jobs.full.uses, './.github/workflows/release-gate.yml');
  assert.doesNotMatch(w.jobs.full.if, /head_ref/);
+ assert.deepEqual(w.permissions, { contents: 'read' });
+ assert.equal(w.jobs.detect.permissions, undefined);
+ assert.match(w.jobs.detect.steps.map(s => s.run ?? '').join('\n'), /pr-release-paths\.mjs/);
 });
 test('HTTP regression still fails the cloud gate and browser E2E is not run there [AC:ci-action-reliability#AC-4] [AC:ci-action-reliability#AC-5]', () => {
  const w = parse(readFileSync('.github/workflows/release-gate.yml', 'utf8'));
