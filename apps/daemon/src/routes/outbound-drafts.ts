@@ -1,11 +1,6 @@
-import { join } from 'node:path';
 import { ValidationError, type RawAgentRuntime } from '@ppeng/agent-core';
-import {
-  createUserDeliveryPort,
-  loadGatewayFileConfig,
-  parseGatewayEnv,
-  type UserDeliveryPort
-} from '@ppeng/agent-capability-gateway';
+import type { UserDeliveryPort } from '@ppeng/agent-capability-gateway';
+import { createDaemonDeliveryPort } from '../delivery-port.js';
 import { hasHumanRelease, humanReleaseDenied } from '../human-release.js';
 import { json } from '../http-utils.js';
 import type { RouteContext, RouteSpec } from '../routing.js';
@@ -23,6 +18,8 @@ function parseEditText(body: unknown): string {
   return text;
 }
 
+const LISTED_STATUSES = new Set<string>(['pending_approval', 'failed', 'sending', 'deferred']);
+
 /**
  * Human release path for proactive outbound drafts (digest, webhook, model-initiated).
  * The decision is the URL verb. A request body cannot approve a draft; it may only carry the
@@ -31,12 +28,7 @@ function parseEditText(body: unknown): string {
  * With login off, both fail closed with 403 `human_login_required` and the inbox asks the operator to enable it.
  */
 export function outboundDraftRoutes(runtime: RawAgentRuntime, repoRoot: string, env: NodeJS.ProcessEnv): RouteSpec[] {
-  const gatewayDir = () => join(runtime.stateDir, 'gateway');
-  const port = async (): Promise<UserDeliveryPort> => {
-    const { configPath } = parseGatewayEnv(repoRoot);
-    const cfg = configPath ? await loadGatewayFileConfig(configPath) : undefined;
-    return createUserDeliveryPort({ gatewayDir: gatewayDir(), channels: cfg?.channels ?? [] });
-  };
+  const port = (): Promise<UserDeliveryPort> => createDaemonDeliveryPort(runtime, repoRoot);
   const requireHuman = (ctx: RouteContext): boolean => {
     if (hasHumanRelease(ctx.request, env, ctx.auth)) return true;
     const denied = humanReleaseDenied(env);
@@ -52,9 +44,7 @@ export function outboundDraftRoutes(runtime: RawAgentRuntime, repoRoot: string, 
         // Do not reconcile here. An in-flight approve is `sending` until the POST
         // finishes; treating that as a crash marks a live send failed and the
         // human can release it a second time. Crash recovery runs at startup.
-        const drafts = (await (await port()).listPreviews()).filter(
-          (draft) => draft.status === 'pending_approval' || draft.status === 'failed' || draft.status === 'sending'
-        );
+        const drafts = (await (await port()).listPreviews()).filter((draft) => LISTED_STATUSES.has(draft.status));
         json(response, 200, { drafts });
       }
     },

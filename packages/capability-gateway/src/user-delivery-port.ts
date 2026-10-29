@@ -6,8 +6,9 @@ import {
   type FeishuReceiveIdType,
   type OutboundDraft
 } from './outbound-drafts.js';
-import { releaseOutboundDraft } from './outbound.js';
+import { deferOutboundDraftForQuietHours, releaseOutboundDraft } from './outbound.js';
 import { previewOutboundDraft, type OutboundDraftPreview } from './outbound-identity.js';
+import { isQuietNow, quietWindowEnd, type QuietHoursPolicy } from './delivery-quiet-hours.js';
 
 /**
  * Sole user-facing outbound delivery port.
@@ -18,6 +19,10 @@ import { previewOutboundDraft, type OutboundDraftPreview } from './outbound-iden
  *
  * Lifecycle for user-facing outbound: draft → confirm (human) → send.
  * `confirm` with `approve` performs confirm+send via the existing release path.
+ *
+ * Global quiet hours: while the configured window is active, `confirm(approve)` does not send.
+ * The draft becomes `deferred` (human approval kept) and `flushDeferred()` releases it once
+ * the window has ended. Reject always works, including for deferred drafts.
  */
 export interface UserDeliveryMessage {
   channelId: string;
@@ -49,15 +54,29 @@ export interface UserDeliveryPort {
   list(): Promise<OutboundDraft[]>;
   /** Drafts plus the identity each one will send as. */
   listPreviews(): Promise<OutboundDraftPreview[]>;
+  /**
+   * Send drafts deferred by quiet hours, oldest first. No-op while the window is still active.
+   * Returns the ids it attempted; a failed send is left `failed` (retryable) and does not stop the rest.
+   */
+  flushDeferred(): Promise<string[]>;
 }
 
 export interface UserDeliveryPortOptions {
   gatewayDir: string;
   channels: ChannelSpec[];
+  /** Read per call so a Lab change applies immediately. Undefined or disabled = no quiet window. */
+  quietHours?: () => QuietHoursPolicy | undefined;
+  now?: () => number;
 }
 
 export function createUserDeliveryPort(opts: UserDeliveryPortOptions): UserDeliveryPort {
   const { gatewayDir, channels } = opts;
+  const clock = opts.now ?? Date.now;
+  const quiet = () => {
+    const policy = opts.quietHours?.();
+    return policy && isQuietNow(policy, clock()) ? policy : undefined;
+  };
+  const release = (id: string) => releaseOutboundDraft({ gatewayDir, id, decision: 'approve', channels });
   return {
     draft(message) {
       return appendOutboundDraft(gatewayDir, {
@@ -69,11 +88,21 @@ export function createUserDeliveryPort(opts: UserDeliveryPortOptions): UserDeliv
       });
     },
     confirm(input) {
-      return releaseOutboundDraft({
+      const policy = input.decision === 'approve' ? quiet() : undefined;
+      if (!policy) {
+        return releaseOutboundDraft({
+          gatewayDir,
+          id: input.id,
+          decision: input.decision,
+          channels,
+          expectedRevision: input.expectedRevision
+        });
+      }
+      const end = quietWindowEnd(policy, clock());
+      return deferOutboundDraftForQuietHours({
         gatewayDir,
         id: input.id,
-        decision: input.decision,
-        channels,
+        until: end === undefined ? undefined : new Date(end).toISOString(),
         expectedRevision: input.expectedRevision
       });
     },
@@ -86,6 +115,12 @@ export function createUserDeliveryPort(opts: UserDeliveryPortOptions): UserDeliv
     async listPreviews() {
       const drafts = await readOutboundDrafts(gatewayDir);
       return drafts.map((draft) => previewOutboundDraft(draft, channels));
+    },
+    async flushDeferred() {
+      if (quiet()) return [];
+      const due = (await readOutboundDrafts(gatewayDir)).filter((draft) => draft.status === 'deferred');
+      for (const draft of due) await release(draft.id).catch(() => undefined);
+      return due.map((draft) => draft.id);
     }
   };
 }

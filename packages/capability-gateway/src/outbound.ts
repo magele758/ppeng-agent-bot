@@ -15,6 +15,7 @@ import {
   appendOutboundDraft,
   claimOutboundDraft,
   confirmOutboundDraft,
+  deferOutboundDraft,
   OutboundDraftError,
   readOutboundDrafts,
   rejectOutboundDraft,
@@ -80,6 +81,22 @@ async function sendApprovedChannel(opts: {
   });
 }
 
+const NEEDS_CONFIRM = new Set<OutboundDraft['status']>(['pending_approval', 'failed', 'deferred']);
+
+/** Quiet hours: keep a human-approved draft unsent until the window ends. Does not POST. */
+export async function deferOutboundDraftForQuietHours(input: {
+  gatewayDir: string;
+  id: string;
+  until?: string;
+  expectedRevision?: number;
+}): Promise<OutboundDraft> {
+  try {
+    return await deferOutboundDraft(input.gatewayDir, input.id, input.until, { expectedRevision: input.expectedRevision });
+  } catch (error) {
+    rethrowDraft(error);
+  }
+}
+
 function rethrowDraft(error: unknown): never {
   if (!(error instanceof OutboundDraftError)) throw error;
   if (error.code === 'not_found') throw new NotFoundError('OutboundDraft', error.draftId);
@@ -114,7 +131,7 @@ export async function releaseOutboundDraft(input: {
     // Draft → Confirm → Send: confirm is mandatory before claim/send.
     const current = (await readOutboundDrafts(input.gatewayDir)).find((item) => item.id === input.id);
     if (!current) throw new OutboundDraftError('not_found', input.id, `draft ${input.id} not found`);
-    if (current.status === 'pending_approval' || current.status === 'failed') {
+    if (NEEDS_CONFIRM.has(current.status)) {
       await confirmOutboundDraft(input.gatewayDir, input.id, { expectedRevision: input.expectedRevision });
     } else if (current.status !== 'confirmed') {
       throw new OutboundDraftError('not_pending', input.id, `draft ${input.id} is ${current.status}`);

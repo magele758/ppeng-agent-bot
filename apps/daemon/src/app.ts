@@ -51,6 +51,7 @@ import { miscRoutes } from './routes/misc.js';
 import { modelFallbackRoutes } from './routes/model-fallback.js';
 import { modelProviderRoutes } from './routes/model-providers.js';
 import { orchestrationRoutes } from './routes/orchestration.js';
+import { deliveryQuietHoursRoutes } from './routes/delivery-quiet-hours.js';
 import { outboundDraftRoutes } from './routes/outbound-drafts.js';
 import { researchRoutes } from './routes/research.js';
 import { sandboxRoutes } from './routes/sandbox.js';
@@ -117,6 +118,7 @@ export function buildDaemonRouter(deps: DaemonAppDeps): Router {
     .addAll(externalAgentRoutes(runtime))
     .addAll(socialRoutes(runtime, repoRoot))
     .addAll(outboundDraftRoutes(runtime, repoRoot, env))
+    .addAll(deliveryQuietHoursRoutes(runtime))
     .addAll(selfHealRoutes(runtime))
     .addAll(mailboxRoutes(runtime))
     .addAll(orchestrationRoutes(runtime))

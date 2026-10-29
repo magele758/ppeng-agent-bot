@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 import { cwd, env } from 'node:process';
+import { startDeliveryFlushTicker } from './delivery-port.js';
 import { createGatewayContext, startGatewayLearnTicker } from '@ppeng/agent-capability-gateway';
 import {
   RawAgentRuntime,
@@ -194,6 +195,9 @@ log.info(`loop kernel=${loopOn.kernelVariant} assembly=${loopOn.assemblyPreset}`
 const gatewayCtx = await timeBootPhase('gateway_context', () =>
   desktopValidation ? undefined : createGatewayContext(runtime, repoRoot, stateDir)
 );
+if (!desktopValidation) {
+  startDeliveryFlushTicker(runtime, repoRoot, (e) => log.error('delivery quiet-hours flush failed', e)).unref();
+}
 if (gatewayCtx) {
   log.info(`capability-gateway enabled at ${gatewayCtx.env.pathPrefix}`);
   startGatewayLearnTicker(() => gatewayCtx, (e) => log.error('gateway learn tick failed', e)).unref();

@@ -449,6 +449,8 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
     ['POST /api/mailbox', ADMIN],
     ['GET /api/social-post-schedules', ADMIN],
     ['POST /api/social-post-schedules/:taskId/action', ADMIN],
+    ['GET /api/delivery/quiet-hours', ADMIN],
+    ['PATCH /api/delivery/quiet-hours', ADMIN],
     ['GET /api/outbound-drafts', ADMIN],
     ['PATCH /api/outbound-drafts/:id', ADMIN],
     ['POST /api/outbound-drafts/:id/approve', ADMIN],

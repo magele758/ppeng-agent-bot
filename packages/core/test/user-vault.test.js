@@ -84,11 +84,31 @@ test('fill-by-ref resolves for forms but model report never contains raw secrets
   assert.deepEqual(typed, ['SuperSecretPw99!', '5555555555554444', '999']);
   assert.equal(outcome.modelReport.filled, 3);
   assert.ok(outcome.modelReport.text.includes(pwRef));
-  assert.ok(!outcome.modelReport.text.includes('SuperSecretPw99!'));
-  assert.ok(!outcome.modelReport.text.includes('5555555555554444'));
-  assert.ok(!outcome.modelReport.text.includes('999'));
+  // Refs embed random ids that can contain '999' by chance; scan the prose with refs masked.
+  const prose = outcome.modelReport.refs.reduce((out, ref) => out.split(ref).join('<ref>'), outcome.modelReport.text);
+  assert.ok(!prose.includes('SuperSecretPw99!'));
+  assert.ok(!prose.includes('5555555555554444'));
+  assert.ok(!prose.includes('999'));
   assertModelFacingHasNoUserVaultSecrets(outcome.modelReport.text, vault);
   assert.throws(() => assertModelFacingHasNoUserVaultSecrets(`leak SuperSecretPw99!`, vault));
+});
+
+test('fill-by-ref succeeds when an opaque ref id happens to contain a short secret [AC:user-vault-ref-fill#AC-3]', async () => {
+  const vault = createMemoryUserVault();
+  const card = vault.upsertCard({
+    id: 'card_a999b',
+    label: 'Visa',
+    number: '5555555555554444',
+    cvv: '999',
+    holderName: 'Lei',
+    expiry: '01/29'
+  });
+  const cvvRef = card.fillRefs.cvv;
+  assert.ok(cvvRef?.includes('999'));
+  const outcome = await fillByReferences(vault, [cvvRef], async () => 'ok');
+  assert.equal(outcome.ok, true);
+  if (!outcome.ok) return;
+  assert.ok(outcome.modelReport.text.includes(cvvRef));
 });
 
 test('fill refs parse round-trip; invalid ref fails closed', async () => {

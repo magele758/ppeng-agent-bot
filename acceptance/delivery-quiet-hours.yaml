@@ -1,0 +1,28 @@
+id: delivery-quiet-hours
+title: 用户可见外发的全局静默时段
+status: implemented
+requirement: |
+  UserDeliveryPort 是用户可见外发的唯一出口。配置了全局静默时段后，窗口内不立即发送，
+  而是暂存（保留人工批准），窗口结束后自动发出；窗口外与未启用时行为不变。
+notes: 'P1-A; assumedApproval: standing-order-2026-10-22. 配置面：GET/PATCH /api/delivery/quiet-hours（daemon_control KV，立即生效，无环境变量）。'
+criteria:
+  - id: AC-1
+    given: 静默时段已启用且当前时间在窗口内（含跨午夜窗口）
+    when: 人工批准一条草稿
+    then: 不向渠道发送，草稿变为 deferred 并记录预计释放时间，批准意图保留
+  - id: AC-2
+    given: 静默时段未启用，或当前时间在窗口之外
+    when: 人工批准一条草稿
+    then: 与原来一致，立即发送且只发送一次
+  - id: AC-3
+    given: 存在 deferred 草稿
+    when: 窗口仍在进行时执行 flush
+    then: 什么都不发送；窗口结束后 flush 按先后顺序发送且只发送一次，单条失败不影响其余
+  - id: AC-4
+    given: 草稿处于 deferred
+    when: 人工拒绝
+    then: 草稿被拒绝，窗口结束后也不会发出
+  - id: AC-5
+    given: 通过 Lab / API 配置静默时段
+    when: PATCH 非法的小时或时区
+    then: 返回校验错误且不改变已保存配置；合法配置立即影响后续批准
