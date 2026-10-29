@@ -1,4 +1,5 @@
 import type {SqliteStateStore} from '../storage.js';
+import { filterUserVaultTools } from '../secrets/user-vault-settings.js';
 import { runtimeCapabilityCheck } from '../config/runtime-capabilities.js';
 import type { GoalSnapshot } from '../bots/goals/types.js';
 import { filterFactoryTools } from '../factory/tool-policy.js';
@@ -133,6 +134,7 @@ export function authorizeToolsForSession(input: {
   const discovery = input.settingsStore?.getDaemonControl?.('discovery_settings') as {enabled?: boolean; tailscaleEnabled?:boolean} | undefined;
   const tailscaleOn=discovery ? discovery.enabled===true && discovery.tailscaleEnabled===true : envBool(input.env,'RAW_AGENT_DISCOVERY',true)&&envBool(input.env,'RAW_AGENT_TAILSCALE_DISCOVERY',false);
   if(!tailscaleOn)tools=tools.filter(tool=>!tool.name.startsWith('tailscale_'));
+  tools=filterUserVaultTools(tools,input.settingsStore);
   const routine=input.settingsStore?.getDaemonControl?.('routine.settings') as {dialogToolsEnabled?:boolean}|undefined;
   if(routine?.dialogToolsEnabled===false)tools=tools.filter(tool=>!tool.name.startsWith('cron_'));
   checkpoint(tools,'disabled');

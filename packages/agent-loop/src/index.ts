@@ -447,6 +447,18 @@ export type {
 } from './session/apply-claimed-inbox.js';
 
 export { decideHitlLatch, shouldParkBeforeTools } from './approval/hitl-latch.js';
+export {
+  autoReviewIdempotencyKey,
+  evaluateAutoReview,
+  hasRequestSmartModeApproval,
+  isAutoReviewSubject,
+  isHighRiskAutoReviewCall,
+  readSmartModeBlockReason,
+  shellCommandIsHighRisk,
+  stripAutoReviewFlags,
+} from './approval/auto-review.js';
+export type { AutoReviewDecision } from './approval/auto-review.js';
+
 export type {
   DecideHitlLatchInput,
   HitlApprovalDecision,

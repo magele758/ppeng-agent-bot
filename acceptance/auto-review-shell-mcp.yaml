@@ -1,0 +1,30 @@
+id: auto-review-shell-mcp
+title: Auto-review 工具级审批卡（高危 Shell/MCP）
+status: implemented
+requirement: |
+  Auto-review / tool-level approval card aligned with Grok behavior:
+  Lab already has approvals/Risk/approve; tree has NO AutoReview / request_smart_mode.
+  Slice: high-risk spawn/Shell/MCP default-block → native approval card → same-action retry with approval flag; denial = final; no bypass routes.
+  Accept: risky shell/MCP blocked by default, card shown, same-params retry after approve, deny terminal.
+notes: 'assumedApproval: standing-order-2026-10-22; Round-2 P0 #1 / r2-1; final acceptance by lei pending'
+criteria:
+  - id: AC-1
+    given: 一次高危 Shell 或 MCP 工具调用尚未带审批升级标志，也没有未决/已批的 Auto-review 记录
+    when: 运行时做 Auto-review 门闩
+    then: 调用被默认拦住，不会执行副作用，并提示须用同参加重试且带上审批升级标志
+  - id: AC-2
+    given: 同一高危调用带着审批升级标志重试，且尚无人类决定
+    when: 运行时做 Auto-review 门闩
+    then: 出现原生待审批卡（不执行），会话进入等待批准
+  - id: AC-3
+    given: 该高危调用的 Auto-review 卡已被批准
+    when: 用相同实质参数再次调用（升级标志可有可无）
+    then: 门闩放行，不再新建审批卡
+  - id: AC-4
+    given: 该高危调用的 Auto-review 卡已被拒绝
+    when: 用相同实质参数再次调用（含带升级标志）
+    then: 拒绝为终局，调用失败且不再弹出新卡
+  - id: AC-5
+    given: 会话权限模式为 bypass
+    when: 发起一次高危 Shell 或 MCP 调用
+    then: Auto-review 仍生效，不能凭 bypass 绕过

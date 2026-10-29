@@ -341,6 +341,27 @@ export const settingsEntries = {
     probe: 'Probe Tailscale now',
     probeDone: 'Probe finished: found {count}, source {source}'
   },
+  userVault: {
+    title: 'User Vault (fill by reference)',
+    keywords: 'vault password login card contact form fill uvref reference',
+    desc: 'Keep logins, cards and contacts so the assistant can fill browser forms by reference. This is not the connector secret store: connector keys live under Secrets; this is only for form filling.',
+    enabled: 'Let the assistant use the Vault',
+    hint: 'When on, the assistant can list entries and fill browser forms with vault_fill. Every fill needs your approval and browser tools must be on. The assistant only sees uvref references, never passwords or card numbers.',
+    kind: 'Type',
+    kinds: { login: 'Login', card: 'Card', contact: 'Contact' },
+    fields: {
+      label: 'Name', hint: 'Note', username: 'Username', sites: 'Sites (space or comma separated)', password: 'Password (write-only)',
+      holderName: 'Cardholder', expiry: 'Expiry', number: 'Card number (write-only)', cvv: 'CVV (write-only)',
+      fullName: 'Full name', email: 'Email', phone: 'Phone', address: 'Address'
+    },
+    add: 'Add entry',
+    delete: 'Delete',
+    pickToFill: 'Pick to fill',
+    pickHint: 'Send this to the assistant and it will fill the form on the current browser page from these references.',
+    fillInstruction: 'Use vault_fill to fill the form in the browser from my Vault entry "{label}". References: {refs}',
+    copy: 'Copy',
+    copied: 'Copied'
+  },
   connectors: {
     title: 'Connector grants',
     keywords: 'connector grant plugin domain secret authorization',

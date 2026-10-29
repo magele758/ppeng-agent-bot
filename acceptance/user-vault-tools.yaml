@@ -1,0 +1,27 @@
+id: user-vault-tools
+title: User Vault assistant tools and Lab reference-fill
+status: implemented
+requirement: |
+  Ship UserVault product surface: vault_* assistant tools + Lab/product card fill UX aligned with Grok Vault reference-fill (uvref). This is product Vault entries, NOT SecretVault.
+notes: 'Round-3 P0; assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: The User Vault holds login, card and contact entries and the Vault toggle is on
+    when: The assistant calls vault_list (optionally by kind or query) or vault_get
+    then: It receives labels, non-secret details and uvref fill references, and never a password, card number or CVV; with the toggle off (default) the vault_* tools are not offered and refuse to run
+  - id: AC-2
+    given: Browser tools are on and the assistant holds uvref references from the Vault
+    when: The assistant calls vault_fill with ref and selector pairs
+    then: Each form field receives the real value inside the runtime, and the tool result lists only refs and selectors
+  - id: AC-3
+    given: A fill request that cannot complete (unknown ref, malformed field, no browser, or a field that fails to fill)
+    when: vault_fill runs
+    then: It returns a failure naming refs and selectors only, without any secret value
+  - id: AC-4
+    given: The Lab Vault API is used by an admin
+    when: Entries are created, listed, enabled for the assistant and deleted
+    then: Secrets are write-only, listings carry uvref references, and the connector SecretVault listing stays separate
+  - id: AC-5
+    given: The Lab Vault card shows an entry with fill references
+    when: The user picks that entry to fill a form
+    then: The card offers a ready instruction naming the entry's uvref references for the chat, with no secret value in it

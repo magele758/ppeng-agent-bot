@@ -283,7 +283,11 @@ function riskyBashTurn() {
         type: 'tool_call',
         toolCallId: 'call_1',
         name: 'bash',
-        input: { command: 'rm -rf /tmp/example' }
+        input: {
+          command: 'rm -rf /tmp/example',
+          requestSmartModeApproval: true,
+          smartModeBlockReason: 'Auto-review blocked high-risk bash'
+        }
       }
     ]
   };

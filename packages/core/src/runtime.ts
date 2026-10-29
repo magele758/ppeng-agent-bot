@@ -584,6 +584,7 @@ export class RawAgentRuntime {
       env: process.env,
       store: this.store,
       stateDir: this.stateDir,
+      getUserVault: () => this.userVault,
       getCronStore: () => {
         if (!this.cronStore) this.cronStore = new CronJobStore(this.stateDir);
         return this.cronStore;

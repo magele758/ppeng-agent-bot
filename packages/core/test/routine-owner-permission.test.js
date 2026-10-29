@@ -30,11 +30,13 @@ const bashTool = {
 };
 
 function bashCall() {
+  // Non-Auto-review subject: permissionMode bypass/ask semantics under test.
+  // isolation=direct is Auto-review high-risk even under bypass (auto-review-shell-mcp#AC-5).
   return {
     type: 'tool_call',
     toolCallId: 'c1',
     name: 'bash',
-    input: { command: 'echo ok', isolation: 'direct' }
+    input: { command: 'echo ok' }
   };
 }
 
