@@ -5,6 +5,8 @@ requirement: |
   我给4090的bot已经配置了bypass权限了，怎么还是一直在申请权限，还有ssh那边一直完成的不好，帮我排查一下原因
   优化一下这个问题
 notes: |
+  Auto-review (auto-review-shell-mcp) still gates high-risk Shell/MCP and isolation=direct even under bypass;
+  bypass no longer skips that card path (AC-5 there). Benign non-AR commands still proceed under bypass.
   批准后要改写已实现标准 model-sandbox-isolation 的 AC-3：
   去掉「包括会话被设成跳过一般审批时」。
   无隔离在普通档位仍要审批；只有已被人确认成从不请求审批的对话才直接执行。
