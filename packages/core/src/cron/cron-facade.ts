@@ -13,6 +13,7 @@ import type { SessionFacadeHost } from '../runtime/session-facade.js';
 import type { CronJobRecord } from './cron-store.js';
 import { CronJobStore } from './cron-store.js';
 import { nextZonedCronRunAt, normalizeRoutineTimezone, parseCron5 } from './cron-next.js';
+import { weekdayDaytimeSchedule } from './routine-default-schedule.js';
 import { normalizeCiConclusions, parseEventScheduleValue } from './event-routine.js';
 import type { RoutinePrecheck } from './routine-precheck.js';
 import { assertCredentialEnvName } from '../secrets/credential-env.js';
@@ -182,18 +183,28 @@ function onceSchedule(value:string):Pick<CronJobRecord,'scheduleKind'|'scheduleV
 function eventSchedule(value:string):Pick<CronJobRecord,'scheduleKind'|'scheduleValue'|'nextRunAt'>{
  const event=parseEventScheduleValue(value);if(!event)throw new ValidationError('invalid event');return {scheduleKind:'event',scheduleValue:event,nextRunAt:undefined};
 }
+function isProvidedSchedule(value: unknown): boolean {
+  return value !== undefined && value !== '';
+}
+function hasExplicitSchedule(input: Pick<CreateCronJobInput, 'cron' | 'event' | 'onceAt' | 'intervalMs'>): boolean {
+  return [input.cron, input.event, input.onceAt, input.intervalMs].some(isProvidedSchedule);
+}
 function normalizeSchedule(input:Pick<CreateCronJobInput,'cron'|'event'|'onceAt'|'intervalMs'>,timezone:string):Pick<CronJobRecord,'scheduleKind'|'scheduleValue'|'nextRunAt'>{
- const selectors=[input.cron,input.event,input.onceAt,input.intervalMs].filter(value=>value!==undefined&&value!=='');
+ const selectors=[input.cron,input.event,input.onceAt,input.intervalMs].filter(isProvidedSchedule);
  if(selectors.length!==1)throw new ValidationError('choose exactly one schedule');
  if(input.onceAt!==undefined)return onceSchedule(input.onceAt);
  if(input.intervalMs!==undefined)return intervalSchedule(input.intervalMs);
  if(input.event!==undefined)return eventSchedule(input.event);
  const cron=normalizeCron(input.cron!);return {scheduleKind:'cron5',scheduleValue:cron,nextRunAt:nextZonedCronRunAt(cron,timezone).toISOString()};
 }
+function createScheduleOrDefault(input: Pick<CreateCronJobInput, 'cron' | 'event' | 'onceAt' | 'intervalMs'>, timezone: string): Pick<CronJobRecord, 'scheduleKind' | 'scheduleValue' | 'nextRunAt'> {
+  if (hasExplicitSchedule(input)) return normalizeSchedule(input, timezone);
+  return weekdayDaytimeSchedule(timezone);
+}
 export function createCronJob(host:CronFacadeHost,input:CreateCronJobInput):CronJobRecord {
  const name=normalizeName(input.name),prompt=normalizePrompt(input.prompt);
  const {session,botId}=resolveCronBinding(host,input);const timezone=normalizeRoutineTimezone(input.timezone);
- const schedule=normalizeSchedule(input,timezone);
+ const schedule=createScheduleOrDefault(input,timezone);
  const principal=principalFromSession(host.store,session);
  const roomId=input.roomId?.trim();
  if(roomId)assertBotRoomTarget(host.store,roomId,botId,principal);

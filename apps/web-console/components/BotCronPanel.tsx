@@ -10,6 +10,7 @@ import { supportsRoutineExpiration, routineTimezone } from '@/lib/routine-form';
 import { useI18n, type MessageKey } from '@/lib/i18n';
 import {
   cronFromTime,
+  defaultRoutineSchedule,
   describeCron,
   formatTimeValue,
   parseTimeValue,
@@ -87,10 +88,10 @@ export function BotCronPanel({
   const [deliveryPolicy,setDeliveryPolicy]=useState<{inputSources:string;changesOnly:boolean;failureThreshold:number;approvalBeforeSend:boolean;comparison?:'text'|'facts';quietStart?:number;quietEnd?:number;dailyBudget?:number}>({inputSources:'',changesOnly:false,failureThreshold:1,approvalBeforeSend:false});
   const [roomId,setRoomId]=useState('');
   const [rooms,setRooms]=useState<{id:string;title:string;botIds:string[]}[]>([]);
-  const [preset, setPreset] = useState<CronPreset>('daily');
-  const [time, setTime] = useState('09:00');
+  const [preset, setPreset] = useState<CronPreset>(defaultRoutineSchedule().preset);
+  const [time, setTime] = useState<string>(defaultRoutineSchedule().time);
   const [weekday, setWeekday] = useState(1);
-  const [cronDraft, setCronDraft] = useState('0 9 * * *');
+  const [cronDraft, setCronDraft] = useState(defaultRoutineSchedule().cron);
   const [precheckKind, setPrecheckKind] = useState<'none' | 'script' | 'predicate'>('none');
   const [precheckSource, setPrecheckSource] = useState('');
   const [precheckMode,setPrecheckMode]=useState<'strict'|'compat'>('strict');

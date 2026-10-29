@@ -12,6 +12,7 @@ import { ValidationError } from '../errors.js';
 import { assertBotRoomTarget } from '../rooms/index.js';
 import { assertCredentialEnvName } from '../secrets/credential-env.js';
 import { nextCronRunAt, nextZonedCronRunAt, normalizeRoutineTimezone } from './cron-next.js';
+import { weekdayDaytimeSchedule } from './routine-default-schedule.js';
 
 /**
  * First-class agent cron (SQLite-backed file store under stateDir).
@@ -159,6 +160,75 @@ export class CronJobStore {
   }
 }
 
+type DialogScheduleArgs = {
+  every_ms?: number;
+  once_at?: string;
+  cron?: string;
+  event?: string;
+  secretEnv?: string;
+};
+
+type DialogSchedule =
+  | { ok: true; scheduleKind: CronJobRecord['scheduleKind']; scheduleValue: string; nextRunAt?: string }
+  | { ok: false; content: string };
+
+function isDefinedSchedule(value: unknown): boolean {
+  return value !== undefined && value !== '';
+}
+
+function dialogScheduleCount(args: DialogScheduleArgs): number {
+  return [args.every_ms, args.once_at, args.cron, args.event].filter(isDefinedSchedule).length;
+}
+
+function intervalDialogSchedule(everyMs: number): DialogSchedule {
+  if (!Number.isInteger(everyMs) || everyMs < 60000) {
+    return { ok: false, content: 'Provide every_ms >= 60000, once_at, or cron' };
+  }
+  const scheduleValue = String(Math.floor(everyMs));
+  return {
+    ok: true,
+    scheduleKind: 'every_ms',
+    scheduleValue,
+    nextRunAt: new Date(Date.now() + Number(scheduleValue)).toISOString()
+  };
+}
+
+function onceDialogSchedule(onceAt: string): DialogSchedule {
+  if (!Number.isFinite(Date.parse(onceAt))) throw new ValidationError('invalid once_at');
+  const scheduleValue = new Date(onceAt).toISOString();
+  return { ok: true, scheduleKind: 'once_at', scheduleValue, nextRunAt: scheduleValue };
+}
+
+function cronDialogSchedule(cron: string, timezone: string): DialogSchedule {
+  return {
+    ok: true,
+    scheduleKind: 'cron5',
+    scheduleValue: cron,
+    nextRunAt: nextZonedCronRunAt(cron, timezone).toISOString()
+  };
+}
+
+function eventDialogSchedule(args: DialogScheduleArgs): DialogSchedule {
+  const event = parseEventScheduleValue(args.event ?? '');
+  if (!event) throw new ValidationError('valid event and secretEnv required');
+  assertCredentialEnvName(String(args.secretEnv ?? ''));
+  return { ok: true, scheduleKind: 'event', scheduleValue: event };
+}
+
+function explicitDialogSchedule(args: DialogScheduleArgs, timezone: string): DialogSchedule {
+  if (args.every_ms !== undefined) return intervalDialogSchedule(args.every_ms);
+  if (args.once_at) return onceDialogSchedule(args.once_at);
+  if (args.cron) return cronDialogSchedule(args.cron, timezone);
+  return eventDialogSchedule(args);
+}
+
+function resolveDialogSchedule(args: DialogScheduleArgs, timezone: string): DialogSchedule {
+  const count = dialogScheduleCount(args);
+  if (count > 1) throw new ValidationError('choose exactly one schedule');
+  if (count === 0) return { ok: true, ...weekdayDaytimeSchedule(timezone) };
+  return explicitDialogSchedule(args, timezone);
+}
+
 export function createCronTools(getStore: () => CronJobStore, opts?: CronToolOptions): ToolContract<any>[] {
   const createTool: ToolContract<{
     name: string;
@@ -177,7 +247,7 @@ export function createCronTools(getStore: () => CronJobStore, opts?: CronToolOpt
   }> = {
     name: 'cron_create',
     description:
-      'Schedule a recurring or one-shot agent prompt (first-class cron). Prefer every_ms for simple intervals.',
+      'Schedule a recurring or one-shot agent prompt. Omit every_ms, once_at, cron, and event to run weekdays at 09:00 in the routine timezone. Pass exactly one of those fields to choose a different schedule.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -203,30 +273,9 @@ export function createCronTools(getStore: () => CronJobStore, opts?: CronToolOpt
     async execute(context, args) {
       if(opts?.isEnabled && !opts.isEnabled())return {ok:false,content:'Routine dialog tools are disabled in Lab settings'};
       const timezone=normalizeRoutineTimezone(args.timezone);
-      if([args.every_ms,args.once_at,args.cron,args.event].filter(v=>v!==undefined).length!==1)throw new ValidationError('choose exactly one schedule');
-      let scheduleKind: CronJobRecord['scheduleKind'] = 'every_ms';
-      let scheduleValue = '3600000';
-      let nextRunAt: string | undefined;
-      if (args.every_ms != null && Number.isInteger(args.every_ms) && Number(args.every_ms) >= 60000) {
-        scheduleKind = 'every_ms';
-        scheduleValue = String(Math.floor(Number(args.every_ms)));
-        nextRunAt = new Date(Date.now() + Number(scheduleValue)).toISOString();
-      } else if (args.once_at) {
-        scheduleKind = 'once_at';
-        if(!Number.isFinite(Date.parse(args.once_at)))throw new ValidationError('invalid once_at');
-        scheduleValue = new Date(args.once_at).toISOString();
-        nextRunAt = scheduleValue;
-      } else if (args.cron) {
-        scheduleKind = 'cron5';
-        scheduleValue = args.cron;
-        nextRunAt = nextZonedCronRunAt(args.cron,timezone).toISOString();
-      } else if (args.event) {
-        if(!parseEventScheduleValue(args.event))throw new ValidationError('valid event and secretEnv required');
-        assertCredentialEnvName(String(args.secretEnv ?? ''));
-        scheduleKind='event';scheduleValue=parseEventScheduleValue(args.event)!;
-      } else {
-        return { ok: false, content: 'Provide every_ms >= 60000, once_at, or cron' };
-      }
+      const scheduled=resolveDialogSchedule(args,timezone);
+      if(!scheduled.ok)return scheduled;
+      const {scheduleKind,scheduleValue,nextRunAt}=scheduled;
       if (typeof args.roomId === 'string' && args.roomId.trim()) {
         if (!opts?.store) throw new ValidationError('roomId requires routine storage');
         const botId = context.session.metadata?.botId;

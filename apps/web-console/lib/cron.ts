@@ -27,6 +27,13 @@ export function parseCronUserPrompt(text: string): { name: string; body: string 
   return { name: m[1] ?? '', body: text.slice(m[0].length) };
 }
 
+/** Lab create form: weekday 09:00 until the user picks another schedule. */
+export function defaultRoutineSchedule(): { preset: 'weekdays'; time: '09:00'; cron: string } {
+  const preset = 'weekdays' as const;
+  const time = '09:00' as const;
+  return { preset, time, cron: cronFromTime({ hour: 9, minute: 0, preset }) };
+}
+
 export function cronFromTime(opts: {
   hour: number;
   minute: number;
