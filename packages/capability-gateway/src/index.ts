@@ -61,6 +61,19 @@ export type {
 export { drainGatewayTurns, claimInboundEvent, InboundClaimTimeoutError } from './inbound-guard.js';
 
 export {
+  DELIVERY_QUIET_HOURS_KEY,
+  defaultQuietHours,
+  isQuietNow,
+  normalizeQuietHours,
+  parseQuietHoursPatch,
+  quietWindowEnd,
+  readQuietHours,
+  writeQuietHours,
+  type QuietHoursPatch,
+  type QuietHoursPolicy,
+  type QuietHoursSettings
+} from './delivery-quiet-hours.js';
+export {
   createUserDeliveryPort,
   type UserDeliveryMessage,
   type UserDeliveryPort,
