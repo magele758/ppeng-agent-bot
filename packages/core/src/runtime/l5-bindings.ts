@@ -1,5 +1,4 @@
 import {SourceLedger} from '../learning/sources.js';
-import { createRegisteredMachinePort } from '../registered-machines/index.js';
 import { restoreTaskContract, type TaskContract } from '../session/task-contract.js';
 import { diagnosePrompt, type CacheDiagnostic } from '../session/cache-diagnostics.js';
 import { usesDurableBotGoals, reviewDirectGoalBeforeEnd, type GoalRuntimeHost } from '../bots/goals/runtime-host.js';
@@ -464,7 +463,6 @@ export function createRuntimeToolServices(rt: L5Bindable) {
   return buildToolServices({
     store: rt.store,
     stateDir: rt.stateDir,
-    registeredMachines: createRegisteredMachinePort(rt.store),
     resolveSkillLoad: (name, sessionId) => resolveSkillLoad({
       promptBuilder: rt.promptBuilder,
       emitTrace: (id, event) => rt.emitTrace(id, event)
