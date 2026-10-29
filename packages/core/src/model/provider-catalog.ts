@@ -188,6 +188,8 @@ export function readSessionModelOverride(
 
 function providerUsable(provider: ModelProvider | undefined): provider is ModelProvider {
   if (!provider) return false;
+  // Last scan failed (unreachable or rejected). Do not keep a pinned session on it.
+  if (provider.scanError?.trim()) return false;
   return provider.kind === 'heuristic' || Boolean(provider.apiKey?.trim() && provider.baseUrl?.trim());
 }
 
@@ -245,7 +247,7 @@ export function resolveSessionPreferredRef(
       );
     }
   }
-  const fromSession = modelRefFromSession(session);
+  const fromSession = resolveModelOverrideRef(catalog, modelRefFromSession(session), env);
   if (fromSession) return { ref: fromSession, source: 'session', overrideSkipped };
   if (catalog.defaultRef || catalog.providers.some((p) => providerUsable(p) && p.models.some((m) => m.enabled))) {
     const ref = availableDefaultRef(catalog, env);

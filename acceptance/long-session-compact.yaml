@@ -1,0 +1,26 @@
+id: long-session-compact
+title: 长会话能真正做摘要而不是只丢历史
+status: implemented
+notes: 'assumedApproval: standing-order-2026-10-22'
+requirement: |
+  长会话大量 compact_skipped reason=context_budget，真正的 compact 很少，
+  fold_budget_drop 把历史硬切到大约 8 条。应让自动摘要在长会话或历史已经超过
+  发送上限时发生，而不是每轮都记 context_budget。不要改 loop_settings，
+  也不要降低普通会话原来的 token 压缩阈值。
+criteria:
+  - id: AC-1
+    given: Bot 会话的历史仍低于窗口一半，但已经高于固定前缀之外还能放下的历史额度
+    when: 准备这一轮的上下文
+    then: 写入一条摘要并替换更早的消息，而不是因为没到一半窗口就跳过
+  - id: AC-2
+    given: 普通会话或 Bot 会话已经有很多条消息，但总 token 仍低于原来的压缩阈值
+    when: 考虑压缩
+    then: 用模型摘要替换更早的消息，而不是只靠把视图硬切短
+  - id: AC-3
+    given: Bot 这一轮的历史放得进发送上限，并且没有发生压缩
+    when: 调用模型
+    then: 不记录 compact_skipped 且 reason 为 context_budget
+  - id: AC-4
+    given: 历史已经超过发送上限或一半窗口，压缩没有替换任何消息
+    when: 继续这一轮
+    then: 仍然记录 compact_skipped 且 reason 为 context_budget

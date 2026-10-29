@@ -1,4 +1,4 @@
-.bot-goals { border: 1px solid var(--border, #ddd); border-radius: 10px; margin: 8px 0; font-size: 13px; background: var(--surface, transparent); }
+.bot-goals { border: 1px solid var(--border, #ddd); border-radius: 10px; margin: 8px 0; font-size: 13px; background: var(--glass-fill); backdrop-filter: var(--glass-filter); -webkit-backdrop-filter: var(--glass-filter); }
 .bot-goals:not([open]) > .bot-goals__body { display: none; }
 .bot-goals summary { cursor: pointer; padding: 10px 12px; font-weight: 600; }
 .bot-goals__body { padding: 0 12px 12px; max-height: 45vh; overflow: auto; overflow-anchor: none; }

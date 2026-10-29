@@ -6,7 +6,9 @@
   margin: 0;
   padding: 4px;
   list-style: none;
-  background: var(--color-surface-strong, #141414);
+  background: var(--glass-fill);
+  backdrop-filter: var(--glass-filter);
+  -webkit-backdrop-filter: var(--glass-filter);
   color: var(--color-text-primary, #fff);
   border: 1px solid var(--color-border-strong, #292929);
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);

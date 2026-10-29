@@ -6,6 +6,7 @@
 
 import {
   formatChatFeedStatsLine,
+  formatElapsedMs,
   hasRealUsageTotals,
   parseTimeMs,
   parseUsageTotals,
@@ -42,6 +43,15 @@ export type TurnFeedStat = {
   endedAtMs?: number;
   /** Last turn of a session that has finished. Its endedAtMs is when the session ended. */
   sessionEnded?: boolean;
+  /** Pre-model startup for this user turn. Durations only; no message text. */
+  startup?: StartupTiming;
+};
+
+export type StartupTiming = {
+  totalMs?: number;
+  slowest: string;
+  slowestMs: number;
+  phases: Array<{ phase: string; durationMs: number }>;
 };
 
 function isUserRole(role: unknown): boolean {
@@ -177,9 +187,296 @@ function latestReplyMs(messages: TurnFeedStatMessage[], slice: ConversationTurnS
   return end;
 }
 
+const PHASE_LABELS: Record<'zh' | 'en', Record<string, string>> = {
+  zh: {
+    writer_claim: '写入占用',
+    ensure_mcp: 'MCP 加载',
+    resolve_file_policy: '文件策略',
+    ingest_mailbox: '邮箱',
+    auto_claim_task: '领取任务',
+    claim_next_run: '领取下轮',
+    ensure_workspace: '工作区',
+    resolve_workspace: '工作区路径',
+    pack_turn: '打包消息',
+    build_system_prompt: '系统提示词',
+    before_turn_hook: '开轮钩子',
+    pick_turn_tools: '工具选择',
+    before_model: '模型前检查',
+    session_start_hook: '会话开始钩子',
+    fit_model_request: '请求适配',
+    auto_compact: '自动压缩',
+    fold_messages: '折叠消息',
+    fold_budget: '折叠预算',
+    prepare_view: '准备视图',
+    memory_appendix: '记忆附录',
+    prepare_turn: '打包总耗时',
+    seal_exposure: '共享曝光',
+    embed_quotes: '引用嵌入',
+    compact_fold: '压缩折叠',
+    skill_catalog: '技能目录',
+    skill_route: '技能路由',
+    stable_prefix: '稳定前缀',
+    dynamic_context: '动态上下文',
+    system_prompt: '系统提示词合计',
+    mcp_expand: 'MCP 展开',
+    mcp_http_connect: 'MCP 连接',
+    mcp_http_list: 'MCP 工具列表',
+    mcp_stdio: 'MCP 本地进程',
+    expire_bot_work: '过期工作',
+    prepare_room: '房间准备',
+    goal_intake: '目标接入',
+    bind_goal: '绑定目标',
+    assemble_loop: '组装循环',
+    computer_use_begin: '计算机使用',
+    admit: '准入'
+  },
+  en: {
+    writer_claim: 'Writer claim',
+    ensure_mcp: 'MCP load',
+    resolve_file_policy: 'File policy',
+    ingest_mailbox: 'Mailbox',
+    auto_claim_task: 'Claim task',
+    claim_next_run: 'Claim next run',
+    ensure_workspace: 'Workspace',
+    resolve_workspace: 'Workspace path',
+    pack_turn: 'Pack messages',
+    build_system_prompt: 'System prompt',
+    before_turn_hook: 'Before-turn hook',
+    pick_turn_tools: 'Tool selection',
+    before_model: 'Pre-model check',
+    session_start_hook: 'Session-start hook',
+    fit_model_request: 'Request fit',
+    auto_compact: 'Auto compact',
+    fold_messages: 'Fold messages',
+    fold_budget: 'Fold budget',
+    prepare_view: 'Prepare view',
+    memory_appendix: 'Memory appendix',
+    prepare_turn: 'Pack total',
+    seal_exposure: 'Shared exposure',
+    embed_quotes: 'Embed quotes',
+    compact_fold: 'Compact fold',
+    skill_catalog: 'Skill catalog',
+    skill_route: 'Skill routing',
+    stable_prefix: 'Stable prefix',
+    dynamic_context: 'Dynamic context',
+    system_prompt: 'System prompt total',
+    mcp_expand: 'MCP expansion',
+    mcp_http_connect: 'MCP connect',
+    mcp_http_list: 'MCP tool list',
+    mcp_stdio: 'MCP local process',
+    expire_bot_work: 'Expire work',
+    prepare_room: 'Room prep',
+    goal_intake: 'Goal intake',
+    bind_goal: 'Bind goal',
+    assemble_loop: 'Assemble loop',
+    computer_use_begin: 'Computer use',
+    admit: 'Admission'
+  }
+};
+
+function startupLang(locale?: string): 'zh' | 'en' {
+  return locale?.toLowerCase().startsWith('en') ? 'en' : 'zh';
+}
+
+function formatStartupMs(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) return '—';
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  if (ms < 10_000) {
+    const sec = ms / 1000;
+    return `${sec.toFixed(1).replace(/\.0$/, '')}s`;
+  }
+  if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
+  return formatElapsedMs(ms);
+}
+
+function phaseLabel(phase: string, locale?: string): string {
+  return PHASE_LABELS[startupLang(locale)][phase] ?? phase;
+}
+
+function readTracePayload(event: TurnFeedTraceEvent): Record<string, unknown> | undefined {
+  const payload = event.payload;
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return undefined;
+  return payload as Record<string, unknown>;
+}
+
+function phaseNameOk(phase: unknown): phase is string {
+  return typeof phase === 'string' && /^[a-z0-9_]+$/.test(phase);
+}
+
+function finiteMs(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function copyPositivePhases(map: unknown, phases: Map<string, number>): void {
+  if (!map || typeof map !== 'object' || Array.isArray(map)) return;
+  for (const [name, ms] of Object.entries(map as Record<string, unknown>)) {
+    const duration = finiteMs(ms);
+    if (phaseNameOk(name) && duration !== undefined && duration > 0) phases.set(name, duration);
+  }
+}
+
+function readReadyNote(payload: Record<string, unknown>, phases: Map<string, number>): { totalMs?: number; namedSlowest?: string; namedSlowestMs: number } {
+  const totalMs = finiteMs(payload.durationMs);
+  const namedSlowest = phaseNameOk(payload.slowest) ? payload.slowest : undefined;
+  copyPositivePhases(payload.phases, phases);
+  return { ...(totalMs === undefined ? {} : { totalMs }), ...(namedSlowest ? { namedSlowest } : {}), namedSlowestMs: finiteMs(payload.slowestMs) ?? -1 };
+}
+
+function payloadInStartupWindow(event: TurnFeedTraceEvent, startMs: number, endMsExclusive: number | undefined): Record<string, unknown> | undefined {
+  if (event.kind !== 'startup_phase') return undefined;
+  const ts = parseTimeMs(event.ts);
+  if (ts == null || ts < startMs || (endMsExclusive != null && ts >= endMsExclusive)) return undefined;
+  const payload = readTracePayload(event);
+  if (!payload || !phaseNameOk(payload.phase)) return undefined;
+  return payload;
+}
+
+function rememberPhase(payload: Record<string, unknown>, phases: Map<string, number>): void {
+  const durationMs = finiteMs(payload.durationMs);
+  if (phaseNameOk(payload.phase) && durationMs !== undefined && durationMs > 0) phases.set(payload.phase, durationMs);
+}
+
+function slowestPhase(phases: Map<string, number>, named: string | undefined, namedMs: number): { slowest?: string; slowestMs: number } {
+  let slowest = named;
+  let slowestMs = namedMs;
+  for (const [name, ms] of phases) {
+    if (!slowest || ms > slowestMs) {
+      slowest = name;
+      slowestMs = ms;
+    }
+  }
+  return { slowest, slowestMs };
+}
+
+function listedStartupPhases(phases: Map<string, number>): Array<{ phase: string; durationMs: number }> {
+  return [...phases.entries()]
+    .filter(([name, ms]) => name !== 'ready' && ms > 0)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 6)
+    .map(([phase, durationMs]) => ({ phase, durationMs }));
+}
+
+function absorbStartupEvent(event: TurnFeedTraceEvent, startMs: number, endMsExclusive: number | undefined, phases: Map<string, number>, acc: { totalMs?: number; namedSlowest?: string; namedSlowestMs: number }): void {
+  const payload = payloadInStartupWindow(event, startMs, endMsExclusive);
+  if (!payload) return;
+  if (payload.phase === 'ready') {
+    const ready = readReadyNote(payload, phases);
+    if (ready.totalMs !== undefined) acc.totalMs = ready.totalMs;
+    if (ready.namedSlowest) acc.namedSlowest = ready.namedSlowest;
+    acc.namedSlowestMs = ready.namedSlowestMs;
+    return;
+  }
+  rememberPhase(payload, phases);
+}
+
+function startupInWindow(
+  events: TurnFeedTraceEvent[],
+  startMs: number | undefined,
+  endMsExclusive: number | undefined
+): StartupTiming | undefined {
+  if (startMs == null) return undefined;
+  const phases = new Map<string, number>();
+  const acc: { totalMs?: number; namedSlowest?: string; namedSlowestMs: number } = { namedSlowestMs: -1 };
+  for (const event of events) absorbStartupEvent(event, startMs, endMsExclusive, phases, acc);
+  const picked = slowestPhase(phases, acc.namedSlowest, acc.namedSlowestMs);
+  if (!picked.slowest || picked.slowestMs < 0) return undefined;
+  if (picked.slowestMs <= 0 && (acc.totalMs ?? 0) <= 0) return undefined;
+  const totalMs = acc.totalMs;
+  return { ...(typeof totalMs === 'number' ? { totalMs } : {}), slowest: picked.slowest, slowestMs: picked.slowestMs, phases: listedStartupPhases(phases) };
+}
+
+export function formatStartupClause(timing: StartupTiming, locale?: string, labels?: { startup?: string; slowest?: string }): string {
+  const startup = labels?.startup ?? (startupLang(locale) === 'en' ? 'Startup' : '启动');
+  const slowestLabel = labels?.slowest ?? (startupLang(locale) === 'en' ? 'Slowest' : '最慢');
+  const parts = [
+    typeof timing.totalMs === 'number' ? `${startup} ${formatStartupMs(timing.totalMs)}` : startup,
+    `${slowestLabel} ${phaseLabel(timing.slowest, locale)} ${formatStartupMs(timing.slowestMs)}`
+  ];
+  for (const phase of timing.phases) {
+    if (phase.phase === timing.slowest) continue;
+    parts.push(`${phaseLabel(phase.phase, locale)} ${formatStartupMs(phase.durationMs)}`);
+  }
+  return parts.join(' · ');
+}
+
+type WindowFold = {
+  usage?: SessionUsageTotals;
+  costUsd: number;
+  hasCost: boolean;
+  firstModelStart?: number;
+  lastModelEnd?: number;
+  lastClosedEnd?: number;
+};
+
+function foldModelWindows(modelWindows: ModelTurnWindow[], bounds: { startMs?: number; endMsExclusive?: number }): WindowFold {
+  const fold: WindowFold = { costUsd: 0, hasCost: false };
+  for (const win of modelWindows) {
+    if (!windowOverlaps(win, bounds.startMs, bounds.endMsExclusive)) continue;
+    fold.usage = mergeUsageTotals(fold.usage, win.usage);
+    if (typeof win.costUsd === 'number') {
+      fold.costUsd += win.costUsd;
+      fold.hasCost = true;
+    }
+    fold.firstModelStart = fold.firstModelStart == null ? win.startMs : Math.min(fold.firstModelStart, win.startMs);
+    fold.lastModelEnd = fold.lastModelEnd == null ? win.endMs : Math.max(fold.lastModelEnd, win.endMs);
+    if (!win.open) fold.lastClosedEnd = fold.lastClosedEnd == null ? win.endMs : Math.max(fold.lastClosedEnd, win.endMs);
+  }
+  return fold;
+}
+
+function elapsedFromBounds(fold: WindowFold, bounds: { startMs?: number; lastMsgMs?: number }, isLiveTail: boolean, now: number): number | undefined {
+  if (fold.firstModelStart != null) {
+    const end = isLiveTail ? now : (fold.lastModelEnd ?? bounds.lastMsgMs ?? fold.firstModelStart);
+    if (end >= fold.firstModelStart) return end - fold.firstModelStart;
+    return undefined;
+  }
+  if (bounds.startMs == null) return undefined;
+  const endMs = isLiveTail ? now : bounds.lastMsgMs;
+  if (endMs != null && endMs >= bounds.startMs && (endMs > bounds.startMs || isLiveTail)) return endMs - bounds.startMs;
+  return undefined;
+}
+
+function statHasAnything(stat: TurnFeedStat): boolean {
+  return stat.elapsedMs != null
+    || hasRealUsageTotals(stat.usageTotals)
+    || (typeof stat.usageCostUsd === 'number' && stat.usageCostUsd > 0)
+    || stat.endedAtMs != null
+    || stat.startup != null;
+}
+
+function applyEndedAt(stat: TurnFeedStat, messages: TurnFeedStatMessage[], slice: ConversationTurnSlice, isOpenTail: boolean, sessionOpen: boolean, lastSlice: boolean, lastClosedEnd: number | undefined): void {
+  if (isOpenTail) return;
+  const endedAtMs = lastClosedEnd ?? latestReplyMs(messages, slice);
+  if (endedAtMs == null) return;
+  stat.endedAtMs = endedAtMs;
+  if (!sessionOpen && lastSlice) stat.sessionEnded = true;
+}
+
+function buildSliceStat(input: {
+  messages: TurnFeedStatMessage[];
+  traces?: TurnFeedTraceEvent[];
+  running?: boolean;
+  sessionOpen?: boolean;
+}, slice: ConversationTurnSlice, next: ConversationTurnSlice | undefined, index: number, sliceCount: number, now: number, modelWindows: ModelTurnWindow[]): TurnFeedStat | null {
+  const bounds = messageWindowBounds(input.messages, slice, next);
+  const sessionOpen = Boolean(input.running || input.sessionOpen);
+  const isLiveTail = Boolean(input.running) && index === sliceCount - 1;
+  const isOpenTail = sessionOpen && index === sliceCount - 1;
+  const fold = foldModelWindows(modelWindows, bounds);
+  const elapsedMs = elapsedFromBounds(fold, bounds, isLiveTail, now);
+  const stat: TurnFeedStat = {};
+  if (typeof elapsedMs === 'number' && Number.isFinite(elapsedMs) && elapsedMs >= 0) stat.elapsedMs = elapsedMs;
+  if (fold.usage) stat.usageTotals = fold.usage;
+  if (fold.hasCost && fold.costUsd > 0) stat.usageCostUsd = Math.round(fold.costUsd * 1e6) / 1e6;
+  applyEndedAt(stat, input.messages, slice, isOpenTail, sessionOpen, index === sliceCount - 1, fold.lastClosedEnd);
+  const startup = startupInWindow(input.traces ?? [], bounds.startMs, bounds.endMsExclusive);
+  if (startup) stat.startup = startup;
+  return statHasAnything(stat) ? stat : null;
+}
+
 /**
  * Build one stats object per conversation turn. Returns null entries when that
- * turn has neither elapsed, real usage/cost, nor an end time.
+ * turn has neither elapsed, real usage/cost, an end time, nor startup timing.
  */
 export function buildTurnFeedStats(input: {
   messages: TurnFeedStatMessage[];
@@ -196,81 +493,16 @@ export function buildTurnFeedStats(input: {
   const modelWindows = extractModelTurnWindows(input.traces ?? [], {
     openEndMs: input.running ? now : undefined
   });
-  const out: Array<TurnFeedStat | null> = [];
-
-  for (let si = 0; si < slices.length; si += 1) {
-    const slice = slices[si]!;
-    const next = slices[si + 1];
-    const bounds = messageWindowBounds(input.messages, slice, next);
-    const sessionOpen = Boolean(input.running || input.sessionOpen);
-    const isLiveTail = Boolean(input.running) && si === slices.length - 1;
-    const isOpenTail = sessionOpen && si === slices.length - 1;
-
-    let usage: SessionUsageTotals | undefined;
-    let costUsd = 0;
-    let hasCost = false;
-    let firstModelStart: number | undefined;
-    let lastModelEnd: number | undefined;
-    let lastClosedEnd: number | undefined;
-
-    for (const win of modelWindows) {
-      if (!windowOverlaps(win, bounds.startMs, bounds.endMsExclusive)) continue;
-      usage = mergeUsageTotals(usage, win.usage);
-      if (typeof win.costUsd === 'number') {
-        costUsd += win.costUsd;
-        hasCost = true;
-      }
-      firstModelStart =
-        firstModelStart == null ? win.startMs : Math.min(firstModelStart, win.startMs);
-      lastModelEnd = lastModelEnd == null ? win.endMs : Math.max(lastModelEnd, win.endMs);
-      if (!win.open) {
-        lastClosedEnd = lastClosedEnd == null ? win.endMs : Math.max(lastClosedEnd, win.endMs);
-      }
-    }
-
-    let elapsedMs: number | undefined;
-    if (firstModelStart != null) {
-      const end = isLiveTail ? now : (lastModelEnd ?? bounds.lastMsgMs ?? firstModelStart);
-      if (end >= firstModelStart) elapsedMs = end - firstModelStart;
-    } else if (bounds.startMs != null) {
-      const endMs = isLiveTail ? now : bounds.lastMsgMs;
-      if (endMs != null && endMs >= bounds.startMs && (endMs > bounds.startMs || isLiveTail)) {
-        elapsedMs = endMs - bounds.startMs;
-      }
-    }
-
-    const stat: TurnFeedStat = {};
-    if (typeof elapsedMs === 'number' && Number.isFinite(elapsedMs) && elapsedMs >= 0) {
-      stat.elapsedMs = elapsedMs;
-    }
-    if (usage) stat.usageTotals = usage;
-    if (hasCost && costUsd > 0) stat.usageCostUsd = Math.round(costUsd * 1e6) / 1e6;
-    if (!isOpenTail) {
-      const endedAtMs = lastClosedEnd ?? latestReplyMs(input.messages, slice);
-      if (endedAtMs != null) {
-        stat.endedAtMs = endedAtMs;
-        if (!sessionOpen && si === slices.length - 1) stat.sessionEnded = true;
-      }
-    }
-
-    const hasAnything =
-      stat.elapsedMs != null ||
-      hasRealUsageTotals(stat.usageTotals) ||
-      (typeof stat.usageCostUsd === 'number' && stat.usageCostUsd > 0) ||
-      stat.endedAtMs != null;
-    out.push(hasAnything ? stat : null);
-  }
-
-  return out;
+  return slices.map((slice, index) => buildSliceStat(input, slice, slices[index + 1], index, slices.length, now, modelWindows));
 }
 
 export function formatTurnFeedStatsLine(
   stat: TurnFeedStat | null | undefined,
-  labels?: ChatFeedStatsLabels,
+  labels?: ChatFeedStatsLabels & { startup?: string; slowest?: string },
   locale?: string
 ): string | null {
   if (!stat) return null;
-  return formatChatFeedStatsLine({
+  const base = formatChatFeedStatsLine({
     elapsedMs: stat.elapsedMs,
     usageTotals: stat.usageTotals,
     usageCostUsd: stat.usageCostUsd,
@@ -279,4 +511,6 @@ export function formatTurnFeedStatsLine(
     labels,
     locale
   });
+  const startup = stat.startup ? formatStartupClause(stat.startup, locale, labels) : null;
+  return [base, startup].filter(Boolean).join(' · ') || null;
 }

@@ -53,6 +53,8 @@ export type TraceEventKind =
   | 'working_log_append'
   /** Optional post-fold history budget dropped seqs (never silent) */
   | 'fold_budget_drop'
+  /** Timed bot-startup slice. Payload is phase, scope, durationMs, and counts only — never message text. `ready` adds slowest and a phase map. */
+  | 'startup_phase'
   /** Ordinary-session request still exceeds 20% of the context window */
   | 'request_over_budget'
   /** Capability Registry: card registered / upserted */

@@ -80,11 +80,14 @@ html[data-skin="sanctum"] .chat-send-btn.chat-send-btn--steer:hover {
 }
 
 html[data-skin="sanctum"] .chat-composer {
-  background: #0c1411;
+  background: var(--glass-fill);
+  backdrop-filter: var(--glass-filter);
+  -webkit-backdrop-filter: var(--glass-filter);
   border: none;
   border-radius: 0;
   box-shadow: none;
   border-top: 1px solid rgba(195, 170, 119, 0.28);
+  border-color: var(--glass-edge);
 }
 
 html[data-skin="sanctum"] .chat-composer:focus-within {

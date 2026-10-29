@@ -143,7 +143,7 @@ function chatStub() {
 }
 
 function renderStream(
-  entries: ReadonlyArray<{ id: string; excerpt: string; title: string; sourceMessageId?: string; createdAt?: string }>,
+  entries: ReadonlyArray<{ id: string; excerpt: string; title: string; sourceMessageId?: string; createdAt?: string; status?: string }>,
   onOpen?: (sessionId: string) => void,
   feedMessages?: ReturnType<typeof messages>
 ) {
@@ -298,6 +298,59 @@ test('入口说法随界面语言切换 [AC:bot-child-task-stream-entry#AC-6]', 
   catalog = zh;
   assert.notEqual(zh.play.childTask.streamLabel, en.play.childTask.streamLabel);
   assert.notEqual(zh.play.childTask.streamOpen, en.play.childTask.streamOpen);
+});
+
+test('正在执行的子任务入口多一行状态，其他状态不加 [AC:bot-child-task-stream-entry#AC-9]', () => {
+  const running = {
+    id: 'child-running',
+    title: '正在整理纪要',
+    status: 'running',
+    createdAt: '2026-10-22T01:06:00.000Z',
+    metadata: { botId: 'researcher', spawnSource: 'concurrent-bot-work', parentSessionId: 'sess-researcher' }
+  };
+  const idle = {
+    id: 'child-idle',
+    title: '已经整理完',
+    status: 'idle',
+    createdAt: '2026-10-22T01:06:01.000Z',
+    metadata: { botId: 'researcher', spawnSource: 'concurrent-bot-work', parentSessionId: 'sess-researcher' }
+  };
+  const passed = streamChildTaskEntries({
+    surface: 'bot',
+    sessions: [sessions[0]!, running, idle],
+    bot: researcher,
+    current: sessions[0]
+  });
+  assert.equal(passed.find((entry) => entry.id === 'child-running')?.status, 'running');
+  assert.equal(passed.find((entry) => entry.id === 'child-idle')?.status, 'idle');
+  const visible = passed.map((entry) => ({
+    id: entry.id,
+    excerpt: entry.excerpt,
+    title: entry.title,
+    status: entry.status,
+    createdAt: entry.id === 'child-running' ? running.createdAt : idle.createdAt
+  }));
+  catalog = zh;
+  const zhHtml = streamNav(renderStream(visible));
+  assert.match(zhHtml, /正在整理纪要/);
+  assert.match(zhHtml, /已经整理完/);
+  assert.equal(zhHtml.match(/data-testid="bot-child-task-stream-status"/g)?.length, 1);
+  assert.match(zhHtml, /正在执行/);
+  assert.equal(zhHtml.includes('Running'), false);
+  catalog = en;
+  const enHtml = streamNav(renderStream(visible));
+  assert.equal(enHtml.match(/data-testid="bot-child-task-stream-status"/g)?.length, 1);
+  assert.match(enHtml, /Running/);
+  assert.equal(enHtml.includes('正在执行'), false);
+  catalog = zh;
+  const other = streamNav(renderStream([
+    { id: 'done', excerpt: '已经整理完', title: '已经整理完', status: 'completed', createdAt: '2026-10-22T01:06:00.000Z' },
+    { id: 'wait', excerpt: '还在等批准', title: '还在等批准', status: 'waiting_approval', createdAt: '2026-10-22T01:06:01.000Z' }
+  ]));
+  assert.equal(other.includes('data-testid="bot-child-task-stream-status"'), false);
+  assert.equal(other.includes('正在执行'), false);
+  assert.match(other, /已经整理完/);
+  assert.match(other, /还在等批准/);
 });
 
 test('较早的子任务留在两句话之间，较晚的跟在后一句后面 [AC:bot-child-task-stream-entry#AC-7]', () => {

@@ -22,6 +22,7 @@
 @import '../styles/motion/pixel.css';
 @import '../styles/motion/kindergarten.css';
 @import '../styles/skin-motion-guard.css';
+@import '../styles/glass.css';
 /* Keep rem typography at the browser's normal reading size. */
 html {
   font-size: 100%;

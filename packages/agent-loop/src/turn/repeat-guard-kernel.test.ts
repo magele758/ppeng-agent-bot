@@ -125,6 +125,7 @@ async function runRepeated(opts: {
   sameToolStreak?: string;
   failStreak?: string;
   fail?: boolean;
+  prose?: boolean;
   onRound?: (round: number) => void;
 }) {
   const { host, store, session, calls } = createHarness();
@@ -143,30 +144,37 @@ async function runRepeated(opts: {
     spinWatchdog: false,
     hitlLatch: false,
   };
+  if (opts.prose) {
+    host.runLifecycleHook = async (input) => input.phase === 'stop' ? { block: true } : {};
+  }
   host.maxTurnsPerRun = opts.maxTurns ?? 4;
+  let shots = 0;
   const adapter: ModelAdapter = {
     name: opts.adapterName,
     ...(opts.modelName ? { modelName: opts.modelName } : {}),
     async runTurn(): Promise<ModelTurnResult> {
-      const round = calls.execute + 1;
-      opts.onRound?.(round);
-      const text = `${opts.fail ? 'fail' : 'looking'} ${round}`;
+      shots += 1;
+      opts.onRound?.(shots);
+      if (opts.prose) {
+        return { stopReason: 'end', assistantParts: [{ type: 'text', text: 'same paragraph' }] };
+      }
+      const text = `${opts.fail ? 'fail' : 'looking'} ${shots}`;
       const parts: MessagePart[] = opts.fail
         ? [
             { type: 'text', text },
-            { type: 'tool_call', toolCallId: `bash-${round}`, name: 'bash', input: { command: 'ls' } },
+            { type: 'tool_call', toolCallId: `bash-${shots}`, name: 'bash', input: { command: 'ls' } },
           ]
         : [
             { type: 'text', text },
             {
               type: 'tool_call',
-              toolCallId: `read-${round}`,
+              toolCallId: `read-${shots}`,
               name: 'read_file',
               input: { path: 'src/app.ts' },
             },
             {
               type: 'tool_call',
-              toolCallId: `grep-${round}`,
+              toolCallId: `grep-${shots}`,
               name: 'grep_files',
               input: { pattern: 'repeat' },
             },
@@ -252,7 +260,7 @@ describe('repeat guard in the agent loop', () => {
     expect(out.waves).toBe(4);
   });
 
-  it('still stops a weak model that keeps failing the same tool when repeat detection is off', async () => {
+  it('still stops a weak model that keeps failing the same call when repeat detection is off [AC:tool-loop-same-call#AC-2]', async () => {
     const out = await runRepeated({
       adapterName: 'heuristic',
       repeatGuard: 'off',
@@ -264,6 +272,18 @@ describe('repeat guard in the agent loop', () => {
     expect(out.system).toMatch(/failed/);
     expect(out.system).not.toMatch(/repeat detection/);
     expect(out.waves).toBe(2);
+  });
+
+  it('does not stop repeated prose after repeat detection is turned off [AC:tool-loop-same-call#AC-3]', async () => {
+    const out = await runRepeated({
+      adapterName: 'heuristic',
+      repeatGuard: 'off',
+      prose: true,
+      maxTurns: 4,
+    });
+    expect(out.reason).toBe('max_turns');
+    expect(out.reason).not.toBe('repetition');
+    expect(out.system).not.toMatch(/repeated model output/);
   });
 });
 

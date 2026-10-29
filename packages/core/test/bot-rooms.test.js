@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { SqliteStateStore } from '../dist/storage.js';
 import { createBot } from '../dist/bots/index.js';
 import { createChatSession } from '../dist/runtime/session-facade.js';
-import { BotRoomService } from '../dist/rooms/index.js';
+import { BotRoomService, writeRoomSettings } from '../dist/rooms/index.js';
 import { RawAgentRuntime } from '../dist/runtime.js';
 import { resolveBotPrincipal } from '../dist/bots/bot-identity.js';
 import { saveSemanticFact } from '../dist/memory/memory-writer.js';
@@ -1622,4 +1622,39 @@ test('runtime exposes and executes owner delegation and evidence verification to
     assert.equal(turn.collaboration.tasks[0].status, 'completed');
     assert.equal(ownerCalls, 4);
   } finally { rt.destroy(); }
+});
+
+test('a new room does not stop conversation rounds when the cap switch is off [AC:unlimited-bot-rounds#AC-1]', async () => {
+  const f = fixture();
+  const extra = [];
+  for (let i = 0; i < 7; i += 1) {
+    const bot = createBot(f.facade, { name: `Open${i}` });
+    f.store.updateSession(bot.canonicalSessionId, { metadata: { ...f.store.getSession(bot.canonicalSessionId).metadata, ...f.principal } });
+    extra.push(bot);
+  }
+  writeRoomSettings(f.store, { maxWaveSpeakers: 10 });
+  const ids = [f.a.id, f.b.id, ...extra.map(bot => bot.id)];
+  const room = f.rooms.create(f.principal, { title: 'Open', botIds: ids, hostBotId: f.a.id });
+  assert.equal(room.maxBotTurns, 0);
+  assert.notEqual(room.turnCapEnabled, true);
+  assert.equal(room.maxToolCalls, 100);
+  assert.equal(room.maxCostUsd, 1);
+  assert.equal(room.toolCapEnabled, true);
+  assert.equal(room.costCapEnabled, true);
+  const sent = f.rooms.send(f.principal, room.id, { text: 'keep going', mentions: ids });
+  assert.equal(sent.turn.maxBotTurns, 0);
+  await f.rooms.tick();
+  assert.equal(f.runs.length, ids.length);
+});
+
+test('an explicit conversation cap of 2 stops that round [AC:unlimited-bot-rounds#AC-2]', async () => {
+  const f = fixture();
+  const c = createBot(f.facade, { name: 'CapGamma' });
+  f.store.updateSession(c.canonicalSessionId, { metadata: { ...f.store.getSession(c.canonicalSessionId).metadata, ...f.principal } });
+  const room = f.rooms.create(f.principal, { title: 'Capped', botIds: [f.a.id, f.b.id, c.id], hostBotId: f.a.id, maxBotTurns: 2 });
+  assert.equal(room.maxBotTurns, 2);
+  assert.equal(room.turnCapEnabled, true);
+  f.rooms.send(f.principal, room.id, { text: 'cap', mentions: [f.a.id, f.b.id, c.id] });
+  await f.rooms.tick();
+  assert.equal(f.runs.length, 2);
 });

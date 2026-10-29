@@ -1,8 +1,11 @@
 /* Shell surface overrides. Every rule is prefixed so classic skin stays untouched. */
 
 html[data-skin="sanctum"] .lab-rail {
-  background: #0f1613;
+  background: var(--glass-fill);
+  backdrop-filter: var(--glass-filter);
+  -webkit-backdrop-filter: var(--glass-filter);
   border-right: 1px solid rgba(195, 170, 119, 0.28);
+  border-color: var(--glass-edge);
   border-radius: 0;
   box-shadow: none;
 }
@@ -84,14 +87,19 @@ html[data-skin="sanctum"] .lab-rail__foot-menu {
 }
 
 html[data-skin="sanctum"] .lab-main {
-  background: #0a100f;
+  background: var(--glass-fill);
+  backdrop-filter: var(--glass-filter);
+  -webkit-backdrop-filter: var(--glass-filter);
 }
 
 html[data-skin="sanctum"] .lab-toolbar {
-  background: #0c1411;
+  background: var(--glass-fill);
+  backdrop-filter: var(--glass-filter);
+  -webkit-backdrop-filter: var(--glass-filter);
   color: #aaa99e;
   border: 0;
   border-bottom: 1px solid rgba(195, 170, 119, 0.28);
+  border-color: var(--glass-edge);
   border-radius: 0;
   box-shadow: inset 0 -2px 0 rgba(195, 170, 119, 0.18);
 }

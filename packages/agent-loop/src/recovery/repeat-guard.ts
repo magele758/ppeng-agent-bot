@@ -14,9 +14,10 @@
  *
  * `loop_settings.repeatGuard`: `weak` (default) | `all` | `off`.
  * Read on every tool round. No RAW_AGENT_* switch.
- * When inactive, identical tool-content aborts and shell directory-browse / code-search
- * caps are skipped. Tool-failure streaks, GUI launch, unbounded walks, sandbox,
- * approvals, and sensitive-path refusal stay.
+ * When inactive, identical tool-content aborts, repeated assistant prose, and
+ * shell directory-browse / code-search caps are skipped. Same-call failure
+ * streaks, GUI launch, unbounded walks, sandbox, approvals, and sensitive-path
+ * refusal stay.
  */
 
 /** Same KV key as `AGENT_LOOP_SETTINGS_KEY` in session/steer-drain.ts. */
@@ -139,14 +140,16 @@ export function isContentRepeatAbort(reason: string | undefined): boolean {
   return typeof reason === 'string' && reason.startsWith('repeat detection:');
 }
 
+
 export function loopGuardStopReason(reason: string | undefined): 'repeat_detection' | 'tool_loop' {
   return isContentRepeatAbort(reason) ? 'repeat_detection' : 'tool_loop';
 }
 
 /**
- * Drop identical tool-content aborts when the saved mode does not apply to this model.
- * Failure streaks are unchanged. The guard still counts the streak, so flipping the
- * mode takes effect on the next tool round.
+ * Drop identical tool-content and assistant-prose aborts when the saved mode
+ * does not apply to this model. Same-call failure streaks are unchanged.
+ * The guard still counts the streak, so flipping the mode takes effect on the
+ * next tool round.
  */
 export function applyRepeatGuard(input: {
   store?: { getDaemonControl?(key: string): unknown };
@@ -154,7 +157,10 @@ export function applyRepeatGuard(input: {
   decision: { abort: true; reason: string } | { abort: false; reason?: string };
 }): { abort: true; reason: string } | { abort: false; reason?: string } {
   if (!input.decision.abort) return input.decision;
-  if (!isContentRepeatAbort(input.decision.reason)) return input.decision;
+  const assistantRepeat = typeof input.decision.reason === 'string' && input.decision.reason.startsWith('repeated model output');
+  if (!isContentRepeatAbort(input.decision.reason) && !assistantRepeat) {
+    return input.decision;
+  }
   const active = repeatLimitsActive(
     resolveRepeatGuardMode(input.store),
     classifyModelTier(input.identity)

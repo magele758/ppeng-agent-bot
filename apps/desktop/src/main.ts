@@ -343,11 +343,21 @@ function stopAllProcesses(): void {
 async function createWindow(): Promise<void> {
   const bounds = getStore().get('windowBounds');
 
+  const darwinGlass = process.platform === 'darwin'
+    ? {
+        transparent: true,
+        backgroundColor: '#00000000',
+        vibrancy: 'under-window' as const,
+        visualEffectState: 'active' as const,
+      }
+    : {};
+
   mainWindow = new BrowserWindow({
     ...bounds,
     title: 'Agent Home',
     minWidth: 1000,
     minHeight: 600,
+    ...darwinGlass,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
