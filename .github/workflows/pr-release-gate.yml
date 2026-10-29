@@ -1,6 +1,9 @@
 # The GitHub App cannot workflow_dispatch. pull_request still can start Actions,
 # so this pull request runs the same release-gate jobs as Full validation.
-# Opt in with a label; ordinary PRs retain the bounded quick gate.
+# The full Release gate runs when the PR carries the `full-validation` label
+# (opt-in for any PR) OR when its diff touches a core path listed in
+# scripts/ci/pr-release-paths.mjs (left-shift). Docs, domain bundles, web-console
+# and desktop-only PRs keep the bounded quick gate.
 name: PR release gate
 on:
   pull_request:
@@ -11,8 +14,27 @@ concurrency:
   group: pr-release-gate-${{ github.event.pull_request.head.sha }}
   cancel-in-progress: false
 jobs:
+  detect:
+    name: Detect core paths
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      core: ${{ steps.paths.outputs.core }}
+    steps:
+      - name: Checkout merge commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Match changed files against release-gate paths
+        id: paths
+        run: node scripts/ci/pr-release-paths.mjs
   full:
     name: Release gate
-    if: contains(github.event.pull_request.labels.*.name, 'full-validation')
+    needs: detect
+    if: contains(github.event.pull_request.labels.*.name, 'full-validation') || needs.detect.outputs.core == 'true'
     uses: ./.github/workflows/release-gate.yml
     secrets: inherit

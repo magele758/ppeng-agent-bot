@@ -11,6 +11,21 @@
 
 远程冒烟 **仅在你配置了 `RAW_AGENT_API_KEY` 时才会执行**，未配置时整 Job 跳过，不影响通过。真模型压缩 A/B 不在这条流水线里，见下方「压缩 A/B」。
 
+### PR release gate（左移）
+
+[`pr-release-gate.yml`](../.github/workflows/pr-release-gate.yml) 在 PR 带 `full-validation` 标签，**或** PR 改动触及核心路径时，运行与 `full-validation` 相同的 Formal + CRAP Release gate（只读权限，无需写标签）。核心路径由 [`scripts/ci/pr-release-paths.mjs`](../scripts/ci/pr-release-paths.mjs) 的 `detect` Job 判定：
+
+```
+packages/core/**  packages/agent-loop/**  packages/capability-gateway/**  packages/api-types/**
+apps/daemon/**  specs/formal/**  scripts/formal/**  scripts/crap/**
+scripts/ci/validation-*.mjs  scripts/ci/validation-artifacts.mjs  scripts/ci/validation-lane.mjs
+scripts/ci/main-full-health.mjs  scripts/ci/release-results.mjs  scripts/ci/reviewed-verification-inputs.mjs
+scripts/ci/test-partition.mjs  scripts/ci/verification-evidence.mjs
+.github/workflows/{full-validation,pr-release-gate,release-gate,ci}.yml
+```
+
+仅改 `doc/**`、`docs/**`、`packages/agent-{erp,homeiot,sre,stock}/**`、`apps/web-console/**`、`apps/desktop/**` 的 PR 仍只跑快速门禁。Main full health、CRAP 阈值与 `full-validation.yml` 触发器不变。
+
 ## main 发布卡点
 
 `release-gate.yml` 是可复用 workflow，三处调用。**npm 与 Docker 发布改为强制阻断**：只有同一工作流 revision 的门禁成功才允许发布；失败、取消、跳过均不放行。这不等同于已配置 GitHub main 分支保护，也不覆盖桌面发布或本地直接发布命令。
