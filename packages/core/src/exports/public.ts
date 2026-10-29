@@ -302,9 +302,29 @@ export {
   assertWritableEnvName,
   isReservedEnvName,
   SECRET_VAULT_KEY,
-  SECRET_REFS_METADATA_KEY
+  SECRET_REFS_METADATA_KEY,
+  USER_VAULT_KEY,
+  USER_VAULT_REF_PREFIX,
+  UserVault,
+  createMemoryUserVault,
+  bindUserVault,
+  getBoundUserVault,
+  makeUserVaultFillRef,
+  parseUserVaultFillRef,
+  fillByReferences,
+  assertModelFacingHasNoUserVaultSecrets,
+  isUserVaultFillRef
 } from '../secrets/index.js';
-export type { SecretEntrySummary } from '../secrets/index.js';
+export type {
+  SecretEntrySummary,
+  UserVaultStore,
+  UserVaultEntryKind,
+  UserVaultSecretField,
+  UserVaultFillField,
+  UserVaultFillRef,
+  UserVaultEntrySummary,
+  FillByRefModelReport
+} from '../secrets/index.js';
 export {
   parseRemoteModelList,
   listRemoteModels,

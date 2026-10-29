@@ -16,6 +16,7 @@ import { createCronJob, listCronJobs } from '../../packages/core/dist/cron/cron-
 import { RoutineRunStore } from '../../packages/core/dist/cron/routine-runtime.js';
 import { sanitizeSpawnEnv } from '../../packages/core/dist/sandbox/env-sanitizer.js';
 import { loadSqlDump } from '../migration-fixtures/sql-dump.mjs';
+import { SNAPSHOT_REVISIONS } from '../migration-fixtures/generate.mjs';
 import { preparePinnedCheckout } from '../migration-fixtures/pinned-checkout.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -58,7 +59,7 @@ test('real v24 ownerless Bot/cron upgrade is idempotent and rollback restores a 
   const beforeDir=join(temporary,'before-upgrade');const beforeManifest=stoppedSnapshot(stateDir,beforeDir);
 
   const current=new SqliteStateStore(dbFile);const currentHost=host(current,stateDir);
-  assert.equal(getCurrentSchemaVersion(current.db),LATEST_SCHEMA_VERSION);assert.equal(LATEST_SCHEMA_VERSION,35);
+  assert.equal(getCurrentSchemaVersion(current.db),LATEST_SCHEMA_VERSION);assert.equal(Math.max(...SNAPSHOT_REVISIONS.map((r)=>r.version)),LATEST_SCHEMA_VERSION-1,'add SNAPSHOT_REVISIONS + vN.sql via generate.mjs before bumping LATEST_SCHEMA_VERSION');
   assert.deepEqual(current.db.prepare('PRAGMA table_info(session_message_sources)').all().map(column=>column.name),['message_id','session_id','source_id']);
   assert.ok(current.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='memory_suppressions'").get());
   assert.ok(current.db.prepare('PRAGMA table_info(session_inbox)').all().some(column=>column.name==='context_parts_json'));

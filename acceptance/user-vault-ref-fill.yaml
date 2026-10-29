@@ -1,0 +1,21 @@
+id: user-vault-ref-fill
+title: User Vault reference fill (distinct from secret-vault)
+status: implemented
+requirement: |
+  Product user entries (login / card / contact) live in UserVault, typed apart from
+  SecretVault (connector/env injection). Password and card number/CVV never enter
+  model-facing list or fill reports; computerUse/forms fill by opaque uvref tokens.
+notes: 'Round-2 P0 r2-2; Machine: 4090'
+criteria:
+  - id: AC-1
+    given: SecretVault stores a connector env secret
+    when: list / resolveNamed run
+    then: SecretVault role unchanged — inject by env name; list never leaks values; key ≠ user_vault
+  - id: AC-2
+    given: UserVault holds login, card, and contact entries
+    when: list / getSummary run
+    then: Summaries expose kinds + fillRefs (uvref:…) without password/cardNumber/cvv plaintext
+  - id: AC-3
+    given: Fill references for password and card secrets
+    when: fillByReferences runs for computerUse/forms
+    then: Callback receives plaintext; modelReport text contains refs only, never raw secrets
