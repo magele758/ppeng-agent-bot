@@ -27,6 +27,7 @@ import {
 } from '@/lib/nav';
 import type { ModelProvidersResponse } from '@/lib/model-providers';
 import { fetchList, idleLabListState, settleList, type LabListKey, type LabListState, type ListFetch } from '@/lib/list-load';
+import type { OutboundIdentity } from '@/lib/outbound-draft-preview';
 import { shouldRefreshOpenSession } from '@/lib/run-leave';
 import { sameData } from '@/lib/same-data';
 import type {
@@ -92,6 +93,11 @@ export interface OutboundDraftItem {
   receiveIdType?: string;
   error?: string;
   createdAt: string;
+  /** Bumped on every human edit; sent back on approve so a stale preview cannot send. */
+  revision?: number;
+  originalText?: string;
+  editedAt?: string;
+  identity?: OutboundIdentity;
 }
 
 export interface ServerMeta {

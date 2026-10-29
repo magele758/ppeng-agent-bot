@@ -532,15 +532,24 @@ export async function fillByReferences<T>(
     text: `Filled ${usedRefs.length} field(s) by vault reference (${usedRefs.join(', ')}).`
   };
   // Defense in depth: never let a secret slip into the model report text.
+  // Refs are opaque ids (random hex) that can contain a short secret such as a CVV by chance;
+  // mask them so only the surrounding prose is scanned.
+  const scanned = maskFillRefs(modelReport.text, usedRefs);
+  const anySecret = usedRefs.some((r) => {
+    const field = parseUserVaultFillRef(r)?.field;
+    return field && isSecretField(field);
+  });
   for (const value of Object.values(resolved)) {
-    const parsedFields = usedRefs.map((r) => parseUserVaultFillRef(r)?.field);
-    const anySecret = parsedFields.some((f) => f && isSecretField(f));
-    if (anySecret && value && modelReport.text.includes(value)) {
+    if (anySecret && value && scanned.includes(value)) {
       return { ok: false, error: 'refusing to emit secret value into model-facing fill report' };
     }
   }
-  assertModelFacingHasNoUserVaultSecrets(modelReport.text, vault);
+  assertModelFacingHasNoUserVaultSecrets(scanned, vault);
   return { ok: true, result, modelReport };
+}
+
+function maskFillRefs(text: string, refs: string[]): string {
+  return refs.reduce((out, ref) => out.split(ref).join('<ref>'), text);
 }
 
 /** Throw if model-facing text contains any known user-vault secret. */

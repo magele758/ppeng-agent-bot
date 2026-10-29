@@ -88,6 +88,7 @@ async function boot(env) {
   const base = `http://127.0.0.1:${server.address().port}`;
   return {
     runtime,
+    repoRoot,
     authStore,
     base,
     gatewayDir: join(stateDir, 'gateway'),
@@ -243,6 +244,55 @@ test('a Lab login session can approve and the release header cannot bypass login
   const headerBody = await headerOnly.json();
   assert.equal(headerBody.error, 'login_required');
   assert.equal(headerBody.loginRequired, true);
+});
+
+test('editing a draft needs a Lab login session; a session edit shows identity and the stale revision cannot send [AC:outbound-draft-edit-identity#AC-6] [AC:outbound-draft-edit-identity#AC-3] [AC:outbound-draft-edit-identity#AC-5]', async (t) => {
+  const token = `op-${randomBytes(8).toString('hex')}`;
+  const daemon = await boot({
+    RAW_AGENT_AUTH_TOKEN: token,
+    RAW_AGENT_OAUTH_GITHUB_CLIENT_ID: 'draft-client',
+    RAW_AGENT_OAUTH_GITHUB_CLIENT_SECRET: 'draft-secret'
+  });
+  t.after(() => daemon.close());
+  writeFileSync(
+    join(daemon.repoRoot, 'gateway.config.json'),
+    JSON.stringify({ channels: [{ id: 'out', type: 'http_post', url: 'http://im.test/hook?key=SECRETKEY' }] })
+  );
+  const draft = await appendOutboundDraft(daemon.gatewayDir, { channelId: 'out', text: 'original' });
+  const url = `${daemon.base}/api/outbound-drafts/${draft.id}`;
+  const json = { 'content-type': 'application/json' };
+
+  const bearerOnly = await fetch(url, {
+    method: 'PATCH',
+    headers: { ...json, authorization: `Bearer ${token}` },
+    body: JSON.stringify({ text: 'model rewrite' })
+  });
+  assert.equal(bearerOnly.status, 401);
+  assert.equal((await readOutboundDrafts(daemon.gatewayDir))[0].text, 'original');
+
+  const session = grantSession(daemon);
+  const headers = { ...json, 'x-ppeng-lab': '1', authorization: `Bearer ${token}`, cookie: `ppeng_lab_session=${session}` };
+  const missingText = await fetch(url, { method: 'PATCH', headers, body: JSON.stringify({}) });
+  assert.equal(missingText.status, 400);
+  const badRevision = await fetch(url, { method: 'PATCH', headers, body: JSON.stringify({ text: 'x', revision: 'one' }) });
+  assert.equal(badRevision.status, 400);
+
+  const edited = await fetch(url, { method: 'PATCH', headers, body: JSON.stringify({ text: 'human edit', revision: 0 }) });
+  assert.equal(edited.status, 200);
+  const editedBody = await edited.json();
+  assert.equal(editedBody.draft.text, 'human edit');
+  assert.equal(editedBody.draft.revision, 1);
+  assert.equal(editedBody.draft.status, 'pending_approval');
+
+  const listed = await (await fetch(`${daemon.base}/api/outbound-drafts`, { headers })).json();
+  const row = listed.drafts.find((item) => item.id === draft.id);
+  assert.equal(row.text, 'human edit');
+  assert.deepEqual(row.identity, { channelId: 'out', kind: 'http_post', resolved: true, sender: 'im.test' });
+  assert.ok(!JSON.stringify(listed).includes('SECRETKEY'));
+
+  const stale = await fetch(`${url}/approve`, { method: 'POST', headers, body: JSON.stringify({ revision: 0 }) });
+  assert.equal(stale.status, 409);
+  assert.equal((await readOutboundDrafts(daemon.gatewayDir))[0].status, 'pending_approval');
 });
 
 async function withEnv(patch, fn) {
