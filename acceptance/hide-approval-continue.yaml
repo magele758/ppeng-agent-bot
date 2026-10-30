@@ -1,0 +1,16 @@
+id: hide-approval-continue
+title: 聊天不展示审批自动合成的续跑用户消息
+status: implemented
+notes: "assumedApproval: standing-order-2026-10-22"
+requirement: |
+  审批后系统合成的 user 消息「Approval for <tool> was approved|rejected. Continue.」
+  仍送给模型，但聊天 UI（历史与即时）不展示。
+criteria:
+  - id: AC-1
+    given: 一条 user 消息，文本恰为「Approval for bash was approved. Continue.」或 rejected/denied 变体
+    when: 聊天渲染判定是否隐藏
+    then: 隐藏
+  - id: AC-2
+    given: 用户真实输入（含该句夹在其他文字中、或 assistant 角色）
+    when: 判定
+    then: 不隐藏
