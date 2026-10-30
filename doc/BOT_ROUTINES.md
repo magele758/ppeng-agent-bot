@@ -20,6 +20,9 @@ The daemon’s existing Gateway event ingress accepts signed requests without a 
 | --- | --- | --- |
 | `webhook/generic` | `/gateway/v1/routines/webhook` | `X-Ppeng-Timestamp`, `X-Ppeng-Delivery`, `X-Ppeng-Signature` |
 | `ci/status` | `/gateway/v1/routines/ci` or `/gateway/v1/routines/github` | `X-Github-Event`, `X-Github-Timestamp`, `X-Github-Delivery`, `X-Hub-Signature-256` |
+| `slack/message` | `/gateway/v1/providers/slack/events` (also `/gateway/v1/routines/slack`) | `X-Slack-Request-Timestamp`, `X-Slack-Signature` (`v0=` HMAC of `v0:timestamp:body`) |
+
+Slack Events user messages are addressed as `slack:<channel>:<thread_ts>` (a top-level message uses its own `ts` as the thread). A verified message wakes every enabled `slack/message` routine and includes that address in the fenced event. The signing secret is the existing gateway Slack setting, not a new environment variable. A bot's own messages, edits, and URL verification do not wake a routine. The five-minute window and delivery dedupe are unchanged.
 
 Both use `sha256=<hex HMAC-SHA256(secret, timestamp + "." + deliveryId + "." + rawBody)>`. Timestamp is Unix seconds, with an inclusive five-minute window in either direction. Sign the exact UTF-8 request body; timestamp and delivery ID are authenticated too. Signature comparison is constant-time. The GitHub contract is the existing replay-protected relay format, **not GitHub’s native body-only signature**: a trusted sender/relay must add the timestamp and compute this signature.
 

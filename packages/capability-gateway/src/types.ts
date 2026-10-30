@@ -58,6 +58,23 @@ export interface FeishuProviderSpec {
   botId?: string;
 }
 
+/**
+ * Slack Events API inbound. Signing secret is required; Lab settings override.
+ * A verified user message is addressed as `slack:<channel>:<thread_ts>` and
+ * wakes routines listening for `slack/message`.
+ */
+export interface SlackProviderSpec {
+  enabled?: boolean;
+  /** Slack app signing secret. Never echoed by the settings API. */
+  signingSecret?: string;
+  /** Default internal agent id for the channel turn. */
+  defaultAgentId?: string;
+  /** Outbound channel id (`type: slack`) used to draft a thread reply. */
+  replyChannelId?: string;
+  /** Route the turn into this Bot's canonical session. */
+  botId?: string;
+}
+
 /** WeCom: outbound group bot + optional simple bridge inbound. */
 export interface WeComProviderSpec {
   enabled?: boolean;
@@ -85,6 +102,7 @@ export interface GatewayAgentRoute {
 export interface GatewayProvidersConfig {
   feishu?: FeishuProviderSpec;
   wecom?: WeComProviderSpec;
+  slack?: SlackProviderSpec;
 }
 
 export interface LearnConfig {

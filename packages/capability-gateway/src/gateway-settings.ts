@@ -27,10 +27,20 @@ export interface GatewayWebhookSettings {
   allowedSenders: string[];
 }
 
+export interface GatewaySlackSettings {
+  /** Slack Events signing secret. Empty = not configured (inbound fails closed). */
+  signingSecret?: string;
+  /** Slack user ids; empty = no sender restriction. */
+  allowedSenders: string[];
+  /** Route Slack chats into this Bot's canonical session. */
+  botId?: string;
+}
+
 export interface GatewaySettings {
   feishu: GatewayFeishuSettings;
   wecom: GatewayWecomSettings;
   webhook: GatewayWebhookSettings;
+  slack: GatewaySlackSettings;
   updatedAt: string;
 }
 
@@ -47,6 +57,11 @@ export interface GatewaySettingsPatch {
     botId?: string | null;
   };
   webhook?: { allowedSenders?: string[] };
+  slack?: {
+    signingSecret?: string | null;
+    allowedSenders?: string[];
+    botId?: string | null;
+  };
 }
 
 export interface GatewaySettingsStore {
@@ -63,6 +78,7 @@ export interface GatewaySettingsView {
   };
   wecom: { bridgeSecretSet: boolean; allowedSenders: string[]; botId?: string };
   webhook: { allowedSenders: string[] };
+  slack: { signingSecretSet: boolean; allowedSenders: string[]; botId?: string };
   updatedAt: string;
 }
 
@@ -71,6 +87,7 @@ export function defaultGatewaySettings(): GatewaySettings {
     feishu: { allowedSenders: [] },
     wecom: { allowedSenders: [] },
     webhook: { allowedSenders: [] },
+    slack: { allowedSenders: [] },
     updatedAt: new Date(0).toISOString()
   };
 }
@@ -101,6 +118,11 @@ export function normalizeGatewaySettings(raw: unknown): GatewaySettings {
       botId: str(r.wecom?.botId)
     },
     webhook: { allowedSenders: list(r.webhook?.allowedSenders) },
+    slack: {
+      signingSecret: str(r.slack?.signingSecret),
+      allowedSenders: list(r.slack?.allowedSenders),
+      botId: str(r.slack?.botId)
+    },
     updatedAt: typeof (raw as { updatedAt?: unknown }).updatedAt === 'string'
       ? (raw as { updatedAt: string }).updatedAt
       : base.updatedAt
@@ -141,6 +163,11 @@ export function writeGatewaySettings(
     webhook: {
       allowedSenders: patch.webhook?.allowedSenders ? list(patch.webhook.allowedSenders) : cur.webhook.allowedSenders
     },
+    slack: {
+      signingSecret: applyOptional(cur.slack.signingSecret, patch.slack?.signingSecret),
+      allowedSenders: patch.slack?.allowedSenders ? list(patch.slack.allowedSenders) : cur.slack.allowedSenders,
+      botId: applyOptional(cur.slack.botId, patch.slack?.botId)
+    },
     updatedAt: new Date().toISOString()
   };
   store.setDaemonControl(GATEWAY_SETTINGS_KEY, next);
@@ -162,6 +189,11 @@ export function redactGatewaySettings(s: GatewaySettings): GatewaySettingsView {
       botId: s.wecom.botId
     },
     webhook: { allowedSenders: s.webhook.allowedSenders },
+    slack: {
+      signingSecretSet: Boolean(s.slack.signingSecret),
+      allowedSenders: s.slack.allowedSenders,
+      botId: s.slack.botId
+    },
     updatedAt: s.updatedAt
   };
 }
@@ -215,6 +247,14 @@ export function parseGatewaySettingsPatch(body: unknown): GatewaySettingsPatch {
   const webhook = expectObject(root.webhook, 'webhook');
   if (webhook) {
     patch.webhook = { allowedSenders: expectStringList(webhook, 'allowedSenders', 'webhook') };
+  }
+  const slack = expectObject(root.slack, 'slack');
+  if (slack) {
+    patch.slack = {
+      signingSecret: expectNullableString(slack, 'signingSecret', 'slack'),
+      allowedSenders: expectStringList(slack, 'allowedSenders', 'slack'),
+      botId: expectNullableString(slack, 'botId', 'slack')
+    };
   }
   return patch;
 }

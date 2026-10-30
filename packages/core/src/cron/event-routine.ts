@@ -310,9 +310,24 @@ function routinePrompt(job: CronJobRecord): string {
   return job.prompt.trim();
 }
 
+function slackThreadLine(rawBody: string): string {
+  try {
+    const body = JSON.parse(rawBody) as { event?: { channel?: unknown; thread_ts?: unknown; ts?: unknown } };
+    const channel = typeof body.event?.channel === 'string' ? body.event.channel.trim() : '';
+    const thread = typeof body.event?.thread_ts === 'string' ? body.event.thread_ts.trim() : '';
+    const ts = typeof body.event?.ts === 'string' ? body.event.ts.trim() : '';
+    const threadTs = thread || ts;
+    if (!/^[A-Z0-9]{1,32}$/.test(channel) || !/^\d{1,16}\.\d{1,8}$/.test(threadTs)) return '';
+    return `thread: slack:${channel}:${threadTs}\n`;
+  } catch {
+    return '';
+  }
+}
+
 function summarizeEvent(scheduleValue: string, deliveryId: string, rawBody: string): string {
   const body = rawBody.length > SUMMARY_MAX ? `${rawBody.slice(0, SUMMARY_MAX)}\n…[truncated]` : rawBody;
-  return `delivery: ${deliveryId}\nschedule: ${scheduleValue}\n${body}`;
+  const thread = scheduleValue === 'slack/message' ? slackThreadLine(rawBody) : '';
+  return `delivery: ${deliveryId}\nschedule: ${scheduleValue}\n${thread}${body}`;
 }
 
 function eventUserText(job: CronJobRecord, scheduleValue: string, deliveryId: string, rawBody: string): string {
