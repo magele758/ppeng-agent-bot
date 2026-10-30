@@ -8,8 +8,15 @@ requirement: |
   to the phone handler and never spawns ssh. Shell and copy stay closed
   (device_local_readonly) unless the attachment opts in AND device_shell / device_copy
   is available. Detach and sensitive paths fail closed. Factory settings stay untouched.
-  Daemon HTTP/SSE remains desktop-only; phone attach is in-process.
-notes: 'Round-5 r5-1; read-only default slice; shell/copy opt-in only; assumedApproval: standing-order-2026-10-22'
+  A phone in another process can keep that same DeviceLocalHub attachment over the
+  daemon HTTP/SSE channel (its own device-local stream, not the desktop-agent stream).
+  Opening the stream marks the phone connected. list_machines and read are delivered
+  on that stream and complete from a matching reply. Shell and copy stay gated the
+  same way as an in-process attach: no opt-in yields device_local_readonly, and a
+  tool that is not available yields device_local_tool_unavailable. Sensitive paths
+  are refused. Closing the stream or an explicit detach marks the phone disconnected
+  and fails any in-flight op. This path never uses Factory SSH.
+notes: 'Round-5 r5-1 + r5-3 daemon HTTP/SSE; read-only default; shell/copy opt-in only; parallel device-local stream, not desktop-agent routes; assumedApproval: standing-order-2026-10-22'
 criteria:
   - id: AC-1
     given: A machine registered with kind phone and deviceLocalTools, then a device-local agent attached
@@ -27,3 +34,11 @@ criteria:
     given: An attachment that opts into shell and a registry row whose device_shell state is not available, then one whose state is available
     when: shell runs
     then: unavailable yields device_local_tool_unavailable and does not call the handler; available dispatches to the handler and still does not spawn ssh
+  - id: AC-5
+    given: A registered phone whose agent is connected to the daemon over the device-local HTTP/SSE stream from another process, without shell or copy opt-in
+    when: the stream opens, list_machines and read run, a matching reply is posted, then shell or copy runs, then the stream closes or the phone detaches
+    then: the phone shows connected while the stream is open; read is delivered on the stream and completes from the posted reply without spawning ssh; shell and copy return device_local_readonly and are not delivered; after close or detach the phone is disconnected and any in-flight read fails closed; Factory settings stay untouched
+  - id: AC-6
+    given: The same remote phone stream, first without an available device_shell or device_copy, then with shell and copy opted in and those tools available, plus a sensitive path
+    when: shell, copy, and read run
+    then: missing availability yields device_local_tool_unavailable and does not deliver the op; once available, shell and copy are delivered and complete from the reply without spawning ssh; a sensitive path is refused and is not delivered

@@ -24,7 +24,8 @@ export {
   setSharedDeviceLocalHubForTests,
   createDeviceLocalBackend,
   createCompositeRegisteredMachineBackend,
-  createDesktopAgentHttpSseSession
+  createDesktopAgentHttpSseSession,
+  createDeviceLocalHttpSseSession
 } from './registered-machines/index.js';
 export type {
   RegisteredMachinePort,
@@ -36,7 +37,8 @@ export type {
   DesktopAgentHttpSseSession,
   DesktopAgentReply,
   DeviceLocalHub,
-  DeviceLocalHandlers
+  DeviceLocalHandlers,
+  DeviceLocalHttpSseSessionOptions
 } from './registered-machines/index.js';
 export type { FactoryMachine, FactoryTask, FactorySettings, FactoryTransport } from './factory/types.js';
 
