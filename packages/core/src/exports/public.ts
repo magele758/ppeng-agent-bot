@@ -878,6 +878,19 @@ export {
   remoteExecRejection
 } from '../sandbox/microvm-remote-url.js';
 export type { MicrovmExecRequestBody, MicrovmExecResponseBody } from '../sandbox/microvm-remote-url.js';
+export {
+  resolveMicrovmApiKey,
+  createMicrovmSandbox,
+  getMicrovmGuestHealth,
+  deleteMicrovmSandbox,
+  smokeMicrovmLifecycle
+} from '../sandbox/microvm-control-plane.js';
+export type {
+  MicrovmSandboxCreateBody,
+  MicrovmSandbox,
+  MicrovmInternalRoute
+} from '../sandbox/microvm-control-plane.js';
+
 
 export {
   validateSkillManifest,
