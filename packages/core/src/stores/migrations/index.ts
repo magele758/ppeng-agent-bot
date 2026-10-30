@@ -1047,6 +1047,24 @@ export const MIGRATIONS: Migration[] = [
         db.exec(`ALTER TABLE approvals ADD COLUMN authorized_by_json TEXT`);
       }
     }
+  },
+  {
+    version: 37,
+    description: 'library_pages stores durable markdown pages with a share id',
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS library_pages (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          revision INTEGER NOT NULL,
+          share_id TEXT NOT NULL UNIQUE,
+          markdown TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_library_pages_updated ON library_pages(updated_at DESC);
+      `);
+    }
   }
 ];
 

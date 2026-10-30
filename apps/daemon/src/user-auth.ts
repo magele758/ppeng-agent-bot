@@ -28,7 +28,9 @@ export function isLabProxyRequest(request: IncomingMessage): boolean {
 
 export function isAuthPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;
-  return pathname === '/api/auth' || pathname.startsWith('/api/auth/');
+  if (pathname === '/api/auth' || pathname.startsWith('/api/auth/')) return true;
+  // The share id is the capability. Library create/list/update stay behind login.
+  return /^\/api\/pages\/share\/[^/]+$/.test(pathname);
 }
 
 export function requestPublicOrigin(request: IncomingMessage, env: NodeJS.ProcessEnv): string {

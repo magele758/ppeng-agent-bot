@@ -29,6 +29,7 @@ import { json } from './http-utils.js';
 import { Router } from './routing.js';
 import { attachmentRoutes } from './routes/attachments.js';
 import { libraryPickRoutes } from './routes/library-pick.js';
+import { libraryPageRoutes } from './routes/library-pages.js';
 import { authRoutes } from './routes/auth.js';
 import { botsRoutes } from './routes/bots.js';
 import { botMaterialRoutes } from './routes/bot-materials.js';
@@ -146,6 +147,7 @@ export function buildDaemonRouter(deps: DaemonAppDeps): Router {
     .addAll(toolExposureRoutes(runtime))
     .addAll(attachmentRoutes(runtime))
     .addAll(libraryPickRoutes(runtime))
+    .addAll(libraryPageRoutes(runtime))
     .addAll(sandboxRoutes(runtime))
     .addAll(trajectoryRoutes(runtime))
     .addAll(workspaceRoutes(runtime))

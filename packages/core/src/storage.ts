@@ -39,6 +39,7 @@ import { StepInboxStore, type EnqueueSteerOptions, type InboxItem } from './sess
 import { ImageAssetStore } from './stores/image-asset-store.js';
 import { AttachmentStore } from './stores/attachment-store.js';
 import { ArtifactStore, type ArtifactIndexRecord } from './stores/artifact-store.js';
+import { LibraryPageStore, type LibraryPageRecord } from './stores/library-page-store.js';
 import type { AttachmentRecord } from './ingestion/attachment-ingest-service.js';
 import { BotStore } from './bots/bot-store.js';
 import type { BotRecord, ListBotsOptions, UpdateBotInput } from './bots/types.js';
@@ -107,6 +108,7 @@ export class SqliteStateStore {
   private readonly imageAssets: ImageAssetStore;
   private readonly attachments: AttachmentStore;
   private readonly artifacts: ArtifactStore;
+  private readonly libraryPages: LibraryPageStore;
   private readonly agentCases: AgentCaseStore;
   private readonly bots: BotStore;
   private readonly contextSnapshots: ContextSnapshotStore;
@@ -132,6 +134,7 @@ export class SqliteStateStore {
     this.imageAssets = new ImageAssetStore(this.db);
     this.attachments = new AttachmentStore(this.db);
     this.artifacts = new ArtifactStore(this.db);
+    this.libraryPages = new LibraryPageStore(this.db);
     this.agentCases = new AgentCaseStore(this.db);
     this.bots = new BotStore(this.db);
     this.contextSnapshots = new ContextSnapshotStore(this.db);
@@ -696,6 +699,30 @@ export class SqliteStateStore {
 
   listArtifactsForSession(sessionId: string): ArtifactIndexRecord[] {
     return this.artifacts.listArtifactsForSession(sessionId);
+  }
+
+  insertLibraryPage(row: LibraryPageRecord): LibraryPageRecord {
+    const r = this.libraryPages.insertPage(row);
+    this.bumpVersion();
+    return r;
+  }
+
+  updateLibraryPage(row: LibraryPageRecord): LibraryPageRecord {
+    const r = this.libraryPages.updatePage(row);
+    this.bumpVersion();
+    return r;
+  }
+
+  getLibraryPage(id: string): LibraryPageRecord | undefined {
+    return this.libraryPages.getPage(id);
+  }
+
+  getLibraryPageByShareId(shareId: string): LibraryPageRecord | undefined {
+    return this.libraryPages.getPageByShareId(shareId);
+  }
+
+  listLibraryPages(): LibraryPageRecord[] {
+    return this.libraryPages.listPages();
   }
 
   // ── Task domain (delegated to TaskStore) ──

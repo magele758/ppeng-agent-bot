@@ -739,6 +739,7 @@ export type {
 } from '../connectors/registry.js';
 export * from '../ingestion/index.js';
 export * from '../artifact/index.js';
+export * from '../library/index.js';
 export { createArtifactTools } from '../tools/artifact-tools.js';
 export {
   BROWSER_SETTINGS_KEY,
