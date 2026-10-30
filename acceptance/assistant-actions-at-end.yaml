@@ -1,0 +1,21 @@
+id: assistant-actions-at-end
+title: 助手消息的引用/纠错按钮放在正文末尾
+status: implemented
+requirement: |
+  引用与纠错按钮不再放在顶部标题行，改为正文下方紧贴的一小行；
+  标题行仅保留角色名及 steer/cron 标签；连续助手消息省略标题后无任何顶部占位。
+  其它角色行为不变。
+criteria:
+  - id: AC-1
+    given: 助手消息
+    when: 渲染
+    then: 纠错与引用按钮位于气泡之后的 chat-turn__actions 行，不在 chat-turn__label 内
+  - id: AC-2
+    given: 标题被省略且无标签的连续助手消息
+    when: 渲染
+    then: 不渲染 chat-turn__label 行
+  - id: AC-3
+    given: 非助手角色
+    when: 渲染
+    then: 按钮仍在标题行（行为不变）
+notes: "assumedApproval: standing-order-2026-10-22; 与 assistant-run-spacing AC-1 措辞同步调整，未删除"
