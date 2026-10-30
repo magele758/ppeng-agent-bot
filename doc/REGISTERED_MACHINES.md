@@ -30,7 +30,7 @@
 
 核心类型：`DesktopAgentHub`、`createDesktopAgentBackend`、`createCompositeRegisteredMachineBackend`、`createDesktopAgentHttpSseSession`（`packages/core/src/registered-machines/`）。
 
-HTTP/SSE 仍只服务桌面 agent（`/api/desktop-agent/...`）。手机不另开一条 SSE：本刀的手机路径是 daemon **同进程** `DeviceLocalHub.attach`。跨进程手机长连留到后续，不复用桌面 SSE 路由。
+桌面 HTTP/SSE 只服务桌面 agent（`/api/desktop-agent/...`）。手机跨进程走下面的独立 `/api/device-local/...`，不复用桌面路由，也不经过 Factory。
 
 ## 路径 B — SSH Host 别名（#321）
 
@@ -44,17 +44,25 @@ HTTP/SSE 仍只服务桌面 agent（`/api/desktop-agent/...`）。手机不另�
 与路径 A 并列的非 SSH 附着，服务 `kind: 'phone'`。默认切片是**只读**。
 
 1. `register_machine { machineId, label, kind: "phone", deviceLocalTools }`。`deviceLocalTools` 会出现在 `list_machines` 里（`toolId` + `available` / `needs_permission` / `unavailable`）。不带 `sshAlias`。
-2. 手机 agent 与 daemon **同进程**时，`getSharedDeviceLocalHub().attach(machineId, { read })`。默认不提供 shell / copy。
+2. 手机 agent 与 daemon **同进程**时，`getSharedDeviceLocalHub().attach(machineId, { read })`。默认不提供 shell / copy。**另一进程**时走下面的 HTTP/SSE，不必自己拿 hub。
 3. `list_machines` → `kind=phone` 且 `connected=true`。`read_file { machineId, path }` 打到该 handler，**不** spawn `ssh`。
-4. 未 opt-in 时 `bash` / `copy_*` 返回 `device_local_readonly`（机器仍算 connected，但不执行）。要打开 shell 或 copy，必须同时：`attach(..., { shell: true })`（或 `copy: true`）且 `deviceLocalTools` 里 `device_shell` / `device_copy` 为 `available`。缺一则 `device_local_readonly` 或 `device_local_tool_unavailable`。
-5. `detach` 之后 `connected=false`；若同时还配了 `sshAlias`，composite 才回退 SSH。敏感路径（`.env` / `id_rsa` / `credentials` 及 `.ssh` `.aws` `.gnupg` `.kube` `.docker`）在 handler 之前拒绝。
+4. 未 opt-in 时 `bash` / `copy_*` 返回 `device_local_readonly`（机器仍算 connected，但不执行）。要打开 shell 或 copy，必须同时：附着时 `shell: true`（或 `copy: true`）且 `deviceLocalTools` 里 `device_shell` / `device_copy` 为 `available`。缺一则 `device_local_readonly` 或 `device_local_tool_unavailable`。跨进程时，opt-in 写在事件流查询串 `?shell=1` / `?copy=1`（可同时）。
+5. `detach` 之后 `connected=false`；若同时还配了 `sshAlias`，composite 才回退 SSH。敏感路径（`.env` / `id_rsa` / `credentials` 及 `.ssh` `.aws` `.gnupg` `.kube` `.docker`）在 handler 之前拒绝，不会推到 SSE。
 
-本刀不改 daemon HTTP/SSE：那条通道仍是桌面专用。手机跨进程长连未做。
+### Daemon HTTP/SSE（跨进程，r5-3）
 
-核心类型：`DeviceLocalHub`、`createDeviceLocalBackend`、`getSharedDeviceLocalHub`（与桌面 hub 分开的进程级单例）。
+手机 agent 用 daemon bearer 接同一条 `DeviceLocalHub`（`getSharedDeviceLocalHub`），不经过 Factory，也不走 `/api/desktop-agent/...`：
+
+1. `GET /api/device-local/:machineId/events` — SSE。打开即 `attach`（默认只读）；首条事件 `ready`，data 含 `{ machineId, attached, shell, copy }`。之后每个放行的 read / shell / copy 推一条 `event: op`，data 为 `{ requestId, kind, input }`。查询串 `shell=1` / `copy=1`（或 `true`）才登记对应 handler。
+2. `POST /api/device-local/:machineId/reply` — body `{ requestId, result }`，`result` 为 `{ ok, content, exitCode? }`。命中挂起操作则 200；无会话或未知 `requestId` 为 404。
+3. 连接关闭，或 `POST /api/device-local/:machineId/detach`，都会 `detach`。进行中的操作以 `machine_disconnected` 结束，不再 spawn `ssh`。
+
+未 opt-in 的 shell / copy 在 backend 返回 `device_local_readonly`，不会出现在事件流上。已 opt-in 但工具不是 `available` 时返回 `device_local_tool_unavailable`，同样不推 `op`。同一 `machineId` 再开一条 SSE 会替换上一条。适配器 `createDeviceLocalHttpSseSession` 不依赖 `node:http`，daemon 路由只负责收发。
+
+核心类型：`DeviceLocalHub`、`createDeviceLocalBackend`、`getSharedDeviceLocalHub`、`createDeviceLocalHttpSseSession`（与桌面 hub 分开的进程级单例）。
 
 ## 失败即关闭
 
 离线、未注册、无 `sshAlias` 且无 agent / 手机本机工具附着 → `machine_disconnected` / `unknown_machine`，不执行任何远端命令。手机默认切片上的 shell / copy → `device_local_readonly`（或工具未 `available` 时 `device_local_tool_unavailable`）。ssh 子进程使用 `sanitizeSpawnEnv`，并强制 `ClearAllForwardings` / `ForwardAgent=no` / `PermitLocalCommand=no`；命令过 hardline；远端读写拒绝 `.env` / `id_rsa` / `credentials` 及 `.ssh` `.aws` `.gnupg` `.kube` `.docker` 目录（agent 与手机本机工具路径同样在 backend 层拒绝敏感路径）。
 
-注意：SSH 别名由 daemon 所在主机的 ssh 配置解析；多租户部署应只在受信用户的会话中放开 `register_machine`。桌面 agent 附着在 daemon 进程内（HTTP/SSE 只是把另一进程接到桌面 hub）；手机本机工具只在同进程 `attach`。daemon 退出后两条长连都失效。
+注意：SSH 别名由 daemon 所在主机的 ssh 配置解析；多租户部署应只在受信用户的会话中放开 `register_machine`。桌面 agent 与手机本机工具都附着在 daemon 进程内（各自的 HTTP/SSE 只是把另一进程接到对应 hub）。daemon 退出后两条长连都失效。

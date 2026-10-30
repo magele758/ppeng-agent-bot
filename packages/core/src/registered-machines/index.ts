@@ -49,8 +49,10 @@ export {
 } from './composite-backend.js';
 export {
   createDesktopAgentHttpSseSession,
+  createDeviceLocalHttpSseSession,
   type DesktopAgentHttpSseSession,
   type DesktopAgentHttpSseSessionOptions,
+  type DeviceLocalHttpSseSessionOptions,
   type DesktopAgentOpEvent,
   type DesktopAgentOpKind,
   type DesktopAgentReply,

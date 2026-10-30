@@ -55,6 +55,7 @@ import { modelProviderRoutes } from './routes/model-providers.js';
 import { orchestrationRoutes } from './routes/orchestration.js';
 import { deliveryQuietHoursRoutes } from './routes/delivery-quiet-hours.js';
 import { desktopAgentRoutes } from './routes/desktop-agent.js';
+import { deviceLocalRoutes } from './routes/device-local.js';
 import { outboundDraftRoutes } from './routes/outbound-drafts.js';
 import { researchRoutes } from './routes/research.js';
 import { sandboxRoutes } from './routes/sandbox.js';
@@ -153,6 +154,7 @@ export function buildDaemonRouter(deps: DaemonAppDeps): Router {
     .addAll(libraryPageRoutes(runtime))
     .addAll(sandboxRoutes(runtime))
     .addAll(desktopAgentRoutes())
+    .addAll(deviceLocalRoutes())
     .addAll(trajectoryRoutes(runtime))
     .addAll(workspaceRoutes(runtime))
     .addAll(evolutionRoutes(repoRoot));

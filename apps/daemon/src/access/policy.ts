@@ -529,6 +529,10 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
     ['GET /api/desktop-agent/:machineId/events', AUTHENTICATED],
     ['POST /api/desktop-agent/:machineId/reply', AUTHENTICATED],
     ['POST /api/desktop-agent/:machineId/detach', AUTHENTICATED],
+    // Phone / device-local long-connect. Same bearer; separate from desktop-agent.
+    ['GET /api/device-local/:machineId/events', AUTHENTICATED],
+    ['POST /api/device-local/:machineId/reply', AUTHENTICATED],
+    ['POST /api/device-local/:machineId/detach', AUTHENTICATED],
     ['GET /api/secrets', ADMIN],
     // MCP client OAuth loopback. Daemon bearer still applies via checkAuth.
     ['GET /api/mcp/oauth/callback', ADMIN],
