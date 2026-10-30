@@ -88,6 +88,11 @@ export const tasks = {
     unsavedEditHint: '正在编辑：保存或放弃修改后才能批准并发送。',
     editedBadge: '已编辑',
     editedHint: '内容已由你修改，原文已保留。',
+    styleSampleHint: '建议先采样这个渠道最近几条消息，对照一下语气再发送。不采样也可以直接批准。',
+    styleSampleGlance: '看看近期消息',
+    styleSampleGlanceAria: '看看 {channel} 最近几条消息',
+    styleSampleEmpty: '这里还没有可对照的近期消息。草稿正文不会被改写。',
+    styleSampleNote: '仅供扫一眼，不会改写你已写好的正文。',
     identityKind: {
       webhook: 'Webhook',
       http_post: 'HTTP POST',

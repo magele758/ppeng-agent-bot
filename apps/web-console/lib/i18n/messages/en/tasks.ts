@@ -88,6 +88,11 @@ export const tasks = {
     unsavedEditHint: 'Editing: save or discard your changes before approving and sending.',
     editedBadge: 'Edited',
     editedHint: 'You edited this text. The original is kept.',
+    styleSampleHint: 'Consider sampling a few recent messages in this channel so the tone matches. You can still approve without sampling.',
+    styleSampleGlance: 'Glance at recent messages',
+    styleSampleGlanceAria: 'Glance at recent messages in {channel}',
+    styleSampleEmpty: 'No recent messages to compare yet. The draft text is left as you wrote it.',
+    styleSampleNote: 'For a glance only. This never rewrites the text you already wrote.',
     identityKind: {
       webhook: 'Webhook',
       http_post: 'HTTP POST',

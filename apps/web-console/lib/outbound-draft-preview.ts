@@ -65,6 +65,34 @@ export function editInit(draft: DraftPreviewBase, text: string): RequestInit {
   return { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify({ text, revision: draftRevisionOf(draft) }) };
 }
 
+/** How many same-channel messages a glance shows. Advisory only — never fed back into the draft. */
+export const STYLE_SAMPLE_LIMIT = 3;
+
+export interface StyleSample {
+  text: string;
+}
+
+/**
+ * Option A: before approve, suggest glancing at recent messages in this channel.
+ * The hint never blocks send and never rewrites the draft the human already wrote.
+ */
+export function shouldSuggestStyleSample(status: string): boolean {
+  return status === 'pending_approval' || status === 'failed';
+}
+
+/**
+ * A request for recent same-channel messages the human can glance at.
+ * Callers must not write the result into draft text (no summaries, no style prompt).
+ */
+export function styleSampleRequest(channelId: string): { channelId: string; limit: number } {
+  return { channelId, limit: STYLE_SAMPLE_LIMIT };
+}
+
+/** Samples are a side glance. The body the human wrote is returned unchanged. */
+export function draftTextAfterSamples(text: string, _samples: readonly StyleSample[]): string {
+  return text;
+}
+
 /** Daemon answers 403 `human_login_required` when Lab login is off; the panel asks the operator to turn it on. */
 export function draftActionError(error: unknown): { loginRequired: boolean; message: string } {
   const message = error instanceof Error ? error.message : String(error);

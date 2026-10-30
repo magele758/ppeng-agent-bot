@@ -6,10 +6,14 @@ import {
   canSaveDraftText,
   draftActionError,
   draftRevisionOf,
+  draftTextAfterSamples,
   editInit,
   identityKindKey,
   isDraftEditable,
   OUTBOUND_DRAFT_MAX_TEXT,
+  shouldSuggestStyleSample,
+  STYLE_SAMPLE_LIMIT,
+  styleSampleRequest,
   type OutboundIdentityKind
 } from './outbound-draft-preview.ts';
 import { en } from './i18n/messages/en/index.ts';
@@ -53,6 +57,28 @@ test('save needs non-empty, changed, bounded text; only pending or failed drafts
   assert.equal(canSaveDraftText(draft, 'hello!'), true);
   for (const status of ['pending_approval', 'failed']) assert.equal(isDraftEditable(status), true);
   for (const status of ['confirmed', 'sending', 'sent', 'rejected']) assert.equal(isDraftEditable(status), false);
+});
+
+test('a pending draft suggests sampling, and approve stays available without it [AC:outbound-style-sample-hint#AC-1] [AC:outbound-style-sample-hint#AC-2]', () => {
+  assert.equal(shouldSuggestStyleSample('pending_approval'), true);
+  assert.equal(shouldSuggestStyleSample('failed'), true);
+  for (const status of ['confirmed', 'sending', 'sent', 'rejected']) {
+    assert.equal(shouldSuggestStyleSample(status), false);
+  }
+  assert.equal(canApproveDraft(false), true);
+  const request = styleSampleRequest('slack-general');
+  assert.deepEqual(request, { channelId: 'slack-general', limit: STYLE_SAMPLE_LIMIT });
+  assert.equal(STYLE_SAMPLE_LIMIT, 3);
+});
+
+test('sampling never rewrites the body the human wrote [AC:outbound-style-sample-hint#AC-3] [AC:outbound-style-sample-hint#AC-4]', () => {
+  const written = 'ship it tomorrow';
+  const samples = [{ text: 'hey team, quick update' }, { text: 'lgtm, merging' }];
+  assert.equal(draftTextAfterSamples(written, samples), written);
+  assert.equal(draftTextAfterSamples(written, []), written);
+  const request = styleSampleRequest('slack-general');
+  assert.equal('text' in request, false);
+  assert.equal('summary' in request, false);
 });
 
 test('login-off 403 is told apart from other failures', () => {

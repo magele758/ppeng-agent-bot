@@ -26,7 +26,7 @@ function load(): Record<string, any> {
   return mod.exports;
 }
 
-const { OutboundDraftCard, OutboundDraftActions, OutboundDraftBody, OutboundIdentityBar } = load();
+const { OutboundDraftCard, OutboundDraftActions, OutboundDraftBody, OutboundIdentityBar, OutboundStyleSampleHint } = load();
 const noop = () => undefined;
 
 const draft = {
@@ -50,8 +50,49 @@ test('card shows the identity bar, the text, an Edit button, and a still-require
   assert.match(html, /hello team/);
   assert.match(html, /编辑/);
   assert.match(html, /批准并发送/);
+  assert.match(html, /data-testid="outbound-style-sample"/);
+  assert.match(html, /建议先采样/);
+  assert.match(html, /看看近期消息/);
   assert.doesNotMatch(html, /<textarea/);
   assert.doesNotMatch(html, /现在发不出去/);
+  const hintAt = html.indexOf('data-testid="outbound-style-sample"');
+  const approveAt = html.indexOf('批准并发送');
+  assert.ok(hintAt >= 0 && hintAt < approveAt);
+});
+
+test('the hint stays advisory: approve is enabled, and shown samples never replace the body [AC:outbound-style-sample-hint#AC-2] [AC:outbound-style-sample-hint#AC-3] [AC:outbound-style-sample-hint#AC-4]', () => {
+  const html = renderToStaticMarkup(
+    React.createElement(OutboundDraftCard, { draft, onSave: async () => true, onApprove: noop, onReject: noop })
+  );
+  assert.match(html, /hello team/);
+  assert.match(html, /aria-label="批准并发送 out"/);
+  assert.doesNotMatch(html, /aria-label="批准并发送 out"[^>]*disabled|disabled=""[^>]*aria-label="批准并发送 out"/);
+
+  const open = renderToStaticMarkup(
+    React.createElement(OutboundStyleSampleHint, {
+      channelId: 'out',
+      status: 'pending_approval',
+      samples: [{ text: 'hey team, quick update' }, { text: 'lgtm' }],
+      open: true,
+      onGlance: noop
+    })
+  );
+  assert.match(open, /hey team, quick update/);
+  assert.match(open, /不会改写你已写好的正文/);
+  assert.doesNotMatch(open, /hello team/);
+
+  const hidden = renderToStaticMarkup(
+    React.createElement(OutboundStyleSampleHint, {
+      channelId: 'out', status: 'sent', samples: [], open: false, onGlance: noop
+    })
+  );
+  assert.equal(hidden, '');
+});
+
+test('english copy offers the same non-blocking sample hint [AC:outbound-style-sample-hint#AC-1]', () => {
+  const source = readFileSync(new URL('../../../lib/i18n/messages/en/tasks.ts', import.meta.url), 'utf8');
+  assert.match(source, /Consider sampling a few recent messages/);
+  assert.match(source, /You can still approve without sampling/);
 });
 
 test('identity bar flags an unsendable draft and tolerates a missing sender [AC:outbound-draft-edit-identity#AC-5]', () => {

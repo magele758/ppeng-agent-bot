@@ -5,9 +5,13 @@ import { useI18n } from '@/lib/i18n';
 import {
   canApproveDraft,
   canSaveDraftText,
+  draftTextAfterSamples,
   identityKindKey,
   isDraftEditable,
-  type OutboundIdentity
+  shouldSuggestStyleSample,
+  styleSampleRequest,
+  type OutboundIdentity,
+  type StyleSample
 } from '@/lib/outbound-draft-preview';
 import type { OutboundDraftItem } from '../../shell/LabProvider';
 import styles from './tasks.module.css';
@@ -135,24 +139,86 @@ export function OutboundDraftActions(props: DraftActionsProps) {
   );
 }
 
+export interface StyleSampleHintProps {
+  channelId: string;
+  status: string;
+  /** Recent same-channel messages, if the human asked to glance. Never written into the draft. */
+  samples: readonly StyleSample[];
+  open: boolean;
+  onGlance: () => void;
+}
+
+function StyleSampleGlance({ samples }: { samples: readonly StyleSample[] }) {
+  const { t } = useI18n();
+  if (samples.length === 0) return <small>{t('tasks.inbox.styleSampleEmpty')}</small>;
+  return (
+    <>
+      <ul className={styles.styleSampleList}>
+        {samples.map((sample) => (
+          <li key={sample.text}>{sample.text}</li>
+        ))}
+      </ul>
+      <small>{t('tasks.inbox.styleSampleNote')}</small>
+    </>
+  );
+}
+
+/** Advisory only: suggest a same-channel glance before approve. Does not block send or touch the body. */
+export function OutboundStyleSampleHint({ channelId, status, samples, open, onGlance }: StyleSampleHintProps) {
+  const { t } = useI18n();
+  if (!shouldSuggestStyleSample(status)) return null;
+  return (
+    <div className={styles.styleSampleHint} data-testid="outbound-style-sample" role="note">
+      <p>{t('tasks.inbox.styleSampleHint')}</p>
+      <button
+        type="button"
+        className="btn btn-ghost btn-sm"
+        aria-label={t('tasks.inbox.styleSampleGlanceAria', { channel: channelId })}
+        aria-expanded={open}
+        onClick={onGlance}
+      >
+        {t('tasks.inbox.styleSampleGlance')}
+      </button>
+      {open ? <StyleSampleGlance samples={samples} /> : null}
+    </div>
+  );
+}
+
 export interface OutboundDraftCardProps {
   draft: OutboundDraftItem;
   /** Resolves true when the edit was saved. */
   onSave: (draft: OutboundDraftItem, text: string) => Promise<boolean>;
   onApprove: (draft: OutboundDraftItem) => void;
   onReject: (draft: OutboundDraftItem) => void;
+  /**
+   * Optional glance at recent same-channel messages. The result is shown beside the draft
+   * and must never be written into `draft.text`.
+   */
+  loadStyleSamples?: (channelId: string) => Promise<readonly StyleSample[]>;
 }
 
 /** One pending outbound draft: identity bar, editable preview, and the confirm/send actions. */
-export function OutboundDraftCard({ draft, onSave, onApprove, onReject }: OutboundDraftCardProps) {
+export function OutboundDraftCard({ draft, onSave, onApprove, onReject, loadStyleSamples }: OutboundDraftCardProps) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(draft.text);
+  const [samplesOpen, setSamplesOpen] = useState(false);
+  const [samples, setSamples] = useState<readonly StyleSample[]>([]);
   const startEdit = () => {
     setValue(draft.text);
     setEditing(true);
   };
   const save = async () => {
-    if (await onSave(draft, value)) setEditing(false);
+    const text = draftTextAfterSamples(value, samples);
+    if (await onSave(draft, text)) setEditing(false);
+  };
+  const showSamples = (loaded: readonly StyleSample[]) => {
+    setSamples(loaded);
+    setValue((current) => draftTextAfterSamples(current, loaded));
+  };
+  const glance = () => {
+    const request = styleSampleRequest(draft.channelId);
+    setSamplesOpen(true);
+    void loadStyleSamples?.(request.channelId).then(showSamples);
   };
   return (
     <div className={`list-item ${styles.row}`} data-draft-id={draft.id}>
@@ -163,6 +229,13 @@ export function OutboundDraftCard({ draft, onSave, onApprove, onReject }: Outbou
       {draft.identity ? <OutboundIdentityBar identity={draft.identity} /> : null}
       <DraftMeta draft={draft} />
       <OutboundDraftBody draft={draft} editing={editing} value={value} onChange={setValue} />
+      <OutboundStyleSampleHint
+        channelId={draft.channelId}
+        status={draft.status}
+        samples={samples}
+        open={samplesOpen}
+        onGlance={glance}
+      />
       <OutboundDraftActions
         draft={draft}
         editing={editing}
