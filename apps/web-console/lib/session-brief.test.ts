@@ -6,6 +6,7 @@ import {
   parseSessionBrief,
   readSessionBrief,
   rowsForSessionBrief,
+  showProcessNote,
   SESSION_BRIEF_CHANGED_EVENT,
   SESSION_BRIEF_OPEN_KEY,
   SESSION_BRIEF_STORAGE_KEY,
@@ -172,6 +173,13 @@ test('流式过程也收起，回答仍在 [AC:session-brief#AC-2]', () => {
   assert.deepEqual(mixed.segments, [{ kind: 'text', raw: '查到了' }]);
   assert.equal(mixed.hidden.length, 1);
   assert.equal(mixed.hidden[0]?.kind, 'tool');
+});
+
+test('精简模式不渲染过程折叠块 [AC:brief-no-process-note#AC-1] [AC:brief-no-process-note#AC-2]', () => {
+  assert.equal(showProcessNote(true, 3), false);
+  assert.equal(showProcessNote(true, 0), false);
+  assert.equal(showProcessNote(false, 3), true);
+  assert.equal(showProcessNote(false, 0), false);
 });
 
 test('刷新后已点开的过程仍展开，没点开的仍收起 [AC:session-brief#AC-9]', () => {
