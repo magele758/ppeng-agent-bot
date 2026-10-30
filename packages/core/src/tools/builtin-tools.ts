@@ -14,6 +14,7 @@ import { resolvePermissionMode } from '../approval/permission-mode.js';
 import { commandHardlineToolResult } from '../sandbox/command-hardline.js';
 import type { SkillManifest } from '../skills/skill-manifest.js';
 import { manifestsForSession, noteActiveSkillManifest } from '../skills/skill-manifest-gate.js';
+import { noteLoadedSkill } from '../skills/mandatory-skill-gate.js';
 import { evaluateDefaultDenyPolicy, untrustedCorpusFromMessages } from '../safety/default-deny-policy.js';
 import { sanitizeSpawnEnv } from '../sandbox/env-sanitizer.js';
 import { redactToolContent } from '../sandbox/result-redaction.js';
@@ -95,7 +96,7 @@ export interface RuntimeToolServices {
   loadSkill: (
     name: string,
     sessionId: string
-  ) => Promise<{ content?: string; error?: string; manifest?: SkillManifest; skillId?: string }>;
+  ) => Promise<{ content?: string; error?: string; manifest?: SkillManifest; skillId?: string; requiredSkills?: string[] }>;
   searchSkills: (
     query: string,
     sessionId: string,
@@ -1164,17 +1165,28 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
     ptc: { kind: 'read' },
     async execute(context, args) {
       const result = await services.loadSkill(args.name, context.session.id);
-      if (result.manifest) {
-        noteActiveSkillManifest(context.session.id, result.manifest);
-        context.session.metadata = {
-          ...(context.session.metadata ?? {}),
-          activeSkillManifests: manifestsForSession(context.session.id, context.session.metadata)
+      if (!result.content) {
+        return {
+          ok: false,
+          content: result.error ?? `Unknown skill ${args.name}`
         };
       }
-      return {
-        ok: Boolean(result.content),
-        content: result.content ?? result.error ?? `Unknown skill ${args.name}`
+      const loaded = noteLoadedSkill(
+        context.session.id,
+        args.name,
+        { requiredSkills: result.requiredSkills ?? result.manifest?.requiredSkills },
+        context.session.metadata,
+        services.stateStore
+      );
+      if (result.manifest) noteActiveSkillManifest(context.session.id, result.manifest);
+      context.session.metadata = {
+        ...(context.session.metadata ?? {}),
+        loadedSkillNames: loaded,
+        ...(result.manifest
+          ? { activeSkillManifests: manifestsForSession(context.session.id, context.session.metadata) }
+          : {})
       };
+      return { ok: true, content: result.content };
     }
   };
 

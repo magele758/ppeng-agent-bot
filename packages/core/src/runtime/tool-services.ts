@@ -36,7 +36,7 @@ export interface ToolServicesHost {
   resolveSkillLoad: (
     name: string,
     sessionId: string
-  ) => Promise<{ content?: string; error?: string; manifest?: SkillManifest }>;
+  ) => Promise<{ content?: string; error?: string; manifest?: SkillManifest; requiredSkills?: string[] }>;
   resolveSkillSearch: (query: string, sessionId: string, limit?: number) => Promise<{ content: string }>;
   unblockDependentTasks: (taskId: string) => Promise<void>;
   spawnSubagent: (

@@ -63,7 +63,7 @@ export async function resolveSkillLoad(
   host: SkillLoadHost,
   name: string,
   sessionId: string
-): Promise<{ content?: string; error?: string; manifest?: SkillManifest; skillId?: string }> {
+): Promise<{ content?: string; error?: string; manifest?: SkillManifest; skillId?: string; requiredSkills?: string[] }> {
   const skills = await host.promptBuilder.skillsForSession(sessionId);
   const normalizedName = name.trim().toLowerCase();
   const matches = skills.filter((skill) => {
@@ -171,5 +171,10 @@ export async function resolveSkillLoad(
   });
   const progressive = envBool(process.env, 'RAW_AGENT_SKILL_PROGRESSIVE', true);
   const disclosed = discloseSkillBody(found.content, { progressive });
-  return { content: formatDisclosedSkillContent(disclosed), manifest: found.manifest, skillId: found.id };
+  return {
+    content: formatDisclosedSkillContent(disclosed),
+    manifest: found.manifest,
+    skillId: found.id,
+    requiredSkills: found.requiredSkills
+  };
 }

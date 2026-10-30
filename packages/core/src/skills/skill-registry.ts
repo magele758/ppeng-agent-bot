@@ -100,6 +100,11 @@ function frontmatterString(meta: Record<string, SkillFrontmatterValue>, ...keys:
   return undefined;
 }
 
+function mergeRequiredSkills(frontmatter: string[] | undefined, manifest: string[] | undefined): string[] | undefined {
+  const merged = [...new Set([...(frontmatter ?? []), ...(manifest ?? [])].map((name) => name.trim()).filter(Boolean))];
+  return merged.length > 0 ? merged : undefined;
+}
+
 function frontmatterList(meta: Record<string, SkillFrontmatterValue>, ...keys: string[]): string[] | undefined {
   const values: string[] = [];
   for (const key of keys) {
@@ -192,6 +197,7 @@ async function loadSkillsFromTree(
       const sharedBotIds = ownerBotId ? frontmatterList(parsed.meta, 'shared-bots') ?? [] : undefined;
       const id = ownerBotId ? botSkillId(ownerBotId, name) : frontmatterString(parsed.meta, 'id') ?? name;
       const aliases = frontmatterList(parsed.meta, 'aliases', 'alias');
+      const requiredSkills = frontmatterList(parsed.meta, 'requiredSkills', 'required-skills', 'required_skills');
       const triggerWords = frontmatterList(
         parsed.meta,
         'triggerWords',
@@ -218,7 +224,8 @@ async function loadSkillsFromTree(
         skillPath: relPath,
         aliases,
         triggerWords,
-        manifest: loadedManifest.manifest
+        manifest: loadedManifest.manifest,
+        requiredSkills: mergeRequiredSkills(requiredSkills, loadedManifest.manifest?.requiredSkills)
       });
     }
 

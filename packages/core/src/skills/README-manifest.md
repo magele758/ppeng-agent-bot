@@ -18,3 +18,5 @@ Sources (sibling JSON preferred when present; else frontmatter):
 2. Frontmatter key `capability` or `manifest` (object or JSON string)
 
 Builtin example: Planning carries `PLANNING_SKILL_MANIFEST` (todo tools only, network none).
+
+`requiredSkills` on a Manifest (or SKILL frontmatter) does not widen that ceiling. Loading the skill marks those names satisfied for the mandatory skill gate (`mandatory-skill-gate.ts`), which separately refuses shopping, login, outbound-send, and payment tools until the matching skill has been `load_skill`'d.

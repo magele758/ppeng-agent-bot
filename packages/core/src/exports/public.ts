@@ -905,6 +905,14 @@ export {
   noteActiveSkillManifest,
   runWithSkillManifest
 } from '../skills/skill-manifest-gate.js';
+export {
+  MANDATORY_SKILL_NAMES,
+  gateMandatorySkills,
+  gateMandatorySkillsForSession,
+  mandatorySkillsForTool,
+  noteLoadedSkill
+} from '../skills/mandatory-skill-gate.js';
+export type { MandatorySkillRequirement, MandatorySkillSurface } from '../skills/mandatory-skill-gate.js';
 export type {
   SkillManifest,
   SkillNetworkPolicy,
