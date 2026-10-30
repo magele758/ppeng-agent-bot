@@ -28,7 +28,7 @@ export function gatewaySettingsRoutes(runtime: RawAgentRuntime): RouteSpec[] {
       pattern: '/api/gateway/settings',
       handler: async ({ readBody, response }) => {
         const patch = parseGatewaySettingsPatch(await readBody());
-        const botIds = [patch.feishu?.botId, patch.wecom?.botId].filter(
+        const botIds = [patch.feishu?.botId, patch.wecom?.botId, patch.slack?.botId].filter(
           (id): id is string => typeof id === 'string' && id.trim() !== ''
         );
         for (const id of botIds) {
