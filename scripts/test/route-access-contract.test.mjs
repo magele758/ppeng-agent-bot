@@ -48,6 +48,23 @@ async function readJsonBody(request) {
   return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
 
+/** A successful SSE endpoint never ends; validate its first event and close the connection. */
+async function readContractResponse(response) {
+  if (!response.headers.get('content-type')?.includes('text/event-stream')) return response.text();
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let text = '';
+  try {
+    while (!text.includes('\n\n')) {
+      const { value, done } = await reader.read();
+      assert.equal(done, false, 'SSE route must emit an initial event');
+      text += decoder.decode(value, { stream: true });
+      assert.ok(text.length <= 64 * 1024, 'SSE initial event must be bounded');
+    }
+    return text;
+  } finally { await reader.cancel(); }
+}
+
 /**
  * Boots the real daemon app on an ephemeral port with users A, B (member) and admin C.
  * `gatewayPrefix` mounts the capability gateway (no `RAW_AGENT_GATEWAY_TOKEN`) at that prefix.
@@ -115,9 +132,10 @@ export async function bootDaemon(env, { gatewayPrefix } = {}) {
       method,
       headers,
       redirect: 'manual',
+      signal: AbortSignal.timeout(30_000),
       body: method === 'GET' || body === undefined ? undefined : JSON.stringify(body)
     });
-    const text = await res.text();
+    const text = await readContractResponse(res);
     let data;
     try {
       data = text ? JSON.parse(text) : {};
@@ -310,6 +328,13 @@ test('route access contract: every route is classified, isolated, and A-owned da
     }
     assert.equal((await d.call('C', 'GET', '/api/secrets')).status, 200, 'tenant admin');
     assert.equal((await d.call('operator', 'GET', '/api/secrets')).status, 200, 'operator bearer');
+  });
+
+  await t.test('authenticated SSE yields ready without waiting for connection EOF', async () => {
+    const response = await d.call('B', 'GET', '/api/desktop-agent/contract-stream/events');
+    assert.equal(response.status, 200);
+    assert.match(response.text, /event: ready/);
+    assert.match(response.text, /"attached":true/);
   });
 
   await t.test('authenticated GET routes stay reachable for plain users', async () => {
