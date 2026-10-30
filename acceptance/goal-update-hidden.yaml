@@ -1,0 +1,17 @@
+id: goal-update-hidden
+title: 目标更新通知不在聊天里展示
+status: implemented
+requirement: |
+  聊天里以 [goal update] 开头的系统通知完全不展示（历史与即时都隐藏），通知仍送模型。
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  取代 goal-update-presentation；仅 UI 不渲染，不改送模型的内容。
+criteria:
+  - id: AC-1
+    given: 对话里有以 [goal update] 开头的系统通知
+    when: 查看历史或即时对话
+    then: 不出现目标状态卡，也没有原始详情入口
+  - id: AC-2
+    given: 对话里有助手回复和其它系统通知（如 [recovery] Stopped）
+    when: 查看对话
+    then: 它们照常显示
