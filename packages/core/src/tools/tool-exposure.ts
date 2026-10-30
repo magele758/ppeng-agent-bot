@@ -359,7 +359,8 @@ export const TOOL_GROUPS: ToolGroup[] = [
             "list_pages",
             "get_page",
             "write_page",
-            "edit_page"
+            "edit_page",
+            "delete_page"
         ],
         "extension": true
     },

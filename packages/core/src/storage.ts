@@ -713,6 +713,12 @@ export class SqliteStateStore {
     return r;
   }
 
+  deleteLibraryPage(id: string): boolean {
+    const deleted = this.libraryPages.deletePage(id);
+    if (deleted) this.bumpVersion();
+    return deleted;
+  }
+
   getLibraryPage(id: string): LibraryPageRecord | undefined {
     return this.libraryPages.getPage(id);
   }

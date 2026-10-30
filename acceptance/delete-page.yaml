@@ -1,0 +1,29 @@
+id: delete-page
+title: Delete library pages and revoke public shares
+status: implemented
+requirement: |
+  Implement the smallest correct cut for r5-5 delete_page (store/port delete + admin DELETE /api/library/pages/:id + tool delete_page; share read 404 after delete).
+  Run focused unit + acceptance tests for delete_page (delete then list omits; get/share 404; missing id fails without mis-delete; admin DELETE; public share read-only) with nice and low concurrency.
+notes: |
+  assumedApproval: standing-order-2026-10-22
+criteria:
+  - id: AC-1
+    given: A library contains a shared page and another page
+    when: The shared page is deleted through the durable library capability
+    then: The deleted page cannot be retrieved or listed and the other page remains unchanged
+  - id: AC-2
+    given: An administrator can access a shared library page
+    when: The administrator deletes that page
+    then: Deletion succeeds and subsequent authenticated and public share reads return 404 while the list omits it
+  - id: AC-3
+    given: A visitor has a valid public share link
+    when: The visitor attempts to delete through the public share endpoint
+    then: The request cannot delete the page and the public share remains readable
+  - id: AC-4
+    given: An assistant has the library page tools
+    when: It requests deletion by page id
+    then: Deletion has workspace side effects and requires at least the approval level of writing or editing a page
+  - id: AC-5
+    given: A library contains pages that must be preserved
+    when: Deletion is requested for a missing or invalid id
+    then: The request fails cleanly without deleting any existing page
