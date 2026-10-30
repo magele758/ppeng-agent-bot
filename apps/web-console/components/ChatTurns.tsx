@@ -27,6 +27,8 @@ import { foldA2uiMessages } from './a2ui/fold';
 import { surfacePartKey, useSurfaceContext } from './a2ui/SurfaceContext';
 import type { A2uiMessage, SurfaceState } from './a2ui/types';
 import { useI18n, type MessageKey } from '@/lib/i18n';
+import { api } from '@/lib/api';
+import { secureFormResultCard, secureFormSubmitBody } from '@/lib/secure-form-card';
 import { ComposerMessageContext } from './ComposerContext';
 import type { ContextLabel } from '@/lib/composer-context';
 import { BotReplyQuoteAction, MessageReplyQuote } from './ReplyQuote';
@@ -169,14 +171,55 @@ function ReasoningFold({ text, streaming }: { text: string; streaming?: boolean 
   );
 }
 
+function SecureFormFill({ sessionId, content }: { sessionId: string; content: string }) {
+  const { t } = useI18n();
+  const face = secureFormResultCard(content);
+  const [value, setValue] = useState('');
+  const [status, setStatus] = useState('');
+  if (!face || !sessionId) return null;
+  const send = (action: 'submit' | 'cancel') => {
+    if (action === 'submit' && !value.trim()) return;
+    void api(`/api/sessions/${encodeURIComponent(sessionId)}/secure-form`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(secureFormSubmitBody(face, value.trim(), action))
+    })
+      .then(() => {
+        setValue('');
+        setStatus(action === 'submit' ? 'filled' : 'cancelled');
+      })
+      .catch(() => undefined);
+  };
+  if (status) return <p className="secure-form-card__status">{status}</p>;
+  return (
+    <div className="secure-form-card">
+      <p>{face.prompt}</p>
+      <input
+        className="secure-form-field"
+        type="password"
+        autoComplete="off"
+        placeholder={t('play.approval.secureFormPlaceholder')}
+        aria-label={face.label}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+      />
+      <button type="button" disabled={!value.trim()} onClick={() => send('submit')}>
+        {t('play.approval.secureFormSubmit')}
+      </button>
+    </div>
+  );
+}
+
 function ToolResultFold({
   p,
   call,
-  modelView
+  modelView,
+  sessionId
 }: {
   p: Extract<MessagePart, { type: 'tool_result' }>;
   call?: ToolCallPart;
   modelView?: boolean;
+  sessionId?: string;
 }) {
   const { t } = useI18n();
   const ok = p.ok !== false;
@@ -199,8 +242,10 @@ function ToolResultFold({
   const spawnBlocked = parseSpawnBlocked(p.name, content);
   const sandboxReason = parseOsSandboxReason(content);
 
+  const secureForm = !modelView && sessionId ? secureFormResultCard(content) : null;
   return (
     <div className="chat-tool-result-block">
+      {secureForm && sessionId ? <SecureFormFill sessionId={sessionId} content={content} /> : null}
       <details
         className={`chat-tool-fold chat-tool-fold--result chat-tool-fold--compact ${ok ? 'chat-tool-fold--success' : 'chat-tool-fold--error'}${modelView ? ' chat-tool-fold--model-view' : ''}${stub ? ' chat-tool-fold--stub' : ''}${isSubagent ? ' chat-tool-fold--subagent' : ''}${isSteerSkipped ? ' chat-tool-fold--steer' : ''}${spawnBlocked ? ' chat-tool-fold--blocked' : ''}`}
         data-model-view={modelView ? (stub ? 'stub' : trimmed ? 'trimmed' : '1') : undefined}
@@ -431,6 +476,7 @@ function StructuredBubble({
             toolCallsById?.get(p.toolCallId) ?? toolCallsById?.get(toolIoPartKey(msgIndex, pi))
           }
           modelView={modelView}
+          sessionId={sessionId}
         />
       );
     } else if (p.type === 'surface_update') {

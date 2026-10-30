@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { api } from '@/lib/api';
 import { approvalShownLines } from '@/lib/approval-feed';
+import { secureFormCardFace } from '@/lib/secure-form-card';
 import { attachBeforeAskUserDecision, type LiveStreamArm } from '@/lib/live-stream-attach';
 import { useI18n } from '@/lib/i18n';
 import type { ApprovalItem } from '@/lib/types';
@@ -51,6 +52,7 @@ function ApprovalItemRow({
   const { t } = useI18n();
   const [reply, setReply] = useState('');
   const isAsk = a.toolName === 'ask_user';
+  const secureForm = secureFormCardFace(a);
   const shown = approvalShownLines(a, t('play.approval.needInfo'));
 
   const postDecision = async (decision: 'approve' | 'reject') => {
@@ -87,7 +89,9 @@ function ApprovalItemRow({
         <strong>{a.toolName}</strong>
         <ApprovalReasonLine approval={a} fallback={shown.reason} />
       </div>
-      {isAsk ? (
+      {secureForm ? (
+        <p className="approval-banner__q">{secureForm.prompt}</p>
+      ) : isAsk ? (
         shown.question ? <p className="approval-banner__q">{shown.question}</p> : null
       ) : (
         <ApprovalActionPreview args={a.args} />

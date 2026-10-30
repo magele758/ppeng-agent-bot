@@ -318,7 +318,12 @@ export {
   USER_VAULT_TOOL_NAMES,
   readUserVaultSettings,
   writeUserVaultSettings,
-  filterUserVaultTools
+  filterUserVaultTools,
+  SECURE_FORM_TOOL_NAME,
+  SECURE_FORM_META,
+  SECURE_FORM_FIELDS,
+  createSecureFormPort,
+  secureFormTextLeaks
 } from '../secrets/index.js';
 export type {
   SecretEntrySummary,
@@ -329,7 +334,12 @@ export type {
   UserVaultFillRef,
   UserVaultEntrySummary,
   FillByRefModelReport,
-  UserVaultSettings
+  UserVaultSettings,
+  SecureFormField,
+  SecureFormStatus,
+  SecureFormCard,
+  SecureFormReceipt,
+  SecureFormPort
 } from '../secrets/index.js';
 export {
   parseRemoteModelList,

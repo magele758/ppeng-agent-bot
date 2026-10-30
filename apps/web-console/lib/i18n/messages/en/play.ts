@@ -744,7 +744,9 @@ export const play = {
     reject: 'Reject',
     kindShell: 'Shell',
     kindMcp: 'MCP',
-    blockReasonLabel: 'Blocked because'
+    blockReasonLabel: 'Blocked because',
+    secureFormSubmit: 'Submit privately',
+    secureFormPlaceholder: 'Type here. It is not saved in the chat.'
   },
 
   model: {
