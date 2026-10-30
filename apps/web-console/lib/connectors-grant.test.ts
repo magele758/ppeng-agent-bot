@@ -10,7 +10,7 @@ import {
 
 const SECRET = 'super-secret-acme-value';
 
-test('needsAuth when auth has no vault name, needsGrant once a reference exists [AC:connector-authorization#AC-1]', () => {
+test('needsAuth when auth has no vault name, needsGrant once a reference exists or no secret is required [AC:connector-authorization#AC-1] [AC:connector-authorization#AC-2]', () => {
   assert.equal(connectorAuthState({ granted: false, authKind: 'bearer' }), 'needsAuth');
   assert.equal(connectorAuthState({ granted: false, authKind: 'oauth' }), 'needsAuth');
   assert.equal(

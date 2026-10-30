@@ -114,7 +114,7 @@ test('authorization dialogue is needsAuth, needsGrant, or granted [AC:connector-
   }
 });
 
-test('ungranted connectors contribute no tools and no prompt instructions', () => {
+test('ungranted connectors with a vault name or no secret are needsGrant and contribute no tools or instructions [AC:connector-authorization#AC-2]', () => {
   const h = harness();
   try {
     assert.equal(h.loaded.tools.length, 0);
