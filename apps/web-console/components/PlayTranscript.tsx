@@ -7,7 +7,7 @@ import { messageHasStructuredParts, msgPartsToText, normalizedRole } from '@/lib
 import { readMessageSessionId } from '@/lib/goal-update-notice';
 import { omitStreamTextSavedOnTurn } from '@/lib/history-window';
 import { buildFeedSlots, steerStreamPlacement, type FeedSlot } from '@/lib/feed-window';
-import { rowsForSessionBrief } from '@/lib/session-brief';
+import { rowsForSessionBrief, showProcessNote } from '@/lib/session-brief';
 import { SessionBriefDisclosure } from './SessionBriefDisclosure';
 import { formatHash } from '@/lib/nav';
 import { useI18n } from '@/lib/i18n';
@@ -103,10 +103,10 @@ function BriefBanner() {
   return <p className="chat-process-note" role="status">{t('play.chrome.sessionBriefBanner')}</p>;
 }
 
-function ProcessNote({ slot, view, props }: { slot: FeedSlot; view: TranscriptModel; props: Parameters<typeof renderTranscriptSlot>[2] }) {
+function ProcessNote({ slot, view, props, brief }: { slot: FeedSlot; view: TranscriptModel; props: Parameters<typeof renderTranscriptSlot>[2]; brief: boolean }) {
   const { t } = useI18n();
   const folded = slot.folded ?? [];
-  if (folded.length === 0) return null;
+  if (!showProcessNote(brief, folded.length)) return null;
   return (
     <SessionBriefDisclosure noteKey={slot.key} label={t('play.turns.processNote', { count: folded.length })} title={t('play.turns.processNoteTitle')}>
       {folded.map((foldedSlot) => (
@@ -340,7 +340,7 @@ function renderTranscriptSlot(slot: FeedSlot, view: TranscriptModel, props: {
   onQuoteReply?: (quote: ReplyQuote) => void;
   onOpenChildTask?: (sessionId: string) => void;
 }, brief = false): ReactNode {
-  if (slot.kind === 'brief-note') return <ProcessNote slot={slot} view={view} props={props} />;
+  if (slot.kind === 'brief-note') return <ProcessNote slot={slot} view={view} props={props} brief={brief} />;
   if (slot.kind === 'child-task') {
     const group = view.childTaskGroups.get(slot.messageIndex ?? -1) ?? [];
     return <BotChildTaskStreamEntry entries={group} onOpen={props.onOpenChildTask} />;

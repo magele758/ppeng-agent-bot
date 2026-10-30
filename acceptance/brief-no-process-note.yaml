@@ -1,0 +1,18 @@
+id: brief-no-process-note
+title: 精简模式不显示「已收起 N 条过程」
+status: implemented
+requirement: |
+  聊天里「已收起 N 条过程」的折叠块，在精简模式下应完全不渲染任何 UI（包括标题行和展开内容）；非精简模式保持不变。
+owner: user
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  取代 session-brief 中 AC-3/AC-8/AC-9 里「收成一行、可点开」的展示部分：精简模式下过程一律不渲染（仍不改对话记录）；折叠分段的计算逻辑保留。
+criteria:
+  - id: AC-1
+    given: 已打开精简模式，会话或流式回复里有被收起的过程
+    when: 查看聊天
+    then: 页面上没有「已收起 N 条过程」的标题行，也没有任何展开内容
+  - id: AC-2
+    given: 已关掉精简模式
+    when: 查看聊天
+    then: 行为和之前一致，不出现收起过程的折叠块

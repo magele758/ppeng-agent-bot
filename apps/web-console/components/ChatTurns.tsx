@@ -15,7 +15,7 @@ import {
   msgPartsToText,
   normalizedRole
 } from '@/lib/chat-utils';
-import { briefStreamSegments, visibleBriefParts } from '@/lib/session-brief';
+import { briefStreamSegments, showProcessNote, visibleBriefParts } from '@/lib/session-brief';
 import { SessionBriefDisclosure } from './SessionBriefDisclosure';
 import { parseCronUserPrompt } from '@/lib/cron';
 import { quietRoutineResult } from '@/lib/routine-quiet';
@@ -690,7 +690,7 @@ export function ChatTurnStreaming({
         <div className="chat-turn__label">{t('play.role.streaming')}</div>
         <div className="chat-bubble chat-bubble--stream-blocks">
           {retry ? <ModelRetryStatus progress={retry} /> : null}
-          {shown.hidden.length > 0 ? (
+          {showProcessNote(brief, shown.hidden.length) ? (
             <SessionBriefDisclosure label={t('play.turns.processNote', { count: shown.hidden.length })} title={t('play.turns.processNoteTitle')}>
               {shown.hidden.map(renderSeg)}
             </SessionBriefDisclosure>
