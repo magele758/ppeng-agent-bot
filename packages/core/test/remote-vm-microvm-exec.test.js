@@ -14,6 +14,17 @@ import {
 
 test('resolveMicrovmRemoteUrl prefers MICROVM_URL', () => {
   assert.equal(
+    resolveMicrovmRemoteUrl({ MICROVM_URL: 'http://100.108.223.41:18081/' }),
+    'http://100.108.223.41:18081'
+  );
+  assert.equal(
+    resolveMicrovmRemoteUrl({
+      MICROVM_URL: 'http://preferred/',
+      RAW_AGENT_SANDBOX_MICROVM_URL: 'http://127.0.0.1:9999/'
+    }),
+    'http://preferred'
+  );
+  assert.equal(
     resolveMicrovmRemoteUrl({ RAW_AGENT_SANDBOX_MICROVM_URL: 'http://127.0.0.1:9999/' }),
     'http://127.0.0.1:9999'
   );

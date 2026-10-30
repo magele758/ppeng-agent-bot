@@ -9,7 +9,7 @@ const log = createLogger('sandbox-remote-vm');
 /**
  * E2B-like / in-house microVM sandbox: run commands via HTTP POST /exec.
  *
- * URL resolution prefers agent-sandbox-microvm (`RAW_AGENT_SANDBOX_MICROVM_URL`)
+ * URL resolution prefers agent-sandbox-microvm (`MICROVM_URL` / `RAW_AGENT_SANDBOX_MICROVM_URL`)
  * then generic `RAW_AGENT_SANDBOX_REMOTE_URL`. See README-microvm.md.
  */
 export class RemoteVmAgentSandbox implements AgentSandbox {
@@ -26,7 +26,7 @@ export class RemoteVmAgentSandbox implements AgentSandbox {
       return {
         stdout: '',
         stderr:
-          '[sandbox:remote_vm] RAW_AGENT_SANDBOX_MICROVM_URL / RAW_AGENT_SANDBOX_REMOTE_URL is not configured. ' +
+          '[sandbox:remote_vm] MICROVM_URL / RAW_AGENT_SANDBOX_MICROVM_URL / RAW_AGENT_SANDBOX_REMOTE_URL is not configured. ' +
           'Point it at agent-sandbox-microvm /exec or an E2B-like adapter (see packages/core/src/sandbox/README-microvm.md).',
         code: 127,
         signal: null,
@@ -45,7 +45,7 @@ export class RemoteVmAgentSandbox implements AgentSandbox {
 
     const backend =
       (this.env.RAW_AGENT_SANDBOX_REMOTE_BACKEND ?? '').trim().toLowerCase().includes('microvm') ||
-      Boolean((this.env.RAW_AGENT_SANDBOX_MICROVM_URL ?? '').trim())
+      Boolean((this.env.MICROVM_URL ?? this.env.RAW_AGENT_SANDBOX_MICROVM_URL ?? '').trim())
         ? 'remote_vm-microvm'
         : 'remote_vm-http';
 

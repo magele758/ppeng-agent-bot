@@ -1,13 +1,15 @@
 /**
  * Resolve the HTTP base URL for in-house agent-sandbox-microvm /exec.
  *
- * Prefer explicit env; fall back to well-known local adapter ports used in lab.
+ * Prefer MICROVM_URL, then RAW_AGENT_SANDBOX_MICROVM_URL; fall back to remote_url+backend=microvm.
  * Virt (Firecracker/cloud-hypervisor) may be absent — callers should mock /exec
  * in tests. See README-microvm.md.
  */
 
 export function resolveMicrovmRemoteUrl(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  // Prefer short MICROVM_URL (ops / Ubuntu1 control-plane), then RAW_AGENT_* aliases.
   const explicit = (
+    env.MICROVM_URL ??
     env.RAW_AGENT_SANDBOX_MICROVM_URL ??
     env.RAW_AGENT_AGENT_SANDBOX_MICROVM_URL ??
     ''
