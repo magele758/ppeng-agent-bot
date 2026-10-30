@@ -673,6 +673,53 @@ function continuedLabelClass(hide: boolean): string {
   return hide ? ' chat-turn__label--bare' : '';
 }
 
+/** 标题行：仅「角色名 + 标签」；无内容时整行不渲染，连续助手消息不留顶部占位。 */
+function TurnLabel({ text, bare, steer, cronName, actions }: { text: string; bare: boolean; steer: boolean; cronName: string | null; actions: ReactNode }) {
+  if (bare && !steer && cronName === null && !actions) return null;
+  return (
+    <div className={`chat-turn__label${continuedLabelClass(bare)}`}>
+      {text}
+      {actions}
+      <TurnTags steer={steer} cronName={cronName} />
+    </div>
+  );
+}
+
+function TurnTags({ steer, cronName }: { steer: boolean; cronName: string | null }) {
+  const { t } = useI18n();
+  if (!steer && cronName === null) return null;
+  return (
+    <>
+      {steer ? (
+        <span className="chat-steer-tag" title={t('play.turns.steerTagTitle')}>
+          {t('play.turns.steerTag')}
+        </span>
+      ) : null}
+      {cronName === null ? null : (
+        <span className="chat-cron-tag" title={t('play.turns.cronTagTitle')}>
+          {t('play.turns.cronTag', { name: cronName })}
+        </span>
+      )}
+    </>
+  );
+}
+
+/** 纠错 / 引用按钮；助手消息放在正文末尾的紧凑行，其它角色仍在标题行。 */
+function TurnActionButtons({
+  correction,
+  quote
+}: {
+  correction: { sessionId: string; messageId: string } | null;
+  quote: { reply: Parameters<typeof BotReplyQuoteAction>[0]['reply']; onQuote: (quote: ReplyQuote) => void } | null;
+}) {
+  return (
+    <>
+      {correction ? <CorrectionCapture sessionId={correction.sessionId} messageId={correction.messageId} /> : null}
+      {quote ? <BotReplyQuoteAction reply={quote.reply} onQuote={quote.onQuote} /> : null}
+    </>
+  );
+}
+
 export function ChatTurnFromMessage({
   m,
   sessionId = '',
@@ -751,36 +798,36 @@ export function ChatTurnFromMessage({
     cronPrompt && !(messageHasStructuredParts(shown.parts) && shown.parts) ? (
       <MarkdownHtml className="chat-bubble__body chat-bubble__md" text={cronPrompt.body || cronPrompt.name} />
     ) : bubble;
-  return (
-    <div className={`chat-turn ${buildModClass(r)}${continuedClass(hideRoleLabel)}${noAvatar ? ' chat-turn--no-avatar' : ''}`}>
-      {!noAvatar ? <div className="chat-avatar">{avatarText(r, t('play.me'))}</div> : null}
-      <div className="chat-turn__content">
-        <div className={`chat-turn__label${continuedLabelClass(hideRoleLabel)}`}>
-          {roleLabelText(r, t, hideRoleLabel)}
-          {r==='assistant'&&sessionId&&replyMessageId(m)&&<CorrectionCapture sessionId={sessionId} messageId={replyMessageId(m)}/>}
-          {onQuote && quoteBot ? (
-            <BotReplyQuoteAction
-              reply={{
+  const actions = (
+    <TurnActionButtons
+      correction={r === 'assistant' && sessionId && replyMessageId(m) ? { sessionId, messageId: replyMessageId(m) } : null}
+      quote={
+        onQuote && quoteBot
+          ? {
+              reply: {
                 messageId: replyMessageId(m),
                 botId: quoteBot.id,
                 botName: quoteBot.name,
                 text: replySourceText(shown.parts),
                 author: r === 'assistant' ? 'bot' : 'user'
-              }}
-              onQuote={onQuote}
-            />
-          ) : null}
-          {isSteerMessage ? (
-            <span className="chat-steer-tag" title={t('play.turns.steerTagTitle')}>
-              {t('play.turns.steerTag')}
-            </span>
-          ) : null}
-          {cronPrompt ? (
-            <span className="chat-cron-tag" title={t('play.turns.cronTagTitle')}>
-              {t('play.turns.cronTag', { name: cronPrompt.name })}
-            </span>
-          ) : null}
-        </div>
+              },
+              onQuote
+            }
+          : null
+      }
+    />
+  );
+  return (
+    <div className={`chat-turn ${buildModClass(r)}${continuedClass(hideRoleLabel)}${noAvatar ? ' chat-turn--no-avatar' : ''}`}>
+      {!noAvatar ? <div className="chat-avatar">{avatarText(r, t('play.me'))}</div> : null}
+      <div className="chat-turn__content">
+        <TurnLabel
+          text={roleLabelText(r, t, hideRoleLabel)}
+          bare={hideRoleLabel}
+          steer={isSteerMessage}
+          cronName={cronPrompt ? cronPrompt.name : null}
+          actions={r === 'assistant' ? null : actions}
+        />
         <div className={`chat-bubble${artifactBubble ? ' chat-bubble--artifact' : ''}`}>
           {storedReply ? (
             <MessageReplyQuote replyTo={storedReply} botName={replyAuthorName(storedReply, replyNames)} />
@@ -788,6 +835,7 @@ export function ChatTurnFromMessage({
           {cronBubble}
           <ComposerMessageContext role={r} message={m} />
         </div>
+        {r === 'assistant' ? <div className="chat-turn__actions">{actions}</div> : null}
       </div>
     </div>
   );

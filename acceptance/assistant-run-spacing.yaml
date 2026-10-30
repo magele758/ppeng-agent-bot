@@ -8,7 +8,7 @@ criteria:
   - id: AC-1
     given: 被省略标题的助手消息
     when: 渲染
-    then: 标题行脱离文档流、高度为 0，按钮仍在
+    then: 标题行脱离文档流、高度为 0（无标签/按钮时整行不渲染；按钮已移到正文末尾，见 assistant-actions-at-end）
   - id: AC-2
     given: 相邻的连续助手消息
     when: 渲染
