@@ -28,6 +28,22 @@ export {
   type DesktopAgentBackendOptions
 } from './agent-backend.js';
 export {
+  createDeviceLocalHub,
+  getSharedDeviceLocalHub,
+  setSharedDeviceLocalHubForTests,
+  type DeviceLocalHub,
+  type DeviceLocalHandlers,
+  type DeviceLocalAttachment,
+  type DeviceLocalAttachmentOptions,
+  type DeviceLocalHubOptions
+} from './device-local-hub.js';
+export {
+  createDeviceLocalBackend,
+  DEVICE_LOCAL_SHELL_TOOL_ID,
+  DEVICE_LOCAL_COPY_TOOL_ID,
+  type DeviceLocalBackendOptions
+} from './device-local-backend.js';
+export {
   createCompositeRegisteredMachineBackend,
   type CompositeRegisteredMachineBackendOptions
 } from './composite-backend.js';

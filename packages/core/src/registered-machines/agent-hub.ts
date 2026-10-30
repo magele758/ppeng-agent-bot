@@ -7,6 +7,7 @@
  * dispatch to the attached handlers without spawning ssh.
  */
 
+import { createAttachmentHub } from './attachment-hub.js';
 import type {
   RegisteredMachineCopyInput,
   RegisteredMachineOpResult,
@@ -41,42 +42,7 @@ export interface DesktopAgentHubOptions {
 }
 
 export function createDesktopAgentHub(options: DesktopAgentHubOptions = {}): DesktopAgentHub {
-  const now = options.now ?? Date.now;
-  const attached = new Map<string, DesktopAgentAttachment>();
-
-  return {
-    attach(machineId, handlers) {
-      const id = machineId.trim();
-      if (!id) throw new Error('machineId required');
-      const entry: DesktopAgentAttachment = {
-        machineId: id,
-        attachedAt: now(),
-        handlers
-      };
-      attached.set(id, entry);
-      let live = true;
-      return {
-        detach() {
-          if (!live) return;
-          live = false;
-          const current = attached.get(id);
-          if (current === entry) attached.delete(id);
-        }
-      };
-    },
-    detach(machineId) {
-      return attached.delete(machineId.trim());
-    },
-    isAttached(machineId) {
-      return attached.has(machineId.trim());
-    },
-    get(machineId) {
-      return attached.get(machineId.trim());
-    },
-    listAttached() {
-      return [...attached.keys()];
-    }
-  };
+  return createAttachmentHub<DesktopAgentHandlers>(options);
 }
 
 /** Process-wide hub for the daemon / desktop embed (one per Node process). */

@@ -31,7 +31,7 @@ export function createRegisteredMachineTools(
     {
       name: 'list_machines',
       description:
-        'List this user\'s personal registered machines (desktop/phone). Returns machineId, label, kind, sshAlias, live connected status (desktop-agent long-connect or SSH probe), and optional deviceLocalTools. Not the Factory SSH software-factory machine list — use factory_status for that.',
+        'List this user\'s personal registered machines (desktop/phone). Returns machineId, label, kind (including phone), sshAlias, live connected status (desktop-agent long-connect, phone device-local attach, or SSH probe), and deviceLocalTools. Not the Factory SSH software-factory machine list — use factory_status for that.',
       approvalMode: 'never',
       sideEffectLevel: 'none',
       inputSchema: { type: 'object', properties: {} },
@@ -48,7 +48,7 @@ export function createRegisteredMachineTools(
     {
       name: 'register_machine',
       description:
-        'Register or update a personal machine for this user (desktop/phone/other). Pass sshAlias (a Host alias from the user\'s own ~/.ssh/config, key-based auth, host key already trusted) to make the machine reachable for bash/read_file/copy_* via machineId; registering with sshAlias needs approval. Without sshAlias the machine is listed but stays disconnected until a desktop agent attaches (DesktopAgentHub long-connect) or an sshAlias is added. Does not touch Factory SSH settings.',
+        'Register or update a personal machine for this user (desktop/phone/other). kind=phone plus deviceLocalTools lists phone-class machines. Pass sshAlias (a Host alias from the user\'s own ~/.ssh/config, key-based auth, host key already trusted) to make the machine reachable for bash/read_file/copy_* via machineId; registering with sshAlias needs approval. Without sshAlias the machine stays disconnected until a desktop agent attaches (DesktopAgentHub) or a phone device-local agent attaches (DeviceLocalHub; read is the default slice). Does not touch Factory SSH settings.',
       approvalMode: 'auto',
       sideEffectLevel: 'none',
       needsApproval: (_ctx, args) => Boolean(args?.sshAlias),

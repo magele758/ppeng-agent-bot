@@ -1,7 +1,8 @@
 import {
   createRegisteredMachinePort,
   createCompositeRegisteredMachineBackend,
-  getSharedDesktopAgentHub
+  getSharedDesktopAgentHub,
+  getSharedDeviceLocalHub
 } from '../registered-machines/index.js';
 import {parkBackgroundDurableWait} from '../waits/background-source.js';
 /**
@@ -86,7 +87,10 @@ export function createToolServices(host: ToolServicesHost): RuntimeToolServices 
     stateStore: host.store,
     registeredMachines: createRegisteredMachinePort(
       host.store,
-      createCompositeRegisteredMachineBackend({ agentHub: getSharedDesktopAgentHub() })
+      createCompositeRegisteredMachineBackend({
+        agentHub: getSharedDesktopAgentHub(),
+        deviceLocalHub: getSharedDeviceLocalHub()
+      })
     ),
     loadSkill: async (name, sessionId) => {
       const result = await host.resolveSkillLoad(name, sessionId);
