@@ -51,6 +51,7 @@ export interface AssembledLoopIo {
   ensureWorkspaceRoot?: TurnKernelHost['ensureWorkspaceRoot'];
   resolveWorkspaceRoots?: TurnKernelHost['resolveWorkspaceRoots'];
   resolveFilePolicy?: TurnKernelHost['resolveFilePolicy'];
+  resolveMediaDataUrl?: TurnKernelHost['resolveMediaDataUrl'];
   resolveImageDataUrl?: TurnKernelHost['resolveImageDataUrl'];
   resolveModelAdapter?: TurnKernelHost['resolveModelAdapter'];
   resolveTurnTools?: TurnKernelHost['resolveTurnTools'];

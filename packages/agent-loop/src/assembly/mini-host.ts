@@ -27,14 +27,7 @@ export function defaultMiniPrompt(systemPrompt?: string): TurnKernelPrompt {
 }
 
 export function applyIoOverrides(host: TurnKernelHost, io: AssembledLoopIo): void {
-  if (io.ensureMcpLoaded) host.ensureMcpLoaded = io.ensureMcpLoaded;
-  if (io.ensureWorkspaceRoot) host.ensureWorkspaceRoot = io.ensureWorkspaceRoot;
-  if (io.resolveWorkspaceRoots) host.resolveWorkspaceRoots = io.resolveWorkspaceRoots;
-  if (io.resolveFilePolicy) host.resolveFilePolicy = io.resolveFilePolicy;
-  if (io.resolveImageDataUrl) host.resolveImageDataUrl = io.resolveImageDataUrl;
-  if (io.resolveModelAdapter) host.resolveModelAdapter = io.resolveModelAdapter;
-  if (io.resolveTurnTools) host.resolveTurnTools = io.resolveTurnTools;
-  if (io.resolveRunProfile) host.resolveRunProfile = io.resolveRunProfile;
+  applyTurnInputIoOverrides(host, io);
   if (io.evaluateGoalGate) host.evaluateGoalGate = io.evaluateGoalGate;
   if (io.beforeModelTurn) host.beforeModelTurn = io.beforeModelTurn;
   if (io.chooseRecovery) host.chooseRecovery = io.chooseRecovery;
@@ -80,13 +73,7 @@ async function executeToolsSimple(
   turnTools?: ToolContract<Record<string, unknown>>[]
 ) {
   const pool = turnTools ?? tools;
-  const results: Array<{
-    toolCallId: string;
-    name: string;
-    ok: boolean;
-    content: string;
-    metadata?: Record<string, unknown>;
-  }> = [];
+  const results: import('../turn/host.js').ToolExecResult[] = [];
   for (const tc of toolCalls) {
     const tool = pool.find((t) => t.name === tc.name);
     if (!tool) {
@@ -115,6 +102,8 @@ async function executeToolsSimple(
         ok: result.ok,
         content: result.content,
         metadata: result.metadata,
+        images: result.images,
+        media: result.media,
       });
     } catch (err) {
       results.push({
@@ -196,6 +185,7 @@ export function createMiniAssembledLoop(input: CreateAssembledLoopInput = {}): A
         ];
         store.appendMessage(session.id, 'tool', parts);
       }
+      appendMediaObservations(store, session.id, results);
     },
     prepareMessagesForModel: async (_session, messages) =>
       defaultPrepareView(messages, { refusalPreservation: input.config?.refusalPreservation }),
@@ -220,4 +210,25 @@ export function createMiniAssembledLoop(input: CreateAssembledLoopInput = {}): A
       });
     },
   };
+}
+
+function appendMediaObservations(store: TurnKernelStore, sessionId: string, results: import('../turn/host.js').ToolExecResult[]): void {
+  const media = results.flatMap(result => [...(result.images ?? []), ...(result.media ?? [])]);
+  if (media.length === 0) return;
+  store.appendMessage(sessionId, 'user', [
+    { type: 'text', text: '[Tool observations: media returned by tools, not a new user instruction.]' },
+    ...media,
+  ]);
+}
+
+function applyTurnInputIoOverrides(host: TurnKernelHost, io: AssembledLoopIo): void {
+  if (io.ensureMcpLoaded) host.ensureMcpLoaded = io.ensureMcpLoaded;
+  if (io.ensureWorkspaceRoot) host.ensureWorkspaceRoot = io.ensureWorkspaceRoot;
+  if (io.resolveWorkspaceRoots) host.resolveWorkspaceRoots = io.resolveWorkspaceRoots;
+  if (io.resolveFilePolicy) host.resolveFilePolicy = io.resolveFilePolicy;
+  if (io.resolveMediaDataUrl) host.resolveMediaDataUrl = io.resolveMediaDataUrl;
+  if (io.resolveImageDataUrl) host.resolveImageDataUrl = io.resolveImageDataUrl;
+  if (io.resolveModelAdapter) host.resolveModelAdapter = io.resolveModelAdapter;
+  if (io.resolveTurnTools) host.resolveTurnTools = io.resolveTurnTools;
+  if (io.resolveRunProfile) host.resolveRunProfile = io.resolveRunProfile;
 }

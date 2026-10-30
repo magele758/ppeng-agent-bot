@@ -40,8 +40,30 @@ export interface ReasoningPart {
 /** Tier for image memory policy (hot=recent full res, warm=contact sheet / keyframe, cold=text-only archive). */
 export type ImageRetentionTier = 'hot' | 'warm' | 'cold';
 
+/** Portable media payload. URLs are forwarded to the provider, never fetched by the loop. */
+export type MediaSource =
+  | { type: 'base64'; data: string }
+  | { type: 'url'; url: string };
+
+export interface AudioPart {
+  type: 'audio';
+  assetId: string;
+  mimeType: string;
+  source?: MediaSource;
+}
+
+export interface VideoPart {
+  type: 'video';
+  assetId: string;
+  mimeType: string;
+  source?: MediaSource;
+}
+
+export type MediaPart = ImagePart | AudioPart | VideoPart;
+
 export interface ImagePart {
   type: 'image';
+  source?: MediaSource;
   assetId: string;
   mimeType: string;
   alt?: string;
@@ -101,6 +123,8 @@ export type MessagePart =
   | TextPart
   | ReasoningPart
   | ImagePart
+  | AudioPart
+  | VideoPart
   | ToolCallPart
   | ToolResultPart
   | SurfaceUpdatePart;

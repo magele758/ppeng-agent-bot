@@ -23,6 +23,8 @@ export function estimateMessageTokens(messages: Array<{ role: string; parts: Arr
       if (part.type === 'image') {
         total += IMAGE_PART_TOKEN_ESTIMATE;
       }
+      if (part.type === 'audio') total += 3000;
+      if (part.type === 'video') total += 10000;
       if (part.type === 'tool_call') {
         const input = (part as { input?: unknown }).input;
         const s = input !== undefined ? JSON.stringify(input) : '';

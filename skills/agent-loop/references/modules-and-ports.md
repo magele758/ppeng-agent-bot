@@ -77,3 +77,11 @@ export interface AssembledLoopIo {
 另有可选宿主端口（见 `TurnKernelHost`）：`resolveTurnTools`（可 `Promise`）、`beforeModelTurn?`（主模型前软跳过）、`chooseRecovery?`（离散恢复择一）。mini 可不实现后两者。Jev 仅由产品宿主在这些端口内调用，不进入 SDK 静态依赖。
 
 PTC 工具宿主（`createPtcExecTool` / `PtcExecToolDependencies`，max 动态模块）：可选 `resolveJevHooks?({ context, signal })` → `{ noul, choice } | undefined`。有返回值才把全局 `jev` 注入 `node:vm` 沙箱；未提供则与旧行为一致。Jev HTTP 客户端留在产品宿主（`packages/core`），不要静态带进 `@ppeng/agent-loop`。
+
+### 媒体文件与解析端口
+
+- `readMediaFile` 是 `model` 子路径的 Node 文件辅助 API，不是自动装配模块；不加入 mini 依赖树。
+- `AssembledLoopIo.resolveMediaDataUrl(part: MediaPart, sessionId: string, signal?: AbortSignal)` 返回 `Promise<string | undefined>`（data URL / HTTPS URL）。内核绑定会话后注入 `ModelTurnInput.resolveMediaDataUrl(part, signal?)`；旧 `resolveImageDataUrl` 是图片回退。
+- `ToolExecutionResult` / `ToolExecResult` / `ToolLoopResult` 支持 `media?: MediaPart[]`，旧 `images` 保留；mini 和 normal 工具执行路径都转交媒体观察。
+- full/max 对带 `source` 的图片直接保留；引用图片继续遵守 `getImageAsset` 留存策略。
+- `OpenAICompatibleAdapterOptions.mediaProfile` 仅声明 Chat Completions 方言：默认 `openai`，全模态使用 `qwen-omni`。能力矩阵与示例见上级 SKILL.md。

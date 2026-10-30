@@ -237,3 +237,50 @@ Quoted inbox items are exempt from lossy overflow summarization: the configured 
 
 Session forks copy WAL nodes with fresh IDs. Memory and SQLite hosts must remap each copied replyTo.messageId to the copied original in the child, keeping excerpt/botId and parent history unchanged. Targets absent from the copied prefix must never trigger cross-session history lookup.
 Product hosts must also preserve history visibility restrictions when forking. A copied prefix does not grant group membership: retain revoked source ranges and conservatively close active/pending group exposure at the copied boundary, without blocking new private child input or changing parent restrictions. A host unable to persist these constraints must reject the fork.
+
+### 原生图片、音频、视频文件输入
+
+`@mage-ai-lab/agent-loop/model` 导出 `readMediaFile(path, { mimeType?, maxBytes?, assetId?, signal? })`、`ReadMediaFileOptions`、`MediaInputError` 和 `MediaProfile`。它读取原文件字节并编码 Base64，不做 OCR、转写或视频抽帧。Node 文件 I/O 仅在 model 子路径；mini 静态依赖仍不引入 Node。文件类型按扩展名推断或显式 MIME 指定，不做媒体解码/内容嗅探；格式是否可解码由上游模型验证。默认每文件上限 6 MiB 原始字节，拒绝空文件、目录、未知类型和超限；取消信号贯穿读取与上游请求。上游对整次请求、时长、编码的限制仍须遵守，大文件可由宿主上传后使用 HTTPS URL。
+
+`MessagePart` 新增 `AudioPart`、`VideoPart`，与 `ImagePart` 合称 `MediaPart`（主入口/types 均导出）。均保留 `assetId` 和 `mimeType`；可选 `source: { type: 'base64', data } | { type: 'url', url }`。Base64 是原始编码串，不能带 data URL 前缀；URL 必须 HTTPS 且不含用户名密码。SDK 不下载远端 URL，不自动上传文件，也不把消息中的字符串路径当成本地文件读取授权。宿主应先完成文件授权再调用 `readMediaFile`。
+
+| 适配协议 | 图片 | 音频 | 视频 |
+|---|---|---|---|
+| Chat Completions，`mediaProfile: 'openai'`（默认） | image_url | input_audio，WAV/MP3 原始 Base64 | 明确拒绝 |
+| Chat Completions，`mediaProfile: 'qwen-omni'` | image_url | input_audio，data URL / HTTPS URL；WAV/MP3/AAC/AMR/3GPP | video_url，data URL / HTTPS URL |
+| Responses / Anthropic | 原生图片 | 明确拒绝 | 明确拒绝 |
+
+`mediaProfile` 是 SDK 构造参数，声明请求协议，不根据模型名猜测能力、不新增环境变量。调用方必须选择支持对应模态与协议的模型/网关；Qwen-Omni 方言不是任意 OpenAI 服务的视频标准。流式/非流式共用序列化；含音视频时请求 `modalities: ['text']`，本功能只解析媒体并返回文字，不生成音视频。部分上游只支持流式，应使用 `runTurnStream` 或在循环中提供流回调。
+
+```ts native-media
+import { createAssembledLoop } from '@mage-ai-lab/agent-loop';
+import { OpenAICompatibleAdapter, readMediaFile } from '@mage-ai-lab/agent-loop/model';
+import { createDefaultMemoryStore } from '@mage-ai-lab/agent-loop/mini';
+
+// upstream 由宿主现有配置提供，不新增功能开关环境变量。
+const model = new OpenAICompatibleAdapter({
+  ...upstream, // { baseUrl, apiKey, model }
+  useJsonMode: false,
+  mediaProfile: 'qwen-omni',
+});
+const { store, surface } = createDefaultMemoryStore();
+const loop = await createAssembledLoop({ preset: 'normal', io: { model, store } });
+const session = surface.createSession({ title: '媒体分析', mode: 'chat', agentId: 'general' });
+surface.appendMessage(session.id, 'user', [
+  { type: 'text', text: '结合图片、录音和视频，描述发生了什么。' },
+  await readMediaFile('/authorized/photo.png'),
+  await readMediaFile('/authorized/audio.wav'),
+  await readMediaFile('/authorized/clip.mp4'),
+]);
+await loop.run(session.id, { onModelStreamChunk: chunk => console.log(chunk) });
+```
+
+也可以把这些 parts 放入 `ModelTurnInput.messages`，直接调用适配器的 `runTurn` / `runTurnStream`。只做单张图片单次问答时原来的 `runOpenAiVisionTurn` 继续有效。
+
+大型/持久化会话建议只保存资产引用：省略 `source`，注入 `AssembledLoopIo.resolveMediaDataUrl(part, sessionId, signal?)`；宿主按会话校验访问权，返回匹配 MIME 的 data URL 或 HTTPS URL。内核绑定 sessionId 后以 `ModelTurnInput.resolveMediaDataUrl(part, signal?)` 传给模型。优先级为 source → 通用解析器 → 旧的图片 `resolveImageDataUrl`。full/max 中内联图片不依赖图片资产库；旧的引用图片仍须提供 `getImageAsset` 来实施 hot/warm/cold 留存策略。音视频引用不会被图片留存逻辑误删。`HybridModelRouterAdapter` 将图片、音频、视频都视为多模态，`last_user` / `any` 范围不变。
+
+工具返回 `ToolExecutionResult.media?: MediaPart[]`，旧 `images?: ImagePart[]` 不变。mini/normal/full/max 均先写配对的工具结果，再写标明工具来源的媒体观察 user 消息。不要把音视频直接塞入 tool 或 assistant 消息。缺失音视频资产、格式不匹配、协议不支持时抛 `MediaInputError`（status=400，归类 bad_request，不做无效重试）；旧图片缺失仍保留文字占位兼容行为。
+
+摘要只记录媒体类型/资产标记；上下文预算对音频/视频分别使用粗略固定估算 3000/10000 token，并非按时长计费或准确限额。长媒体请由宿主结合实际模型窗口与时长控制请求。模型调试日志省略媒体 Base64 正文；显式内联媒体仍会随消息持久化，不能把日志省略当作资产存储脱敏。
+
+协议依据：[OpenAI audio input](https://developers.openai.com/api/docs/guides/audio-chat-completions)、[Qwen-Omni media input](https://www.alibabacloud.com/help/en/model-studio/qwen-omni)。回归：`src/model/native-media.test.ts`、`src/assembly/native-media.test.ts`。

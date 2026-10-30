@@ -1,0 +1,27 @@
+id: loop-native-media
+title: SDK 原生多模态文件理解
+status: implemented
+requirement: |
+  那就把 agent-loop 原生调用全模态模型解析图片、音频、视频文件的能力补齐，同步更新 SDK skill 和测试，审查通过后提交并合并。
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 调用方提供图片、音频或视频本地文件
+    when: 使用 SDK 文件入口准备输入
+    then: 保留原文件媒体数据；空文件、超限、未知类型和取消操作明确失败
+  - id: AC-2
+    given: 使用支持对应模态的模型协议
+    when: 将媒体文件随文字提交给模型
+    then: 流式与非流式均发送原生媒体内容并保留原始顺序，返回模型文字结果
+  - id: AC-3
+    given: 模型协议不支持该媒体或媒体资产缺失或格式无效
+    when: 发起解析
+    then: 在发送请求前明确报错，不静默丢弃音视频，不进行无效重试
+  - id: AC-4
+    given: 任一装配档位使用媒体输入或工具返回媒体观察
+    when: 执行模型轮次
+    then: 媒体到达模型，已有图片资产解析保持兼容，工具结果配对不被破坏
+  - id: AC-5
+    given: 会话含媒体文件
+    when: 生成摘要、估算上下文或记录模型请求调试日志
+    then: 摘要保留媒体标记、预算计入媒体成本且日志不输出媒体 Base64 正文

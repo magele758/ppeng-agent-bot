@@ -69,6 +69,7 @@ export function prepareRichView(
     ...msg,
     parts: msg.parts.flatMap((part): MessagePart[] => {
       if (part.type !== 'image') return [part];
+      if (part.source) return [part];
       const asset = ports.getImageAsset?.(part.assetId);
       if (!asset || asset.retentionTier === 'cold') {
         return [{ type: 'text', text: `[archived image ${part.assetId}]` }];
