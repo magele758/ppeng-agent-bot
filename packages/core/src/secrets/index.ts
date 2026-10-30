@@ -54,6 +54,7 @@ export {
   SECURE_FORM_META,
   SECURE_FORM_FIELDS,
   createSecureFormPort,
+  replaceSecureFormCardResult,
   secureFormTextLeaks
 } from './secure-form.js';
 export type {

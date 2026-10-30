@@ -229,3 +229,48 @@ export function secureFormTextLeaks(text: string, secret: string): boolean {
   const value = String(secret ?? '');
   return value.length >= 3 && body.includes(value);
 }
+
+interface SecureFormToolResultPart {
+  type: 'tool_result';
+  toolCallId: string;
+  name: string;
+  content: string;
+  ok: boolean;
+}
+
+interface SecureFormTranscriptMessage {
+  id: string;
+  role: string;
+  parts: readonly unknown[];
+}
+
+/**
+ * The tool returns a pending card before the user types. Once they submit,
+ * that same tool result must become the status receipt — otherwise the next
+ * turn still shows "waiting" and never learns the fill status.
+ * Returns how many messages changed. Never writes the secret.
+ */
+export function replaceSecureFormCardResult(
+  messages: SecureFormTranscriptMessage[],
+  formId: string,
+  receipt: SecureFormReceipt,
+  rewrite: (messageId: string, parts: SecureFormToolResultPart[]) => void
+): number {
+  const next = JSON.stringify(receipt);
+  let changed = 0;
+  for (const message of messages) {
+    if (message.role !== 'tool') continue;
+    let touched = false;
+    const parts = message.parts.map((raw) => {
+      const part = raw as Partial<SecureFormToolResultPart>;
+      if (part.type !== 'tool_result' || part.name !== SECURE_FORM_TOOL_NAME) return raw as SecureFormToolResultPart;
+      if (!String(part.content ?? '').includes(formId)) return raw as SecureFormToolResultPart;
+      touched = true;
+      return { ...(raw as SecureFormToolResultPart), ok: receipt.status === 'filled', content: next };
+    });
+    if (!touched) continue;
+    rewrite(message.id, parts);
+    changed += 1;
+  }
+  return changed;
+}

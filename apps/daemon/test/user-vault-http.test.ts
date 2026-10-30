@@ -138,3 +138,72 @@ test('runtime vault tools follow the Lab toggle and hand out refs only [AC:user-
     await env.close();
   }
 });
+
+const FORM_OTP = 'http-secure-form-OTP-440191';
+
+test('secure form submit stores the otp and the chat transcript stays free of it [AC:secure-form#AC-2]', async () => {
+  const env = await boot();
+  try {
+    const session = env.runtime.store.createSession({ title: 'secure form', mode: 'chat', agentId: 'general' });
+    const port = env.runtime.tools.find((tool) => tool.name === 'secure_form');
+    assert.ok(port, 'secure_form tool');
+    const waiting = await port.execute({ session: { id: session.id, metadata: {} } } as never, { field: 'otp' });
+    const opened = JSON.parse(waiting.content) as { card: { id: string } };
+    env.runtime.store.appendMessage(session.id, 'tool', [
+      { type: 'tool_result', toolCallId: 'c1', name: 'secure_form', ok: false, content: waiting.content }
+    ]);
+
+    const res = await send(env.root, 'POST', `/api/sessions/${session.id}/secure-form`, {
+      action: 'submit',
+      id: opened.card.id,
+      value: FORM_OTP
+    });
+    assert.equal(res.status, 200);
+    const body = await res.text();
+    assert.equal(body.includes(FORM_OTP), false);
+    assert.match(body, /filled/);
+    assert.match(body, /uvref:sf_/);
+
+    const transcript = JSON.stringify(env.runtime.store.foldMessages(session.id));
+    assert.equal(transcript.includes(FORM_OTP), false);
+    assert.match(transcript, /filled/);
+    assert.equal(
+      env.runtime.userVault.resolveFillReference(
+        (JSON.parse(body) as { receipt: { fillRef: string } }).receipt.fillRef
+      ),
+      FORM_OTP
+    );
+
+    const missing = await send(env.root, 'POST', `/api/sessions/${session.id}/secure-form`, {
+      action: 'submit',
+      id: opened.card.id,
+      value: FORM_OTP
+    });
+    assert.equal(missing.status, 400);
+  } finally {
+    await env.close();
+  }
+});
+
+test('secure form cancel stores nothing [AC:secure-form#AC-3]', async () => {
+  const env = await boot();
+  try {
+    const session = env.runtime.store.createSession({ title: 'secure form cancel', mode: 'chat', agentId: 'general' });
+    const tool = env.runtime.tools.find((item) => item.name === 'secure_form');
+    assert.ok(tool);
+    const waiting = await tool.execute({ session: { id: session.id, metadata: {} } } as never, { field: 'password' });
+    const opened = JSON.parse(waiting.content) as { card: { id: string } };
+    const res = await send(env.root, 'POST', `/api/sessions/${session.id}/secure-form`, {
+      action: 'cancel',
+      id: opened.card.id
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json() as { receipt: { status: string; fillRef?: string } };
+    assert.equal(body.receipt.status, 'cancelled');
+    assert.equal(body.receipt.fillRef, undefined);
+    assert.equal(env.runtime.userVault.list().length, 0);
+    assert.equal((await send(env.root, 'POST', `/api/sessions/${session.id}/secure-form`, { action: 'drop', id: 'x' })).status, 400);
+  } finally {
+    await env.close();
+  }
+});

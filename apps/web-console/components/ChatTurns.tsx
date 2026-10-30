@@ -188,7 +188,10 @@ function SecureFormFill({ sessionId, content }: { sessionId: string; content: st
         setValue('');
         setStatus(action === 'submit' ? 'filled' : 'cancelled');
       })
-      .catch(() => undefined);
+      .catch(() => {
+        setValue('');
+        setStatus(t('play.approval.secureFormFailed'));
+      });
   };
   if (status) return <p className="secure-form-card__status">{status}</p>;
   return (
@@ -205,6 +208,9 @@ function SecureFormFill({ sessionId, content }: { sessionId: string; content: st
       />
       <button type="button" disabled={!value.trim()} onClick={() => send('submit')}>
         {t('play.approval.secureFormSubmit')}
+      </button>
+      <button type="button" onClick={() => send('cancel')}>
+        {t('play.approval.secureFormCancel')}
       </button>
     </div>
   );

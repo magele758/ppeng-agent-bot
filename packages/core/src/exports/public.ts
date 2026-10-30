@@ -323,6 +323,7 @@ export {
   SECURE_FORM_META,
   SECURE_FORM_FIELDS,
   createSecureFormPort,
+  replaceSecureFormCardResult,
   secureFormTextLeaks
 } from '../secrets/index.js';
 export type {

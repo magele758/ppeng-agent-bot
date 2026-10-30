@@ -4,6 +4,7 @@ import { createMemoryUserVault } from '../dist/secrets/user-vault.js';
 import {
   SECURE_FORM_TOOL_NAME,
   createSecureFormPort,
+  replaceSecureFormCardResult,
   secureFormTextLeaks
 } from '../dist/secrets/secure-form.js';
 import { createSecureFormTool } from '../dist/tools/secure-form-tools.js';
@@ -48,8 +49,7 @@ test('submit stores the otp in UserVault and the receipt is status plus uvref on
   const summary = vault.list().find((entry) => entry.fillRefs.password === done.fillRef);
   assert.ok(summary);
   assert.equal(JSON.stringify(summary).includes(OTP), false);
-  const resolved = vault.resolveReferences([done.fillRef]);
-  assert.equal(resolved.get(done.fillRef), OTP);
+  assert.equal(vault.resolveFillReference(done.fillRef), OTP);
 });
 
 test('cancel stores nothing and reports cancelled [AC:secure-form#AC-3]', () => {
@@ -113,4 +113,36 @@ test('the tool result after submit is a status receipt, not the secret [AC:secur
   assert.equal(again.ok, true);
   assert.equal(again.content.includes(OTP), false);
   assert.match(again.content, /filled/);
+});
+
+test('submitting replaces the pending tool result with a status receipt and no secret [AC:secure-form#AC-2]', () => {
+  const vault = createMemoryUserVault();
+  const port = createSecureFormPort({ store: memoryStore(), vault });
+  const opened = port.request({ sessionId: 's1', field: 'otp' });
+  const pending = JSON.stringify({ card: opened.card, receipt: opened.receipt });
+  const messages = [
+    {
+      id: 'm1',
+      role: 'tool',
+      parts: [{ type: 'tool_result', toolCallId: 'c1', name: 'secure_form', ok: false, content: pending }]
+    },
+    {
+      id: 'm2',
+      role: 'tool',
+      parts: [{ type: 'tool_result', toolCallId: 'c2', name: 'other', ok: true, content: pending }]
+    }
+  ];
+  const done = port.submit({ sessionId: 's1', id: opened.card.id, value: OTP });
+  const rewritten = [];
+  const changed = replaceSecureFormCardResult(messages, done.id, done, (messageId, parts) => {
+    rewritten.push({ messageId, parts });
+  });
+  assert.equal(changed, 1);
+  assert.equal(rewritten.length, 1);
+  assert.equal(rewritten[0].messageId, 'm1');
+  assert.equal(rewritten[0].parts[0].ok, true);
+  assert.equal(rewritten[0].parts[0].content.includes(OTP), false);
+  assert.match(rewritten[0].parts[0].content, /filled/);
+  assert.match(rewritten[0].parts[0].content, /uvref:sf_/);
+  assert.equal(messages[1].parts[0].content, pending);
 });

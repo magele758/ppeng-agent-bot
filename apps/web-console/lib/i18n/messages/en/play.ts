@@ -746,6 +746,8 @@ export const play = {
     kindMcp: 'MCP',
     blockReasonLabel: 'Blocked because',
     secureFormSubmit: 'Submit privately',
+    secureFormCancel: 'Cancel',
+    secureFormFailed: 'Could not save. Try again.',
     secureFormPlaceholder: 'Type here. It is not saved in the chat.'
   },
 

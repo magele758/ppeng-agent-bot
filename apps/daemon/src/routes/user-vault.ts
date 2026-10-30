@@ -10,6 +10,7 @@ import {
   ValidationError,
   createSecureFormPort,
   readUserVaultSettings,
+  replaceSecureFormCardResult,
   secureFormTextLeaks,
   writeUserVaultSettings,
   type RawAgentRuntime,
@@ -150,6 +151,11 @@ function secureFormRoutes(runtime: RawAgentRuntime): RouteSpec[] {
               text: done.text,
               ...(done.fillRef ? { fillRef: done.fillRef } : {})
             }
+          });
+          // The tool already wrote a pending card. Swap it for the status
+          // receipt so the next turn does not keep seeing "waiting".
+          replaceSecureFormCardResult(runtime.store.listMessages(sessionId), done.id, done, (messageId, parts) => {
+            runtime.store.rewriteMessageParts(sessionId, messageId, parts);
           });
         }
         json(response, 200, { receipt: done });
