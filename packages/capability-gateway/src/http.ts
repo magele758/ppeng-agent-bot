@@ -10,6 +10,7 @@ import {
   tryBotChatCommand
 } from './im-handlers.js';
 import { handleEventIngress } from './event-ingress.js';
+import { handleSlackEventsRequest } from './slack-events-handler.js';
 import { appendOutboundDraft as appendOutboundDraftLedger } from './outbound-drafts.js';
 import { createUserDeliveryPort } from './user-delivery-port.js';
 
@@ -85,6 +86,46 @@ function json(res: ServerResponse, status: number, body: unknown): void {
   res.end(JSON.stringify(body, null, 2));
 }
 
+async function dispatchSlackEvents(
+  request: IncomingMessage,
+  response: ServerResponse,
+  ctx: GatewayHandleContext,
+  fc: GatewayFileConfig,
+  gatewayDir: string,
+  readBodyLimit: number
+): Promise<boolean> {
+  const spec = fc.providers?.slack;
+  if (!spec?.enabled) {
+    json(response, 404, { error: 'Slack provider disabled' });
+    return true;
+  }
+  const { raw, parsed } = await readRawJsonBody(request, readBodyLimit);
+  const out = await handleSlackEventsRequest({
+    body: parsed,
+    rawBody: raw,
+    headers: request.headers,
+    spec,
+    settings: readGatewaySettings(ctx.runtime.store),
+    runtime: ctx.runtime,
+    gatewayDir,
+    stateDir: gatewayDir,
+    channels: fc.channels ?? []
+  });
+  if (out.kind === 'challenge') {
+    response.statusCode = 200;
+    response.setHeader('content-type', 'application/json; charset=utf-8');
+    response.end(JSON.stringify({ challenge: out.challenge }));
+    return true;
+  }
+  if (out.kind === 'json') {
+    json(response, out.status, out.body);
+    return true;
+  }
+  response.statusCode = out.status;
+  response.end();
+  return true;
+}
+
 function checkAuth(request: IncomingMessage, ctx: GatewayHandleContext): boolean {
   const token = ctx.env.authToken;
   if (!token) {
@@ -114,6 +155,432 @@ function gatewayPathParts(pathname: string, prefix: string): string[] | null {
   return tail ? tail.split('/').filter(Boolean) : [];
 }
 
+interface GatewayRoute {
+  request: IncomingMessage;
+  response: ServerResponse;
+  ctx: GatewayHandleContext;
+  fc: GatewayFileConfig;
+  gatewayDir: string;
+  parts: string[];
+  readBodyLimit: number;
+}
+
+const PLATFORM_ACTION: Record<string, string> = { feishu: 'events', wecom: 'bridge', slack: 'events' };
+const EVENT_INGRESS = new Set(['github', 'slack', 'email', 'webhook', 'ci']);
+
+function isPlatformPath(parts: string[]): boolean {
+  const action = parts[0] === 'providers' ? PLATFORM_ACTION[parts[1] ?? ''] : undefined;
+  return action !== undefined && parts[2] === action;
+}
+
+function isEventIngressPath(method: string | undefined, parts: string[]): boolean {
+  return method === 'POST' && parts[0] === 'routines' && EVENT_INGRESS.has(parts[1] ?? '') && parts.length === 2;
+}
+
+type ProviderHttpResult =
+  | { kind: 'challenge'; challenge: string }
+  | { kind: 'json'; status: number; body: unknown }
+  | { kind: 'empty'; status: number };
+
+function writeProviderResult(response: ServerResponse, out: ProviderHttpResult): void {
+  if (out.kind === 'challenge') {
+    response.statusCode = 200;
+    response.setHeader('content-type', 'application/json; charset=utf-8');
+    response.end(JSON.stringify({ challenge: out.challenge }));
+    return;
+  }
+  if (out.kind === 'json') {
+    json(response, out.status, out.body);
+    return;
+  }
+  response.statusCode = out.status;
+  response.end();
+}
+
+async function dispatchFeishuEvents(route: GatewayRoute): Promise<void> {
+  const spec = route.fc.providers?.feishu;
+  if (!spec?.enabled) {
+    json(route.response, 404, { error: 'Feishu provider disabled' });
+    return;
+  }
+  const { raw, parsed } = await readRawJsonBody(route.request, route.readBodyLimit);
+  const out = await handleFeishuEventRequest({
+    body: (parsed ?? {}) as Record<string, unknown>,
+    rawBody: raw,
+    headers: route.request.headers,
+    spec,
+    settings: readGatewaySettings(route.ctx.runtime.store),
+    runtime: route.ctx.runtime,
+    gatewayDir: route.gatewayDir,
+    channels: route.fc.channels ?? []
+  });
+  writeProviderResult(route.response, out);
+}
+
+async function dispatchWeComBridge(route: GatewayRoute): Promise<void> {
+  const spec = route.fc.providers?.wecom;
+  if (!spec?.enabled) {
+    json(route.response, 404, { error: 'WeCom provider disabled' });
+    return;
+  }
+  const body = (await readJsonBody(route.request, route.readBodyLimit)) as Record<string, unknown>;
+  const out = await handleWeComBridgeRequest({
+    body,
+    headers: route.request.headers,
+    spec,
+    settings: readGatewaySettings(route.ctx.runtime.store),
+    runtime: route.ctx.runtime,
+    gatewayDir: route.gatewayDir,
+    channels: route.fc.channels ?? []
+  });
+  json(route.response, out.status, out.body);
+}
+
+async function dispatchAgentInvoke(route: GatewayRoute): Promise<void> {
+  const agentId = route.parts[1] ?? '';
+  const routeSpec = (route.fc.agentRoutes ?? []).find((item) => item.agentId === agentId);
+  if (!routeSpec) {
+    json(route.response, 404, { error: 'Unknown agent route' });
+    return;
+  }
+  if (routeSpec.routeKey) {
+    const got = route.request.headers['x-agent-route-key'];
+    if (typeof got !== 'string' || !safeEqual(got, routeSpec.routeKey)) {
+      json(route.response, 401, { error: 'Invalid X-Agent-Route-Key' });
+      return;
+    }
+  }
+  if (!route.ctx.runtime.listAgents().some((agent) => agent.id === agentId)) {
+    json(route.response, 404, { error: 'Agent not registered' });
+    return;
+  }
+  const body = (await readJsonBody(route.request, route.readBodyLimit)) as Record<string, unknown>;
+  const message = String(body.message ?? '').trim();
+  if (!message) {
+    json(route.response, 400, { error: 'Missing message' });
+    return;
+  }
+  const userKey = String(body.userKey ?? 'default').trim() || 'default';
+  const state = await readGatewayState(route.gatewayDir);
+  const { sessionId } = await runAgentTurnAndReply({
+    runtime: route.ctx.runtime,
+    gatewayDir: route.gatewayDir,
+    state,
+    sessionKey: `invoke:${agentId}:${userKey}`,
+    userText: message,
+    agentId,
+    stickySession: body.stickySession !== false && routeSpec.stickySession !== false,
+    reply: async () => {
+      /* internal invoke: HTTP response carries assistant text */
+    }
+  });
+  json(route.response, 200, {
+    agentId,
+    sessionId,
+    latestAssistant: route.ctx.runtime.getLatestAssistantText(sessionId)
+  });
+}
+
+async function openChatBotSession(
+  route: GatewayRoute,
+  botId: string
+): Promise<string | undefined> {
+  try {
+    return route.ctx.runtime.openBot(botId).sessionId;
+  } catch (error) {
+    if (error instanceof NotFoundError || (error as { statusCode?: number }).statusCode === 404) {
+      json(route.response, 404, { error: `Unknown bot: ${botId}` });
+      return undefined;
+    }
+    throw error;
+  }
+}
+
+async function dispatchChat(route: GatewayRoute): Promise<boolean> {
+  const body = (await readJsonBody(route.request, route.readBodyLimit)) as Record<string, unknown>;
+  const message = String(body.message ?? '').trim();
+  if (!message) {
+    json(route.response, 400, { error: 'Missing message' });
+    return true;
+  }
+  const sessionId = typeof body.sessionId === 'string' ? body.sessionId : undefined;
+  const botId = typeof body.botId === 'string' ? body.botId.trim() : '';
+  const botSessionId = botId && !sessionId ? await openChatBotSession(route, botId) : undefined;
+  if (botId && !sessionId && !botSessionId) return true;
+  if (botSessionId) {
+    const command = await tryBotChatCommand(route.ctx.runtime, botSessionId, message);
+    if (command) {
+      json(route.response, 200, {
+        command,
+        session: route.ctx.runtime.getSession(botSessionId),
+        latestAssistant: command.reply
+      });
+      return true;
+    }
+  }
+  const session = chatSessionFor(route, body, message, botSessionId, sessionId);
+  await route.ctx.runtime.runSession(session.id);
+  json(route.response, 200, {
+    session: route.ctx.runtime.getSession(session.id),
+    latestAssistant: route.ctx.runtime.getLatestAssistantText(session.id)
+  });
+  return true;
+}
+
+function chatSessionFor(
+  route: GatewayRoute,
+  body: Record<string, unknown>,
+  message: string,
+  botSessionId: string | undefined,
+  sessionId: string | undefined
+) {
+  if (botSessionId) return route.ctx.runtime.sendUserMessage(botSessionId, message);
+  if (sessionId) return route.ctx.runtime.sendUserMessage(sessionId, message);
+  return route.ctx.runtime.createChatSession({
+    title: typeof body.title === 'string' ? body.title : 'Gateway Chat',
+    message,
+    agentId: typeof body.agentId === 'string' ? body.agentId : undefined,
+    background: false
+  });
+}
+
+const DRAFT_CHANNEL_TYPES = new Set(['webhook', 'http_post', 'slack', 'telegram', 'email']);
+
+async function runChannelWebhookTurn(
+  route: GatewayRoute,
+  channel: NonNullable<GatewayFileConfig['channels']>[number],
+  inbound: NonNullable<ReturnType<typeof parseGenericWebhookInbound>>,
+  body: Record<string, unknown>
+) {
+  const agentId = typeof body.agentId === 'string' && body.agentId.trim() ? body.agentId.trim() : 'general';
+  const state = await readGatewayState(route.gatewayDir);
+  const webhookAllowed = readGatewaySettings(route.ctx.runtime.store).webhook.allowedSenders;
+  const botId = typeof body.botId === 'string' && body.botId.trim() ? body.botId.trim() : undefined;
+  return processChannelTurn(inbound, {
+    defaultAgentId: agentId,
+    allowedSenders: webhookAllowed.length > 0 ? new Set(webhookAllowed) : undefined,
+    runAgentTurn: async ({ conversationKey, text, agentId: aid }) => {
+      const { sessionId } = await runAgentTurnAndReply({
+        runtime: route.ctx.runtime,
+        gatewayDir: route.gatewayDir,
+        state,
+        sessionKey: `${channel.type}:${conversationKey}`,
+        userText: text,
+        agentId: aid,
+        stickySession: true,
+        botId,
+        origin: 'webhook',
+        reply: async () => {
+          /* outbound handled below when channel supports delivery */
+        }
+      });
+      return {
+        sessionId,
+        assistantText: route.ctx.runtime.getLatestAssistantText(sessionId) ?? ''
+      };
+    }
+  });
+}
+
+async function dispatchChannelWebhook(route: GatewayRoute): Promise<void> {
+  const channelId = route.parts[1] ?? '';
+  const channel = (route.fc.channels ?? []).find((item) => item.id === channelId);
+  if (!channel) {
+    json(route.response, 404, { error: 'Unknown channel' });
+    return;
+  }
+  const body = (await readJsonBody(route.request, route.readBodyLimit)) as Record<string, unknown>;
+  const inbound = parseGenericWebhookInbound(channelId, channel.type, body);
+  if (!inbound) {
+    json(route.response, 400, { error: 'Unrecognized webhook payload' });
+    return;
+  }
+  const result = await runChannelWebhookTurn(route, channel, inbound, body);
+  if (result.error) {
+    json(route.response, result.error === 'empty_message' ? 400 : 403, { error: result.error });
+    return;
+  }
+  const decision = resolveImOutbound(result.reply?.text ?? '', { origin: 'webhook', userText: inbound.text });
+  if (decision.action === 'drop') {
+    json(route.response, 200, { ok: true, sessionId: result.sessionId, reply: null });
+    return;
+  }
+  if (DRAFT_CHANNEL_TYPES.has(channel.type)) {
+    try {
+      await appendOutboundDraft(route.gatewayDir, {
+        channelId: channel.id,
+        text: decision.text,
+        event: 'gateway.im.reply'
+      });
+    } catch (error) {
+      json(route.response, 502, {
+        error: error instanceof Error ? error.message : String(error),
+        sessionId: result.sessionId,
+        reply: result.reply
+      });
+      return;
+    }
+  }
+  json(route.response, 200, {
+    ok: true,
+    sessionId: result.sessionId,
+    reply: result.reply ? { ...result.reply, text: decision.text } : result.reply
+  });
+}
+
+async function dispatchTask(route: GatewayRoute): Promise<void> {
+  const body = (await readJsonBody(route.request, route.readBodyLimit)) as Record<string, unknown>;
+  const title = String(body.title ?? '').trim();
+  if (!title) {
+    json(route.response, 400, { error: 'Missing title' });
+    return;
+  }
+  const result = route.ctx.runtime.createTaskSession({
+    title,
+    description: typeof body.description === 'string' ? body.description : undefined,
+    message: typeof body.message === 'string' ? body.message : undefined,
+    agentId: typeof body.agentId === 'string' ? body.agentId : undefined,
+    blockedBy: Array.isArray(body.blockedBy) ? body.blockedBy.map(String) : undefined,
+    background: body.background !== false
+  });
+  if (body.autoRun !== false) {
+    await route.ctx.runtime.runSession(result.session.id);
+  }
+  json(route.response, 201, {
+    task: route.ctx.runtime.getTask(result.task.id),
+    session: route.ctx.runtime.getSession(result.session.id),
+    latestAssistant: route.ctx.runtime.getLatestAssistantText(result.session.id)
+  });
+}
+
+async function dispatchMailbox(route: GatewayRoute): Promise<void> {
+  const body = (await readJsonBody(route.request, route.readBodyLimit)) as Record<string, unknown>;
+  const fromAgentId = String(body.fromAgentId ?? '').trim();
+  const toAgentId = String(body.toAgentId ?? '').trim();
+  const content = String(body.content ?? '').trim();
+  if (!fromAgentId || !toAgentId || !content) {
+    json(route.response, 400, { error: 'Missing fromAgentId, toAgentId, or content' });
+    return;
+  }
+  const mail = route.ctx.runtime.sendMailboxMessage({
+    fromAgentId,
+    toAgentId,
+    content,
+    type: typeof body.type === 'string' ? body.type : undefined,
+    correlationId: typeof body.correlationId === 'string' ? body.correlationId : undefined
+  });
+  json(route.response, 201, { mail });
+}
+
+async function dispatchLearnRun(route: GatewayRoute): Promise<void> {
+  const learn = route.ctx.fileConfigRef.current.learn;
+  if (!learn?.feeds?.length) {
+    json(route.response, 400, { error: 'Configure learn.feeds in gateway.config.json' });
+    return;
+  }
+  const result = await runLearnCycle({
+    repoRoot: route.ctx.repoRoot,
+    gatewayStateDir: route.gatewayDir,
+    runtime: route.ctx.runtime,
+    learn,
+    channels: route.fc.channels ?? []
+  });
+  json(route.response, result.ok ? 200 : 502, result);
+}
+
+async function dispatchSkillsDigest(route: GatewayRoute): Promise<void> {
+  const state = await readGatewayState(route.gatewayDir);
+  json(route.response, 200, {
+    markdown: state.lastDigestMarkdown ?? '',
+    lastRun: state.lastLearnRunDateUtc ?? null
+  });
+}
+
+async function dispatchReloadConfig(route: GatewayRoute): Promise<void> {
+  route.ctx.fileConfigRef.current = (await loadGatewayFileConfig(route.ctx.env.configPath!)) ?? {};
+  json(route.response, 200, { ok: true });
+}
+
+/** `*` means that path segment must be non-empty; extra segments are ignored. */
+const ROUTE_PATTERNS: Array<[method: string, pattern: string[], key: string]> = [
+  ['POST', ['providers', 'feishu', 'events'], 'feishu'],
+  ['POST', ['providers', 'wecom', 'bridge'], 'wecom'],
+  ['POST', ['agents', '*', 'invoke'], 'invoke'],
+  ['GET', ['health'], 'health'],
+  ['GET', ['agents'], 'agents'],
+  ['POST', ['chat'], 'chat'],
+  ['POST', ['channels', '*', 'webhook'], 'channel-webhook'],
+  ['POST', ['task'], 'task'],
+  ['POST', ['mailbox'], 'mailbox'],
+  ['POST', ['scheduler', 'run'], 'scheduler'],
+  ['GET', ['skills', 'digest'], 'digest'],
+  ['POST', ['learn', 'run'], 'learn'],
+  ['POST', ['admin', 'reload-config'], 'reload']
+];
+
+function patternMatches(parts: string[], pattern: string[]): boolean {
+  for (let i = 0; i < pattern.length; i += 1) {
+    const want = pattern[i];
+    if (want === '*') {
+      if (!parts[i]) return false;
+    } else if (parts[i] !== want) return false;
+  }
+  return true;
+}
+
+function routeKey(method: string | undefined, parts: string[]): string {
+  for (const [expected, pattern, key] of ROUTE_PATTERNS) {
+    if (method === expected && patternMatches(parts, pattern)) return key;
+  }
+  return '';
+}
+
+async function dispatchGatewayRoute(route: GatewayRoute): Promise<boolean> {
+  switch (routeKey(route.request.method, route.parts)) {
+    case 'feishu':
+      await dispatchFeishuEvents(route);
+      return true;
+    case 'wecom':
+      await dispatchWeComBridge(route);
+      return true;
+    case 'invoke':
+      await dispatchAgentInvoke(route);
+      return true;
+    case 'health':
+      json(route.response, 200, { ok: true, gateway: true, prefix: route.ctx.env.pathPrefix });
+      return true;
+    case 'agents':
+      json(route.response, 200, { agents: route.ctx.runtime.listAgents() });
+      return true;
+    case 'chat':
+      return dispatchChat(route);
+    case 'channel-webhook':
+      await dispatchChannelWebhook(route);
+      return true;
+    case 'task':
+      await dispatchTask(route);
+      return true;
+    case 'mailbox':
+      await dispatchMailbox(route);
+      return true;
+    case 'scheduler':
+      await route.ctx.runtime.runScheduler();
+      json(route.response, 200, { ok: true });
+      return true;
+    case 'digest':
+      await dispatchSkillsDigest(route);
+      return true;
+    case 'learn':
+      await dispatchLearnRun(route);
+      return true;
+    case 'reload':
+      await dispatchReloadConfig(route);
+      return true;
+    default:
+      return false;
+  }
+}
+
 export async function handleGatewayHttp(
   request: IncomingMessage,
   response: ServerResponse,
@@ -128,362 +595,24 @@ export async function handleGatewayHttp(
 
   const gatewayDir = `${ctx.stateDir}/gateway`;
   const fc = ctx.fileConfigRef.current;
-  const isPlatformPath =
-    (parts[0] === 'providers' && parts[1] === 'feishu' && parts[2] === 'events') ||
-    (parts[0] === 'providers' && parts[1] === 'wecom' && parts[2] === 'bridge');
-  const isEventIngress =
-    request.method === 'POST' &&
-    parts[0] === 'routines' &&
-    (parts[1] === 'github' || parts[1] === 'slack' || parts[1] === 'email' || parts[1] === 'webhook' || parts[1] === 'ci') &&
-    parts.length === 2;
-
-  if (!isPlatformPath && !isEventIngress && !checkAuth(request, ctx)) {
+  if (!isPlatformPath(parts) && !isEventIngressPath(request.method, parts) && !checkAuth(request, ctx)) {
     json(response, 401, { error: 'Unauthorized' });
     return true;
   }
 
   try {
+    if (parts[0] === 'providers' && parts[1] === 'slack' && parts[2] === 'events') {
+      return dispatchSlackEvents(request, response, ctx, fc, gatewayDir, readBodyLimit);
+    }
     if (await handleEventIngress(request, response, ctx, parts, readBodyLimit)) {
       return true;
     }
-
-    if (request.method === 'POST' && parts[0] === 'providers' && parts[1] === 'feishu' && parts[2] === 'events') {
-      const spec = fc.providers?.feishu;
-      if (!spec?.enabled) {
-        json(response, 404, { error: 'Feishu provider disabled' });
-        return true;
-      }
-      const { raw, parsed } = await readRawJsonBody(request, readBodyLimit);
-      const out = await handleFeishuEventRequest({
-        body: (parsed ?? {}) as Record<string, unknown>,
-        rawBody: raw,
-        headers: request.headers,
-        spec,
-        settings: readGatewaySettings(ctx.runtime.store),
-        runtime: ctx.runtime,
-        gatewayDir,
-        channels: fc.channels ?? []
-      });
-      if (out.kind === 'challenge') {
-        response.statusCode = 200;
-        response.setHeader('content-type', 'application/json; charset=utf-8');
-        response.end(JSON.stringify({ challenge: out.challenge }));
-        return true;
-      }
-      if (out.kind === 'json') {
-        json(response, out.status, out.body);
-        return true;
-      }
-      response.statusCode = out.status;
-      response.end();
+    if (await dispatchGatewayRoute({ request, response, ctx, fc, gatewayDir, parts, readBodyLimit })) {
       return true;
     }
-
-    if (request.method === 'POST' && parts[0] === 'providers' && parts[1] === 'wecom' && parts[2] === 'bridge') {
-      const spec = fc.providers?.wecom;
-      if (!spec?.enabled) {
-        json(response, 404, { error: 'WeCom provider disabled' });
-        return true;
-      }
-      const body = (await readJsonBody(request, readBodyLimit)) as Record<string, unknown>;
-      const out = await handleWeComBridgeRequest({
-        body,
-        headers: request.headers,
-        spec,
-        settings: readGatewaySettings(ctx.runtime.store),
-        runtime: ctx.runtime,
-        gatewayDir,
-        channels: fc.channels ?? []
-      });
-      json(response, out.status, out.body);
-      return true;
-    }
-
-    if (request.method === 'POST' && parts[0] === 'agents' && parts[2] === 'invoke' && parts[1]) {
-      const agentId = parts[1];
-      const routes = fc.agentRoutes ?? [];
-      const route = routes.find((r) => r.agentId === agentId);
-      if (!route) {
-        json(response, 404, { error: 'Unknown agent route' });
-        return true;
-      }
-      if (route.routeKey) {
-        const got = request.headers['x-agent-route-key'];
-        if (typeof got !== 'string' || !safeEqual(got, route.routeKey)) {
-          json(response, 401, { error: 'Invalid X-Agent-Route-Key' });
-          return true;
-        }
-      }
-      if (!ctx.runtime.listAgents().some((a) => a.id === agentId)) {
-        json(response, 404, { error: 'Agent not registered' });
-        return true;
-      }
-      const body = (await readJsonBody(request, readBodyLimit)) as Record<string, unknown>;
-      const message = String(body.message ?? '').trim();
-      if (!message) {
-        json(response, 400, { error: 'Missing message' });
-        return true;
-      }
-      const userKey = String(body.userKey ?? 'default').trim() || 'default';
-      const state = await readGatewayState(gatewayDir);
-      const sticky = body.stickySession !== false && route.stickySession !== false;
-      const { sessionId } = await runAgentTurnAndReply({
-        runtime: ctx.runtime,
-        gatewayDir,
-        state,
-        sessionKey: `invoke:${agentId}:${userKey}`,
-        userText: message,
-        agentId,
-        stickySession: sticky,
-        reply: async () => {
-          /* internal invoke: HTTP response carries assistant text */
-        }
-      });
-      json(response, 200, {
-        agentId,
-        sessionId,
-        latestAssistant: ctx.runtime.getLatestAssistantText(sessionId)
-      });
-      return true;
-    }
-
-    if (request.method === 'GET' && parts[0] === 'health') {
-      json(response, 200, { ok: true, gateway: true, prefix: ctx.env.pathPrefix });
-      return true;
-    }
-
-    if (request.method === 'GET' && parts[0] === 'agents') {
-      json(response, 200, { agents: ctx.runtime.listAgents() });
-      return true;
-    }
-
-    if (request.method === 'POST' && parts[0] === 'chat') {
-      const body = (await readJsonBody(request, readBodyLimit)) as Record<string, unknown>;
-      const message = String(body.message ?? '').trim();
-      if (!message) {
-        json(response, 400, { error: 'Missing message' });
-        return true;
-      }
-      const sessionId = typeof body.sessionId === 'string' ? body.sessionId : undefined;
-      const botId = typeof body.botId === 'string' ? body.botId.trim() : '';
-      let botSessionId: string | undefined;
-      if (botId && !sessionId) {
-        try {
-          botSessionId = ctx.runtime.openBot(botId).sessionId;
-        } catch (e) {
-          if (e instanceof NotFoundError || (e as { statusCode?: number }).statusCode === 404) {
-            json(response, 404, { error: `Unknown bot: ${botId}` });
-            return true;
-          }
-          throw e;
-        }
-      }
-      if (botSessionId) {
-        const command = await tryBotChatCommand(ctx.runtime, botSessionId, message);
-        if (command) {
-          json(response, 200, {
-            command,
-            session: ctx.runtime.getSession(botSessionId),
-            latestAssistant: command.reply
-          });
-          return true;
-        }
-      }
-      const session = botSessionId
-        ? ctx.runtime.sendUserMessage(botSessionId, message)
-        : sessionId
-        ? ctx.runtime.sendUserMessage(sessionId, message)
-        : ctx.runtime.createChatSession({
-            title: typeof body.title === 'string' ? body.title : 'Gateway Chat',
-            message,
-            agentId: typeof body.agentId === 'string' ? body.agentId : undefined,
-            background: false
-          });
-      await ctx.runtime.runSession(session.id);
-      json(response, 200, {
-        session: ctx.runtime.getSession(session.id),
-        latestAssistant: ctx.runtime.getLatestAssistantText(session.id)
-      });
-      return true;
-    }
-
-    // Generic / Telegram-ish inbound via channel turn kernel
-    if (
-      request.method === 'POST' &&
-      parts[0] === 'channels' &&
-      parts[2] === 'webhook' &&
-      parts[1]
-    ) {
-      const channelId = parts[1];
-      const channel = (fc.channels ?? []).find((c) => c.id === channelId);
-      if (!channel) {
-        json(response, 404, { error: 'Unknown channel' });
-        return true;
-      }
-      const body = (await readJsonBody(request, readBodyLimit)) as Record<string, unknown>;
-      const inbound = parseGenericWebhookInbound(channelId, channel.type, body);
-      if (!inbound) {
-        json(response, 400, { error: 'Unrecognized webhook payload' });
-        return true;
-      }
-      const agentId =
-        typeof body.agentId === 'string' && body.agentId.trim()
-          ? body.agentId.trim()
-          : 'general';
-      const state = await readGatewayState(gatewayDir);
-      const webhookAllowed = readGatewaySettings(ctx.runtime.store).webhook.allowedSenders;
-      const botId = typeof body.botId === 'string' && body.botId.trim() ? body.botId.trim() : undefined;
-      const result = await processChannelTurn(inbound, {
-        defaultAgentId: agentId,
-        allowedSenders: webhookAllowed.length > 0 ? new Set(webhookAllowed) : undefined,
-        runAgentTurn: async ({ conversationKey, text, agentId: aid }) => {
-          const { sessionId } = await runAgentTurnAndReply({
-            runtime: ctx.runtime,
-            gatewayDir,
-            state,
-            sessionKey: `${channel.type}:${conversationKey}`,
-            userText: text,
-            agentId: aid,
-            stickySession: true,
-            botId,
-            origin: 'webhook',
-            reply: async () => {
-              /* outbound handled below when channel supports delivery */
-            }
-          });
-          return {
-            sessionId,
-            assistantText: ctx.runtime.getLatestAssistantText(sessionId) ?? ''
-          };
-        }
-      });
-      if (result.error) {
-        json(response, result.error === 'empty_message' ? 400 : 403, { error: result.error });
-        return true;
-      }
-      const decision = resolveImOutbound(result.reply?.text ?? '', { origin: 'webhook', userText: inbound.text });
-      if (decision.action === 'drop') {
-        json(response, 200, { ok: true, sessionId: result.sessionId, reply: null });
-        return true;
-      }
-      if (
-        channel.type === 'webhook' ||
-        channel.type === 'http_post' ||
-        channel.type === 'slack' ||
-        channel.type === 'telegram' ||
-        channel.type === 'email'
-      ) {
-        try {
-          await appendOutboundDraft(gatewayDir, {
-            channelId: channel.id,
-            text: decision.text,
-            event: 'gateway.im.reply'
-          });
-        } catch (e) {
-          json(response, 502, {
-            error: e instanceof Error ? e.message : String(e),
-            sessionId: result.sessionId,
-            reply: result.reply
-          });
-          return true;
-        }
-      }
-      json(response, 200, {
-        ok: true,
-        sessionId: result.sessionId,
-        reply: result.reply ? { ...result.reply, text: decision.text } : result.reply
-      });
-      return true;
-    }
-
-    if (request.method === 'POST' && parts[0] === 'task') {
-      const body = (await readJsonBody(request, readBodyLimit)) as Record<string, unknown>;
-      const title = String(body.title ?? '').trim();
-      if (!title) {
-        json(response, 400, { error: 'Missing title' });
-        return true;
-      }
-      const result = ctx.runtime.createTaskSession({
-        title,
-        description: typeof body.description === 'string' ? body.description : undefined,
-        message: typeof body.message === 'string' ? body.message : undefined,
-        agentId: typeof body.agentId === 'string' ? body.agentId : undefined,
-        blockedBy: Array.isArray(body.blockedBy) ? body.blockedBy.map(String) : undefined,
-        background: body.background !== false
-      });
-      if (body.autoRun !== false) {
-        await ctx.runtime.runSession(result.session.id);
-      }
-      json(response, 201, {
-        task: ctx.runtime.getTask(result.task.id),
-        session: ctx.runtime.getSession(result.session.id),
-        latestAssistant: ctx.runtime.getLatestAssistantText(result.session.id)
-      });
-      return true;
-    }
-
-    if (request.method === 'POST' && parts[0] === 'mailbox') {
-      const body = (await readJsonBody(request, readBodyLimit)) as Record<string, unknown>;
-      const fromAgentId = String(body.fromAgentId ?? '').trim();
-      const toAgentId = String(body.toAgentId ?? '').trim();
-      const content = String(body.content ?? '').trim();
-      if (!fromAgentId || !toAgentId || !content) {
-        json(response, 400, { error: 'Missing fromAgentId, toAgentId, or content' });
-        return true;
-      }
-      const mail = ctx.runtime.sendMailboxMessage({
-        fromAgentId,
-        toAgentId,
-        content,
-        type: typeof body.type === 'string' ? body.type : undefined,
-        correlationId: typeof body.correlationId === 'string' ? body.correlationId : undefined
-      });
-      json(response, 201, { mail });
-      return true;
-    }
-
-    if (request.method === 'POST' && parts[0] === 'scheduler' && parts[1] === 'run') {
-      await ctx.runtime.runScheduler();
-      json(response, 200, { ok: true });
-      return true;
-    }
-
-    if (request.method === 'GET' && parts[0] === 'skills' && parts[1] === 'digest') {
-      const state = await readGatewayState(gatewayDir);
-      json(response, 200, {
-        markdown: state.lastDigestMarkdown ?? '',
-        lastRun: state.lastLearnRunDateUtc ?? null
-      });
-      return true;
-    }
-
-    if (request.method === 'POST' && parts[0] === 'learn' && parts[1] === 'run') {
-      const fc = ctx.fileConfigRef.current;
-      const learn = fc.learn;
-      if (!learn?.feeds?.length) {
-        json(response, 400, { error: 'Configure learn.feeds in gateway.config.json' });
-        return true;
-      }
-      const result = await runLearnCycle({
-        repoRoot: ctx.repoRoot,
-        gatewayStateDir: gatewayDir,
-        runtime: ctx.runtime,
-        learn,
-        channels: fc.channels ?? []
-      });
-      json(response, result.ok ? 200 : 502, result);
-      return true;
-    }
-
-    if (request.method === 'POST' && parts[0] === 'admin' && parts[1] === 'reload-config') {
-      const next = (await loadGatewayFileConfig(ctx.env.configPath!)) ?? {};
-      ctx.fileConfigRef.current = next;
-      json(response, 200, { ok: true });
-      return true;
-    }
-  } catch (e) {
-    const code = e instanceof Error && (e as { code?: string }).code === 'PAYLOAD_TOO_LARGE' ? 413 : 500;
-    json(response, code, { error: e instanceof Error ? e.message : String(e) });
+  } catch (error) {
+    const code = error instanceof Error && (error as { code?: string }).code === 'PAYLOAD_TOO_LARGE' ? 413 : 500;
+    json(response, code, { error: error instanceof Error ? error.message : String(error) });
     return true;
   }
 

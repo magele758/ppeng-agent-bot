@@ -38,7 +38,7 @@
 | 微信个人号机器人 | 无 |
 | 钉钉机器人 | 无（仓库内无钉钉 API / channel 类型） |
 | Telegram Bot | 无 |
-| Slack Events API 入站 | 无（仅 webhook 出站形态） |
+| Slack Events API 入站 | 有：`POST /gateway/v1/providers/slack/events`（签名校验、线程寻址、`slack/message` 例行任务）。出站 `chat.postMessage` 仍是草稿 |
 
 扩展方式：新增 `ChannelType` / `GatewayProvidersConfig` 与对应 handler，或在外部用桥接服务调用 Gateway 的 `POST .../agents/:agentId/invoke`（见 [`types.ts`](../packages/capability-gateway/src/types.ts) 中 `agentRoutes`）。
 
@@ -91,4 +91,5 @@ Bot 定时任务可带 `precheck`，经 `POST` / `PATCH /api/cron/jobs` 或 Lab 
 ## 小结
 
 - **能通过 IM「控制 Agent」**（用户消息 → 创建/续跑 session）：当前主要是**飞书事件订阅**；**企业微信**依赖 **bridge** 入站，群机器人通道主要用于**发回复**。
+- **Slack Events**：用户消息按 `slack:<channel>:<thread_ts>` 进入会话，并唤醒监听 `slack/message` 的例行任务。签名密钥走已有网关设置，不新增环境变量。出站回复仍经草稿确认，不会直接 `chat.postMessage`。
 - **钉钉 / Telegram / 个人微信**：需新增实现，或 **HTTP invoke + 外部桥**。

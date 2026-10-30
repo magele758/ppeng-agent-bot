@@ -33,6 +33,11 @@
       "bridgeSecret": "",
       "defaultAgentId": "main",
       "replyChannelId": "wecom-digest"
+    },
+    "slack": {
+      "enabled": false,
+      "signingSecret": "FROM_SLACK_APP",
+      "defaultAgentId": "main"
     }
   },
   "agentRoutes": [
