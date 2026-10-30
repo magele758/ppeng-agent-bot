@@ -113,3 +113,15 @@ test('unkeyed human steering retains its direct provenance [AC:agent-learning-go
  f.store.enqueueSteer(sid,'Human correction',{source:'user'});const m=f.store.appendMessage(sid,'user',[{type:'text',text:'Human correction'}]);ledger.observe(sid);
  assert.equal(ledger.entries(sid).find(e=>e.messageId===m.id).kind,'user');
 });
+function bypassFixture(t, kind, mode = 'bypass') {
+    const f = fixture(t);
+    f.store.updateSession(f.session.id, { metadata: { userId: 'alice', permissionMode: mode } });
+    const ledger = new SourceLedger(f.store);
+    ledger.record(f.session.id, { kind, ref: 'a1', label: kind });
+    ledger.record(f.session.id, { kind: 'tool', ref: 'bash:1', label: 'bash' });
+    return { f, ledger };
+}
+test('bypass + user authority passes scope check despite external exposure [AC:bypass-source-scope#AC-1]', t => { const { f, ledger } = bypassFixture(t, 'user'); assert.equal(ledger.allowed(f.session.id, 'bash', 'external', { command: 'x' }), true); });
+test('non-bypass exposed session is still denied [AC:bypass-source-scope#AC-2]', t => { const { f, ledger } = bypassFixture(t, 'user', 'auto'); assert.equal(ledger.allowed(f.session.id, 'bash', 'external', { command: 'x' }), false); });
+test('bypass does not lift routine/event authority or subagents [AC:bypass-source-scope#AC-3]', t => { for (const kind of ['routine', 'event']) { const { f, ledger } = bypassFixture(t, kind); assert.equal(ledger.allowed(f.session.id, 'bash', 'external', { command: 'x' }), false); } const { f, ledger } = bypassFixture(t, 'user'); const child = f.store.createSession({ title: 'c', mode: 'subagent', agentId: 'general', parentSessionId: f.session.id, metadata: { userId: 'alice', permissionMode: 'bypass' } }); ledger.record(child.id, { kind: 'subagent', ref: 'c1', label: 'sub' }); assert.equal(ledger.allowed(child.id, 'bash', 'external', { command: 'x' }), false); });
+test('secret directories stay blocked regardless of bypass [AC:bypass-source-scope#AC-4]', async t => { const { isBlockedPath } = await import('../dist/workspace/blocked.js'); const home = process.env.HOME ?? '/root'; assert.equal(isBlockedPath(join(home, '.ssh', 'id_rsa'), home), true); });
