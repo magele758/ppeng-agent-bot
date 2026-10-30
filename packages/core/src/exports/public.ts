@@ -723,6 +723,7 @@ export {
   revokeConnector,
   instructionsForGranted,
   shouldInjectDiscovery,
+  connectorAuthState,
   mergeGrantedConnectorTools,
   pluginConnectorId,
   discoveryConnectorId,
@@ -733,6 +734,7 @@ export type {
   ConnectorPublic,
   ConnectorSource,
   ConnectorAuthKind,
+  ConnectorAuthState,
   DomainConnectorSource,
   ConnectorGrantStore,
   ConnectorRegistryDeps
