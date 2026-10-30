@@ -70,6 +70,8 @@ query → [lexical channel] → scores₁
 
 **安全约束**：`RAW_AGENT_SKILL_LOAD_STRICT=1` 时只允许加载当轮 shortlist 内的 skill——防止模型绕过路由加载不相关技能（减少 prompt injection 风险）。
 
+**高危面强制 skill**（始终开启，不是环境变量开关）：购物 / 登录 / 外发 / 支付相关工具在本会话成功 `load_skill` 对应技能之前 fail-closed，不执行工具。对照表在 `packages/core/src/skills/mandatory-skill-gate.ts`（`vault_fill`、`vault_get`、`collect_credentials`、结账意图下的 `browser_click` / `browser_type`、卡号或 CVV 的 `secure_form`、`schedule_social_post`）。拒绝文案要求先调用 `load_skill(name)`。Manifest 或 SKILL frontmatter 的 `requiredSkills` 在加载该 skill 时一并视为已满足。通过后仍受 Auto-review 与 Manifest allowTools 约束。
+
 ---
 
 ## 设计取舍
@@ -95,3 +97,4 @@ query → [lexical channel] → scores₁
 | `skills/skill-matcher.ts` | TF-IDF / fusion / robustness |
 | `skills/skill-registry.ts` | 文件系统 glob + SKILL.md 解析 |
 | `skills/skill-disclosure.ts` | 格式化注入内容 |
+| `skills/mandatory-skill-gate.ts` | 高危面未 load_skill 则 fail-closed |

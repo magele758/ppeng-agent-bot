@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { parseRequiredSkills } from './mandatory-skill-gate.js';
 
 /**
  * Skill capability-boundary Manifest.
@@ -30,6 +31,11 @@ export interface SkillManifest {
   network?: SkillNetworkPolicy;
   /** Secret *names* the skill needs (never values). */
   secretNeeds?: string[];
+  /**
+   * Other skill names satisfied by loading this skill.
+   * The mandatory skill gate treats each name as already load_skill'd.
+   */
+  requiredSkills?: string[];
 }
 
 export type SkillManifestValidation =
@@ -103,6 +109,8 @@ export function validateSkillManifest(raw: unknown): SkillManifestValidation {
   if (!denyPaths.ok) return denyPaths;
   const secretNeeds = asStringList(obj.secretNeeds ?? obj.secret_needs, 'secretNeeds');
   if (!secretNeeds.ok) return secretNeeds;
+  const requiredSkills = parseRequiredSkills(obj.requiredSkills ?? obj.required_skills);
+  if (!requiredSkills.ok) return requiredSkills;
   const network = parseNetwork(obj.network);
   if (!network.ok) return network;
 
@@ -113,7 +121,8 @@ export function validateSkillManifest(raw: unknown): SkillManifestValidation {
     ...(allowPaths.value.length ? { allowPaths: allowPaths.value } : {}),
     ...(denyPaths.value.length ? { denyPaths: denyPaths.value } : {}),
     ...(network.value ? { network: network.value } : { network: { mode: 'none' } }),
-    ...(secretNeeds.value.length ? { secretNeeds: secretNeeds.value } : {})
+    ...(secretNeeds.value.length ? { secretNeeds: secretNeeds.value } : {}),
+    ...(requiredSkills.value.length ? { requiredSkills: requiredSkills.value } : {})
   };
   return { ok: true, manifest };
 }

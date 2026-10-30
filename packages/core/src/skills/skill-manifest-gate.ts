@@ -6,6 +6,7 @@
 
 import type { SkillManifest } from './skill-manifest.js';
 import { enforceSkillManifest, networkHostFromInput } from './skill-manifest.js';
+import { gateMandatorySkillsForSession } from './mandatory-skill-gate.js';
 
 const noted = new Map<string, SkillManifest[]>();
 
@@ -178,6 +179,8 @@ export async function runWithSkillManifest<T extends { ok: boolean; content: str
   args: unknown,
   run: () => Promise<T>
 ): Promise<T | { ok: false; content: string }> {
+  const mandatory = gateMandatorySkillsForSession(context.session.id, context.session.metadata, toolName, args);
+  if (!mandatory.ok) return { ok: false, content: mandatory.content };
   const decision = gateActiveSkillManifests(
     manifestsForSession(context.session.id, context.session.metadata),
     toolName,

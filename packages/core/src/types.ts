@@ -82,6 +82,11 @@ export interface SkillSpec {
   triggerWords?: string[];
   /** Optional capability-boundary Manifest (tools/paths/network/secrets). */
   manifest?: SkillManifest;
+  /**
+   * Skill names this skill satisfies for the mandatory skill gate
+   * (frontmatter `requiredSkills`, unioned with Manifest.requiredSkills).
+   */
+  requiredSkills?: string[];
 }
 
 export interface ImageAssetRecord {
