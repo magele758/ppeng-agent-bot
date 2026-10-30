@@ -18,6 +18,7 @@ import {
 import { briefStreamSegments, showProcessNote, visibleBriefParts } from '@/lib/session-brief';
 import { SessionBriefDisclosure } from './SessionBriefDisclosure';
 import { parseCronUserPrompt } from '@/lib/cron';
+import { isApprovalContinueMessage } from '@/lib/approval-continue';
 import { quietRoutineResult } from '@/lib/routine-quiet';
 import { presentGoalUpdate, readMessageSessionId } from '@/lib/goal-update-notice';
 import { A2uiSurface } from './a2ui/A2uiSurface';
@@ -866,10 +867,14 @@ function storedMessageKey(message: object): string | undefined {
   if (!('key' in message)) return undefined;
   return typeof message.key === 'string' ? message.key : undefined;
 }
+function hiddenStoredMessage(message: Parameters<typeof ChatTurnFromMessage>[0]['m']): boolean {
+  const role = normalizedRole(message);
+  const text = msgPartsToText(message.parts);
+  return quietRoutineResult(role, storedMessageKey(message), text) || isApprovalContinueMessage(role, text);
+}
 export function ChatTurnIfVisible(props: Parameters<typeof ChatTurnFromMessage>[0]) {
   const continued = useContext(ContinuedAssistantContext);
-  const message = props.m;
-  if (quietRoutineResult(normalizedRole(message), storedMessageKey(message), msgPartsToText(message.parts))) return null;
+  if (hiddenStoredMessage(props.m)) return null;
   return <ChatTurnFromMessage {...props} hideRoleLabel={continued.has(props.msgIndex ?? -1)} />;
 }
 
