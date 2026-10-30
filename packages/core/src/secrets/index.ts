@@ -49,3 +49,18 @@ export {
   filterUserVaultTools
 } from './user-vault-settings.js';
 export type { UserVaultSettings } from './user-vault-settings.js';
+export {
+  SECURE_FORM_TOOL_NAME,
+  SECURE_FORM_META,
+  SECURE_FORM_FIELDS,
+  createSecureFormPort,
+  replaceSecureFormCardResult,
+  secureFormTextLeaks
+} from './secure-form.js';
+export type {
+  SecureFormField,
+  SecureFormStatus,
+  SecureFormCard,
+  SecureFormReceipt,
+  SecureFormPort
+} from './secure-form.js';

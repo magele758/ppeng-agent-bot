@@ -6,14 +6,20 @@
 
 import {
   NotFoundError,
+  SECURE_FORM_META,
   ValidationError,
+  createSecureFormPort,
   readUserVaultSettings,
+  replaceSecureFormCardResult,
+  secureFormTextLeaks,
   writeUserVaultSettings,
   type RawAgentRuntime,
+  type SecureFormReceipt,
   type UserVaultEntrySummary
 } from '@ppeng/agent-core';
 import type { RouteSpec } from '../routing.js';
 import { json } from '../http-utils.js';
+import { wrapSessionIdRoutes } from '../session-guard.js';
 
 type Body = Record<string, unknown>;
 
@@ -109,6 +115,51 @@ export function userVaultRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         if (!runtime.userVault.delete(id)) throw new NotFoundError('User vault entry', id);
         json(response, 200, { ok: true, id });
       }
-    }
+    },
+    ...secureFormRoutes(runtime)
   ];
+}
+
+/** Chat card submit. The typed value is stored, then dropped from the response. */
+function secureFormRoutes(runtime: RawAgentRuntime): RouteSpec[] {
+  return wrapSessionIdRoutes(runtime, [
+    {
+      method: 'POST',
+      pattern: '/api/sessions/:id/secure-form',
+      handler: async ({ requireParam, readBody, response }) => {
+        const sessionId = requireParam('id');
+        const body = asBody(await readBody());
+        const action = str(body, 'action') ?? 'submit';
+        if (action !== 'submit' && action !== 'cancel') {
+          throw new ValidationError('action must be submit or cancel');
+        }
+        const id = str(body, 'id') ?? '';
+        const value = str(body, 'value') ?? '';
+        const port = createSecureFormPort({ store: runtime.store, vault: runtime.userVault });
+        const done: SecureFormReceipt =
+          action === 'cancel' ? port.cancel({ sessionId, id }) : port.submit({ sessionId, id, value });
+        if (secureFormTextLeaks(JSON.stringify(done), value)) {
+          throw new ValidationError('refusing to return a secret in the secure form receipt');
+        }
+        const session = runtime.getSession(sessionId);
+        if (session) {
+          runtime.mergeSessionMetadata(sessionId, {
+            [SECURE_FORM_META]: {
+              id: done.id,
+              field: done.field,
+              status: done.status,
+              text: done.text,
+              ...(done.fillRef ? { fillRef: done.fillRef } : {})
+            }
+          });
+          // The tool already wrote a pending card. Swap it for the status
+          // receipt so the next turn does not keep seeing "waiting".
+          replaceSecureFormCardResult(runtime.store.listMessages(sessionId), done.id, done, (messageId, parts) => {
+            runtime.store.rewriteMessageParts(sessionId, messageId, parts);
+          });
+        }
+        json(response, 200, { receipt: done });
+      }
+    }
+  ]);
 }

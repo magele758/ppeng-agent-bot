@@ -4,5 +4,4 @@
 .preview { white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin: 6px 0; }
 .card summary { cursor: pointer; font-size: 0.8rem; margin-top: 6px; }
 .card pre { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; font-size: 0.75rem; max-width: 100%; }
-.goal :global(.goal-update-card__title), .goal :global(.goal-update-card__reason) { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 @media (max-width: 600px) { .card { padding: 10px 12px; } }

@@ -1,6 +1,7 @@
 id: goal-update-presentation
 title: 目标更新用紧凑状态卡展示
-status: implemented
+status: retired
+retiredReason: 用户要求目标更新通知完全不展示（见 goal-update-hidden）
 requirement: |
   [goal update] {"id":"goal_84377e09-043c-4a93-86de-3e834e1678be","title":"可以考虑让bo”: 这种要么不展示，要么补个UI来展示，不要搞裸的
 notes: |

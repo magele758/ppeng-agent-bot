@@ -3,6 +3,14 @@
 import { useState } from 'react';
 import { api } from '@/lib/api';
 import { approvalShownLines } from '@/lib/approval-feed';
+import {
+  approvalApproveDisabled,
+  approvalDecisionFlow,
+  approvalItemBodyKind,
+  approvalPostPlan,
+  approvalSendAskReply
+} from '@/lib/approval-item-view';
+import { secureFormCardFace, type SecureFormCardFace } from '@/lib/secure-form-card';
 import { attachBeforeAskUserDecision, type LiveStreamArm } from '@/lib/live-stream-attach';
 import { useI18n } from '@/lib/i18n';
 import type { ApprovalItem } from '@/lib/types';
@@ -37,6 +45,23 @@ export function ApprovalBanner({
   );
 }
 
+function ApprovalItemBody({
+  kind,
+  secureForm,
+  question,
+  args
+}: {
+  kind: ReturnType<typeof approvalItemBodyKind>;
+  secureForm: SecureFormCardFace | null;
+  question?: string | null;
+  args?: Record<string, unknown>;
+}) {
+  if (kind === 'secure-form') return <p className="approval-banner__q">{secureForm!.prompt}</p>;
+  if (kind === 'ask') return question ? <p className="approval-banner__q">{question}</p> : null;
+  if (kind === 'preview') return <ApprovalActionPreview args={args} />;
+  return null;
+}
+
 function ApprovalItemRow({
   approval: a,
   otherPendingCount,
@@ -51,33 +76,47 @@ function ApprovalItemRow({
   const { t } = useI18n();
   const [reply, setReply] = useState('');
   const isAsk = a.toolName === 'ask_user';
+  const secureForm = secureFormCardFace(a);
   const shown = approvalShownLines(a, t('play.approval.needInfo'));
+  const bodyKind = approvalItemBodyKind({
+    hasSecureForm: Boolean(secureForm),
+    isAsk,
+    hasQuestion: Boolean(shown.question)
+  });
 
   const postDecision = async (decision: 'approve' | 'reject') => {
-    if (decision === 'approve' && isAsk) {
-      if (!reply.trim() || !a.sessionId) return;
-      await api(`/api/sessions/${encodeURIComponent(a.sessionId)}/ask-user/reply`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reply: reply.trim() })
-      });
-    }
-    const path = decision === 'approve' ? 'approve' : 'reject';
-    const send = () =>
-      api(`/api/approvals/${a.id}/${path}`, { method: 'POST' }).then(() => undefined);
-    if (!onAttachStream) {
-      await send();
-      onDone();
-      return;
-    }
-    await attachBeforeAskUserDecision({
-      toolName: a.toolName,
+    const plan = approvalPostPlan({
       decision,
-      otherPendingCount,
-      sessionId: a.sessionId,
-      arm: onAttachStream,
-      postDecision: send
+      isAsk,
+      reply,
+      hasSession: Boolean(a.sessionId)
     });
+    const flow = approvalDecisionFlow({ plan, hasAttachStream: Boolean(onAttachStream) });
+    if (flow === 'stop') return;
+    await approvalSendAskReply({
+      plan,
+      sessionId: a.sessionId,
+      post: (path, body) =>
+        api(path, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        })
+    });
+    const path = decision === 'approve' ? 'approve' : 'reject';
+    const send = () => api(`/api/approvals/${a.id}/${path}`, { method: 'POST' }).then(() => undefined);
+    if (flow === 'attach') {
+      await attachBeforeAskUserDecision({
+        toolName: a.toolName,
+        decision,
+        otherPendingCount,
+        sessionId: a.sessionId,
+        arm: onAttachStream!,
+        postDecision: send
+      });
+    } else {
+      await send();
+    }
     onDone();
   };
 
@@ -87,11 +126,12 @@ function ApprovalItemRow({
         <strong>{a.toolName}</strong>
         <ApprovalReasonLine approval={a} fallback={shown.reason} />
       </div>
-      {isAsk ? (
-        shown.question ? <p className="approval-banner__q">{shown.question}</p> : null
-      ) : (
-        <ApprovalActionPreview args={a.args} />
-      )}
+      <ApprovalItemBody
+        kind={bodyKind}
+        secureForm={secureForm}
+        question={shown.question}
+        args={a.args}
+      />
       {isAsk ? (
         <textarea
           className="ask-user-reply"
@@ -105,7 +145,7 @@ function ApprovalItemRow({
         <button
           type="button"
           className="btn btn-primary btn-sm"
-          disabled={isAsk && !reply.trim()}
+          disabled={approvalApproveDisabled(isAsk, reply)}
           onClick={() => void postDecision('approve').catch(() => undefined)}
         >
           {isAsk ? t('play.approval.replyContinue') : t('play.approval.approveContinue')}
