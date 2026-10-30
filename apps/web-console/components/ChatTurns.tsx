@@ -30,6 +30,7 @@ import type { A2uiMessage, SurfaceState } from './a2ui/types';
 import { useI18n, type MessageKey } from '@/lib/i18n';
 import { api } from '@/lib/api';
 import { secureFormResultCard, secureFormSubmitBody } from '@/lib/secure-form-card';
+import { ConnectorGrantFill } from './ConnectorGrantCard';
 import { ComposerMessageContext } from './ComposerContext';
 import type { ContextLabel } from '@/lib/composer-context';
 import { BotReplyQuoteAction, MessageReplyQuote } from './ReplyQuote';
@@ -435,6 +436,7 @@ function ToolResultFold
   return (
     <div className="chat-tool-result-block">
       {secureForm && sessionId ? <SecureFormFill sessionId={sessionId} content={content} /> : null}
+      <ConnectorGrantFill content={content} modelView={modelView} />
       <details
         className={toolResultFoldClass({ ok, modelView, stub, isSubagent, isSteerSkipped, spawnBlocked: Boolean(spawnBlocked) })}
         data-model-view={modelView ? (stub ? 'stub' : trimmed ? 'trimmed' : '1') : undefined}

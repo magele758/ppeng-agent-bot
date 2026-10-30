@@ -1,15 +1,29 @@
 /** Pure helpers for ApprovalBanner row UI (CRAP-coverable without JSX). */
 
-export type ApprovalItemBodyKind = 'secure-form' | 'ask' | 'preview' | 'empty';
+export type ApprovalItemBodyKind = 'secure-form' | 'connector-grant' | 'ask' | 'preview' | 'empty';
 
 export function approvalItemBodyKind(input: {
   hasSecureForm: boolean;
   isAsk: boolean;
   hasQuestion: boolean;
+  hasConnectorGrant?: boolean;
 }): ApprovalItemBodyKind {
   if (input.hasSecureForm) return 'secure-form';
+  return approvalItemBodyKindRest(input);
+}
+
+function approvalItemBodyKindRest(input: {
+  isAsk: boolean;
+  hasQuestion: boolean;
+  hasConnectorGrant?: boolean;
+}): ApprovalItemBodyKind {
+  if (input.hasConnectorGrant) return 'connector-grant';
   if (!input.isAsk) return 'preview';
   return input.hasQuestion ? 'ask' : 'empty';
+}
+
+export function approvalBannerShowsGrant(kind: ApprovalItemBodyKind): boolean {
+  return kind === 'connector-grant';
 }
 
 export function approvalApproveDisabled(isAsk: boolean, reply: string): boolean {

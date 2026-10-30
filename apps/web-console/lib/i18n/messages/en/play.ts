@@ -748,7 +748,12 @@ export const play = {
     secureFormSubmit: 'Submit privately',
     secureFormCancel: 'Cancel',
     secureFormFailed: 'Could not save. Try again.',
-    secureFormPlaceholder: 'Type here. It is not saved in the chat.'
+    secureFormPlaceholder: 'Type here. It is not saved in the chat.',
+    connectorGrant: 'Grant',
+    connectorGrantVault: 'Vault name',
+    connectorGrantDone: 'Granted',
+    connectorGrantFailed: 'Could not grant. Try again.',
+    connectorGrantPrompt: 'Grant {title} with a vault name. The secret stays in the vault.'
   },
 
   model: {

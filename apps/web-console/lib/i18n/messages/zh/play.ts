@@ -748,7 +748,12 @@ export const play = {
     secureFormSubmit: '私下提交',
     secureFormCancel: '取消',
     secureFormFailed: '没能保存，请再试一次。',
-    secureFormPlaceholder: '在此输入。内容不会写入对话。'
+    secureFormPlaceholder: '在此输入。内容不会写入对话。',
+    connectorGrant: '授权',
+    connectorGrantVault: '保险库名称',
+    connectorGrantDone: '已授权',
+    connectorGrantFailed: '授权失败，请再试一次。',
+    connectorGrantPrompt: '用保险库名称授权 {title}。密钥值留在保险库里。'
   },
 
   model: {
