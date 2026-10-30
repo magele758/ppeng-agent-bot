@@ -6,6 +6,7 @@ import {
   connectorViews,
   defaultGrantName,
   grantReferenceBody,
+  postConnectorGrant as postConnectorGrantLib,
   secretNames,
   type ConnectorAuthState,
   type ConnectorView,
@@ -21,8 +22,7 @@ export async function postConnectorGrant(
   post: (path: string, body: { secretEnv?: string; credRef?: string }) => Promise<unknown> = (path, body) =>
     api(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
 ): Promise<void> {
-  const body = grantReferenceBody(row, pickedName);
-  await post(`/api/connectors/${encodeURIComponent(row.id)}/grant`, body);
+  await postConnectorGrantLib(row, pickedName, post);
 }
 
 const STATE_ORDER: ConnectorAuthState[] = ['needsAuth', 'needsGrant', 'granted'];

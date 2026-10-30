@@ -5,16 +5,19 @@ import { api } from '@/lib/api';
 import { approvalShownLines } from '@/lib/approval-feed';
 import {
   approvalApproveDisabled,
+  approvalBannerShowsGrant,
   approvalDecisionFlow,
   approvalItemBodyKind,
   approvalPostPlan,
   approvalSendAskReply
 } from '@/lib/approval-item-view';
 import { secureFormCardFace, type SecureFormCardFace } from '@/lib/secure-form-card';
+import { connectorGrantApprovalCard } from '@/lib/connectors-grant-card';
 import { attachBeforeAskUserDecision, type LiveStreamArm } from '@/lib/live-stream-attach';
 import { useI18n } from '@/lib/i18n';
 import type { ApprovalItem } from '@/lib/types';
 import { ApprovalActionPreview } from './ApprovalActionPreview';
+import { ConnectorGrantApproval } from './ConnectorGrantCard';
 import { ApprovalReasonLine } from './AutoReviewMarks';
 
 export function ApprovalBanner({
@@ -45,6 +48,17 @@ export function ApprovalBanner({
   );
 }
 
+function ApprovalGrantBody({
+  kind,
+  args
+}: {
+  kind: ReturnType<typeof approvalItemBodyKind>;
+  args?: Record<string, unknown>;
+}) {
+  if (!approvalBannerShowsGrant(kind)) return null;
+  return <ConnectorGrantApproval toolName="connector_grant" args={args} />;
+}
+
 function ApprovalItemBody({
   kind,
   secureForm,
@@ -59,7 +73,7 @@ function ApprovalItemBody({
   if (kind === 'secure-form') return <p className="approval-banner__q">{secureForm!.prompt}</p>;
   if (kind === 'ask') return question ? <p className="approval-banner__q">{question}</p> : null;
   if (kind === 'preview') return <ApprovalActionPreview args={args} />;
-  return null;
+  return <ApprovalGrantBody kind={kind} args={args} />;
 }
 
 function ApprovalItemRow({
@@ -77,9 +91,11 @@ function ApprovalItemRow({
   const [reply, setReply] = useState('');
   const isAsk = a.toolName === 'ask_user';
   const secureForm = secureFormCardFace(a);
+  const connectorGrant = connectorGrantApprovalCard(a);
   const shown = approvalShownLines(a, t('play.approval.needInfo'));
   const bodyKind = approvalItemBodyKind({
     hasSecureForm: Boolean(secureForm),
+    hasConnectorGrant: Boolean(connectorGrant),
     isAsk,
     hasQuestion: Boolean(shown.question)
   });

@@ -9,11 +9,19 @@ import {
   approvalUsesStreamAttach
 } from './approval-item-view.ts';
 
-test('approvalItemBodyKind prefers secure form then ask/preview', () => {
+test('approvalItemBodyKind prefers secure form then the in-chat grant card [AC:connector-authorization#AC-5]', () => {
   assert.equal(approvalItemBodyKind({ hasSecureForm: true, isAsk: true, hasQuestion: true }), 'secure-form');
   assert.equal(approvalItemBodyKind({ hasSecureForm: false, isAsk: false, hasQuestion: false }), 'preview');
   assert.equal(approvalItemBodyKind({ hasSecureForm: false, isAsk: true, hasQuestion: true }), 'ask');
   assert.equal(approvalItemBodyKind({ hasSecureForm: false, isAsk: true, hasQuestion: false }), 'empty');
+  assert.equal(
+    approvalItemBodyKind({ hasSecureForm: false, hasConnectorGrant: true, isAsk: false, hasQuestion: false }),
+    'connector-grant'
+  );
+  assert.equal(
+    approvalItemBodyKind({ hasSecureForm: true, hasConnectorGrant: true, isAsk: false, hasQuestion: false }),
+    'secure-form'
+  );
 });
 
 test('approvalApproveDisabled only blocks empty ask replies', () => {

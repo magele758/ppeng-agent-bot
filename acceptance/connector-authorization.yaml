@@ -7,8 +7,10 @@ requirement: |
   reference is present, or no secret is required, and the user has not granted),
   and granted. One-click grant posts only a SecretVault name or an existing
   credential reference. Secret values never enter the grant record, the public
-  list, or the model prompt. In-chat grant cards are out of scope.
-notes: 'r4-4; Machine: 4090. Lab settings card only. ConnectorRegistry grant/revoke unchanged aside from authState.'
+  list, or the model prompt. The same grant is available on the chat surface:
+  a needsAuth or needsGrant card shows Grant, and Grant posts only a SecretVault
+  name to the existing grant route.
+notes: 'r4-4 Lab settings card; r5-2 in-chat grant card. Machine: 4090. assumedApproval: standing-order-2026-10-22. ConnectorRegistry grant/revoke unchanged; no new daemon grant route.'
 criteria:
   - id: AC-1
     given: A connector requires auth and has no secretEnv or credRef
@@ -26,3 +28,7 @@ criteria:
     given: Lab settings are open in Chinese or English
     when: The user looks at the Connectors card
     then: needsAuth, needsGrant, and granted are visible, and Grant sends a vault name rather than a secret value
+  - id: AC-5
+    given: A chat turn shows a connector that needs a vault reference or a grant
+    when: The user grants from the chat card
+    then: Grant posts only a SecretVault name on the existing grant route, and the secret value is absent from the card and the posted body
