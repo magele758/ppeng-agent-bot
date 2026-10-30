@@ -124,7 +124,7 @@ test('悬停或聚焦才出现图标 [AC:correction-capture-hover#AC-2]', () => 
   const enHtml = assistantHtml('en');
   const zhButton = triggerMarkup(zhHtml);
   const enButton = triggerMarkup(enHtml);
-  assert.match(zhHtml, /class="chat-turn[^"]*"[\s\S]*correction-capture__trigger[\s\S]*class="chat-bubble/);
+  assert.match(zhHtml, /class="chat-bubble[\s\S]*chat-turn__actions[\s\S]*correction-capture__trigger/);
   assert.match(zhButton, /aria-label="纠错转评测"/);
   assert.match(enButton, /aria-label="Capture correction"/);
   assert.match(zhButton, /<svg[\s\S]*aria-hidden="true"/);
