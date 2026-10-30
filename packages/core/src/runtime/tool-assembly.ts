@@ -7,6 +7,8 @@ import { CronJobStore, createCronTools } from '../cron/cron-store.js';
 import { CapabilityRegistry } from '../discovery/registry.js';
 import type { SqliteStateStore } from '../storage.js';
 import { createTailscaleTools } from '../tools/tailscale-tools.js';
+import { createDurablePagePort } from '../library/durable-page-port.js';
+import { createPageTools } from '../tools/page-tools.js';
 import { createVaultTools } from '../tools/vault-tools.js';
 import type { UserVault } from '../secrets/user-vault.js';
 import { readUserVaultSettings } from '../secrets/user-vault-settings.js';
@@ -56,6 +58,7 @@ export function assembleOptionalTools(input: {
       })
     );
   }
+  optionalExtras.push(...createPageTools({ getPagePort: () => createDurablePagePort(input.store) }));
   optionalExtras.push(
     ...createVaultTools({
       getVault: input.getUserVault,

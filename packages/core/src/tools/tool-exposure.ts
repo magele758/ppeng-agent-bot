@@ -351,6 +351,19 @@ export const TOOL_GROUPS: ToolGroup[] = [
         ]
     },
     {
+        "id": "pages",
+        "tier": 1,
+        "labelZh": "库级页面",
+        "labelEn": "Library pages",
+        "tools": [
+            "list_pages",
+            "get_page",
+            "write_page",
+            "edit_page"
+        ],
+        "extension": true
+    },
+    {
         "id": "vault",
         "tier": 2,
         "labelZh": "用户保险库填表",

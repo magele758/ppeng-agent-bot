@@ -1,0 +1,25 @@
+id: page-tools
+title: 助手可调用的库级页面工具
+status: implemented
+requirement: |
+  Add assistant-callable library Page tools wired to DurablePagePort so the agent loop can create/list/get/edit durable Pages — product bar = Grok WriteCanvas/ListCanvases capability parity for tools. Do NOT clone Grok/canvas visual UI.
+
+  Tools:
+  1. list_pages — summaries only (id, title, revision, sharePath/shareId; NO body)
+  2. get_page — by id (optional shareId) → full page incl. markdown
+  3. write_page — create(title, markdown) → { id, revision, sharePath }; reject empty title
+  4. edit_page — update(id, title?, markdown?) → monotonic revision; share path stable across edits
+notes: 'assumedApproval: standing-order-2026-10-22. 只加助手可调用的四个库级页面工具，挂在已有持久页面入口上，和保险库工具一样进对话回路。不做画布界面。'
+criteria:
+  - id: AC-1
+    given: 库里还没有这份页面
+    when: 助手调用写页面工具，给出标题和 markdown 正文
+    then: 得到页面 id、第 1 版和分享路径；标题或正文为空（含纯空白）时被拒绝，且库里没有新页面
+  - id: AC-2
+    given: 助手已经写过一页
+    when: 再用编辑工具只改正文，然后列出库、按 id 读取
+    then: 版本加一且标题不变，分享路径与创建时相同；列表只有 id、标题、版本和分享信息，不含正文；按 id 读回的正文是改过的那一版
+  - id: AC-3
+    given: 助手已经写过一页
+    when: 用分享 id 读取，或编辑一个不存在的页面
+    then: 分享 id 读回同一页的正文；不存在的页面编辑失败，不产生新页面
