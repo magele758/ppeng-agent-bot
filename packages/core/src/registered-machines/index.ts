@@ -32,6 +32,15 @@ export {
   type CompositeRegisteredMachineBackendOptions
 } from './composite-backend.js';
 export {
+  createDesktopAgentHttpSseSession,
+  type DesktopAgentHttpSseSession,
+  type DesktopAgentHttpSseSessionOptions,
+  type DesktopAgentOpEvent,
+  type DesktopAgentOpKind,
+  type DesktopAgentReply,
+  type DesktopAgentSseSend
+} from './daemon-http-sse-adapter.js';
+export {
   createRegisteredMachinePort,
   assertRegisteredMachineId,
   denyCrossRailFactoryUse,
