@@ -1,5 +1,7 @@
-// Decides whether a pull request touches paths that must run the full Release gate.
-// Keep INCLUDE in step with the globs documented in doc/CI.md and the PR release gate workflow.
+// Decides whether a pull request touches paths that auto-run Formal only on PRs
+// (CI layering A). Keep INCLUDE in step with the globs documented in doc/CI.md
+// and the PR release gate workflow. Full Release pack still needs the
+// full-validation label (or main push / scheduled Full validation).
 import {appendFileSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
@@ -23,6 +25,7 @@ export const RELEASE_GATE_PATHS = [
   'scripts/ci/verification-evidence.mjs',
   '.github/workflows/full-validation.yml',
   '.github/workflows/pr-release-gate.yml',
+  '.github/workflows/formal-only.yml',
   '.github/workflows/release-gate.yml',
   '.github/workflows/ci.yml',
 ];

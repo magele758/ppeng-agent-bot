@@ -1,0 +1,102 @@
+# Formal + real process verification only (coverage lane).
+# Called by PR release gate for core-path PRs (CI layering A), and by
+# release-gate.yml so Formal steps stay a single source of truth.
+# Does NOT run unit-coverage, CRAP, mutation, or the rest of the Release pack.
+name: Formal only
+on:
+  workflow_call: null
+permissions:
+  contents: read
+jobs:
+  formal:
+    name: Formal + real process verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CI_VERIFICATION_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Review fingerprint preflight
+        run: node scripts/ci/reviewed-verification-inputs.mjs
+      - name: Verify coverage toolchain
+        run: pnpm run test:crap --preflight
+      - name: TypeScript build (workspace packages)
+        run: node scripts/build-workspace.mjs
+      - name: Allow precheck network namespaces
+        run: |
+          if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+      - name: Run formal coverage lane
+        run: |-
+          mkdir -p "$RUNNER_TEMP/validation"
+          node scripts/ci/validation-lane.mjs formal --out "$RUNNER_TEMP/validation/formal"
+        env:
+          CI_VERIFICATION_EVIDENCE_DIR: ${{ runner.temp }}/verification-evidence
+      - name: Preserve validation-formal
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-formal
+          path: ${{ runner.temp }}/validation/formal
+          if-no-files-found: error
+          retention-days: 30
+      - name: Preserve acceptance-results-formal
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: acceptance-results-formal
+          path: ${{ runner.temp }}/validation/formal/results
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload pairing verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tool-call-pairing-verification
+          path: coverage/formal/pairing/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload lifecycle verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: session-lifecycle-verification
+          path: coverage/formal/lifecycle/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload restart verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: session-restart-recovery-verification
+          path: coverage/formal/restart/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload concurrency verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: session-multiprocess-concurrency-verification
+          path: coverage/formal/concurrency/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Preserve verification reuse records
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-reuse-evidence
+          path: ${{ runner.temp }}/verification-evidence/
+          if-no-files-found: ignore
+          retention-days: 30
