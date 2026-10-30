@@ -1,0 +1,16 @@
+id: assistant-run-spacing
+title: 连续助手消息省略标题后不留大段空白
+status: implemented
+requirement: |
+  标题被省略的连续助手消息，标题行不再占高度（操作按钮浮在右上角仍可用），
+  相邻助手消息间距收紧到段落级别。
+criteria:
+  - id: AC-1
+    given: 被省略标题的助手消息
+    when: 渲染
+    then: 标题行脱离文档流、高度为 0，按钮仍在
+  - id: AC-2
+    given: 相邻的连续助手消息
+    when: 渲染
+    then: 下边距与气泡上内边距收紧
+notes: "assumedApproval: standing-order-2026-10-22"
