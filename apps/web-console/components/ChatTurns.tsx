@@ -171,6 +171,55 @@ function ReasoningFold({ text, streaming }: { text: string; streaming?: boolean 
   );
 }
 
+function secureFormStatusText(action: 'submit' | 'cancel', failed: boolean, failedText: string): string {
+  if (failed) return failedText;
+  return action === 'submit' ? 'filled' : 'cancelled';
+}
+
+function SecureFormStatus({ status }: { status: string }) {
+  return <p className="secure-form-card__status">{status}</p>;
+}
+
+function SecureFormField({
+  sessionId,
+  content,
+  value,
+  onValue,
+  onSubmit,
+  onCancel
+}: {
+  sessionId: string;
+  content: string;
+  value: string;
+  onValue: (value: string) => void;
+  onSubmit: () => void;
+  onCancel: () => void;
+}) {
+  const { t } = useI18n();
+  const face = secureFormResultCard(content);
+  if (!face || !sessionId) return null;
+  return (
+    <div className="secure-form-card">
+      <p>{face.prompt}</p>
+      <input
+        className="secure-form-field"
+        type="password"
+        autoComplete="off"
+        placeholder={t('play.approval.secureFormPlaceholder')}
+        aria-label={face.label}
+        value={value}
+        onChange={(e) => onValue(e.target.value)}
+      />
+      <button type="button" disabled={!value.trim()} onClick={onSubmit}>
+        {t('play.approval.secureFormSubmit')}
+      </button>
+      <button type="button" onClick={onCancel}>
+        {t('play.approval.secureFormCancel')}
+      </button>
+    </div>
+  );
+}
+
 function SecureFormFill({ sessionId, content }: { sessionId: string; content: string }) {
   const { t } = useI18n();
   const face = secureFormResultCard(content);
@@ -186,33 +235,167 @@ function SecureFormFill({ sessionId, content }: { sessionId: string; content: st
     })
       .then(() => {
         setValue('');
-        setStatus(action === 'submit' ? 'filled' : 'cancelled');
+        setStatus(secureFormStatusText(action, false, t('play.approval.secureFormFailed')));
       })
       .catch(() => {
         setValue('');
-        setStatus(t('play.approval.secureFormFailed'));
+        setStatus(secureFormStatusText(action, true, t('play.approval.secureFormFailed')));
       });
   };
-  if (status) return <p className="secure-form-card__status">{status}</p>;
+  if (status) return <SecureFormStatus status={status} />;
   return (
-    <div className="secure-form-card">
-      <p>{face.prompt}</p>
-      <input
-        className="secure-form-field"
-        type="password"
-        autoComplete="off"
-        placeholder={t('play.approval.secureFormPlaceholder')}
-        aria-label={face.label}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
+    <SecureFormField
+      sessionId={sessionId}
+      content={content}
+      value={value}
+      onValue={setValue}
+      onSubmit={() => send('submit')}
+      onCancel={() => send('cancel')}
+    />
+  );
+}
+
+function toolResultConfidence(content: string): string | null {
+  const confMatch = content.match(/(?:confidence|置信度)\s*[:=：]?\s*(\d{1,3})\s*%?/i);
+  return confMatch ? `${confMatch[1]}%` : null;
+}
+
+function toolResultFoldClass(flags: {
+  ok: boolean;
+  modelView?: boolean;
+  stub: boolean;
+  isSubagent: boolean;
+  isSteerSkipped: boolean;
+  spawnBlocked: boolean;
+}): string {
+  const parts = [
+    'chat-tool-fold chat-tool-fold--result chat-tool-fold--compact',
+    flags.ok ? 'chat-tool-fold--success' : 'chat-tool-fold--error'
+  ];
+  if (flags.modelView) parts.push('chat-tool-fold--model-view');
+  if (flags.stub) parts.push('chat-tool-fold--stub');
+  if (flags.isSubagent) parts.push('chat-tool-fold--subagent');
+  if (flags.isSteerSkipped) parts.push('chat-tool-fold--steer');
+  if (flags.spawnBlocked) parts.push('chat-tool-fold--blocked');
+  return parts.join(' ');
+}
+
+function ToolResultStatusPill({
+  isSteerSkipped,
+  spawnBlocked,
+  isSubagent,
+  isTeammate,
+  ok
+}: {
+  isSteerSkipped: boolean;
+  spawnBlocked: boolean;
+  isSubagent: boolean;
+  isTeammate: boolean;
+  ok: boolean;
+}) {
+  const { t } = useI18n();
+  if (isSteerSkipped) {
+    return <span className="chat-tool-fold__pill chat-tool-fold__pill--steer">{t('play.turns.steerSkip')}</span>;
+  }
+  if (spawnBlocked) return null;
+  if (isSubagent) {
+    return <span className="chat-tool-fold__pill chat-tool-fold__pill--subagent">{t('play.turns.subagentDeliver')}</span>;
+  }
+  if (isTeammate) {
+    return <span className="chat-tool-fold__pill chat-tool-fold__pill--team">{t('play.turns.teammateReply')}</span>;
+  }
+  return (
+    <span className={`chat-tool-fold__pill ${ok ? 'chat-tool-fold__pill--ok' : 'chat-tool-fold__pill--err'}`}>
+      {ok ? t('play.output') : t('play.fail')}
+    </span>
+  );
+}
+
+function ToolResultSummary({
+  name,
+  preview,
+  confidence,
+  isLowConf,
+  modelView,
+  spawnBlocked,
+  sandboxReason,
+  stub,
+  trimmed,
+  status
+}: {
+  name?: string;
+  preview: string;
+  confidence: string | null;
+  isLowConf: boolean;
+  modelView?: boolean;
+  spawnBlocked: ReturnType<typeof parseSpawnBlocked>;
+  sandboxReason: ReturnType<typeof parseOsSandboxReason>;
+  stub: boolean;
+  trimmed: boolean;
+  status: {
+    isSteerSkipped: boolean;
+    spawnBlocked: boolean;
+    isSubagent: boolean;
+    isTeammate: boolean;
+    ok: boolean;
+  };
+}) {
+  const { t } = useI18n();
+  return (
+    <summary className="chat-tool-fold__summary">
+      <ToolResultStatusPill
+        isSteerSkipped={status.isSteerSkipped}
+        spawnBlocked={status.spawnBlocked}
+        isSubagent={status.isSubagent}
+        isTeammate={status.isTeammate}
+        ok={status.ok}
       />
-      <button type="button" disabled={!value.trim()} onClick={() => send('submit')}>
-        {t('play.approval.secureFormSubmit')}
-      </button>
-      <button type="button" onClick={() => send('cancel')}>
-        {t('play.approval.secureFormCancel')}
-      </button>
-    </div>
+      <span className="chat-tool-fold__name">{name ?? 'unknown'}</span>
+      {preview ? <span className="chat-tool-fold__preview">{preview}</span> : null}
+      {confidence ? (
+        <span className={`chat-tool-fold__pill ${isLowConf ? 'chat-tool-fold__pill--err' : 'chat-tool-fold__pill--ok'}`}>
+          {t('play.turns.confidence', { value: confidence })}
+        </span>
+      ) : null}
+      {modelView ? (
+        <span className="chat-tool-fold__pill chat-tool-fold__pill--model-view">{t('play.modelViewOnly')}</span>
+      ) : null}
+      {spawnBlocked ? <SpawnBlockedPill /> : null}
+      {sandboxReason ? (
+        <span className="chat-tool-fold__pill" data-testid="os-sandbox-reason">
+          {t(osSandboxReasonKey(sandboxReason))}
+        </span>
+      ) : null}
+      {stub ? <span className="chat-tool-fold__pill chat-tool-fold__pill--stub">{t('play.stub')}</span> : null}
+      {trimmed ? <span className="chat-tool-fold__pill chat-tool-fold__pill--trim">{t('play.trimmed')}</span> : null}
+    </summary>
+  );
+}
+
+function ToolResultBody({
+  content,
+  inputText,
+  isSubagent,
+  stub,
+  modelView,
+  spawnBlocked
+}: {
+  content: string;
+  inputText: string;
+  isSubagent: boolean;
+  stub: boolean;
+  modelView?: boolean;
+  spawnBlocked: ReturnType<typeof parseSpawnBlocked>;
+}) {
+  return (
+    <>
+      {spawnBlocked ? <SpawnBlockedNotice blocked={spawnBlocked} /> : null}
+      {isSubagent && !stub && !modelView && !spawnBlocked ? (
+        <MarkdownHtml className="chat-subagent-summary chat-bubble__md" text={content} />
+      ) : (
+        <ToolIoBlocks input={inputText} output={content} />
+      )}
+    </>
   );
 }
 
@@ -227,75 +410,48 @@ function ToolResultFold({
   modelView?: boolean;
   sessionId?: string;
 }) {
-  const { t } = useI18n();
   const ok = p.ok !== false;
   const content = p.content ?? '';
   const stub = Boolean(modelView && isToolResultStub(content));
   const trimmed = Boolean(modelView && isToolResultTrimmed(content));
   const inputText = call ? formatToolInput(call.input) : '';
   const preview = call ? previewToolInput(call.input) : '';
-
   const isSubagent = p.name === 'spawn_subagent';
   const isTeammate = p.name === 'spawn_teammate';
   const isSteerSkipped = content.startsWith('[skipped by user steer:');
-
-  let confidence: string | null = null;
-  const confMatch = content.match(/(?:confidence|置信度)\s*[:=：]?\s*(\d{1,3})\s*%?/i);
-  if (confMatch) {
-    confidence = `${confMatch[1]}%`;
-  }
+  const confidence = toolResultConfidence(content);
   const isLowConf = content.includes('[low-confidence:');
   const spawnBlocked = parseSpawnBlocked(p.name, content);
   const sandboxReason = parseOsSandboxReason(content);
-
   const secureForm = !modelView && sessionId ? secureFormResultCard(content) : null;
   return (
     <div className="chat-tool-result-block">
       {secureForm && sessionId ? <SecureFormFill sessionId={sessionId} content={content} /> : null}
       <details
-        className={`chat-tool-fold chat-tool-fold--result chat-tool-fold--compact ${ok ? 'chat-tool-fold--success' : 'chat-tool-fold--error'}${modelView ? ' chat-tool-fold--model-view' : ''}${stub ? ' chat-tool-fold--stub' : ''}${isSubagent ? ' chat-tool-fold--subagent' : ''}${isSteerSkipped ? ' chat-tool-fold--steer' : ''}${spawnBlocked ? ' chat-tool-fold--blocked' : ''}`}
+        className={toolResultFoldClass({ ok, modelView, stub, isSubagent, isSteerSkipped, spawnBlocked: Boolean(spawnBlocked) })}
         data-model-view={modelView ? (stub ? 'stub' : trimmed ? 'trimmed' : '1') : undefined}
         {...(spawnBlocked ? { open: true } : {})}
       >
-        <summary className="chat-tool-fold__summary">
-          {isSteerSkipped ? (
-            <span className="chat-tool-fold__pill chat-tool-fold__pill--steer">{t('play.turns.steerSkip')}</span>
-          ) : spawnBlocked ? null : isSubagent ? (
-            <span className="chat-tool-fold__pill chat-tool-fold__pill--subagent">{t('play.turns.subagentDeliver')}</span>
-          ) : isTeammate ? (
-            <span className="chat-tool-fold__pill chat-tool-fold__pill--team">{t('play.turns.teammateReply')}</span>
-          ) : (
-            <span
-              className={`chat-tool-fold__pill ${ok ? 'chat-tool-fold__pill--ok' : 'chat-tool-fold__pill--err'}`}
-            >
-              {ok ? t('play.output') : t('play.fail')}
-            </span>
-          )}
-          <span className="chat-tool-fold__name">{p.name ?? 'unknown'}</span>
-          {preview ? <span className="chat-tool-fold__preview">{preview}</span> : null}
-          {confidence ? (
-            <span className={`chat-tool-fold__pill ${isLowConf ? 'chat-tool-fold__pill--err' : 'chat-tool-fold__pill--ok'}`}>
-              {t('play.turns.confidence', { value: confidence })}
-            </span>
-          ) : null}
-          {modelView ? (
-            <span className="chat-tool-fold__pill chat-tool-fold__pill--model-view">{t('play.modelViewOnly')}</span>
-          ) : null}
-          {spawnBlocked ? <SpawnBlockedPill /> : null}
-          {sandboxReason ? (
-            <span className="chat-tool-fold__pill" data-testid="os-sandbox-reason">
-              {t(osSandboxReasonKey(sandboxReason))}
-            </span>
-          ) : null}
-          {stub ? <span className="chat-tool-fold__pill chat-tool-fold__pill--stub">{t('play.stub')}</span> : null}
-          {trimmed ? <span className="chat-tool-fold__pill chat-tool-fold__pill--trim">{t('play.trimmed')}</span> : null}
-        </summary>
-        {spawnBlocked ? <SpawnBlockedNotice blocked={spawnBlocked} /> : null}
-        {isSubagent && !stub && !modelView && !spawnBlocked ? (
-          <MarkdownHtml className="chat-subagent-summary chat-bubble__md" text={content} />
-        ) : (
-          <ToolIoBlocks input={inputText} output={content} />
-        )}
+        <ToolResultSummary
+          name={p.name}
+          preview={preview}
+          confidence={confidence}
+          isLowConf={isLowConf}
+          modelView={modelView}
+          spawnBlocked={spawnBlocked}
+          sandboxReason={sandboxReason}
+          stub={stub}
+          trimmed={trimmed}
+          status={{ isSteerSkipped, spawnBlocked: Boolean(spawnBlocked), isSubagent, isTeammate, ok }}
+        />
+        <ToolResultBody
+          content={content}
+          inputText={inputText}
+          isSubagent={isSubagent}
+          stub={stub}
+          modelView={modelView}
+          spawnBlocked={spawnBlocked}
+        />
       </details>
     </div>
   );
