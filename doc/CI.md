@@ -11,9 +11,18 @@
 
 远程冒烟 **仅在你配置了 `RAW_AGENT_API_KEY` 时才会执行**，未配置时整 Job 跳过，不影响通过。真模型压缩 A/B 不在这条流水线里，见下方「压缩 A/B」。
 
-### PR release gate（左移）
+### PR release gate（CI 分层 A）
 
-[`pr-release-gate.yml`](../.github/workflows/pr-release-gate.yml) 在 PR 带 `full-validation` 标签，**或** PR 改动触及核心路径时，运行与 `full-validation` 相同的 Formal + CRAP Release gate（只读权限，无需写标签）。核心路径由 [`scripts/ci/pr-release-paths.mjs`](../scripts/ci/pr-release-paths.mjs) 的 `detect` Job 判定：
+分层目标：PR 上左移 Formal；CRAP / 完整 Release pack 仍只在 **main push** 与既有 **定时 Full validation / 发布** 路径阻断。门禁红了先修，再开新功能 PR。
+
+| 触发 | 跑什么 |
+|------|--------|
+| **每个 PR** | Quick / Core（[`ci.yml`](../.github/workflows/ci.yml)，行为不变） |
+| **核心路径 PR**（无 `full-validation` 标签） | 仅 Formal（[`formal-only.yml`](../.github/workflows/formal-only.yml)：Formal + 真实进程验证 / formal coverage lane）。**不**自动跑 unit-coverage 长门、CRAP、mutation 或完整 Release pack |
+| **`full-validation` 标签**（可选强制全量） | 完整 [`release-gate.yml`](../.github/workflows/release-gate.yml)，与 Full validation / main push 相同 |
+| **main push + 定时 Full validation** | 完整 Release pack（含 CRAP）；数值阈值不变 |
+
+[`pr-release-gate.yml`](../.github/workflows/pr-release-gate.yml) 只读权限，无需写标签即可对核心路径跑 Formal。核心路径由 [`scripts/ci/pr-release-paths.mjs`](../scripts/ci/pr-release-paths.mjs) 的 `detect` Job 判定：
 
 ```
 packages/core/**  packages/agent-loop/**  packages/capability-gateway/**  packages/api-types/**
@@ -21,10 +30,11 @@ apps/daemon/**  specs/formal/**  scripts/formal/**  scripts/crap/**
 scripts/ci/validation-*.mjs  scripts/ci/validation-artifacts.mjs  scripts/ci/validation-lane.mjs
 scripts/ci/main-full-health.mjs  scripts/ci/release-results.mjs  scripts/ci/reviewed-verification-inputs.mjs
 scripts/ci/test-partition.mjs  scripts/ci/verification-evidence.mjs
-.github/workflows/{full-validation,pr-release-gate,release-gate,ci}.yml
+.github/workflows/{full-validation,pr-release-gate,formal-only,release-gate,ci}.yml
 ```
 
-仅改 `doc/**`、`docs/**`、`packages/agent-{erp,homeiot,sre,stock}/**`、`apps/web-console/**`、`apps/desktop/**` 的 PR 仍只跑快速门禁。Main full health、CRAP 阈值与 `full-validation.yml` 触发器不变。
+仅改 `doc/**`、`docs/**`、`packages/agent-{erp,homeiot,sre,stock}/**`、`apps/web-console/**`、`apps/desktop/**` 的 PR 仍只跑 Quick/Core。Formal 阈值与 CRAP 数值规则不放宽；改变的只是「何时在 PR 上跑 / 是否阻断 PR 合并」。
+
 
 ## main 发布卡点
 

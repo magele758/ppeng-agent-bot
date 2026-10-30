@@ -41,4 +41,4 @@ criteria:
   - id: AC-9
     given: PR 改动触及核心路径（packages/core、agent-loop、capability-gateway、api-types、apps/daemon、formal、crap 及验证相关 CI 脚本与工作流）
     when: PR 打开或更新
-    then: 无需标签即自动运行与 full-validation 标签相同的 Release gate；仅改文档、领域包、web-console、desktop 的 PR 仍跳过，已有标签的 PR 不论路径照常运行，Main full health 与 CRAP 阈值不变
+    then: 无需标签即自动仅运行 Formal（Formal + 真实进程验证 / formal coverage lane），不自动启动完整 Release pack（不含 unit-coverage 长门、CRAP、mutation）；仅改文档、领域包、web-console、desktop 的 PR 仍只跑 Quick/Core；带 full-validation 标签的 PR 不论路径运行完整 Release pack；CRAP 与完整 Release pack 仍在 main push 与定时 Full validation；Formal 阈值与 CRAP 数值规则不放宽

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {RELEASE_GATE_PATHS, touchesReleaseGatePaths} from '../ci/pr-release-paths.mjs';
 
-test('core paths trigger the PR release gate [AC:ci-action-reliability#AC-9]', () => {
+test('core paths trigger Formal-only on PR [AC:ci-action-reliability#AC-9]', () => {
   for (const file of [
     'packages/core/src/runtime.ts',
     'packages/agent-loop/package.json',
@@ -18,12 +18,13 @@ test('core paths trigger the PR release gate [AC:ci-action-reliability#AC-9]', (
     'scripts/ci/test-partition.mjs',
     '.github/workflows/ci.yml',
     '.github/workflows/pr-release-gate.yml',
+    '.github/workflows/formal-only.yml',
     '.github/workflows/release-gate.yml',
     '.github/workflows/full-validation.yml',
   ]) assert.equal(touchesReleaseGatePaths([file]), true, file);
 });
 
-test('non-core-only changes do not trigger the PR release gate [AC:ci-action-reliability#AC-9]', () => {
+test('non-core-only changes do not trigger Formal-only [AC:ci-action-reliability#AC-9]', () => {
   for (const file of [
     'doc/CI.md',
     'docs/x.md',
@@ -47,5 +48,5 @@ test('one core file among non-core files triggers the gate [AC:ci-action-reliabi
 });
 
 test('include list is the approved set [AC:ci-action-reliability#AC-9]', () => {
-  assert.equal(RELEASE_GATE_PATHS.length, 20);
+  assert.equal(RELEASE_GATE_PATHS.length, 21);
 });

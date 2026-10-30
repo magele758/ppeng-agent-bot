@@ -1,9 +1,13 @@
-# The GitHub App cannot workflow_dispatch. pull_request still can start Actions,
-# so this pull request runs the same release-gate jobs as Full validation.
-# The full Release gate runs when the PR carries the `full-validation` label
-# (opt-in for any PR) OR when its diff touches a core path listed in
-# scripts/ci/pr-release-paths.mjs (left-shift). Docs, domain bundles, web-console
-# and desktop-only PRs keep the bounded quick gate.
+# CI layering A (PR side):
+# - Every PR still gets Quick/Core from ci.yml (unchanged).
+# - Core-path PRs (scripts/ci/pr-release-paths.mjs): auto-run Formal only
+#   (Formal + real process verification / formal coverage lane). Do NOT
+#   auto-start the full Release gate pack (no unit-coverage long gate, no
+#   CRAP, no mutation on this PR auto path).
+# - Label `full-validation`: optional force-full → entire release-gate.yml
+#   (same pack as Full validation / main push).
+# - CRAP + full Release pack remain on main push + scheduled Full validation.
+#   If that gate is red, fix before opening new feature PRs.
 name: PR release gate
 on:
   pull_request:
@@ -32,9 +36,14 @@ jobs:
       - name: Match changed files against release-gate paths
         id: paths
         run: node scripts/ci/pr-release-paths.mjs
+  formal:
+    name: Formal only
+    needs: detect
+    if: needs.detect.outputs.core == 'true' && !contains(github.event.pull_request.labels.*.name, 'full-validation')
+    uses: ./.github/workflows/formal-only.yml
   full:
     name: Release gate
     needs: detect
-    if: contains(github.event.pull_request.labels.*.name, 'full-validation') || needs.detect.outputs.core == 'true'
+    if: contains(github.event.pull_request.labels.*.name, 'full-validation')
     uses: ./.github/workflows/release-gate.yml
     secrets: inherit

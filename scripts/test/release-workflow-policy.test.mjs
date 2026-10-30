@@ -56,7 +56,11 @@ test('release gate retains deterministic test layers and does not tolerate failu
     assert.ok(runs.includes(`pnpm run ${script}`), `missing release layer: ${script}`);
   }
   // test:unit runs through the flaky-retry wrapper. Cloud full validation does not run Playwright.
-  for(const lane of ['unit','formal','sdk'])assert.ok(runs.some(run=>run.includes(`validation-lane.mjs ${lane} --out`)),`missing release layer: ${lane}`);
+  // Formal lane lives in reusable formal-only.yml (CI layering A); release-gate calls it.
+  assert.equal(doc.jobs.formal.uses, './.github/workflows/formal-only.yml');
+  const formalRuns = Object.values(workflow('formal-only').jobs).flatMap(job => job.steps ?? []).map((step) => step.run).filter(Boolean);
+  assert.ok(formalRuns.some(run => run.includes('validation-lane.mjs formal --out')), 'missing release layer: formal');
+  for (const lane of ['unit', 'sdk']) assert.ok(runs.some(run => run.includes(`validation-lane.mjs ${lane} --out`)), `missing release layer: ${lane}`);
   assert.match(readFileSync('scripts/ci/validation-lane.mjs','utf8'),/run-formal-regression.mjs/);
   assert.equal(runs.some((run) => run.includes('test:e2e')), false);
   assert.ok(runs.some(run => run.startsWith('pnpm run agent:eval:fast --exit-on-fail')));
