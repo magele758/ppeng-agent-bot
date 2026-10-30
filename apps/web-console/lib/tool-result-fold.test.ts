@@ -4,7 +4,9 @@ import {
   toolResultBodyMode,
   toolResultFoldClass,
   toolResultStatusKind,
-  toolResultSummaryFlags
+  toolResultStatusPillSpec,
+  toolResultSummaryFlags,
+  toolResultSummaryPillSpecs
 } from './tool-result-fold.ts';
 
 test('toolResultFoldClass covers success and flag classes', () => {
@@ -61,6 +63,30 @@ test('toolResultStatusKind priority order', () => {
   );
 });
 
+test('toolResultStatusPillSpec maps kind to class and i18n key', () => {
+  assert.equal(toolResultStatusPillSpec('blocked'), null);
+  assert.deepEqual(toolResultStatusPillSpec('steer'), {
+    className: 'chat-tool-fold__pill chat-tool-fold__pill--steer',
+    i18nKey: 'play.turns.steerSkip'
+  });
+  assert.deepEqual(toolResultStatusPillSpec('subagent'), {
+    className: 'chat-tool-fold__pill chat-tool-fold__pill--subagent',
+    i18nKey: 'play.turns.subagentDeliver'
+  });
+  assert.deepEqual(toolResultStatusPillSpec('teammate'), {
+    className: 'chat-tool-fold__pill chat-tool-fold__pill--team',
+    i18nKey: 'play.turns.teammateReply'
+  });
+  assert.deepEqual(toolResultStatusPillSpec('ok'), {
+    className: 'chat-tool-fold__pill chat-tool-fold__pill--ok',
+    i18nKey: 'play.output'
+  });
+  assert.deepEqual(toolResultStatusPillSpec('err'), {
+    className: 'chat-tool-fold__pill chat-tool-fold__pill--err',
+    i18nKey: 'play.fail'
+  });
+});
+
 test('toolResultBodyMode chooses markdown only for live subagent', () => {
   assert.equal(toolResultBodyMode({ isSubagent: true, stub: false, modelView: false, spawnBlocked: false }), 'markdown');
   assert.equal(toolResultBodyMode({ isSubagent: true, stub: true, modelView: false, spawnBlocked: false }), 'io');
@@ -105,5 +131,68 @@ test('toolResultSummaryFlags lists active pills', () => {
       trimmed: false
     }),
     ['confidence-ok']
+  );
+});
+
+test('toolResultSummaryPillSpecs builds declarative pill rows', () => {
+  assert.deepEqual(
+    toolResultSummaryPillSpecs({
+      confidence: null,
+      isLowConf: false,
+      modelView: false,
+      spawnBlocked: false,
+      sandboxReasonKey: null,
+      stub: false,
+      trimmed: false
+    }),
+    []
+  );
+  assert.deepEqual(
+    toolResultSummaryPillSpecs({
+      confidence: '80%',
+      isLowConf: true,
+      modelView: true,
+      spawnBlocked: true,
+      sandboxReasonKey: 'play.turns.osSandbox.savedOs',
+      stub: true,
+      trimmed: true
+    }),
+    [
+      {
+        id: 'confidence',
+        className: 'chat-tool-fold__pill chat-tool-fold__pill--err',
+        i18nKey: 'play.turns.confidence',
+        value: '80%'
+      },
+      { id: 'model-view', className: 'chat-tool-fold__pill chat-tool-fold__pill--model-view', i18nKey: 'play.modelViewOnly' },
+      { id: 'spawn-blocked' },
+      {
+        id: 'sandbox',
+        className: 'chat-tool-fold__pill',
+        i18nKey: 'play.turns.osSandbox.savedOs',
+        testId: 'os-sandbox-reason'
+      },
+      { id: 'stub', className: 'chat-tool-fold__pill chat-tool-fold__pill--stub', i18nKey: 'play.stub' },
+      { id: 'trimmed', className: 'chat-tool-fold__pill chat-tool-fold__pill--trim', i18nKey: 'play.trimmed' }
+    ]
+  );
+  assert.deepEqual(
+    toolResultSummaryPillSpecs({
+      confidence: '90%',
+      isLowConf: false,
+      modelView: false,
+      spawnBlocked: false,
+      sandboxReasonKey: undefined,
+      stub: false,
+      trimmed: false
+    }),
+    [
+      {
+        id: 'confidence',
+        className: 'chat-tool-fold__pill chat-tool-fold__pill--ok',
+        i18nKey: 'play.turns.confidence',
+        value: '90%'
+      }
+    ]
   );
 });

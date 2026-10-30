@@ -54,7 +54,9 @@ import {
   toolResultBodyMode,
   toolResultFoldClass,
   toolResultStatusKind,
-  toolResultSummaryFlags
+  toolResultStatusPillSpec,
+  toolResultSummaryPillSpecs,
+  type ToolResultSummaryPillSpec
 } from '@/lib/tool-result-fold';
 import {
   chatImageRef,
@@ -281,24 +283,33 @@ function ToolResultStatusPill({
   ok: boolean;
 }) {
   const { t } = useI18n();
-  const kind = toolResultStatusKind({ isSteerSkipped, spawnBlocked, isSubagent, isTeammate, ok });
-  if (kind === 'blocked') return null;
-  if (kind === 'steer') {
-    return <span className="chat-tool-fold__pill chat-tool-fold__pill--steer">{t('play.turns.steerSkip')}</span>;
-  }
-  if (kind === 'subagent') {
-    return <span className="chat-tool-fold__pill chat-tool-fold__pill--subagent">{t('play.turns.subagentDeliver')}</span>;
-  }
-  if (kind === 'teammate') {
-    return <span className="chat-tool-fold__pill chat-tool-fold__pill--team">{t('play.turns.teammateReply')}</span>;
-  }
-  return (
-    <span className={`chat-tool-fold__pill ${kind === 'ok' ? 'chat-tool-fold__pill--ok' : 'chat-tool-fold__pill--err'}`}>
-      {kind === 'ok' ? t('play.output') : t('play.fail')}
-    </span>
+  const spec = toolResultStatusPillSpec(
+    toolResultStatusKind({ isSteerSkipped, spawnBlocked, isSubagent, isTeammate, ok })
   );
+  if (!spec) return null;
+  return <span className={spec.className}>{t(spec.i18nKey)}</span>;
 }
 
+function ToolResultSummaryPillView({
+  pill,
+  t
+}: {
+  pill: ToolResultSummaryPillSpec;
+  t: (key: MessageKey, params?: Record<string, string>) => string;
+}) {
+  if (pill.id === 'spawn-blocked') return <SpawnBlockedPill />;
+  if (pill.id === 'confidence') {
+    return <span className={pill.className}>{t(pill.i18nKey, { value: pill.value })}</span>;
+  }
+  if (pill.id === 'sandbox') {
+    return (
+      <span className={pill.className} data-testid={pill.testId}>
+        {t(pill.i18nKey as MessageKey)}
+      </span>
+    );
+  }
+  return <span className={pill.className}>{t(pill.i18nKey)}</span>;
+}
 
 function ToolResultSummary({
   name,
@@ -330,12 +341,12 @@ function ToolResultSummary({
   };
 }) {
   const { t } = useI18n();
-  const flags = toolResultSummaryFlags({
+  const pills = toolResultSummaryPillSpecs({
     confidence,
     isLowConf,
     modelView,
     spawnBlocked: Boolean(spawnBlocked),
-    sandboxReason,
+    sandboxReasonKey: sandboxReason ? osSandboxReasonKey(sandboxReason) : null,
     stub,
     trimmed
   });
@@ -350,22 +361,9 @@ function ToolResultSummary({
       />
       <span className="chat-tool-fold__name">{name ?? 'unknown'}</span>
       {preview ? <span className="chat-tool-fold__preview">{preview}</span> : null}
-      {flags.includes('confidence-low') || flags.includes('confidence-ok') ? (
-        <span className={`chat-tool-fold__pill ${flags.includes('confidence-low') ? 'chat-tool-fold__pill--err' : 'chat-tool-fold__pill--ok'}`}>
-          {t('play.turns.confidence', { value: confidence ?? '' })}
-        </span>
-      ) : null}
-      {flags.includes('model-view') ? (
-        <span className="chat-tool-fold__pill chat-tool-fold__pill--model-view">{t('play.modelViewOnly')}</span>
-      ) : null}
-      {flags.includes('spawn-blocked') ? <SpawnBlockedPill /> : null}
-      {flags.includes('sandbox') ? (
-        <span className="chat-tool-fold__pill" data-testid="os-sandbox-reason">
-          {t(osSandboxReasonKey(sandboxReason!))}
-        </span>
-      ) : null}
-      {flags.includes('stub') ? <span className="chat-tool-fold__pill chat-tool-fold__pill--stub">{t('play.stub')}</span> : null}
-      {flags.includes('trimmed') ? <span className="chat-tool-fold__pill chat-tool-fold__pill--trim">{t('play.trimmed')}</span> : null}
+      {pills.map((pill) => (
+        <ToolResultSummaryPillView key={pill.id} pill={pill} t={t} />
+      ))}
     </summary>
   );
 }
