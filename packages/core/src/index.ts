@@ -14,12 +14,18 @@ export {
   createRegisteredMachinePort,
   createRegisteredMachineTools,
   createDisconnectedBackend,
-  createSshRegisteredMachineBackend
+  createSshRegisteredMachineBackend,
+  createDesktopAgentHub,
+  getSharedDesktopAgentHub,
+  createDesktopAgentBackend,
+  createCompositeRegisteredMachineBackend
 } from './registered-machines/index.js';
 export type {
   RegisteredMachinePort,
   RegisteredMachine,
-  RegisteredMachineBackend
+  RegisteredMachineBackend,
+  DesktopAgentHub,
+  DesktopAgentHandlers
 } from './registered-machines/index.js';
 export type { FactoryMachine, FactoryTask, FactorySettings, FactoryTransport } from './factory/types.js';
 
