@@ -1,0 +1,23 @@
+id: registered-machine-desktop-agent
+title: Desktop agent long-connect for personal registered machines (non-SSH)
+status: implemented
+requirement: |
+  Personal registered machines can connect via a long-lived desktop agent attachment
+  (DesktopAgentHub + createDesktopAgentBackend), without Factory SSH and without
+  requiring an sshAlias. When an agent is attached, list/shell/read/copy work through
+  the agent handlers. Composite backend prefers the agent over the SSH Host-alias
+  backend. Offline / detached machines fail closed.
+notes: 'Round-4 r4-7 Option A; assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: A registered machine with a desktop agent attached to DesktopAgentHub
+    when: list_machines / shell / read / copy run
+    then: connected=true and each op dispatches to the agent handlers (no ssh spawn)
+  - id: AC-2
+    given: An attached agent that later detaches, or a sensitive remote path
+    when: shell / read run
+    then: detach yields machine_disconnected; sensitive paths are refused before handler dispatch
+  - id: AC-3
+    given: Composite backend with both agent hub and SSH backend, Factory settings present
+    when: agent is attached then detached
+    then: attached traffic never calls ssh; Factory settings stay untouched; after detach SSH path is used (fail-closed if offline)

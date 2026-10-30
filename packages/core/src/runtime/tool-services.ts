@@ -1,4 +1,8 @@
-import { createRegisteredMachinePort, createSshRegisteredMachineBackend } from '../registered-machines/index.js';
+import {
+  createRegisteredMachinePort,
+  createCompositeRegisteredMachineBackend,
+  getSharedDesktopAgentHub
+} from '../registered-machines/index.js';
 import {parkBackgroundDurableWait} from '../waits/background-source.js';
 /**
  * Build RuntimeToolServices for builtin tools — extracted from RawAgentRuntime.
@@ -80,7 +84,10 @@ export interface ToolServicesHost {
 export function createToolServices(host: ToolServicesHost): RuntimeToolServices {
   return {
     stateStore: host.store,
-    registeredMachines: createRegisteredMachinePort(host.store, createSshRegisteredMachineBackend()),
+    registeredMachines: createRegisteredMachinePort(
+      host.store,
+      createCompositeRegisteredMachineBackend({ agentHub: getSharedDesktopAgentHub() })
+    ),
     loadSkill: async (name, sessionId) => {
       const result = await host.resolveSkillLoad(name, sessionId);
       if (result.manifest) persistActiveSkillManifest(host.store, sessionId, result.manifest);
