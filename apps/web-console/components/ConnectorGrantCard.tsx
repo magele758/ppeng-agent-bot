@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { postConnectorGrant } from './ConnectorsSettingsCard';
+import { api } from '@/lib/api';
+import { postConnectorGrant } from '@/lib/connectors-grant';
 import { connectorGrantApprovalCard, connectorGrantResultCard, type ConnectorGrantCardFace } from '@/lib/connectors-grant-card';
 import { useI18n } from '@/lib/i18n';
 
@@ -35,6 +36,12 @@ function grantStatusText(failed: boolean, failedText: string, doneText: string):
   return failed ? failedText : doneText;
 }
 
+function postGrant(row: Parameters<typeof postConnectorGrant>[0], name: string) {
+  return postConnectorGrant(row, name, (path, body) =>
+    api(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+  );
+}
+
 export function ConnectorGrantFace({ face }: { face: ConnectorGrantCardFace }) {
   const { t } = useI18n();
   const [name, setName] = useState(face.secretEnv ?? '');
@@ -44,7 +51,7 @@ export function ConnectorGrantFace({ face }: { face: ConnectorGrantCardFace }) {
   const grant = () => {
     if (blocked) return;
     setBusy(true);
-    void postConnectorGrant(face.row, name)
+    void postGrant(face.row, name)
       .then(() => setStatus(grantStatusText(false, t('play.approval.connectorGrantFailed'), t('play.approval.connectorGrantDone'))))
       .catch(() => setStatus(grantStatusText(true, t('play.approval.connectorGrantFailed'), t('play.approval.connectorGrantDone'))))
       .finally(() => setBusy(false));

@@ -115,3 +115,14 @@ export function defaultGrantName(row: ConnectorView, secrets: readonly SecretNam
   if (row.secretEnv && ENV_NAME_RE.test(row.secretEnv)) return row.secretEnv;
   return secrets[0]?.name ?? '';
 }
+
+/** POST /api/connectors/:id/grant. Names only — never a secret value. */
+export async function postConnectorGrant(
+  row: ConnectorView,
+  pickedName: string | undefined,
+  post: (path: string, body: { secretEnv?: string; credRef?: string }) => Promise<unknown>
+): Promise<void> {
+  const body = grantReferenceBody(row, pickedName);
+  await post(`/api/connectors/${encodeURIComponent(row.id)}/grant`, body);
+}
+
