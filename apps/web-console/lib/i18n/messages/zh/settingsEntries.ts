@@ -361,12 +361,25 @@ export const settingsEntries = {
   },
   connectors: {
     title: '连接器授权',
-    keywords: '连接器 connector 授权 grant 插件 领域 密钥',
-    desc: '每个连接器单独授权后，使用说明才会交给模型。这里只显示名称和是否已授权。',
+    keywords: '连接器 connector 授权 grant 插件 领域 密钥 保险库 needsAuth needsGrant',
+    desc: '每个连接器会显示还缺密钥引用、可以授权，或已经授权。授权只保存密钥库里的名字，密钥值不会进入模型。',
     empty: '当前没有可授权的连接器。',
     granted: '已授权',
     notGranted: '未授权',
-    loadFailed: '无法读取连接器'
+    loadFailed: '无法读取连接器',
+    stateMachine: '授权状态',
+    states: {
+      needsAuth: '需要密钥引用',
+      needsGrant: '可以授权',
+      granted: '已授权'
+    },
+    secretRef: '密钥库名称',
+    credRef: '凭据引用',
+    vaultName: '密钥库名称',
+    grant: '授权',
+    revoke: '撤销',
+    grantFailed: '无法授权。请选择密钥库里的名称，不要填写密钥本身。',
+    revokeFailed: '无法撤销这个连接器'
   },
   langfuse: {
     title: 'Langfuse 追踪',

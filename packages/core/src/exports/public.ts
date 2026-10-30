@@ -734,6 +734,7 @@ export {
   revokeConnector,
   instructionsForGranted,
   shouldInjectDiscovery,
+  connectorAuthState,
   mergeGrantedConnectorTools,
   pluginConnectorId,
   discoveryConnectorId,
@@ -744,12 +745,14 @@ export type {
   ConnectorPublic,
   ConnectorSource,
   ConnectorAuthKind,
+  ConnectorAuthState,
   DomainConnectorSource,
   ConnectorGrantStore,
   ConnectorRegistryDeps
 } from '../connectors/registry.js';
 export * from '../ingestion/index.js';
 export * from '../artifact/index.js';
+export * from '../library/index.js';
 export { createArtifactTools } from '../tools/artifact-tools.js';
 export {
   BROWSER_SETTINGS_KEY,

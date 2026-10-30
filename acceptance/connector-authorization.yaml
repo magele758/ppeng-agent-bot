@@ -1,0 +1,28 @@
+id: connector-authorization
+title: Lab connector authorization states and SecretVault grant
+status: implemented
+requirement: |
+  The Lab Connectors panel shows a visible authorization state for every connector:
+  needsAuth (credential required, no SecretVault reference yet), needsGrant (a
+  reference is present, or no secret is required, and the user has not granted),
+  and granted. One-click grant posts only a SecretVault name or an existing
+  credential reference. Secret values never enter the grant record, the public
+  list, or the model prompt. In-chat grant cards are out of scope.
+notes: 'r4-4; Machine: 4090. Lab settings card only. ConnectorRegistry grant/revoke unchanged aside from authState.'
+criteria:
+  - id: AC-1
+    given: A connector requires auth and has no secretEnv or credRef
+    when: Lab lists connectors
+    then: The row is needsAuth and is not injected into the model prompt
+  - id: AC-2
+    given: A connector already names a SecretVault entry or needs no secret
+    when: Lab lists connectors before a grant
+    then: The row is needsGrant and still contributes no tools or instructions
+  - id: AC-3
+    given: A needsGrant or needsAuth row and a SecretVault name
+    when: The user grants in one click
+    then: The stored grant is only secretEnv or credRef, the row becomes granted, and the secret value is absent from the prompt and the public list
+  - id: AC-4
+    given: Lab settings are open in Chinese or English
+    when: The user looks at the Connectors card
+    then: needsAuth, needsGrant, and granted are visible, and Grant sends a vault name rather than a secret value

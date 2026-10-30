@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { loadPluginFromDir } from '../dist/plugins/plugin-loader.js';
 import {
   CONNECTOR_GRANTS_KEY,
+  connectorAuthState,
   createConnectorRegistry,
   discoveryConnectorId,
   instructionsForGranted,
@@ -85,7 +86,35 @@ function harness() {
   return { root, loaded, cards, store, env, registry };
 }
 
-test('ungranted connectors contribute no tools and no prompt instructions', () => {
+test('authorization dialogue is needsAuth, needsGrant, or granted [AC:connector-authorization#AC-1]', () => {
+  assert.equal(connectorAuthState({ granted: false, authKind: 'bearer' }), 'needsAuth');
+  assert.equal(connectorAuthState({ granted: false, authKind: 'oauth' }), 'needsAuth');
+  assert.equal(connectorAuthState({ granted: false, authKind: 'header', secretEnv: 'ACME_TOKEN' }), 'needsGrant');
+  assert.equal(connectorAuthState({ granted: false, authKind: 'none', credRef: 'vault:docs' }), 'needsGrant');
+  assert.equal(connectorAuthState({ granted: false, authKind: 'none' }), 'needsGrant');
+  assert.equal(connectorAuthState({ granted: true, authKind: 'bearer' }), 'granted');
+
+  const h = harness();
+  try {
+    h.registry.setDomains([{ id: 'billing', title: 'Billing', authKind: 'header' }]);
+    const billing = h.registry.listPublic(h.env).find((row) => row.id === 'domain:billing');
+    assert.equal(billing.authState, 'needsAuth');
+    assert.equal(billing.granted, false);
+    assert.equal(billing.secretEnv, undefined);
+    const wire = JSON.stringify(h.registry.listPublic(h.env));
+    assert.equal(wire.includes(SECRET), false);
+    assert.equal(wire.includes('instructions'), false);
+    h.registry.grantConnector('domain:billing', { secretEnv: 'ACME_TOKEN' }, h.env);
+    const granted = h.registry.listPublic(h.env).find((row) => row.id === 'domain:billing');
+    assert.equal(granted.authState, 'granted');
+    assert.equal(granted.secretEnv, 'ACME_TOKEN');
+    assert.equal(JSON.stringify(h.store.getDaemonControl(CONNECTOR_GRANTS_KEY)).includes(SECRET), false);
+  } finally {
+    rmSync(h.root, { recursive: true, force: true });
+  }
+});
+
+test('ungranted connectors with a vault name or no secret are needsGrant and contribute no tools or instructions [AC:connector-authorization#AC-2]', () => {
   const h = harness();
   try {
     assert.equal(h.loaded.tools.length, 0);
@@ -103,7 +132,8 @@ test('ungranted connectors contribute no tools and no prompt instructions', () =
 
     const listed = h.registry.listConnectors(h.env);
     assert.equal(listed.some((row) => row.id === pluginConnectorId('acme') && row.granted === false), true);
-    assert.equal(listed.some((row) => row.source === 'domain' && row.title === 'SRE Agent'), true);
+    assert.equal(listed.find((row) => row.id === pluginConnectorId('acme')).authState, 'needsGrant');
+    assert.equal(listed.find((row) => row.source === 'domain' && row.title === 'SRE Agent').authState, 'needsGrant');
     assert.equal(listed.some((row) => row.id === discoveryConnectorId('untrusted-card')), false);
   } finally {
     rmSync(h.root, { recursive: true, force: true });
@@ -127,6 +157,7 @@ test('grant reveals instructions without the secret, revoke drops the connector 
       h.env
     );
     assert.equal(granted.granted, true);
+    assert.equal(granted.authState, 'granted');
     assert.equal(granted.secretEnv, 'ACME_TOKEN');
     assert.equal(granted.credRef, 'vault:acme');
     const prompt = promptFragment(h.registry, h.env);
@@ -170,6 +201,7 @@ test('grant reveals instructions without the secret, revoke drops the connector 
     assert.equal(after.includes('Bound Docs'), false);
     assert.deepEqual(next.toolsForGranted(h.env), []);
     assert.equal(next.listConnectors(h.env).find((row) => row.id === pluginId).granted, false);
+    assert.equal(next.listConnectors(h.env).find((row) => row.id === pluginId).authState, 'needsGrant');
     assert.equal(shouldInjectDiscovery('untrusted', true), false);
     assert.equal(shouldInjectDiscovery('bound', true), true);
 

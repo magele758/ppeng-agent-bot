@@ -1,0 +1,37 @@
+id: durable-page-port
+title: 库级持久页面与分享链接
+status: implemented
+requirement: |
+  implement a SMALL cut of a library-level durable Page Port (shareable markdown page).
+  This is NOT DurableArtifactPort and NOT paged tool-result by-reference (#328).
+  A Page has a title, a monotonic revision, a shareable id, and a markdown body.
+  It persists in the runtime store and can be created, updated, fetched, and listed
+  through the same daemon/core patterns as other library resources.
+  Rendering may reuse a read-only A2UI basic-catalog surface. Do not clone a
+  Grok/Cursor canvas, and do not turn session A2UI cards into library pages.
+notes: 'assumedApproval: standing-order-2026-10-22. 选择最小 markdown 页面加分享链接。不做 Canvas UI，不改工具结果分页。分享链接只公开该页正文。'
+criteria:
+  - id: AC-1
+    given: 库里还没有这份页面
+    when: 用标题和 markdown 正文创建
+    then: 得到页面 id、第 1 版、分享路径，正文与标题一致，且只读表面里能看到正文
+  - id: AC-2
+    given: 页面已创建
+    when: 只改正文
+    then: 版本加一，分享 id 不变，标题保持原样；内容没变时版本不加
+  - id: AC-3
+    given: 页面已创建
+    when: 用分享 id 读取，以及列出库
+    then: 分享链接读回同一正文；列表有该页的标题和分享路径，但不含正文
+  - id: AC-4
+    given: 页面已写入某个状态库
+    when: 关掉后再用同一状态库打开
+    then: 仍能按 id 和分享 id 读到原来的正文和版本
+  - id: AC-5
+    given: 标题为空，或页面不存在
+    when: 创建或读取
+    then: 空标题被拒绝且不落库；不存在的 id 和分享 id 都读不到
+  - id: AC-6
+    given: 页面已通过该入口创建
+    when: 经 daemon 列出、按 id 读取，并用分享链接读取
+    then: 列表、详情和分享链接都是同一页；分享链接不需要登录
