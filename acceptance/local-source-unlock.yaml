@@ -1,0 +1,23 @@
+id: local-source-unlock
+title: 本机只读命令在批准后能真正执行（来源范围审批匹配、审批卡、已保存 direct 不再 Auto-review）
+status: implemented
+requirement: |
+  Bot 读本机数据（如语音备忘录）时，bash 输出带 «external» 标记会让会话进入「已暴露」状态，
+  之后的有副作用工具需要已保存来源范围或对这次精确调用的批准。现状三处缺陷让批准永远无效：
+  1) Auto-review 审批卡存的是去掉 requestSmartModeApproval 等升级标志的参数，来源范围检查却拿原始参数比对，批准后 1 秒仍 source_scope_denied；
+  2) 来源范围拒绝时不出审批卡，提示「approve this exact call」却没有可批准的东西；
+  3) Lab 已保存隔离方式 direct 时，模型显式写 isolation:"direct" 仍被 Auto-review 当高危拦截，与「保存 direct 不再为这一项单独审批」矛盾。
+notes: 'assumedApproval: standing-order-2026-10-22。bypass 会话视为显式授权由并行 PR（bypass-source-scope）负责，本规格不重复。'
+criteria:
+  - id: AC-1
+    given: 已暴露会话里一条 bash 调用带 requestSmartModeApproval / smartModeBlockReason，对应 Auto-review 审批卡（参数不含这些标志）已在暴露之后创建并批准
+    when: 同一调用重试执行
+    then: 来源范围检查认这张批准，命令执行，不再返回 source_scope_denied
+  - id: AC-2
+    given: 已暴露会话里一条有副作用的调用没有任何匹配批准
+    when: 执行该调用
+    then: 返回 source_scope_denied 并为这次精确参数创建一张待批审批卡（不重复创建）；批准后同一调用执行，拒绝后仍被拒；routine/事件来源的会话同样只能靠这张卡或已保存范围放行
+  - id: AC-3
+    given: Lab 已保存隔离方式 direct
+    when: 模型对普通只读命令显式传 isolation:"direct"
+    then: Auto-review 不拦；命令本身命中高危模式（如 rm）时仍拦；已保存 auto/os 时显式 direct 仍拦

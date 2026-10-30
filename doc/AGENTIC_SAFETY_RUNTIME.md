@@ -25,6 +25,20 @@
   - **审计与可追溯**：会话/工具 trace、日志；运营侧可据此做事后审查。
   - **策略注入（弱但合法）**：通过系统提示 **附录** 重申边界（见下项）；**不** 等同于训练层对齐，只是运行时提醒与一致话术。
 
+## 读本机数据时的五层闸门（以语音备忘录为例）
+
+一条 `bash` 要真正读到 `~/Library/Group Containers/...` 下的文件，要依次过五层，它们各管各的，互不替代：
+
+| 层 | 管什么 | 放行方式 |
+|----|--------|----------|
+| 审批（Auto-review / 审批卡） | 高危命令（`rm `、管道进 shell、MCP）和「绕开已保存隔离方式」的 `isolation: "direct"` | 同参带 `requestSmartModeApproval` 重试 → 负责人批卡。Lab 已保存 direct 时，显式 direct 不再单独拦 |
+| `permissionMode`（auto / bypass / plan） | 普通工具要不要逐个审批 | 会话设置。bypass **不**绕过 Auto-review，也不碰路径封锁 |
+| 沙箱隔离方式（Lab「命令沙箱」） | 命令是否套 seatbelt / bwrap | 保存为 direct 则不套；os 下 seatbelt 只拒 `~/.ssh`、`~/.aws`、`~/.gnupg` 等密钥目录，不拒 Group Containers |
+| 来源范围（`SourceLedger`） | 会话看过外部内容（含带 `«external` 标记的 bash 输出）后，后续有副作用的调用不能由这些内容授权 | Learning 工作台保存范围；或对**这次精确调用**的批准（参数比对时忽略 `requestSmartModeApproval` 等升级标志）。有人值守的根会话被拒时会自动出一张「source scope」审批卡并等待；routine、子 agent、无人值守唤醒仍直接拒 |
+| macOS TCC（系统隐私） | 进程能否读语音备忘录、邮件等受保护目录 | 只能由用户在「系统设置 → 隐私与安全性 → 完全磁盘访问权限」授权给**实际运行 daemon 的 node 可执行文件**（或启动它的终端 App）。没授权时 `ls` 报 `Operation not permitted`，代码层无法也不应绕过 |
+
+排查顺序：先看工具结果的错误码（`AUTO_REVIEW_BLOCKED` → 审批；`source_scope_denied` → 来源范围；`Operation not permitted` → TCC），不要用换命令、换工具的办法绕过。
+
 ## 可选环境变量：运行时系统附录
 
 设置 `RAW_AGENT_AGENTIC_SAFETY_APPENDIX=1`（或 `general` / `true`）时，在 **`general` 内置智能体** 的稳定系统前缀末尾追加一段 **英文** 简短附录（与现有系统提示语言一致），提醒：反对为自保或完成任务而伤害用户/他人、工具意图冲突时暂停询问、配合审批与最小权限、在强冲突场景下把矛盾写清以便人工审计。
