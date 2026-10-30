@@ -11,3 +11,7 @@
 ## Upstream request id
 
 `upstream-request-id.ts` 从 header / JSON / SSE / 嵌套 error 串提取上游 `request_id`，经 `ModelTurnResult.requestId` 进 `turn_end`。纯观测，不改循环控制。
+
+## Prompt variant A/B (Lab UI)
+
+Stable system prefix has two wordings: `anthropic5` (default) and `legacy`. Operators pick the active variant in Lab **Settings → Behavior → System prompt variant**. To roll back, select `legacy` and save — no env switch.

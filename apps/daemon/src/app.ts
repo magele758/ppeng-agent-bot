@@ -39,6 +39,7 @@ import { gatewaySettingsRoutes } from './routes/gateway-settings.js';
 import { configRoutes, type ConfigRoutesDeps } from './routes/config.js';
 import { cronRoutes } from './routes/cron.js';
 import { dynToolRoutes } from './routes/dyn-tools.js';
+import { promptVariantRoutes } from './routes/prompt-variant.js';
 import { goalRoutes } from './routes/goals.js';
 import { jevRoutes } from './routes/jev.js';
 import { langfuseRoutes } from './routes/langfuse.js';
@@ -145,6 +146,7 @@ export function buildDaemonRouter(deps: DaemonAppDeps): Router {
     .addAll(runtimeCapabilitiesRoutes(runtime))
     .addAll(skillProposalRoutes(runtime))
     .addAll(dynToolRoutes(runtime))
+    .addAll(promptVariantRoutes(runtime))
     .addAll(toolExposureRoutes(runtime))
     .addAll(attachmentRoutes(runtime))
     .addAll(libraryPickRoutes(runtime))

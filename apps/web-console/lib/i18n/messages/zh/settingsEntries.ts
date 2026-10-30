@@ -106,6 +106,23 @@ export const settingsEntries = {
       }
     }
   },
+  promptVariant: {
+    title: '系统提示词变体',
+    keywords: '提示词 system prompt anthropic5 legacy A/B 回退 文案',
+    desc: '选择稳定系统提示词的写法。默认 anthropic5（按 Anthropic 五法则重组）。选 legacy 可回退到旧文案。',
+    fields: {
+      variant: {
+        label: '当前变体',
+        hint: '下一轮对话生效，无需重启进程。'
+      }
+    },
+    options: {
+      anthropic5: { label: 'anthropic5（默认）' },
+      legacy: { label: 'legacy（回退）' }
+    },
+    effective: '生效值',
+    rollbackHint: '回退：在此选择 legacy 并保存。'
+  },
   agentLoopEngine: {
     title: 'Agent 运行引擎',
     keywords: '内核 kernel 组装 档位 assembly drain 工具发射 消息堆积 inbox overflow 上限 底层 调度',
