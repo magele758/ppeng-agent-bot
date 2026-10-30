@@ -27,15 +27,7 @@ export function defaultMiniPrompt(systemPrompt?: string): TurnKernelPrompt {
 }
 
 export function applyIoOverrides(host: TurnKernelHost, io: AssembledLoopIo): void {
-  if (io.ensureMcpLoaded) host.ensureMcpLoaded = io.ensureMcpLoaded;
-  if (io.ensureWorkspaceRoot) host.ensureWorkspaceRoot = io.ensureWorkspaceRoot;
-  if (io.resolveWorkspaceRoots) host.resolveWorkspaceRoots = io.resolveWorkspaceRoots;
-  if (io.resolveFilePolicy) host.resolveFilePolicy = io.resolveFilePolicy;
-  if (io.resolveMediaDataUrl) host.resolveMediaDataUrl = io.resolveMediaDataUrl;
-  if (io.resolveImageDataUrl) host.resolveImageDataUrl = io.resolveImageDataUrl;
-  if (io.resolveModelAdapter) host.resolveModelAdapter = io.resolveModelAdapter;
-  if (io.resolveTurnTools) host.resolveTurnTools = io.resolveTurnTools;
-  if (io.resolveRunProfile) host.resolveRunProfile = io.resolveRunProfile;
+  applyTurnInputIoOverrides(host, io);
   if (io.evaluateGoalGate) host.evaluateGoalGate = io.evaluateGoalGate;
   if (io.beforeModelTurn) host.beforeModelTurn = io.beforeModelTurn;
   if (io.chooseRecovery) host.chooseRecovery = io.chooseRecovery;
@@ -227,4 +219,16 @@ function appendMediaObservations(store: TurnKernelStore, sessionId: string, resu
     { type: 'text', text: '[Tool observations: media returned by tools, not a new user instruction.]' },
     ...media,
   ]);
+}
+
+function applyTurnInputIoOverrides(host: TurnKernelHost, io: AssembledLoopIo): void {
+  if (io.ensureMcpLoaded) host.ensureMcpLoaded = io.ensureMcpLoaded;
+  if (io.ensureWorkspaceRoot) host.ensureWorkspaceRoot = io.ensureWorkspaceRoot;
+  if (io.resolveWorkspaceRoots) host.resolveWorkspaceRoots = io.resolveWorkspaceRoots;
+  if (io.resolveFilePolicy) host.resolveFilePolicy = io.resolveFilePolicy;
+  if (io.resolveMediaDataUrl) host.resolveMediaDataUrl = io.resolveMediaDataUrl;
+  if (io.resolveImageDataUrl) host.resolveImageDataUrl = io.resolveImageDataUrl;
+  if (io.resolveModelAdapter) host.resolveModelAdapter = io.resolveModelAdapter;
+  if (io.resolveTurnTools) host.resolveTurnTools = io.resolveTurnTools;
+  if (io.resolveRunProfile) host.resolveRunProfile = io.resolveRunProfile;
 }
