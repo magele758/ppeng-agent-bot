@@ -14,6 +14,10 @@
 import type {
   HttpProblemDetails,
   ImagePart,
+  AudioPart,
+  VideoPart,
+  MediaPart,
+  MediaSource,
   ImageRetentionTier,
   MessagePart,
   MessageRole,
@@ -27,6 +31,10 @@ import type {
 export type {
   HttpProblemDetails,
   ImagePart,
+  AudioPart,
+  VideoPart,
+  MediaPart,
+  MediaSource,
   ImageRetentionTier,
   MessagePart,
   MessageRole,
@@ -263,6 +271,8 @@ export interface ToolExecutionResult {
   content: string;
   /** Host-ingested screenshots, forwarded to the model after the full tool-result wave. */
   images?: ImagePart[];
+  /** Native media observations appended after the tool-result wave. */
+  media?: MediaPart[];
   artifacts?: TaskArtifact[];
   metadata?: Record<string, unknown>;
 }
@@ -320,6 +330,8 @@ export interface ModelTurnInput {
   signal?: AbortSignal;
   /** Session that owns this turn (used to pick Lab-configured provider/model). */
   sessionId?: string;
+  /** Resolve host-owned media assets to a data URL or provider-accessible HTTPS URL. */
+  resolveMediaDataUrl?: (part: MediaPart, signal?: AbortSignal) => Promise<string | undefined>;
   /** Resolve image asset id to data URL for VL requests (optional). */
   resolveImageDataUrl?: (assetId: string, signal?: AbortSignal) => Promise<string | undefined>;
   /** When `RAW_AGENT_DEBUG_LLM_PROMPT` is set, adapters may log sanitized request bodies here. */

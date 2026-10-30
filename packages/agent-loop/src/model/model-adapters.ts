@@ -1,3 +1,4 @@
+import { assertMediaProtocol, buildMediaUserContent, mediaContentBlock, mediaRequestOptions, isMediaPart, type MediaProfile } from './media-content.js';
 import type {
   MessagePart,
   ModelAdapter,
@@ -110,14 +111,14 @@ function assistantOpenAiTextFromParts(parts: MessagePart[]): string {
   return chunks.join('\n\n').trim();
 }
 
-/** Text + image placeholders for skill matching and summarization. */
+/** Text + media placeholders for skill matching and summarization. */
 export function textSummaryFromParts(parts: MessagePart[]): string {
   const lines: string[] = [];
   for (const part of parts) {
     if (part.type === 'reasoning') lines.push(part.text);
     else if (part.type === 'text') lines.push(part.text);
-    else if (part.type === 'image') {
-      lines.push(`[image ${part.assetId}${part.retentionTier ? ` tier=${part.retentionTier}` : ''}]`);
+    else if (isMediaPart(part)) {
+      lines.push(`[${part.type} ${part.assetId}${part.type === 'image' && part.retentionTier ? ` tier=${part.retentionTier}` : ''}]`);
     } else if (part.type === 'tool_call') lines.push(`[tool ${part.name}]`);
     else if (part.type === 'tool_result') lines.push(`[result ${part.name}] ${part.content}`);
   }
@@ -907,7 +908,9 @@ async function buildOpenAiMessages(
   systemPrompt: string,
   messages: SessionMessage[],
   resolveImage?: (assetId: string, signal?: AbortSignal) => Promise<string | undefined>,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  resolveMedia?: ModelTurnInput['resolveMediaDataUrl'],
+  profile: MediaProfile = 'openai'
 ): Promise<Array<Record<string, unknown>>> {
   const output: Array<Record<string, unknown>> = [
     {
@@ -958,34 +961,7 @@ async function buildOpenAiMessages(
     }
 
     if (message.role === 'user') {
-      const contentBlocks: Array<Record<string, unknown>> = [];
-      let textAcc = '';
-      for (const part of message.parts) {
-        if (part.type === 'text') {
-          textAcc += (textAcc ? '\n' : '') + part.text;
-        } else if (part.type === 'image') {
-          if (textAcc.trim()) {
-            contentBlocks.push({ type: 'text', text: textAcc.trim() });
-            textAcc = '';
-          }
-          if (resolveImage) {
-            const url = await resolveImage(part.assetId, signal);
-            if (url) {
-              contentBlocks.push({
-                type: 'image_url',
-                image_url: { url }
-              });
-            } else {
-              textAcc += `[missing image ${part.assetId}]`;
-            }
-          } else {
-            textAcc += `[image ${part.assetId}]`;
-          }
-        }
-      }
-      if (textAcc.trim()) {
-        contentBlocks.push({ type: 'text', text: textAcc.trim() });
-      }
+      const contentBlocks = await buildMediaUserContent(message.parts, { protocol: 'chat_completions', profile, resolveImage, resolveMedia, signal });
       let content: string | Array<Record<string, unknown>>;
       if (contentBlocks.length === 0) {
         content = '';
@@ -1023,7 +999,8 @@ async function buildOpenAiMessages(
 async function buildResponsesApiInput(
   messages: SessionMessage[],
   resolveImage?: (assetId: string, signal?: AbortSignal) => Promise<string | undefined>,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  resolveMedia?: ModelTurnInput['resolveMediaDataUrl']
 ): Promise<Array<Record<string, unknown>>> {
   const out: Array<Record<string, unknown>> = [];
 
@@ -1053,35 +1030,7 @@ async function buildResponsesApiInput(
     }
 
     if (message.role === 'user') {
-      const content: Array<Record<string, unknown>> = [];
-      let textAcc = '';
-      for (const part of message.parts) {
-        if (part.type === 'text') {
-          textAcc += (textAcc ? '\n' : '') + part.text;
-        } else if (part.type === 'image') {
-          if (textAcc.trim()) {
-            content.push({ type: 'input_text', text: textAcc.trim() });
-            textAcc = '';
-          }
-          if (resolveImage) {
-            const url = await resolveImage(part.assetId, signal);
-            if (url) {
-              content.push({
-                type: 'input_image',
-                image_url: url,
-                detail: 'auto' as const
-              });
-            } else {
-              textAcc += `[missing image ${part.assetId}]`;
-            }
-          } else {
-            textAcc += `[image ${part.assetId}]`;
-          }
-        }
-      }
-      if (textAcc.trim()) {
-        content.push({ type: 'input_text', text: textAcc.trim() });
-      }
+      const content = await buildMediaUserContent(message.parts, { protocol: 'responses', resolveImage, resolveMedia, signal });
       if (content.length > 0) {
         out.push({
           type: 'message',
@@ -1161,16 +1110,11 @@ async function buildResponsesApiInput(
   return out;
 }
 
-function parseDataUrl(dataUrl: string): { mediaType: string; base64: string } | undefined {
-  const m = dataUrl.match(/^data:([^;,]+);base64,(.+)$/is);
-  if (!m?.[1] || !m[2]) return undefined;
-  return { mediaType: m[1], base64: m[2] };
-}
-
 async function buildAnthropicMessages(
   messages: SessionMessage[],
   resolveImage?: (assetId: string, signal?: AbortSignal) => Promise<string | undefined>,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  resolveMedia?: ModelTurnInput['resolveMediaDataUrl']
 ): Promise<{
   messages: Array<Record<string, unknown>>;
   refusalReminder: string | null;
@@ -1213,23 +1157,8 @@ async function buildAnthropicMessages(
       if (part.type === 'text') {
         content.push({ type: 'text', text: part.text });
       }
-      if (part.type === 'image' && resolveImage) {
-        const dataUrl = await resolveImage(part.assetId, signal);
-        const parsed = dataUrl ? parseDataUrl(dataUrl) : undefined;
-        if (parsed) {
-          content.push({
-            type: 'image',
-            source: {
-              type: 'base64',
-              media_type: parsed.mediaType,
-              data: parsed.base64
-            }
-          });
-        } else {
-          content.push({ type: 'text', text: `[missing image ${part.assetId}]` });
-        }
-      } else if (part.type === 'image' && !resolveImage) {
-        content.push({ type: 'text', text: `[image ${part.assetId}]` });
+      if (part.type === 'image') {
+        content.push(await mediaContentBlock(part, { protocol: 'anthropic', resolveImage, resolveMedia, signal }));
       }
       if (part.type === 'tool_call') {
         content.push({
@@ -1394,6 +1323,8 @@ export interface OpenAICompatibleAdapterOptions {
   useJsonMode: boolean;
   /** When `responses`, POST `/v1/responses` with `input` (OpenAI reasoning / interleaved tools). */
   httpKind?: OpenAiHttpKind;
+  /** Explicit Chat Completions media dialect; default OpenAI WAV/MP3 input. */
+  mediaProfile?: MediaProfile;
   /** Process environment for debug-logging checks; defaults to `{}`. */
   env?: NodeJS.ProcessEnv;
 }
@@ -1407,6 +1338,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
   constructor(options: OpenAICompatibleAdapterOptions) {
     this.options = {
       httpKind: 'chat_completions',
+      mediaProfile: 'openai',
       env: {},
       ...options,
       apiKey: normalizeRemoteSecret(options.apiKey),
@@ -1490,6 +1422,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
       }>;
     };
 
+    assertMediaProtocol(input.messages, this.httpKind, this.options.mediaProfile);
     const tools = toolDefinitions(input.tools);
     const endpoint = openAiCompatEndpoint(this.options.baseUrl, this.httpKind);
 
@@ -1497,7 +1430,8 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
       const responsesInput = await buildResponsesApiInput(
         input.messages,
         input.resolveImageDataUrl,
-        input.signal
+        input.signal,
+        input.resolveMediaDataUrl
       );
       const payload = {
         model: this.options.model,
@@ -1526,11 +1460,14 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
       input.systemPrompt,
       input.messages,
       input.resolveImageDataUrl,
-      input.signal
+      input.signal,
+      input.resolveMediaDataUrl,
+      this.options.mediaProfile
     );
     const payload = {
       model: this.options.model,
       messages: msgs,
+      ...mediaRequestOptions(input),
       tools,
       tool_choice: 'auto',
       ...(input.promptCacheKey ? { prompt_cache_key: input.promptCacheKey } : {})
@@ -1592,6 +1529,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
     input: ModelTurnInput,
     onChunk: (chunk: ModelStreamChunk) => void
   ): Promise<ModelTurnResult> {
+    assertMediaProtocol(input.messages, this.httpKind, this.options.mediaProfile);
     const tools = toolDefinitions(input.tools);
     const endpoint = openAiCompatEndpoint(this.options.baseUrl, this.httpKind);
     const payload =
@@ -1602,7 +1540,8 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
             input: await buildResponsesApiInput(
               input.messages,
               input.resolveImageDataUrl,
-              input.signal
+              input.signal,
+              input.resolveMediaDataUrl
             ),
             tools: mapToolDefinitionsToResponsesFormat(tools),
             tool_choice: 'auto' as const,
@@ -1615,8 +1554,11 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
               input.systemPrompt,
               input.messages,
               input.resolveImageDataUrl,
-              input.signal
+              input.signal,
+              input.resolveMediaDataUrl,
+              this.options.mediaProfile
             ),
+            ...mediaRequestOptions(input),
             tools,
             tool_choice: 'auto',
             stream: true,
@@ -2027,10 +1969,12 @@ export class AnthropicMessagesAdapter implements ModelAdapter {
   }
 
   private async buildTurnPayload(input: ModelTurnInput): Promise<Record<string, unknown>> {
+    assertMediaProtocol(input.messages, 'anthropic');
     const { messages: anthropicMsgs, refusalReminder } = await buildAnthropicMessages(
       input.messages,
       input.resolveImageDataUrl,
-      input.signal
+      input.signal,
+      input.resolveMediaDataUrl
     );
 
     // Build system prompt array, merging refusal preservation reminder if present
@@ -2175,9 +2119,9 @@ export class HybridModelRouterAdapter implements ModelAdapter {
   private needsVl(input: ModelTurnInput): boolean {
     if (this.routeScope === 'last_user') {
       const last = [...input.messages].reverse().find((m) => m.role === 'user');
-      return last?.parts.some((p) => p.type === 'image') ?? false;
+      return last?.parts.some(isMediaPart) ?? false;
     }
-    return input.messages.some((m) => m.parts.some((p) => p.type === 'image'));
+    return input.messages.some((m) => m.parts.some(isMediaPart));
   }
 
   async runTurn(input: ModelTurnInput): Promise<ModelTurnResult> {

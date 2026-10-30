@@ -26,6 +26,8 @@ function partText(part: MessagePart): string | null {
       return part.text;
     case 'tool_result':
       return part.content;
+    case 'audio':
+    case 'video':
     case 'image':
     case 'tool_call':
     case 'surface_update':

@@ -255,6 +255,15 @@ function partBlock(
         text: imageLines(part).join('\n'),
         tokens: IMAGE_PART_TOKEN_ESTIMATE
       });
+    case 'audio':
+    case 'video':
+      return block({
+        ...base,
+        kind: textKind(message.role),
+        label: part.mimeType,
+        text: `[${part.type} ${part.assetId}]`,
+        tokens: estimateMessageTokens([{ role: message.role, parts: [part] }]) - 4
+      });
     case 'tool_call':
       return block({
         ...base,

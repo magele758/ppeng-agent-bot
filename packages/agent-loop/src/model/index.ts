@@ -85,3 +85,8 @@ export {
 
 export { classifyModelError, isUpstreamRetryableCategory, isTerminalModelErrorCategory } from './error-class.js';
 export type { ModelErrorCategory, ModelErrorClassification } from './error-class.js';
+
+export { readMediaFile } from './media-files.js';
+export type { ReadMediaFileOptions } from './media-files.js';
+export { MediaInputError } from './media-content.js';
+export type { MediaProfile } from './media-content.js';

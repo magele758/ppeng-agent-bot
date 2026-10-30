@@ -140,6 +140,8 @@ export interface TurnKernelPrompt {
 // ============================================================================
 
 export interface ToolExecResult {
+  images?: import('../types.js').ImagePart[];
+  media?: import('../types.js').MediaPart[];
   toolCallId: string;
   name: string;
   ok: boolean;
@@ -358,7 +360,9 @@ export interface TurnKernelHost {
     extras?: CheckToolApprovalsExtras
   ): 'proceed' | 'skip' | 'waiting' | Promise<'proceed' | 'skip' | 'waiting'>;
 
-  /** Resolve an image asset id to a data URL for vision turns. */
+  /** Resolve host-authorized media to a data URL or HTTPS URL; honor cancellation. */
+  resolveMediaDataUrl?(part: import('../types.js').MediaPart, sessionId: string, signal?: AbortSignal): Promise<string | undefined>;
+  /** Legacy image asset resolver. */
   resolveImageDataUrl?(assetId: string, sessionId: string): Promise<string | undefined>;
 
   /** Inbox / steer injection before each turn. */

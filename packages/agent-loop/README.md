@@ -74,3 +74,9 @@ console.log(await handle.fold());
 ```js
 import { createMiniAssembledLoop } from '@mage-ai-lab/agent-loop/mini';
 ```
+
+### Native media input
+
+Import `readMediaFile` from `@mage-ai-lab/agent-loop/model` to turn an authorized local image, audio or video file into a `MediaPart`, then append it alongside text in a user message. The original bytes go to the model without transcription or frame extraction. For asset-backed messages, inject `io.resolveMediaDataUrl(part, sessionId, signal)`.
+
+`OpenAICompatibleAdapter({ ...connection, useJsonMode: false, mediaProfile: 'qwen-omni' })` enables the Qwen-Omni Chat Completions dialect (images, audio and video). The default `openai` profile supports images and WAV/MP3 audio; Responses and Anthropic support images only in this SDK. Unsupported media fails before HTTP. `readMediaFile` defaults to 6 MiB per file; provider limits still apply. See [SDK skill](SKILL.md#原生图片音频视频文件输入) for the full example, supported formats and asset/security contract.

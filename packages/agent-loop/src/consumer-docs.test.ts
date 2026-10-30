@@ -81,3 +81,10 @@ describe('consumer docs', () => {
     typecheckQuickstart(snippet);
   });
 });
+
+it('native media skill example typechecks against public exports', () => {
+  const skill = readFileSync(join(repoRoot, 'skills', 'agent-loop', 'SKILL.md'), 'utf8');
+  const snippet = /```ts native-media\r?\n([\s\S]*?)```/.exec(skill)?.[1];
+  expect(snippet).toBeTruthy();
+  typecheckQuickstart(`declare const upstream: { baseUrl: string; apiKey: string; model: string };\n${snippet}`);
+});

@@ -348,3 +348,16 @@ test('preview uses the real prompt and does not rewrite stored tool output [AC:p
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('native media previews show asset references and budget without binary payload [AC:loop-native-media#AC-5]', () => {
+  const payload = assembleContextStack({
+    sessionId: 's', systemPrompt: '', tools: [], budget: budgetShape(),
+    messages: [msg('media', 'user', [
+      { type: 'audio', assetId: 'sound', mimeType: 'audio/wav', source: { type: 'base64', data: 'AQIDBA==' } },
+      { type: 'video', assetId: 'clip', mimeType: 'video/mp4', source: { type: 'base64', data: 'AQIDBA==' } }
+    ])]
+  });
+  assert.equal(payload.blocks.find(b => b.text === '[audio sound]').tokens, 3000);
+  assert.equal(payload.blocks.find(b => b.text === '[video clip]').tokens, 10000);
+  assert.ok(!JSON.stringify(payload).includes('AQIDBA=='));
+});

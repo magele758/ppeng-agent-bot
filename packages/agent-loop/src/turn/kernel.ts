@@ -961,6 +961,9 @@ turnInput = {
         tools: resolvedTools,
         signal,
         sessionId: sid,
+        resolveMediaDataUrl: host.resolveMediaDataUrl
+          ? (part: import('../types.js').MediaPart, mediaSignal?: AbortSignal) => host.resolveMediaDataUrl!(part, context.session.id, mediaSignal)
+          : undefined,
         resolveImageDataUrl: host.resolveImageDataUrl
           ? (assetId: string) => host.resolveImageDataUrl!(assetId, context.session.id)
           : undefined,
