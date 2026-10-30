@@ -19,6 +19,10 @@ export {
   getSharedDesktopAgentHub,
   setSharedDesktopAgentHubForTests,
   createDesktopAgentBackend,
+  createDeviceLocalHub,
+  getSharedDeviceLocalHub,
+  setSharedDeviceLocalHubForTests,
+  createDeviceLocalBackend,
   createCompositeRegisteredMachineBackend,
   createDesktopAgentHttpSseSession
 } from './registered-machines/index.js';
@@ -30,7 +34,9 @@ export type {
   DesktopAgentHub,
   DesktopAgentHandlers,
   DesktopAgentHttpSseSession,
-  DesktopAgentReply
+  DesktopAgentReply,
+  DeviceLocalHub,
+  DeviceLocalHandlers
 } from './registered-machines/index.js';
 export type { FactoryMachine, FactoryTask, FactorySettings, FactoryTransport } from './factory/types.js';
 

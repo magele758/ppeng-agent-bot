@@ -16,7 +16,11 @@ export interface RegisteredMachine {
   connected: boolean;
   /** Host alias from the user's own ssh config. Required for the live SSH backend. */
   sshAlias?: string;
-  /** Optional phone/desktop local tools (stretch; listing only). */
+  /**
+   * Phone/device-local tool states. Listing always returns them.
+   * `device_shell` / `device_copy` must be `available` before those ops run
+   * on the device-local backend; read does not require an entry.
+   */
   deviceLocalTools?: DeviceLocalTool[];
 }
 

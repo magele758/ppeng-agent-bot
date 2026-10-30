@@ -1,0 +1,29 @@
+id: registered-machine-phone-local
+title: Phone registered machines via device-local tools (non-SSH, read-only default)
+status: implemented
+requirement: |
+  Personal registered machines of kind phone show up on list_machines with their
+  deviceLocalTools. Connectivity is a DeviceLocalHub attachment, not createSsh and
+  not Factory SSH. The r5-1 slice is read-only: read_file / backend read dispatches
+  to the phone handler and never spawns ssh. Shell and copy stay closed
+  (device_local_readonly) unless the attachment opts in AND device_shell / device_copy
+  is available. Detach and sensitive paths fail closed. Factory settings stay untouched.
+  Daemon HTTP/SSE remains desktop-only; phone attach is in-process.
+notes: 'Round-5 r5-1; read-only default slice; shell/copy opt-in only; assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: A machine registered with kind phone and deviceLocalTools, then a device-local agent attached
+    when: list_machines and read run
+    then: kind is phone, deviceLocalTools are listed, connected=true, and read dispatches to the phone handler with no ssh spawn
+  - id: AC-2
+    given: The same phone attachment without shell/copy opt-in, or a sensitive remote path, or a later detach
+    when: shell / copy / read run
+    then: shell and copy return device_local_readonly; sensitive paths are refused before handler dispatch; detach yields machine_disconnected
+  - id: AC-3
+    given: Composite backend with device-local hub, desktop hub, and SSH, plus Factory settings
+    when: the phone agent is attached and then detached
+    then: attached read never calls ssh or the desktop hub; Factory settings stay untouched; after detach the SSH path is used (fail-closed if offline)
+  - id: AC-4
+    given: An attachment that opts into shell and a registry row whose device_shell state is not available, then one whose state is available
+    when: shell runs
+    then: unavailable yields device_local_tool_unavailable and does not call the handler; available dispatches to the handler and still does not spawn ssh
