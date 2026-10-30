@@ -1,0 +1,31 @@
+id: slack-events-inbound
+title: Slack Events 入站按线程唤醒例行任务
+status: implemented
+requirement: |
+  Slack Events 的用户消息要能进入 Agent 的会话，并按频道和线程区分。
+  监听 slack/message 的例行任务要被这条消息唤醒，而且知道消息落在哪个线程。
+  签名不对、过期、机器人自己的消息、以及同一条事件的重试都不能再跑一遍。
+  不新增环境变量；飞书入站保持原样；回复仍然先草稿，不直接发到 Slack。
+notes: |
+  user pre-authorized start（用户明确要求立即实现，未等待逐条确认；标准仍以用户视角书写，PR 中供负责人事后复核）
+criteria:
+  - id: AC-1
+    given: Slack 入站已配置签名密钥，并且有一个监听 slack/message 的例行任务
+    when: 一条签名正确的用户消息到达，并且它回复了已有线程
+    then: 消息进入 slack:频道:线程 这一会话，例行任务被唤醒一次，唤醒内容里带有同一线程地址
+  - id: AC-2
+    given: Slack 入站已配置签名密钥
+    when: 签名缺失、错误，或投递时间超过几分钟
+    then: 请求被拒绝，Agent 不运行，例行任务也不唤醒
+  - id: AC-3
+    given: 一条 Slack 用户消息刚刚被接受
+    when: 同一个 event_id 再次到达（Slack 超时重试）
+    then: 第二次不再运行 Agent，也不再唤醒例行任务
+  - id: AC-4
+    given: Slack 入站已配置签名密钥
+    when: 到达的是 URL 验证、机器人自己的消息，或消息编辑
+    then: 不创建会话，也不唤醒例行任务；URL 验证仍返回 challenge
+  - id: AC-5
+    given: 管理员在设置里为 Slack 配置了发送者白名单
+    when: 不在白名单中的用户发来签名正确的消息
+    then: Agent 不运行，例行任务也不唤醒

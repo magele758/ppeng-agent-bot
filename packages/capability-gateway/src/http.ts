@@ -10,6 +10,7 @@ import {
   tryBotChatCommand
 } from './im-handlers.js';
 import { handleEventIngress } from './event-ingress.js';
+import { handleSlackEventsRequest } from './slack-events-handler.js';
 import { appendOutboundDraft as appendOutboundDraftLedger } from './outbound-drafts.js';
 import { createUserDeliveryPort } from './user-delivery-port.js';
 
@@ -85,6 +86,46 @@ function json(res: ServerResponse, status: number, body: unknown): void {
   res.end(JSON.stringify(body, null, 2));
 }
 
+async function dispatchSlackEvents(
+  request: IncomingMessage,
+  response: ServerResponse,
+  ctx: GatewayHandleContext,
+  fc: GatewayFileConfig,
+  gatewayDir: string,
+  readBodyLimit: number
+): Promise<boolean> {
+  const spec = fc.providers?.slack;
+  if (!spec?.enabled) {
+    json(response, 404, { error: 'Slack provider disabled' });
+    return true;
+  }
+  const { raw, parsed } = await readRawJsonBody(request, readBodyLimit);
+  const out = await handleSlackEventsRequest({
+    body: parsed,
+    rawBody: raw,
+    headers: request.headers,
+    spec,
+    settings: readGatewaySettings(ctx.runtime.store),
+    runtime: ctx.runtime,
+    gatewayDir,
+    stateDir: gatewayDir,
+    channels: fc.channels ?? []
+  });
+  if (out.kind === 'challenge') {
+    response.statusCode = 200;
+    response.setHeader('content-type', 'application/json; charset=utf-8');
+    response.end(JSON.stringify({ challenge: out.challenge }));
+    return true;
+  }
+  if (out.kind === 'json') {
+    json(response, out.status, out.body);
+    return true;
+  }
+  response.statusCode = out.status;
+  response.end();
+  return true;
+}
+
 function checkAuth(request: IncomingMessage, ctx: GatewayHandleContext): boolean {
   const token = ctx.env.authToken;
   if (!token) {
@@ -128,9 +169,9 @@ export async function handleGatewayHttp(
 
   const gatewayDir = `${ctx.stateDir}/gateway`;
   const fc = ctx.fileConfigRef.current;
-  const isPlatformPath =
-    (parts[0] === 'providers' && parts[1] === 'feishu' && parts[2] === 'events') ||
-    (parts[0] === 'providers' && parts[1] === 'wecom' && parts[2] === 'bridge');
+  const platformKind = parts[0] === 'providers' ? parts[1] : '';
+  const platformAction = { feishu: 'events', wecom: 'bridge', slack: 'events' }[platformKind ?? ''];
+  const isPlatformPath = platformAction !== undefined && parts[2] === platformAction;
   const isEventIngress =
     request.method === 'POST' &&
     parts[0] === 'routines' &&
@@ -143,6 +184,10 @@ export async function handleGatewayHttp(
   }
 
   try {
+    if (platformKind === 'slack') {
+      return dispatchSlackEvents(request, response, ctx, fc, gatewayDir, readBodyLimit);
+    }
+
     if (await handleEventIngress(request, response, ctx, parts, readBodyLimit)) {
       return true;
     }

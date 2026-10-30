@@ -20,6 +20,9 @@ export {
   shouldRunDailyLearn
 } from './learn.js';
 export { runAgentTurnAndReply } from './im-handlers.js';
+export { handleSlackEventsRequest, wakeSlackMessageRoutines } from './slack-events-handler.js';
+export { parseSlackEventsBody, verifySlackEventsSignature } from './channels/slack-events.js';
+export type { SlackEventsAddress, SlackEventsParseResult } from './channels/slack-events.js';
 export { isSilentMarker, resolveImOutbound, SILENT_ACK } from './silent-reply.js';
 export type { ImOutboundDecision, ImTurnOrigin } from './silent-reply.js';
 export {
