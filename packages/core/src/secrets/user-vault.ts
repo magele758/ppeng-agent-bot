@@ -552,9 +552,22 @@ function maskFillRefs(text: string, refs: string[]): string {
   return refs.reduce((out, ref) => out.split(ref).join('<ref>'), text);
 }
 
+/**
+ * Opaque tokens that legitimately appear in model-facing vault text and can
+ * contain a short secret (a CVV) by chance: entry ids, `uvref:` tokens, and
+ * ISO timestamps. Masked only for the leak scan — callers still return the
+ * original text, and a secret outside these tokens still fails the scan.
+ */
+function maskOpaqueVaultTokens(text: string): string {
+  return text
+    .replace(/"(?:id|billingAddressId)"\s*:\s*"[^"]*"/g, '"id":"<id>"')
+    .replace(/uvref:[A-Za-z0-9_-]+:[A-Za-z]+/g, '<ref>')
+    .replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z/g, '<time>');
+}
+
 /** Throw if model-facing text contains any known user-vault secret. */
 export function assertModelFacingHasNoUserVaultSecrets(text: string, vault: UserVault): void {
-  const body = String(text ?? '');
+  const body = maskOpaqueVaultTokens(String(text ?? ''));
   for (const secret of vault.knownSecretValues()) {
     if (secret.length >= 3 && body.includes(secret)) {
       throw new ValidationError('user vault secret must not appear in model-facing text');

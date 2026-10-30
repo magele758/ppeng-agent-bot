@@ -14,9 +14,26 @@ const PASSWORD = 'Hunter2-VAULT-PW!';
 const CARD = '4242424242424242';
 const CVV = '737';
 
+/** Drop entry ids, uvref tokens and timestamps before looking for a secret substring. */
+function withoutOpaqueTokens(text) {
+  return String(text)
+    .replace(/"(?:id|billingAddressId)"\s*:\s*"[^"]*"/g, '"id":"<id>"')
+    .replace(/uvref:[A-Za-z0-9_-]+:[A-Za-z]+/g, '<ref>')
+    .replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z/g, '<time>');
+}
+
 function seed(vault) {
   const login = vault.upsertLogin({ label: 'GitHub', username: 'lei', password: PASSWORD, sites: ['https://github.com'] });
-  const card = vault.upsertCard({ label: 'Travel Visa', holderName: 'Lei P', expiry: '12/30', number: CARD, cvv: CVV });
+  // Id embeds the CVV so the model-facing scan is exercised on every run, not only
+  // when a random UUID happens to contain those three digits.
+  const card = vault.upsertCard({
+    id: 'card_737deadbeef',
+    label: 'Travel Visa',
+    holderName: 'Lei P',
+    expiry: '12/30',
+    number: CARD,
+    cvv: CVV
+  });
   const contact = vault.upsertContact({ label: 'Me', fullName: 'Lei Peng', email: 'me@example.com' });
   return { login, card, contact };
 }
@@ -46,7 +63,7 @@ test('vault_list / vault_get return uvref refs, never secrets [AC:user-vault-too
   const all = await h.byName.vault_list.execute(h.ctx, {});
   assert.equal(all.ok, true);
   assert.equal(JSON.parse(all.content).count, 3);
-  for (const secret of [PASSWORD, CARD, CVV]) assert.ok(!all.content.includes(secret));
+  for (const secret of [PASSWORD, CARD, CVV]) assert.ok(!withoutOpaqueTokens(all.content).includes(secret));
   assert.ok(all.content.includes(h.entries.login.fillRefs.password));
 
   const cards = JSON.parse((await h.byName.vault_list.execute(h.ctx, { kind: 'card' })).content);
@@ -58,7 +75,7 @@ test('vault_list / vault_get return uvref refs, never secrets [AC:user-vault-too
   const one = await h.byName.vault_get.execute(h.ctx, { id: h.entries.card.id });
   assert.equal(one.ok, true);
   assert.ok(one.content.includes(h.entries.card.fillRefs.cvv));
-  for (const secret of [PASSWORD, CARD, CVV]) assert.ok(!one.content.includes(secret));
+  for (const secret of [PASSWORD, CARD, CVV]) assert.ok(!withoutOpaqueTokens(one.content).includes(secret));
   assert.equal((await h.byName.vault_get.execute(h.ctx, { id: 'nope' })).ok, false);
 });
 
@@ -101,6 +118,23 @@ test('vault tools are hidden and refuse to run until the Lab toggle is on [AC:us
   assert.equal((await list.execute({}, {})).ok, true);
 });
 
+test('vault_list stays ok when a short secret collides with an opaque id or timestamp [AC:user-vault-tools#AC-1]', async () => {
+  const h = harness();
+  const listed = await h.byName.vault_list.execute(h.ctx, {});
+  assert.equal(listed.ok, true);
+  assert.ok(listed.content.includes('uvref:card_737deadbeef:cvv'));
+  assert.ok(!listed.content.includes(PASSWORD));
+  assert.ok(!listed.content.includes(CARD));
+
+  const { assertModelFacingHasNoUserVaultSecrets } = await import('../dist/secrets/index.js');
+  const stamped = `${listed.content}\n"updatedAt": "2026-10-30T03:17:37.737Z"`;
+  assert.doesNotThrow(() => assertModelFacingHasNoUserVaultSecrets(stamped, h.vault));
+  assert.throws(
+    () => assertModelFacingHasNoUserVaultSecrets(`${listed.content}\nnote ${CVV}`, h.vault),
+    /must not appear/
+  );
+});
+
 test('vault_fill types resolved values into the form; result lists refs only [AC:user-vault-tools#AC-2]', async () => {
   const h = harness();
   const { login, card } = h.entries;
@@ -123,7 +157,7 @@ test('vault_fill types resolved values into the form; result lists refs only [AC
   const body = JSON.parse(result.content);
   assert.equal(body.filled, 3);
   assert.ok(body.fields.every((f) => f.ref.startsWith('uvref:') && f.selector.startsWith('#')));
-  for (const secret of [PASSWORD, CARD, CVV]) assert.ok(!result.content.includes(secret));
+  for (const secret of [PASSWORD, CARD, CVV]) assert.ok(!withoutOpaqueTokens(result.content).includes(secret));
 });
 
 test('vault_fill failures name refs and selectors, never secrets [AC:user-vault-tools#AC-3]', async () => {
@@ -147,7 +181,7 @@ test('vault_fill failures name refs and selectors, never secrets [AC:user-vault-
   for (const args of cases) {
     const r = await h.byName.vault_fill.execute(h.ctx, args);
     assert.equal(r.ok, false, JSON.stringify(args).slice(0, 80));
-    for (const secret of [PASSWORD, CARD, CVV]) assert.ok(!r.content.includes(secret));
+    for (const secret of [PASSWORD, CARD, CVV]) assert.ok(!withoutOpaqueTokens(r.content).includes(secret));
   }
   const failed = await h.byName.vault_fill.execute(h.ctx, { fields: [{ ref: pw, selector: '#pw' }] });
   assert.match(failed.content, /#pw/);
