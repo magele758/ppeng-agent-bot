@@ -1,6 +1,6 @@
 id: registered-machine-desktop-agent
 title: Desktop agent long-connect for personal registered machines (non-SSH)
-status: approved
+status: implemented
 requirement: |
   Personal registered machines can connect via a long-lived desktop agent attachment
   (DesktopAgentHub + createDesktopAgentBackend), without Factory SSH and without
