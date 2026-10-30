@@ -99,6 +99,8 @@ export interface ToolLoopHost {
   assertSessionWritable?(sessionId: string): void;
   /** Injected env; replaces direct process.env reads. */
   env: Record<string, string | undefined>;
+  /** Owner-saved shell isolation mode (e.g. `direct`). Omit when the host has no saved setting. */
+  savedShellIsolation?(): string | undefined;
 
   appendMessage(sessionId: string, role: 'tool' | 'user' | 'assistant' | 'system', parts: MessagePart[]): void;
   listApprovals(filter?: { status?: 'pending' | 'approved' | 'rejected' }): ApprovalRecord[];
@@ -464,7 +466,11 @@ export function checkToolApprovals(
   for (const tc of validToolCalls) {
     const tool = findToolByName(tools, tc.name);
     if (!tool) continue;
-    const decision = evaluateAutoReview({ toolName: tool.name, toolInput: tc.input });
+    const decision = evaluateAutoReview({
+      toolName: tool.name,
+      toolInput: tc.input,
+      savedIsolation: host.savedShellIsolation?.()
+    });
     if (decision.action === 'allow') continue;
 
     const idemKey = autoReviewIdempotencyKey(tool.name, decision.fingerprintInput, stableJsonHash);

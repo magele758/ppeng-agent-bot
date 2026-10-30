@@ -158,6 +158,8 @@ Jev 不是 SDK 模块：未配置入口时宿主不调用它，SDK 接入参数�
 
 高危 Shell/MCP 的 `evaluateAutoReview` 在 `soft_block` 与 `require_card` 上带 `kind`（`shell` | `mcp`）和人类可读 `blockReason`。待审批卡的 `reason` 写成 `Auto-review (<kind>) blocked high-risk <tool>: <blockReason>`，指纹参数仍不含升级标志。Lab 卡片用这个种类显示 Shell / MCP 徽章，并用冒号后的 `blockReason` 说明为什么拦住。控制流不变：默认 soft-block、带 `requestSmartModeApproval` 出卡、批准后同指纹放行、拒绝终局、`permissionMode=bypass` 不能绕过。
 
+宿主可选实现 `ToolLoopHost.savedShellIsolation()`（也可直接给 `evaluateAutoReview({ ..., savedIsolation })`）返回负责人已保存的隔离方式。返回 `direct` 时，显式 `isolation: "direct"` 本身不再算高危（和省略该字段的效果一样）；命令命中 `rm ` 等高危模式仍拦。未实现或返回其它值时行为不变。
+
 ### 2.5 审批记录上的可选过期字段
 
 `ApprovalRecord`（`src/types.ts`）可带 `expiresAt` / `expireReason` / `wakeSource`。这三个字段只描述产品层的无人值守审批：cron、Bot routine、调度等唤醒会写入截止时间；人坐在 Lab 对话里提起的审批不写。到点后由产品层把审批拒绝并记上 `expireReason`，且不执行该工具。循环内核创建审批时只透传字段，不解释超时、也不因为超时改控制流。

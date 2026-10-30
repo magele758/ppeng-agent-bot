@@ -159,14 +159,19 @@ export function shellCommandIsHighRisk(command: string): boolean {
 }
 
 /** MCP invoke/side-effect tools are always high-risk Auto-review subjects. */
-export function isHighRiskAutoReviewCall(toolName: string, input: unknown): boolean {
+/**
+ * `savedIsolation` is the host's saved shell isolation mode. When the owner saved
+ * `direct`, an explicit `isolation: "direct"` matches what an omitted field already
+ * does, so it is not high-risk by itself; the command patterns still apply.
+ */
+export function isHighRiskAutoReviewCall(toolName: string, input: unknown, savedIsolation?: string): boolean {
   if (!isAutoReviewSubject(toolName)) return false;
   const n = toolName.trim().toLowerCase();
   const args = stripAutoReviewFlags(input);
   if (n.startsWith('mcp_') || n === 'mcp_invoke' || n === 'mcp_read_resource') {
     return true;
   }
-  if (isolationIsDirect(args)) return true;
+  if (isolationIsDirect(args) && savedIsolation !== 'direct') return true;
   return shellCommandIsHighRisk(shellCommandOf(n, args));
 }
 
@@ -185,9 +190,10 @@ export function autoReviewIdempotencyKey(
 export function evaluateAutoReview(input: {
   toolName: string;
   toolInput: unknown;
+  savedIsolation?: string;
 }): AutoReviewDecision {
   const { toolName, toolInput } = input;
-  if (!isHighRiskAutoReviewCall(toolName, toolInput)) {
+  if (!isHighRiskAutoReviewCall(toolName, toolInput, input.savedIsolation)) {
     return { action: 'allow' };
   }
   return blockedAutoReview(toolName, toolInput);

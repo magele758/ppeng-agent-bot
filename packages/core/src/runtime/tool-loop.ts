@@ -1,7 +1,8 @@
 import {SourceLedger} from '../learning/sources.js';
 import { executeLoadsBeforeEffects, runWithSkillManifest } from '../skills/skill-manifest-gate.js';
 import type {SqliteStateStore} from '../storage.js';
-import {stableJson} from '../cron/notification-decision.js';
+import { SOURCE_SCOPE_APPROVAL_PREFIX, planSourceScopeHold, sourceScopeVerdict } from '../learning/source-scope-approval.js';
+import { getBoundSandboxSettingsStore, resolveSandboxMode } from '../sandbox/sandbox-settings.js';
 import { registerSteerToolWave } from './steer-tools.js';
 /**
  * Product adapter: ToolLoopDeps → A's ToolLoopHost.
@@ -59,6 +60,7 @@ import {
   pairedToolCallIdsFromMessages,
   processToolResults as processToolResultsA,
   runTurnWithRetries as runTurnWithRetriesA,
+  stripAutoReviewFlags,
   type FileApprovalPolicy as LoopFilePolicy,
   type ToolLoopHost,
   type ToolLoopResult
@@ -147,9 +149,8 @@ function toolsForTurn(deps: ToolLoopDeps, turnTools?: ToolContract<any>[]): Tool
   const ledger=new SourceLedger(deps.governanceStore);
   return tools.map(tool=>({...tool,execute:async(context,args)=>{
     ledger.observe(context.session.id);
-    const latest=deps.store.listApprovals().filter(a=>a.sessionId===context.session.id&&a.toolName===tool.name&&stableJson(a.args)===stableJson(args)).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)||b.updatedAt.localeCompare(a.updatedAt))[0];
-    const approved=latest?.status==='approved'&&latest.createdAt>=ledger.approvalFloor(context.session.id);
-    if(!ledger.allowed(context.session.id,tool.name,tool.sideEffectLevel,args)&&!approved)return {ok:false,content:JSON.stringify({error:'source_scope_denied',tool:tool.name,reason:'External or delegated input cannot authorize this effect. Save an explicit scope in Lab or approve this exact call.'})};
+    const verdict=sourceScopeVerdict(deps.store,ledger,context.session.id,tool,args);
+    if(verdict!=='allowed'&&verdict!=='approved')return {ok:false,content:JSON.stringify({error:'source_scope_denied',tool:tool.name,approval:verdict,reason:'External or delegated input cannot authorize this effect. Save an explicit scope in Lab, or retry this exact call so the owner gets an approval card.'})};
     const result=await tool.execute(context,args);
     if(result.content.includes('«external'))ledger.record(context.session.id,{kind:'tool',ref:tool.name+':'+Date.now(),label:tool.name});
     return result;
@@ -168,6 +169,7 @@ function adaptFilePolicy(policy: FileApprovalPolicy | undefined): LoopFilePolicy
 function hostFromDeps(deps: ToolLoopDeps): ToolLoopHost {
   return {
     env: process.env,
+    savedShellIsolation: () => resolveSandboxMode(getBoundSandboxSettingsStore(), process.env),
     assertSessionWritable: (sessionId) => deps.store.assertCurrentWriter?.(sessionId),
     gateDirtyInput: true,
     appendMessage: (sessionId, role, parts) => {
@@ -355,7 +357,8 @@ export function checkToolApprovals(
     closure
   );
   if (decision !== 'proceed') return decision;
-  return holdDirectIsolation(deps, validToolCalls, session);
+  if (holdDirectIsolation(deps, validToolCalls, session) === 'waiting') return 'waiting';
+  return holdSourceScope(deps, validToolCalls, session, turnTools ?? deps.tools);
 }
 
 /** Assembled-loop path: file policy is already the loop shape. */
@@ -382,7 +385,31 @@ export function checkToolApprovalsForLoop(
     closure
   );
   if (decision !== 'proceed') return decision;
-  return holdDirectIsolation(deps, validToolCalls, session);
+  if (holdDirectIsolation(deps, validToolCalls, session) === 'waiting') return 'waiting';
+  return holdSourceScope(deps, validToolCalls, session, turnTools ?? deps.tools);
+}
+
+function holdSourceScope(
+  deps: ToolLoopDeps,
+  calls: ToolCallPart[],
+  session: SessionRecord,
+  tools: ToolContract<any>[]
+): 'waiting' | 'proceed' {
+  if (!deps.governanceStore) return 'proceed';
+  const ledger = new SourceLedger(deps.governanceStore);
+  ledger.observe(session.id);
+  const plan = planSourceScopeHold(deps.store, ledger, session, tools, calls);
+  for (const item of plan.create) {
+    const args = stripAutoReviewFlags(item.input);
+    hostFromDeps(deps).createApproval({
+      sessionId: session.id,
+      toolName: item.name,
+      reason: `Approval required: ${item.name} would act on content from outside this chat (source scope)`,
+      args,
+      idempotencyKey: `${SOURCE_SCOPE_APPROVAL_PREFIX}${item.name}:${ledger.approvalFloor(session.id)}:${stableJsonHash(item.name, args)}`
+    });
+  }
+  return plan.wait ? 'waiting' : 'proceed';
 }
 
 function holdDirectIsolation(

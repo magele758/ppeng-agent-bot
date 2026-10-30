@@ -396,3 +396,21 @@ describe('checkToolApprovals Auto-review gate', () => {
     expect(h.approvals).toHaveLength(1);
   });
 });
+
+describe('saved direct isolation', () => {
+  const session = { id: 's1', metadata: {} } as unknown as SessionRecord;
+  const tools = [tool('bash')];
+  const listing = call('bash', { command: 'ls -lt ~/Recordings', isolation: 'direct' }, 'c-direct');
+
+  it('does not Auto-review explicit direct when the owner saved direct, but still reviews risky commands [AC:local-source-unlock#AC-3]', () => {
+    const saved = host({ savedShellIsolation: () => 'direct' });
+    expect(checkToolApprovals(saved, tools, [listing], ctx, undefined, session, undefined)).toBe('proceed');
+    expect(saved.appended).toHaveLength(0);
+    const risky = call('bash', { command: 'rm -rf ./build', isolation: 'direct' }, 'c-direct-rm');
+    expect(checkToolApprovals(saved, tools, [risky], ctx, undefined, session, undefined)).toBe('skip');
+    for (const mode of ['auto', 'os', undefined]) {
+      const h = host({ savedShellIsolation: () => mode });
+      expect(checkToolApprovals(h, tools, [listing], ctx, undefined, session, undefined)).toBe('skip');
+    }
+  });
+});
