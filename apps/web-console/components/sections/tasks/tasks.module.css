@@ -184,3 +184,16 @@
 .draftEditor:focus-visible {
   outline: var(--ui-focus);
 }
+
+.styleSampleHint {
+  margin: 0;
+  color: var(--ui-text-muted);
+  font-size: var(--ui-text-sm);
+}
+
+.styleSampleList {
+  margin: 0;
+  padding-left: var(--ui-space-4);
+  color: var(--ui-text-muted);
+  font-size: var(--ui-text-sm);
+}
