@@ -46,6 +46,7 @@ const EXTRA_RESERVED = new Set<string>([
   'vault_list',
   'vault_get',
   'vault_fill',
+  'secure_form',
   'ask_user',
   'save_user_info',
   'collect_credentials',

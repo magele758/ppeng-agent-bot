@@ -259,6 +259,7 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
     ['POST /api/sessions/:id/dyn-tools/:name/promote', session],
     ['GET /api/sessions/:id/goal', session],
     ['POST /api/sessions/:id/ask-user/reply', session],
+    ['POST /api/sessions/:id/secure-form', session],
     ['GET /api/sessions/:id/trajectory', session],
     ['POST /api/lab/composer-hint', owner('session', sessionBodyRef('sessionId'))],
     ['POST /api/chat', owner('session', sessionBodyRef('sessionId'))],

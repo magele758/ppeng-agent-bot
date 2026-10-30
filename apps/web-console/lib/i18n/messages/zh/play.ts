@@ -744,7 +744,11 @@ export const play = {
     reject: '拒绝',
     kindShell: 'Shell',
     kindMcp: 'MCP',
-    blockReasonLabel: '拦截原因'
+    blockReasonLabel: '拦截原因',
+    secureFormSubmit: '私下提交',
+    secureFormCancel: '取消',
+    secureFormFailed: '没能保存，请再试一次。',
+    secureFormPlaceholder: '在此输入。内容不会写入对话。'
   },
 
   model: {

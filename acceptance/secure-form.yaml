@@ -1,0 +1,28 @@
+id: secure-form
+title: 对话里的单字段安全表单
+status: implemented
+requirement: |
+  用户在对话里填写一次性验证码、密码、卡号或 CVV，而不是走浏览器 vault_fill。
+  模型只收到填写状态和一条不透明的 uvref。明文只进 UserVault，不进模型上下文，也不进对话文本。
+  这条路径与 vault_fill（浏览器会话填表）和 SecretVault（连接器环境变量）分开。
+criteria:
+  - id: AC-1
+    given: 对话里还没有这张安全表单
+    when: 模型请求一个 otp 字段
+    then: 出现一张单字段遮罩卡片，卡片和回执都不含明文
+  - id: AC-2
+    given: 一张 otp 安全表单正在等待
+    when: 用户在卡片里提交验证码
+    then: 明文写入 UserVault，回执只有 filled 状态和 uvref，对话文本不含明文
+  - id: AC-3
+    given: 一张安全表单正在等待
+    when: 用户取消
+    then: 回执为 cancelled，不写入保险库
+  - id: AC-4
+    given: 已有 vault_fill 浏览器填表和 SecretVault
+    when: 查看安全表单工具
+    then: 它不是 vault_fill，也不读写连接器环境变量
+  - id: AC-5
+    given: 工具参数里没有密钥
+    when: 渲染对话卡片
+    then: 卡片是遮罩单字段，提交体只发给安全表单接口，不写入对话文本

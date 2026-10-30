@@ -71,6 +71,9 @@ import type { BotMemoryLookup } from '../memory/bot-memory-scope.js';
 import { createMemoryTools, type ExtendedMemoryToolServices } from './memory-tools.js';
 import { createPlanTools } from './plan-tools.js';
 import { createInteractionTools } from './interaction-tools.js';
+import { getBoundUserVault } from '../secrets/user-vault.js';
+import { SECURE_FORM_META } from '../secrets/secure-form.js';
+import { createSecureFormTool, secureFormPortFor } from './secure-form-tools.js';
 import {
   SOCIAL_POST_SCHEDULE_METADATA_KEY,
   SOCIAL_POST_TASK_KIND,
@@ -1870,6 +1873,26 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
     ...createHistoryTools(services),
     ...createPlanTools(),
     ...createInteractionTools(),
+    ...(services.stateStore
+      ? [
+          createSecureFormTool({
+            port: secureFormPortFor(services.stateStore),
+            readMeta: (sessionId) => {
+              const session = services.stateStore?.getSession(sessionId);
+              const meta = session?.metadata?.[SECURE_FORM_META];
+              return meta && typeof meta === 'object' ? (meta as { id?: string }) : undefined;
+            },
+            writeMeta: (sessionId, patch) => {
+              const session = services.stateStore?.getSession(sessionId);
+              if (!session || !services.stateStore) return;
+              services.stateStore.updateSession(sessionId, {
+                metadata: { ...session.metadata, [SECURE_FORM_META]: patch }
+              });
+            },
+            getVault: () => getBoundUserVault()
+          })
+        ]
+      : []),
     createRoomRouteTool(),
     writeFileTool,
     editFileTool,

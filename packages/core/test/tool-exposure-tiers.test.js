@@ -39,8 +39,8 @@ test('exact approved baseline plus room planning and external Agent tools [AC:to
     const addedExternalTools = new Set(['external_agent_list', 'external_agent_delegate', 'external_agent_status', 'external_agent_cancel', 'external_agent_input']);
     for (const name of addedExternalTools) assert.equal(groups.find(group => group.tools.includes(name))?.id, 'team');
     const counts = excludeRoom => [1, 2, 3].map(tier => groups.filter(g => g.tier === tier && !g.extension).reduce((sum, group) => sum + group.tools.filter(name => !excludeRoom || (name !== 'room_route_turn' && !addedExternalTools.has(name))).length, 0));
-    assert.deepEqual(counts(true), [50, 23, 68], 'the original classified inventory stays unchanged');
-    assert.deepEqual(counts(false), [51, 28, 68]);
+    assert.deepEqual(counts(true), [50, 24, 68], 'the original classified inventory stays unchanged');
+    assert.deepEqual(counts(false), [51, 29, 68]);
     assert.equal(groups.find(group => group.tools.includes('room_route_turn')).tier, 1);
     const names = groups.flatMap(group => group.tools);
     assert.equal(names.length, new Set(names).size);

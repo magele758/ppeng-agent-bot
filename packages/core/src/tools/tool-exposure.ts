@@ -190,7 +190,8 @@ export const TOOL_GROUPS: ToolGroup[] = [
         "labelZh": "凭据收集",
         "labelEn": "Credential collection",
         "tools": [
-            "collect_credentials"
+            "collect_credentials",
+            "secure_form"
         ]
     },
     {
