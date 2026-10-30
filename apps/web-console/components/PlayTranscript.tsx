@@ -1,11 +1,12 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import type { ApprovalItem, ChatMessage } from '@/lib/types';
 import { anchorApprovals } from '@/lib/approval-feed';
 import { messageHasStructuredParts, msgPartsToText, normalizedRole } from '@/lib/chat-utils';
 import { readMessageSessionId } from '@/lib/goal-update-notice';
 import { omitStreamTextSavedOnTurn } from '@/lib/history-window';
+import { continuedAssistantIndexes } from '@/lib/assistant-label-run';
 import { buildFeedSlots, steerStreamPlacement, type FeedSlot } from '@/lib/feed-window';
 import { rowsForSessionBrief, showProcessNote } from '@/lib/session-brief';
 import { SessionBriefDisclosure } from './SessionBriefDisclosure';
@@ -18,7 +19,7 @@ import { placeChildTaskEntries, type ChildTaskStreamEntry } from '@/lib/bot-chil
 import { ApprovalBanner } from './ApprovalBanner';
 import { BotChildTaskStreamEntry } from './BotChildTaskStreamEntry';
 import { ChatFeedWindow } from './ChatFeedWindow';
-import { ChatTurnIfVisible, ChatTurnPlain, ChatTurnStreaming } from './ChatTurns';
+import { ContinuedAssistantContext, ChatTurnIfVisible, ChatTurnPlain, ChatTurnStreaming } from './ChatTurns';
 import { SurfaceContextProvider } from './a2ui/SurfaceContext';
 import { SkillOperationCards } from './SkillOperationCards';
 import { SkillCaptureCards } from './SkillCaptureCards';
@@ -51,8 +52,10 @@ export function PlayTranscript(props: {
   const slots = rowsForSessionBrief(brief, view.slots, view.messages).map((row) =>
     row.type === 'slot' ? row.slot : { key: row.key, kind: 'brief-note' as const, briefCount: row.count, folded: row.slots }
   );
+  const continued = useContinuedAssistant(slots, view);
   return (
     <SurfaceContextProvider messages={props.chat.displayMessages}>
+      <ContinuedAssistantContext.Provider value={continued}>
       <ChatFeedWindow
         layoutKey={props.layoutKey}
         scrollerRef={props.chat.playMessagesRef}
@@ -75,8 +78,18 @@ export function PlayTranscript(props: {
           }}
         /> : null}{props.selectedSessionId ? <SkillOperationCards key={'operations-'+props.selectedSessionId} sessionId={props.selectedSessionId} onLayoutChange={() => { const feed = props.chat.playMessagesRef.current; if (feed && props.chat.playStickToBottomRef.current) feed.scrollTop = feed.scrollHeight; }}/> : null}{props.footer}</>}
       />
+      </ContinuedAssistantContext.Provider>
     </SurfaceContextProvider>
   );
+}
+
+function roleAt(messages: ChatMessage[], i: number): string | undefined {
+  const m = messages[i];
+  return m ? normalizedRole(m) : undefined;
+}
+
+function useContinuedAssistant(slots: FeedSlot[], view: TranscriptModel): ReadonlySet<number> {
+  return useMemo(() => continuedAssistantIndexes(slots, (i) => roleAt(view.messages, i)), [slots, view.messages]);
 }
 
 function FeedHeader(props: {
