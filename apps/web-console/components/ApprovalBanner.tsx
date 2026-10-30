@@ -5,9 +5,10 @@ import { api } from '@/lib/api';
 import { approvalShownLines } from '@/lib/approval-feed';
 import {
   approvalApproveDisabled,
+  approvalDecisionFlow,
   approvalItemBodyKind,
   approvalPostPlan,
-  approvalUsesStreamAttach
+  approvalSendAskReply
 } from '@/lib/approval-item-view';
 import { secureFormCardFace, type SecureFormCardFace } from '@/lib/secure-form-card';
 import { attachBeforeAskUserDecision, type LiveStreamArm } from '@/lib/live-stream-attach';
@@ -90,31 +91,32 @@ function ApprovalItemRow({
       reply,
       hasSession: Boolean(a.sessionId)
     });
-    if (plan.type === 'noop') return;
-    if (plan.type === 'ask-reply') {
-      await api(`/api/sessions/${encodeURIComponent(a.sessionId!)}/ask-user/reply`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reply: plan.reply })
-      });
-    }
-    const path = decision === 'approve' ? 'approve' : 'reject';
-    const send = () =>
-      api(`/api/approvals/${a.id}/${path}`, { method: 'POST' }).then(() => undefined);
-    const flow = approvalUsesStreamAttach({ hasAttachStream: Boolean(onAttachStream) });
-    if (flow === 'direct') {
-      await send();
-      onDone();
-      return;
-    }
-    await attachBeforeAskUserDecision({
-      toolName: a.toolName,
-      decision,
-      otherPendingCount,
+    const flow = approvalDecisionFlow({ plan, hasAttachStream: Boolean(onAttachStream) });
+    if (flow === 'stop') return;
+    await approvalSendAskReply({
+      plan,
       sessionId: a.sessionId,
-      arm: onAttachStream!,
-      postDecision: send
+      post: (path, body) =>
+        api(path, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        })
     });
+    const path = decision === 'approve' ? 'approve' : 'reject';
+    const send = () => api(`/api/approvals/${a.id}/${path}`, { method: 'POST' }).then(() => undefined);
+    if (flow === 'attach') {
+      await attachBeforeAskUserDecision({
+        toolName: a.toolName,
+        decision,
+        otherPendingCount,
+        sessionId: a.sessionId,
+        arm: onAttachStream!,
+        postDecision: send
+      });
+    } else {
+      await send();
+    }
     onDone();
   };
 

@@ -6,6 +6,7 @@ import {
   toolResultStatusKind,
   toolResultStatusPillSpec,
   toolResultSummaryFlags,
+  toolResultSummaryPillPaint,
   toolResultSummaryPillSpecs
 } from './tool-result-fold.ts';
 
@@ -194,5 +195,53 @@ test('toolResultSummaryPillSpecs builds declarative pill rows', () => {
         value: '90%'
       }
     ]
+  );
+});
+
+test('toolResultSummaryPillPaint maps spawn-blocked, confidence, and plain spans', () => {
+  assert.deepEqual(toolResultSummaryPillPaint({ id: 'spawn-blocked' }), { paint: 'spawn-blocked' });
+  assert.deepEqual(
+    toolResultSummaryPillPaint({
+      id: 'confidence',
+      className: 'chat-tool-fold__pill chat-tool-fold__pill--err',
+      i18nKey: 'play.turns.confidence',
+      value: '80%'
+    }),
+    {
+      paint: 'span',
+      className: 'chat-tool-fold__pill chat-tool-fold__pill--err',
+      textKey: 'play.turns.confidence',
+      textParams: { value: '80%' },
+      testId: undefined
+    }
+  );
+  assert.deepEqual(
+    toolResultSummaryPillPaint({
+      id: 'sandbox',
+      className: 'chat-tool-fold__pill',
+      i18nKey: 'play.turns.osSandbox.savedOs',
+      testId: 'os-sandbox-reason'
+    }),
+    {
+      paint: 'span',
+      className: 'chat-tool-fold__pill',
+      textKey: 'play.turns.osSandbox.savedOs',
+      textParams: undefined,
+      testId: 'os-sandbox-reason'
+    }
+  );
+  assert.deepEqual(
+    toolResultSummaryPillPaint({
+      id: 'stub',
+      className: 'chat-tool-fold__pill chat-tool-fold__pill--stub',
+      i18nKey: 'play.stub'
+    }),
+    {
+      paint: 'span',
+      className: 'chat-tool-fold__pill chat-tool-fold__pill--stub',
+      textKey: 'play.stub',
+      textParams: undefined,
+      testId: undefined
+    }
   );
 });

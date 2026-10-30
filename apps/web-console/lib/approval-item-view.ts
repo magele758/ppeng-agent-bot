@@ -39,3 +39,26 @@ export function approvalUsesStreamAttach(input: {
 }): 'direct' | 'attach' {
   return input.hasAttachStream ? 'attach' : 'direct';
 }
+
+export type ApprovalDecisionFlow = 'stop' | 'direct' | 'attach';
+
+/** After the ask-reply plan: stop, post the decision, or arm the live stream first. */
+export function approvalDecisionFlow(input: {
+  plan: ApprovalPostPlan;
+  hasAttachStream: boolean;
+}): ApprovalDecisionFlow {
+  if (input.plan.type === 'noop') return 'stop';
+  return approvalUsesStreamAttach({ hasAttachStream: input.hasAttachStream });
+}
+
+/** Ask-reply POST, if the plan says so. Decision POST stays with the caller. */
+export async function approvalSendAskReply(input: {
+  plan: ApprovalPostPlan;
+  sessionId: string | undefined;
+  post: (path: string, body: unknown) => Promise<unknown>;
+}): Promise<void> {
+  if (input.plan.type !== 'ask-reply' || !input.sessionId) return;
+  await input.post(`/api/sessions/${encodeURIComponent(input.sessionId)}/ask-user/reply`, {
+    reply: input.plan.reply
+  });
+}

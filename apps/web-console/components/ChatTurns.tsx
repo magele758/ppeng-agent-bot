@@ -55,6 +55,7 @@ import {
   toolResultFoldClass,
   toolResultStatusKind,
   toolResultStatusPillSpec,
+  toolResultSummaryPillPaint,
   toolResultSummaryPillSpecs,
   type ToolResultSummaryPillSpec
 } from '@/lib/tool-result-fold';
@@ -297,18 +298,13 @@ function ToolResultSummaryPillView({
   pill: ToolResultSummaryPillSpec;
   t: (key: MessageKey, params?: Record<string, string>) => string;
 }) {
-  if (pill.id === 'spawn-blocked') return <SpawnBlockedPill />;
-  if (pill.id === 'confidence') {
-    return <span className={pill.className}>{t(pill.i18nKey, { value: pill.value })}</span>;
-  }
-  if (pill.id === 'sandbox') {
-    return (
-      <span className={pill.className} data-testid={pill.testId}>
-        {t(pill.i18nKey as MessageKey)}
-      </span>
-    );
-  }
-  return <span className={pill.className}>{t(pill.i18nKey)}</span>;
+  const paint = toolResultSummaryPillPaint(pill);
+  if (paint.paint === 'spawn-blocked') return <SpawnBlockedPill />;
+  return (
+    <span className={paint.className} data-testid={paint.testId}>
+      {t(paint.textKey as MessageKey, paint.textParams)}
+    </span>
+  );
 }
 
 function ToolResultSummary({

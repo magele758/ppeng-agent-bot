@@ -2,8 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   approvalApproveDisabled,
+  approvalDecisionFlow,
   approvalItemBodyKind,
   approvalPostPlan,
+  approvalSendAskReply,
   approvalUsesStreamAttach
 } from './approval-item-view.ts';
 
@@ -47,4 +49,24 @@ test('approvalPostPlan covers ask-reply and noop paths', () => {
 test('approvalUsesStreamAttach', () => {
   assert.equal(approvalUsesStreamAttach({ hasAttachStream: false }), 'direct');
   assert.equal(approvalUsesStreamAttach({ hasAttachStream: true }), 'attach');
+});
+
+test('approvalDecisionFlow stops on noop and otherwise follows the stream flag', () => {
+  assert.equal(approvalDecisionFlow({ plan: { type: 'noop' }, hasAttachStream: true }), 'stop');
+  assert.equal(approvalDecisionFlow({ plan: { type: 'decision-only' }, hasAttachStream: false }), 'direct');
+  assert.equal(
+    approvalDecisionFlow({ plan: { type: 'ask-reply', reply: 'hi' }, hasAttachStream: true }),
+    'attach'
+  );
+});
+
+test('approvalSendAskReply posts only an ask-reply with a session', async () => {
+  const calls: Array<{ path: string; body: unknown }> = [];
+  const post = async (path: string, body: unknown) => {
+    calls.push({ path, body });
+  };
+  await approvalSendAskReply({ plan: { type: 'decision-only' }, sessionId: 's1', post });
+  await approvalSendAskReply({ plan: { type: 'ask-reply', reply: 'hi' }, sessionId: undefined, post });
+  await approvalSendAskReply({ plan: { type: 'ask-reply', reply: 'hi' }, sessionId: 's/1', post });
+  assert.deepEqual(calls, [{ path: '/api/sessions/s%2F1/ask-user/reply', body: { reply: 'hi' } }]);
 });

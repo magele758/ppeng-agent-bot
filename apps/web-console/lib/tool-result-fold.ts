@@ -173,3 +173,28 @@ export function toolResultSummaryPillSpecs(input: {
   }
   return pills;
 }
+
+/** How a summary pill paints. spawn-blocked stays a dedicated component. */
+export type ToolResultSummaryPillPaint =
+  | { paint: 'spawn-blocked' }
+  | { paint: 'span'; className: string; textKey: string; textParams?: Record<string, string>; testId?: string };
+
+function pillTextParams(pill: Exclude<ToolResultSummaryPillSpec, { id: 'spawn-blocked' }>): Record<string, string> | undefined {
+  return pill.id === 'confidence' ? { value: pill.value } : undefined;
+}
+
+function pillTestId(pill: Exclude<ToolResultSummaryPillSpec, { id: 'spawn-blocked' }>): string | undefined {
+  return pill.id === 'sandbox' ? pill.testId : undefined;
+}
+
+/** Data-driven paint spec so the React pill view has no id chain. */
+export function toolResultSummaryPillPaint(pill: ToolResultSummaryPillSpec): ToolResultSummaryPillPaint {
+  if (pill.id === 'spawn-blocked') return { paint: 'spawn-blocked' };
+  return {
+    paint: 'span',
+    className: pill.className,
+    textKey: pill.i18nKey,
+    textParams: pillTextParams(pill),
+    testId: pillTestId(pill)
+  };
+}
