@@ -14,11 +14,21 @@
 ## 路径 A — 桌面 agent 长连（r4-7 Option A）
 
 1. `register_machine { machineId, label, kind }`（可不带 `sshAlias`）。
-2. 本机桌面 agent（或同进程适配器）调用 `getSharedDesktopAgentHub().attach(machineId, handlers)`，在长连存活期间提供 `shell` / `read` / `copy`。
+2. 桌面 agent 与 daemon **同进程**时，调用 `getSharedDesktopAgentHub().attach(machineId, handlers)`。**另一进程**时走下面的 HTTP/SSE，不必自己拿 hub。
 3. `list_machines` → `connected=true`；`bash` / `read_file` / `copy_*` 的 `machineId` 打到该 agent。
 4. 长连断开时 `detach`；此后 `connected=false`，操作返回 `machine_disconnected`（若同时配置了 `sshAlias`，composite 会回退到 SSH 探测）。
 
-核心类型：`DesktopAgentHub`、`createDesktopAgentBackend`、`createCompositeRegisteredMachineBackend`（`packages/core/src/registered-machines/`）。Daemon HTTP/SSE 适配器可随后把远端桌面进程接到同一 hub；本切片先落地 Port/backend 与单测。
+### Daemon HTTP/SSE（跨进程）
+
+桌面 agent 用 daemon bearer 接同一条 `DesktopAgentHub`（`getSharedDesktopAgentHub`），不经过 Factory：
+
+1. `GET /api/desktop-agent/:machineId/events` — SSE。打开即 `attach`；首条事件 `ready`。之后每个 shell / read / copy 推一条 `event: op`，data 为 `{ requestId, kind, input }`。
+2. `POST /api/desktop-agent/:machineId/reply` — body `{ requestId, result }`，`result` 为 `{ ok, content, exitCode? }`。命中挂起操作则 200；无会话或未知 `requestId` 为 404。
+3. 连接关闭，或 `POST /api/desktop-agent/:machineId/detach`，都会 `detach`。进行中的操作以 `machine_disconnected` 结束，不再 spawn `ssh`。
+
+同一 `machineId` 再开一条 SSE 会替换上一条。适配器 `createDesktopAgentHttpSseSession` 不依赖 `node:http`，daemon 路由只负责收发。
+
+核心类型：`DesktopAgentHub`、`createDesktopAgentBackend`、`createCompositeRegisteredMachineBackend`、`createDesktopAgentHttpSseSession`（`packages/core/src/registered-machines/`）。
 
 ## 路径 B — SSH Host 别名（#321）
 
@@ -31,4 +41,4 @@
 
 离线、未注册、无 `sshAlias` 且无 agent 附着 → `machine_disconnected` / `unknown_machine`，不执行任何远端命令。ssh 子进程使用 `sanitizeSpawnEnv`，并强制 `ClearAllForwardings` / `ForwardAgent=no` / `PermitLocalCommand=no`；命令过 hardline；远端读写拒绝 `.env` / `id_rsa` / `credentials` 及 `.ssh` `.aws` `.gnupg` `.kube` `.docker` 目录（agent 路径同样在 backend 层拒绝敏感路径）。
 
-注意：SSH 别名由 daemon 所在主机的 ssh 配置解析；多租户部署应只在受信用户的会话中放开 `register_machine`。桌面 agent 附着是进程内状态，需与 daemon 生命周期对齐。
+注意：SSH 别名由 daemon 所在主机的 ssh 配置解析；多租户部署应只在受信用户的会话中放开 `register_machine`。桌面 agent 附着在 daemon 进程内（HTTP/SSE 只是把另一进程接到这个 hub），daemon 退出后长连即失效。

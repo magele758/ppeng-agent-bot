@@ -7,7 +7,12 @@ requirement: |
   requiring an sshAlias. When an agent is attached, list/shell/read/copy work through
   the agent handlers. Composite backend prefers the agent over the SSH Host-alias
   backend. Offline / detached machines fail closed.
-notes: 'Round-4 r4-7 Option A; assumedApproval: standing-order-2026-10-22'
+  A desktop agent in another process can keep that same attachment over the daemon's
+  HTTP/SSE channel: opening the event stream marks the machine connected, shell/read/copy
+  are delivered as events on that stream, and posting a matching reply completes the op.
+  Closing the stream or an explicit detach marks the machine disconnected and fails any
+  in-flight op. This path never uses Factory SSH.
+notes: 'Round-4 r4-7 Option A + daemon HTTP/SSE follow-up; assumedApproval: standing-order-2026-10-22'
 criteria:
   - id: AC-1
     given: A registered machine with a desktop agent attached to DesktopAgentHub
@@ -21,3 +26,7 @@ criteria:
     given: Composite backend with both agent hub and SSH backend, Factory settings present
     when: agent is attached then detached
     then: attached traffic never calls ssh; Factory settings stay untouched; after detach SSH path is used (fail-closed if offline)
+  - id: AC-4
+    given: A registered machine whose desktop agent is connected to the daemon over HTTP/SSE from another process
+    when: the event stream opens, shell/read/copy run, a matching reply is posted, then the stream closes or the agent detaches
+    then: the machine shows connected while the stream is open; each op is delivered on the stream and completes from the posted reply without spawning ssh; after close or detach the machine is disconnected and any in-flight op fails closed; Factory settings stay untouched

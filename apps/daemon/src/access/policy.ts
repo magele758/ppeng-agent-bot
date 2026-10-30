@@ -523,6 +523,10 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
     ['POST /api/model-providers/:id/scan', ADMIN],
     ['GET /api/sandbox/settings', AUTHENTICATED],
     ['PATCH /api/sandbox/settings', ADMIN],
+    // Desktop agent long-connect. Daemon bearer (AUTHENTICATED); not Factory.
+    ['GET /api/desktop-agent/:machineId/events', AUTHENTICATED],
+    ['POST /api/desktop-agent/:machineId/reply', AUTHENTICATED],
+    ['POST /api/desktop-agent/:machineId/detach', AUTHENTICATED],
     ['GET /api/secrets', ADMIN],
     // MCP client OAuth loopback. Daemon bearer still applies via checkAuth.
     ['GET /api/mcp/oauth/callback', ADMIN],

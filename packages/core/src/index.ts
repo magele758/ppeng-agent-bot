@@ -17,15 +17,20 @@ export {
   createSshRegisteredMachineBackend,
   createDesktopAgentHub,
   getSharedDesktopAgentHub,
+  setSharedDesktopAgentHubForTests,
   createDesktopAgentBackend,
-  createCompositeRegisteredMachineBackend
+  createCompositeRegisteredMachineBackend,
+  createDesktopAgentHttpSseSession
 } from './registered-machines/index.js';
 export type {
   RegisteredMachinePort,
   RegisteredMachine,
   RegisteredMachineBackend,
+  RegisteredMachineOpResult,
   DesktopAgentHub,
-  DesktopAgentHandlers
+  DesktopAgentHandlers,
+  DesktopAgentHttpSseSession,
+  DesktopAgentReply
 } from './registered-machines/index.js';
 export type { FactoryMachine, FactoryTask, FactorySettings, FactoryTransport } from './factory/types.js';
 

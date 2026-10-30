@@ -53,6 +53,7 @@ import { modelFallbackRoutes } from './routes/model-fallback.js';
 import { modelProviderRoutes } from './routes/model-providers.js';
 import { orchestrationRoutes } from './routes/orchestration.js';
 import { deliveryQuietHoursRoutes } from './routes/delivery-quiet-hours.js';
+import { desktopAgentRoutes } from './routes/desktop-agent.js';
 import { outboundDraftRoutes } from './routes/outbound-drafts.js';
 import { researchRoutes } from './routes/research.js';
 import { sandboxRoutes } from './routes/sandbox.js';
@@ -149,6 +150,7 @@ export function buildDaemonRouter(deps: DaemonAppDeps): Router {
     .addAll(libraryPickRoutes(runtime))
     .addAll(libraryPageRoutes(runtime))
     .addAll(sandboxRoutes(runtime))
+    .addAll(desktopAgentRoutes())
     .addAll(trajectoryRoutes(runtime))
     .addAll(workspaceRoutes(runtime))
     .addAll(evolutionRoutes(repoRoot));
