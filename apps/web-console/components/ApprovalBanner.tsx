@@ -52,7 +52,7 @@ function ApprovalItemBody({
 }: {
   kind: ReturnType<typeof approvalItemBodyKind>;
   secureForm: SecureFormCardFace | null;
-  question?: string;
+  question?: string | null;
   args?: Record<string, unknown>;
 }) {
   if (kind === 'secure-form') return <p className="approval-banner__q">{secureForm!.prompt}</p>;
