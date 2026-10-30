@@ -60,8 +60,12 @@ test('baseline measurements are manual only and cannot replace a PR required gat
 });
 test('runner-local evidence paths are evaluated at step scope [AC:ci-gate-speedup#AC-4]',()=>{
   const jobs=workflow('release-gate').jobs;
-  for(const lane of ['unit','formal'])assert.doesNotMatch(JSON.stringify(jobs[lane].env??{}),/runner\./,'runner context is not available in job env');
-  assert.match(jobs.formal.steps.find(s=>s.name==='Run formal coverage lane').env?.CI_VERIFICATION_EVIDENCE_DIR??'',/runner.temp/);
+  assert.doesNotMatch(JSON.stringify(jobs.unit.env??{}),/runner\./,'runner context is not available in job env');
+  // Formal steps live in reusable formal-only.yml (CI layering A); release-gate only calls it.
+  assert.equal(jobs.formal.uses, './.github/workflows/formal-only.yml');
+  const formalJobs=workflow('formal-only').jobs;
+  assert.doesNotMatch(JSON.stringify(formalJobs.formal.env??{}),/runner\./,'runner context is not available in job env');
+  assert.match(formalJobs.formal.steps.find(s=>s.name==='Run formal coverage lane').env?.CI_VERIFICATION_EVIDENCE_DIR??'',/runner.temp/);
 });
 test('all reviewed verification inputs are checked before expensive unit execution [AC:ci-gate-speedup#AC-6]',()=>{
   const steps=workflow('release-gate').jobs.unit.steps;
