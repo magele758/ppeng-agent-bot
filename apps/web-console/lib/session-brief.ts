@@ -150,6 +150,11 @@ export function rowsForSessionBrief<T extends BriefSlot>(
   return out;
 }
 
+/** 精简模式下被收起的过程完全不渲染；非精简模式有内容才渲染。 */
+export function showProcessNote(brief: boolean, count: number): boolean {
+  return !brief && count > 0;
+}
+
 export function briefStreamSegments<T extends { kind: string }>(segments: readonly T[]): { segments: T[]; hidden: T[] } {
   const kept: T[] = [];
   const hidden: T[] = [];

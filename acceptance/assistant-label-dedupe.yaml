@@ -1,0 +1,20 @@
+id: assistant-label-dedupe
+title: 连续助手发言只在第一条显示「助手」标题
+status: implemented
+requirement: |
+  聊天流里同一段连续的助手发言（中间只隔着过程折叠、工具块、隐藏项，没有用户消息）
+  只在第一条显示「助手」标题，后面的不再重复；用户和系统消息不变，引用等操作仍可用。
+criteria:
+  - id: AC-1
+    given: 一段连续的助手消息，中间隔着折叠的过程块或系统消息
+    when: 渲染聊天流
+    then: 只有第一条助手消息显示标题，后续省略
+  - id: AC-2
+    given: 助手消息之间出现了用户消息
+    when: 渲染聊天流
+    then: 用户消息之后的第一条助手消息重新显示标题
+  - id: AC-3
+    given: 被省略标题的助手消息带有引用等操作按钮
+    when: 渲染该消息
+    then: 操作按钮仍然存在，只是不显示「助手」文字
+notes: "assumedApproval: standing-order-2026-10-22"

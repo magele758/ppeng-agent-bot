@@ -6,6 +6,7 @@ requirement: |
 owner: user
 notes: |
   assumedApproval: standing-order-2026-10-22
+  后续 brief-no-process-note：精简模式下「收成一行」的折叠块不再渲染，AC-3/8/9 的展示部分以该标准为准。
   默认只看关键信息。关掉后才展开全文。选择记在这个浏览器。只留用户的话、助手回答、图片、目标进展，以及还没处理的确认。工具过程、推理、系统流水、统计和子任务收成一行。不改对话记录，也不改模型看到的内容。
 criteria:
   - id: AC-1

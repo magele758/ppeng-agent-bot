@@ -1,13 +1,14 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import type { ApprovalItem, ChatMessage } from '@/lib/types';
 import { anchorApprovals } from '@/lib/approval-feed';
 import { messageHasStructuredParts, msgPartsToText, normalizedRole } from '@/lib/chat-utils';
 import { readMessageSessionId } from '@/lib/goal-update-notice';
 import { omitStreamTextSavedOnTurn } from '@/lib/history-window';
+import { continuedAssistantIndexes } from '@/lib/assistant-label-run';
 import { buildFeedSlots, steerStreamPlacement, type FeedSlot } from '@/lib/feed-window';
-import { rowsForSessionBrief } from '@/lib/session-brief';
+import { rowsForSessionBrief, showProcessNote } from '@/lib/session-brief';
 import { SessionBriefDisclosure } from './SessionBriefDisclosure';
 import { formatHash } from '@/lib/nav';
 import { useI18n } from '@/lib/i18n';
@@ -18,7 +19,7 @@ import { placeChildTaskEntries, type ChildTaskStreamEntry } from '@/lib/bot-chil
 import { ApprovalBanner } from './ApprovalBanner';
 import { BotChildTaskStreamEntry } from './BotChildTaskStreamEntry';
 import { ChatFeedWindow } from './ChatFeedWindow';
-import { ChatTurnIfVisible, ChatTurnPlain, ChatTurnStreaming } from './ChatTurns';
+import { ContinuedAssistantContext, ChatTurnIfVisible, ChatTurnPlain, ChatTurnStreaming } from './ChatTurns';
 import { SurfaceContextProvider } from './a2ui/SurfaceContext';
 import { SkillOperationCards } from './SkillOperationCards';
 import { SkillCaptureCards } from './SkillCaptureCards';
@@ -51,8 +52,10 @@ export function PlayTranscript(props: {
   const slots = rowsForSessionBrief(brief, view.slots, view.messages).map((row) =>
     row.type === 'slot' ? row.slot : { key: row.key, kind: 'brief-note' as const, briefCount: row.count, folded: row.slots }
   );
+  const continued = useContinuedAssistant(slots, view);
   return (
     <SurfaceContextProvider messages={props.chat.displayMessages}>
+      <ContinuedAssistantContext.Provider value={continued}>
       <ChatFeedWindow
         layoutKey={props.layoutKey}
         scrollerRef={props.chat.playMessagesRef}
@@ -75,8 +78,18 @@ export function PlayTranscript(props: {
           }}
         /> : null}{props.selectedSessionId ? <SkillOperationCards key={'operations-'+props.selectedSessionId} sessionId={props.selectedSessionId} onLayoutChange={() => { const feed = props.chat.playMessagesRef.current; if (feed && props.chat.playStickToBottomRef.current) feed.scrollTop = feed.scrollHeight; }}/> : null}{props.footer}</>}
       />
+      </ContinuedAssistantContext.Provider>
     </SurfaceContextProvider>
   );
+}
+
+function roleAt(messages: ChatMessage[], i: number): string | undefined {
+  const m = messages[i];
+  return m ? normalizedRole(m) : undefined;
+}
+
+function useContinuedAssistant(slots: FeedSlot[], view: TranscriptModel): ReadonlySet<number> {
+  return useMemo(() => continuedAssistantIndexes(slots, (i) => roleAt(view.messages, i)), [slots, view.messages]);
 }
 
 function FeedHeader(props: {
@@ -103,10 +116,10 @@ function BriefBanner() {
   return <p className="chat-process-note" role="status">{t('play.chrome.sessionBriefBanner')}</p>;
 }
 
-function ProcessNote({ slot, view, props }: { slot: FeedSlot; view: TranscriptModel; props: Parameters<typeof renderTranscriptSlot>[2] }) {
+function ProcessNote({ slot, view, props, brief }: { slot: FeedSlot; view: TranscriptModel; props: Parameters<typeof renderTranscriptSlot>[2]; brief: boolean }) {
   const { t } = useI18n();
   const folded = slot.folded ?? [];
-  if (folded.length === 0) return null;
+  if (!showProcessNote(brief, folded.length)) return null;
   return (
     <SessionBriefDisclosure noteKey={slot.key} label={t('play.turns.processNote', { count: folded.length })} title={t('play.turns.processNoteTitle')}>
       {folded.map((foldedSlot) => (
@@ -340,7 +353,7 @@ function renderTranscriptSlot(slot: FeedSlot, view: TranscriptModel, props: {
   onQuoteReply?: (quote: ReplyQuote) => void;
   onOpenChildTask?: (sessionId: string) => void;
 }, brief = false): ReactNode {
-  if (slot.kind === 'brief-note') return <ProcessNote slot={slot} view={view} props={props} />;
+  if (slot.kind === 'brief-note') return <ProcessNote slot={slot} view={view} props={props} brief={brief} />;
   if (slot.kind === 'child-task') {
     const group = view.childTaskGroups.get(slot.messageIndex ?? -1) ?? [];
     return <BotChildTaskStreamEntry entries={group} onOpen={props.onOpenChildTask} />;

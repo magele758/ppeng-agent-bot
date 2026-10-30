@@ -1,7 +1,7 @@
 'use client';
 import {CorrectionCapture} from './LearningWorkbench';
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { SystemMessageContent } from './SystemMessageContent';
 import { ModelRetryStatus } from './ModelRetryStatus';
 import type { RetryProgress } from '@/lib/model-retry';
@@ -15,7 +15,7 @@ import {
   msgPartsToText,
   normalizedRole
 } from '@/lib/chat-utils';
-import { briefStreamSegments, visibleBriefParts } from '@/lib/session-brief';
+import { briefStreamSegments, showProcessNote, visibleBriefParts } from '@/lib/session-brief';
 import { SessionBriefDisclosure } from './SessionBriefDisclosure';
 import { parseCronUserPrompt } from '@/lib/cron';
 import { quietRoutineResult } from '@/lib/routine-quiet';
@@ -76,6 +76,13 @@ function buildModClass(
   if (role === 'tool') return 'chat-turn--tool';
   if (role === 'system') return 'chat-turn--system';
   return 'chat-turn--assistant';
+}
+
+/** 同一连续助手发言的后续消息：message index 集合，由 PlayTranscript 提供。 */
+export const ContinuedAssistantContext = createContext<ReadonlySet<number>>(new Set());
+
+function roleLabelText(role: string, t: (key: MessageKey) => string, hidden: boolean): string {
+  return hidden ? '' : roleLabel(role, t);
 }
 
 function roleLabel(role: string, t: (key: MessageKey) => string): string {
@@ -668,8 +675,10 @@ export function ChatTurnFromMessage({
   quoteBot = null,
   onQuote,
   replyNames,
-  brief = false
+  brief = false,
+  hideRoleLabel = false
 }: {
+  hideRoleLabel?: boolean;
   m: ChatMessage;
   sessionId?: string;
   msgIndex?: number;
@@ -740,7 +749,7 @@ export function ChatTurnFromMessage({
       {!noAvatar ? <div className="chat-avatar">{avatarText(r, t('play.me'))}</div> : null}
       <div className="chat-turn__content">
         <div className="chat-turn__label">
-          {roleLabel(r, t)}
+          {roleLabelText(r, t, hideRoleLabel)}
           {r==='assistant'&&sessionId&&replyMessageId(m)&&<CorrectionCapture sessionId={sessionId} messageId={replyMessageId(m)}/>}
           {onQuote && quoteBot ? (
             <BotReplyQuoteAction
@@ -783,9 +792,10 @@ function storedMessageKey(message: object): string | undefined {
   return typeof message.key === 'string' ? message.key : undefined;
 }
 export function ChatTurnIfVisible(props: Parameters<typeof ChatTurnFromMessage>[0]) {
+  const continued = useContext(ContinuedAssistantContext);
   const message = props.m;
   if (quietRoutineResult(normalizedRole(message), storedMessageKey(message), msgPartsToText(message.parts))) return null;
-  return <ChatTurnFromMessage {...props} />;
+  return <ChatTurnFromMessage {...props} hideRoleLabel={continued.has(props.msgIndex ?? -1)} />;
 }
 
 export function ChatTurnPlain({
@@ -898,7 +908,7 @@ export function ChatTurnStreaming({
         <div className="chat-turn__label">{t('play.role.streaming')}</div>
         <div className="chat-bubble chat-bubble--stream-blocks">
           {retry ? <ModelRetryStatus progress={retry} /> : null}
-          {shown.hidden.length > 0 ? (
+          {showProcessNote(brief, shown.hidden.length) ? (
             <SessionBriefDisclosure label={t('play.turns.processNote', { count: shown.hidden.length })} title={t('play.turns.processNoteTitle')}>
               {shown.hidden.map(renderSeg)}
             </SessionBriefDisclosure>
