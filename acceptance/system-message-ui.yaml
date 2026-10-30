@@ -6,6 +6,7 @@ requirement: |
 notes: |
   assumedApproval: standing-order-2026-10-22
   系统文字统一渲染，保留现有专用卡片和会话归属规则；未知及无标记文本使用兜底卡片。
+  AC-2 中的目标更新长内容/原始详情已被 goal-update-hidden 取代（目标更新通知不再展示）。
 criteria:
   - id: AC-1
     given: 历史、即时或结构化系统消息包含恢复、模型回退、目标、压缩、扩展、协作或权限信息

@@ -503,7 +503,6 @@ export function ChatTurnFromMessage({
   ) {
     return null;
   }
-  const goalCard = presented.kind === 'card' && !modelView;
   const bubble =
     (r === 'system' && !modelView && !messageHasStructuredParts(shown.parts) ? (
       <SystemMessageContent text={msgPartsToText(shown.parts)} scope={{ messageSessionId: readMessageSessionId(m as { sessionId?: unknown }), conversationId: sessionId }} />
@@ -537,7 +536,7 @@ export function ChatTurnFromMessage({
       <MarkdownHtml className="chat-bubble__body chat-bubble__md" text={cronPrompt.body || cronPrompt.name} />
     ) : bubble;
   return (
-    <div className={`chat-turn ${buildModClass(r)}${noAvatar ? ' chat-turn--no-avatar' : ''}${goalCard ? ' chat-turn--goal-update' : ''}`}>
+    <div className={`chat-turn ${buildModClass(r)}${noAvatar ? ' chat-turn--no-avatar' : ''}`}>
       {!noAvatar ? <div className="chat-avatar">{avatarText(r, t('play.me'))}</div> : null}
       <div className="chat-turn__content">
         <div className="chat-turn__label">
@@ -618,12 +617,11 @@ export function ChatTurnPlain({
   const mod = buildModClass(role === 'stream' ? 'assistant' : role, stream);
   const av = avatarText(role === 'stream' ? 'assistant' : role, t('play.me'), stream);
   const label = labelOverride ?? (stream ? t('play.role.streaming') : roleLabel(role, t));
-  const goalCard = presented.kind === 'card';
-  const usePre = (role === 'tool' || role === 'system') && !goalCard;
+  const usePre = role === 'tool' || role === 'system';
   const noAvatar =
     role === 'tool' || role === 'system' || role === 'assistant' || role === 'stream';
   return (
-    <div className={`chat-turn ${mod} ${noAvatar ? 'chat-turn--no-avatar' : ''} ${goalCard ? 'chat-turn--goal-update' : ''} ${extraClass}`.trim()}>
+    <div className={`chat-turn ${mod} ${noAvatar ? 'chat-turn--no-avatar' : ''} ${extraClass}`.trim()}>
       {!noAvatar ? <div className="chat-avatar">{av}</div> : null}
       <div className="chat-turn__content">
         <div className="chat-turn__label">{label}</div>

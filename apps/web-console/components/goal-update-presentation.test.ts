@@ -133,189 +133,28 @@ const blockedNotice = goalUpdateText({
   nextStep: 'probe-next-step-9f3a'
 });
 
-test('目标更新不再显示花括号原文和英文叮嘱 [AC:goal-update-presentation#AC-1]', () => {
-  const html = renderTurns([{ role: 'system', text: blockedNotice, sessionId: CURRENT }], CURRENT);
-  assert.equal(cards(html).length, 1);
-  assert.equal(cards(html).join('').includes('[goal update]'), false);
-  assert.equal(cards(html).join('').includes(NUDGE_TELL), false);
-  assert.equal(cards(html).join('').includes(NUDGE_RESTART), false);
-  assert.equal(cards(html).join('').includes('{"id"'), false);
-  assert.equal(cards(html).join('').includes('probe-progress-9f3a'), false);
-  assert.equal(cards(html).join('').includes('probe-next-step-9f3a'), false);
-  assert.match(html, /可以考虑让bo/);
-});
-
-test('目标更新显示为带标题、可读状态和人话原因的状态卡 [AC:goal-update-presentation#AC-2]', () => {
-  const cases = [
-    { status: 'blocked', label: '受阻', title: '周报草稿' },
-    { status: 'running', label: '进行中', title: '整理资料' },
-    { status: 'completed', label: '完成', title: '发出周报' }
-  ] as const;
-  for (const item of cases) {
-    const html = renderTurns(
-      [{
-        role: 'system',
-        sessionId: CURRENT,
-        text: goalUpdateText({
-          id: GOAL_ID,
-          title: item.title,
-          status: item.status,
-          reason: '证据已经对齐',
-          progress: 'probe-progress-9f3a'
-        })
-      }],
-      CURRENT
-    );
-    assert.equal(cards(html).length, 1);
-    assert.equal(textOf(html, 'goal-update-title'), item.title);
-    assert.equal(textOf(html, 'goal-update-status'), item.label);
-    assert.match(html, new RegExp(`data-status="${item.status}"`));
-    assert.equal(textOf(html, 'goal-update-reason'), '证据已经对齐');
-    assert.equal(cards(html).join('').includes(GOAL_ID), false);
-    assert.equal(cards(html).join('').includes('probe-progress-9f3a'), false);
+test('目标更新通知不展示，助手回复与其它系统通知照常 [AC:goal-update-hidden#AC-1] [AC:goal-update-hidden#AC-2]', () => {
+  const html = renderTurns(
+    [
+      { role: 'user', text: '请把结论写短一点', sessionId: CURRENT },
+      { role: 'system', text: blockedNotice, sessionId: CURRENT },
+      { role: 'system', text: blockedNotice, sessionId: OTHER },
+      { role: 'assistant', text: '好，我改成三句话。', sessionId: CURRENT },
+      { role: 'system', text: '[recovery] Stopped: test-only', sessionId: CURRENT }
+    ],
+    CURRENT
+  );
+  for (const gone of ['goal-update-card', '[goal update]', '可以考虑让bo', 'probe-progress-9f3a', NUDGE_TELL]) {
+    assert.equal(html.includes(gone), false, gone);
   }
-
-  const untitled = renderTurns(
-    [{
-      role: 'system',
-      sessionId: CURRENT,
-      text: goalUpdateText({
-        id: 'goal_aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
-        title: '',
-        status: 'blocked',
-        reason: '先停一下'
-      })
-    }],
-    CURRENT
-  );
-  const fallbackTitle = textOf(untitled, 'goal-update-title');
-  assert.equal(fallbackTitle, '目标有更新');
-  assert.equal(cards(untitled).join('').includes('goal_aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'), false);
-
-  const unknown = renderTurns(
-    [{
-      role: 'system',
-      sessionId: CURRENT,
-      text: goalUpdateText({
-        id: GOAL_ID,
-        title: '整理资料',
-        status: 'running',
-        reason: 'worker lease expired before verification'
-      })
-    }],
-    CURRENT
-  );
-  assert.equal(textOf(unknown, 'goal-update-status'), '进行中');
-  assert.equal(textOf(unknown, 'goal-update-reason'), '这次变化已记下，细节留待查看');
-  assert.equal(cards(unknown).join('').includes('worker lease expired before verification'), false);
+  assert.match(html, /请把结论写短一点/);
+  assert.match(html, /好，我改成三句话。/);
+  assert.match(html, /data-kind="stopped"/);
+  assert.equal(html.split('<details').length - 1, 1);
+  const message = { role: 'system', parts: [{ type: 'text', text: blockedNotice }] };
+  const hist = renderToStaticMarkup(React.createElement(ui.ChatTurnFromMessage, { m: message, sessionId: CURRENT }));
+  assert.equal(hist.includes('chat-turn'), false);
 });
-
-test('受阻原因写成完成核验不可用、证据留着待查 [AC:goal-update-presentation#AC-3]', () => {
-  const html = renderTurns([{ role: 'system', text: blockedNotice, sessionId: CURRENT }], CURRENT);
-  assert.equal(textOf(html, 'goal-update-status'), '受阻');
-  assert.equal(textOf(html, 'goal-update-reason'), '完成核验不可用、证据留着待查');
-  assert.equal(cards(html).join('').includes(VERIFY_REASON), false);
-  assert.equal(cards(html).join('').includes('Completion verification unavailable'), false);
-  assert.equal(cards(html).join('').includes('evidence retained for review'), false);
-});
-
-test('没有目标更新时不出现空的目标状态卡 [AC:goal-update-presentation#AC-4]', () => {
-  const html = renderTurns(
-    [
-      { role: 'user', text: '今天天气怎么样', sessionId: CURRENT },
-      { role: 'assistant', text: '我看不到窗外，但可以查。', sessionId: CURRENT },
-      {
-        role: 'system',
-        text: '[goal coordination] Ask which goal should change priority; keep other goals unchanged.',
-        sessionId: CURRENT
-      }
-    ],
-    CURRENT
-  );
-  assert.equal(html.includes('goal-update-card'), false);
-  assert.equal(html.includes('goal-status-card'), false);
-  assert.match(html, /今天天气怎么样/);
-  assert.match(html, /我看不到窗外，但可以查。/);
-  assert.match(html, /Ask which goal should change priority/);
-  assert.equal(renderTurns([], CURRENT).includes('goal-update-card'), false);
-});
-
-test('用户消息和助手回复仍按原样显示 [AC:goal-update-presentation#AC-5]', () => {
-  const userText = '请把结论写短一点';
-  const assistantText = '好，我改成三句话。';
-  const html = renderTurns(
-    [
-      { role: 'user', text: userText, sessionId: CURRENT },
-      { role: 'assistant', text: assistantText, sessionId: CURRENT },
-      { role: 'system', text: blockedNotice, sessionId: CURRENT }
-    ],
-    CURRENT
-  );
-  assert.equal(cards(html).length, 1);
-  assert.match(html, /chat-turn--user[\s\S]*请把结论写短一点/);
-  assert.match(html, /chat-turn--assistant[\s\S]*好，我改成三句话。/);
-  const card = cards(html)[0] ?? '';
-  assert.equal(card.includes(userText), false);
-  assert.equal(card.includes(assistantText), false);
-  assert.match(html, /可以考虑让bo/);
-});
-
-test('不属于当前对话的目标更新不出现 [AC:goal-update-presentation#AC-6]', () => {
-  const html = renderTurns(
-    [
-      { role: 'user', text: '继续看这个目标', sessionId: CURRENT },
-      {
-        role: 'system',
-        sessionId: CURRENT,
-        text: goalUpdateText({ id: 'goal_current', title: '可以考虑让bo', status: 'blocked', reason: '证据已经对齐' })
-      },
-      {
-        role: 'system',
-        sessionId: CURRENT,
-        text: goalUpdateText({ id: 'goal_same_chat', title: '同一段对话的另一件事', status: 'running', reason: '还在做' })
-      },
-      {
-        role: 'system',
-        sessionId: OTHER,
-        text: goalUpdateText({
-          id: 'goal_other_session',
-          title: '隔壁会话的目标',
-          status: 'completed',
-          reason: 'shipped in the other session'
-        })
-      }
-    ],
-    CURRENT
-  );
-  assert.match(html, /可以考虑让bo/);
-  assert.match(html, /同一段对话的另一件事/);
-  assert.equal(html.includes('隔壁会话的目标'), false);
-  assert.equal(html.includes('goal_other_session'), false);
-  assert.equal(html.includes('shipped in the other session'), false);
-
-  const other = renderTurns(
-    [
-      { role: 'assistant', text: '这边还没有目标通知。', sessionId: OTHER },
-      {
-        role: 'system',
-        sessionId: CURRENT,
-        text: goalUpdateText({ id: GOAL_ID, title: '可以考虑让bo', status: 'blocked', reason: VERIFY_REASON })
-      },
-      {
-        role: 'system',
-        sessionId: OTHER,
-        text: goalUpdateText({ id: 'goal_other_goal', title: '另一个目标的标题', status: 'completed', reason: '已经做完' })
-      }
-    ],
-    OTHER
-  );
-  assert.match(other, /另一个目标的标题/);
-  assert.match(other, /这边还没有目标通知。/);
-  assert.equal(other.includes('可以考虑让bo'), false);
-  assert.equal(other.includes(GOAL_ID), false);
-  assert.equal(other.includes(VERIFY_REASON), false);
-});
-
 
 test('system cards cover immediate, historical, mixed and model-view text [AC:system-message-ui#AC-1] [AC:system-message-ui#AC-3]', () => {
   const text = '[recovery] Stopped: test-only';
@@ -330,12 +169,4 @@ test('system cards cover immediate, historical, mixed and model-view text [AC:sy
   assert.match(mixed, /data-kind="stopped"/);
   assert.match(mixed, /PRESERVED_TOOL_RESULT/);
   assert.doesNotMatch(renderTurns([{ role: 'user', text }], CURRENT), /data-testid="system-notice-card"/);
-});
-
-test('raw goal-update details remain available in a closed disclosure [AC:system-message-ui#AC-2]', () => {
-  const html = renderTurns([{ role: 'system', text: blockedNotice, sessionId: CURRENT }], CURRENT);
-  assert.match(html, /<details><summary>原始详情<\/summary><pre>/);
-  assert.doesNotMatch(html, /<details[^>]*\bopen/);
-  assert.match(html, /probe-progress-9f3a/);
-  assert.match(html, /Briefly tell the user/);
 });

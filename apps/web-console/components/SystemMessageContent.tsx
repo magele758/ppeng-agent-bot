@@ -6,7 +6,6 @@ import { parseRiskAdvisory } from '@/lib/risk-advisory';
 import { presentGoalUpdate, type GoalUpdateScope } from '@/lib/goal-update-notice';
 import { SystemContextCard } from './SystemContextCard';
 import { RiskAdvisoryCard } from './RiskAdvisoryCard';
-import { GoalUpdateCard } from './GoalUpdateCard';
 import styles from './SystemMessageContent.module.css';
 
 /** Shared by historical, immediate and structured system-text renderers. */
@@ -20,12 +19,10 @@ export function SystemMessageContent({ text, scope }: { text: string; scope?: Go
   if (risk) return <RiskAdvisoryCard notice={risk} />;
   const notice = classifySystemMessage(text);
   return (
-    <div className={`${styles.card} ${notice.warning ? styles.warning : ''}`} data-testid="system-notice-card" data-kind={goal.kind === 'card' ? 'goalUpdate' : notice.kind}>
-      {goal.kind === 'card' ? <div className={styles.goal}><GoalUpdateCard notice={goal.notice} /></div> : <>
-        <strong>{t(`play.systemNotice.${notice.kind}`)}</strong>
-        <p className={styles.hint}>{t(`play.systemNotice.${notice.kind}Hint`)}</p>
-        <p className={styles.preview}>{text.length > 240 ? `${text.slice(0, 240)}…` : text}</p>
-      </>}
+    <div className={`${styles.card} ${notice.warning ? styles.warning : ''}`} data-testid="system-notice-card" data-kind={notice.kind}>
+      <strong>{t(`play.systemNotice.${notice.kind}`)}</strong>
+      <p className={styles.hint}>{t(`play.systemNotice.${notice.kind}Hint`)}</p>
+      <p className={styles.preview}>{text.length > 240 ? `${text.slice(0, 240)}…` : text}</p>
       <details>
         <summary>{t('play.systemNotice.details')}</summary>
         <pre>{text}</pre>
