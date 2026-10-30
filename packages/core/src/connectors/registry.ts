@@ -20,6 +20,14 @@ export const CONNECTOR_GRANTS_KEY = 'connector_grants';
 export type ConnectorSource = 'plugin' | 'discovery' | 'domain';
 export type ConnectorAuthKind = PluginAuthKind;
 
+/**
+ * Lab authorization dialogue.
+ * needsAuth: the connector requires a credential and none is referenced yet.
+ * needsGrant: a SecretVault name (or other credential reference) is on the row, but the user has not granted it.
+ * granted: the user granted it; the model may see instructions, never the secret value.
+ */
+export type ConnectorAuthState = 'needsAuth' | 'needsGrant' | 'granted';
+
 export interface ConnectorRecord {
   id: string;
   title: string;
@@ -29,6 +37,7 @@ export interface ConnectorRecord {
   secretEnv?: string;
   credRef?: string;
   granted: boolean;
+  authState: ConnectorAuthState;
 }
 
 /** Wire shape. Instructions and secret values are omitted. */
@@ -40,6 +49,7 @@ export interface ConnectorPublic {
   secretEnv?: string;
   credRef?: string;
   granted: boolean;
+  authState: ConnectorAuthState;
 }
 
 export interface DomainConnectorSource {
@@ -194,6 +204,22 @@ function parseGrant(input: unknown, env: NodeJS.ProcessEnv): StoredGrant {
   return grant;
 }
 
+/**
+ * Visible authorization state. A grant wins. Auth without a SecretVault name
+ * or credential reference still needs one. Anything else is waiting for the
+ * one-click grant, including connectors that need no secret.
+ */
+export function connectorAuthState(input: {
+  granted: boolean;
+  authKind: ConnectorAuthKind;
+  secretEnv?: string;
+  credRef?: string;
+}): ConnectorAuthState {
+  if (input.granted) return 'granted';
+  if (input.authKind !== 'none' && !input.secretEnv && !input.credRef) return 'needsAuth';
+  return 'needsGrant';
+}
+
 function compose(parts: Array<string | undefined>): string {
   return parts
     .map((part) => part?.trim() ?? '')
@@ -223,7 +249,13 @@ function projectPlugin(
     authKind: plugin.authKind,
     ...(secretEnv ? { secretEnv } : {}),
     ...(credRef ? { credRef } : {}),
-    granted: grant !== undefined
+    granted: grant !== undefined,
+    authState: connectorAuthState({
+      granted: grant !== undefined,
+      authKind: plugin.authKind,
+      ...(secretEnv ? { secretEnv } : {}),
+      ...(credRef ? { credRef } : {})
+    })
   };
 }
 
@@ -235,6 +267,7 @@ function projectDiscovery(
   if (card.trust !== 'bound') return undefined;
   const secretEnv = safeEnvName(grant?.secretEnv);
   const credRef = safeCredRef(grant?.credRef ?? card.credRef, env, secretEnv);
+  const authKind: ConnectorAuthKind = credRef || secretEnv ? 'bearer' : 'none';
   const instructions = compose([
     card.description,
     `Capability ${card.name} (${card.kind}) is bound.`,
@@ -248,10 +281,16 @@ function projectDiscovery(
     title: card.name,
     source: 'discovery',
     instructions,
-    authKind: credRef || secretEnv ? 'bearer' : 'none',
+    authKind,
     ...(secretEnv ? { secretEnv } : {}),
     ...(credRef ? { credRef } : {}),
-    granted: grant !== undefined
+    granted: grant !== undefined,
+    authState: connectorAuthState({
+      granted: grant !== undefined,
+      authKind,
+      ...(secretEnv ? { secretEnv } : {}),
+      ...(credRef ? { credRef } : {})
+    })
   };
 }
 
@@ -262,15 +301,22 @@ function projectDomain(
 ): ConnectorRecord {
   const secretEnv = safeEnvName(grant?.secretEnv ?? domain.secretEnv);
   const credRef = safeCredRef(grant?.credRef ?? domain.credRef, env, secretEnv);
+  const authKind = domain.authKind ?? 'none';
   return {
     id: domainConnectorId(domain.id),
     title: domain.title,
     source: 'domain',
     instructions: compose([domain.instructions]),
-    authKind: domain.authKind ?? 'none',
+    authKind,
     ...(secretEnv ? { secretEnv } : {}),
     ...(credRef ? { credRef } : {}),
-    granted: grant !== undefined
+    granted: grant !== undefined,
+    authState: connectorAuthState({
+      granted: grant !== undefined,
+      authKind,
+      ...(secretEnv ? { secretEnv } : {}),
+      ...(credRef ? { credRef } : {})
+    })
   };
 }
 
@@ -387,7 +433,8 @@ export class ConnectorRegistry {
       authKind: record.authKind,
       ...(record.secretEnv ? { secretEnv: record.secretEnv } : {}),
       ...(credRef ? { credRef } : {}),
-      granted: record.granted
+      granted: record.granted,
+      authState: record.authState
     };
   }
 

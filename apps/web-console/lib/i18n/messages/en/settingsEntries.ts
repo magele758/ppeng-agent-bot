@@ -364,12 +364,25 @@ export const settingsEntries = {
   },
   connectors: {
     title: 'Connector grants',
-    keywords: 'connector grant plugin domain secret authorization',
-    desc: 'Each connector is granted on its own. Usage notes reach the model only after a grant. This list shows the name and whether it is granted.',
+    keywords: 'connector grant plugin domain secret authorization vault needsAuth needsGrant',
+    desc: 'Each connector shows whether it still needs a SecretVault reference, is ready to grant, or is already granted. A grant stores the vault name only. The secret value never enters the model.',
     empty: 'No connectors to grant.',
     granted: 'Granted',
     notGranted: 'Not granted',
-    loadFailed: 'Could not load connectors'
+    loadFailed: 'Could not load connectors',
+    stateMachine: 'Authorization states',
+    states: {
+      needsAuth: 'Needs a vault reference',
+      needsGrant: 'Ready to grant',
+      granted: 'Granted'
+    },
+    secretRef: 'SecretVault name',
+    credRef: 'Credential reference',
+    vaultName: 'SecretVault name',
+    grant: 'Grant',
+    revoke: 'Revoke',
+    grantFailed: 'Could not grant this connector. Choose a SecretVault name, not a secret value.',
+    revokeFailed: 'Could not revoke this connector'
   },
   langfuse: {
     title: 'Langfuse tracing',
