@@ -538,3 +538,24 @@
 .chat-process-note__body {
   margin-top: 6px;
 }
+
+/* 连续助手消息：标题被省略后标题行不占高度，操作按钮浮到右上角，间距收紧到段落级。 */
+.chat-turn--continued {
+  margin-bottom: 4px;
+}
+.chat-turn--continued .chat-turn__content {
+  position: relative;
+}
+.chat-turn--continued .chat-turn__label--bare {
+  position: absolute;
+  top: 0;
+  right: 0;
+  margin: 0;
+  padding: 0;
+  height: 0;
+  overflow: visible;
+  z-index: 1;
+}
+.chat-turn--continued .chat-bubble {
+  padding-top: 0;
+}

@@ -457,6 +457,14 @@ function StructuredBubble({
   return <>{nodes}</>;
 }
 
+/** 省略标题的连续助手消息：标题行脱离文档流、整体收紧间距。 */
+function continuedClass(hide: boolean): string {
+  return hide ? ' chat-turn--continued' : '';
+}
+function continuedLabelClass(hide: boolean): string {
+  return hide ? ' chat-turn__label--bare' : '';
+}
+
 export function ChatTurnFromMessage({
   m,
   sessionId = '',
@@ -537,10 +545,10 @@ export function ChatTurnFromMessage({
       <MarkdownHtml className="chat-bubble__body chat-bubble__md" text={cronPrompt.body || cronPrompt.name} />
     ) : bubble;
   return (
-    <div className={`chat-turn ${buildModClass(r)}${noAvatar ? ' chat-turn--no-avatar' : ''}${goalCard ? ' chat-turn--goal-update' : ''}`}>
+    <div className={`chat-turn ${buildModClass(r)}${continuedClass(hideRoleLabel)}${noAvatar ? ' chat-turn--no-avatar' : ''}${goalCard ? ' chat-turn--goal-update' : ''}`}>
       {!noAvatar ? <div className="chat-avatar">{avatarText(r, t('play.me'))}</div> : null}
       <div className="chat-turn__content">
-        <div className="chat-turn__label">
+        <div className={`chat-turn__label${continuedLabelClass(hideRoleLabel)}`}>
           {roleLabelText(r, t, hideRoleLabel)}
           {r==='assistant'&&sessionId&&replyMessageId(m)&&<CorrectionCapture sessionId={sessionId} messageId={replyMessageId(m)}/>}
           {onQuote && quoteBot ? (
