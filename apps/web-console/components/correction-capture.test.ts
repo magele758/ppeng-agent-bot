@@ -298,3 +298,14 @@ test('用户消息和正在输出的消息没有这个入口 [AC:correction-capt
     assert.equal(html.includes('learning.capture'), false);
   }
 });
+
+test('省略标题的助手消息仍保留操作按钮 [AC:assistant-label-dedupe#AC-3]', () => {
+  const props = {
+    m: { id: 'msg-done', role: 'assistant', parts: [{ type: 'text', text: '已经答完。' }] },
+    sessionId: 'sess-done'
+  };
+  assert.ok(renderTurn(props).includes('助手'));
+  const html = renderTurn({ ...props, hideRoleLabel: true });
+  assert.equal(html.includes('>助手'), false);
+  assert.ok(html.includes('correction-capture__trigger'));
+});
