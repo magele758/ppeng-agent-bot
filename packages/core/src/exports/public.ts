@@ -114,6 +114,21 @@ export {
   annotateRetiredToolParts,
   searchDynTools
 } from '../dyn-tools/index.js';
+
+export {
+  PROMPT_VARIANT_SETTINGS_KEY,
+  defaultPromptVariantSettings,
+  normalizePromptVariantSettings,
+  hasPersistedPromptVariantSettings,
+  readPromptVariantSettings,
+  writePromptVariantSettings,
+  resolvePromptVariant,
+  promptVariantOptions,
+  type PromptVariant,
+  type PromptVariantSettings,
+  type PromptVariantSettingsPatch,
+  type PromptVariantSettingsStore
+} from '../model/prompt-variant-settings.js';
 export type {
   DynToolRecord,
   DynToolSettings,

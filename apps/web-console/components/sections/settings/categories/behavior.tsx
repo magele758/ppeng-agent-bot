@@ -1,4 +1,5 @@
 import { AgentLoopSettingsCard } from '../../../AgentLoopSettingsCard';
+import { PromptVariantSettingsCard } from '../../../PromptVariantSettingsCard';
 import { InputSuggestionSettingsCard } from '../../../InputSuggestionSettingsCard';
 import { SessionRecapSettingsCard } from '../../../SessionRecapSettingsCard';
 import { GoalSettingsCard } from '../../../GoalSettingsCard';
@@ -20,6 +21,13 @@ export const behaviorEntries: SettingsEntry[] = [
     titleKey: 'settingsEntries.agentLoop.title',
     keywordsKey: 'settingsEntries.agentLoop.keywords',
     render: () => <AgentLoopSettingsCard />
+  },
+  {
+    id: 'promptVariant',
+    category: 'behavior',
+    titleKey: 'settingsEntries.promptVariant.title',
+    keywordsKey: 'settingsEntries.promptVariant.keywords',
+    render: () => <PromptVariantSettingsCard />
   },
   {
     id: 'inputSuggestion',

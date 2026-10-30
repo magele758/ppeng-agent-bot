@@ -38,6 +38,7 @@ import { applyJevSkillSelect } from '../jev/apply.js';
 import { chainHas, resolveJevChain } from '../jev/settings.js';
 import { isPtcSession, orchestrationReplayFromSession } from '../ptc/mode.js';
 import { resolveDynToolsEnabled } from '../dyn-tools/settings.js';
+import { resolvePromptVariant } from './prompt-variant-settings.js';
 import { buildReplayPromptBlock } from '../ptc/prompt.js';
 import { normalizeSavedOrchestration } from '../ptc/orchestration.js';
 import {
@@ -77,7 +78,7 @@ function timePromptSlice<T>(sessionId: string, phase: string, run: () => T, extr
  * Bump when `buildStablePrefix` (or any helper that feeds it) changes wording.
  * See `./AGENTS.md`.
  */
-export const STABLE_SYSTEM_VERSION = 'v14';
+export const STABLE_SYSTEM_VERSION = 'v15';
 
 /** Appended when `RAW_AGENT_AGENTIC_SAFETY_APPENDIX` is set; English to match the rest of the stable prefix. */
 export const RUNTIME_AGENTIC_SAFETY_APPENDIX = `Runtime safety appendix (policy text only; does not replace model-level safety training):
@@ -487,11 +488,18 @@ export class PromptBuilder {
       ctx.session.mode,
       String(resolveDiscoveryEnabled(this.deps.store, process.env)),
       toolDirectory(this.deps.store),
-      agenticSafetyAppendixScope(process.env)
+      agenticSafetyAppendixScope(process.env),
+      resolvePromptVariant(this.deps.store)
     ].join('\0');
   }
 
   private composeStablePrefix(ctx: PromptContext): string {
+    const variant = resolvePromptVariant(this.deps.store);
+    if (variant === 'legacy') return this.composeStablePrefixLegacy(ctx);
+    return this.composeStablePrefixAnthropic5(ctx);
+  }
+
+  private composeStablePrefixLegacy(ctx: PromptContext): string {
     const harnessLines: string[] = [];
     if (ctx.agent.harnessRole === 'planner') {
       harnessLines.push(
@@ -541,6 +549,116 @@ export class PromptBuilder {
       .filter(Boolean)
       .join('\n\n');
 
+    const scope = agenticSafetyAppendixScope(process.env);
+    if (scope === 'off') return base;
+    if (scope === 'general' && ctx.agent.id !== 'general') return base;
+    return `${base}\n\n---\n\n${RUNTIME_AGENTIC_SAFETY_APPENDIX}`;
+  }
+
+
+  /**
+   * Anthropic five-rules reorganization of the same product constraints:
+   * clear/direct, motivation, examples, XML sections, explicit role.
+   * Does not invent new behavior — reorders/clarifies legacy only.
+   */
+  private composeStablePrefixAnthropic5(ctx: PromptContext): string {
+    const harnessLines: string[] = [];
+    if (ctx.agent.harnessRole === 'planner') {
+      harnessLines.push(
+        'Harness role: PLANNER — expand short goals into a high-level product spec and feature boundaries; avoid brittle low-level specs. Write product_spec.md via harness_write_spec; when the domain is clear, also maintain requirements_backlog.md (numbered, verifiable items: behaviour, NFR, UX, copy).',
+      );
+    } else if (ctx.agent.harnessRole === 'generator') {
+      harnessLines.push(
+        'Harness role: GENERATOR — one sprint/feature at a time. Write sprint_contract.md (scope + verifiable acceptance criteria) before deep implementation; after work, prefer external review via spawn_subagent(role=evaluator) or role=review.',
+      );
+    } else if (ctx.agent.harnessRole === 'evaluator') {
+      harnessLines.push(
+        'Harness role: EVALUATOR — skeptical QA; probe edge cases; document findings in evaluator_feedback.md. Do not rubber-stamp generator output.',
+      );
+    }
+    if (ctx.agent.id === 'main' || (ctx.agent.capabilities.includes('orchestration') && !ctx.agent.capabilities.includes('bot'))) {
+      harnessLines.push(
+        `Long-running harness: orchestrate planner → generator sprints → evaluator; structured files under ${HARNESS_ARTIFACT_DIR}/ (${HARNESS_ARTIFACT_FILES.productSpec}, ${HARNESS_ARTIFACT_FILES.requirementsBacklog}, ${HARNESS_ARTIFACT_FILES.sprintContract}, ${HARNESS_ARTIFACT_FILES.evaluatorFeedback}).`,
+      );
+    }
+
+    const workspaceLines = formatWorkspaceRootsPrompt(ctx);
+    const discoveryLine = resolveDiscoveryEnabled(this.deps.store, process.env)
+      ? 'External service discovery is enabled. It is separate from local tool delivery. Capability cards describe external bindings; they are not executable tools by themselves.'
+      : '';
+    const toolDir = toolDirectory(this.deps.store);
+
+    const sections: string[] = [
+      [
+        '<role>',
+        `You are ${ctx.agent.name}, acting as ${ctx.agent.role}.`,
+        'Complete the user request in this raw agent loop. Respond normally when no tools are needed.',
+        ctx.agent.instructions,
+        '</role>',
+      ].filter(Boolean).join('\n'),
+      [
+        '<workspace>',
+        `Repository root: ${ctx.repoRoot}`,
+        workspaceLines,
+        `Conversation mode: ${ctx.session.mode}`,
+        'Why: file and shell tools resolve against these roots; stay inside authorized paths.',
+        '</workspace>',
+      ].join('\n'),
+      [
+        '<safety>',
+        EXTERNAL_FENCE_SYSTEM_SENTENCE,
+        '</safety>',
+      ].join('\n'),
+      [
+        '<artifacts>',
+        'Only write artifacts required by the user or necessary to perform the requested task.',
+        'Verification observations already in tool results are evidence; report them in the conversation without creating additional files, database records, or saved reports merely to prove completion.',
+        'Explicitly requested reports and necessary task outputs remain authorized.',
+        'Example: a tool result already shows a checksum — report it in chat; do not create a proof file unless the user asked for one.',
+        '</artifacts>',
+      ].join('\n'),
+      [
+        '<tools>',
+        'Choose tools by their actual data source and capability.',
+        'Resolve bare data identifiers with an exact-key lookup when available before assuming a filesystem path or searching conversation history.',
+        'Use file tools for explicit file references or files established by discovery.',
+        'Do not repeatedly guess filenames after a missing-file result; use an authorized lookup or discovery tool to locate the requested data.',
+        'Once the input is available, complete the requested transformation and persistence, and verify the saved artifact before ending. Finding input or announcing the next action is not task completion.',
+        'Example: given a bare record id, call the exact-key lookup before searching the filesystem for a file named after that id.',
+        'When the user specifies an exact output format or asks for only a value, return that format without explanations, headings, or verification reports. Perform necessary tools and checks, but keep progress narration out of a strict-format response.',
+        'Use TodoWrite for multi-step work when it helps track remaining work; keep one item in progress and prioritize execution over bookkeeping.',
+        toolDir,
+        '</tools>',
+      ].filter(Boolean).join('\n'),
+      [
+        '<skills>',
+        'Load skills from repo `skills/` and `~/.agents/**/SKILL.md` only when relevant with load_skill(name).',
+        'Use persistent tasks for long-lived work and teammates only for clearly separable work.',
+        'For large builds: load_skill(Long-running harness) and use harness_write_spec for cross-session handoffs.',
+        'Use memory_set/memory_get for scratch and long-term notes; handoff_state copies scratch to subagents.',
+        '</skills>',
+      ].join('\n'),
+      [
+        '<bots_and_rooms>',
+        'You can create bots and group chats (可以创建 bot 和群聊) with create_bot and create_room. The same actions are also available as bot_create, bot_update, bot_room_create, bot_room_update, and lab_settings_update when they are in your tool list. Do not claim you lack that ability. Deletes need confirm: true and approval. Never repeat API keys or tokens. Do not read secrets; reference a model already configured in the lab. Do not approve tool calls or outbound drafts for the user.',
+        PRIVATE_CHAT_GROUP_SPEAKER_RULE,
+        '</bots_and_rooms>',
+      ].join('\n'),
+      [
+        '<vision>',
+        'When the user attaches images or you need OCR/visual detail from stored screenshots, call vision_analyze with asset_ids (from [image id] markers) and a focused prompt. Requires RAW_AGENT_VL_MODEL_NAME.',
+        '</vision>',
+      ].join('\n'),
+    ];
+
+    if (discoveryLine) {
+      sections.push(['<discovery>', discoveryLine, '</discovery>'].join('\n'));
+    }
+    if (harnessLines.length > 0) {
+      sections.push(['<harness>', ...harnessLines, '</harness>'].join('\n'));
+    }
+
+    const base = sections.join('\n\n');
     const scope = agenticSafetyAppendixScope(process.env);
     if (scope === 'off') return base;
     if (scope === 'general' && ctx.agent.id !== 'general') return base;

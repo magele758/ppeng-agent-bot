@@ -109,6 +109,23 @@ export const settingsEntries = {
       }
     }
   },
+  promptVariant: {
+    title: 'System prompt variant',
+    keywords: 'prompt system prompt anthropic5 legacy A/B rollback wording',
+    desc: 'Choose how the stable system prompt is worded. Default is anthropic5 (Anthropic five-rules layout). Pick legacy to roll back to the previous wording.',
+    fields: {
+      variant: {
+        label: 'Active variant',
+        hint: 'Applies on the next turn. No process restart required.'
+      }
+    },
+    options: {
+      anthropic5: { label: 'anthropic5 (default)' },
+      legacy: { label: 'legacy (rollback)' }
+    },
+    effective: 'Effective',
+    rollbackHint: 'Rollback: select legacy here and save.'
+  },
   agentLoopEngine: {
     title: 'Agent engine',
     keywords: 'kernel assembly preset drain tool launch inbox overflow cap low level scheduling',
