@@ -46,6 +46,10 @@ export class LibraryPageStore {
     return row;
   }
 
+  deletePage(id: string): boolean {
+    return this.db.prepare(`DELETE FROM library_pages WHERE id = ?`).run(id).changes > 0;
+  }
+
   getPage(id: string): LibraryPageRecord | undefined {
     const row = this.db.prepare(`SELECT * FROM library_pages WHERE id = ?`).get(id) as
       | Record<string, unknown>

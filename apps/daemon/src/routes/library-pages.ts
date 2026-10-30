@@ -1,5 +1,5 @@
 /**
- * Library durable Pages: create, update, get, list, and a share link.
+ * Library durable Pages: create, update, delete, get, list, and a share link.
  *
  * These are markdown documents in the library, not session A2UI cards and not
  * paged tool-result artifacts. The share path is the capability: anyone with
@@ -65,6 +65,15 @@ export function libraryPageRoutes(runtime: RawAgentRuntime): RouteSpec[] {
           markdown: readString(body, 'markdown')
         });
         json(response, 200, { page });
+      }
+    },
+    {
+      method: 'DELETE',
+      pattern: '/api/library/pages/:id',
+      handler: ({ requireParam, response }) => {
+        const id = requireParam('id');
+        pagePort(runtime).delete(id);
+        json(response, 200, { deleted: true, id });
       }
     },
     {

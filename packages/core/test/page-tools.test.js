@@ -6,6 +6,8 @@ import { join } from 'node:path';
 import { SqliteStateStore } from '../dist/storage.js';
 import { createDurablePagePort } from '../dist/library/index.js';
 import { createPageTools } from '../dist/tools/page-tools.js';
+import { collectReservedDynToolNames, isReservedDynToolName } from '../dist/dyn-tools/names.js';
+import { SoftwareExecution } from '../dist/connectors/software-execution.js';
 import { assembleOptionalTools } from '../dist/runtime/tool-assembly.js';
 import { filterToolsForSession } from '../dist/turn/resolve-turn-tools.js';
 
@@ -29,7 +31,7 @@ function harness() {
 test('write_page 返回 id、第 1 版和分享路径，空标题或空正文不落库 [AC:page-tools#AC-1]', async () => {
   const h = harness();
   try {
-    assert.deepEqual(Object.keys(h.byName).sort(), ['edit_page', 'get_page', 'list_pages', 'write_page']);
+    assert.deepEqual(Object.keys(h.byName).sort(), ['delete_page', 'edit_page', 'get_page', 'list_pages', 'write_page']);
     const written = await h.byName.write_page.execute(h.ctx, { title: '  发布说明  ', markdown: '# 你好' });
     assert.equal(written.ok, true);
     const page = JSON.parse(written.content);
@@ -108,7 +110,63 @@ test('分享 id 读回同一正文，编辑不存在的页面失败且不新增 
   }
 });
 
-test('page tools are on the same assembly path as vault tools and reach a turn [AC:page-tools#AC-1] [AC:page-tools#AC-2]', async () => {
+test('delete_page revokes reads with workspace write-level approval [AC:delete-page#AC-4]', async () => {
+  const h = harness();
+  try {
+    const tool = h.byName.delete_page;
+    assert.ok(tool);
+    assert.equal(collectReservedDynToolNames().has('delete_page'), true);
+    assert.equal(isReservedDynToolName('delete_page', []), true);
+    const software = new SoftwareExecution(h.store);
+    const principal = software.principal({ userId: 'page-tools-owner' });
+    assert.throws(() => software.bind(principal, 'general', 'page-collision', {
+      tools: [{
+        name: 'delete_page',
+        description: 'Conflicting connector tool',
+        inputSchema: { type: 'object' },
+        executor: { kind: 'mcp', toolName: 'mcp_test_delete' }
+      }]
+    }), /Invalid or duplicate tool name/);
+    assert.deepEqual(software.list(principal, 'general'), []);
+    assert.deepEqual(tool.inputSchema.required, ['id']);
+    assert.equal(tool.inputSchema.properties.id.type, 'string');
+    assert.equal(tool.approvalMode, h.byName.write_page.approvalMode);
+    assert.equal(tool.approvalMode, h.byName.edit_page.approvalMode);
+    assert.equal(tool.sideEffectLevel, 'workspace');
+    const port = createDurablePagePort(h.store);
+    const page = port.create({ title: 'Delete', markdown: 'Body' });
+    const keep = port.create({ title: 'Keep', markdown: 'Untouched' });
+    const deleted = await tool.execute(h.ctx, { id: page.id });
+    assert.equal(deleted.ok, true);
+    assert.deepEqual(JSON.parse(deleted.content), { deleted: true, id: page.id });
+    for (const args of [{ id: page.id }, { shareId: page.shareId }]) {
+      assert.equal((await h.byName.get_page.execute(h.ctx, args)).ok, false);
+    }
+    const listed = JSON.parse((await h.byName.list_pages.execute(h.ctx, {})).content).pages;
+    assert.deepEqual(listed.map((row) => row.id), [keep.id]);
+  } finally {
+    h.close();
+  }
+});
+
+test('delete_page rejects missing ids without mis-deletion [AC:delete-page#AC-5]', async () => {
+  const h = harness();
+  try {
+    const port = createDurablePagePort(h.store);
+    const page = port.create({ title: 'Keep', markdown: 'Body' });
+    for (const args of [{}, { id: '' }, { id: ' ' }, { id: 123 }, { id: 'page_missing' }, { id: page.shareId }]) {
+      const result = await h.byName.delete_page.execute(h.ctx, args);
+      assert.equal(result.ok, false);
+      assert.match(result.content, /required|not found/);
+      assert.deepEqual(port.get(page.id), page);
+    }
+    assert.equal(port.list().length, 1);
+  } finally {
+    h.close();
+  }
+});
+
+test('page tools are on the same assembly path as vault tools and reach a turn [AC:page-tools#AC-1] [AC:page-tools#AC-2] [AC:delete-page#AC-4]', async () => {
   const h = harness();
   try {
     const assembled = assembleOptionalTools({
@@ -118,9 +176,9 @@ test('page tools are on the same assembly path as vault tools and reach a turn [
       getUserVault() { throw new Error('vault not used'); },
       getCronStore() { throw new Error('cron not used'); }
     });
-    const pageNames = new Set(['list_pages', 'get_page', 'write_page', 'edit_page']);
+    const pageNames = new Set(['list_pages', 'get_page', 'write_page', 'edit_page', 'delete_page']);
     const names = assembled.filter((tool) => pageNames.has(tool.name)).map((tool) => tool.name);
-    assert.deepEqual(names.sort(), ['edit_page', 'get_page', 'list_pages', 'write_page']);
+    assert.deepEqual(names.sort(), ['delete_page', 'edit_page', 'get_page', 'list_pages', 'write_page']);
 
     h.store.setDaemonControl('tool_exposure_settings', { mode: 'full', pinnedGroups: {} });
     const agent = { id: 'general', name: 'General' };
@@ -132,7 +190,7 @@ test('page tools are on the same assembly path as vault tools and reach a turn [
       session: h.store.getSession(session.id),
       settingsStore: h.store
     }).tools.map((tool) => tool.name);
-    for (const name of ['list_pages', 'get_page', 'write_page', 'edit_page']) assert.ok(visible.includes(name), name);
+    for (const name of ['list_pages', 'get_page', 'write_page', 'edit_page', 'delete_page']) assert.ok(visible.includes(name), name);
 
     const write = assembled.find((tool) => tool.name === 'write_page');
     const created = JSON.parse((await write.execute({}, { title: '回路', markdown: '从组装进来的' })).content);

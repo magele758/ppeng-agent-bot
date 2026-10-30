@@ -50,6 +50,7 @@ const EXTRA_RESERVED = new Set<string>([
   'get_page',
   'write_page',
   'edit_page',
+  'delete_page',
   'secure_form',
   'ask_user',
   'save_user_info',

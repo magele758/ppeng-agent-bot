@@ -91,6 +91,60 @@ test('重新打开同一状态库仍能按 id 和分享 id 读回 [AC:durable-pa
   }
 });
 
+test('deletion removes only the requested page and revokes its share [AC:delete-page#AC-1]', () => {
+  withStore((store) => {
+    const port = createDurablePagePort(store);
+    const page = port.create({ title: 'Delete', markdown: 'Remove this' });
+    const keep = port.create({ title: 'Keep', markdown: 'Preserve this' });
+    port.delete(page.id);
+    assert.equal(store.getLibraryPage(page.id), undefined);
+    assert.equal(store.getLibraryPageByShareId(page.shareId), undefined);
+    assert.throws(() => port.get(page.id), NotFoundError);
+    assert.throws(() => port.getByShareId(page.shareId), NotFoundError);
+    assert.deepEqual(port.list().map((row) => row.id), [keep.id]);
+    assert.deepEqual(port.get(keep.id), keep);
+  });
+});
+
+test('deletion and share revocation persist after reopening the library [AC:delete-page#AC-1]', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'dur-page-delete-reopen-'));
+  const dbPath = join(dir, 'state.sqlite');
+  let store = new SqliteStateStore(dbPath);
+  try {
+    const port = createDurablePagePort(store);
+    const page = port.create({ title: 'Delete', markdown: 'Gone' });
+    const keep = port.create({ title: 'Keep', markdown: 'Persist' });
+    port.delete(page.id);
+    store.db.close();
+    store = new SqliteStateStore(dbPath);
+    const reopened = createDurablePagePort(store);
+    assert.throws(() => reopened.get(page.id), NotFoundError);
+    assert.throws(() => reopened.getByShareId(page.shareId), NotFoundError);
+    assert.deepEqual(reopened.list().map((row) => row.id), [keep.id]);
+    assert.deepEqual(reopened.get(keep.id), keep);
+  } finally {
+    store.db.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('missing or invalid deletion ids preserve every page [AC:delete-page#AC-5]', () => {
+  withStore((store) => {
+    const port = createDurablePagePort(store);
+    const page = port.create({ title: 'Keep', markdown: 'Preserve' });
+    for (const id of ['page_missing', page.shareId, "' OR 1=1 --"]) {
+      assert.throws(() => port.delete(id), NotFoundError);
+    }
+    for (const id of ['', '   ', undefined, null, 123]) {
+      assert.throws(() => port.delete(id), ValidationError);
+    }
+    assert.deepEqual(port.list().map((row) => row.id), [page.id]);
+    assert.deepEqual(port.getByShareId(page.shareId), page);
+    port.delete(page.id);
+    assert.throws(() => port.delete(page.id), NotFoundError);
+  });
+});
+
 test('空标题不落库，不存在的 id 和分享 id 读不到 [AC:durable-page-port#AC-5]', () => {
   withStore((store) => {
     const port = createDurablePagePort(store);
