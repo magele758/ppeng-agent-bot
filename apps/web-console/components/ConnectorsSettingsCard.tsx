@@ -31,6 +31,143 @@ function stateKey(state: ConnectorAuthState): `settingsEntries.connectors.states
   return `settingsEntries.connectors.states.${state}`;
 }
 
+function ConnectorRefLine({ label, value }: { label: string; value: string | undefined }) {
+  if (!value) return null;
+  return (
+    <p>
+      {label}: {value}
+    </p>
+  );
+}
+
+function VaultNameField({
+  rowId,
+  secrets,
+  selected,
+  busy,
+  onPick
+}: {
+  rowId: string;
+  secrets: SecretName[];
+  selected: string;
+  busy: boolean;
+  onPick: (name: string) => void;
+}) {
+  const { t } = useI18n();
+  const fieldId = `connector-secret-${rowId}`;
+  return (
+    <>
+      <label htmlFor={fieldId}>{t('settingsEntries.connectors.vaultName')}</label>
+      {secrets.length > 0 ? (
+        <select id={fieldId} value={selected} disabled={busy} onChange={(event) => onPick(event.target.value)}>
+          {secrets.map((item) => (
+            <option key={item.name} value={item.name}>
+              {item.name}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <input
+          id={fieldId}
+          value={selected}
+          disabled={busy}
+          autoComplete="off"
+          spellCheck={false}
+          onChange={(event) => onPick(event.target.value)}
+        />
+      )}
+    </>
+  );
+}
+
+function grantBlocked(needsName: boolean, selected: string, busy: boolean): boolean {
+  return busy || (needsName && !selected);
+}
+
+function ConnectorRowActions({
+  row,
+  secrets,
+  selected,
+  busy,
+  onPick,
+  onGrant,
+  onRevoke
+}: {
+  row: ConnectorView;
+  secrets: SecretName[];
+  selected: string;
+  busy: boolean;
+  onPick: (name: string) => void;
+  onGrant: () => void;
+  onRevoke: () => void;
+}) {
+  const { t } = useI18n();
+  const needsName = row.authState === 'needsAuth';
+  if (row.authState === 'granted') {
+    return (
+      <div className="settings-actions">
+        <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={onRevoke}>
+          {t('settingsEntries.connectors.revoke')}
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="settings-actions">
+      {needsName ? (
+        <VaultNameField rowId={row.id} secrets={secrets} selected={selected} busy={busy} onPick={onPick} />
+      ) : null}
+      <button
+        type="button"
+        className="btn btn-primary btn-sm"
+        data-grant={row.id}
+        disabled={grantBlocked(needsName, selected, busy)}
+        onClick={onGrant}
+      >
+        {t('settingsEntries.connectors.grant')}
+      </button>
+    </div>
+  );
+}
+
+function ConnectorAuthRow({
+  row,
+  secrets,
+  selected,
+  busy,
+  onPick,
+  onGrant,
+  onRevoke
+}: {
+  row: ConnectorView;
+  secrets: SecretName[];
+  selected: string;
+  busy: boolean;
+  onPick: (name: string) => void;
+  onGrant: () => void;
+  onRevoke: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <div className="connector-row" data-connector-id={row.id} data-auth-state={row.authState}>
+      <p>
+        {row.title} · <span data-auth-label={row.authState}>{t(stateKey(row.authState))}</span>
+      </p>
+      <ConnectorRefLine label={t('settingsEntries.connectors.secretRef')} value={row.secretEnv} />
+      <ConnectorRefLine label={t('settingsEntries.connectors.credRef')} value={row.credRef} />
+      <ConnectorRowActions
+        row={row}
+        secrets={secrets}
+        selected={selected}
+        busy={busy}
+        onPick={onPick}
+        onGrant={onGrant}
+        onRevoke={onRevoke}
+      />
+    </div>
+  );
+}
+
 export function ConnectorAuthList({
   rows,
   secrets,
@@ -63,80 +200,18 @@ export function ConnectorAuthList({
           </li>
         ))}
       </ol>
-      {rows.map((row) => {
-        const selected = picks[row.id] ?? defaultGrantName(row, secrets);
-        const canGrant = row.authState !== 'granted';
-        const needsName = row.authState === 'needsAuth';
-        return (
-          <div key={row.id} className="connector-row" data-connector-id={row.id} data-auth-state={row.authState}>
-            <p>
-              {row.title} · <span data-auth-label={row.authState}>{t(stateKey(row.authState))}</span>
-            </p>
-            {row.secretEnv ? (
-              <p>
-                {t('settingsEntries.connectors.secretRef')}: {row.secretEnv}
-              </p>
-            ) : null}
-            {row.credRef ? (
-              <p>
-                {t('settingsEntries.connectors.credRef')}: {row.credRef}
-              </p>
-            ) : null}
-            {canGrant ? (
-              <div className="settings-actions">
-                {needsName ? (
-                  <>
-                    <label htmlFor={`connector-secret-${row.id}`}>{t('settingsEntries.connectors.vaultName')}</label>
-                    {secrets.length > 0 ? (
-                      <select
-                        id={`connector-secret-${row.id}`}
-                        value={selected}
-                        disabled={busyId === row.id}
-                        onChange={(event) => onPick(row.id, event.target.value)}
-                      >
-                        {secrets.map((item) => (
-                          <option key={item.name} value={item.name}>
-                            {item.name}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        id={`connector-secret-${row.id}`}
-                        value={selected}
-                        disabled={busyId === row.id}
-                        autoComplete="off"
-                        spellCheck={false}
-                        onChange={(event) => onPick(row.id, event.target.value)}
-                      />
-                    )}
-                  </>
-                ) : null}
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
-                  data-grant={row.id}
-                  disabled={busyId === row.id || (needsName && !selected)}
-                  onClick={() => onGrant(row)}
-                >
-                  {t('settingsEntries.connectors.grant')}
-                </button>
-              </div>
-            ) : (
-              <div className="settings-actions">
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  disabled={busyId === row.id}
-                  onClick={() => onRevoke(row)}
-                >
-                  {t('settingsEntries.connectors.revoke')}
-                </button>
-              </div>
-            )}
-          </div>
-        );
-      })}
+      {rows.map((row) => (
+        <ConnectorAuthRow
+          key={row.id}
+          row={row}
+          secrets={secrets}
+          selected={picks[row.id] ?? defaultGrantName(row, secrets)}
+          busy={busyId === row.id}
+          onPick={(name) => onPick(row.id, name)}
+          onGrant={() => onGrant(row)}
+          onRevoke={() => onRevoke(row)}
+        />
+      ))}
       {rowError ? (
         <p role="alert" className="settings-field__error">
           {rowError}
