@@ -169,7 +169,8 @@ test('list_machines tool returns registered machines only; factory filter untouc
     'copy_from_machine',
     'copy_to_machine',
     'list_machines',
-    'register_machine'
+    'register_machine',
+    'unregister_machine'
   ]);
   for (const name of names) {
     assert.equal(name.startsWith('factory_'), false);
