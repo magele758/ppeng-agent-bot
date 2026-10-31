@@ -5,6 +5,8 @@ import {
   secureFormResultCard,
   secureFormSubmitBody,
   secureFormSubmitBodyMulti,
+  secureFormSubmitBodyFromVault,
+  vaultEntriesCompatibleWithSecureForm,
   type SecureFormCardMultiFace
 } from './secure-form-card.ts';
 
@@ -105,4 +107,69 @@ test('username field is recognized [AC:secure-form-multi#AC-9]', () => {
   });
   assert.ok(pending);
   assert.equal(pending.field, 'username');
+});
+
+test('Lab card can submit from a saved vault entry without plaintext [AC:secure-form-vault#AC-1]', () => {
+  const content = JSON.stringify({
+    card: {
+      kind: 'secure_form',
+      id: 'sform_v1',
+      field: 'password',
+      label: 'Password',
+      prompt: 'Enter password',
+      masked: true,
+      status: 'pending'
+    }
+  });
+  const face = secureFormResultCard(content);
+  assert.ok(face);
+  const body = secureFormSubmitBodyFromVault(face, 'login_bank');
+  assert.deepEqual(body, { action: 'submit', id: 'sform_v1', vaultEntryId: 'login_bank' });
+  assert.equal(JSON.stringify(body).includes('secret'), false);
+});
+
+test('Lab card filters vault entries by field match for login/card [AC:secure-form-vault#AC-4] [AC:secure-form-vault#AC-5]', () => {
+  const loginFace = secureFormResultCard(
+    JSON.stringify({
+      card: {
+        kind: 'secure_form',
+        id: 'sform_v2',
+        fields: [
+          { field: 'username', label: 'Username' },
+          { field: 'password', label: 'Password' }
+        ],
+        masked: true,
+        status: 'pending'
+      }
+    })
+  );
+  assert.ok(loginFace);
+  const cardFace = secureFormResultCard(
+    JSON.stringify({
+      card: {
+        kind: 'secure_form',
+        id: 'sform_v3',
+        fields: [
+          { field: 'cardNumber', label: 'Card' },
+          { field: 'cvv', label: 'CVV' }
+        ],
+        masked: true,
+        status: 'pending'
+      }
+    })
+  );
+  assert.ok(cardFace);
+  const entries = [
+    { id: 'l1', kind: 'login', label: 'Bank' },
+    { id: 'c1', kind: 'card', label: 'Visa' },
+    { id: 'n1', kind: 'contact', label: 'Mom' }
+  ];
+  assert.deepEqual(
+    vaultEntriesCompatibleWithSecureForm(loginFace, entries).map((e) => e.id),
+    ['l1']
+  );
+  assert.deepEqual(
+    vaultEntriesCompatibleWithSecureForm(cardFace, entries).map((e) => e.id),
+    ['c1']
+  );
 });

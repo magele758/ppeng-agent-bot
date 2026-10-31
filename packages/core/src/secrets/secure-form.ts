@@ -178,8 +178,9 @@ export interface SecureFormPort {
   /** User submit. Stores the value(s) in UserVault; returns status only. */
   submit(
     input:
-      | { sessionId: string; id: string; value: string }
-      | { sessionId: string; id: string; values: Record<string, string> }
+      | { sessionId: string; id: string; value: string; vaultEntryId?: never }
+      | { sessionId: string; id: string; values: Record<string, string>; vaultEntryId?: never }
+      | { sessionId: string; id: string; vaultEntryId: string; value?: never; values?: never }
   ): SecureFormReceipt;
   /** User dismissed the card. Stores nothing. */
   cancel(input: { sessionId: string; id: string }): SecureFormReceipt;
@@ -251,6 +252,64 @@ export function createSecureFormPort(options: SecureFormPortOptions): SecureForm
     const done = receipt(row, 'filled', undefined, fillRefs);
     assertModelFacingHasNoUserVaultSecrets(JSON.stringify(done), vault);
     return done;
+  }
+
+  function submitFromVaultEntry(
+    row: PendingSecureForm,
+    vaultEntryId: string,
+    vault: UserVault
+  ): SecureFormReceipt {
+    const entry = vault.getSummary(vaultEntryId);
+    if (!entry) throw new ValidationError(`vault entry ${vaultEntryId} not found`);
+
+    // Multi-field mode
+    if (row.fields && row.fields.length > 0) {
+      const fillRefs: SecureFormReceiptField[] = [];
+      for (const spec of row.fields) {
+        const field = spec.field;
+        // Map secure form field to vault field
+        let vaultField: string;
+        if (field === 'otp') vaultField = 'password';
+        else vaultField = field;
+
+        // Check if entry kind supports this field
+        if (entry.kind === 'login' && (vaultField === 'username' || vaultField === 'password')) {
+          const fillRef = makeUserVaultFillRef(vaultEntryId, vaultField);
+          fillRefs.push({ field, fillRef });
+        } else if (entry.kind === 'card' && (vaultField === 'cardNumber' || vaultField === 'cvv' || vaultField === 'holderName' || vaultField === 'expiry')) {
+          const fillRef = makeUserVaultFillRef(vaultEntryId, vaultField);
+          fillRefs.push({ field, fillRef });
+        } else {
+          throw new ValidationError(`field ${field} not available in ${entry.kind} entry ${entry.label}`);
+        }
+      }
+      const done = receipt(row, 'filled', undefined, fillRefs);
+      assertModelFacingHasNoUserVaultSecrets(JSON.stringify(done), vault);
+      return done;
+    }
+
+    // Single-field mode
+    if (!row.field) {
+      throw new ValidationError('Single-field submit requires a field in the pending form');
+    }
+    let vaultField: string;
+    if (row.field === 'otp') vaultField = 'password';
+    else vaultField = row.field;
+
+    // Check if entry kind supports this field
+    if (entry.kind === 'login' && (vaultField === 'username' || vaultField === 'password')) {
+      const fillRef = makeUserVaultFillRef(vaultEntryId, vaultField);
+      const done = receipt(row, 'filled', fillRef);
+      assertModelFacingHasNoUserVaultSecrets(JSON.stringify(done), vault);
+      return done;
+    } else if (entry.kind === 'card' && (vaultField === 'cardNumber' || vaultField === 'cvv')) {
+      const fillRef = makeUserVaultFillRef(vaultEntryId, vaultField);
+      const done = receipt(row, 'filled', fillRef);
+      assertModelFacingHasNoUserVaultSecrets(JSON.stringify(done), vault);
+      return done;
+    } else {
+      throw new ValidationError(`field ${row.field} not available in ${entry.kind} entry ${entry.label}`);
+    }
   }
 
   function submitSingleField(
@@ -359,6 +418,13 @@ export function createSecureFormPort(options: SecureFormPortOptions): SecureForm
       const id = String('id' in input ? input.id : '').trim();
       const row = take(sessionId, id);
       const vault = vaultOrBound(options.vault);
+
+      // Check for vaultEntryId first
+      if ('vaultEntryId' in input) {
+        const vaultEntryId = String(input.vaultEntryId).trim();
+        if (!vaultEntryId) throw new ValidationError('vaultEntryId must not be empty');
+        return submitFromVaultEntry(row, vaultEntryId, vault);
+      }
 
       // Multi-field submit
       if ('values' in input && row.fields && row.fields.length > 0) {

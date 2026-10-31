@@ -29,7 +29,15 @@ import { surfacePartKey, useSurfaceContext } from './a2ui/SurfaceContext';
 import type { A2uiMessage, SurfaceState } from './a2ui/types';
 import { useI18n, type MessageKey } from '@/lib/i18n';
 import { api } from '@/lib/api';
-import { secureFormResultCard, secureFormSubmitBody, secureFormSubmitBodyMulti, type SecureFormCardMultiFace } from '@/lib/secure-form-card';
+import {
+  secureFormResultCard,
+  secureFormSubmitBody,
+  secureFormSubmitBodyMulti,
+  secureFormSubmitBodyFromVault,
+  vaultEntriesCompatibleWithSecureForm,
+  type SecureFormCardMultiFace
+} from '@/lib/secure-form-card';
+import type { VaultEntry } from '@/lib/user-vault';
 import { ConnectorGrantFill } from './ConnectorGrantCard';
 import { ComposerMessageContext } from './ComposerContext';
 import type { ContextLabel } from '@/lib/composer-context';
@@ -291,22 +299,62 @@ function SecureFormFill({ sessionId, content }: { sessionId: string; content: st
   const [value, setValue] = useState('');
   const [values, setValues] = useState<Record<string, string>>({});
   const [status, setStatus] = useState('');
+  const [vaultEntries, setVaultEntries] = useState<VaultEntry[]>([]);
+  const [vaultEntryId, setVaultEntryId] = useState('');
+  useEffect(() => {
+    if (!sessionId) return;
+    let cancelled = false;
+    void api('/api/user-vault')
+      .then((data) => {
+        if (cancelled) return;
+        const entries = Array.isArray((data as { entries?: VaultEntry[] })?.entries)
+          ? ((data as { entries: VaultEntry[] }).entries)
+          : [];
+        setVaultEntries(entries);
+      })
+      .catch(() => {
+        if (!cancelled) setVaultEntries([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId]);
   if (!face || !sessionId) return null;
-  
+
   const isMulti = 'fields' in face;
-  
+  const compatible = vaultEntriesCompatibleWithSecureForm(face, vaultEntries);
+
   const send = (action: 'submit' | 'cancel') => {
+    if (action === 'submit' && vaultEntryId) {
+      const body = secureFormSubmitBodyFromVault(face, vaultEntryId, action);
+      void api(`/api/sessions/${encodeURIComponent(sessionId)}/secure-form`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+        .then(() => {
+          setValue('');
+          setValues({});
+          setVaultEntryId('');
+          setStatus(secureFormStatusText(action, false, t('play.approval.secureFormFailed')));
+        })
+        .catch(() => {
+          setStatus(secureFormStatusText(action, true, t('play.approval.secureFormFailed')));
+        });
+      return;
+    }
+
     if (isMulti) {
       const multiFace = face as SecureFormCardMultiFace;
       if (action === 'submit' && !multiFace.fields.every((spec) => values[spec.field]?.trim())) return;
     } else if (action === 'submit' && !value.trim()) {
       return;
     }
-    
+
     const body = isMulti
       ? secureFormSubmitBodyMulti(face as SecureFormCardMultiFace, values, action)
       : secureFormSubmitBody(face, value.trim(), action);
-    
+
     void api(`/api/sessions/${encodeURIComponent(sessionId)}/secure-form`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -323,33 +371,77 @@ function SecureFormFill({ sessionId, content }: { sessionId: string; content: st
         setStatus(secureFormStatusText(action, true, t('play.approval.secureFormFailed')));
       });
   };
-  
+
   if (status) return <SecureFormStatus status={status} />;
-  
+
+  const vaultPicker =
+    compatible.length > 0 ? (
+      <div className="secure-form-vault-pick">
+        <label>
+          Use saved Vault entry
+          <select
+            aria-label="Use saved Vault entry"
+            value={vaultEntryId}
+            onChange={(e) => setVaultEntryId(e.target.value)}
+          >
+            <option value="">— type instead —</option>
+            {compatible.map((entry) => (
+              <option key={entry.id} value={entry.id}>
+                {entry.label} ({entry.kind})
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="button" disabled={!vaultEntryId} onClick={() => send('submit')}>
+          Fill from Vault
+        </button>
+      </div>
+    ) : null;
+
   if (isMulti) {
     return (
-      <SecureFormMultiField
-        sessionId={sessionId}
-        content={content}
-        values={values}
-        onValues={setValues}
-        onSubmit={() => send('submit')}
-        onCancel={() => send('cancel')}
-      />
+      <div className="secure-form-card-wrap">
+        {vaultPicker}
+        {!vaultEntryId ? (
+          <SecureFormMultiField
+            sessionId={sessionId}
+            content={content}
+            values={values}
+            onValues={setValues}
+            onSubmit={() => send('submit')}
+            onCancel={() => send('cancel')}
+          />
+        ) : (
+          <button type="button" onClick={() => send('cancel')}>
+            {t('play.approval.secureFormCancel')}
+          </button>
+        )}
+      </div>
     );
   }
-  
+
   return (
-    <SecureFormField
-      sessionId={sessionId}
-      content={content}
-      value={value}
-      onValue={setValue}
-      onSubmit={() => send('submit')}
-      onCancel={() => send('cancel')}
-    />
+    <div className="secure-form-card-wrap">
+      {vaultPicker}
+      {!vaultEntryId ? (
+        <SecureFormField
+          sessionId={sessionId}
+          content={content}
+          value={value}
+          onValue={setValue}
+          onSubmit={() => send('submit')}
+          onCancel={() => send('cancel')}
+        />
+      ) : (
+        <button type="button" onClick={() => send('cancel')}>
+          {t('play.approval.secureFormCancel')}
+        </button>
+      )}
+    </div>
   );
 }
+
+
 
 function toolResultConfidence(content: string): string | null {
   const confMatch = content.match(/(?:confidence|置信度)\s*[:=：]?\s*(\d{1,3})\s*%?/i);

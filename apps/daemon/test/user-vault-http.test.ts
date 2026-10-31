@@ -356,3 +356,156 @@ test('multi-field secure form cancel stores nothing [AC:secure-form-multi#AC-4]'
     await env.close();
   }
 });
+
+test('single-field secure form can fill from vault entry [AC:secure-form-vault#AC-1]', async () => {
+  const env = await boot();
+  try {
+    // Create a vault login entry
+    const loginRes = await send(env.root, 'POST', '/api/user-vault/entries', entryPayload({
+      ...emptyForm('login'), label: 'TestBank', username: 'bob', password: PASSWORD
+    }));
+    const { entry: login } = (await loginRes.json()) as { entry: VaultEntry };
+
+    // Create session and request secure form
+    const session = env.runtime.store.createSession({ title: 'vault fill test', mode: 'chat', agentId: 'general' });
+    const tool = env.runtime.tools.find((item) => item.name === 'secure_form');
+    assert.ok(tool);
+
+    const waiting = await tool.execute({ session: { id: session.id, metadata: {} } } as never, {
+      field: 'password', label: 'Bank Password'
+    });
+    const opened = JSON.parse(waiting.content) as { card: { id: string } };
+
+    env.runtime.store.appendMessage(session.id, 'tool', [
+      { type: 'tool_result', toolCallId: 'c1', name: 'secure_form', ok: false, content: waiting.content }
+    ]);
+
+    // Submit with vaultEntryId instead of value
+    const res = await send(env.root, 'POST', `/api/sessions/${session.id}/secure-form`, {
+      action: 'submit',
+      id: opened.card.id,
+      vaultEntryId: login.id
+    });
+    assert.equal(res.status, 200);
+    const body = await res.text();
+
+    // Receipt must have no plaintext password
+    assert.equal(body.includes(PASSWORD), false, 'password should not appear in receipt');
+    assert.match(body, /filled/);
+    assert.match(body, /uvref:/);
+
+    const receipt = JSON.parse(body) as { receipt: { fillRef?: string } };
+    assert.ok(receipt.receipt.fillRef);
+    assert.match(receipt.receipt.fillRef, new RegExp(`:${login.id}:password$`));
+
+    // Verify fill reference resolves correctly
+    const resolved = env.runtime.userVault.resolveFillReference(receipt.receipt.fillRef);
+    assert.equal(resolved, PASSWORD);
+  } finally {
+    await env.close();
+  }
+});
+
+test('multi-field secure form can fill from vault login entry [AC:secure-form-vault#AC-2]', async () => {
+  const env = await boot();
+  try {
+    // Create a vault login entry
+    const loginRes = await send(env.root, 'POST', '/api/user-vault/entries', entryPayload({
+      ...emptyForm('login'), label: 'WebApp', username: 'admin', password: PASSWORD
+    }));
+    const { entry: login } = (await loginRes.json()) as { entry: VaultEntry };
+
+    // Create session and request multi-field form
+    const session = env.runtime.store.createSession({ title: 'multi vault fill', mode: 'chat', agentId: 'general' });
+    const tool = env.runtime.tools.find((item) => item.name === 'secure_form');
+    assert.ok(tool);
+
+    const waiting = await tool.execute({ session: { id: session.id, metadata: {} } } as never, {
+      fields: [{ field: 'username' }, { field: 'password' }]
+    });
+    const opened = JSON.parse(waiting.content) as { card: { id: string } };
+
+    env.runtime.store.appendMessage(session.id, 'tool', [
+      { type: 'tool_result', toolCallId: 'c1', name: 'secure_form', ok: false, content: waiting.content }
+    ]);
+
+    // Submit with vaultEntryId
+    const res = await send(env.root, 'POST', `/api/sessions/${session.id}/secure-form`, {
+      action: 'submit',
+      id: opened.card.id,
+      vaultEntryId: login.id
+    });
+    assert.equal(res.status, 200);
+    const body = await res.text();
+
+    // No plaintext secrets
+    assert.equal(body.includes('admin'), false);
+    assert.equal(body.includes(PASSWORD), false);
+    assert.match(body, /filled/);
+
+    const receipt = JSON.parse(body) as { receipt: { fields?: Array<{ field: string; fillRef?: string }> } };
+    assert.ok(receipt.receipt.fields);
+    assert.equal(receipt.receipt.fields.length, 2);
+
+    // Verify both fields have fillRefs pointing to the same vault entry
+    for (const field of receipt.receipt.fields) {
+      assert.ok(field.fillRef);
+      assert.match(field.fillRef, new RegExp(`:${login.id}:`));
+    }
+  } finally {
+    await env.close();
+  }
+});
+
+test('secure form vaultEntryId rejects non-existent entry [AC:secure-form-vault#AC-3]', async () => {
+  const env = await boot();
+  try {
+    const session = env.runtime.store.createSession({ title: 'vault fill error', mode: 'chat', agentId: 'general' });
+    const tool = env.runtime.tools.find((item) => item.name === 'secure_form');
+    assert.ok(tool);
+
+    const waiting = await tool.execute({ session: { id: session.id, metadata: {} } } as never, {
+      field: 'password'
+    });
+    const opened = JSON.parse(waiting.content) as { card: { id: string } };
+
+    // Submit with non-existent vaultEntryId
+    const res = await send(env.root, 'POST', `/api/sessions/${session.id}/secure-form`, {
+      action: 'submit',
+      id: opened.card.id,
+      vaultEntryId: 'nonexistent_abc123'
+    });
+    assert.equal(res.status, 400);
+    const body = await res.json() as { error: string };
+    assert.match(body.error, /vault entry.*not found/);
+  } finally {
+    await env.close();
+  }
+});
+
+test('legacy value submission still works alongside vaultEntryId [AC:secure-form-vault#AC-4]', async () => {
+  const env = await boot();
+  try {
+    const session = env.runtime.store.createSession({ title: 'legacy value test', mode: 'chat', agentId: 'general' });
+    const tool = env.runtime.tools.find((item) => item.name === 'secure_form');
+    assert.ok(tool);
+
+    const waiting = await tool.execute({ session: { id: session.id, metadata: {} } } as never, {
+      field: 'otp'
+    });
+    const opened = JSON.parse(waiting.content) as { card: { id: string } };
+
+    // Submit with legacy value (not vaultEntryId)
+    const res = await send(env.root, 'POST', `/api/sessions/${session.id}/secure-form`, {
+      action: 'submit',
+      id: opened.card.id,
+      value: FORM_OTP
+    });
+    assert.equal(res.status, 200);
+    const body = await res.text();
+    assert.equal(body.includes(FORM_OTP), false);
+    assert.match(body, /filled/);
+  } finally {
+    await env.close();
+  }
+});
