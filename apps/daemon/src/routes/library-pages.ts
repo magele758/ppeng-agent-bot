@@ -98,6 +98,37 @@ export function libraryPageRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         const page = pagePort(runtime).getByShareId(requireParam('shareId'));
         html(response, 200, renderPageShareDocument({ title: page.title, markdown: page.markdown }));
       }
-    }
+    },
+    {
+      method: 'GET',
+      pattern: '/api/library/pages/:id/revisions',
+      handler: ({ requireParam, response }) => {
+        json(response, 200, { revisions: pagePort(runtime).listRevisions(requireParam('id')) });
+      }
+    },
+    {
+      method: 'GET',
+      pattern: '/api/library/pages/:id/revisions/:revision',
+      handler: ({ requireParam, response }) => {
+        const id = requireParam('id');
+        const revision = parseInt(requireParam('revision'), 10);
+        if (isNaN(revision) || revision <= 0) {
+          throw new ValidationError('revision must be a positive number');
+        }
+        json(response, 200, { revision: pagePort(runtime).getRevision(id, revision) });
+      }
+    },
+    {
+      method: 'POST',
+      pattern: '/api/library/pages/:id/revisions/:revision/restore',
+      handler: ({ requireParam, response }) => {
+        const id = requireParam('id');
+        const revision = parseInt(requireParam('revision'), 10);
+        if (isNaN(revision) || revision <= 0) {
+          throw new ValidationError('revision must be a positive number');
+        }
+        json(response, 200, { page: pagePort(runtime).restoreRevision(id, revision) });
+      }
+    },
   ];
 }
