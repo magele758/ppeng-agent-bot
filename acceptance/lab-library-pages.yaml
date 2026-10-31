@@ -29,3 +29,7 @@ criteria:
     given: a page detail is open
     when: modify title or markdown and click Save
     then: changes are saved, list row updates, detail shows new content
+  - id: AC-rev
+    given: a page detail is open in Lab
+    when: view revision history and restore an older revision
+    then: list shows revision number and time; restore reloads detail with restored body

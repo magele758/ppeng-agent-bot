@@ -39,7 +39,7 @@ import { StepInboxStore, type EnqueueSteerOptions, type InboxItem } from './sess
 import { ImageAssetStore } from './stores/image-asset-store.js';
 import { AttachmentStore } from './stores/attachment-store.js';
 import { ArtifactStore, type ArtifactIndexRecord } from './stores/artifact-store.js';
-import { LibraryPageStore, type LibraryPageRecord } from './stores/library-page-store.js';
+import { LibraryPageStore, type LibraryPageRecord, type LibraryPageRevisionRecord } from './stores/library-page-store.js';
 import type { AttachmentRecord } from './ingestion/attachment-ingest-service.js';
 import { BotStore } from './bots/bot-store.js';
 import type { BotRecord, ListBotsOptions, UpdateBotInput } from './bots/types.js';
@@ -735,6 +735,22 @@ export class SqliteStateStore {
 
   listLibraryPages(): LibraryPageRecord[] {
     return this.libraryPages.listPages();
+  }
+
+  insertLibraryPageRevision(row: LibraryPageRevisionRecord): void {
+    this.libraryPages.insertRevision(row);
+  }
+
+  listLibraryPageRevisions(pageId: string): Array<{ revision: number; createdAt: string; title: string }> {
+    return this.libraryPages.listRevisions(pageId);
+  }
+
+  getLibraryPageRevision(pageId: string, revision: number): LibraryPageRevisionRecord | undefined {
+    return this.libraryPages.getRevision(pageId, revision);
+  }
+
+  deleteLibraryPageRevisionsForPage(pageId: string): void {
+    this.libraryPages.deleteRevisionsForPage(pageId);
   }
 
   // ── Task domain (delegated to TaskStore) ──

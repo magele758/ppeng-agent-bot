@@ -3,7 +3,12 @@
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { api } from '@/lib/api';
 import { useI18n, type MessageKey } from '@/lib/i18n';
-import type { LibraryPageDetail, LibraryPageSummary } from './library-pages-model.ts';
+import type {
+  LibraryPageDetail,
+  LibraryPageRevision,
+  LibraryPageRevisionSummary,
+  LibraryPageSummary
+} from './library-pages-model.ts';
 import {
   applyCreate,
   applyDelete,
@@ -12,8 +17,11 @@ import {
   copySharePath,
   createPage,
   deletePage,
+  getRevision,
+  listRevisions,
   loadPages,
   openPage,
+  restoreRevision,
   rotatePageShare,
   updatePage
 } from './library-pages-actions.ts';
@@ -48,19 +56,34 @@ function usePageDetail(t: TFn, setErr: (v: string | null) => void) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<LibraryPageDetail | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [revisions, setRevisions] = useState<LibraryPageRevisionSummary[]>([]);
+  const [revisionPreview, setRevisionPreview] = useState<LibraryPageRevision | null>(null);
+
+  const refreshRevisions = async (id: string) => {
+    const listed = await listRevisions(api, id);
+    if ('error' in listed) {
+      setErr(t('knowledge.pages.revisionsLoadFailed', { error: listed.error }));
+      setRevisions([]);
+      return;
+    }
+    setRevisions(listed.revisions);
+  };
 
   const open = async (id: string) => {
     setBusy(true);
     setMsg(null);
     setErr(null);
+    setRevisionPreview(null);
     const result = await openPage(api, id);
-    setBusy(false);
     if ('error' in result) {
+      setBusy(false);
       setErr(t('knowledge.pages.openFailed', { error: result.error }));
       return;
     }
     setSelectedId(id);
     setDetail(result.page);
+    await refreshRevisions(id);
+    setBusy(false);
   };
 
   const back = () => {
@@ -68,9 +91,62 @@ function usePageDetail(t: TFn, setErr: (v: string | null) => void) {
     setDetail(null);
     setMsg(null);
     setErr(null);
+    setRevisions([]);
+    setRevisionPreview(null);
   };
 
-  return { busy, setBusy, selectedId, setSelectedId, detail, setDetail, msg, setMsg, open, back };
+  const openRevision = async (id: string, revision: number) => {
+    setBusy(true);
+    setMsg(null);
+    setErr(null);
+    const result = await getRevision(api, id, revision);
+    setBusy(false);
+    if ('error' in result) {
+      setErr(t('knowledge.pages.revisionsLoadFailed', { error: result.error }));
+      return;
+    }
+    setRevisionPreview(result.revision);
+  };
+
+  const restore = async (id: string, revision: number) => {
+    if (!window.confirm(t('knowledge.pages.restoreRevisionConfirm', { n: String(revision) }))) return;
+    setBusy(true);
+    setMsg(null);
+    setErr(null);
+    const result = await restoreRevision(api, id, revision);
+    if ('error' in result) {
+      setBusy(false);
+      setErr(t('knowledge.pages.restoreRevisionFailed', { error: result.error }));
+      return;
+    }
+    setDetail(result.page);
+    setRevisionPreview(null);
+    setMsg(t('knowledge.pages.restoredRevision', { n: String(revision) }));
+    await refreshRevisions(id);
+    setBusy(false);
+    return result.page;
+  };
+
+  // note: callers should applyUpdatePages after restore to keep list tip in sync
+
+
+  return {
+    busy,
+    setBusy,
+    selectedId,
+    setSelectedId,
+    detail,
+    setDetail,
+    msg,
+    setMsg,
+    open,
+    back,
+    revisions,
+    revisionPreview,
+    openRevision,
+    restore,
+    refreshRevisions
+  };
 }
 
 function usePageShare(
@@ -163,21 +239,24 @@ function usePageUpdate(
   setBusy: (v: boolean) => void,
   setMsg: (v: string | null) => void,
   setErr: (v: string | null) => void,
-  setDetail: (v: LibraryPageDetail | null) => void
+  setDetail: (v: LibraryPageDetail | null) => void,
+  refreshRevisions: (id: string) => Promise<void>
 ) {
   const update = async (id: string, updates: { title?: string; markdown?: string }) => {
     setBusy(true);
     setMsg(null);
     setErr(null);
     const result = await updatePage(api, id, updates);
-    setBusy(false);
     if ('error' in result) {
+      setBusy(false);
       setErr(t('knowledge.pages.updateFailed', { error: result.error }));
       return;
     }
     setPages((prev) => applyUpdate(prev, result.page));
     setDetail(result.page);
     setMsg(t('knowledge.pages.saved'));
+    await refreshRevisions(id);
+    setBusy(false);
   };
 
   return { update };
@@ -211,7 +290,8 @@ export function useLibraryPages() {
     detail.setBusy,
     detail.setMsg,
     list.setErr,
-    detail.setDetail
+    detail.setDetail,
+    detail.refreshRevisions
   );
   return {
     t,
@@ -229,6 +309,13 @@ export function useLibraryPages() {
     rotate: share.rotate,
     remove: share.remove,
     create: creator.create,
-    update: updater.update
+    update: updater.update,
+    revisions: detail.revisions,
+    revisionPreview: detail.revisionPreview,
+    openRevision: detail.openRevision,
+    restoreRevision: async (id: string, revision: number) => {
+      const page = await detail.restore(id, revision);
+      if (page) list.setPages((prev) => applyUpdate(prev, page));
+    }
   };
 }

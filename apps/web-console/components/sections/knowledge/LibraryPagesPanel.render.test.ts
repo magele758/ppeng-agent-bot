@@ -40,6 +40,18 @@ type HookState = {
   copyShare: (sharePath: string) => Promise<void>;
   rotate: (id: string) => Promise<void>;
   remove: (id: string) => Promise<void>;
+  create?: (title: string, markdown: string) => Promise<void>;
+  update?: (id: string, updates: { title?: string; markdown?: string }) => Promise<void>;
+  revisions: Array<{ revision: number; createdAt: string; title: string }>;
+  revisionPreview: null | {
+    pageId: string;
+    revision: number;
+    title: string;
+    markdown: string;
+    createdAt: string;
+  };
+  openRevision: (id: string, revision: number) => Promise<void>;
+  restoreRevision: (id: string, revision: number) => Promise<void>;
 };
 
 const noopAsync = async () => undefined;
@@ -61,7 +73,19 @@ function translate(key: string, vars?: Record<string, string | number>) {
     'knowledge.pages.revision': 'rev {n}',
     'knowledge.pages.sharePath': 'Share',
     'knowledge.pages.updatedAt': 'Updated {time}',
-    'knowledge.pages.body': 'Body'
+    'knowledge.pages.body': 'Body',
+    'knowledge.pages.save': 'Save',
+    'knowledge.pages.saving': 'Saving…',
+    'knowledge.pages.markdownPlaceholder': 'markdown',
+    'knowledge.pages.titlePlaceholder': 'title',
+    'knowledge.pages.create': 'Create',
+    'knowledge.pages.creating': 'Creating…',
+    'knowledge.pages.revisionsTitle': 'Revision history',
+    'knowledge.pages.revisionsEmpty': 'No revisions yet.',
+    'knowledge.pages.revisionAt': 'r{n} · {time}',
+    'knowledge.pages.openRevision': 'Open',
+    'knowledge.pages.restoreRevision': 'Restore',
+    'knowledge.pages.restoringRevision': 'Restoring…'
   };
   let text = table[key] ?? key;
   for (const [name, value] of Object.entries(vars ?? {})) text = text.replaceAll(`{${name}}`, String(value));
@@ -123,6 +147,17 @@ function loadPanel() {
     if (id === './library-pages-model' || id.endsWith('/library-pages-model') || id.endsWith('/library-pages-model.ts')) {
       return {};
     }
+    if (
+      id === './library-pages-revisions' ||
+      id.endsWith('/library-pages-revisions') ||
+      id.endsWith('/library-pages-revisions.tsx') ||
+      id.endsWith('/library-pages-revisions.ts')
+    ) {
+      return {
+        PageRevisionsSection: () =>
+          React.createElement('div', { 'data-testid': 'library-pages-revisions' }, 'revisions')
+      };
+    }
     return localRequire(id);
   };
   new Function('require', 'module', 'exports', 'React', compiled)(req, mod, mod.exports, React);
@@ -145,6 +180,12 @@ function baseState(overrides: Partial<HookState> = {}): HookState {
     copyShare: noopAsync,
     rotate: noopAsync,
     remove: noopAsync,
+    create: noopAsync,
+    update: noopAsync,
+    revisions: [],
+    revisionPreview: null,
+    openRevision: noopAsync,
+    restoreRevision: noopAsync,
     ...overrides
   };
 }

@@ -361,7 +361,10 @@ export const TOOL_GROUPS: ToolGroup[] = [
             "write_page",
             "edit_page",
             "rotate_page_share",
-            "delete_page"
+            "delete_page",
+            "list_page_revisions",
+            "get_page_revision",
+            "restore_page_revision"
         ],
         "extension": true
     },

@@ -1065,7 +1065,25 @@ export const MIGRATIONS: Migration[] = [
         CREATE INDEX IF NOT EXISTS idx_library_pages_updated ON library_pages(updated_at DESC);
       `);
     }
-  }
+  },
+  {
+    version: 38,
+    description: 'library_page_revisions stores append-only page revision archive',
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS library_page_revisions (
+          page_id TEXT NOT NULL,
+          revision INTEGER NOT NULL,
+          title TEXT NOT NULL,
+          markdown TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          PRIMARY KEY (page_id, revision),
+          FOREIGN KEY (page_id) REFERENCES library_pages(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_library_page_revisions_page ON library_page_revisions(page_id);
+      `);
+    }
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]!.version;

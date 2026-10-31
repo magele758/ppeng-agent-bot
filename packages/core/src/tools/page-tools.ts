@@ -7,10 +7,10 @@
  */
 
 import { NotFoundError, ValidationError } from '../errors.js';
-import type { DurablePage, DurablePagePort, DurablePageSummary } from '../library/durable-page-port.js';
+import type { DurablePage, DurablePagePort, DurablePageSummary, DurablePageRevision, DurablePageRevisionSummary } from '../library/durable-page-port.js';
 import type { ToolContract, ToolExecutionResult } from '../types.js';
 
-export const PAGE_TOOL_NAMES = ['list_pages', 'get_page', 'write_page', 'edit_page', 'rotate_page_share', 'delete_page'] as const;
+export const PAGE_TOOL_NAMES = ['list_pages', 'get_page', 'write_page', 'edit_page', 'rotate_page_share', 'delete_page', 'list_page_revisions', 'get_page_revision', 'restore_page_revision'] as const;
 
 export interface PageToolServices {
   getPagePort: () => DurablePagePort;
@@ -56,6 +56,24 @@ function pageView(page: DurablePage) {
 
 function writtenView(page: DurablePage) {
   return { id: page.id, revision: page.revision, sharePath: page.sharePath };
+}
+
+function revisionSummaryView(rev: DurablePageRevisionSummary) {
+  return {
+    revision: rev.revision,
+    createdAt: rev.createdAt,
+    title: rev.title
+  };
+}
+
+function revisionView(rev: DurablePageRevision) {
+  return {
+    pageId: rev.pageId,
+    revision: rev.revision,
+    title: rev.title,
+    markdown: rev.markdown,
+    createdAt: rev.createdAt
+  };
 }
 
 export function createPageTools(services: PageToolServices): ToolContract<any>[] {
@@ -204,5 +222,88 @@ export function createPageTools(services: PageToolServices): ToolContract<any>[]
     }
   };
 
-  return [list, get, write, edit, rotate, remove];
+
+  const listRevisions: ToolContract<{ id?: string }> = {
+    name: 'list_page_revisions',
+    description:
+      'List revision history for a durable library page by id. Returns revision number, createdAt timestamp, and title for each archived revision. Older revisions can be restored.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string', description: 'Page id from write_page or list_pages' } },
+      required: ['id']
+    },
+    approvalMode: 'never',
+    sideEffectLevel: 'none',
+    async execute(_ctx, args) {
+      const id = typeof args.id === 'string' ? args.id.trim() : '';
+      try {
+        return okJson({ revisions: services.getPagePort().listRevisions(id).map(revisionSummaryView) });
+      } catch (error) {
+        const result = fromPort(error);
+        if (result) return result;
+        throw error;
+      }
+    }
+  };
+
+  const getRevision: ToolContract<{ id?: string; revision?: number }> = {
+    name: 'get_page_revision',
+    description:
+      'Read a specific revision of a durable library page, including its full title and markdown body. Use list_page_revisions to see available revisions.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'Page id' },
+        revision: { type: 'number', description: 'Revision number to read' }
+      },
+      required: ['id', 'revision']
+    },
+    approvalMode: 'never',
+    sideEffectLevel: 'none',
+    async execute(_ctx, args) {
+      const id = typeof args.id === 'string' ? args.id.trim() : '';
+      const revision = typeof args.revision === 'number' ? args.revision : 0;
+      if (!id) return fail('id is required');
+      if (revision <= 0) return fail('revision must be a positive number');
+      try {
+        return okJson(revisionView(services.getPagePort().getRevision(id, revision)));
+      } catch (error) {
+        const result = fromPort(error);
+        if (result) return result;
+        throw error;
+      }
+    }
+  };
+
+  const restoreRevision: ToolContract<{ id?: string; revision?: number }> = {
+    name: 'restore_page_revision',
+    description:
+      'Restore an older revision of a durable library page. This loads the archived title and markdown from the specified revision and applies it as a new update, incrementing the revision number. Use list_page_revisions to find available revisions.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'Page id' },
+        revision: { type: 'number', description: 'Revision number to restore' }
+      },
+      required: ['id', 'revision']
+    },
+    approvalMode: 'auto',
+    sideEffectLevel: 'workspace',
+    async execute(_ctx, args) {
+      const id = typeof args.id === 'string' ? args.id.trim() : '';
+      const revision = typeof args.revision === 'number' ? args.revision : 0;
+      if (!id) return fail('id is required');
+      if (revision <= 0) return fail('revision must be a positive number');
+      try {
+        const page = services.getPagePort().restoreRevision(id, revision);
+        return okJson({ ...writtenView(page), title: page.title, restored: true });
+      } catch (error) {
+        const result = fromPort(error);
+        if (result) return result;
+        throw error;
+      }
+    }
+  };
+
+  return [list, get, write, edit, rotate, remove, listRevisions, getRevision, restoreRevision];
 }
