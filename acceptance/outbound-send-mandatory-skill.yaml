@@ -1,0 +1,21 @@
+id: outbound-send-mandatory-skill
+title: 捆绑 outbound-send 强制技能可加载并解锁外发面
+status: implemented
+requirement: |
+  Repo ships skills/outbound-send (SKILL.md + sibling Manifest). load_skill(outbound-send)
+  unlocks schedule_social_post; without load it stays fail-closed. Skill body forces
+  Draft → Confirm → Send; may remind style sampling; NEVER send without confirmation.
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 仓库 skills/ 目录已检出
+    when: 代理或运行时扫描 workspace skills
+    then: 存在可发现的 outbound-send 技能，且 Manifest 允许 schedule_social_post，正文写明 Draft→Confirm→Send、可提醒 style sampling、禁止未确认发送
+  - id: AC-2
+    given: 当前会话尚未成功 load_skill(outbound-send)
+    when: 代理调用 schedule_social_post
+    then: 强制技能门 fail-closed，提示先 load_skill(outbound-send)
+  - id: AC-3
+    given: 本会话已经成功 load_skill(outbound-send)
+    when: 代理再次调用 schedule_social_post
+    then: 强制技能门放行（仍受 Auto-review 与 Manifest allowTools 约束）

@@ -1,0 +1,21 @@
+id: payment-mandatory-skill
+title: 捆绑 payment 强制技能可加载并解锁支付面
+status: implemented
+requirement: |
+  Repo ships skills/payment (SKILL.md + sibling Manifest). load_skill(payment)
+  unlocks secure_form/vault_fill when touching cardNumber/CVV/card; without load
+  they stay fail-closed. Secrets NEVER enter the model; separate from login Secure Form.
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 仓库 skills/ 目录已检出
+    when: 代理或运行时扫描 workspace skills
+    then: 存在可发现的 payment 技能，且 Manifest 允许 secure_form、vault_fill，正文写明密钥永不进模型，并与 login Secure Form 轨道分开
+  - id: AC-2
+    given: 当前会话尚未成功 load_skill(payment)
+    when: 代理调用 secure_form(field=cvv|cardNumber|card) 或触及卡号的 vault_fill
+    then: 强制技能门 fail-closed，提示先 load_skill(payment)（vault_fill 同时仍可能要求 shopping）
+  - id: AC-3
+    given: 本会话已经成功 load_skill(payment)（vault_fill 场景另已 load shopping）
+    when: 代理再次调用上述支付面工具
+    then: 强制技能门放行（仍受 Auto-review 与 Manifest allowTools 约束）
