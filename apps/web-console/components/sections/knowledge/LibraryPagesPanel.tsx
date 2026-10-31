@@ -5,6 +5,18 @@ import type { LibraryPageDetail, LibraryPageSummary } from './library-pages-mode
 import styles from './knowledge.module.css';
 import { useLibraryPages } from './use-library-pages';
 
+type ActionLabels = {
+  open: string;
+  copyShare: string;
+  rotate: string;
+  rotating: string;
+  delete: string;
+  deleting: string;
+  revision: (n: number) => string;
+};
+
+type Translate = (key: string, vars?: Record<string, string | number>) => string;
+
 function PageList({
   pages,
   busy,
@@ -20,15 +32,7 @@ function PageList({
   onCopy: (sharePath: string) => void;
   onRotate: (id: string) => void;
   onDelete: (id: string) => void;
-  labels: {
-    open: string;
-    copyShare: string;
-    rotate: string;
-    rotating: string;
-    delete: string;
-    deleting: string;
-    revision: (n: number) => string;
-  };
+  labels: ActionLabels;
 }) {
   return (
     <ul id="libraryPagesList" className={styles.list} data-testid="library-pages-list">
@@ -74,13 +78,7 @@ function PageDetail({
   onCopy: (sharePath: string) => void;
   onRotate: (id: string) => void;
   onDelete: (id: string) => void;
-  labels: {
-    copyShare: string;
-    rotate: string;
-    rotating: string;
-    delete: string;
-    deleting: string;
-    revision: (n: number) => string;
+  labels: ActionLabels & {
     sharePath: string;
     updatedAt: (time: string) => string;
     body: string;
@@ -117,10 +115,150 @@ function PageDetail({
   );
 }
 
+function LibraryPagesToolbar({
+  selectedId,
+  busy,
+  loaded,
+  onBack,
+  onRefresh,
+  t
+}: {
+  selectedId: string | null;
+  busy: boolean;
+  loaded: boolean;
+  onBack: () => void;
+  onRefresh: () => void;
+  t: Translate;
+}) {
+  if (selectedId) {
+    return (
+      <div className={styles.actions}>
+        <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={onBack}>
+          {t('knowledge.pages.back')}
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className={styles.actions}>
+      <button type="button" className="btn btn-secondary btn-sm" disabled={busy || !loaded} onClick={onRefresh}>
+        {t('knowledge.pages.refresh')}
+      </button>
+    </div>
+  );
+}
+
+function LibraryPagesLoading({ loaded, err, t }: { loaded: boolean; err: string | null; t: Translate }) {
+  if (loaded || err) return null;
+  return <p className="muted">{t('knowledge.pages.loading')}</p>;
+}
+
+function LibraryPagesEmpty({
+  loaded,
+  selectedId,
+  pageCount,
+  t
+}: {
+  loaded: boolean;
+  selectedId: string | null;
+  pageCount: number;
+  t: Translate;
+}) {
+  if (!loaded || selectedId || pageCount > 0) return null;
+  return <p id="libraryPagesEmpty">{t('knowledge.pages.empty')}</p>;
+}
+
+function LibraryPagesListSection({
+  loaded,
+  selectedId,
+  pages,
+  busy,
+  onOpen,
+  onCopy,
+  onRotate,
+  onDelete,
+  labels
+}: {
+  loaded: boolean;
+  selectedId: string | null;
+  pages: LibraryPageSummary[];
+  busy: boolean;
+  onOpen: (id: string) => void;
+  onCopy: (sharePath: string) => void;
+  onRotate: (id: string) => void;
+  onDelete: (id: string) => void;
+  labels: ActionLabels;
+}) {
+  if (!loaded || selectedId || pages.length === 0) return null;
+  return (
+    <PageList
+      pages={pages}
+      busy={busy}
+      onOpen={onOpen}
+      onCopy={onCopy}
+      onRotate={onRotate}
+      onDelete={onDelete}
+      labels={labels}
+    />
+  );
+}
+
+function LibraryPagesDetailSection({
+  detail,
+  selectedId,
+  busy,
+  onCopy,
+  onRotate,
+  onDelete,
+  labels
+}: {
+  detail: LibraryPageDetail | null;
+  selectedId: string | null;
+  busy: boolean;
+  onCopy: (sharePath: string) => void;
+  onRotate: (id: string) => void;
+  onDelete: (id: string) => void;
+  labels: ActionLabels & {
+    sharePath: string;
+    updatedAt: (time: string) => string;
+    body: string;
+  };
+}) {
+  if (!detail || !selectedId) return null;
+  return (
+    <PageDetail
+      detail={detail}
+      busy={busy}
+      onCopy={onCopy}
+      onRotate={onRotate}
+      onDelete={onDelete}
+      labels={labels}
+    />
+  );
+}
+
+function LibraryPagesMessage({ msg }: { msg: string | null }) {
+  if (!msg) return null;
+  return (
+    <p role="status" className="muted">
+      {msg}
+    </p>
+  );
+}
+
+function LibraryPagesError({ err }: { err: string | null }) {
+  if (!err) return null;
+  return (
+    <p role="alert" className={styles.error}>
+      {err}
+    </p>
+  );
+}
+
 export function LibraryPagesPanel() {
   const s = useLibraryPages();
   const revision = (n: number) => s.t('knowledge.pages.revision', { n: String(n) });
-  const actionLabels = {
+  const actionLabels: ActionLabels = {
     open: s.t('knowledge.pages.open'),
     copyShare: s.t('knowledge.pages.copyShare'),
     rotate: s.t('knowledge.pages.rotate'),
@@ -129,60 +267,47 @@ export function LibraryPagesPanel() {
     deleting: s.t('knowledge.pages.deleting'),
     revision
   };
+  const detailLabels = {
+    ...actionLabels,
+    sharePath: s.t('knowledge.pages.sharePath'),
+    updatedAt: (time: string) => s.t('knowledge.pages.updatedAt', { time }),
+    body: s.t('knowledge.pages.body')
+  };
 
   return (
     <SettingsGroup id="library-pages" title={s.t('knowledge.pages.title')} description={s.t('knowledge.pages.desc')}>
-      <div className={styles.actions}>
-        {s.selectedId ? (
-          <button type="button" className="btn btn-secondary btn-sm" disabled={s.busy} onClick={s.back}>
-            {s.t('knowledge.pages.back')}
-          </button>
-        ) : (
-          <button type="button" className="btn btn-secondary btn-sm" disabled={s.busy || !s.loaded} onClick={() => void s.load()}>
-            {s.t('knowledge.pages.refresh')}
-          </button>
-        )}
-      </div>
-
-      {!s.loaded && !s.err ? <p className="muted">{s.t('knowledge.pages.loading')}</p> : null}
-      {s.loaded && !s.selectedId && s.pages.length === 0 ? <p id="libraryPagesEmpty">{s.t('knowledge.pages.empty')}</p> : null}
-      {s.loaded && !s.selectedId && s.pages.length > 0 ? (
-        <PageList
-          pages={s.pages}
-          busy={s.busy}
-          onOpen={(id) => void s.open(id)}
-          onCopy={(p) => void s.copyShare(p)}
-          onRotate={(id) => void s.rotate(id)}
-          onDelete={(id) => void s.remove(id)}
-          labels={actionLabels}
-        />
-      ) : null}
-      {s.detail && s.selectedId ? (
-        <PageDetail
-          detail={s.detail}
-          busy={s.busy}
-          onCopy={(p) => void s.copyShare(p)}
-          onRotate={(id) => void s.rotate(id)}
-          onDelete={(id) => void s.remove(id)}
-          labels={{
-            ...actionLabels,
-            sharePath: s.t('knowledge.pages.sharePath'),
-            updatedAt: (time) => s.t('knowledge.pages.updatedAt', { time }),
-            body: s.t('knowledge.pages.body')
-          }}
-        />
-      ) : null}
-
-      {s.msg ? (
-        <p role="status" className="muted">
-          {s.msg}
-        </p>
-      ) : null}
-      {s.err ? (
-        <p role="alert" className={styles.error}>
-          {s.err}
-        </p>
-      ) : null}
+      <LibraryPagesToolbar
+        selectedId={s.selectedId}
+        busy={s.busy}
+        loaded={s.loaded}
+        onBack={s.back}
+        onRefresh={() => void s.load()}
+        t={s.t}
+      />
+      <LibraryPagesLoading loaded={s.loaded} err={s.err} t={s.t} />
+      <LibraryPagesEmpty loaded={s.loaded} selectedId={s.selectedId} pageCount={s.pages.length} t={s.t} />
+      <LibraryPagesListSection
+        loaded={s.loaded}
+        selectedId={s.selectedId}
+        pages={s.pages}
+        busy={s.busy}
+        onOpen={(id) => void s.open(id)}
+        onCopy={(p) => void s.copyShare(p)}
+        onRotate={(id) => void s.rotate(id)}
+        onDelete={(id) => void s.remove(id)}
+        labels={actionLabels}
+      />
+      <LibraryPagesDetailSection
+        detail={s.detail}
+        selectedId={s.selectedId}
+        busy={s.busy}
+        onCopy={(p) => void s.copyShare(p)}
+        onRotate={(id) => void s.rotate(id)}
+        onDelete={(id) => void s.remove(id)}
+        labels={detailLabels}
+      />
+      <LibraryPagesMessage msg={s.msg} />
+      <LibraryPagesError err={s.err} />
     </SettingsGroup>
   );
 }
