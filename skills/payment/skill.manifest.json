@@ -1,0 +1,14 @@
+{
+  "version": "1.0.0",
+  "allowTools": [
+    "load_skill",
+    "search_skills",
+    "secure_form",
+    "vault_fill",
+    "ask_user"
+  ],
+  "denyTools": ["bash", "bg_run", "shell"],
+  "allowPaths": [".", "./"],
+  "network": { "mode": "none" },
+  "secretNeeds": []
+}
