@@ -1,0 +1,51 @@
+id: secure-form-vault
+title: Secure Form fill-from-Vault
+status: implemented
+requirement: |
+  Lab Secure Form card can pick a saved UserVault login or card entry and map fields
+  by match (username/password/otp, cardNumber/cvv). Daemon POST /secure-form accepts
+  vaultEntryId (and entryId alias) while keeping legacy value/values. Port resolves
+  uvref: server-side; receipts stay fillRefs; plaintext never enters the model or
+  transcript. Separate track from browser vault_fill.
+notes: 'r5-16; Machine: 4090'
+criteria:
+  - id: AC-1
+    given: UserVault holds a login entry and a single-field password Secure Form is pending
+    when: The form is submitted with vaultEntryId for that login
+    then: Receipt status is filled with a password uvref fillRef and no plaintext password
+  - id: AC-2
+    given: UserVault holds a login entry and a single-field username Secure Form is pending
+    when: The form is submitted with vaultEntryId for that login
+    then: Receipt has a username uvref fillRef and the username plaintext is absent
+  - id: AC-3
+    given: UserVault holds a card entry and a single-field cardNumber Secure Form is pending
+    when: The form is submitted with vaultEntryId for that card
+    then: Receipt has a cardNumber uvref fillRef and card digits never appear in the receipt
+  - id: AC-4
+    given: A multi-field username+password Secure Form is pending and a login entry exists
+    when: Submitted with vaultEntryId for that login
+    then: Receipt lists fillRefs for username and password; plaintext credentials are absent
+  - id: AC-5
+    given: A multi-field cardNumber+cvv Secure Form is pending and a card entry exists
+    when: Submitted with vaultEntryId for that card
+    then: Receipt lists fillRefs for cardNumber and cvv; card secrets are absent
+  - id: AC-6
+    given: A Secure Form is pending
+    when: Submitted with a vaultEntryId that does not exist
+    then: Submission is rejected with a not-found error and nothing is filled
+  - id: AC-7
+    given: A username Secure Form is pending and only a card entry is available
+    when: Submitted with that card vaultEntryId
+    then: Submission is rejected as incompatible field/entry kinds
+  - id: AC-8
+    given: A single-field Secure Form is pending
+    when: Submitted with legacy value (no vaultEntryId)
+    then: Fill still works and returns a uvref fillRef as before
+  - id: AC-9
+    given: A multi-field Secure Form is pending
+    when: Submitted with legacy values map (no vaultEntryId)
+    then: Multi-field fill still works with per-field fillRefs
+  - id: AC-10
+    given: An otp Secure Form is pending and a login entry has a password
+    when: Submitted with that login vaultEntryId
+    then: otp maps to the login password fillRef without exposing plaintext

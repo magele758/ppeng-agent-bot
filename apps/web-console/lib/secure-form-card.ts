@@ -132,6 +132,39 @@ export function secureFormSubmitBodyMulti(
   };
 }
 
+/** Submit body that fills from a saved UserVault entry (no plaintext). */
+export function secureFormSubmitBodyFromVault(
+  face: SecureFormCardAny,
+  vaultEntryId: string,
+  action: 'submit' | 'cancel' = 'submit'
+) {
+  const id = face.id;
+  if (action === 'cancel') return { action, id };
+  return { action, id, vaultEntryId };
+}
+
+/** Which vault kinds can supply the requested Secure Form fields. */
+export function vaultKindsForSecureForm(face: SecureFormCardAny): Array<'login' | 'card'> {
+  const fields = 'fields' in face ? face.fields.map((f) => f.field) : [face.field];
+  const loginFields = new Set(['username', 'password', 'otp']);
+  const cardFields = new Set(['cardNumber', 'cvv']);
+  const needsLogin = fields.some((f) => loginFields.has(f));
+  const needsCard = fields.some((f) => cardFields.has(f));
+  const kinds: Array<'login' | 'card'> = [];
+  if (needsLogin && !needsCard) kinds.push('login');
+  if (needsCard && !needsLogin) kinds.push('card');
+  // Mixed forms are unusual; prefer neither over wrong mapping.
+  return kinds;
+}
+
+export function vaultEntriesCompatibleWithSecureForm<T extends { kind: string }>(
+  face: SecureFormCardAny,
+  entries: T[]
+): T[] {
+  const kinds = new Set(vaultKindsForSecureForm(face));
+  return entries.filter((e) => kinds.has(e.kind as 'login' | 'card'));
+}
+
 /** Universal submit body handler. */
 export function secureFormSubmitBodyAny(
   face: SecureFormCardAny,

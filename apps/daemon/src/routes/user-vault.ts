@@ -140,10 +140,13 @@ function secureFormRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         if (action === 'cancel') {
           done = port.cancel({ sessionId, id });
         } else {
-          // Check if vaultEntryId is provided
-          const vaultEntryId = str(body, 'vaultEntryId');
+          // Fill-from-Vault: vaultEntryId, entryId alias, or vaultRefs[0] opaque id.
+          const vaultRefs = body.vaultRefs;
+          const vaultRefId =
+            Array.isArray(vaultRefs) && typeof vaultRefs[0] === 'string' ? String(vaultRefs[0]).trim() : '';
+          const vaultEntryId = str(body, 'vaultEntryId') || str(body, 'entryId') || vaultRefId || '';
           if (vaultEntryId) {
-            // Fill from vault entry
+            // Fill from vault entry; port resolves uvref server-side into fillRefs.
             done = port.submit({ sessionId, id, vaultEntryId });
           } else {
             // Check if multi-field values are provided
