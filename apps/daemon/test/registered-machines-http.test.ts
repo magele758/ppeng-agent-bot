@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { RawAgentRuntime } from '@ppeng/agent-core';
+import { RawAgentRuntime, ValidationError } from '@ppeng/agent-core';
 import { registeredMachinesRoutes } from '../dist/routes/registered-machines.js';
 import type { RouteSpec } from '../dist/routing.js';
 
@@ -82,13 +82,14 @@ test('POST /api/registered-machines registers a machine with valid machineId, la
 test('POST /api/registered-machines validates missing machineId [BRANCH: validation]', async () => {
   const { dir, runtime, routes } = boot();
   try {
-    const response = await callPost(routes, {
-      label: 'Test Machine',
-      kind: 'desktop'
-    });
-    assert.equal(response.status, 400);
-    assert.ok(response.body.error);
-    assert.match(String(response.body.error), /machineId.*required/i);
+    await assert.rejects(
+      () =>
+        callPost(routes, {
+          label: 'Test Machine',
+          kind: 'desktop'
+        }),
+      ValidationError
+    );
   } finally {
     await runtime.destroy();
     rmSync(dir, { recursive: true, force: true });
@@ -98,13 +99,14 @@ test('POST /api/registered-machines validates missing machineId [BRANCH: validat
 test('POST /api/registered-machines validates missing label [BRANCH: validation]', async () => {
   const { dir, runtime, routes } = boot();
   try {
-    const response = await callPost(routes, {
-      machineId: 'test-machine-001',
-      kind: 'desktop'
-    });
-    assert.equal(response.status, 400);
-    assert.ok(response.body.error);
-    assert.match(String(response.body.error), /label.*required/i);
+    await assert.rejects(
+      () =>
+        callPost(routes, {
+          machineId: 'test-machine-001',
+          kind: 'desktop'
+        }),
+      ValidationError
+    );
   } finally {
     await runtime.destroy();
     rmSync(dir, { recursive: true, force: true });
@@ -114,13 +116,14 @@ test('POST /api/registered-machines validates missing label [BRANCH: validation]
 test('POST /api/registered-machines validates missing kind [BRANCH: validation]', async () => {
   const { dir, runtime, routes } = boot();
   try {
-    const response = await callPost(routes, {
-      machineId: 'test-machine-001',
-      label: 'Test Machine'
-    });
-    assert.equal(response.status, 400);
-    assert.ok(response.body.error);
-    assert.match(String(response.body.error), /kind.*required/i);
+    await assert.rejects(
+      () =>
+        callPost(routes, {
+          machineId: 'test-machine-001',
+          label: 'Test Machine'
+        }),
+      ValidationError
+    );
   } finally {
     await runtime.destroy();
     rmSync(dir, { recursive: true, force: true });
@@ -130,13 +133,15 @@ test('POST /api/registered-machines validates missing kind [BRANCH: validation]'
 test('POST /api/registered-machines handles empty string fields as missing [BRANCH: field validation]', async () => {
   const { dir, runtime, routes } = boot();
   try {
-    const response = await callPost(routes, {
-      machineId: '',
-      label: 'Test Machine',
-      kind: 'desktop'
-    });
-    assert.equal(response.status, 400);
-    assert.ok(response.body.error);
+    await assert.rejects(
+      () =>
+        callPost(routes, {
+          machineId: '',
+          label: 'Test Machine',
+          kind: 'desktop'
+        }),
+      ValidationError
+    );
   } finally {
     await runtime.destroy();
     rmSync(dir, { recursive: true, force: true });
@@ -146,13 +151,15 @@ test('POST /api/registered-machines handles empty string fields as missing [BRAN
 test('POST /api/registered-machines ignores non-string field types [BRANCH: type coercion]', async () => {
   const { dir, runtime, routes } = boot();
   try {
-    const response = await callPost(routes, {
-      machineId: 123, // number, not string
-      label: 'Test Machine',
-      kind: 'desktop'
-    });
-    assert.equal(response.status, 400);
-    assert.ok(response.body.error);
+    await assert.rejects(
+      () =>
+        callPost(routes, {
+          machineId: 123,
+          label: 'Test Machine',
+          kind: 'desktop'
+        }),
+      ValidationError
+    );
   } finally {
     await runtime.destroy();
     rmSync(dir, { recursive: true, force: true });
@@ -184,9 +191,7 @@ test('POST /api/registered-machines accepts authenticated user context', async (
 test('POST /api/registered-machines handles empty body gracefully [BRANCH: empty body]', async () => {
   const { dir, runtime, routes } = boot();
   try {
-    const response = await callPost(routes, {});
-    assert.equal(response.status, 400);
-    assert.ok(response.body.error);
+    await assert.rejects(() => callPost(routes, {}), ValidationError);
   } finally {
     await runtime.destroy();
     rmSync(dir, { recursive: true, force: true });
@@ -196,9 +201,7 @@ test('POST /api/registered-machines handles empty body gracefully [BRANCH: empty
 test('POST /api/registered-machines handles null body gracefully [BRANCH: null body]', async () => {
   const { dir, runtime, routes } = boot();
   try {
-    const response = await callPost(routes, null);
-    assert.equal(response.status, 400);
-    assert.ok(response.body.error);
+    await assert.rejects(() => callPost(routes, null), ValidationError);
   } finally {
     await runtime.destroy();
     rmSync(dir, { recursive: true, force: true });
