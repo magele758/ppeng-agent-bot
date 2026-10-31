@@ -1,0 +1,28 @@
+id: page-share-html
+title: Public library page share HTML (read-only)
+status: implemented
+requirement: |
+  Implement the smallest correct cut for r5-7 public library-level Page read-only share HTML.
+  pageSharePath(shareId) is /pages/${shareId}. Humans opening that path must read title + body
+  as sanitized HTML without login. After rotate/delete, old shareId returns 404. No edit/delete/
+  rotate controls. No canvas / grok visual clone; keep a plain document.
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  JSON GET /api/pages/share/:shareId remains; HTML is the human-facing sharePath.
+criteria:
+  - id: AC-1
+    given: A shared library page with markdown that includes HTML-looking text
+    when: The public HTML share document is rendered
+    then: Title and body are readable, raw HTML is escaped, and unsafe link schemes are dropped
+  - id: AC-2
+    given: A visitor opens GET /pages/:shareId anonymously
+    when: The share id is valid
+    then: The response is text/html with the page title and body and no edit/delete/rotate controls
+  - id: AC-3
+    given: A page share link has been rotated or the page deleted
+    when: A visitor opens the old /pages/:oldShareId URL
+    then: The response is 404 while the new share URL (if any) still reads the unchanged body
+  - id: AC-4
+    given: A visitor has a public HTML share URL
+    when: They attempt POST/PATCH/DELETE on that path
+    then: The page and share id are unchanged

@@ -173,7 +173,7 @@ export function gatewayAuthorizer(env: NodeJS.ProcessEnv): (request: IncomingMes
 
 export interface DaemonApp {
   router: Router;
-  /** Handles gateway and `/api/*` requests; returns false for anything else (static files). */
+  /** Handles gateway, `/api/*`, and public `/pages/*` share HTML; returns false for static files. */
   handle(request: IncomingMessage, response: ServerResponse<IncomingMessage>): Promise<boolean>;
 }
 
@@ -209,7 +209,8 @@ export function createDaemonApp(deps: DaemonAppDeps): DaemonApp {
       if (gateway && (await handleGatewayHttp(request, response, { ...gateway, authorize }, deps.readBodyLimit))) {
         return true;
       }
-      if (!url.pathname.startsWith('/api/')) return false;
+      const isPublicPageShare = /^\/pages\/[^/]+$/.test(url.pathname);
+      if (!url.pathname.startsWith('/api/') && !isPublicPageShare) return false;
       await handleApi(request, response, url);
       return true;
     }

@@ -8,11 +8,12 @@
 
 import {
   createDurablePagePort,
+  renderPageShareDocument,
   ValidationError,
   type RawAgentRuntime
 } from '@ppeng/agent-core';
 import type { RouteSpec } from '../routing.js';
-import { json } from '../http-utils.js';
+import { html, json } from '../http-utils.js';
 
 function pagePort(runtime: RawAgentRuntime) {
   return createDurablePagePort(runtime.store);
@@ -88,6 +89,14 @@ export function libraryPageRoutes(runtime: RawAgentRuntime): RouteSpec[] {
       pattern: '/api/pages/share/:shareId',
       handler: ({ requireParam, response }) => {
         json(response, 200, { page: pagePort(runtime).getByShareId(requireParam('shareId')) });
+      }
+    },
+    {
+      method: 'GET',
+      pattern: '/pages/:shareId',
+      handler: ({ requireParam, response }) => {
+        const page = pagePort(runtime).getByShareId(requireParam('shareId'));
+        html(response, 200, renderPageShareDocument({ title: page.title, markdown: page.markdown }));
       }
     }
   ];
