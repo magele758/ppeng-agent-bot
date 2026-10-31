@@ -1,0 +1,33 @@
+id: page-revisions
+title: Page revision history (list / get / restore)
+status: implemented
+requirement: |
+  Append-only Page revision archive so edits are recoverable via DurablePagePort,
+  assistant tools, daemon admin HTTP, and a minimal Lab Knowledge Pages history
+  list. Align capability with Grok EditCanvas history — NOT a canvas/grok UI clone.
+notes: 'assumedApproval: standing-order-2026-10-22. Smallest cut: store v38 + port + tools + Lab list/restore.'
+criteria:
+  - id: AC-1
+    given: a page is created
+    when: list/get revisions
+    then: revision 1 is archived with the original title and markdown
+  - id: AC-2
+    given: a page was edited
+    when: get an older revision
+    then: the prior body remains readable while tip revision advanced
+  - id: AC-3
+    given: an older revision exists
+    when: restore that revision
+    then: page body returns to that snapshot and revision increments with a new archive tip
+  - id: AC-4
+    given: a page with revisions is deleted
+    when: list or get revisions for that id
+    then: NotFound; no readable revision rows remain
+  - id: AC-5
+    given: update with unchanged title and markdown
+    when: update is applied
+    then: revision does not bump and no extra archive row is written
+  - id: AC-lab
+    given: Lab page detail is open
+    when: open revision history and restore one entry
+    then: list shows revision+time; restore applies old body and refreshes detail

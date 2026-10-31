@@ -75,6 +75,16 @@ export const knowledge = {
     save: 'Save',
     saving: 'Saving…',
     updateFailed: 'Save failed: {error}',
+    revisionsTitle: 'Revision history',
+    revisionsEmpty: 'No revisions yet.',
+    revisionsLoadFailed: 'Failed to load revisions: {error}',
+    revisionAt: 'r{n} · {time}',
+    openRevision: 'Open',
+    restoreRevision: 'Restore',
+    restoringRevision: 'Restoring…',
+    restoredRevision: 'Restored revision {n}',
+    restoreRevisionFailed: 'Restore failed: {error}',
+    restoreRevisionConfirm: 'Restore revision {n}? This writes a new tip with that snapshot.',
     saved: 'Page saved'
   },
 };

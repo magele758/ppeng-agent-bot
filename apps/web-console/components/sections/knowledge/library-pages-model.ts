@@ -71,3 +71,51 @@ export function withRotatedShare<T extends LibraryPageSummary>(
     p.id === next.id ? { ...p, shareId: next.shareId, sharePath: next.sharePath } : p
   );
 }
+
+export interface LibraryPageRevisionSummary {
+  revision: number;
+  createdAt: string;
+  title: string;
+}
+
+export interface LibraryPageRevision {
+  pageId: string;
+  revision: number;
+  title: string;
+  markdown: string;
+  createdAt: string;
+}
+
+export function parseRevisionList(raw: unknown): LibraryPageRevisionSummary[] {
+  const rows = (raw as { revisions?: unknown })?.revisions;
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .map((row) => {
+      const r = row as Record<string, unknown>;
+      const revision = Number(r.revision);
+      if (!Number.isFinite(revision) || revision <= 0) return null;
+      return {
+        revision,
+        createdAt: typeof r.createdAt === 'string' ? r.createdAt : '',
+        title: typeof r.title === 'string' ? r.title : ''
+      };
+    })
+    .filter((x): x is LibraryPageRevisionSummary => x !== null);
+}
+
+export function parseRevisionDetail(raw: unknown): LibraryPageRevision | null {
+  const rev = (raw as { revision?: unknown })?.revision ?? raw;
+  if (!rev || typeof rev !== 'object') return null;
+  const r = rev as Record<string, unknown>;
+  const revision = Number(r.revision);
+  if (!Number.isFinite(revision) || revision <= 0) return null;
+  if (typeof r.pageId !== 'string' || typeof r.title !== 'string') return null;
+  return {
+    pageId: r.pageId,
+    revision,
+    title: r.title,
+    markdown: typeof r.markdown === 'string' ? r.markdown : '',
+    createdAt: typeof r.createdAt === 'string' ? r.createdAt : ''
+  };
+}
+

@@ -1,9 +1,13 @@
 import {
   parsePageDetail,
   parsePageList,
+  parseRevisionDetail,
+  parseRevisionList,
   withRotatedShare,
   withoutPage,
   type LibraryPageDetail,
+  type LibraryPageRevision,
+  type LibraryPageRevisionSummary,
   type LibraryPageSummary
 } from './library-pages-model.ts';
 
@@ -128,3 +132,51 @@ export function applyUpdate(pages: LibraryPageSummary[], page: LibraryPageDetail
     p.id === page.id ? { ...p, title: page.title, revision: page.revision, updatedAt: page.updatedAt } : p
   );
 }
+
+export async function listRevisions(
+  api: ApiFn,
+  id: string
+): Promise<{ revisions: LibraryPageRevisionSummary[] } | { error: string }> {
+  try {
+    return { revisions: parseRevisionList(await api(`/api/library/pages/${encodeURIComponent(id)}/revisions`)) };
+  } catch (e) {
+    return { error: errText(e) };
+  }
+}
+
+export async function getRevision(
+  api: ApiFn,
+  id: string,
+  revision: number
+): Promise<{ revision: LibraryPageRevision } | { error: string }> {
+  try {
+    const parsed = parseRevisionDetail(
+      await api(`/api/library/pages/${encodeURIComponent(id)}/revisions/${encodeURIComponent(String(revision))}`)
+    );
+    if (!parsed) return { error: 'invalid revision' };
+    return { revision: parsed };
+  } catch (e) {
+    return { error: errText(e) };
+  }
+}
+
+export async function restoreRevision(
+  api: ApiFn,
+  id: string,
+  revision: number
+): Promise<{ page: LibraryPageDetail } | { error: string }> {
+  try {
+    const page = parsePageDetail(
+      await api(`/api/library/pages/${encodeURIComponent(id)}/revisions/${encodeURIComponent(String(revision))}/restore`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}'
+      })
+    );
+    if (!page) return { error: 'invalid page' };
+    return { page };
+  } catch (e) {
+    return { error: errText(e) };
+  }
+}
+

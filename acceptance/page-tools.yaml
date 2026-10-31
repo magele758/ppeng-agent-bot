@@ -23,3 +23,7 @@ criteria:
     given: 助手已经写过一页
     when: 用分享 id 读取，或编辑一个不存在的页面
     then: 分享 id 读回同一页的正文；不存在的页面编辑失败，不产生新页面
+  - id: AC-rev
+    given: a page with archived revisions
+    when: list_page_revisions / get_page_revision / restore_page_revision
+    then: list omits markdown; get returns full snapshot; restore needs approval, returns new tip, and prior revisions stay readable

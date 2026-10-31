@@ -35,3 +35,7 @@ criteria:
     given: 页面已通过该入口创建
     when: 经 daemon 列出、按 id 读取，并用分享链接读取
     then: 列表、详情和分享链接都是同一页；分享链接不需要登录
+  - id: AC-rev-1
+    given: a page was created then edited
+    when: listRevisions / getRevision / restoreRevision
+    then: every committed revision body remains readable; restore rewrites via update and bumps revision; delete leaves revisions unreadable

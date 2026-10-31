@@ -8,8 +8,11 @@ import {
   copySharePath,
   createPage,
   deletePage,
+  getRevision,
+  listRevisions,
   loadPages,
   openPage,
+  restoreRevision,
   rotatePageShare,
   updatePage
 } from './library-pages-actions.ts';
@@ -88,3 +91,26 @@ test('applyCreate adds to front; applyUpdate modifies row [AC:lab-library-pages#
   const updated = applyUpdate(rows, { ...sample, title: 'Changed' });
   assert.equal(updated[0]?.title, 'Changed');
 });
+
+test('list/get/restore revisions via api stubs [AC:lab-library-pages#AC-rev] [AC:page-revisions#AC-lab]', async () => {
+  const listed = await listRevisions(async () => ({ revisions: [{ revision: 1, createdAt: 't', title: 'T' }] }), 'page_1');
+  assert.ok('revisions' in listed && listed.revisions[0]?.revision === 1);
+
+  const got = await getRevision(
+    async () => ({ revision: { pageId: 'page_1', revision: 1, title: 'T', markdown: '# hi', createdAt: 't' } }),
+    'page_1',
+    1
+  );
+  assert.ok('revision' in got && got.revision.markdown === '# hi');
+
+  const restored = await restoreRevision(async () => ({ page: { ...sample, revision: 3, markdown: '# hi' } }), 'page_1', 1);
+  assert.ok('page' in restored && restored.page.revision === 3);
+
+  const fail = async () => {
+    throw new Error('boom');
+  };
+  assert.equal((await listRevisions(fail, 'x') as { error: string }).error, 'boom');
+  assert.equal((await getRevision(fail, 'x', 1) as { error: string }).error, 'boom');
+  assert.equal((await restoreRevision(fail, 'x', 1) as { error: string }).error, 'boom');
+});
+

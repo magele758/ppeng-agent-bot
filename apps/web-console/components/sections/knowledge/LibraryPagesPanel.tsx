@@ -6,6 +6,8 @@ import { type MessageKey } from '@/lib/i18n';
 import type { LibraryPageDetail, LibraryPageSummary } from './library-pages-model.ts';
 import styles from './knowledge.module.css';
 import { useLibraryPages } from './use-library-pages.ts';
+import { PageRevisionsSection } from './library-pages-revisions.tsx';
+import type { LibraryPageRevision, LibraryPageRevisionSummary } from './library-pages-model.ts';
 
 type ActionLabels = {
   open: string;
@@ -192,7 +194,11 @@ function PageDetail({
   onDelete,
   onEditSubmit,
   labels,
-  editMode
+  editMode,
+  revisions,
+  revisionPreview,
+  onOpenRevision,
+  onRestoreRevision
 }: {
   detail: LibraryPageDetail;
   busy: boolean;
@@ -207,8 +213,18 @@ function PageDetail({
     save: string;
     saving: string;
     markdownPlaceholder: string;
+    revisionsTitle: string;
+    revisionsEmpty: string;
+    revisionAt: (n: number, time: string) => string;
+    openRevision: string;
+    restoreRevision: string;
+    restoringRevision: string;
   };
   editMode: boolean;
+  revisions: LibraryPageRevisionSummary[];
+  revisionPreview: LibraryPageRevision | null;
+  onOpenRevision: (revision: number) => void;
+  onRestoreRevision: (revision: number) => void;
 }) {
   if (editMode) {
     return (
@@ -246,6 +262,21 @@ function PageDetail({
         <pre className={styles.pre} data-testid="library-pages-markdown">
           {detail.markdown}
         </pre>
+        <PageRevisionsSection
+          revisions={revisions}
+          preview={revisionPreview}
+          busy={busy}
+          onOpen={onOpenRevision}
+          onRestore={onRestoreRevision}
+          labels={{
+            revisionsTitle: labels.revisionsTitle,
+            revisionsEmpty: labels.revisionsEmpty,
+            revisionAt: labels.revisionAt,
+            openRevision: labels.openRevision,
+            restoreRevision: labels.restoreRevision,
+            restoringRevision: labels.restoringRevision
+          }}
+        />
       </div>
     </div>
   );
@@ -348,7 +379,11 @@ function LibraryPagesDetailSection({
   onDelete,
   onEditSubmit,
   labels,
-  editMode
+  editMode,
+  revisions,
+  revisionPreview,
+  onOpenRevision,
+  onRestoreRevision
 }: {
   detail: LibraryPageDetail | null;
   selectedId: string | null;
@@ -364,8 +399,18 @@ function LibraryPagesDetailSection({
     save: string;
     saving: string;
     markdownPlaceholder: string;
+    revisionsTitle: string;
+    revisionsEmpty: string;
+    revisionAt: (n: number, time: string) => string;
+    openRevision: string;
+    restoreRevision: string;
+    restoringRevision: string;
   };
   editMode: boolean;
+  revisions: LibraryPageRevisionSummary[];
+  revisionPreview: LibraryPageRevision | null;
+  onOpenRevision: (revision: number) => void;
+  onRestoreRevision: (revision: number) => void;
 }) {
   if (!detail || !selectedId) return null;
   return (
@@ -378,6 +423,10 @@ function LibraryPagesDetailSection({
       onEditSubmit={onEditSubmit}
       labels={labels}
       editMode={editMode}
+      revisions={revisions}
+      revisionPreview={revisionPreview}
+      onOpenRevision={onOpenRevision}
+      onRestoreRevision={onRestoreRevision}
     />
   );
 }
@@ -440,7 +489,13 @@ export function LibraryPagesPanel() {
     body: s.t('knowledge.pages.body'),
     save: s.t('knowledge.pages.save'),
     saving: s.t('knowledge.pages.saving'),
-    markdownPlaceholder: s.t('knowledge.pages.markdownPlaceholder')
+    markdownPlaceholder: s.t('knowledge.pages.markdownPlaceholder'),
+    revisionsTitle: s.t('knowledge.pages.revisionsTitle'),
+    revisionsEmpty: s.t('knowledge.pages.revisionsEmpty'),
+    revisionAt: (n: number, time: string) => s.t('knowledge.pages.revisionAt', { n: String(n), time }),
+    openRevision: s.t('knowledge.pages.openRevision'),
+    restoreRevision: s.t('knowledge.pages.restoreRevision'),
+    restoringRevision: s.t('knowledge.pages.restoringRevision')
   };
   const createLabels = {
     create: s.t('knowledge.pages.create'),
@@ -505,6 +560,14 @@ export function LibraryPagesPanel() {
         onEditSubmit={handleUpdate}
         labels={detailLabels}
         editMode={editMode}
+        revisions={s.revisions}
+        revisionPreview={s.revisionPreview}
+        onOpenRevision={(rev) => {
+          if (s.selectedId) void s.openRevision(s.selectedId, rev);
+        }}
+        onRestoreRevision={(rev) => {
+          if (s.selectedId) void s.restoreRevision(s.selectedId, rev);
+        }}
       />
       <LibraryPagesMessage msg={s.msg} />
       <LibraryPagesError err={s.err} />

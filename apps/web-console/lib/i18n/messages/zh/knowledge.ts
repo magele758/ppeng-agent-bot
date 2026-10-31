@@ -75,6 +75,16 @@ export const knowledge = {
     save: '保存',
     saving: '正在保存…',
     updateFailed: '保存失败：{error}',
+    revisionsTitle: '修订历史',
+    revisionsEmpty: '还没有修订。',
+    revisionsLoadFailed: '加载修订失败：{error}',
+    revisionAt: '第 {n} 版 · {time}',
+    openRevision: '查看',
+    restoreRevision: '恢复',
+    restoringRevision: '正在恢复…',
+    restoredRevision: '已恢复第 {n} 版',
+    restoreRevisionFailed: '恢复失败：{error}',
+    restoreRevisionConfirm: '恢复第 {n} 版？将以该快照写入新的最新版。',
     saved: '页面已保存'
   },
 };
