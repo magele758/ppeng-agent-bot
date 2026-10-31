@@ -76,4 +76,5 @@ export const knowledge = {
     saving: 'Saving…',
     updateFailed: 'Save failed: {error}',
     saved: 'Page saved'
+  },
 };
