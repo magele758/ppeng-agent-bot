@@ -134,24 +134,86 @@ function secureFormRoutes(runtime: RawAgentRuntime): RouteSpec[] {
           throw new ValidationError('action must be submit or cancel');
         }
         const id = str(body, 'id') ?? '';
-        const value = str(body, 'value') ?? '';
         const port = createSecureFormPort({ store: runtime.store, vault: runtime.userVault });
-        const done: SecureFormReceipt =
-          action === 'cancel' ? port.cancel({ sessionId, id }) : port.submit({ sessionId, id, value });
-        if (secureFormTextLeaks(JSON.stringify(done), value)) {
-          throw new ValidationError('refusing to return a secret in the secure form receipt');
+
+        let done: SecureFormReceipt;
+        if (action === 'cancel') {
+          done = port.cancel({ sessionId, id });
+        } else {
+          // Check if multi-field values are provided
+          const values = body.values;
+          if (values && typeof values === 'object' && !Array.isArray(values)) {
+            // Multi-field submit
+            const recordValues: Record<string, string> = {};
+            for (const [key, val] of Object.entries(values)) {
+              if (typeof val === 'string') {
+                recordValues[key] = val;
+              }
+            }
+            // Leak scan all submitted values
+            const receipt_text = JSON.stringify({});
+            for (const secret of Object.values(recordValues)) {
+              if (secureFormTextLeaks(receipt_text, secret)) {
+                throw new ValidationError('refusing to return a secret in the secure form receipt');
+              }
+            }
+            done = port.submit({ sessionId, id, values: recordValues });
+          } else {
+            // Single-field submit (legacy)
+            const value = str(body, 'value') ?? '';
+            if (secureFormTextLeaks(JSON.stringify({}), value)) {
+              throw new ValidationError('refusing to return a secret in the secure form receipt');
+            }
+            done = port.submit({ sessionId, id, value });
+          }
         }
+
+        // Verify receipt has no secrets
+        if (body.values) {
+          // Multi-field case: check all values in values object
+          for (const secret of Object.values(body.values)) {
+            if (typeof secret === 'string' && secureFormTextLeaks(JSON.stringify(done), secret)) {
+              throw new ValidationError('refusing to return a secret in the secure form receipt');
+            }
+          }
+        } else {
+          // Single-field case
+          const value = str(body, 'value') ?? '';
+          if (secureFormTextLeaks(JSON.stringify(done), value)) {
+            throw new ValidationError('refusing to return a secret in the secure form receipt');
+          }
+        }
+
         const session = runtime.getSession(sessionId);
         if (session) {
-          runtime.mergeSessionMetadata(sessionId, {
-            [SECURE_FORM_META]: {
-              id: done.id,
-              field: done.field,
-              status: done.status,
-              text: done.text,
-              ...(done.fillRef ? { fillRef: done.fillRef } : {})
+          const meta: Record<string, any> = {
+            id: done.id,
+            status: done.status,
+            text: done.text
+          };
+
+          // Set field metadata based on single or multi
+          if (done.fields && done.fields.length > 0) {
+            // Multi-field: use fields and fillRefs
+            meta.fields = done.fields;
+            const fillRefs: Array<{ field: string; fillRef?: string }> = [];
+            for (const f of done.fields) {
+              fillRefs.push({
+                field: f.field,
+                ...(f.fillRef ? { fillRef: f.fillRef } : {})
+              });
             }
+            meta.fillRefs = fillRefs;
+          } else {
+            // Single-field: use field and fillRef for backward compat
+            if (done.field) meta.field = done.field;
+            if (done.fillRef) meta.fillRef = done.fillRef;
+          }
+
+          runtime.mergeSessionMetadata(sessionId, {
+            [SECURE_FORM_META]: meta
           });
+
           // The tool already wrote a pending card. Swap it for the status
           // receipt so the next turn does not keep seeing "waiting".
           replaceSecureFormCardResult(runtime.store.listMessages(sessionId), done.id, done, (messageId, parts) => {
