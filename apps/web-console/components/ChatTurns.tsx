@@ -439,71 +439,9 @@ function SecureFormFill({ sessionId, content }: { sessionId: string; content: st
       )}
     </div>
   );
-}: { sessionId: string; content: string }) {
-  const { t } = useI18n();
-  const face = secureFormResultCard(content);
-  const [value, setValue] = useState('');
-  const [values, setValues] = useState<Record<string, string>>({});
-  const [status, setStatus] = useState('');
-  if (!face || !sessionId) return null;
-  
-  const isMulti = 'fields' in face;
-  
-  const send = (action: 'submit' | 'cancel') => {
-    if (isMulti) {
-      const multiFace = face as SecureFormCardMultiFace;
-      if (action === 'submit' && !multiFace.fields.every((spec) => values[spec.field]?.trim())) return;
-    } else if (action === 'submit' && !value.trim()) {
-      return;
-    }
-    
-    const body = isMulti
-      ? secureFormSubmitBodyMulti(face as SecureFormCardMultiFace, values, action)
-      : secureFormSubmitBody(face, value.trim(), action);
-    
-    void api(`/api/sessions/${encodeURIComponent(sessionId)}/secure-form`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    })
-      .then(() => {
-        setValue('');
-        setValues({});
-        setStatus(secureFormStatusText(action, false, t('play.approval.secureFormFailed')));
-      })
-      .catch(() => {
-        setValue('');
-        setValues({});
-        setStatus(secureFormStatusText(action, true, t('play.approval.secureFormFailed')));
-      });
-  };
-  
-  if (status) return <SecureFormStatus status={status} />;
-  
-  if (isMulti) {
-    return (
-      <SecureFormMultiField
-        sessionId={sessionId}
-        content={content}
-        values={values}
-        onValues={setValues}
-        onSubmit={() => send('submit')}
-        onCancel={() => send('cancel')}
-      />
-    );
-  }
-  
-  return (
-    <SecureFormField
-      sessionId={sessionId}
-      content={content}
-      value={value}
-      onValue={setValue}
-      onSubmit={() => send('submit')}
-      onCancel={() => send('cancel')}
-    />
-  );
 }
+
+
 
 function toolResultConfidence(content: string): string | null {
   const confMatch = content.match(/(?:confidence|置信度)\s*[:=：]?\s*(\d{1,3})\s*%?/i);
