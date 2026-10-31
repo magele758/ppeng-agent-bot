@@ -45,7 +45,7 @@ test('chat card is one masked field and the submit body is not chat text [AC:sec
   assert.equal(secureFormResultCard('not json'), null);
   assert.equal(secureFormResultCard(JSON.stringify({ receipt: { status: 'filled' } })), null);
 });
-test('multi-field card renders and submits multiple values [AC:secure-form-multi#AC-1,AC-2]', () => {
+test('multi-field card renders and submits multiple values [AC:secure-form-multi#AC-1] [AC:secure-form-multi#AC-2]', () => {
   const content = JSON.stringify({
     card: {
       kind: 'secure_form',
@@ -98,7 +98,7 @@ test('single-field backward compat still works [AC:secure-form-multi#AC-3]', () 
   assert.equal(face.field, 'password');
 });
 
-test('username field is recognized [AC:r5-14#username]', () => {
+test('username field is recognized [AC:secure-form-multi#AC-9]', () => {
   const pending = secureFormCardFace({
     toolName: 'secure_form',
     args: { field: 'username', label: 'Username', prompt: 'Enter username' }
