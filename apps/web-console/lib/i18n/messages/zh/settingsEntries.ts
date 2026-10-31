@@ -1,3 +1,6 @@
+import type {
+ Messages } from '../types.ts';
+
 export const settingsEntries = {
   toolExposure: {
   "title": "工具提供方式",

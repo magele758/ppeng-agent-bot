@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react';
 import { useI18n, type MessageKey } from '@/lib/i18n';
 import { SettingsGroup } from './ui';
-import { useRegisteredMachines } from './machines/use-registered-machines.ts';
+import { useRegisteredMachines } from './sections/settings/machines/use-registered-machines';
 
 function getAttachHint(kind: string): string {
   if (kind === 'desktop') {

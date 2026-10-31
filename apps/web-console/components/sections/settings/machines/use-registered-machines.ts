@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useI18n, type MessageKey } from '@/lib/i18n';
-import type { RegisteredMachineSummary } from './registered-machines-model.ts';
+import type { RegisteredMachineSummary } from './registered-machines-model';
 import {
   applyRefresh,
   applyRegister,
@@ -12,12 +12,12 @@ import {
   refreshMachine,
   registerMachine,
   unregisterMachine
-} from './registered-machines-actions.ts';
+} from './registered-machines-actions';
 
 type TFn = (key: MessageKey, vars?: Record<string, string | number>) => string;
 
 export function useRegisteredMachines() {
-  const t = useI18n();
+  const { t } = useI18n();
   const [machines, setMachines] = useState<RegisteredMachineSummary[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -49,7 +49,7 @@ export function useRegisteredMachines() {
       const result = await registerMachine(api, input);
       if ('machine' in result) {
         setMachines(applyRegister(machines, result.machine));
-        setMsg(t('settingsEntries.registeredMachines.registered'));
+        setMsg(t('settingsEntries.registeredMachines.registered' as MessageKey));
       } else {
         setErr(result.error);
       }
@@ -66,7 +66,7 @@ export function useRegisteredMachines() {
       const result = await unregisterMachine(api, machineId);
       if ('ok' in result) {
         setMachines(applyUnregister(machines, machineId));
-        setMsg(t('settingsEntries.registeredMachines.unregistered'));
+        setMsg(t('settingsEntries.registeredMachines.unregistered' as MessageKey));
       } else {
         setErr(result.error);
       }
