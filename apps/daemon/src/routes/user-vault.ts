@@ -150,40 +150,25 @@ function secureFormRoutes(runtime: RawAgentRuntime): RouteSpec[] {
                 recordValues[key] = val;
               }
             }
-            // Leak scan all submitted values
-            const receipt_text = JSON.stringify({});
+            done = port.submit({ sessionId, id, values: recordValues });
+
+            // Leak scan all submitted values AFTER submit
             for (const secret of Object.values(recordValues)) {
-              if (secureFormTextLeaks(receipt_text, secret)) {
+              if (secureFormTextLeaks(JSON.stringify(done), secret)) {
                 throw new ValidationError('refusing to return a secret in the secure form receipt');
               }
             }
-            done = port.submit({ sessionId, id, values: recordValues });
           } else {
             // Single-field submit (legacy)
             const value = str(body, 'value') ?? '';
-            if (secureFormTextLeaks(JSON.stringify({}), value)) {
-              throw new ValidationError('refusing to return a secret in the secure form receipt');
-            }
             done = port.submit({ sessionId, id, value });
-          }
-        }
 
-        // Verify receipt has no secrets
-        if (body.values) {
-          // Multi-field case: check all values in values object
-          for (const secret of Object.values(body.values)) {
-            if (typeof secret === 'string' && secureFormTextLeaks(JSON.stringify(done), secret)) {
+            // Leak scan AFTER submit
+            if (secureFormTextLeaks(JSON.stringify(done), value)) {
               throw new ValidationError('refusing to return a secret in the secure form receipt');
             }
           }
-        } else {
-          // Single-field case
-          const value = str(body, 'value') ?? '';
-          if (secureFormTextLeaks(JSON.stringify(done), value)) {
-            throw new ValidationError('refusing to return a secret in the secure form receipt');
-          }
         }
-
         const session = runtime.getSession(sessionId);
         if (session) {
           const meta: Record<string, any> = {
