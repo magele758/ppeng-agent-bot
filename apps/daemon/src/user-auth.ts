@@ -30,7 +30,8 @@ export function isAuthPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;
   if (pathname === '/api/auth' || pathname.startsWith('/api/auth/')) return true;
   // The share id is the capability. Library create/list/update stay behind login.
-  return /^\/api\/pages\/share\/[^/]+$/.test(pathname);
+  if (/^\/api\/pages\/share\/[^/]+$/.test(pathname)) return true;
+  return /^\/pages\/[^/]+$/.test(pathname);
 }
 
 export function requestPublicOrigin(request: IncomingMessage, env: NodeJS.ProcessEnv): string {

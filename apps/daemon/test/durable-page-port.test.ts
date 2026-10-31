@@ -301,3 +301,56 @@ function dispatch(
     )
     .then(() => ({ status, json: raw ? JSON.parse(raw) : {} }));
 }
+
+test('anonymous GET /pages/:shareId returns sanitized HTML body [AC:page-share-html#AC-2]', async () => {
+  const h = await bootHttp();
+  try {
+    const page = h.port.create({ title: 'Share <Me>', markdown: 'Hello **world**\n\n<script>x</script>' });
+    const response = await h.send('GET', `/pages/${page.shareId}`, 'anonymous');
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('content-type') ?? '', /text\/html/);
+    const body = await response.text();
+    assert.match(body, /<!DOCTYPE html>/);
+    assert.match(body, /Share &lt;Me&gt;/);
+    assert.match(body, /<strong>world<\/strong>/);
+    assert.match(body, /&lt;script&gt;x&lt;\/script&gt;/);
+    assert.doesNotMatch(body, /<script>x<\/script>/);
+    assert.doesNotMatch(body, /rotate|delete|edit|settings/i);
+  } finally {
+    await h.close();
+  }
+});
+
+test('HTML share 404 after rotate; new share HTML readable [AC:page-share-html#AC-3]', async () => {
+  const h = await bootHttp();
+  try {
+    const page = h.port.create({ title: 'Rotate HTML', markdown: 'Keep body' });
+    const oldHtml = `/pages/${page.shareId}`;
+    const rotate = await h.send('POST', `/api/library/pages/${page.id}/rotate-share`);
+    assert.equal(rotate.status, 200);
+    const body = await rotate.json() as { page: { shareId: string; markdown: string } };
+    assert.equal((await h.send('GET', oldHtml, 'anonymous')).status, 404);
+    const neu = await h.send('GET', `/pages/${body.page.shareId}`, 'anonymous');
+    assert.equal(neu.status, 200);
+    assert.match(await neu.text(), /Keep body/);
+  } finally {
+    await h.close();
+  }
+});
+
+test('HTML share path rejects mutations [AC:page-share-html#AC-4]', async () => {
+  const h = await bootHttp();
+  try {
+    const page = h.port.create({ title: 'RO', markdown: 'Body' });
+    const path = `/pages/${page.shareId}`;
+    for (const role of ['anonymous', 'admin']) {
+      for (const method of ['POST', 'PATCH', 'DELETE']) {
+        assert.equal((await h.send(method, path, role)).status, 404);
+      }
+    }
+    assert.equal((await h.send('GET', path, 'anonymous')).status, 200);
+    assert.equal(h.port.get(page.id).shareId, page.shareId);
+  } finally {
+    await h.close();
+  }
+});

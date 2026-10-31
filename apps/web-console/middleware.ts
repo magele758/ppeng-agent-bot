@@ -35,7 +35,7 @@ function appendLabForwarding(request: NextRequest, headers: Headers): void {
 }
 
 export const config = {
-  matcher: '/api/:path*'
+  matcher: ['/api/:path*', '/pages/:path*']
 };
 
 /** 构建时 next.config rewrites 会固化目标；e2e 随机 daemon 端口必须在运行时解析 DAEMON_PROXY_TARGET */

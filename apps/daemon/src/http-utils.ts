@@ -56,3 +56,14 @@ export function sseSend(
     /* A disconnected client must not fail the run that is still writing. */
   }
 }
+
+export function html(response: ServerResponse<IncomingMessage>, status: number, body: string): void {
+  response.statusCode = status;
+  response.setHeader('content-type', 'text/html; charset=utf-8');
+  response.setHeader('cache-control', 'no-store');
+  response.setHeader(
+    'content-security-policy',
+    "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+  );
+  response.end(body);
+}
