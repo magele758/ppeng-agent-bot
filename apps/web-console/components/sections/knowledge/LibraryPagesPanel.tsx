@@ -1,252 +1,186 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { api } from '@/lib/api';
-import { useI18n } from '@/lib/i18n';
 import { SettingsGroup } from '../../ui';
-import {
-  parsePageDetail,
-  parsePageList,
-  withRotatedShare,
-  withoutPage,
-  type LibraryPageDetail,
-  type LibraryPageSummary
-} from './library-pages-model';
+import type { LibraryPageDetail, LibraryPageSummary } from './library-pages-model';
 import styles from './knowledge.module.css';
+import { useLibraryPages } from './use-library-pages';
 
-const JSON_HEADERS = { 'Content-Type': 'application/json' };
+function PageList({
+  pages,
+  busy,
+  onOpen,
+  onCopy,
+  onRotate,
+  onDelete,
+  labels
+}: {
+  pages: LibraryPageSummary[];
+  busy: boolean;
+  onOpen: (id: string) => void;
+  onCopy: (sharePath: string) => void;
+  onRotate: (id: string) => void;
+  onDelete: (id: string) => void;
+  labels: {
+    open: string;
+    copyShare: string;
+    rotate: string;
+    rotating: string;
+    delete: string;
+    deleting: string;
+    revision: (n: number) => string;
+  };
+}) {
+  return (
+    <ul id="libraryPagesList" className={styles.list} data-testid="library-pages-list">
+      {pages.map((row) => (
+        <li key={row.id} className={styles.row}>
+          <div className={styles.rowMain}>
+            <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => onOpen(row.id)}>
+              {row.title}
+            </button>
+            <span className="muted">{labels.revision(row.revision)}</span>
+          </div>
+          <div className={styles.value}>{row.sharePath}</div>
+          <div className={styles.actions}>
+            <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => onOpen(row.id)}>
+              {labels.open}
+            </button>
+            <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => onCopy(row.sharePath)}>
+              {labels.copyShare}
+            </button>
+            <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => onRotate(row.id)}>
+              {busy ? labels.rotating : labels.rotate}
+            </button>
+            <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => onDelete(row.id)}>
+              {busy ? labels.deleting : labels.delete}
+            </button>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function PageDetail({
+  detail,
+  busy,
+  onCopy,
+  onRotate,
+  onDelete,
+  labels
+}: {
+  detail: LibraryPageDetail;
+  busy: boolean;
+  onCopy: (sharePath: string) => void;
+  onRotate: (id: string) => void;
+  onDelete: (id: string) => void;
+  labels: {
+    copyShare: string;
+    rotate: string;
+    rotating: string;
+    delete: string;
+    deleting: string;
+    revision: (n: number) => string;
+    sharePath: string;
+    updatedAt: (time: string) => string;
+    body: string;
+  };
+}) {
+  return (
+    <div id="libraryPagesDetail" data-testid="library-pages-detail" className={styles.list}>
+      <div className={styles.row}>
+        <div className={styles.rowMain}>
+          <strong className={styles.key}>{detail.title}</strong>
+          <span className="muted">{labels.revision(detail.revision)}</span>
+        </div>
+        <div className={styles.value}>
+          {labels.sharePath}: {detail.sharePath}
+        </div>
+        {detail.updatedAt ? <div className={styles.value}>{labels.updatedAt(detail.updatedAt)}</div> : null}
+        <div className={styles.actions}>
+          <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => onCopy(detail.sharePath)}>
+            {labels.copyShare}
+          </button>
+          <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => onRotate(detail.id)}>
+            {busy ? labels.rotating : labels.rotate}
+          </button>
+          <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => onDelete(detail.id)}>
+            {busy ? labels.deleting : labels.delete}
+          </button>
+        </div>
+        <h4 className={styles.subhead}>{labels.body}</h4>
+        <pre className={styles.pre} data-testid="library-pages-markdown">
+          {detail.markdown}
+        </pre>
+      </div>
+    </div>
+  );
+}
 
 export function LibraryPagesPanel() {
-  const { t } = useI18n();
-  const [pages, setPages] = useState<LibraryPageSummary[]>([]);
-  const [loaded, setLoaded] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [detail, setDetail] = useState<LibraryPageDetail | null>(null);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setErr(null);
-    try {
-      const data = await api('/api/library/pages');
-      setPages(parsePageList(data));
-      setLoaded(true);
-    } catch (e) {
-      setErr(t('knowledge.pages.loadFailed', { error: e instanceof Error ? e.message : String(e) }));
-    }
-  }, [t]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const open = async (id: string) => {
-    setBusy(true);
-    setMsg(null);
-    setErr(null);
-    try {
-      const data = await api(`/api/library/pages/${encodeURIComponent(id)}`);
-      const page = parsePageDetail(data);
-      if (!page) throw new Error('invalid page');
-      setSelectedId(id);
-      setDetail(page);
-    } catch (e) {
-      setErr(t('knowledge.pages.openFailed', { error: e instanceof Error ? e.message : String(e) }));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const back = () => {
-    setSelectedId(null);
-    setDetail(null);
-    setMsg(null);
-    setErr(null);
-  };
-
-  const copyShare = async (sharePath: string) => {
-    setMsg(null);
-    setErr(null);
-    try {
-      await navigator.clipboard.writeText(sharePath);
-      setMsg(t('knowledge.pages.copied'));
-    } catch (e) {
-      setErr(t('knowledge.pages.copyFailed', { error: e instanceof Error ? e.message : String(e) }));
-    }
-  };
-
-  const rotate = async (id: string) => {
-    if (!window.confirm(t('knowledge.pages.rotateConfirm'))) return;
-    setBusy(true);
-    setMsg(null);
-    setErr(null);
-    try {
-      const data = await api(`/api/library/pages/${encodeURIComponent(id)}/rotate-share`, {
-        method: 'POST',
-        headers: JSON_HEADERS,
-        body: '{}'
-      });
-      const page = parsePageDetail(data);
-      if (!page) throw new Error('invalid page');
-      setPages((prev) => withRotatedShare(prev, page));
-      setDetail(page);
-      setMsg(t('knowledge.pages.rotated'));
-    } catch (e) {
-      setErr(t('knowledge.pages.rotateFailed', { error: e instanceof Error ? e.message : String(e) }));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const remove = async (id: string) => {
-    if (!window.confirm(t('knowledge.pages.deleteConfirm'))) return;
-    setBusy(true);
-    setMsg(null);
-    setErr(null);
-    try {
-      await api(`/api/library/pages/${encodeURIComponent(id)}`, { method: 'DELETE' });
-      setPages((prev) => withoutPage(prev, id));
-      setSelectedId(null);
-      setDetail(null);
-      setMsg(t('knowledge.pages.deleted'));
-    } catch (e) {
-      setErr(t('knowledge.pages.deleteFailed', { error: e instanceof Error ? e.message : String(e) }));
-    } finally {
-      setBusy(false);
-    }
+  const s = useLibraryPages();
+  const revision = (n: number) => s.t('knowledge.pages.revision', { n: String(n) });
+  const actionLabels = {
+    open: s.t('knowledge.pages.open'),
+    copyShare: s.t('knowledge.pages.copyShare'),
+    rotate: s.t('knowledge.pages.rotate'),
+    rotating: s.t('knowledge.pages.rotating'),
+    delete: s.t('knowledge.pages.delete'),
+    deleting: s.t('knowledge.pages.deleting'),
+    revision
   };
 
   return (
-    <SettingsGroup id="library-pages" title={t('knowledge.pages.title')} description={t('knowledge.pages.desc')}>
+    <SettingsGroup id="library-pages" title={s.t('knowledge.pages.title')} description={s.t('knowledge.pages.desc')}>
       <div className={styles.actions}>
-        {selectedId ? (
-          <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={back}>
-            {t('knowledge.pages.back')}
+        {s.selectedId ? (
+          <button type="button" className="btn btn-secondary btn-sm" disabled={s.busy} onClick={s.back}>
+            {s.t('knowledge.pages.back')}
           </button>
         ) : (
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            disabled={busy || !loaded}
-            onClick={() => void load()}
-          >
-            {t('knowledge.pages.refresh')}
+          <button type="button" className="btn btn-secondary btn-sm" disabled={s.busy || !s.loaded} onClick={() => void s.load()}>
+            {s.t('knowledge.pages.refresh')}
           </button>
         )}
       </div>
 
-      {!loaded && !err ? <p className="muted">{t('knowledge.pages.loading')}</p> : null}
-
-      {loaded && !selectedId && pages.length === 0 ? (
-        <p id="libraryPagesEmpty">{t('knowledge.pages.empty')}</p>
+      {!s.loaded && !s.err ? <p className="muted">{s.t('knowledge.pages.loading')}</p> : null}
+      {s.loaded && !s.selectedId && s.pages.length === 0 ? <p id="libraryPagesEmpty">{s.t('knowledge.pages.empty')}</p> : null}
+      {s.loaded && !s.selectedId && s.pages.length > 0 ? (
+        <PageList
+          pages={s.pages}
+          busy={s.busy}
+          onOpen={(id) => void s.open(id)}
+          onCopy={(p) => void s.copyShare(p)}
+          onRotate={(id) => void s.rotate(id)}
+          onDelete={(id) => void s.remove(id)}
+          labels={actionLabels}
+        />
+      ) : null}
+      {s.detail && s.selectedId ? (
+        <PageDetail
+          detail={s.detail}
+          busy={s.busy}
+          onCopy={(p) => void s.copyShare(p)}
+          onRotate={(id) => void s.rotate(id)}
+          onDelete={(id) => void s.remove(id)}
+          labels={{
+            ...actionLabels,
+            sharePath: s.t('knowledge.pages.sharePath'),
+            updatedAt: (time) => s.t('knowledge.pages.updatedAt', { time }),
+            body: s.t('knowledge.pages.body')
+          }}
+        />
       ) : null}
 
-      {loaded && !selectedId && pages.length > 0 ? (
-        <ul id="libraryPagesList" className={styles.list} data-testid="library-pages-list">
-          {pages.map((row) => (
-            <li key={row.id} className={styles.row}>
-              <div className={styles.rowMain}>
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  disabled={busy}
-                  onClick={() => void open(row.id)}
-                >
-                  {row.title}
-                </button>
-                <span className="muted">{t('knowledge.pages.revision', { n: String(row.revision) })}</span>
-              </div>
-              <div className={styles.value}>{row.sharePath}</div>
-              <div className={styles.actions}>
-                <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => void open(row.id)}>
-                  {t('knowledge.pages.open')}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  disabled={busy}
-                  onClick={() => void copyShare(row.sharePath)}
-                >
-                  {t('knowledge.pages.copyShare')}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  disabled={busy}
-                  onClick={() => void rotate(row.id)}
-                >
-                  {busy ? t('knowledge.pages.rotating') : t('knowledge.pages.rotate')}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  disabled={busy}
-                  onClick={() => void remove(row.id)}
-                >
-                  {busy ? t('knowledge.pages.deleting') : t('knowledge.pages.delete')}
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-
-      {detail && selectedId ? (
-        <div id="libraryPagesDetail" data-testid="library-pages-detail" className={styles.list}>
-          <div className={styles.row}>
-            <div className={styles.rowMain}>
-              <strong className={styles.key}>{detail.title}</strong>
-              <span className="muted">{t('knowledge.pages.revision', { n: String(detail.revision) })}</span>
-            </div>
-            <div className={styles.value}>
-              {t('knowledge.pages.sharePath')}: {detail.sharePath}
-            </div>
-            {detail.updatedAt ? (
-              <div className={styles.value}>{t('knowledge.pages.updatedAt', { time: detail.updatedAt })}</div>
-            ) : null}
-            <div className={styles.actions}>
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                disabled={busy}
-                onClick={() => void copyShare(detail.sharePath)}
-              >
-                {t('knowledge.pages.copyShare')}
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                disabled={busy}
-                onClick={() => void rotate(detail.id)}
-              >
-                {busy ? t('knowledge.pages.rotating') : t('knowledge.pages.rotate')}
-              </button>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                disabled={busy}
-                onClick={() => void remove(detail.id)}
-              >
-                {busy ? t('knowledge.pages.deleting') : t('knowledge.pages.delete')}
-              </button>
-            </div>
-            <h4 className={styles.subhead}>{t('knowledge.pages.body')}</h4>
-            <pre className={styles.pre} data-testid="library-pages-markdown">
-              {detail.markdown}
-            </pre>
-          </div>
-        </div>
-      ) : null}
-
-      {msg ? (
+      {s.msg ? (
         <p role="status" className="muted">
-          {msg}
+          {s.msg}
         </p>
       ) : null}
-      {err ? (
+      {s.err ? (
         <p role="alert" className={styles.error}>
-          {err}
+          {s.err}
         </p>
       ) : null}
     </SettingsGroup>
