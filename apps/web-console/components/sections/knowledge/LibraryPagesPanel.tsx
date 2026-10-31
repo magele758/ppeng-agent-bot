@@ -1,6 +1,7 @@
 'use client';
 
 import { SettingsGroup } from '../../ui';
+import { type MessageKey } from '@/lib/i18n';
 import type { LibraryPageDetail, LibraryPageSummary } from './library-pages-model';
 import styles from './knowledge.module.css';
 import { useLibraryPages } from './use-library-pages';
@@ -15,7 +16,7 @@ type ActionLabels = {
   revision: (n: number) => string;
 };
 
-type Translate = (key: string, vars?: Record<string, string | number>) => string;
+type Translate = (key: MessageKey, vars?: Record<string, string | number>) => string;
 
 function PageList({
   pages,
