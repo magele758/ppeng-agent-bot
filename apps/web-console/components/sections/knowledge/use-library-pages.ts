@@ -3,16 +3,20 @@
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { api } from '@/lib/api';
 import { useI18n, type MessageKey } from '@/lib/i18n';
-import type { LibraryPageDetail, LibraryPageSummary } from './library-pages-model';
+import type { LibraryPageDetail, LibraryPageSummary } from './library-pages-model.ts';
 import {
+  applyCreate,
   applyDelete,
   applyRotate,
+  applyUpdate,
   copySharePath,
+  createPage,
   deletePage,
   loadPages,
   openPage,
-  rotatePageShare
-} from './library-pages-actions';
+  rotatePageShare,
+  updatePage
+} from './library-pages-actions.ts';
 
 type TFn = (key: MessageKey, vars?: Record<string, string | number>) => string;
 
@@ -125,6 +129,60 @@ function usePageShare(
   return { copyShare, rotate, remove };
 }
 
+function usePageCreate(
+  t: TFn,
+  setPages: Dispatch<SetStateAction<LibraryPageSummary[]>>,
+  setBusy: (v: boolean) => void,
+  setMsg: (v: string | null) => void,
+  setErr: (v: string | null) => void,
+  setSelectedId: (v: string | null) => void,
+  setDetail: (v: LibraryPageDetail | null) => void
+) {
+  const create = async (title: string, markdown: string) => {
+    setBusy(true);
+    setMsg(null);
+    setErr(null);
+    const result = await createPage(api, title, markdown);
+    setBusy(false);
+    if ('error' in result) {
+      setErr(t('knowledge.pages.createFailed', { error: result.error }));
+      return;
+    }
+    setPages((prev) => applyCreate(prev, result.page));
+    setSelectedId(result.page.id);
+    setDetail(result.page);
+    setMsg(t('knowledge.pages.created'));
+  };
+
+  return { create };
+}
+
+function usePageUpdate(
+  t: TFn,
+  setPages: Dispatch<SetStateAction<LibraryPageSummary[]>>,
+  setBusy: (v: boolean) => void,
+  setMsg: (v: string | null) => void,
+  setErr: (v: string | null) => void,
+  setDetail: (v: LibraryPageDetail | null) => void
+) {
+  const update = async (id: string, updates: { title?: string; markdown?: string }) => {
+    setBusy(true);
+    setMsg(null);
+    setErr(null);
+    const result = await updatePage(api, id, updates);
+    setBusy(false);
+    if ('error' in result) {
+      setErr(t('knowledge.pages.updateFailed', { error: result.error }));
+      return;
+    }
+    setPages((prev) => applyUpdate(prev, result.page));
+    setDetail(result.page);
+    setMsg(t('knowledge.pages.saved'));
+  };
+
+  return { update };
+}
+
 export function useLibraryPages() {
   const { t } = useI18n();
   const list = usePageList(t);
@@ -136,6 +194,23 @@ export function useLibraryPages() {
     detail.setMsg,
     list.setErr,
     detail.setSelectedId,
+    detail.setDetail
+  );
+  const creator = usePageCreate(
+    t,
+    list.setPages,
+    detail.setBusy,
+    detail.setMsg,
+    list.setErr,
+    detail.setSelectedId,
+    detail.setDetail
+  );
+  const updater = usePageUpdate(
+    t,
+    list.setPages,
+    detail.setBusy,
+    detail.setMsg,
+    list.setErr,
     detail.setDetail
   );
   return {
@@ -152,6 +227,8 @@ export function useLibraryPages() {
     back: detail.back,
     copyShare: share.copyShare,
     rotate: share.rotate,
-    remove: share.remove
+    remove: share.remove,
+    create: creator.create,
+    update: updater.update
   };
 }

@@ -78,3 +78,53 @@ export function applyRotate(pages: LibraryPageSummary[], page: LibraryPageDetail
 export function applyDelete(pages: LibraryPageSummary[], id: string): LibraryPageSummary[] {
   return withoutPage(pages, id);
 }
+export async function createPage(api: ApiFn, title: string, markdown: string): Promise<{ page: LibraryPageDetail } | { error: string }> {
+  try {
+    const page = parsePageDetail(
+      await api('/api/library/pages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, markdown })
+      })
+    );
+    if (!page) return { error: 'invalid page response' };
+    return { page };
+  } catch (e) {
+    return { error: errText(e) };
+  }
+}
+
+export async function updatePage(api: ApiFn, id: string, updates: { title?: string; markdown?: string }): Promise<{ page: LibraryPageDetail } | { error: string }> {
+  try {
+    const page = parsePageDetail(
+      await api(`/api/library/pages/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      })
+    );
+    if (!page) return { error: 'invalid page response' };
+    return { page };
+  } catch (e) {
+    return { error: errText(e) };
+  }
+}
+
+export function applyCreate(pages: LibraryPageSummary[], page: LibraryPageDetail): LibraryPageSummary[] {
+  const summary: LibraryPageSummary = {
+    id: page.id,
+    title: page.title,
+    revision: page.revision,
+    shareId: page.shareId,
+    sharePath: page.sharePath,
+    createdAt: page.createdAt,
+    updatedAt: page.updatedAt
+  };
+  return [summary, ...pages];
+}
+
+export function applyUpdate(pages: LibraryPageSummary[], page: LibraryPageDetail): LibraryPageSummary[] {
+  return pages.map((p) =>
+    p.id === page.id ? { ...p, title: page.title, revision: page.revision, updatedAt: page.updatedAt } : p
+  );
+}

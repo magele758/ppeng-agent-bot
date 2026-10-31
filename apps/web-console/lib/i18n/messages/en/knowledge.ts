@@ -65,6 +65,15 @@ export const knowledge = {
     revision: 'Revision {n}',
     sharePath: 'Share path',
     updatedAt: 'Updated {time}',
-    body: 'Markdown body'
-  },
+    body: 'Markdown body',
+    create: 'Create page',
+    creating: 'Creating…',
+    createFailed: 'Create failed: {error}',
+    created: 'Page created',
+    titlePlaceholder: 'Page title',
+    markdownPlaceholder: 'Write markdown here…',
+    save: 'Save',
+    saving: 'Saving…',
+    updateFailed: 'Save failed: {error}',
+    saved: 'Page saved'
 };
