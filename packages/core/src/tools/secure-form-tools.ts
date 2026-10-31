@@ -17,12 +17,13 @@ import {
   type SecureFormReceipt,
   type SecureFormStatus
 } from '../secrets/secure-form.js';
-import { assertModelFacingHasNoUserVaultSecrets, type UserVault } from '../secrets/user-vault.js';
+import { assertModelFacingHasNoUserVaultSecrets, type UserVault, type UserVaultFillRef } from '../secrets/user-vault.js';
 import type { RunContext, ToolContract, ToolExecutionResult } from '../types.js';
 
 interface SecureFormMeta {
   id?: string;
   field?: SecureFormField;
+  fields?: Array<{ field: SecureFormField; fillRef: string }>;
   status?: SecureFormStatus | 'pending';
   text?: string;
   fillRef?: string;
@@ -44,35 +45,65 @@ function fail(content: string): ToolExecutionResult {
 function metaOf(context: RunContext, services: SecureFormToolServices): SecureFormMeta | undefined {
   return services.readMeta(context.session.id) ?? (context.session.metadata?.[SECURE_FORM_META] as SecureFormMeta | undefined);
 }
-
 function asReceipt(meta: SecureFormMeta | undefined): SecureFormReceipt | undefined {
-  if (!meta?.id || !meta.field || !meta.status || !meta.text) return undefined;
+  if (!meta?.id || !meta.status || !meta.text) return undefined;
   if (meta.status !== 'filled' && meta.status !== 'cancelled' && meta.status !== 'expired') return undefined;
+  
+  // Multi-field receipt
+  if (meta.fields && meta.fields.length > 0) {
+    const fields = meta.fields.map((f) => ({
+      field: f.field,
+      fillRef: f.fillRef as unknown as UserVaultFillRef
+    }));
+    return {
+      kind: 'secure_form_receipt',
+      id: meta.id,
+      fields,
+      status: meta.status,
+      text: meta.text
+    };
+  }
+  
+  // Single-field receipt (backward compat)
+  if (!meta.field) return undefined;
   return {
     kind: 'secure_form_receipt',
     id: meta.id,
     field: meta.field,
     status: meta.status,
-    ...(meta.fillRef ? { fillRef: meta.fillRef as SecureFormReceipt['fillRef'] } : {}),
+    ...(meta.fillRef ? { fillRef: meta.fillRef as unknown as UserVaultFillRef } : {}),
     text: meta.text
   };
 }
 
 export function createSecureFormTool(services: SecureFormToolServices): ToolContract<{
   field?: string;
+  fields?: Array<{ field: string; label?: string }>;
   label?: string;
   prompt?: string;
 }> {
   return {
     name: SECURE_FORM_TOOL_NAME,
     description:
-      'Ask the user to type one secret (otp, password, card number, or CVV) into a masked chat card. You never receive the value. After they submit, the result is a fill status and an opaque uvref only. Not vault_fill (browser) and not connector secrets.',
+      'Ask the user to type one or more secrets (otp, password, cardNumber, cvv) into a masked chat card. You never receive the values. After they submit, the result is a fill status and opaque uvref(s) only. Not vault_fill (browser) and not connector secrets. Use fields array for multi-field (e.g., username+password). Use single field for backward compat.',
     inputSchema: {
       type: 'object',
       properties: {
-        field: { type: 'string', enum: [...SECURE_FORM_FIELDS], description: 'Defaults to otp' },
-        label: { type: 'string', description: 'Short card title, no secret' },
-        prompt: { type: 'string', description: 'What to ask the user, no secret' }
+        field: { type: 'string', enum: [...SECURE_FORM_FIELDS], description: 'Single field mode (defaults to otp)' },
+        fields: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              field: { type: 'string', enum: [...SECURE_FORM_FIELDS] },
+              label: { type: 'string' }
+            },
+            required: ['field']
+          },
+          description: 'Multi-field mode (e.g., [{field: "password", label: "Username"}, {field: "password", label: "Password"}])'
+        },
+        label: { type: 'string', description: 'Short card title (single field only), no secret' },
+        prompt: { type: 'string', description: 'What to ask the user (single field only), no secret' }
       }
     },
     approvalMode: 'always',
@@ -86,6 +117,22 @@ export function createSecureFormTool(services: SecureFormToolServices): ToolCont
         return { ok: done.status === 'filled', content };
       }
       try {
+        // Multi-field mode
+        if (args.fields && Array.isArray(args.fields) && args.fields.length > 0) {
+          const opened = services.port.request({
+            sessionId: context.session.id,
+            fields: args.fields
+          });
+          services.writeMeta(context.session.id, {
+            id: opened.card.id,
+            fields: opened.card.fields?.map((f) => ({ field: f.field, fillRef: '' })),
+            status: 'pending'
+          });
+          const content = JSON.stringify({ card: opened.card, receipt: opened.receipt });
+          return { ok: false, content };
+        }
+        
+        // Single-field mode (backward compat)
         const opened = services.port.request({
           sessionId: context.session.id,
           field: args.field,
