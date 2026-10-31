@@ -1,0 +1,40 @@
+id: secure-form-multi
+title: 对话里的多字段安全表单
+status: implemented
+requirement: |
+  用户在对话里一次性填写多个验证字段（如卡号和 CVV），而不是分别填写。
+  模型只收到多个字段的填写状态和对应的不透明 uvref。明文只进 UserVault，不进模型上下文，也不进对话文本。
+  保持单字段向后兼容；多字段和单字段共用同一接口。
+criteria:
+  - id: AC-1
+    given: 对话里还没有这张安全表单
+    when: 模型请求多个字段（如 password 和 cvv）
+    then: 出现一张多字段遮罩卡片，卡片有多个字段列表，回执不含任何明文
+  - id: AC-2
+    given: 一张多字段安全表单正在等待
+    when: 用户在卡片里提交所有字段值
+    then: 每个明文值写入 UserVault，回执有多个 field/fillRef 对，对话文本不含任何明文
+  - id: AC-3
+    given: 系统曾经支持单字段安全表单
+    when: 模型用旧的单字段请求参数（field/label 而不是 fields 数组）
+    then: 单字段请求仍然能工作，返回兼容格式的回执
+  - id: AC-4
+    given: 一张多字段安全表单正在等待
+    when: 用户取消
+    then: 回执为 cancelled，任何字段都不写入保险库
+  - id: AC-5
+    given: 多字段表单请求要求字段 password 和 cvv
+    when: 用户提交时省略或留空任一字段
+    then: 提交被拒绝，返回字段名和"required"的错误
+  - id: AC-6
+    given: 字段名必须在允许列表中
+    when: 模型请求一个不存在的字段名（如 invalidField）
+    then: 请求被拒绝，返回允许字段的错误
+  - id: AC-7
+    given: 多字段表单支持可变数量的字段
+    when: 模型发送空的 fields 数组
+    then: 请求被拒绝，返回"fields array must not be empty"的错误
+  - id: AC-8
+    given: 多字段表单填充完毕，回执包含多个 uvref
+    when: 模型收到回执并序列化检查
+    then: 回执 JSON 中不含任何 UserVault 内部引用或原始明文数据
