@@ -18,7 +18,7 @@ import {
 } from '../a2ui/protocol.js';
 import { BASIC_CATALOG_ID } from '../a2ui/catalog/basic.js';
 import { NotFoundError, ValidationError } from '../errors.js';
-import type { LibraryPageRecord } from '../stores/library-page-store.js';
+import type { LibraryPageRecord, LibraryPageRevisionRecord } from '../stores/library-page-store.js';
 
 export interface DurablePage {
   id: string;
@@ -48,6 +48,20 @@ export interface DurablePageSummary {
   updatedAt: string;
 }
 
+export interface DurablePageRevisionSummary {
+  revision: number;
+  createdAt: string;
+  title: string;
+}
+
+export interface DurablePageRevision {
+  pageId: string;
+  revision: number;
+  title: string;
+  markdown: string;
+  createdAt: string;
+}
+
 export interface DurablePageStore {
   insertLibraryPage(row: LibraryPageRecord): LibraryPageRecord;
   updateLibraryPage(row: LibraryPageRecord): LibraryPageRecord;
@@ -56,6 +70,10 @@ export interface DurablePageStore {
   getLibraryPage(id: string): LibraryPageRecord | undefined;
   getLibraryPageByShareId(shareId: string): LibraryPageRecord | undefined;
   listLibraryPages(): LibraryPageRecord[];
+  insertLibraryPageRevision(row: LibraryPageRevisionRecord): void;
+  listLibraryPageRevisions(pageId: string): Array<{ revision: number; createdAt: string; title: string }>;
+  getLibraryPageRevision(pageId: string, revision: number): LibraryPageRevisionRecord | undefined;
+  deleteLibraryPageRevisionsForPage(pageId: string): void;
 }
 
 export interface DurablePagePort {
@@ -66,6 +84,9 @@ export interface DurablePagePort {
   rotateShare(id: string): DurablePage;
   /** Permanently delete a page and revoke its share link. Throws when the id is missing. */
   delete(id: string): void;
+  listRevisions(id: string): DurablePageRevisionSummary[];
+  getRevision(id: string, revision: number): DurablePageRevision;
+  restoreRevision(id: string, revision: number): DurablePage;
   get(id: string): DurablePage;
   /** Resolve a page from its share id. The share id is the whole capability. */
   getByShareId(shareId: string): DurablePage;
@@ -163,6 +184,14 @@ export function createDurablePagePort(store: DurablePageStore, now: () => string
         createdAt: stamp,
         updatedAt: stamp
       });
+      // Archive revision 1 snapshot
+      store.insertLibraryPageRevision({
+        pageId: row.id,
+        revision: 1,
+        title: row.title,
+        markdown: row.markdown,
+        createdAt: row.createdAt
+      });
       return toDurablePage(row);
     },
     update(input) {
@@ -172,12 +201,22 @@ export function createDurablePagePort(store: DurablePageStore, now: () => string
       const title = input.title === undefined ? existing.title : normalizeTitle(input.title);
       const markdown = input.markdown === undefined ? existing.markdown : normalizeMarkdown(input.markdown);
       if (title === existing.title && markdown === existing.markdown) return toDurablePage(existing);
+      const newRevision = existing.revision + 1;
+      const stamp = now();
       const row = store.updateLibraryPage({
         ...existing,
         title,
         markdown,
-        revision: existing.revision + 1,
-        updatedAt: now()
+        revision: newRevision,
+        updatedAt: stamp
+      });
+      // Archive the new revision snapshot
+      store.insertLibraryPageRevision({
+        pageId: row.id,
+        revision: newRevision,
+        title: row.title,
+        markdown: row.markdown,
+        createdAt: stamp
       });
       return toDurablePage(row);
     },
@@ -191,6 +230,7 @@ export function createDurablePagePort(store: DurablePageStore, now: () => string
     },
     delete(id) {
       const pageId = requireText(id, 'id');
+      store.deleteLibraryPageRevisionsForPage(pageId);
       if (!store.deleteLibraryPage(pageId)) throw new NotFoundError('Page', pageId);
     },
     get(id) {
@@ -207,6 +247,29 @@ export function createDurablePagePort(store: DurablePageStore, now: () => string
     },
     list() {
       return store.listLibraryPages().map((row) => toDurablePageSummary(toDurablePage(row)));
-    }
+    },
+    listRevisions(id) {
+      const pageId = requireText(id, 'id');
+      const page = store.getLibraryPage(pageId);
+      if (!page) throw new NotFoundError('Page', pageId);
+      return store.listLibraryPageRevisions(pageId);
+    },
+    getRevision(id, revision) {
+      const pageId = requireText(id, 'id');
+      const page = store.getLibraryPage(pageId);
+      if (!page) throw new NotFoundError('Page', pageId);
+      const rev = store.getLibraryPageRevision(pageId, revision);
+      if (!rev) throw new NotFoundError('Revision', `${pageId} r${revision}`);
+      return rev;
+    },
+    restoreRevision(id, revision) {
+      const pageId = requireText(id, 'id');
+      const page = store.getLibraryPage(pageId);
+      if (!page) throw new NotFoundError('Page', pageId);
+      const rev = store.getLibraryPageRevision(pageId, revision);
+      if (!rev) throw new NotFoundError('Revision', `${pageId} r${revision}`);
+      // Call normal update to bump revision and archive the restored content
+      return this.update({ id: pageId, title: rev.title, markdown: rev.markdown });
+    },
   };
 }

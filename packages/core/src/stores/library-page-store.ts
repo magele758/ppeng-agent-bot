@@ -17,6 +17,14 @@ export interface LibraryPageRecord {
   updatedAt: string;
 }
 
+export interface LibraryPageRevisionRecord {
+  pageId: string;
+  revision: number;
+  title: string;
+  markdown: string;
+  createdAt: string;
+}
+
 export class LibraryPageStore {
   constructor(private readonly db: DatabaseSync) {}
 
@@ -88,5 +96,58 @@ export class LibraryPageStore {
       createdAt: String(row.created_at),
       updatedAt: String(row.updated_at)
     };
+  }
+
+  insertRevision(row: LibraryPageRevisionRecord): void {
+    this.db
+      .prepare(
+        `
+      INSERT INTO library_page_revisions (page_id, revision, title, markdown, created_at)
+      VALUES (?, ?, ?, ?, ?)
+    `
+      )
+      .run(row.pageId, row.revision, row.title, row.markdown, row.createdAt);
+  }
+
+  listRevisions(pageId: string): Array<{ revision: number; createdAt: string; title: string }> {
+    const rows = this.db
+      .prepare(
+        `
+      SELECT revision, created_at, title
+      FROM library_page_revisions
+      WHERE page_id = ?
+      ORDER BY revision DESC
+    `
+      )
+      .all(pageId) as Array<Record<string, unknown>>;
+    return rows.map((row) => ({
+      revision: Number(row.revision),
+      createdAt: String(row.created_at),
+      title: String(row.title)
+    }));
+  }
+
+  getRevision(pageId: string, revision: number): LibraryPageRevisionRecord | undefined {
+    const row = this.db
+      .prepare(
+        `
+      SELECT page_id, revision, title, markdown, created_at
+      FROM library_page_revisions
+      WHERE page_id = ? AND revision = ?
+    `
+      )
+      .get(pageId, revision) as Record<string, unknown> | undefined;
+    if (!row) return undefined;
+    return {
+      pageId: String(row.page_id),
+      revision: Number(row.revision),
+      title: String(row.title),
+      markdown: optionalString(row.markdown) ?? '',
+      createdAt: String(row.created_at)
+    };
+  }
+
+  deleteRevisionsForPage(pageId: string): void {
+    this.db.prepare(`DELETE FROM library_page_revisions WHERE page_id = ?`).run(pageId);
   }
 }

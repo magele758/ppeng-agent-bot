@@ -3,7 +3,8 @@ export { escapeHtml, markdownToSafeHtml, renderPageShareDocument, safeHref } fro
 export type {
   DurablePage,
   DurablePagePort,
-  DurablePageStore,
-  DurablePageSummary
+  DurablePageSummary,
+  DurablePageRevisionSummary,
+  DurablePageRevision
 } from './durable-page-port.js';
-export type { LibraryPageRecord } from '../stores/library-page-store.js';
+export type { LibraryPageRecord, LibraryPageRevisionRecord } from '../stores/library-page-store.js';
