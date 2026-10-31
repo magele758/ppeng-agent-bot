@@ -22,7 +22,7 @@ export const SECURE_FORM_TOOL_NAME = 'secure_form';
 /** Session metadata key. Holds the form id only — never the typed secret. */
 export const SECURE_FORM_META = 'secureForm';
 
-export const SECURE_FORM_FIELDS = ['otp', 'password', 'cardNumber', 'cvv'] as const;
+export const SECURE_FORM_FIELDS = ['otp', 'password', 'cardNumber', 'cvv', 'username'] as const;
 
 export type SecureFormField = (typeof SECURE_FORM_FIELDS)[number];
 
@@ -93,7 +93,8 @@ const FIELD_LABEL: Record<SecureFormField, string> = {
   otp: 'One-time code',
   password: 'Password',
   cardNumber: 'Card number',
-  cvv: 'CVV'
+  cvv: 'CVV',
+  username: 'Username'
 };
 
 function isField(value: string): value is SecureFormField {
@@ -308,6 +309,8 @@ export function createSecureFormPort(options: SecureFormPortOptions): SecureForm
           const entryId = `${entryIdFor(row.id)}_f${idx}`;
           if (spec.field === 'otp' || spec.field === 'password') {
             vault.upsertLogin({ id: entryId, label: spec.label, password: fieldValue });
+          } else if (spec.field === 'username') {
+            vault.upsertLogin({ id: entryId, label: spec.label, username: fieldValue });
           } else if (spec.field === 'cardNumber') {
             vault.upsertCard({ id: entryId, label: spec.label, number: fieldValue });
           } else if (spec.field === 'cvv') {
