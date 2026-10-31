@@ -207,3 +207,152 @@ test('secure form cancel stores nothing [AC:secure-form#AC-3]', async () => {
     await env.close();
   }
 });
+
+test('multi-field secure form submit (username + password) stores values and receipt has no plaintext secrets [AC:secure-form-multi#AC-2] [AC:secure-form-multi#AC-9]', async () => {
+  const env = await boot();
+  try {
+    const session = env.runtime.store.createSession({ title: 'multi-field secure form', mode: 'chat', agentId: 'general' });
+    const tool = env.runtime.tools.find((item) => item.name === 'secure_form');
+    assert.ok(tool);
+
+    // Request multi-field form (username + password)
+    const waiting = await tool.execute({ session: { id: session.id, metadata: {} } } as never, {
+      fields: [{ field: 'username' }, { field: 'password' }]
+    });
+    const opened = JSON.parse(waiting.content) as { card: { id: string } };
+
+    env.runtime.store.appendMessage(session.id, 'tool', [
+      { type: 'tool_result', toolCallId: 'c1', name: 'secure_form', ok: false, content: waiting.content }
+    ]);
+
+    // Submit multi-field with values
+    const res = await send(env.root, 'POST', `/api/sessions/${session.id}/secure-form`, {
+      action: 'submit',
+      id: opened.card.id,
+      values: { username: 'alice', password: PASSWORD }
+    });
+    assert.equal(res.status, 200);
+    const body = await res.text();
+
+    // Receipt must have no plaintext secrets
+    assert.equal(body.includes(PASSWORD), false, 'password should not appear in receipt');
+    assert.match(body, /filled/);
+
+    // Receipt must have fields array for multi-field forms
+    const receipt = JSON.parse(body) as { receipt: { fields?: Array<{ field: string; fillRef?: string }> } };
+    assert.ok(receipt.receipt.fields, 'multi-field receipt must have fields array');
+    assert.equal(receipt.receipt.fields.length, 2);
+    for (const field of receipt.receipt.fields) {
+      assert.ok(field.fillRef, `field ${field.field} must have fillRef`);
+    }
+
+    // Transcript must have no plaintext secrets
+    const transcript = JSON.stringify(env.runtime.store.foldMessages(session.id));
+    assert.equal(transcript.includes(PASSWORD), false, 'password should not appear in transcript');
+    assert.match(transcript, /filled/);
+
+    // resolveFillReference should work
+    for (const field of receipt.receipt.fields) {
+      if (field.fillRef) {
+        const resolved = env.runtime.userVault.resolveFillReference(field.fillRef);
+        if (field.field === 'username') {
+          assert.equal(resolved, 'alice');
+        } else if (field.field === 'password') {
+          assert.equal(resolved, PASSWORD);
+        }
+      }
+    }
+  } finally {
+    await env.close();
+  }
+});
+
+test('multi-field secure form submit (card number + cvv) with no plaintext in receipt [AC:secure-form-multi#AC-2] [AC:secure-form-multi#AC-8]', async () => {
+  const env = await boot();
+  try {
+    const session = env.runtime.store.createSession({ title: 'multi-field card form', mode: 'chat', agentId: 'general' });
+    const tool = env.runtime.tools.find((item) => item.name === 'secure_form');
+    assert.ok(tool);
+
+    // Request multi-field form (cardNumber + cvv)
+    const waiting = await tool.execute({ session: { id: session.id, metadata: {} } } as never, {
+      fields: [{ field: 'cardNumber' }, { field: 'cvv' }]
+    });
+    const opened = JSON.parse(waiting.content) as { card: { id: string } };
+
+    env.runtime.store.appendMessage(session.id, 'tool', [
+      { type: 'tool_result', toolCallId: 'c1', name: 'secure_form', ok: false, content: waiting.content }
+    ]);
+
+    // Submit multi-field with values
+    const res = await send(env.root, 'POST', `/api/sessions/${session.id}/secure-form`, {
+      action: 'submit',
+      id: opened.card.id,
+      values: { cardNumber: CARD, cvv: CVV }
+    });
+    assert.equal(res.status, 200);
+    const body = await res.text();
+
+    // Receipt must have no plaintext secrets
+    assert.equal(body.includes(CARD), false, 'card number should not appear in receipt');
+    assert.equal(body.includes(CVV), false, 'cvv should not appear in receipt');
+    assert.match(body, /filled/);
+
+    // Receipt must have fields array with fillRefs
+    const receipt = JSON.parse(body) as { receipt: { fields?: Array<{ field: string; fillRef?: string }> } };
+    assert.ok(receipt.receipt.fields, 'multi-field receipt must have fields array');
+    assert.equal(receipt.receipt.fields.length, 2);
+    const fillRefs = receipt.receipt.fields.map((f) => f.fillRef).filter((f) => f);
+    assert.equal(fillRefs.length, 2, 'both fields should have fillRefs');
+
+    // Transcript must have no plaintext secrets
+    const transcript = JSON.stringify(env.runtime.store.foldMessages(session.id));
+    assert.equal(transcript.includes(CARD), false, 'card number should not appear in transcript');
+    assert.equal(transcript.includes(CVV), false, 'cvv should not appear in transcript');
+
+    // resolveFillReference should work
+    for (const field of receipt.receipt.fields) {
+      if (field.fillRef) {
+        const resolved = env.runtime.userVault.resolveFillReference(field.fillRef);
+        if (field.field === 'cardNumber') {
+          assert.equal(resolved, CARD);
+        } else if (field.field === 'cvv') {
+          assert.equal(resolved, CVV);
+        }
+      }
+    }
+  } finally {
+    await env.close();
+  }
+});
+
+test('multi-field secure form cancel stores nothing [AC:secure-form-multi#AC-4]', async () => {
+  const env = await boot();
+  try {
+    const session = env.runtime.store.createSession({ title: 'multi-field cancel', mode: 'chat', agentId: 'general' });
+    const tool = env.runtime.tools.find((item) => item.name === 'secure_form');
+    assert.ok(tool);
+
+    // Request multi-field form
+    const waiting = await tool.execute({ session: { id: session.id, metadata: {} } } as never, {
+      fields: [{ field: 'username' }, { field: 'password' }]
+    });
+    const opened = JSON.parse(waiting.content) as { card: { id: string } };
+
+    env.runtime.store.appendMessage(session.id, 'tool', [
+      { type: 'tool_result', toolCallId: 'c1', name: 'secure_form', ok: false, content: waiting.content }
+    ]);
+
+    // Cancel multi-field form
+    const res = await send(env.root, 'POST', `/api/sessions/${session.id}/secure-form`, {
+      action: 'cancel',
+      id: opened.card.id
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json() as { receipt: { status: string; fields?: unknown } };
+    assert.equal(body.receipt.status, 'cancelled');
+    assert.equal(env.runtime.userVault.list().length, 0, 'cancel should store nothing');
+  } finally {
+    await env.close();
+  }
+});
