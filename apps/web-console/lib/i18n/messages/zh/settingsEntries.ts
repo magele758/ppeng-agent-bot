@@ -526,7 +526,8 @@ export const settingsEntries = {
     "unregister": "取消注册",
     "registered": "机器已成功注册。",
     "unregistered": "机器已成功取消注册。",
-    "error": {
-      "required": "机器 ID 和标签为必填项。"
+    error: {
+      required: '机器 ID 和标签为必填项。'
     }
-};
+  }
+} satisfies Messages['settingsEntries'];

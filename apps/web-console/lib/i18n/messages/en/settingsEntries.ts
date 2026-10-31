@@ -507,6 +507,7 @@ export const settingsEntries = {
       enabled: {
         label: 'Record the session event log',
         hint: 'When off, new events are no longer written; existing records are kept.'
+      }
     }
   },
   registeredMachines: {
