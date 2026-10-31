@@ -208,7 +208,7 @@ test('secure form cancel stores nothing [AC:secure-form#AC-3]', async () => {
   }
 });
 
-test('multi-field secure form submit (username + password) stores values and receipt has no plaintext secrets [AC:r5-15#AC-1]', async () => {
+test('multi-field secure form submit (username + password) stores values and receipt has no plaintext secrets [AC:secure-form-multi#AC-2] [AC:secure-form-multi#AC-9]', async () => {
   const env = await boot();
   try {
     const session = env.runtime.store.createSession({ title: 'multi-field secure form', mode: 'chat', agentId: 'general' });
@@ -267,7 +267,7 @@ test('multi-field secure form submit (username + password) stores values and rec
   }
 });
 
-test('multi-field secure form submit (card number + cvv) with no plaintext in receipt [AC:r5-15#AC-2]', async () => {
+test('multi-field secure form submit (card number + cvv) with no plaintext in receipt [AC:secure-form-multi#AC-2] [AC:secure-form-multi#AC-8]', async () => {
   const env = await boot();
   try {
     const session = env.runtime.store.createSession({ title: 'multi-field card form', mode: 'chat', agentId: 'general' });
@@ -326,7 +326,7 @@ test('multi-field secure form submit (card number + cvv) with no plaintext in re
   }
 });
 
-test('multi-field secure form cancel stores nothing [AC:r5-15#AC-3]', async () => {
+test('multi-field secure form cancel stores nothing [AC:secure-form-multi#AC-4]', async () => {
   const env = await boot();
   try {
     const session = env.runtime.store.createSession({ title: 'multi-field cancel', mode: 'chat', agentId: 'general' });
