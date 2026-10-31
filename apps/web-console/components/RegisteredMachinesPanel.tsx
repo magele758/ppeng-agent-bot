@@ -4,16 +4,7 @@ import { useCallback, useState } from 'react';
 import { useI18n, type MessageKey } from '@/lib/i18n';
 import { SettingsGroup } from './ui';
 import { useRegisteredMachines } from './sections/settings/machines/use-registered-machines';
-
-function getAttachHint(kind: string): string {
-  if (kind === 'desktop') {
-    return 'GET /api/desktop-agent/:id/events (SSE)';
-  }
-  if (kind === 'phone') {
-    return 'GET /api/device-local/:id/events (SSE)';
-  }
-  return 'SSH only';
-}
+import { attachHintForKind } from './sections/settings/machines/registered-machines-model';
 
 export function RegisteredMachinesPanel() {
   const t = useI18n().t;
@@ -99,7 +90,7 @@ export function RegisteredMachinesPanel() {
                     Kind: {machine.kind} • Status: {machine.connected ? '🟢 Connected' : '⚪ Disconnected'}
                   </div>
                   <div style={{ fontSize: '0.85em', color: '#999', marginTop: '0.5em' }}>
-                    {label('attachHint')}: {getAttachHint(machine.kind)}
+                    {label('attachHint')}: {attachHintForKind(machine.kind)}
                   </div>
                   {machine.sshAlias && (
                     <div style={{ fontSize: '0.85em', color: '#999' }}>SSH: {machine.sshAlias}</div>

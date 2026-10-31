@@ -1,102 +1,82 @@
-import { describe, it } from 'node:test';
+import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   applyRegister,
   applyUnregister,
-  applyRefresh
+  applyRefresh,
+  loadMachines,
+  registerMachine,
+  unregisterMachine,
+  refreshMachine
 } from './registered-machines-actions.ts';
-import type { RegisteredMachineSummary } from './registered-machines-model.ts';
 
-// [AC:lab-registered-machines#AC-1] [AC:lab-registered-machines#AC-2] [AC:lab-registered-machines#AC-3] [AC:lab-registered-machines#AC-4]
+const sample = {
+  machineId: 'mac1',
+  label: 'My MacBook',
+  kind: 'desktop' as const,
+  connected: true,
+  sshAlias: 'mbp'
+};
 
-describe('registered-machines-actions', () => {
-  describe('applyRegister', () => {
-    it('appends new machine and replaces existing one', () => {
-      const machines: RegisteredMachineSummary[] = [
-        { machineId: 'mac1', label: 'Old Mac', kind: 'desktop', connected: false }
-      ];
-      const newMachine: RegisteredMachineSummary = {
-        machineId: 'mac1',
-        label: 'Updated Mac',
-        kind: 'desktop',
-        connected: true
+test('loadMachines lists live machines via api stub [AC:lab-registered-machines#AC-1]', async () => {
+  const listed = await loadMachines(async () => ({ machines: [{ ...sample }] }));
+  assert.ok('machines' in listed && listed.machines[0]?.machineId === 'mac1');
+  assert.equal(listed.machines[0]?.kind, 'desktop');
+  assert.equal(listed.machines[0]?.connected, true);
+});
+
+test('registerMachine posts form fields and returns machine [AC:lab-registered-machines#AC-2]', async () => {
+  const registered = await registerMachine(
+    async (_path, init) => {
+      assert.equal(init?.method, 'POST');
+      const body = JSON.parse(String(init?.body ?? '{}'));
+      assert.equal(body.machineId, 'mac2');
+      assert.equal(body.label, 'MacBook');
+      assert.equal(body.kind, 'desktop');
+      return {
+        machine: {
+          machineId: 'mac2',
+          label: 'MacBook',
+          kind: 'desktop',
+          connected: false
+        }
       };
-      const result = applyRegister(machines, newMachine);
-      assert.equal(result.length, 1);
-      assert.equal(result[0].label, 'Updated Mac');
-      assert.equal(result[0].connected, true);
-    });
+    },
+    { machineId: 'mac2', label: 'MacBook', kind: 'desktop' }
+  );
+  assert.ok('machine' in registered && registered.machine.machineId === 'mac2');
+  const rows = applyRegister([], registered.machine);
+  assert.equal(rows.length, 1);
+});
 
-    it('adds completely new machine', () => {
-      const machines: RegisteredMachineSummary[] = [
-        { machineId: 'mac1', label: 'Mac', kind: 'desktop', connected: true }
-      ];
-      const newMachine: RegisteredMachineSummary = {
-        machineId: 'phone1',
-        label: 'iPhone',
-        kind: 'phone',
-        connected: false
-      };
-      const result = applyRegister(machines, newMachine);
-      assert.equal(result.length, 2);
-      assert.equal(result[1].machineId, 'phone1');
-    });
-  });
+test('unregisterMachine deletes and applyUnregister drops row [AC:lab-registered-machines#AC-3]', async () => {
+  const deleted = await unregisterMachine(async (path, init) => {
+    assert.match(path, /\/api\/registered-machines\/mac1$/);
+    assert.equal(init?.method, 'DELETE');
+    return {};
+  }, 'mac1');
+  assert.deepEqual(deleted, { ok: true });
+  const rows = applyUnregister([{ ...sample }, { ...sample, machineId: 'phone1', kind: 'phone', connected: false }], 'mac1');
+  assert.deepEqual(rows.map((r) => r.machineId), ['phone1']);
+});
 
-  describe('applyUnregister', () => {
-    it('removes specified machine', () => {
-      const machines: RegisteredMachineSummary[] = [
-        { machineId: 'mac1', label: 'Mac', kind: 'desktop', connected: true },
-        { machineId: 'phone1', label: 'Phone', kind: 'phone', connected: false }
-      ];
-      const result = applyUnregister(machines, 'mac1');
-      assert.equal(result.length, 1);
-      assert.equal(result[0].machineId, 'phone1');
-    });
+test('refreshMachine probes and applyRefresh updates connected [AC:lab-registered-machines#AC-4]', async () => {
+  const refreshed = await refreshMachine(async (path, init) => {
+    assert.match(path, /\/api\/registered-machines\/mac1\/refresh$/);
+    assert.equal(init?.method, 'POST');
+    return { machine: { ...sample, connected: true } };
+  }, 'mac1');
+  assert.ok('machine' in refreshed && refreshed.machine.connected === true);
+  const rows = applyRefresh([{ ...sample, connected: false }], refreshed.machine);
+  assert.equal(rows[0]?.connected, true);
+});
 
-    it('handles non-existent machine gracefully', () => {
-      const machines: RegisteredMachineSummary[] = [
-        { machineId: 'mac1', label: 'Mac', kind: 'desktop', connected: true }
-      ];
-      const result = applyUnregister(machines, 'nonexistent');
-      assert.equal(result.length, 1);
-      assert.equal(result[0].machineId, 'mac1');
-    });
-  });
-
-  describe('applyRefresh', () => {
-    it('updates connection status for matching machine', () => {
-      const machines: RegisteredMachineSummary[] = [
-        { machineId: 'mac1', label: 'Mac', kind: 'desktop', connected: false },
-        { machineId: 'phone1', label: 'Phone', kind: 'phone', connected: true }
-      ];
-      const refreshed: RegisteredMachineSummary = {
-        machineId: 'mac1',
-        label: 'Mac',
-        kind: 'desktop',
-        connected: true
-      };
-      const result = applyRefresh(machines, refreshed);
-      assert.equal(result.length, 2);
-      assert.equal(result[0].connected, true);
-      assert.equal(result[1].machineId, 'phone1');
-    });
-
-    it('preserves other machines unchanged', () => {
-      const machines: RegisteredMachineSummary[] = [
-        { machineId: 'mac1', label: 'Mac', kind: 'desktop', connected: false },
-        { machineId: 'phone1', label: 'Phone', kind: 'phone', connected: true }
-      ];
-      const refreshed: RegisteredMachineSummary = {
-        machineId: 'mac1',
-        label: 'Mac Updated',
-        kind: 'desktop',
-        connected: true
-      };
-      const result = applyRefresh(machines, refreshed);
-      assert.equal(result[0].label, 'Mac Updated');
-      assert.equal(result[1].label, 'Phone');
-      assert.equal(result[1].connected, true);
-    });
-  });
+test('api failures return error strings [AC:lab-registered-machines#AC-1]', async () => {
+  const fail = async () => {
+    throw new Error('boom');
+  };
+  assert.equal((await loadMachines(fail) as { error: string }).error, 'boom');
+  assert.equal((await registerMachine(fail, { machineId: 'x', label: 'y', kind: 'desktop' }) as { error: string }).error, 'boom');
+  assert.equal((await unregisterMachine(fail, 'x') as { error: string }).error, 'boom');
+  assert.equal((await refreshMachine(fail, 'x') as { error: string }).error, 'boom');
 });

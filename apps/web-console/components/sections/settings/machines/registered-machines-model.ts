@@ -59,3 +59,11 @@ export function applyUnregister(machines: RegisteredMachineSummary[], machineId:
 export function applyRefresh(machines: RegisteredMachineSummary[], machine: RegisteredMachineSummary): RegisteredMachineSummary[] {
   return machines.map(m => m.machineId === machine.machineId ? machine : m);
 }
+
+/** Short attach pairing hint; never Factory SSH UI. */
+export function attachHintForKind(kind: string): string {
+  if (kind === 'desktop') return 'GET /api/desktop-agent/:id/events (SSE)';
+  if (kind === 'phone') return 'GET /api/device-local/:id/events (SSE)';
+  return 'pair via desktop agent or phone DeviceLocal';
+}
+
