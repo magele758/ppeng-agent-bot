@@ -1,6 +1,3 @@
-import type {
- Messages } from '../types.ts';
-
 export const settingsEntries = {
   toolExposure: {
   "title": "工具提供方式",
@@ -533,4 +530,4 @@ export const settingsEntries = {
       required: '机器 ID 和标签为必填项。'
     }
   }
-} satisfies Messages['settingsEntries'];
+};
