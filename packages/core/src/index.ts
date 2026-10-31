@@ -30,6 +30,7 @@ export {
 export type {
   RegisteredMachinePort,
   RegisteredMachine,
+  RegisteredMachineKind,
   RegisteredMachineBackend,
   RegisteredMachineOpResult,
   DesktopAgentHub,
