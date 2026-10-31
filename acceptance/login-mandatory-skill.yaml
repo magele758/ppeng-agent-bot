@@ -1,0 +1,22 @@
+id: login-mandatory-skill
+title: 捆绑 login 强制技能可加载并解锁登录面
+status: implemented
+requirement: |
+  Repo ships skills/login (SKILL.md + sibling Manifest). load_skill(login)
+  unlocks collect_credentials / vault_get; without load they stay fail-closed.
+  Skill body states Vault → Secure Form (vaultEntryId/entryId) → Secure Form
+  hand-fill → handoff; no plaintext to model; separate from browser vault_fill.
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 仓库 skills/ 目录已检出
+    when: 代理或运行时扫描 workspace skills
+    then: 存在可发现的 login 技能，且 Manifest 允许 collect_credentials、vault_get、vault_list、secure_form，正文写明 Vault→Secure Form→handoff 且禁止把明文交给模型、并与 browser vault_fill 分开
+  - id: AC-2
+    given: 当前会话尚未成功 load_skill(login)
+    when: 代理调用 collect_credentials 或 vault_get
+    then: 强制技能门 fail-closed，提示先 load_skill(login)
+  - id: AC-3
+    given: 本会话已经成功 load_skill(login)
+    when: 代理再次调用 collect_credentials 或 vault_get
+    then: 强制技能门放行（仍受 Auto-review 与 Manifest allowTools 约束）
