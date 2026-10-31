@@ -466,6 +466,7 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
     ['GET /api/library/pages/:id', ADMIN],
     ['PATCH /api/library/pages/:id', ADMIN],
     ['DELETE /api/library/pages/:id', ADMIN],
+    ['POST /api/library/pages/:id/rotate-share', ADMIN],
     ['GET /api/pages/share/:shareId', PUBLIC],
     ['GET /api/browser/settings', AUTHENTICATED],
     ['PATCH /api/browser/settings', ADMIN],

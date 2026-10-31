@@ -51,6 +51,7 @@ export interface DurablePageSummary {
 export interface DurablePageStore {
   insertLibraryPage(row: LibraryPageRecord): LibraryPageRecord;
   updateLibraryPage(row: LibraryPageRecord): LibraryPageRecord;
+  rotateLibraryPageShare(id: string, shareId: string): LibraryPageRecord | undefined;
   deleteLibraryPage(id: string): boolean;
   getLibraryPage(id: string): LibraryPageRecord | undefined;
   getLibraryPageByShareId(shareId: string): LibraryPageRecord | undefined;
@@ -61,6 +62,8 @@ export interface DurablePagePort {
   create(input: { title: string; markdown: string }): DurablePage;
   /** Replace title and/or markdown. Revision increments only when one of them changes. */
   update(input: { id: string; title?: string; markdown?: string }): DurablePage;
+  /** Replace the share capability without changing page content or revision. */
+  rotateShare(id: string): DurablePage;
   /** Permanently delete a page and revoke its share link. Throws when the id is missing. */
   delete(id: string): void;
   get(id: string): DurablePage;
@@ -176,6 +179,14 @@ export function createDurablePagePort(store: DurablePageStore, now: () => string
         revision: existing.revision + 1,
         updatedAt: now()
       });
+      return toDurablePage(row);
+    },
+    rotateShare(id) {
+      const pageId = requireText(id, 'id');
+      const existing = store.getLibraryPage(pageId);
+      if (!existing) throw new NotFoundError('Page', pageId);
+      const row = store.rotateLibraryPageShare(pageId, newId('share'));
+      if (!row) throw new NotFoundError('Page', pageId);
       return toDurablePage(row);
     },
     delete(id) {

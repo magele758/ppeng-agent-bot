@@ -1,0 +1,34 @@
+id: rotate-page-share
+title: Rotate library page share links without deleting content
+status: implemented
+requirement: |
+  Implement the smallest correct cut for r5-6 rotate_page_share (store rotate share_id + DurablePagePort.rotateShare + admin POST /api/library/pages/:id/rotate-share + tool rotate_page_share; old share 404; page+body kept; pick and test revision policy).
+  Run focused unit + acceptance tests for rotate_page_share (rotate keeps page+body; old share 404; new share works; missing id fails cleanly; revision policy asserted; admin POST rotate-share; public share read-only) with nice and low concurrency.
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  Rotation changes only the share capability, not content revision or content timestamps.
+criteria:
+  - id: AC-1
+    given: A library contains a shared page and another page
+    when: The shared page's link is rotated
+    then: A new share id and path are returned while page identity, title, body, content revision, timestamps, and the other page remain unchanged
+  - id: AC-2
+    given: A page has had its share link rotated
+    when: Readers use the old and new share links, including after reopening the library
+    then: The old link is not found and the new link reads the unchanged page
+  - id: AC-3
+    given: An administrator can access a shared page
+    when: They rotate its link through the administrative HTTP endpoint
+    then: The response contains the new share id and path, the old public read returns 404, the new public read and page read succeed, and anonymous or non-admin rotation is denied
+  - id: AC-4
+    given: A visitor has a public page share link
+    when: They attempt mutations or rotation through the public share endpoint
+    then: The request cannot change the page or share link even with administrator credentials
+  - id: AC-5
+    given: An assistant has library page tools
+    when: It rotates a page share by page id
+    then: The registered tool returns a new share id and path, preserves content revision, has workspace side effects, and requires the same approval as writing, editing, or deleting a page
+  - id: AC-6
+    given: A library contains pages that must be preserved
+    when: Rotation is requested with a missing or invalid page id
+    then: The request fails cleanly without changing any existing page or share link

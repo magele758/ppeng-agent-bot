@@ -31,7 +31,7 @@ function harness() {
 test('write_page 返回 id、第 1 版和分享路径，空标题或空正文不落库 [AC:page-tools#AC-1]', async () => {
   const h = harness();
   try {
-    assert.deepEqual(Object.keys(h.byName).sort(), ['delete_page', 'edit_page', 'get_page', 'list_pages', 'write_page']);
+    assert.deepEqual(Object.keys(h.byName).sort(), ['delete_page', 'edit_page', 'get_page', 'list_pages', 'rotate_page_share', 'write_page']);
     const written = await h.byName.write_page.execute(h.ctx, { title: '  发布说明  ', markdown: '# 你好' });
     assert.equal(written.ok, true);
     const page = JSON.parse(written.content);
@@ -110,6 +110,54 @@ test('分享 id 读回同一正文，编辑不存在的页面失败且不新增 
   }
 });
 
+test('rotate_page_share returns a new capability without changing content revision [AC:rotate-page-share#AC-5]', async () => {
+  const h = harness();
+  try {
+    const tool = h.byName.rotate_page_share;
+    assert.ok(tool);
+    assert.equal(collectReservedDynToolNames().has('rotate_page_share'), true);
+    assert.equal(isReservedDynToolName('rotate_page_share', []), true);
+    assert.deepEqual(tool.inputSchema.required, ['id']);
+    assert.equal(tool.approvalMode, h.byName.write_page.approvalMode);
+    assert.equal(tool.approvalMode, h.byName.edit_page.approvalMode);
+    assert.equal(tool.approvalMode, h.byName.delete_page.approvalMode);
+    assert.equal(tool.sideEffectLevel, 'workspace');
+    const page = createDurablePagePort(h.store).create({ title: 'Rotate', markdown: 'Body' });
+    const result = await tool.execute(h.ctx, { id: page.id });
+    assert.equal(result.ok, true);
+    const rotated = JSON.parse(result.content);
+    assert.equal(rotated.id, page.id);
+    assert.equal(rotated.revision, page.revision);
+    assert.notEqual(rotated.shareId, page.shareId);
+    assert.equal(rotated.sharePath, `/pages/${rotated.shareId}`);
+    const { surface, ...view } = page;
+    assert.deepEqual(JSON.parse((await h.byName.get_page.execute(h.ctx, { id: page.id })).content), {
+      ...view,
+      shareId: rotated.shareId,
+      sharePath: rotated.sharePath
+    });
+    assert.equal((await h.byName.get_page.execute(h.ctx, { shareId: page.shareId })).ok, false);
+    assert.equal((await h.byName.get_page.execute(h.ctx, { shareId: rotated.shareId })).ok, true);
+  } finally {
+    h.close();
+  }
+});
+
+test('rotate_page_share rejects missing ids without changing an existing share [AC:rotate-page-share#AC-6]', async () => {
+  const h = harness();
+  try {
+    const page = createDurablePagePort(h.store).create({ title: 'Keep', markdown: 'Body' });
+    for (const args of [{}, { id: '' }, { id: ' ' }, { id: 123 }, { id: 'page_missing' }, { id: page.shareId }]) {
+      const result = await h.byName.rotate_page_share.execute(h.ctx, args);
+      assert.equal(result.ok, false);
+      assert.match(result.content, /required|not found/);
+      assert.deepEqual(createDurablePagePort(h.store).get(page.id), page);
+    }
+  } finally {
+    h.close();
+  }
+});
+
 test('delete_page revokes reads with workspace write-level approval [AC:delete-page#AC-4]', async () => {
   const h = harness();
   try {
@@ -176,9 +224,9 @@ test('page tools are on the same assembly path as vault tools and reach a turn [
       getUserVault() { throw new Error('vault not used'); },
       getCronStore() { throw new Error('cron not used'); }
     });
-    const pageNames = new Set(['list_pages', 'get_page', 'write_page', 'edit_page', 'delete_page']);
+    const pageNames = new Set(['list_pages', 'get_page', 'write_page', 'edit_page', 'rotate_page_share', 'delete_page']);
     const names = assembled.filter((tool) => pageNames.has(tool.name)).map((tool) => tool.name);
-    assert.deepEqual(names.sort(), ['delete_page', 'edit_page', 'get_page', 'list_pages', 'write_page']);
+    assert.deepEqual(names.sort(), ['delete_page', 'edit_page', 'get_page', 'list_pages', 'rotate_page_share', 'write_page']);
 
     h.store.setDaemonControl('tool_exposure_settings', { mode: 'full', pinnedGroups: {} });
     const agent = { id: 'general', name: 'General' };
@@ -190,7 +238,7 @@ test('page tools are on the same assembly path as vault tools and reach a turn [
       session: h.store.getSession(session.id),
       settingsStore: h.store
     }).tools.map((tool) => tool.name);
-    for (const name of ['list_pages', 'get_page', 'write_page', 'edit_page', 'delete_page']) assert.ok(visible.includes(name), name);
+    for (const name of ['list_pages', 'get_page', 'write_page', 'edit_page', 'rotate_page_share', 'delete_page']) assert.ok(visible.includes(name), name);
 
     const write = assembled.find((tool) => tool.name === 'write_page');
     const created = JSON.parse((await write.execute({}, { title: '回路', markdown: '从组装进来的' })).content);

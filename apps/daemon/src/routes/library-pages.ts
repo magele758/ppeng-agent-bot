@@ -77,6 +77,13 @@ export function libraryPageRoutes(runtime: RawAgentRuntime): RouteSpec[] {
       }
     },
     {
+      method: 'POST',
+      pattern: '/api/library/pages/:id/rotate-share',
+      handler: ({ requireParam, response }) => {
+        json(response, 200, { page: pagePort(runtime).rotateShare(requireParam('id')) });
+      }
+    },
+    {
       method: 'GET',
       pattern: '/api/pages/share/:shareId',
       handler: ({ requireParam, response }) => {

@@ -161,6 +161,65 @@ async function bootHttp() {
   };
 }
 
+test('admin POST rotate-share revokes the old public link and keeps page content [AC:rotate-page-share#AC-3]', async () => {
+  const h = await bootHttp();
+  try {
+    const page = h.port.create({ title: 'Rotate', markdown: 'Body' });
+    const oldPath = `/api/pages/share/${page.shareId}`;
+    const rotatePath = `/api/library/pages/${page.id}/rotate-share`;
+    assert.equal((await h.send('POST', rotatePath, 'anonymous')).status, 401);
+    assert.equal((await h.send('POST', rotatePath, 'member')).status, 403);
+    const response = await h.send('POST', rotatePath);
+    assert.equal(response.status, 200);
+    const body = await response.json() as { page: { id: string; title: string; markdown: string; revision: number; shareId: string; sharePath: string } };
+    assert.equal(body.page.id, page.id);
+    assert.equal(body.page.title, page.title);
+    assert.equal(body.page.markdown, page.markdown);
+    assert.equal(body.page.revision, page.revision);
+    assert.notEqual(body.page.shareId, page.shareId);
+    assert.equal(body.page.sharePath, `/pages/${body.page.shareId}`);
+    assert.equal((await h.send('GET', oldPath, 'anonymous')).status, 404);
+    assert.equal((await h.send('GET', `/api/pages/share/${body.page.shareId}`, 'anonymous')).status, 200);
+    assert.equal((await h.send('GET', `/api/library/pages/${page.id}`)).status, 200);
+    assert.equal((await h.send('POST', oldPath, 'admin')).status, 404);
+  } finally {
+    await h.close();
+  }
+});
+
+test('public share stays read-only for rotation and mutation [AC:rotate-page-share#AC-4]', async () => {
+  const h = await bootHttp();
+  try {
+    const page = h.port.create({ title: 'Keep', markdown: 'Shared' });
+    const path = `/api/pages/share/${page.shareId}`;
+    for (const role of ['anonymous', 'admin']) {
+      for (const method of ['POST', 'PATCH', 'DELETE']) {
+        assert.equal((await h.send(method, path, role)).status, 404);
+      }
+      assert.equal((await h.send('POST', `${path}/rotate-share`, role)).status, 404);
+      assert.equal((await h.send('GET', path, 'anonymous')).status, 200);
+      assert.deepEqual(h.port.get(page.id), page);
+    }
+  } finally {
+    await h.close();
+  }
+});
+
+test('admin rotation rejects invalid page ids without changing shares [AC:rotate-page-share#AC-6]', async () => {
+  const h = await bootHttp();
+  try {
+    const page = h.port.create({ title: 'Keep', markdown: 'Shared' });
+    for (const id of ['page_missing', page.shareId, "' OR 1=1 --"]) {
+      assert.equal((await h.send('POST', `/api/library/pages/${encodeURIComponent(id)}/rotate-share`)).status, 404);
+    }
+    assert.equal((await h.send('POST', '/api/library/pages/%20/rotate-share')).status, 400);
+    assert.deepEqual(h.port.getByShareId(page.shareId), page);
+    assert.deepEqual(h.port.list().map((row) => row.id), [page.id]);
+  } finally {
+    await h.close();
+  }
+});
+
 test('admin DELETE revokes page and share reads and removes its list entry [AC:delete-page#AC-2]', async () => {
   const h = await bootHttp();
   try {
