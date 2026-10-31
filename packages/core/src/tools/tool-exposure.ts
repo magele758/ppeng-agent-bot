@@ -360,6 +360,7 @@ export const TOOL_GROUPS: ToolGroup[] = [
             "get_page",
             "write_page",
             "edit_page",
+            "rotate_page_share",
             "delete_page"
         ],
         "extension": true

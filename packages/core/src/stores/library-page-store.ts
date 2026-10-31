@@ -46,6 +46,13 @@ export class LibraryPageStore {
     return row;
   }
 
+  rotateShareId(id: string, shareId: string): LibraryPageRecord | undefined {
+    const changed = this.db
+      .prepare(`UPDATE library_pages SET share_id = ? WHERE id = ?`)
+      .run(shareId, id).changes;
+    return changed > 0 ? this.getPage(id) : undefined;
+  }
+
   deletePage(id: string): boolean {
     return this.db.prepare(`DELETE FROM library_pages WHERE id = ?`).run(id).changes > 0;
   }

@@ -145,6 +145,66 @@ test('missing or invalid deletion ids preserve every page [AC:delete-page#AC-5]'
   });
 });
 
+test('rotation preserves page content, revision, timestamps, and other pages [AC:rotate-page-share#AC-1] [AC:rotate-page-share#AC-2]', () => {
+  withStore((store) => {
+    const port = createDurablePagePort(store);
+    const created = port.create({ title: 'Rotate', markdown: 'First' });
+    const page = port.update({ id: created.id, markdown: 'Current body' });
+    const keep = port.create({ title: 'Keep', markdown: 'Untouched' });
+    const rotated = port.rotateShare(page.id);
+    assert.notEqual(rotated.shareId, page.shareId);
+    assert.match(rotated.shareId, /^share_/);
+    assert.equal(rotated.sharePath, `/pages/${rotated.shareId}`);
+    assert.deepEqual(rotated, { ...page, shareId: rotated.shareId, sharePath: rotated.sharePath });
+    assert.equal(store.getLibraryPageByShareId(page.shareId), undefined);
+    assert.throws(() => port.getByShareId(page.shareId), NotFoundError);
+    assert.deepEqual(port.getByShareId(rotated.shareId), rotated);
+    assert.deepEqual(port.get(page.id), rotated);
+    assert.deepEqual(port.get(keep.id), keep);
+    const edited = port.update({ id: page.id, title: 'Edited' });
+    assert.equal(edited.shareId, rotated.shareId);
+    assert.equal(edited.revision, page.revision + 1);
+  });
+});
+
+test('rotation and revocation persist after reopening [AC:rotate-page-share#AC-2]', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'dur-page-rotate-reopen-'));
+  const dbPath = join(dir, 'state.sqlite');
+  let store = new SqliteStateStore(dbPath);
+  try {
+    const port = createDurablePagePort(store);
+    const page = port.create({ title: 'Rotate', markdown: 'Persist' });
+    const rotated = port.rotateShare(page.id);
+    store.db.close();
+    store = new SqliteStateStore(dbPath);
+    const reopened = createDurablePagePort(store);
+    assert.throws(() => reopened.getByShareId(page.shareId), NotFoundError);
+    assert.deepEqual(reopened.getByShareId(rotated.shareId), rotated);
+    const again = reopened.rotateShare(page.id);
+    assert.notEqual(again.shareId, rotated.shareId);
+    assert.throws(() => reopened.getByShareId(rotated.shareId), NotFoundError);
+    assert.equal(again.revision, page.revision);
+  } finally {
+    store.db.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('missing rotation ids preserve all pages and shares [AC:rotate-page-share#AC-6]', () => {
+  withStore((store) => {
+    const port = createDurablePagePort(store);
+    const page = port.create({ title: 'Keep', markdown: 'Body' });
+    for (const id of ['page_missing', page.shareId, "' OR 1=1 --"]) {
+      assert.throws(() => port.rotateShare(id), NotFoundError);
+    }
+    for (const id of ['', '   ', undefined, null, 123]) {
+      assert.throws(() => port.rotateShare(id), ValidationError);
+    }
+    assert.deepEqual(port.getByShareId(page.shareId), page);
+    assert.deepEqual(port.list().map((row) => row.id), [page.id]);
+  });
+});
+
 test('空标题不落库，不存在的 id 和分享 id 读不到 [AC:durable-page-port#AC-5]', () => {
   withStore((store) => {
     const port = createDurablePagePort(store);

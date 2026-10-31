@@ -1,5 +1,5 @@
 /**
- * `list_pages` / `get_page` / `write_page` / `edit_page` / `delete_page` over DurablePagePort.
+ * `list_pages` / `get_page` / `write_page` / `edit_page` / `rotate_page_share` / `delete_page` over DurablePagePort.
  *
  * Library markdown pages, not a canvas and not oversized tool-result pages.
  * Listing never includes the body. The share path is the port's share path
@@ -10,7 +10,7 @@ import { NotFoundError, ValidationError } from '../errors.js';
 import type { DurablePage, DurablePagePort, DurablePageSummary } from '../library/durable-page-port.js';
 import type { ToolContract, ToolExecutionResult } from '../types.js';
 
-export const PAGE_TOOL_NAMES = ['list_pages', 'get_page', 'write_page', 'edit_page', 'delete_page'] as const;
+export const PAGE_TOOL_NAMES = ['list_pages', 'get_page', 'write_page', 'edit_page', 'rotate_page_share', 'delete_page'] as const;
 
 export interface PageToolServices {
   getPagePort: () => DurablePagePort;
@@ -156,6 +156,30 @@ export function createPageTools(services: PageToolServices): ToolContract<any>[]
     }
   };
 
+  const rotate: ToolContract<{ id?: string }> = {
+    name: 'rotate_page_share',
+    description:
+      'Rotate a durable library page share link by id. The old share link is revoked and a new shareId/sharePath is returned. Page title, markdown, revision, and content timestamps stay unchanged.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string', description: 'Page id from write_page or list_pages' } },
+      required: ['id']
+    },
+    approvalMode: 'auto',
+    sideEffectLevel: 'workspace',
+    async execute(_ctx, args) {
+      const id = typeof args.id === 'string' ? args.id.trim() : '';
+      try {
+        const page = services.getPagePort().rotateShare(id);
+        return okJson({ id: page.id, revision: page.revision, shareId: page.shareId, sharePath: page.sharePath });
+      } catch (error) {
+        const result = fromPort(error);
+        if (result) return result;
+        throw error;
+      }
+    }
+  };
+
   const remove: ToolContract<{ id?: string }> = {
     name: 'delete_page',
     description:
@@ -180,5 +204,5 @@ export function createPageTools(services: PageToolServices): ToolContract<any>[]
     }
   };
 
-  return [list, get, write, edit, remove];
+  return [list, get, write, edit, rotate, remove];
 }

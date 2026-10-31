@@ -713,6 +713,12 @@ export class SqliteStateStore {
     return r;
   }
 
+  rotateLibraryPageShare(id: string, shareId: string): LibraryPageRecord | undefined {
+    const r = this.libraryPages.rotateShareId(id, shareId);
+    if (r) this.bumpVersion();
+    return r;
+  }
+
   deleteLibraryPage(id: string): boolean {
     const deleted = this.libraryPages.deletePage(id);
     if (deleted) this.bumpVersion();
