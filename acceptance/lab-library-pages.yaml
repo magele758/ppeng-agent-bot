@@ -1,0 +1,22 @@
+id: lab-library-pages
+title: Lab library Pages panel (list / open / share / rotate / delete)
+status: implemented
+requirement: |
+  Add a minimal Lab Knowledge -> Pages panel over existing admin
+  /api/library/pages* routes. Humans can list pages, open read-only
+  markdown, copy /pages/:shareId, rotate share (old link dies), and
+  delete (gone from list; public HTML 404). Do not clone Grok/Canvas UI.
+notes: 'assumedApproval: standing-order-2026-10-22. Plain list+detail only.'
+criteria:
+  - id: AC-1
+    given: library already has pages
+    when: Lab opens Knowledge -> Pages
+    then: list shows title and sharePath without markdown body
+  - id: AC-2
+    given: a page is in the list
+    when: open that page
+    then: show read-only markdown body
+  - id: AC-3
+    given: a page is listed or open
+    when: copy share path / rotate / delete
+    then: copy yields /pages/:shareId; rotate invalidates old link; delete removes from list and public HTML 404s
