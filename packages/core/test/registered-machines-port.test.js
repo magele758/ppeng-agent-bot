@@ -187,3 +187,66 @@ test('list_machines tool returns registered machines only; factory filter untouc
     factoryish.map((t) => t.name)
   );
 });
+
+test('unregister_machine tool removes machine and returns not_found for unknown id', async () => {
+  const f = fixture({
+    isConnected: () => true,
+    async shell() {
+      return { ok: true, content: '' };
+    },
+    async read() {
+      return { ok: true, content: '' };
+    },
+    async copy() {
+      return { ok: true, content: '' };
+    }
+  });
+  f.port.register(f.principal, { machineId: 'm1', label: 'One', kind: 'desktop' });
+  f.port.register(f.principal, { machineId: 'm2', label: 'Two', kind: 'phone' });
+  assert.equal(f.port.list(f.principal).length, 2);
+
+  const tools = createRegisteredMachineTools(f.store, f.port);
+  const unregister = tools.find((t) => t.name === 'unregister_machine');
+  assert.ok(unregister);
+
+  // Verify tool properties
+  assert.equal(unregister.approvalMode, 'auto');
+  assert.equal(unregister.sideEffectLevel, 'none');
+  assert.equal(unregister.needsApproval(), true);
+
+  // Unregister existing machine
+  const result1 = await unregister.execute(
+    { session: { id: 's1', metadata: { userId: 'owner' } } },
+    { machineId: 'm1' }
+  );
+  assert.equal(result1.ok, true);
+  const body1 = JSON.parse(result1.content);
+  assert.equal(body1.ok, true);
+  assert.equal(body1.id, 'm1');
+  assert.equal(f.port.list(f.principal).length, 1);
+  assert.equal(f.port.list(f.principal)[0].machineId, 'm2');
+
+  // Unregister unknown machine
+  const result2 = await unregister.execute(
+    { session: { id: 's1', metadata: { userId: 'owner' } } },
+    { machineId: 'unknown' }
+  );
+  assert.equal(result2.ok, false);
+  const body2 = JSON.parse(result2.content);
+  assert.equal(body2.error, 'machine_not_found');
+  assert.equal(body2.id, 'unknown');
+  assert.equal(f.port.list(f.principal).length, 1);
+});
+
+test('tool list includes unregister_machine after register_machine', async () => {
+  const f = fixture();
+  const tools = createRegisteredMachineTools(f.store, f.port);
+  const names = tools.map((t) => t.name).sort();
+  assert.deepEqual(names, [
+    'copy_from_machine',
+    'copy_to_machine',
+    'list_machines',
+    'register_machine',
+    'unregister_machine'
+  ]);
+});

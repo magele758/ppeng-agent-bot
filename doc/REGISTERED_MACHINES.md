@@ -6,7 +6,7 @@
 |---|---|---|
 | 用途 | 软件工厂：固定只读 / 受控开发 worker，带 receipt | 用户自己的桌面/手机/服务器：桌面任意 shell、读文件、拷贝；手机默认只读 |
 | 传输 | `SshFactoryTransport`，固定 Python worker | **优先**桌面 agent 长连（`DesktopAgentHub`）或手机本机工具（`DeviceLocalHub`）；否则 `createSshRegisteredMachineBackend`（用户 `~/.ssh/config` Host 别名） |
-| 入口 | `factory_*` 工具、Factory 设置 | `list_machines` / `register_machine` / `copy_to_machine` / `copy_from_machine`，`bash` / `read_file` 的 `machineId` |
+| 入口 | `factory_*` 工具、Factory 设置 | `list_machines` / `register_machine` / `unregister_machine` / `copy_to_machine` / `copy_from_machine`，`bash` / `read_file` 的 `machineId` |
 | 审批 | 工厂策略 | 远端 shell / read / copy 与带 `sshAlias` 的注册**每次都需审批** |
 
 运行时后端由 `createCompositeRegisteredMachineBackend` 装配：同一 `machineId` 上若手机本机工具或桌面 agent 已 `attach`，一律走对应 handlers，**不**再 spawn `ssh`。手机附着优先于桌面附着。

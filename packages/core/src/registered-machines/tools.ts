@@ -96,6 +96,34 @@ export function createRegisteredMachineTools(
       }
     },
     {
+      name: 'unregister_machine',
+      description:
+        'Unregister a personal registered machine for this user. Requires machineId from list_machines. Does not touch Factory SSH.',
+      approvalMode: 'auto',
+      sideEffectLevel: 'none',
+      needsApproval: () => true,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          machineId: { type: 'string' }
+        },
+        required: ['machineId']
+      },
+      async execute(ctx, args) {
+        try {
+          const principal = principalFromSession(store, ctx.session);
+          const machineId = assertRegisteredMachineId(args.machineId);
+          const ok = port.unregister(principal, machineId);
+          if (!ok) {
+            return { ok: false, content: JSON.stringify({ error: 'machine_not_found', id: machineId }) };
+          }
+          return { ok: true, content: JSON.stringify({ ok: true, id: machineId }) };
+        } catch (error) {
+          return failed(error);
+        }
+      }
+    },
+    {
       name: 'copy_to_machine',
       description:
         'Copy a local workspace file to a personal registered machine. Requires machineId from list_machines. Never uses Factory SSH.',
