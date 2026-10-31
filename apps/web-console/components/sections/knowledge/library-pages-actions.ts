@@ -5,7 +5,7 @@ import {
   withoutPage,
   type LibraryPageDetail,
   type LibraryPageSummary
-} from './library-pages-model';
+} from './library-pages-model.ts';
 
 export type ApiFn = (path: string, init?: RequestInit) => Promise<unknown>;
 
