@@ -38,3 +38,7 @@ criteria:
     given: 多字段表单填充完毕，回执包含多个 uvref
     when: 模型收到回执并序列化检查
     then: 回执 JSON 中不含任何 UserVault 内部引用或原始明文数据
+  - id: AC-9
+    given: 用户需要输入 username 字段
+    when: 模型请求 username 字段作为多字段表单的一部分
+    then: username 字段在卡片中被遮罩，回执包含 username 的 uvref 和对应的 fillRef

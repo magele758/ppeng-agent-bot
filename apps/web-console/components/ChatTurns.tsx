@@ -29,7 +29,7 @@ import { surfacePartKey, useSurfaceContext } from './a2ui/SurfaceContext';
 import type { A2uiMessage, SurfaceState } from './a2ui/types';
 import { useI18n, type MessageKey } from '@/lib/i18n';
 import { api } from '@/lib/api';
-import { secureFormResultCard, secureFormSubmitBody } from '@/lib/secure-form-card';
+import { secureFormResultCard, secureFormSubmitBody, secureFormSubmitBodyMulti, type SecureFormCardMultiFace } from '@/lib/secure-form-card';
 import { ConnectorGrantFill } from './ConnectorGrantCard';
 import { ComposerMessageContext } from './ComposerContext';
 import type { ContextLabel } from '@/lib/composer-context';
@@ -215,7 +215,7 @@ function SecureFormField({
 }) {
   const { t } = useI18n();
   const face = secureFormResultCard(content);
-  if (!face || !sessionId) return null;
+  if (!face || !sessionId || 'fields' in face) return null;
   return (
     <div className="secure-form-card">
       <p>{face.prompt}</p>
@@ -238,29 +238,107 @@ function SecureFormField({
   );
 }
 
+function SecureFormMultiField({
+  sessionId,
+  content,
+  values,
+  onValues,
+  onSubmit,
+  onCancel
+}: {
+  sessionId: string;
+  content: string;
+  values: Record<string, string>;
+  onValues: (values: Record<string, string>) => void;
+  onSubmit: () => void;
+  onCancel: () => void;
+}) {
+  const { t } = useI18n();
+  const face = secureFormResultCard(content);
+  if (!face || !sessionId || !('fields' in face)) return null;
+  const multiFace = face as SecureFormCardMultiFace;
+  const allFilled = multiFace.fields.every((spec) => values[spec.field]?.trim());
+  return (
+    <div className="secure-form-card">
+      {multiFace.fields.map((spec) => (
+        <div key={spec.field} className="secure-form-multi-field">
+          <label>{spec.label}</label>
+          <input
+            type="password"
+            autoComplete="off"
+            placeholder={t('play.approval.secureFormPlaceholder')}
+            aria-label={spec.label}
+            value={values[spec.field] || ''}
+            onChange={(e) =>
+              onValues({ ...values, [spec.field]: e.target.value })
+            }
+          />
+        </div>
+      ))}
+      <button type="button" disabled={!allFilled} onClick={onSubmit}>
+        {t('play.approval.secureFormSubmit')}
+      </button>
+      <button type="button" onClick={onCancel}>
+        {t('play.approval.secureFormCancel')}
+      </button>
+    </div>
+  );
+}
+
 function SecureFormFill({ sessionId, content }: { sessionId: string; content: string }) {
   const { t } = useI18n();
   const face = secureFormResultCard(content);
   const [value, setValue] = useState('');
+  const [values, setValues] = useState<Record<string, string>>({});
   const [status, setStatus] = useState('');
   if (!face || !sessionId) return null;
+  
+  const isMulti = 'fields' in face;
+  
   const send = (action: 'submit' | 'cancel') => {
-    if (action === 'submit' && !value.trim()) return;
+    if (isMulti) {
+      const multiFace = face as SecureFormCardMultiFace;
+      if (action === 'submit' && !multiFace.fields.every((spec) => values[spec.field]?.trim())) return;
+    } else if (action === 'submit' && !value.trim()) {
+      return;
+    }
+    
+    const body = isMulti
+      ? secureFormSubmitBodyMulti(face as SecureFormCardMultiFace, values, action)
+      : secureFormSubmitBody(face, value.trim(), action);
+    
     void api(`/api/sessions/${encodeURIComponent(sessionId)}/secure-form`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(secureFormSubmitBody(face, value.trim(), action))
+      body: JSON.stringify(body)
     })
       .then(() => {
         setValue('');
+        setValues({});
         setStatus(secureFormStatusText(action, false, t('play.approval.secureFormFailed')));
       })
       .catch(() => {
         setValue('');
+        setValues({});
         setStatus(secureFormStatusText(action, true, t('play.approval.secureFormFailed')));
       });
   };
+  
   if (status) return <SecureFormStatus status={status} />;
+  
+  if (isMulti) {
+    return (
+      <SecureFormMultiField
+        sessionId={sessionId}
+        content={content}
+        values={values}
+        onValues={setValues}
+        onSubmit={() => send('submit')}
+        onCancel={() => send('cancel')}
+      />
+    );
+  }
+  
   return (
     <SecureFormField
       sessionId={sessionId}

@@ -22,7 +22,7 @@ export const SECURE_FORM_TOOL_NAME = 'secure_form';
 /** Session metadata key. Holds the form id only — never the typed secret. */
 export const SECURE_FORM_META = 'secureForm';
 
-export const SECURE_FORM_FIELDS = ['otp', 'password', 'cardNumber', 'cvv'] as const;
+export const SECURE_FORM_FIELDS = ['otp', 'password', 'cardNumber', 'cvv', 'username'] as const;
 
 export type SecureFormField = (typeof SECURE_FORM_FIELDS)[number];
 
@@ -93,7 +93,8 @@ const FIELD_LABEL: Record<SecureFormField, string> = {
   otp: 'One-time code',
   password: 'Password',
   cardNumber: 'Card number',
-  cvv: 'CVV'
+  cvv: 'CVV',
+  username: 'Username'
 };
 
 function isField(value: string): value is SecureFormField {
@@ -212,6 +213,73 @@ export function createSecureFormPort(options: SecureFormPortOptions): SecureForm
     return row;
   }
 
+  function submitMultiField(
+    row: PendingSecureForm,
+    input: Record<string, unknown>,
+    vault: UserVault
+  ): SecureFormReceipt {
+    if (!row.fields || row.fields.length === 0) {
+      throw new ValidationError('Multi-field submit requires fields in the pending form');
+    }
+    const values = 'values' in input && typeof input.values === 'object' && input.values ? (input.values as Record<string, unknown>) : {};
+    const fillRefs: SecureFormReceiptField[] = [];
+    const fieldsArray = row.fields;
+
+    for (let idx = 0; idx < fieldsArray.length; idx++) {
+      const spec = fieldsArray[idx];
+      if (!spec) continue; // Guard against undefined
+      const fieldValue = String(values[spec.field] ?? '').trim();
+      if (!fieldValue) {
+        throw new ValidationError(`value for field ${spec.field} is required`);
+      }
+      // Create unique entry ID for each field using form id + field index
+      const entryId = `${entryIdFor(row.id)}_f${idx}`;
+      if (spec.field === 'otp' || spec.field === 'password') {
+        vault.upsertLogin({ id: entryId, label: spec.label, password: fieldValue });
+      } else if (spec.field === 'username') {
+        vault.upsertLogin({ id: entryId, label: spec.label, username: fieldValue });
+      } else if (spec.field === 'cardNumber') {
+        vault.upsertCard({ id: entryId, label: spec.label, number: fieldValue });
+      } else if (spec.field === 'cvv') {
+        vault.upsertCard({ id: entryId, label: spec.label, cvv: fieldValue });
+      }
+      const fillField = spec.field === 'otp' ? 'password' : spec.field;
+      const fillRef = makeUserVaultFillRef(entryId, fillField);
+      fillRefs.push({ field: spec.field, fillRef });
+    }
+
+    const done = receipt(row, 'filled', undefined, fillRefs);
+    assertModelFacingHasNoUserVaultSecrets(JSON.stringify(done), vault);
+    return done;
+  }
+
+  function submitSingleField(
+    row: PendingSecureForm,
+    input: Record<string, unknown>,
+    vault: UserVault
+  ): SecureFormReceipt {
+    const value = String('value' in input ? input.value : '').trim();
+    if (!value) throw new ValidationError('value is required');
+    if (!row.field) {
+      throw new ValidationError('Single-field submit requires a field in the pending form');
+    }
+
+    const entryId = entryIdFor(row.id);
+    if (row.field === 'otp' || row.field === 'password') {
+      vault.upsertLogin({ id: entryId, label: row.label ?? '', password: value });
+    } else if (row.field === 'username') {
+      vault.upsertLogin({ id: entryId, label: row.label ?? '', username: value });
+    } else if (row.field === 'cardNumber') {
+      vault.upsertCard({ id: entryId, label: row.label ?? '', number: value });
+    } else if (row.field === 'cvv') {
+      vault.upsertCard({ id: entryId, label: row.label ?? '', cvv: value });
+    }
+    const fillField = row.field === 'otp' ? 'password' : row.field;
+    const fillRef = makeUserVaultFillRef(entryId, fillField);
+    const done = receipt(row, 'filled', fillRef);
+    assertModelFacingHasNoUserVaultSecrets(JSON.stringify(done), vault);
+    return done;
+  }
   return {
     request(input: unknown) {
       if (!input || typeof input !== 'object') {
@@ -282,6 +350,7 @@ export function createSecureFormPort(options: SecureFormPortOptions): SecureForm
       return { card, receipt: receipt(row, 'pending') };
     },
 
+
     submit(input: unknown) {
       if (!input || typeof input !== 'object') {
         throw new ValidationError('submit input must be an object');
@@ -293,55 +362,10 @@ export function createSecureFormPort(options: SecureFormPortOptions): SecureForm
 
       // Multi-field submit
       if ('values' in input && row.fields && row.fields.length > 0) {
-        const values = 'values' in input && typeof input.values === 'object' && input.values ? (input.values as Record<string, unknown>) : {};
-        const fillRefs: SecureFormReceiptField[] = [];
-        const fieldsArray = row.fields; // Narrow the type
-
-        for (let idx = 0; idx < fieldsArray.length; idx++) {
-          const spec = fieldsArray[idx];
-          if (!spec) continue; // Guard against undefined
-          const fieldValue = String(values[spec.field] ?? '').trim();
-          if (!fieldValue) {
-            throw new ValidationError(`value for field ${spec.field} is required`);
-          }
-          // Create unique entry ID for each field using form id + field index
-          const entryId = `${entryIdFor(row.id)}_f${idx}`;
-          if (spec.field === 'otp' || spec.field === 'password') {
-            vault.upsertLogin({ id: entryId, label: spec.label, password: fieldValue });
-          } else if (spec.field === 'cardNumber') {
-            vault.upsertCard({ id: entryId, label: spec.label, number: fieldValue });
-          } else if (spec.field === 'cvv') {
-            vault.upsertCard({ id: entryId, label: spec.label, cvv: fieldValue });
-          }
-          const fillField = spec.field === 'otp' ? 'password' : spec.field;
-          const fillRef = makeUserVaultFillRef(entryId, fillField);
-          fillRefs.push({ field: spec.field, fillRef });
-        }
-
-        const done = receipt(row, 'filled', undefined, fillRefs);
-        assertModelFacingHasNoUserVaultSecrets(JSON.stringify(done), vault);
-        return done;
+        return submitMultiField(row, input as Record<string, unknown>, vault);
       }
       // Single-field submit (backward compat)
-      const value = String('value' in input ? input.value : '').trim();
-      if (!value) throw new ValidationError('value is required');
-      if (!row.field) {
-        throw new ValidationError('Single-field submit requires a field in the pending form');
-      }
-
-      const entryId = entryIdFor(row.id);
-      if (row.field === 'otp' || row.field === 'password') {
-        vault.upsertLogin({ id: entryId, label: row.label ?? '', password: value });
-      } else if (row.field === 'cardNumber') {
-        vault.upsertCard({ id: entryId, label: row.label ?? '', number: value });
-      } else {
-        vault.upsertCard({ id: entryId, label: row.label ?? '', cvv: value });
-      }
-      const fillField = row.field === 'otp' ? 'password' : row.field;
-      const fillRef = makeUserVaultFillRef(entryId, fillField);
-      const done = receipt(row, 'filled', fillRef);
-      assertModelFacingHasNoUserVaultSecrets(JSON.stringify(done), vault);
-      return done;
+      return submitSingleField(row, input as Record<string, unknown>, vault);
     },
 
     cancel(input) {
