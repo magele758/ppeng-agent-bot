@@ -506,5 +506,27 @@ export const settingsEntries = {
         hint: '关闭后，新的事件不再写入日志，已有记录保留。'
       }
     }
-  }
+  },
+  registeredMachines: {
+    "title": "已注册的机器",
+    "keywords": "机器 桌面 代理 手机 设备 本地 注册 连接 ssh",
+    "description": "管理用于 Agent 连接的个人已注册机器。",
+    "registerNew": "注册新机器",
+    "machineIdPlaceholder": "机器 ID",
+    "labelPlaceholder": "机器标签",
+    "kindDesktop": "桌面（Agent）",
+    "kindPhone": "手机（Device Local）",
+    "kindOther": "其他（仅 SSH）",
+    "register": "注册",
+    "registering": "正在注册...",
+    "listTitle": "已注册的机器",
+    "noMachines": "还没有已注册的机器。",
+    "attachHint": "通过以下方式连接",
+    "refresh": "刷新",
+    "unregister": "取消注册",
+    "registered": "机器已成功注册。",
+    "unregistered": "机器已成功取消注册。",
+    "error": {
+      "required": "机器 ID 和标签为必填项。"
+    }
 };

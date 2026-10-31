@@ -1,3 +1,4 @@
+import { RegisteredMachinesPanel } from '../../../RegisteredMachinesPanel';
 import { RuntimeCapabilitiesCard } from '../../../RuntimeCapabilitiesCard';
 import { ToolExposureSettingsCard } from '../../../ToolExposureSettingsCard';
 import { AppControlSettingsCard } from '../../../AppControlSettingsCard';
@@ -20,5 +21,12 @@ export const toolsEntries: SettingsEntry[] = [
     titleKey: 'settingsEntries.skills.title',
     keywordsKey: 'settingsEntries.skills.keywords',
     render: () => <SkillSettingsCard />
+  },
+  {
+    id: 'registeredMachines',
+    category: 'tools',
+    titleKey: 'settingsEntries.registeredMachines.title',
+    keywordsKey: 'settingsEntries.registeredMachines.keywords',
+    render: () => <RegisteredMachinesPanel />
   }
 ];

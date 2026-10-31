@@ -507,7 +507,29 @@ export const settingsEntries = {
       enabled: {
         label: 'Record the session event log',
         hint: 'When off, new events are no longer written; existing records are kept.'
-      }
+    }
+  },
+  registeredMachines: {
+    "title": "Registered Machines",
+    "keywords": "machines desktop agent phone device local registered attach ssh",
+    "description": "Manage personal registered machines for agent attachment.",
+    "registerNew": "Register New Machine",
+    "machineIdPlaceholder": "Machine ID",
+    "labelPlaceholder": "Machine label",
+    "kindDesktop": "Desktop (Agent)",
+    "kindPhone": "Phone (Device Local)",
+    "kindOther": "Other (SSH only)",
+    "register": "Register",
+    "registering": "Registering...",
+    "listTitle": "Registered Machines",
+    "noMachines": "No machines registered yet.",
+    "attachHint": "Attach via",
+    "refresh": "Refresh",
+    "unregister": "Unregister",
+    "registered": "Machine registered successfully.",
+    "unregistered": "Machine unregistered successfully.",
+    "error": {
+      "required": "Machine ID and label are required."
     }
   }
 } satisfies Messages['settingsEntries'];
