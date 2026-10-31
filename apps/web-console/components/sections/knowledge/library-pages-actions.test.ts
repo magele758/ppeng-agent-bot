@@ -1,13 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  applyCreate,
   applyDelete,
   applyRotate,
+  applyUpdate,
   copySharePath,
+  createPage,
   deletePage,
   loadPages,
   openPage,
-  rotatePageShare
+  rotatePageShare,
+  updatePage
 } from './library-pages-actions.ts';
 
 const sample = {
@@ -51,4 +55,36 @@ test('api failures return error strings [AC:lab-library-pages#AC-3]', async () =
   assert.equal((await rotatePageShare(fail, 'x') as { error: string }).error, 'boom');
   assert.equal((await deletePage(fail, 'x') as { error: string }).error, 'boom');
   assert.equal((await copySharePath(async () => { throw new Error('deny'); }, '/x') as { error: string }).error, 'deny');
+});
+
+test('createPage / updatePage via api stubs [AC:lab-library-pages#AC-create]', async () => {
+  const created = await createPage(async () => ({ page: { ...sample, id: 'page_new', revision: 1 } }), 'New Page', '# New');
+  assert.ok('page' in created && created.page.id === 'page_new');
+  assert.equal(created.page.markdown, '# hi');
+
+  const updated = await updatePage(
+    async () => ({ page: { ...sample, title: 'Updated', markdown: '# Updated' } }),
+    'page_1',
+    { title: 'Updated', markdown: '# Updated' }
+  );
+  assert.ok('page' in updated && updated.page.title === 'Updated');
+});
+
+test('createPage / updatePage failures return error strings [AC:lab-library-pages#AC-edit]', async () => {
+  const fail = async () => {
+    throw new Error('api error');
+  };
+  assert.equal((await createPage(fail, 'Title', 'body') as { error: string }).error, 'api error');
+  assert.equal((await updatePage(fail, 'x', { title: 'T' }) as { error: string }).error, 'api error');
+});
+
+test('applyCreate adds to front; applyUpdate modifies row [AC:lab-library-pages#AC-create][AC:lab-library-pages#AC-edit]', () => {
+  const rows = [{ ...sample }];
+  const newPage = { ...sample, id: 'page_2', title: 'New' };
+  const created = applyCreate(rows, newPage);
+  assert.equal(created[0]?.id, 'page_2');
+  assert.equal(created[1]?.id, 'page_1');
+
+  const updated = applyUpdate(rows, { ...sample, title: 'Changed' });
+  assert.equal(updated[0]?.title, 'Changed');
 });

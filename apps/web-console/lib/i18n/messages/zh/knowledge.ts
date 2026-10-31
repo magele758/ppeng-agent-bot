@@ -65,6 +65,16 @@ export const knowledge = {
     revision: '第 {n} 版',
     sharePath: '分享路径',
     updatedAt: '更新于 {time}',
-    body: 'Markdown 正文'
+    body: 'Markdown 正文',
+    create: '创建页面',
+    creating: '正在创建…',
+    createFailed: '创建失败：{error}',
+    created: '页面已创建',
+    titlePlaceholder: '页面标题',
+    markdownPlaceholder: '在此输入 markdown…',
+    save: '保存',
+    saving: '正在保存…',
+    updateFailed: '保存失败：{error}',
+    saved: '页面已保存'
   },
 };

@@ -1,12 +1,13 @@
 id: lab-library-pages
-title: Lab library Pages panel (list / open / share / rotate / delete)
+title: Lab library Pages panel (list / open / share / rotate / delete / create / edit)
 status: implemented
 requirement: |
   Add a minimal Lab Knowledge -> Pages panel over existing admin
-  /api/library/pages* routes. Humans can list pages, open read-only
-  markdown, copy /pages/:shareId, rotate share (old link dies), and
-  delete (gone from list; public HTML 404). Do not clone Grok/Canvas UI.
-notes: 'assumedApproval: standing-order-2026-10-22. Plain list+detail only.'
+  /api/library/pages* routes. Humans can list pages, open read-only or edit
+  markdown, copy /pages/:shareId, rotate share (old link dies), delete
+  (gone from list; public HTML 404), and create new pages. Do not clone
+  Grok/Canvas UI.
+notes: 'assumedApproval: standing-order-2026-10-22. Plain list/create/detail/edit only.'
 criteria:
   - id: AC-1
     given: library already has pages
@@ -20,3 +21,11 @@ criteria:
     given: a page is listed or open
     when: copy share path / rotate / delete
     then: copy yields /pages/:shareId; rotate invalidates old link; delete removes from list and public HTML 404s
+  - id: AC-create
+    given: lab pages panel is open with no page selected
+    when: fill title and markdown, click Create
+    then: page is created, appears in list with new shareId, and opens with detail view
+  - id: AC-edit
+    given: a page detail is open
+    when: modify title or markdown and click Save
+    then: changes are saved, list row updates, detail shows new content

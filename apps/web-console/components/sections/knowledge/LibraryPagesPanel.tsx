@@ -1,10 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import { SettingsGroup } from '../../ui';
 import { type MessageKey } from '@/lib/i18n';
-import type { LibraryPageDetail, LibraryPageSummary } from './library-pages-model';
+import type { LibraryPageDetail, LibraryPageSummary } from './library-pages-model.ts';
 import styles from './knowledge.module.css';
-import { useLibraryPages } from './use-library-pages';
+import { useLibraryPages } from './use-library-pages.ts';
 
 type ActionLabels = {
   open: string;
@@ -17,6 +18,123 @@ type ActionLabels = {
 };
 
 type Translate = (key: MessageKey, vars?: Record<string, string | number>) => string;
+
+function PageCreateForm({
+  busy,
+  onSubmit,
+  labels
+}: {
+  busy: boolean;
+  onSubmit: (title: string, markdown: string) => void;
+  labels: {
+    create: string;
+    creating: string;
+    titlePlaceholder: string;
+    markdownPlaceholder: string;
+  };
+}) {
+  const [title, setTitle] = useState('');
+  const [markdown, setMarkdown] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim()) return;
+    onSubmit(title, markdown);
+    setTitle('');
+    setMarkdown('');
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className={styles.form}>
+      <div className={styles.formGroup}>
+        <input
+          type="text"
+          placeholder={labels.titlePlaceholder}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          disabled={busy}
+          className={styles.input}
+          data-testid="library-pages-create-title"
+        />
+      </div>
+      <div className={styles.formGroup}>
+        <textarea
+          placeholder={labels.markdownPlaceholder}
+          value={markdown}
+          onChange={(e) => setMarkdown(e.target.value)}
+          disabled={busy}
+          className={styles.textarea}
+          rows={6}
+          data-testid="library-pages-create-markdown"
+        />
+      </div>
+      <div className={styles.actions}>
+        <button type="submit" disabled={busy || !title.trim()} className="btn btn-secondary btn-sm">
+          {busy ? labels.creating : labels.create}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function PageEditForm({
+  detail,
+  busy,
+  onSubmit,
+  labels
+}: {
+  detail: LibraryPageDetail;
+  busy: boolean;
+  onSubmit: (title: string, markdown: string) => void;
+  labels: {
+    save: string;
+    saving: string;
+    markdownPlaceholder: string;
+  };
+}) {
+  const [title, setTitle] = useState(detail.title);
+  const [markdown, setMarkdown] = useState(detail.markdown);
+  const titleChanged = title !== detail.title;
+  const markdownChanged = markdown !== detail.markdown;
+  const isDirty = titleChanged || markdownChanged;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isDirty) return;
+    onSubmit(title, markdown);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className={styles.form}>
+      <div className={styles.formGroup}>
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          disabled={busy}
+          className={styles.input}
+          data-testid="library-pages-edit-title"
+        />
+      </div>
+      <div className={styles.formGroup}>
+        <textarea
+          value={markdown}
+          onChange={(e) => setMarkdown(e.target.value)}
+          disabled={busy}
+          className={styles.textarea}
+          rows={6}
+          placeholder={labels.markdownPlaceholder}
+          data-testid="library-pages-edit-markdown"
+        />
+      </div>
+      <div className={styles.actions}>
+        <button type="submit" disabled={busy || !isDirty} className="btn btn-secondary btn-sm">
+          {busy ? labels.saving : labels.save}
+        </button>
+      </div>
+    </form>
+  );
+}
 
 function PageList({
   pages,
@@ -72,19 +190,36 @@ function PageDetail({
   onCopy,
   onRotate,
   onDelete,
-  labels
+  onEditSubmit,
+  labels,
+  editMode
 }: {
   detail: LibraryPageDetail;
   busy: boolean;
   onCopy: (sharePath: string) => void;
   onRotate: (id: string) => void;
   onDelete: (id: string) => void;
+  onEditSubmit: (title: string, markdown: string) => void;
   labels: ActionLabels & {
     sharePath: string;
     updatedAt: (time: string) => string;
     body: string;
+    save: string;
+    saving: string;
+    markdownPlaceholder: string;
   };
+  editMode: boolean;
 }) {
+  if (editMode) {
+    return (
+      <div id="libraryPagesDetail" data-testid="library-pages-detail" className={styles.list}>
+        <div className={styles.row}>
+          <PageEditForm detail={detail} busy={busy} onSubmit={onEditSubmit} labels={labels} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div id="libraryPagesDetail" data-testid="library-pages-detail" className={styles.list}>
       <div className={styles.row}>
@@ -211,7 +346,9 @@ function LibraryPagesDetailSection({
   onCopy,
   onRotate,
   onDelete,
-  labels
+  onEditSubmit,
+  labels,
+  editMode
 }: {
   detail: LibraryPageDetail | null;
   selectedId: string | null;
@@ -219,11 +356,16 @@ function LibraryPagesDetailSection({
   onCopy: (sharePath: string) => void;
   onRotate: (id: string) => void;
   onDelete: (id: string) => void;
+  onEditSubmit: (title: string, markdown: string) => void;
   labels: ActionLabels & {
     sharePath: string;
     updatedAt: (time: string) => string;
     body: string;
+    save: string;
+    saving: string;
+    markdownPlaceholder: string;
   };
+  editMode: boolean;
 }) {
   if (!detail || !selectedId) return null;
   return (
@@ -233,9 +375,31 @@ function LibraryPagesDetailSection({
       onCopy={onCopy}
       onRotate={onRotate}
       onDelete={onDelete}
+      onEditSubmit={onEditSubmit}
       labels={labels}
+      editMode={editMode}
     />
   );
+}
+
+function LibraryPagesCreateSection({
+  selectedId,
+  busy,
+  onSubmit,
+  labels
+}: {
+  selectedId: string | null;
+  busy: boolean;
+  onSubmit: (title: string, markdown: string) => void;
+  labels: {
+    create: string;
+    creating: string;
+    titlePlaceholder: string;
+    markdownPlaceholder: string;
+  };
+}) {
+  if (selectedId) return null;
+  return <PageCreateForm busy={busy} onSubmit={onSubmit} labels={labels} />;
 }
 
 function LibraryPagesMessage({ msg }: { msg: string | null }) {
@@ -258,6 +422,7 @@ function LibraryPagesError({ err }: { err: string | null }) {
 
 export function LibraryPagesPanel() {
   const s = useLibraryPages();
+  const [editMode, setEditMode] = useState(false);
   const revision = (n: number) => s.t('knowledge.pages.revision', { n: String(n) });
   const actionLabels: ActionLabels = {
     open: s.t('knowledge.pages.open'),
@@ -272,7 +437,27 @@ export function LibraryPagesPanel() {
     ...actionLabels,
     sharePath: s.t('knowledge.pages.sharePath'),
     updatedAt: (time: string) => s.t('knowledge.pages.updatedAt', { time }),
-    body: s.t('knowledge.pages.body')
+    body: s.t('knowledge.pages.body'),
+    save: s.t('knowledge.pages.save'),
+    saving: s.t('knowledge.pages.saving'),
+    markdownPlaceholder: s.t('knowledge.pages.markdownPlaceholder')
+  };
+  const createLabels = {
+    create: s.t('knowledge.pages.create'),
+    creating: s.t('knowledge.pages.creating'),
+    titlePlaceholder: s.t('knowledge.pages.titlePlaceholder'),
+    markdownPlaceholder: s.t('knowledge.pages.markdownPlaceholder')
+  };
+
+  const handleCreate = (title: string, markdown: string) => {
+    void s.create(title, markdown);
+  };
+
+  const handleUpdate = (title: string, markdown: string) => {
+    if (s.detail) {
+      void s.update(s.detail.id, { title, markdown });
+      setEditMode(false);
+    }
   };
 
   return (
@@ -281,18 +466,30 @@ export function LibraryPagesPanel() {
         selectedId={s.selectedId}
         busy={s.busy}
         loaded={s.loaded}
-        onBack={s.back}
+        onBack={() => {
+          s.back();
+          setEditMode(false);
+        }}
         onRefresh={() => void s.load()}
         t={s.t}
       />
       <LibraryPagesLoading loaded={s.loaded} err={s.err} t={s.t} />
       <LibraryPagesEmpty loaded={s.loaded} selectedId={s.selectedId} pageCount={s.pages.length} t={s.t} />
+      <LibraryPagesCreateSection
+        selectedId={s.selectedId}
+        busy={s.busy}
+        onSubmit={handleCreate}
+        labels={createLabels}
+      />
       <LibraryPagesListSection
         loaded={s.loaded}
         selectedId={s.selectedId}
         pages={s.pages}
         busy={s.busy}
-        onOpen={(id) => void s.open(id)}
+        onOpen={(id) => {
+          void s.open(id);
+          setEditMode(false);
+        }}
         onCopy={(p) => void s.copyShare(p)}
         onRotate={(id) => void s.rotate(id)}
         onDelete={(id) => void s.remove(id)}
@@ -305,7 +502,9 @@ export function LibraryPagesPanel() {
         onCopy={(p) => void s.copyShare(p)}
         onRotate={(id) => void s.rotate(id)}
         onDelete={(id) => void s.remove(id)}
+        onEditSubmit={handleUpdate}
         labels={detailLabels}
+        editMode={editMode}
       />
       <LibraryPagesMessage msg={s.msg} />
       <LibraryPagesError err={s.err} />
