@@ -140,32 +140,39 @@ function secureFormRoutes(runtime: RawAgentRuntime): RouteSpec[] {
         if (action === 'cancel') {
           done = port.cancel({ sessionId, id });
         } else {
-          // Check if multi-field values are provided
-          const values = body.values;
-          if (values && typeof values === 'object' && !Array.isArray(values)) {
-            // Multi-field submit
-            const recordValues: Record<string, string> = {};
-            for (const [key, val] of Object.entries(values)) {
-              if (typeof val === 'string') {
-                recordValues[key] = val;
+          // Check if vaultEntryId is provided
+          const vaultEntryId = str(body, 'vaultEntryId');
+          if (vaultEntryId) {
+            // Fill from vault entry
+            done = port.submit({ sessionId, id, vaultEntryId });
+          } else {
+            // Check if multi-field values are provided
+            const values = body.values;
+            if (values && typeof values === 'object' && !Array.isArray(values)) {
+              // Multi-field submit
+              const recordValues: Record<string, string> = {};
+              for (const [key, val] of Object.entries(values)) {
+                if (typeof val === 'string') {
+                  recordValues[key] = val;
+                }
               }
-            }
-            done = port.submit({ sessionId, id, values: recordValues });
+              done = port.submit({ sessionId, id, values: recordValues });
 
-            // Leak scan all submitted values AFTER submit
-            for (const secret of Object.values(recordValues)) {
-              if (secureFormTextLeaks(JSON.stringify(done), secret)) {
+              // Leak scan all submitted values AFTER submit
+              for (const secret of Object.values(recordValues)) {
+                if (secureFormTextLeaks(JSON.stringify(done), secret)) {
+                  throw new ValidationError('refusing to return a secret in the secure form receipt');
+                }
+              }
+            } else {
+              // Single-field submit (legacy)
+              const value = str(body, 'value') ?? '';
+              done = port.submit({ sessionId, id, value });
+
+              // Leak scan AFTER submit
+              if (secureFormTextLeaks(JSON.stringify(done), value)) {
                 throw new ValidationError('refusing to return a secret in the secure form receipt');
               }
-            }
-          } else {
-            // Single-field submit (legacy)
-            const value = str(body, 'value') ?? '';
-            done = port.submit({ sessionId, id, value });
-
-            // Leak scan AFTER submit
-            if (secureFormTextLeaks(JSON.stringify(done), value)) {
-              throw new ValidationError('refusing to return a secret in the secure form receipt');
             }
           }
         }
