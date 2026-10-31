@@ -29,16 +29,3 @@ criteria:
     given: a page detail is open
     when: modify title or markdown and click Save
     then: changes are saved, list row updates, detail shows new content
-criteria:
-  - id: AC-1
-    given: library already has pages
-    when: Lab opens Knowledge -> Pages
-    then: list shows title and sharePath without markdown body
-  - id: AC-2
-    given: a page is in the list
-    when: open that page
-    then: show read-only markdown body
-  - id: AC-3
-    given: a page is listed or open
-    when: copy share path / rotate / delete
-    then: copy yields /pages/:shareId; rotate invalidates old link; delete removes from list and public HTML 404s
