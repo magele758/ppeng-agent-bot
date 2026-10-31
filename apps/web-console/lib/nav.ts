@@ -10,7 +10,7 @@ export const SUB_PAGES = {
   chat: [],
   agents: ['bots', 'agents', 'teams', 'skills'],
   tasks: ['queue', 'bots', 'runs', 'inbox'],
-  knowledge: ['memory', 'ingestion'],
+  knowledge: ['memory', 'pages', 'ingestion'],
   settings: ['general', 'models', 'behavior', 'safety', 'tools', 'integrations', 'experimental', 'ops']
 } as const satisfies Record<SectionId, readonly string[]>;
 

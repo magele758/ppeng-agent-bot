@@ -47,42 +47,111 @@ export function safeHref(raw: string): string | null {
  * Convert markdown to a safe HTML fragment (no document shell).
  * Unsupported constructs render as escaped plain text.
  */
+type ListTag = 'ul' | 'ol';
+
+interface MdBlocks {
+  blocks: string[];
+  para: string[];
+  listItems: string[];
+  listTag: ListTag | null;
+}
+
+function flushPara(state: MdBlocks): void {
+  if (!state.para.length) return;
+  state.blocks.push(`<p>${inlineMarkdown(escapeHtml(state.para.join('\n')))}</p>`);
+  state.para = [];
+}
+
+function flushList(state: MdBlocks): void {
+  if (!state.listTag || !state.listItems.length) {
+    state.listItems = [];
+    state.listTag = null;
+    return;
+  }
+  state.blocks.push(`<${state.listTag}>${state.listItems.join('')}</${state.listTag}>`);
+  state.listItems = [];
+  state.listTag = null;
+}
+
+function closeFence(state: MdBlocks, fenceLang: string, fenceLines: string[]): void {
+  const code = escapeHtml(fenceLines.join('\n'));
+  const langClass = fenceLang ? ` class="language-${escapeHtml(fenceLang)}"` : '';
+  state.blocks.push(`<pre><code${langClass}>${code}</code></pre>`);
+}
+
+function pushHeading(state: MdBlocks, level: number, body: string): void {
+  flushPara(state);
+  flushList(state);
+  state.blocks.push(`<h${level}>${inlineMarkdown(escapeHtml(body))}</h${level}>`);
+}
+
+function pushListItem(state: MdBlocks, tag: ListTag, body: string): void {
+  flushPara(state);
+  if (state.listTag && state.listTag !== tag) flushList(state);
+  state.listTag = tag;
+  state.listItems.push(`<li>${inlineMarkdown(escapeHtml(body))}</li>`);
+}
+
+function pushParagraphLine(state: MdBlocks, line: string): void {
+  flushList(state);
+  state.para.push(line);
+}
+
+function consumeNonFenceLine(state: MdBlocks, line: string): void {
+  if (/^\s*$/.test(line)) {
+    flushPara(state);
+    flushList(state);
+    return;
+  }
+  const heading = line.match(/^(#{1,6})\s+(.+)$/);
+  if (heading) {
+    pushHeading(state, heading[1]!.length, heading[2]!);
+    return;
+  }
+  const ul = line.match(/^\s*[-*+]\s+(.+)$/);
+  if (ul) {
+    pushListItem(state, 'ul', ul[1]!);
+    return;
+  }
+  const ol = line.match(/^\s*\d+\.\s+(.+)$/);
+  if (ol) {
+    pushListItem(state, 'ol', ol[1]!);
+    return;
+  }
+  const bq = line.match(/^\s*>\s?(.*)$/);
+  if (bq) {
+    flushPara(state);
+    flushList(state);
+    state.blocks.push(`<blockquote><p>${inlineMarkdown(escapeHtml(bq[1] ?? ''))}</p></blockquote>`);
+    return;
+  }
+  const hr = /^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/.test(line);
+  if (hr) {
+    flushPara(state);
+    flushList(state);
+    state.blocks.push('<hr />');
+    return;
+  }
+  pushParagraphLine(state, line);
+}
+
 export function markdownToSafeHtml(markdown: string): string {
   const src = String(markdown ?? '').replace(/\r\n/g, '\n');
   if (!src.trim()) return '';
 
   const lines = src.split('\n');
-  const blocks: string[] = [];
+  const state: MdBlocks = { blocks: [], para: [], listItems: [], listTag: null };
   let i = 0;
-  let para: string[] = [];
-  let listItems: string[] = [];
-  let listTag: 'ul' | 'ol' | null = null;
   let inFence = false;
   let fenceLang = '';
   let fenceLines: string[] = [];
-
-  const flushPara = () => {
-    if (!para.length) return;
-    blocks.push(`<p>${inlineMarkdown(escapeHtml(para.join('\n')))}</p>`);
-    para = [];
-  };
-  const flushList = () => {
-    if (!listTag || !listItems.length) {
-      listItems = [];
-      listTag = null;
-      return;
-    }
-    blocks.push(`<${listTag}>${listItems.join('')}</${listTag}>`);
-    listItems = [];
-    listTag = null;
-  };
 
   while (i < lines.length) {
     const line = lines[i]!;
     const fenceOpen = line.match(/^```([\w-]*)\s*$/);
     if (fenceOpen && !inFence) {
-      flushPara();
-      flushList();
+      flushPara(state);
+      flushList(state);
       inFence = true;
       fenceLang = fenceOpen[1] ?? '';
       fenceLines = [];
@@ -91,9 +160,7 @@ export function markdownToSafeHtml(markdown: string): string {
     }
     if (inFence) {
       if (/^```\s*$/.test(line)) {
-        const code = escapeHtml(fenceLines.join('\n'));
-        const langClass = fenceLang ? ` class="language-${escapeHtml(fenceLang)}"` : '';
-        blocks.push(`<pre><code${langClass}>${code}</code></pre>`);
+        closeFence(state, fenceLang, fenceLines);
         inFence = false;
         fenceLang = '';
         fenceLines = [];
@@ -103,62 +170,18 @@ export function markdownToSafeHtml(markdown: string): string {
       i += 1;
       continue;
     }
-
-    if (/^\s*$/.test(line)) {
-      flushPara();
-      flushList();
-      i += 1;
-      continue;
-    }
-
-    const heading = line.match(/^(#{1,6})\s+(.+)$/);
-    if (heading) {
-      flushPara();
-      flushList();
-      const level = heading[1]!.length;
-      blocks.push(`<h${level}>${inlineMarkdown(escapeHtml(heading[2]!))}</h${level}>`);
-      i += 1;
-      continue;
-    }
-
-    const ul = line.match(/^[-*]\s+(.+)$/);
-    if (ul) {
-      flushPara();
-      if (listTag && listTag !== 'ul') flushList();
-      listTag = 'ul';
-      listItems.push(`<li>${inlineMarkdown(escapeHtml(ul[1]!))}</li>`);
-      i += 1;
-      continue;
-    }
-
-    const ol = line.match(/^\d+\.\s+(.+)$/);
-    if (ol) {
-      flushPara();
-      if (listTag && listTag !== 'ol') flushList();
-      listTag = 'ol';
-      listItems.push(`<li>${inlineMarkdown(escapeHtml(ol[1]!))}</li>`);
-      i += 1;
-      continue;
-    }
-
-    flushList();
-    para.push(line);
+    consumeNonFenceLine(state, line);
     i += 1;
   }
-
   if (inFence) {
-    flushPara();
-    flushList();
-    blocks.push(`<pre><code>${escapeHtml(fenceLines.join('\n'))}</code></pre>`);
-  } else {
-    flushPara();
-    flushList();
+    // Unclosed fence: emit remaining lines as a code block.
+    closeFence(state, fenceLang, fenceLines);
   }
-
-  return blocks.join('\n');
+  flushPara(state);
+  flushList(state);
+  return state.blocks.join('\n');
 }
 
-/** Full minimal HTML document for a shared library page (read-only). */
 export function renderPageShareDocument(input: { title: string; markdown: string }): string {
   const title = escapeHtml(String(input.title ?? '').trim() || 'Untitled');
   const body = markdownToSafeHtml(input.markdown);

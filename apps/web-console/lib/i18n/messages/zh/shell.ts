@@ -18,14 +18,14 @@ export const shell = {
   desc: {
     agents: '管理 Agent、Bot、团队协作与技能。',
     tasks: '任务队列、编排运行、审批与收件箱。',
-    knowledge: '查看与管理 Agent 的长期记忆与摄取配置。',
+    knowledge: '查看与管理 Agent 的长期记忆、库页面与摄取配置。',
     ops: '会话轨迹、系统健康与诊断。',
     settings: '常用项在前；实验特性单独成组。仍有少量分组需打开「显示高级」。可用搜索快速定位。'
   },
   sub: {
     agents: { agents: 'Agents', bots: 'Bots', teams: 'Teams', skills: '技能' },
     tasks: { bots: 'Bot 任务', queue: '任务队列', runs: '编排运行', inbox: '审批与收件箱' },
-    knowledge: { memory: '记忆', ingestion: '摄取' },
+    knowledge: { memory: '记忆', pages: '页面', ingestion: '摄取' },
     ops: { trajectory: '会话轨迹', health: '系统健康' }
   },
   ui: {

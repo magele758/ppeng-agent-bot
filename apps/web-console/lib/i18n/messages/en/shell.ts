@@ -18,14 +18,14 @@ export const shell = {
   desc: {
     agents: 'Manage agents, bots, team collaboration and skills.',
     tasks: 'Task queue, orchestration runs, approvals and inbox.',
-    knowledge: 'Browse and manage long-term agent memory and ingestion.',
+    knowledge: 'Browse and manage long-term agent memory, library pages, and ingestion.',
     ops: 'Session trajectory, system health and diagnostics.',
     settings: 'Common options come first; experimental options have their own group. A few groups still need Show advanced. Use search to jump.'
   },
   sub: {
     agents: { agents: 'Agents', bots: 'Bots', teams: 'Teams', skills: 'Skills' },
     tasks: { bots: 'Bot tasks', queue: 'Task queue', runs: 'Runs', inbox: 'Approvals & inbox' },
-    knowledge: { memory: 'Memory', ingestion: 'Ingestion' },
+    knowledge: { memory: 'Memory', pages: 'Pages', ingestion: 'Ingestion' },
     ops: { trajectory: 'Trajectory', health: 'System health' }
   },
   ui: {

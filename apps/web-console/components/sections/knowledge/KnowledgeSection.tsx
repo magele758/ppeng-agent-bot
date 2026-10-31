@@ -5,6 +5,7 @@ import { MemoryPanel } from '../../MemoryPanel';
 import { AdvancedToggle } from '../../ui';
 import { SectionFrame } from '../SectionFrame';
 import { LibraryDirsCard } from './LibraryDirsCard';
+import { LibraryPagesPanel } from './LibraryPagesPanel';
 
 export function KnowledgeSection({ active }: { active: boolean }) {
   return (
@@ -21,6 +22,8 @@ export function KnowledgeSection({ active }: { active: boolean }) {
                 <MemoryPanel />
               </>
             );
+          case 'pages':
+            return <LibraryPagesPanel />;
           case 'ingestion':
             return <IngestionSettingsCard />;
           default:
