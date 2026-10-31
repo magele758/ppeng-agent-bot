@@ -31,7 +31,7 @@ function harness() {
 test('write_page 返回 id、第 1 版和分享路径，空标题或空正文不落库 [AC:page-tools#AC-1]', async () => {
   const h = harness();
   try {
-    assert.deepEqual(Object.keys(h.byName).sort(), ['delete_page', 'edit_page', 'get_page', 'list_pages', 'rotate_page_share', 'write_page']);
+    assert.deepEqual(Object.keys(h.byName).sort(), ['delete_page', 'edit_page', 'get_page', 'get_page_revision', 'list_page_revisions', 'list_pages', 'restore_page_revision', 'rotate_page_share', 'write_page']);
     const written = await h.byName.write_page.execute(h.ctx, { title: '  发布说明  ', markdown: '# 你好' });
     assert.equal(written.ok, true);
     const page = JSON.parse(written.content);
@@ -224,9 +224,9 @@ test('page tools are on the same assembly path as vault tools and reach a turn [
       getUserVault() { throw new Error('vault not used'); },
       getCronStore() { throw new Error('cron not used'); }
     });
-    const pageNames = new Set(['list_pages', 'get_page', 'write_page', 'edit_page', 'rotate_page_share', 'delete_page']);
+    const pageNames = new Set(['list_pages', 'get_page', 'write_page', 'edit_page', 'rotate_page_share', 'delete_page', 'list_page_revisions', 'get_page_revision', 'restore_page_revision']);
     const names = assembled.filter((tool) => pageNames.has(tool.name)).map((tool) => tool.name);
-    assert.deepEqual(names.sort(), ['delete_page', 'edit_page', 'get_page', 'list_pages', 'rotate_page_share', 'write_page']);
+    assert.deepEqual(names.sort(), ['delete_page', 'edit_page', 'get_page', 'get_page_revision', 'list_page_revisions', 'list_pages', 'restore_page_revision', 'rotate_page_share', 'write_page']);
 
     h.store.setDaemonControl('tool_exposure_settings', { mode: 'full', pinnedGroups: {} });
     const agent = { id: 'general', name: 'General' };
@@ -238,7 +238,7 @@ test('page tools are on the same assembly path as vault tools and reach a turn [
       session: h.store.getSession(session.id),
       settingsStore: h.store
     }).tools.map((tool) => tool.name);
-    for (const name of ['list_pages', 'get_page', 'write_page', 'edit_page', 'rotate_page_share', 'delete_page']) assert.ok(visible.includes(name), name);
+    for (const name of ['list_pages', 'get_page', 'write_page', 'edit_page', 'rotate_page_share', 'delete_page', 'list_page_revisions', 'get_page_revision', 'restore_page_revision']) assert.ok(visible.includes(name), name);
 
     const write = assembled.find((tool) => tool.name === 'write_page');
     const created = JSON.parse((await write.execute({}, { title: '回路', markdown: '从组装进来的' })).content);
@@ -247,6 +247,36 @@ test('page tools are on the same assembly path as vault tools and reach a turn [
     assert.equal(pages[0].id, created.id);
     assert.equal(pages[0].sharePath, created.sharePath);
     assert.equal(JSON.stringify(pages).includes('从组装进来的'), false);
+  } finally {
+    h.close();
+  }
+});
+
+
+test('list/get/restore page revision tools [AC:page-tools#AC-rev] [AC:page-revisions#AC-3]', async () => {
+  const h = harness();
+  try {
+    const created = await h.byName.write_page.execute(h.ctx, { title: 'Rev', markdown: '# v1' });
+    assert.equal(created.ok, true);
+    const id = JSON.parse(created.content).id;
+    await h.byName.edit_page.execute(h.ctx, { id, markdown: '# v2' });
+
+    const listed = await h.byName.list_page_revisions.execute(h.ctx, { id });
+    assert.equal(listed.ok, true);
+    const revisions = JSON.parse(listed.content).revisions;
+    assert.ok(revisions.length >= 2);
+    assert.equal(revisions.every((r) => !('markdown' in r) || r.markdown === undefined), true);
+
+    const got = await h.byName.get_page_revision.execute(h.ctx, { id, revision: 1 });
+    assert.equal(got.ok, true);
+    assert.equal(JSON.parse(got.content).markdown, '# v1');
+
+    assert.equal(h.byName.restore_page_revision.approvalMode, 'auto');
+    const restored = await h.byName.restore_page_revision.execute(h.ctx, { id, revision: 1 });
+    assert.equal(restored.ok, true);
+    const body = JSON.parse(restored.content);
+    assert.equal(body.restored, true);
+    assert.ok(body.revision >= 3);
   } finally {
     h.close();
   }
