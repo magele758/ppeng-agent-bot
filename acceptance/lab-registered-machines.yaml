@@ -1,0 +1,35 @@
+id: lab-registered-machines
+title: Lab Settings → Tools → Registered Machines panel
+status: implemented
+requirement: |
+  Add a minimal Lab Settings → Tools → Registered Machines panel over new admin
+  /api/registered-machines routes. Users can list live machines (connected status),
+  register new machines (id/label/kind), unregister, and refresh one machine.
+  Show short attach hints for desktop-agent SSE and device-local SSE paths.
+  No Factory SSH UI. No Grok/Canvas clone.
+notes: 'assumedApproval: standing-order-2026-10-22. Mirror r5-8 Lab Knowledge Pages pattern.'
+criteria:
+  - id: AC-1
+    given: machines are registered
+    when: Lab opens Settings → Tools → Registered Machines
+    then: list shows machineId, label, kind, connected status without showing Factory SSH UI
+
+  - id: AC-2
+    given: user fills machineId, label, kind form
+    when: user clicks Register
+    then: machine appears in list with initial connected status from probe
+
+  - id: AC-3
+    given: a machine is in the list
+    when: user clicks Unregister
+    then: machine is removed from list
+
+  - id: AC-4
+    given: a machine is in the list
+    when: user clicks Refresh
+    then: connection status updates based on live probe
+
+  - id: AC-5
+    given: machines are displayed
+    when: user views machine details
+    then: attach hint shows desktop-agent GET /api/desktop-agent/:id/events or device-local GET /api/device-local/:id/events, never Factory SSH UI

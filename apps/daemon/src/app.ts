@@ -76,6 +76,7 @@ import { workspaceRoutes } from './routes/workspace.js';
 import { requireLabLogin, resolveRequestAuth } from './user-auth.js';
 import { isExternalAgentTaskPath } from './external-agent-settings.js';
 import { externalAgentRoutes } from './routes/external-agents.js';
+import { registeredMachinesRoutes } from './routes/registered-machines.js';
 
 export interface DaemonAppDeps {
   runtime: RawAgentRuntime;
@@ -152,6 +153,7 @@ export function buildDaemonRouter(deps: DaemonAppDeps): Router {
     .addAll(attachmentRoutes(runtime))
     .addAll(libraryPickRoutes(runtime))
     .addAll(libraryPageRoutes(runtime))
+    .addAll(registeredMachinesRoutes(runtime))
     .addAll(sandboxRoutes(runtime))
     .addAll(desktopAgentRoutes())
     .addAll(deviceLocalRoutes())
