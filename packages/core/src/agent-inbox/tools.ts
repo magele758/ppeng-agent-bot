@@ -8,10 +8,14 @@ import type { BotPrincipal } from '../bots/bot-identity.js';
 import type { RunContext } from '../types.js';
 import { ValidationError, NotFoundError } from '../errors.js';
 import { principalFromSession } from '../bots/bot-identity.js';
+import { fenceExternalContent } from '../safety/external-content.js';
 
 function fenceEmailBody(message: EmailMessage): string {
-  const body = message.body.trim();
-  return `[untrusted source=email label=message-body] ${body}`;
+  return fenceExternalContent({
+    source: 'event',
+    label: `email:${message.messageId || 'message-body'}`,
+    body: message.body ?? ''
+  });
 }
 
 function handleError(error: unknown): ToolExecutionResult {
@@ -63,7 +67,7 @@ export function createAgentInboxTools(
       description:
         'Claim a local-part@product-domain email inbox. Requires explicit local-part naming (no guessing/random). One per user.',
       approvalMode: 'auto',
-      sideEffectLevel: 'heavy',
+      sideEffectLevel: 'workspace',
       inputSchema: {
         type: 'object',
         properties: {

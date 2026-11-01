@@ -225,6 +225,8 @@ export interface RuntimeToolServices {
   webSearchSettingsStore?: WebSettingsReadStore;
   /** Personal registered machines (≠ Factory SSH). When set, bash/read_file honor machineId. */
   registeredMachines?: import('../registered-machines/port.js').RegisteredMachinePort;
+  /** Store needed to resolve principal for machineId-gated bash/read_file. */
+  stateStore?: import('../storage.js').SqliteStateStore;
   /** Agent native email inbox (product-domain). When set, list_email_inboxes/claim_email_inbox/search_email_threads/read_email_thread are available. */
   agentInbox?: import('../agent-inbox/port.js').AgentInboxPort;
   /** Sibling-file facts for a sub-task read. Missing hook keeps the previous read behavior. */

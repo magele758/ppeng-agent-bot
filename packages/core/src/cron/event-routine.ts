@@ -14,6 +14,14 @@ import { SecretVault, type SecretVaultStore } from '../secrets/secret-vault.js';
 import { ValidationError } from '../errors.js';
 import type { Logger } from '../logger.js';
 import { fenceExternalContent } from '../safety/external-content.js';
+import { createAgentInboxPort } from '../agent-inbox/port.js';
+import {
+  emailReceivedMatchesBind,
+  ingestProductDomainEmail,
+  productEmailFieldsFromBody,
+  recipientsFromEmailBody
+} from '../agent-inbox/inbound.js';
+import { principalFromSession } from '../bots/bot-identity.js';
 import { assertCredentialEnvName } from '../secrets/credential-env.js';
 import type { MessagePart, SessionRecord } from '../types.js';
 import { textPart } from '../runtime/session-facade.js';
@@ -73,7 +81,7 @@ export interface AcceptEventRoutineInput {
 export interface EventJobOutcome {
   jobId: string;
   status: 'rejected' | 'duplicate' | 'skipped' | 'woke' | 'not_idle' | 'missing_session' | 'queue_full' | 'queued';
-  reason?: 'bad_signature' | 'no_delivery';
+  reason?: 'bad_signature' | 'no_delivery' | 'inbox_bind_mismatch';
   sessionId?: string;
 }
 
@@ -388,6 +396,48 @@ async function acceptLegacyRoutineEvent(host:EventRoutineHost,config:CronJobStor
  host.store.appendMessage(job.sessionId,'user',[textPart(eventUserText(job,scheduleValue,deliveryId,input.rawBody))]);markCronJobRan(config,job);
  const started=startIdleSessionRun(host,session,`event:${job.id}`);return {jobId:job.id,status:started?'woke':'not_idle',sessionId:session.id};
 }
+
+function maybeIngestAndBindEmail(
+  host: EventRoutineHost,
+  job: CronJobRecord,
+  scheduleValue: string,
+  deliveryId: string,
+  body: unknown
+): 'skip_bind' | 'ok' {
+  if (!scheduleValue.startsWith('email/')) return 'ok';
+  const port = createAgentInboxPort(host.store as import('../storage.js').SqliteStateStore);
+  const recipients = recipientsFromEmailBody(body);
+  const fields = productEmailFieldsFromBody(body, deliveryId);
+  if (fields && recipients.length) {
+    // Product-domain path: persist regardless of HMAC (HMAC already verified for webhook jobs).
+    ingestProductDomainEmail(port, {
+      to: recipients,
+      from: fields.from,
+      subject: fields.subject,
+      body: fields.text,
+      messageId: fields.messageId,
+      threadId: fields.threadId
+    });
+  }
+  const bind =
+    typeof job.metadata?.bindInboxLocalPart === 'string'
+      ? job.metadata.bindInboxLocalPart
+      : typeof job.metadata?.inboxLocalPart === 'string'
+        ? job.metadata.inboxLocalPart
+        : undefined;
+  try {
+    const session = host.store.getSession(job.sessionId);
+    if (!session) return 'ok';
+    const principal = principalFromSession(host.store as import('../storage.js').SqliteStateStore, session);
+    if (!emailReceivedMatchesBind(port, principal, bind, recipients.length ? recipients : [''])) {
+      return 'skip_bind';
+    }
+  } catch {
+    return 'ok';
+  }
+  return 'ok';
+}
+
 /** Validated events are durably admitted before claiming external dedupe; compatibility stores keep their old wake contract. */
 export async function acceptEventRoutine(host:EventRoutineHost,input:AcceptEventRoutineInput):Promise<AcceptEventRoutineResult>{
  let parsed=input.body;
@@ -400,6 +450,8 @@ export async function acceptEventRoutine(host:EventRoutineHost,input:AcceptEvent
  for(const job of jobs){
   const verified=verifyRoutineDelivery(job,verifiedInput,env,nowMs,host.store);
   if('jobId' in verified){outcomes.push(verified);continue;}
+  const bindResult=maybeIngestAndBindEmail(host,job,job.scheduleValue,verified.deliveryId,parsed);
+  if(bindResult==='skip_bind'){outcomes.push({jobId:job.id,status:'skipped',reason:'inbox_bind_mismatch'});continue;}
   const outcome='db' in host.store&&'createSession' in host.store?await acceptDurableRoutineEvent(host,config,job,verifiedInput,job.scheduleValue,verified.deliveryId,nowMs):await acceptLegacyRoutineEvent(host,config,job,verifiedInput,job.scheduleValue,verified.deliveryId,verified.secretName);
   outcomes.push(outcome);
  }

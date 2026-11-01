@@ -69,7 +69,11 @@ function describeChannel(channel: ChannelSpec, env: NodeJS.ProcessEnv): Outbound
     case 'telegram':
       return { ...base, sender: tokenSource(channel), recipient: chatTarget(channel) };
     case 'email':
-      return { ...base, sender: hostOf(channel.url), recipient: channel.target?.trim() || undefined };
+      return {
+        ...base,
+        sender: channel.from?.trim() || hostOf(channel.url),
+        recipient: channel.target?.trim() || undefined
+      };
     case 'webhook':
     case 'http_post':
     case 'wecom_group_bot':

@@ -1,4 +1,4 @@
-import { ValidationError, NotFoundError } from '../errors.js';
+import { ValidationError, NotFoundError, ConflictError } from '../errors.js';
 import type { SqliteStateStore } from '../storage.js';
 import {
   botPrincipalKey,
@@ -7,7 +7,7 @@ import {
 
 /**
  * Agent-native email inbox port.
- * 
+ *
  * Per user at most 1 claimed local-part@product-domain.
  * Product-domain inbound does not depend only on external HMAC relay.
  */
@@ -45,52 +45,46 @@ export interface EmailMessage {
 export interface AgentInboxPort {
   /**
    * Check if a local-part is available for claiming.
-   * Forbids guessing/random usernames - validates format only.
+   * Forbids guessing/random usernames - validates format only + uniqueness.
+   * Caller must still pass an explicitly named local-part to claim.
    */
   checkAvailability(localPart: string): { available: boolean; reason?: string };
-  
-  /**
-   * List claimed inbox for the principal (at most 1).
-   */
+
+  /** List claimed inbox for the principal (at most 1). */
   list(principal: BotPrincipal): AgentInbox | undefined;
-  
+
   /**
    * Claim a local-part@product-domain inbox.
-   * Requires explicit local-part naming. One per user.
+   * Requires explicit local-part naming. One per user. Local-part globally unique.
    */
   claim(principal: BotPrincipal, localPart: string): AgentInbox;
-  
-  /**
-   * Release the claimed inbox.
-   */
+
+  /** Release the claimed inbox. */
   release(principal: BotPrincipal): boolean;
-  
-  /**
-   * Search email threads for a claimed inbox.
-   * Returns threads matching query (subject/participants).
-   */
+
+  /** Search email threads for a claimed inbox. */
   searchThreads(principal: BotPrincipal, query?: string, limit?: number): EmailThread[];
-  
-  /**
-   * Read all messages in a thread.
-   */
+
+  /** Read all messages in a thread. */
   readThread(principal: BotPrincipal, threadId: string): EmailMessage[];
-  
+
   /**
-   * Store an inbound email message.
-   * Used by email/received routine.
+   * Store an inbound email message (product-domain path).
+   * Used by email/received binding and non-HMAC product ingest.
    */
   storeInbound(localPart: string, message: EmailMessage): void;
-  
-  /**
-   * Check if a localPart (including +tag) matches a claimed inbox.
-   */
+
+  /** Check if a localPart (including +tag) matches a claimed inbox. */
   matchesClaimedInbox(principal: BotPrincipal, localPart: string): boolean;
+
+  /** Resolve which principal owns a local-part (after stripping +tag). */
+  ownerOfLocalPart(localPart: string): string | undefined;
 }
 
 interface StoredInbox {
   localPart: string;
   claimedAt: string;
+  principalKey: string;
 }
 
 interface StoredMessage {
@@ -108,20 +102,30 @@ function inboxKey(principal: BotPrincipal): string {
   return 'agent.inbox:' + botPrincipalKey(principal);
 }
 
+function byLocalKey(localPart: string): string {
+  return 'agent.inbox.byLocal:' + localPart;
+}
+
 function messagesKey(localPart: string): string {
   return 'agent.inbox.messages:' + localPart;
 }
 
 function parseLocalPart(value: unknown): string {
   if (typeof value !== 'string') throw new ValidationError('localPart must be string');
-  const clean = value.trim().toLowerCase();
+  const trimmed = value.trim();
+  if (!trimmed) throw new ValidationError('Invalid localPart format');
+  // Reject uppercase / mixed case — user must name a lowercase local-part explicitly.
+  if (trimmed !== trimmed.toLowerCase()) {
+    throw new ValidationError('Invalid localPart format');
+  }
+  const clean = trimmed.toLowerCase();
   if (!LOCAL_PART.test(clean)) {
     throw new ValidationError('Invalid localPart format');
   }
   return clean;
 }
 
-function stripTag(localPart: string): string {
+export function stripEmailTag(localPart: string): string {
   const plusIndex = localPart.indexOf('+');
   return plusIndex >= 0 ? localPart.slice(0, plusIndex) : localPart;
 }
@@ -146,31 +150,35 @@ export function createAgentInboxPort(
       claimedAt: stored.claimedAt
     };
   }
-  
+
   function readMessages(localPart: string): StoredMessage[] {
-    const key = messagesKey(stripTag(localPart));
+    const key = messagesKey(stripEmailTag(localPart));
     const stored = store.getDaemonControl<{ messages: StoredMessage[] }>(key);
     return stored?.messages ?? [];
   }
-  
+
   function writeMessages(localPart: string, messages: StoredMessage[]): void {
-    const key = messagesKey(stripTag(localPart));
+    const key = messagesKey(stripEmailTag(localPart));
     store.setDaemonControl(key, { messages });
   }
 
   return {
     checkAvailability(localPart) {
       try {
-        parseLocalPart(localPart);
+        const clean = parseLocalPart(localPart);
+        const taken = store.getDaemonControl<{ principalKey: string }>(byLocalKey(clean));
+        if (taken?.principalKey) {
+          return { available: false, reason: 'Local-part already claimed' };
+        }
         return { available: true };
       } catch (err) {
-        return { 
-          available: false, 
-          reason: err instanceof Error ? err.message : 'Invalid format' 
+        return {
+          available: false,
+          reason: err instanceof Error ? err.message : 'Invalid format'
         };
       }
     },
-    
+
     list(principal) {
       const key = inboxKey(principal);
       const stored = store.getDaemonControl<StoredInbox>(key);
@@ -181,63 +189,73 @@ export function createAgentInboxPort(
         claimedAt: stored.claimedAt
       };
     },
-    
+
     claim(principal, localPart) {
       const clean = parseLocalPart(localPart);
-      const key = inboxKey(principal);
+      const pKey = botPrincipalKey(principal);
+      const existing = store.getDaemonControl<StoredInbox>(inboxKey(principal));
+      if (existing?.localPart && existing.localPart !== clean) {
+        throw new ConflictError(`Already claimed ${existing.localPart}@${productDomain}`);
+      }
+      const taken = store.getDaemonControl<{ principalKey: string }>(byLocalKey(clean));
+      if (taken?.principalKey && taken.principalKey !== pKey) {
+        throw new ConflictError('Local-part already claimed');
+      }
       const inbox: StoredInbox = {
         localPart: clean,
-        claimedAt: nowIso()
+        claimedAt: existing?.claimedAt ?? nowIso(),
+        principalKey: pKey
       };
-      store.setDaemonControl(key, inbox);
+      store.setDaemonControl(inboxKey(principal), inbox);
+      store.setDaemonControl(byLocalKey(clean), { principalKey: pKey });
       return {
         localPart: clean,
         address: `${clean}@${productDomain}`,
         claimedAt: inbox.claimedAt
       };
     },
-    
+
     release(principal) {
       const key = inboxKey(principal);
       const existed = store.getDaemonControl<StoredInbox>(key);
       if (!existed || !existed.localPart) return false;
+      store.setDaemonControl(byLocalKey(existed.localPart), null);
       store.setDaemonControl(key, null);
       return true;
     },
-    
+
     searchThreads(principal, query, limit = 50) {
       const inbox = requireClaimed(principal);
       const messages = readMessages(inbox.localPart);
-      
-      // Group by threadId
+
       const threads = new Map<string, EmailMessage[]>();
       for (const msg of messages) {
         if (!threads.has(msg.threadId)) threads.set(msg.threadId, []);
         threads.get(msg.threadId)!.push(msg as EmailMessage);
       }
-      
+
       const results: EmailThread[] = [];
       for (const entry of Array.from(threads.entries())) {
         const [threadId, msgs] = entry;
-        const sorted = msgs.sort((a, b) => 
-          new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime()
+        const sorted = msgs.sort(
+          (a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime()
         );
         const latest = sorted[0];
         if (!latest) continue;
-        
-        // Filter by query if provided
+
         if (query) {
           const lowerQuery = query.toLowerCase();
           const matchSubject = latest.subject.toLowerCase().includes(lowerQuery);
-          const matchParticipants = [latest.from, ...latest.to]
-            .some(p => p.toLowerCase().includes(lowerQuery));
+          const matchParticipants = [latest.from, ...latest.to].some((p) =>
+            p.toLowerCase().includes(lowerQuery)
+          );
           if (!matchSubject && !matchParticipants) continue;
         }
-        
+
         const participants = Array.from(
           new Set([latest.from, ...latest.to, ...(latest.cc ?? [])])
         );
-        
+
         results.push({
           threadId,
           subject: latest.subject,
@@ -247,36 +265,34 @@ export function createAgentInboxPort(
           snippet: latest.body.slice(0, 200)
         });
       }
-      
-      // Sort by most recent first
-      results.sort((a, b) => 
-        new Date(b.lastReceivedAt).getTime() - new Date(a.lastReceivedAt).getTime()
+
+      results.sort(
+        (a, b) => new Date(b.lastReceivedAt).getTime() - new Date(a.lastReceivedAt).getTime()
       );
-      
+
       return results.slice(0, limit);
     },
-    
+
     readThread(principal, threadId) {
       const inbox = requireClaimed(principal);
       const messages = readMessages(inbox.localPart);
-      
+
       const thread = messages
-        .filter(m => m.threadId === threadId)
-        .sort((a, b) => 
-          new Date(a.receivedAt).getTime() - new Date(b.receivedAt).getTime()
+        .filter((m) => m.threadId === threadId)
+        .sort(
+          (a, b) => new Date(a.receivedAt).getTime() - new Date(b.receivedAt).getTime()
         );
-      
+
       return thread as EmailMessage[];
     },
-    
+
     storeInbound(localPart, message) {
-      const clean = stripTag(localPart);
+      const clean = stripEmailTag(localPart.toLowerCase());
       const messages = readMessages(clean);
-      
-      // Dedupe by messageId
-      const exists = messages.some(m => m.messageId === message.messageId);
+
+      const exists = messages.some((m) => m.messageId === message.messageId);
       if (exists) return;
-      
+
       messages.push({
         messageId: message.messageId,
         threadId: message.threadId,
@@ -287,23 +303,28 @@ export function createAgentInboxPort(
         receivedAt: message.receivedAt,
         body: message.body
       });
-      
-      // Keep last 500 messages
+
       if (messages.length > 500) {
-        messages.sort((a, b) => 
-          new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime()
+        messages.sort(
+          (a, b) => new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime()
         );
         messages.splice(500);
       }
-      
+
       writeMessages(clean, messages);
     },
-    
+
     matchesClaimedInbox(principal, localPart) {
       const inbox = this.list(principal);
       if (!inbox) return false;
-      const cleanInput = stripTag(localPart.toLowerCase());
+      const cleanInput = stripEmailTag(localPart.toLowerCase());
       return cleanInput === inbox.localPart;
+    },
+
+    ownerOfLocalPart(localPart) {
+      const clean = stripEmailTag(localPart.toLowerCase());
+      const taken = store.getDaemonControl<{ principalKey: string }>(byLocalKey(clean));
+      return taken?.principalKey;
     }
   };
 }
