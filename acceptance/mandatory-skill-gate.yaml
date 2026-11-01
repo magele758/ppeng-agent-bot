@@ -2,26 +2,27 @@ id: mandatory-skill-gate
 title: 高危面必须先加载对应技能
 status: implemented
 requirement: |
-  Shopping, login, outbound-send, and payment tools fail closed unless this
-  session has successfully load_skill'd the matching skill (or a loaded skill
-  Manifest declares that name in requiredSkills). Ungated tools are unchanged.
-  After the skill is loaded, the tool still goes through Auto-review and any
-  active Manifest allowTools ceiling.
+  Shopping, login, outbound-send, payment, and site-playbooks tools fail closed
+  unless this session has successfully load_skill'd the matching skill (or a
+  loaded skill Manifest declares that name in requiredSkills). Ungated tools
+  are unchanged. After the skill is loaded, the tool still goes through
+  Auto-review and any active Manifest allowTools ceiling (and URL refuse for
+  browser_navigate).
 notes: 'assumedApproval: standing-order-2026-10-22'
 criteria:
   - id: AC-1
-    given: 当前会话没有成功 load_skill 购物、登录、外发或支付技能
-    when: 代理调用该高危面上的工具
+    given: 当前会话没有成功 load_skill 购物、登录、外发、支付或站点 playbook 技能
+    when: 代理调用该高危面上的工具（含 browser_navigate）
     then: 调用 fail-closed，工具不会执行，并提示先 load_skill(对应名称)
   - id: AC-2
     given: 本会话已经成功 load_skill 该面要求的技能，或所加载技能的 Manifest requiredSkills 覆盖了该名称
     when: 代理再次调用同一高危工具
-    then: 强制技能门放行，工具可以执行，但仍然受 Auto-review 与 Manifest allowTools 约束
+    then: 强制技能门放行，工具可以执行，但仍然受 Auto-review 与 Manifest allowTools 约束（browser_navigate 另受 URL refuse）
   - id: AC-3
-    given: 工具不在购物、登录、外发、支付这些高危面上
+    given: 工具不在购物、登录、外发、支付、站点 playbook 这些高危面上
     when: 会话从未 load_skill
     then: 强制技能门不拦截该工具
   - id: AC-4
-    given: 高危面与所需技能名称的对照表
+    given: 高危面与所需技能名称的对照表（含 browser_navigate → site-playbooks）
     when: 用单元测试调用门禁助手判断工具与参数
     then: 未加载时拒绝，加载后放行，非高危工具不受影响
