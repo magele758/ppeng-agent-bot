@@ -33,6 +33,7 @@ import {
 import { createExternalAiTools } from './external-ai-tools.js';
 import { bashCommandNeedsApproval } from './bash-command-policy.js';
 import { createRegisteredMachineTools, executeOnRegisteredMachine } from '../registered-machines/tools.js';
+import { createAgentInboxTools } from '../agent-inbox/tools.js';
 import { globWorkspaceFiles } from './glob-files.js';
 import { isVaultMetadataDirName } from './markdown-vault-noise.js';
 import { SENSITIVE_READ_REFUSAL, sensitiveReadRefusal } from '../workspace/sensitive-read.js';
@@ -224,8 +225,8 @@ export interface RuntimeToolServices {
   webSearchSettingsStore?: WebSettingsReadStore;
   /** Personal registered machines (≠ Factory SSH). When set, bash/read_file honor machineId. */
   registeredMachines?: import('../registered-machines/port.js').RegisteredMachinePort;
-  /** Store needed to resolve principal for machineId-gated bash/read_file. */
-  stateStore?: import('../storage.js').SqliteStateStore;
+  /** Agent native email inbox (product-domain). When set, list_email_inboxes/claim_email_inbox/search_email_threads/read_email_thread are available. */
+  agentInbox?: import('../agent-inbox/port.js').AgentInboxPort;
   /** Sibling-file facts for a sub-task read. Missing hook keeps the previous read behavior. */
   forkSiblingFileFacts?: (context: RunContext) => ForkSiblingFileFacts;
   /** Record a file this sub-task just created so siblings cannot read it. */
@@ -396,6 +397,7 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
     services.stateStore && services.registeredMachines
       ? createRegisteredMachineTools(services.stateStore, services.registeredMachines)
       : [];
+  const agentInboxTools = createAgentInboxTools(services.stateStore, services.agentInbox);
   const riskyShellTokens = ['rm ', 'git reset', 'git checkout', 'git clean', 'npm publish', 'sudo '];
 
   function shellCommandOf(args: { command?: string; verify_command?: string }): string {
@@ -1872,6 +1874,7 @@ export function createBuiltinTools(services: RuntimeToolServices, options: { inc
   const tools: ToolContract<any>[] = [
     bashTool,
     ...registeredMachineTools,
+    ...agentInboxTools,
     workEvidenceTool,
     readFileTool,
     visionAnalyzeTool,

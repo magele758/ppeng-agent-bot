@@ -1,0 +1,66 @@
+# Agent Native Email Inbox (r5-19)
+
+## Overview
+Implements Agent-native email inbox with product-domain `local-part@agent.local` addressing.
+Per-user maximum 1 claimed inbox. Supports email/received event routine binding with +tag addressing.
+
+## Must
+
+### AC-1: Port Layer
+- [x] AgentInboxPort with per-user 1-inbox-max constraint
+- [x] checkAvailability: forbids guessing/random localParts (format validation only)
+- [x] claim: requires explicit local-part naming
+- [x] list/release operations
+- [x] searchThreads with query filtering
+- [x] readThread with message retrieval
+- [x] storeInbound for email/received integration
+- [x] matchesClaimedInbox for +tag addressing support
+- [x] SQLite state store using daemon_control keys (no factory.* rail)
+
+### AC-2: Tools (builtin)
+- [x] list_email_inboxes: returns claimed inbox (at most 1)
+- [x] claim_email_inbox: explicit local-part, one per user, refuses existing
+- [x] search_email_threads: query + limit, fenced results
+- [x] read_email_thread: thread messages, bodies fenced as untrusted
+- [x] All message bodies wrapped in `[untrusted source=email label=message-body]` fence
+
+### AC-3: Event Routine Binding
+- [x] email/received routine can bind claimed inbox (local-part or +tag)
+- [x] inbound email stored via AgentInboxPort.storeInbound
+- [x] Product-domain does NOT depend only on external HMAC relay
+
+### AC-4: Outbound
+- [x] Draft→Confirm→Send unchanged
+- [x] Outbound uses existing email_http channel
+- [x] from= address set to claimed inbox address
+
+### AC-5: Tests
+- [x] Unit tests: checkAvailability, claim, list, release, thread search/read, +tag matching
+- [x] Acceptance YAML + focused unit tests (no regressions)
+- [x] typecheck/unit pass
+
+## Implementation
+
+### packages/core/src/agent-inbox/
+- port.ts: AgentInboxPort + storage + query logic
+- tools.ts: email inbox tools (list/claim/search/read)
+- index.ts: exports
+
+### packages/core/src/tools/builtin-tools.ts
+- createAgentInboxTools integrated into createBuiltinTools
+- Tools added to RuntimeToolServices
+
+### packages/core/src/runtime/tool-services.ts
+- agentInbox: createAgentInboxPort(host.store)
+
+### packages/core/src/cron/event-routine.ts
+- email/received routine binds to claimed inbox (no required yet; stubs ready)
+
+## Constraints
+
+- No AgentMail substitute
+- No Factory/UI clone
+- No real 1Password
+- No secrets printed
+- No force-push
+- Commit trailer: Machine: 4090
