@@ -1,5 +1,6 @@
 /**
- * Agent inbox tools: list_email_inboxes, claim_email_inbox, search_email_threads, read_email_thread.
+ * Agent inbox tools: list_email_inboxes, check_email_inbox_availability, claim_email_inbox,
+ * search_email_threads, read_email_thread.
  */
 
 import type { ToolContract, ToolExecutionResult } from '../types.js';
@@ -56,6 +57,42 @@ export function createAgentInboxTools(
           return {
             ok: true,
             content: JSON.stringify({ inbox: inbox ?? null })
+          };
+        } catch (error) {
+          return handleError(error);
+        }
+      }
+    },
+    {
+      name: 'check_email_inbox_availability',
+      description:
+        'Check whether a named local-part is available to claim (format + uniqueness). Does not claim. Does not invent or randomize local-parts — pass an explicit candidate.',
+      approvalMode: 'never',
+      sideEffectLevel: 'none',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          local_part: {
+            type: 'string',
+            description: 'Local part of email address to probe (lowercase alphanumeric, dots, hyphens, underscores)'
+          }
+        },
+        required: ['local_part'],
+        additionalProperties: false
+      },
+      async execute(_context: RunContext, args: Record<string, unknown>) {
+        try {
+          const localPart = args.local_part;
+          if (typeof localPart !== 'string') {
+            throw new ValidationError('local_part must be string');
+          }
+          const availability = port.checkAvailability(localPart);
+          return {
+            ok: true,
+            content: JSON.stringify({
+              available: availability.available,
+              reason: availability.reason
+            })
           };
         } catch (error) {
           return handleError(error);
