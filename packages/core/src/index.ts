@@ -27,6 +27,13 @@ export {
   createDesktopAgentHttpSseSession,
   createDeviceLocalHttpSseSession
 } from './registered-machines/index.js';
+export {
+  createAgentInboxPort,
+  type AgentInboxPort,
+  type AgentInbox,
+  type EmailThread,
+  type EmailMessage
+} from './agent-inbox/index.js';
 export type {
   RegisteredMachinePort,
   RegisteredMachine,

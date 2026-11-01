@@ -32,11 +32,13 @@ export async function sendEmailHttp(
   }
   const to = channel.target?.trim();
   const subject = channel.subject?.trim();
+  const from = channel.from?.trim();
   const payload = {
     transport: 'email_http',
     text: bodyText,
     ...(to ? { to } : {}),
-    ...(subject ? { subject } : {})
+    ...(subject ? { subject } : {}),
+    ...(from ? { from } : {})
   };
   try {
     const res = await fetch(url, {

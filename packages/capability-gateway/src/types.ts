@@ -41,6 +41,8 @@ export interface ChannelSpec {
   target?: string;
   /** Subject field on the email_http JSON body. */
   subject?: string;
+  /** From address for email_http when sending as a claimed agent inbox. */
+  from?: string;
 }
 
 /** Feishu / Lark event subscription (inbound). */

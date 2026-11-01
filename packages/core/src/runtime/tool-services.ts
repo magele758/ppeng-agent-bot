@@ -4,6 +4,7 @@ import {
   getSharedDesktopAgentHub,
   getSharedDeviceLocalHub
 } from '../registered-machines/index.js';
+import { createAgentInboxPort } from '../agent-inbox/index.js';
 import {parkBackgroundDurableWait} from '../waits/background-source.js';
 /**
  * Build RuntimeToolServices for builtin tools — extracted from RawAgentRuntime.
@@ -92,6 +93,7 @@ export function createToolServices(host: ToolServicesHost): RuntimeToolServices 
         deviceLocalHub: getSharedDeviceLocalHub()
       })
     ),
+    agentInbox: createAgentInboxPort(host.store),
     loadSkill: async (name, sessionId) => {
       const result = await host.resolveSkillLoad(name, sessionId);
       if (result.manifest) persistActiveSkillManifest(host.store, sessionId, result.manifest);

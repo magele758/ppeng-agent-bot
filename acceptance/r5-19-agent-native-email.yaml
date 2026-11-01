@@ -1,0 +1,32 @@
+id: r5-19-agent-native-email
+title: Agent native email inbox (product-domain)
+status: implemented
+requirement: |
+  Agent native email aligned with Grok Bot ListEmailInboxes / ClaimEmailInbox / SearchEmailThreads / ReadEmailThread.
+  Per user at most one claimed local-part@product-domain; CheckAvailability; List; persist; no random/guessed local-part;
+  user must name local-part before claim. Tools: list_email_inboxes, claim_email_inbox, search_email_threads, read_email_thread
+  (body via tool; untrusted fence). email/received can bind claimed inbox (+tag ok); product inbound not only external HMAC relay.
+  Outbound still Draft→Confirm; from=claimed address via outbound draft identity. Acceptance YAML + unit tests; no AgentMail substitute.
+notes: |
+  Machine: 4090. Smallest correct cut: AgentInboxPort + tools + product ingest + email/received bind + outbound from identity.
+criteria:
+  - id: AC-1
+    given: A user has not claimed an inbox and names an explicit lowercase local-part
+    when: checkAvailability runs then claim is called with that local-part
+    then: Format/uniqueness are validated without guessing a name; claim persists at most one inbox per user and refuses a second distinct claim or a local-part already taken by another user
+  - id: AC-2
+    given: Builtin tools are available and the user has or has not claimed an inbox
+    when: list_email_inboxes, claim_email_inbox, search_email_threads, or read_email_thread runs
+    then: The tools use the exact names above; claim requires an explicit local_part; read_email_thread returns message bodies fenced as untrusted external content
+  - id: AC-3
+    given: A claimed inbox exists and an inbound product-domain message addresses that local-part or a +tag form
+    when: ingestProductDomainEmail runs or an email/received routine with bindInboxLocalPart matches recipients
+    then: The message is stored via AgentInboxPort without depending only on external HMAC relay; +tag addressing matches the claimed base local-part; mismatched binds are skipped
+  - id: AC-4
+    given: An email channel is configured with ChannelSpec.from set to the claimed address
+    when: outbound draft identity is previewed and email_http sends after Draft→Confirm
+    then: Draft→Confirm→Send is unchanged; identity sender and the email_http JSON from field use the claimed address
+  - id: AC-5
+    given: The r5-19 acceptance and focused unit suite
+    when: The gate and agent-inbox unit tests run
+    then: Criteria are tagged and covered; no third-party AgentMail substitute is registered
