@@ -19,7 +19,7 @@ function fixture() {
   return { path, store, principal, port };
 }
 
-test('AgentInboxPort checkAvailability validates format only', () => {
+test('AgentInboxPort checkAvailability validates format only [AC:r5-19-agent-native-email#AC-1]', () => {
   const f = fixture();
   assert.deepEqual(f.port.checkAvailability('agent'), { available: true });
   assert.deepEqual(f.port.checkAvailability('a1b2'), { available: true });
@@ -32,7 +32,7 @@ test('AgentInboxPort checkAvailability validates format only', () => {
   assert.equal(f.port.checkAvailability('test@example').available, false);
 });
 
-test('AgentInboxPort claim requires explicit naming', () => {
+test('AgentInboxPort claim requires explicit naming [AC:r5-19-agent-native-email#AC-1]', () => {
   const f = fixture();
   assert.equal(f.port.list(f.principal), undefined);
   const inbox = f.port.claim(f.principal, 'agent1');
@@ -43,7 +43,7 @@ test('AgentInboxPort claim requires explicit naming', () => {
   assert.equal(listed?.localPart, 'agent1');
 });
 
-test('AgentInboxPort enforces one inbox per user', () => {
+test('AgentInboxPort enforces one inbox per user [AC:r5-19-agent-native-email#AC-1]', () => {
   const f = fixture();
   f.port.claim(f.principal, 'agent1');
   assert.throws(() => f.port.claim(f.principal, 'agent2'), /Already claimed/);
@@ -51,7 +51,7 @@ test('AgentInboxPort enforces one inbox per user', () => {
   assert.equal(listed?.localPart, 'agent1');
 });
 
-test('AgentInboxPort refuses local-part taken by another user', () => {
+test('AgentInboxPort refuses local-part taken by another user [AC:r5-19-agent-native-email#AC-1]', () => {
   const f = fixture();
   const other = { userId: 'other' };
   f.port.claim(f.principal, 'shared');
@@ -59,7 +59,7 @@ test('AgentInboxPort refuses local-part taken by another user', () => {
   assert.throws(() => f.port.claim(other, 'shared'), /already claimed/i);
 });
 
-test('AgentInboxPort release removes inbox', () => {
+test('AgentInboxPort release removes inbox [AC:r5-19-agent-native-email#AC-1]', () => {
   const f = fixture();
   f.port.claim(f.principal, 'agent1');
   assert.ok(f.port.list(f.principal));
@@ -69,7 +69,7 @@ test('AgentInboxPort release removes inbox', () => {
   assert.equal(f.port.checkAvailability('agent1').available, true);
 });
 
-test('AgentInboxPort storeInbound and search/read threads', () => {
+test('AgentInboxPort storeInbound and search/read threads [AC:r5-19-agent-native-email#AC-2] [AC:r5-19-agent-native-email#AC-3]', () => {
   const f = fixture();
   f.port.claim(f.principal, 'agent1');
   f.port.storeInbound('agent1', {
@@ -111,7 +111,7 @@ test('AgentInboxPort storeInbound and search/read threads', () => {
   assert.equal(thread[1].messageId, 'm2');
 });
 
-test('AgentInboxPort dedupes by messageId', () => {
+test('AgentInboxPort dedupes by messageId [AC:r5-19-agent-native-email#AC-3]', () => {
   const f = fixture();
   f.port.claim(f.principal, 'agent1');
   const msg = {
@@ -128,7 +128,7 @@ test('AgentInboxPort dedupes by messageId', () => {
   assert.equal(f.port.readThread(f.principal, 't1').length, 1);
 });
 
-test('AgentInboxPort matchesClaimedInbox with +tag addressing', () => {
+test('AgentInboxPort matchesClaimedInbox with +tag addressing [AC:r5-19-agent-native-email#AC-3]', () => {
   const f = fixture();
   assert.equal(f.port.matchesClaimedInbox(f.principal, 'anything'), false);
   f.port.claim(f.principal, 'agent1');
@@ -139,7 +139,7 @@ test('AgentInboxPort matchesClaimedInbox with +tag addressing', () => {
   assert.equal(f.port.matchesClaimedInbox(f.principal, 'agent2+tag'), false);
 });
 
-test('AgentInboxPort isolates per user', () => {
+test('AgentInboxPort isolates per user [AC:r5-19-agent-native-email#AC-1]', () => {
   const f = fixture();
   const other = { userId: 'other' };
   f.port.claim(f.principal, 'user1');
@@ -148,7 +148,7 @@ test('AgentInboxPort isolates per user', () => {
   assert.equal(f.port.list(other)?.localPart, 'user2');
 });
 
-test('product-domain ingest stores without HMAC and honors +tag', () => {
+test('product-domain ingest stores without HMAC and honors +tag [AC:r5-19-agent-native-email#AC-3] [AC:r5-19-agent-native-email#AC-5]', () => {
   const f = fixture();
   f.port.claim(f.principal, 'agent1');
   const result = ingestProductDomainEmail(f.port, {
@@ -165,7 +165,7 @@ test('product-domain ingest stores without HMAC and honors +tag', () => {
   assert.equal(f.port.readThread(f.principal, 'mid-1')[0].body, 'shipped');
 });
 
-test('email/received bind matches claimed inbox +tag', () => {
+test('email/received bind matches claimed inbox +tag [AC:r5-19-agent-native-email#AC-3] [AC:r5-19-agent-native-email#AC-5]', () => {
   const f = fixture();
   f.port.claim(f.principal, 'agent1');
   assert.equal(
@@ -177,4 +177,31 @@ test('email/received bind matches claimed inbox +tag', () => {
     false
   );
   assert.deepEqual(recipientsFromEmailBody({ to: 'agent1@agent.local' }), ['agent1@agent.local']);
+});
+
+test('tools expose exact names [AC:r5-19-agent-native-email#AC-2]', async () => {
+  const { createAgentInboxTools } = await import('../dist/agent-inbox/tools.js');
+  const f = fixture();
+  const tools = createAgentInboxTools(f.store, f.port);
+  assert.deepEqual(
+    tools.map((t) => t.name),
+    ['list_email_inboxes', 'claim_email_inbox', 'search_email_threads', 'read_email_thread']
+  );
+});
+
+test('outbound email identity uses channel.from [AC:r5-19-agent-native-email#AC-4]', async () => {
+  const { describeOutboundIdentity } = await import('../../capability-gateway/dist/outbound-identity.js');
+  const draft = { id: 'd1', channelId: 'email-1', text: 'hi', status: 'pending_approval', revision: 1, createdAt: new Date().toISOString() };
+  const channels = [{ id: 'email-1', type: 'email', url: 'https://relay.example/send', target: 'user@example.com', from: 'agent1@agent.local' }];
+  const identity = describeOutboundIdentity(draft, channels, {});
+  assert.equal(identity.sender, 'agent1@agent.local');
+  assert.equal(identity.recipient, 'user@example.com');
+});
+
+test('no AgentMail substitute in agent-inbox sources [AC:r5-19-agent-native-email#AC-5]', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = ['port.ts', 'tools.ts', 'inbound.ts']
+    .map((name) => readFileSync(new URL('../src/agent-inbox/' + name, import.meta.url), 'utf8'))
+    .join('\n');
+  assert.equal(/agentmail/i.test(src), false);
 });
