@@ -154,6 +154,8 @@ test('gate helper covers each high-risk surface and ignores other tools [AC:mand
   assert.equal(mandatorySkillsForTool('collect_credentials', {})[0].skills[0], MANDATORY_SKILL_NAMES.login);
   assert.equal(mandatorySkillsForTool('vault_get', { id: '1' })[0].skills[0], MANDATORY_SKILL_NAMES.login);
   assert.equal(mandatorySkillsForTool('schedule_social_post', { body: 'hi' })[0].skills[0], MANDATORY_SKILL_NAMES.outboundSend);
+  assert.equal(mandatorySkillsForTool('browser_navigate', { url: 'https://example.com' })[0].skills[0], MANDATORY_SKILL_NAMES.sitePlaybooks);
+  assert.equal(mandatorySkillsForTool('browser_navigate', { url: 'https://example.com' })[0].surface, 'site-playbooks');
   assert.equal(mandatorySkillsForTool('secure_form', { field: 'otp' }).length, 0);
   assert.equal(mandatorySkillsForTool('secure_form', { field: 'cvv' })[0].skills[0], MANDATORY_SKILL_NAMES.payment);
   assert.equal(mandatorySkillsForTool('secure_form', { field: 'cardNumber' })[0].skills[0], MANDATORY_SKILL_NAMES.payment);
@@ -197,4 +199,66 @@ test('Manifest requiredSkills are satisfied by loading the declaring skill [AC:m
   );
   assert.equal(decision.ok, true);
   assert.equal(validateSkillManifest({ version: '1', requiredSkills: ['bad name'] }).ok, false);
+});
+
+
+test('browser_navigate without load_skill fails closed [AC:mandatory-skill-gate#AC-1]', async (t) => {
+  const { dir, store, session } = sessionFixture(t);
+  const nav = tool('browser_navigate');
+  const context = {
+    session,
+    repoRoot: dir,
+    stateDir: dir,
+    agent: { id: 'general', role: 'assistant', instructions: '', capabilities: [] }
+  };
+  const deps = { store, stateDir: dir, tools: [nav.contract], modelAdapter: adapter, maxParallelToolCalls: 1, emitTrace() {} };
+  const denied = await executeSingleTool(
+    deps,
+    { type: 'tool_call', toolCallId: 'nav', name: 'browser_navigate', input: { url: 'https://example.com' } },
+    context,
+    false,
+    session.id
+  );
+  assert.equal(nav.ran(), 0);
+  assert.equal(denied.ok, false);
+  assert.match(denied.content, /load_skill\(site-playbooks\)/);
+});
+
+test('load_skill(site-playbooks) lets browser_navigate proceed [AC:mandatory-skill-gate#AC-2]', async (t) => {
+  const { dir, store, session } = sessionFixture(t);
+  const context = {
+    session,
+    repoRoot: dir,
+    stateDir: dir,
+    agent: { id: 'general', role: 'assistant', instructions: '', capabilities: [] }
+  };
+  const tools = createBuiltinTools({
+    loadSkill: async () => ({ content: 'follow playbooks', skillId: 'site-playbooks' })
+  });
+  const load = tools.find((item) => item.name === 'load_skill');
+  assert.ok(load);
+  const loaded = await load.execute(context, { name: 'site-playbooks' });
+  assert.equal(loaded.ok, true);
+  assert.ok(session.metadata.loadedSkillNames.map((name) => name.toLowerCase()).includes('site-playbooks'));
+
+  const nav = tool('browser_navigate');
+  const deps = { store, stateDir: dir, tools: [nav.contract], modelAdapter: adapter, maxParallelToolCalls: 1, emitTrace() {} };
+  const allowed = await executeSingleTool(
+    deps,
+    { type: 'tool_call', toolCallId: 'nav', name: 'browser_navigate', input: { url: 'https://example.com' } },
+    context,
+    false,
+    session.id
+  );
+  assert.equal(nav.ran(), 1);
+  assert.equal(allowed.ok, true);
+  assert.equal(allowed.content, 'ran');
+});
+
+test('gate helper opens browser_navigate only after site-playbooks load [AC:mandatory-skill-gate#AC-4]', () => {
+  const denied = gateMandatorySkills([], 'browser_navigate', { url: 'https://example.com' });
+  assert.equal(denied.ok, false);
+  assert.match(denied.content, /load_skill\(site-playbooks\)/);
+  const opened = gateMandatorySkills(['site-playbooks'], 'browser_navigate', { url: 'https://example.com' });
+  assert.equal(opened.ok, true);
 });

@@ -1,10 +1,10 @@
 /**
  * Mandatory skill gate for high-risk surfaces.
  *
- * Shopping / login / outbound-send / payment tools fail closed unless this
- * session has successfully load_skill'd every required skill name. A loaded
- * skill's Manifest `requiredSkills` also counts as satisfied — loading S
- * satisfies S and each name it declares.
+ * Shopping / login / outbound-send / payment / site-playbooks tools fail closed
+ * unless this session has successfully load_skill'd every required skill name.
+ * A loaded skill's Manifest `requiredSkills` also counts as satisfied — loading
+ * S satisfies S and each name it declares.
  *
  * Always on for the listed surfaces. Not an env flag.
  * Orthogonal to skill-manifest-gate (that one is a ceiling on what a loaded
@@ -14,26 +14,34 @@
 
 import type { SkillManifest } from './skill-manifest.js';
 
-export type MandatorySkillSurface = 'shopping' | 'login' | 'outbound-send' | 'payment';
+export type MandatorySkillSurface =
+  | 'shopping'
+  | 'login'
+  | 'outbound-send'
+  | 'payment'
+  | 'site-playbooks';
 
 /** Canonical skill name the model must load_skill for each surface. */
 export const MANDATORY_SKILL_NAMES = {
   shopping: 'shopping',
   login: 'login',
   outboundSend: 'outbound-send',
-  payment: 'payment'
+  payment: 'payment',
+  sitePlaybooks: 'site-playbooks'
 } as const;
 
 const SHOPPING = MANDATORY_SKILL_NAMES.shopping;
 const LOGIN = MANDATORY_SKILL_NAMES.login;
 const OUTBOUND = MANDATORY_SKILL_NAMES.outboundSend;
 const PAYMENT = MANDATORY_SKILL_NAMES.payment;
+const SITE_PLAYBOOKS = MANDATORY_SKILL_NAMES.sitePlaybooks;
 
 /** Tools that always belong to a surface, whatever the arguments. */
-const ALWAYS_GATED: Record<string, readonly string[]> = {
-  collect_credentials: [LOGIN],
-  vault_get: [LOGIN],
-  schedule_social_post: [OUTBOUND]
+const ALWAYS_GATED: Record<string, { surface: MandatorySkillSurface; skills: readonly string[] }> = {
+  collect_credentials: { surface: 'login', skills: [LOGIN] },
+  vault_get: { surface: 'login', skills: [LOGIN] },
+  schedule_social_post: { surface: 'outbound-send', skills: [OUTBOUND] },
+  browser_navigate: { surface: 'site-playbooks', skills: [SITE_PLAYBOOKS] }
 };
 
 /**
@@ -200,8 +208,7 @@ export function mandatorySkillsForTool(
 
   const always = ALWAYS_GATED[tool];
   if (always) {
-    const surface: MandatorySkillSurface = tool === 'schedule_social_post' ? 'outbound-send' : 'login';
-    push(out, surface, always);
+    push(out, always.surface, always.skills);
   }
 
   if (tool === 'vault_fill') {
