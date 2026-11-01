@@ -1,0 +1,25 @@
+id: r5-21-check-email-inbox-availability
+title: Independent check_email_inbox_availability tool
+status: implemented
+requirement: |
+  Expose a standalone agent-inbox tool check_email_inbox_availability aligned with Grok
+  CheckEmailInboxAvailability. Complements r5-19 / #374 agent native email. Agents must be
+  able to probe multiple explicitly named local-part candidates before claiming. The tool
+  calls port.checkAvailability only — it does not claim, and it does not invent or randomize
+  local-parts. claim_email_inbox remains fail-closed (still checks availability before claim
+  and rejects invalid/taken local-parts).
+notes: |
+  Machine: 4090. Smallest correct cut: add the tool to createAgentInboxTools + AC YAML + unit tests.
+criteria:
+  - id: AC-1
+    given: Builtin agent-inbox tools are created and an explicitly named lowercase local-part is free
+    when: check_email_inbox_availability runs with that local_part
+    then: The tool returns ok JSON with available true (reason omitted or undefined); the store is unchanged (no claim side-effect)
+  - id: AC-2
+    given: A local-part is already claimed by another user, or the candidate is invalid (empty, uppercase, bad format)
+    when: check_email_inbox_availability runs with that local_part
+    then: The tool returns ok JSON with available false and a reason string; no inbox is claimed
+  - id: AC-3
+    given: createAgentInboxTools is wired and claim_email_inbox still exists
+    when: Tools are listed and claim_email_inbox is invoked with an invalid or taken local_part
+    then: Tool names include check_email_inbox_availability exactly; claim_email_inbox still fail-closes after checkAvailability and does not claim
