@@ -157,7 +157,8 @@ test('identity bar describes who each channel sends as without secrets [AC:outbo
   const tgInline = await id('tg-inline');
   assert.deepEqual([tgInline.sender, tgInline.recipient], ['inline', '42']);
   const mail = await id('mail');
-  assert.deepEqual([mail.sender, mail.recipient], ['mail.test', 'a@example.test']);
+  // r5-22: empty channel.from + no claimedFrom → do not invent URL host; unresolved
+  assert.deepEqual([mail.resolved, mail.sender, mail.recipient], [false, undefined, 'a@example.test']);
   const fs = await id('fs');
   assert.deepEqual([fs.kind, fs.resolved, fs.sender, fs.recipient], ['feishu_bot', true, 'cli_…f6', 'ou_abc']);
   const fsMissing = await id('fs', undefined, {});
