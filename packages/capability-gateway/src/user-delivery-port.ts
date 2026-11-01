@@ -67,6 +67,12 @@ export interface UserDeliveryPortOptions {
   /** Read per call so a Lab change applies immediately. Undefined or disabled = no quiet window. */
   quietHours?: () => QuietHoursPolicy | undefined;
   now?: () => number;
+  /**
+   * Claimed agent-inbox address (`localPart@productDomain`).
+   * Applied when ChannelSpec.from is empty for email identity preview and send.
+   * Explicit channel.from still wins. Return undefined when no claim (do not invent).
+   */
+  claimedFrom?: () => string | undefined;
 }
 
 export function createUserDeliveryPort(opts: UserDeliveryPortOptions): UserDeliveryPort {
@@ -76,7 +82,9 @@ export function createUserDeliveryPort(opts: UserDeliveryPortOptions): UserDeliv
     const policy = opts.quietHours?.();
     return policy && isQuietNow(policy, clock()) ? policy : undefined;
   };
-  const release = (id: string) => releaseOutboundDraft({ gatewayDir, id, decision: 'approve', channels });
+  const claimedFrom = () => opts.claimedFrom?.()?.trim() || undefined;
+  const release = (id: string) =>
+    releaseOutboundDraft({ gatewayDir, id, decision: 'approve', channels, claimedFrom: claimedFrom() });
   return {
     draft(message) {
       return appendOutboundDraft(gatewayDir, {
@@ -114,7 +122,7 @@ export function createUserDeliveryPort(opts: UserDeliveryPortOptions): UserDeliv
     },
     async listPreviews() {
       const drafts = await readOutboundDrafts(gatewayDir);
-      return drafts.map((draft) => previewOutboundDraft(draft, channels));
+      return drafts.map((draft) => previewOutboundDraft(draft, channels, process.env, { claimedFrom: claimedFrom() }));
     },
     async flushDeferred() {
       if (quiet()) return [];

@@ -11,7 +11,7 @@ import { buildWeComWebhookUrl, sendWeComGroupBotMarkdown } from './wecom-send.js
 export async function deliverToChannel(
   channel: ChannelSpec,
   body: Record<string, unknown>,
-  opts?: { approval?: string }
+  opts?: { approval?: string; claimedFrom?: string; requireEmailFrom?: boolean }
 ): Promise<{ ok: boolean; status: number; text: string }> {
   requireHumanEgressApproval(opts?.approval);
   if (channel.type === 'feishu_bot') {
@@ -60,7 +60,10 @@ export async function deliverToChannel(
     const text = channelMessageText(body);
     if (channel.type === 'slack') return sendSlackChatMessage(channel, text);
     if (channel.type === 'telegram') return sendTelegramMessage(channel, text);
-    return sendEmailHttp(channel, text);
+    return sendEmailHttp(channel, text, env, {
+      claimedFrom: opts?.claimedFrom,
+      requireFrom: opts?.requireEmailFrom
+    });
   }
 
   const headers: Record<string, string> = {

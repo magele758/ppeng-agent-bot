@@ -1,0 +1,28 @@
+id: r5-22-outbound-from-claimed
+title: Outbound email from=claimed when ChannelSpec.from empty
+status: implemented
+requirement: |
+  Fill r5-19 AC-4 residual: when ChannelSpec.from is empty, outbound identity.sender
+  and email_http JSON `from` use the claimed `localPart@productDomain`. Explicit
+  channel.from still wins. No claim → do not invent an address (identity unresolved;
+  no URL-host fallback). Draft→Confirm→Send unchanged; no silent send; no AgentMail.
+notes: |
+  Machine: 4090. Precedence documented on ChannelSpec.from and resolveEmailOutboundFrom.
+  claimedFrom threaded through UserDeliveryPort / releaseOutboundDraft / deliverToChannel.
+criteria:
+  - id: AC-1
+    given: A claimed inbox exists and the email channel has empty ChannelSpec.from
+    when: outbound draft identity is previewed and email_http sends after Draft→Confirm
+    then: identity.sender and the email_http JSON from field equal the claimed localPart@productDomain
+  - id: AC-2
+    given: ChannelSpec.from is set to an address different from the claimed inbox
+    when: identity is previewed and email_http builds its payload
+    then: Explicit channel.from wins for both identity.sender and payload.from (claimed is ignored)
+  - id: AC-3
+    given: No claimed inbox and ChannelSpec.from is empty
+    when: identity is previewed
+    then: from is not invented; identity.resolved is false and sender is unset; Draft→Confirm→Send path is unchanged (no silent send)
+  - id: AC-4
+    given: The r5-22 acceptance and focused unit suite (identity preview + sendEmailHttp payload)
+    when: The gate and unit tests run
+    then: Criteria are tagged and covered; no third-party AgentMail substitute is registered

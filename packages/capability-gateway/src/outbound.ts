@@ -61,6 +61,7 @@ async function sendApprovedChannel(opts: {
   text: string;
   event?: string;
   draftId?: string;
+  claimedFrom?: string;
 }): Promise<void> {
   await sendLedgered({
     gatewayDir: opts.gatewayDir,
@@ -74,7 +75,7 @@ async function sendApprovedChannel(opts: {
           text,
           event: opts.event ?? 'gateway.im.reply'
         },
-        { approval: 'approved' }
+        { approval: 'approved', claimedFrom: opts.claimedFrom }
       );
       if (!result.ok) throw new Error(result.text || 'delivery failed');
     }
@@ -115,6 +116,8 @@ export async function releaseOutboundDraft(input: {
   channels: ChannelSpec[];
   /** Revision of the preview the human saw. A stale value fails closed instead of sending newer text. */
   expectedRevision?: number;
+  /** Claimed inbox address for email from fallback when ChannelSpec.from is empty. */
+  claimedFrom?: string;
 }): Promise<OutboundDraft> {
   if (input.decision === 'reject') {
     try {
@@ -165,7 +168,8 @@ export async function releaseOutboundDraft(input: {
         channel,
         text: draft.text,
         event: draft.event,
-        draftId: draft.id
+        draftId: draft.id,
+        claimedFrom: input.claimedFrom
       });
     }
     return await settleOutboundDraft(input.gatewayDir, draft.id, { status: 'sent' });

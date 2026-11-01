@@ -41,7 +41,12 @@ export interface ChannelSpec {
   target?: string;
   /** Subject field on the email_http JSON body. */
   subject?: string;
-  /** From address for email_http when sending as a claimed agent inbox. */
+  /**
+   * From address for email_http.
+   * Precedence (r5-22): explicit `from` wins; when empty, outbound identity +
+   * email_http JSON `from` fall back to the claimed `localPart@productDomain`;
+   * with no claim, from is not invented (identity unresolved).
+   */
   from?: string;
 }
 

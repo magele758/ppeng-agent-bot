@@ -50,6 +50,7 @@ export {
 export {
   describeOutboundIdentity,
   previewOutboundDraft,
+  resolveEmailOutboundFrom,
   type OutboundDraftPreview,
   type OutboundIdentity,
   type OutboundIdentityKind

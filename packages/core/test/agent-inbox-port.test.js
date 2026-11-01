@@ -204,6 +204,39 @@ test('outbound email identity uses channel.from [AC:r5-19-agent-native-email#AC-
   assert.equal(identity.recipient, 'user@example.com');
 });
 
+test('outbound email identity uses claimed address when channel.from empty [AC:r5-22-outbound-from-claimed#AC-1]', async () => {
+  const { describeOutboundIdentity } = await import('../../capability-gateway/dist/outbound-identity.js');
+  const draft = { id: 'd1', channelId: 'email-1', text: 'hi', status: 'pending_approval', revision: 1, createdAt: new Date().toISOString() };
+  const channels = [{ id: 'email-1', type: 'email', url: 'https://relay.example/send', target: 'user@example.com' }];
+  const claimed = 'agent1@agent.local';
+  const identity = describeOutboundIdentity(draft, channels, {}, { claimedFrom: claimed });
+  assert.equal(identity.resolved, true);
+  assert.equal(identity.sender, claimed);
+  assert.equal(identity.recipient, 'user@example.com');
+});
+
+test('outbound email identity prefers explicit channel.from over claimed [AC:r5-22-outbound-from-claimed#AC-2]', async () => {
+  const { describeOutboundIdentity, resolveEmailOutboundFrom } = await import('../../capability-gateway/dist/outbound-identity.js');
+  const draft = { id: 'd1', channelId: 'email-1', text: 'hi', status: 'pending_approval', revision: 1, createdAt: new Date().toISOString() };
+  const channels = [{ id: 'email-1', type: 'email', url: 'https://relay.example/send', target: 'user@example.com', from: 'explicit@other.example' }];
+  const identity = describeOutboundIdentity(draft, channels, {}, { claimedFrom: 'agent1@agent.local' });
+  assert.equal(identity.sender, 'explicit@other.example');
+  const resolved = resolveEmailOutboundFrom(channels[0], 'agent1@agent.local');
+  assert.equal(resolved.source, 'channel');
+  assert.equal(resolved.from, 'explicit@other.example');
+});
+
+test('outbound email identity unresolved when no from and no claim [AC:r5-22-outbound-from-claimed#AC-3]', async () => {
+  const { describeOutboundIdentity, resolveEmailOutboundFrom } = await import('../../capability-gateway/dist/outbound-identity.js');
+  const draft = { id: 'd1', channelId: 'email-1', text: 'hi', status: 'pending_approval', revision: 1, createdAt: new Date().toISOString() };
+  const channels = [{ id: 'email-1', type: 'email', url: 'https://relay.example/send', target: 'user@example.com' }];
+  const identity = describeOutboundIdentity(draft, channels, {});
+  assert.equal(identity.resolved, false);
+  assert.equal(identity.sender, undefined);
+  assert.equal(resolveEmailOutboundFrom(channels[0]).resolved, false);
+});
+
+
 test('no AgentMail substitute in agent-inbox sources [AC:r5-19-agent-native-email#AC-5]', async () => {
   const { readFileSync } = await import('node:fs');
   const src = ['port.ts', 'tools.ts', 'inbound.ts']

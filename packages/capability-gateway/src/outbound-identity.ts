@@ -20,6 +20,33 @@ export interface OutboundDraftPreview extends OutboundDraft {
   identity: OutboundIdentity;
 }
 
+/** Optional claimed inbox address (`localPart@productDomain`) for email from fallback. */
+export interface OutboundIdentityOptions {
+  /**
+   * Claimed agent-inbox address. Used only when `ChannelSpec.from` is empty.
+   * Explicit `channel.from` always wins. When neither is set, email identity
+   * stays unresolved and does not invent a from (no URL-host fallback).
+   */
+  claimedFrom?: string;
+}
+
+/**
+ * Resolve email outbound From with documented precedence:
+ * 1. Explicit `ChannelSpec.from` (wins)
+ * 2. Claimed inbox `localPart@productDomain` when from is empty
+ * 3. Otherwise unresolved — do not invent an address
+ */
+export function resolveEmailOutboundFrom(
+  channel: Pick<ChannelSpec, 'from'>,
+  claimedFrom?: string
+): { from?: string; resolved: boolean; source?: 'channel' | 'claimed' } {
+  const explicit = channel.from?.trim();
+  if (explicit) return { from: explicit, resolved: true, source: 'channel' };
+  const claimed = claimedFrom?.trim();
+  if (claimed) return { from: claimed, resolved: true, source: 'claimed' };
+  return { resolved: false };
+}
+
 function maskId(id: string): string {
   return id.length <= 8 ? `${id.slice(0, 2)}…` : `${id.slice(0, 4)}…${id.slice(-2)}`;
 }
@@ -58,7 +85,11 @@ function chatTarget(channel: ChannelSpec): string | undefined {
   return isHttp(channel.url) ? undefined : channel.url.trim() || undefined;
 }
 
-function describeChannel(channel: ChannelSpec, env: NodeJS.ProcessEnv): OutboundIdentity {
+function describeChannel(
+  channel: ChannelSpec,
+  env: NodeJS.ProcessEnv,
+  options?: OutboundIdentityOptions
+): OutboundIdentity {
   const base = { channelId: channel.id, kind: channel.type, resolved: true };
   switch (channel.type) {
     case 'feishu_bot': {
@@ -68,12 +99,15 @@ function describeChannel(channel: ChannelSpec, env: NodeJS.ProcessEnv): Outbound
     case 'slack':
     case 'telegram':
       return { ...base, sender: tokenSource(channel), recipient: chatTarget(channel) };
-    case 'email':
+    case 'email': {
+      const emailFrom = resolveEmailOutboundFrom(channel, options?.claimedFrom);
       return {
         ...base,
-        sender: channel.from?.trim() || hostOf(channel.url),
+        resolved: emailFrom.resolved,
+        sender: emailFrom.from,
         recipient: channel.target?.trim() || undefined
       };
+    }
     case 'webhook':
     case 'http_post':
     case 'wecom_group_bot':
@@ -100,18 +134,20 @@ function describeDirectFeishu(draft: OutboundDraft, env: NodeJS.ProcessEnv): Out
 export function describeOutboundIdentity(
   draft: OutboundDraft,
   channels: ChannelSpec[],
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  options?: OutboundIdentityOptions
 ): OutboundIdentity {
   if (draft.receiveId && draft.receiveIdType) return describeDirectFeishu(draft, env);
   const channel = channels.find((item) => item.id === draft.channelId);
   if (!channel) return { channelId: draft.channelId, kind: 'unknown', resolved: false };
-  return describeChannel(channel, env);
+  return describeChannel(channel, env, options);
 }
 
 export function previewOutboundDraft(
   draft: OutboundDraft,
   channels: ChannelSpec[],
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  options?: OutboundIdentityOptions
 ): OutboundDraftPreview {
-  return { ...draft, identity: describeOutboundIdentity(draft, channels, env) };
+  return { ...draft, identity: describeOutboundIdentity(draft, channels, env, options) };
 }
