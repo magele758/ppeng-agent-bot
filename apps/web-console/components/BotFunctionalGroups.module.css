@@ -28,3 +28,4 @@
 .fact input, .fact textarea { width: 100%; min-width: 0; grid-column: 1; box-sizing: border-box; font: inherit; }
 .fact textarea { resize: vertical; min-height: 72px; line-height: 1.6; }
 .fact button { grid-column: 2; grid-row: 1 / 3; align-self: start; }
+.sharedHeading, .sharedBody, .sharedFooter { background: var(--ui-surface); }
