@@ -1,4 +1,12 @@
 export const botSettings = {
+ overview: 'Overview',
+ editBasics: 'Edit basic information',
+ modelAndExecution: 'Model and execution settings',
+ addRoutine: 'Add scheduled task',
+ editRoutine: 'Edit scheduled task',
+ routineOptions: 'Advanced options',
+ routineSettings: 'Schedule settings',
+ routineDetails: 'Task content and history',
  basic: 'Basics', capabilities: 'Capabilities & permissions', automation: 'Automation', records: 'Records',
  name: 'Bot name', title: 'Role', description: 'Purpose & instructions', saveBasics: 'Save basics',
  optional: 'Optional details & appearance', appearance: 'Appearance', purpose: 'What should it do?', create: 'Create and start chatting', createHint: 'Name your Bot and describe what it should do, then start chatting.',

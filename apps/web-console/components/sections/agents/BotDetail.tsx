@@ -1,5 +1,5 @@
 'use client';
-import { BotBasics } from '../../BotBasics';
+import { BotOverviewInfo, revealBotSetting } from '../../BotOverviewInfo';
 import { BotGoals } from '../../bot-work/BotGoals';
 import { BotDetailSkills } from '../../BotDetailSkills';
 
@@ -38,7 +38,7 @@ import { BotPolicySettings } from '../../BotPolicySettings';
 import { BotFace } from '../../BotFace';
 import { BotFaceChoice } from '../../BotFaceChoice';
 import { useLab } from '../../shell/LabProvider';
-import { SettingsGroup } from '../../ui';
+
 
 interface BotDetailProps {
   bot: BotInfo;
@@ -203,7 +203,7 @@ export function BotDetail({ bot, onOpenChat, records, embedded = false }: BotDet
     }
     const target = readBotPermissionsTarget(window.location.hash);
     if (!target || target.botId !== bot.id) return;
-    panelRef.current?.querySelector('[data-testid=bot-permissions]')?.scrollIntoView({ block: 'start' });
+    revealBotSetting(panelRef.current, '[data-testid=bot-permissions]');
   }, [settings, bot.id]);
 
   useEffect(() => {
@@ -294,7 +294,7 @@ export function BotDetail({ bot, onOpenChat, records, embedded = false }: BotDet
   );
 
   return (
-    <section ref={panelRef} className="ag-panel" aria-label={t('agents.bots.detailTitle')} id={embedded ? 'botDetailEmbedded' : 'botDetail'} data-testid={embedded ? "bot-detail-embedded" : "bot-detail"}>
+    <section ref={panelRef} className="ag-panel bot-settings-panel" aria-label={t('agents.bots.detailTitle')} id={embedded ? 'botDetailEmbedded' : 'botDetail'} data-testid={embedded ? "bot-detail-embedded" : "bot-detail"}>
       <div className="ag-panel__head">
         <div className="ag-panel__identity">
           <BotFace
@@ -323,7 +323,6 @@ export function BotDetail({ bot, onOpenChat, records, embedded = false }: BotDet
       <div className="ag-chips">
         <span className="chip chip-muted">{t('agents.bots.agentChip', { agent: bot.agentId })}</span>
       </div>
-      {bot.description ? <p className="ag-panel__lead">{bot.description}</p> : null}
       {error ? (
         <p className="ag-status ag-status--err" role="alert">
           {error}
@@ -331,12 +330,14 @@ export function BotDetail({ bot, onOpenChat, records, embedded = false }: BotDet
       ) : null}
       {!settings && !error ? <p className="ag-panel__lead">{t('agents.bots.loadingSettings')}</p> : null}
       <div className="bot-settings-tabs" role="tablist" aria-label={t('polish.settingsTabs')}>
-        {(['overview', 'permissions', 'automation', 'history'] as const).map(tab => <button key={tab} type="button" role="tab" id={`${panelId}-tab-${tab}`} aria-controls={`${panelId}-page-${tab}`} aria-selected={detailTab === tab} onClick={() => setDetailTab(tab)}>{t(tab === 'overview' ? 'botSettings.basic' : tab === 'permissions' ? 'botSettings.capabilities' : tab === 'automation' ? 'botSettings.automation' : 'botSettings.records')}</button>)}
+        {(['overview', 'permissions', 'history'] as const).map(tab => <button key={tab} type="button" role="tab" id={`${panelId}-tab-${tab}`} aria-controls={`${panelId}-page-${tab}`} aria-selected={detailTab === tab} onClick={() => setDetailTab(tab)}>{t(tab === 'overview' ? 'botSettings.overview' : tab === 'permissions' ? 'botSettings.capabilities' : 'botSettings.records')}</button>)}
       </div>
-      <p>{t('botSettings.scope')}</p>
       {saveEffect && <p role="status" data-testid="bot-save-effect">{t(`botSettings.${saveEffect}`)}</p>}
       <div role="tabpanel" id={`${panelId}-page-overview`} aria-labelledby={`${panelId}-tab-overview`} hidden={detailTab !== 'overview'}>
-      <BotBasics key={bot.id} bot={bot} onSave={patchBot} />
+      <BotOverviewInfo bot={bot} onSave={patchBot} />
+      <BotCronPanel key={bot.id} botId={bot.id} botName={bot.name} />
+      <details className="bot-settings-disclosure"><summary>{t('botSettings.modelAndExecution')}</summary>
+      <p className="ag-panel__lead">{t('botSettings.scope')}</p>
       {settings && <>          <BotModelSetting
             botId={bot.id}
             pinned={settings.modelOverride}
@@ -353,7 +354,9 @@ export function BotDetail({ bot, onOpenChat, records, embedded = false }: BotDet
               onSave={patchBot}
             />
           </div></>}
-      <details><summary>{t('botSettings.appearance')}</summary>
+      <BotRuntimeControl botId={bot.id}/>
+      </details>
+      <details className="bot-settings-disclosure"><summary>{t('botSettings.appearance')}</summary>
       <BotFaceChoice
         name={bot.name}
         botId={bot.id}
@@ -420,7 +423,6 @@ export function BotDetail({ bot, onOpenChat, records, embedded = false }: BotDet
 
       </details>
       {sessionId && <BotGoals key={`${bot.id}:${sessionId}`} botId={bot.id} sessionId={sessionId}/>}
-      <BotRuntimeControl botId={bot.id}/>
       </div>
       <div role="tabpanel" id={`${panelId}-page-history`} aria-labelledby={`${panelId}-tab-history`} hidden={detailTab !== 'history'}>
       <BotHistory sessionId={sessionId} />
@@ -431,11 +433,6 @@ export function BotDetail({ bot, onOpenChat, records, embedded = false }: BotDet
       {settings && <BotPolicySettings onlyTools botId={bot.id} maxTurns={settings.maxTurns} permissionMode={settings.permissionMode} onSavePermission={savePermission} allowedTools={settings.allowedTools} onSave={patchBot} />}
       {visitedCapabilities && <BotDetailSkills botId={bot.id}/>}
       <div data-bot-connections id={embedded ? `${panelId}-connections` : "bot-connections"}><BotConnections botId={bot.id} /></div>
-      </div>
-      <div role="tabpanel" id={`${panelId}-page-automation`} aria-labelledby={`${panelId}-tab-automation`} hidden={detailTab !== 'automation'}>
-          <SettingsGroup title={t('agents.bots.sectionSchedule')}>
-            <BotCronPanel botId={bot.id} botName={bot.name} />
-          </SettingsGroup>
       </div>
     </section>
   );

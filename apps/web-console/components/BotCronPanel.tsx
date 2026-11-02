@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {RoutineWorkLinkFields,type RoutineWorkLinkValue} from './RoutineWorkLinkFields';
+import { RoutineEditorDialog } from './RoutineEditorDialog';
 import { RoutineSchedule } from './RoutineSchedule';
 import { RoutineRuns } from './bot-work/RoutineRuns';
 import { zonedLocalToIso, zonedInstantToLocal } from '@/lib/routine-time';
@@ -67,6 +68,7 @@ export function BotCronPanel({
   botName?: string;
   taskTemplate?: {taskId:string;attempt:number;prompt:string};
 }) {
+  const [editorOpen, setEditorOpen] = useState(Boolean(taskTemplate));
   const [workLink,setWorkLink]=useState<RoutineWorkLinkValue|null>(null);
   const [editingId,setEditingId]=useState<string|null>(null);
   const [scheduleKind,setScheduleKind]=useState('cron');
@@ -150,6 +152,7 @@ export function BotCronPanel({
           ...(precheck ? { precheck: {...precheck,mode:precheckMode} } : editingId ? { precheck: null } : {})
         })
       });
+      setEditorOpen(false);
       setEditingId(null);setWorkLink(null);
       setExpiresAt('');
       setName('');
@@ -194,6 +197,17 @@ export function BotCronPanel({
     }
   };
 
+  function openNewRoutine() {
+    setEditingId(null); setWorkLink(null); setSourceDelivery(undefined);
+    setName(''); setPrompt(''); setRoomId(''); setErr(null);
+    setScheduleKind('cron'); setPreset(defaultRoutineSchedule().preset);
+    setTime(defaultRoutineSchedule().time); setCronDraft(defaultRoutineSchedule().cron); setWeekday(1);
+    setOnceAt(''); setExpiresAt(''); setIntervalSeconds(3600); setEvent(''); setEventSecret(''); setConclusions('');
+    setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone); setMissedPolicy('coalesce');
+    setDeliveryPolicy({inputSources:'',changesOnly:false,failureThreshold:1,approvalBeforeSend:false});
+    setPrecheckKind('none'); setPrecheckSource(''); setPrecheckMode('strict'); setEditorOpen(true);
+  }
+
   function refreshSchedule() { void load(); }
 
   if (!botId) {
@@ -212,12 +226,16 @@ export function BotCronPanel({
       <div className="activity-panel__head">
         <h3 className="activity-panel__title">{t('play.cronPanel.title')}</h3>
         <span className="badge">{jobs.length}</span>
+        <button type="button" className="btn btn-primary btn-sm" data-testid="routine-add" disabled={busy} onClick={openNewRoutine}>{t('botSettings.addRoutine')}</button>
       </div>
+      <details className="bot-settings-disclosure bot-routine-settings"><summary>{t('botSettings.routineSettings')}</summary>
       <p className="bot-cron-panel__hint">
         {t('play.cronPanel.bound', { name: botName ?? botId })}
       </p>
 
       <label><input type="checkbox" checked={dialogTools} disabled={busy} onChange={e=>{const enabled=e.target.checked;void api('/api/cron/settings',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({dialogToolsEnabled:enabled})}).then(()=>setDialogTools(enabled)).catch(e=>setErr(String(e)));}}/>{t('botWork.dialogTools')}</label>
+      </details>
+      <RoutineEditorDialog open={editorOpen} editingId={editingId} busy={busy} error={err} onClose={() => setEditorOpen(false)}>
       <form
         className="bot-cron-form"
         onSubmit={(e) => {
@@ -249,25 +267,7 @@ export function BotCronPanel({
           />
         </label>
         <label className="field field--stack"><span>{t('botWork.schedule')}</span><select value={scheduleKind} onChange={e=>setScheduleKind(e.target.value)}><option value="cron">{t('botWork.cron')}</option><option value="once">{t('botWork.once')}</option><option value="interval">{t('botWork.interval')}</option><option value="event">{t('botWork.event')}</option></select></label>
-        {sourceDelivery&&<p>{t('botWork.routineSourceVersion',{task:sourceDelivery.taskId,attempt:sourceDelivery.attempt})}</p>}
-        <label className="field field--stack"><span>{t('botWork.routineInputs')}</span><textarea aria-label={t('botWork.routineInputs')} value={deliveryPolicy.inputSources} onChange={e=>setDeliveryPolicy({...deliveryPolicy,inputSources:e.target.value})}/></label>
-        <label className="field field--stack"><span>{t('botWork.routineOutput')}</span><select aria-label={t('botWork.routineOutput')} value={roomId} onChange={e=>setRoomId(e.target.value)}><option value="">{t('botWork.routineOutputChat')}</option>{rooms.filter(room=>room.botIds.includes(botId??'')).map(room=><option key={room.id} value={room.id}>{room.title}</option>)}</select></label>
-        <label><input type="checkbox" checked={deliveryPolicy.changesOnly} onChange={e=>setDeliveryPolicy({...deliveryPolicy,changesOnly:e.target.checked})}/>{t('botWork.routineChangesOnly')}</label>
-        <label className="field field--stack"><span>{t('botWork.routineFailureThreshold')}</span><input type="number" min={1} max={100} required value={deliveryPolicy.failureThreshold} onChange={e=>setDeliveryPolicy({...deliveryPolicy,failureThreshold:Number(e.target.value)})}/></label>
-        <label><input type="checkbox" checked={deliveryPolicy.approvalBeforeSend} onChange={e=>setDeliveryPolicy({...deliveryPolicy,approvalBeforeSend:e.target.checked})}/>{t('botWork.routineApprovalBeforeSend')}</label>
-        <label><input type="checkbox" checked={deliveryPolicy.comparison==='facts'} onChange={e=>setDeliveryPolicy({...deliveryPolicy,comparison:e.target.checked?'facts':'text'})}/>{t('botWork.attentionFacts')}</label>
-        <p>{t('botWork.attentionFactsHint')}</p>
-        <label><input type="checkbox" checked={deliveryPolicy.quietStart!==undefined} onChange={e=>setDeliveryPolicy({...deliveryPolicy,quietStart:e.target.checked?22:undefined,quietEnd:e.target.checked?8:undefined})}/>{t('botWork.attentionQuiet')}</label>
-        {deliveryPolicy.quietStart!==undefined&&<div>
-          <label>{t('botWork.attentionStart')}<input type="number" min={0} max={23} value={deliveryPolicy.quietStart} onChange={e=>setDeliveryPolicy({...deliveryPolicy,quietStart:Number(e.target.value)})}/></label>
-          <label>{t('botWork.attentionEnd')}<input type="number" min={0} max={23} value={deliveryPolicy.quietEnd} onChange={e=>setDeliveryPolicy({...deliveryPolicy,quietEnd:Number(e.target.value)})}/></label>
-        </div>}
-        <label>{t('botWork.attentionBudget')}<input type="number" min={0} max={1000} value={deliveryPolicy.dailyBudget??0} onChange={e=>setDeliveryPolicy({...deliveryPolicy,dailyBudget:Number(e.target.value)||undefined})}/></label>
-        <p>{t('botWork.routineNotificationNote')}</p>
-        <label className="field field--stack"><span>{t('botWork.timezone')}</span><input required value={timezone} onChange={e=>setTimezone(e.target.value)}/></label>
-        <label className="field field--stack"><span>{t('botWork.missed')}</span><select value={missedPolicy} onChange={e=>setMissedPolicy(e.target.value)}><option value="coalesce">{t('botWork.coalesce')}</option><option value="skip">{t('botWork.skip')}</option><option value="catch_up">{t('botWork.catchUp')}</option></select></label>
         {scheduleKind==='once'&&<label>{t('botWork.onceAt')}<input type="datetime-local" required value={onceAt} onChange={e=>setOnceAt(e.target.value)}/></label>}
-        {supportsRoutineExpiration(scheduleKind)&&<label className="field field--stack"><span>{t('botWork.expiresAt')}</span><input className="input-compact" type="datetime-local" value={expiresAt} onChange={e=>setExpiresAt(e.target.value)}/></label>}
         {scheduleKind==='interval'&&<label>{t('botWork.intervalSeconds')}<input type="number" min={60} required value={intervalSeconds} onChange={e=>setIntervalSeconds(Number(e.target.value))}/></label>}
         {scheduleKind==='event'&&<><label>{t('botWork.eventName')}<input required value={event} onChange={e=>setEvent(e.target.value)}/></label><label>{t('botWork.routineSecret')}<input value={eventSecret} onChange={e=>setEventSecret(e.target.value)}/></label>{event==='ci/status'&&<label>{t('botWork.ciConclusions')}<input value={conclusions} onChange={e=>setConclusions(e.target.value)}/></label>}</>}
         {scheduleKind==='cron'&&<>
@@ -325,6 +325,7 @@ export function BotCronPanel({
             )}
           </label>
         ) : null}
+        <details className="bot-settings-disclosure"><summary>{t('play.cronPanel.cronAria')}</summary>
         <label className="field field--stack">
           <span>{t('botWork.cron')}</span>
           <input
@@ -336,7 +337,27 @@ export function BotCronPanel({
             spellCheck={false}
           />
         </label>
+        </details>
         </>}
+        <details className="bot-settings-disclosure"><summary>{t('botSettings.routineOptions')}</summary>
+        <label className="field field--stack"><span>{t('botWork.timezone')}</span><input required value={timezone} onChange={e=>setTimezone(e.target.value)}/></label>
+        <label className="field field--stack"><span>{t('botWork.missed')}</span><select value={missedPolicy} onChange={e=>setMissedPolicy(e.target.value)}><option value="coalesce">{t('botWork.coalesce')}</option><option value="skip">{t('botWork.skip')}</option><option value="catch_up">{t('botWork.catchUp')}</option></select></label>
+        {supportsRoutineExpiration(scheduleKind)&&<label className="field field--stack"><span>{t('botWork.expiresAt')}</span><input className="input-compact" type="datetime-local" value={expiresAt} onChange={e=>setExpiresAt(e.target.value)}/></label>}
+        {sourceDelivery&&<p>{t('botWork.routineSourceVersion',{task:sourceDelivery.taskId,attempt:sourceDelivery.attempt})}</p>}
+        <label className="field field--stack"><span>{t('botWork.routineInputs')}</span><textarea aria-label={t('botWork.routineInputs')} value={deliveryPolicy.inputSources} onChange={e=>setDeliveryPolicy({...deliveryPolicy,inputSources:e.target.value})}/></label>
+        <label className="field field--stack"><span>{t('botWork.routineOutput')}</span><select aria-label={t('botWork.routineOutput')} value={roomId} onChange={e=>setRoomId(e.target.value)}><option value="">{t('botWork.routineOutputChat')}</option>{rooms.filter(room=>room.botIds.includes(botId??'')).map(room=><option key={room.id} value={room.id}>{room.title}</option>)}</select></label>
+        <label><input type="checkbox" checked={deliveryPolicy.changesOnly} onChange={e=>setDeliveryPolicy({...deliveryPolicy,changesOnly:e.target.checked})}/>{t('botWork.routineChangesOnly')}</label>
+        <label className="field field--stack"><span>{t('botWork.routineFailureThreshold')}</span><input type="number" min={1} max={100} required value={deliveryPolicy.failureThreshold} onChange={e=>setDeliveryPolicy({...deliveryPolicy,failureThreshold:Number(e.target.value)})}/></label>
+        <label><input type="checkbox" checked={deliveryPolicy.approvalBeforeSend} onChange={e=>setDeliveryPolicy({...deliveryPolicy,approvalBeforeSend:e.target.checked})}/>{t('botWork.routineApprovalBeforeSend')}</label>
+        <label><input type="checkbox" checked={deliveryPolicy.comparison==='facts'} onChange={e=>setDeliveryPolicy({...deliveryPolicy,comparison:e.target.checked?'facts':'text'})}/>{t('botWork.attentionFacts')}</label>
+        <p>{t('botWork.attentionFactsHint')}</p>
+        <label><input type="checkbox" checked={deliveryPolicy.quietStart!==undefined} onChange={e=>setDeliveryPolicy({...deliveryPolicy,quietStart:e.target.checked?22:undefined,quietEnd:e.target.checked?8:undefined})}/>{t('botWork.attentionQuiet')}</label>
+        {deliveryPolicy.quietStart!==undefined&&<div>
+          <label>{t('botWork.attentionStart')}<input type="number" min={0} max={23} value={deliveryPolicy.quietStart} onChange={e=>setDeliveryPolicy({...deliveryPolicy,quietStart:Number(e.target.value)})}/></label>
+          <label>{t('botWork.attentionEnd')}<input type="number" min={0} max={23} value={deliveryPolicy.quietEnd} onChange={e=>setDeliveryPolicy({...deliveryPolicy,quietEnd:Number(e.target.value)})}/></label>
+        </div>}
+        <label>{t('botWork.attentionBudget')}<input type="number" min={0} max={1000} value={deliveryPolicy.dailyBudget??0} onChange={e=>setDeliveryPolicy({...deliveryPolicy,dailyBudget:Number(e.target.value)||undefined})}/></label>
+        <p>{t('botWork.routineNotificationNote')}</p>
         <label className="field field--stack">
           <span>{t('play.cronPanel.precheck')}</span>
           <select
@@ -367,10 +388,12 @@ export function BotCronPanel({
         {precheckKind !== 'none' && <label><span>{t('botWork.precheckMode')}</span><select data-testid="strict-precheck-mode" value={precheckMode} onChange={e=>setPrecheckMode(e.target.value as 'strict'|'compat')}><option value="strict">{t('botWork.precheckStrict')}</option><option value="compat">{t('botWork.precheckCompat')}</option></select></label>}
         {precheckKind !== 'none' ? <p className="bot-cron-form__preview">{t('play.cronPanel.precheckHint')}</p> : null}
         {scheduleKind==='cron'&&<p className="bot-cron-form__preview">{describeCron(generatedCron)}</p>}
+        </details>
         <button type="submit" className="btn btn-primary btn-sm" disabled={busy}>
           {editingId?t('botWork.save'):t('play.cronPanel.add')}
         </button>
       </form>
+      </RoutineEditorDialog>
 
       {err ? <p className="bot-cron-panel__err">{err}</p> : null}
 
@@ -384,20 +407,23 @@ export function BotCronPanel({
             <article key={job.id} data-testid="bot-detail-routine" className={`activity-card${job.enabled ? '' : ' is-off'}`}>
               <div className="bot-cron-card__head">
                 <strong>{job.name}</strong>
+                <RoutineEnabled enabled={job.enabled} />
 
               </div>
               <RoutineSchedule job={job} onSaved={refreshSchedule} />
               <WorkLinkStopStatus job={job}/>
+              <details className="bot-settings-disclosure"><summary>{t('botSettings.routineDetails')}</summary>
               <p className="bot-cron-card__prompt">{job.prompt}</p>
               {summary ? <p className="bot-cron-card__meta">{summary}</p> : null}
+              <RoutineRuns jobId={job.id}/>
+              </details>
               <p className="bot-cron-card__meta">
                 {t('play.cronPanel.next', { when: formatWhen(job.nextRunAt) })}
                 {job.lastRunAt ? t('play.cronPanel.last', { when: formatWhen(job.lastRunAt) }) : ''}
               </p>
               <p>{String(routineTimezone(job.timezone, timezone))}</p>
               {job.expiresAt&&<p className="bot-cron-card__meta">{t('botWork.expiresAt')}: {formatWhen(job.expiresAt)}</p>}
-              <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={()=>{setEditingId(job.id);setWorkLink(storedWorkLink(job));setSourceDelivery(job.metadata.sourceDelivery as {taskId:string;attempt:number}|undefined);setRoomId(String(job.metadata.roomId??''));setDeliveryPolicy((job.metadata.deliveryPolicy as typeof deliveryPolicy)??{inputSources:'',changesOnly:false,failureThreshold:1,approvalBeforeSend:false});setExpiresAt(job.expiresAt?zonedInstantToLocal(job.expiresAt,routineTimezone(job.timezone, timezone)):'');setName(job.name);setPrompt(job.prompt);setTimezone(String(routineTimezone(job.timezone, timezone)));setMissedPolicy(String(job.missedPolicy??'coalesce'));if(job.scheduleKind==='once_at'){setScheduleKind('once');setOnceAt(zonedInstantToLocal(job.scheduleValue,routineTimezone(job.timezone, timezone)));}else if(job.scheduleKind==='every_ms'){setScheduleKind('interval');setIntervalSeconds(Number(job.scheduleValue)/1000);}else if(job.scheduleKind==='event'){setScheduleKind('event');setEvent(job.scheduleValue);setEventSecret(String(job.metadata.secretEnv??''));setConclusions(Array.isArray(job.metadata.conclusions)?job.metadata.conclusions.join(', '):'');}else{setScheduleKind('cron');setPreset('custom');setCronDraft(job.scheduleValue);}const check=job.metadata.precheck as {kind?:'script'|'predicate';source?:string}|undefined;setPrecheckKind(check?.kind??'none');setPrecheckSource(check?.source??'');setPrecheckMode(job.metadata.precheckMode==='strict'?'strict':'compat');}}>{t('botWork.edit')}</button>
-              <RoutineRuns jobId={job.id}/>
+              <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={()=>{setEditorOpen(true);setErr(null);setEditingId(job.id);setWorkLink(storedWorkLink(job));setSourceDelivery(job.metadata.sourceDelivery as {taskId:string;attempt:number}|undefined);setRoomId(String(job.metadata.roomId??''));setDeliveryPolicy((job.metadata.deliveryPolicy as typeof deliveryPolicy)??{inputSources:'',changesOnly:false,failureThreshold:1,approvalBeforeSend:false});setExpiresAt(job.expiresAt?zonedInstantToLocal(job.expiresAt,routineTimezone(job.timezone, timezone)):'');setName(job.name);setPrompt(job.prompt);setTimezone(String(routineTimezone(job.timezone, timezone)));setMissedPolicy(String(job.missedPolicy??'coalesce'));if(job.scheduleKind==='once_at'){setScheduleKind('once');setOnceAt(zonedInstantToLocal(job.scheduleValue,routineTimezone(job.timezone, timezone)));}else if(job.scheduleKind==='every_ms'){setScheduleKind('interval');setIntervalSeconds(Number(job.scheduleValue)/1000);}else if(job.scheduleKind==='event'){setScheduleKind('event');setEvent(job.scheduleValue);setEventSecret(String(job.metadata.secretEnv??''));setConclusions(Array.isArray(job.metadata.conclusions)?job.metadata.conclusions.join(', '):'');}else{setScheduleKind('cron');setPreset('custom');setCronDraft(job.scheduleValue);}const check=job.metadata.precheck as {kind?:'script'|'predicate';source?:string}|undefined;setPrecheckKind(check?.kind??'none');setPrecheckSource(check?.source??'');setPrecheckMode(job.metadata.precheckMode==='strict'?'strict':'compat');}}>{t('botWork.edit')}</button>
               <div className="bot-cron-card__actions">
                 <button
                   type="button"
@@ -423,4 +449,9 @@ export function BotCronPanel({
       </div>
     </div>
   );
+}
+
+function RoutineEnabled({ enabled }: { enabled: boolean }) {
+  const { t } = useI18n();
+  return <span className="badge">{t(enabled ? 'play.botDetail.on' : 'play.botDetail.off')}</span>;
 }

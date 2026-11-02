@@ -1,4 +1,12 @@
 export const botSettings = {
+ overview: '概览',
+ editBasics: '编辑基本资料',
+ modelAndExecution: '模型与运行配置',
+ addRoutine: '新增定时任务',
+ editRoutine: '编辑定时任务',
+ routineOptions: '高级选项',
+ routineSettings: '定时任务设置',
+ routineDetails: '任务内容与记录',
  basic: '基本设置', capabilities: '能力与权限', automation: '自动化', records: '记录',
  name: 'Bot 名称', title: '职责', description: '用途与说明', saveBasics: '保存基本资料',
  optional: '可选资料与外观', appearance: '外观', purpose: '希望它做什么？', create: '创建并开始对话', createHint: '起一个名字，描述希望它做什么，即可开始对话。',
