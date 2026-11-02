@@ -113,7 +113,7 @@ test('Bot 正在回复时回顾不调用模型，只返回已有回顾或空文�
   }
 });
 
-test('客户端取消会停掉回顾的模型调用 [AC:session-recap#AC-8]', async () => {
+test('客户端取消会停掉回顾的模型调用 [AC:session-recap#AC-8] [AC:recap-request-lifecycle#AC-2]', { timeout: 5000 }, async () => {
   const dir = mkdtempSync(join(tmpdir(), 'recap-abort-'));
   let seen: AbortSignal | undefined;
   const entered = Promise.withResolvers<void>();
@@ -157,14 +157,63 @@ test('客户端取消会停掉回顾的模型调用 [AC:session-recap#AC-8]', as
       signal: controller.signal
     });
     await entered.promise;
+    assert.equal(seen?.aborted, false, 'reading a complete request body must not cancel the response');
+    const cancelled = new Promise<void>(resolve => seen!.addEventListener('abort', () => resolve(), { once: true }));
     const started = Date.now();
     controller.abort();
     await pending.catch(() => undefined);
+    await cancelled;
     assert.ok(seen);
     assert.equal(seen.aborted, true);
     assert.notEqual((seen.reason as { name?: string } | undefined)?.name, 'TimeoutError');
     assert.ok(Date.now() - started < 5_000);
     assert.equal(runtime.store.listMessages(sessionId).length, before);
+  } finally {
+    await server.close();
+    await runtime.destroy();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+
+test('completed HTTP request body still permits recap generation and cache reuse [AC:recap-request-lifecycle#AC-1]', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'recap-success-'));
+  let calls = 0;
+  const runtime = new RawAgentRuntime({
+    repoRoot: dir, stateDir: join(dir, 'state'),
+    modelAdapter: {
+      name: 'recap-success',
+      async summarizeMessages() { return ''; },
+      async runTurn() { return { stopReason: 'end' as const, assistantParts: [] }; },
+      async completeText(input: { signal?: AbortSignal }) {
+        calls += 1;
+        input.signal?.throwIfAborted();
+        await new Promise(resolve => setTimeout(resolve, 20));
+        input.signal?.throwIfAborted();
+        return '支付页已完成，还需核对日期。\n核对支付页日期';
+      }
+    }
+  });
+  const server = await listen(runtime);
+  try {
+    const sessionId = runtime.openBot(runtime.createBot({ name: 'Successful recap' }).id).sessionId;
+    runtime.store.appendMessage(sessionId, 'user', [{ type: 'text', text: '修改支付页' }]);
+    runtime.store.appendMessage(sessionId, 'assistant', [{ type: 'text', text: '已修改，还需核对日期' }]);
+    runtime.store.updateSession(sessionId, { status: 'idle' });
+    const before = runtime.store.listMessages(sessionId).length;
+    const request = () => fetch(`http://127.0.0.1:${server.port}/api/sessions/${sessionId}/recap`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ locale: 'zh' })
+    });
+    const response = await request();
+    assert.equal(response.status, 200);
+    const result = await response.json();
+    assert.equal(result.text, '支付页已完成，还需核对日期。');
+    assert.equal(result.hint, '核对支付页日期');
+    assert.ok(result.anchorId);
+    assert.deepEqual(await (await request()).json(), result);
+    assert.equal(calls, 1);
+    assert.equal(runtime.store.listMessages(sessionId).length, before);
+    assert.equal((runtime.getSession(sessionId)?.metadata.sessionRecap as {text:string}).text, result.text);
   } finally {
     await server.close();
     await runtime.destroy();
