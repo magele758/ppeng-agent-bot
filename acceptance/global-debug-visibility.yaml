@@ -1,0 +1,15 @@
+id: global-debug-visibility
+title: 全局调试信息开关
+status: implemented
+requirement: |
+  这种内部机制的内容，全局加一个调试开关，开启才展示，不开启就关闭，这个开关默认关闭，这个开关配置存到到库里，下面的目标与进展也是一样的的处理逻辑
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 用户未开启调试显示
+    when: 打开会话
+    then: 不展示目标状态、目标历史、目标与进展、停止原因和 Trace 入口
+  - id: AC-2
+    given: 用户在设置中切换调试显示
+    when: 保存成功或重新打开控制台
+    then: 开关保存到数据库且统一控制所有会话的诊断内容，关闭后再次隐藏

@@ -5,11 +5,12 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { BotGoalService, RawAgentRuntime, ResourceOwnerStore } from '@ppeng/agent-core';
+import { SqliteStateStore } from '../../../packages/core/dist/storage.js';
 import { Router } from '../dist/routing.js';
 import { buildRoutePolicy } from '../dist/access/policy.js';
 import { userPreferenceRoutes } from '../dist/routes/user-preferences.js';
 
-test('durable preferences HTTP migration [AC:user-preference-sync#AC-1] [AC:user-preference-sync#AC-2]', async () => {
+test('durable preferences HTTP migration [AC:user-preference-sync#AC-1] [AC:user-preference-sync#AC-2] [AC:global-debug-visibility#AC-2]', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'bot-goals-http-'));
   const runtime = new RawAgentRuntime({ repoRoot: dir, stateDir: join(dir, 'state'), modelAdapter: {
     name: 'http-goals-test', async runTurn() { return { stopReason: 'end', assistantParts: [] }; }, async summarizeMessages() { return ''; }
@@ -36,6 +37,14 @@ test('durable preferences HTTP migration [AC:user-preference-sync#AC-1] [AC:user
     assert.equal((await write({'theme':null})).status,200);
     await write({'theme':'light','lab.fontSize':'18'},true);
     assert.deepEqual(await read(),{'theme':null,'lab.locale':'zh','lab.fontSize':'18'});
+    assert.equal((await write({'lab.debugDisplay':'1'})).status,200);
+    assert.equal((await read())['lab.debugDisplay'],'1');
+    const snapshot = await (await fetch(base)).json();
+    const reopened = new SqliteStateStore(join(dir, 'state', 'runtime.sqlite'));
+    try { assert.equal(reopened.getDaemonControl(snapshot.scope)['lab.debugDisplay'], '1'); }
+    finally { reopened.db.close(); }
+    assert.equal((await write({'lab.debugDisplay':'0'})).status,200);
+    assert.equal((await read())['lab.debugDisplay'],'0');
     assert.equal((await write({'token':'no'})).status,400);
   } finally {
     server.closeAllConnections();
