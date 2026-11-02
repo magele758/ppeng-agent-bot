@@ -1,0 +1,14 @@
+id: shared-info-compact
+title: 共享信息紧凑入口
+status: implemented
+requirement: 这里展示优化一下，太乱了，界面占用太多了
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 用户浏览 Bot 列表
+    when: 未打开共享信息
+    then: 只显示一行入口，不显示编辑表单
+  - id: AC-2
+    given: 用户需要编辑共享信息
+    when: 打开共享信息
+    then: 独立窗口显示编辑内容，提供关闭操作，编辑区域可滚动而不挤占列表

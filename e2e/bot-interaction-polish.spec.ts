@@ -143,9 +143,9 @@ test('shared information persists and failed saves retain edits for retry [AC:bo
     return r.fulfill({ json: { entries } });
   });
   await setup(page);
-  const shared = page.locator('details').filter({ has: page.locator('summary', { hasText: '共享信息' }) });
-  await shared.locator('summary').click();
-  const value = shared.locator('input').nth(1);
+  const shared = page.getByRole('dialog', { name: '共享信息', exact: true });
+  await page.getByRole('button', { name: '共享信息', exact: true }).click();
+  const value = shared.getByLabel('第 1 条信息的内容');
   await expect(value).toHaveValue('中文');
   await value.fill('English');
   await shared.getByRole('button', { name: '保存共享信息' }).click();
@@ -155,8 +155,8 @@ test('shared information persists and failed saves retain edits for retry [AC:bo
   await shared.getByRole('button', { name: '保存共享信息' }).click();
   await expect.poll(() => entries.language).toBe('English');
   await page.reload();
-  await shared.locator('summary').click();
-  await expect(shared.locator('input').nth(1)).toHaveValue('English');
+  await page.getByRole('button', { name: '共享信息', exact: true }).click();
+  await expect(shared.getByLabel('第 1 条信息的内容')).toHaveValue('English');
 });
 
 test('large history stays responsive across scroll and rail resize [AC:feed-reading-anchor-boundary#AC-1] [AC:bot-workspace-interaction-polish#AC-16] [AC:bot-workspace-interaction-polish#AC-17]', async ({ page }) => {
@@ -183,18 +183,27 @@ test('large history stays responsive across scroll and rail resize [AC:feed-read
   await expect.poll(async () => Math.abs((await feed.locator(`[data-feed-key="${anchor}"]`).boundingBox())!.y - anchorTop)).toBeLessThan(2);
 });
 
-test('shared drafts survive scope switches [AC:bot-workspace-interaction-polish#AC-7]', async ({ page }) => {
+test('shared drafts survive scope switches and dialog close [AC:shared-info-compact#AC-1] [AC:shared-info-compact#AC-2] [AC:bot-workspace-interaction-polish#AC-7]', async ({ page }) => {
   await setup(page);
   await page.route('**/api/bot-functional-groups', r => r.fulfill({ json: { groups: [{ id: 'group1', name: 'Research', botIds: [] }] } }));
   await page.route('**/api/bot-shared-context?**', r => r.fulfill({ json: { entries: { location: r.request().url().includes('global') ? 'global' : 'group' } } }));
   await page.reload();
-  const shared = page.locator('details').filter({ has: page.locator('summary', { hasText: '共享信息' }) });
-  await shared.locator('summary').click();
-  await shared.locator('input').nth(1).fill('unsaved');
+  const shared = page.getByRole('dialog', { name: '共享信息', exact: true });
+  await page.getByRole('button', { name: '共享信息', exact: true }).click();
+  const box = await shared.boundingBox();
+  expect(box!.width).toBeGreaterThan(500);
+  expect(box!.x).toBeGreaterThan(200);
+  await shared.getByLabel('第 1 条信息的内容').fill('unsaved');
+  await shared.getByRole('button', {name: '关闭', exact: true}).click();
+  await expect(shared).toHaveCount(0);
+  const entry = page.getByRole('button', {name: '共享信息', exact: true});
+  expect((await entry.boundingBox())!.height).toBeLessThanOrEqual(44);
+  await entry.click();
+  await expect(shared.getByLabel('第 1 条信息的内容')).toHaveValue('unsaved');
   await shared.locator('select').selectOption('group1');
-  await expect(shared.locator('input').nth(1)).toHaveValue('group');
+  await expect(shared.getByLabel('第 1 条信息的内容')).toHaveValue('group');
   await shared.locator('select').selectOption('global');
-  await expect(shared.locator('input').nth(1)).toHaveValue('unsaved');
+  await expect(shared.getByLabel('第 1 条信息的内容')).toHaveValue('unsaved');
 });
 
 test('memory file sources preview registered files and report unavailable sources [AC:bot-workspace-interaction-polish#AC-14]', async ({ page }) => {
