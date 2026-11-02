@@ -1,5 +1,5 @@
 export type UserPreferences = Record<string, string | null>;
-const keys = new Set(['theme','lab.locale','lab.skin','lab.fontSize','lab.settings.advanced','agentLab.sendAckSound','lab.sessionBrief','lab.botFirstTaskSent','lab.botFirstTaskDismissed']);
+const keys = new Set(['theme','lab.locale','lab.skin','lab.fontSize','lab.debugDisplay','lab.settings.advanced','agentLab.sendAckSound','lab.sessionBrief','lab.botFirstTaskSent','lab.botFirstTaskDismissed']);
 const prefixes = ['lab.botFirstTaskDismissed.','lab.skillCaptureDismissed.','lab.skillOperationDismissed.'];
 export function isUserPreferenceKey(key: string): boolean {
  return keys.has(key) || prefixes.some(prefix => key.startsWith(prefix));

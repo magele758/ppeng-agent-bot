@@ -1,0 +1,15 @@
+id: hide-dev-overlays
+title: 本地页面不展示开发浮层
+status: implemented
+requirement: |
+  我想要本地web页面不显示这个next的调试工具，还有右边的4Issue也不要展示，怎么搞
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 使用本地开发模式打开控制台
+    when: 页面加载完成
+    then: 不展示 Next.js 开发指示器和 Issues 徽标
+  - id: AC-2
+    given: 使用本地开发模式打开控制台
+    when: 页面加载完成
+    then: 不自动加载或显示 Copy element 元素抓取浮层
