@@ -1,4 +1,8 @@
 'use client';
+import { usePreferenceRevision } from './usePreferenceRevision';
+
+import { preferenceStorage } from '@/lib/user-preference-storage';
+
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
@@ -22,18 +26,19 @@ type Capture = {
 export function SkillCaptureCards({ sessionId, onLayoutChange }: { sessionId: string; onLayoutChange?: () => void }) {
   const { t } = useI18n();
   const bots = useSkillBots();
+  const preferenceRevision = usePreferenceRevision();
   const dismissalKey = 'lab.skillCaptureDismissed.' + sessionId;
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [storageError, setStorageError] = useState(false);
   useEffect(() => {
     try {
-      const saved: unknown = JSON.parse(localStorage.getItem(dismissalKey) ?? '[]');
+      const saved: unknown = JSON.parse(preferenceStorage.getItem(dismissalKey) ?? '[]');
       setDismissed(new Set(Array.isArray(saved) ? saved.filter((id): id is string => typeof id === 'string') : []));
     } catch { setDismissed(new Set()); }
     setExpanded(new Set());
     setStorageError(false);
-  }, [dismissalKey]);
+  }, [dismissalKey, preferenceRevision]);
   const dismissalFocus = useRef<HTMLElement | null>(null);
   function dismiss(id: string, button: HTMLButtonElement) {
     const card = button.closest<HTMLElement>('.skill-capture-card');
@@ -41,7 +46,7 @@ export function SkillCaptureCards({ sessionId, onLayoutChange }: { sessionId: st
     const next = new Set(dismissed).add(id);
     setDismissed(next);
     try {
-      localStorage.setItem(dismissalKey, JSON.stringify([...next]));
+      preferenceStorage.setItem(dismissalKey, JSON.stringify([...next]));
       setStorageError(false);
     } catch { setStorageError(true); }
   }

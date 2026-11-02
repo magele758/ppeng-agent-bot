@@ -1,5 +1,8 @@
 'use client';
 
+import { preferenceStorage } from '@/lib/user-preference-storage';
+
+
 import { useCallback, useSyncExternalStore } from 'react';
 import { ADVANCED_STORAGE_KEY, readStoredAdvanced, writeStoredAdvanced } from '@/lib/advanced-mode';
 
@@ -21,11 +24,11 @@ function subscribe(cb: () => void) {
 export function useAdvancedMode(): [boolean, (next: boolean) => void] {
   const advanced = useSyncExternalStore(
     subscribe,
-    () => readStoredAdvanced(window.localStorage),
+    () => readStoredAdvanced(preferenceStorage),
     () => false
   );
   const setAdvanced = useCallback((next: boolean) => {
-    writeStoredAdvanced(window.localStorage, next);
+    writeStoredAdvanced(preferenceStorage, next);
     listeners.forEach((l) => l());
   }, []);
   return [advanced, setAdvanced];

@@ -1,3 +1,4 @@
+import { preferenceStorage } from './user-preference-storage.ts';
 export const FONT_SIZES = [13, 14, 15, 16, 18] as const;
 export const DEFAULT_FONT_SIZE = 14;
 export const FONT_SIZE_STORAGE_KEY = 'lab.fontSize';
@@ -14,7 +15,7 @@ export function applyFontSize(size: number): boolean {
   const value = String(normalizeFontSize(size));
   document.documentElement.setAttribute('data-font-size', value);
   try {
-    localStorage.setItem(FONT_SIZE_STORAGE_KEY, value);
+    preferenceStorage.setItem(FONT_SIZE_STORAGE_KEY, value);
     return true;
   } catch {
     return false;

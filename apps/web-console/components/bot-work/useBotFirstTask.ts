@@ -1,5 +1,9 @@
 'use client';
 
+import { usePreferenceRevision } from '../usePreferenceRevision';
+import { preferenceStorage } from '@/lib/user-preference-storage';
+
+
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { BotInfo, SessionSummary } from '@/lib/types';
 import {
@@ -42,6 +46,7 @@ export function useBotFirstTask(input: {
   playInput: string;
   setPlayInput: (value: string) => void;
 }): { phase: BotFirstTaskPhase; dismiss: () => void; storageFailed: boolean } {
+  const preferenceRevision = usePreferenceRevision();
   const { botId, conversation, sessions, bots, currentSessionId, playInput, setPlayInput } = input;
   const [storageReady, setStorageReady] = useState(false);
   const [dismissed, setDismissed] = useState(false);
@@ -53,17 +58,17 @@ export function useBotFirstTask(input: {
 
   useEffect(() => {
     try {
-      const storedDismissed = readBotFirstTaskDismissed(window.localStorage);
-      const storedSent = readBotFirstTaskSent(window.localStorage);
+      const storedDismissed = readBotFirstTaskDismissed(preferenceStorage);
+      const storedSent = readBotFirstTaskSent(preferenceStorage);
       setDismissed(storedDismissed);
       setSentFlag(storedSent);
-      setAnchor(readBotFirstTaskAnchor(window.localStorage));
+      setAnchor(readBotFirstTaskAnchor(preferenceStorage));
       if (storedSent) setAccountSent(true);
     } catch {
       /* private mode */
     }
     setStorageReady(true);
-  }, []);
+  }, [preferenceRevision]);
 
   useEffect(() => {
     const onSent = () => {
@@ -111,7 +116,7 @@ export function useBotFirstTask(input: {
   useEffect(() => {
     if (phase !== 'visible' || !botId || anchor === botId) return;
     try {
-      writeBotFirstTaskAnchor(window.localStorage, botId);
+      writeBotFirstTaskAnchor(preferenceStorage, botId);
     } catch {
       /* private mode */
     }
@@ -126,13 +131,13 @@ export function useBotFirstTask(input: {
     try {
       if (hydratedBot.current !== botId) {
         hydratedBot.current = botId;
-        const saved = readBotFirstTaskDraft(window.localStorage, botId);
+        const saved = readBotFirstTaskDraft(preferenceStorage, botId);
         if (typeof saved === 'string' && saved !== playInput) {
           setPlayInput(saved);
           return;
         }
       }
-      writeBotFirstTaskDraft(window.localStorage, botId, playInput);
+      writeBotFirstTaskDraft(preferenceStorage, botId, playInput);
     } catch {
       /* private mode */
     }
@@ -140,7 +145,7 @@ export function useBotFirstTask(input: {
 
   const dismiss = useCallback(() => {
     try {
-      writeBotFirstTaskDismissed(window.localStorage);
+      writeBotFirstTaskDismissed(preferenceStorage);
       setStorageFailed(false);
     } catch {
       setStorageFailed(true);

@@ -1,0 +1,18 @@
+id: user-preference-sync
+title: 用户长期偏好入库与迁移
+status: implemented
+requirement: 排查一下还有哪些用户配置只存在浏览器里，应该存数据库的都改成存数据库，避免再出现这种跨浏览器不一致的问题，已有的数据要迁移过去
+notes: 'assumedApproval: standing-order-2026-10-22; 语言偏好按本次要求覆盖此前仅本地保存约定。临时导航、草稿、布局折叠及活动观测仍属于设备状态。'
+criteria:
+  - id: AC-1
+    given: 用户在不同浏览器使用工作台
+    when: 修改长期偏好或恢复默认
+    then: 偏好入库并跨浏览器同步，恢复默认不会被旧数据复活
+  - id: AC-2
+    given: 浏览器已有旧偏好
+    when: 首次连接数据库
+    then: 只补充数据库缺少的字段，保留已有数据库设置
+  - id: AC-3
+    given: 不同用户或网络暂时不可用
+    when: 保存偏好
+    then: 用户数据隔离，失败写入保留重试，临时页面状态不迁移

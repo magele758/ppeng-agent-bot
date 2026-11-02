@@ -1,4 +1,5 @@
 'use client';
+import { usePreferenceRevision } from './usePreferenceRevision';
 
 import { useEffect, useState } from 'react';
 import { useI18n } from '@/lib/i18n';
@@ -7,11 +8,12 @@ import { SettingsGroup } from './ui';
 
 export function FontSizeSettingsCard() {
   const { t } = useI18n();
+  const preferenceRevision = usePreferenceRevision();
   const [size, setSize] = useState<number>(DEFAULT_FONT_SIZE);
   const [saveFailed, setSaveFailed] = useState(false);
   useEffect(() => {
     setSize(normalizeFontSize(document.documentElement.getAttribute('data-font-size')));
-  }, []);
+  }, [preferenceRevision]);
   const choose = (value: number) => {
     setSize(value);
     setSaveFailed(!applyFontSize(value));

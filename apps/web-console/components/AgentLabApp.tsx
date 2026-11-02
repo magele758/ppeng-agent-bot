@@ -1,5 +1,6 @@
 'use client';
 
+import { UserPreferenceSync } from './UserPreferenceSync';
 import { useState } from 'react';
 import type { AuthUser } from '@/lib/auth';
 import { AuthGate } from './AuthGate';
@@ -12,6 +13,7 @@ export function AgentLabApp() {
   return (
     <AuthGate onUser={setAuthUser}>
       <LabProvider>
+        <UserPreferenceSync key={authUser?.id ?? "local"} />
         <LabShell authUser={authUser} />
       </LabProvider>
     </AuthGate>

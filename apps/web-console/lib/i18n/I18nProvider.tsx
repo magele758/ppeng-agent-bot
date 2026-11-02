@@ -16,6 +16,7 @@ import {
   writeStoredLocale,
   type Locale
 } from './locales';
+import { usePreferenceRevision } from '../../components/usePreferenceRevision';
 import { en } from './messages/en';
 import type { MessageKey, Messages } from './messages/types';
 import { zh } from './messages/zh';
@@ -44,6 +45,7 @@ function messagesForLocale(locale: Locale): Messages {
 }
 
 export function I18nProvider({ children }: { children: ReactNode }) {
+  const preferenceRevision = usePreferenceRevision();
   // 首次 render 固定默认语言，避免 hydration mismatch
   const [locale, setLocaleState] = useState<Locale>(DEFAULT_LOCALE);
 
@@ -55,7 +57,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     setLocaleState(next);
     document.documentElement.lang = localeHtmlLang(next);
     document.documentElement.dataset.i18nReady = next;
-  }, []);
+  }, [preferenceRevision]);
 
   const setLocale = useCallback((next: Locale) => {
     writeStoredLocale(next);

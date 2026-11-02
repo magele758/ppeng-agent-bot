@@ -1,3 +1,4 @@
+import { preferenceStorage } from './user-preference-storage.ts';
 /**
  * Instant local feedback when the user commits a chat send (optimistic turn).
  * Mirrors the "show the elevator letter immediately" idea: a sub‑50ms tone can
@@ -9,7 +10,7 @@ export const SEND_ACK_SOUND_STORAGE_KEY = 'agentLab.sendAckSound';
 export function readSendAckSoundEnabled(): boolean {
   if (typeof window === 'undefined') return false;
   try {
-    return window.localStorage.getItem(SEND_ACK_SOUND_STORAGE_KEY) === '1';
+    return preferenceStorage.getItem(SEND_ACK_SOUND_STORAGE_KEY) === '1';
   } catch {
     return false;
   }
@@ -18,8 +19,8 @@ export function readSendAckSoundEnabled(): boolean {
 export function writeSendAckSoundEnabled(on: boolean): void {
   if (typeof window === 'undefined') return;
   try {
-    if (on) window.localStorage.setItem(SEND_ACK_SOUND_STORAGE_KEY, '1');
-    else window.localStorage.removeItem(SEND_ACK_SOUND_STORAGE_KEY);
+    if (on) preferenceStorage.setItem(SEND_ACK_SOUND_STORAGE_KEY, '1');
+    else preferenceStorage.removeItem(SEND_ACK_SOUND_STORAGE_KEY);
   } catch {
     // quota / private mode
   }
