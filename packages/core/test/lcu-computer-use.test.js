@@ -60,7 +60,7 @@ test('one desktop turn owns the input lease [AC:lcu-computer-use#AC-7]', async (
 test('Lab approval only forwards the real user decision and cancels on stop [AC:lcu-computer-use#AC-2]', async () => {
   const { createLcuApprovalHandler } = await import('../dist/computer-use/approval.js');
   let row;
-  const handler = createLcuApprovalHandler({ createApproval: input => (row={...input,id:'native-approval',status:'pending'}),getApproval:()=>row,updateApproval:(_id,status)=>(row={...row,status}) });
+  const handler = createLcuApprovalHandler({ createApproval: input => (row={...input,id:'native-approval',status:'pending'}),getApproval:()=>row,updateApproval:(_id,status)=>(row={...row,status}),getDaemonControl:()=>undefined,setDaemonControl:()=>{} });
   const params={mode:'form',message:'Allow TextEdit?',requestedSchema:{type:'object',properties:{}},_meta:{connector_id:'computer-use',codex_approval_kind:'mcp_tool_call',tool_params:{app:'com.apple.TextEdit'}}};
   const controller = new AbortController();const pending=handler('s1',params,controller.signal);
   assert.equal(row.sessionId,'s1');assert.deepEqual(row.args.originalRequest,params);
@@ -90,4 +90,60 @@ test('transport close failure blocks rather than leaving queued turns hanging [A
   const f=fixture();await f.provider.beginTurn('s1','t1');await f.provider.beginTurn('s2','t2');await f.provider.execute('s1','js',{});
   f.clients[0].close=async()=>{throw new Error('close failed')};const pending=f.provider.execute('s2','js',{});const rejected=assert.rejects(pending,/close failed/);
   await assert.rejects(f.provider.endTurn('s1'),/close failed/);await rejected;await f.provider.endTurn('s2');
+});
+
+const appRequest=(app='com.apple.VoiceMemos',persist=['session','always'])=>({mode:'form',message:`Allow Computer Use to use "${app}"?`,requestedSchema:{type:'object',properties:{}},_meta:{connector_id:'computer-use',codex_approval_kind:'mcp_tool_call',persist,tool_params:{app}}});
+function grantFixture(policy){
+  const rows=[];const control=new Map();
+  const store={createApproval:input=>{const row={...input,id:`a${rows.length}`,status:'pending'};rows.push(row);return row;},getApproval:id=>rows.find(r=>r.id===id),updateApproval:(id,status)=>Object.assign(rows.find(r=>r.id===id),{status}),
+    getDaemonControl:key=>control.get(key),setDaemonControl:(key,value)=>control.set(key,value)};
+  return {rows,control,store,policy:{autoAllow:()=>false,userAuthority:()=>true,...policy}};
+}
+async function decide(rows,handler,sid,params,status){const pending=handler(sid,params,new AbortController().signal);await new Promise(r=>setTimeout(r,5));rows.at(-1).status=status;return pending;}
+
+test('bypass root user session allows app access without a Lab approval [AC:lcu-app-grant#AC-1]', async () => {
+  const { createLcuApprovalHandler } = await import('../dist/computer-use/approval.js');
+  const f=grantFixture({autoAllow:sid=>sid==='root'});const handler=createLcuApprovalHandler(f.store,f.policy);
+  assert.deepEqual(await handler('root',appRequest(),new AbortController().signal),{action:'accept',content:{},_meta:{persist:'session'}});
+  assert.deepEqual(await handler('root',appRequest('com.apple.TextEdit',[]),new AbortController().signal),{action:'accept',content:{}});
+  assert.equal(f.rows.length,0);
+});
+test('one approval is remembered for the same app in the same session only [AC:lcu-app-grant#AC-2]', async () => {
+  const { createLcuApprovalHandler } = await import('../dist/computer-use/approval.js');
+  const f=grantFixture();const handler=createLcuApprovalHandler(f.store,f.policy);
+  assert.deepEqual(await decide(f.rows,handler,'s1',appRequest(),'approved'),{action:'accept',content:{},_meta:{persist:'session'}});
+  assert.deepEqual(await handler('s1',appRequest(),new AbortController().signal),{action:'accept',content:{},_meta:{persist:'session'}});
+  assert.equal(f.rows.length,1);
+  const other=handler('s1',appRequest('com.apple.TextEdit'),new AbortController().signal);await new Promise(r=>setTimeout(r,5));assert.equal(f.rows.length,2);f.rows[1].status='rejected';await other;
+  const otherSession=handler('s2',appRequest(),new AbortController().signal);await new Promise(r=>setTimeout(r,5));assert.equal(f.rows.length,3);f.rows[2].status='rejected';await otherSession;
+});
+test('routine or delegated authority never reuses grants or bypass [AC:lcu-app-grant#AC-3]', async () => {
+  const { createLcuApprovalHandler } = await import('../dist/computer-use/approval.js');
+  const f=grantFixture({userAuthority:()=>false});const handler=createLcuApprovalHandler(f.store,f.policy);
+  await decide(f.rows,handler,'s1',appRequest(),'approved');
+  assert.deepEqual(await decide(f.rows,handler,'s1',appRequest(),'rejected'),{action:'decline'});
+  assert.equal(f.rows.length,2);
+});
+test('denials and unsupported requests are not remembered [AC:lcu-app-grant#AC-4]', async () => {
+  const { createLcuApprovalHandler } = await import('../dist/computer-use/approval.js');
+  const f=grantFixture({autoAllow:()=>true});const handler=createLcuApprovalHandler(f.store,f.policy);
+  const bad=appRequest();bad.requestedSchema={type:'object',properties:{secret:{type:'string'}}};
+  assert.deepEqual(await handler('s1',bad,new AbortController().signal),{action:'cancel'});
+  const g=grantFixture();const h=createLcuApprovalHandler(g.store,g.policy);
+  assert.deepEqual(await decide(g.rows,h,'s1',appRequest(),'rejected'),{action:'decline'});
+  await decide(g.rows,h,'s1',appRequest(),'rejected');assert.equal(g.rows.length,2);
+});
+test('runtime wires bypass and delegated sessions to the source ledger [AC:lcu-app-grant#AC-1] [AC:lcu-app-grant#AC-3]', async () => {
+  const { RawAgentRuntime }=await import('../dist/runtime.js');const {mkdtempSync}=await import('node:fs');const {tmpdir}=await import('node:os');const {join}=await import('node:path');
+  const answers=[];let calls=0;
+  const model={name:'lcu-grant-test',runTurn:async input=>input.messages.at(-1).role==='tool'?{stopReason:'end',assistantParts:[{type:'text',text:'done'}]}:{stopReason:'tool_calls',assistantParts:[{type:'tool_call',toolCallId:`c${++calls}`,name:'lcu_js',input:{code:'x'}}]},summarizeMessages:async()=>''};
+  const rt=new RawAgentRuntime({repoRoot:mkdtempSync(join(tmpdir(),'lcu-repo-')),stateDir:mkdtempSync(join(tmpdir(),'lcu-state-')),modelAdapter:model,computerUseClientFactory:async({onElicitation})=>({connect:async()=>{},instructions:'',publicTools:()=>[{name:'js',inputSchema:{type:'object'}}],call:async()=>{answers.push(await onElicitation(appRequest(),{signal:new AbortController().signal}));return {content:[{type:'text',text:'ok'}]};},turnEnded:async()=>{},close:async()=>{}})});
+  rt.store.setDaemonControl('tool_exposure_settings',{mode:'full',pinnedGroups:{}});rt.store.setDaemonControl('computer_use_settings',{enabled:true});
+  try{
+    const root=rt.store.createSession({title:'bypass',mode:'chat',agentId:'general',background:false,metadata:{permissionMode:'bypass'}});rt.store.appendMessage(root.id,'user',[{type:'text',text:'open voice memos'}]);await rt.runSession(root.id);
+    assert.deepEqual(answers.at(-1),{action:'accept',content:{},_meta:{persist:'session'}});assert.equal(rt.listApprovals().filter(a=>a.toolName==='lcu_app_access').length,0);
+    const child=rt.store.createSession({title:'child',mode:'subagent',agentId:'general',parentSessionId:root.id,background:false,metadata:{permissionMode:'bypass'}});rt.store.appendMessage(child.id,'user',[{type:'text',text:'open voice memos'}]);
+    const run=rt.runSession(child.id);let pending;for(let i=0;i<200&&!pending;i++){await new Promise(r=>setTimeout(r,20));pending=rt.listApprovals().find(a=>a.toolName==='lcu_app_access'&&a.sessionId===child.id&&a.status==='pending');}
+    assert.ok(pending,'delegated session must still ask');rt.store.updateApproval(pending.id,'rejected');await run;assert.deepEqual(answers.at(-1),{action:'decline'});
+  }finally{await rt.destroy();}
 });

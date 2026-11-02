@@ -12,7 +12,7 @@ LCU 由 `packages/core/src/computer-use` 管理，通用 `agent-loop` 只接收�
 
 每个对话回合建立独立原始 CUA 连接，完整原始 initialization instructions 进入系统上下文，只注册模型可见 `lcu_js` / `lcu_js_reset`。内部工具由宿主调用。会话和回合 ID 不由模型构造。
 
-原始应用授权请求进入 Lab 审批列表；批准只转发本次允许，不制造永久授权。拒绝、关闭/取消回合不会批准；无法显示的授权形式取消。普通工具审批策略继续有效。
+原始应用授权请求进入 Lab 审批列表。批准后按会话范围回复（`_meta.persist: session`，不选 `always`），并在宿主记下「本会话 + 该应用」（`daemon_control` 的 `lcu-app-grants:<sessionId>`），同会话后续回合不再申请。已保存 `permissionMode=bypass` 且来源为用户直接输入的根会话不弹审批，直接按会话范围允许。子 agent、routine / event 驱动的回合不复用授权、不享受 bypass，仍逐次审批。拒绝、关闭/取消回合不会批准也不记授权；无法显示的授权形式取消。普通工具审批策略继续有效。
 
 同一运行时的多个 Agent 按完整桌面回合取得输入租约，同一回合的工具调用也串行。停止会取消排队操作，等待原始 Interrupt 清理；已发给系统的动作不可撤回，停止延迟受原始运行时限制。清理失败会阻止后续桌面动作并报告具体错误，需重启运行时恢复。
 

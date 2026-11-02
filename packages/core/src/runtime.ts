@@ -30,7 +30,8 @@ import { LibraryIndexWatcher } from './ingestion/library-index.js';
 import { acquireRuntimeProcessOwnership, recoverInterruptedSessions } from './runtime/restart-recovery.js';
 import { randomUUID } from 'node:crypto';
 import { LcuComputerUseProvider, type LcuDeps } from './computer-use/lcu-provider.js';
-import { createLcuApprovalHandler } from './computer-use/approval.js';
+import { createLcuApprovalHandler, lcuGrantPolicy } from './computer-use/approval.js';
+import { SourceLedger } from './learning/sources.js';
 import { readLcuSettings } from './computer-use/settings.js';
 import { createAppControlTools } from './app-control/tools.js';
 import { readAppControlSettings } from './app-control/settings.js';
@@ -811,7 +812,7 @@ export class RawAgentRuntime {
         const asset = await this.ingestImageBase64(sessionId, { dataBase64: image.data, mimeType: image.mimeType });
         return { type: 'image', assetId: asset.id, mimeType: asset.mimeType, alt: 'LCU desktop observation' };
       },
-      requestApproval: createLcuApprovalHandler(this.store),
+      requestApproval: createLcuApprovalHandler(this.store, lcuGrantPolicy(new SourceLedger(this.store))),
     });
     this.tools.push(...createAppControlTools({
       enabled: () => readAppControlSettings(this.store).enabled,
