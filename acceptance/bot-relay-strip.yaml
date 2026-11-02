@@ -1,0 +1,31 @@
+id: bot-relay-strip
+title: Bot 间通信在聊天流里显示为紧凑通信条，点击弹窗看全文
+status: implemented
+notes: "assumedApproval: standing-order-2026-10-22"
+requirement: |
+  runtime 投递给 Bot 会话的 user 消息「Message from <名称> / <bot_id>[ (from room <id>)]: <正文>」
+  （正文可为「Delegated task <btask_id>: …」委派任务、「Task <btask_id> <status>: …」委派结果或普通消息）
+  在聊天流里只显示一行通信条：来源 Bot 名称 + 类型 + 正文首行摘要，不以 bot_/btask_ id 作主文本。
+  点击通信条打开弹窗，以 Markdown 展示完整原文；Esc / 点遮罩 / 关闭按钮可关闭。
+  模型侧消息与「模型视图」不变；普通用户消息与非精确前缀文本不受影响。
+criteria:
+  - id: AC-1
+    given: 一条委派任务 / 委派结果 / 普通 Bot 消息格式的 user 消息
+    when: 解析
+    then: 得到来源名称、类型、首行摘要（截断），摘要不含 bot_/btask_ id
+  - id: AC-2
+    given: 普通用户输入、前缀夹在正文中、非 user 角色、缺少 bot_ id 的文本
+    when: 解析
+    then: 不判为 Bot 通信
+  - id: AC-3
+    given: 一条长委派任务消息
+    when: 聊天流渲染
+    then: 只渲染通信条（名称、类型、摘要），不含完整正文与 bot_/btask_ id 主文本
+  - id: AC-4
+    given: 通信条
+    when: 打开弹窗
+    then: 弹窗为可访问对话框（role=dialog、aria-modal、带关闭按钮），以 Markdown 展示完整原文
+  - id: AC-5
+    given: 普通用户消息
+    when: 聊天流渲染
+    then: 仍按原用户气泡完整显示，无通信条

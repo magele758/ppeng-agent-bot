@@ -1,0 +1,91 @@
+.bot-relay-turn {
+  display: flex;
+  min-width: 0;
+}
+
+.bot-relay-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2, 8px);
+  max-width: 100%;
+  min-width: 0;
+  padding: 4px 10px 4px 4px;
+  border: 1px solid var(--ui-border, rgb(127 127 127 / 0.25));
+  border-radius: 999px;
+  background: var(--ui-surface-2, transparent);
+  color: inherit;
+  font: inherit;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  text-align: start;
+  cursor: pointer;
+}
+
+.bot-relay-strip:hover {
+  border-color: var(--ui-accent, currentColor);
+}
+
+.bot-relay-strip:focus-visible {
+  outline: 2px solid var(--ui-accent, currentColor);
+  outline-offset: 2px;
+}
+
+.bot-relay-strip__avatar {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--ui-accent-soft, rgb(127 127 127 / 0.2));
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.bot-relay-strip__name {
+  flex: 0 0 auto;
+  font-weight: 600;
+}
+
+.bot-relay-strip__kind {
+  flex: 0 0 auto;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--ui-accent-soft, rgb(127 127 127 / 0.15));
+  font-size: 0.75rem;
+  opacity: 0.85;
+}
+
+.bot-relay-strip__summary {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  opacity: 0.8;
+}
+
+.bot-relay-dialog__head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2, 8px);
+  padding: var(--ui-space-4, 16px) var(--ui-space-4, 16px) 0;
+}
+
+.bot-relay-dialog__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--ui-space-4, 16px);
+  overflow-wrap: anywhere;
+}
+
+.bot-relay-dialog__actions {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--ui-space-3, 12px) var(--ui-space-4, 16px);
+  border-top: 1px solid var(--ui-border, rgb(127 127 127 / 0.25));
+}
