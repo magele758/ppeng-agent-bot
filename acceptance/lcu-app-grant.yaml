@@ -1,0 +1,28 @@
+id: lcu-app-grant
+title: 桌面操作应用授权：全自动免审批，批准一次后同会话记住
+status: implemented
+requirement: |
+  Super Bot 全自动（permissionMode=bypass）会话里反复弹「Allow Computer Use to use "Voice Memos"?」，
+  批准后同一应用的下一个动作又再申请。全自动下不该再弹；需要审批时一次批准后同会话同应用不再申请。
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  根因：LCU 原生应用授权（MCP form elicitation，_meta.persist 提供 session/always）由宿主无条件转成
+  Lab 审批，不看 permissionMode；且回答 accept 时不带 _meta.persist，原运行时按「仅此一次」处理，
+  每个 click/get_app_state 都重新申请。授权记在宿主会话级 daemon_control（不新增环境变量）。
+criteria:
+  - id: AC-1
+    given: 根会话已保存 permissionMode=bypass，且来源权威为用户直接输入
+    when: 桌面运行时申请使用某个应用
+    then: 不创建审批，直接允许，并按会话范围（_meta.persist=session）回复
+  - id: AC-2
+    given: 非全自动会话，用户批准了某应用的授权
+    when: 同会话后续动作（含后续回合）再次申请同一应用
+    then: 首次批准按会话范围回复；之后不再创建审批而直接允许；其他应用仍需审批
+  - id: AC-3
+    given: 会话是子 agent，或来源权威为 routine/event
+    when: 桌面运行时申请应用（即使会话保存为 bypass 或已有同应用授权）
+    then: 仍创建审批等待用户决定，不自动放行
+  - id: AC-4
+    given: 用户拒绝授权，或请求结构不是受支持的原生应用表单
+    when: 审批结束或请求到达
+    then: 拒绝照常转发且不记授权；不支持的结构仍取消，不自动放行

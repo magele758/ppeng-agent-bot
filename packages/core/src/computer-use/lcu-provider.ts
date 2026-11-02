@@ -5,7 +5,7 @@ import { sanitizeSpawnEnv } from '../sandbox/env-sanitizer.js';
 import type { ImagePart, RunContext, ToolContract, ToolExecutionResult } from '../types.js';
 
 export type LcuContent = { type: string; text?: string; data?: string; mimeType?: string; [key: string]: unknown };
-export type LcuApproval = { action: 'accept' | 'decline' | 'cancel'; content?: Record<string, unknown> };
+export type LcuApproval = { action: 'accept' | 'decline' | 'cancel'; content?: Record<string, unknown>; _meta?: { persist: 'session' } };
 export interface LcuClient {
   instructions: string;
   connect(): Promise<unknown>;
