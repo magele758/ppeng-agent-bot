@@ -1,3 +1,4 @@
+import { preferenceStorage } from './user-preference-storage.ts';
 export const SKIN_IDS = ['classic', 'sanctum', 'cyberpunk', 'demon', 'robot-stage', 'pixel', 'kindergarten', 'minimal'] as const;
 export type SkinId = (typeof SKIN_IDS)[number];
 
@@ -29,7 +30,7 @@ export type SkinEnv = {
 
 function liveEnv(): SkinEnv {
   return {
-    storage: window.localStorage,
+    storage: preferenceStorage,
     root: document.documentElement,
     dispatch: () => window.dispatchEvent(new Event(SKIN_CHANGED_EVENT))
   };

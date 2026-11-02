@@ -1,3 +1,4 @@
+import { preferenceStorage } from './user-preference-storage.ts';
 export const BOT_FIRST_TASK_DISMISSED_KEY = 'lab.botFirstTaskDismissed';
 export const BOT_FIRST_TASK_DISMISSED_PREFIX = 'lab.botFirstTaskDismissed.';
 export const BOT_FIRST_TASK_ANCHOR_KEY = 'lab.botFirstTaskAnchor';
@@ -88,7 +89,7 @@ export function markBotFirstTaskSent(storage: FirstTaskStorage): void {
 export function noteBotFirstTaskSent(): void {
   if (typeof window === 'undefined') return;
   try {
-    markBotFirstTaskSent(window.localStorage);
+    markBotFirstTaskSent(preferenceStorage);
   } catch {
     /* private mode */
   }

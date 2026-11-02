@@ -1,0 +1,14 @@
+id: bot-pin-sync
+title: 跨浏览器置顶同步
+status: implemented
+requirement: 为什么，我在codex里的浏览器里访问的置顶列表和我在浏览器里访问的不一样？浏览器里有rsi bot，但是我在codex里的置顶列表里没这个？排查根因修复问题
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 同一用户使用两个浏览器
+    when: 一个浏览器保存置顶列表
+    then: 另一个浏览器读取到相同列表，包括空列表
+  - id: AC-2
+    given: 后台尚无置顶记录且浏览器已有置顶
+    when: 打开工作台
+    then: 自动迁移旧记录，已有后台记录不会被旧记录覆盖

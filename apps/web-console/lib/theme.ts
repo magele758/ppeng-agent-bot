@@ -1,3 +1,4 @@
+import { preferenceStorage } from './user-preference-storage.ts';
 export type ThemePreference = 'light' | 'dark' | 'system';
 export type ResolvedTheme = 'light' | 'dark';
 
@@ -14,7 +15,7 @@ export function resolveTheme(pref: ThemePreference, prefersDark: boolean): Resol
 }
 
 export function readThemePreference(): ThemePreference {
-  return parseThemePreference(window.localStorage.getItem(THEME_STORAGE_KEY));
+  return parseThemePreference(preferenceStorage.getItem(THEME_STORAGE_KEY));
 }
 
 export function currentTheme(): ResolvedTheme {
@@ -23,8 +24,8 @@ export function currentTheme(): ResolvedTheme {
 
 /** `system` removes the stored key so the pre-hydration script keeps following the OS. */
 export function applyThemePreference(pref: ThemePreference): void {
-  if (pref === 'system') window.localStorage.removeItem(THEME_STORAGE_KEY);
-  else window.localStorage.setItem(THEME_STORAGE_KEY, pref);
+  if (pref === 'system') preferenceStorage.removeItem(THEME_STORAGE_KEY);
+  else preferenceStorage.setItem(THEME_STORAGE_KEY, pref);
   document.documentElement.setAttribute('data-theme', currentTheme());
   window.dispatchEvent(new Event(THEME_CHANGED_EVENT));
 }

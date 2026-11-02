@@ -1,3 +1,5 @@
+import { userPreferenceRoutes } from './routes/user-preferences.js';
+import { botPinSettingsRoutes } from './routes/bot-pin-settings.js';
 import { runtimeCapabilitiesRoutes } from './routes/runtime-capabilities.js';
 import {learningRoutes} from './routes/learning.js';
 import { toolExposureRoutes } from './routes/tool-exposure.js';
@@ -106,6 +108,8 @@ export function buildDaemonRouter(deps: DaemonAppDeps): Router {
     .addAll(botsRoutes(runtime))
     .addAll(botMaterialRoutes(runtime))
     .addAll(botFunctionalGroupRoutes(runtime))
+    .addAll(botPinSettingsRoutes(runtime))
+    .addAll(userPreferenceRoutes(runtime))
     .addAll(botWorkRoutes(runtime))
     .addAll(botGoalsRoutes(runtime))
     .addAll(botRoomsRoutes(runtime))

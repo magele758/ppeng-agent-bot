@@ -7,7 +7,7 @@
 - Web 控制台（Next.js）：会话列表自动刷新时应保留滚动位置，并减轻整页跳动；发送消息后输入框应清空，且用户消息应立即出现在对话流（等待模型可用占位符如「…」）。
 - 对话区：默认开启流式（`useStream=true`）；发送时先挂乐观用户气泡与助手占位（`…`）并滚动，再 `clearComposerOnly()` 清空输入，再 `await` 请求；thinking/推理块历史消息默认折叠、流式期间展开；工具调用结果默认折叠、点击展开；助手气泡正文用 Markdown 渲染。
 - Python 相关任务优先用 conda 创建独立虚拟环境再执行，避免污染全局。
-- **前端用户可见文案走 i18n**：禁止硬编码中英文；必须 `const { t } = useI18n();` + `t('namespace.key')`（`apps/web-console/lib/i18n`）。新增能力同步改 zh/en 同一套 key。语言偏好走 Lab UI + `localStorage`，禁止 `RAW_AGENT_LANG` 等语言 env。详见下方「前端 i18n」。
+- **前端用户可见文案走 i18n**：禁止硬编码中英文；必须 `const { t } = useI18n();` + `t('namespace.key')`（`apps/web-console/lib/i18n`）。新增能力同步改 zh/en 同一套 key。语言偏好走 Lab UI + 数据库用户配置（`localStorage` 仅缓存与旧数据迁移），禁止 `RAW_AGENT_LANG` 等语言 env。详见下方「前端 i18n」。
 - **`apps/web-console` 的 CRAP 按 0% 覆盖棘轮，不要往已超标函数里加分支**：计分范围含 `apps/web-console` 的 `.ts`/`.tsx`（`scripts/crap/crap-gate.mjs` 的 `SOURCE_ROOTS`），但覆盖率只来自 `test:unit` 的 V8（`dist` + source map，或测试直接执行的源文件）和 agent-loop vitest。`ts.transpileModule` 再 `new Function` 的组件测试记在内存脚本上，**不算**源文件覆盖。因此这些函数覆盖率是 0。`allowedCrap` 在覆盖率为 0 时等于基线分，没有 `× 1.05 + 1`。圈复杂度每多一个 `if` / `?:` / `&&` / `||` / `??` / 循环，CRAP = `C² + C`。已超过阈值 30 的函数（0% 时复杂度 ≥ 6）禁止再加判断；新判断放进复杂度 ≤ 5 的新函数（0% 时 CRAP ≤ 30，不会变成新违规）。基线按 PR 基线提交的源码现算，不是当前分数。详见 `doc/CRAP_GATE.md`。
 - **验收优先（核心指令）：禁止停下来等批准。** 新需求 / 行为变更当轮写 [`acceptance/<id>.yaml`](skills/acceptance-first/SKILL.md)（直接 `approved`，`notes` 含 `assumedApproval: standing-order-2026-10-22`），接着写标题带 `[AC:<id>#<AC-n>]` 的失败测试并实现，通过后改 `implemented`。禁止把 Given/When/Then 贴出来问「是否正确完整」，禁止说「确认后我再改」，禁止派「只起草标准」的子任务。改已有标准、和旧规格冲突、两种做法都说得通，都同一轮做完，回复里用一句话说明。只有用户原话明确说先看标准或先别写代码时才停。禁止删/弱化标准来过门禁（用 `retired` + `retiredReason`）。门禁 `pnpm run test:acceptance`。详见 `skills/acceptance-first/SKILL.md`、`doc/ACCEPTANCE_GATE.md`。
 - **做完先审查再合并（核心指令）：** 功能或修复做完后先 review。没问题就 commit、开 PR、合并，不要等用户再说「合并 PR」。review 有问题先改到通过再提交。不要 force push，不要跳过 hooks。用户明确说先别提交或先别合并时才停。
@@ -80,7 +80,7 @@
   - 新增能力/界面：同步改 `messages/zh/<ns>.ts` 与 `messages/en/<ns>.ts`（同一套 key）。key 为 `namespace.camelCase` 点路径；namespace = `common|nav|play|more|memory|teams|ops|auth`（新面板可新 namespace，并在 `messages/{zh,en}/index.ts` 合并）。
   - 插值：`t('play.messageToBot', { name })`，模板 `{name}`。不做 ICU/复数框架；英文复数用组件内 `count===1` 选不同 key，或一句里带 `{count}`。
   - namespace 对象不要 `as const`（en 靠 `satisfies Messages` 对齐；`as const` 会让英文字面量对不上中文）。
-  - 语言切换：工作台顶栏 `LanguageToggle` + 「更多」`LanguageSettingsCard`（`#card-language`）。按钮显示语言自称（中文 / English），不随界面语言翻译。持久化 `localStorage['lab.locale']`（`LOCALE_STORAGE_KEY`），无 daemon API、**禁止** `RAW_AGENT_LANG` 等语言 env。
+  - 语言切换：工作台顶栏 `LanguageToggle` + 「更多」`LanguageSettingsCard`（`#card-language`）。按钮显示语言自称（中文 / English），不随界面语言翻译。持久化到 `/api/user/preferences` 对应的 SQLite 用户记录；`localStorage['lab.locale']`（`LOCALE_STORAGE_KEY`）只作缓存与迁移来源、**禁止** `RAW_AGENT_LANG` 等语言 env。
   - 默认：已保存偏好 → 否则 `navigator.language`（zh*→zh，其它→en）。SSR 首屏固定 zh，mount 后再切，避免 hydration mismatch。
   - 单测：`lib/i18n/*.test.ts` 必须保持 en/zh 叶子 key 集合一致；解析/插值纯函数有测。新增 namespace 后跑这些测试。
   - 示例：新增按钮改组件 `t('more.myButton')` + `zh/more.ts` + `en/more.ts`。

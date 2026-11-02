@@ -1,3 +1,4 @@
+import { preferenceStorage } from './user-preference-storage.ts';
 import { isToolObservationCaption } from './chat-images.ts';
 
 export const SESSION_BRIEF_STORAGE_KEY = 'lab.sessionBrief';
@@ -22,7 +23,7 @@ export function parseSessionBrief(raw: string | null | undefined): boolean {
 
 export function readSessionBrief(): boolean {
   try {
-    return parseSessionBrief(window.localStorage.getItem(SESSION_BRIEF_STORAGE_KEY));
+    return parseSessionBrief(preferenceStorage.getItem(SESSION_BRIEF_STORAGE_KEY));
   } catch {
     return true;
   }
@@ -31,7 +32,7 @@ export function readSessionBrief(): boolean {
 /** Display preference only. Does not rewrite stored messages. */
 export function applySessionBrief(on: boolean): boolean {
   try {
-    window.localStorage.setItem(SESSION_BRIEF_STORAGE_KEY, on ? '1' : '0');
+    preferenceStorage.setItem(SESSION_BRIEF_STORAGE_KEY, on ? '1' : '0');
     window.dispatchEvent(new Event(SESSION_BRIEF_CHANGED_EVENT));
     return true;
   } catch {
@@ -52,7 +53,7 @@ export function parseBriefOpen(raw: string | null | undefined): string[] {
 
 export function readBriefOpen(noteKey: string): boolean {
   try {
-    return parseBriefOpen(window.localStorage.getItem(SESSION_BRIEF_OPEN_KEY)).includes(noteKey);
+    return parseBriefOpen(preferenceStorage.getItem(SESSION_BRIEF_OPEN_KEY)).includes(noteKey);
   } catch {
     return false;
   }
@@ -61,10 +62,10 @@ export function readBriefOpen(noteKey: string): boolean {
 /** Display preference only. Does not rewrite stored messages. */
 export function writeBriefOpen(noteKey: string, open: boolean): boolean {
   try {
-    const keys = new Set(parseBriefOpen(window.localStorage.getItem(SESSION_BRIEF_OPEN_KEY)));
+    const keys = new Set(parseBriefOpen(preferenceStorage.getItem(SESSION_BRIEF_OPEN_KEY)));
     if (open) keys.add(noteKey);
     else keys.delete(noteKey);
-    window.localStorage.setItem(SESSION_BRIEF_OPEN_KEY, JSON.stringify([...keys]));
+    preferenceStorage.setItem(SESSION_BRIEF_OPEN_KEY, JSON.stringify([...keys]));
     return true;
   } catch {
     return false;

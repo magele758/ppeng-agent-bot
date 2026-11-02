@@ -1,3 +1,4 @@
+import { preferenceStorage } from '../user-preference-storage.ts';
 export type Locale = 'zh' | 'en';
 
 export const LOCALES: readonly Locale[] = ['zh', 'en'];
@@ -47,7 +48,7 @@ export function localeHtmlLang(locale: Locale): string {
 export function readStoredLocale(): Locale | undefined {
   if (typeof window === 'undefined') return undefined;
   try {
-    return parseLocale(window.localStorage.getItem(LOCALE_STORAGE_KEY));
+    return parseLocale(preferenceStorage.getItem(LOCALE_STORAGE_KEY));
   } catch {
     return undefined;
   }
@@ -56,7 +57,7 @@ export function readStoredLocale(): Locale | undefined {
 export function writeStoredLocale(locale: Locale): void {
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+    preferenceStorage.setItem(LOCALE_STORAGE_KEY, locale);
   } catch {
     // private mode / quota
   }

@@ -1,4 +1,6 @@
 "use client";
+import { usePreferenceRevision } from './usePreferenceRevision';
+import { preferenceStorage } from '@/lib/user-preference-storage';
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
@@ -31,17 +33,18 @@ export function SkillOperationCards({ sessionId, onLayoutChange }: { sessionId: 
   const [toggled, setToggled] = useState<Set<string>>(new Set());
   const [storageError, setStorageError] = useState(false);
   const focusTarget = useRef<HTMLElement | null>(null);
+  const preferenceRevision = usePreferenceRevision();
   const storageKey = 'lab.skillOperationDismissed.' + sessionId;
   const callback = useRef(onLayoutChange);
   callback.current = onLayoutChange;
   useEffect(() => {
     try {
-      const ids: unknown = JSON.parse(localStorage.getItem(storageKey) ?? '[]');
+      const ids: unknown = JSON.parse(preferenceStorage.getItem(storageKey) ?? '[]');
       setDismissed(new Set(Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : []));
     } catch { setDismissed(new Set()); }
     setToggled(new Set());
     setStorageError(false);
-  }, [storageKey]);
+  }, [storageKey, preferenceRevision]);
   useLayoutEffect(() => {
     callback.current?.();
     if (focusTarget.current?.isConnected) {
@@ -55,7 +58,7 @@ export function SkillOperationCards({ sessionId, onLayoutChange }: { sessionId: 
     focusTarget.current = (card?.nextElementSibling ?? card?.previousElementSibling) as HTMLElement | null;
     const next = new Set(dismissed).add(id);
     setDismissed(next);
-    try { localStorage.setItem(storageKey, JSON.stringify([...next])); }
+    try { preferenceStorage.setItem(storageKey, JSON.stringify([...next])); }
     catch { setStorageError(true); }
   }
   const endpoint = `/api/sessions/${encodeURIComponent(sessionId)}/skill-operations`;
