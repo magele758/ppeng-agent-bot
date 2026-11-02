@@ -3,7 +3,7 @@ title: 回顾有内容才展示
 status: implemented
 requirement: |
   如果没有回顾，就不要展示，只加一个主动回顾的按钮就行了，另外回顾逻辑给我说一下
-notes: 'assumedApproval: standing-order-2026-10-22。按本次要求更新 session-recap AC-1 的失败展示规则；自动触发与模型生成逻辑保持不变。'
+notes: 'assumedApproval: standing-order-2026-10-22。按本次要求更新 session-recap AC-1、AC-3 的失败展示规则；自动触发与模型生成逻辑保持不变。'
 criteria:
   - id: AC-1
     given: 回顾功能开启且会话已完成至少一轮
