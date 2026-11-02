@@ -1,4 +1,9 @@
 export const botSettings = {
+ memoryManagement: 'Memory management',
+ skillManagement: 'Skill management',
+ otherRecords: 'Files and task records',
+ dateFilters: 'Filter by date',
+ connectionTools: 'Tool details ({count})',
  overview: 'Overview',
  editBasics: 'Edit basic information',
  modelAndExecution: 'Model and execution settings',

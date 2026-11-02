@@ -1,4 +1,9 @@
 export const botSettings = {
+ memoryManagement: '记忆管理',
+ skillManagement: '技能管理',
+ otherRecords: '文件与任务记录',
+ dateFilters: '按日期筛选',
+ connectionTools: '工具详情（{count}）',
  overview: '概览',
  editBasics: '编辑基本资料',
  modelAndExecution: '模型与运行配置',

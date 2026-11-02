@@ -168,6 +168,8 @@ export function BotConnections({ botId }: { botId: string }) {
               : t("botWork.connectionNotChecked")}
           </p>
           {c.healthReason === 'authorization_required' && <p role="alert">{t("botWork.connectionAuthorizationRequired")}</p>}
+          <details className="bot-settings-disclosure" data-testid="connection-tools">
+            <summary>{t('botSettings.connectionTools', { count: c.tools.length })}</summary>
           <ul>
             {c.tools.map((tool) => (
               <li role="presentation" key={tool.name}>
@@ -180,6 +182,7 @@ export function BotConnections({ botId }: { botId: string }) {
               </li>
             ))}
           </ul>
+          </details>
           <button
             disabled={action.busy}
             onClick={() => {

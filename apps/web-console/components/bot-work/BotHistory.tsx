@@ -79,6 +79,8 @@ export function BotHistory({ sessionId }: { sessionId: string }) {
             onChange={(e) => setQuery(e.target.value)}
           />
         </label>
+        <details className="bot-settings-disclosure" data-testid="bot-history-filters">
+          <summary>{t("botSettings.dateFilters")}</summary>
         <label>
           {t("botWork.from")}
           <input
@@ -95,6 +97,7 @@ export function BotHistory({ sessionId }: { sessionId: string }) {
             onChange={(e) => setTo(e.target.value)}
           />
         </label>
+        </details>
         <button data-testid="bot-history-search" disabled={action.busy}>
           {t("botWork.search")}
         </button>
@@ -111,7 +114,7 @@ export function BotHistory({ sessionId }: { sessionId: string }) {
           {t("botWork.older")}
         </button>
       )}
-      <div style={{ maxHeight: 440, overflow: "auto" }}>
+      <div style={{ maxHeight: 280, overflow: "auto" }}>
         {visibleRows.map((m) => (
           <article key={m.id}>
             <small>
