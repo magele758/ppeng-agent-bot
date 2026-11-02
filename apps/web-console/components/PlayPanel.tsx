@@ -72,6 +72,7 @@ import { BotFirstTask } from './bot-work/BotFirstTask';
 import { useBotFirstTask } from './bot-work/useBotFirstTask';
 import { usePlayComposerHint } from './usePlayComposerHint';
 import { useSessionRecap } from './useSessionRecap';
+import { SessionRecapBar } from './SessionRecapBar';
 import type { BotFirstTaskConversation } from '@/lib/bot-first-task';
 import { BotFunctionalGroups } from './BotFunctionalGroups';
 import { BotPinArea } from './BotPinArea';
@@ -1427,32 +1428,7 @@ export function PlayPanel({
                     </button>
                   </div>
                 ) : null}
-                {selectedSessionId && (sessionRecap.shown || sessionRecap.canManual) ? (
-                  <div className="session-recap-bar">
-                    {sessionRecap.shown ? (
-                      <div className="session-recap" role="status" data-testid="session-recap">
-                        <p className="session-recap__text">{sessionRecap.text}</p>
-                        <button
-                          type="button"
-                          className="session-recap__dismiss"
-                          aria-label={t('play.sessionRecap.dismiss')}
-                          onClick={sessionRecap.dismiss}
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        className="session-recap__manual"
-                        data-testid="session-recap-manual"
-                        onClick={sessionRecap.requestManual}
-                      >
-                        {t('play.sessionRecap.manual')}
-                      </button>
-                    )}
-                  </div>
-                ) : null}
+                {selectedSessionId ? <SessionRecapBar {...sessionRecap} /> : null}
     </>
   );
 
