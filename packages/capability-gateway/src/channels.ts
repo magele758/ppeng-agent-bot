@@ -11,7 +11,15 @@ import { buildWeComWebhookUrl, sendWeComGroupBotMarkdown } from './wecom-send.js
 export async function deliverToChannel(
   channel: ChannelSpec,
   body: Record<string, unknown>,
-  opts?: { approval?: string; claimedFrom?: string; requireEmailFrom?: boolean }
+  opts?: {
+    approval?: string;
+    claimedFrom?: string;
+    requireEmailFrom?: boolean;
+    inReplyTo?: string;
+    references?: string;
+    subject?: string;
+    replyToSubject?: string;
+  }
 ): Promise<{ ok: boolean; status: number; text: string }> {
   requireHumanEgressApproval(opts?.approval);
   if (channel.type === 'feishu_bot') {
@@ -62,7 +70,13 @@ export async function deliverToChannel(
     if (channel.type === 'telegram') return sendTelegramMessage(channel, text);
     return sendEmailHttp(channel, text, env, {
       claimedFrom: opts?.claimedFrom,
-      requireFrom: opts?.requireEmailFrom
+      requireFrom: opts?.requireEmailFrom,
+      inReplyTo: opts?.inReplyTo,
+      references: opts?.references,
+      ...(opts && Object.prototype.hasOwnProperty.call(opts, 'subject')
+        ? { subject: opts.subject }
+        : {}),
+      replyToSubject: opts?.replyToSubject
     });
   }
 

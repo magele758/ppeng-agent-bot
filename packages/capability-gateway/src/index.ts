@@ -1,5 +1,10 @@
 export { deliverToChannel } from './channels.js';
 export {
+  resolveEmailReplySubject,
+  sendEmailHttp,
+  type SendEmailHttpOptions
+} from './channels/email.js';
+export {
   loadGatewayChannelIdsSync,
   loadGatewayFileConfig,
   parseGatewayEnv,

@@ -32,6 +32,25 @@ export interface OutboundDraft {
   editedAt?: string;
   /** Quiet hours: approved by a human, held until this ISO time (informational; release is by window state). */
   deferredUntil?: string;
+  /**
+   * Email In-Reply-To (message-id) for claimed-inbox reply threading.
+   * Threaded through preview / release into email_http JSON `inReplyTo`.
+   */
+  inReplyTo?: string;
+  /**
+   * Email References chain. When omitted at send with inReplyTo set, may default to inReplyTo.
+   */
+  references?: string;
+  /**
+   * Optional per-draft email subject. Explicit value wins over channel.subject.
+   * When empty/absent while replying (inReplyTo + replyToSubject), defaults to `Re: <original>`.
+   */
+  subject?: string;
+  /**
+   * Original subject of the claimed-inbox message being replied to.
+   * Used only for Re: defaulting when draft/channel subject is empty.
+   */
+  replyToSubject?: string;
 }
 
 export type OutboundDraftErrorCode =
@@ -108,6 +127,10 @@ export async function appendOutboundDraft(
     event?: string;
     receiveId?: string;
     receiveIdType?: FeishuReceiveIdType;
+    inReplyTo?: string;
+    references?: string;
+    subject?: string;
+    replyToSubject?: string;
   }
 ): Promise<OutboundDraft> {
   return withGatewayLock(gatewayDir, async () => {
@@ -115,6 +138,10 @@ export async function appendOutboundDraft(
     const receiveId = input.receiveId?.trim();
     const receiveIdType =
       input.receiveIdType && RECEIVE_TYPES.has(input.receiveIdType) ? input.receiveIdType : undefined;
+    const inReplyTo = input.inReplyTo?.trim() || undefined;
+    const references = input.references?.trim() || undefined;
+    const subject = input.subject !== undefined ? input.subject : undefined;
+    const replyToSubject = input.replyToSubject?.trim() || undefined;
     const draft: OutboundDraft = {
       id: `draft_${randomUUID().replace(/-/g, '')}`,
       channelId: input.channelId,
@@ -122,7 +149,11 @@ export async function appendOutboundDraft(
       event: input.event,
       createdAt: new Date().toISOString(),
       status: 'pending_approval',
-      ...(receiveId && receiveIdType ? { receiveId, receiveIdType } : {})
+      ...(receiveId && receiveIdType ? { receiveId, receiveIdType } : {}),
+      ...(inReplyTo ? { inReplyTo } : {}),
+      ...(references ? { references } : {}),
+      ...(subject !== undefined ? { subject } : {}),
+      ...(replyToSubject ? { replyToSubject } : {})
     };
     items.push(draft);
     await writeDrafts(gatewayDir, items);

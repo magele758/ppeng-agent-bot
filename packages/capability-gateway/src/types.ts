@@ -48,6 +48,17 @@ export interface ChannelSpec {
    * with no claim, from is not invented (identity unresolved).
    */
   from?: string;
+  /**
+   * In-Reply-To message-id for email_http (claimed-inbox reply threading).
+   * When set, the JSON body includes `inReplyTo` (and `references` when provided
+   * or derived from this value).
+   */
+  inReplyTo?: string;
+  /**
+   * References header chain for email_http. When omitted but `inReplyTo` is set,
+   * sendEmailHttp may default references to inReplyTo.
+   */
+  references?: string;
 }
 
 /** Feishu / Lark event subscription (inbound). */
