@@ -47,6 +47,23 @@ export interface SendEmailHttpOptions {
  * When subject is empty and `replyToSubject` is set (claimed-inbox reply),
  * default to `Re: <original>` (without doubling an existing Re: prefix).
  */
+
+/**
+ * Email-channel webhook → draft reply threading fields (r5-25).
+ * Non-email channels return {}. Empty original subject is still passed as
+ * replyToSubject so r5-24 Re: defaulting can apply when subject is empty.
+ */
+export function emailWebhookDraftReplyFields(
+  channelType: string,
+  inbound: { messageId?: string; subject?: string }
+): { inReplyTo?: string; replyToSubject?: string } {
+  if (channelType !== 'email') return {};
+  return {
+    ...(inbound.messageId?.trim() ? { inReplyTo: inbound.messageId.trim() } : {}),
+    ...(inbound.subject !== undefined ? { replyToSubject: inbound.subject } : {})
+  };
+}
+
 export function resolveEmailReplySubject(input: {
   subject?: string;
   replyToSubject?: string;

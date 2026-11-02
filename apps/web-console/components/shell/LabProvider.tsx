@@ -98,6 +98,11 @@ export interface OutboundDraftItem {
   originalText?: string;
   editedAt?: string;
   identity?: OutboundIdentity;
+  /** Email reply threading (r5-24/25). Read-only in Lab preview. */
+  inReplyTo?: string;
+  references?: string;
+  subject?: string;
+  replyToSubject?: string;
 }
 
 export interface ServerMeta {

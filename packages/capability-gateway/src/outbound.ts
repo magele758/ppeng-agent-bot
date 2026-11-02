@@ -43,6 +43,10 @@ export async function deliverChannelText(opts: {
    * or `confirmOutboundDraft` then claim/send. No silent send.
    */
   approval?: 'approved';
+  inReplyTo?: string;
+  references?: string;
+  subject?: string;
+  replyToSubject?: string;
 }): Promise<void> {
   // Always draft (Draft→Confirm→Send). Route through UserDeliveryPort only.
   void opts.approval;
@@ -51,7 +55,11 @@ export async function deliverChannelText(opts: {
   await createUserDeliveryPort({ gatewayDir: opts.gatewayDir, channels: [opts.channel] }).draft({
     channelId: opts.channel.id,
     text: opts.text,
-    event: opts.event ?? 'gateway.im.reply'
+    event: opts.event ?? 'gateway.im.reply',
+    inReplyTo: opts.inReplyTo,
+    references: opts.references,
+    ...(opts.subject !== undefined ? { subject: opts.subject } : {}),
+    replyToSubject: opts.replyToSubject
   });
 }
 

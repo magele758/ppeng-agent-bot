@@ -89,6 +89,24 @@ test('the hint stays advisory: approve is enabled, and shown samples never repla
   assert.equal(hidden, '');
 });
 
+test('card shows reply thread metadata read-only [AC:r5-25-reply-draft-ingress#AC-4]', () => {
+  const threaded = {
+    ...draft,
+    inReplyTo: '<msg-1@agent.local>',
+    references: '<root@x> <msg-1@agent.local>',
+    subject: '',
+    replyToSubject: 'Need docs'
+  };
+  const html = renderToStaticMarkup(
+    React.createElement(OutboundDraftCard, { draft: threaded, onSave: async () => true, onApprove: noop, onReject: noop })
+  );
+  assert.match(html, /data-testid="outbound-draft-thread"/);
+  assert.match(html, /Need docs/);
+  assert.match(html, /msg-1@agent\.local/);
+  assert.match(html, /hello team/);
+  assert.doesNotMatch(html, /type="text"[^>]*subject|name="subject"/i);
+});
+
 test('english copy offers the same non-blocking sample hint [AC:outbound-style-sample-hint#AC-1]', () => {
   const source = readFileSync(new URL('../../../lib/i18n/messages/en/tasks.ts', import.meta.url), 'utf8');
   assert.match(source, /Consider sampling a few recent messages/);

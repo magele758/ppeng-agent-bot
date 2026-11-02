@@ -25,6 +25,10 @@ function portDraft(
     event?: string;
     receiveId?: string;
     receiveIdType?: import('./outbound-drafts.js').FeishuReceiveIdType;
+    inReplyTo?: string;
+    references?: string;
+    subject?: string;
+    replyToSubject?: string;
   },
   channels: import('./types.js').ChannelSpec[] = []
 ) {

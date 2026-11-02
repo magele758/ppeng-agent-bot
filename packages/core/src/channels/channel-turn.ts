@@ -13,6 +13,10 @@ export interface ChannelInboundEnvelope {
   conversationKey: string;
   senderId?: string;
   text: string;
+  /** Email / claimed-inbox message-id for reply threading (r5-25). */
+  messageId?: string;
+  /** Original subject of the inbound message (r5-25 replyToSubject). */
+  subject?: string;
   raw?: unknown;
 }
 
@@ -100,6 +104,14 @@ export function parseGenericWebhookInbound(
   const message = (body.message ?? body.edited_message) as
     | { text?: string; chat?: { id?: number | string }; from?: { id?: number | string } }
     | undefined;
+  const messageId =
+    typeof body.messageId === 'string' && body.messageId.trim()
+      ? body.messageId.trim()
+      : typeof body.message_id === 'string' && body.message_id.trim()
+        ? body.message_id.trim()
+        : undefined;
+  const subject = typeof body.subject === 'string' ? body.subject : undefined;
+
   if (message?.text && message.chat?.id != null) {
     return {
       channelId,
@@ -108,11 +120,13 @@ export function parseGenericWebhookInbound(
       conversationKey: String(message.chat.id),
       senderId: message.from?.id != null ? String(message.from.id) : undefined,
       text: message.text,
+      ...(messageId ? { messageId } : {}),
+      ...(subject !== undefined ? { subject } : {}),
       raw: body
     };
   }
 
-  // Generic { text, conversationKey?, senderId? }
+  // Generic { text, conversationKey?, senderId?, messageId?, subject? }
   if (typeof body.text === 'string') {
     return {
       channelId,
@@ -121,6 +135,8 @@ export function parseGenericWebhookInbound(
       conversationKey: String(body.conversationKey ?? body.chatId ?? body.senderId ?? 'default'),
       senderId: body.senderId != null ? String(body.senderId) : undefined,
       text: body.text,
+      ...(messageId ? { messageId } : {}),
+      ...(subject !== undefined ? { subject } : {}),
       raw: body
     };
   }
