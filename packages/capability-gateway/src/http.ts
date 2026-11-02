@@ -13,6 +13,7 @@ import { handleEventIngress } from './event-ingress.js';
 import { handleSlackEventsRequest } from './slack-events-handler.js';
 import { appendOutboundDraft as appendOutboundDraftLedger } from './outbound-drafts.js';
 import { createUserDeliveryPort } from './user-delivery-port.js';
+import { emailWebhookDraftReplyFields } from './channels/email.js';
 
 /** Route user-facing drafts through UserDeliveryPort without touching handleGatewayHttp body. */
 function appendOutboundDraft(
@@ -23,6 +24,10 @@ function appendOutboundDraft(
     event?: string;
     receiveId?: string;
     receiveIdType?: import('./outbound-drafts.js').FeishuReceiveIdType;
+    inReplyTo?: string;
+    references?: string;
+    subject?: string;
+    replyToSubject?: string;
   }
 ) {
   void appendOutboundDraftLedger;
@@ -410,7 +415,8 @@ async function dispatchChannelWebhook(route: GatewayRoute): Promise<void> {
       await appendOutboundDraft(route.gatewayDir, {
         channelId: channel.id,
         text: decision.text,
-        event: 'gateway.im.reply'
+        event: 'gateway.im.reply',
+        ...emailWebhookDraftReplyFields(channel.type, inbound)
       });
     } catch (error) {
       json(route.response, 502, {
