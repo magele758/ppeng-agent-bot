@@ -222,6 +222,8 @@ function bodyRefCases(f) {
 /** Self-filtered writes that need a request shaped around A's data. */
 function selfFilteredWriteCases(f) {
   return {
+    'PUT /api/bot-pin-settings': { state: { customized: true, ids: ['B-pin'], roomIds: [] } },
+    'PATCH /api/user/preferences': { values: { 'lab.debugDisplay': 'false' } },
     'POST /api/sessions/cancel-all': {},
     'POST /api/sessions/bulk-delete': { ids: [f.session] },
     'POST /api/memory/suppressions/:id/restore': {},
@@ -368,6 +370,37 @@ test('route access contract: every route is classified, isolated, and A-owned da
     const memory = await d.call('A', 'GET', '/api/memory?scope=user.memory');
     assert.ok(memory.text.includes('A-MEM-SECRET'));
     assert.ok(!memory.text.includes('B-POISON'));
+  });
+
+  await t.test('preferences writes and initialization cannot target another user [AC:lab-auth-and-route-access#AC-4]', async () => {
+    const path = '/api/user/preferences';
+    const a = { 'lab.debugDisplay': 'true' };
+    const b = { 'lab.debugDisplay': 'false' };
+    assert.equal((await d.call('A', 'PATCH', path, { values: a })).status, 200);
+    assert.deepEqual((await d.call('B', 'GET', path)).data.values, {});
+    const initialized = await d.call('B', 'PATCH', path, { values: b, initialize: true, userId: 'user_a' });
+    assert.equal(initialized.status, 200);
+    assert.deepEqual(initialized.data.values, b);
+    assert.deepEqual((await d.call('B', 'PATCH', path, { values: a, initialize: true })).data.values, b);
+    assert.deepEqual((await d.call('A', 'GET', path)).data.values, a);
+    assert.deepEqual((await d.call('B', 'PATCH', path, { values: { 'lab.debugDisplay': null } })).data.values, { 'lab.debugDisplay': null });
+    assert.deepEqual((await d.call('A', 'GET', path)).data.values, a);
+  });
+
+  await t.test('pin settings writes and initialization stay within the authenticated user [AC:lab-auth-and-route-access#AC-4]', async () => {
+    const path = '/api/bot-pin-settings';
+    const a = { customized: true, ids: [f.bot], roomIds: ['A-private-pin'] };
+    const b = { customized: true, ids: ['B-pin'], roomIds: [] };
+    assert.equal((await d.call('A', 'PUT', path, { state: a })).status, 200);
+    assert.equal((await d.call('B', 'GET', path)).data.state, null);
+    const initialized = await d.call('B', 'PUT', path, { state: b, initialize: true, userId: 'user_a' });
+    assert.equal(initialized.status, 200);
+    assert.deepEqual(initialized.data.state, b);
+    assert.deepEqual((await d.call('A', 'GET', path)).data.state, a);
+    const cleared = { customized: true, ids: [], roomIds: [] };
+    assert.equal((await d.call('B', 'PUT', path, { state: cleared })).status, 200);
+    assert.deepEqual((await d.call('B', 'PUT', path, { state: b, initialize: true })).data.state, cleared);
+    assert.deepEqual((await d.call('A', 'GET', path)).data.state, a);
   });
 
   await t.test("self-filtered routes never return A's rows to B [AC:lab-auth-and-route-access#AC-4]", async () => {
