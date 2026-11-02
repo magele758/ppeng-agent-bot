@@ -1,5 +1,5 @@
 export const goals = {
-  attention: '目标需要你处理', addBudget: '为此目标追加预算（美元）', addAttempts: '批准额外尝试次数', extend: '增加此目标额度', extendHint: '保留历史用量和结果。准备好后再恢复；待验收结果仍需接受或退回。',
+  attention: '目标需要你处理', addBudget: '为此目标追加预算（美元）', addAttempts: '追加尝试次数', extend: '增加此目标额度', extendHint: '保留历史用量和结果。准备好后再恢复。',
   attemptUsage: '执行 {used}/{max} 次', durableVerification: '按目标证据核验',
   history: '目标历史', historyEmpty: '暂无已结束的目标', historyError: '无法加载目标历史',
   title: '目标与进展', empty: '暂时没有目标。提出任务后，进展会显示在这里。', loading: '正在加载目标…',
@@ -10,6 +10,6 @@ export const goals = {
   usage: '已用 {cost} / 预算 {budget} 美元', priority: '优先级', pause: '暂停', resume: '恢复', cancel: '取消', verify: '核对完成',
   reject: '打回', rejectReason: '打回理由', rejectReasonPlaceholder: '可选，说明还缺什么', rejectSubmit: '确认打回', rejectDismiss: '返回',
   draining: '仍有行动正在收尾，后续工作已停止派发。', target: '下一条消息关联的目标', automatic: '自动判断',
-  setPriority: '更新优先级', status: { queued: '排队中', running: '执行中', waiting: '等待中', blocked: '已阻塞', paused: '已暂停', pending_review: '待核对', completed: '已完成', failed: '失败', cancelled: '已取消' },
+  setPriority: '更新优先级', status: { queued: '排队中', running: '执行中', waiting: '等待中', blocked: '已阻塞', paused: '已暂停', pending_review: '结果已返回（未自动核验）', completed: '已完成', failed: '失败', cancelled: '已取消' },
   strategy: { browser: '浏览器操作', computer: '桌面操作', deep_research: '深度研究', auto: '自动选择', direct: '主 Bot', subagent: '子代理', bot_delegate: 'Bot 委派', ptc: '程序编排（PTC）', team_dag: '团队任务图', swarm: 'Swarm 流水线' }
 };

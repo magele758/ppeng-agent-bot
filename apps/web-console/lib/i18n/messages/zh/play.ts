@@ -317,7 +317,7 @@ export const play = {
         "paused": "已暂停",
         "waiting": "等待依赖",
         "blocked": "受阻",
-        "pending_review": "等待核验",
+        "pending_review": "结果已返回（未自动核验）",
         "completed": "已核验完成",
         "failed": "失败",
         "cancelled": "已取消",

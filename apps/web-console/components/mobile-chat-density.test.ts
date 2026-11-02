@@ -199,7 +199,7 @@ function find(node: unknown, match: (props: Record<string, unknown>) => boolean)
 const pendingGoal = {
   goalId: 'goal-1',
   source: 'bot',
-  status: 'pending_review',
+  status: 'waiting',
   condition: '把简历里的项目经历问完并给出评分',
   turnsUsed: 1,
   maxTurns: 4
@@ -245,7 +245,7 @@ test('点开窄屏摘要后权限、详情、目标历史、状态、费用、Tr
     const collapsed = find(view.tree, (props) => props['data-testid'] === 'mobile-goal-card-toggle');
     assert.ok(collapsed);
     assert.equal(collapsed['aria-expanded'], false);
-    assert.match(view.html, /目标 待核对/);
+    assert.match(view.html, /目标 等待中/);
     assert.match(view.html, /把简历里的项目经历问完并给出评分/);
     assert.doesNotMatch(String((find(view.tree, (props) => props.role === 'status') ?? {}).className), /is-expanded/);
     (collapsed.onClick as () => void)();
