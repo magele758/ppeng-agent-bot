@@ -1,4 +1,11 @@
 export const settings = {
+  debugDisplay: {
+  "title": "Debug information",
+  "keywords": "debug goals progress trace internals",
+  "description": "Off by default. Show goal status, goal history, goals and progress, stop reasons, and Trace in all chats. Changes apply immediately after saving and sync with your account.",
+  "enable": "Show internal debug information",
+  "saveFailed": "Could not save. Please try again."
+},
   fontSize: {
     title: 'Font size', keywords: 'font size text appearance typography',
     description: 'Adjust text throughout the console. Changes apply immediately and sync across your browsers.',

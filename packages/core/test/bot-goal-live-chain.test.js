@@ -58,10 +58,11 @@ test('active goal tools visible by default but never bypass allowlist [AC:bot-go
  assert.ok(!filterToolsForSession({...input,session:{...input.session,metadata:{...input.session.metadata,allowedTools:['read_file']}}}).tools.some(t=>t.name==='goal_dispatch'));
 });
 
-test('terminal notice is durable without scheduling a new turn; stale checkpoint refused [AC:bot-goal-live-chain#AC-4] [AC:quiet-goal-notice#AC-2]',async t=>{
+test('terminal notice is durable without scheduling a new turn; stale checkpoint refused [AC:bot-goal-live-chain#AC-4] [AC:quiet-goal-results#AC-5]',async t=>{
  const {store,parent,service,ex}=fixture(t);
- const ended=service.report('b',ex.id,{kind:'candidate_completed',summary:'verified result',verified:true});
+ const ended=service.report('b',ex.id,{kind:'candidate_completed',summary:'verified result',verified:true,evidence:['read-back confirmed the result']});
  const wakes=[];store.enqueueSchedulerWake=(...args)=>wakes.push(args);
+ assert.equal(ended.status,'completed');
  announceGoalState({store},ended);announceGoalState({store},ended);
  assert.equal(wakes.length,0);
  assert.equal(store.foldMessages(parent.id).filter(m=>m.parts.some(p=>p.text?.startsWith('[goal update]'))).length,1);
@@ -141,12 +142,15 @@ test('non-running and foreign executions cannot disclose or checkpoint; notice p
  const stale=store.getSession(parent.id);
  const pending=service.report('b',ex.id,{kind:'candidate_completed',summary:'result',evidence:['observed'],verified:false});
  announceGoalState({store},pending);
+ assert.equal(pending.status,'pending_review');
+ assert.equal(store.foldMessages(parent.id).filter(m=>m.parts.some(p=>p.text?.startsWith('[goal update]'))).length,0);
+ assert.deepEqual(service.get('b',goal.id).evidence,['observed']);
  const newMessage=store.appendMessage(parent.id,'user',[{type:'text',text:'Write a second file'}]);
  const done=service.control('b',goal.id,'verify',{accepted:true});
  announceGoalState({store},done);
  announceGoalState({store},pending);
  const notices=store.foldMessages(parent.id).filter(m=>m.parts.some(p=>p.text?.startsWith('[goal update]')));
- assert.equal(notices.length,2);
+ assert.equal(notices.length,1);
  assert.match(notices.at(-1).parts[0].text,/^\[goal update\] Done:/);
  assert.ok(store.foldMessages(parent.id).some(m=>m.id===newMessage.id));
  assert.ok(!names(store.getSession(parent.id)).includes('goal_dispatch'));
@@ -177,12 +181,13 @@ test('waiting continuation receives scoped tool observations before model execut
  assert.match(observed,/Do not repeat completed operations/);
 });
 
-test('meaningful state notifications stay deterministic across terminal and review states [AC:bot-goal-live-chain#AC-4]',t=>{
+test('terminal notifications stay deterministic while unverified results remain quiet [AC:bot-goal-live-chain#AC-4] [AC:quiet-goal-results#AC-3] [AC:quiet-goal-results#AC-5]',t=>{
  const {store,parent,service}=fixture(t);
  for(const kind of ['blocked','failed','candidate_completed']) {
   const goal=service.create({botId:'b',sessionId:parent.id,title:kind,objective:'Do '+kind});
   const execution=service.claim('b',goal.id,{strategy:'direct'});
-  const state=service.report('b',execution.id,{kind,summary:'observed',evidence:['observed']});
+  const state=service.report('b',execution.id,{kind,summary:'observed',evidence:['observed'],verified:kind==='candidate_completed'});
+  assert.equal(state.status,kind==='candidate_completed'?'completed':kind);
   announceGoalState({store},state);announceGoalState({store},state);
  }
  const notices=store.foldMessages(parent.id).filter(m=>m.parts.some(p=>p.text?.startsWith('[goal update]')));

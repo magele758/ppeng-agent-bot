@@ -1,3 +1,4 @@
+import { DebugDisplaySettingsCard } from '../../../DebugDisplay';
 import { FontSizeSettingsCard } from '../../../FontSizeSettingsCard';
 import { LanguageSettingsCard } from '../../../LanguageSettingsCard';
 import { RoomCapacitySettingsCard } from '../../../RoomCapacitySettingsCard';
@@ -6,6 +7,7 @@ import { ThemeSettingsCard } from '../../../ThemeSettingsCard';
 import type { SettingsEntry } from '../registry';
 
 export const generalEntries: SettingsEntry[] = [
+  { id: 'debug-display', category: 'general', titleKey: 'settings.debugDisplay.title', keywordsKey: 'settings.debugDisplay.keywords', render: () => <DebugDisplaySettingsCard /> },
   { id: 'font-size', category: 'general', titleKey: 'settings.fontSize.title', keywordsKey: 'settings.fontSize.keywords', render: () => <FontSizeSettingsCard /> },
   {
     id: 'language',

@@ -1,4 +1,5 @@
 'use client';
+import { DebugOnly } from './DebugDisplay';
 
 import { feedNearBottom, planFeedScroll, railToggleIntent, readFeedAnchor, viewportAnchorDelta } from '@/lib/feed-window';
 import { WorkspaceIcon } from './WorkspaceIcon';
@@ -1257,7 +1258,7 @@ export function PlayPanel({
                         {tokens != null ? ` · ${tokens} tok` : ''}
                       </span>
                     ) : null}
-                    {!headerBotId && (chrome?.goalEnabled || chrome?.goalCondition) ? (
+                    <DebugOnly>{!headerBotId && (chrome?.goalEnabled || chrome?.goalCondition) ? (
                       <span
                         className={`session-chrome__chip${goalMet === true ? ' is-ok' : goalMet === false ? ' is-warn' : ''}`}
                         title={chrome?.goalCondition || t('play.chrome.noGoal')}
@@ -1267,7 +1268,7 @@ export function PlayPanel({
                           ? ` ${chrome.goalTurnsUsed}${chrome.goalMaxTurns != null ? `/${chrome.goalMaxTurns}` : ''}`
                           : ''}
                       </span>
-                    ) : null}
+                    ) : null}</DebugOnly>
                   </div>
                 ) : null}
                 </div>
@@ -1275,7 +1276,7 @@ export function PlayPanel({
 
   const renderHeaderActions = () => (
               <div className="chat-panel-header__actions play-toolbar">
-                <GoalHistory key={selectedSessionId} sessionId={selectedSessionId} botId={headerBotId ?? undefined} />
+                <DebugOnly><GoalHistory key={selectedSessionId} sessionId={selectedSessionId} botId={headerBotId ?? undefined} /></DebugOnly>
                 <button type="button" className="btn btn-ghost rail-toggle" aria-label={t(railCollapsed ? 'polish.expandRail' : 'polish.collapseRail')} title={t(railCollapsed ? 'polish.expandRail' : 'polish.collapseRail')} aria-expanded={!railCollapsed} onClick={() => {
                   const feed = chat.playMessagesRef.current;
                   const anchor = readFeedAnchor(feed);
@@ -1286,7 +1287,7 @@ export function PlayPanel({
                   setRailCollapsed((value) => !value);
                 }}><WorkspaceIcon kind="panel" /></button>
                 {accountMenu}
-                <button
+                <DebugOnly><button
                   type="button"
                   className="btn btn-ghost btn-sm"
                   disabled={!selectedSessionId}
@@ -1294,7 +1295,7 @@ export function PlayPanel({
                   title={t('play.chrome.traceTitle')}
                 >
                   {t('play.trace')}
-                </button>
+                </button></DebugOnly>
                 {sessionBusy ? (
                   <button
                     type="button"
@@ -1370,7 +1371,7 @@ export function PlayPanel({
                       : null
                   }
                   onQuoteReply={botSurface ? chat.quoteReply : undefined}
-                  footer={feedHasTurns && !statsLive ? <ChatStopReasonFooter outcome={chrome?.outcome} /> : null}
+                  footer={feedHasTurns && !statsLive ? <DebugOnly><ChatStopReasonFooter outcome={chrome?.outcome} /></DebugOnly> : null}
                   onOpenModelSetup={onOpenModelSetup}
                   onNewSession={onNewSession}
                   onApprovalsChanged={onApprovalsChanged}
@@ -1406,7 +1407,7 @@ export function PlayPanel({
 
   const renderComposerLead = () => (
     <>
-                {headerBotId && selectedSessionId && <BotGoals key={`${headerBotId}:${selectedSessionId}`} botId={headerBotId} sessionId={selectedSessionId} selectedGoalId={chat.selectedGoalId} onSelectGoal={chat.setSelectedGoalId} />}
+                {headerBotId && selectedSessionId && <DebugOnly><BotGoals key={`${headerBotId}:${selectedSessionId}`} botId={headerBotId} sessionId={selectedSessionId} selectedGoalId={chat.selectedGoalId} onSelectGoal={chat.setSelectedGoalId} /></DebugOnly>}
                 {(firstTask.phase === 'visible' || firstTask.storageFailed) && headerBotId &&
                   <BotFirstTask key={headerBotId} storageFailed={firstTask.storageFailed} onDismiss={() => { firstTask.dismiss(); chat.playInputRef.current?.focus({ preventScroll: true }); }} botId={headerBotId} needsModel={chat.needsModelSetup} onChoose={chat.setPlayInput} onConfigureModel={onOpenModelSetup} />}
                 {chat.needsModelSetup && selectedSessionId ? (
@@ -1788,7 +1789,7 @@ export function PlayPanel({
           {botSurface && openGroupId ? <PlayBotGroupChat key={openGroupId} roomId={openGroupId} bots={botRoster} onOpenWork={id=>{setOpenGroupId(null);onSelectSession(id);}} /> : null}
           <div className="play-main chat-panel" hidden={botSurface && openGroupId != null}>
       {renderChatHeader()}
-            <GoalStatusCard sessionId={selectedSessionId} />
+            <DebugOnly><GoalStatusCard sessionId={selectedSessionId} /></DebugOnly>
       {renderChatBody()}
           </div>
           <BotDetailPane onClose={() => setBotDetailOpen(false)} visible={botDetailVisible} botId={headerBotId} botName={headerBotName} agentId={selectedBot?.agentId} childTasks={detailChildTasks} onOpenChildTask={(sessionId) => {

@@ -1,4 +1,11 @@
 export const settings = {
+  debugDisplay: {
+  "title": "调试信息",
+  "keywords": "调试 目标 进展 Trace 内部机制",
+  "description": "默认关闭。开启后，所有会话展示目标状态、目标历史、目标与进展、停止原因和 Trace 入口。保存后立即生效，并随当前账号同步。",
+  "enable": "显示内部调试信息",
+  "saveFailed": "保存失败，请重试。"
+},
   fontSize: {
     title: '字体大小', keywords: '字体 字号 外观 大小 font size text appearance',
     description: '调整整个控制台的文字大小，立即生效并同步到当前用户的其他浏览器。',

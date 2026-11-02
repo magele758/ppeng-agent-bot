@@ -163,35 +163,40 @@ export type StreamTextPiece = { kind: string; raw?: string };
 
 /** Assistant prose that was streamed but is not in the saved transcript yet. */
 export function unpersistedAssistantText(
-  messages: ReadonlyArray<{ role?: string; text?: string; parts?: ReadonlyArray<{ type?: string; text?: string }> }>,
+  messages: ReadonlyArray<TranscriptRow>,
   segments: ReadonlyArray<StreamTextPiece>
 ): string {
-  const lastUser = messages.findLastIndex(message => message.role === 'user');
-  const saved = messages.slice(lastUser + 1)
-    .filter((message) => message.role === 'assistant')
-    .map((message) => rowBody(message).trim())
-    .filter(Boolean);
+  const saved = currentTurnSavedBodies(messages);
   const pending: string[] = [];
   for (const segment of segments) {
     if (segment.kind !== 'text') continue;
-    const raw = (segment.raw ?? '').trim();
-    if (!raw) continue;
-    if (saved.some((body) => body.includes(raw))) continue;
-    const prefix = saved.filter((body) => raw.startsWith(body) && body.length >= 12).sort((a, b) => b.length - a.length)[0];
-    if (prefix) {
-      const rest = raw.slice(prefix.length).trim();
-      if (rest) pending.push(rest);
-      continue;
-    }
-    pending.push(raw);
+    const remaining = unsavedHeldText(segment.raw ?? '', saved);
+    if (remaining?.trim()) pending.push(remaining.trim());
   }
   return pending.join('\n\n');
 }
 
-type TranscriptRow = { role?: string; text?: string; parts?: ReadonlyArray<{ type?: string; text?: string }> };
+function unsavedHeldText(raw: string, saved: readonly string[]): string | null {
+  const visible = stripVisibleClockMarks(raw).trim();
+  if (saved.some(body => body.includes(visible))) return null;
+  return unsavedStreamText(raw, saved);
+}
+
+type TranscriptRow = { key?: unknown; role?: string; text?: string; parts?: ReadonlyArray<{ type?: string; text?: string }> };
+
+/** Steering continues the current execution; only an ordinary user request starts a new one. */
+function startsTranscriptTurn(message: TranscriptRow): boolean {
+  if (message.role !== 'user') return false;
+  return !isSteeringKey(message.key);
+}
+
+function isSteeringKey(key: unknown): boolean {
+  if (typeof key !== 'string') return false;
+  return key.includes('steer') || key.includes('note');
+}
 
 function currentTurnSavedBodies(messages: ReadonlyArray<TranscriptRow>): string[] {
-  const lastUser = messages.findLastIndex((message) => message.role === 'user');
+  const lastUser = messages.findLastIndex(startsTranscriptTurn);
   return messages
     .slice(lastUser + 1)
     .filter((message) => message.role === 'assistant')
