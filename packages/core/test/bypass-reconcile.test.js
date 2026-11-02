@@ -1,0 +1,24 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { SqliteStateStore } from '../dist/storage.js';
+import { approve } from '../dist/runtime/session-facade.js';
+import { reconcileBypassApprovals } from '../dist/runtime/bypass-approvals.js';
+test('release only pending bypass tool gates and resume once [AC:bypass-full-auto#AC-4]', async t => {
+  const dir=mkdtempSync(join(tmpdir(),'bypass-')); const store=new SqliteStateStore(join(dir,'state.db'));
+  t.after(()=>{store.db.close();rmSync(dir,{recursive:true,force:true});});
+  const make=mode=>store.createSession({agentId:'general',title:mode,mode:'chat',metadata:{permissionMode:mode}});
+  const a=make('bypass'), b=make('auto'), c=make('bypass');
+  const gate=s=>store.createApproval({sessionId:s.id,toolName:'bash',reason:'Auto-review (shell)',args:{command:'rm -rf /tmp/test'},idempotencyKey:'ar:one'});
+  const pa=gate(a),pb=gate(b),pc=gate(c); store.updateApproval(pc.id,'rejected');
+  const question=store.createApproval({sessionId:c.id,toolName:'ask_user',reason:'Question',args:{},idempotencyKey:'question'});
+  store.updateSession(a.id,{status:'waiting_approval'});
+  const resumed=[];
+  const host={store,stateDir:dir,approve:(id,decision)=>approve(store,id,decision),isSessionRunning:()=>false,runSession:async id=>{resumed.push(id);return store.getSession(id);},emitTraceEvent:()=>{},hasUnconfirmedEffects:()=>false,cancelSession:()=>{}};
+  await Promise.all([reconcileBypassApprovals(host),reconcileBypassApprovals(host)]); await reconcileBypassApprovals(host);
+  assert.equal(store.getApproval(pa.id).status,'approved'); assert.equal(store.getApproval(pb.id).status,'pending');
+  assert.equal(store.getApproval(pc.id).status,'rejected'); assert.equal(store.getApproval(question.id).status,'pending');
+  assert.deepEqual(resumed,[a.id]);
+});

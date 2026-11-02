@@ -6,6 +6,8 @@ const SHELL_TOOLS = new Set(['bash', 'bg_run', 'shell', 'work_evidence']);
 
 export type AutoReviewCardInput = {
   toolName: string;
+  id?: string;
+  args?: Record<string, unknown>;
   reason?: string;
   kind?: string;
   blockReason?: string;

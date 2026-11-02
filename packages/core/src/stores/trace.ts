@@ -3,6 +3,8 @@ import { join } from 'node:path';
 import type { EventBufferRepository } from '../storage/interfaces.js';
 
 export type TraceEventKind =
+  | 'bypass_approval_error'
+  | 'bypass_approval_released'
   | 'turn_start'
   | 'turn_end'
   /** Model output cut off by a token cap (finish_reason length / max_tokens); content is incomplete */

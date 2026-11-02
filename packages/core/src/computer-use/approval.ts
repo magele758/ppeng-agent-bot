@@ -7,7 +7,7 @@ interface ApprovalStore {
   getDaemonControl<T>(key:string): T | undefined;
   setDaemonControl(key:string,value:unknown): void;
 }
-/** Who may skip the per-app prompt. Both must be false for routines, events and delegated sessions. */
+/** Who may skip the per-app prompt. Explicit bypass is automatic; remembered grants still require direct user authority. */
 export interface LcuGrantPolicy {
   autoAllow(sessionId:string): boolean;
   userAuthority(sessionId:string): boolean;

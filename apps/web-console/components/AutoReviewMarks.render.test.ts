@@ -25,6 +25,7 @@ function load(): Record<string, any> {
     if (id === '@/lib/i18n') {
       return { useI18n: () => ({ t: (key: string, vars?: Record<string, string>) => translate(zh, key, vars) }) };
     }
+    if (id === './ApprovalExplanation') return { ApprovalExplanation: () => null };
     if (id === '@/lib/auto-review-card') return localRequire('../lib/auto-review-card.ts');
     return localRequire(id);
   };

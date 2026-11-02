@@ -156,7 +156,7 @@ Jev 不是 SDK 模块：未配置入口时宿主不调用它，SDK 接入参数�
 
 ### 2.4 Auto-review 卡上的种类与拦截原因
 
-高危 Shell/MCP 的 `evaluateAutoReview` 在 `soft_block` 与 `require_card` 上带 `kind`（`shell` | `mcp`）和人类可读 `blockReason`。待审批卡的 `reason` 写成 `Auto-review (<kind>) blocked high-risk <tool>: <blockReason>`，指纹参数仍不含升级标志。Lab 卡片用这个种类显示 Shell / MCP 徽章，并用冒号后的 `blockReason` 说明为什么拦住。控制流不变：默认 soft-block、带 `requestSmartModeApproval` 出卡、批准后同指纹放行、拒绝终局、`permissionMode=bypass` 不能绕过。
+高危 Shell/MCP 的 `evaluateAutoReview` 在 `soft_block` 与 `require_card` 上带 `kind`（`shell` | `mcp`）和人类可读 `blockReason`。待审批卡的 `reason` 写成 `Auto-review (<kind>) blocked high-risk <tool>: <blockReason>`，指纹参数仍不含升级标志。Lab 卡片用这个种类显示 Shell / MCP 徽章，并用冒号后的 `blockReason` 说明为什么拦住。控制流不变：默认 soft-block、带 `requestSmartModeApproval` 出卡、批准后同指纹放行、拒绝终局；用户保存的 `permissionMode=bypass` 全自动跳过新审批（含 Auto-review 与 pre-tool ask），已有同指纹明确拒绝仍失败，不再弹卡。默认非 bypass 行为不变。
 
 宿主可选实现 `ToolLoopHost.savedShellIsolation()`（也可直接给 `evaluateAutoReview({ ..., savedIsolation })`）返回负责人已保存的隔离方式。返回 `direct` 时，显式 `isolation: "direct"` 本身不再算高危（和省略该字段的效果一样）；命令命中 `rm ` 等高危模式仍拦。未实现或返回其它值时行为不变。
 
@@ -284,3 +284,7 @@ await loop.run(session.id, { onModelStreamChunk: chunk => console.log(chunk) });
 摘要只记录媒体类型/资产标记；上下文预算对音频/视频分别使用粗略固定估算 3000/10000 token，并非按时长计费或准确限额。长媒体请由宿主结合实际模型窗口与时长控制请求。模型调试日志省略媒体 Base64 正文；显式内联媒体仍会随消息持久化，不能把日志省略当作资产存储脱敏。
 
 协议依据：[OpenAI audio input](https://developers.openai.com/api/docs/guides/audio-chat-completions)、[Qwen-Omni media input](https://www.alibabacloud.com/help/en/model-studio/qwen-omni)。回归：`src/model/native-media.test.ts`、`src/assembly/native-media.test.ts`。
+
+### Bypass 全自动（2026-11-02）
+
+产品宿主把已保存的 bypass 视为工具操作授权，覆盖常规审批、Auto-review、来源范围和受支持的 LCU 应用确认；来源文本不能设置权限模式。SDK 的 pre-tool ask 在 bypass 下直接继续，pre-tool block 和已有精确调用拒绝仍失败。命令硬拒绝、路径封锁与工具执行错误不是审批，不因此取消。Shell 风险关键词有词边界，不把 nodeterm / agent-term 等名字中的 rm 当删除命令。

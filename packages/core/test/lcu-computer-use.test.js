@@ -117,7 +117,7 @@ test('one approval is remembered for the same app in the same session only [AC:l
   const other=handler('s1',appRequest('com.apple.TextEdit'),new AbortController().signal);await new Promise(r=>setTimeout(r,5));assert.equal(f.rows.length,2);f.rows[1].status='rejected';await other;
   const otherSession=handler('s2',appRequest(),new AbortController().signal);await new Promise(r=>setTimeout(r,5));assert.equal(f.rows.length,3);f.rows[2].status='rejected';await otherSession;
 });
-test('routine or delegated authority never reuses grants or bypass [AC:lcu-app-grant#AC-3]', async () => {
+test('non-bypass routine or delegated authority never reuses grants [AC:lcu-app-grant#AC-3]', async () => {
   const { createLcuApprovalHandler } = await import('../dist/computer-use/approval.js');
   const f=grantFixture({userAuthority:()=>false});const handler=createLcuApprovalHandler(f.store,f.policy);
   await decide(f.rows,handler,'s1',appRequest(),'approved');
@@ -133,7 +133,7 @@ test('denials and unsupported requests are not remembered [AC:lcu-app-grant#AC-4
   assert.deepEqual(await decide(g.rows,h,'s1',appRequest(),'rejected'),{action:'decline'});
   await decide(g.rows,h,'s1',appRequest(),'rejected');assert.equal(g.rows.length,2);
 });
-test('runtime wires bypass and delegated sessions to the source ledger [AC:lcu-app-grant#AC-1] [AC:lcu-app-grant#AC-3]', async () => {
+test('runtime respects explicit bypass for root and delegated sessions [AC:lcu-app-grant#AC-1] [AC:bypass-full-auto#AC-5]', async () => {
   const { RawAgentRuntime }=await import('../dist/runtime.js');const {mkdtempSync}=await import('node:fs');const {tmpdir}=await import('node:os');const {join}=await import('node:path');
   const answers=[];let calls=0;
   const model={name:'lcu-grant-test',runTurn:async input=>input.messages.at(-1).role==='tool'?{stopReason:'end',assistantParts:[{type:'text',text:'done'}]}:{stopReason:'tool_calls',assistantParts:[{type:'tool_call',toolCallId:`c${++calls}`,name:'lcu_js',input:{code:'x'}}]},summarizeMessages:async()=>''};
@@ -143,7 +143,6 @@ test('runtime wires bypass and delegated sessions to the source ledger [AC:lcu-a
     const root=rt.store.createSession({title:'bypass',mode:'chat',agentId:'general',background:false,metadata:{permissionMode:'bypass'}});rt.store.appendMessage(root.id,'user',[{type:'text',text:'open voice memos'}]);await rt.runSession(root.id);
     assert.deepEqual(answers.at(-1),{action:'accept',content:{},_meta:{persist:'session'}});assert.equal(rt.listApprovals().filter(a=>a.toolName==='lcu_app_access').length,0);
     const child=rt.store.createSession({title:'child',mode:'subagent',agentId:'general',parentSessionId:root.id,background:false,metadata:{permissionMode:'bypass'}});rt.store.appendMessage(child.id,'user',[{type:'text',text:'open voice memos'}]);
-    const run=rt.runSession(child.id);let pending;for(let i=0;i<200&&!pending;i++){await new Promise(r=>setTimeout(r,20));pending=rt.listApprovals().find(a=>a.toolName==='lcu_app_access'&&a.sessionId===child.id&&a.status==='pending');}
-    assert.ok(pending,'delegated session must still ask');rt.store.updateApproval(pending.id,'rejected');await run;assert.deepEqual(answers.at(-1),{action:'decline'});
+    await rt.runSession(child.id); assert.deepEqual(answers.at(-1),{action:'accept',content:{},_meta:{persist:'session'}}); assert.equal(rt.listApprovals().filter(a=>a.toolName==='lcu_app_access').length,0);
   }finally{await rt.destroy();}
 });

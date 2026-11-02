@@ -138,9 +138,9 @@ export class SourceLedger {
         }
         return constrained.every(id => sourcePolicyAllows(this.settings(id), name, args));
     }
-    /** Saved permissionMode=bypass is explicit user authorization, only for a root session whose authority is direct user input. */
+    /** Saved permissionMode=bypass is explicit user authorization for automatic tool use; source text cannot set this mode. */
     bypassGrant(sid: string): boolean {
-        return this.store.getSession(sid)?.metadata?.permissionMode === 'bypass' && this.directUser(sid);
+        return this.store.getSession(sid)?.metadata?.permissionMode === 'bypass';
     }
     /** Root session whose current authority is direct user input (not a routine, event, or delegated child). */
     directUser(sid: string): boolean {

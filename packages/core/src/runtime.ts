@@ -1,3 +1,4 @@
+import { reconcileBypassApprovals } from './runtime/bypass-approvals.js';
 import {createWaitForTool} from './waits/tool.js';
 import { mergeDomainBundles, type DomainBundle } from './domain.js';
 import { registerDomainCatalog, domainCatalog, readRuntimeCapabilities, runtimeCapabilityCheck, guardRuntimeCapability } from './config/runtime-capabilities.js';
@@ -1584,6 +1585,7 @@ export class RawAgentRuntime {
       }
       return;
     }
+    await reconcileBypassApprovals(this);
     await this.factory.tick().catch(error => this.log.warn('Factory scheduler failed', {error:String(error)}));
     await tickBotWork(this.botWorkRuntimeHost());
     await tickBotGoals(this.goalRuntimeHost());

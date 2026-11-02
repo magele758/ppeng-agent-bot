@@ -209,7 +209,7 @@ test('direct isolation does not run until approval outside bypass [AC:model-sand
   }
 });
 
-test('bypass still hits Auto-review for direct isolation, then proceeds after approve [AC:bypass-remote-shell#AC-1] [AC:auto-review-shell-mcp#AC-5]', async () => {
+test('bypass executes direct isolation without approval flags or cards [AC:bypass-remote-shell#AC-1] [AC:auto-review-shell-mcp#AC-5]', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'iso-bypass-'));
   const marker = join(dir, 'ran.txt');
   const command = `printf ran > ${JSON.stringify(marker)}`;
@@ -238,7 +238,7 @@ test('bypass still hits Auto-review for direct isolation, then proceeds after ap
       stateDir: dir,
       emitTrace() {}
     };
-    // Auto-review still gates isolation=direct under bypass (no side effects without the escalate flag).
+    // Saved bypass authorizes direct execution, whether or not the model asks for a card.
     const soft = checkToolApprovals(
       deps,
       [{ type: 'tool_call', toolCallId: 'c1', name: 'bash', input: { command, isolation: 'direct' } }],
@@ -247,7 +247,7 @@ test('bypass still hits Auto-review for direct isolation, then proceeds after ap
       session,
       deps.tools
     );
-    assert.equal(soft, 'skip');
+    assert.equal(soft, 'proceed');
     assert.equal(approvals.length, 0);
     const flagged = checkToolApprovals(
       deps,
@@ -262,9 +262,8 @@ test('bypass still hits Auto-review for direct isolation, then proceeds after ap
       session,
       deps.tools
     );
-    assert.equal(flagged, 'waiting');
-    assert.equal(approvals.length, 1);
-    approvals[0].status = 'approved';
+    assert.equal(flagged, 'proceed');
+    assert.equal(approvals.length, 0);
     const decision = checkToolApprovals(
       deps,
       [{ type: 'tool_call', toolCallId: 'c3', name: 'bash', input: { command, isolation: 'direct' } }],

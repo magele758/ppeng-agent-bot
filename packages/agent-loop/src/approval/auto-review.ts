@@ -4,7 +4,7 @@
  * Grok-aligned contract (not a UI clone):
  * 1) High-risk call without requestSmartModeApproval → default soft-block (no side effects).
  * 2) Same action + requestSmartModeApproval → native approval card (createApproval) and wait.
- * 3) Approve → same fingerprint proceeds; deny → terminal; no bypass via permissionMode=bypass.
+ * 3) Approve → same fingerprint proceeds; deny → terminal; bypass skips new approval prompts; explicit denials remain final.
  *
  * `authorizedBy` is an audit citation (owner message / answered-card ids), not a skip flag.
  * It is stripped from the fingerprint the same way the escalate flags are.
@@ -151,7 +151,7 @@ function autoReviewSummary(toolName: string, kind: AutoReviewKind, blockReason: 
 export function shellCommandIsHighRisk(command: string): boolean {
   const lower = command.toLowerCase();
   if (!lower.trim()) return false;
-  if (RISKY_SHELL_SUBSTRINGS.some((t) => lower.includes(t))) return true;
+  if (RISKY_SHELL_SUBSTRINGS.some((t) => new RegExp('(?:^|[^\\w.-])' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).test(lower))) return true;
   if (/\|\s*(?:ba)?sh\b/.test(lower)) return true;
   if (/\|\s*zsh\b/.test(lower)) return true;
   if (/<\(\s*(curl|wget)\b/.test(lower)) return true;

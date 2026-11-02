@@ -1,0 +1,23 @@
+id: approval-explanations
+title: 审批操作与风险说明
+status: implemented
+requirement: |
+  这里给的信息太杂了，要告知我风险的原因，以及具体要执行什么，可以让模型来解释这个，避免搞不清楚为啥
+notes: 'assumedApproval: standing-order-2026-10-22。说明仅辅助理解，不改变审批结果或执行参数。'
+criteria:
+  - id: AC-1
+    given: 一项待批准的 Shell 或 MCP 操作
+    when: 查看审批卡
+    then: 优先展示要执行的操作和风险原因，重复的内部拦截提示收进原始详情，实际参数仍可核对
+  - id: AC-2
+    given: 模型能够生成说明
+    when: 为审批生成解释
+    then: 根据该审批实际参数生成对应语言的操作与风险说明，不执行命令、不批准操作、不改变参数；相同审批的重复请求复用结果
+  - id: AC-3
+    given: 模型失败或返回无效说明
+    when: 查看审批
+    then: 仍保留规则风险提示和实际参数，批准与拒绝不依赖模型说明成功
+  - id: AC-4
+    given: 另一用户的审批或包含密钥的参数
+    when: 请求模型解释
+    then: 另一用户无法访问该审批说明，敏感字段及服务端已知密钥不会进入解释请求
