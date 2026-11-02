@@ -108,7 +108,8 @@ function clientAbortSignal(request: IncomingMessage, response: ServerResponse): 
   response.on('close', onClose);
   request.on('aborted', abort);
   request.socket?.on('close', onClose);
-  if (request.destroyed) abort();
+  // A fully consumed IncomingMessage can be destroyed while its response is still open.
+  if (request.aborted) abort();
   return controller.signal;
 }
 

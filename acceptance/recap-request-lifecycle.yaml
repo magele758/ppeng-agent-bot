@@ -1,0 +1,15 @@
+id: recap-request-lifecycle
+title: 主动回顾正常生成与取消
+status: implemented
+requirement: |
+  这个点击也是失败的，查一下问题，我点了主动回顾，也返回这次没有回顾成
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 空闲会话已有完成的对话且模型可返回回顾
+    when: 用户主动请求回顾并等待响应
+    then: 正常收到回顾正文，成功结果可复用，聊天记录不增加回顾消息
+  - id: AC-2
+    given: 回顾请求正在生成且客户端仍连接
+    when: 用户取消请求或断开连接
+    then: 生成在取消前保持有效，在取消后及时停止而不是等到固定超时
