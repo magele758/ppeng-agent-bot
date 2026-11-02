@@ -1,7 +1,7 @@
 /** Play / Chat copy. Do not add as const. */
 export const play = {
   reliability: {"title":"Long-running tasks and cache diagnostics","hint":"The task contract is stored separately and restored to model context after compression. One item per line; update the contract when requirements change. Newer direct instructions take precedence.","objective":"Objective","constraints":"Constraints and authorization boundaries","todos":"Unfinished work","evidence":"Evidence references (messages or files)","save":"Save task contract","version":"Contract version {version}","cache":"Prompt cache diagnostics","refresh":"Refresh diagnostics","cacheHint":"Changed sections do not prove a cache miss. Cached tokens are reported only when supplied by the provider; unknown is not zero.","unknown":"Unknown","changed":"Changed sections","none":"Unchanged or first request","cached":"Cached / total input tokens","system":"System prompt","tools":"Tool definitions","stable":"Stable context"},
-  botRelay: { open: 'View full message from {name}', dialog: 'Message from {name}', close: 'Close', kind: { task: 'Delegated task', result: 'Task result', message: 'Message' }, status: { completed: 'completed', failed: 'failed', cancelled: 'cancelled', unknown: 'status unknown' } },
+  botRelay: { from: 'From', open: 'View full message from {name}', dialog: 'Message from {name}', close: 'Close', kind: { task: 'Delegated task', result: 'Task result', message: 'Message' }, status: { completed: 'completed', failed: 'failed', cancelled: 'cancelled', unknown: 'status unknown' } },
   history: { loading: 'Loading earlier messages…', failed: 'Could not load earlier messages', retry: 'Retry' },
 
   systemNotice: {
@@ -109,7 +109,7 @@ export const play = {
     saveFailed: 'Reply mode was not saved',
     saved: 'Saved',
   },
-  entry: { new: 'New', remove: 'Remove', removeBot: 'Remove Bot “{name}”', removeBotConfirm: 'Remove Bot “{name}”? It will be hidden from the Bot list. Existing conversations, group chats and tasks are kept; this does not delete conversations.', removeFailed: 'Removal failed: {error}' },
+  entry: { new: 'New', remove: 'Remove', confirmRemove: 'Confirm remove', removeBot: 'Remove Bot “{name}”', removeBotConfirm: 'Remove Bot “{name}”? It will be hidden from the Bot list. Existing conversations, group chats and tasks are kept; this does not delete conversations.', removeFailed: 'Removal failed: {error}' },
   groupModel: {
     settings: "Default model",
   },
@@ -214,6 +214,7 @@ export const play = {
     selectAll: 'Select all',
     selectAllAria: 'Select every session in this list',
     deleteOne: 'Delete',
+    confirmDelete: 'Confirm delete',
     deleteOneAria: 'Delete session {title}',
     deleteSelected: 'Delete {count}',
     deleteConfirmOne: 'Delete session “{title}”? This cannot be undone.',

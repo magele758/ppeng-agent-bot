@@ -1,0 +1,13 @@
+id: bot-relay-slug
+title: 非 bot_ 前缀的 Bot 通信也收成小提醒
+status: implemented
+requirement: |
+  Bot 之间的通信即使发送方 id 是 ubuntu2-bot 这种 slug，也收成一行小提醒，点击才看全文
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  补上 bot-relay-strip 只认 bot_ 前缀、认不出实际 bot id 的缺口。
+criteria:
+  - id: AC-1
+    given: "一条用户消息以 Message from Ubuntu2 Bot / ubuntu2-bot: Task btask_… completed: 开头"
+    when: 在聊天里查看
+    then: 它被识别为来自该 Bot 的委派结果，主界面不展示 btask id 和全文

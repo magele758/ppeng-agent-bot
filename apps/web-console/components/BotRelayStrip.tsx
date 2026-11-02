@@ -53,10 +53,15 @@ export function BotRelayTurn({ relay }: { relay: BotRelayMessage }) {
         aria-label={t('play.botRelay.open', { name: relay.senderName })}
         onClick={() => setOpen(true)}
       >
-        <span className="bot-relay-strip__avatar" aria-hidden="true">{Array.from(relay.senderName)[0]}</span>
-        <span className="bot-relay-strip__name">{relay.senderName}</span>
-        <span className="bot-relay-strip__kind">{kind}</span>
-        <span className="bot-relay-strip__summary">{relay.summary}</span>
+        <span className="bot-relay-strip__line">
+          <span className="bot-relay-strip__from">{t('play.botRelay.from')}</span>
+          <span className="bot-relay-strip__avatar" aria-hidden="true">{Array.from(relay.senderName)[0]}</span>
+          <span className="bot-relay-strip__name">{relay.senderName}</span>
+        </span>
+        <span className="bot-relay-strip__line">
+          <span className="bot-relay-strip__kind">{kind}</span>
+          <span className="bot-relay-strip__summary">{relay.summary}</span>
+        </span>
       </button>
       {open ? createPortal(<BotRelayDialog relay={relay} onClose={() => setOpen(false)} />, document.body) : null}
     </div>

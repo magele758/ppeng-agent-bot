@@ -990,7 +990,7 @@ export function PlayPanel({
     } finally { setDeleting(false); }
   };
   const removalProps = (s: SessionSummary, rowBot: BotInfo | undefined) => {
-    if (rowBot) return { deleteAria: t('play.entry.removeBot', { name: rowBot.name }), deleteLabel: t('play.entry.remove'), onDelete: () => { void removeBot(rowBot); } };
+    if (rowBot) return { deleteAria: t('play.entry.removeBot', { name: rowBot.name }), deleteLabel: t('play.entry.remove'), confirmLabel: t('play.entry.confirmRemove'), onDelete: () => { void removeBot(rowBot); } };
     if (!onDeleteSessions) return {};
     return { onDelete: (title: string) => { void confirmDelete([s.id], t('play.sidebar.deleteConfirmOne', { title })); } };
   };

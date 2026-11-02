@@ -7,6 +7,7 @@ import { useI18n } from '@/lib/i18n';
 import { sessionRowCopy, sessionWorkBotId } from '@/lib/session-row';
 import { BotFace } from './BotFace';
 import { useBotWorkMood } from './bot-work/BotWorkState';
+import { useArmedConfirm } from './use-armed-confirm';
 
 function isCoreExecAgent(id: string): boolean {
   return id === 'general' || id === 'main';
@@ -25,7 +26,8 @@ export function SessionListRow({
   onToggleChecked,
   onDelete,
   deleteAria,
-  deleteLabel
+  deleteLabel,
+  confirmLabel
 }: {
   session: SessionSummary;
   bots: readonly BotInfo[];
@@ -40,8 +42,10 @@ export function SessionListRow({
   onDelete?: (title: string) => void;
   deleteAria?: string;
   deleteLabel?: string;
+  confirmLabel?: string;
 }) {
   const { t } = useI18n();
+  const confirm = useArmedConfirm();
   const copy = sessionRowCopy({
     session,
     bots,
@@ -108,13 +112,12 @@ export function SessionListRow({
           type="button"
           className="btn btn-ghost btn-sm session-item__delete"
           disabled={deleting}
-          aria-label={deleteAria ?? t('play.sidebar.deleteOneAria', { title })}
-          onClick={(event) => {
-            event.stopPropagation();
-            onDelete(title);
-          }}
+          data-armed={confirm.armed ? 'true' : 'false'}
+          aria-label={confirm.armed ? (confirmLabel ?? t('play.sidebar.confirmDelete')) : (deleteAria ?? t('play.sidebar.deleteOneAria', { title }))}
+          onPointerDown={confirm.onPointerDown}
+          onClick={(event) => confirm.onClick(event, () => onDelete(title))}
         >
-          {deleteLabel ?? t('play.sidebar.deleteOne')}
+          {confirm.armed ? (confirmLabel ?? t('play.sidebar.confirmDelete')) : (deleteLabel ?? t('play.sidebar.deleteOne'))}
         </button>
       ) : null}
     </div>
