@@ -519,6 +519,15 @@ export function usePlayChat(deps: PlayChatDeps) {
     if (!steerSplitRef.current) return;
     publishSteerSplit(null);
   };
+  const finishSteerLanding = (sid: string, known: Set<string>, cancelled: boolean) => {
+    if (cancelled || selectedSessionRef.current !== sid || pendingSteerKnownIdsRef.current !== known) return;
+    pendingSteerTextRef.current = null;
+    pendingSteerSessionRef.current = null;
+    clearSteerSplit();
+    setOptimisticUser(null);
+    setOptimisticContext([]);
+    setOptimisticReply(null);
+  };
   const anchorSteerSplit = () => {
     publishSteerSplit({
       prefix: streamSegmentsRef.current.length,
@@ -1309,13 +1318,8 @@ export function usePlayChat(deps: PlayChatDeps) {
           return message.role === 'user' && id && !known.has(id) && messageUserText(message).includes(wanted);
         });
         if (!landed) return;
-        pendingSteerTextRef.current = null;
-        pendingSteerSessionRef.current = null;
-        clearSteerSplit();
-        setOptimisticUser(null);
-        setOptimisticContext([]);
-        setOptimisticReply(null);
         await refreshPlayPanel();
+        finishSteerLanding(sid, known, cancelled);
       } catch {
         /* steer landing is best-effort */
       }
