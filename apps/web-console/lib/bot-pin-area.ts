@@ -1,3 +1,5 @@
+import { api } from './api.ts';
+import { createPinSync } from './bot-pin-sync.ts';
 import { botForCanonicalSession } from './bots.ts';
 import {
   BOT_PIN_STORAGE_KEY,
@@ -77,6 +79,7 @@ function emit(): void {
 
 export function subscribeBotPins(listener: () => void): () => void {
   listeners.add(listener);
+  const stopSync = startPinSync();
   const onStorage = (event: StorageEvent) => {
     if (event.key !== null && event.key !== BOT_PIN_STORAGE_KEY) return;
     listener();
@@ -84,6 +87,7 @@ export function subscribeBotPins(listener: () => void): () => void {
   if (typeof window !== 'undefined') window.addEventListener('storage', onStorage);
   return () => {
     listeners.delete(listener);
+    stopSync();
     if (typeof window !== 'undefined') window.removeEventListener('storage', onStorage);
   };
 }
@@ -110,6 +114,7 @@ export function commitBotPinState(state: BotPinState): void {
   saveBotPinState(next);
   remember(next);
   emit();
+  queuePinSave(next);
 }
 
 export function pinRoster<T extends PinRosterBot>(bots: readonly T[]): T[] {
@@ -246,4 +251,35 @@ export function resultOfPinAreaDrop(
       return leftover;
     }
   }
+}
+
+const pinSync = createPinSync(api);
+let pendingPin: BotPinState | null = null;
+let syncBusy = false;
+async function syncPins(): Promise<void> {
+  if (syncBusy) return;
+  syncBusy = true;
+  const pending = pendingPin;
+  try {
+    const state = await exchangePins(pending);
+    if (pendingPin !== pending) return;
+    pendingPin = null;
+    saveBotPinState(state);
+    remember(state);
+    emit();
+  } catch { /* Keep local state and retry on the next poll. */ }
+  finally { syncBusy = false; }
+}
+function exchangePins(pending: BotPinState | null): Promise<BotPinState> {
+  return pending ? pinSync.save(pending) : pinSync.refresh(loadBotPinState());
+}
+function queuePinSave(state: BotPinState): void {
+  pendingPin = state;
+  if (typeof window !== 'undefined') void syncPins();
+}
+function startPinSync(): () => void {
+  if (typeof window === 'undefined') return () => {};
+  void syncPins();
+  const timer = window.setInterval(() => void syncPins(), 3000);
+  return () => window.clearInterval(timer);
 }
