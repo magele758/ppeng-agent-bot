@@ -736,6 +736,20 @@ export const play = {
   },
 
   approval: {
+    commandHeading: '实际执行命令',
+    actionHeading: "将执行什么",
+    riskHeading: "为什么需要确认",
+    actionFallback: "将执行 {tool} 操作，具体命令和参数见下方详情。",
+    originalReason: "查看原始拦截原因",
+    modelNote: "模型辅助说明，请以实际命令和参数为准。",
+    riskDelete: "命令包含删除操作，可能递归删除目标目录及其内容；请核对删除范围。",
+    riskGit: "命令可能切换或清理工作区、重置提交，覆盖未保存的修改。",
+    riskPrivilege: "命令涉及提权或扩大文件权限，影响范围可能超出当前工作区。",
+    riskPublish: "命令涉及发布，可能将本地内容上传并对外可见。",
+    riskMcp: "此操作通过外部工具执行，可能修改外部系统的数据或状态。",
+    riskDirect: "命令请求在操作系统沙箱之外执行，访问范围更大。",
+    riskGeneric: "该操作命中了需要确认的规则，可能改变文件或系统状态，请核对实际参数。",
+
     aria: '待审批',
     title: '需要你确认后才能继续',
     needInfo: '需要你补充信息',

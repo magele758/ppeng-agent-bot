@@ -1984,3 +1984,8 @@ details.trace-row,
 .font-size-controls select { width: auto; min-width: 110px; }
 .font-size-controls :is(select, button):focus-visible { outline: var(--ui-focus); outline-offset: 3px; }
 .font-size-preview { padding: 16px; border: 1px solid var(--ui-border); border-radius: var(--ui-radius-md); overflow-wrap: anywhere; }
+
+.approval-explanation { display: flex; flex-basis: 100%; align-items: flex-start; flex-direction: column; gap: 0.65rem; min-width: 0; }
+.approval-explanation__section { display: flex; flex-direction: column; gap: 0.25rem; overflow-wrap: anywhere; }
+.approval-explanation__section small { display: block; margin-top: 0.25rem; }
+.approval-explanation__raw { font-size: 0.85em; overflow-wrap: anywhere; }

@@ -4,7 +4,7 @@ status: implemented
 requirement: |
   会话已保存 permissionMode=bypass 且当前来源权威为用户直接输入时，来源范围检查放行，
   不因外部暴露(如 bash 输出外部标记)或缺少 scope 而 source_scope_denied。
-notes: 'assumedApproval: standing-order-2026-10-22'
+notes: '2026-11-02 用户明确要求 bypass 全自动，AC-3 扩展至已配置 bypass 的自动任务；assumedApproval: standing-order-2026-10-22'
 criteria:
   - id: AC-1
     given: 会话 permissionMode=bypass、权威为 user、且已被外部内容暴露
@@ -17,7 +17,7 @@ criteria:
   - id: AC-3
     given: 会话 permissionMode=bypass 但权威为 routine/event 或为子 agent
     when: 调用有副作用的工具
-    then: 仍被拒绝
+    then: 已保存的 bypass 仍代表用户选择全自动，来源内容不能自行设置该模式
   - id: AC-4
     given: bypass 会话
     when: 访问 ~/.ssh 等密钥目录

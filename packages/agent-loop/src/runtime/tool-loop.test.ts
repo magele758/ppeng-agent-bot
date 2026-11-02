@@ -527,6 +527,13 @@ describe('pre_tool_use ask', () => {
     expect(execute).toHaveBeenCalledTimes(3);
   });
 
+  it('bypass runs hook ask without opening a card [AC:bypass-full-auto#AC-5]', async () => {
+    const h = host({runLifecycleHook: async () => ({permissionDecision:'ask'})});
+    const echo = tool('echo', async () => ({ok:true, content:'ran'}));
+    const bypass = {...ctx, session:{...ctx.session, metadata:{permissionMode:'bypass'}}};
+    const result = await executeSingleTool(h,[echo],call('echo',{a:1}),bypass,false,'s1');
+    expect(result.ok).toBe(true); expect(result.hold).toBeUndefined();
+  });
   it('holds for approval instead of writing a failure result', async () => {
     const h = host({
       runLifecycleHook: async () => ({ permissionDecision: 'ask', message: 'please confirm' }),

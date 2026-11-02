@@ -1,0 +1,25 @@
+id: bypass-critical-approval
+title: bypass 仅最高风险审批及误报修复
+status: retired
+retiredReason: 用户随后明确改为 bypass 全自动，不再采用最高风险档位。
+requirement: |
+  之前审批弹窗的优化也继续做完，要清楚告诉我具体执行什么、为什么有风险，反复申请审批的问题也一起查清楚修掉。现在还是疯狂的弹窗，要我审批，bypass的拦截审批的等级设置到最高
+  仅最高风险操作审批（推荐）
+notes: 'assumedApproval: standing-order-2026-10-22; 用户选择仅最高风险操作审批，调整旧规格的 bypass 固定策略为可配置策略，默认严格行为保留。'
+criteria:
+  - id: AC-1
+    given: 命令只读查询名为 nodeterm 或 agent-term 的目录
+    when: 评估命令风险
+    then: 不因目录名包含 rm 字符而误触发删除审批，真实删除操作仍识别
+  - id: AC-2
+    given: 用户为 bypass 保存仅最高风险审批
+    when: 日常查询或临时目录清理执行
+    then: 不反复申请审批，非 bypass 和未配置的严格模式保持原规则
+  - id: AC-3
+    given: bypass 仅最高风险审批或已有拒绝记录
+    when: 强制覆盖历史、执行远程脚本、外部破坏性操作或重试已拒绝操作
+    then: 最高风险仍需审批，已拒绝的操作保持拒绝，已批准的相同操作不重复出卡
+  - id: AC-4
+    given: 管理员在设置界面更改 bypass 审批级别
+    when: 保存后重新读取并处理现有待审批
+    then: 配置持久化并热生效，只释放符合新策略的 bypass 待审批，其他待审批与拒绝记录保持原样

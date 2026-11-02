@@ -736,6 +736,20 @@ export const play = {
   },
 
   approval: {
+    commandHeading: 'Command to execute',
+    actionHeading: "What will happen",
+    riskHeading: "Why approval is needed",
+    actionFallback: "Run {tool}. Review the exact command and arguments below.",
+    originalReason: "View original blocking reason",
+    modelNote: "AI-assisted explanation; verify against the actual command and arguments.",
+    riskDelete: "The command includes deletion and may recursively remove the target directory and its contents. Verify the scope.",
+    riskGit: "The command may switch or clean the workspace or reset commits, overwriting unsaved changes.",
+    riskPrivilege: "The command requests elevated privileges or broader file permissions and may affect more than this workspace.",
+    riskPublish: "The command involves publishing and may upload local content for others to access.",
+    riskMcp: "This action uses an external tool and may change data or state in another system.",
+    riskDirect: "The command requests execution outside the operating-system sandbox with broader access.",
+    riskGeneric: "The action matched an approval rule and may change files or system state. Review the actual arguments.",
+
     aria: 'Pending approval',
     title: 'Needs your confirmation to continue',
     needInfo: 'Needs more information from you',

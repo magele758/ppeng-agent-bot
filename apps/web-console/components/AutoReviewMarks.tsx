@@ -6,6 +6,7 @@ import {
   type AutoReviewCardInput,
   type AutoReviewCardKind
 } from '@/lib/auto-review-card';
+import { ApprovalExplanation } from './ApprovalExplanation';
 import { useI18n } from '@/lib/i18n';
 
 /** Kind badge and block reason for an Auto-review card; other approvals keep their existing reason line. */
@@ -17,7 +18,7 @@ export function ApprovalReasonLine({
   fallback?: string | null;
 }) {
   const face = autoReviewCardFace(approval);
-  if (face) return <AutoReviewFace face={face} />;
+  if (face) return <ExplainedFace approval={approval} face={face} />;
   if (!fallback) return null;
   return <span className="muted small">{fallback}</span>;
 }
@@ -41,4 +42,9 @@ function AutoReviewFace({ face }: { face: { kind: AutoReviewCardKind; blockReaso
       </span>
     </span>
   );
+}
+
+function ExplainedFace({ approval, face }: { approval: AutoReviewCardInput; face: { kind: AutoReviewCardKind; blockReason: string } }) {
+  if (approval.id) return <ApprovalExplanation key={approval.id} approval={approval} face={face} />;
+  return <AutoReviewFace face={face} />;
 }

@@ -373,27 +373,26 @@ describe('checkToolApprovals Auto-review gate', () => {
     });
     expect(decision.action).toBe('soft_block');
     const bypass = { id: 's1', metadata: { permissionMode: 'bypass' } } as unknown as SessionRecord;
-    expect(checkToolApprovals(h, tools, [citedOnly], ctx, undefined, bypass, undefined)).toBe('skip');
+    expect(checkToolApprovals(h, tools, [citedOnly], ctx, undefined, bypass, undefined)).toBe('proceed');
     expect(h.approvals).toHaveLength(0);
     const flagged = call(
       'bash',
       { command: 'rm -rf ./build', requestSmartModeApproval: true, authorizedBy: ['tNu1'] },
       'c-still-card'
     );
-    expect(checkToolApprovals(h, tools, [flagged], ctx, undefined, bypass, undefined)).toBe('waiting');
-    expect(h.approvals).toHaveLength(1);
-    expect(h.approvals[0]?.status).toBe('pending');
+    expect(checkToolApprovals(h, tools, [flagged], ctx, undefined, bypass, undefined)).toBe('proceed');
+    expect(h.approvals).toHaveLength(0);
   });
 
-  it('does not let permissionMode=bypass skip Auto-review [AC:auto-review-shell-mcp#AC-5]', () => {
+  it('permissionMode=bypass skips new Auto-review prompts [AC:auto-review-shell-mcp#AC-5]', () => {
     const bypass = { id: 's1', metadata: { permissionMode: 'bypass' } } as unknown as SessionRecord;
     const h = host();
     const mcp = call('mcp_invoke', { server: 0, tool: 'delete_all' }, 'c-mcp');
-    expect(checkToolApprovals(h, tools, [mcp], ctx, undefined, bypass, undefined)).toBe('skip');
+    expect(checkToolApprovals(h, tools, [mcp], ctx, undefined, bypass, undefined)).toBe('proceed');
     expect(h.approvals).toHaveLength(0);
     const flagged = call('mcp_invoke', { server: 0, tool: 'delete_all', requestSmartModeApproval: true }, 'c-mcp2');
-    expect(checkToolApprovals(h, tools, [flagged], ctx, undefined, bypass, undefined)).toBe('waiting');
-    expect(h.approvals).toHaveLength(1);
+    expect(checkToolApprovals(h, tools, [flagged], ctx, undefined, bypass, undefined)).toBe('proceed');
+    expect(h.approvals).toHaveLength(0);
   });
 });
 
@@ -413,4 +412,38 @@ describe('saved direct isolation', () => {
       expect(checkToolApprovals(h, tools, [listing], ctx, undefined, session, undefined)).toBe('skip');
     }
   });
+});
+
+describe('fully automatic bypass', () => {
+  const session = { id:'s1', metadata:{permissionMode:'bypass'} } as unknown as SessionRecord;
+  it('directory suffixes do not trigger rm checks [AC:bypass-full-auto#AC-1]', () => {
+    for (const command of ['find /tmp/nodeterm -type f','ls /work/agent-term /tmp','echo confirm please']) expect(isHighRiskAutoReviewCall('bash',{command})).toBe(false);
+    expect(isHighRiskAutoReviewCall('bash',{command:'rm -rf /tmp/build'})).toBe(true);
+  });
+  it('bypass skips shell and MCP prompts regardless of risk or escalation flags [AC:bypass-full-auto#AC-2]', () => {
+    const h=host();
+    for (const tc of [call('bash',{command:'rm -rf /tmp/build',requestSmartModeApproval:true}),call('mcp_invoke',{tool:'delete_repository',requestSmartModeApproval:true})]) {
+      expect(checkToolApprovals(h,[tool(tc.name)],[tc],ctx,undefined,session,undefined)).toBe('proceed');
+    }
+    expect(h.approvals).toHaveLength(0);
+    expect(checkToolApprovals(h,[tool('bash')],[call('bash',{command:'rm -rf /tmp/build',requestSmartModeApproval:true})],ctx,undefined,{...session,metadata:{permissionMode:'auto'}},undefined)).toBe('waiting');
+  });
+  it('explicit denials remain final after switching to bypass [AC:bypass-full-auto#AC-3]', () => {
+    const h=host(), tc=call('bash',{command:'rm -rf /tmp/build',requestSmartModeApproval:true});
+    expect(checkToolApprovals(h,[tool('bash')],[tc],ctx,undefined,{...session,metadata:{permissionMode:'auto'}},undefined)).toBe('waiting');
+    h.approvals[0]!.status='rejected';
+    expect(checkToolApprovals(h,[tool('bash')],[tc],ctx,undefined,session,undefined)).toBe('skip');
+    expect(h.approvals).toHaveLength(1);
+  });
+});
+
+it('ordinary approval denials remain final in bypass [AC:bypass-full-auto#AC-3]', () => {
+  const h=host(), tc=call('write_file',{path:'note.txt',content:'x'}), tools=[tool('write_file')];
+  const session={id:'s1',metadata:{permissionMode:'ask'}} as unknown as SessionRecord;
+  expect(checkToolApprovals(h,tools,[tc],ctx,undefined,session,undefined)).toBe('waiting');
+  h.approvals[0]!.status='rejected'; session.metadata={permissionMode:'bypass'};
+  const closed={reported:false,ids:[] as string[]};
+  expect(checkToolApprovals(h,tools,[tc],ctx,undefined,session,undefined,closed)).toBe('proceed');
+  expect(closed.ids).toEqual([tc.toolCallId]);
+  expect(h.approvals).toHaveLength(1);
 });

@@ -45,6 +45,7 @@ import {
 import {
   autoReviewIdempotencyKey,
   evaluateAutoReview,
+  stripAutoReviewFlags,
   readAuthorizedBy,
 } from '../approval/auto-review.js';
 
@@ -462,7 +463,7 @@ export function checkToolApprovals(
     return sessionApprovals.get(idemKey);
   };
 
-  // Auto-review owns high-risk Shell/MCP. It is not skipped by permissionMode=bypass.
+  // Explicit owner policy may relax ordinary risks; existing denials remain final.
   const autoReviewHandled = new Set<string>();
   for (const tc of validToolCalls) {
     const tool = findToolByName(tools, tc.name);
@@ -472,16 +473,11 @@ export function checkToolApprovals(
       toolInput: tc.input,
       savedIsolation: host.savedShellIsolation?.()
     });
-    if (decision.action === 'allow') continue;
-
-    const idemKey = autoReviewIdempotencyKey(tool.name, decision.fingerprintInput, stableJsonHash);
+    const fingerprintInput = stripAutoReviewFlags(tc.input);
+    const idemKey = autoReviewIdempotencyKey(tool.name, fingerprintInput, stableJsonHash);
     const existing = approvalFor(idemKey);
-    autoReviewHandled.add(tc.toolCallId);
-
-    if (existing?.status === 'approved') {
-      continue;
-    }
     if (existing?.status === 'rejected') {
+      autoReviewHandled.add(tc.toolCallId);
       closure?.ids.push(tc.toolCallId);
       appendApprovalToolResult(
         host,
@@ -493,6 +489,10 @@ export function checkToolApprovals(
       softBlocked = true;
       continue;
     }
+    if (decision.action === 'allow') continue;
+    autoReviewHandled.add(tc.toolCallId);
+    if (existing?.status === 'approved') continue;
+    if (permissionMode === 'bypass') continue;
     if (existing?.status === 'pending') {
       citeAuthorizedBy(host, existing, tc.input);
       waiting = true;
@@ -526,7 +526,7 @@ export function checkToolApprovals(
   for (const tc of validToolCalls) {
     if (autoReviewHandled.has(tc.toolCallId)) continue;
     const tool = findToolByName(tools, tc.name);
-    if (!tool || !needsApproval(tool, tc)) continue;
+    if (!tool) continue;
     const idemKey = stableJsonHash(tool.name, tc.input);
     const existing = approvalFor(idemKey);
     if (existing?.status === 'approved') continue;
@@ -541,6 +541,7 @@ export function checkToolApprovals(
       );
       continue;
     }
+    if (!needsApproval(tool, tc)) continue;
     if (existing?.status === 'pending') {
       waiting = true;
       continue;
@@ -656,12 +657,14 @@ function resolvePreToolAsk(
   toolCall: ToolCallPart,
   sessionId: string,
   message: string | undefined,
-  approvalFor: (key: string) => ApprovalRecord | undefined
+  approvalFor: (key: string) => ApprovalRecord | undefined,
+  permissionMode: string
 ): ToolLoopResult | undefined {
   const idemKey = hookAskKey(toolCall);
   const latest = approvalFor(idemKey);
   if (latest && latest.status === 'rejected') return userRejectedToolResult(toolCall, tool.name);
   if (latest && latest.status === 'approved') return undefined;
+  if (permissionMode === 'bypass') return undefined;
   return holdForHookAsk(host, tool, toolCall, sessionId, message);
 }
 
@@ -862,7 +865,7 @@ async function executeScopedTool(
   }
 
   if (pre.permissionDecision === 'ask') {
-    const asked = resolvePreToolAsk(host, tool, toolCall, sessionId, pre.message, approvalFor);
+    const asked = resolvePreToolAsk(host, tool, toolCall, sessionId, pre.message, approvalFor, resolvePermissionMode(context.session.metadata, host.env));
     if (asked) return asked;
   }
 

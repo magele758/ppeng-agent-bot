@@ -346,7 +346,7 @@ test('route access contract: every route is classified, isolated, and A-owned da
     }
   });
 
-  await t.test("owner routes hide A's resources from B [AC:lab-auth-and-route-access#AC-4]", async () => {
+  await t.test("owner routes hide A's resources from B [AC:lab-auth-and-route-access#AC-4] [AC:approval-explanations#AC-4]", async () => {
     for (const r of routes.filter((x) => x.access.kind === 'owner')) {
       const k = key(r);
       const pathOwner = r.pattern.includes('/:');

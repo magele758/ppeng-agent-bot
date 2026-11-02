@@ -291,6 +291,10 @@ export function buildRoutePolicy(l: OwnerLookups): Map<string, RouteAccess> {
         })
       )
     ],
+    ['POST /api/approval-explanations/:id', owner('approval', byParam('id', id => {
+      const approval = l.runtime.store.getApproval(id);
+      return approval ? sessionRef(l, approval.sessionId) : { found: false };
+    }))],
     ['GET /api/tasks', selfFiltered('task')],
     ['GET /api/external-agents/connections', ADMIN],
     ['PATCH /api/external-agents/connections', ADMIN],

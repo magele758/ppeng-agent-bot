@@ -1,0 +1,28 @@
+id: bypass-full-auto
+title: bypass 全自动与重复审批修复
+status: implemented
+requirement: |
+  之前审批弹窗的优化也继续做完，要清楚告诉我具体执行什么、为什么有风险，反复申请审批的问题也一起查清楚修掉。
+  改一下，bypass全自动，不然叫什么bypass？
+notes: 'assumedApproval: standing-order-2026-10-22; 按最新指令取代最高风险档位；工具审批不再阻塞 bypass，明确拒绝和执行硬限制保留。'
+criteria:
+  - id: AC-1
+    given: 只读命令查询 nodeterm 或 agent-term 目录
+    when: 识别删除风险
+    then: 不因名称包含 rm 字符误报，真实删除仍可识别
+  - id: AC-2
+    given: 用户选择 bypass 权限模式
+    when: 发起 Shell 或 MCP 工具操作
+    then: 不再弹审批，其他权限模式仍使用各自审批策略
+  - id: AC-3
+    given: 某操作曾明确被用户拒绝
+    when: 在 bypass 中重试同一操作
+    then: 直接拒绝而不再次弹卡，不把旧拒绝改成批准
+  - id: AC-4
+    given: bypass 会话已有未完成的旧工具审批
+    when: 启用修复后的行为
+    then: 自动释放符合条件的工具审批，其他会话和提问卡保留
+  - id: AC-5
+    given: bypass 会话调用计算机操作或触发工具审核钩子
+    when: 工具申请确认
+    then: 自动继续而不产生新的工具审批卡，真正的拒绝仍以失败返回

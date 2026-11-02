@@ -5,6 +5,7 @@ requirement: |
   Super Bot 全自动（permissionMode=bypass）会话里反复弹「Allow Computer Use to use "Voice Memos"?」，
   批准后同一应用的下一个动作又再申请。全自动下不该再弹；需要审批时一次批准后同会话同应用不再申请。
 notes: |
+  2026-11-02 用户明确要求 bypass 全自动，非直接用户来源只有非 bypass 时保持审批。
   assumedApproval: standing-order-2026-10-22
   根因：LCU 原生应用授权（MCP form elicitation，_meta.persist 提供 session/always）由宿主无条件转成
   Lab 审批，不看 permissionMode；且回答 accept 时不带 _meta.persist，原运行时按「仅此一次」处理，
@@ -19,8 +20,8 @@ criteria:
     when: 同会话后续动作（含后续回合）再次申请同一应用
     then: 首次批准按会话范围回复；之后不再创建审批而直接允许；其他应用仍需审批
   - id: AC-3
-    given: 会话是子 agent，或来源权威为 routine/event
-    when: 桌面运行时申请应用（即使会话保存为 bypass 或已有同应用授权）
+    given: 非 bypass 会话是子 agent，或来源权威为 routine/event
+    when: 桌面运行时申请应用，即使已有同应用授权
     then: 仍创建审批等待用户决定，不自动放行
   - id: AC-4
     given: 用户拒绝授权，或请求结构不是受支持的原生应用表单
