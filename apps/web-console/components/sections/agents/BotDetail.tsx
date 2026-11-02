@@ -426,14 +426,27 @@ export function BotDetail({ bot, onOpenChat, records, embedded = false }: BotDet
       </div>
       <div role="tabpanel" id={`${panelId}-page-history`} aria-labelledby={`${panelId}-tab-history`} hidden={detailTab !== 'history'}>
       <BotHistory sessionId={sessionId} />
+      <details className="bot-settings-disclosure" data-testid="bot-memory-settings"><summary>{t('botSettings.memoryManagement')}</summary>
       <BotMemory botId={bot.id} sessionId={sessionId}/>
-      {records}
+      </details>
+      <BotOtherRecords>{records}</BotOtherRecords>
       </div>
       <div role="tabpanel" id={`${panelId}-page-permissions`} aria-labelledby={`${panelId}-tab-permissions`} hidden={detailTab !== 'permissions'}>
-      {settings && <BotPolicySettings onlyTools botId={bot.id} maxTurns={settings.maxTurns} permissionMode={settings.permissionMode} onSavePermission={savePermission} allowedTools={settings.allowedTools} onSave={patchBot} />}
-      {visitedCapabilities && <BotDetailSkills botId={bot.id}/>}
       <div data-bot-connections id={embedded ? `${panelId}-connections` : "bot-connections"}><BotConnections botId={bot.id} /></div>
+      <details className="bot-settings-disclosure" data-testid="bot-tools-settings"><summary>{t('botSettings.tools')}</summary>
+      {settings && <BotPolicySettings onlyTools botId={bot.id} maxTurns={settings.maxTurns} permissionMode={settings.permissionMode} onSavePermission={savePermission} allowedTools={settings.allowedTools} onSave={patchBot} />}
+      </details>
+      <details className="bot-settings-disclosure" data-testid="bot-skills-settings"><summary>{t('botSettings.skillManagement')}</summary>
+      {visitedCapabilities && <BotDetailSkills botId={bot.id}/>}
+      </details>
+
       </div>
     </section>
   );
+}
+
+function BotOtherRecords({ children }: { children?: ReactNode }) {
+  const { t } = useI18n();
+  if (!children) return null;
+  return <details className="bot-settings-disclosure" data-testid="bot-other-records"><summary>{t('botSettings.otherRecords')}</summary>{children}</details>;
 }

@@ -1,0 +1,20 @@
+id: compact-bot-secondary-tabs
+title: 精简 Bot 能力与权限及记录页
+status: implemented
+requirement: |
+  其他2个tab的也这么改一下
+notes: |
+  assumedApproval: standing-order-2026-10-22
+criteria:
+  - id: AC-1
+    given: 用户打开能力与权限
+    when: 尚未展开配置
+    then: 软件连接优先显示，工具范围和技能管理默认折叠且仍可展开访问
+  - id: AC-2
+    given: 用户打开记录页
+    when: 尚未展开详细选项
+    then: 历史搜索直接可用，日期筛选、记忆管理和其他记录默认折叠，历史列表有独立滚动区域
+  - id: AC-3
+    given: 软件连接包含很多工具
+    when: 用户查看连接列表
+    then: 连接名称与健康状态直接可见，工具详情默认折叠且显示数量

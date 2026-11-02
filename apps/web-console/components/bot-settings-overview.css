@@ -42,3 +42,16 @@
 }
 .routine-editor-dialog .field { margin: 0; }
 .routine-editor-dialog > header { position: sticky; top: -20px; padding: 12px 0; background: var(--color-surface-base); z-index: 1; }
+.bot-settings-panel { gap: 8px; }
+.bot-settings-panel :is([data-testid="bot-history"], [data-testid="bot-connections"]) {
+  gap: 8px; margin-block: 0 12px;
+}
+.bot-settings-panel :is([data-testid="bot-history"], [data-testid="bot-connections"]) > :is(h3, p) { margin: 0; }
+.bot-settings-panel [data-testid="bot-history"] > form {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+.bot-settings-panel [data-testid="bot-history"] > form > label { grid-column: 1; grid-row: 1; }
+.bot-settings-panel [data-testid="bot-history-search"] { grid-column: 2; grid-row: 1; margin: 0; }
+.bot-settings-panel [data-testid="bot-history-filters"] { grid-column: 1 / -1; margin: 0; }
+.bot-settings-panel [data-testid="bot-history-filters"] label { margin-block: 8px; }
