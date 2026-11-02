@@ -26,6 +26,8 @@ export function ingestProductDomainEmail(
     threadId?: string;
     receivedAt?: string;
     cc?: string[];
+    inReplyTo?: string;
+    references?: string;
   }
 ): { stored: boolean; localPart?: string; reason?: string } {
   const recipients = Array.isArray(input.to) ? input.to : [input.to];
@@ -53,7 +55,9 @@ export function ingestProductDomainEmail(
     cc: input.cc,
     subject: input.subject,
     receivedAt: input.receivedAt ?? new Date().toISOString(),
-    body: input.body
+    body: input.body,
+    ...(input.inReplyTo?.trim() ? { inReplyTo: input.inReplyTo.trim() } : {}),
+    ...(input.references?.trim() ? { references: input.references.trim() } : {})
   };
   port.storeInbound(target, message);
   return { stored: true, localPart: stripEmailTag(target) };
@@ -112,6 +116,8 @@ export function productEmailFieldsFromBody(body: unknown, deliveryId: string): {
   text: string;
   messageId: string;
   threadId: string;
+  inReplyTo?: string;
+  references?: string;
 } | undefined {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return undefined;
   const rec = body as Record<string, unknown>;
@@ -137,5 +143,23 @@ export function productEmailFieldsFromBody(body: unknown, deliveryId: string): {
       : typeof rec.thread_id === 'string'
         ? rec.thread_id
         : messageId;
-  return { from, subject, text, messageId, threadId };
+  const inReplyTo =
+    typeof rec.inReplyTo === 'string' && rec.inReplyTo.trim()
+      ? rec.inReplyTo.trim()
+      : typeof rec.in_reply_to === 'string' && rec.in_reply_to.trim()
+        ? rec.in_reply_to.trim()
+        : undefined;
+  const references =
+    typeof rec.references === 'string' && rec.references.trim()
+      ? rec.references.trim()
+      : undefined;
+  return {
+    from,
+    subject,
+    text,
+    messageId,
+    threadId,
+    ...(inReplyTo ? { inReplyTo } : {}),
+    ...(references ? { references } : {})
+  };
 }

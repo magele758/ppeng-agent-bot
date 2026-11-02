@@ -17,6 +17,10 @@ export interface ChannelInboundEnvelope {
   messageId?: string;
   /** Original subject of the inbound message (r5-25 replyToSubject). */
   subject?: string;
+  /** Optional In-Reply-To from inbound webhook (r5-26 persist). */
+  inReplyTo?: string;
+  /** Optional References chain from inbound webhook (r5-26 persist + draft chain). */
+  references?: string;
   raw?: unknown;
 }
 
@@ -111,6 +115,16 @@ export function parseGenericWebhookInbound(
         ? body.message_id.trim()
         : undefined;
   const subject = typeof body.subject === 'string' ? body.subject : undefined;
+  const inReplyTo =
+    typeof body.inReplyTo === 'string' && body.inReplyTo.trim()
+      ? body.inReplyTo.trim()
+      : typeof body.in_reply_to === 'string' && body.in_reply_to.trim()
+        ? body.in_reply_to.trim()
+        : undefined;
+  const references =
+    typeof body.references === 'string' && body.references.trim()
+      ? body.references.trim()
+      : undefined;
 
   if (message?.text && message.chat?.id != null) {
     return {
@@ -122,11 +136,13 @@ export function parseGenericWebhookInbound(
       text: message.text,
       ...(messageId ? { messageId } : {}),
       ...(subject !== undefined ? { subject } : {}),
+      ...(inReplyTo ? { inReplyTo } : {}),
+      ...(references ? { references } : {}),
       raw: body
     };
   }
 
-  // Generic { text, conversationKey?, senderId?, messageId?, subject? }
+  // Generic { text, conversationKey?, senderId?, messageId?, subject?, inReplyTo?, references? }
   if (typeof body.text === 'string') {
     return {
       channelId,
@@ -137,6 +153,8 @@ export function parseGenericWebhookInbound(
       text: body.text,
       ...(messageId ? { messageId } : {}),
       ...(subject !== undefined ? { subject } : {}),
+      ...(inReplyTo ? { inReplyTo } : {}),
+      ...(references ? { references } : {}),
       raw: body
     };
   }

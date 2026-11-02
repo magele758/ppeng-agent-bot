@@ -49,18 +49,49 @@ export interface SendEmailHttpOptions {
  */
 
 /**
- * Email-channel webhook → draft reply threading fields (r5-25).
+ * Append messageId to a parent References chain, dedupe tokens, no trailing dup.
+ * Returns undefined when messageId is missing/blank OR parentReferences is blank
+ * (r5-26 AC-2: messageId-only drafts omit references; send still defaults to inReplyTo).
+ */
+export function buildEmailReplyReferences(
+  parentReferences?: string,
+  messageId?: string
+): string | undefined {
+  const mid = messageId?.trim();
+  if (!mid) return undefined;
+  const parent = parentReferences?.trim();
+  if (!parent) return undefined;
+  const tokens = parent.split(/\s+/).filter(Boolean);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const token of tokens) {
+    if (token === mid) continue;
+    if (seen.has(token)) continue;
+    seen.add(token);
+    out.push(token);
+  }
+  out.push(mid);
+  return out.join(' ');
+}
+
+/**
+ * Email-channel webhook → draft reply threading fields (r5-25/r5-26).
  * Non-email channels return {}. Empty original subject is still passed as
  * replyToSubject so r5-24 Re: defaulting can apply when subject is empty.
+ * When inbound carries parent references + messageId, draft.references is the
+ * deduped parent+messageId chain; messageId-only omits references.
  */
 export function emailWebhookDraftReplyFields(
   channelType: string,
-  inbound: { messageId?: string; subject?: string }
-): { inReplyTo?: string; replyToSubject?: string } {
+  inbound: { messageId?: string; subject?: string; references?: string }
+): { inReplyTo?: string; replyToSubject?: string; references?: string } {
   if (channelType !== 'email') return {};
+  const messageId = inbound.messageId?.trim() || undefined;
+  const references = buildEmailReplyReferences(inbound.references, messageId);
   return {
-    ...(inbound.messageId?.trim() ? { inReplyTo: inbound.messageId.trim() } : {}),
-    ...(inbound.subject !== undefined ? { replyToSubject: inbound.subject } : {})
+    ...(messageId ? { inReplyTo: messageId } : {}),
+    ...(inbound.subject !== undefined ? { replyToSubject: inbound.subject } : {}),
+    ...(references ? { references } : {})
   };
 }
 

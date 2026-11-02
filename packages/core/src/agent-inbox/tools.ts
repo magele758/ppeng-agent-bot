@@ -229,6 +229,8 @@ export function createAgentInboxTools(
             cc: msg.cc,
             subject: msg.subject,
             receivedAt: msg.receivedAt,
+            ...(msg.inReplyTo ? { inReplyTo: msg.inReplyTo } : {}),
+            ...(msg.references ? { references: msg.references } : {}),
             body: fenceEmailBody(msg)
           }));
 
