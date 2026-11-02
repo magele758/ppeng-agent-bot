@@ -1,6 +1,7 @@
 id: quiet-goal-notice
 title: Quieter goal completion notices in chat
-status: implemented
+status: retired
+retiredReason: 'Superseded by quiet-goal-results (user-requested PR #378): pending_review no longer emits a chat notice. Original criteria preserved; terminal notice formatting and idempotency remain required by quiet-goal-results AC-5.'
 requirement: |
   Terminal goal notices in the main chat should be a short Done/Failed/Blocked/Needs review
   line instead of a JSON dump of progress/nextStep. Lab still holds full state.
