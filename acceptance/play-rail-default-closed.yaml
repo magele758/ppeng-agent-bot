@@ -1,0 +1,25 @@
+id: play-rail-default-closed
+title: 对话页右侧栏默认关闭
+status: implemented
+requirement: |
+  对话页右侧栏 aside.play-rail（活动 / 上下文 / 工件 / 轨迹 / 定时）默认关闭，不要默认展开。
+  用户用头部已有的侧栏切换按钮手动打开或关闭；手动操作后的偏好记在本机界面偏好里（localStorage，
+  和会话列表收起一样），刷新还在。首次或没设置过时默认关闭。不新增环境变量。
+  有活动时不自动展开。窄屏下右侧栏照旧不显示。
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  现有代码没有「有活动/审批时自动展开」的逻辑，审批在对话流内处理，无需保留例外。
+  偏好键 lab.playRailOpen，与左侧图标轨 lab.railCollapsed、会话列表 lab.playSidebarCollapsed 区分。
+criteria:
+  - id: AC-1
+    given: 用户首次打开对话页，或从未手动切换过右侧栏
+    when: 页面加载完成
+    then: 右侧栏处于关闭状态，切换按钮 aria-expanded 为 false
+  - id: AC-2
+    given: 右侧栏关闭
+    when: 用户点头部侧栏切换按钮
+    then: 右侧栏打开，偏好被记下；刷新后仍为打开；再点关闭后刷新仍为关闭
+  - id: AC-3
+    given: 会话里有正在进行的工作或新活动
+    when: 活动列表更新
+    then: 右侧栏不会被自动展开，只有切换按钮能改变它

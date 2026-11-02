@@ -28,6 +28,7 @@ import { PlayTranscript } from './PlayTranscript';
 import { SessionBriefToggle } from './SessionBriefToggle';
 import { readSessionBrief, SESSION_BRIEF_CHANGED_EVENT } from '@/lib/session-brief';
 import { readPlaySidebarCollapsed, writePlaySidebarCollapsed } from '@/lib/play-sidebar-collapsed';
+import { readPlayRailOpen, writePlayRailOpen } from '@/lib/play-rail-open';
 import type { usePlayChat } from './usePlayChat';
 import { ActivityPanel } from './ActivityPanel';
 import { ArtifactRail } from './ArtifactRail';
@@ -374,11 +375,19 @@ export function PlayPanel({
   const configBtnRef = useRef<HTMLButtonElement>(null);
   const configPanelRef = useRef<HTMLDivElement>(null);
   const prevSteerCountRef = useRef(0);
-  const [railCollapsed, setRailCollapsed] = useState(false);
+  const [railCollapsed, setRailCollapsed] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   useEffect(() => {
     setSidebarCollapsed(readPlaySidebarCollapsed());
+    setRailCollapsed(!readPlayRailOpen());
   }, []);
+  const togglePlayRail = () => {
+    setRailCollapsed((current) => {
+      const next = !current;
+      writePlayRailOpen(!next);
+      return next;
+    });
+  };
   const togglePlaySidebar = () => {
     setSidebarCollapsed((current) => {
       const next = !current;
@@ -1284,7 +1293,7 @@ export function PlayPanel({
                   if (!nearBottom) chat.playStickToBottomRef.current = false;
                   const absoluteTop = (feed?.getBoundingClientRect().top ?? 0) + (anchor.offset ?? 0);
                   chat.feedScrollIntentRef.current = railToggleIntent(nearBottom, anchor, absoluteTop);
-                  setRailCollapsed((value) => !value);
+                  togglePlayRail();
                 }}><WorkspaceIcon kind="panel" /></button>
                 {accountMenu}
                 <DebugOnly><button
