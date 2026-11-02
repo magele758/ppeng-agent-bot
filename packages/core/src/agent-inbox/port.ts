@@ -40,6 +40,10 @@ export interface EmailMessage {
   receivedAt: string;
   /** Raw body text - MUST be fenced as untrusted by tools */
   body: string;
+  /** Optional In-Reply-To header from inbound (r5-26). */
+  inReplyTo?: string;
+  /** Optional References chain from inbound (r5-26). */
+  references?: string;
 }
 
 export interface AgentInboxPort {
@@ -96,6 +100,8 @@ interface StoredMessage {
   subject: string;
   receivedAt: string;
   body: string;
+  inReplyTo?: string;
+  references?: string;
 }
 
 function inboxKey(principal: BotPrincipal): string {
@@ -301,7 +307,9 @@ export function createAgentInboxPort(
         cc: message.cc,
         subject: message.subject,
         receivedAt: message.receivedAt,
-        body: message.body
+        body: message.body,
+        ...(message.inReplyTo ? { inReplyTo: message.inReplyTo } : {}),
+        ...(message.references ? { references: message.references } : {})
       });
 
       if (messages.length > 500) {

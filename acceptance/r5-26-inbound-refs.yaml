@@ -1,0 +1,38 @@
+id: r5-26-inbound-refs
+title: Inbound References/In-Reply-To persist + auto-draft References chain
+status: implemented
+requirement: |
+  ChannelInboundEnvelope / parseGenericWebhookInbound accept optional inbound
+  references and inReplyTo (webhook aliases). buildEmailReplyReferences appends
+  messageId to the parent chain with dedupe; emailWebhookDraftReplyFields wires
+  that into email auto-drafts so drafts carry references (not only inReplyTo /
+  replyToSubject). Claimed-inbox EmailMessage / storeInbound /
+  productEmailFieldsFromBody / ingestProductDomainEmail persist optional
+  inReplyTo+references; read_email_thread surfaces them (body still fenced).
+  sendEmailHttp fallback unchanged (explicit refs win, else default inReplyTo).
+  Lab continues read-only references display when present — no UX clone.
+notes: |
+  Machine: 4090. Continues r5-24/r5-25 reply threading. No AgentMail; no
+  outbound attachments / forwardMessageId; no subject editor; claimedFrom and
+  Draft→Confirm→Send unchanged. MID/#379 untouched.
+criteria:
+  - id: AC-1
+    given: "An email webhook inbound with messageId and parent references"
+    when: "emailWebhookDraftReplyFields / webhook auto-draft runs"
+    then: "Draft has inReplyTo=messageId and references=parentRefs+messageId without a trailing duplicate"
+  - id: AC-2
+    given: "An email webhook inbound with messageId only (no parent references)"
+    when: "emailWebhookDraftReplyFields runs"
+    then: "Draft omits references; sendEmailHttp still defaults references to inReplyTo (r5-24)"
+  - id: AC-3
+    given: "A non-email webhook channel inbound"
+    when: "emailWebhookDraftReplyFields runs"
+    then: "No inReplyTo / references / replyToSubject reply-thread fields are attached"
+  - id: AC-4
+    given: "A claimed-inbox store with optional inReplyTo+references on ingest"
+    when: "storeInbound / readThread / read_email_thread run"
+    then: "Round-trip persists the fields and read_email_thread JSON includes them (body fenced)"
+  - id: AC-5
+    given: "The r5-26 acceptance and focused unit suite"
+    when: "The gate and tests run"
+    then: "Criteria are tagged and covered; Draft→Confirm→Send and claimedFrom stay unchanged"

@@ -1,6 +1,7 @@
 export { deliverToChannel } from './channels.js';
 export {
   resolveEmailReplySubject,
+  buildEmailReplyReferences,
   emailWebhookDraftReplyFields,
   sendEmailHttp,
   type SendEmailHttpOptions

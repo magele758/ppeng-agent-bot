@@ -416,7 +416,9 @@ function maybeIngestAndBindEmail(
       subject: fields.subject,
       body: fields.text,
       messageId: fields.messageId,
-      threadId: fields.threadId
+      threadId: fields.threadId,
+      ...(fields.inReplyTo ? { inReplyTo: fields.inReplyTo } : {}),
+      ...(fields.references ? { references: fields.references } : {})
     });
   }
   const bind =
