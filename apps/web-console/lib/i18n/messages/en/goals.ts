@@ -1,5 +1,5 @@
 export const goals = {
-  attention: 'Goal needs your attention', addBudget: 'Add budget to this goal (USD)', addAttempts: 'Approve additional attempts', extend: 'Extend this goal’s limits', extendHint: 'Keeps past usage and results. Resume when ready; pending results still need acceptance or send-back.',
+  attention: 'Goal needs your attention', addBudget: 'Add budget to this goal (USD)', addAttempts: 'Add execution attempts', extend: 'Extend this goal’s limits', extendHint: 'Keeps past usage and results. Resume when ready.',
   attemptUsage: 'Attempts {used}/{max}', durableVerification: 'Verified against goal evidence',
   history: 'Goal history', historyEmpty: 'No finished goals yet', historyError: 'Could not load goal history',
   title: 'Goals and progress', empty: 'No goals yet. Progress appears here when you request a task.', loading: 'Loading goals…',
@@ -10,6 +10,6 @@ export const goals = {
   usage: 'Used {cost} / budget {budget} USD', priority: 'Priority', pause: 'Pause', resume: 'Resume', cancel: 'Cancel', verify: 'Accept completion',
   reject: 'Send back', rejectReason: 'Reason', rejectReasonPlaceholder: 'Optional: what is still missing', rejectSubmit: 'Confirm send-back', rejectDismiss: 'Back',
   draining: 'Actions are still finishing. Further work is no longer being dispatched.', target: 'Goal for the next message', automatic: 'Determine automatically',
-  setPriority: 'Update priority', status: { queued: 'Queued', running: 'Running', waiting: 'Waiting', blocked: 'Blocked', paused: 'Paused', pending_review: 'Pending review', completed: 'Completed', failed: 'Failed', cancelled: 'Cancelled' },
+  setPriority: 'Update priority', status: { queued: 'Queued', running: 'Running', waiting: 'Waiting', blocked: 'Blocked', paused: 'Paused', pending_review: 'Result returned (not automatically verified)', completed: 'Completed', failed: 'Failed', cancelled: 'Cancelled' },
   strategy: { browser: 'Browser operations', computer: 'Desktop operations', deep_research: 'Deep research', auto: 'Automatic', direct: 'Main Bot', subagent: 'Subagent', bot_delegate: 'Bot delegation', ptc: 'Programmatic orchestration (PTC)', team_dag: 'Team task graph', swarm: 'Swarm pipeline' }
 };

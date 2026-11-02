@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
-import { goalActions, goalVerifyRequest, goalsPanelState, type BotGoalView, type BotGoalsSnapshot, type BotGoalSettings, type GoalStrategy } from '@/lib/bot-goals';
+import { goalActions, goalsPanelState, type BotGoalView, type BotGoalsSnapshot, type BotGoalSettings, type GoalStrategy } from '@/lib/bot-goals';
 import './bot-goals.css';
 
 export function BotGoals({ botId, sessionId, selectedGoalId, onSelectGoal, initialSnapshot = null }: {
@@ -16,7 +16,6 @@ export function BotGoals({ botId, sessionId, selectedGoalId, onSelectGoal, initi
   const [listFailed, setListFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [rejectingId, setRejectingId] = useState<string | null>(null);
   const alive = useRef(true);
   const revision = useRef(0);
   const base = `/api/bots/${encodeURIComponent(botId)}/goals`;
@@ -91,14 +90,7 @@ export function BotGoals({ botId, sessionId, selectedGoalId, onSelectGoal, initi
         </dl>
         <p>{t('goals.usage', { cost: (goal.costUsd ?? 0).toFixed(2), budget: goal.budgetUsd ?? 0 })}</p>
         {goal.draining && <p>{t('goals.draining')}</p>}
-        <div className="bot-goals__actions">{goalActions(goal.status).map(action => <button className="btn btn-sm" key={action} type="button" disabled={busy} data-testid={action === 'verify' ? `bot-goal-verify-${goal.id}` : undefined} onClick={() => void mutate(`${base}/${encodeURIComponent(goal.id)}/actions`, 'POST', action === 'verify' ? goalVerifyRequest(true) : { action })}>{t(`goals.${action}`)}</button>)}
-        {goal.status === 'pending_review' && (rejectingId === goal.id
-          ? <form data-testid={`bot-goal-reject-form-${goal.id}`} onSubmit={e => { e.preventDefault(); const reason = (e.currentTarget.elements.namedItem('reason') as { value?: string } | null)?.value ?? ''; void mutate(`${base}/${encodeURIComponent(goal.id)}/actions`, 'POST', goalVerifyRequest(false, reason)).then(() => { if (alive.current) setRejectingId(current => current === goal.id ? null : current); }); }}>
-            <label>{t('goals.rejectReason')}<input name="reason" type="text" maxLength={500} placeholder={t('goals.rejectReasonPlaceholder')} /></label>
-            <button className="btn btn-sm" type="submit" disabled={busy} data-testid={`bot-goal-reject-submit-${goal.id}`}>{t('goals.rejectSubmit')}</button>
-            <button className="btn btn-sm" type="button" disabled={busy} onClick={() => setRejectingId(null)}>{t('goals.rejectDismiss')}</button>
-          </form>
-          : <button className="btn btn-sm" type="button" disabled={busy} data-testid={`bot-goal-reject-${goal.id}`} onClick={() => setRejectingId(goal.id)}>{t('goals.reject')}</button>)}
+        <div className="bot-goals__actions">{goalActions(goal.status).map(action => <button className="btn btn-sm" key={action} type="button" disabled={busy} onClick={() => void mutate(`${base}/${encodeURIComponent(goal.id)}/actions`, 'POST', { action })}>{t(`goals.${action}`)}</button>)}
         <GoalLimits goal={goal} busy={busy} attention={attention} onAction={body=>mutate(`${base}/${encodeURIComponent(goal.id)}/actions`, 'POST', body)} /></div>
       </article>)}</div>
       {draft && !attention && <details><summary>{t('goals.settings')}</summary><form className="bot-goals__settings" onSubmit={e => { e.preventDefault(); void mutate(`${base}/settings`, 'PATCH', { ...draft }); }}>
@@ -112,7 +104,7 @@ export function BotGoals({ botId, sessionId, selectedGoalId, onSelectGoal, initi
 }
 
 function needsGoalAttention(panel: ReturnType<typeof goalsPanelState>): boolean {
-  return !panel.show && panel.items.length === 1 && ['pending_review','blocked','paused'].includes(panel.items[0].status);
+  return !panel.show && panel.items.length === 1 && ['blocked','paused'].includes(panel.items[0].status);
 }
 function hideGoalPanel(failed:boolean,snapshot:BotGoalsSnapshot|null,multiple:boolean,attention:boolean):boolean {
   return failed || !snapshot || (!multiple && !attention);
@@ -135,7 +127,7 @@ function useNarrowChat(): boolean {
 function GoalLimits({goal,busy,attention,onAction}:{goal:BotGoalView;busy:boolean;attention:boolean;onAction:(body:Record<string,unknown>)=>Promise<void>}) {
   const {t}=useI18n();
   return <>
-        {['blocked','paused','pending_review'].includes(goal.status) && <form data-testid={`bot-goal-extend-${goal.id}`} onSubmit={e => {
+        {['blocked','paused'].includes(goal.status) && <form data-testid={`bot-goal-extend-${goal.id}`} onSubmit={e => {
           e.preventDefault(); const data = new FormData(e.currentTarget);
           void onAction( {action:'extend',additionalBudgetUsd:Number(data.get('budget')),additionalAttempts:Number(data.get('attempts'))});
         }}>

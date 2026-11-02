@@ -6,7 +6,7 @@ import { useI18n, type MessageKey } from '@/lib/i18n';
 
 type HistoryGoal = { updatedAt?: string; id?: string; goalId?: string; title?: string; condition?: string; status: string; progress?: string; blockedReason?: string; closeReason?: string; evidence?: string[] };
 const labels: Record<string, MessageKey> = {
-  completed: 'goals.status.completed', failed: 'goals.status.failed', cancelled: 'goals.status.cancelled',
+  pending_review: 'goals.status.pending_review', completed: 'goals.status.completed', failed: 'goals.status.failed', cancelled: 'goals.status.cancelled',
   achieved: 'play.goalCard.statusAchieved', unmet_closed: 'play.goalCard.statusUnmet'
 };
 export function GoalHistory({ sessionId, botId }: { sessionId: string | null; botId?: string }) {
@@ -39,9 +39,13 @@ export function GoalHistory({ sessionId, botId }: { sessionId: string | null; bo
       {failed ? <p role="alert">{t('goals.historyError')}</p> : !goals ? <p>{t('goals.loading')}</p> : goals.length === 0 ? <p>{t('goals.historyEmpty')}</p> : goals.map(goal => <article key={goal.id ?? goal.goalId}>
         <strong>{goal.title ?? goal.condition}</strong> · <span>{t(labels[goal.status])}</span>
         {goal.progress && <p>{goal.progress}</p>}
-        {(goal.blockedReason || goal.closeReason) && <p>{goal.blockedReason || goal.closeReason}</p>}
+        {historyReason(goal) && <p>{historyReason(goal)}</p>}
         {!!goal.evidence?.length && <ul>{goal.evidence.map((evidence, index) => <li key={index}>{evidence}</li>)}</ul>}
       </article>)}
     </div>}
   </details>;
+}
+
+function historyReason(goal: HistoryGoal): string | undefined {
+  return goal.status === 'pending_review' ? undefined : goal.blockedReason || goal.closeReason;
 }

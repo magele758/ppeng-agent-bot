@@ -38,13 +38,13 @@ export function formatQuietGoalNotice(goal:BotGoal):string {
  if(goal.status==='completed')return `[goal update] Done: ${title}`;
  if(goal.status==='failed')return `[goal update] Failed: ${title}${reason?` — ${reason}`:''}`;
  if(goal.status==='blocked')return `[goal update] Blocked: ${title}${reason?` — ${reason}`:''}`;
- if(goal.status==='pending_review')return `[goal update] Needs review: ${title}`;
+ if(goal.status==='pending_review')return `[goal update] Result returned (not automatically verified): ${title}`;
  return `[goal update] ${title}: ${goal.status}`;
 }
 export function announceGoalState(host:GoalRuntimeHost,goal:BotGoal):void {
  host.store.transaction(()=>{
  goal=new BotGoalService(host.store,Date.now,goal.sessionId).get(goal.botId,goal.id)??goal;
- if(!['completed','blocked','failed','pending_review'].includes(goal.status))return;
+ if(!['completed','blocked','failed'].includes(goal.status))return;
  const key=`bot.goal-notice:${goal.id}`;
  const version=`${goal.revision}:${goal.status}:${goal.blockedReason??''}`;
  if(host.store.getDaemonControl<string>(key)===version)return;

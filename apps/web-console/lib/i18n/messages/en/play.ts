@@ -317,7 +317,7 @@ export const play = {
         "paused": "Paused",
         "waiting": "Waiting for dependency",
         "blocked": "Blocked",
-        "pending_review": "Awaiting verification",
+        "pending_review": "Result returned (not automatically verified)",
         "completed": "Verified complete",
         "failed": "Failed",
         "cancelled": "Cancelled",

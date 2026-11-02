@@ -166,100 +166,24 @@ test('the panel follows the in-progress count without a reload [AC:bot-goals-pan
   assert.equal(render([running]), '');
 });
 
-const slots: Array<{ value: unknown }> = [];
-const realUseState = React.useState;
-const realUseRef = React.useRef;
-const realUseEffect = React.useEffect;
-let replay = false;
-
-function memoryUseState<T,>(initial: T): [T, (action: T | ((value: T) => T)) => void] {
-  const slot = replay ? slots[memoryUseState.cursor++]! : (() => { const created = { value: initial as unknown }; slots.push(created); return created; })();
-  const set = (action: T | ((value: T) => T)) => {
-    slot.value = typeof action === 'function' ? (action as (value: T) => T)(slot.value as T) : action;
-  };
-  return [slot.value as T, set];
-}
-memoryUseState.cursor = 0;
-
-function installMemoryState() {
-  slots.length = 0;
-  replay = false;
-  React.useState = memoryUseState as typeof React.useState;
-  React.useRef = ((initial: unknown) => ({ current: initial })) as typeof React.useRef;
-  React.useEffect = (() => undefined) as typeof React.useEffect;
-}
-
-function renderReview(): React.ReactElement {
-  memoryUseState.cursor = 0;
-  if (slots.length === 0) replay = false;
-  React.useState = memoryUseState as typeof React.useState;
-  const element = (BotGoals as unknown as (props: Record<string, unknown>) => React.ReactElement)({
-    botId: 'bot-a',
-    sessionId: 'sess-current',
-    initialSnapshot: {
-      goals: [goal('g-review', 'Check the report', 'pending_review'), goal('g-run', 'Keep watching', 'running')],
-      settings,
-    },
-  });
-  replay = true;
-  return element;
-}
-
-type SubmitEvent = { preventDefault(): void; currentTarget: { elements: { namedItem(name: string): { value?: string } | null } } };
-
-function controls(node: React.ReactNode, found: { accept?: () => void | Promise<void>; openReject?: () => void; submit?: (event: SubmitEvent) => void | Promise<void> } = {}): typeof found {
-  if (!React.isValidElement(node)) return found;
-  const element = node as React.ReactElement<{ 'data-testid'?: string; onClick?: () => void; onSubmit?: (event: SubmitEvent) => void; children?: React.ReactNode }>;
-  const id = element.props['data-testid'];
-  if (id === 'bot-goal-verify-g-review' && element.props.onClick) found.accept = element.props.onClick;
-  if (id === 'bot-goal-reject-g-review' && element.props.onClick) found.openReject = element.props.onClick;
-  if (id === 'bot-goal-reject-form-g-review' && element.props.onSubmit) found.submit = element.props.onSubmit;
-  React.Children.forEach(element.props.children, child => controls(child, found));
-  return found;
-}
-
-test('pending review can accept or send the completion back', async () => {
-  const html = render([
-    goal('g-review', 'Check the report', 'pending_review'),
-    goal('g-run', 'Keep watching', 'running'),
-  ]);
-  assert.match(html, /核对完成/);
-  assert.match(html, /打回/);
-  assert.equal(html.includes('bot-goal-reject-g-run'), false);
-  posted.length = 0;
-  installMemoryState();
-  BotGoals = loadPanel();
-  try {
-    const first = controls(renderReview());
-    assert.equal(typeof first.openReject, 'function');
-    assert.equal(first.submit, undefined);
-    await first.accept!();
-    assert.deepEqual(posted.at(-1), {
-      path: '/api/bots/bot-a/goals/g-review/actions',
-      body: { sessionId: 'sess-current', action: 'verify', accepted: true },
-    });
-    first.openReject!();
-    const opened = controls(renderReview());
-    assert.equal(typeof opened.submit, 'function');
-    await opened.submit!({
-      preventDefault() {},
-      currentTarget: { elements: { namedItem: (name: string) => name === 'reason' ? { value: '还差最后一项核对' } : null } },
-    });
-    assert.deepEqual(posted.at(-1), {
-      path: '/api/bots/bot-a/goals/g-review/actions',
-      body: { sessionId: 'sess-current', action: 'verify', accepted: false, reason: '还差最后一项核对' },
-    });
-  } finally {
-    React.useState = realUseState;
-    React.useRef = realUseRef;
-    React.useEffect = realUseEffect;
-  }
-});
-
-test('a single review or blocked goal has an independent actionable card [AC:bot-goal-lifecycle-boundaries#AC-3]', () => {
+test('only blocked goals need an independent actionable card [AC:bot-goal-lifecycle-boundaries#AC-3]', () => {
  const html=render([goal('review','Review result','pending_review')]);
- assert.match(html,/bot-goal-attention/);assert.match(html,/bot-goal-verify-review/);assert.match(html,/bot-goal-reject-review/);
+ assert.equal(html, '');
  assert.doesNotMatch(html,/data-testid="bot-goals"/);
  assert.match(render([goal('blocked','Budget stop','blocked')]),/bot-goal-extend-blocked/);
  assert.doesNotMatch(render([goal('running','Work','running')]),/bot-goal-attention/);
+});
+
+test('unverified results do not ask for manual review [AC:quiet-goal-results#AC-1]', () => {
+  assert.equal(render([goal('old', 'Old result', 'pending_review')]), '');
+  const html = render([goal('old', 'Old result', 'pending_review'), goal('a', 'Active A', 'running'), goal('b', 'Active B', 'waiting')]);
+  assert.match(html, /目标与进展 \(2\)/);
+  assert.doesNotMatch(html, /Old result|核对完成|打回/);
+});
+
+test('actual blockers retain their reason and controls [AC:quiet-goal-results#AC-4]', () => {
+  const html = render([{...goal('limit', 'Task', 'blocked'), blockedReason: 'Goal budget exhausted'}]);
+  assert.match(html, /Goal budget exhausted/);
+  assert.match(html, /bot-goal-extend-limit/);
+  assert.match(html, /恢复/);
 });
