@@ -1,5 +1,9 @@
 import { join } from 'node:path';
-import type { RawAgentRuntime } from '@ppeng/agent-core';
+import {
+  createAgentInboxPort,
+  resolveBotPrincipal,
+  type RawAgentRuntime
+} from '@ppeng/agent-core';
 import {
   createUserDeliveryPort,
   loadGatewayFileConfig,
@@ -9,13 +13,21 @@ import {
 } from '@ppeng/agent-capability-gateway';
 
 /** The daemon's UserDeliveryPort: gateway channels from file config, quiet hours from the Lab setting. */
-export async function createDaemonDeliveryPort(runtime: RawAgentRuntime, repoRoot: string): Promise<UserDeliveryPort> {
+export async function createDaemonDeliveryPort(
+  runtime: RawAgentRuntime,
+  repoRoot: string,
+  owner?: { userId?: string; tenantId?: string }
+): Promise<UserDeliveryPort> {
   const { configPath } = parseGatewayEnv(repoRoot);
   const cfg = configPath ? await loadGatewayFileConfig(configPath) : undefined;
+  const principal = resolveBotPrincipal(runtime.store, owner);
+  const inboxPort = createAgentInboxPort(runtime.store);
   return createUserDeliveryPort({
     gatewayDir: join(runtime.stateDir, 'gateway'),
     channels: cfg?.channels ?? [],
-    quietHours: () => readQuietHours(runtime.store)
+    quietHours: () => readQuietHours(runtime.store),
+    // Empty ChannelSpec.from → claimed localPart@productDomain; no claim → undefined (do not invent).
+    claimedFrom: () => inboxPort.list(principal)?.address
   });
 }
 

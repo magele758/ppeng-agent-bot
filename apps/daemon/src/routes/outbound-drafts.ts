@@ -28,7 +28,7 @@ const LISTED_STATUSES = new Set<string>(['pending_approval', 'failed', 'sending'
  * With login off, both fail closed with 403 `human_login_required` and the inbox asks the operator to enable it.
  */
 export function outboundDraftRoutes(runtime: RawAgentRuntime, repoRoot: string, env: NodeJS.ProcessEnv): RouteSpec[] {
-  const port = (): Promise<UserDeliveryPort> => createDaemonDeliveryPort(runtime, repoRoot);
+  const port = (owner?: { userId?: string; tenantId?: string }): Promise<UserDeliveryPort> => createDaemonDeliveryPort(runtime, repoRoot, owner);
   const requireHuman = (ctx: RouteContext): boolean => {
     if (hasHumanRelease(ctx.request, env, ctx.auth)) return true;
     const denied = humanReleaseDenied(env);
@@ -39,13 +39,14 @@ export function outboundDraftRoutes(runtime: RawAgentRuntime, repoRoot: string, 
     {
       method: 'GET',
       pattern: '/api/outbound-drafts',
-      handler: async ({ response }) => {
+      handler: async (ctx) => {
         // Each draft carries the identity it will send as, so the preview shows who it goes out as.
         // Do not reconcile here. An in-flight approve is `sending` until the POST
         // finishes; treating that as a crash marks a live send failed and the
         // human can release it a second time. Crash recovery runs at startup.
-        const drafts = (await (await port()).listPreviews()).filter((draft) => LISTED_STATUSES.has(draft.status));
-        json(response, 200, { drafts });
+        const owner = ctx.auth.user ? { userId: ctx.auth.user.id, tenantId: ctx.auth.user.tenantId } : undefined;
+        const drafts = (await (await port(owner)).listPreviews()).filter((draft) => LISTED_STATUSES.has(draft.status));
+        json(ctx.response, 200, { drafts });
       }
     },
     {
@@ -54,7 +55,8 @@ export function outboundDraftRoutes(runtime: RawAgentRuntime, repoRoot: string, 
       handler: async (ctx) => {
         if (!requireHuman(ctx)) return;
         const body = await ctx.readBody();
-        const draft = await (await port()).edit({
+        const owner = ctx.auth.user ? { userId: ctx.auth.user.id, tenantId: ctx.auth.user.tenantId } : undefined;
+        const draft = await (await port(owner)).edit({
           id: ctx.requireParam('id'),
           text: parseEditText(body),
           expectedRevision: parseRevision(body)
@@ -68,7 +70,8 @@ export function outboundDraftRoutes(runtime: RawAgentRuntime, repoRoot: string, 
       handler: async (ctx) => {
         if (!requireHuman(ctx)) return;
         const expectedRevision = parseRevision(await ctx.readBody());
-        const draft = await (await port()).confirm({ id: ctx.requireParam('id'), decision: 'approve', expectedRevision });
+        const owner = ctx.auth.user ? { userId: ctx.auth.user.id, tenantId: ctx.auth.user.tenantId } : undefined;
+        const draft = await (await port(owner)).confirm({ id: ctx.requireParam('id'), decision: 'approve', expectedRevision });
         json(ctx.response, 200, { draft });
       }
     },
@@ -77,7 +80,8 @@ export function outboundDraftRoutes(runtime: RawAgentRuntime, repoRoot: string, 
       pattern: '/api/outbound-drafts/:id/reject',
       handler: async (ctx) => {
         if (!requireHuman(ctx)) return;
-        const draft = await (await port()).confirm({ id: ctx.requireParam('id'), decision: 'reject' });
+        const owner = ctx.auth.user ? { userId: ctx.auth.user.id, tenantId: ctx.auth.user.tenantId } : undefined;
+        const draft = await (await port(owner)).confirm({ id: ctx.requireParam('id'), decision: 'reject' });
         json(ctx.response, 200, { draft });
       }
     }

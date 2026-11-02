@@ -1,0 +1,29 @@
+id: r5-23-daemon-claimed-from
+title: Daemon delivery port wires claimedFrom from AgentInboxPort
+status: implemented
+requirement: |
+  Wire r5-22 claimedFrom into the real daemon path: createDaemonDeliveryPort passes
+  claimedFrom from AgentInboxPort (claimed localPart@productDomain for the principal)
+  into createUserDeliveryPort. Explicit ChannelSpec.from still wins. No claim → do not
+  invent an address (identity unresolved). Outbound draft routes pass auth.user as owner
+  when present; flush ticker uses installation principal.
+notes: |
+  Machine: 4090. Completes daemon wiring left open by #377/r5-22. confirm() non-quiet
+  releaseOutboundDraft also passes claimedFrom so send matches preview.
+criteria:
+  - id: AC-1
+    given: A claimed inbox exists for the principal and the email channel has empty ChannelSpec.from
+    when: createDaemonDeliveryPort listPreviews runs
+    then: identity.sender equals the claimed localPart@productDomain and identity.resolved is true
+  - id: AC-2
+    given: ChannelSpec.from is set differently from the claimed inbox
+    when: listPreviews runs
+    then: Explicit channel.from wins for identity.sender
+  - id: AC-3
+    given: No claimed inbox and ChannelSpec.from is empty
+    when: listPreviews runs
+    then: from is not invented; identity.resolved is false and sender is unset
+  - id: AC-4
+    given: A claim under a user principal and createDaemonDeliveryPort is called with that owner
+    when: listPreviews runs
+    then: identity.sender uses that user's claimed address
