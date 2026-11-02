@@ -13,22 +13,22 @@ notes: |
   outbound attachments / forwardMessageId; no subject editor this knife.
 criteria:
   - id: AC-1
-    given: A draft helper (http appendOutboundDraft / im|learn portDraft / deliverChannelText) receives inReplyTo/references/subject/replyToSubject
-    when: It calls UserDeliveryPort.draft
-    then: Those fields are forwarded into the stored OutboundDraft
+    given: "A draft helper (http appendOutboundDraft / im|learn portDraft / deliverChannelText) receives inReplyTo/references/subject/replyToSubject"
+    when: "It calls UserDeliveryPort.draft"
+    then: "Those fields are forwarded into the stored OutboundDraft"
   - id: AC-2
-    given: An email-type channel webhook inbound with messageId and subject
-    when: The webhook auto-draft path runs
-    then: The draft has inReplyTo=messageId and replyToSubject=original subject; empty subject still sets replyToSubject so Re: defaulting applies
+    given: "An email-type channel webhook inbound with messageId and subject"
+    when: "The webhook auto-draft path runs"
+    then: "The draft has inReplyTo=messageId and replyToSubject=original subject; empty subject still sets replyToSubject so Re: defaulting applies"
   - id: AC-3
-    given: A non-email webhook channel inbound
-    when: emailWebhookDraftReplyFields runs
-    then: No inReplyTo/replyToSubject are attached
+    given: "A non-email webhook channel inbound"
+    when: "emailWebhookDraftReplyFields runs"
+    then: "No inReplyTo/replyToSubject are attached"
   - id: AC-4
-    given: An OutboundDraftItem with thread fields in Lab
-    when: OutboundDraftCard renders
-    then: Thread metadata is shown read-only (no subject editor, no attachments)
+    given: "An OutboundDraftItem with thread fields in Lab"
+    when: "OutboundDraftCard renders"
+    then: "Thread metadata is shown read-only (no subject editor, no attachments)"
   - id: AC-5
-    given: The r5-25 acceptance and focused unit/component suite
-    when: The gate and tests run
-    then: Criteria are tagged and covered; Draft→Confirm→Send and claimedFrom stay unchanged
+    given: "The r5-25 acceptance and focused unit/component suite"
+    when: "The gate and tests run"
+    then: "Criteria are tagged and covered; Draft→Confirm→Send and claimedFrom stay unchanged"
