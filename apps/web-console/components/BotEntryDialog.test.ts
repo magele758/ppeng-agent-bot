@@ -20,7 +20,7 @@ test('新建 Bot 弹窗没有白边，背后是半透明遮罩 [AC:bot-entry-dia
   assert.doesNotMatch(legacy, /\.bot-entry-dialog/);
   const shell = readFileSync(shellCssPath, 'utf8');
   const backdrop = rule(shell, '.bot-entry-backdrop');
-  const dialog = rule(shell, '.bot-entry-dialog');
+  const dialog = rule(shell, 'html body .bot-entry-backdrop .bot-entry-dialog[role="dialog"]');
   assert.match(backdrop, /position:\s*fixed/);
   assert.match(backdrop, /inset:\s*0/);
   assert.match(backdrop, /background:\s*rgb\(0 0 0 \/ 0\.6\)/);
@@ -32,7 +32,7 @@ test('新建 Bot 弹窗没有白边，背后是半透明遮罩 [AC:bot-entry-dia
 
 test('创建和取消固定在弹窗底部，中间内容单独滚动 [AC:bot-entry-dialog-shell#AC-2]', () => {
   const shell = readFileSync(shellCssPath, 'utf8');
-  const dialog = rule(shell, '.bot-entry-dialog');
+  const dialog = rule(shell, 'html body .bot-entry-backdrop .bot-entry-dialog[role="dialog"]');
   const scroll = rule(shell, '.bot-entry-dialog .ag-form__scroll');
   const actions = rule(shell, '.bot-entry-dialog .ag-form__actions');
   assert.match(dialog, /overflow:\s*hidden/);
