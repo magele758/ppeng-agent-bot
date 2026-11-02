@@ -1,6 +1,8 @@
 'use client';
 import { goalMessage } from '@/lib/bot-goals';
 import { composerMessageToSend } from '@/lib/composer-next-hint';
+import { composerDraftKey } from '@/lib/composer-draft';
+import { useComposerDraftScope } from './useComposerDraftScope';
 import { recapCommandShouldSend } from '@/lib/session-recap';
 import { noteBotFirstTaskSent } from '@/lib/bot-first-task';
 
@@ -1049,6 +1051,30 @@ export function usePlayChat(deps: PlayChatDeps) {
       setPlayStatus({ text: e instanceof Error ? e.message : t('play.status.speechStartFailed'), err: true });
     }
   }, [stopSpeechDictation, t]);
+
+  useComposerDraftScope(
+    { key: composerDraftKey({ sessionId: selectedSessionId, surface: playSurface, botId }), botId },
+    liveOwnerRef.current === selectedSessionId,
+    {
+      read: () => ({
+        text: playInputLiveRef.current,
+        imageAssetIds: pendingImageAssetIds,
+        attachmentIds: pendingAttachmentIds,
+        context: pendingContext
+      }),
+      apply: (draft) => {
+        playInputLiveRef.current = draft.text;
+        setPlayInput(draft.text);
+        setPendingImageAssetIds(draft.imageAssetIds);
+        setPendingAttachmentIds(draft.attachmentIds);
+        setPendingContext(draft.context);
+      },
+      leave: () => {
+        stopSpeechDictation();
+        clearInputSuggestion();
+      }
+    }
+  );
 
   const toggleOptionalGroup = useCallback(
     async (groupId: string, on: boolean) => {
