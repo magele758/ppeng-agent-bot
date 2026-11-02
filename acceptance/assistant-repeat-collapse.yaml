@@ -1,0 +1,17 @@
+id: assistant-repeat-collapse
+title: 助手正文里相邻的重复行收成一行
+status: implemented
+requirement: |
+  助手回复里同一句话紧挨着出现两遍时，界面只显示一遍
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  只去掉与上一行完全相同的非空行，不同的句子保留。
+criteria:
+  - id: AC-1
+    given: 助手正文里同一句话连续出现两次
+    when: 查看这条回复
+    then: 这句话只出现一次
+  - id: AC-2
+    given: 相邻两句并不相同
+    when: 查看这条回复
+    then: 两句都还在

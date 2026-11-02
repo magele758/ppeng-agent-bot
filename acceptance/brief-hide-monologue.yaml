@@ -1,0 +1,17 @@
+id: brief-hide-monologue
+title: 精简界面隐藏混进正文的思考独白
+status: implemented
+requirement: |
+  只看关键信息时，中文回答后面那段英文思考不要再当正文展示
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  推理块本来就会收起。这里补的是写进正文的 think 块，以及中文回答后的长英文独白。整段英文回答保留。
+criteria:
+  - id: AC-1
+    given: 一条助手回复先用中文作答，后面跟着大段英文思考或 think 块
+    when: 精简界面展示这条回复
+    then: 只留下中文回答
+  - id: AC-2
+    given: 整段回复是英文，或中文回答里只有很短的英文
+    when: 精简界面展示
+    then: 这些内容保留

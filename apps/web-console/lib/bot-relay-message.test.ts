@@ -29,3 +29,15 @@ test('[AC:bot-relay-strip#AC-2] ignores ordinary input and lookalikes', () => {
   assert.equal(parseBotRelayMessage('user', 'Message from 科研小助手: Delegated task btask_1: 你好'), null);
   assert.equal(parseBotRelayMessage('user', 'Message from 科研小助手 / user_1: 你好'), null);
 });
+
+test('slug 形式的 bot id 也收成通信条 [AC:bot-relay-slug#AC-1]', () => {
+  const parsed = parseBotRelayMessage(
+    'user',
+    'Message from Ubuntu2 Bot / ubuntu2-bot: Task btask_d23f completed: 清理被拒绝，摘录不该为了删除再克隆。\n\n摘录还在。'
+  );
+  assert.equal(parsed?.senderId, 'ubuntu2-bot');
+  assert.equal(parsed?.kind, 'result');
+  assert.equal(parsed?.status, 'completed');
+  assert.equal(parsed?.summary.startsWith('清理被拒绝'), true);
+  assert.equal(parsed?.summary.includes('btask_'), false);
+});

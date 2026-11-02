@@ -1,0 +1,17 @@
+id: remove-needs-confirm
+title: 列表里的移除需要再确认一次
+status: implemented
+requirement: |
+  会话或 Bot 行上的移除按钮第一次点击不删除，变成确认，再点一次才删除
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  点到按钮外面、按 Esc 或几秒不操作会回到原来的移除。
+criteria:
+  - id: AC-1
+    given: 列表行上有移除按钮
+    when: 第一次点击
+    then: 不调用删除，按钮变成确认
+  - id: AC-2
+    given: 按钮已经是确认
+    when: 再点一次
+    then: 才调用删除

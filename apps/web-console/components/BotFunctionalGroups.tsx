@@ -284,6 +284,7 @@ export function BotFunctionalGroups({ bots, sessions, rooms = [], renderSession,
             <PlayGroupRow
               room={room}
               names={room.botIds.map(nameOf).join('、')}
+              members={room.botIds.map((id) => ({ id, name: nameOf(id) }))}
               selected={selectedRoomId === room.id}
               busy={deletingRoomId === room.id}
               disabled={deletingRoomId !== null || pending}

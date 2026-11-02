@@ -15,6 +15,8 @@ import {
   msgPartsToText,
   normalizedRole
 } from '@/lib/chat-utils';
+import { collapseRepeatedLines } from '@/lib/collapse-repeated-lines';
+import { stripLeakedMonologue } from '@/lib/leaked-monologue';
 import { briefStreamSegments, showProcessNote, visibleBriefParts } from '@/lib/session-brief';
 import { SessionBriefDisclosure } from './SessionBriefDisclosure';
 import { parseCronUserPrompt } from '@/lib/cron';
@@ -1110,6 +1112,15 @@ export function ChatTurnPlain({
   );
 }
 
+function StreamBody({ raw, html, brief }: { raw: string; html: string; brief: boolean }) {
+  const text = collapseRepeatedLines(brief ? stripLeakedMonologue(raw) : raw);
+  if (!text.trim()) return null;
+  if (!brief && text === raw) {
+    return <StaticHtml className="chat-bubble__body chat-bubble__md chat-stream-fold__text" html={html} />;
+  }
+  return <MarkdownHtml className="chat-bubble__body chat-bubble__md chat-stream-fold__text" text={text} />;
+}
+
 export function ChatTurnStreaming({
   segments,
   retry,
@@ -1151,13 +1162,7 @@ export function ChatTurnStreaming({
       if (!state) return null;
       return <A2uiSurface key={seg.id} state={state} sessionId={sessionId} />;
     }
-    return (
-      <StaticHtml
-        key={seg.id}
-        className="chat-bubble__body chat-bubble__md chat-stream-fold__text"
-        html={seg.html}
-      />
-    );
+    return <StreamBody key={seg.id} raw={seg.raw} html={seg.html} brief={brief} />;
   };
   return (
     <div

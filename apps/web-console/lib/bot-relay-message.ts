@@ -14,7 +14,7 @@ export type BotRelayMessage = {
   text: string;
 };
 
-const HEADER = /^Message from (.+?) \/ (bot_[A-Za-z0-9_-]+)(?: \(from room [^)\n]+\))?: /;
+const HEADER = /^Message from (.+?) \/ ([A-Za-z0-9][A-Za-z0-9_-]*)(?: \(from room [^)\n]+\))?: /;
 const TASK = /^Delegated task btask_[A-Za-z0-9_-]+: /;
 const RESULT = /^Task btask_[A-Za-z0-9_-]+ ([a-z_]+): /;
 const SUMMARY_MAX = 80;
@@ -36,7 +36,7 @@ function classify(body: string): Pick<BotRelayMessage, 'kind' | 'status'> & { re
 export function parseBotRelayMessage(role: string, text: string): BotRelayMessage | null {
   if (role !== 'user') return null;
   const header = HEADER.exec(text);
-  if (!header) return null;
+  if (!header || header[2]!.startsWith('user_')) return null;
   const { rest, ...kind } = classify(text.slice(header[0].length));
   return { senderName: header[1]!, senderId: header[2]!, ...kind, summary: firstLine(rest), text };
 }

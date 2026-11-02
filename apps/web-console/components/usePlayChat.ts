@@ -26,6 +26,7 @@ import { loadSessionPanelResource, transcriptModelView } from '@/lib/session-pan
 import { readRetryProgress, type RetryProgress } from '@/lib/model-retry';
 import { modelErrorText } from '@/lib/model-errors';
 import { getSpeechRecognitionCtor, type SpeechRecognitionLike } from '@/lib/speech-dictation';
+import { collapseRepeatedLines } from '@/lib/collapse-repeated-lines';
 import { renderMarkdown } from '@/lib/markdown';
 import { stripVisibleClockMarks } from '@/lib/visible-clock';
 import { rollbackToCheckpoint, streamCheckpoint, type StreamSegment } from '@/lib/stream-segments';
@@ -1815,10 +1816,11 @@ export function usePlayChat(deps: PlayChatDeps) {
           const delta = p.text ?? '';
           const last = segments[segments.length - 1];
           if (last?.kind === 'text') {
-            last.raw += delta;
+            last.raw = collapseRepeatedLines(last.raw + delta);
             last.html = renderMarkdown(stripVisibleClockMarks(last.raw) || '…');
           } else {
-            segments.push({ kind: 'text', id: nextId(), raw: delta, html: renderMarkdown(stripVisibleClockMarks(delta) || '…') });
+            const raw = collapseRepeatedLines(delta);
+            segments.push({ kind: 'text', id: nextId(), raw, html: renderMarkdown(stripVisibleClockMarks(raw) || '…') });
           }
           sync();
         }

@@ -1,5 +1,6 @@
 import { preferenceStorage } from './user-preference-storage.ts';
 import { isToolObservationCaption } from './chat-images.ts';
+import { stripLeakedMonologue } from './leaked-monologue.ts';
 
 export const SESSION_BRIEF_STORAGE_KEY = 'lab.sessionBrief';
 export const SESSION_BRIEF_CHANGED_EVENT = 'ppeng-session-brief-changed';
@@ -83,11 +84,18 @@ export interface BriefMessage {
   parts?: BriefPart[];
 }
 
+function briefTextPart<T extends BriefPart>(part: T): T[] {
+  if (isToolObservationCaption(part.text)) return [];
+  const text = stripLeakedMonologue(part.text ?? '');
+  if (!text.trim()) return [];
+  return text === part.text ? [part] : [{ ...part, text }];
+}
+
 export function visibleBriefParts<T extends BriefPart>(parts: readonly T[] | undefined): T[] {
-  return (parts ?? []).filter((part) => {
-    if (part.type === 'image') return Boolean(part.assetId?.trim());
-    if (part.type !== 'text') return false;
-    return !isToolObservationCaption(part.text) && Boolean((part.text ?? '').trim());
+  return (parts ?? []).flatMap((part) => {
+    if (part.type === 'image') return part.assetId?.trim() ? [part] : [];
+    if (part.type !== 'text') return [];
+    return briefTextPart(part);
   });
 }
 

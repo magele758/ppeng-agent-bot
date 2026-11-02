@@ -33,6 +33,7 @@ import {
   looseRooms,
 } from '@/lib/functional-group-view';
 import { WorkspaceIcon } from '../WorkspaceIcon';
+import { GroupFace, type GroupMemberFace } from './GroupFace';
 import './play-group.css';
 
 export type SidebarRoom = {
@@ -66,6 +67,7 @@ export async function deletePlayRoom(
 export function PlayGroupRow({
   room,
   names,
+  members = [],
   selected,
   busy,
   disabled,
@@ -81,6 +83,7 @@ export function PlayGroupRow({
 }: {
   room: SidebarRoom;
   names: string;
+  members?: readonly GroupMemberFace[];
   selected: boolean;
   busy: boolean;
   disabled: boolean;
@@ -121,6 +124,7 @@ export function PlayGroupRow({
         }
       }}
     >
+      <GroupFace members={members} />
       <div className="session-item__body">
         <div className="session-item__title">{room.title}</div>
         <div className="session-item__meta">
@@ -277,6 +281,7 @@ export function PlayBotGroupList({
             key={room.id}
             room={room}
             names={names}
+            members={room.botIds.map((id) => ({ id, name: nameOf(id) }))}
             selected={selectedId === room.id}
             busy={deletingId === room.id}
             disabled={deletingId !== null}

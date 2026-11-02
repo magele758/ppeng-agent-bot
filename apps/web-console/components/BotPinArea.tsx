@@ -258,6 +258,7 @@ export function BotPinArea({
             <PlayGroupRow
               room={room}
               names={names}
+              members={room.botIds.map((id) => ({ id, name: bots.find((bot) => bot.id === id)?.name ?? id }))}
               selected={selectedRoomId === room.id}
               busy={deletingId === room.id}
               disabled={deletingId !== null}

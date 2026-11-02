@@ -2,13 +2,14 @@
 
 import { useState } from 'react';
 import { useI18n, type MessageKey } from '@/lib/i18n';
+import { collapseRepeatedLines } from '@/lib/collapse-repeated-lines';
 import { stripVisibleClockMarks } from '@/lib/visible-clock';
 import { MarkdownHtml } from './MarkdownHtml';
 
 export function ReadableMessage({ text, role, messageKey }: { text: string; role: string; messageKey?: string }) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
-  const body = stripVisibleClockMarks(text);
+  const body = collapseRepeatedLines(stripVisibleClockMarks(text));
   const result = role === 'assistant' && messageKey?.startsWith('routine-result:')
     ? /^\[routine:(.+)\] (\w+)\n([\s\S]*?)\nRun: (.+)$/.exec(body) : null;
   const context = messageKey?.startsWith('routine-context:') && /^\[routine-context [^\n]+\]\n[\s\S]*?\n\[\/routine-context\]/.exec(body);

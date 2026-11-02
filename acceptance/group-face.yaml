@@ -1,0 +1,12 @@
+id: group-face
+title: 群聊行展示成员头像
+status: implemented
+requirement: |
+  群聊列表项把群里 Bot 的头像拼成一个群头像，最多四个，让人在点进去之前知道群里有谁
+notes: |
+  assumedApproval: standing-order-2026-10-22
+criteria:
+  - id: AC-1
+    given: 一个群里有若干 Bot
+    when: 在会话列表里看这个群
+    then: 群行上有一个群头像，包含这些 Bot，超过四个只显示前四个
