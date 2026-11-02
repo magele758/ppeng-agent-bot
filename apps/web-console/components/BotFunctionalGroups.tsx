@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import styles from './BotFunctionalGroups.module.css';
 import { BotEntryDialog } from './BotEntryDialog';
+import { SharedFactsPanel } from './SharedFactsPanel';
 
 import { displayPinnedRoomIds } from '@/lib/bot-pin';
 import { arrangeSidebarRows, beginSidebarDrag, BOT_DRAG_MIME, commitBotPinState, commitRegionOrder, currentSidebarDrag, dropPlace, endSidebarDrag, forgetRegionRef, getBotPinServerSnapshot, getBotPinSnapshot, groupRowsWithoutPinnedBots, moveSidebarItem, orderRegionKey, regionRefs, ROOM_DRAG_MIME, sameOrderRegion, savedRegionRefs, sortBotRows, subscribeBotPins, type OrderRegion } from '@/lib/bot-pin-area';
@@ -349,22 +350,21 @@ function SharedFacts({ groups }: { groups: FunctionalGroup[] }) {
     } catch (cause) { setError(String(cause)); }
     finally { setBusy(false); }
   };
-  return <details className={styles.shared} onToggle={(event) => setOpen(event.currentTarget.open)}>
-    <summary>{t('play.functionalGroups.sharedTitle')}</summary>
+  return <SharedFactsPanel open={open} busy={busy} onOpen={() => setOpen(true)} onClose={() => setOpen(false)}>
     <p>{t('play.functionalGroups.sharedHint')}</p>
     <label>{t('play.functionalGroups.sharedScope')}<select aria-label={t('play.functionalGroups.sharedScope')} value={scope} disabled={busy} onChange={(event) => setScope(event.target.value)}>
       <option value="global">{t('play.functionalGroups.global')}</option>{groups.map((g) => <option value={g.id} key={g.id}>{g.name}</option>)}
     </select></label>
     {rows.map((row, index) => <div className={styles.fact} key={index}>
       <input aria-label={t('play.functionalGroups.factName', { index: index + 1 })} placeholder={t('play.functionalGroups.factNameHint')} value={row.key} disabled={controls.disabled} onChange={(event) => { setSaved(false); editRows(rows.map((r, i) => i === index ? { ...r, key: event.target.value } : r)); }} />
-      <input aria-label={t('play.functionalGroups.factValue', { index: index + 1 })} placeholder={t('play.functionalGroups.factValueHint')} value={row.value} disabled={controls.disabled} onChange={(event) => { setSaved(false); editRows(rows.map((r, i) => i === index ? { ...r, value: event.target.value } : r)); }} />
+      <textarea rows={3} aria-label={t('play.functionalGroups.factValue', { index: index + 1 })} placeholder={t('play.functionalGroups.factValueHint')} value={row.value} disabled={controls.disabled} onChange={(event) => { setSaved(false); editRows(rows.map((r, i) => i === index ? { ...r, value: event.target.value } : r)); }} />
       <button className="btn btn-ghost btn-sm" disabled={controls.disabled} aria-label={t('play.functionalGroups.removeFact', { index: index + 1 })} onClick={() => { setSaved(false); editRows(rows.filter((_, i) => i !== index)); }}>×</button>
     </div>)}
     <button className="btn btn-ghost btn-sm" disabled={controls.disabled} onClick={() => { setSaved(false); editRows([...rows, { key: '', value: '' }]); }}>{t('play.functionalGroups.addFact')}</button>
     <button className="btn btn-sm" disabled={controls.saveDisabled} onClick={() => { void save(); }}>{t('play.functionalGroups.saveShared')}</button>
     <GroupLoadError error={error && t('play.functionalGroups.failed', { error })} loaded={ready} busy={busy} retry={() => setRetry(n => n + 1)} />
     {saved ? <p role="status">{t('play.functionalGroups.saved')}</p> : null}
-  </details>;
+  </SharedFactsPanel>;
 }
 
 function GroupLoadError({ error, loaded, busy = false, retry }: { error: string; loaded: boolean; busy?: boolean; retry: () => void }) {

@@ -17,10 +17,14 @@
 .editor label { width: 100%; font-size: 12px; }
 .editor input { display: block; width: 100%; box-sizing: border-box; margin-top: 5px; }
 .error { font-size: 12px; padding: 8px 10px; color: var(--danger, #b42318); overflow-wrap: anywhere; }
-.shared { border-top: 1px solid var(--border, #ddd); padding: 10px; font-size: 12px; }
-.shared summary { cursor: pointer; }
-.shared p { line-height: 1.5; color: var(--ui-text-muted); }
-.shared label, .shared select { display: block; width: 100%; margin-bottom: 6px; }
-.fact { display: grid; grid-template-columns: minmax(0, 1fr) 24px; gap: 4px; margin: 10px 0; }
-.fact input { width: 100%; min-width: 0; grid-column: 1; box-sizing: border-box; font-size: 12px; }
-.fact button { grid-column: 2; grid-row: 1 / 3; }
+.sharedEntry { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 40px; padding: 8px 12px; border: 0; border-top: 1px solid var(--border, #ddd); background: transparent; color: var(--ui-text-muted); font: inherit; font-size: 12px; cursor: pointer; }
+.sharedEntry:hover { background: var(--ui-surface-hover, #eee); color: var(--ui-text); }
+.sharedHeading { margin: 0; padding: 20px 20px 12px; font-size: 16px; }
+.sharedBody { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 20px 16px; font-size: 13px; }
+.sharedBody p { line-height: 1.6; color: var(--ui-text-muted); }
+.sharedBody label, .sharedBody select { display: block; width: 100%; margin-bottom: 8px; }
+.sharedFooter { display: flex; justify-content: flex-end; padding: 12px 20px; border-top: 1px solid var(--border, #ddd); }
+.fact { display: grid; grid-template-columns: minmax(0, 1fr) 28px; gap: 6px; margin: 16px 0; }
+.fact input, .fact textarea { width: 100%; min-width: 0; grid-column: 1; box-sizing: border-box; font: inherit; }
+.fact textarea { resize: vertical; min-height: 72px; line-height: 1.6; }
+.fact button { grid-column: 2; grid-row: 1 / 3; align-self: start; }
