@@ -62,6 +62,10 @@ async function sendApprovedChannel(opts: {
   event?: string;
   draftId?: string;
   claimedFrom?: string;
+  inReplyTo?: string;
+  references?: string;
+  subject?: string;
+  replyToSubject?: string;
 }): Promise<void> {
   await sendLedgered({
     gatewayDir: opts.gatewayDir,
@@ -75,7 +79,14 @@ async function sendApprovedChannel(opts: {
           text,
           event: opts.event ?? 'gateway.im.reply'
         },
-        { approval: 'approved', claimedFrom: opts.claimedFrom }
+        {
+          approval: 'approved',
+          claimedFrom: opts.claimedFrom,
+          inReplyTo: opts.inReplyTo,
+          references: opts.references,
+          ...(opts.subject !== undefined ? { subject: opts.subject } : {}),
+          replyToSubject: opts.replyToSubject
+        }
       );
       if (!result.ok) throw new Error(result.text || 'delivery failed');
     }
@@ -169,7 +180,11 @@ export async function releaseOutboundDraft(input: {
         text: draft.text,
         event: draft.event,
         draftId: draft.id,
-        claimedFrom: input.claimedFrom
+        claimedFrom: input.claimedFrom,
+        inReplyTo: draft.inReplyTo,
+        references: draft.references,
+        ...(draft.subject !== undefined ? { subject: draft.subject } : {}),
+        replyToSubject: draft.replyToSubject
       });
     }
     return await settleOutboundDraft(input.gatewayDir, draft.id, { status: 'sent' });

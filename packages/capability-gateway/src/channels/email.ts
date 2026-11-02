@@ -21,6 +21,42 @@ export interface SendEmailHttpOptions {
    * Default false preserves legacy email_http relays that omit from.
    */
   requireFrom?: boolean;
+  /**
+   * Draft-level In-Reply-To override. Wins over `channel.inReplyTo` when set.
+   */
+  inReplyTo?: string;
+  /**
+   * Draft-level References override. Wins over `channel.references` when set.
+   */
+  references?: string;
+  /**
+   * Draft-level subject override. When provided (including empty string), used
+   * instead of `channel.subject` for resolveEmailReplySubject.
+   */
+  subject?: string;
+  /**
+   * Original subject of the claimed-inbox message being replied to.
+   * Used for Re: defaulting when the effective subject is empty.
+   */
+  replyToSubject?: string;
+}
+
+/**
+ * Resolve the email_http subject for a send / preview.
+ * Explicit subject (non-empty after trim) always wins.
+ * When subject is empty and `replyToSubject` is set (claimed-inbox reply),
+ * default to `Re: <original>` (without doubling an existing Re: prefix).
+ */
+export function resolveEmailReplySubject(input: {
+  subject?: string;
+  replyToSubject?: string;
+}): string | undefined {
+  const explicit = input.subject?.trim();
+  if (explicit) return explicit;
+  const original = input.replyToSubject?.trim();
+  if (!original) return undefined;
+  if (/^re:\s/i.test(original)) return original;
+  return `Re: ${original}`;
 }
 
 /**
@@ -28,6 +64,8 @@ export interface SendEmailHttpOptions {
  * No vendor SDK. Auth headers may name an env var; values are not logged.
  *
  * From precedence (r5-22): channel.from > claimedFrom > omit/fail when requireFrom.
+ * Reply threading (r5-24): optional inReplyTo / references on payload; subject
+ * defaults to Re: <original> when empty and replyToSubject is provided.
  */
 export async function sendEmailHttp(
   channel: ChannelSpec,
@@ -50,18 +88,32 @@ export async function sendEmailHttp(
     secrets.push(bearer?.[1] ?? resolved);
   }
   const to = channel.target?.trim();
-  const subject = channel.subject?.trim();
+  const subjectSource =
+    options && Object.prototype.hasOwnProperty.call(options, 'subject')
+      ? options.subject
+      : channel.subject;
+  const subject = resolveEmailReplySubject({
+    subject: subjectSource,
+    replyToSubject: options?.replyToSubject ?? undefined
+  });
   const emailFrom = resolveEmailOutboundFrom(channel, options?.claimedFrom);
   if (options?.requireFrom && !emailFrom.resolved) {
     return { ok: false, status: 0, text: 'email_http from unresolved (no channel.from and no claimed inbox)' };
   }
   const from = emailFrom.from;
+  const inReplyTo =
+    (options?.inReplyTo?.trim() || channel.inReplyTo?.trim() || undefined) || undefined;
+  const referencesExplicit =
+    (options?.references?.trim() || channel.references?.trim() || undefined) || undefined;
+  const references = referencesExplicit || (inReplyTo ? inReplyTo : undefined);
   const payload = {
     transport: 'email_http',
     text: bodyText,
     ...(to ? { to } : {}),
     ...(subject ? { subject } : {}),
-    ...(from ? { from } : {})
+    ...(from ? { from } : {}),
+    ...(inReplyTo ? { inReplyTo } : {}),
+    ...(references ? { references } : {})
   };
   try {
     const res = await fetch(url, {

@@ -30,6 +30,16 @@ export interface UserDeliveryMessage {
   event?: string;
   receiveId?: string;
   receiveIdType?: FeishuReceiveIdType;
+  /** Claimed-inbox reply: In-Reply-To message-id for email_http. */
+  inReplyTo?: string;
+  /** Optional References chain; defaults to inReplyTo at send when omitted. */
+  references?: string;
+  /**
+   * Optional email subject. Explicit wins; empty + replyToSubject → Re: default.
+   */
+  subject?: string;
+  /** Original subject of the message being replied to (for Re: defaulting). */
+  replyToSubject?: string;
 }
 
 export interface UserDeliveryPort {
@@ -92,7 +102,11 @@ export function createUserDeliveryPort(opts: UserDeliveryPortOptions): UserDeliv
         text: message.text,
         event: message.event,
         receiveId: message.receiveId,
-        receiveIdType: message.receiveIdType
+        receiveIdType: message.receiveIdType,
+        inReplyTo: message.inReplyTo,
+        references: message.references,
+        ...(message.subject !== undefined ? { subject: message.subject } : {}),
+        replyToSubject: message.replyToSubject
       });
     },
     confirm(input) {

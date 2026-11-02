@@ -1,0 +1,34 @@
+id: r5-24-outbound-email-reply
+title: Outbound email reply threading (inReplyTo / Re: subject)
+status: implemented
+requirement: |
+  OutboundDraft (+ preview / release / email_http) support optional inReplyTo
+  (+ references, defaulting to inReplyTo when omitted). When replying from a
+  claimed inbox messageId: empty subject defaults to `Re: <original subject>`;
+  an explicit subject always wins. claimedFrom precedence stays r5-22/23
+  (explicit channel.from wins; empty → claim; no claim → unresolved).
+  Draft→Confirm→Send unchanged; no silent send; no AgentMail.
+notes: |
+  Machine: 4090. Parity with Grok agent inbox replyToMessageId + Re: subject
+  for claimed-inbox replies. No outbound attachments / forwardMessageId.
+criteria:
+  - id: AC-1
+    given: An email_http send (or draft release) carries inReplyTo
+    when: sendEmailHttp builds its JSON payload
+    then: The payload includes inReplyTo; references is the explicit value or defaults to inReplyTo
+  - id: AC-2
+    given: A reply from a claimed inbox messageId with empty subject and a known original subject
+    when: resolveEmailReplySubject / sendEmailHttp runs
+    then: The subject becomes `Re: <original subject>` (without doubling an existing Re: prefix)
+  - id: AC-3
+    given: An explicit subject is set on the draft or channel while inReplyTo is also set
+    when: subject is resolved for email_http
+    then: The explicit subject wins; Re: default is not applied
+  - id: AC-4
+    given: claimedFrom and ChannelSpec.from combinations from r5-22
+    when: sendEmailHttp builds payload.from
+    then: Explicit channel.from wins; empty from uses claimedFrom; no claim leaves from omitted / unresolved under requireFrom
+  - id: AC-5
+    given: The r5-24 acceptance and focused unit suite
+    when: The gate and unit tests run
+    then: Criteria are tagged and covered; Draft→Confirm→Send path is unchanged
