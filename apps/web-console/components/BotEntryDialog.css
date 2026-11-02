@@ -9,13 +9,16 @@
   background: rgb(0 0 0 / 0.6);
 }
 
-.bot-entry-dialog {
+html body .bot-entry-backdrop .bot-entry-dialog[role="dialog"] {
+  --glass-filter: none;
   width: min(640px, 100%);
   max-height: min(85vh, calc(100dvh - 48px));
   display: flex;
   flex-direction: column;
   overflow: hidden;
   background: var(--ui-surface);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   color: var(--ui-text);
   border: none;
   outline: none;

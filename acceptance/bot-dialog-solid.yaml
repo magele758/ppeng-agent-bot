@@ -1,0 +1,11 @@
+id: bot-dialog-solid
+title: Bot 消息弹窗使用纯色背景
+status: implemented
+requirement: |
+  这个弹窗太丑了，直接纯色就行了，不要搞毛玻璃之类的
+notes: 'assumedApproval: standing-order-2026-10-22; Bot 弹窗覆盖全局玻璃样式，其他页面外观不变。'
+criteria:
+  - id: AC-1
+    given: 使用浅色或深色主题
+    when: 打开 Bot 消息弹窗
+    then: 弹窗是不透明纯色，无渐变和背景模糊，正文可读且关闭按钮正常工作
