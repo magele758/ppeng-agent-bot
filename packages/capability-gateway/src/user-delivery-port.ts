@@ -103,7 +103,8 @@ export function createUserDeliveryPort(opts: UserDeliveryPortOptions): UserDeliv
           id: input.id,
           decision: input.decision,
           channels,
-          expectedRevision: input.expectedRevision
+          expectedRevision: input.expectedRevision,
+          claimedFrom: claimedFrom()
         });
       }
       const end = quietWindowEnd(policy, clock());
