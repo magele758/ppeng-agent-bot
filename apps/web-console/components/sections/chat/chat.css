@@ -204,6 +204,12 @@
 }
 
 /* —— 顶部操作：「更多」菜单 —— */
+/* 毛玻璃让头部自成层叠上下文，弹层 z-index 只在头部内生效，头部本身须压过后面的正文。 */
+.chat-panel-header {
+  position: relative;
+  z-index: var(--ui-z-toolbar);
+}
+
 .more-menu {
   position: relative;
 }
@@ -220,11 +226,13 @@
   padding: var(--ui-space-2);
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-md);
-  background: var(--glass-fill);
-  backdrop-filter: var(--glass-filter);
-  -webkit-backdrop-filter: var(--glass-filter);
-  border-color: var(--glass-edge);
+  background: var(--ui-surface);
+  color: var(--ui-text);
   box-shadow: var(--ui-shadow-md);
+}
+
+.more-menu__pop .more-menu__item {
+  color: var(--ui-text);
 }
 
 .more-menu__item {

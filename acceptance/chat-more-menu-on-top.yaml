@@ -1,0 +1,21 @@
+id: chat-more-menu-on-top
+title: 对话头部「⋯」更多菜单在最上层且不透明
+status: implemented
+requirement: |
+  聊天面板头部「⋯」更多菜单（只看关键信息 / 模型所见 / 重新运行会话）被下方聊天内容和毛玻璃层盖住，
+  弹层半透明、文字看不清。要求弹层完整显示在最上层、文字清晰、背景不透明。
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  根因：glass.css 给 .chat-panel-header 加了 backdrop-filter，形成独立层叠上下文，弹层 z-index 只在头部内生效，
+  后面的兄弟 .chat-panel-body（同样是毛玻璃层叠上下文）画在它上面；弹层自身用 18% 的 --glass-fill，近乎透明。
+  修复：头部 position: relative + z-index: var(--ui-z-toolbar) 抬到正文之上；弹层改用不透明 var(--ui-surface)，去掉 backdrop-filter。
+  与 app-frosted-glass「弹层半透明」相比，这个菜单例外地使用实底。
+criteria:
+  - id: AC-1
+    given: 打开对话页并点开头部「⋯」更多菜单
+    when: 菜单弹层与下方聊天正文重叠
+    then: 聊天头部建立高于正文的层级（position 非 static 且 z-index 使用 --ui-z-toolbar），弹层不被正文或毛玻璃层盖住
+  - id: AC-2
+    given: 同上
+    when: 看菜单弹层
+    then: 弹层背景为不透明的 var(--ui-surface)，不使用 --glass-fill 或 backdrop-filter，弹层和菜单项文字颜色为 var(--ui-text)（不沿用 .toggle 的灰色）；菜单项本身没有被设 opacity，仅禁用的动作按钮变淡
