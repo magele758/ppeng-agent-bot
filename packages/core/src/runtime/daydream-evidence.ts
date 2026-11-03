@@ -4,10 +4,16 @@ import { daydreamLocalDate } from '../daydream/settings.js';
 import { redactToolContent } from '../sandbox/result-redaction.js';
 import type { SessionMessage } from '../types.js';
 import type { DaydreamEvidence } from '../daydream/types.js';
-export function botDaydreamPrincipal(store:SqliteStateStore,botId:string){
- const bot=store.getBot(botId);if(!bot)throw Error('Bot not found');
- const session=store.getSession(bot.canonicalSessionId);if(!session)throw Error('Bot session not found');
+export function tryBotDaydreamPrincipal(store:SqliteStateStore,botId:string){
+ const bot=store.getBot(botId);const session=bot&&store.getSession(bot.canonicalSessionId);
+ if(!bot||!session)return undefined;
  return botDefinitionOwner(store,botId)??principalFromSession(store,session);
+}
+export function botDaydreamPrincipal(store:SqliteStateStore,botId:string){
+ if(!store.getBot(botId))throw Error('Bot not found');
+ const principal=tryBotDaydreamPrincipal(store,botId);
+ if(!principal)throw Error('Bot session not found');
+ return principal;
 }
 function toolOutcome(message:SessionMessage):DaydreamEvidence['outcome'] {
  const results=message.parts.filter(p=>p.type==='tool_result');

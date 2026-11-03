@@ -2,7 +2,13 @@ import { isTemporaryMemoryInstruction } from '../memory/memory-dialogue-extract.
 import { createHash, randomUUID } from 'node:crypto';
 import { DAYDREAM_PROMPT, parseDaydreamCandidates } from './candidates.js';
 import { daydreamLocalDate, daydreamLocalTime, readDaydreamSettings, shiftDay, updateDaydreamSettings } from './settings.js';
-import type { DaydreamDeps, DaydreamRun, DaydreamSettings, DaydreamCandidate, DaydreamOutput } from './types.js';
+import type { DaydreamBot, DaydreamDeps, DaydreamRun, DaydreamSettings, DaydreamCandidate, DaydreamOutput } from './types.js';
+function isDaydreamBotRunnable(bot: DaydreamBot): boolean {
+  return bot.runnable !== false;
+}
+function runnableBots(bots: DaydreamBot[]): DaydreamBot[] {
+  return bots.filter(isDaydreamBotRunnable);
+}
 export class BotDaydreamService {
   private closing = false;
   private readonly botLeases = new Map<string, string>();
@@ -72,8 +78,12 @@ export class BotDaydreamService {
   private now() {
     return this.deps.now?.() ?? Date.now();
   }
+  private findBot(id: string): DaydreamBot | undefined {
+    if (this.deps.getBot) return this.deps.getBot(id);
+    return this.deps.listBots().find(b => b.id === id);
+  }
   private bot(id: string) {
-    const bot = this.deps.listBots().find(b => b.id === id);
+    const bot = this.findBot(id);
     if (!bot)
       throw new Error('Bot not found');
     return bot;
@@ -107,7 +117,7 @@ export class BotDaydreamService {
       throw new Error('Daydream lease lost');
   }
   async tick(): Promise<void> {
-    for (const bot of this.deps.listBots()) {
+    for (const bot of runnableBots(this.deps.listBots())) {
       const settings = this.getSettings(bot.id);
       if (!this.isDue(settings))
         continue;

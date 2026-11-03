@@ -13,6 +13,8 @@ export interface DaydreamBot {
   id: string;
   tenantId?: string;
   userId?: string;
+  /** False when this Bot has no conversation left to review. */
+  runnable?: boolean;
 }
 export interface DaydreamArtifactRef {
   id: string;
@@ -71,6 +73,8 @@ export interface DaydreamDeps {
     setDaemonControl(key: string, value: unknown): void;
   };
   listBots(): DaydreamBot[];
+  /** Looks up one Bot without listing every Bot; falls back to listBots when absent. */
+  getBot?(botId: string): DaydreamBot | undefined;
   readEvidence(botId: string, date: string, timezone: string): Promise<DaydreamEvidence[]>;
   complete(botId: string, input: {
     system: string;

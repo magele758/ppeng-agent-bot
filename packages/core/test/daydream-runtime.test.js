@@ -340,3 +340,41 @@ test("governance throttles pending decisions and close aborts manual analysis [A
     /closed/,
   );
 });
+test("a missing conversation does not fail the scheduled review [AC:bot-daydream-missing-session#AC-1] [AC:bot-daydream-missing-session#AC-2]", async (t) => {
+  const x = setup(t);
+  const now = new Date().toISOString();
+  x.runtime.store.createBot({
+    id: "gone-bot",
+    name: "Gone Bot",
+    title: "",
+    description: "",
+    agentId: "gone-bot",
+    canonicalSessionId: "session-does-not-exist",
+    hidden: true,
+    faceShape: null,
+    faceColor: null,
+    faceStyle: null,
+    faceExpression: null,
+    avatar: null,
+    createdAt: now,
+    updatedAt: now,
+  });
+  const settings = x.host.local.getSettings(x.bots.a.id);
+  x.runtime.store.setDaemonControl("bot_daydream:" + x.bots.a.id, {
+    ...settings,
+    enabled: true,
+    dailyAt: "00:00",
+    timezone: "UTC",
+    effectiveFrom: "2026-10-01T00:00:00.000Z",
+  });
+  await x.host.tick();
+  await x.host.tick();
+  const reviewed = x.host.local.listRuns(x.bots.a.id);
+  assert.ok(reviewed.length > 0);
+  assert.equal(
+    x.runtime.store.db.prepare("SELECT id FROM bot_daydream_runs WHERE bot_id=?").all("gone-bot").length,
+    0,
+  );
+  assert.equal(x.runtime.store.getDaemonControl("daydream.lastError:gone-bot"), undefined);
+  assert.equal(x.runtime.store.getDaemonControl("daydream.lastError:" + x.bots.a.id), undefined);
+});

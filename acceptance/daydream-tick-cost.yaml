@@ -1,0 +1,18 @@
+id: daydream-tick-cost
+title: 每日复盘调度不能拖死 daemon
+status: implemented
+requirement: |
+  怎么我本地的bot都不显示了？赶紧看看可能是其他agent搞的
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  本机有 93 个 Bot、45 条主会话，元数据合计约 7.6MB。每日复盘每查一个 Bot 都把全部 Bot 的会话重读一遍，daemon 启动后接口全部超时，Bot 列表为空。
+  缺会话的 Bot 仍然跳过且不记失败（acceptance/bot-daydream-missing-session.yaml 不变）。
+criteria:
+  - id: AC-1
+    given: 有很多 Bot，每个都开着每日复盘
+    when: 每日复盘调度跑一轮
+    then: 全部 Bot 只列一次，查单个 Bot 的设置、记录或忙闲时不再把全部 Bot 重新读一遍
+  - id: AC-2
+    given: 每日复盘调度正在跑
+    when: 用户打开 Lab 查看 Bot 列表
+    then: Bot 列表照常显示，不会因为复盘调度一直拿不到数据
