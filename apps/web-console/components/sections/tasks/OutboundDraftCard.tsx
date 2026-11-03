@@ -38,37 +38,55 @@ export function OutboundIdentityBar({ identity }: { identity: OutboundIdentity }
   );
 }
 
-function DraftMeta({ draft }: { draft: OutboundDraftItem }) {
+function draftShowsThread(draft: OutboundDraftItem): boolean {
+  if (draft.inReplyTo) return true;
+  if (draft.references) return true;
+  if (draft.subject !== undefined) return true;
+  return draft.replyToSubject !== undefined;
+}
+
+function DraftChannelLine({ draft }: { draft: OutboundDraftItem }) {
   const { t } = useI18n();
-  const hasThread =
-    Boolean(draft.inReplyTo) ||
-    Boolean(draft.references) ||
-    draft.subject !== undefined ||
-    draft.replyToSubject !== undefined;
+  return (
+    <div className={styles.rowMeta}>
+      <span>{t('tasks.inbox.draftChannel', { channel: draft.channelId })}</span>
+      {draft.event ? <span>{t('tasks.inbox.draftEvent', { event: draft.event })}</span> : null}
+      {draft.revision ? <span>{t('tasks.inbox.editedBadge')}</span> : null}
+      {draft.error ? <span>{draft.error}</span> : null}
+    </div>
+  );
+}
+
+function DraftSubjectSpan({ draft }: { draft: OutboundDraftItem }) {
+  const { t } = useI18n();
+  if (draft.subject === undefined || draft.subject === '') return null;
+  return <span>{t('tasks.inbox.draftSubject', { subject: draft.subject })}</span>;
+}
+
+function DraftReplySubjectSpan({ draft }: { draft: OutboundDraftItem }) {
+  const { t } = useI18n();
+  if (draft.replyToSubject === undefined) return null;
+  return <span>{t('tasks.inbox.draftReplyToSubject', { subject: draft.replyToSubject || '—' })}</span>;
+}
+
+function DraftThreadLine({ draft }: { draft: OutboundDraftItem }) {
+  const { t } = useI18n();
+  if (!draftShowsThread(draft)) return null;
+  return (
+    <div className={styles.rowMeta} data-testid="outbound-draft-thread">
+      {draft.inReplyTo ? <span>{t('tasks.inbox.draftInReplyTo', { id: draft.inReplyTo })}</span> : null}
+      {draft.references ? <span>{t('tasks.inbox.draftReferences', { refs: draft.references })}</span> : null}
+      <DraftSubjectSpan draft={draft} />
+      <DraftReplySubjectSpan draft={draft} />
+    </div>
+  );
+}
+
+function DraftMeta({ draft }: { draft: OutboundDraftItem }) {
   return (
     <>
-      <div className={styles.rowMeta}>
-        <span>{t('tasks.inbox.draftChannel', { channel: draft.channelId })}</span>
-        {draft.event ? <span>{t('tasks.inbox.draftEvent', { event: draft.event })}</span> : null}
-        {draft.revision ? <span>{t('tasks.inbox.editedBadge')}</span> : null}
-        {draft.error ? <span>{draft.error}</span> : null}
-      </div>
-      {hasThread ? (
-        <div className={styles.rowMeta} data-testid="outbound-draft-thread">
-          {draft.inReplyTo ? (
-            <span>{t('tasks.inbox.draftInReplyTo', { id: draft.inReplyTo })}</span>
-          ) : null}
-          {draft.references ? (
-            <span>{t('tasks.inbox.draftReferences', { refs: draft.references })}</span>
-          ) : null}
-          {draft.subject !== undefined && draft.subject !== '' ? (
-            <span>{t('tasks.inbox.draftSubject', { subject: draft.subject })}</span>
-          ) : null}
-          {draft.replyToSubject !== undefined ? (
-            <span>{t('tasks.inbox.draftReplyToSubject', { subject: draft.replyToSubject || '—' })}</span>
-          ) : null}
-        </div>
-      ) : null}
+      <DraftChannelLine draft={draft} />
+      <DraftThreadLine draft={draft} />
     </>
   );
 }
