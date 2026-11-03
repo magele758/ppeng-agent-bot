@@ -1,0 +1,15 @@
+id: bot-message-name
+title: Bot 回复标签显示 Bot 名称
+status: implemented
+notes: 'assumedApproval: standing-order-2026-10-22'
+requirement: |
+  这个用bot的名称，不要只搞个助手
+criteria:
+  - id: AC-1
+    given: 用户打开一个有名称的 Bot 对话
+    when: 查看历史回复、生成中的回复或等待回复
+    then: 发言标签使用该 Bot 名称，生成时显示该名称加生成中提示
+  - id: AC-2
+    given: 普通对话或没有可用 Bot 名称的对话
+    when: 查看回复标签
+    then: 保留本语言的助手称呼，用户与工具标签不变

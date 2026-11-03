@@ -1,4 +1,5 @@
 'use client';
+import { useAssistantName } from './AssistantNameContext';
 import { UserMessageActions } from './UserMessageActions';
 import {CorrectionCapture} from './LearningWorkbench';
 
@@ -96,11 +97,11 @@ function buildModClass(
 /** 同一连续助手发言的后续消息：message index 集合，由 PlayTranscript 提供。 */
 export const ContinuedAssistantContext = createContext<ReadonlySet<number>>(new Set());
 
-function roleLabelText(role: string, t: (key: MessageKey) => string, hidden: boolean): string {
-  return hidden ? '' : roleLabel(role, t);
+function roleLabelText(role: string, t: (key: MessageKey) => string, hidden: boolean, assistantName: string): string {
+  return hidden ? '' : roleLabel(role, t, assistantName);
 }
 
-function roleLabel(role: string, t: (key: MessageKey) => string): string {
+function roleLabel(role: string, t: (key: MessageKey) => string, assistantName: string): string {
   switch (role) {
     case 'user':
       return t('play.role.user');
@@ -109,7 +110,7 @@ function roleLabel(role: string, t: (key: MessageKey) => string): string {
     case 'system':
       return t('play.role.system');
     case 'assistant':
-      return t('play.role.assistant');
+      return assistantName;
     default:
       return role;
   }
@@ -967,6 +968,7 @@ export function ChatTurnFromMessage({
   brief?: boolean;
 }) {
   const { t } = useI18n();
+  const assistantName = useAssistantName();
   const shown = brief ? { ...m, parts: visibleBriefParts(m.parts) } : m;
   const r = normalizedRole(m);
   const storedReply = r === 'user' ? readStoredReplyTo(m) : null;
@@ -1021,7 +1023,7 @@ export function ChatTurnFromMessage({
       <div className="chat-turn__content">
         <UserMessageActions message={m} sessionId={sessionId} modelView={modelView} />
         <TurnLabel
-          text={roleLabelText(r, t, hideRoleLabel)}
+          text={roleLabelText(r, t, hideRoleLabel, assistantName.normal)}
           bare={hideRoleLabel}
           steer={isSteerMessage}
           cronName={cronPrompt ? cronPrompt.name : null}
@@ -1084,12 +1086,13 @@ export function ChatTurnPlain({
   conversationId?: string;
 }) {
   const { t } = useI18n();
+  const assistantName = useAssistantName();
   const presented = role === 'system' ? presentGoalUpdate(text, { messageSessionId, conversationId }) : { kind: 'absent' as const };
   if (presented.kind === 'hidden') return null;
   const stream = role === 'stream';
   const mod = buildModClass(role === 'stream' ? 'assistant' : role, stream);
   const av = avatarText(role === 'stream' ? 'assistant' : role, t('play.me'), stream);
-  const label = labelOverride ?? (stream ? t('play.role.streaming') : roleLabel(role, t));
+  const label = labelOverride ?? (stream ? assistantName.streaming : roleLabel(role, t, assistantName.normal));
   const usePre = role === 'tool' || role === 'system';
   const noAvatar =
     role === 'tool' || role === 'system' || role === 'assistant' || role === 'stream';
@@ -1139,6 +1142,7 @@ export function ChatTurnStreaming({
   brief?: boolean;
 }) {
   const { t } = useI18n();
+  const assistantName = useAssistantName();
   const shown = brief ? briefStreamSegments(segments) : { segments, hidden: [] as StreamSegment[] };
   const renderSeg = (seg: StreamSegment) => {
     if (seg.kind === 'reasoning') {
@@ -1171,7 +1175,7 @@ export function ChatTurnStreaming({
       className={`chat-turn chat-turn--streaming chat-turn--no-avatar${typing ? ' chat-turn--typing' : ''}`}
     >
       <div className="chat-turn__content">
-        <div className="chat-turn__label">{t('play.role.streaming')}</div>
+        <div className="chat-turn__label">{assistantName.streaming}</div>
         <div className="chat-bubble chat-bubble--stream-blocks">
           {retry ? <ModelRetryStatus progress={retry} /> : null}
           {showProcessNote(brief, shown.hidden.length) ? (
