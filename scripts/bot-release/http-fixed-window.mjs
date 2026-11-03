@@ -3,9 +3,9 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,Math.max(0,ms)));
 
 /**
  * Fixed admission/completion window; a slow endpoint never creates an unbounded Promise chain.
- * Slots are admitted only before `deadline`. Work already started may finish within a bounded
- * `completionGraceMs` after it (default 0): without it the final planned slot, scheduled at
- * deadline-1/rate, would get a single inter-arrival gap (25ms at 40 rps) to complete.
+ * Slots are offered only before `deadline`. Work already offered may start and finish within a
+ * bounded `completionGraceMs` after it (default 0): without it the final planned slot, scheduled
+ * at deadline-1/rate, or a slot queued behind that request, would miss the window.
  */
 export async function runFixedHttpWindow({name,seconds,streams,onProgress,signal,completionGraceMs=0}) {
  if(!(seconds>0)||!streams.length||new Set(streams.map(s=>s.name)).size!==streams.length)throw new Error('A positive fixed window and streams are required');
@@ -16,11 +16,11 @@ export async function runFixedHttpWindow({name,seconds,streams,onProgress,signal
   return {stream,next:0,clients:Array.from({length:stream.clients},()=>({active:false,started:false,pending:[]})),counts:{planned,offered:0,started:0,completed:0,failed:0,queueRejected:0,expiredQueued:0,timedOut:0,missedSchedule:0,maxActive:0,maxQueued:0},active:0,queued:0};
  });
  function begin(item,client,slot){
-  if(closed||performance.now()>=deadline){item.counts.expiredQueued++;return;}
+  if(closed||performance.now()>=completionDeadline){item.counts.expiredQueued++;return;}
   client.active=true;client.started=false;item.active++;item.counts.maxActive=Math.max(item.counts.maxActive,item.active);
   Promise.resolve().then(()=>{
    if(closed)return {skipped:true};
-   if(performance.now()>=deadline||controller.signal.aborted){client.active=false;item.active--;item.counts.expiredQueued++;return {skipped:true};}
+   if(performance.now()>=completionDeadline||controller.signal.aborted){client.active=false;item.active--;item.counts.expiredQueued++;return {skipped:true};}
    client.started=true;item.counts.started++;
    return Promise.resolve(item.stream.run({...slot,startedMono:performance.now(),deadlineMono:completionDeadline,signal:controller.signal})).then(value=>({ok:value!==false}));
   }).then(result=>{if(!result.skipped)settle(item,client,result.ok);},()=>settle(item,client,false));

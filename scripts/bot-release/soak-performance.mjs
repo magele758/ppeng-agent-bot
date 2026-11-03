@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { sanitizeScriptEnv } from '../spawn-utils.mjs';
+import { PERFORMANCE_SPAWN_TIMEOUT_MS, SHARED_RUNNER_SMOKE_DRAIN_SECONDS } from './http-fixture-timing.mjs';
 
 const workload = JSON.parse(readFileSync(new URL('./workload.v1.json', import.meta.url), 'utf8'));
 
@@ -28,17 +29,23 @@ export function performanceResult(report, profile = 'local') {
     limitation: 'Compressed HTTP workload performance only; not full-duration soak or release acceptance.' };
 }
 
+export function performanceSoakArgs(profile, reportPath) {
+  if (!['local', 'github-actions'].includes(profile)) throw new Error(`Unknown performance profile: ${profile}`);
+  const soakArgs = ['scripts/bot-release/http-soak.mjs', '--smoke', '--out', reportPath];
+  // 2 reads/s with a deeper queue, and a drain long enough for result-notification turns
+  // after the offered work is already terminal. 90s stays inside the 180s process budget.
+  if (profile === 'github-actions') soakArgs.push('--read-every-ms', '500', '--read-queue-cap', '40', '--drain-seconds', String(SHARED_RUNNER_SMOKE_DRAIN_SECONDS));
+  return soakArgs;
+}
+
 export function runPerformance({ directory = 'test-results/soak-performance', profile = 'local' } = {}) {
   performanceResult(undefined, profile);
   const output = resolve(directory);
   mkdirSync(output, { recursive: true });
   const reportPath = join(output, 'http-soak.json');
   rmSync(reportPath, { force: true });
-  const soakArgs = ['scripts/bot-release/http-soak.mjs', '--smoke', '--out', reportPath];
-  // 2 reads/s with a deeper queue: a 2-core runner can finish every offered read during drain.
-  if (profile === 'github-actions') soakArgs.push('--read-every-ms', '500', '--read-queue-cap', '40');
-  const child = spawnSync(process.execPath, soakArgs, {
-    env: performanceEnv(), stdio: 'inherit', timeout: 180_000
+  const child = spawnSync(process.execPath, performanceSoakArgs(profile, reportPath), {
+    env: performanceEnv(), stdio: 'inherit', timeout: PERFORMANCE_SPAWN_TIMEOUT_MS
   });
   let report;
   let error = child.error?.message;

@@ -8,6 +8,7 @@ import {createHash} from 'node:crypto';
 import {performance} from 'node:perf_hooks';
 import {readExecutableFingerprint} from './executable-fingerprint.mjs';
 import {runFixedHttpWindow} from './http-fixed-window.mjs';
+import {completionGraceMs} from './http-fixture-timing.mjs';
 import {sanitizeSpawnEnv} from '../../packages/core/dist/sandbox/env-sanitizer.js';
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,Math.max(0,ms)));
 const hash=text=>createHash('sha256').update(text).digest('hex');
@@ -61,7 +62,7 @@ export async function runHttpLoad({smoke=false,smokeSeconds=10,out='test-results
  }
  async function phase(name,seconds){
   const writeBase=writeSequence;writeSequence+=seconds*workload.write.topLevelPerSecond;
-  const window=await runFixedHttpWindow({name,seconds,signal:stop.signal,completionGraceMs:workload.thresholdsMs.searchP95,onProgress:progress=>writeFileSync(output+'.progress.json',JSON.stringify(progress,null,2)+'\n'),streams:[
+  const window=await runFixedHttpWindow({name,seconds,signal:stop.signal,completionGraceMs:completionGraceMs(smoke,workload.thresholdsMs.searchP95),onProgress:progress=>writeFileSync(output+'.progress.json',JSON.stringify(progress,null,2)+'\n'),streams:[
    {name:'read',rate:workload.read.requestsPerSecond,clients:workload.read.clients,maxPendingPerClient:1,async run({index,plannedMono,enqueuedMono,startedMono,deadlineMono,signal}){
     const type=index%10<5?'page':index%10<8?'search':'status',b=Math.floor(random()*ready.sessions.length),n=1+Math.floor(random()*ready.counts[b]);const path=type==='status'?'/api/bot-work/status':`/api/sessions/${ready.sessions[b]}/history?limit=50`+(type==='search'?'&query='+encodeURIComponent(`http_source_${b}_${n} unique_${b}_${n};`):'');
     inFlight++;maxReadInFlight=Math.max(maxReadInFlight,inFlight);
