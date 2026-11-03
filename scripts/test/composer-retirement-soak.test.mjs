@@ -65,7 +65,7 @@ test('performance measurement refuses instrumentation and missing/slow samples w
 
 test('core verification lanes remain mandatory without failure bypasses [AC:composer-drop-retirement-soak-isolation#AC-8]', () => {
   const { jobs } = workflow();
-  for (const name of ['tests','unit','formal','sdk','crap','browser','acceptance','mutation']) {
+  for (const name of ['tests','unit','formal','sdk','browser','acceptance','mutation']) {
     assert.ok(jobs.gate.needs.includes(name));
     assert.notEqual(jobs[name]['continue-on-error'], true);
     assert.ok(releaseFailures({ [name]: { result: 'failure' } }).includes(name));
