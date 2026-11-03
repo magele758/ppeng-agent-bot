@@ -108,20 +108,37 @@ export function SessionListRow({
         </div>
       </div>
       {onDelete && !selectMode ? (
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm session-item__delete"
-          disabled={deleting}
-          data-armed={confirm.armed ? 'true' : 'false'}
-          aria-label={confirm.armed ? (confirmLabel ?? t('play.sidebar.confirmDelete')) : (deleteAria ?? t('play.sidebar.deleteOneAria', { title }))}
-          onPointerDown={confirm.onPointerDown}
-          onClick={(event) => confirm.onClick(event, () => onDelete(title))}
-        >
-          {confirm.armed ? (confirmLabel ?? t('play.sidebar.confirmDelete')) : (deleteLabel ?? t('play.sidebar.deleteOne'))}
-        </button>
+        <SessionRowDelete title={title} deleting={deleting} confirm={confirm} onDelete={onDelete}
+          deleteAria={deleteAria} deleteLabel={deleteLabel} confirmLabel={confirmLabel} />
       ) : null}
     </div>
   );
+}
+
+type DeleteLabels = { deleteAria?: string; deleteLabel?: string; confirmLabel?: string };
+
+function useDeleteLabels(armed: boolean, title: string, labels: DeleteLabels) {
+  const { t } = useI18n();
+  if (armed) {
+    const text = labels.confirmLabel ?? t('play.sidebar.confirmDelete');
+    return { text, aria: text };
+  }
+  return {
+    text: labels.deleteLabel ?? t('play.sidebar.deleteOne'),
+    aria: labels.deleteAria ?? t('play.sidebar.deleteOneAria', { title })
+  };
+}
+
+function SessionRowDelete(props: DeleteLabels & {
+  title: string; deleting: boolean; confirm: ReturnType<typeof useArmedConfirm>; onDelete: (title: string) => void;
+}) {
+  const { title, deleting, confirm, onDelete } = props;
+  const labels = useDeleteLabels(confirm.armed, title, props);
+  return <button type="button" className="btn btn-ghost btn-sm session-item__delete"
+    disabled={deleting} data-armed={String(confirm.armed)} aria-label={labels.aria}
+    onPointerDown={confirm.onPointerDown} onClick={(event) => confirm.onClick(event, () => onDelete(title))}>
+    {labels.text}
+  </button>;
 }
 
 function SessionRowSubtitle({ bot, subtitle, hasQuestion, agentId, owner }: { bot: boolean; subtitle: string; hasQuestion: boolean; agentId?: string; owner?: string }) {
