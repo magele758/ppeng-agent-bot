@@ -50,7 +50,7 @@ jobs:
         with:
           name: validation-formal
           path: ${{ runner.temp }}/validation/formal
-          if-no-files-found: error
+          if-no-files-found: ignore
           retention-days: 30
       - name: Preserve acceptance-results-formal
         if: always()
@@ -58,7 +58,7 @@ jobs:
         with:
           name: acceptance-results-formal
           path: ${{ runner.temp }}/validation/formal/results
-          if-no-files-found: error
+          if-no-files-found: ignore
           retention-days: 7
       - name: Upload pairing verification evidence
         if: always()
@@ -66,7 +66,7 @@ jobs:
         with:
           name: tool-call-pairing-verification
           path: coverage/formal/pairing/
-          if-no-files-found: error
+          if-no-files-found: ignore
           retention-days: 30
       - name: Upload lifecycle verification evidence
         if: always()
@@ -74,7 +74,7 @@ jobs:
         with:
           name: session-lifecycle-verification
           path: coverage/formal/lifecycle/
-          if-no-files-found: error
+          if-no-files-found: ignore
           retention-days: 30
       - name: Upload restart verification evidence
         if: always()
@@ -82,7 +82,7 @@ jobs:
         with:
           name: session-restart-recovery-verification
           path: coverage/formal/restart/
-          if-no-files-found: error
+          if-no-files-found: ignore
           retention-days: 30
       - name: Upload concurrency verification evidence
         if: always()
@@ -90,7 +90,7 @@ jobs:
         with:
           name: session-multiprocess-concurrency-verification
           path: coverage/formal/concurrency/
-          if-no-files-found: error
+          if-no-files-found: ignore
           retention-days: 30
       - name: Preserve verification reuse records
         if: always()
@@ -100,3 +100,6 @@ jobs:
           path: ${{ runner.temp }}/verification-evidence/
           if-no-files-found: ignore
           retention-days: 30
+      - name: Require lane artifacts
+        if: success()
+        run: node scripts/ci/require-nonempty-artifacts.mjs "$RUNNER_TEMP/validation/formal" "$RUNNER_TEMP/validation/formal/results" coverage/formal/pairing coverage/formal/lifecycle coverage/formal/restart coverage/formal/concurrency
