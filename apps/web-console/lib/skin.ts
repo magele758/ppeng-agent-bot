@@ -5,6 +5,8 @@ export type SkinId = (typeof SKIN_IDS)[number];
 export const SKIN_STORAGE_KEY = 'lab.skin';
 export const SKIN_CHANGED_EVENT = 'ppeng-skin-changed';
 export const SKIN_ATTRIBUTE = 'data-skin';
+/** Set on <html> while the outer skin picker list is open so rail foot menu stays up. */
+export const SKIN_MENU_OPEN_ATTR = 'data-ppeng-skin-menu-open';
 
 export function parseSkin(raw: string | null | undefined): SkinId {
   return SKIN_IDS.includes(raw as SkinId) ? (raw as SkinId) : 'classic';

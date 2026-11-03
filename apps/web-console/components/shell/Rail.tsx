@@ -56,9 +56,18 @@ function useRailFoot(children: ReactNode) {
   };
 
   const pointerStillInside = (next: EventTarget | null) => {
+    // Outer SkinToggle list is position:fixed beside the foot; moving across the gap
+    // would otherwise close the foot before the option click lands.
+    if (typeof document !== 'undefined' && document.documentElement.getAttribute('data-ppeng-skin-menu-open') === '1') {
+      return true;
+    }
     if (!next || typeof (next as Node).nodeType !== 'number') return false;
     const node = next as Node;
-    return Boolean(rootRef.current?.contains(node) || menuRef.current?.contains(node));
+    if (rootRef.current?.contains(node) || menuRef.current?.contains(node)) return true;
+    if (typeof Element !== 'undefined' && node instanceof Element && node.closest('.skin-menu__list')) {
+      return true;
+    }
+    return false;
   };
 
   const arm = () => {
