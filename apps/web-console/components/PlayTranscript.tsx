@@ -1,4 +1,6 @@
 'use client';
+import { AssistantNameContext } from './AssistantNameContext';
+import { transcriptBotName } from '@/lib/assistant-name';
 import { UserMessageActionsContext } from './UserMessageActions';
 
 import { useMemo, type ReactNode } from 'react';
@@ -55,6 +57,7 @@ export function PlayTranscript(props: {
   );
   const continued = useContinuedAssistant(slots, view);
   return (
+    <AssistantNameContext.Provider value={transcriptBotName(props.botSurface, props.replyQuoteBot)}>
     <UserMessageActionsContext.Provider value={{ retry: props.chat.retryUserMessage, busy: props.chat.messageRetryBusy }}>
     <SurfaceContextProvider messages={props.chat.displayMessages}>
       <ContinuedAssistantContext.Provider value={continued}>
@@ -83,6 +86,7 @@ export function PlayTranscript(props: {
       </ContinuedAssistantContext.Provider>
     </SurfaceContextProvider>
     </UserMessageActionsContext.Provider>
+    </AssistantNameContext.Provider>
   );
 }
 

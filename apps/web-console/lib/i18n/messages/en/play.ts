@@ -675,6 +675,7 @@ export const play = {
   },
 
   role: {
+    botStreaming: '{name} (generating)',
     user: 'You',
     assistant: 'Assistant',
     tool: 'Tool',
