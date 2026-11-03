@@ -1,5 +1,7 @@
 # Bot 能力开发计划（Phase A）
 
+后续能力（2026-11-03，已实现）：[Bot Daydream 与共享知识开发计划](BOT_DAYDREAM_PLAN.md)。每日复盘默认开启；工作 Bot 独立沉淀，Super Bot 汇总治理，共享成果接入实际 Memory 召回与 Skill 加载。本文 Phase A 的已实现状态不包含该专项。
+
 **Implementation status**：Lab 对话 / Bot 双模式并存（已落地）。Bot 固定对话里的 `/new`、`/stop`、`/model` 已落地。  
 对照调研：`/opt/cursor/artifacts/hermes-grok-bot-research.md`（Hermes Bot Mode / Grok Bot）。
 

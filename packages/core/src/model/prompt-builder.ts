@@ -315,6 +315,8 @@ function buildSkillCatalogBlock(
 }
 
 export interface PromptBuilderDeps {
+  sharedSkills?: (sessionId: string) => SkillSpec[] | Promise<SkillSpec[]>;
+  sharedMemory?: (sessionId: string, query: string) => string;
   runtimeInstructions?: (sessionId: string) => string;
   store: SqliteStateStore;
   repoRoot: string;
@@ -373,11 +375,17 @@ export class PromptBuilder {
    * Rank the catalog for search_skills. Always uses lexical/hybrid scoring
    * (legacy routing is listing-only and would make search useless).
    */
+  private async sharedSkillsForSession(sessionId: string): Promise<SkillSpec[]> {
+    return await this.deps.sharedSkills?.(sessionId) ?? [];
+  }
+
   async skillsForSession(sessionId: string): Promise<SkillSpec[]> {
     const session = typeof this.deps.store.getSession === 'function' ? this.deps.store.getSession(sessionId) : undefined;
     const botId = sessionBotId(session?.metadata);
     const profile = session ? runProfileFromSession(session) : undefined;
+    const sharedSkills = await this.sharedSkillsForSession(sessionId);
     const key = [
+      JSON.stringify(sharedSkills),
       String(this.skillGeneration),
       botId ?? '',
       JSON.stringify(readBotSkillSelection(this.deps.store, botId)),
@@ -391,7 +399,7 @@ export class PromptBuilder {
     const started = Date.now();
     let skillCount = 0;
     try {
-      const visible = selectBotSkills(filterSkillsByBot(await this.allSkills(), botId), readBotSkillSelection(this.deps.store, botId));
+      const visible = selectBotSkills(filterSkillsByBot([...(await this.allSkills()), ...sharedSkills], botId), readBotSkillSelection(this.deps.store, botId));
       const skills = session && profile
         ? filterSkillsByScope(visible, profile.skillScope, requestedSkillNames(session.metadata))
         : visible;
@@ -780,12 +788,13 @@ export class PromptBuilder {
    */
   buildMemoryAppendix(ctx: PromptContext, opts?: { query?: string; stateDir?: string }): string {
     if (runProfileFromSession(ctx.session).persistentMemory === 'off') return '';
-    return compileTurnAppendix({
+    const local = compileTurnAppendix({
       session: ctx.session,
       query: opts?.query ?? '',
       store: this.deps.store,
       stateDir: opts?.stateDir
     });
+    return [local, this.deps.sharedMemory?.(ctx.session.id, opts?.query ?? '')].filter(Boolean).join('\n\n');
   }
 
   /** Turn packing path: includes optional Jev memorySelect on appendix slots. */
@@ -794,12 +803,13 @@ export class PromptBuilder {
     opts?: { query?: string; stateDir?: string }
   ): Promise<string> {
     if (runProfileFromSession(ctx.session).persistentMemory === 'off') return '';
-    return compileTurnAppendixAsync({
+    const local = await compileTurnAppendixAsync({
       session: ctx.session,
       query: opts?.query ?? '',
       store: this.deps.store,
       stateDir: opts?.stateDir
     });
+    return [local, this.deps.sharedMemory?.(ctx.session.id, opts?.query ?? '')].filter(Boolean).join('\n\n');
   }
 
   /** Full system prompt = stable prefix + dynamic context (memory excluded). */

@@ -953,3 +953,6 @@ export {
   loadAgentFromFolder
 } from '../agents/agent-as-folder.js';
 export type { AgentAsFolder, AgentFolderRaw } from '../agents/agent-as-folder.js';
+
+export * from '../daydream/index.js';
+export * from '../knowledge/index.js';

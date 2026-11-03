@@ -54,6 +54,7 @@ Bot 创建、统一设置面板、热配置的作用范围与生效时机见 [BO
 | [`CAPABILITY_DISCOVERY_PLAN.md`](CAPABILITY_DISCOVERY_PLAN.md) | 自主探针 / Capability Discovery（含 Tailscale 设备池）开发计划（Draft） |
 | [`bot/README.md`](bot/README.md) | Bot 统一入口产品说明：完整功能审阅稿、分章规则与每份规格的状态。改 Bot 行为时同步更新 |
 | [`BOT_CAPABILITY_PLAN.md`](BOT_CAPABILITY_PLAN.md) | Bot 名册 + canonical 对话；`/new` 压缩、`/stop`、`/model` |
+| [`BOT_DAYDREAM_PLAN.md`](BOT_DAYDREAM_PLAN.md) | 默认开启的每日复盘、Bot 私有沉淀、Super Bot 治理、共享检索与防递归闭环 |
 | [`BOT_MULTI_GOAL_DESIGN.md`](BOT_MULTI_GOAL_DESIGN.md) | 多目标持久化、插话归属、自动执行路由、等待恢复与 Lab 目标面板 |
 | [`BOT_ROOM_MOE_PLAN.md`](BOT_ROOM_MOE_PLAN.md) | 大规模群聊 Agentic Sparse MoE；稀疏调度、群内找回和触达记忆已实现，子任务、群目标、群内审批和百人群界面仍是已批准 |
 | [`EMBEDDING_SDK.md`](EMBEDDING_SDK.md) | `@ppeng/agent-core` 作为可嵌入 SDK：稳定 API 面、embed env 最小契约、examples 验收 |

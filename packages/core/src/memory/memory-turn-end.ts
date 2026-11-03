@@ -128,7 +128,7 @@ export function scheduleMemoryTurnEnd(input: {
           settingsStore: input.settingsStore,
           memoryAgentId: botAgentId,
           afterAccept: (obs) => {
-            if (!settings.dreamerEnabled || !obs.userId) return;
+            if (botAgentId || !settings.dreamerEnabled || !obs.userId) return;
             void dreamNowForUser({
               store: input.store,
               userId: obs.userId,

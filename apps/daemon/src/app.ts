@@ -1,3 +1,4 @@
+import { botDaydreamRoutes } from './routes/bot-daydream.js';
 import { userPreferenceRoutes } from './routes/user-preferences.js';
 import { botPinSettingsRoutes } from './routes/bot-pin-settings.js';
 import { runtimeCapabilitiesRoutes } from './routes/runtime-capabilities.js';
@@ -107,6 +108,7 @@ export function buildDaemonRouter(deps: DaemonAppDeps): Router {
     .addAll(sessionsRoutes(runtime))
     .addAll(composerHintRoutes(runtime))
     .addAll(botsRoutes(runtime))
+    .addAll(botDaydreamRoutes(runtime))
     .addAll(botMaterialRoutes(runtime))
     .addAll(botFunctionalGroupRoutes(runtime))
     .addAll(botPinSettingsRoutes(runtime))

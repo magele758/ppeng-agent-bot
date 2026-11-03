@@ -1,0 +1,23 @@
+id: bot-daydream-http
+title: 每日复盘与共享治理真实 HTTP 通路
+status: implemented
+requirement: |
+  按照这个开发计划，帮我分多个agent去完成开发
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 用户管理 Bot 复盘配置
+    when: 保存有效或无效配置并请求复盘
+    then: 有效配置立即生效，无效日期被拒绝且不会虚报成功
+  - id: AC-2
+    given: A 已沉淀并上报有效记忆，Super 只授权 B
+    when: Super 发布后 B 和 C 分别查询，再撤销
+    then: B 可读取、C 不可读取，撤销后 B 也不可读取
+  - id: AC-3
+    given: B 使用已共享成果后有真实对话证据
+    when: 提交反馈或伪造证据标识
+    then: 真实来源可提交，伪造或他人证据被拒绝；默认人工审核策略可查看反馈并发布修订，版本冲突被拒绝
+  - id: AC-4
+    given: 请求者没有管理或所属会话访问权限
+    when: 尝试修改配置或读取其他用户 Bot
+    then: 请求被拒绝且不返回其知识与对话证据

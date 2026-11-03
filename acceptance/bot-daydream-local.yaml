@@ -1,0 +1,23 @@
+id: bot-daydream-local
+title: Bot 每日独立复盘
+status: implemented
+requirement: |
+  按照这个开发计划，帮我分多个agent去完成开发
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: Bot 尚未配置每日复盘
+    when: 查看配置并修改开关
+    then: 默认开启且显式关闭持久保留，重新开启保留策略
+  - id: AC-2
+    given: Bot 有跨会话证据
+    when: 每日复盘完成并重复运行
+    then: 可靠记忆和技能候选被保存，重复运行不会重复写入
+  - id: AC-3
+    given: 对话包含临时要求或要求不要保存的内容
+    when: 复盘提取候选
+    then: 不将这些内容沉淀为长期记忆
+  - id: AC-4
+    given: 复盘处理预算不足或发生失败
+    when: 再次运行
+    then: 从持久进度恢复而不重复已完成产出

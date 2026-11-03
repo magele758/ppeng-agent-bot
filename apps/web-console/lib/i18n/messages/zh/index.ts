@@ -1,3 +1,4 @@
+import { daydream } from './daydream.ts';
 import { botSettings } from './botSettings.ts';
 import { learning } from './learning.ts';
 import { mobile } from './mobile.ts';
@@ -25,6 +26,7 @@ import { skillProposals } from './skillProposals.ts';
 import { teams } from './teams.ts';
 
 export const zh = {
+  daydream,
   botSettings,
   learning,
   mobile,
