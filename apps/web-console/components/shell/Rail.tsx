@@ -5,9 +5,20 @@ import { useI18n } from '@/lib/i18n';
 import { SECTION_IDS, formatHash, type SectionId } from '@/lib/nav';
 import { readRailCollapsed, writeRailCollapsed } from '@/lib/rail-collapsed';
 import { SectionIcon } from './icons';
+import { skinMenuHoldsFoot } from '@/lib/skin';
 import { useLab } from './LabProvider';
 
 const FOOT_MENU_CLOSE_MS = 160;
+
+function skinMenuRoot(): { getAttribute(name: string): string | null } | null {
+  if (typeof document === 'undefined') return null;
+  return document.documentElement;
+}
+
+function keepFootOpen(aliveFlag: boolean): boolean {
+  if (!aliveFlag) return true;
+  return skinMenuHoldsFoot(skinMenuRoot());
+}
 
 type FootBox = { bottom: number; left: number; width: number };
 
@@ -86,7 +97,7 @@ function useRailFoot(children: ReactNode) {
     clearClose();
     closeTimer.current = setTimeout(() => {
       closeTimer.current = null;
-      if (!alive.current) return;
+      if (keepFootOpen(alive.current)) return;
       setHovered(false);
     }, FOOT_MENU_CLOSE_MS);
   };

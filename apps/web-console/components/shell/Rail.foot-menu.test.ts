@@ -364,8 +364,12 @@ test('rail foot stays open while outer skin menu is marked open [AC:outer-skin-p
   const skinToggle = readFileSync(path.join(webRoot, 'components/SkinToggle.tsx'), 'utf8');
   const skinLib = readFileSync(path.join(webRoot, 'lib/skin.ts'), 'utf8');
   assert.match(skinLib, /SKIN_MENU_OPEN_ATTR\s*=\s*'data-ppeng-skin-menu-open'/);
-  assert.match(skinToggle, /setAttribute\(SKIN_MENU_OPEN_ATTR/);
-  assert.match(skinToggle, /removeAttribute\(SKIN_MENU_OPEN_ATTR/);
+  assert.match(skinLib, /setAttribute\(SKIN_MENU_OPEN_ATTR/);
+  assert.match(skinLib, /removeAttribute\(SKIN_MENU_OPEN_ATTR/);
+  assert.match(skinToggle, /paintSkinMenuOpen\(/);
   assert.match(rail, /data-ppeng-skin-menu-open/);
   assert.match(rail, /closest\('\.skin-menu__list'\)/);
+  assert.match(rail, /keepFootOpen\(alive\.current\)/);
+  assert.match(skinToggle, /createPortal\(/);
+  assert.match(skinToggle, /onMouseDown=\{[\s\S]{0,160}chooseSkin\(id\)/);
 });
