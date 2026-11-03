@@ -17,6 +17,7 @@ import { createBot, openBot } from './bot-facade.js';
 import { beginBotDelivery, finishBotDelivery, readBotDelivery, type BotDelivery } from './bot-delivery.js';
 import { resolveBotPrincipal, principalFromSession, botPrincipalKey, sameBotPrincipal, botDefinitionOwner, type BotPrincipal } from './bot-identity.js';
 import { ROOM_HUMAN_STEP_NOTICE, ROOM_HUMAN_STEP_REASON, memberNeedsHuman, privateHandbackText, roomMetadataAfterHandOff } from '../rooms/human-step.js';
+import { botWorkRestartDefersCompletion, settleBotWorkRestart, withholdRestartSessions } from './bot-work-restart.js';
 export { resolveBotPrincipal, principalFromSession } from './bot-identity.js';
 export type { BotPrincipal } from './bot-identity.js';
 
@@ -540,6 +541,7 @@ function persistProcessingResult(host:BotWorkHost,row:Record<string,unknown>,con
 }
 function completeProcessing(host:BotWorkHost,row:Record<string,unknown>,fence:number,owner:string,error?:unknown):void {
   if(!leaseValid(host.store,String(row.session_id),owner,fence))return;
+  if(botWorkRestartDefersCompletion(host.store, String(row.session_id)))return;
   const context=processingContext(host,row,error);
   if(processingAwaitsApproval(host,row,context))return;
   const result=lastAssistant(host.store,String(row.session_id),String(row.message_ref));
@@ -684,6 +686,23 @@ export function expireOverdueBotWork(host:BotWorkHost,sessionId?:string):boolean
  }
  return rows.length>0;
 }
+function retireRestartUnknown(store:SqliteStateStore,sessionId:string,rows:Record<string,unknown>[]):void {
+ for(const row of rows) {
+  if(row.kind!=='task')continue;
+  const task=store.db.prepare('SELECT attempt FROM bot_work_tasks WHERE id=?').get(String(row.task_id)) as {attempt:number}|undefined;
+  if(!task)continue;
+  finishBotDelivery(store,{taskId:String(row.task_id),sessionId,attempt:task.attempt,executionStatus:'unknown',report:lastAssistant(store,sessionId,String(row.message_ref)),failureReason:'Process interrupted; verify side effects before retry'});
+ }
+ const writer=store.getSession(sessionId)?.activeWriterRunId;
+ if(writer)store.releaseWriter(sessionId,writer);
+ retireBotExecution(store,sessionId,rows,'Execution interrupted');
+ const now=nowIso();
+ for(const row of rows) {
+  if(row.kind==='task')store.db.prepare("UPDATE bot_work_tasks SET status='unknown',failure_reason='Process interrupted; verify side effects before retry',updated_at=? WHERE id=? AND status='running'").run(now,String(row.task_id));
+  store.db.prepare("UPDATE bot_work_messages SET status='failed',updated_at=? WHERE id=? AND status='processing'").run(now,String(row.id));
+ }
+ store.db.prepare('UPDATE bot_work_leases SET fence=fence+1,expires=0 WHERE session_id=?').run(sessionId);
+}
 /** Boot recovery fences old attempts; unconfirmed processing is never blindly rerun. */
 export function recoverBotWork(store:SqliteStateStore):void {
  ensureBotWorkSchema(store);
@@ -696,23 +715,26 @@ export function recoverBotWork(store:SqliteStateStore):void {
   const inactiveSessions = 'session_id NOT IN (SELECT value FROM json_each(?))';
   const inactiveTasks = `id NOT IN (SELECT task_id FROM bot_work_messages WHERE session_id IN (SELECT value FROM json_each(?)) AND task_id IS NOT NULL)`;
   const interrupted=store.db.prepare(`SELECT * FROM bot_work_messages WHERE status='processing' AND session_id IN (SELECT id FROM sessions WHERE status != 'waiting_approval') AND ${inactiveSessions}`).all(liveJson) as Record<string,unknown>[];
-  for(const row of interrupted) {
+  const plan=withholdRestartSessions(store, interrupted);
+  const keptJson=JSON.stringify(plan.keptSessionIds);
+  const waitJson=JSON.stringify(plan.waitSessionIds);
+  for(const row of plan.retiring) {
    if(row.kind!=='task')continue;
    const task=store.db.prepare('SELECT attempt FROM bot_work_tasks WHERE id=?').get(String(row.task_id)) as {attempt:number}|undefined;
    if(task)finishBotDelivery(store,{taskId:String(row.task_id),sessionId:String(row.session_id),attempt:task.attempt,
     executionStatus:'unknown',report:lastAssistant(store,String(row.session_id),String(row.message_ref)),
     failureReason:'Process interrupted; verify side effects before retry'});
   }
-  for(const id of new Set(interrupted.map(row=>String(row.session_id)))) {
+  for(const id of new Set(plan.retiring.map(row=>String(row.session_id)))) {
    const writer = store.getSession(id)?.activeWriterRunId;
    if (writer) store.releaseWriter(id, writer);
-   retireBotExecution(store,id,interrupted.filter(row=>row.session_id===id),'Execution interrupted');
+   retireBotExecution(store,id,plan.retiring.filter(row=>row.session_id===id),'Execution interrupted');
   }
   store.db.exec("UPDATE bot_work_tasks SET status='unknown',failure_reason='Execution context missing; verify effects before retry',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE status IN ('running','waiting_approval') AND id IN (SELECT task_id FROM bot_work_messages WHERE status='processing' AND session_id NOT IN (SELECT id FROM sessions)); UPDATE bot_work_messages SET status='failed' WHERE status='processing' AND session_id NOT IN (SELECT id FROM sessions);");
   store.db.prepare(`UPDATE bot_work_tasks SET status='waiting_approval' WHERE status='running' AND id IN (SELECT task_id FROM bot_work_messages WHERE status='processing' AND session_id IN (SELECT id FROM sessions WHERE status='waiting_approval')) AND ${inactiveTasks}`).run(liveJson);
-  store.db.prepare(`UPDATE bot_work_tasks SET status='unknown',failure_reason='Process interrupted; verify side effects before retry',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE status='running' AND ${inactiveTasks}`).run(liveJson);
-  store.db.prepare(`UPDATE bot_work_messages SET status='failed' WHERE status='processing' AND session_id NOT IN (SELECT id FROM sessions WHERE status='waiting_approval') AND (kind != 'task' OR task_id IN (SELECT id FROM bot_work_tasks WHERE status='unknown')) AND ${inactiveSessions}`).run(liveJson);
-  store.db.prepare(`UPDATE bot_work_leases SET fence=fence+1,expires=0 WHERE ${inactiveSessions}`).run(liveJson);
+  store.db.prepare(`UPDATE bot_work_tasks SET status='unknown',failure_reason='Process interrupted; verify side effects before retry',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE status='running' AND ${inactiveTasks} AND id NOT IN (SELECT task_id FROM bot_work_messages WHERE task_id IS NOT NULL AND session_id IN (SELECT value FROM json_each(?)))`).run(liveJson, keptJson);
+  store.db.prepare(`UPDATE bot_work_messages SET status='failed' WHERE status='processing' AND session_id NOT IN (SELECT id FROM sessions WHERE status='waiting_approval') AND (kind != 'task' OR task_id IN (SELECT id FROM bot_work_tasks WHERE status='unknown')) AND ${inactiveSessions} AND session_id NOT IN (SELECT value FROM json_each(?))`).run(liveJson, keptJson);
+  store.db.prepare(`UPDATE bot_work_leases SET fence=fence+1,expires=0 WHERE ${inactiveSessions} AND session_id NOT IN (SELECT value FROM json_each(?))`).run(liveJson, waitJson);
  });
 }
 export async function tickBotWork(host:BotWorkHost):Promise<void> {
@@ -721,9 +743,10 @@ export async function tickBotWork(host:BotWorkHost):Promise<void> {
  for(const row of host.store.db.prepare("SELECT m.* FROM bot_work_messages m LEFT JOIN sessions s ON s.id=m.session_id WHERE m.status='pending' AND s.id IS NULL").all() as Record<string,unknown>[]){
   try{const [tenantId,userId]=JSON.parse(String(row.principal)) as [string,string];const context=openBotWorkContext(host,String(row.target_bot),{userId,...(tenantId?{tenantId}:{})});host.store.db.prepare("UPDATE bot_work_messages SET session_id=?,updated_at=? WHERE id=? AND status='pending'").run(context.id,nowIso(),String(row.id));}catch(error){host.log.warn('Pending Bot context repair blocked',{messageId:row.id,error:String(error)});}
  }
+ settleBotWorkRestart(host,{isBusy:id=>active(host.store).has(id)||host.isSessionRunning?.(id)===true,retireUnknown:(sessionId,rows)=>retireRestartUnknown(host.store,sessionId,rows)});
  // Approvals resume through the existing runtime; completion is observed after it ends.
  for(const row of host.store.db.prepare("SELECT * FROM bot_work_messages WHERE status='processing'").all() as Record<string,unknown>[]){
- const id=String(row.session_id);if(active(host.store).has(id)||host.isSessionRunning?.(id))continue;
+ const id=String(row.session_id);if(botWorkRestartDefersCompletion(host.store,id))continue;if(active(host.store).has(id)||host.isSessionRunning?.(id))continue;
  const session=host.store.getSession(id);if(session?.status==='running'||session?.status==='waiting_approval')continue;
  const lease=host.store.db.prepare('SELECT owner,fence FROM bot_work_leases WHERE session_id=?').get(id) as {owner:string;fence:number}|undefined;
  if(lease){if(resumeApprovedBotSession(host,id,String(row.updated_at),error=>completeProcessing(host,row,lease.fence,lease.owner,error)))continue;completeProcessing(host,row,lease.fence,lease.owner);}
