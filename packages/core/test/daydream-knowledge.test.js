@@ -433,3 +433,60 @@ test("review policy runs Super analysis but waits for human publication [AC:bot-
   assert.equal(s.listArtifacts(actor("b")).length, 1);
   db.close();
 });
+test("review policy stages feedback until a person publishes it [AC:bot-daydream-knowledge#AC-3] [AC:bot-daydream-knowledge#AC-4]", async () => {
+  const { s, db } = setup();
+  s.savePolicy({ ...actor("super"), admin: true }, policy);
+  const sub = s.submit(actor("a"), { ...input(), publicationMode: "curated" });
+  const published = s.decide(
+    actor("super"),
+    s.startBatch(actor("super")).id,
+    sub.id,
+    { action: "publish", reason: "valid" },
+  );
+  const ref = published.publishedArtifact;
+  s.savePolicy(
+    { ...actor("super"), admin: true },
+    { ...policy, publishPolicy: "review" },
+  );
+  const feedback = s.feedback(actor("b"), {
+    artifactId: ref.id,
+    artifactVersion: 1,
+    kind: "extension",
+    description: "Retry health check before accepting",
+    evidenceRefs: [
+      { sessionId: "b", messageId: "execution", observedAt: "2026-11-03" },
+    ],
+  });
+  const decision = {
+    id: feedback.id,
+    action: "revise",
+    reason: "Verified but needs approval",
+    expectedVersion: 1,
+    content: "Deploy requires a health check with retry.",
+    summary: "Health check and retry",
+  };
+  let calls = 0;
+  await s.govern(actor("super"), async () => {
+    calls++;
+    return JSON.stringify({ decisions: [], feedbackDecisions: [decision] });
+  });
+  const staged = s.listFeedback(actor("super"))[0];
+  assert.equal(staged.status, "pending");
+  assert.equal(staged.reviewDecision.action, "revise");
+  assert.equal(s.getArtifact(actor("b"), ref.id).version, 1);
+  await s.govern(actor("super"), async () => {
+    calls++;
+    return JSON.stringify({ decisions: [], feedbackDecisions: [decision] });
+  });
+  assert.equal(calls, 1);
+  const resolved = s.decideFeedback(
+    { ...actor("super"), admin: true },
+    s.startBatch(actor("super")).id,
+    feedback.id,
+    staged.reviewDecision,
+  );
+  assert.equal(resolved.status, "resolved");
+  assert.equal(s.getArtifact(actor("b"), ref.id).version, 2);
+  assert.match(s.getArtifact(actor("b"), ref.id).content, /retry/);
+  db.close();
+});
