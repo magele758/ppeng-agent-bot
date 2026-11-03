@@ -1,0 +1,19 @@
+id: bot-startup-summary-latency
+title: 摘要服务变慢时 Bot 启动有界等待
+status: implemented
+notes: 'assumedApproval: standing-order-2026-10-22'
+requirement: |
+  帮我分析下现在启动bot会话的耗时，怎么感觉启动会话这么慢？排查定位根因，修复问题
+criteria:
+  - id: AC-1
+    given: Bot 启动需要历史摘要，但摘要服务迟迟不返回
+    when: 等待超过五秒
+    then: 取消摘要等待并继续准备会话，原始历史不被迟到的摘要替换
+  - id: AC-2
+    given: 摘要服务刚刚超时
+    when: 三十秒内再次准备同一会话
+    then: 不重复等待故障的摘要服务，其他会话不受影响，冷却结束后可以重试
+  - id: AC-3
+    given: 摘要服务正常返回或用户强制压缩
+    when: 准备摘要
+    then: 正常摘要仍替换历史并归档，强制压缩可以绕过冷却但仍遵守等待上限

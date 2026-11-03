@@ -1,3 +1,4 @@
+import { CompactSummaryTimeout, summaryCoolingDown, summarizeWithinDeadline } from '../session/compact-summary-deadline.js';
 import { resolveBotWindowBudget } from '../session/history/window.js';
 
 /** Long chats get an LLM summary even while still under the token threshold. */
@@ -224,7 +225,7 @@ export async function autoCompactSession(
   const session = host.store.getSession(context.session.id) ?? context.session;
   const force = compactForce(opts, host.store.foldMessages(session.id).length);
   if (isCanonicalBotChat(session)) {
-    return compactCanonicalBot(host, context, { ...opts, force });
+    return maybeCompactCanonicalBot(host, context, force, opts?.force);
   }
 
   const tokenThreshold = resolveHistoryTokenBudget(
@@ -290,6 +291,19 @@ export async function autoCompactSession(
   return { replaced: result.replaced };
 }
 
+async function maybeCompactCanonicalBot(
+  host: CompactHost,
+  context: RunContext,
+  force: boolean,
+  explicitForce?: boolean
+): Promise<{ replaced?: { startSeq: number; endSeq: number } }> {
+  if (!explicitForce && summaryCoolingDown(host.store, context.session.id)) {
+    void host.emitTrace(context.session.id, { kind: 'compact_skipped', payload: { reason: 'summary_cooldown' } });
+    return {};
+  }
+  return compactCanonicalBot(host, context, { force });
+}
+
 /**
  * Canonical bot chats only. 50% of the model window is a structured summary;
  * 85% is a shorter hygiene pass. Both cut on a closed tool wave, prune large
@@ -339,20 +353,21 @@ async function compactCanonicalBot(
   const adapter = actualAdapter;
   let summary: string;
   try {
-    summary = adapter.completeText
+    summary = await summarizeWithinDeadline(host.store, session.id, async (signal) => adapter.completeText
       ? await adapter.completeText({
         system: botCompactInstruction(tier) + '\nSummarize only the supplied history and still-valid previous summary. Do not include these summarization instructions, their output format, or this internal request as a user goal or constraint. Return the summary text only.',
         user: JSON.stringify({ previousSummary: prior, history: pruned }),
-        jsonMode: false
+        jsonMode: false,
+        signal
       })
       : await adapter.summarizeMessages({
         agent: context.agent,
         messages: [...pruned, instructionMessage(session.id, instruction)],
         reason: `bot ${tier} compact session ${session.id}`
-      });
+      }));
   } catch (error) {
     persistBotCompactLong(host, context, range.older);
-    void host.emitTrace(session.id, { kind: 'compact_skipped', payload: { reason: 'summary_failed', tier, message: error instanceof Error ? error.message : String(error) } });
+    void host.emitTrace(session.id, { kind: 'compact_skipped', payload: { reason: error instanceof CompactSummaryTimeout ? 'summary_timeout' : 'summary_failed', tier, message: error instanceof Error ? error.message : String(error) } });
     return {};
   }
 
