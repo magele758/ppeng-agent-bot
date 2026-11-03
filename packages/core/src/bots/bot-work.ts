@@ -740,7 +740,6 @@ export function recoverBotWork(store:SqliteStateStore):void {
  });
 }
 export async function tickBotWork(host:BotWorkHost):Promise<void> {
- await resumeParkedBotWork(host);
  ensureBotWorkSchema(host.store);expireOverdueBotWork(host);
  // A missing chat does not revoke already accepted pending work. Repair only its recorded principal.
  for(const row of host.store.db.prepare("SELECT m.* FROM bot_work_messages m LEFT JOIN sessions s ON s.id=m.session_id WHERE m.status='pending' AND s.id IS NULL").all() as Record<string,unknown>[]){
@@ -755,6 +754,9 @@ export async function tickBotWork(host:BotWorkHost):Promise<void> {
  if(lease){if(resumeApprovedBotSession(host,id,String(row.updated_at),error=>completeProcessing(host,row,lease.fence,lease.owner,error)))continue;completeProcessing(host,row,lease.fence,lease.owner);}
  }
  for(const row of host.store.db.prepare("SELECT DISTINCT session_id FROM bot_work_messages WHERE status='pending'").all() as {session_id:string}[])drainBotSession(host,row.session_id);
+ // bot_delegate fires this tick without awaiting. Claim and drain stay synchronous;
+ // the resume import must not yield before that work.
+ await resumeParkedBotWork(host);
  // Allow immediately resolved deterministic runners to commit within this tick.
  await Promise.resolve();
 }
