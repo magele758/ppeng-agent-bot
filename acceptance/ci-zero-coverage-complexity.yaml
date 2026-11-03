@@ -1,0 +1,15 @@
+id: ci-zero-coverage-complexity
+title: 零覆盖画面仍能通过复杂度门禁
+status: implemented
+requirement: |
+  分多个agent去彻底解决这几个问题
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 会话列表和外发草稿摘要在共享持续集成里没有语句覆盖
+    when: 有人再给这些画面加一个显示条件
+    then: 复杂度门禁仍然通过，因为每个相关函数的复杂度都不超过 5
+  - id: AC-2
+    given: 认领邮箱的工具执行路径
+    when: 共享持续集成按语句覆盖计算复杂度风险
+    then: 这条路径的风险分数不超过 30
