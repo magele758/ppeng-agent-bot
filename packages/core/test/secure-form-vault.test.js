@@ -37,7 +37,7 @@ test('single-field secure form can fill username from vault login [AC:secure-for
   const vault = createMemoryUserVault();
   const port = createSecureFormPort({ store: memoryStore(), vault });
 
-  const login = vault.upsertLogin({ label: 'GitHub', username: 'bob', password: 'pass456' });
+  const login = vault.upsertLogin({ label: 'GitHub', username: 'bob@lab', password: 'pass456' });
 
   const opened = port.request({ sessionId: 's2', field: 'username', label: 'GitHub Username' });
   const done = port.submit({ sessionId: 's2', id: opened.card.id, vaultEntryId: login.id });
@@ -45,14 +45,14 @@ test('single-field secure form can fill username from vault login [AC:secure-for
   assert.equal(done.status, 'filled');
   assert.ok(done.fillRef);
   assert.match(done.fillRef, new RegExp(`:${login.id}:username$`));
-  assert.equal(done.text.includes('bob'), false);
+  assert.equal(done.text.includes('bob@lab'), false);
 });
 
 test('single-field secure form can fill from vault card entry [AC:secure-form-vault#AC-3]', () => {
   const vault = createMemoryUserVault();
   const port = createSecureFormPort({ store: memoryStore(), vault });
 
-  const card = vault.upsertCard({ label: 'Visa', number: '4111111111111111', cvv: '123' });
+  const card = vault.upsertCard({ label: 'Visa', number: '4111-1111-1111-1111', cvv: '123' });
 
   const opened = port.request({ sessionId: 's3', field: 'cardNumber', label: 'Card Number' });
   const done = port.submit({ sessionId: 's3', id: opened.card.id, vaultEntryId: card.id });
@@ -60,7 +60,7 @@ test('single-field secure form can fill from vault card entry [AC:secure-form-va
   assert.equal(done.status, 'filled');
   assert.ok(done.fillRef);
   assert.match(done.fillRef, new RegExp(`:${card.id}:cardNumber$`));
-  assert.equal(done.text.includes('4111'), false);
+  assert.equal(done.text.includes('4111-1111-1111-1111'), false);
 });
 
 test('multi-field secure form can fill from vault login [AC:secure-form-vault#AC-4]', () => {
@@ -102,7 +102,7 @@ test('multi-field secure form can fill card fields from vault [AC:secure-form-va
   const vault = createMemoryUserVault();
   const port = createSecureFormPort({ store: memoryStore(), vault });
 
-  const card = vault.upsertCard({ label: 'MasterCard', number: '5555555555554444', cvv: '456' });
+  const card = vault.upsertCard({ label: 'MasterCard', number: '5555-5555-5555-4444', cvv: '45z6' });
 
   const opened = port.request({
     sessionId: 's5',
@@ -126,8 +126,8 @@ test('multi-field secure form can fill card fields from vault [AC:secure-form-va
   assert.ok(cvvFill);
   assert.match(cvvFill.fillRef, new RegExp(`:${card.id}:cvv$`));
 
-  assert.equal(done.text.includes('5555'), false);
-  assert.equal(done.text.includes('456'), false);
+  assert.equal(done.text.includes('5555-5555-5555-4444'), false);
+  assert.equal(done.text.includes('45z6'), false);
 });
 
 test('vaultEntryId submission rejects non-existent entry [AC:secure-form-vault#AC-6]', () => {
