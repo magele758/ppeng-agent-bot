@@ -4,6 +4,22 @@ import { createHash } from 'node:crypto';
 import { gradeBotEvidence } from './bot-quality.mjs';
 
 export const hash = value => createHash('sha256').update(typeof value === 'string' ? value : JSON.stringify(value)).digest('hex');
+const plainObject = value => {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+};
+function isValidToolPrefix(prefix) {
+  if (!Array.isArray(prefix) || prefix.length === 0) return false;
+  return prefix.every(step => {
+    if (!plainObject(step)) return false;
+    if (Object.keys(step).some(key => key !== 'name' && key !== 'input' && key !== 'ok')) return false;
+    if (typeof step.name !== 'string' || step.name.length === 0) return false;
+    if (Object.hasOwn(step, 'input') && !plainObject(step.input)) return false;
+    if (Object.hasOwn(step, 'ok') && typeof step.ok !== 'boolean') return false;
+    return true;
+  });
+}
 export const DEFAULT_POLICY = {
   minCases: 30, minTrials: 3, minBaselinePassRate: 0.8,
   nonInferiorityMargin: 0.05, maxCategoryDrop: 0.05,
@@ -19,11 +35,37 @@ export function validateSuite(suite) {
     if (!c.category || !Array.isArray(c.turns) || !c.turns.length || c.turns.some(x => typeof x !== 'string' || !x.trim())) throw new Error(`invalid task: ${c.id}`);
     if (!c.expected || !['exact', 'json', 'state'].some(key => Object.hasOwn(c.expected, key))) throw new Error(`case has no outcome grader: ${c.id}`);
     for (const key of Object.keys(c.expected)) {
-      if (!['exact', 'json', 'state', 'requiredTools', 'forbiddenTools', 'maxToolCalls', 'status', 'botEvidence','observedTools'].includes(key)) throw new Error(`unknown grader ${key}`);
+      if (!['exact', 'json', 'state', 'requiredTools', 'forbiddenTools', 'maxToolCalls', 'status', 'botEvidence','observedTools','toolPrefix'].includes(key)) throw new Error(`unknown grader ${key}`);
     }
     if (c.expected.exact != null && typeof c.expected.exact !== 'string') throw new Error(`exact grader must be text: ${c.id}`);
+    if (Object.hasOwn(c.expected, 'toolPrefix') && !isValidToolPrefix(c.expected.toolPrefix)) throw new Error(`invalid tool prefix: ${c.id}`);
   }
   return suite;
+}
+
+/** Opening calls must match name, and any declared input or ok. Calls after the prefix are allowed. */
+export function gradeToolPrefix(prefix, calls) {
+  const failures = [];
+  const seen = Array.isArray(calls) ? calls : [];
+  if (seen.length < prefix.length) failures.push('tool prefix short');
+  for (let i = 0; i < prefix.length; i++) {
+    const step = prefix[i];
+    const call = seen[i];
+    if (!call || call.name !== step.name) failures.push('tool prefix order');
+    if (call && Object.hasOwn(step, 'input') && !isDeepStrictEqual(call.input, step.input)) failures.push('tool prefix input');
+    if (call && Object.hasOwn(step, 'ok') && call.ok !== step.ok) failures.push('tool prefix result');
+  }
+  return failures;
+}
+
+/** Recorded prompt shapes that omit a needed tool invalidate the trial. Missing shapes are not graded. */
+export function gradeOfferedTools(expected, trial) {
+  const shapes = trial?.promptShapes;
+  if (!Array.isArray(shapes) || shapes.length === 0) return [];
+  const prefixNames = Array.isArray(expected.toolPrefix) ? expected.toolPrefix.map(step => step.name) : [];
+  const needed = [...(expected.requiredTools ?? []), ...prefixNames];
+  const offered = new Set(shapes.flatMap(shape => Array.isArray(shape?.tools) ? shape.tools : []));
+  return needed.some(name => !offered.has(name)) ? ['tools not offered'] : [];
 }
 
 /** Accept folded messages: grade only the final assistant's text, never its reasoning. */
@@ -51,6 +93,8 @@ export function gradeTask(task, trial) {
   for (const name of e.forbiddenTools ?? []) if (calls.some(c => c.name === name)) failures.push(`forbidden tool: ${name}`);
   if (e.maxToolCalls != null && calls.length > e.maxToolCalls) failures.push('tool call budget');
   if(e.botEvidence) failures.push(...gradeBotEvidence(e.botEvidence,trial.botEvidence).failures);
+  if (Array.isArray(e.toolPrefix)) failures.push(...gradeToolPrefix(e.toolPrefix, calls));
+  failures.push(...gradeOfferedTools(e, trial));
   return { pass: failures.length === 0, failures };
 }
 
@@ -111,6 +155,7 @@ export function compareQuality(suite, records, { trials, policy: overrides = {},
     seen.add(key);
     if (r.infrastructureError) invalid.push(`infrastructure: ${key}`);
     if (typeof r.pass !== 'boolean') invalid.push(`missing grade: ${key}`);
+    if (Array.isArray(r.failures) && r.failures.includes('tools not offered')) invalid.push(`tools not offered: ${key}`);
   }
   for (const c of suite) {
     const rows = records.filter(r => r.caseId === c.id);

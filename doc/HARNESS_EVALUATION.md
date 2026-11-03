@@ -54,3 +54,27 @@ pnpm run agent:eval:compare --config scripts/agent-eval/experiments/starter.json
 常规 release gate 已跑 `agent:eval:verify`，但**真实能力比较尚未设为强制发布依赖**：须先校准代表性任务集并配置 CI 上游连接。当前没有真实上游实验结果，也没有据此宣称任何提示词有正收益。后续可将校准后的比较 job 接入同 SHA 发布依赖；不能把默认 12 题/A/A 当生产质量门禁。
 
 方法参考：[Anthropic：Agent evals](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents)、[OpenAI：Evaluation best practices](https://developers.openai.com/api/docs/guides/evaluation-best-practices)。项目的具体实现、默认阈值与统计方法以代码为准，不等同于这些文档的官方背书。
+
+## 回归卷和能力卷
+
+回归卷用来发现下降。它保持不差不叫提升。能力卷用来发现提升。只有能力卷 `improved` 且回归卷是 `improved` 或 `non_inferior`，`lift.mjs` 才给出 `lift`。`inconclusive` 不是持平。
+
+两次 `compare` 都必须带上实验文件里的 `tool_exposure` `full`，否则工具不会出现在模型请求里，这次试验无效。
+
+```bash
+node scripts/agent-eval/compare.mjs --config scripts/agent-eval/experiments/session-regression.json \
+  --baseline-root /absolute/path/to/baseline --candidate-root /absolute/path/to/candidate \
+  --out test-results/session-regression
+
+node scripts/agent-eval/compare.mjs --config scripts/agent-eval/experiments/session-capability.json \
+  --baseline-root /absolute/path/to/baseline --candidate-root /absolute/path/to/candidate \
+  --out test-results/session-capability
+
+node scripts/agent-eval/lift.mjs \
+  --regression test-results/session-regression/report.json \
+  --capability test-results/session-capability/report.json
+```
+
+12 道旧 starter 题全绿只能说明回归探针没坏，不能说明新功能有收益。这里没有真实模型结果。
+
+三十题、五类的对照可以立刻判下降：总通过率或某一类掉过五个百分点，或一道关键题从稳过变成失败，`compareQuality` 给出 `regressed`，`lift.mjs` 给出 `decline`。全对的持平在这个样本量下区间仍宽于五个百分点，结论保持 `inconclusive`，不写成持平，也不写成提升。能力卷现在是 8 道过程陷阱，不到 30 题，所以它自己的对照会停在证据不足；任务级的赢和输会印在 `lift.mjs` 的同一行里，供看方向，不改变结论。要把「提升」说出口，能力卷需要补到同一条政策下区间下界大于 0，并且回归卷没有变差。不要为了这句话下调 `minCases` 或五个百分点。
