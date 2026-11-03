@@ -1,4 +1,5 @@
 'use client';
+import { messageRetryBusy, retryMessageBody, runMessageRetry, userMessageText } from '@/lib/user-message-actions';
 import { goalMessage } from '@/lib/bot-goals';
 import { composerMessageToSend } from '@/lib/composer-next-hint';
 import { composerDraftKey } from '@/lib/composer-draft';
@@ -2045,6 +2046,45 @@ export function usePlayChat(deps: PlayChatDeps) {
     return sid;
   };
 
+  const messageRetryLock = useRef(false);
+  const retryBusy = messageRetryBusy(playSending, sessionChrome?.status, sharedSessionStatus);
+  const retryBusyRef = useRef(retryBusy);
+  retryBusyRef.current = retryBusy;
+  const retryUserMessage = (sessionId: string, message: ChatMessage) => runMessageRetry({
+    lock: messageRetryLock,
+    selected: () => selectedSessionRef.current,
+    busy: () => retryBusyRef.current,
+    run: async (sid, original) => {
+      const generation = claimLiveTurn(sid);
+      setPlaySending(true);
+      clearHeldAssistant();
+      setStreamOverlay({ segments: [] });
+      setPlayStatus({ text: '' });
+      setOptimisticUser(userMessageText(original));
+      requestScrollPlayToBottom();
+      try {
+        await readSseFetch(
+          `/api/sessions/${encodeURIComponent(sid)}/stream`, retryMessageBody(original), undefined,
+          { liveGen: generation, extraAttempts: 0 }
+        );
+      } catch (error) {
+        await runIf(liveTurnOnScreen(generation), async () => {
+          setPlayStatus({ text: modelErrorText(String(error), t), err: true });
+        });
+        throw error;
+      } finally {
+        const segments = snapshotStreamText();
+        try { await runIf(liveTurnOnScreen(generation), refreshPlayPanel); }
+        finally {
+          await runIf(liveTurnOnScreen(generation), async () => {
+            settleHeld(segments, historyMessagesRef.current);
+          });
+          finishLiveTurn(generation);
+        }
+      }
+    }
+  }, sessionId, message);
+
   const sendBotCommand = async (commandBotId: string, text: string) => {
       noteBotFirstTaskSent();
       stopSpeechDictation();
@@ -2694,6 +2734,8 @@ export function usePlayChat(deps: PlayChatDeps) {
     refreshPlayPanel,
     requestScrollPlayToBottom,
     sendPlayMessage,
+    retryUserMessage,
+    messageRetryBusy: retryBusy,
     recapNonce,
     armLiveSessionStream,
     handleFileUpload,

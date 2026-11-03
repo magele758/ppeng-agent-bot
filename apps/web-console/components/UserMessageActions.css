@@ -1,0 +1,13 @@
+.chat-turn--user .chat-turn__content { position: relative; }
+.user-message-actions { position: absolute; right: 22px; top: -4px; z-index: 5; font-size: 12px; opacity: 0; pointer-events: none; }
+.chat-turn--user:hover .user-message-actions,
+.user-message-actions:focus-within,
+.user-message-actions[open] { opacity: 1; pointer-events: auto; }
+.user-message-actions > summary { list-style: none; cursor: pointer; border: 1px solid var(--ui-border); border-radius: 6px; background: var(--ui-surface); color: var(--ui-text); padding: 0 7px; line-height: 24px; }
+.user-message-actions > summary::-webkit-details-marker { display: none; }
+.user-message-actions__menu { position: absolute; right: 0; top: 28px; min-width: 112px; padding: 4px; border: 1px solid var(--ui-border); border-radius: 8px; background: var(--ui-surface); color: var(--ui-text); box-shadow: var(--ui-shadow-md); }
+.user-message-actions__menu button { display: block; width: 100%; padding: 7px 10px; text-align: left; background: transparent; border: 0; border-radius: 4px; color: inherit; cursor: pointer; }
+.user-message-actions__menu button:hover { background: var(--ui-accent); }
+.user-message-actions__menu button:disabled { opacity: .45; cursor: not-allowed; }
+.user-message-actions__menu [role="status"]:not(:empty) { display: block; padding: 5px 10px; }
+@media (hover: none) { .user-message-actions { opacity: 1; pointer-events: auto; } }

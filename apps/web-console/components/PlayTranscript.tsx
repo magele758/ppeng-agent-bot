@@ -1,4 +1,5 @@
 'use client';
+import { UserMessageActionsContext } from './UserMessageActions';
 
 import { useMemo, type ReactNode } from 'react';
 import type { ApprovalItem, ChatMessage } from '@/lib/types';
@@ -54,6 +55,7 @@ export function PlayTranscript(props: {
   );
   const continued = useContinuedAssistant(slots, view);
   return (
+    <UserMessageActionsContext.Provider value={{ retry: props.chat.retryUserMessage, busy: props.chat.messageRetryBusy }}>
     <SurfaceContextProvider messages={props.chat.displayMessages}>
       <ContinuedAssistantContext.Provider value={continued}>
       <ChatFeedWindow
@@ -80,6 +82,7 @@ export function PlayTranscript(props: {
       />
       </ContinuedAssistantContext.Provider>
     </SurfaceContextProvider>
+    </UserMessageActionsContext.Provider>
   );
 }
 
