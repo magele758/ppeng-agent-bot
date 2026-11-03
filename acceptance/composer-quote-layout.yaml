@@ -1,0 +1,20 @@
+id: composer-quote-layout
+title: 输入栏中线对齐与不占行的消息操作
+status: implemented
+requirement: |
+  这里的中线都没对齐
+  把那个hover显示引用的按钮，改成不要占位的，现在空的一行行的太丑了
+notes: 'assumedApproval: standing-order-2026-10-22; 替代 assistant-actions-at-end 的独立操作行，保留引用与纠错功能。'
+criteria:
+  - id: AC-1
+    given: 桌面和手机宽度的 Bot 输入栏
+    when: 空输入或输入文字
+    then: 头像、加号、文字输入区、语音和发送按钮垂直中线对齐
+  - id: AC-2
+    given: 助手消息包含引用按钮
+    when: 未悬浮或鼠标悬浮
+    then: 操作按钮不在正文下面占一行，显示隐藏不改变消息高度
+  - id: AC-3
+    given: 用户通过鼠标或键盘选择引用
+    when: 激活浮动引用按钮
+    then: 引用预览正常出现，原有草稿保留

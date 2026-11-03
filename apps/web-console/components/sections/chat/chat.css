@@ -468,8 +468,9 @@
   flex: 0 0 36px;
   width: 36px;
   height: 36px;
-  align-self: flex-end;
+  align-self: center;
   font-size: 24px;
+  line-height: 1;
 }
 .chat-composer-outer .chat-composer-dock--empty { display: none; }
 .chat-composer-outer:has(.chat-composer-dock--empty) { min-height: 0; }
@@ -567,3 +568,14 @@
 .chat-turn--continued .chat-bubble {
   padding-top: 0;
 }
+
+/* Keep all composer controls on the same center line, including empty input. */
+.chat-composer-outer .chat-composer { align-items: center; }
+.chat-composer-outer .chat-composer-input {
+  display: block;
+  box-sizing: border-box;
+  min-height: 36px;
+  margin: 0;
+  padding: 6px 0;
+}
+.chat-composer-outer .chat-composer-ghost { top: 6px; }
