@@ -78,8 +78,12 @@ export class BotDaydreamService {
   private now() {
     return this.deps.now?.() ?? Date.now();
   }
+  private findBot(id: string): DaydreamBot | undefined {
+    if (this.deps.getBot) return this.deps.getBot(id);
+    return this.deps.listBots().find(b => b.id === id);
+  }
   private bot(id: string) {
-    const bot = this.deps.listBots().find(b => b.id === id);
+    const bot = this.findBot(id);
     if (!bot)
       throw new Error('Bot not found');
     return bot;

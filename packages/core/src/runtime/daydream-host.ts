@@ -60,6 +60,7 @@ export class DaydreamHost {
       settingsStore: runtime.store,
       listBots: () =>
         runtime.listBots({ includeHidden: true }).map((b) => daydreamBotRecord(runtime.store, b)),
+      getBot: (id) => (runtime.store.getBot(id) ? daydreamBotRecord(runtime.store, { id }) : undefined),
       readEvidence: async (id, date, tz) =>
         readBotDaydreamEvidence(runtime.store, id, date, tz),
       complete: (id, input) => this.complete(id, input),
