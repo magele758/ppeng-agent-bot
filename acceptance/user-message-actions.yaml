@@ -1,0 +1,23 @@
+id: user-message-actions
+title: 自己发送的消息支持复制和重试
+status: implemented
+notes: 'assumedApproval: standing-order-2026-10-22; 重试按原内容重新发送，保留既有历史。'
+requirement: |
+  现在有时候，会因为网络问题，导致请求失败，帮我在我自己的会话的部分加一个 hover 菜单，里面可以复制、重试
+criteria:
+  - id: AC-1
+    given: 用户查看自己发送的消息
+    when: 悬停或键盘聚焦消息操作，或在触屏上点击操作入口
+    then: 可以打开含复制和重试的菜单，助手消息不出现该菜单
+  - id: AC-2
+    given: 用户打开消息菜单
+    when: 点击复制
+    then: 复制该条消息文本并显示成功反馈，复制失败则显示失败反馈
+  - id: AC-3
+    given: 会话空闲且有已发送的用户消息
+    when: 点击重试
+    then: 向原会话重新发送该条内容并展示回复，保留图片与引用信息，不覆盖正在编辑的草稿
+  - id: AC-4
+    given: 会话正在执行或重试请求已经发出
+    when: 再次尝试重试或切换会话
+    then: 不重复发起重试，不把响应显示到另一会话；请求失败后可以再次操作

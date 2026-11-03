@@ -1,4 +1,5 @@
 'use client';
+import { UserMessageActions } from './UserMessageActions';
 import {CorrectionCapture} from './LearningWorkbench';
 
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
@@ -1018,6 +1019,7 @@ export function ChatTurnFromMessage({
     <div className={`chat-turn ${buildModClass(r)}${continuedClass(hideRoleLabel)}${noAvatar ? ' chat-turn--no-avatar' : ''}`}>
       {!noAvatar ? <div className="chat-avatar">{avatarText(r, t('play.me'))}</div> : null}
       <div className="chat-turn__content">
+        <UserMessageActions message={m} sessionId={sessionId} modelView={modelView} />
         <TurnLabel
           text={roleLabelText(r, t, hideRoleLabel)}
           bare={hideRoleLabel}
