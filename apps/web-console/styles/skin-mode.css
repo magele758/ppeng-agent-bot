@@ -1,0 +1,385 @@
+/* Mode-aware skin tokens. Non-classic skins previously hardcoded one mode;
+   classic already follows [data-theme]. Imported after skin sheets, before glass. */
+
+/* Shared: when a skin is active, root/body follow token surfaces so mode flips apply. */
+html[data-skin],
+html[data-skin] body {
+  background: var(--ui-bg);
+  color: var(--ui-text);
+}
+
+html[data-skin] .lab-rail {
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  border-right-color: var(--ui-border);
+}
+
+html[data-skin] .lab-main {
+  background: var(--ui-bg);
+  color: var(--ui-text);
+}
+
+html[data-skin="cyberpunk"][data-theme="light"] {
+  --color-text-primary: #12141c;
+  --color-text-secondary: #007a85;
+  --color-text-inverse: #f4f6fb;
+  --color-surface-base: #f4f6fb;
+  --color-surface-strong: #ffffff;
+  --color-surface-raised: #c4a800;
+  --color-border-strong: #c5cad8;
+  --color-danger: #d81b60;
+  --color-warn: #c77700;
+  --color-ok: #1b8a5a;
+  --bg-inset: #e8ebf2;
+  --muted: #4a5163;
+  --accent: #c4a800;
+  --chat-bg: #f4f6fb;
+  --chat-surface: #ffffff;
+  --chat-border: #c5cad8;
+  --chat-send: #c4a800;
+  --chat-send-hover: #a38b00;
+  --ui-bg: #f4f6fb;
+  --ui-surface: #ffffff;
+  --ui-border: #c5cad8;
+  --ui-text: #12141c;
+  --ui-text-muted: #4a5163;
+  --ui-accent: #c4a800;
+  --ui-accent-contrast: #12141c;
+  --ui-focus: 2px solid #007a85;
+  --text: #12141c;
+  --muted-2: #4a5163;
+  --bg-void: #f4f6fb;
+  --bg-deep: #f4f6fb;
+  --bg-raised: #ffffff;
+  --border: #c5cad8;
+  --border-strong: #c5cad8;
+  --accent-bright: #a38b00;
+  --accent-soft: rgba(196, 168, 0, 0.14);
+  --accent-text: #12141c;
+  --chat-user-bubble: #ffffff;
+  --chat-tool-bg: rgba(196, 168, 0, 0.08);
+  --chat-composer-bg: #ffffff;
+  --chat-send-disabled: rgba(196, 168, 0, 0.35);
+  --ui-danger: #d81b60;
+  --ui-warn: #c77700;
+  --ui-ok: #1b8a5a;
+  background: var(--ui-bg);
+  color: var(--ui-text);
+}
+html[data-skin="cyberpunk"][data-theme="light"] body {
+  background: var(--ui-bg);
+  color: var(--ui-text);
+}
+
+html[data-skin="demon"][data-theme="light"] {
+  --color-text-primary: #1a0c0e;
+  --color-text-secondary: #9a4a12;
+  --color-text-inverse: #fff8f0;
+  --color-surface-base: #fbf3ea;
+  --color-surface-strong: #ffffff;
+  --color-surface-raised: #d14a1c;
+  --color-border-strong: #e2c4b0;
+  --color-danger: #d14a1c;
+  --color-warn: #b07820;
+  --color-ok: #5f7a45;
+  --bg-inset: #f0e2d4;
+  --muted: #6e5648;
+  --accent: #d14a1c;
+  --chat-bg: #fbf3ea;
+  --chat-surface: #ffffff;
+  --chat-border: #e2c4b0;
+  --chat-send: #d14a1c;
+  --chat-send-hover: #b53d14;
+  --ui-bg: #fbf3ea;
+  --ui-surface: #ffffff;
+  --ui-border: #e2c4b0;
+  --ui-text: #1a0c0e;
+  --ui-text-muted: #6e5648;
+  --ui-accent: #d14a1c;
+  --ui-accent-contrast: #fff8f0;
+  --ui-focus: 2px solid #9a4a12;
+  --text: #1a0c0e;
+  --muted-2: #6e5648;
+  --bg-void: #fbf3ea;
+  --bg-deep: #fbf3ea;
+  --bg-raised: #ffffff;
+  --border: #e2c4b0;
+  --border-strong: #e2c4b0;
+  --accent-text: #fff8f0;
+  --accent-bright: #b53d14;
+  --chat-user-bubble: #ffffff;
+  --chat-composer-bg: #ffffff;
+  --chat-send-disabled: rgba(209, 74, 28, 0.35);
+  --ui-danger: #d14a1c;
+  --ui-warn: #b07820;
+  --ui-ok: #5f7a45;
+  background: var(--ui-bg);
+  color: var(--ui-text);
+}
+html[data-skin="demon"][data-theme="light"] body {
+  background: var(--ui-bg);
+  color: var(--ui-text);
+}
+
+html[data-skin="sanctum"][data-theme="light"] {
+  --color-text-primary: #1a2118;
+  --color-text-secondary: #8a7344;
+  --color-text-inverse: #f7f3e8;
+  --color-surface-base: #f4efe4;
+  --color-surface-strong: #fffcf5;
+  --color-surface-raised: #a88b4a;
+  --color-border-strong: #d5cdb8;
+  --color-danger: #b05a45;
+  --color-warn: #9a7a35;
+  --color-ok: #6a7548;
+  --bg-void: #f4efe4;
+  --bg-deep: #f4efe4;
+  --bg-raised: #fffcf5;
+  --bg-inset: #ebe4d4;
+  --border: #d5cdb8;
+  --border-strong: #d5cdb8;
+  --stroke: #d5cdb8;
+  --text: #1a2118;
+  --muted: #6a675c;
+  --muted-2: #6a675c;
+  --accent: #a88b4a;
+  --accent-bright: #8f7338;
+  --accent-soft: rgba(168, 139, 74, 0.16);
+  --accent-text: #f7f3e8;
+  --chat-bg: #f4efe4;
+  --chat-surface: #fffcf5;
+  --chat-border: #d5cdb8;
+  --chat-user-bubble: #fffcf5;
+  --chat-tool-bg: rgba(168, 139, 74, 0.08);
+  --chat-composer-bg: #ebe4d4;
+  --chat-send: #a88b4a;
+  --chat-send-hover: #8f7338;
+  --chat-send-disabled: rgba(168, 139, 74, 0.35);
+  --ui-bg: #f4efe4;
+  --ui-surface: #fffcf5;
+  --ui-border: #d5cdb8;
+  --ui-text: #1a2118;
+  --ui-text-muted: #6a675c;
+  --ui-accent: #a88b4a;
+  --ui-accent-contrast: #f7f3e8;
+  --ui-danger: #b05a45;
+  --ui-warn: #9a7a35;
+  --ui-ok: #6a7548;
+  background: var(--ui-bg);
+  color: var(--ui-text);
+}
+html[data-skin="sanctum"][data-theme="light"] body {
+  background: var(--ui-bg);
+  color: var(--ui-text);
+}
+
+html[data-skin="robot-stage"][data-theme="light"] {
+  --color-text-primary: #141820;
+  --color-text-secondary: #a66f00;
+  --color-text-inverse: #f7f8fb;
+  --color-surface-base: #f3f5f9;
+  --color-surface-strong: #ffffff;
+  --color-surface-raised: #d99400;
+  --color-border-strong: #c9ced8;
+  --color-danger: #c14555;
+  --color-warn: #b07820;
+  --color-ok: #3f8a5c;
+  --bg-inset: #e6e9f0;
+  --muted: #5a6372;
+  --accent: #d99400;
+  --chat-bg: #f3f5f9;
+  --chat-surface: #ffffff;
+  --chat-border: #c9ced8;
+  --chat-send: #d99400;
+  --chat-send-hover: #b87c00;
+  --ui-bg: #f3f5f9;
+  --ui-surface: #ffffff;
+  --ui-border: #c9ced8;
+  --ui-text: #141820;
+  --ui-text-muted: #5a6372;
+  --ui-accent: #d99400;
+  --ui-accent-contrast: #141820;
+  --ui-focus: 2px solid #d99400;
+  --text: #141820;
+  --muted-2: #5a6372;
+  --bg-void: #f3f5f9;
+  --bg-deep: #f3f5f9;
+  --bg-raised: #ffffff;
+  --border: #c9ced8;
+  --border-strong: #c9ced8;
+  --stroke: #c9ced8;
+  --accent-bright: #b87c00;
+  --accent-soft: rgba(217, 148, 0, 0.14);
+  --accent-text: #141820;
+  --chat-user-bubble: #ffffff;
+  --chat-tool-bg: rgba(217, 148, 0, 0.08);
+  --chat-composer-bg: #ffffff;
+  --chat-send-disabled: rgba(217, 148, 0, 0.35);
+  --ui-danger: #c14555;
+  --ui-warn: #b07820;
+  --ui-ok: #3f8a5c;
+  background: var(--ui-bg);
+  color: var(--ui-text);
+}
+html[data-skin="robot-stage"][data-theme="light"] body {
+  background: var(--ui-bg);
+  color: var(--ui-text);
+}
+
+html[data-skin="pixel"][data-theme="light"] {
+  --color-text-primary: #000;
+  --color-text-secondary: #555;
+  --color-text-inverse: #fff;
+  --color-surface-base: #fff;
+  --color-surface-strong: #f0f0f0;
+  --color-surface-raised: #000;
+  --color-border-strong: #000;
+  --color-danger: #000;
+  --color-warn: #555;
+  --color-ok: #333;
+  --bg-void: #fff;
+  --bg-deep: #fff;
+  --bg-raised: #f0f0f0;
+  --bg-inset: #e8e8e8;
+  --border: #000;
+  --border-strong: #000;
+  --stroke: #000;
+  --text: #000;
+  --muted: #555;
+  --muted-2: #555;
+  --accent: #000;
+  --accent-bright: #333;
+  --accent-soft: rgba(0, 0, 0, 0.08);
+  --accent-text: #fff;
+  --chat-bg: #fff;
+  --chat-surface: #f0f0f0;
+  --chat-border: #000;
+  --chat-user-bubble: #000;
+  --chat-tool-bg: rgba(0, 0, 0, 0.05);
+  --chat-composer-bg: #f0f0f0;
+  --chat-send: #000;
+  --chat-send-hover: #333;
+  --chat-send-disabled: #888;
+  --ui-bg: #fff;
+  --ui-surface: #f0f0f0;
+  --ui-border: #000;
+  --ui-text: #000;
+  --ui-text-muted: #555;
+  --ui-accent: #000;
+  --ui-accent-contrast: #fff;
+  --ui-danger: #000;
+  --ui-warn: #555;
+  --ui-ok: #333;
+  --ui-focus: 2px solid #000;
+  background: var(--ui-bg);
+  color: var(--ui-text);
+}
+html[data-skin="pixel"][data-theme="light"] body {
+  background: var(--ui-bg);
+  color: var(--ui-text);
+}
+
+html[data-skin="kindergarten"][data-theme="dark"] {
+  --color-text-primary: #f4efe6;
+  --color-text-secondary: #6ec4f0;
+  --color-text-inverse: #2b2a28;
+  --color-surface-base: #1c1814;
+  --color-surface-strong: #2a241c;
+  --color-surface-raised: #f5b400;
+  --color-border-strong: #4a4030;
+  --color-danger: #e06a6a;
+  --color-warn: #e0a040;
+  --color-ok: #5cbc7a;
+  --bg-inset: #14110e;
+  --muted: #b0a698;
+  --accent: #f5b400;
+  --chat-bg: #1c1814;
+  --chat-surface: #2a241c;
+  --chat-border: #4a4030;
+  --chat-send: #f5b400;
+  --chat-send-hover: #e0a200;
+  --ui-bg: #1c1814;
+  --ui-surface: #2a241c;
+  --ui-border: #4a4030;
+  --ui-text: #f4efe6;
+  --ui-text-muted: #b0a698;
+  --ui-accent: #f5b400;
+  --ui-accent-contrast: #2b2a28;
+  --ui-focus: 2px solid #6ec4f0;
+  --text: #f4efe6;
+  --muted-2: #b0a698;
+  --bg-void: #1c1814;
+  --bg-deep: #1c1814;
+  --bg-raised: #2a241c;
+  --border: #4a4030;
+  --border-strong: #4a4030;
+  --stroke: #4a4030;
+  --accent-text: #2b2a28;
+  --accent-soft: rgba(245, 180, 0, 0.18);
+  --chat-user-bubble: #2a241c;
+  --chat-composer-bg: #2a241c;
+  --chat-send-disabled: rgba(245, 180, 0, 0.4);
+  --ui-danger: #e06a6a;
+  --ui-warn: #e0a040;
+  --ui-ok: #5cbc7a;
+  background: var(--ui-bg);
+  color: var(--ui-text);
+}
+html[data-skin="kindergarten"][data-theme="dark"] body {
+  background: var(--ui-bg);
+  color: var(--ui-text);
+}
+
+html[data-skin="minimal"][data-theme="dark"] {
+  --color-text-primary: #f0f0f0;
+  --color-text-secondary: #aaaaaa;
+  --color-text-inverse: #111111;
+  --color-surface-base: #111111;
+  --color-surface-strong: #1a1a1a;
+  --color-surface-raised: #f0f0f0;
+  --color-border-strong: #f0f0f0;
+  --color-danger: #f0f0f0;
+  --color-warn: #aaaaaa;
+  --color-ok: #dddddd;
+  --bg-void: #111111;
+  --bg-deep: #111111;
+  --bg-raised: #1a1a1a;
+  --bg-inset: #0a0a0a;
+  --border: #f0f0f0;
+  --border-strong: #f0f0f0;
+  --stroke: #f0f0f0;
+  --text: #f0f0f0;
+  --muted: #aaaaaa;
+  --muted-2: #aaaaaa;
+  --accent: #f0f0f0;
+  --accent-bright: #dddddd;
+  --accent-soft: rgba(240, 240, 240, 0.1);
+  --accent-text: #111111;
+  --chat-bg: #111111;
+  --chat-surface: #1a1a1a;
+  --chat-border: #f0f0f0;
+  --chat-user-bubble: #1a1a1a;
+  --chat-tool-bg: rgba(240, 240, 240, 0.06);
+  --chat-composer-bg: #1a1a1a;
+  --chat-send: #f0f0f0;
+  --chat-send-hover: #dddddd;
+  --chat-send-disabled: #666666;
+  --ui-bg: #111111;
+  --ui-surface: #1a1a1a;
+  --ui-border: #f0f0f0;
+  --ui-text: #f0f0f0;
+  --ui-text-muted: #aaaaaa;
+  --ui-accent: #f0f0f0;
+  --ui-accent-contrast: #111111;
+  --ui-danger: #f0f0f0;
+  --ui-warn: #aaaaaa;
+  --ui-ok: #dddddd;
+  --ui-focus: 2px solid #f0f0f0;
+  background: var(--ui-bg);
+  color: var(--ui-text);
+}
+html[data-skin="minimal"][data-theme="dark"] body {
+  background: var(--ui-bg);
+  color: var(--ui-text);
+}
+

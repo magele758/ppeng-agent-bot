@@ -130,3 +130,19 @@ test('每套外观有独立特效，极简黑白没有彩色 [AC:console-skin-mo
   assert.ok(colors.every(gray));
   assert.match(read('skin-motion-guard.css'), /prefers-reduced-motion:\s*reduce/);
 });
+
+test('非经典外观随深浅色切换有独立 token [AC:skin-mode-adapt#AC-1]', () => {
+  const mode = readFileSync(new URL('../styles/skin-mode.css', import.meta.url), 'utf8');
+  const globals = readFileSync(new URL('../app/globals.css', import.meta.url), 'utf8');
+  assert.match(globals, /skin-mode\.css/);
+  const darkDefault = ['cyberpunk', 'demon', 'sanctum', 'robot-stage', 'pixel'];
+  for (const id of darkDefault) {
+    assert.match(mode, new RegExp(`html\\[data-skin="${id}"\\]\\[data-theme="light"\\]`));
+    assert.match(mode, new RegExp(`html\\[data-skin="${id}"\\]\\[data-theme="light"\\][\\s\\S]*?--ui-bg:`));
+  }
+  for (const id of ['kindergarten', 'minimal']) {
+    assert.match(mode, new RegExp(`html\\[data-skin="${id}"\\]\\[data-theme="dark"\\]`));
+    assert.match(mode, new RegExp(`html\\[data-skin="${id}"\\]\\[data-theme="dark"\\][\\s\\S]*?--ui-bg:`));
+  }
+  assert.match(mode, /html\[data-skin\]\s*,\s*\nhtml\[data-skin\] body/);
+});
