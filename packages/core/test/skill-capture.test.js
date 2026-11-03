@@ -122,3 +122,53 @@ test('shutdown cancels pending distillation without installing a skill', async t
   await ready;await service.close();
   assert.equal((await result).status,'failed');assert.equal(existsSync(join(dir,'skills')),false);
 });
+
+const validBody = () => JSON.stringify({ description: 'Verify releases', body: '# Release\n1. Build.\n2. Check health.' });
+test('confirmation saves from a bounded conversation excerpt when tool output is huge [AC:skill-capture-save#AC-1]', async t => {
+  let seen = '';
+  const dump = 'TOOL_DUMP_' + 'x'.repeat(20_000);
+  const evidence = JSON.stringify([
+    { role: 'user', parts: [{ type: 'text', text: '记住：发布后检查健康检查' }] },
+    { role: 'tool', parts: [{ type: 'tool_result', content: dump }] },
+    { role: 'assistant', parts: [{ type: 'text', text: '健康检查已通过' }, { type: 'tool_call', name: 'bash' }] }
+  ]);
+  const { service, dir } = setup(t, {
+    getEvidence: () => evidence,
+    complete: async (_sessionId, input) => { seen = input.user; return validBody(); }
+  });
+  const s = await service.suggest('s1', 'bot', suggestion);
+  const saved = await service.confirm('s1', s.id);
+  assert.equal(saved.status, 'saved');
+  const payload = JSON.parse(seen);
+  assert.match(payload.evidence, /发布后检查健康检查/);
+  assert.match(payload.evidence, /健康检查已通过/);
+  assert.equal(payload.evidence.includes('TOOL_DUMP_'), false);
+  assert.ok(payload.evidence.length <= 8_000);
+  assert.ok((await loadStateDirSkills(dir)).some(skill => skill.name === suggestion.name));
+});
+test('a valid distillation is saved after the model wait has expired [AC:skill-capture-save#AC-2]', async t => {
+  const { service, dir } = setup(t, {
+    modelWaitMs: 30,
+    complete: async () => validBody(),
+    reloadSkills: async () => { await new Promise(resolve => setTimeout(resolve, 50)); }
+  });
+  const s = await service.suggest('s1', 'bot', suggestion);
+  const saved = await service.confirm('s1', s.id);
+  assert.equal(saved.status, 'saved', saved.error);
+  assert.ok((await loadStateDirSkills(dir)).some(skill => skill.name === suggestion.name));
+});
+test('model silence fails the capture and writes no skill [AC:skill-capture-save#AC-3]', async t => {
+  const { service, dir } = setup(t, {
+    modelWaitMs: 30,
+    complete: (_sessionId, input) => new Promise((_resolve, reject) => {
+      const signal = input.signal;
+      if (signal?.aborted) reject(signal.reason);
+      else signal?.addEventListener('abort', () => reject(signal.reason), { once: true });
+    })
+  });
+  const s = await service.suggest('s1', 'bot', suggestion);
+  const failed = await service.confirm('s1', s.id);
+  assert.equal(failed.status, 'failed');
+  assert.match(failed.error ?? '', /abort|timeout|时间|interrupted/i);
+  assert.equal(existsSync(join(dir, 'skills')), false);
+});

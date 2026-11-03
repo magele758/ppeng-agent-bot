@@ -113,8 +113,7 @@ import { runWithJevTrace } from './jev/client.js';
 import { chainHas, resolveJevChain } from './jev/settings.js';
 import { mirrorTraceToLangfuse } from './langfuse/export.js';
 import { createDynMetaTools, tryCreateDynToolStore } from './dyn-tools/index.js';
-import { SkillManagementService, createSkillManageTool, createSkillProposeTool, SkillCaptureService } from './skill-proposals/index.js';
-import { redactToolContent } from './sandbox/result-redaction.js';
+import { SkillManagementService, createSkillManageTool, createSkillProposeTool, SkillCaptureService, captureEvidenceFromMessages } from './skill-proposals/index.js';
 import { createStoreScratchPersist } from './ptc/scratchpad.js';
 import { inheritBotIdentityMetadata } from './memory/bot-memory-scope.js';
 import { botTeammatePermission, childPermissionMode, inheritBotAllowlists, inheritModelOverride } from './runtime/spawn-policy.js';
@@ -697,8 +696,7 @@ export class RawAgentRuntime {
       validateSharing: (owner, recipients) => {
         if ([owner, ...recipients].some(id => !this.store.getBot(id))) throw new Error('Unknown Bot in sharing scope');
       },
-      getEvidence: (sessionId) => redactToolContent(JSON.stringify(this.store.listMessages(sessionId)
-        .map(message => ({ role: message.role, parts: message.parts.filter(part => part.type === 'text' || part.type === 'tool_call' || part.type === 'tool_result') })))),
+      getEvidence: (sessionId) => captureEvidenceFromMessages(this.store.listMessages(sessionId)),
       complete: async (sessionId, input) => {
         const session = this.store.getSession(sessionId);
         if (!session) throw new NotFoundError('Session');
