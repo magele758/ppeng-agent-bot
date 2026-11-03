@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PERFORMANCE_SPAWN_TIMEOUT_MS, SHARED_RUNNER_SMOKE_DRAIN_SECONDS, httpSoakOptionsFromArgv, soakTiming } from '../bot-release/http-fixture-timing.mjs';
+import { COVERED_SMOKE_HARNESS_TIMEOUT_MS, PERFORMANCE_SPAWN_TIMEOUT_MS, SHARED_RUNNER_SMOKE_DRAIN_SECONDS, SHARED_RUNNER_SMOKE_READ_QUEUE_CAP, httpSoakOptionsFromArgv, smokeCoverageActive, smokeTimingForRun, soakTiming } from '../bot-release/http-fixture-timing.mjs';
 import { performanceResult, performanceSoakArgs } from '../bot-release/soak-performance.mjs';
 
 test('shared runner smoke drain waits out notification tails without moving local or full-protocol drains [AC:ci-http-fixture-timing#AC-3]', () => {
@@ -24,4 +24,25 @@ test('shared runner smoke drain waits out notification tails without moving loca
   assert.equal(performanceResult({ ...report, fixturePassed: false }, 'github-actions').passed, false);
   assert.equal(performanceResult({ ...report, latency: { ...latency, receive: { count: 34, p95Ms: 8001 } } }, 'github-actions').passed, false);
   assert.throws(() => performanceSoakArgs('unknown', 'out.json'), /profile/);
+});
+
+test('covered smoke keeps planned reads queued and waits out notification tails [AC:ci-http-fixture-timing#AC-4]', () => {
+  const covered = smokeTimingForRun({ smoke: true, smokeSeconds: 8, readEveryMs: 25, readQueueCap: 20 }, { NODE_V8_COVERAGE: '/tmp/cov' });
+  assert.equal(covered.configuration.drainSeconds, SHARED_RUNNER_SMOKE_DRAIN_SECONDS);
+  assert.equal(covered.configuration.readQueueCap, SHARED_RUNNER_SMOKE_READ_QUEUE_CAP);
+  assert.equal(covered.configuration.readEveryMs, 25);
+  const local = smokeTimingForRun({ smoke: true, smokeSeconds: 8, readEveryMs: 25, readQueueCap: 20 }, {});
+  assert.equal(local.configuration.drainSeconds, 30);
+  assert.equal(local.configuration.readQueueCap, 20);
+  const explicit = smokeTimingForRun({ smoke: true, smokeSeconds: 8, readEveryMs: 500, readQueueCap: 40, drainSeconds: 30 }, { NODE_V8_COVERAGE: '/tmp/cov' });
+  assert.equal(explicit.configuration.drainSeconds, 30);
+  assert.equal(explicit.configuration.readQueueCap, 40);
+  const full = smokeTimingForRun({ smoke: false, smokeSeconds: 8, readEveryMs: 25, readQueueCap: 20 }, { NODE_V8_COVERAGE: '/tmp/cov' });
+  assert.equal(full.configuration.drainSeconds, 120);
+  assert.equal(full.configuration.readQueueCap, 20);
+  assert.equal(smokeCoverageActive({ NODE_V8_COVERAGE: '/tmp/cov' }), true);
+  assert.equal(smokeCoverageActive({}), false);
+  assert.equal(smokeCoverageActive({ NODE_V8_COVERAGE: '' }), false);
+  assert.equal(SHARED_RUNNER_SMOKE_READ_QUEUE_CAP, 80);
+  assert.ok(2 + 8 + SHARED_RUNNER_SMOKE_DRAIN_SECONDS + 15 < COVERED_SMOKE_HARNESS_TIMEOUT_MS / 1000);
 });
