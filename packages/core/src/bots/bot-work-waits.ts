@@ -40,7 +40,8 @@ export async function resumeParkedBotWork(host:ResumeHost):Promise<void> {
  for(const row of rows){
   const session=host.store.getSession(row.id);
   const waitId=session?.metadata.botWorkDurableWait;
-  if(!session||session.status==='running'||host.isSessionRunning?.(session.id)||typeof waitId!=='string'||!waitId)continue;
+  if(!session||host.isSessionRunning?.(session.id)||typeof waitId!=='string'||!waitId)continue;
+  if(session.status==='running'&&host.store.isSessionWriterLive(session.id))continue;
   const waits=new DurableWaitStore(host.store);
   let wait;
   try{wait=waits.check(waitId);}catch{continue;}

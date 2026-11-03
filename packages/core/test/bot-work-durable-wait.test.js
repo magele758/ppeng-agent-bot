@@ -186,6 +186,41 @@ test('a finished command resumes the same task once and a second tick does not [
   assert.equal(reopened.getSession(sessionId).metadata.botWorkDurableWait, undefined);
 });
 
+test('a dead running session resumes once after the command finishes [AC:bot-work-durable-wait#AC-5]', async (t) => {
+  const fx = scenario(t);
+  const services = servicesFor(fx.store, fx.dir);
+  let sessionId;
+  let parked;
+  const host = hostFor(fx.store, async (id) => {
+    sessionId = id;
+    parked = await services.startBackgroundJob(id, 'sleep 30');
+    return endTurnOnBackground(fx.store, id);
+  });
+  const principal = resolveBotPrincipal(fx.store);
+  await dispatch(host, principal, 'Resume a session left running');
+  await tickBotWork(host);
+  await settle();
+  fx.store.updateSession(sessionId, { status: 'running' });
+  const reopened = fx.reopen();
+  reopened.updateBackgroundJob(parked.id, 'completed', 'command finished');
+  let calls = 0;
+  let saw = '';
+  const restarted = hostFor(reopened, async (id) => {
+    if (id !== sessionId) return reopened.getSession(id);
+    calls += 1;
+    saw = messagesText(reopened, id);
+    const session = reopened.getSession(id);
+    reopened.updateSession(id, { status: 'idle', metadata: { ...session.metadata, outcome: { kind: 'idle', reason: 'end' } } });
+    return reopened.getSession(id);
+  });
+  await tickBotWork(restarted);
+  assert.equal(calls, 1);
+  assert.match(saw, /\[wait resumed\]/);
+  await tickBotWork(restarted);
+  await settle();
+  assert.equal(calls, 1);
+});
+
 test('another bot session, a bad condition, and a missing observation do not resume the task [AC:bot-work-durable-wait#AC-4]', async (t) => {
   const fx = scenario(t);
   const services = servicesFor(fx.store, fx.dir);
