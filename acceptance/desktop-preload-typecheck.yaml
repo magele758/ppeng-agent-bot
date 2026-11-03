@@ -1,0 +1,16 @@
+id: desktop-preload-typecheck
+title: 桌面预加载脚本通过类型检查
+status: implemented
+requirement: |
+  分多个agent去彻底解决这几个问题
+notes: |
+  assumedApproval: standing-order-2026-10-22
+criteria:
+  - id: AC-1
+    given: 桌面端预加载脚本要给页面根节点加上桌面玻璃样式
+    when: 三个桌面打包任务做类型检查
+    then: 类型检查通过，并且主进程代码仍然不把浏览器文档库当作自己的类型环境
+  - id: AC-2
+    given: 页面根节点已经存在
+    when: 预加载脚本运行
+    then: 根节点带有 desktop-glass；根节点稍后再出现时，脚本在文档就绪后补上这个类

@@ -6,7 +6,7 @@
   "description": "Raw Agent Desktop Client (macOS, Windows, Linux)",
   "author": "ppeng",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.preload.json",
     "start": "electron .",
     "dev": "pnpm run build && electron .",
     "pack": "pnpm run build && electron-builder --dir",

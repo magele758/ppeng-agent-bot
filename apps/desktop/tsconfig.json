@@ -14,5 +14,5 @@
     "types": ["node"]
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "release", "src/**/*.test.ts"]
+  "exclude": ["node_modules", "dist", "release", "src/**/*.test.ts", "src/preload.ts"]
 }
