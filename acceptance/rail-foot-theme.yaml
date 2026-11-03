@@ -1,0 +1,13 @@
+id: rail-foot-theme
+title: 侧栏底部主题按钮能切换
+status: implemented
+requirement: |
+  点击左下角的theme点击还是没动静
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  侧栏底部菜单里的深浅色按钮在按下时就切换，不等鼠标松开，避免菜单收起把这次点击丢掉。
+criteria:
+  - id: AC-1
+    given: 用户打开侧栏左下角菜单，当前是深色
+    when: 按下主题按钮
+    then: 界面立刻切到另一种深浅色，再按一次切回去

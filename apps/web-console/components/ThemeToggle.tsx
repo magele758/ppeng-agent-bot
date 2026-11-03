@@ -36,7 +36,21 @@ export function ThemeToggle() {
 
   const label = theme === 'dark' ? t('common.themeToLight') : t('common.themeToDark');
   return (
-    <button type="button" onClick={toggleTheme} className="btn-ghost btn-icon" aria-label={label} title={label}>
+    <button
+      type="button"
+      onMouseDown={(event) => {
+        event.preventDefault();
+        toggleTheme();
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        toggleTheme();
+      }}
+      className="btn-ghost btn-icon"
+      aria-label={label}
+      title={label}
+    >
       {theme === 'dark' ? (
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="8" cy="8" r="3.5" />

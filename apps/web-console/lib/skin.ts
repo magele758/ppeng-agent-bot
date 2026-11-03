@@ -48,11 +48,35 @@ export function paintSkin(skin: SkinId, root: SkinRoot): void {
   else root.setAttribute(SKIN_ATTRIBUTE, skin);
 }
 
+/** Classic clears the attribute. Writing data-skin="classic" makes the glass sheet treat it as a skin. */
+export function paintSkinAttribute(root: SkinRoot, skin: SkinId): void {
+  paintSkin(skin, root);
+}
+
+export function paintSkinMenuOpen(root: SkinRoot, open: boolean): void {
+  if (open) root.setAttribute(SKIN_MENU_OPEN_ATTR, '1');
+  else root.removeAttribute(SKIN_MENU_OPEN_ATTR);
+}
+
+export function skinMenuHoldsFoot(root: { getAttribute(name: string): string | null } | null): boolean {
+  return root?.getAttribute(SKIN_MENU_OPEN_ATTR) === '1';
+}
+
+export function skinMenuTargetInside(
+  target: EventTarget | null,
+  root: { contains(node: Node): boolean } | null,
+  list: { contains(node: Node): boolean } | null
+): boolean {
+  if (target == null || typeof target !== 'object') return false;
+  if (root?.contains(target as Node)) return true;
+  return Boolean(list?.contains(target as Node));
+}
+
 /** Classic removes the stored key and the attribute, so the original theme CSS applies unchanged. */
 export function applySkin(skin: SkinId, env: SkinEnv = liveEnv()): void {
   if (skin === 'classic') env.storage.removeItem(SKIN_STORAGE_KEY);
   else env.storage.setItem(SKIN_STORAGE_KEY, skin);
-  paintSkin(skin, env.root);
+  paintSkinAttribute(env.root, skin);
   env.dispatch?.();
 }
 

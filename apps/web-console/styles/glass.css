@@ -71,9 +71,10 @@ html.desktop-glass body {
   box-shadow: var(--glass-sheen), var(--glass-shadow);
 }
 
-/* Skin sheets use equal specificity and opaque fills. This file is imported last. */
-html[data-skin],
-html[data-skin] body {
+/* Skin sheets use equal specificity and opaque fills. This file is imported last.
+   Classic is not a skin; data-skin="classic" must not pick up this wash. */
+html[data-skin]:not([data-skin="classic"]),
+html[data-skin]:not([data-skin="classic"]) body {
   background:
     radial-gradient(1200px 640px at 12% -8%, color-mix(in srgb, var(--ui-text, white) 10%, transparent), transparent 58%),
     radial-gradient(900px 520px at 100% 0%, color-mix(in srgb, var(--ui-text, white) 8%, transparent), transparent 52%),
@@ -81,7 +82,7 @@ html[data-skin] body {
   background-attachment: fixed;
 }
 
-html[data-skin] :is(.lab-rail, .lab-main, .lab-view, .lab-toolbar, .chat-composer, .chat-composer-outer, .card, .ag-panel, .settings-panel, .modal, .dialog, [role="dialog"], .drawer, .play-sidebar, .play-main.chat-panel, .chat-panel-header, .chat-panel-body) {
+html[data-skin]:not([data-skin="classic"]) :is(.lab-rail, .lab-main, .lab-view, .lab-toolbar, .chat-composer, .chat-composer-outer, .card, .ag-panel, .settings-panel, .modal, .dialog, [role="dialog"], .drawer, .play-sidebar, .play-main.chat-panel, .chat-panel-header, .chat-panel-body) {
   background: var(--glass-highlight), var(--glass-fill);
   backdrop-filter: var(--glass-filter);
   -webkit-backdrop-filter: var(--glass-filter);
@@ -106,10 +107,10 @@ html[data-skin].desktop-glass body {
 }
 
 
-/* Classic dark/black: opaque solid surfaces — no frosted glass / blur / translucency.
-   Skins keep their own look; classic light may still use glass tokens above. */
-html:not([data-skin]):not([data-theme="light"]),
-html:not([data-skin])[data-theme="dark"] {
+/* Classic dark/black: opaque solid surfaces — no frosted glass / blur / white top highlight.
+   data-skin="classic" is still classic. Other skins and classic light keep glass. */
+html:is(:not([data-skin]), [data-skin="classic"]):not([data-theme="light"]),
+html:is(:not([data-skin]), [data-skin="classic"])[data-theme="dark"] {
   --glass-filter: none;
   --glass-fill: var(--ui-surface, var(--color-surface-strong));
   --glass-fill-strong: var(--ui-bg, var(--color-surface-base));
@@ -119,22 +120,25 @@ html:not([data-skin])[data-theme="dark"] {
   --glass-highlight: none;
 }
 
-html:not([data-skin]):not([data-theme="light"]),
-html:not([data-skin]):not([data-theme="light"]) body,
-html:not([data-skin])[data-theme="dark"],
-html:not([data-skin])[data-theme="dark"] body {
-  background: var(--ui-bg, var(--color-surface-base));
+html:is(:not([data-skin]), [data-skin="classic"]):not([data-theme="light"]),
+html:is(:not([data-skin]), [data-skin="classic"]):not([data-theme="light"]) body,
+html:is(:not([data-skin]), [data-skin="classic"])[data-theme="dark"],
+html:is(:not([data-skin]), [data-skin="classic"])[data-theme="dark"] body {
+  background-color: var(--ui-bg, var(--color-surface-base));
+  background-image: none;
   background-attachment: scroll;
 }
 
-html:not([data-skin]):not([data-theme="light"]) :is(.lab-shell, .lab-main, .lab-view),
-html:not([data-skin])[data-theme="dark"] :is(.lab-shell, .lab-main, .lab-view) {
-  background: var(--ui-bg, var(--color-surface-base));
+html:is(:not([data-skin]), [data-skin="classic"]):not([data-theme="light"]) :is(.lab-shell, .lab-main, .lab-view),
+html:is(:not([data-skin]), [data-skin="classic"])[data-theme="dark"] :is(.lab-shell, .lab-main, .lab-view) {
+  background-color: var(--ui-bg, var(--color-surface-base));
+  background-image: none;
 }
 
-html:not([data-skin]):not([data-theme="light"]) :is(.lab-rail, .lab-toolbar, .card, .modal, .dialog, [role="dialog"], .popover, .menu, .drawer, .chat-composer, .chat-composer-outer, .settings-panel, .ag-panel, .bot-goals, .lab-rail__foot-menu, .play-sidebar, .play-main.chat-panel, .chat-panel-header, .chat-panel-body, .play-rail),
-html:not([data-skin])[data-theme="dark"] :is(.lab-rail, .lab-toolbar, .card, .modal, .dialog, [role="dialog"], .popover, .menu, .drawer, .chat-composer, .chat-composer-outer, .settings-panel, .ag-panel, .bot-goals, .lab-rail__foot-menu, .play-sidebar, .play-main.chat-panel, .chat-panel-header, .chat-panel-body, .play-rail) {
-  background: var(--ui-surface, var(--color-surface-strong));
+html:is(:not([data-skin]), [data-skin="classic"]):not([data-theme="light"]) :is(.lab-rail, .lab-toolbar, .card, .modal, .dialog, [role="dialog"], .popover, .menu, .drawer, .chat-composer, .chat-composer-outer, .settings-panel, .ag-panel, .bot-goals, .lab-rail__foot-menu, .play-sidebar, .play-main.chat-panel, .chat-panel-header, .chat-panel-body, .play-rail),
+html:is(:not([data-skin]), [data-skin="classic"])[data-theme="dark"] :is(.lab-rail, .lab-toolbar, .card, .modal, .dialog, [role="dialog"], .popover, .menu, .drawer, .chat-composer, .chat-composer-outer, .settings-panel, .ag-panel, .bot-goals, .lab-rail__foot-menu, .play-sidebar, .play-main.chat-panel, .chat-panel-header, .chat-panel-body, .play-rail) {
+  background-color: var(--ui-surface, var(--color-surface-strong));
+  background-image: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   border-color: var(--ui-border, var(--color-border-strong));

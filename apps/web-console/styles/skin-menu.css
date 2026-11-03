@@ -1,7 +1,8 @@
 .skin-menu { position: relative; }
 .skin-menu__list {
   position: fixed;
-  z-index: 200;
+  z-index: 1000;
+  pointer-events: auto;
   min-width: 168px;
   margin: 0;
   padding: 4px;

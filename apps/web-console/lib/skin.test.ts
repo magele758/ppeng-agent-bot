@@ -7,7 +7,11 @@ import {
   SKIN_BOOTSTRAP,
   SKIN_STORAGE_KEY,
   applySkin,
+  paintSkinAttribute,
+  paintSkinMenuOpen,
   parseSkin,
+  skinMenuHoldsFoot,
+  skinMenuTargetInside,
   type SkinEnv
 } from './skin.ts';
 
@@ -129,6 +133,43 @@ test('每套外观有独立特效，极简黑白没有彩色 [AC:console-skin-mo
   assert.ok(colors.length > 0);
   assert.ok(colors.every(gray));
   assert.match(read('skin-motion-guard.css'), /prefers-reduced-motion:\s*reduce/);
+});
+
+test('偏好同步不能把经典写成 data-skin [AC:classic-solid-dark#AC-1]', () => {
+  const env = memoryEnv();
+  env.root.setAttribute('data-skin', 'classic');
+  paintSkinAttribute(env.root, 'classic');
+  assert.equal(env.root.getAttribute('data-skin'), null);
+  paintSkinAttribute(env.root, 'sanctum');
+  assert.equal(env.root.getAttribute('data-skin'), 'sanctum');
+  const sync = readFileSync(path.join(webRoot, 'components/UserPreferenceSync.tsx'), 'utf8');
+  assert.match(sync, /paintSkinAttribute\(root, readSkin\(\)\)/);
+  assert.doesNotMatch(sync, /setAttribute\('data-skin'/);
+});
+
+test('外观列表挂到页面上，按下就切换 [AC:outer-skin-picker#AC-1]', () => {
+  const env = memoryEnv();
+  const root = { child: null as unknown, contains(node: unknown) { return node === root.child; } };
+  const list = { child: null as unknown, contains(node: unknown) { return node === list.child; } };
+  const option = {};
+  list.child = option;
+  assert.equal(skinMenuTargetInside(option, root as unknown as Node, list as unknown as Node), true);
+  assert.equal(skinMenuTargetInside({}, null, null), false);
+  paintSkinMenuOpen(env.root, true);
+  assert.equal(skinMenuHoldsFoot(env.root), true);
+  paintSkinMenuOpen(env.root, false);
+  assert.equal(skinMenuHoldsFoot(env.root), false);
+  const toggle = readFileSync(path.join(webRoot, 'components/SkinToggle.tsx'), 'utf8');
+  assert.match(toggle, /createPortal\(/);
+  assert.match(toggle, /onMouseDown=\{[\s\S]{0,160}chooseSkin\(id\)/);
+  const rail = readFileSync(path.join(webRoot, 'components/shell/Rail.tsx'), 'utf8');
+  assert.match(rail, /keepFootOpen\(alive\.current\)/);
+});
+
+test('底部主题按钮按下就切换 [AC:rail-foot-theme#AC-1]', () => {
+  const toggle = readFileSync(path.join(webRoot, 'components/ThemeToggle.tsx'), 'utf8');
+  assert.match(toggle, /onMouseDown=\{[\s\S]{0,120}toggleTheme\(\)/);
+  assert.doesNotMatch(toggle, /onClick=\{toggleTheme\}/);
 });
 
 test('非经典外观随深浅色切换有独立 token [AC:skin-mode-adapt#AC-1]', () => {
