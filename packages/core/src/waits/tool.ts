@@ -6,11 +6,13 @@ import {DurableWaitStore} from './store.js';
 import {waitSources} from './sources.js';
 import {waitConditionSchema} from './conditions.js';
 import {DURABLE_WAIT_DEFAULT} from './default-park.js';
+import {botWorkWaitOwner} from '../bots/bot-work-waits.js';
 import type {WaitOwner,WaitSpec} from './types.js';
 export function activeWaitOwner(store:SqliteStateStore,session:SessionRecord):WaitOwner|undefined {
  const runs=new RoutineRunStore(store).pending().filter(r=>r.sessionId===session.id&&r.status==='running');
  if(runs.length===1){const run=runs[0]!;return {kind:'routine',id:run.id,revision:run.attempt,sessionId:session.id,scopeSessionId:run.mainSessionId};}
- if(runs.length||session.metadata.botWorkTaskId||session.metadata.botGoalWorker)return undefined;
+ if(runs.length||session.metadata.botGoalWorker)return undefined;
+ if(session.metadata.botWorkTaskId)return botWorkWaitOwner(store,session);
  const scope=goalScope(store,session);const id=session.metadata.botGoalId,executionId=session.metadata.botGoalExecutionId;
  if(!scope||typeof id!=='string'||typeof executionId!=='string')return undefined;
  const goal=scope.service.get(scope.botId,id),execution=scope.service.executions(scope.botId,id).find(e=>e.id===executionId);

@@ -15,6 +15,7 @@ import type { MessagePart, SessionRecord, ToolContract } from '../types.js';
 import type { SessionFacadeHost } from '../runtime/session-facade.js';
 import { createBot, openBot } from './bot-facade.js';
 import { beginBotDelivery, finishBotDelivery, readBotDelivery, type BotDelivery } from './bot-delivery.js';
+import { botWorkDurableWaitHolding, resumeParkedBotWork } from './bot-work-waits.js';
 import { resolveBotPrincipal, principalFromSession, botPrincipalKey, sameBotPrincipal, botDefinitionOwner, type BotPrincipal } from './bot-identity.js';
 import { ROOM_HUMAN_STEP_NOTICE, ROOM_HUMAN_STEP_REASON, memberNeedsHuman, privateHandbackText, roomMetadataAfterHandOff } from '../rooms/human-step.js';
 import { botWorkRestartDefersCompletion, settleBotWorkRestart, withholdRestartSessions } from './bot-work-restart.js';
@@ -486,6 +487,7 @@ function processingContext(host:BotWorkHost,row:Record<string,unknown>,error?:un
 }
 function processingAwaitsApproval(host:BotWorkHost,row:Record<string,unknown>,context:ProcessingContext):boolean {
   if(context.priorTask?.status==='unknown'||context.priorTask?.status==='cancelled')return false;
+  if(context.session&&botWorkDurableWaitHolding(host.store,context.session))return true;
   if(hasPendingSessionWake(host.store,String(row.session_id)))return true;
   if(context.denied)return false;
   if(context.session?.status==='waiting_approval') {
@@ -738,6 +740,7 @@ export function recoverBotWork(store:SqliteStateStore):void {
  });
 }
 export async function tickBotWork(host:BotWorkHost):Promise<void> {
+ await resumeParkedBotWork(host);
  ensureBotWorkSchema(host.store);expireOverdueBotWork(host);
  // A missing chat does not revoke already accepted pending work. Repair only its recorded principal.
  for(const row of host.store.db.prepare("SELECT m.* FROM bot_work_messages m LEFT JOIN sessions s ON s.id=m.session_id WHERE m.status='pending' AND s.id IS NULL").all() as Record<string,unknown>[]){
