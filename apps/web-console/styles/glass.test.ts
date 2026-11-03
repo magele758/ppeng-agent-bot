@@ -36,3 +36,17 @@ test('[AC:app-frosted-glass#AC-2] reduced transparency drops blur and desktop gl
   const desktop = blockAfter(glass, 'html.desktop-glass body');
   assert.match(desktop, /background:\s*transparent/);
 });
+
+
+test('[AC:classic-solid-dark#AC-1] classic dark disables frosted glass; skins untouched', () => {
+  assert.match(glass, /html:not\(\[data-skin\]\):not\(\[data-theme="light"\]\)/);
+  assert.match(glass, /html:not\(\[data-skin\]\)\[data-theme="dark"\]/);
+  const at = glass.indexOf('html:not([data-skin]):not([data-theme="light"])');
+  assert.notEqual(at, -1);
+  const classicDark = glass.slice(at);
+  assert.match(classicDark, /--glass-filter:\s*none/);
+  assert.match(classicDark, /backdrop-filter:\s*none/);
+  assert.match(classicDark, /-webkit-backdrop-filter:\s*none/);
+  // Skin glass rules remain in the shared sheet above the classic-solid override.
+  assert.match(glass, /html\[data-skin\] :is\(\.lab-rail/);
+});
