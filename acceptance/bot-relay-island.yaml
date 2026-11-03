@@ -1,0 +1,15 @@
+id: bot-relay-island
+title: Bot 通信收起为灵动岛式胶囊
+status: implemented
+requirement: |
+  这个加个小UI，可以用个类似灵动岛的设计，对话内容不用展示，点开再展示
+notes: 'assumedApproval: standing-order-2026-10-22; 替代旧通信条的摘要展示，保留原时间轴位置与纯色全文弹窗。'
+criteria:
+  - id: AC-1
+    given: 时间轴中有 Bot 通信
+    when: 尚未打开
+    then: 显示居中的紧凑纯色胶囊，只有来源名称、头像与类型，不渲染正文或摘要
+  - id: AC-2
+    given: 桌面或窄屏中的通信胶囊
+    when: 点击或通过键盘打开再关闭
+    then: 胶囊不越出容器，完整消息在纯色弹窗中可读，关闭后焦点回到入口

@@ -1,7 +1,7 @@
 id: bot-relay-strip
 title: Bot 间通信在聊天流里显示为紧凑通信条，点击弹窗看全文
 status: implemented
-notes: "assumedApproval: standing-order-2026-10-22"
+notes: "assumedApproval: standing-order-2026-10-22; 2026-11-03 用户要求默认不展示摘要，改用 bot-relay-island 胶囊。"
 requirement: |
   runtime 投递给 Bot 会话的 user 消息「Message from <名称> / <bot_id>[ (from room <id>)]: <正文>」
   （正文可为「Delegated task <btask_id>: …」委派任务、「Task <btask_id> <status>: …」委派结果或普通消息）
@@ -20,7 +20,7 @@ criteria:
   - id: AC-3
     given: 一条长委派任务消息
     when: 聊天流渲染
-    then: 只渲染通信条（名称、类型、摘要），不含完整正文与 bot_/btask_ id 主文本
+    then: 只渲染通信入口（名称、类型），不含摘要、正文与 bot_/btask_ id 主文本
   - id: AC-4
     given: 通信条
     when: 打开弹窗

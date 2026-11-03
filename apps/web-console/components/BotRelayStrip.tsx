@@ -50,18 +50,14 @@ export function BotRelayTurn({ relay }: { relay: BotRelayMessage }) {
         className="bot-relay-strip"
         data-testid="bot-relay-strip"
         aria-haspopup="dialog"
+        aria-expanded={open}
         aria-label={t('play.botRelay.open', { name: relay.senderName })}
         onClick={() => setOpen(true)}
       >
-        <span className="bot-relay-strip__line">
-          <span className="bot-relay-strip__from">{t('play.botRelay.from')}</span>
-          <span className="bot-relay-strip__avatar" aria-hidden="true">{Array.from(relay.senderName)[0]}</span>
-          <span className="bot-relay-strip__name">{relay.senderName}</span>
-        </span>
-        <span className="bot-relay-strip__line">
-          <span className="bot-relay-strip__kind">{kind}</span>
-          <span className="bot-relay-strip__summary">{relay.summary}</span>
-        </span>
+        <span className="bot-relay-strip__avatar" aria-hidden="true">{Array.from(relay.senderName)[0]}</span>
+        <span className="bot-relay-strip__name">{relay.senderName}</span>
+        <span className="bot-relay-strip__kind">{kind}</span>
+        <svg className="bot-relay-strip__chevron" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m9 5 7 7-7 7" /></svg>
       </button>
       {open ? createPortal(<BotRelayDialog relay={relay} onClose={() => setOpen(false)} />, document.body) : null}
     </div>
