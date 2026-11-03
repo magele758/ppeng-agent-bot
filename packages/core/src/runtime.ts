@@ -1903,6 +1903,7 @@ export class RawAgentRuntime {
       store: this.store,
       isRunning: id => this.runningSessions.has(id),
       executionInterrupted: id => { const session = this.store.getSession(id); return !session || (!this.runningSessions.has(id) && !this.store.isSessionWriterLive(id) && (session.status === 'running' || session.status === 'unknown')); },
+      hasUnconfirmedEffects: (id, since) => this.hasUnconfirmedEffects(id, since),
       cancel: id => this.cancelSession(id),
       run: id => this.runSession(id),
       judge: this.modelAdapter.completeText?.bind(this.modelAdapter),
