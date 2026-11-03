@@ -1930,8 +1930,11 @@ details.trace-row,
 .play-sidebar__search { display: flex; align-items: center; min-width: 0; }
 .play-sidebar__search input { min-width: 0; flex: 1; }
 .chat-turn__label .chat-reply-quote__start, .chat-turn__actions .chat-reply-quote__start { min-height: 24px; width: 24px; padding: 3px; border-radius: 6px; color: var(--muted); opacity: 0; }
-.chat-turn__actions { display: flex; align-items: center; gap: 4px; }
+.chat-turn--assistant .chat-turn__content { position: relative; }
+.chat-turn__actions { position: absolute; top: 0; right: 0; z-index: 2; display: flex; align-items: center; gap: 4px; }
 .chat-turn__actions:empty { display: none; }
+.chat-turn .chat-turn__actions .correction-capture__trigger.btn { position: static; }
+.chat-turn__actions > button { background: var(--bg-raised); }
 .chat-turn__actions .chat-reply-quote__start { margin-left: 0; }
 .chat-turn:hover .chat-reply-quote__start, .chat-turn:focus-within .chat-reply-quote__start { opacity: 1; }
 @media (hover: none) { .chat-turn__label .chat-reply-quote__start, .chat-turn__actions .chat-reply-quote__start { opacity: 1; } }
