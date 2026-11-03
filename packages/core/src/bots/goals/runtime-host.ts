@@ -30,6 +30,8 @@ export interface GoalRuntimeHost {
  emitTrace?(sessionId: string, event: { kind: 'child_session'; payload: Record<string, unknown> }): void;
  /** True when this process no longer owns the execution, including after a restart. */
  executionInterrupted?(sessionId: string): boolean;
+ /** Missing means the external effect is unverified and must not be resumed. */
+ hasUnconfirmedEffects?(sessionId: string, startedAt: string): boolean;
 }
 /** Short terminal notice — keep the chat quiet; Lab surfaces still hold full state. */
 export function formatQuietGoalNotice(goal:BotGoal):string {

@@ -43,7 +43,8 @@ export function parkBackgroundDurableWait(
   markHostRegistered(store,record.id);
   const live=store.getSession(session.id)??session;
   const checkpoint={kind:'waiting' as const,summary,wait:{source:'durable_wait',correlationId:record.id}};
-  store.updateSession(live.id,{metadata:{...live.metadata,agentWaitId:record.id,...(owner.kind==='goal'?{botGoalCheckpoint:checkpoint}:{})}});
+  const botWork=owner.kind==='bot_work'?{botWorkDurableWait:record.id,outcome:{kind:'idle' as const,reason:'bot_work_durable_wait'}}:{};
+  store.updateSession(live.id,{metadata:{...live.metadata,agentWaitId:record.id,...(owner.kind==='goal'?{botGoalCheckpoint:checkpoint}:{}),...botWork}});
   if(owner.kind==='routine'){
    new RoutineRunStore(store).update(owner.id,{waitId:record.id,waitCheckpoint:summary,status:'waiting_condition',result:summary,error:undefined});
   }

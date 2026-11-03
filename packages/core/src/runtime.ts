@@ -30,6 +30,7 @@ import { observeGoalBudget } from './bots/goals/budget.js';
 import { join } from 'node:path';
 import { LibraryIndexWatcher } from './ingestion/library-index.js';
 import { acquireRuntimeProcessOwnership, recoverInterruptedSessions } from './runtime/restart-recovery.js';
+import { sweepOrphanBackgroundJobs } from './runtime/background-job-recovery.js';
 import { randomUUID } from 'node:crypto';
 import { LcuComputerUseProvider, type LcuDeps } from './computer-use/lcu-provider.js';
 import { createLcuApprovalHandler, lcuGrantPolicy } from './computer-use/approval.js';
@@ -464,6 +465,7 @@ export class RawAgentRuntime {
           this.releaseProcessOwnership = ownership.release;
           recoverInterruptedSessions(this.store);
           recoverBotWork(this.store);
+          sweepOrphanBackgroundJobs(this.store, new Set<string>());
           interruptedSubagents = markInterruptedSubagentsUnknown(this.store);
         }
       } catch (error) {
@@ -862,6 +864,14 @@ export class RawAgentRuntime {
   isBackgroundJobRunning(jobId: string): boolean {
     const controller = this.backgroundJobAborts.get(jobId);
     return Boolean(controller && !controller.signal.aborted);
+  }
+
+  private liveBackgroundJobIds(): ReadonlySet<string> {
+    const live = new Set<string>();
+    for (const jobId of this.backgroundJobAborts.keys()) {
+      if (this.isBackgroundJobRunning(jobId)) live.add(jobId);
+    }
+    return live;
   }
 
   hasUnconfirmedEffects(sessionId: string, startedAt: string): boolean {
@@ -1590,6 +1600,7 @@ export class RawAgentRuntime {
       }
       return;
     }
+    sweepOrphanBackgroundJobs(this.store, this.liveBackgroundJobIds());
     void this.daydream.tick().catch(error => this.log.warn('Daydream failed', { error: String(error) }));
     await reconcileBypassApprovals(this);
     await this.factory.tick().catch(error => this.log.warn('Factory scheduler failed', {error:String(error)}));
@@ -1892,6 +1903,7 @@ export class RawAgentRuntime {
       store: this.store,
       isRunning: id => this.runningSessions.has(id),
       executionInterrupted: id => { const session = this.store.getSession(id); return !session || (!this.runningSessions.has(id) && !this.store.isSessionWriterLive(id) && (session.status === 'running' || session.status === 'unknown')); },
+      hasUnconfirmedEffects: (id, since) => this.hasUnconfirmedEffects(id, since),
       cancel: id => this.cancelSession(id),
       run: id => this.runSession(id),
       judge: this.modelAdapter.completeText?.bind(this.modelAdapter),

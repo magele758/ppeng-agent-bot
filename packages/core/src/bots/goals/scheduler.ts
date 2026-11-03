@@ -12,6 +12,7 @@ import { childPermissionMode, inheritBotAllowlists, inheritModelOverride } from 
 import { inheritForkRetrievalMetadata, forkOpeningMessage } from '../fork-inheritance.js';
 import { childSessionTrace } from '../../stores/trace-visible.js';
 import { announceGoalState, bindGoalExecution, goalAlreadyHandled, goalScope, judgeChildCompletion, settleGoalExecution, type GoalRuntimeHost } from './runtime-host.js';
+import { settleDeadGoalExecution } from './restart-resume.js';
 import type { BotGoal, GoalExecution, GoalReport } from './types.js';
 
 import { occupiesGoalCapacity } from './service.js';
@@ -321,9 +322,6 @@ function deadRunningExecution(host: GoalRuntimeHost, session: SessionRecord | un
  const target = host.store.getSession(targetId);
  return target?.status === 'unknown';
 }
-function recoverDeadExecution(service: GoalService, botId: string, goal: BotGoal, execution: GoalExecution): void {
- service.recoverInterruptedExecution(botId, execution.id);
-}
 function ownedGoalSession(host: GoalRuntimeHost, parent: SessionRecord, goal: BotGoal, sessionId: string): SessionRecord | undefined {
  const session = host.store.getSession(sessionId);
  if (!session || session.metadata.botGoalScopeSessionId !== parent.id || session.metadata.botGoalId !== goal.id) return undefined;
@@ -361,7 +359,7 @@ function heldForApproval(host: GoalRuntimeHost, parent: SessionRecord | undefine
 function settleRunningLease(host: GoalRuntimeHost, service: GoalService, botId: string, session: SessionRecord | undefined, goal: BotGoal, execution: GoalExecution, running: boolean): void {
  const parent = host.store.getSession(goal.sessionId);
  if (heldForApproval(host, parent, goal)) return;
- if (deadRunningExecution(host, session, execution)) { recoverDeadExecution(service, botId, goal, execution); return; }
+ if (deadRunningExecution(host, session, execution)) { settleDeadGoalExecution(host, service, botId, goal, execution); return; }
  if (!session) return;
  if (running || session.status === 'waiting_approval') {
   renewOrExpireLease(host, service, botId, session, goal, execution);

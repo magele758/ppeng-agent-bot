@@ -304,6 +304,27 @@ export class BotGoalService {
   if(!terminal.has(goal.status)&&goal.status!=='paused'){goal.status=execution.safeToRetry?'queued':'blocked';goal.blockedReason=execution.safeToRetry?undefined:'Execution interrupted; verify external effects before retry';}
   this.event(s,'recovered',goal);return goal;
  });}
+ resumeInterruptedCheckpoint(botId:string,executionId:string,nextStep:string):BotGoal|undefined{return mutateGoalSnapshot(this.store,botId,s=>{
+  const execution=s.executions.find(item=>item.id===executionId&&item.status==='running');
+  if(!execution)return undefined;
+  return this.requeueCheckpoint(s,execution,nextStep);
+ });}
+ private requeueCheckpoint(s:GoalSnapshot,execution:GoalExecution,nextStep:string):BotGoal|undefined{
+  const goal=s.goals.find(item=>item.id===execution.goalId&&this.visible(item));
+  if(!goal)return undefined;
+  this.interruptExecution(execution,goal);
+  this.queueCheckpointResume(goal,nextStep);
+  this.event(s,'recovered',goal);
+  return goal;
+ }
+ private interruptExecution(execution:GoalExecution,goal:BotGoal):void{
+  execution.status='interrupted';execution.endedAt=this.date();
+  if(goal.activeExecutionId===execution.id){goal.activeExecutionId=undefined;goal.draining=false;}
+ }
+ private queueCheckpointResume(goal:BotGoal,nextStep:string):void{
+  if(terminal.has(goal.status)||goal.status==='paused')return;
+  goal.status='queued';goal.blockedReason=undefined;goal.resumeRequested=true;goal.nextStep=nextStep;
+ }
  recover(botId:string,heldExecutionIds?:ReadonlySet<string>):BotGoal[]{return mutateGoalSnapshot(this.store,botId,s=>{
   const changed:BotGoal[]=[];
   for(const e of s.executions){const g=s.goals.find(x=>x.id===e.goalId&&this.visible(x));if(!g||e.status!=='running'||e.leaseUntil>this.clock()||heldExecutionIds?.has(e.id))continue;

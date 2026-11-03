@@ -7,7 +7,7 @@ export type WaitCondition =
  | {op:'changed';field:string}
  | {op:'all'|'any';conditions:WaitCondition[]};
 export interface WaitSpec { source:string;ref:string;condition:WaitCondition;deadline?:number;maxChecks?:number }
-export interface WaitOwner { kind:'goal'|'routine';id:string;revision:number;sessionId:string;scopeSessionId:string;executionId?:string;botId?:string }
+export interface WaitOwner { kind:'goal'|'routine'|'bot_work';id:string;revision:number;sessionId:string;scopeSessionId:string;executionId?:string;botId?:string }
 export type Observation = {availability:'available';facts:Record<string,Fact>} | {availability:'unavailable'|'unauthorized';reason:string};
 export interface WaitSource {
  fields:readonly string[];
