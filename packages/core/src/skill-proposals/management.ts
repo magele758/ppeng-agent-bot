@@ -589,7 +589,7 @@ export function createSkillManageTool(
   return {
     name: "skill_manage",
     description:
-      "List accessible skills and manage skills owned by this Bot. Actions: list, create, update, share, unshare, delete. List supports query, offset and limit (default 20, max 50); it returns summaries, not bodies. Use exact skill IDs and Bot recipient IDs. User-directed operations execute automatically after runtime authorization verification; autonomous changes show one confirmation card then execute automatically. Submit intent/changes for create/update, never a body. Public and received skills are read-only. Do not use filesystem or shell tools to bypass this workflow.",
+      "List accessible skills and manage skills owned by this Bot. Actions: list, create, update, share, unshare, delete. List supports query, offset and limit (default 20, max 50); it returns summaries, not bodies. Use exact skill IDs and Bot recipient IDs. When this conversation permissionMode is bypass, owned create, update, share, unshare and delete run immediately. Otherwise user-directed operations execute automatically after runtime authorization verification; autonomous changes show one confirmation card then execute automatically. Submit intent/changes for create/update, never a body. Public and received skills are read-only. Do not use filesystem or shell tools to bypass this workflow.",
     approvalMode: "never",
     sideEffectLevel: "workspace",
     inputSchema: {

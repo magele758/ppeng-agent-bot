@@ -389,7 +389,7 @@
     "scripts/agent-eval/goal-chain-live.mjs": "cea87ee0ef29a7ebfdc7c35d219aa944416e04eeb5fc8331eb6a2bd357f51a9a",
     "packages/core/src/bots/goals/intake.ts": "c5a6a60e675e37071e874e4747b0527990dbab301dce1b460a0a0ba81116a1c3",
     "packages/core/src/bots/goals/completion-evidence.ts": "133fdd6901cd06287e9cf5f9d673a3406652c572e6435e086c91aae9e14a36f8",
-    "packages/core/src/runtime.ts": "99b204f4c23153efd54ed0919af4381f8a3884c541d4c51ef40f6d0aa49eec74",
+    "packages/core/src/runtime.ts": "56d0f3d68c639b7ccbaab92232e5c0a9973616c931af049847ff302eadd84625",
     "packages/core/src/runtime/l5-bindings.ts": "ba46d44c63f1be19a8f05f56491a78f9315ad5ec54136450c15f36e26886ee21",
     "packages/core/src/bots/strict-output.ts": "892f0f7347b6bf134c1f4d66d97e8f9a0677afaff69b5fc812d1ecf117d7aeb2",
     "packages/core/src/runtime/steer-tools.ts": "ee3ac8ce03aed1a3fd236421c5e01fcc5ca062e9ac20b2c662821bc88dde17a2",

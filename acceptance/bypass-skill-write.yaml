@@ -1,0 +1,26 @@
+id: bypass-skill-write
+title: bypass 的 Bot 写技能不再被额外确认拦住
+status: implemented
+requirement: |
+  正式 skill 的文件写入由 approve() 完成，写入路径为 stateDir/skills/.bots/<botSkillId>/SKILL.md。
+
+  但 skill_manage 的成功分支里没有调用 install、approve、distill 或 generator。因此 skill_manage 的持久化方式与提案存储不同。
+
+  需要先确认 skill_manage 的成功路径，避免给用户错误的文件位置。
+
+  skill存储的问题看起来还是没搞定，帮我排查彻底解决一下
+  而且我的bot是bypass权限怎么还有这种限制，skill写本来就不该拦截，何况是bypass的bot
+  还有什么其他的类似的问题，不该拦截的就帮我一起排查修改一下，这种逻辑都是矛盾的，分多个agent去排查和解决类似的问题，快速解决
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  bypass 会话写自己的技能时直接保存，不再经过「这句话是否明确授权」的第二道确认。
+  不是 bypass 的会话仍先确认一次。成功写入仍只走原来的批准安装，不另写一套文件。
+criteria:
+  - id: AC-1
+    given: 某个 Bot 的权限是 bypass
+    when: 它新建自己的技能
+    then: 技能直接保存，该 Bot 能加载，不出现确认卡，也不再询问一次权限；其他 Bot 看不到这份额外的私有技能
+  - id: AC-2
+    given: Bot 的权限不是 bypass，用户也没有明确要求写这个技能
+    when: Agent 自己提出新建技能
+    then: 先出现确认；确认前不保存技能
