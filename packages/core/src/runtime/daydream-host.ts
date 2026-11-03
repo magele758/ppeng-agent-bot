@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { RawAgentRuntime } from "../runtime.js";
 import { BotDaydreamService } from "../daydream/service.js";
-import type { DaydreamCandidate, DaydreamOutput } from "../daydream/types.js";
+import type { DaydreamBot, DaydreamCandidate, DaydreamOutput } from "../daydream/types.js";
 import { KnowledgeService } from "../knowledge/service.js";
 import type {
   KnowledgeActor,
@@ -17,6 +17,7 @@ import {
 import {
   botDaydreamPrincipal,
   readBotDaydreamEvidence,
+  tryBotDaydreamPrincipal,
 } from "./daydream-evidence.js";
 import { resolveSessionModelAdapter } from "../model/provider-catalog.js";
 import { saveSemanticFact } from "../memory/memory-writer.js";
@@ -58,10 +59,7 @@ export class DaydreamHost {
       db: runtime.store.db,
       settingsStore: runtime.store,
       listBots: () =>
-        runtime.listBots({ includeHidden: true }).map((b) => ({
-          id: b.id,
-          ...botDaydreamPrincipal(runtime.store, b.id),
-        })),
+        runtime.listBots({ includeHidden: true }).map((b) => daydreamBotRecord(runtime.store, b)),
       readEvidence: async (id, date, tz) =>
         readBotDaydreamEvidence(runtime.store, id, date, tz),
       complete: (id, input) => this.complete(id, input),
@@ -536,9 +534,12 @@ export class DaydreamHost {
       this.knowledge.ackEvents(actor, "runtime", events.at(-1)!.seq);
     }
   }
+  private reviewBots() {
+    return this.runtime.listBots().filter((bot) => isDaydreamRunnable(this.runtime.store, bot));
+  }
   private async executeTick() {
     await this.local.tick();
-    for (const bot of this.runtime.listBots()) {
+    for (const bot of this.reviewBots()) {
       if (this.closed) return;
       try {
         if (this.local.getSettings(bot.id).enabled)
@@ -569,6 +570,13 @@ export class DaydreamHost {
       this.activeTick ?? Promise.resolve(),
     ]);
   }
+}
+function daydreamBotRecord(store: RawAgentRuntime["store"], bot: { id: string }): DaydreamBot {
+  const principal = tryBotDaydreamPrincipal(store, bot.id);
+  return principal ? { id: bot.id, ...principal } : { id: bot.id, runnable: false };
+}
+function isDaydreamRunnable(store: RawAgentRuntime["store"], bot: { id: string }): boolean {
+  return daydreamBotRecord(store, bot).runnable !== false;
 }
 function sharedQueryTerms(query: string): string[] {
   const words =

@@ -1,0 +1,18 @@
+id: bot-daydream-missing-session
+title: 缺少固定对话时每日复盘继续
+status: implemented
+notes: 'assumedApproval: standing-order-2026-10-22'
+requirement: |
+  [runtime] Daydream failed { error: 'Error: Bot session not found' }
+  [runtime] Daydream failed { error: 'Error: Bot session not found' }
+  [runtime] Daydream failed { error: 'Error: Bot session not found' }
+  [runtime] Daydream failed { error: 'Error: Bot session not found' } 修复这个问题
+criteria:
+  - id: AC-1
+    given: 每日复盘已到点，有的 Bot 固定对话还在，有的 Bot 固定对话已经不在
+    when: 定时复盘运行
+    then: 这一轮不会因为缺少对话而失败，仍有对话的 Bot 照常进入复盘，没有对话的 Bot 被跳过
+  - id: AC-2
+    given: 一只 Bot 的固定对话已经不在
+    when: 定时复盘再次运行
+    then: 不再把找不到对话记成这一轮复盘失败

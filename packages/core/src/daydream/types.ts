@@ -13,6 +13,8 @@ export interface DaydreamBot {
   id: string;
   tenantId?: string;
   userId?: string;
+  /** False when this Bot has no conversation left to review. */
+  runnable?: boolean;
 }
 export interface DaydreamArtifactRef {
   id: string;

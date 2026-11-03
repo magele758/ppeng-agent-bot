@@ -2,7 +2,13 @@ import { isTemporaryMemoryInstruction } from '../memory/memory-dialogue-extract.
 import { createHash, randomUUID } from 'node:crypto';
 import { DAYDREAM_PROMPT, parseDaydreamCandidates } from './candidates.js';
 import { daydreamLocalDate, daydreamLocalTime, readDaydreamSettings, shiftDay, updateDaydreamSettings } from './settings.js';
-import type { DaydreamDeps, DaydreamRun, DaydreamSettings, DaydreamCandidate, DaydreamOutput } from './types.js';
+import type { DaydreamBot, DaydreamDeps, DaydreamRun, DaydreamSettings, DaydreamCandidate, DaydreamOutput } from './types.js';
+function isDaydreamBotRunnable(bot: DaydreamBot): boolean {
+  return bot.runnable !== false;
+}
+function runnableBots(bots: DaydreamBot[]): DaydreamBot[] {
+  return bots.filter(isDaydreamBotRunnable);
+}
 export class BotDaydreamService {
   private closing = false;
   private readonly botLeases = new Map<string, string>();
@@ -107,7 +113,7 @@ export class BotDaydreamService {
       throw new Error('Daydream lease lost');
   }
   async tick(): Promise<void> {
-    for (const bot of this.deps.listBots()) {
+    for (const bot of runnableBots(this.deps.listBots())) {
       const settings = this.getSettings(bot.id);
       if (!this.isDue(settings))
         continue;
