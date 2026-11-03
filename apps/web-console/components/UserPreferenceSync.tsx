@@ -4,14 +4,14 @@ import { api } from '@/lib/api';
 import { createPreferenceSync } from '@/lib/user-preference-sync';
 import { acknowledgePreferences, scopedLegacyPreferences, pendingPreferences, receivePreferences } from '@/lib/user-preference-storage';
 import { currentTheme, THEME_CHANGED_EVENT } from '@/lib/theme';
-import { readSkin, SKIN_CHANGED_EVENT } from '@/lib/skin';
+import { paintSkin, readSkin, SKIN_CHANGED_EVENT } from '@/lib/skin';
 import { normalizeFontSize } from '@/lib/font-size';
 import { SESSION_BRIEF_CHANGED_EVENT } from '@/lib/session-brief';
 
 function applyAppearance(): void {
  const root = document.documentElement;
  root.setAttribute('data-theme',currentTheme());
- root.setAttribute('data-skin',readSkin());
+ paintSkin(readSkin(),root);
  root.setAttribute('data-font-size',String(normalizeFontSize(localStorage.getItem('lab.fontSize'))));
  for (const event of [THEME_CHANGED_EVENT,SKIN_CHANGED_EVENT,SESSION_BRIEF_CHANGED_EVENT]) window.dispatchEvent(new Event(event));
 }
