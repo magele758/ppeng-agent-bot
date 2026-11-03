@@ -42,15 +42,17 @@ export function readSkin(env: SkinEnv = liveEnv()): SkinId {
   return parseSkin(env.storage.getItem(SKIN_STORAGE_KEY));
 }
 
+/** Classic has no data-skin, so solid dark rules keep matching. Other skins set the attribute. */
+export function paintSkin(skin: SkinId, root: SkinRoot): void {
+  if (skin === 'classic') root.removeAttribute(SKIN_ATTRIBUTE);
+  else root.setAttribute(SKIN_ATTRIBUTE, skin);
+}
+
 /** Classic removes the stored key and the attribute, so the original theme CSS applies unchanged. */
 export function applySkin(skin: SkinId, env: SkinEnv = liveEnv()): void {
-  if (skin === 'classic') {
-    env.storage.removeItem(SKIN_STORAGE_KEY);
-    env.root.removeAttribute(SKIN_ATTRIBUTE);
-  } else {
-    env.storage.setItem(SKIN_STORAGE_KEY, skin);
-    env.root.setAttribute(SKIN_ATTRIBUTE, skin);
-  }
+  if (skin === 'classic') env.storage.removeItem(SKIN_STORAGE_KEY);
+  else env.storage.setItem(SKIN_STORAGE_KEY, skin);
+  paintSkin(skin, env.root);
   env.dispatch?.();
 }
 
