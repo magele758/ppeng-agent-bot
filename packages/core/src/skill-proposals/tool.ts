@@ -14,7 +14,7 @@ export function createSkillProposeTool(deps: SkillProposeToolDeps): ToolContract
     description:
       'Suggest capturing a reusable skill from a successfully completed workflow, or updating an existing skill. ' +
       'Decide whether the experience is worth recording yourself. Submit ONLY an intent (name, description, reason, summary), NOT a skill body. ' +
-      'A non-blocking confirmation card appears in this conversation. Only after the human confirms will the runtime distill and save the skill automatically, without a second review. ' +
+      'When this conversation permissionMode is bypass, the runtime distills and saves immediately. Otherwise a non-blocking confirmation card appears in this conversation, and only after the human confirms does the runtime distill and save the skill, without a second review. ' +
       'New Bot skills are private by default. For explicit user commands to create/update, or to manage sharing/deletion, use skill_manage; skill_propose is for autonomous suggestions. Use the exact owned skill name and targetSkillId for updates; choose a new name for built-in or ~/.agents skills that cannot be replaced. ' +
       'Do not repeat rejected suggestions. Continue the current task without waiting for a decision. Never include secrets.',
     inputSchema: {

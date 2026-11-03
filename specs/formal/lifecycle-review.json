@@ -335,7 +335,7 @@
     }
   ],
   "sha256": {
-    "packages/core/src/runtime.ts": "99b204f4c23153efd54ed0919af4381f8a3884c541d4c51ef40f6d0aa49eec74",
+    "packages/core/src/runtime.ts": "56d0f3d68c639b7ccbaab92232e5c0a9973616c931af049847ff302eadd84625",
     "packages/core/src/runtime/session-control.ts": "8f42a13096811dd960ed726e7d9685350fa041e08c57960e9e2f57cf7c5d55b4",
     "packages/core/src/runtime/session-facade.ts": "54d800b00dd14bcd9d1184da8c69c5ef1f2fffa9c2e1d6e2608b735e98ae7de0",
     "packages/core/src/runtime/session-complete.ts": "dc1ac19365583096d95892d5f424293ab5ef2e0e3494665451a2ed951fc7f6e5",
@@ -425,7 +425,7 @@
     "packages/core/src/bots/bot-delivery.ts": "c7011280fd6fdefca91da9a1756d96694ddf7132e133c649f5c7dddd09ce44b2",
     "packages/core/src/runtime/request-metrics.ts": "d845f4bdb25095aea99b5f8e7b24ed2536f5540845731c7de9a7673a47fe80d0",
     "packages/core/src/skill-proposals/capture.ts": "f3155c224aa007e78233e7faaaf8569c2aebef36a507e2d0323f96cb935d76d3",
-    "packages/core/src/skill-proposals/management.ts": "e8812054dd996203a6da64e9e6aef2c4f1a4fc3391408cce7f7927973d1e7e8a",
+    "packages/core/src/skill-proposals/management.ts": "2344beb4d4e2ff16ba907eab7b832b1808cad024906940546dc01a414a3294d5",
     "packages/core/src/runtime/spawn-policy.ts": "4889022804d3797796d018abfbe084a2373f1bf630098c6470d932a0c67ebabd",
     "packages/core/src/memory/bot-memory-scope.ts": "bffdcf6cf3e848ea1f2fcc5059b54345d3ee9d49ff98b3a57e917e88593d50c9",
     "packages/core/src/tools/product-admin-tools.ts": "3e154e1f4af085abb374b29923af4795f5ae7ea7d2960749d7f549a94227b81c",
