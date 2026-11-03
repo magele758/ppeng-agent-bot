@@ -4,56 +4,58 @@
   min-width: 0;
 }
 
-.bot-relay-strip {
-  display: flex;
-  flex-direction: column;
+.bot-relay-turn .bot-relay-strip {
+  display: inline-flex;
   align-items: center;
-  gap: 2px;
-  max-width: 100%;
+  gap: 8px;
+  width: fit-content;
+  max-width: min(360px, 100%);
   min-width: 0;
-  padding: 2px 8px;
-  border: 0;
-  background: transparent;
-  color: var(--ui-text-muted, rgb(80 80 80 / 0.72));
+  min-height: 38px;
+  box-sizing: border-box;
+  padding: 6px 12px 6px 7px;
+  border: 1px solid #363a3e;
+  border-radius: 999px;
+  background: #1c1f22;
+  color: #f6f7f8;
+  box-shadow: 0 3px 10px rgb(0 0 0 / 12%);
   font: inherit;
   font-size: 0.8125rem;
   line-height: 1.4;
-  text-align: center;
+  text-align: start;
   cursor: pointer;
-}
-
-.bot-relay-strip__line {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  max-width: 100%;
-  min-width: 0;
+  transition: background-color 140ms ease, transform 140ms ease;
 }
 
 .bot-relay-strip:hover {
-  border-color: var(--ui-accent, currentColor);
+  background: #2c3034;
+  transform: translateY(-1px);
 }
 
 .bot-relay-strip:focus-visible {
   outline: 2px solid var(--ui-accent, currentColor);
-  outline-offset: 2px;
+  outline-offset: 3px;
 }
 
-.bot-relay-strip__avatar {
+.bot-relay-strip .bot-relay-strip__avatar {
   flex: 0 0 auto;
   display: inline-grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  background: var(--ui-accent-soft, rgb(127 127 127 / 0.2));
-  font-size: 0.75rem;
+  background: #354a40;
+  color: #d4eddf;
+  font-size: 0.6875rem;
   font-weight: 600;
 }
 
 .bot-relay-strip__name {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   font-weight: 600;
 }
 
@@ -62,13 +64,18 @@
   font-size: 0.75rem;
 }
 
-.bot-relay-strip__summary {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
+.bot-relay-strip > .bot-relay-strip__kind {
+  color: #bbc2c8;
   white-space: nowrap;
-  text-overflow: ellipsis;
-  opacity: 0.8;
+  padding-inline-start: 8px;
+  border-inline-start: 1px solid #4a4e52;
+}
+
+.bot-relay-strip__chevron { flex: 0 0 auto; color: #bbc2c8; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bot-relay-turn .bot-relay-strip { transition: none; }
+  .bot-relay-strip:hover { transform: none; }
 }
 
 .bot-relay-dialog__head {

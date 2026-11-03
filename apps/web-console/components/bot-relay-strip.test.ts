@@ -83,12 +83,12 @@ function renderTurn(role: string, text: string, extra: Record<string, unknown> =
   );
 }
 
-test('委派任务只显示紧凑通信条 [AC:bot-relay-strip#AC-3]', () => {
+test('委派任务只显示紧凑通信条 [AC:bot-relay-strip#AC-3] [AC:bot-relay-island#AC-1]', () => {
   const html = renderTurn('user', TASK);
   assert.match(html, /data-testid="bot-relay-strip"/);
   assert.match(html, /科研小助手/);
   assert.match(html, /委派任务/);
-  assert.match(html, /请评估这篇论文的实验设计/);
+  assert.doesNotMatch(html, /请评估这篇论文的实验设计/);
   assert.equal(html.includes(DETAIL), false);
   assert.equal(html.includes('bot_367eca'), false);
   assert.equal(html.includes('btask_9f8e7d'), false);
