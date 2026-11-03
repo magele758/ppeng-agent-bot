@@ -1,0 +1,13 @@
+id: skin-mode-adapt
+title: 非经典外观适配深浅色
+status: implemented
+requirement: |
+  除了经典主题，其他主题都没有适配深色、浅色的切换。
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  经典已跟随 data-theme。非经典外观（sanctum/cyberpunk/demon/robot-stage/pixel/kindergarten/minimal）在切换浅色/深色（或系统解析后的模式）时必须切换对应表面与文字 token，保持该外观的强调色性格。
+criteria:
+  - id: AC-1
+    given: 用户选了任一非经典外观
+    when: 在浅色与深色之间切换
+    then: 页面表面、文字对比度与相关 UI token 跟随模式变化，而不是卡在单一深浅色
