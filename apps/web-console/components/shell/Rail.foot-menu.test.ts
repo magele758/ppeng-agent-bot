@@ -358,3 +358,14 @@ test('悬停或聚焦后能看到配置模型和语言并触发原动作 [AC:rai
     t.mock.timers.reset();
   }
 });
+
+test('rail foot stays open while outer skin menu is marked open [AC:outer-skin-picker#AC-1]', () => {
+  const rail = readFileSync(path.join(webRoot, 'components/shell/Rail.tsx'), 'utf8');
+  const skinToggle = readFileSync(path.join(webRoot, 'components/SkinToggle.tsx'), 'utf8');
+  const skinLib = readFileSync(path.join(webRoot, 'lib/skin.ts'), 'utf8');
+  assert.match(skinLib, /SKIN_MENU_OPEN_ATTR\s*=\s*'data-ppeng-skin-menu-open'/);
+  assert.match(skinToggle, /setAttribute\(SKIN_MENU_OPEN_ATTR/);
+  assert.match(skinToggle, /removeAttribute\(SKIN_MENU_OPEN_ATTR/);
+  assert.match(rail, /data-ppeng-skin-menu-open/);
+  assert.match(rail, /closest\('\.skin-menu__list'\)/);
+});

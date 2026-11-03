@@ -1,0 +1,13 @@
+id: outer-skin-picker
+title: 外层外观设置可选中
+status: implemented
+requirement: |
+  外层的主题设置的按钮坏了，选择没反应。
+notes: |
+  assumedApproval: standing-order-2026-10-22
+  侧栏底部悬停菜单里的外观（SkinToggle）列表是 fixed 定位，移入选项时不得提前收起底部菜单，选中后应立刻应用并持久化。
+criteria:
+  - id: AC-1
+    given: 用户打开侧栏底部菜单并展开外观列表
+    when: 把指针移到某一外观选项并点击
+    then: 底部菜单在选项可选中前保持打开，选中后外观立刻切换并在刷新后仍保持

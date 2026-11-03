@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useI18n, type MessageKey } from '@/lib/i18n';
-import { SKIN_CHANGED_EVENT, SKIN_IDS, applySkin, readSkin, type SkinId } from '@/lib/skin';
+import { SKIN_CHANGED_EVENT, SKIN_IDS, SKIN_MENU_OPEN_ATTR, applySkin, readSkin, type SkinId } from '@/lib/skin';
 
 export function SkinToggle() {
   const { t } = useI18n();
@@ -35,6 +35,13 @@ export function SkinToggle() {
       document.removeEventListener('mousedown', close);
       document.removeEventListener('keydown', onKey);
     };
+  }, [open]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (open) root.setAttribute(SKIN_MENU_OPEN_ATTR, '1');
+    else root.removeAttribute(SKIN_MENU_OPEN_ATTR);
+    return () => root.removeAttribute(SKIN_MENU_OPEN_ATTR);
   }, [open]);
 
   const label = t('settings.skin.label');
