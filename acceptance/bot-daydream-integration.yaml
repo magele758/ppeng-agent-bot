@@ -1,0 +1,19 @@
+id: bot-daydream-integration
+title: 每日复盘共享成果进入后续 Bot 任务
+status: implemented
+requirement: |
+  按照这个开发计划，帮我分多个agent去完成开发
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: A 的技能已经获准共享给 B，C 未获授权
+    when: B 和 C 在新会话中搜索和加载技能
+    then: B 可以使用共享技能，C 无法读取，撤销后 B 也无法继续加载
+  - id: AC-2
+    given: 共享记忆只授权给 B
+    when: B 和 C 发起相关任务
+    then: B 的记忆上下文包含该成果，C 不包含，撤销后新上下文不再包含
+  - id: AC-3
+    given: 已开启每日复盘并存在当天多个会话
+    when: 发起指定日期复盘
+    then: 只回顾该 Bot 所有者及指定日期的会话，产出进入后续可用目录

@@ -52,6 +52,10 @@ export async function dreamNowForUser(input: {
     if (Date.now() - last < DREAM_THROTTLE_MS) return 'throttled';
   }
 
+  const text = (input.messagesText || '').trim();
+  const userLines = (text.match(/^user:/gim) || []).length;
+  if (!input.force && (!text || userLines < DREAM_MIN_MESSAGES)) return 'skipped';
+
   const date = new Date().toISOString().slice(0, 10);
   const run = input.store.claimDreamRun({
     userId: runKey,
@@ -62,17 +66,6 @@ export async function dreamNowForUser(input: {
   if (!run) return 'skipped';
 
   try {
-    const text = (input.messagesText || '').trim();
-    const userLines = (text.match(/^user:/gim) || []).length;
-    if (userLines < DREAM_MIN_MESSAGES && !input.force) {
-      input.store.finishDreamRun(run.id, { status: 'skipped', factsCount: 0, summary: 'min_messages' });
-      return 'skipped';
-    }
-    if (!text && !input.force) {
-      input.store.finishDreamRun(run.id, { status: 'skipped', factsCount: 0, summary: 'no_messages' });
-      return 'skipped';
-    }
-
     const facts = heuristicExtractDialogueFacts(text.replace(/^user:\s*/gim, ''));
     let written = 0;
     for (const fact of facts) {

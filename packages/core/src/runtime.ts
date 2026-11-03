@@ -1,3 +1,4 @@
+import { DaydreamHost } from './runtime/daydream-host.js';
 import { reconcileBypassApprovals } from './runtime/bypass-approvals.js';
 import {createWaitForTool} from './waits/tool.js';
 import { mergeDomainBundles, type DomainBundle } from './domain.js';
@@ -346,6 +347,8 @@ export class RawAgentRuntime {
   readonly modelAdapter: ModelAdapter;
   readonly selfHeal: SelfHealScheduler;
   readonly promptBuilder: PromptBuilder;
+  private daydreamHost?: DaydreamHost;
+  get daydream(): DaydreamHost { return this.daydreamHost ??= new DaydreamHost(this); }
   readonly skillCaptures: SkillCaptureService;
   readonly skillManagement: SkillManagementService;
   tools: ToolContract<any>[];
@@ -505,6 +508,8 @@ export class RawAgentRuntime {
       stateDir: this.stateDir,
       extraSkills: [...(options.extraSkills ?? []), ...mergedPlugins.skills],
       cloudSkillsLoader: options.cloudSkillsLoader,
+      sharedSkills: id => this.daydream.sharedSkills(id),
+      sharedMemory: (id, query) => this.daydream.sharedMemory(id, query),
       runtimeInstructions: (sessionId) =>
         [this.computerUse?.instructionsForSession(sessionId) ?? '', this.connectors.instructionsForGranted(process.env)]
           .filter(Boolean)
@@ -1585,6 +1590,7 @@ export class RawAgentRuntime {
       }
       return;
     }
+    void this.daydream.tick().catch(error => this.log.warn('Daydream failed', { error: String(error) }));
     await reconcileBypassApprovals(this);
     await this.factory.tick().catch(error => this.log.warn('Factory scheduler failed', {error:String(error)}));
     await tickBotWork(this.botWorkRuntimeHost());
@@ -2176,6 +2182,7 @@ export class RawAgentRuntime {
   /** Gracefully shut down all in-flight work, MCP sessions, and release SQLite. */
   async destroy(): Promise<void> {
     this.libraryIndex?.stop();
+    await this.daydreamHost?.close();
     await this.skillCaptures.close();
     await this.skillManagement.close();
     await this.factory.close();

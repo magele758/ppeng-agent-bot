@@ -1,0 +1,27 @@
+id: bot-daydream-knowledge
+title: Daydream Super Bot 共享治理
+status: implemented
+requirement: |
+  按照这个开发计划，帮我分多个agent去完成开发
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 工作 Bot 提交私有成果且 Super Bot 暂未配置
+    when: 服务重启或重复提交
+    then: 候选持久保留且不重复
+  - id: AC-2
+    given: 已配置 Super Bot 与允许共享的接收 Bot
+    when: Super Bot 发布候选
+    then: 授权 Bot 能读取确定版本，未授权 Bot 和其他租户不能读取
+  - id: AC-3
+    given: 治理任务已锁定候选集合
+    when: 新候选提交或其他 Bot 尝试裁决
+    then: 新候选留到下批且未授权裁决被拒绝
+  - id: AC-4
+    given: 已共享成果被读取或转述
+    when: Bot 再次上报或反馈
+    then: 没有新增证据不能循环上报，有新证据的反馈在下一批生成带血缘的新版本且不修改原 Bot 私有技能
+  - id: AC-5
+    given: 已发布成果及更新事件
+    when: 并发旧版本更新或撤销共享
+    then: 旧更新被拒绝且撤销立即阻止读取，事件进度可恢复

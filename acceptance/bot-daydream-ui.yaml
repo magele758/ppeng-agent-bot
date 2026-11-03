@@ -1,0 +1,27 @@
+id: bot-daydream-ui
+title: Bot 每日复盘配置与治理界面
+status: implemented
+requirement: |
+  按照这个开发计划，帮我分多个agent去完成开发
+notes: 'assumedApproval: standing-order-2026-10-22'
+criteria:
+  - id: AC-1
+    given: 用户打开 Bot 每日复盘
+    when: 查看并保存配置
+    then: 展示默认开启与时间时区策略，关闭期间仍可配置，保存后显示服务端结果
+  - id: AC-2
+    given: Bot 已有复盘记录
+    when: 用户手动复盘或展开历史
+    then: 可选择日期运行并查看结果及来源，失败不会显示成功
+  - id: AC-3
+    given: 用户具备共享治理权限
+    when: 配置 Super Bot 与接收范围并处理候选
+    then: 明确选择共享范围并可执行治理与接受拒绝暂缓；无治理权限不显示写入按钮
+  - id: AC-4
+    given: 手动任务已提交并在后台完成
+    when: 用户停留在每日复盘页
+    then: 运行结果自动刷新且不覆盖正在编辑的设置
+  - id: AC-5
+    given: 用户查看已有授权共享成果
+    when: 提交含真实消息引用的反馈或由治理者撤销
+    then: 反馈只选择服务端提供的证据，撤销需确认并更新共享列表；治理者可审核建议并编辑修订内容，提交时绑定原始版本

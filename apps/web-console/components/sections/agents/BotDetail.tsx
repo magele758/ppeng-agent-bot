@@ -1,6 +1,7 @@
 'use client';
 import { BotOverviewInfo, revealBotSetting } from '../../BotOverviewInfo';
 import { BotGoals } from '../../bot-work/BotGoals';
+import { BotDaydreamTab, BotDaydreamPage } from '../../daydream/BotDaydream';
 import { BotDetailSkills } from '../../BotDetailSkills';
 
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
@@ -331,8 +332,10 @@ export function BotDetail({ bot, onOpenChat, records, embedded = false }: BotDet
       {!settings && !error ? <p className="ag-panel__lead">{t('agents.bots.loadingSettings')}</p> : null}
       <div className="bot-settings-tabs" role="tablist" aria-label={t('polish.settingsTabs')}>
         {(['overview', 'permissions', 'history'] as const).map(tab => <button key={tab} type="button" role="tab" id={`${panelId}-tab-${tab}`} aria-controls={`${panelId}-page-${tab}`} aria-selected={detailTab === tab} onClick={() => setDetailTab(tab)}>{t(tab === 'overview' ? 'botSettings.overview' : tab === 'permissions' ? 'botSettings.capabilities' : 'botSettings.records')}</button>)}
+        <BotDaydreamTab panelId={panelId} selected={detailTab} onSelect={setDetailTab}/>
       </div>
       {saveEffect && <p role="status" data-testid="bot-save-effect">{t(`botSettings.${saveEffect}`)}</p>}
+      <BotDaydreamPage botId={bot.id} panelId={panelId} selected={detailTab}/>
       <div role="tabpanel" id={`${panelId}-page-overview`} aria-labelledby={`${panelId}-tab-overview`} hidden={detailTab !== 'overview'}>
       <BotOverviewInfo bot={bot} onSave={patchBot} />
       <BotCronPanel key={bot.id} botId={bot.id} botName={bot.name} />
