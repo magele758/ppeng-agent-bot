@@ -1,0 +1,24 @@
+id: background-job-restart
+title: 重启后中断无人执行的后台命令
+status: implemented
+requirement: |
+  如果bot在执行过程中，服务重启了，之前的任务就直接停了，重启之后，也没有继续执行。后台命令在进程死亡后不能永远停在运行中，也不能被自动再执行一遍。
+notes: |
+  assumedApproval: standing-order-2026-10-22
+criteria:
+  - id: AC-1
+    given: 一条后台命令记录仍显示为执行中，而当前进程并没有在执行它
+    when: 运行时完成启动恢复
+    then: 这条记录不再处于执行中。保存的结果写明进程已中断，且该命令没有被重新启动。不会另建一条命令记录。
+  - id: AC-2
+    given: 当前进程正在执行一条后台命令
+    when: 同一次清扫运行
+    then: 这条命令保持执行中
+  - id: AC-3
+    given: 一条后台命令已被记为进程中断
+    when: 再次清扫
+    then: 该记录保持不变，命令也不会被启动
+  - id: AC-4
+    given: 所属的持久等待正在等这条后台命令进入终态
+    when: 清扫把无人执行的命令记为中断
+    then: 等待方观察到该记录为失败，因此可以继续。错误状态会被报告为失败。
