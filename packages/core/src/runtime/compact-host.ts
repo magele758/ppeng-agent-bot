@@ -186,10 +186,6 @@ export async function autoCompactSession(
   context: RunContext,
   opts?: { force?: boolean }
 ): Promise<{ replaced?: { startSeq: number; endSeq: number } }> {
-  if (isCanonicalBotChat(context.session) && !opts?.force && summaryCoolingDown(host.store, context.session.id)) {
-    void host.emitTrace(context.session.id, { kind: 'compact_skipped', payload: { reason: 'summary_cooldown' } });
-    return {};
-  }
   const preCompact = await runLifecycleHook(process.env, {
     phase: 'pre_compact',
     sessionId: context.session.id,
@@ -229,7 +225,7 @@ export async function autoCompactSession(
   const session = host.store.getSession(context.session.id) ?? context.session;
   const force = compactForce(opts, host.store.foldMessages(session.id).length);
   if (isCanonicalBotChat(session)) {
-    return compactCanonicalBot(host, context, { ...opts, force });
+    return maybeCompactCanonicalBot(host, context, force, opts?.force);
   }
 
   const tokenThreshold = resolveHistoryTokenBudget(
@@ -293,6 +289,19 @@ export async function autoCompactSession(
     });
   }
   return { replaced: result.replaced };
+}
+
+async function maybeCompactCanonicalBot(
+  host: CompactHost,
+  context: RunContext,
+  force: boolean,
+  explicitForce?: boolean
+): Promise<{ replaced?: { startSeq: number; endSeq: number } }> {
+  if (!explicitForce && summaryCoolingDown(host.store, context.session.id)) {
+    void host.emitTrace(context.session.id, { kind: 'compact_skipped', payload: { reason: 'summary_cooldown' } });
+    return {};
+  }
+  return compactCanonicalBot(host, context, { force });
 }
 
 /**
