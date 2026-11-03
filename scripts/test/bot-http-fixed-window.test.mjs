@@ -40,6 +40,14 @@ test('completion grace lets the final admitted slot finish but never admits new 
  const phase=await runFixedHttpWindow({name:'measurement',seconds:.1,completionGraceMs:200,streams:[{name:'read',rate:100,clients:20,maxPendingPerClient:1,run:({index})=>new Promise(resolve=>setTimeout(()=>resolve(true),index===9?60:1))}]});
  const counts=phase.streams.read;assert.equal(counts.planned,10);assert.equal(counts.completed,10);assert.equal(counts.timedOut,0);assert.equal(phase.protocolPassed,true);assert.ok(phase.admissionElapsedSeconds<phase.observedElapsedSeconds);
 });
+test('completion grace finishes a slot already queued before the deadline and does not admit a later one [AC:ci-http-fixture-timing#AC-1]',async()=>{
+ const calls=[];
+ const phase=await runFixedHttpWindow({name:'measurement',seconds:.2,completionGraceMs:400,streams:[{name:'write',rate:10,clients:1,maxPendingPerClient:1,run:({index})=>new Promise(resolve=>{calls.push(index);setTimeout(()=>resolve(true),index===0?250:20);})}]});
+ const counts=phase.streams.write;
+ assert.deepEqual(calls,[0,1]);
+ assert.equal(counts.planned,2);assert.equal(counts.offered,2);assert.equal(counts.started,2);assert.equal(counts.completed,2);
+ assert.equal(counts.expiredQueued,0);assert.equal(counts.timedOut,0);assert.equal(counts.missedSchedule,0);assert.equal(phase.protocolPassed,true);
+});
 test('work exceeding the completion grace still times out and fails the window',async()=>{
  const started=performance.now();const phase=await runFixedHttpWindow({name:'measurement',seconds:.05,completionGraceMs:50,streams:[{name:'read',rate:20,clients:1,maxPendingPerClient:1,run:()=>new Promise(()=>{})}]});
  assert.ok(performance.now()-started<400);assert.equal(phase.streams.read.timedOut,1);assert.equal(phase.streams.read.completed,0);assert.equal(phase.protocolPassed,false);

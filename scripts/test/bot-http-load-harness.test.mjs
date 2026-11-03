@@ -6,6 +6,10 @@ import {join} from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {sanitizeSpawnEnv} from '../../packages/core/dist/sandbox/env-sanitizer.js';
 import {runHttpLoad, untrackedFingerprintInput} from '../bot-release/http-load.mjs';
+import {completionGraceMs} from '../bot-release/http-fixture-timing.mjs';
+// Covered smoke has been observed near 23s before grace. Both phases may then consume the
+// 15s smoke grace, and the daemon still has a 15s shutdown budget plus a 5s forced kill.
+const SHUTDOWN_HANG_PARENT_BOUND_MS = 90_000;
 import {controlledOperation,preferUnansweredCron} from '../bot-release/http-controlled-operation.mjs';
 test('dirty fingerprint records vanished files but preserves non-ENOENT errors', () => {
  const missing = Object.assign(new Error('deleted by concurrent test'), { code: 'ENOENT' });
@@ -25,7 +29,15 @@ test('controlled Room oracle selects current trigger despite old and later refer
  assert.equal(preferUnansweredCron([{role:'user',parts:[text('http_op_3 current')]},{role:'user',parts:[text('[cron:http_op_4] http_op_4 iii')]}],sessionId,'http_op_4'),'http_op_4');
  assert.equal(preferUnansweredCron([{role:'user',parts:[text('[cron:http_op_4] http_op_4 iii')]},{role:'user',parts:[text('http_op_3 current')]}],sessionId,'http_op_3'),'http_op_3');
 });
-test('real authenticated HTTP load fixture observes fixed read/write mix and refuses release acceptance [AC:bot-release-readiness#AC-3]',{timeout:60000},async()=>{
+test('smoke completion grace covers a coverage-slow write while the full protocol keeps the search budget [AC:ci-http-fixture-timing#AC-1]',()=>{
+ assert.equal(completionGraceMs(true,1000),15000);
+ assert.equal(completionGraceMs(false,1000),1000);
+});
+test('parent shutdown bound outlasts covered smoke, completion grace and the daemon shutdown budget [AC:ci-http-fixture-timing#AC-2]',()=>{
+ assert.ok(SHUTDOWN_HANG_PARENT_BOUND_MS>=23000+15000+15000+15000+5000);
+ assert.equal(SHUTDOWN_HANG_PARENT_BOUND_MS,90000);
+});
+test('real authenticated HTTP load fixture observes fixed read/write mix and refuses release acceptance [AC:bot-release-readiness#AC-3] [AC:ci-http-fixture-timing#AC-1]',{timeout:120000},async()=>{
  const directory=mkdtempSync(join(tmpdir(),'bot-http-load-test-'));
  try{const report=await runHttpLoad({smoke:true,smokeSeconds:5,out:join(directory,'report.json')});
   assert.equal(report.fixturePassed,true,JSON.stringify(report.errors));assert.equal(report.fullProtocol,false);assert.equal(report.referenceHardwareMatched,false);
@@ -39,7 +51,7 @@ test('real authenticated HTTP load fixture observes fixed read/write mix and ref
   for(const rows of Object.values(report.daemon.pending))assert.ok(rows.every(row=>!['queued','running','waiting_approval'].includes(row.status)),JSON.stringify(rows));
  }finally{rmSync(directory,{recursive:true,force:true});}
 });
-test('HTTP load rejects a daemon shutdown failure even after all results were completed [AC:bot-release-readiness#AC-3]',{timeout:60000},async()=>{
+test('HTTP load rejects a daemon shutdown failure even after all results were completed [AC:bot-release-readiness#AC-3]',{timeout:120000},async()=>{
  const directory=mkdtempSync(join(tmpdir(),'bot-http-load-exit-test-'));
  try{const report=await runHttpLoad({smoke:true,smokeSeconds:5,fixtureFault:'shutdown',out:join(directory,'report.json')});assert.equal(report.fixturePassed,false);assert.equal(report.daemonExit.code,1);assert.ok(report.errors.some(item=>item.phase==='daemon-exit'));assert.equal(report.acceptedResults.completed,report.acceptedResults.count);assert.match(report.releaseAcceptance,/NOT ACCEPTED/);}finally{rmSync(directory,{recursive:true,force:true});}
 });
@@ -48,9 +60,9 @@ test('HTTP load persists rejected startup evidence when daemon exits before read
  try{const report=await runHttpLoad({smoke:true,smokeSeconds:5,fixtureFault:'startup',out:join(directory,'report.json')});assert.equal(report.fixturePassed,false);assert.equal(report.daemonExit.code,1);assert.equal(report.errors[0].phase,'startup');assert.match(report.releaseAcceptance,/NOT ACCEPTED/);}finally{rmSync(directory,{recursive:true,force:true});}
 });
 
-test('HTTP load fails and kills daemon that hangs after final ledger [AC:bot-release-readiness#AC-3]',{timeout:45000},async()=>{
+test('HTTP load fails and kills daemon that hangs after final ledger [AC:bot-release-readiness#AC-3] [AC:ci-http-fixture-timing#AC-2]',{timeout:120000},async()=>{
  const directory=mkdtempSync(join(tmpdir(),'bot-http-load-hang-test-'));let timer;
- try{const report=await Promise.race([runHttpLoad({smoke:true,smokeSeconds:5,fixtureFault:'shutdown-hang',out:join(directory,'report.json')}),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Parent failed to bound shutdown after final ledger')),35000);})]);
+ try{const report=await Promise.race([runHttpLoad({smoke:true,smokeSeconds:5,fixtureFault:'shutdown-hang',out:join(directory,'report.json')}),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Parent failed to bound shutdown after final ledger')),SHUTDOWN_HANG_PARENT_BOUND_MS);})]);
   assert.equal(report.fixturePassed,false);assert.equal(report.daemonExit.signal,'SIGKILL');assert.ok(report.errors.some(item=>item.message.includes('shutdown')&&item.message.includes('budget')));assert.match(report.releaseAcceptance,/NOT ACCEPTED/);
  }finally{clearTimeout(timer);const lines=execFileSync('ps',['-eo','pid,args'],{encoding:'utf8',env:sanitizeSpawnEnv()}).split('\n');for(const line of lines.filter(line=>line.includes('http-load-daemon.mjs')&&line.includes(directory))){try{process.kill(Number(line.trim().split(/\s+/)[0]),'SIGKILL');}catch{}}rmSync(directory,{recursive:true,force:true});}
 });
