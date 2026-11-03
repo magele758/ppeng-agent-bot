@@ -1,3 +1,4 @@
+import { CompactSummaryTimeout, summaryCoolingDown, summarizeWithinDeadline } from '../session/compact-summary-deadline.js';
 import { resolveBotWindowBudget } from '../session/history/window.js';
 
 /** Long chats get an LLM summary even while still under the token threshold. */
@@ -185,6 +186,10 @@ export async function autoCompactSession(
   context: RunContext,
   opts?: { force?: boolean }
 ): Promise<{ replaced?: { startSeq: number; endSeq: number } }> {
+  if (isCanonicalBotChat(context.session) && !opts?.force && summaryCoolingDown(host.store, context.session.id)) {
+    void host.emitTrace(context.session.id, { kind: 'compact_skipped', payload: { reason: 'summary_cooldown' } });
+    return {};
+  }
   const preCompact = await runLifecycleHook(process.env, {
     phase: 'pre_compact',
     sessionId: context.session.id,
@@ -339,20 +344,21 @@ async function compactCanonicalBot(
   const adapter = actualAdapter;
   let summary: string;
   try {
-    summary = adapter.completeText
+    summary = await summarizeWithinDeadline(host.store, session.id, async (signal) => adapter.completeText
       ? await adapter.completeText({
         system: botCompactInstruction(tier) + '\nSummarize only the supplied history and still-valid previous summary. Do not include these summarization instructions, their output format, or this internal request as a user goal or constraint. Return the summary text only.',
         user: JSON.stringify({ previousSummary: prior, history: pruned }),
-        jsonMode: false
+        jsonMode: false,
+        signal
       })
       : await adapter.summarizeMessages({
         agent: context.agent,
         messages: [...pruned, instructionMessage(session.id, instruction)],
         reason: `bot ${tier} compact session ${session.id}`
-      });
+      }));
   } catch (error) {
     persistBotCompactLong(host, context, range.older);
-    void host.emitTrace(session.id, { kind: 'compact_skipped', payload: { reason: 'summary_failed', tier, message: error instanceof Error ? error.message : String(error) } });
+    void host.emitTrace(session.id, { kind: 'compact_skipped', payload: { reason: error instanceof CompactSummaryTimeout ? 'summary_timeout' : 'summary_failed', tier, message: error instanceof Error ? error.message : String(error) } });
     return {};
   }
 
