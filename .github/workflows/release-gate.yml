@@ -136,7 +136,7 @@ jobs:
         with:
           name: validation-unit
           path: ${{ runner.temp }}/validation/unit
-          if-no-files-found: error
+          if-no-files-found: ignore
           retention-days: 30
       - name: Preserve acceptance-results-unit
         if: always()
@@ -144,8 +144,11 @@ jobs:
         with:
           name: acceptance-results-unit
           path: ${{ runner.temp }}/validation/unit/results
-          if-no-files-found: error
+          if-no-files-found: ignore
           retention-days: 7
+      - name: Require lane artifacts
+        if: success()
+        run: node scripts/ci/require-nonempty-artifacts.mjs "$RUNNER_TEMP/validation/unit" "$RUNNER_TEMP/validation/unit/results"
   formal:
     name: Formal + real process verification
     uses: ./.github/workflows/formal-only.yml
@@ -182,7 +185,7 @@ jobs:
         with:
           name: validation-sdk
           path: ${{ runner.temp }}/validation/sdk
-          if-no-files-found: error
+          if-no-files-found: ignore
           retention-days: 30
       - name: Preserve acceptance-results-sdk
         if: always()
@@ -190,8 +193,11 @@ jobs:
         with:
           name: acceptance-results-sdk
           path: ${{ runner.temp }}/validation/sdk/results
-          if-no-files-found: error
+          if-no-files-found: ignore
           retention-days: 7
+      - name: Require lane artifacts
+        if: success()
+        run: node scripts/ci/require-nonempty-artifacts.mjs "$RUNNER_TEMP/validation/sdk" "$RUNNER_TEMP/validation/sdk/results"
   crap:
     name: CRAP gate (verified coverage artifacts)
     needs:
