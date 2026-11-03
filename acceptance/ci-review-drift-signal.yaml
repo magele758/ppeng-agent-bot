@@ -1,0 +1,15 @@
+id: ci-review-drift-signal
+title: 评审指纹不一致时不要再报一次结果缺失
+status: approved
+requirement: 分多个agent去彻底解决这几个问题
+notes: |
+  assumedApproval: standing-order-2026-10-22
+criteria:
+  - id: AC-1
+    given: 待验证的代码和已评审指纹不一致
+    when: 共享持续集成开始跑单元、形式化或 SDK 验证
+    then: 这次验证因为指纹不一致而失败，并且不会再因为结果目录还没生成而额外失败一次
+  - id: AC-2
+    given: 指纹一致且验证步骤成功
+    when: 该步骤没有写出规定的结果
+    then: 验证作业仍然失败
