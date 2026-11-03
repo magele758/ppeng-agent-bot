@@ -1,6 +1,6 @@
 id: child-wake-workitem
 title: 子代理完成唤醒继续同一项工作
-status: approved
+status: implemented
 requirement: |
   Feature (minimal mergeable slice OK): Child-agent wake carries/continues WorkItem (work association) properly.
   When a child/subagent/fork finishes or emits a wake, the parent resume path preserves workRef/parentWorkRef (or equivalent goal/execution correlation) so the continued work is the same WorkItem, not a detached orphan session.
@@ -8,7 +8,7 @@ requirement: |
   Cover concurrent-fork and goal_dispatch child session waits: wake resumes the correct owner once with evidence; wrong owner/revision rejected.
   Tests proving: child completion wake continues parent workRef; missing/mismatched work association fails closed; no double-wake.
   No new WorkItem table/system. No RAW_AGENT_* flags.
-notes: 'assumedApproval: standing-order-2026-10-22; final acceptance by lei pending'
+notes: 'assumedApproval: standing-order-2026-10-22; implemented coverage via bot-goals-scheduler AC-1..3'
 criteria:
   - id: AC-1
     given: 父目标正在等待它派出的子代理或并发子任务
