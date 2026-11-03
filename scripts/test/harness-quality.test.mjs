@@ -234,3 +234,57 @@ test('network adapter experiment actually injects the system appendix and record
   assert.equal(report.control, false);
   assert.doesNotMatch(readFileSync(join(out, 'manifest.json'), 'utf8'), /fixture-secret-not-in-report/);
 });
+
+test('wrong tool order fails even when the final state is right [AC:session-eval-lift#AC-1]', () => {
+  const ordered = { ...task(), expected: { ...task().expected, toolPrefix: [{ name: 'lookup_record', input: { key: 'document:policy' }, ok: true }, { name: 'save_result', ok: true }] } };
+  const wrong = gradeTask(ordered, { ...result(), toolCalls: [
+    { name: 'lookup_record', input: { key: 'policy' }, ok: true },
+    { name: 'lookup_record', input: { key: 'document:policy' }, ok: true },
+    { name: 'save_result', ok: true }
+  ] });
+  assert.equal(wrong.pass, false);
+  assert.equal(wrong.failures.includes('actual tool side effects'), false);
+  assert.equal(wrong.failures.includes('exact final answer'), false);
+  assert.ok(wrong.failures.includes('tool prefix input') || wrong.failures.includes('tool prefix order'));
+  const right = gradeTask(ordered, { ...result(), toolCalls: [
+    { name: 'lookup_record', input: { key: 'document:policy' }, ok: true },
+    { name: 'save_result', ok: true },
+    { name: 'lookup_record', input: { key: 'later' }, ok: true }
+  ] });
+  assert.equal(right.pass, true);
+});
+
+test('repeated trials stay one task and a category drop is a regression [AC:session-eval-lift#AC-2]', () => {
+  const cases = suite(30);
+  const calm = compareQuality(cases, rows(cases), { trials: 3 });
+  assert.equal(calm.summary.tasks, 30);
+  cases.slice(0, 2).forEach(item => { item.category = 'ordered-tools'; });
+  const records = rows(cases);
+  for (const row of records) if (Number(row.caseId.slice(5)) < 2 && row.variant === 'candidate') row.pass = false;
+  const report = compareQuality(cases, records, { trials: 3 });
+  assert.equal(report.verdict, 'regressed');
+  assert.ok(report.regressions.includes('category regression: ordered-tools'));
+});
+
+test('missing tool surface is invalid rather than a model result [AC:session-eval-lift#AC-4]', () => {
+  const hidden = gradeTask(task(), { ...result(), promptShapes: [{ tools: [] }] });
+  assert.equal(hidden.pass, false);
+  assert.ok(hidden.failures.includes('tools not offered'));
+  const visible = gradeTask(task(), result());
+  assert.equal(visible.failures.includes('tools not offered'), false);
+  assert.equal(visible.pass, true);
+  const cases = suite(30);
+  const records = rows(cases);
+  const candidate = records.find(row => row.variant === 'candidate');
+  candidate.pass = false;
+  candidate.failures = ['tools not offered'];
+  const report = compareQuality(cases, records, { trials: 3 });
+  assert.equal(report.verdict, 'invalid');
+  assert.equal(report.promotionEligible, false);
+});
+
+test('tasks without a tool prefix keep the previous grade [AC:session-eval-lift#AC-5]', () => {
+  const starter = JSON.parse(readFileSync('scripts/agent-eval/quality-cases/starter.json', 'utf8'));
+  assert.doesNotThrow(() => validateSuite(starter));
+  assert.equal(gradeTask(task(), result()).pass, true);
+});

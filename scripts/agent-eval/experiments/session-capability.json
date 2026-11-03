@@ -1,0 +1,45 @@
+{
+  "suiteRole": "capability",
+  "suite": "scripts/agent-eval/quality-cases/capability.json",
+  "trials": 3,
+  "concurrency": 4,
+  "baseline": {
+    "repoRoot": ".",
+    "systemAppendix": "",
+    "daemonControl": {
+      "tool_exposure_settings": { "mode": "full", "pinnedGroups": {} }
+    }
+  },
+  "candidate": {
+    "repoRoot": ".",
+    "systemAppendix": "",
+    "daemonControl": {
+      "tool_exposure_settings": { "mode": "full", "pinnedGroups": {} }
+    }
+  },
+  "model": {
+    "provider": "openai-compatible",
+    "apiKeyEnv": "RAW_AGENT_API_KEY",
+    "baseUrlEnv": "RAW_AGENT_BASE_URL",
+    "nameEnv": "RAW_AGENT_MODEL_NAME",
+    "httpKind": "chat",
+    "temperature": 0
+  },
+  "limits": {
+    "timeoutMs": 180000,
+    "maxModelCalls": 8,
+    "maxOutputTokens": 2048,
+    "maxInputChars": 100000,
+    "maxTotalCalls": 800
+  },
+  "policy": {
+    "minCases": 30,
+    "minTrials": 3,
+    "minBaselinePassRate": 0.8,
+    "nonInferiorityMargin": 0.05,
+    "maxCategoryDrop": 0.05,
+    "maxTokenRatio": 1.2,
+    "maxLatencyRatio": 1.5,
+    "requireUsage": true
+  }
+}

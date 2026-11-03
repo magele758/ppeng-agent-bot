@@ -4,6 +4,22 @@ import { createHash } from 'node:crypto';
 import { gradeBotEvidence } from './bot-quality.mjs';
 
 export const hash = value => createHash('sha256').update(typeof value === 'string' ? value : JSON.stringify(value)).digest('hex');
+const plainObject = value => {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+};
+function isValidToolPrefix(prefix) {
+  if (!Array.isArray(prefix) || prefix.length === 0) return false;
+  return prefix.every(step => {
+    if (!plainObject(step)) return false;
+    if (Object.keys(step).some(key => key !== 'name' && key !== 'input' && key !== 'ok')) return false;
+    if (typeof step.name !== 'string' || step.name.length === 0) return false;
+    if (Object.hasOwn(step, 'input') && !plainObject(step.input)) return false;
+    if (Object.hasOwn(step, 'ok') && typeof step.ok !== 'boolean') return false;
+    return true;
+  });
+}
 export const DEFAULT_POLICY = {
   minCases: 30, minTrials: 3, minBaselinePassRate: 0.8,
   nonInferiorityMargin: 0.05, maxCategoryDrop: 0.05,
@@ -19,11 +35,37 @@ export function validateSuite(suite) {
     if (!c.category || !Array.isArray(c.turns) || !c.turns.length || c.turns.some(x => typeof x !== 'string' || !x.trim())) throw new Error(`invalid task: ${c.id}`);
     if (!c.expected || !['exact', 'json', 'state'].some(key => Object.hasOwn(c.expected, key))) throw new Error(`case has no outcome grader: ${c.id}`);
     for (const key of Object.keys(c.expected)) {
-      if (!['exact', 'json', 'state', 'requiredTools', 'forbiddenTools', 'maxToolCalls', 'status', 'botEvidence','observedTools'].includes(key)) throw new Error(`unknown grader ${key}`);
+      if (!['exact', 'json', 'state', 'requiredTools', 'forbiddenTools', 'maxToolCalls', 'status', 'botEvidence','observedTools','toolPrefix'].includes(key)) throw new Error(`unknown grader ${key}`);
     }
     if (c.expected.exact != null && typeof c.expected.exact !== 'string') throw new Error(`exact grader must be text: ${c.id}`);
+    if (Object.hasOwn(c.expected, 'toolPrefix') && !isValidToolPrefix(c.expected.toolPrefix)) throw new Error(`invalid tool prefix: ${c.id}`);
   }
   return suite;
+}
+
+/** Opening calls must match name, and any declared input or ok. Calls after the prefix are allowed. */
+export function gradeToolPrefix(prefix, calls) {
+  const failures = [];
+  const seen = Array.isArray(calls) ? calls : [];
+  if (seen.length < prefix.length) failures.push('tool prefix short');
+  for (let i = 0; i < prefix.length; i++) {
+    const step = prefix[i];
+    const call = seen[i];
+    if (!call || call.name !== step.name) failures.push('tool prefix order');
+    if (call && Object.hasOwn(step, 'input') && !isDeepStrictEqual(call.input, step.input)) failures.push('tool prefix input');
+    if (call && Object.hasOwn(step, 'ok') && call.ok !== step.ok) failures.push('tool prefix result');
+  }
+  return failures;
+}
+
+/** Recorded prompt shapes that omit a needed tool invalidate the trial. Missing shapes are not graded. */
+export function gradeOfferedTools(expected, trial) {
+  const shapes = trial?.promptShapes;
+  if (!Array.isArray(shapes) || shapes.length === 0) return [];
+  const prefixNames = Array.isArray(expected.toolPrefix) ? expected.toolPrefix.map(step => step.name) : [];
+  const needed = [...(expected.requiredTools ?? []), ...prefixNames];
+  const offered = new Set(shapes.flatMap(shape => Array.isArray(shape?.tools) ? shape.tools : []));
+  return needed.some(name => !offered.has(name)) ? ['tools not offered'] : [];
 }
 
 /** Accept folded messages: grade only the final assistant's text, never its reasoning. */
@@ -51,6 +93,8 @@ export function gradeTask(task, trial) {
   for (const name of e.forbiddenTools ?? []) if (calls.some(c => c.name === name)) failures.push(`forbidden tool: ${name}`);
   if (e.maxToolCalls != null && calls.length > e.maxToolCalls) failures.push('tool call budget');
   if(e.botEvidence) failures.push(...gradeBotEvidence(e.botEvidence,trial.botEvidence).failures);
+  if (Array.isArray(e.toolPrefix)) failures.push(...gradeToolPrefix(e.toolPrefix, calls));
+  failures.push(...gradeOfferedTools(e, trial));
   return { pass: failures.length === 0, failures };
 }
 
@@ -94,50 +138,59 @@ export function pairedSummary(pairs, familyComparisons = 1) {
   };
 }
 
-export function compareQuality(suite, records, { trials, policy: overrides = {}, simulation = false } = {}) {
-  validateSuite(suite);
+function checkedPolicy(overrides) {
   const policy = { ...DEFAULT_POLICY, ...overrides };
-  if (!Number.isInteger(trials) || trials < 1) throw new Error('trials must be a positive integer');
   for (const key of Object.keys(overrides)) if (!(key in DEFAULT_POLICY)) throw new Error(`unknown policy ${key}`);
   for (const key of ['minCases', 'minTrials']) if (!Number.isInteger(policy[key]) || policy[key] < 1) throw new Error(`invalid ${key}`);
   for (const key of ['minBaselinePassRate', 'nonInferiorityMargin', 'maxCategoryDrop']) if (!Number.isFinite(policy[key]) || policy[key] < 0 || policy[key] > 1) throw new Error(`invalid ${key}`);
   for (const key of ['maxTokenRatio', 'maxLatencyRatio']) if (!Number.isFinite(policy[key]) || policy[key] <= 0) throw new Error(`invalid ${key}`);
   if (typeof policy.requireUsage !== 'boolean') throw new Error('invalid requireUsage');
-  const invalid = [], regressions = [], blockers = [], uncertain = [], pairs = [];
-  const seen = new Set();
-  for (const r of records) {
-    const key = `${r.caseId}/${r.trial}/${r.variant}`;
-    if (seen.has(key) || !['baseline', 'candidate'].includes(r.variant) || !suite.some(c => c.id === r.caseId) || !Number.isInteger(r.trial) || r.trial < 0 || r.trial >= trials) invalid.push(`invalid/duplicate record: ${key}`);
-    seen.add(key);
-    if (r.infrastructureError) invalid.push(`infrastructure: ${key}`);
-    if (typeof r.pass !== 'boolean') invalid.push(`missing grade: ${key}`);
-  }
-  for (const c of suite) {
-    const rows = records.filter(r => r.caseId === c.id);
-    const baseline = rows.filter(r => r.variant === 'baseline'), candidate = rows.filter(r => r.variant === 'candidate');
-    if (baseline.length !== trials || candidate.length !== trials) { invalid.push(`missing trials: ${c.id}`); continue; }
-    const b = baseline.filter(r => r.pass).length / trials, a = candidate.filter(r => r.pass).length / trials;
-    pairs.push({ id: c.id, category: c.category, baselineRate: b, candidateRate: a, baselineReliable: b === 1, candidateReliable: a === 1 });
-    if (c.critical && candidate.some(r => !r.pass)) {
-      if (b === 1) regressions.push(`critical task regressed: ${c.id}`);
-      else blockers.push(`critical task fails in the candidate (baseline also imperfect): ${c.id}`);
-    }
-  }
-  const categories = [...new Set(suite.map(c => c.category))];
-  const summary = pairedSummary(pairs, categories.length + 1);
-  const byCategory = Object.fromEntries(categories.map(category => [category, pairedSummary(pairs.filter(p => p.category === category), categories.length + 1)]));
-  if (suite.length < policy.minCases) uncertain.push(`only ${suite.length} distinct tasks; need ${policy.minCases}`);
+  return policy;
+}
+
+function recordFaults(record, suite, trials, seen) {
+  const key = `${record.caseId}/${record.trial}/${record.variant}`;
+  const faults = [];
+  if (seen.has(key) || !['baseline', 'candidate'].includes(record.variant) || !suite.some(c => c.id === record.caseId) || !Number.isInteger(record.trial) || record.trial < 0 || record.trial >= trials) faults.push(`invalid/duplicate record: ${key}`);
+  seen.add(key);
+  if (record.infrastructureError) faults.push(`infrastructure: ${key}`);
+  if (typeof record.pass !== 'boolean') faults.push(`missing grade: ${key}`);
+  if (Array.isArray(record.failures) && record.failures.includes('tools not offered')) faults.push(`tools not offered: ${key}`);
+  return faults;
+}
+
+function pairCase(task, records, trials) {
+  const rows = records.filter(r => r.caseId === task.id);
+  const baseline = rows.filter(r => r.variant === 'baseline'), candidate = rows.filter(r => r.variant === 'candidate');
+  if (baseline.length !== trials || candidate.length !== trials) return { invalid: `missing trials: ${task.id}` };
+  const b = baseline.filter(r => r.pass).length / trials, a = candidate.filter(r => r.pass).length / trials;
+  const pair = { id: task.id, category: task.category, baselineRate: b, candidateRate: a, baselineReliable: b === 1, candidateReliable: a === 1 };
+  if (!(task.critical && candidate.some(r => !r.pass))) return { pair };
+  if (b === 1) return { pair, regression: `critical task regressed: ${task.id}` };
+  return { pair, blocker: `critical task fails in the candidate (baseline also imperfect): ${task.id}` };
+}
+
+function sampleSizeFindings(suiteLength, trials, policy) {
+  const uncertain = [];
+  if (suiteLength < policy.minCases) uncertain.push(`only ${suiteLength} distinct tasks; need ${policy.minCases}`);
   if (trials < policy.minTrials) uncertain.push(`only ${trials} trials; need ${policy.minTrials}`);
+  return uncertain;
+}
+
+function rateFindings(summary, byCategory, policy) {
+  const regressions = [], uncertain = [];
   if (summary && summary.baselinePassRate < policy.minBaselinePassRate) uncertain.push('baseline floor not met; first calibrate tasks/grader/model');
-  if (summary) {
-    if (summary.candidatePassRate < summary.baselinePassRate - policy.nonInferiorityMargin) regressions.push('overall observed success rate regression');
-    if (summary.deltaInterval[0] < -policy.nonInferiorityMargin) uncertain.push('overall non-inferiority not established');
-  }
+  if (summary && summary.candidatePassRate < summary.baselinePassRate - policy.nonInferiorityMargin) regressions.push('overall observed success rate regression');
+  if (summary && summary.deltaInterval[0] < -policy.nonInferiorityMargin) uncertain.push('overall non-inferiority not established');
   for (const [category, s] of Object.entries(byCategory)) if (s) {
     if (s.candidatePassRate < s.baselinePassRate - policy.maxCategoryDrop) regressions.push(`category regression: ${category}`);
     if (s.deltaInterval[0] < -policy.maxCategoryDrop) uncertain.push(`category non-inferiority not established: ${category}`);
   }
-  const metrics = {};
+  return { regressions, uncertain };
+}
+
+function metricBudgets(records, policy) {
+  const metrics = {}, regressions = [], uncertain = [];
   for (const [field, cap] of [['tokens', policy.maxTokenRatio], ['durationMs', policy.maxLatencyRatio]]) {
     const b = records.filter(r => r.variant === 'baseline'), a = records.filter(r => r.variant === 'candidate');
     if (!records.length || records.some(r => !Number.isFinite(r[field]) || r[field] < 0)) {
@@ -150,9 +203,42 @@ export function compareQuality(suite, records, { trials, policy: overrides = {},
     metrics[field] = { available: true, baseline, candidate, ratio, cap };
     if (ratio == null || ratio > cap) regressions.push(`${field} budget regression`);
   }
-  const verdict = invalid.length ? 'invalid' : regressions.length ? 'regressed' : blockers.length ? 'blocked' : uncertain.length ? 'inconclusive'
-    : summary.deltaInterval[0] > 0 ? 'improved' : 'non_inferior';
+  return { metrics, regressions, uncertain };
+}
+
+function qualityVerdict(summary, lists) {
+  if (lists.invalid.length) return 'invalid';
+  if (lists.regressions.length) return 'regressed';
+  if (lists.blockers.length) return 'blocked';
+  if (lists.uncertain.length) return 'inconclusive';
+  if (summary.deltaInterval[0] > 0) return 'improved';
+  return 'non_inferior';
+}
+
+export function compareQuality(suite, records, { trials, policy: overrides = {}, simulation = false } = {}) {
+  validateSuite(suite);
+  if (!Number.isInteger(trials) || trials < 1) throw new Error('trials must be a positive integer');
+  const policy = checkedPolicy(overrides);
+  const invalid = [], regressions = [], blockers = [], pairs = [];
+  const seen = new Set();
+  for (const record of records) invalid.push(...recordFaults(record, suite, trials, seen));
+  for (const task of suite) {
+    const row = pairCase(task, records, trials);
+    if (row.invalid) { invalid.push(row.invalid); continue; }
+    pairs.push(row.pair);
+    if (row.regression) regressions.push(row.regression);
+    if (row.blocker) blockers.push(row.blocker);
+  }
+  const categories = [...new Set(suite.map(c => c.category))];
+  const family = categories.length + 1;
+  const summary = pairedSummary(pairs, family);
+  const byCategory = Object.fromEntries(categories.map(category => [category, pairedSummary(pairs.filter(p => p.category === category), family)]));
+  const rates = rateFindings(summary, byCategory, policy);
+  const budget = metricBudgets(records, policy);
+  const uncertain = [...sampleSizeFindings(suite.length, trials, policy), ...rates.uncertain, ...budget.uncertain];
+  regressions.push(...rates.regressions, ...budget.regressions);
+  const verdict = qualityVerdict(summary, { invalid, regressions, blockers, uncertain });
   return { schemaVersion: 1, evaluationKind: simulation ? 'simulation' : 'live', verdict,
     promotionEligible: !simulation && ['improved', 'non_inferior'].includes(verdict),
-    invalid, regressions, blockers, uncertain, policy, summary, byCategory, metrics, pairs };
+    invalid, regressions, blockers, uncertain, policy, summary, byCategory, metrics: budget.metrics, pairs };
 }
