@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 356 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 359 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -76,7 +76,7 @@
 
 - `bg-run-host-park` Host parks durable wait for owned bg_run
 
-## bot（110）
+## bot（111）
 
 需求正文见 [bot](bot.md)。
 
@@ -108,6 +108,7 @@
 - `bot-entry-dialog-shell` 新建 Bot 弹窗遮罩与底部按钮
 - `bot-entry-simplification` Bot 创建入口统一与管理页面职责拆分
 - `bot-execution-p0` Bot 任务直达执行与证据保真
+- `bot-extreme-concurrency` Bot 以高并发同时推进多件工作
 - `bot-face-readable-shapes` 脸型圆润，列表里能看见表情，干活时更忙
 - `bot-face-soft-style` 软萌机器人脸与经典脸并存
 - `bot-first-task-dismissal` 首次任务引导可关闭且不干扰已有对话
@@ -799,11 +800,12 @@
 - `secure-form-multi` 对话里的多字段安全表单
 - `secure-form-vault` Secure Form fill-from-Vault
 
-## session（9）
+## session（10）
 
 需求正文见 [session](session.md)。
 
 - `session-brief` 会话可以只看关键信息
+- `session-eval-baseline` 会话评估能留下基准并发现短板
 - `session-eval-lift` 会话评估能区分能力提升和下降
 - `session-lifecycle-state-consistency` 生命周期验证发现的结束原因与部分审批状态一致性修复
 - `session-lifecycle-verification` 会话生命周期验证：取消、重试与审批恢复
@@ -911,6 +913,12 @@
 
 - `system-context-cards` 会话摘要与 Jev 提示卡片
 - `system-message-ui` 统一聊天系统消息展示
+
+## thinking（1）
+
+需求正文见 [other](other.md)。
+
+- `thinking-effort` 思考力度
 
 ## tool（6）
 

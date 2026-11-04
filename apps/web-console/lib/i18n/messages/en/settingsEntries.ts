@@ -126,6 +126,25 @@ export const settingsEntries = {
     effective: 'Effective',
     rollbackHint: 'Rollback: select legacy here and save.'
   },
+  thinkingEffort: {
+    title: 'Thinking effort',
+    keywords: 'thinking effect level reasoning effort low medium high',
+    desc: 'How hard the model thinks on the next reply. Off is the default and leaves the request unchanged. Low, medium, or high applies on the next turn without a restart.',
+    fields: {
+      level: {
+        label: 'Effort',
+        hint: 'Applies on the next turn. Off does not ask the model for an effort level.'
+      }
+    },
+    options: {
+      off: { label: 'Off' },
+      low: { label: 'Low' },
+      medium: { label: 'Medium' },
+      high: { label: 'High' }
+    },
+    effective: 'Effective',
+    note: 'This changes chat replies only. Summaries and internal checks keep the previous request. If the provider rejects the level, switch back to Off.'
+  },
   agentLoopEngine: {
     title: 'Agent engine',
     keywords: 'kernel assembly preset drain tool launch inbox overflow cap low level scheduling',

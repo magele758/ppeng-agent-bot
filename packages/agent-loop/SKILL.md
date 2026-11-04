@@ -190,6 +190,7 @@ Jev 不是 SDK 模块：未配置入口时宿主不调用它，SDK 接入参数�
 - **发模型前的最后一刀**：可选 `TurnKernelHost.fitModelRequest` / `AssembledLoopIo.fitModelRequest`。内核在微压缩之后、`runTurnWithRetries` 之前调用它，入参已是即将送出的 `systemPrompt` + `tools` + `messages`。不提供则原样送出。产品用它把普通会话压到上下文窗口的 20%；规范 Bot 会话不走这刀。不要在这里丢掉最新一条用户消息。
 - **`stream_reset` 契约**：同一轮重新开始出流（重试、或宿主切到 fallback 模型）前，内核先发 `{ type: 'stream_reset', reason: 'retry' | 'fallback' }`。消费者必须丢弃**上一个 `done` 之后**累积的增量文本 / 推理 / 工具参数，再接收新流，否则会出现半截答案 + 完整答案的重复。宿主自己做 fallback 时用 `createStreamResetTracker(onStream)`：把增量交给 `tracker.onChunk(chunk)`，换下一个模型前调 `tracker.resetIfDirty('fallback')`（上一次尝试没出过字就不发）。core 的 `l5-bindings.ts` 中 `fallbackStream().forAttempt(i)` 就是这样接的。
 - **取消**：`ModelTurnInput.signal` 一路传到 `fetch`；宿主（如 daemon SSE）在客户端断开时 abort，即可同时放弃上游请求。
+- **思考力度**：`ModelTurnInput.reasoningEffort` 可选，只接受 `low` | `medium` | `high`。缺省时 chat、responses、Anthropic 的请求体都不带力度字段。有值时：Chat Completions 写 `reasoning_effort`，Responses 写 `reasoning.effort`，Anthropic Messages 写 `output_config.effort`。流式与非流式同一套。`completeText` / `summarizeMessages` 不读这个字段。产品在 Lab「设置 → 行为 → 思考力度」保存 `off | low | medium | high`（默认 `off`），下一轮对话才带上；不新增环境变量。回归：`src/model/reasoning-effort.test.ts`。
 
 ### 2.9 上游回放测试工具（`src/testing/upstream-replay.ts`）
 

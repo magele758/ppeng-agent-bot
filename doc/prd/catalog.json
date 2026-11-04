@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 356,
+    "implemented": 359,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -321,6 +321,13 @@
       "requirement": "那就按你建议的顺序直接改，先把 P0 的分类路由、压缩丢证据、完成验证和执行提示修好，参考 grok-build 的实现，做好测试和 review 后提交合并。",
       "verificationStage": "software",
       "file": "acceptance/bot-execution-p0.yaml"
+    },
+    {
+      "id": "bot-extreme-concurrency",
+      "title": "Bot 以高并发同时推进多件工作",
+      "requirement": "现在bot的并发能力和并发机制是什么样的？我想要极致的并发能力，来快速完成各种任务，分多个agent去分析和完成提升",
+      "verificationStage": "software",
+      "file": "acceptance/bot-extreme-concurrency.yaml"
     },
     {
       "id": "bot-face-readable-shapes",
@@ -2150,6 +2157,13 @@
       "file": "acceptance/session-brief.yaml"
     },
     {
+      "id": "session-eval-baseline",
+      "title": "会话评估能留下基准并发现短板",
+      "requirement": "新的评估集，结果如何？我觉得2个问题，一个这个模型基准，在这套harness上不要降低，第二，是否有提升？还有有没有专门针对agent能力的评估集？分多个agent去研究和分析一下，然后看看当前项目怎么做harness 评估比较好，帮我完成一版，让我发现短板，建立基准，以后也好持续提升",
+      "verificationStage": "software",
+      "file": "acceptance/session-eval-baseline.yaml"
+    },
+    {
       "id": "session-eval-lift",
       "title": "会话评估能区分能力提升和下降",
       "requirement": "结合最新代码，这个评估集，需要做什么升级和配合来检测新的功能是带来提升还是下降？\n分多个agent去帮我开发完成",
@@ -2372,6 +2386,13 @@
       "requirement": "顺便把聊天里其他这种裸的系统消息也检查一遍，统一加上合适的 UI，长内容默认折叠，原始详情保留，别漏了。",
       "verificationStage": "software",
       "file": "acceptance/system-message-ui.yaml"
+    },
+    {
+      "id": "thinking-effort",
+      "title": "思考力度",
+      "requirement": "现在这个有没有thinking Effect level的控制？没有就规划一下，加一个",
+      "verificationStage": "software",
+      "file": "acceptance/thinking-effort.yaml"
     },
     {
       "id": "tool-call-pairing-batch-dedup",

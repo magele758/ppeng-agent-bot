@@ -341,6 +341,11 @@ export interface ModelTurnInput {
    * Stable for the life of a session toolset lock.
    */
   promptCacheKey?: string;
+  /**
+   * How hard this chat turn should think. Absent means the request omits the
+   * effort field and the provider keeps its own default.
+   */
+  reasoningEffort?: 'low' | 'medium' | 'high';
 }
 
 export interface ModelTurnResult {

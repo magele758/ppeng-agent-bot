@@ -1,5 +1,6 @@
 import { AgentLoopSettingsCard } from '../../../AgentLoopSettingsCard';
 import { PromptVariantSettingsCard } from '../../../PromptVariantSettingsCard';
+import { ThinkingEffortSettingsCard } from '../../../ThinkingEffortSettingsCard';
 import { InputSuggestionSettingsCard } from '../../../InputSuggestionSettingsCard';
 import { SessionRecapSettingsCard } from '../../../SessionRecapSettingsCard';
 import { GoalSettingsCard } from '../../../GoalSettingsCard';
@@ -28,6 +29,13 @@ export const behaviorEntries: SettingsEntry[] = [
     titleKey: 'settingsEntries.promptVariant.title',
     keywordsKey: 'settingsEntries.promptVariant.keywords',
     render: () => <PromptVariantSettingsCard />
+  },
+  {
+    id: 'thinkingEffort',
+    category: 'behavior',
+    titleKey: 'settingsEntries.thinkingEffort.title',
+    keywordsKey: 'settingsEntries.thinkingEffort.keywords',
+    render: () => <ThinkingEffortSettingsCard />
   },
   {
     id: 'inputSuggestion',

@@ -1311,6 +1311,16 @@ export class HeuristicModelAdapter implements ModelAdapter {
   }
 }
 
+function reasoningEffortBody(
+  kind: 'chat_completions' | 'responses' | 'anthropic',
+  effort: ModelTurnInput['reasoningEffort']
+): Record<string, unknown> {
+  if (effort !== 'low' && effort !== 'medium' && effort !== 'high') return {};
+  if (kind === 'responses') return { reasoning: { effort } };
+  if (kind === 'anthropic') return { output_config: { effort } };
+  return { reasoning_effort: effort };
+}
+
 // ---------------------------------------------------------------------------
 // OpenAI-compatible adapter (base of OpenAiChatAdapter / OpenAiResponsesAdapter;
 // use it directly when the wire format is chosen at runtime)
@@ -1439,6 +1449,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
         input: responsesInput,
         tools: mapToolDefinitionsToResponsesFormat(tools),
         tool_choice: 'auto' as const,
+        ...reasoningEffortBody('responses', input.reasoningEffort),
         ...(input.promptCacheKey ? { prompt_cache_key: input.promptCacheKey } : {})
       };
       await maybeLogLlmRequest(this.options.env, input.debugLlmContext, this.name, {
@@ -1470,6 +1481,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
       ...mediaRequestOptions(input),
       tools,
       tool_choice: 'auto',
+      ...reasoningEffortBody('chat_completions', input.reasoningEffort),
       ...(input.promptCacheKey ? { prompt_cache_key: input.promptCacheKey } : {})
     };
 
@@ -1546,6 +1558,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
             tools: mapToolDefinitionsToResponsesFormat(tools),
             tool_choice: 'auto' as const,
             stream: true,
+            ...reasoningEffortBody('responses', input.reasoningEffort),
             ...(input.promptCacheKey ? { prompt_cache_key: input.promptCacheKey } : {})
           }
         : {
@@ -1564,6 +1577,7 @@ export class OpenAICompatibleAdapter implements ModelAdapter {
             stream: true,
             // Ask the provider to emit a final usage-only chunk (empty choices + usage).
             stream_options: { include_usage: true },
+            ...reasoningEffortBody('chat_completions', input.reasoningEffort),
             ...(input.promptCacheKey ? { prompt_cache_key: input.promptCacheKey } : {})
           };
 
@@ -2004,7 +2018,8 @@ export class AnthropicMessagesAdapter implements ModelAdapter {
         name: tool.name,
         description: tool.description,
         input_schema: tool.inputSchema
-      }))
+      })),
+      ...reasoningEffortBody('anthropic', input.reasoningEffort)
     };
   }
 

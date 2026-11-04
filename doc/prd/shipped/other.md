@@ -930,6 +930,11 @@ Super Bot 独立配好多机软件工厂
 
 顺便把聊天里其他这种裸的系统消息也检查一遍，统一加上合适的 UI，长内容默认折叠，原始详情保留，别漏了。
 
+## thinking-effort
+思考力度
+
+现在这个有没有thinking Effect level的控制？没有就规划一下，加一个
+
 ## turn-stats-end-time
 对话轮次统计显示结束时间
 
