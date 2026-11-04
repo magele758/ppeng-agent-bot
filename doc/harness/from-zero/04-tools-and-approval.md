@@ -22,7 +22,7 @@ filterValidToolCalls
 
 ### 3. 执行
 
-`partitionForParallel` 按 `RAW_AGENT_MAX_PARALLEL_TOOLS` 分块；块内 `Promise.all`，块之间串行。单个工具异常会转换成失败结果，不让整轮丢失其他工具结果。
+`partitionForParallel` 按 `RAW_AGENT_MAX_PARALLEL_TOOLS`（未设置时 32）分块；块内 `Promise.all`，块之间串行。单个工具异常会转换成失败结果，不让整轮丢失其他工具结果。
 
 ### 4. 回流
 

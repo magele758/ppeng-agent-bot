@@ -11,6 +11,11 @@ export interface BotGoalSettings {
   maxNoProgress: number; leaseMs: number; preferredStrategy: GoalStrategy;
 }
 export interface BotGoalsSnapshot { goals: BotGoalView[]; settings: BotGoalSettings }
+/** Lab number field. Higher than this is still accepted by the API. */
+export const GOAL_CONCURRENCY_FIELD_MAX = 256;
+export function goalSettingFieldMax(key: keyof BotGoalSettings): number | undefined {
+  return key === 'maxConcurrent' ? GOAL_CONCURRENCY_FIELD_MAX : undefined;
+}
 export function goalMessage(text: string, goalId: string | null): string {
   return goalId && text.trim() && !text.trim().startsWith('/') ? `[goal:${goalId}] ${text}` : text;
 }
