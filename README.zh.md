@@ -124,6 +124,7 @@ pnpm run agent:eval:fast --exit-on-fail
 | `pnpm run test --workspace=@ppeng/agent-loop` | 循环 SDK 的 Vitest 测试 |
 | `pnpm run ci` | build + unit + formal + fast eval + 评估引擎 simulation + 包产物自检 + CRAP + regression + integration + e2e |
 | `pnpm run start:daemon` / `start:supervised` | 守护进程 / 监督拉起 |
+| `pnpm run pm2:start` / `pm2:stop` / `pm2:restart` | 用 PM2 管理受监督的 daemon（`ecosystem.config.cjs`） |
 | `pnpm run start:cli` | CLI（含 `self-heal`、`chat` 等） |
 | `pnpm run dev:lab` | 开发辅助（Next + 代理） |
 | `pnpm run evolution --help` | 统一进化入口，查看全部参数 |
