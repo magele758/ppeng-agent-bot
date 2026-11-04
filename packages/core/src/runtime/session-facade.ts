@@ -413,6 +413,10 @@ export async function approve(
   return store.transaction(() => {
   const approval = store.updateApproval(approvalId, decision);
   if (approval.status !== decision) return approval;
+  opts?.emitTrace?.(approval.sessionId, {
+    kind: 'approval_decision',
+    payload: { approvalId: approval.id, decision, toolName: approval.toolName }
+  });
   disarmUnattendedApprovalExpiry(approval.id);
   if (decision === 'approved' && approval.toolName === DYN_TOOL_PROMOTE_APPROVAL) {
     const name = typeof approval.args?.name === 'string' ? approval.args.name : '';

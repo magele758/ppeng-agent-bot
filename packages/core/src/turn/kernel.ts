@@ -131,6 +131,11 @@ import {
   type WorkspaceStoreHost
 } from '../workspace/index.js';
 
+function modelTraceField(modelName: string | undefined): { model?: string } {
+  if (!modelName) return {};
+  return { model: modelName };
+}
+
 function redactForTrace(text: string): string {
   return redactToolContent(text, process.env);
 }
@@ -930,11 +935,13 @@ stablePrefixHash = createHash('sha256')
         .digest('hex')
         .slice(0, 16);
 routing = host.promptBuilder.getRouting(sid);
+const startedAdapter = adapterOf(host.store.getSession(sid) ?? session);
 void host.emitTrace(sid, {
         kind: 'turn_start',
         payload: {
           turn,
-          adapter: adapterOf(host.store.getSession(sid) ?? session).name,
+          adapter: startedAdapter.name,
+          ...modelTraceField(startedAdapter.modelName),
           stablePrefixHash,
           routing: routing ? {
             mode: routing.mode,
