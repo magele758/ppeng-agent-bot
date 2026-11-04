@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 356,
+    "implemented": 360,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -321,6 +321,13 @@
       "requirement": "那就按你建议的顺序直接改，先把 P0 的分类路由、压缩丢证据、完成验证和执行提示修好，参考 grok-build 的实现，做好测试和 review 后提交合并。",
       "verificationStage": "software",
       "file": "acceptance/bot-execution-p0.yaml"
+    },
+    {
+      "id": "bot-extreme-concurrency",
+      "title": "Bot 以高并发同时推进多件工作",
+      "requirement": "现在bot的并发能力和并发机制是什么样的？我想要极致的并发能力，来快速完成各种任务，分多个agent去分析和完成提升",
+      "verificationStage": "software",
+      "file": "acceptance/bot-extreme-concurrency.yaml"
     },
     {
       "id": "bot-face-readable-shapes",
@@ -1870,6 +1877,13 @@
       "file": "acceptance/pr152-approval-followups.yaml"
     },
     {
+      "id": "prd-test-trace",
+      "title": "产品需求与测试对照",
+      "requirement": "按这个做对照表、核心用例和命令",
+      "verificationStage": "software",
+      "file": "acceptance/prd-test-trace.yaml"
+    },
+    {
       "id": "product-prd",
       "title": "产品需求目录",
       "requirement": "我想要在readme之外，构建一套产品的prd体系，一个是现有的功能的说明，一个是开发了具体哪些feature，还有未来待开发的功能的特性，然后还有一个这个项目使用的skill也要同步的配套更新，分多个agent去完成这几件事情",
@@ -2150,6 +2164,13 @@
       "file": "acceptance/session-brief.yaml"
     },
     {
+      "id": "session-eval-baseline",
+      "title": "会话评估能留下基准并发现短板",
+      "requirement": "新的评估集，结果如何？我觉得2个问题，一个这个模型基准，在这套harness上不要降低，第二，是否有提升？还有有没有专门针对agent能力的评估集？分多个agent去研究和分析一下，然后看看当前项目怎么做harness 评估比较好，帮我完成一版，让我发现短板，建立基准，以后也好持续提升",
+      "verificationStage": "software",
+      "file": "acceptance/session-eval-baseline.yaml"
+    },
+    {
       "id": "session-eval-lift",
       "title": "会话评估能区分能力提升和下降",
       "requirement": "结合最新代码，这个评估集，需要做什么升级和配合来检测新的功能是带来提升还是下降？\n分多个agent去帮我开发完成",
@@ -2337,6 +2358,13 @@
       "requirement": "那就按这个方案改，普通插话立即进入会话，不要跳过或中断工具；只有明确要求停止，或者结合上下文确实需要取消时，才中断对应的工具，不要把整个会话停掉。",
       "verificationStage": "software",
       "file": "acceptance/steer-tool-continuity.yaml"
+    },
+    {
+      "id": "stream-live-status",
+      "title": "生成中的速度与正在做什么",
+      "requirement": "[Image #1]  我想要在他生成的时候知道他在干嘛怎么办？加个交互，让我知道他的速度和在干嘛，另外这里的三个 ... 可以加点动效，免得太静态了",
+      "verificationStage": "software",
+      "file": "acceptance/stream-live-status.yaml"
     },
     {
       "id": "stream-text-once",
@@ -2711,7 +2739,7 @@
     },
     {
       "name": "product-prd",
-      "description": "在 ppeng-agent-core 改用户能看到的产品行为，或增删改 skills/**/SKILL.md 时，同步 doc/prd 产品需求目录。目录在根 README 之外：现状说明、已开发功能、待开发功能、仓库技能对照。Use when shipping or planning a user-visible feature, editing acceptance status, or changing a repo skill.",
+      "description": "在 ppeng-agent-core 改用户能看到的产品行为，或增删改 skills/**/SKILL.md 时，同步 doc/prd 产品需求目录。目录在根 README 之外：现状说明、已开发功能、待开发功能、仓库技能对照、现状与测试对照、核心用例。Use when shipping or planning a user-visible feature, editing acceptance status, changing a repo skill, or updating the core-case list.",
       "path": "skills/product-prd/SKILL.md"
     },
     {

@@ -614,6 +614,11 @@ Assert that cancelling a parked session also rejects the pending approval record
 Add a comment noting that the createdAt >= string compare relies on ISO 8601 lexicographic ordering.
 Run the packages/agent-loop tests and build, plus packages/core bot-work test. Report per item.
 
+## prd-test-trace
+产品需求与测试对照
+
+按这个做对照表、核心用例和命令
+
 ## product-prd
 产品需求目录
 
@@ -886,6 +891,11 @@ Required outcomes:
 插话即时入会话与按工具取消
 
 那就按这个方案改，普通插话立即进入会话，不要跳过或中断工具；只有明确要求停止，或者结合上下文确实需要取消时，才中断对应的工具，不要把整个会话停掉。
+
+## stream-live-status
+生成中的速度与正在做什么
+
+[Image #1]  我想要在他生成的时候知道他在干嘛怎么办？加个交互，让我知道他的速度和在干嘛，另外这里的三个 ... 可以加点动效，免得太静态了
 
 ## stream-text-once
 流式输出时助手文字只出现一次
