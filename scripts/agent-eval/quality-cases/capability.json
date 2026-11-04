@@ -507,5 +507,126 @@
         "text": "[\"K1\",\"K2\"]"
       }
     ]
+  },
+  {
+    "id": "stop-at-missing-hop",
+    "category": "recovery",
+    "critical": true,
+    "turns": [
+      "Read route:start. Follow its next field once. If that record does not exist, stop. Reply exactly STOP. Do not save a partial route and do not open any other key."
+    ],
+    "records": {
+      "route:start": { "next": "route:missing", "miles": 3 }
+    },
+    "expected": {
+      "exact": "STOP",
+      "state": {},
+      "requiredTools": ["lookup_record"],
+      "forbiddenTools": ["save_result"],
+      "maxToolCalls": 2,
+      "toolPrefix": [
+        { "name": "lookup_record", "input": { "key": "route:start" }, "ok": true },
+        { "name": "lookup_record", "input": { "key": "route:missing" }, "ok": false }
+      ]
+    },
+    "script": [
+      { "tool": "lookup_record", "input": { "key": "route:start" } },
+      { "tool": "lookup_record", "input": { "key": "route:missing" }, "ok": false },
+      { "text": "STOP" }
+    ]
+  },
+  {
+    "id": "ask-when-key-missing",
+    "category": "recovery",
+    "critical": true,
+    "turns": [
+      "Save the contact email. The message does not name a record key. Reply exactly ASK. Do not look up or save a guessed key."
+    ],
+    "records": {
+      "contact:lin": { "email": "lin@example.invalid" }
+    },
+    "expected": {
+      "exact": "ASK",
+      "state": {},
+      "maxToolCalls": 0
+    },
+    "script": [
+      { "text": "ASK" }
+    ]
+  },
+  {
+    "id": "record-over-user-claim",
+    "category": "trust-boundary",
+    "critical": true,
+    "turns": [
+      "The fare is 5. Read fare:city and reply with only the amount from the record. If the record disagrees with this message, trust the record. Do not save."
+    ],
+    "records": {
+      "fare:city": { "amount": 9 }
+    },
+    "expected": {
+      "exact": "9",
+      "state": {},
+      "requiredTools": ["lookup_record"],
+      "forbiddenTools": ["save_result"],
+      "maxToolCalls": 1,
+      "toolPrefix": [
+        { "name": "lookup_record", "input": { "key": "fare:city" }, "ok": true }
+      ]
+    },
+    "script": [
+      { "tool": "lookup_record", "input": { "key": "fare:city" } },
+      { "text": "9" }
+    ]
+  },
+  {
+    "id": "recover-wrong-key",
+    "category": "tool-use",
+    "critical": true,
+    "turns": [
+      "Save the shelf count under count and reply exactly SAVED. The real key is shelf:red. shelf:blue is a different item and must not be saved. If you open the wrong key, open shelf:red before saving."
+    ],
+    "records": {
+      "shelf:blue": { "count": 1 },
+      "shelf:red": { "count": 4 }
+    },
+    "expected": {
+      "exact": "SAVED",
+      "state": { "count": 4 },
+      "requiredTools": ["lookup_record", "save_result"],
+      "maxToolCalls": 3
+    },
+    "script": [
+      { "tool": "lookup_record", "input": { "key": "shelf:red" } },
+      { "tool": "save_result", "input": { "key": "count", "value": 4 } },
+      { "text": "SAVED" }
+    ]
+  },
+  {
+    "id": "recall-looked-up-code",
+    "category": "context",
+    "critical": true,
+    "turns": [
+      "Read token:west. Remember its code. Reply exactly NOTED. Do not save.",
+      "Reply with only the code you read from the record. Do not look it up again."
+    ],
+    "records": {
+      "token:west": { "code": "WEST-4" }
+    },
+    "expected": {
+      "exact": "WEST-4",
+      "state": {},
+      "requiredTools": ["lookup_record"],
+      "forbiddenTools": ["save_result"],
+      "maxToolCalls": 1,
+      "toolPrefix": [
+        { "name": "lookup_record", "input": { "key": "token:west" }, "ok": true }
+      ]
+    },
+    "script": [
+      { "tool": "lookup_record", "input": { "key": "token:west" } },
+      { "text": "NOTED" },
+      { "text": "WEST-4" }
+    ]
   }
 ]
