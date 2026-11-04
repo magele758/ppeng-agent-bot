@@ -1,0 +1,65 @@
+note: 领域包和交互卡片没有单独的验收规格，所以不进核心用例。演进不是日常入口由运维页规格证明。
+cases:
+  - id: default-entry
+    title: 打开产品落在默认 Bot，旧的普通会话还在
+    chapters:
+      - 01-product
+      - 02-bots-and-workspace
+    specs:
+      - single-host-bot-completion
+      - bots
+      - bot-entry-simplification
+  - id: forever-chat
+    title: 一只 Bot 一条主对话，压缩和换模型都不另开
+    chapters:
+      - 03-conversation
+    specs:
+      - bot-forever-chat
+      - bot-dual-compact
+      - bot-window-compact
+  - id: speak-while-busy
+    title: 发出的话马上出现、忙时还能插话、下一句建议要按 Tab 才采纳
+    chapters:
+      - 03-conversation
+    specs:
+      - bot-immediate-steer
+      - bot-input-suggestion
+      - session-recap
+  - id: goal-done-means-done
+    title: 目标没达到不能显示完成，子任务结果回到原来的目标
+    chapters:
+      - 04-goals-and-collaboration
+    specs:
+      - unified-bot-goal-lifecycle
+      - bot-goal-result-return
+      - bot-multi-goal-coordination
+  - id: room-speaks-when-picked
+    title: 群里只有被点到的才发言
+    chapters:
+      - 04-goals-and-collaboration
+    specs:
+      - bot-room-speaker-pick
+      - bot-rooms
+  - id: approval-and-failure
+    title: 待批准停在对话里等人决定，超时未批不执行
+    chapters:
+      - 06-safety-and-runtime
+    specs:
+      - chat-approval-inline
+      - bot-goal-nested-approval
+      - unattended-approval-expiry
+  - id: skills-and-routines
+    title: 技能和定时任务的结果留在这只 Bot 上
+    chapters:
+      - 05-memory-skills-routines
+    specs:
+      - bot-scoped-skill-sharing
+      - bot-routine-main-session
+      - agent-skill-management
+  - id: ops-without-evolution
+    title: 运维页能看服务和自愈，没有演进入口；工具默认按层提供，不是一次全给
+    chapters:
+      - 07-evolution-and-platform
+    specs:
+      - ops-console
+      - tool-exposure-tiers

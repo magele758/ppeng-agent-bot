@@ -1,0 +1,3739 @@
+{
+  "generatedFrom": "doc/prd/current chapters → doc/bot/01-09 + acceptance status + runnable tests",
+  "chapters": [
+    {
+      "file": "doc/prd/current/01-product.md",
+      "title": "产品是什么",
+      "botChapters": [
+        "doc/bot/01-product.md"
+      ],
+      "specs": [
+        {
+          "id": "bot-autonomous-execution-coverage",
+          "title": "Bot 自动选择并完整承接原有执行能力",
+          "tests": [
+            "packages/core/test/bot-autonomous-execution.test.js",
+            "packages/core/test/bot-autonomous-factory.test.js",
+            "packages/core/test/bot-autonomous-lifecycle.test.js"
+          ]
+        },
+        {
+          "id": "bot-entry-simplification",
+          "title": "Bot 创建入口统一与管理页面职责拆分",
+          "tests": [
+            "e2e/bot-entry-sidebar.spec.ts",
+            "e2e/bot-management-focus.spec.ts",
+            "e2e/bot-room-deletion.spec.ts",
+            "e2e/bot-task-settings-split.spec.ts"
+          ]
+        },
+        {
+          "id": "bots",
+          "title": "Bot 名册、互发消息与权限",
+          "tests": [
+            "e2e/agent-home-features.spec.ts",
+            "e2e/bot-model.spec.ts",
+            "e2e/bot-policy.spec.ts",
+            "packages/core/test/bot-memory-namespace.test.js",
+            "packages/core/test/bot-model-override.test.js",
+            "packages/core/test/bots.test.js",
+            "packages/core/test/legacy-bots-migration.test.js",
+            "packages/core/test/message-agent-runtime.test.js",
+            "packages/core/test/message-agent.test.js",
+            "scripts/test/schema-migration-snapshots.test.mjs",
+            "scripts/test/session-bot-policy-routes.test.mjs"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "doc/prd/current/02-bots-and-workspace.md",
+      "title": "Bot、名册与工作台",
+      "botChapters": [
+        "doc/bot/02-identity.md",
+        "doc/bot/03-workspace.md"
+      ],
+      "specs": [
+        {
+          "id": "bot-activity-open-session",
+          "title": "活动卡点击打开所属会话",
+          "tests": [
+            "apps/web-console/components/BotActivityList.test.ts",
+            "apps/web-console/lib/bot-activity.test.ts",
+            "packages/core/test/bot-activity.test.js"
+          ]
+        },
+        {
+          "id": "bot-activity-rail",
+          "title": "Lab activity rail 展示 Bot 在途工作，并按 owner 隔离",
+          "tests": [
+            "packages/core/test/bot-activity.test.js"
+          ]
+        },
+        {
+          "id": "bot-chat-header",
+          "title": "Bot 对话头部只显示名字、活脸和权限入口",
+          "tests": [
+            "apps/web-console/lib/bot-chat-header.test.ts"
+          ]
+        },
+        {
+          "id": "bot-child-task-chat-entry",
+          "title": "普通会话列表里的 Bot 子任务入口",
+          "tests": [
+            "apps/web-console/components/SessionListRow.child-task.test.ts",
+            "apps/web-console/lib/bot-child-tasks.test.ts",
+            "apps/web-console/lib/session-row.test.ts"
+          ]
+        },
+        {
+          "id": "bot-child-task-stream-entry",
+          "title": "主对话流里的子任务入口",
+          "tests": [
+            "apps/web-console/components/BotChildTaskStreamEntry.test.ts",
+            "apps/web-console/lib/bot-child-task-stream.test.ts"
+          ]
+        },
+        {
+          "id": "bot-console-selection",
+          "title": "切换 Bot 时显示当前会话，开发态仍能载入默认 Bot",
+          "tests": [
+            "apps/web-console/lib/bot-console-selection.test.ts"
+          ]
+        },
+        {
+          "id": "bot-create-named-tools",
+          "title": "对话里能用 create_bot 和 create_room 创建",
+          "tests": [
+            "packages/core/test/product-admin-tools.test.js"
+          ]
+        },
+        {
+          "id": "bot-detail-child-tasks-tab",
+          "title": "子任务改到详情页签",
+          "tests": [
+            "apps/web-console/components/BotDetailMenu.test.ts"
+          ]
+        },
+        {
+          "id": "bot-detail-menu",
+          "title": "Bot 对话右侧详情菜单",
+          "tests": [
+            "apps/daemon/test/bot-materials.test.ts",
+            "apps/web-console/components/BotDetailMenu.test.ts",
+            "apps/web-console/lib/bot-detail-menu.test.ts",
+            "e2e/bot-detail-skills.spec.ts"
+          ]
+        },
+        {
+          "id": "bot-detail-skill-management",
+          "title": "在 Bot 详情中查看可选技能并管理技能",
+          "tests": [
+            "apps/daemon/test/bot-skill-selection.test.ts",
+            "e2e/bot-detail-skills.spec.ts",
+            "packages/core/test/agent-skill-management.test.js"
+          ]
+        },
+        {
+          "id": "bot-entry-simplification",
+          "title": "Bot 创建入口统一与管理页面职责拆分",
+          "tests": [
+            "e2e/bot-entry-sidebar.spec.ts",
+            "e2e/bot-management-focus.spec.ts",
+            "e2e/bot-room-deletion.spec.ts",
+            "e2e/bot-task-settings-split.spec.ts"
+          ]
+        },
+        {
+          "id": "bot-face-readable-shapes",
+          "title": "脸型圆润，列表里能看见表情，干活时更忙",
+          "tests": [
+            "apps/web-console/components/BotFace.render.test.ts",
+            "apps/web-console/lib/bot-face.test.ts"
+          ]
+        },
+        {
+          "id": "bot-first-task-dismissal",
+          "title": "首次任务引导可关闭且不干扰已有对话",
+          "tests": [
+            "e2e/bot-first-task-dismissal.spec.ts"
+          ]
+        },
+        {
+          "id": "bot-first-task-new-user",
+          "title": "首次任务引导只给新用户看",
+          "tests": [
+            "e2e/bot-first-task-new-user.spec.ts"
+          ]
+        },
+        {
+          "id": "bot-functional-groups",
+          "title": "Bot 功能分组、共享范围优先级与头像修复",
+          "tests": [
+            "apps/web-console/components/BotFace.render.test.ts",
+            "e2e/bot-functional-groups.spec.ts",
+            "e2e/bot-room-deletion.spec.ts",
+            "packages/core/test/bot-functional-groups.test.js",
+            "packages/core/test/bot-reply-quote.test.js",
+            "packages/core/test/bot-room-deletion.test.js",
+            "packages/core/test/history-shared-isolation.test.js",
+            "packages/core/test/memory-shared-context-isolation.test.js",
+            "packages/core/test/session-fork.test.js",
+            "scripts/test/bot-functional-group-routes.test.mjs",
+            "scripts/test/route-access-contract.test.mjs"
+          ]
+        },
+        {
+          "id": "bot-goals-panel-rules",
+          "title": "目标与进展只展示同时在做的多件事",
+          "tests": [
+            "apps/daemon/test/bot-goals-panel-rules.test.ts",
+            "apps/web-console/components/bot-work/BotGoals.panel.test.ts",
+            "e2e/bot-goals-panel-threshold.spec.ts",
+            "packages/core/test/bot-goals-panel-rules.test.js"
+          ]
+        },
+        {
+          "id": "bot-goals-panel-threshold",
+          "title": "目标与进展少于两个目标时不展示",
+          "tests": [
+            "e2e/bot-goals-panel-threshold.spec.ts"
+          ]
+        },
+        {
+          "id": "bot-group-drag-only",
+          "title": "Bot 侧栏移组仅保留拖拽入口",
+          "tests": [
+            "e2e/bot-entry-sidebar.spec.ts",
+            "e2e/bot-functional-groups.spec.ts"
+          ]
+        },
+        {
+          "id": "bot-mock-interview",
+          "title": "内置模拟面试官按指定信息出题、评分并给改进建议",
+          "tests": [
+            "packages/core/test/bot-mock-interview.test.js"
+          ]
+        },
+        {
+          "id": "bot-panel-reset",
+          "title": "切换 Bot 时重置记忆、暂停开关和软件连接",
+          "tests": [
+            "apps/web-console/lib/bot-panel-reset.test.ts"
+          ]
+        },
+        {
+          "id": "bot-pin-area",
+          "title": "Bot 列表置顶区",
+          "tests": [
+            "apps/web-console/components/BotPinArea.test.ts",
+            "apps/web-console/lib/bot-pin-area.test.ts",
+            "apps/web-console/lib/bot-pin.test.ts",
+            "e2e/bot-pin-area.spec.ts"
+          ]
+        },
+        {
+          "id": "bot-robot-faces",
+          "title": "Bot 显示稳定的机器人头像",
+          "tests": [
+            "apps/web-console/lib/bot-face.test.ts"
+          ]
+        },
+        {
+          "id": "bot-session-row",
+          "title": "单 Bot 会话行显示名字、问题和活体脸",
+          "tests": [
+            "apps/web-console/lib/session-row.test.ts",
+            "e2e/agent-home-features.spec.ts",
+            "packages/core/test/bot-history-memory.test.js"
+          ]
+        },
+        {
+          "id": "bot-skill-panel-layout",
+          "title": "Bot 技能面板布局清晰且适应窄屏",
+          "tests": [
+            "e2e/bot-detail-skills.spec.ts"
+          ]
+        },
+        {
+          "id": "bot-switch-live-turn",
+          "title": "切换 Bot 后主画面离开上一场进行中的对话",
+          "tests": [
+            "apps/web-console/lib/live-turn-session.test.ts",
+            "apps/web-console/lib/session-panel-resource.test.ts",
+            "e2e/bot-switch-live-turn.spec.ts"
+          ]
+        },
+        {
+          "id": "bot-workspace-interaction-polish",
+          "title": "Bot 工作台引用、任务通知、上下文与长会话体验优化",
+          "tests": [
+            "apps/web-console/lib/feed-window.test.ts",
+            "e2e/bot-interaction-polish.spec.ts",
+            "packages/core/test/bot-functional-groups.test.js",
+            "packages/core/test/normal-request-budget.test.js",
+            "packages/core/test/routine-continuation.test.js"
+          ]
+        },
+        {
+          "id": "bots",
+          "title": "Bot 名册、互发消息与权限",
+          "tests": [
+            "e2e/agent-home-features.spec.ts",
+            "e2e/bot-model.spec.ts",
+            "e2e/bot-policy.spec.ts",
+            "packages/core/test/bot-memory-namespace.test.js",
+            "packages/core/test/bot-model-override.test.js",
+            "packages/core/test/bots.test.js",
+            "packages/core/test/legacy-bots-migration.test.js",
+            "packages/core/test/message-agent-runtime.test.js",
+            "packages/core/test/message-agent.test.js",
+            "scripts/test/schema-migration-snapshots.test.mjs",
+            "scripts/test/session-bot-policy-routes.test.mjs"
+          ]
+        },
+        {
+          "id": "default-super-bot",
+          "title": "默认 Super Bot 的状态查看、派工与结果汇总",
+          "tests": [
+            "e2e/bot-work-recovery.spec.ts",
+            "e2e/bot-workspace.spec.ts",
+            "e2e/lab.smoke.spec.ts",
+            "packages/core/test/bot-work.test.js",
+            "packages/core/test/message-agent.test.js",
+            "scripts/test/bot-work-routes.test.mjs"
+          ]
+        },
+        {
+          "id": "low-interference-onboarding-goals",
+          "title": "仅向新用户展示首次引导并隐藏少量目标面板",
+          "tests": [
+            "e2e/bot-first-task-dismissal.spec.ts",
+            "e2e/bot-first-task-new-user.spec.ts",
+            "e2e/bot-goals-panel-threshold.spec.ts"
+          ]
+        },
+        {
+          "id": "turn-stats-end-time",
+          "title": "对话轮次统计显示结束时间",
+          "tests": [
+            "apps/web-console/lib/turn-feed-stats.test.ts"
+          ]
+        },
+        {
+          "id": "unowned-legacy-bot",
+          "title": "无主旧 Bot 不被打开时认领",
+          "tests": [
+            "packages/core/test/message-agent.test.js",
+            "packages/core/test/unowned-legacy-bot.test.js"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "doc/prd/current/03-conversation.md",
+      "title": "主对话",
+      "botChapters": [
+        "doc/bot/04-conversation.md"
+      ],
+      "specs": [
+        {
+          "id": "bot-chat-image-compatibility",
+          "title": "Bot 历史图片兼容与群聊发送恢复",
+          "tests": [
+            "apps/web-console/lib/model-errors.test.ts",
+            "e2e/bot-chat-recovery.spec.ts",
+            "packages/core/test/bot-rooms.test.js",
+            "packages/core/test/image-compatibility.test.js"
+          ]
+        },
+        {
+          "id": "bot-composer-next-hint",
+          "title": "Bot 输入框推荐下一句",
+          "tests": [
+            "apps/daemon/test/composer-hint.test.ts",
+            "apps/web-console/lib/composer-next-hint.test.ts"
+          ]
+        },
+        {
+          "id": "bot-dual-compact",
+          "title": "规范 Bot 会话的双阈值压缩",
+          "tests": [
+            "packages/core/test/bot-dual-compact.test.js"
+          ]
+        },
+        {
+          "id": "bot-forever-chat",
+          "title": "Bot 永久主会话命令",
+          "tests": [
+            "apps/web-console/lib/bot-chat-commands.test.ts",
+            "packages/capability-gateway/test/bot-forever-chat.test.js",
+            "packages/core/test/bot-forever-chat.test.js",
+            "scripts/test/bot-forever-chat-routes.test.mjs"
+          ]
+        },
+        {
+          "id": "bot-human-continuation",
+          "title": "Bot忙时接收与连续对话",
+          "tests": [
+            "packages/core/test/bot-work.test.js",
+            "packages/core/test/human-continuation.test.js",
+            "scripts/test/bot-human-continuation.test.mjs"
+          ]
+        },
+        {
+          "id": "bot-immediate-steer",
+          "title": "Bot 回合中直接插入并转向",
+          "tests": [
+            "apps/daemon/test/loop-steer-policy.test.ts",
+            "apps/web-console/lib/running-turn-send.test.ts",
+            "packages/agent-loop/src/runtime/agent-loop.test.ts",
+            "packages/agent-loop/src/session/steer-ack.test.ts",
+            "packages/agent-loop/src/turn/kernel.test.ts",
+            "packages/core/test/bot-immediate-steer.test.js"
+          ]
+        },
+        {
+          "id": "bot-input-suggestion",
+          "title": "Bot 输入框下一句建议",
+          "tests": [
+            "apps/daemon/test/input-suggestion-cache.test.ts",
+            "apps/daemon/test/input-suggestion-http.test.ts",
+            "apps/web-console/lib/input-suggestion.test.ts",
+            "packages/core/test/input-suggestion.test.js"
+          ]
+        },
+        {
+          "id": "bot-input-suggestion-cache",
+          "title": "Bot 每轮推荐只生成一次并保留",
+          "tests": [
+            "apps/daemon/test/input-suggestion-cache.test.ts",
+            "apps/daemon/test/input-suggestion-http.test.ts",
+            "e2e/bot-input-suggestion-cache.spec.ts"
+          ]
+        },
+        {
+          "id": "bot-reply-quote",
+          "title": "引用某条 Bot 回复再发消息",
+          "tests": [
+            "apps/web-console/components/ReplyQuote.test.ts",
+            "e2e/bot-reply-quote.spec.ts",
+            "packages/agent-loop/src/session/apply-claimed-inbox.test.ts",
+            "packages/agent-loop/src/session/fork-quote.test.ts",
+            "packages/agent-loop/src/session/step-inbox-context.test.ts",
+            "packages/core/test/bot-reply-quote.test.js",
+            "packages/core/test/human-continuation.test.js",
+            "packages/core/test/session-fork.test.js"
+          ]
+        },
+        {
+          "id": "bot-steer-visible",
+          "title": "Bot 对话里的实时插话马上出现在对话流",
+          "tests": [
+            "apps/web-console/lib/feed-window.test.ts",
+            "apps/web-console/lib/live-turn-session.test.ts"
+          ]
+        },
+        {
+          "id": "bot-window-compact",
+          "title": "规范 Bot 按真实模型窗口的一半和 85% 压缩",
+          "tests": [
+            "packages/core/test/bot-dual-compact.test.js"
+          ]
+        },
+        {
+          "id": "bot-working-animation",
+          "title": "Bot 工作期间持续动态、列表待机保持活性",
+          "tests": [
+            "apps/web-console/components/BotFace.render.test.ts",
+            "e2e/bot-working-state.spec.ts",
+            "scripts/test/bot-work-routes.test.mjs"
+          ]
+        },
+        {
+          "id": "session-recap",
+          "title": "会话末尾回顾",
+          "tests": [
+            "apps/daemon/test/session-recap-settings.test.ts",
+            "apps/daemon/test/session-recap-text.test.ts",
+            "apps/daemon/test/session-recap-yield.test.ts",
+            "apps/web-console/lib/session-recap.test.ts"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "doc/prd/current/04-goals-and-collaboration.md",
+      "title": "目标、协作与外部软件",
+      "botChapters": [
+        "doc/bot/05-goals-and-work.md",
+        "doc/bot/07-rooms.md",
+        "doc/bot/08-collaboration.md"
+      ],
+      "specs": [
+        {
+          "id": "bot-autonomous-execution-coverage",
+          "title": "Bot 自动选择并完整承接原有执行能力",
+          "tests": [
+            "packages/core/test/bot-autonomous-execution.test.js",
+            "packages/core/test/bot-autonomous-factory.test.js",
+            "packages/core/test/bot-autonomous-lifecycle.test.js"
+          ]
+        },
+        {
+          "id": "bot-concurrent-subagents",
+          "title": "Bot 并发工作时派生子代理，并允许子代理复用记忆与互助",
+          "tests": [
+            "packages/core/test/bot-concurrent-subagents.test.js"
+          ]
+        },
+        {
+          "id": "bot-create-named-tools",
+          "title": "对话里能用 create_bot 和 create_room 创建",
+          "tests": [
+            "packages/core/test/product-admin-tools.test.js"
+          ]
+        },
+        {
+          "id": "bot-fork-retrievable-inheritance",
+          "title": "Bot 子任务按权限检索父 Bot 的记忆、技能、文件与上下文",
+          "tests": [
+            "packages/core/test/bot-fork-retrieval.test.js",
+            "packages/core/test/bot-fork-spawn-inheritance.test.js",
+            "packages/core/test/fork-sibling-isolation.test.js"
+          ]
+        },
+        {
+          "id": "bot-goal-result-return",
+          "title": "子执行结果回到原目标并收口",
+          "tests": [
+            "packages/core/test/bot-goal-result-return.test.js"
+          ]
+        },
+        {
+          "id": "bot-multi-goal-coordination",
+          "title": "Bot 多目标持续执行与自动选择执行方式",
+          "tests": [
+            "apps/daemon/test/bot-goals-http.test.ts",
+            "apps/daemon/test/bot-goals.test.ts",
+            "e2e/bot-multi-goal.spec.ts",
+            "packages/core/test/bot-goal-intake.test.js",
+            "packages/core/test/bot-goal-routing-gateway.test.js",
+            "packages/core/test/bot-goal-routing-runtime.test.js",
+            "packages/core/test/bot-goal-routing.test.js",
+            "packages/core/test/bot-goal-runtime.test.js",
+            "packages/core/test/bot-goals-budget.test.js",
+            "packages/core/test/bot-goals-executor-cancellation.test.js",
+            "packages/core/test/bot-goals-scheduler.test.js",
+            "packages/core/test/bot-goals.test.js"
+          ]
+        },
+        {
+          "id": "bot-product-admin",
+          "title": "对话 bot 能管理产品和配置",
+          "tests": [
+            "packages/core/test/product-admin-tools.test.js"
+          ]
+        },
+        {
+          "id": "bot-product-p0",
+          "title": "Bot可靠工作与可验收交付闭环",
+          "tests": [
+            "apps/web-console/lib/approval-preview.test.ts",
+            "apps/web-console/lib/bot-dispatch.test.ts",
+            "apps/web-console/lib/bot-product-state.test.ts",
+            "apps/web-console/lib/bot-recovery-link.test.ts",
+            "apps/web-console/lib/bot-work-state.test.ts",
+            "e2e/bot-product-approval.spec.ts",
+            "e2e/bot-product-delivery.spec.ts",
+            "e2e/bot-product-state.spec.ts",
+            "packages/core/test/bot-product-activity.test.js",
+            "packages/core/test/bot-product-delivery.test.js",
+            "packages/core/test/bot-work.test.js"
+          ]
+        },
+        {
+          "id": "bot-product-p1",
+          "title": "Bot首次任务与软件连接引导",
+          "tests": [
+            "e2e/bot-product-onboarding.spec.ts",
+            "packages/core/test/software-execution.test.js",
+            "scripts/test/bot-product-connection.test.mjs"
+          ]
+        },
+        {
+          "id": "bot-product-p2",
+          "title": "Bot成果复用记忆纠错与持续协作",
+          "tests": [
+            "e2e/bot-product-metrics.spec.ts",
+            "e2e/bot-product-onboarding.spec.ts",
+            "e2e/bot-product-p2.spec.ts",
+            "e2e/bot-workspace.spec.ts",
+            "packages/core/test/bot-product-collaboration.test.js",
+            "packages/core/test/bot-product-delivery.test.js",
+            "packages/core/test/bot-product-memory.test.js",
+            "packages/core/test/bot-product-metrics.test.js",
+            "packages/core/test/bot-product-routine.test.js",
+            "scripts/test/bot-product-metrics.test.mjs",
+            "scripts/test/bot-product-p2.test.mjs"
+          ]
+        },
+        {
+          "id": "bot-reliable-messaging",
+          "title": "Bot可靠工作与身份连续性",
+          "tests": [
+            "packages/core/test/bot-work.test.js",
+            "packages/core/test/message-agent.test.js"
+          ]
+        },
+        {
+          "id": "bot-room-console",
+          "title": "大规模群的对话区界面",
+          "tests": [
+            "apps/web-console/components/play-group/room-console.test.ts"
+          ]
+        },
+        {
+          "id": "bot-room-goal-intake",
+          "title": "群目标与中途插话",
+          "tests": [
+            "packages/core/test/bot-room-goal-intake.test.js"
+          ]
+        },
+        {
+          "id": "bot-room-inline-approval",
+          "title": "群内原位批准",
+          "tests": [
+            "packages/core/test/bot-room-inline-approval.test.js"
+          ]
+        },
+        {
+          "id": "bot-room-recall",
+          "title": "群纪要、群规约与按群取回",
+          "tests": [
+            "packages/core/test/bot-room-recall.test.js",
+            "packages/core/test/message-agent.test.js"
+          ]
+        },
+        {
+          "id": "bot-room-sparse-routing",
+          "title": "所有群稀疏唤醒",
+          "tests": [
+            "packages/core/test/bot-room-sparse-routing.test.js",
+            "packages/core/test/bot-room-speaker-pick.test.js",
+            "packages/core/test/bot-rooms.test.js",
+            "packages/core/test/room-scheduling.test.js"
+          ]
+        },
+        {
+          "id": "bot-room-speaker-identity",
+          "title": "Bot 一开始就知道群里发言用自己的身份",
+          "tests": [
+            "packages/core/test/bot-rooms.test.js",
+            "packages/core/test/product-admin-tools.test.js"
+          ]
+        },
+        {
+          "id": "bot-room-speaker-pick",
+          "title": "群聊按贴题程度决定谁开口",
+          "tests": [
+            "packages/core/test/bot-room-sparse-routing.test.js",
+            "packages/core/test/bot-room-speaker-pick.test.js",
+            "packages/core/test/bot-rooms.test.js",
+            "packages/core/test/room-scheduling.test.js",
+            "packages/core/test/room-speaker-score.test.js"
+          ]
+        },
+        {
+          "id": "bot-room-tasks",
+          "title": "群子任务与成员接力",
+          "tests": [
+            "packages/core/test/bot-room-tasks.test.js"
+          ]
+        },
+        {
+          "id": "bot-room-touched-memory",
+          "title": "按触达打通单聊记忆与群内容",
+          "tests": [
+            "packages/core/test/bot-room-touched-memory.test.js"
+          ]
+        },
+        {
+          "id": "bot-room-wave-dispatch",
+          "title": "群发言并行与停止拦截",
+          "tests": [
+            "packages/core/test/bot-room-wave-dispatch.test.js"
+          ]
+        },
+        {
+          "id": "bot-rooms",
+          "title": "多 Bot 群会话与可靠发言",
+          "tests": [
+            "apps/web-console/lib/history-window.test.ts",
+            "e2e/bot-workspace.spec.ts",
+            "packages/core/test/bot-room-sparse-routing.test.js",
+            "packages/core/test/bot-room-speaker-pick.test.js",
+            "packages/core/test/bot-room-wave-dispatch.test.js",
+            "packages/core/test/bot-rooms.test.js",
+            "packages/core/test/history-tool-unification.test.js",
+            "packages/core/test/room-human-step.test.js",
+            "packages/core/test/room-scheduling.test.js",
+            "scripts/test/bot-room-routes.test.mjs"
+          ]
+        },
+        {
+          "id": "bot-software-execution",
+          "title": "Bot 软件连接与可靠执行",
+          "tests": [
+            "e2e/bot-workspace.spec.ts",
+            "packages/core/test/bash-execution-result.test.js",
+            "packages/core/test/discovery-openapi.test.js",
+            "packages/core/test/software-dns-policy.test.js",
+            "packages/core/test/software-execution.test.js",
+            "packages/core/test/software-http-response.test.js",
+            "scripts/test/bot-software-credential-access.test.mjs"
+          ]
+        },
+        {
+          "id": "bot-task-permission-inheritance",
+          "title": "同 Bot 任务继承权限，跨 Bot 按目标权限执行",
+          "tests": [
+            "packages/core/test/bot-concurrent-subagents.test.js",
+            "packages/core/test/bot-policy.test.js",
+            "packages/core/test/bot-product-collaboration.test.js",
+            "packages/core/test/product-admin-tools.test.js",
+            "packages/core/test/subagent-blocked.test.js"
+          ]
+        },
+        {
+          "id": "bots",
+          "title": "Bot 名册、互发消息与权限",
+          "tests": [
+            "e2e/agent-home-features.spec.ts",
+            "e2e/bot-model.spec.ts",
+            "e2e/bot-policy.spec.ts",
+            "packages/core/test/bot-memory-namespace.test.js",
+            "packages/core/test/bot-model-override.test.js",
+            "packages/core/test/bots.test.js",
+            "packages/core/test/legacy-bots-migration.test.js",
+            "packages/core/test/message-agent-runtime.test.js",
+            "packages/core/test/message-agent.test.js",
+            "scripts/test/schema-migration-snapshots.test.mjs",
+            "scripts/test/session-bot-policy-routes.test.mjs"
+          ]
+        },
+        {
+          "id": "default-super-bot",
+          "title": "默认 Super Bot 的状态查看、派工与结果汇总",
+          "tests": [
+            "e2e/bot-work-recovery.spec.ts",
+            "e2e/bot-workspace.spec.ts",
+            "e2e/lab.smoke.spec.ts",
+            "packages/core/test/bot-work.test.js",
+            "packages/core/test/message-agent.test.js",
+            "scripts/test/bot-work-routes.test.mjs"
+          ]
+        },
+        {
+          "id": "play-bot-group",
+          "title": "Bot 会话列表里的多 Bot 群聊",
+          "tests": [
+            "apps/web-console/lib/bot-group.test.ts"
+          ]
+        },
+        {
+          "id": "room-task-collaboration",
+          "title": "群聊临时负责人任务协作模式",
+          "tests": [
+            "e2e/room-task-collaboration.spec.ts",
+            "packages/core/test/bot-room-wave-dispatch.test.js",
+            "packages/core/test/bot-rooms.test.js",
+            "packages/core/test/tool-exposure-tiers.test.js"
+          ]
+        },
+        {
+          "id": "superbot-factory-setup",
+          "title": "Super Bot 独立配好多机软件工厂",
+          "tests": [
+            "packages/core/test/factory-discover.test.js",
+            "packages/core/test/factory-tool-policy.test.js",
+            "packages/core/test/superbot-factory-setup.test.js"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "doc/prd/current/05-memory-skills-routines.md",
+      "title": "记忆、技能与定时任务",
+      "botChapters": [
+        "doc/bot/03-workspace.md",
+        "doc/bot/06-memory-skills-routines.md"
+      ],
+      "specs": [
+        {
+          "id": "bot-activity-open-session",
+          "title": "活动卡点击打开所属会话",
+          "tests": [
+            "apps/web-console/components/BotActivityList.test.ts",
+            "apps/web-console/lib/bot-activity.test.ts",
+            "packages/core/test/bot-activity.test.js"
+          ]
+        },
+        {
+          "id": "bot-activity-rail",
+          "title": "Lab activity rail 展示 Bot 在途工作，并按 owner 隔离",
+          "tests": [
+            "packages/core/test/bot-activity.test.js"
+          ]
+        },
+        {
+          "id": "bot-child-task-chat-entry",
+          "title": "普通会话列表里的 Bot 子任务入口",
+          "tests": [
+            "apps/web-console/components/SessionListRow.child-task.test.ts",
+            "apps/web-console/lib/bot-child-tasks.test.ts",
+            "apps/web-console/lib/session-row.test.ts"
+          ]
+        },
+        {
+          "id": "bot-child-task-stream-entry",
+          "title": "主对话流里的子任务入口",
+          "tests": [
+            "apps/web-console/components/BotChildTaskStreamEntry.test.ts",
+            "apps/web-console/lib/bot-child-task-stream.test.ts"
+          ]
+        },
+        {
+          "id": "bot-console-selection",
+          "title": "切换 Bot 时显示当前会话，开发态仍能载入默认 Bot",
+          "tests": [
+            "apps/web-console/lib/bot-console-selection.test.ts"
+          ]
+        },
+        {
+          "id": "bot-detail-child-tasks-tab",
+          "title": "子任务改到详情页签",
+          "tests": [
+            "apps/web-console/components/BotDetailMenu.test.ts"
+          ]
+        },
+        {
+          "id": "bot-detail-menu",
+          "title": "Bot 对话右侧详情菜单",
+          "tests": [
+            "apps/daemon/test/bot-materials.test.ts",
+            "apps/web-console/components/BotDetailMenu.test.ts",
+            "apps/web-console/lib/bot-detail-menu.test.ts",
+            "e2e/bot-detail-skills.spec.ts"
+          ]
+        },
+        {
+          "id": "bot-detail-skill-management",
+          "title": "在 Bot 详情中查看可选技能并管理技能",
+          "tests": [
+            "apps/daemon/test/bot-skill-selection.test.ts",
+            "e2e/bot-detail-skills.spec.ts",
+            "packages/core/test/agent-skill-management.test.js"
+          ]
+        },
+        {
+          "id": "bot-entry-simplification",
+          "title": "Bot 创建入口统一与管理页面职责拆分",
+          "tests": [
+            "e2e/bot-entry-sidebar.spec.ts",
+            "e2e/bot-management-focus.spec.ts",
+            "e2e/bot-room-deletion.spec.ts",
+            "e2e/bot-task-settings-split.spec.ts"
+          ]
+        },
+        {
+          "id": "bot-first-task-dismissal",
+          "title": "首次任务引导可关闭且不干扰已有对话",
+          "tests": [
+            "e2e/bot-first-task-dismissal.spec.ts"
+          ]
+        },
+        {
+          "id": "bot-first-task-new-user",
+          "title": "首次任务引导只给新用户看",
+          "tests": [
+            "e2e/bot-first-task-new-user.spec.ts"
+          ]
+        },
+        {
+          "id": "bot-functional-groups",
+          "title": "Bot 功能分组、共享范围优先级与头像修复",
+          "tests": [
+            "apps/web-console/components/BotFace.render.test.ts",
+            "e2e/bot-functional-groups.spec.ts",
+            "e2e/bot-room-deletion.spec.ts",
+            "packages/core/test/bot-functional-groups.test.js",
+            "packages/core/test/bot-reply-quote.test.js",
+            "packages/core/test/bot-room-deletion.test.js",
+            "packages/core/test/history-shared-isolation.test.js",
+            "packages/core/test/memory-shared-context-isolation.test.js",
+            "packages/core/test/session-fork.test.js",
+            "scripts/test/bot-functional-group-routes.test.mjs",
+            "scripts/test/route-access-contract.test.mjs"
+          ]
+        },
+        {
+          "id": "bot-gateway-delivery",
+          "title": "IM 静默回复、至少一次投递与例行预检",
+          "tests": [
+            "apps/web-console/lib/cron.test.ts",
+            "packages/capability-gateway/test/outbound-delivery.test.js",
+            "packages/core/test/routine-precheck.test.js",
+            "scripts/test/cron-job-patch.test.mjs"
+          ]
+        },
+        {
+          "id": "bot-goals-panel-rules",
+          "title": "目标与进展只展示同时在做的多件事",
+          "tests": [
+            "apps/daemon/test/bot-goals-panel-rules.test.ts",
+            "apps/web-console/components/bot-work/BotGoals.panel.test.ts",
+            "e2e/bot-goals-panel-threshold.spec.ts",
+            "packages/core/test/bot-goals-panel-rules.test.js"
+          ]
+        },
+        {
+          "id": "bot-goals-panel-threshold",
+          "title": "目标与进展少于两个目标时不展示",
+          "tests": [
+            "e2e/bot-goals-panel-threshold.spec.ts"
+          ]
+        },
+        {
+          "id": "bot-group-drag-only",
+          "title": "Bot 侧栏移组仅保留拖拽入口",
+          "tests": [
+            "e2e/bot-entry-sidebar.spec.ts",
+            "e2e/bot-functional-groups.spec.ts"
+          ]
+        },
+        {
+          "id": "bot-history-memory",
+          "title": "Bot 持续对话历史与记忆",
+          "tests": [
+            "apps/web-console/lib/history-window.test.ts",
+            "e2e/bot-workspace.spec.ts",
+            "packages/core/test/bot-history-memory.test.js",
+            "packages/core/test/history-tool-unification.test.js",
+            "packages/core/test/history-trigram-candidate.test.js",
+            "packages/core/test/history-visible-fold.test.js",
+            "scripts/test/bot-history-http.test.mjs",
+            "scripts/test/bot-history-routes.test.mjs"
+          ]
+        },
+        {
+          "id": "bot-identity-continuity",
+          "title": "Bot可靠工作与身份连续性",
+          "tests": [
+            "packages/core/test/bot-work.test.js",
+            "packages/core/test/message-agent.test.js",
+            "scripts/test/bot-identity-http.test.mjs"
+          ]
+        },
+        {
+          "id": "bot-panel-reset",
+          "title": "切换 Bot 时重置记忆、暂停开关和软件连接",
+          "tests": [
+            "apps/web-console/lib/bot-panel-reset.test.ts"
+          ]
+        },
+        {
+          "id": "bot-pin-area",
+          "title": "Bot 列表置顶区",
+          "tests": [
+            "apps/web-console/components/BotPinArea.test.ts",
+            "apps/web-console/lib/bot-pin-area.test.ts",
+            "apps/web-console/lib/bot-pin.test.ts",
+            "e2e/bot-pin-area.spec.ts"
+          ]
+        },
+        {
+          "id": "bot-product-p2",
+          "title": "Bot成果复用记忆纠错与持续协作",
+          "tests": [
+            "e2e/bot-product-metrics.spec.ts",
+            "e2e/bot-product-onboarding.spec.ts",
+            "e2e/bot-product-p2.spec.ts",
+            "e2e/bot-workspace.spec.ts",
+            "packages/core/test/bot-product-collaboration.test.js",
+            "packages/core/test/bot-product-delivery.test.js",
+            "packages/core/test/bot-product-memory.test.js",
+            "packages/core/test/bot-product-metrics.test.js",
+            "packages/core/test/bot-product-routine.test.js",
+            "scripts/test/bot-product-metrics.test.mjs",
+            "scripts/test/bot-product-p2.test.mjs"
+          ]
+        },
+        {
+          "id": "bot-routine-lifecycle",
+          "title": "Bot 可靠例行任务",
+          "tests": [
+            "apps/web-console/lib/routine-status.test.ts",
+            "apps/web-console/lib/routine-time.test.ts",
+            "e2e/bot-work-recovery.spec.ts",
+            "e2e/bot-workspace.spec.ts",
+            "packages/core/test/cron-facade.test.js",
+            "packages/core/test/cron-store.test.js",
+            "packages/core/test/event-routine.test.js",
+            "packages/core/test/routine-continuation.test.js",
+            "packages/core/test/routine-lease.test.js",
+            "packages/core/test/routine-lifecycle.test.js",
+            "packages/core/test/routine-room-delivery.test.js",
+            "scripts/test/cron-job-patch.test.mjs"
+          ]
+        },
+        {
+          "id": "bot-routine-main-session",
+          "title": "Bot 定时任务跟自己的会话走",
+          "tests": [
+            "e2e/bot-workspace.spec.ts",
+            "packages/core/test/routine-bot-session.test.js"
+          ]
+        },
+        {
+          "id": "bot-scoped-skill-sharing",
+          "title": "Bot 私有技能沉淀与指定 Bot 共享",
+          "tests": [
+            "e2e/bot-scoped-skills.spec.ts",
+            "packages/core/test/bot-scoped-skills.test.js"
+          ]
+        },
+        {
+          "id": "bot-skill-panel-layout",
+          "title": "Bot 技能面板布局清晰且适应窄屏",
+          "tests": [
+            "e2e/bot-detail-skills.spec.ts"
+          ]
+        },
+        {
+          "id": "bot-switch-live-turn",
+          "title": "切换 Bot 后主画面离开上一场进行中的对话",
+          "tests": [
+            "apps/web-console/lib/live-turn-session.test.ts",
+            "apps/web-console/lib/session-panel-resource.test.ts",
+            "e2e/bot-switch-live-turn.spec.ts"
+          ]
+        },
+        {
+          "id": "bot-workspace-interaction-polish",
+          "title": "Bot 工作台引用、任务通知、上下文与长会话体验优化",
+          "tests": [
+            "apps/web-console/lib/feed-window.test.ts",
+            "e2e/bot-interaction-polish.spec.ts",
+            "packages/core/test/bot-functional-groups.test.js",
+            "packages/core/test/normal-request-budget.test.js",
+            "packages/core/test/routine-continuation.test.js"
+          ]
+        },
+        {
+          "id": "bots",
+          "title": "Bot 名册、互发消息与权限",
+          "tests": [
+            "e2e/agent-home-features.spec.ts",
+            "e2e/bot-model.spec.ts",
+            "e2e/bot-policy.spec.ts",
+            "packages/core/test/bot-memory-namespace.test.js",
+            "packages/core/test/bot-model-override.test.js",
+            "packages/core/test/bots.test.js",
+            "packages/core/test/legacy-bots-migration.test.js",
+            "packages/core/test/message-agent-runtime.test.js",
+            "packages/core/test/message-agent.test.js",
+            "scripts/test/schema-migration-snapshots.test.mjs",
+            "scripts/test/session-bot-policy-routes.test.mjs"
+          ]
+        },
+        {
+          "id": "low-interference-onboarding-goals",
+          "title": "仅向新用户展示首次引导并隐藏少量目标面板",
+          "tests": [
+            "e2e/bot-first-task-dismissal.spec.ts",
+            "e2e/bot-first-task-new-user.spec.ts",
+            "e2e/bot-goals-panel-threshold.spec.ts"
+          ]
+        },
+        {
+          "id": "turn-stats-end-time",
+          "title": "对话轮次统计显示结束时间",
+          "tests": [
+            "apps/web-console/lib/turn-feed-stats.test.ts"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "doc/prd/current/06-safety-and-runtime.md",
+      "title": "安全、模型与运行方式",
+      "botChapters": [
+        "doc/bot/02-identity.md",
+        "doc/bot/05-goals-and-work.md",
+        "doc/bot/09-safety.md"
+      ],
+      "specs": [
+        {
+          "id": "bot-autonomous-execution-coverage",
+          "title": "Bot 自动选择并完整承接原有执行能力",
+          "tests": [
+            "packages/core/test/bot-autonomous-execution.test.js",
+            "packages/core/test/bot-autonomous-factory.test.js",
+            "packages/core/test/bot-autonomous-lifecycle.test.js"
+          ]
+        },
+        {
+          "id": "bot-chat-header",
+          "title": "Bot 对话头部只显示名字、活脸和权限入口",
+          "tests": [
+            "apps/web-console/lib/bot-chat-header.test.ts"
+          ]
+        },
+        {
+          "id": "bot-concurrent-subagents",
+          "title": "Bot 并发工作时派生子代理，并允许子代理复用记忆与互助",
+          "tests": [
+            "packages/core/test/bot-concurrent-subagents.test.js"
+          ]
+        },
+        {
+          "id": "bot-create-named-tools",
+          "title": "对话里能用 create_bot 和 create_room 创建",
+          "tests": [
+            "packages/core/test/product-admin-tools.test.js"
+          ]
+        },
+        {
+          "id": "bot-face-readable-shapes",
+          "title": "脸型圆润，列表里能看见表情，干活时更忙",
+          "tests": [
+            "apps/web-console/components/BotFace.render.test.ts",
+            "apps/web-console/lib/bot-face.test.ts"
+          ]
+        },
+        {
+          "id": "bot-fork-retrievable-inheritance",
+          "title": "Bot 子任务按权限检索父 Bot 的记忆、技能、文件与上下文",
+          "tests": [
+            "packages/core/test/bot-fork-retrieval.test.js",
+            "packages/core/test/bot-fork-spawn-inheritance.test.js",
+            "packages/core/test/fork-sibling-isolation.test.js"
+          ]
+        },
+        {
+          "id": "bot-goal-result-return",
+          "title": "子执行结果回到原目标并收口",
+          "tests": [
+            "packages/core/test/bot-goal-result-return.test.js"
+          ]
+        },
+        {
+          "id": "bot-mock-interview",
+          "title": "内置模拟面试官按指定信息出题、评分并给改进建议",
+          "tests": [
+            "packages/core/test/bot-mock-interview.test.js"
+          ]
+        },
+        {
+          "id": "bot-multi-goal-coordination",
+          "title": "Bot 多目标持续执行与自动选择执行方式",
+          "tests": [
+            "apps/daemon/test/bot-goals-http.test.ts",
+            "apps/daemon/test/bot-goals.test.ts",
+            "e2e/bot-multi-goal.spec.ts",
+            "packages/core/test/bot-goal-intake.test.js",
+            "packages/core/test/bot-goal-routing-gateway.test.js",
+            "packages/core/test/bot-goal-routing-runtime.test.js",
+            "packages/core/test/bot-goal-routing.test.js",
+            "packages/core/test/bot-goal-runtime.test.js",
+            "packages/core/test/bot-goals-budget.test.js",
+            "packages/core/test/bot-goals-executor-cancellation.test.js",
+            "packages/core/test/bot-goals-scheduler.test.js",
+            "packages/core/test/bot-goals.test.js"
+          ]
+        },
+        {
+          "id": "bot-product-p0",
+          "title": "Bot可靠工作与可验收交付闭环",
+          "tests": [
+            "apps/web-console/lib/approval-preview.test.ts",
+            "apps/web-console/lib/bot-dispatch.test.ts",
+            "apps/web-console/lib/bot-product-state.test.ts",
+            "apps/web-console/lib/bot-recovery-link.test.ts",
+            "apps/web-console/lib/bot-work-state.test.ts",
+            "e2e/bot-product-approval.spec.ts",
+            "e2e/bot-product-delivery.spec.ts",
+            "e2e/bot-product-state.spec.ts",
+            "packages/core/test/bot-product-activity.test.js",
+            "packages/core/test/bot-product-delivery.test.js",
+            "packages/core/test/bot-work.test.js"
+          ]
+        },
+        {
+          "id": "bot-product-p1",
+          "title": "Bot首次任务与软件连接引导",
+          "tests": [
+            "e2e/bot-product-onboarding.spec.ts",
+            "packages/core/test/software-execution.test.js",
+            "scripts/test/bot-product-connection.test.mjs"
+          ]
+        },
+        {
+          "id": "bot-product-p2",
+          "title": "Bot成果复用记忆纠错与持续协作",
+          "tests": [
+            "e2e/bot-product-metrics.spec.ts",
+            "e2e/bot-product-onboarding.spec.ts",
+            "e2e/bot-product-p2.spec.ts",
+            "e2e/bot-workspace.spec.ts",
+            "packages/core/test/bot-product-collaboration.test.js",
+            "packages/core/test/bot-product-delivery.test.js",
+            "packages/core/test/bot-product-memory.test.js",
+            "packages/core/test/bot-product-metrics.test.js",
+            "packages/core/test/bot-product-routine.test.js",
+            "scripts/test/bot-product-metrics.test.mjs",
+            "scripts/test/bot-product-p2.test.mjs"
+          ]
+        },
+        {
+          "id": "bot-robot-faces",
+          "title": "Bot 显示稳定的机器人头像",
+          "tests": [
+            "apps/web-console/lib/bot-face.test.ts"
+          ]
+        },
+        {
+          "id": "bot-session-row",
+          "title": "单 Bot 会话行显示名字、问题和活体脸",
+          "tests": [
+            "apps/web-console/lib/session-row.test.ts",
+            "e2e/agent-home-features.spec.ts",
+            "packages/core/test/bot-history-memory.test.js"
+          ]
+        },
+        {
+          "id": "bot-task-permission-inheritance",
+          "title": "同 Bot 任务继承权限，跨 Bot 按目标权限执行",
+          "tests": [
+            "packages/core/test/bot-concurrent-subagents.test.js",
+            "packages/core/test/bot-policy.test.js",
+            "packages/core/test/bot-product-collaboration.test.js",
+            "packages/core/test/product-admin-tools.test.js",
+            "packages/core/test/subagent-blocked.test.js"
+          ]
+        },
+        {
+          "id": "bots",
+          "title": "Bot 名册、互发消息与权限",
+          "tests": [
+            "e2e/agent-home-features.spec.ts",
+            "e2e/bot-model.spec.ts",
+            "e2e/bot-policy.spec.ts",
+            "packages/core/test/bot-memory-namespace.test.js",
+            "packages/core/test/bot-model-override.test.js",
+            "packages/core/test/bots.test.js",
+            "packages/core/test/legacy-bots-migration.test.js",
+            "packages/core/test/message-agent-runtime.test.js",
+            "packages/core/test/message-agent.test.js",
+            "scripts/test/schema-migration-snapshots.test.mjs",
+            "scripts/test/session-bot-policy-routes.test.mjs"
+          ]
+        },
+        {
+          "id": "default-super-bot",
+          "title": "默认 Super Bot 的状态查看、派工与结果汇总",
+          "tests": [
+            "e2e/bot-work-recovery.spec.ts",
+            "e2e/bot-workspace.spec.ts",
+            "e2e/lab.smoke.spec.ts",
+            "packages/core/test/bot-work.test.js",
+            "packages/core/test/message-agent.test.js",
+            "scripts/test/bot-work-routes.test.mjs"
+          ]
+        },
+        {
+          "id": "loop-guard-model-switch",
+          "title": "重复检测默认只约束弱模型",
+          "tests": [
+            "apps/web-console/lib/i18n/repeat-guard-copy.test.ts",
+            "packages/agent-loop/src/assembly/max-host.test.ts",
+            "packages/agent-loop/src/recovery/repeat-guard.test.ts",
+            "packages/agent-loop/src/tools/shell-policy.test.ts",
+            "packages/agent-loop/src/turn/repeat-guard-kernel.test.ts",
+            "packages/core/test/repeat-guard-settings.test.js"
+          ]
+        },
+        {
+          "id": "unattended-approval-expiry",
+          "title": "无人值守审批超时拒绝",
+          "tests": [
+            "apps/web-console/lib/approval-inbox.test.ts",
+            "packages/core/test/unattended-approval-expiry.test.js",
+            "packages/core/test/unattended-approval-writer-scope.test.js"
+          ]
+        },
+        {
+          "id": "unowned-legacy-bot",
+          "title": "无主旧 Bot 不被打开时认领",
+          "tests": [
+            "packages/core/test/message-agent.test.js",
+            "packages/core/test/unowned-legacy-bot.test.js"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "doc/prd/current/07-evolution-and-platform.md",
+      "title": "自愈、演进与平台能力",
+      "botChapters": [
+        "doc/bot/05-goals-and-work.md"
+      ],
+      "specs": [
+        {
+          "id": "bot-autonomous-execution-coverage",
+          "title": "Bot 自动选择并完整承接原有执行能力",
+          "tests": [
+            "packages/core/test/bot-autonomous-execution.test.js",
+            "packages/core/test/bot-autonomous-factory.test.js",
+            "packages/core/test/bot-autonomous-lifecycle.test.js"
+          ]
+        },
+        {
+          "id": "bot-concurrent-subagents",
+          "title": "Bot 并发工作时派生子代理，并允许子代理复用记忆与互助",
+          "tests": [
+            "packages/core/test/bot-concurrent-subagents.test.js"
+          ]
+        },
+        {
+          "id": "bot-fork-retrievable-inheritance",
+          "title": "Bot 子任务按权限检索父 Bot 的记忆、技能、文件与上下文",
+          "tests": [
+            "packages/core/test/bot-fork-retrieval.test.js",
+            "packages/core/test/bot-fork-spawn-inheritance.test.js",
+            "packages/core/test/fork-sibling-isolation.test.js"
+          ]
+        },
+        {
+          "id": "bot-goal-result-return",
+          "title": "子执行结果回到原目标并收口",
+          "tests": [
+            "packages/core/test/bot-goal-result-return.test.js"
+          ]
+        },
+        {
+          "id": "bot-multi-goal-coordination",
+          "title": "Bot 多目标持续执行与自动选择执行方式",
+          "tests": [
+            "apps/daemon/test/bot-goals-http.test.ts",
+            "apps/daemon/test/bot-goals.test.ts",
+            "e2e/bot-multi-goal.spec.ts",
+            "packages/core/test/bot-goal-intake.test.js",
+            "packages/core/test/bot-goal-routing-gateway.test.js",
+            "packages/core/test/bot-goal-routing-runtime.test.js",
+            "packages/core/test/bot-goal-routing.test.js",
+            "packages/core/test/bot-goal-runtime.test.js",
+            "packages/core/test/bot-goals-budget.test.js",
+            "packages/core/test/bot-goals-executor-cancellation.test.js",
+            "packages/core/test/bot-goals-scheduler.test.js",
+            "packages/core/test/bot-goals.test.js"
+          ]
+        },
+        {
+          "id": "bot-product-p0",
+          "title": "Bot可靠工作与可验收交付闭环",
+          "tests": [
+            "apps/web-console/lib/approval-preview.test.ts",
+            "apps/web-console/lib/bot-dispatch.test.ts",
+            "apps/web-console/lib/bot-product-state.test.ts",
+            "apps/web-console/lib/bot-recovery-link.test.ts",
+            "apps/web-console/lib/bot-work-state.test.ts",
+            "e2e/bot-product-approval.spec.ts",
+            "e2e/bot-product-delivery.spec.ts",
+            "e2e/bot-product-state.spec.ts",
+            "packages/core/test/bot-product-activity.test.js",
+            "packages/core/test/bot-product-delivery.test.js",
+            "packages/core/test/bot-work.test.js"
+          ]
+        },
+        {
+          "id": "bot-product-p1",
+          "title": "Bot首次任务与软件连接引导",
+          "tests": [
+            "e2e/bot-product-onboarding.spec.ts",
+            "packages/core/test/software-execution.test.js",
+            "scripts/test/bot-product-connection.test.mjs"
+          ]
+        },
+        {
+          "id": "bot-product-p2",
+          "title": "Bot成果复用记忆纠错与持续协作",
+          "tests": [
+            "e2e/bot-product-metrics.spec.ts",
+            "e2e/bot-product-onboarding.spec.ts",
+            "e2e/bot-product-p2.spec.ts",
+            "e2e/bot-workspace.spec.ts",
+            "packages/core/test/bot-product-collaboration.test.js",
+            "packages/core/test/bot-product-delivery.test.js",
+            "packages/core/test/bot-product-memory.test.js",
+            "packages/core/test/bot-product-metrics.test.js",
+            "packages/core/test/bot-product-routine.test.js",
+            "scripts/test/bot-product-metrics.test.mjs",
+            "scripts/test/bot-product-p2.test.mjs"
+          ]
+        },
+        {
+          "id": "bot-task-permission-inheritance",
+          "title": "同 Bot 任务继承权限，跨 Bot 按目标权限执行",
+          "tests": [
+            "packages/core/test/bot-concurrent-subagents.test.js",
+            "packages/core/test/bot-policy.test.js",
+            "packages/core/test/bot-product-collaboration.test.js",
+            "packages/core/test/product-admin-tools.test.js",
+            "packages/core/test/subagent-blocked.test.js"
+          ]
+        }
+      ]
+    }
+  ],
+  "unassigned": [
+    {
+      "id": "acceptance-gate",
+      "title": "验收标准门禁（需求 → 可执行验收用例）",
+      "tests": [
+        "scripts/test/acceptance-gate-cli.test.mjs",
+        "scripts/test/acceptance-lib.test.mjs"
+      ]
+    },
+    {
+      "id": "agent-as-folder-eval",
+      "title": "Agent-as-folder path + eval default-on",
+      "tests": [
+        "packages/core/test/agent-as-folder-eval.test.js"
+      ]
+    },
+    {
+      "id": "agent-learning-governance",
+      "title": "纠错评测、技能验证、输入授权与事件调度",
+      "tests": [
+        "apps/daemon/test/learning-http.test.ts",
+        "e2e/learning-governance.spec.ts",
+        "packages/core/test/learning-governance.test.js"
+      ]
+    },
+    {
+      "id": "agent-skill-management",
+      "title": "Agent 在对话中管理自身技能",
+      "tests": [
+        "e2e/bot-detail-skills.spec.ts",
+        "packages/core/test/agent-skill-management.test.js"
+      ]
+    },
+    {
+      "id": "agents-management",
+      "title": "Bots / Agents / Teams / Skills 管理页清晰易用",
+      "tests": [
+        "apps/web-console/lib/agents-view.test.ts",
+        "e2e/agent-home-features.spec.ts",
+        "e2e/agents-management.spec.ts",
+        "e2e/bot-model.spec.ts"
+      ]
+    },
+    {
+      "id": "always-on-reliability",
+      "title": "常驻 Agent 的恢复、通知、长期评测、缓存诊断与压缩契约",
+      "tests": [
+        "apps/daemon/test/session-reliability.test.ts",
+        "e2e/always-on-reliability.spec.ts",
+        "packages/core/test/always-on-reliability.test.js"
+      ]
+    },
+    {
+      "id": "app-frosted-glass",
+      "title": "整个应用是毛玻璃",
+      "tests": [
+        "apps/desktop/src/window-glass.test.ts",
+        "apps/web-console/components/sections/settings/settings-glass.test.ts",
+        "apps/web-console/styles/glass.test.ts"
+      ]
+    },
+    {
+      "id": "approval-explanations",
+      "title": "审批操作与风险说明",
+      "tests": [
+        "apps/daemon/test/approval-explanation.test.ts",
+        "apps/web-console/components/approval-explanation.test.ts",
+        "e2e/approval-explanations.spec.ts"
+      ]
+    },
+    {
+      "id": "ask-user-live-stream",
+      "title": "回答追问后继续看到生成内容",
+      "tests": [
+        "apps/web-console/lib/live-stream-attach.test.ts",
+        "packages/core/test/ask-user-live-stream.test.js"
+      ]
+    },
+    {
+      "id": "assistant-actions-at-end",
+      "title": "助手消息的引用/纠错按钮放在正文末尾",
+      "tests": [
+        "apps/web-console/components/assistant-actions-at-end.test.ts"
+      ]
+    },
+    {
+      "id": "assistant-label-dedupe",
+      "title": "连续助手发言只在第一条显示「助手」标题",
+      "tests": [
+        "apps/web-console/components/correction-capture.test.ts",
+        "apps/web-console/lib/assistant-label-run.test.ts"
+      ]
+    },
+    {
+      "id": "assistant-repeat-collapse",
+      "title": "助手正文里相邻的重复行收成一行",
+      "tests": [
+        "apps/web-console/lib/collapse-repeated-lines.test.ts"
+      ]
+    },
+    {
+      "id": "assistant-run-spacing",
+      "title": "连续助手消息省略标题后不留大段空白",
+      "tests": [
+        "apps/web-console/components/assistant-run-spacing.test.ts"
+      ]
+    },
+    {
+      "id": "auto-review-authorized-by",
+      "title": "Auto-review 批准回执记录授权引用",
+      "tests": [
+        "packages/agent-loop/src/approval/auto-review.test.ts",
+        "packages/core/test/approval-authorized-by.test.js"
+      ]
+    },
+    {
+      "id": "auto-review-shell-mcp",
+      "title": "Auto-review 工具级审批卡（高危 Shell/MCP）",
+      "tests": [
+        "apps/web-console/components/AutoReviewMarks.render.test.ts",
+        "apps/web-console/lib/auto-review-card.test.ts",
+        "packages/agent-loop/src/approval/auto-review.test.ts",
+        "packages/core/test/model-sandbox-isolation.test.js"
+      ]
+    },
+    {
+      "id": "background-job-restart",
+      "title": "重启后中断无人执行的后台命令",
+      "tests": [
+        "packages/core/test/background-job-restart.test.js"
+      ]
+    },
+    {
+      "id": "bg-run-host-park",
+      "title": "Host parks durable wait for owned bg_run",
+      "tests": [
+        "packages/core/test/bg-run-host-park.test.js"
+      ]
+    },
+    {
+      "id": "bot-bloub-dynamic",
+      "title": "Bloub 动态头像风格",
+      "tests": [
+        "apps/web-console/lib/bloub-motion.test.ts",
+        "apps/web-console/lib/bot-face-save.test.ts",
+        "e2e/bot-bloub-dynamic.spec.ts",
+        "packages/core/test/bots.test.js"
+      ]
+    },
+    {
+      "id": "bot-child-task-chip-fill",
+      "title": "子任务芯片有底色",
+      "tests": [
+        "apps/web-console/components/BotChildTaskStreamEntry.test.ts"
+      ]
+    },
+    {
+      "id": "bot-completion-reliability",
+      "title": "完成验证可追溯与任务收尾可靠性",
+      "tests": [
+        "packages/core/test/bot-completion-reliability.test.js",
+        "scripts/test/bot-quality-reliability.test.mjs",
+        "scripts/test/completion-audit.test.mjs"
+      ]
+    },
+    {
+      "id": "bot-daydream-http",
+      "title": "每日复盘与共享治理真实 HTTP 通路",
+      "tests": [
+        "apps/daemon/test/bot-daydream-http.test.ts"
+      ]
+    },
+    {
+      "id": "bot-daydream-integration",
+      "title": "每日复盘共享成果进入后续 Bot 任务",
+      "tests": [
+        "packages/core/test/daydream-integration.test.js",
+        "packages/core/test/daydream-runtime.test.js"
+      ]
+    },
+    {
+      "id": "bot-daydream-knowledge",
+      "title": "Daydream Super Bot 共享治理",
+      "tests": [
+        "packages/core/test/daydream-knowledge.test.js"
+      ]
+    },
+    {
+      "id": "bot-daydream-local",
+      "title": "Bot 每日独立复盘",
+      "tests": [
+        "packages/core/test/bot-daydream-local.test.js"
+      ]
+    },
+    {
+      "id": "bot-daydream-missing-session",
+      "title": "缺少固定对话时每日复盘继续",
+      "tests": [
+        "packages/core/test/daydream-runtime.test.js"
+      ]
+    },
+    {
+      "id": "bot-daydream-ui",
+      "title": "Bot 每日复盘配置与治理界面",
+      "tests": [
+        "e2e/bot-daydream.spec.ts"
+      ]
+    },
+    {
+      "id": "bot-dialog-solid",
+      "title": "Bot 消息弹窗使用纯色背景",
+      "tests": [
+        "e2e/bot-dialog-solid.spec.ts"
+      ]
+    },
+    {
+      "id": "bot-entry-dialog-shell",
+      "title": "新建 Bot 弹窗遮罩与底部按钮",
+      "tests": [
+        "apps/web-console/components/BotEntryDialog.test.ts",
+        "e2e/bot-entry-sidebar.spec.ts"
+      ]
+    },
+    {
+      "id": "bot-execution-p0",
+      "title": "Bot 任务直达执行与证据保真",
+      "tests": [
+        "packages/core/test/bot-execution-p0.test.js",
+        "packages/core/test/bot-goal-result-return.test.js"
+      ]
+    },
+    {
+      "id": "bot-extreme-concurrency",
+      "title": "Bot 以高并发同时推进多件工作",
+      "tests": [
+        "apps/web-console/lib/bot-goal-concurrency.test.ts",
+        "packages/core/test/bot-extreme-concurrency.test.js"
+      ]
+    },
+    {
+      "id": "bot-face-soft-style",
+      "title": "软萌机器人脸与经典脸并存",
+      "tests": [
+        "apps/web-console/components/BotFace.render.test.ts",
+        "apps/web-console/lib/bot-avatar.test.ts",
+        "apps/web-console/lib/bot-face-save.test.ts",
+        "apps/web-console/lib/bot-face.test.ts",
+        "apps/web-console/lib/soft-bot-face.test.ts",
+        "packages/core/test/bots.test.js"
+      ]
+    },
+    {
+      "id": "bot-fork-sessions-in-detail",
+      "title": "Bot 子任务会话放进详情菜单",
+      "tests": [
+        "apps/web-console/components/BotDetailMenu.test.ts",
+        "apps/web-console/lib/bot-child-tasks.test.ts"
+      ]
+    },
+    {
+      "id": "bot-goal-conclusion",
+      "title": "目标结算与子会话身份的生命周期闭环",
+      "tests": [
+        "packages/core/test/bot-goal-conclusion.test.js",
+        "packages/core/test/bot-goals-scheduler.test.js",
+        "packages/core/test/bot-goals.test.js"
+      ]
+    },
+    {
+      "id": "bot-goal-lifecycle-boundaries",
+      "title": "Bot 目标跨用户与执行生命周期闭环",
+      "tests": [
+        "apps/daemon/test/bot-goals-http.test.ts",
+        "apps/daemon/test/bot-goals.test.ts",
+        "apps/web-console/components/bot-work/BotGoals.panel.test.ts",
+        "e2e/bot-goals-panel-threshold.spec.ts",
+        "packages/core/test/bot-goal-boundaries.test.js"
+      ]
+    },
+    {
+      "id": "bot-goal-live-chain",
+      "title": "Bot 默认配置完整执行与证据回流",
+      "tests": [
+        "packages/core/test/bot-goal-live-chain.test.js",
+        "packages/core/test/bot-goal-routing-runtime.test.js",
+        "packages/core/test/deferred-tool-load.test.js"
+      ]
+    },
+    {
+      "id": "bot-goal-nested-approval",
+      "title": "目标子任务的待批准出现在主对话",
+      "tests": [
+        "apps/web-console/lib/goal-chat-approvals.test.ts",
+        "packages/core/test/bot-goals-scheduler.test.js"
+      ]
+    },
+    {
+      "id": "bot-goal-only-when-needed",
+      "title": "Bot 只在必须时才为目标再开子任务",
+      "tests": [
+        "packages/core/test/bot-goal-only-when-needed.test.js"
+      ]
+    },
+    {
+      "id": "bot-linked-watchers",
+      "title": "关联原工作的临时盯梢与观察证据",
+      "tests": [
+        "e2e/bot-linked-watchers.spec.ts",
+        "packages/core/test/bot-goals-scheduler.test.js",
+        "packages/core/test/bot-linked-watchers-runtime.test.js",
+        "packages/core/test/bot-linked-watchers.test.js",
+        "scripts/test/bot-linked-watchers-http.test.mjs"
+      ]
+    },
+    {
+      "id": "bot-list-face-plate",
+      "title": "侧栏 Bot 脸保持原形，不套外框也不拉变形",
+      "tests": [
+        "apps/web-console/components/SessionListRow.face-plate.test.ts"
+      ]
+    },
+    {
+      "id": "bot-list-idle-motion",
+      "title": "Bot 列表待机头像保持活性",
+      "tests": [
+        "apps/web-console/lib/bot-face.test.ts",
+        "e2e/bot-list-idle-motion.spec.ts",
+        "e2e/bot-working-state.spec.ts"
+      ]
+    },
+    {
+      "id": "bot-message-name",
+      "title": "Bot 回复标签显示 Bot 名称",
+      "tests": [
+        "apps/web-console/lib/assistant-name.test.ts",
+        "e2e/bot-message-name.spec.ts"
+      ]
+    },
+    {
+      "id": "bot-pin-sync",
+      "title": "跨浏览器置顶同步",
+      "tests": [
+        "apps/daemon/test/bot-pin-settings-http.test.ts",
+        "apps/web-console/lib/bot-pin-sync.test.ts"
+      ]
+    },
+    {
+      "id": "bot-quality-reliability",
+      "title": "限定写入范围与辅助判断可靠性及重复对照",
+      "tests": [
+        "packages/core/test/bot-quality-reliability.test.js",
+        "scripts/test/bot-quality-reliability.test.mjs"
+      ]
+    },
+    {
+      "id": "bot-quality-sample-plan",
+      "title": "真实模型评估的独立任务与样本量预检",
+      "tests": [
+        "scripts/test/quality-sample-plan.test.mjs"
+      ]
+    },
+    {
+      "id": "bot-readonly-api",
+      "title": "Bot 正文 API 与显式只读路由",
+      "tests": [
+        "apps/daemon/test/bot-readonly-api-http.test.ts",
+        "packages/core/test/bot-readonly-api.test.js"
+      ]
+    },
+    {
+      "id": "bot-relay-island",
+      "title": "Bot 通信收起为灵动岛式胶囊",
+      "tests": [
+        "apps/web-console/components/bot-relay-strip.test.ts",
+        "e2e/bot-dialog-solid.spec.ts"
+      ]
+    },
+    {
+      "id": "bot-relay-slug",
+      "title": "非 bot_ 前缀的 Bot 通信也收成小提醒",
+      "tests": [
+        "apps/web-console/lib/bot-relay-message.test.ts"
+      ]
+    },
+    {
+      "id": "bot-relay-strip",
+      "title": "Bot 间通信在聊天流里显示为紧凑通信条，点击弹窗看全文",
+      "tests": [
+        "apps/web-console/components/bot-relay-strip.test.ts",
+        "apps/web-console/lib/bot-relay-message.test.ts"
+      ]
+    },
+    {
+      "id": "bot-room-work-continuity",
+      "title": "群派工到原 Bot 持久工作的可靠承接",
+      "tests": [
+        "e2e/bot-room-work-continuity.spec.ts",
+        "packages/core/test/bot-room-work-continuity.test.js",
+        "packages/core/test/bot-room-work-runtime.test.js",
+        "scripts/test/bot-room-work-continuity-http.test.mjs"
+      ]
+    },
+    {
+      "id": "bot-runtime-log-regressions",
+      "title": "Bot 实际运行日志回归",
+      "tests": [
+        "packages/core/test/bot-runtime-log-regressions.test.js"
+      ]
+    },
+    {
+      "id": "bot-settings-flow",
+      "title": "简化 Bot 操作与设置生效反馈",
+      "tests": [
+        "apps/daemon/test/bot-settings-flow.test.ts",
+        "apps/web-console/lib/bot-console-selection.test.ts",
+        "e2e/bot-entry-sidebar.spec.ts",
+        "e2e/bot-face-creation.spec.ts",
+        "e2e/bot-face-persistence.spec.ts",
+        "e2e/bot-settings-flow.spec.ts",
+        "packages/core/test/bot-settings-flow.test.js"
+      ]
+    },
+    {
+      "id": "bot-sidebar-child-sessions",
+      "title": "Bot 侧栏不列出子任务会话",
+      "tests": [
+        "apps/web-console/lib/bot-child-tasks.test.ts"
+      ]
+    },
+    {
+      "id": "bot-sidebar-order",
+      "title": "Bot 列表同一区域内拖拽排序",
+      "tests": [
+        "apps/web-console/lib/sidebar-order.test.ts"
+      ]
+    },
+    {
+      "id": "bot-soft-create-runtime",
+      "title": "软萌头像可正常创建和保存",
+      "tests": [
+        "e2e/bot-soft-create-runtime.spec.ts"
+      ]
+    },
+    {
+      "id": "bot-soft-motion",
+      "title": "软萌头像跟随实际工作状态动起来",
+      "tests": [
+        "apps/web-console/components/BotFace.render.test.ts",
+        "e2e/bot-soft-motion.spec.ts"
+      ]
+    },
+    {
+      "id": "bot-source-authorization-continuity",
+      "title": "Bot 已授权工作的来源连续性",
+      "tests": [
+        "packages/core/test/bot-source-authorization-continuity.test.js"
+      ]
+    },
+    {
+      "id": "bot-startup-summary-latency",
+      "title": "摘要服务变慢时 Bot 启动有界等待",
+      "tests": [
+        "packages/core/test/bot-startup-summary-latency.test.js"
+      ]
+    },
+    {
+      "id": "bot-startup-trace",
+      "title": "Bot 启动耗时分段可观测",
+      "tests": [
+        "apps/daemon/test/bot-startup-boot.test.ts",
+        "packages/agent-loop/src/turn/prepare-startup-trace.test.ts",
+        "packages/agent-loop/src/turn/startup-trace.test.ts",
+        "packages/core/test/bot-startup-admit.test.ts",
+        "packages/core/test/bot-startup-kernel.test.ts",
+        "packages/core/test/bot-startup-prepare.test.ts",
+        "packages/core/test/bot-startup-wake.test.ts"
+      ]
+    },
+    {
+      "id": "bot-supervision-freshness",
+      "title": "Bot 监督状态新鲜度与回复关联",
+      "tests": [
+        "packages/core/test/bot-linked-watchers.test.js",
+        "packages/core/test/bot-supervision-freshness.test.js",
+        "packages/core/test/bot-supervision-runtime.test.js"
+      ]
+    },
+    {
+      "id": "bot-work-durable-wait",
+      "title": "Bot 任务停在持久等待上并只恢复一次",
+      "tests": [
+        "packages/core/test/bot-work-durable-wait.test.js"
+      ]
+    },
+    {
+      "id": "bot-work-restart-resume",
+      "title": "重启后从安全检查点继续 Bot 任务",
+      "tests": [
+        "packages/core/test/bot-work-restart-resume.test.js"
+      ]
+    },
+    {
+      "id": "brief-hide-monologue",
+      "title": "精简界面隐藏混进正文的思考独白",
+      "tests": [
+        "apps/web-console/lib/leaked-monologue.test.ts"
+      ]
+    },
+    {
+      "id": "brief-no-process-note",
+      "title": "精简模式不显示「已收起 N 条过程」",
+      "tests": [
+        "apps/web-console/lib/session-brief.test.ts"
+      ]
+    },
+    {
+      "id": "browser-navigate-private-network",
+      "title": "浏览器导航拒绝私网和本地文件",
+      "tests": [
+        "packages/core/test/browser-backend.test.js",
+        "packages/core/test/browser-tools.test.js"
+      ]
+    },
+    {
+      "id": "bypass-full-auto",
+      "title": "bypass 全自动与重复审批修复",
+      "tests": [
+        "packages/agent-loop/src/approval/auto-review.test.ts",
+        "packages/agent-loop/src/runtime/tool-loop.test.ts",
+        "packages/core/test/bypass-reconcile.test.js",
+        "packages/core/test/lcu-computer-use.test.js"
+      ]
+    },
+    {
+      "id": "bypass-remote-shell",
+      "title": "bypass 下不再为无隔离反复审批，远端查找不被本机浏览规则拦住",
+      "tests": [
+        "packages/agent-loop/src/tools/shell-policy.test.ts",
+        "packages/core/test/model-sandbox-isolation.test.js"
+      ]
+    },
+    {
+      "id": "bypass-skill-write",
+      "title": "bypass 的 Bot 写技能不再被额外确认拦住",
+      "tests": [
+        "packages/core/test/bypass-skill-write.test.js"
+      ]
+    },
+    {
+      "id": "bypass-source-scope",
+      "title": "permissionMode=bypass 视为用户显式授权，不再被来源范围拦截",
+      "tests": [
+        "packages/core/test/learning-governance.test.js"
+      ]
+    },
+    {
+      "id": "chat-approval-inline",
+      "title": "待审批嵌在对话流里",
+      "tests": [
+        "apps/web-console/lib/approval-feed.test.ts",
+        "e2e/chat-approval-inline.spec.ts"
+      ]
+    },
+    {
+      "id": "chat-basics",
+      "title": "对话基础体验",
+      "tests": [
+        "apps/web-console/lib/run-leave.test.ts",
+        "e2e/chat-basics.spec.ts",
+        "e2e/lab.smoke.spec.ts",
+        "scripts/test/sse-disconnect.test.mjs"
+      ]
+    },
+    {
+      "id": "chat-bubble-written-stamp",
+      "title": "对话气泡不展示写入时间戳",
+      "tests": [
+        "apps/web-console/components/chat-bubble-written-stamp.test.ts",
+        "apps/web-console/lib/visible-clock.test.ts"
+      ]
+    },
+    {
+      "id": "chat-experience",
+      "title": "对话页简洁易用",
+      "tests": [
+        "e2e/agent-home-features.spec.ts",
+        "e2e/chat-experience.spec.ts"
+      ]
+    },
+    {
+      "id": "chat-inline-history",
+      "title": "单行附件入口与自动加载聊天历史",
+      "tests": [
+        "e2e/chat-inline-history.spec.ts"
+      ]
+    },
+    {
+      "id": "chat-more-menu-on-top",
+      "title": "对话头部「⋯」更多菜单在最上层且不透明",
+      "tests": [
+        "apps/web-console/styles/chat-more-menu.test.ts"
+      ]
+    },
+    {
+      "id": "chat-tail-kept",
+      "title": "对话结束时助手正文留在对话里",
+      "tests": [
+        "apps/web-console/lib/feed-window.test.ts",
+        "apps/web-console/lib/history-window.test.ts",
+        "apps/web-console/lib/live-turn-session.test.ts"
+      ]
+    },
+    {
+      "id": "child-wake-workitem",
+      "title": "子代理完成唤醒继续同一项工作",
+      "tests": [
+        "packages/core/test/bot-goals-scheduler.test.js"
+      ]
+    },
+    {
+      "id": "ci-action-reliability",
+      "title": "Actions 长短验证可靠性",
+      "tests": [
+        "apps/web-console/lib/feed-window.test.ts",
+        "e2e/chat-experience.spec.ts",
+        "packages/core/test/bot-goal-result-return.test.js",
+        "scripts/test/acceptance-lib.test.mjs",
+        "scripts/test/ci-action-reliability.test.mjs",
+        "scripts/test/e2e-suite.test.mjs",
+        "scripts/test/pr-release-paths.test.mjs"
+      ]
+    },
+    {
+      "id": "ci-audit-p1-p2",
+      "title": "CI audit P1/P2 release gate hardening",
+      "tests": [
+        "packages/core/test/approvals-http.test.js",
+        "packages/core/test/rate-limit-proxy.test.js",
+        "scripts/test/base-revision.test.mjs",
+        "scripts/test/ci-audit.test.mjs"
+      ]
+    },
+    {
+      "id": "ci-fast-and-bihourly-gates",
+      "title": "两分钟快速门禁与每两小时完整验证",
+      "tests": [
+        "scripts/test/acceptance-lib.test.mjs",
+        "scripts/test/changed-complexity.test.mjs",
+        "scripts/test/ci-fast-bihourly.test.mjs",
+        "scripts/test/core-unit-scope.test.mjs",
+        "scripts/test/main-full-health.test.mjs"
+      ]
+    },
+    {
+      "id": "ci-http-fixture-timing",
+      "title": "共享持续集成 HTTP 夹具计时",
+      "tests": [
+        "scripts/test/bot-http-fixed-window.test.mjs",
+        "scripts/test/bot-http-load-harness.test.mjs",
+        "scripts/test/ci-http-fixture-timing.test.mjs"
+      ]
+    },
+    {
+      "id": "ci-parallel-validation",
+      "title": "完整验证职责并行与覆盖率产物复用",
+      "tests": [
+        "scripts/test/ci-parallel-validation.test.mjs"
+      ]
+    },
+    {
+      "id": "ci-review-drift-signal",
+      "title": "评审指纹不一致时不要再报一次结果缺失",
+      "tests": [
+        "scripts/test/ci-review-drift-signal.test.mjs"
+      ]
+    },
+    {
+      "id": "ci-zero-coverage-complexity",
+      "title": "零覆盖画面仍能通过复杂度门禁",
+      "tests": [
+        "packages/core/test/agent-inbox-claim-execute.test.js",
+        "scripts/test/ci-zero-coverage-complexity.test.mjs"
+      ]
+    },
+    {
+      "id": "classic-solid-dark",
+      "title": "经典主题深色用纯色",
+      "tests": [
+        "apps/web-console/components/classic-skin-menu.test.ts",
+        "apps/web-console/lib/skin.test.ts",
+        "apps/web-console/styles/glass.test.ts"
+      ]
+    },
+    {
+      "id": "command-hardline",
+      "title": "危险命令硬拦截与密钥脱敏",
+      "tests": [
+        "packages/core/test/command-hardline.test.js",
+        "packages/core/test/result-redaction.test.js",
+        "packages/core/test/sandbox.test.js"
+      ]
+    },
+    {
+      "id": "compact-bot-secondary-tabs",
+      "title": "精简 Bot 能力与权限及记录页",
+      "tests": [
+        "apps/web-console/components/compact-bot-settings.test.ts"
+      ]
+    },
+    {
+      "id": "compact-bot-settings",
+      "title": "Bot 设置优先展示基本信息与已有定时任务",
+      "tests": [
+        "apps/web-console/components/compact-bot-settings.test.ts",
+        "apps/web-console/components/routine-editor-dialog.test.ts"
+      ]
+    },
+    {
+      "id": "composer-draft-per-session",
+      "title": "聊天输入框草稿按会话隔离",
+      "tests": [
+        "apps/web-console/lib/composer-draft.test.ts"
+      ]
+    },
+    {
+      "id": "composer-drop-retirement-soak-isolation",
+      "title": "退役消息框拖拽并独立验证 HTTP soak 性能",
+      "tests": [
+        "e2e/composer-attachments.spec.ts",
+        "packages/core/test/skill-router.test.js",
+        "scripts/test/bot-http-soak-harness.test.mjs",
+        "scripts/test/bot-http-soak-math.test.mjs",
+        "scripts/test/composer-retirement-soak.test.mjs"
+      ]
+    },
+    {
+      "id": "composer-ime-enter",
+      "title": "输入法确认回车不发送",
+      "tests": [
+        "apps/web-console/lib/composer-enter.test.ts"
+      ]
+    },
+    {
+      "id": "composer-quote-layout",
+      "title": "输入栏中线对齐与不占行的消息操作",
+      "tests": [
+        "e2e/composer-quote-layout.spec.ts"
+      ]
+    },
+    {
+      "id": "connector-authorization",
+      "title": "Lab connector authorization states and SecretVault grant",
+      "tests": [
+        "apps/web-console/components/ConnectorGrantCard.test.ts",
+        "apps/web-console/components/ConnectorsSettingsCard.test.ts",
+        "apps/web-console/lib/approval-item-view.test.ts",
+        "apps/web-console/lib/connectors-grant-card.test.ts",
+        "apps/web-console/lib/connectors-grant.test.ts",
+        "packages/core/test/connector-registry.test.js"
+      ]
+    },
+    {
+      "id": "console-font-size-preference",
+      "title": "控制台字体大小偏好",
+      "tests": [
+        "e2e/font-size-preference.spec.ts",
+        "e2e/mac-retina-text-readability.spec.ts"
+      ]
+    },
+    {
+      "id": "console-knowledge",
+      "title": "知识与记忆：分层记忆、搜索与摄取设置",
+      "tests": [
+        "apps/web-console/components/sections/knowledge/memory-model.test.ts",
+        "e2e/tasks-knowledge.spec.ts"
+      ]
+    },
+    {
+      "id": "console-navigation",
+      "title": "控制台主导航与页面结构",
+      "tests": [
+        "apps/web-console/lib/i18n/messages.test.ts",
+        "apps/web-console/lib/nav.test.ts",
+        "e2e/agent-home-features.spec.ts",
+        "e2e/lab.features.spec.ts",
+        "e2e/lab.smoke.spec.ts"
+      ]
+    },
+    {
+      "id": "console-settings",
+      "title": "设置页渐进披露与搜索",
+      "tests": [
+        "apps/web-console/lib/settings-search.test.ts",
+        "e2e/lab.smoke.spec.ts"
+      ]
+    },
+    {
+      "id": "console-skin-motion",
+      "title": "各外观独立特效与极简黑白",
+      "tests": [
+        "apps/web-console/lib/skin.test.ts"
+      ]
+    },
+    {
+      "id": "console-skins",
+      "title": "多套可切换外观",
+      "tests": [
+        "apps/web-console/lib/skin.test.ts"
+      ]
+    },
+    {
+      "id": "console-tasks",
+      "title": "任务页：队列、编排运行与审批收件箱",
+      "tests": [
+        "apps/web-console/components/sections/tasks/i18n-sync.test.ts",
+        "apps/web-console/components/sections/tasks/task-filters.test.ts",
+        "apps/web-console/lib/approvals.test.ts",
+        "e2e/agent-home-features.spec.ts",
+        "e2e/tasks-knowledge.spec.ts",
+        "packages/core/test/approvals-http.test.js"
+      ]
+    },
+    {
+      "id": "context-reliability",
+      "title": "持续对话的任务保真与历史记忆找回",
+      "tests": [
+        "packages/agent-loop/src/approval/permission-mode.test.ts",
+        "packages/agent-loop/src/session/rolling-summary.test.ts",
+        "packages/core/test/bot-dual-compact.test.js",
+        "packages/core/test/context-compaction-reliability.test.js",
+        "packages/core/test/context-recall-parity.test.js",
+        "packages/core/test/history-retrieval.test.js",
+        "packages/core/test/history-tool-unification.test.js",
+        "packages/core/test/memory-http-isolation.test.js",
+        "packages/core/test/task-context.test.js",
+        "scripts/test/context-reliability-eval.test.mjs"
+      ]
+    },
+    {
+      "id": "context-send-ceiling",
+      "title": "压缩先于发送上限，任务事实有上限，已保存的 32768 生效",
+      "tests": [
+        "packages/core/test/context-send-ceiling.test.js"
+      ]
+    },
+    {
+      "id": "conversation-date-clock",
+      "title": "续聊时日期跟现在走，不跟历史里的旧日期走",
+      "tests": [
+        "apps/daemon/test/session-recap-text.test.ts",
+        "packages/agent-loop/src/model/summary-clock.test.ts",
+        "packages/core/test/conversation-clock-request.test.js",
+        "packages/core/test/conversation-clock-summary.test.js",
+        "packages/core/test/room-conversation-clock.test.js"
+      ]
+    },
+    {
+      "id": "conversation-loop-defaults",
+      "title": "对话默认行为要进入新对话和正在跑的普通对话",
+      "tests": [
+        "apps/daemon/test/loop-steer-policy.test.ts",
+        "apps/web-console/lib/loop-composer-defaults.test.ts",
+        "packages/agent-loop/src/recovery/repeat-guard.test.ts"
+      ]
+    },
+    {
+      "id": "correction-capture-hover",
+      "title": "纠错转评测改为悬停图标",
+      "tests": [
+        "apps/web-console/components/correction-capture.test.ts"
+      ]
+    },
+    {
+      "id": "create-menu-trigger-hit-area",
+      "title": "新增菜单展开后按钮仍可点击",
+      "tests": [
+        "e2e/bot-interaction-polish.spec.ts"
+      ]
+    },
+    {
+      "id": "daydream-tick-cost",
+      "title": "每日复盘调度不能拖死 daemon",
+      "tests": [
+        "packages/core/test/daydream-tick-cost.test.js"
+      ]
+    },
+    {
+      "id": "delete-page",
+      "title": "Delete library pages and revoke public shares",
+      "tests": [
+        "apps/daemon/test/durable-page-port.test.ts",
+        "packages/core/test/durable-page-port.test.js",
+        "packages/core/test/page-tools.test.js"
+      ]
+    },
+    {
+      "id": "delivery-quiet-hours",
+      "title": "用户可见外发的全局静默时段",
+      "tests": [
+        "apps/daemon/test/delivery-quiet-hours-http.test.ts",
+        "apps/web-console/components/DeliveryQuietHoursSettingsCard.test.ts",
+        "apps/web-console/lib/delivery-quiet-hours-form.test.ts",
+        "packages/capability-gateway/test/delivery-quiet-hours.test.js"
+      ]
+    },
+    {
+      "id": "desktop-preload-typecheck",
+      "title": "桌面预加载脚本通过类型检查",
+      "tests": [
+        "apps/desktop/src/preload-typecheck.test.ts"
+      ]
+    },
+    {
+      "id": "desktop-safe-update",
+      "title": "客户端手动一键更新、备份与失败回滚",
+      "tests": [
+        "apps/daemon/test/desktop-update-gate.test.ts",
+        "apps/desktop/src/update-data-check.test.ts",
+        "apps/desktop/src/update-prompt.test.ts",
+        "apps/desktop/src/update-transaction.test.ts",
+        "scripts/desktop/test/update-daemon.test.mjs",
+        "scripts/desktop/test/update-electron-files.test.mjs"
+      ]
+    },
+    {
+      "id": "dev-lab-process-cleanup",
+      "title": "开发启动器退出时完整清理子进程",
+      "tests": [
+        "scripts/test/dev-lab-process-cleanup.test.mjs"
+      ]
+    },
+    {
+      "id": "dev-tailnet-https",
+      "title": "本地启动自动同步 Tailnet HTTPS",
+      "tests": [
+        "scripts/test/dev-tailnet-https.test.mjs",
+        "scripts/test/dev-tailnet-start.test.mjs"
+      ]
+    },
+    {
+      "id": "discovery-default-on",
+      "title": "能力发现总开关默认开启",
+      "tests": [
+        "apps/web-console/lib/discovery-default-on.test.ts",
+        "packages/core/test/discovery-settings.test.js"
+      ]
+    },
+    {
+      "id": "durable-agent-waits",
+      "title": "Agent 持久化条件等待与恢复",
+      "tests": [
+        "packages/core/test/durable-agent-waits.test.js",
+        "packages/core/test/durable-wait-chain.test.js",
+        "packages/core/test/durable-wait-replay.test.js"
+      ]
+    },
+    {
+      "id": "durable-artifact-port",
+      "title": "大结果落盘并按页引用",
+      "tests": [
+        "apps/daemon/test/durable-artifact-port.test.ts",
+        "packages/core/test/durable-artifact-port.test.js"
+      ]
+    },
+    {
+      "id": "durable-page-port",
+      "title": "库级持久页面与分享链接",
+      "tests": [
+        "apps/daemon/test/durable-page-port.test.ts",
+        "packages/core/test/durable-page-port.test.js",
+        "packages/core/test/page-revisions.test.js"
+      ]
+    },
+    {
+      "id": "durable-wait-default",
+      "title": "Durable wait is the default Goal/Routine park path",
+      "tests": [
+        "packages/core/test/durable-wait-default.test.js"
+      ]
+    },
+    {
+      "id": "email-webhook-replay",
+      "title": "邮件事件不能靠换投递号重放",
+      "tests": [
+        "packages/core/test/event-routine.test.js"
+      ]
+    },
+    {
+      "id": "experimental-settings",
+      "title": "设置里的实验特性菜单",
+      "tests": [
+        "apps/daemon/test/loop-engine-hint.test.ts",
+        "apps/web-console/lib/experimental-settings.test.ts",
+        "e2e/experimental-settings.spec.ts",
+        "packages/core/test/experimental-switches.test.js"
+      ]
+    },
+    {
+      "id": "external-agent-bots",
+      "title": "Bot 级外部 Agent 通信",
+      "tests": [
+        "e2e/external-agent-bots.spec.ts",
+        "packages/core/test/external-agent-connections.test.js",
+        "packages/core/test/tool-exposure-tiers.test.js",
+        "scripts/test/external-agent-bots.test.mjs"
+      ]
+    },
+    {
+      "id": "external-agent-task-handoff",
+      "title": "外部 Agent 任务交接",
+      "tests": [
+        "e2e/external-agent-handoff.spec.ts",
+        "scripts/test/external-agent-handoff.test.mjs"
+      ]
+    },
+    {
+      "id": "feed-reading-anchor-boundary",
+      "title": "对话侧栏调整保留实际阅读位置",
+      "tests": [
+        "apps/web-console/lib/feed-window.test.ts",
+        "e2e/bot-interaction-polish.spec.ts"
+      ]
+    },
+    {
+      "id": "fold-visible-history",
+      "title": "折叠历史保留用户问题",
+      "tests": [
+        "packages/agent-loop/src/session/fold-budget.test.ts"
+      ]
+    },
+    {
+      "id": "gateway-im-security",
+      "title": "IM 网关入站安全（验签、去重、白名单、Bot 路由）",
+      "tests": [
+        "packages/capability-gateway/test/gateway-security.test.js"
+      ]
+    },
+    {
+      "id": "github-webhook-replay",
+      "title": "GitHub 事件不能靠换投递号重放",
+      "tests": [
+        "packages/core/test/event-routine.test.js"
+      ]
+    },
+    {
+      "id": "global-debug-visibility",
+      "title": "全局调试信息开关",
+      "tests": [
+        "apps/daemon/test/user-preferences-http.test.ts",
+        "apps/web-console/components/debug-display.test.ts",
+        "apps/web-console/lib/debug-display.test.ts"
+      ]
+    },
+    {
+      "id": "global-default-model-clarity",
+      "title": "全局默认模型配置与群聊模型来源可见",
+      "tests": [
+        "apps/web-console/components/play-group/room-console.test.ts",
+        "apps/web-console/lib/group-chat-view.test.ts",
+        "apps/web-console/lib/model-providers.test.ts",
+        "e2e/global-default-model.spec.ts",
+        "e2e/room-model-clarity.spec.ts",
+        "packages/core/test/model-providers.test.js",
+        "scripts/test/bot-room-models.test.mjs",
+        "scripts/test/global-default-model-routes.test.mjs"
+      ]
+    },
+    {
+      "id": "global-default-model-row-align",
+      "title": "全局默认模型行左右对齐",
+      "tests": [
+        "e2e/global-default-model.spec.ts"
+      ]
+    },
+    {
+      "id": "goal-history-toolbar-align",
+      "title": "目标历史与标题栏按钮垂直居中",
+      "tests": [
+        "apps/web-console/components/GoalHistory.align.test.ts"
+      ]
+    },
+    {
+      "id": "goal-intake-hot-path",
+      "title": "开轮不再等待目标判定和数据库锁",
+      "tests": [
+        "packages/core/test/goal-intake-hot-path.test.ts",
+        "packages/core/test/goal-snapshot-busy-wait.test.ts"
+      ]
+    },
+    {
+      "id": "goal-restart-resume",
+      "title": "重启后从安全检查点继续 Goal",
+      "tests": [
+        "packages/core/test/goal-restart-resume.test.js"
+      ]
+    },
+    {
+      "id": "goal-update-hidden",
+      "title": "目标更新通知不在聊天里展示",
+      "tests": [
+        "apps/web-console/components/goal-update-presentation.test.ts"
+      ]
+    },
+    {
+      "id": "group-active-header",
+      "title": "群聊顶部仅显示工作中的成员",
+      "tests": [
+        "e2e/group-active-header.spec.ts"
+      ]
+    },
+    {
+      "id": "group-chat-settings-save",
+      "title": "群聊设置改完可以保存",
+      "tests": [
+        "apps/web-console/lib/group-settings-save.test.ts",
+        "e2e/group-settings-save.spec.ts"
+      ]
+    },
+    {
+      "id": "group-chat-sidebar-placement",
+      "title": "群聊可置顶并可拖入功能分组",
+      "tests": [
+        "apps/web-console/lib/room-sidebar-placement.test.ts",
+        "packages/core/test/bot-functional-groups.test.js"
+      ]
+    },
+    {
+      "id": "group-command-same-as-dm",
+      "title": "群里的命令跟该 Bot 单聊同一套放行",
+      "tests": [
+        "packages/core/test/group-command-scope.test.js"
+      ]
+    },
+    {
+      "id": "group-face",
+      "title": "群聊行展示成员头像",
+      "tests": [
+        "apps/web-console/lib/group-members.test.ts"
+      ]
+    },
+    {
+      "id": "group-member-quiet",
+      "title": "群聊成员区只留成员本身的信息",
+      "tests": [
+        "apps/web-console/components/play-group/room-console.test.ts",
+        "apps/web-console/lib/group-chat-view.test.ts",
+        "e2e/room-model-clarity.spec.ts"
+      ]
+    },
+    {
+      "id": "group-member-sections",
+      "title": "群成员分成已在群里和添加成员",
+      "tests": [
+        "apps/web-console/components/play-group/room-console.test.ts"
+      ]
+    },
+    {
+      "id": "group-mode-explanations",
+      "title": "群聊回复模式与运行限制说明",
+      "tests": [
+        "e2e/group-mode-explanations.spec.ts"
+      ]
+    },
+    {
+      "id": "group-reply-mode",
+      "title": "群聊回复模式",
+      "tests": [
+        "apps/web-console/lib/group-reply-mode.test.ts",
+        "packages/core/test/group-reply-mode.test.js",
+        "scripts/test/group-reply-mode-routes.test.mjs"
+      ]
+    },
+    {
+      "id": "group-settings-clarity",
+      "title": "群聊设置分区与成员提及清理",
+      "tests": [
+        "e2e/group-settings-clarity.spec.ts"
+      ]
+    },
+    {
+      "id": "hide-approval-continue",
+      "title": "聊天不展示审批自动合成的续跑用户消息",
+      "tests": [
+        "apps/web-console/lib/approval-continue.test.ts"
+      ]
+    },
+    {
+      "id": "hide-dev-overlays",
+      "title": "本地页面不展示开发浮层",
+      "tests": [
+        "apps/web-console/lib/dev-overlays.test.ts"
+      ]
+    },
+    {
+      "id": "jev-model-settings",
+      "title": "在模型设置中配置 Jev 评估",
+      "tests": [
+        "e2e/jev-model-settings.spec.ts"
+      ]
+    },
+    {
+      "id": "knowledge-library-dirs",
+      "title": "本地资料目录进入知识库并可检索",
+      "tests": [
+        "apps/daemon/test/library-pick-http.test.ts",
+        "apps/web-console/components/sections/knowledge/library-dirs-model.test.ts",
+        "apps/web-console/lib/i18n/messages.test.ts",
+        "packages/core/test/library-folder-picker.test.js",
+        "packages/core/test/library-index.test.js"
+      ]
+    },
+    {
+      "id": "lab-auth-and-route-access",
+      "title": "控制台鉴权与接口访问隔离",
+      "tests": [
+        "e2e/auth-bearer-proxy.spec.ts",
+        "scripts/test/route-access-contract.test.mjs"
+      ]
+    },
+    {
+      "id": "lab-library-pages",
+      "title": "Lab library Pages panel (list / open / share / rotate / delete / create / edit)",
+      "tests": [
+        "apps/web-console/components/sections/knowledge/LibraryPagesPanel.render.test.ts",
+        "apps/web-console/components/sections/knowledge/library-pages-actions.test.ts",
+        "apps/web-console/components/sections/knowledge/library-pages-model.test.ts"
+      ]
+    },
+    {
+      "id": "lab-registered-machines",
+      "title": "Lab Settings → Tools → Registered Machines panel",
+      "tests": [
+        "apps/web-console/components/sections/settings/machines/registered-machines-actions.test.ts",
+        "apps/web-console/components/sections/settings/machines/registered-machines-model.test.ts"
+      ]
+    },
+    {
+      "id": "lab-startup-timing",
+      "title": "Lab 会话显示启动耗时",
+      "tests": [
+        "apps/web-console/lib/turn-feed-stats.test.ts"
+      ]
+    },
+    {
+      "id": "lcu-app-grant",
+      "title": "桌面操作应用授权：全自动免审批，批准一次后同会话记住",
+      "tests": [
+        "packages/core/test/lcu-computer-use.test.js"
+      ]
+    },
+    {
+      "id": "lcu-computer-use",
+      "title": "本机 LCU 桌面操作接入",
+      "tests": [
+        "e2e/lcu-computer-use.spec.ts",
+        "packages/agent-loop/src/runtime/tool-loop.test.ts",
+        "packages/core/test/lcu-computer-use.test.js"
+      ]
+    },
+    {
+      "id": "live-bot-quality",
+      "title": "真实 Bot 任务评估与版本准入",
+      "tests": [
+        "scripts/test/live-bot-quality.test.mjs"
+      ]
+    },
+    {
+      "id": "local-source-unlock",
+      "title": "本机只读命令在批准后能真正执行（来源范围审批匹配、审批卡、已保存 direct 不再 Auto-review）",
+      "tests": [
+        "packages/agent-loop/src/approval/auto-review.test.ts",
+        "packages/core/test/local-source-unlock.test.js"
+      ]
+    },
+    {
+      "id": "login-mandatory-skill",
+      "title": "捆绑 login 强制技能可加载并解锁登录面",
+      "tests": [
+        "packages/core/test/login-mandatory-skill.test.js"
+      ]
+    },
+    {
+      "id": "long-session-compact",
+      "title": "长会话能真正做摘要而不是只丢历史",
+      "tests": [
+        "packages/core/test/long-session-compact.test.ts"
+      ]
+    },
+    {
+      "id": "loop-native-media",
+      "title": "SDK 原生多模态文件理解",
+      "tests": [
+        "packages/agent-loop/src/assembly/native-media.test.ts",
+        "packages/agent-loop/src/model/native-media.test.ts",
+        "packages/core/test/context-stack.test.js"
+      ]
+    },
+    {
+      "id": "loop-prefix-cache",
+      "title": "稳定前缀和技能目录不在每轮重做",
+      "tests": [
+        "packages/agent-loop/src/turn/prepare-input-cache.test.ts",
+        "packages/core/test/loop-prefix-cache.test.ts"
+      ]
+    },
+    {
+      "id": "mac-retina-text-readability",
+      "title": "Mac Retina 屏幕文字可读性优化",
+      "tests": [
+        "e2e/mac-retina-text-readability.spec.ts"
+      ]
+    },
+    {
+      "id": "macos-app-control",
+      "title": "macOS 应用控制（外层宿主）",
+      "tests": [
+        "e2e/macos-app-control.spec.ts",
+        "packages/core/test/app-control.test.js"
+      ]
+    },
+    {
+      "id": "mandatory-skill-gate",
+      "title": "高危面必须先加载对应技能",
+      "tests": [
+        "packages/core/test/mandatory-skill-gate.test.js"
+      ]
+    },
+    {
+      "id": "memory-deletion-suppression",
+      "title": "删除记忆后阻止自动写回",
+      "tests": [
+        "e2e/first-batch-reliability.spec.ts",
+        "packages/core/test/memory-deletion-suppression.test.js"
+      ]
+    },
+    {
+      "id": "micro-compact-stub-wording",
+      "title": "微压缩占位只说明工具输出被省略",
+      "tests": [
+        "packages/agent-loop/src/session/tool-result-stub.test.ts"
+      ]
+    },
+    {
+      "id": "mobile-chat-density",
+      "title": "窄屏对话区优先展示聊天记录",
+      "tests": [
+        "apps/web-console/components/mobile-chat-density.test.ts",
+        "e2e/mobile-chat-density.spec.ts"
+      ]
+    },
+    {
+      "id": "mobile-console",
+      "title": "控制台移动端布局",
+      "tests": [
+        "e2e/mobile-console.spec.ts"
+      ]
+    },
+    {
+      "id": "model-fallback",
+      "title": "备用模型自动切换",
+      "tests": [
+        "e2e/model-fallback.spec.ts",
+        "packages/core/test/model-fallback.test.js"
+      ]
+    },
+    {
+      "id": "model-retry-progress",
+      "title": "临时模型故障延长退避并展示重试进度",
+      "tests": [
+        "e2e/model-retry-progress.spec.ts",
+        "packages/agent-loop/src/runtime/model-retry-progress.test.ts",
+        "packages/agent-loop/src/runtime/turn-retries.test.ts",
+        "packages/agent-loop/src/turn/kernel.test.ts",
+        "packages/core/test/model-fallback.test.js"
+      ]
+    },
+    {
+      "id": "model-sandbox-isolation",
+      "title": "命令隔离由对话里的 Agent 自己选",
+      "tests": [
+        "apps/web-console/lib/sandbox-settings-copy.test.ts",
+        "packages/core/test/model-sandbox-isolation.test.js"
+      ]
+    },
+    {
+      "id": "multi-machine-controlled-delivery",
+      "title": "多机软件工厂第三阶段：受控远端交付至 MERGED",
+      "tests": [
+        "e2e/factory-delivery.spec.ts",
+        "packages/core/test/factory-delivery-process.test.js",
+        "packages/core/test/factory-delivery-publisher-regressions.test.js",
+        "packages/core/test/factory-delivery-transport.test.js",
+        "packages/core/test/factory-delivery-vertical-regressions.test.js",
+        "packages/core/test/factory-delivery-worker.test.js",
+        "packages/core/test/factory-delivery.test.js",
+        "packages/core/test/factory-development-delivery-sync.test.js",
+        "scripts/test/factory-delivery-routes.test.mjs"
+      ]
+    },
+    {
+      "id": "multi-machine-controlled-development",
+      "title": "多机软件工厂第二阶段：受控开发至 READY",
+      "tests": [
+        "e2e/factory-development.spec.ts",
+        "e2e/factory-http-integration.spec.ts",
+        "packages/core/test/factory-development.test.js"
+      ]
+    },
+    {
+      "id": "multi-machine-local-foundation",
+      "title": "多机软件工厂第四阶段本地软件交付",
+      "tests": [
+        "e2e/factory-production-http.spec.ts",
+        "scripts/test/factory-production-routes.test.mjs",
+        "scripts/test/production-evidence-files.test.mjs",
+        "scripts/test/production-real-store-backup.test.mjs",
+        "scripts/test/production-security-regressions.test.mjs",
+        "scripts/test/production-state-backup.test.mjs",
+        "scripts/test/production-state-fence.test.mjs"
+      ]
+    },
+    {
+      "id": "multi-machine-readonly-pilot",
+      "title": "多机软件工厂第一阶段：只读试运行",
+      "tests": [
+        "e2e/factory-http-integration.spec.ts",
+        "e2e/factory-readonly.spec.ts",
+        "packages/core/test/factory-readonly.test.js",
+        "packages/core/test/factory-trust-review.test.js",
+        "packages/core/test/factory-worker.test.js",
+        "scripts/test/factory-routes.test.mjs"
+      ]
+    },
+    {
+      "id": "multi-page-live-session",
+      "title": "多个网页同时看到流式结果和页面状态",
+      "tests": [
+        "apps/web-console/lib/run-leave.test.ts",
+        "packages/core/test/multi-page-live-session.test.js"
+      ]
+    },
+    {
+      "id": "necessary-tool-injection",
+      "title": "只把当前任务需要的工具定义交给模型",
+      "tests": [
+        "packages/core/test/deferred-tool-load.test.js",
+        "packages/core/test/necessary-tool-injection.test.js"
+      ]
+    },
+    {
+      "id": "no-windows-desktop-pack",
+      "title": "不再打 Windows 桌面安装包",
+      "tests": [
+        "scripts/desktop/test/targets.test.mjs"
+      ]
+    },
+    {
+      "id": "normal-session-request-budget",
+      "title": "普通会话请求不超过窗口的 20%",
+      "tests": [
+        "packages/core/test/normal-request-budget.test.js"
+      ]
+    },
+    {
+      "id": "npm-auto-publish",
+      "title": "公开 npm 包自动发布",
+      "tests": [
+        "scripts/test/npm-publish-workflow.test.mjs"
+      ]
+    },
+    {
+      "id": "ops-console",
+      "title": "运维页：系统健康总览与轨迹浏览",
+      "tests": [
+        "apps/web-console/lib/effective-config.test.ts",
+        "apps/web-console/lib/evolution-results.test.ts",
+        "apps/web-console/lib/nav.test.ts",
+        "apps/web-console/lib/ops-health.test.ts",
+        "apps/web-console/lib/trace-groups.test.ts",
+        "e2e/agent-home-features.spec.ts",
+        "e2e/ops.spec.ts",
+        "packages/core/test/evolution-surface.test.js",
+        "scripts/test/evolution-surface-guard.test.mjs"
+      ]
+    },
+    {
+      "id": "ops-session-trace-repair",
+      "title": "运维会话轨迹能定位没看过的对话",
+      "tests": [
+        "apps/web-console/components/ops-session-trace.test.ts",
+        "apps/web-console/lib/trace-groups.test.ts",
+        "apps/web-console/lib/trace-page.test.ts",
+        "packages/agent-loop/src/runtime/tool-loop.test.ts",
+        "packages/core/test/bot-goal-routing-runtime.test.js",
+        "packages/core/test/session-trace-repair.test.js"
+      ]
+    },
+    {
+      "id": "outbound-draft-edit-identity",
+      "title": "外发草稿可编辑预览，并显示将以哪个身份发送（Draft → Confirm → Send 之上）",
+      "tests": [
+        "apps/web-console/components/sections/tasks/OutboundDraftCard.render.test.ts",
+        "apps/web-console/lib/outbound-draft-preview.test.ts",
+        "packages/capability-gateway/test/outbound-draft-edit-identity.test.js",
+        "scripts/test/outbound-draft-human-release.test.mjs"
+      ]
+    },
+    {
+      "id": "outbound-send-mandatory-skill",
+      "title": "捆绑 outbound-send 强制技能可加载并解锁外发面",
+      "tests": [
+        "packages/core/test/outbound-send-mandatory-skill.test.js"
+      ]
+    },
+    {
+      "id": "outbound-style-sample-hint",
+      "title": "外发前建议先采样同渠道近期消息，只提示语气，不改已编正文",
+      "tests": [
+        "apps/web-console/components/sections/tasks/OutboundDraftCard.render.test.ts",
+        "apps/web-console/lib/outbound-draft-preview.test.ts"
+      ]
+    },
+    {
+      "id": "outer-skin-picker",
+      "title": "外层外观设置可选中",
+      "tests": [
+        "apps/web-console/components/classic-skin-menu.test.ts",
+        "apps/web-console/components/shell/Rail.foot-menu.test.ts",
+        "apps/web-console/lib/skin.test.ts"
+      ]
+    },
+    {
+      "id": "page-revisions",
+      "title": "Page revision history (list / get / restore)",
+      "tests": [
+        "apps/web-console/components/sections/knowledge/library-pages-actions.test.ts",
+        "packages/core/test/page-revisions.test.js",
+        "packages/core/test/page-tools.test.js"
+      ]
+    },
+    {
+      "id": "page-share-html",
+      "title": "Public library page share HTML (read-only)",
+      "tests": [
+        "apps/daemon/test/durable-page-port.test.ts",
+        "packages/core/test/page-share-html.test.js"
+      ]
+    },
+    {
+      "id": "page-tools",
+      "title": "助手可调用的库级页面工具",
+      "tests": [
+        "packages/core/test/page-tools.test.js"
+      ]
+    },
+    {
+      "id": "payment-mandatory-skill",
+      "title": "捆绑 payment 强制技能可加载并解锁支付面",
+      "tests": [
+        "packages/core/test/payment-mandatory-skill.test.js"
+      ]
+    },
+    {
+      "id": "play-context-replay",
+      "title": "Play 上下文回放",
+      "tests": [
+        "apps/web-console/lib/context-stack-replay.test.ts",
+        "packages/core/test/context-snapshots.test.js"
+      ]
+    },
+    {
+      "id": "play-context-stack",
+      "title": "Play 右侧栏模型上下文",
+      "tests": [
+        "apps/web-console/lib/context-stack-bar.test.ts",
+        "packages/core/test/context-stack.test.js"
+      ]
+    },
+    {
+      "id": "play-feed-window",
+      "title": "对话记录按页加载并窗口渲染",
+      "tests": [
+        "apps/web-console/lib/feed-window.test.ts",
+        "packages/core/test/visible-message-page.test.js"
+      ]
+    },
+    {
+      "id": "play-group-delete-menu",
+      "title": "群聊行的删除收进悬停图标菜单",
+      "tests": [
+        "apps/web-console/components/play-group/PlayBotGroupList.test.ts",
+        "e2e/bot-room-deletion.spec.ts"
+      ]
+    },
+    {
+      "id": "play-rail-default-closed",
+      "title": "对话页右侧栏默认关闭",
+      "tests": [
+        "apps/web-console/lib/play-rail-open.test.ts"
+      ]
+    },
+    {
+      "id": "play-sidebar-collapse",
+      "title": "对话页会话列表可收起",
+      "tests": [
+        "apps/web-console/lib/play-sidebar-collapsed.test.ts"
+      ]
+    },
+    {
+      "id": "pnpm-migration",
+      "title": "全仓库迁移至 pnpm 并完成回归",
+      "tests": [
+        "scripts/test/dev-lab-port-retry.test.mjs",
+        "scripts/test/pnpm-dev-start.test.mjs",
+        "scripts/test/pnpm-migration.test.mjs"
+      ]
+    },
+    {
+      "id": "pr152-approval-followups",
+      "title": "Consistent approval decisions and cancelled parked work",
+      "tests": [
+        "packages/agent-loop/src/runtime/tool-loop.test.ts",
+        "packages/core/test/bot-work.test.js"
+      ]
+    },
+    {
+      "id": "prd-test-trace",
+      "title": "产品需求与测试对照",
+      "tests": [
+        "scripts/prd/prd-trace.test.mjs"
+      ]
+    },
+    {
+      "id": "product-prd",
+      "title": "产品需求目录",
+      "tests": [
+        "scripts/prd/prd-catalog.test.mjs"
+      ]
+    },
+    {
+      "id": "quiet-goal-results",
+      "title": "目标结果不再默认要求人工核对",
+      "tests": [
+        "apps/web-console/components/GoalHistory.results.test.ts",
+        "apps/web-console/components/bot-work/BotGoals.panel.test.ts",
+        "packages/core/test/bot-goal-live-chain.test.js",
+        "packages/core/test/quiet-goal-notice.test.js"
+      ]
+    },
+    {
+      "id": "r5-19-agent-native-email",
+      "title": "Agent native email inbox (product-domain)",
+      "tests": [
+        "packages/core/test/agent-inbox-port.test.js"
+      ]
+    },
+    {
+      "id": "r5-21-check-email-inbox-availability",
+      "title": "Independent check_email_inbox_availability tool",
+      "tests": [
+        "packages/core/test/agent-inbox-port.test.js"
+      ]
+    },
+    {
+      "id": "r5-22-outbound-from-claimed",
+      "title": "Outbound email from=claimed when ChannelSpec.from empty",
+      "tests": [
+        "packages/capability-gateway/test/outbound-email-from-claimed.test.js",
+        "packages/core/test/agent-inbox-port.test.js"
+      ]
+    },
+    {
+      "id": "r5-23-daemon-claimed-from",
+      "title": "Daemon delivery port wires claimedFrom from AgentInboxPort",
+      "tests": [
+        "apps/daemon/test/delivery-claimed-from.test.ts"
+      ]
+    },
+    {
+      "id": "r5-24-outbound-email-reply",
+      "title": "Outbound email reply threading (inReplyTo / Re subject)",
+      "tests": [
+        "packages/capability-gateway/test/outbound-email-reply.test.js"
+      ]
+    },
+    {
+      "id": "r5-25-reply-draft-ingress",
+      "title": "Reply draft ingress + Lab thread preview",
+      "tests": [
+        "apps/web-console/components/sections/tasks/OutboundDraftCard.render.test.ts",
+        "packages/capability-gateway/test/reply-draft-ingress.test.js",
+        "packages/core/test/channel-webhook-inbound-thread.test.js"
+      ]
+    },
+    {
+      "id": "r5-26-inbound-refs",
+      "title": "Inbound References/In-Reply-To persist + auto-draft References chain",
+      "tests": [
+        "packages/capability-gateway/test/inbound-refs-draft.test.js",
+        "packages/core/test/agent-inbox-inbound-refs.test.js",
+        "packages/core/test/channel-webhook-inbound-refs.test.js"
+      ]
+    },
+    {
+      "id": "rail-foot-menu",
+      "title": "侧栏底部收成悬停菜单",
+      "tests": [
+        "apps/web-console/components/shell/Rail.foot-menu.test.ts"
+      ]
+    },
+    {
+      "id": "rail-foot-theme",
+      "title": "侧栏底部主题按钮能切换",
+      "tests": [
+        "apps/web-console/lib/skin.test.ts"
+      ]
+    },
+    {
+      "id": "rail-settings-icon",
+      "title": "侧栏设置入口使用设置图标",
+      "tests": [
+        "apps/web-console/components/shell/Rail.settings-icon.test.ts"
+      ]
+    },
+    {
+      "id": "recap-content-only",
+      "title": "回顾有内容才展示",
+      "tests": [
+        "apps/web-console/components/session-recap-bar.test.ts"
+      ]
+    },
+    {
+      "id": "recap-next-action",
+      "title": "回顾之后推荐下一步行动",
+      "tests": [
+        "apps/daemon/test/composer-hint.test.ts",
+        "apps/daemon/test/session-recap-text.test.ts",
+        "apps/web-console/lib/composer-next-hint.test.ts"
+      ]
+    },
+    {
+      "id": "recap-request-lifecycle",
+      "title": "主动回顾正常生成与取消",
+      "tests": [
+        "apps/daemon/test/session-recap-yield.test.ts"
+      ]
+    },
+    {
+      "id": "refresh-keeps-agent-run",
+      "title": "刷新页面不终止正在进行的对话",
+      "tests": [
+        "apps/web-console/lib/run-leave.test.ts",
+        "e2e/bot-switch-live-turn.spec.ts",
+        "scripts/test/sse-disconnect.test.mjs"
+      ]
+    },
+    {
+      "id": "registered-machine-desktop-agent",
+      "title": "Desktop agent long-connect for personal registered machines (non-SSH)",
+      "tests": [
+        "apps/daemon/test/desktop-agent-http.test.ts",
+        "packages/core/test/registered-machines-agent-backend.test.js",
+        "packages/core/test/registered-machines-daemon-http-sse-adapter.test.js"
+      ]
+    },
+    {
+      "id": "registered-machine-live-backend",
+      "title": "Live SSH backend for personal registered machines (not Factory SSH)",
+      "tests": [
+        "packages/core/test/registered-machines-ssh-backend.test.js"
+      ]
+    },
+    {
+      "id": "registered-machine-phone-local",
+      "title": "Phone registered machines via device-local tools (non-SSH, read-only default)",
+      "tests": [
+        "apps/daemon/test/device-local-http.test.ts",
+        "packages/core/test/registered-machines-phone-local.test.js"
+      ]
+    },
+    {
+      "id": "remotevm-no-host-downgrade",
+      "title": "microVM 命令不会悄悄改在宿主机上跑",
+      "tests": [
+        "packages/core/test/remote-vm-microvm-exec.test.js"
+      ]
+    },
+    {
+      "id": "remove-needs-confirm",
+      "title": "列表里的移除需要再确认一次",
+      "tests": [
+        "apps/web-console/lib/armed-delete.test.ts"
+      ]
+    },
+    {
+      "id": "request-metric-follows-turn",
+      "title": "已发送请求指标随所选轮变化",
+      "tests": [
+        "apps/web-console/lib/request-metric-turn.test.ts",
+        "e2e/request-metric-follows-turn.spec.ts"
+      ]
+    },
+    {
+      "id": "risk-advisory-ui",
+      "title": "对话里的运行策略提醒",
+      "tests": [
+        "apps/web-console/lib/risk-advisory.test.ts",
+        "e2e/risk-advisory.spec.ts"
+      ]
+    },
+    {
+      "id": "rotate-page-share",
+      "title": "Rotate library page share links without deleting content",
+      "tests": [
+        "apps/daemon/test/durable-page-port.test.ts",
+        "packages/core/test/durable-page-port.test.js",
+        "packages/core/test/page-tools.test.js"
+      ]
+    },
+    {
+      "id": "routine-failure-governance",
+      "title": "例行任务连续故障治理",
+      "tests": [
+        "e2e/first-batch-reliability.spec.ts",
+        "packages/core/test/routine-failure-governance.test.js",
+        "packages/core/test/routine-lease.test.js",
+        "packages/core/test/routine-room-delivery.test.js"
+      ]
+    },
+    {
+      "id": "routine-owner-permission",
+      "title": "定时任务沿用 Bot 免审批",
+      "tests": [
+        "packages/core/test/routine-owner-permission.test.js"
+      ]
+    },
+    {
+      "id": "routine-precheck-fail-closed",
+      "title": "例行预检失败不唤醒模型",
+      "tests": [
+        "packages/core/test/routine-precheck.test.js"
+      ]
+    },
+    {
+      "id": "routine-quiet-chat",
+      "title": "无结论的定时回执不进主对话",
+      "tests": [
+        "apps/web-console/components/routine-quiet-chat.test.ts",
+        "packages/core/test/routine-lifecycle.test.js"
+      ]
+    },
+    {
+      "id": "routine-strict-precheck",
+      "title": "严格例行预检与持久游标",
+      "tests": [
+        "e2e/first-batch-reliability.spec.ts",
+        "packages/core/test/routine-failure-governance.test.js",
+        "packages/core/test/routine-precheck.test.js",
+        "packages/core/test/routine-strict-precheck.test.js"
+      ]
+    },
+    {
+      "id": "routine-weekday-daytime-default",
+      "title": "新建例行任务默认工作日白天",
+      "tests": [
+        "apps/web-console/lib/routine-weekday-daytime.test.ts",
+        "packages/core/test/routine-weekday-daytime.test.js",
+        "scripts/test/routine-weekday-daytime.test.mjs"
+      ]
+    },
+    {
+      "id": "runtime-gap-closures",
+      "title": "事件密钥、内置工具名、发布脚本环境、只读 MCP、HTTP 来源与幂等并发",
+      "tests": [
+        "packages/core/test/runtime-gap-closures.test.js",
+        "scripts/test/bot-release-spawn-env.test.mjs"
+      ]
+    },
+    {
+      "id": "sanctum-skin",
+      "title": "圣所外观可切换且不覆盖原主题",
+      "tests": [
+        "apps/web-console/components/ThemeSettingsCard.skin.test.ts",
+        "apps/web-console/lib/skin.test.ts"
+      ]
+    },
+    {
+      "id": "saved-sandbox-mode-constrains-shell",
+      "title": "已保存的隔离方式约束 shell",
+      "tests": [
+        "apps/web-console/components/os-sandbox-reason.test.ts",
+        "apps/web-console/lib/os-sandbox-reason.test.ts",
+        "apps/web-console/lib/sandbox-settings-copy.test.ts",
+        "packages/core/test/model-sandbox-isolation.test.js",
+        "packages/core/test/saved-sandbox-mode.test.js"
+      ]
+    },
+    {
+      "id": "scheduler-db-lock",
+      "title": "调度写目标时不再因数据库锁失败",
+      "tests": [
+        "packages/core/test/scheduler-db-lock.test.ts"
+      ]
+    },
+    {
+      "id": "schema-upgrade-safety",
+      "title": "数据库升级不丢数据",
+      "tests": [
+        "packages/core/test/bot-memory-namespace.test.js",
+        "packages/core/test/schema-migrations.test.js",
+        "scripts/test/bot-migration-rollback.test.mjs",
+        "scripts/test/bot-pinned-checkout.test.mjs",
+        "scripts/test/schema-migration-snapshots.test.mjs",
+        "scripts/test/schema-snapshot-freshness.test.mjs"
+      ]
+    },
+    {
+      "id": "secure-form",
+      "title": "对话里的单字段安全表单",
+      "tests": [
+        "apps/daemon/test/user-vault-http.test.ts",
+        "apps/web-console/lib/secure-form-card.test.ts",
+        "packages/core/test/secure-form.test.js"
+      ]
+    },
+    {
+      "id": "secure-form-multi",
+      "title": "对话里的多字段安全表单",
+      "tests": [
+        "apps/daemon/test/user-vault-http.test.ts",
+        "apps/web-console/lib/secure-form-card.test.ts",
+        "packages/core/test/secure-form-multi.test.js"
+      ]
+    },
+    {
+      "id": "secure-form-vault",
+      "title": "Secure Form fill-from-Vault",
+      "tests": [
+        "apps/daemon/test/user-vault-http.test.ts",
+        "apps/web-console/lib/secure-form-card.test.ts",
+        "packages/core/test/secure-form-vault.test.js"
+      ]
+    },
+    {
+      "id": "session-brief",
+      "title": "会话可以只看关键信息",
+      "tests": [
+        "apps/web-console/components/SessionBriefDisclosure.test.ts",
+        "apps/web-console/lib/session-brief.test.ts"
+      ]
+    },
+    {
+      "id": "session-eval-baseline",
+      "title": "会话评估能留下基准并发现短板",
+      "tests": [
+        "scripts/test/session-eval-baseline.test.mjs"
+      ]
+    },
+    {
+      "id": "session-eval-lift",
+      "title": "会话评估能区分能力提升和下降",
+      "tests": [
+        "scripts/test/harness-quality.test.mjs",
+        "scripts/test/session-eval-lift.test.mjs",
+        "scripts/test/session-eval-suites.test.mjs"
+      ]
+    },
+    {
+      "id": "session-lifecycle-state-consistency",
+      "title": "生命周期验证发现的结束原因与部分审批状态一致性修复",
+      "tests": [
+        "packages/core/test/approval-admission-race.test.js",
+        "packages/core/test/session-lifecycle-state-consistency.test.js"
+      ]
+    },
+    {
+      "id": "session-lifecycle-verification",
+      "title": "会话生命周期验证：取消、重试与审批恢复",
+      "tests": [
+        "scripts/test/session-lifecycle-verification.test.mjs"
+      ]
+    },
+    {
+      "id": "session-multiprocess-concurrency-verification",
+      "title": "多进程并发验证：写入占用、迟到结果与审批恢复",
+      "tests": [
+        "scripts/test/session-multiprocess-concurrency-verification.test.mjs"
+      ]
+    },
+    {
+      "id": "session-multiprocess-state-consistency",
+      "title": "多进程会话状态一致性修复",
+      "tests": [
+        "packages/agent-loop/src/turn/kernel.test.ts",
+        "packages/core/test/approval-admission-race.test.js",
+        "packages/core/test/multiprocess-stream-fence.test.js",
+        "packages/core/test/superbot-factory-setup.test.js",
+        "packages/core/test/writer-claim.test.js",
+        "scripts/test/session-multiprocess-state-consistency.test.mjs"
+      ]
+    },
+    {
+      "id": "session-restart-recovery-state-consistency",
+      "title": "重启恢复发现的运行状态、审批衔接与未确认工具结果修复",
+      "tests": [
+        "scripts/test/session-restart-recovery-fix.test.mjs"
+      ]
+    },
+    {
+      "id": "session-restart-recovery-verification",
+      "title": "进程重启恢复验证：运行中、重试等待与等待审批",
+      "tests": [
+        "scripts/test/session-restart-recovery-verification.test.mjs"
+      ]
+    },
+    {
+      "id": "settings-categories",
+      "title": "设置页「行为 / 安全 / 工具 / 集成」分类易用化",
+      "tests": [
+        "apps/web-console/lib/i18n/settings-entries.test.ts",
+        "apps/web-console/lib/settings-fields.test.ts",
+        "e2e/settings-categories.spec.ts"
+      ]
+    },
+    {
+      "id": "settings-models-onboarding",
+      "title": "设置：模型向导、首次引导、搜索与保存状态",
+      "tests": [
+        "apps/web-console/lib/gateway-settings.test.ts",
+        "apps/web-console/lib/model-providers.test.ts",
+        "apps/web-console/lib/settings-search.test.ts",
+        "e2e/settings-models.spec.ts"
+      ]
+    },
+    {
+      "id": "shared-info-compact",
+      "title": "共享信息紧凑入口",
+      "tests": [
+        "apps/web-console/components/SharedFactsPanel.test.ts",
+        "e2e/bot-interaction-polish.spec.ts"
+      ]
+    },
+    {
+      "id": "shell-output-untrusted-fence",
+      "title": "命令输出作为不可信内容围栏后再给模型",
+      "tests": [
+        "packages/core/test/bash-execution-result.test.js",
+        "packages/core/test/external-content.test.js"
+      ]
+    },
+    {
+      "id": "shopping-mandatory-skill",
+      "title": "捆绑 shopping 强制技能可加载并解锁购物面",
+      "tests": [
+        "packages/core/test/shopping-mandatory-skill.test.js"
+      ]
+    },
+    {
+      "id": "single-host-bot-completion",
+      "title": "单机 Bot 工作收尾与默认入口",
+      "tests": [
+        "apps/web-console/lib/nav.test.ts",
+        "e2e/bot-first-task-new-user.spec.ts",
+        "e2e/bot-interaction-polish.spec.ts",
+        "e2e/lab.smoke.spec.ts",
+        "packages/core/test/bot-linked-watchers.test.js",
+        "packages/core/test/routine-result-isolation.test.js",
+        "scripts/test/dev-lab-process-cleanup.test.mjs"
+      ]
+    },
+    {
+      "id": "skill-capture-dismissal",
+      "title": "技能沉淀完成提示可收起和关闭",
+      "tests": [
+        "e2e/skill-capture-dismissal.spec.ts"
+      ]
+    },
+    {
+      "id": "skill-capture-intent-confirmation",
+      "title": "模型判断技能沉淀并在提炼前请求确认",
+      "tests": [
+        "e2e/skill-capture.spec.ts",
+        "packages/core/test/skill-capture-http.test.js",
+        "packages/core/test/skill-capture.test.js"
+      ]
+    },
+    {
+      "id": "skill-capture-save",
+      "title": "技能沉淀确认后能把正文存下来",
+      "tests": [
+        "packages/core/test/skill-capture.test.js"
+      ]
+    },
+    {
+      "id": "skill-manifest-boundary",
+      "title": "技能能力边界",
+      "tests": [
+        "packages/core/test/skill-manifest-gate.test.js",
+        "packages/core/test/skill-manifest.test.js"
+      ]
+    },
+    {
+      "id": "skill-operation-card-dismissal",
+      "title": "技能管理结果可收起关闭且不干扰对话",
+      "tests": [
+        "e2e/skill-operation-dismissal.spec.ts"
+      ]
+    },
+    {
+      "id": "skill-operation-confirm-bar",
+      "title": "技能操作确认后收成可关闭的小横条",
+      "tests": [
+        "apps/web-console/components/skill-operation-card-model.test.ts",
+        "e2e/skill-operation-confirm-bar.spec.ts"
+      ]
+    },
+    {
+      "id": "skill-proposals",
+      "title": "技能提案审批",
+      "tests": [
+        "e2e/skill-proposals.spec.ts",
+        "packages/core/test/skill-proposals.test.js"
+      ]
+    },
+    {
+      "id": "skin-mode-adapt",
+      "title": "非经典外观适配深浅色",
+      "tests": [
+        "apps/web-console/lib/skin.test.ts"
+      ]
+    },
+    {
+      "id": "slack-events-inbound",
+      "title": "Slack Events 入站按线程唤醒例行任务",
+      "tests": [
+        "packages/capability-gateway/test/slack-events-inbound.test.js"
+      ]
+    },
+    {
+      "id": "software-egress-reserved-tools",
+      "title": "软件出站地址与内置工具名",
+      "tests": [
+        "packages/core/test/software-egress-reserved-tools.test.js"
+      ]
+    },
+    {
+      "id": "startup-invariants-compact",
+      "title": "启动时校验压缩策略、稳定前缀与重复守卫",
+      "tests": [
+        "packages/core/test/startup-invariants.test.js"
+      ]
+    },
+    {
+      "id": "steer-timeline-order",
+      "title": "实时插话前后的回复保持时间线位置",
+      "tests": [
+        "apps/web-console/lib/steer-timeline-order.test.ts"
+      ]
+    },
+    {
+      "id": "steer-tool-continuity",
+      "title": "插话即时入会话与按工具取消",
+      "tests": [
+        "packages/agent-loop/src/runtime/tool-loop.test.ts",
+        "packages/agent-loop/src/turn/kernel.test.ts",
+        "packages/core/test/steer-tool-continuity.test.js",
+        "packages/core/test/tool-wave-close.test.js"
+      ]
+    },
+    {
+      "id": "stream-live-status",
+      "title": "生成中的速度与正在做什么",
+      "tests": [
+        "apps/web-console/components/StreamLiveStatus.test.ts",
+        "apps/web-console/lib/stream-live-status.test.ts"
+      ]
+    },
+    {
+      "id": "stream-text-once",
+      "title": "流式输出时助手文字只出现一次",
+      "tests": [
+        "apps/web-console/lib/live-stream-once.test.ts"
+      ]
+    },
+    {
+      "id": "subagent-delegation",
+      "title": "委派子任务的上下文隔离、权限收敛与重启未知态",
+      "tests": [
+        "packages/core/test/subagent-delegation-policy.test.js"
+      ]
+    },
+    {
+      "id": "system-context-cards",
+      "title": "会话摘要与 Jev 提示卡片",
+      "tests": [
+        "apps/web-console/lib/system-context-notice.test.ts",
+        "e2e/system-context-cards.spec.ts"
+      ]
+    },
+    {
+      "id": "system-message-ui",
+      "title": "统一聊天系统消息展示",
+      "tests": [
+        "apps/web-console/components/goal-update-presentation.test.ts",
+        "apps/web-console/lib/system-message-kind.test.ts",
+        "e2e/system-message-ui.spec.ts"
+      ]
+    },
+    {
+      "id": "tool-call-pairing-batch-dedup",
+      "title": "同批重复工具结果去重（验证试点发现 F-1）",
+      "tests": [
+        "packages/agent-loop/src/runtime/tool-loop.test.ts"
+      ]
+    },
+    {
+      "id": "tool-call-pairing-verification",
+      "title": "工具调用与结果配对验证试点",
+      "tests": [
+        "scripts/test/tool-call-pairing-verification.test.mjs"
+      ]
+    },
+    {
+      "id": "tool-exposure-tiers",
+      "title": "工具三层分类与独立的渐进和全量提供方式",
+      "tests": [
+        "e2e/tool-exposure.spec.ts",
+        "packages/core/test/jev-points.test.js",
+        "packages/core/test/tool-exposure-tiers.test.js"
+      ]
+    },
+    {
+      "id": "tool-loop-same-call",
+      "title": "工具循环按同一次调用判断",
+      "tests": [
+        "packages/agent-loop/src/recovery/repeat-guard.test.ts",
+        "packages/agent-loop/src/recovery/session-loop-guard.test.ts",
+        "packages/agent-loop/src/turn/repeat-guard-kernel.test.ts",
+        "packages/core/test/session-loop-guard.test.js"
+      ]
+    },
+    {
+      "id": "tool-observation-thumbnails",
+      "title": "工具观察截图缩略图",
+      "tests": [
+        "apps/web-console/lib/chat-images.test.ts"
+      ]
+    },
+    {
+      "id": "tool-progress-guard",
+      "title": "重复工具调用按实际进展判断",
+      "tests": [
+        "packages/agent-loop/src/recovery/session-loop-guard.test.ts",
+        "packages/agent-loop/src/turn/repeat-guard-kernel.test.ts",
+        "packages/core/test/session-loop-guard.test.js"
+      ]
+    },
+    {
+      "id": "unified-bot-goal-lifecycle",
+      "title": "统一 Bot 目标生命周期与归档展示",
+      "tests": [
+        "apps/daemon/test/unified-goal-lifecycle.test.ts",
+        "apps/web-console/lib/bot-goals.test.ts",
+        "e2e/bot-goals-panel-threshold.spec.ts",
+        "packages/core/test/bot-goal-projection.test.js",
+        "packages/core/test/bot-goal-runtime.test.js",
+        "packages/core/test/bot-goals.test.js"
+      ]
+    },
+    {
+      "id": "unlimited-bot-rounds",
+      "title": "Bot 对话轮和执行轮默认不限",
+      "tests": [
+        "packages/core/test/bot-rooms.test.js",
+        "packages/core/test/unlimited-bot-rounds.test.ts"
+      ]
+    },
+    {
+      "id": "unlimited-execution-steps",
+      "title": "默认不限单次执行步数",
+      "tests": [
+        "apps/web-console/lib/unlimited-execution-steps.test.ts",
+        "e2e/bot-policy.spec.ts",
+        "packages/core/test/bot-policy.test.js",
+        "packages/core/test/bot-room-wave-dispatch.test.js",
+        "packages/core/test/routine-lifecycle.test.js",
+        "packages/core/test/runtime.test.js"
+      ]
+    },
+    {
+      "id": "untrusted-cwd-default-deny",
+      "title": "不可信内容不能带出工作目录或执行动态代码",
+      "tests": [
+        "packages/core/test/default-deny-policy.test.js",
+        "packages/core/test/default-deny-shell.test.js"
+      ]
+    },
+    {
+      "id": "upstream-resilience",
+      "title": "上游模型异常时的稳健性",
+      "tests": [
+        "apps/web-console/lib/stream-segments.test.ts",
+        "packages/agent-loop/src/model/upstream-replay.test.ts",
+        "packages/agent-loop/src/runtime/turn-retries.test.ts"
+      ]
+    },
+    {
+      "id": "user-message-actions",
+      "title": "自己发送的消息支持复制和重试",
+      "tests": [
+        "apps/web-console/lib/user-message-actions.test.ts",
+        "e2e/user-message-actions.spec.ts"
+      ]
+    },
+    {
+      "id": "user-preference-sync",
+      "title": "用户长期偏好入库与迁移",
+      "tests": [
+        "apps/daemon/test/user-preferences-http.test.ts",
+        "apps/web-console/lib/user-preferences.test.ts"
+      ]
+    },
+    {
+      "id": "user-vault-ref-fill",
+      "title": "User Vault reference fill (distinct from secret-vault)",
+      "tests": [
+        "packages/core/test/user-vault.test.js"
+      ]
+    },
+    {
+      "id": "user-vault-tools",
+      "title": "User Vault assistant tools and Lab reference-fill",
+      "tests": [
+        "apps/daemon/test/user-vault-http.test.ts",
+        "apps/web-console/lib/user-vault.test.ts",
+        "packages/core/test/vault-tools.test.js"
+      ]
+    }
+  ]
+}
