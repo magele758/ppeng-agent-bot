@@ -11,6 +11,10 @@ description: Work effectively in the ppeng-agent-core (Raw Agent SDK) monorepo�
 2. [`README.md`](../../README.md) 或 [`README.zh.md`](../../README.zh.md) 中 **「给 AI 编码 Agent 的指引」** 小节 — 与 AGENTS 互补的速查。
 3. 架构与 API 面：[`doc/ARCHITECTURE.md`](../../doc/ARCHITECTURE.md)。配置模板：[`.env.example`](../../.env.example)。
 
+## 产品需求目录
+
+改用户能看到的行为，或增删改仓库 `skills/**/SKILL.md` 时，按 [skills/product-prd/SKILL.md](../product-prd/SKILL.md) 更新 [doc/prd/README.md](../../doc/prd/README.md)。不要把步骤再抄一遍。
+
 ## 仓库地图（摘要）
 
 | 区域 | 路径 | 职责 |

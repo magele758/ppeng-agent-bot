@@ -65,6 +65,7 @@
     "evolution:source-scores": "node scripts/evolution/source-score-report.mjs",
     "evolution:tag": "node scripts/evolution/capability-tagger.mjs",
     "doc:env": "node scripts/print-env-help.mjs --write",
+    "prd:catalog": "node scripts/prd/build-catalog.mjs",
     "agent-eval": "node scripts/agent-eval.mjs",
     "agent:eval": "node scripts/agent-eval/runner.mjs",
     "agent:eval:fast": "node scripts/agent-eval/runner.mjs --mode fast",
