@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { pm2StartPlan } from '../pm2-service.mjs';
 import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
@@ -37,6 +38,14 @@ test('PM2 服务配置是单实例监督进程 [AC:pm2-service#AC-1]', () => {
   assert.notEqual(app.treekill, true);
 });
 
+test('已经在跑时启动命令不会再起一份 [AC:pm2-service#AC-1]', () => {
+  assert.equal(pm2StartPlan('online'), null);
+  assert.equal(pm2StartPlan('launching'), null);
+  assert.deepEqual(pm2StartPlan('missing'), ['start', 'ecosystem.config.cjs']);
+  assert.deepEqual(pm2StartPlan('stopped'), ['restart', 'ppeng-daemon']);
+  assert.deepEqual(pm2StartPlan('errored'), ['restart', 'ppeng-daemon']);
+});
+
 test('停止服务时预留不少于 10 秒收尾 [AC:pm2-service#AC-2]', () => {
   const app = serviceApp();
   assert.ok(Number(app.kill_timeout) >= 10_000);
@@ -44,7 +53,7 @@ test('停止服务时预留不少于 10 秒收尾 [AC:pm2-service#AC-2]', () => 
 
 test('服务脚本不触碰夜间 evolution 任务 [AC:pm2-service#AC-1] [AC:pm2-service#AC-3]', () => {
   const scripts = packageScripts();
-  assert.equal(scripts['pm2:start'], 'pm2 start ecosystem.config.cjs');
+  assert.equal(scripts['pm2:start'], 'node scripts/pm2-service.mjs');
   assert.equal(scripts['pm2:stop'], 'pm2 stop ppeng-daemon');
   assert.equal(scripts['pm2:restart'], 'pm2 restart ppeng-daemon');
   assert.equal(scripts['pm2:logs'], 'pm2 logs ppeng-daemon');

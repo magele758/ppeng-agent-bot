@@ -39,7 +39,7 @@
     "ci": "pnpm run build && pnpm run test:unit && pnpm run test:bot:soak:performance && pnpm run test:acceptance && pnpm run test:formal && pnpm run agent:eval:fast --exit-on-fail --out test-results/fast-eval && pnpm run agent:eval:verify && pnpm run test:package && pnpm run test:crap && pnpm run test:regression && pnpm run test:integration && pnpm run test:e2e",
     "start:daemon": "node apps/daemon/dist/server.js",
     "start:supervised": "node scripts/supervisor.mjs",
-    "pm2:start": "pm2 start ecosystem.config.cjs",
+    "pm2:start": "node scripts/pm2-service.mjs",
     "pm2:stop": "pm2 stop ppeng-daemon",
     "pm2:restart": "pm2 restart ppeng-daemon",
     "pm2:logs": "pm2 logs ppeng-daemon",
