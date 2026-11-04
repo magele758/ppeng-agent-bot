@@ -89,7 +89,7 @@ turn 开始
 
 ### 3.2 并行分块
 
-`partitionForParallel(calls, maxParallelToolCalls)`：按 `RAW_AGENT_MAX_PARALLEL_TOOLS`（默认 8）切片；**块内** `Promise.all`，**块间**串行。  
+`partitionForParallel(calls, maxParallelToolCalls)`：按 `RAW_AGENT_MAX_PARALLEL_TOOLS`（默认 32）切片；**块内** `Promise.all`，**块间**串行。  
 无「顺序敏感工具强制串行」分区——依赖模型/调用方控制依赖顺序。
 
 ### 3.3 审批与配对
@@ -208,7 +208,7 @@ Grace / Goal 否决文案走直接 system message。
 | 复读 watchdog | `RAW_AGENT_STREAM_WATCHDOG` | 轮内 |
 | 空转 watchdog | `RAW_AGENT_REASONING_SPIN_WATCHDOG` | 跨轮 |
 | Goal Gate | `RAW_AGENT_GOAL_GATE` | 另需 `goalCondition` |
-| 并行工具 | `RAW_AGENT_MAX_PARALLEL_TOOLS` | 默认 8 |
+| 并行工具 | `RAW_AGENT_MAX_PARALLEL_TOOLS` | 默认 32 |
 | Token 预算信号 | `RAW_AGENT_TOKEN_BUDGET` | 0=不启用 budget_high |
 
 Risk 细项：`RAW_AGENT_RISK_TOOL_ERROR_STREAK`、`RAW_AGENT_RISK_ITERATION_NEAR_GAP`、`RAW_AGENT_RISK_BUDGET_HIGH_RATIO`、`RAW_AGENT_RISK_MAX_COACH`、`RAW_AGENT_RISK_COACH_COOLDOWN`、`RAW_AGENT_RISK_USER_QUIET`。

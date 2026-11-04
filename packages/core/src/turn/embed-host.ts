@@ -7,6 +7,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ExtensionRegistry } from '../extensions/extension-registry.js';
+import { DEFAULT_PARALLEL_TOOL_CALLS } from '../runtime-env.js';
 import { normalizeAuthorizedBy } from '../approval/authorized-by.js';
 import { createId, nowIso } from '../id.js';
 import type { PromptContext } from '../model/prompt-builder.js';
@@ -247,7 +248,7 @@ export function createEmbedTurnHost(
     tools,
     store: toolLoopStore,
     envApprovalPolicy: undefined,
-    maxParallelToolCalls: 8,
+    maxParallelToolCalls: DEFAULT_PARALLEL_TOOL_CALLS,
     modelAdapter: input.model,
     stateDir,
     emitTrace: () => undefined

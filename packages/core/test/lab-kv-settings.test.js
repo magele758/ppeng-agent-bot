@@ -54,11 +54,11 @@ test('ingestion settings clamp byte budgets', () => {
 
 test('teams DAG settings reject shell-like gate commands', () => {
   const n = normalizeTeamsDagSettings({
-    maxConcurrent: 99,
+    maxConcurrent: 999,
     workspaceSyncMode: 'nope',
     gates: { regression: { enabled: true, checker: 'command', command: 'rm -rf /' } }
   });
-  assert.equal(n.maxConcurrent, 16);
+  assert.equal(n.maxConcurrent, 256);
   assert.equal(n.workspaceSyncMode, 'directory-copy');
   assert.equal(n.gates.regression.command, undefined);
   const ok = normalizeTeamsDagSettings({

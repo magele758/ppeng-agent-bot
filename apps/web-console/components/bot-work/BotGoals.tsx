@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
-import { goalActions, goalsPanelState, type BotGoalView, type BotGoalsSnapshot, type BotGoalSettings, type GoalStrategy } from '@/lib/bot-goals';
+import { goalActions, goalSettingFieldMax, goalsPanelState, type BotGoalView, type BotGoalsSnapshot, type BotGoalSettings, type GoalStrategy } from '@/lib/bot-goals';
 import './bot-goals.css';
 
 export function BotGoals({ botId, sessionId, selectedGoalId, onSelectGoal, initialSnapshot = null }: {
@@ -94,7 +94,7 @@ export function BotGoals({ botId, sessionId, selectedGoalId, onSelectGoal, initi
         <GoalLimits goal={goal} busy={busy} attention={attention} onAction={body=>mutate(`${base}/${encodeURIComponent(goal.id)}/actions`, 'POST', body)} /></div>
       </article>)}</div>
       {draft && !attention && <details><summary>{t('goals.settings')}</summary><form className="bot-goals__settings" onSubmit={e => { e.preventDefault(); void mutate(`${base}/settings`, 'PATCH', { ...draft }); }}>
-        {(['maxConcurrent', 'defaultBudgetUsd', 'maxAttempts', 'maxNoProgress'] as const).map((key, index) => <label key={key}>{t((['goals.concurrency', 'goals.budget', 'goals.attempts', 'goals.noProgress'] as const)[index])}<input type="number" min={key === 'defaultBudgetUsd' ? 0.01 : 1} max={key === 'maxConcurrent' ? 32 : undefined} step={key === 'defaultBudgetUsd' ? 0.01 : 1} required value={draft[key]} onChange={e => { setSaved(false); setDraft({ ...draft, [key]: Number(e.target.value) }); }}/></label>)}
+        {(['maxConcurrent', 'defaultBudgetUsd', 'maxAttempts', 'maxNoProgress'] as const).map((key, index) => <label key={key}>{t((['goals.concurrency', 'goals.budget', 'goals.attempts', 'goals.noProgress'] as const)[index])}<input type="number" min={key === 'defaultBudgetUsd' ? 0.01 : 1} max={goalSettingFieldMax(key)} step={key === 'defaultBudgetUsd' ? 0.01 : 1} required value={draft[key]} onChange={e => { setSaved(false); setDraft({ ...draft, [key]: Number(e.target.value) }); }}/></label>)}
         <label>{t('goals.preference')}<select value={draft.preferredStrategy} onChange={e => { setSaved(false); setDraft({ ...draft, preferredStrategy: e.target.value as GoalStrategy }); }}>{(['auto', 'direct', 'subagent', 'bot_delegate', 'ptc', 'team_dag', 'swarm', 'browser', 'computer', 'deep_research'] as const).map(strategy => <option key={strategy} value={strategy}>{t(`goals.strategy.${strategy}`)}</option>)}</select></label>
         <button className="btn btn-sm" disabled={busy}>{t('goals.save')}</button>
         {saved && <p role="status">{t('goals.saved')}</p>}

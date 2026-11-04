@@ -1,4 +1,5 @@
 import { GOAL_JUDGE_TIMEOUT_MS } from './judge-budget.js';
+import { GOAL_INTAKE_SPLIT_LIMIT } from './settings.js';
 import { visibleTaskText } from '../fork-inheritance.js';
 
 export interface GoalMessageIntent {
@@ -84,14 +85,18 @@ export function classifyGoalMessage(raw: string): GoalMessageIntent {
   if (isCoordinationInstruction(text)) return { kind: 'chat', ...base };
   return { kind: 'new_goal', ...base };
 }
+function asksParallelAgents(text: string): boolean {
+  return /分多个\s*agent|多个子代理|多个代理|multiple agents|parallel agents/i.test(text);
+}
 function isCoordinationInstruction(text: string): boolean {
-  if (/(?:创建|写入|修复|实现|修改|添加|开发|部署|编写)/.test(text)) return false;
+  if (/(?:创建|写入|修复|实现|修改|添加|开发|部署|编写|分析|提升)/.test(text)) return false;
   return /(?:并行推进|不要把[\s\S]{0,16}收成一个目标|各自保留真实文件)/.test(text)
-    || /^(?:请)?同时完成[\s\S]{0,16}独立的事[。.!！]?$/.test(text.trim());
+    || /^(?:请)?同时完成[\s\S]{0,16}独立的事[。.!！]?$/.test(text.trim())
+    || asksParallelAgents(text);
 }
 
 function independentClause(text:string,piece:string):boolean {
-  return /(?:独立的事|独立任务|independent tasks)/i.test(text)
+  return /(?:独立的事|独立任务|independent tasks|分多个\s*agent|多个子代理|多个代理|multiple agents|parallel agents)/i.test(text)
     && !/^(?:然后|再|必须|不要|then\b|verify\b|do not\b)/i.test(piece.trim());
 }
 function fallbackClauses(text:string):string[] {
@@ -125,7 +130,7 @@ function fallbackIntents(raw: string, goals: GoalIntakeContext[]): GoalIntentPro
   const text = (explicit ? raw.slice(explicit[0].length) : raw).trim();
   const clauses = fallbackClauses(text);
   // Overly complex messages stay intact for semantic interpretation instead of losing clauses.
-  if (clauses.length > 8) return [classifyGoalMessage(raw)];
+  if (clauses.length > GOAL_INTAKE_SPLIT_LIMIT) return [classifyGoalMessage(raw)];
   return (clauses.length ? clauses : ['']).map(clause => {
     const clean = clause.replace(/^(?:另外|顺便|然后|then\s+|also\s+)\s*/i, '').trim();
     const parsed = classifyGoalMessage(`${explicit?.[0] ?? ''}${clean}`);
@@ -155,7 +160,7 @@ function parsedJudge(output: unknown): { intents?: unknown[] } {
 }
 function usableIntents(decoded: { intents?: unknown[] } | null | undefined): unknown[] | undefined {
   if (!decoded || !Array.isArray(decoded.intents)) return undefined;
-  if (!decoded.intents.length || decoded.intents.length > 8) return undefined;
+  if (!decoded.intents.length || decoded.intents.length > GOAL_INTAKE_SPLIT_LIMIT) return undefined;
   return decoded.intents;
 }
 function intentTextOk(item: { kind?: string; text?: unknown } | null, raw: string): boolean {
