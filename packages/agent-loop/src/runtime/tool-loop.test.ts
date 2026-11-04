@@ -64,6 +64,17 @@ const call = (name: string, input: Record<string, unknown>, id = `tc-${name}`): 
   input,
 });
 
+function captureHost(redactSecrets?: (text: string) => string) {
+  const payloads: Array<{ kind: string; payload?: Record<string, unknown> }> = [];
+  const h = host({
+    emitTrace: (_sid, ev) => {
+      payloads.push(ev as { kind: string; payload?: Record<string, unknown> });
+    },
+    ...(redactSecrets ? { redactSecrets } : {}),
+  });
+  return { h, payloads };
+}
+
 describe('tool result truncation knobs', () => {
   it('defaults to 120k and honors both env keys (legacy RAW_AGENT_* wins)', () => {
     expect(envToolResultMaxChars({})).toBe(DEFAULT_TOOL_RESULT_MAX_CHARS);
@@ -832,17 +843,6 @@ describe('multimodal tool observations', () => {
 });
 
 describe('session trace tool_end payload', () => {
-  function captureHost(redactSecrets?: (text: string) => string) {
-    const payloads: Array<{ kind: string; payload?: Record<string, unknown> }> = [];
-    const h = host({
-      emitTrace: (_sid, ev) => {
-        payloads.push(ev as { kind: string; payload?: Record<string, unknown> });
-      },
-      ...(redactSecrets ? { redactSecrets } : {}),
-    });
-    return { h, payloads };
-  }
-
   it('[AC:ops-session-trace-repair#AC-1] failed tool_end keeps the command and the real error, with secrets redacted', () => {
     const secret = 'sk-live-secret-value';
     const { h, payloads } = captureHost((text) => text.split(secret).join('[REDACTED:RAW_AGENT_API_KEY]'));
@@ -953,6 +953,73 @@ describe('session trace tool_end payload', () => {
     await expect(
       runTurnWithRetries(h, adapter as never, { sessionId: 's1', messages: [], tools: [] } as never, () => {})
     ).rejects.toMatchObject({ sample: repeated });
+  });
+});
+
+describe('execution log can tell calls apart', () => {
+  it('keeps a call id on each same-name tool, including the failure code [AC:execution-log-analysis#AC-1]', () => {
+    const { h, payloads } = captureHost();
+    processToolResults(
+      h,
+      [
+        { toolCallId: 'bash-ok', name: 'bash', ok: true, ran: true, durationMs: 4, content: 'ok' },
+        {
+          toolCallId: 'bash-bad',
+          name: 'bash',
+          ok: false,
+          ran: true,
+          durationMs: 9,
+          content: 'bash: not found',
+          problem: { title: 'fail', detail: 'bash: not found', code: 'EXIT_127' },
+        },
+      ],
+      [call('bash', { command: 'true' }, 'bash-ok'), call('bash', { command: 'false' }, 'bash-bad')],
+      ctx.session,
+      undefined,
+      's1'
+    );
+    expect(payloads.map((event) => event.payload?.toolCallId)).toEqual(['bash-ok', 'bash-bad']);
+    expect(payloads[1]?.payload).toMatchObject({ ok: false, code: 'EXIT_127', ran: true, durationMs: 9 });
+  });
+
+  it('records an unknown tool as a finished failed call [AC:execution-log-analysis#AC-4]', async () => {
+    const { h, payloads } = captureHost();
+    const result = await executeSingleTool(h, [], call('nope', {}, 'nope-1'), ctx, false, 's1');
+    processToolResults(h, [result], [call('nope', {}, 'nope-1')], ctx.session, undefined, 's1');
+    expect(payloads.find((event) => event.kind === 'tool_end')?.payload).toMatchObject({
+      toolCallId: 'nope-1',
+      name: 'nope',
+      ok: false,
+      ran: false,
+      code: 'UNKNOWN_TOOL',
+    });
+  });
+
+  it('records a hook ask as a finished call that is waiting [AC:execution-log-analysis#AC-5]', async () => {
+    const payloads: Array<{ kind: string; payload?: Record<string, unknown> }> = [];
+    const h = host({
+      emitTrace: (_sid, event) => {
+        payloads.push(event as { kind: string; payload?: Record<string, unknown> });
+      },
+      runLifecycleHook: async () => ({ permissionDecision: 'ask', message: 'please confirm' }),
+    });
+    const result = await executeSingleTool(
+      h,
+      [tool('bash', async () => ({ ok: true, content: 'ran' }))],
+      call('bash', {}, 'bash-wait'),
+      ctx,
+      false,
+      's1'
+    );
+    expect(result.hold).toBe('approval');
+    expect(result.traceLogged).toBe(true);
+    expect(payloads.find((event) => event.kind === 'tool_end')?.payload).toMatchObject({
+      toolCallId: 'bash-wait',
+      name: 'bash',
+      ok: false,
+      ran: false,
+      hold: 'approval',
+    });
   });
 });
 

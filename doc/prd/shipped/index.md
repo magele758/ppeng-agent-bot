@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 359 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 361 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -374,6 +374,12 @@
 需求正文见 [other](other.md)。
 
 - `email-webhook-replay` 邮件事件不能靠换投递号重放
+
+## execution（1）
+
+需求正文见 [other](other.md)。
+
+- `execution-log-analysis` 执行日志能查出问题并指到具体调用
 
 ## experimental（1）
 
@@ -889,10 +895,11 @@
 - `steer-timeline-order` 实时插话前后的回复保持时间线位置
 - `steer-tool-continuity` 插话即时入会话与按工具取消
 
-## stream（1）
+## stream（2）
 
 需求正文见 [other](other.md)。
 
+- `stream-live-status` 生成中的速度与正在做什么
 - `stream-text-once` 流式输出时助手文字只出现一次
 
 ## subagent（1）

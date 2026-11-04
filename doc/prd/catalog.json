@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 359,
+    "implemented": 361,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1317,6 +1317,13 @@
       "file": "acceptance/email-webhook-replay.yaml"
     },
     {
+      "id": "execution-log-analysis",
+      "title": "执行日志能查出问题并指到具体调用",
+      "requirement": "帮我看看现在的agent的执行日志是否记录完成，我想要构建一套基于日志分析agent行为，发现问题，自己去排查问题，解决问题，提升整体能力的方案，分多个agent去帮我检查，如果没有就分多个agent去快速补全",
+      "verificationStage": "software",
+      "file": "acceptance/execution-log-analysis.yaml"
+    },
+    {
       "id": "experimental-settings",
       "title": "设置里的实验特性菜单",
       "requirement": "用户刚得知 Jev 评估藏在「设置 → 集成与可观测 → 显示高级」里，说这样太深了。要求：把这些高级配置单独抽一个配置菜单，名字叫「实验特性」。\n\n先读设置信息架构：apps/web-console 的 nav（lib/nav.ts）、设置分类 sections/settings/categories/*.tsx、advanced 默认隐藏的机制、doc/UI_REDESIGN.md 里和设置相关的部分。弄清现在哪些条目被标成 advanced、入口在侧栏还是设置内部。\n\n要做成：\n1. 有一个一眼能看到的配置菜单，文案是「实验特性」（英文 Experimental）。不要再要求先打开「显示高级」才能看见这些配置。\n2. 现在被 advanced 收起来的设置项（含 Jev 评估，以及同一套 advanced 机制里的其它高级项）挪进这个菜单。原位置不要留空壳重复入口。若「显示高级」只是为了露出这些项，挪走后这个开关也不要再挡路；如果它还控制别的东西，只把实验项移走，其余行为保持。\n3. 菜单放在现有设置导航里，作为和「模型」「集成与可观测」同级、默认可见的一项（hash 路由跟现有 #/settings/... 一致）。不要新造一套与 Lab 导航无关的页面，也不要只在搜索里才能找到。\n4. 文案走 i18n，zh 与 en 同一套 key。不要硬编码中英文。不要新增 RAW_AGENT_*。\n5. 只搬入口和分组，不要改这些配置的保存、字段和生效逻辑。\n\n后续：实验特性里每一项都要能一眼看出开/关，并且有自己的开关。每一项一行：名称、一句它做什么、一个开关。关：这项不生效（Jev 就是不调用，等同关闭档）。开：这项生效，它自己的配置出现在这一项下面（Jev 的地址、Key、档位仍用现有保存逻辑）。已有关闭/精简/标准这类档位的，菜单上的开关是总闸：关=不调用；开=使用该项里保存的档位，若保存的档位本身是关闭，打开开关时落到该项原来的默认启用档（Jev 用标准）。持久化走现有 Lab 配置，不要新增 RAW_AGENT_*。上面第 5 条「不改生效逻辑」由这一条代替。",
@@ -2351,6 +2358,13 @@
       "requirement": "那就按这个方案改，普通插话立即进入会话，不要跳过或中断工具；只有明确要求停止，或者结合上下文确实需要取消时，才中断对应的工具，不要把整个会话停掉。",
       "verificationStage": "software",
       "file": "acceptance/steer-tool-continuity.yaml"
+    },
+    {
+      "id": "stream-live-status",
+      "title": "生成中的速度与正在做什么",
+      "requirement": "[Image #1]  我想要在他生成的时候知道他在干嘛怎么办？加个交互，让我知道他的速度和在干嘛，另外这里的三个 ... 可以加点动效，免得太静态了",
+      "verificationStage": "software",
+      "file": "acceptance/stream-live-status.yaml"
     },
     {
       "id": "stream-text-once",

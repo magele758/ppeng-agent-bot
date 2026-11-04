@@ -35,6 +35,7 @@ import {
   noteCriticalHit,
   toolCallParts,
 } from './turn-recovery.js';
+import { turnStartTraceData } from './turn-start-trace.js';
 import {
   mergeOutcomeMetadata,
   runOutcomeFromEnd,
@@ -180,6 +181,14 @@ function parkResumedApproval(
     executedToolCallIds: interrupt.executedToolCallIds,
   });
   const current = host.store.getSession(sid) as SessionRecord;
+  const outcome = runOutcomeFromEnd({
+    reason: 'waiting_approval',
+    sessionStatus: 'waiting_approval',
+  });
+  void host.emitTrace(sid, {
+    kind: 'turn_end',
+    data: { terminal: true, reason: 'waiting_approval', outcome },
+  });
   return host.store.updateSession(sid, {
     status: 'waiting_approval',
     metadata: mergeInterruptMetadata(current.metadata ?? {}, nextInterrupt),
@@ -943,13 +952,16 @@ promptCacheKey = composePromptCacheKey([
         host.promptCacheEpoch,
         loopConfig.promptCacheBustKey,
       ]);
+const startedAdapter = adapterOf(context.session);
 void host.emitTrace(sid, {
         kind: 'turn_start',
-        data: {
+        data: turnStartTraceData({
           turn,
-          adapter: adapterOf(context.session).name,
-          ...(promptCacheKey ? { promptCacheKey } : {}),
-        },
+          adapterName: startedAdapter.name,
+          modelName: startedAdapter.modelName,
+          promptCacheKey,
+          toolNames: resolvedTools.map((tool: { name: string }) => tool.name),
+        }),
       });
 return undefined;
 }
@@ -1852,6 +1864,10 @@ parkForApproval = async () => {
           ),
         });
         await emitStep({ type: 'waiting_approval', approvalIds, interrupt });
+        void host.emitTrace(sid, {
+          kind: 'turn_end',
+          data: { terminal: true, reason: 'waiting_approval', outcome },
+        });
         return updated;
       };
 if (latch.action === 'abort') {

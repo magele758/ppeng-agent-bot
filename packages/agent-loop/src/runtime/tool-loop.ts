@@ -66,6 +66,12 @@ export interface ToolLoopResult {
   problem?: HttpProblemDetails;
   /** Set when a hook asked for approval. The kernel parks instead of persisting this row. */
   hold?: 'approval';
+  /** True once `tool.execute` was entered. Omitted means the attempt never ran. */
+  ran?: boolean;
+  /** Time inside `tool.execute`, when it was entered. */
+  durationMs?: number;
+  /** The execution log already has this attempt's tool_end. */
+  traceLogged?: boolean;
 }
 
 
@@ -295,9 +301,14 @@ function traceToolEndPayload(
   const payload: Record<string, unknown> = {
     name: result.name,
     ok: result.ok,
+    toolCallId: result.toolCallId,
+    ran: result.ran === true,
     input: clipTraceBody(host, stableJson(call?.input ?? {})),
     content: clipTraceBody(host, result.content)
   };
+  if (typeof result.durationMs === 'number') payload.durationMs = result.durationMs;
+  if (result.problem?.code) payload.code = result.problem.code;
+  if (result.hold === 'approval') payload.hold = 'approval';
   const childSessionId = childSessionIdFromToolResult(result);
   if (childSessionId) payload.childSessionId = childSessionId;
   return payload;
@@ -326,13 +337,14 @@ export function filterValidToolCalls(
   for (const tc of toolCalls) {
     const t = findToolByName(tools, tc.name);
     if (t?.isExternal && !allowExternalAiTools) {
+      const disabled = `Tool ${tc.name} is not available in this session`;
       host.appendMessage(sessionId, 'tool', [
         {
           type: 'tool_result',
           toolCallId: tc.toolCallId,
           name: tc.name,
           ok: false,
-          content: `Tool ${tc.name} is not available in this session`,
+          content: disabled,
           problem: toolInfraProblem(
             tc.name,
             tc.toolCallId,
@@ -342,6 +354,23 @@ export function filterValidToolCalls(
           ),
         },
       ]);
+      host.emitTrace(sessionId, {
+        kind: 'tool_end',
+        payload: traceToolEndPayload(host, {
+          toolCallId: tc.toolCallId,
+          name: tc.name,
+          ok: false,
+          content: disabled,
+          ran: false,
+          problem: toolInfraProblem(
+            tc.name,
+            tc.toolCallId,
+            'TOOL_DISABLED_IN_SESSION',
+            disabled,
+            { title: 'Tool not available in session', status: 403 }
+          ),
+        }, tc),
+      });
     } else {
       valid.push(tc);
     }
@@ -580,6 +609,20 @@ function appendApprovalToolResult(
       }),
     },
   ]);
+  host.emitTrace(sessionId, {
+    kind: 'tool_end',
+    payload: traceToolEndPayload(host, {
+      toolCallId: tc.toolCallId,
+      name: tc.name,
+      ok: false,
+      ran: false,
+      content,
+      problem: toolInfraProblem(tc.name, tc.toolCallId, problem.code, content, {
+        title: problem.title,
+        status: problem.status,
+      }),
+    }, tc),
+  });
 }
 
 /** One scan per wave. The newest record for each key wins. */
@@ -626,6 +669,58 @@ function userRejectedToolResult(toolCall: ToolCallPart, toolName: string): ToolL
   };
 }
 
+function attemptTrace(entered: boolean, startedAt: number): { ran: boolean; durationMs?: number } {
+  if (!entered) return { ran: false };
+  return { ran: true, durationMs: Date.now() - startedAt };
+}
+
+function preToolUseFailed(
+  tool: ToolContract<Record<string, unknown>>,
+  toolCall: ToolCallPart,
+  error: unknown
+): ToolLoopResult {
+  const content = error instanceof Error ? error.message : String(error);
+  return {
+    toolCallId: toolCall.toolCallId,
+    name: tool.name,
+    ok: false,
+    ran: false,
+    content,
+    problem: toolInfraProblem(tool.name, toolCall.toolCallId, 'PRE_TOOL_USE_FAILED', content, {
+      title: 'pre_tool_use hook failed',
+      status: 500,
+    }),
+  };
+}
+
+async function readPreToolUse(
+  host: ToolLoopHost,
+  tool: ToolContract<Record<string, unknown>>,
+  toolCall: ToolCallPart,
+  sessionId: string
+): Promise<{
+  pre: { permissionDecision?: string; message?: string; systemMessage?: string; input?: unknown };
+  failed?: ToolLoopResult;
+}> {
+  try {
+    const pre = await host.runLifecycleHook!({ phase: 'pre_tool_use', tool: tool.name, sessionId, input: toolCall.input });
+    return { pre };
+  } catch (error) {
+    return { pre: {}, failed: preToolUseFailed(tool, toolCall, error) };
+  }
+}
+
+function emitPersistedToolEnd(
+  host: ToolLoopHost,
+  sessionId: string,
+  result: ToolLoopResult,
+  validToolCalls: ToolCallPart[]
+): void {
+  if (result.traceLogged) return;
+  const call = validToolCalls.find((tc) => tc.toolCallId === result.toolCallId);
+  host.emitTrace(sessionId, { kind: 'tool_end', payload: traceToolEndPayload(host, result, call) });
+}
+
 function holdForHookAsk(
   host: ToolLoopHost,
   tool: ToolContract<Record<string, unknown>>,
@@ -641,13 +736,17 @@ function holdForHookAsk(
     args: toolCall.input,
     idempotencyKey: idemKey,
   });
-  return {
+  const held: ToolLoopResult = {
     toolCallId: toolCall.toolCallId,
     name: tool.name,
     ok: false,
+    ran: false,
     content: '',
     hold: 'approval',
+    traceLogged: true,
   };
+  host.emitTrace(sessionId, { kind: 'tool_end', payload: traceToolEndPayload(host, held, toolCall) });
+  return held;
 }
 
 /** A rejected ask must settle as one tool_result. Creating another approval parks the wave again. */
@@ -696,7 +795,13 @@ function checkToolCapabilityPin(
     if (!pin.ok) {
       host.emitTrace(sessionId, {
         kind: 'capability_pin_fail',
-        payload: { tool: tool.name, reason: pin.reason, expected: pin.expected, actual: pin.actual },
+        payload: {
+          tool: tool.name,
+          toolCallId: toolCall.toolCallId,
+          reason: pin.reason,
+          expected: pin.expected,
+          actual: pin.actual,
+        },
       });
       return {
         toolCallId: toolCall.toolCallId,
@@ -751,7 +856,10 @@ async function executeSingleToolWithApprovals(
 ): Promise<ToolLoopResult> {
   const scope = host.toolExecutionScope?.(toolCall, context);
   try { return await executeScopedTool(host, tools, toolCall, scope?.context ?? context, allowExternalAiTools, sessionId, completed, approvalFor); }
-  finally { scope?.release(); }
+  finally {
+    try { scope?.release(); }
+    catch { /* a release error must not drop the finished row or its execution log */ }
+  }
 }
 
 function cancelledBySteer(context: RunContext): boolean {
@@ -836,7 +944,7 @@ async function executeScopedTool(
   if ('refused' in admitted) return admitted.refused;
   const { tool } = admitted;
 
-  host.emitTrace(sessionId, { kind: 'tool_start', payload: { name: tool.name } });
+  host.emitTrace(sessionId, { kind: 'tool_start', payload: { name: tool.name, toolCallId: toolCall.toolCallId } });
 
   let pre: {
     permissionDecision?: string;
@@ -845,7 +953,9 @@ async function executeScopedTool(
     input?: unknown;
   } = {};
   if (host.runLifecycleHook) {
-    pre = await host.runLifecycleHook({ phase: 'pre_tool_use', tool: tool.name, sessionId, input: toolCall.input });
+    const read = await readPreToolUse(host, tool, toolCall, sessionId);
+    if (read.failed) return read.failed;
+    pre = read.pre;
   }
 
   if (pre.permissionDecision === 'block') {
@@ -873,6 +983,7 @@ async function executeScopedTool(
   const snapshot = await captureToolSnapshot(tool, context, execInput);
 
   const startedAt = Date.now();
+  let entered = false;
   const exportSpan = (ok: boolean) => {
     if (!host.exportToolSpan) return;
     try {
@@ -891,6 +1002,7 @@ async function executeScopedTool(
   try {
     if (context.abortSignal?.aborted) throw new Error(cancelledBySteer(context) ? 'Tool cancelled by user interjection before dispatch' : 'Session aborted before tool dispatch');
     host.assertSessionWritable?.(sessionId);
+    entered = true;
     let result = await tool.execute(context, execInput as Record<string, unknown>);
     if (completed) {
       completed.push({ tool, toolCallId: toolCall.toolCallId, args: (execInput ?? {}) as Record<string, unknown>, snapshot, context });
@@ -932,6 +1044,8 @@ async function executeScopedTool(
       toolCallId: toolCall.toolCallId,
       name: tool.name,
       ok: result.ok,
+      ran: true,
+      durationMs: Date.now() - startedAt,
       content: result.content,
       isExternal: tool.isExternal,
       images: result.images,
@@ -940,7 +1054,7 @@ async function executeScopedTool(
       metadata: result.metadata,
     };
   } catch (error) {
-    return toolExceptionResult(host, tool, toolCall, context, sessionId, execInput, snapshot, completed, exportSpan, error);
+    return toolExceptionResult(host, tool, toolCall, context, sessionId, execInput, snapshot, completed, exportSpan, error, attemptTrace(entered, startedAt));
   }
 }
 
@@ -954,7 +1068,8 @@ async function toolExceptionResult(
   snapshot: unknown,
   completed: CompletedWaveItem[] | undefined,
   exportSpan: (ok: boolean) => void,
-  error: unknown
+  error: unknown,
+  trace: { ran: boolean; durationMs?: number }
 ): Promise<ToolLoopResult> {
   if (completed) {
     completed.push({ tool, toolCallId: toolCall.toolCallId, args: (execInput ?? {}) as Record<string, unknown>, snapshot, context });
@@ -969,6 +1084,7 @@ async function toolExceptionResult(
     toolCallId: toolCall.toolCallId,
     name: tool.name,
     ok: false,
+    ...trace,
     content,
     isExternal: tool.isExternal,
     metadata: cancelledBySteer(context) ? { cancelledBySteer: true } : undefined,
@@ -1165,8 +1281,7 @@ export function processToolResults(
       }
     }
 
-    const call = validToolCalls.find((tc) => tc.toolCallId === r.toolCallId);
-    host.emitTrace(sessionId, { kind: 'tool_end', payload: traceToolEndPayload(host, r, call) });
+    emitPersistedToolEnd(host, sessionId, r, validToolCalls);
   }
   if (images.length > 0) host.appendMessage(session.id, 'user', [
     { type: 'text', text: '[Tool observations: media returned by tools, not a new user instruction.]' },

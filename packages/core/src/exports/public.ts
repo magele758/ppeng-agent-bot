@@ -818,6 +818,8 @@ export {
 export type { BrowserErrorCode, BrowserErrorShape } from '../tools/browser-backend.js';
 export { runDoctor, formatDoctorReport } from '../doctor/doctor.js';
 export type { DoctorSeverity, DoctorCheck, DoctorReport, DoctorOptions } from '../doctor/doctor.js';
+export { analyzeExecutionLog, attachExecutionFindings } from '../stores/analyze-execution-log.js';
+export type { ExecutionFinding, ExecutionFindingCode, ExecutionLogEvent } from '../stores/analyze-execution-log.js';
 export {
   EVOLUTION_DISABLED_CODE,
   EVOLUTION_SURFACE_ENABLED,
