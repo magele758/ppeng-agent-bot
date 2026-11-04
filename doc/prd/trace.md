@@ -2107,6 +2107,14 @@ Durable wait is the default Goal/Routine park path
 
 - `packages/core/test/event-routine.test.js`
 
+### execution-log-analysis
+
+执行日志能查出问题并指到具体调用
+
+- `packages/agent-loop/src/runtime/tool-loop.test.ts`
+- `packages/agent-loop/src/turn/turn-start-trace.test.ts`
+- `packages/core/test/execution-findings.test.ts`
+
 ### experimental-settings
 
 设置里的实验特性菜单
@@ -3178,6 +3186,16 @@ Slack Events 入站按线程唤醒例行任务
 - `apps/web-console/components/goal-update-presentation.test.ts`
 - `apps/web-console/lib/system-message-kind.test.ts`
 - `e2e/system-message-ui.spec.ts`
+
+### thinking-effort
+
+思考力度
+
+- `apps/daemon/test/thinking-effort-http.test.ts`
+- `apps/web-console/components/thinking-effort-settings.test.ts`
+- `packages/agent-loop/src/model/reasoning-effort.test.ts`
+- `packages/core/test/thinking-effort-settings.test.js`
+- `packages/core/test/thinking-effort-turn.test.js`
 
 ### tool-call-pairing-batch-dedup
 
