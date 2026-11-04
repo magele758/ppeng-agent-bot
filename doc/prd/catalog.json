@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 361,
+    "implemented": 362,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1884,6 +1884,13 @@
       "file": "acceptance/pr152-approval-followups.yaml"
     },
     {
+      "id": "prd-test-trace",
+      "title": "产品需求与测试对照",
+      "requirement": "按这个做对照表、核心用例和命令",
+      "verificationStage": "software",
+      "file": "acceptance/prd-test-trace.yaml"
+    },
+    {
       "id": "product-prd",
       "title": "产品需求目录",
       "requirement": "我想要在readme之外，构建一套产品的prd体系，一个是现有的功能的说明，一个是开发了具体哪些feature，还有未来待开发的功能的特性，然后还有一个这个项目使用的skill也要同步的配套更新，分多个agent去完成这几件事情",
@@ -2746,7 +2753,7 @@
     },
     {
       "name": "product-prd",
-      "description": "在 ppeng-agent-core 改用户能看到的产品行为，或增删改 skills/**/SKILL.md 时，同步 doc/prd 产品需求目录。目录在根 README 之外：现状说明、已开发功能、待开发功能、仓库技能对照。Use when shipping or planning a user-visible feature, editing acceptance status, or changing a repo skill.",
+      "description": "在 ppeng-agent-core 改用户能看到的产品行为，或增删改 skills/**/SKILL.md 时，同步 doc/prd 产品需求目录。目录在根 README 之外：现状说明、已开发功能、待开发功能、仓库技能对照、现状与测试对照、核心用例。Use when shipping or planning a user-visible feature, editing acceptance status, changing a repo skill, or updating the core-case list.",
       "path": "skills/product-prd/SKILL.md"
     },
     {

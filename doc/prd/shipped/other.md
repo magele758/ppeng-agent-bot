@@ -619,6 +619,11 @@ Assert that cancelling a parked session also rejects the pending approval record
 Add a comment noting that the createdAt >= string compare relies on ISO 8601 lexicographic ordering.
 Run the packages/agent-loop tests and build, plus packages/core bot-work test. Report per item.
 
+## prd-test-trace
+产品需求与测试对照
+
+按这个做对照表、核心用例和命令
+
 ## product-prd
 产品需求目录
 

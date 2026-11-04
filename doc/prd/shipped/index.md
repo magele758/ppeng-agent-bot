@@ -2,7 +2,7 @@
 
 # 已经开发的功能
 
-已实现 361 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
+已实现 362 条。每条对上一条已经实现的验收规格：名称在下面，用户需求在对应分页。满 4 条的前缀单独成页，其余收在 [other](other.md)。
 
 ## acceptance（1）
 
@@ -666,6 +666,12 @@
 需求正文见 [other](other.md)。
 
 - `pr152-approval-followups` Consistent approval decisions and cancelled parked work
+
+## prd（1）
+
+需求正文见 [other](other.md)。
+
+- `prd-test-trace` 产品需求与测试对照
 
 ## product（1）
 
