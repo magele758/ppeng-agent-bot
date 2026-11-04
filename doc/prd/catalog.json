@@ -1,7 +1,7 @@
 {
   "generatedFrom": "acceptance/*.yaml + skills/**/SKILL.md",
   "counts": {
-    "implemented": 360,
+    "implemented": 361,
     "approved": 3,
     "draft": 13,
     "retired": 6
@@ -1315,6 +1315,13 @@
       "requirement": "Fix: email webhook HMAC must cover X-Ppeng-Delivery (or equivalent delivery id) the same way GitHub now covers delivery id. Replaying within 5 minutes with the same signature and a new delivery id must not wake a second routine. Do not weaken Slack or the GitHub format from #114. No new env vars. Acceptance-first, user asked to fix now, tests first. Open a PR and merge when the relevant checks are green. Do not publish npm. Do not edit browser, cron secretEnv, compact, or the web console.",
       "verificationStage": "software",
       "file": "acceptance/email-webhook-replay.yaml"
+    },
+    {
+      "id": "execution-log-analysis",
+      "title": "执行日志能查出问题并指到具体调用",
+      "requirement": "帮我看看现在的agent的执行日志是否记录完成，我想要构建一套基于日志分析agent行为，发现问题，自己去排查问题，解决问题，提升整体能力的方案，分多个agent去帮我检查，如果没有就分多个agent去快速补全",
+      "verificationStage": "software",
+      "file": "acceptance/execution-log-analysis.yaml"
     },
     {
       "id": "experimental-settings",

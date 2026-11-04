@@ -2385,6 +2385,15 @@
       ]
     },
     {
+      "id": "execution-log-analysis",
+      "title": "执行日志能查出问题并指到具体调用",
+      "tests": [
+        "packages/agent-loop/src/runtime/tool-loop.test.ts",
+        "packages/agent-loop/src/turn/turn-start-trace.test.ts",
+        "packages/core/test/execution-findings.test.ts"
+      ]
+    },
+    {
       "id": "experimental-settings",
       "title": "设置里的实验特性菜单",
       "tests": [

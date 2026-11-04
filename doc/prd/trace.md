@@ -2107,6 +2107,14 @@ Durable wait is the default Goal/Routine park path
 
 - `packages/core/test/event-routine.test.js`
 
+### execution-log-analysis
+
+执行日志能查出问题并指到具体调用
+
+- `packages/agent-loop/src/runtime/tool-loop.test.ts`
+- `packages/agent-loop/src/turn/turn-start-trace.test.ts`
+- `packages/core/test/execution-findings.test.ts`
+
 ### experimental-settings
 
 设置里的实验特性菜单

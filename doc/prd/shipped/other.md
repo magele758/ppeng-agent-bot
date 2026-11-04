@@ -240,6 +240,11 @@ Card reads/writes only through the existing quiet-hours API. i18n zh+en.
 
 Fix: email webhook HMAC must cover X-Ppeng-Delivery (or equivalent delivery id) the same way GitHub now covers delivery id. Replaying within 5 minutes with the same signature and a new delivery id must not wake a second routine. Do not weaken Slack or the GitHub format from #114. No new env vars. Acceptance-first, user asked to fix now, tests first. Open a PR and merge when the relevant checks are green. Do not publish npm. Do not edit browser, cron secretEnv, compact, or the web console.
 
+## execution-log-analysis
+执行日志能查出问题并指到具体调用
+
+帮我看看现在的agent的执行日志是否记录完成，我想要构建一套基于日志分析agent行为，发现问题，自己去排查问题，解决问题，提升整体能力的方案，分多个agent去帮我检查，如果没有就分多个agent去快速补全
+
 ## experimental-settings
 设置里的实验特性菜单
 
