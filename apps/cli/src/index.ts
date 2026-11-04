@@ -49,6 +49,12 @@ function usage(): void {
 
 Commands:
   chat <message>
+  bot ls
+  bot create <name>
+  bot show <botId>
+  bot open <botId>             print this bot's chat session id
+  bot send <botId> <message>   open that chat and stream one reply
+  bot goals <botId>            list goals on that bot chat
   send <sessionId> <message>
   attach <sessionId> <message>   same as send (attach-friendly alias)
   stream <sessionId> <message>   POST /api/sessions/:id/stream (SSE text)
@@ -97,6 +103,122 @@ function printMessages(messages: ChatMessage[]) {
       .join('\n');
     console.log(`${message.role}: ${text}`);
   }
+}
+
+function requireArg(value: string | undefined, usageText: string): string {
+  if (!value) throw new Error(usageText);
+  return value;
+}
+
+function joinedName(parts: string[]): string {
+  return parts.join(' ').trim();
+}
+
+/** The typed command is the caller's confirmation, which bypass requires. */
+function permissionBody(action: string): { shift?: string; mode?: string; confirmBypass: true } {
+  if (action === 'elevate' || action === 'demote') return { shift: action, confirmBypass: true };
+  return { mode: action, confirmBypass: true };
+}
+
+function formatBotRow(bot: { id: string; name: string }): string {
+  return `${bot.id}  ${bot.name}`;
+}
+
+function botLines(bots: Array<{ id: string; name: string }>): string {
+  return bots.map(formatBotRow).join('\n');
+}
+
+async function listBots(): Promise<void> {
+  const data = await request<{ bots?: Array<{ id: string; name: string }> }>('/api/bots');
+  const text = botLines(data.bots ?? []);
+  console.log(text.length === 0 ? '(no bots)' : text);
+}
+
+async function createBot(rest: string[]): Promise<void> {
+  const name = requireArg(joinedName(rest), 'Usage: bot create <name>');
+  const data = await request<{ bot?: { id?: string; name?: string } }>('/api/bots', {
+    method: 'POST',
+    body: JSON.stringify({ name })
+  });
+  const id = data.bot?.id;
+  if (!id) throw new Error('bot create did not return an id');
+  console.log(`${id}  ${data.bot?.name ?? ''}`);
+}
+
+async function showBot(rest: string[]): Promise<void> {
+  const botId = requireArg(rest[0], 'Usage: bot show <botId>');
+  const data = await request<{ bot?: { id: string; name: string } }>(`/api/bots/${encodeURIComponent(botId)}`);
+  if (!data.bot) throw new Error('bot not found');
+  console.log(formatBotRow(data.bot));
+}
+
+/** Goals live on the bot chat, so the list request needs the session from open. */
+async function openBotSession(botId: string): Promise<string> {
+  const opened = await request<{ session?: { id?: string } }>(`/api/bots/${encodeURIComponent(botId)}/open`, {
+    method: 'POST'
+  });
+  const sessionId = opened.session?.id;
+  if (!sessionId) throw new Error('bot open did not return a session');
+  return sessionId;
+}
+
+async function openBot(rest: string[]): Promise<void> {
+  const botId = requireArg(rest[0], 'Usage: bot open <botId>');
+  console.log(await openBotSession(botId));
+}
+
+async function sendBot(rest: string[]): Promise<void> {
+  const botId = requireArg(rest[0], 'Usage: bot send <botId> <message>');
+  const message = requireArg(joinedName(rest.slice(1)), 'Usage: bot send <botId> <message>');
+  await streamTurn(await openBotSession(botId), message);
+}
+
+function formatGoalRow(goal: { id: string; status: string; title: string }): string {
+  return `${goal.id}  ${goal.status}  ${goal.title}`;
+}
+
+function goalLines(goals: Array<{ id: string; status: string; title: string }>): string {
+  return goals.map(formatGoalRow).join('\n');
+}
+
+async function printBotGoals(rest: string[]): Promise<void> {
+  const botId = requireArg(rest[0], 'Usage: bot goals <botId>');
+  const sessionId = await openBotSession(botId);
+  const data = await request<{ goals?: Array<{ id: string; title: string; status: string }> }>(
+    `/api/bots/${encodeURIComponent(botId)}/goals?sessionId=${encodeURIComponent(sessionId)}`
+  );
+  const text = goalLines(data.goals ?? []);
+  console.log(text.length === 0 ? '(no goals)' : text);
+}
+
+async function runBotCommand(subcommand: string | undefined, rest: string[]): Promise<void> {
+  const handlers: Record<string, (args: string[]) => Promise<void>> = {
+    ls: () => listBots(),
+    create: createBot,
+    show: showBot,
+    open: openBot,
+    send: sendBot,
+    goals: printBotGoals
+  };
+  const handler = subcommand ? handlers[subcommand] : undefined;
+  if (!handler) {
+    throw new Error(
+      'Usage: bot ls | bot create <name> | bot show <botId> | bot open <botId> | bot send <botId> <message> | bot goals <botId>'
+    );
+  }
+  await handler(rest);
+}
+
+async function runUnmatchedCliCommand(
+  command: string | undefined,
+  subcommand: string | undefined,
+  rest: string[]
+): Promise<void> {
+  if (command === 'bot') {
+    await runBotCommand(subcommand, rest);
+    return;
+  }
+  usage();
 }
 
 async function main(): Promise<void> {
@@ -516,10 +638,7 @@ async function main(): Promise<void> {
       console.log(JSON.stringify(data, null, 2));
       return;
     }
-    const body =
-      action === 'elevate' || action === 'demote'
-        ? { shift: action }
-        : { mode: action };
+    const body = permissionBody(action);
     const data = await request(`/api/sessions/${sessionId}/permission`, {
       method: 'POST',
       body: JSON.stringify(body)
@@ -539,7 +658,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  usage();
+  await runUnmatchedCliCommand(command, subcommand, rest);
 }
 
 main().catch((error) => {
