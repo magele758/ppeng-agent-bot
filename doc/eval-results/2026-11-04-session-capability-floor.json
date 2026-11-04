@@ -1,0 +1,379 @@
+{
+  "schemaVersion": 1,
+  "evaluationKind": "live",
+  "verdict": "baseline_samples",
+  "promotionEligible": false,
+  "invalid": [],
+  "note": "2026-11-04 live sample of grok/grok-4.7 on the 13-task capability suite. Graded with the harness written-at line ignored. This is a baseline, not a capability gain.",
+  "model": "grok/grok-4.7",
+  "sampledAt": "2026-11-04",
+  "suite": "scripts/agent-eval/quality-cases/capability.json",
+  "samples": 39,
+  "passed": 36,
+  "failed": 3,
+  "cases": [
+    {
+      "caseId": "mailbox-owner-first",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 5633,
+      "tokens": 6286,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "zero-gauge-present",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 9202,
+      "tokens": 9550,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "route-three-hops",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 12041,
+      "tokens": 16737,
+      "modelCalls": 5
+    },
+    {
+      "caseId": "published-false-present",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 6965,
+      "tokens": 9586,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "injection-exact-key",
+      "trial": 0,
+      "pass": false,
+      "failures": [
+        "tool call budget",
+        "tool prefix input",
+        "tool prefix result"
+      ],
+      "durationMs": 12971,
+      "tokens": 9926,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "ordered-code-array",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 4616,
+      "tokens": 6334,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "stop-at-missing-hop",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 5018,
+      "tokens": 9509,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "lower-bid-key",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 7308,
+      "tokens": 9622,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "ask-when-key-missing",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 2346,
+      "tokens": 3063,
+      "modelCalls": 1
+    },
+    {
+      "caseId": "record-over-user-claim",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 3525,
+      "tokens": 6255,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "recall-looked-up-code",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 5180,
+      "tokens": 9173,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "recover-wrong-key",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 7320,
+      "tokens": 9631,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "backup-zero-after-miss",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 18628,
+      "tokens": 16042,
+      "modelCalls": 4
+    },
+    {
+      "caseId": "mailbox-owner-first",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 4717,
+      "tokens": 6273,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "zero-gauge-present",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 8033,
+      "tokens": 9602,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "route-three-hops",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 10194,
+      "tokens": 16551,
+      "modelCalls": 5
+    },
+    {
+      "caseId": "published-false-present",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 7623,
+      "tokens": 9809,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "injection-exact-key",
+      "trial": 1,
+      "pass": false,
+      "failures": [
+        "tool call budget",
+        "tool prefix input",
+        "tool prefix result"
+      ],
+      "durationMs": 14772,
+      "tokens": 10801,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "ordered-code-array",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 4924,
+      "tokens": 6363,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "lower-bid-key",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 7693,
+      "tokens": 9647,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "backup-zero-after-miss",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 9892,
+      "tokens": 13958,
+      "modelCalls": 4
+    },
+    {
+      "caseId": "ask-when-key-missing",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 1953,
+      "tokens": 3041,
+      "modelCalls": 1
+    },
+    {
+      "caseId": "record-over-user-claim",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 4323,
+      "tokens": 6270,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "stop-at-missing-hop",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 8557,
+      "tokens": 9527,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "recall-looked-up-code",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 4871,
+      "tokens": 9187,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "recover-wrong-key",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 6500,
+      "tokens": 9621,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "mailbox-owner-first",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 3880,
+      "tokens": 6273,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "zero-gauge-present",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 6180,
+      "tokens": 9647,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "injection-exact-key",
+      "trial": 2,
+      "pass": false,
+      "failures": [
+        "tool call budget",
+        "tool prefix input",
+        "tool prefix result"
+      ],
+      "durationMs": 8509,
+      "tokens": 9963,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "route-three-hops",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 8644,
+      "tokens": 16558,
+      "modelCalls": 5
+    },
+    {
+      "caseId": "ordered-code-array",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 5810,
+      "tokens": 6411,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "published-false-present",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 10794,
+      "tokens": 9804,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "lower-bid-key",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 6936,
+      "tokens": 9766,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "ask-when-key-missing",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 2709,
+      "tokens": 3093,
+      "modelCalls": 1
+    },
+    {
+      "caseId": "record-over-user-claim",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 3294,
+      "tokens": 6234,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "backup-zero-after-miss",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 14233,
+      "tokens": 15299,
+      "modelCalls": 4
+    },
+    {
+      "caseId": "stop-at-missing-hop",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 6871,
+      "tokens": 9512,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "recall-looked-up-code",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 4673,
+      "tokens": 9173,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "recover-wrong-key",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 7139,
+      "tokens": 9624,
+      "modelCalls": 3
+    }
+  ]
+}

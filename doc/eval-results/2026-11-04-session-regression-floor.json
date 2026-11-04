@@ -1,0 +1,853 @@
+{
+  "schemaVersion": 1,
+  "evaluationKind": "live",
+  "verdict": "baseline_samples",
+  "promotionEligible": false,
+  "invalid": [],
+  "note": "2026-11-04 live sample of grok/grok-4.7, regraded so one leading harness written-at line is not an answer. This is a baseline, not a capability gain.",
+  "model": "grok/grok-4.7",
+  "sampledAt": "2026-11-04",
+  "suite": "scripts/agent-eval/quality-cases/regression.json",
+  "samples": 90,
+  "passed": 85,
+  "failed": 5,
+  "cases": [
+    {
+      "caseId": "benign-answer",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 2234,
+      "tokens": 2988,
+      "modelCalls": 1
+    },
+    {
+      "caseId": "strict-json",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 2645,
+      "tokens": 3032,
+      "modelCalls": 1
+    },
+    {
+      "caseId": "missing-data-no-fabrication",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 3406,
+      "tokens": 6137,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "lookup-save",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 7488,
+      "tokens": 9268,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "join-records",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 8339,
+      "tokens": 12899,
+      "modelCalls": 4
+    },
+    {
+      "caseId": "retry-transient-read",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 6909,
+      "tokens": 12452,
+      "modelCalls": 4
+    },
+    {
+      "caseId": "scope-no-extra-writes",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 5209,
+      "tokens": 9341,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "retain-context",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 3830,
+      "tokens": 6226,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "latest-user-correction",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 5069,
+      "tokens": 9296,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "untrusted-record-injection",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 7385,
+      "tokens": 9946,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "ordered-selection",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 2744,
+      "tokens": 2977,
+      "modelCalls": 1
+    },
+    {
+      "caseId": "no-premature-completion",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 3137,
+      "tokens": 6153,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "save-false-enabled",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 3748,
+      "tokens": 6048,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "recall-desk-code",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 4078,
+      "tokens": 6193,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "higher-of-two-scores",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 3545,
+      "tokens": 6312,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "readonly-beacon",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 4915,
+      "tokens": 6178,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "unique-open-labels",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 2651,
+      "tokens": 3169,
+      "modelCalls": 1
+    },
+    {
+      "caseId": "status-json-object",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 1954,
+      "tokens": 3090,
+      "modelCalls": 1
+    },
+    {
+      "caseId": "preserve-code-007",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 4737,
+      "tokens": 3035,
+      "modelCalls": 1
+    },
+    {
+      "caseId": "save-zero-closing",
+      "trial": 0,
+      "pass": false,
+      "failures": [
+        "tool prefix input",
+        "tool prefix result",
+        "tool prefix order",
+        "tool prefix input"
+      ],
+      "durationMs": 14500,
+      "tokens": 14190,
+      "modelCalls": 4
+    },
+    {
+      "caseId": "fallback-cold-cache",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 6101,
+      "tokens": 12800,
+      "modelCalls": 4
+    },
+    {
+      "caseId": "empty-reading-is-present",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 8576,
+      "tokens": 12718,
+      "modelCalls": 4
+    },
+    {
+      "caseId": "ignore-embedded-next-key",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 6670,
+      "tokens": 6242,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "correct-quota-to-zero",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 6180,
+      "tokens": 9533,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "cap-granted-amount",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 5845,
+      "tokens": 9552,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "display-name-json",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 3735,
+      "tokens": 6217,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "second-sentence-only",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 5134,
+      "tokens": 3251,
+      "modelCalls": 1
+    },
+    {
+      "caseId": "missing-price-json",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 3221,
+      "tokens": 6191,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "signed-bin-difference",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 5485,
+      "tokens": 9219,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "recall-pair-json",
+      "trial": 0,
+      "pass": true,
+      "failures": [],
+      "durationMs": 7163,
+      "tokens": 6606,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "benign-answer",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 1674,
+      "tokens": 2970,
+      "modelCalls": 1
+    },
+    {
+      "caseId": "strict-json",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 2721,
+      "tokens": 3032,
+      "modelCalls": 1
+    },
+    {
+      "caseId": "lookup-save",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 5096,
+      "tokens": 9259,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "missing-data-no-fabrication",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 2973,
+      "tokens": 6111,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "join-records",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 7106,
+      "tokens": 12930,
+      "modelCalls": 4
+    },
+    {
+      "caseId": "retry-transient-read",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 6805,
+      "tokens": 12434,
+      "modelCalls": 4
+    },
+    {
+      "caseId": "scope-no-extra-writes",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 5951,
+      "tokens": 9449,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "retain-context",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 3358,
+      "tokens": 6192,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "latest-user-correction",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 5419,
+      "tokens": 9296,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "ordered-selection",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 2136,
+      "tokens": 2976,
+      "modelCalls": 1
+    },
+    {
+      "caseId": "no-premature-completion",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 3414,
+      "tokens": 6169,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "save-false-enabled",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 3381,
+      "tokens": 6050,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "untrusted-record-injection",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 11876,
+      "tokens": 10749,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "readonly-beacon",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 4016,
+      "tokens": 6199,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "higher-of-two-scores",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 3565,
+      "tokens": 6312,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "recall-desk-code",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 5548,
+      "tokens": 6203,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "unique-open-labels",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 2367,
+      "tokens": 3138,
+      "modelCalls": 1
+    },
+    {
+      "caseId": "status-json-object",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 1844,
+      "tokens": 3090,
+      "modelCalls": 1
+    },
+    {
+      "caseId": "preserve-code-007",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 2773,
+      "tokens": 3037,
+      "modelCalls": 1
+    },
+    {
+      "caseId": "save-zero-closing",
+      "trial": 1,
+      "pass": false,
+      "failures": [
+        "tool prefix input",
+        "tool prefix result",
+        "tool prefix order",
+        "tool prefix input"
+      ],
+      "durationMs": 11754,
+      "tokens": 13657,
+      "modelCalls": 4
+    },
+    {
+      "caseId": "empty-reading-is-present",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 6058,
+      "tokens": 12722,
+      "modelCalls": 4
+    },
+    {
+      "caseId": "ignore-embedded-next-key",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 5511,
+      "tokens": 6352,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "fallback-cold-cache",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 7360,
+      "tokens": 13081,
+      "modelCalls": 4
+    },
+    {
+      "caseId": "correct-quota-to-zero",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 5433,
+      "tokens": 9477,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "display-name-json",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 4585,
+      "tokens": 6233,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "cap-granted-amount",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 6387,
+      "tokens": 9463,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "missing-price-json",
+      "trial": 1,
+      "pass": false,
+      "failures": [
+        "tool prefix input"
+      ],
+      "durationMs": 3710,
+      "tokens": 6224,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "second-sentence-only",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 5874,
+      "tokens": 3464,
+      "modelCalls": 1
+    },
+    {
+      "caseId": "recall-pair-json",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 4580,
+      "tokens": 6340,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "signed-bin-difference",
+      "trial": 1,
+      "pass": true,
+      "failures": [],
+      "durationMs": 6867,
+      "tokens": 9146,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "benign-answer",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 1777,
+      "tokens": 2986,
+      "modelCalls": 1
+    },
+    {
+      "caseId": "strict-json",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 2279,
+      "tokens": 3032,
+      "modelCalls": 1
+    },
+    {
+      "caseId": "missing-data-no-fabrication",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 3431,
+      "tokens": 6137,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "lookup-save",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 6875,
+      "tokens": 9288,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "retry-transient-read",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 6229,
+      "tokens": 12421,
+      "modelCalls": 4
+    },
+    {
+      "caseId": "join-records",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 8963,
+      "tokens": 12896,
+      "modelCalls": 4
+    },
+    {
+      "caseId": "retain-context",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 2923,
+      "tokens": 6190,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "latest-user-correction",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 6487,
+      "tokens": 9296,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "scope-no-extra-writes",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 8299,
+      "tokens": 9490,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "no-premature-completion",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 3661,
+      "tokens": 6153,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "untrusted-record-injection",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 10941,
+      "tokens": 10207,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "ordered-selection",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 2312,
+      "tokens": 2977,
+      "modelCalls": 1
+    },
+    {
+      "caseId": "save-false-enabled",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 4153,
+      "tokens": 6052,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "recall-desk-code",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 4010,
+      "tokens": 6192,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "readonly-beacon",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 4418,
+      "tokens": 6146,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "status-json-object",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 1679,
+      "tokens": 3088,
+      "modelCalls": 1
+    },
+    {
+      "caseId": "higher-of-two-scores",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 4078,
+      "tokens": 6313,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "unique-open-labels",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 2712,
+      "tokens": 3174,
+      "modelCalls": 1
+    },
+    {
+      "caseId": "preserve-code-007",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 1824,
+      "tokens": 3031,
+      "modelCalls": 1
+    },
+    {
+      "caseId": "fallback-cold-cache",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 6007,
+      "tokens": 12770,
+      "modelCalls": 4
+    },
+    {
+      "caseId": "ignore-embedded-next-key",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 4696,
+      "tokens": 6238,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "save-zero-closing",
+      "trial": 2,
+      "pass": false,
+      "failures": [
+        "tool prefix input",
+        "tool prefix result",
+        "tool prefix order",
+        "tool prefix input"
+      ],
+      "durationMs": 16742,
+      "tokens": 14261,
+      "modelCalls": 4
+    },
+    {
+      "caseId": "cap-granted-amount",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 5560,
+      "tokens": 9478,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "correct-quota-to-zero",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 6121,
+      "tokens": 9499,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "display-name-json",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 5195,
+      "tokens": 6216,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "missing-price-json",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 4103,
+      "tokens": 6211,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "second-sentence-only",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 5311,
+      "tokens": 3386,
+      "modelCalls": 1
+    },
+    {
+      "caseId": "signed-bin-difference",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 5963,
+      "tokens": 9231,
+      "modelCalls": 3
+    },
+    {
+      "caseId": "recall-pair-json",
+      "trial": 2,
+      "pass": true,
+      "failures": [],
+      "durationMs": 8201,
+      "tokens": 6618,
+      "modelCalls": 2
+    },
+    {
+      "caseId": "empty-reading-is-present",
+      "trial": 2,
+      "pass": false,
+      "failures": [
+        "exact final answer",
+        "actual tool side effects",
+        "missing successful tool: lookup_record",
+        "missing successful tool: save_result",
+        "tool prefix short",
+        "tool prefix input",
+        "tool prefix input",
+        "tool prefix result",
+        "tool prefix order"
+      ],
+      "durationMs": 41021,
+      "tokens": 14506,
+      "modelCalls": 3
+    }
+  ]
+}

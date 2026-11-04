@@ -74,16 +74,22 @@ export function finalAssistantOutput(messages) {
   return assistant?.parts.filter(part => part.type === 'text').map(part => part.text).join('\n') ?? '';
 }
 
+/** Drop one leading harness written-at line. The model was not asked to emit it. */
+export function modelAnswer(output) {
+  return String(output ?? '').replace(/^\[written \d{4}-\d{2}-\d{2} \d{2}:\d{2} [^\]\n]+\]\n?/, '').trim();
+}
+
 export function gradeTask(task, trial) {
   const failures = [];
   const e = task.expected;
+  const answer = modelAnswer(trial.output);
   if (trial.error) failures.push(`execution: ${trial.error}`);
   if (trial.infrastructureError) failures.push('infrastructure failure');
   if (trial.status !== (e.status ?? 'idle')) failures.push(`terminal status: ${trial.status}`);
   if (trial.invariantsOk !== true) failures.push('transcript invariants');
-  if (Object.hasOwn(e, 'exact') && trial.output?.trim() !== e.exact) failures.push('exact final answer');
+  if (Object.hasOwn(e, 'exact') && answer !== e.exact) failures.push('exact final answer');
   if (Object.hasOwn(e, 'json')) {
-    try { if (!isDeepStrictEqual(JSON.parse(trial.output), e.json)) failures.push('JSON final answer'); }
+    try { if (!isDeepStrictEqual(JSON.parse(answer), e.json)) failures.push('JSON final answer'); }
     catch { failures.push('invalid JSON final answer'); }
   }
   if (Object.hasOwn(e, 'state') && !isDeepStrictEqual(trial.state, e.state)) failures.push('actual tool side effects');
