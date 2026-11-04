@@ -118,8 +118,12 @@ test('approve promote uses tryCreateDynToolStore and emits dyn_tool_promote', as
     emitTrace: (sessionId, event) => traces.push({ sessionId, event })
   });
   assert.equal(dyn.get('add_one', { sessionId: 'sess-1' }).scope, 'project.memory');
-  assert.equal(traces[0].event.kind, 'dyn_tool_promote');
-  assert.equal(traces[0].event.payload.name, 'add_one');
+  assert.equal(traces[0].event.kind, 'approval_decision');
+  assert.equal(traces[0].event.payload.decision, 'approved');
+  assert.equal(traces[0].event.payload.approvalId, approval.id);
+  const promote = traces.find((row) => row.event.kind === 'dyn_tool_promote');
+  assert.equal(promote?.event.kind, 'dyn_tool_promote');
+  assert.equal(promote?.event.payload.name, 'add_one');
 });
 
 test('session-memory backend ignores dirty rows without dyn-tools namespace', () => {
